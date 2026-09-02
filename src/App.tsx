@@ -26,6 +26,12 @@ const ImplementationPortal = lazy(() =>
 const PillarViewer = lazy(() =>
   import("./modules/pillar-viewer/PillarViewer").then((m) => ({ default: m.PillarViewer })),
 );
+const TechDevelopment = lazy(() =>
+  import("./routes/TechDevelopment").then((m) => ({ default: m.TechDevelopment })),
+);
+const WebProjects = lazy(() =>
+  import("./modules/admin/desarrollo/WebProjects").then((m) => ({ default: m.WebProjects })),
+);
 const LoginPortal = lazy(() => import("./modules/login/LoginPortal").then((m) => ({ default: m.LoginPortal })));
 const PillarManagement = lazy(() =>
   import("./modules/admin/gestion-pilares/PillarManagement").then((m) => ({ default: m.PillarManagement })),
@@ -80,6 +86,7 @@ export default function App() {
           <Route path="/tablero" element={<Dashboard />} />
           <Route path="/implementacion" element={<ImplementationPortal />} />
           <Route path="/implementacion/pilar/:slug" element={<PillarViewer />} />
+          <Route path="/desarrollo-tecnologico" element={<TechDevelopment />} />
           <Route path="/acceso-intranet" element={<LoginPortal />} />
 
           <Route
@@ -103,6 +110,14 @@ export default function App() {
             element={
               <RequireRole minimum="consulta">
                 <GlobalParameters />
+              </RequireRole>
+            }
+          />
+          <Route
+            path="/admin/desarrollo"
+            element={
+              <RequireRole minimum="consulta">
+                <WebProjects />
               </RequireRole>
             }
           />

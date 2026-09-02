@@ -32,6 +32,7 @@ import type {
   ProjectProgress,
   ReportPeriod,
   StrategicArea,
+  WebProject,
 } from "../types/database";
 import { emptyProgress, emptySummary } from "./pdi";
 import { describeDatabaseError } from "./errors";
@@ -51,6 +52,7 @@ export const keys = {
   parameters: () => [...keys.all, "parameters"] as const,
   profiles: () => [...keys.all, "profiles"] as const,
   owners: () => [...keys.all, "owners"] as const,
+  webProjects: () => [...keys.all, "web-projects"] as const,
 };
 
 /** Convierte el error de PostgREST en algo que se pueda mostrar y accionar. */
@@ -316,6 +318,18 @@ export function useProfiles() {
     queryKey: keys.profiles(),
     queryFn: async (): Promise<Profile[]> =>
       supabase.from("profiles").select("*").order("full_name").then(unwrap<Profile[]>),
+  });
+}
+
+/**
+ * Desarrollos web de la oficina. La misma consulta sirve al portal público y a
+ * la intranet: RLS decide si devuelve solo los publicados o todos.
+ */
+export function useWebProjects() {
+  return useQuery({
+    queryKey: keys.webProjects(),
+    queryFn: async (): Promise<WebProject[]> =>
+      supabase.from("web_projects").select("*").order("position").then(unwrap<WebProject[]>),
   });
 }
 

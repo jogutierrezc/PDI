@@ -16,6 +16,7 @@ export type PublicationStatus = "borrador" | "revision" | "publicado" | "archiva
 export type ParameterCategory = "estado_proyecto" | "nivel_gestion" | "unidad" | "periodicidad";
 export type ChangeType = "creacion" | "modificacion" | "reforma" | "eliminacion";
 export type PillarIcon = "person" | "chip" | "spark" | "columns" | "leaf" | "community";
+export type RepoKind = "github" | "udes";
 
 export interface Profile {
   id: string;
@@ -261,6 +262,26 @@ export interface GlossaryTerm {
   position: number;
 }
 
+/** Autor de un desarrollo. Vive dentro del proyecto, no en su propia tabla. */
+export interface WebProjectAuthor {
+  full_name: string;
+  role?: string;
+}
+
+export interface WebProject {
+  id: string;
+  name: string;
+  description: string;
+  public_url: string | null;
+  repo_kind: RepoKind;
+  repo_url: string | null;
+  authors: WebProjectAuthor[];
+  status: PublicationStatus;
+  position: number;
+  created_at: string;
+  updated_at: string;
+}
+
 export interface PillarOwner {
   pillar_id: string;
   profile_id: string;
@@ -281,3 +302,4 @@ export type ChangeLogInput = Writable<ChangeLogEntry>;
 export type GlossaryInput = Writable<GlossaryTerm>;
 export type ParameterInput = Writable<Parameter>;
 export type PlanningItemInput = Writable<PlanningItem>;
+export type WebProjectInput = Writable<WebProject>;

@@ -42,7 +42,8 @@ pegarlos en el editor SQL del panel de Supabase o aplicarlos con la CLI
 | `0005_areas_y_proyectos.sql` | Retira `pillars.progress` y enlaza los proyectos con sus líneas de acción |
 | `0006_edicion_y_trazabilidad.sql` | Actividades y documentos dentro de la estructura + control de cambios automático |
 | `0007_permisos_y_cache.sql` | Permisos de la API y recarga de su caché |
-| `0008_cascada_de_avance.sql` | El avance se propaga de la actividad al pilar. **Ejecútala la última.** |
+| `0008_cascada_de_avance.sql` | El avance se propaga de la actividad al pilar |
+| `0009_desarrollo_tecnologico.sql` | Catálogo de los desarrollos web de la oficina. **Ejecútala la última.** |
 
 Todos son idempotentes: volver a ejecutarlos no duplica nada.
 
@@ -210,10 +211,12 @@ A partir de ahí, el resto de altas se hacen desde **Usuarios y roles**.
 | `/tablero` | Tablero de cumplimiento | Público |
 | `/implementacion` | Avance por pilar + repositorio documental | Público |
 | `/implementacion/pilar/:slug` | Ficha del pilar, con filtro por área estratégica | Público |
+| `/desarrollo-tecnologico` | Desarrollos web de la oficina | Público |
 | `/acceso-intranet` | Inicio de sesión | Público |
 | `/admin/pilares` | Gestión de pilares y responsables | `consulta`+ |
 | `/admin/pilares/:slug/configurar` | Áreas, líneas, proyectos, actividades y soportes | `consulta`+ |
 | `/admin/parametros` | Catálogos globales | `consulta`+ |
+| `/admin/desarrollo` | Proyectos web y sus autores | `consulta`+ |
 | `/admin/usuarios` | Usuarios y roles | `admin` |
 | `/sin-permiso` | Rol insuficiente | Autenticado |
 | cualquier otra | Página 404 | Público |
@@ -278,6 +281,24 @@ Un proyecto sin `action_line_id` no pertenece a ningún área y por tanto no
 aparece al filtrar. Tanto el visor público como la configuración de la intranet
 lo señalan en vez de dejarlo desaparecer sin explicación; se le asigna una línea
 desde **Configurar pilar → Proyectos estratégicos**.
+
+## Desarrollo tecnológico
+
+`web_projects` es un catálogo aparte: son las herramientas que construye la
+oficina, no proyectos del plan. Por eso no cuelgan de ningún pilar y su edición
+es de `planeacion` en adelante, sin entrar en el reparto por responsable.
+
+Cada proyecto lleva nombre, descripción, enlace público, tipo de repositorio
+(GitHub o Repositorio UDES), enlace del repositorio y una lista de autores con
+nombre y cargo. Solo los que están en estado **publicado** salen en la página
+pública.
+
+Los autores van en una columna `jsonb` y no en una tabla hija: son una lista
+ordenada que solo existe dentro de su proyecto, no se consultan por separado ni
+se enlazan con perfiles. Así el alta, la edición y el borrado son una sola
+operación. A cambio la base no puede imponer columnas, y eso lo cubre la función
+`web_project_authors_ok`, que exige que cada elemento sea un objeto con
+`full_name` no vacío.
 
 # Estructura del código
 

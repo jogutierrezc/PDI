@@ -9,6 +9,7 @@ const links = [
   { to: "/", label: "Inicio" },
   { to: "/implementacion", label: "Implementación del PDI" },
   { to: "/tablero", label: "Tablero PDI" },
+  { to: "/desarrollo-tecnologico", label: "Desarrollo tecnológico" },
   { to: "/implementacion#repositorio", label: "Repositorio" },
 ];
 

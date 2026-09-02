@@ -33,7 +33,8 @@ export type WritableTable =
   | "glossary_terms"
   | "parameters"
   | "pillar_owners"
-  | "profiles";
+  | "profiles"
+  | "web_projects";
 
 function useInvalidate(invalidates: QueryKey[]) {
   const client = useQueryClient();

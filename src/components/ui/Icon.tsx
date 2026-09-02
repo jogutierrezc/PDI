@@ -30,7 +30,8 @@ export type IconName =
   | "document"
   | "settings"
   | "grid"
-  | "plus";
+  | "plus"
+  | "code";
 
 const paths: Record<IconName, JSX.Element> = {
   /* --- Pilares ---------------------------------------------------------- */
@@ -146,6 +147,7 @@ const paths: Record<IconName, JSX.Element> = {
     </>
   ),
   plus: <path d="M12 5v14M5 12h14" />,
+  code: <path d="m8.5 8-5 4 5 4M15.5 8l5 4-5 4M13.8 4.5l-3.6 15" />,
 };
 
 interface IconProps extends Omit<SVGProps<SVGSVGElement>, "name"> {

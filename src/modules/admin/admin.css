@@ -1594,3 +1594,125 @@ fieldset.admin-field legend {
   color: var(--ink);
   font-weight: 400;
 }
+
+/* =============================================================================
+   Administración de los proyectos web
+   ========================================================================== */
+
+.webproject-list {
+  display: grid;
+  gap: var(--space-4);
+}
+
+.webproject-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: start;
+  gap: var(--space-4);
+}
+
+.webproject-row__main header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.webproject-row__main h2 {
+  font-size: var(--text-md);
+}
+
+.webproject-row__main p {
+  margin-top: var(--space-2);
+  color: var(--ink-secondary);
+  font-size: var(--text-sm);
+  line-height: var(--leading-normal);
+}
+
+.webproject-row__links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-4);
+  margin-top: var(--space-3);
+  font-size: var(--text-xs);
+  font-weight: 700;
+}
+
+.webproject-row__links a {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  color: var(--brand-blue);
+}
+
+.webproject-row__missing {
+  color: var(--status-pending);
+  font-weight: 600;
+}
+
+.webproject-row__authors {
+  margin-top: var(--space-2) !important;
+  color: var(--ink-muted) !important;
+  font-size: var(--text-xs) !important;
+}
+
+/* --- Campo repetible de autores --------------------------------------------- */
+
+.author-fields {
+  display: grid;
+  gap: var(--space-2);
+}
+
+.author-fields > small {
+  color: var(--ink-muted);
+  font-size: var(--text-xs);
+}
+
+.author-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr) auto;
+  gap: var(--space-2);
+  align-items: center;
+}
+
+.author-row input {
+  width: 100%;
+  padding: var(--space-2) var(--space-3);
+  color: var(--ink);
+  background: var(--surface-2);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-xs);
+  font-size: var(--text-sm);
+}
+
+.author-row input:focus-visible {
+  outline: none;
+  border-color: var(--brand-blue);
+  box-shadow: var(--ring);
+}
+
+.author-row .icon-button {
+  width: 30px;
+  height: 30px;
+}
+
+.author-add {
+  justify-self: start;
+  margin-top: var(--space-1);
+  padding: var(--space-2) var(--space-3);
+  font-size: var(--text-xs);
+}
+
+@media (max-width: 640px) {
+  .webproject-row {
+    grid-template-columns: 1fr;
+  }
+
+  .author-row {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+
+  .author-row label:first-child {
+    grid-column: 1 / -1;
+  }
+}

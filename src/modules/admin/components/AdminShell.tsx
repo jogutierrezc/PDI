@@ -15,7 +15,7 @@ import { roleLabels, useAuth } from "../../../lib/auth";
 import type { AppRole } from "../../../types/database";
 import "../admin.css";
 
-export type AdminSection = "pillars" | "parameters" | "users" | "repository";
+export type AdminSection = "pillars" | "parameters" | "development" | "users" | "repository";
 
 const navigation: {
   id: AdminSection;
@@ -27,6 +27,7 @@ const navigation: {
 }[] = [
   { id: "pillars", label: "Gestión de pilares", icon: "grid", to: "/admin/pilares", minimum: "consulta" },
   { id: "parameters", label: "Parámetros globales", icon: "settings", to: "/admin/parametros", minimum: "consulta" },
+  { id: "development", label: "Desarrollo tecnológico", icon: "code", to: "/admin/desarrollo", minimum: "consulta" },
   { id: "users", label: "Usuarios y roles", icon: "user", to: "/admin/usuarios", minimum: "admin" },
   { id: "repository", label: "Repositorio", icon: "document", to: "/implementacion#repositorio", minimum: "consulta" },
 ];

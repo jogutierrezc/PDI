@@ -241,6 +241,24 @@ const FIXTURES = {
     },
   ],
   pillar_owners: [],
+  web_projects: [
+    {
+      id: "w1",
+      name: "Portal PDI 2024-2028",
+      description: "Portal público y de administración del Plan de Desarrollo Institucional.",
+      public_url: "https://www.udes.edu.co/",
+      repo_kind: "github",
+      repo_url: "https://github.com/jogutierrezc/PDI",
+      authors: [
+        { full_name: "Oficina de Planeación Institucional", role: "Formulación y seguimiento" },
+        { full_name: "José Gutiérrez", role: "Desarrollo" },
+      ],
+      status: "publicado",
+      position: 1,
+      created_at: "2026-01-10T00:00:00Z",
+      updated_at: "2026-01-10T00:00:00Z",
+    },
+  ],
 };
 
 /* --- Rutas a comprobar ----------------------------------------------------- */
@@ -302,6 +320,78 @@ const routes = [
       if (!lineas.includes("Cultura digital")) {
         throw new Error("no se muestran las líneas del área elegida");
       }
+    },
+  },
+  {
+    path: "/desarrollo-tecnologico",
+    note: "los autores se abren a demanda y no aprietan los botones",
+    expect: "Lo que construimos en Planeación",
+    also: ["Portal PDI 2024-2028", "GitHub", "Abrir aplicativo", "Repositorio", "Ver autores"],
+    interact: async (window, tick) => {
+      const texto = () => window.document.body.textContent ?? "";
+
+      // De entrada la tarjeta solo muestra el proyecto y sus botones.
+      if (texto().includes("José Gutiérrez")) {
+        throw new Error("los autores se ven sin haberlos pedido");
+      }
+
+      const toggle = [...window.document.querySelectorAll("button")].find((b) =>
+        (b.textContent ?? "").includes("Ver autores"),
+      );
+      if (!toggle) throw new Error("no se encontró el botón de ver autores");
+      if (toggle.getAttribute("aria-expanded") !== "false") {
+        throw new Error("el botón no anuncia que el panel está cerrado");
+      }
+
+      toggle.click();
+      await tick();
+
+      if (!texto().includes("José Gutiérrez") || !texto().includes("Formulación y seguimiento")) {
+        throw new Error("el panel no muestra los autores con su cargo");
+      }
+
+      // Escape lo cierra, como cualquier capa que se abre encima.
+      window.document.dispatchEvent(new window.KeyboardEvent("keydown", { key: "Escape" }));
+      await tick();
+
+      if (texto().includes("José Gutiérrez")) {
+        throw new Error("Escape no cerró el panel de autores");
+      }
+    },
+  },
+  {
+    path: "/admin/desarrollo",
+    session: true,
+    note: "el formulario de autores es repetible",
+    expect: "Proyectos web",
+    also: ["Portal PDI 2024-2028", "Editar proyecto web", "Añadir autor"],
+    interact: async (window, tick) => {
+      const edit = window.document.querySelector('[aria-label="Editar Portal PDI 2024-2028"]');
+      if (!edit) throw new Error("no se encontró el botón de editar");
+      edit.click();
+      await tick();
+
+      const dialog = window.document.querySelector(".modal-panel");
+      if (!dialog) throw new Error("el modal no se abrió");
+
+      // Los dos autores guardados deben llegar al formulario, cada uno con su
+      // nombre y su cargo.
+      const rows = dialog.querySelectorAll(".author-row");
+      if (rows.length !== 2) throw new Error(`se esperaban 2 autores, llegaron ${rows.length}`);
+
+      const primero = rows[0].querySelectorAll("input");
+      if (primero[0].value !== "Oficina de Planeación Institucional") {
+        throw new Error(`nombre del primer autor: "${primero[0].value}"`);
+      }
+      if (primero[1].value !== "Formulación y seguimiento") {
+        throw new Error(`cargo del primer autor: "${primero[1].value}"`);
+      }
+
+      // Y debe poder añadirse otro.
+      dialog.querySelector(".author-add").click();
+      await tick();
+      const despues = window.document.querySelectorAll(".modal-panel .author-row").length;
+      if (despues !== 3) throw new Error(`tras añadir se esperaban 3 filas, hay ${despues}`);
     },
   },
   { path: "/acceso-intranet", expect: "Intranet PDI" },

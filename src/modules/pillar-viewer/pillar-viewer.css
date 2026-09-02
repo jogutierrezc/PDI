@@ -326,13 +326,6 @@
 
 /* --- Proyectos y líneas ----------------------------------------------------- */
 
-.pillar-columns {
-  display: grid;
-  grid-template-columns: minmax(0, 1.4fr) minmax(17rem, 0.6fr);
-  gap: var(--space-6);
-  align-items: start;
-}
-
 .project-list {
   display: grid;
   gap: var(--space-2);
@@ -428,6 +421,11 @@
   font-variant-numeric: tabular-nums;
 }
 
+.lines-section {
+  scroll-margin-top: calc(var(--header-h) + 56px + var(--space-5));
+}
+
+/* Lectura destacada del pilar, ahora dentro de la ficha. */
 .insight {
   display: grid;
   grid-template-columns: auto 1fr;
@@ -591,11 +589,7 @@
 
 /* --- Adaptación -------------------------------------------------------------- */
 
-@media (max-width: 1080px) {
-  .pillar-columns {
-    grid-template-columns: 1fr;
-  }
-}
+@media (max-width: 1080px) {}
 
 @media (max-width: 860px) {
   .pillar-hero__inner {
@@ -713,10 +707,20 @@
 
 /* --- Líneas agrupadas por área ---------------------------------------------- */
 
-.line-group + .line-group {
-  margin-top: var(--space-5);
-  padding-top: var(--space-5);
-  border-top: 1px solid var(--line-faint);
+/* A ancho completo los grupos van en rejilla: en una sola columna, doce líneas
+   formaban una tira larguísima al final de la página. */
+.line-groups {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 21rem), 1fr));
+  gap: var(--space-4);
+}
+
+.line-group {
+  padding: var(--space-5);
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-sm);
 }
 
 .line-group h3 {

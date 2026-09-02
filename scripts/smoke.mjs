@@ -60,16 +60,27 @@ const PILLARS = [
   },
 ];
 
+// El avance del pilar ya no es la proporción de actividades: baja en cascada
+// desde sus áreas. p1 = promedio de (75, 30) = 53.
 const PROGRESS = [
-  { pillar_id: "p1", slug: "ambiente-tecnologico", done: 4, active: 1, pending: 1, risk: 0, total: 6, progress: 67 },
-  { pillar_id: "p2", slug: "sostenibilidad", done: 4, active: 2, pending: 0, risk: 0, total: 6, progress: 67 },
+  { pillar_id: "p1", slug: "ambiente-tecnologico", done: 4, active: 1, pending: 1, risk: 0, total: 6, progress: 53, completion_rate: 67, area_count: 2, line_count: 2 },
+  { pillar_id: "p2", slug: "sostenibilidad", done: 4, active: 2, pending: 0, risk: 0, total: 6, progress: 67, completion_rate: 67, area_count: 0, line_count: 0 },
 ];
 
 const FIXTURES = {
   pillars: PILLARS,
   v_pillar_progress: PROGRESS,
   v_pdi_summary: [
-    { done: 8, active: 3, pending: 1, risk: 0, total: 12, progress: 67, on_track: 0, need_attention: 0, pillar_count: 2 },
+    { done: 8, active: 3, pending: 1, risk: 0, total: 12, progress: 60, on_track: 0, need_attention: 0, pillar_count: 2, completion_rate: 67 },
+  ],
+  // Cascada: el área promedia sus líneas, la línea sus proyectos y el proyecto
+  // sus actividades.
+  v_area_progress: [
+    { area_id: "ae1", pillar_id: "p1", area_name: "Infraestructura tecnológica", progress: 75, line_count: 1, project_count: 1 },
+    { area_id: "ae2", pillar_id: "p1", area_name: "Cultura digital", progress: 30, line_count: 1, project_count: 0 },
+  ],
+  v_project_progress: [
+    { project_id: "pr1", pillar_id: "p1", action_line_id: "l1", name: "Migración a la nube institucional", reported_progress: 60, progress: 75, activity_count: 2, is_derived: true },
   ],
   v_current_period: [
     { id: "r1", label: "Corte agosto 2026", cutoff_date: "2026-08-28", published_at: "2026-08-28T17:00:00Z" },
@@ -127,8 +138,8 @@ const FIXTURES = {
     },
   ],
   v_action_lines: [
-    { id: "l1", code: "LA-4.1", name: "Infraestructura base", progress: 85, position: 1, area_id: "ae1", area_name: "Infraestructura tecnológica", pillar_id: "p1" },
-    { id: "l2", code: "LA-5.1", name: "Cultura digital", progress: 30, position: 1, area_id: "ae2", area_name: "Cultura digital", pillar_id: "p1" },
+    { id: "l1", code: "LA-4.1", name: "Infraestructura base", progress: 75, position: 1, area_id: "ae1", area_name: "Infraestructura tecnológica", pillar_id: "p1", reported_progress: 85, project_count: 1, is_derived: true },
+    { id: "l2", code: "LA-5.1", name: "Cultura digital", progress: 30, position: 1, area_id: "ae2", area_name: "Cultura digital", pillar_id: "p1", reported_progress: 30, project_count: 0, is_derived: false },
   ],
   v_indicators: [
     {
@@ -248,6 +259,8 @@ const routes = [
       "Infraestructura base",         // su línea de acción
       "PDI-AT-001",
       "Presupuesto ejecutado",        // los recursos del indicador sí se ven
+      "Promedio de 2 áreas",          // el anillo dice de dónde sale
+      "promedio de 2 actividades",    // el proyecto deriva de sus actividades
     ],
   },
   {
@@ -304,7 +317,8 @@ const routes = [
       "Migración a la nube institucional",
       "Infraestructura tecnológica",
       "Actividades",
-      "registro automático",  // la entrada escrita por el disparador
+      "registro automático",     // la entrada escrita por el disparador
+      "promedio de 1 proyecto",  // la línea deriva su avance
     ],
   },
   {

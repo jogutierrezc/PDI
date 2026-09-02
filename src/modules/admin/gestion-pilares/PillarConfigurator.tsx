@@ -71,10 +71,16 @@ export function PillarConfigurator() {
     );
   }
 
-  const { pillar, areas, lines, projects, activities, changes, glossary, documents, indicators } =
+  const { pillar, areas, lines, projectProgress, projects, activities, changes, glossary, documents, indicators } =
     detail.data;
   const lineById = new Map(lines.map((line) => [line.id, line]));
   const activeArea = areas.find((area) => area.id === selectedAreaId) ?? areas[0];
+  // Las líneas se leen de la vista, no del embebido de la tabla: la vista trae
+  // el avance en cascada, que es el que se publica.
+  const areaLines = activeArea
+    ? lines.filter((line) => line.area_id === activeArea.id).sort((a, b) => a.position - b.position)
+    : [];
+  const projectStats = new Map(projectProgress.map((row) => [row.project_id, row]));
 
   /** Envuelve una escritura para mostrar el resultado en la cabecera. */
   async function run(action: () => Promise<unknown>, message: string) {
@@ -216,20 +222,26 @@ export function PillarConfigurator() {
               canEdit && activeArea ? { label: "Nueva línea", onClick: () => open("line") } : undefined
             }
           >
-            {!activeArea || activeArea.action_lines.length === 0 ? (
+            {!activeArea || areaLines.length === 0 ? (
               <EmptyBlock title="Sin líneas relacionadas todavía." />
             ) : (
               <ul className="record-list">
-                {[...activeArea.action_lines]
-                  .sort((a, b) => a.position - b.position)
-                  .map((line) => (
+                {areaLines.map((line) => (
                     <li key={line.id}>
                       <div>
                         <strong>
                           {line.code ? `${line.code} · ` : ""}
                           {line.name}
                         </strong>
-                        <small>{line.progress}% de cumplimiento reportado</small>
+                        {/* Se muestra el valor en cascada, que es el que ve el
+                            portal, y se aclara de dónde sale: si no, alguien
+                            edita el reporte y no entiende por qué no cambia. */}
+                        <small>
+                          {line.progress}%{" "}
+                          {line.is_derived
+                            ? `· promedio de ${line.project_count} ${line.project_count === 1 ? "proyecto" : "proyectos"}`
+                            : "· cumplimiento reportado"}
+                        </small>
                       </div>
                       <span className="progress-track" aria-hidden="true">
                         <span className="progress-track__fill" style={{ width: `${line.progress}%` }} />
@@ -273,7 +285,11 @@ export function PillarConfigurator() {
                         <strong>{project.name}</strong>
                         <small>
                           {project.owner || "Sin responsable"} · {formatMonth(project.due_date)} ·{" "}
-                          {statusMeta[project.status].label} · {project.progress}%
+                          {statusMeta[project.status].label} ·{" "}
+                          {projectStats.get(project.id)?.progress ?? project.progress}%
+                          {projectStats.get(project.id)?.is_derived
+                            ? ` (promedio de ${projectStats.get(project.id)?.activity_count} actividades)`
+                            : ""}
                         </small>
                         {line ? (
                           <small className="record-lineage">
@@ -290,7 +306,7 @@ export function PillarConfigurator() {
                         <span
                           className="progress-track__fill"
                           style={{
-                            width: `${project.progress}%`,
+                            width: `${projectStats.get(project.id)?.progress ?? project.progress}%`,
                             background: statusMeta[project.status].color,
                           }}
                         />

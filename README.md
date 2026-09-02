@@ -41,7 +41,8 @@ pegarlos en el editor SQL del panel de Supabase o aplicarlos con la CLI
 | `0004_seed.sql` | Datos iniciales para que el portal funcione desde el primer despliegue |
 | `0005_areas_y_proyectos.sql` | Retira `pillars.progress` y enlaza los proyectos con sus líneas de acción |
 | `0006_edicion_y_trazabilidad.sql` | Actividades y documentos dentro de la estructura + control de cambios automático |
-| `0007_permisos_y_cache.sql` | Permisos de la API y recarga de su caché. **Ejecútala siempre la última.** |
+| `0007_permisos_y_cache.sql` | Permisos de la API y recarga de su caché |
+| `0008_cascada_de_avance.sql` | El avance se propaga de la actividad al pilar. **Ejecútala la última.** |
 
 Todos son idempotentes: volver a ejecutarlos no duplica nada.
 
@@ -86,10 +87,32 @@ update public.profiles set role = 'planeacion' where email = 'persona@udes.edu.c
    action_lines                                                              (repositorio)
 ```
 
-**El avance no se guarda en ninguna columna.** Sale de contar `activities`:
-la vista `v_pillar_progress` cuenta por estado y `v_pdi_summary` agrega el plan
-completo. Es la razón por la que el tablero, la portada y la ficha de cada pilar
-ya no pueden mostrar cifras distintas del mismo pilar.
+**El avance no se guarda en ninguna columna: se propaga hacia arriba.** Cada
+nivel es el promedio del nivel inferior, y la actividad es la hoja:
+
+```
+actividad   →  porcentaje reportado (la hoja)
+proyecto    →  promedio de sus actividades, o su reporte si no tiene
+línea       →  promedio de sus proyectos,  o su reporte si no tiene
+área        →  promedio de sus líneas
+pilar       →  promedio de sus áreas, o de sus actividades si no hay áreas
+```
+
+Mover el avance de un proyecto sube por la línea, el área y el pilar hasta el
+tablero, sin que nadie tenga que actualizar nada. Lo resuelven las vistas
+`v_project_progress`, `v_line_progress`, `v_area_progress` y
+`v_pillar_progress`; no hay columnas denormalizadas que puedan quedar
+desincronizadas.
+
+El reporte manual sigue existiendo como respaldo: una línea sin proyectos
+conserva el porcentaje que valida el comité, y la intranet indica cuál de los dos
+está mandando (`promedio de N proyectos` frente a `cumplimiento reportado`), para
+que nadie edite un número que ya no se usa.
+
+Aparte del avance, `v_pillar_progress` conserva los **conteos por estado** de las
+actividades: alimentan la barra apilada y las tarjetas del tablero, que responden
+a otra pregunta —cuántas hay de cada clase— distinta de cuánto se ha avanzado.
+Ese segundo número se llama `completion_rate`.
 
 > Si en algún momento apareció una columna `pillars.progress`, era un síntoma de
 > un fallo del formulario de la intranet, no una necesidad del modelo. La

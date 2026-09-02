@@ -56,8 +56,14 @@ export function Home() {
                 <ProgressRing value={totals.progress} size={104} label="Avance global" />
                 <div>
                   <span className="eyebrow">Avance global</span>
+                  {/* El anillo es el promedio de los pilares, no la proporción
+                      de actividades cumplidas: se dice cuál es cuál. */}
                   <p>
-                    {totals.done} de {totals.total} actividades cumplidas
+                    Promedio de {totals.pillar_count}{" "}
+                    {totals.pillar_count === 1 ? "pilar" : "pilares"}
+                    {totals.total > 0
+                      ? ` · ${totals.done} de ${totals.total} actividades cumplidas`
+                      : ""}
                     {period.data ? ` · ${period.data.label}` : ""}
                   </p>
                 </div>

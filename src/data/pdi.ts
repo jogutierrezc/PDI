@@ -99,6 +99,9 @@ export const emptyProgress: PillarProgress = {
   risk: 0,
   total: 0,
   progress: 0,
+  completion_rate: 0,
+  area_count: 0,
+  line_count: 0,
 };
 
 export const emptySummary: PdiSummary = {
@@ -111,6 +114,7 @@ export const emptySummary: PdiSummary = {
   on_track: 0,
   need_attention: 0,
   pillar_count: 0,
+  completion_rate: 0,
 };
 
 /** Cuenta de un estado dentro de un resumen, para no repetir el switch. */
@@ -142,7 +146,11 @@ export function summarizeProgress(rows: PillarProgress[]): PdiSummary {
 
   return {
     ...totals,
-    progress: totals.total === 0 ? 0 : Math.round((totals.done / totals.total) * 100),
+    // Promedio de los pilares, igual que v_pdi_summary: cada pilar pesa lo
+    // mismo. Sumar actividades daría más peso a los pilares con más filas.
+    progress:
+      rows.length === 0 ? 0 : Math.round(rows.reduce((sum, row) => sum + row.progress, 0) / rows.length),
+    completion_rate: totals.total === 0 ? 0 : Math.round((totals.done / totals.total) * 100),
     on_track: rows.filter((row) => row.progress >= 80).length,
     need_attention: rows.filter((row) => row.risk > 0).length,
     pillar_count: rows.length,

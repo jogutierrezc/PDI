@@ -15,6 +15,7 @@ import { supabase } from "../lib/supabase";
 import type {
   ActionLineWithArea,
   Activity,
+  AreaProgress,
   ChangeLogWithTarget,
   GlossaryTerm,
   IndicatorWithLabels,
@@ -28,10 +29,11 @@ import type {
   PlanningItem,
   Profile,
   Project,
+  ProjectProgress,
   ReportPeriod,
   StrategicArea,
 } from "../types/database";
-import { emptySummary } from "./pdi";
+import { emptyProgress, emptySummary } from "./pdi";
 import { describeDatabaseError } from "./errors";
 import type { DatabaseError } from "./errors";
 
@@ -80,16 +82,7 @@ export function usePillars() {
       const byId = new Map(progress.map((row) => [row.pillar_id, row]));
       return pillars.map((pillar) => ({
         ...pillar,
-        progress: byId.get(pillar.id) ?? {
-          pillar_id: pillar.id,
-          slug: pillar.slug,
-          done: 0,
-          active: 0,
-          pending: 0,
-          risk: 0,
-          total: 0,
-          progress: 0,
-        },
+        progress: byId.get(pillar.id) ?? { ...emptyProgress, pillar_id: pillar.id, slug: pillar.slug },
       }));
     },
   });
@@ -181,6 +174,10 @@ export interface PillarDetail {
   pillar: Pillar;
   progress: PillarProgress;
   areas: AreaWithLines[];
+  /** Avance de cada área, en cascada desde sus líneas. */
+  areaProgress: AreaProgress[];
+  /** Avance de cada proyecto, en cascada desde sus actividades. */
+  projectProgress: ProjectProgress[];
   lines: ActionLineWithArea[];
   indicators: IndicatorWithLabels[];
   projects: Project[];
@@ -212,9 +209,27 @@ export function usePillarDetail(slug: string | undefined) {
 
       const id = (pillar as Pillar).id;
 
-      const [progress, areas, lines, indicators, projects, activities, planning, changes, glossary, documents] =
-        await Promise.all([
+      const [
+        progress,
+        areaProgress,
+        projectProgress,
+        areas,
+        lines,
+        indicators,
+        projects,
+        activities,
+        planning,
+        changes,
+        glossary,
+        documents,
+      ] = await Promise.all([
           supabase.from("v_pillar_progress").select("*").eq("pillar_id", id).maybeSingle(),
+          supabase.from("v_area_progress").select("*").eq("pillar_id", id).then(unwrap<AreaProgress[]>),
+          supabase
+            .from("v_project_progress")
+            .select("*")
+            .eq("pillar_id", id)
+            .then(unwrap<ProjectProgress[]>),
           supabase
             .from("strategic_areas")
             .select("*, action_lines(id, code, name, progress, position)")
@@ -258,16 +273,14 @@ export function usePillarDetail(slug: string | undefined) {
 
       return {
         pillar: pillar as Pillar,
-        progress: (progress.data as PillarProgress) ?? {
-          pillar_id: id,
-          slug: (pillar as Pillar).slug,
-          done: 0,
-          active: 0,
-          pending: 0,
-          risk: 0,
-          total: 0,
-          progress: 0,
-        },
+        progress:
+          (progress.data as PillarProgress) ?? {
+            ...emptyProgress,
+            pillar_id: id,
+            slug: (pillar as Pillar).slug,
+          },
+        areaProgress,
+        projectProgress,
         areas,
         lines,
         indicators,

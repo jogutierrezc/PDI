@@ -68,12 +68,18 @@ export interface Pillar {
 export interface PillarProgress {
   pillar_id: string;
   slug: string;
+  /** Conteo de actividades por estado. */
   done: number;
   active: number;
   pending: number;
   risk: number;
   total: number;
+  /** Avance en cascada desde las áreas del pilar. */
   progress: number;
+  /** Proporción de actividades cumplidas. Responde a otra pregunta. */
+  completion_rate: number;
+  area_count: number;
+  line_count: number;
 }
 
 export interface PdiSummary {
@@ -82,10 +88,13 @@ export interface PdiSummary {
   pending: number;
   risk: number;
   total: number;
+  /** Promedio del avance de los pilares. */
   progress: number;
   on_track: number;
   need_attention: number;
   pillar_count: number;
+  /** Proporción de actividades cumplidas sobre el total. */
+  completion_rate: number;
 }
 
 export interface StrategicArea {
@@ -106,11 +115,38 @@ export interface ActionLine {
   position: number;
 }
 
-/** Vista v_action_lines: la línea con su área y su pilar ya resueltos. */
+/** Vista v_action_lines: la línea con su área y su pilar ya resueltos.
+ *  `progress` viene en cascada desde sus proyectos; `reported_progress` es el
+ *  número escrito a mano, que solo se usa mientras la línea no tenga ninguno. */
 export interface ActionLineWithArea extends Omit<ActionLine, "area_id"> {
   area_id: string;
   area_name: string;
   pillar_id: string;
+  reported_progress: number;
+  project_count: number;
+  is_derived: boolean;
+}
+
+/** Vista v_area_progress. */
+export interface AreaProgress {
+  area_id: string;
+  pillar_id: string;
+  area_name: string;
+  progress: number;
+  line_count: number;
+  project_count: number;
+}
+
+/** Vista v_project_progress. */
+export interface ProjectProgress {
+  project_id: string;
+  pillar_id: string;
+  action_line_id: string | null;
+  name: string;
+  reported_progress: number;
+  progress: number;
+  activity_count: number;
+  is_derived: boolean;
 }
 
 export interface Indicator {

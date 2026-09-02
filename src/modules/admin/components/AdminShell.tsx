@@ -78,7 +78,7 @@ export function AdminShell({
 
       <aside className="admin-sidebar" id="admin-nav">
         <Link className="admin-brand" to="/admin/pilares">
-          <img src="/logo-udes.svg" alt="" width={34} height={34} />
+          <img src="/logo-udes.svg" alt="" width={95} height={34} />
           <span>
             <strong>Intranet PDI</strong>
             <small>Planeación institucional</small>

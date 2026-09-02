@@ -78,7 +78,7 @@ export function LoginPortal() {
       <main className="login-main" id="acceso">
         <section className="login-card" aria-labelledby="login-title">
           <header className="login-heading">
-            <img src="/logo-udes.svg" alt="Universidad de Santander" width={48} height={48} />
+            <img src="/logo-udes.svg" alt="Universidad de Santander" width={145} height={52} />
             <h1 id="login-title">Intranet PDI</h1>
             <p>Oficina de Planeación Institucional · Universidad de Santander</p>
           </header>

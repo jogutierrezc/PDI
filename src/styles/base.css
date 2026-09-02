@@ -396,11 +396,13 @@ table {
   transition: opacity var(--dur-base) ease;
 }
 
+/* Alto fijo y ancho automático: el logotipo es un lockup de casi 2,8:1 y
+   forzarlo a un cuadrado lo deformaba. */
 .brand-logo {
-  width: 38px;
-  height: 38px;
-  padding: 4px;
-  border-radius: var(--radius-xs);
+  height: 34px;
+  width: auto;
+  padding: var(--logo-plate-pad);
+  border-radius: 6px;
   background: var(--logo-plate);
 }
 
@@ -523,14 +525,18 @@ table {
   font-size: var(--text-xs);
 }
 
-@media (max-width: 1080px) {
+@media (max-width: 1180px) {
   .site-navigation a {
     padding-inline: var(--space-2);
     font-size: var(--text-xs);
   }
+
+  .brand-title {
+    font-size: var(--text-base);
+  }
 }
 
-@media (max-width: 860px) {
+@media (max-width: 1080px) {
   .site-header {
     flex-wrap: wrap;
     gap: var(--space-3);
@@ -602,7 +608,7 @@ table {
   display: none;
 }
 
-@media (max-width: 860px) {
+@media (max-width: 1080px) {
   .site-navigation__intranet {
     display: block;
   }

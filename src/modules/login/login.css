@@ -37,7 +37,9 @@
 }
 
 .login-heading img {
-  padding: 6px;
+  height: 52px;
+  width: auto;
+  padding: var(--logo-plate-pad);
   background: var(--logo-plate);
   border-radius: var(--radius-sm);
 }

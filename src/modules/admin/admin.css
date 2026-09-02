@@ -27,15 +27,19 @@
   border-right: 1px solid var(--line);
 }
 
+/* En una barra de 250 px, el logotipo y el texto en la misma fila dejaban al
+   logo sin ancho. Apilados, cada uno se lee bien. */
 .admin-brand {
-  display: flex;
-  align-items: center;
+  display: grid;
   gap: var(--space-3);
+  justify-items: start;
   padding: var(--space-2);
 }
 
 .admin-brand img {
-  padding: 4px;
+  height: 34px;
+  width: auto;
+  padding: var(--logo-plate-pad);
   background: var(--logo-plate);
   border-radius: var(--radius-xs);
 }

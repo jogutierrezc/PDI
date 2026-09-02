@@ -23,7 +23,12 @@
   --surface-2: #f8fafd;
   --surface-3: #eef3fa;
   --surface-glass: rgba(255, 255, 255, 0.72);
-  --logo-plate: var(--brand-navy);
+  /* El logotipo está dibujado para fondo claro: sus trazos son azul #014898 y
+     lleva blancos. Sobre la placa azul marino que tenía antes, el azul del
+     logo se perdía contra el azul del fondo. En tema claro no necesita placa;
+     en oscuro sí, y blanca, para conservar el fondo que su diseño supone. */
+  --logo-plate: transparent;
+  --logo-plate-pad: 0px;
 
   /* --- Tinta -------------------------------------------------------------- */
   --ink: #0d1c31;
@@ -166,7 +171,8 @@
     --surface-2: #1a232f;
     --surface-3: #202c3a;
     --surface-glass: rgba(21, 29, 40, 0.78);
-    --logo-plate: #202c3a;
+    --logo-plate: #ffffff;
+    --logo-plate-pad: 5px;
 
     --ink: #eef3f9;
     --ink-secondary: #b3c1d2;
@@ -228,7 +234,8 @@
   --surface-2: #1a232f;
   --surface-3: #202c3a;
   --surface-glass: rgba(21, 29, 40, 0.78);
-  --logo-plate: #202c3a;
+  --logo-plate: #ffffff;
+  --logo-plate-pad: 5px;
 
   --ink: #eef3f9;
   --ink-secondary: #b3c1d2;

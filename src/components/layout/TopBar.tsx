@@ -75,8 +75,8 @@ export function TopBar() {
             className="brand-logo"
             src="/logo-udes.svg"
             alt=""
-            width={38}
-            height={38}
+            width={95}
+            height={34}
             decoding="async"
           />
           <span className="brand-title">

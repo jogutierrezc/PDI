@@ -1,4 +1,4 @@
-# Portal PDI · Universidad de Santander
+# Portal PDI · Universidad de Santander by Planeación Institucional 
 
 Portal público y de administración del Plan de Desarrollo Institucional 2024-2028.
 React 18 + TypeScript + Vite sobre **Supabase** (Postgres, Auth y Edge Functions).

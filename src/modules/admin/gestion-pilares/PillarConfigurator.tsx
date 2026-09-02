@@ -5,17 +5,16 @@ import { AdminShell, ReadOnlyNotice } from "../components/AdminShell";
 import { Icon } from "../../../components/ui/Icon";
 import { Modal, ModalActions } from "../../../components/ui/Modal";
 import { EmptyBlock, ErrorBlock, LoadingBlock } from "../../../components/ui/QueryState";
-import { usePillarDetail, usePillarOwners } from "../../../data/queries";
-import { keys } from "../../../data/queries";
-import { pillarScope, useCreateRow, useDeleteRow } from "../../../data/mutations";
-import { accentFor, formatDate, formatMonth, statusMeta, statusOrder } from "../../../data/pdi";
+import { keys, usePillarDetail, usePillarOwners } from "../../../data/queries";
+import { pillarScope, useRemoveRow, useSaveRow } from "../../../data/mutations";
+import { accentFor, formatDate, formatMonth, statusMeta } from "../../../data/pdi";
 import { useAuth } from "../../../lib/auth";
-import type { ActivityStatus, ChangeType } from "../../../types/database";
+import { buildForm, tableFor } from "./forms";
+import type { EntityKind, FieldSpec, FormConfig, Values } from "./forms";
+import type { WritableTable } from "../../../data/mutations";
 
-type ModalType = "area" | "line" | "project" | "activity" | "document" | "change" | "glossary" | null;
-
-const CHANGE_TYPES: ChangeType[] = ["creacion", "modificacion", "reforma", "eliminacion"];
-const DOC_KINDS = ["PDF", "XLSX", "DOCX", "CSV", "HTML", "Enlace"];
+/** Qué diálogo está abierto y sobre qué fila. Sin fila = alta. */
+type ModalState = { kind: EntityKind; entity?: Record<string, unknown> } | null;
 
 export function PillarConfigurator() {
   const { slug } = useParams<{ slug: string }>();
@@ -24,29 +23,18 @@ export function PillarConfigurator() {
   const { profile, hasRole } = useAuth();
 
   const [selectedAreaId, setSelectedAreaId] = useState<string | null>(null);
-  const [modal, setModal] = useState<ModalType>(null);
+  const [modal, setModal] = useState<ModalState>(null);
   const [error, setError] = useState("");
+  const [notice, setNotice] = useState("");
 
   const pillarId = detail.data?.pillar.id;
 
-  // Escrituras. Todas invalidan el mismo ámbito: al guardar cualquier cosa, el
-  // tablero público y el visor del pilar se refrescan solos.
+  // Al guardar cualquier cosa se refrescan el tablero público, el visor del
+  // pilar y esta misma pantalla: el control de cambios lo rellena la base de
+  // datos y hay que volver a leerlo.
   const scope = [...pillarScope(), keys.documents(pillarId ?? "none")];
-  const createArea = useCreateRow("strategic_areas", scope);
-  const createLine = useCreateRow("action_lines", scope);
-  const createProject = useCreateRow("projects", scope);
-  const createActivity = useCreateRow("activities", scope);
-  const createDocument = useCreateRow("documents", scope);
-  const createChange = useCreateRow("change_log", scope);
-  const createTerm = useCreateRow("glossary_terms", scope);
-
-  const removeArea = useDeleteRow("strategic_areas", scope);
-  const removeLine = useDeleteRow("action_lines", scope);
-  const removeProject = useDeleteRow("projects", scope);
-  const removeActivity = useDeleteRow("activities", scope);
-  const removeDocument = useDeleteRow("documents", scope);
-  const removeChange = useDeleteRow("change_log", scope);
-  const removeTerm = useDeleteRow("glossary_terms", scope);
+  const save = useSaveRow(scope);
+  const remove = useRemoveRow(scope);
 
   const canEdit = useMemo(() => {
     if (hasRole("planeacion")) return true;
@@ -85,21 +73,45 @@ export function PillarConfigurator() {
 
   const { pillar, areas, lines, projects, activities, changes, glossary, documents, indicators } =
     detail.data;
-  // v_action_lines trae el área ya resuelta: basta un índice para saber de qué
-  // línea y de qué área cuelga cada proyecto.
   const lineById = new Map(lines.map((line) => [line.id, line]));
   const activeArea = areas.find((area) => area.id === selectedAreaId) ?? areas[0];
 
-  /** Envuelve una mutación para mostrar el error en la cabecera, no en consola. */
-  async function run(action: () => Promise<unknown>) {
+  /** Envuelve una escritura para mostrar el resultado en la cabecera. */
+  async function run(action: () => Promise<unknown>, message: string) {
     setError("");
+    setNotice("");
     try {
       await action();
+      setNotice(message);
       setModal(null);
     } catch (mutationError) {
       setError(mutationError instanceof Error ? mutationError.message : "No se pudo guardar.");
     }
   }
+
+  function open(kind: EntityKind, entity?: Record<string, unknown>) {
+    setError("");
+    setModal({ kind, entity });
+  }
+
+  function removeRow(kind: EntityKind, id: string, message: string) {
+    return run(() => remove.mutateAsync({ table: tableFor[kind] as WritableTable, id }), message);
+  }
+
+  const formConfig: FormConfig | null = modal
+    ? buildForm(modal.kind, {
+        pillarId: pillar.id,
+        pillarName: pillar.name,
+        areas,
+        lines,
+        indicators,
+        projects,
+        activities,
+        documents,
+        activeAreaId: activeArea?.id,
+        entity: modal.entity,
+      })
+    : null;
 
   return (
     <AdminShell
@@ -115,6 +127,13 @@ export function PillarConfigurator() {
     >
       {!canEdit && <ReadOnlyNotice />}
 
+      {notice && (
+        <p className="admin-notice" role="status">
+          <Icon name="check" size={16} />
+          {notice}
+        </p>
+      )}
+
       {error && (
         <p className="admin-error" role="alert">
           <Icon name="alert" size={16} />
@@ -122,22 +141,24 @@ export function PillarConfigurator() {
         </p>
       )}
 
-      <div className="config-layout" style={{ "--accent": accentFor(pillar.accent_slot) } as React.CSSProperties}>
+      <div
+        className="config-layout"
+        style={{ "--accent": accentFor(pillar.accent_slot) } as React.CSSProperties}
+      >
         <div className="config-main">
           {/* --- Áreas --------------------------------------------------- */}
           <Section
             title="Áreas estratégicas"
             hint="Segundo nivel de la estructura: cada área agrupa sus líneas de acción."
-            action={canEdit ? { label: "Nueva área", onClick: () => setModal("area") } : undefined}
+            action={canEdit ? { label: "Nueva área", onClick: () => open("area") } : undefined}
           >
             {areas.length === 0 ? (
               <EmptyBlock title="Sin áreas configuradas." />
             ) : (
               <div className="area-grid" role="radiogroup" aria-label="Áreas estratégicas">
                 {areas.map((area) => (
-                  // El botón de borrar va fuera del selectable: un <button>
-                  // dentro de otro <button> no es HTML válido y los lectores de
-                  // pantalla no saben cuál anunciar.
+                  // El botón de seleccionar y los de editar/borrar van
+                  // separados: un <button> dentro de otro no es HTML válido.
                   <div
                     className={`area-card-wrap${activeArea?.id === area.id ? " is-active" : ""}`}
                     key={area.id}
@@ -161,14 +182,21 @@ export function PillarConfigurator() {
                     </button>
 
                     {canEdit && (
-                      <button
-                        type="button"
-                        className="area-card__remove"
-                        aria-label={`Eliminar el área ${area.name} y sus líneas`}
-                        onClick={() => void run(() => removeArea.mutateAsync(area.id))}
-                      >
-                        <Icon name="close" size={14} />
-                      </button>
+                      <span className="area-card__actions">
+                        <IconAction
+                          icon="settings"
+                          label={`Editar el área ${area.name}`}
+                          onClick={() => open("area", area as unknown as Record<string, unknown>)}
+                        />
+                        <IconAction
+                          icon="close"
+                          danger
+                          label={`Eliminar el área ${area.name} y sus líneas`}
+                          onClick={() =>
+                            void removeRow("area", area.id, `Se eliminó el área “${area.name}”.`)
+                          }
+                        />
+                      </span>
                     )}
                   </div>
                 ))}
@@ -179,9 +207,13 @@ export function PillarConfigurator() {
           {/* --- Líneas -------------------------------------------------- */}
           <Section
             title="Líneas de acción"
-            hint={activeArea ? `Dependen de: ${activeArea.name}` : "Crea un área para añadir líneas."}
+            hint={
+              activeArea
+                ? `Dependen de: ${activeArea.name}. El avance del área es el promedio de sus líneas.`
+                : "Crea un área para añadir líneas."
+            }
             action={
-              canEdit && activeArea ? { label: "Nueva línea", onClick: () => setModal("line") } : undefined
+              canEdit && activeArea ? { label: "Nueva línea", onClick: () => open("line") } : undefined
             }
           >
             {!activeArea || activeArea.action_lines.length === 0 ? (
@@ -203,9 +235,18 @@ export function PillarConfigurator() {
                         <span className="progress-track__fill" style={{ width: `${line.progress}%` }} />
                       </span>
                       {canEdit && (
-                        <RemoveButton
-                          label={`Eliminar ${line.name}`}
-                          onClick={() => void run(() => removeLine.mutateAsync(line.id))}
+                        <RowActions
+                          onEdit={() =>
+                            open("line", {
+                              ...line,
+                              area_id: activeArea.id,
+                            } as unknown as Record<string, unknown>)
+                          }
+                          editLabel={`Editar la línea ${line.name}`}
+                          onRemove={() =>
+                            void removeRow("line", line.id, `Se eliminó la línea “${line.name}”.`)
+                          }
+                          removeLabel={`Eliminar la línea ${line.name}`}
                         />
                       )}
                     </li>
@@ -217,8 +258,8 @@ export function PillarConfigurator() {
           {/* --- Proyectos ----------------------------------------------- */}
           <Section
             title="Proyectos estratégicos"
-            hint="Los proyectos responden a las líneas de acción definidas."
-            action={canEdit ? { label: "Nuevo proyecto", onClick: () => setModal("project") } : undefined}
+            hint="Cada alta y cada actualización deja su registro en el control de cambios."
+            action={canEdit ? { label: "Nuevo proyecto", onClick: () => open("project") } : undefined}
           >
             {projects.length === 0 ? (
               <EmptyBlock title="Sin proyectos registrados." />
@@ -227,42 +268,44 @@ export function PillarConfigurator() {
                 {projects.map((project) => {
                   const line = project.action_line_id ? lineById.get(project.action_line_id) : undefined;
                   return (
-                  <li key={project.id}>
-                    <div>
-                      <strong>{project.name}</strong>
-                      <small>
-                        {project.owner || "Sin responsable"} · {formatMonth(project.due_date)} ·{" "}
-                        {statusMeta[project.status].label}
-                      </small>
-                      {/* Sin la línea a la vista no hay forma de detectar en la
-                          intranet un proyecto que quedó fuera de la estructura. */}
-                      {line ? (
-                        <small className="record-lineage">
-                          {line.area_name} › {line.code ? `${line.code} · ` : ""}
-                          {line.name}
+                    <li key={project.id}>
+                      <div>
+                        <strong>{project.name}</strong>
+                        <small>
+                          {project.owner || "Sin responsable"} · {formatMonth(project.due_date)} ·{" "}
+                          {statusMeta[project.status].label} · {project.progress}%
                         </small>
-                      ) : (
-                        <small className="record-lineage record-lineage--empty">
-                          Sin línea de acción · no aparecerá al filtrar por área
-                        </small>
+                        {line ? (
+                          <small className="record-lineage">
+                            {line.area_name} › {line.code ? `${line.code} · ` : ""}
+                            {line.name}
+                          </small>
+                        ) : (
+                          <small className="record-lineage record-lineage--empty">
+                            Sin línea de acción · no aparecerá al filtrar por área
+                          </small>
+                        )}
+                      </div>
+                      <span className="progress-track" aria-hidden="true">
+                        <span
+                          className="progress-track__fill"
+                          style={{
+                            width: `${project.progress}%`,
+                            background: statusMeta[project.status].color,
+                          }}
+                        />
+                      </span>
+                      {canEdit && (
+                        <RowActions
+                          onEdit={() => open("project", project as unknown as Record<string, unknown>)}
+                          editLabel={`Editar el proyecto ${project.name}`}
+                          onRemove={() =>
+                            void removeRow("project", project.id, `Se eliminó “${project.name}”.`)
+                          }
+                          removeLabel={`Eliminar el proyecto ${project.name}`}
+                        />
                       )}
-                    </div>
-                    <span className="progress-track" aria-hidden="true">
-                      <span
-                        className="progress-track__fill"
-                        style={{
-                          width: `${project.progress}%`,
-                          background: statusMeta[project.status].color,
-                        }}
-                      />
-                    </span>
-                    {canEdit && (
-                      <RemoveButton
-                        label={`Eliminar ${project.name}`}
-                        onClick={() => void run(() => removeProject.mutateAsync(project.id))}
-                      />
-                    )}
-                  </li>
+                    </li>
                   );
                 })}
               </ul>
@@ -273,7 +316,7 @@ export function PillarConfigurator() {
           <Section
             title="Actividades"
             hint="El avance del pilar sale de contar estas filas: una actividad cumplida suma al porcentaje."
-            action={canEdit ? { label: "Nueva actividad", onClick: () => setModal("activity") } : undefined}
+            action={canEdit ? { label: "Nueva actividad", onClick: () => open("activity") } : undefined}
           >
             {activities.length === 0 ? (
               <EmptyBlock
@@ -282,31 +325,47 @@ export function PillarConfigurator() {
               />
             ) : (
               <ul className="record-list">
-                {activities.map((activity) => (
-                  <li key={activity.id}>
-                    <div>
-                      <strong>
-                        {activity.title}
-                        {activity.is_featured && <span className="record-flag">Destacada</span>}
-                      </strong>
-                      <small>
-                        {activity.owner || "Sin responsable"} · vence {formatMonth(activity.due_date)}
-                      </small>
-                    </div>
-                    <span className={`status-badge status-badge--${activity.status}`}>
-                      <span className="status-badge__glyph" aria-hidden="true">
-                        {statusMeta[activity.status].glyph}
+                {activities.map((activity) => {
+                  const line = activity.action_line_id
+                    ? lineById.get(activity.action_line_id)
+                    : undefined;
+                  return (
+                    <li key={activity.id}>
+                      <div>
+                        <strong>
+                          {activity.title}
+                          {activity.is_featured && <span className="record-flag">Destacada</span>}
+                        </strong>
+                        <small>
+                          {activity.owner || "Sin responsable"} · vence {formatMonth(activity.due_date)}{" "}
+                          · {activity.progress}%
+                        </small>
+                        {line && (
+                          <small className="record-lineage">
+                            {line.area_name} › {line.code ? `${line.code} · ` : ""}
+                            {line.name}
+                          </small>
+                        )}
+                      </div>
+                      <span className={`status-badge status-badge--${activity.status}`}>
+                        <span className="status-badge__glyph" aria-hidden="true">
+                          {statusMeta[activity.status].glyph}
+                        </span>
+                        {statusMeta[activity.status].label}
                       </span>
-                      {statusMeta[activity.status].label}
-                    </span>
-                    {canEdit && (
-                      <RemoveButton
-                        label={`Eliminar ${activity.title}`}
-                        onClick={() => void run(() => removeActivity.mutateAsync(activity.id))}
-                      />
-                    )}
-                  </li>
-                ))}
+                      {canEdit && (
+                        <RowActions
+                          onEdit={() => open("activity", activity as unknown as Record<string, unknown>)}
+                          editLabel={`Editar la actividad ${activity.title}`}
+                          onRemove={() =>
+                            void removeRow("activity", activity.id, `Se eliminó “${activity.title}”.`)
+                          }
+                          removeLabel={`Eliminar la actividad ${activity.title}`}
+                        />
+                      )}
+                    </li>
+                  );
+                })}
               </ul>
             )}
           </Section>
@@ -314,35 +373,51 @@ export function PillarConfigurator() {
           {/* --- Soportes ------------------------------------------------ */}
           <Section
             title="Soportes y documentos"
-            hint="Enlaces a los archivos que respaldan el seguimiento. Los marcados como públicos salen en el repositorio."
-            action={canEdit ? { label: "Añadir documento", onClick: () => setModal("document") } : undefined}
+            hint="Enlaces a los archivos que respaldan el seguimiento, ubicados en su área y su línea."
+            action={canEdit ? { label: "Añadir documento", onClick: () => open("document") } : undefined}
           >
             {documents.length === 0 ? (
               <EmptyBlock title="Sin documentos de soporte." />
             ) : (
               <ul className="record-list">
-                {documents.map((document) => (
-                  <li key={document.id}>
-                    <div>
-                      <strong>
-                        {document.title}
-                        {document.is_public && <span className="record-flag">Público</span>}
-                      </strong>
-                      <small>
-                        <a href={document.url} target="_blank" rel="noopener noreferrer">
-                          {document.kind} · abrir enlace
-                        </a>
-                      </small>
-                    </div>
-                    <span />
-                    {canEdit && (
-                      <RemoveButton
-                        label={`Eliminar ${document.title}`}
-                        onClick={() => void run(() => removeDocument.mutateAsync(document.id))}
-                      />
-                    )}
-                  </li>
-                ))}
+                {documents.map((document) => {
+                  const line = document.action_line_id
+                    ? lineById.get(document.action_line_id)
+                    : undefined;
+                  const area = areas.find((item) => item.id === document.area_id);
+                  return (
+                    <li key={document.id}>
+                      <div>
+                        <strong>
+                          {document.title}
+                          {document.is_public && <span className="record-flag">Público</span>}
+                        </strong>
+                        <small>
+                          <a href={document.url} target="_blank" rel="noopener noreferrer">
+                            {document.kind} · abrir enlace
+                          </a>
+                        </small>
+                        {(area || line) && (
+                          <small className="record-lineage">
+                            {area?.name ?? line?.area_name}
+                            {line ? ` › ${line.code ? `${line.code} · ` : ""}${line.name}` : ""}
+                          </small>
+                        )}
+                      </div>
+                      <span />
+                      {canEdit && (
+                        <RowActions
+                          onEdit={() => open("document", document as unknown as Record<string, unknown>)}
+                          editLabel={`Editar el documento ${document.title}`}
+                          onRemove={() =>
+                            void removeRow("document", document.id, `Se eliminó “${document.title}”.`)
+                          }
+                          removeLabel={`Eliminar el documento ${document.title}`}
+                        />
+                      )}
+                    </li>
+                  );
+                })}
               </ul>
             )}
           </Section>
@@ -366,42 +441,63 @@ export function PillarConfigurator() {
 
           <Section
             title="Control de cambios"
-            action={canEdit ? { label: "Registrar", onClick: () => setModal("change") } : undefined}
+            hint="Las entradas de proyectos y actividades se escriben solas al guardar."
+            action={canEdit ? { label: "Registrar", onClick: () => open("change") } : undefined}
             compact
           >
             {changes.length === 0 ? (
               <EmptyBlock title="Sin cambios registrados." />
             ) : (
               <ol className="timeline">
-                {changes.map((change) => (
-                  <li key={change.id}>
-                    <b>
-                      {change.change_type} · v{change.version}
-                    </b>
-                    <time dateTime={change.changed_on}>{formatDate(change.changed_on)}</time>
-                    <p>
-                      {change.area_code ? `${change.area_code} · ` : ""}
-                      {change.description}
-                    </p>
-                    {canEdit && (
-                      <button
-                        type="button"
-                        className="timeline__remove"
-                        onClick={() => void run(() => removeChange.mutateAsync(change.id))}
-                        aria-label={`Eliminar el cambio v${change.version}`}
-                      >
-                        <Icon name="close" size={13} />
-                      </button>
-                    )}
-                  </li>
-                ))}
+                {changes.map((change) => {
+                  const target =
+                    change.project_name ?? change.activity_title ?? change.indicator_code ?? null;
+                  // Solo se editan las entradas manuales: reescribir una traza
+                  // automática destruiría el registro de lo que pasó.
+                  const isAutomatic = Boolean(change.project_id || change.activity_id);
+
+                  return (
+                    <li key={change.id}>
+                      <b>
+                        {change.change_type} · v{change.version}
+                      </b>
+                      <time dateTime={change.changed_on}>{formatDate(change.changed_on)}</time>
+                      {target && <span className="timeline__target">{target}</span>}
+                      <p>
+                        {change.area_code ? `${change.area_code} · ` : ""}
+                        {change.description}
+                      </p>
+                      <small className="timeline__actor">
+                        {change.approved_by}
+                        {isAutomatic ? " · registro automático" : ""}
+                      </small>
+                      {canEdit && !isAutomatic && (
+                        <span className="timeline__actions">
+                          <IconAction
+                            icon="settings"
+                            label={`Editar el registro v${change.version}`}
+                            onClick={() => open("change", change as unknown as Record<string, unknown>)}
+                          />
+                          <IconAction
+                            icon="close"
+                            danger
+                            label={`Eliminar el registro v${change.version}`}
+                            onClick={() =>
+                              void removeRow("change", change.id, "Se eliminó el registro de cambio.")
+                            }
+                          />
+                        </span>
+                      )}
+                    </li>
+                  );
+                })}
               </ol>
             )}
           </Section>
 
           <Section
             title="Glosario"
-            action={canEdit ? { label: "Término", onClick: () => setModal("glossary") } : undefined}
+            action={canEdit ? { label: "Término", onClick: () => open("glossary") } : undefined}
             compact
           >
             {glossary.length === 0 ? (
@@ -418,13 +514,22 @@ export function PillarConfigurator() {
                       {item.description}
                       {item.source && <small>Fuente: {item.source}</small>}
                       {canEdit && item.pillar_id !== null && (
-                        <button
-                          type="button"
-                          className="meta-list__remove"
-                          onClick={() => void run(() => removeTerm.mutateAsync(item.id))}
-                        >
-                          Eliminar
-                        </button>
+                        <span className="meta-list__actions">
+                          <button
+                            type="button"
+                            onClick={() => open("glossary", item as unknown as Record<string, unknown>)}
+                          >
+                            Editar
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() =>
+                              void removeRow("glossary", item.id, `Se eliminó “${item.term}”.`)
+                            }
+                          >
+                            Eliminar
+                          </button>
+                        </span>
                       )}
                     </dd>
                   </div>
@@ -435,266 +540,22 @@ export function PillarConfigurator() {
         </aside>
       </div>
 
-      {/* --- Modales ---------------------------------------------------- */}
-      {modal === "area" && pillarId && (
-        <FormModal
-          title="Nueva área estratégica"
-          submitLabel="Crear área"
+      {modal && formConfig && (
+        <EntityForm
+          config={formConfig}
+          pending={save.isPending}
           onClose={() => setModal(null)}
           onSubmit={(values) =>
-            run(() =>
-              createArea.mutateAsync({
-                pillar_id: pillarId,
-                code: values.code || null,
-                name: values.name,
-                description: values.description ?? "",
-                position: areas.length + 1,
-              }),
+            run(
+              () =>
+                save.mutateAsync({
+                  table: tableFor[modal.kind] as WritableTable,
+                  id: modal.entity?.id as string | undefined,
+                  values: formConfig.toRow(values),
+                }),
+              modal.entity ? "Cambios guardados." : "Registro creado.",
             )
           }
-          fields={[
-            { name: "name", label: "Nombre del área", required: true, placeholder: "Ej. Infraestructura tecnológica" },
-            { name: "code", label: "Código", placeholder: "Ej. AE-04" },
-            { name: "description", label: "Descripción", type: "textarea" },
-          ]}
-        />
-      )}
-
-      {modal === "line" && activeArea && (
-        <FormModal
-          title={`Nueva línea para ${activeArea.name}`}
-          submitLabel="Vincular línea"
-          onClose={() => setModal(null)}
-          onSubmit={(values) =>
-            run(() =>
-              createLine.mutateAsync({
-                area_id: activeArea.id,
-                code: values.code || null,
-                name: values.name,
-                progress: Number(values.progress ?? 0),
-                position: activeArea.action_lines.length + 1,
-              }),
-            )
-          }
-          fields={[
-            { name: "name", label: "Nombre de la línea", required: true, placeholder: "Ej. Modernización de infraestructura" },
-            { name: "code", label: "Código", placeholder: "Ej. LA-4.1" },
-            { name: "progress", label: "Cumplimiento reportado", type: "range", defaultValue: "0" },
-          ]}
-        />
-      )}
-
-      {modal === "project" && pillarId && (
-        <FormModal
-          title="Nuevo proyecto estratégico"
-          submitLabel="Crear proyecto"
-          onClose={() => setModal(null)}
-          onSubmit={(values) =>
-            run(() =>
-              createProject.mutateAsync({
-                pillar_id: pillarId,
-                action_line_id: values.action_line_id || null,
-                name: values.name,
-                owner: values.owner ?? "",
-                description: values.description ?? "",
-                due_date: values.due_date || null,
-                progress: Number(values.progress ?? 0),
-                status: (values.status as ActivityStatus) ?? "pendiente",
-                position: projects.length + 1,
-              }),
-            )
-          }
-          fields={[
-            { name: "name", label: "Nombre del proyecto", required: true },
-            { name: "owner", label: "Responsable", placeholder: "Persona o dependencia" },
-            {
-              name: "action_line_id",
-              label: "Línea de acción",
-              type: "select",
-              options: [
-                { value: "", label: "Sin línea asociada" },
-                ...areas.flatMap((area) =>
-                  area.action_lines.map((line) => ({
-                    value: line.id,
-                    label: `${area.name} · ${line.name}`,
-                  })),
-                ),
-              ],
-            },
-            { name: "description", label: "Descripción", type: "textarea" },
-            { name: "due_date", label: "Fecha objetivo", type: "date" },
-            {
-              name: "status",
-              label: "Estado",
-              type: "select",
-              defaultValue: "pendiente",
-              options: statusOrder.map((status) => ({ value: status, label: statusMeta[status].label })),
-            },
-            { name: "progress", label: "Porcentaje de avance", type: "range", defaultValue: "0" },
-          ]}
-        />
-      )}
-
-      {modal === "activity" && pillarId && (
-        <FormModal
-          title="Nueva actividad"
-          description="El avance del pilar se calcula contando actividades cumplidas sobre el total."
-          submitLabel="Crear actividad"
-          onClose={() => setModal(null)}
-          onSubmit={(values) => {
-            const status = (values.status as ActivityStatus) ?? "pendiente";
-            return run(() =>
-              createActivity.mutateAsync({
-                pillar_id: pillarId,
-                title: values.title,
-                owner: values.owner ?? "",
-                due_date: values.due_date || null,
-                // La base de datos rechaza "cumplida al 60 %"; se ajusta aquí
-                // para que el formulario no falle por una combinación imposible.
-                progress: status === "cumplida" ? 100 : Number(values.progress ?? 0),
-                status,
-                is_featured: values.is_featured === "on",
-                position: activities.length + 1,
-              }),
-            );
-          }}
-          fields={[
-            { name: "title", label: "Título de la actividad", required: true },
-            { name: "owner", label: "Responsable" },
-            { name: "due_date", label: "Fecha de vencimiento", type: "date" },
-            {
-              name: "status",
-              label: "Estado",
-              type: "select",
-              defaultValue: "pendiente",
-              options: statusOrder.map((status) => ({ value: status, label: statusMeta[status].label })),
-            },
-            { name: "progress", label: "Porcentaje de avance", type: "range", defaultValue: "0" },
-            {
-              name: "is_featured",
-              label: "Destacar en el tablero público",
-              type: "checkbox",
-            },
-          ]}
-        />
-      )}
-
-      {modal === "document" && pillarId && (
-        <FormModal
-          title="Añadir documento de soporte"
-          description="El portal guarda el enlace, no el archivo. Sube el documento a la unidad institucional y pega aquí su dirección."
-          submitLabel="Añadir documento"
-          onClose={() => setModal(null)}
-          onSubmit={(values) =>
-            run(() =>
-              createDocument.mutateAsync({
-                pillar_id: pillarId,
-                title: values.title,
-                description: values.description ?? "",
-                kind: values.kind ?? "PDF",
-                url: values.url,
-                size_label: values.size_label || null,
-                is_public: values.is_public === "on",
-                published_at: values.is_public === "on" ? new Date().toISOString() : null,
-                position: documents.length + 1,
-              }),
-            )
-          }
-          fields={[
-            { name: "title", label: "Título del documento", required: true },
-            {
-              name: "url",
-              label: "Enlace",
-              required: true,
-              type: "url",
-              placeholder: "https://…",
-              hint: "Debe empezar por http:// o https://",
-            },
-            { name: "description", label: "Descripción", type: "textarea" },
-            {
-              name: "kind",
-              label: "Tipo",
-              type: "select",
-              defaultValue: "PDF",
-              options: DOC_KINDS.map((kind) => ({ value: kind, label: kind })),
-            },
-            { name: "size_label", label: "Tamaño (informativo)", placeholder: "Ej. 4,2 MB" },
-            { name: "is_public", label: "Publicar en el repositorio público", type: "checkbox" },
-          ]}
-        />
-      )}
-
-      {modal === "change" && pillarId && (
-        <FormModal
-          title="Registrar control de cambios"
-          submitLabel="Registrar cambio"
-          onClose={() => setModal(null)}
-          onSubmit={(values) =>
-            run(() =>
-              createChange.mutateAsync({
-                pillar_id: pillarId,
-                indicator_id: values.indicator_id || null,
-                area_code: values.area_code ?? "",
-                version: values.version,
-                approved_by: values.approved_by ?? "",
-                changed_on: values.changed_on || new Date().toISOString().slice(0, 10),
-                description: values.description ?? "",
-                change_type: (values.change_type as ChangeType) ?? "modificacion",
-              }),
-            )
-          }
-          fields={[
-            { name: "version", label: "Número de versión", required: true, placeholder: "Ej. 1.1" },
-            { name: "area_code", label: "Código del área", placeholder: "Ej. AE-04" },
-            { name: "approved_by", label: "Aval del cambio", placeholder: "Comité de Planeación" },
-            { name: "changed_on", label: "Fecha de modificación", type: "date" },
-            { name: "description", label: "Descripción del ajuste", type: "textarea", required: true },
-            {
-              name: "change_type",
-              label: "Tipo de cambio",
-              type: "select",
-              defaultValue: "modificacion",
-              options: CHANGE_TYPES.map((type) => ({ value: type, label: type })),
-            },
-            {
-              name: "indicator_id",
-              label: "Indicador relacionado",
-              type: "select",
-              options: [
-                { value: "", label: "Ninguno" },
-                ...indicators.map((indicator) => ({
-                  value: indicator.id,
-                  label: `${indicator.code} · ${indicator.name}`,
-                })),
-              ],
-            },
-          ]}
-        />
-      )}
-
-      {modal === "glossary" && pillarId && (
-        <FormModal
-          title="Nuevo término del glosario"
-          submitLabel="Guardar término"
-          onClose={() => setModal(null)}
-          onSubmit={(values) =>
-            run(() =>
-              createTerm.mutateAsync({
-                pillar_id: pillarId,
-                term: values.term,
-                definition: values.definition ?? "",
-                description: values.description ?? "",
-                source: values.source || null,
-                position: glossary.length + 1,
-              }),
-            )
-          }
-          fields={[
-            { name: "term", label: "Término", required: true },
-            { name: "definition", label: "Definición corta" },
-            { name: "description", label: "Descripción", type: "textarea", required: true },
-            { name: "source", label: "Fuente (opcional)", placeholder: "Ej. NIST SP 800-207" },
-          ]}
         />
       )}
     </AdminShell>
@@ -734,11 +595,46 @@ function Section({
   );
 }
 
-function RemoveButton({ label, onClick }: { label: string; onClick: () => void }) {
+function IconAction({
+  icon,
+  label,
+  onClick,
+  danger = false,
+}: {
+  icon: React.ComponentProps<typeof Icon>["name"];
+  label: string;
+  onClick: () => void;
+  danger?: boolean;
+}) {
   return (
-    <button type="button" className="icon-button" onClick={onClick} aria-label={label}>
-      <Icon name="close" size={15} />
+    <button
+      type="button"
+      className={`icon-button${danger ? " icon-button--danger" : ""}`}
+      onClick={onClick}
+      aria-label={label}
+      title={label}
+    >
+      <Icon name={icon} size={15} />
     </button>
+  );
+}
+
+function RowActions({
+  onEdit,
+  editLabel,
+  onRemove,
+  removeLabel,
+}: {
+  onEdit: () => void;
+  editLabel: string;
+  onRemove: () => void;
+  removeLabel: string;
+}) {
+  return (
+    <span className="row-actions">
+      <IconAction icon="settings" label={editLabel} onClick={onEdit} />
+      <IconAction icon="close" danger label={removeLabel} onClick={onRemove} />
+    </span>
   );
 }
 
@@ -751,105 +647,137 @@ function Meta({ label, value }: { label: string; value: string }) {
   );
 }
 
-/* --- Modal de formulario genérico ------------------------------------------
-   Los siete diálogos de esta pantalla tenían el mismo esqueleto repetido siete
-   veces. Aquí se declara qué campos tiene cada uno y el resto es común: la
-   trampa de foco, el cierre con Escape y el bloqueo del fondo vienen de Modal.
+/* --- Formulario genérico ----------------------------------------------------
+   Los siete diálogos comparten esqueleto; forms.ts declara sus campos y cómo se
+   arma la fila. La trampa de foco, el cierre con Escape y el bloqueo del fondo
+   vienen de Modal.
    -------------------------------------------------------------------------- */
 
-interface FieldSpec {
-  name: string;
-  label: string;
-  type?: "text" | "textarea" | "select" | "date" | "range" | "checkbox" | "url";
-  required?: boolean;
-  placeholder?: string;
-  hint?: string;
-  defaultValue?: string;
-  options?: { value: string; label: string }[];
-}
-
-function FormModal({
-  title,
-  description,
-  submitLabel,
-  fields,
+function EntityForm({
+  config,
+  pending,
   onSubmit,
   onClose,
 }: {
-  title: string;
-  description?: string;
-  submitLabel: string;
-  fields: FieldSpec[];
-  onSubmit: (values: Record<string, string>) => void | Promise<void>;
+  config: FormConfig;
+  pending: boolean;
+  onSubmit: (values: Values) => void | Promise<void>;
   onClose: () => void;
 }) {
-  const [values, setValues] = useState<Record<string, string>>(() =>
-    Object.fromEntries(fields.map((field) => [field.name, field.defaultValue ?? ""])),
-  );
-  const [saving, setSaving] = useState(false);
-
-  async function handleSubmit(event: FormEvent) {
-    event.preventDefault();
-    setSaving(true);
-    try {
-      await onSubmit(values);
-    } finally {
-      setSaving(false);
-    }
-  }
+  const [values, setValues] = useState<Values>(config.initial);
 
   const set = (name: string, value: string) => setValues((current) => ({ ...current, [name]: value }));
 
+  function handleSubmit(event: FormEvent) {
+    event.preventDefault();
+    void onSubmit(values);
+  }
+
   return (
-    <Modal title={title} description={description} onClose={onClose}>
+    <Modal title={config.title} description={config.description} onClose={onClose}>
       <form className="modal-form" onSubmit={handleSubmit}>
-        {fields.map((field) => (
-          <label className="admin-field" key={field.name}>
-            <span>
-              {field.label}
-              {field.type === "range" && <output>{values[field.name] || 0}%</output>}
-            </span>
-
-            {field.type === "textarea" ? (
-              <textarea
-                rows={3}
-                required={field.required}
-                placeholder={field.placeholder}
-                value={values[field.name]}
-                onChange={(event) => set(field.name, event.target.value)}
-              />
-            ) : field.type === "select" ? (
-              <select value={values[field.name]} onChange={(event) => set(field.name, event.target.value)}>
-                {field.options?.map((option) => (
-                  <option key={option.value} value={option.value}>
-                    {option.label}
-                  </option>
-                ))}
-              </select>
-            ) : field.type === "checkbox" ? (
-              <input
-                type="checkbox"
-                checked={values[field.name] === "on"}
-                onChange={(event) => set(field.name, event.target.checked ? "on" : "")}
-              />
-            ) : (
-              <input
-                type={field.type === "range" ? "range" : field.type === "date" ? "date" : field.type === "url" ? "url" : "text"}
-                min={field.type === "range" ? 0 : undefined}
-                max={field.type === "range" ? 100 : undefined}
-                required={field.required}
-                placeholder={field.placeholder}
-                value={values[field.name]}
-                onChange={(event) => set(field.name, event.target.value)}
-              />
-            )}
-
-            {field.hint && <small>{field.hint}</small>}
-          </label>
+        {config.fields.map((field) => (
+          <Field key={field.name} field={field} value={values[field.name] ?? ""} onChange={set} />
         ))}
-
-        <ModalActions onCancel={onClose} submitLabel={saving ? "Guardando…" : submitLabel} />
+        <ModalActions onCancel={onClose} submitLabel={pending ? "Guardando…" : config.submitLabel} />
       </form>
     </Modal>
+  );
+}
+
+function Field({
+  field,
+  value,
+  onChange,
+}: {
+  field: FieldSpec;
+  value: string;
+  onChange: (name: string, value: string) => void;
+}) {
+  const grouped = field.options?.some((option) => option.group);
+
+  return (
+    <label className="admin-field">
+      <span>
+        {field.label}
+        {field.type === "range" && <output>{value || 0}%</output>}
+      </span>
+
+      {field.type === "textarea" ? (
+        <textarea
+          rows={3}
+          required={field.required}
+          placeholder={field.placeholder}
+          value={value}
+          onChange={(event) => onChange(field.name, event.target.value)}
+        />
+      ) : field.type === "select" ? (
+        <select
+          required={field.required}
+          value={value}
+          onChange={(event) => onChange(field.name, event.target.value)}
+        >
+          {grouped ? renderGrouped(field.options ?? []) : renderFlat(field.options ?? [])}
+        </select>
+      ) : field.type === "checkbox" ? (
+        <input
+          type="checkbox"
+          checked={value === "on"}
+          onChange={(event) => onChange(field.name, event.target.checked ? "on" : "")}
+        />
+      ) : (
+        <input
+          type={
+            field.type === "range"
+              ? "range"
+              : field.type === "date"
+                ? "date"
+                : field.type === "url"
+                  ? "url"
+                  : "text"
+          }
+          min={field.type === "range" ? 0 : undefined}
+          max={field.type === "range" ? 100 : undefined}
+          required={field.required}
+          placeholder={field.placeholder}
+          value={value}
+          onChange={(event) => onChange(field.name, event.target.value)}
+        />
+      )}
+
+      {field.hint && <small>{field.hint}</small>}
+    </label>
+  );
+}
+
+function renderFlat(options: { value: string; label: string }[]) {
+  return options.map((option) => (
+    <option key={option.value} value={option.value}>
+      {option.label}
+    </option>
+  ));
+}
+
+/** Las líneas se agrupan por su área: así se ve de dónde cuelga cada una. */
+function renderGrouped(options: { value: string; label: string; group?: string }[]) {
+  const loose = options.filter((option) => !option.group);
+  const groups = new Map<string, { value: string; label: string }[]>();
+
+  for (const option of options) {
+    if (!option.group) continue;
+    const bucket = groups.get(option.group) ?? [];
+    bucket.push(option);
+    groups.set(option.group, bucket);
+  }
+
+  return (
+    <>
+      {renderFlat(loose)}
+      {[...groups.entries()].map(([group, items]) => (
+        <optgroup key={group} label={group}>
+          {renderFlat(items)}
+        </optgroup>
+      ))}
+    </>
   );
 }

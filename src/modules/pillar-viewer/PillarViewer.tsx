@@ -580,8 +580,11 @@ export function PillarViewer() {
             ) : (
               <DataTable
                 caption={`Historial de cambios del pilar ${pillar.name}`}
-                headers={["Código", "Versión", "Aval", "Fecha", "Ajuste", "Tipo"]}
+                headers={["Objeto", "Área", "Versión", "Aval", "Fecha", "Ajuste", "Tipo"]}
                 rows={changes.map((change) => [
+                  // Qué cambió. Sin esta columna, una entrada automática sería
+                  // una descripción sin sujeto.
+                  change.project_name ?? change.activity_title ?? change.indicator_code ?? "Pilar",
                   change.area_code || "—",
                   change.version,
                   change.approved_by || "—",

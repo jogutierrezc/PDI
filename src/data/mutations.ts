@@ -16,6 +16,7 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import type { QueryKey } from "@tanstack/react-query";
 import { callAdminUsers, supabase } from "../lib/supabase";
 import { keys } from "./queries";
+import { describeDatabaseError as describe } from "./errors";
 import type { AppRole, Profile } from "../types/database";
 
 /** Tablas sobre las que escribe la intranet. */
@@ -33,29 +34,6 @@ export type WritableTable =
   | "parameters"
   | "pillar_owners"
   | "profiles";
-
-/** Mensajes de Postgres traducidos a algo accionable para quien edita. */
-function describe(error: { message: string; code?: string }): Error {
-  const message = error.message ?? "";
-
-  if (error.code === "23505" || /duplicate key/i.test(message)) {
-    return new Error("Ya existe un registro con esos datos.");
-  }
-  if (error.code === "23503" || /violates foreign key/i.test(message)) {
-    return new Error("No se puede eliminar: hay contenido que todavía lo usa.");
-  }
-  if (error.code === "42501" || /row-level security/i.test(message)) {
-    return new Error("No tienes permiso para hacer este cambio.");
-  }
-  if (/pillars_slug_format/i.test(message)) {
-    return new Error("El identificador solo admite minúsculas, números y guiones.");
-  }
-  if (/activities_done_is_complete/i.test(message)) {
-    return new Error("Una actividad cumplida debe estar al 100 %.");
-  }
-  // Los mensajes de los disparadores (RAISE EXCEPTION) ya están en español.
-  return new Error(message || "No se pudo guardar el cambio.");
-}
 
 function useInvalidate(invalidates: QueryKey[]) {
   const client = useQueryClient();
@@ -98,6 +76,49 @@ export function useDeleteRow(table: WritableTable, invalidates: QueryKey[]) {
   const invalidate = useInvalidate(invalidates);
   return useMutation({
     mutationFn: async (id: string) => {
+      const { error } = await supabase.from(table).delete().eq("id", id);
+      if (error) throw describe(error);
+    },
+    onSuccess: invalidate,
+  });
+}
+
+/* =============================================================================
+   Escritura genérica por tabla
+
+   La configuración de un pilar escribe en siete tablas y cada una necesita
+   crear, actualizar y borrar. Con las fábricas de arriba harían falta veintiún
+   hooks en una sola pantalla; aquí la tabla es un argumento de la llamada, no
+   del hook.
+   ========================================================================== */
+
+export interface SaveRowArgs {
+  table: WritableTable;
+  /** Con id actualiza; sin id inserta. */
+  id?: string;
+  values: Record<string, unknown>;
+}
+
+export function useSaveRow(invalidates: QueryKey[]) {
+  const invalidate = useInvalidate(invalidates);
+  return useMutation({
+    mutationFn: async ({ table, id, values }: SaveRowArgs) => {
+      const query = id
+        ? supabase.from(table).update(values).eq("id", id)
+        : supabase.from(table).insert(values);
+
+      const { data, error } = await query.select().single();
+      if (error) throw describe(error);
+      return data;
+    },
+    onSuccess: invalidate,
+  });
+}
+
+export function useRemoveRow(invalidates: QueryKey[]) {
+  const invalidate = useInvalidate(invalidates);
+  return useMutation({
+    mutationFn: async ({ table, id }: { table: WritableTable; id: string }) => {
       const { error } = await supabase.from(table).delete().eq("id", id);
       if (error) throw describe(error);
     },

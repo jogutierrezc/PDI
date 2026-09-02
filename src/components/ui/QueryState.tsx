@@ -13,6 +13,7 @@
 import type { ReactNode } from "react";
 import { Icon } from "./Icon";
 import { isSupabaseConfigured } from "../../lib/supabase";
+import { FriendlyError } from "../../data/errors";
 
 export function LoadingBlock({ rows = 3, label = "Cargando" }: { rows?: number; label?: string }) {
   return (
@@ -44,6 +45,10 @@ interface ErrorBlockProps {
 
 export function ErrorBlock({ error, onRetry, title = "No se pudieron cargar los datos" }: ErrorBlockProps) {
   const message = error instanceof Error ? error.message : "Error desconocido.";
+  // Los errores con causa conocida traen instrucciones; mostrarlas evita que
+  // alguien tenga que buscar qué significa "schema cache".
+  const advice = error instanceof FriendlyError ? error.advice : undefined;
+  const original = error instanceof FriendlyError ? error.original : undefined;
 
   // Causa más frecuente en una instalación nueva: el .env sin rellenar.
   if (!isSupabaseConfigured) {
@@ -68,6 +73,17 @@ export function ErrorBlock({ error, onRetry, title = "No se pudieron cargar los 
       <div>
         <strong>{title}</strong>
         <p>{message}</p>
+        {advice && <p className="state-error__advice">{advice}</p>}
+
+        {/* El mensaje técnico queda a mano para quien lo necesite, sin ocupar
+            la pantalla de quien solo quiere saber si puede reintentar. */}
+        {original && original !== message && (
+          <details className="state-error__detail">
+            <summary>Detalle técnico</summary>
+            <code>{original}</code>
+          </details>
+        )}
+
         {onRetry && (
           <button className="button-secondary" type="button" onClick={onRetry}>
             Reintentar

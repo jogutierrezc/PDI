@@ -40,8 +40,27 @@ pegarlos en el editor SQL del panel de Supabase o aplicarlos con la CLI
 | `0003_views.sql` | Vistas derivadas (avance por pilar, resumen global, catálogos resueltos) |
 | `0004_seed.sql` | Datos iniciales para que el portal funcione desde el primer despliegue |
 | `0005_areas_y_proyectos.sql` | Retira `pillars.progress` y enlaza los proyectos con sus líneas de acción |
+| `0006_edicion_y_trazabilidad.sql` | Actividades y documentos dentro de la estructura + control de cambios automático |
+| `0007_permisos_y_cache.sql` | Permisos de la API y recarga de su caché. **Ejecútala siempre la última.** |
 
 Todos son idempotentes: volver a ejecutarlos no duplica nada.
+
+> **Termina siempre con `0007`.** PostgREST guarda el esquema en una caché; sin
+> recargarla, una tabla recién creada sigue dando 404 durante un rato.
+
+### El disparador de auth.users
+
+`0001` intenta crear un disparador en `auth.users` para que cada usuario nuevo
+tenga su perfil automáticamente. En algunos proyectos el rol que ejecuta las
+migraciones no es dueño de esa tabla y la operación falla.
+
+La migración lo tiene previsto: en ese caso emite un **aviso** y continúa, en
+lugar de tumbar la transacción. Si ves el aviso, todo lo demás se aplicó, pero
+tendrás que fijar el rol a mano tras dar de alta a alguien:
+
+```sql
+update public.profiles set role = 'planeacion' where email = 'persona@udes.edu.co';
+```
 
 > **Requiere Postgres 15 o superior** (usa `NULLS NOT DISTINCT` y
 > `security_invoker` en vistas). Cualquier proyecto de Supabase creado desde 2023
@@ -179,13 +198,58 @@ A partir de ahí, el resto de altas se hacen desde **Usuarios y roles**.
 Las pantallas de intranet son legibles desde `consulta` y muestran un aviso de
 solo lectura; los controles de edición aparecen según el rol.
 
+## Trazabilidad automática
+
+Cada alta, actualización y baja de un **proyecto** o de una **actividad** deja su
+propia entrada en el control de cambios, con la versión correlativa (`1.0`,
+`1.1`, `1.2`…), quién la hizo y qué cambió en concreto —"Avance 60 % → 75 %",
+"Estado pendiente → curso", "Se destacó en el tablero público"—.
+
+Lo hacen disparadores en la base de datos y no el código de React, por dos
+razones: el registro es atómico con el cambio que documenta (no puede guardarse
+el proyecto y perderse su traza), y ocurre igual venga de la intranet o de una
+llamada directa a la API.
+
+Reordenar una lista o corregir una descripción no genera entrada: solo lo que
+cambia el sentido del registro (avance, estado, nombre, responsable, fecha,
+línea, y en actividades también el destacado).
+
+Las entradas automáticas **no se pueden editar** desde la intranet —reescribir
+una traza destruye el registro de lo que pasó—; el botón de edición solo aparece
+en las que se registraron a mano. Esas siguen sirviendo para lo que se decide
+fuera del portal: actas, avales y reformas del indicador.
+
+## Qué se edita desde la intranet
+
+En **Configurar pilar** se crean, editan y eliminan áreas estratégicas, líneas de
+acción, proyectos, actividades y documentos de soporte. Los formularios sirven
+para las dos cosas: al abrirlos sobre una fila llegan rellenos con sus valores.
+
+Proyectos, actividades y documentos eligen su **línea de acción** en un
+desplegable agrupado por área. En los documentos hay además un selector de área:
+si se elige una línea, su área manda sobre él, de modo que un soporte nunca queda
+colocado en dos sitios a la vez.
+
 ## El filtro por área en la ficha del pilar
 
 El selector de la barra pegajosa recorre las **áreas estratégicas** del pilar.
-Al elegir una, se filtran las dos secciones que cuelgan de ella: los proyectos y
-el desglose de líneas. Cada proyecto muestra además su cadena completa —pilar ›
-área › línea de acción—, de modo que la estructura del plan se lee en la propia
-página y no solo en la base de datos.
+Al elegir una:
+
+- la ficha pasa a describir el área —pilar, acción y su descripción— con su
+  avance, sus líneas y sus proyectos, en lugar del indicador del pilar;
+- se retiran el presupuesto y el tiempo transcurrido, que miden el indicador
+  completo y no el área;
+- se filtran los proyectos y el desglose de líneas.
+
+El control de cambios **no** se filtra: es la historia del pilar entero.
+
+Sin filtro, la sección **Áreas estratégicas del pilar** muestra una rejilla con
+el avance de cada una —el promedio del cumplimiento reportado de sus líneas— y
+cada tarjeta funciona también como filtro.
+
+Cada proyecto muestra además su cadena completa —pilar › área › línea de
+acción—, de modo que la estructura del plan se lee en la propia página y no solo
+en la base de datos.
 
 Un proyecto sin `action_line_id` no pertenece a ningún área y por tanto no
 aparece al filtrar. Tanto el visor público como la configuración de la intranet
@@ -285,6 +349,49 @@ para cualquier ruta que no sea un archivo, o `/tablero` dará 404 al recargar.
 Recuerda añadir la URL de producción en **Authentication → URL Configuration**
 de Supabase, o los enlaces de invitación y de recuperación de contraseña
 apuntarán a `localhost`.
+
+# Si la API devuelve 404
+
+Síntoma: la pantalla dice *"La base de datos todavía no tiene las tablas del
+portal"* y la consola muestra
+`Could not find the table 'public.…' in the schema cache`.
+
+No es un problema de las variables de entorno: si la URL o la clave estuvieran
+mal, la respuesta sería 401, no 404. Ese 404 significa que PostgREST no
+encuentra el objeto en su caché de esquema, y eso ocurre por dos motivos.
+
+**1. Las migraciones no llegaron a aplicarse.** El editor SQL de Supabase
+ejecuta cada script dentro de una transacción: si una sola sentencia falla, se
+revierte el script entero y no queda ni una tabla. Por eso fallan a la vez
+`pillars`, `activities` y las vistas.
+
+**2. La caché de la API está vieja o falta un permiso.** Sin `SELECT` para el rol
+`anon`, PostgREST ni siquiera incluye el objeto en su caché y responde 404 en
+lugar de 401.
+
+Para distinguirlas, ejecuta **`supabase/diagnostico.sql`** en el editor SQL. Te
+dice cuántas tablas, vistas, políticas y disparadores existen, quién puede
+leerlas y cuántas filas hay.
+
+- Si dice **0 tablas** → vuelve a aplicar las migraciones en orden y mira el
+  panel de mensajes por si alguna sentencia falló.
+- Si están todas pero la API sigue en 404 → ejecuta
+  **`0007_permisos_y_cache.sql`**, o pulsa *Reload schema cache* en
+  Settings → API.
+
+# Despliegue en Vercel
+
+`vercel.json` ya trae la reescritura que necesita una aplicación de una sola
+página y el cacheado de los recursos con huella.
+
+Dos cosas que hay que configurar en el panel de Vercel:
+
+1. **Variables de entorno** — `VITE_SUPABASE_URL` y `VITE_SUPABASE_ANON_KEY`.
+   Vite las inserta *en el momento de compilar*, no en tiempo de ejecución: si
+   las añades después, hay que volver a desplegar para que surtan efecto.
+2. **URLs en Supabase** — añade tu dominio en Authentication → URL
+   Configuration (*Site URL* y *Redirect URLs*), o los enlaces de invitación y
+   de recuperación de contraseña seguirán apuntando a `localhost`.
 
 # Aviso de seguridad conocido
 

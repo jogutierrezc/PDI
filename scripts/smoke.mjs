@@ -86,6 +86,7 @@ const FIXTURES = {
       status: "curso",
       is_featured: true,
       position: 1,
+      action_line_id: "l1",
       pillar: { slug: "ambiente-tecnologico", name: "Ambiente tecnológico", accent_slot: 2 },
     },
   ],
@@ -94,6 +95,7 @@ const FIXTURES = {
       id: "d1",
       pillar_id: null,
       area_id: null,
+      action_line_id: null,
       title: "Plan de Desarrollo Institucional 2024-2028",
       description: "Documento maestro.",
       kind: "PDF",
@@ -170,18 +172,41 @@ const FIXTURES = {
     },
   ],
   planning_items: [{ id: "pl1", pillar_id: "p1", text: "Cerrar la migración.", position: 1 }],
-  change_log: [
+  v_change_log: [
     {
       id: "c1",
       pillar_id: "p1",
       indicator_id: "i1",
+      project_id: null,
+      activity_id: null,
       area_code: "AE-03",
       version: "1.0",
       approved_by: "Comité de Planeación",
       changed_on: "2024-10-15",
-      description: "Registro inicial.",
+      description: "Registro inicial del indicador.",
       change_type: "creacion",
       document_id: null,
+      project_name: null,
+      activity_title: null,
+      indicator_code: "PDI-AT-001",
+    },
+    {
+      // Entrada automática: la escribe el disparador al guardar el proyecto.
+      id: "c2",
+      pillar_id: "p1",
+      indicator_id: null,
+      project_id: "pr1",
+      activity_id: null,
+      area_code: "AE-03",
+      version: "1.1",
+      approved_by: "Administradora de prueba",
+      changed_on: "2026-08-20",
+      description: "Avance 60 % → 75 %.",
+      change_type: "modificacion",
+      document_id: null,
+      project_name: "Migración a la nube institucional",
+      activity_title: null,
+      indicator_code: null,
     },
   ],
   glossary_terms: [
@@ -218,22 +243,52 @@ const routes = [
     expect: "Ambiente tecnológico",
     also: [
       "Todas las áreas",              // el selector apunta a áreas, no a protocolos
+      "Áreas estratégicas del pilar", // la rejilla con el avance por área
       "Infraestructura tecnológica",  // el área del proyecto
       "Infraestructura base",         // su línea de acción
       "PDI-AT-001",
+      "Presupuesto ejecutado",        // los recursos del indicador sí se ven
     ],
   },
   {
     path: "/implementacion/pilar/ambiente-tecnologico",
     note: "al elegir un área se filtran proyectos y líneas",
     expect: "Mostrando el área",
-    also: ["Cultura digital", "Sin proyectos vinculados a Cultura digital"],
-    absent: ["Migración a la nube institucional", "Infraestructura base"],
-    interact: (window) => {
+    also: [
+      "Cultura digital",
+      "Sin proyectos vinculados a Cultura digital",
+      "Ficha del área seleccionada",  // la ficha pasa a hablar del área
+      "Avance del área",
+      "Descripción de la acción",
+    ],
+    absent: [
+      "Presupuesto ejecutado",        // recursos del indicador: ocultos
+      "Tiempo transcurrido",
+      "Consideraciones del indicador",
+      "Áreas estratégicas del pilar", // la rejilla solo está en la vista general
+    ],
+    interact: async (window, tick) => {
       const select = window.document.querySelector(".area-selector select");
       if (!select) throw new Error("no se encontró el selector de áreas");
       select.value = "ae2";
       select.dispatchEvent(new window.Event("change", { bubbles: true }));
+      await tick();
+
+      // El filtro afecta a proyectos y líneas. El control de cambios NO se
+      // filtra: es la historia del pilar completo, así que ahí el proyecto
+      // sigue apareciendo con razón. Por eso se comprueba por sección.
+      const proyectos = window.document.querySelector("#proyectos")?.textContent ?? "";
+      if (proyectos.includes("Migración a la nube institucional")) {
+        throw new Error("el proyecto de otra área sigue en la lista");
+      }
+
+      const lineas = window.document.querySelector("#cumplimiento")?.textContent ?? "";
+      if (lineas.includes("Infraestructura base")) {
+        throw new Error("la línea de otra área sigue en el desglose");
+      }
+      if (!lineas.includes("Cultura digital")) {
+        throw new Error("no se muestran las líneas del área elegida");
+      }
     },
   },
   { path: "/acceso-intranet", expect: "Intranet PDI" },
@@ -245,10 +300,69 @@ const routes = [
     path: "/admin/pilares/ambiente-tecnologico/configurar",
     expect: "Áreas estratégicas",
     session: true,
-    also: ["Migración a la nube institucional", "Infraestructura tecnológica"],
+    also: [
+      "Migración a la nube institucional",
+      "Infraestructura tecnológica",
+      "Actividades",
+      "registro automático",  // la entrada escrita por el disparador
+    ],
+  },
+  {
+    path: "/admin/pilares/ambiente-tecnologico/configurar",
+    session: true,
+    note: "el formulario de edición llega relleno",
+    expect: "Editar proyecto",
+    also: ["control de cambios", "Línea de acción"],
+    interact: async (window, tick) => {
+      const edit = window.document.querySelector(
+        '[aria-label="Editar el proyecto Migración a la nube institucional"]',
+      );
+      if (!edit) throw new Error("no se encontró el botón de editar del proyecto");
+      edit.click();
+      await tick();
+
+      // El modal debe abrirse con los valores actuales, no vacío.
+      const dialog = window.document.querySelector(".modal-panel");
+      if (!dialog) throw new Error("el modal de edición no se abrió");
+
+      const name = dialog.querySelector("input[type=text]");
+      if (!name || name.value !== "Migración a la nube institucional") {
+        throw new Error(`el nombre no llegó relleno: "${name ? name.value : "sin campo"}"`);
+      }
+
+      const range = dialog.querySelector("input[type=range]");
+      if (!range || range.value !== "75") {
+        throw new Error(`el avance no llegó relleno: "${range ? range.value : "sin campo"}"`);
+      }
+
+      // La línea de acción debe venir seleccionada y agrupada por su área.
+      const selects = [...dialog.querySelectorAll("select")];
+      const linea = selects.find((element) => element.value === "l1");
+      if (!linea) throw new Error("la línea de acción no llegó seleccionada");
+      if (!linea.querySelector("optgroup")) {
+        throw new Error("las líneas no se agruparon por área");
+      }
+    },
   },
   { path: "/admin/usuarios", expect: "Usuarios y roles", session: true, also: ["Administradora de prueba"] },
   { path: "/tablero", expect: "Cumplimiento global y por pilar", theme: "dark", note: "tema oscuro" },
+  {
+    path: "/tablero",
+    broken: true,
+    note: "sin esquema aplicado, el error explica qué hacer",
+    expect: "La base de datos todavía no tiene las tablas del portal",
+    also: ["0007_permisos_y_cache.sql", "Detalle técnico"],
+    interact: async (window) => {
+      // El mensaje crudo de PostgREST sigue disponible, pero plegado: quien
+      // solo quiere saber qué hacer no debería tropezar con él.
+      const detail = window.document.querySelector(".state-error__detail");
+      if (!detail) throw new Error("no se ofreció el detalle técnico");
+      if (detail.open) throw new Error("el detalle técnico no debería estar desplegado");
+      if (!detail.textContent.includes("Could not find the table")) {
+        throw new Error("el detalle técnico no conserva el mensaje original");
+      }
+    },
+  },
 ];
 
 /* --- Empaquetado ----------------------------------------------------------- */
@@ -283,7 +397,7 @@ const html = `<!doctype html><html lang="es"><body><div id="root"></div></body><
  * red silencioso — todas las pantallas se quedaban en "cargando" sin decir por
  * qué.
  */
-function makeFetch(session) {
+function makeFetch(session, broken = false) {
   return async (input, init = {}) => {
     const url = typeof input === "string" ? input : input.url;
     if (process.env.SMOKE_DEBUG) console.log("  fetch:", url.slice(0, 130));
@@ -302,6 +416,20 @@ function makeFetch(session) {
         : reply({ message: "invalid claim" }, 401);
     }
     if (url.includes("/auth/v1/")) return reply({});
+
+    // Base de datos sin migrar: PostgREST responde 404 con PGRST205. Es
+    // exactamente el error que se ve al desplegar sin aplicar el esquema.
+    if (broken) {
+      const parsed = new URL(url);
+      const table = parsed.pathname.match(/\/rest\/v1\/([a-z_]+)/)?.[1] ?? "desconocida";
+      return reply(
+        {
+          code: "PGRST205",
+          message: `Could not find the table 'public.${table}' in the schema cache`,
+        },
+        404,
+      );
+    }
 
     // Datos
     const parsed = new URL(url);
@@ -420,7 +548,7 @@ for (const route of routes) {
 
   // El cliente de Supabase toma fetch de globalThis al construirse, que dentro
   // de jsdom es el window.
-  dom.window.fetch = makeFetch(Boolean(route.session));
+  dom.window.fetch = makeFetch(Boolean(route.session), Boolean(route.broken));
   dom.window.Headers = Headers;
   dom.window.Response = Response;
   dom.window.Request = Request;
@@ -436,9 +564,10 @@ for (const route of routes) {
 
   // Interacción opcional: comprobar que un control hace lo que dice.
   if (route.interact) {
+    const tick = () => new Promise((resolve) => setTimeout(resolve, 120));
     try {
-      route.interact(dom.window);
-      await new Promise((resolve) => setTimeout(resolve, 150));
+      await route.interact(dom.window, tick);
+      await tick();
     } catch (error) {
       errors.push(String(error));
     }
@@ -460,7 +589,11 @@ for (const route of routes) {
     console.log(`OK     ${route.path}${route.note ? `  (${route.note})` : ""}`);
   }
 
-  dom.window.close();
+  try {
+    dom.window.close();
+  } catch {
+    /* jsdom protesta si queda algún temporizador vivo; no afecta al resultado */
+  }
 }
 
 console.log(

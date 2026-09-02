@@ -113,10 +113,25 @@ begin
 end;
 $$;
 
-drop trigger if exists on_auth_user_created on auth.users;
-create trigger on_auth_user_created
-  after insert on auth.users
-  for each row execute function public.handle_new_user();
+-- El disparador vive en auth.users, que en algunos proyectos no pertenece al rol
+-- que ejecuta las migraciones. Si no se puede crear, la migración avisa y
+-- continúa: sin este bloque, el error tumbaría la transacción entera del editor
+-- SQL y no quedaría creada ni una sola tabla.
+--
+-- Si aparece el aviso, créalo desde el panel de Supabase o asigna el rol a mano
+-- tras dar de alta cada usuario (ver README, "El disparador de auth.users").
+do $$
+begin
+  execute 'drop trigger if exists on_auth_user_created on auth.users';
+  execute 'create trigger on_auth_user_created
+             after insert on auth.users
+             for each row execute function public.handle_new_user()';
+exception
+  when insufficient_privilege or undefined_table then
+    raise warning
+      'No se pudo crear el disparador sobre auth.users (%). El resto del esquema sí se aplicó; los perfiles habrá que crearlos a mano.',
+      sqlerrm;
+end $$;
 
 -- -----------------------------------------------------------------------------
 -- Catálogos globales

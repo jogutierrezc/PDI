@@ -1230,39 +1230,6 @@
   padding-right: var(--space-6);
 }
 
-.timeline__remove,
-.meta-list__remove {
-  color: var(--ink-faint);
-  background: transparent;
-  border: 0;
-  font-size: var(--text-2xs);
-  font-weight: 700;
-  transition: color var(--dur-fast) ease;
-}
-
-.timeline__remove {
-  position: absolute;
-  top: 0;
-  right: 0;
-  display: grid;
-  place-items: center;
-  width: 22px;
-  height: 22px;
-  border-radius: 50%;
-}
-
-.meta-list__remove {
-  display: block;
-  margin-top: var(--space-1);
-}
-
-@media (hover: hover) and (pointer: fine) {
-  .timeline__remove:hover,
-  .meta-list__remove:hover {
-    color: var(--status-risk);
-  }
-}
-
 /* --- Usuarios y roles -------------------------------------------------------- */
 
 .role-legend {
@@ -1490,7 +1457,6 @@ fieldset.admin-field legend {
 
 .area-card-wrap .area-card {
   flex: 1 1 auto;
-  padding-right: var(--space-8);
 }
 
 .area-card-wrap.is-active .area-card {
@@ -1499,27 +1465,6 @@ fieldset.admin-field legend {
   border-left-color: var(--brand-blue);
 }
 
-.area-card__remove {
-  position: absolute;
-  top: var(--space-2);
-  right: var(--space-2);
-  display: grid;
-  place-items: center;
-  width: 24px;
-  height: 24px;
-  color: var(--ink-faint);
-  background: transparent;
-  border: 0;
-  border-radius: 50%;
-  transition: color var(--dur-fast) ease, background-color var(--dur-fast) ease;
-}
-
-@media (hover: hover) and (pointer: fine) {
-  .area-card__remove:hover {
-    color: var(--status-risk);
-    background: var(--status-risk-soft);
-  }
-}
 
 /* De qué línea y área cuelga un registro, dentro de la lista de la intranet. */
 .record-lineage {
@@ -1532,4 +1477,120 @@ fieldset.admin-field legend {
 .record-lineage--empty {
   color: var(--status-pending);
   font-weight: 600;
+}
+
+/* =============================================================================
+   Acciones de fila (editar / eliminar)
+   ========================================================================== */
+
+.row-actions,
+.area-card__actions,
+.timeline__actions {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+}
+
+.row-actions .icon-button,
+.area-card__actions .icon-button,
+.timeline__actions .icon-button {
+  width: 30px;
+  height: 30px;
+}
+
+/* El botón destructivo solo se tiñe al apuntarlo: en reposo compite con el de
+   editar, que es la acción habitual. */
+@media (hover: hover) and (pointer: fine) {
+  .icon-button--danger:hover {
+    color: var(--status-risk);
+    background: var(--status-risk-soft);
+    border-color: color-mix(in srgb, var(--status-risk) 32%, transparent);
+  }
+}
+
+.icon-button--danger:focus-visible {
+  outline-color: var(--status-risk);
+}
+
+/* --- Área: acciones sobre la tarjeta ---------------------------------------- */
+
+.area-card__actions {
+  position: absolute;
+  top: var(--space-2);
+  right: var(--space-2);
+}
+
+.area-card-wrap .area-card {
+  padding-right: calc(var(--space-8) + var(--space-6));
+}
+
+/* --- Control de cambios ------------------------------------------------------ */
+
+.timeline li {
+  padding-right: var(--space-2);
+}
+
+/* A qué proyecto o actividad se refiere la entrada. Sin esto, una traza
+   automática sería una descripción sin sujeto. */
+.timeline__target {
+  display: inline-block;
+  margin-top: 2px;
+  padding: 1px var(--space-2);
+  color: var(--accent, var(--brand-blue));
+  background: color-mix(in srgb, var(--accent, var(--brand-blue)) 12%, transparent);
+  border-radius: var(--radius-pill);
+  font-size: var(--text-2xs);
+  font-weight: 700;
+}
+
+.timeline__actor {
+  display: block;
+  margin-top: var(--space-1);
+  color: var(--ink-faint);
+  font-size: var(--text-2xs);
+}
+
+.timeline__actions {
+  margin-top: var(--space-2);
+}
+
+/* --- Glosario ---------------------------------------------------------------- */
+
+.meta-list__actions {
+  display: flex;
+  gap: var(--space-3);
+  margin-top: var(--space-1);
+}
+
+.meta-list__actions button {
+  padding: 0;
+  color: var(--ink-faint);
+  background: transparent;
+  border: 0;
+  font-size: var(--text-2xs);
+  font-weight: 700;
+  transition: color var(--dur-fast) ease;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .meta-list__actions button:hover {
+    color: var(--brand-blue);
+  }
+
+  .meta-list__actions button:last-child:hover {
+    color: var(--status-risk);
+  }
+}
+
+/* --- Formularios: grupos dentro de un desplegable ---------------------------- */
+
+.admin-field optgroup {
+  color: var(--ink-muted);
+  font-style: normal;
+  font-weight: 700;
+}
+
+.admin-field optgroup option {
+  color: var(--ink);
+  font-weight: 400;
 }

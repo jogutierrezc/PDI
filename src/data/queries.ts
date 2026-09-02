@@ -32,6 +32,8 @@ import type {
   StrategicArea,
 } from "../types/database";
 import { emptySummary } from "./pdi";
+import { describeDatabaseError } from "./errors";
+import type { DatabaseError } from "./errors";
 
 /** Árbol de claves de caché. Invalidar `keys.pillars()` alcanza a sus hijas. */
 export const keys = {
@@ -49,9 +51,9 @@ export const keys = {
   owners: () => [...keys.all, "owners"] as const,
 };
 
-/** Convierte el error de PostgREST en algo que se pueda mostrar. */
-function unwrap<T>({ data, error }: { data: T | null; error: { message: string } | null }): T {
-  if (error) throw new Error(error.message);
+/** Convierte el error de PostgREST en algo que se pueda mostrar y accionar. */
+function unwrap<T>({ data, error }: { data: T | null; error: DatabaseError | null }): T {
+  if (error) throw describeDatabaseError(error);
   return data as T;
 }
 
@@ -98,7 +100,7 @@ export function useSummary() {
     queryKey: keys.summary(),
     queryFn: async (): Promise<PdiSummary> => {
       const { data, error } = await supabase.from("v_pdi_summary").select("*").maybeSingle();
-      if (error) throw new Error(error.message);
+      if (error) throw describeDatabaseError(error);
       return data ?? emptySummary;
     },
   });
@@ -109,7 +111,7 @@ export function useCurrentPeriod() {
     queryKey: keys.period(),
     queryFn: async (): Promise<ReportPeriod | null> => {
       const { data, error } = await supabase.from("v_current_period").select("*").maybeSingle();
-      if (error) throw new Error(error.message);
+      if (error) throw describeDatabaseError(error);
       return data as ReportPeriod | null;
     },
     // El corte cambia una vez al mes: no tiene sentido revalidarlo al volver
@@ -205,7 +207,7 @@ export function usePillarDetail(slug: string | undefined) {
         .eq("slug", slug!)
         .maybeSingle();
 
-      if (error) throw new Error(error.message);
+      if (error) throw describeDatabaseError(error);
       if (!pillar) return null;
 
       const id = (pillar as Pillar).id;

@@ -5,6 +5,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import App from "./App";
 import { ThemeProvider } from "./lib/theme";
 import { AuthProvider } from "./lib/auth";
+import { isRetryable } from "./data/errors";
 
 import "./styles/tokens.css";
 import "./styles/base.css";
@@ -17,12 +18,9 @@ const queryClient = new QueryClient({
       // vuelta a la pestaña solo gastaría peticiones.
       staleTime: 5 * 60 * 1000,
       refetchOnWindowFocus: false,
-      retry: (failureCount, error) => {
-        // Un fallo de permisos no mejora reintentando.
-        const message = error instanceof Error ? error.message : "";
-        if (/permiso|JWT|row-level security/i.test(message)) return false;
-        return failureCount < 2;
-      },
+      // Falta de esquema, permisos o sesión no mejoran reintentando: se
+      // muestra el error de inmediato en vez de hacer esperar tres segundos.
+      retry: (failureCount, error) => isRetryable(error) && failureCount < 2,
     },
   },
 });

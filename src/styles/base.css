@@ -865,3 +865,35 @@ table {
     animation: none;
   }
 }
+
+/* Qué hacer ante un error con causa conocida, y el mensaje técnico plegado. */
+.state-error__advice {
+  margin-top: var(--space-3) !important;
+  padding: var(--space-3) var(--space-4);
+  color: var(--ink-secondary) !important;
+  background: var(--surface);
+  border-radius: var(--radius-sm);
+  font-size: var(--text-sm) !important;
+}
+
+.state-error__detail {
+  margin-top: var(--space-3);
+  font-size: var(--text-xs);
+}
+
+.state-error__detail summary {
+  color: var(--ink-muted);
+  cursor: pointer;
+  font-weight: 700;
+}
+
+.state-error__detail code {
+  display: block;
+  margin-top: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  color: var(--ink-secondary);
+  background: var(--surface);
+  border-radius: var(--radius-xs);
+  font-family: ui-monospace, "SFMono-Regular", "Cascadia Mono", Menlo, monospace;
+  overflow-wrap: anywhere;
+}

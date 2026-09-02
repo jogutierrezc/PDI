@@ -1,0 +1,8 @@
+# Configuración local de Supabase CLI.
+# Sustituye project_id por la referencia de tu proyecto (Project Settings → General).
+project_id = "pdi-udes"
+
+[functions.admin-users]
+# La función comprueba la sesión por su cuenta: necesita recibir la cabecera
+# Authorization tal cual, sin que la plataforma la valide antes.
+verify_jwt = false

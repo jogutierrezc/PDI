@@ -1,0 +1,269 @@
+/* =============================================================================
+   PDI · Sistema de diseño — tokens
+   Una sola fuente de verdad para color, tipografía, espacio, forma y movimiento.
+   Los tokens de color se declaran completos en :root (tema claro) y se
+   redefinen — solo los que cambian — para el tema oscuro.
+   ========================================================================== */
+
+:root {
+  color-scheme: light;
+
+  /* --- Marca -------------------------------------------------------------- */
+  --brand-navy: #0a2d63;
+  --brand-navy-deep: #061e46;
+  --brand-blue: #2166d6;
+  --brand-blue-strong: #1b52ad;
+  --brand-blue-soft: #eaf1fd;
+  --brand-teal: #0096a5;
+
+  /* --- Planos ------------------------------------------------------------- */
+  --page: #f4f7fb;
+  --page-alt: #eaeff7;
+  --surface: #ffffff;
+  --surface-2: #f8fafd;
+  --surface-3: #eef3fa;
+  --surface-glass: rgba(255, 255, 255, 0.72);
+  --logo-plate: var(--brand-navy);
+
+  /* --- Tinta -------------------------------------------------------------- */
+  --ink: #0d1c31;
+  --ink-secondary: #45566d;
+  --ink-muted: #6b7c93;
+  --ink-faint: #93a2b6;
+  --ink-on-accent: #ffffff;
+
+  /* --- Líneas y separación ------------------------------------------------ */
+  --line: rgba(13, 40, 84, 0.11);
+  --line-strong: rgba(13, 40, 84, 0.2);
+  --line-faint: rgba(13, 40, 84, 0.06);
+
+  /* --- Acentos de pilar (paleta categórica validada: all-pairs CVD) --------
+     Verificada con el validador de dataviz sobre superficie clara:
+     banda de luminosidad OK · croma OK · CVD dE 10.1 · visión normal dE 16.5
+     · contraste >= 3:1. El nombre y el ícono del pilar acompañan siempre al
+     color: la identidad nunca depende solo del tono.                        */
+  --pillar-1: #2166d6; /* Personalización        · azul institucional */
+  --pillar-2: #0096a5; /* Ambiente tecnológico   · cian */
+  --pillar-3: #a67e00; /* Entorno emprendedor    · ámbar */
+  --pillar-4: #78398c; /* Gobernanza             · púrpura */
+  --pillar-5: #2e6b0b; /* Sostenibilidad         · verde */
+  --pillar-6: #bc4861; /* Apropiación social     · rosa */
+
+  /* --- Estado (reservado; nunca se reutiliza como serie) ------------------
+     Los colores de estado siempre viajan con ícono + etiqueta.              */
+  --status-done: #12833a;
+  --status-active: #2f6fd0;
+  --status-pending: #b07d00;
+  --status-risk: #d03b3b;
+  --status-done-soft: #e6f4ea;
+  --status-active-soft: #e8f0fd;
+  --status-pending-soft: #fbf2e0;
+  --status-risk-soft: #fceaea;
+
+  /* --- Datos: rejilla y pistas -------------------------------------------- */
+  --track: rgba(13, 40, 84, 0.09);
+  --gridline: rgba(13, 40, 84, 0.07);
+
+  /* --- Tipografía --------------------------------------------------------- */
+  --font-display: "Fraunces", "Iowan Old Style", Georgia, serif;
+  --font-sans: "Manrope", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+
+  --text-2xs: 0.6875rem;
+  --text-xs: 0.75rem;
+  --text-sm: 0.8125rem;
+  --text-base: 0.9375rem;
+  --text-md: 1.0625rem;
+  --text-lg: clamp(1.15rem, 0.4vw + 1.05rem, 1.3rem);
+  --text-xl: clamp(1.35rem, 0.8vw + 1.15rem, 1.65rem);
+  --text-2xl: clamp(1.7rem, 1.4vw + 1.35rem, 2.3rem);
+  --text-3xl: clamp(2.1rem, 2.6vw + 1.5rem, 3.1rem);
+  --text-4xl: clamp(2.6rem, 4.6vw + 1.4rem, 4.6rem);
+
+  --leading-tight: 1.08;
+  --leading-snug: 1.28;
+  --leading-normal: 1.5;
+  --leading-relaxed: 1.7;
+
+  --tracking-display: -0.028em;
+  --tracking-tight: -0.012em;
+  --tracking-wide: 0.08em;
+  --tracking-caps: 0.14em;
+
+  /* --- Espacio (base 4px) -------------------------------------------------- */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-7: 32px;
+  --space-8: 40px;
+  --space-9: 48px;
+  --space-10: 64px;
+  --space-11: 80px;
+  --space-12: 104px;
+
+  --gutter: clamp(16px, 4vw, 40px);
+  --measure: 68ch;
+  --content-max: 1220px;
+  --header-h: 72px;
+
+  /* --- Forma -------------------------------------------------------------- */
+  --radius-xs: 8px;
+  --radius-sm: 12px;
+  --radius-md: 16px;
+  --radius-lg: 20px;
+  --radius-xl: 26px;
+  --radius-2xl: 32px;
+  --radius-pill: 999px;
+
+  /* --- Elevación (sombras en capas, no un solo desenfoque) ---------------- */
+  --shadow-xs: 0 1px 2px rgba(10, 34, 73, 0.06);
+  --shadow-sm: 0 1px 2px rgba(10, 34, 73, 0.05), 0 2px 6px rgba(10, 34, 73, 0.04);
+  --shadow-md: 0 1px 2px rgba(10, 34, 73, 0.05), 0 6px 16px rgba(10, 34, 73, 0.06);
+  --shadow-lg: 0 2px 4px rgba(10, 34, 73, 0.05), 0 12px 28px rgba(10, 34, 73, 0.08);
+  --shadow-xl: 0 4px 8px rgba(10, 34, 73, 0.06), 0 24px 48px rgba(10, 34, 73, 0.11);
+  --shadow-accent: 0 8px 20px rgba(33, 102, 214, 0.24);
+  --ring: 0 0 0 3px rgba(33, 102, 214, 0.32);
+
+  /* --- Movimiento ---------------------------------------------------------
+     Curvas fuertes: las nativas de CSS son demasiado tibias.                */
+  --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
+  --ease-in-out: cubic-bezier(0.77, 0, 0.175, 1);
+  --ease-drawer: cubic-bezier(0.32, 0.72, 0, 1);
+
+  --dur-press: 140ms;
+  --dur-fast: 180ms;
+  --dur-base: 220ms;
+  --dur-slow: 300ms;
+  --dur-bar: 900ms;
+
+  /* --- Capas -------------------------------------------------------------- */
+  --z-sticky: 20;
+  --z-header: 50;
+  --z-overlay: 80;
+  --z-modal: 90;
+}
+
+/* ---------------------------------------------------------------------------
+   Tema oscuro. Se aplica cuando el sistema lo pide y el usuario no eligió
+   claro, o cuando el usuario eligió oscuro explícitamente.
+   -------------------------------------------------------------------------- */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+
+    --brand-navy: #9dc0f5;
+    --brand-navy-deep: #7fabee;
+    --brand-blue: #5c9bf2;
+    --brand-blue-strong: #7fb0f6;
+    --brand-blue-soft: rgba(92, 155, 242, 0.14);
+    --brand-teal: #37b6c4;
+
+    --page: #0b1017;
+    --page-alt: #0e141d;
+    --surface: #151d28;
+    --surface-2: #1a232f;
+    --surface-3: #202c3a;
+    --surface-glass: rgba(21, 29, 40, 0.78);
+    --logo-plate: #202c3a;
+
+    --ink: #eef3f9;
+    --ink-secondary: #b3c1d2;
+    --ink-muted: #8b9bb0;
+    --ink-faint: #6d7d92;
+    --ink-on-accent: #08111d;
+
+    --line: rgba(148, 176, 214, 0.16);
+    --line-strong: rgba(148, 176, 214, 0.28);
+    --line-faint: rgba(148, 176, 214, 0.09);
+
+    /* Paleta oscura re-derivada, no un volteo automático.
+       banda OK · croma OK · CVD dE 7.7 (banda de piso: exige el ícono y la
+       etiqueta que ya acompañan a cada pilar) · visión normal dE 15.6 ·
+       contraste >= 3:1 sobre la superficie oscura.                          */
+    --pillar-1: #2e5fca;
+    --pillar-2: #0ca3b7;
+    --pillar-3: #a58c0d;
+    --pillar-4: #b271ed;
+    --pillar-5: #327f3a;
+    --pillar-6: #db516a;
+
+    --status-done: #3fb267;
+    --status-active: #5c9bf2;
+    --status-pending: #d9a221;
+    --status-risk: #ec6a6a;
+    --status-done-soft: rgba(63, 178, 103, 0.16);
+    --status-active-soft: rgba(92, 155, 242, 0.16);
+    --status-pending-soft: rgba(217, 162, 33, 0.16);
+    --status-risk-soft: rgba(236, 106, 106, 0.16);
+
+    --track: rgba(148, 176, 214, 0.16);
+    --gridline: rgba(148, 176, 214, 0.09);
+
+    --shadow-xs: 0 1px 2px rgba(0, 0, 0, 0.4);
+    --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.4), 0 2px 6px rgba(0, 0, 0, 0.3);
+    --shadow-md: 0 1px 2px rgba(0, 0, 0, 0.45), 0 6px 16px rgba(0, 0, 0, 0.34);
+    --shadow-lg: 0 2px 4px rgba(0, 0, 0, 0.45), 0 12px 28px rgba(0, 0, 0, 0.42);
+    --shadow-xl: 0 4px 8px rgba(0, 0, 0, 0.5), 0 24px 48px rgba(0, 0, 0, 0.5);
+    --shadow-accent: 0 8px 20px rgba(33, 84, 168, 0.5);
+    --ring: 0 0 0 3px rgba(92, 155, 242, 0.42);
+  }
+}
+
+/* La elección explícita del usuario gana en ambos sentidos. */
+:root[data-theme="dark"] {
+  color-scheme: dark;
+
+  --brand-navy: #9dc0f5;
+  --brand-navy-deep: #7fabee;
+  --brand-blue: #5c9bf2;
+  --brand-blue-strong: #7fb0f6;
+  --brand-blue-soft: rgba(92, 155, 242, 0.14);
+  --brand-teal: #37b6c4;
+
+  --page: #0b1017;
+  --page-alt: #0e141d;
+  --surface: #151d28;
+  --surface-2: #1a232f;
+  --surface-3: #202c3a;
+  --surface-glass: rgba(21, 29, 40, 0.78);
+  --logo-plate: #202c3a;
+
+  --ink: #eef3f9;
+  --ink-secondary: #b3c1d2;
+  --ink-muted: #8b9bb0;
+  --ink-faint: #6d7d92;
+  --ink-on-accent: #08111d;
+
+  --line: rgba(148, 176, 214, 0.16);
+  --line-strong: rgba(148, 176, 214, 0.28);
+  --line-faint: rgba(148, 176, 214, 0.09);
+
+  --pillar-1: #2e5fca;
+  --pillar-2: #0ca3b7;
+  --pillar-3: #a58c0d;
+  --pillar-4: #b271ed;
+  --pillar-5: #327f3a;
+  --pillar-6: #db516a;
+
+  --status-done: #3fb267;
+  --status-active: #5c9bf2;
+  --status-pending: #d9a221;
+  --status-risk: #ec6a6a;
+  --status-done-soft: rgba(63, 178, 103, 0.16);
+  --status-active-soft: rgba(92, 155, 242, 0.16);
+  --status-pending-soft: rgba(217, 162, 33, 0.16);
+  --status-risk-soft: rgba(236, 106, 106, 0.16);
+
+  --track: rgba(148, 176, 214, 0.16);
+  --gridline: rgba(148, 176, 214, 0.09);
+
+  --shadow-xs: 0 1px 2px rgba(0, 0, 0, 0.4);
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.4), 0 2px 6px rgba(0, 0, 0, 0.3);
+  --shadow-md: 0 1px 2px rgba(0, 0, 0, 0.45), 0 6px 16px rgba(0, 0, 0, 0.34);
+  --shadow-lg: 0 2px 4px rgba(0, 0, 0, 0.45), 0 12px 28px rgba(0, 0, 0, 0.42);
+  --shadow-xl: 0 4px 8px rgba(0, 0, 0, 0.5), 0 24px 48px rgba(0, 0, 0, 0.5);
+  --shadow-accent: 0 8px 20px rgba(33, 84, 168, 0.5);
+  --ring: 0 0 0 3px rgba(92, 155, 242, 0.42);
+}

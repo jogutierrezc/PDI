@@ -3,11 +3,58 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="color-scheme" content="light dark" />
     <meta
       name="description"
-      content="Tablero PDI público para consultar el cumplimiento global y por pilar del plan de desarrollo institucional."
+      content="Portal público del Plan de Desarrollo Institucional 2024-2028 de la Universidad de Santander: pilares estratégicos, avance por indicador y tablero de cumplimiento."
     />
+    <meta name="theme-color" content="#f4f7fb" media="(prefers-color-scheme: light)" />
+    <meta name="theme-color" content="#0b1017" media="(prefers-color-scheme: dark)" />
+
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content="PDI 2024-2028 | Universidad de Santander" />
+    <meta
+      property="og:description"
+      content="Consulta el cumplimiento global y por pilar del Plan de Desarrollo Institucional."
+    />
+    <meta property="og:image" content="/og-card.jpg" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta name="twitter:card" content="summary_large_image" />
+
+    <link rel="icon" type="image/svg+xml" href="/logo-udes.svg" />
+
+    <!-- Las fuentes se piden desde el HTML, no con @import dentro del CSS:
+         un @import obliga al navegador a descargar la hoja de estilos antes
+         de descubrir siquiera la petición de la fuente. -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      rel="preload"
+      as="style"
+      href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600;9..144,700&family=Manrope:wght@400;500;600;700;800&display=swap"
+    />
+    <link
+      rel="stylesheet"
+      href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600;9..144,700&family=Manrope:wght@400;500;600;700;800&display=swap"
+    />
+
     <title>PDI 2024-2028 | Universidad de Santander</title>
+
+    <!-- El tema se aplica antes del primer pintado. Sin esto, quien tiene el
+         tema oscuro guardado ve un destello blanco en cada carga. -->
+    <script>
+      (function () {
+        try {
+          var stored = localStorage.getItem("pdi-theme");
+          if (stored === "light" || stored === "dark") {
+            document.documentElement.setAttribute("data-theme", stored);
+          }
+        } catch (error) {
+          /* almacenamiento bloqueado: manda prefers-color-scheme */
+        }
+      })();
+    </script>
   </head>
   <body>
     <div id="root"></div>

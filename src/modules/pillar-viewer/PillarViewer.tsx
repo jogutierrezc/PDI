@@ -1,41 +1,725 @@
-import { useState } from "react";
-import type { CSSProperties } from "react";
-import { TopBar } from "../../components/layout/TopBar";
+import { useEffect, useState } from "react";
+import { Link, Navigate, useParams } from "react-router-dom";
+import { PublicLayout } from "../../components/layout/PublicLayout";
+import { Icon } from "../../components/ui/Icon";
+import { ProgressRing } from "../../components/ui/ProgressRing";
+import { EmptyBlock, ErrorBlock, LoadingBlock } from "../../components/ui/QueryState";
+import { useCurrentPeriod, usePillarDetail } from "../../data/queries";
+import { accentFor, formatBudget, formatDate, formatMonth, statusMeta } from "../../data/pdi";
 import "./pillar-viewer.css";
 
-interface Project { name: string; owner: string; date: string; status: string; progress: number; icon: string; }
-interface PillarData { title: string; number: string; status: string; description: string; icon: string; budget: string; budgetProgress: number; elapsed: string; elapsedProgress: number; critical: number; projects: Project[]; lines: { name: string; progress: number; color: string }[]; impulsor: string; contributes: string; managementOwner: string; calculationOwner: string; considerations: string; level: string; unit: string; periodicity: string; }
-
-const defaultData: PillarData = {
-  title: "Ambiente tecnológico", number: "III", status: "En curso", description: "Modernización de la infraestructura digital, optimización de procesos mediante tecnología y fomento de una cultura de innovación digital en toda la institución.", icon: "⌘", budget: "$4.2M", budgetProgress: 65, elapsed: "18 meses", elapsedProgress: 40, critical: 3, impulsor: "Transformación digital y eficiencia institucional", contributes: "Modernización, innovación y continuidad operativa", managementOwner: "Dirección de Tecnología", calculationOwner: "Oficina de Planeación", considerations: "El avance considera proyectos activos, hitos aprobados y evidencias reportadas durante el periodo de seguimiento.", level: "Estratégico", unit: "Porcentaje", periodicity: "Anual",
-  projects: [
-    { name: "Migración a la Nube Institucional", owner: "Dra. Elena Ríos", date: "Oct 2024", status: "En proceso", progress: 75, icon: "◉" },
-    { name: "Ampliación Cobertura WiFi Campus Sur", owner: "Ing. Carlos Vega", date: "Ene 2024", status: "Completado", progress: 100, icon: "⌁" },
-    { name: "Actualización Protocolos de Ciberseguridad", owner: "Lic. Ana Silva", date: "Mar 2025", status: "Pendiente", progress: 10, icon: "◇" },
-  ],
-  lines: [{ name: "Infraestructura base", progress: 85, color: "blue" }, { name: "Sistemas de información", progress: 60, color: "green" }, { name: "Cultura digital", progress: 30, color: "gray" }],
-};
-const pillarNames: Record<string, string> = { personalizacion: "Personalización", "ambiente-tecnologico": "Ambiente tecnológico", "entorno-emprendedor": "Entorno emprendedor", gobernanza: "Gobernanza", sostenibilidad: "Sostenibilidad", "apropiacion-social": "Apropiación social" };
-const protocolOverrides: Record<string, Partial<PillarData>> = { "PDI-AT-001": {}, "PDI-AT-002": { status: "En validación", description: "Seguimiento a la adopción de servicios digitales, disponibilidad tecnológica y apropiación de herramientas institucionales.", budget: "$2.8M", budgetProgress: 38, elapsed: "9 meses", elapsedProgress: 22, critical: 5, impulsor: "Adopción y disponibilidad de servicios digitales", contributes: "Continuidad académica y experiencia de usuario", managementOwner: "Vicerrectoría Administrativa", calculationOwner: "Equipo de Analítica Institucional", considerations: "La medición se actualiza con reportes de disponibilidad, usuarios activos y actas de validación.", level: "Táctico", periodicity: "Mensual", projects: [{ name: "Adopción de servicios digitales", owner: "Equipo de Transformación", date: "Abr 2025", status: "En proceso", progress: 38, icon: "◉" }, { name: "Mesa de ayuda institucional", owner: "Soporte TI", date: "Jun 2025", status: "En proceso", progress: 55, icon: "⌁" }], lines: [{ name: "Disponibilidad de servicios", progress: 72, color: "blue" }, { name: "Adopción de usuarios", progress: 43, color: "green" }, { name: "Soporte y continuidad", progress: 28, color: "gray" }] } };
-const changes = [{ code: "PDI-AT-001", version: "1.0", approvedBy: "Comité de Planeación", date: "2024-10-15", adjustment: "Registro inicial del indicador del pilar.", type: "Creación" }, { code: "PDI-AT-001", version: "1.1", approvedBy: "Dirección de Planeación", date: "2025-02-08", adjustment: "Actualización de metas y responsables de cálculo.", type: "Actualización" }];
-const glossary = [{ pillar: "Avance", definition: "Porcentaje de ejecución", description: "Resultado validado frente a la meta definida para el periodo." }, { pillar: "Hito", definition: "Resultado verificable", description: "Evento o entregable que evidencia el avance de un proyecto." }, { pillar: "Evidencia", definition: "Soporte documental", description: "Archivo o registro que respalda el cumplimiento reportado." }];
-
-export function PillarViewer() {
-  const [selectedProtocol, setSelectedProtocol] = useState("PDI-AT-001");
-  const slug = window.location.pathname.split("/").pop() ?? "ambiente-tecnologico";
-  const data = { ...defaultData, ...protocolOverrides[selectedProtocol], title: pillarNames[slug] ?? defaultData.title };
-  return <div className="pillar-viewer"><TopBar activeSection="implementation" /><main className="pillar-viewer__main">
-    <header className="pillar-viewer__hero"><div className="pillar-viewer__icon">{data.icon}</div><div><div className="pillar-viewer__badges"><span>Pilar estratégico {data.number}</span><b>✓ {data.status}</b></div><h1>{data.title}</h1><p>{data.description}</p></div></header>
-    <nav className="pillar-subnav" aria-label="Secciones del pilar"><a href="#proyectos">Proyectos estratégicos</a><a href="#cumplimiento">Cumplimiento por línea</a><a href="#soporte">Soporte</a><a href="#planeacion">Planeación de resultados</a><a href="#cambios">Control de cambios</a><a href="#glosario">Glosario</a><label className="protocol-selector"><span>Protocolo</span><select value={selectedProtocol} onChange={(event) => setSelectedProtocol(event.target.value)}><option value="PDI-AT-001">PDI-AT-001 · Indicador principal</option><option value="PDI-AT-002">PDI-AT-002 · Seguimiento operativo</option></select></label></nav>
-    <section className="indicator-context"><div><span>Impulsador</span><strong>{data.impulsor}</strong></div><div><span>Aporta</span><strong>{data.contributes}</strong></div><div><span>Responsable de la gestión</span><strong>{data.managementOwner}</strong></div><div><span>Responsable del cálculo</span><strong>{data.calculationOwner}</strong></div><div className="indicator-context__wide"><span>Consideraciones del indicador del pilar</span><strong>{data.considerations}</strong></div></section>
-    <section className="classification-grid" aria-label="Clasificación del indicador"><div className="classification-card classification-card--status"><strong>{data.status === "En curso" ? "Activo" : data.status}</strong><span>Estado</span><i>●</i></div><div className="classification-card classification-card--level"><strong>{data.level}</strong><span>Nivel de gestión</span><i>◆</i></div><div className="classification-card classification-card--unit"><strong>{data.unit}</strong><span>Unidad</span><i>%</i></div><div className="classification-card classification-card--period"><strong>{data.periodicity}</strong><span>Periodicidad</span><i>◷</i></div></section>
-    <section className="pillar-stats"><Stat label="Presupuesto ejecutado" value={data.budget} progress={data.budgetProgress} caption={`${data.budgetProgress}% del total`} icon="$" /><Stat label="Tiempo transcurrido" value={data.elapsed} progress={data.elapsedProgress} caption="Año 2 de 5" icon="◷" /><div className="pillar-stat"><div className="stat-top"><span>Tareas críticas</span><strong>!</strong></div><strong className="stat-value stat-value--error">{data.critical}</strong><p>Requieren atención inmediata esta semana.</p></div></section>
-    <section className="planning-strip" id="planeacion"><div><span className="panel-kicker">Próximo ciclo</span><h2>Planeación de resultados</h2><p>La siguiente revisión se enfocará en equilibrar la ejecución del pilar y asegurar resultados medibles.</p></div><ul><li>Priorizar cultura digital.</li><li>Validar evidencias del trimestre.</li><li>Actualizar metas y responsables.</li></ul></section>
-    <div className="pillar-content"><section className="project-section" id="proyectos"><div className="pillar-section-title"><h2>Proyectos estratégicos</h2><a href="/implementacion">Ver todos →</a></div><div className="project-list">{data.projects.map((project) => <article className="project-row" key={project.name}><div className="project-icon">{project.icon}</div><div className="project-info"><h3>{project.name}</h3><p>{project.owner} <span>•</span> {project.date}</p></div><div className="project-state"><b>{project.status}</b><div className="mini-progress"><span style={{ width: `${project.progress}%` }} /></div></div></article>)}</div></section><aside className="compliance-card" id="cumplimiento"><h2>Cumplimiento por línea</h2>{data.lines.map((line) => <div className="line-progress" key={line.name}><div><span>{line.name}</span><b>{line.progress}%</b></div><div className={`progress-bar progress-bar--${line.color}`}><span style={{ width: `${line.progress}%` }} /></div></div>)}<div className="insight"><strong>✦</strong><p>Priorizar las iniciativas de <b>cultura digital</b> en el próximo trimestre para equilibrar el desarrollo del pilar.</p></div></aside></div>
-    <section className="support-panel detail-panel" id="soporte"><div><span className="panel-kicker">Acompañamiento e información</span><h2>Soporte</h2><p>Consulta aquí la información disponible para interpretar el indicador, sus proyectos y evidencias de seguimiento.</p><div className="support-summary"><span>Responsable de atención</span><strong>Oficina de Planeación · planeacion@udes.edu.co</strong></div></div><div className="support-resources"><a href="#cumplimiento"><strong>Ficha del indicador</strong><span>Definición, clasificación y responsables →</span></a><a href="#proyectos"><strong>Proyectos y evidencias</strong><span>Avances, hitos y responsables →</span></a></div></section>
-    <section className="additional-panels"><article className="detail-panel detail-panel--wide" id="cambios"><span className="panel-kicker">Trazabilidad</span><h2>Control de cambios</h2><DataTable headers={["Código del protocolo", "Versión", "Aval de cambio", "Fecha de modificación", "Descripción de ajuste", "Tipo de cambio"]} rows={changes.map((change) => [change.code, change.version, change.approvedBy, change.date, change.adjustment, change.type])} /></article><article className="detail-panel detail-panel--wide" id="glosario"><span className="panel-kicker">Definiciones</span><h2>Glosario</h2><DataTable headers={["Pilar", "Definición", "Descripción"]} rows={glossary.map((item) => [item.pillar, item.definition, item.description])} /></article></section>
-  </main><footer className="pillar-viewer__footer"><span>Portal de Implementación PDI</span><a href="/implementacion">← Volver a pilares</a></footer></div>;
+/**
+ * La barra de secciones cambia con el filtro: al mirar un área concreta, la
+ * sección "Áreas estratégicas" no existe, y enlazar a un ancla que no está en
+ * la página deja al lector donde estaba sin explicación.
+ */
+function sectionsFor(hasArea: boolean) {
+  return [
+    { id: "ficha", label: hasArea ? "Ficha del área" : "Ficha del indicador" },
+    ...(hasArea ? [] : [{ id: "areas", label: "Áreas estratégicas" }]),
+    { id: "proyectos", label: "Proyectos" },
+    { id: "cumplimiento", label: "Líneas de acción" },
+    { id: "planeacion", label: "Planeación" },
+    { id: "cambios", label: "Control de cambios" },
+    { id: "glosario", label: "Glosario" },
+  ];
 }
 
-function Stat({ label, value, progress, caption, icon }: { label: string; value: string; progress: number; caption: string; icon: string }) { return <div className="pillar-stat"><div className="stat-top"><span>{label}</span><strong>{icon}</strong></div><strong className="stat-value">{value}</strong><div className="stat-progress"><div className="progress-bar"><span style={{ width: `${progress}%` }} /></div><small>{caption}</small></div></div>; }
-function DataTable({ headers, rows }: { headers: string[]; rows: string[][] }) { return <div className="data-table-wrap"><table className="data-table"><thead><tr>{headers.map((header) => <th key={header}>{header}</th>)}</tr></thead><tbody>{rows.map((row, rowIndex) => <tr key={`${row[0]}-${rowIndex}`}>{row.map((cell, cellIndex) => <td key={`${cell}-${cellIndex}`}>{cell}</td>)}</tr>)}</tbody></table></div>; }
+/**
+ * Avance de un área: promedio del cumplimiento reportado de sus líneas.
+ *
+ * No se deriva de los proyectos a propósito. El avance de una línea es un dato
+ * que valida el comité (así está modelado en action_lines.progress); calcularlo
+ * desde los proyectos daría un segundo número que discreparía del oficial.
+ */
+function statsForArea(
+  areaIdentifier: string,
+  lines: { area_id: string; progress: number }[],
+  projects: { action_line_id: string | null }[],
+  lineArea: Map<string, string>,
+) {
+  const own = lines.filter((line) => line.area_id === areaIdentifier);
+  const progress = own.length
+    ? Math.round(own.reduce((total, line) => total + line.progress, 0) / own.length)
+    : 0;
+  const projectCount = projects.filter(
+    (project) => project.action_line_id && lineArea.get(project.action_line_id) === areaIdentifier,
+  ).length;
+
+  return { progress, lines: own.length, projects: projectCount };
+}
+
+export function PillarViewer() {
+  const { slug } = useParams<{ slug: string }>();
+  const detail = usePillarDetail(slug);
+  const period = useCurrentPeriod();
+  // null = todas las áreas. El selector de la barra filtra los proyectos y el
+  // cumplimiento por línea, que son las dos secciones que cuelgan de un área.
+  const [areaId, setAreaId] = useState<string | null>(null);
+
+  // Al cambiar de pilar el área elegida deja de existir: se vuelve a "todas"
+  // en vez de dejar el selector apuntando a la nada.
+  useEffect(() => setAreaId(null), [slug]);
+
+  if (detail.isPending) {
+    return (
+      <PublicLayout className="pillar-page">
+        <div className="u-container pillar-body">
+          <LoadingBlock rows={6} label="Cargando el pilar" />
+        </div>
+      </PublicLayout>
+    );
+  }
+
+  if (detail.isError) {
+    return (
+      <PublicLayout className="pillar-page">
+        <div className="u-container pillar-body">
+          <ErrorBlock error={detail.error} onRetry={() => void detail.refetch()} />
+        </div>
+      </PublicLayout>
+    );
+  }
+
+  // Un slug inventado, o un pilar sin publicar visto por alguien anónimo, no
+  // muestran otro pilar por defecto: llevan a la página 404, que sí explica qué
+  // ha pasado.
+  if (!detail.data) return <Navigate to="/404" replace />;
+
+  const { pillar, progress, areas, lines, indicators, projects, planning, changes, glossary } = detail.data;
+  const accent = accentFor(pillar.accent_slot);
+  const accentStyle = { "--accent": accent } as React.CSSProperties;
+
+  // La ficha describe el indicador principal del pilar. Si hay más protocolos,
+  // sus códigos se listan dentro de la ficha para que no queden invisibles.
+  const indicator = indicators.find((item) => item.is_primary) ?? indicators[0];
+
+  // v_action_lines ya trae el área de cada línea resuelta: con este índice, un
+  // proyecto sabe a qué línea y a qué área pertenece sin más consultas.
+  const lineById = new Map(lines.map((line) => [line.id, line]));
+  const lineArea = new Map(lines.map((line) => [line.id, line.area_id]));
+  const activeArea = areaId ? areas.find((area) => area.id === areaId) : undefined;
+  const sections = sectionsFor(Boolean(activeArea));
+  const areaStats = new Map(
+    areas.map((area) => [area.id, statsForArea(area.id, lines, projects, lineArea)]),
+  );
+
+  const visibleAreas = activeArea ? [activeArea] : areas;
+  const visibleLines = activeArea ? lines.filter((line) => line.area_id === activeArea.id) : lines;
+  const visibleProjects = activeArea
+    ? projects.filter(
+        (project) =>
+          project.action_line_id && lineById.get(project.action_line_id)?.area_id === activeArea.id,
+      )
+    : projects;
+
+  // Proyectos que nadie ha colgado todavía de una línea: se avisa en vez de
+  // hacerlos desaparecer al filtrar.
+  const unlinkedProjects = projects.filter((project) => !project.action_line_id).length;
+
+  return (
+    <PublicLayout className="pillar-page">
+      <div className="pillar-viewer" style={accentStyle}>
+        <header className="pillar-hero">
+          <div className="u-container pillar-hero__inner">
+            <span className="pillar-hero__icon">
+              <Icon name={pillar.icon} size={30} />
+            </span>
+
+            <div className="pillar-hero__copy">
+              <div className="pillar-hero__badges">
+                <span className="pillar-hero__numeral">Pilar estratégico {pillar.numeral}</span>
+                <span className="pillar-hero__owner">{pillar.management_owner}</span>
+              </div>
+              <h1>{pillar.name}</h1>
+              <p className="lede">{pillar.description}</p>
+            </div>
+
+            <div className="pillar-hero__gauge">
+              <ProgressRing
+                value={progress.progress}
+                size={124}
+                thickness={10}
+                color={accent}
+                label={`Avance de ${pillar.name}`}
+              />
+              <small>
+                {progress.done} de {progress.total} actividades
+                {period.data ? ` · al ${formatDate(period.data.cutoff_date)}` : ""}
+              </small>
+            </div>
+          </div>
+        </header>
+
+        <nav className="pillar-subnav" aria-label="Secciones del pilar">
+          <div className="u-container pillar-subnav__inner">
+            <ul>
+              {sections.map((section) => (
+                <li key={section.id}>
+                  <a href={`#${section.id}`}>{section.label}</a>
+                </li>
+              ))}
+            </ul>
+
+            {areas.length > 0 && (
+              <label className="area-selector">
+                <span>Áreas</span>
+                <select
+                  value={areaId ?? ""}
+                  onChange={(event) => setAreaId(event.target.value || null)}
+                >
+                  <option value="">Todas las áreas ({areas.length})</option>
+                  {areas.map((area) => (
+                    <option key={area.id} value={area.id}>
+                      {area.code ? `${area.code} · ` : ""}
+                      {area.name}
+                    </option>
+                  ))}
+                </select>
+                <Icon name="chevron-down" size={15} />
+              </label>
+            )}
+          </div>
+        </nav>
+
+        <div className="u-container pillar-body">
+          {activeArea && (
+            <p className="area-note" aria-live="polite">
+              <Icon name="grid" size={15} />
+              <span>
+                Mostrando el área <strong>{activeArea.name}</strong>
+                {activeArea.description ? ` · ${activeArea.description}` : ""}
+              </span>
+              <button type="button" className="area-note__clear" onClick={() => setAreaId(null)}>
+                Ver todas
+              </button>
+            </p>
+          )}
+
+          {/* --- Ficha ------------------------------------------------------ */}
+          <section className="pillar-section" id="ficha" aria-labelledby="ficha-title">
+            {activeArea ? (
+              /* Con un área elegida la ficha habla del área, no del indicador
+                 del pilar: aporta, responsables y consideraciones describen el
+                 indicador y aquí solo serían ruido. */
+              <>
+                <div className="section-heading">
+                  <span className="eyebrow">Área estratégica</span>
+                  <h2 id="ficha-title">Ficha del área seleccionada</h2>
+                </div>
+
+                <dl className="fact-grid">
+                  <Fact label="Pilar" value={pillar.name} />
+                  <Fact
+                    label="Acción del pilar"
+                    value={`${activeArea.code ? `${activeArea.code} · ` : ""}${activeArea.name}`}
+                  />
+                  <Fact label="Descripción de la acción" value={activeArea.description} wide />
+                </dl>
+
+                <div className="classification-grid">
+                  <Classification
+                    label="Avance del área"
+                    value={`${areaStats.get(activeArea.id)?.progress ?? 0}%`}
+                    glyph="◐"
+                    tone="active"
+                  />
+                  <Classification
+                    label="Líneas de acción"
+                    value={String(areaStats.get(activeArea.id)?.lines ?? 0)}
+                    glyph="◆"
+                    tone="neutral"
+                  />
+                  <Classification
+                    label="Proyectos vinculados"
+                    value={String(areaStats.get(activeArea.id)?.projects ?? 0)}
+                    glyph="▤"
+                    tone="neutral"
+                  />
+                </div>
+              </>
+            ) : (
+              <>
+                <div className="section-heading">
+                  <span className="eyebrow">Ficha del indicador</span>
+                  <h2 id="ficha-title">Cómo se mide este pilar</h2>
+                </div>
+
+                <dl className="fact-grid">
+                  {indicator && (
+                    <Fact
+                      label="Código del indicador"
+                      value={`${indicator.code} · ${indicator.name}`}
+                    />
+                  )}
+                  <Fact label="Impulsador" value={pillar.impulsor} />
+                  <Fact label="Aporta a" value={pillar.contributes} />
+                  <Fact label="Responsable de la gestión" value={pillar.management_owner} />
+                  <Fact label="Responsable del cálculo" value={pillar.calculation_owner} />
+                  {indicator && (
+                    <Fact label="Consideraciones del indicador" value={indicator.considerations} wide />
+                  )}
+                </dl>
+
+                {indicator ? (
+                  <div className="classification-grid">
+                    <Classification label="Estado" value={indicator.status_label} glyph="●" tone="active" />
+                    <Classification
+                      label="Nivel de gestión"
+                      value={indicator.level_label ?? "Sin definir"}
+                      glyph="◆"
+                      tone="neutral"
+                    />
+                    <Classification
+                      label="Unidad"
+                      value={indicator.unit_label ?? "Sin definir"}
+                      glyph="%"
+                      tone="neutral"
+                    />
+                    <Classification
+                      label="Periodicidad"
+                      value={indicator.periodicity_label ?? "Sin definir"}
+                      glyph="◷"
+                      tone="neutral"
+                    />
+                  </div>
+                ) : (
+                  <EmptyBlock
+                    title="Este pilar todavía no tiene indicadores configurados"
+                    hint="Se crean desde la intranet, en la configuración del pilar."
+                  />
+                )}
+              </>
+            )}
+          </section>
+
+          {/* --- Recursos y tiempo ------------------------------------------
+              Describen el indicador del pilar completo, así que se retiran
+              mientras se mira un área concreta. --------------------------- */}
+          {indicator && !activeArea && (
+            <section className="pillar-stats" aria-label="Recursos y tiempo">
+              <StatBlock
+                label="Presupuesto ejecutado"
+                value={formatBudget(indicator.budget_amount)}
+                progress={indicator.budget_progress}
+                caption={`${indicator.budget_progress}% del total asignado`}
+                icon="document"
+              />
+              <StatBlock
+                label="Tiempo transcurrido"
+                value={indicator.elapsed_label ?? "—"}
+                progress={indicator.elapsed_progress}
+                caption="Del horizonte del plan"
+                icon="clock"
+              />
+              <article className="stat-block stat-block--alert">
+                <header>
+                  <span>Tareas críticas</span>
+                  <Icon name="alert" size={17} />
+                </header>
+                <strong>{indicator.critical_tasks}</strong>
+                <p>Requieren atención directa en el corte actual.</p>
+              </article>
+            </section>
+          )}
+
+          {/* --- Áreas estratégicas -----------------------------------------
+              Antes esto era una línea de texto apretada dentro de la ficha con
+              los códigos de los protocolos. Aquí baja a su propia sección, con
+              el avance de cada área y con la tarjeta como forma de filtrar: el
+              selector de la barra y estas tarjetas hacen lo mismo. --------- */}
+          {!activeArea && areas.length > 0 && (
+            <section className="pillar-section" id="areas" aria-labelledby="areas-title">
+              <div className="section-heading">
+                <span className="eyebrow">Estructura del plan</span>
+                <h2 id="areas-title">Áreas estratégicas del pilar</h2>
+                <p>
+                  Cada área agrupa sus líneas de acción y los proyectos que cuelgan de ellas. El avance
+                  del área es el promedio del cumplimiento reportado de sus líneas.
+                </p>
+              </div>
+
+              <div className="area-cards stagger">
+                {areas.map((area) => {
+                  const stats = areaStats.get(area.id) ?? { progress: 0, lines: 0, projects: 0 };
+
+                  return (
+                    <button
+                      className="area-card-public"
+                      type="button"
+                      key={area.id}
+                      onClick={() => setAreaId(area.id)}
+                    >
+                      <span className="area-card-public__top">
+                        {area.code && <span className="area-card-public__code">{area.code}</span>}
+                        <ProgressRing
+                          value={stats.progress}
+                          size={56}
+                          thickness={5}
+                          color={accent}
+                          label={`Avance de ${area.name}`}
+                        />
+                      </span>
+
+                      <span className="area-card-public__body">
+                        <strong>{area.name}</strong>
+                        {area.description && <small>{area.description}</small>}
+                      </span>
+
+                      <span className="area-card-public__foot">
+                        <span>
+                          {stats.lines} {stats.lines === 1 ? "línea" : "líneas"}
+                        </span>
+                        <span aria-hidden="true">·</span>
+                        <span>
+                          {stats.projects} {stats.projects === 1 ? "proyecto" : "proyectos"}
+                        </span>
+                        <span className="area-card-public__cta">
+                          Ver el área <span data-arrow aria-hidden="true">→</span>
+                        </span>
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+            </section>
+          )}
+
+          {/* --- Proyectos y líneas ----------------------------------------- */}
+          <div className="pillar-columns">
+            <section className="pillar-section" id="proyectos" aria-labelledby="proyectos-title">
+              <div className="pillar-section__head">
+                <div className="section-heading">
+                  <span className="eyebrow">Ejecución</span>
+                  <h2 id="proyectos-title">Proyectos estratégicos</h2>
+                </div>
+                <Link className="button-ghost" to="/implementacion">
+                  Ver todos los pilares
+                </Link>
+              </div>
+
+              {visibleProjects.length === 0 ? (
+                <EmptyBlock
+                  title={
+                    activeArea
+                      ? `Sin proyectos vinculados a ${activeArea.name}.`
+                      : "Sin proyectos registrados."
+                  }
+                  hint={
+                    activeArea && unlinkedProjects > 0
+                      ? `Hay ${unlinkedProjects} proyecto(s) del pilar sin línea de acción asignada, así que no aparecen bajo ningún área.`
+                      : undefined
+                  }
+                />
+              ) : (
+                <ul className="project-list">
+                  {visibleProjects.map((project) => {
+                    const meta = statusMeta[project.status];
+                    const line = project.action_line_id ? lineById.get(project.action_line_id) : undefined;
+                    return (
+                      <li className="project-row" key={project.id}>
+                        <span className="project-row__icon">
+                          <Icon name="check" size={16} />
+                        </span>
+                        <div className="project-row__info">
+                          <strong>{project.name}</strong>
+                          <small>
+                            {project.owner || "Sin responsable"} · {formatMonth(project.due_date)}
+                          </small>
+                          {/* De dónde cuelga el proyecto: pilar → área → línea.
+                              Sin esto, la estructura del plan solo existía en la
+                              base de datos. */}
+                          {line ? (
+                            <span className="project-row__lineage">
+                              <span>{pillar.name}</span>
+                              <i aria-hidden="true">›</i>
+                              <span>{line.area_name}</span>
+                              <i aria-hidden="true">›</i>
+                              <strong>
+                                {line.code ? `${line.code} · ` : ""}
+                                {line.name}
+                              </strong>
+                            </span>
+                          ) : (
+                            <span className="project-row__lineage project-row__lineage--empty">
+                              Sin línea de acción asignada
+                            </span>
+                          )}
+                        </div>
+                        <div className="project-row__state">
+                          <span className={`status-badge status-badge--${project.status}`}>
+                            <span className="status-badge__glyph" aria-hidden="true">
+                              {meta.glyph}
+                            </span>
+                            {meta.label}
+                          </span>
+                          <span className="project-row__meter">
+                            <span className="progress-track">
+                              <span
+                                className="progress-track__fill"
+                                style={{ width: `${project.progress}%`, background: meta.color }}
+                              />
+                            </span>
+                            <b>{project.progress}%</b>
+                          </span>
+                        </div>
+                      </li>
+                    );
+                  })}
+                </ul>
+              )}
+            </section>
+
+            <aside className="pillar-section card" id="cumplimiento" aria-labelledby="cumplimiento-title">
+              <div className="section-heading">
+                <span className="eyebrow">Desglose</span>
+                <h2 id="cumplimiento-title">Líneas de acción</h2>
+              </div>
+
+              {visibleLines.length === 0 ? (
+                <EmptyBlock title="Sin áreas ni líneas configuradas." />
+              ) : (
+                // Agrupado por área para que se vea la jerarquía, no una lista
+                // plana de líneas sueltas.
+                visibleAreas.map((area) => {
+                  const areaLines = visibleLines
+                    .filter((line) => line.area_id === area.id)
+                    .sort((a, b) => a.position - b.position);
+                  if (areaLines.length === 0) return null;
+
+                  return (
+                    <div className="line-group" key={area.id}>
+                      <h3>
+                        {area.code ? `${area.code} · ` : ""}
+                        {area.name}
+                      </h3>
+                      <ul className="line-list">
+                        {areaLines.map((line) => (
+                          <li key={line.id}>
+                            <div>
+                              <span>
+                                {line.code ? `${line.code} · ` : ""}
+                                {line.name}
+                              </span>
+                              <b>{line.progress}%</b>
+                            </div>
+                            <span className="progress-track">
+                              <span
+                                className="progress-track__fill"
+                                style={{ width: `${line.progress}%`, background: accent }}
+                              />
+                            </span>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  );
+                })
+              )}
+
+              {pillar.insight && (
+                <p className="insight">
+                  <Icon name="spark" size={17} />
+                  <span>{pillar.insight}</span>
+                </p>
+              )}
+            </aside>
+          </div>
+
+          {/* --- Planeación -------------------------------------------------- */}
+          {planning.length > 0 && (
+            <section className="pillar-section planning" id="planeacion" aria-labelledby="planeacion-title">
+              <div className="section-heading">
+                <span className="eyebrow">Próximo ciclo</span>
+                <h2 id="planeacion-title">Planeación de resultados</h2>
+                <p>La siguiente revisión se enfocará en asegurar resultados medibles para este pilar.</p>
+              </div>
+              <ul className="planning__list">
+                {planning.map((item) => (
+                  <li key={item.id}>
+                    <Icon name="arrow-right" size={16} />
+                    {item.text}
+                  </li>
+                ))}
+              </ul>
+            </section>
+          )}
+
+          {/* --- Soporte ----------------------------------------------------- */}
+          <section className="pillar-section support" aria-labelledby="soporte-title">
+            <div className="section-heading">
+              <span className="eyebrow">Acompañamiento</span>
+              <h2 id="soporte-title">Soporte e información</h2>
+              <p>
+                Responsable de atención: Oficina de Planeación ·{" "}
+                <a href="mailto:planeacion@udes.edu.co">planeacion@udes.edu.co</a>
+              </p>
+            </div>
+            <div className="support__links">
+              <a href="#ficha">
+                <strong>Ficha del indicador</strong>
+                <small>Definición, clasificación y responsables</small>
+                <Icon name="arrow-right" size={16} />
+              </a>
+              <Link to="/implementacion#repositorio">
+                <strong>Proyectos y evidencias</strong>
+                <small>Documentos de soporte del plan</small>
+                <Icon name="arrow-right" size={16} />
+              </Link>
+            </div>
+          </section>
+
+          {/* --- Trazabilidad ------------------------------------------------ */}
+          <section className="pillar-section" id="cambios" aria-labelledby="cambios-title">
+            <div className="section-heading">
+              <span className="eyebrow">Trazabilidad</span>
+              <h2 id="cambios-title">Control de cambios</h2>
+            </div>
+            {changes.length === 0 ? (
+              <EmptyBlock title="Sin cambios registrados todavía." />
+            ) : (
+              <DataTable
+                caption={`Historial de cambios del pilar ${pillar.name}`}
+                headers={["Código", "Versión", "Aval", "Fecha", "Ajuste", "Tipo"]}
+                rows={changes.map((change) => [
+                  change.area_code || "—",
+                  change.version,
+                  change.approved_by || "—",
+                  formatDate(change.changed_on),
+                  change.description,
+                  change.change_type,
+                ])}
+              />
+            )}
+          </section>
+
+          <section className="pillar-section" id="glosario" aria-labelledby="glosario-title">
+            <div className="section-heading">
+              <span className="eyebrow">Definiciones</span>
+              <h2 id="glosario-title">Glosario</h2>
+            </div>
+            {glossary.length === 0 ? (
+              <EmptyBlock title="Sin términos en el glosario." />
+            ) : (
+              <DataTable
+                caption="Términos usados en el seguimiento del pilar"
+                headers={["Término", "Definición", "Descripción"]}
+                rows={glossary.map((item) => [
+                  item.term,
+                  item.definition,
+                  item.source ? `${item.description} · Fuente: ${item.source}` : item.description,
+                ])}
+              />
+            )}
+          </section>
+
+          <nav className="pillar-footer-nav" aria-label="Navegación entre pilares">
+            <Link className="button-secondary" to="/implementacion">
+              <span aria-hidden="true">←</span> Volver a los pilares
+            </Link>
+            <Link className="button-ghost" to="/tablero#pilares">
+              Ver este pilar en el tablero <span data-arrow aria-hidden="true">→</span>
+            </Link>
+          </nav>
+        </div>
+      </div>
+    </PublicLayout>
+  );
+}
+
+/* --- Piezas ---------------------------------------------------------------- */
+
+function Fact({ label, value, wide = false }: { label: string; value: string; wide?: boolean }) {
+  return (
+    <div className={wide ? "fact fact--wide" : "fact"}>
+      <dt>{label}</dt>
+      <dd>{value || "—"}</dd>
+    </div>
+  );
+}
+
+function Classification({
+  label,
+  value,
+  glyph,
+  tone,
+}: {
+  label: string;
+  value: string;
+  glyph: string;
+  tone: "active" | "neutral";
+}) {
+  return (
+    <div className={`classification classification--${tone}`}>
+      <span className="classification__glyph" aria-hidden="true">
+        {glyph}
+      </span>
+      <strong>{value}</strong>
+      <span>{label}</span>
+    </div>
+  );
+}
+
+function StatBlock({
+  label,
+  value,
+  progress,
+  caption,
+  icon,
+}: {
+  label: string;
+  value: string;
+  progress: number;
+  caption: string;
+  icon: React.ComponentProps<typeof Icon>["name"];
+}) {
+  return (
+    <article className="stat-block">
+      <header>
+        <span>{label}</span>
+        <Icon name={icon} size={17} />
+      </header>
+      <strong>{value}</strong>
+      <span className="progress-track">
+        <span className="progress-track__fill" style={{ width: `${progress}%` }} />
+      </span>
+      <p>{caption}</p>
+    </article>
+  );
+}
+
+function DataTable({
+  caption,
+  headers,
+  rows,
+}: {
+  caption: string;
+  headers: string[];
+  rows: string[][];
+}) {
+  return (
+    <div className="table-scroll">
+      <table className="data-table">
+        <caption className="sr-only">{caption}</caption>
+        <thead>
+          <tr>
+            {headers.map((header) => (
+              <th scope="col" key={header}>
+                {header}
+              </th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((row, index) => (
+            <tr key={`${row[0]}-${index}`}>
+              {row.map((cell, cellIndex) => (
+                <td key={`${cell}-${cellIndex}`}>{cell}</td>
+              ))}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}

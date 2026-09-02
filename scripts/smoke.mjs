@@ -279,7 +279,11 @@ const routes = [
       "Presupuesto ejecutado",        // los recursos del indicador sí se ven
       "Promedio de 2 áreas",          // el anillo dice de dónde sale
       "promedio de 2 actividades",    // el proyecto deriva de sus actividades
+      "Actividades del pilar",        // sustituye a "Planeación de resultados"
+      "Fortalecimiento del aula híbrida",
+      "En el tablero",                // la actividad destacada se marca
     ],
+    absent: ["Planeación de resultados"],
   },
   {
     path: "/implementacion/pilar/ambiente-tecnologico",
@@ -320,6 +324,15 @@ const routes = [
       if (!lineas.includes("Cultura digital")) {
         throw new Error("no se muestran las líneas del área elegida");
       }
+
+      // Las actividades siguen el mismo filtro que los proyectos.
+      const actividades = window.document.querySelector("#actividades")?.textContent ?? "";
+      if (actividades.includes("Fortalecimiento del aula híbrida")) {
+        throw new Error("la actividad de otra área sigue en la lista");
+      }
+      if (!actividades.includes("Sin actividades vinculadas a Cultura digital")) {
+        throw new Error("no se avisa de que el área no tiene actividades");
+      }
     },
   },
   {
@@ -356,6 +369,12 @@ const routes = [
 
       if (texto().includes("José Gutiérrez")) {
         throw new Error("Escape no cerró el panel de autores");
+      }
+
+      // La descripción de este proyecto cabe entera, así que no debe ofrecerse
+      // "Ver más": un botón que no cambia nada es peor que no tenerlo.
+      if (texto().includes("Ver más")) {
+        throw new Error("se ofrece ampliar una tarjeta que no está recortada");
       }
     },
   },

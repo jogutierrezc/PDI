@@ -326,12 +326,12 @@
 
 /* --- Proyectos y líneas ----------------------------------------------------- */
 
-.project-list {
+.entry-list {
   display: grid;
   gap: var(--space-2);
 }
 
-.project-row {
+.entry-row {
   display: grid;
   grid-template-columns: auto minmax(0, 1fr) auto;
   align-items: center;
@@ -344,12 +344,12 @@
 }
 
 @media (hover: hover) and (pointer: fine) {
-  .project-row:hover {
+  .entry-row:hover {
     border-color: var(--line-strong);
   }
 }
 
-.project-row__icon {
+.entry-row__icon {
   width: 34px;
   height: 34px;
   display: grid;
@@ -359,39 +359,52 @@
   border-radius: var(--radius-xs);
 }
 
-.project-row__info strong {
+.entry-row__info strong {
   display: block;
   color: var(--ink);
   font-size: var(--text-base);
   line-height: var(--leading-snug);
 }
 
-.project-row__info small {
+/* Marca de que la actividad también sale en el tablero público. */
+.entry-row__flag {
+  display: inline-block;
+  margin-left: var(--space-2);
+  padding: 1px var(--space-2);
+  color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
+  border-radius: var(--radius-pill);
+  font-size: var(--text-2xs);
+  font-weight: 700;
+  vertical-align: middle;
+}
+
+.entry-row__info small {
   display: block;
   margin-top: 2px;
   color: var(--ink-muted);
   font-size: var(--text-xs);
 }
 
-.project-row__state {
+.entry-row__state {
   display: grid;
   justify-items: end;
   gap: var(--space-2);
 }
 
-.project-row__meter {
+.entry-row__meter {
   display: flex;
   align-items: center;
   gap: var(--space-2);
   width: 9rem;
 }
 
-.project-row__meter .progress-track {
+.entry-row__meter .progress-track {
   flex: 1 1 auto;
   height: 6px;
 }
 
-.project-row__meter b {
+.entry-row__meter b {
   color: var(--ink-secondary);
   font-size: var(--text-xs);
   font-variant-numeric: tabular-nums;
@@ -446,37 +459,11 @@
 
 /* --- Planeación y soporte --------------------------------------------------- */
 
-.planning,
 .support {
   padding: var(--space-7);
   background: var(--surface);
   border: 1px solid var(--line);
   border-radius: var(--radius-xl);
-}
-
-.planning__list {
-  display: grid;
-  gap: var(--space-3);
-}
-
-.planning__list li {
-  display: grid;
-  grid-template-columns: auto 1fr;
-  align-items: start;
-  gap: var(--space-3);
-  padding: var(--space-3) 0;
-  border-bottom: 1px solid var(--line-faint);
-  color: var(--ink-secondary);
-  font-size: var(--text-sm);
-}
-
-.planning__list li:last-child {
-  border-bottom: 0;
-}
-
-.planning__list svg {
-  color: var(--accent);
-  margin-top: 2px;
 }
 
 .support__links {
@@ -608,17 +595,17 @@
 }
 
 @media (max-width: 640px) {
-  .project-row {
+  .entry-row {
     grid-template-columns: auto minmax(0, 1fr);
   }
 
-  .project-row__state {
+  .entry-row__state {
     grid-column: 1 / -1;
     justify-items: start;
     width: 100%;
   }
 
-  .project-row__meter {
+  .entry-row__meter {
     width: 100%;
   }
 }
@@ -677,7 +664,7 @@
    aquí se lee de un vistazo en la propia fila del proyecto.
    -------------------------------------------------------------------------- */
 
-.project-row__lineage {
+.entry-row__lineage {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
@@ -688,12 +675,12 @@
   line-height: 1.4;
 }
 
-.project-row__lineage i {
+.entry-row__lineage i {
   color: var(--ink-faint);
   font-style: normal;
 }
 
-.project-row__lineage strong {
+.entry-row__lineage strong {
   padding: 1px var(--space-2);
   color: var(--accent);
   background: color-mix(in srgb, var(--accent) 12%, transparent);
@@ -701,7 +688,7 @@
   font-weight: 700;
 }
 
-.project-row__lineage--empty {
+.entry-row__lineage--empty {
   color: var(--status-pending);
 }
 

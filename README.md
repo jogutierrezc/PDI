@@ -269,6 +269,16 @@ Al elegir una:
 
 El control de cambios **no** se filtra: es la historia del pilar entero.
 
+La sección **Actividades del pilar** ocupa el lugar de la antigua "Planeación de
+resultados". Muestra las actividades que el portal público puede ver, con su
+línea de acción, su estado y su avance, y marca cuáles salen además en el
+tablero. Tiene sentido ahí porque son las filas que determinan la proporción de
+cumplimiento del pilar.
+
+> La tabla `planning_items` sigue en la base de datos con sus filas, pero ya no
+> se muestra ni se consulta. Si no vais a usarla, se puede retirar en una
+> migración futura.
+
 Sin filtro, la sección **Áreas estratégicas del pilar** muestra una rejilla con
 el avance de cada una —el promedio del cumplimiento reportado de sus líneas— y
 cada tarjeta funciona también como filtro.

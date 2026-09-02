@@ -63,11 +63,33 @@ export function TechDevelopment() {
 
 function ProjectCard({ project }: { project: WebProject }) {
   const [showAuthors, setShowAuthors] = useState(false);
+  const [expanded, setExpanded] = useState(false);
+  // Solo se ofrece ampliar cuando la descripción está realmente recortada: un
+  // botón que no cambia nada es peor que no tenerlo.
+  const [clipped, setClipped] = useState(false);
   const panelRef = useRef<HTMLDivElement>(null);
   const toggleRef = useRef<HTMLButtonElement>(null);
+  const descriptionRef = useRef<HTMLParagraphElement>(null);
   const headingId = useId();
 
   const authors = project.authors ?? [];
+
+  // Se mide con el recorte puesto; ampliada, el alto real y el visible
+  // coinciden y la medición dejaría de tener sentido.
+  useEffect(() => {
+    if (expanded) return;
+    const node = descriptionRef.current;
+    if (!node) return;
+
+    const check = () => setClipped(node.scrollHeight - node.clientHeight > 2);
+    check();
+
+    // El texto cambia de alto al cargar la tipografía y al redimensionar.
+    if (typeof ResizeObserver === "undefined") return;
+    const observer = new ResizeObserver(check);
+    observer.observe(node);
+    return () => observer.disconnect();
+  }, [project.description, expanded]);
 
   // Escape cierra el panel y devuelve el foco al botón que lo abrió.
   useEffect(() => {
@@ -89,7 +111,7 @@ function ProjectCard({ project }: { project: WebProject }) {
   }, [showAuthors]);
 
   return (
-    <li className="tech-card">
+    <li className={`tech-card${expanded ? " is-expanded" : ""}`}>
       <header className="tech-card__top">
         <span className="tech-card__mark" aria-hidden="true">
           <Icon name="code" size={20} />
@@ -101,7 +123,19 @@ function ProjectCard({ project }: { project: WebProject }) {
 
       <div className="tech-card__body">
         <h2>{project.name}</h2>
-        <p>{project.description}</p>
+        <p ref={descriptionRef}>{project.description}</p>
+
+        {(clipped || expanded) && (
+          <button
+            className="tech-card__more"
+            type="button"
+            aria-expanded={expanded}
+            onClick={() => setExpanded((open) => !open)}
+          >
+            {expanded ? "Ver menos" : "Ver más"}
+            <Icon name="chevron-down" size={13} />
+          </button>
+        )}
       </div>
 
       <footer className="tech-card__foot">

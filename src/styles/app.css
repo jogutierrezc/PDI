@@ -1464,6 +1464,9 @@
 }
 
 .tech-card__body {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
   flex: 1 1 auto;
   min-height: 0;
 }
@@ -1485,6 +1488,58 @@
   color: var(--ink-secondary);
   font-size: var(--text-sm);
   line-height: var(--leading-relaxed);
+}
+
+/* Botón de ampliar. Aparece solo cuando la descripción está recortada de
+   verdad; lo decide una medición, no una suposición sobre su largo. */
+.tech-card__more {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  margin-top: var(--space-2);
+  padding: 0;
+  color: var(--brand-blue);
+  background: transparent;
+  border: 0;
+  font-size: var(--text-xs);
+  font-weight: 700;
+}
+
+.tech-card__more svg {
+  transition: transform var(--dur-base) var(--ease-out);
+}
+
+.tech-card.is-expanded .tech-card__more svg {
+  transform: rotate(180deg);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .tech-card__more:hover {
+    text-decoration: underline;
+  }
+}
+
+/* --- Tarjeta ampliada -------------------------------------------------------
+   Ocupa dos columnas y suelta la proporción cuadrada, que es lo que obligaba a
+   recortar el texto. Solo a partir de dos columnas: en una sola, `span 2`
+   desbordaría la rejilla.
+   -------------------------------------------------------------------------- */
+
+.tech-card.is-expanded {
+  aspect-ratio: auto;
+}
+
+.tech-card.is-expanded .tech-card__body p {
+  display: block;
+  overflow: visible;
+  -webkit-line-clamp: unset;
+  line-clamp: unset;
+}
+
+@media (min-width: 44rem) {
+  .tech-card.is-expanded {
+    grid-column: span 2;
+  }
 }
 
 /* --- Pie: la acción principal manda, el resto va debajo ---------------------
@@ -1618,12 +1673,24 @@
   }
 }
 
+@media (min-width: 44rem) {
+  /* Con el doble de ancho, los tres botones caben en una fila. */
+  .tech-card.is-expanded .tech-card__foot {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1.2fr);
+    align-items: center;
+  }
+}
+
 @media (max-width: 640px) {
   /* En una sola columna la tarjeta cuadrada se vuelve enorme: se deja crecer al
-     alto del contenido. */
+     alto del contenido, y ampliar deja de tener sentido. */
   .tech-card {
     aspect-ratio: auto;
     min-height: 0;
+  }
+
+  .tech-card__more {
+    display: none;
   }
 }
 

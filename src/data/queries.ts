@@ -26,7 +26,6 @@ import type {
   Pillar,
   PillarOwner,
   PillarProgress,
-  PlanningItem,
   Profile,
   Project,
   ProjectProgress,
@@ -184,7 +183,6 @@ export interface PillarDetail {
   indicators: IndicatorWithLabels[];
   projects: Project[];
   activities: Activity[];
-  planning: PlanningItem[];
   changes: ChangeLogWithTarget[];
   glossary: GlossaryTerm[];
   documents: PdiDocument[];
@@ -220,7 +218,6 @@ export function usePillarDetail(slug: string | undefined) {
         indicators,
         projects,
         activities,
-        planning,
         changes,
         glossary,
         documents,
@@ -252,7 +249,6 @@ export function usePillarDetail(slug: string | undefined) {
             .then(unwrap<IndicatorWithLabels[]>),
           supabase.from("projects").select("*").eq("pillar_id", id).order("position").then(unwrap<Project[]>),
           supabase.from("activities").select("*").eq("pillar_id", id).order("position").then(unwrap<Activity[]>),
-          supabase.from("planning_items").select("*").eq("pillar_id", id).order("position").then(unwrap<PlanningItem[]>),
           // v_change_log añade el nombre del proyecto, la actividad o el
           // indicador: sin eso, una entrada automática sería un id suelto.
           supabase
@@ -288,7 +284,6 @@ export function usePillarDetail(slug: string | undefined) {
         indicators,
         projects,
         activities,
-        planning,
         changes,
         glossary,
         documents,

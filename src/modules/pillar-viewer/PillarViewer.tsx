@@ -18,7 +18,7 @@ function sectionsFor(hasArea: boolean) {
     { id: "ficha", label: hasArea ? "Ficha del área" : "Ficha del indicador" },
     ...(hasArea ? [] : [{ id: "areas", label: "Áreas estratégicas" }]),
     { id: "proyectos", label: "Proyectos" },
-    { id: "planeacion", label: "Planeación" },
+    { id: "actividades", label: "Actividades" },
     { id: "cambios", label: "Control de cambios" },
     { id: "glosario", label: "Glosario" },
     { id: "cumplimiento", label: "Líneas de acción" },
@@ -62,7 +62,7 @@ export function PillarViewer() {
   // ha pasado.
   if (!detail.data) return <Navigate to="/404" replace />;
 
-  const { pillar, progress, areas, areaProgress, projectProgress, lines, indicators, projects, planning, changes, glossary } =
+  const { pillar, progress, areas, areaProgress, projectProgress, lines, indicators, projects, activities, changes, glossary } =
     detail.data;
   const accent = accentFor(pillar.accent_slot);
   const accentStyle = { "--accent": accent } as React.CSSProperties;
@@ -94,6 +94,14 @@ export function PillarViewer() {
   // Proyectos que nadie ha colgado todavía de una línea: se avisa en vez de
   // hacerlos desaparecer al filtrar.
   const unlinkedProjects = projects.filter((project) => !project.action_line_id).length;
+
+  const visibleActivities = activeArea
+    ? activities.filter(
+        (activity) =>
+          activity.action_line_id && lineById.get(activity.action_line_id)?.area_id === activeArea.id,
+      )
+    : activities;
+  const unlinkedActivities = activities.filter((activity) => !activity.action_line_id).length;
 
   return (
     <PublicLayout className="pillar-page">
@@ -409,7 +417,7 @@ export function PillarViewer() {
                 }
               />
             ) : (
-              <ul className="project-list">
+              <ul className="entry-list">
                 {visibleProjects.map((project) => {
                   const meta = statusMeta[project.status];
                   const line = project.action_line_id ? lineById.get(project.action_line_id) : undefined;
@@ -418,11 +426,11 @@ export function PillarViewer() {
                   const stats = projectStats.get(project.id);
                   const shown = stats?.progress ?? project.progress;
                   return (
-                    <li className="project-row" key={project.id}>
-                      <span className="project-row__icon">
+                    <li className="entry-row" key={project.id}>
+                      <span className="entry-row__icon">
                         <Icon name="check" size={16} />
                       </span>
-                      <div className="project-row__info">
+                      <div className="entry-row__info">
                         <strong>{project.name}</strong>
                         <small>
                           {project.owner || "Sin responsable"} · {formatMonth(project.due_date)}
@@ -432,7 +440,7 @@ export function PillarViewer() {
                             Sin esto, la estructura del plan solo existía en la
                             base de datos. */}
                         {line ? (
-                          <span className="project-row__lineage">
+                          <span className="entry-row__lineage">
                             <span>{pillar.name}</span>
                             <i aria-hidden="true">›</i>
                             <span>{line.area_name}</span>
@@ -443,19 +451,19 @@ export function PillarViewer() {
                             </strong>
                           </span>
                         ) : (
-                          <span className="project-row__lineage project-row__lineage--empty">
+                          <span className="entry-row__lineage entry-row__lineage--empty">
                             Sin línea de acción asignada
                           </span>
                         )}
                       </div>
-                      <div className="project-row__state">
+                      <div className="entry-row__state">
                         <span className={`status-badge status-badge--${project.status}`}>
                           <span className="status-badge__glyph" aria-hidden="true">
                             {meta.glyph}
                           </span>
                           {meta.label}
                         </span>
-                        <span className="project-row__meter">
+                        <span className="entry-row__meter">
                           <span className="progress-track">
                             <span
                               className="progress-track__fill"
@@ -472,24 +480,92 @@ export function PillarViewer() {
             )}
           </section>
 
-          {/* --- Planeación -------------------------------------------------- */}
-          {planning.length > 0 && (
-            <section className="pillar-section planning" id="planeacion" aria-labelledby="planeacion-title">
-              <div className="section-heading">
-                <span className="eyebrow">Próximo ciclo</span>
-                <h2 id="planeacion-title">Planeación de resultados</h2>
-                <p>La siguiente revisión se enfocará en asegurar resultados medibles para este pilar.</p>
-              </div>
-              <ul className="planning__list">
-                {planning.map((item) => (
-                  <li key={item.id}>
-                    <Icon name="arrow-right" size={16} />
-                    {item.text}
-                  </li>
-                ))}
+          {/* --- Actividades --------------------------------------------------
+              Ocupa el sitio de la antigua "Planeación de resultados", que eran
+              tres frases sueltas. Aquí van las actividades reales del pilar,
+              que además son las que determinan su porcentaje. ------------- */}
+          <section className="pillar-section" id="actividades" aria-labelledby="actividades-title">
+            <div className="section-heading">
+              <span className="eyebrow">Seguimiento</span>
+              <h2 id="actividades-title">Actividades del pilar</h2>
+              <p>
+                {activeArea
+                  ? `Actividades vinculadas a ${activeArea.name}.`
+                  : "El avance del pilar sale de contar estas actividades: la proporción de cumplidas sobre el total."}
+              </p>
+            </div>
+
+            {visibleActivities.length === 0 ? (
+              <EmptyBlock
+                title={
+                  activeArea
+                    ? `Sin actividades vinculadas a ${activeArea.name}.`
+                    : "Este pilar todavía no tiene actividades registradas."
+                }
+                hint={
+                  activeArea && unlinkedActivities > 0
+                    ? `Hay ${unlinkedActivities} actividad(es) del pilar sin línea de acción asignada, así que no aparecen bajo ningún área.`
+                    : undefined
+                }
+              />
+            ) : (
+              <ul className="entry-list">
+                {visibleActivities.map((activity) => {
+                  const meta = statusMeta[activity.status];
+                  const line = activity.action_line_id
+                    ? lineById.get(activity.action_line_id)
+                    : undefined;
+
+                  return (
+                    <li className="entry-row" key={activity.id}>
+                      <span className="entry-row__icon">
+                        <Icon name="check" size={16} />
+                      </span>
+                      <div className="entry-row__info">
+                        <strong>
+                          {activity.title}
+                          {activity.is_featured && (
+                            <span className="entry-row__flag">En el tablero</span>
+                          )}
+                        </strong>
+                        <small>
+                          {activity.owner || "Sin responsable"} · vence{" "}
+                          {formatMonth(activity.due_date)}
+                        </small>
+                        {line && (
+                          <span className="entry-row__lineage">
+                            <span>{line.area_name}</span>
+                            <i aria-hidden="true">›</i>
+                            <strong>
+                              {line.code ? `${line.code} · ` : ""}
+                              {line.name}
+                            </strong>
+                          </span>
+                        )}
+                      </div>
+                      <div className="entry-row__state">
+                        <span className={`status-badge status-badge--${activity.status}`}>
+                          <span className="status-badge__glyph" aria-hidden="true">
+                            {meta.glyph}
+                          </span>
+                          {meta.label}
+                        </span>
+                        <span className="entry-row__meter">
+                          <span className="progress-track">
+                            <span
+                              className="progress-track__fill"
+                              style={{ width: `${activity.progress}%`, background: meta.color }}
+                            />
+                          </span>
+                          <b>{activity.progress}%</b>
+                        </span>
+                      </div>
+                    </li>
+                  );
+                })}
               </ul>
-            </section>
-          )}
+            )}
+          </section>
 
           {/* --- Soporte ----------------------------------------------------- */}
           <section className="pillar-section support" aria-labelledby="soporte-title">

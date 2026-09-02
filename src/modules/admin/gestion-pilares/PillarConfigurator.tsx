@@ -7,7 +7,7 @@ import { Modal, ModalActions } from "../../../components/ui/Modal";
 import { EmptyBlock, ErrorBlock, LoadingBlock } from "../../../components/ui/QueryState";
 import { keys, usePillarDetail, usePillarOwners } from "../../../data/queries";
 import { pillarScope, useRemoveRow, useSaveRow } from "../../../data/mutations";
-import { accentFor, formatDate, formatMonth, statusMeta } from "../../../data/pdi";
+import { accentFor, bandFor, formatDate, formatMonth, statusMeta } from "../../../data/pdi";
 import { useAuth } from "../../../lib/auth";
 import { buildForm, tableFor } from "./forms";
 import type { EntityKind, FieldSpec, FormConfig, Values } from "./forms";
@@ -71,7 +71,7 @@ export function PillarConfigurator() {
     );
   }
 
-  const { pillar, areas, lines, projectProgress, projects, activities, changes, glossary, documents, indicators } =
+  const { pillar, areas, areaProgress, lines, projectProgress, projects, activities, changes, glossary, documents, indicators } =
     detail.data;
   const lineById = new Map(lines.map((line) => [line.id, line]));
   const activeArea = areas.find((area) => area.id === selectedAreaId) ?? areas[0];
@@ -264,6 +264,101 @@ export function PillarConfigurator() {
                     </li>
                   ))}
               </ul>
+            )}
+          </Section>
+
+          {/* --- Metas y cumplimiento -----------------------------------------
+              Los tres campos de meta viven en los formularios de área y de
+              línea, pero ahí no se ven: había que abrir cada uno para saber si
+              estaban puestos. Esta tabla los reúne y usa el mismo aspecto que
+              el cuadro de mando público, así se ve configurado lo que se va a
+              publicar. ---------------------------------------------------- */}
+          <Section
+            title="Metas y cumplimiento"
+            hint="La meta es opcional y en valor absoluto. El cumplimiento no se escribe: el del área sale de sus líneas y el de la línea, de sus proyectos."
+          >
+            {areas.length === 0 ? (
+              <EmptyBlock title="Crea un área para poder fijar metas." />
+            ) : (
+              <div className="table-scroll">
+                <table className="result-table">
+                  <caption className="sr-only">
+                    Metas y cumplimiento de las áreas estratégicas y sus líneas de acción
+                  </caption>
+                  <thead>
+                    <tr>
+                      <th scope="col">Código</th>
+                      <th scope="col">Área o línea</th>
+                      <th scope="col">Meta</th>
+                      <th scope="col">Avance</th>
+                      <th scope="col">Cumplimiento</th>
+                      {canEdit && (
+                        <th scope="col">
+                          <span className="sr-only">Acciones</span>
+                        </th>
+                      )}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {areas.flatMap((area) => {
+                      const stats = areaProgress.find((row) => row.area_id === area.id);
+                      const ownLines = lines
+                        .filter((line) => line.area_id === area.id)
+                        .sort((a, b) => a.position - b.position);
+
+                      return [
+                        <TargetRow
+                          key={area.id}
+                          code={area.code}
+                          name={area.name}
+                          target={stats?.target_value ?? null}
+                          achieved={stats?.achieved_value ?? null}
+                          unit={stats?.measure_unit ?? null}
+                          progress={stats?.progress ?? 0}
+                          source={
+                            (stats?.line_count ?? 0) > 0
+                              ? `promedio de ${stats?.line_count} ${stats?.line_count === 1 ? "línea" : "líneas"}`
+                              : "sin líneas"
+                          }
+                          onEdit={
+                            canEdit
+                              ? () => open("area", area as unknown as Record<string, unknown>)
+                              : undefined
+                          }
+                          editLabel={`Editar la meta del área ${area.name}`}
+                        />,
+                        ...ownLines.map((line) => (
+                          <TargetRow
+                            key={line.id}
+                            nested
+                            code={line.code}
+                            name={line.name}
+                            target={line.target_value}
+                            achieved={line.achieved_value}
+                            unit={line.measure_unit}
+                            progress={line.progress}
+                            source={
+                              line.is_derived
+                                ? `promedio de ${line.project_count} ${line.project_count === 1 ? "proyecto" : "proyectos"}`
+                                : "cumplimiento reportado"
+                            }
+                            onEdit={
+                              canEdit
+                                ? () =>
+                                    open("line", {
+                                      ...line,
+                                      area_id: area.id,
+                                    } as unknown as Record<string, unknown>)
+                                : undefined
+                            }
+                            editLabel={`Editar la meta de la línea ${line.name}`}
+                          />
+                        )),
+                      ];
+                    })}
+                  </tbody>
+                </table>
+              </div>
             )}
           </Section>
 
@@ -608,6 +703,62 @@ function Section({
       </header>
       {children}
     </section>
+  );
+}
+
+/** Una fila de la tabla de metas: área o línea, con su meta y su cumplimiento. */
+function TargetRow({
+  code,
+  name,
+  target,
+  achieved,
+  unit,
+  progress,
+  source,
+  onEdit,
+  editLabel,
+  nested = false,
+}: {
+  code: string | null;
+  name: string;
+  target: number | null;
+  achieved: number | null;
+  unit: string | null;
+  progress: number;
+  /** De dónde sale el porcentaje, para que no parezca escrito a mano. */
+  source: string;
+  onEdit?: () => void;
+  editLabel: string;
+  nested?: boolean;
+}) {
+  const band = bandFor(progress);
+  const suffix = unit ? ` ${unit}` : "";
+
+  return (
+    <tr className={nested ? "is-nested" : undefined}>
+      <td className="result-table__code">{code || "—"}</td>
+      <th scope="row">
+        <strong>{name}</strong>
+        <small>{source}</small>
+      </th>
+      <td className="result-table__number">
+        {target === null ? <span className="target-empty">Sin meta</span> : `${target}${suffix}`}
+      </td>
+      <td className="result-table__number">
+        {achieved === null ? <span className="target-empty">—</span> : `${achieved}${suffix}`}
+      </td>
+      <td>
+        <span className="band-chip" style={{ "--band": band.color } as React.CSSProperties}>
+          <span className="band-chip__value">{progress} %</span>
+          <span className="band-chip__label">{band.label}</span>
+        </span>
+      </td>
+      {onEdit && (
+        <td>
+          <IconAction icon="settings" label={editLabel} onClick={onEdit} />
+        </td>
+      )}
+    </tr>
   );
 }
 

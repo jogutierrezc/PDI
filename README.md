@@ -43,7 +43,8 @@ pegarlos en el editor SQL del panel de Supabase o aplicarlos con la CLI
 | `0006_edicion_y_trazabilidad.sql` | Actividades y documentos dentro de la estructura + control de cambios automático |
 | `0007_permisos_y_cache.sql` | Permisos de la API y recarga de su caché |
 | `0008_cascada_de_avance.sql` | El avance se propaga de la actividad al pilar |
-| `0009_desarrollo_tecnologico.sql` | Catálogo de los desarrollos web de la oficina. **Ejecútala la última.** |
+| `0009_desarrollo_tecnologico.sql` | Catálogo de los desarrollos web de la oficina |
+| `0010_metas_y_cumplimiento.sql` | Meta y avance absolutos + conteos del cuadro de mando. **Ejecútala la última.** |
 
 Todos son idempotentes: volver a ejecutarlos no duplica nada.
 
@@ -209,6 +210,7 @@ A partir de ahí, el resto de altas se hacen desde **Usuarios y roles**.
 | --- | --- | --- |
 | `/` | Portada | Público |
 | `/tablero` | Tablero de cumplimiento | Público |
+| `/tablero/pilar/:slug` | Cuadro de mando de un pilar | Público |
 | `/implementacion` | Avance por pilar + repositorio documental | Público |
 | `/implementacion/pilar/:slug` | Ficha del pilar, con filtro por área estratégica | Público |
 | `/desarrollo-tecnologico` | Desarrollos web de la oficina | Público |
@@ -291,6 +293,54 @@ Un proyecto sin `action_line_id` no pertenece a ningún área y por tanto no
 aparece al filtrar. Tanto el visor público como la configuración de la intranet
 lo señalan en vez de dejarlo desaparecer sin explicación; se le asigna una línea
 desde **Configurar pilar → Proyectos estratégicos**.
+
+## Dos lecturas del mismo pilar
+
+| | `/implementacion/pilar/:slug` | `/tablero/pilar/:slug` |
+| --- | --- | --- |
+| Pregunta | Qué es el pilar y qué hay dentro | Cuánto se ha cumplido |
+| Contenido | Ficha del indicador, áreas, proyectos, actividades, trazabilidad | Convención de bandas, cuatro indicadores y tres tablas de resultados |
+| Se llega desde | Implementación del PDI | Tablero PDI |
+
+Las dos enlazan entre sí, así que nadie queda atrapado en una.
+
+### Bandas de cumplimiento
+
+Cinco tramos con nombre: **Bajo** (0-24 %), **Medio bajo** (25-49), **Medio**
+(50-69), **Medio alto** (70-89) y **Satisfactorio** (90-100). Los umbrales viven
+en `complianceBands`, en `src/data/pdi.ts`, y en ningún otro sitio.
+
+La escala va de naranja a verde, que es justo el par que **no** distingue el
+daltonismo. Por eso se apoya además en la luminosidad —baja de forma monótona de
+L 0,74 a L 0,46, con saltos de 0,07— y se verificó con el validador ordinal:
+monotonía, salto suficiente entre bandas y contraste del extremo claro. En
+greyscale la escala sigue leyéndose.
+
+Y sobre todo: **ningún porcentaje se comunica solo con color.** Cada ficha lleva
+la cifra y el nombre de su banda; la convención está en la propia página; la
+banda del pilar actual se marca con texto, no solo resaltando su fila.
+
+### Meta y avance
+
+`strategic_areas`, `action_lines` y `projects` tienen `target_value`,
+`achieved_value` y `measure_unit` para capturar metas absolutas ("28 de 40
+convenios"). Son opcionales.
+
+Se configuran en **Configurar pilar → Metas y cumplimiento**, una tabla que
+reúne cada área con sus líneas y muestra meta, avance y cumplimiento de un
+vistazo, con un botón de edición por fila. Usa el mismo aspecto que el cuadro de
+mando público a propósito: se configura viendo lo que se va a publicar. Los
+proyectos llevan sus metas en su propio formulario.
+
+El **cumplimiento no se escribe** en esa tabla: el del área sale de sus líneas y
+el de la línea, de sus proyectos. Cada fila dice de dónde viene su porcentaje
+—"promedio de 3 líneas", "cumplimiento reportado"— para que nadie edite un
+número que no se está usando.
+
+Mientras no se capturen, las columnas **Meta** y **Avance** de las tablas cuentan
+actividades —comprometidas y cumplidas—, y la tabla lo dice al pie. El
+**porcentaje** es siempre el avance en cascada, venga de donde venga la meta: una
+sola fuente para toda la aplicación.
 
 ## Desarrollo tecnológico
 

@@ -75,6 +75,40 @@ const DOC_KINDS = ["PDF", "XLSX", "DOCX", "CSV", "HTML", "Enlace"];
 const text = (value: unknown) => (value === null || value === undefined ? "" : String(value));
 const orNull = (value: string) => (value.trim() === "" ? null : value.trim());
 
+/**
+ * Meta y avance en valor absoluto. Son opcionales: mientras estén vacíos, las
+ * tablas del cuadro de mando cuentan actividades en su lugar. El porcentaje no
+ * sale de aquí — ese lo calcula la cascada.
+ */
+const targetFields: FieldSpec[] = [
+  {
+    name: "target_value",
+    label: "Meta (valor absoluto)",
+    placeholder: "Ej. 40",
+    hint: "Opcional. Sin meta capturada, el cuadro de mando cuenta actividades.",
+  },
+  { name: "achieved_value", label: "Avance alcanzado", placeholder: "Ej. 28" },
+  { name: "measure_unit", label: "Unidad de la meta", placeholder: "Ej. convenios" },
+];
+
+/** Los tres campos de meta, listos para el envío. */
+function targetValues(entity: Record<string, unknown>): Values {
+  return {
+    target_value: text(entity.target_value),
+    achieved_value: text(entity.achieved_value),
+    measure_unit: text(entity.measure_unit),
+  };
+}
+
+function targetRow(values: Values): Record<string, unknown> {
+  const num = (raw: string) => (raw.trim() === "" ? null : Number(raw));
+  return {
+    target_value: num(values.target_value ?? ""),
+    achieved_value: num(values.achieved_value ?? ""),
+    measure_unit: orNull(values.measure_unit ?? ""),
+  };
+}
+
 const statusOptions: FieldOption[] = statusOrder.map((status) => ({
   value: status,
   label: statusMeta[status].label,
@@ -117,11 +151,13 @@ export function buildForm(kind: EntityKind, ctx: FormContext): FormConfig {
           { name: "name", label: "Nombre del área", required: true, placeholder: "Ej. Infraestructura tecnológica" },
           { name: "code", label: "Código", placeholder: "Ej. AE-04" },
           { name: "description", label: "Descripción", type: "textarea" },
+          ...targetFields,
         ],
         initial: {
           name: text(entity.name),
           code: text(entity.code),
           description: text(entity.description),
+          ...targetValues(entity),
         },
         toRow: (values) => ({
           pillar_id: ctx.pillarId,
@@ -129,6 +165,7 @@ export function buildForm(kind: EntityKind, ctx: FormContext): FormConfig {
           code: orNull(values.code),
           description: values.description ?? "",
           position: position ?? ctx.areas.length + 1,
+          ...targetRow(values),
         }),
       };
 
@@ -151,12 +188,14 @@ export function buildForm(kind: EntityKind, ctx: FormContext): FormConfig {
             options: areaOptions(ctx.areas, "Selecciona un área…"),
           },
           { name: "progress", label: "Cumplimiento reportado", type: "range" },
+          ...targetFields,
         ],
         initial: {
           name: text(entity.name),
           code: text(entity.code),
           area_id: currentArea,
           progress: text(entity.progress ?? 0),
+          ...targetValues(entity),
         },
         toRow: (values) => ({
           area_id: values.area_id,
@@ -166,6 +205,7 @@ export function buildForm(kind: EntityKind, ctx: FormContext): FormConfig {
           position:
             position ??
             (ctx.areas.find((area) => area.id === values.area_id)?.action_lines.length ?? 0) + 1,
+          ...targetRow(values),
         }),
       };
     }
@@ -204,11 +244,13 @@ export function buildForm(kind: EntityKind, ctx: FormContext): FormConfig {
               })),
             ],
           },
+          ...targetFields,
         ],
         initial: {
           name: text(entity.name),
           owner: text(entity.owner),
           action_line_id: text(entity.action_line_id),
+          ...targetValues(entity),
           description: text(entity.description),
           due_date: text(entity.due_date),
           status: text(entity.status) || "pendiente",
@@ -226,6 +268,7 @@ export function buildForm(kind: EntityKind, ctx: FormContext): FormConfig {
           progress: Number(values.progress || 0),
           status: (values.status as ActivityStatus) || "pendiente",
           position: position ?? ctx.projects.length + 1,
+          ...targetRow(values),
         }),
       };
 

@@ -26,6 +26,9 @@ const ImplementationPortal = lazy(() =>
 const PillarViewer = lazy(() =>
   import("./modules/pillar-viewer/PillarViewer").then((m) => ({ default: m.PillarViewer })),
 );
+const PillarScorecard = lazy(() =>
+  import("./routes/PillarScorecard").then((m) => ({ default: m.PillarScorecard })),
+);
 const TechDevelopment = lazy(() =>
   import("./routes/TechDevelopment").then((m) => ({ default: m.TechDevelopment })),
 );
@@ -84,6 +87,7 @@ export default function App() {
         <Routes>
           <Route path="/" element={<Home />} />
           <Route path="/tablero" element={<Dashboard />} />
+          <Route path="/tablero/pilar/:slug" element={<PillarScorecard />} />
           <Route path="/implementacion" element={<ImplementationPortal />} />
           <Route path="/implementacion/pilar/:slug" element={<PillarViewer />} />
           <Route path="/desarrollo-tecnologico" element={<TechDevelopment />} />

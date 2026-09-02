@@ -102,6 +102,7 @@ export const emptyProgress: PillarProgress = {
   completion_rate: 0,
   area_count: 0,
   line_count: 0,
+  project_count: 0,
 };
 
 export const emptySummary: PdiSummary = {
@@ -155,6 +156,38 @@ export function summarizeProgress(rows: PillarProgress[]): PdiSummary {
     need_attention: rows.filter((row) => row.risk > 0).length,
     pillar_count: rows.length,
   };
+}
+
+/* --- Bandas de cumplimiento ------------------------------------------------
+   Cinco tramos con nombre. Los umbrales viven aquí y en ningún otro sitio: si
+   la institución cambia el criterio, se cambia una vez.
+
+   El color nunca viaja solo — cada uso muestra también el nombre de la banda.
+   Naranja y verde son indistinguibles bajo daltonismo, así que la escala se
+   apoya además en la luminosidad (ver tokens.css).
+   -------------------------------------------------------------------------- */
+
+export interface ComplianceBand {
+  id: 1 | 2 | 3 | 4 | 5;
+  label: string;
+  /** Mínimo incluido del tramo. */
+  from: number;
+  /** Máximo incluido del tramo. */
+  to: number;
+  color: string;
+}
+
+export const complianceBands: ComplianceBand[] = [
+  { id: 1, label: "Bajo", from: 0, to: 24, color: "var(--band-1)" },
+  { id: 2, label: "Medio bajo", from: 25, to: 49, color: "var(--band-2)" },
+  { id: 3, label: "Medio", from: 50, to: 69, color: "var(--band-3)" },
+  { id: 4, label: "Medio alto", from: 70, to: 89, color: "var(--band-4)" },
+  { id: 5, label: "Satisfactorio", from: 90, to: 100, color: "var(--band-5)" },
+];
+
+export function bandFor(progress: number): ComplianceBand {
+  const value = Math.max(0, Math.min(100, Math.round(progress)));
+  return complianceBands.find((band) => value >= band.from && value <= band.to) ?? complianceBands[0];
 }
 
 /** Etiqueta de estado a partir del avance, no de un texto escrito a mano. */

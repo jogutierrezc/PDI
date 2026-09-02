@@ -63,8 +63,8 @@ const PILLARS = [
 // El avance del pilar ya no es la proporción de actividades: baja en cascada
 // desde sus áreas. p1 = promedio de (75, 30) = 53.
 const PROGRESS = [
-  { pillar_id: "p1", slug: "ambiente-tecnologico", done: 4, active: 1, pending: 1, risk: 0, total: 6, progress: 53, completion_rate: 67, area_count: 2, line_count: 2 },
-  { pillar_id: "p2", slug: "sostenibilidad", done: 4, active: 2, pending: 0, risk: 0, total: 6, progress: 67, completion_rate: 67, area_count: 0, line_count: 0 },
+  { pillar_id: "p1", slug: "ambiente-tecnologico", done: 4, active: 1, pending: 1, risk: 0, total: 6, progress: 53, completion_rate: 67, area_count: 2, line_count: 2, project_count: 1 },
+  { pillar_id: "p2", slug: "sostenibilidad", done: 4, active: 2, pending: 0, risk: 0, total: 6, progress: 67, completion_rate: 67, area_count: 0, line_count: 0, project_count: 0 },
 ];
 
 const FIXTURES = {
@@ -76,11 +76,11 @@ const FIXTURES = {
   // Cascada: el área promedia sus líneas, la línea sus proyectos y el proyecto
   // sus actividades.
   v_area_progress: [
-    { area_id: "ae1", pillar_id: "p1", area_name: "Infraestructura tecnológica", progress: 75, line_count: 1, project_count: 1 },
-    { area_id: "ae2", pillar_id: "p1", area_name: "Cultura digital", progress: 30, line_count: 1, project_count: 0 },
+    { area_id: "ae1", pillar_id: "p1", area_code: "AE-03", area_name: "Infraestructura tecnológica", progress: 75, line_count: 1, project_count: 1, activity_count: 4, activity_done: 3, target_value: 40, achieved_value: 28, measure_unit: "servicios" },
+    { area_id: "ae2", pillar_id: "p1", area_code: "AE-05", area_name: "Cultura digital", progress: 30, line_count: 1, project_count: 0, activity_count: 2, activity_done: 0, target_value: null, achieved_value: null, measure_unit: null },
   ],
   v_project_progress: [
-    { project_id: "pr1", pillar_id: "p1", action_line_id: "l1", name: "Migración a la nube institucional", reported_progress: 60, progress: 75, activity_count: 2, is_derived: true },
+    { project_id: "pr1", pillar_id: "p1", action_line_id: "l1", name: "Migración a la nube institucional", reported_progress: 60, progress: 75, activity_count: 2, activity_done: 1, is_derived: true, target_value: null, achieved_value: null, measure_unit: null },
   ],
   v_current_period: [
     { id: "r1", label: "Corte agosto 2026", cutoff_date: "2026-08-28", published_at: "2026-08-28T17:00:00Z" },
@@ -125,6 +125,9 @@ const FIXTURES = {
       name: "Infraestructura tecnológica",
       description: "Capacidad y disponibilidad.",
       position: 1,
+      target_value: 40,
+      achieved_value: 28,
+      measure_unit: "servicios",
       action_lines: [{ id: "l1", code: "LA-4.1", name: "Infraestructura base", progress: 85, position: 1 }],
     },
     {
@@ -134,12 +137,15 @@ const FIXTURES = {
       name: "Cultura digital",
       description: "Competencias digitales de la comunidad.",
       position: 2,
+      target_value: null,
+      achieved_value: null,
+      measure_unit: null,
       action_lines: [{ id: "l2", code: "LA-5.1", name: "Cultura digital", progress: 30, position: 1 }],
     },
   ],
   v_action_lines: [
-    { id: "l1", code: "LA-4.1", name: "Infraestructura base", progress: 75, position: 1, area_id: "ae1", area_name: "Infraestructura tecnológica", pillar_id: "p1", reported_progress: 85, project_count: 1, is_derived: true },
-    { id: "l2", code: "LA-5.1", name: "Cultura digital", progress: 30, position: 1, area_id: "ae2", area_name: "Cultura digital", pillar_id: "p1", reported_progress: 30, project_count: 0, is_derived: false },
+    { id: "l1", code: "LA-4.1", name: "Infraestructura base", progress: 75, position: 1, area_id: "ae1", area_name: "Infraestructura tecnológica", area_code: "AE-03", pillar_id: "p1", reported_progress: 85, project_count: 1, is_derived: true, activity_count: 4, activity_done: 3, target_value: null, achieved_value: null, measure_unit: null },
+    { id: "l2", code: "LA-5.1", name: "Cultura digital", progress: 30, position: 1, area_id: "ae2", area_name: "Cultura digital", area_code: "AE-05", pillar_id: "p1", reported_progress: 30, project_count: 0, is_derived: false, activity_count: 2, activity_done: 0, target_value: null, achieved_value: null, measure_unit: null },
   ],
   v_indicators: [
     {
@@ -413,6 +419,42 @@ const routes = [
       if (despues !== 3) throw new Error(`tras añadir se esperaban 3 filas, hay ${despues}`);
     },
   },
+  {
+    path: "/tablero/pilar/ambiente-tecnologico",
+    note: "cuadro de mando: bandas, indicadores y tres tablas",
+    expect: "Relación de cumplimiento del pilar",
+    also: [
+      "Bajo", "Medio bajo", "Medio alto", "Satisfactorio",   // la convención
+      "Cumplimiento general del pilar",
+      "Resultados a nivel de pilar",
+      "Resultado a nivel de áreas estratégicas",
+      "Resultado a nivel de proyectos",
+      "Cumplimiento del pilar",
+      "Resultados a nivel de áreas y líneas estratégicas",
+      "Resultados a nivel de proyectos",
+      "AE-03",                       // código del área
+      "Infraestructura tecnológica",
+      "28 servicios",                // meta absoluta capturada
+      "Migración a la nube institucional",
+      "cuentan actividades",         // la nota del respaldo
+    ],
+    interact: async (window) => {
+      // Ningún porcentaje puede comunicarse solo con color: cada ficha lleva
+      // su cifra y el nombre de su banda.
+      const chips = [...window.document.querySelectorAll(".result-table .band-chip")];
+      if (chips.length === 0) throw new Error("las tablas no muestran fichas de banda");
+      for (const chip of chips) {
+        if (!chip.querySelector(".band-chip__value") || !chip.querySelector(".band-chip__label")) {
+          throw new Error("una ficha de banda no lleva cifra y etiqueta");
+        }
+      }
+
+      // Las líneas cuelgan visualmente de su área.
+      if (!window.document.querySelector(".result-table tr.is-nested")) {
+        throw new Error("las líneas no se muestran anidadas bajo su área");
+      }
+    },
+  },
   { path: "/acceso-intranet", expect: "Intranet PDI" },
   { path: "/ruta-que-no-existe", expect: "Esta página no existe" },
   { path: "/admin/pilares", expect: "Intranet PDI", note: "sin sesión debe redirigir al acceso" },
@@ -428,6 +470,9 @@ const routes = [
       "Actividades",
       "registro automático",     // la entrada escrita por el disparador
       "promedio de 1 proyecto",  // la línea deriva su avance
+      "Metas y cumplimiento",    // el panel de metas por área y línea
+      "28 servicios",            // meta capturada del área
+      "Sin meta",                // y el estado de la que no tiene
     ],
   },
   {
@@ -464,6 +509,32 @@ const routes = [
       if (!linea) throw new Error("la línea de acción no llegó seleccionada");
       if (!linea.querySelector("optgroup")) {
         throw new Error("las líneas no se agruparon por área");
+      }
+    },
+  },
+  {
+    path: "/admin/pilares/ambiente-tecnologico/configurar",
+    session: true,
+    note: "la meta del área se edita desde la tabla de metas",
+    expect: "Editar área estratégica",
+    also: ["Meta (valor absoluto)", "Unidad de la meta"],
+    interact: async (window, tick) => {
+      const edit = window.document.querySelector(
+        '[aria-label="Editar la meta del área Infraestructura tecnológica"]',
+      );
+      if (!edit) throw new Error("no se encontró el botón de editar la meta del área");
+      edit.click();
+      await tick();
+
+      const dialog = window.document.querySelector(".modal-panel");
+      if (!dialog) throw new Error("el modal no se abrió");
+
+      // Los tres campos deben llegar con lo que ya estaba guardado.
+      const valores = [...dialog.querySelectorAll("input")].map((input) => input.value);
+      for (const esperado of ["40", "28", "servicios"]) {
+        if (!valores.includes(esperado)) {
+          throw new Error(`falta "${esperado}" en el formulario; llegó: ${valores.join(" | ")}`);
+        }
       }
     },
   },

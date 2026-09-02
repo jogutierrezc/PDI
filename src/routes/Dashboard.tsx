@@ -122,8 +122,8 @@ export function Dashboard() {
           {activePillar && (
             <p className="board-filter__note" aria-live="polite">
               Mostrando <strong>{activePillar.name}</strong> · {activePillar.focus}{" "}
-              <Link to={`/implementacion/pilar/${activePillar.slug}`}>
-                Ver detalle del pilar <span data-arrow aria-hidden="true">→</span>
+              <Link to={`/tablero/pilar/${activePillar.slug}`}>
+                Ver su cumplimiento <span data-arrow aria-hidden="true">→</span>
               </Link>
             </p>
           )}
@@ -245,8 +245,10 @@ export function Dashboard() {
                       </span>
                     </footer>
 
-                    <Link className="pillar-card__link" to={`/implementacion/pilar/${pillar.slug}`}>
-                      Ver detalle<span className="sr-only"> de {pillar.name}</span>{" "}
+                    {/* El tablero lleva a su propia lectura del pilar —cuánto
+                        se ha cumplido—, no a la ficha de implementación. */}
+                    <Link className="pillar-card__link" to={`/tablero/pilar/${pillar.slug}`}>
+                      Ver cumplimiento<span className="sr-only"> de {pillar.name}</span>{" "}
                       <span data-arrow aria-hidden="true">→</span>
                     </Link>
                   </article>

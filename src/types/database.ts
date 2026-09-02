@@ -81,6 +81,7 @@ export interface PillarProgress {
   completion_rate: number;
   area_count: number;
   line_count: number;
+  project_count: number;
 }
 
 export interface PdiSummary {
@@ -98,7 +99,7 @@ export interface PdiSummary {
   completion_rate: number;
 }
 
-export interface StrategicArea {
+export interface StrategicArea extends TargetFields {
   id: string;
   pillar_id: string;
   code: string | null;
@@ -107,7 +108,7 @@ export interface StrategicArea {
   position: number;
 }
 
-export interface ActionLine {
+export interface ActionLine extends TargetFields {
   id: string;
   area_id: string;
   code: string | null;
@@ -119,27 +120,40 @@ export interface ActionLine {
 /** Vista v_action_lines: la línea con su área y su pilar ya resueltos.
  *  `progress` viene en cascada desde sus proyectos; `reported_progress` es el
  *  número escrito a mano, que solo se usa mientras la línea no tenga ninguno. */
-export interface ActionLineWithArea extends Omit<ActionLine, "area_id"> {
+export interface ActionLineWithArea extends Omit<ActionLine, "area_id">, TargetFields {
   area_id: string;
   area_name: string;
+  area_code: string | null;
   pillar_id: string;
   reported_progress: number;
   project_count: number;
+  activity_count: number;
+  activity_done: number;
   is_derived: boolean;
 }
 
+/** Meta y avance en valor absoluto. Nulos mientras no se capturen. */
+export interface TargetFields {
+  target_value: number | null;
+  achieved_value: number | null;
+  measure_unit: string | null;
+}
+
 /** Vista v_area_progress. */
-export interface AreaProgress {
+export interface AreaProgress extends TargetFields {
   area_id: string;
   pillar_id: string;
+  area_code: string | null;
   area_name: string;
   progress: number;
   line_count: number;
   project_count: number;
+  activity_count: number;
+  activity_done: number;
 }
 
 /** Vista v_project_progress. */
-export interface ProjectProgress {
+export interface ProjectProgress extends TargetFields {
   project_id: string;
   pillar_id: string;
   action_line_id: string | null;
@@ -147,6 +161,7 @@ export interface ProjectProgress {
   reported_progress: number;
   progress: number;
   activity_count: number;
+  activity_done: number;
   is_derived: boolean;
 }
 
@@ -176,7 +191,7 @@ export interface IndicatorWithLabels extends Indicator {
   periodicity_label: string | null;
 }
 
-export interface Project {
+export interface Project extends TargetFields {
   id: string;
   pillar_id: string;
   action_line_id: string | null;

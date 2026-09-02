@@ -65,6 +65,18 @@
   --status-pending-soft: #fbf2e0;
   --status-risk-soft: #fceaea;
 
+  /* --- Escala de cumplimiento (5 bandas) ----------------------------------
+     Naranja → verde es justo el par que no separa el daltonismo, así que las
+     bandas se distinguen además por luminosidad: bajan de L 0.74 a L 0.46 de
+     forma monótona, con saltos de 0.07. Verificado con el validador ordinal:
+     monótona, salto suficiente entre bandas y contraste del extremo claro OK.
+     Cada uso lleva siempre la etiqueta de la banda, nunca solo el color.    */
+  --band-1: #fd8453; /* Bajo          */
+  --band-2: #d77b00; /* Medio bajo    */
+  --band-3: #9f7a00; /* Medio         */
+  --band-4: #667500; /* Medio alto    */
+  --band-5: #006b27; /* Satisfactorio */
+
   /* --- Datos: rejilla y pistas -------------------------------------------- */
   --track: rgba(13, 40, 84, 0.09);
   --gridline: rgba(13, 40, 84, 0.07);
@@ -204,6 +216,15 @@
     --status-pending-soft: rgba(217, 162, 33, 0.16);
     --status-risk-soft: rgba(236, 106, 106, 0.16);
 
+    /* Escala de cumplimiento en oscuro: la convención se invierte, más
+       luminosidad es más presencia. Monótona y con todas las bandas por encima
+       de 3:1 sobre la superficie oscura. */
+    --band-1: #b74506;
+    --band-2: #bd6c01;
+    --band-3: #bc9200;
+    --band-4: #a6bb2d;
+    --band-5: #73e087;
+
     --track: rgba(148, 176, 214, 0.16);
     --gridline: rgba(148, 176, 214, 0.09);
 
@@ -262,6 +283,15 @@
   --status-active-soft: rgba(92, 155, 242, 0.16);
   --status-pending-soft: rgba(217, 162, 33, 0.16);
   --status-risk-soft: rgba(236, 106, 106, 0.16);
+
+  /* Escala de cumplimiento en oscuro: la convención se invierte, más
+     luminosidad es más presencia. Monótona y con todas las bandas por encima
+     de 3:1 sobre la superficie oscura. */
+  --band-1: #b74506;
+  --band-2: #bd6c01;
+  --band-3: #bc9200;
+  --band-4: #a6bb2d;
+  --band-5: #73e087;
 
   --track: rgba(148, 176, 214, 0.16);
   --gridline: rgba(148, 176, 214, 0.09);

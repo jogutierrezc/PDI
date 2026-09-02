@@ -1720,3 +1720,22 @@ fieldset.admin-field legend {
     grid-column: 1 / -1;
   }
 }
+
+/* Meta sin capturar: se dice, no se deja en blanco — un hueco vacío no
+   distingue "no hay meta" de "se me olvidó mirarlo". */
+.target-empty {
+  color: var(--ink-faint);
+  font-style: italic;
+  font-size: var(--text-xs);
+}
+
+/* La tabla de metas reutiliza el aspecto del cuadro de mando público: se
+   configura viendo lo mismo que se va a publicar. Solo cambia el ancho, que
+   aquí compite con la barra lateral. */
+.admin-card .result-table {
+  min-width: 38rem;
+}
+
+.admin-card .result-table tbody th small {
+  color: var(--ink-faint);
+}

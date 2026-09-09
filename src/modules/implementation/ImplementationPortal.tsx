@@ -34,7 +34,7 @@ export function ImplementationPortal() {
             <div>
               <span className="eyebrow">Avance global</span>
               <strong>
-                {totals.done} de {totals.total} actividades
+                {totals.done} de {totals.total} indicadores
               </strong>
               <small>{period.data?.label ?? "Sin corte publicado"}</small>
             </div>
@@ -84,7 +84,7 @@ export function ImplementationPortal() {
                       />
                     </span>
                     <small>
-                      {pillar.progress.done} de {pillar.progress.total} actividades finalizadas ·{" "}
+                      {pillar.progress.done} de {pillar.progress.total} indicadores cumplidos ·{" "}
                       {pillar.management_owner}
                     </small>
                   </div>

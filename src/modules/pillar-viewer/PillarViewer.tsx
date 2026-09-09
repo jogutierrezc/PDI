@@ -1,11 +1,23 @@
-import { useEffect, useState } from "react";
+import { Fragment, useEffect, useState } from "react";
 import { Link, Navigate, useParams } from "react-router-dom";
 import { PublicLayout } from "../../components/layout/PublicLayout";
 import { Icon } from "../../components/ui/Icon";
 import { ProgressRing } from "../../components/ui/ProgressRing";
 import { EmptyBlock, ErrorBlock, LoadingBlock } from "../../components/ui/QueryState";
 import { useCurrentPeriod, usePillarDetail } from "../../data/queries";
-import { accentFor, formatBudget, formatDate, formatMonth, statusMeta } from "../../data/pdi";
+import {
+  accentFor,
+  bandFor,
+  formatBudget,
+  formatDate,
+  formatMonth,
+  formatValue,
+  latestTarget,
+  shortYear,
+  statusMeta,
+  yearsInPlay,
+} from "../../data/pdi";
+import type { ActivityWithTargets, PillarObservation } from "../../types/database";
 import "./pillar-viewer.css";
 
 /**
@@ -15,10 +27,11 @@ import "./pillar-viewer.css";
  */
 function sectionsFor(hasArea: boolean) {
   return [
-    { id: "ficha", label: hasArea ? "Ficha del área" : "Ficha del indicador" },
+    { id: "ficha", label: hasArea ? "Ficha del área" : "Protocolo de medición" },
     ...(hasArea ? [] : [{ id: "areas", label: "Áreas estratégicas" }]),
     { id: "proyectos", label: "Proyectos" },
-    { id: "actividades", label: "Actividades" },
+    { id: "indicadores", label: "Indicadores" },
+    { id: "observaciones", label: "Observaciones" },
     { id: "cambios", label: "Control de cambios" },
     { id: "glosario", label: "Glosario" },
     { id: "cumplimiento", label: "Líneas de acción" },
@@ -62,8 +75,20 @@ export function PillarViewer() {
   // ha pasado.
   if (!detail.data) return <Navigate to="/404" replace />;
 
-  const { pillar, progress, areas, areaProgress, projectProgress, lines, indicators, projects, activities, changes, glossary } =
-    detail.data;
+  const {
+    pillar,
+    progress,
+    areas,
+    areaProgress,
+    projectProgress,
+    lines,
+    indicators,
+    projects,
+    activities,
+    observations,
+    changes,
+    glossary,
+  } = detail.data;
   const accent = accentFor(pillar.accent_slot);
   const accentStyle = { "--accent": accent } as React.CSSProperties;
 
@@ -102,6 +127,9 @@ export function PillarViewer() {
       )
     : activities;
   const unlinkedActivities = activities.filter((activity) => !activity.action_line_id).length;
+  // Las columnas del reporte son los años que este pilar tenga capturados,
+  // más los del plan: no se pintan cortes que nadie ha reportado todavía.
+  const years = yearsInPlay(visibleActivities.flatMap((activity) => activity.targets));
 
   return (
     <PublicLayout className="pillar-page">
@@ -130,12 +158,12 @@ export function PillarViewer() {
                 label={`Avance de ${pillar.name}`}
               />
               {/* El anillo es el avance en cascada, no la proporción de
-                  actividades cumplidas: se dice de dónde sale para que el
+                  indicadores cumplidos: se dice de dónde sale para que el
                   número no parezca sacado de la nada. */}
               <small>
                 {progress.line_count > 0
                   ? `Promedio de ${progress.area_count} ${progress.area_count === 1 ? "área" : "áreas"}`
-                  : `Promedio de ${progress.total} ${progress.total === 1 ? "actividad" : "actividades"}`}
+                  : `Promedio de ${progress.total} ${progress.total === 1 ? "indicador" : "indicadores"}`}
                 {progress.total > 0 ? ` · ${progress.done} de ${progress.total} cumplidas` : ""}
                 {period.data ? ` · al ${formatDate(period.data.cutoff_date)}` : ""}
               </small>
@@ -242,14 +270,14 @@ export function PillarViewer() {
             ) : (
               <>
                 <div className="section-heading">
-                  <span className="eyebrow">Ficha del indicador</span>
+                  <span className="eyebrow">Protocolo de medición</span>
                   <h2 id="ficha-title">Cómo se mide este pilar</h2>
                 </div>
 
                 <dl className="fact-grid">
                   {indicator && (
                     <Fact
-                      label="Código del indicador"
+                      label="Código del protocolo"
                       value={`${indicator.code} · ${indicator.name}`}
                     />
                   )}
@@ -258,7 +286,7 @@ export function PillarViewer() {
                   <Fact label="Responsable de la gestión" value={pillar.management_owner} />
                   <Fact label="Responsable del cálculo" value={pillar.calculation_owner} />
                   {indicator && (
-                    <Fact label="Consideraciones del indicador" value={indicator.considerations} wide />
+                    <Fact label="Consideraciones del protocolo" value={indicator.considerations} wide />
                   )}
                 </dl>
 
@@ -286,8 +314,8 @@ export function PillarViewer() {
                   </div>
                 ) : (
                   <EmptyBlock
-                    title="Este pilar todavía no tiene indicadores configurados"
-                    hint="Se crean desde la intranet, en la configuración del pilar."
+                    title="Este pilar todavía no tiene protocolo de medición"
+                    hint="Se configura desde la intranet, en la configuración del pilar."
                   />
                 )}
               </>
@@ -421,7 +449,7 @@ export function PillarViewer() {
                 {visibleProjects.map((project) => {
                   const meta = statusMeta[project.status];
                   const line = project.action_line_id ? lineById.get(project.action_line_id) : undefined;
-                  // El avance del proyecto sale de sus actividades cuando las
+                  // El avance del proyecto sale de sus indicadores cuando los
                   // tiene; project.progress es solo el respaldo reportado.
                   const stats = projectStats.get(project.id);
                   const shown = stats?.progress ?? project.progress;
@@ -434,7 +462,7 @@ export function PillarViewer() {
                         <strong>{project.name}</strong>
                         <small>
                           {project.owner || "Sin responsable"} · {formatMonth(project.due_date)}
-                          {stats?.is_derived ? ` · promedio de ${stats.activity_count} actividades` : ""}
+                          {stats?.is_derived ? ` · promedio de ${stats.activity_count} indicadores` : ""}
                         </small>
                         {/* De dónde cuelga el proyecto: pilar → área → línea.
                             Sin esto, la estructura del plan solo existía en la
@@ -480,18 +508,18 @@ export function PillarViewer() {
             )}
           </section>
 
-          {/* --- Actividades --------------------------------------------------
-              Ocupa el sitio de la antigua "Planeación de resultados", que eran
-              tres frases sueltas. Aquí van las actividades reales del pilar,
-              que además son las que determinan su porcentaje. ------------- */}
-          <section className="pillar-section" id="actividades" aria-labelledby="actividades-title">
+          {/* --- Indicadores de resultado --------------------------------
+              La tabla del reporte institucional: base, y por cada año lo
+              comprometido, lo logrado y su relación. El avance del pilar sale
+              de la última columna de cumplimiento de cada fila. ----------- */}
+          <section className="pillar-section" id="indicadores" aria-labelledby="indicadores-title">
             <div className="section-heading">
               <span className="eyebrow">Seguimiento</span>
-              <h2 id="actividades-title">Actividades del pilar</h2>
+              <h2 id="indicadores-title">Indicadores de resultado</h2>
               <p>
                 {activeArea
-                  ? `Actividades vinculadas a ${activeArea.name}.`
-                  : "El avance del pilar sale de contar estas actividades: la proporción de cumplidas sobre el total."}
+                  ? `Indicadores vinculados a ${activeArea.name}.`
+                  : "Cada indicador aporta al pilar el cumplimiento de su año más reciente: resultado sobre meta."}
               </p>
             </div>
 
@@ -499,73 +527,99 @@ export function PillarViewer() {
               <EmptyBlock
                 title={
                   activeArea
-                    ? `Sin actividades vinculadas a ${activeArea.name}.`
-                    : "Este pilar todavía no tiene actividades registradas."
+                    ? `Sin indicadores vinculados a ${activeArea.name}.`
+                    : "Este pilar todavía no tiene indicadores registrados."
                 }
                 hint={
                   activeArea && unlinkedActivities > 0
-                    ? `Hay ${unlinkedActivities} actividad(es) del pilar sin línea de acción asignada, así que no aparecen bajo ningún área.`
+                    ? `Hay ${unlinkedActivities} indicador(es) del pilar sin línea de acción asignada, así que no aparecen bajo ningún área.`
                     : undefined
                 }
               />
             ) : (
-              <ul className="entry-list">
-                {visibleActivities.map((activity) => {
-                  const meta = statusMeta[activity.status];
-                  const line = activity.action_line_id
-                    ? lineById.get(activity.action_line_id)
-                    : undefined;
+              <>
+                <div className="table-scroll">
+                  <table className="result-table indicator-table">
+                    <caption className="sr-only">
+                      Indicadores de resultado: unidad, línea base y, por cada año, meta, resultado
+                      y cumplimiento
+                    </caption>
+                    <thead>
+                      <tr>
+                        <th scope="col">Indicador</th>
+                        <th scope="col">Unidad</th>
+                        <th scope="col">Base</th>
+                        {years.map((year) => (
+                          <th scope="col" key={year} colSpan={3} className="indicator-table__year">
+                            {year}
+                          </th>
+                        ))}
+                        <th scope="col">Avance</th>
+                      </tr>
+                      <tr className="indicator-table__subhead">
+                        <th scope="col" />
+                        <th scope="col" />
+                        <th scope="col" />
+                        {years.map((year) => (
+                          <Fragment key={year}>
+                            <th scope="col">Meta {shortYear(year)}</th>
+                            <th scope="col">Result.</th>
+                            <th scope="col">Cumpl.</th>
+                          </Fragment>
+                        ))}
+                        <th scope="col" />
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {visibleActivities.map((activity) => (
+                        <IndicatorRow
+                          key={activity.id}
+                          activity={activity}
+                          years={years}
+                          line={
+                            activity.action_line_id
+                              ? lineById.get(activity.action_line_id)
+                              : undefined
+                          }
+                        />
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
 
-                  return (
-                    <li className="entry-row" key={activity.id}>
-                      <span className="entry-row__icon">
-                        <Icon name="check" size={16} />
-                      </span>
-                      <div className="entry-row__info">
-                        <strong>
-                          {activity.title}
-                          {activity.is_featured && (
-                            <span className="entry-row__flag">En el tablero</span>
-                          )}
-                        </strong>
-                        <small>
-                          {activity.owner || "Sin responsable"} · vence{" "}
-                          {formatMonth(activity.due_date)}
-                        </small>
-                        {line && (
-                          <span className="entry-row__lineage">
-                            <span>{line.area_name}</span>
-                            <i aria-hidden="true">›</i>
-                            <strong>
-                              {line.code ? `${line.code} · ` : ""}
-                              {line.name}
-                            </strong>
-                          </span>
-                        )}
-                      </div>
-                      <div className="entry-row__state">
-                        <span className={`status-badge status-badge--${activity.status}`}>
-                          <span className="status-badge__glyph" aria-hidden="true">
-                            {meta.glyph}
-                          </span>
-                          {meta.label}
-                        </span>
-                        <span className="entry-row__meter">
-                          <span className="progress-track">
-                            <span
-                              className="progress-track__fill"
-                              style={{ width: `${activity.progress}%`, background: meta.color }}
-                            />
-                          </span>
-                          <b>{activity.progress}%</b>
-                        </span>
-                      </div>
-                    </li>
-                  );
-                })}
-              </ul>
+                <p className="result-table__note">
+                  <strong>Base</strong> es el punto de partida del indicador y su año.{" "}
+                  <strong>Cumpl.</strong> es el resultado sobre la meta de ese año; el año en
+                  negrita es el que fija el avance que sube a la línea, al área y al pilar.
+                </p>
+              </>
             )}
           </section>
+
+          {/* --- Observaciones ------------------------------------------------
+              La tabla dice cuánto; esto dice por qué. Se publica solo si hay
+              algo escrito: una sección vacía no informa de nada. ---------- */}
+          {observations.length > 0 && (
+            <section
+              className="pillar-section"
+              id="observaciones"
+              aria-labelledby="observaciones-title"
+            >
+              <div className="section-heading">
+                <span className="eyebrow">Lectura del avance</span>
+                <h2 id="observaciones-title">Observaciones sobre los indicadores</h2>
+                <p>
+                  Balance cualitativo del pilar: lo que explica las cifras de la tabla anterior.
+                </p>
+              </div>
+
+              <ul className="observation-list">
+                {observations.map((observation) => (
+                  <ObservationCard key={observation.id} observation={observation} />
+                ))}
+              </ul>
+            </section>
+          )}
 
           {/* --- Soporte ----------------------------------------------------- */}
           <section className="pillar-section support" aria-labelledby="soporte-title">
@@ -797,5 +851,98 @@ function DataTable({
         </tbody>
       </table>
     </div>
+  );
+}
+
+/* --- Fila de la tabla de indicadores ----------------------------------------
+   Tres celdas por año. El cumplimiento del año que manda va marcado: de los
+   cinco cortes solo uno llega al pilar, y sin señalarlo la tabla no lo dice.
+   -------------------------------------------------------------------------- */
+
+function IndicatorRow({
+  activity,
+  years,
+  line,
+}: {
+  activity: ActivityWithTargets;
+  years: number[];
+  line?: { area_name: string; code: string | null; name: string };
+}) {
+  const byYear = new Map(activity.targets.map((row) => [row.year, row]));
+  const driver = latestTarget(activity.targets);
+  const band = bandFor(activity.progress);
+  const meta = statusMeta[activity.status];
+
+  return (
+    <tr>
+      <th scope="row">
+        <strong>
+          {activity.title}
+          {activity.is_featured && <span className="entry-row__flag">En el tablero</span>}
+        </strong>
+        <small>
+          {line
+            ? `${line.area_name} › ${line.code ? `${line.code} · ` : ""}${line.name}`
+            : "Sin línea de acción"}
+        </small>
+      </th>
+
+      <td>{activity.unit?.label ?? "—"}</td>
+
+      <td className="result-table__number">
+        {activity.baseline_value === null ? (
+          "—"
+        ) : (
+          <>
+            {formatValue(activity.baseline_value)}
+            {activity.baseline_year && (
+              <small className="indicator-table__base-year"> {activity.baseline_year}</small>
+            )}
+          </>
+        )}
+      </td>
+
+      {years.map((year) => {
+        const row = byYear.get(year);
+        const isDriver = driver?.year === year;
+
+        return (
+          <Fragment key={year}>
+            <td className="result-table__number">{formatValue(row?.target_value)}</td>
+            <td className="result-table__number">{formatValue(row?.result_value)}</td>
+            <td
+              className={`result-table__number${isDriver ? " indicator-table__driver" : ""}`}
+              title={isDriver ? "Año que fija el avance del indicador" : undefined}
+            >
+              {row?.compliance === null || row?.compliance === undefined
+                ? "—"
+                : `${formatValue(row.compliance)} %`}
+            </td>
+          </Fragment>
+        );
+      })}
+
+      <td>
+        <span className="band-chip" style={{ "--band": band.color } as React.CSSProperties}>
+          <span className="band-chip__value">{activity.progress} %</span>
+          <span className="band-chip__label">{driver ? `Año ${driver.year}` : meta.label}</span>
+        </span>
+      </td>
+    </tr>
+  );
+}
+
+function ObservationCard({ observation }: { observation: PillarObservation }) {
+  return (
+    <li className="observation">
+      <div className="observation__head">
+        <span className="observation__corte">
+          {observation.year ? `Corte ${observation.year}` : "Vigente"}
+        </span>
+        {observation.title && <strong>{observation.title}</strong>}
+      </div>
+      <p>{observation.body}</p>
+      {observation.author && <small>{observation.author}</small>}
+    </li>
   );
 }

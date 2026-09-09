@@ -256,7 +256,7 @@ export function PillarManagement() {
 
                   <footer>
                     <span>
-                      {pillar.progress.total} actividades · {pillar.progress.progress}% de avance
+                      {pillar.progress.total} indicadores · {pillar.progress.progress}% de avance
                     </span>
 
                     {pillarOwners.length > 0 && (
@@ -446,7 +446,7 @@ export function PillarManagement() {
       {pendingDelete && (
         <Modal
           title="Eliminar pilar"
-          description={`“${pendingDelete.name}” se eliminará junto con sus áreas, líneas, proyectos, actividades y documentos. Esta acción no se puede deshacer.`}
+          description={`“${pendingDelete.name}” se eliminará junto con sus áreas, líneas, proyectos, indicadores y documentos. Esta acción no se puede deshacer.`}
           onClose={() => setPendingDelete(null)}
         >
           <div className="modal-actions">

@@ -111,7 +111,7 @@ export function describeDatabaseError(error: DatabaseError): FriendlyError {
   }
 
   if (/activities_done_is_complete/i.test(message)) {
-    return new FriendlyError("Una actividad cumplida debe estar al 100 %.", { original });
+    return new FriendlyError("Un indicador cumplido debe estar al 100 %.", { original });
   }
 
   if (/documents_url_scheme/i.test(message)) {

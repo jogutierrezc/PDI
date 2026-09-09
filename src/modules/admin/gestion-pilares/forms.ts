@@ -1,25 +1,32 @@
 /* =============================================================================
    Formularios de la configuración de un pilar.
 
-   Los siete diálogos (área, línea, proyecto, actividad, documento, cambio y
-   término) comparten esqueleto: cambian los campos y cómo se arma la fila. Aquí
-   se declara esa diferencia y nada más; el modal, la trampa de foco y el envío
-   son comunes.
+   Los ocho diálogos (área, línea, proyecto, indicador de resultado, documento,
+   cambio, término y observación) comparten esqueleto: cambian los campos y cómo
+   se arma la fila. Aquí se declara esa diferencia y nada más; el modal, la
+   trampa de foco y el envío son comunes.
+
+   La excepción es el indicador de resultado: su serie anual no cabe en un campo
+   suelto, así que declara además `childRows`, las filas de `activity_targets`
+   que hay que guardar detrás del indicador.
 
    Cada formulario sirve para crear y para editar: si llega una entidad, sus
    valores rellenan el estado inicial y el envío hace UPDATE en vez de INSERT.
    ========================================================================== */
 
-import { statusMeta, statusOrder } from "../../../data/pdi";
+import { baselineYear, computeCompliance, planYears, shortYear, statusMeta, statusOrder } from "../../../data/pdi";
 import type {
-  Activity,
   ActivityStatus,
+  ActivityTarget,
+  ActivityWithTargets,
   ChangeType,
   IndicatorWithLabels,
+  Parameter,
   PdiDocument,
   Project,
   StrategicArea,
 } from "../../../types/database";
+import type { ChildRowPlan } from "../../../data/mutations";
 import type { AreaWithLines } from "../../../data/queries";
 import type { ActionLineWithArea } from "../../../types/database";
 
@@ -35,11 +42,13 @@ export interface FieldOption {
 export interface FieldSpec {
   name: string;
   label: string;
-  type?: "text" | "textarea" | "select" | "date" | "range" | "checkbox" | "url";
+  type?: "text" | "textarea" | "select" | "date" | "range" | "checkbox" | "url" | "number" | "years";
   required?: boolean;
   placeholder?: string;
   hint?: string;
   options?: FieldOption[];
+  /** Solo para `years`: los cortes que se abren a captura. */
+  years?: number[];
 }
 
 export interface FormConfig {
@@ -50,9 +59,19 @@ export interface FormConfig {
   initial: Values;
   /** Fila lista para insertar o actualizar. */
   toRow: (values: Values) => Record<string, unknown>;
+  /** Filas dependientes que se guardan después, ya con el id del padre. */
+  childRows?: (values: Values, parentId: string) => ChildRowPlan | null;
 }
 
-export type EntityKind = "area" | "line" | "project" | "activity" | "document" | "change" | "glossary";
+export type EntityKind =
+  | "area"
+  | "line"
+  | "project"
+  | "activity"
+  | "document"
+  | "change"
+  | "glossary"
+  | "observation";
 
 export interface FormContext {
   pillarId: string;
@@ -61,7 +80,9 @@ export interface FormContext {
   lines: ActionLineWithArea[];
   indicators: IndicatorWithLabels[];
   projects: Project[];
-  activities: Activity[];
+  activities: ActivityWithTargets[];
+  /** Catálogo global de unidades de medida (Parámetros globales). */
+  units: Parameter[];
   documents: PdiDocument[];
   /** Área seleccionada en la pantalla, para proponerla por defecto. */
   activeAreaId?: string;
@@ -77,7 +98,7 @@ const orNull = (value: string) => (value.trim() === "" ? null : value.trim());
 
 /**
  * Meta y avance en valor absoluto. Son opcionales: mientras estén vacíos, las
- * tablas del cuadro de mando cuentan actividades en su lugar. El porcentaje no
+ * tablas del cuadro de mando cuentan indicadores en su lugar. El porcentaje no
  * sale de aquí — ese lo calcula la cascada.
  */
 const targetFields: FieldSpec[] = [
@@ -85,7 +106,7 @@ const targetFields: FieldSpec[] = [
     name: "target_value",
     label: "Meta (valor absoluto)",
     placeholder: "Ej. 40",
-    hint: "Opcional. Sin meta capturada, el cuadro de mando cuenta actividades.",
+    hint: "Opcional. Sin meta capturada, el cuadro de mando cuenta indicadores.",
   },
   { name: "achieved_value", label: "Avance alcanzado", placeholder: "Ej. 28" },
   { name: "measure_unit", label: "Unidad de la meta", placeholder: "Ej. convenios" },
@@ -108,6 +129,31 @@ function targetRow(values: Values): Record<string, unknown> {
     measure_unit: orNull(values.measure_unit ?? ""),
   };
 }
+
+/* --- Serie anual del indicador ---------------------------------------------
+   Los tres datos de cada año viajan por el formulario como campos planos
+   —`year_2025_target` y compañía— porque `Values` es un mapa de cadenas y no
+   merece la pena complicarlo por una sola pantalla. Aquí se traducen a filas de
+   `activity_targets` y de vuelta.
+   -------------------------------------------------------------------------- */
+
+export const yearField = (year: number, part: "target" | "result" | "override") =>
+  `year_${year}_${part}`;
+
+/** Los años del plan más cualquiera ya capturado fuera de ese rango. */
+function yearsFor(targets: ActivityTarget[]): number[] {
+  const years = new Set<number>(planYears);
+  for (const row of targets) years.add(row.year);
+  return [...years].sort((a, b) => a - b);
+}
+
+const number = (raw: string | undefined): number | null => {
+  const value = (raw ?? "").trim();
+  if (value === "") return null;
+  // Se admite la coma decimal: es lo que sale del teclado en español.
+  const parsed = Number(value.replace(",", "."));
+  return Number.isFinite(parsed) ? parsed : null;
+};
 
 const statusOptions: FieldOption[] = statusOrder.map((status) => ({
   value: status,
@@ -272,21 +318,54 @@ export function buildForm(kind: EntityKind, ctx: FormContext): FormConfig {
         }),
       };
 
-    /* --- Actividad --------------------------------------------------------- */
-    case "activity":
+    /* --- Indicador de resultado -------------------------------------------
+       Sigue guardándose en `activities`: es la misma fila que alimenta la
+       cascada del tablero, ahora con la unidad, la línea base y los años
+       delante.
+       -------------------------------------------------------------------- */
+    case "activity": {
+      const targets = ((entity.targets as ActivityTarget[] | undefined) ?? []).slice();
+      const byYear = new Map(targets.map((row) => [row.year, row]));
+      const years = yearsFor(targets);
+      const hasSeries = targets.some((row) => row.compliance !== null);
+
+      const yearValues: Values = {};
+      for (const year of years) {
+        const row = byYear.get(year);
+        yearValues[yearField(year, "target")] = text(row?.target_value);
+        yearValues[yearField(year, "result")] = text(row?.result_value);
+        yearValues[yearField(year, "override")] = text(row?.compliance_override);
+      }
+
       return {
-        title: editing ? "Editar actividad" : "Nueva actividad",
+        title: editing ? "Editar indicador de resultado" : "Nuevo indicador de resultado",
         description:
-          "El avance del pilar se calcula contando actividades cumplidas sobre el total. Cada edición deja su registro en el control de cambios.",
-        submitLabel: editing ? "Guardar actividad" : "Crear actividad",
+          "El cumplimiento de cada año se calcula solo: resultado sobre meta. El avance del indicador es el del año más reciente que tenga cifras, y de ahí sube a la línea, al área y al pilar.",
+        submitLabel: editing ? "Guardar indicador" : "Crear indicador",
         fields: [
-          { name: "title", label: "Título de la actividad", required: true },
-          { name: "owner", label: "Responsable" },
+          {
+            name: "title",
+            label: "Nombre del indicador",
+            required: true,
+            placeholder: "Ej. Convenios de cooperación vigentes",
+          },
+          { name: "owner", label: "Responsable", placeholder: "Persona o dependencia" },
+          {
+            name: "unit_id",
+            label: "Unidad de medida",
+            type: "select",
+            options: [
+              { value: "", label: "Sin unidad" },
+              ...ctx.units.map((unit) => ({ value: unit.id, label: unit.label })),
+            ],
+            hint: "Sale del catálogo de Parámetros globales. Es lo que da sentido a la cifra: 40 no dice nada, 40 convenios sí.",
+          },
           {
             name: "action_line_id",
             label: "Línea de acción",
             type: "select",
             options: lineOptions(ctx.lines, "Sin línea asignada"),
+            hint: "El área se deduce de la línea. Sin línea, el indicador no aparece al filtrar por área.",
           },
           {
             name: "project_id",
@@ -297,25 +376,59 @@ export function buildForm(kind: EntityKind, ctx: FormContext): FormConfig {
               ...ctx.projects.map((project) => ({ value: project.id, label: project.name })),
             ],
           },
+          {
+            name: "baseline_year",
+            label: "Año de la línea base",
+            type: "number",
+            placeholder: String(baselineYear),
+            hint: "El punto de partida contra el que se leen las metas.",
+          },
+          {
+            name: "baseline_value",
+            label: "Valor de la línea base",
+            type: "number",
+            placeholder: "Ej. 28",
+          },
+          {
+            name: "years",
+            label: "Metas y resultados por año",
+            type: "years",
+            years,
+            hint: "Deja en blanco los años que aún no toca reportar: no se guardan y no cuentan.",
+          },
           { name: "due_date", label: "Fecha de vencimiento", type: "date" },
-          { name: "status", label: "Estado", type: "select", options: statusOptions },
+          {
+            name: "status",
+            label: "Estado",
+            type: "select",
+            options: statusOptions,
+            hint: hasSeries
+              ? "Con años capturados el estado lo ajusta la base: al 100 % pasa a cumplida y por debajo vuelve a en curso."
+              : undefined,
+          },
           {
             name: "progress",
             label: "Porcentaje de avance",
             type: "range",
-            hint: "Una actividad cumplida se guarda siempre al 100 %.",
+            hint: hasSeries
+              ? "Lo fija el cumplimiento del año más reciente; lo que escribas aquí se sobrescribe al guardar."
+              : "Se usa mientras el indicador no tenga ningún año capturado.",
           },
           { name: "is_featured", label: "Destacar en el tablero público", type: "checkbox" },
         ],
         initial: {
           title: text(entity.title),
           owner: text(entity.owner),
+          unit_id: text(entity.unit_id),
           action_line_id: text(entity.action_line_id),
           project_id: text(entity.project_id),
+          baseline_year: text(entity.baseline_year),
+          baseline_value: text(entity.baseline_value),
           due_date: text(entity.due_date),
           status: text(entity.status) || "pendiente",
           progress: text(entity.progress ?? 0),
           is_featured: entity.is_featured ? "on" : "",
+          ...yearValues,
         },
         toRow: (values) => {
           const status = (values.status as ActivityStatus) || "pendiente";
@@ -323,18 +436,52 @@ export function buildForm(kind: EntityKind, ctx: FormContext): FormConfig {
             pillar_id: ctx.pillarId,
             action_line_id: orNull(values.action_line_id),
             project_id: orNull(values.project_id),
+            unit_id: orNull(values.unit_id),
             title: values.title.trim(),
             owner: values.owner ?? "",
+            baseline_year: number(values.baseline_year),
+            baseline_value: number(values.baseline_value),
             due_date: orNull(values.due_date),
             // La base rechaza "cumplida al 60 %": se ajusta aquí para que el
-            // formulario no falle por una combinación imposible.
+            // formulario no falle por una combinación imposible. Si hay años
+            // capturados, el disparador vuelve a fijar ambos al guardarlos.
             progress: status === "cumplida" ? 100 : Number(values.progress || 0),
             status,
             is_featured: values.is_featured === "on",
             position: position ?? ctx.activities.length + 1,
           };
         },
+        childRows: (values, parentId) => {
+          const upsert: Record<string, unknown>[] = [];
+          const removeIds: string[] = [];
+
+          for (const year of years) {
+            const target = number(values[yearField(year, "target")]);
+            const result = number(values[yearField(year, "result")]);
+            const override = number(values[yearField(year, "override")]);
+            const existing = byYear.get(year);
+
+            // Un año sin ninguna de las tres cifras es un año no reportado, no
+            // un año en cero: se borra en vez de guardarse vacío.
+            if (target === null && result === null && override === null) {
+              if (existing) removeIds.push(existing.id);
+              continue;
+            }
+
+            upsert.push({
+              activity_id: parentId,
+              year,
+              target_value: target,
+              result_value: result,
+              compliance_override: override,
+            });
+          }
+
+          if (upsert.length === 0 && removeIds.length === 0) return null;
+          return { table: "activity_targets", onConflict: "activity_id,year", upsert, removeIds };
+        },
       };
+    }
 
     /* --- Documento --------------------------------------------------------- */
     case "document":
@@ -413,7 +560,7 @@ export function buildForm(kind: EntityKind, ctx: FormContext): FormConfig {
       return {
         title: editing ? "Editar registro de cambio" : "Registrar cambio",
         description:
-          "Los cambios de proyectos y actividades se registran solos. Esto es para lo que se decide fuera del portal: actas, avales y reformas del indicador.",
+          "Los cambios de proyectos e indicadores se registran solos. Esto es para lo que se decide fuera del portal: actas, avales y reformas del protocolo de medición.",
         submitLabel: editing ? "Guardar registro" : "Registrar cambio",
         fields: [
           { name: "version", label: "Número de versión", required: true, placeholder: "Ej. 1.1" },
@@ -429,7 +576,7 @@ export function buildForm(kind: EntityKind, ctx: FormContext): FormConfig {
           },
           {
             name: "indicator_id",
-            label: "Indicador relacionado",
+            label: "Protocolo de medición relacionado",
             type: "select",
             options: [
               { value: "", label: "Ninguno" },
@@ -450,10 +597,10 @@ export function buildForm(kind: EntityKind, ctx: FormContext): FormConfig {
           },
           {
             name: "activity_id",
-            label: "Actividad relacionada",
+            label: "Indicador relacionado",
             type: "select",
             options: [
-              { value: "", label: "Ninguna" },
+              { value: "", label: "Ninguno" },
               ...ctx.activities.map((activity) => ({ value: activity.id, label: activity.title })),
             ],
           },
@@ -509,6 +656,60 @@ export function buildForm(kind: EntityKind, ctx: FormContext): FormConfig {
           position: position ?? ctx.documents.length + 1,
         }),
       };
+
+    /* --- Observación del pilar ---------------------------------------------
+       El balance en prosa del avance de los indicadores. Va aparte de la serie
+       anual a propósito: la cifra dice cuánto, y esto dice por qué.
+       -------------------------------------------------------------------- */
+    case "observation": {
+      const cortes = [...planYears].sort((a, b) => b - a);
+      return {
+        title: editing ? "Editar observación" : "Nueva observación",
+        description:
+          "Se publica en la ficha del pilar, debajo de la tabla de indicadores. Es la lectura del avance: lo que explica las cifras, no lo que las repite.",
+        submitLabel: editing ? "Guardar observación" : "Publicar observación",
+        fields: [
+          {
+            name: "title",
+            label: "Título",
+            placeholder: "Ej. Balance del corte 2025",
+            hint: "Opcional. Sin título, la observación se muestra solo con su texto.",
+          },
+          {
+            name: "body",
+            label: "Observación",
+            type: "textarea",
+            required: true,
+            placeholder: "Qué explica el avance de los indicadores de este pilar en el corte.",
+          },
+          {
+            name: "year",
+            label: "Corte al que se refiere",
+            type: "select",
+            options: [
+              { value: "", label: "Vigente (sin año)" },
+              ...cortes.map((year) => ({ value: String(year), label: String(year) })),
+            ],
+            hint: "Sin año, la observación se lee como el estado actual del pilar.",
+          },
+          { name: "author", label: "Quién la firma", placeholder: "Ej. Comité de Planeación" },
+        ],
+        initial: {
+          title: text(entity.title),
+          body: text(entity.body),
+          year: text(entity.year),
+          author: text(entity.author),
+        },
+        toRow: (values) => ({
+          pillar_id: ctx.pillarId,
+          title: values.title ?? "",
+          body: values.body.trim(),
+          year: (values.year ?? "").trim() === "" ? null : Number(values.year),
+          author: values.author ?? "",
+          position: position ?? 0,
+        }),
+      };
+    }
   }
 }
 
@@ -521,4 +722,5 @@ export const tableFor: Record<EntityKind, string> = {
   document: "documents",
   change: "change_log",
   glossary: "glossary_terms",
+  observation: "pillar_observations",
 };

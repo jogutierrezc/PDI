@@ -15,6 +15,7 @@ import { supabase } from "../lib/supabase";
 import type {
   ActionLineWithArea,
   Activity,
+  ActivityWithTargets,
   AreaProgress,
   ChangeLogWithTarget,
   GlossaryTerm,
@@ -24,6 +25,7 @@ import type {
   PdiDocument,
   PdiSummary,
   Pillar,
+  PillarObservation,
   PillarOwner,
   PillarProgress,
   Profile,
@@ -52,12 +54,28 @@ export const keys = {
   profiles: () => [...keys.all, "profiles"] as const,
   owners: () => [...keys.all, "owners"] as const,
   webProjects: () => [...keys.all, "web-projects"] as const,
+  observations: (pillarId: string) => [...keys.all, "observations", pillarId] as const,
 };
 
 /** Convierte el error de PostgREST en algo que se pueda mostrar y accionar. */
 function unwrap<T>({ data, error }: { data: T | null; error: DatabaseError | null }): T {
   if (error) throw describeDatabaseError(error);
   return data as T;
+}
+
+/**
+ * Un indicador de resultado no se entiende sin su unidad ni sin su serie de
+ * años: se piden embebidos para que la tabla del reporte salga de una sola
+ * petición en vez de una por indicador.
+ */
+const ACTIVITY_SELECT = "*, unit:parameters(label), targets:activity_targets(*)";
+
+/** Los años llegan en el orden que quiera Postgres; la tabla los quiere en el suyo. */
+function sortTargets(rows: ActivityWithTargets[]): ActivityWithTargets[] {
+  return rows.map((row) => ({
+    ...row,
+    targets: [...(row.targets ?? [])].sort((a, b) => a.year - b.year),
+  }));
 }
 
 /* =============================================================================
@@ -177,12 +195,15 @@ export interface PillarDetail {
   areas: AreaWithLines[];
   /** Avance de cada área, en cascada desde sus líneas. */
   areaProgress: AreaProgress[];
-  /** Avance de cada proyecto, en cascada desde sus actividades. */
+  /** Avance de cada proyecto, en cascada desde sus indicadores. */
   projectProgress: ProjectProgress[];
   lines: ActionLineWithArea[];
   indicators: IndicatorWithLabels[];
   projects: Project[];
-  activities: Activity[];
+  /** Indicadores de resultado, con su unidad y su serie anual. */
+  activities: ActivityWithTargets[];
+  /** Lectura cualitativa del avance, escrita por el responsable del pilar. */
+  observations: PillarObservation[];
   changes: ChangeLogWithTarget[];
   glossary: GlossaryTerm[];
   documents: PdiDocument[];
@@ -218,6 +239,7 @@ export function usePillarDetail(slug: string | undefined) {
         indicators,
         projects,
         activities,
+        observations,
         changes,
         glossary,
         documents,
@@ -248,8 +270,23 @@ export function usePillarDetail(slug: string | undefined) {
             .order("position")
             .then(unwrap<IndicatorWithLabels[]>),
           supabase.from("projects").select("*").eq("pillar_id", id).order("position").then(unwrap<Project[]>),
-          supabase.from("activities").select("*").eq("pillar_id", id).order("position").then(unwrap<Activity[]>),
-          // v_change_log añade el nombre del proyecto, la actividad o el
+          supabase
+            .from("activities")
+            .select(ACTIVITY_SELECT)
+            .eq("pillar_id", id)
+            .order("position")
+            .then(unwrap<ActivityWithTargets[]>)
+            .then(sortTargets),
+          supabase
+            .from("pillar_observations")
+            .select("*")
+            .eq("pillar_id", id)
+            // Sin año = observación vigente: va primero, y después los cortes
+            // del más reciente al más antiguo.
+            .order("year", { ascending: false, nullsFirst: true })
+            .order("position")
+            .then(unwrap<PillarObservation[]>),
+          // v_change_log añade el nombre del proyecto, el indicador o el
           // indicador: sin eso, una entrada automática sería un id suelto.
           supabase
             .from("v_change_log")
@@ -284,6 +321,7 @@ export function usePillarDetail(slug: string | undefined) {
         indicators,
         projects,
         activities,
+        observations,
         changes,
         glossary,
         documents,

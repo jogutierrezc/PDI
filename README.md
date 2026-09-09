@@ -40,11 +40,12 @@ pegarlos en el editor SQL del panel de Supabase o aplicarlos con la CLI
 | `0003_views.sql` | Vistas derivadas (avance por pilar, resumen global, catálogos resueltos) |
 | `0004_seed.sql` | Datos iniciales para que el portal funcione desde el primer despliegue |
 | `0005_areas_y_proyectos.sql` | Retira `pillars.progress` y enlaza los proyectos con sus líneas de acción |
-| `0006_edicion_y_trazabilidad.sql` | Actividades y documentos dentro de la estructura + control de cambios automático |
+| `0006_edicion_y_trazabilidad.sql` | Indicadores y documentos dentro de la estructura + control de cambios automático |
 | `0007_permisos_y_cache.sql` | Permisos de la API y recarga de su caché |
-| `0008_cascada_de_avance.sql` | El avance se propaga de la actividad al pilar |
+| `0008_cascada_de_avance.sql` | El avance se propaga del indicador al pilar |
 | `0009_desarrollo_tecnologico.sql` | Catálogo de los desarrollos web de la oficina |
-| `0010_metas_y_cumplimiento.sql` | Meta y avance absolutos + conteos del cuadro de mando. **Ejecútala la última.** |
+| `0010_metas_y_cumplimiento.sql` | Meta y avance absolutos + conteos del cuadro de mando |
+| `0011_indicadores_por_anio.sql` | Unidad, línea base y serie anual del indicador + observaciones del pilar. **Ejecútala la última.** |
 
 Todos son idempotentes: volver a ejecutarlos no duplica nada.
 
@@ -83,21 +84,27 @@ update public.profiles set role = 'planeacion' where email = 'persona@udes.edu.c
                                               │                    │
         ┌────────────┬───────────────┬────────┴──────┬─────────────┼──────────────┐
         ▼            ▼               ▼               ▼             ▼              ▼
-  strategic_areas  indicators    activities      projects   planning_items   change_log
-        │            (protocolos)  (el avance)                                glossary_terms
-        ▼                                                                     documents
-   action_lines                                                              (repositorio)
+  strategic_areas  indicators    activities      projects  pillar_observations  change_log
+        │            (protocolos)      │                   (lectura del avance)  glossary_terms
+        ▼                              ▼                                         documents
+   action_lines               activity_targets                                  (repositorio)
+                          (meta / resultado por año,
+                            de donde sale el avance)
 ```
+
+`planning_items` sigue en la base con sus filas, pero ya no se muestra ni se
+consulta: la sustituyeron los indicadores de resultado. Se puede retirar en una
+migración futura.
 
 **El avance no se guarda en ninguna columna: se propaga hacia arriba.** Cada
-nivel es el promedio del nivel inferior, y la actividad es la hoja:
+nivel es el promedio del nivel inferior, y el indicador es la hoja:
 
 ```
-actividad   →  porcentaje reportado (la hoja)
-proyecto    →  promedio de sus actividades, o su reporte si no tiene
-línea       →  promedio de sus proyectos,  o su reporte si no tiene
+indicador   →  cumplimiento de su año más reciente (la hoja)
+proyecto    →  promedio de sus indicadores, o su reporte si no tiene
+línea       →  promedio de sus proyectos,   o su reporte si no tiene
 área        →  promedio de sus líneas
-pilar       →  promedio de sus áreas, o de sus actividades si no hay áreas
+pilar       →  promedio de sus áreas, o de sus indicadores si no hay áreas
 ```
 
 Mover el avance de un proyecto sube por la línea, el área y el pilar hasta el
@@ -111,15 +118,61 @@ conserva el porcentaje que valida el comité, y la intranet indica cuál de los 
 está mandando (`promedio de N proyectos` frente a `cumplimiento reportado`), para
 que nadie edite un número que ya no se usa.
 
-Aparte del avance, `v_pillar_progress` conserva los **conteos por estado** de las
-actividades: alimentan la barra apilada y las tarjetas del tablero, que responden
-a otra pregunta —cuántas hay de cada clase— distinta de cuánto se ha avanzado.
+Aparte del avance, `v_pillar_progress` conserva los **conteos por estado** de los
+indicadores: alimentan la barra apilada y las tarjetas del tablero, que responden
+a otra pregunta —cuántos hay de cada clase— distinta de cuánto se ha avanzado.
 Ese segundo número se llama `completion_rate`.
 
 > Si en algún momento apareció una columna `pillars.progress`, era un síntoma de
 > un fallo del formulario de la intranet, no una necesidad del modelo. La
 > migración `0005` la retira. **No vuelvas a crearla**: guardar el porcentaje
-> permitiría que el número del pilar y el de sus actividades se separaran.
+> permitiría que el número del pilar y el de sus indicadores se separaran.
+
+### El indicador de resultado y su serie anual
+
+La hoja del modelo es la tabla `activities`. En la interfaz se llama **indicador
+de resultado**, que es como lo nombra el reporte institucional; la tabla conserva
+el nombre antiguo para no romper la trazabilidad ya escrita.
+
+Un indicador tiene unidad de medida (referencia a `parameters`, categoría
+`unidad`), línea base con su año, y una fila por año en `activity_targets`:
+
+| Indicador | Unidad | Base 2023 | Meta 24 | Result. 24 | Cumpl. 24 | Meta 25 | … |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| Convenios vigentes | Convenios | 28 | 40 | 34 | 85 % | 50 | … |
+
+**El cumplimiento no se captura: es una columna generada.** Vale
+`result_value / target_value`, salvo que se escriba un `compliance_override`,
+que es lo que se usa en los indicadores de reducción, con tope, o los que ajusta
+el comité. Al ser generada no puede quedarse desfasada respecto a las dos cifras
+que tiene al lado.
+
+**El avance del indicador lo fija el año más reciente con cumplimiento.** Lo hace
+el disparador `activity_targets_sync_progress` sobre
+`sync_activity_progress()`, y de ahí sube por la cascada hasta el pilar: el
+número que se lee en la tabla y el que pinta el tablero son el mismo. Si el año
+más reciente baja del 100 %, el estado `cumplida` baja a `curso` con él, porque
+la base rechaza "cumplida al 94 %".
+
+Mientras un indicador **no tenga ningún año capturado**, su porcentaje sigue
+siendo el que se escribe a mano. Es lo que deja intactos los pilares cargados
+antes de la migración `0011`.
+
+Los años que se abren a captura son los del plan (2024-2028) y viven en
+`planYears`, en `src/data/pdi.ts`. La base admite cualquier año entre 2000 y
+2100: si alguien captura uno fuera del plan, las tablas lo muestran igual.
+
+### Observaciones del pilar
+
+`pillar_observations` guarda la lectura cualitativa del avance: por qué un
+indicador se quedó corto, qué se decidió en el comité, de qué depende lo que
+falta. Cuelga del pilar y no del indicador porque es un balance del conjunto.
+
+Cada observación puede anclarse a un año —"Corte 2025"— o quedarse sin año, y
+entonces se lee como el estado vigente. Se escriben en **Configurar pilar →
+Observaciones del pilar** y se publican en la ficha, debajo de la tabla de
+indicadores. La sección no aparece si no hay ninguna: una sección vacía no
+informa de nada.
 
 ### Decisiones que conviene conocer
 
@@ -134,9 +187,10 @@ Ese segundo número se llama `completion_rate`.
 - **Nivel, unidad y periodicidad son referencias a `parameters`**, no copias del
   texto: renombrar "Táctico" en el catálogo se refleja en todas partes, y
   borrarlo mientras está en uso falla en vez de dejar indicadores huérfanos.
-- **Restricciones que impiden estados imposibles**: una actividad `cumplida`
+- **Restricciones que impiden estados imposibles**: un indicador `cumplido`
   debe estar al 100 %; un `slug` solo admite minúsculas, números y guiones; una
-  URL de documento debe empezar por `http`; solo puede haber un corte vigente.
+  URL de documento debe empezar por `http`; solo puede haber un corte vigente;
+  un indicador no puede tener dos filas del mismo año.
 
 ## Roles y permisos
 
@@ -216,7 +270,7 @@ A partir de ahí, el resto de altas se hacen desde **Usuarios y roles**.
 | `/desarrollo-tecnologico` | Desarrollos web de la oficina | Público |
 | `/acceso-intranet` | Inicio de sesión | Público |
 | `/admin/pilares` | Gestión de pilares y responsables | `consulta`+ |
-| `/admin/pilares/:slug/configurar` | Áreas, líneas, proyectos, actividades y soportes | `consulta`+ |
+| `/admin/pilares/:slug/configurar` | Áreas, líneas, proyectos, indicadores, observaciones y soportes | `consulta`+ |
 | `/admin/parametros` | Catálogos globales | `consulta`+ |
 | `/admin/desarrollo` | Proyectos web y sus autores | `consulta`+ |
 | `/admin/usuarios` | Usuarios y roles | `admin` |
@@ -228,7 +282,7 @@ solo lectura; los controles de edición aparecen según el rol.
 
 ## Trazabilidad automática
 
-Cada alta, actualización y baja de un **proyecto** o de una **actividad** deja su
+Cada alta, actualización y baja de un **proyecto** o de un **indicador** deja su
 propia entrada en el control de cambios, con la versión correlativa (`1.0`,
 `1.1`, `1.2`…), quién la hizo y qué cambió en concreto —"Avance 60 % → 75 %",
 "Estado pendiente → curso", "Se destacó en el tablero público"—.
@@ -240,20 +294,29 @@ llamada directa a la API.
 
 Reordenar una lista o corregir una descripción no genera entrada: solo lo que
 cambia el sentido del registro (avance, estado, nombre, responsable, fecha,
-línea, y en actividades también el destacado).
+línea, y en indicadores también el destacado). Guardar la serie anual cambia el
+avance del indicador, así que también deja su entrada.
 
 Las entradas automáticas **no se pueden editar** desde la intranet —reescribir
 una traza destruye el registro de lo que pasó—; el botón de edición solo aparece
 en las que se registraron a mano. Esas siguen sirviendo para lo que se decide
-fuera del portal: actas, avales y reformas del indicador.
+fuera del portal: actas, avales y reformas del protocolo de medición.
 
 ## Qué se edita desde la intranet
 
 En **Configurar pilar** se crean, editan y eliminan áreas estratégicas, líneas de
-acción, proyectos, actividades y documentos de soporte. Los formularios sirven
-para las dos cosas: al abrirlos sobre una fila llegan rellenos con sus valores.
+acción, proyectos, indicadores de resultado, observaciones y documentos de
+soporte. Los formularios sirven para las dos cosas: al abrirlos sobre una fila
+llegan rellenos con sus valores.
 
-Proyectos, actividades y documentos eligen su **línea de acción** en un
+El formulario del indicador incluye la **rejilla de metas por año**: una fila por
+corte del plan, con meta y resultado uno al lado del otro y el cumplimiento
+calculándose mientras se escribe. Un año sin ninguna de las tres cifras es un año
+no reportado, no un año en cero: no se guarda, y si estaba guardado se borra.
+Guardar el indicador escribe también su serie anual —el formulario resuelve las
+dos tablas en una sola operación.
+
+Proyectos, indicadores y documentos eligen su **línea de acción** en un
 desplegable agrupado por área. En los documentos hay además un selector de área:
 si se elige una línea, su área manda sobre él, de modo que un soporte nunca queda
 colocado en dos sitios a la vez.
@@ -271,15 +334,13 @@ Al elegir una:
 
 El control de cambios **no** se filtra: es la historia del pilar entero.
 
-La sección **Actividades del pilar** ocupa el lugar de la antigua "Planeación de
-resultados". Muestra las actividades que el portal público puede ver, con su
-línea de acción, su estado y su avance, y marca cuáles salen además en el
-tablero. Tiene sentido ahí porque son las filas que determinan la proporción de
-cumplimiento del pilar.
+La sección **Indicadores de resultado** ocupa el lugar de la antigua "Planeación
+de resultados". Es la tabla del reporte institucional: unidad, línea base y, por
+cada año del plan, meta, resultado y cumplimiento. El año que fija el avance del
+indicador va marcado, porque de los cinco cortes solo uno llega al pilar.
 
-> La tabla `planning_items` sigue en la base de datos con sus filas, pero ya no
-> se muestra ni se consulta. Si no vais a usarla, se puede retirar en una
-> migración futura.
+Debajo, **Observaciones sobre los indicadores** publica el balance cualitativo
+del pilar, si lo hay.
 
 Sin filtro, la sección **Áreas estratégicas del pilar** muestra una rejilla con
 el avance de cada una —el promedio del cumplimiento reportado de sus líneas— y
@@ -299,7 +360,7 @@ desde **Configurar pilar → Proyectos estratégicos**.
 | | `/implementacion/pilar/:slug` | `/tablero/pilar/:slug` |
 | --- | --- | --- |
 | Pregunta | Qué es el pilar y qué hay dentro | Cuánto se ha cumplido |
-| Contenido | Ficha del indicador, áreas, proyectos, actividades, trazabilidad | Convención de bandas, cuatro indicadores y tres tablas de resultados |
+| Contenido | Protocolo de medición, áreas, proyectos, indicadores, observaciones, trazabilidad | Convención de bandas, cuatro resultados generales y cuatro tablas |
 | Se llega desde | Implementación del PDI | Tablero PDI |
 
 Las dos enlazan entre sí, así que nadie queda atrapado en una.
@@ -338,9 +399,14 @@ el de la línea, de sus proyectos. Cada fila dice de dónde viene su porcentaje
 número que no se está usando.
 
 Mientras no se capturen, las columnas **Meta** y **Avance** de las tablas cuentan
-actividades —comprometidas y cumplidas—, y la tabla lo dice al pie. El
+indicadores —comprometidos y cumplidos—, y la tabla lo dice al pie. El
 **porcentaje** es siempre el avance en cascada, venga de donde venga la meta: una
 sola fuente para toda la aplicación.
+
+No hay que confundirlas con la meta anual del indicador: aquellas son el
+compromiso agregado del área, la línea o el proyecto —"28 de 40 convenios"— y
+estas son la serie que se reporta cada año. Las primeras se escriben; las
+segundas se calculan y son las que mandan.
 
 ## Desarrollo tecnológico
 

@@ -85,6 +85,9 @@ const FIXTURES = {
   v_current_period: [
     { id: "r1", label: "Corte agosto 2026", cutoff_date: "2026-08-28", published_at: "2026-08-28T17:00:00Z" },
   ],
+  // Un indicador de resultado completo: unidad del catálogo, línea base y la
+  // serie anual con su cumplimiento ya calculado, tal como llega de la columna
+  // generada de activity_targets.
   activities: [
     {
       id: "a1",
@@ -98,7 +101,29 @@ const FIXTURES = {
       is_featured: true,
       position: 1,
       action_line_id: "l1",
+      unit_id: "u2",
+      baseline_year: 2023,
+      baseline_value: 28,
+      unit: { label: "Aulas" },
+      targets: [
+        { id: "t1", activity_id: "a1", year: 2024, target_value: 40, result_value: 34, compliance_override: null, compliance: 85, note: "" },
+        { id: "t2", activity_id: "a1", year: 2025, target_value: 50, result_value: 36, compliance_override: null, compliance: 72, note: "" },
+      ],
       pillar: { slug: "ambiente-tecnologico", name: "Ambiente tecnológico", accent_slot: 2 },
+    },
+  ],
+  activity_targets: [],
+  pillar_observations: [
+    {
+      id: "ob1",
+      pillar_id: "p1",
+      year: 2025,
+      title: "Balance del corte 2025",
+      body: "La meta de aulas se cumplió al 72 %: faltó la dotación de dos sedes, prevista para el primer trimestre.",
+      author: "Comité de Planeación",
+      position: 1,
+      created_at: "2026-01-10T00:00:00Z",
+      updated_at: "2026-01-10T00:00:00Z",
     },
   ],
   documents: [
@@ -232,6 +257,7 @@ const FIXTURES = {
   parameters: [
     { id: "n1", category: "nivel_gestion", label: "Estratégico", description: null, position: 1, is_active: true },
     { id: "u1", category: "unidad", label: "Porcentaje", description: null, position: 1, is_active: true },
+    { id: "u2", category: "unidad", label: "Aulas", description: null, position: 2, is_active: true },
     { id: "pe1", category: "periodicidad", label: "Anual", description: null, position: 1, is_active: true },
   ],
   profiles: [
@@ -284,12 +310,19 @@ const routes = [
       "PDI-AT-001",
       "Presupuesto ejecutado",        // los recursos del indicador sí se ven
       "Promedio de 2 áreas",          // el anillo dice de dónde sale
-      "promedio de 2 actividades",    // el proyecto deriva de sus actividades
-      "Actividades del pilar",        // sustituye a "Planeación de resultados"
+      "promedio de 2 indicadores",    // el proyecto deriva de sus indicadores
+      "Indicadores de resultado",     // sustituye a "Actividades del pilar"
       "Fortalecimiento del aula híbrida",
-      "En el tablero",                // la actividad destacada se marca
+      "En el tablero",                // el indicador destacado se marca
+      "Aulas",                        // la unidad del catálogo
+      "Meta 24",                      // la cabecera de la serie anual
+      "Meta 28",                      // los cinco años del plan, aunque estén vacíos
+      "85",                           // cumplimiento 2024 = 34 / 40
+      "Año 2025",                     // el año que fija el avance va identificado
+      "Observaciones sobre los indicadores",
+      "Balance del corte 2025",
     ],
-    absent: ["Planeación de resultados"],
+    absent: ["Planeación de resultados", "Actividades del pilar"],
   },
   {
     path: "/implementacion/pilar/ambiente-tecnologico",
@@ -331,13 +364,13 @@ const routes = [
         throw new Error("no se muestran las líneas del área elegida");
       }
 
-      // Las actividades siguen el mismo filtro que los proyectos.
-      const actividades = window.document.querySelector("#actividades")?.textContent ?? "";
-      if (actividades.includes("Fortalecimiento del aula híbrida")) {
-        throw new Error("la actividad de otra área sigue en la lista");
+      // Los indicadores siguen el mismo filtro que los proyectos.
+      const indicadores = window.document.querySelector("#indicadores")?.textContent ?? "";
+      if (indicadores.includes("Fortalecimiento del aula híbrida")) {
+        throw new Error("el indicador de otra área sigue en la tabla");
       }
-      if (!actividades.includes("Sin actividades vinculadas a Cultura digital")) {
-        throw new Error("no se avisa de que el área no tiene actividades");
+      if (!indicadores.includes("Sin indicadores vinculados a Cultura digital")) {
+        throw new Error("no se avisa de que el área no tiene indicadores");
       }
     },
   },
@@ -436,7 +469,9 @@ const routes = [
       "Infraestructura tecnológica",
       "28 servicios",                // meta absoluta capturada
       "Migración a la nube institucional",
-      "cuentan actividades",         // la nota del respaldo
+      "cuentan indicadores",         // la nota del respaldo
+      "Resultados a nivel de indicadores", // la serie anual, de donde sale todo
+      "Meta 24",
     ],
     interact: async (window) => {
       // Ningún porcentaje puede comunicarse solo con color: cada ficha lleva
@@ -467,7 +502,9 @@ const routes = [
     also: [
       "Migración a la nube institucional",
       "Infraestructura tecnológica",
-      "Actividades",
+      "Indicadores de resultado",
+      "Observaciones del pilar",
+      "Meta 24",                    // la tabla de captura trae la serie anual
       "registro automático",     // la entrada escrita por el disparador
       "promedio de 1 proyecto",  // la línea deriva su avance
       "Metas y cumplimiento",    // el panel de metas por área y línea
@@ -535,6 +572,69 @@ const routes = [
         if (!valores.includes(esperado)) {
           throw new Error(`falta "${esperado}" en el formulario; llegó: ${valores.join(" | ")}`);
         }
+      }
+    },
+  },
+  {
+    path: "/admin/pilares/ambiente-tecnologico/configurar",
+    session: true,
+    note: "la serie anual del indicador se captura en el mismo formulario",
+    expect: "Editar indicador de resultado",
+    also: ["Unidad de medida", "Metas y resultados por año", "Ajustar el cumplimiento a mano"],
+    interact: async (window, tick) => {
+      const edit = window.document.querySelector(
+        '[aria-label="Editar el indicador Fortalecimiento del aula híbrida"]',
+      );
+      if (!edit) throw new Error("no se encontró el botón de editar del indicador");
+      edit.click();
+      await tick();
+
+      const dialog = window.document.querySelector(".modal-panel");
+      if (!dialog) throw new Error("el modal del indicador no se abrió");
+
+      // La unidad llega del catálogo, seleccionada.
+      const unidad = [...dialog.querySelectorAll("select")].find(
+        (element) => element.value === "u2",
+      );
+      if (!unidad) throw new Error("la unidad de medida no llegó seleccionada");
+
+      // La rejilla trae los cinco años del plan con lo ya capturado en 2024-25.
+      const grid = dialog.querySelector(".year-grid");
+      if (!grid) throw new Error("no se pintó la rejilla de metas por año");
+
+      const filas = [...grid.querySelectorAll("tbody tr")];
+      if (filas.length !== 5) {
+        throw new Error(`se esperaban 5 años del plan y llegaron ${filas.length}`);
+      }
+
+      const meta24 = filas[0].querySelector("input");
+      if (!meta24 || meta24.value !== "40") {
+        throw new Error(`la meta 2024 no llegó rellena: "${meta24 ? meta24.value : "sin campo"}"`);
+      }
+
+      // El cumplimiento no se captura: se calcula mientras se escribe.
+      const calculado = filas[0].querySelector(".year-grid__computed");
+      if (!calculado || !calculado.textContent.includes("85")) {
+        throw new Error(
+          `el cumplimiento 2024 no se calculó: "${calculado ? calculado.textContent : "sin salida"}"`,
+        );
+      }
+
+      // Y sigue el resultado: al cambiarlo, la cifra se mueve sin guardar.
+      const resultado = filas[0].querySelectorAll("input")[1];
+      const setter = Object.getOwnPropertyDescriptor(
+        window.HTMLInputElement.prototype,
+        "value",
+      ).set;
+      setter.call(resultado, "20");
+      resultado.dispatchEvent(new window.Event("input", { bubbles: true }));
+      await tick();
+
+      const recalculado = window.document
+        .querySelector(".year-grid tbody tr .year-grid__computed")
+        ?.textContent ?? "";
+      if (!recalculado.includes("50")) {
+        throw new Error(`el cumplimiento no se recalculó al escribir: "${recalculado}"`);
       }
     },
   },

@@ -1,16 +1,28 @@
-import { useMemo, useState } from "react";
+import { Fragment, useMemo, useState } from "react";
 import type { FormEvent } from "react";
 import { Link, useParams } from "react-router-dom";
 import { AdminShell, ReadOnlyNotice } from "../components/AdminShell";
 import { Icon } from "../../../components/ui/Icon";
 import { Modal, ModalActions } from "../../../components/ui/Modal";
 import { EmptyBlock, ErrorBlock, LoadingBlock } from "../../../components/ui/QueryState";
-import { keys, usePillarDetail, usePillarOwners } from "../../../data/queries";
+import { keys, useParameters, usePillarDetail, usePillarOwners } from "../../../data/queries";
 import { pillarScope, useRemoveRow, useSaveRow } from "../../../data/mutations";
-import { accentFor, bandFor, formatDate, formatMonth, statusMeta } from "../../../data/pdi";
+import {
+  accentFor,
+  bandFor,
+  computeCompliance,
+  formatDate,
+  formatMonth,
+  formatValue,
+  latestTarget,
+  shortYear,
+  statusMeta,
+  yearsInPlay,
+} from "../../../data/pdi";
 import { useAuth } from "../../../lib/auth";
-import { buildForm, tableFor } from "./forms";
+import { buildForm, tableFor, yearField } from "./forms";
 import type { EntityKind, FieldSpec, FormConfig, Values } from "./forms";
+import type { ActivityWithTargets } from "../../../types/database";
 import type { WritableTable } from "../../../data/mutations";
 
 /** Qué diálogo está abierto y sobre qué fila. Sin fila = alta. */
@@ -20,6 +32,9 @@ export function PillarConfigurator() {
   const { slug } = useParams<{ slug: string }>();
   const detail = usePillarDetail(slug);
   const owners = usePillarOwners();
+  // El desplegable de unidad del indicador sale del catálogo global, no de
+  // texto libre: así "convenios" se escribe una vez y no de cinco maneras.
+  const units = useParameters("unidad");
   const { profile, hasRole } = useAuth();
 
   const [selectedAreaId, setSelectedAreaId] = useState<string | null>(null);
@@ -71,8 +86,25 @@ export function PillarConfigurator() {
     );
   }
 
-  const { pillar, areas, areaProgress, lines, projectProgress, projects, activities, changes, glossary, documents, indicators } =
-    detail.data;
+  const {
+    pillar,
+    areas,
+    areaProgress,
+    lines,
+    projectProgress,
+    projects,
+    activities,
+    observations,
+    changes,
+    glossary,
+    documents,
+    indicators,
+  } = detail.data;
+
+  // Las columnas de la tabla son los años que alguien haya capturado en
+  // cualquier indicador del pilar, más los del plan: si un pilar todavía no
+  // reporta 2027, esa columna no ocupa sitio en pantalla.
+  const years = yearsInPlay(activities.flatMap((activity) => activity.targets));
   const lineById = new Map(lines.map((line) => [line.id, line]));
   const activeArea = areas.find((area) => area.id === selectedAreaId) ?? areas[0];
   // Las líneas se leen de la vista, no del embebido de la tabla: la vista trae
@@ -113,6 +145,7 @@ export function PillarConfigurator() {
         indicators,
         projects,
         activities,
+        units: units.data ?? [],
         documents,
         activeAreaId: activeArea?.id,
         entity: modal.entity,
@@ -124,7 +157,7 @@ export function PillarConfigurator() {
       section="pillars"
       kicker="Administración · Configuración del pilar"
       title={pillar.name}
-      description="Estructura, proyectos, actividades, soportes y trazabilidad del pilar."
+      description="Estructura, proyectos, indicadores de resultado, soportes y trazabilidad del pilar."
       actions={
         <Link className="button-ghost" to="/admin/pilares">
           <span aria-hidden="true">←</span> Volver a pilares
@@ -383,7 +416,7 @@ export function PillarConfigurator() {
                           {statusMeta[project.status].label} ·{" "}
                           {projectStats.get(project.id)?.progress ?? project.progress}%
                           {projectStats.get(project.id)?.is_derived
-                            ? ` (promedio de ${projectStats.get(project.id)?.activity_count} actividades)`
+                            ? ` (promedio de ${projectStats.get(project.id)?.activity_count} indicadores)`
                             : ""}
                         </small>
                         {line ? (
@@ -423,60 +456,138 @@ export function PillarConfigurator() {
             )}
           </Section>
 
-          {/* --- Actividades --------------------------------------------- */}
+          {/* --- Indicadores de resultado --------------------------------
+              La tabla es la del reporte institucional: una fila por indicador y
+              tres columnas por año. Se configura viendo exactamente lo que se
+              va a publicar. ------------------------------------------------ */}
           <Section
-            title="Actividades"
-            hint="El avance del pilar sale de contar estas filas: una actividad cumplida suma al porcentaje."
-            action={canEdit ? { label: "Nueva actividad", onClick: () => open("activity") } : undefined}
+            title="Indicadores de resultado"
+            hint="Meta, resultado y cumplimiento de cada año. El avance del pilar sale de aquí: cada indicador aporta el cumplimiento de su año más reciente."
+            action={canEdit ? { label: "Nuevo indicador", onClick: () => open("activity") } : undefined}
           >
             {activities.length === 0 ? (
               <EmptyBlock
-                title="Sin actividades"
-                hint="Mientras no haya actividades, el pilar aparecerá al 0 % en el tablero."
+                title="Sin indicadores de resultado"
+                hint="Mientras no haya indicadores, el pilar aparecerá al 0 % en el tablero."
+              />
+            ) : (
+              <div className="table-scroll">
+                <table className="result-table indicator-table">
+                  <caption className="sr-only">
+                    Indicadores de resultado del pilar: unidad, línea base y, por cada año, meta,
+                    resultado y cumplimiento
+                  </caption>
+                  <thead>
+                    <tr>
+                      <th scope="col">Indicador</th>
+                      <th scope="col">Unidad</th>
+                      <th scope="col">Base</th>
+                      {years.map((year) => (
+                        <th scope="col" key={year} colSpan={3} className="indicator-table__year">
+                          {year}
+                        </th>
+                      ))}
+                      <th scope="col">Avance</th>
+                      {canEdit && (
+                        <th scope="col">
+                          {/* La celda tiene que ocupar su sitio en la cabecera; lo
+                              que se oculta es el texto, no la columna. */}
+                          <span className="sr-only">Acciones</span>
+                        </th>
+                      )}
+                    </tr>
+                    <tr className="indicator-table__subhead">
+                      <th scope="col" />
+                      <th scope="col" />
+                      <th scope="col" />
+                      {years.map((year) => (
+                        <Fragment key={year}>
+                          <th scope="col">Meta {shortYear(year)}</th>
+                          <th scope="col">Result.</th>
+                          <th scope="col">Cumpl.</th>
+                        </Fragment>
+                      ))}
+                      <th scope="col" />
+                      {canEdit && <th scope="col" />}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {activities.map((activity) => (
+                      <IndicatorRow
+                        key={activity.id}
+                        activity={activity}
+                        years={years}
+                        line={
+                          activity.action_line_id ? lineById.get(activity.action_line_id) : undefined
+                        }
+                        actions={
+                          canEdit ? (
+                            <RowActions
+                              onEdit={() =>
+                                open("activity", activity as unknown as Record<string, unknown>)
+                              }
+                              editLabel={`Editar el indicador ${activity.title}`}
+                              onRemove={() =>
+                                void removeRow(
+                                  "activity",
+                                  activity.id,
+                                  `Se eliminó “${activity.title}”.`,
+                                )
+                              }
+                              removeLabel={`Eliminar el indicador ${activity.title}`}
+                            />
+                          ) : null
+                        }
+                      />
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </Section>
+
+          {/* --- Observaciones -------------------------------------------- */}
+          <Section
+            title="Observaciones del pilar"
+            hint="La lectura del avance: por qué un indicador se quedó corto, qué se decidió, de qué depende lo que falta. Se publica bajo la tabla."
+            action={canEdit ? { label: "Nueva observación", onClick: () => open("observation") } : undefined}
+          >
+            {observations.length === 0 ? (
+              <EmptyBlock
+                title="Sin observaciones"
+                hint="La tabla dice cuánto se cumplió; la observación, por qué."
               />
             ) : (
               <ul className="record-list">
-                {activities.map((activity) => {
-                  const line = activity.action_line_id
-                    ? lineById.get(activity.action_line_id)
-                    : undefined;
-                  return (
-                    <li key={activity.id}>
-                      <div>
-                        <strong>
-                          {activity.title}
-                          {activity.is_featured && <span className="record-flag">Destacada</span>}
-                        </strong>
-                        <small>
-                          {activity.owner || "Sin responsable"} · vence {formatMonth(activity.due_date)}{" "}
-                          · {activity.progress}%
-                        </small>
-                        {line && (
-                          <small className="record-lineage">
-                            {line.area_name} › {line.code ? `${line.code} · ` : ""}
-                            {line.name}
-                          </small>
-                        )}
-                      </div>
-                      <span className={`status-badge status-badge--${activity.status}`}>
-                        <span className="status-badge__glyph" aria-hidden="true">
-                          {statusMeta[activity.status].glyph}
+                {observations.map((observation) => (
+                  <li key={observation.id}>
+                    <div>
+                      <strong>
+                        {observation.title || "Observación"}
+                        <span className="record-flag">
+                          {observation.year ? `Corte ${observation.year}` : "Vigente"}
                         </span>
-                        {statusMeta[activity.status].label}
-                      </span>
-                      {canEdit && (
-                        <RowActions
-                          onEdit={() => open("activity", activity as unknown as Record<string, unknown>)}
-                          editLabel={`Editar la actividad ${activity.title}`}
-                          onRemove={() =>
-                            void removeRow("activity", activity.id, `Se eliminó “${activity.title}”.`)
-                          }
-                          removeLabel={`Eliminar la actividad ${activity.title}`}
-                        />
+                      </strong>
+                      <small>{observation.body}</small>
+                      {observation.author && (
+                        <small className="record-lineage">{observation.author}</small>
                       )}
-                    </li>
-                  );
-                })}
+                    </div>
+                    <span />
+                    {canEdit && (
+                      <RowActions
+                        onEdit={() =>
+                          open("observation", observation as unknown as Record<string, unknown>)
+                        }
+                        editLabel={`Editar la observación ${observation.title || observation.year || ""}`}
+                        onRemove={() =>
+                          void removeRow("observation", observation.id, "Se eliminó la observación.")
+                        }
+                        removeLabel={`Eliminar la observación ${observation.title || observation.year || ""}`}
+                      />
+                    )}
+                  </li>
+                ))}
               </ul>
             )}
           </Section>
@@ -543,7 +654,7 @@ export function PillarConfigurator() {
               <Meta label="Aporta a" value={pillar.contributes} />
               <Meta label="Responsable" value={pillar.management_owner} />
               <Meta label="Cálculo" value={pillar.calculation_owner} />
-              <Meta label="Indicadores" value={`${indicators.length} protocolo(s)`} />
+              <Meta label="Protocolos de medición" value={`${indicators.length} protocolo(s)`} />
             </dl>
             <Link className="button-ghost" to="/admin/pilares">
               Editar identidad del pilar
@@ -552,7 +663,7 @@ export function PillarConfigurator() {
 
           <Section
             title="Control de cambios"
-            hint="Las entradas de proyectos y actividades se escriben solas al guardar."
+            hint="Las entradas de proyectos e indicadores se escriben solas al guardar."
             action={canEdit ? { label: "Registrar", onClick: () => open("change") } : undefined}
             compact
           >
@@ -663,6 +774,11 @@ export function PillarConfigurator() {
                   table: tableFor[modal.kind] as WritableTable,
                   id: modal.entity?.id as string | undefined,
                   values: formConfig.toRow(values),
+                  // La serie anual del indicador vive en otra tabla y necesita el
+                  // id del padre, que al crear no existe hasta después del INSERT.
+                  children: formConfig.childRows
+                    ? (parentId) => formConfig.childRows!(values, parentId)
+                    : undefined,
                 }),
               modal.entity ? "Cambios guardados." : "Registro creado.",
             )
@@ -762,6 +878,88 @@ function TargetRow({
   );
 }
 
+/** Una fila de la tabla de indicadores: la unidad, la base y los tres datos de
+ *  cada año. El año que fija el avance se marca, porque de los cinco solo uno
+ *  llega al pilar y sin señalarlo la tabla no lo dice. */
+function IndicatorRow({
+  activity,
+  years,
+  line,
+  actions,
+}: {
+  activity: ActivityWithTargets;
+  years: number[];
+  line?: { area_name: string; code: string | null; name: string };
+  actions: React.ReactNode;
+}) {
+  const byYear = new Map(activity.targets.map((row) => [row.year, row]));
+  const driver = latestTarget(activity.targets);
+  const band = bandFor(activity.progress);
+  const unit = activity.unit?.label ?? null;
+
+  return (
+    <tr>
+      <th scope="row">
+        <strong>
+          {activity.title}
+          {activity.is_featured && <span className="record-flag">Destacado</span>}
+        </strong>
+        <small>
+          {line
+            ? `${line.area_name} › ${line.code ? `${line.code} · ` : ""}${line.name}`
+            : "Sin línea de acción"}
+        </small>
+      </th>
+
+      <td>{unit ?? <span className="target-empty">Sin unidad</span>}</td>
+
+      <td className="result-table__number">
+        {activity.baseline_value === null ? (
+          <span className="target-empty">—</span>
+        ) : (
+          <>
+            {formatValue(activity.baseline_value)}
+            {activity.baseline_year && <small> ({activity.baseline_year})</small>}
+          </>
+        )}
+      </td>
+
+      {years.map((year) => {
+        const row = byYear.get(year);
+        const isDriver = driver?.year === year;
+        return (
+          <Fragment key={year}>
+            <td className="result-table__number">{formatValue(row?.target_value)}</td>
+            <td className="result-table__number">{formatValue(row?.result_value)}</td>
+            <td
+              className={`result-table__number${isDriver ? " indicator-table__driver" : ""}`}
+              title={isDriver ? "Este es el año que fija el avance del indicador" : undefined}
+            >
+              {row?.compliance === null || row?.compliance === undefined
+                ? "—"
+                : `${formatValue(row.compliance)} %`}
+              {row?.compliance_override !== null && row?.compliance_override !== undefined && (
+                <small title="Cumplimiento decidido a mano"> ·</small>
+              )}
+            </td>
+          </Fragment>
+        );
+      })}
+
+      <td>
+        <span className="band-chip" style={{ "--band": band.color } as React.CSSProperties}>
+          <span className="band-chip__value">{activity.progress} %</span>
+          <span className="band-chip__label">
+            {driver ? `Año ${driver.year}` : statusMeta[activity.status].label}
+          </span>
+        </span>
+      </td>
+
+      {actions && <td>{actions}</td>}
+    </tr>
+  );
+}
+
 function IconAction({
   icon,
   label,
@@ -843,9 +1041,16 @@ function EntityForm({
   return (
     <Modal title={config.title} description={config.description} onClose={onClose}>
       <form className="modal-form" onSubmit={handleSubmit}>
-        {config.fields.map((field) => (
-          <Field key={field.name} field={field} value={values[field.name] ?? ""} onChange={set} />
-        ))}
+        {config.fields.map((field) =>
+          // La rejilla de años no es un campo con un valor: son tres por año, y
+          // necesita ver el estado entero para calcular el cumplimiento mientras
+          // se escribe.
+          field.type === "years" ? (
+            <YearGrid key={field.name} field={field} values={values} onChange={set} />
+          ) : (
+            <Field key={field.name} field={field} value={values[field.name] ?? ""} onChange={set} />
+          ),
+        )}
         <ModalActions onCancel={onClose} submitLabel={pending ? "Guardando…" : config.submitLabel} />
       </form>
     </Modal>
@@ -901,7 +1106,9 @@ function Field({
                 ? "date"
                 : field.type === "url"
                   ? "url"
-                  : "text"
+                  : field.type === "number"
+                    ? "number"
+                    : "text"
           }
           min={field.type === "range" ? 0 : undefined}
           max={field.type === "range" ? 100 : undefined}
@@ -914,6 +1121,128 @@ function Field({
 
       {field.hint && <small>{field.hint}</small>}
     </label>
+  );
+}
+
+/* --- Rejilla de metas por año -----------------------------------------------
+   La captura reproduce la tabla del reporte: una fila por año, y la meta y el
+   resultado uno al lado del otro. El cumplimiento no se escribe —se calcula
+   mientras se teclea— salvo que se abra el campo de ajuste, que es lo que se
+   usa en los indicadores de reducción o con tope.
+   -------------------------------------------------------------------------- */
+
+function YearGrid({
+  field,
+  values,
+  onChange,
+}: {
+  field: FieldSpec;
+  values: Values;
+  onChange: (name: string, value: string) => void;
+}) {
+  const years = field.years ?? [];
+  const [showOverride, setShowOverride] = useState(() =>
+    years.some((year) => (values[yearField(year, "override")] ?? "") !== ""),
+  );
+
+  const parse = (raw: string): number | null => {
+    const value = raw.trim();
+    if (value === "") return null;
+    const parsed = Number(value.replace(",", "."));
+    return Number.isFinite(parsed) ? parsed : null;
+  };
+
+  return (
+    <fieldset className="year-grid">
+      <legend>{field.label}</legend>
+
+      <table>
+        <thead>
+          <tr>
+            <th scope="col">Año</th>
+            <th scope="col">Meta</th>
+            <th scope="col">Resultado</th>
+            <th scope="col">Cumplimiento</th>
+          </tr>
+        </thead>
+        <tbody>
+          {years.map((year) => {
+            const target = parse(values[yearField(year, "target")] ?? "");
+            const result = parse(values[yearField(year, "result")] ?? "");
+            const override = values[yearField(year, "override")] ?? "";
+            const computed = computeCompliance(target, result);
+
+            return (
+              <tr key={year}>
+                <th scope="row">{year}</th>
+                <td>
+                  <input
+                    type="number"
+                    step="any"
+                    inputMode="decimal"
+                    aria-label={`Meta ${year}`}
+                    value={values[yearField(year, "target")] ?? ""}
+                    onChange={(event) => onChange(yearField(year, "target"), event.target.value)}
+                  />
+                </td>
+                <td>
+                  <input
+                    type="number"
+                    step="any"
+                    inputMode="decimal"
+                    aria-label={`Resultado ${year}`}
+                    value={values[yearField(year, "result")] ?? ""}
+                    onChange={(event) => onChange(yearField(year, "result"), event.target.value)}
+                  />
+                </td>
+                <td>
+                  {showOverride ? (
+                    <input
+                      type="number"
+                      step="any"
+                      inputMode="decimal"
+                      aria-label={`Cumplimiento ${year}`}
+                      placeholder={computed === null ? "—" : String(computed)}
+                      value={override}
+                      onChange={(event) =>
+                        onChange(yearField(year, "override"), event.target.value)
+                      }
+                    />
+                  ) : (
+                    <output className="year-grid__computed">
+                      {computed === null ? "—" : `${computed} %`}
+                    </output>
+                  )}
+                </td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+
+      <label className="year-grid__toggle">
+        <input
+          type="checkbox"
+          checked={showOverride}
+          onChange={(event) => {
+            const next = event.target.checked;
+            setShowOverride(next);
+            // Desmarcar devuelve el control al cálculo: dejar los valores
+            // escritos y ocultarlos publicaría un número que ya nadie ve.
+            if (!next) for (const year of years) onChange(yearField(year, "override"), "");
+          }}
+        />
+        <span>
+          Ajustar el cumplimiento a mano
+          <small>
+            Para indicadores que no se miden dividiendo resultado entre meta: los de reducción, los
+            que tienen tope, los que ajusta el comité.
+          </small>
+        </span>
+      </label>
+
+      {field.hint && <p className="year-grid__hint">{field.hint}</p>}
+    </fieldset>
   );
 }
 

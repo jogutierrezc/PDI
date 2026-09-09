@@ -37,7 +37,7 @@ export function StackedProgress({ summary }: StackedProgressProps) {
         onPointerLeave={() => setHovered(null)}
       >
         <span id={titleId} className="sr-only">
-          Distribución de {summary.total} actividades:{" "}
+          Distribución de {summary.total} indicadores:{" "}
           {segments.map((s) => `${s.label} ${s.value}`).join(", ")}.
         </span>
 
@@ -59,7 +59,7 @@ export function StackedProgress({ summary }: StackedProgressProps) {
                     {segment.glyph} {segment.label}
                   </strong>
                   <span>
-                    {segment.value} actividades · {Math.round(share)} %
+                    {segment.value} indicadores · {Math.round(share)} %
                   </span>
                 </span>
               )}

@@ -27,6 +27,8 @@ export type WritableTable =
   | "indicators"
   | "projects"
   | "activities"
+  | "activity_targets"
+  | "pillar_observations"
   | "planning_items"
   | "documents"
   | "change_log"
@@ -93,23 +95,65 @@ export function useDeleteRow(table: WritableTable, invalidates: QueryKey[]) {
    del hook.
    ========================================================================== */
 
+/**
+ * Filas de otra tabla que se guardan con el padre. Existe por la serie anual de
+ * un indicador: meta, resultado y cumplimiento de cada año viven en
+ * `activity_targets`, pero se capturan en el mismo formulario que el indicador
+ * y no tendría sentido pedir dos guardados.
+ *
+ * `upsert` escribe los años con algo capturado y `removeIds` borra los que se
+ * vaciaron: sin esa segunda mitad, quitar una cifra la dejaría publicada.
+ */
+export interface ChildRowPlan {
+  table: WritableTable;
+  /** Columnas que identifican la fila, para que reguardar no duplique. */
+  onConflict: string;
+  upsert: Record<string, unknown>[];
+  removeIds: string[];
+}
+
 export interface SaveRowArgs {
   table: WritableTable;
   /** Con id actualiza; sin id inserta. */
   id?: string;
   values: Record<string, unknown>;
+  /** Se resuelve con el id del padre, que al crear no se conoce hasta después. */
+  children?: (parentId: string) => ChildRowPlan | null;
 }
 
 export function useSaveRow(invalidates: QueryKey[]) {
   const invalidate = useInvalidate(invalidates);
   return useMutation({
-    mutationFn: async ({ table, id, values }: SaveRowArgs) => {
+    mutationFn: async ({ table, id, values, children }: SaveRowArgs) => {
       const query = id
         ? supabase.from(table).update(values).eq("id", id)
         : supabase.from(table).insert(values);
 
       const { data, error } = await query.select().single();
       if (error) throw describe(error);
+
+      const parentId = (data as { id?: string } | null)?.id;
+      const plan = children && parentId ? children(parentId) : null;
+
+      if (plan) {
+        // Primero el borrado: si un año cambia de sitio, dejar el upsert para
+        // el final evita que el borrado se lleve por delante lo recién escrito.
+        if (plan.removeIds.length > 0) {
+          const { error: removeError } = await supabase
+            .from(plan.table)
+            .delete()
+            .in("id", plan.removeIds);
+          if (removeError) throw describe(removeError);
+        }
+
+        if (plan.upsert.length > 0) {
+          const { error: upsertError } = await supabase
+            .from(plan.table)
+            .upsert(plan.upsert, { onConflict: plan.onConflict });
+          if (upsertError) throw describe(upsertError);
+        }
+      }
+
       return data;
     },
     onSuccess: invalidate,

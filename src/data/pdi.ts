@@ -6,7 +6,13 @@
    datos a la interfaz: colores, glifos, formatos y etiquetas.
    ========================================================================== */
 
-import type { ActivityStatus, PdiSummary, PillarProgress, PublicationStatus } from "../types/database";
+import type {
+  ActivityStatus,
+  ActivityTarget,
+  PdiSummary,
+  PillarProgress,
+  PublicationStatus,
+} from "../types/database";
 
 /* --- Estados -------------------------------------------------------------- */
 
@@ -19,7 +25,7 @@ export interface StatusMeta {
 }
 
 export const statusMeta: Record<ActivityStatus, StatusMeta> = {
-  cumplida: { id: "cumplida", label: "Cumplida", glyph: "✓", color: "var(--status-done)" },
+  cumplida: { id: "cumplida", label: "Cumplido", glyph: "✓", color: "var(--status-done)" },
   curso: { id: "curso", label: "En curso", glyph: "◐", color: "var(--status-active)" },
   pendiente: { id: "pendiente", label: "Pendiente", glyph: "○", color: "var(--status-pending)" },
   riesgo: { id: "riesgo", label: "En riesgo", glyph: "▲", color: "var(--status-risk)" },
@@ -34,6 +40,58 @@ export const publicationLabels: Record<PublicationStatus, string> = {
   publicado: "Publicado",
   archivado: "Archivado",
 };
+
+/* --- Serie anual de los indicadores ----------------------------------------
+   El PDI cubre 2024-2028 y su línea base es 2023. Los años viven aquí y en
+   ningún otro sitio: la base admite cualquiera, pero los formularios y las
+   tablas abren solo estos para que dos personas no capturen el mismo corte con
+   dos rejillas distintas.
+   -------------------------------------------------------------------------- */
+
+export const planYears = [2024, 2025, 2026, 2027, 2028] as const;
+
+/** Año de la línea base que se propone al crear un indicador. */
+export const baselineYear = 2023;
+
+/** "Meta 24" — la cabecera del reporte usa el año en dos cifras. */
+export function shortYear(year: number): string {
+  return String(year).slice(-2);
+}
+
+/**
+ * Cumplimiento de un año: resultado sobre meta. Es la misma fórmula que la
+ * columna generada de `activity_targets`; se repite aquí solo para que el
+ * formulario muestre la cifra mientras se escribe, antes de guardar.
+ */
+export function computeCompliance(
+  target: number | null,
+  result: number | null,
+): number | null {
+  if (target === null || result === null || target === 0) return null;
+  return Math.round((result * 100) / target);
+}
+
+/** El año más reciente con cumplimiento: el que fija el avance del indicador. */
+export function latestTarget(targets: ActivityTarget[]): ActivityTarget | null {
+  return (
+    [...targets]
+      .filter((row) => row.compliance !== null)
+      .sort((a, b) => b.year - a.year)[0] ?? null
+  );
+}
+
+/** Los años a mostrar: los del plan más cualquiera ya capturado fuera de rango. */
+export function yearsInPlay(targets: ActivityTarget[]): number[] {
+  const years = new Set<number>(planYears);
+  for (const row of targets) years.add(row.year);
+  return [...years].sort((a, b) => a - b);
+}
+
+/** 28 → "28", 28.5 → "28,5". Sin decimales de relleno en una tabla de cifras. */
+export function formatValue(value: number | null | undefined): string {
+  if (value === null || value === undefined) return "—";
+  return value.toLocaleString("es-CO", { maximumFractionDigits: 2 });
+}
 
 /* --- Color ---------------------------------------------------------------- */
 
@@ -148,7 +206,7 @@ export function summarizeProgress(rows: PillarProgress[]): PdiSummary {
   return {
     ...totals,
     // Promedio de los pilares, igual que v_pdi_summary: cada pilar pesa lo
-    // mismo. Sumar actividades daría más peso a los pilares con más filas.
+    // mismo. Sumar indicadores daría más peso a los pilares con más filas.
     progress:
       rows.length === 0 ? 0 : Math.round(rows.reduce((sum, row) => sum + row.progress, 0) / rows.length),
     completion_rate: totals.total === 0 ? 0 : Math.round((totals.done / totals.total) * 100),

@@ -3,9 +3,10 @@
 
    Otra lectura del mismo pilar que la de "Implementación". Allí se cuenta qué
    es el pilar y qué hay dentro; aquí solo se responde a "cuánto se ha
-   cumplido", en cuatro pasos: la convención de bandas, los cuatro indicadores
-   de resultado y tres tablas —pilar, áreas y líneas, proyectos— con la misma
-   estructura.
+   cumplido", en cinco pasos: la convención de bandas, los cuatro resultados
+   generales, tres tablas —pilar, áreas y líneas, proyectos— con la misma
+   estructura, y la serie anual de los indicadores, que es de donde salen todos
+   los porcentajes anteriores.
 
    Nota sobre el color: la escala naranja→verde no es separable bajo
    daltonismo, así que ningún porcentaje se comunica solo con color. Cada celda
@@ -13,14 +14,24 @@
    luminosidad (ver tokens.css).
    ========================================================================== */
 
+import { Fragment } from "react";
 import { Link, Navigate, useParams } from "react-router-dom";
 import { PublicLayout } from "../components/layout/PublicLayout";
 import { Icon } from "../components/ui/Icon";
 import { ProgressRing } from "../components/ui/ProgressRing";
 import { ErrorBlock, LoadingBlock } from "../components/ui/QueryState";
 import { useCurrentPeriod, usePillarDetail } from "../data/queries";
-import { accentFor, bandFor, complianceBands, formatDate } from "../data/pdi";
-import type { TargetFields } from "../types/database";
+import {
+  accentFor,
+  bandFor,
+  complianceBands,
+  formatDate,
+  formatValue,
+  latestTarget,
+  shortYear,
+  yearsInPlay,
+} from "../data/pdi";
+import type { ActivityWithTargets, TargetFields } from "../types/database";
 
 export function PillarScorecard() {
   const { slug } = useParams<{ slug: string }>();
@@ -49,11 +60,13 @@ export function PillarScorecard() {
 
   if (!detail.data) return <Navigate to="/404" replace />;
 
-  const { pillar, progress, areaProgress, projectProgress, lines } = detail.data;
+  const { pillar, progress, areaProgress, projectProgress, lines, activities } = detail.data;
   const accent = accentFor(pillar.accent_slot);
   const band = bandFor(progress.progress);
 
   const areaById = new Map(areaProgress.map((area) => [area.area_id, area]));
+  const lineById = new Map(lines.map((line) => [line.id, line]));
+  const years = yearsInPlay(activities.flatMap((activity) => activity.targets));
 
   return (
     <PublicLayout className="scorecard-page">
@@ -107,7 +120,7 @@ export function PillarScorecard() {
                 <span className="eyebrow">Cómo leer esta página</span>
                 <h2 id="convencion-title">Relación de cumplimiento del pilar</h2>
                 <p>
-                  Cada actividad, proyecto, línea y área se clasifica en una de estas cinco bandas
+                  Cada indicador, proyecto, línea y área se clasifica en una de estas cinco bandas
                   según su porcentaje de avance. El color acompaña siempre al nombre de la banda: la
                   escala no se comunica solo con color.
                 </p>
@@ -160,7 +173,7 @@ export function PillarScorecard() {
               <Kpi
                 label="Resultados a nivel de pilar"
                 value={`${progress.progress} %`}
-                hint={`${progress.done} de ${progress.total} actividades cumplidas`}
+                hint={`${progress.done} de ${progress.total} indicadores cumplidos`}
                 progress={progress.progress}
               />
               <Kpi
@@ -268,6 +281,85 @@ export function PillarScorecard() {
             empty="Este pilar todavía no tiene proyectos registrados."
           />
 
+          {/* --- 6. Serie anual de los indicadores ----------------------
+              Las tres tablas anteriores resumen; esta es el dato de origen.
+              Todo porcentaje de esta página sale, subiendo por la cascada, de
+              la última columna de cumplimiento de estas filas. ------------ */}
+          <section className="scorecard-block" id="tabla-indicadores" aria-labelledby="tabla-indicadores-title">
+            <div className="section-heading">
+              <span className="eyebrow">Medición</span>
+              <h2 id="tabla-indicadores-title">Resultados a nivel de indicadores</h2>
+            </div>
+
+            {activities.length === 0 ? (
+              <p className="scorecard-empty">
+                Este pilar todavía no tiene indicadores de resultado registrados.
+              </p>
+            ) : (
+              <>
+                <div className="table-scroll">
+                  <table className="result-table indicator-table">
+                    <caption className="sr-only">
+                      Indicadores del pilar: unidad, línea base y, por cada año, meta, resultado y
+                      cumplimiento
+                    </caption>
+                    <thead>
+                      <tr>
+                        <th scope="col">Indicador</th>
+                        <th scope="col">Unidad</th>
+                        <th scope="col">Base</th>
+                        {years.map((year) => (
+                          <th scope="col" key={year} colSpan={3} className="indicator-table__year">
+                            {year}
+                          </th>
+                        ))}
+                        <th scope="col">Cumplimiento</th>
+                      </tr>
+                      <tr className="indicator-table__subhead">
+                        <th scope="col" />
+                        <th scope="col" />
+                        <th scope="col" />
+                        {years.map((year) => (
+                          <Fragment key={year}>
+                            <th scope="col">Meta {shortYear(year)}</th>
+                            <th scope="col">Result.</th>
+                            <th scope="col">Cumpl.</th>
+                          </Fragment>
+                        ))}
+                        <th scope="col" />
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {activities.map((activity) => {
+                        const line = activity.action_line_id
+                          ? lineById.get(activity.action_line_id)
+                          : undefined;
+                        return (
+                          <IndicatorRow
+                            key={activity.id}
+                            activity={activity}
+                            years={years}
+                            detail={
+                              line
+                                ? `${line.area_name} › ${line.name}`
+                                : "Sin línea de acción"
+                            }
+                          />
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+
+                <p className="result-table__note">
+                  <strong>Cumpl.</strong> es el resultado sobre la meta del año. El año en negrita es
+                  el que fija el cumplimiento del indicador, y ese es el que sube a la línea, al área
+                  y al pilar.
+                </p>
+              </>
+            )}
+          </section>
+
           <nav className="scorecard-footer" aria-label="Otras vistas del pilar">
             <Link className="button-secondary" to="/tablero">
               <span aria-hidden="true">←</span> Volver al tablero
@@ -320,6 +412,70 @@ function Kpi({
   );
 }
 
+/** Una fila de la serie anual: la unidad, la base y tres celdas por año. */
+function IndicatorRow({
+  activity,
+  years,
+  detail,
+}: {
+  activity: ActivityWithTargets;
+  years: number[];
+  detail: string;
+}) {
+  const byYear = new Map(activity.targets.map((row) => [row.year, row]));
+  const driver = latestTarget(activity.targets);
+  const band = bandFor(activity.progress);
+
+  return (
+    <tr>
+      <th scope="row">
+        <strong>{activity.title}</strong>
+        <small>{detail}</small>
+      </th>
+      <td>{activity.unit?.label ?? "—"}</td>
+      <td className="result-table__number">
+        {activity.baseline_value === null ? (
+          "—"
+        ) : (
+          <>
+            {formatValue(activity.baseline_value)}
+            {activity.baseline_year && (
+              <small className="indicator-table__base-year"> {activity.baseline_year}</small>
+            )}
+          </>
+        )}
+      </td>
+
+      {years.map((year) => {
+        const row = byYear.get(year);
+        const isDriver = driver?.year === year;
+
+        return (
+          <Fragment key={year}>
+            <td className="result-table__number">{formatValue(row?.target_value)}</td>
+            <td className="result-table__number">{formatValue(row?.result_value)}</td>
+            <td
+              className={`result-table__number${isDriver ? " indicator-table__driver" : ""}`}
+              title={isDriver ? "Año que fija el cumplimiento del indicador" : undefined}
+            >
+              {row?.compliance === null || row?.compliance === undefined
+                ? "—"
+                : `${formatValue(row.compliance)} %`}
+            </td>
+          </Fragment>
+        );
+      })}
+
+      <td>
+        <span className="band-chip" style={{ "--band": band.color } as React.CSSProperties}>
+          <span className="band-chip__value">{activity.progress} %</span>
+          <span className="band-chip__label">{band.label}</span>
+        </span>
+      </td>
+    </tr>
+  );
+}
+
 interface ResultRow extends Partial<TargetFields> {
   key: string;
   code: string;
@@ -328,7 +484,7 @@ interface ResultRow extends Partial<TargetFields> {
   target: number | null;
   achieved: number | null;
   unit?: string | null;
-  /** Se usa cuando no hay meta absoluta capturada: cuenta actividades. */
+  /** Se usa cuando no hay meta absoluta capturada: cuenta indicadores. */
   fallbackTarget: number;
   fallbackAchieved: number;
   progress: number;
@@ -417,7 +573,7 @@ function ResultTable({
           {usesFallback && (
             <p className="result-table__note">
               Donde no hay una meta absoluta capturada, <strong>Meta</strong> y{" "}
-              <strong>Avance</strong> cuentan actividades: comprometidas y cumplidas. El porcentaje
+              <strong>Avance</strong> cuentan indicadores: comprometidos y cumplidos. El porcentaje
               es siempre el avance en cascada.
             </p>
           )}

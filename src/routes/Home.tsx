@@ -57,12 +57,12 @@ export function Home() {
                 <div>
                   <span className="eyebrow">Avance global</span>
                   {/* El anillo es el promedio de los pilares, no la proporción
-                      de actividades cumplidas: se dice cuál es cuál. */}
+                      de indicadores cumplidos: se dice cuál es cuál. */}
                   <p>
                     Promedio de {totals.pillar_count}{" "}
                     {totals.pillar_count === 1 ? "pilar" : "pilares"}
                     {totals.total > 0
-                      ? ` · ${totals.done} de ${totals.total} actividades cumplidas`
+                      ? ` · ${totals.done} de ${totals.total} indicadores cumplidos`
                       : ""}
                     {period.data ? ` · ${period.data.label}` : ""}
                   </p>
@@ -136,7 +136,7 @@ export function Home() {
                       </span>
                       <small>
                         {pillar.progress.progress}% · {pillar.progress.done} de {pillar.progress.total}{" "}
-                        actividades
+                        indicadores
                       </small>
                     </span>
                     <span className="home-pillar-card__link">
@@ -156,7 +156,7 @@ export function Home() {
             <span className="eyebrow">Seguimiento público</span>
             <h2>Consulta cómo avanzamos</h2>
             <p>
-              Revisa el cumplimiento global del PDI, el estado de cada actividad y el avance detallado por
+              Revisa el cumplimiento global del PDI, el estado de cada indicador y el avance detallado por
               pilar, con la misma información que usa el comité de planeación.
             </p>
           </div>

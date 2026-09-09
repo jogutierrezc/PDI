@@ -2130,6 +2130,121 @@
   color: var(--ink-secondary);
 }
 
+/* --- Tabla de indicadores por año ---------------------------------------------
+   La misma tabla en las tres pantallas: la ficha del pilar, el cuadro de mando
+   y la configuración. Tres columnas por año, así que la cabecera va en dos
+   pisos —el año arriba, meta/resultado/cumplimiento debajo— y el conjunto vive
+   dentro de .table-scroll: es la única tabla del portal que puede crecer a lo
+   ancho sin límite.
+   -------------------------------------------------------------------------- */
+
+.indicator-table {
+  /* Nombre + unidad + base + un año de tres columnas, sin apretar. */
+  min-width: 52rem;
+}
+
+/* El año agrupa sus tres columnas; la separación vertical las mantiene juntas
+   sin necesidad de bordes en cada celda. */
+.indicator-table thead th.indicator-table__year {
+  border-left: 1px solid var(--line);
+  color: var(--ink-secondary);
+  font-size: var(--text-xs);
+  letter-spacing: var(--tracking-wide);
+  text-align: center;
+}
+
+.indicator-table__subhead th {
+  padding-top: 0;
+  padding-bottom: var(--space-2);
+  color: var(--ink-faint);
+  font-size: var(--text-2xs);
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: none;
+}
+
+.indicator-table tbody td,
+.indicator-table tbody th {
+  padding-top: var(--space-3);
+  padding-bottom: var(--space-3);
+}
+
+/* De los cinco cortes solo uno llega al pilar. Va en negrita y con su propio
+   fondo porque, si no, la tabla no dice cuál de las cinco cifras manda; el
+   `title` del elemento lo explica al pasar por encima. */
+.indicator-table__driver {
+  background: var(--surface-3);
+  color: var(--ink);
+  font-weight: 800;
+}
+
+.indicator-table__base-year {
+  color: var(--ink-faint);
+  font-size: var(--text-2xs);
+  font-variant-numeric: tabular-nums;
+}
+
+/* --- Observaciones del pilar --------------------------------------------------
+   Texto, no cifras: se lee en una columna estrecha y no en el ancho completo de
+   la tabla que hay justo encima.
+   -------------------------------------------------------------------------- */
+
+.observation-list {
+  display: grid;
+  gap: var(--space-4);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.observation {
+  padding: var(--space-5) var(--space-6);
+  border: 1px solid var(--line);
+  border-left: 3px solid var(--accent, var(--brand-blue));
+  border-radius: var(--radius-md);
+  background: var(--surface);
+}
+
+.observation__head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--space-3);
+  margin-bottom: var(--space-2);
+}
+
+.observation__head strong {
+  color: var(--ink);
+  font-size: var(--text-md);
+  line-height: var(--leading-snug);
+}
+
+.observation__corte {
+  padding: 2px var(--space-2);
+  border-radius: var(--radius-pill);
+  background: var(--surface-3);
+  color: var(--ink-secondary);
+  font-size: var(--text-2xs);
+  font-weight: 800;
+  letter-spacing: var(--tracking-caps);
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.observation p {
+  margin: 0;
+  max-width: var(--measure);
+  color: var(--ink-secondary);
+  line-height: var(--leading-relaxed);
+}
+
+.observation small {
+  display: block;
+  margin-top: var(--space-3);
+  color: var(--ink-muted);
+  font-size: var(--text-xs);
+}
+
 /* --- Pie ---------------------------------------------------------------------- */
 
 .scorecard-footer {

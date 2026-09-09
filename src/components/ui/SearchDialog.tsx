@@ -1,7 +1,7 @@
 /* =============================================================================
    Buscador del portal.
    La cabecera tenía un botón "Buscar" que no hacía nada. Aquí está lo que
-   prometía: un índice de páginas, pilares y actividades con navegación por
+   prometía: un índice de páginas, pilares e indicadores con navegación por
    teclado, construido a partir de lo que hay en la base de datos.
 
    Sin animación de apertura: es un control de teclado que se usa muchas veces
@@ -72,8 +72,8 @@ export function SearchDialog({ open, onClose }: SearchDialogProps) {
       id: `activity-${activity.id}`,
       title: activity.title,
       hint: `${activity.pillar?.name ?? ""} · ${activity.owner}`,
-      group: "Actividades",
-      to: "/tablero#actividades",
+      group: "Indicadores",
+      to: "/tablero#indicadores",
       icon: "check",
       keywords: activity.status,
     }));
@@ -169,7 +169,7 @@ export function SearchDialog({ open, onClose }: SearchDialogProps) {
             value={query}
             onChange={(event) => setQuery(event.target.value)}
             onKeyDown={onKeyDown}
-            placeholder="Buscar pilares, actividades o páginas…"
+            placeholder="Buscar pilares, indicadores o páginas…"
             aria-label="Buscar"
             aria-controls={listId}
             aria-activedescendant={results[activeIndex] ? `${listId}-${results[activeIndex].id}` : undefined}

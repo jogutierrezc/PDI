@@ -69,7 +69,7 @@ export interface Pillar {
 export interface PillarProgress {
   pillar_id: string;
   slug: string;
-  /** Conteo de actividades por estado. */
+  /** Conteo de indicadores por estado. */
   done: number;
   active: number;
   pending: number;
@@ -77,7 +77,7 @@ export interface PillarProgress {
   total: number;
   /** Avance en cascada desde las áreas del pilar. */
   progress: number;
-  /** Proporción de actividades cumplidas. Responde a otra pregunta. */
+  /** Proporción de indicadores cumplidos. Responde a otra pregunta. */
   completion_rate: number;
   area_count: number;
   line_count: number;
@@ -95,7 +95,7 @@ export interface PdiSummary {
   on_track: number;
   need_attention: number;
   pillar_count: number;
-  /** Proporción de actividades cumplidas sobre el total. */
+  /** Proporción de indicadores cumplidos sobre el total. */
   completion_rate: number;
 }
 
@@ -208,6 +208,8 @@ export interface Project extends TargetFields {
   position: number;
 }
 
+/** Indicador de resultado. La tabla se sigue llamando `activities` por
+ *  compatibilidad; en la interfaz es "indicador de resultado". */
 export interface Activity {
   id: string;
   pillar_id: string;
@@ -216,10 +218,52 @@ export interface Activity {
   title: string;
   owner: string;
   due_date: string | null;
+  /** Cumplimiento del año más reciente cuando hay serie anual; escrito a mano
+   *  mientras no la haya. Es la raíz de la cascada del tablero. */
   progress: number;
   status: ActivityStatus;
   is_featured: boolean;
   position: number;
+  /** Unidad de medida, del catálogo global (categoría "unidad"). */
+  unit_id: string | null;
+  /** Año y valor de la línea base: "Base 2023 · 28 convenios". */
+  baseline_year: number | null;
+  baseline_value: number | null;
+}
+
+/** Una fila de la serie anual: lo comprometido, lo logrado y su relación. */
+export interface ActivityTarget {
+  id: string;
+  activity_id: string;
+  year: number;
+  target_value: number | null;
+  result_value: number | null;
+  /** Cumplimiento decidido a mano, para indicadores que no se miden dividiendo. */
+  compliance_override: number | null;
+  /** Columna generada: el override si lo hay, si no resultado / meta. */
+  compliance: number | null;
+  note: string;
+}
+
+/** El indicador con su unidad resuelta y su serie anual, como lo piden las
+ *  tablas de resultados. */
+export interface ActivityWithTargets extends Activity {
+  unit: { label: string } | null;
+  targets: ActivityTarget[];
+}
+
+/** Lectura cualitativa del avance de los indicadores de un pilar. */
+export interface PillarObservation {
+  id: string;
+  pillar_id: string;
+  /** Nulo = observación vigente, sin anclar a un corte anual. */
+  year: number | null;
+  title: string;
+  body: string;
+  author: string;
+  position: number;
+  created_at: string;
+  updated_at: string;
 }
 
 export interface PlanningItem {
@@ -312,6 +356,8 @@ export type ActionLineInput = Writable<ActionLine>;
 export type IndicatorInput = Writable<Indicator>;
 export type ProjectInput = Writable<Project>;
 export type ActivityInput = Writable<Activity>;
+export type ActivityTargetInput = Writable<Omit<ActivityTarget, "compliance">>;
+export type PillarObservationInput = Writable<PillarObservation>;
 export type DocumentInput = Writable<PdiDocument>;
 export type ChangeLogInput = Writable<ChangeLogEntry>;
 export type GlossaryInput = Writable<GlossaryTerm>;

@@ -14,6 +14,7 @@ import {
   formatDate,
   formatMonth,
   formatValue,
+  indexYearProgress,
   latestTarget,
   shortYear,
   statusMeta,
@@ -22,7 +23,8 @@ import {
 import { useAuth } from "../../../lib/auth";
 import { buildForm, tableFor, yearField } from "./forms";
 import type { EntityKind, FieldSpec, FormConfig, Values } from "./forms";
-import type { ActivityWithTargets } from "../../../types/database";
+import type { ActivityWithTargets, ProgressScope } from "../../../types/database";
+import type { YearIndex } from "../../../data/pdi";
 import type { WritableTable } from "../../../data/mutations";
 
 /** Qué diálogo está abierto y sobre qué fila. Sin fila = alta. */
@@ -95,6 +97,7 @@ export function PillarConfigurator() {
     projects,
     activities,
     observations,
+    yearProgress,
     changes,
     glossary,
     documents,
@@ -105,6 +108,9 @@ export function PillarConfigurator() {
   // cualquier indicador del pilar, más los del plan: si un pilar todavía no
   // reporta 2027, esa columna no ocupa sitio en pantalla.
   const years = yearsInPlay(activities.flatMap((activity) => activity.targets));
+  // El avance año a año de áreas y líneas, para configurar viendo lo mismo
+  // que se publica en el cuadro de mando.
+  const yearIndex = indexYearProgress(yearProgress);
   const lineById = new Map(lines.map((line) => [line.id, line]));
   const activeArea = areas.find((area) => area.id === selectedAreaId) ?? areas[0];
   // Las líneas se leen de la vista, no del embebido de la tabla: la vista trae
@@ -308,7 +314,7 @@ export function PillarConfigurator() {
               publicar. ---------------------------------------------------- */}
           <Section
             title="Metas y cumplimiento"
-            hint="La meta es opcional y en valor absoluto. El cumplimiento no se escribe: el del área sale de sus líneas y el de la línea, de sus proyectos."
+            hint="La meta es opcional y en valor absoluto. El cumplimiento no se escribe: el del área sale de sus líneas, y el de la línea, de sus proyectos y de los indicadores que cuelgan de ella sin proyecto."
           >
             {areas.length === 0 ? (
               <EmptyBlock title="Crea un área para poder fijar metas." />
@@ -324,7 +330,12 @@ export function PillarConfigurator() {
                       <th scope="col">Área o línea</th>
                       <th scope="col">Meta</th>
                       <th scope="col">Avance</th>
-                      <th scope="col">Cumplimiento</th>
+                      {yearIndex.years.map((year) => (
+                        <th scope="col" key={year} className="result-table__year">
+                          Cumpl. {shortYear(year)}
+                        </th>
+                      ))}
+                      <th scope="col">Acumulado</th>
                       {canEdit && (
                         <th scope="col">
                           <span className="sr-only">Acciones</span>
@@ -342,6 +353,10 @@ export function PillarConfigurator() {
                       return [
                         <TargetRow
                           key={area.id}
+                          scope="area"
+                          entityId={area.id}
+                          years={yearIndex.years}
+                          yearIndex={yearIndex}
                           code={area.code}
                           name={area.name}
                           target={stats?.target_value ?? null}
@@ -364,17 +379,17 @@ export function PillarConfigurator() {
                           <TargetRow
                             key={line.id}
                             nested
+                            scope="line"
+                            entityId={line.id}
+                            years={yearIndex.years}
+                            yearIndex={yearIndex}
                             code={line.code}
                             name={line.name}
                             target={line.target_value}
                             achieved={line.achieved_value}
                             unit={line.measure_unit}
                             progress={line.progress}
-                            source={
-                              line.is_derived
-                                ? `promedio de ${line.project_count} ${line.project_count === 1 ? "proyecto" : "proyectos"}`
-                                : "cumplimiento reportado"
-                            }
+                            source={lineSource(line)}
                             onEdit={
                               canEdit
                                 ? () =>
@@ -568,7 +583,7 @@ export function PillarConfigurator() {
                           {observation.year ? `Corte ${observation.year}` : "Vigente"}
                         </span>
                       </strong>
-                      <small>{observation.body}</small>
+                      <small className="observation-preview">{observation.body}</small>
                       {observation.author && (
                         <small className="record-lineage">{observation.author}</small>
                       )}
@@ -822,8 +837,29 @@ function Section({
   );
 }
 
+/** De dónde sale el porcentaje de una línea. Se dice en la propia fila para
+ *  que nadie edite el cumplimiento reportado cuando ya no se está usando. */
+function lineSource(line: { is_derived: boolean; project_count: number; loose_activity_count: number }) {
+  if (!line.is_derived) return "cumplimiento reportado";
+
+  const piezas: string[] = [];
+  if (line.project_count > 0) {
+    piezas.push(`${line.project_count} ${line.project_count === 1 ? "proyecto" : "proyectos"}`);
+  }
+  if (line.loose_activity_count > 0) {
+    piezas.push(
+      `${line.loose_activity_count} ${line.loose_activity_count === 1 ? "indicador" : "indicadores"}`,
+    );
+  }
+  return `promedio de ${piezas.join(" y ")}`;
+}
+
 /** Una fila de la tabla de metas: área o línea, con su meta y su cumplimiento. */
 function TargetRow({
+  scope,
+  entityId,
+  years,
+  yearIndex,
   code,
   name,
   target,
@@ -835,6 +871,10 @@ function TargetRow({
   editLabel,
   nested = false,
 }: {
+  scope: ProgressScope;
+  entityId: string;
+  years: number[];
+  yearIndex: YearIndex;
   code: string | null;
   name: string;
   target: number | null;
@@ -863,6 +903,28 @@ function TargetRow({
       <td className="result-table__number">
         {achieved === null ? <span className="target-empty">—</span> : `${achieved}${suffix}`}
       </td>
+
+      {/* Un año que esta fila no ha reportado se deja vacío: escribir un cero
+          diría "no se cumplió" donde solo hay silencio. */}
+      {years.map((year) => {
+        const value = yearIndex.at(scope, entityId, year);
+        return (
+          <td className="result-table__number" key={year}>
+            {value === null ? (
+              <span className="target-empty">—</span>
+            ) : (
+              <span
+                className="year-cell"
+                style={{ "--band": bandFor(value).color } as React.CSSProperties}
+                title={`${bandFor(value).label} en ${year}`}
+              >
+                {value} %
+              </span>
+            )}
+          </td>
+        );
+      })}
+
       <td>
         <span className="band-chip" style={{ "--band": band.color } as React.CSSProperties}>
           <span className="band-chip__value">{progress} %</span>

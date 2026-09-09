@@ -34,6 +34,7 @@ import type {
   ReportPeriod,
   StrategicArea,
   WebProject,
+  YearProgress,
 } from "../types/database";
 import { emptyProgress, emptySummary } from "./pdi";
 import { describeDatabaseError } from "./errors";
@@ -197,6 +198,8 @@ export interface PillarDetail {
   areaProgress: AreaProgress[];
   /** Avance de cada proyecto, en cascada desde sus indicadores. */
   projectProgress: ProjectProgress[];
+  /** La misma cascada, año a año, para los cinco niveles del plan. */
+  yearProgress: YearProgress[];
   lines: ActionLineWithArea[];
   indicators: IndicatorWithLabels[];
   projects: Project[];
@@ -234,6 +237,7 @@ export function usePillarDetail(slug: string | undefined) {
         progress,
         areaProgress,
         projectProgress,
+        yearProgress,
         areas,
         lines,
         indicators,
@@ -251,6 +255,14 @@ export function usePillarDetail(slug: string | undefined) {
             .select("*")
             .eq("pillar_id", id)
             .then(unwrap<ProjectProgress[]>),
+          // Los cinco niveles apilados en una sola vista: una petición en vez
+          // de cinco para poder pintar una columna por año.
+          supabase
+            .from("v_year_progress")
+            .select("*")
+            .eq("pillar_id", id)
+            .order("year")
+            .then(unwrap<YearProgress[]>),
           supabase
             .from("strategic_areas")
             .select("*, action_lines(id, code, name, progress, position)")
@@ -316,6 +328,7 @@ export function usePillarDetail(slug: string | undefined) {
           },
         areaProgress,
         projectProgress,
+        yearProgress,
         areas,
         lines,
         indicators,

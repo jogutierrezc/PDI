@@ -82,6 +82,20 @@ const FIXTURES = {
   v_project_progress: [
     { project_id: "pr1", pillar_id: "p1", action_line_id: "l1", name: "Migración a la nube institucional", reported_progress: 60, progress: 75, activity_count: 2, activity_done: 1, is_derived: true, target_value: null, achieved_value: null, measure_unit: null },
   ],
+  // La cascada, año a año. El indicador cumplió 85 en 2024 y 72 en 2025; su
+  // línea, su área y su pilar promedian con el proyecto que cuelga de ellos.
+  v_year_progress: [
+    { scope: "activity", entity_id: "a1", pillar_id: "p1", year: 2024, progress: 85 },
+    { scope: "activity", entity_id: "a1", pillar_id: "p1", year: 2025, progress: 72 },
+    { scope: "project", entity_id: "pr1", pillar_id: "p1", year: 2024, progress: 90 },
+    { scope: "project", entity_id: "pr1", pillar_id: "p1", year: 2025, progress: 78 },
+    { scope: "line", entity_id: "l1", pillar_id: "p1", year: 2024, progress: 88 },
+    { scope: "line", entity_id: "l1", pillar_id: "p1", year: 2025, progress: 75 },
+    { scope: "area", entity_id: "ae1", pillar_id: "p1", year: 2024, progress: 88 },
+    { scope: "area", entity_id: "ae1", pillar_id: "p1", year: 2025, progress: 75 },
+    { scope: "pillar", entity_id: "p1", pillar_id: "p1", year: 2024, progress: 88 },
+    { scope: "pillar", entity_id: "p1", pillar_id: "p1", year: 2025, progress: 75 },
+  ],
   v_current_period: [
     { id: "r1", label: "Corte agosto 2026", cutoff_date: "2026-08-28", published_at: "2026-08-28T17:00:00Z" },
   ],
@@ -169,8 +183,8 @@ const FIXTURES = {
     },
   ],
   v_action_lines: [
-    { id: "l1", code: "LA-4.1", name: "Infraestructura base", progress: 75, position: 1, area_id: "ae1", area_name: "Infraestructura tecnológica", area_code: "AE-03", pillar_id: "p1", reported_progress: 85, project_count: 1, is_derived: true, activity_count: 4, activity_done: 3, target_value: null, achieved_value: null, measure_unit: null },
-    { id: "l2", code: "LA-5.1", name: "Cultura digital", progress: 30, position: 1, area_id: "ae2", area_name: "Cultura digital", area_code: "AE-05", pillar_id: "p1", reported_progress: 30, project_count: 0, is_derived: false, activity_count: 2, activity_done: 0, target_value: null, achieved_value: null, measure_unit: null },
+    { id: "l1", code: "LA-4.1", name: "Infraestructura base", progress: 75, position: 1, area_id: "ae1", area_name: "Infraestructura tecnológica", area_code: "AE-03", pillar_id: "p1", reported_progress: 85, project_count: 1, is_derived: true, source_count: 2, loose_activity_count: 1, activity_count: 4, activity_done: 3, target_value: null, achieved_value: null, measure_unit: null },
+    { id: "l2", code: "LA-5.1", name: "Cultura digital", progress: 30, position: 1, area_id: "ae2", area_name: "Cultura digital", area_code: "AE-05", pillar_id: "p1", reported_progress: 30, project_count: 0, is_derived: false, source_count: 0, loose_activity_count: 0, activity_count: 2, activity_done: 0, target_value: null, achieved_value: null, measure_unit: null },
   ],
   v_indicators: [
     {
@@ -321,6 +335,8 @@ const routes = [
       "Año 2025",                     // el año que fija el avance va identificado
       "Observaciones sobre los indicadores",
       "Balance del corte 2025",
+      "Leer completa",              // la observación se abre, no se vuelca
+      "88",                         // el rastro anual del área y de su línea
     ],
     absent: ["Planeación de resultados", "Actividades del pilar"],
   },
@@ -371,6 +387,42 @@ const routes = [
       }
       if (!indicadores.includes("Sin indicadores vinculados a Cultura digital")) {
         throw new Error("no se avisa de que el área no tiene indicadores");
+      }
+    },
+  },
+  {
+    path: "/implementacion/pilar/ambiente-tecnologico",
+    note: "la observación se lee en una ventana, con el texto justificado",
+    expect: "Observaciones sobre los indicadores",
+    interact: async (window, tick) => {
+      const card = [...window.document.querySelectorAll(".observation__open")].find((button) =>
+        button.textContent.includes("Balance del corte 2025"),
+      );
+      if (!card) throw new Error("no se encontró la observación en la lista");
+
+      // Fuera de la ventana solo va el adelanto recortado, no el texto entero.
+      card.click();
+      await tick();
+
+      const panel = window.document.querySelector(".modal-panel");
+      if (!panel) throw new Error("la observación no se abrió en una ventana");
+      if (!panel.classList.contains("modal-panel--reader")) {
+        throw new Error("la ventana no usa el ancho de lectura");
+      }
+      if (!panel.textContent.includes("faltó la dotación de dos sedes")) {
+        throw new Error("la ventana no trae el texto completo");
+      }
+      if (!panel.querySelector(".observation-reader p")) {
+        throw new Error("el texto no se pintó como párrafos justificados");
+      }
+
+      // Y se cierra con Escape, como el resto de los modales.
+      window.document.dispatchEvent(
+        new window.KeyboardEvent("keydown", { key: "Escape", bubbles: true }),
+      );
+      await tick();
+      if (window.document.querySelector(".modal-panel")) {
+        throw new Error("la ventana no se cerró con Escape");
       }
     },
   },
@@ -472,6 +524,8 @@ const routes = [
       "cuentan indicadores",         // la nota del respaldo
       "Resultados a nivel de indicadores", // la serie anual, de donde sale todo
       "Meta 24",
+      "Cumpl. 24",                   // la cascada, año a año, en las tres tablas
+      "Acumulado",
     ],
     interact: async (window) => {
       // Ningún porcentaje puede comunicarse solo con color: cada ficha lleva
@@ -508,6 +562,8 @@ const routes = [
       "registro automático",     // la entrada escrita por el disparador
       "promedio de 1 proyecto",  // la línea deriva su avance
       "Metas y cumplimiento",    // el panel de metas por área y línea
+      "Cumpl. 25",               // con su cascada anual
+      "promedio de 1 proyecto y 1 indicador", // de dónde sale el número de la línea
       "28 servicios",            // meta capturada del área
       "Sin meta",                // y el estado de la que no tiene
     ],

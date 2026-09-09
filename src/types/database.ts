@@ -118,8 +118,9 @@ export interface ActionLine extends TargetFields {
 }
 
 /** Vista v_action_lines: la línea con su área y su pilar ya resueltos.
- *  `progress` viene en cascada desde sus proyectos; `reported_progress` es el
- *  número escrito a mano, que solo se usa mientras la línea no tenga ninguno. */
+ *  `progress` viene en cascada desde sus piezas —sus proyectos y los
+ *  indicadores que cuelgan de ella sin proyecto—; `reported_progress` es el
+ *  número escrito a mano, que solo se usa mientras no tenga ninguna. */
 export interface ActionLineWithArea extends Omit<ActionLine, "area_id">, TargetFields {
   area_id: string;
   area_name: string;
@@ -129,7 +130,24 @@ export interface ActionLineWithArea extends Omit<ActionLine, "area_id">, TargetF
   project_count: number;
   activity_count: number;
   activity_done: number;
+  /** Cuántas piezas promedia: proyectos + indicadores sueltos. */
+  source_count: number;
+  /** Indicadores que entran en el promedio por su cuenta, sin proyecto. */
+  loose_activity_count: number;
   is_derived: boolean;
+}
+
+/** Los cinco niveles de la cascada, para leer el avance por año. */
+export type ProgressScope = "pillar" | "area" | "line" | "project" | "activity";
+
+/** Vista v_year_progress: una fila por entidad y año con algo reportado.
+ *  Los años sin dato no existen: un cero por falta de reporte engaña. */
+export interface YearProgress {
+  scope: ProgressScope;
+  entity_id: string;
+  pillar_id: string;
+  year: number;
+  progress: number;
 }
 
 /** Meta y avance en valor absoluto. Nulos mientras no se capturen. */

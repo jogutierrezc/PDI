@@ -2184,9 +2184,95 @@
   font-variant-numeric: tabular-nums;
 }
 
+/* --- Modales -----------------------------------------------------------------
+   Compartidos por la intranet y el visor público: el componente vive en
+   components/ui, así que sus estilos tienen que ser globales.
+   -------------------------------------------------------------------------- */
+
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: var(--z-modal);
+  display: grid;
+  place-items: center;
+  padding: var(--gutter);
+  background: rgba(6, 16, 32, 0.5);
+  backdrop-filter: blur(3px);
+  -webkit-backdrop-filter: blur(3px);
+  animation: modal-veil var(--dur-fast) ease-out;
+}
+
+.modal-panel {
+  width: min(34rem, 100%);
+  max-height: min(44rem, 88vh);
+  display: flex;
+  flex-direction: column;
+  padding: var(--space-6);
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-xl);
+  /* Entra desde 0.97, nunca desde 0, y con el origen centrado: un modal no
+     cuelga de un disparador concreto. */
+  animation: modal-enter var(--dur-base) var(--ease-out);
+}
+
+/* Un formulario cabe en 34rem; un texto de varios párrafos, no: a ese ancho la
+   línea sale demasiado corta y se lee a saltos. */
+.modal-panel--reader {
+  width: min(46rem, 100%);
+}
+
+@keyframes modal-veil {
+  from {
+    opacity: 0;
+  }
+}
+
+@keyframes modal-enter {
+  from {
+    opacity: 0;
+    transform: scale(0.97);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .modal-panel,
+  .modal-backdrop {
+    animation: none;
+  }
+}
+
+.modal-panel__head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-4);
+}
+
+.modal-panel__head h2 {
+  font-size: var(--text-lg);
+}
+
+.modal-panel__description {
+  margin-top: var(--space-3);
+  color: var(--ink-secondary);
+  font-size: var(--text-sm);
+  line-height: var(--leading-normal);
+}
+
+.modal-panel__body {
+  margin-top: var(--space-5);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+
 /* --- Observaciones del pilar --------------------------------------------------
-   Texto, no cifras: se lee en una columna estrecha y no en el ancho completo de
-   la tabla que hay justo encima.
+   En la página solo va el encabezado y dos líneas de adelanto; el texto se lee
+   en su ventana. La tarjeta entera es el disparador —un enlace de tres
+   palabras sería una diana pequeña al lado de un párrafo que ya invita a
+   pulsar.
    -------------------------------------------------------------------------- */
 
 .observation-list {
@@ -2197,12 +2283,53 @@
   list-style: none;
 }
 
-.observation {
+@media (min-width: 60rem) {
+  .observation-list {
+    grid-template-columns: repeat(auto-fit, minmax(22rem, 1fr));
+  }
+}
+
+.observation__open {
+  display: grid;
+  gap: var(--space-2);
+  width: 100%;
+  height: 100%;
   padding: var(--space-5) var(--space-6);
   border: 1px solid var(--line);
   border-left: 3px solid var(--accent, var(--brand-blue));
   border-radius: var(--radius-md);
   background: var(--surface);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition:
+    border-color var(--dur-fast) var(--ease-out),
+    box-shadow var(--dur-fast) var(--ease-out),
+    transform var(--dur-fast) var(--ease-out);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .observation__open:hover {
+    border-color: var(--line-strong);
+    border-left-color: var(--accent, var(--brand-blue));
+    box-shadow: var(--shadow-md);
+    transform: translateY(-1px);
+  }
+}
+
+.observation__open:focus-visible {
+  outline: 2px solid var(--accent, var(--brand-blue));
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .observation__open {
+    transition: none;
+  }
+
+  .observation__open:hover {
+    transform: none;
+  }
 }
 
 .observation__head {
@@ -2210,7 +2337,6 @@
   flex-wrap: wrap;
   align-items: baseline;
   gap: var(--space-3);
-  margin-bottom: var(--space-2);
 }
 
 .observation__head strong {
@@ -2231,18 +2357,101 @@
   white-space: nowrap;
 }
 
-.observation p {
-  margin: 0;
-  max-width: var(--measure);
+/* Dos líneas: lo justo para reconocer de qué va sin traer el texto entero. */
+.observation__preview {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  overflow: hidden;
   color: var(--ink-secondary);
-  line-height: var(--leading-relaxed);
+  font-size: var(--text-sm);
+  line-height: var(--leading-normal);
 }
 
-.observation small {
-  display: block;
-  margin-top: var(--space-3);
-  color: var(--ink-muted);
+.observation__cue {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  color: var(--accent, var(--brand-blue));
   font-size: var(--text-xs);
+  font-weight: 700;
+}
+
+/* --- El texto, ya en su ventana ---------------------------------------------
+   Justificado y con partición de palabras, que es como se lee un informe. Sin
+   `hyphens`, justificar en español abre ríos de espacio entre palabras.
+   -------------------------------------------------------------------------- */
+
+.observation-reader {
+  display: grid;
+  gap: var(--space-4);
+}
+
+.observation-reader p {
+  margin: 0;
+  color: var(--ink-secondary);
+  font-size: var(--text-base);
+  line-height: var(--leading-relaxed);
+  text-align: justify;
+  text-wrap: pretty;
+  hyphens: auto;
+  -webkit-hyphens: auto;
+}
+
+/* --- Rastro anual -------------------------------------------------------------
+   La serie de un área, una línea o un proyecto: un año y su cifra por pieza. El
+   color de la banda va en una barra bajo el número, nunca en el número: sobre
+   texto pequeño, naranja y verde no se distinguen.
+   -------------------------------------------------------------------------- */
+
+.year-trail {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin: var(--space-3) 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.year-trail li {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-2);
+  padding: 2px var(--space-3) 3px;
+  border-bottom: 2px solid var(--band, var(--line-strong));
+  border-radius: var(--radius-xs) var(--radius-xs) 0 0;
+  background: var(--surface-2);
+  font-size: var(--text-xs);
+}
+
+.year-trail b {
+  color: var(--ink-muted);
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
+}
+
+.year-trail span {
+  color: var(--ink);
+  font-variant-numeric: tabular-nums;
+  font-weight: 800;
+}
+
+/* --- Columnas por año en las tablas de resultados --------------------------- */
+
+.result-table thead th.result-table__year {
+  color: var(--ink-secondary);
+  white-space: nowrap;
+}
+
+.year-cell {
+  display: inline-block;
+  padding: 2px var(--space-2);
+  border-bottom: 2px solid var(--band);
+  border-radius: var(--radius-xs) var(--radius-xs) 0 0;
+  background: var(--surface-2);
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
 }
 
 /* --- Pie ---------------------------------------------------------------------- */

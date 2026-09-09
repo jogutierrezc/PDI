@@ -4,6 +4,7 @@ import { PublicLayout } from "../../components/layout/PublicLayout";
 import { Icon } from "../../components/ui/Icon";
 import { ProgressRing } from "../../components/ui/ProgressRing";
 import { EmptyBlock, ErrorBlock, LoadingBlock } from "../../components/ui/QueryState";
+import { Modal } from "../../components/ui/Modal";
 import { useCurrentPeriod, usePillarDetail } from "../../data/queries";
 import {
   accentFor,
@@ -12,12 +13,14 @@ import {
   formatDate,
   formatMonth,
   formatValue,
+  indexYearProgress,
   latestTarget,
   shortYear,
   statusMeta,
   yearsInPlay,
 } from "../../data/pdi";
-import type { ActivityWithTargets, PillarObservation } from "../../types/database";
+import type { ActivityWithTargets, PillarObservation, ProgressScope } from "../../types/database";
+import type { YearIndex } from "../../data/pdi";
 import "./pillar-viewer.css";
 
 /**
@@ -45,10 +48,16 @@ export function PillarViewer() {
   // null = todas las áreas. El selector de la barra filtra los proyectos y el
   // cumplimiento por línea, que son las dos secciones que cuelgan de un área.
   const [areaId, setAreaId] = useState<string | null>(null);
+  // La observación abierta. Fuera del modal la lista solo muestra su
+  // encabezado: un párrafo de balance entre tablas de cifras no se lee.
+  const [reading, setReading] = useState<PillarObservation | null>(null);
 
   // Al cambiar de pilar el área elegida deja de existir: se vuelve a "todas"
   // en vez de dejar el selector apuntando a la nada.
-  useEffect(() => setAreaId(null), [slug]);
+  useEffect(() => {
+    setAreaId(null);
+    setReading(null);
+  }, [slug]);
 
   if (detail.isPending) {
     return (
@@ -86,6 +95,7 @@ export function PillarViewer() {
     projects,
     activities,
     observations,
+    yearProgress,
     changes,
     glossary,
   } = detail.data;
@@ -130,6 +140,9 @@ export function PillarViewer() {
   // Las columnas del reporte son los años que este pilar tenga capturados,
   // más los del plan: no se pintan cortes que nadie ha reportado todavía.
   const years = yearsInPlay(visibleActivities.flatMap((activity) => activity.targets));
+  // El avance de cada año, ya girado: dado un área, una línea o un proyecto,
+  // su serie. Es la misma cascada del acumulado aplicada año a año.
+  const yearIndex = indexYearProgress(yearProgress);
 
   return (
     <PublicLayout className="pillar-page">
@@ -483,6 +496,7 @@ export function PillarViewer() {
                             Sin línea de acción asignada
                           </span>
                         )}
+                        <YearTrail scope="project" id={project.id} index={yearIndex} />
                       </div>
                       <div className="entry-row__state">
                         <span className={`status-badge status-badge--${project.status}`}>
@@ -610,12 +624,17 @@ export function PillarViewer() {
                 <h2 id="observaciones-title">Observaciones sobre los indicadores</h2>
                 <p>
                   Balance cualitativo del pilar: lo que explica las cifras de la tabla anterior.
+                  Abre cada una para leerla completa.
                 </p>
               </div>
 
               <ul className="observation-list">
                 {observations.map((observation) => (
-                  <ObservationCard key={observation.id} observation={observation} />
+                  <ObservationCard
+                    key={observation.id}
+                    observation={observation}
+                    onOpen={() => setReading(observation)}
+                  />
                 ))}
               </ul>
             </section>
@@ -699,6 +718,11 @@ export function PillarViewer() {
             <div className="section-heading">
               <span className="eyebrow">Desglose</span>
               <h2 id="cumplimiento-title">Líneas de acción</h2>
+              <p>
+                El porcentaje grande es el acumulado —el último dato de cada indicador—; debajo, lo
+                cumplido en cada año. Un año que no aparece es un año que esa línea todavía no ha
+                reportado.
+              </p>
             </div>
 
             {visibleLines.length === 0 ? (
@@ -718,6 +742,9 @@ export function PillarViewer() {
                       {area.code ? `${area.code} · ` : ""}
                       {area.name}
                     </h3>
+                    {/* El área también tiene su serie: el promedio anual de sus
+                        líneas, que es lo que responde a "cómo íbamos en 2024". */}
+                    <YearTrail scope="area" id={area.id} index={yearIndex} />
                     <ul className="line-list">
                       {areaLines.map((line) => (
                         <li key={line.id}>
@@ -734,6 +761,7 @@ export function PillarViewer() {
                               style={{ width: `${line.progress}%`, background: accent }}
                             />
                           </span>
+                          <YearTrail scope="line" id={line.id} index={yearIndex} />
                         </li>
                       ))}
                     </ul>
@@ -742,6 +770,10 @@ export function PillarViewer() {
               })
             )}
           </section>
+
+          {reading && (
+            <ObservationReader observation={reading} onClose={() => setReading(null)} />
+          )}
 
           <nav className="pillar-footer-nav" aria-label="Navegación entre pilares">
             <Link className="button-secondary" to="/implementacion">
@@ -932,17 +964,111 @@ function IndicatorRow({
   );
 }
 
-function ObservationCard({ observation }: { observation: PillarObservation }) {
+/* --- Rastro anual -----------------------------------------------------------
+   La serie de un área, una línea o un proyecto en una línea de texto. Va debajo
+   del acumulado y no en lugar de él: son dos preguntas distintas —"cómo va" y
+   "cómo fue cada año"— y sustituir una por otra perdería la primera.
+
+   Cada año lleva su cifra; el color de la banda es un refuerzo, nunca el dato.
+   -------------------------------------------------------------------------- */
+
+function YearTrail({
+  scope,
+  id,
+  index,
+}: {
+  scope: ProgressScope;
+  id: string;
+  index: YearIndex;
+}) {
+  const entries = index.of(scope, id);
+  if (entries.length === 0) return null;
+
+  return (
+    <ul className="year-trail">
+      {entries.map((entry) => {
+        const band = bandFor(entry.progress);
+        return (
+          <li key={entry.year} style={{ "--band": band.color } as React.CSSProperties}>
+            <b>{entry.year}</b>
+            <span>{entry.progress} %</span>
+            <span className="sr-only">{band.label}</span>
+          </li>
+        );
+      })}
+    </ul>
+  );
+}
+
+/* --- Observaciones ----------------------------------------------------------
+   En la página quedan solo los encabezados; el texto se lee en su propia
+   ventana. Un balance de varios párrafos intercalado entre tablas de cifras
+   compite con ellas y no gana: o interrumpe la lectura de la tabla, o se salta.
+
+   Dentro del modal el texto va justificado y con partición de palabras, que es
+   como se lee un informe, y a un ancho de medida controlada.
+   -------------------------------------------------------------------------- */
+
+function observationTitle(observation: PillarObservation): string {
+  if (observation.title) return observation.title;
+  return observation.year ? `Observación del corte ${observation.year}` : "Observación del pilar";
+}
+
+function ObservationCard({
+  observation,
+  onOpen,
+}: {
+  observation: PillarObservation;
+  onOpen: () => void;
+}) {
   return (
     <li className="observation">
-      <div className="observation__head">
-        <span className="observation__corte">
-          {observation.year ? `Corte ${observation.year}` : "Vigente"}
+      <button type="button" className="observation__open" onClick={onOpen}>
+        <span className="observation__head">
+          <span className="observation__corte">
+            {observation.year ? `Corte ${observation.year}` : "Vigente"}
+          </span>
+          <strong>{observationTitle(observation)}</strong>
         </span>
-        {observation.title && <strong>{observation.title}</strong>}
-      </div>
-      <p>{observation.body}</p>
-      {observation.author && <small>{observation.author}</small>}
+        {/* Dos líneas de adelanto: lo justo para saber si esta es la que se
+            busca, sin convertir la lista en el texto entero. */}
+        <span className="observation__preview">{observation.body}</span>
+        <span className="observation__cue">
+          Leer completa
+          <Icon name="arrow-right" size={14} />
+        </span>
+      </button>
     </li>
+  );
+}
+
+function ObservationReader({
+  observation,
+  onClose,
+}: {
+  observation: PillarObservation;
+  onClose: () => void;
+}) {
+  // Los saltos de línea dobles del formulario se respetan como párrafos: quien
+  // escribe separando ideas espera verlas separadas.
+  const paragraphs = observation.body
+    .split(/\n\s*\n/)
+    .map((block) => block.trim())
+    .filter(Boolean);
+
+  const meta = [observation.year ? `Corte ${observation.year}` : "Observación vigente", observation.author]
+    .filter(Boolean)
+    .join(" · ");
+
+  return (
+    <Modal size="reader" title={observationTitle(observation)} description={meta} onClose={onClose}>
+      <div className="observation-reader">
+        {paragraphs.length === 0 ? (
+          <p>{observation.body}</p>
+        ) : (
+          paragraphs.map((block, position) => <p key={position}>{block}</p>)
+        )}
+      </div>
+    </Modal>
   );
 }

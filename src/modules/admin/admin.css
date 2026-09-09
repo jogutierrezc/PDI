@@ -904,73 +904,6 @@
   font-size: var(--text-xs);
 }
 
-/* --- Modales ---------------------------------------------------------------- */
-
-.modal-backdrop {
-  position: fixed;
-  inset: 0;
-  z-index: var(--z-modal);
-  display: grid;
-  place-items: center;
-  padding: var(--gutter);
-  background: rgba(6, 16, 32, 0.5);
-  backdrop-filter: blur(3px);
-  -webkit-backdrop-filter: blur(3px);
-  animation: modal-veil var(--dur-fast) ease-out;
-}
-
-.modal-panel {
-  width: min(34rem, 100%);
-  max-height: min(44rem, 88vh);
-  display: flex;
-  flex-direction: column;
-  padding: var(--space-6);
-  background: var(--surface);
-  border: 1px solid var(--line);
-  border-radius: var(--radius-lg);
-  box-shadow: var(--shadow-xl);
-  /* Entra desde 0.97, nunca desde 0, y con el origen centrado: un modal no
-     cuelga de un disparador concreto. */
-  animation: modal-enter var(--dur-base) var(--ease-out);
-}
-
-@keyframes modal-veil {
-  from {
-    opacity: 0;
-  }
-}
-
-@keyframes modal-enter {
-  from {
-    opacity: 0;
-    transform: scale(0.97);
-  }
-}
-
-.modal-panel__head {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: var(--space-4);
-}
-
-.modal-panel__head h2 {
-  font-size: var(--text-lg);
-}
-
-.modal-panel__description {
-  margin-top: var(--space-3);
-  color: var(--ink-secondary);
-  font-size: var(--text-sm);
-  line-height: var(--leading-normal);
-}
-
-.modal-panel__body {
-  margin-top: var(--space-5);
-  overflow-y: auto;
-  overscroll-behavior: contain;
-}
-
 .modal-form {
   display: grid;
   gap: var(--space-4);
@@ -1071,13 +1004,6 @@
 
   .admin-topbar {
     flex-wrap: wrap;
-  }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .modal-panel,
-  .modal-backdrop {
-    animation: none;
   }
 }
 
@@ -1852,4 +1778,15 @@ fieldset.admin-field legend {
    columna de al lado. */
 .admin-card .indicator-table {
   min-width: 46rem;
+}
+
+/* El cuerpo de una observación puede ocupar diez líneas. En la lista de la
+   intranet se recorta a tres: lo que hace falta para reconocerla antes de
+   abrirla a editar. */
+.record-list .observation-preview {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+  line-clamp: 3;
+  overflow: hidden;
 }

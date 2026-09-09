@@ -27,11 +27,13 @@ import {
   complianceBands,
   formatDate,
   formatValue,
+  indexYearProgress,
   latestTarget,
   shortYear,
   yearsInPlay,
 } from "../data/pdi";
-import type { ActivityWithTargets, TargetFields } from "../types/database";
+import type { ActivityWithTargets, ProgressScope, TargetFields } from "../types/database";
+import type { YearIndex } from "../data/pdi";
 
 export function PillarScorecard() {
   const { slug } = useParams<{ slug: string }>();
@@ -60,13 +62,17 @@ export function PillarScorecard() {
 
   if (!detail.data) return <Navigate to="/404" replace />;
 
-  const { pillar, progress, areaProgress, projectProgress, lines, activities } = detail.data;
+  const { pillar, progress, areaProgress, projectProgress, lines, activities, yearProgress } =
+    detail.data;
   const accent = accentFor(pillar.accent_slot);
   const band = bandFor(progress.progress);
 
   const areaById = new Map(areaProgress.map((area) => [area.area_id, area]));
   const lineById = new Map(lines.map((line) => [line.id, line]));
   const years = yearsInPlay(activities.flatMap((activity) => activity.targets));
+  // La misma cascada, año a año: cada tabla añade una columna por año con
+  // algo reportado. Si no hay ninguno, las tablas se quedan como estaban.
+  const yearIndex = indexYearProgress(yearProgress);
 
   return (
     <PublicLayout className="scorecard-page">
@@ -204,9 +210,12 @@ export function PillarScorecard() {
             eyebrow="Resultados"
             title="Resultados a nivel de pilar"
             nameHeader="Nomenclatura del pilar"
+            years={yearIndex.years}
+            yearIndex={yearIndex}
             rows={[
               {
                 key: pillar.id,
+                scope: "pillar",
                 code: pillar.numeral || "—",
                 name: pillar.name,
                 target: null,
@@ -224,9 +233,12 @@ export function PillarScorecard() {
             eyebrow="Estructura"
             title="Resultados a nivel de áreas y líneas estratégicas"
             nameHeader="Nomenclatura del área o línea"
+            years={yearIndex.years}
+            yearIndex={yearIndex}
             rows={areaProgress.flatMap((area) => [
               {
                 key: area.area_id,
+                scope: "area" as const,
                 code: area.area_code || "—",
                 name: area.area_name,
                 target: area.target_value,
@@ -240,6 +252,7 @@ export function PillarScorecard() {
                 .filter((line) => line.area_id === area.area_id)
                 .map((line) => ({
                   key: line.id,
+                  scope: "line" as const,
                   code: line.code || "—",
                   name: line.name,
                   target: line.target_value,
@@ -259,6 +272,8 @@ export function PillarScorecard() {
             eyebrow="Ejecución"
             title="Resultados a nivel de proyectos"
             nameHeader="Nomenclatura del proyecto"
+            years={yearIndex.years}
+            yearIndex={yearIndex}
             rows={projectProgress.map((project) => {
               const line = project.action_line_id
                 ? lines.find((item) => item.id === project.action_line_id)
@@ -267,6 +282,7 @@ export function PillarScorecard() {
 
               return {
                 key: project.project_id,
+                scope: "project" as const,
                 code: line?.code || area?.area_code || "—",
                 name: project.name,
                 detail: line ? `${line.area_name} › ${line.name}` : "Sin línea de acción",
@@ -478,6 +494,8 @@ function IndicatorRow({
 
 interface ResultRow extends Partial<TargetFields> {
   key: string;
+  /** Nivel de la cascada al que pertenece la fila, para buscar sus años. */
+  scope: ProgressScope;
   code: string;
   name: string;
   detail?: string;
@@ -497,6 +515,8 @@ function ResultTable({
   title,
   nameHeader,
   rows,
+  years,
+  yearIndex,
   empty,
 }: {
   id: string;
@@ -504,6 +524,9 @@ function ResultTable({
   title: string;
   nameHeader: string;
   rows: ResultRow[];
+  /** Años con algo reportado en el pilar; vacío = tabla sin columnas de año. */
+  years: number[];
+  yearIndex: YearIndex;
   empty?: string;
 }) {
   const usesFallback = rows.some((row) => row.target === null || row.achieved === null);
@@ -522,7 +545,7 @@ function ResultTable({
           <div className="table-scroll">
             <table className="result-table">
               <caption className="sr-only">
-                {title}: código, nomenclatura, meta, avance y porcentaje de cumplimiento
+                {title}: código, nomenclatura, meta, avance, cumplimiento de cada año y acumulado
               </caption>
               <thead>
                 <tr>
@@ -530,7 +553,12 @@ function ResultTable({
                   <th scope="col">{nameHeader}</th>
                   <th scope="col">Meta</th>
                   <th scope="col">Avance</th>
-                  <th scope="col">Cumplimiento</th>
+                  {years.map((year) => (
+                    <th scope="col" key={year} className="result-table__year">
+                      Cumpl. {shortYear(year)}
+                    </th>
+                  ))}
+                  <th scope="col">Acumulado</th>
                 </tr>
               </thead>
               <tbody>
@@ -552,6 +580,32 @@ function ResultTable({
                       <td className="result-table__number">
                         {absolute ? `${row.achieved}${unit}` : row.fallbackAchieved}
                       </td>
+
+                      {/* Un año sin nada reportado se deja vacío. Escribir un
+                          cero diría "no se cumplió" donde solo hay silencio. */}
+                      {years.map((year) => {
+                        const value = yearIndex.at(row.scope, row.key, year);
+                        if (value === null) {
+                          return (
+                            <td className="result-table__number" key={year}>
+                              <span className="target-empty">—</span>
+                            </td>
+                          );
+                        }
+                        const yearBand = bandFor(value);
+                        return (
+                          <td className="result-table__number" key={year}>
+                            <span
+                              className="year-cell"
+                              style={{ "--band": yearBand.color } as React.CSSProperties}
+                              title={`${yearBand.label} en ${year}`}
+                            >
+                              {value} %
+                            </span>
+                          </td>
+                        );
+                      })}
+
                       <td>
                         {/* La cifra y el nombre de la banda van siempre: el
                             color es un refuerzo, nunca el único dato. */}
@@ -573,8 +627,17 @@ function ResultTable({
           {usesFallback && (
             <p className="result-table__note">
               Donde no hay una meta absoluta capturada, <strong>Meta</strong> y{" "}
-              <strong>Avance</strong> cuentan indicadores: comprometidos y cumplidos. El porcentaje
-              es siempre el avance en cascada.
+              <strong>Avance</strong> cuentan indicadores: comprometidos y cumplidos.{" "}
+              {years.length > 0 ? (
+                <>
+                  Las columnas por año son la misma cascada aplicada al cumplimiento de ese año; el{" "}
+                  <strong>acumulado</strong> es el estado actual, con el último dato de cada
+                  indicador. Un año en blanco no es un cero: es un año que esa fila todavía no ha
+                  reportado.
+                </>
+              ) : (
+                <>El porcentaje es siempre el avance en cascada.</>
+              )}
             </p>
           )}
         </>

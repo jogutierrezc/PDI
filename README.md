@@ -45,7 +45,8 @@ pegarlos en el editor SQL del panel de Supabase o aplicarlos con la CLI
 | `0008_cascada_de_avance.sql` | El avance se propaga del indicador al pilar |
 | `0009_desarrollo_tecnologico.sql` | Catálogo de los desarrollos web de la oficina |
 | `0010_metas_y_cumplimiento.sql` | Meta y avance absolutos + conteos del cuadro de mando |
-| `0011_indicadores_por_anio.sql` | Unidad, línea base y serie anual del indicador + observaciones del pilar. **Ejecútala la última.** |
+| `0011_indicadores_por_anio.sql` | Unidad, línea base y serie anual del indicador + observaciones del pilar |
+| `0012_cascada_anual.sql` | La cascada, año a año, y el indicador sin proyecto cuenta para su línea. **Ejecútala la última.** |
 
 Todos son idempotentes: volver a ejecutarlos no duplica nada.
 
@@ -102,10 +103,19 @@ nivel es el promedio del nivel inferior, y el indicador es la hoja:
 ```
 indicador   →  cumplimiento de su año más reciente (la hoja)
 proyecto    →  promedio de sus indicadores, o su reporte si no tiene
-línea       →  promedio de sus proyectos,   o su reporte si no tiene
+línea       →  promedio de sus piezas,      o su reporte si no tiene
 área        →  promedio de sus líneas
 pilar       →  promedio de sus áreas, o de sus indicadores si no hay áreas
 ```
+
+Las **piezas** de una línea son sus proyectos y los indicadores que cuelgan de
+ella sin proyecto. Cada una pesa lo mismo. Un indicador que sí tiene proyecto ya
+llega por él y no se cuenta dos veces.
+
+> Hasta la migración `0012`, la línea solo promediaba proyectos: un indicador
+> colgado directamente de ella no movía nada, ni la línea, ni el área, ni el
+> pilar. Aplicar `0012` puede cambiar el porcentaje de esas líneas — antes se
+> ignoraban, ahora pesan.
 
 Mover el avance de un proyecto sube por la línea, el área y el pilar hasta el
 tablero, sin que nadie tenga que actualizar nada. Lo resuelven las vistas
@@ -127,6 +137,36 @@ Ese segundo número se llama `completion_rate`.
 > un fallo del formulario de la intranet, no una necesidad del modelo. La
 > migración `0005` la retira. **No vuelvas a crearla**: guardar el porcentaje
 > permitiría que el número del pilar y el de sus indicadores se separaran.
+
+### La misma cascada, año a año
+
+La cascada de arriba responde a "cómo va". Para responder a "cómo iba en 2024",
+`0012` la recorre entera **para cada año**, con las mismas reglas aplicadas al
+cumplimiento de ese año concreto:
+
+```
+v_activity_year → v_project_year → v_line_year → v_area_year → v_pillar_year
+```
+
+Los cinco se apilan en `v_year_progress`, con una columna `scope` que dice de
+qué nivel es cada fila. Una tabla con una columna por año necesita el avance de
+todas sus filas a la vez; con cinco vistas serían cinco peticiones por pantalla,
+y así es una.
+
+**Un año solo existe donde hay algo reportado.** Una línea cuyos proyectos aún no
+han reportado 2026 no aparece con un cero en 2026: aparece sin 2026, y la
+interfaz deja la celda en blanco. Un cero dicho por falta de datos se lee como
+"no se cumplió", que es una afirmación distinta de "todavía no se sabe".
+
+Las dos lecturas conviven en la misma tabla: las columnas por año son el
+cumplimiento de cada corte, y la última columna —**acumulado**— es el estado
+actual, con el último dato de cada indicador. No son la misma pregunta y por eso
+no se sustituyen: un área con 2024 al 90 % y 2025 al 40 % tiene un acumulado del
+40 %, y las tres cifras dicen algo que las otras dos no.
+
+En el portal se ven en el cuadro de mando (una columna por año en las tres
+tablas), en la ficha del pilar (el rastro anual bajo cada área, línea y proyecto)
+y en **Configurar pilar → Metas y cumplimiento**.
 
 ### El indicador de resultado y su serie anual
 
@@ -173,6 +213,13 @@ entonces se lee como el estado vigente. Se escriben en **Configurar pilar →
 Observaciones del pilar** y se publican en la ficha, debajo de la tabla de
 indicadores. La sección no aparece si no hay ninguna: una sección vacía no
 informa de nada.
+
+En la página va solo el encabezado y dos líneas de adelanto; **el texto se lee en
+su propia ventana**, justificado y con partición de palabras, al ancho de lectura
+del modal (`size="reader"`, 46rem). Un balance de varios párrafos intercalado
+entre dos tablas de cifras compite con ellas y no gana: o interrumpe la lectura
+de la tabla, o se salta. Los saltos de línea dobles del formulario se respetan
+como párrafos.
 
 ### Decisiones que conviene conocer
 

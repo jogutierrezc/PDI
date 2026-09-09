@@ -19,12 +19,15 @@ interface ModalProps {
   description?: string;
   onClose: () => void;
   children: ReactNode;
+  /** "reader" ensancha el panel: un párrafo largo a 34rem sale demasiado
+   *  estrecho y se lee a saltos. Los formularios se quedan como están. */
+  size?: "form" | "reader";
 }
 
 const FOCUSABLE =
   'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
 
-export function Modal({ title, description, onClose, children }: ModalProps) {
+export function Modal({ title, description, onClose, children, size = "form" }: ModalProps) {
   const panelRef = useRef<HTMLDivElement>(null);
   const restoreRef = useRef<HTMLElement | null>(null);
   const titleId = useId();
@@ -92,7 +95,7 @@ export function Modal({ title, description, onClose, children }: ModalProps) {
     >
       <div
         ref={panelRef}
-        className="modal-panel"
+        className={`modal-panel${size === "reader" ? " modal-panel--reader" : ""}`}
         role="dialog"
         aria-modal="true"
         aria-labelledby={titleId}

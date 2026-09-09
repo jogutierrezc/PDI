@@ -11,7 +11,9 @@ import type {
   ActivityTarget,
   PdiSummary,
   PillarProgress,
+  ProgressScope,
   PublicationStatus,
+  YearProgress,
 } from "../types/database";
 
 /* --- Estados -------------------------------------------------------------- */
@@ -91,6 +93,43 @@ export function yearsInPlay(targets: ActivityTarget[]): number[] {
 export function formatValue(value: number | null | undefined): string {
   if (value === null || value === undefined) return "—";
   return value.toLocaleString("es-CO", { maximumFractionDigits: 2 });
+}
+
+/* --- Avance por año --------------------------------------------------------
+   `v_year_progress` llega como una lista plana de (ámbito, entidad, año,
+   avance). Las tablas la necesitan al revés: dada una fila y un año, su cifra.
+   Este índice hace esa vuelta una sola vez por pantalla.
+   -------------------------------------------------------------------------- */
+
+export interface YearIndex {
+  /** Años con algo reportado en el pilar, de menor a mayor. */
+  years: number[];
+  /** Avance de una entidad en un año. Null = ese año no se reportó. */
+  at: (scope: ProgressScope, id: string, year: number) => number | null;
+  /** La serie completa de una entidad, ya ordenada. */
+  of: (scope: ProgressScope, id: string) => { year: number; progress: number }[];
+}
+
+export function indexYearProgress(rows: YearProgress[]): YearIndex {
+  const byEntity = new Map<string, Map<number, number>>();
+  const years = new Set<number>();
+
+  for (const row of rows) {
+    const key = `${row.scope}:${row.entity_id}`;
+    const bucket = byEntity.get(key) ?? new Map<number, number>();
+    bucket.set(row.year, row.progress);
+    byEntity.set(key, bucket);
+    years.add(row.year);
+  }
+
+  return {
+    years: [...years].sort((a, b) => a - b),
+    at: (scope, id, year) => byEntity.get(`${scope}:${id}`)?.get(year) ?? null,
+    of: (scope, id) =>
+      [...(byEntity.get(`${scope}:${id}`) ?? new Map())]
+        .map(([year, progress]) => ({ year, progress }))
+        .sort((a, b) => a.year - b.year),
+  };
 }
 
 /* --- Color ---------------------------------------------------------------- */

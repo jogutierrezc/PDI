@@ -7,6 +7,10 @@ import { Icon } from "../components/ui/Icon";
 import { ProgressRing } from "../components/ui/ProgressRing";
 import { StackedProgress } from "../components/ui/StackedProgress";
 import { YearScrubber } from "../components/ui/YearScrubber";
+import { ComplianceChart } from "../components/ui/ComplianceChart";
+import type { ChartSeries } from "../components/ui/ComplianceChart";
+import { ViewToggle } from "../components/ui/ViewToggle";
+import type { ResultView } from "../components/ui/ViewToggle";
 import { CardSkeleton, EmptyBlock, ErrorBlock, LoadingBlock } from "../components/ui/QueryState";
 import {
   useCurrentPeriod,
@@ -18,11 +22,13 @@ import {
 import {
   accentFor,
   aggregateYears,
+  bandFor,
   emptySummary,
   formatDate,
   formatMonth,
   indexYearProgress,
   planYears,
+  shortYear,
   statusMeta,
   summarizeProgress,
   yearScopeLabel,
@@ -36,6 +42,9 @@ export function Dashboard() {
   // el tablero busca la lectura de conjunto, y una cifra de un año suelto
   // pasaría por la del plan.
   const [yearScope, setYearScope] = useState<YearScope>("plan");
+  // Tabla o gráfica en la comparativa 2024-2028. Arranca en tabla: es la cifra
+  // exacta y la lectura que funciona con lector de pantalla y en papel.
+  const [view, setView] = useState<ResultView>("table");
 
   const pillars = usePillars();
   const globalSummary = useSummary();
@@ -76,6 +85,21 @@ export function Dashboard() {
     [scopedYears, scope],
   );
   const yearIndex = useMemo(() => indexYearProgress(yearRows), [yearRows]);
+
+  // Las filas de la comparativa: un pilar y sus cinco cortes. Sirven igual a la
+  // tabla y a la gráfica, que es justamente lo que hace que las dos lecturas no
+  // puedan discrepar.
+  const comparison = useMemo<ChartSeries[]>(
+    () =>
+      scope.map((pillar) => ({
+        key: pillar.id,
+        label: pillar.name,
+        detail: `Pilar ${pillar.numeral} · ${pillar.management_owner}`,
+        points: yearIndex.series("pillar", pillar.id),
+      })),
+    [scope, yearIndex],
+  );
+  const hasYearData = comparison.some((row) => row.points.some((point) => point.progress !== null));
 
   // Null = ese año no lo ha reportado nadie del alcance. Se dice, no se pinta
   // un cero: "no se cumplió" y "todavía no se sabe" son cosas distintas.
@@ -327,6 +351,127 @@ export function Dashboard() {
                 );
               })}
             </div>
+          )}
+        </section>
+
+        {/* --- Comparativa 2024-2028 -----------------------------------
+            Las tarjetas de arriba dicen cómo va cada pilar en el corte que
+            marca la barra de años; esta sección pone los cinco cortes uno al
+            lado del otro. La misma serie alimenta la tabla y la gráfica: no
+            son dos cálculos, son dos lecturas del mismo. --------------- */}
+        <section className="board-section" id="comparativa" aria-label="Comparativa de cumplimiento por año">
+          <div className="section-bar">
+            <div className="section-heading">
+              <span className="eyebrow">
+                Comparativa {planYears[0]}-{planYears[planYears.length - 1]}
+              </span>
+              <h2>Cumplimiento por año</h2>
+              <p>
+                La tabla da la cifra exacta de cada corte; la gráfica compara los cinco años de un
+                vistazo. Un año en blanco no es un cero: es un corte que ese pilar todavía no ha
+                reportado.
+              </p>
+            </div>
+
+            <ViewToggle
+              label="Ver como"
+              value={view}
+              onChange={setView}
+              chartDisabled={!hasYearData}
+              disabledHint="Todavía no hay cumplimiento reportado por año."
+            />
+          </div>
+
+          {pillars.isPending ? (
+            <LoadingBlock rows={4} label="Cargando la comparativa por año" />
+          ) : !hasYearData ? (
+            <EmptyBlock
+              title="Todavía no hay cumplimiento reportado por año"
+              hint="En cuanto un indicador registre meta y resultado de un año, ese corte sube por la cascada hasta su pilar y aparece aquí."
+            />
+          ) : view === "chart" ? (
+            <ComplianceChart
+              series={comparison}
+              caption="Cumplimiento de cada pilar frente a lo comprometido para ese año. El color es la banda de cumplimiento y acompaña siempre a la cifra; un año sin barra es un año sin reportar."
+            />
+          ) : (
+            <>
+              <div className="table-scroll">
+                <table className="result-table">
+                  <caption className="sr-only">
+                    Cumplimiento de cada pilar en cada año del plan y avance acumulado del plan
+                  </caption>
+                  <thead>
+                    <tr>
+                      <th scope="col">Pilar</th>
+                      {planYears.map((year) => (
+                        <th scope="col" key={year} className="result-table__year">
+                          Cumpl. {shortYear(year)}
+                        </th>
+                      ))}
+                      <th scope="col">Plan</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {scope.map((pillar) => {
+                      const plan = yearIndex.plan("pillar", pillar.id);
+                      const planBand = bandFor(plan);
+
+                      return (
+                        <tr key={pillar.id}>
+                          <th scope="row">
+                            <strong>{pillar.name}</strong>
+                            <small>
+                              Pilar {pillar.numeral} · {pillar.management_owner}
+                            </small>
+                          </th>
+
+                          {planYears.map((year) => {
+                            const value = yearIndex.at("pillar", pillar.id, year);
+                            if (value === null) {
+                              return (
+                                <td className="result-table__number" key={year}>
+                                  <span className="target-empty">—</span>
+                                </td>
+                              );
+                            }
+                            const band = bandFor(value);
+                            return (
+                              <td className="result-table__number" key={year}>
+                                <span
+                                  className="year-cell"
+                                  style={{ "--band": band.color } as React.CSSProperties}
+                                  title={`${band.label} en ${year}`}
+                                >
+                                  {value} %
+                                </span>
+                              </td>
+                            );
+                          })}
+
+                          <td>
+                            <span
+                              className="band-chip"
+                              style={{ "--band": planBand.color } as React.CSSProperties}
+                            >
+                              <span className="band-chip__value">{plan} %</span>
+                              <span className="band-chip__label">{planBand.label}</span>
+                            </span>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+
+              <p className="result-table__note">
+                Cada columna de año es lo cumplido frente a lo comprometido para ese año.{" "}
+                <strong>Plan</strong> es otra pregunta: los {planYears.length} años pesan lo mismo y
+                los que aún no se han reportado cuentan como cero, así que el 100 % solo llega al
+                cerrar {planYears[planYears.length - 1]}.
+              </p>
+            </>
           )}
         </section>
 

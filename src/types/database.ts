@@ -209,8 +209,30 @@ export interface IndicatorWithLabels extends Indicator {
   periodicity_label: string | null;
 }
 
+/** Un impacto declarado del proyecto. Viaja como JSON dentro de la fila. */
+export interface ProjectImpact {
+  /** Tipo de impacto: académico, social, ambiental… */
+  kind: string;
+  /** Plazo en el que se espera: corto, mediano, largo. */
+  term: string;
+  justification: string;
+}
+
+/** A qué pilar, área y línea apunta un proyecto. Puede haber varios. */
+export interface ProjectLink {
+  id: string;
+  project_id: string;
+  pillar_id: string;
+  area_id: string | null;
+  action_line_id: string | null;
+  /** El vínculo que manda en `projects.pillar_id`: desde ahí se administra. */
+  is_primary: boolean;
+  position: number;
+}
+
 export interface Project extends TargetFields {
   id: string;
+  /** Pilar dueño: el del vínculo principal. Decide quién puede editarlo. */
   pillar_id: string;
   action_line_id: string | null;
   indicator_id: string | null;
@@ -224,6 +246,25 @@ export interface Project extends TargetFields {
   state_id: string | null;
   document_id: string | null;
   position: number;
+
+  /* --- Formulación (módulo de proyectos) --------------------------------- */
+  start_date: string | null;
+  end_date: string | null;
+  /** Programas o unidades académicas responsables. */
+  academic_units: string[] | null;
+  /** Números de los ODS a los que aporta (1-17). */
+  sdg_goals: number[] | null;
+  total_value: number | null;
+  impacts: ProjectImpact[];
+  /** Ruta dentro del bucket "proyectos" de Storage; el archivo no está en la base. */
+  attachment_path: string | null;
+  attachment_name: string | null;
+  attachment_size: number | null;
+}
+
+/** El proyecto con sus vínculos ya resueltos, como lo piden las fichas. */
+export interface ProjectWithLinks extends Project {
+  links: ProjectLink[];
 }
 
 /** Indicador de resultado. La tabla se sigue llamando `activities` por
@@ -373,6 +414,7 @@ export type AreaInput = Writable<StrategicArea>;
 export type ActionLineInput = Writable<ActionLine>;
 export type IndicatorInput = Writable<Indicator>;
 export type ProjectInput = Writable<Project>;
+export type ProjectLinkInput = Writable<ProjectLink>;
 export type ActivityInput = Writable<Activity>;
 export type ActivityTargetInput = Writable<Omit<ActivityTarget, "compliance">>;
 export type PillarObservationInput = Writable<PillarObservation>;

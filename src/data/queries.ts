@@ -31,6 +31,7 @@ import type {
   Profile,
   Project,
   ProjectProgress,
+  ProjectWithLinks,
   ReportPeriod,
   StrategicArea,
   WebProject,
@@ -57,6 +58,8 @@ export const keys = {
   webProjects: () => [...keys.all, "web-projects"] as const,
   observations: (pillarId: string) => [...keys.all, "observations", pillarId] as const,
   pillarYears: () => [...keys.all, "pillar-years"] as const,
+  projects: () => [...keys.all, "projects"] as const,
+  structure: () => [...keys.all, "structure"] as const,
 };
 
 /** Convierte el error de PostgREST en algo que se pueda mostrar y accionar. */
@@ -223,7 +226,8 @@ export interface PillarDetail {
   yearProgress: YearProgress[];
   lines: ActionLineWithArea[];
   indicators: IndicatorWithLabels[];
-  projects: Project[];
+  /** Proyectos que tocan el pilar, propios o vinculados desde otro. */
+  projects: ProjectWithLinks[];
   /** Indicadores de resultado, con su unidad y su serie anual. */
   activities: ActivityWithTargets[];
   /** Lectura cualitativa del avance, escrita por el responsable del pilar. */
@@ -302,7 +306,14 @@ export function usePillarDetail(slug: string | undefined) {
             .eq("pillar_id", id)
             .order("position")
             .then(unwrap<IndicatorWithLabels[]>),
-          supabase.from("projects").select("*").eq("pillar_id", id).order("position").then(unwrap<Project[]>),
+          // v_projects, no projects: un proyecto puede apuntar a este pilar
+          // desde otro, y la tabla solo conoce a su pilar dueño.
+          supabase
+            .from("v_projects")
+            .select("*")
+            .contains("pillar_ids", [id])
+            .order("position")
+            .then(unwrap<ProjectWithLinks[]>),
           supabase
             .from("activities")
             .select(ACTIVITY_SELECT)
@@ -397,6 +408,44 @@ export function useWebProjects() {
     queryKey: keys.webProjects(),
     queryFn: async (): Promise<WebProject[]> =>
       supabase.from("web_projects").select("*").order("position").then(unwrap<WebProject[]>),
+  });
+}
+
+/**
+ * Todos los proyectos del plan, con sus vínculos. Es la consulta del módulo de
+ * proyectos, que es transversal: se administra fuera de la configuración de un
+ * pilar concreto porque un proyecto puede tocar varios.
+ */
+/**
+ * La estructura completa del plan —áreas y líneas de todos los pilares— para el
+ * selector de vínculos del módulo de proyectos. Un proyecto puede apuntar a
+ * cualquier pilar, así que no sirve la estructura de uno solo.
+ *
+ * Se piden las áreas con sus líneas embebidas y no `v_action_lines` porque un
+ * área todavía sin líneas también debe poder vincularse.
+ */
+export function useStructure() {
+  return useQuery({
+    queryKey: keys.structure(),
+    queryFn: async (): Promise<AreaWithLines[]> =>
+      supabase
+        .from("strategic_areas")
+        .select("*, action_lines(id, code, name, progress, position)")
+        .order("position")
+        .then(unwrap<AreaWithLines[]>),
+    staleTime: 10 * 60 * 1000,
+  });
+}
+
+export function useProjects() {
+  return useQuery({
+    queryKey: keys.projects(),
+    queryFn: async (): Promise<ProjectWithLinks[]> =>
+      supabase
+        .from("v_projects")
+        .select("*")
+        .order("position")
+        .then(unwrap<ProjectWithLinks[]>),
   });
 }
 

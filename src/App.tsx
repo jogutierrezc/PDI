@@ -35,6 +35,9 @@ const TechDevelopment = lazy(() =>
 const WebProjects = lazy(() =>
   import("./modules/admin/desarrollo/WebProjects").then((m) => ({ default: m.WebProjects })),
 );
+const ProjectsAdmin = lazy(() =>
+  import("./modules/admin/proyectos/ProjectsAdmin").then((m) => ({ default: m.ProjectsAdmin })),
+);
 const LoginPortal = lazy(() => import("./modules/login/LoginPortal").then((m) => ({ default: m.LoginPortal })));
 const PillarManagement = lazy(() =>
   import("./modules/admin/gestion-pilares/PillarManagement").then((m) => ({ default: m.PillarManagement })),
@@ -114,6 +117,14 @@ export default function App() {
             element={
               <RequireRole minimum="consulta">
                 <GlobalParameters />
+              </RequireRole>
+            }
+          />
+          <Route
+            path="/admin/proyectos"
+            element={
+              <RequireRole minimum="consulta">
+                <ProjectsAdmin />
               </RequireRole>
             }
           />

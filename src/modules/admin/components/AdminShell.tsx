@@ -15,7 +15,13 @@ import { roleLabels, useAuth } from "../../../lib/auth";
 import type { AppRole } from "../../../types/database";
 import "../admin.css";
 
-export type AdminSection = "pillars" | "parameters" | "development" | "users" | "repository";
+export type AdminSection =
+  | "pillars"
+  | "projects"
+  | "parameters"
+  | "development"
+  | "users"
+  | "repository";
 
 const navigation: {
   id: AdminSection;
@@ -26,6 +32,9 @@ const navigation: {
   minimum: AppRole;
 }[] = [
   { id: "pillars", label: "Gestión de pilares", icon: "grid", to: "/admin/pilares", minimum: "consulta" },
+  // Los proyectos van justo después de los pilares y no dentro: son lo único
+  // transversal del plan, uno puede apuntar a varios.
+  { id: "projects", label: "Proyectos", icon: "columns", to: "/admin/proyectos", minimum: "consulta" },
   { id: "parameters", label: "Parámetros globales", icon: "settings", to: "/admin/parametros", minimum: "consulta" },
   { id: "development", label: "Desarrollo tecnológico", icon: "code", to: "/admin/desarrollo", minimum: "consulta" },
   { id: "users", label: "Usuarios y roles", icon: "user", to: "/admin/usuarios", minimum: "admin" },

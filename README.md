@@ -46,7 +46,8 @@ pegarlos en el editor SQL del panel de Supabase o aplicarlos con la CLI
 | `0009_desarrollo_tecnologico.sql` | Catálogo de los desarrollos web de la oficina |
 | `0010_metas_y_cumplimiento.sql` | Meta y avance absolutos + conteos del cuadro de mando |
 | `0011_indicadores_por_anio.sql` | Unidad, línea base y serie anual del indicador + observaciones del pilar |
-| `0012_cascada_anual.sql` | La cascada, año a año, y el indicador sin proyecto cuenta para su línea. **Ejecútala la última.** |
+| `0012_cascada_anual.sql` | La cascada, año a año, y el indicador sin proyecto cuenta para su línea |
+| `0013_modulo_de_proyectos.sql` | Proyectos transversales: formulación, vínculos a varios pilares, impactos y archivo en Storage. **Ejecútala la última.** |
 
 Todos son idempotentes: volver a ejecutarlos no duplica nada.
 
@@ -86,11 +87,11 @@ update public.profiles set role = 'planeacion' where email = 'persona@udes.edu.c
         ┌────────────┬───────────────┬────────┴──────┬─────────────┼──────────────┐
         ▼            ▼               ▼               ▼             ▼              ▼
   strategic_areas  indicators    activities      projects  pillar_observations  change_log
-        │            (protocolos)      │                   (lectura del avance)  glossary_terms
-        ▼                              ▼                                         documents
-   action_lines               activity_targets                                  (repositorio)
-                          (meta / resultado por año,
-                            de donde sale el avance)
+        │            (protocolos)      │               │       (lectura del avance)  glossary_terms
+        ▼                              ▼               ▼                             documents
+   action_lines               activity_targets   project_links                      (repositorio)
+                          (meta / resultado por año,   (a qué pilares,
+                            de donde sale el avance)    áreas y líneas)
 ```
 
 `planning_items` sigue en la base con sus filas, pero ya no se muestra ni se
@@ -111,6 +112,11 @@ pilar       →  promedio de sus áreas, o de sus indicadores si no hay áreas
 Las **piezas** de una línea son sus proyectos y los indicadores que cuelgan de
 ella sin proyecto. Cada una pesa lo mismo. Un indicador que sí tiene proyecto ya
 llega por él y no se cuenta dos veces.
+
+Un proyecto cuenta en **cada línea a la que esté vinculado**. Si aporta a tres,
+su porcentaje entra en el promedio de las tres: refleja que el trabajo empuja
+los tres frentes, a cambio de que ese mismo avance pese tres veces en el total
+del plan. Es una decisión deliberada, no un efecto secundario.
 
 > Hasta la migración `0012`, la línea solo promediaba proyectos: un indicador
 > colgado directamente de ella no movía nada, ni la línea, ni el área, ni el
@@ -252,6 +258,55 @@ Los años que se abren a captura son los del plan (2024-2028) y viven en
 `planYears`, en `src/data/pdi.ts`. La base admite cualquier año entre 2000 y
 2100: si alguien captura uno fuera del plan, las tablas lo muestran igual.
 
+### El proyecto, y por qué es uno solo
+
+Un proyecto es lo único transversal del plan: puede aportar al pilar de ambiente
+tecnológico y al de apropiación social a la vez. Por eso se administra en su
+propio módulo (`/admin/proyectos`) y no dentro de "Configurar pilar", que
+siempre habla de uno.
+
+Se amplió la tabla `projects` que ya existía en vez de crear otra al lado. Son el
+mismo objeto —el que se formula y el que agrupa indicadores—; dos tablas
+llamadas "proyecto" obligarían a capturar dos veces lo mismo y a decidir en cada
+pantalla cuál de las dos se está mirando. La configuración del pilar sigue
+listándolos, pero ya no los crea ni los edita: creado desde ahí, un proyecto
+nacería atado a ese pilar y sin manera de vincularlo a otro.
+
+Un proyecto lleva: título, fechas de inicio y finalización, programas o unidades
+académicas, Objetivos de Desarrollo Sostenible, valor total, descripción corta,
+los impactos declarados (tipo, plazo y justificación) y el documento que lo
+formula.
+
+**`project_links`** guarda a qué apunta: una fila por pilar, área y línea. El
+primer vínculo es el **principal** y es el que hereda `projects.pillar_id`, que
+decide quién puede editarlo; los demás son igual de reales para el avance y para
+la visibilidad. La migración crea el vínculo de los proyectos ya cargados a
+partir de su pilar y su línea, de modo que ninguno desaparece de su ficha.
+
+Los ODS, los tipos de impacto y los plazos son listas cerradas en
+`src/data/pdi.ts` y no catálogos de `parameters`: ninguna de las tres la decide
+la universidad. Los ODS son los diecisiete de Naciones Unidas, con su color
+oficial —que se usa como refuerzo del número, nunca como único dato.
+
+Los impactos viajan como JSON dentro de la fila, igual que los autores de
+`web_projects`: son una lista corta que solo se lee entera.
+
+### El archivo del proyecto
+
+Es lo primero que el portal guarda de verdad en lugar de enlazar. Vive en el
+bucket **`proyectos`** de Supabase Storage, público en lectura —el documento que
+formula un proyecto es del mismo tipo que lo que ya se publica en el
+repositorio— y con escritura para `responsable` en adelante. Máximo 25 MB.
+
+El nombre en Storage lleva delante el id del proyecto y un sello de tiempo, y va
+sin tildes ni espacios porque forma parte de una URL; el nombre original se
+conserva en `attachment_name`, que es el que se muestra. Al reemplazarlo se
+borra el anterior: un archivo que ya no referencia nadie sigue ocupando la cuota.
+
+Todo eso vive en `src/data/storage.ts` y en ningún otro sitio. Si la migración
+no pudo crear el bucket —en algunos proyectos el rol que migra no es dueño de
+`storage.objects`— la migración avisa y hay que crearlo a mano desde Storage.
+
 ### Observaciones del pilar
 
 `pillar_observations` guarda la lectura cualitativa del avance: por qué un
@@ -367,7 +422,8 @@ A partir de ahí, el resto de altas se hacen desde **Usuarios y roles**.
 | `/desarrollo-tecnologico` | Desarrollos web de la oficina | Público |
 | `/acceso-intranet` | Inicio de sesión | Público |
 | `/admin/pilares` | Gestión de pilares y responsables | `consulta`+ |
-| `/admin/pilares/:slug/configurar` | Áreas, líneas, proyectos, indicadores, observaciones y soportes | `consulta`+ |
+| `/admin/pilares/:slug/configurar` | Áreas, líneas, indicadores, observaciones y soportes | `consulta`+ |
+| `/admin/proyectos` | Proyectos del plan: formulación, vínculos a varios pilares, impactos y archivo | `consulta`+ |
 | `/admin/parametros` | Catálogos globales | `consulta`+ |
 | `/admin/desarrollo` | Proyectos web y sus autores | `consulta`+ |
 | `/admin/usuarios` | Usuarios y roles | `admin` |
@@ -402,8 +458,9 @@ fuera del portal: actas, avales y reformas del protocolo de medición.
 ## Qué se edita desde la intranet
 
 En **Configurar pilar** se crean, editan y eliminan áreas estratégicas, líneas de
-acción, proyectos, indicadores de resultado, observaciones y documentos de
-soporte. Los formularios sirven para las dos cosas: al abrirlos sobre una fila
+acción, indicadores de resultado, observaciones y documentos de soporte. Los
+proyectos se listan ahí pero se administran en **Proyectos**, porque uno puede
+apuntar a varios pilares. Los formularios sirven para las dos cosas: al abrirlos sobre una fila
 llegan rellenos con sus valores.
 
 El formulario del indicador incluye la **rejilla de metas por año**: una fila por

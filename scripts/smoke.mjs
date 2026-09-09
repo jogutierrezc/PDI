@@ -227,6 +227,53 @@ const FIXTURES = {
       position: 1,
     },
   ],
+  project_links: [
+    { id: "lk1", project_id: "pr1", pillar_id: "p1", area_id: "ae1", action_line_id: "l1", is_primary: true, position: 1 },
+    { id: "lk2", project_id: "pr1", pillar_id: "p2", area_id: null, action_line_id: null, is_primary: false, position: 2 },
+  ],
+  // v_projects: la fila con sus vínculos ya resueltos. `pillar_ids` es lo que
+  // hace que el proyecto salga en la ficha de los dos pilares.
+  v_projects: [
+    {
+      id: "pr1",
+      pillar_id: "p1",
+      action_line_id: "l1",
+      indicator_id: "i1",
+      name: "Migración a la nube institucional",
+      owner: "Dirección TIC",
+      description: "Traslado de los servicios críticos a infraestructura gestionada.",
+      detail: "",
+      due_date: "2026-10-30",
+      progress: 75,
+      status: "curso",
+      state_id: null,
+      document_id: null,
+      position: 1,
+      target_value: null,
+      achieved_value: null,
+      measure_unit: null,
+      start_date: "2025-02-01",
+      end_date: "2026-10-30",
+      academic_units: ["Facultad de Ingeniería", "Dirección TIC"],
+      sdg_goals: [4, 9],
+      total_value: 120000000,
+      impacts: [
+        {
+          kind: "Tecnológico",
+          term: "Mediano plazo",
+          justification: "Reduce la indisponibilidad de los servicios académicos.",
+        },
+      ],
+      attachment_path: "pr1/1700000000-formulacion.pdf",
+      attachment_name: "formulacion.pdf",
+      attachment_size: 452000,
+      pillar_ids: ["p1", "p2"],
+      links: [
+        { id: "lk1", project_id: "pr1", pillar_id: "p1", area_id: "ae1", action_line_id: "l1", is_primary: true, position: 1 },
+        { id: "lk2", project_id: "pr1", pillar_id: "p2", area_id: null, action_line_id: null, is_primary: false, position: 2 },
+      ],
+    },
+  ],
   planning_items: [{ id: "pl1", pillar_id: "p1", text: "Cerrar la migración.", position: 1 }],
   v_change_log: [
     {
@@ -364,6 +411,66 @@ const routes = [
     },
   },
   {
+    path: "/tablero",
+    note: "la comparativa 2024-2028 se lee como tabla o como gráfica",
+    expect: "Cumplimiento por año",
+    also: ["Cumpl. 24", "Cumpl. 28", "Ver como"],
+    interact: async (window, tick) => {
+      const seccion = () => window.document.querySelector("#comparativa");
+
+      // Arranca en tabla: es la cifra exacta y la lectura que funciona con
+      // lector de pantalla y en papel.
+      if (!seccion().querySelector("table")) throw new Error("la comparativa no arrancó en tabla");
+      if (seccion().querySelector(".compliance-chart")) {
+        throw new Error("la gráfica no debería estar montada antes de pedirla");
+      }
+
+      const opcion = (etiqueta) =>
+        [...seccion().querySelectorAll(".view-toggle__option")].find((boton) =>
+          boton.textContent.includes(etiqueta),
+        );
+
+      opcion("Gráfica").click();
+      await tick();
+
+      const chart = seccion().querySelector(".compliance-chart");
+      if (!chart) throw new Error("el conmutador no montó la gráfica");
+      if (seccion().querySelector("table")) throw new Error("la tabla siguió montada bajo la gráfica");
+
+      // p1 reporta 88 en 2024 y 75 en 2025; p2 no reporta por años, así que su
+      // fila no aparece: un año sin dato no se dibuja como cero.
+      const barras = [...chart.querySelectorAll(".compliance-chart__bar")];
+      if (barras.length !== 5) throw new Error(`se esperaban 5 barras y hay ${barras.length}`);
+
+      const y2024 = barras.find((barra) => barra.textContent.startsWith("2024"));
+      if (!y2024.textContent.includes("88 %")) {
+        throw new Error(`la barra de 2024 no lleva su cifra escrita: "${y2024.textContent}"`);
+      }
+
+      // Ninguna cifra puede depender del color: los años sin dato se anuncian.
+      const y2026 = barras.find((barra) => barra.textContent.startsWith("2026"));
+      if (!y2026.textContent.includes("sin reportar")) {
+        throw new Error(`2026 debería anunciarse sin reportar: "${y2026.textContent}"`);
+      }
+      if (y2026.querySelector(".compliance-chart__fill")) {
+        throw new Error("un año sin reportar no puede dibujar barra");
+      }
+
+      // Y la leyenda de bandas va siempre, que es lo que hace que el color
+      // signifique algo sin recordar los umbrales.
+      if (chart.querySelectorAll(".compliance-chart__legend li").length !== 5) {
+        throw new Error("la gráfica no muestra las cinco bandas de cumplimiento");
+      }
+
+      // Volver a la tabla debe devolver el dato exacto, no dejar las dos.
+      opcion("Tabla").click();
+      await tick();
+      if (!seccion().querySelector("table") || seccion().querySelector(".compliance-chart")) {
+        throw new Error("el conmutador no volvió a la tabla");
+      }
+    },
+  },
+  {
     path: "/implementacion",
     expect: "Cómo avanza cada pilar",
     also: ["Plan de Desarrollo Institucional", "Plan 2024-2028", "88 %"],
@@ -381,6 +488,9 @@ const routes = [
       "Plan 2024-2028",               // la barra de años, junto al selector de áreas
       "promedio de 2 áreas",          // el anillo dice de dónde sale
       "promedio de 2 indicadores",    // el proyecto deriva de sus indicadores
+      "También aporta a 1 pilar más", // el proyecto es transversal y se dice
+      "formulacion.pdf",              // su documento, desde Storage
+      "120.000.000",                  // el valor total del proyecto
       "Indicadores de resultado",     // sustituye a "Actividades del pilar"
       "Fortalecimiento del aula híbrida",
       "En el tablero",                // el indicador destacado se marca
@@ -600,11 +710,128 @@ const routes = [
       }
     },
   },
+  {
+    path: "/tablero/pilar/ambiente-tecnologico",
+    note: "las cuatro tablas de resultados cambian juntas a gráfica",
+    expect: "Ver los resultados como",
+    interact: async (window, tick) => {
+      const doc = window.document;
+      const opcion = (etiqueta) =>
+        [...doc.querySelectorAll(".scorecard-views .view-toggle__option")].find((boton) =>
+          boton.textContent.includes(etiqueta),
+        );
+
+      if (doc.querySelector(".compliance-chart")) {
+        throw new Error("el cuadro de mando no debería arrancar en gráfica");
+      }
+
+      opcion("Gráfica").click();
+      await tick();
+
+      // Un solo conmutador para los cuatro bloques: pilar, áreas y líneas,
+      // proyectos e indicadores. Si alguno se quedara en tabla, la página se
+      // leería a dos modos.
+      const graficas = [...doc.querySelectorAll(".compliance-chart")];
+      if (graficas.length !== 4) {
+        throw new Error(`se esperaban 4 gráficas y hay ${graficas.length}`);
+      }
+      if (doc.querySelector(".result-table")) {
+        throw new Error("una tabla de resultados siguió montada bajo la gráfica");
+      }
+
+      // La gráfica de indicadores sale del dato de origen: 85 en 2024 y 72 en
+      // 2025, no del avance ya agregado del indicador.
+      const indicadores = doc.querySelector("#tabla-indicadores .compliance-chart");
+      if (!indicadores.textContent.includes("Fortalecimiento del aula híbrida")) {
+        throw new Error("la gráfica de indicadores no rotula sus filas");
+      }
+      if (!indicadores.textContent.includes("85 %") || !indicadores.textContent.includes("72 %")) {
+        throw new Error(`la serie del indicador no salió: "${indicadores.textContent}"`);
+      }
+
+      // Ninguna barra puede comunicarse solo con color: todas llevan su año y
+      // su cifra escritos, y la leyenda de bandas acompaña a cada gráfica.
+      for (const chart of graficas) {
+        for (const barra of chart.querySelectorAll(".compliance-chart__bar")) {
+          if (!barra.querySelector(".compliance-chart__year")) {
+            throw new Error("una barra no dice de qué año es");
+          }
+          if (!barra.querySelector(".compliance-chart__value").textContent.trim()) {
+            throw new Error("una barra no lleva su cifra escrita");
+          }
+        }
+        if (chart.querySelectorAll(".compliance-chart__legend li").length !== 5) {
+          throw new Error("una gráfica no muestra las cinco bandas de cumplimiento");
+        }
+      }
+
+      opcion("Tabla").click();
+      await tick();
+      if (doc.querySelector(".compliance-chart") || !doc.querySelector(".result-table")) {
+        throw new Error("el conmutador no devolvió las tablas");
+      }
+    },
+  },
   { path: "/acceso-intranet", expect: "Intranet PDI" },
   { path: "/ruta-que-no-existe", expect: "Esta página no existe" },
   { path: "/admin/pilares", expect: "Intranet PDI", note: "sin sesión debe redirigir al acceso" },
   { path: "/admin/pilares", expect: "Gestión de pilares", session: true },
   { path: "/admin/parametros", expect: "Parámetros globales", session: true, also: ["Estratégico"] },
+  {
+    path: "/admin/proyectos",
+    expect: "Proyectos",
+    session: true,
+    also: [
+      "Migración a la nube institucional",
+      "Facultad de Ingeniería",   // unidades académicas
+      "Educación de calidad",     // ODS 4
+      "Tecnológico",              // la tabla de impactos
+      "Mediano plazo",
+      "principal",                // el vínculo que manda
+      "formulacion.pdf",
+    ],
+  },
+  {
+    path: "/admin/proyectos",
+    session: true,
+    note: "el formulario del proyecto llega relleno, con sus vínculos y sus ODS",
+    expect: "Editar proyecto",
+    interact: async (window, tick) => {
+      const edit = [...window.document.querySelectorAll('.project-card__foot button')].find(
+        (button) => button.textContent.includes('Editar'),
+      );
+      if (!edit) throw new Error('no se encontró el botón de editar del proyecto');
+      edit.click();
+      await tick();
+
+      const dialog = window.document.querySelector('.modal-panel');
+      if (!dialog) throw new Error('el formulario no se abrió');
+
+      const title = dialog.querySelector('input[type=text], input:not([type])');
+      if (!title || title.value !== 'Migración a la nube institucional') {
+        throw new Error(`el título no llegó relleno: "${title ? title.value : 'sin campo'}"`);
+      }
+
+      // Los dos vínculos, con el principal primero.
+      const filas = dialog.querySelectorAll('.link-row');
+      if (filas.length !== 2) {
+        throw new Error(`se esperaban 2 vínculos y llegaron ${filas.length}`);
+      }
+
+      // Y los ODS marcados son los dos del proyecto, ni uno más.
+      const marcados = [...dialog.querySelectorAll('.sdg-chip.is-on')].map((chip) =>
+        chip.querySelector('b').textContent,
+      );
+      if (marcados.join(',') !== '4,9') {
+        throw new Error(`los ODS no llegaron marcados: ${marcados.join(',') || 'ninguno'}`);
+      }
+
+      // El archivo cargado se ofrece para abrirlo, no como un campo vacío.
+      if (!dialog.querySelector('.file-field__current')) {
+        throw new Error('el archivo actual no se mostró');
+      }
+    },
+  },
   {
     path: "/admin/pilares/ambiente-tecnologico/configurar",
     expect: "Áreas estratégicas",
@@ -627,38 +854,21 @@ const routes = [
   {
     path: "/admin/pilares/ambiente-tecnologico/configurar",
     session: true,
-    note: "el formulario de edición llega relleno",
-    expect: "Editar proyecto",
-    also: ["control de cambios", "Línea de acción"],
-    interact: async (window, tick) => {
-      const edit = window.document.querySelector(
-        '[aria-label="Editar el proyecto Migración a la nube institucional"]',
+    note: "los proyectos se listan, pero se editan en su módulo",
+    expect: "Migración a la nube institucional",
+    also: ["Ir a Proyectos"],
+    interact: async (window) => {
+      // La sección ya no crea ni borra: un proyecto creado aquí nacería atado a
+      // este pilar y sin manera de vincularlo a otro.
+      const seccion = [...window.document.querySelectorAll(".admin-card")].find((card) =>
+        card.querySelector("h2")?.textContent === "Proyectos",
       );
-      if (!edit) throw new Error("no se encontró el botón de editar del proyecto");
-      edit.click();
-      await tick();
-
-      // El modal debe abrirse con los valores actuales, no vacío.
-      const dialog = window.document.querySelector(".modal-panel");
-      if (!dialog) throw new Error("el modal de edición no se abrió");
-
-      const name = dialog.querySelector("input[type=text]");
-      if (!name || name.value !== "Migración a la nube institucional") {
-        throw new Error(`el nombre no llegó relleno: "${name ? name.value : "sin campo"}"`);
+      if (!seccion) throw new Error("no se encontró la sección de proyectos");
+      if (seccion.textContent.includes("Nuevo proyecto")) {
+        throw new Error("la configuración del pilar sigue ofreciendo crear proyectos");
       }
-
-      const range = dialog.querySelector("input[type=range]");
-      if (!range || range.value !== "75") {
-        throw new Error(`el avance no llegó relleno: "${range ? range.value : "sin campo"}"`);
-      }
-
-      // La línea de acción debe venir seleccionada y agrupada por su área.
-      const selects = [...dialog.querySelectorAll("select")];
-      const linea = selects.find((element) => element.value === "l1");
-      if (!linea) throw new Error("la línea de acción no llegó seleccionada");
-      if (!linea.querySelector("optgroup")) {
-        throw new Error("las líneas no se agruparon por área");
-      }
+      const editar = seccion.querySelector('[href="/admin/proyectos"]');
+      if (!editar) throw new Error("no se ofrece editar el proyecto en su módulo");
     },
   },
   {

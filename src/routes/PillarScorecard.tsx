@@ -14,12 +14,16 @@
    luminosidad (ver tokens.css).
    ========================================================================== */
 
-import { Fragment } from "react";
+import { Fragment, useState } from "react";
 import { Link, Navigate, useParams } from "react-router-dom";
 import { PublicLayout } from "../components/layout/PublicLayout";
 import { Icon } from "../components/ui/Icon";
 import { ProgressRing } from "../components/ui/ProgressRing";
 import { ErrorBlock, LoadingBlock } from "../components/ui/QueryState";
+import { ComplianceChart } from "../components/ui/ComplianceChart";
+import type { ChartSeries } from "../components/ui/ComplianceChart";
+import { ViewToggle } from "../components/ui/ViewToggle";
+import type { ResultView } from "../components/ui/ViewToggle";
 import { useCurrentPeriod, usePillarDetail } from "../data/queries";
 import {
   accentFor,
@@ -39,6 +43,10 @@ export function PillarScorecard() {
   const { slug } = useParams<{ slug: string }>();
   const detail = usePillarDetail(slug);
   const period = useCurrentPeriod();
+  // Las cuatro tablas de resultados cambian juntas: si cada bloque llevara su
+  // propio conmutador, dos secciones contiguas quedarían en modos distintos y
+  // la página dejaría de leerse de corrido.
+  const [view, setView] = useState<ResultView>("table");
 
   if (detail.isPending) {
     return (
@@ -73,6 +81,30 @@ export function PillarScorecard() {
   // La misma cascada, año a año: cada tabla añade una columna por año con
   // algo reportado. Si no hay ninguno, las tablas se quedan como estaban.
   const yearIndex = indexYearProgress(yearProgress);
+  const hasYears = yearIndex.years.length > 0;
+
+  // La gráfica de indicadores sale del dato de origen —la serie de metas y
+  // resultados—, no de la cascada: un indicador puede superar su meta, y ese
+  // 120 % merece verse, mientras que a la línea y al pilar sube recortado al
+  // 100 % para no dejar áreas por encima de su techo.
+  const indicatorSeries: ChartSeries[] = activities.map((activity) => {
+    const byYear = new Map(activity.targets.map((row) => [row.year, row]));
+    const line = activity.action_line_id ? lineById.get(activity.action_line_id) : undefined;
+
+    return {
+      key: activity.id,
+      label: activity.title,
+      detail: line ? `${line.area_name} › ${line.name}` : "Sin línea de acción",
+      points: years.map((year) => {
+        const compliance = byYear.get(year)?.compliance;
+        return {
+          year,
+          progress:
+            compliance === null || compliance === undefined ? null : Math.round(compliance),
+        };
+      }),
+    };
+  });
 
   return (
     <PublicLayout className="scorecard-page">
@@ -204,6 +236,24 @@ export function PillarScorecard() {
             </div>
           </section>
 
+          {/* La barra gobierna los cuatro bloques siguientes y va encima de
+              ellos, no dentro de ninguno: es un control de la página, no de
+              una tarjeta. */}
+          <div className="scorecard-views">
+            <ViewToggle
+              label="Ver los resultados como"
+              value={view}
+              onChange={setView}
+              chartDisabled={!hasYears}
+              disabledHint="Este pilar todavía no tiene cumplimiento reportado por año."
+            />
+            <p>
+              {hasYears
+                ? "La tabla da la cifra exacta de cada corte; la gráfica compara los años de un vistazo. El cambio se aplica a los cuatro bloques de resultados."
+                : "La gráfica se activa en cuanto algún indicador de este pilar registre meta y resultado de un año."}
+            </p>
+          </div>
+
           {/* --- 3. Tabla de pilar --------------------------------------- */}
           <ResultTable
             id="tabla-pilar"
@@ -212,6 +262,7 @@ export function PillarScorecard() {
             nameHeader="Nomenclatura del pilar"
             years={yearIndex.years}
             yearIndex={yearIndex}
+            view={view}
             rows={[
               {
                 key: pillar.id,
@@ -235,6 +286,7 @@ export function PillarScorecard() {
             nameHeader="Nomenclatura del área o línea"
             years={yearIndex.years}
             yearIndex={yearIndex}
+            view={view}
             rows={areaProgress.flatMap((area) => [
               {
                 key: area.area_id,
@@ -274,6 +326,7 @@ export function PillarScorecard() {
             nameHeader="Nomenclatura del proyecto"
             years={yearIndex.years}
             yearIndex={yearIndex}
+            view={view}
             rows={projectProgress.map((project) => {
               const line = project.action_line_id
                 ? lines.find((item) => item.id === project.action_line_id)
@@ -311,6 +364,12 @@ export function PillarScorecard() {
               <p className="scorecard-empty">
                 Este pilar todavía no tiene indicadores de resultado registrados.
               </p>
+            ) : view === "chart" ? (
+              <ComplianceChart
+                series={indicatorSeries}
+                caption="Cumplimiento de cada indicador frente a la meta de ese año. El color es la banda de cumplimiento y acompaña siempre a la cifra; un año sin barra es un año que ese indicador no ha reportado. La escala pasa del 100 % cuando algún indicador supera su meta."
+                empty="Ningún indicador de este pilar tiene todavía un año con meta y resultado."
+              />
             ) : (
               <>
                 <div className="table-scroll">
@@ -517,6 +576,7 @@ function ResultTable({
   rows,
   years,
   yearIndex,
+  view,
   empty,
 }: {
   id: string;
@@ -527,6 +587,8 @@ function ResultTable({
   /** Años con algo reportado en el pilar; vacío = tabla sin columnas de año. */
   years: number[];
   yearIndex: YearIndex;
+  /** Tabla o gráfica. Lo decide la página entera, no cada bloque. */
+  view: ResultView;
   empty?: string;
 }) {
   const usesFallback = rows.some((row) => row.target === null || row.achieved === null);
@@ -540,6 +602,17 @@ function ResultTable({
 
       {rows.length === 0 ? (
         <p className="scorecard-empty">{empty}</p>
+      ) : view === "chart" ? (
+        <ComplianceChart
+          series={rows.map((row) => ({
+            key: row.key,
+            label: row.name,
+            detail: row.detail ?? (row.code && row.code !== "—" ? row.code : undefined),
+            points: yearIndex.series(row.scope, row.key),
+          }))}
+          caption="Cada barra es lo que esa fila cumplió en ese año, con la misma cascada que alimenta la tabla. El color es la banda de cumplimiento y acompaña siempre a la cifra; un año sin barra es un año sin reportar."
+          empty="Ninguna de estas filas tiene todavía cumplimiento reportado por año."
+        />
       ) : (
         <>
           <div className="table-scroll">

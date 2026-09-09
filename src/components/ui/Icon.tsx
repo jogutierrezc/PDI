@@ -31,7 +31,9 @@ export type IconName =
   | "settings"
   | "grid"
   | "plus"
-  | "code";
+  | "code"
+  | "table"
+  | "chart";
 
 const paths: Record<IconName, JSX.Element> = {
   /* --- Pilares ---------------------------------------------------------- */
@@ -148,6 +150,20 @@ const paths: Record<IconName, JSX.Element> = {
   ),
   plus: <path d="M12 5v14M5 12h14" />,
   code: <path d="m8.5 8-5 4 5 4M15.5 8l5 4-5 4M13.8 4.5l-3.6 15" />,
+  /* Tabla y gráfica: las dos lecturas del mismo dato. El conmutador las pone
+     una al lado de la otra, así que comparten rejilla y peso de trazo. */
+  table: (
+    <>
+      <rect x="3.5" y="4.5" width="17" height="15" rx="2" />
+      <path d="M3.5 9.5h17M9.5 9.5v10M3.5 14.5h17" />
+    </>
+  ),
+  chart: (
+    <>
+      <path d="M4 4v16h16" />
+      <path d="M7.5 16.5h5M7.5 12h9M7.5 7.5h3" />
+    </>
+  ),
 };
 
 interface IconProps extends Omit<SVGProps<SVGSVGElement>, "name"> {

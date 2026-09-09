@@ -1,6 +1,6 @@
 import { Fragment, useMemo, useState } from "react";
 import type { FormEvent } from "react";
-import { Link, useParams } from "react-router-dom";
+import { Link, useNavigate, useParams } from "react-router-dom";
 import { AdminShell, ReadOnlyNotice } from "../components/AdminShell";
 import { Icon } from "../../../components/ui/Icon";
 import { Modal, ModalActions } from "../../../components/ui/Modal";
@@ -22,6 +22,7 @@ import {
 } from "../../../data/pdi";
 import { useAuth } from "../../../lib/auth";
 import { buildForm, tableFor, yearField } from "./forms";
+import { Link as RouterLink } from "react-router-dom";
 import type { EntityKind, FieldSpec, FormConfig, Values } from "./forms";
 import type { ActivityWithTargets, ProgressScope } from "../../../types/database";
 import type { YearIndex } from "../../../data/pdi";
@@ -32,6 +33,7 @@ type ModalState = { kind: EntityKind; entity?: Record<string, unknown> } | null;
 
 export function PillarConfigurator() {
   const { slug } = useParams<{ slug: string }>();
+  const navigate = useNavigate();
   const detail = usePillarDetail(slug);
   const owners = usePillarOwners();
   // El desplegable de unidad del indicador sale del catálogo global, no de
@@ -410,14 +412,22 @@ export function PillarConfigurator() {
             )}
           </Section>
 
-          {/* --- Proyectos ----------------------------------------------- */}
+          {/* --- Proyectos -----------------------------------------------
+              Solo lectura. Los proyectos se administran en su propio módulo
+              porque uno puede apuntar a varios pilares: creado desde aquí
+              nacería atado a este y sin manera de vincularlo a otro. --- */}
           <Section
-            title="Proyectos estratégicos"
-            hint="Cada alta y cada actualización deja su registro en el control de cambios."
-            action={canEdit ? { label: "Nuevo proyecto", onClick: () => open("project") } : undefined}
+            title="Proyectos"
+            hint="Los que aportan a este pilar, propios o vinculados desde otro. Se crean y se editan en el módulo de Proyectos."
+            action={
+              canEdit ? { label: "Ir a Proyectos", onClick: () => navigate("/admin/proyectos") } : undefined
+            }
           >
             {projects.length === 0 ? (
-              <EmptyBlock title="Sin proyectos registrados." />
+              <EmptyBlock
+                title="Sin proyectos vinculados."
+                hint="Se vinculan desde el módulo de Proyectos, eligiendo este pilar."
+              />
             ) : (
               <ul className="record-list">
                 {projects.map((project) => {
@@ -444,6 +454,9 @@ export function PillarConfigurator() {
                             Sin línea de acción · no aparecerá al filtrar por área
                           </small>
                         )}
+                        {project.pillar_id !== pillar.id && (
+                          <small className="record-flag">Vinculado desde otro pilar</small>
+                        )}
                       </div>
                       <span className="progress-track" aria-hidden="true">
                         <span
@@ -455,14 +468,14 @@ export function PillarConfigurator() {
                         />
                       </span>
                       {canEdit && (
-                        <RowActions
-                          onEdit={() => open("project", project as unknown as Record<string, unknown>)}
-                          editLabel={`Editar el proyecto ${project.name}`}
-                          onRemove={() =>
-                            void removeRow("project", project.id, `Se eliminó “${project.name}”.`)
-                          }
-                          removeLabel={`Eliminar el proyecto ${project.name}`}
-                        />
+                        <RouterLink
+                          className="icon-button"
+                          to="/admin/proyectos"
+                          aria-label={`Editar el proyecto ${project.name} en el módulo de Proyectos`}
+                          title="Editar en Proyectos"
+                        >
+                          <Icon name="settings" size={15} />
+                        </RouterLink>
                       )}
                     </li>
                   );

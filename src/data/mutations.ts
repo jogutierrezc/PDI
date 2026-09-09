@@ -27,6 +27,7 @@ export type WritableTable =
   | "indicators"
   | "projects"
   | "activities"
+  | "project_links"
   | "activity_targets"
   | "pillar_observations"
   | "planning_items"
@@ -184,6 +185,8 @@ export const pillarScope = (): QueryKey[] => [
   keys.summary(),
   keys.featured(),
   keys.pillarYears(),
+  keys.projects(),
+  keys.structure(),
 ];
 
 /* =============================================================================

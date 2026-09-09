@@ -245,6 +245,74 @@ export function yearScopeLabel(scope: YearScope): string {
   return scope === "plan" ? `Plan ${planYears[0]}-${planYears[planYears.length - 1]}` : String(scope);
 }
 
+/* --- Proyectos --------------------------------------------------------------
+   Tres listas cerradas. Viven aquí y no en `parameters` porque ninguna de las
+   tres la decide la universidad: los ODS son los de Naciones Unidas, y los
+   tipos de impacto y de plazo son la nomenclatura del formato de proyectos.
+   Si algún día hay que editarlas desde la intranet, pasan a ser catálogos.
+   -------------------------------------------------------------------------- */
+
+export interface SdgGoal {
+  id: number;
+  label: string;
+  /** Color oficial del objetivo. Se usa como refuerzo, nunca como único dato. */
+  color: string;
+}
+
+export const sdgGoals: SdgGoal[] = [
+  { id: 1, label: "Fin de la pobreza", color: "#e5243b" },
+  { id: 2, label: "Hambre cero", color: "#dda63a" },
+  { id: 3, label: "Salud y bienestar", color: "#4c9f38" },
+  { id: 4, label: "Educación de calidad", color: "#c5192d" },
+  { id: 5, label: "Igualdad de género", color: "#ff3a21" },
+  { id: 6, label: "Agua limpia y saneamiento", color: "#26bde2" },
+  { id: 7, label: "Energía asequible y no contaminante", color: "#fcc30b" },
+  { id: 8, label: "Trabajo decente y crecimiento económico", color: "#a21942" },
+  { id: 9, label: "Industria, innovación e infraestructura", color: "#fd6925" },
+  { id: 10, label: "Reducción de las desigualdades", color: "#dd1367" },
+  { id: 11, label: "Ciudades y comunidades sostenibles", color: "#fd9d24" },
+  { id: 12, label: "Producción y consumo responsables", color: "#bf8b2e" },
+  { id: 13, label: "Acción por el clima", color: "#3f7e44" },
+  { id: 14, label: "Vida submarina", color: "#0a97d9" },
+  { id: 15, label: "Vida de ecosistemas terrestres", color: "#56c02b" },
+  { id: 16, label: "Paz, justicia e instituciones sólidas", color: "#00689d" },
+  { id: 17, label: "Alianzas para lograr los objetivos", color: "#19486a" },
+];
+
+export const sdgById = new Map(sdgGoals.map((goal) => [goal.id, goal]));
+
+/** Tipos de impacto del formato de proyectos. */
+export const impactKinds = [
+  "Académico",
+  "Social",
+  "Económico",
+  "Ambiental",
+  "Institucional",
+  "Tecnológico",
+  "Cultural",
+];
+
+/** Plazos en los que se espera el impacto. */
+export const impactTerms = ["Corto plazo", "Mediano plazo", "Largo plazo"];
+
+/** 4200000000 → "$4.200.000.000". El valor de un proyecto se lee entero: a
+ *  diferencia del presupuesto del indicador, aquí la cifra exacta importa. */
+export function formatCurrency(value: number | null | undefined): string {
+  if (value === null || value === undefined) return "—";
+  return value.toLocaleString("es-CO", {
+    style: "currency",
+    currency: "COP",
+    maximumFractionDigits: 0,
+  });
+}
+
+/** "2026-03-01" y "2027-11-30" → "mar 2026 – nov 2027". */
+export function formatRange(start: string | null, end: string | null): string {
+  if (!start && !end) return "Sin fechas";
+  if (start && end) return `${formatMonth(start)} – ${formatMonth(end)}`;
+  return start ? `desde ${formatMonth(start)}` : `hasta ${formatMonth(end)}`;
+}
+
 /* --- Color ---------------------------------------------------------------- */
 
 /**

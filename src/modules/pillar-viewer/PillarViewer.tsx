@@ -13,8 +13,11 @@ import {
   formatBudget,
   formatDate,
   formatMonth,
+  formatCurrency,
+  formatRange,
   formatValue,
   indexYearProgress,
+  sdgById,
   latestTarget,
   planYears,
   shortYear,
@@ -22,7 +25,13 @@ import {
   yearScopeLabel,
   yearsInPlay,
 } from "../../data/pdi";
-import type { ActivityWithTargets, PillarObservation, ProgressScope } from "../../types/database";
+import type {
+  ActivityWithTargets,
+  PillarObservation,
+  ProgressScope,
+  ProjectWithLinks,
+} from "../../types/database";
+import { projectFileUrl } from "../../data/storage";
 import type { YearIndex, YearScope } from "../../data/pdi";
 import "./pillar-viewer.css";
 
@@ -545,6 +554,7 @@ export function PillarViewer() {
                             Sin línea de acción asignada
                           </span>
                         )}
+                        <ProjectBrief project={project} pillarId={pillar.id} />
                         <YearTrail scope="project" id={project.id} index={yearIndex} />
                       </div>
                       <div className="entry-row__state">
@@ -1076,6 +1086,71 @@ function YearTrail({
 function observationTitle(observation: PillarObservation): string {
   if (observation.title) return observation.title;
   return observation.year ? `Observación del corte ${observation.year}` : "Observación del pilar";
+}
+
+/* --- Formulación del proyecto ------------------------------------------------
+   Lo que el módulo de proyectos añadió a la fila: vigencia, valor, ODS, a qué
+   otros pilares aporta y el documento que lo formula. Va debajo de la cadena de
+   estructura y no en su propia sección: es el mismo proyecto, no otra cosa.
+
+   Los otros pilares se nombran a propósito. Un proyecto que aparece en tres
+   fichas sin decir que es el mismo se lee como tres proyectos distintos.
+   -------------------------------------------------------------------------- */
+
+function ProjectBrief({ project, pillarId }: { project: ProjectWithLinks; pillarId: string }) {
+  const elsewhere = [
+    ...new Set(
+      (project.links ?? [])
+        .filter((link) => link.pillar_id !== pillarId)
+        .map((link) => link.pillar_id),
+    ),
+  ];
+  const fileUrl = projectFileUrl(project.attachment_path);
+  const goals = project.sdg_goals ?? [];
+
+  const facts = [
+    formatRange(project.start_date, project.end_date),
+    project.total_value !== null ? formatCurrency(project.total_value) : null,
+    project.academic_units?.length ? project.academic_units.join(" · ") : null,
+  ].filter(Boolean) as string[];
+
+  if (facts.length === 0 && goals.length === 0 && elsewhere.length === 0 && !fileUrl) return null;
+
+  return (
+    <div className="project-brief">
+      {facts.length > 0 && <span className="project-brief__facts">{facts.join(" · ")}</span>}
+
+      {goals.length > 0 && (
+        <ul className="sdg-row sdg-row--compact" aria-label="Objetivos de Desarrollo Sostenible">
+          {goals.map((id) => {
+            const goal = sdgById.get(id);
+            if (!goal) return null;
+            return (
+              <li key={id} style={{ "--sdg": goal.color } as React.CSSProperties} title={goal.label}>
+                <b>{id}</b>
+                <span className="sr-only">{goal.label}</span>
+              </li>
+            );
+          })}
+        </ul>
+      )}
+
+      <span className="project-brief__links">
+        {elsewhere.length > 0 && (
+          <span className="project-brief__shared">
+            También aporta a {elsewhere.length}{" "}
+            {elsewhere.length === 1 ? "pilar más" : "pilares más"}
+          </span>
+        )}
+        {fileUrl && (
+          <a href={fileUrl} target="_blank" rel="noopener noreferrer">
+            <Icon name="document" size={13} />
+            {project.attachment_name ?? "Documento del proyecto"}
+          </a>
+        )}
+      </span>
+    </div>
+  );
 }
 
 function ObservationCard({

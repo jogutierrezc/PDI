@@ -168,6 +168,56 @@ En el portal se ven en el cuadro de mando (una columna por año en las tres
 tablas), en la ficha del pilar (el rastro anual bajo cada área, línea y proyecto)
 y en **Configurar pilar → Metas y cumplimiento**.
 
+### La barra de años y el avance del plan
+
+El tablero, la página de implementación y la ficha del pilar llevan una **barra
+de seis paradas**: el plan entero y sus cinco cortes. Todo lo que hay debajo la
+sigue —el anillo, las tarjetas de pilar, las áreas, las líneas y los proyectos—,
+y cada parada muestra ya su cifra, así que la barra es a la vez el filtro y el
+resumen del quinquenio. En la ficha del pilar va junto al selector de áreas, y
+al elegir un área pasa a hablar de esa área.
+
+Arranca siempre en la posición del plan: quien abre el tablero busca la lectura
+de conjunto, y una cifra de un año suelto pasaría por la del plan.
+
+**El avance del plan pondera hasta el último año del horizonte.** Los cinco años
+pesan lo mismo y los que todavía no se han reportado cuentan como cero, porque
+todavía no están cumplidos:
+
+```
+   2024  85 %  × 20 %  =  17,0
+   2025  72 %  × 20 %  =  14,4
+   2026  sin reportar  =   0,0
+   2027  sin reportar  =   0,0
+   2028  sin reportar  =   0,0
+                          ─────
+   Avance del plan          31 %
+```
+
+Es una cifra deliberadamente más baja que el acumulado, y responde a otra
+pregunta: **cuánto llevamos del plan**, no **cómo se cumplió lo comprometido
+hasta ahora**. Un plan que va perfecto marca 40 % a finales de 2025, y eso es
+correcto: le quedan tres años por cumplir. El acumulado sigue publicándose en el
+cuadro de mando, en la última columna de sus tablas.
+
+Las dos lecturas tratan el silencio de forma distinta, a propósito:
+
+- **Un año concreto** promedia solo a quien lo reportó, y quien no lo reportó
+  aparece en blanco, no en cero. Un cero por falta de datos se lee como "no se
+  cumplió", que es otra afirmación. El anillo, en ese caso, muestra una raya y
+  anuncia "sin reportar" también a los lectores de pantalla.
+- **El plan** cuenta como cero los años no reportados de quien ya reporta: ahí
+  el cero sí significa algo.
+
+Y, como en el resto de la cascada, **una entidad que todavía no ha capturado
+ningún año conserva su avance acumulado** en la posición del plan. Aplicarle la
+ponderación la mandaría a cero de golpe el día que se aplica la migración, sin
+que nada haya cambiado en su ejecución.
+
+Los años del horizonte viven en `planYears`, en `src/data/pdi.ts`. Cambiar ese
+arreglo cambia a la vez la rejilla de captura, las columnas de las tablas y el
+divisor de la ponderación.
+
 ### El indicador de resultado y su serie anual
 
 La hoja del modelo es la tabla `activities`. En la interfaz se llama **indicador

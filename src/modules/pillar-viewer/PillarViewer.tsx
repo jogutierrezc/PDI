@@ -5,6 +5,7 @@ import { Icon } from "../../components/ui/Icon";
 import { ProgressRing } from "../../components/ui/ProgressRing";
 import { EmptyBlock, ErrorBlock, LoadingBlock } from "../../components/ui/QueryState";
 import { Modal } from "../../components/ui/Modal";
+import { YearScrubber } from "../../components/ui/YearScrubber";
 import { useCurrentPeriod, usePillarDetail } from "../../data/queries";
 import {
   accentFor,
@@ -15,12 +16,14 @@ import {
   formatValue,
   indexYearProgress,
   latestTarget,
+  planYears,
   shortYear,
   statusMeta,
+  yearScopeLabel,
   yearsInPlay,
 } from "../../data/pdi";
 import type { ActivityWithTargets, PillarObservation, ProgressScope } from "../../types/database";
-import type { YearIndex } from "../../data/pdi";
+import type { YearIndex, YearScope } from "../../data/pdi";
 import "./pillar-viewer.css";
 
 /**
@@ -51,12 +54,17 @@ export function PillarViewer() {
   // La observación abierta. Fuera del modal la lista solo muestra su
   // encabezado: un párrafo de balance entre tablas de cifras no se lee.
   const [reading, setReading] = useState<PillarObservation | null>(null);
+  // La barra de años gobierna todos los porcentajes de la página: el anillo,
+  // las áreas, los proyectos y las líneas. La tabla de indicadores no cambia
+  // —ya enseña los cinco años— pero marca la columna que se está mirando.
+  const [yearScope, setYearScope] = useState<YearScope>("plan");
 
   // Al cambiar de pilar el área elegida deja de existir: se vuelve a "todas"
   // en vez de dejar el selector apuntando a la nada.
   useEffect(() => {
     setAreaId(null);
     setReading(null);
+    setYearScope("plan");
   }, [slug]);
 
   if (detail.isPending) {
@@ -144,6 +152,24 @@ export function PillarViewer() {
   // su serie. Es la misma cascada del acumulado aplicada año a año.
   const yearIndex = indexYearProgress(yearProgress);
 
+  /** El avance de una fila según dónde esté la barra. Null = ese corte no lo ha
+   *  reportado. Es la única función que traduce la barra a un número, para que
+   *  el anillo, las áreas, los proyectos y las líneas no puedan discrepar. */
+  const shownProgress = (scope: ProgressScope, id: string, fallback: number): number | null => {
+    if (yearScope === "plan") {
+      // Sin ningún año capturado, el plan ponderado sería un cero engañoso: se
+      // mantiene la cascada acumulada, que es lo que había antes de los años.
+      return yearIndex.of(scope, id).length === 0 ? fallback : yearIndex.plan(scope, id);
+    }
+    return yearIndex.at(scope, id, yearScope);
+  };
+
+  // La barra habla del área elegida cuando hay una: filtrar y seguir viendo la
+  // serie del pilar entero sería contradictorio.
+  const barScope: ProgressScope = activeArea ? "area" : "pillar";
+  const barId = activeArea ? activeArea.id : pillar.id;
+  const heroValue = shownProgress("pillar", pillar.id, progress.progress);
+
   return (
     <PublicLayout className="pillar-page">
       <div className="pillar-viewer" style={accentStyle}>
@@ -164,20 +190,22 @@ export function PillarViewer() {
 
             <div className="pillar-hero__gauge">
               <ProgressRing
-                value={progress.progress}
+                value={heroValue}
                 size={124}
                 thickness={10}
                 color={accent}
-                label={`Avance de ${pillar.name}`}
+                label={`Avance de ${pillar.name}, ${yearScopeLabel(yearScope)}`}
+                emptyHint="sin reportar"
               />
               {/* El anillo es el avance en cascada, no la proporción de
                   indicadores cumplidos: se dice de dónde sale para que el
                   número no parezca sacado de la nada. */}
               <small>
+                {yearScopeLabel(yearScope)}
+                {" · "}
                 {progress.line_count > 0
-                  ? `Promedio de ${progress.area_count} ${progress.area_count === 1 ? "área" : "áreas"}`
-                  : `Promedio de ${progress.total} ${progress.total === 1 ? "indicador" : "indicadores"}`}
-                {progress.total > 0 ? ` · ${progress.done} de ${progress.total} cumplidas` : ""}
+                  ? `promedio de ${progress.area_count} ${progress.area_count === 1 ? "área" : "áreas"}`
+                  : `promedio de ${progress.total} ${progress.total === 1 ? "indicador" : "indicadores"}`}
                 {period.data ? ` · al ${formatDate(period.data.cutoff_date)}` : ""}
               </small>
             </div>
@@ -212,6 +240,21 @@ export function PillarViewer() {
                 <Icon name="chevron-down" size={15} />
               </label>
             )}
+          </div>
+
+          <div className="u-container pillar-subnav__years">
+            <YearScrubber
+              label={activeArea ? `Corte · ${activeArea.name}` : "Corte del plan"}
+              value={yearScope}
+              onChange={setYearScope}
+              series={yearIndex.series(barScope, barId)}
+              plan={yearIndex.plan(barScope, barId)}
+              hint={
+                yearScope === "plan"
+                  ? `Avance del plan: los ${planYears.length} años pesan lo mismo y los que aún no se han reportado cuentan como cero. El 100 % llega al cerrar ${planYears[planYears.length - 1]}.`
+                  : `Cumplimiento de ${yearScope}: lo logrado sobre lo comprometido para ese año.`
+              }
+            />
           </div>
         </nav>
 
@@ -377,7 +420,8 @@ export function PillarViewer() {
                 <h2 id="areas-title">Áreas estratégicas del pilar</h2>
                 <p>
                   Cada área agrupa sus líneas de acción y los proyectos que cuelgan de ellas. El avance
-                  del área es el promedio del cumplimiento reportado de sus líneas.
+                  del área es el promedio de sus líneas, y sigue a la barra de arriba:{" "}
+                  <strong>{yearScopeLabel(yearScope)}</strong>.
                 </p>
               </div>
 
@@ -386,6 +430,7 @@ export function PillarViewer() {
                   const stats = areaStats.get(area.id);
                   const areaLines = stats?.line_count ?? 0;
                   const areaProjects = stats?.project_count ?? 0;
+                  const areaValue = shownProgress("area", area.id, stats?.progress ?? 0);
 
                   return (
                     <button
@@ -397,11 +442,11 @@ export function PillarViewer() {
                       <span className="area-card-public__top">
                         {area.code && <span className="area-card-public__code">{area.code}</span>}
                         <ProgressRing
-                          value={stats?.progress ?? 0}
+                          value={areaValue}
                           size={56}
                           thickness={5}
                           color={accent}
-                          label={`Avance de ${area.name}`}
+                          label={`Avance de ${area.name}, ${yearScopeLabel(yearScope)}`}
                         />
                       </span>
 
@@ -465,7 +510,11 @@ export function PillarViewer() {
                   // El avance del proyecto sale de sus indicadores cuando los
                   // tiene; project.progress es solo el respaldo reportado.
                   const stats = projectStats.get(project.id);
-                  const shown = stats?.progress ?? project.progress;
+                  const shown = shownProgress(
+                    "project",
+                    project.id,
+                    stats?.progress ?? project.progress,
+                  );
                   return (
                     <li className="entry-row" key={project.id}>
                       <span className="entry-row__icon">
@@ -509,7 +558,7 @@ export function PillarViewer() {
                           <span className="progress-track">
                             <span
                               className="progress-track__fill"
-                              style={{ width: `${shown}%`, background: meta.color }}
+                              style={{ width: `${shown ?? 0}%`, background: meta.color }}
                             />
                           </span>
                           <b>{shown}%</b>
@@ -590,6 +639,7 @@ export function PillarViewer() {
                           key={activity.id}
                           activity={activity}
                           years={years}
+                          highlight={yearScope === "plan" ? null : yearScope}
                           line={
                             activity.action_line_id
                               ? lineById.get(activity.action_line_id)
@@ -719,9 +769,9 @@ export function PillarViewer() {
               <span className="eyebrow">Desglose</span>
               <h2 id="cumplimiento-title">Líneas de acción</h2>
               <p>
-                El porcentaje grande es el acumulado —el último dato de cada indicador—; debajo, lo
-                cumplido en cada año. Un año que no aparece es un año que esa línea todavía no ha
-                reportado.
+                El porcentaje grande sigue a la barra de arriba —
+                <strong>{yearScopeLabel(yearScope)}</strong>—; debajo, la serie completa de la línea.
+                Un año que no aparece es un año que esa línea todavía no ha reportado.
               </p>
             </div>
 
@@ -746,24 +796,27 @@ export function PillarViewer() {
                         líneas, que es lo que responde a "cómo íbamos en 2024". */}
                     <YearTrail scope="area" id={area.id} index={yearIndex} />
                     <ul className="line-list">
-                      {areaLines.map((line) => (
-                        <li key={line.id}>
-                          <div>
-                            <span>
-                              {line.code ? `${line.code} · ` : ""}
-                              {line.name}
+                      {areaLines.map((line) => {
+                        const lineValue = shownProgress("line", line.id, line.progress);
+                        return (
+                          <li key={line.id}>
+                            <div>
+                              <span>
+                                {line.code ? `${line.code} · ` : ""}
+                                {line.name}
+                              </span>
+                              <b>{lineValue === null ? "—" : `${lineValue}%`}</b>
+                            </div>
+                            <span className="progress-track">
+                              <span
+                                className="progress-track__fill"
+                                style={{ width: `${lineValue ?? 0}%`, background: accent }}
+                              />
                             </span>
-                            <b>{line.progress}%</b>
-                          </div>
-                          <span className="progress-track">
-                            <span
-                              className="progress-track__fill"
-                              style={{ width: `${line.progress}%`, background: accent }}
-                            />
-                          </span>
-                          <YearTrail scope="line" id={line.id} index={yearIndex} />
-                        </li>
-                      ))}
+                            <YearTrail scope="line" id={line.id} index={yearIndex} />
+                          </li>
+                        );
+                      })}
                     </ul>
                   </div>
                 );
@@ -895,10 +948,13 @@ function IndicatorRow({
   activity,
   years,
   line,
+  highlight,
 }: {
   activity: ActivityWithTargets;
   years: number[];
   line?: { area_name: string; code: string | null; name: string };
+  /** Año elegido en la barra. Sin año, se marca el que fija el avance. */
+  highlight: number | null;
 }) {
   const byYear = new Map(activity.targets.map((row) => [row.year, row]));
   const driver = latestTarget(activity.targets);
@@ -936,7 +992,9 @@ function IndicatorRow({
 
       {years.map((year) => {
         const row = byYear.get(year);
-        const isDriver = driver?.year === year;
+        // Con un año en la barra se marca ese; con el plan, el que fija el
+        // avance del indicador. Marcar los dos a la vez no diría cuál es cuál.
+        const isDriver = highlight === null ? driver?.year === year : highlight === year;
 
         return (
           <Fragment key={year}>
@@ -944,7 +1002,13 @@ function IndicatorRow({
             <td className="result-table__number">{formatValue(row?.result_value)}</td>
             <td
               className={`result-table__number${isDriver ? " indicator-table__driver" : ""}`}
-              title={isDriver ? "Año que fija el avance del indicador" : undefined}
+              title={
+                isDriver
+                  ? highlight === null
+                    ? "Año que fija el avance del indicador"
+                    : "Año elegido en la barra"
+                  : undefined
+              }
             >
               {row?.compliance === null || row?.compliance === undefined
                 ? "—"

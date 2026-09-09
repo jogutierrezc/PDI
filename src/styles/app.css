@@ -422,12 +422,27 @@
 }
 
 .board-hero__score-label {
+  display: grid;
+  gap: 2px;
   color: rgba(255, 255, 255, 0.76);
   font-size: var(--text-xs);
   font-weight: 800;
   letter-spacing: var(--tracking-caps);
   text-transform: uppercase;
   text-align: center;
+}
+
+/* El corte que se está mirando, bajo el rótulo: sin él, la cifra del anillo
+   podría confundirse con la del plan entero al mover la barra. */
+.board-hero__score-label small {
+  color: rgba(255, 255, 255, 0.58);
+  font-size: var(--text-2xs);
+  font-weight: 700;
+}
+
+/* Sobre el fondo oscuro del encabezado la raya necesita su propio contraste. */
+.board-hero__score .ring-empty {
+  color: rgba(255, 255, 255, 0.72);
 }
 
 .board-hero__score .progress-ring {
@@ -2182,6 +2197,159 @@
   color: var(--ink-faint);
   font-size: var(--text-2xs);
   font-variant-numeric: tabular-nums;
+}
+
+/* --- Barra de años del plan ---------------------------------------------------
+   Seis paradas sobre un raíl, cada una con su cifra y su barrita. El resaltado
+   es un solo elemento que se desplaza —transform y width, fuera del hilo
+   principal e interrumpible—, igual que en el filtro de pilares.
+
+   En móvil el raíl se desplaza en horizontal antes que apilarse: seis columnas
+   estrechas siguen siendo legibles y una lista vertical de seis años deja de
+   parecer una línea de tiempo.
+   -------------------------------------------------------------------------- */
+
+.year-scrubber {
+  display: grid;
+  gap: var(--space-2);
+}
+
+.year-scrubber__label {
+  color: var(--ink-muted);
+  font-size: var(--text-2xs);
+  font-weight: 800;
+  letter-spacing: var(--tracking-caps);
+  text-transform: uppercase;
+}
+
+.year-scrubber__rail {
+  position: relative;
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(6.5rem, 1fr);
+  gap: 2px;
+  padding: var(--space-1);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  background: var(--surface-2);
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  scrollbar-width: thin;
+}
+
+.year-scrubber__marker {
+  position: absolute;
+  top: var(--space-1);
+  bottom: var(--space-1);
+  left: 0;
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  box-shadow: var(--shadow-sm);
+  transition:
+    transform var(--dur-base) var(--ease-out),
+    width var(--dur-base) var(--ease-out);
+  pointer-events: none;
+}
+
+.year-scrubber__stop {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  gap: 3px;
+  justify-items: start;
+  padding: var(--space-3) var(--space-4);
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+/* La posición del plan es la lectura de conjunto: se separa de los cinco
+   cortes con una línea, no con un color, que ya lleva bastantes. */
+.year-scrubber__stop.is-plan {
+  border-right: 1px solid var(--line);
+  border-radius: var(--radius-sm) 0 0 var(--radius-sm);
+}
+
+.year-scrubber__stop:focus-visible {
+  outline: 2px solid var(--brand-blue);
+  outline-offset: -2px;
+}
+
+.year-scrubber__caption {
+  color: var(--ink-muted);
+  font-size: var(--text-2xs);
+  font-weight: 800;
+  letter-spacing: var(--tracking-caps);
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.year-scrubber__value {
+  color: var(--ink-secondary);
+  font-size: var(--text-md);
+  font-variant-numeric: tabular-nums;
+  font-weight: 800;
+  line-height: 1.1;
+}
+
+.year-scrubber__stop[data-active="true"] .year-scrubber__caption,
+.year-scrubber__stop[data-active="true"] .year-scrubber__value {
+  color: var(--ink);
+}
+
+.year-scrubber__meter {
+  display: block;
+  width: 100%;
+  height: 3px;
+  border-radius: var(--radius-pill);
+  background: var(--track);
+  overflow: hidden;
+}
+
+.year-scrubber__meter span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  transition: width var(--dur-base) var(--ease-out);
+}
+
+.year-scrubber__hint {
+  margin: 0;
+  color: var(--ink-muted);
+  font-size: var(--text-xs);
+  line-height: var(--leading-normal);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .year-scrubber__marker,
+  .year-scrubber__meter span {
+    transition: none;
+  }
+}
+
+/* --- Anillo sin dato ----------------------------------------------------------
+   Un corte que nadie ha reportado no es un cero. El anillo se queda vacío y en
+   el centro va una raya, no una cifra que se leería como incumplimiento.
+   -------------------------------------------------------------------------- */
+
+.ring-empty {
+  display: grid;
+  justify-items: center;
+  gap: 1px;
+  color: var(--ink-faint);
+  font-size: var(--text-lg);
+  font-weight: 800;
+  line-height: 1;
+}
+
+.ring-empty small {
+  font-size: var(--text-2xs);
+  font-weight: 700;
+  letter-spacing: var(--tracking-caps);
+  text-transform: uppercase;
 }
 
 /* --- Modales -----------------------------------------------------------------

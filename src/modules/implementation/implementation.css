@@ -120,6 +120,14 @@
   border-color: color-mix(in srgb, var(--status-risk) 26%, transparent);
 }
 
+/* Un pilar que no ha reportado el corte elegido no está "en riesgo": no está.
+   El rótulo se queda neutro para no inventar un diagnóstico. */
+.implementation-status--neutral {
+  color: var(--ink-muted);
+  background: var(--surface-3);
+  border-color: var(--line);
+}
+
 .implementation-card h2 {
   font-size: var(--text-lg);
   line-height: var(--leading-snug);
@@ -279,4 +287,11 @@
   .repo-item > svg:last-child {
     display: none;
   }
+}
+
+/* La barra de años queda entre el encabezado y la rejilla de pilares: gobierna
+   las dos cosas —el anillo global y cada tarjeta—, así que no puede colgar de
+   ninguna de ellas. */
+.implementation-shell > .year-scrubber {
+  margin-bottom: var(--space-7);
 }

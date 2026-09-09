@@ -10,14 +10,16 @@
 import { useEffect, useRef, useState } from "react";
 
 interface ProgressRingProps {
-  /** 0-100 */
-  value: number;
+  /** 0-100, o null cuando ese corte no se ha reportado. */
+  value: number | null;
   size?: number;
   thickness?: number;
   /** Color del arco. Por defecto, el azul institucional. */
   color?: string;
   /** Texto para lectores de pantalla; el número visible ya lo lleva dentro. */
   label: string;
+  /** Rótulo pequeño bajo la raya cuando no hay dato. */
+  emptyHint?: string;
   /** Contenido del centro. Si se omite, se muestra el porcentaje. */
   children?: React.ReactNode;
 }
@@ -28,6 +30,7 @@ export function ProgressRing({
   thickness = 8,
   color = "var(--brand-blue)",
   label,
+  emptyHint,
   children,
 }: ProgressRingProps) {
   const ref = useRef<SVGSVGElement>(null);
@@ -35,7 +38,11 @@ export function ProgressRing({
 
   const radius = (size - thickness) / 2;
   const circumference = 2 * Math.PI * radius;
-  const clamped = Math.max(0, Math.min(100, value));
+  // Un corte que nadie ha reportado no es un cero: el arco se queda vacío, el
+  // centro lleva una raya y el rótulo dice "sin reportar" en vez de anunciar
+  // "0 por ciento", que se leería como un incumplimiento.
+  const missing = value === null;
+  const clamped = Math.max(0, Math.min(100, value ?? 0));
 
   // El arco crece cuando el anillo entra en pantalla: si ya está dibujado
   // cuando aparece, el movimiento no comunica nada.
@@ -73,7 +80,7 @@ export function ProgressRing({
         height={size}
         viewBox={`0 0 ${size} ${size}`}
         role="img"
-        aria-label={`${label}: ${clamped} por ciento`}
+        aria-label={missing ? `${label}: sin reportar` : `${label}: ${clamped} por ciento`}
       >
         <circle
           cx={size / 2}
@@ -98,12 +105,18 @@ export function ProgressRing({
         />
       </svg>
       <span className="progress-ring__center" aria-hidden="true">
-        {children ?? (
-          <strong>
-            {clamped}
-            <span>%</span>
-          </strong>
-        )}
+        {children ??
+          (missing ? (
+            <span className="ring-empty">
+              <span>—</span>
+              {emptyHint && <small>{emptyHint}</small>}
+            </span>
+          ) : (
+            <strong>
+              {clamped}
+              <span>%</span>
+            </strong>
+          ))}
       </span>
     </div>
   );

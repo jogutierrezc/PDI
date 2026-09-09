@@ -849,3 +849,25 @@
   display: inline-block;
   transition: transform var(--dur-base) var(--ease-out);
 }
+
+/* La barra de años va bajo la fila de secciones y del selector de áreas, dentro
+   de la misma barra pegajosa: filtrar por área y elegir el corte son la misma
+   decisión —qué recorte se está mirando— y separarlas obligaría a subir la
+   página para cambiar una de las dos. */
+.pillar-subnav__years {
+  padding-bottom: var(--space-3);
+}
+
+.pillar-subnav__years .year-scrubber__label {
+  display: none;
+}
+
+.pillar-subnav__years .year-scrubber__hint {
+  margin-top: var(--space-2);
+}
+
+@media (max-width: 52rem) {
+  .pillar-subnav__years .year-scrubber__hint {
+    display: none;
+  }
+}

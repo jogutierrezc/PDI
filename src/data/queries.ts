@@ -56,6 +56,7 @@ export const keys = {
   owners: () => [...keys.all, "owners"] as const,
   webProjects: () => [...keys.all, "web-projects"] as const,
   observations: (pillarId: string) => [...keys.all, "observations", pillarId] as const,
+  pillarYears: () => [...keys.all, "pillar-years"] as const,
 };
 
 /** Convierte el error de PostgREST en algo que se pueda mostrar y accionar. */
@@ -105,6 +106,26 @@ export function usePillars() {
         progress: byId.get(pillar.id) ?? { ...emptyProgress, pillar_id: pillar.id, slug: pillar.slug },
       }));
     },
+  });
+}
+
+/**
+ * Avance por año de todos los pilares. La barra de años del tablero y de
+ * implementación necesita los cinco cortes de los seis pilares a la vez, y
+ * `v_year_progress` ya los tiene apilados: basta con quedarse con el nivel de
+ * pilar. El avance del plan —la ponderación hasta 2028— se calcula sobre estas
+ * mismas filas en el cliente, así que no hace falta pedirlo aparte.
+ */
+export function usePillarYears() {
+  return useQuery({
+    queryKey: keys.pillarYears(),
+    queryFn: async (): Promise<YearProgress[]> =>
+      supabase
+        .from("v_year_progress")
+        .select("*")
+        .eq("scope", "pillar")
+        .order("year")
+        .then(unwrap<YearProgress[]>),
   });
 }
 

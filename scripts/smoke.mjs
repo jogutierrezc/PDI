@@ -311,8 +311,63 @@ const FIXTURES = {
 
 const routes = [
   { path: "/", expect: "Aquí construimos futuro", also: ["Ambiente tecnológico", "67"] },
-  { path: "/tablero", expect: "Cumplimiento global y por pilar", also: ["Fortalecimiento del aula híbrida"] },
-  { path: "/implementacion", expect: "Cómo avanza cada pilar", also: ["Plan de Desarrollo Institucional"] },
+  {
+    path: "/tablero",
+    expect: "Cumplimiento global y por pilar",
+    also: ["Fortalecimiento del aula híbrida", "Plan 2024-2028", "Corte del plan"],
+  },
+  {
+    path: "/tablero",
+    note: "la barra recorre el plan y sus cinco cortes",
+    expect: "Plan 2024-2028",
+    interact: async (window, tick) => {
+      const paradas = () => [...window.document.querySelectorAll('.year-scrubber__stop')];
+
+      if (paradas().length !== 6) {
+        throw new Error(`se esperaban 6 paradas y hay ${paradas().length}`);
+      }
+
+      // Arranca en el plan: la lectura de conjunto antes que un año suelto.
+      const plan = paradas()[0];
+      if (plan.getAttribute('aria-checked') !== 'true') {
+        throw new Error('la barra no arranca en el plan');
+      }
+
+      // p1 reporta 88 y 75 → (88+75)/5 = 33. p2 no reporta por años, así que
+      // conserva su acumulado, 67. La media de los dos es 50.
+      if (!plan.textContent.includes('50 %')) {
+        throw new Error(`el avance del plan no salió 50 %: "${plan.textContent}"`);
+      }
+
+      const anillo = () => window.document.querySelector('.board-hero__score').textContent;
+      if (!anillo().includes('50')) throw new Error(`el anillo no arrancó en el plan: ${anillo()}`);
+
+      // Al saltar a 2024, todo lo que sigue a la barra cambia con ella.
+      paradas()
+        .find((stop) => stop.textContent.startsWith('2024'))
+        .click();
+      await tick();
+      if (!anillo().includes('88')) {
+        throw new Error(`el anillo no siguió a la barra hasta 2024: ${anillo()}`);
+      }
+
+      // Y un corte que nadie ha reportado se dice, no se pinta como cero.
+      const y2026 = paradas().find((stop) => stop.textContent.startsWith('2026'));
+      if (!y2026.textContent.includes('sin reportar')) {
+        throw new Error(`2026 debería anunciarse sin reportar: "${y2026.textContent}"`);
+      }
+      y2026.click();
+      await tick();
+      if (anillo().includes('0 %') || !anillo().includes('sin reportar')) {
+        throw new Error(`el anillo de un año sin datos no puede leerse como 0 %: ${anillo()}`);
+      }
+    },
+  },
+  {
+    path: "/implementacion",
+    expect: "Cómo avanza cada pilar",
+    also: ["Plan de Desarrollo Institucional", "Plan 2024-2028", "88 %"],
+  },
   {
     path: "/implementacion/pilar/ambiente-tecnologico",
     expect: "Ambiente tecnológico",
@@ -323,7 +378,8 @@ const routes = [
       "Infraestructura base",         // su línea de acción
       "PDI-AT-001",
       "Presupuesto ejecutado",        // los recursos del indicador sí se ven
-      "Promedio de 2 áreas",          // el anillo dice de dónde sale
+      "Plan 2024-2028",               // la barra de años, junto al selector de áreas
+      "promedio de 2 áreas",          // el anillo dice de dónde sale
       "promedio de 2 indicadores",    // el proyecto deriva de sus indicadores
       "Indicadores de resultado",     // sustituye a "Actividades del pilar"
       "Fortalecimiento del aula híbrida",

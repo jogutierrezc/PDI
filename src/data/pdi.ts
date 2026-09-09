@@ -101,13 +101,42 @@ export function formatValue(value: number | null | undefined): string {
    Este índice hace esa vuelta una sola vez por pantalla.
    -------------------------------------------------------------------------- */
 
+/** Dónde está puesta la barra de años: un corte del plan, o el plan entero. */
+export type YearScope = number | "plan";
+
+/** Un año del horizonte con su cifra. Null = ese año no se ha reportado. */
+export interface YearStop {
+  year: number;
+  progress: number | null;
+}
+
+/**
+ * Avance del plan.
+ *
+ * Los cinco años del horizonte pesan lo mismo y **los que todavía no se han
+ * reportado cuentan como cero**: el 100 % no se alcanza hasta cerrar 2028. Es
+ * una pregunta distinta de "cómo se cumplió lo comprometido hasta ahora" —para
+ * eso está el cumplimiento de cada año— y da siempre una cifra más baja.
+ *
+ * Un plan que va perfecto marca 40 % a finales de 2025, y eso es correcto: le
+ * quedan tres años por cumplir.
+ */
+export function planProgress(at: (year: number) => number | null): number {
+  const total = planYears.reduce((sum, year) => sum + (at(year) ?? 0), 0);
+  return Math.round(total / planYears.length);
+}
+
 export interface YearIndex {
-  /** Años con algo reportado en el pilar, de menor a mayor. */
+  /** Años con algo reportado, de menor a mayor. */
   years: number[];
   /** Avance de una entidad en un año. Null = ese año no se reportó. */
   at: (scope: ProgressScope, id: string, year: number) => number | null;
-  /** La serie completa de una entidad, ya ordenada. */
+  /** La serie completa de una entidad, ya ordenada. Solo los años con dato. */
   of: (scope: ProgressScope, id: string) => { year: number; progress: number }[];
+  /** Los cinco años del plan, con hueco donde no hay dato. Para la barra. */
+  series: (scope: ProgressScope, id: string) => YearStop[];
+  /** Avance del plan de esa entidad, ponderado hasta 2028. */
+  plan: (scope: ProgressScope, id: string) => number;
 }
 
 export function indexYearProgress(rows: YearProgress[]): YearIndex {
@@ -122,14 +151,98 @@ export function indexYearProgress(rows: YearProgress[]): YearIndex {
     years.add(row.year);
   }
 
+  const at = (scope: ProgressScope, id: string, year: number) =>
+    byEntity.get(`${scope}:${id}`)?.get(year) ?? null;
+
   return {
     years: [...years].sort((a, b) => a - b),
-    at: (scope, id, year) => byEntity.get(`${scope}:${id}`)?.get(year) ?? null,
+    at,
     of: (scope, id) =>
       [...(byEntity.get(`${scope}:${id}`) ?? new Map())]
         .map(([year, progress]) => ({ year, progress }))
         .sort((a, b) => a.year - b.year),
+    series: (scope, id) => planYears.map((year) => ({ year, progress: at(scope, id, year) })),
+    plan: (scope, id) => planProgress((year) => at(scope, id, year)),
   };
+}
+
+/**
+ * El mismo cálculo para un conjunto de entidades del mismo nivel: el tablero
+ * necesita "los seis pilares en 2025" y "los seis pilares en el plan".
+ *
+ * Cada entidad pesa lo mismo, igual que en `v_pdi_summary`: sumar indicadores
+ * daría más voz a los pilares con más filas.
+ *
+ * Las dos lecturas tratan el silencio de forma distinta, a propósito:
+ *
+ * - **Un año concreto** promedia solo a quien lo reportó. Contar como cero a un
+ *   pilar que aún no ha entregado ese corte diría "no cumplió" donde solo hay
+ *   "todavía no se sabe".
+ *
+ * - **El plan** cuenta como cero los años no reportados de quien ya reporta:
+ *   ahí el cero sí significa algo —queda por cumplir— y es lo que hace que el
+ *   100 % solo llegue al cerrar el último año del horizonte.
+ *
+ * `roster` da el conjunto completo y, por entidad, el número que se publicaba
+ * antes de la serie anual. Una entidad sin ningún año capturado conserva ese
+ * valor en la posición del plan, igual que hace la cascada: aplicar la
+ * ponderación a quien no ha empezado a reportar por años la mandaría a cero de
+ * golpe.
+ */
+export interface YearAggregate {
+  /** Promedio de las entidades que reportaron ese año. Null = ninguna. */
+  at: (year: number) => number | null;
+  /** Los cinco años del plan, con hueco donde no hay dato. */
+  series: YearStop[];
+  /** Avance del plan del conjunto, ponderado hasta el final del horizonte. */
+  plan: number;
+}
+
+export interface RosterEntry {
+  id: string;
+  /** Avance acumulado, para las entidades que aún no reportan por años. */
+  fallback: number;
+}
+
+export function aggregateYears(rows: YearProgress[], roster?: RosterEntry[]): YearAggregate {
+  const byYear = new Map<number, number[]>();
+  const byEntity = new Map<string, Map<number, number>>();
+
+  for (const row of rows) {
+    byYear.set(row.year, [...(byYear.get(row.year) ?? []), row.progress]);
+    const bucket = byEntity.get(row.entity_id) ?? new Map<number, number>();
+    bucket.set(row.year, row.progress);
+    byEntity.set(row.entity_id, bucket);
+  }
+
+  const at = (year: number) => {
+    const values = byYear.get(year);
+    if (!values || values.length === 0) return null;
+    return Math.round(values.reduce((sum, value) => sum + value, 0) / values.length);
+  };
+
+  const entries: RosterEntry[] =
+    roster ?? [...byEntity.keys()].map((id) => ({ id, fallback: 0 }));
+
+  const planes = entries.map((entry) => {
+    const bucket = byEntity.get(entry.id);
+    if (!bucket || bucket.size === 0) return entry.fallback;
+    return planProgress((year) => bucket.get(year) ?? null);
+  });
+
+  return {
+    at,
+    series: planYears.map((year) => ({ year, progress: at(year) })),
+    plan:
+      planes.length === 0
+        ? 0
+        : Math.round(planes.reduce((sum, value) => sum + value, 0) / planes.length),
+  };
+}
+
+/** Etiqueta de la posición de la barra, para los rótulos que la acompañan. */
+export function yearScopeLabel(scope: YearScope): string {
+  return scope === "plan" ? `Plan ${planYears[0]}-${planYears[planYears.length - 1]}` : String(scope);
 }
 
 /* --- Color ---------------------------------------------------------------- */

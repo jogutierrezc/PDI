@@ -6,16 +6,40 @@ import type { FilterOption } from "../components/ui/FilterChips";
 import { Icon } from "../components/ui/Icon";
 import { ProgressRing } from "../components/ui/ProgressRing";
 import { StackedProgress } from "../components/ui/StackedProgress";
+import { YearScrubber } from "../components/ui/YearScrubber";
 import { CardSkeleton, EmptyBlock, ErrorBlock, LoadingBlock } from "../components/ui/QueryState";
-import { useCurrentPeriod, useFeaturedActivities, usePillars, useSummary } from "../data/queries";
-import { accentFor, emptySummary, formatDate, formatMonth, statusMeta, summarizeProgress } from "../data/pdi";
+import {
+  useCurrentPeriod,
+  useFeaturedActivities,
+  usePillars,
+  usePillarYears,
+  useSummary,
+} from "../data/queries";
+import {
+  accentFor,
+  aggregateYears,
+  emptySummary,
+  formatDate,
+  formatMonth,
+  indexYearProgress,
+  planYears,
+  statusMeta,
+  summarizeProgress,
+  yearScopeLabel,
+} from "../data/pdi";
+import type { YearScope } from "../data/pdi";
 
 export function Dashboard() {
   // null = todos los pilares. El filtro gobierna el detalle y la tabla.
   const [filter, setFilter] = useState<string | null>(null);
+  // Dónde está puesta la barra de años. Arranca en el plan entero: quien abre
+  // el tablero busca la lectura de conjunto, y una cifra de un año suelto
+  // pasaría por la del plan.
+  const [yearScope, setYearScope] = useState<YearScope>("plan");
 
   const pillars = usePillars();
   const globalSummary = useSummary();
+  const pillarYears = usePillarYears();
   const activities = useFeaturedActivities();
   const period = useCurrentPeriod();
 
@@ -31,6 +55,31 @@ export function Dashboard() {
   const summary = filter
     ? summarizeProgress(scope.map((pillar) => pillar.progress))
     : (globalSummary.data ?? emptySummary);
+
+  // La barra y el anillo miran las mismas filas que el filtro de pilares: al
+  // elegir un pilar, la serie pasa a ser la suya.
+  const yearRows = pillarYears.data ?? [];
+  const scopedYears = useMemo(() => {
+    const ids = new Set(scope.map((pillar) => pillar.id));
+    return yearRows.filter((row) => ids.has(row.entity_id));
+  }, [yearRows, scope]);
+
+  // El conjunto completo, no solo quien ya reporta por años: un pilar que
+  // todavía no ha capturado ningún corte conserva su avance acumulado en la
+  // posición del plan, en vez de irse a cero y hundir la media.
+  const aggregate = useMemo(
+    () =>
+      aggregateYears(
+        scopedYears,
+        scope.map((pillar) => ({ id: pillar.id, fallback: pillar.progress.progress })),
+      ),
+    [scopedYears, scope],
+  );
+  const yearIndex = useMemo(() => indexYearProgress(yearRows), [yearRows]);
+
+  // Null = ese año no lo ha reportado nadie del alcance. Se dice, no se pinta
+  // un cero: "no se cumplió" y "todavía no se sabe" son cosas distintas.
+  const headline = yearScope === "plan" ? aggregate.plan : aggregate.at(yearScope);
 
   const filterOptions = useMemo<FilterOption[]>(
     () => [
@@ -90,13 +139,15 @@ export function Dashboard() {
           <aside className="board-hero__score" aria-label="Indicador de cumplimiento global">
             <span className="board-hero__score-label">
               {activePillar ? activePillar.name : "Cumplimiento global"}
+              <small>{yearScopeLabel(yearScope)}</small>
             </span>
             <ProgressRing
-              value={summary.progress}
+              value={headline}
               size={168}
               thickness={12}
               color={activePillar ? accentFor(activePillar.accent_slot) : "var(--brand-blue)"}
-              label={activePillar ? `Avance de ${activePillar.name}` : "Cumplimiento global"}
+              label={`${activePillar ? `Avance de ${activePillar.name}` : "Cumplimiento global"}, ${yearScopeLabel(yearScope)}`}
+              emptyHint="sin reportar"
             />
             <dl className="board-hero__facts">
               <div>
@@ -118,6 +169,19 @@ export function Dashboard() {
           ) : (
             <FilterChips label="Pilares" value={filter} onChange={setFilter} options={filterOptions} />
           )}
+
+          <YearScrubber
+            label="Corte del plan"
+            value={yearScope}
+            onChange={setYearScope}
+            series={aggregate.series}
+            plan={aggregate.plan}
+            hint={
+              yearScope === "plan"
+                ? `Avance del plan: los ${planYears.length} años pesan lo mismo y los que aún no se han reportado cuentan como cero. El 100 % llega al cerrar ${planYears[planYears.length - 1]}.`
+                : `Cumplimiento de ${yearScope}: lo logrado sobre lo comprometido para ese año. Los conteos por estado de abajo son siempre los del corte actual.`
+            }
+          />
 
           {activePillar && (
             <p className="board-filter__note" aria-live="polite">
@@ -198,6 +262,12 @@ export function Dashboard() {
             <div className="pillar-grid stagger">
               {scope.map((pillar) => {
                 const accent = accentFor(pillar.accent_slot);
+                // La tarjeta sigue a la barra: con el plan, su ponderación
+                // hasta 2028; con un año, lo que ese pilar cumplió ese año.
+                const value =
+                  yearScope === "plan"
+                    ? yearIndex.plan("pillar", pillar.id)
+                    : yearIndex.at("pillar", pillar.id, yearScope);
                 return (
                   <article
                     className="pillar-card card"
@@ -213,11 +283,11 @@ export function Dashboard() {
                         <h3>{pillar.name}</h3>
                       </div>
                       <ProgressRing
-                        value={pillar.progress.progress}
+                        value={value}
                         size={62}
                         thickness={6}
                         color={accent}
-                        label={`Avance de ${pillar.name}`}
+                        label={`Avance de ${pillar.name}, ${yearScopeLabel(yearScope)}`}
                       />
                     </header>
 
@@ -234,12 +304,14 @@ export function Dashboard() {
                       <span className="progress-track">
                         <span
                           className="progress-track__fill"
-                          style={{ width: `${pillar.progress.progress}%`, background: accent }}
+                          style={{ width: `${value ?? 0}%`, background: accent }}
                         />
                       </span>
                       <span className="pillar-card__foot-labels">
                         <small>
-                          {pillar.progress.done} de {pillar.progress.total} indicadores
+                          {value === null
+                            ? `Sin reportes de ${yearScopeLabel(yearScope)}`
+                            : `${value} % · ${yearScopeLabel(yearScope)}`}
                         </small>
                         <small>{pillar.management_owner}</small>
                       </span>

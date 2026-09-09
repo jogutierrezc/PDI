@@ -183,6 +183,7 @@ export const pillarScope = (): QueryKey[] => [
   keys.progress(),
   keys.summary(),
   keys.featured(),
+  keys.pillarYears(),
 ];
 
 /* =============================================================================

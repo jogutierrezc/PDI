@@ -1,19 +1,59 @@
+import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { PublicLayout } from "../../components/layout/PublicLayout";
 import { Icon } from "../../components/ui/Icon";
 import { ProgressRing } from "../../components/ui/ProgressRing";
 import { CardSkeleton, EmptyBlock, ErrorBlock, LoadingBlock } from "../../components/ui/QueryState";
-import { useCurrentPeriod, usePillars, usePublicDocuments, useSummary } from "../../data/queries";
-import { accentFor, emptySummary, formatDate, toneForProgress } from "../../data/pdi";
+import { YearScrubber } from "../../components/ui/YearScrubber";
+import {
+  useCurrentPeriod,
+  usePillars,
+  usePillarYears,
+  usePublicDocuments,
+  useSummary,
+} from "../../data/queries";
+import {
+  accentFor,
+  aggregateYears,
+  emptySummary,
+  formatDate,
+  indexYearProgress,
+  planYears,
+  toneForProgress,
+  yearScopeLabel,
+} from "../../data/pdi";
+import type { YearScope } from "../../data/pdi";
 import "./implementation.css";
 
 export function ImplementationPortal() {
+  // Arranca en el plan entero, igual que el tablero: la lectura de conjunto
+  // primero, y el año concreto para quien lo busque.
+  const [yearScope, setYearScope] = useState<YearScope>("plan");
+
   const pillars = usePillars();
   const summary = useSummary();
+  const pillarYears = usePillarYears();
   const period = useCurrentPeriod();
   const documents = usePublicDocuments();
 
   const totals = summary.data ?? emptySummary;
+
+  const yearRows = pillarYears.data ?? [];
+  // Con el conjunto completo: los pilares que aún no reportan por años
+  // conservan su avance acumulado en la posición del plan.
+  const roster = (pillars.data ?? []).map((pillar) => ({
+    id: pillar.id,
+    fallback: pillar.progress.progress,
+  }));
+  const aggregate = useMemo(
+    () => aggregateYears(yearRows, roster),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [yearRows, pillars.data],
+  );
+  const yearIndex = useMemo(() => indexYearProgress(yearRows), [yearRows]);
+
+  // Null = ningún pilar ha reportado ese corte todavía.
+  const headline = yearScope === "plan" ? aggregate.plan : aggregate.at(yearScope);
 
   return (
     <PublicLayout className="implementation-page">
@@ -30,9 +70,17 @@ export function ImplementationPortal() {
           </div>
 
           <div className="implementation-intro__gauge">
-            <ProgressRing value={totals.progress} size={112} thickness={10} label="Avance global del PDI" />
+            <ProgressRing
+              value={headline}
+              size={112}
+              thickness={10}
+              label={`Avance del PDI, ${yearScopeLabel(yearScope)}`}
+              emptyHint="sin reportar"
+            />
             <div>
-              <span className="eyebrow">Avance global</span>
+              <span className="eyebrow">
+                {yearScope === "plan" ? "Avance del plan" : `Cumplimiento ${yearScope}`}
+              </span>
               <strong>
                 {totals.done} de {totals.total} indicadores
               </strong>
@@ -40,6 +88,19 @@ export function ImplementationPortal() {
             </div>
           </div>
         </header>
+
+        <YearScrubber
+          label="Corte del plan"
+          value={yearScope}
+          onChange={setYearScope}
+          series={aggregate.series}
+          plan={aggregate.plan}
+          hint={
+            yearScope === "plan"
+              ? `Avance del plan: los ${planYears.length} años pesan lo mismo y los que aún no se han reportado cuentan como cero. El 100 % llega al cerrar ${planYears[planYears.length - 1]}.`
+              : `Cumplimiento de ${yearScope}: lo logrado sobre lo comprometido para ese año.`
+          }
+        />
 
         <section className="implementation-grid stagger" id="indicadores" aria-label="Pilares estratégicos y avance">
           {pillars.isPending ? (
@@ -50,7 +111,12 @@ export function ImplementationPortal() {
             <EmptyBlock title="Todavía no hay pilares publicados." />
           ) : (
             pillars.data.map((pillar) => {
-              const progress = pillar.progress.progress;
+              // La tarjeta sigue a la barra: el plan ponderado, o el año elegido.
+              const value =
+                yearScope === "plan"
+                  ? yearIndex.plan("pillar", pillar.id)
+                  : yearIndex.at("pillar", pillar.id, yearScope);
+              const progress = value ?? 0;
               const status = toneForProgress(progress);
               const accent = accentFor(pillar.accent_slot);
 
@@ -64,8 +130,16 @@ export function ImplementationPortal() {
                     <span className="implementation-card__icon">
                       <Icon name={pillar.icon} size={20} />
                     </span>
-                    <span className={`implementation-status implementation-status--${status.tone}`}>
-                      <span aria-hidden="true">{status.glyph}</span> {status.label}
+                    <span
+                      className={`implementation-status implementation-status--${value === null ? "neutral" : status.tone}`}
+                    >
+                      {value === null ? (
+                        "Sin reportar"
+                      ) : (
+                        <>
+                          <span aria-hidden="true">{status.glyph}</span> {status.label}
+                        </>
+                      )}
                     </span>
                   </header>
 
@@ -74,8 +148,8 @@ export function ImplementationPortal() {
 
                   <div className="implementation-card__meter">
                     <div className="implementation-card__meter-head">
-                      <span>Progreso</span>
-                      <strong>{progress}%</strong>
+                      <span>{yearScopeLabel(yearScope)}</span>
+                      <strong>{value === null ? "—" : `${progress}%`}</strong>
                     </div>
                     <span className="progress-track">
                       <span
@@ -84,7 +158,9 @@ export function ImplementationPortal() {
                       />
                     </span>
                     <small>
-                      {pillar.progress.done} de {pillar.progress.total} indicadores cumplidos ·{" "}
+                      {value === null
+                        ? `Sin reportes de ${yearScopeLabel(yearScope)} · `
+                        : `${pillar.progress.done} de ${pillar.progress.total} indicadores cumplidos · `}
                       {pillar.management_owner}
                     </small>
                   </div>

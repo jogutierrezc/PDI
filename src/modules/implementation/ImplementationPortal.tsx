@@ -257,8 +257,13 @@ export function ImplementationPortal() {
           areas={structure.data ?? []}
           projects={projectRows}
           pending={pillars.isPending || structure.isPending || projects.isPending}
+          refreshing={pillars.isFetching || structure.isFetching || projects.isFetching}
           error={(structure.error ?? pillars.error ?? projects.error) as Error | null}
+          // También es el botón "Actualizar datos" del mapa: quien acaba de
+          // editar un proyecto en la intranet, en otra pestaña, no pasa por la
+          // invalidación de caché de esta y necesita poder forzarlo.
           onRetry={() => {
+            void pillars.refetch();
             void structure.refetch();
             void projects.refetch();
           }}

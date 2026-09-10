@@ -1,23 +1,30 @@
 /* =============================================================================
    Mapa numerado de relacionamiento · el lienzo
 
-   El diseño de `Mapa_Red_Pilares_Proyectos.html`, con sus mismas piezas:
-   columnas a la izquierda, curvas de Bézier entre ellas, resaltado de la cadena
-   completa al posar el cursor, leyenda por pilar que aísla, búsqueda, zoom y
-   una ficha flotante.
+   Un solo mapa. Antes eran dos —relaciones arriba, presupuesto abajo— y
+   compartían el 95 % del dibujo: las mismas columnas, los mismos nodos y las
+   mismas curvas, con la única diferencia de qué aristas quedaban en pie. Dos
+   lienzos idénticos uno encima de otro obligaban a recorrer el mapa dos veces y
+   a perder la selección al bajar. Ahora el presupuesto es una vista más del
+   mismo mapa, y lo seleccionado sobrevive al cambio de vista: es justamente
+   entonces cuando interesa —"esta línea, ¿tiene dinero detrás?"—.
 
-   Tres diferencias con el original, y las tres son deliberadas:
+   El diseño de `Mapa_Red_Pilares_Proyectos.html` se conserva pieza a pieza:
+   columnas a la izquierda, curvas de Bézier, resaltado de la cadena completa,
+   leyenda por pilar que aísla, búsqueda, zoom y ficha flotante.
 
-   1. Los datos salen de Supabase, no de un JSON pegado en el HTML. Añadir una
-      línea de acción desde la intranet la dibuja aquí sin tocar código.
+   Dos diferencias con el prototipo, deliberadas: los datos salen de Supabase en
+   vez de un JSON pegado en el HTML, y los colores son los tokens del portal
+   —validados para el tema oscuro— en vez de hexadecimales fijos. Y una adición:
+   la quinta columna, los ODS.
 
-   2. Los colores son los del portal —`accentFor()` y los oficiales de cada
-      ODS— en vez de la paleta suelta del prototipo. Los tokens del portal
-      tienen su versión validada para el tema oscuro; unos hexadecimales fijos
-      lo romperían, que es justo lo que el prototipo resolvía con su propio
-      juego de variables.
+   Dos formas de seleccionar, y hacen falta las dos:
 
-   3. Hay una quinta columna, los ODS, que el prototipo no tenía.
+     · Pasar el cursor previsualiza. Es el gesto del diseño original y sirve
+       para recorrer el mapa rápido.
+     · Pulsar fija. El resaltado se queda al retirar el cursor, así que se puede
+       cambiar de vista, buscar otra cosa o desplazarse sin perderlo. Se suelta
+       pulsando otra vez, con Escape o con "Restablecer vista".
 
    Sobre el movimiento del cursor: la ficha flotante se coloca escribiendo el
    estilo directamente sobre el nodo, sin pasar por el estado de React. Con
@@ -25,17 +32,19 @@
    doscientas y pico curvas del mapa.
    ========================================================================== */
 
-import { useEffect, useMemo, useRef, useState } from "react";
-import type { MouseEvent as ReactMouseEvent } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import type { KeyboardEvent as ReactKeyboardEvent, MouseEvent as ReactMouseEvent } from "react";
 import { Icon } from "../../components/ui/Icon";
 import { formatBudget } from "../../data/pdi";
 import { clip, indexNetwork, relatedTo, relatedToPillar, search } from "./network";
-import type { Network, NetworkNode, Related } from "./network";
+import type { Network, NetworkColumn, NetworkNode, Related } from "./network";
 
 /** Dónde cae cada columna. Del diseño original, más la de ODS al final. */
 const COL_X = { pilar: 300, area: 680, linea: 1225, proyecto: 1375, ods: 1920 } as const;
 const MARGIN = 30;
 const WIDTH = 2220;
+
+const COLUMN_ORDER: NetworkColumn[] = ["pilar", "area", "linea", "proyecto", "ods"];
 
 /** Radio y tamaño de etiqueta por columna: el peso visual baja al bajar de
  *  nivel, que es lo que deja leer sesenta líneas sin que tapen a sus áreas. */
@@ -51,19 +60,31 @@ const SHAPE = {
  *  siguiente; completo sigue estando en la ficha flotante. */
 const MAX_CHARS = { pilar: 46, area: 58, linea: 74, proyecto: 62, ods: 44 } as const;
 
+const COLUMN_LABEL: Record<NetworkColumn, string> = {
+  pilar: "Pilar",
+  area: "Área estratégica",
+  linea: "Línea de acción",
+  proyecto: "Proyecto",
+  ods: "Objetivo de Desarrollo Sostenible",
+};
+
 export interface NetworkMapProps {
   network: Network;
   /** Los pilares de la leyenda, en el orden del plan. */
   legend: { id: string; name: string; color: string }[];
   /** Título accesible del lienzo. */
   label: string;
-  /** Grosor de la curva según el valor: solo en el mapa de presupuesto. */
+  /** Grosor de la curva según el valor: solo en las vistas de presupuesto. */
   weightByValue?: boolean;
-  /** Nodos que la pestaña activa deja sin relaciones: se atenúan en vez de
+  /** Nodos que la vista activa deja sin relaciones: se atenúan en vez de
    *  desaparecer, para que se vea qué falta. */
   dimmed?: Set<string>;
   /** Pie del lienzo. */
   footer: string;
+  /** Vuelve a pedir los datos. El mapa se dibuja con lo que hay en caché, y
+   *  quien acaba de editar un proyecto en otra pestaña necesita forzarlo. */
+  onRefresh?: () => void;
+  refreshing?: boolean;
 }
 
 export function NetworkMap({
@@ -73,24 +94,56 @@ export function NetworkMap({
   weightByValue = false,
   dimmed,
   footer,
+  onRefresh,
+  refreshing = false,
 }: NetworkMapProps) {
-  const [focus, setFocus] = useState<string | null>(null);
-  const [pinnedPillar, setPinnedPillar] = useState<string | null>(null);
+  /** Lo que se está rozando con el cursor. Previsualiza. */
+  const [hover, setHover] = useState<string | null>(null);
+  /** Lo que quedó fijado al pulsar. Sobrevive al cursor, a la búsqueda y al
+   *  cambio de vista. Puede ser un nodo (`p:…`, `l:…`) o un pilar entero de la
+   *  leyenda (`pillar:…`). */
+  const [pinned, setPinned] = useState<string | null>(null);
   const [query, setQuery] = useState("");
   const [scale, setScale] = useState(1);
+  /** Qué nodo recibe el foco del teclado. Un solo punto de tabulación para
+   *  todo el mapa; dentro se navega con las flechas. */
+  const [cursor, setCursor] = useState<string | null>(null);
 
   const wrapRef = useRef<HTMLDivElement>(null);
   const tooltipRef = useRef<HTMLDivElement>(null);
+  const nodeRefs = useRef(new Map<string, SVGGElement>());
 
   const index = useMemo(() => indexNetwork(network), [network]);
 
-  // Qué se queda encendido. Manda el cursor; si no hay cursor, el pilar fijado
-  // desde la leyenda; si no, la búsqueda. Null = el mapa entero.
+  /** Los nodos de cada columna, de arriba abajo: es como se mueve el teclado. */
+  const byColumn = useMemo(() => {
+    const map = new Map<NetworkColumn, NetworkNode[]>();
+    for (const column of COLUMN_ORDER) {
+      map.set(
+        column,
+        network.nodes.filter((node) => node.column === column).sort((a, b) => a.y - b.y),
+      );
+    }
+    return map;
+  }, [network.nodes]);
+
+  const resolve = useCallback(
+    (target: string | null): Related | null => {
+      if (!target) return null;
+      if (target.startsWith("pillar:")) return relatedToPillar(network, target.slice(7));
+      return relatedTo(index, target);
+    },
+    [network, index],
+  );
+
+  // Qué se queda encendido. Manda el cursor del ratón, porque es una
+  // previsualización y tiene que responder al instante; después lo fijado; y si
+  // no hay nada de eso, la búsqueda. Null = el mapa entero.
   const found: Related | null = useMemo(() => {
-    if (focus) return relatedTo(index, focus);
-    if (pinnedPillar) return relatedToPillar(network, pinnedPillar);
+    if (hover) return resolve(hover);
+    if (pinned) return resolve(pinned);
     return search(network, index, query);
-  }, [focus, pinnedPillar, query, network, index]);
+  }, [hover, pinned, query, network, index, resolve]);
 
   // Una búsqueda sin resultados apagaría el mapa entero, que se lee como una
   // pantalla rota. Se deja visible y se dice con palabras que no hay nada.
@@ -134,33 +187,101 @@ export function NetworkMap({
     if (tooltipRef.current) tooltipRef.current.style.display = "none";
   };
 
-  const hovered = focus ? index.byId.get(focus) : undefined;
+  const togglePin = (id: string) => setPinned((current) => (current === id ? null : id));
 
   const reset = () => {
     setScale(1);
     setQuery("");
-    setPinnedPillar(null);
-    setFocus(null);
+    setPinned(null);
+    setHover(null);
     if (wrapRef.current) {
       wrapRef.current.scrollTop = 0;
       wrapRef.current.scrollLeft = 0;
     }
   };
 
+  /* --- Teclado -----------------------------------------------------------
+     Un mapa de más de cien nodos no puede ser cien paradas de tabulación: quien
+     navega con teclado tendría que atravesarlo entero para llegar al
+     repositorio documental. En su lugar, el mapa es una sola parada y por
+     dentro se recorre con las flechas —arriba y abajo dentro de la columna,
+     izquierda y derecha saltando por las relaciones—, que es como se lee. */
+  const move = (from: NetworkNode, key: string): NetworkNode | undefined => {
+    if (key === "ArrowUp" || key === "ArrowDown") {
+      const list = byColumn.get(from.column) ?? [];
+      const at = list.findIndex((node) => node.id === from.id);
+      return list[at + (key === "ArrowDown" ? 1 : -1)];
+    }
+
+    // Izquierda y derecha siguen una relación real, no la posición: saltar a
+    // "lo que esté enfrente" llevaría a un nodo con el que no se tiene nada
+    // que ver.
+    const list =
+      key === "ArrowRight" ? (index.out.get(from.id) ?? []) : (index.into.get(from.id) ?? []);
+    const next = list[0];
+    return next ? index.byId.get(key === "ArrowRight" ? next.to : next.from) : undefined;
+  };
+
+  const onKeyDown = (event: ReactKeyboardEvent<SVGGElement>) => {
+    if (event.key === "Escape") {
+      setPinned(null);
+      setHover(null);
+      return;
+    }
+
+    const current = cursor ? index.byId.get(cursor) : undefined;
+    if (!current) return;
+
+    if (event.key === "Enter" || event.key === " ") {
+      event.preventDefault();
+      togglePin(current.id);
+      return;
+    }
+
+    if (!event.key.startsWith("Arrow")) return;
+    const next = move(current, event.key);
+    if (!next) return;
+
+    event.preventDefault();
+    setCursor(next.id);
+    setHover(next.id);
+    const element = nodeRefs.current.get(next.id);
+    element?.focus();
+    element?.scrollIntoView({ block: "nearest", inline: "nearest" });
+  };
+
+  // El nodo que lleva la parada de tabulación: el que tenga el foco, y si
+  // ninguno lo ha tenido todavía, el primer pilar.
+  const tabStop = cursor ?? byColumn.get("pilar")?.[0]?.id ?? network.nodes[0]?.id ?? null;
+
+  const shown = hover ?? pinned;
+  const hovered = shown && !shown.startsWith("pillar:") ? index.byId.get(shown) : undefined;
+  const pinnedPillar = pinned?.startsWith("pillar:")
+    ? legend.find((pillar) => pillar.id === pinned.slice(7))
+    : undefined;
+  const pinnedNode = pinned && !pinned.startsWith("pillar:") ? index.byId.get(pinned) : undefined;
+
   return (
     <div className="netmap">
       <div className="netmap__legend" role="group" aria-label="Aislar un pilar del mapa">
         {legend.map((pillar) => {
-          const on = pinnedPillar === pillar.id;
+          const key = `pillar:${pillar.id}`;
+          const on = pinned === key;
           return (
             <button
               key={pillar.id}
               type="button"
-              className={`netmap__legend-item${pinnedPillar && !on ? " is-dim" : ""}`}
+              className={`netmap__legend-item${pinned?.startsWith("pillar:") && !on ? " is-dim" : ""}`}
               aria-pressed={on}
-              onClick={() => setPinnedPillar(on ? null : pillar.id)}
+              onClick={() => togglePin(key)}
+              onMouseEnter={() => setHover(key)}
+              onMouseLeave={() => setHover(null)}
             >
-              <span className="netmap__swatch" style={{ background: pillar.color }} aria-hidden="true" />
+              <span
+                className="netmap__swatch"
+                style={{ background: pillar.color }}
+                aria-hidden="true"
+              />
               {pillar.name}
             </button>
           );
@@ -178,6 +299,18 @@ export function NetworkMap({
             onChange={(event) => setQuery(event.target.value)}
           />
         </label>
+
+        {onRefresh && (
+          <button
+            type="button"
+            className="button-ghost"
+            onClick={onRefresh}
+            disabled={refreshing}
+            title="Vuelve a pedir pilares, estructura y proyectos"
+          >
+            {refreshing ? "Actualizando…" : "Actualizar datos"}
+          </button>
+        )}
 
         <button type="button" className="button-ghost" onClick={reset}>
           Restablecer vista
@@ -202,6 +335,26 @@ export function NetworkMap({
           +
         </button>
       </div>
+
+      {/* Lo fijado se dice con palabras y no solo con el resaltado: al cambiar
+          de vista o desplazarse, el nodo encendido puede quedar fuera de
+          pantalla y el mapa parecería medio apagado sin motivo. */}
+      {(pinnedNode || pinnedPillar) && (
+        <p className="netmap__pinned" role="status">
+          <span>
+            Fijado: <b>{pinnedNode ? `${pinnedNode.code}. ${pinnedNode.name}` : pinnedPillar!.name}</b>
+            {pinnedNode ? ` · ${COLUMN_LABEL[pinnedNode.column]}` : " · pilar completo"}
+          </span>
+          <button
+            type="button"
+            className="icon-button"
+            onClick={() => setPinned(null)}
+            aria-label="Soltar la selección"
+          >
+            <Icon name="close" size={14} />
+          </button>
+        </p>
+      )}
 
       {empty && (
         <p className="netmap__empty" role="status">
@@ -229,17 +382,13 @@ export function NetworkMap({
                 const from = index.byId.get(item.from);
                 const to = index.byId.get(item.to);
                 if (!from || !to) return null;
-                const x1 = COL_X[from.column];
-                const x2 = COL_X[to.column];
-                const y1 = yOf(from);
-                const y2 = yOf(to);
                 const faded = active !== null && !active.edges.has(item.key);
 
                 return (
                   <path
                     key={item.key}
                     className={`netmap__link${faded ? " is-faded" : ""}`}
-                    d={curve(x1, y1, x2, y2)}
+                    d={curve(COL_X[from.column], yOf(from), COL_X[to.column], yOf(to))}
                     stroke={item.color}
                     strokeWidth={weightByValue ? 0.8 + (item.value / maxValue) * 4 : 1}
                   />
@@ -247,7 +396,7 @@ export function NetworkMap({
               })}
             </g>
 
-            <g className="netmap__nodes">
+            <g className="netmap__nodes" onKeyDown={onKeyDown}>
               {network.nodes.map((node) => {
                 const shape = SHAPE[node.column];
                 const x = COL_X[node.column];
@@ -257,17 +406,32 @@ export function NetworkMap({
                 const labelX = shape.side === "end" ? x - shape.r - 8 : x + shape.r + 8;
                 const faded = active !== null && !active.nodes.has(node.id);
                 const isDim = dimmed?.has(node.id) ?? false;
+                const isPinned = pinned === node.id;
 
                 return (
                   <g
                     key={node.id}
-                    className={`netmap__node netmap__node--${node.column}${faded ? " is-faded" : ""}${isDim ? " is-dim" : ""}`}
-                    onMouseEnter={() => setFocus(node.id)}
+                    ref={(element) => {
+                      if (element) nodeRefs.current.set(node.id, element);
+                      else nodeRefs.current.delete(node.id);
+                    }}
+                    className={`netmap__node netmap__node--${node.column}${faded ? " is-faded" : ""}${isDim ? " is-dim" : ""}${isPinned ? " is-pinned" : ""}`}
+                    role="button"
+                    aria-pressed={isPinned}
+                    tabIndex={tabStop === node.id ? 0 : -1}
+                    aria-label={`${COLUMN_LABEL[node.column]} ${node.code}. ${node.name}`}
+                    onMouseEnter={() => setHover(node.id)}
                     onMouseLeave={() => {
-                      setFocus(null);
+                      setHover(null);
                       hideTooltip();
                     }}
                     onMouseMove={showTooltip}
+                    onFocus={() => {
+                      setCursor(node.id);
+                      setHover(node.id);
+                    }}
+                    onBlur={() => setHover(null)}
+                    onClick={() => togglePin(node.id)}
                   >
                     <title>
                       {node.code}. {node.name}
@@ -290,6 +454,12 @@ export function NetworkMap({
                     >
                       {text}
                     </text>
+                    {/* El anillo del nodo fijado: el resaltado por sí solo no
+                        distingue "esto es lo que elegí" de "esto está en la
+                        cadena de lo que elegí". */}
+                    {isPinned && (
+                      <circle cx={x} cy={y} r={shape.r + 4} className="netmap__ring" fill="none" />
+                    )}
                     <circle cx={x} cy={y} r={shape.r} fill={node.color} className="netmap__dot" />
                   </g>
                 );
@@ -304,7 +474,7 @@ export function NetworkMap({
 
           `aria-hidden`: sigue al ratón y cambia con cada nodo que se roza. Un
           lector de pantalla la anunciaría en bucle, y lo que dice ya está en el
-          <title> de cada nodo, que es donde toca. */}
+          `aria-label` de cada nodo, que es donde toca. */}
       <div className="netmap__tooltip" ref={tooltipRef} aria-hidden="true">
         {hovered && (
           <>
@@ -315,6 +485,9 @@ export function NetworkMap({
               <small key={i}>{line}</small>
             ))}
             {hovered.value > 0 && <small>Valor estimado: {formatBudget(hovered.value)}</small>}
+            <small className="netmap__tooltip-hint">
+              {pinned === hovered.id ? "Pulsa para soltar" : "Pulsa para fijar"}
+            </small>
           </>
         )}
       </div>

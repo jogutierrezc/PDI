@@ -623,6 +623,35 @@
   cursor: pointer;
 }
 
+/* El anillo de lo fijado. El resaltado por sí solo no distingue "esto es lo
+   que elegí" de "esto está en la cadena de lo que elegí". */
+.netmap__ring {
+  stroke: var(--ink);
+  stroke-width: 1.5;
+}
+
+.netmap__node.is-pinned .netmap__label {
+  fill: var(--ink);
+  font-weight: 700;
+}
+
+/* El foco del teclado se dibuja sobre el nodo: el contorno nativo de un <g> de
+   SVG rodea su caja completa —incluida la etiqueta— y se pierde entre las
+   curvas. */
+.netmap__node:focus {
+  outline: none;
+}
+
+.netmap__node:focus-visible .netmap__dot {
+  stroke: var(--brand-blue);
+  stroke-width: 3;
+}
+
+.netmap__node:focus-visible .netmap__label {
+  fill: var(--brand-blue);
+  font-weight: 700;
+}
+
 /* Apagado por el resaltado: casi invisible, pero sigue ahí. Es lo que deja leer
    una cadena concreta dentro de doscientas curvas. */
 .netmap__node.is-faded,
@@ -730,6 +759,34 @@
   .netmap-tab {
     transition: none;
   }
+}
+
+/* Lo que quedó fijado, dicho con palabras. Al cambiar de vista o desplazarse,
+   el nodo encendido puede quedar fuera de pantalla y el mapa parecería medio
+   apagado sin motivo. */
+.netmap__pinned {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  margin: 0 var(--space-5);
+  padding: var(--space-2) var(--space-2) var(--space-2) var(--space-4);
+  color: var(--ink-secondary);
+  background: var(--brand-blue-soft);
+  border-radius: var(--radius-xs);
+  font-size: var(--text-xs);
+}
+
+.netmap__pinned b {
+  color: var(--ink);
+}
+
+.netmap__tooltip-hint {
+  margin-top: var(--space-2);
+  padding-top: var(--space-2);
+  border-top: 1px solid var(--line);
+  color: var(--ink-faint) !important;
+  font-style: italic;
 }
 
 /* Búsqueda sin resultados. El mapa se queda entero —apagarlo del todo se lee

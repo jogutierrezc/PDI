@@ -1,13 +1,12 @@
 /* =============================================================================
    Mapa numerado de relacionamiento · el lienzo
 
-   Un solo mapa. Antes eran dos —relaciones arriba, presupuesto abajo— y
-   compartían el 95 % del dibujo: las mismas columnas, los mismos nodos y las
-   mismas curvas, con la única diferencia de qué aristas quedaban en pie. Dos
-   lienzos idénticos uno encima de otro obligaban a recorrer el mapa dos veces y
-   a perder la selección al bajar. Ahora el presupuesto es una vista más del
-   mismo mapa, y lo seleccionado sobrevive al cambio de vista: es justamente
-   entonces cuando interesa —"esta línea, ¿tiene dinero detrás?"—.
+   El lienzo, reutilizable: la sección pública lo usa para el relacionamiento y
+   el módulo de presupuesto de la intranet lo usará con `dimmed` y
+   `weightByValue` para pintar lo proyectado y lo ejecutado. Esas dos
+   propiedades siguen aquí aunque la pantalla pública no las pase: el grosor de
+   la curva y el atenuado no son conceptos de dinero, son "esta relación pesa
+   más" y "esta se queda sin nada", que es lo que hace falta.
 
    El diseño de `Mapa_Red_Pilares_Proyectos.html` se conserva pieza a pieza:
    columnas a la izquierda, curvas de Bézier, resaltado de la cadena completa,
@@ -22,8 +21,8 @@
      · Pasar el cursor previsualiza. Es el gesto del diseño original y sirve
        para recorrer el mapa rápido.
      · Pulsar fija. El resaltado se queda al retirar el cursor, así que se puede
-       cambiar de vista, buscar otra cosa o desplazarse sin perderlo. Se suelta
-       pulsando otra vez, con Escape o con "Restablecer vista".
+       buscar otra cosa o desplazarse sin perderlo. Se suelta pulsando otra vez,
+       con Escape o con "Restablecer vista".
 
    Sobre el movimiento del cursor: la ficha flotante se coloca escribiendo el
    estilo directamente sobre el nodo, sin pasar por el estado de React. Con
@@ -34,7 +33,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { KeyboardEvent as ReactKeyboardEvent, MouseEvent as ReactMouseEvent } from "react";
 import { Icon } from "../../components/ui/Icon";
-import { formatBudget } from "../../data/pdi";
 import { clip, indexNetwork, relatedTo, relatedToPillar, search } from "./network";
 import type { Network, NetworkColumn, NetworkNode, Related } from "./network";
 
@@ -71,7 +69,8 @@ export interface NetworkMapProps {
   legend: { id: string; name: string; color: string }[];
   /** Título accesible del lienzo. */
   label: string;
-  /** Grosor de la curva según el valor: solo en las vistas de presupuesto. */
+  /** Grosor de la curva según el valor de la relación. Sin usar en la pantalla
+   *  pública; lo pide el módulo de presupuesto de la intranet. */
   weightByValue?: boolean;
   /** Nodos que la vista activa deja sin relaciones: se atenúan en vez de
    *  desaparecer, para que se vea qué falta. */
@@ -96,9 +95,8 @@ export function NetworkMap({
 }: NetworkMapProps) {
   /** Lo que se está rozando con el cursor. Previsualiza. */
   const [hover, setHover] = useState<string | null>(null);
-  /** Lo que quedó fijado al pulsar. Sobrevive al cursor, a la búsqueda y al
-   *  cambio de vista. Puede ser un nodo (`p:…`, `l:…`) o un pilar entero de la
-   *  leyenda (`pillar:…`). */
+  /** Lo que quedó fijado al pulsar. Sobrevive al cursor y a la búsqueda. Puede
+   *  ser un nodo (`p:…`, `l:…`) o un pilar entero de la leyenda (`pillar:…`). */
   const [pinned, setPinned] = useState<string | null>(null);
   const [query, setQuery] = useState("");
   const [scale, setScale] = useState(1);
@@ -333,9 +331,9 @@ export function NetworkMap({
         </button>
       </div>
 
-      {/* Lo fijado se dice con palabras y no solo con el resaltado: al cambiar
-          de vista o desplazarse, el nodo encendido puede quedar fuera de
-          pantalla y el mapa parecería medio apagado sin motivo. */}
+      {/* Lo fijado se dice con palabras y no solo con el resaltado: al
+          desplazarse, el nodo encendido puede quedar fuera de pantalla y el
+          mapa parecería medio apagado sin motivo. */}
       {(pinnedNode || pinnedPillar) && (
         <p className="netmap__pinned" role="status">
           <span>
@@ -480,7 +478,6 @@ export function NetworkMap({
             {hovered.meta.map((line, i) => (
               <small key={i}>{line}</small>
             ))}
-            {hovered.value > 0 && <small>Valor estimado: {formatBudget(hovered.value)}</small>}
             <small className="netmap__tooltip-hint">
               {pinned === hovered.id ? "Pulsa para soltar" : "Pulsa para fijar"}
             </small>

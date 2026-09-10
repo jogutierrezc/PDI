@@ -623,10 +623,10 @@
   line-height: var(--leading-normal);
 }
 
-/* --- Recursos y tiempo -----------------------------------------------------
-   Presupuesto estimado, ejecutado y plazo recorrido. Fila aparte de `.stat-row`
-   porque no cuentan indicadores: son un importe y un plazo, y compartir el
-   estilo de las cifras de conteo los haría pasar por lo que no son.
+/* --- Alcance y tiempo ------------------------------------------------------
+   Plazo recorrido, proyectos formulados e indicadores en seguimiento. Fila
+   aparte de `.stat-row` porque esa cuenta indicadores por estado y esta mezcla
+   un plazo con dos conteos: compartir estilo los haría pasar por lo mismo.
    -------------------------------------------------------------------------- */
 
 .board-resources {

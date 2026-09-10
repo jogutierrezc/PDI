@@ -21,7 +21,7 @@ import { AdminShell, ReadOnlyNotice } from "../components/AdminShell";
 import { Icon } from "../../../components/ui/Icon";
 import { Modal, ModalActions } from "../../../components/ui/Modal";
 import { CardSkeleton, EmptyBlock, ErrorBlock } from "../../../components/ui/QueryState";
-import { keys, usePillars, useProjects, useStructure } from "../../../data/queries";
+import { keys, useAdminProjects, usePillars, useStructure } from "../../../data/queries";
 import { pillarScope, useRemoveRow, useSaveRow } from "../../../data/mutations";
 import {
   accentFor,
@@ -45,7 +45,7 @@ import type {
   ActivityStatus,
   ProjectImpact,
   ProjectLink,
-  ProjectWithLinks,
+  ProjectAdminRow,
 } from "../../../types/database";
 import "./projects.css";
 
@@ -108,7 +108,7 @@ function dedupeLinks(links: DraftLink[]): DraftLink[] {
 }
 const emptyImpact: ProjectImpact = { kind: impactKinds[0], term: impactTerms[0], justification: "" };
 
-function draftFrom(project?: ProjectWithLinks): Draft {
+function draftFrom(project?: ProjectAdminRow): Draft {
   return {
     name: project?.name ?? "",
     owner: project?.owner ?? "",
@@ -139,14 +139,16 @@ function draftFrom(project?: ProjectWithLinks): Draft {
 }
 
 export function ProjectsAdmin() {
-  const projects = useProjects();
+  // `useAdminProjects`, no `useProjects`: aquí sí se administra el valor de
+  // formulación, y la vista pública ya no lo trae.
+  const projects = useAdminProjects();
   const pillars = usePillars();
   const structure = useStructure();
   const { hasRole } = useAuth();
   const canEdit = hasRole("responsable");
 
-  const [editing, setEditing] = useState<{ project?: ProjectWithLinks } | null>(null);
-  const [pendingDelete, setPendingDelete] = useState<ProjectWithLinks | null>(null);
+  const [editing, setEditing] = useState<{ project?: ProjectAdminRow } | null>(null);
+  const [pendingDelete, setPendingDelete] = useState<ProjectAdminRow | null>(null);
   const [notice, setNotice] = useState("");
   const [error, setError] = useState("");
 
@@ -374,7 +376,7 @@ function ProjectCard({
   onEdit,
   onRemove,
 }: {
-  project: ProjectWithLinks;
+  project: ProjectAdminRow;
   pillarById: Map<string, PillarWithProgress>;
   structure: AreaWithLines[];
   onEdit?: () => void;
@@ -574,7 +576,7 @@ function ProjectForm({
   onSubmit,
   onClose,
 }: {
-  project?: ProjectWithLinks;
+  project?: ProjectAdminRow;
   pillars: PillarWithProgress[];
   structure: AreaWithLines[];
   pending: boolean;

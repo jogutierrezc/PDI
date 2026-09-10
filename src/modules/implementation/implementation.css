@@ -56,9 +56,9 @@
 /* --- Tarjetas de pilar ----------------------------------------------------- */
 
 /* --- Recursos y tiempo del plan ----------------------------------------------
-   Tres cifras que no son indicadores: presupuesto estimado, ejecutado y tiempo
-   recorrido. Van antes de la rejilla de pilares porque enmarcan lo que viene
-   después —cuánto dinero y cuánto plazo— y no se leen pilar por pilar.
+   Tres cifras que no son indicadores: plazo recorrido, proyectos formulados e
+   indicadores en seguimiento. Van antes de la rejilla de pilares porque enmarcan
+   lo que viene después y no se leen pilar por pilar.
    -------------------------------------------------------------------------- */
 
 .implementation-stats {
@@ -655,8 +655,9 @@
   opacity: 0.06;
 }
 
-/* Apagado por la pestaña de presupuesto: se atenúa, no se esconde. El nodo sin
-   dinero detrás es justamente lo que hay que poder ver. */
+/* Atenuado por la vista activa: se apaga, no se esconde. Un nodo que se queda
+   sin relaciones es justamente lo que hay que poder ver. Lo usa el módulo de
+   presupuesto de la intranet. */
 .netmap__node.is-dim {
   opacity: 0.22;
 }
@@ -695,64 +696,11 @@
   font-variant-numeric: tabular-nums;
 }
 
-/* --- Pestañas del mapa de presupuesto ------------------------------------------ */
-
-.netmap-tabs {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--space-1);
-  border-bottom: 1px solid var(--line);
-}
-
-.netmap-tab {
-  padding: var(--space-3) var(--space-4);
-  color: var(--ink-secondary);
-  background: none;
-  border: 0;
-  border-bottom: 2.5px solid transparent;
-  font-size: var(--text-sm);
-  font-weight: 600;
-  cursor: pointer;
-  transition: color var(--dur-fast) var(--ease-out), border-color var(--dur-fast) var(--ease-out);
-}
-
-.netmap-tab span {
-  color: var(--ink-faint);
-  font-weight: 400;
-  font-size: var(--text-xs);
-  font-variant-numeric: tabular-nums;
-}
-
-.netmap-tab:hover {
-  color: var(--ink);
-}
-
-.netmap-tab.is-on {
-  color: var(--ink);
-  border-bottom-color: var(--brand-blue);
-}
-
-.netmap-notice {
-  margin-bottom: var(--space-4);
-  padding: var(--space-4) var(--space-5);
-  color: var(--ink-secondary);
-  background: var(--surface-2);
-  border-left: 3px solid var(--brand-blue);
-  border-radius: var(--radius-sm);
-  font-size: var(--text-sm);
-  line-height: var(--leading-normal);
-}
-
-.netmap-notice b {
-  color: var(--ink);
-}
-
 @media (prefers-reduced-motion: reduce) {
   .netmap__stage,
   .netmap__link,
   .netmap__node,
-  .netmap__legend-item,
-  .netmap-tab {
+  .netmap__legend-item {
     transition: none;
   }
 }

@@ -10,15 +10,10 @@ import { useCurrentPeriod, usePillarDetail } from "../../data/queries";
 import {
   accentFor,
   bandFor,
-  budgetedCount,
   entriesForPillar,
-  estimatedBudget,
-  formatBudget,
   planElapsed,
-  EXECUTED_BUDGET,
   formatDate,
   formatMonth,
-  formatCurrency,
   formatRange,
   formatValue,
   indexYearProgress,
@@ -164,11 +159,7 @@ export function PillarViewer() {
     entriesOf(project).every((entry) => !entry.lineId),
   ).length;
 
-  // Presupuesto y tiempo del pilar. El valor lo declaran los proyectos —es el
-  // único sitio del portal donde hay una cifra de dinero— y el tiempo lo pone
-  // el calendario contra el horizonte del plan.
-  const pillarBudget = estimatedBudget(projects);
-  const budgetedProjects = budgetedCount(projects);
+  // El tiempo del pilar lo pone el calendario contra el horizonte del plan.
   const elapsed = planElapsed();
 
   const visibleActivities = activeArea
@@ -411,43 +402,44 @@ export function PillarViewer() {
             )}
           </section>
 
-          {/* --- Recursos y tiempo ------------------------------------------
+          {/* --- El pilar en cifras -----------------------------------------
               Hablan del pilar completo, así que se retiran mientras se mira un
               área concreta.
 
-              Las tres cifras salían del indicador, escritas a mano: un
-              presupuesto ejecutado que nadie conciliaba, un "18 meses" que el
-              calendario dejaba atrás y un contador de tareas críticas sin nada
-              detrás que lo alimentara. Ahora el presupuesto lo suman los
-              proyectos, el tiempo lo pone el calendario y las tareas críticas
-              se retiraron: una cifra que nadie mantiene es peor que ninguna.
+              Salían del indicador, escritas a mano: un presupuesto ejecutado
+              que nadie conciliaba, un "18 meses" que el calendario dejaba atrás
+              y un contador de tareas críticas sin nada detrás. El tiempo lo
+              pone ahora el calendario; las tareas críticas se retiraron —una
+              cifra que nadie mantiene es peor que ninguna— y el presupuesto,
+              también: esta página es pública y las cifras presupuestales de la
+              universidad no lo son. Viven en la intranet.
               -------------------------------------------------------------- */}
           {!activeArea && (
-            <section className="pillar-stats" aria-label="Recursos y tiempo">
-              <StatBlock
-                label="Presupuesto estimado"
-                value={formatBudget(pillarBudget)}
-                progress={budgetedProjects === 0 ? 0 : Math.round((budgetedProjects * 100) / projects.length)}
-                caption={
-                  projects.length === 0
-                    ? "Sin proyectos formulados en este pilar"
-                    : `Declarado por ${budgetedProjects} de ${projects.length} ${projects.length === 1 ? "proyecto" : "proyectos"}`
-                }
-                icon="document"
-              />
-              <StatBlock
-                label="Presupuesto ejecutado"
-                value={formatBudget(EXECUTED_BUDGET)}
-                progress={0}
-                caption="El portal aún no registra ejecución presupuestal"
-                icon="chart"
-              />
+            <section className="pillar-stats" aria-label="El pilar en cifras">
               <StatBlock
                 label="Tiempo transcurrido"
                 value={elapsed.label}
                 progress={elapsed.progress}
                 caption={elapsed.caption}
                 icon="clock"
+              />
+              <StatBlock
+                label="Proyectos del pilar"
+                value={String(projects.length)}
+                progress={projects.length === 0 ? 0 : 100}
+                caption={
+                  projects.length === 0
+                    ? "Sin proyectos formulados en este pilar"
+                    : "Propios y de otros pilares que aportan a este"
+                }
+                icon="document"
+              />
+              <StatBlock
+                label="Indicadores de resultado"
+                value={String(progress.total)}
+                progress={progress.completion_rate}
+                caption={`${progress.done} cumplidos · ${progress.completion_rate}% del total`}
+                icon="chart"
               />
             </section>
           )}
@@ -1174,9 +1166,9 @@ function ProjectBrief({ project, pillarId }: { project: ProjectWithLinks; pillar
   const fileUrl = projectFileUrl(project.attachment_path);
   const goals = project.sdg_goals ?? [];
 
+  // Sin el valor del proyecto: el presupuesto no se publica en abierto.
   const facts = [
     formatRange(project.start_date, project.end_date),
-    project.total_value !== null ? formatCurrency(project.total_value) : null,
     project.academic_units?.length ? project.academic_units.join(" · ") : null,
   ].filter(Boolean) as string[];
 

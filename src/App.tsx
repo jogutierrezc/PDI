@@ -38,6 +38,9 @@ const TechDevelopment = lazy(() =>
 const WebProjects = lazy(() =>
   import("./modules/admin/desarrollo/WebProjects").then((m) => ({ default: m.WebProjects })),
 );
+const BudgetAdmin = lazy(() =>
+  import("./modules/admin/presupuesto/BudgetAdmin").then((m) => ({ default: m.BudgetAdmin })),
+);
 const ProjectsAdmin = lazy(() =>
   import("./modules/admin/proyectos/ProjectsAdmin").then((m) => ({ default: m.ProjectsAdmin })),
 );
@@ -129,6 +132,14 @@ export default function App() {
             element={
               <RequireRole minimum="consulta">
                 <ProjectsAdmin />
+              </RequireRole>
+            }
+          />
+          <Route
+            path="/admin/presupuesto"
+            element={
+              <RequireRole minimum="consulta">
+                <BudgetAdmin />
               </RequireRole>
             }
           />

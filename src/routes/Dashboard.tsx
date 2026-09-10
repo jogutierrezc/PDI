@@ -24,10 +24,7 @@ import {
   accentFor,
   aggregateYears,
   bandFor,
-  budgetedCount,
   emptySummary,
-  estimatedBudget,
-  formatBudget,
   formatDate,
   formatMonth,
   indexYearProgress,
@@ -38,7 +35,6 @@ import {
   statusMeta,
   summarizeProgress,
   yearScopeLabel,
-  EXECUTED_BUDGET,
 } from "../data/pdi";
 import type { YearScope } from "../data/pdi";
 
@@ -69,18 +65,16 @@ export function Dashboard() {
   );
   const activePillar = filter ? rows.find((pillar) => pillar.slug === filter) : undefined;
 
-  // El presupuesto sigue al filtro, como todo lo demás del tablero. Un proyecto
-  // que aporta a varios pilares cuenta entero en cada uno: es la misma decisión
-  // que tomó la cascada del avance en la migración 0013, y cambiarla aquí haría
-  // que dos cifras de la misma pantalla contaran los proyectos distinto.
+  // Los proyectos siguen al filtro, como todo lo demás del tablero. Uno que
+  // aporta a varios pilares cuenta entero en cada uno: es la misma decisión que
+  // tomó la cascada del avance en la migración 0013, y cambiarla aquí haría que
+  // dos cifras de la misma pantalla contaran los proyectos distinto.
   const budgetScope = useMemo(() => {
     const all = projects.data ?? [];
     if (!activePillar) return all;
     return all.filter((project) => pillarsOfProject(project).includes(activePillar.id));
   }, [projects.data, activePillar]);
 
-  const planBudget = estimatedBudget(budgetScope);
-  const withBudget = budgetedCount(budgetScope);
   const elapsed = planElapsed();
 
   // Con un pilar seleccionado el resumen se recalcula en el cliente sobre las
@@ -249,37 +243,36 @@ export function Dashboard() {
           <StatTile label="En riesgo" value={summary.risk} hint="Requieren seguimiento directo." tone="riesgo" />
         </section>
 
-        {/* --- Recursos y tiempo -------------------------------------------
-            Ni el dinero ni el calendario son indicadores, así que van en su
-            propia fila y no entre las cuatro cifras de arriba. El presupuesto
-            lo suman los proyectos del alcance seleccionado; lo ejecutado se
-            publica en cero mientras no exista dónde registrarlo. ----------- */}
-        <section className="board-resources" aria-label="Recursos y tiempo del plan">
-          <ResourceTile
-            label="Presupuesto estimado"
-            value={projects.isPending ? "…" : formatBudget(planBudget)}
-            hint={
-              projects.isPending
-                ? "Calculando…"
-                : budgetScope.length === 0
-                  ? activePillar
-                    ? "Este pilar todavía no tiene proyectos formulados"
-                    : "Todavía no hay proyectos formulados"
-                  : `Declarado por ${withBudget} de ${budgetScope.length} ${budgetScope.length === 1 ? "proyecto" : "proyectos"}${activePillar ? ` de ${activePillar.name}` : ""}`
-            }
-            icon="document"
-          />
-          <ResourceTile
-            label="Presupuesto ejecutado"
-            value={formatBudget(EXECUTED_BUDGET)}
-            hint="El portal aún no registra ejecución presupuestal."
-            icon="chart"
-          />
+        {/* --- Tiempo del plan ---------------------------------------------
+            El calendario no es un indicador, así que va en su propia fila y no
+            entre las cuatro cifras de arriba.
+
+            Aquí hubo también dos cifras de presupuesto. El portal es público, y
+            las cifras presupuestales de la universidad no lo son: se retiraron
+            de todas las pantallas abiertas —tablero, implementación, ficha de
+            pilar, ODS— y viven solo en la intranet. ----------------------- */}
+        <section className="board-resources" aria-label="Tiempo del plan">
           <ResourceTile
             label="Tiempo transcurrido"
             value={elapsed.label}
             hint={`${elapsed.progress}% del horizonte · ${elapsed.caption}`}
             icon="clock"
+          />
+          <ResourceTile
+            label="Proyectos formulados"
+            value={projects.isPending ? "…" : String(budgetScope.length)}
+            hint={
+              activePillar
+                ? `Aportan a ${activePillar.name}.`
+                : "Formulados en el plan, con sus pilares, líneas e impactos."
+            }
+            icon="document"
+          />
+          <ResourceTile
+            label="Indicadores en seguimiento"
+            value={String(summary.total)}
+            hint={`${summary.done} cumplidos · ${summary.active} en curso.`}
+            icon="chart"
           />
         </section>
 

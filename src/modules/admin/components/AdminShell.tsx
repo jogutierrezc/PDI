@@ -18,6 +18,7 @@ import "../admin.css";
 export type AdminSection =
   | "pillars"
   | "projects"
+  | "budget"
   | "parameters"
   | "development"
   | "users"
@@ -35,6 +36,9 @@ const navigation: {
   // Los proyectos van justo después de los pilares y no dentro: son lo único
   // transversal del plan, uno puede apuntar a varios.
   { id: "projects", label: "Proyectos", icon: "columns", to: "/admin/proyectos", minimum: "consulta" },
+  // El presupuesto va detrás de los proyectos porque cuelga de ellos, y nunca
+  // sale de aquí: no hay pantalla pública que lo muestre.
+  { id: "budget", label: "Presupuesto", icon: "chart", to: "/admin/presupuesto", minimum: "consulta" },
   { id: "parameters", label: "Parámetros globales", icon: "settings", to: "/admin/parametros", minimum: "consulta" },
   { id: "development", label: "Desarrollo tecnológico", icon: "code", to: "/admin/desarrollo", minimum: "consulta" },
   { id: "users", label: "Usuarios y roles", icon: "user", to: "/admin/usuarios", minimum: "admin" },

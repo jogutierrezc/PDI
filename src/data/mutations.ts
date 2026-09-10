@@ -37,7 +37,8 @@ export type WritableTable =
   | "parameters"
   | "pillar_owners"
   | "profiles"
-  | "web_projects";
+  | "web_projects"
+  | "project_budget_reports";
 
 function useInvalidate(invalidates: QueryKey[]) {
   const client = useQueryClient();
@@ -179,8 +180,13 @@ export function useRemoveRow(invalidates: QueryKey[]) {
  * `keys.pillar(slug)`, y la invalidación de TanStack Query es por prefijo: con
  * una sola clave se refrescan la lista y el detalle de cada pilar.
  */
+/** Lo que cambia al reportar un año de presupuesto. */
+export const budgetScope = (): QueryKey[] => [keys.budget(), keys.adminProjects()];
+
 export const pillarScope = (): QueryKey[] => [
   keys.pillars(),
+  keys.adminProjects(),
+  keys.budget(),
   keys.progress(),
   keys.summary(),
   keys.featured(),

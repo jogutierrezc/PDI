@@ -275,7 +275,6 @@ export interface Project extends TargetFields {
   academic_units: string[] | null;
   /** Números de los ODS a los que aporta (1-17). */
   sdg_goals: number[] | null;
-  total_value: number | null;
   impacts: ProjectImpact[];
   /** Ruta dentro del bucket "proyectos" de Storage; el archivo no está en la base. */
   attachment_path: string | null;
@@ -283,13 +282,76 @@ export interface Project extends TargetFields {
   attachment_size: number | null;
 }
 
-/** El proyecto con sus vínculos ya resueltos, como lo piden las fichas. */
+/**
+ * El proyecto con sus vínculos ya resueltos, como lo piden las fichas.
+ *
+ * Sin cifras de dinero, a propósito: es lo que devuelve `v_projects`, la vista
+ * que leen las páginas públicas. El presupuesto no se publica, y la forma más
+ * segura de garantizarlo es que el tipo con el que se dibuja lo público ni
+ * siquiera lo tenga —así el compilador avisa antes de que llegue a una
+ * pantalla—. Para la intranet está `ProjectAdminRow`.
+ */
 export interface ProjectWithLinks extends Project {
   links: ProjectLink[];
   /** Los pilares a los que apunta, para filtrar sin recorrer `links`. Lo
    *  calcula `v_projects`; para los proyectos anteriores al módulo de vínculos
    *  la vista devuelve su `pillar_id` de siempre, así que nunca llega vacío. */
   pillar_ids: string[];
+}
+
+/**
+ * El mismo proyecto tal y como lo ve la intranet: con lo que costó formularlo.
+ *
+ * Viene de `v_projects_admin`, que la migración 0015 deja fuera del alcance de
+ * `anon` y filtra además por rol dentro de la propia vista.
+ */
+export interface ProjectAdminRow extends ProjectWithLinks {
+  /** Valor declarado al formular el proyecto. Es la formulación, no el
+   *  presupuesto vigente: eso lo dicen los reportes anuales. */
+  total_value: number | null;
+}
+
+/* --- Presupuesto -------------------------------------------------------------
+   Nada de esto sale a las páginas públicas. Los tipos viven aquí junto al resto
+   del esquema, pero solo los consume el módulo de presupuesto de la intranet.
+   -------------------------------------------------------------------------- */
+
+/** Un año de presupuesto de un proyecto. Nulo no es cero: es "sin reportar". */
+export interface ProjectBudgetReport {
+  id: string;
+  project_id: string;
+  year: number;
+  projected: number | null;
+  executed: number | null;
+  note: string;
+}
+
+/** Vista `v_project_budget`: el presupuesto de un proyecto ya sumado. */
+export interface ProjectBudget {
+  project_id: string;
+  pillar_id: string;
+  name: string;
+  /** `projects.total_value`: lo que costó formularlo. */
+  formulated: number | null;
+  projected: number;
+  executed: number;
+  reported_years: number;
+  first_year: number | null;
+  last_year: number | null;
+  /** Ejecutado sobre proyectado. Nulo si no hay nada proyectado todavía. */
+  execution_rate: number | null;
+}
+
+/** Vista `v_pillar_budget`: el mismo resumen, por pilar. */
+export interface PillarBudget {
+  pillar_id: string;
+  slug: string;
+  name: string;
+  project_count: number;
+  formulated: number;
+  projected: number;
+  executed: number;
+  execution_rate: number | null;
 }
 
 /** Indicador de resultado. La tabla se sigue llamando `activities` por
@@ -443,6 +505,7 @@ export type ProjectLinkInput = Writable<ProjectLink>;
 export type ActivityInput = Writable<Activity>;
 export type ActivityTargetInput = Writable<Omit<ActivityTarget, "compliance">>;
 export type PillarObservationInput = Writable<PillarObservation>;
+export type BudgetReportInput = Writable<ProjectBudgetReport>;
 export type DocumentInput = Writable<PdiDocument>;
 export type ChangeLogInput = Writable<ChangeLogEntry>;
 export type GlossaryInput = Writable<GlossaryTerm>;

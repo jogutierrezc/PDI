@@ -57,7 +57,8 @@ export interface NetworkNode {
   pillarIds: string[];
   /** Líneas del pie de la ficha flotante. */
   meta: string[];
-  /** Valor estimado asociado, en pesos. 0 en los nodos que no manejan dinero. */
+  /** Cuánto pesa el nodo, si quien construyó el mapa pasó pesos. Cero en la
+   *  pantalla pública, que no maneja cifras de dinero. */
   value: number;
 }
 
@@ -111,6 +112,16 @@ interface BuildInput {
   /** Áreas de todo el plan, con sus líneas embebidas. */
   areas: AreaWithLines[];
   projects: ProjectWithLinks[];
+  /**
+   * Cuánto pesa cada proyecto, por id. Solo lo pasa el módulo de presupuesto de
+   * la intranet; la pantalla pública lo omite y todos los pesos quedan en cero.
+   *
+   * Va como parámetro y no se lee de `projects` porque el tipo público del
+   * proyecto ya no trae cifras de dinero —la migración 0015 las sacó de la vista
+   * que leen las páginas abiertas—, y ese es justamente el punto: el mapa
+   * público no puede pintar presupuesto ni queriendo.
+   */
+  weights?: Map<string, number>;
 }
 
 /**
@@ -120,7 +131,7 @@ interface BuildInput {
  * llegada de la consulta: dos cargas de la misma página tienen que dibujar el
  * mismo mapa.
  */
-export function buildNetwork({ pillars, areas, projects }: BuildInput): Network {
+export function buildNetwork({ pillars, areas, projects, weights }: BuildInput): Network {
   const nodes: NetworkNode[] = [];
   const edges: NetworkEdge[] = [];
 
@@ -264,7 +275,7 @@ export function buildNetwork({ pillars, areas, projects }: BuildInput): Network 
 
     const projectId = `r:${project.id}`;
     projectNumber += 1;
-    const value = project.total_value ?? 0;
+    const value = weights?.get(project.id) ?? 0;
     const projectPillars = pillarsOfProject(project).filter((id) => knownPillars.has(id));
     const goals = [...new Set(project.sdg_goals ?? [])].filter((id) => sdgById.has(id)).sort((a, b) => a - b);
 

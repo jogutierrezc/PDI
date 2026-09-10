@@ -29,7 +29,11 @@ import type {
   PillarOwner,
   PillarProgress,
   Profile,
+  PillarBudget,
   Project,
+  ProjectAdminRow,
+  ProjectBudget,
+  ProjectBudgetReport,
   ProjectProgress,
   ProjectWithLinks,
   ReportPeriod,
@@ -59,6 +63,8 @@ export const keys = {
   observations: (pillarId: string) => [...keys.all, "observations", pillarId] as const,
   pillarYears: () => [...keys.all, "pillar-years"] as const,
   projects: () => [...keys.all, "projects"] as const,
+  adminProjects: () => [...keys.all, "admin-projects"] as const,
+  budget: () => [...keys.all, "budget"] as const,
   structure: () => [...keys.all, "structure"] as const,
 };
 
@@ -449,6 +455,72 @@ export function useProjects() {
         .select("*")
         .order("position")
         .then(unwrap<ProjectWithLinks[]>),
+  });
+}
+
+/* =============================================================================
+   Presupuesto · solo intranet
+
+   Ninguna de estas consultas puede resolverse sin sesión: la migración 0015 deja
+   `v_projects_admin`, `v_project_budget`, `v_pillar_budget` y la tabla de
+   reportes fuera del alcance de `anon`, y las vistas filtran además por rol.
+   Si alguna apareciera por error en una pantalla pública devolvería vacío en
+   vez de filtrarse: el fallo es visible, no silencioso.
+   ========================================================================== */
+
+/**
+ * Los proyectos con su valor de formulación. Es la misma lista que
+ * `useProjects()`, pero desde la vista interna; la pública no trae dinero.
+ */
+export function useAdminProjects() {
+  return useQuery({
+    queryKey: keys.adminProjects(),
+    queryFn: async (): Promise<ProjectAdminRow[]> =>
+      supabase
+        .from("v_projects_admin")
+        .select("*")
+        .order("position")
+        .then(unwrap<ProjectAdminRow[]>),
+  });
+}
+
+export interface BudgetOverview {
+  pillars: PillarBudget[];
+  projects: ProjectBudget[];
+  /** El reporte año a año de cada proyecto. */
+  reports: ProjectBudgetReport[];
+  /**
+   * Los indicadores de resultado que cuelgan de un proyecto: las acciones que
+   * ejecutan el presupuesto. Se piden de una vez y no por proyecto para que la
+   * pantalla se arme con una sola tanda de peticiones.
+   */
+  actions: Activity[];
+}
+
+export function useBudget() {
+  return useQuery({
+    queryKey: keys.budget(),
+    queryFn: async (): Promise<BudgetOverview> => {
+      const [pillars, projects, reports, actions] = await Promise.all([
+        supabase.from("v_pillar_budget").select("*").then(unwrap<PillarBudget[]>),
+        supabase.from("v_project_budget").select("*").then(unwrap<ProjectBudget[]>),
+        supabase
+          .from("project_budget_reports")
+          .select("*")
+          .order("year")
+          .then(unwrap<ProjectBudgetReport[]>),
+        // Solo las que cuelgan de un proyecto: un indicador suelto en una línea
+        // de acción no ejecuta el presupuesto de ningún proyecto.
+        supabase
+          .from("activities")
+          .select("*")
+          .not("project_id", "is", null)
+          .order("position")
+          .then(unwrap<Activity[]>),
+      ]);
+
+      return { pillars, projects, reports, actions };
+    },
   });
 }
 

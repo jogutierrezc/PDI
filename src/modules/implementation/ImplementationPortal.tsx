@@ -17,17 +17,13 @@ import {
 import {
   accentFor,
   aggregateYears,
-  budgetedCount,
   emptySummary,
-  estimatedBudget,
-  formatBudget,
   formatDate,
   indexYearProgress,
   planElapsed,
   planYears,
   toneForProgress,
   yearScopeLabel,
-  EXECUTED_BUDGET,
 } from "../../data/pdi";
 import { NetworkSection } from "./NetworkSection";
 import { buildRepository } from "../../data/repository";
@@ -76,8 +72,6 @@ export function ImplementationPortal() {
   const headline = yearScope === "plan" ? aggregate.plan : aggregate.at(yearScope);
 
   const projectRows = useMemo(() => projects.data ?? [], [projects.data]);
-  const planBudget = estimatedBudget(projectRows);
-  const withBudget = budgetedCount(projectRows);
   const elapsed = planElapsed();
 
   const pillarNames = useMemo(
@@ -141,37 +135,39 @@ export function ImplementationPortal() {
           }
         />
 
-        {/* --- Recursos y tiempo del plan ---------------------------------
-            Tres cifras que antes solo existían dentro de la ficha de un pilar y
-            que describen el plan entero. El presupuesto lo suman los proyectos
-            —no hay otra cifra de dinero en el portal— y el tiempo lo pone el
-            calendario contra el horizonte 2024-2028. ------------------------ */}
-        <section className="implementation-stats" aria-label="Recursos y tiempo del plan">
-          <PlanStat
-            label="Presupuesto estimado"
-            value={formatBudget(planBudget)}
-            progress={projectRows.length === 0 ? 0 : Math.round((withBudget * 100) / projectRows.length)}
-            caption={
-              projectRows.length === 0
-                ? "Todavía no hay proyectos formulados"
-                : `Declarado por ${withBudget} de ${projectRows.length} ${projectRows.length === 1 ? "proyecto" : "proyectos"}`
-            }
-            icon="document"
-            pending={projects.isPending}
-          />
-          <PlanStat
-            label="Presupuesto ejecutado"
-            value={formatBudget(EXECUTED_BUDGET)}
-            progress={0}
-            caption="El portal aún no registra ejecución presupuestal"
-            icon="chart"
-          />
+        {/* --- El plan en cifras -------------------------------------------
+            Aquí hubo dos cifras de presupuesto. El portal es público y las
+            cifras presupuestales de la universidad no lo son: se retiraron de
+            todas las pantallas abiertas y viven solo en la intranet. Lo que
+            queda describe el alcance y el plazo, que sí son información
+            pública del plan. --------------------------------------------- */}
+        <section className="implementation-stats" aria-label="El plan en cifras">
           <PlanStat
             label="Tiempo transcurrido"
             value={elapsed.label}
             progress={elapsed.progress}
             caption={elapsed.caption}
             icon="clock"
+          />
+          <PlanStat
+            label="Proyectos formulados"
+            value={String(projectRows.length)}
+            progress={projectRows.length === 0 ? 0 : 100}
+            caption={
+              projectRows.length === 0
+                ? "Todavía no hay proyectos formulados"
+                : "Con sus pilares, líneas de acción e impactos declarados"
+            }
+            icon="document"
+            pending={projects.isPending}
+          />
+          <PlanStat
+            label="Indicadores en seguimiento"
+            value={String(totals.total)}
+            progress={totals.total === 0 ? 0 : Math.round((totals.done * 100) / totals.total)}
+            caption={`${totals.done} cumplidos · ${totals.active} en curso`}
+            icon="chart"
+            pending={summary.isPending}
           />
         </section>
 

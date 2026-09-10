@@ -29,10 +29,6 @@ import { CardSkeleton, EmptyBlock, ErrorBlock } from "../../components/ui/QueryS
 import { usePillars, useProjects } from "../../data/queries";
 import {
   accentFor,
-  budgetedCount,
-  estimatedBudget,
-  formatBudget,
-  formatCurrency,
   formatRange,
   pillarsOfProject,
   sdgGoals,
@@ -102,9 +98,10 @@ export function SdgPortal() {
               </small>
             </li>
             <li>
-              <strong>{formatBudget(estimatedBudget(withSdg))}</strong>
+              <strong>{pillarRows.length}</strong>
               <small>
-                Valor estimado de esos proyectos · {budgetedCount(withSdg)} con cifra declarada
+                {pillarRows.length === 1 ? "Pilar del plan" : "Pilares del plan"} con proyectos
+                orientados a la Agenda 2030
               </small>
             </li>
           </ul>
@@ -195,7 +192,7 @@ export function SdgPortal() {
                 <p>
                   {selected.projects.length === 0
                     ? "Ningún proyecto del plan declara aportar a este objetivo todavía."
-                    : `${selected.projects.length} ${selected.projects.length === 1 ? "proyecto declara" : "proyectos declaran"} aportar a este objetivo · ${formatBudget(selected.value)} de valor estimado.`}
+                    : `${selected.projects.length} ${selected.projects.length === 1 ? "proyecto declara" : "proyectos declaran"} aportar a este objetivo, desde ${selected.pillarIds.length} ${selected.pillarIds.length === 1 ? "pilar" : "pilares"}.`}
                 </p>
               </div>
               <button
@@ -323,7 +320,7 @@ export function SdgPortal() {
                     <small>
                       {own.length === 0
                         ? "Sin proyectos formulados"
-                        : `${own.length} ${own.length === 1 ? "proyecto" : "proyectos"} · ${formatBudget(estimatedBudget(own))} estimados`}
+                        : `${own.length} ${own.length === 1 ? "proyecto" : "proyectos"} · ${goals.size} ${goals.size === 1 ? "objetivo" : "objetivos"}`}
                     </small>
                   </li>
                 );
@@ -346,9 +343,9 @@ export function SdgPortal() {
 function ProjectRow({ project, pillarNames }: { project: ProjectWithLinks; pillarNames: string }) {
   const fileUrl = projectFileUrl(project.attachment_path);
 
+  // Sin el valor del proyecto: el presupuesto no se publica en abierto.
   const facts = [
     formatRange(project.start_date, project.end_date),
-    project.total_value !== null ? formatCurrency(project.total_value) : null,
     project.academic_units?.length ? project.academic_units.join(" · ") : null,
   ].filter(Boolean) as string[];
 

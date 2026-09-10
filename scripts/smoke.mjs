@@ -17,6 +17,16 @@
 import { JSDOM, VirtualConsole } from "jsdom";
 import { build } from "esbuild";
 
+/* --- Lo que jamás puede salir en una pantalla pública ----------------------
+   El portal es público y las cifras presupuestales de la universidad no lo son.
+   Se comprueba pantalla por pantalla, y no en una sola, porque cada una las
+   mostraba en un sitio distinto: el tablero en su fila de recursos, la ficha
+   del pilar en sus tarjetas, el mapa en sus pestañas y la página de ODS en el
+   resumen y en cada proyecto.
+   -------------------------------------------------------------------------- */
+
+const SIN_DINERO = ['Presupuesto estimado', 'Presupuesto ejecutado', '$120 M', '120.000.000', '$0'];
+
 /* --- Fixtures: la forma exacta que devuelve PostgREST ---------------------- */
 
 const PILLARS = [
@@ -110,7 +120,9 @@ const FIXTURES = {
     {
       id: "a1",
       pillar_id: "p1",
-      project_id: null,
+      // Cuelga del proyecto: es una de las acciones que ejecutan su presupuesto,
+      // y es lo que ya afirmaba v_project_progress al declararse derivado.
+      project_id: "pr1",
       title: "Fortalecimiento del aula híbrida",
       owner: "Dirección TIC",
       due_date: "2026-09-30",
@@ -260,7 +272,6 @@ const FIXTURES = {
       end_date: "2026-10-30",
       academic_units: ["Facultad de Ingeniería", "Dirección TIC"],
       sdg_goals: [4, 9],
-      total_value: 120000000,
       impacts: [
         {
           kind: "Tecnológico",
@@ -277,6 +288,33 @@ const FIXTURES = {
         { id: "lk2", project_id: "pr1", pillar_id: "p2", area_id: null, action_line_id: null, is_primary: false, position: 2 },
       ],
     },
+  ],
+  // v_projects_admin: la misma fila que v_projects más `total_value`. La
+  // migración 0015 separó las dos vistas porque el valor de un proyecto no se
+  // publica: la pública no lo trae y esta solo responde con sesión y rol.
+  v_projects_admin: [],
+  // El presupuesto, que solo existe en la intranet.
+  project_budget_reports: [
+    { id: "b1", project_id: "pr1", year: 2024, projected: 40000000, executed: 38500000, note: "Cierre sin novedad." },
+    { id: "b2", project_id: "pr1", year: 2025, projected: 50000000, executed: 12000000, note: "Retraso en la licitación de licencias." },
+  ],
+  v_project_budget: [
+    {
+      project_id: "pr1",
+      pillar_id: "p1",
+      name: "Migración a la nube institucional",
+      formulated: 120000000,
+      projected: 90000000,
+      executed: 50500000,
+      reported_years: 2,
+      first_year: 2024,
+      last_year: 2025,
+      execution_rate: 56,
+    },
+  ],
+  v_pillar_budget: [
+    { pillar_id: "p1", slug: "ambiente-tecnologico", name: "Ambiente tecnológico", project_count: 1, formulated: 120000000, projected: 90000000, executed: 50500000, execution_rate: 56 },
+    { pillar_id: "p2", slug: "sostenibilidad", name: "Sostenibilidad", project_count: 0, formulated: 0, projected: 0, executed: 0, execution_rate: null },
   ],
   planning_items: [{ id: "pl1", pillar_id: "p1", text: "Cerrar la migración.", position: 1 }],
   v_change_log: [
@@ -369,14 +407,13 @@ const routes = [
       "Fortalecimiento del aula híbrida",
       "Plan 2024-2028",
       "Corte del plan",
-      // Recursos y tiempo: la misma lectura que la ficha del pilar, pero del
-      // plan entero y siguiendo el filtro de pilar.
-      "Presupuesto estimado",
-      "$120 M",
-      "Presupuesto ejecutado",
+      // Alcance y tiempo. Aquí hubo dos cifras de presupuesto y se retiraron:
+      // el tablero es público y las cifras presupuestales no lo son.
       "Tiempo transcurrido",
+      "Proyectos formulados",
+      "Indicadores en seguimiento",
     ],
-    absent: ["Tareas críticas"],
+    absent: ["Tareas críticas", ...SIN_DINERO],
   },
   {
     path: "/tablero",
@@ -492,9 +529,9 @@ const routes = [
       "Plan de Desarrollo Institucional",
       "Plan 2024-2028",
       "88 %",
-      "Presupuesto estimado",
-      "Presupuesto ejecutado",
       "Tiempo transcurrido",
+      "Proyectos formulados",
+      "Indicadores en seguimiento",
       // El repositorio junta las dos fuentes: el documento institucional…
       "Documentos de soporte del plan",
       // …y la formulación que vive en Storage, con su etiqueta de origen.
@@ -506,8 +543,6 @@ const routes = [
       "AE1. Infraestructura tecnológica",
       "LA1. Infraestructura base",
       "PR1. Migración a la nube institucional",
-      "Relaciones declaradas",
-      "Presupuesto estimado",
     ],
     absent: [
       "Tareas críticas",
@@ -515,11 +550,14 @@ const routes = [
       // Siguen en la ficha flotante de cada proyecto y en la página /ods.
       "ODS4. Educación de calidad",
       "Objetivo de Desarrollo Sostenible (ODS)",
+      // Y las vistas de presupuesto del mapa se fueron a la intranet.
+      "Relaciones declaradas",
+      ...SIN_DINERO,
     ],
   },
   {
     path: "/implementacion",
-    note: "un solo mapa: la selección se fija al pulsar y sobrevive al cambio de vista",
+    note: "un solo mapa: la selección se fija al pulsar y se suelta al repetir",
     expect: "Mapa numerado",
     interact: async (window, tick) => {
       // Un único lienzo, no dos: el presupuesto es una vista del mismo mapa.
@@ -553,30 +591,6 @@ const routes = [
         throw new Error("fijar un nodo no apaga el resto del mapa");
       }
 
-      // Cambiar de vista sin perder la selección: es la razón de fundir los
-      // dos mapas en uno.
-      const tabs = [...window.document.querySelectorAll(".netmap-tab")];
-      const ejecutado = tabs.find((tab) => tab.textContent.includes("Presupuesto ejecutado"));
-      if (!ejecutado) throw new Error("falta la vista de presupuesto ejecutado");
-
-      ejecutado.dispatchEvent(new window.Event("click", { bubbles: true }));
-      await tick();
-
-      const sigueFijado = window.document.querySelector(".netmap__pinned")?.textContent ?? "";
-      if (!sigueFijado.includes("LA1.")) {
-        throw new Error("la selección se perdió al cambiar de vista");
-      }
-
-      const aviso = window.document.querySelector(".netmap-notice")?.textContent ?? "";
-      if (!aviso.includes("no tiene dónde registrar ejecución presupuestal")) {
-        throw new Error("la vista de ejecutado no explica por qué está vacía");
-      }
-      // Sin ejecución registrada, ninguna relación de proyecto queda en pie y
-      // el proyecto tiene que verse atenuado, no desaparecido.
-      if (!window.document.querySelector(".netmap__node.is-dim")) {
-        throw new Error("los nodos sin presupuesto no se atenúan");
-      }
-
       // Y se suelta pulsando otra vez.
       linea.dispatchEvent(new window.Event("click", { bubbles: true }));
       await tick();
@@ -594,17 +608,14 @@ const routes = [
       "Infraestructura tecnológica",  // el área del proyecto
       "Infraestructura base",         // su línea de acción
       "PDI-AT-001",
-      "Presupuesto estimado",         // lo suman los proyectos del pilar
-      "$120 M",                       // el valor declarado del único proyecto
-      "Presupuesto ejecutado",        // se publica, y vale cero
       "Tiempo transcurrido",          // sale del calendario, no del indicador
+      "Proyectos del pilar",
+      "Indicadores de resultado",
       "Plan 2024-2028",               // la barra de años, junto al selector de áreas
       "promedio de 2 áreas",          // el anillo dice de dónde sale
       "promedio de 2 indicadores",    // el proyecto deriva de sus indicadores
       "También aporta a 1 pilar más", // el proyecto es transversal y se dice
       "formulacion.pdf",              // su documento, desde Storage
-      "120.000.000",                  // el valor total del proyecto
-      "Indicadores de resultado",     // sustituye a "Actividades del pilar"
       "Fortalecimiento del aula híbrida",
       "En el tablero",                // el indicador destacado se marca
       "Aulas",                        // la unidad del catálogo
@@ -622,6 +633,7 @@ const routes = [
       "Actividades del pilar",
       "Tareas críticas",   // retiradas de los tableros de implementación
       "18 meses",          // el plazo escrito a mano del indicador ya no se lee
+      ...SIN_DINERO,       // la ficha es pública: sin cifras de dinero
     ],
   },
   {
@@ -636,8 +648,7 @@ const routes = [
       "Descripción de la acción",
     ],
     absent: [
-      "Presupuesto ejecutado",        // recursos del indicador: ocultos
-      "Tiempo transcurrido",
+      "Tiempo transcurrido",          // el pilar en cifras: oculto al filtrar
       "Consideraciones del indicador",
       "Áreas estratégicas del pilar", // la rejilla solo está en la vista general
     ],
@@ -719,13 +730,13 @@ const routes = [
       "Sostenibilidad · sin área ni línea",  // su vínculo es al pilar entero
       "También aporta a 1 pilar más",
       "75",                                  // el avance derivado, no el 60 reportado
-      "$120 M",                              // su valor suma al presupuesto de este pilar
     ],
     absent: [
       // La cadena del pilar dueño no puede aparecer aquí: el proyecto no entra
       // en Sostenibilidad por el área ni por la línea de Ambiente tecnológico.
       "Infraestructura tecnológica",
       "Infraestructura base",
+      ...SIN_DINERO,
     ],
   },
   {
@@ -919,6 +930,7 @@ const routes = [
       "Objetivos con aporte declarado",
       "A qué objetivos aporta cada pilar",
     ],
+    absent: [...SIN_DINERO, "Valor estimado"],
   },
   {
     path: "/ods",
@@ -1184,6 +1196,60 @@ const routes = [
       }
     },
   },
+  {
+    path: "/admin/presupuesto",
+    expect: "Presupuesto",
+    session: true,
+    also: [
+      "Información interna",          // se avisa antes de enseñar una cifra
+      "Presupuesto formulado",
+      "Presupuesto proyectado",
+      "Presupuesto ejecutado",
+      "120.000.000",                  // lo formulado
+      "90.000.000",                   // lo proyectado en los reportes
+      "50.500.000",                   // lo ejecutado
+      "56%",                          // ejecutado sobre proyectado
+      "Por pilar",
+      "Proyecto a proyecto",
+    ],
+  },
+  {
+    path: "/admin/presupuesto",
+    note: "el proyecto abre su reporte anual y las acciones que lo ejecutan",
+    expect: "Proyecto a proyecto",
+    session: true,
+    interact: async (window, tick) => {
+      const cabecera = window.document.querySelector(".budget-card__head");
+      if (!cabecera) throw new Error("no se listó ningún proyecto");
+
+      cabecera.dispatchEvent(new window.Event("click", { bubbles: true }));
+      await tick();
+
+      const cuerpo = window.document.querySelector(".budget-card__body")?.textContent ?? "";
+      if (!cuerpo.includes("Reporte anual")) {
+        throw new Error("el proyecto no abre su reporte anual");
+      }
+      // Los cinco años del plan, reportados o no: el hueco es lo que falta por
+      // reportar y esconderlo lo haría invisible para quien tiene que llenarlo.
+      const filas = window.document.querySelectorAll(".budget-card__body tbody tr");
+      if (filas.length !== 5) {
+        throw new Error(`se esperaban 5 años del plan y hay ${filas.length}`);
+      }
+      if (window.document.querySelectorAll(".budget-card__body tr.is-empty").length !== 3) {
+        throw new Error("los años sin reportar no se marcan como vacíos");
+      }
+      if (!cuerpo.includes("Retraso en la licitación")) {
+        throw new Error("no se muestra la nota del reporte");
+      }
+      // Y las acciones que ejecutan ese presupuesto.
+      if (!cuerpo.includes("Acciones que ejecutan el presupuesto")) {
+        throw new Error("falta el bloque de acciones");
+      }
+      if (!cuerpo.includes("Fortalecimiento del aula híbrida")) {
+        throw new Error("no se listan los indicadores del proyecto");
+      }
+    },
+  },
   { path: "/admin/usuarios", expect: "Usuarios y roles", session: true, also: ["Administradora de prueba"] },
   { path: "/tablero", expect: "Cumplimiento global y por pilar", theme: "dark", note: "tema oscuro" },
   {
@@ -1328,6 +1394,13 @@ function matches(actual, operator, value) {
       return String(actual) !== value;
     case "is":
       return value === "null" ? actual === null : String(actual) === value;
+    // not.is.null y compañía: PostgREST antepone `not.` al operador. Mientras
+    // esto cayó en el `default`, el simulador devolvía las filas que la consulta
+    // pedía descartar.
+    case "not": {
+      const [inner, ...rest] = value.split(".");
+      return !matches(actual, inner, rest.join("."));
+    }
     // cs.{"p1"} — "la columna de arreglo contiene todos estos valores". Es como
     // se piden los proyectos de un pilar desde que uno puede apuntar a varios.
     // Mientras esto devolvió `true` sin mirar, el simulador daba a cada pilar
@@ -1345,6 +1418,13 @@ function matches(actual, operator, value) {
       return true;
   }
 }
+
+// v_projects_admin es v_projects con el valor de formulación de vuelta. Se arma
+// aquí y no a mano para que las dos vistas no se desincronicen al tocar una.
+FIXTURES.v_projects_admin = FIXTURES.v_projects.map((project) => ({
+  ...project,
+  total_value: 120000000,
+}));
 
 /* --- Ejecución -------------------------------------------------------------- */
 

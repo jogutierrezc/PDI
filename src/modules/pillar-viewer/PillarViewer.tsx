@@ -11,6 +11,7 @@ import {
   accentFor,
   bandFor,
   budgetedCount,
+  entriesForPillar,
   estimatedBudget,
   formatBudget,
   planElapsed,
@@ -140,16 +141,28 @@ export function PillarViewer() {
 
   const visibleAreas = activeArea ? [activeArea] : areas;
   const visibleLines = activeArea ? lines.filter((line) => line.area_id === activeArea.id) : lines;
+  /** Por dónde entra el proyecto en ESTE pilar. Un proyecto compartido tiene
+   *  vínculos en varios, y `projects.action_line_id` solo conoce el principal:
+   *  usarlo aquí dibujaba la cadena de otro pilar y escondía el proyecto al
+   *  filtrar por el área a la que sí apunta. */
+  const entriesOf = (project: ProjectWithLinks) => entriesForPillar(project, pillar.id);
+
+  /** ¿El proyecto toca el área elegida? Basta con que uno de sus vínculos
+   *  apunte al área, directamente o a través de una de sus líneas. */
+  const touchesArea = (project: ProjectWithLinks, areaIdToMatch: string) =>
+    entriesOf(project).some((entry) =>
+      entry.lineId ? lineById.get(entry.lineId)?.area_id === areaIdToMatch : entry.areaId === areaIdToMatch,
+    );
+
   const visibleProjects = activeArea
-    ? projects.filter(
-        (project) =>
-          project.action_line_id && lineById.get(project.action_line_id)?.area_id === activeArea.id,
-      )
+    ? projects.filter((project) => touchesArea(project, activeArea.id))
     : projects;
 
-  // Proyectos que nadie ha colgado todavía de una línea: se avisa en vez de
-  // hacerlos desaparecer al filtrar.
-  const unlinkedProjects = projects.filter((project) => !project.action_line_id).length;
+  // Proyectos que apuntan a este pilar sin llegar a ninguna de sus líneas: se
+  // avisa en vez de hacerlos desaparecer al filtrar por área.
+  const unlinkedProjects = projects.filter((project) =>
+    entriesOf(project).every((entry) => !entry.lineId),
+  ).length;
 
   // Presupuesto y tiempo del pilar. El valor lo declaran los proyectos —es el
   // único sitio del portal donde hay una cifra de dinero— y el tiempo lo pone
@@ -537,7 +550,11 @@ export function PillarViewer() {
               <ul className="entry-list">
                 {visibleProjects.map((project) => {
                   const meta = statusMeta[project.status];
-                  const line = project.action_line_id ? lineById.get(project.action_line_id) : undefined;
+                  // Todas las cadenas por las que este proyecto entra en el
+                  // pilar. Casi siempre es una; cuando son varias, verlas
+                  // juntas es lo que explica por qué su avance pesa más de una
+                  // vez dentro del mismo pilar.
+                  const entries = entriesOf(project);
                   // El avance del proyecto sale de sus indicadores cuando los
                   // tiene; project.progress es solo el respaldo reportado.
                   const stats = projectStats.get(project.id);
@@ -557,25 +574,52 @@ export function PillarViewer() {
                           {project.owner || "Sin responsable"} · {formatMonth(project.due_date)}
                           {stats?.is_derived ? ` · promedio de ${stats.activity_count} indicadores` : ""}
                         </small>
-                        {/* De dónde cuelga el proyecto: pilar → área → línea.
-                            Sin esto, la estructura del plan solo existía en la
-                            base de datos. */}
-                        {line ? (
-                          <span className="entry-row__lineage">
-                            <span>{pillar.name}</span>
-                            <i aria-hidden="true">›</i>
-                            <span>{line.area_name}</span>
-                            <i aria-hidden="true">›</i>
-                            <strong>
-                              {line.code ? `${line.code} · ` : ""}
-                              {line.name}
-                            </strong>
-                          </span>
-                        ) : (
-                          <span className="entry-row__lineage entry-row__lineage--empty">
-                            Sin línea de acción asignada
-                          </span>
-                        )}
+                        {/* De dónde cuelga el proyecto dentro de ESTE pilar:
+                            pilar → área → línea. Sin esto, la estructura del
+                            plan solo existía en la base de datos. */}
+                        {entries.map((entry, index) => {
+                          const line = entry.lineId ? lineById.get(entry.lineId) : undefined;
+                          // Solo hace falta cuando el vínculo se queda en el
+                          // área: si hay línea, ella ya trae el nombre del área.
+                          const area = !line && entry.areaId
+                            ? areas.find((row) => row.id === entry.areaId)
+                            : undefined;
+
+                          if (!line && !area) {
+                            return (
+                              <span
+                                key={index}
+                                className="entry-row__lineage entry-row__lineage--empty"
+                              >
+                                {pillar.name} · sin área ni línea de acción
+                              </span>
+                            );
+                          }
+
+                          return (
+                            <span className="entry-row__lineage" key={index}>
+                              <span>{pillar.name}</span>
+                              <i aria-hidden="true">›</i>
+                              {line ? (
+                                <>
+                                  <span>{line.area_name}</span>
+                                  <i aria-hidden="true">›</i>
+                                  <strong>
+                                    {line.code ? `${line.code} · ` : ""}
+                                    {line.name}
+                                  </strong>
+                                </>
+                              ) : (
+                                /* Vínculo al área entera: la cadena se para
+                                   ahí, y se dice, en vez de fingir una línea. */
+                                <strong>
+                                  {area?.code ? `${area.code} · ` : ""}
+                                  {area?.name} · toda el área
+                                </strong>
+                              )}
+                            </span>
+                          );
+                        })}
                         <ProjectBrief project={project} pillarId={pillar.id} />
                         <YearTrail scope="project" id={project.id} index={yearIndex} />
                       </div>

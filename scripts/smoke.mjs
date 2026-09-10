@@ -64,7 +64,9 @@ const PILLARS = [
 // desde sus áreas. p1 = promedio de (75, 30) = 53.
 const PROGRESS = [
   { pillar_id: "p1", slug: "ambiente-tecnologico", done: 4, active: 1, pending: 1, risk: 0, total: 6, progress: 53, completion_rate: 67, area_count: 2, line_count: 2, project_count: 1 },
-  { pillar_id: "p2", slug: "sostenibilidad", done: 4, active: 2, pending: 0, risk: 0, total: 6, progress: 67, completion_rate: 67, area_count: 0, line_count: 0, project_count: 0 },
+  // p2 no tiene áreas ni líneas capturadas todavía, y aun así cuenta el
+  // proyecto que apunta a él desde p1: es el escenario que abre la 0014.
+  { pillar_id: "p2", slug: "sostenibilidad", done: 4, active: 2, pending: 0, risk: 0, total: 6, progress: 67, completion_rate: 67, area_count: 0, line_count: 0, project_count: 1 },
 ];
 
 const FIXTURES = {
@@ -80,7 +82,9 @@ const FIXTURES = {
     { area_id: "ae2", pillar_id: "p1", area_code: "AE-05", area_name: "Cultura digital", progress: 30, line_count: 1, project_count: 0, activity_count: 2, activity_done: 0, target_value: null, achieved_value: null, measure_unit: null },
   ],
   v_project_progress: [
-    { project_id: "pr1", pillar_id: "p1", action_line_id: "l1", name: "Migración a la nube institucional", reported_progress: 60, progress: 75, activity_count: 2, activity_done: 1, is_derived: true, target_value: null, achieved_value: null, measure_unit: null },
+    // `pillar_ids` es lo que hace que el avance del proyecto llegue también al
+    // pilar vecino, al que apunta sin línea de acción.
+    { project_id: "pr1", pillar_id: "p1", pillar_ids: ["p1", "p2"], action_line_id: "l1", name: "Migración a la nube institucional", reported_progress: 60, progress: 75, activity_count: 2, activity_done: 1, is_derived: true, target_value: null, achieved_value: null, measure_unit: null },
   ],
   // La cascada, año a año. El indicador cumplió 85 en 2024 y 72 en 2025; su
   // línea, su área y su pilar promedian con el proyecto que cuelga de ellos.
@@ -625,6 +629,24 @@ const routes = [
     },
   },
   {
+    path: "/implementacion/pilar/sostenibilidad",
+    note: "el proyecto compartido llega al pilar vecino con su cadena, no con la del pilar dueño",
+    expect: "Sostenibilidad",
+    also: [
+      "Migración a la nube institucional",   // el proyecto de p1 aporta aquí
+      "Sostenibilidad · sin área ni línea",  // su vínculo es al pilar entero
+      "También aporta a 1 pilar más",
+      "75",                                  // el avance derivado, no el 60 reportado
+      "$120 M",                              // su valor suma al presupuesto de este pilar
+    ],
+    absent: [
+      // La cadena del pilar dueño no puede aparecer aquí: el proyecto no entra
+      // en Sostenibilidad por el área ni por la línea de Ambiente tecnológico.
+      "Infraestructura tecnológica",
+      "Infraestructura base",
+    ],
+  },
+  {
     path: "/desarrollo-tecnologico",
     note: "los autores se abren a demanda y no aprietan los botones",
     expect: "Lo que construimos en Planeación",
@@ -1140,7 +1162,7 @@ function makeFetch(session, broken = false) {
 
 
 /**
- * Aplica los filtros de PostgREST que usa el portal (eq, is, or) sobre los
+ * Aplica los filtros de PostgREST que usa el portal (eq, is, or, cs) sobre los
  * fixtures. Sin esto, .maybeSingle() recibía todas las filas de la tabla y
  * fallaba con "multiple rows returned" — un fallo del simulador, no del código.
  */
@@ -1179,6 +1201,19 @@ function matches(actual, operator, value) {
       return String(actual) !== value;
     case "is":
       return value === "null" ? actual === null : String(actual) === value;
+    // cs.{"p1"} — "la columna de arreglo contiene todos estos valores". Es como
+    // se piden los proyectos de un pilar desde que uno puede apuntar a varios.
+    // Mientras esto devolvió `true` sin mirar, el simulador daba a cada pilar
+    // los proyectos de todos y la prueba no veía el filtro.
+    case "cs": {
+      if (!Array.isArray(actual)) return false;
+      const wanted = value
+        .replace(/^\{|\}$/g, "")
+        .split(",")
+        .map((item) => item.trim().replace(/^"|"$/g, ""))
+        .filter(Boolean);
+      return wanted.every((item) => actual.map(String).includes(item));
+    }
     default:
       return true;
   }

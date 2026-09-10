@@ -173,7 +173,11 @@ export interface AreaProgress extends TargetFields {
 /** Vista v_project_progress. */
 export interface ProjectProgress extends TargetFields {
   project_id: string;
+  /** El pilar dueño: desde el que se administra el proyecto. */
   pillar_id: string;
+  /** Todos los pilares en los que el proyecto entra. Un proyecto compartido
+   *  trae sus cifras a cada uno de ellos, no solo al dueño. */
+  pillar_ids: string[];
   action_line_id: string | null;
   name: string;
   reported_progress: number;

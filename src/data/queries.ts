@@ -275,10 +275,13 @@ export function usePillarDetail(slug: string | undefined) {
       ] = await Promise.all([
           supabase.from("v_pillar_progress").select("*").eq("pillar_id", id).maybeSingle(),
           supabase.from("v_area_progress").select("*").eq("pillar_id", id).then(unwrap<AreaProgress[]>),
+          // `contains`, no `eq`: el avance de un proyecto compartido tiene que
+          // llegar a los dos pilares. Con `pillar_id` —el dueño— la ficha del
+          // pilar vecino se quedaba con el avance reportado a mano.
           supabase
             .from("v_project_progress")
             .select("*")
-            .eq("pillar_id", id)
+            .contains("pillar_ids", [id])
             .then(unwrap<ProjectProgress[]>),
           // Los cinco niveles apilados en una sola vista: una petición en vez
           // de cinco para poder pintar una columna por año.

@@ -1,0 +1,386 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<title>Mapa Numerado — Modelo declarado vs. Presupuesto ejecutado</title>
+<style>
+  :root{
+    --bg:#ffffff; --panel:#f7f6f2; --border:#dedcd3; --border-strong:#b4b2a9;
+    --text:#2c2c2a; --text-secondary:#5f5e5a; --text-muted:#888780;
+    --accent:#378ADD;
+  }
+  @media (prefers-color-scheme: dark){
+    :root{
+      --bg:#1c1c1a; --panel:#242422; --border:#3a3a37; --border-strong:#54534e;
+      --text:#eceae2; --text-secondary:#b4b2a9; --text-muted:#888780;
+    }
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0; font-family:-apple-system,"Segoe UI",Helvetica,Arial,sans-serif;
+    background:var(--bg); color:var(--text);
+  }
+  header{ padding:20px 24px 14px; border-bottom:0.5px solid var(--border); }
+  h1{font-size:19px; font-weight:500; margin:0 0 4px;}
+  p.sub{font-size:13px; color:var(--text-secondary); margin:0 0 14px; line-height:1.5;}
+  .legend{display:flex; flex-wrap:wrap; gap:8px 16px; align-items:center;}
+  .legend-item{display:flex; align-items:center; gap:6px; font-size:12.5px; color:var(--text-secondary); cursor:pointer; user-select:none; padding:3px 8px; border-radius:6px; border:0.5px solid transparent;}
+  .legend-item:hover{border-color:var(--border-strong);}
+  .legend-item.dim{opacity:0.35;}
+  .swatch{width:10px; height:10px; border-radius:50%; flex:none;}
+  .tabs{ display:flex; gap:0; padding:0 24px; border-bottom:0.5px solid var(--border); background:var(--panel); }
+  .tab-btn{ font-size:13.5px; font-weight:500; padding:12px 18px; border:none; background:none; color:var(--text-secondary); cursor:pointer; border-bottom:2.5px solid transparent; }
+  .tab-btn.active{ color:var(--text); border-bottom-color:var(--accent); }
+  .tab-btn .count{ font-weight:400; color:var(--text-muted); font-size:12px; }
+  .toolbar{ display:flex; align-items:center; gap:10px; padding:10px 24px; border-bottom:0.5px solid var(--border); flex-wrap:wrap; }
+  .toolbar input[type=text]{ flex:1; min-width:180px; max-width:320px; font-size:13px; padding:6px 10px; border-radius:8px; border:0.5px solid var(--border-strong); background:var(--panel); color:var(--text); }
+  .btn{ font-size:12.5px; padding:6px 10px; border-radius:8px; border:0.5px solid var(--border-strong); background:var(--panel); color:var(--text); cursor:pointer; }
+  .btn:hover{background:var(--border);}
+  .col-labels{display:flex; padding:8px 24px 0; font-size:12px; color:var(--text-muted); font-weight:500;}
+  #wrap{ position:relative; height:640px; overflow:auto; border-bottom:0.5px solid var(--border); background:var(--bg); }
+  #stage{ transform-origin: 0 0; }
+  svg text{ font-family:inherit; }
+  .t-pilar{font-size:13px; font-weight:500; fill:var(--text);}
+  .t-area{font-size:11px; fill:var(--text-secondary);}
+  .t-linea{font-size:10.5px; fill:var(--text-secondary);}
+  .t-proy{font-size:12.5px; font-weight:500; fill:var(--text);}
+  .lbl-bg{fill:var(--bg); opacity:0.82;}
+  .link{fill:none; transition:opacity .15s;}
+  .node-circle{stroke-width:1; cursor:pointer; transition:opacity .15s;}
+  .fade{opacity:0.06 !important;}
+  .no-exec{opacity:0.22;}
+  #tooltip{
+    position:fixed; pointer-events:none; background:var(--panel); border:0.5px solid var(--border-strong);
+    border-radius:8px; padding:8px 12px; font-size:12.5px; color:var(--text); max-width:340px;
+    box-shadow:0 4px 16px rgba(0,0,0,.18); display:none; z-index:50; line-height:1.5;
+  }
+  footer{padding:10px 24px; font-size:11.5px; color:var(--text-muted);}
+</style>
+</head>
+<body>
+
+<header>
+  <h1>Mapa Numerado — modelo declarado vs. presupuesto ejecutado</h1>
+  <p class="sub">Compara el modelo <b>declarado</b> del PDI (todas las líneas de acción que cada proyecto tiene asignadas, según ficha técnica + asignación validada) contra el <b>presupuesto ejecutado</b> (solo las líneas que tienen al menos una acción con presupuesto real en el instrumento presupuestal). Pasa el cursor sobre cualquier nodo para resaltar su cadena de relaciones. Los nodos sin conexión en la pestaña activa aparecen atenuados.</p>
+  <div class="legend" id="legend"></div>
+</header>
+
+<div class="tabs">
+  <button class="tab-btn active" id="tabDeclarado">Modelo declarado <span class="count" id="countDeclarado"></span></button>
+  <button class="tab-btn" id="tabPresupuesto">Presupuesto ejecutado <span class="count" id="countPresupuesto"></span></button>
+</div>
+
+<div class="toolbar">
+  <input type="text" id="search" placeholder="Buscar por código o nombre (ej. LA12, PR4, Personalización)…">
+  <button class="btn" id="btnReset">Restablecer vista</button>
+  <button class="btn" id="zoomOut">−</button>
+  <button class="btn" id="zoomIn">+</button>
+</div>
+
+<div class="col-labels">Pilar (P) · Área estratégica (AE) · Línea de acción (LA) · Proyecto (PR)</div>
+
+<div id="wrap">
+  <div id="stage"></div>
+</div>
+
+<footer id="footerText"></footer>
+
+<div id="tooltip"></div>
+
+<script id="graph-data" type="application/json">{"pilares": [{"id": "p0", "name": "P1. Personalización", "y": 68.0}, {"id": "p1", "name": "P2. Ambiente tecnológico", "y": 240.125}, {"id": "p2", "name": "P3. Entorno emprendedor", "y": 427.125}, {"id": "p3", "name": "P4. Gobernanza para el buen gobierno", "y": 578.0}, {"id": "p4", "name": "P5. Sostenibilidad", "y": 705.5}, {"id": "p5", "name": "P6. Apropiación social", "y": 935.0}], "areas": [{"id": "a0", "name": "AE1. Apropiación de los problemas del sector productivo", "y": 8.5, "pilarId": "p0"}, {"id": "a1", "name": "AE2. Flexibilidad administrativa", "y": 42.5, "pilarId": "p0"}, {"id": "a2", "name": "AE3. Flexibilidad curricular - académica", "y": 85.0, "pilarId": "p0"}, {"id": "a3", "name": "AE4. Gestión del aprendizaje a lo largo de la vida", "y": 136.0, "pilarId": "p0"}, {"id": "a4", "name": "AE5. Experiencia en el aula", "y": 187.0, "pilarId": "p1"}, {"id": "a5", "name": "AE6. Experiencia en el campus", "y": 221.0, "pilarId": "p1"}, {"id": "a6", "name": "AE7. Tecnología para la investigación y extensión", "y": 255.0, "pilarId": "p1"}, {"id": "a7", "name": "AE8. Virtualidad", "y": 297.5, "pilarId": "p1"}, {"id": "a8", "name": "AE9. Apropiación del ecosistema emprendedor", "y": 348.5, "pilarId": "p2"}, {"id": "a9", "name": "AE10. Investigación hacia el emprendimiento", "y": 399.5, "pilarId": "p2"}, {"id": "a10", "name": "AE11. Generación de cultura emprendedora institucional", "y": 450.5, "pilarId": "p2"}, {"id": "a11", "name": "AE12. Gestión de recursos", "y": 510.0, "pilarId": "p2"}, {"id": "a12", "name": "AE13. Fortalecimiento institucional", "y": 578.0, "pilarId": "p3"}, {"id": "a13", "name": "AE14. Prácticas sostenibles UDES", "y": 629.0, "pilarId": "p4"}, {"id": "a14", "name": "AE15. Conciencia y compromiso sostenible", "y": 671.5, "pilarId": "p4"}, {"id": "a15", "name": "AE16. Sostenibilidad financiera", "y": 731.0, "pilarId": "p4"}, {"id": "a16", "name": "AE17. Colaboración sostenible", "y": 790.5, "pilarId": "p4"}, {"id": "a17", "name": "AE18. Impacto de la investigación", "y": 850.0, "pilarId": "p5"}, {"id": "a18", "name": "AE19. Impacto de la extensión", "y": 909.5, "pilarId": "p5"}, {"id": "a19", "name": "AE20. Impacto de la Enseñanza", "y": 960.5, "pilarId": "p5"}, {"id": "a20", "name": "AE21. Mecanismos de articulación", "y": 1020.0, "pilarId": "p5"}], "lineas": [{"id": "l0", "name": "LA1. Mecanismos de escucha sector productivo", "y": 8.5, "areaId": "a0"}, {"id": "l1", "name": "LA2. Modernización administrativa", "y": 25.5, "areaId": "a1"}, {"id": "l2", "name": "LA3. Arquitectura institucional", "y": 42.5, "areaId": "a1"}, {"id": "l3", "name": "LA4. Mecanismos de retención", "y": 59.5, "areaId": "a1"}, {"id": "l4", "name": "LA5. Apropiación de Reforma curricular", "y": 76.5, "areaId": "a2"}, {"id": "l5", "name": "LA6. Modernización académica", "y": 93.5, "areaId": "a2"}, {"id": "l6", "name": "LA7. Desarrollo de programas técnicos y tecnológicos", "y": 110.5, "areaId": "a3"}, {"id": "l7", "name": "LA8. Ciclos secuenciales y complementarios", "y": 127.5, "areaId": "a3"}, {"id": "l8", "name": "LA9. Educación continua", "y": 144.5, "areaId": "a3"}, {"id": "l9", "name": "LA10. Fortalecimiento centro de posgrados", "y": 161.5, "areaId": "a3"}, {"id": "l10", "name": "LA11. Incorporación de tecnología en la enseñanza", "y": 178.5, "areaId": "a4"}, {"id": "l11", "name": "LA12. Resultados de aprendizaje", "y": 195.5, "areaId": "a4"}, {"id": "l12", "name": "LA13. Solución de Experiencia en Campus", "y": 212.5, "areaId": "a5"}, {"id": "l13", "name": "LA14. Impacto de la Tecnología en el Campus", "y": 229.5, "areaId": "a5"}, {"id": "l14", "name": "LA15. Apropiación de la tecnología", "y": 246.5, "areaId": "a6"}, {"id": "l15", "name": "LA16. Colaboración interinstitucional", "y": 263.5, "areaId": "a6"}, {"id": "l16", "name": "LA17. Desarrollo de plataformas Tecnológicas Educativas", "y": 280.5, "areaId": "a7"}, {"id": "l17", "name": "LA18. Virtualización de la enseñanza", "y": 297.5, "areaId": "a7"}, {"id": "l18", "name": "LA19. Virtualización administrativa", "y": 314.5, "areaId": "a7"}, {"id": "l19", "name": "LA20. Generación de cultura de uso", "y": 331.5, "areaId": "a8"}, {"id": "l20", "name": "LA21. Vinculación con mejores prácticas", "y": 348.5, "areaId": "a8"}, {"id": "l21", "name": "LA22. Resultados de emprendimiento", "y": 365.5, "areaId": "a8"}, {"id": "l22", "name": "LA23. Desarrollar soluciones para el emprendimiento", "y": 382.5, "areaId": "a9"}, {"id": "l23", "name": "LA24. Generar estrategias de escucha al sector productivo", "y": 399.5, "areaId": "a9"}, {"id": "l24", "name": "LA25. Incentivar la transferencia tecnológica", "y": 416.5, "areaId": "a9"}, {"id": "l25", "name": "LA26. Generación de Capacidades", "y": 433.5, "areaId": "a10"}, {"id": "l26", "name": "LA27. Centro de Emprendimiento", "y": 450.5, "areaId": "a10"}, {"id": "l27", "name": "LA28. Programa Emprendedor", "y": 467.5, "areaId": "a10"}, {"id": "l28", "name": "LA29. Fomento de la inversión en emprendimiento", "y": 484.5, "areaId": "a11"}, {"id": "l29", "name": "LA30. Creación de fondos de capital semilla", "y": 501.5, "areaId": "a11"}, {"id": "l30", "name": "LA31. Desarrollo de programas de apoyo financiero", "y": 518.5, "areaId": "a11"}, {"id": "l31", "name": "LA32. Promoción de la innovación abierta", "y": 535.5, "areaId": "a11"}, {"id": "l32", "name": "LA33. Apropiación de cultura de transparencia", "y": 552.5, "areaId": "a12"}, {"id": "l33", "name": "LA34. Apropiación de marco normativo", "y": 569.5, "areaId": "a12"}, {"id": "l34", "name": "LA35. Fortalecimiento de la participación y representatividad en los órganos de gobierno", "y": 586.5, "areaId": "a12"}, {"id": "l35", "name": "LA36. Fortalecimiento de comunicación efectiva y participativa", "y": 603.5, "areaId": "a12"}, {"id": "l36", "name": "LA37. Recursos naturales y cambio climático", "y": 620.5, "areaId": "a13"}, {"id": "l37", "name": "LA38. Gestión de residuos", "y": 637.5, "areaId": "a13"}, {"id": "l38", "name": "LA39. Sostenibilidad en la academia", "y": 654.5, "areaId": "a14"}, {"id": "l39", "name": "LA40. Cultura sostenible", "y": 671.5, "areaId": "a14"}, {"id": "l40", "name": "LA41. Integración de investigación", "y": 688.5, "areaId": "a14"}, {"id": "l41", "name": "LA42. Diversificación de fuentes de ingresos", "y": 705.5, "areaId": "a15"}, {"id": "l42", "name": "LA43. Optimización de recursos existentes", "y": 722.5, "areaId": "a15"}, {"id": "l43", "name": "LA44. Fomento de la captación de recursos externos", "y": 739.5, "areaId": "a15"}, {"id": "l44", "name": "LA45. Implementación de políticas de ahorro y gestión financiera responsable", "y": 756.5, "areaId": "a15"}, {"id": "l45", "name": "LA46. Convenios enfocados en sostenibilidad", "y": 773.5, "areaId": "a16"}, {"id": "l46", "name": "LA47. Redes de investigación sostenibles", "y": 790.5, "areaId": "a16"}, {"id": "l47", "name": "LA48. Colaboración de la comunidad para proyectos", "y": 807.5, "areaId": "a16"}, {"id": "l48", "name": "LA49. Desarrollo de capacidades investigativas", "y": 824.5, "areaId": "a17"}, {"id": "l49", "name": "LA50. Gestión de la investigación", "y": 841.5, "areaId": "a17"}, {"id": "l50", "name": "LA51. Participación en redes de investigación", "y": 858.5, "areaId": "a17"}, {"id": "l51", "name": "LA52. Evaluación del impacto", "y": 875.5, "areaId": "a17"}, {"id": "l52", "name": "LA53. Gestión de la extensión universitaria", "y": 892.5, "areaId": "a18"}, {"id": "l53", "name": "LA54. Integración con la comunidad (Extensión)", "y": 909.5, "areaId": "a18"}, {"id": "l54", "name": "LA55. Desarrollo de proyectos de impacto social", "y": 926.5, "areaId": "a18"}, {"id": "l55", "name": "LA56. Desarrollar sistema de seguimiento y monitoreo de la enseñanza", "y": 943.5, "areaId": "a19"}, {"id": "l56", "name": "LA57. Implementar mecanismos de retroalimentación con la comunidad", "y": 960.5, "areaId": "a19"}, {"id": "l57", "name": "LA58. Fortalecer el seguimiento a graduados", "y": 977.5, "areaId": "a19"}, {"id": "l58", "name": "LA59. Fortalecimiento de alianzas estratégicas", "y": 994.5, "areaId": "a20"}, {"id": "l59", "name": "LA60. Vinculación con el sector productivo", "y": 1011.5, "areaId": "a20"}, {"id": "l60", "name": "LA61. Promoción del desarrollo regional", "y": 1028.5, "areaId": "a20"}, {"id": "l61", "name": "LA62. Integración con la comunidad (Articulación)", "y": 1045.5, "areaId": "a20"}], "proyectos": [{"id": "r0", "name": "PR4. Universidad Creativa y Emprendedora", "y": 487.9}, {"id": "r1", "name": "PR7. Relación universidad-empresa-estado-comunidad y sociedad civil", "y": 629.9444444444445}, {"id": "r2", "name": "PR2. Modernización y Flexibilidad Administrativa Institucional", "y": 265.2}, {"id": "r3", "name": "PR1. Transformación curricular", "y": 349.8076923076923}, {"id": "r4", "name": "PR3. Fortalecimiento del gobierno institucional y la transparencia", "y": 578.0}, {"id": "r5", "name": "PR5. Cultura Universitaria Sostenible", "y": 714.0}, {"id": "r6", "name": "PR6. Capacidades Científicas e Impacto de la Investigación UDES", "y": 901.0}], "totalHeight": 1054, "edgesLP_declarado": [{"l": "l0", "r": "r0"}, {"l": "l0", "r": "r1"}, {"l": "l1", "r": "r2"}, {"l": "l2", "r": "r2"}, {"l": "l3", "r": "r2"}, {"l": "l4", "r": "r3"}, {"l": "l5", "r": "r3"}, {"l": "l6", "r": "r3"}, {"l": "l7", "r": "r3"}, {"l": "l8", "r": "r3"}, {"l": "l8", "r": "r0"}, {"l": "l9", "r": "r3"}, {"l": "l10", "r": "r3"}, {"l": "l11", "r": "r3"}, {"l": "l12", "r": "r2"}, {"l": "l13", "r": "r2"}, {"l": "l14", "r": "r2"}, {"l": "l15", "r": "r2"}, {"l": "l16", "r": "r3"}, {"l": "l17", "r": "r3"}, {"l": "l18", "r": "r2"}, {"l": "l19", "r": "r0"}, {"l": "l20", "r": "r0"}, {"l": "l21", "r": "r0"}, {"l": "l22", "r": "r1"}, {"l": "l23", "r": "r1"}, {"l": "l24", "r": "r1"}, {"l": "l25", "r": "r0"}, {"l": "l26", "r": "r0"}, {"l": "l26", "r": "r1"}, {"l": "l27", "r": "r0"}, {"l": "l28", "r": "r0"}, {"l": "l29", "r": "r0"}, {"l": "l30", "r": "r0"}, {"l": "l31", "r": "r0"}, {"l": "l32", "r": "r2"}, {"l": "l32", "r": "r4"}, {"l": "l33", "r": "r4"}, {"l": "l34", "r": "r4"}, {"l": "l35", "r": "r4"}, {"l": "l36", "r": "r5"}, {"l": "l37", "r": "r5"}, {"l": "l38", "r": "r5"}, {"l": "l39", "r": "r5"}, {"l": "l40", "r": "r5"}, {"l": "l41", "r": "r2"}, {"l": "l41", "r": "r5"}, {"l": "l42", "r": "r5"}, {"l": "l43", "r": "r5"}, {"l": "l44", "r": "r5"}, {"l": "l45", "r": "r5"}, {"l": "l46", "r": "r5"}, {"l": "l47", "r": "r5"}, {"l": "l48", "r": "r6"}, {"l": "l49", "r": "r6"}, {"l": "l50", "r": "r6"}, {"l": "l51", "r": "r6"}, {"l": "l52", "r": "r0"}, {"l": "l53", "r": "r0"}, {"l": "l54", "r": "r0"}, {"l": "l54", "r": "r1"}, {"l": "l55", "r": "r3"}, {"l": "l56", "r": "r3"}, {"l": "l57", "r": "r3"}, {"l": "l58", "r": "r6"}, {"l": "l59", "r": "r6"}, {"l": "l59", "r": "r1"}, {"l": "l60", "r": "r1"}, {"l": "l61", "r": "r1"}], "edgesLP_presupuesto": [{"l": "l0", "r": "r0"}, {"l": "l0", "r": "r1"}, {"l": "l1", "r": "r2"}, {"l": "l10", "r": "r3"}, {"l": "l11", "r": "r3"}, {"l": "l12", "r": "r2"}, {"l": "l12", "r": "r3"}, {"l": "l13", "r": "r2"}, {"l": "l14", "r": "r2"}, {"l": "l16", "r": "r3"}, {"l": "l17", "r": "r3"}, {"l": "l18", "r": "r2"}, {"l": "l19", "r": "r0"}, {"l": "l20", "r": "r0"}, {"l": "l22", "r": "r1"}, {"l": "l24", "r": "r1"}, {"l": "l25", "r": "r0"}, {"l": "l26", "r": "r0"}, {"l": "l27", "r": "r0"}, {"l": "l28", "r": "r0"}, {"l": "l3", "r": "r2"}, {"l": "l32", "r": "r4"}, {"l": "l33", "r": "r4"}, {"l": "l34", "r": "r4"}, {"l": "l35", "r": "r4"}, {"l": "l37", "r": "r5"}, {"l": "l38", "r": "r5"}, {"l": "l39", "r": "r5"}, {"l": "l4", "r": "r3"}, {"l": "l40", "r": "r5"}, {"l": "l42", "r": "r5"}, {"l": "l45", "r": "r5"}, {"l": "l46", "r": "r5"}, {"l": "l48", "r": "r6"}, {"l": "l49", "r": "r6"}, {"l": "l5", "r": "r3"}, {"l": "l50", "r": "r6"}, {"l": "l51", "r": "r6"}, {"l": "l59", "r": "r1"}, {"l": "l60", "r": "r1"}, {"l": "l61", "r": "r1"}, {"l": "l7", "r": "r3"}, {"l": "l8", "r": "r3"}], "totalPresupuesto": 43}</script>
+<script>
+(function(){
+  const DATA = JSON.parse(document.getElementById('graph-data').textContent);
+  let currentTab = 'declarado'; // 'declarado' | 'presupuesto'
+
+  document.getElementById('countDeclarado').textContent = '(' + DATA.edgesLP_declarado.length + ')';
+  document.getElementById('countPresupuesto').textContent = '(' + DATA.edgesLP_presupuesto.length + ')';
+  document.getElementById('footerText').textContent =
+    DATA.pilares.length + ' pilares · ' + DATA.areas.length + ' áreas estratégicas · ' +
+    DATA.lineas.length + ' líneas de acción · ' + DATA.proyectos.length + ' proyectos · ' +
+    DATA.edgesLP_declarado.length + ' conexiones declaradas / ' + DATA.edgesLP_presupuesto.length + ' con presupuesto real';
+
+  const PILAR_COLORS = [
+    {fill:'#7F77DD', stroke:'#3C3489'},
+    {fill:'#D85A30', stroke:'#712B13'},
+    {fill:'#D4537E', stroke:'#72243E'},
+    {fill:'#378ADD', stroke:'#0C447C'},
+    {fill:'#1D9E75', stroke:'#085041'},
+    {fill:'#639922', stroke:'#27500A'}
+  ];
+  const PROY_COLOR = {fill:'#888780', stroke:'#444441'};
+
+  const pilarColor = {};
+  DATA.pilares.forEach((p,i)=> pilarColor[p.id] = PILAR_COLORS[i % PILAR_COLORS.length]);
+
+  const areaPilar = {}; DATA.areas.forEach(a=> areaPilar[a.id]=a.pilarId);
+  const lineaArea = {}; DATA.lineas.forEach(l=> lineaArea[l.id]=l.areaId);
+  const lineaColor = {}; DATA.lineas.forEach(l=> lineaColor[l.id]= pilarColor[areaPilar[lineaArea[l.id]]]);
+  const areaColor = {}; DATA.areas.forEach(a=> areaColor[a.id]= pilarColor[a.pilarId]);
+
+  let proyLineas = {}, lineaProys = {};
+  function rebuildMaps(edgesLP){
+    proyLineas = {}; lineaProys = {};
+    edgesLP.forEach(e=>{
+      (proyLineas[e.r] = proyLineas[e.r]||[]).push(e.l);
+      (lineaProys[e.l] = lineaProys[e.l]||[]).push(e.r);
+    });
+  }
+  rebuildMaps(DATA.edgesLP_declarado);
+
+  const COL_X = {pilar:300, area:680, linea:1225, proy:1375};
+  const MARGIN_TOP = 30, MARGIN_BOTTOM = 30;
+  const W = 1865, H = DATA.totalHeight + MARGIN_TOP + MARGIN_BOTTOM;
+
+  function yOf(node){ return node.y + MARGIN_TOP; }
+
+  const svgNS = 'http://www.w3.org/2000/svg';
+  function el(tag, attrs){
+    const e = document.createElementNS(svgNS, tag);
+    for (const k in attrs) e.setAttribute(k, attrs[k]);
+    return e;
+  }
+
+  const svg = el('svg', {width:W, height:H, viewBox:`0 0 ${W} ${H}`, style:'display:block;'});
+  const linksLayer = el('g', {id:'links-layer'});
+  const labelBgLayer = el('g', {id:'label-bg-layer'});
+  const nodesLayer = el('g', {id:'nodes-layer'});
+  svg.appendChild(linksLayer);
+  svg.appendChild(labelBgLayer);
+  svg.appendChild(nodesLayer);
+  document.getElementById('stage').appendChild(svg);
+
+  function curve(x1,y1,x2,y2){
+    const mx = (x1+x2)/2;
+    return `M ${x1} ${y1} C ${mx} ${y1}, ${mx} ${y2}, ${x2} ${y2}`;
+  }
+
+  let linkEls = {};
+  function addLink(id1, x1, y1, id2, x2, y2, color){
+    const key = id1+'__'+id2;
+    const p = el('path', { d: curve(x1,y1,x2,y2), class:'link', stroke: color.fill, 'stroke-width':1, opacity:0.28 });
+    linksLayer.appendChild(p);
+    linkEls[key] = p;
+    return p;
+  }
+
+  // Enlaces fijos pilar->area y area->linea (no cambian entre pestañas)
+  DATA.areas.forEach(a=>{
+    const p = DATA.pilares.find(pp=>pp.id===a.pilarId);
+    addLink(p.id, COL_X.pilar, yOf(p), a.id, COL_X.area, yOf(a), pilarColor[p.id]);
+  });
+  DATA.lineas.forEach(l=>{
+    const a = DATA.areas.find(aa=>aa.id===l.areaId);
+    addLink(a.id, COL_X.area, yOf(a), l.id, COL_X.linea, yOf(l), areaColor[a.id]);
+  });
+
+  let lpLinkEls = []; // enlaces linea->proyecto, se reconstruyen por pestaña
+  function rebuildLPLinks(edgesLP){
+    lpLinkEls.forEach(p=> p.remove());
+    lpLinkEls = [];
+    edgesLP.forEach(e=>{
+      const l = DATA.lineas.find(ll=>ll.id===e.l);
+      const r = DATA.proyectos.find(pp=>pp.id===e.r);
+      const p = addLink(l.id, COL_X.linea, yOf(l), r.id, COL_X.proy, yOf(r), lineaColor[l.id]);
+      lpLinkEls.push(p);
+    });
+  }
+  rebuildLPLinks(DATA.edgesLP_declarado);
+
+  function estWidth(text, perChar){ return text.length * perChar; }
+
+  const nodeEls = {};
+  function addNode(node, x, colType, color, radius, labelClass, labelSide, perChar){
+    const g = el('g', {class:'node-g', style:'cursor:pointer;'});
+    const c = el('circle', { cx:x, cy:yOf(node), r:radius, class:'node-circle', fill: color.fill, stroke: color.stroke });
+    g.appendChild(c);
+
+    const anchor = labelSide === 'end' ? 'end' : 'start';
+    const lx = labelSide === 'end' ? x - radius - 8 : x + radius + 8;
+    const w = estWidth(node.name, perChar);
+    const bgX = labelSide === 'end' ? lx - w - 4 : lx - 4;
+    const bg = el('rect', { x:bgX, y:yOf(node)-8, width:w+8, height:16, class:'lbl-bg' });
+    labelBgLayer.appendChild(bg);
+
+    const label = el('text', {x:lx, y:yOf(node)+4, class:labelClass, 'text-anchor':anchor});
+    label.textContent = node.name;
+    g.appendChild(label);
+
+    nodesLayer.appendChild(g);
+    nodeEls[node.id] = {circle:c, label:label, bg:bg, type:colType, node:node};
+    g.addEventListener('mouseenter', ()=> highlight(node.id));
+    g.addEventListener('mouseleave', ()=>{ clearHighlight(); hideTooltip(); });
+    g.addEventListener('mousemove', (ev)=> showTooltip(ev, node));
+    return g;
+  }
+
+  DATA.pilares.forEach(p=> addNode(p, COL_X.pilar, 'pilar', pilarColor[p.id], 7, 't-pilar', 'end', 7.2));
+  DATA.areas.forEach(a=> addNode(a, COL_X.area, 'area', areaColor[a.id], 4.5, 't-area', 'end', 6.0));
+  DATA.lineas.forEach(l=> addNode(l, COL_X.linea, 'linea', lineaColor[l.id], 3, 't-linea', 'end', 5.7));
+  DATA.proyectos.forEach(r=> addNode(r, COL_X.proy, 'proy', PROY_COLOR, 7, 't-proy', 'start', 6.6));
+
+  function relatedSet(id){
+    const nodes = new Set([id]);
+    const links = new Set();
+    const info = nodeEls[id];
+    if (!info) return {nodes, links};
+    const t = info.type;
+    if (t === 'pilar'){
+      DATA.areas.filter(a=>a.pilarId===id).forEach(a=>{
+        nodes.add(a.id); links.add(id+'__'+a.id);
+        DATA.lineas.filter(l=>l.areaId===a.id).forEach(l=>{
+          nodes.add(l.id); links.add(a.id+'__'+l.id);
+          (lineaProys[l.id]||[]).forEach(r=>{ nodes.add(r); links.add(l.id+'__'+r); });
+        });
+      });
+    } else if (t === 'area'){
+      nodes.add(areaPilar[id]); links.add(areaPilar[id]+'__'+id);
+      DATA.lineas.filter(l=>l.areaId===id).forEach(l=>{
+        nodes.add(l.id); links.add(id+'__'+l.id);
+        (lineaProys[l.id]||[]).forEach(r=>{ nodes.add(r); links.add(l.id+'__'+r); });
+      });
+    } else if (t === 'linea'){
+      const a = lineaArea[id];
+      nodes.add(a); links.add(a+'__'+id);
+      nodes.add(areaPilar[a]); links.add(areaPilar[a]+'__'+a);
+      (lineaProys[id]||[]).forEach(r=>{ nodes.add(r); links.add(id+'__'+r); });
+    } else if (t === 'proy'){
+      (proyLineas[id]||[]).forEach(l=>{
+        nodes.add(l); links.add(l+'__'+id);
+        const a = lineaArea[l];
+        nodes.add(a); links.add(a+'__'+l);
+        nodes.add(areaPilar[a]); links.add(areaPilar[a]+'__'+a);
+      });
+    }
+    return {nodes, links};
+  }
+
+  function highlight(id){
+    const {nodes, links} = relatedSet(id);
+    for (const key in linkEls) linkEls[key].classList.toggle('fade', !links.has(key));
+    for (const nid in nodeEls){
+      const info = nodeEls[nid];
+      const dim = !nodes.has(nid);
+      info.circle.classList.toggle('fade', dim);
+      info.label.classList.toggle('fade', dim);
+      info.bg.classList.toggle('fade', dim);
+    }
+  }
+  function clearHighlight(){
+    for (const key in linkEls) linkEls[key].classList.remove('fade');
+    for (const nid in nodeEls){
+      nodeEls[nid].circle.classList.remove('fade');
+      nodeEls[nid].label.classList.remove('fade');
+      nodeEls[nid].bg.classList.remove('fade');
+    }
+  }
+
+  // Atenuar nodos (linea/proyecto) sin ninguna conexion en la pestaña activa
+  function applyNoExec(){
+    DATA.lineas.forEach(l=>{
+      const sinConexion = !(lineaProys[l.id] && lineaProys[l.id].length);
+      const info = nodeEls[l.id];
+      info.circle.classList.toggle('no-exec', sinConexion);
+      info.label.classList.toggle('no-exec', sinConexion);
+    });
+    DATA.proyectos.forEach(r=>{
+      const sinConexion = !(proyLineas[r.id] && proyLineas[r.id].length);
+      const info = nodeEls[r.id];
+      info.circle.classList.toggle('no-exec', sinConexion);
+      info.label.classList.toggle('no-exec', sinConexion);
+    });
+  }
+  applyNoExec();
+
+  const tooltip = document.getElementById('tooltip');
+  function showTooltip(ev, node){
+    tooltip.style.display = 'block';
+    tooltip.style.left = (ev.clientX + 14) + 'px';
+    tooltip.style.top = (ev.clientY + 14) + 'px';
+    tooltip.innerHTML = `<b>${node.name}</b>`;
+  }
+  function hideTooltip(){ tooltip.style.display = 'none'; }
+
+  const legendDiv = document.getElementById('legend');
+  let activePilar = null;
+  DATA.pilares.forEach(p=>{
+    const item = document.createElement('div');
+    item.className = 'legend-item';
+    item.innerHTML = `<span class="swatch" style="background:${pilarColor[p.id].fill}"></span>${p.name}`;
+    item.addEventListener('click', ()=>{
+      if (activePilar === p.id){
+        activePilar = null;
+        clearHighlight();
+        document.querySelectorAll('.legend-item').forEach(x=>x.classList.remove('dim'));
+      } else {
+        activePilar = p.id;
+        highlight(p.id);
+        document.querySelectorAll('.legend-item').forEach(x=>x.classList.remove('dim'));
+        item.classList.remove('dim');
+        Array.from(legendDiv.children).forEach(c=>{ if(c!==item) c.classList.add('dim'); });
+      }
+    });
+    legendDiv.appendChild(item);
+  });
+
+  const search = document.getElementById('search');
+  search.addEventListener('input', ()=>{
+    const q = search.value.trim().toLowerCase();
+    if (!q){ clearHighlight(); return; }
+    const nodes = new Set(); const links = new Set();
+    for (const nid in nodeEls){
+      if (nodeEls[nid].node.name.toLowerCase().includes(q)){
+        const rs = relatedSet(nid);
+        rs.nodes.forEach(n=>nodes.add(n));
+        rs.links.forEach(l=>links.add(l));
+      }
+    }
+    for (const key in linkEls) linkEls[key].classList.toggle('fade', !links.has(key));
+    for (const nid in nodeEls){
+      const dim = !nodes.has(nid);
+      nodeEls[nid].circle.classList.toggle('fade', dim && nodes.size>0);
+      nodeEls[nid].label.classList.toggle('fade', dim && nodes.size>0);
+      nodeEls[nid].bg.classList.toggle('fade', dim && nodes.size>0);
+    }
+  });
+
+  const wrap = document.getElementById('wrap');
+  const stage = document.getElementById('stage');
+  let scale = 1;
+  function applyScale(){ stage.style.transform = `scale(${scale})`; }
+  document.getElementById('zoomIn').addEventListener('click', ()=>{ scale = Math.min(scale*1.2, 3); applyScale(); });
+  document.getElementById('zoomOut').addEventListener('click', ()=>{ scale = Math.max(scale/1.2, 0.25); applyScale(); });
+  document.getElementById('btnReset').addEventListener('click', ()=>{
+    scale = 1; applyScale(); wrap.scrollTop = 0; wrap.scrollLeft = 0;
+    activePilar = null; search.value=''; clearHighlight();
+    document.querySelectorAll('.legend-item').forEach(x=>x.classList.remove('dim'));
+  });
+  wrap.addEventListener('wheel', (ev)=>{
+    if (!ev.ctrlKey) return;
+    ev.preventDefault();
+    scale = Math.min(3, Math.max(0.25, scale + (ev.deltaY<0? 0.1 : -0.1)));
+    applyScale();
+  }, {passive:false});
+
+  const tabDeclarado = document.getElementById('tabDeclarado');
+  const tabPresupuesto = document.getElementById('tabPresupuesto');
+  function switchTab(tab){
+    currentTab = tab;
+    tabDeclarado.classList.toggle('active', tab==='declarado');
+    tabPresupuesto.classList.toggle('active', tab==='presupuesto');
+    const edges = tab==='declarado' ? DATA.edgesLP_declarado : DATA.edgesLP_presupuesto;
+    rebuildMaps(edges);
+    rebuildLPLinks(edges);
+    applyNoExec();
+    clearHighlight();
+    search.value = '';
+    activePilar = null;
+    document.querySelectorAll('.legend-item').forEach(x=>x.classList.remove('dim'));
+  }
+  tabDeclarado.addEventListener('click', ()=> switchTab('declarado'));
+  tabPresupuesto.addEventListener('click', ()=> switchTab('presupuesto'));
+
+})();
+</script>
+</body>
+</html>

@@ -29,6 +29,7 @@ import {
   accentFor,
   bandFor,
   complianceBands,
+  entriesForPillar,
   formatDate,
   formatValue,
   indexYearProgress,
@@ -70,13 +71,16 @@ export function PillarScorecard() {
 
   if (!detail.data) return <Navigate to="/404" replace />;
 
-  const { pillar, progress, areaProgress, projectProgress, lines, activities, yearProgress } =
+  const { pillar, progress, areaProgress, projectProgress, projects, lines, activities, yearProgress } =
     detail.data;
   const accent = accentFor(pillar.accent_slot);
   const band = bandFor(progress.progress);
 
   const areaById = new Map(areaProgress.map((area) => [area.area_id, area]));
   const lineById = new Map(lines.map((line) => [line.id, line]));
+  // Los vínculos de cada proyecto, para saber por dónde entra en ESTE pilar.
+  // `v_project_progress` trae las cifras pero no la estructura.
+  const linksById = new Map(projects.map((project) => [project.id, project]));
   const years = yearsInPlay(activities.flatMap((activity) => activity.targets));
   // La misma cascada, año a año: cada tabla añade una columna por año con
   // algo reportado. Si no hay ninguno, las tablas se quedan como estaban.
@@ -328,17 +332,29 @@ export function PillarScorecard() {
             yearIndex={yearIndex}
             view={view}
             rows={projectProgress.map((project) => {
-              const line = project.action_line_id
-                ? lines.find((item) => item.id === project.action_line_id)
-                : undefined;
-              const area = line ? areaById.get(line.area_id) : undefined;
+              // Por dónde entra en este pilar. Un proyecto compartido tiene su
+              // línea en otro pilar, y buscarla entre las de este devolvía
+              // "sin línea de acción" para algo que sí está vinculado.
+              const source = linksById.get(project.project_id);
+              const entries = source ? entriesForPillar(source, pillar.id) : [];
+              const entry = entries.find((item) => item.lineId) ?? entries[0];
+              const line = entry?.lineId ? lineById.get(entry.lineId) : undefined;
+              const area = line
+                ? areaById.get(line.area_id)
+                : entry?.areaId
+                  ? areaById.get(entry.areaId)
+                  : undefined;
 
               return {
                 key: project.project_id,
                 scope: "project" as const,
                 code: line?.code || area?.area_code || "—",
                 name: project.name,
-                detail: line ? `${line.area_name} › ${line.name}` : "Sin línea de acción",
+                detail: line
+                  ? `${line.area_name} › ${line.name}`
+                  : area
+                    ? `${area.area_name} › toda el área`
+                    : "Vinculado al pilar completo",
                 target: project.target_value,
                 achieved: project.achieved_value,
                 unit: project.measure_unit,

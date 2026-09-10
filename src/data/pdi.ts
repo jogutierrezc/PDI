@@ -435,6 +435,50 @@ export function pillarsOfProject(project: SdgCountable): string[] {
   return project.pillar_id ? [project.pillar_id] : [];
 }
 
+/* --- Dónde entra un proyecto en un pilar ------------------------------------
+   El espejo en la interfaz de la vista `v_project_entry` (migración 0014). Un
+   proyecto puede apuntar a un pilar de tres formas —a una línea, a un área
+   entera o al pilar entero— y la ficha tiene que filtrar y dibujar la cadena
+   con los vínculos de **ese** pilar, no con `projects.action_line_id`, que es
+   siempre el del vínculo principal.
+
+   Mientras la ficha usó el campo principal, un proyecto compartido mostraba en
+   el pilar B una cadena inventada: el nombre del pilar B seguido del área y la
+   línea del pilar A. Y al filtrar por un área del pilar B desaparecía, aunque
+   su vínculo apuntara justo a una línea de esa área.
+   -------------------------------------------------------------------------- */
+
+/** Un punto de entrada del proyecto en un pilar. */
+export interface ProjectEntry {
+  areaId: string | null;
+  lineId: string | null;
+}
+
+interface LinkedProject {
+  pillar_id: string | null;
+  action_line_id: string | null;
+  links?: { pillar_id: string; area_id: string | null; action_line_id: string | null }[];
+}
+
+/**
+ * Por dónde entra el proyecto en este pilar.
+ *
+ * Devuelve un punto por vínculo, en el orden en que se capturaron. Vacío = el
+ * proyecto no toca este pilar. Un solo punto con las dos partes en null = está
+ * vinculado al pilar entero, sin área ni línea.
+ */
+export function entriesForPillar(project: LinkedProject, pillarId: string): ProjectEntry[] {
+  const links = (project.links ?? []).filter((link) => link.pillar_id === pillarId);
+  if (links.length > 0) {
+    return links.map((link) => ({ areaId: link.area_id, lineId: link.action_line_id }));
+  }
+
+  // Respaldo para un proyecto sin vínculos —anterior al módulo, o insertado a
+  // mano—: su pilar y su línea de siempre. Es el mismo respaldo que la vista.
+  if (project.pillar_id !== pillarId) return [];
+  return [{ areaId: null, lineId: project.action_line_id }];
+}
+
 /** Los ODS a los que aporta un pilar, en orden y sin repetir. */
 export function sdgOfPillar<T extends SdgCountable>(projects: T[], pillarId: string): number[] {
   const goals = new Set<number>();

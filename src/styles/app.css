@@ -2391,6 +2391,17 @@
   width: min(46rem, 100%);
 }
 
+/* Los formularios largos —el de proyectos: fechas, unidades, ODS, vínculos,
+   impactos, archivo y metas— ocupan lo que la pantalla dé. A 46rem se capturan
+   a ciegas, desplazándose media docena de pantallas; con este ancho los campos
+   se reparten en dos columnas y el diálogo cabe casi entero de una vez.
+   El tope de 76rem existe porque más allá el ojo pierde la relación entre la
+   etiqueta y su campo al recorrer la fila. */
+.modal-panel--wide {
+  width: min(76rem, 100%);
+  max-height: min(62rem, 92vh);
+}
+
 @keyframes modal-veil {
   from {
     opacity: 0;

@@ -588,13 +588,13 @@ function ProjectForm({
 
   return (
     <Modal
-      size="reader"
+      size="wide"
       title={project ? "Editar proyecto" : "Nuevo proyecto"}
       description="Un proyecto puede apuntar a varios pilares. El primer vínculo es el principal: desde ese pilar se administra."
       onClose={onClose}
     >
-      <form className="modal-form" onSubmit={handleSubmit}>
-        <label className="admin-field">
+      <form className="modal-form modal-form--wide" onSubmit={handleSubmit}>
+        <label className="admin-field admin-field--wide">
           <span>Título del proyecto</span>
           <input required value={draft.name} onChange={(e) => set("name", e.target.value)} />
         </label>
@@ -650,10 +650,28 @@ function ProjectForm({
           )}
         />
 
-        {/* --- ODS: selección múltiple ------------------------------------- */}
+        {/* --- ODS: selección múltiple -------------------------------------
+             La casilla nativa se oculta (`sr-only`, sigue existiendo para el
+             teclado y el lector de pantalla) porque `.admin-field input` la
+             estiraba al ancho del campo y tapaba el número y el nombre del
+             objetivo: solo se veían recuadros. Lo que marca el estado es la
+             tarjeta entera —borde, fondo y palomita—, no la casilla. -------- */}
         <fieldset className="admin-field sdg-picker">
           <legend>Objetivos de Desarrollo Sostenible</legend>
-          <small>Marca todos a los que aporta el proyecto.</small>
+          <div className="sdg-picker__head">
+            <small>Marca todos a los que aporta el proyecto.</small>
+            <span className="sdg-picker__count" aria-live="polite">
+              {draft.sdg_goals.length === 0
+                ? "Ninguno seleccionado"
+                : `${draft.sdg_goals.length} de ${sdgGoals.length} seleccionados`}
+            </span>
+            {draft.sdg_goals.length > 0 && (
+              <button type="button" className="button-ghost" onClick={() => set("sdg_goals", [])}>
+                Limpiar selección
+              </button>
+            )}
+          </div>
+
           <div className="sdg-picker__grid">
             {sdgGoals.map((goal) => {
               const checked = draft.sdg_goals.includes(goal.id);
@@ -664,6 +682,7 @@ function ProjectForm({
                   style={{ "--sdg": goal.color } as React.CSSProperties}
                 >
                   <input
+                    className="sr-only"
                     type="checkbox"
                     checked={checked}
                     onChange={() =>
@@ -671,16 +690,28 @@ function ProjectForm({
                         "sdg_goals",
                         checked
                           ? draft.sdg_goals.filter((id) => id !== goal.id)
-                          : [...draft.sdg_goals, goal.id],
+                          : [...draft.sdg_goals, goal.id].sort((a, b) => a - b),
                       )
                     }
                   />
-                  <b>{goal.id}</b>
-                  <span>{goal.label}</span>
+                  <b aria-hidden="true">{goal.id}</b>
+                  <span className="sdg-chip__label">
+                    <span className="sr-only">ODS {goal.id}: </span>
+                    {goal.label}
+                  </span>
+                  <span className="sdg-chip__mark" aria-hidden="true">
+                    <Icon name="check" size={12} />
+                  </span>
                 </label>
               );
             })}
           </div>
+
+          {draft.sdg_goals.length > 0 && (
+            <p className="sdg-picker__summary">
+              Aporta a: {draft.sdg_goals.map((id) => sdgById.get(id)?.label ?? `ODS ${id}`).join(" · ")}
+            </p>
+          )}
         </fieldset>
 
         <label className="admin-field">

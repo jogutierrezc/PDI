@@ -77,6 +77,35 @@ interface Draft {
 }
 
 const emptyLink: DraftLink = { pillar_id: "", area_id: "", action_line_id: "" };
+
+/**
+ * La clave por la que dos vínculos son el mismo.
+ *
+ * Es exactamente el índice único de `project_links` —(project_id, pillar_id,
+ * area_id, action_line_id), con `nulls not distinct`—, así que dos filas con la
+ * misma terna chocan en la base. El formulario deja añadir cuantas filas se
+ * quiera y nada impide elegir dos veces el mismo pilar dejando área y línea en
+ * blanco: al guardar, el `upsert` mandaba las dos y Postgres respondía
+ * "ON CONFLICT DO UPDATE command cannot affect row a second time" con un 500,
+ * porque una sola sentencia no puede tocar la misma fila dos veces.
+ *
+ * Las cadenas vacías del borrador se normalizan a null, que es como viajan.
+ */
+function linkKey(link: DraftLink): string {
+  return [link.pillar_id, link.area_id || "", link.action_line_id || ""].join("|");
+}
+
+/** Los vínculos sin repetir, conservando el primero de cada terna —y con él el
+ *  principal, que es el que hereda `projects.pillar_id`—. */
+function dedupeLinks(links: DraftLink[]): DraftLink[] {
+  const seen = new Set<string>();
+  return links.filter((link) => {
+    const key = linkKey(link);
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+}
 const emptyImpact: ProjectImpact = { kind: impactKinds[0], term: impactTerms[0], justification: "" };
 
 function draftFrom(project?: ProjectWithLinks): Draft {
@@ -143,7 +172,10 @@ export function ProjectsAdmin() {
 
     // El primer vínculo con pilar manda: hereda projects.pillar_id, que es lo
     // que decide quién puede editar el proyecto.
-    const links = draft.links.filter((link) => link.pillar_id !== "");
+    //
+    // Y sin repetidos: dos filas con el mismo pilar, área y línea son el mismo
+    // vínculo para la base, y mandarlas juntas hacía fallar el guardado entero.
+    const links = dedupeLinks(draft.links.filter((link) => link.pillar_id !== ""));
     if (links.length === 0) {
       setError("Un proyecto necesita al menos un pilar. Añade un vínculo antes de guardar.");
       return;
@@ -736,8 +768,16 @@ function ProjectForm({
             vincules, así que vincula solo aquellas a las que aporta de verdad.
           </small>
 
-          {draft.links.map((link, index) => (
-            <div className="link-row" key={index}>
+          {draft.links.map((link, index) => {
+            // ¿Esta fila repite una anterior? Se marca aquí en vez de dejar que
+            // el guardado la descarte en silencio: quien la capturó cree que
+            // añadió un aporte más y merece saber que no lo es.
+            const repeated =
+              link.pillar_id !== "" &&
+              draft.links.slice(0, index).some((other) => linkKey(other) === linkKey(link));
+
+            return (
+            <div className={`link-row${repeated ? " is-repeated" : ""}`} key={index}>
               <label>
                 <span>Pilar {index === 0 ? "(principal)" : ""}</span>
                 <select
@@ -804,8 +844,17 @@ function ProjectForm({
               >
                 <Icon name="close" size={14} />
               </button>
+
+              {repeated && (
+                <p className="link-row__repeated">
+                  <Icon name="alert" size={13} />
+                  Repite un vínculo de más arriba. Al guardar se conserva uno solo: elige otra
+                  línea de acción o quita esta fila.
+                </p>
+              )}
             </div>
-          ))}
+            );
+          })}
 
           <button
             className="button-ghost author-add"

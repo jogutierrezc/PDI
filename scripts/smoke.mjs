@@ -1008,6 +1008,51 @@ const routes = [
     },
   },
   {
+    path: "/admin/proyectos",
+    note: "un vínculo repetido se avisa en vez de romper el guardado",
+    expect: "Editar proyecto",
+    session: true,
+    interact: async (window, tick) => {
+      const edit = [...window.document.querySelectorAll('.project-card__foot button')].find(
+        (button) => button.textContent.includes('Editar'),
+      );
+      edit.click();
+      await tick();
+
+      const dialog = window.document.querySelector('.modal-panel');
+      const añadir = [...dialog.querySelectorAll('button')].find((button) =>
+        button.textContent.includes('Añadir pilar'),
+      );
+      if (!añadir) throw new Error('no se encontró el botón de añadir vínculo');
+
+      añadir.dispatchEvent(new window.Event('click', { bubbles: true }));
+      await tick();
+
+      // La fila nueva se apunta al mismo pilar que el segundo vínculo, que ya
+      // apuntaba al pilar entero: misma terna (pilar, sin área, sin línea).
+      // Es exactamente lo que provocaba el 500 de Postgres,
+      // "ON CONFLICT DO UPDATE command cannot affect row a second time".
+      const filas = [...dialog.querySelectorAll('.link-row')];
+      if (filas.length !== 3) {
+        throw new Error(`se esperaban 3 vínculos y hay ${filas.length}`);
+      }
+
+      const selector = filas[2].querySelector('select');
+      selector.value = 'p2';
+      selector.dispatchEvent(new window.Event('change', { bubbles: true }));
+      await tick();
+
+      const marcadas = dialog.querySelectorAll('.link-row.is-repeated');
+      if (marcadas.length !== 1) {
+        throw new Error(`el vínculo repetido no se marcó (${marcadas.length} marcadas)`);
+      }
+      const aviso = dialog.querySelector('.link-row__repeated')?.textContent ?? '';
+      if (!aviso.includes('Repite un vínculo de más arriba')) {
+        throw new Error('no se explica por qué la fila está marcada');
+      }
+    },
+  },
+  {
     path: "/admin/pilares/ambiente-tecnologico/configurar",
     expect: "Áreas estratégicas",
     session: true,

@@ -262,6 +262,29 @@
   }
 }
 
+/* Un vínculo que repite otro. No se bloquea el guardado —se conserva uno solo
+   y ya está—, pero tiene que verse: quien añadió la fila cree que sumó un
+   aporte más. */
+.link-row.is-repeated {
+  border-color: color-mix(in srgb, var(--status-pending) 45%, transparent);
+  background: var(--surface);
+}
+
+.link-row__repeated {
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  color: var(--status-pending);
+  font-size: var(--text-2xs);
+  font-weight: 700;
+  line-height: var(--leading-snug);
+}
+
+.link-row__repeated svg {
+  flex: none;
+}
+
 .impact-row__why textarea {
   resize: vertical;
 }

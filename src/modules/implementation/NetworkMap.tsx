@@ -15,8 +15,7 @@
 
    Dos diferencias con el prototipo, deliberadas: los datos salen de Supabase en
    vez de un JSON pegado en el HTML, y los colores son los tokens del portal
-   —validados para el tema oscuro— en vez de hexadecimales fijos. Y una adición:
-   la quinta columna, los ODS.
+   —validados para el tema oscuro— en vez de hexadecimales fijos.
 
    Dos formas de seleccionar, y hacen falta las dos:
 
@@ -39,12 +38,12 @@ import { formatBudget } from "../../data/pdi";
 import { clip, indexNetwork, relatedTo, relatedToPillar, search } from "./network";
 import type { Network, NetworkColumn, NetworkNode, Related } from "./network";
 
-/** Dónde cae cada columna. Del diseño original, más la de ODS al final. */
-const COL_X = { pilar: 300, area: 680, linea: 1225, proyecto: 1375, ods: 1920 } as const;
+/** Dónde cae cada columna, y el ancho del lienzo: los del diseño original. */
+const COL_X = { pilar: 300, area: 680, linea: 1225, proyecto: 1375 } as const;
 const MARGIN = 30;
-const WIDTH = 2220;
+const WIDTH = 1865;
 
-const COLUMN_ORDER: NetworkColumn[] = ["pilar", "area", "linea", "proyecto", "ods"];
+const COLUMN_ORDER: NetworkColumn[] = ["pilar", "area", "linea", "proyecto"];
 
 /** Radio y tamaño de etiqueta por columna: el peso visual baja al bajar de
  *  nivel, que es lo que deja leer sesenta líneas sin que tapen a sus áreas. */
@@ -53,19 +52,17 @@ const SHAPE = {
   area: { r: 4.5, side: "end", perChar: 6.0 },
   linea: { r: 3, side: "end", perChar: 5.7 },
   proyecto: { r: 7, side: "start", perChar: 6.6 },
-  ods: { r: 6, side: "start", perChar: 5.7 },
 } as const;
 
 /** Tope de caracteres por etiqueta. Un nombre más largo invadiría la columna
  *  siguiente; completo sigue estando en la ficha flotante. */
-const MAX_CHARS = { pilar: 46, area: 58, linea: 74, proyecto: 62, ods: 44 } as const;
+const MAX_CHARS = { pilar: 46, area: 58, linea: 74, proyecto: 62 } as const;
 
 const COLUMN_LABEL: Record<NetworkColumn, string> = {
   pilar: "Pilar",
   area: "Área estratégica",
   linea: "Línea de acción",
   proyecto: "Proyecto",
-  ods: "Objetivo de Desarrollo Sostenible",
 };
 
 export interface NetworkMapProps {
@@ -364,8 +361,7 @@ export function NetworkMap({
       )}
 
       <p className="netmap__columns" aria-hidden="true">
-        Pilar (P) <i>·</i> Área estratégica (AE) <i>·</i> Línea de acción (LA) <i>·</i> Proyecto (PR){" "}
-        <i>·</i> Objetivo de Desarrollo Sostenible (ODS)
+        Pilar (P) <i>·</i> Área estratégica (AE) <i>·</i> Línea de acción (LA) <i>·</i> Proyecto (PR)
       </p>
 
       <div className="netmap__wrap" ref={wrapRef}>

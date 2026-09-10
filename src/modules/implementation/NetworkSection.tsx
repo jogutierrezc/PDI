@@ -15,6 +15,7 @@
    ========================================================================== */
 
 import { useMemo, useState } from "react";
+import { Link } from "react-router-dom";
 import { CardSkeleton, EmptyBlock, ErrorBlock } from "../../components/ui/QueryState";
 import { accentFor, formatBudget, EXECUTED_BUDGET } from "../../data/pdi";
 import { NetworkMap } from "./NetworkMap";
@@ -27,7 +28,7 @@ const VIEWS: { id: BudgetMode; label: string; hint: string }[] = [
   {
     id: "declarado",
     label: "Relaciones declaradas",
-    hint: "Todo lo capturado: qué área cuelga de qué pilar, qué línea de qué área, a qué apunta cada proyecto y a qué ODS aporta.",
+    hint: "Todo lo capturado: qué área cuelga de qué pilar, qué línea de qué área y a qué apunta cada proyecto.",
   },
   {
     id: "estimado",
@@ -88,7 +89,7 @@ export function NetworkSection({
     <div className="section-heading">
       <span className="eyebrow">Relacionamiento</span>
       <h2 id="mapa-title">
-        Mapa numerado — Pilar › Área estratégica › Línea de acción › Proyecto › ODS
+        Mapa numerado — Pilar › Área estratégica › Línea de acción › Proyecto
       </h2>
     </div>
   );
@@ -125,13 +126,15 @@ export function NetworkSection({
       <div className="section-heading">
         <span className="eyebrow">Relacionamiento</span>
         <h2 id="mapa-title">
-          Mapa numerado — Pilar › Área estratégica › Línea de acción › Proyecto › ODS
+          Mapa numerado — Pilar › Área estratégica › Línea de acción › Proyecto
         </h2>
         <p>
           Cada elemento lleva su número: P = pilar, AE = área estratégica, LA = línea de acción, PR
-          = proyecto, ODS = objetivo de desarrollo sostenible. Pasa el cursor por un nodo para ver
-          su cadena y <b>púlsalo para fijarla</b>: se queda encendida aunque cambies de vista,
-          busques otra cosa o te desplaces. Ctrl + rueda del ratón hace zoom.
+          = proyecto. Pasa el cursor por un nodo para ver su cadena y <b>púlsalo para fijarla</b>:
+          se queda encendida aunque cambies de vista, busques otra cosa o te desplaces. Ctrl +
+          rueda del ratón hace zoom. Los ODS de cada proyecto aparecen en su ficha al posar el
+          cursor; la lectura completa está en{" "}
+          <Link to="/ods">PDI y los ODS</Link>.
         </p>
       </div>
 
@@ -186,14 +189,14 @@ export function NetworkSection({
         <NetworkMap
           network={view.network}
           legend={legend}
-          label={`Mapa numerado del PDI: ${counts.pilares} pilares, ${counts.areas} áreas estratégicas, ${counts.lineas} líneas de acción, ${counts.proyectos} proyectos y ${counts.ods} objetivos de desarrollo sostenible.`}
+          label={`Mapa numerado del PDI: ${counts.pilares} pilares, ${counts.areas} áreas estratégicas, ${counts.lineas} líneas de acción y ${counts.proyectos} proyectos.`}
           weightByValue={mode !== "declarado"}
           dimmed={mode === "declarado" ? undefined : view.dimmed}
           onRefresh={onRetry}
           refreshing={refreshing}
           footer={
             mode === "declarado"
-              ? `${counts.pilares} pilares · ${counts.areas} áreas estratégicas · ${counts.lineas} líneas de acción · ${counts.proyectos} proyectos · ${counts.ods} ODS · ${counts.relaciones} relaciones`
+              ? `${counts.pilares} pilares · ${counts.areas} áreas estratégicas · ${counts.lineas} líneas de acción · ${counts.proyectos} proyectos · ${counts.relaciones} relaciones`
               : `${view.network.counts.relaciones} relaciones en pie · ${view.projects} de ${counts.proyectos} proyectos con relación en esta vista · ${formatBudget(view.total)}`
           }
         />

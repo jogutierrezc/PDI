@@ -1,9 +1,17 @@
 /* =============================================================================
    Mapa numerado de relacionamiento · el modelo y el trazado
 
-   Traduce lo que hay en la base —pilares, áreas, líneas, proyectos y sus ODS— a
-   la rejilla de columnas del mapa: cinco columnas, un nodo por fila y una curva
+   Traduce lo que hay en la base —pilares, áreas, líneas y proyectos— a la
+   rejilla de columnas del mapa: cuatro columnas, un nodo por fila y una curva
    por relación.
+
+   Hubo una quinta columna con los ODS y se retiró. Un objetivo cuelga de varios
+   proyectos repartidos por todo el alto del mapa, así que se situaba en el
+   promedio de unos nodos que no tienen nada que ver entre sí y sus curvas
+   cruzaban el lienzo entero: enredaba el dibujo sin responder ninguna pregunta.
+   Los ODS de cada proyecto siguen a un golpe de cursor, en su ficha flotante, y
+   la lectura completa —los diecisiete, con lo que aporta cada pilar— es la
+   página "PDI y los ODS", que existe para eso.
 
    El diseño original (`Mapa_Red_Pilares_Proyectos.html`) traía las posiciones
    `y` ya calculadas dentro del HTML: alguien las había resuelto fuera y las
@@ -16,7 +24,6 @@
      · Un área se sitúa en el promedio de sus líneas.
      · Un pilar, en el promedio de sus áreas.
      · Un proyecto, en el promedio de todo aquello a lo que se vincula.
-     · Un ODS, en el promedio de los proyectos que lo declaran.
 
    Así el mapa se ordena solo y ningún nodo cruza la mitad del lienzo para
    llegar a los suyos.
@@ -31,23 +38,22 @@ import { accentFor, pillarsOfProject, sdgById } from "../../data/pdi";
 import type { AreaWithLines, PillarWithProgress } from "../../data/queries";
 import type { ProjectWithLinks } from "../../types/database";
 
-export type NetworkColumn = "pilar" | "area" | "linea" | "proyecto" | "ods";
+export type NetworkColumn = "pilar" | "area" | "linea" | "proyecto";
 
 export interface NetworkNode {
   /** Único en todo el mapa: el prefijo evita que un área y una línea con el
    *  mismo uuid —imposible, pero barato de descartar— se pisen. */
   id: string;
   column: NetworkColumn;
-  /** El número del mapa: P1, AE3, LA12, PR4, ODS9. */
+  /** El número del mapa: P1, AE3, LA12, PR4. */
   code: string;
   name: string;
   y: number;
-  /** Color del nodo. Los cuatro primeros niveles heredan el del pilar; el ODS
-   *  lleva el suyo oficial y el proyecto uno neutro: un proyecto de tres
-   *  pilares no puede tener el color de uno. */
+  /** Color del nodo. La estructura hereda el del pilar; el proyecto lleva uno
+   *  neutro, porque uno que aporta a tres pilares no puede tener el de uno. */
   color: string;
   /** A qué pilares pertenece. Un proyecto puede pertenecer a varios; el resto,
-   *  a uno. Vacío solo en un ODS, que cuelga de sus proyectos. */
+   *  a uno. */
   pillarIds: string[];
   /** Líneas del pie de la ficha flotante. */
   meta: string[];
@@ -77,7 +83,6 @@ export interface Network {
     areas: number;
     lineas: number;
     proyectos: number;
-    ods: number;
     relaciones: number;
   };
 }
@@ -302,60 +307,6 @@ export function buildNetwork({ pillars, areas, projects }: BuildInput): Network 
     yByNode.set(projectId, nodes[nodes.length - 1].y);
   }
 
-  /* --- Paso 4: los ODS ---------------------------------------------------
-     Solo los que algún proyecto declara. Un ODS sin proyectos no tendría de
-     qué colgar, y en un mapa de relaciones un punto suelto no dice nada: eso
-     se lee mejor en la página "PDI y los ODS", donde los diecisiete aparecen
-     precisamente para enseñar los que el plan no toca. */
-  const goalProjects = new Map<number, ProjectWithLinks[]>();
-  for (const project of orderedProjects) {
-    if (!yByNode.has(`r:${project.id}`)) continue;
-    for (const id of new Set(project.sdg_goals ?? [])) {
-      if (!sdgById.has(id)) continue;
-      const list = goalProjects.get(id) ?? [];
-      list.push(project);
-      goalProjects.set(id, list);
-    }
-  }
-
-  for (const id of [...goalProjects.keys()].sort((a, b) => a - b)) {
-    const goal = sdgById.get(id)!;
-    const own = goalProjects.get(id)!;
-    const nodeId = `s:${id}`;
-    const value = own.reduce((total, project) => total + (project.total_value ?? 0), 0);
-    const pillarIds = [...new Set(own.flatMap((project) => pillarsOfProject(project)))].filter((p) =>
-      knownPillars.has(p),
-    );
-
-    nodes.push({
-      id: nodeId,
-      column: "ods",
-      code: `ODS${id}`,
-      name: goal.label,
-      y: average(own.map((project) => yByNode.get(`r:${project.id}`)!)),
-      color: goal.color,
-      pillarIds,
-      meta: [
-        `Objetivo ${id} de la Agenda 2030`,
-        `${own.length} ${own.length === 1 ? "proyecto aporta" : "proyectos aportan"} desde ${pillarIds.length} ${pillarIds.length === 1 ? "pilar" : "pilares"}`,
-      ],
-      value,
-    });
-
-    for (const project of own) {
-      edges.push(
-        edge(
-          `r:${project.id}`,
-          nodeId,
-          goal.color,
-          pillarsOfProject(project).filter((p) => knownPillars.has(p)),
-          project.id,
-          project.total_value ?? 0,
-        ),
-      );
-    }
-  }
-
   return {
     nodes,
     edges,
@@ -365,7 +316,6 @@ export function buildNetwork({ pillars, areas, projects }: BuildInput): Network 
       areas: areaNumber,
       lineas: lineNumber,
       proyectos: projectNumber,
-      ods: goalProjects.size,
       relaciones: edges.length,
     },
   };
@@ -388,9 +338,10 @@ function average(values: number[]): number {
 }
 
 /* --- Consulta del mapa ------------------------------------------------------
-   Dado un nodo, qué se ilumina. Sube hasta el pilar y baja hasta los ODS, que
-   es lo que hace legible una maraña de doscientas curvas: al posar el cursor
-   sobre una línea de acción se ve su cadena entera, no su vecindad inmediata.
+   Dado un nodo, qué se ilumina. Sube hasta el pilar y baja hasta los proyectos,
+   que es lo que hace legible una maraña de doscientas curvas: al posar el
+   cursor sobre una línea de acción se ve su cadena entera, no su vecindad
+   inmediata.
    -------------------------------------------------------------------------- */
 
 export interface NetworkIndex {
@@ -525,9 +476,9 @@ export function budgetView(network: Network, mode: BudgetMode): BudgetView {
 
   const edges = network.edges.filter(keep);
 
-  // Con qué se queda cada nodo. Una línea sin proyecto, un proyecto sin línea y
-  // un ODS sin proyecto se atenúan: siguen en el mapa —el hueco es el dato—
-  // pero dejan de competir por la atención.
+  // Con qué se queda cada nodo. Una línea sin proyecto y un proyecto sin línea
+  // se atenúan: siguen en el mapa —el hueco es el dato— pero dejan de competir
+  // por la atención.
   const linked = new Set<string>();
   for (const item of edges) {
     if (item.projectId === null) continue;

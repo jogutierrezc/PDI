@@ -610,10 +610,6 @@
   font-weight: 600;
 }
 
-.netmap__node--ods .netmap__label {
-  font-size: 11px;
-}
-
 .netmap__dot {
   stroke: var(--surface);
   stroke-width: 1;

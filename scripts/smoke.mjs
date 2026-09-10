@@ -506,12 +506,16 @@ const routes = [
       "AE1. Infraestructura tecnológica",
       "LA1. Infraestructura base",
       "PR1. Migración a la nube institucional",
-      "ODS4. Educación de calidad",
-      "ODS9. Industria, innovación e infraestructura",
       "Relaciones declaradas",
       "Presupuesto estimado",
     ],
-    absent: ["Tareas críticas"],
+    absent: [
+      "Tareas críticas",
+      // Los ODS salieron del mapa: enredaban el dibujo sin responder nada.
+      // Siguen en la ficha flotante de cada proyecto y en la página /ods.
+      "ODS4. Educación de calidad",
+      "Objetivo de Desarrollo Sostenible (ODS)",
+    ],
   },
   {
     path: "/implementacion",

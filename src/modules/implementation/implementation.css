@@ -416,3 +416,330 @@
 .implementation-shell > .year-scrubber {
   margin-bottom: var(--space-7);
 }
+
+/* =============================================================================
+   Mapa numerado de relacionamiento
+
+   La hoja del diseño original (`Mapa_Red_Pilares_Proyectos.html`) traducida a
+   los tokens del portal. Se conserva todo lo que hace legible el mapa —los
+   tamaños de nodo y etiqueta por columna, el fondo bajo cada rótulo, el 6 % de
+   opacidad de lo apagado, la transición de 150 ms— y se cambia únicamente de
+   dónde salen los colores: los del prototipo eran hexadecimales fijos con su
+   propio juego de variables para el tema oscuro, y el portal ya tiene los
+   suyos validados en los dos temas.
+   ========================================================================== */
+
+.netmap-section {
+  display: grid;
+  gap: var(--space-6);
+  scroll-margin-top: calc(var(--header-h) + var(--space-6));
+}
+
+.netmap {
+  display: grid;
+  gap: var(--space-4);
+  padding: var(--space-5) 0 0;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+}
+
+/* --- Leyenda: aísla un pilar ------------------------------------------------- */
+
+.netmap__legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2) var(--space-3);
+  padding: 0 var(--space-5);
+}
+
+.netmap__legend-item {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: 3px var(--space-3);
+  color: var(--ink-secondary);
+  background: none;
+  border: 1px solid transparent;
+  border-radius: var(--radius-xs);
+  font-size: var(--text-xs);
+  cursor: pointer;
+  transition: opacity var(--dur-fast) var(--ease-out), border-color var(--dur-fast) var(--ease-out);
+}
+
+.netmap__legend-item:hover {
+  border-color: var(--line-strong);
+}
+
+.netmap__legend-item[aria-pressed="true"] {
+  border-color: var(--line-strong);
+  color: var(--ink);
+  font-weight: 700;
+}
+
+.netmap__legend-item.is-dim {
+  opacity: 0.35;
+}
+
+.netmap__swatch {
+  width: 10px;
+  height: 10px;
+  flex: none;
+  border-radius: 50%;
+}
+
+/* --- Barra de herramientas ---------------------------------------------------- */
+
+.netmap__toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+  padding: 0 var(--space-5) var(--space-3);
+  border-bottom: 1px solid var(--line);
+}
+
+.netmap__search {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex: 1;
+  min-width: 14rem;
+  max-width: 26rem;
+  padding: 0 var(--space-3);
+  color: var(--ink-faint);
+  background: var(--surface-2);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+}
+
+.netmap__search:focus-within {
+  border-color: var(--brand-blue);
+  box-shadow: var(--ring);
+}
+
+.netmap__search input {
+  flex: 1;
+  min-width: 0;
+  padding: var(--space-2) 0;
+  color: var(--ink);
+  background: none;
+  border: 0;
+  font-size: var(--text-sm);
+}
+
+.netmap__search input:focus-visible {
+  outline: none;
+}
+
+.netmap__zoom {
+  min-width: 3.2rem;
+  color: var(--ink-muted);
+  font-size: var(--text-xs);
+  font-variant-numeric: tabular-nums;
+  text-align: center;
+}
+
+.netmap__columns {
+  padding: 0 var(--space-5);
+  color: var(--ink-muted);
+  font-size: var(--text-xs);
+  font-weight: 700;
+}
+
+.netmap__columns i {
+  color: var(--ink-faint);
+  font-style: normal;
+}
+
+/* --- El lienzo ----------------------------------------------------------------
+   Alto fijo con desplazamiento propio: el mapa mide más de mil píxeles y dejarlo
+   crecer empujaría el repositorio documental fuera de la vista de cualquiera.
+   ---------------------------------------------------------------------------- */
+
+.netmap__wrap {
+  position: relative;
+  height: 40rem;
+  overflow: auto;
+  overscroll-behavior: contain;
+  background: var(--surface);
+  border-top: 1px solid var(--line);
+  border-bottom: 1px solid var(--line);
+}
+
+.netmap__stage {
+  transform-origin: 0 0;
+  transition: transform var(--dur-fast) var(--ease-out);
+}
+
+.netmap__wrap svg {
+  display: block;
+}
+
+.netmap__link {
+  fill: none;
+  opacity: 0.28;
+  transition: opacity var(--dur-fast) var(--ease-out);
+}
+
+.netmap__label-bg {
+  fill: var(--surface);
+  opacity: 0.82;
+}
+
+.netmap__label {
+  fill: var(--ink-secondary);
+  font-family: inherit;
+  font-size: 10.5px;
+}
+
+.netmap__node--pilar .netmap__label {
+  fill: var(--ink);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.netmap__node--area .netmap__label {
+  font-size: 11px;
+}
+
+.netmap__node--proyecto .netmap__label {
+  fill: var(--ink);
+  font-size: 12.5px;
+  font-weight: 600;
+}
+
+.netmap__node--ods .netmap__label {
+  font-size: 11px;
+}
+
+.netmap__dot {
+  stroke: var(--surface);
+  stroke-width: 1;
+}
+
+.netmap__node {
+  cursor: pointer;
+}
+
+/* Apagado por el resaltado: casi invisible, pero sigue ahí. Es lo que deja leer
+   una cadena concreta dentro de doscientas curvas. */
+.netmap__node.is-faded,
+.netmap__link.is-faded {
+  opacity: 0.06;
+}
+
+/* Apagado por la pestaña de presupuesto: se atenúa, no se esconde. El nodo sin
+   dinero detrás es justamente lo que hay que poder ver. */
+.netmap__node.is-dim {
+  opacity: 0.22;
+}
+
+.netmap__tooltip {
+  position: fixed;
+  z-index: var(--z-modal);
+  display: none;
+  max-width: 22rem;
+  padding: var(--space-3) var(--space-4);
+  pointer-events: none;
+  background: var(--surface);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-sm);
+  box-shadow: var(--shadow-lg);
+  font-size: var(--text-xs);
+  line-height: var(--leading-snug);
+}
+
+.netmap__tooltip strong {
+  display: block;
+  margin-bottom: 2px;
+  color: var(--ink);
+  font-size: var(--text-sm);
+}
+
+.netmap__tooltip small {
+  display: block;
+  color: var(--ink-muted);
+}
+
+.netmap__footer {
+  padding: 0 var(--space-5) var(--space-4);
+  color: var(--ink-muted);
+  font-size: var(--text-xs);
+  font-variant-numeric: tabular-nums;
+}
+
+/* --- Pestañas del mapa de presupuesto ------------------------------------------ */
+
+.netmap-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1);
+  border-bottom: 1px solid var(--line);
+}
+
+.netmap-tab {
+  padding: var(--space-3) var(--space-4);
+  color: var(--ink-secondary);
+  background: none;
+  border: 0;
+  border-bottom: 2.5px solid transparent;
+  font-size: var(--text-sm);
+  font-weight: 600;
+  cursor: pointer;
+  transition: color var(--dur-fast) var(--ease-out), border-color var(--dur-fast) var(--ease-out);
+}
+
+.netmap-tab span {
+  color: var(--ink-faint);
+  font-weight: 400;
+  font-size: var(--text-xs);
+  font-variant-numeric: tabular-nums;
+}
+
+.netmap-tab:hover {
+  color: var(--ink);
+}
+
+.netmap-tab.is-on {
+  color: var(--ink);
+  border-bottom-color: var(--brand-blue);
+}
+
+.netmap-notice {
+  margin-bottom: var(--space-4);
+  padding: var(--space-4) var(--space-5);
+  color: var(--ink-secondary);
+  background: var(--surface-2);
+  border-left: 3px solid var(--brand-blue);
+  border-radius: var(--radius-sm);
+  font-size: var(--text-sm);
+  line-height: var(--leading-normal);
+}
+
+.netmap-notice b {
+  color: var(--ink);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .netmap__stage,
+  .netmap__link,
+  .netmap__node,
+  .netmap__legend-item,
+  .netmap-tab {
+    transition: none;
+  }
+}
+
+/* Búsqueda sin resultados. El mapa se queda entero —apagarlo del todo se lee
+   como una pantalla rota— y el aviso pone en palabras lo que pasó. */
+.netmap__empty {
+  margin: 0 var(--space-5);
+  padding: var(--space-3) var(--space-4);
+  color: var(--ink-secondary);
+  background: var(--surface-2);
+  border-left: 3px solid var(--status-pending);
+  border-radius: var(--radius-xs);
+  font-size: var(--text-xs);
+}

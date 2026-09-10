@@ -500,8 +500,48 @@ const routes = [
       // …y la formulación que vive en Storage, con su etiqueta de origen.
       "formulacion.pdf",
       "Formulación de proyectos",
+      // El mapa numerado: las cinco columnas con su numeración propia.
+      "Mapa numerado",
+      "P1. Ambiente tecnológico",
+      "AE1. Infraestructura tecnológica",
+      "LA1. Infraestructura base",
+      "PR1. Migración a la nube institucional",
+      "ODS4. Educación de calidad",
+      "ODS9. Industria, innovación e infraestructura",
+      "Modelo declarado",
+      "Presupuesto estimado",
     ],
     absent: ["Tareas críticas"],
+  },
+  {
+    path: "/implementacion",
+    note: "el mapa de presupuesto cambia de pestaña y dice qué queda en pie",
+    expect: "Mapa numerado",
+    interact: async (window, tick) => {
+      const nodos = window.document.querySelectorAll(".netmap__node");
+      // Dos mapas en la página: el de relaciones y el de presupuesto.
+      if (window.document.querySelectorAll(".netmap").length !== 2) {
+        throw new Error("no se dibujaron los dos mapas");
+      }
+      if (nodos.length === 0) throw new Error("el mapa no tiene nodos");
+
+      const tabs = [...window.document.querySelectorAll(".netmap-tab")];
+      const ejecutado = tabs.find((tab) => tab.textContent.includes("Presupuesto ejecutado"));
+      if (!ejecutado) throw new Error("falta la pestaña de presupuesto ejecutado");
+
+      ejecutado.dispatchEvent(new window.Event("click", { bubbles: true }));
+      await tick();
+
+      const aviso = window.document.querySelector(".netmap-notice")?.textContent ?? "";
+      if (!aviso.includes("no tiene dónde registrar ejecución presupuestal")) {
+        throw new Error("la pestaña de ejecutado no explica por qué está vacía");
+      }
+      // Sin ejecución registrada, ninguna relación de proyecto queda en pie y
+      // el proyecto tiene que verse atenuado, no desaparecido.
+      if (!window.document.querySelector(".netmap__node.is-dim")) {
+        throw new Error("los nodos sin presupuesto no se atenúan");
+      }
+    },
   },
   {
     path: "/implementacion/pilar/ambiente-tecnologico",

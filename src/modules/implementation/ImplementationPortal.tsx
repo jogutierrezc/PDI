@@ -11,6 +11,7 @@ import {
   usePillarYears,
   useProjects,
   usePublicDocuments,
+  useStructure,
   useSummary,
 } from "../../data/queries";
 import {
@@ -28,6 +29,7 @@ import {
   yearScopeLabel,
   EXECUTED_BUDGET,
 } from "../../data/pdi";
+import { NetworkSection } from "./NetworkSection";
 import { buildRepository } from "../../data/repository";
 import type { RepositorySource } from "../../data/repository";
 import type { YearScope } from "../../data/pdi";
@@ -50,6 +52,9 @@ export function ImplementationPortal() {
   // y traen el documento que los formula. RLS ya filtra a los de pilares
   // públicos, así que un anónimo no ve más de lo que puede abrir.
   const projects = useProjects();
+  // Áreas y líneas de todo el plan: el mapa de relacionamiento las necesita de
+  // los seis pilares a la vez, y `usePillarDetail` solo sabe de uno.
+  const structure = useStructure();
 
   const totals = summary.data ?? emptySummary;
 
@@ -242,6 +247,22 @@ export function ImplementationPortal() {
             })
           )}
         </section>
+
+        {/* --- Mapa numerado de relacionamiento -----------------------------
+            Va aquí, entre los pilares y el repositorio: después de saber cómo
+            va cada pilar y antes de ir a los documentos, que es cuando alguien
+            se pregunta cómo se conecta todo. --------------------------------- */}
+        <NetworkSection
+          pillars={pillars.data ?? []}
+          areas={structure.data ?? []}
+          projects={projectRows}
+          pending={pillars.isPending || structure.isPending || projects.isPending}
+          error={(structure.error ?? pillars.error ?? projects.error) as Error | null}
+          onRetry={() => {
+            void structure.refetch();
+            void projects.refetch();
+          }}
+        />
 
         <section className="implementation-repo" id="repositorio" aria-labelledby="repositorio-title">
           <div className="section-heading">

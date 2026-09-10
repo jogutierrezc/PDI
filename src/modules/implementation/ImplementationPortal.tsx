@@ -9,19 +9,27 @@ import {
   useCurrentPeriod,
   usePillars,
   usePillarYears,
+  useProjects,
   usePublicDocuments,
   useSummary,
 } from "../../data/queries";
 import {
   accentFor,
   aggregateYears,
+  budgetedCount,
   emptySummary,
+  estimatedBudget,
+  formatBudget,
   formatDate,
   indexYearProgress,
+  planElapsed,
   planYears,
   toneForProgress,
   yearScopeLabel,
+  EXECUTED_BUDGET,
 } from "../../data/pdi";
+import { buildRepository } from "../../data/repository";
+import type { RepositorySource } from "../../data/repository";
 import type { YearScope } from "../../data/pdi";
 import "./implementation.css";
 
@@ -29,12 +37,19 @@ export function ImplementationPortal() {
   // Arranca en el plan entero, igual que el tablero: la lectura de conjunto
   // primero, y el año concreto para quien lo busque.
   const [yearScope, setYearScope] = useState<YearScope>("plan");
+  // Qué fuente del repositorio se está mirando. Arranca en todas: la unión es
+  // el punto de la sección.
+  const [repoFilter, setRepoFilter] = useState<RepositorySource | "todos">("todos");
 
   const pillars = usePillars();
   const summary = useSummary();
   const pillarYears = usePillarYears();
   const period = useCurrentPeriod();
   const documents = usePublicDocuments();
+  // Los proyectos entran por dos motivos: son la única cifra de dinero del plan
+  // y traen el documento que los formula. RLS ya filtra a los de pilares
+  // públicos, así que un anónimo no ve más de lo que puede abrir.
+  const projects = useProjects();
 
   const totals = summary.data ?? emptySummary;
 
@@ -54,6 +69,25 @@ export function ImplementationPortal() {
 
   // Null = ningún pilar ha reportado ese corte todavía.
   const headline = yearScope === "plan" ? aggregate.plan : aggregate.at(yearScope);
+
+  const projectRows = useMemo(() => projects.data ?? [], [projects.data]);
+  const planBudget = estimatedBudget(projectRows);
+  const withBudget = budgetedCount(projectRows);
+  const elapsed = planElapsed();
+
+  const pillarNames = useMemo(
+    () => new Map((pillars.data ?? []).map((pillar) => [pillar.id, pillar.name])),
+    [pillars.data],
+  );
+  const repository = useMemo(
+    () => buildRepository(documents.data ?? [], projectRows, pillarNames),
+    [documents.data, projectRows, pillarNames],
+  );
+  const visibleRepository = repository.filter(
+    (entry) => repoFilter === "todos" || entry.source === repoFilter,
+  );
+  const formulationCount = repository.filter((entry) => entry.source === "proyecto").length;
+  const institutionalCount = repository.length - formulationCount;
 
   return (
     <PublicLayout className="implementation-page">
@@ -101,6 +135,40 @@ export function ImplementationPortal() {
               : `Cumplimiento de ${yearScope}: lo logrado sobre lo comprometido para ese año.`
           }
         />
+
+        {/* --- Recursos y tiempo del plan ---------------------------------
+            Tres cifras que antes solo existían dentro de la ficha de un pilar y
+            que describen el plan entero. El presupuesto lo suman los proyectos
+            —no hay otra cifra de dinero en el portal— y el tiempo lo pone el
+            calendario contra el horizonte 2024-2028. ------------------------ */}
+        <section className="implementation-stats" aria-label="Recursos y tiempo del plan">
+          <PlanStat
+            label="Presupuesto estimado"
+            value={formatBudget(planBudget)}
+            progress={projectRows.length === 0 ? 0 : Math.round((withBudget * 100) / projectRows.length)}
+            caption={
+              projectRows.length === 0
+                ? "Todavía no hay proyectos formulados"
+                : `Declarado por ${withBudget} de ${projectRows.length} ${projectRows.length === 1 ? "proyecto" : "proyectos"}`
+            }
+            icon="document"
+            pending={projects.isPending}
+          />
+          <PlanStat
+            label="Presupuesto ejecutado"
+            value={formatBudget(EXECUTED_BUDGET)}
+            progress={0}
+            caption="El portal aún no registra ejecución presupuestal"
+            icon="chart"
+          />
+          <PlanStat
+            label="Tiempo transcurrido"
+            value={elapsed.label}
+            progress={elapsed.progress}
+            caption={elapsed.caption}
+            icon="clock"
+          />
+        </section>
 
         <section className="implementation-grid stagger" id="indicadores" aria-label="Pilares estratégicos y avance">
           {pillars.isPending ? (
@@ -179,40 +247,70 @@ export function ImplementationPortal() {
           <div className="section-heading">
             <span className="eyebrow">Repositorio documental</span>
             <h2 id="repositorio-title">Documentos de soporte del plan</h2>
-            <p>Las fuentes que respaldan cada cifra publicada en este portal.</p>
+            <p>
+              Las fuentes que respaldan cada cifra publicada en este portal: los documentos
+              institucionales del PDI y el documento con el que se formuló cada proyecto.
+            </p>
           </div>
 
-          {documents.isPending ? (
+          {/* Un proyecto sin documento no aparece, así que el filtro solo se
+              ofrece cuando de verdad hay dos fuentes que separar. */}
+          {formulationCount > 0 && (
+            <div className="repo-filter" role="group" aria-label="Filtrar el repositorio por origen">
+              {(
+                [
+                  ["todos", "Todos", repository.length],
+                  ["institucional", "Documentos del plan", institutionalCount],
+                  ["proyecto", "Formulación de proyectos", formulationCount],
+                ] as const
+              ).map(([value, label, count]) => (
+                <button
+                  key={value}
+                  type="button"
+                  className={`repo-filter__chip${repoFilter === value ? " is-on" : ""}`}
+                  aria-pressed={repoFilter === value}
+                  onClick={() => setRepoFilter(value)}
+                >
+                  {label} <span>{count}</span>
+                </button>
+              ))}
+            </div>
+          )}
+
+          {documents.isPending || projects.isPending ? (
             <LoadingBlock rows={4} label="Cargando documentos" />
           ) : documents.isError ? (
             <ErrorBlock error={documents.error} onRetry={() => void documents.refetch()} />
-          ) : documents.data.length === 0 ? (
+          ) : visibleRepository.length === 0 ? (
             <EmptyBlock
               title="Aún no hay documentos publicados"
-              hint="Los documentos se publican desde la intranet marcándolos como públicos."
+              hint="Los documentos institucionales se publican desde la intranet marcándolos como públicos; los de formulación aparecen al cargar el archivo del proyecto."
             />
           ) : (
             <ul className="repo-list">
-              {documents.data.map((document) => (
-                <li key={document.id}>
+              {visibleRepository.map((entry) => (
+                <li key={entry.id}>
                   <a
-                    href={document.url}
+                    href={entry.url}
                     className="repo-item"
                     target="_blank"
                     // noopener evita que la página destino pueda manipular esta
                     // pestaña a través de window.opener.
                     rel="noopener noreferrer"
-                    aria-label={`${document.title}, ${document.kind}${document.size_label ? `, ${document.size_label}` : ""}, se abre en una pestaña nueva`}
+                    aria-label={`${entry.title}, ${entry.kind}${entry.sizeLabel ? `, ${entry.sizeLabel}` : ""}, ${entry.source === "proyecto" ? "formulación de proyecto" : "documento del plan"}, se abre en una pestaña nueva`}
                   >
-                    <span className="repo-item__kind" data-kind={document.kind}>
+                    <span className="repo-item__kind" data-kind={entry.kind} data-source={entry.source}>
                       <Icon name="document" size={18} />
-                      {document.kind}
+                      {entry.kind}
                     </span>
                     <span className="repo-item__body">
-                      <strong>{document.title}</strong>
-                      <small>{document.description}</small>
+                      <strong>{entry.title}</strong>
+                      <small>{entry.description}</small>
                     </span>
-                    {document.size_label && <span className="repo-item__size">{document.size_label}</span>}
+                    {entry.source === "proyecto" && (
+                      <span className="repo-item__tag">Formulación</span>
+                    )}
+                    {entry.sizeLabel && <span className="repo-item__size">{entry.sizeLabel}</span>}
                     <Icon name="external" size={16} />
                   </a>
                 </li>
@@ -227,5 +325,42 @@ export function ImplementationPortal() {
         </section>
       </div>
     </PublicLayout>
+  );
+}
+
+/**
+ * Una cifra de recursos o tiempo del plan.
+ *
+ * Es el mismo bloque que la ficha del pilar, con una diferencia: aquí el
+ * presupuesto depende de una consulta que puede seguir en vuelo, y una cifra en
+ * cero mientras carga se leería como "el plan no tiene presupuesto".
+ */
+function PlanStat({
+  label,
+  value,
+  progress,
+  caption,
+  icon,
+  pending = false,
+}: {
+  label: string;
+  value: string;
+  progress: number;
+  caption: string;
+  icon: React.ComponentProps<typeof Icon>["name"];
+  pending?: boolean;
+}) {
+  return (
+    <article className="plan-stat card">
+      <header>
+        <span>{label}</span>
+        <Icon name={icon} size={17} />
+      </header>
+      <strong>{pending ? "…" : value}</strong>
+      <span className="progress-track">
+        <span className="progress-track__fill" style={{ width: `${pending ? 0 : progress}%` }} />
+      </span>
+      <p>{pending ? "Calculando…" : caption}</p>
+    </article>
   );
 }

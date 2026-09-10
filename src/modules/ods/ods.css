@@ -1,0 +1,544 @@
+/* =============================================================================
+   El PDI y los ODS · estilos propios
+
+   Diecisiete colores oficiales en una sola pantalla. La regla que gobierna toda
+   la hoja: el color del objetivo decora —un número, un punto, un filo— y nunca
+   es lo que comunica el estado. Lo seleccionado se dice con borde, elevación y
+   `aria-pressed`; el aporte, con una barra y una cifra. Así la página sigue
+   funcionando para quien no distingue el rojo del ODS 1 del rojo del ODS 4, y
+   no se convierte en un mosaico donde nada destaca porque todo destaca.
+   ========================================================================== */
+
+.sdg-shell {
+  display: grid;
+  gap: var(--space-9);
+  padding: var(--space-9) 0 var(--space-10);
+}
+
+/* --- Encabezado --------------------------------------------------------------- */
+
+.sdg-intro {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: var(--space-7);
+  padding-bottom: var(--space-8);
+  border-bottom: 1px solid var(--line);
+}
+
+.sdg-intro__copy {
+  max-width: 46rem;
+}
+
+.sdg-intro__copy h1 {
+  margin: var(--space-3) 0 var(--space-4);
+  font-size: var(--text-3xl);
+}
+
+.sdg-intro__figures {
+  display: grid;
+  gap: var(--space-4);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.sdg-intro__figures li {
+  display: grid;
+  gap: 2px;
+  padding-left: var(--space-4);
+  border-left: 3px solid var(--brand-blue);
+}
+
+.sdg-intro__figures strong {
+  color: var(--brand-navy);
+  font-family: var(--font-display);
+  font-size: var(--text-xl);
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+
+/* El denominador es contexto, no cifra: "17" no debe competir con el número
+   que de verdad se está leyendo. */
+.sdg-intro__figures strong span {
+  color: var(--ink-faint);
+  font-size: 0.6em;
+  font-weight: 600;
+}
+
+.sdg-intro__figures small {
+  color: var(--ink-muted);
+  font-size: var(--text-xs);
+  line-height: var(--leading-snug);
+}
+
+/* --- Secciones ---------------------------------------------------------------- */
+
+.sdg-section {
+  display: grid;
+  gap: var(--space-6);
+}
+
+/* --- La rejilla de los diecisiete ---------------------------------------------
+   Tarjetas iguales, en la misma posición siempre. El número va en un cuadro del
+   color oficial —es como se citan los ODS— y el resto de la tarjeta es neutro.
+   ---------------------------------------------------------------------------- */
+
+.sdg-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 15rem), 1fr));
+  gap: var(--space-3);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.sdg-card {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  grid-template-rows: auto auto auto;
+  gap: var(--space-2) var(--space-3);
+  width: 100%;
+  height: 100%;
+  padding: var(--space-4);
+  text-align: left;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  transition:
+    border-color var(--dur-base) var(--ease-out),
+    box-shadow var(--dur-base) var(--ease-out),
+    transform var(--dur-press) var(--ease-out);
+}
+
+.sdg-card__number {
+  grid-row: 1 / 2;
+  display: grid;
+  place-items: center;
+  width: 2.4rem;
+  height: 2.4rem;
+  border-radius: var(--radius-xs);
+  background: var(--sdg);
+  color: #fff;
+  font-family: var(--font-display);
+  font-size: var(--text-md);
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+}
+
+.sdg-card__label {
+  grid-row: 1 / 2;
+  align-self: center;
+  color: var(--ink);
+  font-size: var(--text-sm);
+  font-weight: 700;
+  line-height: var(--leading-snug);
+}
+
+.sdg-card__meter {
+  grid-column: 1 / -1;
+  display: block;
+  height: 5px;
+  border-radius: var(--radius-pill);
+  background: var(--surface-3);
+  overflow: hidden;
+}
+
+.sdg-card__meter-fill {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--sdg);
+  /* La barra crece al entrar la tarjeta, no salta a su ancho: es lo único que
+     se anima aquí, y es lo que se está comparando entre tarjetas. */
+  transition: width var(--dur-slow) var(--ease-out);
+}
+
+.sdg-card__count {
+  grid-column: 1 / -1;
+  color: var(--ink-secondary);
+  font-size: var(--text-xs);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.sdg-card__count em {
+  color: var(--ink-faint);
+  font-style: normal;
+  font-weight: 600;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .sdg-card:hover {
+    border-color: var(--sdg);
+    box-shadow: var(--shadow-md);
+    transform: translateY(-2px);
+  }
+}
+
+.sdg-card:active {
+  transform: translateY(0) scale(0.995);
+}
+
+/* Seleccionada: filo grueso del color y elevación. El anillo interior hace de
+   segundo borde para que el estado se vea también sin percibir el matiz. */
+.sdg-card.is-on {
+  border-color: var(--sdg);
+  box-shadow:
+    inset 0 0 0 1px var(--sdg),
+    var(--shadow-lg);
+}
+
+/* Un objetivo sin proyectos no se esconde: se apaga. Sigue siendo legible
+   —contraste suficiente— pero no compite con los que sí tienen aporte. */
+.sdg-card.is-empty {
+  background: var(--surface-2);
+}
+
+.sdg-card.is-empty .sdg-card__number {
+  background: var(--ink-faint);
+}
+
+.sdg-card.is-empty .sdg-card__label {
+  color: var(--ink-secondary);
+  font-weight: 600;
+}
+
+.sdg-card.is-empty .sdg-card__count {
+  color: var(--ink-muted);
+  font-weight: 600;
+}
+
+/* --- Detalle del objetivo ------------------------------------------------------ */
+
+.sdg-detail {
+  display: grid;
+  gap: var(--space-6);
+  padding: var(--space-7);
+  background: var(--surface);
+  border: 1px solid var(--line);
+  /* El único sitio donde el color del ODS ocupa superficie: un filo lateral que
+     ata el panel a la tarjeta que se acaba de pulsar. */
+  border-left: 4px solid var(--sdg);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-md);
+  scroll-margin-top: calc(var(--header-h) + var(--space-6));
+  animation: sdg-detail-in var(--dur-base) var(--ease-out);
+}
+
+@keyframes sdg-detail-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+}
+
+.sdg-detail__head {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: start;
+  gap: var(--space-4);
+}
+
+.sdg-detail__number {
+  display: grid;
+  place-items: center;
+  width: 3.2rem;
+  height: 3.2rem;
+  border-radius: var(--radius-sm);
+  background: var(--sdg);
+  color: #fff;
+  font-family: var(--font-display);
+  font-size: var(--text-xl);
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+}
+
+.sdg-detail__head h2 {
+  margin: var(--space-1) 0 var(--space-2);
+  font-size: var(--text-xl);
+}
+
+.sdg-detail__head p {
+  color: var(--ink-secondary);
+  font-size: var(--text-sm);
+  line-height: var(--leading-normal);
+}
+
+.sdg-detail__pillars h3 {
+  margin-bottom: var(--space-3);
+  color: var(--ink-secondary);
+  font-size: var(--text-xs);
+  font-weight: 800;
+  letter-spacing: var(--tracking-caps);
+  text-transform: uppercase;
+}
+
+.sdg-detail__pillars ul {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.sdg-detail__pillars li {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-4);
+  background: var(--surface-2);
+  border: 1px solid var(--line);
+  border-left: 3px solid var(--accent);
+  border-radius: var(--radius-sm);
+  font-size: var(--text-xs);
+}
+
+.sdg-detail__pillars li svg {
+  color: var(--accent);
+}
+
+.sdg-detail__pillars a {
+  color: var(--ink);
+  font-weight: 700;
+}
+
+.sdg-detail__pillars li > span {
+  color: var(--ink-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+/* --- Proyectos del objetivo ---------------------------------------------------- */
+
+.sdg-project-list {
+  display: grid;
+  gap: var(--space-3);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.sdg-project {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: start;
+  gap: var(--space-3) var(--space-5);
+  padding: var(--space-5);
+}
+
+.sdg-project__body h4 {
+  color: var(--ink);
+  font-size: var(--text-base);
+  font-weight: 700;
+  line-height: var(--leading-snug);
+}
+
+.sdg-project__pillars {
+  display: block;
+  margin-top: 2px;
+  color: var(--brand-blue);
+  font-size: var(--text-2xs);
+  font-weight: 800;
+  letter-spacing: var(--tracking-caps);
+  text-transform: uppercase;
+}
+
+.sdg-project__body p {
+  margin-top: var(--space-2);
+  color: var(--ink-secondary);
+  font-size: var(--text-sm);
+  line-height: var(--leading-normal);
+}
+
+.sdg-project__body small {
+  display: block;
+  margin-top: var(--space-2);
+  color: var(--ink-muted);
+  font-size: var(--text-xs);
+  font-variant-numeric: tabular-nums;
+}
+
+.sdg-project__goals {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: var(--space-1);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.sdg-project__goals li {
+  display: grid;
+  place-items: center;
+  width: 1.5rem;
+  height: 1.5rem;
+  border-radius: var(--radius-xs);
+  background: var(--sdg);
+  color: #fff;
+  font-size: var(--text-2xs);
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+}
+
+.sdg-project__file {
+  grid-column: 1 / -1;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  color: var(--brand-blue);
+  font-size: var(--text-xs);
+  font-weight: 700;
+}
+
+/* --- Aporte de cada pilar ------------------------------------------------------ */
+
+.sdg-pillar-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 24rem), 1fr));
+  gap: var(--space-4);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.sdg-pillar {
+  display: grid;
+  gap: var(--space-4);
+  align-content: start;
+  padding: var(--space-6);
+  border-top: 3px solid var(--accent);
+}
+
+.sdg-pillar header {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.sdg-pillar__icon {
+  display: grid;
+  place-items: center;
+  width: 2.4rem;
+  height: 2.4rem;
+  border-radius: var(--radius-sm);
+  color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 12%, var(--surface));
+}
+
+.sdg-pillar h3 {
+  font-size: var(--text-base);
+  line-height: var(--leading-snug);
+}
+
+.sdg-pillar h3 a {
+  color: var(--ink);
+}
+
+.sdg-pillar > header > strong {
+  color: var(--brand-navy);
+  font-family: var(--font-display);
+  font-size: var(--text-lg);
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+
+.sdg-pillar > header > strong span {
+  color: var(--ink-faint);
+  font-size: 0.6em;
+  font-weight: 600;
+}
+
+.sdg-pillar small {
+  color: var(--ink-muted);
+  font-size: var(--text-xs);
+  font-variant-numeric: tabular-nums;
+}
+
+/* La matriz: diecisiete puntos por pilar, siempre en la misma posición. Los
+   apagados también ocupan su sitio; si desaparecieran, las filas dejarían de
+   poder compararse en vertical, que es justo para lo que existe la matriz. */
+.sdg-dots {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.sdg-dot {
+  display: grid;
+  place-items: center;
+  width: 1.65rem;
+  height: 1.65rem;
+  padding: 0;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-xs);
+  background: var(--surface-2);
+  color: var(--ink-faint);
+  font-size: var(--text-2xs);
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  cursor: pointer;
+  transition:
+    transform var(--dur-press) var(--ease-out),
+    background-color var(--dur-fast) var(--ease-out);
+}
+
+.sdg-dot.is-on {
+  border-color: transparent;
+  background: var(--sdg);
+  color: #fff;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .sdg-dot:hover {
+    transform: scale(1.12);
+  }
+}
+
+.sdg-note {
+  padding-top: var(--space-6);
+  border-top: 1px solid var(--line);
+  color: var(--ink-muted);
+  font-size: var(--text-sm);
+  line-height: var(--leading-normal);
+}
+
+.sdg-note a {
+  color: var(--brand-blue);
+  font-weight: 700;
+}
+
+/* --- Estrecho ------------------------------------------------------------------ */
+
+@media (max-width: 40rem) {
+  .sdg-detail {
+    padding: var(--space-5);
+  }
+
+  .sdg-project {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .sdg-project__goals {
+    justify-content: flex-start;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sdg-card,
+  .sdg-card__meter-fill,
+  .sdg-dot {
+    transition: none;
+  }
+
+  .sdg-detail {
+    animation: none;
+  }
+}

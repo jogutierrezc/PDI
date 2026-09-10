@@ -82,6 +82,91 @@ export function latestTarget(targets: ActivityTarget[]): ActivityTarget | null {
   );
 }
 
+/* --- Tiempo real del plan --------------------------------------------------
+   El tiempo transcurrido salía de `indicators.elapsed_label` y
+   `elapsed_progress`: dos campos que alguien escribía a mano y que envejecían
+   solos —decían "18 meses" en pantalla mientras el calendario iba por 32—.
+
+   El horizonte del plan es un dato del calendario, no del reporte: se calcula.
+   Nadie tiene que acordarse de actualizarlo y no puede quedar desalineado.
+   -------------------------------------------------------------------------- */
+
+/** 1 de enero del primer año del plan. */
+export const planStart = new Date(planYears[0], 0, 1);
+/** 31 de diciembre del último: el plan se cierra con el año, no antes. */
+export const planEnd = new Date(planYears[planYears.length - 1], 11, 31);
+
+export interface PlanElapsed {
+  /** Porcentaje del horizonte ya recorrido, 0-100. */
+  progress: number;
+  /** "2 años y 8 meses" */
+  label: string;
+  /** "de 5 años · 2024-2028" */
+  caption: string;
+  /** Falso antes de que arranque el plan o después de cerrarlo. */
+  running: boolean;
+}
+
+function monthsBetween(from: Date, to: Date): number {
+  const months = (to.getFullYear() - from.getFullYear()) * 12 + (to.getMonth() - from.getMonth());
+  // La fracción del mes en curso: sin ella la barra daría saltos de un mes
+  // entero y el porcentaje se quedaría quieto treinta días seguidos.
+  const daysInMonth = new Date(to.getFullYear(), to.getMonth() + 1, 0).getDate();
+  return months + (to.getDate() - 1) / daysInMonth;
+}
+
+/** Cuánto del horizonte del plan va recorrido a día de hoy. */
+export function planElapsed(reference: Date = new Date()): PlanElapsed {
+  const total = monthsBetween(planStart, planEnd);
+  const span = `de ${planYears.length} años · ${planYears[0]}-${planYears[planYears.length - 1]}`;
+
+  if (reference <= planStart) {
+    return { progress: 0, label: "Sin iniciar", caption: span, running: false };
+  }
+  if (reference >= planEnd) {
+    return { progress: 100, label: "Horizonte cumplido", caption: span, running: false };
+  }
+
+  const elapsed = monthsBetween(planStart, reference);
+  const years = Math.floor(elapsed / 12);
+  const months = Math.floor(elapsed % 12);
+
+  const parts: string[] = [];
+  if (years > 0) parts.push(`${years} ${years === 1 ? "año" : "años"}`);
+  if (months > 0) parts.push(`${months} ${months === 1 ? "mes" : "meses"}`);
+  if (parts.length === 0) parts.push("menos de un mes");
+
+  return {
+    progress: Math.round((elapsed / total) * 100),
+    label: parts.join(" y "),
+    caption: span,
+    running: true,
+  };
+}
+
+/* --- Presupuesto -----------------------------------------------------------
+   El plan no tiene una cifra de presupuesto propia: la tiene cada proyecto, en
+   `projects.total_value`. Sumarlos es la única cifra de dinero que el portal
+   puede sostener, y es una **estimación**: es lo que los proyectos declaran que
+   valen, no lo que se ha girado.
+
+   Lo ejecutado se publica en cero a propósito. No hay ningún campo donde se
+   registre ejecución presupuestal, así que cualquier otra cifra sería inventada.
+   -------------------------------------------------------------------------- */
+
+/** Suma del valor declarado de un conjunto de proyectos. */
+export function estimatedBudget(projects: { total_value: number | null }[]): number {
+  return projects.reduce((total, project) => total + (project.total_value ?? 0), 0);
+}
+
+/** Cuántos de esos proyectos traen cifra: el resto no suma y conviene decirlo. */
+export function budgetedCount(projects: { total_value: number | null }[]): number {
+  return projects.filter((project) => project.total_value !== null && project.total_value > 0).length;
+}
+
+/** Lo ejecutado, mientras no exista dónde registrarlo. */
+export const EXECUTED_BUDGET = 0;
+
 /** Los años a mostrar: los del plan más cualquiera ya capturado fuera de rango. */
 export function yearsInPlay(targets: ActivityTarget[]): number[] {
   const years = new Set<number>(planYears);
@@ -280,6 +365,87 @@ export const sdgGoals: SdgGoal[] = [
 ];
 
 export const sdgById = new Map(sdgGoals.map((goal) => [goal.id, goal]));
+
+/* --- El plan visto desde los ODS -------------------------------------------
+   La relación entre el PDI y los ODS no está declarada en ninguna parte: se
+   deduce de los proyectos, que son los que marcan a qué objetivos aportan. Un
+   pilar aporta a un ODS si alguno de sus proyectos lo marca.
+
+   El recuento se hace aquí y no en una vista de la base porque depende de qué
+   proyectos puede ver quien mira: con RLS, un anónimo solo ve los de pilares
+   públicos, y una vista agregada le daría totales de proyectos que no puede
+   abrir.
+   -------------------------------------------------------------------------- */
+
+/** Lo mínimo que necesita el recuento; encaja con `ProjectWithLinks`. */
+export interface SdgCountable {
+  sdg_goals: number[] | null;
+  pillar_ids?: string[] | null;
+  pillar_id?: string | null;
+  total_value?: number | null;
+}
+
+export interface SdgContribution<T extends SdgCountable> {
+  goal: SdgGoal;
+  /** Proyectos que declaran aportar a este objetivo. */
+  projects: T[];
+  /** Pilares desde los que se aporta, sin repetir. */
+  pillarIds: string[];
+  /** Valor estimado de esos proyectos. Un proyecto que aporta a tres ODS suma
+   *  su valor en los tres: la cifra responde "cuánto se mueve alrededor de este
+   *  objetivo", no reparte el presupuesto entre objetivos. */
+  value: number;
+}
+
+/** Los diecisiete objetivos con lo que el plan les aporta. Siempre los 17: los
+ *  que nadie toca también dicen algo, y desaparecerlos lo escondería. */
+export function tallySdg<T extends SdgCountable>(projects: T[]): SdgContribution<T>[] {
+  const buckets = new Map<number, { projects: T[]; pillars: Set<string>; value: number }>();
+  for (const goal of sdgGoals) {
+    buckets.set(goal.id, { projects: [], pillars: new Set(), value: 0 });
+  }
+
+  for (const project of projects) {
+    // Un proyecto puede repetir un número en su arreglo; contarlo dos veces
+    // duplicaría su valor dentro del mismo objetivo.
+    for (const id of new Set(project.sdg_goals ?? [])) {
+      const bucket = buckets.get(id);
+      if (!bucket) continue; // Un número fuera de 1-17 no es un objetivo.
+      bucket.projects.push(project);
+      bucket.value += project.total_value ?? 0;
+      for (const pillarId of pillarsOfProject(project)) bucket.pillars.add(pillarId);
+    }
+  }
+
+  return sdgGoals.map((goal) => {
+    const bucket = buckets.get(goal.id)!;
+    return {
+      goal,
+      projects: bucket.projects,
+      pillarIds: [...bucket.pillars],
+      value: bucket.value,
+    };
+  });
+}
+
+/** Los pilares a los que apunta un proyecto, con respaldo para los anteriores
+ *  al módulo de vínculos. */
+export function pillarsOfProject(project: SdgCountable): string[] {
+  if (project.pillar_ids?.length) return project.pillar_ids;
+  return project.pillar_id ? [project.pillar_id] : [];
+}
+
+/** Los ODS a los que aporta un pilar, en orden y sin repetir. */
+export function sdgOfPillar<T extends SdgCountable>(projects: T[], pillarId: string): number[] {
+  const goals = new Set<number>();
+  for (const project of projects) {
+    if (!pillarsOfProject(project).includes(pillarId)) continue;
+    for (const id of project.sdg_goals ?? []) {
+      if (sdgById.has(id)) goals.add(id);
+    }
+  }
+  return [...goals].sort((a, b) => a - b);
+}
 
 /** Tipos de impacto del formato de proyectos. */
 export const impactKinds = [

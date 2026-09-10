@@ -193,10 +193,27 @@ export interface Indicator {
   unit_id: string | null;
   periodicity_id: string | null;
   considerations: string;
+  /* --- Campos que ya no se publican ---------------------------------------
+     Las tres cifras de recursos y tiempo del indicador se escribían a mano y
+     nadie las mantenía: el presupuesto no se conciliaba con nada, el plazo
+     ("18 meses") envejecía solo y las tareas críticas no tenían detrás ningún
+     dato que las alimentara.
+
+     Ahora el presupuesto lo suman los proyectos (`projects.total_value`), el
+     tiempo lo calcula `planElapsed()` contra el horizonte del plan y las
+     tareas críticas se retiraron de la interfaz. Las columnas siguen en la
+     base —borrarlas perdería lo capturado y no lo pide nadie— pero ninguna
+     pantalla las lee. No las uses en código nuevo.
+     -------------------------------------------------------------------- */
+  /** @deprecated Sin uso en la interfaz. Ver `estimatedBudget()`. */
   budget_amount: number | null;
+  /** @deprecated Sin uso en la interfaz. */
   budget_progress: number;
+  /** @deprecated Sin uso en la interfaz. Ver `planElapsed()`. */
   elapsed_label: string | null;
+  /** @deprecated Sin uso en la interfaz. Ver `planElapsed()`. */
   elapsed_progress: number;
+  /** @deprecated Retirado de los tableros de implementación. */
   critical_tasks: number;
   is_primary: boolean;
   position: number;
@@ -265,6 +282,10 @@ export interface Project extends TargetFields {
 /** El proyecto con sus vínculos ya resueltos, como lo piden las fichas. */
 export interface ProjectWithLinks extends Project {
   links: ProjectLink[];
+  /** Los pilares a los que apunta, para filtrar sin recorrer `links`. Lo
+   *  calcula `v_projects`; para los proyectos anteriores al módulo de vínculos
+   *  la vista devuelve su `pillar_id` de siempre, así que nunca llega vacío. */
+  pillar_ids: string[];
 }
 
 /** Indicador de resultado. La tabla se sigue llamando `activities` por

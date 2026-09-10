@@ -17,21 +17,28 @@ import {
   useFeaturedActivities,
   usePillars,
   usePillarYears,
+  useProjects,
   useSummary,
 } from "../data/queries";
 import {
   accentFor,
   aggregateYears,
   bandFor,
+  budgetedCount,
   emptySummary,
+  estimatedBudget,
+  formatBudget,
   formatDate,
   formatMonth,
   indexYearProgress,
+  pillarsOfProject,
+  planElapsed,
   planYears,
   shortYear,
   statusMeta,
   summarizeProgress,
   yearScopeLabel,
+  EXECUTED_BUDGET,
 } from "../data/pdi";
 import type { YearScope } from "../data/pdi";
 
@@ -51,6 +58,9 @@ export function Dashboard() {
   const pillarYears = usePillarYears();
   const activities = useFeaturedActivities();
   const period = useCurrentPeriod();
+  // El presupuesto del plan no está en ninguna tabla de resumen: lo declaran
+  // los proyectos, uno a uno.
+  const projects = useProjects();
 
   const rows = pillars.data ?? [];
   const scope = useMemo(
@@ -58,6 +68,20 @@ export function Dashboard() {
     [rows, filter],
   );
   const activePillar = filter ? rows.find((pillar) => pillar.slug === filter) : undefined;
+
+  // El presupuesto sigue al filtro, como todo lo demás del tablero. Un proyecto
+  // que aporta a varios pilares cuenta entero en cada uno: es la misma decisión
+  // que tomó la cascada del avance en la migración 0013, y cambiarla aquí haría
+  // que dos cifras de la misma pantalla contaran los proyectos distinto.
+  const budgetScope = useMemo(() => {
+    const all = projects.data ?? [];
+    if (!activePillar) return all;
+    return all.filter((project) => pillarsOfProject(project).includes(activePillar.id));
+  }, [projects.data, activePillar]);
+
+  const planBudget = estimatedBudget(budgetScope);
+  const withBudget = budgetedCount(budgetScope);
+  const elapsed = planElapsed();
 
   // Con un pilar seleccionado el resumen se recalcula en el cliente sobre las
   // mismas filas: no hace falta volver a preguntar a la base de datos.
@@ -223,6 +247,40 @@ export function Dashboard() {
           <StatTile label="En curso" value={summary.active} hint="En ejecución durante el corte actual." tone="curso" />
           <StatTile label="Pendientes" value={summary.pending} hint="Programadas para próximas entregas." tone="pendiente" />
           <StatTile label="En riesgo" value={summary.risk} hint="Requieren seguimiento directo." tone="riesgo" />
+        </section>
+
+        {/* --- Recursos y tiempo -------------------------------------------
+            Ni el dinero ni el calendario son indicadores, así que van en su
+            propia fila y no entre las cuatro cifras de arriba. El presupuesto
+            lo suman los proyectos del alcance seleccionado; lo ejecutado se
+            publica en cero mientras no exista dónde registrarlo. ----------- */}
+        <section className="board-resources" aria-label="Recursos y tiempo del plan">
+          <ResourceTile
+            label="Presupuesto estimado"
+            value={projects.isPending ? "…" : formatBudget(planBudget)}
+            hint={
+              projects.isPending
+                ? "Calculando…"
+                : budgetScope.length === 0
+                  ? activePillar
+                    ? "Este pilar todavía no tiene proyectos formulados"
+                    : "Todavía no hay proyectos formulados"
+                  : `Declarado por ${withBudget} de ${budgetScope.length} ${budgetScope.length === 1 ? "proyecto" : "proyectos"}${activePillar ? ` de ${activePillar.name}` : ""}`
+            }
+            icon="document"
+          />
+          <ResourceTile
+            label="Presupuesto ejecutado"
+            value={formatBudget(EXECUTED_BUDGET)}
+            hint="El portal aún no registra ejecución presupuestal."
+            icon="chart"
+          />
+          <ResourceTile
+            label="Tiempo transcurrido"
+            value={elapsed.label}
+            hint={`${elapsed.progress}% del horizonte · ${elapsed.caption}`}
+            icon="clock"
+          />
         </section>
 
         <section className="board-split">
@@ -579,6 +637,34 @@ function StatTile({
       <span className="stat-tile__label">{label}</span>
       <strong className="stat-tile__value">{value}</strong>
       <span className="stat-tile__hint">{hint}</span>
+    </article>
+  );
+}
+
+/**
+ * Una cifra de recursos. Se parece a `StatTile` pero no es la misma: aquella
+ * cuenta indicadores —siempre un número— y esta muestra texto ya formateado,
+ * un importe o un plazo, con el icono que dice de qué habla.
+ */
+function ResourceTile({
+  label,
+  value,
+  hint,
+  icon,
+}: {
+  label: string;
+  value: string;
+  hint: string;
+  icon: React.ComponentProps<typeof Icon>["name"];
+}) {
+  return (
+    <article className="resource-tile card">
+      <header>
+        <span>{label}</span>
+        <Icon name={icon} size={17} />
+      </header>
+      <strong>{value}</strong>
+      <span className="resource-tile__hint">{hint}</span>
     </article>
   );
 }

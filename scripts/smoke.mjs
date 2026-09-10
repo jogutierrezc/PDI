@@ -361,7 +361,18 @@ const routes = [
   {
     path: "/tablero",
     expect: "Cumplimiento global y por pilar",
-    also: ["Fortalecimiento del aula híbrida", "Plan 2024-2028", "Corte del plan"],
+    also: [
+      "Fortalecimiento del aula híbrida",
+      "Plan 2024-2028",
+      "Corte del plan",
+      // Recursos y tiempo: la misma lectura que la ficha del pilar, pero del
+      // plan entero y siguiendo el filtro de pilar.
+      "Presupuesto estimado",
+      "$120 M",
+      "Presupuesto ejecutado",
+      "Tiempo transcurrido",
+    ],
+    absent: ["Tareas críticas"],
   },
   {
     path: "/tablero",
@@ -473,7 +484,20 @@ const routes = [
   {
     path: "/implementacion",
     expect: "Cómo avanza cada pilar",
-    also: ["Plan de Desarrollo Institucional", "Plan 2024-2028", "88 %"],
+    also: [
+      "Plan de Desarrollo Institucional",
+      "Plan 2024-2028",
+      "88 %",
+      "Presupuesto estimado",
+      "Presupuesto ejecutado",
+      "Tiempo transcurrido",
+      // El repositorio junta las dos fuentes: el documento institucional…
+      "Documentos de soporte del plan",
+      // …y la formulación que vive en Storage, con su etiqueta de origen.
+      "formulacion.pdf",
+      "Formulación de proyectos",
+    ],
+    absent: ["Tareas críticas"],
   },
   {
     path: "/implementacion/pilar/ambiente-tecnologico",
@@ -484,7 +508,10 @@ const routes = [
       "Infraestructura tecnológica",  // el área del proyecto
       "Infraestructura base",         // su línea de acción
       "PDI-AT-001",
-      "Presupuesto ejecutado",        // los recursos del indicador sí se ven
+      "Presupuesto estimado",         // lo suman los proyectos del pilar
+      "$120 M",                       // el valor declarado del único proyecto
+      "Presupuesto ejecutado",        // se publica, y vale cero
+      "Tiempo transcurrido",          // sale del calendario, no del indicador
       "Plan 2024-2028",               // la barra de años, junto al selector de áreas
       "promedio de 2 áreas",          // el anillo dice de dónde sale
       "promedio de 2 indicadores",    // el proyecto deriva de sus indicadores
@@ -504,7 +531,12 @@ const routes = [
       "Leer completa",              // la observación se abre, no se vuelca
       "88",                         // el rastro anual del área y de su línea
     ],
-    absent: ["Planeación de resultados", "Actividades del pilar"],
+    absent: [
+      "Planeación de resultados",
+      "Actividades del pilar",
+      "Tareas críticas",   // retiradas de los tableros de implementación
+      "18 meses",          // el plazo escrito a mano del indicador ya no se lee
+    ],
   },
   {
     path: "/implementacion/pilar/ambiente-tecnologico",
@@ -769,6 +801,49 @@ const routes = [
       await tick();
       if (doc.querySelector(".compliance-chart") || !doc.querySelector(".result-table")) {
         throw new Error("el conmutador no devolvió las tablas");
+      }
+    },
+  },
+  {
+    path: "/ods",
+    expect: "El PDI y los Objetivos de Desarrollo Sostenible",
+    also: [
+      "Educación de calidad",                    // ODS 4, del proyecto
+      "Industria, innovación e infraestructura", // ODS 9, del mismo
+      "Fin de la pobreza",                       // los 17 se pintan siempre…
+      "Sin proyectos",                           // …y los vacíos lo dicen
+      "Objetivos con aporte declarado",
+      "A qué objetivos aporta cada pilar",
+    ],
+  },
+  {
+    path: "/ods",
+    note: "al elegir un objetivo se abren sus pilares y sus proyectos",
+    expect: "El PDI y los Objetivos de Desarrollo Sostenible",
+    interact: async (window, tick) => {
+      // La cuarta tarjeta es el ODS 4, el único con aporte junto al 9.
+      const cards = window.document.querySelectorAll(".sdg-card");
+      if (cards.length !== 17) {
+        throw new Error(`se esperaban 17 objetivos y hay ${cards.length}`);
+      }
+
+      cards[3].dispatchEvent(new window.Event("click", { bubbles: true }));
+      await tick();
+
+      const detail = window.document.querySelector(".sdg-detail")?.textContent ?? "";
+      if (!detail.includes("Migración a la nube institucional")) {
+        throw new Error("el detalle no lista el proyecto del objetivo");
+      }
+      // El proyecto aporta a dos pilares: los dos tienen que aparecer.
+      if (!detail.includes("Ambiente tecnológico") || !detail.includes("Sostenibilidad")) {
+        throw new Error("el detalle no lista los dos pilares que aportan");
+      }
+
+      // Volver a pulsar la misma tarjeta cierra el panel.
+      cards[3].dispatchEvent(new window.Event("click", { bubbles: true }));
+      await tick();
+      if (window.document.querySelector(".sdg-detail")) {
+        throw new Error("el detalle no se cierra al deseleccionar el objetivo");
       }
     },
   },

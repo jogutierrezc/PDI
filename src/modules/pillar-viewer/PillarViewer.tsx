@@ -10,7 +10,11 @@ import { useCurrentPeriod, usePillarDetail } from "../../data/queries";
 import {
   accentFor,
   bandFor,
+  budgetedCount,
+  estimatedBudget,
   formatBudget,
+  planElapsed,
+  EXECUTED_BUDGET,
   formatDate,
   formatMonth,
   formatCurrency,
@@ -146,6 +150,13 @@ export function PillarViewer() {
   // Proyectos que nadie ha colgado todavía de una línea: se avisa en vez de
   // hacerlos desaparecer al filtrar.
   const unlinkedProjects = projects.filter((project) => !project.action_line_id).length;
+
+  // Presupuesto y tiempo del pilar. El valor lo declaran los proyectos —es el
+  // único sitio del portal donde hay una cifra de dinero— y el tiempo lo pone
+  // el calendario contra el horizonte del plan.
+  const pillarBudget = estimatedBudget(projects);
+  const budgetedProjects = budgetedCount(projects);
+  const elapsed = planElapsed();
 
   const visibleActivities = activeArea
     ? activities.filter(
@@ -388,32 +399,43 @@ export function PillarViewer() {
           </section>
 
           {/* --- Recursos y tiempo ------------------------------------------
-              Describen el indicador del pilar completo, así que se retiran
-              mientras se mira un área concreta. --------------------------- */}
-          {indicator && !activeArea && (
+              Hablan del pilar completo, así que se retiran mientras se mira un
+              área concreta.
+
+              Las tres cifras salían del indicador, escritas a mano: un
+              presupuesto ejecutado que nadie conciliaba, un "18 meses" que el
+              calendario dejaba atrás y un contador de tareas críticas sin nada
+              detrás que lo alimentara. Ahora el presupuesto lo suman los
+              proyectos, el tiempo lo pone el calendario y las tareas críticas
+              se retiraron: una cifra que nadie mantiene es peor que ninguna.
+              -------------------------------------------------------------- */}
+          {!activeArea && (
             <section className="pillar-stats" aria-label="Recursos y tiempo">
               <StatBlock
-                label="Presupuesto ejecutado"
-                value={formatBudget(indicator.budget_amount)}
-                progress={indicator.budget_progress}
-                caption={`${indicator.budget_progress}% del total asignado`}
+                label="Presupuesto estimado"
+                value={formatBudget(pillarBudget)}
+                progress={budgetedProjects === 0 ? 0 : Math.round((budgetedProjects * 100) / projects.length)}
+                caption={
+                  projects.length === 0
+                    ? "Sin proyectos formulados en este pilar"
+                    : `Declarado por ${budgetedProjects} de ${projects.length} ${projects.length === 1 ? "proyecto" : "proyectos"}`
+                }
                 icon="document"
               />
               <StatBlock
+                label="Presupuesto ejecutado"
+                value={formatBudget(EXECUTED_BUDGET)}
+                progress={0}
+                caption="El portal aún no registra ejecución presupuestal"
+                icon="chart"
+              />
+              <StatBlock
                 label="Tiempo transcurrido"
-                value={indicator.elapsed_label ?? "—"}
-                progress={indicator.elapsed_progress}
-                caption="Del horizonte del plan"
+                value={elapsed.label}
+                progress={elapsed.progress}
+                caption={elapsed.caption}
                 icon="clock"
               />
-              <article className="stat-block stat-block--alert">
-                <header>
-                  <span>Tareas críticas</span>
-                  <Icon name="alert" size={17} />
-                </header>
-                <strong>{indicator.critical_tasks}</strong>
-                <p>Requieren atención directa en el corte actual.</p>
-              </article>
             </section>
           )}
 

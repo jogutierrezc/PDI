@@ -29,6 +29,7 @@ const pages: Entry[] = [
   { id: "page-home", title: "Inicio", hint: "Portada del PDI 2024-2028", group: "Páginas", to: "/", icon: "grid", keywords: "portada home principal" },
   { id: "page-impl", title: "Implementación del PDI", hint: "Avance de los pilares", group: "Páginas", to: "/implementacion", icon: "document", keywords: "pilares avance proyectos" },
   { id: "page-board", title: "Tablero PDI", hint: "Cumplimiento global y por pilar", group: "Páginas", to: "/tablero", icon: "grid", keywords: "dashboard indicadores seguimiento" },
+  { id: "page-sdg", title: "PDI y los ODS", hint: "Aporte del plan a la Agenda 2030", group: "Páginas", to: "/ods", icon: "leaf", keywords: "ods objetivos desarrollo sostenible agenda 2030 naciones unidas sdg" },
   { id: "page-dev", title: "Desarrollo tecnológico", hint: "Aplicativos construidos por Planeación", group: "Páginas", to: "/desarrollo-tecnologico", icon: "code", keywords: "proyectos web github repositorio aplicativos software" },
   { id: "page-repo", title: "Repositorio documental", hint: "Documentos de soporte del plan", group: "Páginas", to: "/implementacion#repositorio", icon: "document", keywords: "documentos soportes descargas archivos" },
   { id: "page-login", title: "Acceso intranet", hint: "Ingreso para el equipo de Planeación", group: "Páginas", to: "/acceso-intranet", icon: "lock", keywords: "login sesion admin intranet" },

@@ -310,20 +310,6 @@
   font-size: var(--text-xs);
 }
 
-.stat-block--alert {
-  border-color: color-mix(in srgb, var(--status-risk) 32%, transparent);
-  background: var(--status-risk-soft);
-}
-
-.stat-block--alert header,
-.stat-block--alert strong {
-  color: var(--status-risk);
-}
-
-.stat-block--alert p {
-  color: color-mix(in srgb, var(--status-risk) 78%, var(--ink));
-}
-
 /* --- Proyectos y líneas ----------------------------------------------------- */
 
 .entry-list {

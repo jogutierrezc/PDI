@@ -596,6 +596,7 @@ src/
   components/ui/       Icon, ProgressRing, StackedProgress, FilterChips, Modal, SearchDialog, QueryState
   components/layout/   TopBar, PublicLayout, ScrollManager
   routes/              Home, Dashboard, NotFound/Forbidden
+  modules/landing/     Bloques narrativos de la portada + su contenido editorial
   modules/             implementation, pillar-viewer, login, admin
 supabase/
   migrations/          El esquema, en orden
@@ -606,6 +607,29 @@ scripts/               Prueba de humo y optimización de imágenes
 Después de guardar en la intranet, las claves de caché declaradas en
 `pillarScope()` invalidan a la vez el tablero público y la ficha del pilar: es lo
 que evita que la intranet muestre un dato ya editado y el portal el anterior.
+
+## La portada y su contenido editorial
+
+Los bloques narrativos de la portada —barra de contexto, el contraste entre el
+modelo que se supera y el del plan, la vocación de cada sede, el selector de ruta
+y la sala de recursos— viven en `modules/landing/`. El texto está separado de los
+componentes en `modules/landing/content.ts`: lemas, cifras del diagnóstico,
+vocaciones regionales y rutas por perfil se editan ahí, sin tocar JSX.
+
+Lo que sí es dato sigue viniendo de Supabase: el avance de cada pilar, los
+indicadores, los pilares que recomienda el selector de ruta y los documentos de
+la sala de recursos. La narrativa se engancha a los pilares **por `slug`**, así
+que un pilar sin entrada en `pillarNarratives` se pinta igual, solo que sin lema
+ni etiquetas.
+
+Las cifras de `planFigures` (6 pilares, 21 áreas, 61 líneas, 3 sedes) describen
+el **documento aprobado**, no el seguimiento: no cambian con el corte del mes y
+por eso no salen de la base.
+
+`landing.css` se importa desde `main.tsx`, no desde `Home.tsx`. La portada no se
+carga bajo demanda, así que su hoja viaja en el bundle principal de todas formas;
+importarla desde el componente la colocaba *antes* que `base.css`, y `.card`
+acababa pisando el relleno y el fondo de sus bloques.
 
 # Sistema de diseño
 

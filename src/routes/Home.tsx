@@ -8,6 +8,13 @@ import { useCurrentPeriod, usePillars, useSummary } from "../data/queries";
 import { accentFor, emptySummary } from "../data/pdi";
 import { prefetchProps } from "../lib/prefetch";
 
+import { CampusExplorer } from "../modules/landing/CampusExplorer";
+import { ContextTicker } from "../modules/landing/ContextTicker";
+import { ResourceRoom } from "../modules/landing/ResourceRoom";
+import { RouteFinder } from "../modules/landing/RouteFinder";
+import { TheLeap } from "../modules/landing/TheLeap";
+import { pillarNarratives } from "../modules/landing/content";
+
 export function Home() {
   const pillars = usePillars();
   const summary = useSummary();
@@ -40,6 +47,14 @@ export function Home() {
               Ver el tablero
             </Link>
           </div>
+
+          {/* La frase con la que el plan se presenta a sí mismo. Va aquí, bajo
+              los botones, y no dentro del titular: es una cita, no una promesa
+              de navegación. */}
+          <blockquote className="home-hero__quote">
+            Imaginamos una universidad que todavía no existe, pero que forjamos con cada paso hacia el
+            futuro.
+          </blockquote>
         </div>
       </section>
 
@@ -92,6 +107,12 @@ export function Home() {
         </div>
       </section>
 
+      {/* Por qué el plan existe: el diagnóstico, en cifras que se leen de reojo. */}
+      <ContextTicker />
+
+      {/* De qué modelo venimos y a cuál vamos. */}
+      <TheLeap />
+
       <section className="home-pillars" id="pilares">
         <div className="u-container">
           <div className="section-heading section-heading--centered">
@@ -106,49 +127,76 @@ export function Home() {
             <ErrorBlock error={pillars.error} onRetry={() => void pillars.refetch()} />
           ) : (
             <div className="home-pillar-grid stagger">
-              {pillars.data.map((pillar) => (
-                <Link
-                  className="home-pillar-card card card--interactive"
-                  to={`/implementacion/pilar/${pillar.slug}`}
-                  key={pillar.id}
-                  style={{ "--accent": accentFor(pillar.accent_slot) } as React.CSSProperties}
-                >
-                  <span className="home-pillar-card__head">
-                    <span className="home-pillar-card__icon">
-                      <Icon name={pillar.icon} size={22} />
-                    </span>
-                    <span className="home-pillar-card__numeral">{pillar.numeral}</span>
-                  </span>
+              {pillars.data.map((pillar) => {
+                // La narrativa del PDI es editorial y se busca por slug; un
+                // pilar que la base publique sin narrativa se muestra igual,
+                // solo que sin lema ni etiquetas.
+                const narrative = pillarNarratives[pillar.slug];
 
-                  <h3>{pillar.name}</h3>
-                  <p>{pillar.description}</p>
-
-                  <span className="home-pillar-card__foot">
-                    <span className="home-pillar-card__meter">
-                      <span className="progress-track">
-                        <span
-                          className="progress-track__fill"
-                          style={{
-                            width: `${pillar.progress.progress}%`,
-                            background: accentFor(pillar.accent_slot),
-                          }}
-                        />
+                return (
+                  <Link
+                    className="home-pillar-card card card--interactive"
+                    to={`/implementacion/pilar/${pillar.slug}`}
+                    key={pillar.id}
+                    style={{ "--accent": accentFor(pillar.accent_slot) } as React.CSSProperties}
+                  >
+                    <span className="home-pillar-card__head">
+                      <span className="home-pillar-card__icon">
+                        <Icon name={pillar.icon} size={22} />
                       </span>
-                      <small>
-                        {pillar.progress.progress}% · {pillar.progress.done} de {pillar.progress.total}{" "}
-                        indicadores
-                      </small>
+                      <span className="home-pillar-card__numeral">{pillar.numeral}</span>
                     </span>
-                    <span className="home-pillar-card__link">
-                      Conocer el pilar <span data-arrow aria-hidden="true">→</span>
+
+                    <h3>{pillar.name}</h3>
+
+                    {narrative && <p className="home-pillar-card__motto">{narrative.motto}</p>}
+
+                    <p>{pillar.description}</p>
+
+                    {narrative && (
+                      <span className="home-pillar-card__tags">
+                        {narrative.tags.map((tag) => (
+                          <span key={tag}>{tag}</span>
+                        ))}
+                      </span>
+                    )}
+
+                    <span className="home-pillar-card__foot">
+                      <span className="home-pillar-card__meter">
+                        <span className="progress-track">
+                          <span
+                            className="progress-track__fill"
+                            style={{
+                              width: `${pillar.progress.progress}%`,
+                              background: accentFor(pillar.accent_slot),
+                            }}
+                          />
+                        </span>
+                        <small>
+                          {pillar.progress.progress}% · {pillar.progress.done} de{" "}
+                          {pillar.progress.total} indicadores
+                        </small>
+                      </span>
+                      <span className="home-pillar-card__link">
+                        Conocer el pilar <span data-arrow aria-hidden="true">→</span>
+                      </span>
                     </span>
-                  </span>
-                </Link>
-              ))}
+                  </Link>
+                );
+              })}
             </div>
           )}
         </div>
       </section>
+
+      {/* El plan aterrizado en cada territorio. */}
+      <CampusExplorer />
+
+      {/* Qué parte del plan le toca a quien está leyendo. */}
+      <RouteFinder />
+
+      {/* Las fuentes, antes de las bandas de cierre. */}
+      <ResourceRoom />
 
       <section className="home-cta-band">
         <div className="u-container home-cta-band__inner">

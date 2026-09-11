@@ -1,0 +1,761 @@
+/* =============================================================================
+   PDI · Portada — bloques narrativos.
+
+   Solo tokens: ni un color, ni un radio, ni una duración escritos a mano. Los
+   puntos de corte son los mismos del resto del portal (1080 / 860 / 640) para
+   que las secciones nuevas se reordenen a la vez que las que ya existían.
+   ========================================================================== */
+
+/* =============================================================================
+   Barra de contexto
+   Movimiento constante: `linear` y una vuelta larga. Se detiene al pasar el
+   cursor y mientras algo dentro tenga el foco.
+   ========================================================================== */
+
+.context-ticker {
+  position: relative;
+  z-index: 2;
+  /* Va debajo de la franja de pulso, que se monta sobre el héroe con un margen
+     negativo: sin esta separación el cintillo quedaría pegado a esa tarjeta. */
+  margin-top: var(--space-10);
+  border-block: 1px solid var(--line);
+  background: var(--surface);
+  box-shadow: var(--shadow-xs);
+}
+
+.context-ticker__viewport {
+  overflow: hidden;
+  /* Los extremos se desvanecen: el texto no se corta de golpe contra el borde. */
+  mask-image: linear-gradient(90deg, transparent, #000 5%, #000 95%, transparent);
+}
+
+.context-ticker__rail {
+  display: flex;
+  width: max-content;
+  animation: ticker-drift 64s linear infinite;
+}
+
+@keyframes ticker-drift {
+  to {
+    /* El raíl son dos copias idénticas: medio raíl es exactamente una vuelta. */
+    transform: translateX(-50%);
+  }
+}
+
+.context-ticker__viewport:hover .context-ticker__rail,
+.context-ticker__viewport:focus-within .context-ticker__rail {
+  animation-play-state: paused;
+}
+
+.context-ticker__lane {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+}
+
+.context-ticker__item {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-2);
+  padding: var(--space-3) var(--space-6);
+  white-space: nowrap;
+  font-size: var(--text-sm);
+  color: var(--ink-secondary);
+}
+
+/* Un punto separador entre datos: más tranquilo que una línea vertical. */
+.context-ticker__item::after {
+  content: "";
+  width: 4px;
+  height: 4px;
+  margin-left: var(--space-5);
+  border-radius: var(--radius-pill);
+  background: var(--line-strong);
+}
+
+.context-ticker__item strong {
+  color: var(--brand-navy);
+  font-family: var(--font-display);
+  font-size: var(--text-md);
+  letter-spacing: var(--tracking-tight);
+}
+
+/* =============================================================================
+   El gran salto
+   ========================================================================== */
+
+.leap {
+  padding: var(--space-11) 0;
+  background: var(--page-alt);
+  border-block: 1px solid var(--line-faint);
+}
+
+.leap .section-heading {
+  margin-bottom: var(--space-9);
+}
+
+.leap__list {
+  display: grid;
+  gap: var(--space-4);
+}
+
+.leap__row {
+  display: grid;
+  grid-template-columns: 15rem 1fr auto 1fr;
+  align-items: center;
+  gap: var(--space-5);
+  padding: var(--space-6);
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-xl);
+  box-shadow: var(--shadow-xs);
+  transition: box-shadow var(--dur-base) var(--ease-out), border-color var(--dur-base) ease;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .leap__row:hover {
+    border-color: var(--line-strong);
+    box-shadow: var(--shadow-md);
+  }
+}
+
+.leap__dimension {
+  font-size: var(--text-md);
+  line-height: var(--leading-snug);
+}
+
+.leap__pane p {
+  margin-top: var(--space-2);
+  color: var(--ink-secondary);
+  font-size: var(--text-sm);
+  line-height: var(--leading-relaxed);
+}
+
+/* Lo que se supera se lee, pero no compite: la jerarquía entre los dos paneles
+   la marcan esta regla de acento y el color del rótulo, no un gris más flojo en
+   el panel de la izquierda. Apagar ese texto lo dejaría por debajo de AA. */
+.leap__pane--after {
+  padding-left: var(--space-5);
+  border-left: 2px solid var(--brand-blue);
+}
+
+.leap__pane--after p {
+  color: var(--ink);
+}
+
+.leap__tag {
+  display: inline-block;
+  /* --ink-muted se queda en 4,26:1 sobre la superficie clara: por debajo de AA
+     para texto pequeño. Este rótulo es texto, no adorno. */
+  color: var(--ink-secondary);
+  font-size: var(--text-2xs);
+  font-weight: 800;
+  letter-spacing: var(--tracking-caps);
+  text-transform: uppercase;
+}
+
+.leap__pane--after .leap__tag {
+  color: var(--brand-blue);
+}
+
+.leap__arrow {
+  color: var(--ink-muted);
+  font-size: var(--text-lg);
+}
+
+/* --- La forma del plan ---------------------------------------------------- */
+
+.leap__figures {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: var(--space-4);
+  margin: var(--space-8) 0 0;
+}
+
+/* La cifra va encima de su etiqueta, pero en el marcado la etiqueta es el <dt>:
+   el orden visual lo arregla `order`, que necesita un contenedor flex. */
+.leap__figures > div {
+  display: flex;
+  flex-direction: column;
+  padding: var(--space-5) var(--space-6);
+  text-align: center;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+}
+
+.leap__figures dt {
+  order: 2;
+  color: var(--ink-secondary);
+  font-size: var(--text-xs);
+  font-weight: 700;
+  letter-spacing: var(--tracking-wide);
+  text-transform: uppercase;
+}
+
+.leap__figures dd {
+  order: 1;
+  margin: 0 0 var(--space-2);
+  color: var(--brand-navy);
+  font-family: var(--font-display);
+  font-size: var(--text-3xl);
+  line-height: 1;
+}
+
+/* =============================================================================
+   Regionalización
+   ========================================================================== */
+
+.campus {
+  padding: var(--space-11) 0;
+}
+
+.campus .section-heading {
+  margin-bottom: var(--space-7);
+}
+
+.campus__tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin-bottom: var(--space-5);
+}
+
+.campus__tab {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-3) var(--space-5);
+  color: var(--ink-secondary);
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-pill);
+  font-size: var(--text-sm);
+  font-weight: 700;
+  transition:
+    transform var(--dur-press) var(--ease-out),
+    background-color var(--dur-base) ease,
+    border-color var(--dur-base) ease,
+    color var(--dur-base) ease;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .campus__tab:hover {
+    color: var(--brand-navy);
+    border-color: var(--brand-blue);
+  }
+}
+
+.campus__tab:active {
+  transform: scale(0.97);
+}
+
+.campus__tab.is-active {
+  color: var(--ink-on-accent);
+  background: var(--brand-blue);
+  border-color: var(--brand-blue);
+  box-shadow: var(--shadow-accent);
+}
+
+.campus__panel {
+  display: grid;
+  gap: var(--space-7);
+  padding: var(--space-8);
+  /* El panel se remonta al cambiar de sede: la entrada confirma que el
+     contenido es otro sin desplazar nada de sitio. */
+  animation: rise-in var(--dur-base) var(--ease-out) backwards;
+}
+
+.campus__panel:focus-visible {
+  outline: 2px solid var(--brand-blue);
+  outline-offset: 3px;
+}
+
+.campus__intro {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: var(--space-6);
+}
+
+.campus__intro h3 {
+  display: grid;
+  gap: var(--space-2);
+  font-size: var(--text-2xl);
+}
+
+.campus__intro h3 span {
+  /* El teal da 3,56:1 sobre la superficie clara: vale para una regla de 3px,
+     no para 13px en versalitas. */
+  color: var(--brand-blue);
+  font-family: var(--font-sans);
+  font-size: var(--text-sm);
+  font-weight: 700;
+  letter-spacing: var(--tracking-wide);
+  text-transform: uppercase;
+}
+
+.campus__highlights {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-6);
+  margin: 0;
+}
+
+.campus__highlights dt {
+  color: var(--brand-navy);
+  font-family: var(--font-display);
+  font-size: var(--text-lg);
+  line-height: 1;
+}
+
+.campus__highlights dd {
+  max-width: 11rem;
+  margin: var(--space-2) 0 0;
+  color: var(--ink-secondary);
+  font-size: var(--text-xs);
+  font-weight: 600;
+}
+
+.campus__columns {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-7);
+  padding-top: var(--space-6);
+  border-top: 1px solid var(--line-faint);
+}
+
+.campus__column p {
+  margin-top: var(--space-3);
+  color: var(--ink-secondary);
+  line-height: var(--leading-relaxed);
+  font-size: var(--text-sm);
+}
+
+.campus__column--response .leap__tag {
+  color: var(--brand-blue);
+}
+
+.campus__fronts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin-top: var(--space-5);
+}
+
+.campus__fronts li {
+  padding: var(--space-2) var(--space-4);
+  color: var(--brand-navy);
+  background: var(--brand-blue-soft);
+  border-radius: var(--radius-pill);
+  font-size: var(--text-xs);
+  font-weight: 700;
+}
+
+/* =============================================================================
+   Encuentra tu ruta
+   ========================================================================== */
+
+.route-finder {
+  padding: 0 0 var(--space-11);
+}
+
+.route-finder__shell {
+  display: grid;
+  gap: var(--space-7);
+  padding: var(--space-9) var(--space-8);
+  background:
+    radial-gradient(circle at 92% 8%, color-mix(in srgb, var(--brand-teal) 9%, transparent), transparent 44%),
+    var(--surface);
+}
+
+.route-finder .eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.route-finder__step {
+  padding: 0;
+  margin: 0;
+  border: 0;
+}
+
+.route-finder__step legend {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: 0;
+  margin-bottom: var(--space-4);
+  color: var(--brand-navy);
+  font-family: var(--font-display);
+  font-size: var(--text-md);
+  font-weight: 700;
+}
+
+.route-finder__number {
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  color: var(--ink-on-accent);
+  background: var(--brand-navy);
+  border-radius: var(--radius-pill);
+  font-family: var(--font-sans);
+  font-size: var(--text-xs);
+  font-weight: 800;
+}
+
+.route-finder__options {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+}
+
+/* El radio sigue ahí, solo que invisible: el teclado y el lector de pantalla
+   trabajan con él, la ficha es su etiqueta. */
+.route-chip input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.route-chip span {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-3) var(--space-5);
+  color: var(--ink-secondary);
+  background: var(--surface-2);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-pill);
+  font-size: var(--text-sm);
+  font-weight: 700;
+  cursor: pointer;
+  transition:
+    transform var(--dur-press) var(--ease-out),
+    background-color var(--dur-base) ease,
+    border-color var(--dur-base) ease,
+    color var(--dur-base) ease;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .route-chip:hover span {
+    color: var(--brand-navy);
+    border-color: var(--brand-blue);
+  }
+}
+
+.route-chip span:active {
+  transform: scale(0.97);
+}
+
+.route-chip input:checked + span {
+  color: var(--ink-on-accent);
+  background: var(--brand-navy);
+  border-color: var(--brand-navy);
+}
+
+/* El foco viaja en el input oculto, así que el anillo hay que pintarlo en la
+   ficha: si no, navegar con teclado sería a ciegas. */
+.route-chip input:focus-visible + span {
+  outline: 2px solid var(--brand-blue);
+  outline-offset: 2px;
+}
+
+.route-finder__result {
+  padding-top: var(--space-6);
+  border-top: 1px solid var(--line-faint);
+}
+
+.route-finder__hint {
+  color: var(--ink-secondary);
+  font-size: var(--text-sm);
+}
+
+.route-result {
+  display: grid;
+  justify-items: start;
+  gap: var(--space-4);
+  animation: rise-in var(--dur-base) var(--ease-out) backwards;
+}
+
+.route-result__answer {
+  max-width: var(--measure);
+  color: var(--ink);
+  font-size: var(--text-md);
+  line-height: var(--leading-relaxed);
+}
+
+.route-result__pillars {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 17rem), 1fr));
+  gap: var(--space-3);
+  width: 100%;
+}
+
+.route-result__pillar {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  height: 100%;
+  padding: var(--space-4);
+  background: var(--surface-2);
+  border: 1px solid var(--line);
+  border-left: 3px solid var(--accent);
+  border-radius: var(--radius-md);
+  transition:
+    transform var(--dur-base) var(--ease-out),
+    border-color var(--dur-base) ease,
+    box-shadow var(--dur-base) var(--ease-out);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .route-result__pillar:hover {
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-md);
+  }
+
+  .route-result__pillar:hover [data-arrow] {
+    transform: translateX(3px);
+  }
+}
+
+.route-result__pillar [data-arrow] {
+  margin-left: auto;
+  color: var(--ink-muted);
+  transition: transform var(--dur-base) var(--ease-out);
+}
+
+.route-result__pillar-icon {
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  width: 38px;
+  height: 38px;
+  color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
+  border-radius: var(--radius-sm);
+}
+
+.route-result__pillar-body {
+  display: grid;
+  gap: 2px;
+}
+
+.route-result__pillar-body strong {
+  color: var(--brand-navy);
+  font-size: var(--text-sm);
+}
+
+.route-result__pillar-body small {
+  color: var(--ink-secondary);
+  font-size: var(--text-xs);
+  font-weight: 600;
+}
+
+/* =============================================================================
+   Sala de recursos
+   ========================================================================== */
+
+.resources {
+  padding: 0 0 var(--space-11);
+}
+
+.resources .section-heading {
+  margin-bottom: var(--space-7);
+}
+
+.resource-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 17rem), 1fr));
+  gap: var(--space-4);
+}
+
+.resource-card {
+  display: grid;
+  align-content: start;
+  gap: var(--space-4);
+  height: 100%;
+  padding: var(--space-6);
+}
+
+.resource-card__mark {
+  display: grid;
+  place-items: center;
+  width: 42px;
+  height: 42px;
+  color: var(--brand-blue);
+  background: var(--brand-blue-soft);
+  border-radius: var(--radius-sm);
+}
+
+.resource-card__body {
+  display: grid;
+  gap: var(--space-2);
+}
+
+.resource-card__body strong {
+  color: var(--brand-navy);
+  font-family: var(--font-display);
+  font-size: var(--text-md);
+  line-height: var(--leading-snug);
+}
+
+.resource-card__body small {
+  color: var(--ink-secondary);
+  font-size: var(--text-sm);
+  line-height: var(--leading-relaxed);
+}
+
+.resource-card__foot {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  margin-top: auto;
+  padding-top: var(--space-2);
+}
+
+.resource-card__action {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  color: var(--brand-blue);
+  font-size: var(--text-sm);
+  font-weight: 700;
+}
+
+.resources__more {
+  margin-top: var(--space-6);
+}
+
+.resources__more a {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  color: var(--brand-blue);
+  font-size: var(--text-sm);
+  font-weight: 700;
+}
+
+.resources__more [data-arrow] {
+  transition: transform var(--dur-base) var(--ease-out);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .resources__more a:hover [data-arrow] {
+    transform: translateX(3px);
+  }
+}
+
+/* =============================================================================
+   Adaptación
+   ========================================================================== */
+
+@media (max-width: 1080px) {
+  .leap__row {
+    grid-template-columns: 12rem 1fr auto 1fr;
+    gap: var(--space-4);
+  }
+
+  .leap__figures {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 860px) {
+  /* Por debajo de este ancho las dos columnas no caben sin partir palabras:
+     la comparación pasa a leerse de arriba abajo, con la flecha girada. */
+  .leap__row {
+    grid-template-columns: 1fr;
+    gap: var(--space-4);
+  }
+
+  .leap__arrow {
+    justify-self: start;
+    transform: rotate(90deg);
+  }
+
+  .leap__pane--after {
+    padding-left: var(--space-4);
+  }
+
+  .campus__columns {
+    grid-template-columns: 1fr;
+    gap: var(--space-6);
+  }
+
+  .campus__panel {
+    padding: var(--space-6);
+  }
+
+  .route-finder__shell {
+    padding: var(--space-7) var(--space-6);
+  }
+}
+
+@media (max-width: 640px) {
+  .leap,
+  .campus {
+    padding: var(--space-9) 0;
+  }
+
+  .campus__intro h3 {
+    font-size: var(--text-xl);
+  }
+
+  .campus__highlights {
+    gap: var(--space-5);
+  }
+
+  .context-ticker__item {
+    padding: var(--space-3) var(--space-4);
+  }
+}
+
+/* =============================================================================
+   Movimiento reducido
+   El reset global deja las animaciones en 0,01 ms, lo que dejaría el cintillo
+   congelado al final de su recorrido —en blanco—. Aquí se desmonta el bucle:
+   una sola copia, quieta, que se puede arrastrar para leerla entera.
+   ========================================================================== */
+
+@media (prefers-reduced-motion: reduce) {
+  .context-ticker__viewport {
+    overflow-x: auto;
+    mask-image: none;
+  }
+
+  .context-ticker__rail {
+    animation: none;
+    transform: none;
+  }
+
+  .context-ticker__lane[aria-hidden="true"] {
+    display: none;
+  }
+
+  .campus__panel,
+  .route-result {
+    animation: none;
+  }
+
+  .leap__row,
+  .route-chip span,
+  .campus__tab,
+  .route-result__pillar {
+    transition-property: background-color, border-color, color;
+    transition-duration: var(--dur-base);
+  }
+
+  .route-chip span:active,
+  .campus__tab:active,
+  .route-result__pillar:hover {
+    transform: none;
+  }
+}

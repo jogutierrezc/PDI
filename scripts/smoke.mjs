@@ -399,7 +399,83 @@ const FIXTURES = {
 /* --- Rutas a comprobar ----------------------------------------------------- */
 
 const routes = [
-  { path: "/", expect: "Aquí construimos futuro", also: ["Ambiente tecnológico", "67"] },
+  {
+    path: "/",
+    expect: "Aquí construimos futuro",
+    also: [
+      "Ambiente tecnológico",
+      "67",
+      // Los bloques narrativos de la portada. Si alguno deja de montar, el
+      // typecheck no se entera: la página seguiría compilando sin él.
+      "Ventana demográfica decisiva",
+      "Rompemos el molde",
+      "Líneas de acción",
+      "Smart campus",
+      "Tres sedes, tres vocaciones productivas",
+      "Hub de alta tecnología",
+      "¿Qué parte del plan te toca a ti?",
+      "Plan de Desarrollo Institucional 2024-2028",
+    ],
+    // La portada es pública: las cifras presupuestales tampoco caben aquí.
+    absent: SIN_DINERO,
+  },
+  {
+    path: "/",
+    note: "la portada cambia de sede y arma la ruta con los pilares reales",
+    expect: "Aquí construimos futuro",
+    interact: async (window, tick) => {
+      /* --- Sedes: las pestañas cambian el panel ---------------------------- */
+      const tabs = [...window.document.querySelectorAll('[role="tab"]')];
+      if (tabs.length !== 3) throw new Error(`se esperaban 3 sedes y hay ${tabs.length}`);
+
+      const cucuta = tabs.find((tab) => tab.textContent?.includes("Cúcuta"));
+      if (!cucuta) throw new Error("no se encontró la pestaña de Cúcuta");
+
+      cucuta.dispatchEvent(new window.Event("click", { bubbles: true }));
+      await tick();
+
+      if (cucuta.getAttribute("aria-selected") !== "true") {
+        throw new Error("la pestaña pulsada no queda seleccionada");
+      }
+      const panel = window.document.querySelector('[role="tabpanel"]')?.textContent ?? "";
+      if (!panel.includes("comercio binacional")) {
+        throw new Error("el panel no se actualizó a la sede elegida");
+      }
+      // Una sola parada de tabulación para todo el grupo.
+      const focusables = tabs.filter((tab) => tab.getAttribute("tabindex") === "0");
+      if (focusables.length !== 1) {
+        throw new Error(`el grupo de pestañas tiene ${focusables.length} paradas de tabulación`);
+      }
+
+      /* --- Encuentra tu ruta: dos respuestas y un resultado ----------------- */
+      // `click()` y no un Event sintético: React detecta el cambio de un radio
+      // comparando `checked`, y solo la activación real de jsdom lo mueve.
+      const pick = (value) => {
+        const input = window.document.querySelector(`.route-chip input[value="${value}"]`);
+        if (!input) throw new Error(`no se encontró la opción "${value}"`);
+        input.click();
+      };
+
+      // Con una sola respuesta todavía no hay ruta que mostrar.
+      pick("aspirante");
+      await tick();
+      if (!window.document.body.textContent?.includes("Falta una respuesta")) {
+        throw new Error("con media respuesta debería pedirse la otra");
+      }
+
+      pick("emprender");
+      await tick();
+
+      const resultado = window.document.querySelector(".route-result")?.textContent ?? "";
+      if (!resultado.includes("capital semilla")) {
+        throw new Error("el resultado no responde al interés elegido");
+      }
+      // Los pilares recomendados salen de la base, con su avance: no son texto.
+      if (!resultado.includes("Ambiente tecnológico") || !resultado.includes("% de avance")) {
+        throw new Error("el resultado no enlaza los pilares publicados con su avance");
+      }
+    },
+  },
   {
     path: "/tablero",
     expect: "Cumplimiento global y por pilar",

@@ -33,7 +33,10 @@ export type IconName =
   | "plus"
   | "code"
   | "table"
-  | "chart";
+  | "chart"
+  | "pin"
+  | "compass"
+  | "download";
 
 const paths: Record<IconName, JSX.Element> = {
   /* --- Pilares ---------------------------------------------------------- */
@@ -164,6 +167,20 @@ const paths: Record<IconName, JSX.Element> = {
       <path d="M7.5 16.5h5M7.5 12h9M7.5 7.5h3" />
     </>
   ),
+  /* Territorio, ruta y descarga: los tres verbos de la portada. */
+  pin: (
+    <>
+      <path d="M12 21c4.2-4.4 6.3-7.7 6.3-10.3a6.3 6.3 0 1 0-12.6 0C5.7 13.3 7.8 16.6 12 21Z" />
+      <circle cx="12" cy="10.5" r="2.4" />
+    </>
+  ),
+  compass: (
+    <>
+      <circle cx="12" cy="12" r="8.2" />
+      <path d="m15.2 8.8-1.9 4.5-4.5 1.9 1.9-4.5z" />
+    </>
+  ),
+  download: <path d="M12 4v11M7.5 10.5 12 15l4.5-4.5M4.5 19.5h15" />,
 };
 
 interface IconProps extends Omit<SVGProps<SVGSVGElement>, "name"> {

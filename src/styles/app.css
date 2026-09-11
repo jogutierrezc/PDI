@@ -97,6 +97,22 @@
   margin-top: var(--space-7);
 }
 
+/* La cita con la que el plan se presenta. Marcada con una regla del color de
+   marca en vez de comillas dibujadas: sobre el vídeo, una barra se lee y unas
+   comillas decorativas se pierden. */
+.home-hero__quote {
+  max-width: 34rem;
+  margin: var(--space-8) 0 0;
+  padding-left: var(--space-5);
+  border-left: 3px solid var(--brand-teal);
+  color: var(--brand-navy);
+  font-family: var(--font-display);
+  font-size: var(--text-lg);
+  font-style: italic;
+  line-height: var(--leading-snug);
+  text-wrap: balance;
+}
+
 /* --- Franja de pulso ------------------------------------------------------ */
 
 .home-pulse {
@@ -229,6 +245,38 @@
   color: var(--ink-secondary);
   line-height: var(--leading-relaxed);
   font-size: var(--text-sm);
+}
+
+/* El lema oficial del pilar. Va en la serif y con la regla del acento: es una
+   cita del PDI, no la descripción operativa que viene debajo. */
+p.home-pillar-card__motto {
+  padding-left: var(--space-4);
+  border-left: 2px solid var(--accent);
+  color: var(--brand-navy);
+  font-family: var(--font-display);
+  font-size: var(--text-base);
+  font-style: italic;
+  line-height: var(--leading-snug);
+}
+
+/* Las líneas clave, en corto. El detalle completo vive en la ficha del pilar,
+   así que aquí son rótulos, no enlaces. */
+.home-pillar-card__tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin-top: var(--space-1);
+}
+
+.home-pillar-card__tags span {
+  padding: 4px var(--space-3);
+  color: var(--ink-secondary);
+  background: var(--surface-3);
+  border: 1px solid var(--line-faint);
+  border-radius: var(--radius-pill);
+  font-size: var(--text-2xs);
+  font-weight: 700;
+  letter-spacing: 0.01em;
 }
 
 .home-pillar-card__foot {

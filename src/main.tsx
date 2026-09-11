@@ -10,6 +10,11 @@ import { isRetryable } from "./data/errors";
 import "./styles/tokens.css";
 import "./styles/base.css";
 import "./styles/app.css";
+// La portada no se carga bajo demanda, así que su hoja viaja en el bundle
+// principal de todas formas. Se importa aquí, y no desde el componente, porque
+// los import de un módulo se evalúan antes que los de esta lista: desde Home
+// entraría antes que base.css y `.card` pisaría el relleno de sus bloques.
+import "./modules/landing/landing.css";
 
 const queryClient = new QueryClient({
   defaultOptions: {

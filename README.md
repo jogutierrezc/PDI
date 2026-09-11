@@ -47,9 +47,19 @@ pegarlos en el editor SQL del panel de Supabase o aplicarlos con la CLI
 | `0010_metas_y_cumplimiento.sql` | Meta y avance absolutos + conteos del cuadro de mando |
 | `0011_indicadores_por_anio.sql` | Unidad, línea base y serie anual del indicador + observaciones del pilar |
 | `0012_cascada_anual.sql` | La cascada, año a año, y el indicador sin proyecto cuenta para su línea |
-| `0013_modulo_de_proyectos.sql` | Proyectos transversales: formulación, vínculos a varios pilares, impactos y archivo en Storage. **Ejecútala la última.** |
+| `0013_modulo_de_proyectos.sql` | Proyectos transversales: formulación, vínculos a varios pilares, impactos y archivo en Storage |
+| `0014_aporte_en_todos_los_vinculos.sql` | Un proyecto compartido lleva sus cifras a cada pilar al que aporta |
+| `0015_presupuesto.sql` | Reporte anual de presupuesto y cierre del dinero al público |
+| `0016_pdi_por_facultad.sql` | Facultades, sus planes de acción y el enganche con los pilares del PDI |
+| `0017_pdi_por_campus.sql` | Estructura real del plan (21 áreas, 62 líneas) y lo que reporta cada sede |
+| `0018_normalizar_estructura.sql` | Fusionar la estructura duplicada y retirar la de ejemplo. **Ejecútala la última.** |
 
 Todos son idempotentes: volver a ejecutarlos no duplica nada.
+
+Antes de subir una migración, `npm run check:sql` avisa de las columnas que
+referencia y no existen —el fallo que Supabase reporta como `column p.area_id
+does not exist`, pero con el archivo y la línea—. No sustituye a aplicarla: no
+ve el SQL dinámico, las vistas ni el orden de las sentencias.
 
 > **Termina siempre con `0007`.** PostgREST guarda el esquema en una caché; sin
 > recargarla, una tabla recién creada sigue dando 404 durante un rato.
@@ -392,6 +402,58 @@ supabase functions deploy admin-users
 Asignar un rol a alguien que ya existe **no** pasa por aquí: es un `UPDATE`
 normal sobre `profiles` que las políticas ya limitan a administradores.
 
+## Edge Function `sync-facultades`
+
+Trae los planes de acción de las facultades desde su aplicación de Google, que
+los publica como JSON:
+
+```
+GET ?action=list        → { ok, data: [ {facultad, decano, fase_actual, …} ] }
+GET ?facultad=<CÓDIGO>  → { ok, found, row: { …, json_data: "<JSON del plan>" } }
+```
+
+```bash
+supabase functions deploy sync-facultades
+supabase secrets set FACULTY_SOURCE_URL="https://script.google.com/macros/s/<ID>/exec"
+supabase secrets set FACULTY_SYNC_TOKEN="<una cadena larga y aleatoria>"
+```
+
+Se dispara desde **Sincronizar ahora** en `/admin/facultades` —con la sesión del
+portal, si el rol es `planeacion` o superior— o con la cabecera `x-sync-token`
+desde un cron.
+
+**El portal tira del origen; no lo lee en cada visita.** La URL responde JSON y
+admite cualquier origen, así que leerla desde el navegador parecía lo simple. No
+lo es: cada visitante esperaría entre uno y tres segundos, sin caché, y la
+página pública se quedaría en blanco cada vez que Google tarde. Sincronizando,
+el portal sirve siempre lo último que trajo y una caída del origen se nota en la
+intranet, donde alguien puede hacer algo.
+
+**La sincronización no pisa lo que decidió el portal.** Cada acción se reconoce
+por el identificador que le puso el origen (`source_id`, del estilo `d1_2`)
+dentro de su facultad. Se actualiza lo que la facultad escribe; se quedan
+intactos `status`, `note`, `area_id` y `action_line_id`. Tampoco borra: una
+acción que desaparece del origen se reporta en el informe de la corrida y se
+deja como está.
+
+### El enganche con el PDI
+
+El plan de la facultad no conoce el PDI salvo por un campo: cada acción declara
+su pilar como texto. Esos textos **coinciden exactamente** con `pillars.name`
+—"Gobernanza para el buen gobierno", "Personalización", "Ambiente tecnológico",
+"Sostenibilidad", "Apropiación social"—, así que el disparador
+`faculty_action_fill` los resuelve por igualdad y guarda además el texto
+original en `declared_pillar`: si mañana el origen cambia una etiqueta, se ve
+cuál dejó de casar en vez de perderse en silencio.
+
+Lo que no case aparece en rojo en `/admin/facultades` y no se puede publicar
+(`faculty_actions_pillar_before_publish`). Se resuelve anclando la acción a una
+línea de acción del plan, que rellena el área y el pilar hacia arriba.
+
+El área estratégica y la línea de acción son un refinamiento opcional: el origen
+no las pide, y exigirlas dejaría el módulo vacío esperando un dato que nadie
+está capturando.
+
 ## Primer administrador
 
 El disparador `handle_new_user` crea el perfil con rol `consulta`, así que el
@@ -419,11 +481,17 @@ A partir de ahí, el resto de altas se hacen desde **Usuarios y roles**.
 | `/tablero/pilar/:slug` | Cuadro de mando de un pilar | Público |
 | `/implementacion` | Avance por pilar + repositorio documental | Público |
 | `/implementacion/pilar/:slug` | Ficha del pilar, con filtro por área estratégica | Público |
+| `/facultades` | PDI por facultad: matriz facultad × pilar e índice de facultades | Público |
+| `/facultades/:slug` | Plan de acción de una facultad, por dimensiones | Público |
 | `/desarrollo-tecnologico` | Desarrollos web de la oficina | Público |
 | `/acceso-intranet` | Inicio de sesión | Público |
 | `/admin/pilares` | Gestión de pilares y responsables | `consulta`+ |
 | `/admin/pilares/:slug/configurar` | Áreas, líneas, indicadores, observaciones y soportes | `consulta`+ |
 | `/admin/proyectos` | Proyectos del plan: formulación, vínculos a varios pilares, impactos y archivo | `consulta`+ |
+| `/admin/facultades` | Sincronizar con el origen, revisar el enganche y publicar | `consulta`+ (edita `planeacion`+) |
+| `/admin/campus` | Cargar el libro de indicadores por campus | `consulta`+ (edita `planeacion`+) |
+| `/admin/estructura` | Fusionar áreas y líneas duplicadas, retirar las de ejemplo | `consulta`+ (edita `planeacion`+) |
+| `/admin/presupuesto` | Reporte anual de presupuesto por proyecto | `consulta`+ |
 | `/admin/parametros` | Catálogos globales | `consulta`+ |
 | `/admin/desarrollo` | Proyectos web y sus autores | `consulta`+ |
 | `/admin/usuarios` | Usuarios y roles | `admin` |
@@ -597,7 +665,8 @@ src/
   components/layout/   TopBar, PublicLayout, ScrollManager
   routes/              Home, Dashboard, NotFound/Forbidden
   modules/landing/     Bloques narrativos de la portada + su contenido editorial
-  modules/             implementation, pillar-viewer, login, admin
+  modules/facultades/  PDI por facultad: índice con la matriz y plan de cada facultad
+  modules/             implementation, pillar-viewer, ods, login, admin
 supabase/
   migrations/          El esquema, en orden
   functions/           Edge Functions
@@ -632,10 +701,25 @@ el texto editorial lo volvería a publicar por la puerta de al lado. La prueba d
 humo comprueba la portada contra `SIN_DINERO`, y además contra «billones» y
 «USD», que son las dos formas en que se había colado.
 
-**El selector "tu ruta"** cruza perfil × interés en `routeMatrix`: el interés
-dice qué pone en marcha el plan —igual para todo el mundo— y el cruce dice qué
-significa para quien pregunta. Los pilares y los ODS del resultado no se
-escriben: salen de los proyectos publicados.
+**El selector "tu ruta"** vive aparte, en `modules/landing/route-content.ts`,
+porque es con diferencia lo más largo de la portada: siete perfiles por siete
+intereses, cuarenta y nueve cruces.
+
+El interés dice qué pone en marcha el plan —igual para todo el mundo, porque el
+plan es uno solo— y `routeMatrix[perfil][interés]` dice qué significa eso para
+quien pregunta: «emprender» no quiere decir lo mismo para un aspirante que para
+una directiva que tiene que sostenerlo. Los siete intereses están escogidos para
+que los seis pilares sean la respuesta principal de alguno: ninguno se queda sin
+puerta de entrada.
+
+Los perfiles incluyen a quien ejecuta el plan y a quien lo decide —personal
+administrativo y directivos—, no solo a quien estudia o contrata: el PDI lo
+sostiene gente que antes no se veía reflejada en esta pantalla.
+
+Una casilla que falte no rompe nada: el componente muestra el resto del resultado
+sin esa línea, así que añadir un perfil no obliga a escribir sus siete cruces
+antes de publicarlo. Los pilares y los ODS del resultado no se escriben nunca:
+salen de los proyectos publicados.
 
 `landing.css` se importa desde `main.tsx`, no desde `Home.tsx`. La portada no se
 carga bajo demanda, así que su hoja viaja en el bundle principal de todas formas;

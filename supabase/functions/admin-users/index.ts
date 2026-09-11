@@ -48,8 +48,16 @@ const ROLES: Role[] = ["consulta", "responsable", "planeacion", "admin"];
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": Deno.env.get("ALLOWED_ORIGIN") ?? "*",
-  "Access-Control-Allow-Headers": "authorization, content-type",
+  // supabase-js manda dos cabeceras propias en cada petición, además de las que
+  // se declaran aquí: `x-client-info` (la pone auth-js por defecto) y `apikey`
+  // (la añade el cliente de funciones). Si no están en esta lista, el navegador
+  // rechaza el preflight aunque la función responda 200: el log dice
+  // "OPTIONS | 200" y la consola dice "Request header field x-client-info is
+  // not allowed by Access-Control-Allow-Headers". Cuesta de ver porque las dos
+  // cosas parecen contradecirse, y no se contradicen.
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
   "Access-Control-Allow-Methods": "POST, OPTIONS",
+  "Access-Control-Max-Age": "86400",
 };
 
 function json(body: unknown, status = 200) {

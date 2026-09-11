@@ -15,10 +15,24 @@ import { supabase } from "../lib/supabase";
 import type {
   ActionLineWithArea,
   Activity,
+  Campus,
+  CampusFact,
+  CampusIndicator,
+  CampusLineCoverage,
+  CampusPillarCell,
+  CampusReportBatch,
+  CampusSummary,
   ActivityWithTargets,
   AreaProgress,
   ChangeLogWithTarget,
+  Faculty,
+  FacultyAction,
+  FacultyActionAdminRow,
+  FacultyPillarCell,
+  FacultySummary,
   GlossaryTerm,
+  StructureDuplicate,
+  StructureOrphan,
   IndicatorWithLabels,
   Parameter,
   ParameterCategory,
@@ -66,6 +80,19 @@ export const keys = {
   adminProjects: () => [...keys.all, "admin-projects"] as const,
   budget: () => [...keys.all, "budget"] as const,
   structure: () => [...keys.all, "structure"] as const,
+  structureAudit: () => [...keys.all, "structure-audit"] as const,
+  faculties: () => [...keys.all, "faculties"] as const,
+  faculty: (slug: string) => [...keys.faculties(), slug] as const,
+  facultyMatrix: () => [...keys.faculties(), "matrix"] as const,
+  facultyActions: () => [...keys.faculties(), "actions"] as const,
+  adminFacultyActions: () => [...keys.facultyActions(), "admin"] as const,
+  campuses: () => [...keys.all, "campuses"] as const,
+  campusSummary: () => [...keys.campuses(), "summary"] as const,
+  campusPillar: () => [...keys.campuses(), "pillar"] as const,
+  campusCoverage: () => [...keys.campuses(), "coverage"] as const,
+  campusFacts: (slug: string) => [...keys.campuses(), "facts", slug] as const,
+  campusIndicators: (slug: string) => [...keys.campuses(), "indicators", slug] as const,
+  campusBatches: () => [...keys.campuses(), "batches"] as const,
 };
 
 /** Convierte el error de PostgREST en algo que se pueda mostrar y accionar. */
@@ -529,5 +556,242 @@ export function usePillarOwners() {
     queryKey: keys.owners(),
     queryFn: async (): Promise<PillarOwner[]> =>
       supabase.from("pillar_owners").select("*").then(unwrap<PillarOwner[]>),
+  });
+}
+
+/* =============================================================================
+   PDI por facultad
+
+   Lo público sale de tres vistas que ya filtran por publicación: no hace falta
+   —ni sería fiable— volver a filtrar aquí. La vista de administración vive al
+   final y devuelve vacío sin sesión, que es un fallo visible en vez de un dato
+   filtrado.
+   ========================================================================== */
+
+export function useFaculties() {
+  return useQuery({
+    queryKey: keys.faculties(),
+    queryFn: async (): Promise<FacultySummary[]> =>
+      supabase.from("v_faculties").select("*").order("position").then(unwrap<FacultySummary[]>),
+  });
+}
+
+/** La matriz facultad × pilar, con sus casillas en cero. */
+export function useFacultyMatrix() {
+  return useQuery({
+    queryKey: keys.facultyMatrix(),
+    queryFn: async (): Promise<FacultyPillarCell[]> =>
+      supabase
+        .from("v_faculty_pillar_matrix")
+        .select("*")
+        .order("faculty_position")
+        .order("pillar_position")
+        .then(unwrap<FacultyPillarCell[]>),
+  });
+}
+
+export interface FacultyDetail {
+  faculty: FacultySummary;
+  actions: FacultyAction[];
+}
+
+/**
+ * Una facultad y sus acciones publicadas.
+ *
+ * Dos peticiones en paralelo y no una anidada: el resumen ya trae los recuentos
+ * calculados en la base, y pedirlo embebido obligaría a recontar en el cliente
+ * lo que la vista acaba de contar bien. Las actividades sí vienen dentro de
+ * cada acción —la vista las trae como JSON—, porque la ficha las necesita todas
+ * y pedirlas aparte serían dos viajes para pintar una sola lista.
+ */
+export function useFacultyDetail(slug: string | undefined) {
+  return useQuery({
+    queryKey: keys.faculty(slug ?? ""),
+    enabled: Boolean(slug),
+    queryFn: async (): Promise<FacultyDetail | null> => {
+      const [faculty, actions] = await Promise.all([
+        supabase.from("v_faculties").select("*").eq("slug", slug).maybeSingle(),
+        supabase
+          .from("v_faculty_actions")
+          .select("*")
+          .eq("faculty_slug", slug)
+          .order("position")
+          .then(unwrap<FacultyAction[]>),
+      ]);
+
+      if (faculty.error) throw describeDatabaseError(faculty.error);
+      if (!faculty.data) return null;
+
+      return { faculty: faculty.data as FacultySummary, actions };
+    },
+  });
+}
+
+/* --- Solo intranet --------------------------------------------------------- */
+
+/** Todas las acciones, publicadas o no, con la nota de revisión. */
+export function useAdminFacultyActions() {
+  return useQuery({
+    queryKey: keys.adminFacultyActions(),
+    queryFn: async (): Promise<FacultyActionAdminRow[]> =>
+      supabase
+        .from("v_faculty_actions_admin")
+        .select("*")
+        .order("faculty_code")
+        .order("position")
+        .then(unwrap<FacultyActionAdminRow[]>),
+  });
+}
+
+/** El catálogo completo de facultades, incluidas las que aún no se publican. */
+export function useAdminFaculties() {
+  return useQuery({
+    queryKey: [...keys.faculties(), "admin"],
+    queryFn: async (): Promise<Faculty[]> =>
+      supabase.from("faculties").select("*").order("position").then(unwrap<Faculty[]>),
+    staleTime: 10 * 60 * 1000,
+  });
+}
+
+/* =============================================================================
+   PDI por campus
+
+   Las tablas de campus no se consultan nunca directamente: la 0017 no se las
+   concede a `anon` porque llevan cifras financieras, y el enmascarado vive en
+   las vistas. Aquí solo hay vistas.
+   ========================================================================== */
+
+export function useCampuses() {
+  return useQuery({
+    queryKey: keys.campuses(),
+    queryFn: async (): Promise<Campus[]> =>
+      supabase.from("campuses").select("*").order("position").then(unwrap<Campus[]>),
+    // Las sedes cambian de década en década, no de minuto en minuto.
+    staleTime: 30 * 60 * 1000,
+  });
+}
+
+/** Una fila por sede y vigencia publicada. Es lo que alimenta el selector. */
+export function useCampusSummary() {
+  return useQuery({
+    queryKey: keys.campusSummary(),
+    queryFn: async (): Promise<CampusSummary[]> =>
+      supabase
+        .from("v_campus_summary")
+        .select("*")
+        .order("position")
+        .then(unwrap<CampusSummary[]>),
+  });
+}
+
+/** La matriz sede × pilar, con sus ceros: un pilar sin reporte también es dato. */
+export function useCampusPillar() {
+  return useQuery({
+    queryKey: keys.campusPillar(),
+    queryFn: async (): Promise<CampusPillarCell[]> =>
+      supabase
+        .from("v_campus_pillar")
+        .select("*")
+        .order("pillar_position")
+        .then(unwrap<CampusPillarCell[]>),
+  });
+}
+
+/**
+ * Los hechos de una sede. Se piden por sede y no todos de golpe porque son 126
+ * filas con texto largo: traerlas las tres a la vez para mostrar una sería
+ * descargar el triple de lo que se mira.
+ */
+export function useCampusFacts(slug: string | undefined, year: number | undefined) {
+  return useQuery({
+    queryKey: [...keys.campusFacts(slug ?? "none"), year ?? "all"],
+    enabled: Boolean(slug),
+    queryFn: async (): Promise<CampusFact[]> => {
+      let q = supabase.from("v_campus_facts").select("*").eq("campus_slug", slug!);
+      if (year) q = q.eq("year", year);
+      return q.order("position").then(unwrap<CampusFact[]>);
+    },
+  });
+}
+
+export function useCampusIndicators(slug: string | undefined) {
+  return useQuery({
+    queryKey: keys.campusIndicators(slug ?? "none"),
+    enabled: Boolean(slug),
+    queryFn: async (): Promise<CampusIndicator[]> =>
+      supabase
+        .from("v_campus_indicators")
+        .select("*")
+        .eq("campus_slug", slug!)
+        .order("position")
+        .then(unwrap<CampusIndicator[]>),
+  });
+}
+
+/**
+ * Las 62 líneas del plan con lo que aporta cada sede. Se pide entera —no por
+ * pilar— porque la pregunta que responde es "qué parte del plan no reporta
+ * nadie", y esa no se puede contestar mirando un pilar a la vez.
+ */
+export function useCampusCoverage() {
+  return useQuery({
+    queryKey: keys.campusCoverage(),
+    queryFn: async (): Promise<CampusLineCoverage[]> =>
+      supabase
+        .from("v_campus_line_coverage")
+        .select("*")
+        .order("pillar_position")
+        .order("area_position")
+        .order("line_position")
+        .then(unwrap<CampusLineCoverage[]>),
+  });
+}
+
+/** Los lotes cargados. Solo intranet: la tabla no se concede a `anon`. */
+export function useCampusBatches() {
+  return useQuery({
+    queryKey: keys.campusBatches(),
+    queryFn: async (): Promise<CampusReportBatch[]> =>
+      supabase
+        .from("campus_report_batches")
+        .select("*")
+        .order("year", { ascending: false })
+        .then(unwrap<CampusReportBatch[]>),
+  });
+}
+
+/* =============================================================================
+   Normalizar la estructura · solo intranet
+
+   Las dos vistas están fuera del alcance de `anon`: hablan de la salud interna
+   del esquema, no del plan. Sin sesión devuelven vacío, que es un fallo visible
+   en vez de un dato filtrado.
+   ========================================================================== */
+
+export interface StructureAudit {
+  duplicates: StructureDuplicate[];
+  orphans: StructureOrphan[];
+}
+
+export function useStructureAudit() {
+  return useQuery({
+    queryKey: keys.structureAudit(),
+    queryFn: async (): Promise<StructureAudit> => {
+      const [duplicates, orphans] = await Promise.all([
+        supabase
+          .from("v_structure_duplicates")
+          .select("*")
+          .order("kind")
+          .then(unwrap<StructureDuplicate[]>),
+        supabase
+          .from("v_structure_orphans")
+          .select("*")
+          .order("kind")
+          .order("code")
+          .then(unwrap<StructureOrphan[]>),
+      ]);
+
+      return { duplicates, orphans };
+    },
   });
 }

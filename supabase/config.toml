@@ -6,3 +6,9 @@ project_id = "pdi-udes"
 # La función comprueba la sesión por su cuenta: necesita recibir la cabecera
 # Authorization tal cual, sin que la plataforma la valide antes.
 verify_jwt = false
+
+[functions.sync-facultades]
+# Admite dos formas de identificarse —la sesión del portal o la cabecera
+# x-sync-token de un cron— y las comprueba por su cuenta. Validar antes un JWT
+# que en el segundo caso nunca llega haría fallar la sincronización automática.
+verify_jwt = false

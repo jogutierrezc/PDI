@@ -12,6 +12,8 @@
 const loaders: Record<string, () => Promise<unknown>> = {
   "/tablero": () => import("../routes/Dashboard"),
   "/implementacion": () => import("../modules/implementation/ImplementationPortal"),
+  "/campus": () => import("../modules/campus/CampusPortal"),
+  "/facultades": () => import("../modules/facultades/FacultyPortal"),
   "/acceso-intranet": () => import("../modules/login/LoginPortal"),
 };
 

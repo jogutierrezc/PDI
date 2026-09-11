@@ -9,6 +9,9 @@
 import type {
   ActivityStatus,
   ActivityTarget,
+  FacultyAction,
+  FacultyActionStatus,
+  FacultyPillarCell,
   PdiSummary,
   PillarProgress,
   ProgressScope,
@@ -558,9 +561,14 @@ const longDateFormatter = new Intl.DateTimeFormat("es-CO", {
 
 function parseDate(value: string | null | undefined): Date | null {
   if (!value) return null;
-  // Las fechas de Postgres llegan como "2026-08-31". Interpretarlas en UTC
-  // evita que un huso al oeste las muestre un día antes.
-  const date = new Date(`${value}T12:00:00`);
+
+  // Postgres manda dos formas: `date` llega como "2026-08-31" y `timestamptz`
+  // como "2026-08-31T14:05:00Z". A la primera se le pone el mediodía —un huso
+  // al oeste mostraría "30 ago" si se interpretara a medianoche—; la segunda ya
+  // trae su hora y añadírsela producía un texto que `Date` no sabe leer, así
+  // que se devolvía "—" en vez de la fecha. Es el caso de `received_at` y
+  // `published_at` de las propuestas de facultad.
+  const date = new Date(value.includes("T") ? value : `${value}T12:00:00`);
   return Number.isNaN(date.valueOf()) ? null : date;
 }
 
@@ -696,4 +704,207 @@ export function toneForProgress(progress: number) {
   if (progress >= 70) return { label: "En progreso", tone: "active" as const, glyph: "◐" };
   if (progress >= 45) return { label: "En desarrollo", tone: "pending" as const, glyph: "○" };
   return { label: "Atención requerida", tone: "risk" as const, glyph: "▲" };
+}
+
+/* =============================================================================
+   PDI por facultad
+
+   La aritmética del módulo vive aquí y no en la pantalla, por lo mismo que
+   `tallySdg`: son preguntas sobre el plan, no sobre cómo se dibuja.
+   ========================================================================== */
+
+export type ToneName = "done" | "active" | "pending" | "risk" | "neutral";
+
+/** Etiqueta y codificación secundaria del estado que declara la facultad. El
+ *  color nunca viaja solo: la pantalla escribe siempre la etiqueta al lado. */
+export const facultyActionStatus: Record<FacultyActionStatus, { label: string; tone: ToneName }> = {
+  pendiente: { label: "Pendiente", tone: "pending" },
+  proceso: { label: "En proceso", tone: "active" },
+  completado: { label: "Completado", tone: "done" },
+};
+
+/**
+ * En qué banda de la rampa cae una casilla de la matriz.
+ *
+ * Cuatro bandas de un solo tono, no seis colores de pilar: la casilla compara
+ * cuántas acciones hay, y comparar entre columnas con seis matices distintos es
+ * imposible. El color del pilar vive en la cabecera de la columna, que es donde
+ * sí identifica. Y la cifra está siempre escrita, así que la rampa es un
+ * refuerzo y nunca el único dato.
+ *
+ * Los cortes no son lineales: con la distribución real —de 0 a 18 acciones por
+ * casilla, y la mayoría entre 1 y 3— repartir el rango en cuatro tramos iguales
+ * dejaría casi todo en la banda más clara y la matriz no diría nada.
+ */
+export function matrixBand(count: number): 0 | 1 | 2 | 3 {
+  if (count <= 0) return 0;
+  if (count <= 2) return 1;
+  if (count <= 6) return 2;
+  return 3;
+}
+
+/** Las cifras de cabecera del índice de facultades. */
+export interface FacultyOverview {
+  actions: number;
+  faculties: number;
+  facultiesWithPlan: number;
+  /** Pilares que no recibe ninguna acción de ninguna facultad. */
+  untouchedPillars: string[];
+}
+
+export function tallyFaculties(
+  matrix: FacultyPillarCell[],
+  counts: { action_count: number }[],
+): FacultyOverview {
+  const byPillar = new Map<string, { name: string; numeral: string; total: number }>();
+  for (const cell of matrix) {
+    const row = byPillar.get(cell.pillar_id) ?? {
+      name: cell.pillar_name,
+      numeral: cell.pillar_numeral,
+      total: 0,
+    };
+    row.total += cell.actions;
+    byPillar.set(cell.pillar_id, row);
+  }
+
+  return {
+    actions: counts.reduce((sum, row) => sum + row.action_count, 0),
+    faculties: counts.length,
+    facultiesWithPlan: counts.filter((row) => row.action_count > 0).length,
+    untouchedPillars: [...byPillar.values()]
+      .filter((row) => row.total === 0)
+      .map((row) => `${row.numeral} · ${row.name}`),
+  };
+}
+
+/** Los pilares a los que esta facultad todavía no apunta. Se muestra tal cual:
+ *  un pilar sin acciones es información, no un hueco que haya que tapar. */
+export function pillarsMissedBy(matrix: FacultyPillarCell[], facultyId: string): string[] {
+  return matrix
+    .filter((cell) => cell.faculty_id === facultyId && cell.actions === 0)
+    .map((cell) => `${cell.pillar_numeral} · ${cell.pillar_name}`);
+}
+
+/** Reparte las acciones por pilar, para el filtro de la ficha. */
+export function tallyActionsByPillar(actions: FacultyAction[]) {
+  const rows = new Map<
+    string,
+    { id: string; numeral: string; name: string; accent: number; count: number }
+  >();
+
+  for (const action of actions) {
+    if (!action.pillar_id) continue;
+    const row = rows.get(action.pillar_id) ?? {
+      id: action.pillar_id,
+      numeral: action.pillar_numeral ?? "",
+      name: action.pillar_name ?? "",
+      accent: action.pillar_accent ?? 1,
+      count: 0,
+    };
+    row.count += 1;
+    rows.set(action.pillar_id, row);
+  }
+
+  return [...rows.values()].sort((a, b) => b.count - a.count || a.numeral.localeCompare(b.numeral));
+}
+
+/**
+ * Agrupa las acciones por su dimensión, que es como las ordena la facultad.
+ *
+ * El orden es el del código —d1, d2, d3…— y no el del número de acciones: las
+ * dimensiones son una secuencia que la facultad reconoce, y reordenarlas por
+ * tamaño rompería el índice mental de quien las escribió.
+ */
+export interface FacultyDimension {
+  id: string;
+  name: string;
+  actions: FacultyAction[];
+}
+
+export function groupByDimension(actions: FacultyAction[]): FacultyDimension[] {
+  const rows = new Map<string, FacultyDimension>();
+
+  for (const action of actions) {
+    const id = action.dimension || "sin-dimension";
+    const row = rows.get(id) ?? {
+      id,
+      name: action.dimension_name || "Sin dimensión",
+      actions: [],
+    };
+    row.actions.push(action);
+    rows.set(id, row);
+  }
+
+  return [...rows.values()].sort((a, b) => a.id.localeCompare(b.id, "es", { numeric: true }));
+}
+
+/** La fecha límite en el texto correcto: la formateada cuando es una fecha, y
+ *  lo que escribió la facultad —"Por definir"— cuando no lo es. */
+export function deadlineText(date: string | null, label: string): string {
+  if (date) return formatDate(date);
+  return label || "Sin fecha";
+}
+
+/* =============================================================================
+   PDI por campus
+
+   Los estados de lo que reporta una sede son distintos de los del plan
+   (`statusMeta`): allí se mide avance, aquí cumplimiento de una meta anual. No
+   se reutilizan las mismas etiquetas para que nadie lea "En curso" donde dice
+   "Parcial".
+
+   Mismo criterio de accesibilidad: glifo y etiqueta siempre, nunca solo color.
+   ========================================================================== */
+
+import type { CampusState, MappingConfidence } from "../types/database";
+
+export interface CampusStateMeta {
+  id: CampusState;
+  label: string;
+  glyph: string;
+  color: string;
+}
+
+export const campusStateMeta: Record<CampusState, CampusStateMeta> = {
+  superada: { id: "superada", label: "Superada", glyph: "▲", color: "var(--status-done)" },
+  cumplida: { id: "cumplida", label: "Cumplida", glyph: "✓", color: "var(--status-done)" },
+  parcial: { id: "parcial", label: "Parcial", glyph: "◐", color: "var(--status-pending)" },
+  no_cumplida: { id: "no_cumplida", label: "No cumplida", glyph: "○", color: "var(--status-risk)" },
+  // Un logro sin meta no es un incumplimiento: es una casilla que el informe de
+  // esa sede no tiene. Por eso va en gris y no en rojo.
+  sin_meta: { id: "sin_meta", label: "Logro sin meta", glyph: "—", color: "var(--ink-muted)" },
+};
+
+/** Orden de lectura: de lo mejor cumplido a lo que no se puede medir. */
+export const campusStateOrder: CampusState[] = [
+  "superada",
+  "cumplida",
+  "parcial",
+  "no_cumplida",
+  "sin_meta",
+];
+
+export const confidenceLabels: Record<MappingConfidence, string> = {
+  alta: "El informe nombra la línea",
+  media: "Asignación inferida por afinidad temática",
+  baja: "Asignación tentativa",
+};
+
+/**
+ * Cómo se dice un cumplimiento que no se puede calcular.
+ *
+ * Bucaramanga no declara metas programadas, así que su promedio es nulo. Pintar
+ * un 0 % diría que no cumplió nada, que es lo contrario de lo que dice su
+ * informe. Esta función existe para que esa distinción no dependa de que cada
+ * pantalla se acuerde.
+ */
+export function formatCompliance(value: number | null | undefined): string {
+  if (value === null || value === undefined) return "No calculable";
+  return `${Math.round(value)}%`;
+}
+
+/** Cuánto del plan cubre un reporte, en porcentaje entero. */
+export function coveragePct(covered: number, total: number): number {
+  if (!total) return 0;
+  return Math.round((covered * 100) / total);
 }

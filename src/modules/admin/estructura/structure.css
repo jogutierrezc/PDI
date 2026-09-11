@@ -1,0 +1,281 @@
+/* =============================================================================
+   Normalizar la estructura · estilos
+
+   La pieza central es la pareja: dos filas enfrentadas con una flecha en medio.
+   La que se va se dibuja atenuada y tachada; la que se queda, en firme. La
+   dirección de la fusión tiene que leerse sin leer las etiquetas, porque es lo
+   único que no se puede malinterpretar en una operación que no se deshace.
+   ========================================================================== */
+
+.structure-head {
+  display: grid;
+  gap: var(--space-1);
+  min-width: 0;
+}
+
+.structure-head h2 {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.structure-count {
+  padding: 2px var(--space-2);
+  color: var(--ink-secondary);
+  background: var(--surface-3);
+  border-radius: var(--radius-pill);
+  font-family: var(--font-sans);
+  font-size: var(--text-xs);
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+}
+
+/* La tanda inferida se enmarca en ámbar: no está mal, está sin verificar. */
+.structure-card--warn {
+  border-color: color-mix(in srgb, var(--status-pending) 34%, transparent);
+  box-shadow: none;
+}
+
+/* --- El botón y su confirmación --------------------------------------------- */
+
+.structure-action {
+  display: grid;
+  gap: var(--space-3);
+  justify-items: start;
+  padding: var(--space-4);
+  background: var(--surface-2);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+}
+
+.structure-action p {
+  max-width: var(--measure);
+  color: var(--ink-secondary);
+  font-size: var(--text-sm);
+  line-height: var(--leading-normal);
+}
+
+.structure-action strong {
+  color: var(--brand-navy);
+  font-variant-numeric: tabular-nums;
+}
+
+.structure-action__buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.structure-report {
+  display: grid;
+  gap: var(--space-2);
+  padding: var(--space-4);
+  background: var(--status-done-soft);
+  border: 1px solid color-mix(in srgb, var(--status-done) 28%, transparent);
+  border-radius: var(--radius-sm);
+}
+
+.structure-report p {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  color: var(--status-done);
+  font-size: var(--text-sm);
+  font-weight: 700;
+}
+
+.structure-report ul {
+  display: grid;
+  gap: var(--space-1);
+  padding-left: var(--space-6);
+  color: var(--ink-secondary);
+  font-size: var(--text-xs);
+  list-style: disc;
+}
+
+/* --- Una pareja -------------------------------------------------------------- */
+
+.pair-list {
+  display: grid;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+}
+
+.pair-list > li + li {
+  border-top: 1px solid var(--line-faint);
+}
+
+.pair {
+  display: grid;
+  grid-template-columns: 160px minmax(0, 1fr) auto;
+  gap: var(--space-4);
+  align-items: center;
+  padding: var(--space-4);
+  background: var(--surface);
+}
+
+.pair__kind {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  color: var(--ink-muted);
+  font-size: var(--text-2xs);
+  font-weight: 700;
+  letter-spacing: var(--tracking-wide);
+  text-transform: uppercase;
+}
+
+.pair__rows {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  gap: var(--space-3);
+  align-items: center;
+  min-width: 0;
+}
+
+.pair__rows > svg {
+  color: var(--ink-faint);
+}
+
+.pair__row {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-xs);
+}
+
+.pair__row code {
+  color: var(--ink-muted);
+  font-family: ui-monospace, "SF Mono", Menlo, monospace;
+  font-size: var(--text-2xs);
+  font-weight: 600;
+}
+
+.pair__row span {
+  color: var(--ink);
+  font-size: var(--text-sm);
+  font-weight: 700;
+  line-height: var(--leading-snug);
+}
+
+.pair__row small {
+  color: var(--ink-faint);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: var(--tracking-wide);
+  text-transform: uppercase;
+}
+
+/* La que desaparece: atenuada y con el nombre tachado. Se ve de un vistazo en
+   qué dirección va la fusión, sin leer nada. */
+.pair__row--drop {
+  background: var(--surface-2);
+}
+
+.pair__row--drop span {
+  color: var(--ink-muted);
+  text-decoration: line-through;
+  text-decoration-color: var(--ink-faint);
+}
+
+.pair__row--keep {
+  background: var(--brand-blue-soft);
+  border: 1px solid color-mix(in srgb, var(--brand-blue) 26%, transparent);
+}
+
+.pair__row--keep span {
+  color: var(--brand-navy);
+}
+
+.pair__action {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  justify-content: flex-end;
+}
+
+.pair__action small {
+  color: var(--ink-muted);
+  font-size: var(--text-2xs);
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+/* --- Lo que queda suelto ----------------------------------------------------- */
+
+.orphan-list {
+  display: grid;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+}
+
+.orphan-list > li + li {
+  border-top: 1px solid var(--line-faint);
+}
+
+.orphan {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2) var(--space-4);
+  padding: var(--space-3) var(--space-4);
+  background: var(--surface);
+}
+
+.orphan code {
+  color: var(--ink-muted);
+  font-family: ui-monospace, "SF Mono", Menlo, monospace;
+  font-size: var(--text-2xs);
+  font-weight: 600;
+}
+
+.orphan__name {
+  flex: 1 1 16rem;
+  min-width: 0;
+  color: var(--ink);
+  font-size: var(--text-sm);
+  font-weight: 600;
+}
+
+.orphan small {
+  color: var(--ink-faint);
+  font-size: var(--text-2xs);
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+/* Lo que sostiene algo no se puede borrar sin pensarlo: se marca. */
+.orphan__holds {
+  color: var(--status-pending) !important;
+  font-weight: 700;
+}
+
+/* =============================================================================
+   Pantallas estrechas
+   ========================================================================== */
+
+@media (max-width: 75rem) {
+  .pair {
+    grid-template-columns: minmax(0, 1fr);
+    row-gap: var(--space-3);
+  }
+
+  /* Las dos filas de la pareja se apilan, y la flecha gira para que siga
+     señalando hacia la que se conserva. */
+  .pair__rows {
+    grid-template-columns: minmax(0, 1fr);
+    justify-items: stretch;
+  }
+
+  .pair__rows > svg {
+    transform: rotate(90deg);
+    justify-self: center;
+  }
+
+  .pair__action {
+    justify-content: flex-start;
+  }
+}

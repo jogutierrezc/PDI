@@ -10,8 +10,9 @@ const links = [
   { to: "/implementacion", label: "Implementación del PDI" },
   { to: "/tablero", label: "Tablero PDI" },
   { to: "/ods", label: "PDI y los ODS" },
+  { to: "/facultades", label: "PDI por facultad" },
+  { to: "/campus", label: "PDI por campus" },
   { to: "/desarrollo-tecnologico", label: "Desarrollo tecnológico" },
-  { to: "/implementacion#repositorio", label: "Repositorio" },
 ];
 
 export function TopBar() {

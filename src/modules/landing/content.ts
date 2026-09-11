@@ -10,8 +10,6 @@
    si la base cambia un nombre o un color, la narrativa lo sigue sin tocar nada.
    ========================================================================== */
 
-import type { IconName } from "../../components/ui/Icon";
-
 /* =============================================================================
    A · Barra de contexto
    Cifras del diagnóstico que explican por qué el plan existe. Cada una viaja con
@@ -98,7 +96,13 @@ export const leapDimensions: LeapDimension[] = [
   },
 ];
 
-/** Cifras del documento aprobado, no del seguimiento: describen la forma del plan. */
+/**
+ * Cifras del documento aprobado, no del seguimiento: describen la forma del plan.
+ *
+ * Verificadas contra `Indicadores_Campus_Pilares_UDES_2025.xlsx`, que es la
+ * fuente que las cuenta una a una: 21 áreas y 62 líneas, no 61. La suma por
+ * pilar de la hoja 01 (10+9+13+4+12+14) da 62, y la hoja 11 lista las 62.
+ */
 export interface PlanFigure {
   value: string;
   label: string;
@@ -107,7 +111,7 @@ export interface PlanFigure {
 export const planFigures: PlanFigure[] = [
   { value: "6", label: "Pilares estratégicos" },
   { value: "21", label: "Áreas estratégicas" },
-  { value: "61", label: "Líneas de acción" },
+  { value: "62", label: "Líneas de acción" },
   { value: "3", label: "Sedes nacionales" },
 ];
 
@@ -228,169 +232,15 @@ export const campuses: Campus[] = [
 
 /* =============================================================================
    E · Encuentra tu ruta
-
-   Tres piezas, y cada una responde una pregunta distinta:
-
-     · `routeInterests`  qué pone en marcha el plan sobre ese tema — es igual
-                         para todo el mundo, porque el plan es uno solo.
-     · `routeMatrix`     qué significa eso para *este* perfil. Es el cruce, y
-                         es donde está el contenido que de verdad se busca:
-                         "emprender" no quiere decir lo mismo para un aspirante
-                         que para una empresa.
-     · `routeProfiles`   con qué lente se le habla y a dónde se le manda.
-
-   Lo que no está aquí: los pilares y los ODS del resultado. Esos salen de la
-   base —de los proyectos publicados— porque son datos, no redacción.
+   Los siete perfiles, los siete intereses y el cruce entre ambos viven en
+   `route-content.ts`: son con diferencia lo más largo de la portada y aquí
+   habrían enterrado los lemas y las sedes.
    ========================================================================== */
 
-export interface RouteProfile {
-  id: string;
-  label: string;
-  /** Con qué lente se le habla a ese perfil en el resultado. */
-  lens: string;
-  cta: { label: string; to: string };
-}
-
-export const routeProfiles: RouteProfile[] = [
-  {
-    id: "aspirante",
-    label: "Aspirante",
-    lens: "Lo que encontrarás al entrar",
-    cta: { label: "Conocer la implementación", to: "/implementacion" },
-  },
-  {
-    id: "estudiante",
-    label: "Estudiante",
-    lens: "Lo que ya está cambiando en tu semestre",
-    cta: { label: "Ver el avance del plan", to: "/tablero" },
-  },
-  {
-    id: "graduado",
-    label: "Graduado",
-    lens: "Cómo sigue acompañándote la universidad",
-    cta: { label: "Ver el avance del plan", to: "/tablero" },
-  },
-  {
-    id: "empresa",
-    label: "Empresa",
-    lens: "Dónde se conecta tu organización con la UDES",
-    cta: { label: "Explorar los pilares", to: "/implementacion" },
-  },
-  {
-    id: "docente",
-    label: "Docente",
-    lens: "Lo que el plan pone en tus manos",
-    cta: { label: "Ver el avance del plan", to: "/tablero" },
-  },
-];
-
-export interface RouteInterest {
-  id: string;
-  label: string;
-  icon: IconName;
-  /** Qué responde el PDI a ese interés. */
-  answer: string;
-  /** Lo que el plan pone en marcha, en corto. Rótulos, no enlaces. */
-  moves: string[];
-  /** Pilares del plan que lo sostienen. Slugs de `pillars`. */
-  pillars: string[];
-}
-
-export const routeInterests: RouteInterest[] = [
-  {
-    id: "emprender",
-    label: "Emprender",
-    icon: "spark",
-    answer:
-      "El centro de emprendimiento acompaña la idea desde la asesoría legal hasta la aceleración, con fondos de capital semilla para prototipar y validar el modelo de negocio.",
-    moves: ["Incubación y aceleración", "Capital semilla", "Innovación abierta"],
-    pillars: ["entorno-emprendedor", "ambiente-tecnologico"],
-  },
-  {
-    id: "flexibilidad",
-    label: "Flexibilidad de horarios",
-    icon: "clock",
-    answer:
-      "Microcredenciales, bancos de electivas, cursos ubícronos y pago por créditos: la formación se ajusta a tu tiempo y a tu bolsillo, no al revés.",
-    moves: ["Microcredenciales", "Pago por créditos", "Cursos ubícronos"],
-    pillars: ["personalizacion", "ambiente-tecnologico"],
-  },
-  {
-    id: "investigacion",
-    label: "Investigación y tecnología",
-    icon: "chip",
-    answer:
-      "Laboratorios modernizados, analítica de aprendizaje y transferencia tecnológica aplicada a salud, energías limpias y agroindustria del territorio.",
-    moves: ["Laboratorios modernizados", "Analítica e IA en el aula", "Transferencia tecnológica"],
-    pillars: ["ambiente-tecnologico", "entorno-emprendedor"],
-  },
-  {
-    id: "comunidad",
-    label: "Impacto en mi comunidad",
-    icon: "community",
-    answer:
-      "Brigadas de salud, telemedicina, consultorías comunitarias y proyectos de extensión multidisciplinarios, con datos abiertos sobre cómo avanza cada compromiso.",
-    moves: ["Salud en territorio", "Consultorías comunitarias", "Datos abiertos"],
-    pillars: ["apropiacion-social", "gobernanza", "sostenibilidad"],
-  },
-];
-
-/**
- * El cruce perfil × interés: qué significa ese tema para quien pregunta.
- *
- * Se busca como `routeMatrix[perfil][interés]`. Si faltara una casilla el
- * resultado se muestra igual, solo que sin esta línea: el componente no da por
- * hecho que la tabla esté completa.
- */
-export const routeMatrix: Record<string, Record<string, string>> = {
-  aspirante: {
-    emprender:
-      "Entras a una universidad donde tu idea puede empezar en primer semestre, no el día que te gradúas.",
-    flexibilidad:
-      "Eliges cuántos créditos tomas y cómo los pagas: la matrícula deja de ser un bloque único e inamovible.",
-    investigacion:
-      "Desde pregrado puedes vincularte a un semillero y usar los laboratorios que el plan está modernizando.",
-    comunidad:
-      "Tu práctica no será un trámite: se hace dentro de proyectos de extensión con comunidades reales del territorio.",
-  },
-  estudiante: {
-    emprender:
-      "El centro de emprendimiento ya recibe ideas de estudiantes activos, con mentoría y ruta de incubación.",
-    flexibilidad:
-      "Las microcredenciales y el banco de electivas te dejan armar el semestre alrededor de tu horario, y no al revés.",
-    investigacion:
-      "Puedes sumarte a los grupos que están firmando transferencia tecnológica con empresas de la región.",
-    comunidad:
-      "Las brigadas y las consultorías comunitarias cuentan en tu formación y se reportan como avance del plan.",
-  },
-  graduado: {
-    emprender:
-      "La incubadora y el capital semilla siguen abiertos para ti después del grado, no solo mientras estudias.",
-    flexibilidad:
-      "La formación continua y los posgrados modulares están pensados para volver sin dejar el trabajo.",
-    investigacion:
-      "Puedes volver como investigador asociado o traer un problema de tu empresa para resolverlo con la UDES.",
-    comunidad:
-      "El seguimiento a graduados es una línea del plan: tu trayectoria alimenta las redes de impacto regional.",
-  },
-  empresa: {
-    emprender:
-      "La innovación abierta conecta tus retos con los grupos de investigación y con los emprendimientos incubados.",
-    flexibilidad:
-      "Puedes formar a tu equipo con microcredenciales y cursos ubícronos, sin sacarlo de la operación.",
-    investigacion:
-      "La transferencia en salud, energías limpias y agroindustria busca contraparte empresarial para aterrizarse.",
-    comunidad:
-      "Los proyectos de extensión admiten alianzas: tu organización puede sumarse a un impacto que se mide y se publica.",
-  },
-  docente: {
-    emprender:
-      "Tu grupo puede convertir resultados de investigación en patentes y spin-offs, con acompañamiento legal.",
-    flexibilidad:
-      "El diseño modular y los cursos ubícronos cambian cómo se programa tu carga y cómo se evalúa el curso.",
-    investigacion:
-      "Simuladores, analítica de aprendizaje e IA entran al aula como herramientas de enseñanza, no como adorno.",
-    comunidad:
-      "La extensión multidisciplinaria te permite llevar tu asignatura a problemas concretos de la comunidad.",
-  },
-};
+export {
+  routeProfiles,
+  routeInterests,
+  routeMatrix,
+  type RouteProfile,
+  type RouteInterest,
+} from "./route-content";

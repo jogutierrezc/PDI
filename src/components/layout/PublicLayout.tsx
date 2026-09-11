@@ -41,6 +41,7 @@ function SiteFooter() {
           <Link to="/tablero">Tablero PDI</Link>
           <Link to="/implementacion">Implementación</Link>
           <Link to="/ods">PDI y los ODS</Link>
+          <Link to="/facultades">PDI por facultad</Link>
           <Link to="/implementacion#repositorio">Repositorio</Link>
           <a href="mailto:planeacion@udes.edu.co">Contacto</a>
         </nav>

@@ -1,21 +1,22 @@
 /* =============================================================================
    Encuentra tu ruta.
 
-   Dos preguntas y una respuesta armada con cuatro piezas, de la más personal a
+   Dos preguntas y una respuesta armada con cinco piezas, de la más personal a
    la más comprobable:
 
      1. El cruce perfil × interés — qué significa esto para quien pregunta.
      2. Qué pone en marcha el plan sobre ese tema, y con qué nombre.
      3. Los pilares que lo sostienen, con el avance que muestra el tablero.
      4. Los ODS a los que aportan esos pilares, deducidos de sus proyectos.
+     5. Qué hacer después.
 
-   Las dos primeras son redacción y viven en `content.ts`. Las dos últimas son
-   datos: si mañana un proyecto declara un objetivo más, esta respuesta lo dice
-   sin que nadie edite nada.
+   Las piezas 1, 2 y 5 son redacción y viven en `route-content.ts`. La 3 y la 4
+   son datos: si mañana un proyecto declara un objetivo más, esta respuesta lo
+   dice sin que nadie edite nada.
 
    Los botones son radios nativos vestidos de ficha: así el teclado ya sabe
-   moverse con las flechas y el lector de pantalla anuncia "opción 2 de 5" sin
-   que haya que programarlo.
+   moverse entre las opciones con las flechas y el lector de pantalla anuncia
+   "opción 3 de 7" sin que haya que programarlo.
    ========================================================================== */
 
 import { useId, useMemo, useState } from "react";
@@ -72,7 +73,11 @@ export function RouteFinder() {
               <Icon name="compass" size={14} /> Descubre tu ruta UDES
             </span>
             <h2 id="route-title">¿Qué parte del plan te toca a ti?</h2>
-            <p>Dos preguntas y te mostramos las líneas del PDI diseñadas para lo que buscas.</p>
+            <p>
+              El PDI tiene seis pilares, veintiún áreas estratégicas y sesenta y dos líneas de
+              acción. No todas te tocan. Responde dos preguntas y te decimos cuáles sí, con el
+              avance real de cada una y los objetivos globales a los que aportan.
+            </p>
           </div>
 
           <fieldset className="route-finder__step">
@@ -187,9 +192,16 @@ export function RouteFinder() {
                   </div>
                 )}
 
-                <Link className="button-primary" to={profile.cta.to} {...prefetchProps(profile.cta.to)}>
-                  {profile.cta.label} <span data-arrow aria-hidden="true">→</span>
-                </Link>
+                <div className="route-result__next">
+                  <p>{profile.nextStep}</p>
+                  <Link
+                    className="button-primary"
+                    to={profile.cta.to}
+                    {...prefetchProps(profile.cta.to)}
+                  >
+                    {profile.cta.label} <span data-arrow aria-hidden="true">→</span>
+                  </Link>
+                </div>
               </div>
             ) : (
               <p className="route-finder__hint">

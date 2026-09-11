@@ -17,6 +17,9 @@ export type ParameterCategory = "estado_proyecto" | "nivel_gestion" | "unidad" |
 export type ChangeType = "creacion" | "modificacion" | "reforma" | "eliminacion";
 export type PillarIcon = "person" | "chip" | "spark" | "columns" | "leaf" | "community";
 export type RepoKind = "github" | "udes";
+/** Ciclo de vida de una propuesta de facultad. No dice si se publica: eso es
+ *  `PublicationStatus`, y son dos preguntas distintas. */
+export type ProposalStage = "formulada" | "avalada" | "ejecucion" | "cerrada";
 
 export interface Profile {
   id: string;
@@ -492,6 +495,220 @@ export interface PillarOwner {
   profile_id: string;
 }
 
+/* --- PDI por facultad ---------------------------------------------------------
+   El plan de acción de cada facultad, tal y como lo sirve su aplicación de
+   origen. La forma es un calco de la del origen —Facultad › Dimensión › Acción
+   › Actividad— y lo único que el portal añade es el enganche: a qué pilar del
+   PDI corresponde el texto que la facultad escribió.
+
+   Dos tipos por acción, igual que con los proyectos y por el mismo motivo: lo
+   público y lo interno no son la misma fila. `FacultyAction` es lo que sirve
+   `v_faculty_actions` y no tiene forma de traer la nota de revisión —el
+   compilador avisa antes de que llegue a una pantalla—; para la intranet está
+   `FacultyActionAdminRow`.
+   -------------------------------------------------------------------------- */
+
+export interface Faculty {
+  id: string;
+  slug: string;
+  /** Código con el que la facultad se identifica en el origen: FCS, FCMS… */
+  code: string;
+  name: string;
+  dean: string;
+  description: string;
+  status: PublicationStatus;
+  position: number;
+  /** "fase1" (formulación) o "fase2" (con seguimiento), según el origen. */
+  phase: string;
+  period: string;
+  plan_date: string | null;
+  synced_at: string | null;
+  source_updated_at: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+/** Cuántas acciones publicadas aporta una facultad a un pilar. Viaja dentro de
+ *  la fila de `v_faculties` para que la tarjeta no recorra la lista entera. */
+export interface FacultyPillarCount {
+  pillar_id: string;
+  numeral: string;
+  accent: number;
+  count: number;
+}
+
+/** Vista `v_faculties`: la facultad con el recuento de lo que tiene publicado. */
+export interface FacultySummary {
+  faculty_id: string;
+  slug: string;
+  code: string;
+  name: string;
+  dean: string;
+  description: string;
+  phase: string;
+  period: string;
+  plan_date: string | null;
+  position: number;
+  action_count: number;
+  pillar_count: number;
+  dimension_count: number;
+  activity_count: number;
+  /** Promedio de lo reportado. Nulo mientras no haya ningún corte con avance:
+   *  promediar las acciones sin medir como cero diría que van mal. */
+  reported_progress: number | null;
+  reported_count: number;
+  pillar_counts: FacultyPillarCount[];
+}
+
+/** Vista `v_faculty_pillar_matrix`: una fila por facultad y pilar, ceros
+ *  incluidos. Las casillas vacías son el dato que la página quiere enseñar. */
+export interface FacultyPillarCell {
+  faculty_id: string;
+  faculty_slug: string;
+  faculty_code: string;
+  faculty_name: string;
+  faculty_position: number;
+  pillar_id: string;
+  pillar_numeral: string;
+  pillar_name: string;
+  pillar_accent: number;
+  pillar_position: number;
+  actions: number;
+}
+
+/** Lo concreto que la facultad se compromete a hacer dentro de una acción. */
+export interface FacultyActivity {
+  id: string;
+  action_id: string;
+  source_id: string;
+  description: string;
+  owner: string;
+  due_date: string | null;
+  /** El texto original de la fecha: muchas dicen "Por definir". */
+  due_label: string;
+  status_label: string;
+  evidence_url: string;
+  position: number;
+}
+
+/** Estado de la acción según la facultad. */
+export type FacultyActionStatus = "pendiente" | "proceso" | "completado";
+
+/** Vista `v_faculty_actions`: la acción publicada con su pilar resuelto, sus
+ *  actividades y el último corte reportado. */
+export interface FacultyAction {
+  id: string;
+  faculty_id: string;
+  /** El identificador que le puso el origen: "d1_2". */
+  source_id: string;
+  dimension: string;
+  dimension_name: string;
+  /** El pilar en las palabras de la facultad, antes de resolverlo. */
+  declared_pillar: string;
+  pillar_id: string | null;
+  area_id: string | null;
+  action_line_id: string | null;
+  title: string;
+  owner: string;
+  /** La meta, que en el origen trae también el indicador, en el mismo campo. */
+  goal: string;
+  resources: string;
+  deadline: string | null;
+  deadline_label: string;
+  initial_status: FacultyActionStatus;
+  budget_ordinary: boolean;
+  budget_improvement: boolean;
+  published_at: string | null;
+  position: number;
+
+  faculty_slug: string;
+  faculty_code: string;
+  faculty_name: string;
+  pillar_slug: string | null;
+  pillar_numeral: string | null;
+  pillar_name: string | null;
+  pillar_accent: number | null;
+  area_code: string | null;
+  area_name: string | null;
+  line_code: string | null;
+  line_name: string | null;
+
+  activities: FacultyActivity[];
+  /** El último corte reportado. Nulos mientras la facultad no reporte. */
+  last_cut: string | null;
+  last_progress: number | null;
+  last_status: string | null;
+  last_reported_on: string | null;
+}
+
+/** Vista `v_faculty_actions_admin`: lo mismo más la nota de revisión y el
+ *  estado de publicación. Fuera del alcance de `anon`. */
+export interface FacultyActionAdminRow
+  extends Omit<FacultyAction, "activities" | "last_cut" | "last_status" | "last_reported_on"> {
+  status: PublicationStatus;
+  faculty_status: PublicationStatus;
+  note: string;
+  activity_count: number;
+  created_at: string;
+  updated_at: string;
+}
+
+/** El avance reportado de una acción en un corte. */
+export interface FacultyFollowup {
+  id: string;
+  action_id: string;
+  cut: string;
+  reported_on: string | null;
+  progress: number | null;
+  status_label: string;
+  note: string;
+  evidence_url: string;
+}
+
+/* --- Normalizar la estructura -------------------------------------------------
+   La 0017 trajo la estructura real del plan junto a la de ejemplo que ya
+   estaba, y quedaron las dos. Estos dos tipos son lo que la intranet necesita
+   para resolverlo: qué parece duplicado y qué quedó suelto.
+   -------------------------------------------------------------------------- */
+
+/** Una pareja de `v_structure_duplicates`: dos filas que parecen la misma cosa. */
+export interface StructureDuplicate {
+  kind: "area" | "line";
+  pillar_id: string;
+  /** La que conviene conservar: la del código de la estructura real. */
+  keep_id: string;
+  keep_code: string | null;
+  keep_name: string;
+  drop_id: string;
+  drop_code: string | null;
+  drop_name: string;
+  /** Cuántas filas movería la fusión. */
+  moves: number;
+  /** Nombres iguales tras normalizar. Falso = emparejada por parecido, y hay
+   *  que mirarla dos veces antes de confirmar. */
+  is_exact: boolean;
+}
+
+/** Una fila de `v_structure_orphans`: sin código real y sin pareja. */
+export interface StructureOrphan {
+  kind: "area" | "line";
+  id: string;
+  pillar_id: string;
+  pillar_numeral: string;
+  pillar_name: string;
+  code: string | null;
+  name: string;
+  dependents: number;
+}
+
+/** Lo que devuelve `normalize_structure`: una fila por fusión aplicada. */
+export interface NormalizeResult {
+  kind: "area" | "line";
+  keep_code: string | null;
+  drop_code: string | null;
+  moved: number;
+}
+
 /* --- Inserciones y actualizaciones ---------------------------------------- */
 
 type Writable<T> = Partial<Omit<T, "id" | "created_at" | "updated_at">>;
@@ -512,3 +729,211 @@ export type GlossaryInput = Writable<GlossaryTerm>;
 export type ParameterInput = Writable<Parameter>;
 export type PlanningItemInput = Writable<PlanningItem>;
 export type WebProjectInput = Writable<WebProject>;
+export type FacultyInput = Writable<Faculty>;
+
+/**
+ * Lo que la intranet puede escribir de una acción.
+ *
+ * Deliberadamente corto: el texto de la acción, su meta y sus fechas los manda
+ * el origen y la siguiente sincronización los reescribiría. Desde aquí solo se
+ * decide lo que el origen no sabe —a qué línea del plan se ancla, si se
+ * publica y qué se anotó al revisarla—, que es justo lo que la sincronización
+ * no toca.
+ */
+export type FacultyActionInput = Partial<
+  Pick<
+    FacultyActionAdminRow,
+    "action_line_id" | "area_id" | "pillar_id" | "status" | "note" | "position"
+  >
+>;
+
+/* =============================================================================
+   PDI por campus (migración 0017)
+
+   Lo que cada sede reportó en una vigencia, traducido a una línea de acción del
+   plan. Las cifras monetarias no viajan en las vistas públicas: llegan nulas y
+   `is_monetary` dice por qué, para que la pantalla lo explique en vez de pintar
+   un hueco.
+   ========================================================================== */
+
+export type CampusRecordKind = "meta" | "logro";
+export type CampusState = "superada" | "cumplida" | "parcial" | "no_cumplida" | "sin_meta";
+export type MappingConfidence = "alta" | "media" | "baja";
+
+export interface Campus {
+  id: string;
+  slug: string;
+  code: string;
+  name: string;
+  report_kind: string;
+  report_structure: string;
+  /**
+   * Falso cuando el informe de la sede no trae metas programadas. De este campo
+   * depende todo el módulo: con `false`, el cumplimiento no es calculable y no
+   * puede mostrarse como cero.
+   */
+  declares_targets: boolean;
+  owner: string;
+  description: string;
+  status: PublicationStatus;
+  position: number;
+}
+
+export interface CampusReportBatch {
+  id: string;
+  campus_id: string;
+  year: number;
+  file_name: string;
+  source_document: string;
+  note: string;
+  fact_count: number;
+  indicator_count: number;
+  status: PublicationStatus;
+  uploaded_at: string;
+  uploaded_by: string | null;
+}
+
+/** Vista `v_campus_facts`: un hecho publicado con su cadena de alineación. */
+export interface CampusFact {
+  id: string;
+  campus_id: string;
+  year: number;
+  pillar_id: string | null;
+  area_id: string | null;
+  action_line_id: string;
+  objective: string;
+  action: string;
+  unit: string;
+  /** Nulo si `is_monetary`: las cifras financieras no se publican. */
+  target_value: number | null;
+  actual_value: number | null;
+  compliance: number | null;
+  is_monetary: boolean;
+  record_kind: CampusRecordKind;
+  state: CampusState;
+  confidence: MappingConfidence;
+  note: string;
+  evidence: string;
+  source_document: string;
+  source_page: number | null;
+  reported_pillar: string;
+  position: number;
+  campus_slug: string;
+  campus_code: string;
+  campus_name: string;
+  pillar_slug: string | null;
+  pillar_numeral: string | null;
+  pillar_name: string | null;
+  pillar_accent: number | null;
+  area_code: string | null;
+  area_name: string | null;
+  line_code: string | null;
+  line_name: string | null;
+}
+
+/** Vista `v_campus_indicators`: la serie de dos años que reporta la sede. */
+export interface CampusIndicator {
+  id: string;
+  campus_id: string;
+  pillar_id: string | null;
+  area_id: string | null;
+  action_line_id: string;
+  name: string;
+  unit: string;
+  base_year: number;
+  base_value: number | null;
+  last_year: number;
+  last_value: number | null;
+  /** Recalculada, no la que trae el informe. Nula si la base es cero. */
+  variation: number | null;
+  is_monetary: boolean;
+  evidence: string;
+  source_document: string;
+  confidence: MappingConfidence;
+  position: number;
+  campus_slug: string;
+  campus_name: string;
+  pillar_slug: string | null;
+  pillar_numeral: string | null;
+  pillar_name: string | null;
+  pillar_accent: number | null;
+  line_code: string | null;
+  line_name: string | null;
+}
+
+/** Vista `v_campus_pillar`: la casilla de la matriz sede × pilar. */
+export interface CampusPillarCell {
+  campus_id: string;
+  campus_slug: string;
+  campus_name: string;
+  declares_targets: boolean;
+  pillar_id: string;
+  pillar_slug: string;
+  pillar_numeral: string;
+  pillar_name: string;
+  pillar_accent: number;
+  pillar_position: number;
+  year: number | null;
+  records: number;
+  targets: number;
+  achievements: number;
+  exceeded: number;
+  met: number;
+  partial: number;
+  unmet: number;
+  /** Nulo cuando la sede no declara metas. Nunca es cero por esa razón. */
+  compliance_avg: number | null;
+  lines_covered: number;
+  lines_total: number;
+}
+
+/** Vista `v_campus_summary`: una fila por sede y vigencia publicada. */
+export interface CampusSummary {
+  campus_id: string;
+  campus_slug: string;
+  campus_code: string;
+  campus_name: string;
+  report_kind: string;
+  report_structure: string;
+  declares_targets: boolean;
+  owner: string;
+  position: number;
+  year: number | null;
+  source_document: string | null;
+  records: number;
+  targets: number;
+  achievements: number;
+  exceeded: number;
+  met: number;
+  partial: number;
+  unmet: number;
+  /** Cuántas filas llevan un anclaje inferido y no explícito en el informe. */
+  inferred: number;
+  compliance_avg: number | null;
+  pillars_covered: number;
+  lines_covered: number;
+  lines_total: number;
+  indicators: number;
+}
+
+/** Vista `v_campus_line_coverage`: las 62 líneas, se reporten o no. */
+export interface CampusLineCoverage {
+  pillar_id: string;
+  pillar_slug: string;
+  pillar_numeral: string;
+  pillar_name: string;
+  pillar_accent: number;
+  pillar_position: number;
+  area_id: string;
+  area_code: string;
+  area_name: string;
+  area_position: number;
+  line_id: string;
+  line_code: string;
+  line_name: string;
+  line_position: number;
+  records: number;
+  campuses_reporting: number;
+  /** { "cucuta": 3, "valledupar": 1 } — solo las sedes que reportaron. */
+  by_campus: Record<string, number>;
+}

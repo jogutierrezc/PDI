@@ -1,0 +1,180 @@
+// src/modules/landing/route-content.ts
+var routeProfiles = [
+  {
+    id: "aspirante",
+    label: "Aspirante",
+    lens: "Lo que encontrar\xE1s al entrar",
+    nextStep: "El plan completo est\xE1 publicado: puedes leerlo antes de decidir.",
+    cta: { label: "Conocer la implementaci\xF3n", to: "/implementacion" }
+  },
+  {
+    id: "estudiante",
+    label: "Estudiante",
+    lens: "Lo que ya est\xE1 cambiando en tu semestre",
+    nextStep: "Lo que aqu\xED se promete se mide. Revisa el avance real de cada compromiso.",
+    cta: { label: "Ver el avance del plan", to: "/tablero" }
+  },
+  {
+    id: "graduado",
+    label: "Graduado",
+    lens: "C\xF3mo sigue acompa\xF1\xE1ndote la universidad",
+    nextStep: "El plan se reporta por cortes p\xFAblicos: mira en qu\xE9 va el que te interesa.",
+    cta: { label: "Ver el avance del plan", to: "/tablero" }
+  },
+  {
+    id: "docente",
+    label: "Docente",
+    lens: "Lo que el plan pone en tus manos",
+    nextStep: "Cada pilar tiene su ficha, con indicadores, metas y responsable de c\xE1lculo.",
+    cta: { label: "Explorar los pilares", to: "/implementacion" }
+  },
+  {
+    id: "administrativo",
+    label: "Personal administrativo",
+    lens: "Lo que cambia en tu d\xEDa a d\xEDa de trabajo",
+    nextStep: "Si operas alguno de estos procesos, la ficha del pilar dice qui\xE9n lo gestiona.",
+    cta: { label: "Ver c\xF3mo se implementa", to: "/implementacion" }
+  },
+  {
+    id: "directivo",
+    label: "Directivo",
+    lens: "Lo que hay que decidir y sostener",
+    nextStep: "El tablero trae el mismo corte que usa el comit\xE9 de planeaci\xF3n.",
+    cta: { label: "Ir al tablero PDI", to: "/tablero" }
+  },
+  {
+    id: "empresa",
+    label: "Empresa o aliado",
+    lens: "D\xF3nde se conecta tu organizaci\xF3n con la UDES",
+    nextStep: "Cada pilar publica su impulsor y a qu\xE9 contribuye: por ah\xED se entra.",
+    cta: { label: "Explorar los pilares", to: "/implementacion" }
+  }
+];
+var routeInterests = [
+  {
+    id: "emprender",
+    label: "Emprender",
+    icon: "spark",
+    answer: "El centro de emprendimiento acompa\xF1a la idea desde la asesor\xEDa legal hasta la aceleraci\xF3n, con fondos de capital semilla para prototipar y validar el modelo de negocio.",
+    moves: ["Incubaci\xF3n y aceleraci\xF3n", "Capital semilla", "Innovaci\xF3n abierta"],
+    pillars: ["entorno-emprendedor", "ambiente-tecnologico"]
+  },
+  {
+    id: "flexibilidad",
+    label: "Flexibilidad de horarios",
+    icon: "clock",
+    answer: "Microcredenciales, bancos de electivas, cursos ub\xEDcronos y pago por cr\xE9ditos: la formaci\xF3n se ajusta a tu tiempo y a tu bolsillo, no al rev\xE9s.",
+    moves: ["Microcredenciales", "Pago por cr\xE9ditos", "Cursos ub\xEDcronos"],
+    pillars: ["personalizacion", "ambiente-tecnologico"]
+  },
+  {
+    id: "investigacion",
+    label: "Investigaci\xF3n y tecnolog\xEDa",
+    icon: "chip",
+    answer: "Laboratorios modernizados, anal\xEDtica de aprendizaje y transferencia tecnol\xF3gica aplicada a salud, energ\xEDas limpias y agroindustria del territorio.",
+    moves: ["Laboratorios modernizados", "Anal\xEDtica e IA en el aula", "Transferencia tecnol\xF3gica"],
+    pillars: ["ambiente-tecnologico", "entorno-emprendedor"]
+  },
+  {
+    id: "tramites",
+    label: "Tr\xE1mites y vida digital",
+    icon: "settings",
+    answer: "Smart campus, oficinas virtuales, carn\xE9 digital y tableros de avance en tiempo real: el plan redise\xF1a el proceso antes de automatizarlo, no solo la pantalla.",
+    moves: ["Oficinas virtuales", "Carn\xE9 digital", "Avance acad\xE9mico en vivo"],
+    pillars: ["ambiente-tecnologico", "personalizacion"]
+  },
+  {
+    id: "gobierno",
+    label: "Transparencia y buen gobierno",
+    icon: "columns",
+    answer: "Rendici\xF3n de cuentas continua, datos abiertos y vocer\xEDa real de estudiantes, docentes y graduados en los \xF3rganos de direcci\xF3n.",
+    moves: ["Rendici\xF3n de cuentas continua", "Datos abiertos", "Representatividad"],
+    pillars: ["gobernanza", "ambiente-tecnologico"]
+  },
+  {
+    id: "sostenibilidad",
+    label: "Sostenibilidad y ambiente",
+    icon: "leaf",
+    answer: "Ruta declarada hacia la carbono neutralidad, gesti\xF3n integral de residuos, eficiencia h\xEDdrica y energ\xE9tica, y alianzas en bioeconom\xEDa y energ\xEDas limpias.",
+    moves: ["Carbono neutralidad", "Gesti\xF3n de residuos", "Alianzas verdes"],
+    pillars: ["sostenibilidad", "apropiacion-social"]
+  },
+  {
+    id: "comunidad",
+    label: "Impacto en mi comunidad",
+    icon: "community",
+    answer: "Brigadas de salud, telemedicina, consultor\xEDas comunitarias y proyectos de extensi\xF3n multidisciplinarios, con datos abiertos sobre c\xF3mo avanza cada compromiso.",
+    moves: ["Salud en territorio", "Consultor\xEDas comunitarias", "Datos abiertos"],
+    pillars: ["apropiacion-social", "gobernanza", "sostenibilidad"]
+  }
+];
+var routeMatrix = {
+  aspirante: {
+    emprender: "Entras a una universidad donde tu idea puede empezar en primer semestre, no el d\xEDa que te grad\xFAas.",
+    flexibilidad: "Eliges cu\xE1ntos cr\xE9ditos tomas y c\xF3mo los pagas: la matr\xEDcula deja de ser un bloque \xFAnico e inamovible.",
+    investigacion: "Desde pregrado puedes vincularte a un semillero y usar los laboratorios que el plan est\xE1 modernizando.",
+    tramites: "Inscripci\xF3n, matr\xEDcula y carn\xE9 digital: lo que antes era hacer fila empieza a resolverse desde el m\xF3vil.",
+    gobierno: "Puedes ver c\xF3mo avanza el plan antes de matricularte: el tablero es p\xFAblico y no hace falta ser estudiante.",
+    sostenibilidad: "Estudiar\xE1s en un campus con ruta declarada hacia la carbono neutralidad, y puedes comprobar por d\xF3nde va.",
+    comunidad: "Tu pr\xE1ctica no ser\xE1 un tr\xE1mite: se hace dentro de proyectos de extensi\xF3n con comunidades reales del territorio."
+  },
+  estudiante: {
+    emprender: "El centro de emprendimiento ya recibe ideas de estudiantes activos, con mentor\xEDa y ruta de incubaci\xF3n.",
+    flexibilidad: "Las microcredenciales y el banco de electivas te dejan armar el semestre alrededor de tu horario, y no al rev\xE9s.",
+    investigacion: "Puedes sumarte a los grupos que est\xE1n firmando transferencia tecnol\xF3gica con empresas de la regi\xF3n.",
+    tramites: "Oficinas virtuales, carn\xE9 digital y un tablero con tu avance acad\xE9mico en tiempo real, sin pedir cita.",
+    gobierno: "La representaci\xF3n estudiantil tiene vocer\xEDa en los \xF3rganos de direcci\xF3n, y lo que all\xED se decide se publica.",
+    sostenibilidad: "Residuos, agua y energ\xEDa del campus donde pasas el d\xEDa dejan de ser invisibles: se miden y se publican.",
+    comunidad: "Las brigadas y las consultor\xEDas comunitarias cuentan en tu formaci\xF3n y se reportan como avance del plan."
+  },
+  graduado: {
+    emprender: "La incubadora y el capital semilla siguen abiertos para ti despu\xE9s del grado, no solo mientras estudias.",
+    flexibilidad: "La formaci\xF3n continua y los posgrados modulares est\xE1n pensados para volver sin dejar el trabajo.",
+    investigacion: "Puedes volver como investigador asociado o traer un problema de tu empresa para resolverlo con la UDES.",
+    tramites: "Certificados, actas y constancias dejan de pedirse en ventanilla y pasan a emitirse en l\xEDnea.",
+    gobierno: "Los graduados tienen silla en la conversaci\xF3n institucional, no solo en la ceremonia de grado.",
+    sostenibilidad: "Las alianzas en bioeconom\xEDa y energ\xEDas limpias son una puerta de entrada profesional en la regi\xF3n.",
+    comunidad: "El seguimiento a graduados es una l\xEDnea del plan: tu trayectoria alimenta las redes de impacto regional."
+  },
+  docente: {
+    emprender: "Tu grupo puede convertir resultados de investigaci\xF3n en patentes y spin-offs, con acompa\xF1amiento legal.",
+    flexibilidad: "El dise\xF1o modular y los cursos ub\xEDcronos cambian c\xF3mo se programa tu carga y c\xF3mo se eval\xFAa el curso.",
+    investigacion: "Simuladores, anal\xEDtica de aprendizaje e IA entran al aula como herramientas de ense\xF1anza, no como adorno.",
+    tramites: "Menos formatos y m\xE1s tiempo de clase: el plan ataca la carga administrativa que hoy se lleva tus horas.",
+    gobierno: "El marco normativo se actualiza y se consulta: escalaf\xF3n, evaluaci\xF3n y participaci\xF3n dejan de ser reglas t\xE1citas.",
+    sostenibilidad: "Bioeconom\xEDa y transici\xF3n energ\xE9tica son l\xEDneas con financiaci\xF3n y contraparte buscando equipo investigador.",
+    comunidad: "La extensi\xF3n multidisciplinaria te permite llevar tu asignatura a problemas concretos de la comunidad."
+  },
+  administrativo: {
+    emprender: "Constituir una spin-off, registrar propiedad intelectual o firmar un convenio deja de improvisarse: el plan le pone ruta y responsable.",
+    flexibilidad: "Pago por cr\xE9ditos y diferimiento de cuotas obligan a que registro, cartera y matr\xEDcula trabajen sobre el mismo dato.",
+    investigacion: "La compra de equipo cient\xEDfico y la gesti\xF3n de convenios entran al mismo ciclo de seguimiento que el resto del plan.",
+    tramites: "Es tu pilar: el smart campus y las oficinas virtuales redise\xF1an el proceso que hoy operas, no solo su pantalla.",
+    gobierno: "Rendici\xF3n de cuentas continua significa que el dato que t\xFA cargas es el que se publica: la calidad del reporte es la del gobierno.",
+    sostenibilidad: "Compras responsables, residuos y consumo energ\xE9tico dejan de ser buenas intenciones y pasan a ser criterio en el pliego.",
+    comunidad: "Las brigadas y las jornadas en territorio viven de log\xEDstica, contrataci\xF3n y transporte: ah\xED es donde el impacto se hace o se cae."
+  },
+  directivo: {
+    emprender: "El emprendimiento deja de medirse por eventos realizados y pasa a medirse por empresas creadas y patentes en uso.",
+    flexibilidad: "La flexibilidad es una decisi\xF3n de modelo, no de calendario: toca reglamento, oferta y flujo de caja a la vez.",
+    investigacion: "La pregunta deja de ser cu\xE1ntos art\xEDculos se publican y pasa a ser cu\xE1nto de eso llega a salud, energ\xEDa o agroindustria.",
+    tramites: "Digitalizar no es comprar software: el plan pide redise\xF1ar el proceso antes de automatizarlo, y esa decisi\xF3n es tuya.",
+    gobierno: "Datos abiertos y rendici\xF3n continua cambian el costo de decidir tarde: lo que no se reporta, se nota.",
+    sostenibilidad: "Aqu\xED sostenibilidad son tres cosas a la vez \u2014ambiental, social y financiera\u2014 y la tercera es la que sostiene a las otras dos.",
+    comunidad: "El impacto social deja de contarse en asistentes y pasa a contarse en necesidades atendidas y comunidades con seguimiento."
+  },
+  empresa: {
+    emprender: "La innovaci\xF3n abierta conecta tus retos con los grupos de investigaci\xF3n y con los emprendimientos incubados.",
+    flexibilidad: "Puedes formar a tu equipo con microcredenciales y cursos ub\xEDcronos, sin sacarlo de la operaci\xF3n.",
+    investigacion: "La transferencia en salud, energ\xEDas limpias y agroindustria busca contraparte empresarial para aterrizarse.",
+    tramites: "Convenios, contrataci\xF3n y facturaci\xF3n con la universidad entran a pasarelas digitales con trazabilidad en l\xEDnea.",
+    gobierno: "Puedes verificar con qu\xE9 avanza cada compromiso antes de firmar: el seguimiento del plan es p\xFAblico.",
+    sostenibilidad: "Los proyectos de bioeconom\xEDa y energ\xEDas limpias buscan aliado industrial con presencia en el territorio.",
+    comunidad: "Los proyectos de extensi\xF3n admiten alianzas: tu organizaci\xF3n puede sumarse a un impacto que se mide y se publica."
+  }
+};
+export {
+  routeInterests,
+  routeMatrix,
+  routeProfiles
+};

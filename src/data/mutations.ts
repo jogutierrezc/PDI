@@ -14,10 +14,10 @@
 
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import type { QueryKey } from "@tanstack/react-query";
-import { callAdminUsers, supabase } from "../lib/supabase";
+import { callAdminUsers, readFunctionError, supabase } from "../lib/supabase";
 import { keys } from "./queries";
 import { describeDatabaseError as describe } from "./errors";
-import type { AppRole, Profile } from "../types/database";
+import type { AppRole, NormalizeResult, Profile } from "../types/database";
 
 /** Tablas sobre las que escribe la intranet. */
 export type WritableTable =
@@ -38,7 +38,9 @@ export type WritableTable =
   | "pillar_owners"
   | "profiles"
   | "web_projects"
-  | "project_budget_reports";
+  | "project_budget_reports"
+  | "faculties"
+  | "faculty_actions";
 
 function useInvalidate(invalidates: QueryKey[]) {
   const client = useQueryClient();
@@ -183,6 +185,11 @@ export function useRemoveRow(invalidates: QueryKey[]) {
 /** Lo que cambia al reportar un año de presupuesto. */
 export const budgetScope = (): QueryKey[] => [keys.budget(), keys.adminProjects()];
 
+/** Publicar o retirar una acción cambia lo que ve el portal público, así que
+ *  `keys.faculties()` —que es la raíz del índice, la matriz y cada ficha— entra
+ *  entera, no solo la bandeja de la intranet. */
+export const facultyScope = (): QueryKey[] => [keys.faculties()];
+
 export const pillarScope = (): QueryKey[] => [
   keys.pillars(),
   keys.adminProjects(),
@@ -289,3 +296,144 @@ export function useUpdateProfile() {
     onSuccess: invalidate,
   });
 }
+
+/* =============================================================================
+   PDI por facultad · sincronización con el origen
+   ========================================================================== */
+
+/**
+ * Trae los planes desde la aplicación de las facultades.
+ *
+ * Va por la Edge Function y no por una consulta directa: escribir en las tablas
+ * del módulo con la sesión de quien pulsa el botón exigiría concederle permiso
+ * de escritura sobre filas que él no redacta, y la función además guarda la URL
+ * del origen fuera del navegador.
+ */
+export function useSyncFaculties() {
+  const invalidate = useInvalidate(facultyScope());
+
+  return useMutation({
+    mutationFn: async (): Promise<SyncReport> => {
+      const { data, error } = await supabase.functions.invoke<SyncReport>("sync-facultades", {
+        body: {},
+      });
+      if (error) {
+        // `describe` no sirve aquí: traduce errores de PostgREST, y esto es una
+        // Edge Function. Su mensaje útil está en el cuerpo de la respuesta.
+        const detail = await readFunctionError(error);
+        throw new Error(detail ?? error.message);
+      }
+      return data as SyncReport;
+    },
+    onSuccess: invalidate,
+  });
+}
+
+/** Lo que devuelve la sincronización. Se enseña tal cual: si una facultad se
+ *  quedó fuera, quien pulsó el botón tiene que verlo. */
+export interface SyncReport {
+  ok: boolean;
+  source: number;
+  faculties: number;
+  actions: { created: number; updated: number };
+  activities: number;
+  followups: number;
+  orphans: { faculty: string; source_id: string; title: string }[];
+  skipped: { faculty: string; reason: string }[];
+}
+
+/* =============================================================================
+   Normalizar la estructura
+
+   Las tres escrituras van por funciones de la base y no por `update`: mover una
+   línea toca siete tablas y borrar la duplicada tiene que pasar en el mismo
+   momento. Hecho desde el cliente, una petición que falle a mitad dejaría la
+   estructura peor que al empezar.
+   ========================================================================== */
+
+/** Fusionar toda la estructura duplicada de una vez. Es el botón. */
+export function useNormalizeStructure() {
+  const invalidate = useInvalidate(structureScope());
+
+  return useMutation({
+    mutationFn: async (onlyExact: boolean): Promise<NormalizeResult[]> => {
+      const { data, error } = await supabase.rpc("normalize_structure", {
+        only_exact: onlyExact,
+      });
+      if (error) throw describe(error);
+      return (data ?? []) as NormalizeResult[];
+    },
+    onSuccess: invalidate,
+  });
+}
+
+/** Fusionar una sola pareja, cuando se quiere ir una a una. */
+export function useMergeStructure() {
+  const invalidate = useInvalidate(structureScope());
+
+  return useMutation({
+    mutationFn: async ({
+      kind,
+      keepId,
+      dropId,
+    }: {
+      kind: "area" | "line";
+      keepId: string;
+      dropId: string;
+    }): Promise<number> => {
+      const { data, error } = await supabase.rpc(
+        kind === "area" ? "merge_strategic_areas" : "merge_action_lines",
+        { keep_id: keepId, drop_id: dropId },
+      );
+      if (error) throw describe(error);
+      return (data ?? 0) as number;
+    },
+    onSuccess: invalidate,
+  });
+}
+
+/** Retirar de una vez toda la estructura de ejemplo que no sostiene nada. */
+export function useDropEmptyStructure() {
+  const invalidate = useInvalidate(structureScope());
+
+  return useMutation({
+    mutationFn: async (): Promise<{ kind: "area" | "line"; code: string | null; name: string }[]> => {
+      const { data, error } = await supabase.rpc("drop_empty_structure");
+      if (error) throw describe(error);
+      return (data ?? []) as { kind: "area" | "line"; code: string | null; name: string }[];
+    },
+    onSuccess: invalidate,
+  });
+}
+
+/** Retirar una sola. La base se niega —con la cuenta— si sostiene algo. */
+export function useDropStructureOrphan() {
+  const invalidate = useInvalidate(structureScope());
+
+  return useMutation({
+    mutationFn: async ({ kind, id }: { kind: "area" | "line"; id: string }) => {
+      const { error } = await supabase.rpc("drop_structure_orphan", { kind, target: id });
+      if (error) throw describe(error);
+    },
+    onSuccess: invalidate,
+  });
+}
+
+/**
+ * Fusionar estructura cambia dónde cuelga casi todo, así que invalida casi
+ * todo: el avance en cascada, los proyectos, el presupuesto, las facultades y
+ * los campus leen áreas y líneas.
+ */
+export const structureScope = (): QueryKey[] => [
+  keys.structureAudit(),
+  keys.structure(),
+  keys.pillars(),
+  keys.progress(),
+  keys.summary(),
+  keys.pillarYears(),
+  keys.projects(),
+  keys.adminProjects(),
+  keys.budget(),
+  keys.faculties(),
+  keys.campuses(),
+];

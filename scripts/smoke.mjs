@@ -172,6 +172,145 @@ const FIXTURES = {
       position: 1,
     },
   ],
+  /* --- PDI por facultad -------------------------------------------------
+     Dos facultades y dos pilares, con una casilla en cero a propósito: la
+     matriz tiene que pintar el hueco, no saltárselo. Y una acción cuyo pilar
+     declarado no casó con ninguno, que es la que la bandeja debe marcar y
+     negarse a publicar.
+
+     Los textos imitan la forma real del origen: la meta trae el indicador
+     dentro, con saltos de línea, y hay fechas que dicen "Por definir".
+     -------------------------------------------------------------------- */
+  faculties: [
+    {
+      id: "f1", slug: "ingenierias-y-tecnologias", code: "FIT",
+      name: "Facultad de Ingenierías y Tecnologías", dean: "Viviana Prada Pérez",
+      description: "", status: "publicado", position: 1,
+      phase: "fase1", period: "2026", plan_date: "2026-07-02",
+      synced_at: "2026-09-11T06:00:00Z", source_updated_at: "2026-09-03T21:05:36Z",
+      created_at: "2026-07-02T08:00:00Z", updated_at: "2026-09-11T06:00:00Z",
+    },
+    {
+      id: "f2", slug: "ciencias-naturales", code: "FCN",
+      name: "Facultad de Ciencias Naturales", dean: "Fabiola Aguilar Galvis",
+      description: "", status: "publicado", position: 2,
+      phase: "fase1", period: "2026", plan_date: "2026-07-06",
+      synced_at: "2026-09-11T06:00:00Z", source_updated_at: "2026-07-30T14:32:21Z",
+      created_at: "2026-07-06T08:00:00Z", updated_at: "2026-09-11T06:00:00Z",
+    },
+  ],
+
+  v_faculties: [
+    {
+      faculty_id: "f1", slug: "ingenierias-y-tecnologias", code: "FIT",
+      name: "Facultad de Ingenierías y Tecnologías", dean: "Viviana Prada Pérez",
+      description: "", phase: "fase1", period: "2026", plan_date: "2026-07-02", position: 1,
+      action_count: 2, pillar_count: 2, dimension_count: 2, activity_count: 2,
+      reported_progress: 20, reported_count: 1,
+      pillar_counts: [
+        { pillar_id: "p1", numeral: "II", accent: 2, count: 1 },
+        { pillar_id: "p2", numeral: "V", accent: 5, count: 1 },
+      ],
+    },
+    {
+      faculty_id: "f2", slug: "ciencias-naturales", code: "FCN",
+      name: "Facultad de Ciencias Naturales", dean: "Fabiola Aguilar Galvis",
+      description: "", phase: "fase1", period: "2026", plan_date: "2026-07-06", position: 2,
+      action_count: 1, pillar_count: 1, dimension_count: 1, activity_count: 0,
+      reported_progress: null, reported_count: 0,
+      pillar_counts: [{ pillar_id: "p1", numeral: "II", accent: 2, count: 1 }],
+    },
+  ],
+
+  v_faculty_pillar_matrix: [
+    { faculty_id: "f1", faculty_slug: "ingenierias-y-tecnologias", faculty_code: "FIT", faculty_name: "Facultad de Ingenierías y Tecnologías", faculty_position: 1, pillar_id: "p1", pillar_numeral: "II", pillar_name: "Ambiente tecnológico", pillar_accent: 2, pillar_position: 1, actions: 1 },
+    { faculty_id: "f1", faculty_slug: "ingenierias-y-tecnologias", faculty_code: "FIT", faculty_name: "Facultad de Ingenierías y Tecnologías", faculty_position: 1, pillar_id: "p2", pillar_numeral: "V", pillar_name: "Sostenibilidad", pillar_accent: 5, pillar_position: 2, actions: 1 },
+    { faculty_id: "f2", faculty_slug: "ciencias-naturales", faculty_code: "FCN", faculty_name: "Facultad de Ciencias Naturales", faculty_position: 2, pillar_id: "p1", pillar_numeral: "II", pillar_name: "Ambiente tecnológico", pillar_accent: 2, pillar_position: 1, actions: 1 },
+    { faculty_id: "f2", faculty_slug: "ciencias-naturales", faculty_code: "FCN", faculty_name: "Facultad de Ciencias Naturales", faculty_position: 2, pillar_id: "p2", pillar_numeral: "V", pillar_name: "Sostenibilidad", pillar_accent: 5, pillar_position: 2, actions: 0 },
+  ],
+
+  v_faculty_actions: [
+    {
+      id: "fa1", faculty_id: "f1", source_id: "d1_1",
+      dimension: "d1", dimension_name: "Gestión de calidad y autorregulación",
+      declared_pillar: "Ambiente tecnológico",
+      pillar_id: "p1", area_id: "ae2", action_line_id: "l2",
+      title: "Modernizar los laboratorios de simulación de la facultad",
+      owner: "Dirección de Programa",
+      goal: "Doce escenarios en operación.\n\nIndicador:\nNúmero de laboratorios intervenidos.",
+      resources: "Talento humano, plataformas institucionales y recursos tecnológicos",
+      deadline: "2026-11-27", deadline_label: "2026-11-27",
+      initial_status: "proceso", budget_ordinary: true, budget_improvement: false,
+      published_at: "2026-09-11T07:00:00Z", position: 1,
+      faculty_slug: "ingenierias-y-tecnologias", faculty_code: "FIT",
+      faculty_name: "Facultad de Ingenierías y Tecnologías",
+      pillar_slug: "ambiente-tecnologico", pillar_numeral: "II",
+      pillar_name: "Ambiente tecnológico", pillar_accent: 2,
+      area_code: "AE-05", area_name: "Cultura digital",
+      line_code: "LA-5.1", line_name: "Cultura digital",
+      activities: [
+        {
+          id: "fac1", action_id: "fa1", source_id: "d1_1_act_1",
+          description: "Levantar el inventario de equipos y su estado de obsolescencia",
+          owner: "Coordinación de Laboratorios",
+          due_date: "2026-11-27", due_label: "2026-11-27",
+          status_label: "En proceso", evidence_url: "", position: 1,
+        },
+      ],
+      last_cut: "Semestre I 2026", last_progress: 20,
+      last_status: "En proceso", last_reported_on: "2026-09-11",
+    },
+    {
+      id: "fa2", faculty_id: "f1", source_id: "d7_3",
+      dimension: "d7", dimension_name: "Gestión financiera",
+      declared_pillar: "Sostenibilidad",
+      pillar_id: "p2", area_id: null, action_line_id: null,
+      title: "Diversificar las fuentes de financiación de la facultad",
+      owner: "Por definir",
+      goal: "", resources: "",
+      // Muchas acciones del origen llegan sin fecha: se guarda el texto y la
+      // ficha lo enseña tal cual en vez de inventarse una.
+      deadline: null, deadline_label: "Por definir",
+      initial_status: "pendiente", budget_ordinary: false, budget_improvement: true,
+      published_at: "2026-09-11T07:00:00Z", position: 2,
+      faculty_slug: "ingenierias-y-tecnologias", faculty_code: "FIT",
+      faculty_name: "Facultad de Ingenierías y Tecnologías",
+      pillar_slug: "sostenibilidad", pillar_numeral: "V",
+      pillar_name: "Sostenibilidad", pillar_accent: 5,
+      area_code: null, area_name: null, line_code: null, line_name: null,
+      activities: [],
+      last_cut: null, last_progress: null, last_status: null, last_reported_on: null,
+    },
+  ],
+
+  v_structure_duplicates: [
+    {
+      kind: "area", pillar_id: "p1",
+      keep_id: "ae2", keep_code: "6.1.3", keep_name: "Cultura digital",
+      drop_id: "ae9", drop_code: "AE-05", drop_name: "Cultura digital",
+      moves: 3, is_exact: true,
+    },
+    {
+      kind: "line", pillar_id: "p1",
+      keep_id: "l2", keep_code: "6.1.3.a", keep_name: "a. Cultura digital institucional",
+      drop_id: "l9", drop_code: "LA-5.1", drop_name: "Cultura digital",
+      moves: 1, is_exact: false,
+    },
+  ],
+
+  v_structure_orphans: [
+    {
+      kind: "area", id: "ae8", pillar_id: "p1", pillar_numeral: "II",
+      pillar_name: "Ambiente tecnológico", code: "AE-04",
+      name: "Seguridad y continuidad", dependents: 0,
+    },
+    {
+      kind: "area", id: "ae7", pillar_id: "p2", pillar_numeral: "V",
+      pillar_name: "Sostenibilidad", code: "AE-10",
+      name: "Gestión ambiental del campus", dependents: 4,
+    },
+  ],
+
   strategic_areas: [
     {
       id: "ae1",
@@ -394,6 +533,103 @@ const FIXTURES = {
       updated_at: "2026-01-10T00:00:00Z",
     },
   ],
+
+  /* --- PDI por campus (migración 0017) ------------------------------------
+     Las tres sedes, y la que importa es Bucaramanga: no declara metas, así que
+     su cumplimiento llega nulo. La prueba comprueba que la pantalla escribe
+     "No calculable" y no un 0 %.
+     También va una fila monetaria con el valor ya retirado, tal y como la
+     devolvería la vista pública: la pantalla tiene que explicar el hueco.
+     -------------------------------------------------------------------- */
+  campuses: [
+    { id: "c1", slug: "bucaramanga", code: "BUC", name: "Bucaramanga",
+      report_kind: "Informe de Gestión Institucional", report_structure: "Por función sustantiva",
+      declares_targets: false, owner: "Rectoría General", description: "",
+      status: "publicado", position: 1 },
+    { id: "c2", slug: "cucuta", code: "CUC", name: "Cúcuta",
+      report_kind: "Informe de gestión de campus", report_structure: "Por objetivos y metas",
+      declares_targets: true, owner: "Rectoría Campus Cúcuta", description: "",
+      status: "publicado", position: 2 },
+  ],
+  v_campus_summary: [
+    { campus_id: "c1", campus_slug: "bucaramanga", campus_code: "BUC", campus_name: "Bucaramanga",
+      report_kind: "Informe de Gestión Institucional", report_structure: "Por función sustantiva",
+      declares_targets: false, owner: "Rectoría General", position: 1, year: 2025,
+      source_document: "Informe_Gestion_Institucional_2025.pdf",
+      records: 52, targets: 0, achievements: 52, exceeded: 0, met: 0, partial: 0, unmet: 0,
+      inferred: 9, compliance_avg: null, pillars_covered: 6, lines_covered: 30,
+      lines_total: 62, indicators: 1 },
+    { campus_id: "c2", campus_slug: "cucuta", campus_code: "CUC", campus_name: "Cúcuta",
+      report_kind: "Informe de gestión de campus", report_structure: "Por objetivos y metas",
+      declares_targets: true, owner: "Rectoría Campus Cúcuta", position: 2, year: 2025,
+      source_document: "Informe_cucuta_2025.pdf",
+      records: 32, targets: 32, achievements: 0, exceeded: 15, met: 14, partial: 2, unmet: 1,
+      inferred: 6, compliance_avg: 97.29, pillars_covered: 6, lines_covered: 19,
+      lines_total: 62, indicators: 18 },
+  ],
+  v_campus_pillar: [
+    { campus_id: "c1", campus_slug: "bucaramanga", campus_name: "Bucaramanga",
+      declares_targets: false, pillar_id: "p1", pillar_slug: "ambiente-tecnologico",
+      pillar_numeral: "II", pillar_name: "Ambiente tecnológico", pillar_accent: 2,
+      pillar_position: 1, year: 2025, records: 7, targets: 0, achievements: 7,
+      exceeded: 0, met: 0, partial: 0, unmet: 0, compliance_avg: null,
+      lines_covered: 5, lines_total: 9 },
+    { campus_id: "c2", campus_slug: "cucuta", campus_name: "Cúcuta",
+      declares_targets: true, pillar_id: "p1", pillar_slug: "ambiente-tecnologico",
+      pillar_numeral: "II", pillar_name: "Ambiente tecnológico", pillar_accent: 2,
+      pillar_position: 1, year: 2025, records: 6, targets: 6, achievements: 0,
+      exceeded: 2, met: 3, partial: 0, unmet: 1, compliance_avg: 91.62,
+      lines_covered: 4, lines_total: 9 },
+  ],
+  v_campus_facts: [
+    { id: "cf1", campus_id: "c2", year: 2025, pillar_id: "p1", area_id: "ae1",
+      action_line_id: "al1", objective: "Fortalecer la virtualidad",
+      action: "Diseñar y ofertar cursos autogestionables", unit: "Conteo",
+      target_value: 3, actual_value: 6, compliance: 200, is_monetary: false,
+      record_kind: "meta", state: "superada", confidence: "alta",
+      note: "Rutas de pedagogía y competencia digital.", evidence: "Documento de diseño instruccional",
+      source_document: "Informe_cucuta_2025.pdf", source_page: 7, reported_pillar: "Ambiente tecnológico",
+      position: 1, campus_slug: "cucuta", campus_code: "CUC", campus_name: "Cúcuta",
+      pillar_slug: "ambiente-tecnologico", pillar_numeral: "II", pillar_name: "Ambiente tecnológico",
+      pillar_accent: 2, area_code: "6.2.4", area_name: "Virtualidad",
+      line_code: "6.2.4.b", line_name: "b. Virtualización de la enseñanza" },
+    { id: "cf2", campus_id: "c2", year: 2025, pillar_id: "p1", area_id: "ae1",
+      action_line_id: "al2", objective: "Adquisición de predio",
+      action: "Adquisición del predio de la Cruz Roja", unit: "Hito",
+      target_value: 1, actual_value: 1, compliance: 100, is_monetary: false,
+      record_kind: "meta", state: "cumplida", confidence: "media",
+      note: "La estructura no tiene área de infraestructura física.", evidence: "Escritura de compra",
+      source_document: "Informe_cucuta_2025.pdf", source_page: 7, reported_pillar: "Personalización",
+      position: 2, campus_slug: "cucuta", campus_code: "CUC", campus_name: "Cúcuta",
+      pillar_slug: "ambiente-tecnologico", pillar_numeral: "II", pillar_name: "Ambiente tecnológico",
+      pillar_accent: 2, area_code: "6.2.2", area_name: "Experiencia en el campus",
+      line_code: "6.2.2.a", line_name: "a. Solución de Experiencia en Campus" },
+    { id: "cf3", campus_id: "c2", year: 2025, pillar_id: "p1", area_id: "ae1",
+      action_line_id: "al3", objective: "Diversificar ingresos",
+      action: "Patrimonio institucional", unit: "Moneda (COP millones)",
+      target_value: null, actual_value: null, compliance: null, is_monetary: true,
+      record_kind: "logro", state: "sin_meta", confidence: "alta",
+      note: "", evidence: "Estados financieros",
+      source_document: "Informe_cucuta_2025.pdf", source_page: 40, reported_pillar: "Sostenibilidad",
+      position: 3, campus_slug: "cucuta", campus_code: "CUC", campus_name: "Cúcuta",
+      pillar_slug: "ambiente-tecnologico", pillar_numeral: "II", pillar_name: "Ambiente tecnológico",
+      pillar_accent: 2, area_code: "6.5.3", area_name: "Sostenibilidad financiera",
+      line_code: "6.5.3.b", line_name: "b. Optimización de recursos existentes" },
+  ],
+  v_campus_indicators: [
+    { id: "ci1", campus_id: "c2", pillar_id: "p1", area_id: "ae1", action_line_id: "al1",
+      name: "Proyectos de investigación en curso", unit: "Conteo",
+      base_year: 2024, base_value: 6, last_year: 2025, last_value: 12, variation: 100,
+      is_monetary: false, evidence: "Registro SIGIIP", source_document: "Informe_cucuta_2025.pdf",
+      confidence: "alta", position: 1, campus_slug: "cucuta", campus_name: "Cúcuta",
+      pillar_slug: "ambiente-tecnologico", pillar_numeral: "II", pillar_name: "Ambiente tecnológico",
+      pillar_accent: 2, line_code: "6.6.1.b", line_name: "b. Gestión de la investigación" },
+  ],
+  campus_report_batches: [
+    { id: "b1", campus_id: "c2", year: 2025, file_name: "Indicadores_Campus_Pilares_UDES_2025.xlsx",
+      source_document: "Informe_cucuta_2025.pdf", note: "", fact_count: 32, indicator_count: 18,
+      status: "publicado", uploaded_at: "2026-02-10T10:00:00Z", uploaded_by: null },
+  ],
 };
 
 /* --- Rutas a comprobar ----------------------------------------------------- */
@@ -491,6 +727,35 @@ const routes = [
       const otro = window.document.querySelector(".route-result")?.textContent ?? "";
       if (!otro.includes("innovación abierta") && !otro.includes("Innovación abierta")) {
         throw new Error("cambiar de perfil no cambió el cruce");
+      }
+
+      // Los dos perfiles internos: sin ellos el selector solo hablaba a quien
+      // estudia o compra, y el plan lo ejecuta y lo sostiene alguien más.
+      pick("administrativo");
+      await tick();
+      const interno = window.document.querySelector(".route-result")?.textContent ?? "";
+      if (!interno.includes("propiedad intelectual")) {
+        throw new Error("el perfil administrativo no tiene cruce propio");
+      }
+
+      pick("directivo");
+      await tick();
+      const directivo = window.document.querySelector(".route-result")?.textContent ?? "";
+      if (!directivo.includes("empresas creadas")) {
+        throw new Error("el perfil directivo no tiene cruce propio");
+      }
+      // Y el resultado cierra diciendo qué hacer, no solo con un botón.
+      if (!window.document.querySelector(".route-result__next p")?.textContent?.trim()) {
+        throw new Error("el resultado no dice qué hacer después");
+      }
+
+      // Un interés de los nuevos: sin ellos, gobernanza y sostenibilidad no
+      // eran la respuesta principal de ninguna ruta.
+      pick("sostenibilidad");
+      await tick();
+      const verde = window.document.querySelector(".route-result")?.textContent ?? "";
+      if (!verde.includes("Sostenibilidad")) {
+        throw new Error("el interés de sostenibilidad no llega a su pilar");
       }
 
       /* --- ODS: deducidos de los proyectos, no escritos ------------------- */
@@ -1072,6 +1337,148 @@ const routes = [
       }
     },
   },
+  /* --- PDI por facultad -------------------------------------------------- */
+  {
+    path: "/facultades",
+    expect: "El PDI, facultad por facultad",
+    also: [
+      "Dónde aporta cada facultad",
+      "Facultad de Ingenierías y Tecnologías",
+      "Facultad de Ciencias Naturales",
+      "Ambiente tecnológico",
+      "Sostenibilidad",
+      "Más acciones",
+      "De dónde sale lo que se lee aquí",
+    ],
+    // Es una página pública: ni cifras de dinero ni nada de la revisión interna.
+    absent: [...SIN_DINERO, "Innovación curricular", "Sin pilar"],
+  },
+  {
+    path: "/facultades/ingenierias-y-tecnologias",
+    expect: "Facultad de Ingenierías y Tecnologías",
+    also: [
+      // El plan se agrupa por dimensión, que es como lo escribió la facultad.
+      "Gestión de calidad y autorregulación",
+      "Gestión financiera",
+      "Modernizar los laboratorios de simulación de la facultad",
+      "Diversificar las fuentes de financiación de la facultad",
+      // Una acción sin fecha enseña el texto del origen, no una fecha inventada.
+      "Por definir",
+      // El pilar viaja en cada acción.
+      "II · Ambiente tecnológico",
+    ],
+    absent: [...SIN_DINERO],
+  },
+  {
+    path: "/facultades/ingenierias-y-tecnologias",
+    note: "al abrir una acción se ven su meta, sus actividades y su seguimiento",
+    expect: "Modernizar los laboratorios de simulación de la facultad",
+    interact: async (window, tick) => {
+      const heads = [...window.document.querySelectorAll(".action__head")];
+      if (heads.length !== 2) throw new Error(`se esperaban 2 acciones y hay ${heads.length}`);
+
+      heads[0].dispatchEvent(new window.Event("click", { bubbles: true }));
+      await tick();
+
+      const body = window.document.querySelector(".action__body")?.textContent ?? "";
+      if (!body.includes("Número de laboratorios intervenidos")) {
+        throw new Error("no se ve el indicador que el origen guarda dentro de la meta");
+      }
+      if (!body.includes("Levantar el inventario de equipos")) {
+        throw new Error("no se ven las actividades de la acción");
+      }
+      if (!body.includes("20%") || !body.includes("Semestre I 2026")) {
+        throw new Error("no se ve el último corte reportado");
+      }
+      // La trazabilidad del enganche: de dónde salió el pilar.
+      if (!body.includes("La facultad declaró este aporte como")) {
+        throw new Error("no se dice de dónde salió el pilar");
+      }
+
+      // La segunda acción no tiene ningún corte: debe decirlo, no pintar 0 %.
+      heads[1].dispatchEvent(new window.Event("click", { bubbles: true }));
+      await tick();
+      const second = window.document.querySelector(".action.is-open .action__body")?.textContent ?? "";
+      if (!second.includes("todavía no tiene ningún corte reportado")) {
+        throw new Error("una acción sin reportar debería decirlo en vez de mostrar un cero");
+      }
+    },
+  },
+  {
+    path: "/campus",
+    expect: "Qué reportó cada sede contra el plan",
+    also: [
+      "Bucaramanga",
+      "Cúcuta",
+      // Lo que gobierna la lectura de toda la página.
+      "no son comparables",
+      // Sin metas no es cero: Bucaramanga tiene que decir que no se puede calcular.
+      "No calculable",
+      // El puente con el resto del portal.
+      "Qué promete el plan",
+      "Cómo va",
+    ],
+    // La portada de campus es pública: ninguna cifra de dinero, y menos las que
+    // la vista ya retiró. "325788" es el patrimonio del libro real.
+    absent: [...SIN_DINERO, "325788", "Moneda (COP"],
+  },
+  {
+    path: "/campus",
+    note: "cambiar de sede cambia el cumplimiento y lo reportado",
+    expect: "Qué reportó cada sede contra el plan",
+    interact: async (window, tick) => {
+      const botones = [...window.document.querySelectorAll(".campus-tab")];
+      if (botones.length !== 2) {
+        throw new Error(`se esperaban 2 sedes y hay ${botones.length}`);
+      }
+
+      // Bucaramanga entra primero (posición 1) y no declara metas.
+      const texto = () => window.document.body.textContent ?? "";
+      if (!texto().includes("No calculable")) {
+        throw new Error("la sede sin metas no anuncia que su cumplimiento no es calculable");
+      }
+
+      const cucuta = botones.find((b) => b.textContent?.includes("Cúcuta"));
+      if (!cucuta) throw new Error("no se encontró la pestaña de Cúcuta");
+      cucuta.dispatchEvent(new window.Event("click", { bubbles: true }));
+      await tick();
+
+      if (cucuta.getAttribute("aria-pressed") !== "true") {
+        throw new Error("la sede pulsada no queda seleccionada");
+      }
+      // Cúcuta sí declara metas: su cumplimiento es un porcentaje.
+      if (!texto().includes("97%")) {
+        throw new Error("la sede con metas no muestra su cumplimiento promedio");
+      }
+      // Una cifra retirada se explica; un hueco callado parecería un fallo de
+      // carga. La fila monetaria de Cúcuta llega con el valor ya anulado.
+      if (!texto().includes("Cifra financiera, no publicada")) {
+        throw new Error("el importe retirado no se explica en pantalla");
+      }
+      // Lo inferido se publica, pero dicho.
+      if (!texto().includes("Asignación inferida")) {
+        throw new Error("un anclaje inferido no se marca");
+      }
+
+      // Y el filtro por estado tiene que reducir la lista.
+      const antes = window.document.querySelectorAll(".campus-fact").length;
+      if (antes === 0) throw new Error("no se pintó lo reportado");
+      const chip = [...window.document.querySelectorAll(".campus-chip")]
+        .find((c) => c.textContent?.includes("Superada"));
+      if (chip) {
+        chip.dispatchEvent(new window.Event("click", { bubbles: true }));
+        await tick();
+        const despues = window.document.querySelectorAll(".campus-fact").length;
+        if (despues >= antes) throw new Error("filtrar por estado no redujo la lista");
+      }
+    },
+  },
+  {
+    path: "/admin/campus",
+    expect: "PDI por campus",
+    session: true,
+    also: ["Elige el libro", "Reportes cargados", "Indicadores_Campus_Pilares_UDES_2025.xlsx"],
+  },
   { path: "/acceso-intranet", expect: "Intranet PDI" },
   { path: "/ruta-que-no-existe", expect: "Esta página no existe" },
   { path: "/admin/pilares", expect: "Intranet PDI", note: "sin sesión debe redirigir al acceso" },
@@ -1306,6 +1713,77 @@ const routes = [
     },
   },
   {
+    path: "/admin/facultades",
+    expect: "PDI por facultad",
+    session: true,
+    also: [
+      "Aplicación de planes de facultad",
+      "Sincronizar ahora",
+      "Sin pilar resuelto",
+      "Qué se publica",
+      // La acción cuyo pilar declarado no casó con ninguno del PDI.
+      "Rediseñar el currículo de los programas de la facultad",
+      "Innovación curricular",
+      "Anclar a una línea del PDI",
+    ],
+  },
+  {
+    path: "/admin/facultades",
+    note: "sin pilar resuelto, el botón de publicar está bloqueado",
+    expect: "Acciones",
+    session: true,
+    interact: async (window, tick) => {
+      await tick();
+      const fila = window.document.querySelector(".tray-row--warn");
+      if (!fila) throw new Error("la acción sin pilar no se marca");
+
+      const publicar = [...fila.querySelectorAll("button")].find(
+        (boton) => boton.textContent?.trim() === "Publicar",
+      );
+      if (!publicar) throw new Error("no aparece el botón de publicar");
+      if (!publicar.disabled) {
+        throw new Error("se puede publicar una acción que no enganchó con ningún pilar");
+      }
+    },
+  },
+  {
+    path: "/admin/estructura",
+    expect: "Normalizar la estructura",
+    session: true,
+    also: [
+      "Qué hay que resolver",
+      "Mismo nombre",
+      "Emparejadas por parecido",
+      "Sin equivalente en la estructura real",
+      // La dirección de la fusión: lo que se va y lo que se queda.
+      "se fusiona y desaparece",
+      "se conserva",
+      // Y la distinción que hace útil la lista de sueltas.
+      "no sostiene nada",
+      "sostiene 4 filas",
+    ],
+  },
+  {
+    path: "/admin/estructura",
+    note: "solo se puede retirar lo que no sostiene nada",
+    expect: "Sin equivalente en la estructura real",
+    session: true,
+    interact: async (window) => {
+      const filas = [...window.document.querySelectorAll(".orphan")];
+      if (filas.length !== 2) throw new Error(`se esperaban 2 sueltas y hay ${filas.length}`);
+
+      const vacia = filas.find((f) => f.textContent?.includes("no sostiene nada"));
+      const llena = filas.find((f) => f.textContent?.includes("sostiene 4 filas"));
+
+      if (!vacia?.querySelector("button")) {
+        throw new Error("la entrada vacía debería poder retirarse");
+      }
+      if (llena?.querySelector("button")) {
+        throw new Error("una entrada que sostiene datos no debería ofrecer retirarla");
+      }
+    },
+  },
+  {
     path: "/admin/presupuesto",
     expect: "Presupuesto",
     session: true,
@@ -1534,6 +2012,41 @@ FIXTURES.v_projects_admin = FIXTURES.v_projects.map((project) => ({
   ...project,
   total_value: 120000000,
 }));
+
+// La vista de administración es la pública más la nota de revisión, y se
+// deriva de ella para que las dos no se desincronicen al tocar una. Se le añade
+// una acción cuyo pilar declarado no casó con ninguno del PDI: es el único caso
+// que bloquea la publicación, y el que la bandeja existe para atrapar.
+FIXTURES.v_faculty_actions_admin = [
+  ...FIXTURES.v_faculty_actions.map(({ activities, last_cut, last_status, last_reported_on, ...action }) => ({
+    ...action,
+    status: "publicado",
+    faculty_status: "publicado",
+    note: "",
+    activity_count: activities.length,
+    created_at: "2026-07-02T08:00:00Z",
+    updated_at: "2026-09-11T06:00:00Z",
+  })),
+  {
+    id: "fa3", faculty_id: "f2", source_id: "d3_1",
+    dimension: "d3", dimension_name: "Gestión académica",
+    declared_pillar: "Innovación curricular",
+    pillar_id: null, area_id: null, action_line_id: null,
+    title: "Rediseñar el currículo de los programas de la facultad",
+    owner: "Decanatura", goal: "", resources: "",
+    deadline: null, deadline_label: "Por definir",
+    initial_status: "pendiente", budget_ordinary: false, budget_improvement: false,
+    published_at: null, position: 1,
+    faculty_slug: "ciencias-naturales", faculty_code: "FCN",
+    faculty_name: "Facultad de Ciencias Naturales",
+    pillar_slug: null, pillar_numeral: null, pillar_name: null, pillar_accent: null,
+    area_code: null, area_name: null, line_code: null, line_name: null,
+    last_progress: null,
+    status: "borrador", faculty_status: "publicado", note: "",
+    activity_count: 0,
+    created_at: "2026-07-06T08:00:00Z", updated_at: "2026-09-11T06:00:00Z",
+  },
+];
 
 /* --- Ejecución -------------------------------------------------------------- */
 

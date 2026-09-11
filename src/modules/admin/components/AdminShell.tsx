@@ -18,7 +18,10 @@ import "../admin.css";
 export type AdminSection =
   | "pillars"
   | "projects"
+  | "faculties"
+  | "campus"
   | "budget"
+  | "structure"
   | "parameters"
   | "development"
   | "users"
@@ -36,9 +39,16 @@ const navigation: {
   // Los proyectos van justo después de los pilares y no dentro: son lo único
   // transversal del plan, uno puede apuntar a varios.
   { id: "projects", label: "Proyectos", icon: "columns", to: "/admin/proyectos", minimum: "consulta" },
+  // Las facultades van pegadas a los proyectos porque responden a la otra mitad
+  // de la misma pregunta: qué se está haciendo, y quién lo está empujando.
+  { id: "faculties", label: "PDI por facultad", icon: "community", to: "/admin/facultades", minimum: "consulta" },
+  { id: "campus", label: "PDI por campus", icon: "pin", to: "/admin/campus", minimum: "consulta" },
   // El presupuesto va detrás de los proyectos porque cuelga de ellos, y nunca
   // sale de aquí: no hay pantalla pública que lo muestre.
   { id: "budget", label: "Presupuesto", icon: "chart", to: "/admin/presupuesto", minimum: "consulta" },
+  // Detrás de los catálogos y antes de los usuarios: es mantenimiento del
+  // esquema, no gestión del plan, y solo se entra cuando algo hay que arreglar.
+  { id: "structure", label: "Normalizar estructura", icon: "table", to: "/admin/estructura", minimum: "consulta" },
   { id: "parameters", label: "Parámetros globales", icon: "settings", to: "/admin/parametros", minimum: "consulta" },
   { id: "development", label: "Desarrollo tecnológico", icon: "code", to: "/admin/desarrollo", minimum: "consulta" },
   { id: "users", label: "Usuarios y roles", icon: "user", to: "/admin/usuarios", minimum: "admin" },

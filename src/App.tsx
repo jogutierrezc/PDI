@@ -32,6 +32,15 @@ const PillarScorecard = lazy(() =>
 const SdgPortal = lazy(() =>
   import("./modules/ods/SdgPortal").then((m) => ({ default: m.SdgPortal })),
 );
+const CampusPortal = lazy(() =>
+  import("./modules/campus/CampusPortal").then((m) => ({ default: m.CampusPortal })),
+);
+const FacultyPortal = lazy(() =>
+  import("./modules/facultades/FacultyPortal").then((m) => ({ default: m.FacultyPortal })),
+);
+const FacultyDetail = lazy(() =>
+  import("./modules/facultades/FacultyDetail").then((m) => ({ default: m.FacultyDetail })),
+);
 const TechDevelopment = lazy(() =>
   import("./routes/TechDevelopment").then((m) => ({ default: m.TechDevelopment })),
 );
@@ -43,6 +52,17 @@ const BudgetAdmin = lazy(() =>
 );
 const ProjectsAdmin = lazy(() =>
   import("./modules/admin/proyectos/ProjectsAdmin").then((m) => ({ default: m.ProjectsAdmin })),
+);
+const FacultyAdmin = lazy(() =>
+  import("./modules/admin/facultades/FacultyAdmin").then((m) => ({ default: m.FacultyAdmin })),
+);
+const CampusImport = lazy(() =>
+  import("./modules/admin/campus/CampusImport").then((m) => ({ default: m.CampusImport })),
+);
+const StructureNormalize = lazy(() =>
+  import("./modules/admin/estructura/StructureNormalize").then((m) => ({
+    default: m.StructureNormalize,
+  })),
 );
 const LoginPortal = lazy(() => import("./modules/login/LoginPortal").then((m) => ({ default: m.LoginPortal })));
 const PillarManagement = lazy(() =>
@@ -100,6 +120,9 @@ export default function App() {
           <Route path="/implementacion" element={<ImplementationPortal />} />
           <Route path="/implementacion/pilar/:slug" element={<PillarViewer />} />
           <Route path="/ods" element={<SdgPortal />} />
+          <Route path="/campus" element={<CampusPortal />} />
+          <Route path="/facultades" element={<FacultyPortal />} />
+          <Route path="/facultades/:slug" element={<FacultyDetail />} />
           <Route path="/desarrollo-tecnologico" element={<TechDevelopment />} />
           <Route path="/acceso-intranet" element={<LoginPortal />} />
 
@@ -120,6 +143,14 @@ export default function App() {
             }
           />
           <Route
+            path="/admin/estructura"
+            element={
+              <RequireRole minimum="consulta">
+                <StructureNormalize />
+              </RequireRole>
+            }
+          />
+          <Route
             path="/admin/parametros"
             element={
               <RequireRole minimum="consulta">
@@ -132,6 +163,22 @@ export default function App() {
             element={
               <RequireRole minimum="consulta">
                 <ProjectsAdmin />
+              </RequireRole>
+            }
+          />
+          <Route
+            path="/admin/campus"
+            element={
+              <RequireRole minimum="consulta">
+                <CampusImport />
+              </RequireRole>
+            }
+          />
+          <Route
+            path="/admin/facultades"
+            element={
+              <RequireRole minimum="consulta">
+                <FacultyAdmin />
               </RequireRole>
             }
           />

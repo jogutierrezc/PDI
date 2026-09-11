@@ -11,6 +11,7 @@ import { prefetchProps } from "../lib/prefetch";
 import { CampusExplorer } from "../modules/landing/CampusExplorer";
 import { ContextTicker } from "../modules/landing/ContextTicker";
 import { ResourceRoom } from "../modules/landing/ResourceRoom";
+import { SdgBand } from "../modules/landing/SdgBand";
 import { RouteFinder } from "../modules/landing/RouteFinder";
 import { TheLeap } from "../modules/landing/TheLeap";
 import { pillarNarratives } from "../modules/landing/content";
@@ -188,6 +189,10 @@ export function Home() {
           )}
         </div>
       </section>
+
+      {/* A dónde apunta el plan fuera del campus. Va pegado a los pilares
+          porque el aporte se deduce de sus proyectos, no de una declaración. */}
+      <SdgBand />
 
       {/* El plan aterrizado en cada territorio. */}
       <CampusExplorer />

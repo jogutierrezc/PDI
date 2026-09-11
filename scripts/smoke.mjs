@@ -415,9 +415,14 @@ const routes = [
       "Hub de alta tecnología",
       "¿Qué parte del plan te toca a ti?",
       "Plan de Desarrollo Institucional 2024-2028",
+      // El plan y los ODS: las cifras salen de los proyectos publicados.
+      "A qué se compromete el PDI más allá del campus",
+      "Objetivos con aporte",
     ],
     // La portada es pública: las cifras presupuestales tampoco caben aquí.
-    absent: SIN_DINERO,
+    // "billones" y "USD" cerraban la puerta a las dos formas en que se habían
+    // colado cifras de dinero en el texto editorial de la portada.
+    absent: [...SIN_DINERO, "billones", "USD"],
   },
   {
     path: "/",
@@ -470,9 +475,37 @@ const routes = [
       if (!resultado.includes("capital semilla")) {
         throw new Error("el resultado no responde al interés elegido");
       }
+      // El cruce perfil x interés: lo único de la respuesta que cambia con el
+      // perfil. Sin esto, elegir "aspirante" o "empresa" daría lo mismo.
+      if (!resultado.includes("primer semestre")) {
+        throw new Error("el resultado no cruza el perfil con el interés");
+      }
       // Los pilares recomendados salen de la base, con su avance: no son texto.
       if (!resultado.includes("Ambiente tecnológico") || !resultado.includes("% de avance")) {
         throw new Error("el resultado no enlaza los pilares publicados con su avance");
+      }
+
+      // Cambiar de perfil sin tocar el interés tiene que cambiar la respuesta.
+      pick("empresa");
+      await tick();
+      const otro = window.document.querySelector(".route-result")?.textContent ?? "";
+      if (!otro.includes("innovación abierta") && !otro.includes("Innovación abierta")) {
+        throw new Error("cambiar de perfil no cambió el cruce");
+      }
+
+      /* --- ODS: deducidos de los proyectos, no escritos ------------------- */
+      const marcas = [...window.document.querySelectorAll(".sdg-band .sdg-mark")];
+      if (marcas.length !== 17) {
+        throw new Error(`la franja de ODS pinta ${marcas.length} objetivos y deben ser 17`);
+      }
+      // El fixture declara ODS en sus proyectos: alguno tiene que salir encendido.
+      if (!marcas.some((marca) => marca.className.includes("is-on"))) {
+        throw new Error("ningún objetivo aparece con aporte pese a haber proyectos que lo declaran");
+      }
+      // Y los apagados siguen ahí, dichos: un objetivo sin aporte no se esconde.
+      const apagado = marcas.find((marca) => !marca.className.includes("is-on"));
+      if (apagado && !apagado.getAttribute("aria-label")?.includes("sin aporte declarado")) {
+        throw new Error("un objetivo sin aporte no se anuncia como tal");
       }
     },
   },

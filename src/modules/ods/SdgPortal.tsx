@@ -16,7 +16,10 @@
    objetivo sin proyectos es información: dice dónde el plan no llega. Filtrar
    la rejilla a los que tienen aporte la dejaría más bonita y menos honesta.
 
-   El color oficial de cada ODS entra como `--sdg` y decora; el estado —cuántos
+   El color oficial de cada ODS entra como `--sdg` y decora, junto con la tinta
+   que ese color admite (`--sdg-ink`): diez de los diecisiete no llegan a 4,5:1
+   con texto blanco, y el amarillo del objetivo 7 se queda en 1,62:1. El estado
+   —cuántos
    proyectos, cuál está seleccionado— nunca se comunica solo con el matiz,
    porque diecisiete colores a la vez no distinguen nada.
    ========================================================================== */
@@ -132,7 +135,7 @@ export function SdgPortal() {
                     <button
                       type="button"
                       className={`sdg-card${isOn ? " is-on" : ""}${count === 0 ? " is-empty" : ""}`}
-                      style={{ "--sdg": row.goal.color } as React.CSSProperties}
+                      style={{ "--sdg": row.goal.color, "--sdg-ink": row.goal.ink } as React.CSSProperties}
                       // El botón es un interruptor: volver a pulsarlo cierra el
                       // detalle, que es lo que espera quien acaba de abrirlo.
                       aria-pressed={isOn}
@@ -175,7 +178,7 @@ export function SdgPortal() {
         {selected && (
           <section
             className="sdg-detail"
-            style={{ "--sdg": selected.goal.color } as React.CSSProperties}
+            style={{ "--sdg": selected.goal.color, "--sdg-ink": selected.goal.ink } as React.CSSProperties}
             aria-labelledby="detalle-title"
             // El panel aparece por debajo de la rejilla, así que se anuncia:
             // con lector de pantalla, pulsar una tarjeta no movería el foco y
@@ -305,7 +308,7 @@ export function SdgPortal() {
                             <button
                               type="button"
                               className={`sdg-dot${on ? " is-on" : ""}`}
-                              style={{ "--sdg": goal.color } as React.CSSProperties}
+                              style={{ "--sdg": goal.color, "--sdg-ink": goal.ink } as React.CSSProperties}
                               onClick={() => setActiveGoal(goal.id)}
                               aria-label={`Objetivo ${goal.id}, ${goal.label}${on ? "" : " · sin aporte de este pilar"}`}
                               title={`${goal.id} · ${goal.label}`}
@@ -368,7 +371,7 @@ function ProjectRow({ project, pillarNames }: { project: ProjectWithLinks; pilla
             return (
               <li
                 key={id}
-                style={{ "--sdg": goal.color } as React.CSSProperties}
+                style={{ "--sdg": goal.color, "--sdg-ink": goal.ink } as React.CSSProperties}
                 title={`${id} · ${goal.label}`}
               >
                 <span aria-hidden="true">{id}</span>

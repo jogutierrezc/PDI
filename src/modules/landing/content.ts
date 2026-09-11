@@ -31,8 +31,8 @@ export const contextFacts: ContextFact[] = [
     text: "Ventana demográfica decisiva en Colombia: innovar hoy para transformar el mañana.",
   },
   {
-    figure: "$70 billones",
-    text: "Presupuesto nacional de educación proyectado, con «Universidad en tu Territorio».",
+    figure: "Universidad en tu Territorio",
+    text: "La política nacional de educación superior sitúa a la UDES como agente activo de la región.",
   },
   {
     figure: "28.000+",
@@ -45,6 +45,10 @@ export const contextFacts: ContextFact[] = [
   {
     figure: "2024-2028",
     text: "Horizonte del plan: cinco años de ejecución con seguimiento público.",
+  },
+  {
+    figure: "17 ODS",
+    text: "Cada proyecto declara a qué Objetivos de Desarrollo Sostenible aporta.",
   },
 ];
 
@@ -184,7 +188,7 @@ export const campuses: Campus[] = [
     response:
       "Acreditación de excelencia, modernización de laboratorios biomédicos e itinerarios en ingeniería de software y construcción sostenible.",
     highlights: [
-      { value: "USD 120 M", label: "Turismo médico al año" },
+      { value: "Turismo médico", label: "Destino internacional de referencia" },
       { value: "Industria 4.0", label: "IA, software y analítica" },
       { value: "Café y cacao", label: "Agroindustria de exportación" },
     ],
@@ -224,8 +228,19 @@ export const campuses: Campus[] = [
 
 /* =============================================================================
    E · Encuentra tu ruta
-   Dos preguntas: quién eres y qué buscas. El resultado no inventa nada — apunta
-   a los pilares del plan que responden a ese interés, con su avance real.
+
+   Tres piezas, y cada una responde una pregunta distinta:
+
+     · `routeInterests`  qué pone en marcha el plan sobre ese tema — es igual
+                         para todo el mundo, porque el plan es uno solo.
+     · `routeMatrix`     qué significa eso para *este* perfil. Es el cruce, y
+                         es donde está el contenido que de verdad se busca:
+                         "emprender" no quiere decir lo mismo para un aspirante
+                         que para una empresa.
+     · `routeProfiles`   con qué lente se le habla y a dónde se le manda.
+
+   Lo que no está aquí: los pilares y los ODS del resultado. Esos salen de la
+   base —de los proyectos publicados— porque son datos, no redacción.
    ========================================================================== */
 
 export interface RouteProfile {
@@ -275,6 +290,8 @@ export interface RouteInterest {
   icon: IconName;
   /** Qué responde el PDI a ese interés. */
   answer: string;
+  /** Lo que el plan pone en marcha, en corto. Rótulos, no enlaces. */
+  moves: string[];
   /** Pilares del plan que lo sostienen. Slugs de `pillars`. */
   pillars: string[];
 }
@@ -286,6 +303,7 @@ export const routeInterests: RouteInterest[] = [
     icon: "spark",
     answer:
       "El centro de emprendimiento acompaña la idea desde la asesoría legal hasta la aceleración, con fondos de capital semilla para prototipar y validar el modelo de negocio.",
+    moves: ["Incubación y aceleración", "Capital semilla", "Innovación abierta"],
     pillars: ["entorno-emprendedor", "ambiente-tecnologico"],
   },
   {
@@ -294,6 +312,7 @@ export const routeInterests: RouteInterest[] = [
     icon: "clock",
     answer:
       "Microcredenciales, bancos de electivas, cursos ubícronos y pago por créditos: la formación se ajusta a tu tiempo y a tu bolsillo, no al revés.",
+    moves: ["Microcredenciales", "Pago por créditos", "Cursos ubícronos"],
     pillars: ["personalizacion", "ambiente-tecnologico"],
   },
   {
@@ -302,6 +321,7 @@ export const routeInterests: RouteInterest[] = [
     icon: "chip",
     answer:
       "Laboratorios modernizados, analítica de aprendizaje y transferencia tecnológica aplicada a salud, energías limpias y agroindustria del territorio.",
+    moves: ["Laboratorios modernizados", "Analítica e IA en el aula", "Transferencia tecnológica"],
     pillars: ["ambiente-tecnologico", "entorno-emprendedor"],
   },
   {
@@ -310,6 +330,67 @@ export const routeInterests: RouteInterest[] = [
     icon: "community",
     answer:
       "Brigadas de salud, telemedicina, consultorías comunitarias y proyectos de extensión multidisciplinarios, con datos abiertos sobre cómo avanza cada compromiso.",
+    moves: ["Salud en territorio", "Consultorías comunitarias", "Datos abiertos"],
     pillars: ["apropiacion-social", "gobernanza", "sostenibilidad"],
   },
 ];
+
+/**
+ * El cruce perfil × interés: qué significa ese tema para quien pregunta.
+ *
+ * Se busca como `routeMatrix[perfil][interés]`. Si faltara una casilla el
+ * resultado se muestra igual, solo que sin esta línea: el componente no da por
+ * hecho que la tabla esté completa.
+ */
+export const routeMatrix: Record<string, Record<string, string>> = {
+  aspirante: {
+    emprender:
+      "Entras a una universidad donde tu idea puede empezar en primer semestre, no el día que te gradúas.",
+    flexibilidad:
+      "Eliges cuántos créditos tomas y cómo los pagas: la matrícula deja de ser un bloque único e inamovible.",
+    investigacion:
+      "Desde pregrado puedes vincularte a un semillero y usar los laboratorios que el plan está modernizando.",
+    comunidad:
+      "Tu práctica no será un trámite: se hace dentro de proyectos de extensión con comunidades reales del territorio.",
+  },
+  estudiante: {
+    emprender:
+      "El centro de emprendimiento ya recibe ideas de estudiantes activos, con mentoría y ruta de incubación.",
+    flexibilidad:
+      "Las microcredenciales y el banco de electivas te dejan armar el semestre alrededor de tu horario, y no al revés.",
+    investigacion:
+      "Puedes sumarte a los grupos que están firmando transferencia tecnológica con empresas de la región.",
+    comunidad:
+      "Las brigadas y las consultorías comunitarias cuentan en tu formación y se reportan como avance del plan.",
+  },
+  graduado: {
+    emprender:
+      "La incubadora y el capital semilla siguen abiertos para ti después del grado, no solo mientras estudias.",
+    flexibilidad:
+      "La formación continua y los posgrados modulares están pensados para volver sin dejar el trabajo.",
+    investigacion:
+      "Puedes volver como investigador asociado o traer un problema de tu empresa para resolverlo con la UDES.",
+    comunidad:
+      "El seguimiento a graduados es una línea del plan: tu trayectoria alimenta las redes de impacto regional.",
+  },
+  empresa: {
+    emprender:
+      "La innovación abierta conecta tus retos con los grupos de investigación y con los emprendimientos incubados.",
+    flexibilidad:
+      "Puedes formar a tu equipo con microcredenciales y cursos ubícronos, sin sacarlo de la operación.",
+    investigacion:
+      "La transferencia en salud, energías limpias y agroindustria busca contraparte empresarial para aterrizarse.",
+    comunidad:
+      "Los proyectos de extensión admiten alianzas: tu organización puede sumarse a un impacto que se mide y se publica.",
+  },
+  docente: {
+    emprender:
+      "Tu grupo puede convertir resultados de investigación en patentes y spin-offs, con acompañamiento legal.",
+    flexibilidad:
+      "El diseño modular y los cursos ubícronos cambian cómo se programa tu carga y cómo se evalúa el curso.",
+    investigacion:
+      "Simuladores, analítica de aprendizaje e IA entran al aula como herramientas de enseñanza, no como adorno.",
+    comunidad:
+      "La extensión multidisciplinaria te permite llevar tu asignatura a problemas concretos de la comunidad.",
+  },
+};

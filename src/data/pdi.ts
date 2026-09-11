@@ -342,26 +342,38 @@ export interface SdgGoal {
   label: string;
   /** Color oficial del objetivo. Se usa como refuerzo, nunca como único dato. */
   color: string;
+  /**
+   * Con qué tinta se escribe encima de `color`.
+   *
+   * No es una preferencia: diez de los diecisiete colores oficiales no llegan a
+   * 4,5:1 con texto blanco —el amarillo del objetivo 7 se queda en 1,62:1, que
+   * es ilegible—. Cada objetivo lleva la tinta que sí pasa, elegida una vez y
+   * escrita aquí en vez de recalculada en cada pintado.
+   *
+   * Es un valor fijo y no un token: el fondo es el color de Naciones Unidas en
+   * los dos temas, así que la tinta tampoco puede cambiar con el tema.
+   */
+  ink: string;
 }
 
 export const sdgGoals: SdgGoal[] = [
-  { id: 1, label: "Fin de la pobreza", color: "#e5243b" },
-  { id: 2, label: "Hambre cero", color: "#dda63a" },
-  { id: 3, label: "Salud y bienestar", color: "#4c9f38" },
-  { id: 4, label: "Educación de calidad", color: "#c5192d" },
-  { id: 5, label: "Igualdad de género", color: "#ff3a21" },
-  { id: 6, label: "Agua limpia y saneamiento", color: "#26bde2" },
-  { id: 7, label: "Energía asequible y no contaminante", color: "#fcc30b" },
-  { id: 8, label: "Trabajo decente y crecimiento económico", color: "#a21942" },
-  { id: 9, label: "Industria, innovación e infraestructura", color: "#fd6925" },
-  { id: 10, label: "Reducción de las desigualdades", color: "#dd1367" },
-  { id: 11, label: "Ciudades y comunidades sostenibles", color: "#fd9d24" },
-  { id: 12, label: "Producción y consumo responsables", color: "#bf8b2e" },
-  { id: 13, label: "Acción por el clima", color: "#3f7e44" },
-  { id: 14, label: "Vida submarina", color: "#0a97d9" },
-  { id: 15, label: "Vida de ecosistemas terrestres", color: "#56c02b" },
-  { id: 16, label: "Paz, justicia e instituciones sólidas", color: "#00689d" },
-  { id: 17, label: "Alianzas para lograr los objetivos", color: "#19486a" },
+  { id: 1, label: "Fin de la pobreza", color: "#e5243b", ink: "#ffffff" },
+  { id: 2, label: "Hambre cero", color: "#dda63a", ink: "#11202f" },
+  { id: 3, label: "Salud y bienestar", color: "#4c9f38", ink: "#11202f" },
+  { id: 4, label: "Educación de calidad", color: "#c5192d", ink: "#ffffff" },
+  { id: 5, label: "Igualdad de género", color: "#ff3a21", ink: "#11202f" },
+  { id: 6, label: "Agua limpia y saneamiento", color: "#26bde2", ink: "#11202f" },
+  { id: 7, label: "Energía asequible y no contaminante", color: "#fcc30b", ink: "#11202f" },
+  { id: 8, label: "Trabajo decente y crecimiento económico", color: "#a21942", ink: "#ffffff" },
+  { id: 9, label: "Industria, innovación e infraestructura", color: "#fd6925", ink: "#11202f" },
+  { id: 10, label: "Reducción de las desigualdades", color: "#dd1367", ink: "#ffffff" },
+  { id: 11, label: "Ciudades y comunidades sostenibles", color: "#fd9d24", ink: "#11202f" },
+  { id: 12, label: "Producción y consumo responsables", color: "#bf8b2e", ink: "#11202f" },
+  { id: 13, label: "Acción por el clima", color: "#3f7e44", ink: "#ffffff" },
+  { id: 14, label: "Vida submarina", color: "#0a97d9", ink: "#11202f" },
+  { id: 15, label: "Vida de ecosistemas terrestres", color: "#56c02b", ink: "#11202f" },
+  { id: 16, label: "Paz, justicia e instituciones sólidas", color: "#00689d", ink: "#ffffff" },
+  { id: 17, label: "Alianzas para lograr los objetivos", color: "#19486a", ink: "#ffffff" },
 ];
 
 export const sdgById = new Map(sdgGoals.map((goal) => [goal.id, goal]));

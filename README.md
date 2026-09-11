@@ -626,6 +626,17 @@ Las cifras de `planFigures` (6 pilares, 21 áreas, 61 líneas, 3 sedes) describe
 el **documento aprobado**, no el seguimiento: no cambian con el corte del mes y
 por eso no salen de la base.
 
+**Ninguna cifra de dinero entra en este archivo.** La portada es pública y la
+migración 0015 ya cierra el presupuesto a `anon` en la base; escribirlo a mano en
+el texto editorial lo volvería a publicar por la puerta de al lado. La prueba de
+humo comprueba la portada contra `SIN_DINERO`, y además contra «billones» y
+«USD», que son las dos formas en que se había colado.
+
+**El selector "tu ruta"** cruza perfil × interés en `routeMatrix`: el interés
+dice qué pone en marcha el plan —igual para todo el mundo— y el cruce dice qué
+significa para quien pregunta. Los pilares y los ODS del resultado no se
+escriben: salen de los proyectos publicados.
+
 `landing.css` se importa desde `main.tsx`, no desde `Home.tsx`. La portada no se
 carga bajo demanda, así que su hoja viaja en el bundle principal de todas formas;
 importarla desde el componente la colocaba *antes* que `base.css`, y `.card`
@@ -650,6 +661,14 @@ que la identidad nunca depende solo del color.
 **Colores de estado.** Verde, azul, ámbar y rojo no son separables bajo
 daltonismo por definición, así que viajan siempre con un glifo (`✓ ◐ ○ ▲`) y su
 etiqueta.
+
+**Colores de los ODS.** Los diecisiete son los oficiales de Naciones Unidas y no
+se pueden cambiar, así que el objetivo se identifica por su **número**, nunca por
+su tono: diecisiete colores no se separan bajo daltonismo de ninguna manera. Cada
+objetivo lleva además su tinta en `sdgGoals[].ink`, porque diez de los diecisiete
+no llegan a 4,5:1 con texto blanco —el amarillo del objetivo 7 se quedaba en
+1,62:1—. La tinta es un valor fijo y no un token: el fondo es el color de la ONU
+en los dos temas, así que la tinta tampoco puede cambiar con el tema.
 
 **Movimiento.** Curvas propias (`--ease-out`, `--ease-in-out`, `--ease-drawer`)
 porque las nativas de CSS son demasiado tibias. Duraciones por debajo de 300 ms

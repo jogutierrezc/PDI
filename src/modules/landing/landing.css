@@ -490,6 +490,39 @@
   line-height: var(--leading-relaxed);
 }
 
+/* El cruce perfil x interes: la unica frase de la respuesta que solo aplica a
+   quien acaba de elegir, asi que es la que se lee primero. */
+.route-result__crossing {
+  max-width: var(--measure);
+  color: var(--brand-navy);
+  font-family: var(--font-display);
+  font-size: var(--text-lg);
+  line-height: var(--leading-snug);
+  text-wrap: balance;
+}
+
+.route-result__block,
+.route-result__moves {
+  display: grid;
+  gap: var(--space-3);
+  width: 100%;
+}
+
+.route-result__moves ul {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.route-result__moves li {
+  padding: var(--space-2) var(--space-4);
+  color: var(--brand-navy);
+  background: var(--brand-blue-soft);
+  border-radius: var(--radius-pill);
+  font-size: var(--text-xs);
+  font-weight: 700;
+}
+
 .route-result__pillars {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(min(100%, 17rem), 1fr));
@@ -555,6 +588,171 @@
   color: var(--ink-secondary);
   font-size: var(--text-xs);
   font-weight: 600;
+}
+
+/* =============================================================================
+   Marcas de ODS
+   El número identifica; el color oficial solo acompaña. Diecisiete tonos no se
+   separan bajo daltonismo, así que el dato nunca vive en el color.
+   ========================================================================== */
+
+.sdg-marks {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.sdg-mark {
+  display: grid;
+  place-items: center;
+  width: 1.9rem;
+  height: 1.9rem;
+  color: var(--ink-secondary);
+  background: var(--surface-2);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-xs);
+  font-size: var(--text-xs);
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  transition:
+    transform var(--dur-press) var(--ease-out),
+    box-shadow var(--dur-fast) var(--ease-out);
+}
+
+/* Encendido: la placa toma el color oficial del objetivo, y con ella la tinta
+   que ese color admite. Diez de los diecisiete no llegan a 4,5:1 con blanco
+   —el amarillo del 7 se queda en 1,62:1—, así que la tinta viaja con el dato
+   en vez de fijarse aquí. */
+.sdg-mark.is-on {
+  color: var(--sdg-ink);
+  background: var(--sdg);
+  border-color: transparent;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .sdg-mark:hover {
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-sm);
+  }
+}
+
+.sdg-mark:active {
+  transform: scale(0.94);
+}
+
+/* Con nombre: deja de ser una placa cuadrada y pasa a ser una ficha. Se usa
+   donde los objetivos son pocos y hay sitio para leerlos. */
+.sdg-marks--named .sdg-mark {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  width: auto;
+  height: auto;
+  padding: var(--space-2) var(--space-4) var(--space-2) var(--space-2);
+  border-radius: var(--radius-pill);
+}
+
+.sdg-marks--named .sdg-mark.is-on {
+  color: var(--ink);
+  background: var(--surface-2);
+  border-color: var(--line);
+}
+
+.sdg-marks--named .sdg-mark__number {
+  display: grid;
+  place-items: center;
+  width: 1.55rem;
+  height: 1.55rem;
+  color: var(--sdg-ink);
+  background: var(--sdg);
+  border-radius: var(--radius-pill);
+  font-size: var(--text-2xs);
+}
+
+.sdg-mark__label {
+  font-size: var(--text-xs);
+  font-weight: 700;
+}
+
+/* =============================================================================
+   El PDI y los ODS
+   ========================================================================== */
+
+.sdg-band {
+  padding: 0 0 var(--space-11);
+}
+
+.sdg-band__inner {
+  display: grid;
+  gap: var(--space-6);
+  padding: var(--space-8);
+}
+
+.sdg-band__copy {
+  display: grid;
+  gap: var(--space-3);
+  max-width: var(--measure);
+}
+
+.sdg-band__copy h2 {
+  font-size: var(--text-2xl);
+}
+
+.sdg-band__copy p {
+  color: var(--ink-secondary);
+  line-height: var(--leading-relaxed);
+}
+
+.sdg-band__figures {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-8);
+  margin: 0;
+  padding-bottom: var(--space-2);
+}
+
+.sdg-band__figures dt {
+  color: var(--ink-secondary);
+  font-size: var(--text-xs);
+  font-weight: 700;
+  letter-spacing: var(--tracking-wide);
+  text-transform: uppercase;
+}
+
+.sdg-band__figures dd {
+  margin: var(--space-2) 0 0;
+  color: var(--brand-navy);
+  font-family: var(--font-display);
+  font-size: var(--text-2xl);
+  line-height: 1;
+}
+
+/* El denominador no compite con la cifra: es contexto, no dato. */
+.sdg-band__figures dd span {
+  color: var(--ink-muted);
+  font-size: var(--text-lg);
+}
+
+.sdg-band__foot a {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  color: var(--brand-blue);
+  font-size: var(--text-sm);
+  font-weight: 700;
+}
+
+.sdg-band__foot [data-arrow] {
+  transition: transform var(--dur-base) var(--ease-out);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .sdg-band__foot a:hover [data-arrow] {
+    transform: translateX(3px);
+  }
 }
 
 /* =============================================================================

@@ -52,7 +52,9 @@ pegarlos en el editor SQL del panel de Supabase o aplicarlos con la CLI
 | `0015_presupuesto.sql` | Reporte anual de presupuesto y cierre del dinero al público |
 | `0016_pdi_por_facultad.sql` | Facultades, sus planes de acción y el enganche con los pilares del PDI |
 | `0017_pdi_por_campus.sql` | Estructura real del plan (21 áreas, 62 líneas) y lo que reporta cada sede |
-| `0018_normalizar_estructura.sql` | Fusionar la estructura duplicada y retirar la de ejemplo. **Ejecútala la última.** |
+| `0018_normalizar_estructura.sql` | Fusionar la estructura duplicada y retirar la de ejemplo |
+| `0019_udes_en_cifras.sql` | UDES en Cifras: periodo global, campus, oficinas, informes, indicadores, valores, conjuntos visuales, diseño de la ficha, trazabilidad y RLS |
+| `0020_udes_en_cifras_datos_iniciales.sql` | Periodo 2020-2025 con los nueve informes y cifras **ilustrativas** (generada, no editar a mano) |
 
 Todos son idempotentes: volver a ejecutarlos no duplica nada.
 
@@ -484,6 +486,8 @@ A partir de ahí, el resto de altas se hacen desde **Usuarios y roles**.
 | `/facultades` | PDI por facultad: matriz facultad × pilar e índice de facultades | Público |
 | `/facultades/:slug` | Plan de acción de una facultad, por dimensiones | Público |
 | `/desarrollo-tecnologico` | Desarrollos web de la oficina | Público |
+| `/datos-abiertos` | UDES en Cifras: portada con vídeo y tablero de los nueve informes | Público |
+| `/datos-abiertos/:informe` | Ficha de un informe: cifras clave, evolución, campus, desgloses, tabla y CSV | Público |
 | `/acceso-intranet` | Inicio de sesión | Público |
 | `/admin/pilares` | Gestión de pilares y responsables | `consulta`+ |
 | `/admin/pilares/:slug/configurar` | Áreas, líneas, indicadores, observaciones y soportes | `consulta`+ |
@@ -495,6 +499,7 @@ A partir de ahí, el resto de altas se hacen desde **Usuarios y roles**.
 | `/admin/parametros` | Catálogos globales | `consulta`+ |
 | `/admin/desarrollo` | Proyectos web y sus autores | `consulta`+ |
 | `/admin/usuarios` | Usuarios y roles | `admin` |
+| `/admin/udes-en-cifras/:estacion/:informe` | UDES en Cifras: periodo, estructura y KPI, captura, diseño visual y publicación | `consulta`+ (edita `planeacion`+) |
 | `/sin-permiso` | Rol insuficiente | Autenticado |
 | cualquier otra | Página 404 | Público |
 
@@ -647,6 +652,122 @@ se enlazan con perfiles. Así el alta, la edición y el borrado son una sola
 operación. A cambio la base no puede imponer columnas, y eso lo cubre la función
 `web_project_authors_ok`, que exige que cada elemento sea un objeto con
 `full_name` no vacío.
+
+# Datos Abiertos · UDES en Cifras
+
+Portal estadístico aparte dentro del mismo código (`src/modules/datos-abiertos/`):
+cabecera, marca y pie propios, sin la navegación del PDI. Nueve informes —Poblacional,
+Permanencia, Visibilidad, Enseñanza, Extensión y Proyección Social, Investigación,
+Infraestructura Física y Tecnológica, UDES Sostenible y Plan de Desarrollo Institucional—.
+
+**El portal lee la base.** `useOpenDataCatalog()` (`data/open-data.ts`) pide las tablas
+`od_*` con `data/repository.ts` y las arma en el catálogo que consumen las pantallas.
+Muestra el periodo vigente y publicado, y solo sus informes publicados. Con
+`?vista-previa` en la URL, alguien con sesión de intranet ve también los borradores. Sin
+periodo publicado, la página lo dice en lugar de quedar en blanco.
+
+## El modelo en la base (0019)
+
+```
+od_periods ─┬─ od_period_campuses          campus que cubre el periodo (enlaza a campuses)
+            └─ od_reports ─┬─ od_indicators ── od_values (año × campus; campus NULL = total)
+                           ├─ od_breakdowns ── od_breakdown_values
+                           ├─ od_heatmaps ──── od_heatmap_cells
+                           ├─ od_maps ──────── od_map_values (año × campus × departamento DANE)
+                           ├─ od_pipelines ─── od_pipeline_values (cohorte × campus × etapa)
+                           └─ od_report_blocks  orden, visibilidad y ajustes de la ficha
+od_offices        oficinas fuente ("Reporta:")
+od_imports        rastro de cada carga: rejilla, pegado o plantilla
+od_publications   rastro de cada publicación (lo escribe un disparador)
+```
+
+- **El periodo es global.** Un periodo vigente (2020-2025) para todos los informes. Sus
+  años son las columnas de la captura, y un valor fuera de ellos se rechaza en la base.
+  `od_copy_period()` abre el siguiente y copia la estructura: informes, indicadores con
+  sus KPI, conjuntos y diseño. No copia cifras.
+- **Vacío no es cero.** Un valor ausente es `NULL` y el portal lo pinta "sin reportar".
+- **El total institucional** es la fila con `campus_id` NULL. Si el indicador agrega por
+  `suma`, el portal suma los campus cuando no se capturó. Si agrega por `reportado`
+  (tasas, promedios), se captura aparte.
+- **KPI.** `is_kpi` y `kpi_position` ordenan el tablero de indicadores. `is_headline` es la
+  cifra titular del informe, única por informe (índice único).
+- **Seguridad.** El público lee solo lo publicado. `consulta` en adelante lee todo, y solo
+  `planeacion` y `admin` escriben.
+
+**La semilla (0020) es ilustrativa y se genera**:
+
+```bash
+node scripts/build-od-seed.mjs
+```
+
+El comando lee `src/modules/datos-abiertos/data/seed/` y escribe la migración `0020` más
+`scripts/fixtures/udes-en-cifras.json`, que usa la prueba de humo. Deja el periodo
+marcado como ilustrativo. Cuando lleguen las cifras oficiales, se cargan desde la intranet
+y se desmarca "Cifras ilustrativas" en la estación Periodo y campus.
+
+## La intranet: estaciones del periodo
+
+`/admin/udes-en-cifras` organiza el trabajo en cinco estaciones fijas. La barra superior
+dice cuánto le falta a cada una. La lista de la izquierda marca cada informe en cada
+estación.
+
+1. **Periodo y campus**: años, fecha de corte, marca de cifras ilustrativas, estado de
+   publicación, campus cubiertos, oficinas fuente y apertura del periodo siguiente.
+2. **Estructura y KPI**: ficha del informe (nombre, código, color de línea, textos,
+   imagen), indicadores, tablero de KPI con titular y conjuntos visuales.
+3. **Captura**: rejillas por indicador × campus × año, y también para desgloses, mapas de
+   calor, mapas y tubería. Se escribe casilla por casilla, se pega un rango de Excel o se
+   sube la plantilla CSV, con vista previa de cada cambio antes de pasarla a la rejilla.
+   Nada se guarda sin pulsar Guardar, y cada guardado queda en `od_imports`.
+4. **Diseño visual**: orden de los bloques de la ficha (arrastrando o con flechas),
+   visibilidad, título propio y gráfica con la que abre la evolución.
+5. **Publicación**: lo que falta, las cifras que cambiaron desde la última publicación y la
+   vista previa. Desde aquí se publica o se retira cada informe, con su bitácora. Publicar,
+   retirar o cambiar el estado pide confirmar en el mismo sitio.
+
+**Publicar no es una zona de espera.** Solo Planeación edita, así que lo que se guarda en un
+informe ya publicado se ve en el portal de inmediato; la estación lo dice así ("ya visibles
+en el portal"). Para cargar sin exponer cifras, pasa el informe a borrador primero.
+
+El menú de la intranet se agrupa por portal: Plan de Desarrollo, UDES en Cifras y
+Sistema. La cabecera lleva la ruta (portal › pantalla).
+
+## El portal
+
+- **Corte y campus viajan en la URL** (`?corte=2024&campus=cucuta`; `?sede=` sigue
+  funcionando): un enlace compartido abre el tablero o la ficha tal como se veía.
+- **Cada cifra lleva su boleto**: oficina que la reporta, campus y corte, y debajo el corte
+  anterior con su variación (las tasas en puntos porcentuales, los conteos en porcentaje).
+- **La ficha pinta sus bloques** en el orden y con la visibilidad que decide la intranet.
+  Un bloque sin datos no se pinta.
+- **La ficha descarga un CSV** con punto y coma y BOM, que Excel en español abre directo.
+
+**Gráficas de la ficha**, todas animadas al entrar en pantalla e interactivas (tooltip,
+clic, teclado), cada una con su fuente al pie:
+
+| Componente | Qué muestra |
+| --- | --- |
+| `KpiBoard` | Todos los indicadores del informe con variación, rastro de cortes y boleto |
+| `LineChart` | Evolución por campus (paleta validada para daltonismo) con total punteado |
+| `Donut` | Desgloses y reparto por campus, con leyenda de cifra y porcentaje |
+| `Pipeline` | Tubería con fugas: la deserción de una cohorte, tramo a tramo (Permanencia) |
+| `ColombiaMap` | Origen de estudiantes y cobertura por departamento, con flujos hacia cada campus |
+| `Heatmap` | Mapa de calor en escala azul, por matriz o por fila |
+| `PivotTable` | Tabla dinámica: indicador, campus y año en filas, columnas o fijo; CSV de la vista |
+
+Mapas, mapas de calor y tubería salen de sus tablas (`od_maps`, `od_heatmaps`, `od_pipelines`).
+Sus cifras de ejemplo se generaron con reglas deterministas en `data/seed/visual-data.ts`. `data/colombia-map.ts` sale de la cartografía
+departamental del DANE proyectada y simplificada; no se edita a mano.
+
+El portal sigue el tema claro/oscuro del sitio: el tablero cambia de paletas blancas con
+tinta azul marino a azul noche con tinta blanca.
+
+El tablero es de paletas partidas (`components/SplitFlap.tsx`): las cifras voltean al
+entrar en pantalla y al cambiar de corte o campus. Con `prefers-reduced-motion` se escriben
+directamente. Las imágenes de `public/datos-abiertos/` son fotogramas del vídeo
+institucional, provisionales hasta tener fotografía oficial; su procedencia está en el
+`.json` que acompaña a cada una. El vídeo de portada corta el bucle en el segundo 39,2,
+antes del cierre rosa del archivo.
 
 # Estructura del código
 

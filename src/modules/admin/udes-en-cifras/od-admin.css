@@ -1,0 +1,1867 @@
+/* =============================================================================
+   Intranet · UDES en Cifras
+   El sistema de la intranet, sin inventar otro: superficies blancas y gris
+   azulado, tinta azul marino, azul institucional solo para acción, selección
+   y foco; verde de estado para lo completo y ámbar de estado para lo
+   pendiente, siempre con glifo y texto. Rejillas densas con numerales
+   tabulares; la casilla vacía se raya.
+   ========================================================================== */
+
+/* --- Selector de periodo --------------------------------------------------- */
+
+.oda-period-select {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  color: var(--ink-secondary);
+  font-size: var(--text-xs);
+  font-weight: 700;
+}
+
+.oda-period-select select,
+.oda-add-select select,
+.oda-status-select {
+  min-height: 36px;
+  padding: var(--space-1) var(--space-7) var(--space-1) var(--space-3);
+  color: var(--ink);
+  background: var(--surface);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-xs);
+  font: inherit;
+  font-size: var(--text-sm);
+  font-weight: 600;
+}
+
+/* --- Barra de estaciones -------------------------------------------------- */
+
+.oda-stations ol {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+  list-style: none;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-xs);
+}
+
+.oda-stations li + li {
+  border-left: 1px solid var(--line);
+}
+
+.oda-station {
+  position: relative;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: var(--space-3);
+  height: 100%;
+  padding: var(--space-4);
+  color: var(--ink);
+  text-decoration: none;
+  transition: background-color var(--dur-fast) ease;
+}
+
+.oda-station[aria-current="step"] {
+  background: var(--brand-blue-soft);
+  box-shadow: inset 0 -3px 0 var(--brand-blue);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .oda-station:not([aria-current="step"]):hover {
+    background: var(--surface-2);
+  }
+}
+
+.oda-station__number {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  color: var(--ink-secondary);
+  background: var(--surface-3);
+  border-radius: 50%;
+  font-size: var(--text-sm);
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+}
+
+.oda-station[data-state="ok"] .oda-station__number {
+  color: var(--status-done);
+  background: var(--status-done-soft);
+}
+
+.oda-station[data-state="pendiente"] .oda-station__number {
+  color: var(--status-pending);
+  background: var(--status-pending-soft);
+}
+
+.oda-station[aria-current="step"] .oda-station__number {
+  color: #fff;
+  background: var(--brand-blue);
+}
+
+.oda-station__text {
+  display: grid;
+  gap: 1px;
+  min-width: 0;
+}
+
+.oda-station__label {
+  color: var(--ink-secondary);
+  font-size: var(--text-xs);
+  font-weight: 700;
+}
+
+.oda-station__value {
+  color: var(--ink);
+  font-size: var(--text-lg);
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.2;
+}
+
+.oda-station__detail {
+  overflow: hidden;
+  color: var(--ink-muted);
+  font-size: var(--text-2xs);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.oda-station__meter,
+.oda-meter {
+  display: block;
+  height: 4px;
+  overflow: hidden;
+  background: var(--track);
+  border-radius: 2px;
+}
+
+.oda-station__meter {
+  grid-column: 1 / -1;
+  margin-top: var(--space-1);
+}
+
+.oda-station__meter i,
+.oda-meter i {
+  display: block;
+  height: 100%;
+  background: var(--brand-blue);
+  border-radius: 2px;
+}
+
+/* --- Espacio de trabajo ------------------------------------------------------ */
+
+/* Tres columnas solo donde la vista previa acompaña fija (Estructura y
+   Publicación). En Captura la vista previa es un cajón: la rejilla se queda
+   con el ancho. */
+.oda-workspace {
+  display: grid;
+  grid-template-columns: 16.5rem minmax(0, 1fr);
+  align-items: start;
+  gap: var(--space-5);
+}
+
+.oda-workspace[data-station="estructura"],
+.oda-workspace[data-station="publicacion"] {
+  grid-template-columns: 16.5rem minmax(0, 1fr) 15.5rem;
+}
+
+/* Los hijos de la rejilla principal no pueden crecer más que la pantalla. */
+.admin-main:has(.oda-workspace) > *,
+.oda-workspace > * {
+  min-width: 0;
+}
+
+.oda-stage {
+  display: grid;
+  gap: var(--space-5);
+  min-width: 0;
+}
+
+.oda-stack {
+  display: grid;
+  gap: var(--space-5);
+}
+
+.oda-columns {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 22rem), 1fr));
+  gap: var(--space-5);
+  align-items: start;
+}
+
+/* --- Lista de informes ------------------------------------------------------ */
+
+.oda-rail {
+  position: sticky;
+  top: calc(var(--admin-topbar-h, 96px) + var(--space-5));
+  overflow: hidden;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+}
+
+.oda-rail__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  padding: var(--space-3) var(--space-4);
+  color: var(--ink-secondary);
+  background: var(--surface-2);
+  border-bottom: 1px solid var(--line);
+  font-size: var(--text-xs);
+}
+
+.oda-rail__legend {
+  display: inline-grid;
+  grid-template-columns: repeat(5, 16px);
+  gap: 3px;
+  color: var(--ink-muted);
+  font-size: 0.625rem;
+  font-weight: 700;
+  text-align: center;
+}
+
+.oda-rail ul {
+  margin: 0;
+  padding: var(--space-1);
+  list-style: none;
+}
+
+.oda-rail__item {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: var(--space-1) var(--space-3);
+  width: 100%;
+  padding: var(--space-3);
+  color: var(--ink);
+  background: transparent;
+  border: 0;
+  border-radius: var(--radius-xs);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: background-color var(--dur-fast) ease;
+}
+
+.oda-rail__item[aria-current="true"] {
+  background: var(--brand-blue-soft);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .oda-rail__item:not([aria-current="true"]):hover {
+    background: var(--surface-2);
+  }
+}
+
+.oda-code {
+  display: inline-grid;
+  place-items: center;
+  width: 30px;
+  height: 26px;
+  color: #fff;
+  background: var(--line, #1f5fbf);
+  background: var(--line);
+  border-radius: 5px;
+  font-size: var(--text-xs);
+  font-weight: 800;
+  letter-spacing: 0.04em;
+}
+
+.oda-rail__name {
+  display: grid;
+  gap: 1px;
+  min-width: 0;
+  font-size: var(--text-sm);
+  font-weight: 700;
+  line-height: 1.25;
+}
+
+.oda-rail__name small {
+  color: var(--ink-muted);
+  font-size: var(--text-2xs);
+  font-weight: 600;
+}
+
+.oda-rail__marks {
+  grid-column: 2;
+  display: inline-grid;
+  grid-template-columns: repeat(5, 16px);
+  gap: 3px;
+}
+
+.oda-mark {
+  display: grid;
+  place-items: center;
+  width: 16px;
+  height: 16px;
+  color: var(--ink-faint);
+  border: 1.5px solid var(--line-strong);
+  border-radius: 50%;
+}
+
+.oda-mark[data-state="ok"] {
+  color: #fff;
+  background: var(--status-done);
+  border-color: var(--status-done);
+}
+
+.oda-mark[data-state="pendiente"] {
+  color: var(--status-pending);
+  background: var(--status-pending-soft);
+  border-color: color-mix(in srgb, var(--status-pending) 55%, transparent);
+}
+
+.oda-rail__add {
+  padding: var(--space-2) var(--space-3) var(--space-3);
+  border-top: 1px solid var(--line-faint);
+}
+
+.oda-rail__add form {
+  display: grid;
+  gap: var(--space-2);
+}
+
+.oda-rail__add input {
+  min-height: 36px;
+  padding: var(--space-1) var(--space-3);
+  color: var(--ink);
+  background: var(--surface-2);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-xs);
+  font: inherit;
+  font-size: var(--text-sm);
+}
+
+.oda-rail__add small {
+  color: var(--ink-muted);
+  font-size: var(--text-2xs);
+}
+
+.oda-rail__add div {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--space-2);
+}
+
+/* --- Tira de vista previa ---------------------------------------------------- */
+
+/* Por defecto la vista previa es un cajón a la derecha que se abre desde la
+   cabecera. Donde hay sitio para tres columnas pasa a columna fija (ver
+   Adaptación). */
+.oda-preview {
+  position: fixed;
+  inset: 0 0 0 auto;
+  z-index: var(--z-overlay);
+  width: min(22rem, calc(100vw - var(--space-7)));
+  display: grid;
+  align-content: start;
+  gap: var(--space-4);
+  padding: calc(var(--space-5) + env(safe-area-inset-top, 0px)) var(--space-5) calc(var(--space-5) + env(safe-area-inset-bottom, 0px));
+  overflow-y: auto;
+  background: var(--surface);
+  border-left: 1px solid var(--line);
+  box-shadow: var(--shadow-xl);
+  transform: translateX(100%);
+  visibility: hidden;
+  transition:
+    transform var(--dur-slow) var(--ease-drawer),
+    visibility 0s linear var(--dur-slow);
+}
+
+.oda-preview[data-open] {
+  transform: translateX(0);
+  visibility: visible;
+  transition: transform var(--dur-slow) var(--ease-drawer);
+}
+
+.oda-preview__close {
+  justify-self: end;
+  margin: calc(-1 * var(--space-2)) calc(-1 * var(--space-2)) calc(-1 * var(--space-3)) 0;
+}
+
+.oda-preview-scrim {
+  position: fixed;
+  inset: 0;
+  z-index: calc(var(--z-overlay) - 1);
+  background: rgba(6, 16, 32, 0.32);
+  border: 0;
+}
+
+.oda-preview-toggle[aria-expanded="true"] {
+  color: var(--brand-blue);
+  background: var(--brand-blue-soft);
+}
+
+.oda-preview__head {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.oda-preview__head div {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.oda-preview__head strong {
+  font-size: var(--text-sm);
+  line-height: 1.2;
+}
+
+.oda-preview__head span[data-status] {
+  color: var(--ink-muted);
+  font-size: var(--text-2xs);
+  font-weight: 700;
+}
+
+.oda-preview__head span[data-status="publicado"] {
+  color: var(--status-done);
+}
+
+.oda-preview__label {
+  display: block;
+  margin-bottom: var(--space-2);
+  color: var(--ink-muted);
+  font-size: var(--text-2xs);
+  font-weight: 700;
+}
+
+.oda-preview__kpis,
+.oda-preview__blocks {
+  display: grid;
+  gap: 4px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: var(--text-xs);
+}
+
+.oda-preview__kpis li {
+  padding: 5px var(--space-2);
+  background: var(--surface-2);
+  border-radius: 6px;
+}
+
+.oda-preview__kpis li[data-headline] {
+  color: var(--brand-navy);
+  background: var(--brand-blue-soft);
+  font-weight: 700;
+}
+
+.oda-preview__blocks li {
+  display: grid;
+  grid-template-columns: 18px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--space-2);
+  padding: 5px var(--space-2);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+}
+
+.oda-preview__blocks li span {
+  color: var(--ink-muted);
+  font-size: 0.625rem;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+}
+
+.oda-preview__blocks li small {
+  color: var(--ink-muted);
+  font-size: 0.625rem;
+}
+
+.oda-preview__blocks li[data-hidden] {
+  color: var(--ink-muted);
+  border-style: dashed;
+}
+
+.oda-preview__empty {
+  margin: 0;
+  color: var(--ink-muted);
+  font-size: var(--text-xs);
+}
+
+.oda-preview__facts {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-2);
+  margin: 0;
+}
+
+.oda-preview__facts div {
+  display: grid;
+  gap: 1px;
+  padding: var(--space-2);
+  background: var(--surface-2);
+  border-radius: 6px;
+}
+
+.oda-preview__facts dt {
+  color: var(--ink-muted);
+  font-size: 0.625rem;
+  font-weight: 700;
+}
+
+.oda-preview__facts dd {
+  margin: 0;
+  font-size: var(--text-md);
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+}
+
+.oda-preview__open {
+  justify-self: stretch;
+}
+
+/* --- Paneles ------------------------------------------------------------------ */
+
+.oda-panel {
+  min-width: 0;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-xs);
+}
+
+.oda-panel[data-tone="quiet"] {
+  background: var(--surface-2);
+  box-shadow: none;
+}
+
+.oda-panel__head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-3) var(--space-5);
+  padding: var(--space-4) var(--space-5);
+  border-bottom: 1px solid var(--line-faint);
+}
+
+/* Con ancho, título a la izquierda y acciones arriba a la derecha: Guardar no
+   baja a una segunda línea bajo la descripción. */
+@media (min-width: 1100px) {
+  .oda-panel__head {
+    display: grid;
+    grid-template-columns: minmax(14rem, 1fr) auto;
+  }
+}
+
+.oda-panel__head h2 {
+  margin: 0;
+  font-family: var(--font-sans);
+  font-size: var(--text-md);
+  font-weight: 800;
+  letter-spacing: 0;
+}
+
+.oda-panel__head p {
+  max-width: 64ch;
+  margin: var(--space-1) 0 0;
+  color: var(--ink-secondary);
+  font-size: var(--text-xs);
+  line-height: var(--leading-normal);
+}
+
+.oda-panel__actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--space-2);
+}
+
+.oda-panel__actions .button-primary,
+.oda-panel__actions .button-secondary,
+.oda-panel__actions .button-ghost {
+  padding: var(--space-2) var(--space-4);
+  font-size: var(--text-xs);
+}
+
+.oda-panel__body {
+  display: grid;
+  gap: var(--space-4);
+  padding: var(--space-5);
+}
+
+.oda-panel__lede {
+  margin: 0;
+  color: var(--ink-secondary);
+  font-size: var(--text-sm);
+}
+
+.oda-form-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 14rem), 1fr));
+  gap: var(--space-4);
+}
+
+.oda-form-grid .admin-field input,
+.oda-form-grid .admin-field select,
+.oda-form-grid .admin-field textarea {
+  padding: var(--space-2) var(--space-3);
+  font-size: var(--text-sm);
+}
+
+.oda-form-grid .admin-field > span small {
+  color: var(--ink-muted);
+  font-weight: 500;
+}
+
+.oda-muted {
+  margin: 0;
+  color: var(--ink-muted);
+  font-size: var(--text-sm);
+}
+
+/* --- Estado de guardado ---------------------------------------------------- */
+
+.oda-save {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  color: var(--ink-muted);
+  font-size: var(--text-xs);
+  font-weight: 600;
+}
+
+.oda-save[data-state="ok"] { color: var(--status-done); }
+.oda-save[data-state="error"] { color: var(--status-risk); max-width: 28rem; }
+
+.oda-save__spinner {
+  width: 12px;
+  height: 12px;
+  border: 2px solid var(--line-strong);
+  border-top-color: var(--brand-blue);
+  border-radius: 50%;
+  animation: oda-spin 700ms linear infinite;
+}
+
+@keyframes oda-spin {
+  to { transform: rotate(360deg); }
+}
+
+.oda-banner {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2) var(--space-3);
+  margin: 0;
+  padding: var(--space-3) var(--space-4);
+  color: var(--ink);
+  background: var(--status-pending-soft);
+  border: 1px solid color-mix(in srgb, var(--status-pending) 35%, transparent);
+  border-radius: var(--radius-sm);
+  font-size: var(--text-sm);
+}
+
+.oda-banner svg { color: var(--status-pending); }
+
+/* --- Controles pequeños ---------------------------------------------------- */
+
+.oda-link-button {
+  padding: var(--space-1) var(--space-2);
+  color: var(--brand-blue);
+  background: transparent;
+  border: 0;
+  border-radius: 6px;
+  font: inherit;
+  font-size: var(--text-xs);
+  font-weight: 700;
+  cursor: pointer;
+}
+
+/* Borrar descansa neutro: una columna de "Borrar" en rojo gritaba más que las
+   cifras. El rojo llega al apuntarlo o enfocarlo, y en la confirmación. */
+.oda-link-button[data-tone="danger"] { color: var(--ink-secondary); font-weight: 600; }
+.oda-link-button[data-tone="danger"]:focus-visible,
+.oda-confirm .oda-link-button[data-tone="danger"] { color: var(--status-risk); }
+.oda-link-button:disabled { color: var(--ink-faint); cursor: default; }
+
+@media (hover: hover) and (pointer: fine) {
+  .oda-link-button:not(:disabled):hover { background: var(--surface-3); }
+  .oda-link-button[data-tone="danger"]:not(:disabled):hover { color: var(--status-risk); }
+}
+
+.oda-confirm {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  padding: 2px var(--space-1) 2px var(--space-2);
+  background: var(--status-risk-soft);
+  border-radius: 6px;
+  font-size: var(--text-xs);
+  font-weight: 600;
+}
+
+.oda-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-left: var(--space-2);
+  padding: 1px var(--space-2);
+  color: var(--ink-secondary);
+  background: var(--surface-3);
+  border-radius: var(--radius-pill);
+  font-size: var(--text-2xs);
+  font-weight: 700;
+  white-space: nowrap;
+  vertical-align: middle;
+}
+
+.oda-badge[data-tone="ok"] { color: var(--status-done); background: var(--status-done-soft); }
+.oda-badge[data-tone="warn"] { color: var(--status-pending); background: var(--status-pending-soft); }
+
+.oda-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 5px var(--space-3);
+  color: var(--ink);
+  background: var(--surface);
+  border: 1px dashed var(--line-strong);
+  border-radius: var(--radius-pill);
+  font: inherit;
+  font-size: var(--text-xs);
+  font-weight: 600;
+  cursor: pointer;
+  transition: border-color var(--dur-fast) ease, background-color var(--dur-fast) ease;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .oda-chip:not(:disabled):hover {
+    background: var(--brand-blue-soft);
+    border-color: var(--brand-blue);
+    border-style: solid;
+  }
+}
+
+.oda-check {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-3);
+  font-size: var(--text-sm);
+  cursor: pointer;
+}
+
+.oda-check input {
+  width: 18px;
+  height: 18px;
+  margin-top: 2px;
+  accent-color: var(--brand-blue);
+}
+
+.oda-check span {
+  display: grid;
+  gap: 1px;
+}
+
+.oda-check small {
+  color: var(--ink-muted);
+  font-size: var(--text-xs);
+}
+
+.oda-inline-input,
+.oda-add-row input,
+.oda-inline-field input,
+.oda-inline-field select {
+  min-width: 0;
+  min-height: 36px;
+  padding: var(--space-1) var(--space-3);
+  color: var(--ink);
+  background: var(--surface-2);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-xs);
+  font: inherit;
+  font-size: var(--text-sm);
+}
+
+.oda-inline-input:focus-visible,
+.oda-add-row input:focus-visible,
+.oda-inline-field input:focus-visible,
+.oda-inline-field select:focus-visible {
+  outline: none;
+  border-color: var(--brand-blue);
+  box-shadow: var(--ring);
+}
+
+.oda-add-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+  padding-top: var(--space-3);
+  border-top: 1px dashed var(--line);
+}
+
+.oda-add-row input { flex: 1 1 10rem; }
+.oda-add-row input[type="number"] { flex: 0 0 6rem; }
+
+.oda-add-row__label {
+  color: var(--ink-secondary);
+  font-size: var(--text-xs);
+  font-weight: 700;
+}
+
+.oda-choice-list,
+.oda-office-list {
+  display: grid;
+  gap: var(--space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.oda-choice-list li {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.oda-office-list li {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.oda-office-list .oda-inline-input { flex: 1; }
+
+/* --- Tablas ---------------------------------------------------------------- */
+
+.oda-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--text-sm);
+  font-variant-numeric: tabular-nums;
+}
+
+.oda-table th,
+.oda-table td {
+  padding: var(--space-2) var(--space-3);
+  border-bottom: 1px solid var(--line-faint);
+  text-align: left;
+  vertical-align: middle;
+}
+
+.oda-table thead th {
+  color: var(--ink-muted);
+  font-size: var(--text-2xs);
+  font-weight: 700;
+}
+
+.oda-table th[scope="row"] {
+  font-weight: 700;
+}
+
+.oda-table th[scope="row"] small {
+  display: block;
+  color: var(--ink-muted);
+  font-size: var(--text-2xs);
+  font-weight: 500;
+}
+
+.oda-table tr[data-selected] > * {
+  background: var(--brand-blue-soft);
+}
+
+.oda-table td[data-changed] {
+  color: var(--brand-navy);
+  font-weight: 800;
+}
+
+.oda-table td[data-empty] { color: var(--ink-faint); }
+
+.oda-table__actions {
+  text-align: right;
+  white-space: nowrap;
+}
+
+.oda-table__editor > td {
+  padding: var(--space-4);
+  background: var(--surface-2);
+}
+
+.oda-row-link {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  color: var(--ink);
+  text-decoration: none;
+}
+
+.oda-meter {
+  display: inline-block;
+  width: 4rem;
+  margin-right: var(--space-2);
+  vertical-align: middle;
+}
+
+.oda-status-select[data-status="publicado"] {
+  color: var(--status-done);
+  border-color: color-mix(in srgb, var(--status-done) 45%, transparent);
+}
+
+.oda-inline-form {
+  display: grid;
+  gap: var(--space-4);
+}
+
+.oda-inline-form__actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--space-2);
+}
+
+/* --- KPI -------------------------------------------------------------------- */
+
+.oda-kpi-editor {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 22rem), 1fr));
+  gap: var(--space-5);
+}
+
+.oda-kpi-list {
+  display: grid;
+  gap: var(--space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.oda-kpi-list li {
+  display: grid;
+  grid-template-columns: 26px minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-2) var(--space-3);
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-xs);
+}
+
+.oda-kpi-list li[data-headline] {
+  background: var(--brand-blue-soft);
+  border-color: color-mix(in srgb, var(--brand-blue) 40%, transparent);
+}
+
+.oda-kpi-list__empty {
+  display: block !important;
+  color: var(--ink-muted);
+  border-style: dashed !important;
+  font-size: var(--text-sm);
+}
+
+.oda-kpi-list__pos {
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  color: var(--ink-secondary);
+  background: var(--surface-3);
+  border-radius: 50%;
+  font-size: var(--text-xs);
+  font-weight: 800;
+}
+
+.oda-kpi-list li[data-headline] .oda-kpi-list__pos {
+  color: #fff;
+  background: var(--brand-blue);
+}
+
+.oda-kpi-list__name {
+  font-size: var(--text-sm);
+  font-weight: 700;
+}
+
+.oda-kpi-list__headline {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  color: var(--ink-secondary);
+  font-size: var(--text-xs);
+  font-weight: 600;
+}
+
+.oda-kpi-list__headline input { accent-color: var(--brand-blue); }
+
+.oda-kpi-list__tools {
+  display: inline-flex;
+  gap: 2px;
+}
+
+.oda-kpi-list__tools .icon-button,
+.oda-block__tools .icon-button {
+  width: 30px;
+  height: 30px;
+}
+
+.oda-kpi-available {
+  display: grid;
+  align-content: start;
+  gap: var(--space-2);
+  padding: var(--space-3);
+  background: var(--surface-2);
+  border-radius: var(--radius-xs);
+}
+
+.oda-kpi-available__label {
+  color: var(--ink-muted);
+  font-size: var(--text-2xs);
+  font-weight: 700;
+}
+
+.oda-kpi-available ul,
+.oda-missing-blocks ul {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+/* --- Colores de línea ------------------------------------------------------- */
+
+.oda-lines {
+  border: 0;
+  margin: 0;
+  padding: 0;
+}
+
+.oda-lines legend {
+  margin-bottom: var(--space-2);
+  color: var(--ink-secondary);
+  font-size: var(--text-sm);
+  font-weight: 700;
+}
+
+.oda-lines div {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.oda-line-swatch {
+  position: relative;
+  cursor: pointer;
+}
+
+.oda-line-swatch input {
+  position: absolute;
+  opacity: 0;
+}
+
+.oda-line-swatch span[aria-hidden] {
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 30px;
+  color: #fff;
+  background: var(--line);
+  border-radius: 6px;
+  font-size: var(--text-xs);
+  font-weight: 800;
+  transition: box-shadow var(--dur-fast) ease;
+}
+
+.oda-line-swatch input:checked + span {
+  box-shadow: 0 0 0 2px var(--surface), 0 0 0 4px var(--line);
+}
+
+.oda-line-swatch input:focus-visible + span {
+  box-shadow: 0 0 0 2px var(--surface), 0 0 0 4px var(--brand-blue);
+}
+
+/* --- Conjuntos ------------------------------------------------------------------- */
+
+.oda-datasets {
+  display: grid;
+  gap: var(--space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.oda-dataset {
+  border: 1px solid var(--line);
+  border-radius: var(--radius-xs);
+}
+
+.oda-dataset[data-editing] {
+  background: var(--surface-2);
+}
+
+.oda-dataset .oda-inline-form {
+  padding: 0 var(--space-4) var(--space-4);
+}
+
+.oda-dataset__row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2) var(--space-3);
+  padding: var(--space-2) var(--space-3);
+}
+
+.oda-dataset__row .oda-badge { margin-left: 0; }
+.oda-dataset__row strong { font-size: var(--text-sm); }
+.oda-dataset__row small { color: var(--ink-muted); font-size: var(--text-xs); }
+.oda-dataset__row .oda-table__actions { margin-left: auto; }
+
+/* --- Pestañas de captura -------------------------------------------------------- */
+
+.oda-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px;
+  padding: 3px;
+  background: var(--surface-3);
+  border-radius: var(--radius-sm);
+  justify-self: start;
+}
+
+.oda-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-4);
+  color: var(--ink-secondary);
+  background: transparent;
+  border: 0;
+  border-radius: var(--radius-xs);
+  font: inherit;
+  font-size: var(--text-sm);
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.oda-tab[aria-selected="true"] {
+  color: var(--ink);
+  background: var(--surface);
+  box-shadow: var(--shadow-sm);
+}
+
+.oda-tab__count {
+  padding: 0 6px;
+  color: var(--ink-muted);
+  background: var(--surface-3);
+  border-radius: var(--radius-pill);
+  font-size: var(--text-2xs);
+}
+
+/* --- Rejilla de captura ------------------------------------------------------------ */
+
+/* Sin caja de alto fijo dentro de la página: la rejilla crece con sus filas y
+   su cabecera se pega bajo la de la intranet. Si no cabe a lo ancho, DataGrid
+   marca data-overflow y la rejilla se desplaza en horizontal en su marco. */
+.oda-grid-wrap {
+  border: 1px solid var(--line);
+  border-radius: var(--radius-xs);
+  scrollbar-color: var(--line-strong) transparent;
+}
+
+.oda-grid-wrap[data-overflow] {
+  overflow-x: auto;
+}
+
+/* Dentro de un marco que se desplaza, la cabecera se pega a ese marco. */
+.oda-grid-wrap[data-overflow] thead th {
+  top: 0;
+}
+
+.oda-grid {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+  font-size: var(--text-sm);
+  font-variant-numeric: tabular-nums;
+}
+
+.oda-grid thead th {
+  position: sticky;
+  top: var(--admin-topbar-h, 0px);
+  z-index: 2;
+  padding: var(--space-2) var(--space-3);
+  color: var(--ink-secondary);
+  background: var(--surface-2);
+  border-bottom: 1px solid var(--line-strong);
+  font-size: var(--text-xs);
+  font-weight: 800;
+  text-align: right;
+  white-space: nowrap;
+}
+
+.oda-grid thead th:first-child {
+  left: 0;
+  z-index: 3;
+  text-align: left;
+}
+
+.oda-grid tbody th {
+  position: sticky;
+  left: 0;
+  z-index: 1;
+  min-width: 12.5rem;
+  max-width: 18rem;
+  padding: var(--space-2) var(--space-3);
+  background: var(--surface);
+  border-bottom: 1px solid var(--line-faint);
+  box-shadow: 1px 0 0 var(--line);
+  text-align: left;
+  font-weight: 600;
+}
+
+.oda-grid tbody th span {
+  display: block;
+  font-size: var(--text-sm);
+}
+
+.oda-grid tbody th small {
+  display: block;
+  color: var(--ink-muted);
+  font-size: var(--text-2xs);
+  font-weight: 500;
+}
+
+.oda-grid tbody tr[data-group-start] > * {
+  border-top: 1px solid var(--line-strong);
+}
+
+.oda-grid tbody tr:not([data-group-start]) th span {
+  padding-left: var(--space-3);
+  color: var(--ink-secondary);
+}
+
+.oda-grid tbody tr:not([data-group-start]) th small {
+  display: none;
+}
+
+.oda-grid td {
+  min-width: 5.5rem;
+  padding: 0;
+  border-bottom: 1px solid var(--line-faint);
+  border-left: 1px solid var(--line-faint);
+}
+
+.oda-grid td input {
+  width: 100%;
+  height: 36px;
+  padding: 0 var(--space-3);
+  color: var(--ink);
+  background: transparent;
+  border: 0;
+  font: inherit;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+
+.oda-grid td input::placeholder { color: var(--ink-faint); }
+
+.oda-grid td input:focus {
+  position: relative;
+  z-index: 1;
+  outline: 2px solid var(--brand-blue);
+  outline-offset: -2px;
+  background: var(--surface);
+}
+
+.oda-grid td[data-empty] {
+  background: repeating-linear-gradient(135deg, transparent 0 6px, var(--line-faint) 6px 7px);
+}
+
+.oda-grid td[data-changed] {
+  background: var(--brand-blue-soft);
+}
+
+.oda-grid td[data-changed] input {
+  color: var(--brand-navy);
+  font-weight: 800;
+}
+
+.oda-grid td[data-error] {
+  background: var(--status-risk-soft);
+}
+
+.oda-grid td[data-error] input {
+  color: var(--status-risk);
+  outline: 1.5px solid var(--status-risk);
+  outline-offset: -2px;
+}
+
+.oda-grid td[data-locked] {
+  padding: 0 var(--space-3);
+  color: var(--ink-muted);
+  background: var(--surface-2);
+  font-style: italic;
+  text-align: right;
+  cursor: help;
+}
+
+.oda-grid tbody tr:hover > td:not([data-changed]):not([data-error]) {
+  background-color: color-mix(in srgb, var(--surface-3) 60%, transparent);
+}
+
+/* --- Carga de plantilla ------------------------------------------------------------ */
+
+.oda-upload {
+  display: grid;
+  gap: var(--space-3);
+  padding: var(--space-4);
+  background: var(--surface-2);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-xs);
+}
+
+.oda-upload__head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2) var(--space-3);
+  font-size: var(--text-sm);
+}
+
+.oda-upload__head > span:not(.oda-upload__actions) { color: var(--ink-muted); }
+
+.oda-upload__actions {
+  display: inline-flex;
+  gap: var(--space-2);
+  margin-left: auto;
+}
+
+.oda-upload__errors {
+  display: grid;
+  gap: 4px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  color: var(--status-risk);
+  font-size: var(--text-xs);
+}
+
+.oda-upload__errors li {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.oda-upload__diff {
+  max-height: 18rem;
+  overflow: auto;
+  background: var(--surface);
+  border-radius: var(--radius-xs);
+}
+
+/* --- Diseño visual ------------------------------------------------------------- */
+
+.oda-design {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 14rem;
+  align-items: start;
+  gap: var(--space-5);
+}
+
+.oda-blocks {
+  display: grid;
+  gap: var(--space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.oda-block {
+  display: grid;
+  grid-template-columns: 14px 26px minmax(0, 1fr) auto;
+  align-items: start;
+  gap: var(--space-3);
+  padding: var(--space-3);
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-xs);
+  transition: opacity var(--dur-fast) ease, box-shadow var(--dur-fast) ease;
+}
+
+.oda-block[draggable="true"] { cursor: grab; }
+.oda-block[data-dragging] { opacity: 0.5; box-shadow: var(--shadow-lg); }
+
+.oda-block[data-hidden] {
+  background: var(--surface-2);
+  border-style: dashed;
+}
+
+.oda-block[data-hidden] .oda-block__body strong { color: var(--ink-muted); }
+
+.oda-block__grip {
+  padding-top: 5px;
+  color: var(--ink-faint);
+  fill: currentColor;
+}
+
+.oda-block__pos {
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  color: var(--ink-secondary);
+  background: var(--surface-3);
+  border-radius: 50%;
+  font-size: var(--text-xs);
+  font-weight: 800;
+}
+
+.oda-block__body {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.oda-block__body strong { font-size: var(--text-sm); }
+.oda-block__body > small { color: var(--ink-muted); font-size: var(--text-xs); }
+
+.oda-block__settings {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2) var(--space-4);
+  margin-top: var(--space-2);
+}
+
+.oda-inline-field {
+  display: grid;
+  gap: 2px;
+  min-width: min(100%, 12rem);
+}
+
+.oda-inline-field span {
+  color: var(--ink-muted);
+  font-size: var(--text-2xs);
+  font-weight: 700;
+}
+
+.oda-block__tools {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.oda-switch {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin-right: var(--space-2);
+  color: var(--ink-secondary);
+  font-size: var(--text-xs);
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.oda-switch input {
+  appearance: none;
+  width: 30px;
+  height: 18px;
+  margin: 0;
+  background: var(--line-strong);
+  border-radius: var(--radius-pill);
+  cursor: pointer;
+  transition: background-color var(--dur-fast) ease;
+}
+
+.oda-switch input::after {
+  content: "";
+  display: block;
+  width: 14px;
+  height: 14px;
+  margin: 2px;
+  background: #fff;
+  border-radius: 50%;
+  box-shadow: var(--shadow-xs);
+  transition: transform var(--dur-fast) var(--ease-out);
+}
+
+.oda-switch input:checked { background: var(--brand-blue); }
+.oda-switch input:checked::after { transform: translateX(12px); }
+.oda-switch input:focus-visible { outline: 2px solid var(--brand-blue); outline-offset: 2px; }
+
+.oda-missing-blocks {
+  display: grid;
+  gap: var(--space-2);
+  padding: var(--space-3);
+  background: var(--status-pending-soft);
+  border-radius: var(--radius-xs);
+  font-size: var(--text-xs);
+  font-weight: 600;
+}
+
+.oda-schematic {
+  position: sticky;
+  top: calc(var(--space-6) + 96px);
+  display: grid;
+  gap: var(--space-2);
+}
+
+.oda-schematic__label {
+  color: var(--ink-muted);
+  font-size: var(--text-2xs);
+  font-weight: 700;
+}
+
+.oda-schematic__page {
+  display: grid;
+  gap: 4px;
+  padding: var(--space-2);
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-xs);
+}
+
+.oda-schematic__head {
+  height: 34px;
+  background: var(--od-board);
+  border: 1px solid var(--line);
+  border-radius: 4px;
+}
+
+.oda-schematic__bar {
+  height: 8px;
+  background: var(--surface-3);
+  border-radius: 3px;
+}
+
+.oda-schematic__block {
+  display: flex;
+  align-items: center;
+  min-height: 26px;
+  padding: 3px 6px;
+  background: var(--surface-2);
+  border-radius: 4px;
+  font-size: 0.625rem;
+  font-weight: 700;
+  line-height: 1.2;
+  transition: transform var(--dur-base) var(--ease-out);
+}
+
+.oda-schematic__block[data-kind="kpis"] { min-height: 34px; background: var(--brand-blue-soft); }
+.oda-schematic__block[data-kind="mapa"],
+.oda-schematic__block[data-kind="tuberia"] { min-height: 44px; }
+.oda-schematic__block[data-kind="mapa_calor"] {
+  min-height: 38px;
+  background: linear-gradient(90deg, var(--od-seq-1), var(--od-seq-4));
+  color: var(--ink);
+}
+
+/* --- Publicación ---------------------------------------------------------------- */
+
+.oda-review {
+  display: grid;
+  grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.4fr);
+  gap: var(--space-5);
+}
+
+.oda-review__label {
+  display: block;
+  margin-bottom: var(--space-2);
+  color: var(--ink-muted);
+  font-size: var(--text-2xs);
+  font-weight: 700;
+}
+
+.oda-review__checks ul {
+  display: grid;
+  gap: var(--space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: var(--text-sm);
+}
+
+.oda-review__checks li {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-2);
+}
+
+.oda-review__checks li svg { flex: none; margin-top: 3px; }
+.oda-review__checks li[data-state="ok"] svg { color: var(--status-done); }
+.oda-review__checks li[data-state="pendiente"] svg,
+.oda-review__checks li[data-state="vacio"] svg { color: var(--status-pending); }
+
+.oda-review__diff {
+  max-height: 22rem;
+  overflow: auto;
+}
+
+.oda-log {
+  display: grid;
+  gap: var(--space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: var(--text-sm);
+}
+
+.oda-log li {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2) var(--space-3);
+}
+
+.oda-log .oda-badge { margin-left: 0; }
+.oda-log time { margin-left: auto; color: var(--ink-muted); font-size: var(--text-xs); }
+
+/* --- Estados vacíos -------------------------------------------------------------- */
+
+.oda-stage-empty,
+.oda-first {
+  display: grid;
+  gap: var(--space-2);
+  padding: var(--space-7);
+  color: var(--ink-secondary);
+  background: var(--surface);
+  border: 1px dashed var(--line-strong);
+  border-radius: var(--radius-md);
+  text-align: left;
+}
+
+.oda-stage-empty strong,
+.oda-first h2 {
+  margin: 0;
+  color: var(--ink);
+  font-family: var(--font-sans);
+  font-size: var(--text-md);
+  font-weight: 800;
+}
+
+.oda-stage-empty p,
+.oda-first p {
+  max-width: 60ch;
+  margin: 0;
+  font-size: var(--text-sm);
+}
+
+/* --- Adaptación ---------------------------------------------------------------------- */
+
+/* Vista previa en columna fija: Estructura y Publicación, desde 1280 px. */
+@media (min-width: 1280px) {
+  .oda-workspace:is([data-station="estructura"], [data-station="publicacion"]) .oda-preview {
+    position: sticky;
+    inset: auto;
+    top: calc(var(--admin-topbar-h, 96px) + var(--space-5));
+    z-index: auto;
+    width: auto;
+    padding: var(--space-4);
+    overflow: visible;
+    border: 1px solid var(--line);
+    border-radius: var(--radius-md);
+    box-shadow: none;
+    transform: none;
+    visibility: visible;
+    transition: none;
+  }
+
+  .oda-workspace:is([data-station="estructura"], [data-station="publicacion"]) :is(.oda-preview__close, .oda-preview-scrim),
+  .oda-preview-toggle:is([data-station="estructura"], [data-station="publicacion"]) {
+    display: none;
+  }
+}
+
+@media (max-width: 1600px) {
+  .oda-workspace {
+    grid-template-columns: 14rem minmax(0, 1fr);
+  }
+
+  .oda-workspace[data-station="estructura"],
+  .oda-workspace[data-station="publicacion"] {
+    grid-template-columns: 14rem minmax(0, 1fr) 14rem;
+  }
+}
+
+@media (max-width: 1279px) {
+  .oda-workspace[data-station="estructura"],
+  .oda-workspace[data-station="publicacion"] {
+    grid-template-columns: 14rem minmax(0, 1fr);
+  }
+}
+
+@media (max-width: 1100px) {
+  .oda-stations ol {
+    grid-template-columns: repeat(5, minmax(9.5rem, 1fr));
+    overflow-x: auto;
+  }
+
+  .oda-workspace,
+  .oda-workspace[data-station] {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .oda-rail {
+    position: static;
+  }
+
+  .oda-rail ul {
+    display: flex;
+    gap: var(--space-1);
+    overflow-x: auto;
+  }
+
+  .oda-rail__item {
+    min-width: 13rem;
+  }
+
+  .oda-design,
+  .oda-review {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .oda-schematic { position: static; }
+}
+
+@media (max-width: 640px) {
+  .oda-panel__head,
+  .oda-panel__body {
+    padding-inline: var(--space-4);
+  }
+
+  .oda-kpi-list li {
+    grid-template-columns: 26px minmax(0, 1fr);
+  }
+
+  .oda-kpi-list__headline,
+  .oda-kpi-list__tools {
+    grid-column: 2;
+  }
+
+  .oda-block {
+    grid-template-columns: 26px minmax(0, 1fr);
+  }
+
+  .oda-block__grip { display: none; }
+  .oda-block__tools { grid-column: 1 / -1; justify-content: flex-end; }
+
+  .oda-choice-list li { grid-template-columns: minmax(0, 1fr); }
+
+  /* Rejilla en el móvil: la columna de rótulos cede el ancho a las cifras. */
+  .oda-grid tbody th,
+  .oda-grid thead th:first-child {
+    min-width: 8rem;
+    max-width: 8rem;
+    white-space: normal;
+  }
+
+  .oda-grid tbody th span { overflow-wrap: anywhere; }
+  .oda-grid td { min-width: 5rem; }
+
+  /* Guardar sigue en la fila de acciones; el estado va en su propia línea. */
+  .oda-panel__actions .oda-save { flex-basis: 100%; justify-content: flex-end; }
+  .oda-label-long { display: none; }
+  .oda-preview-toggle { padding-inline: var(--space-3); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .oda-save__spinner { animation-duration: 2s; }
+}
+
+/* Los textos para lectores de pantalla (.sr-only) van en posición absoluta. Dentro
+   de una tira desplazable sin posicionar escapan del recorte y ensanchan la
+   página entera en el móvil: cada contenedor con desplazamiento se posiciona. */
+.oda-stations ol,
+.oda-rail ul,
+.oda-rail__item,
+.oda-mark,
+.oda-tabs,
+.oda-grid-wrap,
+.oda-upload__diff,
+.oda-review__diff {
+  position: relative;
+}
+
+/* En pantallas angostas las tablas de los paneles se desplazan dentro del panel,
+   no arrastran la página. */
+@media (max-width: 900px) {
+  .oda-panel__body {
+    position: relative;
+    overflow-x: auto;
+  }
+
+  .oda-panel__body > .oda-table,
+  .oda-review__diff .oda-table,
+  .oda-upload__diff .oda-table {
+    min-width: 36rem;
+  }
+}
+
+/* --- Confirmaciones de visibilidad --------------------------------------------------
+   Publicar, retirar o cambiar el estado de un informe cambia lo que ve el
+   público: se confirma en el mismo sitio y la pregunta nombra la consecuencia. */
+
+.oda-confirm-box {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--space-2) var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  background: var(--status-pending-soft);
+  border: 1px solid color-mix(in srgb, var(--status-pending) 35%, transparent);
+  border-radius: var(--radius-sm);
+  font-size: var(--text-sm);
+}
+
+.oda-confirm-box > svg { color: var(--status-pending); }
+.oda-confirm-box strong { display: block; font-weight: 700; }
+.oda-confirm-box p { margin: 2px 0 0; color: var(--ink-secondary); font-size: var(--text-xs); }
+
+.oda-confirm-box__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.oda-confirm-box__actions :is(.button-primary, .button-ghost) {
+  padding: var(--space-2) var(--space-4);
+  font-size: var(--text-xs);
+}
+
+.oda-inline-confirm {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+  font-weight: 600;
+}
+
+.oda-inline-confirm .button-primary {
+  padding: var(--space-1) var(--space-3);
+  font-size: var(--text-xs);
+}
+
+.oda-review__more {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+  margin: var(--space-2) 0 0;
+  color: var(--ink-muted);
+  font-size: var(--text-xs);
+}
+
+@media (max-width: 640px) {
+  .oda-confirm-box { grid-template-columns: auto minmax(0, 1fr); }
+  .oda-confirm-box__actions { grid-column: 1 / -1; justify-content: flex-end; }
+}
+
+/* En pantallas angostas el cuerpo del panel se desplaza a lo ancho: la
+   cabecera de la rejilla se pega a él, no a la cabecera de la intranet. */
+@media (max-width: 900px) {
+  .oda-grid thead th { top: 0; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .oda-preview,
+  .oda-preview[data-open] { transition: none; }
+}

@@ -1,0 +1,959 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-09-15T17:50:07.854Z",
+  "title": "Design System: PDI UDES · Portal, Intranet y UDES en Cifras",
+  "extensions": {
+    "colorMeta": {
+      "brand-navy": {
+        "role": "primary",
+        "displayName": "Azul Marino UDES",
+        "canonical": "#0a2d63",
+        "oklch": "oklch(30.9% 0.104 259.4)",
+        "tonalRamp": [
+          "#00072a",
+          "#002156",
+          "#1d4078",
+          "#3c619b",
+          "#5c83c0",
+          "#7ea6e6",
+          "#accbfb",
+          "#e5efff"
+        ]
+      },
+      "brand-blue": {
+        "role": "primary",
+        "displayName": "Azul Institucional",
+        "canonical": "#2166d6",
+        "oklch": "oklch(53.4% 0.186 260.0)",
+        "tonalRamp": [
+          "#00062c",
+          "#002059",
+          "#033b90",
+          "#1259c8",
+          "#387def",
+          "#72a5f9",
+          "#abcbfe",
+          "#e6effe"
+        ]
+      },
+      "brand-blue-strong": {
+        "role": "primary",
+        "displayName": "Azul Institucional Profundo",
+        "canonical": "#1b52ad",
+        "oklch": "oklch(45.9% 0.157 260.2)",
+        "tonalRamp": [
+          "#00072a",
+          "#022156",
+          "#003a93",
+          "#255cb8",
+          "#4780df",
+          "#70a4fd",
+          "#adcbfb",
+          "#e6efff"
+        ]
+      },
+      "brand-blue-soft": {
+        "role": "primary",
+        "displayName": "Azul Selección",
+        "canonical": "#eaf1fd",
+        "oklch": "oklch(95.6% 0.018 261.3)",
+        "tonalRamp": [
+          "#070b13",
+          "#20252e",
+          "#3d424c",
+          "#5c626c",
+          "#7c838d",
+          "#9fa5b1",
+          "#c3cad5",
+          "#e8effb"
+        ]
+      },
+      "brand-teal": {
+        "role": "secondary",
+        "displayName": "Cian Institucional",
+        "canonical": "#0096a5",
+        "oklch": "oklch(61.5% 0.106 207.2)",
+        "tonalRamp": [
+          "#000e12",
+          "#002b30",
+          "#074b53",
+          "#1a6d77",
+          "#25929f",
+          "#40b7c7",
+          "#6addec",
+          "#ccf8fe"
+        ]
+      },
+      "page": {
+        "role": "neutral",
+        "displayName": "Papel Azulado",
+        "canonical": "#f4f7fb",
+        "oklch": "oklch(97.5% 0.006 255.5)",
+        "tonalRamp": [
+          "#080b10",
+          "#21252b",
+          "#3e4248",
+          "#5d6268",
+          "#7e838a",
+          "#a0a5ad",
+          "#c4cad1",
+          "#e9eff7"
+        ]
+      },
+      "surface": {
+        "role": "neutral",
+        "displayName": "Blanco Superficie",
+        "canonical": "#ffffff",
+        "oklch": "oklch(100.0% 0.000 89.9)",
+        "tonalRamp": [
+          "#0d0b06",
+          "#27251f",
+          "#44423b",
+          "#64615a",
+          "#85827a",
+          "#a8a59d",
+          "#ccc9c1",
+          "#f1eee6"
+        ]
+      },
+      "surface-2": {
+        "role": "neutral",
+        "displayName": "Superficie Callada",
+        "canonical": "#f8fafd",
+        "oklch": "oklch(98.4% 0.005 258.3)",
+        "tonalRamp": [
+          "#080b10",
+          "#21252b",
+          "#3e4249",
+          "#5d6268",
+          "#7e838a",
+          "#a0a5ad",
+          "#c4c9d1",
+          "#eaeff7"
+        ]
+      },
+      "surface-3": {
+        "role": "neutral",
+        "displayName": "Superficie Hundida",
+        "canonical": "#eef3fa",
+        "oklch": "oklch(96.2% 0.011 256.7)",
+        "tonalRamp": [
+          "#080b10",
+          "#21252b",
+          "#3e4248",
+          "#5d6268",
+          "#7e838a",
+          "#a0a5ad",
+          "#c4cad1",
+          "#e9eff7"
+        ]
+      },
+      "ink": {
+        "role": "neutral",
+        "displayName": "Tinta Noche",
+        "canonical": "#0d1c31",
+        "oklch": "oklch(22.5% 0.046 257.0)",
+        "tonalRamp": [
+          "#010b1e",
+          "#16253b",
+          "#32435b",
+          "#51627c",
+          "#71849e",
+          "#93a7c2",
+          "#b7cbe8",
+          "#e5effe"
+        ]
+      },
+      "ink-secondary": {
+        "role": "neutral",
+        "displayName": "Tinta Pizarra",
+        "canonical": "#45566d",
+        "oklch": "oklch(44.8% 0.044 256.1)",
+        "tonalRamp": [
+          "#010b1d",
+          "#17263a",
+          "#334359",
+          "#51637a",
+          "#72849d",
+          "#94a7c1",
+          "#b7cbe6",
+          "#e5f0fe"
+        ]
+      },
+      "ink-muted": {
+        "role": "neutral",
+        "displayName": "Tinta Niebla",
+        "canonical": "#6b7c93",
+        "oklch": "oklch(58.1% 0.041 256.0)",
+        "tonalRamp": [
+          "#020b1c",
+          "#182639",
+          "#344358",
+          "#526279",
+          "#73849b",
+          "#95a7bf",
+          "#b8cbe4",
+          "#e4f0ff"
+        ]
+      },
+      "ink-faint": {
+        "role": "neutral",
+        "displayName": "Tinta Tenue",
+        "canonical": "#93a2b6",
+        "oklch": "oklch(70.7% 0.034 255.6)",
+        "tonalRamp": [
+          "#030b19",
+          "#1a2635",
+          "#364354",
+          "#556275",
+          "#758497",
+          "#97a6bb",
+          "#bbcbe0",
+          "#e5f0fe"
+        ]
+      },
+      "line": {
+        "role": "neutral",
+        "displayName": "Línea",
+        "canonical": "rgba(13, 40, 84, 0.11)"
+      },
+      "line-strong": {
+        "role": "neutral",
+        "displayName": "Línea Marcada",
+        "canonical": "rgba(13, 40, 84, 0.2)"
+      },
+      "status-done": {
+        "role": "status",
+        "displayName": "Verde Completo",
+        "canonical": "#12833a",
+        "oklch": "oklch(53.5% 0.144 149.0)",
+        "tonalRamp": [
+          "#001002",
+          "#042e11",
+          "#02501f",
+          "#147534",
+          "#33994f",
+          "#5bbe71",
+          "#80e394",
+          "#cbfed3"
+        ]
+      },
+      "status-pending": {
+        "role": "status",
+        "displayName": "Ámbar Pendiente",
+        "canonical": "#b07d00",
+        "oklch": "oklch(62.5% 0.129 79.9)",
+        "tonalRamp": [
+          "#130900",
+          "#332100",
+          "#573d03",
+          "#7d5a13",
+          "#a7791d",
+          "#cf9b36",
+          "#f5bf5f",
+          "#ffeccd"
+        ]
+      },
+      "status-risk": {
+        "role": "status",
+        "displayName": "Rojo Riesgo",
+        "canonical": "#d03b3b",
+        "oklch": "oklch(57.5% 0.186 25.2)",
+        "tonalRamp": [
+          "#200001",
+          "#4a0509",
+          "#7f0411",
+          "#b31923",
+          "#dc4645",
+          "#fd756d",
+          "#feb3ac",
+          "#fee9e7"
+        ]
+      },
+      "status-pending-soft": {
+        "role": "status",
+        "displayName": "Ámbar Pendiente Suave",
+        "canonical": "#fbf2e0",
+        "oklch": "oklch(96.3% 0.026 84.6)",
+        "tonalRamp": [
+          "#100a01",
+          "#2b2416",
+          "#484133",
+          "#686051",
+          "#898171",
+          "#ada493",
+          "#d1c8b7",
+          "#f7eedc"
+        ]
+      },
+      "od-board": {
+        "role": "neutral",
+        "displayName": "Tablero Claro",
+        "canonical": "#ffffff",
+        "oklch": "oklch(100.0% 0.000 89.9)",
+        "tonalRamp": [
+          "#0d0b06",
+          "#27251f",
+          "#44423b",
+          "#64615a",
+          "#85827a",
+          "#a8a59d",
+          "#ccc9c1",
+          "#f1eee6"
+        ]
+      },
+      "od-board-night": {
+        "role": "neutral",
+        "displayName": "Tablero Noche",
+        "canonical": "#06142b",
+        "oklch": "oklch(19.4% 0.051 259.2)",
+        "tonalRamp": [
+          "#010a20",
+          "#16253e",
+          "#32435d",
+          "#50627e",
+          "#7083a1",
+          "#92a6c5",
+          "#b6cbeb",
+          "#e6effe"
+        ]
+      },
+      "od-flap": {
+        "role": "neutral",
+        "displayName": "Paleta",
+        "canonical": "#f6f8fc",
+        "oklch": "oklch(97.9% 0.006 264.5)",
+        "tonalRamp": [
+          "#090b10",
+          "#22252b",
+          "#3f4249",
+          "#5e6168",
+          "#7f828a",
+          "#a1a5ad",
+          "#c5c9d1",
+          "#eaeff7"
+        ]
+      },
+      "od-flap-ink": {
+        "role": "primary",
+        "displayName": "Tinta de Paleta",
+        "canonical": "#0a2d63",
+        "oklch": "oklch(30.9% 0.104 259.4)",
+        "tonalRamp": [
+          "#00072a",
+          "#002156",
+          "#1d4078",
+          "#3c619b",
+          "#5c83c0",
+          "#7ea6e6",
+          "#accbfb",
+          "#e5efff"
+        ]
+      },
+      "od-signal": {
+        "role": "secondary",
+        "displayName": "Ámbar de Señal",
+        "canonical": "#f6b93f",
+        "oklch": "oklch(82.2% 0.149 80.7)",
+        "tonalRamp": [
+          "#130900",
+          "#322202",
+          "#573c00",
+          "#7e5a0b",
+          "#a77912",
+          "#d59900",
+          "#fbbe45",
+          "#ffeccc"
+        ]
+      },
+      "od-signal-text": {
+        "role": "secondary",
+        "displayName": "Ámbar de Señal · Texto",
+        "canonical": "#8a5700",
+        "oklch": "oklch(50.2% 0.108 70.5)",
+        "tonalRamp": [
+          "#150800",
+          "#361f00",
+          "#5c3904",
+          "#845614",
+          "#ab762f",
+          "#d09954",
+          "#f6bd78",
+          "#feebd6"
+        ]
+      },
+      "od-signal-ink": {
+        "role": "neutral",
+        "displayName": "Tinta sobre Señal",
+        "canonical": "#1d1402",
+        "oklch": "oklch(19.8% 0.036 84.9)",
+        "tonalRamp": [
+          "#120900",
+          "#2d240f",
+          "#4b412c",
+          "#6b604a",
+          "#8c816a",
+          "#b0a48c",
+          "#d4c8af",
+          "#faedd4"
+        ]
+      },
+      "od-previous": {
+        "role": "tertiary",
+        "displayName": "Cian Corte Anterior",
+        "canonical": "#0a6f7c",
+        "oklch": "oklch(49.7% 0.083 209.3)",
+        "tonalRamp": [
+          "#000e12",
+          "#022b31",
+          "#0b4b53",
+          "#076e7b",
+          "#3a909d",
+          "#60b4c1",
+          "#85d9e7",
+          "#cdf7ff"
+        ]
+      },
+      "od-ticket-stock": {
+        "role": "neutral",
+        "displayName": "Papel de Boleto",
+        "canonical": "#eef2f8",
+        "oklch": "oklch(96.0% 0.009 258.3)",
+        "tonalRamp": [
+          "#080b10",
+          "#22252b",
+          "#3e4249",
+          "#5d6268",
+          "#7e838a",
+          "#a0a5ad",
+          "#c4c9d1",
+          "#eaeff7"
+        ]
+      },
+      "od-page": {
+        "role": "neutral",
+        "displayName": "Papel del Portal Estadístico",
+        "canonical": "#eef2f8",
+        "oklch": "oklch(96.0% 0.009 258.3)",
+        "tonalRamp": [
+          "#080b10",
+          "#22252b",
+          "#3e4249",
+          "#5d6268",
+          "#7e838a",
+          "#a0a5ad",
+          "#c4c9d1",
+          "#eaeff7"
+        ]
+      },
+      "od-line-1": {
+        "role": "data",
+        "displayName": "Línea de informe 1",
+        "canonical": "#1f5fbf",
+        "oklch": "oklch(50.2% 0.164 259.0)",
+        "tonalRamp": [
+          "#000828",
+          "#022253",
+          "#003c8e",
+          "#1c5cbc",
+          "#4080e3",
+          "#71a5f8",
+          "#abcbfd",
+          "#e6effe"
+        ]
+      },
+      "od-line-2": {
+        "role": "data",
+        "displayName": "Línea de informe 2",
+        "canonical": "#0b7481",
+        "oklch": "oklch(51.3% 0.086 208.7)",
+        "tonalRamp": [
+          "#000e12",
+          "#002b31",
+          "#074b54",
+          "#196d79",
+          "#36909e",
+          "#5db4c2",
+          "#82d9e7",
+          "#ccf8ff"
+        ]
+      },
+      "od-line-3": {
+        "role": "data",
+        "displayName": "Línea de informe 3",
+        "canonical": "#a4471f",
+        "oklch": "oklch(51.4% 0.134 41.7)",
+        "tonalRamp": [
+          "#1c0300",
+          "#431401",
+          "#6f2907",
+          "#9d4118",
+          "#c3633d",
+          "#ea865f",
+          "#fbb79d",
+          "#feeae2"
+        ]
+      },
+      "od-line-4": {
+        "role": "data",
+        "displayName": "Línea de informe 4",
+        "canonical": "#6b3fa0",
+        "oklch": "oklch(46.9% 0.152 301.7)",
+        "tonalRamp": [
+          "#120026",
+          "#33025a",
+          "#522383",
+          "#7246a8",
+          "#9469cd",
+          "#b78cf4",
+          "#d3bcfb",
+          "#f2eaff"
+        ]
+      },
+      "od-line-5": {
+        "role": "data",
+        "displayName": "Línea de informe 5",
+        "canonical": "#7f6200",
+        "oklch": "oklch(51.1% 0.104 88.3)",
+        "tonalRamp": [
+          "#110a00",
+          "#302300",
+          "#533f02",
+          "#775e11",
+          "#9c7e2d",
+          "#c0a153",
+          "#e5c677",
+          "#feedc5"
+        ]
+      },
+      "od-line-6": {
+        "role": "data",
+        "displayName": "Línea de informe 6",
+        "canonical": "#ad2f58",
+        "oklch": "oklch(50.9% 0.164 5.6)",
+        "tonalRamp": [
+          "#1e0007",
+          "#4b001d",
+          "#7b0636",
+          "#a72953",
+          "#cf4f74",
+          "#f77396",
+          "#fbb2c1",
+          "#fee8ec"
+        ]
+      },
+      "od-line-7": {
+        "role": "data",
+        "displayName": "Línea de informe 7",
+        "canonical": "#43536b",
+        "oklch": "oklch(43.9% 0.045 258.3)",
+        "tonalRamp": [
+          "#020a1e",
+          "#17253b",
+          "#33435a",
+          "#52627b",
+          "#72839e",
+          "#94a6c2",
+          "#b8cbe7",
+          "#e5efff"
+        ]
+      },
+      "od-line-8": {
+        "role": "data",
+        "displayName": "Línea de informe 8",
+        "canonical": "#2e6b2f",
+        "oklch": "oklch(47.2% 0.112 143.8)",
+        "tonalRamp": [
+          "#001000",
+          "#032e06",
+          "#0f5014",
+          "#347135",
+          "#569356",
+          "#79b777",
+          "#9cdc9a",
+          "#cefecc"
+        ]
+      },
+      "od-line-9": {
+        "role": "data",
+        "displayName": "Línea de informe 9",
+        "canonical": "#8a3b8f",
+        "oklch": "oklch(49.1% 0.152 325.2)",
+        "tonalRamp": [
+          "#19001b",
+          "#400044",
+          "#67176d",
+          "#8a3b8f",
+          "#af5eb4",
+          "#d481d9",
+          "#f6a9fa",
+          "#fee5ff"
+        ]
+      },
+      "od-series-1": {
+        "role": "data",
+        "displayName": "Serie Bucaramanga",
+        "canonical": "#1f5fbf",
+        "oklch": "oklch(50.2% 0.164 259.0)",
+        "tonalRamp": [
+          "#000828",
+          "#022253",
+          "#003c8e",
+          "#1c5cbc",
+          "#4080e3",
+          "#71a5f8",
+          "#abcbfd",
+          "#e6effe"
+        ]
+      },
+      "od-series-2": {
+        "role": "data",
+        "displayName": "Serie Cúcuta",
+        "canonical": "#c2571a",
+        "oklch": "oklch(58.3% 0.153 45.4)",
+        "tonalRamp": [
+          "#1a0400",
+          "#411601",
+          "#6c2c08",
+          "#9e4104",
+          "#ca5e24",
+          "#f2824b",
+          "#fcb798",
+          "#feeae1"
+        ]
+      },
+      "od-series-3": {
+        "role": "data",
+        "displayName": "Serie Valledupar",
+        "canonical": "#0f8a6e",
+        "oklch": "oklch(56.5% 0.107 171.4)",
+        "tonalRamp": [
+          "#001009",
+          "#002d22",
+          "#084e3d",
+          "#00725a",
+          "#27977a",
+          "#53bb9d",
+          "#79e0c0",
+          "#bfffe9"
+        ]
+      },
+      "od-seq-0": {
+        "role": "data",
+        "displayName": "Secuencial · mínimo",
+        "canonical": "#eef3fa",
+        "oklch": "oklch(96.2% 0.011 256.7)",
+        "tonalRamp": [
+          "#0d366b",
+          "#184f95",
+          "#256abf",
+          "#3987e5",
+          "#6da7ec",
+          "#9ec5f4",
+          "#cde2fb",
+          "#eef3fa"
+        ]
+      },
+      "od-seq-7": {
+        "role": "data",
+        "displayName": "Secuencial · máximo",
+        "canonical": "#0d366b",
+        "oklch": "oklch(33.8% 0.103 256.9)",
+        "tonalRamp": [
+          "#0d366b",
+          "#184f95",
+          "#256abf",
+          "#3987e5",
+          "#6da7ec",
+          "#9ec5f4",
+          "#cde2fb",
+          "#eef3fa"
+        ]
+      }
+    },
+    "typographyMeta": {
+      "display": {
+        "displayName": "Display",
+        "purpose": "Títulos de página en azul marino (Fraunces)."
+      },
+      "headline": {
+        "displayName": "Headline",
+        "purpose": "Títulos de sección y de pantalla de la intranet."
+      },
+      "title": {
+        "displayName": "Title",
+        "purpose": "Cabecera de panel y nombre de informe (Manrope 800)."
+      },
+      "body": {
+        "displayName": "Body",
+        "purpose": "Texto corrido y descripciones."
+      },
+      "label": {
+        "displayName": "Label",
+        "purpose": "Botones, rótulos de campo y cabeceras de rejilla."
+      },
+      "sign-hero": {
+        "displayName": "Sign Hero",
+        "purpose": "Rótulo de estación de la portada de UDES en Cifras."
+      },
+      "sign-label": {
+        "displayName": "Sign Label",
+        "purpose": "Rótulos, sellos y cortes del tablero, en mayúsculas."
+      }
+    },
+    "shadows": [
+      {
+        "name": "shadow-xs",
+        "value": "0 1px 2px rgba(10, 34, 73, 0.06)",
+        "purpose": "Reposo de paneles y botón secundario."
+      },
+      {
+        "name": "shadow-md",
+        "value": "0 1px 2px rgba(10, 34, 73, 0.05), 0 6px 16px rgba(10, 34, 73, 0.06)",
+        "purpose": "Tarjetas levantadas al apuntar."
+      },
+      {
+        "name": "shadow-lg",
+        "value": "0 2px 4px rgba(10, 34, 73, 0.05), 0 12px 28px rgba(10, 34, 73, 0.08)",
+        "purpose": "Tooltips y elementos flotantes."
+      },
+      {
+        "name": "shadow-xl",
+        "value": "0 4px 8px rgba(10, 34, 73, 0.06), 0 24px 48px rgba(10, 34, 73, 0.11)",
+        "purpose": "Cajones (navegación móvil, vista previa)."
+      },
+      {
+        "name": "shadow-accent",
+        "value": "0 8px 20px rgba(33, 102, 214, 0.24)",
+        "purpose": "Solo el botón primario."
+      },
+      {
+        "name": "od-shadow-panel",
+        "value": "0 2px 4px rgba(10, 34, 73, 0.05), 0 18px 40px rgba(10, 34, 73, 0.1)",
+        "purpose": "Paneles de gráfica del portal estadístico."
+      },
+      {
+        "name": "od-flap-shadow",
+        "value": "0 0 0 1px rgba(13, 40, 84, 0.1), 0 1px 2px rgba(13, 40, 84, 0.12)",
+        "purpose": "Cuerpo físico de cada paleta."
+      },
+      {
+        "name": "ring",
+        "value": "0 0 0 3px rgba(33, 102, 214, 0.32)",
+        "purpose": "Foco de campos."
+      }
+    ],
+    "motion": [
+      {
+        "name": "ease-out",
+        "value": "cubic-bezier(0.23, 1, 0.32, 1)",
+        "purpose": "Transiciones de estado y pulsación."
+      },
+      {
+        "name": "ease-in-out",
+        "value": "cubic-bezier(0.77, 0, 0.175, 1)",
+        "purpose": "Movimientos de ida y vuelta."
+      },
+      {
+        "name": "ease-drawer",
+        "value": "cubic-bezier(0.32, 0.72, 0, 1)",
+        "purpose": "Cajones de navegación y de vista previa (300ms)."
+      },
+      {
+        "name": "ease-flap-fall",
+        "value": "cubic-bezier(0.55, 0, 1, 0.45)",
+        "purpose": "Caída de la hoja superior de la paleta."
+      },
+      {
+        "name": "ease-flap-settle",
+        "value": "cubic-bezier(0.2, 1.6, 0.45, 1)",
+        "purpose": "Asentamiento con rebote de la última hoja."
+      },
+      {
+        "name": "dur-press",
+        "value": "140ms",
+        "purpose": "Pulsación (escala 0.97)."
+      },
+      {
+        "name": "dur-base",
+        "value": "220ms",
+        "purpose": "Color, borde y fondo."
+      },
+      {
+        "name": "dur-slow",
+        "value": "300ms",
+        "purpose": "Cajones."
+      },
+      {
+        "name": "dur-image-flap",
+        "value": "720ms",
+        "purpose": "Foto-paleta de los informes."
+      }
+    ],
+    "breakpoints": [
+      {
+        "name": "phone",
+        "value": "640px"
+      },
+      {
+        "name": "drawer-nav",
+        "value": "900px"
+      },
+      {
+        "name": "single-column",
+        "value": "1100px"
+      },
+      {
+        "name": "preview-column",
+        "value": "1280px"
+      },
+      {
+        "name": "wide",
+        "value": "1600px"
+      }
+    ]
+  },
+  "components": [
+    {
+      "name": "Botón primario",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "Una acción principal por zona de trabajo, arriba a la derecha.",
+      "html": "<button class=\"ds-btn-primary\">Guardar</button>",
+      "css": ".ds-btn-primary{display:inline-flex;align-items:center;gap:8px;padding:12px 20px;color:#fff;background:var(--brand-blue,#2166d6);border:1px solid transparent;border-radius:999px;box-shadow:var(--shadow-accent,0 8px 20px rgba(33,102,214,.24));font:700 13px/1 var(--font-sans,Manrope,system-ui,sans-serif);letter-spacing:.01em;cursor:pointer;transition:transform 140ms cubic-bezier(.23,1,.32,1),background-color 220ms ease}.ds-btn-primary:hover{background:var(--brand-blue-strong,#1b52ad)}.ds-btn-primary:active{transform:scale(.97)}.ds-btn-primary:focus-visible{outline:2px solid var(--brand-blue,#2166d6);outline-offset:2px}"
+    },
+    {
+      "name": "Botón secundario",
+      "kind": "button",
+      "refersTo": "button-secondary",
+      "description": "Acción alterna junto a la principal (Retirar del portal, Crear).",
+      "html": "<button class=\"ds-btn-secondary\">Retirar del portal</button>",
+      "css": ".ds-btn-secondary{display:inline-flex;align-items:center;gap:8px;padding:12px 20px;color:var(--brand-navy,#0a2d63);background:var(--surface,#fff);border:1px solid var(--line-strong,rgba(13,40,84,.2));border-radius:999px;box-shadow:var(--shadow-xs,0 1px 2px rgba(10,34,73,.06));font:700 13px/1 var(--font-sans,Manrope,system-ui,sans-serif);cursor:pointer;transition:transform 140ms cubic-bezier(.23,1,.32,1),border-color 220ms ease}.ds-btn-secondary:hover{border-color:var(--brand-blue,#2166d6)}.ds-btn-secondary:active{transform:scale(.97)}.ds-btn-secondary:focus-visible{outline:2px solid var(--brand-blue,#2166d6);outline-offset:2px}"
+    },
+    {
+      "name": "Botón fantasma",
+      "kind": "button",
+      "refersTo": "button-ghost",
+      "description": "Acciones de apoyo: plantilla, vista previa, descartar.",
+      "html": "<button class=\"ds-btn-ghost\">Vista previa</button>",
+      "css": ".ds-btn-ghost{display:inline-flex;align-items:center;gap:8px;padding:12px 20px;color:var(--ink-secondary,#45566d);background:transparent;border:1px solid var(--line,rgba(13,40,84,.11));border-radius:999px;font:700 13px/1 var(--font-sans,Manrope,system-ui,sans-serif);cursor:pointer;transition:background-color 220ms ease,color 220ms ease}.ds-btn-ghost:hover{color:var(--ink,#0d1c31);background:var(--surface-3,#eef3fa)}.ds-btn-ghost:focus-visible{outline:2px solid var(--brand-blue,#2166d6);outline-offset:2px}"
+    },
+    {
+      "name": "Campo de texto",
+      "kind": "input",
+      "refersTo": "input-field",
+      "description": "Campos de formulario de la intranet.",
+      "html": "<label class=\"ds-field\"><span>Nombre del informe</span><input value=\"Permanencia\"></label>",
+      "css": ".ds-field{display:grid;gap:6px;font:700 13px/1.4 var(--font-sans,Manrope,system-ui,sans-serif);color:var(--ink,#0d1c31)}.ds-field input{padding:12px 16px;color:var(--ink,#0d1c31);background:var(--surface-2,#f8fafd);border:1px solid var(--line,rgba(13,40,84,.11));border-radius:12px;font:500 15px/1.5 var(--font-sans,Manrope,system-ui,sans-serif);transition:border-color 220ms ease,box-shadow 220ms ease}.ds-field input:hover{border-color:var(--line-strong,rgba(13,40,84,.2))}.ds-field input:focus-visible{outline:none;border-color:var(--brand-blue,#2166d6);box-shadow:var(--ring,0 0 0 3px rgba(33,102,214,.32))}"
+    },
+    {
+      "name": "Navegación de la intranet",
+      "kind": "nav",
+      "refersTo": "admin-nav",
+      "description": "Menú lateral agrupado por portal, con entrada activa en azul suave.",
+      "html": "<nav class=\"ds-nav\"><span class=\"ds-nav__group\">UDES en Cifras</span><a class=\"is-active\" href=\"#\"><svg width=\"17\" height=\"17\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\"><rect x=\"3\" y=\"4\" width=\"18\" height=\"16\" rx=\"2\"/><path d=\"M3 10h18M9 10v10\"/></svg>Estaciones del periodo</a><span class=\"ds-nav__group\">Sistema</span><a href=\"#\"><svg width=\"17\" height=\"17\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\"><circle cx=\"12\" cy=\"8\" r=\"4\"/><path d=\"M4 21c1.5-4 4.5-6 8-6s6.5 2 8 6\"/></svg>Usuarios y roles</a></nav>",
+      "css": ".ds-nav{display:grid;gap:2px;width:250px;padding:12px;background:var(--surface,#fff);font-family:var(--font-sans,Manrope,system-ui,sans-serif)}.ds-nav__group{padding:12px 12px 4px;color:var(--ink-muted,#6b7c93);font-size:11px;font-weight:700;letter-spacing:.02em}.ds-nav a{display:flex;align-items:center;gap:12px;padding:10px 12px;color:var(--ink-secondary,#45566d);border-radius:12px;font-size:14px;font-weight:600;text-decoration:none;transition:background-color 180ms ease,color 180ms ease}.ds-nav a:hover{color:var(--ink,#0d1c31);background:var(--surface-3,#eef3fa)}.ds-nav a.is-active{color:var(--brand-blue,#2166d6);background:var(--brand-blue-soft,#eaf1fd)}.ds-nav a:focus-visible{outline:2px solid var(--brand-blue,#2166d6);outline-offset:2px}"
+    },
+    {
+      "name": "Marca de estado",
+      "kind": "chip",
+      "refersTo": "status-mark",
+      "description": "Estado de un informe en cada estación: vacío, pendiente o completo, siempre con glifo y texto.",
+      "html": "<span class=\"ds-marks\"><span class=\"ds-mark\" data-state=\"ok\" title=\"Captura: Completo\"><svg width=\"10\" height=\"10\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"4\"><path d=\"M5 12l5 5 9-10\"/></svg></span><span class=\"ds-mark\" data-state=\"pendiente\" title=\"Diseño: Pendiente\"><svg width=\"10\" height=\"10\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"3\"><path d=\"M12 7v6M12 17h.01\"/></svg></span><span class=\"ds-mark\" title=\"Publicación: Sin empezar\"></span></span>",
+      "css": ".ds-marks{display:inline-flex;gap:3px}.ds-mark{display:grid;place-items:center;width:16px;height:16px;color:var(--ink-faint,#93a2b6);border:1.5px solid var(--line-strong,rgba(13,40,84,.2));border-radius:50%;box-sizing:border-box}.ds-mark[data-state=ok]{color:#fff;background:var(--status-done,#12833a);border-color:var(--status-done,#12833a)}.ds-mark[data-state=pendiente]{color:var(--status-pending,#b07d00);background:var(--status-pending-soft,#fbf2e0);border-color:color-mix(in srgb,var(--status-pending,#b07d00) 55%,transparent)}"
+    },
+    {
+      "name": "Casillas de la rejilla",
+      "kind": "custom",
+      "refersTo": "data-grid",
+      "description": "Cifra guardada, casilla cambiada y casilla sin reportar (rayada, nunca cero).",
+      "html": "<table class=\"ds-grid\"><thead><tr><th>Indicador</th><th>2024</th><th>2025</th></tr></thead><tbody><tr><th>Bucaramanga</th><td>13.188</td><td data-changed>13.412</td></tr><tr><th>Valledupar</th><td data-empty>—</td><td>2.729</td></tr></tbody></table>",
+      "css": ".ds-grid{border-collapse:separate;border-spacing:0;border:1px solid var(--line,rgba(13,40,84,.11));border-radius:8px;font:500 13px/1 var(--font-sans,Manrope,system-ui,sans-serif);font-variant-numeric:tabular-nums;color:var(--ink,#0d1c31)}.ds-grid thead th{padding:8px 12px;color:var(--ink-secondary,#45566d);background:var(--surface-2,#f8fafd);border-bottom:1px solid var(--line-strong,rgba(13,40,84,.2));font-size:12px;font-weight:800;text-align:right}.ds-grid thead th:first-child,.ds-grid tbody th{text-align:left}.ds-grid tbody th{min-width:12.5rem;padding:10px 12px;font-weight:600;background:var(--surface,#fff);box-shadow:1px 0 0 var(--line,rgba(13,40,84,.11))}.ds-grid td{min-width:5.5rem;height:36px;padding:0 12px;text-align:right;border-left:1px solid var(--line-faint,rgba(13,40,84,.06));border-top:1px solid var(--line-faint,rgba(13,40,84,.06))}.ds-grid td:hover{background:var(--surface-2,#f8fafd)}.ds-grid td[data-empty]{color:var(--ink-faint,#93a2b6);background:repeating-linear-gradient(135deg,transparent 0 6px,var(--line-faint,rgba(13,40,84,.06)) 6px 7px)}.ds-grid td[data-changed]{background:var(--brand-blue-soft,#eaf1fd);box-shadow:inset 0 0 0 1px var(--brand-blue,#2166d6)}"
+    },
+    {
+      "name": "Paleta partida",
+      "kind": "custom",
+      "refersTo": "od-flap-cell",
+      "description": "Cada carácter de una cifra del tablero en su celda; al asentarse, destello ámbar.",
+      "html": "<span class=\"ds-flaps\" aria-label=\"21.034\"><span class=\"ds-flap\">2</span><span class=\"ds-flap\">1</span><span class=\"ds-flap\">.</span><span class=\"ds-flap\">0</span><span class=\"ds-flap\">3</span><span class=\"ds-flap ds-flap--arrived\">4</span></span>",
+      "css": ".ds-flaps{display:inline-flex;gap:.07em;font:600 2.9rem/1 var(--font-sign,'Barlow Condensed','Arial Narrow',sans-serif);font-variant-numeric:tabular-nums}.ds-flap{position:relative;display:grid;place-items:center;width:.7em;height:1.24em;color:var(--od-flap-ink,#0a2d63);background:linear-gradient(var(--od-flap,#f6f8fc) 50%,var(--od-flap-low,#e8eef6) 50%);border-radius:.1em;box-shadow:var(--od-flap-shadow,0 0 0 1px rgba(13,40,84,.1),0 1px 2px rgba(13,40,84,.12))}.ds-flap::after{content:'';position:absolute;inset:50% 0 auto;height:1px;background:var(--od-flap-hinge,#b7c3d6)}.ds-flap--arrived{animation:ds-arrive 900ms ease-out}@keyframes ds-arrive{0%{box-shadow:0 0 0 2px var(--od-signal,#f6b93f)}100%{box-shadow:var(--od-flap-shadow,0 0 0 1px rgba(13,40,84,.1))}}@media (prefers-reduced-motion:reduce){.ds-flap--arrived{animation:none}}"
+    },
+    {
+      "name": "Boleto de origen",
+      "kind": "custom",
+      "refersTo": "od-ticket",
+      "description": "Quién reporta la cifra, para qué campus y con qué corte; papel perforado en los dos temas.",
+      "html": "<span class=\"ds-ticket\"><strong>Registro Académico</strong><span>Todos los campus</span><span class=\"ds-ticket__stamp\">Corte 2025</span></span>",
+      "css": ".ds-ticket{display:inline-flex;flex-wrap:wrap;align-items:center;gap:0 8px;padding:5px 12px 5px 20px;color:var(--od-ticket-muted,#4a5b73);background-color:var(--od-ticket-stock,#eef2f8);background-image:linear-gradient(var(--od-ticket-perforation,#b7c3d6) 50%,transparent 0);background-size:1px 6px;background-position:9px 0;background-repeat:repeat-y;border-radius:3px;font:500 11px/1.45 var(--font-sans,Manrope,system-ui,sans-serif);-webkit-mask:radial-gradient(circle 3.5px at 0 50%,transparent 97%,#000) 0 0/100% 10px repeat-y;mask:radial-gradient(circle 3.5px at 0 50%,transparent 97%,#000) 0 0/100% 10px repeat-y}.ds-ticket strong,.ds-ticket__stamp{color:var(--od-ticket-ink,#0d1c31);font-weight:700}.ds-ticket__stamp{letter-spacing:.04em;text-transform:uppercase}"
+    },
+    {
+      "name": "Botón de señal",
+      "kind": "button",
+      "refersTo": "od-button-signal",
+      "description": "Acción principal del portal estadístico (Ver informes).",
+      "html": "<button class=\"ds-od-signal\">Ver informes</button>",
+      "css": ".ds-od-signal{display:inline-flex;align-items:center;gap:8px;padding:12px 20px;color:var(--od-signal-ink,#1d1402);background:var(--od-signal,#f6b93f);border:1px solid transparent;border-radius:8px;font:700 13px/1 var(--font-sans,Manrope,system-ui,sans-serif);cursor:pointer;transition:transform 140ms cubic-bezier(.23,1,.32,1),background-color 220ms ease}.ds-od-signal:hover{background:var(--od-signal-strong,#ffcc66)}.ds-od-signal:active{transform:scale(.97)}.ds-od-signal:focus-visible{outline:2px solid var(--od-signal,#f6b93f);outline-offset:2px}"
+    }
+  ],
+  "narrative": {
+    "northStar": "El tablero de llegadas de la universidad",
+    "overview": "Un solo código atiende tres superficies con un mismo suelo: el portal del Plan de Desarrollo, la intranet de Planeación y el portal estadístico UDES en Cifras. El suelo común es institucional y sobrio: planos blancos y gris azulado, tinta azul marino, azul institucional reservado para la acción, Fraunces para los títulos y Manrope para todo lo demás. Sobre ese suelo, UDES en Cifras monta su propio mundo: un tablero de paletas partidas (Solari) donde cada cifra voltea hasta asentarse en el dato oficial, con boletos de origen de papel perforado que dicen quién la reporta, para qué campus y con qué corte.\n\nLa intranet es el otro extremo: densa, callada y orientada a la tarea. Estaciones fijas, rejillas tipo hoja de cálculo, estado siempre con glifo y texto. El color de estado solo aparece cuando algo está completo, pendiente o en riesgo. Los dos temas (claro y oscuro) son reales en todo el sistema: cada token de color se redefine por tema, no se invierte automáticamente.",
+    "keyCharacteristics": [
+      "Planos claros en capas tonales (page → surface → surface-2 → surface-3) con sombras en capas muy suaves.",
+      "Azul institucional solo para acción principal, selección y foco.",
+      "Cifras en numerales tabulares; vacío (\"sin reportar\") nunca es cero y se dibuja distinto.",
+      "En UDES en Cifras: paletas partidas, rótulos condensados de señalética en mayúsculas, ámbar para lo recién llegado, cian para el corte anterior.",
+      "Identidad nunca solo por color: código de dos letras, leyenda, glifo o etiqueta acompañan siempre al tono."
+    ],
+    "rules": [
+      {
+        "name": "The Reserved Status Rule",
+        "body": "Verde, ámbar y rojo de estado (status-done, status-pending, status-risk) significan completo, pendiente y riesgo, y viajan siempre con glifo y texto. Nunca se reutilizan como serie de datos ni como decoración.",
+        "section": "colors"
+      },
+      {
+        "name": "The One Signal Rule",
+        "body": "El ámbar de señal existe solo dentro de UDES en Cifras y marca lo que acaba de llegar o lo que está activo. Si todo brilla en ámbar, nada llegó.",
+        "section": "colors"
+      },
+      {
+        "name": "The Selected Theme Rule",
+        "body": "El tema oscuro es una paleta elegida y validada contra su propia superficie, no un volteo. Todo token nuevo se declara en :root y se redefine en los dos bloques oscuros de tokens.css.",
+        "section": "colors"
+      },
+      {
+        "name": "The Tabular Figure Rule",
+        "body": "Toda cifra que se compara (rejillas, tablero, tablas, KPI) usa numerales tabulares. En el tablero, cada carácter ocupa su propia celda de paleta.",
+        "section": "typography"
+      },
+      {
+        "name": "The Sign Belongs To The Board Rule",
+        "body": "Barlow Condensed y las mayúsculas espaciadas no salen del portal estadístico; la intranet y el PDI hablan en Manrope.",
+        "section": "typography"
+      },
+      {
+        "name": "The Tinted Shadow Rule",
+        "body": "Una sombra en tema claro se tiñe de azul marino (rgba 10,34,73) y se apila en dos capas. Una sombra gris neutra de un solo desenfoque no pertenece a este sistema.",
+        "section": "elevation"
+      }
+    ],
+    "dos": [
+      "**Do** declare every new color token in `:root` and redefine it in both dark blocks of `tokens.css`; `body` always gets an explicit background.",
+      "**Do** pair every status color with a glyph and a text label, and every series or line color with a legend, code, or direct label.",
+      "**Do** draw \"sin reportar\" as an empty, striped or dashed cell, never as 0.",
+      "**Do** use tabular numerals for any figure that is compared.",
+      "**Do** keep one primary action per work area, top right, in brand-blue.",
+      "**Do** confirm destructive or visibility-changing actions inline, naming the consequence.",
+      "**Do** keep wide tables, grids, and maps scrolling inside their own frame; the page body never scrolls horizontally.",
+      "**Do** set SVG chart colors through `style` with `var()`, not presentation attributes."
+    ],
+    "donts": [
+      "**Don't** reuse status green, amber, or red as a data series or decoration.",
+      "**Don't** use the signal amber, Barlow Condensed, or uppercase sign labels outside UDES en Cifras.",
+      "**Don't** show money figures on any public page.",
+      "**Don't** rest destructive links in red; red arrives on hover, focus, and confirmation.",
+      "**Don't** cycle categorical hues or generate a ninth line color; fold extras into \"Otros\".",
+      "**Don't** add a thick colored side stripe to cards to signal category; category identity comes from the two-letter code and its line badge."
+    ]
+  }
+}

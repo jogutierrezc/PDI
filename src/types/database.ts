@@ -937,3 +937,213 @@ export interface CampusLineCoverage {
   /** { "cucuta": 3, "valledupar": 1 } — solo las sedes que reportaron. */
   by_campus: Record<string, number>;
 }
+
+/* =============================================================================
+   UDES en Cifras (0019_udes_en_cifras.sql)
+   ========================================================================== */
+
+export type OdValueFormat = "entero" | "porcentaje" | "decimal";
+export type OdDirection = "sube" | "baja" | "neutro";
+export type OdAggregation = "suma" | "reportado";
+export type OdMapMode = "origen" | "cobertura";
+export type OdChartKind = "circular" | "barras" | "lineas";
+export type OdBlockKind =
+  | "kpis"
+  | "evolucion"
+  | "mapa"
+  | "tuberia"
+  | "mapa_calor"
+  | "desgloses"
+  | "tabla_dinamica"
+  | "metodologia";
+export type OdImportKind = "rejilla" | "pegado" | "plantilla";
+
+export interface OdPeriod {
+  id: string;
+  label: string;
+  start_year: number;
+  end_year: number;
+  cutoff_date: string;
+  illustrative: boolean;
+  is_current: boolean;
+  status: PublicationStatus;
+  note: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface OdPeriodCampus {
+  period_id: string;
+  campus_id: string;
+  label: string;
+  slug: string;
+  position: number;
+}
+
+export interface OdOffice {
+  id: string;
+  name: string;
+  contact_email: string;
+  position: number;
+}
+
+export interface OdReportRow {
+  id: string;
+  period_id: string;
+  slug: string;
+  code: string;
+  name: string;
+  summary: string;
+  description: string;
+  image_url: string;
+  image_alt: string;
+  image_credit: string;
+  line: number;
+  note: string;
+  position: number;
+  status: PublicationStatus;
+  updated_at: string;
+}
+
+export interface OdIndicatorRow {
+  id: string;
+  report_id: string;
+  key: string;
+  label: string;
+  unit: string;
+  format: OdValueFormat;
+  direction: OdDirection;
+  aggregation: OdAggregation;
+  definition: string;
+  office_id: string | null;
+  position: number;
+  is_kpi: boolean;
+  kpi_position: number | null;
+  is_headline: boolean;
+}
+
+export interface OdValueRow {
+  id?: string;
+  indicator_id: string;
+  year: number;
+  campus_id: string | null;
+  value: number | null;
+  note?: string;
+  updated_at?: string;
+}
+
+export interface OdBreakdownRow {
+  id: string;
+  report_id: string;
+  key: string;
+  title: string;
+  unit: string;
+  format: OdValueFormat;
+  office_id: string | null;
+  default_chart: OdChartKind;
+  position: number;
+}
+
+export interface OdBreakdownValueRow {
+  id?: string;
+  breakdown_id: string;
+  year: number;
+  label: string;
+  position: number;
+  value: number | null;
+}
+
+export interface OdHeatmapRow {
+  id: string;
+  report_id: string;
+  key: string;
+  title: string;
+  description: string;
+  row_label: string;
+  column_label: string;
+  rows: string[];
+  columns: string[];
+  unit: string;
+  format: OdValueFormat;
+  office_id: string | null;
+  empty_meaning: string;
+  position: number;
+}
+
+export interface OdHeatmapCellRow {
+  heatmap_id: string;
+  row_index: number;
+  column_index: number;
+  value: number | null;
+}
+
+export interface OdMapRow {
+  id: string;
+  report_id: string;
+  key: string;
+  title: string;
+  description: string;
+  mode: OdMapMode;
+  unit: string;
+  office_id: string | null;
+  position: number;
+}
+
+export interface OdMapValueRow {
+  map_id: string;
+  year: number;
+  campus_id: string;
+  department_code: string;
+  value: number;
+}
+
+export interface OdPipelineRow {
+  id: string;
+  report_id: string;
+  title: string;
+  description: string;
+  stages: string[];
+  office_id: string | null;
+}
+
+export interface OdPipelineValueRow {
+  id?: string;
+  pipeline_id: string;
+  cohort: number;
+  campus_id: string | null;
+  stage_index: number;
+  remaining: number | null;
+  main_cause: string;
+}
+
+export interface OdReportBlockRow {
+  id: string;
+  report_id: string;
+  kind: OdBlockKind;
+  ref_id: string | null;
+  position: number;
+  visible: boolean;
+  settings: { chart?: OdChartKind; title?: string };
+}
+
+export interface OdImportRow {
+  id: string;
+  period_id: string;
+  report_id: string | null;
+  kind: OdImportKind;
+  file_name: string;
+  cells_changed: number;
+  summary: Record<string, unknown>;
+  created_by: string | null;
+  created_at: string;
+}
+
+export interface OdPublicationRow {
+  id: string;
+  period_id: string;
+  report_id: string | null;
+  action: "publicado" | "retirado";
+  note: string;
+  published_by: string | null;
+  published_at: string;
+}

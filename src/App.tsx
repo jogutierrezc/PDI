@@ -64,6 +64,15 @@ const StructureNormalize = lazy(() =>
     default: m.StructureNormalize,
   })),
 );
+const OpenDataPortal = lazy(() =>
+  import("./modules/datos-abiertos/OpenDataPortal").then((m) => ({ default: m.OpenDataPortal })),
+);
+const OpenDataReport = lazy(() =>
+  import("./modules/datos-abiertos/OpenDataReport").then((m) => ({ default: m.OpenDataReport })),
+);
+const OdAdmin = lazy(() =>
+  import("./modules/admin/udes-en-cifras/OdAdmin").then((m) => ({ default: m.OdAdmin })),
+);
 const LoginPortal = lazy(() => import("./modules/login/LoginPortal").then((m) => ({ default: m.LoginPortal })));
 const PillarManagement = lazy(() =>
   import("./modules/admin/gestion-pilares/PillarManagement").then((m) => ({ default: m.PillarManagement })),
@@ -124,6 +133,8 @@ export default function App() {
           <Route path="/facultades" element={<FacultyPortal />} />
           <Route path="/facultades/:slug" element={<FacultyDetail />} />
           <Route path="/desarrollo-tecnologico" element={<TechDevelopment />} />
+          <Route path="/datos-abiertos" element={<OpenDataPortal />} />
+          <Route path="/datos-abiertos/:slug" element={<OpenDataReport />} />
           <Route path="/acceso-intranet" element={<LoginPortal />} />
 
           <Route
@@ -195,6 +206,16 @@ export default function App() {
             element={
               <RequireRole minimum="consulta">
                 <WebProjects />
+              </RequireRole>
+            }
+          />
+          {/* UDES en Cifras: estación e informe en la ruta, periodo en ?periodo=. */}
+          {/* Una sola ruta con segmentos opcionales: cambiar de estación no desmonta el módulo. */}
+          <Route
+            path="/admin/udes-en-cifras/:station?/:report?"
+            element={
+              <RequireRole minimum="consulta">
+                <OdAdmin />
               </RequireRole>
             }
           />

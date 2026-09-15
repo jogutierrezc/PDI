@@ -43,6 +43,7 @@ function SiteFooter() {
           <Link to="/ods">PDI y los ODS</Link>
           <Link to="/facultades">PDI por facultad</Link>
           <Link to="/implementacion#repositorio">Repositorio</Link>
+          <Link to="/datos-abiertos">UDES en Cifras</Link>
           <a href="mailto:planeacion@udes.edu.co">Contacto</a>
         </nav>
 

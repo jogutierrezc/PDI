@@ -16,6 +16,7 @@
 
 import { JSDOM, VirtualConsole } from "jsdom";
 import { build } from "esbuild";
+import { readFileSync } from "node:fs";
 
 /* --- Lo que jamás puede salir en una pantalla pública ----------------------
    El portal es público y las cifras presupuestales de la universidad no lo son.
@@ -1479,6 +1480,91 @@ const routes = [
     session: true,
     also: ["Elige el libro", "Reportes cargados", "Indicadores_Campus_Pilares_UDES_2025.xlsx"],
   },
+  {
+    path: "/datos-abiertos",
+    expect: "Tablero de informes",
+    also: [
+      "Universidad de Santander",
+      "Principales estadísticas de las actividades académicas y administrativas",
+      // Los nueve informes, con su nombre completo.
+      "Poblacional",
+      "Permanencia",
+      "Visibilidad",
+      "Enseñanza",
+      "Extensión y Proyección Social",
+      "Investigación",
+      "Infraestructura Física y Tecnológica",
+      "UDES Sostenible",
+      "Plan de Desarrollo Institucional",
+      // Mientras las cifras sean de ejemplo, la portada tiene que decirlo.
+      "Cifras ilustrativas",
+      "Sin reportar no es cero",
+    ],
+    absent: [...SIN_DINERO],
+  },
+  {
+    path: "/datos-abiertos/investigacion",
+    note: "el campus cambia la tabla y un año sin reporte no es cero",
+    expect: "Grupos de investigación reconocidos",
+    also: ["Vicerrectoría de Investigaciones", "Tabla dinámica", "Mapa de calor", "Cifras ilustrativas"],
+    absent: [...SIN_DINERO],
+    interact: async (window, tick) => {
+      const opcion = [...window.document.querySelectorAll(".od-segmented__option")].find(
+        (b) => b.textContent?.trim() === "Valledupar",
+      );
+      if (!opcion) throw new Error("no se encontró la sede Valledupar en los controles");
+      opcion.dispatchEvent(new window.Event("click", { bubbles: true }));
+      await tick();
+
+      if (opcion.getAttribute("aria-checked") !== "true") {
+        throw new Error("la sede pulsada no queda seleccionada");
+      }
+      // Valledupar no tenía grupos en 2021: la casilla va vacía, no en cero.
+      const primera = window.document.querySelector(".od-table tbody tr td");
+      if (!primera || primera.textContent?.trim() !== "—") {
+        throw new Error(`2021 en Valledupar debería ir sin reportar y dice "${primera?.textContent}"`);
+      }
+    },
+  },
+  {
+    path: "/datos-abiertos/permanencia",
+    note: "la tubería de la deserción y el mapa de calor por cohorte",
+    expect: "La tubería de la permanencia",
+    also: ["Retención por cohorte y semestre", "Deserción por tramo", "aún no cursado"],
+    absent: [...SIN_DINERO],
+  },
+  {
+    path: "/datos-abiertos/poblacional",
+    note: "el mapa de origen de los estudiantes",
+    expect: "De dónde vienen nuestros estudiantes",
+    also: ["Santander", "Norte de Santander", "Cesar"],
+    absent: [...SIN_DINERO],
+  },
+  { path: "/datos-abiertos/informe-que-no-existe", expect: "Este informe no existe" },
+  {
+    path: "/admin/udes-en-cifras/captura/poblacional",
+    note: "UDES en Cifras: la rejilla marca lo cambiado antes de guardar",
+    session: true,
+    expect: "Cifras de Poblacional",
+    also: ["Estaciones del periodo", "Periodo y campus", "Estructura y KPI", "Diseño visual", "Publicación", "Plantilla CSV", "Total institucional"],
+    interact: async (window, tick) => {
+      const input = window.document.querySelector(".oda-grid td:not([data-locked]) input");
+      if (!input) throw new Error("la rejilla no tiene casillas editables");
+      const setter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, "value").set;
+      setter.call(input, "12345");
+      input.dispatchEvent(new window.Event("input", { bubbles: true }));
+      await tick();
+      input.dispatchEvent(new window.FocusEvent("focusout", { bubbles: true }));
+      await tick();
+      const text = window.document.body.textContent ?? "";
+      if (!text.includes("1 casilla cambiada")) throw new Error("editar una casilla no la marca como cambiada");
+      if (!window.document.querySelector(".oda-grid td[data-changed]")) throw new Error("la casilla editada no se resalta");
+    },
+  },
+  { path: "/admin/udes-en-cifras/estructura/permanencia", session: true, expect: "Tablero de KPI", also: ["Ficha del informe", "Indicadores (4)", "Conjuntos visuales", "Titular"] },
+  { path: "/admin/udes-en-cifras/diseno/poblacional", session: true, expect: "Bloques de la ficha", also: ["Así se lee la ficha", "Tabla dinámica"] },
+  { path: "/admin/udes-en-cifras/publicacion/sostenible", session: true, expect: "Estado de los informes", also: ["Revisar UDES Sostenible", "Bitácora de publicación"] },
+  { path: "/admin/udes-en-cifras/periodo", session: true, expect: "Campus del periodo", also: ["Oficinas fuente", "Periodo 2020-2025"] },
   { path: "/acceso-intranet", expect: "Intranet PDI" },
   { path: "/ruta-que-no-existe", expect: "Esta página no existe" },
   { path: "/admin/pilares", expect: "Intranet PDI", note: "sin sesión debe redirigir al acceso" },
@@ -1970,7 +2056,9 @@ function applyFilters(rows, params) {
     result = result.filter((row) => matches(row[key], operator, value));
   }
 
-  return result;
+  const offset = Number(params.get("offset") ?? 0);
+  const limit = params.has("limit") ? Number(params.get("limit")) : undefined;
+  return limit === undefined ? result.slice(offset) : result.slice(offset, offset + limit);
 }
 
 function matches(actual, operator, value) {
@@ -1979,6 +2067,14 @@ function matches(actual, operator, value) {
       return String(actual) === value;
     case "neq":
       return String(actual) !== value;
+    // in.("a","b") — así piden las tablas hijas de UDES en Cifras sus padres.
+    case "in": {
+      const wanted = value
+        .replace(/^\(|\)$/g, "")
+        .split(",")
+        .map((item) => item.trim().replace(/^"|"$/g, ""));
+      return wanted.includes(String(actual));
+    }
     case "is":
       return value === "null" ? actual === null : String(actual) === value;
     // not.is.null y compañía: PostgREST antepone `not.` al operador. Mientras
@@ -2047,6 +2143,10 @@ FIXTURES.v_faculty_actions_admin = [
     created_at: "2026-07-06T08:00:00Z", updated_at: "2026-09-11T06:00:00Z",
   },
 ];
+
+/* UDES en Cifras: las filas que deja la migración 0020, generadas junto con ella. */
+const OD_FIXTURES = JSON.parse(readFileSync(new URL("./fixtures/udes-en-cifras.json", import.meta.url), "utf8"));
+Object.assign(FIXTURES, OD_FIXTURES);
 
 /* --- Ejecución -------------------------------------------------------------- */
 

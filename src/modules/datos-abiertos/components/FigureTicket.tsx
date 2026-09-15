@@ -6,14 +6,17 @@
    corte y su fuente no se publica, así que el componente no admite omitirlos.
    ========================================================================== */
 
-import { changeBetween, formatValue, formatWithUnit, valueOf } from "../data/open-data";
-import type { CampusId, Indicator } from "../data/types";
+import { basisOf, changeBetween, formatValue, formatWithUnit, valueOf } from "../data/open-data";
+import { cutLabel } from "../data/terms";
+import type { CampusId, Indicator, Term } from "../data/types";
 import { SplitFlap } from "./SplitFlap";
 import type { FlapSize } from "./SplitFlap";
 
 interface FigureTicketProps {
   indicator: Indicator;
   year: number;
+  /** Periodo académico. Sin él, la cifra es la del año. */
+  term?: Term | null;
   campus: CampusId;
   campusName: string;
   illustrative: boolean;
@@ -38,6 +41,7 @@ function Pin({ letter }: { letter: string | null | undefined }) {
 export function FigureTicket({
   indicator,
   year,
+  term = null,
   campus,
   campusName,
   illustrative,
@@ -47,11 +51,14 @@ export function FigureTicket({
   variant = "board",
   annotate,
 }: FigureTicketProps) {
-  const value = valueOf(indicator, year, campus);
-  const previous = valueOf(indicator, year - 1, campus);
+  const value = valueOf(indicator, year, campus, term);
+  const previous = valueOf(indicator, year - 1, campus, term);
   const change = changeBetween(indicator, value, previous);
   const figure = formatValue(value, indicator.format);
   const hasPrevious = year - 1 in indicator.values;
+  const cut = cutLabel(year, term);
+  const previousCut = cutLabel(year - 1, term);
+  const basis = basisOf(indicator, year, campus, term);
 
   return (
     <span className={`od-figure od-figure--${variant}`} data-empty={value === null || undefined}>
@@ -78,10 +85,10 @@ export function FigureTicket({
         {!hasPrevious ? (
           <>Primer corte publicado</>
         ) : previous === null ? (
-          <>{year - 1}: sin reportar</>
+          <>{previousCut}: sin reportar</>
         ) : (
           <>
-            {year - 1}: {formatValue(previous, indicator.format)}
+            {previousCut}: {formatValue(previous, indicator.format)}
             {change && (
               <span className="od-figure__change" data-reading={change.reading}>
                 {" · "}
@@ -99,7 +106,8 @@ export function FigureTicket({
         <span className="od-ticket">
           <span className="od-ticket__source">{indicator.source}</span>
           <span className="od-ticket__meta">
-            <span className="od-ticket__campus">{campusName} · </span>Corte {year}
+            <span className="od-ticket__campus">{campusName} · </span>Corte {cut}
+            {basis && <span className="od-ticket__basis"> · {basis}</span>}
           </span>
           {illustrative && <span className="od-ticket__stamp">Dato ilustrativo</span>}
         </span>

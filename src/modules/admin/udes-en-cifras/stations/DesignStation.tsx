@@ -22,7 +22,8 @@ const BLOCK_HELP: Record<OdBlockKind, string> = {
   kpis: "Las cifras clave del informe, con variación y rastro de cortes.",
   evolucion: "El indicador elegido año a año, por campus.",
   mapa: "Colombia por departamento, con flujos hacia cada campus.",
-  tuberia: "La deserción de una cohorte, tramo a tramo.",
+  tuberia: "La deserción de una cohorte, tramo a tramo, en estudiantes o en %.",
+  historico: "La cifra de un periodo frente a otro, con sus categorías y su peso en el total.",
   mapa_calor: "Matriz de dos dimensiones en escala azul.",
   desgloses: "Cómo se reparte la cifra: circular o barras.",
   tabla_dinamica: "Todas las cifras, para armar la tabla propia y descargarla.",
@@ -44,13 +45,15 @@ function DesignEditor({ data, reportId, blocks, canEdit }: { data: StationProps[
 
   const heatmaps = data.rows.heatmaps.filter((h) => h.report_id === reportId);
   const maps = data.rows.maps.filter((m) => m.report_id === reportId);
-  const pipeline = data.rows.pipelines.find((p) => p.report_id === reportId);
+  const pipelines = data.rows.pipelines.filter((p) => p.report_id === reportId);
+  const histories = data.rows.histories.filter((h) => h.report_id === reportId);
   const breakdowns = data.rows.breakdowns.filter((b) => b.report_id === reportId);
 
   const nameOf = (b: DraftBlock) => {
     if (b.kind === "mapa_calor") return heatmaps.find((h) => h.id === b.ref_id)?.title ?? "Mapa de calor sin conjunto";
     if (b.kind === "mapa") return maps.find((m) => m.id === b.ref_id)?.title ?? "Mapa sin conjunto";
-    if (b.kind === "tuberia") return pipeline?.title ?? "Tubería sin conjunto";
+    if (b.kind === "tuberia") return pipelines.find((p) => p.id === b.ref_id)?.title ?? "Tubería sin conjunto";
+    if (b.kind === "historico") return histories.find((h) => h.id === b.ref_id)?.title ?? "Evolución histórica sin conjunto";
     return BLOCK_LABELS[b.kind];
   };
 
@@ -62,7 +65,8 @@ function DesignEditor({ data, reportId, blocks, canEdit }: { data: StationProps[
     ...(breakdowns.length && !draft.some((b) => b.kind === "desgloses") ? [{ kind: "desgloses" as OdBlockKind, ref_id: null, label: BLOCK_LABELS.desgloses }] : []),
     ...heatmaps.filter((h) => !draft.some((b) => b.ref_id === h.id)).map((h) => ({ kind: "mapa_calor" as OdBlockKind, ref_id: h.id, label: h.title })),
     ...maps.filter((m) => !draft.some((b) => b.ref_id === m.id)).map((m) => ({ kind: "mapa" as OdBlockKind, ref_id: m.id, label: m.title })),
-    ...(pipeline && !draft.some((b) => b.ref_id === pipeline.id) ? [{ kind: "tuberia" as OdBlockKind, ref_id: pipeline.id, label: pipeline.title }] : []),
+    ...pipelines.filter((p) => !draft.some((b) => b.ref_id === p.id)).map((p) => ({ kind: "tuberia" as OdBlockKind, ref_id: p.id, label: p.title })),
+    ...histories.filter((h) => !draft.some((b) => b.ref_id === h.id)).map((h) => ({ kind: "historico" as OdBlockKind, ref_id: h.id, label: h.title })),
   ];
 
   const normalized = (list: DraftBlock[]) => list.map((b, i) => ({ ...b, position: i + 1 }));

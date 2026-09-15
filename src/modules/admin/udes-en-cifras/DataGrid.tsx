@@ -5,7 +5,8 @@
    · Enter baja a la casilla siguiente, Mayús+Enter sube; las flechas arriba y
      abajo cambian de fila y Tab avanza de columna.
    · Pegar un rango copiado de Excel lo reparte desde la casilla enfocada,
-     saltando las casillas calculadas.
+     saltando las columnas calculadas de esa fila (la cifra del año que sale
+     de A y B): un rango con columnas A y B cae en A y B.
    · Lo que cambió respecto a la base se marca, y un texto que no es número se
      queda en rojo sin guardarse, con el motivo al pasar el puntero.
    · Vacío es "sin reportar": la casilla vacía guarda NULL, no cero.
@@ -29,6 +30,10 @@ export interface GridRow {
 export interface GridColumn {
   key: string;
   label: string;
+  /** Grupo de la cabecera (el año): las columnas seguidas del mismo grupo comparten rótulo. */
+  group?: string;
+  /** Rótulo completo para lectores de pantalla: "2024, periodo A". */
+  ariaLabel?: string;
 }
 
 export type CellKey = `${string}|${string}`;
@@ -95,6 +100,16 @@ export function DataGrid({
     [rows, columns, readOnly, lockedReason],
   );
 
+  // Cabecera en dos filas cuando las columnas se agrupan (año → A, B, año).
+  const groups: { label: string; span: number }[] = [];
+  const groupStarts = columns.map((c, index) => {
+    if (!c.group) return false;
+    const starts = index === 0 || columns[index - 1].group !== c.group;
+    if (starts) groups.push({ label: c.group, span: 1 });
+    else groups[groups.length - 1].span += 1;
+    return starts;
+  });
+
   const current = (row: string, column: string) => {
     const key = cellKey(row, column);
     return key in draft ? draft[key] : stored(row, column);
@@ -157,12 +172,16 @@ export function DataGrid({
     const next = { ...draft };
     const nextErrors = { ...errors };
     let count = 0;
+    // Las columnas de destino son las editables de la fila donde empieza el
+    // pegado, desde la casilla enfocada: las calculadas no consumen valores.
+    const targets = columns.map((_, index) => index).filter((index) => index >= ci && editable[ri][index]);
     grid.forEach((line, dr) => {
       const row = rows[ri + dr];
       if (!row) return;
       line.forEach((raw, dc) => {
-        const column = columns[ci + dc];
-        if (!column || !editable[ri + dr][ci + dc]) return;
+        const columnIndex = targets[dc];
+        const column = columnIndex === undefined ? undefined : columns[columnIndex];
+        if (!column || !editable[ri + dr][columnIndex]) return;
         const key = cellKey(row.key, column.key);
         const parsed = parseNumber(raw);
         if (!parsed.ok) {
@@ -186,14 +205,34 @@ export function DataGrid({
       <table ref={tableRef} className="oda-grid">
         <caption className="sr-only">{label}</caption>
         <thead>
-          <tr>
-            <th scope="col">{rowHeader}</th>
-            {columns.map((c) => (
-              <th key={c.key} scope="col">
-                {c.label}
-              </th>
-            ))}
-          </tr>
+          {groups.length > 0 ? (
+            <>
+              <tr className="oda-grid__groups">
+                <th scope="col" rowSpan={2}>{rowHeader}</th>
+                {groups.map((g) => (
+                  <th key={g.label} scope="colgroup" colSpan={g.span} data-group-start>
+                    {g.label}
+                  </th>
+                ))}
+              </tr>
+              <tr className="oda-grid__subheads">
+                {columns.map((c, index) => (
+                  <th key={c.key} scope="col" data-group-start={groupStarts[index] || undefined} aria-label={c.ariaLabel}>
+                    {c.label}
+                  </th>
+                ))}
+              </tr>
+            </>
+          ) : (
+            <tr>
+              <th scope="col">{rowHeader}</th>
+              {columns.map((c) => (
+                <th key={c.key} scope="col">
+                  {c.label}
+                </th>
+              ))}
+            </tr>
+          )}
         </thead>
         <tbody>
           {rows.map((row, ri) => (
@@ -208,7 +247,7 @@ export function DataGrid({
                 if (locked) {
                   const shown = lockedValue?.(row.key, column.key) ?? null;
                   return (
-                    <td key={column.key} data-locked title={locked}>
+                    <td key={column.key} data-locked data-group-start={groupStarts[ci] || undefined} title={locked}>
                       <span>{shown === null ? "—" : formatValue(shown, row.format ?? "entero")}</span>
                     </td>
                   );
@@ -219,6 +258,7 @@ export function DataGrid({
                 return (
                   <td
                     key={column.key}
+                    data-group-start={groupStarts[ci] || undefined}
                     data-changed={changed || undefined}
                     data-empty={value === null || undefined}
                     data-error={error ? true : undefined}
@@ -232,7 +272,7 @@ export function DataGrid({
                       value={texts[key] ?? (focused === key || value === null ? editableText(value) : formatValue(value, row.format ?? "entero"))}
                       inputMode="decimal"
                       readOnly={readOnly}
-                      aria-label={`${row.label}, ${column.label}`}
+                      aria-label={`${row.label}, ${column.ariaLabel ?? column.label}`}
                       aria-invalid={error ? true : undefined}
                       placeholder="—"
                       onChange={(event) => setTexts((t) => ({ ...t, [key]: event.target.value }))}

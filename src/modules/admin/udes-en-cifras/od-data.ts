@@ -15,8 +15,11 @@ import type {
   Campus as CampusRow,
   OdBreakdownRow,
   OdBreakdownValueRow,
+  OdBlockKind,
   OdHeatmapCellRow,
   OdHeatmapRow,
+  OdHistoryRow,
+  OdHistoryValueRow,
   OdImportKind,
   OdIndicatorRow,
   OdMapRow,
@@ -222,18 +225,43 @@ export interface SaveValuesInput {
 export function useSaveValues() {
   return useOdMutation(async ({ periodId, reportId, kind, fileName, values }: SaveValuesInput) => {
     for (let i = 0; i < values.length; i += 500) {
-      await run(supabase.from("od_values").upsert(values.slice(i, i + 500), { onConflict: "indicator_id,year,campus_id" }));
+      await run(supabase.from("od_values").upsert(values.slice(i, i + 500), { onConflict: "indicator_id,year,term,campus_id" }));
     }
     await logImport(periodId, reportId, kind, values.length, fileName, { tabla: "od_values" });
   });
 }
 
+/**
+ * Un conjunto recién creado entra a la ficha como bloque visible, al final.
+ * Sin esto, lo cargado no se veía en el portal hasta añadir el bloque a mano
+ * en Diseño visual. Los desgloses comparten un solo bloque.
+ */
+async function ensureBlock(reportId: string, kind: OdBlockKind, refId: string | null) {
+  const existing = unwrap<{ id: string; kind: OdBlockKind; ref_id: string | null; position: number }[]>(
+    await supabase.from("od_report_blocks").select("id,kind,ref_id,position").eq("report_id", reportId),
+  );
+  if (existing.some((b) => b.kind === kind && (refId === null || b.ref_id === refId))) return;
+  const position = existing.reduce((max, b) => Math.max(max, b.position), 0) + 1;
+  await run(supabase.from("od_report_blocks").insert({ report_id: reportId, kind, ref_id: refId, position, visible: true, settings: {} }));
+}
+
+/** Inserta o actualiza un conjunto; al insertarlo, le crea su bloque. */
+async function saveDataset(
+  table: "od_breakdowns" | "od_heatmaps" | "od_maps" | "od_pipelines" | "od_histories",
+  kind: OdBlockKind,
+  row: { id?: string; report_id: string } & Record<string, unknown>,
+) {
+  const { id, ...fields } = row;
+  if (id) {
+    await run(supabase.from(table).update(fields).eq("id", id));
+    return;
+  }
+  const created = unwrap<{ id: string }>(await supabase.from(table).insert(fields).select("id").single());
+  await ensureBlock(row.report_id, kind, kind === "desgloses" ? null : created.id);
+}
+
 export function useSaveBreakdown() {
-  return useOdMutation(async (row: Partial<OdBreakdownRow> & { report_id: string }) => {
-    const { id, ...fields } = row;
-    if (id) await run(supabase.from("od_breakdowns").update(fields).eq("id", id));
-    else await run(supabase.from("od_breakdowns").insert(fields));
-  });
+  return useOdMutation(async (row: Partial<OdBreakdownRow> & { report_id: string }) => saveDataset("od_breakdowns", "desgloses", row));
 }
 
 export function useSaveBreakdownValues() {
@@ -245,7 +273,7 @@ export function useSaveBreakdownValues() {
         await run(supabase.from("od_breakdown_values").delete().eq("breakdown_id", breakdownId).in("label", removeLabels));
       }
       if (values.length) {
-        await run(supabase.from("od_breakdown_values").upsert(values, { onConflict: "breakdown_id,year,label" }));
+        await run(supabase.from("od_breakdown_values").upsert(values, { onConflict: "breakdown_id,year,term,label" }));
       }
       await logImport(periodId, reportId, kind, values.length, "", { tabla: "od_breakdown_values" });
     },
@@ -253,11 +281,7 @@ export function useSaveBreakdownValues() {
 }
 
 export function useSaveHeatmap() {
-  return useOdMutation(async (row: Partial<OdHeatmapRow> & { report_id: string }) => {
-    const { id, ...fields } = row;
-    if (id) await run(supabase.from("od_heatmaps").update(fields).eq("id", id));
-    else await run(supabase.from("od_heatmaps").insert(fields));
-  });
+  return useOdMutation(async (row: Partial<OdHeatmapRow> & { report_id: string }) => saveDataset("od_heatmaps", "mapa_calor", row));
 }
 
 export function useSaveHeatmapCells() {
@@ -272,11 +296,7 @@ export function useSaveHeatmapCells() {
 }
 
 export function useSaveMap() {
-  return useOdMutation(async (row: Partial<OdMapRow> & { report_id: string }) => {
-    const { id, ...fields } = row;
-    if (id) await run(supabase.from("od_maps").update(fields).eq("id", id));
-    else await run(supabase.from("od_maps").insert(fields));
-  });
+  return useOdMutation(async (row: Partial<OdMapRow> & { report_id: string }) => saveDataset("od_maps", "mapa", row));
 }
 
 export function useSaveMapValues() {
@@ -299,16 +319,42 @@ export function useSaveMapValues() {
 }
 
 export function useSavePipeline() {
-  return useOdMutation(async (row: Partial<OdPipelineRow> & { report_id: string }) => {
-    const { id, ...fields } = row;
-    if (id) await run(supabase.from("od_pipelines").update(fields).eq("id", id));
-    else await run(supabase.from("od_pipelines").insert(fields));
-  });
+  return useOdMutation(async (row: Partial<OdPipelineRow> & { report_id: string }) => saveDataset("od_pipelines", "tuberia", row));
+}
+
+export function useSaveHistory() {
+  return useOdMutation(async (row: Partial<OdHistoryRow> & { report_id: string }) => saveDataset("od_histories", "historico", row));
+}
+
+/** Cifras de una evolución histórica: periodos × categorías. Quitar un periodo o una categoría borra sus cifras. */
+export function useSaveHistoryValues() {
+  return useOdMutation(
+    async ({ periodId, reportId, historyId, values, removePeriods, removeCategories, kind }: {
+      periodId: string; reportId: string; historyId: string; values: OdHistoryValueRow[];
+      removePeriods: string[]; removeCategories: string[]; kind: OdImportKind;
+    }) => {
+      if (removePeriods.length) {
+        await run(supabase.from("od_history_values").delete().eq("history_id", historyId).in("period_label", removePeriods));
+      }
+      if (removeCategories.length) {
+        await run(supabase.from("od_history_values").delete().eq("history_id", historyId).in("category", removeCategories));
+      }
+      if (values.length) {
+        await run(supabase.from("od_history_values").upsert(values, { onConflict: "history_id,period_label,category" }));
+      }
+      await logImport(periodId, reportId, kind, values.length, "", { tabla: "od_history_values" });
+    },
+  );
 }
 
 export function useSavePipelineValues() {
   return useOdMutation(
-    async ({ periodId, reportId, values, kind }: { periodId: string; reportId: string; values: OdPipelineValueRow[]; kind: OdImportKind }) => {
+    async ({ periodId, reportId, values, removeCohorts = [], pipelineId, kind }: {
+      periodId: string; reportId: string; values: OdPipelineValueRow[]; removeCohorts?: string[]; pipelineId?: string; kind: OdImportKind;
+    }) => {
+      if (removeCohorts.length && pipelineId) {
+        await run(supabase.from("od_pipeline_values").delete().eq("pipeline_id", pipelineId).in("cohort", removeCohorts));
+      }
       if (values.length) {
         await run(supabase.from("od_pipeline_values").upsert(values, { onConflict: "pipeline_id,cohort,campus_id,stage_index" }));
       }
@@ -318,7 +364,7 @@ export function useSavePipelineValues() {
 }
 
 export function useDeleteDataset() {
-  return useOdMutation(async ({ table, id }: { table: "od_breakdowns" | "od_heatmaps" | "od_maps" | "od_pipelines"; id: string }) => {
+  return useOdMutation(async ({ table, id }: { table: "od_breakdowns" | "od_heatmaps" | "od_maps" | "od_pipelines" | "od_histories"; id: string }) => {
     await run(supabase.from(table).delete().eq("id", id));
   });
 }

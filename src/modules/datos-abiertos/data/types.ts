@@ -15,6 +15,9 @@
    ========================================================================== */
 
 import type { PublicationStatus } from "../../../types/database";
+import type { AnnualRule, Term } from "./terms";
+
+export type { AnnualRule, Term } from "./terms";
 
 export type ReportSlug = string;
 
@@ -40,7 +43,8 @@ export type BlockKind =
   | "mapa_calor"
   | "desgloses"
   | "tabla_dinamica"
-  | "metodologia";
+  | "metodologia"
+  | "historico";
 
 export interface Campus {
   id: CampusId;
@@ -50,6 +54,9 @@ export interface Campus {
 
 /** valores[año][campus] */
 export type YearCampusValues = Record<number, Partial<Record<CampusId, number | null>>>;
+
+/** valores[año][periodo][campus] */
+export type TermCampusValues = Record<number, Partial<Record<Term, Partial<Record<CampusId, number | null>>>>>;
 
 export interface Indicator {
   id: string;
@@ -68,7 +75,16 @@ export interface Indicator {
   isKpi?: boolean;
   kpiPosition?: number | null;
   isHeadline?: boolean;
+  /** Años con dato. Sin lista, todos los del periodo. */
+  years?: number[];
+  /** Cifra del año: sale de los periodos A y B según `annualRule`. */
   values: YearCampusValues;
+  /** Cómo se obtiene la cifra del año. Sin ella, la serie es solo anual. */
+  annualRule?: AnnualRule;
+  /** Cifras por periodo académico, tal como se reportaron. */
+  terms?: TermCampusValues;
+  /** Con la regla "ultimo": de qué periodo salió cada cifra anual. */
+  annualFrom?: Record<number, Partial<Record<CampusId, Term>>>;
 }
 
 export interface BreakdownItem {
@@ -85,8 +101,12 @@ export interface Breakdown {
   source: string;
   officeId?: string | null;
   defaultChart?: ChartKind;
+  /** Años con dato. Sin lista, todos los del periodo. */
+  years?: number[];
   /** Se publica para el total institucional; por campus no se desagrega. */
   values: Record<number, BreakdownItem[]>;
+  annualRule?: AnnualRule;
+  terms?: Record<number, Partial<Record<Term, BreakdownItem[]>>>;
 }
 
 /** Matriz para mapa de calor. `values[fila][columna]`; null = no aplica o sin reportar. */
@@ -108,12 +128,21 @@ export interface HeatmapData {
   emptyMeaning: string;
 }
 
+/** Qué se captura en cada etapa: estudiantes, % de la cohorte que sigue o % que se retira en el tramo. */
+export type PipelineMeasure = "estudiantes" | "permanencia" | "desercion";
+
 /** Cohorte que avanza por etapas y pierde estudiantes entre una y otra. */
 export interface PipelineCohort {
-  cohort: number;
+  /** Periodo de ingreso ("2014-A"). La semilla antigua usaba el año. */
+  cohort: string | number;
   campus: CampusId;
-  /** Estudiantes que siguen al llegar a cada etapa. El primero es el ingreso. */
+  /**
+   * Lo que sigue al llegar a cada etapa. El primero es el ingreso. En
+   * estudiantes, personas; en permanencia y deserción, % de la cohorte.
+   */
   remaining: (number | null)[];
+  /** Solo con deserción: % que se retira en el tramo que termina en cada etapa. */
+  dropout?: (number | null)[];
   /** Causa principal de retiro en cada tramo (entre etapa i e i+1). */
   mainCause: string[];
 }
@@ -123,10 +152,32 @@ export interface PipelineData {
   uuid?: string;
   title: string;
   description: string;
+  measure?: PipelineMeasure;
   stages: string[];
   cohorts: PipelineCohort[];
   source: string;
   officeId?: string | null;
+}
+
+/** La cifra en los periodos elegidos, con sus categorías y su peso en el total. */
+export interface HistoryData {
+  id: string;
+  uuid?: string;
+  title: string;
+  description: string;
+  unit: string;
+  format: ValueFormat;
+  totalLabel: string;
+  source: string;
+  officeId?: string | null;
+  /** Periodos en orden cronológico ("2020-A"). */
+  periods: string[];
+  /** Categorías en su orden (Pregrado, Posgrado…). */
+  categories: string[];
+  /** total[periodo] */
+  total: Record<string, number | null>;
+  /** values[categoría][periodo] */
+  values: Record<string, Record<string, number | null>>;
 }
 
 /** Valores por departamento (código DANE) para un año y un campus. */
@@ -140,6 +191,8 @@ export interface MapDataset {
   unit: string;
   source: string;
   officeId?: string | null;
+  /** Años con dato. Sin lista, todos los del periodo. */
+  years?: number[];
   values: Record<number, Partial<Record<CampusId, Record<string, number>>>>;
 }
 
@@ -178,7 +231,10 @@ export interface Report {
   indicators: Indicator[];
   breakdowns: Breakdown[];
   heatmaps?: HeatmapData[];
+  /** Semilla ilustrativa: una sola tubería. La base puede tener varias (`pipelines`). */
   pipeline?: PipelineData;
+  pipelines?: PipelineData[];
+  histories?: HistoryData[];
   maps?: MapDataset[];
   /** Orden y visibilidad de los bloques de la ficha. Sin bloques, el orden por defecto. */
   blocks?: ReportBlock[];
@@ -213,6 +269,7 @@ export interface OpenDataCatalog {
 export const DEFAULT_BLOCK_ORDER: BlockKind[] = [
   "kpis",
   "evolucion",
+  "historico",
   "mapa",
   "tuberia",
   "mapa_calor",
@@ -221,11 +278,15 @@ export const DEFAULT_BLOCK_ORDER: BlockKind[] = [
   "metodologia",
 ];
 
+/** Bloques que apuntan a un conjunto concreto del informe. */
+export const DATASET_BLOCKS: BlockKind[] = ["mapa", "mapa_calor", "tuberia", "historico"];
+
 export const BLOCK_LABELS: Record<BlockKind, string> = {
   kpis: "Tablero de indicadores",
   evolucion: "Evolución por campus",
   mapa: "Mapa por departamento",
   tuberia: "Tubería de permanencia",
+  historico: "Evolución histórica",
   mapa_calor: "Mapa de calor",
   desgloses: "Desgloses",
   tabla_dinamica: "Tabla dinámica",

@@ -24,7 +24,8 @@ import { ImageFlap } from "./components/ImageFlap";
 import { EmptyPeriod, OpenDataLayout } from "./components/OpenDataLayout";
 import { SplitFlap } from "./components/SplitFlap";
 import { changeBetween, formatValue, keyIndicators, useOpenDataCatalog, valueOf } from "./data/open-data";
-import type { CampusId, Indicator, OpenDataCatalog, Report } from "./data/types";
+import { cutLabel } from "./data/terms";
+import type { CampusId, Indicator, OpenDataCatalog, Report, Term } from "./data/types";
 import "./datos-abiertos.css";
 
 /** Las cuatro cifras de la fila de llegadas: informe e indicador. */
@@ -40,8 +41,8 @@ function findIndicator(data: OpenDataCatalog, slug: string, id: string): Indicat
 }
 
 /** Celdas para alinear una columna de cifras a la derecha. */
-function cellsFor(indicators: Indicator[], year: number, campus: CampusId): number {
-  return Math.max(1, ...indicators.map((i) => formatValue(valueOf(i, year, campus), i.format).length));
+function cellsFor(indicators: Indicator[], year: number, campus: CampusId, term: Term | null): number {
+  return Math.max(1, ...indicators.map((i) => formatValue(valueOf(i, year, campus, term), i.format).length));
 }
 
 export function OpenDataPortal() {
@@ -71,7 +72,7 @@ interface ContentProps extends ReturnType<typeof useBoardFilters> {
   data: OpenDataCatalog;
 }
 
-function PortalContent({ data, year, campus, setYear, setCampus, search }: ContentProps) {
+function PortalContent({ data, year, term, campus, setYear, setTerm, setCampus, search }: ContentProps) {
   const campusName = data.campuses.find((c) => c.id === campus)?.name ?? "Todos los campus";
   const arrivals = ARRIVALS.map(([slug, id]) => findIndicator(data, slug, id)).filter(
     (i): i is Indicator => Boolean(i),
@@ -96,7 +97,7 @@ function PortalContent({ data, year, campus, setYear, setCampus, search }: Conte
           <div className="u-container od-arrivals__inner">
             <p className="od-arrivals__head">
               <span>
-                Corte {year} · {campusName}
+                Corte {cutLabel(year, term)} · {campusName}
               </span>
               {data.illustrative && <span className="od-stamp">Cifras ilustrativas</span>}
             </p>
@@ -106,6 +107,7 @@ function PortalContent({ data, year, campus, setYear, setCampus, search }: Conte
                   key={indicator.id}
                   indicator={indicator}
                   year={year}
+                  term={term}
                   campus={campus}
                   campusName={campusName}
                   illustrative={data.illustrative}
@@ -126,9 +128,11 @@ function PortalContent({ data, year, campus, setYear, setCampus, search }: Conte
       <DepartureBoard
         data={data}
         year={year}
+        term={term}
         campus={campus}
         campusName={campusName}
         setYear={setYear}
+        setTerm={setTerm}
         setCampus={setCampus}
         query={query}
       />
@@ -168,19 +172,21 @@ function PortalContent({ data, year, campus, setYear, setCampus, search }: Conte
 interface BoardProps {
   data: OpenDataCatalog;
   year: number;
+  term: Term | null;
   campus: CampusId;
   campusName: string;
   setYear: (year: number) => void;
+  setTerm: (term: Term | null) => void;
   setCampus: (campus: CampusId) => void;
   query: string;
 }
 
-function DepartureBoard({ data, year, campus, campusName, setYear, setCampus, query }: BoardProps) {
+function DepartureBoard({ data, year, term, campus, campusName, setYear, setTerm, setCampus, query }: BoardProps) {
   const [activeSlug, setActiveSlug] = useState(data.reports[0]?.slug);
   const active = data.reports.find((r) => r.slug === activeSlug) ?? data.reports[0];
 
   const headlines = useMemo(() => data.reports.map((report) => keyIndicators(report)[0]), [data.reports]);
-  const headlineCells = cellsFor(headlines.filter(Boolean), year, campus);
+  const headlineCells = cellsFor(headlines.filter(Boolean), year, campus, term);
 
   return (
     <section className="od-board" id="informes" aria-labelledby="od-informes">
@@ -193,14 +199,14 @@ function DepartureBoard({ data, year, campus, campusName, setYear, setCampus, qu
               con la evolución, el detalle por campus y los datos para descargar.
             </p>
           </div>
-          <BoardControls data={data} year={year} campus={campus} setYear={setYear} setCampus={setCampus} />
+          <BoardControls data={data} year={year} term={term} campus={campus} setYear={setYear} setTerm={setTerm} setCampus={setCampus} />
         </div>
 
         <div className="od-board__grid">
           <div className="od-departures">
             <div className="od-departures__columns" aria-hidden="true">
               <span>Informe</span>
-              <span>Cifra titular · {year}</span>
+              <span>Cifra titular · {cutLabel(year, term)}</span>
               <span>Corte anterior</span>
             </div>
 
@@ -212,6 +218,7 @@ function DepartureBoard({ data, year, campus, campusName, setYear, setCampus, qu
                   indicator={headlines[index]}
                   index={index}
                   year={year}
+                  term={term}
                   campus={campus}
                   cells={headlineCells}
                   active={report.slug === active?.slug}
@@ -233,7 +240,7 @@ function DepartureBoard({ data, year, campus, campusName, setYear, setCampus, qu
                   <h3>{active.name}</h3>
                 </div>
                 <p>{active.description}</p>
-                <PlatformFigures report={active} data={data} year={year} campus={campus} campusName={campusName} />
+                <PlatformFigures report={active} data={data} year={year} term={term} campus={campus} campusName={campusName} />
                 <Link className="od-button od-button--signal" to={`/datos-abiertos/${active.slug}${query}`}>
                   Abrir el informe <Icon name="arrow-right" size={17} />
                 </Link>
@@ -251,17 +258,19 @@ function PlatformFigures({
   report,
   data,
   year,
+  term,
   campus,
   campusName,
 }: {
   report: Report;
   data: OpenDataCatalog;
   year: number;
+  term: Term | null;
   campus: CampusId;
   campusName: string;
 }) {
   const figures = keyIndicators(report).slice(1, 4);
-  const cells = cellsFor(figures, year, campus);
+  const cells = cellsFor(figures, year, campus, term);
 
   return (
     <div className="od-platform__figures">
@@ -270,6 +279,7 @@ function PlatformFigures({
           key={`${report.slug}-${indicator.id}`}
           indicator={indicator}
           year={year}
+          term={term}
           campus={campus}
           campusName={campusName}
           illustrative={data.illustrative}
@@ -288,6 +298,7 @@ interface RowProps {
   indicator: Indicator | undefined;
   index: number;
   year: number;
+  term: Term | null;
   campus: CampusId;
   cells: number;
   active: boolean;
@@ -295,9 +306,9 @@ interface RowProps {
   query: string;
 }
 
-function DepartureRow({ report, indicator, index, year, campus, cells, active, onActivate, query }: RowProps) {
-  const value = indicator ? valueOf(indicator, year, campus) : null;
-  const previous = indicator ? valueOf(indicator, year - 1, campus) : null;
+function DepartureRow({ report, indicator, index, year, term, campus, cells, active, onActivate, query }: RowProps) {
+  const value = indicator ? valueOf(indicator, year, campus, term) : null;
+  const previous = indicator ? valueOf(indicator, year - 1, campus, term) : null;
   const change = indicator ? changeBetween(indicator, value, previous) : null;
   const figure = indicator ? formatValue(value, indicator.format) : "—";
   const wave = index * 85;
@@ -347,7 +358,7 @@ function DepartureRow({ report, indicator, index, year, campus, cells, active, o
           {indicator && (
             <>
               <span>
-                {year - 1}: {previous === null ? "sin reportar" : formatValue(previous, indicator.format)}
+                {cutLabel(year - 1, term)}: {previous === null ? "sin reportar" : formatValue(previous, indicator.format)}
               </span>
               {change && (
                 <span className="od-row__change" data-reading={change.reading}>

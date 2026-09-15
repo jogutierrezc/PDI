@@ -8,11 +8,12 @@
 -- El modelo, de arriba abajo:
 --
 --   od_periods ─┬─ od_period_campuses        qué campus cubre el periodo
---               └─ od_reports ─┬─ od_indicators ── od_values (año × campus)
+--               └─ od_reports ─┬─ od_indicators ── od_values (año × periodo A/B × campus)
 --                              ├─ od_breakdowns ── od_breakdown_values
 --                              ├─ od_heatmaps ──── od_heatmap_cells
 --                              ├─ od_maps ──────── od_map_values
---                              ├─ od_pipelines ─── od_pipeline_values
+--                              ├─ od_pipelines ─── od_pipeline_values (cohorte histórica × campus × etapa)
+--                              ├─ od_histories ─── od_history_values  (periodo × categoría)
 --                              └─ od_report_blocks  orden y visibilidad de la ficha
 --
 --   od_offices       oficinas que producen las cifras (la "fuente" pública)
@@ -24,6 +25,16 @@
 -- · El periodo es global: un periodo vigente (2020-2025) para todos los
 --   informes. Abrir el siguiente copia la estructura (od_copy_period) y el
 --   anterior queda archivado y consultable.
+-- · Cada año tiene dos periodos académicos, A y B, y los indicadores se
+--   reportan por periodo. La cifra del año sale de A y B según la regla anual
+--   del indicador: suma (graduados), último periodo reportado (matrícula),
+--   promedio (tasas) o se reporta aparte (la fila con periodo 'anual').
+-- · Indicadores, desgloses y mapas declaran sus años con dato (years). NULL es
+--   "todos los años del periodo"; una lista deja fuera los años sin reporte, y
+--   ni la captura ni el portal los muestran.
+-- · Un informe puede tener varios conjuntos de cada tipo. La tubería elige qué
+--   se captura (estudiantes, permanencia % o deserción % del tramo) y sus
+--   cohortes son periodos históricos como '2014-A', no años del periodo.
 -- · Un valor ausente es NULL, nunca 0. "No reportado" y "cero" son
 --   afirmaciones distintas y el portal las pinta distinto.
 -- · El total institucional es la fila con campus_id NULL. Si el indicador
@@ -50,6 +61,15 @@ begin
   if not exists (select 1 from pg_type where typname = 'od_aggregation') then
     create type public.od_aggregation as enum ('suma', 'reportado');
   end if;
+  if not exists (select 1 from pg_type where typname = 'od_term') then
+    create type public.od_term as enum ('A', 'B', 'anual');
+  end if;
+  if not exists (select 1 from pg_type where typname = 'od_annual_rule') then
+    create type public.od_annual_rule as enum ('suma', 'ultimo', 'promedio', 'reportado');
+  end if;
+  if not exists (select 1 from pg_type where typname = 'od_pipeline_measure') then
+    create type public.od_pipeline_measure as enum ('estudiantes', 'permanencia', 'desercion');
+  end if;
   if not exists (select 1 from pg_type where typname = 'od_map_mode') then
     create type public.od_map_mode as enum ('origen', 'cobertura');
   end if;
@@ -58,12 +78,15 @@ begin
   end if;
   if not exists (select 1 from pg_type where typname = 'od_block_kind') then
     create type public.od_block_kind as enum
-      ('kpis', 'evolucion', 'mapa', 'tuberia', 'mapa_calor', 'desgloses', 'tabla_dinamica', 'metodologia');
+      ('kpis', 'evolucion', 'mapa', 'tuberia', 'mapa_calor', 'desgloses', 'tabla_dinamica', 'metodologia', 'historico');
   end if;
   if not exists (select 1 from pg_type where typname = 'od_import_kind') then
     create type public.od_import_kind as enum ('rejilla', 'pegado', 'plantilla');
   end if;
 end $$;
+
+-- Bases creadas antes de la evolución histórica.
+alter type public.od_block_kind add value if not exists 'historico';
 
 -- -----------------------------------------------------------------------------
 -- 2. Periodo y campus
@@ -193,6 +216,10 @@ create table if not exists public.od_indicators (
   format       public.od_value_format not null default 'entero',
   direction    public.od_direction not null default 'neutro',
   aggregation  public.od_aggregation not null default 'suma',
+  -- Cómo sale la cifra del año a partir de los periodos A y B.
+  annual_rule  public.od_annual_rule not null default 'suma',
+  -- Años con dato. NULL = todos los del periodo.
+  years        smallint[],
   definition   text not null default '',
   office_id    uuid references public.od_offices (id) on delete set null,
   position     smallint not null default 0,
@@ -209,6 +236,11 @@ create table if not exists public.od_indicators (
   constraint od_indicators_headline_is_kpi check (not is_headline or is_kpi)
 );
 
+-- Bases creadas antes de los periodos A y B.
+alter table public.od_indicators
+  add column if not exists annual_rule public.od_annual_rule not null default 'suma';
+alter table public.od_indicators add column if not exists years smallint[];
+
 create unique index if not exists od_indicators_one_headline
   on public.od_indicators (report_id) where is_headline;
 
@@ -221,6 +253,9 @@ create table if not exists public.od_values (
   id           uuid primary key default gen_random_uuid(),
   indicator_id uuid not null references public.od_indicators (id) on delete cascade,
   year         smallint not null,
+  -- Periodo académico del año. 'anual' solo para indicadores con regla
+  -- 'reportado': la cifra del año que no se deduce de A y B.
+  term         public.od_term not null,
   -- NULL = total institucional.
   campus_id    uuid references public.campuses (id) on delete restrict,
   value        numeric,
@@ -228,9 +263,30 @@ create table if not exists public.od_values (
   updated_by   uuid references public.profiles (id) on delete set null,
   updated_at   timestamptz not null default now(),
 
-  constraint od_values_unique unique nulls not distinct (indicator_id, year, campus_id),
+  constraint od_values_term_unique unique nulls not distinct (indicator_id, year, term, campus_id),
   constraint od_values_year_range check (year between 2000 and 2100)
 );
+
+-- Bases creadas antes de los periodos A y B: los valores que había eran del
+-- año completo y quedan como periodo B (el cierre del año). Volver a ejecutar
+-- la semilla 0020 completa el periodo A.
+do $$
+begin
+  if not exists (
+    select 1 from information_schema.columns
+    where table_schema = 'public' and table_name = 'od_values' and column_name = 'term'
+  ) then
+    alter table public.od_values add column term public.od_term not null default 'B';
+    alter table public.od_values alter column term drop default;
+  end if;
+  if exists (select 1 from pg_constraint where conname = 'od_values_unique') then
+    alter table public.od_values drop constraint od_values_unique;
+  end if;
+  if not exists (select 1 from pg_constraint where conname = 'od_values_term_unique') then
+    alter table public.od_values
+      add constraint od_values_term_unique unique nulls not distinct (indicator_id, year, term, campus_id);
+  end if;
+end $$;
 
 create index if not exists od_values_indicator on public.od_values (indicator_id);
 
@@ -240,7 +296,8 @@ create trigger od_values_set_updated_at
   for each row execute function public.set_updated_at();
 
 -- Un valor fuera de los años del periodo de su informe no se guarda: la
--- rejilla de captura no lo mostraría y el portal tampoco.
+-- rejilla de captura no lo mostraría y el portal tampoco. Tampoco un valor
+-- 'anual' en un indicador que deduce el año de sus periodos A y B.
 create or replace function public.od_value_in_period()
 returns trigger
 language plpgsql
@@ -248,8 +305,9 @@ as $$
 declare
   first_year smallint;
   last_year  smallint;
+  rule       public.od_annual_rule;
 begin
-  select p.start_year, p.end_year into first_year, last_year
+  select p.start_year, p.end_year, i.annual_rule into first_year, last_year, rule
   from public.od_indicators i
   join public.od_reports r on r.id = i.report_id
   join public.od_periods p on p.id = r.period_id
@@ -257,6 +315,10 @@ begin
 
   if new.year < first_year or new.year > last_year then
     raise exception 'El año % está fuera del periodo %-%.', new.year, first_year, last_year
+      using errcode = 'check_violation';
+  end if;
+  if new.term = 'anual' and rule <> 'reportado' then
+    raise exception 'Este indicador calcula la cifra del año a partir de los periodos A y B: no admite un valor anual aparte.'
       using errcode = 'check_violation';
   end if;
   return new;
@@ -281,20 +343,41 @@ create table if not exists public.od_breakdowns (
   format        public.od_value_format not null default 'entero',
   office_id     uuid references public.od_offices (id) on delete set null,
   default_chart public.od_chart_kind not null default 'circular',
+  -- Cómo sale la cifra del año de cada categoría a partir de A y B.
+  annual_rule   public.od_annual_rule not null default 'reportado',
+  -- Años con dato. NULL = todos los del periodo.
+  years         smallint[],
   position      smallint not null default 0,
   created_at    timestamptz not null default now(),
   constraint od_breakdowns_key_unique unique (report_id, key)
 );
 
+alter table public.od_breakdowns add column if not exists years smallint[];
+alter table public.od_breakdowns
+  add column if not exists annual_rule public.od_annual_rule not null default 'reportado';
+
 create table if not exists public.od_breakdown_values (
   id           uuid primary key default gen_random_uuid(),
   breakdown_id uuid not null references public.od_breakdowns (id) on delete cascade,
   year         smallint not null,
+  -- A, B o anual. Las cifras que ya existían quedan como anuales.
+  term         public.od_term not null default 'anual',
   label        text not null,
   position     smallint not null default 0,
   value        numeric,
-  constraint od_breakdown_values_unique unique (breakdown_id, year, label)
+  constraint od_breakdown_values_term_unique unique (breakdown_id, year, term, label)
 );
+
+-- Bases creadas antes de los desgloses por periodo (también lo hace 0021).
+alter table public.od_breakdown_values add column if not exists term public.od_term not null default 'anual';
+alter table public.od_breakdown_values drop constraint if exists od_breakdown_values_unique;
+do $$
+begin
+  if not exists (select 1 from pg_constraint where conname = 'od_breakdown_values_term_unique') then
+    alter table public.od_breakdown_values
+      add constraint od_breakdown_values_term_unique unique (breakdown_id, year, term, label);
+  end if;
+end $$;
 
 -- -----------------------------------------------------------------------------
 -- 7. Mapas de calor
@@ -340,10 +423,14 @@ create table if not exists public.od_maps (
   mode        public.od_map_mode not null default 'origen',
   unit        text not null default '',
   office_id   uuid references public.od_offices (id) on delete set null,
+  -- Años con dato. NULL = todos los del periodo.
+  years       smallint[],
   position    smallint not null default 0,
   created_at  timestamptz not null default now(),
   constraint od_maps_key_unique unique (report_id, key)
 );
+
+alter table public.od_maps add column if not exists years smallint[];
 
 create table if not exists public.od_map_values (
   map_id          uuid not null references public.od_maps (id) on delete cascade,
@@ -363,25 +450,123 @@ create table if not exists public.od_map_values (
 create table if not exists public.od_pipelines (
   id          uuid primary key default gen_random_uuid(),
   report_id   uuid not null references public.od_reports (id) on delete cascade,
+  key         text not null,
   title       text not null,
   description text not null default '',
+  -- Qué se captura en cada etapa: estudiantes que siguen, % de la cohorte que
+  -- sigue (permanencia) o % que se retira en el tramo (deserción).
+  measure     public.od_pipeline_measure not null default 'estudiantes',
   stages      text[] not null default '{}',
   office_id   uuid references public.od_offices (id) on delete set null,
+  position    smallint not null default 0,
   created_at  timestamptz not null default now(),
-  constraint od_pipelines_one_per_report unique (report_id)
+  constraint od_pipelines_key_unique unique (report_id, key)
 );
 
 create table if not exists public.od_pipeline_values (
   id          uuid primary key default gen_random_uuid(),
   pipeline_id uuid not null references public.od_pipelines (id) on delete cascade,
-  cohort      smallint not null,
+  -- Cohorte de ingreso: un periodo académico, también anterior al periodo del
+  -- informe ('2014-A').
+  cohort      text not null,
   campus_id   uuid references public.campuses (id) on delete restrict,
   stage_index smallint not null,
-  remaining   integer,
+  -- Estudiantes, o porcentaje con decimales (12,5), según la medida.
+  value       numeric,
   -- Causa principal de retiro en el tramo que termina en esta etapa.
   main_cause  text not null default '',
-  constraint od_pipeline_values_unique unique nulls not distinct (pipeline_id, cohort, campus_id, stage_index)
+  constraint od_pipeline_values_unique unique nulls not distinct (pipeline_id, cohort, campus_id, stage_index),
+  constraint od_pipeline_values_cohort check (cohort ~ '^[0-9]{4}-(A|B)$')
 );
+
+-- Bases creadas con una tubería por informe, cohortes por año y valores enteros.
+do $$
+begin
+  if exists (select 1 from pg_constraint where conname = 'od_pipelines_one_per_report') then
+    alter table public.od_pipelines drop constraint od_pipelines_one_per_report;
+  end if;
+  if not exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'od_pipelines' and column_name = 'key') then
+    alter table public.od_pipelines add column key text;
+    update public.od_pipelines set key = 'tuberia' where key is null;
+    alter table public.od_pipelines alter column key set not null;
+  end if;
+  if not exists (select 1 from pg_constraint where conname = 'od_pipelines_key_unique') then
+    alter table public.od_pipelines add constraint od_pipelines_key_unique unique (report_id, key);
+  end if;
+  alter table public.od_pipelines add column if not exists measure public.od_pipeline_measure not null default 'estudiantes';
+  alter table public.od_pipelines add column if not exists position smallint not null default 0;
+
+  if exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'od_pipeline_values' and column_name = 'cohort' and data_type = 'smallint') then
+    alter table public.od_pipeline_values alter column cohort type text using cohort::text || '-A';
+  end if;
+  if exists (select 1 from information_schema.columns where table_schema = 'public' and table_name = 'od_pipeline_values' and column_name = 'remaining') then
+    alter table public.od_pipeline_values rename column remaining to value;
+    alter table public.od_pipeline_values alter column value type numeric;
+  end if;
+  if not exists (select 1 from pg_constraint where conname = 'od_pipeline_values_cohort') then
+    alter table public.od_pipeline_values add constraint od_pipeline_values_cohort check (cohort ~ '^[0-9]{4}-(A|B)$');
+  end if;
+end $$;
+
+-- -----------------------------------------------------------------------------
+-- 9b. Evolución histórica
+--
+-- La cifra en los periodos que se elijan (también anteriores al informe) con
+-- sus categorías: 2020-A 14.324 estudiantes, 2025-B 8.888; de ellos pregrado y
+-- posgrado. La categoría '' es el total; el portal calcula el % de cada
+-- categoría frente al total y la variación entre periodos.
+-- -----------------------------------------------------------------------------
+
+create table if not exists public.od_histories (
+  id          uuid primary key default gen_random_uuid(),
+  report_id   uuid not null references public.od_reports (id) on delete cascade,
+  key         text not null,
+  title       text not null,
+  description text not null default '',
+  unit        text not null default '',
+  format      public.od_value_format not null default 'entero',
+  total_label text not null default 'Total',
+  office_id   uuid references public.od_offices (id) on delete set null,
+  position    smallint not null default 0,
+  created_at  timestamptz not null default now(),
+  constraint od_histories_key_unique unique (report_id, key)
+);
+
+create table if not exists public.od_history_values (
+  id           uuid primary key default gen_random_uuid(),
+  history_id   uuid not null references public.od_histories (id) on delete cascade,
+  period_label text not null,
+  -- '' = total; cualquier otro texto, una categoría (Pregrado, Posgrado…).
+  category     text not null default '',
+  position     smallint not null default 0,
+  value        numeric,
+  constraint od_history_values_unique unique (history_id, period_label, category),
+  constraint od_history_values_period check (period_label ~ '^[0-9]{4}-(A|B)$')
+);
+
+create index if not exists od_history_values_history on public.od_history_values (history_id);
+
+-- Un conjunto borrado se lleva sus bloques de la ficha: un bloque que apunta a
+-- nada no se puede pintar ni ordenar.
+create or replace function public.od_drop_dataset_blocks()
+returns trigger
+language plpgsql
+as $$
+begin
+  delete from public.od_report_blocks where ref_id = old.id;
+  return old;
+end;
+$$;
+
+do $$
+declare
+  t text;
+begin
+  foreach t in array array['od_heatmaps', 'od_maps', 'od_pipelines', 'od_histories'] loop
+    execute format('drop trigger if exists %I on public.%I', t || '_drop_blocks', t);
+    execute format('create trigger %I after delete on public.%I for each row execute function public.od_drop_dataset_blocks()', t || '_drop_blocks', t);
+  end loop;
+end $$;
 
 -- -----------------------------------------------------------------------------
 -- 10. Diseño de la ficha
@@ -453,9 +638,10 @@ create trigger od_reports_log_publication
 -- -----------------------------------------------------------------------------
 -- 12. Abrir el periodo siguiente copiando la estructura
 --
--- Copia informes, indicadores (con su configuración de KPI), desgloses, mapas
--- de calor, mapas, tubería y diseño de la ficha. No copia valores: el periodo
--- nuevo nace vacío y en borrador.
+-- Copia informes, indicadores (con su configuración de KPI y su regla anual),
+-- desgloses, mapas de calor, mapas, tuberías, evoluciones históricas y diseño
+-- de la ficha. No copia valores: el periodo nuevo nace vacío y en borrador.
+-- Los años con dato se reinician a "todos": el periodo nuevo tiene otros años.
 -- -----------------------------------------------------------------------------
 
 create or replace function public.od_copy_period(source uuid, new_label text, new_start smallint, new_end smallint)
@@ -488,12 +674,12 @@ begin
     returning id into new_report;
 
     insert into public.od_indicators
-      (report_id, key, label, unit, format, direction, aggregation, definition, office_id, position, is_kpi, kpi_position, is_headline)
-    select new_report, key, label, unit, format, direction, aggregation, definition, office_id, position, is_kpi, kpi_position, is_headline
+      (report_id, key, label, unit, format, direction, aggregation, annual_rule, years, definition, office_id, position, is_kpi, kpi_position, is_headline)
+    select new_report, key, label, unit, format, direction, aggregation, annual_rule, null, definition, office_id, position, is_kpi, kpi_position, is_headline
     from public.od_indicators where report_id = r.id;
 
-    insert into public.od_breakdowns (report_id, key, title, unit, format, office_id, default_chart, position)
-    select new_report, key, title, unit, format, office_id, default_chart, position
+    insert into public.od_breakdowns (report_id, key, title, unit, format, office_id, default_chart, annual_rule, years, position)
+    select new_report, key, title, unit, format, office_id, default_chart, annual_rule, null, position
     from public.od_breakdowns where report_id = r.id;
 
     insert into public.od_heatmaps
@@ -501,13 +687,17 @@ begin
     select new_report, key, title, description, row_label, column_label, rows, columns, unit, format, office_id, empty_meaning, position
     from public.od_heatmaps where report_id = r.id;
 
-    insert into public.od_maps (report_id, key, title, description, mode, unit, office_id, position)
-    select new_report, key, title, description, mode, unit, office_id, position
+    insert into public.od_maps (report_id, key, title, description, mode, unit, office_id, years, position)
+    select new_report, key, title, description, mode, unit, office_id, null, position
     from public.od_maps where report_id = r.id;
 
-    insert into public.od_pipelines (report_id, title, description, stages, office_id)
-    select new_report, title, description, stages, office_id
+    insert into public.od_pipelines (report_id, key, title, description, measure, stages, office_id, position)
+    select new_report, key, title, description, measure, stages, office_id, position
     from public.od_pipelines where report_id = r.id;
+
+    insert into public.od_histories (report_id, key, title, description, unit, format, total_label, office_id, position)
+    select new_report, key, title, description, unit, format, total_label, office_id, position
+    from public.od_histories where report_id = r.id;
 
     -- Los bloques con conjunto se reenganchan por clave al conjunto copiado.
     insert into public.od_report_blocks (report_id, kind, ref_id, position, visible, settings)
@@ -515,7 +705,8 @@ begin
       coalesce(
         (select h2.id from public.od_heatmaps h1 join public.od_heatmaps h2 on h2.key = h1.key and h2.report_id = new_report where h1.id = b.ref_id),
         (select m2.id from public.od_maps m1 join public.od_maps m2 on m2.key = m1.key and m2.report_id = new_report where m1.id = b.ref_id),
-        (select p.id from public.od_pipelines p where p.report_id = new_report and b.kind = 'tuberia')
+        (select p2.id from public.od_pipelines p1 join public.od_pipelines p2 on p2.key = p1.key and p2.report_id = new_report where p1.id = b.ref_id),
+        (select s2.id from public.od_histories s1 join public.od_histories s2 on s2.key = s1.key and s2.report_id = new_report where s1.id = b.ref_id)
       ),
       b.position, b.visible, b.settings
     from public.od_report_blocks b where b.report_id = r.id;
@@ -574,7 +765,7 @@ begin
   foreach t in array array[
     'od_periods', 'od_period_campuses', 'od_offices', 'od_reports', 'od_indicators', 'od_values',
     'od_breakdowns', 'od_breakdown_values', 'od_heatmaps', 'od_heatmap_cells', 'od_maps', 'od_map_values',
-    'od_pipelines', 'od_pipeline_values', 'od_report_blocks', 'od_imports', 'od_publications'
+    'od_pipelines', 'od_pipeline_values', 'od_histories', 'od_history_values', 'od_report_blocks', 'od_imports', 'od_publications'
   ] loop
     execute format('alter table public.%I enable row level security', t);
     execute format('drop policy if exists %I on public.%I', t || '_write', t);
@@ -641,6 +832,14 @@ drop policy if exists od_pipeline_values_read on public.od_pipeline_values;
 create policy od_pipeline_values_read on public.od_pipeline_values for select to anon, authenticated
   using (public.od_can_read((select p.report_id from public.od_pipelines p where p.id = pipeline_id)));
 
+drop policy if exists od_histories_read on public.od_histories;
+create policy od_histories_read on public.od_histories for select to anon, authenticated
+  using (public.od_can_read(report_id));
+
+drop policy if exists od_history_values_read on public.od_history_values;
+create policy od_history_values_read on public.od_history_values for select to anon, authenticated
+  using (public.od_can_read((select s.report_id from public.od_histories s where s.id = history_id)));
+
 drop policy if exists od_report_blocks_read on public.od_report_blocks;
 create policy od_report_blocks_read on public.od_report_blocks for select to anon, authenticated
   using (public.od_can_read(report_id));
@@ -657,14 +856,15 @@ create policy od_publications_read on public.od_publications for select to authe
 grant select on
   public.od_periods, public.od_period_campuses, public.od_offices, public.od_reports, public.od_indicators,
   public.od_values, public.od_breakdowns, public.od_breakdown_values, public.od_heatmaps, public.od_heatmap_cells,
-  public.od_maps, public.od_map_values, public.od_pipelines, public.od_pipeline_values, public.od_report_blocks
+  public.od_maps, public.od_map_values, public.od_pipelines, public.od_pipeline_values, public.od_histories,
+  public.od_history_values, public.od_report_blocks
   to anon, authenticated;
 
 grant select, insert, update, delete on
   public.od_periods, public.od_period_campuses, public.od_offices, public.od_reports, public.od_indicators,
   public.od_values, public.od_breakdowns, public.od_breakdown_values, public.od_heatmaps, public.od_heatmap_cells,
-  public.od_maps, public.od_map_values, public.od_pipelines, public.od_pipeline_values, public.od_report_blocks,
-  public.od_imports, public.od_publications
+  public.od_maps, public.od_map_values, public.od_pipelines, public.od_pipeline_values, public.od_histories,
+  public.od_history_values, public.od_report_blocks, public.od_imports, public.od_publications
   to authenticated;
 
 grant execute on function public.od_copy_period(uuid, text, smallint, smallint) to authenticated;

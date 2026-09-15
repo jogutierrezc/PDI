@@ -1,7 +1,8 @@
 /* =============================================================================
    Tabla dinámica.
 
-   Las cifras de un informe tienen tres dimensiones: indicador, campus y año.
+   Las cifras de un informe tienen tres dimensiones: indicador, campus y corte.
+   El corte es el año o, con el detalle "A y B", cada periodo académico.
    Quien consulta elige cuál va en filas, cuál en columnas y fija la tercera.
    Las columnas se ordenan con un clic en su encabezado, las casillas pueden
    llevar mapa de calor y lo que se ve se descarga tal cual en CSV.
@@ -12,19 +13,27 @@
 
 import { useEffect, useState } from "react";
 import { Icon } from "../../../components/ui/Icon";
-import { downloadText, formatValue, valueOf } from "../data/open-data";
-import type { Campus, CampusId, Indicator, Report } from "../data/types";
+import { cutsOf, downloadText, formatValue, valueOf } from "../data/open-data";
+import { cutLabel } from "../data/terms";
+import type { Campus, CampusId, Indicator, Report, Term } from "../data/types";
 import { ViewSwitch } from "./ChartFrame";
 
 type Dim = "indicador" | "campus" | "anio";
 
-const DIM_LABEL: Record<Dim, string> = { indicador: "Indicador", campus: "Campus", anio: "Año" };
+const DIM_LABEL: Record<Dim, string> = { indicador: "Indicador", campus: "Campus", anio: "Corte" };
+
+/** "2024" → año; "2024-A" → periodo A de 2024. */
+const parseCut = (key: string): { year: number; term: Term | null } => {
+  const [year, term] = key.split("-");
+  return { year: Number(year), term: term === "A" || term === "B" ? term : null };
+};
 
 interface PivotTableProps {
   report: Report;
   years: number[];
   campuses: Campus[];
   year: number;
+  term?: Term | null;
   campus: CampusId;
 }
 
@@ -34,25 +43,31 @@ interface Member {
   sub?: string;
 }
 
-export function PivotTable({ report, years, campuses, year, campus }: PivotTableProps) {
+export function PivotTable({ report, years, campuses, year, term = null, campus }: PivotTableProps) {
   const [rows, setRows] = useState<Dim>("indicador");
   const [cols, setCols] = useState<Dim>("anio");
   const [fixedIndicator, setFixedIndicator] = useState(report.keyIndicators[0] ?? report.indicators[0]?.id);
   const [fixedCampus, setFixedCampus] = useState<CampusId>(campus);
-  const [fixedYear, setFixedYear] = useState(year);
+  const [detail, setDetail] = useState<"anual" | "periodos">(term ? "periodos" : "anual");
+  const [fixedCut, setFixedCut] = useState(cutLabel(year, term));
   const [heat, setHeat] = useState<"si" | "no">("si");
   const [sort, setSort] = useState<{ col: string; dir: "desc" | "asc" } | null>(null);
 
   // Los filtros de la página mandan: al cambiar corte o campus arriba, la tabla los sigue.
   useEffect(() => setFixedCampus(campus), [campus]);
-  useEffect(() => setFixedYear(year), [year]);
+  useEffect(() => {
+    setFixedCut(cutLabel(year, term));
+    if (term) setDetail("periodos");
+  }, [year, term]);
+  const cuts = cutsOf(years, detail === "periodos");
+  const selectedCut = cutLabel(year, term);
 
   const fixedDim: Dim = (["indicador", "campus", "anio"] as Dim[]).find((d) => d !== rows && d !== cols)!;
 
   const members = (dim: Dim): Member[] => {
     if (dim === "indicador") return report.indicators.map((i) => ({ key: i.id, label: i.label, sub: i.unit }));
     if (dim === "campus") return campuses.map((c) => ({ key: c.id, label: c.name }));
-    return years.map((y) => ({ key: String(y), label: String(y) }));
+    return cuts.map((c) => ({ key: cutLabel(c.year, c.term), label: cutLabel(c.year, c.term) }));
   };
 
   const indicatorOf = (r: Member, c: Member): Indicator | undefined => {
@@ -65,8 +80,8 @@ export function PivotTable({ report, years, campuses, year, campus }: PivotTable
     const indicator = indicatorOf(r, c);
     if (!indicator) return { value: null, indicator };
     const campusId = pick("campus", fixedCampus) as CampusId;
-    const y = Number(pick("anio", String(fixedYear)));
-    return { value: valueOf(indicator, y, campusId), indicator };
+    const { year: y, term: t } = parseCut(pick("anio", fixedCut));
+    return { value: valueOf(indicator, y, campusId, t), indicator };
   };
 
   const rowMembers = members(rows);
@@ -134,7 +149,7 @@ export function PivotTable({ report, years, campuses, year, campus }: PivotTable
   const dims: { value: Dim; label: string }[] = [
     { value: "indicador", label: "Indicador" },
     { value: "campus", label: "Campus" },
-    { value: "anio", label: "Año" },
+    { value: "anio", label: "Corte" },
   ];
 
   return (
@@ -169,15 +184,33 @@ export function PivotTable({ report, years, campuses, year, campus }: PivotTable
             </select>
           )}
           {fixedDim === "anio" && (
-            <select value={fixedYear} onChange={(e) => setFixedYear(Number(e.target.value))}>
-              {years.map((y) => (
-                <option key={y} value={y}>
-                  {y}
+            <select value={fixedCut} onChange={(e) => setFixedCut(e.target.value)}>
+              {cuts.map((c) => (
+                <option key={cutLabel(c.year, c.term)} value={cutLabel(c.year, c.term)}>
+                  {cutLabel(c.year, c.term)}
                 </option>
               ))}
             </select>
           )}
         </label>
+        <div className="od-pivot__control">
+          <span>Detalle</span>
+          <ViewSwitch
+            label="Detalle del corte"
+            options={[
+              { value: "anual", label: "Año" },
+              { value: "periodos", label: "A y B" },
+            ]}
+            value={detail}
+            onChange={(next) => {
+              setSort(null);
+              setDetail(next);
+              // El corte fijo pasa al detalle elegido: 2024 ↔ 2024-B.
+              const { year: y } = parseCut(fixedCut);
+              setFixedCut(next === "periodos" ? cutLabel(y, term ?? "B") : String(y));
+            }}
+          />
+        </div>
         <div className="od-pivot__control">
           <span>Color</span>
           <ViewSwitch
@@ -196,7 +229,7 @@ export function PivotTable({ report, years, campuses, year, campus }: PivotTable
       </div>
 
       <div className="od-table-wrap" tabIndex={0} role="region" aria-label="Tabla dinámica, desplazable">
-        <table className="od-table od-pivot__table" key={`${rows}-${cols}-${fixedIndicator}-${fixedCampus}-${fixedYear}`}>
+        <table className="od-table od-pivot__table" key={`${rows}-${cols}-${fixedIndicator}-${fixedCampus}-${fixedCut}-${detail}`}>
           <caption className="sr-only">
             {report.name}: {DIM_LABEL[rows]} en filas y {DIM_LABEL[cols]} en columnas
           </caption>
@@ -210,7 +243,7 @@ export function PivotTable({ report, years, campuses, year, campus }: PivotTable
                     key={c.key}
                     scope="col"
                     aria-sort={active ? (sort?.dir === "desc" ? "descending" : "ascending") : "none"}
-                    data-selected={(cols === "anio" && Number(c.key) === year) || undefined}
+                    data-selected={(cols === "anio" && c.key === selectedCut) || undefined}
                   >
                     <button type="button" className="od-pivot__sort" onClick={() => toggleSort(c.key)}>
                       {c.label}
@@ -238,7 +271,7 @@ export function PivotTable({ report, years, campuses, year, campus }: PivotTable
                       key={c.key}
                       data-heat={level}
                       data-empty={value === null || undefined}
-                      data-selected={(cols === "anio" && Number(c.key) === year) || undefined}
+                      data-selected={(cols === "anio" && c.key === selectedCut) || undefined}
                     >
                       {value === null ? <span aria-label="Sin reportar">—</span> : formatValue(value, indicator?.format ?? "entero")}
                     </td>

@@ -9,7 +9,8 @@
 
 import { useQuery } from "@tanstack/react-query";
 import { assembleCatalog, fetchOpenDataRows } from "./repository";
-import type { CampusId, Indicator, OpenDataCatalog, Report, ValueFormat } from "./types";
+import type { CampusId, Indicator, OpenDataCatalog, Report, Term, ValueFormat } from "./types";
+import { ANNUAL_RULE_LABEL, annualBasis, TERMS } from "./terms";
 
 export const openDataKeys = {
   all: ["datos-abiertos"] as const,
@@ -36,9 +37,27 @@ export function findReport(data: OpenDataCatalog, slug: string | undefined): Rep
   return data.reports.find((report) => report.slug === slug);
 }
 
-export function valueOf(indicator: Indicator, year: number, campus: CampusId): number | null {
-  const value = indicator.values[year]?.[campus];
+/** Cifra de un corte: el año (sin periodo) o un periodo académico del año. */
+export function valueOf(indicator: Indicator, year: number, campus: CampusId, term?: Term | null): number | null {
+  if (indicator.years && !indicator.years.includes(year)) return null;
+  const value = term ? indicator.terms?.[year]?.[term]?.[campus] : indicator.values[year]?.[campus];
   return value === undefined ? null : value;
+}
+
+/** ¿El indicador trae cifras por periodo? */
+export function hasTerms(indicator: Indicator): boolean {
+  return Boolean(indicator.terms && indicator.annualRule);
+}
+
+/** Qué hay detrás de la cifra del corte, para el boleto: "A + B", "periodo B". */
+export function basisOf(indicator: Indicator, year: number, campus: CampusId, term?: Term | null): string | null {
+  if (term || !hasTerms(indicator) || valueOf(indicator, year, campus) === null) return null;
+  return annualBasis(indicator.annualRule, indicator.annualFrom?.[year]?.[campus]);
+}
+
+/** Cortes en orden: años, o periodos A y B de cada año. */
+export function cutsOf(years: number[], bySemester: boolean): { year: number; term: Term | null }[] {
+  return bySemester ? years.flatMap((year) => TERMS.map((term) => ({ year, term }))) : years.map((year) => ({ year, term: null }));
 }
 
 export function keyIndicators(report: Report): Indicator[] {
@@ -110,17 +129,21 @@ export function formatCutoff(iso: string): string {
 
 export function reportToCsv(report: Report, years: number[], campuses: { id: CampusId; name: string }[]): string {
   const escape = (text: string) => (/[;"\n]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text);
-  const rows: string[] = [["Informe", "Indicador", "Unidad", "Campus", ...years.map(String), "Fuente"].join(";")];
+  // Por año: el periodo A, el B y la cifra del año, en ese orden.
+  const cuts = years.flatMap((year) => [...TERMS.map((term) => ({ year, term })), { year, term: null as Term | null }]);
+  const rows: string[] = [
+    ["Informe", "Indicador", "Unidad", "Campus", ...cuts.map((c) => (c.term ? `${c.year}-${c.term}` : `${c.year} (año)`)), "Cifra del año se calcula como", "Fuente"].join(";"),
+  ];
 
   for (const indicator of report.indicators) {
     for (const campus of campuses) {
-      const cells = years.map((year) => {
-        const value = valueOf(indicator, year, campus.id);
+      const cells = cuts.map(({ year, term }) => {
+        const value = valueOf(indicator, year, campus.id, term);
         return value === null ? "" : String(value).replace(".", ",");
       });
       if (cells.every((cell) => cell === "")) continue;
       rows.push(
-        [report.name, indicator.label, indicator.unit, campus.name, ...cells, indicator.source].map(escape).join(";"),
+        [report.name, indicator.label, indicator.unit, campus.name, ...cells, indicator.annualRule ? ANNUAL_RULE_LABEL[indicator.annualRule] : "", indicator.source].map(escape).join(";"),
       );
     }
   }

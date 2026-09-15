@@ -24,6 +24,8 @@ import type {
   OdBreakdownValueRow,
   OdHeatmapCellRow,
   OdHeatmapRow,
+  OdHistoryRow,
+  OdHistoryValueRow,
   OdIndicatorRow,
   OdMapRow,
   OdMapValueRow,
@@ -41,6 +43,7 @@ import type {
   Campus,
   CampusId,
   HeatmapData,
+  HistoryData,
   Indicator,
   MapDataset,
   OpenDataCatalog,
@@ -51,6 +54,8 @@ import type {
   YearCampusValues,
 } from "./types";
 import { ALL_CAMPUSES } from "./types";
+import type { Term, TermCampusValues } from "./types";
+import { annualFigure, TERMS } from "./terms";
 
 export interface OpenDataRows {
   period: OdPeriod;
@@ -67,6 +72,8 @@ export interface OpenDataRows {
   mapValues: OdMapValueRow[];
   pipelines: OdPipelineRow[];
   pipelineValues: OdPipelineValueRow[];
+  histories: OdHistoryRow[];
+  historyValues: OdHistoryValueRow[];
   blocks: OdReportBlockRow[];
 }
 
@@ -117,26 +124,28 @@ export async function fetchOpenDataRows({ periodId, includeDrafts = false }: Fet
   const reportIds = reports.map((r) => r.id);
   const empty: OpenDataRows = {
     period, campuses, offices, reports, indicators: [], values: [], breakdowns: [], breakdownValues: [],
-    heatmaps: [], heatmapCells: [], maps: [], mapValues: [], pipelines: [], pipelineValues: [], blocks: [],
+    heatmaps: [], heatmapCells: [], maps: [], mapValues: [], pipelines: [], pipelineValues: [], histories: [],
+    historyValues: [], blocks: [],
   };
   if (reportIds.length === 0) return empty;
 
-  const [indicators, breakdowns, heatmaps, maps, pipelines, blocks] = await Promise.all([
+  const [indicators, breakdowns, heatmaps, maps, pipelines, histories, blocks] = await Promise.all([
     supabase.from("od_indicators").select("*").in("report_id", reportIds).order("position").then(unwrap<OdIndicatorRow>),
     supabase.from("od_breakdowns").select("*").in("report_id", reportIds).order("position").then(unwrap<OdBreakdownRow>),
     supabase.from("od_heatmaps").select("*").in("report_id", reportIds).order("position").then(unwrap<OdHeatmapRow>),
     supabase.from("od_maps").select("*").in("report_id", reportIds).order("position").then(unwrap<OdMapRow>),
-    supabase.from("od_pipelines").select("*").in("report_id", reportIds).then(unwrap<OdPipelineRow>),
+    supabase.from("od_pipelines").select("*").in("report_id", reportIds).order("position").then(unwrap<OdPipelineRow>),
+    supabase.from("od_histories").select("*").in("report_id", reportIds).order("position").then(unwrap<OdHistoryRow>),
     supabase.from("od_report_blocks").select("*").in("report_id", reportIds).order("position").then(unwrap<OdReportBlockRow>),
   ]);
 
   const ids = (rows: { id: string }[]) => rows.map((r) => r.id);
   const none = Promise.resolve([] as never[]);
 
-  const [values, breakdownValues, heatmapCells, mapValues, pipelineValues] = await Promise.all([
+  const [values, breakdownValues, heatmapCells, mapValues, pipelineValues, historyValues] = await Promise.all([
     indicators.length
       ? fetchAll<OdValueRow>((from, to) =>
-          supabase.from("od_values").select("indicator_id,year,campus_id,value,updated_at")
+          supabase.from("od_values").select("indicator_id,year,term,campus_id,value,updated_at")
             .in("indicator_id", ids(indicators)).order("id").range(from, to),
         )
       : none,
@@ -160,9 +169,17 @@ export async function fetchOpenDataRows({ periodId, includeDrafts = false }: Fet
           supabase.from("od_pipeline_values").select("*").in("pipeline_id", ids(pipelines)).order("cohort").range(from, to),
         )
       : none,
+    histories.length
+      ? fetchAll<OdHistoryValueRow>((from, to) =>
+          supabase.from("od_history_values").select("*").in("history_id", ids(histories)).order("period_label").range(from, to),
+        )
+      : none,
   ]);
 
-  return { ...empty, indicators, values, breakdowns, breakdownValues, heatmaps, heatmapCells, maps, mapValues, pipelines, pipelineValues, blocks };
+  return {
+    ...empty, indicators, values, breakdowns, breakdownValues, heatmaps, heatmapCells, maps, mapValues, pipelines,
+    pipelineValues, histories, historyValues, blocks,
+  };
 }
 
 /* --- Ensamblado -------------------------------------------------------------- */
@@ -178,6 +195,9 @@ export function assembleCatalog(rows: OpenDataRows): OpenDataCatalog {
   const officeName = new Map(rows.offices.map((o) => [o.id, o.name]));
   const source = (officeId: string | null) => (officeId ? officeName.get(officeId) ?? "" : "");
   const campusKey = (id: string | null): CampusId => (id === null ? ALL_CAMPUSES : slugOf.get(id) ?? id);
+  /** Años con dato dentro del periodo; sin lista, todos. */
+  const yearsOf = (list: number[] | null | undefined) =>
+    list && list.length ? list.map(Number).filter((y) => years.includes(y)).sort((a, b) => a - b) : undefined;
 
   const campuses: Campus[] = [
     { id: ALL_CAMPUSES, name: "Todos los campus" },
@@ -195,21 +215,50 @@ export function assembleCatalog(rows: OpenDataRows): OpenDataCatalog {
     const indicatorRows = rows.indicators.filter((i) => i.report_id === report.id);
 
     const indicators: Indicator[] = indicatorRows.map((row) => {
-      const values: YearCampusValues = {};
-      for (const year of years) values[year] = {};
-      for (const v of valuesByIndicator.get(row.id) ?? []) {
-        if (!values[v.year]) continue;
-        values[v.year]![campusKey(v.campus_id)] = num(v.value);
+      // Lo reportado: por periodo (A, B) y, con la regla "reportado", la cifra del año.
+      const terms: TermCampusValues = {};
+      const reported: YearCampusValues = {};
+      for (const year of years) {
+        terms[year] = { A: {}, B: {} };
+        reported[year] = {};
       }
-      // El total de lo que se suma, cuando no se capturó, sale de los campus.
+      for (const v of valuesByIndicator.get(row.id) ?? []) {
+        if (!terms[v.year]) continue;
+        if (v.term === "anual") reported[v.year]![campusKey(v.campus_id)] = num(v.value);
+        else terms[v.year]![v.term]![campusKey(v.campus_id)] = num(v.value);
+      }
+
+      // El total de lo que se suma, cuando no se capturó, sale de los campus,
+      // periodo por periodo.
+      const fillTotal = (cell: Partial<Record<CampusId, number | null>>) => {
+        if (cell[ALL_CAMPUSES] !== undefined && cell[ALL_CAMPUSES] !== null) return;
+        const parts = campusSlugs.map((slug) => cell[slug]);
+        cell[ALL_CAMPUSES] = parts.every((p) => p !== undefined && p !== null)
+          ? parts.reduce<number>((sum, p) => sum + (p as number), 0)
+          : null;
+      };
       if (row.aggregation === "suma" && campusSlugs.length > 0) {
         for (const year of years) {
-          const cell = values[year]!;
-          if (cell[ALL_CAMPUSES] !== undefined && cell[ALL_CAMPUSES] !== null) continue;
-          const parts = campusSlugs.map((slug) => cell[slug]);
-          cell[ALL_CAMPUSES] = parts.every((p) => p !== undefined && p !== null)
-            ? parts.reduce<number>((sum, p) => sum + (p as number), 0)
-            : null;
+          TERMS.forEach((term) => fillTotal(terms[year]![term]!));
+          fillTotal(reported[year]!);
+        }
+      }
+
+      // La cifra del año, campus por campus y para el total.
+      const values: YearCampusValues = {};
+      const annualFrom: Record<number, Partial<Record<CampusId, Term>>> = {};
+      for (const year of years) {
+        values[year] = {};
+        annualFrom[year] = {};
+        for (const key of [ALL_CAMPUSES, ...campusSlugs]) {
+          const figure = annualFigure(
+            row.annual_rule,
+            terms[year]!.A![key] ?? null,
+            terms[year]!.B![key] ?? null,
+            reported[year]![key] ?? null,
+          );
+          values[year]![key] = figure.value;
+          if (figure.from) annualFrom[year]![key] = figure.from;
         }
       }
       return {
@@ -226,7 +275,11 @@ export function assembleCatalog(rows: OpenDataRows): OpenDataCatalog {
         isKpi: row.is_kpi,
         kpiPosition: row.kpi_position,
         isHeadline: row.is_headline,
+        years: yearsOf(row.years),
         values,
+        annualRule: row.annual_rule,
+        terms,
+        annualFrom,
       };
     });
 
@@ -239,15 +292,27 @@ export function assembleCatalog(rows: OpenDataRows): OpenDataCatalog {
       .filter((b) => b.report_id === report.id)
       .map((b) => {
         const values: Breakdown["values"] = {};
-        rows.breakdownValues
+        const terms: NonNullable<Breakdown["terms"]> = {};
+        const sourceRows = rows.breakdownValues
           .filter((v) => v.breakdown_id === b.id)
-          .sort((x, y) => x.position - y.position)
-          .forEach((v) => {
-            (values[v.year] ??= []).push({ label: v.label, value: num(v.value) });
+          .sort((x, y) => x.position - y.position);
+        const rule = b.annual_rule ?? "reportado";
+        for (const year of yearsOf(b.years) ?? years) {
+          const yearRows = sourceRows.filter((v) => v.year === year);
+          if (!yearRows.length) continue;
+          terms[year] = {};
+          for (const term of TERMS) {
+            terms[year][term] = yearRows.filter((v) => v.term === term).map((v) => ({ label: v.label, value: num(v.value) }));
+          }
+          values[year] = Array.from(new Set(yearRows.map((v) => v.label))).map((label) => {
+            const get = (term: string) => num(yearRows.find((v) => v.label === label && (v.term ?? "anual") === term)?.value);
+            return { label, value: annualFigure(rule, get("A"), get("B"), get("anual")).value };
           });
+        }
         return {
           id: b.key, uuid: b.id, title: b.title, unit: b.unit, format: b.format,
-          source: source(b.office_id), officeId: b.office_id, defaultChart: b.default_chart, values,
+          source: source(b.office_id), officeId: b.office_id, defaultChart: b.default_chart, years: yearsOf(b.years), values,
+          annualRule: rule, terms,
         };
       });
 
@@ -280,55 +345,117 @@ export function assembleCatalog(rows: OpenDataRows): OpenDataCatalog {
           });
         return {
           id: m.key, uuid: m.id, title: m.title, description: m.description, mode: m.mode, unit: m.unit,
-          source: source(m.office_id), officeId: m.office_id, values,
+          source: source(m.office_id), officeId: m.office_id, years: yearsOf(m.years), values,
         };
       });
 
-    const pipelineRow = rows.pipelines.find((p) => p.report_id === report.id);
-    let pipeline: PipelineData | undefined;
-    if (pipelineRow) {
-      const groups = new Map<string, PipelineCohort>();
-      const stageCount = pipelineRow.stages.length;
-      rows.pipelineValues
-        .filter((v) => v.pipeline_id === pipelineRow.id)
-        .forEach((v) => {
-          const campus = campusKey(v.campus_id);
-          const key = `${v.cohort}|${campus}`;
-          const group = groups.get(key) ?? {
-            cohort: v.cohort,
-            campus,
-            remaining: Array.from({ length: stageCount }, () => null),
-            mainCause: Array.from({ length: Math.max(0, stageCount - 1) }, () => ""),
-          };
-          group.remaining[v.stage_index] = v.remaining;
-          if (v.stage_index > 0) group.mainCause[v.stage_index - 1] = v.main_cause;
-          groups.set(key, group);
-        });
-      // Total de la cohorte cuando no se capturó: suma de campus si están todos.
-      const cohorts = Array.from(new Set(Array.from(groups.values()).map((g) => g.cohort)));
-      for (const cohort of cohorts) {
-        if (groups.has(`${cohort}|${ALL_CAMPUSES}`)) continue;
-        const parts = campusSlugs.map((slug) => groups.get(`${cohort}|${slug}`));
-        if (parts.some((p) => !p)) continue;
-        groups.set(`${cohort}|${ALL_CAMPUSES}`, {
-          cohort,
-          campus: ALL_CAMPUSES,
-          remaining: Array.from({ length: stageCount }, (_, i) => {
-            const values = parts.map((p) => p!.remaining[i]);
-            return values.some((v) => v === null) ? null : values.reduce<number>((a, b) => a + (b as number), 0);
-          }),
-          mainCause: parts[0]!.mainCause,
-        });
-      }
-      pipeline = {
-        id: "tuberia", uuid: pipelineRow.id, title: pipelineRow.title, description: pipelineRow.description,
-        stages: pipelineRow.stages, cohorts: Array.from(groups.values()), source: source(pipelineRow.office_id),
-        officeId: pipelineRow.office_id,
-      };
-    }
+    const pipelines: PipelineData[] = rows.pipelines
+      .filter((p) => p.report_id === report.id)
+      .sort((a, b) => (a.position ?? 0) - (b.position ?? 0))
+      .map((p) => {
+        const measure = p.measure ?? "estudiantes";
+        const stageCount = p.stages.length;
+        const groups = new Map<string, { cohort: string; campus: CampusId; raw: (number | null)[]; mainCause: string[] }>();
+        rows.pipelineValues
+          .filter((v) => v.pipeline_id === p.id)
+          .forEach((v) => {
+            const campus = campusKey(v.campus_id);
+            const key = `${v.cohort}|${campus}`;
+            const group = groups.get(key) ?? {
+              cohort: String(v.cohort),
+              campus,
+              raw: Array.from({ length: stageCount }, () => null),
+              mainCause: Array.from({ length: Math.max(0, stageCount - 1) }, () => ""),
+            };
+            if (v.stage_index < stageCount) group.raw[v.stage_index] = num(v.value);
+            if (v.stage_index > 0) group.mainCause[v.stage_index - 1] = v.main_cause;
+            groups.set(key, group);
+          });
+
+        // Estudiantes: el total de la cohorte, si no se capturó, es la suma de los
+        // campus cuando están todos. Los porcentajes no se suman: su total se captura.
+        if (measure === "estudiantes") {
+          const cohorts = Array.from(new Set(Array.from(groups.values()).map((g) => g.cohort)));
+          for (const cohort of cohorts) {
+            if (groups.has(`${cohort}|${ALL_CAMPUSES}`)) continue;
+            const parts = campusSlugs.map((slug) => groups.get(`${cohort}|${slug}`));
+            if (parts.some((part) => !part)) continue;
+            groups.set(`${cohort}|${ALL_CAMPUSES}`, {
+              cohort,
+              campus: ALL_CAMPUSES,
+              raw: Array.from({ length: stageCount }, (_, i) => {
+                const values = parts.map((part) => part!.raw[i]);
+                return values.some((v) => v === null) ? null : values.reduce<number>((a, b) => a + (b as number), 0);
+              }),
+              mainCause: parts[0]!.mainCause,
+            });
+          }
+        }
+
+        const cohorts: PipelineCohort[] = Array.from(groups.values())
+          .sort((a, b) => a.cohort.localeCompare(b.cohort))
+          .map((g) => {
+            if (measure !== "desercion") return { cohort: g.cohort, campus: g.campus, remaining: g.raw, mainCause: g.mainCause };
+            // Deserción del tramo: de los que llegaron, qué % se retira. La
+            // cohorte entra al 100 % y cada tramo le quita su parte.
+            const remaining: (number | null)[] = [100];
+            for (let i = 1; i < stageCount; i += 1) {
+              const before = remaining[i - 1];
+              const dropout = g.raw[i];
+              remaining.push(before === null || dropout === null ? null : Math.round(before * (1 - dropout / 100) * 100) / 100);
+            }
+            return { cohort: g.cohort, campus: g.campus, remaining, dropout: g.raw, mainCause: g.mainCause };
+          });
+
+        return {
+          id: p.key, uuid: p.id, title: p.title, description: p.description, measure, stages: p.stages, cohorts,
+          source: source(p.office_id), officeId: p.office_id,
+        };
+      });
+
+    const histories: HistoryData[] = rows.histories
+      .filter((h) => h.report_id === report.id)
+      .sort((a, b) => a.position - b.position)
+      .map((h) => {
+        const list = rows.historyValues.filter((v) => v.history_id === h.id);
+        const periods = Array.from(new Set(list.map((v) => v.period_label))).sort();
+        const categories = Array.from(
+          new Map(
+            list
+              .filter((v) => v.category !== "")
+              .sort((a, b) => a.position - b.position)
+              .map((v) => [v.category, v.category]),
+          ).keys(),
+        );
+        const values: HistoryData["values"] = {};
+        const total: HistoryData["total"] = {};
+        for (const category of categories) values[category] = {};
+        for (const v of list) {
+          if (v.category === "") total[v.period_label] = num(v.value);
+          else values[v.category]![v.period_label] = num(v.value);
+        }
+        // Sin total capturado, la suma de las categorías cuando están todas.
+        for (const period of periods) {
+          if (total[period] !== undefined && total[period] !== null) continue;
+          const parts = categories.map((c) => values[c]![period]);
+          total[period] = categories.length && parts.every((part) => part !== undefined && part !== null)
+            ? parts.reduce<number>((a, b) => a + (b as number), 0)
+            : null;
+        }
+        return {
+          id: h.key, uuid: h.id, title: h.title, description: h.description, unit: h.unit, format: h.format,
+          totalLabel: h.total_label, source: source(h.office_id), officeId: h.office_id, periods, categories, total, values,
+        };
+      });
 
     const refKey = (refId: string | null) =>
-      refId === null ? null : heatmaps.find((h) => h.uuid === refId)?.id ?? maps.find((m) => m.uuid === refId)?.id ?? null;
+      refId === null
+        ? null
+        : heatmaps.find((h) => h.uuid === refId)?.id ??
+          maps.find((m) => m.uuid === refId)?.id ??
+          pipelines.find((p) => p.uuid === refId)?.id ??
+          histories.find((h) => h.uuid === refId)?.id ??
+          null;
 
     const blocks: ReportBlock[] = rows.blocks
       .filter((b) => b.report_id === report.id)
@@ -352,7 +479,8 @@ export function assembleCatalog(rows: OpenDataRows): OpenDataCatalog {
       breakdowns,
       heatmaps,
       maps,
-      pipeline,
+      pipelines,
+      histories,
       blocks,
       note: report.note || undefined,
       status: report.status,

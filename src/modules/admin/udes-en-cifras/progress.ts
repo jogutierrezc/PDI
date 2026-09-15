@@ -49,18 +49,22 @@ export function reportProgress(report: Report, rows: OpenDataRows, publications:
   const noOffice = indicators.filter((i) => !i.office_id).length;
   if (noOffice) estructuraIssues.push(`${noOffice} ${noOffice === 1 ? "indicador" : "indicadores"} sin oficina`);
 
-  /* Captura: lo que se suma pide cada campus; lo reportado pide el total. */
+  /* Captura: cada año con dato pide sus periodos A y B (y la cifra del año si
+     se reporta aparte). Lo que se suma pide cada campus; lo reportado, el total. */
   const ids = new Set(indicators.map((i) => i.id));
   const values = rows.values.filter((v) => ids.has(v.indicator_id) && v.value !== null);
+  const periodYears = Array.from({ length: years }, (_, i) => rows.period.start_year + i);
   let expected = 0;
   let filled = 0;
   for (const indicator of indicators) {
-    const own = values.filter((v) => v.indicator_id === indicator.id);
+    const ownYears = indicator.years && indicator.years.length ? periodYears.filter((y) => indicator.years!.includes(y)) : periodYears;
+    const terms = indicator.annual_rule === "reportado" ? ["A", "B", "anual"] : ["A", "B"];
+    const own = values.filter((v) => v.indicator_id === indicator.id && ownYears.includes(v.year) && terms.includes(v.term));
     if (indicator.aggregation === "suma") {
-      expected += years * campusCount;
+      expected += ownYears.length * terms.length * campusCount;
       filled += own.filter((v) => v.campus_id !== null).length;
     } else {
-      expected += years;
+      expected += ownYears.length * terms.length;
       filled += own.filter((v) => v.campus_id === null).length;
     }
   }
@@ -76,6 +80,7 @@ export function reportProgress(report: Report, rows: OpenDataRows, publications:
     ...rows.heatmaps.filter((h) => h.report_id === report.uuid),
     ...rows.maps.filter((m) => m.report_id === report.uuid),
     ...rows.pipelines.filter((p) => p.report_id === report.uuid),
+    ...rows.histories.filter((h) => h.report_id === report.uuid),
   ].filter((set) => !referenced.has(set.id)).length;
   if (orphanSets) disenoIssues.push(`${orphanSets} ${orphanSets === 1 ? "conjunto sin bloque" : "conjuntos sin bloque"}`);
 

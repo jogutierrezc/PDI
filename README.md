@@ -53,10 +53,25 @@ pegarlos en el editor SQL del panel de Supabase o aplicarlos con la CLI
 | `0016_pdi_por_facultad.sql` | Facultades, sus planes de acción y el enganche con los pilares del PDI |
 | `0017_pdi_por_campus.sql` | Estructura real del plan (21 áreas, 62 líneas) y lo que reporta cada sede |
 | `0018_normalizar_estructura.sql` | Fusionar la estructura duplicada y retirar la de ejemplo |
-| `0019_udes_en_cifras.sql` | UDES en Cifras: periodo global, campus, oficinas, informes, indicadores, valores, conjuntos visuales, diseño de la ficha, trazabilidad y RLS |
+| `0019_udes_en_cifras.sql` | UDES en Cifras: periodo global, campus, oficinas, informes, indicadores por periodos A y B con regla anual, años con dato, conjuntos visuales (varios por tipo: desgloses, evolución histórica, tuberías, mapas de calor, mapas), diseño de la ficha, trazabilidad y RLS |
 | `0020_udes_en_cifras_datos_iniciales.sql` | Periodo 2020-2025 con los nueve informes y cifras **ilustrativas** (generada, no editar a mano) |
+| `0021_desgloses_por_periodo.sql` | Desgloses por A/B y cifra anual; clave de guardado por periodo y años habilitados |
 
 Todos son idempotentes: volver a ejecutarlos no duplica nada.
+
+**Si ya habías aplicado una versión anterior de 0019/0020** (antes de los periodos A y B),
+vuelve a ejecutar, en este orden, `0019`, `0020` y `0021`. La 0019 convierte lo que
+había sin perder datos: los valores anuales pasan a periodo B, las cohortes de la tubería
+de "2021" a "2021-A" y la tubería única queda con la clave `tuberia`. La 0020 completa el
+periodo A de las cifras ilustrativas. Las tres son idempotentes y se probaron en
+Postgres en base nueva y en base con la versión anterior.
+
+Para actualizar los desgloses, aplica `0021_desgloses_por_periodo.sql` antes de
+publicar la aplicación. Conserva los valores existentes como cifras anuales
+independientes; A y B quedan sin reportar. En **Captura → Desgloses** se elige
+la regla anual (suma, promedio, último periodo o reporte aparte). Los años se
+habilitan en Captura con **Todos / Solo algunos**; en el portal, **Años visibles**
+filtra la consulta sin cambiar la configuración guardada.
 
 Antes de subir una migración, `npm run check:sql` avisa de las columnas que
 referencia y no existen —el fallo que Supabase reporta como `column p.area_id
@@ -670,11 +685,12 @@ periodo publicado, la página lo dice en lugar de quedar en blanco.
 
 ```
 od_periods ─┬─ od_period_campuses          campus que cubre el periodo (enlaza a campuses)
-            └─ od_reports ─┬─ od_indicators ── od_values (año × campus; campus NULL = total)
-                           ├─ od_breakdowns ── od_breakdown_values
+            └─ od_reports ─┬─ od_indicators ── od_values (año × periodo A/B × campus; campus NULL = total)
+                           ├─ od_breakdowns ── od_breakdown_values (año × periodo × categoría)
+                           ├─ od_histories ─── od_history_values (periodo "2020-A" × categoría)
                            ├─ od_heatmaps ──── od_heatmap_cells
                            ├─ od_maps ──────── od_map_values (año × campus × departamento DANE)
-                           ├─ od_pipelines ─── od_pipeline_values (cohorte × campus × etapa)
+                           ├─ od_pipelines ─── od_pipeline_values (cohorte "2014-A" × campus × etapa)
                            └─ od_report_blocks  orden, visibilidad y ajustes de la ficha
 od_offices        oficinas fuente ("Reporta:")
 od_imports        rastro de cada carga: rejilla, pegado o plantilla
@@ -685,6 +701,29 @@ od_publications   rastro de cada publicación (lo escribe un disparador)
   años son las columnas de la captura, y un valor fuera de ellos se rechaza en la base.
   `od_copy_period()` abre el siguiente y copia la estructura: informes, indicadores con
   sus KPI, conjuntos y diseño. No copia cifras.
+- **Periodos A y B.** Cada indicador se captura por periodo académico de cada año
+  (`od_values.term`). La cifra del año no se guarda: sale de A y B según
+  `annual_rule` del indicador: `suma` (graduados, primer ingreso), `ultimo` (matrícula,
+  docentes: el B, o el A si falta el B), `promedio` (tasas) o `reportado` (se captura
+  en su propia columna, periodo `anual`). La regla vive en `data/terms.ts` y la usan a la
+  vez el portal y la rejilla de captura. En el portal, **Periodo: Año · A · B** cambia el
+  corte de toda la ficha (`?periodo=B`), y el boleto dice de dónde sale la cifra del año
+  ("A + B", "periodo B").
+- **Años con dato.** Indicadores, desgloses y mapas tienen `years`: `NULL` es "todos los
+  del periodo"; una lista deja fuera los años sin reporte. Se ajusta en Estructura y KPI
+  y en Captura (**Años con dato**). Ni la captura ni las gráficas pintan años fuera.
+- **Conjuntos a elección.** Un informe puede tener varios conjuntos de cada tipo. Al crear
+  uno, entra solo a la ficha como bloque visible (antes había que añadirlo en Diseño
+  visual, y por eso una tubería recién creada no se veía). Borrar un conjunto borra su
+  bloque (disparador).
+- **Tuberías.** Cada una elige qué se captura: `estudiantes` que siguen, `permanencia`
+  (% de la cohorte que sigue) o `desercion` (% que se retira en cada tramo; el portal
+  calcula cuánto sigue). Las cohortes son periodos de ingreso, también históricos
+  (`2014-A` a `2023-B`), y los porcentajes admiten decimales (12,5). Con porcentajes el
+  total institucional se captura: no se suma.
+- **Evolución histórica.** La cifra en los periodos que se elijan (2020-A: 14.324 →
+  2025-B: 8.888) con sus categorías (pregrado, posgrado). El portal compara dos periodos
+  con la variación, el % de cada categoría frente al total y la serie completa.
 - **Vacío no es cero.** Un valor ausente es `NULL` y el portal lo pinta "sin reportar".
 - **El total institucional** es la fila con `campus_id` NULL. Si el indicador agrega por
   `suma`, el portal suma los campus cuando no se capturó. Si agrega por `reportado`
@@ -715,8 +754,10 @@ estación.
    publicación, campus cubiertos, oficinas fuente y apertura del periodo siguiente.
 2. **Estructura y KPI**: ficha del informe (nombre, código, color de línea, textos,
    imagen), indicadores, tablero de KPI con titular y conjuntos visuales.
-3. **Captura**: rejillas por indicador × campus × año, y también para desgloses, mapas de
-   calor, mapas y tubería. Se escribe casilla por casilla, se pega un rango de Excel o se
+3. **Captura**: rejillas por indicador × campus × año con sus columnas A, B y la cifra del
+   año (calculada, o editable si se reporta aparte), y también para desgloses, evolución
+   histórica, mapas de calor, mapas y tuberías (cohortes por rango de periodos). Al pegar
+   desde Excel se saltan las columnas calculadas. Se escribe casilla por casilla, se pega un rango de Excel o se
    sube la plantilla CSV, con vista previa de cada cambio antes de pasarla a la rejilla.
    Nada se guarda sin pulsar Guardar, y cada guardado queda en `od_imports`.
 4. **Diseño visual**: orden de los bloques de la ficha (arrastrando o con flechas),

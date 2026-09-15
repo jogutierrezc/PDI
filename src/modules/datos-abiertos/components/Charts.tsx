@@ -28,6 +28,8 @@ interface YearBarsProps {
   format: ValueFormat;
   unit: string;
   onSelectYear?: (year: number) => void;
+  /** Rótulo de cada corte. Por defecto, el número tal cual (el año). */
+  tickLabel?: (year: number) => string;
 }
 
 function niceMax(max: number): number {
@@ -38,7 +40,7 @@ function niceMax(max: number): number {
   return nice * exponent;
 }
 
-export function YearBars({ title, points, selectedYear, format, unit, onSelectYear }: YearBarsProps) {
+export function YearBars({ title, points, selectedYear, format, unit, onSelectYear, tickLabel = String }: YearBarsProps) {
   const ref = useRef<HTMLDivElement>(null);
   const seen = useInView(ref);
   const [hover, setHover] = useState<number | null>(null);
@@ -67,7 +69,7 @@ export function YearBars({ title, points, selectedYear, format, unit, onSelectYe
           {points.map((point, index) => {
             const selected = point.year === selectedYear;
             const height = point.value === null ? 100 : (point.value / max) * 100;
-            const label = `${point.year}: ${formatWithUnit(point.value, format, unit)}`;
+            const label = `${tickLabel(point.year)}: ${formatWithUnit(point.value, format, unit)}`;
             return (
               <div role="listitem" key={point.year} className="od-yearbars__slot">
                 <button
@@ -96,11 +98,11 @@ export function YearBars({ title, points, selectedYear, format, unit, onSelectYe
                   )}
                 </button>
                 <span className="od-yearbars__year" aria-hidden="true">
-                  {point.year}
+                  {tickLabel(point.year)}
                 </span>
                 {focusPoint?.year === point.year && (
                   <span className="od-tooltip" role="presentation">
-                    <strong>{point.year}</strong>
+                    <strong>{tickLabel(point.year)}</strong>
                     {formatWithUnit(point.value, format, unit)}
                   </span>
                 )}

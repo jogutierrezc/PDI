@@ -32,6 +32,8 @@ interface LineChartProps {
   selectedYear: number;
   onSelectYear?: (year: number) => void;
   initiallyHidden?: string[];
+  /** Rótulo de cada corte. Por defecto, el número tal cual (el año). */
+  tickLabel?: (year: number) => string;
 }
 
 const HEIGHT = 300;
@@ -46,6 +48,7 @@ export function LineChart({
   selectedYear,
   onSelectYear,
   initiallyHidden = [],
+  tickLabel = String,
 }: LineChartProps) {
   const wrap = useRef<HTMLDivElement>(null);
   const width = useWidth(wrap);
@@ -197,18 +200,21 @@ export function LineChart({
             </g>
           ))}
 
-          {years.map((year, i) => (
-            <text
-              key={year}
-              className="od-lines__year"
-              data-selected={i === selectedIndex || undefined}
-              x={x(i)}
-              y={HEIGHT - 10}
-              textAnchor="middle"
-            >
-              {year}
-            </text>
-          ))}
+          {years.map((year, i) =>
+            // Con muchos cortes en poco ancho, un rótulo sí y otro no; el elegido siempre.
+            years.length > 8 && innerW / years.length < 56 && i % 2 === 1 && i !== selectedIndex ? null : (
+              <text
+                key={year}
+                className="od-lines__year"
+                data-selected={i === selectedIndex || undefined}
+                x={x(i)}
+                y={HEIGHT - 10}
+                textAnchor="middle"
+              >
+                {tickLabel(year)}
+              </text>
+            ),
+          )}
 
           {visible.map((s, index) => (
             <path
@@ -266,7 +272,7 @@ export function LineChart({
             y={M.top}
             align={tipIndex === 0 ? "start" : tipIndex === years.length - 1 ? "end" : "center"}
           >
-            <strong>{years[tipIndex]}</strong>
+            <strong>{tickLabel(years[tipIndex])}</strong>
             {visible.map((s) => (
               <span key={s.id} className="od-tip__row">
                 <i style={{ background: s.color }} />

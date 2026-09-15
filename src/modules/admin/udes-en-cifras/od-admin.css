@@ -1865,3 +1865,276 @@
   .oda-preview,
   .oda-preview[data-open] { transition: none; }
 }
+
+/* --- Periodos A y B en la rejilla ---------------------------------------------------
+   Cabecera en dos filas: el año arriba y sus columnas A, B y Año debajo. Las dos
+   filas se pegan bajo la cabecera de la intranet; la segunda, debajo de la primera. */
+
+.oda-grid {
+  --oda-group-h: 2rem;
+}
+
+.oda-grid__groups th {
+  height: var(--oda-group-h);
+  padding-block: 0;
+  color: var(--ink);
+  text-align: center;
+}
+
+.oda-grid thead .oda-grid__groups th:first-child {
+  text-align: left;
+}
+
+.oda-grid__subheads th {
+  top: calc(var(--admin-topbar-h, 0px) + var(--oda-group-h));
+}
+
+.oda-grid-wrap[data-overflow] .oda-grid__subheads th {
+  top: var(--oda-group-h);
+}
+
+.oda-grid [data-group-start] {
+  border-left: 1px solid var(--line-strong);
+}
+
+@media (max-width: 900px) {
+  .oda-grid__subheads th { top: var(--oda-group-h); }
+}
+
+/* --- Barra de herramientas sobre una rejilla ---------------------------------------- */
+
+.oda-grid-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2) var(--space-4);
+  font-size: var(--text-sm);
+}
+
+.oda-grid-toolbar__field,
+.oda-grid-toolbar__group {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.oda-grid-toolbar__field > span {
+  color: var(--ink-secondary);
+  font-size: var(--text-xs);
+  font-weight: 700;
+}
+
+.oda-grid-toolbar select,
+.oda-grid-toolbar input:not([type="checkbox"]):not([type="radio"]),
+.oda-period-input input,
+.oda-period-input select {
+  min-height: 36px;
+  padding: var(--space-1) var(--space-3);
+  color: var(--ink);
+  background: var(--surface-2);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-xs);
+  font: inherit;
+  font-size: var(--text-sm);
+}
+
+.oda-grid-toolbar :is(select, input):focus-visible,
+.oda-period-input :is(select, input):focus-visible {
+  outline: none;
+  border-color: var(--brand-blue);
+  box-shadow: var(--ring);
+}
+
+.oda-grid-toolbar .button-secondary {
+  padding: var(--space-2) var(--space-4);
+  font-size: var(--text-xs);
+}
+
+.oda-period-input {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+}
+
+.oda-period-input__label {
+  color: var(--ink-secondary);
+  font-size: var(--text-xs);
+  font-weight: 700;
+}
+
+.oda-period-input input {
+  width: 5.5rem;
+  font-variant-numeric: tabular-nums;
+}
+
+/* --- Años con dato -------------------------------------------------------------------- */
+
+.oda-years {
+  display: grid;
+  gap: var(--space-2);
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.oda-years legend {
+  margin-bottom: var(--space-1);
+  padding: 0;
+  color: var(--ink-secondary);
+  font-size: var(--text-xs);
+  font-weight: 700;
+}
+
+.oda-years__mode {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1) var(--space-4);
+  font-size: var(--text-sm);
+}
+
+.oda-years__mode label {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.oda-years__chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1);
+}
+
+.oda-year-chip {
+  min-width: 3.5rem;
+  min-height: 32px;
+  padding: 0 var(--space-3);
+  color: var(--ink-secondary);
+  background: var(--surface);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-pill);
+  font: inherit;
+  font-size: var(--text-xs);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  cursor: pointer;
+  transition:
+    background-color var(--dur-fast) ease,
+    border-color var(--dur-fast) ease,
+    color var(--dur-fast) ease;
+}
+
+.oda-year-chip[aria-pressed="true"] {
+  color: var(--brand-blue);
+  background: var(--brand-blue-soft);
+  border-color: var(--brand-blue);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .oda-year-chip:not([aria-pressed="true"]):hover { border-color: var(--brand-blue); }
+}
+
+.oda-years-panel {
+  background: var(--surface-2);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+}
+
+.oda-years-panel summary {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--space-1) var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  font-size: var(--text-sm);
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.oda-years-panel summary small {
+  color: var(--ink-muted);
+  font-weight: 500;
+}
+
+.oda-years-panel__body {
+  display: grid;
+  gap: var(--space-3);
+  padding: 0 var(--space-4) var(--space-4);
+}
+
+.oda-years-panel ul {
+  display: grid;
+  gap: var(--space-3);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.oda-years-panel li {
+  display: grid;
+  grid-template-columns: minmax(10rem, 16rem) minmax(0, 1fr);
+  align-items: start;
+  gap: var(--space-2) var(--space-4);
+  padding-top: var(--space-3);
+  border-top: 1px solid var(--line-faint);
+}
+
+.oda-years-panel li strong { font-size: var(--text-sm); }
+
+/* El nombre ya va a la izquierda; la leyenda queda para lectores de pantalla. */
+.oda-years-panel li legend {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+}
+
+@media (max-width: 640px) {
+  .oda-years-panel li { grid-template-columns: minmax(0, 1fr); }
+}
+
+.oda-form-note {
+  margin: 0;
+  color: var(--ink-secondary);
+  font-size: var(--text-xs);
+}
+
+/* Correcciones de maquetación de los periodos A y B ------------------------------------ */
+
+/* Una rejilla o un formulario ancho se desplaza dentro de su marco: no ensancha el panel. */
+.oda-panel__body > * {
+  min-width: 0;
+}
+
+/* Tabla de indicadores con columnas fijas: el formulario que se abre en una fila
+   ocupa el ancho de la tabla, no el que pediría su contenido. */
+.oda-table--indicators {
+  table-layout: fixed;
+}
+
+.oda-table--indicators th:nth-child(1) { width: 30%; }
+.oda-table--indicators th:nth-child(2) { width: 15%; }
+.oda-table--indicators th:nth-child(3) { width: 18%; }
+.oda-table--indicators th:nth-child(4) { width: 18%; }
+.oda-table--indicators :is(th, td) { overflow-wrap: break-word; }
+
+.oda-field-hint {
+  color: var(--ink-muted);
+  font-size: var(--text-2xs);
+  line-height: var(--leading-snug);
+}
+
+/* Cabecera en dos filas: el año centrado sobre sus columnas, y la primera
+   columna de la segunda fila (A) no hereda el rótulo pegado a la izquierda. */
+.oda-grid thead .oda-grid__groups th:not(:first-child) {
+  text-align: center;
+}
+
+.oda-grid thead .oda-grid__subheads th,
+.oda-grid thead .oda-grid__subheads th:first-child {
+  left: auto;
+  z-index: 2;
+  text-align: right;
+}

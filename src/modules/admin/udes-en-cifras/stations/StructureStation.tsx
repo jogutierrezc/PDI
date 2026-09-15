@@ -8,8 +8,9 @@
    3. Qué destaca: el tablero de KPI. Se marcan las cifras clave, se ordenan y
       se elige una titular, que es la que representa al informe en el tablero
       público.
-   Y al final, sus conjuntos visuales (desgloses, mapas de calor, mapas,
-   tubería): aquí se definen; sus cifras se cargan en Captura.
+   Y al final, sus conjuntos visuales (desgloses, evoluciones históricas,
+   tuberías, mapas de calor, mapas), varios de cada tipo si hace falta: aquí se
+   definen; sus cifras se cargan en Captura.
    ========================================================================== */
 
 import { useEffect, useState } from "react";
@@ -17,25 +18,29 @@ import type { CSSProperties } from "react";
 import { Icon } from "../../../../components/ui/Icon";
 import type {
   OdAggregation,
+  OdAnnualRule,
   OdChartKind,
   OdDirection,
   OdIndicatorRow,
   OdMapMode,
+  OdPipelineMeasure,
   OdValueFormat,
 } from "../../../../types/database";
+import { ANNUAL_RULE_HINT, ANNUAL_RULE_LABEL } from "../../../datos-abiertos/data/terms";
 import type { StationProps } from "../OdAdmin";
 import {
   useDeleteDataset,
   useDeleteIndicator,
   useSaveBreakdown,
   useSaveHeatmap,
+  useSaveHistory,
   useSaveIndicator,
   useSaveKpis,
   useSaveMap,
   useSavePipeline,
   useSaveReport,
 } from "../od-data";
-import { ConfirmButton, Panel, SaveState, StageEmpty, slugify } from "../ui";
+import { ConfirmButton, Panel, SaveState, StageEmpty, YearPicker, slugify } from "../ui";
 
 const FORMAT_LABEL: Record<OdValueFormat, string> = { entero: "Entero", porcentaje: "Porcentaje", decimal: "Decimal" };
 const DIRECTION_LABEL: Record<OdDirection, string> = { sube: "Subir es mejor", baja: "Bajar es mejor", neutro: "Neutro" };
@@ -53,8 +58,8 @@ export function StructureStation({ data, report, canEdit }: StationProps) {
     <div className="oda-stack">
       <ReportForm key={reportRow.id + reportRow.updated_at} row={reportRow} canEdit={canEdit} />
       <KpiBoardEditor key={`kpi-${reportRow.id}-${indicators.map((i) => `${i.id}${i.is_kpi}${i.kpi_position}${i.is_headline}`).join()}`} reportId={reportRow.id} indicators={indicators} canEdit={canEdit} />
-      <IndicatorsEditor reportId={reportRow.id} indicators={indicators} offices={data.rows.offices} canEdit={canEdit} />
-      <DatasetsEditor data={data} reportId={reportRow.id} canEdit={canEdit} />
+      <IndicatorsEditor reportId={reportRow.id} indicators={indicators} offices={data.rows.offices} years={data.catalog.years} canEdit={canEdit} />
+      <DatasetsEditor data={data} reportId={reportRow.id} years={data.catalog.years} canEdit={canEdit} />
     </div>
   );
 }
@@ -241,21 +246,27 @@ function KpiBoardEditor({ reportId, indicators, canEdit }: { reportId: string; i
 
 /* --- 2. Indicadores -------------------------------------------------------------------- */
 
-type IndicatorDraft = Pick<OdIndicatorRow, "label" | "key" | "unit" | "format" | "direction" | "aggregation" | "definition" | "office_id">;
+type IndicatorDraft = Pick<
+  OdIndicatorRow,
+  "label" | "key" | "unit" | "format" | "direction" | "aggregation" | "annual_rule" | "years" | "definition" | "office_id"
+>;
 
 const emptyIndicator: IndicatorDraft = {
-  label: "", key: "", unit: "", format: "entero", direction: "sube", aggregation: "suma", definition: "", office_id: null,
+  label: "", key: "", unit: "", format: "entero", direction: "sube", aggregation: "suma", annual_rule: "suma", years: null,
+  definition: "", office_id: null,
 };
 
 function IndicatorsEditor({
   reportId,
   indicators,
   offices,
+  years,
   canEdit,
 }: {
   reportId: string;
   indicators: OdIndicatorRow[];
   offices: StationProps["data"]["rows"]["offices"];
+  years: number[];
   canEdit: boolean;
 }) {
   const save = useSaveIndicator();
@@ -266,7 +277,7 @@ function IndicatorsEditor({
     <Panel
       id="oda-indicadores"
       title={`Indicadores (${indicators.length})`}
-      description="Cada indicador es una fila de captura. Si el total institucional es la suma de los campus, se calcula; si es una tasa o un promedio, se captura aparte."
+      description="Cada indicador se captura por periodo A y B de cada año. La cifra del año sale de A y B según su regla; el total institucional se suma de los campus o se captura aparte. Cada uno marca sus años con dato."
       actions={
         <>
           <SaveState pending={save.isPending || remove.isPending} error={save.error ?? remove.error} success={save.isSuccess || remove.isSuccess} />
@@ -280,9 +291,8 @@ function IndicatorsEditor({
         <thead>
           <tr>
             <th scope="col">Indicador</th>
-            <th scope="col">Unidad</th>
-            <th scope="col">Formato</th>
             <th scope="col">Total</th>
+            <th scope="col">Cifra del año</th>
             <th scope="col">Reporta</th>
             <th scope="col"><span className="sr-only">Acciones</span></th>
           </tr>
@@ -290,10 +300,11 @@ function IndicatorsEditor({
         <tbody>
           {open === "nuevo" && (
             <tr className="oda-table__editor">
-              <td colSpan={6}>
+              <td colSpan={5}>
                 <IndicatorForm
                   initial={emptyIndicator}
                   offices={offices}
+                  years={years}
                   submitLabel="Crear indicador"
                   onCancel={() => setOpen(null)}
                   onSubmit={(draft) =>
@@ -309,10 +320,11 @@ function IndicatorsEditor({
           {indicators.map((indicator) =>
             open === indicator.id ? (
               <tr key={indicator.id} className="oda-table__editor">
-                <td colSpan={6}>
+                <td colSpan={5}>
                   <IndicatorForm
                     initial={indicator}
                     offices={offices}
+                    years={years}
                     submitLabel="Guardar indicador"
                     lockKey
                     onCancel={() => setOpen(null)}
@@ -324,11 +336,14 @@ function IndicatorsEditor({
               <tr key={indicator.id}>
                 <th scope="row">
                   {indicator.label}
-                  <small>{indicator.key}{indicator.is_kpi ? " · cifra clave" : ""}</small>
+                  <small>
+                    {indicator.unit || "sin unidad"} · {FORMAT_LABEL[indicator.format].toLowerCase()} · {indicator.key}
+                    {indicator.is_kpi ? " · cifra clave" : ""}
+                    {indicator.years && indicator.years.length ? ` · años ${indicator.years.join(", ")}` : ""}
+                  </small>
                 </th>
-                <td>{indicator.unit || "—"}</td>
-                <td>{FORMAT_LABEL[indicator.format]}</td>
                 <td>{AGGREGATION_LABEL[indicator.aggregation]}</td>
+                <td>{ANNUAL_RULE_LABEL[indicator.annual_rule]}</td>
                 <td>
                   {offices.find((o) => o.id === indicator.office_id)?.name ?? (
                     <span className="oda-badge" data-tone="warn">
@@ -356,6 +371,7 @@ function IndicatorsEditor({
 function IndicatorForm({
   initial,
   offices,
+  years,
   submitLabel,
   onSubmit,
   onCancel,
@@ -363,6 +379,7 @@ function IndicatorForm({
 }: {
   initial: IndicatorDraft;
   offices: StationProps["data"]["rows"]["offices"];
+  years: number[];
   submitLabel: string;
   onSubmit: (draft: IndicatorDraft) => void;
   onCancel: () => void;
@@ -370,7 +387,8 @@ function IndicatorForm({
 }) {
   const [draft, setDraft] = useState<IndicatorDraft>({
     label: initial.label, key: initial.key, unit: initial.unit, format: initial.format, direction: initial.direction,
-    aggregation: initial.aggregation, definition: initial.definition, office_id: initial.office_id,
+    aggregation: initial.aggregation, annual_rule: initial.annual_rule, years: initial.years, definition: initial.definition,
+    office_id: initial.office_id,
   });
   const key = draft.key || slugify(draft.label);
 
@@ -423,6 +441,15 @@ function IndicatorForm({
           </select>
         </label>
         <label className="admin-field">
+          <span>Cifra del año</span>
+          <select value={draft.annual_rule} onChange={(e) => setDraft({ ...draft, annual_rule: e.target.value as OdAnnualRule })}>
+            {Object.entries(ANNUAL_RULE_LABEL).map(([value, label]) => (
+              <option key={value} value={value}>{label}</option>
+            ))}
+          </select>
+          <small className="oda-field-hint">{ANNUAL_RULE_HINT[draft.annual_rule]}</small>
+        </label>
+        <label className="admin-field">
           <span>Oficina que reporta</span>
           <select value={draft.office_id ?? ""} onChange={(e) => setDraft({ ...draft, office_id: e.target.value || null })}>
             <option value="">Sin oficina</option>
@@ -431,6 +458,9 @@ function IndicatorForm({
             ))}
           </select>
         </label>
+        <div className="admin-field--wide">
+          <YearPicker years={years} value={draft.years} onChange={(next) => setDraft({ ...draft, years: next })} />
+        </div>
         <label className="admin-field admin-field--wide">
           <span>Qué mide y cómo</span>
           <textarea rows={2} value={draft.definition} onChange={(e) => setDraft({ ...draft, definition: e.target.value })} />
@@ -446,95 +476,122 @@ function IndicatorForm({
 
 /* --- Conjuntos visuales --------------------------------------------------------------------- */
 
-function DatasetsEditor({ data, reportId, canEdit }: { data: StationProps["data"]; reportId: string; canEdit: boolean }) {
+type DatasetKind = "desglose" | "calor" | "mapa" | "tuberia" | "historico";
+
+const MEASURE_LABEL: Record<OdPipelineMeasure, string> = {
+  estudiantes: "Estudiantes que siguen en cada etapa",
+  permanencia: "Permanencia: % de la cohorte que sigue en cada etapa",
+  desercion: "Deserción: % que se retira en cada tramo",
+};
+
+/** Clave legible y única dentro del informe: "tuberia", "tuberia-2"… */
+const uniqueKey = (title: string, taken: string[]) => {
+  const base = slugify(title) || "conjunto";
+  let key = base;
+  for (let n = 2; taken.includes(key); n += 1) key = `${base}-${n}`;
+  return key;
+};
+
+function DatasetsEditor({ data, reportId, years, canEdit }: { data: StationProps["data"]; reportId: string; years: number[]; canEdit: boolean }) {
   const saveBreakdown = useSaveBreakdown();
   const saveHeatmap = useSaveHeatmap();
   const saveMap = useSaveMap();
   const savePipeline = useSavePipeline();
+  const saveHistory = useSaveHistory();
   const remove = useDeleteDataset();
-  const [adding, setAdding] = useState<"desglose" | "calor" | "mapa" | "tuberia" | null>(null);
+  const [adding, setAdding] = useState<DatasetKind | null>(null);
   const [editing, setEditing] = useState<string | null>(null);
 
   const breakdowns = data.rows.breakdowns.filter((b) => b.report_id === reportId);
   const heatmaps = data.rows.heatmaps.filter((h) => h.report_id === reportId);
   const maps = data.rows.maps.filter((m) => m.report_id === reportId);
-  const pipeline = data.rows.pipelines.find((p) => p.report_id === reportId);
+  const pipelines = data.rows.pipelines.filter((p) => p.report_id === reportId);
+  const histories = data.rows.histories.filter((h) => h.report_id === reportId);
   const offices = data.rows.offices;
-  const pending = saveBreakdown.isPending || saveHeatmap.isPending || saveMap.isPending || savePipeline.isPending || remove.isPending;
-  const error = saveBreakdown.error ?? saveHeatmap.error ?? saveMap.error ?? savePipeline.error ?? remove.error;
-  const success = saveBreakdown.isSuccess || saveHeatmap.isSuccess || saveMap.isSuccess || savePipeline.isSuccess || remove.isSuccess;
+  const mutations = [saveBreakdown, saveHeatmap, saveMap, savePipeline, saveHistory, remove];
+  const pending = mutations.some((m) => m.isPending);
+  const error = mutations.find((m) => m.error)?.error ?? null;
+  const success = mutations.some((m) => m.isSuccess);
   const done = { onSuccess: () => { setAdding(null); setEditing(null); } };
+  const total = breakdowns.length + heatmaps.length + maps.length + pipelines.length + histories.length;
 
   const lines = (text: string) => text.split("\n").map((s) => s.trim()).filter(Boolean);
+  const yearsDetail = (list: number[] | null) => (list && list.length ? list.join(", ") : "todos los años");
+
+  const create = (kind: DatasetKind, f: DatasetFields) => {
+    const base = { report_id: reportId, office_id: f.office_id || null };
+    if (kind === "desglose") saveBreakdown.mutate({ ...base, key: uniqueKey(f.title, breakdowns.map((b) => b.key)), title: f.title, unit: f.unit, format: f.format, default_chart: f.chart, years: f.years, position: breakdowns.length + 1 }, done);
+    if (kind === "calor") saveHeatmap.mutate({ ...base, key: uniqueKey(f.title, heatmaps.map((h) => h.key)), title: f.title, description: f.description, unit: f.unit, format: f.format, row_label: f.rowLabel, column_label: f.columnLabel, rows: lines(f.rows), columns: lines(f.columns), position: heatmaps.length + 1 }, done);
+    if (kind === "mapa") saveMap.mutate({ ...base, key: uniqueKey(f.title, maps.map((m) => m.key)), title: f.title, description: f.description, unit: f.unit, mode: f.mode, years: f.years, position: maps.length + 1 }, done);
+    if (kind === "tuberia") savePipeline.mutate({ ...base, key: uniqueKey(f.title, pipelines.map((p) => p.key)), title: f.title, description: f.description, measure: f.measure, stages: lines(f.rows), position: pipelines.length + 1 }, done);
+    if (kind === "historico") saveHistory.mutate({ ...base, key: uniqueKey(f.title, histories.map((h) => h.key)), title: f.title, description: f.description, unit: f.unit, format: f.format, total_label: f.totalLabel || "Total", position: histories.length + 1 }, done);
+  };
 
   return (
     <Panel
       id="oda-conjuntos"
       title="Conjuntos visuales"
-      description="Desgloses, mapas de calor, mapas y tubería del informe. Aquí se definen; sus cifras se cargan en Captura y su lugar en la ficha se decide en Diseño visual."
+      description="Desgloses, mapas de calor, mapas, tuberías y evoluciones históricas: los que quieras de cada tipo. Al crearlos entran a la ficha como bloque visible; sus cifras se cargan en Captura y su lugar se ajusta en Diseño visual."
       actions={
         <>
           <SaveState pending={pending} error={error} success={success} />
           <label className="oda-add-select">
             <span className="sr-only">Añadir conjunto</span>
-            <select value="" disabled={!canEdit} onChange={(e) => setAdding((e.target.value || null) as typeof adding)}>
+            <select value="" disabled={!canEdit} onChange={(e) => setAdding((e.target.value || null) as DatasetKind | null)}>
               <option value="">Añadir conjunto…</option>
               <option value="desglose">Desglose (circular o barras)</option>
+              <option value="historico">Evolución histórica (periodos y categorías)</option>
+              <option value="tuberia">Tubería de permanencia o deserción</option>
               <option value="calor">Mapa de calor</option>
               <option value="mapa">Mapa por departamento</option>
-              {!pipeline && <option value="tuberia">Tubería de permanencia</option>}
             </select>
           </label>
         </>
       }
     >
       {adding && (
-        <DatasetForm
-          kind={adding}
-          offices={offices}
-          onCancel={() => setAdding(null)}
-          onSubmit={(f) => {
-            const base = { report_id: reportId, office_id: f.office_id || null };
-            if (adding === "desglose") saveBreakdown.mutate({ ...base, key: slugify(f.title), title: f.title, unit: f.unit, format: f.format, default_chart: f.chart, position: breakdowns.length + 1 }, done);
-            if (adding === "calor") saveHeatmap.mutate({ ...base, key: slugify(f.title), title: f.title, description: f.description, unit: f.unit, format: f.format, row_label: f.rowLabel, column_label: f.columnLabel, rows: lines(f.rows), columns: lines(f.columns), position: heatmaps.length + 1 }, done);
-            if (adding === "mapa") saveMap.mutate({ ...base, key: slugify(f.title), title: f.title, description: f.description, unit: f.unit, mode: f.mode, position: maps.length + 1 }, done);
-            if (adding === "tuberia") savePipeline.mutate({ ...base, title: f.title, description: f.description, stages: lines(f.rows) }, done);
-          }}
-        />
+        <DatasetForm kind={adding} offices={offices} years={years} onCancel={() => setAdding(null)} onSubmit={(f) => create(adding, f)} />
       )}
 
       <ul className="oda-datasets">
         {breakdowns.map((b) => (
-          <DatasetItem key={b.id} kind="Desglose" title={b.title} detail={`${b.unit} · ${b.default_chart === "barras" ? "barras" : "circular"} por defecto`} canEdit={canEdit}
+          <DatasetItem key={b.id} kind="Desglose" title={b.title} detail={`${b.unit} · ${b.default_chart === "barras" ? "barras" : "circular"} · ${yearsDetail(b.years)}`} canEdit={canEdit}
             editing={editing === b.id} onEdit={() => setEditing(b.id)} onDelete={() => remove.mutate({ table: "od_breakdowns", id: b.id })}>
-            <DatasetForm kind="desglose" offices={offices} initial={{ title: b.title, unit: b.unit, format: b.format, chart: b.default_chart, office_id: b.office_id ?? "" }}
-              onCancel={() => setEditing(null)} onSubmit={(f) => saveBreakdown.mutate({ id: b.id, report_id: reportId, title: f.title, unit: f.unit, format: f.format, default_chart: f.chart, office_id: f.office_id || null }, done)} />
+            <DatasetForm kind="desglose" offices={offices} years={years} initial={{ title: b.title, unit: b.unit, format: b.format, chart: b.default_chart, years: b.years, office_id: b.office_id ?? "" }}
+              onCancel={() => setEditing(null)} onSubmit={(f) => saveBreakdown.mutate({ id: b.id, report_id: reportId, title: f.title, unit: f.unit, format: f.format, default_chart: f.chart, years: f.years, office_id: f.office_id || null }, done)} />
+          </DatasetItem>
+        ))}
+        {histories.map((h) => (
+          <DatasetItem key={h.id} kind="Evolución histórica" title={h.title} detail={`${h.unit || "sin unidad"} · total: ${h.total_label}`} canEdit={canEdit}
+            editing={editing === h.id} onEdit={() => setEditing(h.id)} onDelete={() => remove.mutate({ table: "od_histories", id: h.id })}>
+            <DatasetForm kind="historico" offices={offices} years={years} initial={{ title: h.title, description: h.description, unit: h.unit, format: h.format, totalLabel: h.total_label, office_id: h.office_id ?? "" }}
+              onCancel={() => setEditing(null)} onSubmit={(f) => saveHistory.mutate({ id: h.id, report_id: reportId, title: f.title, description: f.description, unit: f.unit, format: f.format, total_label: f.totalLabel || "Total", office_id: f.office_id || null }, done)} />
+          </DatasetItem>
+        ))}
+        {pipelines.map((p) => (
+          <DatasetItem key={p.id} kind="Tubería" title={p.title} detail={`${p.stages.length} etapas · ${MEASURE_LABEL[p.measure].split(":")[0].toLowerCase()}`} canEdit={canEdit}
+            editing={editing === p.id} onEdit={() => setEditing(p.id)} onDelete={() => remove.mutate({ table: "od_pipelines", id: p.id })}>
+            <DatasetForm kind="tuberia" offices={offices} years={years} initial={{ title: p.title, description: p.description, measure: p.measure, rows: p.stages.join("\n"), office_id: p.office_id ?? "" }}
+              onCancel={() => setEditing(null)} onSubmit={(f) => savePipeline.mutate({ id: p.id, report_id: reportId, title: f.title, description: f.description, measure: f.measure, stages: lines(f.rows), office_id: f.office_id || null }, done)} />
           </DatasetItem>
         ))}
         {heatmaps.map((h) => (
           <DatasetItem key={h.id} kind="Mapa de calor" title={h.title} detail={`${h.rows.length} × ${h.columns.length} · ${h.unit}`} canEdit={canEdit}
             editing={editing === h.id} onEdit={() => setEditing(h.id)} onDelete={() => remove.mutate({ table: "od_heatmaps", id: h.id })}>
-            <DatasetForm kind="calor" offices={offices}
+            <DatasetForm kind="calor" offices={offices} years={years}
               initial={{ title: h.title, description: h.description, unit: h.unit, format: h.format, rowLabel: h.row_label, columnLabel: h.column_label, rows: h.rows.join("\n"), columns: h.columns.join("\n"), office_id: h.office_id ?? "" }}
               onCancel={() => setEditing(null)}
               onSubmit={(f) => saveHeatmap.mutate({ id: h.id, report_id: reportId, title: f.title, description: f.description, unit: f.unit, format: f.format, row_label: f.rowLabel, column_label: f.columnLabel, rows: lines(f.rows), columns: lines(f.columns), office_id: f.office_id || null }, done)} />
           </DatasetItem>
         ))}
         {maps.map((m) => (
-          <DatasetItem key={m.id} kind="Mapa" title={m.title} detail={`${m.mode === "origen" ? "origen con flujos" : "cobertura"} · ${m.unit}`} canEdit={canEdit}
+          <DatasetItem key={m.id} kind="Mapa" title={m.title} detail={`${m.mode === "origen" ? "origen con flujos" : "cobertura"} · ${m.unit} · ${yearsDetail(m.years)}`} canEdit={canEdit}
             editing={editing === m.id} onEdit={() => setEditing(m.id)} onDelete={() => remove.mutate({ table: "od_maps", id: m.id })}>
-            <DatasetForm kind="mapa" offices={offices} initial={{ title: m.title, description: m.description, unit: m.unit, mode: m.mode, office_id: m.office_id ?? "" }}
-              onCancel={() => setEditing(null)} onSubmit={(f) => saveMap.mutate({ id: m.id, report_id: reportId, title: f.title, description: f.description, unit: f.unit, mode: f.mode, office_id: f.office_id || null }, done)} />
+            <DatasetForm kind="mapa" offices={offices} years={years} initial={{ title: m.title, description: m.description, unit: m.unit, mode: m.mode, years: m.years, office_id: m.office_id ?? "" }}
+              onCancel={() => setEditing(null)} onSubmit={(f) => saveMap.mutate({ id: m.id, report_id: reportId, title: f.title, description: f.description, unit: f.unit, mode: f.mode, years: f.years, office_id: f.office_id || null }, done)} />
           </DatasetItem>
         ))}
-        {pipeline && (
-          <DatasetItem kind="Tubería" title={pipeline.title} detail={`${pipeline.stages.length} etapas`} canEdit={canEdit}
-            editing={editing === pipeline.id} onEdit={() => setEditing(pipeline.id)} onDelete={() => remove.mutate({ table: "od_pipelines", id: pipeline.id })}>
-            <DatasetForm kind="tuberia" offices={offices} initial={{ title: pipeline.title, description: pipeline.description, rows: pipeline.stages.join("\n"), office_id: pipeline.office_id ?? "" }}
-              onCancel={() => setEditing(null)} onSubmit={(f) => savePipeline.mutate({ id: pipeline.id, report_id: reportId, title: f.title, description: f.description, stages: lines(f.rows), office_id: f.office_id || null }, done)} />
-          </DatasetItem>
-        )}
-        {breakdowns.length + heatmaps.length + maps.length === 0 && !pipeline && !adding && (
+        {total === 0 && !adding && (
           <li className="oda-muted">Este informe no tiene conjuntos visuales. La ficha mostrará los indicadores, su evolución y la tabla dinámica.</li>
         )}
       </ul>
@@ -564,18 +621,21 @@ function DatasetItem({ kind, title, detail, canEdit, editing, onEdit, onDelete, 
 interface DatasetFields {
   title: string; description: string; unit: string; format: OdValueFormat; chart: OdChartKind; mode: OdMapMode;
   rowLabel: string; columnLabel: string; rows: string; columns: string; office_id: string;
+  measure: OdPipelineMeasure; totalLabel: string; years: number[] | null;
 }
 
-function DatasetForm({ kind, offices, initial, onSubmit, onCancel }: {
-  kind: "desglose" | "calor" | "mapa" | "tuberia";
+function DatasetForm({ kind, offices, years, initial, onSubmit, onCancel }: {
+  kind: DatasetKind;
   offices: StationProps["data"]["rows"]["offices"];
+  years: number[];
   initial?: Partial<DatasetFields>;
   onSubmit: (fields: DatasetFields) => void;
   onCancel: () => void;
 }) {
   const [f, setF] = useState<DatasetFields>({
-    title: "", description: "", unit: "", format: "entero", chart: "circular", mode: "origen",
+    title: "", description: "", unit: kind === "historico" ? "estudiantes" : "", format: "entero", chart: "circular", mode: "origen",
     rowLabel: "", columnLabel: "", rows: kind === "tuberia" ? "Ingreso\n2.º semestre\n4.º semestre\n6.º semestre\n8.º semestre\n10.º semestre\nGrado" : "", columns: "", office_id: "",
+    measure: "estudiantes", totalLabel: kind === "historico" ? "Total" : "", years: null,
     ...initial,
   });
   const set = (patch: Partial<DatasetFields>) => setF({ ...f, ...patch });
@@ -599,12 +659,18 @@ function DatasetForm({ kind, offices, initial, onSubmit, onCancel }: {
             <input value={f.unit} onChange={(e) => set({ unit: e.target.value })} />
           </label>
         )}
-        {(kind === "desglose" || kind === "calor") && (
+        {(kind === "desglose" || kind === "calor" || kind === "historico") && (
           <label className="admin-field">
             <span>Formato</span>
             <select value={f.format} onChange={(e) => set({ format: e.target.value as OdValueFormat })}>
               {Object.entries(FORMAT_LABEL).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
             </select>
+          </label>
+        )}
+        {kind === "historico" && (
+          <label className="admin-field">
+            <span>Nombre del total <small>p. ej. Total de estudiantes</small></span>
+            <input value={f.totalLabel} onChange={(e) => set({ totalLabel: e.target.value })} />
           </label>
         )}
         {kind === "desglose" && (
@@ -646,10 +712,23 @@ function DatasetForm({ kind, offices, initial, onSubmit, onCancel }: {
           </>
         )}
         {kind === "tuberia" && (
-          <label className="admin-field admin-field--wide">
-            <span>Etapas <small>una por línea, de la entrada al grado</small></span>
-            <textarea rows={7} value={f.rows} onChange={(e) => set({ rows: e.target.value })} />
-          </label>
+          <>
+            <label className="admin-field admin-field--wide">
+              <span>Qué se captura en cada etapa</span>
+              <select value={f.measure} onChange={(e) => set({ measure: e.target.value as OdPipelineMeasure })}>
+                {Object.entries(MEASURE_LABEL).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+              </select>
+            </label>
+            <label className="admin-field admin-field--wide">
+              <span>Etapas <small>una por línea, de la entrada al grado</small></span>
+              <textarea rows={7} value={f.rows} onChange={(e) => set({ rows: e.target.value })} />
+            </label>
+          </>
+        )}
+        {(kind === "desglose" || kind === "mapa") && (
+          <div className="admin-field--wide">
+            <YearPicker years={years} value={f.years} onChange={(next) => set({ years: next })} />
+          </div>
         )}
         <label className="admin-field">
           <span>Oficina que reporta</span>
@@ -659,6 +738,12 @@ function DatasetForm({ kind, offices, initial, onSubmit, onCancel }: {
           </select>
         </label>
       </div>
+      {kind === "tuberia" && (
+        <p className="oda-form-note">
+          Las cohortes son periodos de ingreso (2014-A, 2023-B) y se eligen en Captura, también si son anteriores al periodo del
+          informe. Los porcentajes admiten decimales: 12,5.
+        </p>
+      )}
       <div className="oda-inline-form__actions">
         <button type="button" className="button-ghost" onClick={onCancel}>Cancelar</button>
         <button type="submit" className="button-primary">{initial ? "Guardar conjunto" : "Crear conjunto"}</button>

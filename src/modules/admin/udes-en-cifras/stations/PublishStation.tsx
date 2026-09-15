@@ -196,16 +196,16 @@ export function PublishStation({ data, report, periodId, canEdit, progress }: St
                 <>
                   <table className="oda-table">
                     <thead>
-                      <tr><th scope="col">Indicador</th><th scope="col">Campus</th><th scope="col">Año</th><th scope="col">Valor</th></tr>
+                      <tr><th scope="col">Indicador</th><th scope="col">Campus</th><th scope="col">Corte</th><th scope="col">Valor</th></tr>
                     </thead>
                     <tbody>
                       {shown.map((v) => {
                         const indicator = indicatorOf(v.indicator_id);
                         return (
-                          <tr key={`${v.indicator_id}-${v.year}-${v.campus_id}`}>
+                          <tr key={`${v.indicator_id}-${v.year}-${v.term}-${v.campus_id}`}>
                             <th scope="row">{indicator?.label}</th>
                             <td>{campusName(v.campus_id)}</td>
-                            <td>{v.year}</td>
+                            <td>{v.term === "anual" ? `${v.year} (año)` : `${v.year}-${v.term}`}</td>
                             <td data-changed>{formatValue(v.value === null ? null : Number(v.value), indicator?.format ?? "entero")}</td>
                           </tr>
                         );

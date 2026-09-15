@@ -1520,9 +1520,18 @@ const routes = [
         throw new Error("la sede pulsada no queda seleccionada");
       }
       // Valledupar no tenía grupos en 2021: la casilla va vacía, no en cero.
-      const primera = window.document.querySelector(".od-table tbody tr td");
+      // La tabla dinámica: la ficha tiene más tablas (desgloses) antes que ella.
+      const primera = window.document.querySelector(".od-pivot .od-table tbody tr td");
       if (!primera || primera.textContent?.trim() !== "—") {
         throw new Error(`2021 en Valledupar debería ir sin reportar y dice "${primera?.textContent}"`);
+      }
+      const combined = [...window.document.querySelectorAll(".od-switch__option")].find((b) => b.textContent === "Líneas y barras");
+      if (!combined) throw new Error("falta la vista combinada");
+      combined.click();
+      await tick();
+      const firstYear = window.document.querySelector('.od-combo [role="button"]');
+      if (!firstYear?.getAttribute("aria-label").includes("Global anual: Sin reportar")) {
+        throw new Error("la vista combinada convirtió un año sin reporte en cero");
       }
     },
   },
@@ -1535,6 +1544,50 @@ const routes = [
   },
   {
     path: "/datos-abiertos/poblacional",
+    note: "la vista combinada respeta cifras anuales, periodos y campus",
+    expect: "Estudiantes matriculados",
+    absent: [...SIN_DINERO],
+    interact: async (window, tick) => {
+      const button = (text) => [...window.document.querySelectorAll("button")].find((b) => b.textContent.trim() === text);
+      button("Líneas y barras")?.click();
+      await tick();
+      const chart = () => window.document.querySelector(".od-combo");
+      if (!chart()?.querySelector("path.od-combo__line") || !chart()?.querySelector('rect[data-series="a"]') || !chart()?.querySelector('rect[data-series="b"]')) {
+        throw new Error("no aparecen la línea anual y las dos series de barras");
+      }
+      const label2025 = () => [...chart().querySelectorAll('[role="button"]')].find((b) => b.getAttribute("aria-label").startsWith("2025."))?.getAttribute("aria-label");
+      // Matrícula usa el último periodo: anual = B, no A + B.
+      if (label2025() !== "2025. Global anual: 21.034 estudiantes. Periodo A: 20.620 estudiantes. Periodo B: 21.034 estudiantes") {
+        throw new Error(`global o periodos incorrectos: ${label2025()}`);
+      }
+      const campusChoice = [...window.document.querySelectorAll('.od-controls button')].find((b) => b.textContent.trim() === "Cúcuta");
+      if (!campusChoice) throw new Error("falta el filtro de campus Cúcuta");
+      campusChoice.click();
+      await tick();
+      if (label2025() !== "2025. Global anual: 4.893 estudiantes. Periodo A: 4.794 estudiantes. Periodo B: 4.893 estudiantes") {
+        throw new Error(`la vista combinada no filtró el campus: ${label2025()}`);
+      }
+      const select = window.document.querySelector("#od-evolucion select");
+      const firstIntake = [...select.options].find((o) => o.textContent === "Estudiantes de primer ingreso");
+      select.value = firstIntake.value;
+      select.dispatchEvent(new window.Event("change", { bubbles: true }));
+      await tick();
+      // Primer ingreso sí suma ambos periodos.
+      if (label2025() !== "2025. Global anual: 1.011 estudiantes. Periodo A: 531 estudiantes. Periodo B: 480 estudiantes") {
+        throw new Error(`la línea anual no respetó la regla de suma: ${label2025()}`);
+      }
+      const firstYear = chart().querySelector('[role="button"]');
+      firstYear.dispatchEvent(new window.KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
+      await tick();
+      if (firstYear.getAttribute("aria-pressed") !== "true") throw new Error("el teclado no seleccionó el año");
+      const typeSwitch = window.document.querySelector('[aria-label="Tipo de gráfica"]');
+      [...typeSwitch.querySelectorAll("button")].find((b) => b.textContent === "Barras").click();
+      await tick();
+      if (chart() || !window.document.querySelector(".od-yearbars")) throw new Error("no se pudo volver a barras");
+    },
+  },
+  {
+    path: "/datos-abiertos/poblacional",
     note: "el mapa de origen de los estudiantes",
     expect: "De dónde vienen nuestros estudiantes",
     also: ["Santander", "Norte de Santander", "Cesar"],
@@ -1543,7 +1596,7 @@ const routes = [
   { path: "/datos-abiertos/informe-que-no-existe", expect: "Este informe no existe" },
   {
     path: "/admin/udes-en-cifras/captura/poblacional",
-    note: "UDES en Cifras: la rejilla marca lo cambiado antes de guardar",
+    note: "UDES en Cifras: guarda A y B por separado y conserva ambos al recargar",
     session: true,
     expect: "Cifras de Poblacional",
     also: ["Estaciones del periodo", "Periodo y campus", "Estructura y KPI", "Diseño visual", "Publicación", "Plantilla CSV", "Total institucional"],
@@ -1559,6 +1612,31 @@ const routes = [
       const text = window.document.body.textContent ?? "";
       if (!text.includes("1 casilla cambiada")) throw new Error("editar una casilla no la marca como cambiada");
       if (!window.document.querySelector(".oda-grid td[data-changed]")) throw new Error("la casilla editada no se resalta");
+
+      // La segunda casilla editable de la misma fila es B del mismo año.
+      // Guardar ambas reproduce el fallo si on_conflict omite el periodo.
+      const row = input.closest("tr");
+      const second = row.querySelectorAll("td:not([data-locked]) input")[1];
+      if (!second) throw new Error("falta la casilla del periodo B");
+      setter.call(second, "23456");
+      second.dispatchEvent(new window.Event("input", { bubbles: true }));
+      await tick();
+      second.dispatchEvent(new window.FocusEvent("focusout", { bubbles: true }));
+      await tick();
+      const save = [...window.document.querySelectorAll("button")].find((b) => b.textContent.trim().startsWith("Guardar"));
+      if (!save || save.disabled) throw new Error("no se puede guardar la captura");
+      save.click();
+      await tick();
+      await tick();
+      if (!window.document.querySelector('.oda-save[data-state="ok"]')) {
+        throw new Error(`falló el guardado: ${window.document.querySelector('.oda-save[data-state="error"]')?.textContent ?? "sin confirmación"}`);
+      }
+      if (window.document.querySelector(".oda-grid td[data-changed]")) throw new Error("el guardado no limpió el borrador");
+      const saved = row.querySelectorAll("td:not([data-locked]) input");
+      const numeric = (value) => Number(value.replace(/[^0-9]/g, ""));
+      if (numeric(saved[0].value) !== 12345 || numeric(saved[1].value) !== 23456) {
+        throw new Error("al recargar se perdió una cifra o se sobrescribió el otro periodo");
+      }
     },
   },
   { path: "/admin/udes-en-cifras/estructura/permanencia", session: true, expect: "Tablero de KPI", also: ["Ficha del informe", "Indicadores (4)", "Conjuntos visuales", "Titular"] },
@@ -1977,6 +2055,8 @@ const html = `<!doctype html><html lang="es"><body><div id="root"></div></body><
  * qué.
  */
 function makeFetch(session, broken = false) {
+  // Estado propio de cada prueba: el refetch debe leer lo que se guardó.
+  const odValues = structuredClone(FIXTURES.od_values ?? []);
   return async (input, init = {}) => {
     const url = typeof input === "string" ? input : input.url;
     if (process.env.SMOKE_DEBUG) console.log("  fetch:", url.slice(0, 130));
@@ -2013,7 +2093,22 @@ function makeFetch(session, broken = false) {
     // Datos
     const parsed = new URL(url);
     const table = parsed.pathname.match(/\/rest\/v1\/([a-z_]+)/)?.[1];
-    const rows = applyFilters(table ? (FIXTURES[table] ?? []) : [], parsed.searchParams);
+    if (table === "od_values" && init.method === "POST") {
+      // Contrato de od_values_term_unique, incluida la igualdad de campus nulos.
+      const key = ["indicator_id", "year", "term", "campus_id"];
+      const conflict = (parsed.searchParams.get("on_conflict") ?? "").split(",");
+      if (conflict.length !== key.length || !key.every((column) => conflict.includes(column))) {
+        return reply({ code: "42P10", message: "there is no unique or exclusion constraint matching the ON CONFLICT specification" }, 400);
+      }
+      const values = JSON.parse(init.body);
+      for (const value of values) {
+        const existing = odValues.find((row) => key.every((column) => row[column] === value[column]));
+        if (existing) Object.assign(existing, value);
+        else odValues.push(value);
+      }
+      return reply(values);
+    }
+    const rows = applyFilters(table === "od_values" ? odValues : table ? (FIXTURES[table] ?? []) : [], parsed.searchParams);
 
     // PostgREST devuelve un objeto, no un array, cuando se pide .single().
     const wantsObject = String(headers.get("Accept") ?? "").includes("pgrst.object");
@@ -2153,6 +2248,7 @@ Object.assign(FIXTURES, OD_FIXTURES);
 let failures = 0;
 
 for (const route of routes) {
+  if (process.env.SMOKE_ROUTE && route.path !== process.env.SMOKE_ROUTE) continue;
   const errors = [];
   const virtualConsole = new VirtualConsole();
   virtualConsole.on("jsdomError", (error) => errors.push(error.message));

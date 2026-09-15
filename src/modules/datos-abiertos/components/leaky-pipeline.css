@@ -1,0 +1,354 @@
+/* =============================================================================
+   Tubería que gotea (LeakyPipeline). Estilos propios del componente: el metal
+   se arma con trazos apilados para que el brillo siga las curvas del tubo.
+   ========================================================================== */
+
+.lp {
+  --lp-shadow: rgba(13, 40, 84, 0.13);
+  --lp-metal-edge: #7b8793;
+  --lp-metal: #c2c9d1;
+  --lp-metal-hi: #f1f4f7;
+  --lp-metal-lo: #8995a1;
+  --lp-shade: #a0aab5;
+  --lp-light: #e1e6eb;
+  --lp-gloss: rgba(255, 255, 255, 0.85);
+  --lp-water: #1f6db5;
+  --lp-water-hi: #8cc4f2;
+  --lp-teal: #1d5b67;
+  --lp-teal-soft: rgba(29, 91, 103, 0.1);
+  --lp-value: var(--od-seq-5);
+
+  display: grid;
+  gap: var(--space-3);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .lp {
+    --lp-shadow: rgba(0, 0, 0, 0.35);
+    --lp-metal-edge: #465260;
+    --lp-metal: #8b96a3;
+    --lp-metal-hi: #c9d1da;
+    --lp-metal-lo: #5a6571;
+    --lp-shade: #6e7985;
+    --lp-light: #a9b3be;
+    --lp-gloss: rgba(255, 255, 255, 0.55);
+    --lp-water: #3d8ee0;
+    --lp-water-hi: #a9d3f7;
+    --lp-teal: #5fb3c0;
+    --lp-teal-soft: rgba(95, 179, 192, 0.12);
+  }
+}
+
+:root[data-theme="dark"] .lp {
+  --lp-shadow: rgba(0, 0, 0, 0.35);
+  --lp-metal-edge: #465260;
+  --lp-metal: #8b96a3;
+  --lp-metal-hi: #c9d1da;
+  --lp-metal-lo: #5a6571;
+  --lp-shade: #6e7985;
+  --lp-light: #a9b3be;
+  --lp-gloss: rgba(255, 255, 255, 0.55);
+  --lp-water: #3d8ee0;
+  --lp-water-hi: #a9d3f7;
+  --lp-teal: #5fb3c0;
+  --lp-teal-soft: rgba(95, 179, 192, 0.12);
+}
+
+.lp__bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: end;
+  gap: var(--space-3) var(--space-5);
+}
+
+.lp__meta {
+  margin: 0;
+  color: var(--ink-muted);
+  font-size: var(--text-sm);
+}
+
+.lp__meta small { font-size: var(--text-xs); }
+
+.lp__scroll {
+  position: relative;
+  overflow-x: auto;
+  scrollbar-color: var(--line-strong) transparent;
+}
+
+.lp__scroll svg { display: block; }
+
+/* --- Recuadro de cierre ---------------------------------------------------- */
+
+.lp__callout {
+  position: absolute;
+  top: 12px;
+  display: grid;
+  grid-template-columns: 38px 1fr;
+  gap: var(--space-3);
+  align-items: start;
+  width: 244px;
+  padding: var(--space-3) var(--space-4);
+  background: var(--surface);
+  border: 1.5px solid var(--lp-teal);
+  border-radius: 12px;
+  box-shadow: 0 6px 20px var(--lp-shadow);
+}
+
+.lp__callout-icon {
+  width: 38px;
+  height: 38px;
+  padding: 7px;
+  fill: var(--surface);
+  background: var(--lp-teal);
+  border-radius: 50%;
+}
+
+.lp__callout p {
+  margin: 0;
+  color: var(--ink);
+  font-size: var(--text-sm);
+  line-height: 1.35;
+  text-align: center;
+}
+
+.lp__callout b {
+  display: block;
+  margin: 2px 0;
+  color: var(--lp-value);
+  font-size: 1.9rem;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.1;
+}
+
+/* --- Boquilla -------------------------------------------------------------- */
+
+.lp__badge { cursor: default; outline: none; }
+
+.lp__badge-disc {
+  fill: var(--surface);
+  stroke: var(--lp-teal);
+  stroke-width: 3;
+}
+
+.lp__badge[data-active] .lp__badge-disc,
+.lp__badge:focus-visible .lp__badge-disc { fill: var(--lp-teal-soft); }
+
+.lp__badge-value {
+  fill: var(--lp-teal);
+  font-size: 23px;
+  font-weight: 800;
+}
+
+.lp__badge-label {
+  fill: var(--lp-teal);
+  font-size: 11.5px;
+  font-weight: 700;
+}
+
+/* --- Tubo ------------------------------------------------------------------ */
+
+.lp__piece path { fill: none; stroke-linejoin: round; }
+
+.lp__shadow { stroke: var(--lp-shadow); stroke-width: 32; transform: translateY(6px); }
+.lp__edge { stroke: var(--lp-metal-edge); stroke-width: 32; }
+.lp__body { stroke: var(--lp-metal); stroke-width: 28; }
+.lp__shade { stroke: var(--lp-shade); stroke-width: 10; transform: translateY(8px); }
+.lp__light { stroke: var(--lp-light); stroke-width: 8; transform: translateY(-5px); }
+.lp__gloss { stroke: var(--lp-gloss); stroke-width: 2.5; transform: translateY(-9px); }
+
+.lp__glint {
+  stroke: #fff;
+  stroke-width: 3;
+  stroke-linecap: round;
+  stroke-dasharray: 10 190;
+  stroke-dashoffset: 200;
+  opacity: 0;
+  transform: translateY(-9px);
+}
+
+.lp__piece[data-progress] .lp__shadow,
+.lp__piece[data-progress] .lp__shade,
+.lp__piece[data-progress] .lp__light,
+.lp__piece[data-progress] .lp__gloss { display: none; }
+
+.lp__piece[data-progress] .lp__edge {
+  stroke: var(--ink-faint);
+  stroke-dasharray: 8 6;
+}
+
+.lp__piece[data-progress] .lp__body { stroke: var(--surface); }
+
+.lp__ring {
+  fill: url(#lp-ring);
+  stroke: var(--lp-metal-edge);
+  stroke-width: 1;
+}
+
+.lp__mouth-rim { fill: var(--lp-metal-lo); stroke: var(--lp-metal-edge); }
+.lp__mouth { fill: #1f2a36; }
+
+.lp__valve-stem { fill: var(--lp-metal-lo); }
+.lp__valve-wheel { fill: var(--lp-teal); stroke: color-mix(in srgb, var(--lp-teal) 60%, #000); stroke-width: 1; }
+.lp__valve-cap { fill: var(--lp-metal-hi); }
+.lp__valve-body { fill: var(--lp-teal); stroke: color-mix(in srgb, var(--lp-teal) 60%, #000); stroke-width: 1; }
+
+/* --- Uniones y cifras ------------------------------------------------------ */
+
+.lp__joint { cursor: pointer; outline: none; }
+
+.lp__stage {
+  fill: var(--ink);
+  font-size: 18px;
+  font-weight: 800;
+}
+
+.lp__value {
+  fill: var(--lp-value);
+  font-size: 16px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.lp__joint[data-progress] .lp__value { fill: var(--ink-muted); font-weight: 600; }
+
+.lp__joint[data-active] .lp__ring,
+.lp__joint:focus-visible .lp__ring {
+  stroke: var(--od-signal);
+  stroke-width: 2.5;
+}
+
+.lp__joint[data-pinned] .lp__value { fill: var(--od-signal-text); }
+
+/* --- Gotas ----------------------------------------------------------------- */
+
+.lp__drop {
+  opacity: 0;
+  transform-box: fill-box;
+  transform-origin: 50% 0;
+}
+
+.lp__splash {
+  fill: none;
+  stroke: var(--lp-water);
+  stroke-width: 1.2;
+  opacity: 0;
+  transform-box: fill-box;
+  transform-origin: 50% 50%;
+}
+
+/* Sin movimiento: una gota colgando en cada fuga. */
+.lp__drips > g:first-child .lp__drop { opacity: 0.9; }
+
+/* --- Movimiento ------------------------------------------------------------ */
+
+.lp[data-motion] .lp__piece,
+.lp[data-motion] .lp__label,
+.lp[data-motion] .lp__callout {
+  opacity: 0;
+  transition: opacity 520ms ease, transform 520ms cubic-bezier(0.2, 0.7, 0.2, 1);
+}
+
+.lp[data-motion] .lp__piece { transform: translateX(-8px); transition-delay: calc(var(--i) * 90ms); }
+.lp[data-motion] .lp__label { transition-delay: calc(var(--i) * 90ms + 220ms); }
+.lp[data-motion] .lp__callout { transform: translateY(6px); transition-delay: 900ms; }
+
+.lp[data-motion][data-seen] .lp__piece,
+.lp[data-motion][data-seen] .lp__label,
+.lp[data-motion][data-seen] .lp__callout {
+  opacity: 1;
+  transform: none;
+}
+
+.lp[data-motion] .lp__drips > g:first-child .lp__drop { opacity: 0; }
+
+.lp[data-motion][data-seen] .lp__drop {
+  animation: lp-drip var(--speed) linear infinite;
+  animation-delay: calc(1100ms + var(--delay));
+}
+
+.lp[data-motion][data-seen] .lp__splash {
+  animation: lp-splash var(--speed) linear infinite;
+  animation-delay: calc(1100ms + var(--delay));
+}
+
+.lp[data-motion][data-seen] .lp__glint {
+  animation: lp-glint 3.6s linear infinite;
+  animation-delay: calc(var(--g) * 240ms + 1200ms);
+}
+
+@keyframes lp-drip {
+  0% {
+    opacity: 0;
+    transform: translateY(0) scale(0.2);
+    animation-timing-function: ease-out;
+  }
+  10% { opacity: 1; }
+  38% {
+    opacity: 1;
+    transform: translateY(1px) scale(1, 1.1);
+    animation-timing-function: cubic-bezier(0.55, 0, 1, 0.45);
+  }
+  70% {
+    opacity: 1;
+    transform: translateY(var(--fall)) scale(0.88, 1.18);
+  }
+  75%,
+  100% {
+    opacity: 0;
+    transform: translateY(var(--fall)) scale(1.6, 0.3);
+  }
+}
+
+@keyframes lp-splash {
+  0%,
+  69% {
+    opacity: 0;
+    transform: scale(0.3);
+  }
+  73% {
+    opacity: 0.65;
+    transform: scale(0.6);
+  }
+  100% {
+    opacity: 0;
+    transform: scale(1.9);
+  }
+}
+
+@keyframes lp-glint {
+  0% { opacity: 0; stroke-dashoffset: 200; }
+  8% { opacity: 0.9; }
+  45% { opacity: 0.9; stroke-dashoffset: 100; }
+  55%,
+  100% { opacity: 0; stroke-dashoffset: 100; }
+}
+
+/* --- Nota ------------------------------------------------------------------ */
+
+.lp__note {
+  display: flex;
+  gap: var(--space-2);
+  align-items: flex-start;
+  max-width: 78ch;
+  margin: 0;
+  color: var(--ink-muted);
+  font-size: var(--text-xs);
+  line-height: 1.45;
+}
+
+.lp__note svg {
+  flex: none;
+  width: 16px;
+  height: 16px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .lp__drop,
+  .lp__splash,
+  .lp__glint { animation: none !important; }
+}

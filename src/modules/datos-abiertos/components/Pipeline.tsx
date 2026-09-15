@@ -6,6 +6,11 @@
    gotea hacia un charco con la cantidad de retirados en ese tramo. Las gotas
    caen más rápido donde la fuga es mayor.
 
+   La tubería habla en estudiantes o en porcentaje, según lo que se capturó:
+   estudiantes que siguen, % de la cohorte que sigue (permanencia) o % que se
+   retira en cada tramo (deserción). Las cohortes son periodos de ingreso,
+   también históricos (2014-A).
+
    Pasar por un tramo o por una fuga cuenta la historia en cifras; un clic fija
    la fuga. Los tramos que la cohorte aún no cursa se dibujan en contorno,
    "en curso", nunca como una fuga total. Con movimiento reducido no corre el
@@ -39,21 +44,32 @@ export function Pipeline({ data, campus, campusName }: PipelineProps) {
   const seen = useInView(wrap);
   const reduced = usePrefersReducedMotion();
 
+  const measure = data.measure ?? "estudiantes";
+  const percent = measure !== "estudiantes";
+  /** Cifra de una etapa: estudiantes, o % de la cohorte. */
+  const fmt = (v: number) => (percent ? `${formatValue(v, "decimal")} %` : formatValue(v, "entero"));
+
   const cohorts = useMemo(
-    () => Array.from(new Set(data.cohorts.map((c) => c.cohort))).sort((a, b) => a - b),
+    () => Array.from(new Set(data.cohorts.map((c) => String(c.cohort)))).sort((a, b) => a.localeCompare(b)),
     [data.cohorts],
   );
   const [cohort, setCohort] = useState(() => {
     const complete = data.cohorts.filter((c) => c.campus === "todas" && c.remaining.every((v) => v !== null));
-    return complete.length ? complete[complete.length - 1].cohort : cohorts[0];
+    return complete.length ? String(complete[complete.length - 1].cohort) : cohorts[cohorts.length - 1];
   });
   const [hover, setHover] = useState<Focus>(null);
   const [pinned, setPinned] = useState<Focus>(null);
   const focus = hover ?? pinned;
 
-  const row = data.cohorts.find((c) => c.cohort === cohort && c.campus === campus) ??
-    data.cohorts.find((c) => c.cohort === cohort && c.campus === "todas");
-  if (!row) return null;
+  // El campus elegido; si no reportó esta cohorte, el total; si tampoco hay
+  // total (un porcentaje capturado solo para un campus), el primero que tenga.
+  const ofCohort = data.cohorts.filter((c) => String(c.cohort) === cohort);
+  const row = ofCohort.find((c) => c.campus === campus) ?? ofCohort.find((c) => c.campus === "todas") ?? ofCohort[0];
+  if (!row) {
+    return <p className="od-empty">Esta tubería todavía no tiene cifras cargadas. Se cargan en la intranet, en Captura.</p>;
+  }
+  const shownCampus = row.campus === "todas" ? "todos los campus" : row.campus === campus ? campusName : String(row.campus);
+  const fellBack = row.campus !== campus;
 
   const stages = data.stages;
   const intake = row.remaining[0] ?? 0;
@@ -76,7 +92,7 @@ export function Pipeline({ data, campus, campusName }: PipelineProps) {
     return {
       index: i,
       lost,
-      shareOfStage: lost !== null && before ? (lost / before) * 100 : null,
+      shareOfStage: row.dropout?.[i] ?? (lost !== null && before ? (lost / before) * 100 : null),
       shareOfIntake: lost !== null && intake ? (lost / intake) * 100 : null,
       cause: row.mainCause[i - 1] ?? "Sin causa declarada",
     };
@@ -97,8 +113,14 @@ export function Pipeline({ data, campus, campusName }: PipelineProps) {
               <span>La cohorte {cohort} todavía no llega a esta etapa.</span>
             ) : (
               <span>
-                Siguen {formatValue(v, "entero")} de {formatValue(intake, "entero")} ·{" "}
-                {formatValue((v / intake) * 100, "decimal")} % del ingreso
+                {percent ? (
+                  <>Sigue el {fmt(v)} de la cohorte</>
+                ) : (
+                  <>
+                    Siguen {formatValue(v, "entero")} de {formatValue(intake, "entero")} ·{" "}
+                    {formatValue((v / intake) * 100, "decimal")} % del ingreso
+                  </>
+                )}
               </span>
             )}
           </>
@@ -119,8 +141,17 @@ export function Pipeline({ data, campus, campusName }: PipelineProps) {
           ) : (
             <>
               <span>
-                Se retiraron {formatValue(leak.lost, "entero")} estudiantes ·{" "}
-                {formatValue(leak.shareOfStage, "decimal")} % de los que llegaron al tramo
+                {percent ? (
+                  <>
+                    Se retira el {formatValue(leak.shareOfStage, "decimal")} % de los que llegaron al tramo · la cohorte
+                    pierde {formatValue(leak.lost, "decimal")} puntos
+                  </>
+                ) : (
+                  <>
+                    Se retiraron {formatValue(leak.lost, "entero")} estudiantes ·{" "}
+                    {formatValue(leak.shareOfStage, "decimal")} % de los que llegaron al tramo
+                  </>
+                )}
               </span>
               <span>Causa principal declarada: {leak.cause}</span>
             </>
@@ -141,19 +172,49 @@ export function Pipeline({ data, campus, campusName }: PipelineProps) {
   return (
     <div className="od-pipe" data-seen={seen || undefined} data-motion={!reduced || undefined}>
       <div className="od-pipe__bar">
-        <ViewSwitch
-          label="Cohorte"
-          options={cohorts.map((c) => ({ value: String(c), label: `Cohorte ${c}` }))}
-          value={String(cohort)}
-          onChange={(v) => {
-            setCohort(Number(v));
-            setPinned(null);
-          }}
-        />
+        {cohorts.length <= 6 ? (
+          <ViewSwitch
+            label="Cohorte"
+            options={cohorts.map((c) => ({ value: c, label: `Cohorte ${c}` }))}
+            value={cohort}
+            onChange={(v) => {
+              setCohort(v);
+              setPinned(null);
+            }}
+          />
+        ) : (
+          <label className="od-select">
+            <span>Cohorte</span>
+            <select
+              value={cohort}
+              onChange={(event) => {
+                setCohort(event.target.value);
+                setPinned(null);
+              }}
+            >
+              {cohorts.map((c) => (
+                <option key={c} value={c}>
+                  {c}
+                </option>
+              ))}
+            </select>
+          </label>
+        )}
         <p className="od-pipe__summary">
-          {graduates !== null ? (
+          {percent ? (
+            graduates !== null ? (
+              <>
+                De la cohorte {cohort} ({shownCampus}) llegó al final el <b>{fmt(graduates)}</b>.
+              </>
+            ) : (
+              <>
+                La cohorte {cohort} ({shownCampus}) sigue en curso: continúa el <b>{fmt(row.remaining[lastKnown] ?? 0)}</b> en{" "}
+                {stages[lastKnown].toLowerCase()}.
+              </>
+            )
+          ) : graduates !== null ? (
             <>
-              De <b>{formatValue(intake, "entero")}</b> estudiantes que entraron en {cohort} ({campus === "todas" ? "todos los campus" : campusName}),
+              De <b>{formatValue(intake, "entero")}</b> estudiantes que entraron en {cohort} ({shownCampus}),
               se graduaron <b>{formatValue(graduates, "entero")}</b> ({formatValue((graduates / intake) * 100, "decimal")} %).
             </>
           ) : (
@@ -162,6 +223,7 @@ export function Pipeline({ data, campus, campusName }: PipelineProps) {
               <b>{formatValue(row.remaining[lastKnown] ?? 0, "entero")}</b> en {stages[lastKnown].toLowerCase()}.
             </>
           )}
+          {fellBack && campus !== "todas" && <small className="od-pipe__note"> {campusName} no reporta esta cohorte.</small>}
         </p>
       </div>
 
@@ -216,7 +278,7 @@ export function Pipeline({ data, campus, campusName }: PipelineProps) {
                   {stage}
                 </text>
                 <text className="od-pipe__stage-value" x={xAt(i)} y={PIPE_Y - MAX_HALF - 22} textAnchor="middle">
-                  {v === null ? "en curso" : formatValue(v, "entero")}
+                  {v === null ? "en curso" : fmt(v)}
                 </text>
                 <rect x={xAt(i) - 44} y={PIPE_Y - MAX_HALF - 64} width={88} height={MAX_HALF * 2 + 90} fill="transparent" />
               </g>
@@ -242,7 +304,9 @@ export function Pipeline({ data, campus, campusName }: PipelineProps) {
                 aria-label={
                   leak.lost === null
                     ? `Tramo hacia ${stages[leak.index]}: en curso`
-                    : `Hacia ${stages[leak.index]} se retiraron ${formatValue(leak.lost, "entero")} estudiantes. Causa principal: ${leak.cause}`
+                    : percent
+                      ? `Hacia ${stages[leak.index]} se retira el ${formatValue(leak.shareOfStage, "decimal")} % del tramo. Causa principal: ${leak.cause}`
+                      : `Hacia ${stages[leak.index]} se retiraron ${formatValue(leak.lost, "entero")} estudiantes. Causa principal: ${leak.cause}`
                 }
                 onPointerEnter={() => setHover({ kind: "leak", index: leak.index })}
                 onPointerLeave={() => setHover(null)}
@@ -271,10 +335,10 @@ export function Pipeline({ data, campus, campusName }: PipelineProps) {
                     ))}
                     <ellipse className="od-pipe__pool" cx={xm} cy={POOL_Y} rx={poolW / 2} ry={5 + strength * 5} />
                     <text className="od-pipe__lost" x={xm} y={POOL_Y + 34} textAnchor="middle">
-                      −{formatValue(leak.lost, "entero")}
+                      {percent ? `−${formatValue(leak.shareOfStage, "decimal")} %` : `−${formatValue(leak.lost, "entero")}`}
                     </text>
                     <text className="od-pipe__lost-share" x={xm} y={POOL_Y + 52} textAnchor="middle">
-                      {formatValue(leak.shareOfStage, "decimal")} % del tramo
+                      {percent ? "del tramo" : `${formatValue(leak.shareOfStage, "decimal")} % del tramo`}
                     </text>
                   </>
                 )}

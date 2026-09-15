@@ -132,3 +132,97 @@ export const slugify = (text: string) =>
     .replace(/[^a-z0-9]+/g, "-")
     .replace(/^-|-$/g, "")
     .slice(0, 48);
+
+/**
+ * Años con dato de un indicador o conjunto: todos los del periodo, o solo
+ * algunos. `null` es "todos"; así un periodo que se alarga no deja años fuera.
+ */
+export function YearPicker({
+  years,
+  value,
+  onChange,
+  disabled,
+  label = "Años con dato",
+}: {
+  years: number[];
+  value: number[] | null;
+  onChange: (next: number[] | null) => void;
+  disabled?: boolean;
+  label?: string;
+}) {
+  const all = !value || value.length === 0;
+  const chosen = all ? years : years.filter((y) => value!.includes(y));
+  const toggle = (year: number) => {
+    const next = chosen.includes(year) ? chosen.filter((y) => y !== year) : [...chosen, year].sort((a, b) => a - b);
+    // Todos marcados es lo mismo que "todos"; ninguno no se permite.
+    if (next.length === 0) return;
+    onChange(next.length === years.length ? null : next);
+  };
+  return (
+    <fieldset className="oda-years" disabled={disabled}>
+      <legend>{label}</legend>
+      <div className="oda-years__mode">
+        <label>
+          <input type="radio" checked={all} onChange={() => onChange(null)} />
+          Todos ({years[0]}-{years[years.length - 1]})
+        </label>
+        <label>
+          <input type="radio" checked={!all} onChange={() => onChange(years.slice(-1))} />
+          Solo algunos
+        </label>
+      </div>
+      {!all && (
+        <div className="oda-years__chips">
+          {years.map((year) => (
+            <button key={year} type="button" className="oda-year-chip" aria-pressed={chosen.includes(year)} onClick={() => toggle(year)}>
+              {year}
+            </button>
+          ))}
+        </div>
+      )}
+    </fieldset>
+  );
+}
+
+/** "2014-A": año y periodo académico. */
+export function PeriodInput({
+  value,
+  onChange,
+  label,
+  min = 1990,
+  max = new Date().getFullYear() + 1,
+}: {
+  value: { year: number; term: "A" | "B" };
+  onChange: (next: { year: number; term: "A" | "B" }) => void;
+  label: string;
+  min?: number;
+  max?: number;
+}) {
+  return (
+    <span className="oda-period-input" role="group" aria-label={label}>
+      <span className="oda-period-input__label">{label}</span>
+      <input
+        type="number"
+        inputMode="numeric"
+        min={min}
+        max={max}
+        value={value.year}
+        aria-label={`${label}: año`}
+        onChange={(e) => onChange({ ...value, year: Number(e.target.value) })}
+      />
+      <select value={value.term} aria-label={`${label}: periodo`} onChange={(e) => onChange({ ...value, term: e.target.value as "A" | "B" })}>
+        <option value="A">A</option>
+        <option value="B">B</option>
+      </select>
+    </span>
+  );
+}
+
+/** Periodos académicos de un rango, en orden: 2014-A, 2014-B, 2015-A… */
+export function periodRange(from: { year: number; term: "A" | "B" }, to: { year: number; term: "A" | "B" }): string[] {
+  const index = (p: { year: number; term: "A" | "B" }) => p.year * 2 + (p.term === "B" ? 1 : 0);
+  const [a, b] = [index(from), index(to)].sort((x, y) => x - y);
+  const labels: string[] = [];
+  for (let i = a; i <= b && labels.length < 200; i += 1) labels.push(`${Math.floor(i / 2)}-${i % 2 ? "B" : "A"}`);
+  return labels;
+}

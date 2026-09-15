@@ -945,7 +945,13 @@ export interface CampusLineCoverage {
 export type OdValueFormat = "entero" | "porcentaje" | "decimal";
 export type OdDirection = "sube" | "baja" | "neutro";
 export type OdAggregation = "suma" | "reportado";
+/** Periodo académico del año. "anual" solo con regla anual "reportado". */
+export type OdTerm = "A" | "B" | "anual";
+/** Cómo sale la cifra del año a partir de los periodos A y B. */
+export type OdAnnualRule = "suma" | "ultimo" | "promedio" | "reportado";
 export type OdMapMode = "origen" | "cobertura";
+/** Qué se captura en cada etapa de una tubería. */
+export type OdPipelineMeasure = "estudiantes" | "permanencia" | "desercion";
 export type OdChartKind = "circular" | "barras" | "lineas";
 export type OdBlockKind =
   | "kpis"
@@ -955,7 +961,8 @@ export type OdBlockKind =
   | "mapa_calor"
   | "desgloses"
   | "tabla_dinamica"
-  | "metodologia";
+  | "metodologia"
+  | "historico";
 export type OdImportKind = "rejilla" | "pegado" | "plantilla";
 
 export interface OdPeriod {
@@ -1014,6 +1021,9 @@ export interface OdIndicatorRow {
   format: OdValueFormat;
   direction: OdDirection;
   aggregation: OdAggregation;
+  annual_rule: OdAnnualRule;
+  /** Años con dato. null = todos los del periodo. */
+  years: number[] | null;
   definition: string;
   office_id: string | null;
   position: number;
@@ -1026,6 +1036,7 @@ export interface OdValueRow {
   id?: string;
   indicator_id: string;
   year: number;
+  term: OdTerm;
   campus_id: string | null;
   value: number | null;
   note?: string;
@@ -1041,6 +1052,9 @@ export interface OdBreakdownRow {
   format: OdValueFormat;
   office_id: string | null;
   default_chart: OdChartKind;
+  annual_rule: OdAnnualRule;
+  /** Años con dato. null = todos los del periodo. */
+  years: number[] | null;
   position: number;
 }
 
@@ -1048,6 +1062,7 @@ export interface OdBreakdownValueRow {
   id?: string;
   breakdown_id: string;
   year: number;
+  term: OdTerm;
   label: string;
   position: number;
   value: number | null;
@@ -1086,6 +1101,8 @@ export interface OdMapRow {
   mode: OdMapMode;
   unit: string;
   office_id: string | null;
+  /** Años con dato. null = todos los del periodo. */
+  years: number[] | null;
   position: number;
 }
 
@@ -1100,20 +1117,49 @@ export interface OdMapValueRow {
 export interface OdPipelineRow {
   id: string;
   report_id: string;
+  key: string;
   title: string;
   description: string;
+  measure: OdPipelineMeasure;
   stages: string[];
   office_id: string | null;
+  position: number;
 }
 
 export interface OdPipelineValueRow {
   id?: string;
   pipeline_id: string;
-  cohort: number;
+  /** Periodo de ingreso de la cohorte: "2014-A". */
+  cohort: string;
   campus_id: string | null;
   stage_index: number;
-  remaining: number | null;
+  /** Estudiantes o porcentaje, según la medida de la tubería. */
+  value: number | null;
   main_cause: string;
+}
+
+export interface OdHistoryRow {
+  id: string;
+  report_id: string;
+  key: string;
+  title: string;
+  description: string;
+  unit: string;
+  format: OdValueFormat;
+  total_label: string;
+  office_id: string | null;
+  position: number;
+}
+
+export interface OdHistoryValueRow {
+  id?: string;
+  history_id: string;
+  /** "2020-A". */
+  period_label: string;
+  /** "" = total. */
+  category: string;
+  position: number;
+  value: number | null;
 }
 
 export interface OdReportBlockRow {

@@ -1,8 +1,8 @@
 /* =============================================================================
    Estación 3 · Captura.
 
-   Las cifras del informe, año por año y campus por campus, en rejillas que se
-   llenan de tres formas:
+   Las cifras del informe, año por año (periodos A y B) y campus por campus, en
+   rejillas que se llenan de tres formas:
    · escribiendo casilla por casilla;
    · pegando un rango copiado de Excel desde la casilla enfocada;
    · descargando la plantilla del informe, llenándola y subiéndola: antes de
@@ -16,21 +16,26 @@ import { useMemo, useRef, useState } from "react";
 import { Icon } from "../../../../components/ui/Icon";
 import { downloadText, formatValue } from "../../../datos-abiertos/data/open-data";
 import { DEPARTMENTS } from "../../../datos-abiertos/data/colombia-map";
-import type { OdImportKind, OdIndicatorRow } from "../../../../types/database";
+import type { OdAnnualRule, OdImportKind, OdIndicatorRow, OdTerm } from "../../../../types/database";
+import { ANNUAL_RULE_LABEL, annualFigure } from "../../../datos-abiertos/data/terms";
 import type { StationProps } from "../OdAdmin";
 import { DataGrid, cellKey } from "../DataGrid";
 import type { CellKey, GridColumn, GridRow } from "../DataGrid";
 import {
+  useSaveBreakdown,
   useSaveBreakdownValues,
   useSaveHeatmapCells,
+  useSaveHistoryValues,
+  useSaveIndicator,
+  useSaveMap,
   useSaveMapValues,
   useSavePipelineValues,
   useSaveValues,
 } from "../od-data";
-import { Panel, SaveState, StageEmpty } from "../ui";
+import { ConfirmButton, Panel, PeriodInput, SaveState, StageEmpty, YearPicker, periodRange } from "../ui";
 import { parseCsv, parseNumber, toCsv } from "../sheet";
 
-type Tab = "indicadores" | "desgloses" | "calor" | "mapas" | "tuberia";
+type Tab = "indicadores" | "desgloses" | "historico" | "calor" | "mapas" | "tuberia";
 const TOTAL = "total";
 
 export function CaptureStation(props: StationProps) {
@@ -41,6 +46,7 @@ export function CaptureStation(props: StationProps) {
   const counts = {
     indicadores: data.rows.indicators.filter((i) => i.report_id === report.uuid).length,
     desgloses: data.rows.breakdowns.filter((b) => b.report_id === report.uuid).length,
+    historico: data.rows.histories.filter((h) => h.report_id === report.uuid).length,
     calor: data.rows.heatmaps.filter((h) => h.report_id === report.uuid).length,
     mapas: data.rows.maps.filter((m) => m.report_id === report.uuid).length,
     tuberia: data.rows.pipelines.filter((p) => p.report_id === report.uuid).length,
@@ -48,9 +54,10 @@ export function CaptureStation(props: StationProps) {
   const tabs: { id: Tab; label: string }[] = [
     { id: "indicadores" as Tab, label: "Indicadores" },
     { id: "desgloses" as Tab, label: "Desgloses" },
+    { id: "historico" as Tab, label: "Evolución histórica" },
     { id: "calor" as Tab, label: "Mapas de calor" },
     { id: "mapas" as Tab, label: "Mapas" },
-    { id: "tuberia" as Tab, label: "Tubería" },
+    { id: "tuberia" as Tab, label: "Tuberías" },
   ].filter((t) => t.id === "indicadores" || counts[t.id] > 0);
 
   return (
@@ -74,6 +81,7 @@ export function CaptureStation(props: StationProps) {
 
       {tab === "indicadores" && <IndicatorCapture key={report.uuid} {...props} />}
       {tab === "desgloses" && <BreakdownCapture key={report.uuid} {...props} />}
+      {tab === "historico" && <HistoryCapture key={report.uuid} {...props} />}
       {tab === "calor" && <HeatmapCapture key={report.uuid} {...props} />}
       {tab === "mapas" && <MapCapture key={report.uuid} {...props} />}
       {tab === "tuberia" && <PipelineCapture key={report.uuid} {...props} />}
@@ -89,25 +97,31 @@ function IndicatorCapture({ data, report, periodId, canEdit }: StationProps) {
   const [via, setVia] = useState<OdImportKind>("rejilla");
   const [pasted, setPasted] = useState<number | null>(null);
   const [upload, setUpload] = useState<UploadPreview | null>(null);
+  const [yearFilter, setYearFilter] = useState("todos");
+  const [showAnnual, setShowAnnual] = useState(true);
   const fileInput = useRef<HTMLInputElement>(null);
 
   const indicators = data.rows.indicators.filter((i) => i.report_id === report!.uuid).sort((a, b) => a.position - b.position);
   const campuses = data.rows.campuses;
   const years = data.catalog.years;
+  const shownYears = yearFilter === "todos" ? years : years.filter((y) => String(y) === yearFilter);
+  const anyReported = indicators.some((i) => i.annual_rule === "reportado");
 
-  // Índice de lo guardado: indicador|año|campus → valor.
+  // Índice de lo guardado: indicador|año|periodo|campus → valor.
   const stored = useMemo(() => {
     const map = new Map<string, number | null>();
-    for (const v of data.rows.values) map.set(`${v.indicator_id}|${v.year}|${v.campus_id ?? TOTAL}`, v.value === null ? null : Number(v.value));
+    for (const v of data.rows.values) {
+      map.set(`${v.indicator_id}|${v.year}|${v.term}|${v.campus_id ?? TOTAL}`, v.value === null ? null : Number(v.value));
+    }
     return map;
   }, [data.rows.values]);
 
-  // Una fila por indicador y campus; el total va primero cuando se captura aparte.
+  // Una fila por indicador y campus; el total va primero.
   const rows: GridRow[] = indicators.flatMap((indicator) => {
     const first: GridRow = {
       key: `${indicator.id}::${TOTAL}`,
       label: indicator.label,
-      sub: `Total institucional · ${indicator.aggregation === "suma" ? "suma de campus" : "reportado"} · ${indicator.unit}`,
+      sub: `Total institucional · ${indicator.aggregation === "suma" ? "suma de campus" : "reportado"} · año: ${ANNUAL_RULE_LABEL[indicator.annual_rule].toLowerCase()} · ${indicator.unit}`,
       groupStart: true,
       format: indicator.format,
     };
@@ -116,31 +130,72 @@ function IndicatorCapture({ data, report, periodId, canEdit }: StationProps) {
       ...campuses.map((c) => ({ key: `${indicator.id}::${c.campus_id}`, label: c.label, sub: indicator.label, format: indicator.format })),
     ];
   });
-  const columns: GridColumn[] = years.map((y) => ({ key: String(y), label: String(y) }));
+
+  // Por año: periodo A, periodo B y la cifra del año (calculada, salvo en "reportado").
+  const columns: GridColumn[] = shownYears.flatMap((y) => [
+    { key: `${y}-A`, label: "A", group: String(y), ariaLabel: `${y}, periodo A` },
+    { key: `${y}-B`, label: "B", group: String(y), ariaLabel: `${y}, periodo B` },
+    ...(showAnnual ? [{ key: `${y}-anual`, label: "Año", group: String(y), ariaLabel: `${y}, cifra del año` }] : []),
+  ]);
 
   const split = (rowKey: string) => {
     const [indicatorId, campus] = rowKey.split("::");
     return { indicator: indicators.find((i) => i.id === indicatorId)!, campus };
   };
+  const parseColumn = (column: string) => {
+    const [year, term] = column.split("-");
+    return { year, term: term as OdTerm };
+  };
   const storedValue = (rowKey: string, column: string) => {
     const { indicator, campus } = split(rowKey);
-    return stored.get(`${indicator.id}|${column}|${campus}`) ?? null;
+    const { year, term } = parseColumn(column);
+    return stored.get(`${indicator.id}|${year}|${term}|${campus}`) ?? null;
   };
-  const sumFor = (indicator: OdIndicatorRow, year: string) => {
-    const parts = campuses.map((c) => {
-      const key = cellKey(`${indicator.id}::${c.campus_id}`, year);
-      return key in draft ? draft[key] : stored.get(`${indicator.id}|${year}|${c.campus_id}`) ?? null;
-    });
+  /** Lo que se ve en la casilla: el cambio sin guardar o lo guardado. */
+  const currentValue = (indicatorId: string, campus: string, year: string, term: OdTerm) => {
+    const key = cellKey(`${indicatorId}::${campus}`, `${year}-${term}`);
+    return key in draft ? draft[key] : stored.get(`${indicatorId}|${year}|${term}|${campus}`) ?? null;
+  };
+  /** Total institucional de lo que se suma: la suma de los campus, o nada si falta uno. */
+  const sumFor = (indicator: OdIndicatorRow, year: string, term: OdTerm) => {
+    const parts = campuses.map((c) => currentValue(indicator.id, c.campus_id, year, term));
     return parts.every((p) => p !== null && p !== undefined) ? parts.reduce<number>((a, b) => a + (b as number), 0) : null;
+  };
+  const cellValue = (indicator: OdIndicatorRow, campus: string, year: string, term: OdTerm) =>
+    campus === TOTAL && indicator.aggregation === "suma" ? sumFor(indicator, year, term) : currentValue(indicator.id, campus, year, term);
+
+  const lockedReason = (rowKey: string, column: string) => {
+    const { indicator, campus } = split(rowKey);
+    const { year, term } = parseColumn(column);
+    if (indicator.years && indicator.years.length && !indicator.years.includes(Number(year))) {
+      return `${indicator.label} no se reporta en ${year}. Cámbialo en "Años con dato".`;
+    }
+    if (term === "anual" && indicator.annual_rule !== "reportado") {
+      return `Cifra del año: ${ANNUAL_RULE_LABEL[indicator.annual_rule].toLowerCase()}. Se cambia en Estructura y KPI.`;
+    }
+    return campus === TOTAL && indicator.aggregation === "suma" ? "Se calcula sumando los campus" : null;
+  };
+  const lockedValue = (rowKey: string, column: string) => {
+    const { indicator, campus } = split(rowKey);
+    const { year, term } = parseColumn(column);
+    if (indicator.years && indicator.years.length && !indicator.years.includes(Number(year))) return null;
+    if (term !== "anual") return cellValue(indicator, campus, year, term);
+    return annualFigure(
+      indicator.annual_rule,
+      cellValue(indicator, campus, year, "A"),
+      cellValue(indicator, campus, year, "B"),
+      cellValue(indicator, campus, year, "anual"),
+    ).value;
   };
 
   const changes = Object.keys(draft).length;
 
   const commitSave = () => {
     const values = Object.entries(draft).map(([key, value]) => {
-      const [rowKey, year] = key.split("|");
+      const [rowKey, column] = key.split("|");
       const { indicator, campus } = split(rowKey);
-      return { indicator_id: indicator.id, year: Number(year), campus_id: campus === TOTAL ? null : campus, value };
+      const { year, term } = parseColumn(column);
+      return { indicator_id: indicator.id, year: Number(year), term, campus_id: campus === TOTAL ? null : campus, value };
     });
     save.mutate(
       { periodId, reportId: report!.uuid!, kind: via, fileName: upload?.fileName, values },
@@ -148,18 +203,22 @@ function IndicatorCapture({ data, report, periodId, canEdit }: StationProps) {
     );
   };
 
-  /* Plantilla: una fila por indicador y campus, con claves para volver a leerla. */
+  /* Plantilla: una fila por indicador y campus, una columna por año y periodo
+     (2024-A, 2024-B y, si algún indicador la reporta aparte, 2024-anual). */
+  const templateTerms: OdTerm[] = anyReported ? ["A", "B", "anual"] : ["A", "B"];
   const downloadTemplate = () => {
-    const header = ["clave", "indicador", "unidad", "campus", ...years.map(String)];
+    const header = ["clave", "indicador", "unidad", "cifra del año", "campus", ...years.flatMap((y) => templateTerms.map((term) => `${y}-${term}`))];
     const body = indicators.flatMap((indicator) =>
       [{ slug: "total", label: "Total institucional", id: TOTAL }, ...campuses.map((c) => ({ slug: c.slug, label: c.label, id: c.campus_id }))]
         .filter((c) => !(indicator.aggregation === "suma" && c.id === TOTAL))
         .map((c) => [
-          indicator.key, indicator.label, indicator.unit, c.slug,
-          ...years.map((y) => {
-            const v = stored.get(`${indicator.id}|${y}|${c.id}`);
-            return v === undefined || v === null ? "" : String(v).replace(".", ",");
-          }),
+          indicator.key, indicator.label, indicator.unit, ANNUAL_RULE_LABEL[indicator.annual_rule], c.slug,
+          ...years.flatMap((y) =>
+            templateTerms.map((term) => {
+              const v = stored.get(`${indicator.id}|${y}|${term}|${c.id}`);
+              return v === undefined || v === null ? "" : String(v).replace(".", ",");
+            }),
+          ),
         ]),
     );
     downloadText(`plantilla-${report!.slug}-${data.rows.period.label}.csv`, toCsv([header, ...body]));
@@ -179,9 +238,19 @@ function IndicatorCapture({ data, report, periodId, canEdit }: StationProps) {
     const col = (name: string) => header.findIndex((h) => h.trim().toLowerCase() === name);
     const keyCol = col("clave");
     const campusCol = col("campus");
-    const yearCols = years.map((y) => [y, header.findIndex((h) => h.trim() === String(y))] as const).filter(([, i]) => i >= 0);
+    // Columnas "2024-A", "2024-B", "2024-anual" de los años del periodo.
+    const cutCols = header
+      .map((h, i) => {
+        const match = h.trim().match(/^(\d{4})-(a|b|anual)$/i);
+        if (!match || !years.includes(Number(match[1]))) return null;
+        const term = (match[2].toLowerCase() === "anual" ? "anual" : match[2].toUpperCase()) as OdTerm;
+        return { year: Number(match[1]), term, index: i };
+      })
+      .filter((c): c is { year: number; term: OdTerm; index: number } => c !== null);
     if (keyCol < 0 || campusCol < 0) errors.push('Faltan las columnas "clave" y "campus": usa la plantilla descargada.');
-    if (yearCols.length === 0) errors.push(`No hay columnas de año del periodo ${data.rows.period.label}.`);
+    if (cutCols.length === 0) {
+      errors.push(`No hay columnas de periodo del ${data.rows.period.label} (como "${years[0]}-A" y "${years[0]}-B"): descarga la plantilla de nuevo.`);
+    }
 
     lines.forEach((line, index) => {
       if (keyCol < 0 || campusCol < 0) return;
@@ -191,21 +260,32 @@ function IndicatorCapture({ data, report, periodId, canEdit }: StationProps) {
       if (!indicator) return errors.push(`Fila ${index + 2}: la clave "${line[keyCol]}" no es un indicador de este informe.`);
       if (!campus) return errors.push(`Fila ${index + 2}: el campus "${line[campusCol]}" no está en el periodo.`);
       if (campus === TOTAL && indicator.aggregation === "suma") return;
-      for (const [year, i] of yearCols) {
+      for (const { year, term, index: i } of cutCols) {
         const parsed = parseNumber(line[i] ?? "");
         if (!parsed.ok) {
-          errors.push(`Fila ${index + 2}, ${year}: ${parsed.reason}.`);
+          errors.push(`Fila ${index + 2}, ${year}-${term}: ${parsed.reason}.`);
           continue;
         }
-        const before = stored.get(`${indicator.id}|${year}|${campus}`) ?? null;
+        if (term === "anual" && indicator.annual_rule !== "reportado") {
+          if (parsed.value !== null) errors.push(`Fila ${index + 2}, ${year}-anual: "${indicator.label}" calcula el año con A y B; el valor se ignora.`);
+          continue;
+        }
+        const before = stored.get(`${indicator.id}|${year}|${term}|${campus}`) ?? null;
         if (parsed.value !== before) {
-          next[cellKey(`${indicator.id}::${campus}`, String(year))] = parsed.value;
-          diff.push({ label: `${indicator.label} · ${campus === TOTAL ? "Total" : campuses.find((c) => c.campus_id === campus)?.label} · ${year}`, before, after: parsed.value, format: indicator.format });
+          next[cellKey(`${indicator.id}::${campus}`, `${year}-${term}`)] = parsed.value;
+          diff.push({
+            label: `${indicator.label} · ${campus === TOTAL ? "Total" : campuses.find((c) => c.campus_id === campus)?.label} · ${year}-${term === "anual" ? "año" : term}`,
+            before,
+            after: parsed.value,
+            format: indicator.format,
+          });
         }
       }
     });
     setUpload({ fileName: file.name, errors, diff, draft: next });
   };
+
+  const hiddenChanges = Object.keys(draft).filter((key) => !shownYears.some((y) => key.split("|")[1]?.startsWith(`${y}-`))).length;
 
   return (
     <Panel
@@ -213,8 +293,9 @@ function IndicatorCapture({ data, report, periodId, canEdit }: StationProps) {
       title={`Cifras de ${report!.name}`}
       description={
         <>
-          {indicators.length} indicadores × {campuses.length} campus × {years.length} años. Vacío es "sin reportar", nunca cero.
-          Pega un rango de Excel desde la casilla donde empieza.
+          {indicators.length} indicadores × {campuses.length} campus × {years.length} años, cada año en periodos A y B. La cifra
+          del año se calcula con la regla de cada indicador. Vacío es "sin reportar", nunca cero. Pega un rango de Excel desde
+          la casilla donde empieza.
         </>
       }
       actions={
@@ -250,7 +331,7 @@ function IndicatorCapture({ data, report, periodId, canEdit }: StationProps) {
     >
       {pasted !== null && (
         <p className="admin-notice" role="status">
-          <Icon name="check" size={15} /> Se pegaron {pasted} casillas. Revisa las marcadas y guarda.
+          <Icon name="check" size={15} /> Se pegaron {pasted} casillas; las columnas calculadas se saltaron. Revisa las marcadas y guarda.
         </p>
       )}
 
@@ -269,28 +350,79 @@ function IndicatorCapture({ data, report, periodId, canEdit }: StationProps) {
       {indicators.length === 0 ? (
         <StageEmpty title="El informe no tiene indicadores">Créalos en Estructura y KPI.</StageEmpty>
       ) : (
-        <DataGrid
-          label={`Cifras de ${report!.name} por indicador, campus y año`}
-          rows={rows}
-          columns={columns}
-          stored={storedValue}
-          draft={draft}
-          onDraft={(next) => {
-            setDraft(next);
-          }}
-          onPasted={(count) => {
-            setPasted(count);
-            setVia("pegado");
-          }}
-          readOnly={!canEdit}
-          lockedReason={(rowKey) => {
-            const { indicator, campus } = split(rowKey);
-            return campus === TOTAL && indicator.aggregation === "suma" ? "Se calcula sumando los campus" : null;
-          }}
-          lockedValue={(rowKey, column) => sumFor(split(rowKey).indicator, column)}
-        />
+        <>
+          <div className="oda-grid-toolbar">
+            <label className="oda-grid-toolbar__field">
+              <span>Años</span>
+              <select value={yearFilter} onChange={(e) => setYearFilter(e.target.value)}>
+                <option value="todos">Todos ({years[0]}-{years[years.length - 1]})</option>
+                {years.map((y) => (
+                  <option key={y} value={String(y)}>{y}</option>
+                ))}
+              </select>
+            </label>
+            <label className="oda-check">
+              <input type="checkbox" checked={showAnnual} onChange={(e) => setShowAnnual(e.target.checked)} />
+              Mostrar la cifra del año
+            </label>
+            {hiddenChanges > 0 && (
+              <span className="oda-badge" data-tone="warn">
+                <Icon name="alert" size={12} /> {hiddenChanges} {hiddenChanges === 1 ? "cambio" : "cambios"} en años ocultos
+              </span>
+            )}
+          </div>
+          <IndicatorYears indicators={indicators} years={years} canEdit={canEdit} />
+          <DataGrid
+            label={`Cifras de ${report!.name} por indicador, campus, año y periodo`}
+            rows={rows}
+            columns={columns}
+            stored={storedValue}
+            draft={draft}
+            onDraft={(next) => {
+              setDraft(next);
+            }}
+            onPasted={(count) => {
+              setPasted(count);
+              setVia("pegado");
+            }}
+            readOnly={!canEdit}
+            lockedReason={lockedReason}
+            lockedValue={lockedValue}
+          />
+        </>
       )}
     </Panel>
+  );
+}
+
+/** Qué años reporta cada indicador. Se guarda al marcar: la rejilla y el portal lo siguen al instante. */
+function IndicatorYears({ indicators, years, canEdit }: { indicators: OdIndicatorRow[]; years: number[]; canEdit: boolean }) {
+  const save = useSaveIndicator();
+  const partial = indicators.filter((i) => i.years && i.years.length).length;
+  return (
+    <details className="oda-years-panel">
+      <summary>
+        Años con dato por indicador
+        <small>{partial ? `${partial} con años elegidos` : "todos los indicadores usan todos los años"}</small>
+      </summary>
+      <div className="oda-years-panel__body">
+        <SaveState pending={save.isPending} error={save.error} success={save.isSuccess} />
+        <ul>
+          {indicators.map((indicator) => (
+            <li key={indicator.id}>
+              <strong>{indicator.label}</strong>
+              <YearPicker
+                years={years}
+                value={indicator.years}
+                disabled={!canEdit || save.isPending}
+                label={`Años con dato de ${indicator.label}`}
+                onChange={(next) => save.mutate({ id: indicator.id, report_id: indicator.report_id, years: next })}
+              />
+            </li>
+          ))}
+        </ul>
+      </div>
+    </details>
   );
 }
 
@@ -359,6 +491,7 @@ function BreakdownCapture({ data, report, periodId, canEdit }: StationProps) {
   const [active, setActive] = useState(breakdowns[0]?.id);
   const breakdown = breakdowns.find((b) => b.id === active) ?? breakdowns[0];
   const save = useSaveBreakdownValues();
+  const saveBreakdown = useSaveBreakdown();
   const [draft, setDraft] = useState<Record<CellKey, number | null>>({});
   const [newLabel, setNewLabel] = useState("");
   const [extraLabels, setExtraLabels] = useState<string[]>([]);
@@ -371,10 +504,22 @@ function BreakdownCapture({ data, report, periodId, canEdit }: StationProps) {
     ...Array.from(new Set(values.sort((a, b) => a.position - b.position).map((v) => v.label))),
     ...extraLabels,
   ].filter((l) => !removed.includes(l));
-  const years = data.catalog.years;
-  const stored = (label: string, year: string) => {
-    const v = values.find((x) => x.label === label && String(x.year) === year);
+  const years = breakdown.years && breakdown.years.length
+    ? data.catalog.years.filter((y) => breakdown.years!.includes(y))
+    : data.catalog.years;
+  const rule = breakdown.annual_rule ?? "reportado";
+  const columns = years.flatMap((year) => (["A", "B", "anual"] as OdTerm[]).map((term) => ({
+    key: `${year}-${term}`, label: term === "anual" ? "Año" : term, group: String(year),
+    ariaLabel: `${year}, ${term === "anual" ? "cifra del año" : `periodo ${term}`}`,
+  })));
+  const stored = (label: string, column: string) => {
+    const [year, term] = column.split("-");
+    const v = values.find((x) => x.label === label && String(x.year) === year && (x.term ?? "anual") === term);
     return v?.value === undefined || v?.value === null ? null : Number(v.value);
+  };
+  const current = (label: string, column: string) => {
+    const key = cellKey(label, column);
+    return key in draft ? draft[key] : stored(label, column);
   };
   const changes = Object.keys(draft).length + removed.length;
 
@@ -382,7 +527,7 @@ function BreakdownCapture({ data, report, periodId, canEdit }: StationProps) {
     <Panel
       id="oda-desgloses"
       title="Desgloses"
-      description="Categorías por año, para el total institucional. La ficha las muestra en circular o en barras."
+      description="Categorías por año y periodos A y B, para el total institucional. La cifra anual sigue la regla del desglose."
       actions={
         <>
           {breakdowns.length > 1 && (
@@ -400,12 +545,11 @@ function BreakdownCapture({ data, report, periodId, canEdit }: StationProps) {
             disabled={!canEdit || changes === 0 || save.isPending}
             onClick={() => {
               const rows = labels.flatMap((label, position) =>
-                years.map((year) => {
-                  const key = cellKey(label, String(year));
-                  const value = key in draft ? draft[key] : stored(label, String(year));
-                  return { breakdown_id: breakdown.id, year, label, position: position + 1, value };
+                columns.filter((c) => rule === "reportado" || !c.key.endsWith("-anual")).map((column) => {
+                  const [year, term] = column.key.split("-");
+                  return { breakdown_id: breakdown.id, year: Number(year), term: term as OdTerm, label, position: position + 1, value: current(label, column.key) };
                 }),
-              ).filter((r) => r.value !== null || values.some((v) => v.label === r.label && v.year === r.year));
+              ).filter((r) => r.value !== null || values.some((v) => v.label === r.label && v.year === r.year && (v.term ?? "anual") === r.term));
               save.mutate(
                 { periodId, reportId: report!.uuid!, breakdownId: breakdown.id, values: rows, removeLabels: removed, kind: via },
                 { onSuccess: () => { setDraft({}); setExtraLabels([]); setRemoved([]); } },
@@ -418,11 +562,31 @@ function BreakdownCapture({ data, report, periodId, canEdit }: StationProps) {
       }
     >
       <p className="oda-panel__lede"><strong>{breakdown.title}</strong> · {breakdown.unit}</p>
+      <label className="admin-field">
+        <span>Cifra del año por categoría</span>
+        <select value={rule} disabled={!canEdit || saveBreakdown.isPending || save.isPending || changes > 0}
+          onChange={(e) => saveBreakdown.mutate({ id: breakdown.id, report_id: breakdown.report_id, annual_rule: e.target.value as OdAnnualRule })}>
+          {Object.entries(ANNUAL_RULE_LABEL).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+        </select>
+        <small>Guarda las cifras pendientes antes de cambiar la regla. Las cifras anuales capturadas se conservan al elegir una regla calculada.</small>
+      </label>
+      <SaveState pending={saveBreakdown.isPending} error={saveBreakdown.error} success={saveBreakdown.isSuccess} />
+      <YearPicker
+        years={data.catalog.years}
+        value={breakdown.years}
+        disabled={!canEdit || saveBreakdown.isPending || save.isPending || changes > 0}
+        onChange={(next) => saveBreakdown.mutate({ id: breakdown.id, report_id: breakdown.report_id, years: next })}
+      />
       <DataGrid
         label={breakdown.title}
         rowHeader="Categoría"
         rows={labels.map((l) => ({ key: l, label: l, format: breakdown.format }))}
-        columns={years.map((y) => ({ key: String(y), label: String(y) }))}
+        columns={columns}
+        lockedReason={(_label, column) => column.endsWith("-anual") && rule !== "reportado" ? ANNUAL_RULE_LABEL[rule] : null}
+        lockedValue={(label, column) => {
+          const year = column.split("-")[0];
+          return annualFigure(rule, current(label, `${year}-A`), current(label, `${year}-B`), current(label, `${year}-anual`)).value;
+        }}
         stored={stored}
         draft={draft}
         onDraft={setDraft}
@@ -528,9 +692,11 @@ function MapCapture({ data, report, periodId, canEdit }: StationProps) {
   const maps = data.rows.maps.filter((m) => m.report_id === report!.uuid);
   const [active, setActive] = useState(maps[0]?.id);
   const map = maps.find((m) => m.id === active) ?? maps[0];
-  const years = data.catalog.years;
-  const [year, setYear] = useState(years[years.length - 1]);
+  const years = map?.years && map.years.length ? data.catalog.years.filter((y) => map.years!.includes(y)) : data.catalog.years;
+  const [pickedYear, setYear] = useState<number | null>(null);
+  const year = pickedYear !== null && years.includes(pickedYear) ? pickedYear : years[years.length - 1];
   const save = useSaveMapValues();
+  const saveMap = useSaveMap();
   const [draft, setDraft] = useState<Record<CellKey, number | null>>({});
   const [via, setVia] = useState<OdImportKind>("rejilla");
   if (!map) return null;
@@ -591,6 +757,12 @@ function MapCapture({ data, report, periodId, canEdit }: StationProps) {
       }
     >
       <p className="oda-panel__lede"><strong>{map.title}</strong> · corte {year} · {map.unit}</p>
+      <YearPicker
+        years={data.catalog.years}
+        value={map.years}
+        disabled={!canEdit || saveMap.isPending}
+        onChange={(next) => saveMap.mutate({ id: map.id, report_id: map.report_id, years: next })}
+      />
       <DataGrid
         label={`${map.title}, ${year}`}
         rowHeader="Departamento"
@@ -608,47 +780,236 @@ function MapCapture({ data, report, periodId, canEdit }: StationProps) {
 
 /* --- Tubería ------------------------------------------------------------------------------- */
 
+const PIPELINE_TOTAL = "total";
+
 function PipelineCapture({ data, report, periodId, canEdit }: StationProps) {
-  const pipeline = data.rows.pipelines.find((p) => p.report_id === report!.uuid);
+  const pipelines = data.rows.pipelines.filter((p) => p.report_id === report!.uuid).sort((a, b) => a.position - b.position);
+  const [active, setActive] = useState(pipelines[0]?.id);
+  const pipeline = pipelines.find((p) => p.id === active) ?? pipelines[0];
   const values = data.rows.pipelineValues.filter((v) => v.pipeline_id === pipeline?.id);
-  const cohorts = Array.from(new Set(values.map((v) => v.cohort))).sort((a, b) => a - b);
-  const [cohort, setCohort] = useState(cohorts[cohorts.length - 1] ?? data.rows.period.start_year);
-  const [extraCohorts, setExtraCohorts] = useState<number[]>([]);
+  const storedCohorts = Array.from(new Set(values.map((v) => String(v.cohort)))).sort();
+  const [extra, setExtra] = useState<string[]>([]);
+  const [removed, setRemoved] = useState<string[]>([]);
+  const cohorts = Array.from(new Set([...storedCohorts, ...extra])).filter((c) => !removed.includes(c)).sort();
+  const [picked, setPicked] = useState<string | null>(null);
+  const cohort = picked && cohorts.includes(picked) ? picked : cohorts[cohorts.length - 1] ?? "";
+  const period = data.rows.period;
+  const [rangeFrom, setRangeFrom] = useState<{ year: number; term: "A" | "B" }>({ year: period.start_year, term: "A" });
+  const [rangeTo, setRangeTo] = useState<{ year: number; term: "A" | "B" }>({ year: period.start_year, term: "A" });
   const save = useSavePipelineValues();
   const [draft, setDraft] = useState<Record<CellKey, number | null>>({});
   const [via, setVia] = useState<OdImportKind>("rejilla");
   if (!pipeline) return null;
 
+  const measure = pipeline.measure ?? "estudiantes";
+  const percent = measure !== "estudiantes";
+  const format: "decimal" | "entero" = percent ? "decimal" : "entero";
   const campuses = data.rows.campuses;
-  const allCohorts = Array.from(new Set([...cohorts, ...extraCohorts])).sort((a, b) => a - b);
-  const stored = (campus: string, stage: string) => {
-    const v = values.find((x) => x.cohort === cohort && (x.campus_id ?? TOTAL) === campus && String(x.stage_index) === stage);
-    return v?.remaining ?? null;
+
+  // Las filas llevan la cohorte en la clave: cambiar de cohorte no pierde lo escrito.
+  const rowKey = (campus: string) => `${cohort}::${campus}`;
+  const rows: GridRow[] = [
+    {
+      key: rowKey(PIPELINE_TOTAL),
+      label: "Total institucional",
+      sub: percent ? "se captura: los porcentajes no se suman" : "suma de campus",
+      groupStart: true,
+      format,
+    },
+    ...campuses.map((c) => ({ key: rowKey(c.campus_id), label: c.label, format })),
+  ];
+  // Deserción: una columna por tramo (hacia la etapa i). Estudiantes y permanencia: una por etapa.
+  const columns: GridColumn[] =
+    measure === "desercion"
+      ? pipeline.stages.slice(1).map((stage, i) => ({ key: String(i + 1), label: `→ ${stage}`, ariaLabel: `Deserción hacia ${stage}, %` }))
+      : pipeline.stages.map((stage, i) => ({ key: String(i), label: stage, ariaLabel: percent ? `${stage}, % que sigue` : `${stage}, estudiantes` }));
+
+  const parseRow = (key: string) => {
+    const [c, campus] = key.split("::");
+    return { cohort: c, campus };
   };
-  const changes = Object.keys(draft).length;
+  const stored = (key: string, stage: string) => {
+    const { cohort: c, campus } = parseRow(key);
+    const v = values.find((x) => String(x.cohort) === c && (x.campus_id ?? PIPELINE_TOTAL) === campus && String(x.stage_index) === stage);
+    return v?.value === undefined || v?.value === null ? null : Number(v.value);
+  };
+  const current = (key: string, stage: string) => {
+    const k = cellKey(key, stage);
+    return k in draft ? draft[k] : stored(key, stage);
+  };
+
+  const invalid = percent
+    ? Object.entries(draft).filter(([, value]) => value !== null && (value < 0 || value > 100)).length
+    : 0;
+  const changes = Object.keys(draft).length + removed.filter((c) => storedCohorts.includes(c)).length;
+
+  const addRange = () => {
+    const labels = periodRange(rangeFrom, rangeTo).filter((label) => !cohorts.includes(label));
+    if (!labels.length) return;
+    setExtra([...extra, ...labels]);
+    setRemoved(removed.filter((c) => !labels.includes(c)));
+    setPicked(labels[labels.length - 1]);
+  };
 
   return (
     <Panel
       id="oda-tuberia"
-      title="Tubería de permanencia"
-      description="Estudiantes de la cohorte que siguen al llegar a cada etapa, por campus. El total se suma solo. Una etapa vacía es un tramo que la cohorte aún no cursa."
+      title="Tuberías"
+      description={
+        measure === "estudiantes"
+          ? "Estudiantes de la cohorte que siguen al llegar a cada etapa, por campus. El total se suma solo. Una etapa vacía es un tramo que la cohorte aún no cursa."
+          : measure === "permanencia"
+            ? "Porcentaje de la cohorte que sigue en cada etapa (100 al ingreso), con decimales: 87,5. El total institucional se captura."
+            : "Porcentaje de los que llegaron a cada tramo que se retira en él, con decimales: 12,5. La tubería calcula cuánto sigue. El total institucional se captura."
+      }
       actions={
         <>
-          <label className="oda-add-select">
-            <span className="sr-only">Cohorte</span>
-            <select value={cohort} onChange={(e) => { setCohort(Number(e.target.value)); setDraft({}); }}>
-              {allCohorts.map((c) => <option key={c} value={c}>Cohorte {c}</option>)}
-            </select>
-          </label>
-          {canEdit && (
-            <button type="button" className="button-ghost" onClick={() => {
-              const next = (allCohorts[allCohorts.length - 1] ?? data.rows.period.start_year - 1) + 1;
-              setExtraCohorts([...extraCohorts, next]);
-              setCohort(next);
-              setDraft({});
-            }}>
-              <Icon name="plus" size={15} /> Cohorte
+          {pipelines.length > 1 && (
+            <label className="oda-add-select">
+              <span className="sr-only">Tubería</span>
+              <select value={pipeline.id} onChange={(e) => { setActive(e.target.value); setDraft({}); setExtra([]); setRemoved([]); setPicked(null); }}>
+                {pipelines.map((p) => <option key={p.id} value={p.id}>{p.title}</option>)}
+              </select>
+            </label>
+          )}
+          <SaveState pending={save.isPending} error={save.error} success={save.isSuccess} idle={invalid ? `${invalid} fuera de 0-100` : undefined} />
+          <button
+            type="button"
+            className="button-primary"
+            disabled={!canEdit || changes === 0 || invalid > 0 || save.isPending}
+            onClick={() =>
+              save.mutate(
+                {
+                  periodId, reportId: report!.uuid!, kind: via, pipelineId: pipeline.id,
+                  removeCohorts: removed.filter((c) => storedCohorts.includes(c)),
+                  values: Object.entries(draft)
+                    .filter(([key]) => !removed.includes(parseRow(key.split("|")[0]).cohort))
+                    .map(([key, value]) => {
+                      const [row, stage] = key.split("|");
+                      const { cohort: c, campus } = parseRow(row);
+                      const campusId = campus === PIPELINE_TOTAL ? null : campus;
+                      const previous = values.find((x) => String(x.cohort) === c && x.campus_id === campusId && String(x.stage_index) === stage);
+                      return {
+                        pipeline_id: pipeline.id, cohort: c, campus_id: campusId, stage_index: Number(stage),
+                        value: value === null ? null : percent ? value : Math.round(value), main_cause: previous?.main_cause ?? "",
+                      };
+                    }),
+                },
+                { onSuccess: () => { setDraft({}); setExtra([]); setRemoved([]); } },
+              )
+            }
+          >
+            Guardar {changes || ""}
+          </button>
+        </>
+      }
+    >
+      <div className="oda-grid-toolbar">
+        <label className="oda-grid-toolbar__field">
+          <span>Cohorte</span>
+          <select value={cohort} disabled={!cohorts.length} onChange={(e) => setPicked(e.target.value)}>
+            {cohorts.length === 0 && <option value="">Sin cohortes</option>}
+            {cohorts.map((c) => <option key={c} value={c}>{c}</option>)}
+          </select>
+        </label>
+        {canEdit && (
+          <span className="oda-grid-toolbar__group">
+            <PeriodInput label="Desde" value={rangeFrom} onChange={setRangeFrom} />
+            <PeriodInput label="Hasta" value={rangeTo} onChange={setRangeTo} />
+            <button type="button" className="button-secondary" onClick={addRange}>
+              <Icon name="plus" size={15} /> Añadir cohortes
             </button>
+          </span>
+        )}
+        {canEdit && cohort && (
+          <ConfirmButton label={`Quitar ${cohort}`} confirmLabel={`¿Quitar la cohorte ${cohort} con sus cifras?`} onConfirm={() => { setRemoved([...removed, cohort]); setPicked(null); }} />
+        )}
+      </div>
+
+      {!cohort ? (
+        <StageEmpty title="Añade las cohortes que analiza esta tubería">
+          Elige desde y hasta qué periodo de ingreso (por ejemplo, 2014-A a 2023-B) y pulsa Añadir cohortes.
+        </StageEmpty>
+      ) : (
+        <>
+          <p className="oda-panel__lede"><strong>{pipeline.title}</strong> · cohorte {cohort} · {percent ? "% de la cohorte" : "estudiantes"}</p>
+          <DataGrid
+            label={`${pipeline.title}, cohorte ${cohort}`}
+            rowHeader="Campus"
+            rows={rows}
+            columns={columns}
+            stored={stored}
+            draft={draft}
+            onDraft={setDraft}
+            onPasted={() => setVia("pegado")}
+            readOnly={!canEdit}
+            lockedReason={(key) => (!percent && parseRow(key).campus === PIPELINE_TOTAL ? "Se calcula sumando los campus" : null)}
+            lockedValue={(_, stage) => {
+              const parts = campuses.map((c) => current(rowKey(c.campus_id), stage));
+              return parts.every((p) => p !== null && p !== undefined) ? parts.reduce<number>((a, b) => a + (b as number), 0) : null;
+            }}
+          />
+        </>
+      )}
+    </Panel>
+  );
+}
+
+/* --- Evolución histórica ----------------------------------------------------------------------- */
+
+const HISTORY_TOTAL = "__total";
+
+function HistoryCapture({ data, report, periodId, canEdit }: StationProps) {
+  const histories = data.rows.histories.filter((h) => h.report_id === report!.uuid).sort((a, b) => a.position - b.position);
+  const [active, setActive] = useState(histories[0]?.id);
+  const history = histories.find((h) => h.id === active) ?? histories[0];
+  const save = useSaveHistoryValues();
+  const [draft, setDraft] = useState<Record<CellKey, number | null>>({});
+  const [via, setVia] = useState<OdImportKind>("rejilla");
+  const [extraPeriods, setExtraPeriods] = useState<string[]>([]);
+  const [extraCategories, setExtraCategories] = useState<string[]>([]);
+  const [removedPeriods, setRemovedPeriods] = useState<string[]>([]);
+  const [removedCategories, setRemovedCategories] = useState<string[]>([]);
+  const [newPeriod, setNewPeriod] = useState<{ year: number; term: "A" | "B" }>({ year: data.rows.period.end_year, term: "B" });
+  const [newCategory, setNewCategory] = useState("");
+  if (!history) return null;
+
+  const values = data.rows.historyValues.filter((v) => v.history_id === history.id);
+  const storedPeriods = Array.from(new Set(values.map((v) => v.period_label))).sort();
+  const storedCategories = Array.from(
+    new Map(values.filter((v) => v.category !== "").sort((a, b) => a.position - b.position).map((v) => [v.category, v.category])).keys(),
+  );
+  const periods = Array.from(new Set([...storedPeriods, ...extraPeriods])).filter((p) => !removedPeriods.includes(p)).sort();
+  const categories = [...storedCategories, ...extraCategories.filter((c) => !storedCategories.includes(c))].filter((c) => !removedCategories.includes(c));
+
+  const stored = (row: string, period: string) => {
+    const category = row === HISTORY_TOTAL ? "" : row;
+    const v = values.find((x) => x.category === category && x.period_label === period);
+    return v?.value === undefined || v?.value === null ? null : Number(v.value);
+  };
+  const changes =
+    Object.keys(draft).length +
+    removedPeriods.filter((p) => storedPeriods.includes(p)).length +
+    removedCategories.filter((c) => storedCategories.includes(c)).length;
+
+  const reset = () => {
+    setDraft({}); setExtraPeriods([]); setExtraCategories([]); setRemovedPeriods([]); setRemovedCategories([]);
+  };
+
+  return (
+    <Panel
+      id="oda-historico"
+      title="Evolución histórica"
+      description={`La cifra de ${history.total_label.toLowerCase()} y de cada categoría en los periodos que elijas, también anteriores al informe. Si el total queda vacío, el portal suma las categorías. Un periodo o una categoría sin cifras no se guarda.`}
+      actions={
+        <>
+          {histories.length > 1 && (
+            <label className="oda-add-select">
+              <span className="sr-only">Evolución histórica</span>
+              <select value={history.id} onChange={(e) => { setActive(e.target.value); reset(); }}>
+                {histories.map((h) => <option key={h.id} value={h.id}>{h.title}</option>)}
+              </select>
+            </label>
           )}
           <SaveState pending={save.isPending} error={save.error} success={save.isSuccess} />
           <button
@@ -658,17 +1019,18 @@ function PipelineCapture({ data, report, periodId, canEdit }: StationProps) {
             onClick={() =>
               save.mutate(
                 {
-                  periodId, reportId: report!.uuid!, kind: via,
-                  values: Object.entries(draft).map(([key, value]) => {
-                    const [campus, stage] = key.split("|");
-                    const previous = values.find((x) => x.cohort === cohort && x.campus_id === campus && String(x.stage_index) === stage);
-                    return {
-                      pipeline_id: pipeline.id, cohort, campus_id: campus, stage_index: Number(stage),
-                      remaining: value === null ? null : Math.round(value), main_cause: previous?.main_cause ?? "",
-                    };
-                  }),
+                  periodId, reportId: report!.uuid!, historyId: history.id, kind: via,
+                  removePeriods: removedPeriods.filter((p) => storedPeriods.includes(p)),
+                  removeCategories: removedCategories.filter((c) => storedCategories.includes(c)),
+                  values: Object.entries(draft)
+                    .map(([key, value]) => {
+                      const [row, period] = key.split("|");
+                      const category = row === HISTORY_TOTAL ? "" : row;
+                      return { history_id: history.id, period_label: period, category, position: category === "" ? 0 : categories.indexOf(category) + 1, value };
+                    })
+                    .filter((v) => periods.includes(v.period_label) && (v.category === "" || categories.includes(v.category))),
                 },
-                { onSuccess: () => setDraft({}) },
+                { onSuccess: reset },
               )
             }
           >
@@ -677,18 +1039,83 @@ function PipelineCapture({ data, report, periodId, canEdit }: StationProps) {
         </>
       }
     >
-      <p className="oda-panel__lede"><strong>{pipeline.title}</strong> · cohorte {cohort}</p>
-      <DataGrid
-        label={`${pipeline.title}, cohorte ${cohort}`}
-        rowHeader="Campus"
-        rows={campuses.map((c) => ({ key: c.campus_id, label: c.label, format: "entero" as const }))}
-        columns={pipeline.stages.map((s, i) => ({ key: String(i), label: s }))}
-        stored={stored}
-        draft={draft}
-        onDraft={setDraft}
-        onPasted={() => setVia("pegado")}
-        readOnly={!canEdit}
-      />
+      <div className="oda-grid-toolbar">
+        {canEdit && (
+          <>
+            <span className="oda-grid-toolbar__group">
+              <PeriodInput label="Periodo" value={newPeriod} onChange={setNewPeriod} />
+              <button
+                type="button"
+                className="button-secondary"
+                disabled={periods.includes(`${newPeriod.year}-${newPeriod.term}`)}
+                onClick={() => {
+                  const label = `${newPeriod.year}-${newPeriod.term}`;
+                  setExtraPeriods([...extraPeriods, label]);
+                  setRemovedPeriods(removedPeriods.filter((p) => p !== label));
+                }}
+              >
+                <Icon name="plus" size={15} /> Añadir periodo
+              </button>
+            </span>
+            <span className="oda-grid-toolbar__group">
+              <input aria-label="Nueva categoría" placeholder="Pregrado, Posgrado…" value={newCategory} onChange={(e) => setNewCategory(e.target.value)} />
+              <button
+                type="button"
+                className="button-secondary"
+                disabled={!newCategory.trim() || categories.includes(newCategory.trim())}
+                onClick={() => {
+                  setExtraCategories([...extraCategories, newCategory.trim()]);
+                  setRemovedCategories(removedCategories.filter((c) => c !== newCategory.trim()));
+                  setNewCategory("");
+                }}
+              >
+                <Icon name="plus" size={15} /> Añadir categoría
+              </button>
+            </span>
+            {(periods.length > 0 || categories.length > 0) && (
+              <label className="oda-add-select">
+                <span className="sr-only">Quitar periodo o categoría</span>
+                <select
+                  value=""
+                  onChange={(e) => {
+                    const [kind, name] = e.target.value.split("::");
+                    if (kind === "p") setRemovedPeriods([...removedPeriods, name]);
+                    if (kind === "c") setRemovedCategories([...removedCategories, name]);
+                  }}
+                >
+                  <option value="">Quitar…</option>
+                  {periods.map((p) => <option key={`p-${p}`} value={`p::${p}`}>Periodo {p}</option>)}
+                  {categories.map((c) => <option key={`c-${c}`} value={`c::${c}`}>Categoría {c}</option>)}
+                </select>
+              </label>
+            )}
+          </>
+        )}
+      </div>
+
+      {periods.length === 0 ? (
+        <StageEmpty title="Añade los periodos que quieres comparar">
+          Por ejemplo 2020-A y 2025-B. Luego escribe el total y, si quieres, categorías como pregrado y posgrado.
+        </StageEmpty>
+      ) : (
+        <>
+          <p className="oda-panel__lede"><strong>{history.title}</strong> · {periods[0]} a {periods[periods.length - 1]} · {history.unit}</p>
+          <DataGrid
+            label={history.title}
+            rowHeader="Categoría"
+            rows={[
+              { key: HISTORY_TOTAL, label: history.total_label, sub: "vacío = suma de categorías", groupStart: true, format: history.format },
+              ...categories.map((c) => ({ key: c, label: c, format: history.format })),
+            ]}
+            columns={periods.map((p) => ({ key: p, label: p }))}
+            stored={stored}
+            draft={draft}
+            onDraft={setDraft}
+            onPasted={() => setVia("pegado")}
+            readOnly={!canEdit}
+          />
+        </>
+      )}
     </Panel>
   );
 }

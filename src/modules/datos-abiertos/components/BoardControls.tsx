@@ -1,15 +1,16 @@
 /* =============================================================================
-   Controles del tablero: corte y campus.
+   Controles del tablero: corte, periodo académico y campus.
 
-   Viven en la URL (?corte=2024&campus=cucuta), así que un enlace compartido
+   Viven en la URL (?corte=2024&periodo=B&campus=cucuta), así que un enlace compartido
    abre el tablero exactamente como lo vio quien lo envió. Cambiar cualquiera
-   de los dos re-voltea todas las cifras a la vez: un control, todo el tablero.
+   de ellos re-voltea todas las cifras a la vez: un control, todo el tablero.
+   Sin ?periodo, las cifras son del año completo (calculadas de A y B).
    ========================================================================== */
 
 import { useCallback, useRef } from "react";
 import type { KeyboardEvent } from "react";
 import { useSearchParams } from "react-router-dom";
-import type { CampusId, OpenDataCatalog } from "../data/types";
+import type { CampusId, OpenDataCatalog, Term } from "../data/types";
 
 export function useBoardFilters(data: OpenDataCatalog | undefined) {
   const [params, setParams] = useSearchParams();
@@ -19,9 +20,11 @@ export function useBoardFilters(data: OpenDataCatalog | undefined) {
   // ?sede= era el nombre anterior del parámetro: los enlaces viejos siguen abriendo.
   const rawCampus = (params.get("campus") ?? params.get("sede")) as CampusId | null;
   const campus: CampusId = data?.campuses.some((c) => c.id === rawCampus) && rawCampus ? rawCampus : "todas";
+  const rawTerm = params.get("periodo")?.toUpperCase();
+  const term: Term | null = rawTerm === "A" || rawTerm === "B" ? rawTerm : null;
 
   const update = useCallback(
-    (key: "corte" | "campus", value: string, fallback: string) => {
+    (key: "corte" | "campus" | "periodo", value: string, fallback: string) => {
       setParams(
         (prev) => {
           const next = new URLSearchParams(prev);
@@ -41,8 +44,9 @@ export function useBoardFilters(data: OpenDataCatalog | undefined) {
     [update, data?.currentYear],
   );
   const setCampus = useCallback((value: CampusId) => update("campus", value, "todas"), [update]);
+  const setTerm = useCallback((value: Term | null) => update("periodo", value ?? "", ""), [update]);
 
-  return { year, campus, setYear, setCampus, search: params.toString() };
+  return { year, term, campus, setYear, setTerm, setCampus, search: params.toString() };
 }
 
 interface Option<T extends string | number> {
@@ -104,14 +108,18 @@ export function Segmented<T extends string | number>({ label, options, value, on
 export function BoardControls({
   data,
   year,
+  term,
   campus,
   setYear,
+  setTerm,
   setCampus,
 }: {
   data: OpenDataCatalog;
   year: number;
+  term: Term | null;
   campus: CampusId;
   setYear: (year: number) => void;
+  setTerm: (term: Term | null) => void;
   setCampus: (campus: CampusId) => void;
 }) {
   return (
@@ -121,6 +129,16 @@ export function BoardControls({
         options={data.years.map((y) => ({ value: y, label: String(y) }))}
         value={year}
         onChange={setYear}
+      />
+      <Segmented
+        label="Periodo"
+        options={[
+          { value: "anual", label: "Año" },
+          { value: "A", label: "A" },
+          { value: "B", label: "B" },
+        ]}
+        value={term ?? "anual"}
+        onChange={(value) => setTerm(value === "anual" ? null : (value as Term))}
       />
       <Segmented
         label="Campus"

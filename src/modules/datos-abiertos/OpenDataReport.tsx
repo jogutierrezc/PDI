@@ -6,15 +6,16 @@
    la URL, igual que en el tablero, así que la ficha se comparte tal como se ve.
 
    Orden de lectura, de lo general a lo detallado:
-     tablero de KPI → evolución por campus → mapa (si el informe lo tiene) →
-     tubería (permanencia) → mapa de calor → desgloses → tabla dinámica →
-     qué mide cada cifra.
+     tablero de KPI → evolución por campus → evolución histórica → mapa (si
+     el informe lo tiene) → tubería (permanencia) → mapa de calor → desgloses →
+     tabla dinámica → qué mide cada cifra. Un informe puede tener varios
+     conjuntos de cada tipo; cada bloque apunta al suyo.
 
    Cambiar de informe desde la barra no desmonta la página: la foto de cabecera
    voltea como una paleta y las cifras se reescriben.
    ========================================================================== */
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import type { CSSProperties } from "react";
 import { Link, useParams } from "react-router-dom";
 import { Icon } from "../../components/ui/Icon";
@@ -22,27 +23,34 @@ import { ErrorBlock, LoadingBlock } from "../../components/ui/QueryState";
 import { BoardControls, useBoardFilters } from "./components/BoardControls";
 import { ChartFrame, ViewSwitch } from "./components/ChartFrame";
 import { BarList, YearBars } from "./components/Charts";
+import { AnnualTermChart } from "./components/AnnualTermChart";
+import { YearFilter, useVisibleYears } from "./components/YearFilter";
+import { BreakdownChart } from "./components/BreakdownChart";
 import { ColombiaMap } from "./components/ColombiaMap";
 import { Donut } from "./components/Donut";
 import { Heatmap } from "./components/Heatmap";
+import { HistoryCompare } from "./components/HistoryCompare";
 import { ImageFlap } from "./components/ImageFlap";
 import { KpiBoard } from "./components/KpiBoard";
 import { LineChart } from "./components/LineChart";
 import type { LineSeries } from "./components/LineChart";
 import { EmptyPeriod, OpenDataLayout } from "./components/OpenDataLayout";
 import { PivotTable } from "./components/PivotTable";
-import { Pipeline } from "./components/Pipeline";
+import { LeakyPipeline } from "./components/LeakyPipeline";
 import { SplitFlap } from "./components/SplitFlap";
 import {
   downloadText,
   findReport,
+  cutsOf,
   formatCutoff,
+  hasTerms,
   keyIndicators,
   reportToCsv,
   useOpenDataCatalog,
   valueOf,
 } from "./data/open-data";
-import type { CampusId, Indicator, OpenDataCatalog, Report, ReportBlock } from "./data/types";
+import { ANNUAL_RULE_LABEL, cutCode, cutCodeLabel, cutLabel, fromCutCode } from "./data/terms";
+import type { CampusId, Indicator, OpenDataCatalog, Report, ReportBlock, Term } from "./data/types";
 import { ALL_CAMPUSES, DEFAULT_BLOCK_ORDER } from "./data/types";
 import "./datos-abiertos.css";
 
@@ -90,7 +98,7 @@ interface ContentProps extends ReturnType<typeof useBoardFilters> {
   report: Report;
 }
 
-function ReportContent({ data, report, year, campus, setYear, setCampus, search }: ContentProps) {
+function ReportContent({ data, report, year, term, campus, setYear, setTerm, setCampus, search }: ContentProps) {
   const query = search ? `?${search}` : "";
   const campusName = data.campuses.find((c) => c.id === campus)?.name ?? "Todos los campus";
   const keys = keyIndicators(report);
@@ -165,7 +173,7 @@ function ReportContent({ data, report, year, campus, setYear, setCampus, search 
               </Link>
             ))}
           </nav>
-          <BoardControls data={data} year={year} campus={campus} setYear={setYear} setCampus={setCampus} />
+          <BoardControls data={data} year={year} term={term} campus={campus} setYear={setYear} setTerm={setTerm} setCampus={setCampus} />
           <button type="button" className="od-button od-button--ghost od-report-bar__csv" onClick={download}>
             <Icon name="download" size={16} /> CSV
           </button>
@@ -184,13 +192,15 @@ function ReportContent({ data, report, year, campus, setYear, setCampus, search 
                   <div className="od-keyrow__head">
                     <h2 id="od-clave">{block.settings.title || "Tablero de indicadores"}</h2>
                     <p>
-                      {campusName} · corte {year}. Elige un indicador para verlo en la gráfica de evolución.
+                      {campusName} · corte {cutLabel(year, term)}
+                      {term ? "" : ", cifra del año calculada con los periodos A y B"}. Elige un indicador para verlo en la gráfica de evolución.
                     </p>
                   </div>
                   <KpiBoard
                     indicators={boardIndicators}
                     years={data.years}
                     year={year}
+                    term={term}
                     campus={campus}
                     campusName={campusName}
                     illustrative={data.illustrative}
@@ -212,9 +222,11 @@ function ReportContent({ data, report, year, campus, setYear, setCampus, search 
                 indicators={report.indicators}
                 onPick={setPickedId}
                 year={year}
+                term={term}
                 campus={campus}
                 campusName={campusName}
                 setYear={setYear}
+                setTerm={setTerm}
                 defaultView={block.settings.chart === "barras" ? "barras" : "lineas"}
               />
             ) : null;
@@ -242,25 +254,51 @@ function ReportContent({ data, report, year, campus, setYear, setCampus, search 
               </section>
             );
           }
-          case "tuberia":
-            if (!report.pipeline || report.pipeline.cohorts.length === 0) return null;
+          case "tuberia": {
+            const pipeline = report.pipelines?.find((p) => p.id === block.refKey) ?? (block.refKey ? undefined : report.pipelines?.[0]);
+            if (!pipeline || pipeline.cohorts.length === 0) return null;
+            const measure = pipeline.measure ?? "estudiantes";
             return (
-              <section className="od-section" key={key} aria-labelledby="od-tuberia">
+              <section className="od-section" key={key} aria-labelledby={`od-tuberia-${pipeline.id}`}>
                 <div className="u-container">
                   <header className="od-section__head">
-                    <h2 id="od-tuberia">{block.settings.title || report.pipeline.title}</h2>
-                    <p>{report.pipeline.description}</p>
+                    <h2 id={`od-tuberia-${pipeline.id}`}>{block.settings.title || pipeline.title}</h2>
+                    <p>{pipeline.description}</p>
                   </header>
                   <ChartFrame
-                    title="Deserción por tramo"
-                    subtitle={`${campusName} · pasa por una fuga para leerla`}
-                    source={report.pipeline.source}
+                    title={measure === "estudiantes" ? "Deserción por tramo" : measure === "permanencia" ? "Permanencia de la cohorte" : "Deserción por tramo, en %"}
+                    subtitle={`${campusName} · ${measure === "estudiantes" ? "estudiantes" : "% de la cohorte"} · pasa por una fuga para leerla`}
+                    source={pipeline.source}
                   >
-                    <Pipeline data={report.pipeline} campus={campus} campusName={campusName} />
+                    <LeakyPipeline key={pipeline.id} data={pipeline} campus={campus} campusName={campusName} />
                   </ChartFrame>
                 </div>
               </section>
             );
+          }
+          case "historico": {
+            const history = report.histories?.find((h) => h.id === block.refKey) ?? (block.refKey ? undefined : report.histories?.[0]);
+            if (!history || history.periods.length === 0) return null;
+            return (
+              <section className="od-section" key={key} aria-labelledby={`od-historico-${history.id}`}>
+                <div className="u-container">
+                  <header className="od-section__head">
+                    <h2 id={`od-historico-${history.id}`}>{block.settings.title || history.title}</h2>
+                    <p>
+                      {history.description} Cifra institucional: no cambia al elegir un campus.
+                    </p>
+                  </header>
+                  <ChartFrame
+                    title="Evolución histórica"
+                    subtitle={`${history.periods[0]} a ${history.periods[history.periods.length - 1]} · ${history.unit}`}
+                    source={history.source}
+                  >
+                    <HistoryCompare key={history.id} data={history} />
+                  </ChartFrame>
+                </div>
+              </section>
+            );
+          }
           case "mapa_calor": {
             const heatmap = report.heatmaps?.find((h) => h.id === block.refKey) ?? (block.refKey ? undefined : report.heatmaps?.[0]);
             if (!heatmap || heatmap.values.flat().every((v) => v === null)) return null;
@@ -291,6 +329,8 @@ function ReportContent({ data, report, year, campus, setYear, setCampus, search 
                 campus={campus}
                 setYear={setYear}
                 title={block.settings.title}
+                term={term}
+                years={data.years}
               />
             ) : null;
           case "tabla_dinamica":
@@ -304,13 +344,14 @@ function ReportContent({ data, report, year, campus, setYear, setCampus, search 
                       clic en el encabezado y descarga exactamente lo que ves.
                     </p>
                   </header>
-                  <ChartFrame title="Todas las cifras del informe" subtitle="Indicador · campus · año" source={sources.join(" · ")}>
+                  <ChartFrame title="Todas las cifras del informe" subtitle="Indicador · campus · corte" source={sources.join(" · ")}>
                     <PivotTable
                       key={report.slug}
                       report={report}
                       years={data.years}
                       campuses={data.campuses}
                       year={year}
+                      term={term}
                       campus={campus}
                     />
                   </ChartFrame>
@@ -387,6 +428,10 @@ function orderedBlocks(report: Report): ReportBlock[] {
   for (const kind of DEFAULT_BLOCK_ORDER) {
     if (kind === "mapa") {
       (report.maps ?? []).forEach((m) => blocks.push({ kind, refKey: m.id, visible: true, position: blocks.length, settings: {} }));
+    } else if (kind === "tuberia") {
+      (report.pipelines ?? []).forEach((p) => blocks.push({ kind, refKey: p.id, visible: true, position: blocks.length, settings: {} }));
+    } else if (kind === "historico") {
+      (report.histories ?? []).forEach((h) => blocks.push({ kind, refKey: h.id, visible: true, position: blocks.length, settings: {} }));
     } else if (kind === "mapa_calor") {
       (report.heatmaps ?? []).forEach((h) => blocks.push({ kind, refKey: h.id, visible: true, position: blocks.length, settings: {} }));
     } else {
@@ -402,9 +447,11 @@ function Evolution({
   indicators,
   onPick,
   year,
+  term,
   campus,
   campusName,
   setYear,
+  setTerm,
   defaultView = "lineas",
 }: {
   data: OpenDataCatalog;
@@ -412,13 +459,32 @@ function Evolution({
   indicators: Indicator[];
   onPick: (id: string) => void;
   year: number;
+  term: Term | null;
   campus: CampusId;
   campusName: string;
   setYear: (year: number) => void;
+  setTerm: (term: Term | null) => void;
   defaultView?: "lineas" | "barras";
 }) {
-  const [view, setView] = useState<"lineas" | "barras">(defaultView);
+  const [view, setView] = useState<"lineas" | "barras" | "combinada">(defaultView);
   const [siteView, setSiteView] = useState<"barras" | "circular">("barras");
+  // Por año (la cifra del año) o por periodos A y B. Elegir un periodo arriba
+  // abre la gráfica por periodos.
+  const [detail, setDetail] = useState<"anual" | "periodos">(term ? "periodos" : "anual");
+  useEffect(() => {
+    if (term) setDetail("periodos");
+  }, [term]);
+  const bySemester = detail === "periodos" && hasTerms(indicator);
+  const indicatorYears = indicator.years ?? data.years;
+  const visible = useVisibleYears(indicatorYears, indicator.id);
+  const cuts = cutsOf(visible.years, bySemester);
+  const codes = cuts.map((c) => cutCode(c.year, c.term));
+  const selectedCode = bySemester ? (term ? cutCode(year, term) : -1) : year;
+  const selectCut = (code: number) => {
+    const picked = fromCutCode(code);
+    setYear(picked.year);
+    setTerm(picked.term);
+  };
 
   // Tres colores validados para daltonismo: desde el cuarto campus el color se
   // repite, y la leyenda y la etiqueta final cargan la identidad.
@@ -428,29 +494,32 @@ function Evolution({
       id: c.id,
       label: c.name,
       color: `var(--od-series-${(index % 3) + 1})`,
-      values: data.years.map((y) => valueOf(indicator, y, c.id)),
+      values: cuts.map((c2) => valueOf(indicator, c2.year, c.id, c2.term)),
     }));
   const totalSeries: LineSeries = {
     id: "todas",
     label: "Total institucional",
     color: "var(--od-series-total)",
     dashed: true,
-    values: data.years.map((y) => valueOf(indicator, y, "todas")),
+    values: cuts.map((c) => valueOf(indicator, c.year, "todas", c.term)),
   };
   const hasSites = siteSeries.some((s) => s.values.some((v) => v !== null));
   const series = hasSites ? [...siteSeries, totalSeries] : [totalSeries];
   // Un conteo sumado aplasta las líneas de los campus: el total arranca apagado.
   const hiddenByDefault = indicator.format === "entero" && hasSites ? ["todas"] : [];
 
-  const points = data.years.map((y) => ({ year: y, value: valueOf(indicator, y, campus) }));
+  const points = cuts.map((c) => ({ year: cutCode(c.year, c.term), value: valueOf(indicator, c.year, campus, c.term) }));
+  const cut = cutLabel(year, term);
   const campusItems = data.campuses
     .filter((c) => c.id !== "todas")
-    .map((c) => ({ label: c.name, value: valueOf(indicator, year, c.id), highlight: c.id === campus }));
+    .map((c) => ({ label: c.name, value: valueOf(indicator, year, c.id, term), highlight: c.id === campus }));
   const hasCampusData = campusItems.some((item) => item.value !== null);
   const campusEverReported = data.years.some((y) =>
-    data.campuses.some((c) => c.id !== "todas" && valueOf(indicator, y, c.id) !== null),
+    data.campuses.some(
+      (c) => c.id !== "todas" && [null, "A", "B"].some((t2) => valueOf(indicator, y, c.id, t2 as Term | null) !== null),
+    ),
   );
-  const total = valueOf(indicator, year, "todas");
+  const total = valueOf(indicator, year, "todas", term);
   const summable =
     indicator.format === "entero" &&
     total !== null &&
@@ -479,50 +548,83 @@ function Evolution({
           </label>
         </header>
 
+        <YearFilter available={indicatorYears} selected={visible.selected} onChange={visible.select} />
         <div className="od-evolution">
           <ChartFrame
             title="Evolución por corte"
-            subtitle={view === "lineas" ? `Por campus · ${indicator.unit}` : `${campusName} · ${indicator.unit}`}
+            subtitle={`${view === "lineas" ? "Por campus" : campusName} · ${view === "combinada" ? "global anual y periodos A y B" : bySemester ? "periodos A y B" : "por año"} · ${indicator.unit}`}
             source={indicator.source}
             actions={
-              <ViewSwitch
-                label="Tipo de gráfica"
-                options={[
-                  { value: "lineas", label: "Líneas" },
-                  { value: "barras", label: "Barras" },
-                ]}
-                value={view}
-                onChange={setView}
-              />
+              <>
+                {hasTerms(indicator) && view !== "combinada" && (
+                  <ViewSwitch
+                    label="Detalle de la serie"
+                    options={[
+                      { value: "anual", label: "Año" },
+                      { value: "periodos", label: "A y B" },
+                    ]}
+                    value={detail}
+                    onChange={setDetail}
+                  />
+                )}
+                <ViewSwitch
+                  label="Tipo de gráfica"
+                  options={[
+                    { value: "lineas", label: "Líneas" },
+                    { value: "barras", label: "Barras" },
+                    { value: "combinada", label: "Líneas y barras" },
+                  ]}
+                  value={view}
+                  onChange={setView}
+                />
+              </>
             }
           >
-            {view === "lineas" ? (
+            {view === "combinada" ? (
+              <AnnualTermChart
+                key={`${indicator.id}-${campus}`}
+                label={`${indicator.label}, ${campusName}: global anual en línea y periodos A y B en barras`}
+                points={visible.years.map((y) => ({
+                  year: y,
+                  annual: valueOf(indicator, y, campus),
+                  a: valueOf(indicator, y, campus, "A"),
+                  b: valueOf(indicator, y, campus, "B"),
+                }))}
+                selectedYear={year}
+                format={indicator.format}
+                unit={indicator.unit}
+                annualRule={indicator.annualRule ? ANNUAL_RULE_LABEL[indicator.annualRule] : "Cifra anual reportada"}
+                onSelectYear={setYear}
+              />
+            ) : view === "lineas" ? (
               <LineChart
-                key={`${indicator.id}-${hasSites}`}
-                label={`${indicator.label} por campus y año`}
-                years={data.years}
+                key={`${indicator.id}-${hasSites}-${bySemester}`}
+                label={`${indicator.label} por campus y ${bySemester ? "periodo" : "año"}`}
+                years={codes}
                 series={series}
                 format={indicator.format}
                 unit={indicator.unit}
-                selectedYear={year}
-                onSelectYear={setYear}
+                selectedYear={selectedCode}
+                onSelectYear={selectCut}
                 initiallyHidden={hiddenByDefault}
+                tickLabel={cutCodeLabel}
               />
             ) : (
               <YearBars
-                title={`${indicator.label}, ${campusName}, por año`}
+                title={`${indicator.label}, ${campusName}, por ${bySemester ? "periodo" : "año"}`}
                 points={points}
-                selectedYear={year}
+                selectedYear={selectedCode}
                 format={indicator.format}
                 unit={indicator.unit}
-                onSelectYear={setYear}
+                onSelectYear={selectCut}
+                tickLabel={cutCodeLabel}
               />
             )}
           </ChartFrame>
 
           <ChartFrame
             title="Por campus"
-            subtitle={`Corte ${year} · ${indicator.unit}`}
+            subtitle={`Corte ${cut} · ${indicator.unit}`}
             actions={
               summable ? (
                 <ViewSwitch
@@ -540,18 +642,18 @@ function Evolution({
             {!hasCampusData ? (
               <p className="od-empty">
                 {campusEverReported
-                  ? `Ningún campus reportó esta cifra para ${year}.`
+                  ? `Ningún campus reportó esta cifra para ${cut}.`
                   : "Esta cifra se reporta solo para el total institucional: los campus no la desagregan."}
               </p>
             ) : summable && siteView === "circular" ? (
-              <Donut label={`${indicator.label} por campus, ${year}`} items={campusItems} format={indicator.format} unit={indicator.unit} />
+              <Donut label={`${indicator.label} por campus, ${cut}`} items={campusItems} format={indicator.format} unit={indicator.unit} />
             ) : (
               <BarList
                 items={campusItems}
                 format={indicator.format}
                 unit={indicator.unit}
                 share={summable}
-                label={`${indicator.label} por campus, ${year}`}
+                label={`${indicator.label} por campus, ${cut}`}
               />
             )}
           </ChartFrame>
@@ -569,14 +671,17 @@ function Breakdowns({
   campus,
   setYear,
   title,
+  term,
+  years,
 }: {
   report: Report;
   year: number;
   campus: CampusId;
   setYear: (year: number) => void;
   title?: string;
+  term: Term | null;
+  years: number[];
 }) {
-  const [views, setViews] = useState<Record<string, "circular" | "barras">>({});
 
   return (
     <section className="od-section" aria-labelledby="od-desgloses">
@@ -590,56 +695,7 @@ function Breakdowns({
         </header>
 
         <div className="od-breakdowns">
-          {report.breakdowns.map((breakdown) => {
-            const items = breakdown.values[year];
-            const available = Object.keys(breakdown.values).map(Number).sort((a, b) => a - b);
-            const latest = available[available.length - 1];
-            // Una parte de un todo se lee en circular; una tasa por categoría, en barras.
-            const canCircle = breakdown.unit !== "%";
-            const view = views[breakdown.id] ?? (canCircle && breakdown.defaultChart !== "barras" ? "circular" : "barras");
-            return (
-              <ChartFrame
-                key={breakdown.id}
-                title={breakdown.title}
-                subtitle={`Corte ${year} · Todos los campus · ${breakdown.unit}`}
-                source={breakdown.source}
-                actions={
-                  canCircle && items ? (
-                    <ViewSwitch
-                      label={`Tipo de gráfica: ${breakdown.title}`}
-                      options={[
-                        { value: "circular", label: "Circular" },
-                        { value: "barras", label: "Barras" },
-                      ]}
-                      value={view}
-                      onChange={(v) => setViews((prev) => ({ ...prev, [breakdown.id]: v }))}
-                    />
-                  ) : undefined
-                }
-              >
-                {!items ? (
-                  <div className="od-empty">
-                    <p>
-                      Este desglose se publica desde {available[0]}. Para {year} no hay reporte.
-                    </p>
-                    <button type="button" className="od-button od-button--line" onClick={() => setYear(latest)}>
-                      Ver el corte {latest}
-                    </button>
-                  </div>
-                ) : view === "circular" ? (
-                  <Donut label={`${breakdown.title}, ${year}`} items={items} format={breakdown.format} unit={breakdown.unit} />
-                ) : (
-                  <BarList
-                    items={items}
-                    format={breakdown.format}
-                    unit={breakdown.unit}
-                    share={canCircle}
-                    label={`${breakdown.title}, ${year}`}
-                  />
-                )}
-              </ChartFrame>
-            );
-          })}
+          {report.breakdowns.map((breakdown) => <BreakdownChart key={breakdown.id} breakdown={breakdown} year={year} term={term} years={years} setYear={setYear} />)}
         </div>
       </div>
     </section>

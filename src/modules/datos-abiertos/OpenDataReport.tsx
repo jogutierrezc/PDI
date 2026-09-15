@@ -257,7 +257,6 @@ function ReportContent({ data, report, year, term, campus, setYear, setTerm, set
           case "tuberia": {
             const pipeline = report.pipelines?.find((p) => p.id === block.refKey) ?? (block.refKey ? undefined : report.pipelines?.[0]);
             if (!pipeline || pipeline.cohorts.length === 0) return null;
-            const measure = pipeline.measure ?? "estudiantes";
             return (
               <section className="od-section" key={key} aria-labelledby={`od-tuberia-${pipeline.id}`}>
                 <div className="u-container">
@@ -266,8 +265,8 @@ function ReportContent({ data, report, year, term, campus, setYear, setTerm, set
                     <p>{pipeline.description}</p>
                   </header>
                   <ChartFrame
-                    title={measure === "estudiantes" ? "Deserción por tramo" : measure === "permanencia" ? "Permanencia de la cohorte" : "Deserción por tramo, en %"}
-                    subtitle={`${campusName} · ${measure === "estudiantes" ? "estudiantes" : "% de la cohorte"} · pasa por una fuga para leerla`}
+                    title="Deserción acumulada"
+                    subtitle={`${campusName} · deserción acumulada en % · pasa por una unión para leer el tramo`}
                     source={pipeline.source}
                   >
                     <LeakyPipeline key={pipeline.id} data={pipeline} campus={campus} campusName={campusName} />

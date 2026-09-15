@@ -2138,3 +2138,9 @@
   z-index: 2;
   text-align: right;
 }
+
+.oda-grid-toolbar__label {
+  color: var(--ink-secondary);
+  font-size: var(--text-xs);
+  font-weight: 700;
+}

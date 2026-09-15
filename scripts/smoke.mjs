@@ -1539,7 +1539,7 @@ const routes = [
     path: "/datos-abiertos/permanencia",
     note: "la tubería de la deserción y el mapa de calor por cohorte",
     expect: "La tubería de la permanencia",
-    also: ["Retención por cohorte y semestre", "Deserción por tramo", "aún no cursado"],
+    also: ["Retención por cohorte y semestre", "Deserción acumulada", "aún no cursado"],
     absent: [...SIN_DINERO],
   },
   {

@@ -479,7 +479,7 @@ function IndicatorForm({
 type DatasetKind = "desglose" | "calor" | "mapa" | "tuberia" | "historico";
 
 const MEASURE_LABEL: Record<OdPipelineMeasure, string> = {
-  estudiantes: "Estudiantes que siguen en cada etapa",
+  estudiantes: "Estudiantes que siguen en cada etapa (el portal lo muestra en %)",
   permanencia: "Permanencia: % de la cohorte que sigue en cada etapa",
   desercion: "Deserción: % que se retira en cada tramo",
 };
@@ -740,8 +740,9 @@ function DatasetForm({ kind, offices, years, initial, onSubmit, onCancel }: {
       </div>
       {kind === "tuberia" && (
         <p className="oda-form-note">
-          Las cohortes son periodos de ingreso (2014-A, 2023-B) y se eligen en Captura, también si son anteriores al periodo del
-          informe. Los porcentajes admiten decimales: 12,5.
+          Cada tubería es un solo flujo de cohortes reportado junto (por ejemplo, 2014-A a 2023-B), que se indica en Captura,
+          también si es anterior al periodo del informe. El portal la muestra como deserción acumulada en %. Los porcentajes
+          admiten decimales: 12,5.
         </p>
       )}
       <div className="oda-inline-form__actions">

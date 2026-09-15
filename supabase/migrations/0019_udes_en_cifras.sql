@@ -33,8 +33,9 @@
 --   "todos los años del periodo"; una lista deja fuera los años sin reporte, y
 --   ni la captura ni el portal los muestran.
 -- · Un informe puede tener varios conjuntos de cada tipo. La tubería elige qué
---   se captura (estudiantes, permanencia % o deserción % del tramo) y sus
---   cohortes son periodos históricos como '2014-A', no años del periodo.
+--   se captura (estudiantes, permanencia % o deserción % del tramo) y analiza un
+--   solo flujo de cohortes con su rango histórico ('2014-A a 2023-B'), que se
+--   reporta junto. El portal la muestra como deserción acumulada en %.
 -- · Un valor ausente es NULL, nunca 0. "No reportado" y "cero" son
 --   afirmaciones distintas y el portal las pinta distinto.
 -- · El total institucional es la fila con campus_id NULL. Si el indicador
@@ -466,8 +467,8 @@ create table if not exists public.od_pipelines (
 create table if not exists public.od_pipeline_values (
   id          uuid primary key default gen_random_uuid(),
   pipeline_id uuid not null references public.od_pipelines (id) on delete cascade,
-  -- Cohorte de ingreso: un periodo académico, también anterior al periodo del
-  -- informe ('2014-A').
+  -- Flujo de cohortes que analiza la tubería: el rango de periodos de ingreso,
+  -- también anteriores al informe ('2014-A a 2023-B'), o un solo periodo ('2014-A').
   cohort      text not null,
   campus_id   uuid references public.campuses (id) on delete restrict,
   stage_index smallint not null,
@@ -476,7 +477,7 @@ create table if not exists public.od_pipeline_values (
   -- Causa principal de retiro en el tramo que termina en esta etapa.
   main_cause  text not null default '',
   constraint od_pipeline_values_unique unique nulls not distinct (pipeline_id, cohort, campus_id, stage_index),
-  constraint od_pipeline_values_cohort check (cohort ~ '^[0-9]{4}-(A|B)$')
+  constraint od_pipeline_values_cohort check (cohort ~ '^[0-9]{4}-(A|B)( a [0-9]{4}-(A|B))?$')
 );
 
 -- Bases creadas con una tubería por informe, cohortes por año y valores enteros.
@@ -503,9 +504,11 @@ begin
     alter table public.od_pipeline_values rename column remaining to value;
     alter table public.od_pipeline_values alter column value type numeric;
   end if;
-  if not exists (select 1 from pg_constraint where conname = 'od_pipeline_values_cohort') then
-    alter table public.od_pipeline_values add constraint od_pipeline_values_cohort check (cohort ~ '^[0-9]{4}-(A|B)$');
-  end if;
+  -- La regla admite rangos: se rehace siempre, así una base con la regla de un
+  -- solo periodo también la actualiza.
+  alter table public.od_pipeline_values drop constraint if exists od_pipeline_values_cohort;
+  alter table public.od_pipeline_values
+    add constraint od_pipeline_values_cohort check (cohort ~ '^[0-9]{4}-(A|B)( a [0-9]{4}-(A|B))?$');
 end $$;
 
 -- -----------------------------------------------------------------------------

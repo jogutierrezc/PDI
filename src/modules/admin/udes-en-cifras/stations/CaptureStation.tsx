@@ -782,22 +782,46 @@ function MapCapture({ data, report, periodId, canEdit }: StationProps) {
 
 const PIPELINE_TOTAL = "total";
 
+type PeriodValue = { year: number; term: "A" | "B" };
+
+/** "2014-A a 2023-B" → desde y hasta; "2014-A" → el mismo periodo en los dos. */
+function parseFlow(label: string | undefined, fallback: PeriodValue): { from: PeriodValue; to: PeriodValue } {
+  const parse = (text: string | undefined): PeriodValue | null => {
+    const match = text?.trim().match(/^(\d{4})-(A|B)$/);
+    return match ? { year: Number(match[1]), term: match[2] as "A" | "B" } : null;
+  };
+  const [a, b] = (label ?? "").split(" a ");
+  const from = parse(a) ?? fallback;
+  return { from, to: parse(b) ?? from };
+}
+
+const flowLabel = (from: PeriodValue, to: PeriodValue) => {
+  const [first, last] = periodRange(from, to).filter((_, i, list) => i === 0 || i === list.length - 1);
+  return last && last !== first ? `${first} a ${last}` : first;
+};
+
+/**
+ * Cada tubería es un solo flujo de cohortes, reportado junto: "2014-A a 2023-B".
+ * Si una base antigua trae varias cohortes, se trabaja la que tiene más etapas
+ * con dato y las demás se pueden quitar.
+ */
 function PipelineCapture({ data, report, periodId, canEdit }: StationProps) {
   const pipelines = data.rows.pipelines.filter((p) => p.report_id === report!.uuid).sort((a, b) => a.position - b.position);
   const [active, setActive] = useState(pipelines[0]?.id);
   const pipeline = pipelines.find((p) => p.id === active) ?? pipelines[0];
   const values = data.rows.pipelineValues.filter((v) => v.pipeline_id === pipeline?.id);
-  const storedCohorts = Array.from(new Set(values.map((v) => String(v.cohort)))).sort();
-  const [extra, setExtra] = useState<string[]>([]);
-  const [removed, setRemoved] = useState<string[]>([]);
-  const cohorts = Array.from(new Set([...storedCohorts, ...extra])).filter((c) => !removed.includes(c)).sort();
-  const [picked, setPicked] = useState<string | null>(null);
-  const cohort = picked && cohorts.includes(picked) ? picked : cohorts[cohorts.length - 1] ?? "";
+  const storedLabels = Array.from(new Set(values.map((v) => String(v.cohort))));
+  const storedLabel = storedLabels
+    .map((label) => ({ label, filled: values.filter((v) => String(v.cohort) === label && v.value !== null).length }))
+    .sort((a, b) => b.filled - a.filled)[0]?.label;
+  const legacy = storedLabels.filter((label) => label !== storedLabel);
   const period = data.rows.period;
-  const [rangeFrom, setRangeFrom] = useState<{ year: number; term: "A" | "B" }>({ year: period.start_year, term: "A" });
-  const [rangeTo, setRangeTo] = useState<{ year: number; term: "A" | "B" }>({ year: period.start_year, term: "A" });
+  const initial = parseFlow(storedLabel, { year: period.start_year, term: "A" });
+  const [from, setFrom] = useState<PeriodValue>(initial.from);
+  const [to, setTo] = useState<PeriodValue>(initial.to);
   const save = useSavePipelineValues();
   const [draft, setDraft] = useState<Record<CellKey, number | null>>({});
+  const [dropLegacy, setDropLegacy] = useState(false);
   const [via, setVia] = useState<OdImportKind>("rejilla");
   if (!pipeline) return null;
 
@@ -805,50 +829,62 @@ function PipelineCapture({ data, report, periodId, canEdit }: StationProps) {
   const percent = measure !== "estudiantes";
   const format: "decimal" | "entero" = percent ? "decimal" : "entero";
   const campuses = data.rows.campuses;
+  const label = flowLabel(from, to);
+  const renamed = Boolean(storedLabel) && label !== storedLabel;
 
-  // Las filas llevan la cohorte en la clave: cambiar de cohorte no pierde lo escrito.
-  const rowKey = (campus: string) => `${cohort}::${campus}`;
   const rows: GridRow[] = [
     {
-      key: rowKey(PIPELINE_TOTAL),
+      key: PIPELINE_TOTAL,
       label: "Total institucional",
       sub: percent ? "se captura: los porcentajes no se suman" : "suma de campus",
       groupStart: true,
       format,
     },
-    ...campuses.map((c) => ({ key: rowKey(c.campus_id), label: c.label, format })),
+    ...campuses.map((c) => ({ key: c.campus_id, label: c.label, format })),
   ];
   // Deserción: una columna por tramo (hacia la etapa i). Estudiantes y permanencia: una por etapa.
   const columns: GridColumn[] =
     measure === "desercion"
-      ? pipeline.stages.slice(1).map((stage, i) => ({ key: String(i + 1), label: `→ ${stage}`, ariaLabel: `Deserción hacia ${stage}, %` }))
-      : pipeline.stages.map((stage, i) => ({ key: String(i), label: stage, ariaLabel: percent ? `${stage}, % que sigue` : `${stage}, estudiantes` }));
+      ? pipeline.stages.slice(1).map((stage, i) => ({ key: String(i + 1), label: `→ ${stage}`, ariaLabel: `Deserción hacia ${stage}, % del tramo` }))
+      : pipeline.stages.map((stage, i) => ({ key: String(i), label: stage, ariaLabel: percent ? `${stage}, % del flujo que sigue` : `${stage}, estudiantes` }));
 
-  const parseRow = (key: string) => {
-    const [c, campus] = key.split("::");
-    return { cohort: c, campus };
-  };
-  const stored = (key: string, stage: string) => {
-    const { cohort: c, campus } = parseRow(key);
-    const v = values.find((x) => String(x.cohort) === c && (x.campus_id ?? PIPELINE_TOTAL) === campus && String(x.stage_index) === stage);
+  const storedValue = (campus: string, stage: string) => {
+    const v = values.find((x) => String(x.cohort) === storedLabel && (x.campus_id ?? PIPELINE_TOTAL) === campus && String(x.stage_index) === stage);
     return v?.value === undefined || v?.value === null ? null : Number(v.value);
   };
-  const current = (key: string, stage: string) => {
-    const k = cellKey(key, stage);
-    return k in draft ? draft[k] : stored(key, stage);
+  const current = (campus: string, stage: string) => {
+    const k = cellKey(campus, stage);
+    return k in draft ? draft[k] : storedValue(campus, stage);
   };
 
-  const invalid = percent
-    ? Object.entries(draft).filter(([, value]) => value !== null && (value < 0 || value > 100)).length
-    : 0;
-  const changes = Object.keys(draft).length + removed.filter((c) => storedCohorts.includes(c)).length;
+  const invalid = percent ? Object.values(draft).filter((value) => value !== null && (value < 0 || value > 100)).length : 0;
+  const changes = Object.keys(draft).length + (renamed ? 1 : 0) + (dropLegacy ? legacy.length : 0);
 
-  const addRange = () => {
-    const labels = periodRange(rangeFrom, rangeTo).filter((label) => !cohorts.includes(label));
-    if (!labels.length) return;
-    setExtra([...extra, ...labels]);
-    setRemoved(removed.filter((c) => !labels.includes(c)));
-    setPicked(labels[labels.length - 1]);
+  const commit = () => {
+    // Con el rango cambiado, el flujo entero se guarda con la etiqueta nueva y se
+    // borra la anterior; si no, solo las casillas tocadas.
+    const cells = renamed
+      ? rows.flatMap((row) => columns.map((column) => ({ campus: row.key, stage: column.key, value: current(row.key, column.key) })))
+          .filter((cell) => cell.value !== null)
+      : Object.entries(draft).map(([key, value]) => {
+          const [campus, stage] = key.split("|");
+          return { campus, stage, value };
+        });
+    save.mutate(
+      {
+        periodId, reportId: report!.uuid!, kind: via, pipelineId: pipeline.id,
+        removeCohorts: [...(renamed && storedLabel ? [storedLabel] : []), ...(dropLegacy ? legacy : [])],
+        values: cells.map(({ campus, stage, value }) => {
+          const campusId = campus === PIPELINE_TOTAL ? null : campus;
+          const previous = values.find((x) => String(x.cohort) === storedLabel && x.campus_id === campusId && String(x.stage_index) === stage);
+          return {
+            pipeline_id: pipeline.id, cohort: label, campus_id: campusId, stage_index: Number(stage),
+            value: value === null ? null : percent ? value : Math.round(value), main_cause: previous?.main_cause ?? "",
+          };
+        }),
+      },
+      { onSuccess: () => { setDraft({}); setDropLegacy(false); } },
+    );
   };
 
   return (
@@ -857,100 +893,79 @@ function PipelineCapture({ data, report, periodId, canEdit }: StationProps) {
       title="Tuberías"
       description={
         measure === "estudiantes"
-          ? "Estudiantes de la cohorte que siguen al llegar a cada etapa, por campus. El total se suma solo. Una etapa vacía es un tramo que la cohorte aún no cursa."
+          ? "Un solo flujo de cohortes, reportado junto. Estudiantes del flujo que siguen al llegar a cada etapa, por campus; el total se suma solo y el portal lo muestra como % del ingreso."
           : measure === "permanencia"
-            ? "Porcentaje de la cohorte que sigue en cada etapa (100 al ingreso), con decimales: 87,5. El total institucional se captura."
-            : "Porcentaje de los que llegaron a cada tramo que se retira en él, con decimales: 12,5. La tubería calcula cuánto sigue. El total institucional se captura."
+            ? "Un solo flujo de cohortes, reportado junto. Porcentaje del flujo que sigue en cada etapa (100 al ingreso), con decimales: 87,5. El total institucional se captura."
+            : "Un solo flujo de cohortes, reportado junto. Porcentaje de los que llegaron a cada tramo que se retira en él, con decimales: 12,5. El portal calcula la deserción acumulada. El total institucional se captura."
       }
       actions={
         <>
           {pipelines.length > 1 && (
             <label className="oda-add-select">
               <span className="sr-only">Tubería</span>
-              <select value={pipeline.id} onChange={(e) => { setActive(e.target.value); setDraft({}); setExtra([]); setRemoved([]); setPicked(null); }}>
+              <select
+                value={pipeline.id}
+                onChange={(e) => {
+                  const next = pipelines.find((p) => p.id === e.target.value);
+                  const nextLabel = data.rows.pipelineValues.find((v) => v.pipeline_id === next?.id)?.cohort;
+                  const range = parseFlow(nextLabel ? String(nextLabel) : undefined, { year: period.start_year, term: "A" });
+                  setActive(e.target.value); setDraft({}); setDropLegacy(false); setFrom(range.from); setTo(range.to);
+                }}
+              >
                 {pipelines.map((p) => <option key={p.id} value={p.id}>{p.title}</option>)}
               </select>
             </label>
           )}
           <SaveState pending={save.isPending} error={save.error} success={save.isSuccess} idle={invalid ? `${invalid} fuera de 0-100` : undefined} />
-          <button
-            type="button"
-            className="button-primary"
-            disabled={!canEdit || changes === 0 || invalid > 0 || save.isPending}
-            onClick={() =>
-              save.mutate(
-                {
-                  periodId, reportId: report!.uuid!, kind: via, pipelineId: pipeline.id,
-                  removeCohorts: removed.filter((c) => storedCohorts.includes(c)),
-                  values: Object.entries(draft)
-                    .filter(([key]) => !removed.includes(parseRow(key.split("|")[0]).cohort))
-                    .map(([key, value]) => {
-                      const [row, stage] = key.split("|");
-                      const { cohort: c, campus } = parseRow(row);
-                      const campusId = campus === PIPELINE_TOTAL ? null : campus;
-                      const previous = values.find((x) => String(x.cohort) === c && x.campus_id === campusId && String(x.stage_index) === stage);
-                      return {
-                        pipeline_id: pipeline.id, cohort: c, campus_id: campusId, stage_index: Number(stage),
-                        value: value === null ? null : percent ? value : Math.round(value), main_cause: previous?.main_cause ?? "",
-                      };
-                    }),
-                },
-                { onSuccess: () => { setDraft({}); setExtra([]); setRemoved([]); } },
-              )
-            }
-          >
+          <button type="button" className="button-primary" disabled={!canEdit || changes === 0 || invalid > 0 || save.isPending} onClick={commit}>
             Guardar {changes || ""}
           </button>
         </>
       }
     >
       <div className="oda-grid-toolbar">
-        <label className="oda-grid-toolbar__field">
-          <span>Cohorte</span>
-          <select value={cohort} disabled={!cohorts.length} onChange={(e) => setPicked(e.target.value)}>
-            {cohorts.length === 0 && <option value="">Sin cohortes</option>}
-            {cohorts.map((c) => <option key={c} value={c}>{c}</option>)}
-          </select>
-        </label>
-        {canEdit && (
-          <span className="oda-grid-toolbar__group">
-            <PeriodInput label="Desde" value={rangeFrom} onChange={setRangeFrom} />
-            <PeriodInput label="Hasta" value={rangeTo} onChange={setRangeTo} />
-            <button type="button" className="button-secondary" onClick={addRange}>
-              <Icon name="plus" size={15} /> Añadir cohortes
-            </button>
-          </span>
-        )}
-        {canEdit && cohort && (
-          <ConfirmButton label={`Quitar ${cohort}`} confirmLabel={`¿Quitar la cohorte ${cohort} con sus cifras?`} onConfirm={() => { setRemoved([...removed, cohort]); setPicked(null); }} />
-        )}
+        <span className="oda-grid-toolbar__group" role="group" aria-label="Cohortes que analiza la tubería">
+          <span className="oda-grid-toolbar__label">Cohortes</span>
+          <PeriodInput label="Desde" value={from} onChange={setFrom} />
+          <PeriodInput label="Hasta" value={to} onChange={setTo} />
+        </span>
+        <span className="oda-badge" data-tone={renamed ? "warn" : undefined}>
+          {renamed ? `Se guardará como ${label} (antes ${storedLabel})` : `Flujo ${label}`}
+        </span>
       </div>
 
-      {!cohort ? (
-        <StageEmpty title="Añade las cohortes que analiza esta tubería">
-          Elige desde y hasta qué periodo de ingreso (por ejemplo, 2014-A a 2023-B) y pulsa Añadir cohortes.
-        </StageEmpty>
-      ) : (
-        <>
-          <p className="oda-panel__lede"><strong>{pipeline.title}</strong> · cohorte {cohort} · {percent ? "% de la cohorte" : "estudiantes"}</p>
-          <DataGrid
-            label={`${pipeline.title}, cohorte ${cohort}`}
-            rowHeader="Campus"
-            rows={rows}
-            columns={columns}
-            stored={stored}
-            draft={draft}
-            onDraft={setDraft}
-            onPasted={() => setVia("pegado")}
-            readOnly={!canEdit}
-            lockedReason={(key) => (!percent && parseRow(key).campus === PIPELINE_TOTAL ? "Se calcula sumando los campus" : null)}
-            lockedValue={(_, stage) => {
-              const parts = campuses.map((c) => current(rowKey(c.campus_id), stage));
-              return parts.every((p) => p !== null && p !== undefined) ? parts.reduce<number>((a, b) => a + (b as number), 0) : null;
-            }}
-          />
-        </>
+      {legacy.length > 0 && (
+        <p className="oda-banner" role="note">
+          <Icon name="alert" size={16} />
+          <span>
+            Esta tubería trae {legacy.length} {legacy.length === 1 ? "cohorte antigua" : "cohortes antiguas"} de cuando se capturaba
+            una por periodo ({legacy.slice(0, 4).join(", ")}{legacy.length > 4 ? "…" : ""}). El portal usa el flujo {storedLabel}.
+          </span>
+          {canEdit && (
+            <button type="button" className="oda-link-button" onClick={() => setDropLegacy(!dropLegacy)}>
+              {dropLegacy ? "No quitarlas" : "Quitarlas al guardar"}
+            </button>
+          )}
+        </p>
       )}
+
+      <p className="oda-panel__lede"><strong>{pipeline.title}</strong> · flujo {label} · {percent ? "% del flujo" : "estudiantes"}</p>
+      <DataGrid
+        label={`${pipeline.title}, flujo ${label}`}
+        rowHeader="Campus"
+        rows={rows}
+        columns={columns}
+        stored={storedValue}
+        draft={draft}
+        onDraft={setDraft}
+        onPasted={() => setVia("pegado")}
+        readOnly={!canEdit}
+        lockedReason={(campus) => (!percent && campus === PIPELINE_TOTAL ? "Se calcula sumando los campus" : null)}
+        lockedValue={(_, stage) => {
+          const parts = campuses.map((c) => current(c.campus_id, stage));
+          return parts.every((p) => p !== null && p !== undefined) ? parts.reduce<number>((a, b) => a + (b as number), 0) : null;
+        }}
+      />
     </Panel>
   );
 }

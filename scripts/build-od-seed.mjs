@@ -399,8 +399,35 @@ on conflict (map_id, year, campus_id, department_code) do update set value = exc
 );
 
 const pipes = catalog.reports.filter((r) => r.pipeline);
+
+/**
+ * Cada tubería es un solo flujo de cohortes, reportado junto: "2018-A a 2021-A".
+ * Las cohortes de ejemplo se promedian en permanencia %: en cada etapa, el
+ * promedio de lo que sigue de cada cohorte que ya llegó a ella.
+ */
+const flowOf = (pipeline) => {
+  const labels = Array.from(new Set(pipeline.cohorts.map((c) => c.cohort))).sort();
+  const label = labels.length > 1 ? `${labels[0]}-A a ${labels[labels.length - 1]}-A` : `${labels[0]}-A`;
+  const byCampus = new Map();
+  for (const row of pipeline.cohorts) {
+    const list = byCampus.get(row.campus) ?? [];
+    list.push(row);
+    byCampus.set(row.campus, list);
+  }
+  const rows = Array.from(byCampus, ([campus, list]) => ({
+    campus,
+    mainCause: list[0].mainCause,
+    values: pipeline.stages.map((_, stage) => {
+      const shares = list
+        .filter((r) => r.remaining[0] && r.remaining[stage] !== null)
+        .map((r) => (r.remaining[stage] / r.remaining[0]) * 100);
+      return shares.length ? Math.round((shares.reduce((a, b) => a + b, 0) / shares.length) * 10) / 10 : null;
+    }),
+  }));
+  return { label, rows };
+};
 emit(`insert into public.od_pipelines (report_id, key, title, description, measure, stages, office_id, position)
-select r.id, 'tuberia', v.title, v.description, 'estudiantes', v.stages, o.id, 1
+select r.id, 'tuberia', v.title, v.description, 'permanencia', v.stages, o.id, 1
 from (values
   ${pipes.map((r) => `(${q(r.slug)}, ${q(r.pipeline.title)}, ${q(r.pipeline.description)}, ${arr(r.pipeline.stages)}, ${q(r.pipeline.source)})`).join(",\n  ")}
 ) as v(report, title, description, stages, office)
@@ -410,17 +437,16 @@ on conflict (report_id, key) do update
   set title = excluded.title, description = excluded.description, measure = excluded.measure,
       stages = excluded.stages, office_id = excluded.office_id;`);
 
-// Solo los campus: el total de cada cohorte lo suma el portal.
-const pipeRows = pipes.flatMap((r) =>
-  r.pipeline.cohorts
-    .filter((c) => c.campus !== "todas")
-    .flatMap((c) =>
-      c.remaining.map(
-        (value, stage) =>
-          `(${q(r.slug)}, ${q(`${c.cohort}-A`)}, ${q(c.campus)}, ${stage}, ${n(value)}::numeric, ${q(stage > 0 ? c.mainCause[stage - 1] ?? "" : "")})`,
-      ),
+// Un flujo por tubería; en porcentaje el total institucional se guarda aparte (campus null).
+const pipeRows = pipes.flatMap((r) => {
+  const flow = flowOf(r.pipeline);
+  return flow.rows.flatMap((row) =>
+    row.values.map(
+      (value, stage) =>
+        `(${q(r.slug)}, ${q(flow.label)}, ${row.campus === "todas" ? "null" : q(row.campus)}, ${stage}, ${n(value)}::numeric, ${q(stage > 0 ? row.mainCause[stage - 1] ?? "" : "")})`,
     ),
-);
+  );
+});
 valuesInsert(
   (rows) => `insert into public.od_pipeline_values (pipeline_id, cohort, campus_id, stage_index, value, main_cause)
 select p.id, v.cohort, c.id, v.stage::smallint, v.value, v.cause
@@ -429,7 +455,7 @@ from (values
 ) as v(report, cohort, campus, stage, value, cause)
 ${R()}
 join public.od_pipelines p on p.report_id = r.id and p.key = 'tuberia'
-join public.campuses c on c.slug = v.campus
+left join public.campuses c on c.slug = v.campus
 on conflict on constraint od_pipeline_values_unique do update
   set value = excluded.value, main_cause = excluded.main_cause;`,
   pipeRows,
@@ -462,6 +488,15 @@ ${R()}
 join public.od_histories s on s.report_id = r.id and s.key = v.key
 on conflict on constraint od_history_values_unique do update set value = excluded.value, position = excluded.position;`);
 }
+
+// Las tuberías de ejemplo pasaron de una cohorte por periodo a un flujo: se quitan
+// las filas por periodo que dejó una versión anterior de esta semilla.
+emit(`delete from public.od_pipeline_values
+where cohort !~ ' a '
+  and pipeline_id in (
+    select p.id from public.od_pipelines p join public.od_reports r on r.id = p.report_id
+    where r.period_id = ${P} and p.key = 'tuberia'
+  );`);
 
 // Diseño de la ficha: se rehace entero con el orden por defecto.
 emit(`delete from public.od_report_blocks where report_id in (select id from public.od_reports where period_id = ${P});`);
@@ -569,9 +604,10 @@ catalog.reports.forEach((r, ri) => {
   });
   if (r.pipeline) {
     const id = `od-tuberia-${r.slug}`;
-    T.od_pipelines.push({ id, report_id: reportId, key: "tuberia", title: r.pipeline.title, description: r.pipeline.description, measure: "estudiantes", stages: r.pipeline.stages, office_id: officeIds.get(r.pipeline.source), position: 1 });
-    r.pipeline.cohorts.filter((c) => c.campus !== "todas").forEach((c) =>
-      c.remaining.forEach((value, stage) => T.od_pipeline_values.push({ id: uid("pv"), pipeline_id: id, cohort: `${c.cohort}-A`, campus_id: CAMPUS_IDS[c.campus], stage_index: stage, value, main_cause: stage > 0 ? c.mainCause[stage - 1] ?? "" : "" })),
+    T.od_pipelines.push({ id, report_id: reportId, key: "tuberia", title: r.pipeline.title, description: r.pipeline.description, measure: "permanencia", stages: r.pipeline.stages, office_id: officeIds.get(r.pipeline.source), position: 1 });
+    const flow = flowOf(r.pipeline);
+    flow.rows.forEach((row) =>
+      row.values.forEach((value, stage) => T.od_pipeline_values.push({ id: uid("pv"), pipeline_id: id, cohort: flow.label, campus_id: row.campus === "todas" ? null : CAMPUS_IDS[row.campus], stage_index: stage, value, main_cause: stage > 0 ? row.mainCause[stage - 1] ?? "" : "" })),
     );
   }
   (HISTORIES.get(r.slug) ?? []).forEach((h, i) => {

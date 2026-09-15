@@ -19,6 +19,8 @@
   --lp-value: var(--od-seq-5);
 
   display: grid;
+  /* minmax(0, …): el dibujo ancho se desliza dentro, no ensancha la columna. */
+  grid-template-columns: minmax(0, 1fr);
   gap: var(--space-3);
 }
 
@@ -54,13 +56,6 @@
   --lp-teal-soft: rgba(95, 179, 192, 0.12);
 }
 
-.lp__bar {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: end;
-  gap: var(--space-3) var(--space-5);
-}
-
 .lp__meta {
   margin: 0;
   color: var(--ink-muted);
@@ -69,19 +64,63 @@
 
 .lp__meta small { font-size: var(--text-xs); }
 
+.lp__viewport { position: relative; }
+
 .lp__scroll {
   position: relative;
   overflow-x: auto;
   scrollbar-color: var(--line-strong) transparent;
+  overscroll-behavior-x: contain;
 }
 
 .lp__scroll svg { display: block; }
+
+.lp__scroll:focus-visible {
+  outline: 2px solid var(--od-signal);
+  outline-offset: 2px;
+}
+
+/* Pantalla angosta: se desvanece el borde derecho mientras quede tubería por ver. */
+.lp__viewport[data-narrow]::after {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 28px;
+  width: 56px;
+  background: linear-gradient(to right, transparent, var(--od-surface, var(--surface)));
+  content: "";
+  pointer-events: none;
+  transition: opacity var(--dur-base) ease;
+}
+
+.lp__viewport[data-narrow][data-end]::after { opacity: 0; }
+
+.lp__hint {
+  display: block;
+  margin-top: var(--space-1);
+  color: var(--ink-muted);
+  font-size: var(--text-xs);
+  text-align: right;
+  transition: opacity var(--dur-base) ease;
+}
+
+.lp__viewport[data-end] .lp__hint { opacity: 0; }
+
+/* --- Avisos ---------------------------------------------------------------- */
+
+/* Con .lp delante para ganarle a .od-tip[data-align], que se carga después. */
+.lp .lp__tip { max-width: min(19rem, 80vw); }
+
+.lp .lp__tip[data-place="right"] { transform: translate(0, -50%); }
+.lp .lp__tip[data-place="below"] { transform: translate(-50%, 10px); }
+.lp .lp__tip[data-place="below"][data-align="start"] { transform: translate(-12px, 10px); }
+.lp .lp__tip[data-place="below"][data-align="end"] { transform: translate(calc(-100% + 12px), 10px); }
 
 /* --- Recuadro de cierre ---------------------------------------------------- */
 
 .lp__callout {
   position: absolute;
-  top: 12px;
+  z-index: 2;
   display: grid;
   grid-template-columns: 38px 1fr;
   gap: var(--space-3);
@@ -93,6 +132,16 @@
   border-radius: 12px;
   box-shadow: 0 6px 20px var(--lp-shadow);
 }
+
+.lp__callout[data-docked] {
+  position: static;
+  grid-template-columns: 38px 1fr;
+  align-items: center;
+  width: auto;
+  max-width: min(26rem, 100%);
+}
+
+.lp__callout[data-docked] p { text-align: left; }
 
 .lp__callout-icon {
   width: 38px;
@@ -180,7 +229,7 @@
 .lp__piece[data-progress] .lp__body { stroke: var(--surface); }
 
 .lp__ring {
-  fill: url(#lp-ring);
+  fill: var(--ring, var(--lp-metal));
   stroke: var(--lp-metal-edge);
   stroke-width: 1;
 }
@@ -242,16 +291,18 @@
 
 /* --- Movimiento ------------------------------------------------------------ */
 
+/* Entrada: los tramos aparecen en orden y sus cifras poco después. Todo queda
+   quieto antes de un segundo, también con 12 etapas (el retraso se topa). */
 .lp[data-motion] .lp__piece,
 .lp[data-motion] .lp__label,
 .lp[data-motion] .lp__callout {
   opacity: 0;
-  transition: opacity 520ms ease, transform 520ms cubic-bezier(0.2, 0.7, 0.2, 1);
+  transition: opacity 380ms ease, transform 380ms cubic-bezier(0.2, 0.7, 0.2, 1);
 }
 
-.lp[data-motion] .lp__piece { transform: translateX(-8px); transition-delay: calc(var(--i) * 90ms); }
-.lp[data-motion] .lp__label { transition-delay: calc(var(--i) * 90ms + 220ms); }
-.lp[data-motion] .lp__callout { transform: translateY(6px); transition-delay: 900ms; }
+.lp[data-motion] .lp__piece { transform: translateX(-8px); transition-delay: calc(min(var(--i), 12) * 45ms); }
+.lp[data-motion] .lp__label { transition-delay: calc(min(var(--i), 12) * 45ms + 100ms); }
+.lp[data-motion] .lp__callout { transform: translateY(6px); transition-delay: 450ms; }
 
 .lp[data-motion][data-seen] .lp__piece,
 .lp[data-motion][data-seen] .lp__label,
@@ -264,17 +315,17 @@
 
 .lp[data-motion][data-seen] .lp__drop {
   animation: lp-drip var(--speed) linear infinite;
-  animation-delay: calc(1100ms + var(--delay));
+  animation-delay: calc(800ms + var(--delay));
 }
 
 .lp[data-motion][data-seen] .lp__splash {
   animation: lp-splash var(--speed) linear infinite;
-  animation-delay: calc(1100ms + var(--delay));
+  animation-delay: calc(800ms + var(--delay));
 }
 
 .lp[data-motion][data-seen] .lp__glint {
   animation: lp-glint 3.6s linear infinite;
-  animation-delay: calc(var(--g) * 240ms + 1200ms);
+  animation-delay: calc(var(--g) * 240ms + 900ms);
 }
 
 @keyframes lp-drip {
@@ -322,29 +373,6 @@
   45% { opacity: 0.9; stroke-dashoffset: 100; }
   55%,
   100% { opacity: 0; stroke-dashoffset: 100; }
-}
-
-/* --- Nota ------------------------------------------------------------------ */
-
-.lp__note {
-  display: flex;
-  gap: var(--space-2);
-  align-items: flex-start;
-  max-width: 78ch;
-  margin: 0;
-  color: var(--ink-muted);
-  font-size: var(--text-xs);
-  line-height: 1.45;
-}
-
-.lp__note svg {
-  flex: none;
-  width: 16px;
-  height: 16px;
-  fill: none;
-  stroke: currentColor;
-  stroke-width: 2;
-  stroke-linecap: round;
 }
 
 @media (prefers-reduced-motion: reduce) {

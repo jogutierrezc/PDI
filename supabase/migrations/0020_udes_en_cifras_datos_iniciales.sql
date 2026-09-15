@@ -2681,9 +2681,9 @@ join public.campuses c on c.slug = v.campus
 on conflict (map_id, year, campus_id, department_code) do update set value = excluded.value;
 
 insert into public.od_pipelines (report_id, key, title, description, measure, stages, office_id, position)
-select r.id, 'tuberia', v.title, v.description, 'estudiantes', v.stages, o.id, 1
+select r.id, 'tuberia', v.title, v.description, 'permanencia', v.stages, o.id, 1
 from (values
-  ('permanencia', 'La tubería de la permanencia', 'Una cohorte entra por la izquierda y avanza semestre a semestre hasta el grado. Cada fuga es la gente que se retira en ese tramo; el grosor del tubo es la gente que sigue.', array['Ingreso', '2.º semestre', '4.º semestre', '6.º semestre', '8.º semestre', '10.º semestre', 'Grado']::text[], 'Bienestar Universitario')
+  ('permanencia', 'La tubería de la permanencia', 'La cohorte entra por la izquierda al 100 % y baja tramo a tramo hasta el grado. Cada escalón marca la deserción acumulada y cada gota, la parte que se retira en ese tramo.', array['Ingreso', '2.º semestre', '4.º semestre', '6.º semestre', '8.º semestre', '10.º semestre', 'Grado']::text[], 'Bienestar Universitario')
 ) as v(report, title, description, stages, office)
 join public.od_reports r on r.slug = v.report and r.period_id = (select id from public.od_periods where label = '2020-2025')
 left join public.od_offices o on o.name = v.office
@@ -2694,94 +2694,38 @@ on conflict (report_id, key) do update
 insert into public.od_pipeline_values (pipeline_id, cohort, campus_id, stage_index, value, main_cause)
 select p.id, v.cohort, c.id, v.stage::smallint, v.value, v.cause
 from (values
-  ('permanencia', '2018-A', 'bucaramanga', 0, 2079::numeric, ''),
-  ('permanencia', '2018-A', 'bucaramanga', 1, 1751::numeric, 'Económicas'),
-  ('permanencia', '2018-A', 'bucaramanga', 2, 1584::numeric, 'Académicas'),
-  ('permanencia', '2018-A', 'bucaramanga', 3, 1478::numeric, 'Económicas'),
-  ('permanencia', '2018-A', 'bucaramanga', 4, 1391::numeric, 'Laborales'),
-  ('permanencia', '2018-A', 'bucaramanga', 5, 1303::numeric, 'Personales o familiares'),
-  ('permanencia', '2018-A', 'bucaramanga', 6, 1069::numeric, 'Académicas'),
-  ('permanencia', '2018-A', 'cucuta', 0, 759::numeric, ''),
-  ('permanencia', '2018-A', 'cucuta', 1, 624::numeric, 'Económicas'),
-  ('permanencia', '2018-A', 'cucuta', 2, 557::numeric, 'Académicas'),
-  ('permanencia', '2018-A', 'cucuta', 3, 513::numeric, 'Económicas'),
-  ('permanencia', '2018-A', 'cucuta', 4, 477::numeric, 'Laborales'),
-  ('permanencia', '2018-A', 'cucuta', 5, 442::numeric, 'Personales o familiares'),
-  ('permanencia', '2018-A', 'cucuta', 6, 353::numeric, 'Académicas'),
-  ('permanencia', '2018-A', 'valledupar', 0, 462::numeric, ''),
-  ('permanencia', '2018-A', 'valledupar', 1, 370::numeric, 'Económicas'),
-  ('permanencia', '2018-A', 'valledupar', 2, 325::numeric, 'Académicas'),
-  ('permanencia', '2018-A', 'valledupar', 3, 295::numeric, 'Económicas'),
-  ('permanencia', '2018-A', 'valledupar', 4, 270::numeric, 'Laborales'),
-  ('permanencia', '2018-A', 'valledupar', 5, 246::numeric, 'Personales o familiares'),
-  ('permanencia', '2018-A', 'valledupar', 6, 190::numeric, 'Académicas'),
-  ('permanencia', '2019-A', 'bucaramanga', 0, 2167::numeric, ''),
-  ('permanencia', '2019-A', 'bucaramanga', 1, 1851::numeric, 'Económicas'),
-  ('permanencia', '2019-A', 'bucaramanga', 2, 1688::numeric, 'Académicas'),
-  ('permanencia', '2019-A', 'bucaramanga', 3, 1585::numeric, 'Económicas'),
-  ('permanencia', '2019-A', 'bucaramanga', 4, 1502::numeric, 'Laborales'),
-  ('permanencia', '2019-A', 'bucaramanga', 5, 1416::numeric, 'Personales o familiares'),
-  ('permanencia', '2019-A', 'bucaramanga', 6, 1178::numeric, 'Académicas'),
-  ('permanencia', '2019-A', 'cucuta', 0, 791::numeric, ''),
-  ('permanencia', '2019-A', 'cucuta', 1, 660::numeric, 'Económicas'),
-  ('permanencia', '2019-A', 'cucuta', 2, 594::numeric, 'Académicas'),
-  ('permanencia', '2019-A', 'cucuta', 3, 551::numeric, 'Económicas'),
-  ('permanencia', '2019-A', 'cucuta', 4, 517::numeric, 'Laborales'),
-  ('permanencia', '2019-A', 'cucuta', 5, 482::numeric, 'Personales o familiares'),
-  ('permanencia', '2019-A', 'cucuta', 6, 391::numeric, 'Académicas'),
-  ('permanencia', '2019-A', 'valledupar', 0, 482::numeric, ''),
-  ('permanencia', '2019-A', 'valledupar', 1, 391::numeric, 'Económicas'),
-  ('permanencia', '2019-A', 'valledupar', 2, 347::numeric, 'Académicas'),
-  ('permanencia', '2019-A', 'valledupar', 3, 318::numeric, 'Económicas'),
-  ('permanencia', '2019-A', 'valledupar', 4, 294::numeric, 'Laborales'),
-  ('permanencia', '2019-A', 'valledupar', 5, 270::numeric, 'Personales o familiares'),
-  ('permanencia', '2019-A', 'valledupar', 6, 213::numeric, 'Académicas'),
-  ('permanencia', '2020-A', 'bucaramanga', 0, 2255::numeric, ''),
-  ('permanencia', '2020-A', 'bucaramanga', 1, 1953::numeric, 'Económicas'),
-  ('permanencia', '2020-A', 'bucaramanga', 2, 1795::numeric, 'Académicas'),
-  ('permanencia', '2020-A', 'bucaramanga', 3, 1697::numeric, 'Económicas'),
-  ('permanencia', '2020-A', 'bucaramanga', 4, 1617::numeric, 'Laborales'),
-  ('permanencia', '2020-A', 'bucaramanga', 5, 1535::numeric, 'Personales o familiares'),
-  ('permanencia', '2020-A', 'bucaramanga', 6, 1293::numeric, 'Académicas'),
-  ('permanencia', '2020-A', 'cucuta', 0, 823::numeric, ''),
-  ('permanencia', '2020-A', 'cucuta', 1, 696::numeric, 'Económicas'),
-  ('permanencia', '2020-A', 'cucuta', 2, 632::numeric, 'Académicas'),
-  ('permanencia', '2020-A', 'cucuta', 3, 591::numeric, 'Económicas'),
-  ('permanencia', '2020-A', 'cucuta', 4, 557::numeric, 'Laborales'),
-  ('permanencia', '2020-A', 'cucuta', 5, 523::numeric, 'Personales o familiares'),
-  ('permanencia', '2020-A', 'cucuta', 6, 431::numeric, 'Académicas'),
-  ('permanencia', '2020-A', 'valledupar', 0, 501::numeric, ''),
-  ('permanencia', '2020-A', 'valledupar', 1, 413::numeric, 'Económicas'),
-  ('permanencia', '2020-A', 'valledupar', 2, 369::numeric, 'Académicas'),
-  ('permanencia', '2020-A', 'valledupar', 3, 340::numeric, 'Económicas'),
-  ('permanencia', '2020-A', 'valledupar', 4, 317::numeric, 'Laborales'),
-  ('permanencia', '2020-A', 'valledupar', 5, 294::numeric, 'Personales o familiares'),
-  ('permanencia', '2020-A', 'valledupar', 6, 236::numeric, 'Académicas'),
-  ('permanencia', '2021-A', 'bucaramanga', 0, 2344::numeric, ''),
-  ('permanencia', '2021-A', 'bucaramanga', 1, 2058::numeric, 'Económicas'),
-  ('permanencia', '2021-A', 'bucaramanga', 2, 1905::numeric, 'Académicas'),
-  ('permanencia', '2021-A', 'bucaramanga', 3, 1812::numeric, 'Económicas'),
-  ('permanencia', '2021-A', 'bucaramanga', 4, 1737::numeric, 'Laborales'),
-  ('permanencia', '2021-A', 'bucaramanga', 5, 1658::numeric, 'Personales o familiares'),
-  ('permanencia', '2021-A', 'bucaramanga', 6, null::numeric, 'Académicas'),
-  ('permanencia', '2021-A', 'cucuta', 0, 856::numeric, ''),
-  ('permanencia', '2021-A', 'cucuta', 1, 734::numeric, 'Económicas'),
-  ('permanencia', '2021-A', 'cucuta', 2, 672::numeric, 'Académicas'),
-  ('permanencia', '2021-A', 'cucuta', 3, 632::numeric, 'Económicas'),
-  ('permanencia', '2021-A', 'cucuta', 4, 600::numeric, 'Laborales'),
-  ('permanencia', '2021-A', 'cucuta', 5, 567::numeric, 'Personales o familiares'),
-  ('permanencia', '2021-A', 'cucuta', 6, null::numeric, 'Académicas'),
-  ('permanencia', '2021-A', 'valledupar', 0, 521::numeric, ''),
-  ('permanencia', '2021-A', 'valledupar', 1, 436::numeric, 'Económicas'),
-  ('permanencia', '2021-A', 'valledupar', 2, 393::numeric, 'Académicas'),
-  ('permanencia', '2021-A', 'valledupar', 3, 365::numeric, 'Económicas'),
-  ('permanencia', '2021-A', 'valledupar', 4, 342::numeric, 'Laborales'),
-  ('permanencia', '2021-A', 'valledupar', 5, 320::numeric, 'Personales o familiares'),
-  ('permanencia', '2021-A', 'valledupar', 6, null::numeric, 'Académicas')
+  ('permanencia', '2018-A a 2021-A', 'bucaramanga', 0, 100::numeric, ''),
+  ('permanencia', '2018-A a 2021-A', 'bucaramanga', 1, 86::numeric, 'Económicas'),
+  ('permanencia', '2018-A a 2021-A', 'bucaramanga', 2, 78.7::numeric, 'Académicas'),
+  ('permanencia', '2018-A a 2021-A', 'bucaramanga', 3, 74.2::numeric, 'Económicas'),
+  ('permanencia', '2018-A a 2021-A', 'bucaramanga', 4, 70.5::numeric, 'Laborales'),
+  ('permanencia', '2018-A a 2021-A', 'bucaramanga', 5, 66.7::numeric, 'Personales o familiares'),
+  ('permanencia', '2018-A a 2021-A', 'bucaramanga', 6, 54.4::numeric, 'Académicas'),
+  ('permanencia', '2018-A a 2021-A', 'cucuta', 0, 100::numeric, ''),
+  ('permanencia', '2018-A a 2021-A', 'cucuta', 1, 84::numeric, 'Económicas'),
+  ('permanencia', '2018-A a 2021-A', 'cucuta', 2, 75.9::numeric, 'Académicas'),
+  ('permanencia', '2018-A a 2021-A', 'cucuta', 3, 70.7::numeric, 'Económicas'),
+  ('permanencia', '2018-A a 2021-A', 'cucuta', 4, 66.5::numeric, 'Laborales'),
+  ('permanencia', '2018-A a 2021-A', 'cucuta', 5, 62.2::numeric, 'Personales o familiares'),
+  ('permanencia', '2018-A a 2021-A', 'cucuta', 6, 49.4::numeric, 'Académicas'),
+  ('permanencia', '2018-A a 2021-A', 'valledupar', 0, 100::numeric, ''),
+  ('permanencia', '2018-A a 2021-A', 'valledupar', 1, 81.8::numeric, 'Económicas'),
+  ('permanencia', '2018-A a 2021-A', 'valledupar', 2, 72.9::numeric, 'Académicas'),
+  ('permanencia', '2018-A a 2021-A', 'valledupar', 3, 66.9::numeric, 'Económicas'),
+  ('permanencia', '2018-A a 2021-A', 'valledupar', 4, 62.1::numeric, 'Laborales'),
+  ('permanencia', '2018-A a 2021-A', 'valledupar', 5, 57.3::numeric, 'Personales o familiares'),
+  ('permanencia', '2018-A a 2021-A', 'valledupar', 6, 44.1::numeric, 'Académicas'),
+  ('permanencia', '2018-A a 2021-A', null, 0, 100::numeric, ''),
+  ('permanencia', '2018-A a 2021-A', null, 1, 85::numeric, 'Económicas'),
+  ('permanencia', '2018-A a 2021-A', null, 2, 77.3::numeric, 'Académicas'),
+  ('permanencia', '2018-A a 2021-A', null, 3, 72.4::numeric, 'Económicas'),
+  ('permanencia', '2018-A a 2021-A', null, 4, 68.4::numeric, 'Laborales'),
+  ('permanencia', '2018-A a 2021-A', null, 5, 64.4::numeric, 'Personales o familiares'),
+  ('permanencia', '2018-A a 2021-A', null, 6, 51.8::numeric, 'Académicas')
 ) as v(report, cohort, campus, stage, value, cause)
 join public.od_reports r on r.slug = v.report and r.period_id = (select id from public.od_periods where label = '2020-2025')
 join public.od_pipelines p on p.report_id = r.id and p.key = 'tuberia'
-join public.campuses c on c.slug = v.campus
+left join public.campuses c on c.slug = v.campus
 on conflict on constraint od_pipeline_values_unique do update
   set value = excluded.value, main_cause = excluded.main_cause;
 
@@ -2812,6 +2756,13 @@ from (values
 join public.od_reports r on r.slug = v.report and r.period_id = (select id from public.od_periods where label = '2020-2025')
 join public.od_histories s on s.report_id = r.id and s.key = v.key
 on conflict on constraint od_history_values_unique do update set value = excluded.value, position = excluded.position;
+
+delete from public.od_pipeline_values
+where cohort !~ ' a '
+  and pipeline_id in (
+    select p.id from public.od_pipelines p join public.od_reports r on r.id = p.report_id
+    where r.period_id = (select id from public.od_periods where label = '2020-2025') and p.key = 'tuberia'
+  );
 
 delete from public.od_report_blocks where report_id in (select id from public.od_reports where period_id = (select id from public.od_periods where label = '2020-2025'));
 

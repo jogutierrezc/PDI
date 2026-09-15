@@ -131,7 +131,7 @@ function buildPipeline(currentYear: number): PipelineData {
     id: "tuberia",
     title: "La tubería de la permanencia",
     description:
-      "Una cohorte entra por la izquierda y avanza semestre a semestre hasta el grado. Cada fuga es la gente que se retira en ese tramo; el grosor del tubo es la gente que sigue.",
+      "La cohorte entra por la izquierda al 100 % y baja tramo a tramo hasta el grado. Cada escalón marca la deserción acumulada y cada gota, la parte que se retira en ese tramo.",
     stages: STAGES,
     cohorts,
     source: "Bienestar Universitario",

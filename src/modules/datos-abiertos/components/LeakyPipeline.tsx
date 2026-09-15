@@ -1,28 +1,24 @@
 /* =============================================================================
-   Tubería que gotea: deserción acumulada por cohorte.
+   Tubería que gotea: deserción acumulada de una cohorte, siempre en %.
 
-   La cohorte entra al 100 % por la boquilla de la izquierda y baja por una
-   tubería metálica escalonada: cada tramo desciende en proporción a la
-   deserción acumulada. En cada unión gotea lo que se perdió en ese tramo; las
-   gotas son más grandes y caen más seguido donde la fuga es mayor. La salida
-   de la derecha sigue goteando.
-
-   Además de cada cohorte se puede ver el promedio de las cohortes, calculado en
-   cada etapa con las que tienen dato hasta ahí (referencia SPADIES).
+   Cada tubería es un único flujo: una cohorte (o un rango de cohortes
+   reportado junto, "2014-A a 2023-B") que entra al 100 % por la boquilla de la
+   izquierda y baja por una tubería metálica escalonada. En cada unión gotea lo
+   que se perdió en ese tramo; las gotas son más grandes y caen más seguido
+   donde la fuga es mayor. La salida de la derecha sigue goteando.
 
    Pasar por una unión cuenta la historia en cifras; un clic la fija. Los tramos
-   que la cohorte aún no cursa quedan en contorno, "en curso". Con movimiento
+   que el flujo aún no cursa quedan en contorno, "en curso". Con movimiento
    reducido no caen gotas: queda la tubería quieta con una gota colgando.
 
    Recibe las mismas props que Pipeline, así se intercambian sin tocar el
    informe.
    ========================================================================== */
 
-import { useId, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { useId, useLayoutEffect, useRef, useState } from "react";
 import type { CSSProperties } from "react";
 import { formatValue } from "../data/open-data";
 import type { CampusId, PipelineCohort, PipelineData } from "../data/types";
-import { ChartTooltip } from "./ChartFrame";
 import { useInView, usePrefersReducedMotion, useWidth } from "./motion";
 import "./leaky-pipeline.css";
 
@@ -31,8 +27,6 @@ interface LeakyPipelineProps {
   campus: CampusId;
   campusName: string;
 }
-
-const AVERAGE = "__promedio__";
 
 const H = 480;
 const R = 16; // radio del tubo
@@ -53,12 +47,7 @@ interface StagePoint {
   lost: number | null;
   /** % de los que llegaron al tramo que se retira en él. */
   shareOfStage: number | null;
-  /** Solo cohorte en estudiantes: cuántos siguen y cuántos se fueron. */
-  students: number | null;
-  studentsLost: number | null;
   cause: string | null;
-  /** Solo promedio: cuántas cohortes tienen dato en esta etapa. */
-  sample: number | null;
 }
 
 const pct = (v: number | null) => `${formatValue(v, "decimal")} %`;
@@ -73,6 +62,8 @@ function shortStage(name: string) {
 const MIN_WIDTH = 860;
 const CALLOUT_W = 244;
 const CALLOUT_TOP = 12;
+/** Alto que necesita un aviso para abrirse hacia arriba sin salirse del dibujo. */
+const TIP_ROOM = 150;
 
 export function LeakyPipeline({ data, campus, campusName }: LeakyPipelineProps) {
   const wrap = useRef<HTMLDivElement>(null);
@@ -99,78 +90,42 @@ export function LeakyPipeline({ data, campus, campusName }: LeakyPipelineProps) 
   }, [narrow]);
   const reduced = usePrefersReducedMotion();
   const stages = data.stages;
-  const students = (data.measure ?? "estudiantes") === "estudiantes";
 
-  const cohorts = useMemo(
-    () => Array.from(new Set(data.cohorts.map((c) => String(c.cohort)))).sort((a, b) => a.localeCompare(b)),
-    [data.cohorts],
-  );
-
-  /** La fila de una cohorte: el campus elegido, si no el total, si no la primera que haya. */
-  const rowOf = (cohort: string): PipelineCohort | undefined => {
-    const ofCohort = data.cohorts.filter((c) => String(c.cohort) === cohort);
-    return ofCohort.find((c) => c.campus === campus) ?? ofCohort.find((c) => c.campus === "todas") ?? ofCohort[0];
-  };
-
-  const [cohort, setCohort] = useState(() => (cohorts.length > 1 ? AVERAGE : (cohorts[0] ?? AVERAGE)));
   const [hover, setHover] = useState<Focus>(null);
   const [pinned, setPinned] = useState<Focus>(null);
   const focus = hover ?? pinned;
-  const average = cohort === AVERAGE;
 
-  const rows = (average ? cohorts : [cohort]).map(rowOf).filter((r): r is PipelineCohort => Boolean(r));
-  if (!rows.length || stages.length < 2) {
+  // Un único flujo por tubería, del campus elegido; si no lo reporta, el total;
+  // si tampoco, el primero que haya. Si quedan varias cohortes de capturas
+  // anteriores, se toma la que más etapas tiene y, a igualdad, la más reciente.
+  const ofCampus = (rows: PipelineCohort[]) =>
+    rows.some((c) => c.campus === campus) ? rows.filter((c) => c.campus === campus)
+      : rows.some((c) => c.campus === "todas") ? rows.filter((c) => c.campus === "todas")
+        : rows;
+  const filled = (c: PipelineCohort) => c.remaining.filter((v) => v !== null).length;
+  const row = ofCampus(data.cohorts)
+    .slice()
+    .sort((a, b) => filled(a) - filled(b) || String(a.cohort).localeCompare(String(b.cohort)))
+    .pop();
+  if (!row || stages.length < 2 || !row.remaining[0]) {
     return <p className="od-empty">Esta tubería todavía no tiene cifras cargadas. Se cargan en la intranet, en Captura.</p>;
   }
 
-  /** Deserción acumulada de una fila en cada etapa. */
-  const cumulativeOf = (row: PipelineCohort) => {
-    const intake = row.remaining[0];
-    return row.remaining.map((v) => (v === null || !intake ? null : (1 - v / intake) * 100));
-  };
+  // Deserción acumulada: qué % de lo que entró ya se retiró al llegar a cada etapa.
+  const intake = row.remaining[0];
+  const cumulative = row.remaining.map((v) => (v === null ? null : (1 - v / intake) * 100));
+  const points: StagePoint[] = cumulative.map((value, i) => {
+    const before = i > 0 ? cumulative[i - 1] : null;
+    const lost = i > 0 && value !== null && before !== null ? value - before : null;
+    return {
+      cumulative: value,
+      lost,
+      shareOfStage:
+        row.dropout?.[i] ?? (lost !== null && before !== null && before < 100 ? (lost / (100 - before)) * 100 : null),
+      cause: i > 0 ? row.mainCause[i - 1] || null : null,
+    };
+  });
 
-  const points: StagePoint[] = (() => {
-    if (average) {
-      const series = rows.map(cumulativeOf);
-      const cumulative = stages.map((_, i) => {
-        const values = series.map((s) => s[i]).filter((v): v is number => v !== null);
-        return { value: values.length ? values.reduce((a, b) => a + b, 0) / values.length : null, sample: values.length };
-      });
-      return cumulative.map((c, i) => {
-        const before = i > 0 ? cumulative[i - 1].value : null;
-        const lost = i > 0 && c.value !== null && before !== null ? c.value - before : null;
-        return {
-          cumulative: c.value,
-          lost,
-          shareOfStage: lost !== null && before !== null && before < 100 ? (lost / (100 - before)) * 100 : null,
-          students: null,
-          studentsLost: null,
-          cause: null,
-          sample: c.sample,
-        };
-      });
-    }
-    const row = rows[0];
-    const cumulative = cumulativeOf(row);
-    return cumulative.map((value, i) => {
-      const before = i > 0 ? cumulative[i - 1] : null;
-      const lost = i > 0 && value !== null && before !== null ? value - before : null;
-      const prev = i > 0 ? row.remaining[i - 1] : null;
-      const now = row.remaining[i];
-      return {
-        cumulative: value,
-        lost,
-        shareOfStage:
-          row.dropout?.[i] ?? (lost !== null && before !== null && before < 100 ? (lost / (100 - before)) * 100 : null),
-        students: students ? now : null,
-        studentsLost: students && i > 0 && prev !== null && now !== null ? prev - now : null,
-        cause: i > 0 ? row.mainCause[i - 1] || "Sin causa declarada" : null,
-        sample: null,
-      };
-    });
-  })();
-
-  const intakeStudents = !average && students ? rows[0].remaining[0] : null;
   let lastKnown = 0;
   points.forEach((p, i) => {
     if (p.cumulative !== null) lastKnown = i;
@@ -246,15 +201,11 @@ export function LeakyPipeline({ data, campus, campusName }: LeakyPipelineProps) 
     return Math.max(0, Math.ceil(CALLOUT_TOP + calloutH + 14 - Math.min(exitTop, ...tops)));
   })();
 
-  const cohortLabel = average
-    ? cohorts.length > 1
-      ? `Cohortes ${cohorts[0]} a ${cohorts[cohorts.length - 1]}`
-      : `Cohorte ${cohorts[0]}`
-    : `Cohorte ${cohort}`;
-  const shownCampus = (() => {
-    const c = rows[0].campus;
-    return c === "todas" ? "todos los campus" : c === campus ? campusName : String(c);
-  })();
+  // "2014-A a 2023-B" es un rango reportado como un solo flujo.
+  const flow = String(row.cohort).trim();
+  const ranged = /\s(a|al|-|–)\s/i.test(flow);
+  const cohortLabel = flow ? (ranged ? `Cohortes ${flow}` : `Cohorte ${flow}`) : "La cohorte";
+  const shownCampus = row.campus === "todas" ? "todos los campus" : row.campus === campus ? campusName : String(row.campus);
 
   const tip = (() => {
     if (!focus) return null;
@@ -264,11 +215,7 @@ export function LeakyPipeline({ data, campus, campusName }: LeakyPipelineProps) 
       i === 0 ? (
         <>
           <strong>{stages[0]}</strong>
-          <span>
-            Entra el 100 % de la cohorte
-            {intakeStudents !== null && <> · {formatValue(intakeStudents, "entero")} estudiantes</>}
-          </span>
-          {average && <span>Promedio de {rows.length} cohortes</span>}
+          <span>Entra el 100 % de {ranged ? "las cohortes" : "la cohorte"}</span>
         </>
       ) : (
         <>
@@ -279,7 +226,6 @@ export function LeakyPipeline({ data, campus, campusName }: LeakyPipelineProps) 
             <>
               <span>
                 Deserción acumulada: <b>{pct(p.cumulative)}</b>
-                {average && <> en promedio</>}
               </span>
               {p.lost !== null && (
                 <span>
@@ -287,25 +233,21 @@ export function LeakyPipeline({ data, campus, campusName }: LeakyPipelineProps) 
                   {p.shareOfStage !== null && <> · {pct(p.shareOfStage)} de los que llegaron</>}
                 </span>
               )}
-              {p.students !== null && (
-                <span>
-                  Siguen {formatValue(p.students, "entero")} estudiantes
-                  {p.studentsLost !== null && <> · se retiraron {formatValue(p.studentsLost, "entero")}</>}
-                </span>
-              )}
               {p.cause && <span>Causa principal declarada: {p.cause}</span>}
-              {p.sample !== null && (
-                <em>
-                  Con {p.sample} {p.sample === 1 ? "cohorte" : "cohortes"} que tienen dato hasta aquí
-                </em>
-              )}
             </>
           )}
         </>
       );
-    const x = i === 0 ? INLET_X : xAt(i);
-    const y = i === 0 ? BADGE_Y - BADGE_R : i % 2 === 1 ? yAt(i) - R - 52 : yAt(i) - R - 10;
-    return { x, y: y + shift, body };
+    // El aviso de la boquilla va a su derecha: encima se saldría del dibujo.
+    if (i === 0) return { x: INLET_X + BADGE_R + 12, y: BADGE_Y + shift, place: "right" as const, align: "start" as const, body };
+    // Las uniones lo abren arriba de su cifra; si no cabe (tramos altos), debajo del tubo.
+    const x = xAt(i);
+    const y = yAt(i) + shift;
+    const above = i % 2 === 1;
+    const topAnchor = above ? y - R - 54 : y - R - (valves.has(i) ? 24 : 10);
+    const align = x < 180 ? ("start" as const) : x > width - 200 ? ("end" as const) : ("center" as const);
+    if (topAnchor >= TIP_ROOM) return { x, y: topAnchor, place: "above" as const, align, body };
+    return { x, y: above ? y + R + 10 : y + R + FALL + 76, place: "below" as const, align, body };
   })();
 
   const toggle = (index: number) => setPinned((p) => (p?.index === index ? null : { kind: "stage", index }));
@@ -323,42 +265,20 @@ export function LeakyPipeline({ data, campus, campusName }: LeakyPipelineProps) 
       </svg>
       <p>
         {complete ? <>Al llegar a {stages[lastKnown].toLowerCase()},</> : <>Hasta {stages[lastKnown].toLowerCase()},</>}
-        {average ? " en promedio" : ""}
         <b>{pct(final)}</b>
-        {average ? "de los estudiantes de las cohortes analizadas ha desertado." : "de la cohorte ha desertado."}
+        {ranged ? "de los estudiantes de las cohortes analizadas ha desertado." : "de la cohorte ha desertado."}
       </p>
     </aside>
   );
 
   return (
     <div className="lp" data-seen={seen || undefined} data-motion={!reduced || undefined}>
-      <div className="lp__bar">
-        {cohorts.length > 1 && (
-          <label className="od-select">
-            <span>Cohorte</span>
-            <select
-              value={cohort}
-              onChange={(event) => {
-                setCohort(event.target.value);
-                setPinned(null);
-              }}
-            >
-              <option value={AVERAGE}>Promedio de cohortes</option>
-              {cohorts.map((c) => (
-                <option key={c} value={c}>
-                  {c}
-                </option>
-              ))}
-            </select>
-          </label>
+      <p className="lp__meta">
+        {cohortLabel} · porcentaje acumulado de deserción
+        {campus !== "todas" && row.campus !== campus && (
+          <small> · {campusName} no reporta esta tubería; se muestra {shownCampus}.</small>
         )}
-        <p className="lp__meta">
-          {cohortLabel}
-          {campus !== "todas" && rows[0].campus !== campus && (
-            <small> · {campusName} no reporta {average ? "estas cohortes" : "esta cohorte"}; se muestra {shownCampus}.</small>
-          )}
-        </p>
-      </div>
+      </p>
 
       {narrow && callout}
 
@@ -525,10 +445,10 @@ export function LeakyPipeline({ data, campus, campusName }: LeakyPipelineProps) 
                 {valves.has(i) && <rect className="lp__valve-body" x={x - 10} y={y - 9} width={20} height={18} rx={3} />}
 
                 <g className="lp__label">
-                  <text className="lp__stage" x={x} y={above ? y - R - 34 : y + R + FALL + 34} textAnchor="middle">
+                  <text className="lp__stage" x={x} y={above ? y - R - 34 : y + R + FALL + 46} textAnchor="middle">
                     {shortStage(stage)}
                   </text>
-                  <text className="lp__value" x={x} y={above ? y - R - 12 : y + R + FALL + 56} textAnchor="middle">
+                  <text className="lp__value" x={x} y={above ? y - R - 12 : y + R + FALL + 68} textAnchor="middle">
                     {p.cumulative === null ? "en curso" : pct(p.cumulative)}
                   </text>
                 </g>
@@ -539,9 +459,15 @@ export function LeakyPipeline({ data, campus, campusName }: LeakyPipelineProps) 
         </svg>
 
         {tip && (
-          <ChartTooltip x={tip.x} y={tip.y} align={tip.x < 180 ? "start" : tip.x > width - 200 ? "end" : "center"}>
+          <span
+            className="od-tip lp__tip"
+            data-align={tip.align}
+            data-place={tip.place}
+            style={{ left: tip.x, top: tip.y }}
+            role="presentation"
+          >
             {tip.body}
-          </ChartTooltip>
+          </span>
         )}
       </div>
       {narrow && (
@@ -550,17 +476,6 @@ export function LeakyPipeline({ data, campus, campusName }: LeakyPipelineProps) 
         </span>
       )}
       </div>
-
-      {average && (
-        <p className="lp__note">
-          <svg viewBox="0 0 24 24" aria-hidden="true">
-            <circle cx="12" cy="12" r="10" />
-            <path d="M12 10.5v6M12 7.2v.1" />
-          </svg>
-          Los valores son porcentajes (%) y corresponden al promedio acumulado por etapa, calculado con las cohortes que
-          tienen dato disponible hasta cada etapa.
-        </p>
-      )}
     </div>
   );
 }

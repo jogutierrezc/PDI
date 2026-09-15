@@ -12,7 +12,7 @@ import { Suspense, lazy } from "react";
 import { Navigate, Route, Routes, useLocation } from "react-router-dom";
 import { ScrollManager } from "./components/layout/ScrollManager";
 import { useAuth } from "./lib/auth";
-import type { AppRole } from "./types/database";
+import type { AdminScreen, AppRole } from "./types/database";
 import type { ReactElement } from "react";
 
 import { Home } from "./routes/Home";
@@ -87,9 +87,19 @@ const UserManagement = lazy(() =>
   import("./modules/admin/usuarios/UserManagement").then((m) => ({ default: m.UserManagement })),
 );
 
-/** Puerta de las rutas internas. Recuerda a dónde iba la persona. */
-function RequireRole({ minimum, children }: { minimum: AppRole; children: ReactElement }) {
-  const { loading, profile, hasRole } = useAuth();
+/** Puerta de las rutas internas. Recuerda a dónde iba la persona.
+ *  `screen` es la pantalla del menú: un rol de acceso que no la tiene tampoco
+ *  entra escribiendo la dirección a mano. */
+function RequireRole({
+  minimum,
+  screen,
+  children,
+}: {
+  minimum: AppRole;
+  screen?: AdminScreen;
+  children: ReactElement;
+}) {
+  const { loading, profile, hasRole, canSee } = useAuth();
   const location = useLocation();
 
   // Sin esto, recargar una ruta de intranet rebotaría al login durante el
@@ -100,7 +110,7 @@ function RequireRole({ minimum, children }: { minimum: AppRole; children: ReactE
     return <Navigate to="/acceso-intranet" replace state={{ from: location.pathname }} />;
   }
 
-  if (!hasRole(minimum)) {
+  if (!hasRole(minimum) || (screen && !canSee(screen))) {
     return <Navigate to="/sin-permiso" replace state={{ from: location.pathname }} />;
   }
 
@@ -140,7 +150,7 @@ export default function App() {
           <Route
             path="/admin/pilares"
             element={
-              <RequireRole minimum="consulta">
+              <RequireRole minimum="consulta" screen="pillars">
                 <PillarManagement />
               </RequireRole>
             }
@@ -148,7 +158,7 @@ export default function App() {
           <Route
             path="/admin/pilares/:slug/configurar"
             element={
-              <RequireRole minimum="consulta">
+              <RequireRole minimum="consulta" screen="pillars">
                 <PillarConfigurator />
               </RequireRole>
             }
@@ -156,7 +166,7 @@ export default function App() {
           <Route
             path="/admin/estructura"
             element={
-              <RequireRole minimum="consulta">
+              <RequireRole minimum="consulta" screen="structure">
                 <StructureNormalize />
               </RequireRole>
             }
@@ -164,7 +174,7 @@ export default function App() {
           <Route
             path="/admin/parametros"
             element={
-              <RequireRole minimum="consulta">
+              <RequireRole minimum="consulta" screen="parameters">
                 <GlobalParameters />
               </RequireRole>
             }
@@ -172,7 +182,7 @@ export default function App() {
           <Route
             path="/admin/proyectos"
             element={
-              <RequireRole minimum="consulta">
+              <RequireRole minimum="consulta" screen="projects">
                 <ProjectsAdmin />
               </RequireRole>
             }
@@ -180,7 +190,7 @@ export default function App() {
           <Route
             path="/admin/campus"
             element={
-              <RequireRole minimum="consulta">
+              <RequireRole minimum="consulta" screen="campus">
                 <CampusImport />
               </RequireRole>
             }
@@ -188,7 +198,7 @@ export default function App() {
           <Route
             path="/admin/facultades"
             element={
-              <RequireRole minimum="consulta">
+              <RequireRole minimum="consulta" screen="faculties">
                 <FacultyAdmin />
               </RequireRole>
             }
@@ -196,7 +206,7 @@ export default function App() {
           <Route
             path="/admin/presupuesto"
             element={
-              <RequireRole minimum="consulta">
+              <RequireRole minimum="consulta" screen="budget">
                 <BudgetAdmin />
               </RequireRole>
             }
@@ -204,7 +214,7 @@ export default function App() {
           <Route
             path="/admin/desarrollo"
             element={
-              <RequireRole minimum="consulta">
+              <RequireRole minimum="consulta" screen="development">
                 <WebProjects />
               </RequireRole>
             }
@@ -214,7 +224,7 @@ export default function App() {
           <Route
             path="/admin/udes-en-cifras/:station?/:report?"
             element={
-              <RequireRole minimum="consulta">
+              <RequireRole minimum="consulta" screen="cifras">
                 <OdAdmin />
               </RequireRole>
             }
@@ -222,7 +232,7 @@ export default function App() {
           <Route
             path="/admin/usuarios"
             element={
-              <RequireRole minimum="admin">
+              <RequireRole minimum="admin" screen="users">
                 <UserManagement />
               </RequireRole>
             }

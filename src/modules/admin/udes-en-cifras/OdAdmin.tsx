@@ -65,8 +65,11 @@ export function OdAdmin() {
   const { station: stationParam, report: reportSlug } = useParams();
   const [params, setParams] = useSearchParams();
   const navigate = useNavigate();
-  const { hasRole } = useAuth();
-  const canEdit = hasRole("planeacion");
+  const { hasRole, canSeeReport, canEditReport, canEditPeriod } = useAuth();
+  // Un rol de área solo ve y escribe sus informes; lo común del periodo
+  // (años, campus, informes nuevos) se le queda en lectura.
+  const canEditAny = hasRole("planeacion");
+  const canManagePeriod = canEditPeriod();
 
   const station = (STATIONS.find((s) => s.id === stationParam)?.id ?? "captura") as StationId;
   const periods = useOdPeriods();
@@ -74,8 +77,18 @@ export function OdAdmin() {
   const admin = useOdAdminData(periodId);
   const publications = useOdPublications(periodId);
 
-  const data = admin.data ?? undefined;
+  const full = admin.data ?? undefined;
+  // La lista de informes que esta persona puede ver. Los ajenos no se enseñan:
+  // no hay nada que hacer con ellos aquí.
+  const data = useMemo(
+    () =>
+      full
+        ? { ...full, catalog: { ...full.catalog, reports: full.catalog.reports.filter((r) => canSeeReport(r.slug)) } }
+        : undefined,
+    [full, canSeeReport],
+  );
   const report = data?.catalog.reports.find((r) => r.slug === reportSlug) ?? data?.catalog.reports[0];
+  const canEdit = report ? canEditReport(report.slug) : canEditAny;
   const currentStation = STATIONS.find((s) => s.id === station)!;
   const [previewOpen, setPreviewOpen] = useState(false);
   const previewToggle = useRef<HTMLButtonElement>(null);
@@ -143,6 +156,12 @@ export function OdAdmin() {
       }
     >
       {!canEdit && <ReadOnlyNotice />}
+      {canEdit && !canManagePeriod && station === "periodo" && (
+        <p className="oda-banner" role="note">
+          <Icon name="alert" size={16} />
+          El periodo, sus campus y la creación de informes los administra Planeación. Aquí se consultan.
+        </p>
+      )}
 
       {periods.isPending || (periodId && admin.isPending) ? (
         <LoadingBlock rows={6} label="Cargando UDES en Cifras" />
@@ -163,13 +182,13 @@ export function OdAdmin() {
               progress={progress}
               onPick={(slug) => navigate(hrefFor(station === "periodo" ? "estructura" : station, slug))}
               station={station}
-              canEdit={canEdit}
+              canEdit={canManagePeriod}
               onCreated={(slug) => navigate(hrefFor("estructura", slug))}
             />
 
             <section className="oda-stage" aria-label={currentStation.label}>
               {station === "periodo" && (
-                <PeriodStation data={data} report={report} periodId={periodId} canEdit={canEdit} progress={progress} />
+                <PeriodStation data={data} report={report} periodId={periodId} canEdit={canManagePeriod} progress={progress} />
               )}
               {station === "estructura" && (
                 <StructureStation data={data} report={report} periodId={periodId} canEdit={canEdit} progress={progress} />

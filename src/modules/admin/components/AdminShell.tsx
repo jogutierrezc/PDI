@@ -111,7 +111,7 @@ export function AdminShell({
 }: AdminShellProps) {
   const [navOpen, setNavOpen] = useState(false);
   const { resolved, toggle } = useTheme();
-  const { profile, signOut, hasRole } = useAuth();
+  const { profile, signOut, hasRole, canSee } = useAuth();
   const navigate = useNavigate();
   const group = navigation.find((g) => g.items.some((item) => item.id === section));
   const shellRef = useRef<HTMLDivElement>(null);
@@ -160,7 +160,9 @@ export function AdminShell({
 
         <nav className="admin-nav" aria-label="Navegación administrativa">
           {navigation.map((navGroup) => {
-            const items = navGroup.items.filter((item) => hasRole(item.minimum));
+            // El rol de acceso decide qué pantallas se enseñan; el rol clásico, con
+            // qué permiso se entra a ellas.
+            const items = navGroup.items.filter((item) => hasRole(item.minimum) && canSee(item.id));
             if (items.length === 0) return null;
             return (
               <div className="admin-nav__group" key={navGroup.id}>

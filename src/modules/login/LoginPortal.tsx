@@ -17,10 +17,11 @@ export function LoginPortal() {
 
   const location = useLocation();
   const errorId = useId();
-  const { profile, loading, signIn, requestPasswordReset } = useAuth();
+  const { profile, loading, signIn, requestPasswordReset, home } = useAuth();
 
-  // A dónde iba la persona antes de que la guarda la mandara aquí.
-  const from = (location.state as { from?: string } | null)?.from ?? "/admin/pilares";
+  // A dónde iba la persona antes de que la guarda la mandara aquí; si venía de
+  // ninguna parte, a la primera pantalla que su rol le deja abrir.
+  const from = (location.state as { from?: string } | null)?.from ?? home;
 
   useEffect(() => {
     document.title = "Acceso intranet | PDI 2024-2028";

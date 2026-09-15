@@ -27,9 +27,46 @@ export interface Profile {
   full_name: string;
   unit: string | null;
   role: AppRole;
+  /** Rol de acceso: manda sobre `role`, que la base sincroniza con su capacidad. */
+  access_role_id?: string | null;
   is_active: boolean;
   created_at: string;
   updated_at: string;
+}
+
+/** Pantallas de la intranet que un rol de acceso puede abrir. */
+export type AdminScreen =
+  | "pillars"
+  | "projects"
+  | "faculties"
+  | "campus"
+  | "budget"
+  | "repository"
+  | "cifras"
+  | "structure"
+  | "parameters"
+  | "development"
+  | "users";
+
+/** Un rol de acceso: qué puede hacer, qué pantallas ve y sobre qué informes escribe. */
+export interface AccessRole {
+  id: string;
+  key: string;
+  name: string;
+  description: string;
+  base_role: AppRole;
+  screens: AdminScreen[];
+  all_screens: boolean;
+  all_reports: boolean;
+  is_system: boolean;
+  position: number;
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface AccessRoleReport {
+  access_role_id: string;
+  report_slug: string;
 }
 
 export interface Parameter {

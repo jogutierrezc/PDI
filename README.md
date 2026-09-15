@@ -58,6 +58,7 @@ pegarlos en el editor SQL del panel de Supabase o aplicarlos con la CLI
 | `0021_desgloses_por_periodo.sql` | Desgloses por A/B y cifra anual; clave de guardado por periodo y años habilitados |
 | `0022_udes_en_cifras_informes.sql` | Informes por puntos (`od_sections`), tablas/rankings/fichas (`od_tables`), periodicidad por indicador y desglose (`reporting`: por periodo o por año) y `od_import_report()` |
 | `0023_investigacion_2020_2025.sql` | Informe de Investigación con las cifras de la VI (Word + CSV de `Informes/`). Generada, no editar a mano |
+| `0024_roles_de_acceso.sql` | Roles de acceso como datos: capacidad, pantallas de la intranet e informes propios (`access_roles`, `access_role_reports`, `profiles.access_role_id`) |
 
 Todos son idempotentes: volver a ejecutarlos no duplica nada.
 
@@ -380,6 +381,33 @@ como párrafos.
   un indicador no puede tener dos filas del mismo año.
 
 ## Roles y permisos
+
+### Roles de acceso (0024)
+
+Un rol de acceso dice tres cosas y se crea desde **Usuarios y roles**, sin migraciones:
+
+1. **Capacidad**: la escalera de siempre (consulta, responsable de pilar, planeación, administración).
+   `profiles.role` se sincroniza con ella, así que todo lo que ya existía (`has_role_at_least`,
+   `can_edit_pillar`, las políticas del Plan de Desarrollo) sigue igual.
+2. **Pantallas**: qué entradas del menú ve. Lo que no está marcado no aparece y tampoco se abre
+   escribiendo la dirección (`has_screen()` en la base, `canSee()` en la interfaz).
+3. **Informes de UDES en Cifras**: todos, o solo los suyos por slug. Un rol con informes propios
+   escribe únicamente esos (`od_can_edit_report()`), no ve los borradores ajenos
+   (`od_can_see_report()`) y no toca el periodo, sus campus ni la creación de informes
+   (`od_can_edit_period()`). Publicar su propio informe sí puede.
+
+Los cuatro roles clásicos existen como roles de fábrica y no se borran; los demás se borran cuando
+ya nadie los lleva. Un perfil sin rol de acceso se comporta como antes de 0024.
+
+Ejemplo: "Editor de Investigación" = capacidad Planeación + pantalla *Estaciones del periodo* +
+informe *Investigación*. Entra, carga su informe con el importador, lo publica y no ve nada más.
+
+**Sesión directa contra la base.** `is_direct_session()` distingue las peticiones de la API
+(PostgREST entra como `authenticator` y adopta anon o authenticated) de las del editor SQL, una
+migración o la clave de servicio. Se mira `session_user`, nunca `current_user`: dentro de una
+función `security definer`, `current_user` es el dueño de la función y diría que sí siempre.
+
+### La escalera de capacidades
 
 | Rol | Lee | Edita | Publica | Usuarios |
 | --- | --- | --- | --- | --- |

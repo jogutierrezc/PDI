@@ -26,6 +26,8 @@ interface CreatePayload {
   email: string;
   full_name: string;
   role: Role;
+  /** Rol de acceso (access_roles.id): decide pantallas e informes. */
+  access_role_id?: string | null;
   unit?: string;
   /** Sin contraseña se envía una invitación por correo. */
   password?: string;
@@ -153,7 +155,14 @@ Deno.serve(async (request) => {
       // no viajan en los metadatos y se garantiza el rol pedido.
       const { error: updateError } = await admin
         .from("profiles")
-        .update({ full_name: fullName, role: payload.role, unit: payload.unit ?? null })
+        .update({
+          full_name: fullName,
+          role: payload.role,
+          unit: payload.unit ?? null,
+          // El disparador de la base sincroniza role con la capacidad del rol
+          // de acceso, así que basta con apuntar cuál es.
+          ...(payload.access_role_id ? { access_role_id: payload.access_role_id } : {}),
+        })
         .eq("id", created.id);
 
       if (updateError) return json({ error: updateError.message }, 500);

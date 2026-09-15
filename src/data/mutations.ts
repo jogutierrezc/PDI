@@ -17,7 +17,7 @@ import type { QueryKey } from "@tanstack/react-query";
 import { callAdminUsers, readFunctionError, supabase } from "../lib/supabase";
 import { keys } from "./queries";
 import { describeDatabaseError as describe } from "./errors";
-import type { AppRole, NormalizeResult, Profile } from "../types/database";
+import type { AccessRole, AppRole, NormalizeResult, Profile } from "../types/database";
 
 /** Tablas sobre las que escribe la intranet. */
 export type WritableTable =
@@ -37,6 +37,8 @@ export type WritableTable =
   | "parameters"
   | "pillar_owners"
   | "profiles"
+  | "access_roles"
+  | "access_role_reports"
   | "web_projects"
   | "project_budget_reports"
   | "faculties"
@@ -242,6 +244,8 @@ export interface CreateUserInput {
   email: string;
   full_name: string;
   role: AppRole;
+  /** Rol de acceso: pantallas e informes que alcanzará. */
+  access_role_id?: string | null;
   unit?: string;
   /** Vacío = se envía una invitación por correo en vez de fijar contraseña. */
   password?: string;
@@ -277,6 +281,51 @@ export function useSendPasswordReset() {
   });
 }
 
+/** Crea o actualiza un rol de acceso con sus informes. Los informes se
+ *  reemplazan enteros: la lista que se guarda es la que queda. */
+export function useSaveAccessRole() {
+  const invalidate = useInvalidate([keys.accessRoles(), keys.profiles()]);
+  return useMutation({
+    mutationFn: async ({
+      role,
+      reports,
+    }: {
+      role: Partial<AccessRole> & { key: string; name: string; base_role: AppRole };
+      reports: string[];
+    }): Promise<AccessRole> => {
+      const { id, ...fields } = role;
+      const saved = id
+        ? await supabase.from("access_roles").update(fields).eq("id", id).select().single()
+        : await supabase.from("access_roles").insert(fields).select().single();
+      if (saved.error) throw describe(saved.error);
+      const roleId = (saved.data as AccessRole).id;
+
+      const remove = await supabase.from("access_role_reports").delete().eq("access_role_id", roleId);
+      if (remove.error) throw describe(remove.error);
+      if (reports.length > 0) {
+        const insert = await supabase
+          .from("access_role_reports")
+          .insert(reports.map((report_slug) => ({ access_role_id: roleId, report_slug })));
+        if (insert.error) throw describe(insert.error);
+      }
+      return saved.data as AccessRole;
+    },
+    onSuccess: invalidate,
+  });
+}
+
+/** Borra un rol propio. Los de sistema los protege un disparador de la base. */
+export function useDeleteAccessRole() {
+  const invalidate = useInvalidate([keys.accessRoles(), keys.profiles()]);
+  return useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase.from("access_roles").delete().eq("id", id);
+      if (error) throw describe(error);
+    },
+    onSuccess: invalidate,
+  });
+}
+
 /** Cambio de rol o de estado. Va por PostgREST: las políticas ya lo limitan a
  *  administradores, y el disparador impide dejar el portal sin ninguno. */
 export function useUpdateProfile() {
@@ -287,7 +336,7 @@ export function useUpdateProfile() {
       values,
     }: {
       id: string;
-      values: Partial<Pick<Profile, "full_name" | "unit" | "role" | "is_active">>;
+      values: Partial<Pick<Profile, "full_name" | "unit" | "role" | "is_active" | "access_role_id">>;
     }) => {
       const { data, error } = await supabase.from("profiles").update(values).eq("id", id).select().single();
       if (error) throw describe(error);

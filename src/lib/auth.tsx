@@ -15,13 +15,36 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useState } 
 import type { ReactNode } from "react";
 import type { Session } from "@supabase/supabase-js";
 import { supabase } from "./supabase";
-import type { AppRole, Profile } from "../types/database";
+import type { AccessRole, AdminScreen, AppRole, Profile } from "../types/database";
 
 const RANK: Record<AppRole, number> = {
   consulta: 1,
   responsable: 2,
   planeacion: 3,
   admin: 4,
+};
+
+/** Rol de acceso de la sesión con los informes que alcanza. */
+export interface AccessScope {
+  role: AccessRole;
+  /** Slugs de los informes propios. Vacío con `all_reports`. */
+  reports: string[];
+}
+
+/** Dónde vive cada pantalla del menú. Sirve para llevar a cada quien a la
+ *  primera que sí puede abrir: un rol de área no empieza en Gestión de pilares. */
+export const SCREEN_PATHS: Record<AdminScreen, string> = {
+  pillars: "/admin/pilares",
+  projects: "/admin/proyectos",
+  faculties: "/admin/facultades",
+  campus: "/admin/campus",
+  budget: "/admin/presupuesto",
+  repository: "/implementacion#repositorio",
+  cifras: "/admin/udes-en-cifras",
+  structure: "/admin/estructura",
+  parameters: "/admin/parametros",
+  development: "/admin/desarrollo",
+  users: "/admin/usuarios",
 };
 
 interface AuthContextValue {
@@ -35,6 +58,18 @@ interface AuthContextValue {
   requestPasswordReset: (email: string) => Promise<void>;
   /** ¿Tiene al menos este rol? Espeja has_role_at_least() de la base de datos. */
   hasRole: (minimum: AppRole) => boolean;
+  /** Rol de acceso asignado. Sin él, la sesión se comporta como antes de 0024. */
+  access: AccessScope | null;
+  /** ¿Ve esta pantalla de la intranet? Espeja has_screen(). */
+  canSee: (screen: AdminScreen) => boolean;
+  /** ¿Ve este informe de UDES en Cifras en la intranet? */
+  canSeeReport: (slug: string) => boolean;
+  /** ¿Escribe en este informe? Espeja od_can_edit_report(). */
+  canEditReport: (slug: string) => boolean;
+  /** ¿Toca lo común del periodo (años, campus, informes nuevos)? */
+  canEditPeriod: () => boolean;
+  /** Primera pantalla que esta persona sí puede abrir. */
+  home: string;
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null);
@@ -42,6 +77,7 @@ const AuthContext = createContext<AuthContextValue | null>(null);
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
+  const [access, setAccess] = useState<AccessScope | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -50,6 +86,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const loadProfile = useCallback(async (userId: string | undefined) => {
     if (!userId) {
       setProfile(null);
+      setAccess(null);
       return;
     }
 
@@ -62,10 +99,31 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (profileError) {
       setError(profileError.message);
       setProfile(null);
+      setAccess(null);
       return;
     }
 
-    setProfile(data && data.is_active ? (data as Profile) : null);
+    const person = data && data.is_active ? (data as Profile) : null;
+    setProfile(person);
+
+    // El rol de acceso decide qué pantallas e informes se enseñan. Si no se
+    // puede leer (base sin la migración 0024), la sesión sigue como antes.
+    if (!person?.access_role_id) {
+      setAccess(null);
+      return;
+    }
+    const [role, reports] = await Promise.all([
+      supabase.from("access_roles").select("*").eq("id", person.access_role_id).maybeSingle(),
+      supabase.from("access_role_reports").select("report_slug").eq("access_role_id", person.access_role_id),
+    ]);
+    setAccess(
+      role.data
+        ? {
+            role: role.data as AccessRole,
+            reports: (reports.data ?? []).map((row) => (row as { report_slug: string }).report_slug),
+          }
+        : null,
+    );
   }, []);
 
   useEffect(() => {
@@ -117,6 +175,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const signOut = useCallback(async () => {
     await supabase.auth.signOut();
     setProfile(null);
+    setAccess(null);
     setSession(null);
   }, []);
 
@@ -132,9 +191,52 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     [profile],
   );
 
+  // Espejo de has_screen(): la pantalla de usuarios siempre pide administración,
+  // y un perfil sin rol de acceso ve lo de siempre.
+  const canSee = useCallback(
+    (screen: AdminScreen) => {
+      if (!profile?.is_active) return false;
+      if (screen === "users" && RANK[profile.role] < RANK.admin) return false;
+      if (!access) return true;
+      return access.role.all_screens || access.role.screens.includes(screen);
+    },
+    [profile, access],
+  );
+
+  const reachesReport = useCallback(
+    (slug: string) => {
+      if (!profile?.is_active) return false;
+      if (RANK[profile.role] >= RANK.admin) return true;
+      if (!access) return true;
+      return access.role.all_reports || access.reports.includes(slug);
+    },
+    [profile, access],
+  );
+
+  const canEditReport = useCallback(
+    (slug: string) => hasRole("planeacion") && reachesReport(slug),
+    [hasRole, reachesReport],
+  );
+
+  const canEditPeriod = useCallback(
+    () => hasRole("planeacion") && (hasRole("admin") || !access || access.role.all_reports),
+    [hasRole, access],
+  );
+
+  const home = useMemo(() => {
+    const first = (Object.keys(SCREEN_PATHS) as AdminScreen[]).find((screen) => canSee(screen));
+    return first ? SCREEN_PATHS[first] : "/";
+  }, [canSee]);
+
   const value = useMemo(
-    () => ({ session, profile, loading, error, signIn, signOut, requestPasswordReset, hasRole }),
-    [session, profile, loading, error, signIn, signOut, requestPasswordReset, hasRole],
+    () => ({
+      session, profile, loading, error, signIn, signOut, requestPasswordReset, hasRole,
+      access, canSee, canSeeReport: reachesReport, canEditReport, canEditPeriod, home,
+    }),
+    [
+      session, profile, loading, error, signIn, signOut, requestPasswordReset, hasRole,
+      access, canSee, reachesReport, canEditReport, canEditPeriod, home,
+    ],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

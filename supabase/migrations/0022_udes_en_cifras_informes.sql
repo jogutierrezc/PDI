@@ -153,6 +153,37 @@ end $$;
 -- 5. Aplicar un plan de importación
 -- -----------------------------------------------------------------------------
 
+-- ¿La petición llega por la API o directamente contra la base?
+--
+-- PostgREST entra como "authenticator" y adopta el rol anon o authenticated;
+-- el editor SQL, una migración o la clave de servicio entran como su propio
+-- usuario. Se mira session_user y no current_user: dentro de una función
+-- SECURITY DEFINER, current_user es el dueño de la función y diría que sí
+-- siempre, abriendo la puerta a cualquiera.
+create or replace function public.is_direct_session()
+returns boolean
+language sql
+stable
+as $$
+  select session_user not in ('anon', 'authenticated', 'authenticator')
+      or current_user = 'service_role';
+$$;
+
+comment on function public.is_direct_session() is
+  'Cierto cuando la petición no viene de la API pública, sino del editor SQL, una migración o la clave de servicio.';
+
+-- ¿Quién puede importar un informe? Desde la API, Planeación. La 0024 la vuelve
+-- a definir para exigir, además, que el informe sea de quien importa.
+create or replace function public.od_import_allowed(target uuid)
+returns boolean
+language sql
+stable
+security definer
+set search_path = public
+as $$
+  select public.is_direct_session() or public.has_role_at_least('planeacion');
+$$;
+
 create or replace function public.od_import_report(target uuid, plan jsonb)
 returns jsonb
 language plpgsql
@@ -170,9 +201,7 @@ declare
   kpi_rank   integer := 0;
   n_values   integer := 0;
 begin
-  -- Desde la API (anon/authenticated) exige Planeación. Desde el editor SQL o
-  -- una migración (postgres, service_role) no hay sesión de usuario y se permite.
-  if current_user in ('anon', 'authenticated') and not public.has_role_at_least('planeacion') then
+  if not public.od_import_allowed(target) then
     raise exception 'Solo Planeación puede importar informes.' using errcode = 'insufficient_privilege';
   end if;
   select * into rpt from public.od_reports where id = target;

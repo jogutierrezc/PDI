@@ -13,6 +13,8 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "../lib/supabase";
 import type {
+  AccessRole,
+  AccessRoleReport,
   ActionLineWithArea,
   Activity,
   Campus,
@@ -73,6 +75,7 @@ export const keys = {
   parameters: () => [...keys.all, "parameters"] as const,
   profiles: () => [...keys.all, "profiles"] as const,
   owners: () => [...keys.all, "owners"] as const,
+  accessRoles: () => [...keys.all, "access-roles"] as const,
   webProjects: () => [...keys.all, "web-projects"] as const,
   observations: (pillarId: string) => [...keys.all, "observations", pillarId] as const,
   pillarYears: () => [...keys.all, "pillar-years"] as const,
@@ -424,6 +427,40 @@ export function useParameters(category?: ParameterCategory) {
       return query.then(unwrap<Parameter[]>);
     },
     staleTime: 10 * 60 * 1000,
+  });
+}
+
+/** Roles de acceso con los informes de UDES en Cifras que alcanza cada uno. */
+export function useAccessRoles() {
+  return useQuery({
+    queryKey: keys.accessRoles(),
+    queryFn: async (): Promise<{ roles: AccessRole[]; reports: AccessRoleReport[] }> => {
+      const [roles, reports] = await Promise.all([
+        supabase.from("access_roles").select("*").order("position").then(unwrap<AccessRole[]>),
+        supabase.from("access_role_reports").select("*").then(unwrap<AccessRoleReport[]>),
+      ]);
+      return { roles, reports };
+    },
+    staleTime: 5 * 60 * 1000,
+  });
+}
+
+/** Informes de UDES en Cifras por slug, para asignarlos a un rol de acceso.
+ *  Un mismo informe existe en cada periodo: aquí se lista una vez. */
+export function useOdReportOptions() {
+  return useQuery({
+    queryKey: [...keys.accessRoles(), "informes"],
+    queryFn: async (): Promise<{ slug: string; name: string }[]> => {
+      const rows = await supabase
+        .from("od_reports")
+        .select("slug,name,position")
+        .order("position")
+        .then(unwrap<{ slug: string; name: string; position: number }[]>);
+      const unique = new Map<string, string>();
+      for (const row of rows) if (!unique.has(row.slug)) unique.set(row.slug, row.name);
+      return [...unique].map(([slug, name]) => ({ slug, name }));
+    },
+    staleTime: 5 * 60 * 1000,
   });
 }
 

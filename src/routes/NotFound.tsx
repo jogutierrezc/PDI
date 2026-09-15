@@ -36,7 +36,7 @@ export function NotFound() {
  * lo reporte como un fallo.
  */
 export function Forbidden() {
-  const { profile } = useAuth();
+  const { profile, home } = useAuth();
 
   return (
     <PublicLayout className="notfound-page">
@@ -45,12 +45,12 @@ export function Forbidden() {
         <h1>No tienes permiso para esta sección</h1>
         <p className="lede">
           {profile
-            ? `Tu cuenta tiene el rol “${roleLabels[profile.role]}”, que no alcanza para esta pantalla. Si necesitas entrar, pide a un administrador que ajuste tu rol.`
+            ? `Tu rol de acceso no incluye esta pantalla (capacidad: ${roleLabels[profile.role]}). Si necesitas entrar, pide a un administrador que la añada a tu rol.`
             : "Inicia sesión con una cuenta autorizada para continuar."}
         </p>
 
         <div className="notfound__actions">
-          <Link className="button-primary" to="/admin/pilares">
+          <Link className="button-primary" to={home}>
             Ir a lo que sí puedo ver <span data-arrow aria-hidden="true">→</span>
           </Link>
           <Link className="button-secondary" to="/">

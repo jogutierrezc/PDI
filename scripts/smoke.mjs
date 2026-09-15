@@ -510,12 +510,32 @@ const FIXTURES = {
       full_name: "Administradora de prueba",
       unit: "Planeación",
       role: "admin",
+      access_role_id: "rol-admin",
       is_active: true,
       created_at: "2024-10-15T00:00:00Z",
       updated_at: "2024-10-15T00:00:00Z",
     },
+    {
+      id: "user-vi",
+      email: "investigaciones@udes.edu.co",
+      full_name: "Vicerrectoría de Investigaciones",
+      unit: "Investigaciones",
+      role: "planeacion",
+      access_role_id: "rol-vi",
+      is_active: true,
+      created_at: "2025-02-01T00:00:00Z",
+      updated_at: "2025-02-01T00:00:00Z",
+    },
   ],
   pillar_owners: [],
+  access_roles: [
+    { id: "rol-consulta", key: "consulta", name: "Consulta", description: "Lee toda la intranet, no edita nada.", base_role: "consulta", screens: [], all_screens: true, all_reports: true, is_system: true, position: 1 },
+    { id: "rol-responsable", key: "responsable", name: "Responsable de pilar", description: "Edita únicamente los pilares que tiene asignados.", base_role: "responsable", screens: [], all_screens: true, all_reports: true, is_system: true, position: 2 },
+    { id: "rol-planeacion", key: "planeacion", name: "Planeación", description: "Edita cualquier pilar y decide qué se publica.", base_role: "planeacion", screens: [], all_screens: true, all_reports: true, is_system: true, position: 3 },
+    { id: "rol-admin", key: "admin", name: "Administrador", description: "Todo lo anterior, más la gestión de usuarios.", base_role: "admin", screens: [], all_screens: true, all_reports: true, is_system: true, position: 4 },
+    { id: "rol-vi", key: "editor-investigacion", name: "Editor de Investigación", description: "Carga y publica el informe de Investigación.", base_role: "planeacion", screens: ["cifras"], all_screens: false, all_reports: false, is_system: false, position: 5 },
+  ],
+  access_role_reports: [{ access_role_id: "rol-vi", report_slug: "investigacion" }],
   web_projects: [
     {
       id: "w1",
@@ -2011,7 +2031,30 @@ const routes = [
       }
     },
   },
-  { path: "/admin/usuarios", expect: "Usuarios y roles", session: true, also: ["Administradora de prueba"] },
+  {
+    path: "/admin/usuarios",
+    expect: "Usuarios y roles",
+    session: true,
+    note: "los roles de acceso se administran junto a las personas",
+    also: ["Administradora de prueba", "Roles de acceso", "Editor de Investigación", "Estaciones del periodo"],
+  },
+  {
+    path: "/admin/udes-en-cifras/captura/investigacion",
+    as: "user-vi",
+    session: true,
+    note: "un rol de área solo ve su informe en UDES en Cifras",
+    expect: "Captura",
+    also: ["Investigación", "Importar informe"],
+    // Los informes ajenos no se enseñan: no hay nada que hacer con ellos aquí.
+    absent: ["UDES Sostenible", "Infraestructura Física y Tecnológica", "PDI por facultad", "Presupuesto"],
+  },
+  {
+    path: "/admin/presupuesto",
+    as: "user-vi",
+    session: true,
+    note: "una pantalla fuera de su rol no se abre ni escribiendo la dirección",
+    expect: "No tienes permiso para esta sección",
+  },
   { path: "/tablero", expect: "Cumplimiento global y por pilar", theme: "dark", note: "tema oscuro" },
   {
     path: "/tablero",
@@ -2064,7 +2107,7 @@ const html = `<!doctype html><html lang="es"><body><div id="root"></div></body><
  * red silencioso — todas las pantallas se quedaban en "cargando" sin decir por
  * qué.
  */
-function makeFetch(session, broken = false) {
+function makeFetch(session, broken = false, userId = "user-admin") {
   // Estado propio de cada prueba: el refetch debe leer lo que se guardó.
   const odValues = structuredClone(FIXTURES.od_values ?? []);
   return async (input, init = {}) => {
@@ -2080,8 +2123,9 @@ function makeFetch(session, broken = false) {
 
     // Autenticación
     if (url.includes("/auth/v1/user")) {
+      const person = (FIXTURES.profiles ?? []).find((row) => row.id === userId);
       return session
-        ? reply({ id: "user-admin", email: "admin@udes.edu.co", aud: "authenticated" })
+        ? reply({ id: userId, email: person?.email ?? "admin@udes.edu.co", aud: "authenticated" })
         : reply({ message: "invalid claim" }, 401);
     }
     if (url.includes("/auth/v1/")) return reply({});
@@ -2301,7 +2345,7 @@ for (const route of routes) {
         refresh_token: "smoke",
         expires_at: Math.floor(Date.now() / 1000) + 3600,
         token_type: "bearer",
-        user: { id: "user-admin", email: "admin@udes.edu.co", aud: "authenticated" },
+        user: { id: route.as ?? "user-admin", email: "admin@udes.edu.co", aud: "authenticated" },
       }),
     );
   }
@@ -2309,7 +2353,7 @@ for (const route of routes) {
 
   // El cliente de Supabase toma fetch de globalThis al construirse, que dentro
   // de jsdom es el window.
-  dom.window.fetch = makeFetch(Boolean(route.session), Boolean(route.broken));
+  dom.window.fetch = makeFetch(Boolean(route.session), Boolean(route.broken), route.as ?? "user-admin");
   dom.window.Headers = Headers;
   dom.window.Response = Response;
   dom.window.Request = Request;

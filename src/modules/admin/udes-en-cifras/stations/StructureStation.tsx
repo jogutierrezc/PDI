@@ -26,7 +26,8 @@ import type {
   OdPipelineMeasure,
   OdValueFormat,
 } from "../../../../types/database";
-import { ANNUAL_RULE_HINT, ANNUAL_RULE_LABEL } from "../../../datos-abiertos/data/terms";
+import { ANNUAL_RULE_HINT, ANNUAL_RULE_LABEL, REPORTING_HINT, REPORTING_LABEL } from "../../../datos-abiertos/data/terms";
+import type { Reporting } from "../../../datos-abiertos/data/terms";
 import type { StationProps } from "../OdAdmin";
 import {
   useDeleteDataset,
@@ -248,11 +249,11 @@ function KpiBoardEditor({ reportId, indicators, canEdit }: { reportId: string; i
 
 type IndicatorDraft = Pick<
   OdIndicatorRow,
-  "label" | "key" | "unit" | "format" | "direction" | "aggregation" | "annual_rule" | "years" | "definition" | "office_id"
+  "label" | "key" | "unit" | "format" | "direction" | "aggregation" | "reporting" | "annual_rule" | "years" | "definition" | "office_id"
 >;
 
 const emptyIndicator: IndicatorDraft = {
-  label: "", key: "", unit: "", format: "entero", direction: "sube", aggregation: "suma", annual_rule: "suma", years: null,
+  label: "", key: "", unit: "", format: "entero", direction: "sube", aggregation: "suma", reporting: "periodo", annual_rule: "suma", years: null,
   definition: "", office_id: null,
 };
 
@@ -277,7 +278,7 @@ function IndicatorsEditor({
     <Panel
       id="oda-indicadores"
       title={`Indicadores (${indicators.length})`}
-      description="Cada indicador se captura por periodo A y B de cada año. La cifra del año sale de A y B según su regla; el total institucional se suma de los campus o se captura aparte. Cada uno marca sus años con dato."
+      description="Cada indicador dice cómo llega: por periodo (A y B, y la cifra del año sale de su regla) o con una sola cifra por año. El total institucional se suma de los campus o se captura aparte. Cada uno marca sus años con dato."
       actions={
         <>
           <SaveState pending={save.isPending || remove.isPending} error={save.error ?? remove.error} success={save.isSuccess || remove.isSuccess} />
@@ -343,7 +344,10 @@ function IndicatorsEditor({
                   </small>
                 </th>
                 <td>{AGGREGATION_LABEL[indicator.aggregation]}</td>
-                <td>{ANNUAL_RULE_LABEL[indicator.annual_rule]}</td>
+                <td>
+                  {indicator.reporting === "anual" ? REPORTING_LABEL.anual : ANNUAL_RULE_LABEL[indicator.annual_rule]}
+                  <small>{indicator.reporting === "anual" ? "una cifra por año" : "periodos A y B"}</small>
+                </td>
                 <td>
                   {offices.find((o) => o.id === indicator.office_id)?.name ?? (
                     <span className="oda-badge" data-tone="warn">
@@ -387,7 +391,7 @@ function IndicatorForm({
 }) {
   const [draft, setDraft] = useState<IndicatorDraft>({
     label: initial.label, key: initial.key, unit: initial.unit, format: initial.format, direction: initial.direction,
-    aggregation: initial.aggregation, annual_rule: initial.annual_rule, years: initial.years, definition: initial.definition,
+    aggregation: initial.aggregation, reporting: initial.reporting ?? "periodo", annual_rule: initial.annual_rule, years: initial.years, definition: initial.definition,
     office_id: initial.office_id,
   });
   const key = draft.key || slugify(draft.label);
@@ -441,13 +445,39 @@ function IndicatorForm({
           </select>
         </label>
         <label className="admin-field">
+          <span>Se reporta</span>
+          <select
+            value={draft.reporting ?? "periodo"}
+            onChange={(e) => {
+              const reporting = e.target.value as Reporting;
+              setDraft({
+                ...draft,
+                reporting,
+                // Por año, la cifra del año es la reportada; de vuelta a periodos, suma A y B.
+                annual_rule: reporting === "anual" ? "reportado" : draft.annual_rule === "reportado" ? "suma" : draft.annual_rule,
+              });
+            }}
+          >
+            {Object.entries(REPORTING_LABEL).map(([value, label]) => (
+              <option key={value} value={value}>{label}</option>
+            ))}
+          </select>
+          <small className="oda-field-hint">{REPORTING_HINT[draft.reporting ?? "periodo"]}</small>
+        </label>
+        <label className="admin-field">
           <span>Cifra del año</span>
-          <select value={draft.annual_rule} onChange={(e) => setDraft({ ...draft, annual_rule: e.target.value as OdAnnualRule })}>
+          <select
+            value={draft.annual_rule}
+            disabled={draft.reporting === "anual"}
+            onChange={(e) => setDraft({ ...draft, annual_rule: e.target.value as OdAnnualRule })}
+          >
             {Object.entries(ANNUAL_RULE_LABEL).map(([value, label]) => (
               <option key={value} value={value}>{label}</option>
             ))}
           </select>
-          <small className="oda-field-hint">{ANNUAL_RULE_HINT[draft.annual_rule]}</small>
+          <small className="oda-field-hint">
+            {draft.reporting === "anual" ? "Es la cifra que se captura para el año." : ANNUAL_RULE_HINT[draft.annual_rule]}
+          </small>
         </label>
         <label className="admin-field">
           <span>Oficina que reporta</span>

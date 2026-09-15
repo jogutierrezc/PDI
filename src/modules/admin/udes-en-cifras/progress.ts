@@ -58,7 +58,7 @@ export function reportProgress(report: Report, rows: OpenDataRows, publications:
   let filled = 0;
   for (const indicator of indicators) {
     const ownYears = indicator.years && indicator.years.length ? periodYears.filter((y) => indicator.years!.includes(y)) : periodYears;
-    const terms = indicator.annual_rule === "reportado" ? ["A", "B", "anual"] : ["A", "B"];
+    const terms = indicator.reporting === "anual" ? ["anual"] : indicator.annual_rule === "reportado" ? ["A", "B", "anual"] : ["A", "B"];
     const own = values.filter((v) => v.indicator_id === indicator.id && ownYears.includes(v.year) && terms.includes(v.term));
     if (indicator.aggregation === "suma") {
       expected += ownYears.length * terms.length * campusCount;

@@ -962,7 +962,14 @@ export type OdBlockKind =
   | "desgloses"
   | "tabla_dinamica"
   | "metodologia"
-  | "historico";
+  | "historico"
+  | "tabla";
+/** Estado de un punto de un informe. */
+/** Cómo llega la cifra: por periodo académico (A y B) o una sola cifra por año. */
+export type OdReporting = "periodo" | "anual";
+export type OdSectionStatus = "completo" | "parcial" | "no_recibido" | "no_oficial" | "abierto";
+/** Cómo se presenta una tabla: tabla, ranking, fichas o cifras de un periodo. */
+export type OdTableDisplay = "tabla" | "ranking" | "fichas" | "cifras";
 export type OdImportKind = "rejilla" | "pegado" | "plantilla";
 
 export interface OdPeriod {
@@ -1021,6 +1028,8 @@ export interface OdIndicatorRow {
   format: OdValueFormat;
   direction: OdDirection;
   aggregation: OdAggregation;
+  /** Por periodo (A y B) o por año. Sin la migración 0022, por periodo. */
+  reporting?: OdReporting;
   annual_rule: OdAnnualRule;
   /** Años con dato. null = todos los del periodo. */
   years: number[] | null;
@@ -1052,6 +1061,7 @@ export interface OdBreakdownRow {
   format: OdValueFormat;
   office_id: string | null;
   default_chart: OdChartKind;
+  reporting?: OdReporting;
   annual_rule: OdAnnualRule;
   /** Años con dato. null = todos los del periodo. */
   years: number[] | null;
@@ -1167,9 +1177,56 @@ export interface OdReportBlockRow {
   report_id: string;
   kind: OdBlockKind;
   ref_id: string | null;
+  /** Punto del informe al que pertenece el bloque. */
+  section_id?: string | null;
   position: number;
   visible: boolean;
-  settings: { chart?: OdChartKind; title?: string };
+  settings: { chart?: OdChartKind; title?: string; indicators?: string[] };
+}
+
+export interface OdSectionRequest {
+  dato: string;
+  responsable: string;
+  periodicidad: string;
+}
+
+export interface OdSectionRow {
+  id: string;
+  report_id: string;
+  key: string;
+  number: number | null;
+  title: string;
+  status: OdSectionStatus;
+  lede: string;
+  warning: string;
+  source: string;
+  requested: OdSectionRequest[];
+  position: number;
+}
+
+export interface OdTableColumn {
+  key: string;
+  label: string;
+  format: OdValueFormat | "texto" | "enlace";
+}
+
+export interface OdTableRow {
+  id: string;
+  report_id: string;
+  key: string;
+  title: string;
+  description: string;
+  display: OdTableDisplay;
+  columns: OdTableColumn[];
+  office_id: string | null;
+  position: number;
+}
+
+export interface OdTableRecordRow {
+  id?: string;
+  table_id: string;
+  position: number;
+  cells: Record<string, string | number | null>;
 }
 
 export interface OdImportRow {

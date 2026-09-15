@@ -44,7 +44,8 @@ export type BlockKind =
   | "desgloses"
   | "tabla_dinamica"
   | "metodologia"
-  | "historico";
+  | "historico"
+  | "tabla";
 
 export interface Campus {
   id: CampusId;
@@ -79,6 +80,8 @@ export interface Indicator {
   years?: number[];
   /** Cifra del año: sale de los periodos A y B según `annualRule`. */
   values: YearCampusValues;
+  /** Por periodo (A y B) o por año. */
+  reporting?: "periodo" | "anual";
   /** Cómo se obtiene la cifra del año. Sin ella, la serie es solo anual. */
   annualRule?: AnnualRule;
   /** Cifras por periodo académico, tal como se reportaron. */
@@ -105,6 +108,7 @@ export interface Breakdown {
   years?: number[];
   /** Se publica para el total institucional; por campus no se desagrega. */
   values: Record<number, BreakdownItem[]>;
+  reporting?: "periodo" | "anual";
   annualRule?: AnnualRule;
   terms?: Record<number, Partial<Record<Term, BreakdownItem[]>>>;
 }
@@ -203,7 +207,9 @@ export interface ReportBlock {
   refKey?: string | null;
   visible: boolean;
   position: number;
-  settings: { chart?: ChartKind; title?: string };
+  settings: { chart?: ChartKind; title?: string; indicators?: string[] };
+  /** Punto del informe al que pertenece. Sin punto, el bloque es de toda la ficha. */
+  sectionKey?: string | null;
 }
 
 export interface ReportImage {
@@ -236,6 +242,9 @@ export interface Report {
   pipelines?: PipelineData[];
   histories?: HistoryData[];
   maps?: MapDataset[];
+  /** Puntos del informe, en orden. Sin puntos, la ficha es una sola columna de bloques. */
+  sections?: ReportSection[];
+  tables?: TableData[];
   /** Orden y visibilidad de los bloques de la ficha. Sin bloques, el orden por defecto. */
   blocks?: ReportBlock[];
   /** Nota metodológica o de alcance. */
@@ -278,8 +287,37 @@ export const DEFAULT_BLOCK_ORDER: BlockKind[] = [
   "metodologia",
 ];
 
+export type SectionStatus = "completo" | "parcial" | "no_recibido" | "no_oficial" | "abierto";
+
+/** Un punto de un informe institucional: su texto, su estado y su fuente. */
+export interface ReportSection {
+  key: string;
+  uuid?: string;
+  number: number | null;
+  title: string;
+  status: SectionStatus;
+  lede: string;
+  warning: string;
+  source: string;
+  requested: { dato: string; responsable: string; periodicidad: string }[];
+  position: number;
+}
+
+export type TableDisplay = "tabla" | "ranking" | "fichas" | "cifras";
+
+export interface TableData {
+  id: string;
+  uuid?: string;
+  title: string;
+  description: string;
+  display: TableDisplay;
+  columns: { key: string; label: string; format: ValueFormat | "texto" | "enlace" }[];
+  rows: Record<string, string | number | null>[];
+  source: string;
+}
+
 /** Bloques que apuntan a un conjunto concreto del informe. */
-export const DATASET_BLOCKS: BlockKind[] = ["mapa", "mapa_calor", "tuberia", "historico"];
+export const DATASET_BLOCKS: BlockKind[] = ["mapa", "mapa_calor", "tuberia", "historico", "tabla"];
 
 export const BLOCK_LABELS: Record<BlockKind, string> = {
   kpis: "Tablero de indicadores",
@@ -287,6 +325,7 @@ export const BLOCK_LABELS: Record<BlockKind, string> = {
   mapa: "Mapa por departamento",
   tuberia: "Tubería de permanencia",
   historico: "Evolución histórica",
+  tabla: "Tabla",
   mapa_calor: "Mapa de calor",
   desgloses: "Desgloses",
   tabla_dinamica: "Tabla dinámica",

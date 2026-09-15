@@ -8,6 +8,9 @@
    · descargando la plantilla del informe, llenándola y subiéndola: antes de
      aplicar se ve cada cambio (antes → después) y cada fila que no se entendió.
 
+   Un informe que llega como documento (Investigación: Word + CSV) se carga
+   entero desde "Importar informe".
+
    Nada se guarda hasta pulsar Guardar. Cada guardado deja rastro en od_imports
    con cuántas casillas cambió y por qué vía llegaron.
    ========================================================================== */
@@ -17,7 +20,8 @@ import { Icon } from "../../../../components/ui/Icon";
 import { downloadText, formatValue } from "../../../datos-abiertos/data/open-data";
 import { DEPARTMENTS } from "../../../datos-abiertos/data/colombia-map";
 import type { OdAnnualRule, OdImportKind, OdIndicatorRow, OdTerm } from "../../../../types/database";
-import { ANNUAL_RULE_LABEL, annualFigure } from "../../../datos-abiertos/data/terms";
+import { ANNUAL_RULE_LABEL, REPORTING_HINT, REPORTING_LABEL, annualFigure } from "../../../datos-abiertos/data/terms";
+import type { Reporting } from "../../../datos-abiertos/data/terms";
 import type { StationProps } from "../OdAdmin";
 import { DataGrid, cellKey } from "../DataGrid";
 import type { CellKey, GridColumn, GridRow } from "../DataGrid";
@@ -34,8 +38,10 @@ import {
 } from "../od-data";
 import { ConfirmButton, Panel, PeriodInput, SaveState, StageEmpty, YearPicker, periodRange } from "../ui";
 import { parseCsv, parseNumber, toCsv } from "../sheet";
+import { ImportReport, profileFor } from "./ImportReport";
+import { IMPORT_PROFILES } from "../import/investigacion";
 
-type Tab = "indicadores" | "desgloses" | "historico" | "calor" | "mapas" | "tuberia";
+type Tab = "importar" | "indicadores" | "desgloses" | "historico" | "calor" | "mapas" | "tuberia";
 const TOTAL = "total";
 
 export function CaptureStation(props: StationProps) {
@@ -43,7 +49,9 @@ export function CaptureStation(props: StationProps) {
   const [tab, setTab] = useState<Tab>("indicadores");
   if (!report?.uuid) return <StageEmpty title="Elige un informe">Las cifras se cargan informe por informe.</StageEmpty>;
 
+  const importable = Boolean(profileFor(report.slug));
   const counts = {
+    importar: data.rows.sections.filter((s) => s.report_id === report.uuid).length,
     indicadores: data.rows.indicators.filter((i) => i.report_id === report.uuid).length,
     desgloses: data.rows.breakdowns.filter((b) => b.report_id === report.uuid).length,
     historico: data.rows.histories.filter((h) => h.report_id === report.uuid).length,
@@ -52,13 +60,14 @@ export function CaptureStation(props: StationProps) {
     tuberia: data.rows.pipelines.filter((p) => p.report_id === report.uuid).length,
   };
   const tabs: { id: Tab; label: string }[] = [
+    { id: "importar" as Tab, label: "Importar informe" },
     { id: "indicadores" as Tab, label: "Indicadores" },
     { id: "desgloses" as Tab, label: "Desgloses" },
     { id: "historico" as Tab, label: "Evolución histórica" },
     { id: "calor" as Tab, label: "Mapas de calor" },
     { id: "mapas" as Tab, label: "Mapas" },
     { id: "tuberia" as Tab, label: "Tuberías" },
-  ].filter((t) => t.id === "indicadores" || counts[t.id] > 0);
+  ].filter((t) => t.id === "indicadores" || t.id === "importar" || counts[t.id] > 0);
 
   return (
     <div className="oda-stack">
@@ -79,6 +88,16 @@ export function CaptureStation(props: StationProps) {
         ))}
       </div>
 
+      {tab === "importar" &&
+        (importable ? (
+          <ImportReport key={report.uuid} {...props} />
+        ) : (
+          <StageEmpty title={`${report.name} todavía no tiene importador de informe`}>
+            El importador lee el Word y los CSV con el formato de cada oficina. Hoy está listo para{" "}
+            {IMPORT_PROFILES.map((p) => p.name).join(", ")}: elige ese informe en la lista de la izquierda. Las cifras de
+            este informe se cargan en las otras pestañas, con la rejilla o la plantilla CSV.
+          </StageEmpty>
+        ))}
       {tab === "indicadores" && <IndicatorCapture key={report.uuid} {...props} />}
       {tab === "desgloses" && <BreakdownCapture key={report.uuid} {...props} />}
       {tab === "historico" && <HistoryCapture key={report.uuid} {...props} />}
@@ -105,7 +124,11 @@ function IndicatorCapture({ data, report, periodId, canEdit }: StationProps) {
   const campuses = data.rows.campuses;
   const years = data.catalog.years;
   const shownYears = yearFilter === "todos" ? years : years.filter((y) => String(y) === yearFilter);
-  const anyReported = indicators.some((i) => i.annual_rule === "reportado");
+  const byYear = (indicator: OdIndicatorRow) => indicator.reporting === "anual";
+  const anyReported = indicators.some((i) => i.annual_rule === "reportado" || byYear(i));
+  const anyByTerm = indicators.some((i) => !byYear(i));
+  // Con indicadores por año, la columna del año se captura: no se oculta.
+  const annualShown = showAnnual || indicators.some(byYear);
 
   // Índice de lo guardado: indicador|año|periodo|campus → valor.
   const stored = useMemo(() => {
@@ -121,7 +144,7 @@ function IndicatorCapture({ data, report, periodId, canEdit }: StationProps) {
     const first: GridRow = {
       key: `${indicator.id}::${TOTAL}`,
       label: indicator.label,
-      sub: `Total institucional · ${indicator.aggregation === "suma" ? "suma de campus" : "reportado"} · año: ${ANNUAL_RULE_LABEL[indicator.annual_rule].toLowerCase()} · ${indicator.unit}`,
+      sub: `Total institucional · ${indicator.aggregation === "suma" ? "suma de campus" : "reportado"} · ${byYear(indicator) ? "se reporta por año" : `año: ${ANNUAL_RULE_LABEL[indicator.annual_rule].toLowerCase()}`} · ${indicator.unit}`,
       groupStart: true,
       format: indicator.format,
     };
@@ -132,10 +155,15 @@ function IndicatorCapture({ data, report, periodId, canEdit }: StationProps) {
   });
 
   // Por año: periodo A, periodo B y la cifra del año (calculada, salvo en "reportado").
+  // Si todos se reportan por año, la rejilla es una columna por año.
   const columns: GridColumn[] = shownYears.flatMap((y) => [
-    { key: `${y}-A`, label: "A", group: String(y), ariaLabel: `${y}, periodo A` },
-    { key: `${y}-B`, label: "B", group: String(y), ariaLabel: `${y}, periodo B` },
-    ...(showAnnual ? [{ key: `${y}-anual`, label: "Año", group: String(y), ariaLabel: `${y}, cifra del año` }] : []),
+    ...(anyByTerm
+      ? [
+          { key: `${y}-A`, label: "A", group: String(y), ariaLabel: `${y}, periodo A` },
+          { key: `${y}-B`, label: "B", group: String(y), ariaLabel: `${y}, periodo B` },
+        ]
+      : []),
+    ...(annualShown ? [{ key: `${y}-anual`, label: "Año", group: String(y), ariaLabel: `${y}, cifra del año` }] : []),
   ]);
 
   const split = (rowKey: string) => {
@@ -170,7 +198,10 @@ function IndicatorCapture({ data, report, periodId, canEdit }: StationProps) {
     if (indicator.years && indicator.years.length && !indicator.years.includes(Number(year))) {
       return `${indicator.label} no se reporta en ${year}. Cámbialo en "Años con dato".`;
     }
-    if (term === "anual" && indicator.annual_rule !== "reportado") {
+    if (byYear(indicator) && term !== "anual") {
+      return `${indicator.label} se reporta por año: sin periodos A y B. Se cambia en Estructura y KPI.`;
+    }
+    if (term === "anual" && indicator.annual_rule !== "reportado" && !byYear(indicator)) {
       return `Cifra del año: ${ANNUAL_RULE_LABEL[indicator.annual_rule].toLowerCase()}. Se cambia en Estructura y KPI.`;
     }
     return campus === TOTAL && indicator.aggregation === "suma" ? "Se calcula sumando los campus" : null;
@@ -179,6 +210,7 @@ function IndicatorCapture({ data, report, periodId, canEdit }: StationProps) {
     const { indicator, campus } = split(rowKey);
     const { year, term } = parseColumn(column);
     if (indicator.years && indicator.years.length && !indicator.years.includes(Number(year))) return null;
+    if (byYear(indicator)) return term === "anual" ? cellValue(indicator, campus, year, "anual") : null;
     if (term !== "anual") return cellValue(indicator, campus, year, term);
     return annualFigure(
       indicator.annual_rule,
@@ -205,7 +237,7 @@ function IndicatorCapture({ data, report, periodId, canEdit }: StationProps) {
 
   /* Plantilla: una fila por indicador y campus, una columna por año y periodo
      (2024-A, 2024-B y, si algún indicador la reporta aparte, 2024-anual). */
-  const templateTerms: OdTerm[] = anyReported ? ["A", "B", "anual"] : ["A", "B"];
+  const templateTerms: OdTerm[] = anyByTerm ? (anyReported ? ["A", "B", "anual"] : ["A", "B"]) : ["anual"];
   const downloadTemplate = () => {
     const header = ["clave", "indicador", "unidad", "cifra del año", "campus", ...years.flatMap((y) => templateTerms.map((term) => `${y}-${term}`))];
     const body = indicators.flatMap((indicator) =>
@@ -266,7 +298,11 @@ function IndicatorCapture({ data, report, periodId, canEdit }: StationProps) {
           errors.push(`Fila ${index + 2}, ${year}-${term}: ${parsed.reason}.`);
           continue;
         }
-        if (term === "anual" && indicator.annual_rule !== "reportado") {
+        if (byYear(indicator) && term !== "anual") {
+          if (parsed.value !== null) errors.push(`Fila ${index + 2}, ${year}-${term}: "${indicator.label}" se reporta por año; el valor se ignora.`);
+          continue;
+        }
+        if (term === "anual" && indicator.annual_rule !== "reportado" && !byYear(indicator)) {
           if (parsed.value !== null) errors.push(`Fila ${index + 2}, ${year}-anual: "${indicator.label}" calcula el año con A y B; el valor se ignora.`);
           continue;
         }
@@ -293,8 +329,8 @@ function IndicatorCapture({ data, report, periodId, canEdit }: StationProps) {
       title={`Cifras de ${report!.name}`}
       description={
         <>
-          {indicators.length} indicadores × {campuses.length} campus × {years.length} años, cada año en periodos A y B. La cifra
-          del año se calcula con la regla de cada indicador. Vacío es "sin reportar", nunca cero. Pega un rango de Excel desde
+          {indicators.length} indicadores × {campuses.length} campus × {years.length} años. Los indicadores por periodo se
+          capturan en A y B y la cifra del año sale de su regla; los que se reportan por año, en la columna Año. Vacío es "sin reportar", nunca cero. Pega un rango de Excel desde
           la casilla donde empieza.
         </>
       }
@@ -362,7 +398,7 @@ function IndicatorCapture({ data, report, periodId, canEdit }: StationProps) {
               </select>
             </label>
             <label className="oda-check">
-              <input type="checkbox" checked={showAnnual} onChange={(e) => setShowAnnual(e.target.checked)} />
+              <input type="checkbox" checked={annualShown} disabled={indicators.some(byYear)} onChange={(e) => setShowAnnual(e.target.checked)} />
               Mostrar la cifra del año
             </label>
             {hiddenChanges > 0 && (
@@ -507,8 +543,9 @@ function BreakdownCapture({ data, report, periodId, canEdit }: StationProps) {
   const years = breakdown.years && breakdown.years.length
     ? data.catalog.years.filter((y) => breakdown.years!.includes(y))
     : data.catalog.years;
-  const rule = breakdown.annual_rule ?? "reportado";
-  const columns = years.flatMap((year) => (["A", "B", "anual"] as OdTerm[]).map((term) => ({
+  const reporting: Reporting = breakdown.reporting ?? "periodo";
+  const rule = reporting === "anual" ? "reportado" : breakdown.annual_rule ?? "reportado";
+  const columns = years.flatMap((year) => ((reporting === "anual" ? ["anual"] : ["A", "B", "anual"]) as OdTerm[]).map((term) => ({
     key: `${year}-${term}`, label: term === "anual" ? "Año" : term, group: String(year),
     ariaLabel: `${year}, ${term === "anual" ? "cifra del año" : `periodo ${term}`}`,
   })));
@@ -527,7 +564,7 @@ function BreakdownCapture({ data, report, periodId, canEdit }: StationProps) {
     <Panel
       id="oda-desgloses"
       title="Desgloses"
-      description="Categorías por año y periodos A y B, para el total institucional. La cifra anual sigue la regla del desglose."
+      description="Categorías para el total institucional, por periodo (A y B, el año sigue la regla del desglose) o con una cifra por año."
       actions={
         <>
           {breakdowns.length > 1 && (
@@ -562,6 +599,25 @@ function BreakdownCapture({ data, report, periodId, canEdit }: StationProps) {
       }
     >
       <p className="oda-panel__lede"><strong>{breakdown.title}</strong> · {breakdown.unit}</p>
+      <div className="oda-form-grid">
+      <label className="admin-field">
+        <span>Se reporta</span>
+        <select
+          value={reporting}
+          disabled={!canEdit || saveBreakdown.isPending || save.isPending || changes > 0}
+          onChange={(e) => {
+            const next = e.target.value as Reporting;
+            saveBreakdown.mutate({
+              id: breakdown.id, report_id: breakdown.report_id, reporting: next,
+              annual_rule: next === "anual" ? "reportado" : breakdown.annual_rule === "reportado" ? "suma" : breakdown.annual_rule,
+            });
+          }}
+        >
+          {Object.entries(REPORTING_LABEL).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+        </select>
+        <small>{REPORTING_HINT[reporting]} Las cifras ya capturadas se conservan al cambiar.</small>
+      </label>
+      {reporting === "periodo" && (
       <label className="admin-field">
         <span>Cifra del año por categoría</span>
         <select value={rule} disabled={!canEdit || saveBreakdown.isPending || save.isPending || changes > 0}
@@ -570,6 +626,8 @@ function BreakdownCapture({ data, report, periodId, canEdit }: StationProps) {
         </select>
         <small>Guarda las cifras pendientes antes de cambiar la regla. Las cifras anuales capturadas se conservan al elegir una regla calculada.</small>
       </label>
+      )}
+      </div>
       <SaveState pending={saveBreakdown.isPending} error={saveBreakdown.error} success={saveBreakdown.isSuccess} />
       <YearPicker
         years={data.catalog.years}
@@ -985,7 +1043,8 @@ function HistoryCapture({ data, report, periodId, canEdit }: StationProps) {
   const [extraCategories, setExtraCategories] = useState<string[]>([]);
   const [removedPeriods, setRemovedPeriods] = useState<string[]>([]);
   const [removedCategories, setRemovedCategories] = useState<string[]>([]);
-  const [newPeriod, setNewPeriod] = useState<{ year: number; term: "A" | "B" }>({ year: data.rows.period.end_year, term: "B" });
+  const [newPeriod, setNewPeriod] = useState<{ year: number; term: "A" | "B" | "anual" }>({ year: data.rows.period.end_year, term: "B" });
+  const newLabel = newPeriod.term === "anual" ? String(newPeriod.year) : `${newPeriod.year}-${newPeriod.term}`;
   const [newCategory, setNewCategory] = useState("");
   if (!history) return null;
 
@@ -1058,13 +1117,13 @@ function HistoryCapture({ data, report, periodId, canEdit }: StationProps) {
         {canEdit && (
           <>
             <span className="oda-grid-toolbar__group">
-              <PeriodInput label="Periodo" value={newPeriod} onChange={setNewPeriod} />
+              <PeriodInput label="Periodo" value={newPeriod} onChange={setNewPeriod} allowYear />
               <button
                 type="button"
                 className="button-secondary"
-                disabled={periods.includes(`${newPeriod.year}-${newPeriod.term}`)}
+                disabled={periods.includes(newLabel)}
                 onClick={() => {
-                  const label = `${newPeriod.year}-${newPeriod.term}`;
+                  const label = newLabel;
                   setExtraPeriods([...extraPeriods, label]);
                   setRemovedPeriods(removedPeriods.filter((p) => p !== label));
                 }}
@@ -1110,7 +1169,7 @@ function HistoryCapture({ data, report, periodId, canEdit }: StationProps) {
 
       {periods.length === 0 ? (
         <StageEmpty title="Añade los periodos que quieres comparar">
-          Por ejemplo 2020-A y 2025-B. Luego escribe el total y, si quieres, categorías como pregrado y posgrado.
+          Por ejemplo 2020-A y 2025-B, o años completos como 2011 y 2025 (elige "Año" en el periodo). Luego escribe el total y, si quieres, categorías como pregrado y posgrado.
         </StageEmpty>
       ) : (
         <>

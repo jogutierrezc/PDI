@@ -28,6 +28,7 @@ const BLOCK_HELP: Record<OdBlockKind, string> = {
   desgloses: "Cómo se reparte la cifra: circular o barras.",
   tabla_dinamica: "Todas las cifras, para armar la tabla propia y descargarla.",
   metodologia: "Qué mide cada indicador y quién lo reporta.",
+  tabla: "Una tabla del informe: listado, ranking, fichas o cifras de un periodo.",
 };
 
 export function DesignStation({ data, report, canEdit }: StationProps) {
@@ -48,12 +49,20 @@ function DesignEditor({ data, reportId, blocks, canEdit }: { data: StationProps[
   const pipelines = data.rows.pipelines.filter((p) => p.report_id === reportId);
   const histories = data.rows.histories.filter((h) => h.report_id === reportId);
   const breakdowns = data.rows.breakdowns.filter((b) => b.report_id === reportId);
+  const tables = data.rows.tables.filter((t) => t.report_id === reportId);
+  const sections = data.rows.sections.filter((s) => s.report_id === reportId);
+  const sectionOf = (b: DraftBlock) => {
+    const s = b.section_id ? sections.find((x) => x.id === b.section_id) : undefined;
+    return s ? (s.number !== null ? `Punto ${s.number} · ${s.title}` : s.title) : null;
+  };
 
   const nameOf = (b: DraftBlock) => {
     if (b.kind === "mapa_calor") return heatmaps.find((h) => h.id === b.ref_id)?.title ?? "Mapa de calor sin conjunto";
     if (b.kind === "mapa") return maps.find((m) => m.id === b.ref_id)?.title ?? "Mapa sin conjunto";
     if (b.kind === "tuberia") return pipelines.find((p) => p.id === b.ref_id)?.title ?? "Tubería sin conjunto";
     if (b.kind === "historico") return histories.find((h) => h.id === b.ref_id)?.title ?? "Evolución histórica sin conjunto";
+    if (b.kind === "tabla") return tables.find((x) => x.id === b.ref_id)?.title ?? "Tabla sin conjunto";
+    if (b.kind === "desgloses" && b.ref_id) return breakdowns.find((x) => x.id === b.ref_id)?.title ?? BLOCK_LABELS.desgloses;
     return BLOCK_LABELS[b.kind];
   };
 
@@ -67,6 +76,7 @@ function DesignEditor({ data, reportId, blocks, canEdit }: { data: StationProps[
     ...maps.filter((m) => !draft.some((b) => b.ref_id === m.id)).map((m) => ({ kind: "mapa" as OdBlockKind, ref_id: m.id, label: m.title })),
     ...pipelines.filter((p) => !draft.some((b) => b.ref_id === p.id)).map((p) => ({ kind: "tuberia" as OdBlockKind, ref_id: p.id, label: p.title })),
     ...histories.filter((h) => !draft.some((b) => b.ref_id === h.id)).map((h) => ({ kind: "historico" as OdBlockKind, ref_id: h.id, label: h.title })),
+    ...tables.filter((x) => !draft.some((b) => b.ref_id === x.id)).map((x) => ({ kind: "tabla" as OdBlockKind, ref_id: x.id, label: x.title })),
   ];
 
   const normalized = (list: DraftBlock[]) => list.map((b, i) => ({ ...b, position: i + 1 }));
@@ -136,7 +146,7 @@ function DesignEditor({ data, reportId, blocks, canEdit }: { data: StationProps[
               <span className="oda-block__pos" aria-hidden="true">{index + 1}</span>
               <div className="oda-block__body">
                 <strong>{block.settings.title || nameOf(block)}</strong>
-                <small>{BLOCK_HELP[block.kind]}</small>
+                <small>{sectionOf(block) ? <><b className="oda-block__section">{sectionOf(block)}</b> · </> : null}{BLOCK_HELP[block.kind]}</small>
                 <div className="oda-block__settings">
                   <label className="oda-inline-field">
                     <span>Título propio</span>

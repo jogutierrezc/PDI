@@ -1504,35 +1504,45 @@ const routes = [
   },
   {
     path: "/datos-abiertos/investigacion",
-    note: "el campus cambia la tabla y un año sin reporte no es cero",
-    expect: "Grupos de investigación reconocidos",
-    also: ["Vicerrectoría de Investigaciones", "Tabla dinámica", "Mapa de calor", "Cifras ilustrativas"],
+    note: "el informe importado del Word: puntos, estados, lo que falta y los rankings",
+    expect: "Puntos del informe",
+    also: [
+      "Visibilidad y posicionamiento científico nacional",
+      "Información no recibida",
+      "Qué información hace falta",
+      "Investigadores con más citas, 2021-2025",
+      "Institutos de investigación vigentes",
+      "Citaciones Scopus 2021-2025",
+      "Tabla dinámica",
+    ],
     absent: [...SIN_DINERO],
     interact: async (window, tick) => {
-      const opcion = [...window.document.querySelectorAll(".od-segmented__option")].find(
-        (b) => b.textContent?.trim() === "Valledupar",
-      );
-      if (!opcion) throw new Error("no se encontró la sede Valledupar en los controles");
-      opcion.dispatchEvent(new window.Event("click", { bubbles: true }));
+      const doc = window.document;
+      const puntos = doc.querySelectorAll(".od-point");
+      if (puntos.length !== 17) throw new Error(`se esperaban 17 puntos y hay ${puntos.length}`);
+      const indice = doc.querySelectorAll(".od-points-index li");
+      if (indice.length !== 17) throw new Error(`el índice debería listar 17 puntos y lista ${indice.length}`);
+      // Un punto sin información no se esconde: dice qué hace falta.
+      const p4 = doc.getElementById("od-punto-04");
+      if (!p4 || p4.getAttribute("data-status") !== "no_recibido" || !p4.querySelector(".od-point__missing tbody tr")) {
+        throw new Error("el punto 4 debería declarar la información no recibida y qué se pidió");
+      }
+      // Los bloques del punto 2 van dentro del punto 2.
+      const p2 = doc.getElementById("od-punto-02");
+      const ranking = p2?.querySelector('.od-tableblock[data-display="ranking"]');
+      if (!ranking) throw new Error("el ranking de investigadores no quedó dentro del punto 2");
+      const filas = ranking.querySelectorAll("tbody tr");
+      if (filas.length !== 15) throw new Error(`el top de investigadores debería tener 15 filas y tiene ${filas.length}`);
+      const primero = () => ranking.querySelector("tbody tr th")?.textContent;
+      const antes = primero();
+      const orden = [...ranking.querySelectorAll("thead th")].find((th) => th.getAttribute("aria-sort") === "descending");
+      if (!orden) throw new Error("el ranking debería abrir ordenado de mayor a menor");
+      orden.querySelector("button").click();
       await tick();
-
-      if (opcion.getAttribute("aria-checked") !== "true") {
-        throw new Error("la sede pulsada no queda seleccionada");
+      if (orden.getAttribute("aria-sort") !== "ascending" || primero() === antes) {
+        throw new Error("pulsar la columna del ranking no invirtió el orden");
       }
-      // Valledupar no tenía grupos en 2021: la casilla va vacía, no en cero.
-      // La tabla dinámica: la ficha tiene más tablas (desgloses) antes que ella.
-      const primera = window.document.querySelector(".od-pivot .od-table tbody tr td");
-      if (!primera || primera.textContent?.trim() !== "—") {
-        throw new Error(`2021 en Valledupar debería ir sin reportar y dice "${primera?.textContent}"`);
-      }
-      const combined = [...window.document.querySelectorAll(".od-switch__option")].find((b) => b.textContent === "Líneas y barras");
-      if (!combined) throw new Error("falta la vista combinada");
-      combined.click();
-      await tick();
-      const firstYear = window.document.querySelector('.od-combo [role="button"]');
-      if (!firstYear?.getAttribute("aria-label").includes("Global anual: Sin reportar")) {
-        throw new Error("la vista combinada convirtió un año sin reporte en cero");
-      }
+      if (!doc.querySelector("#od-punto-11 .od-cards__item")) throw new Error("los institutos deberían salir en fichas");
     },
   },
   {

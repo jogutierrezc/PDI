@@ -184,19 +184,21 @@ export function YearPicker({
   );
 }
 
-/** "2014-A": año y periodo académico. */
-export function PeriodInput({
+/** "2014-A": año y periodo académico. Con allowYear, también el año completo ("2014"). */
+export function PeriodInput<T extends "A" | "B" | "anual" = "A" | "B">({
   value,
   onChange,
   label,
   min = 1990,
   max = new Date().getFullYear() + 1,
+  allowYear = false,
 }: {
-  value: { year: number; term: "A" | "B" };
-  onChange: (next: { year: number; term: "A" | "B" }) => void;
+  value: { year: number; term: T };
+  onChange: (next: { year: number; term: T }) => void;
   label: string;
   min?: number;
   max?: number;
+  allowYear?: boolean;
 }) {
   return (
     <span className="oda-period-input" role="group" aria-label={label}>
@@ -210,9 +212,10 @@ export function PeriodInput({
         aria-label={`${label}: año`}
         onChange={(e) => onChange({ ...value, year: Number(e.target.value) })}
       />
-      <select value={value.term} aria-label={`${label}: periodo`} onChange={(e) => onChange({ ...value, term: e.target.value as "A" | "B" })}>
+      <select value={value.term} aria-label={`${label}: periodo`} onChange={(e) => onChange({ ...value, term: e.target.value as T })}>
         <option value="A">A</option>
         <option value="B">B</option>
+        {allowYear && <option value="anual">Año</option>}
       </select>
     </span>
   );

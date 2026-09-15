@@ -1,0 +1,350 @@
+/* =============================================================================
+   Informes por puntos y tablas
+   ========================================================================== */
+
+/* --- Índice de puntos --------------------------------------------------------------- */
+
+.od-points-index {
+  padding-block: var(--space-6);
+  border-bottom: 1px solid var(--line);
+}
+
+.od-points-index h2 {
+  margin: 0 0 var(--space-3);
+  font-family: var(--font-sign);
+  font-size: 1rem;
+  letter-spacing: var(--tracking-wide);
+  text-transform: uppercase;
+}
+
+.od-points-index ol {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 19rem), 1fr));
+  gap: var(--space-1) var(--space-5);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.od-points-index a {
+  display: grid;
+  grid-template-columns: 2rem minmax(0, 1fr) auto;
+  align-items: baseline;
+  gap: var(--space-2);
+  padding: var(--space-2) 0;
+  color: var(--ink);
+  font-size: var(--text-sm);
+  text-decoration: none;
+  border-bottom: 1px solid var(--line-faint);
+}
+
+.od-points-index a b {
+  color: var(--ink-muted);
+  font-family: var(--font-sign);
+  font-variant-numeric: tabular-nums;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .od-points-index a:hover span { text-decoration: underline; }
+}
+
+/* --- Un punto ---------------------------------------------------------------------- */
+
+.od-point {
+  padding-block: var(--space-9);
+  border-bottom: 1px solid var(--line);
+  scroll-margin-top: calc(var(--header-h) + 5rem);
+}
+
+.od-point[data-status="no_recibido"],
+.od-point[data-status="no_oficial"] {
+  padding-block: var(--space-7);
+  background: var(--od-board-raised);
+}
+
+.od-point__head {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: start;
+  gap: var(--space-4);
+}
+
+.od-point__number {
+  display: grid;
+  place-items: center;
+  width: 3.25rem;
+  height: 3.25rem;
+  color: var(--od-flap-ink);
+  background: var(--od-flap);
+  border-radius: 6px;
+  box-shadow: var(--od-flap-shadow);
+  font-family: var(--font-sign);
+  font-size: 1.6rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.od-point__titles {
+  display: grid;
+  gap: var(--space-1);
+  justify-items: start;
+}
+
+.od-point__kicker {
+  color: var(--od-board-muted);
+  font-family: var(--font-sign);
+  font-size: 0.9rem;
+  font-weight: 600;
+  letter-spacing: var(--tracking-wide);
+  text-transform: uppercase;
+}
+
+.od-point__titles h2 {
+  max-width: 60rem;
+  margin: 0;
+  font-family: var(--font-sign);
+  font-size: clamp(1.5rem, 2.4vw, 2.2rem);
+  line-height: 1.1;
+  text-transform: uppercase;
+}
+
+.od-point__status {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin-top: var(--space-1);
+  padding: 2px var(--space-3) 2px var(--space-2);
+  color: var(--ink-secondary);
+  background: var(--surface-2);
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  font-size: var(--text-xs);
+  font-weight: 700;
+}
+
+.od-point__status svg {
+  width: 14px;
+  height: 14px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+}
+
+.od-point__status[data-status="completo"] { color: var(--status-done); border-color: color-mix(in srgb, var(--status-done) 40%, transparent); }
+.od-point__status[data-status="parcial"] { color: var(--status-pending); border-color: color-mix(in srgb, var(--status-pending) 45%, transparent); }
+.od-point__status[data-status="no_recibido"],
+.od-point__status[data-status="no_oficial"] { color: var(--status-risk); border-color: color-mix(in srgb, var(--status-risk) 40%, transparent); }
+
+.od-point__lede {
+  max-width: 70ch;
+  margin: var(--space-5) 0 0;
+  color: var(--ink);
+  font-size: var(--text-lg);
+  line-height: var(--leading-normal);
+}
+
+.od-point__warning {
+  max-width: 80ch;
+  margin: var(--space-4) 0 0;
+  padding: var(--space-3) var(--space-4);
+  color: var(--ink);
+  background: var(--status-pending-soft);
+  border-left: 3px solid var(--status-pending);
+  border-radius: 0 var(--radius-xs) var(--radius-xs) 0;
+  font-size: var(--text-sm);
+}
+
+.od-point[data-status="no_oficial"] .od-point__warning {
+  background: var(--status-risk-soft);
+  border-left-color: var(--status-risk);
+}
+
+.od-point__missing {
+  margin-top: var(--space-5);
+}
+
+.od-point__missing h3 {
+  margin: 0 0 var(--space-2);
+  color: var(--od-board-muted);
+  font-family: var(--font-sign);
+  font-size: 0.95rem;
+  font-weight: 600;
+  letter-spacing: var(--tracking-wide);
+  text-transform: uppercase;
+}
+
+.od-point__blocks {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--space-6);
+  margin-top: var(--space-6);
+}
+
+.od-point__blocks > .od-kpis {
+  margin: 0;
+}
+
+.od-point__source {
+  max-width: 90ch;
+  margin: var(--space-5) 0 0;
+  color: var(--ink-muted);
+  font-size: var(--text-xs);
+}
+
+/* --- Cifras de un periodo ------------------------------------------------------------ */
+
+.od-figures {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 13rem), 1fr));
+  gap: var(--space-4);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.od-figures__item {
+  display: grid;
+  gap: var(--space-1);
+  padding: var(--space-4);
+  background: var(--od-board);
+  border: 1px solid var(--od-board-line);
+  border-radius: var(--radius-xs);
+}
+
+.od-figures__label {
+  color: var(--ink-secondary);
+  font-size: var(--text-sm);
+}
+
+.od-figures__value {
+  color: var(--od-board-ink);
+  font-family: var(--font-sign);
+  font-size: clamp(2rem, 3vw, 2.6rem);
+  font-weight: 700;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+
+.od-figures__meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  color: var(--ink-muted);
+  font-size: var(--text-xs);
+}
+
+.od-figures__meta em {
+  padding: 0 var(--space-2);
+  color: var(--od-previous);
+  border: 1px solid currentColor;
+  border-radius: 999px;
+  font-style: normal;
+  font-weight: 700;
+}
+
+/* --- Fichas ------------------------------------------------------------------------ */
+
+.od-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 20rem), 1fr));
+  gap: var(--space-4);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.od-cards__item {
+  padding: var(--space-5);
+  background: var(--od-board);
+  border: 1px solid var(--od-board-line);
+  border-radius: var(--radius-xs);
+}
+
+.od-cards__item h4 {
+  margin: 0 0 var(--space-3);
+  font-family: var(--font-sign);
+  font-size: 1.5rem;
+  letter-spacing: var(--tracking-wide);
+}
+
+.od-cards__item dl {
+  display: grid;
+  gap: var(--space-2);
+  margin: 0;
+}
+
+.od-cards__item dl div {
+  display: grid;
+  grid-template-columns: 8.5rem minmax(0, 1fr);
+  gap: var(--space-3);
+  font-size: var(--text-sm);
+}
+
+.od-cards__item dl div[data-long] {
+  grid-template-columns: minmax(0, 1fr);
+  gap: 2px;
+}
+
+.od-cards__item dt {
+  color: var(--ink-muted);
+  font-size: var(--text-xs);
+  font-weight: 700;
+}
+
+.od-cards__item dd {
+  margin: 0;
+  color: var(--ink);
+  white-space: pre-line;
+  overflow-wrap: anywhere;
+}
+
+.od-cards__item a { color: var(--brand-blue); }
+
+/* --- Tabla y ranking ---------------------------------------------------------------- */
+
+.od-tableblock th[data-numeric],
+.od-tableblock td[data-numeric] {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.od-tableblock tbody th {
+  font-weight: 600;
+}
+
+.od-tableblock__rank {
+  width: 2.5rem;
+  color: var(--ink-muted);
+  font-family: var(--font-sign);
+  font-variant-numeric: tabular-nums;
+  text-align: center;
+}
+
+.od-tableblock__bar {
+  position: relative;
+  display: block;
+  min-width: 6rem;
+}
+
+.od-tableblock__bar::before {
+  content: "";
+  position: absolute;
+  inset: 15% auto 15% 0;
+  width: var(--w);
+  background: color-mix(in srgb, var(--od-series-1) 22%, transparent);
+  border-radius: 2px;
+}
+
+.od-tableblock__bar span {
+  position: relative;
+}
+
+.od-tableblock__empty {
+  color: var(--ink-faint);
+}
+
+@media (max-width: 640px) {
+  .od-point__head { grid-template-columns: minmax(0, 1fr); }
+  .od-cards__item dl div { grid-template-columns: minmax(0, 1fr); gap: 2px; }
+}

@@ -36,6 +36,9 @@ import type {
   OdPipelineValueRow,
   OdReportBlockRow,
   OdReportRow,
+  OdSectionRow,
+  OdTableRecordRow,
+  OdTableRow,
   OdValueRow,
 } from "../../../types/database";
 import type {
@@ -51,6 +54,8 @@ import type {
   PipelineData,
   Report,
   ReportBlock,
+  ReportSection,
+  TableData,
   YearCampusValues,
 } from "./types";
 import { ALL_CAMPUSES } from "./types";
@@ -74,6 +79,9 @@ export interface OpenDataRows {
   pipelineValues: OdPipelineValueRow[];
   histories: OdHistoryRow[];
   historyValues: OdHistoryValueRow[];
+  sections: OdSectionRow[];
+  tables: OdTableRow[];
+  tableRows: OdTableRecordRow[];
   blocks: OdReportBlockRow[];
 }
 
@@ -84,6 +92,12 @@ type Result<T> = { data: T[] | null; error: DatabaseError | null };
 function unwrap<T>({ data, error }: Result<T>): T[] {
   if (error) throw describeDatabaseError(error);
   return data ?? [];
+}
+
+/** Tablas de una migración posterior (0022): si aún no existen, el portal sigue sin ellas. */
+function unwrapOptional<T>({ data, error }: Result<T>): T[] {
+  if (error && (error.code === "PGRST205" || error.code === "42P01")) return [];
+  return unwrap({ data, error });
 }
 
 /** Trae todas las filas de una consulta, página a página. */
@@ -125,24 +139,26 @@ export async function fetchOpenDataRows({ periodId, includeDrafts = false }: Fet
   const empty: OpenDataRows = {
     period, campuses, offices, reports, indicators: [], values: [], breakdowns: [], breakdownValues: [],
     heatmaps: [], heatmapCells: [], maps: [], mapValues: [], pipelines: [], pipelineValues: [], histories: [],
-    historyValues: [], blocks: [],
+    historyValues: [], sections: [], tables: [], tableRows: [], blocks: [],
   };
   if (reportIds.length === 0) return empty;
 
-  const [indicators, breakdowns, heatmaps, maps, pipelines, histories, blocks] = await Promise.all([
+  const [indicators, breakdowns, heatmaps, maps, pipelines, histories, sections, tables, blocks] = await Promise.all([
     supabase.from("od_indicators").select("*").in("report_id", reportIds).order("position").then(unwrap<OdIndicatorRow>),
     supabase.from("od_breakdowns").select("*").in("report_id", reportIds).order("position").then(unwrap<OdBreakdownRow>),
     supabase.from("od_heatmaps").select("*").in("report_id", reportIds).order("position").then(unwrap<OdHeatmapRow>),
     supabase.from("od_maps").select("*").in("report_id", reportIds).order("position").then(unwrap<OdMapRow>),
     supabase.from("od_pipelines").select("*").in("report_id", reportIds).order("position").then(unwrap<OdPipelineRow>),
     supabase.from("od_histories").select("*").in("report_id", reportIds).order("position").then(unwrap<OdHistoryRow>),
+    supabase.from("od_sections").select("*").in("report_id", reportIds).order("position").then(unwrapOptional<OdSectionRow>),
+    supabase.from("od_tables").select("*").in("report_id", reportIds).order("position").then(unwrapOptional<OdTableRow>),
     supabase.from("od_report_blocks").select("*").in("report_id", reportIds).order("position").then(unwrap<OdReportBlockRow>),
   ]);
 
   const ids = (rows: { id: string }[]) => rows.map((r) => r.id);
   const none = Promise.resolve([] as never[]);
 
-  const [values, breakdownValues, heatmapCells, mapValues, pipelineValues, historyValues] = await Promise.all([
+  const [values, breakdownValues, heatmapCells, mapValues, pipelineValues, historyValues, tableRows] = await Promise.all([
     indicators.length
       ? fetchAll<OdValueRow>((from, to) =>
           supabase.from("od_values").select("indicator_id,year,term,campus_id,value,updated_at")
@@ -174,11 +190,16 @@ export async function fetchOpenDataRows({ periodId, includeDrafts = false }: Fet
           supabase.from("od_history_values").select("*").in("history_id", ids(histories)).order("period_label").range(from, to),
         )
       : none,
+    tables.length
+      ? fetchAll<OdTableRecordRow>((from, to) =>
+          supabase.from("od_table_rows").select("*").in("table_id", ids(tables)).order("position").range(from, to),
+        )
+      : none,
   ]);
 
   return {
     ...empty, indicators, values, breakdowns, breakdownValues, heatmaps, heatmapCells, maps, mapValues, pipelines,
-    pipelineValues, histories, historyValues, blocks,
+    pipelineValues, histories, historyValues, sections, tables, tableRows, blocks,
   };
 }
 
@@ -244,6 +265,10 @@ export function assembleCatalog(rows: OpenDataRows): OpenDataCatalog {
         }
       }
 
+      // Por año: la cifra del año es la reportada y no hay periodos.
+      const byYear = row.reporting === "anual";
+      const rule = byYear ? "reportado" : row.annual_rule;
+
       // La cifra del año, campus por campus y para el total.
       const values: YearCampusValues = {};
       const annualFrom: Record<number, Partial<Record<CampusId, Term>>> = {};
@@ -252,7 +277,7 @@ export function assembleCatalog(rows: OpenDataRows): OpenDataCatalog {
         annualFrom[year] = {};
         for (const key of [ALL_CAMPUSES, ...campusSlugs]) {
           const figure = annualFigure(
-            row.annual_rule,
+            rule,
             terms[year]!.A![key] ?? null,
             terms[year]!.B![key] ?? null,
             reported[year]![key] ?? null,
@@ -277,8 +302,9 @@ export function assembleCatalog(rows: OpenDataRows): OpenDataCatalog {
         isHeadline: row.is_headline,
         years: yearsOf(row.years),
         values,
-        annualRule: row.annual_rule,
-        terms,
+        reporting: byYear ? "anual" : "periodo",
+        annualRule: byYear ? undefined : row.annual_rule,
+        terms: byYear ? undefined : terms,
         annualFrom,
       };
     });
@@ -296,7 +322,8 @@ export function assembleCatalog(rows: OpenDataRows): OpenDataCatalog {
         const sourceRows = rows.breakdownValues
           .filter((v) => v.breakdown_id === b.id)
           .sort((x, y) => x.position - y.position);
-        const rule = b.annual_rule ?? "reportado";
+        const byYear = b.reporting === "anual";
+        const rule = byYear ? "reportado" : b.annual_rule ?? "reportado";
         for (const year of yearsOf(b.years) ?? years) {
           const yearRows = sourceRows.filter((v) => v.year === year);
           if (!yearRows.length) continue;
@@ -312,7 +339,7 @@ export function assembleCatalog(rows: OpenDataRows): OpenDataCatalog {
         return {
           id: b.key, uuid: b.id, title: b.title, unit: b.unit, format: b.format,
           source: source(b.office_id), officeId: b.office_id, defaultChart: b.default_chart, years: yearsOf(b.years), values,
-          annualRule: rule, terms,
+          reporting: byYear ? "anual" : "periodo", annualRule: rule, terms: byYear ? undefined : terms,
         };
       });
 
@@ -448,10 +475,30 @@ export function assembleCatalog(rows: OpenDataRows): OpenDataCatalog {
         };
       });
 
+    const sections: ReportSection[] = (rows.sections ?? [])
+      .filter((s) => s.report_id === report.id)
+      .sort((a, b) => a.position - b.position)
+      .map((s) => ({
+        key: s.key, uuid: s.id, number: s.number, title: s.title, status: s.status, lede: s.lede, warning: s.warning,
+        source: s.source, requested: Array.isArray(s.requested) ? s.requested : [], position: s.position,
+      }));
+
+    const tables: TableData[] = (rows.tables ?? [])
+      .filter((t) => t.report_id === report.id)
+      .sort((a, b) => a.position - b.position)
+      .map((t) => ({
+        id: t.key, uuid: t.id, title: t.title, description: t.description, display: t.display,
+        columns: Array.isArray(t.columns) ? t.columns : [],
+        rows: (rows.tableRows ?? []).filter((r) => r.table_id === t.id).sort((a, b) => a.position - b.position).map((r) => r.cells ?? {}),
+        source: source(t.office_id),
+      }));
+
     const refKey = (refId: string | null) =>
       refId === null
         ? null
-        : heatmaps.find((h) => h.uuid === refId)?.id ??
+        : breakdowns.find((b) => b.uuid === refId)?.id ??
+          tables.find((t) => t.uuid === refId)?.id ??
+          heatmaps.find((h) => h.uuid === refId)?.id ??
           maps.find((m) => m.uuid === refId)?.id ??
           pipelines.find((p) => p.uuid === refId)?.id ??
           histories.find((h) => h.uuid === refId)?.id ??
@@ -463,6 +510,7 @@ export function assembleCatalog(rows: OpenDataRows): OpenDataCatalog {
       .map((b) => ({
         uuid: b.id, kind: b.kind, refKey: refKey(b.ref_id), visible: b.visible, position: b.position,
         settings: b.settings ?? {},
+        sectionKey: b.section_id ? sections.find((s) => s.uuid === b.section_id)?.key ?? null : null,
       }));
 
     return {
@@ -481,6 +529,8 @@ export function assembleCatalog(rows: OpenDataRows): OpenDataCatalog {
       maps,
       pipelines,
       histories,
+      sections,
+      tables,
       blocks,
       note: report.note || undefined,
       status: report.status,

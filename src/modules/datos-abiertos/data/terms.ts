@@ -87,3 +87,16 @@ export function annualBasis(rule: AnnualRule | undefined, from: Term | undefined
   if (rule === "ultimo") return from ? `periodo ${from}` : null;
   return null;
 }
+
+/** Cómo llega la cifra: por periodo académico (A y B) o una sola cifra por año. */
+export type Reporting = "periodo" | "anual";
+
+export const REPORTING_LABEL: Record<Reporting, string> = {
+  periodo: "Por periodo (A y B)",
+  anual: "Por año",
+};
+
+export const REPORTING_HINT: Record<Reporting, string> = {
+  periodo: "Se capturan los periodos A y B; la cifra del año sale de la regla.",
+  anual: "Se captura una sola cifra por año, sin periodos A y B.",
+};

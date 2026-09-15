@@ -16,7 +16,7 @@
    ========================================================================== */
 
 import { useEffect, useMemo, useState } from "react";
-import type { CSSProperties } from "react";
+import type { CSSProperties, ReactNode } from "react";
 import { Link, useParams } from "react-router-dom";
 import { Icon } from "../../components/ui/Icon";
 import { ErrorBlock, LoadingBlock } from "../../components/ui/QueryState";
@@ -38,6 +38,8 @@ import { EmptyPeriod, OpenDataLayout } from "./components/OpenDataLayout";
 import { PivotTable } from "./components/PivotTable";
 import { LeakyPipeline } from "./components/LeakyPipeline";
 import { SplitFlap } from "./components/SplitFlap";
+import { ReportSectionView, SECTION_STATUS_LABEL } from "./components/ReportSection";
+import { TableBlock } from "./components/TableBlock";
 import {
   downloadText,
   findReport,
@@ -121,6 +123,220 @@ function ReportContent({ data, report, year, term, campus, setYear, setTerm, set
   // Primero los KPI clave, luego el resto de indicadores del informe.
   const boardIndicators = [...keys, ...report.indicators.filter((i) => !report.keyIndicators.includes(i.id))];
 
+  const sections = report.sections ?? [];
+  const blocks = orderedBlocks(report);
+
+  /** Un bloque suelto es una sección de la ficha; dentro de un punto, el punto ya pone el título. */
+  const shell = (key: string, id: string, title: string, description: string | undefined, inSection: boolean, children: ReactNode) =>
+    inSection ? (
+      <div className="od-point__block" key={key}>
+        {children}
+      </div>
+    ) : (
+      <section className="od-section" key={key} aria-labelledby={id}>
+        <div className="u-container">
+          <header className="od-section__head">
+            <h2 id={id}>{title}</h2>
+            {description && <p>{description}</p>}
+          </header>
+          {children}
+        </div>
+      </section>
+    );
+
+  const pickIndicator = (id: string) => {
+    setPickedId(id);
+    document.getElementById("od-evolucion")?.scrollIntoView({ behavior: "smooth", block: "start" });
+  };
+
+  const renderBlock = (block: ReportBlock, key: string, inSection: boolean): ReactNode => {
+    switch (block.kind) {
+      case "kpis": {
+        const picked = block.settings.indicators?.length
+          ? block.settings.indicators.map((id) => report.indicators.find((i) => i.id === id)).filter((i): i is Indicator => Boolean(i))
+          : boardIndicators;
+        if (picked.length === 0) return null;
+        const board = (
+          <KpiBoard
+            indicators={picked}
+            years={data.years}
+            year={year}
+            term={term}
+            campus={campus}
+            campusName={campusName}
+            illustrative={data.illustrative}
+            selectedId={selected?.id}
+            onSelect={pickIndicator}
+          />
+        );
+        if (inSection) return <div className="od-point__block" key={key}>{board}</div>;
+        return (
+          <section className="od-keyrow" aria-labelledby="od-clave" key={key}>
+            <div className="u-container">
+              <div className="od-keyrow__head">
+                <h2 id="od-clave">{block.settings.title || "Tablero de indicadores"}</h2>
+                <p>
+                  {campusName} · corte {cutLabel(year, term)}
+                  {term ? "" : ", cifra del año calculada con los periodos A y B"}. Elige un indicador para verlo en la gráfica de evolución.
+                </p>
+              </div>
+              {board}
+            </div>
+          </section>
+        );
+      }
+      case "evolucion":
+        return selected ? (
+          <Evolution
+            key={key}
+            data={data}
+            indicator={selected}
+            indicators={report.indicators}
+            onPick={setPickedId}
+            year={year}
+            term={term}
+            campus={campus}
+            campusName={campusName}
+            setYear={setYear}
+            setTerm={setTerm}
+            defaultView={block.settings.chart === "barras" ? "barras" : "lineas"}
+          />
+        ) : null;
+      case "mapa": {
+        const dataset = report.maps?.find((m) => m.id === block.refKey) ?? (block.refKey ? undefined : report.maps?.[0]);
+        if (!dataset) return null;
+        return shell(
+          key,
+          `od-mapa-${dataset.id}`,
+          block.settings.title || dataset.title,
+          dataset.description,
+          inSection,
+          <ChartFrame title={inSection ? block.settings.title || dataset.title : "Mapa por departamento"} subtitle={`Corte ${year} · ${dataset.unit}`} source={dataset.source}>
+            <ColombiaMap dataset={dataset} year={year} years={data.years} campus={campus} campuses={data.campuses} onSelectCampus={setCampus} />
+          </ChartFrame>,
+        );
+      }
+      case "tuberia": {
+        const pipeline = report.pipelines?.find((p) => p.id === block.refKey) ?? (block.refKey ? undefined : report.pipelines?.[0]);
+        if (!pipeline || pipeline.cohorts.length === 0) return null;
+        return shell(
+          key,
+          `od-tuberia-${pipeline.id}`,
+          block.settings.title || pipeline.title,
+          pipeline.description,
+          inSection,
+          <ChartFrame
+            title={inSection ? block.settings.title || pipeline.title : "Deserción acumulada"}
+            subtitle={`${campusName} · deserción acumulada en % · pasa por una unión para leer el tramo`}
+            source={pipeline.source}
+          >
+            <LeakyPipeline key={pipeline.id} data={pipeline} campus={campus} campusName={campusName} />
+          </ChartFrame>,
+        );
+      }
+      case "historico": {
+        const history = report.histories?.find((h) => h.id === block.refKey) ?? (block.refKey ? undefined : report.histories?.[0]);
+        if (!history || history.periods.length === 0) return null;
+        return shell(
+          key,
+          `od-historico-${history.id}`,
+          block.settings.title || history.title,
+          `${history.description} Cifra institucional: no cambia al elegir un campus.`,
+          inSection,
+          <ChartFrame
+            title={inSection ? block.settings.title || history.title : "Evolución histórica"}
+            subtitle={`${history.periods[0]} a ${history.periods[history.periods.length - 1]} · ${history.unit}`}
+            source={history.source}
+          >
+            <HistoryCompare key={history.id} data={history} />
+          </ChartFrame>,
+        );
+      }
+      case "mapa_calor": {
+        const heatmap = report.heatmaps?.find((h) => h.id === block.refKey) ?? (block.refKey ? undefined : report.heatmaps?.[0]);
+        if (!heatmap || heatmap.values.flat().every((v) => v === null)) return null;
+        return shell(
+          key,
+          `od-calor-${heatmap.id}`,
+          block.settings.title || heatmap.title,
+          heatmap.description,
+          inSection,
+          <ChartFrame
+            title={inSection ? block.settings.title || heatmap.title : "Mapa de calor"}
+            subtitle={`${inSection && heatmap.description ? `${heatmap.description} · ` : ""}${heatmap.rowLabel} × ${heatmap.columnLabel} · ${heatmap.unit}`}
+            source={heatmap.source}
+          >
+            <Heatmap data={heatmap} />
+          </ChartFrame>,
+        );
+      }
+      case "tabla": {
+        const table = report.tables?.find((x) => x.id === block.refKey);
+        if (!table || table.rows.length === 0) return null;
+        return shell(key, `od-tabla-${table.id}`, block.settings.title || table.title, undefined, inSection, <TableBlock table={table} title={block.settings.title} />);
+      }
+      case "desgloses": {
+        const only = block.refKey ? report.breakdowns.filter((b) => b.id === block.refKey) : report.breakdowns;
+        if (only.length === 0) return null;
+        if (inSection) {
+          return (
+            <div className="od-point__block od-breakdowns" key={key}>
+              {only.map((breakdown) => (
+                <BreakdownChart key={breakdown.id} breakdown={breakdown} year={year} term={term} years={data.years} setYear={setYear} />
+              ))}
+            </div>
+          );
+        }
+        return (
+          <Breakdowns key={key} breakdowns={only} year={year} campus={campus} setYear={setYear} title={block.settings.title} term={term} years={data.years} />
+        );
+      }
+      case "tabla_dinamica":
+        return (
+          <section className="od-section" key={key} aria-labelledby="od-tabla">
+            <div className="u-container">
+              <header className="od-section__head">
+                <h2 id="od-tabla">{block.settings.title || "Tabla dinámica"}</h2>
+                <p>
+                  Arma tu propia tabla: elige qué va en filas y en columnas, fija la tercera dimensión, ordena con un
+                  clic en el encabezado y descarga exactamente lo que ves.
+                </p>
+              </header>
+              <ChartFrame title="Todas las cifras del informe" subtitle="Indicador · campus · corte" source={sources.join(" · ")}>
+                <PivotTable key={report.slug} report={report} years={data.years} campuses={data.campuses} year={year} term={term} campus={campus} />
+              </ChartFrame>
+            </div>
+          </section>
+        );
+      case "metodologia":
+        return (
+          <section className="od-section" key={key} aria-labelledby="od-metodo">
+            <div className="u-container od-method">
+              <header className="od-section__head">
+                <h2 id="od-metodo">{block.settings.title || "Qué mide cada cifra"}</h2>
+                {report.note && <p>{report.note}</p>}
+              </header>
+              <dl className="od-method__list">
+                {report.indicators.map((indicator) => (
+                  <div key={indicator.id}>
+                    <dt>{indicator.label}</dt>
+                    <dd>
+                      {indicator.definition}
+                      <span>
+                        Unidad: {indicator.unit} · Reporta: {indicator.source}
+                      </span>
+                    </dd>
+                  </div>
+                ))}
+              </dl>
+            </div>
+          </section>
+        );
+      default:
+        return null;
+    }
+  };
+
   return (
     <>
       <section className="od-report-head" aria-labelledby="od-informe">
@@ -181,210 +397,41 @@ function ReportContent({ data, report, year, term, campus, setYear, setTerm, set
       </div>
 
       {/* La intranet decide qué bloques salen y en qué orden (od_report_blocks).
-          Un bloque sin datos no se pinta: una sección vacía no informa de nada. */}
-      {orderedBlocks(report).map((block, blockIndex) => {
-        const key = `${block.kind}-${block.refKey ?? blockIndex}`;
-        switch (block.kind) {
-          case "kpis":
-            return (
-              <section className="od-keyrow" aria-labelledby="od-clave" key={key}>
-                <div className="u-container">
-                  <div className="od-keyrow__head">
-                    <h2 id="od-clave">{block.settings.title || "Tablero de indicadores"}</h2>
-                    <p>
-                      {campusName} · corte {cutLabel(year, term)}
-                      {term ? "" : ", cifra del año calculada con los periodos A y B"}. Elige un indicador para verlo en la gráfica de evolución.
-                    </p>
-                  </div>
-                  <KpiBoard
-                    indicators={boardIndicators}
-                    years={data.years}
-                    year={year}
-                    term={term}
-                    campus={campus}
-                    campusName={campusName}
-                    illustrative={data.illustrative}
-                    selectedId={selected?.id}
-                    onSelect={(id) => {
-                      setPickedId(id);
-                      document.getElementById("od-evolucion")?.scrollIntoView({ behavior: "smooth", block: "start" });
-                    }}
-                  />
-                </div>
-              </section>
-            );
-          case "evolucion":
-            return selected ? (
-              <Evolution
-                key={key}
-                data={data}
-                indicator={selected}
-                indicators={report.indicators}
-                onPick={setPickedId}
-                year={year}
-                term={term}
-                campus={campus}
-                campusName={campusName}
-                setYear={setYear}
-                setTerm={setTerm}
-                defaultView={block.settings.chart === "barras" ? "barras" : "lineas"}
-              />
-            ) : null;
-          case "mapa": {
-            const dataset = report.maps?.find((m) => m.id === block.refKey) ?? (block.refKey ? undefined : report.maps?.[0]);
-            if (!dataset) return null;
-            return (
-              <section className="od-section" key={key} aria-labelledby={`od-mapa-${dataset.id}`}>
-                <div className="u-container">
-                  <header className="od-section__head">
-                    <h2 id={`od-mapa-${dataset.id}`}>{block.settings.title || dataset.title}</h2>
-                    <p>{dataset.description}</p>
-                  </header>
-                  <ChartFrame title="Mapa por departamento" subtitle={`Corte ${year} · ${dataset.unit}`} source={dataset.source}>
-                    <ColombiaMap
-                      dataset={dataset}
-                      year={year}
-                      years={data.years}
-                      campus={campus}
-                      campuses={data.campuses}
-                      onSelectCampus={setCampus}
-                    />
-                  </ChartFrame>
-                </div>
-              </section>
-            );
-          }
-          case "tuberia": {
-            const pipeline = report.pipelines?.find((p) => p.id === block.refKey) ?? (block.refKey ? undefined : report.pipelines?.[0]);
-            if (!pipeline || pipeline.cohorts.length === 0) return null;
-            return (
-              <section className="od-section" key={key} aria-labelledby={`od-tuberia-${pipeline.id}`}>
-                <div className="u-container">
-                  <header className="od-section__head">
-                    <h2 id={`od-tuberia-${pipeline.id}`}>{block.settings.title || pipeline.title}</h2>
-                    <p>{pipeline.description}</p>
-                  </header>
-                  <ChartFrame
-                    title="Deserción acumulada"
-                    subtitle={`${campusName} · deserción acumulada en % · pasa por una unión para leer el tramo`}
-                    source={pipeline.source}
-                  >
-                    <LeakyPipeline key={pipeline.id} data={pipeline} campus={campus} campusName={campusName} />
-                  </ChartFrame>
-                </div>
-              </section>
-            );
-          }
-          case "historico": {
-            const history = report.histories?.find((h) => h.id === block.refKey) ?? (block.refKey ? undefined : report.histories?.[0]);
-            if (!history || history.periods.length === 0) return null;
-            return (
-              <section className="od-section" key={key} aria-labelledby={`od-historico-${history.id}`}>
-                <div className="u-container">
-                  <header className="od-section__head">
-                    <h2 id={`od-historico-${history.id}`}>{block.settings.title || history.title}</h2>
-                    <p>
-                      {history.description} Cifra institucional: no cambia al elegir un campus.
-                    </p>
-                  </header>
-                  <ChartFrame
-                    title="Evolución histórica"
-                    subtitle={`${history.periods[0]} a ${history.periods[history.periods.length - 1]} · ${history.unit}`}
-                    source={history.source}
-                  >
-                    <HistoryCompare key={history.id} data={history} />
-                  </ChartFrame>
-                </div>
-              </section>
-            );
-          }
-          case "mapa_calor": {
-            const heatmap = report.heatmaps?.find((h) => h.id === block.refKey) ?? (block.refKey ? undefined : report.heatmaps?.[0]);
-            if (!heatmap || heatmap.values.flat().every((v) => v === null)) return null;
-            return (
-              <section className="od-section" key={key} aria-labelledby={`od-calor-${heatmap.id}`}>
-                <div className="u-container">
-                  <header className="od-section__head">
-                    <h2 id={`od-calor-${heatmap.id}`}>{block.settings.title || heatmap.title}</h2>
-                    <p>{heatmap.description}</p>
-                  </header>
-                  <ChartFrame
-                    title="Mapa de calor"
-                    subtitle={`${heatmap.rowLabel} × ${heatmap.columnLabel} · ${heatmap.unit}`}
-                    source={heatmap.source}
-                  >
-                    <Heatmap data={heatmap} />
-                  </ChartFrame>
-                </div>
-              </section>
-            );
-          }
-          case "desgloses":
-            return report.breakdowns.length > 0 ? (
-              <Breakdowns
-                key={key}
-                report={report}
-                year={year}
-                campus={campus}
-                setYear={setYear}
-                title={block.settings.title}
-                term={term}
-                years={data.years}
-              />
-            ) : null;
-          case "tabla_dinamica":
-            return (
-              <section className="od-section" key={key} aria-labelledby="od-tabla">
-                <div className="u-container">
-                  <header className="od-section__head">
-                    <h2 id="od-tabla">{block.settings.title || "Tabla dinámica"}</h2>
-                    <p>
-                      Arma tu propia tabla: elige qué va en filas y en columnas, fija la tercera dimensión, ordena con un
-                      clic en el encabezado y descarga exactamente lo que ves.
-                    </p>
-                  </header>
-                  <ChartFrame title="Todas las cifras del informe" subtitle="Indicador · campus · corte" source={sources.join(" · ")}>
-                    <PivotTable
-                      key={report.slug}
-                      report={report}
-                      years={data.years}
-                      campuses={data.campuses}
-                      year={year}
-                      term={term}
-                      campus={campus}
-                    />
-                  </ChartFrame>
-                </div>
-              </section>
-            );
-          case "metodologia":
-            return (
-              <section className="od-section" key={key} aria-labelledby="od-metodo">
-                <div className="u-container od-method">
-                  <header className="od-section__head">
-                    <h2 id="od-metodo">{block.settings.title || "Qué mide cada cifra"}</h2>
-                    {report.note && <p>{report.note}</p>}
-                  </header>
-                  <dl className="od-method__list">
-                    {report.indicators.map((indicator) => (
-                      <div key={indicator.id}>
-                        <dt>{indicator.label}</dt>
-                        <dd>
-                          {indicator.definition}
-                          <span>
-                            Unidad: {indicator.unit} · Reporta: {indicator.source}
-                          </span>
-                        </dd>
-                      </div>
-                    ))}
-                  </dl>
-                </div>
-              </section>
-            );
-          default:
-            return null;
-        }
+          Un bloque sin datos no se pinta: una sección vacía no informa de nada.
+          Un informe por puntos lee punto a punto; los bloques de toda la ficha
+          (evolución, tabla dinámica, metodología) cierran después. */}
+      {sections.length > 0 && (
+        <nav className="od-points-index" aria-labelledby="od-puntos">
+          <div className="u-container">
+            <h2 id="od-puntos">Puntos del informe</h2>
+            <ol>
+              {sections.map((section) => (
+                <li key={section.key}>
+                  <a href={`#od-${section.key}`}>
+                    <b>{section.number ?? "·"}</b>
+                    <span>{section.title}</span>
+                    <small className="od-point__status" data-status={section.status}>
+                      {SECTION_STATUS_LABEL[section.status].split(":")[0]}
+                    </small>
+                  </a>
+                </li>
+              ))}
+            </ol>
+          </div>
+        </nav>
+      )}
+      {sections.map((section) => {
+        const own = blocks.filter((b) => b.sectionKey === section.key);
+        const rendered = own.map((block, i) => renderBlock(block, `${block.kind}-${block.refKey ?? i}`, true)).filter(Boolean);
+        return (
+          <ReportSectionView key={section.key} section={section}>
+            {rendered.length > 0 ? rendered : null}
+          </ReportSectionView>
+        );
       })}
+      {blocks.filter((b) => !sections.length || !b.sectionKey || !sections.some((s) => s.key === b.sectionKey)).map((block, blockIndex) =>
+        renderBlock(block, `${block.kind}-${block.refKey ?? blockIndex}`, false),
+      )}
 
       <nav className="od-next" aria-label="Otros informes">
         <div className="u-container od-next__inner">
@@ -665,7 +712,7 @@ function Evolution({
 /* --- Desgloses ------------------------------------------------------------- */
 
 function Breakdowns({
-  report,
+  breakdowns,
   year,
   campus,
   setYear,
@@ -673,7 +720,7 @@ function Breakdowns({
   term,
   years,
 }: {
-  report: Report;
+  breakdowns: Report["breakdowns"];
   year: number;
   campus: CampusId;
   setYear: (year: number) => void;
@@ -694,7 +741,7 @@ function Breakdowns({
         </header>
 
         <div className="od-breakdowns">
-          {report.breakdowns.map((breakdown) => <BreakdownChart key={breakdown.id} breakdown={breakdown} year={year} term={term} years={years} setYear={setYear} />)}
+          {breakdowns.map((breakdown) => <BreakdownChart key={breakdown.id} breakdown={breakdown} year={year} term={term} years={years} setYear={setYear} />)}
         </div>
       </div>
     </section>

@@ -56,6 +56,8 @@ pegarlos en el editor SQL del panel de Supabase o aplicarlos con la CLI
 | `0019_udes_en_cifras.sql` | UDES en Cifras: periodo global, campus, oficinas, informes, indicadores por periodos A y B con regla anual, años con dato, conjuntos visuales (varios por tipo: desgloses, evolución histórica, tuberías, mapas de calor, mapas), diseño de la ficha, trazabilidad y RLS |
 | `0020_udes_en_cifras_datos_iniciales.sql` | Periodo 2020-2025 con los nueve informes y cifras **ilustrativas** (generada, no editar a mano) |
 | `0021_desgloses_por_periodo.sql` | Desgloses por A/B y cifra anual; clave de guardado por periodo y años habilitados |
+| `0022_udes_en_cifras_informes.sql` | Informes por puntos (`od_sections`), tablas/rankings/fichas (`od_tables`), periodicidad por indicador y desglose (`reporting`: por periodo o por año) y `od_import_report()` |
+| `0023_investigacion_2020_2025.sql` | Informe de Investigación con las cifras de la VI (Word + CSV de `Informes/`). Generada, no editar a mano |
 
 Todos son idempotentes: volver a ejecutarlos no duplica nada.
 
@@ -72,6 +74,12 @@ independientes; A y B quedan sin reportar. En **Captura → Desgloses** se elige
 la regla anual (suma, promedio, último periodo o reporte aparte). Los años se
 habilitan en Captura con **Todos / Solo algunos**; en el portal, **Años visibles**
 filtra la consulta sin cambiar la configuración guardada.
+
+**0022 y 0023 se ejecutan por separado**, cada una en su propia ejecución del editor SQL
+(primero 0022, luego 0023). Pegadas juntas fallan con `unsafe use of new value "tabla"`:
+Postgres no deja usar un valor de enum en la misma transacción que lo crea. La 0023 corre
+desde el editor SQL (usuario `postgres`); desde la API, `od_import_report()` exige Planeación.
+Si ya ejecutaste una 0022 anterior, vuelve a ejecutarla: es idempotente.
 
 Antes de subir una migración, `npm run check:sql` avisa de las columnas que
 referencia y no existen —el fallo que Supabase reporta como `column p.area_id
@@ -746,6 +754,18 @@ El comando lee `src/modules/datos-abiertos/data/seed/` y escribe la migración `
 marcado como ilustrativo. Cuando lleguen las cifras oficiales, se cargan desde la intranet
 y se desmarca "Cifras ilustrativas" en la estación Periodo y campus.
 
+**Investigación se genera desde `Informes/`**:
+
+```bash
+node scripts/build-investigacion.mjs
+```
+
+Lee el Word y `datos_procesados/` con el mismo importador de la intranet
+(`src/modules/admin/udes-en-cifras/import/`), escribe `0023` y `Informes/plan-investigacion.json`
+y lista los avisos de calidad. Después, `node scripts/build-od-seed.mjs` lleva ese plan a los
+fixtures de la prueba de humo. Los 15 investigadores con más citas y documentos se publican
+con nombre, como se decidió.
+
 ## La intranet: estaciones del periodo
 
 `/admin/udes-en-cifras` organiza el trabajo en cinco estaciones fijas. La barra superior
@@ -762,6 +782,14 @@ estación.
    desde Excel se saltan las columnas calculadas. Se escribe casilla por casilla, se pega un rango de Excel o se
    sube la plantilla CSV, con vista previa de cada cambio antes de pasarla a la rejilla.
    Nada se guarda sin pulsar Guardar, y cada guardado queda en `od_imports`.
+   Cada indicador y cada desglose dice **cómo se reporta**: por periodo (A y B, y la cifra
+   del año sale de su regla) o por año (una sola cifra, sin A y B). Se elige en Estructura
+   y KPI para indicadores y en Captura → Desgloses; la rejilla bloquea las columnas que no
+   aplican. La evolución histórica admite periodos (2020-A) y años completos (2011).
+   **Importar informe** (hoy para Investigación) sube la carpeta que entrega la oficina
+   —el Word con sus puntos y los CSV—, muestra el plan (puntos y estado, cifras, tablas,
+   archivos reconocidos y avisos de calidad) y lo aplica reemplazando el contenido del
+   informe en una transacción. Se repite en cada corte.
 4. **Diseño visual**: orden de los bloques de la ficha (arrastrando o con flechas),
    visibilidad, título propio y gráfica con la que abre la evolución.
 5. **Publicación**: lo que falta, las cifras que cambiaron desde la última publicación y la

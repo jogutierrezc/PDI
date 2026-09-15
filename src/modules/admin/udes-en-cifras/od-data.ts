@@ -140,6 +140,13 @@ export function useCopyPeriod() {
   );
 }
 
+/** Aplica el plan de un informe completo en una sola transacción: reemplaza todo su contenido. */
+export function useImportReport() {
+  return useOdMutation(async ({ reportId, plan }: { reportId: string; plan: unknown }) =>
+    run(supabase.rpc("od_import_report", { target: reportId, plan })) as Promise<Record<string, number>>,
+  );
+}
+
 export function useSavePeriodCampuses() {
   return useOdMutation(
     async ({ periodId, keep, remove }: { periodId: string; keep: Omit<OdPeriodCampus, "slug">[]; remove: string[] }) => {

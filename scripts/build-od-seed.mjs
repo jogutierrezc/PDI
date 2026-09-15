@@ -624,6 +624,82 @@ catalog.reports.forEach((r, ri) => {
   kinds.push(["tabla_dinamica", null], ["metodologia", null]);
   kinds.forEach(([kind, ref], i) => T.od_report_blocks.push({ id: uid("blk"), report_id: reportId, kind, ref_id: ref, position: i + 1, visible: true, settings: kind === "evolucion" ? { chart: "lineas" } : {} }));
 });
+/* Investigación: lo que deja 0023 (od_import_report con Informes/plan-investigacion.json),
+   no las cifras ilustrativas. Misma lógica que la función, fila por fila. */
+const PLAN_FILE = path.join(ROOT, "Informes", "plan-investigacion.json");
+if (fs.existsSync(PLAN_FILE)) {
+  const plan = JSON.parse(fs.readFileSync(PLAN_FILE, "utf8"));
+  const reportId = "od-informe-investigacion";
+  const drop = (table, pred) => { T[table] = T[table].filter((row) => !pred(row)); };
+  const gone = (table, key) => new Set(T[table].filter((row) => row.report_id === reportId).map((row) => row.id));
+  const ind = gone("od_indicators"), bd = gone("od_breakdowns"), hm = gone("od_heatmaps"), mp = gone("od_maps"), pp = gone("od_pipelines"), hs = gone("od_histories");
+  drop("od_values", (v) => ind.has(v.indicator_id));
+  drop("od_breakdown_values", (v) => bd.has(v.breakdown_id));
+  drop("od_heatmap_cells", (v) => hm.has(v.heatmap_id));
+  drop("od_map_values", (v) => mp.has(v.map_id));
+  drop("od_pipeline_values", (v) => pp.has(v.pipeline_id));
+  drop("od_history_values", (v) => hs.has(v.history_id));
+  for (const table of ["od_indicators", "od_breakdowns", "od_heatmaps", "od_maps", "od_pipelines", "od_histories", "od_report_blocks"]) drop(table, (r) => r.report_id === reportId);
+  T.od_sections = [];
+  T.od_tables = [];
+  T.od_table_rows = [];
+
+  let officeId = null;
+  if (plan.office) {
+    officeId = T.od_offices.find((o) => o.name === plan.office)?.id ?? null;
+    if (!officeId) {
+      officeId = `od-oficina-${T.od_offices.length + 1}`;
+      T.od_offices.push({ id: officeId, name: plan.office, contact_email: "", position: T.od_offices.length + 1 });
+    }
+  }
+  const inPeriod = (y) => y >= PERIOD.start && y <= PERIOD.end;
+  plan.sections.forEach((s, i) =>
+    T.od_sections.push({ id: `od-seccion-${s.key}`, report_id: reportId, key: s.key, number: s.number, title: s.title, status: s.status || "completo", lede: s.lede ?? "", warning: s.warning ?? "", source: s.source ?? "", requested: s.requested ?? [], position: i + 1 }),
+  );
+  let kpiRank = 0;
+  plan.indicators.forEach((p, i) => {
+    const id = `od-ind-investigacion-${p.key}`;
+    if (p.is_kpi) kpiRank += 1;
+    T.od_indicators.push({
+      id, report_id: reportId, key: p.key, label: p.label, unit: p.unit ?? "", format: p.format, direction: p.direction, aggregation: p.aggregation,
+      reporting: p.reporting ?? (p.values.some((v) => v.term !== "anual") ? "periodo" : "anual"), annual_rule: p.annual_rule, years: Array.isArray(p.years) ? p.years.filter(inPeriod) : null, definition: p.definition ?? "", office_id: officeId,
+      position: i + 1, is_kpi: Boolean(p.is_kpi), kpi_position: p.is_kpi ? kpiRank : null, is_headline: Boolean(p.is_kpi) && kpiRank === 1,
+    });
+    p.values
+      .filter((v) => inPeriod(v.year) && (v.campus === null || CAMPUS_IDS[v.campus]))
+      .forEach((v) => T.od_values.push({ id: uid("v"), indicator_id: id, year: v.year, term: v.term, campus_id: v.campus === null ? null : CAMPUS_IDS[v.campus], value: v.value, updated_at: now }));
+  });
+  plan.breakdowns.forEach((b, i) => {
+    const id = `od-desg-investigacion-${b.key}`;
+    T.od_breakdowns.push({ id, report_id: reportId, key: b.key, title: b.title, unit: b.unit ?? "", format: b.format, office_id: officeId, default_chart: b.chart || "barras", reporting: b.reporting ?? (b.values.some((v) => v.term !== "anual") ? "periodo" : "anual"), annual_rule: b.annual_rule || "reportado", position: i + 1 });
+    b.values.forEach((v) => T.od_breakdown_values.push({ id: uid("bv"), breakdown_id: id, year: v.year, term: v.term, label: v.label, position: v.position, value: v.value }));
+  });
+  plan.heatmaps.forEach((h, i) => {
+    const id = `od-calor-investigacion-${h.key}`;
+    T.od_heatmaps.push({ id, report_id: reportId, key: h.key, title: h.title, description: h.description ?? "", row_label: h.row_label ?? "", column_label: h.column_label ?? "", rows: h.rows, columns: h.columns, unit: h.unit ?? "", format: h.format, office_id: officeId, empty_meaning: h.empty_meaning || "sin reportar", position: i + 1 });
+    h.cells.forEach((c) => T.od_heatmap_cells.push({ heatmap_id: id, row_index: c.row, column_index: c.column, value: c.value }));
+  });
+  plan.histories.forEach((h, i) => {
+    const id = `od-historico-investigacion-${h.key}`;
+    T.od_histories.push({ id, report_id: reportId, key: h.key, title: h.title, description: h.description ?? "", unit: h.unit ?? "", format: h.format, total_label: h.total_label || "Total", office_id: officeId, position: i + 1 });
+    h.values.forEach((v) => T.od_history_values.push({ id: uid("hv"), history_id: id, period_label: v.period, category: v.category ?? "", position: v.position ?? 0, value: v.value }));
+  });
+  plan.tables.forEach((t, i) => {
+    const id = `od-tabla-investigacion-${t.key}`;
+    T.od_tables.push({ id, report_id: reportId, key: t.key, title: t.title, description: t.description ?? "", display: t.display || "tabla", columns: t.columns ?? [], office_id: officeId, position: i + 1 });
+    t.rows.forEach((cells, ri) => T.od_table_rows.push({ id: uid("tr"), table_id: id, position: ri + 1, cells }));
+  });
+  const REF_PREFIX = { desglose: "od-desg", calor: "od-calor", historico: "od-historico", tabla: "od-tabla" };
+  plan.blocks.forEach((b, i) => {
+    const [kind, key] = (b.ref ?? "").split(":");
+    const refId = b.ref ? `${REF_PREFIX[kind]}-investigacion-${key}` : null;
+    T.od_report_blocks.push({
+      id: uid("blk"), report_id: reportId, kind: b.kind, ref_id: refId, section_id: b.section ? `od-seccion-${b.section}` : null,
+      position: i + 1, visible: true, settings: b.settings ?? {},
+    });
+  });
+}
+
 const FIXTURE_OUT = path.join(ROOT, "scripts", "fixtures", "udes-en-cifras.json");
 fs.mkdirSync(path.dirname(FIXTURE_OUT), { recursive: true });
 fs.writeFileSync(FIXTURE_OUT, JSON.stringify(T));

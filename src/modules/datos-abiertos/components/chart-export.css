@@ -1,0 +1,97 @@
+/* =============================================================================
+   Exportar gráficas como imagen
+   ========================================================================== */
+
+.od-export {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  padding: 2px;
+  background: var(--od-board);
+  border: 1px solid var(--od-board-line);
+  border-radius: var(--radius-xs);
+}
+
+.od-export__icon {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  color: var(--od-board-muted);
+}
+
+.od-export__option {
+  min-width: 2.75rem;
+  min-height: 30px;
+  padding: 0 var(--space-2);
+  color: var(--od-board-ink);
+  background: transparent;
+  border: 0;
+  border-radius: 6px;
+  font-family: var(--font-sign);
+  font-size: 0.85rem;
+  font-weight: 600;
+  letter-spacing: var(--tracking-wide);
+  cursor: pointer;
+  transition: background-color var(--dur-fast) ease, color var(--dur-fast) ease;
+}
+
+.od-export__option:disabled {
+  color: var(--od-board-muted);
+  cursor: progress;
+}
+
+.od-export__option:focus-visible {
+  outline: 2px solid var(--od-signal);
+  outline-offset: 1px;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .od-export__option:not(:disabled):hover {
+    color: var(--od-signal-text);
+    background: var(--od-board-raised);
+  }
+}
+
+.od-export__status {
+  padding: 0 var(--space-2);
+  color: var(--od-board-muted);
+  font-size: var(--text-2xs);
+}
+
+/* Sello de procedencia: solo aparece en la imagen exportada. */
+.od-frame__stamp {
+  display: none;
+}
+
+.od-frame[data-exporting] .od-frame__stamp {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--space-4);
+  margin: 0;
+  padding: var(--space-2) var(--space-5) var(--space-3);
+  color: var(--od-board-muted);
+  font-family: var(--font-sign);
+  font-size: 0.8rem;
+  font-weight: 600;
+  letter-spacing: var(--tracking-wide);
+  text-transform: uppercase;
+}
+
+/* Lo que no sale en la imagen se oculta antes de medir: si solo se quitara de la
+   copia, las rejillas conservarían sus filas y el contenido se montaría. */
+.od-frame[data-exporting] [data-export-ignore] {
+  display: none !important;
+}
+
+/* En la captura, los marcos desplazables se abren y nada se anima a medias. */
+.od-frame[data-exporting] :is(.od-combo__scroll, .od-table-wrap, [class*="__scroll"]) {
+  overflow: visible !important;
+}
+
+.od-frame[data-exporting] *,
+.od-frame[data-exporting] *::before,
+.od-frame[data-exporting] *::after {
+  animation-delay: 0s !important;
+  animation-duration: 0s !important;
+  transition: none !important;
+}

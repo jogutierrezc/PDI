@@ -5,9 +5,17 @@
    rótulo en letra de señalética, los controles propios a la derecha y, abajo,
    el cuerpo sobre la superficie de lectura. Debajo del cuerpo, siempre, la
    fuente: una gráfica sin procedencia no se publica.
+
+   Cada panel se descarga como imagen (PNG o JPG) tal como se ve, con un sello
+   de procedencia que solo aparece en la imagen (chart-export.ts).
    ========================================================================== */
 
+import { useRef, useState } from "react";
 import type { ReactNode } from "react";
+import { Icon } from "../../../components/ui/Icon";
+import { exportChart } from "./chart-export";
+import type { ImageFormat } from "./chart-export";
+import "./chart-export.css";
 
 interface ChartFrameProps {
   title: string;
@@ -17,20 +25,71 @@ interface ChartFrameProps {
   children: ReactNode;
   className?: string;
   id?: string;
+  /** Nombre del archivo al descargar la imagen. Por defecto, el título. */
+  exportName?: string;
+  /** false para paneles que no son una gráfica. */
+  exportable?: boolean;
 }
 
-export function ChartFrame({ title, subtitle, source, actions, children, className = "", id }: ChartFrameProps) {
+const stampDate = new Intl.DateTimeFormat("es-CO", { day: "numeric", month: "long", year: "numeric" });
+
+export function ChartFrame({ title, subtitle, source, actions, children, className = "", id, exportName, exportable = true }: ChartFrameProps) {
+  const figure = useRef<HTMLElement>(null);
+  const [busy, setBusy] = useState<ImageFormat | null>(null);
+  const [failed, setFailed] = useState(false);
+
+  const download = async (format: ImageFormat) => {
+    if (!figure.current || busy) return;
+    setBusy(format);
+    setFailed(false);
+    try {
+      await exportChart(figure.current, `udes-en-cifras-${exportName ?? title}`, format);
+    } catch {
+      setFailed(true);
+    } finally {
+      setBusy(null);
+    }
+  };
+
   return (
-    <figure className={`od-frame ${className}`.trim()} id={id}>
+    <figure ref={figure} className={`od-frame ${className}`.trim()} id={id}>
       <figcaption className="od-frame__head">
         <span className="od-frame__titles">
           <strong>{title}</strong>
           {subtitle && <span>{subtitle}</span>}
         </span>
-        {actions && <span className="od-frame__actions">{actions}</span>}
+        {(actions || exportable) && (
+          <span className="od-frame__actions" data-export-ignore>
+            {actions}
+            {exportable && (
+              <span className="od-export" role="group" aria-label={`Descargar la gráfica ${title} como imagen`}>
+                <span className="od-export__icon" aria-hidden="true">
+                  <Icon name="download" size={15} />
+                </span>
+                {(["png", "jpg"] as const).map((format) => (
+                  <button
+                    key={format}
+                    type="button"
+                    className="od-export__option"
+                    disabled={busy !== null}
+                    aria-label={`Descargar ${title} en ${format.toUpperCase()}`}
+                    onClick={() => void download(format)}
+                  >
+                    {busy === format ? "…" : format.toUpperCase()}
+                  </button>
+                ))}
+                {failed && <span className="od-export__status" role="status">No se pudo generar la imagen</span>}
+              </span>
+            )}
+          </span>
+        )}
       </figcaption>
       <div className="od-frame__body">{children}</div>
       {source && <p className="od-frame__source">Reporta: {source}</p>}
+      <p className="od-frame__stamp" aria-hidden="true">
+        <span>UDES en Cifras · Universidad de Santander</span>
+        <span>Descargada el {stampDate.format(new Date())}</span>
+      </p>
     </figure>
   );
 }

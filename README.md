@@ -716,11 +716,13 @@ od_publications   rastro de cada publicación (lo escribe un disparador)
   uno, entra solo a la ficha como bloque visible (antes había que añadirlo en Diseño
   visual, y por eso una tubería recién creada no se veía). Borrar un conjunto borra su
   bloque (disparador).
-- **Tuberías.** Cada una elige qué se captura: `estudiantes` que siguen, `permanencia`
-  (% de la cohorte que sigue) o `desercion` (% que se retira en cada tramo; el portal
-  calcula cuánto sigue). Las cohortes son periodos de ingreso, también históricos
-  (`2014-A` a `2023-B`), y los porcentajes admiten decimales (12,5). Con porcentajes el
-  total institucional se captura: no se suma.
+- **Tuberías.** Cada tubería es **un solo flujo de cohortes reportado junto**, con su
+  rango histórico (`2014-A a 2023-B`), que se indica en Captura. Cada una elige qué se
+  captura: `estudiantes` que siguen, `permanencia` (% del flujo que sigue) o `desercion`
+  (% que se retira en cada tramo). El portal siempre la muestra como deserción acumulada
+  en % (componente `LeakyPipeline`). Los porcentajes admiten decimales (12,5) y, con
+  porcentajes, el total institucional se captura: no se suma. Si una base trae varias
+  cohortes de la versión anterior, Captura trabaja la más completa y ofrece quitar las demás.
 - **Evolución histórica.** La cifra en los periodos que se elijan (2020-A: 14.324 →
   2025-B: 8.888) con sus categorías (pregrado, posgrado). El portal compara dos periodos
   con la variación, el % de cada categoría frente al total y la serie completa.
@@ -779,6 +781,14 @@ Sistema. La cabecera lleva la ruta (portal › pantalla).
   funcionando): un enlace compartido abre el tablero o la ficha tal como se veía.
 - **Cada cifra lleva su boleto**: oficina que la reporta, campus y corte, y debajo el corte
   anterior con su variación (las tasas en puntos porcentuales, los conteos en porcentaje).
+- **Desgloses a todo el ancho.** Cada desglose ocupa su fila. Los periodos A y B se
+  muestran por separado, como se reportaron (2024-A, 2024-B); la cifra del año solo
+  aparece donde se reportó como año, así nada se suma dos veces. Vistas: circular y
+  barras de un corte (con selector 2024-A / 2024-B / 2024 si ese año tiene varios),
+  composición al 100 % por corte, líneas y líneas y barras.
+- **Cada gráfica se descarga como imagen.** Los botones PNG y JPG del panel generan la
+  imagen tal como se ve (html-to-image), sin los controles y con un sello de procedencia
+  y fecha. Ver `components/chart-export.ts`.
 - **La ficha pinta sus bloques** en el orden y con la visibilidad que decide la intranet.
   Un bloque sin datos no se pinta.
 - **La ficha descarga un CSV** con punto y coma y BOM, que Excel en español abre directo.

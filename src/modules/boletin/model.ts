@@ -196,6 +196,15 @@ export function datasetRefs(report: Report): { ref: string; title: string }[] {
     if (block.kind === "historico") add(`historico:${block.refKey}`, report.histories?.find((h) => h.id === block.refKey)?.title ?? block.refKey);
     if (block.kind === "tabla") add(`tabla:${block.refKey}`, report.tables?.find((t) => t.id === block.refKey)?.title ?? block.refKey);
   }
+  // Rankings: en el orden de su bloque en la ficha, luego los demás.
+  for (const block of [...(report.blocks ?? [])].sort((a, b) => a.position - b.position)) {
+    if (block.kind !== "rankings") continue;
+    (block.settings.rankings ?? []).forEach((key) => {
+      const ranking = report.rankings?.find((r) => r.id === key);
+      if (ranking) add(`ranking:${ranking.id}`, ranking.title);
+    });
+  }
+  report.rankings?.forEach((r) => add(`ranking:${r.id}`, r.title));
   report.breakdowns.forEach((b) => add(`desglose:${b.id}`, b.title));
   report.maps?.forEach((m) => add(`mapa:${m.id}`, m.title));
   report.heatmaps?.forEach((h) => add(`calor:${h.id}`, h.title));

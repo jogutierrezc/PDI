@@ -30,6 +30,8 @@ import type {
   OdPipelineRow,
   OdPipelineValueRow,
   OdPublicationRow,
+  OdRankingEditionRow,
+  OdRankingRow,
   OdReportBlockRow,
   OdReportRow,
   OdValueRow,
@@ -254,7 +256,7 @@ async function ensureBlock(reportId: string, kind: OdBlockKind, refId: string | 
 
 /** Inserta o actualiza un conjunto; al insertarlo, le crea su bloque. */
 async function saveDataset(
-  table: "od_breakdowns" | "od_heatmaps" | "od_maps" | "od_pipelines" | "od_histories",
+  table: "od_breakdowns" | "od_heatmaps" | "od_maps" | "od_pipelines" | "od_histories" | "od_rankings",
   kind: OdBlockKind,
   row: { id?: string; report_id: string } & Record<string, unknown>,
 ) {
@@ -264,7 +266,8 @@ async function saveDataset(
     return;
   }
   const created = unwrap<{ id: string }>(await supabase.from(table).insert(fields).select("id").single());
-  await ensureBlock(row.report_id, kind, kind === "desgloses" ? null : created.id);
+  // Desgloses y rankings comparten un bloque del informe; los demás, uno por conjunto.
+  await ensureBlock(row.report_id, kind, kind === "desgloses" || kind === "rankings" ? null : created.id);
 }
 
 export function useSaveBreakdown() {
@@ -378,8 +381,32 @@ export function useSavePipelineValues() {
   );
 }
 
+/* --- Rankings (0030) ---------------------------------------------------------- */
+
+export function useSaveRanking() {
+  return useOdMutation(async (row: Partial<OdRankingRow> & { report_id: string }) => saveDataset("od_rankings", "rankings", row));
+}
+
+/** Guarda una edición completa (posiciones y listas); sin fila previa, la crea. */
+export function useSaveRankingEdition() {
+  return useOdMutation(
+    async ({ periodId, reportId, edition }: { periodId: string; reportId: string; edition: OdRankingEditionRow }) => {
+      const { id, ...fields } = edition;
+      void id;
+      await run(supabase.from("od_ranking_editions").upsert(fields, { onConflict: "ranking_id,year" }));
+      await logImport(periodId, reportId, "rejilla", 1, "", { tabla: "od_ranking_editions", anio: edition.year });
+    },
+  );
+}
+
+export function useDeleteRankingEdition() {
+  return useOdMutation(async ({ rankingId, year }: { rankingId: string; year: number }) => {
+    await run(supabase.from("od_ranking_editions").delete().eq("ranking_id", rankingId).eq("year", year));
+  });
+}
+
 export function useDeleteDataset() {
-  return useOdMutation(async ({ table, id }: { table: "od_breakdowns" | "od_heatmaps" | "od_maps" | "od_pipelines" | "od_histories"; id: string }) => {
+  return useOdMutation(async ({ table, id }: { table: "od_breakdowns" | "od_heatmaps" | "od_maps" | "od_pipelines" | "od_histories" | "od_rankings"; id: string }) => {
     await run(supabase.from(table).delete().eq("id", id));
   });
 }

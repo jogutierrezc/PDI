@@ -1573,6 +1573,49 @@ const routes = [
     absent: [...SIN_DINERO],
   },
   {
+    path: "/datos-abiertos/visibilidad",
+    note: "rankings (0030): medallas, tabla, evolución y rueda de ODS",
+    expect: "Rueda de ODS",
+    also: ["Medallas", "Tabla comparativa", "Evolución"],
+    absent: [...SIN_DINERO],
+    interact: async (window, tick) => {
+      const view = (label) => [...window.document.querySelectorAll('[aria-label="Vista de los rankings"] button')].find((b) => b.textContent === label);
+      const text = () => window.document.querySelector(".od-rankings")?.textContent ?? "";
+      // Medallas: bandas tal cual y la variación dicha en palabras (QS Latinoamérica 140 → 131).
+      for (const needle of ["QS World University Rankings", "1001–1200", "sube desde 1201–1400", "sube 9 puestos", "Employability"]) {
+        if (!text().includes(needle)) throw new Error(`las medallas no muestran «${needle}»`);
+      }
+      // Estrellas: 4 de 5 en Teaching.
+      if (!window.document.querySelector('[aria-label="Teaching: 4 de 5 estrellas"]')) throw new Error("faltan las estrellas por categoría");
+      view("Tabla comparativa").click();
+      await tick();
+      if (!window.document.querySelector(".od-rank-table") || !text().includes("131")) throw new Error("la tabla comparativa no se pintó");
+      view("Evolución").click();
+      await tick();
+      if (!window.document.querySelector(".od-rank-evo path.od-rank-evo__line")) throw new Error("la evolución no dibuja líneas");
+      view("Rueda de ODS").click();
+      await tick();
+      const lit = window.document.querySelectorAll(".od-sdg__segment[data-on]").length;
+      if (lit !== 5) throw new Error(`la rueda debía encender 5 ODS y encendió ${lit}`);
+      window.document.querySelector('.od-sdg__segment[aria-label^="ODS 5:"]').dispatchEvent(new window.MouseEvent("click", { bubbles: true }));
+      await tick();
+      if (!text().includes("Igualdad de género") || !text().includes("101–200")) throw new Error("al elegir el ODS 5 no se muestra su posición");
+      // Otra edición: 2025 no tiene el ODS 5.
+      const select = window.document.querySelector(".od-rankings__year select");
+      select.value = "2025";
+      select.dispatchEvent(new window.Event("change", { bubbles: true }));
+      await tick();
+      if (window.document.querySelectorAll(".od-sdg__segment[data-on]").length !== 2) throw new Error("la edición 2025 debía tener 2 ODS");
+    },
+  },
+  {
+    path: "/datos-abiertos/boletines/boletin-visibilidad",
+    note: "el boletín trae una hoja por ranking con posiciones, estrellas y ODS",
+    expect: "QS World University Rankings",
+    also: ["THE Impact Rankings", "Salud y bienestar", "Estrellas por categoría", "Ediciones"],
+    absent: [...SIN_DINERO],
+  },
+  {
     path: "/datos-abiertos/sostenible",
     note: "separadores (0029): franjas de sección, índice y un tablero por grupo",
     expect: "En esta ficha",
@@ -1714,6 +1757,39 @@ const routes = [
     },
   },
   { path: "/admin/udes-en-cifras/estructura/permanencia", session: true, expect: "Tablero de KPI", also: ["Ficha del informe", "Indicadores (4)", "Conjuntos visuales", "Titular"] },
+  {
+    path: "/admin/udes-en-cifras/estructura/visibilidad",
+    session: true,
+    note: "rankings en Estructura: listado y formulario con color y vista",
+    expect: "QS World University Rankings",
+    also: ["Ranking universitario (QS, THE…)", "abre en rueda de ods"],
+  },
+  {
+    path: "/admin/udes-en-cifras/captura/visibilidad",
+    session: true,
+    note: "captura de rankings: edición, posiciones, estrellas, ODS y validación de bandas",
+    expect: "Rankings",
+    interact: async (window, tick) => {
+      const tab = [...window.document.querySelectorAll(".oda-tab")].find((b) => b.textContent.startsWith("Rankings"));
+      if (!tab) throw new Error("falta la pestaña Rankings");
+      tab.click();
+      await tick();
+      const panel = () => window.document.querySelector("#oda-rankings")?.textContent ?? "";
+      if (!panel().includes("Posición · edición 2026") || !panel().includes("Estrellas por categoría")) throw new Error(`captura de rankings: ${panel().slice(0, 200)}`);
+      const input = window.document.querySelector("#oda-rankings .oda-ranking__rank");
+      const setter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, "value").set;
+      setter.call(input, "mil");
+      input.dispatchEvent(new window.Event("input", { bubbles: true }));
+      await tick();
+      if (!panel().includes("Posiciones que no se entienden: Mundial")) throw new Error("una posición inválida debe avisarse");
+      const saveButton = [...window.document.querySelectorAll("#oda-rankings button")].find((b) => b.textContent.startsWith("Guardar edición"));
+      if (!saveButton?.disabled) throw new Error("con una posición inválida no se debe poder guardar");
+      setter.call(input, "801-1000");
+      input.dispatchEvent(new window.Event("input", { bubbles: true }));
+      await tick();
+      if (saveButton.disabled) throw new Error("con una banda válida se debe poder guardar");
+    },
+  },
   { path: "/admin/udes-en-cifras/diseno/poblacional", session: true, expect: "Bloques de la ficha", also: ["Así se lee la ficha", "Tabla dinámica"] },
   {
     path: "/admin/udes-en-cifras/diseno/sostenible",
@@ -2450,6 +2526,54 @@ Object.assign(FIXTURES, OD_FIXTURES);
     ...others.filter((b) => b.kind !== "evolucion" && b.kind !== "mapa_calor" && b.kind !== "desgloses"),
   ].map((b, i) => ({ ...b, position: i + 1 }));
   FIXTURES.od_report_blocks = [...rest, ...ordered];
+}
+
+/* Rankings (0030): Visibilidad sigue cuatro rankings con varias ediciones. */
+{
+  const report = FIXTURES.od_reports.find((r) => r.slug === "visibilidad");
+  const ranking = (key, title, system, accent, view, position) => ({
+    id: `od-ranking-${key}`, report_id: report.id, key, title, description: "", system, accent, view, office_id: null, position,
+  });
+  FIXTURES.od_rankings = [
+    ranking("qs-world", "QS World University Rankings", "qs_world", "#1f5fbf", "medallas", 1),
+    ranking("qs-latam", "QS Latin America & The Caribbean", "qs_latam", "#6b3fa0", "medallas", 2),
+    ranking("the-impact", "THE Impact Rankings", "the_impact", "#0b7481", "ods", 3),
+    ranking("qs-subject", "QS by Subject", "qs_subject", "#a4471f", "medallas", 4),
+  ];
+  const edition = (key, year, fields) => ({
+    id: `od-ranking-${key}-${year}`, ranking_id: `od-ranking-${key}`, year, global_rank: "", regional_rank: "", national_rank: "",
+    evaluated: null, score: null, stars: [], sdgs: [], subjects: [], custom: [], note: "", ...fields,
+  });
+  FIXTURES.od_ranking_editions = [
+    edition("qs-world", 2025, { global_rank: "1201-1400", national_rank: "38" }),
+    edition("qs-world", 2026, {
+      global_rank: "1001-1200", national_rank: "33",
+      stars: [
+        { category: "Teaching", stars: 4 }, { category: "Employability", stars: 5 }, { category: "Research", stars: 3 },
+        { category: "Online Learning", stars: 5 }, { category: "Environmental Impact", stars: 4 },
+      ],
+    }),
+    edition("qs-latam", 2024, { regional_rank: "152", national_rank: "31" }),
+    edition("qs-latam", 2025, { regional_rank: "140", national_rank: "29" }),
+    edition("qs-latam", 2026, { regional_rank: "131", national_rank: "27", score: 38.5 }),
+    edition("the-impact", 2025, {
+      global_rank: "601-800", national_rank: "12",
+      sdgs: [{ sdg: 3, global_rank: "201-300", national_rank: "4" }, { sdg: 4, global_rank: "301-400", national_rank: "6" }],
+    }),
+    edition("the-impact", 2026, {
+      global_rank: "401-600", national_rank: "10",
+      sdgs: [
+        { sdg: 3, global_rank: "201-300", national_rank: "4" }, { sdg: 4, global_rank: "301-400", national_rank: "6" },
+        { sdg: 5, global_rank: "101-200", national_rank: "2" }, { sdg: 10, global_rank: "201-300", national_rank: "5" },
+        { sdg: 17, global_rank: "401-600", national_rank: "9" },
+      ],
+    }),
+    edition("qs-subject", 2026, { subjects: [{ subject: "Medicine", global_rank: "601-650", national_rank: "8" }], custom: [{ label: "Percentil", value: "Top 30 %" }] }),
+  ];
+  FIXTURES.od_report_blocks = [
+    ...FIXTURES.od_report_blocks,
+    { id: "od-bloque-visibilidad-rankings", report_id: report.id, kind: "rankings", ref_id: null, section_id: null, position: 3, visible: true, settings: {} },
+  ];
 }
 
 /* Boletín UDES en Cifras (0027): uno global publicado con una edición en PDF. */

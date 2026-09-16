@@ -748,6 +748,118 @@
   font-weight: 800;
 }
 
+/* --- Ranking universitario ----------------------------------------------------
+   --rk: el color del ranking elegido en la intranet. Marca la posición principal
+   y las estrellas; las cifras van en azul marino para leerse con cualquier color. */
+
+.bol-rank {
+  display: grid;
+  gap: 5mm;
+}
+
+.bol-rank__medals {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(38mm, 1fr));
+  gap: 4mm;
+}
+
+.bol-rank__medals > div {
+  display: grid;
+  align-content: start;
+  gap: 1mm;
+  padding: 3mm 4mm;
+  background: var(--bol-paper-2);
+  border-top: 0.8mm solid var(--bol-rule);
+  border-radius: 0.8mm;
+}
+
+.bol-rank__medals > div[data-lead] {
+  background: color-mix(in srgb, var(--rk) 10%, #ffffff);
+  border-top-color: var(--rk);
+}
+
+.bol-rank__medals span {
+  color: var(--bol-ink-3);
+  font-size: 2.3mm;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.bol-rank__medals strong {
+  color: var(--bol-navy);
+  font-size: 9mm;
+  font-weight: 800;
+  line-height: 1;
+  letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums;
+}
+
+.bol-rank__medals strong[data-band] { font-size: 6mm; }
+
+.bol-rank__medals small {
+  color: var(--bol-ink-2);
+  font-size: 2.4mm;
+  font-weight: 600;
+}
+
+.bol-rank__medals small[data-tone="up"] { color: #12833a; }
+.bol-rank__medals small[data-tone="down"] { color: #b3261e; }
+
+.bol-rank__star-list {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1.6mm 8mm;
+  padding: 0;
+  list-style: none;
+}
+
+.bol-rank__star-list li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 3mm;
+  padding-bottom: 1.2mm;
+  border-bottom: 0.2mm solid var(--bol-rule);
+  font-size: 2.9mm;
+}
+
+.bol-rank__stars { display: inline-flex; gap: 0.3mm; }
+
+.bol-rank__stars svg {
+  width: 3.4mm;
+  height: 3.4mm;
+  fill: var(--bol-rule);
+}
+
+.bol-rank__stars svg[data-on] { fill: var(--rk); }
+
+.bol-rank__sdg-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 1.6mm;
+}
+
+.bol-rank__sdg-label i {
+  display: inline-grid;
+  flex: none;
+  place-items: center;
+  width: 4.6mm;
+  height: 4.6mm;
+  color: #ffffff;
+  background: var(--sdg);
+  border-radius: 0.6mm;
+  font-size: 2.4mm;
+  font-style: normal;
+  font-weight: 800;
+}
+
+.bol-rank__note {
+  color: var(--bol-ink-2);
+  font-size: 2.6mm;
+  line-height: 1.4;
+}
+
 /* --- Apertura de sección ------------------------------------------------------
    Un separador de la ficha ("Graduados") dentro del capítulo: más liviano que la
    apertura del capítulo, con el número de sección en el color del informe. Abre

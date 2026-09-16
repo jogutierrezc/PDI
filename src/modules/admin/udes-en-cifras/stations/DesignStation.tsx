@@ -35,6 +35,7 @@ const BLOCK_HELP: Record<OdBlockKind, string> = {
   metodologia: "Qué mide cada indicador y quién lo reporta.",
   tabla: "Una tabla del informe: listado, ranking, fichas o cifras de un periodo.",
   separador: "Agrupa los bloques que siguen, hasta el próximo separador. En el Boletín abre página.",
+  rankings: "Posiciones en QS, THE y otros rankings, con medallas, tabla, evolución y rueda de ODS.",
 };
 
 /** Clave corta para distinguir varios bloques del mismo tipo (ver 0029). */
@@ -59,6 +60,7 @@ function DesignEditor({ data, reportId, blocks, canEdit }: { data: StationProps[
   const histories = data.rows.histories.filter((h) => h.report_id === reportId);
   const breakdowns = data.rows.breakdowns.filter((b) => b.report_id === reportId);
   const tables = data.rows.tables.filter((t) => t.report_id === reportId);
+  const rankings = (data.rows.rankings ?? []).filter((r) => r.report_id === reportId);
   const sections = data.rows.sections.filter((s) => s.report_id === reportId);
   const indicators = data.rows.indicators.filter((i) => i.report_id === reportId).sort((a, b) => a.position - b.position);
   /** Separador bajo el que queda un bloque (el anterior más cercano). */
@@ -99,6 +101,7 @@ function DesignEditor({ data, reportId, blocks, canEdit }: { data: StationProps[
       .filter((kind) => !draft.some((b) => b.kind === kind))
       .map((kind) => ({ kind, ref_id: null, label: BLOCK_LABELS[kind] })),
     ...(breakdowns.length && !draft.some((b) => b.kind === "desgloses") ? [{ kind: "desgloses" as OdBlockKind, ref_id: null, label: BLOCK_LABELS.desgloses }] : []),
+    ...(rankings.length && !draft.some((b) => b.kind === "rankings") ? [{ kind: "rankings" as OdBlockKind, ref_id: null, label: BLOCK_LABELS.rankings }] : []),
     ...heatmaps.filter((h) => !draft.some((b) => b.ref_id === h.id)).map((h) => ({ kind: "mapa_calor" as OdBlockKind, ref_id: h.id, label: h.title })),
     ...maps.filter((m) => !draft.some((b) => b.ref_id === m.id || (b.kind === "mapa" && b.settings.mapWith === m.key))).map((m) => ({ kind: "mapa" as OdBlockKind, ref_id: m.id, label: m.title })),
     ...pipelines.filter((p) => !draft.some((b) => b.ref_id === p.id)).map((p) => ({ kind: "tuberia" as OdBlockKind, ref_id: p.id, label: p.title })),
@@ -226,6 +229,16 @@ function DesignEditor({ data, reportId, blocks, canEdit }: { data: StationProps[
                       onChange={(list) => patch(block.tempId, { settings: { ...block.settings, indicators: list.length ? list : undefined } })}
                     />
                   )}
+                  {block.kind === "rankings" && rankings.length > 0 && (
+                    <Picker
+                      noun={{ one: "ranking", many: "rankings", block: "bloque de rankings" }}
+                      options={rankings.map((r) => ({ key: r.key, label: r.title }))}
+                      chosen={block.settings.rankings ?? []}
+                      restState={restState(block, (b) => Boolean(b.settings.rankings?.length))}
+                      disabled={!canEdit}
+                      onChange={(list) => patch(block.tempId, { settings: { ...block.settings, rankings: list.length ? list : undefined } })}
+                    />
+                  )}
                   {block.kind === "desgloses" && !block.ref_id && breakdowns.length > 0 && (
                     <Picker
                       noun={{ one: "desglose", many: "desgloses", block: "bloque de desgloses" }}
@@ -348,6 +361,15 @@ function DesignEditor({ data, reportId, blocks, canEdit }: { data: StationProps[
                 onClick={() => add({ kind: "kpis", ref_id: null, visible: true, settings: { slot: newSlot() } })}
               >
                 <Icon name="plus" size={15} /> Otro tablero de indicadores
+              </button>
+            )}
+            {rankings.length > 1 && draft.some((b) => b.kind === "rankings") && (
+              <button
+                type="button"
+                className="button-ghost"
+                onClick={() => add({ kind: "rankings", ref_id: null, visible: true, settings: { slot: newSlot() } })}
+              >
+                <Icon name="plus" size={15} /> Otro bloque de rankings
               </button>
             )}
             {breakdowns.length > 0 && draft.some((b) => b.kind === "desgloses") && (

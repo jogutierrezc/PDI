@@ -57,6 +57,7 @@ import {
 import { ALL_YEARS, ANNUAL_RULE_LABEL, cutCode, cutCodeLabel, cutLabel, fromCutCode } from "./data/terms";
 import type { Breakdown, CampusId, Indicator, MapDataset, OpenDataCatalog, Report, ReportBlock, Term } from "./data/types";
 import { blockPicks } from "./data/groups";
+import { RankingsBlock } from "./components/RankingsBlock";
 import { ALL_CAMPUSES, DEFAULT_BLOCK_ORDER, MAP_MODE_TITLE, isMobilityMap, isWorldMap } from "./data/types";
 import "./datos-abiertos.css";
 
@@ -408,6 +409,13 @@ function ReportContent({ data, report, year, term, campus, setYear, setTerm, set
             </div>
           </section>
         );
+      case "rankings": {
+        if (inSection) return null;
+        const chosen = picks.rankings(block);
+        const shown = chosen.map((key) => report.rankings?.find((r) => r.id === key)).filter((r): r is NonNullable<typeof r> => Boolean(r));
+        if (!shown.length) return null;
+        return <RankingsBlock key={key} rankings={shown} title={block.settings.title} anchor={block.settings.slot ? `od-rankings-${block.settings.slot}` : "od-rankings"} />;
+      }
       case "separador": {
         if (inSection) return null;
         const number = dividers.indexOf(block) + 1;

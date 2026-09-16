@@ -324,6 +324,12 @@ Boleto de papel claro bajo cada cifra: oficina que reporta en negrita, campus y 
 ### Section Divider (UDES en Cifras)
 Separador de la ficha de un informe ("Graduados"): banda en `--od-board-raised` con ficha numerada en el color de la línea del informe, kicker con el nombre del informe, título en letra de señalización más grande que el de cualquier bloque (clamp 2.8–4.4rem) y regla inferior de 4px en el color de la línea. Cada sección muestra sus indicadores y desgloses con un tablero y un bloque de desgloses propios, con lo suyo elegido; un bloque sin elección muestra lo que nadie eligió, y solo el primero (`blockPicks` en `groups.ts`), así nada se repite entre secciones. Con dos o más separadores, un índice "En esta ficha" bajo la barra del informe enlaza a cada uno. El bloque siguiente no repite su regla superior.
 
+### University Rankings (UDES en Cifras)
+Bloque "Rankings" con selector de vista (`RankingsBlock.tsx`). Cada ranking trae su color de acento (`--rk-accent`, elegido en la intranet), que marca identidad y nunca la cifra: insignia QS/THE, anillo de la medalla, estrellas encendidas, línea de evolución. Las cifras van en tinta del tablero y en la letra de señalización.
+- **Medallas:** tarjeta con borde superior del acento, posición principal dentro de un anillo, Latinoamérica y Colombia en celdas elevadas, variación dicha en palabras ("sube 9 puestos"; con bandas, "sube desde 1201–1400", nunca un número de puestos inventado con puntos medios), estrellas 0–5 por categoría, fichas de ODS en su color oficial, áreas plegables y campos propios.
+- **Tabla comparativa**, **Evolución** (escala logarítmica invertida, puesto 1 arriba; las bandas se dibujan como un trazo vertical translúcido) y **Rueda de ODS** (17 segmentos; los que participan se encienden en su color y se eligen con clic o teclado).
+- En el Boletín, una hoja por ranking: posiciones con variación, estrellas, tabla de ODS con su color, áreas, campos propios e historia de ediciones.
+
 ## Boletín UDES en Cifras (papel A4)
 
 El boletín es papel, no pantalla: un documento A4 de 210×297 mm que se imprime a PDF desde el navegador. Su marco lo fijó Planeación con tres páginas modelo (`Modelo Informe/Imagenes`): portada, contraportada y página de contenido. Vive en `src/modules/boletin/` y su plantilla (textos, imágenes, colores, fuente, contenido) se edita en la estación 6 de la intranet.

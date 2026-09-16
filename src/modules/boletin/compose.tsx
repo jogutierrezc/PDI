@@ -24,6 +24,8 @@ import { ALL_YEARS, ANNUAL_RULE_LABEL, cutLabel, TERMS } from "../datos-abiertos
 import type { AnnualRule, Term } from "../datos-abiertos/data/terms";
 import { isMobilityMap, isWorldMap } from "../datos-abiertos/data/types";
 import { indicatorRef, reportGroups } from "../datos-abiertos/data/groups";
+import { RANKING_SYSTEMS, SCOPE_LABEL, SDGS, latestEdition, parseRank, previousEdition, rankChange, rankOf } from "../datos-abiertos/data/rankings";
+import type { RankScope, RankingData } from "../datos-abiertos/data/rankings";
 import type { ReportGroup } from "../datos-abiertos/data/groups";
 import type {
   Breakdown,
@@ -929,6 +931,135 @@ function historyUnit(h: HistoryData): ReactNode | null {
   );
 }
 
+/* --- Ranking universitario ----------------------------------------------------------- */
+
+function StarsPrint({ value }: { value: number }) {
+  return (
+    <span className="bol-rank__stars" aria-label={`${value} de 5 estrellas`}>
+      {Array.from({ length: 5 }, (_, i) => (
+        <svg key={i} viewBox="0 0 20 20" data-on={i < value || undefined} aria-hidden="true">
+          <path d="M10 1.6l2.5 5.3 5.8.7-4.3 4 1.1 5.7L10 14.5l-5.1 2.8 1.1-5.7-4.3-4 5.8-.7z" />
+        </svg>
+      ))}
+    </span>
+  );
+}
+
+/**
+ * Hoja de un ranking: la edición del corte (o la más reciente), sus posiciones
+ * con la variación frente a la edición anterior, estrellas, ODS, áreas, campos
+ * propios y la historia de ediciones.
+ */
+function rankingUnit(r: RankingData, settings: BulletinSettings): ReactNode | null {
+  const edition = latestEdition(r, settings.cut === ALL_YEARS ? undefined : settings.cut);
+  if (!edition) return null;
+  const system = RANKING_SYSTEMS[r.system];
+  const previous = previousEdition(r, edition);
+  const scopes = (["global", "regional", "national"] as RankScope[]).filter((scope) => rankOf(edition, scope));
+  const history = r.editions.filter((e) => e.global_rank || e.regional_rank || e.national_rank || e.score !== null);
+  const rankText = (text: string) => parseRank(text)?.text ?? "—";
+  const editionNote =
+    settings.cut !== ALL_YEARS && edition.year !== settings.cut ? `Edición ${edition.year} (la más reciente hasta ${settings.cut})` : `Edición ${edition.year}`;
+  return (
+    <DatasetSheet
+      title={r.title}
+      description={r.description || system.label}
+      source={r.source}
+      notes={[
+        ["Ranking", system.label],
+        ["Corte", editionNote],
+        ["Lectura", "El puesto 1 es el primero: bajar el número es subir en el ranking."],
+      ]}
+      wide
+    >
+      <div className="bol-rank" style={{ "--rk": r.accent } as CSSProperties}>
+        {(scopes.length > 0 || edition.score !== null) && (
+          <div className="bol-rank__medals">
+            {scopes.map((scope) => {
+              const rank = rankOf(edition, scope)!;
+              const change = previous ? rankChange(rank, rankOf(previous, scope)) : null;
+              return (
+                <div key={scope} data-lead={scope === scopes[0] || undefined}>
+                  <span>{SCOPE_LABEL[scope]}</span>
+                  <strong data-band={rank.band || undefined}>{rank.band ? rank.text : `#${rank.text.replace("=", "")}`}</strong>
+                  {change && (
+                    <small data-tone={change.places > 0 ? "up" : change.places < 0 ? "down" : undefined}>
+                      {change.label} frente a {previous!.year}
+                    </small>
+                  )}
+                </div>
+              );
+            })}
+            {edition.score !== null && (
+              <div>
+                <span>Puntaje</span>
+                <strong>{formatValue(edition.score, "decimal")}</strong>
+                {edition.evaluated && <small>entre {formatValue(edition.evaluated, "entero")} instituciones</small>}
+              </div>
+            )}
+          </div>
+        )}
+
+        {edition.stars.length > 0 && (
+          <figure>
+            <figcaption>Estrellas por categoría · edición {edition.year}</figcaption>
+            <ul className="bol-rank__star-list">
+              {edition.stars.map((star) => (
+                <li key={star.category}>
+                  <span>{star.category}</span>
+                  <StarsPrint value={star.stars} />
+                </li>
+              ))}
+            </ul>
+          </figure>
+        )}
+
+        {edition.sdgs.length > 0 && (
+          <DataTable
+            caption={`ODS en los que participó · ${edition.sdgs.length} de 17`}
+            head={["ODS", "Mundial", "Colombia", "Puntaje"]}
+            rows={edition.sdgs.map((sdg) => ({
+              label: (
+                <span className="bol-rank__sdg-label">
+                  <i style={{ "--sdg": SDGS[sdg.sdg - 1].color } as CSSProperties}>{sdg.sdg}</i>
+                  {SDGS[sdg.sdg - 1].name}
+                </span>
+              ),
+              cells: [rankText(sdg.global_rank), rankText(sdg.national_rank), sdg.score === null || sdg.score === undefined ? "—" : formatValue(Number(sdg.score), "decimal")],
+            }))}
+          />
+        )}
+
+        {edition.subjects.length > 0 && (
+          <DataTable
+            caption="Posición por área"
+            head={["Área", "Mundial", "Colombia"]}
+            rows={edition.subjects.map((subject) => ({ label: subject.subject, cells: [rankText(subject.global_rank), rankText(subject.national_rank)] }))}
+          />
+        )}
+
+        {edition.custom.length > 0 && (
+          <DataTable caption="Otros resultados" head={["Campo", "Resultado"]} rows={edition.custom.map((c) => ({ label: c.label, cells: [c.value || "—"] }))} />
+        )}
+
+        {history.length > 1 && (
+          <DataTable
+            caption="Ediciones"
+            head={["Edición", SCOPE_LABEL.global, SCOPE_LABEL.regional, SCOPE_LABEL.national, "Puntaje"]}
+            highlightCol={undefined}
+            rows={history.map((e) => ({
+              label: String(e.year),
+              strong: e.year === edition.year,
+              cells: [rankText(e.global_rank), rankText(e.regional_rank), rankText(e.national_rank), e.score === null ? "—" : formatValue(e.score, "decimal")],
+            }))}
+          />
+        )}
+        {edition.note && <p className="bol-rank__note">{edition.note}</p>}
+      </div>
+    </DatasetSheet>
+  );
+}
+
 /** Continuación de una tabla larga: sin notas, con el encabezado de la tabla repetido. */
 function TableContinuation({ title, from, to, total, children }: { title: string; from: number; to: number; total: number; children: ReactNode }) {
   return (
@@ -1086,6 +1217,21 @@ function datasetHighlights(report: Report, entry: BulletinSettings["reports"][nu
         value: figure(parts ? total : top.value, b.format),
         unit: parts ? b.unit : `${b.unit} · ${top.label}`,
         note: parts ? `${when} · mayor: ${top.label} (${formatValue(((top.value ?? 0) / (total || 1)) * 100, "decimal")} %)` : `${when} · la categoría más alta`,
+      });
+    } else if (kind === "ranking") {
+      const r = report.rankings?.find((x) => x.id === key);
+      const edition = r ? latestEdition(r, settings.cut === ALL_YEARS ? undefined : settings.cut) : undefined;
+      if (!r || !edition) continue;
+      const scope = (["global", "regional", "national"] as RankScope[]).find((s) => rankOf(edition, s));
+      const rank = scope ? rankOf(edition, scope)! : null;
+      const previous = previousEdition(r, edition);
+      const change = scope && previous ? rankChange(rank, rankOf(previous, scope)) : null;
+      list.push({
+        key: item.ref,
+        title: r.title,
+        value: rank ? (rank.band ? rank.text : `#${rank.text.replace("=", "")}`) : `${edition.sdgs.length || edition.stars.length}`,
+        unit: rank && scope ? `puesto ${SCOPE_LABEL[scope].toLowerCase()}` : edition.sdgs.length ? "ODS" : "categorías con estrellas",
+        note: `Edición ${edition.year}${change ? ` · ${change.label} frente a ${previous!.year}` : ""}`,
       });
     } else if (kind === "tabla") {
       const t = report.tables?.find((x) => x.id === key);
@@ -1314,6 +1460,7 @@ export function compose(catalog: OpenDataCatalog, settings: BulletinSettings): C
           report.histories?.find((h) => `historico:${h.id}` === set.key)?.source ??
           report.breakdowns.find((b) => `desglose:${b.id}` === set.key)?.source ??
           report.tables?.find((t) => `tabla:${t.id}` === set.key)?.source ??
+          report.rankings?.find((r) => `ranking:${r.id}` === set.key)?.source ??
           (report.pipelines ?? []).find((p) => `tuberia:${p.id}` === set.key)?.source;
         if (source) credit(source, report);
       });
@@ -1372,6 +1519,9 @@ export function compose(catalog: OpenDataCatalog, settings: BulletinSettings): C
       } else if (kind === "tabla") {
         const t = report.tables?.find((x) => x.id === key);
         if (t) tableUnits(t, period).forEach(({ node, tight }) => nodes.push({ node, source: t.source, title: t.title, tight }));
+      } else if (kind === "ranking") {
+        const r = report.rankings?.find((x) => x.id === key);
+        if (r) nodes.push({ node: rankingUnit(r, settings), source: r.source, title: r.title });
       }
       nodes.forEach(({ node, source, title, tight }, index) => {
         // Sin cifras, el conjunto no dibuja nada: siempre se omite.

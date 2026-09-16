@@ -3150,3 +3150,217 @@
   color: var(--ink-muted);
   font-size: var(--text-xs);
 }
+
+/* --- Rankings: color y captura por edición ------------------------------------ */
+
+.oda-accent { border: 0; padding: 0; margin: 0; }
+.oda-accent legend { margin-bottom: var(--space-2); color: var(--ink); font-size: var(--text-sm); font-weight: 600; }
+
+.oda-accent__row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.oda-accent__swatch {
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  background: var(--swatch);
+  border: 2px solid var(--surface);
+  border-radius: 50%;
+  box-shadow: 0 0 0 1px var(--line);
+  cursor: pointer;
+}
+
+.oda-accent__swatch[aria-pressed="true"] { box-shadow: 0 0 0 2px var(--ink); }
+
+.oda-accent__custom {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.oda-accent__custom input[type="color"] {
+  width: 34px;
+  height: 34px;
+  padding: 2px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-xs);
+  cursor: pointer;
+}
+
+.oda-accent__custom input:not([type="color"]) { width: 6.5rem; font-family: var(--font-mono, ui-monospace, monospace); }
+
+.oda-accent__preview {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-3);
+  margin-top: var(--space-3);
+  padding: var(--space-3);
+  background: var(--surface-2);
+  border-top: 3px solid var(--rk-accent);
+  border-radius: var(--radius-xs);
+}
+
+.oda-accent__badge,
+.oda-ranking__badge {
+  display: inline-grid;
+  place-items: center;
+  min-width: 2.2rem;
+  height: 2.2rem;
+  padding-inline: 6px;
+  color: #ffffff;
+  background: var(--rk-accent);
+  border-radius: 6px;
+  font-weight: 800;
+}
+
+.oda-ranking__badge { min-width: 1.9rem; height: 1.9rem; margin-right: var(--space-2); font-size: var(--text-xs); vertical-align: middle; }
+
+.oda-accent__ring {
+  display: grid;
+  place-items: center;
+  width: 3.2rem;
+  height: 3.2rem;
+  border: 3px solid var(--rk-accent);
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--rk-accent) 12%, var(--surface));
+  font-weight: 800;
+}
+
+.oda-accent__title { font-weight: 700; }
+.oda-accent__stars { color: var(--rk-accent); letter-spacing: 2px; }
+
+.oda-ranking { display: grid; gap: var(--space-4); }
+
+.oda-ranking__years {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.oda-ranking__years .oda-chip[aria-pressed="true"] {
+  color: #ffffff;
+  background: var(--rk-accent);
+  border-color: var(--rk-accent);
+}
+
+.oda-ranking__add-year { display: inline-flex; gap: var(--space-2); }
+.oda-ranking__add-year input { width: 5.5rem; }
+
+.oda-ranking__block {
+  display: grid;
+  gap: var(--space-3);
+  margin: 0;
+  padding: var(--space-4);
+  border: 1px solid var(--line);
+  border-left: 3px solid var(--rk-accent);
+  border-radius: var(--radius-xs);
+}
+
+.oda-ranking__block legend {
+  padding-inline: var(--space-2);
+  color: var(--ink);
+  font-size: var(--text-sm);
+  font-weight: 700;
+}
+
+.oda-ranking__ranks {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 10rem), 1fr));
+  gap: var(--space-3);
+}
+
+.oda-ranking__rank { font-variant-numeric: tabular-nums; }
+.oda-ranking input[aria-invalid="true"] { border-color: var(--status-risk); background: var(--status-risk-soft); }
+
+.oda-ranking__stars,
+.oda-ranking__custom {
+  display: grid;
+  gap: var(--space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.oda-ranking__stars li,
+.oda-ranking__custom li {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.oda-ranking__custom li { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto; }
+
+.oda-ranking__star-picker { display: inline-flex; gap: 2px; }
+
+.oda-ranking__star-picker button {
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  color: color-mix(in srgb, var(--ink-muted) 35%, transparent);
+  background: none;
+  border: 0;
+  font-size: 1.35rem;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.oda-ranking__star-picker button[data-on] { color: var(--rk-accent); }
+.oda-ranking__star-picker button:focus-visible { outline: 2px solid var(--ink); outline-offset: 1px; border-radius: 4px; }
+
+.oda-ranking__adders { display: flex; flex-wrap: wrap; gap: var(--space-2); }
+
+.oda-ranking__sdg-picker {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(2.6rem, 1fr));
+  gap: 6px;
+}
+
+.oda-ranking__sdg-picker button {
+  height: 2.6rem;
+  color: color-mix(in srgb, var(--sdg) 70%, var(--ink));
+  background: color-mix(in srgb, var(--sdg) 12%, var(--surface));
+  border: 1px solid color-mix(in srgb, var(--sdg) 35%, transparent);
+  border-radius: 6px;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.oda-ranking__sdg-picker button[aria-pressed="true"] { color: #ffffff; background: var(--sdg); border-color: var(--sdg); }
+
+.oda-ranking__table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--text-sm);
+}
+
+.oda-ranking__table th,
+.oda-ranking__table td {
+  padding: 6px var(--space-2);
+  text-align: left;
+  border-bottom: 1px solid var(--line);
+}
+
+.oda-ranking__table thead th { color: var(--ink-muted); font-size: var(--text-2xs); font-weight: 700; }
+.oda-ranking__table td input,
+.oda-ranking__table th input { width: 100%; min-width: 6rem; }
+
+.oda-ranking__table i {
+  display: inline-grid;
+  place-items: center;
+  width: 1.6rem;
+  height: 1.6rem;
+  margin-right: 6px;
+  color: #ffffff;
+  background: var(--sdg);
+  border-radius: 4px;
+  font-style: normal;
+  font-weight: 800;
+}

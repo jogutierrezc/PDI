@@ -29,7 +29,7 @@ export interface ReportGroup {
   description?: string;
   /** Claves de indicador, en el orden del informe. */
   indicators: string[];
-  /** Referencias "desglose:clave", "mapa:clave", "calor:", "tuberia:", "historico:", "tabla:". */
+  /** Referencias "desglose:clave", "mapa:clave", "calor:", "tuberia:", "historico:", "tabla:", "ranking:". */
   datasets: string[];
 }
 
@@ -61,7 +61,7 @@ const sameBlock = (a: ReportBlock, b: ReportBlock) => a === b || (Boolean(a.uuid
  */
 export function blockPicks(report: Report) {
   const blocks = visibleBlocks(report);
-  const pick = (kind: "kpis" | "desgloses", all: string[], explicit: (b: ReportBlock) => string[] | null) => {
+  const pick = (kind: "kpis" | "desgloses" | "rankings", all: string[], explicit: (b: ReportBlock) => string[] | null) => {
     const own = blocks.filter((b) => b.kind === kind);
     const claimed = new Set(own.flatMap((b) => explicit(b) ?? []));
     const restOwner = own.find((b) => explicit(b) === null);
@@ -83,6 +83,11 @@ export function blockPicks(report: Report) {
       "desgloses",
       report.breakdowns.map((b) => b.id),
       (b) => (b.refKey ? [b.refKey] : b.settings.breakdowns?.length ? b.settings.breakdowns : null),
+    ),
+    rankings: pick(
+      "rankings",
+      (report.rankings ?? []).map((r) => r.id),
+      (b) => (b.settings.rankings?.length ? b.settings.rankings : null),
     ),
   };
 }
@@ -116,6 +121,10 @@ export function reportGroups(report: Report): ReportGrouping {
     }
     if (block.kind === "desgloses") {
       picks.breakdowns(block).forEach((key) => claim(`desglose:${key}`, current));
+      return;
+    }
+    if (block.kind === "rankings") {
+      picks.rankings(block).forEach((key) => claim(`ranking:${key}`, current));
       return;
     }
     const prefix = DATASET_PREFIX[block.kind];

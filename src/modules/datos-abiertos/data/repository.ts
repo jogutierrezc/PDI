@@ -39,6 +39,8 @@ import type {
   OdSectionRow,
   OdTableRecordRow,
   OdTableRow,
+  OdRankingRow,
+  OdRankingEditionRow,
   OdValueRow,
 } from "../../../types/database";
 import type {
@@ -61,6 +63,8 @@ import type {
 import { ALL_CAMPUSES } from "./types";
 import type { Term, TermCampusValues } from "./types";
 import { annualFigure, periodText, TERMS } from "./terms";
+import { editionFromRow } from "./rankings";
+import type { RankingData } from "./rankings";
 
 export interface OpenDataRows {
   period: OdPeriod;
@@ -81,6 +85,9 @@ export interface OpenDataRows {
   historyValues: OdHistoryValueRow[];
   sections: OdSectionRow[];
   tables: OdTableRow[];
+  /** 0030: vacías si la base aún no tiene la migración. */
+  rankings: OdRankingRow[];
+  rankingEditions: OdRankingEditionRow[];
   tableRows: OdTableRecordRow[];
   blocks: OdReportBlockRow[];
 }
@@ -139,11 +146,11 @@ export async function fetchOpenDataRows({ periodId, includeDrafts = false }: Fet
   const empty: OpenDataRows = {
     period, campuses, offices, reports, indicators: [], values: [], breakdowns: [], breakdownValues: [],
     heatmaps: [], heatmapCells: [], maps: [], mapValues: [], pipelines: [], pipelineValues: [], histories: [],
-    historyValues: [], sections: [], tables: [], tableRows: [], blocks: [],
+    historyValues: [], sections: [], tables: [], tableRows: [], rankings: [], rankingEditions: [], blocks: [],
   };
   if (reportIds.length === 0) return empty;
 
-  const [indicators, breakdowns, heatmaps, maps, pipelines, histories, sections, tables, blocks] = await Promise.all([
+  const [indicators, breakdowns, heatmaps, maps, pipelines, histories, sections, tables, rankings, blocks] = await Promise.all([
     supabase.from("od_indicators").select("*").in("report_id", reportIds).order("position").then(unwrap<OdIndicatorRow>),
     supabase.from("od_breakdowns").select("*").in("report_id", reportIds).order("position").then(unwrap<OdBreakdownRow>),
     supabase.from("od_heatmaps").select("*").in("report_id", reportIds).order("position").then(unwrap<OdHeatmapRow>),
@@ -152,13 +159,14 @@ export async function fetchOpenDataRows({ periodId, includeDrafts = false }: Fet
     supabase.from("od_histories").select("*").in("report_id", reportIds).order("position").then(unwrap<OdHistoryRow>),
     supabase.from("od_sections").select("*").in("report_id", reportIds).order("position").then(unwrapOptional<OdSectionRow>),
     supabase.from("od_tables").select("*").in("report_id", reportIds).order("position").then(unwrapOptional<OdTableRow>),
+    supabase.from("od_rankings").select("*").in("report_id", reportIds).order("position").then(unwrapOptional<OdRankingRow>),
     supabase.from("od_report_blocks").select("*").in("report_id", reportIds).order("position").then(unwrap<OdReportBlockRow>),
   ]);
 
   const ids = (rows: { id: string }[]) => rows.map((r) => r.id);
   const none = Promise.resolve([] as never[]);
 
-  const [values, breakdownValues, heatmapCells, mapValues, pipelineValues, historyValues, tableRows] = await Promise.all([
+  const [values, breakdownValues, heatmapCells, mapValues, pipelineValues, historyValues, tableRows, rankingEditions] = await Promise.all([
     indicators.length
       ? fetchAll<OdValueRow>((from, to) =>
           supabase.from("od_values").select("indicator_id,year,term,campus_id,value,updated_at")
@@ -195,11 +203,14 @@ export async function fetchOpenDataRows({ periodId, includeDrafts = false }: Fet
           supabase.from("od_table_rows").select("*").in("table_id", ids(tables)).order("position").range(from, to),
         )
       : none,
+    rankings.length
+      ? supabase.from("od_ranking_editions").select("*").in("ranking_id", ids(rankings)).order("year").then(unwrapOptional<OdRankingEditionRow>)
+      : none,
   ]);
 
   return {
     ...empty, indicators, values, breakdowns, breakdownValues, heatmaps, heatmapCells, maps, mapValues, pipelines,
-    pipelineValues, histories, historyValues, sections, tables, tableRows, blocks,
+    pipelineValues, histories, historyValues, sections, tables, tableRows, rankings, rankingEditions, blocks,
   };
 }
 
@@ -509,6 +520,15 @@ export function assembleCatalog(rows: OpenDataRows): OpenDataCatalog {
           histories.find((h) => h.uuid === refId)?.id ??
           null;
 
+    const rankings: RankingData[] = (rows.rankings ?? [])
+      .filter((r) => r.report_id === report.id)
+      .sort((a, b) => a.position - b.position)
+      .map((r) => ({
+        id: r.key, uuid: r.id, title: r.title, description: r.description, system: r.system, accent: r.accent, view: r.view,
+        source: source(r.office_id), officeId: r.office_id,
+        editions: (rows.rankingEditions ?? []).filter((e) => e.ranking_id === r.id).map(editionFromRow).sort((a, b) => a.year - b.year),
+      }));
+
     const blocks: ReportBlock[] = rows.blocks
       .filter((b) => b.report_id === report.id)
       .sort((a, b) => a.position - b.position)
@@ -536,6 +556,7 @@ export function assembleCatalog(rows: OpenDataRows): OpenDataCatalog {
       histories,
       sections,
       tables,
+      rankings,
       blocks,
       note: report.note || undefined,
       status: report.status,

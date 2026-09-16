@@ -1,0 +1,222 @@
+/* =============================================================================
+   Datos Abiertos · rankings universitarios.
+
+   Lo común a la ficha, la intranet y el Boletín: los sistemas de ranking que
+   sigue Planeación, las posiciones (número o banda), las categorías de
+   estrellas QS y los 17 ODS con su color oficial.
+
+   Una posición se guarda como texto porque los rankings publican bandas:
+   "145", "=145", "801-1000", "1001+". Para comparar y dibujar se usa un número:
+   el puesto, o el punto medio de la banda ("1001+" cuenta como 1001).
+   ========================================================================== */
+
+export type RankingSystem = "qs_world" | "qs_latam" | "qs_subject" | "qs_sustainability" | "the_latam" | "the_impact" | "otro";
+export type RankingView = "medallas" | "tabla" | "evolucion" | "ods";
+/** Ámbito de una posición. */
+export type RankScope = "global" | "regional" | "national";
+
+export const RANKING_SYSTEMS: Record<RankingSystem, { label: string; short: string; publisher: "QS" | "THE" | "" }> = {
+  qs_world: { label: "QS World University Rankings", short: "QS World", publisher: "QS" },
+  qs_latam: { label: "QS Latin America & The Caribbean", short: "QS Latinoamérica", publisher: "QS" },
+  qs_subject: { label: "QS World University Rankings by Subject", short: "QS Subject", publisher: "QS" },
+  qs_sustainability: { label: "QS Sustainability Ranking", short: "QS Sostenibilidad", publisher: "QS" },
+  the_latam: { label: "THE Latin America University Rankings", short: "THE Latinoamérica", publisher: "THE" },
+  the_impact: { label: "THE Impact Rankings (ODS)", short: "THE Impact", publisher: "THE" },
+  otro: { label: "Otro ranking", short: "Ranking", publisher: "" },
+};
+
+export const RANKING_VIEWS: Record<RankingView, string> = {
+  medallas: "Medallas",
+  tabla: "Tabla comparativa",
+  evolucion: "Evolución",
+  ods: "Rueda de ODS",
+};
+
+export const SCOPE_LABEL: Record<RankScope, string> = {
+  global: "Mundial",
+  regional: "Latinoamérica",
+  national: "Colombia",
+};
+
+/** Categorías de QS Stars, en el orden en que QS las publica. Se pueden añadir otras. */
+export const QS_STAR_CATEGORIES = [
+  "Teaching",
+  "Employability",
+  "Research",
+  "Internationalization",
+  "Online Learning",
+  "Academic Development",
+  "Facilities",
+  "Social Responsibility",
+  "Environmental Impact",
+  "Inclusiveness",
+  "Program Strength",
+];
+
+/** Colores de acento sugeridos: los de las líneas de informe del portal. */
+export const ACCENT_PRESETS = ["#1f5fbf", "#0b7481", "#a4471f", "#6b3fa0", "#7f6200", "#ad2f58", "#43536b", "#2e6b2f", "#8a3b8f"];
+
+/** Los 17 Objetivos de Desarrollo Sostenible, con el color oficial de la ONU. */
+export const SDGS: { n: number; name: string; color: string }[] = [
+  { n: 1, name: "Fin de la pobreza", color: "#E5243B" },
+  { n: 2, name: "Hambre cero", color: "#DDA63A" },
+  { n: 3, name: "Salud y bienestar", color: "#4C9F38" },
+  { n: 4, name: "Educación de calidad", color: "#C5192D" },
+  { n: 5, name: "Igualdad de género", color: "#FF3A21" },
+  { n: 6, name: "Agua limpia y saneamiento", color: "#26BDE2" },
+  { n: 7, name: "Energía asequible y no contaminante", color: "#FCC30B" },
+  { n: 8, name: "Trabajo decente y crecimiento económico", color: "#A21942" },
+  { n: 9, name: "Industria, innovación e infraestructura", color: "#FD6925" },
+  { n: 10, name: "Reducción de las desigualdades", color: "#DD1367" },
+  { n: 11, name: "Ciudades y comunidades sostenibles", color: "#FD9D24" },
+  { n: 12, name: "Producción y consumo responsables", color: "#BF8B2E" },
+  { n: 13, name: "Acción por el clima", color: "#3F7E44" },
+  { n: 14, name: "Vida submarina", color: "#0A97D9" },
+  { n: 15, name: "Vida de ecosistemas terrestres", color: "#56C02B" },
+  { n: 16, name: "Paz, justicia e instituciones sólidas", color: "#00689D" },
+  { n: 17, name: "Alianzas para lograr los objetivos", color: "#19486A" },
+];
+
+export interface StarRating {
+  category: string;
+  /** 0 a 5. */
+  stars: number;
+}
+
+export interface SdgResult {
+  sdg: number;
+  global_rank: string;
+  national_rank: string;
+  score?: number | null;
+}
+
+export interface SubjectResult {
+  subject: string;
+  global_rank: string;
+  national_rank: string;
+}
+
+export interface CustomField {
+  label: string;
+  value: string;
+}
+
+export interface RankingEdition {
+  year: number;
+  global_rank: string;
+  regional_rank: string;
+  national_rank: string;
+  evaluated: number | null;
+  score: number | null;
+  stars: StarRating[];
+  sdgs: SdgResult[];
+  subjects: SubjectResult[];
+  custom: CustomField[];
+  note: string;
+}
+
+export interface RankingData {
+  id: string;
+  uuid?: string;
+  title: string;
+  description: string;
+  system: RankingSystem;
+  accent: string;
+  view: RankingView;
+  source: string;
+  officeId?: string | null;
+  /** Ediciones en orden de año. */
+  editions: RankingEdition[];
+}
+
+/* --- Posiciones ---------------------------------------------------------------- */
+
+export interface ParsedRank {
+  /** Como se publicó, normalizado: "145", "=145", "801–1000", "1001+". */
+  text: string;
+  /** Número para comparar y dibujar: el puesto o el punto medio de la banda. */
+  value: number;
+  band: boolean;
+}
+
+export function parseRank(raw: string | null | undefined): ParsedRank | null {
+  const text = (raw ?? "").trim().replace(/\s+/g, "");
+  if (!text) return null;
+  let match = text.match(/^=?(\d{1,5})=?$/);
+  if (match) return { text: text.startsWith("=") || text.endsWith("=") ? `=${Number(match[1])}` : String(Number(match[1])), value: Number(match[1]), band: false };
+  match = text.match(/^(\d{1,5})[-–](\d{1,5})$/);
+  if (match) {
+    const [a, b] = [Number(match[1]), Number(match[2])].sort((x, y) => x - y);
+    return { text: `${a}–${b}`, value: (a + b) / 2, band: true };
+  }
+  match = text.match(/^(\d{1,5})\+$/);
+  if (match) return { text: `${Number(match[1])}+`, value: Number(match[1]), band: true };
+  return null;
+}
+
+/** ¿Es una posición válida o vacía? Mismo criterio que od_rank_is_valid en la base. */
+export const isRankText = (raw: string) => raw.trim() === "" || parseRank(raw) !== null;
+
+export const rankOf = (edition: RankingEdition | undefined, scope: RankScope): ParsedRank | null =>
+  edition ? parseRank(scope === "global" ? edition.global_rank : scope === "regional" ? edition.regional_rank : edition.national_rank) : null;
+
+/**
+ * Variación de puesto frente a la edición anterior. En un ranking, bajar el
+ * número es subir: `places` positivo es mejora. Dos bandas iguales no cambian.
+ */
+export function rankChange(current: ParsedRank | null, previous: ParsedRank | null): { places: number; label: string } | null {
+  if (!current || !previous) return null;
+  if (current.text === previous.text) return { places: 0, label: current.band ? "misma banda" : "igual" };
+  const places = Math.round(previous.value - current.value);
+  if (places === 0) return { places: 0, label: "igual" };
+  // Con una banda de por medio, la cuenta de puestos sería un punto medio, no
+  // un dato: se dice de dónde viene.
+  if (current.band || previous.band) return { places, label: `${places > 0 ? "sube" : "baja"} desde ${previous.text}` };
+  const shown = new Intl.NumberFormat("es-CO").format(Math.abs(places));
+  return { places, label: `${places > 0 ? "sube" : "baja"} ${shown} ${Math.abs(places) === 1 ? "puesto" : "puestos"}` };
+}
+
+/** Última edición con alguna posición, estrella u ODS. */
+export function latestEdition(ranking: RankingData, year?: number): RankingEdition | undefined {
+  const withData = ranking.editions.filter(
+    (e) => e.global_rank || e.regional_rank || e.national_rank || e.stars.length || e.sdgs.length || e.subjects.length || e.custom.length || e.score !== null,
+  );
+  if (year !== undefined) return withData.find((e) => e.year === year) ?? withData.filter((e) => e.year <= year).pop();
+  return withData[withData.length - 1];
+}
+
+export const previousEdition = (ranking: RankingData, edition: RankingEdition) =>
+  ranking.editions.filter((e) => e.year < edition.year).pop();
+
+/** Normaliza lo que llega en jsonb: listas que pueden venir incompletas de una captura vieja. */
+export function editionFromRow(row: {
+  year: number;
+  global_rank?: string | null;
+  regional_rank?: string | null;
+  national_rank?: string | null;
+  evaluated?: number | null;
+  score?: number | string | null;
+  stars?: unknown;
+  sdgs?: unknown;
+  subjects?: unknown;
+  custom?: unknown;
+  note?: string | null;
+}): RankingEdition {
+  const list = <T,>(value: unknown): T[] => (Array.isArray(value) ? (value as T[]) : []);
+  return {
+    year: Number(row.year),
+    global_rank: row.global_rank ?? "",
+    regional_rank: row.regional_rank ?? "",
+    national_rank: row.national_rank ?? "",
+    evaluated: row.evaluated ?? null,
+    score: row.score === null || row.score === undefined || row.score === "" ? null : Number(row.score),
+    stars: list<StarRating>(row.stars).filter((s) => s && s.category).map((s) => ({ category: String(s.category), stars: Math.max(0, Math.min(5, Math.round(Number(s.stars) || 0))) })),
+    sdgs: list<SdgResult>(row.sdgs)
+      .filter((s) => s && Number(s.sdg) >= 1 && Number(s.sdg) <= 17)
+      .map((s) => ({ sdg: Number(s.sdg), global_rank: s.global_rank ?? "", national_rank: s.national_rank ?? "", score: s.score ?? null }))
+      .sort((a, b) => a.sdg - b.sdg),
+    subjects: list<SubjectResult>(row.subjects).filter((s) => s && s.subject).map((s) => ({ subject: String(s.subject), global_rank: s.global_rank ?? "", national_rank: s.national_rank ?? "" })),
+    custom: list<CustomField>(row.custom).filter((c) => c && c.label).map((c) => ({ label: String(c.label), value: String(c.value ?? "") })),
+    note: row.note ?? "",
+  };
+}

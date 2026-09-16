@@ -40,10 +40,11 @@ import { ConfirmButton, Panel, PeriodInput, SaveState, StageEmpty, YearPicker, p
 import { parseCsv, parseNumber, toCsv } from "../sheet";
 import { ImportReport, profileFor } from "./ImportReport";
 import { MobilityCapture } from "./MobilityCapture";
+import { RankingCapture } from "./RankingCapture";
 import { PasteMessages, PasteTable, breakdownFromTable, heatmapFromTable } from "../PasteTable";
 import { IMPORT_PROFILES } from "../import/investigacion";
 
-type Tab = "importar" | "indicadores" | "desgloses" | "historico" | "calor" | "mapas" | "tuberia";
+type Tab = "importar" | "indicadores" | "desgloses" | "historico" | "calor" | "mapas" | "tuberia" | "rankings";
 const TOTAL = "total";
 
 export function CaptureStation(props: StationProps) {
@@ -60,6 +61,7 @@ export function CaptureStation(props: StationProps) {
     calor: data.rows.heatmaps.filter((h) => h.report_id === report.uuid).length,
     mapas: data.rows.maps.filter((m) => m.report_id === report.uuid).length,
     tuberia: data.rows.pipelines.filter((p) => p.report_id === report.uuid).length,
+    rankings: (data.rows.rankings ?? []).filter((r) => r.report_id === report.uuid).length,
   };
   const tabs: { id: Tab; label: string }[] = [
     { id: "importar" as Tab, label: "Importar informe" },
@@ -69,6 +71,7 @@ export function CaptureStation(props: StationProps) {
     { id: "calor" as Tab, label: "Mapas de calor" },
     { id: "mapas" as Tab, label: "Mapas" },
     { id: "tuberia" as Tab, label: "Tuberías" },
+    { id: "rankings" as Tab, label: "Rankings" },
   ].filter((t) => t.id === "indicadores" || t.id === "importar" || counts[t.id] > 0);
 
   return (
@@ -106,6 +109,7 @@ export function CaptureStation(props: StationProps) {
       {tab === "calor" && <HeatmapCapture key={report.uuid} {...props} />}
       {tab === "mapas" && <MapCapture key={report.uuid} {...props} />}
       {tab === "tuberia" && <PipelineCapture key={report.uuid} {...props} />}
+      {tab === "rankings" && <RankingCapture key={report.uuid} {...props} />}
     </div>
   );
 }

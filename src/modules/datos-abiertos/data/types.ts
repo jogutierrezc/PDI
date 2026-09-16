@@ -16,6 +16,7 @@
 
 import type { PublicationStatus } from "../../../types/database";
 import type { AnnualRule, Term } from "./terms";
+import type { RankingData } from "./rankings";
 
 export type { AnnualRule, Term } from "./terms";
 
@@ -46,7 +47,8 @@ export type BlockKind =
   | "metodologia"
   | "historico"
   | "tabla"
-  | "separador";
+  | "separador"
+  | "rankings";
 
 export interface Campus {
   id: CampusId;
@@ -254,6 +256,8 @@ export interface ReportBlock {
     breakdowns?: string[];
     /** Distingue varios bloques del mismo tipo sin conjunto (separadores, tableros). */
     slot?: string;
+    /** Bloque de rankings: claves de los rankings que muestra. */
+    rankings?: string[];
   };
   /** Punto del informe al que pertenece. Sin punto, el bloque es de toda la ficha. */
   sectionKey?: string | null;
@@ -292,6 +296,8 @@ export interface Report {
   /** Puntos del informe, en orden. Sin puntos, la ficha es una sola columna de bloques. */
   sections?: ReportSection[];
   tables?: TableData[];
+  /** Rankings universitarios (QS, THE…) con sus ediciones anuales. */
+  rankings?: RankingData[];
   /** Orden y visibilidad de los bloques de la ficha. Sin bloques, el orden por defecto. */
   blocks?: ReportBlock[];
   /** Nota metodológica o de alcance. */
@@ -378,4 +384,5 @@ export const BLOCK_LABELS: Record<BlockKind, string> = {
   tabla_dinamica: "Tabla dinámica",
   metodologia: "Qué mide cada cifra",
   separador: "Separador",
+  rankings: "Rankings",
 };

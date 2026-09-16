@@ -40,9 +40,12 @@ import {
   useSaveKpis,
   useSaveMap,
   useSavePipeline,
+  useSaveRanking,
   useSaveReport,
 } from "../od-data";
 import { ConfirmButton, Panel, SaveState, StageEmpty, YearPicker, slugify } from "../ui";
+import { RankingForm } from "./RankingCapture";
+import { RANKING_SYSTEMS, RANKING_VIEWS } from "../../../datos-abiertos/data/rankings";
 
 const FORMAT_LABEL: Record<OdValueFormat, string> = { entero: "Entero", porcentaje: "Porcentaje", decimal: "Decimal" };
 const DIRECTION_LABEL: Record<OdDirection, string> = { sube: "Subir es mejor", baja: "Bajar es mejor", neutro: "Neutro" };
@@ -507,7 +510,7 @@ function IndicatorForm({
 
 /* --- Conjuntos visuales --------------------------------------------------------------------- */
 
-type DatasetKind = "desglose" | "calor" | "mapa" | "tuberia" | "historico";
+type DatasetKind = "desglose" | "calor" | "mapa" | "tuberia" | "historico" | "ranking";
 
 const MEASURE_LABEL: Record<OdPipelineMeasure, string> = {
   estudiantes: "Estudiantes que siguen en cada etapa (el portal lo muestra en %)",
@@ -529,6 +532,7 @@ function DatasetsEditor({ data, reportId, years, canEdit }: { data: StationProps
   const saveMap = useSaveMap();
   const savePipeline = useSavePipeline();
   const saveHistory = useSaveHistory();
+  const saveRanking = useSaveRanking();
   const remove = useDeleteDataset();
   const [adding, setAdding] = useState<DatasetKind | null>(null);
   // Mapas: por departamento o de movilidad internacional, según la opción elegida.
@@ -540,13 +544,14 @@ function DatasetsEditor({ data, reportId, years, canEdit }: { data: StationProps
   const maps = data.rows.maps.filter((m) => m.report_id === reportId);
   const pipelines = data.rows.pipelines.filter((p) => p.report_id === reportId);
   const histories = data.rows.histories.filter((h) => h.report_id === reportId);
+  const rankings = (data.rows.rankings ?? []).filter((r) => r.report_id === reportId).sort((a, b) => a.position - b.position);
   const offices = data.rows.offices;
-  const mutations = [saveBreakdown, saveHeatmap, saveMap, savePipeline, saveHistory, remove];
+  const mutations = [saveBreakdown, saveHeatmap, saveMap, savePipeline, saveHistory, saveRanking, remove];
   const pending = mutations.some((m) => m.isPending);
   const error = mutations.find((m) => m.error)?.error ?? null;
   const success = mutations.some((m) => m.isSuccess);
   const done = { onSuccess: () => { setAdding(null); setEditing(null); } };
-  const total = breakdowns.length + heatmaps.length + maps.length + pipelines.length + histories.length;
+  const total = breakdowns.length + heatmaps.length + maps.length + pipelines.length + histories.length + rankings.length;
 
   const lines = (text: string) => text.split("\n").map((s) => s.trim()).filter(Boolean);
   const yearsDetail = (list: number[] | null) => (list && list.length ? list.join(", ") : "todos los años");
@@ -588,12 +593,25 @@ function DatasetsEditor({ data, reportId, years, canEdit }: { data: StationProps
               <option value="mapa:entrante">Mapa de movilidad entrante (país → campus)</option>
               <option value="mapa:saliente">Mapa de movilidad saliente (campus → país)</option>
               <option value="mapa:convenios">Mapa de convenios internacionales por país (mapa de calor)</option>
+              <option value="ranking">Ranking universitario (QS, THE…)</option>
             </select>
           </label>
         </>
       }
     >
-      {adding && (
+      {adding === "ranking" && (
+        <RankingForm
+          offices={offices}
+          onCancel={() => setAdding(null)}
+          onSubmit={(f) =>
+            saveRanking.mutate(
+              { report_id: reportId, key: uniqueKey(f.title, rankings.map((r) => r.key)), title: f.title, description: f.description, system: f.system, accent: f.accent, view: f.view, office_id: f.office_id || null, position: rankings.length + 1 },
+              done,
+            )
+          }
+        />
+      )}
+      {adding && adding !== "ranking" && (
         <DatasetForm
           key={`${adding}-${addingMode}`}
           kind={adding}
@@ -647,6 +665,14 @@ function DatasetsEditor({ data, reportId, years, canEdit }: { data: StationProps
             editing={editing === m.id} onEdit={() => setEditing(m.id)} onDelete={() => remove.mutate({ table: "od_maps", id: m.id })}>
             <DatasetForm kind="mapa" offices={offices} years={years} initial={{ title: m.title, description: m.description, unit: m.unit, mode: m.mode, reporting: m.reporting ?? "anual", years: m.years, office_id: m.office_id ?? "" }}
               onCancel={() => setEditing(null)} onSubmit={(f) => saveMap.mutate({ id: m.id, report_id: reportId, title: f.title, description: f.description, unit: f.unit, mode: f.mode, reporting: reportingFor(f), years: reportingFor(f) === "global" ? null : f.years, office_id: f.office_id || null }, done)} />
+          </DatasetItem>
+        ))}
+        {rankings.map((r) => (
+          <DatasetItem key={r.id} kind="Ranking" title={r.title} detail={`${RANKING_SYSTEMS[r.system].short} · abre en ${RANKING_VIEWS[r.view].toLowerCase()}`} canEdit={canEdit}
+            editing={editing === r.id} onEdit={() => setEditing(r.id)} onDelete={() => remove.mutate({ table: "od_rankings", id: r.id })}>
+            <RankingForm offices={offices} initial={{ title: r.title, description: r.description, system: r.system, accent: r.accent, view: r.view, office_id: r.office_id ?? "" }}
+              onCancel={() => setEditing(null)}
+              onSubmit={(f) => saveRanking.mutate({ id: r.id, report_id: reportId, title: f.title, description: f.description, system: f.system, accent: f.accent, view: f.view, office_id: f.office_id || null }, done)} />
           </DatasetItem>
         ))}
         {total === 0 && !adding && (

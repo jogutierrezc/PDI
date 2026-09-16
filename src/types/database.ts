@@ -1006,7 +1006,9 @@ export type OdBlockKind =
   | "historico"
   | "tabla"
   /** Título de sección: agrupa los bloques que le siguen hasta el próximo separador. */
-  | "separador";
+  | "separador"
+  /** Rankings universitarios del informe, con su selector de vista (0030). */
+  | "rankings";
 /** Estado de un punto de un informe. */
 /** Cómo llega la cifra: por periodo académico (A y B) o una sola cifra por año. */
 export type OdReporting = "periodo" | "anual";
@@ -1271,6 +1273,8 @@ export interface OdReportBlockRow {
     description?: string;
     /** Bloque de desgloses: claves de los desgloses que muestra. Sin ellas, los que ningún otro bloque eligió. */
     breakdowns?: string[];
+    /** Bloque de rankings: claves de los rankings que muestra. Sin ellas, los que ningún otro bloque eligió. */
+    rankings?: string[];
     /** Distingue varios bloques del mismo tipo sin conjunto (separadores, tableros). Ver 0029. */
     slot?: string;
   };
@@ -1312,6 +1316,37 @@ export interface OdTableRow {
   columns: OdTableColumn[];
   office_id: string | null;
   position: number;
+}
+
+/** Ranking universitario de un informe (0030). */
+export interface OdRankingRow {
+  id: string;
+  report_id: string;
+  key: string;
+  title: string;
+  description: string;
+  system: "qs_world" | "qs_latam" | "qs_subject" | "qs_sustainability" | "the_latam" | "the_impact" | "otro";
+  accent: string;
+  view: "medallas" | "tabla" | "evolucion" | "ods";
+  office_id: string | null;
+  position: number;
+}
+
+/** Una edición anual de un ranking: posiciones como texto ("145", "801-1000") y listas en jsonb. */
+export interface OdRankingEditionRow {
+  id?: string;
+  ranking_id: string;
+  year: number;
+  global_rank: string;
+  regional_rank: string;
+  national_rank: string;
+  evaluated: number | null;
+  score: number | null;
+  stars: { category: string; stars: number }[];
+  sdgs: { sdg: number; global_rank: string; national_rank: string; score?: number | null }[];
+  subjects: { subject: string; global_rank: string; national_rank: string }[];
+  custom: { label: string; value: string }[];
+  note: string;
 }
 
 export interface OdTableRecordRow {

@@ -2986,3 +2986,12 @@
   color: var(--brand-blue-strong);
   background: var(--brand-blue-soft);
 }
+
+/* Tipo de boletín: completo o ejecutivo. */
+.oda-bulletin-format {
+  display: grid;
+  justify-items: start;
+  gap: var(--space-2);
+  padding-bottom: var(--space-4);
+  border-bottom: 1px solid var(--line);
+}

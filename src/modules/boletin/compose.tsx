@@ -31,15 +31,17 @@ import type {
 import { DEPARTMENTS } from "../datos-abiertos/data/colombia-map";
 import { LeakyPipeline } from "../datos-abiertos/components/LeakyPipeline";
 import { COUNTRIES } from "../datos-abiertos/data/world-map";
-import { ChoroplethMap, DataTable, EvolutionChart, HBars, Legend, MapLegend, SERIES_COLORS, StackedColumns, SwatchLegend, figure } from "./figures";
+import { ChoroplethMap, DataTable, EvolutionChart, HBars, Legend, MapLegend, SERIES_COLORS, StackedColumns, SwatchLegend, Trend, figure } from "./figures";
 import type { Series } from "./figures";
 import type { BulletinSettings, IndicatorShow } from "./model";
 
 export interface Unit {
   key: string;
-  kind: "capitulo" | "indicador" | "conjunto";
-  /** Informe al que pertenece: nombre para el pie, la cabecera y el índice. */
-  report: Report;
+  kind: "resumen" | "capitulo" | "indicador" | "conjunto";
+  /** Informe al que pertenece (el resumen no tiene): pie, cabecera, pestaña e índice. */
+  report?: Report;
+  /** Continuación de una tabla: va pegada a la anterior y no entra al índice. */
+  tight?: boolean;
   /** Título de la hoja: nombre del indicador o del conjunto. */
   title: string;
   breakBefore?: boolean;
@@ -60,7 +62,9 @@ export interface Composition {
   offices: { name: string; reports: string[] }[];
 }
 
-const TABLE_CHUNK = 26;
+/** Filas de una tabla larga en su hoja y en cada continuación. */
+const TABLE_FIRST = 12;
+const TABLE_NEXT = 14;
 const DIRECTION_TEXT = { sube: "Un valor más alto es mejor", baja: "Un valor más bajo es mejor", neutro: "Sin dirección deseada" };
 const NAMES: Record<string, string> = {
   ...Object.fromEntries(DEPARTMENTS.map((d) => [d.code, d.name])),
@@ -465,6 +469,9 @@ function pipelineUnit(p: PipelineData, settings: BulletinSettings, catalog: Open
   const measure = p.measure ?? "estudiantes";
   const format = measure === "estudiantes" ? "entero" : "decimal";
   const campusName = catalog.campuses.find((c) => c.id === settings.campus)?.name ?? "Todos los campus";
+  // La misma cohorte que dibuja la tubería de la web: la de más etapas con dato y, a igualdad, la más reciente.
+  const filled = (c: PipelineData["cohorts"][number]) => c.remaining.filter((v) => v !== null).length;
+  const drawn = rows.slice().sort((a, b) => filled(a) - filled(b) || String(a.cohort).localeCompare(String(b.cohort))).pop();
   return (
     <DatasetSheet
       title={p.title}
@@ -480,9 +487,11 @@ function pipelineUnit(p: PipelineData, settings: BulletinSettings, catalog: Open
       </div>
       <DataTable
         head={["Cohorte", ...p.stages]}
+        caption={rows.length > 1 && drawn ? `La tubería dibuja la cohorte ${drawn.cohort}, en negrita en la tabla.` : undefined}
         rows={rows.map((c) => {
           const first = c.remaining[0] ?? null;
           return {
+            strong: rows.length > 1 && c === drawn,
             label: String(c.cohort),
             cells: p.stages.map((_, i) => figure(c.remaining[i] ?? null, format)),
             shade: p.stages.map((_, i) => {
@@ -518,7 +527,20 @@ function historyUnit(h: HistoryData): ReactNode | null {
   );
 }
 
-function tableUnits(t: TableData, period: string): ReactNode[] {
+/** Continuación de una tabla larga: sin notas, con el encabezado de la tabla repetido. */
+function TableContinuation({ title, from, to, total, children }: { title: string; from: number; to: number; total: number; children: ReactNode }) {
+  return (
+    <article className="bol-sheet bol-sheet--cont">
+      <p className="bol-cont">
+        <b>{title}</b> · continuación · filas {from} a {to} de {total}
+        {to < total ? " · continúa" : ""}
+      </p>
+      {children}
+    </article>
+  );
+}
+
+function tableUnits(t: TableData, period: string): { node: ReactNode; tight: boolean }[] {
   if (!t.rows.length) return [];
   const [first, ...rest] = t.columns;
   const cell = (row: Record<string, string | number | null>, col: TableData["columns"][number]) => {
@@ -527,34 +549,180 @@ function tableUnits(t: TableData, period: string): ReactNode[] {
     if (typeof v === "number" && col.format !== "texto" && col.format !== "enlace") return formatValue(v, col.format);
     return String(v);
   };
-  const chunks: Record<string, string | number | null>[][] = [];
-  for (let i = 0; i < t.rows.length; i += TABLE_CHUNK) chunks.push(t.rows.slice(i, i + TABLE_CHUNK));
+  const table = (rows: Record<string, string | number | null>[]) => (
+    <DataTable head={t.columns.map((c) => c.label)} rows={rows.map((row) => ({ label: cell(row, first), cells: rest.map((c) => cell(row, c)) }))} />
+  );
+  // La hoja lleva las primeras filas; el resto sigue en tramos cortos que
+  // llenan el final de la página y continúan en la siguiente.
+  const chunks: { from: number; rows: Record<string, string | number | null>[] }[] = [{ from: 0, rows: t.rows.slice(0, TABLE_FIRST) }];
+  for (let i = TABLE_FIRST; i < t.rows.length; i += TABLE_NEXT) chunks.push({ from: i, rows: t.rows.slice(i, i + TABLE_NEXT) });
   // Un ranking con una columna numérica se lee mejor con barras encima de la tabla.
   const measureCol = t.display === "ranking" ? t.columns.find((c) => c.format !== "texto" && c.format !== "enlace") : undefined;
   const wide = t.columns.length > 5;
-  return chunks.map((rows, i) => (
-    <DatasetSheet
-      key={i}
-      title={i === 0 ? t.title : `${t.title} (continuación)`}
-      description={i === 0 ? t.description : undefined}
-      source={t.source}
-      notes={chunks.length > 1 ? [["Filas", `${i * TABLE_CHUNK + 1} a ${i * TABLE_CHUNK + rows.length} de ${t.rows.length}${i < chunks.length - 1 ? " · continúa" : ""}`]] : undefined}
-      cut={period}
-      wide={wide}
-    >
-      {i === 0 && measureCol && (
-        <figure>
-          <figcaption>{measureCol.label} · los {Math.min(10, t.rows.length)} primeros</figcaption>
-          <HBars
-            items={t.rows.slice(0, 10).map((row) => ({ label: String(row[first.key] ?? "—"), value: typeof row[measureCol.key] === "number" ? (row[measureCol.key] as number) : null }))}
-            format={measureCol.format === "texto" || measureCol.format === "enlace" ? "entero" : measureCol.format}
-            width={wide ? 178 : 130}
-          />
-        </figure>
-      )}
-      <DataTable head={t.columns.map((c) => c.label)} rows={rows.map((row) => ({ label: cell(row, first), cells: rest.map((c) => cell(row, c)) }))} />
-    </DatasetSheet>
-  ));
+  return chunks.map(({ from, rows }, i) =>
+    i === 0
+      ? {
+          tight: false,
+          node: (
+            <DatasetSheet
+              title={t.title}
+              description={t.description}
+              source={t.source}
+              notes={chunks.length > 1 ? [["Filas", `1 a ${rows.length} de ${t.rows.length} · continúa`]] : undefined}
+              cut={period}
+              wide={wide}
+            >
+              {measureCol && (
+                <figure>
+                  <figcaption>{measureCol.label} · los {Math.min(10, t.rows.length)} primeros</figcaption>
+                  <HBars
+                    items={t.rows.slice(0, 10).map((row) => ({ label: String(row[first.key] ?? "—"), value: typeof row[measureCol.key] === "number" ? (row[measureCol.key] as number) : null }))}
+                    format={measureCol.format === "texto" || measureCol.format === "enlace" ? "entero" : measureCol.format}
+                    width={wide ? 178 : 130}
+                  />
+                </figure>
+              )}
+              {table(rows)}
+            </DatasetSheet>
+          ),
+        }
+      : {
+          tight: true,
+          node: (
+            <TableContinuation title={t.title} from={from + 1} to={from + rows.length} total={t.rows.length}>
+              {table(rows)}
+            </TableContinuation>
+          ),
+        },
+  );
+}
+
+/* --- Formato ejecutivo -------------------------------------------------------------- */
+
+/** Cifras clave de un informe: sus KPI incluidos con datos; sin KPI, los primeros incluidos. */
+function executiveIndicators(report: Report, entry: BulletinSettings["reports"][number], catalog: OpenDataCatalog, limit: number): Indicator[] {
+  const included = entry.indicators
+    .filter((item) => item.include)
+    .map((item) => report.indicators.find((i) => i.id === item.id))
+    .filter((i): i is Indicator => Boolean(i) && indicatorHasData(i!, catalog));
+  const keys = report.keyIndicators.map((id) => included.find((i) => i.id === id)).filter((i): i is Indicator => Boolean(i));
+  return (keys.length ? keys : included).slice(0, limit);
+}
+
+function unitOf(indicator: Indicator) {
+  return indicator.format === "porcentaje" || indicator.unit === "%" ? "%" : indicator.unit;
+}
+
+/** Lectura de la cifra del corte: variación frente al año anterior o cómo salió del periodo. */
+function readingOf(indicator: Indicator, settings: BulletinSettings, campusName: string): ReactNode {
+  const { cut, campus } = settings;
+  const value = valueOf(indicator, cut, campus);
+  if (value === null) return "Sin reportar";
+  if (cut === ALL_YEARS) return periodBasisOf(indicator, campus) ?? "periodo completo";
+  const previous = valueOf(indicator, cut - 1, campus);
+  const change = changeBetween(indicator, value, previous);
+  if (!change) return `${campusName} · sin comparación con ${cut - 1}`;
+  return (
+    <span className="bol-change" data-reading={change.reading}>
+      <Arrow dir={value > previous! ? "up" : value < previous! ? "down" : "flat"} />
+      {change.label} frente a {cut - 1}
+    </span>
+  );
+}
+
+function ExecutiveSummary({ items, settings }: { items: { report: Report; indicators: Indicator[] }[]; settings: BulletinSettings }) {
+  return (
+    <section className="bol-summary">
+      <h2>Resumen ejecutivo</h2>
+      <p className="bol-summary__lede">
+        Las cifras titulares de cada informe · {cutText(settings.cut)}. El detalle de cada una está en su capítulo.
+      </p>
+      <ol className="bol-summary__list">
+        {items.map(({ report, indicators }) => (
+          <li key={report.slug} style={{ "--line": `var(--bol-line-${report.line})` } as CSSProperties}>
+            <a className="bol-summary__report" href={`#cap-${report.slug}`}>
+              <span className="bol-chapter__code">{report.code}</span>
+              <span>{report.name}</span>
+            </a>
+            <dl>
+              {indicators.slice(0, 3).map((indicator) => {
+                const v = valueOf(indicator, settings.cut, settings.campus);
+                return (
+                  <div key={indicator.id}>
+                    <dt>{indicator.label}</dt>
+                    <dd>
+                      <b>{figure(v, indicator.format)}</b>
+                      <small>{v === null ? "sin reportar" : unitOf(indicator)}</small>
+                    </dd>
+                  </div>
+                );
+              })}
+            </dl>
+          </li>
+        ))}
+      </ol>
+    </section>
+  );
+}
+
+function ExecutiveSheet({ report, indicators, catalog, settings }: { report: Report; indicators: Indicator[]; catalog: OpenDataCatalog; settings: BulletinSettings }) {
+  const campusName = catalog.campuses.find((c) => c.id === settings.campus)?.name ?? "Todos los campus";
+  const campuses = sites(catalog);
+  return (
+    <section className="bol-exec" style={{ "--line": `var(--bol-line-${report.line})` } as CSSProperties}>
+      <div className="bol-chapter__title">
+        <span className="bol-chapter__code">{report.code}</span>
+        <div>
+          <h2>{report.name}</h2>
+          <p>{report.summary || report.description}</p>
+        </div>
+      </div>
+      <p className="bol-chapter__meta">
+        {cutText(settings.cut)} · {campusName} · {indicators.length} {indicators.length === 1 ? "cifra clave" : "cifras clave"}
+      </p>
+      <ol className="bol-exec__rows">
+        {indicators.map((indicator) => {
+          const value = valueOf(indicator, settings.cut, settings.campus);
+          const years = yearsOf(catalog, indicator.years);
+          const split = campuses
+            .map((c) => ({ name: c.name, value: valueOf(indicator, settings.cut, c.id) }))
+            .filter((c) => c.value !== null);
+          return (
+            <li key={indicator.id}>
+              <div className="bol-exec__what">
+                <h3>{indicator.label}</h3>
+                <p>{indicator.definition}</p>
+                <small>Reporta: {indicator.source}</small>
+              </div>
+              <div className="bol-exec__figure">
+                <b>
+                  {figure(value, indicator.format)}
+                  {value !== null && unitOf(indicator) === "%" && <span> %</span>}
+                </b>
+                {value !== null && unitOf(indicator) !== "%" && <small>{indicator.unit}</small>}
+                <p>{readingOf(indicator, settings, campusName)}</p>
+              </div>
+              <div className="bol-exec__trend">
+                <Trend years={years} values={years.map((y) => valueOf(indicator, y, "todas"))} format={indicator.format} />
+              </div>
+              <ul className="bol-exec__split">
+                {split.length ? (
+                  split.map((c) => (
+                    <li key={c.name}>
+                      <span>{c.name}</span>
+                      <b>{figure(c.value, indicator.format)}</b>
+                    </li>
+                  ))
+                ) : (
+                  <li className="bol-exec__institutional">Cifra institucional</li>
+                )}
+              </ul>
+            </li>
+          );
+        })}
+      </ol>
+    </section>
+  );
 }
 
 /* --- Composición ---------------------------------------------------------------------- */
@@ -570,10 +738,36 @@ export function compose(catalog: OpenDataCatalog, settings: BulletinSettings): C
     offices.get(source)!.add(report.name);
   };
 
+  const executive = settings.format === "ejecutivo";
+  const summaryItems: { report: Report; indicators: Indicator[] }[] = [];
+
   for (const entry of settings.reports) {
     if (!entry.include || entry.removed) continue;
     const report = catalog.reports.find((r) => r.slug === entry.slug);
     if (!report) continue;
+
+    if (executive || settings.summary) {
+      const headline = executiveIndicators(report, entry, catalog, executive ? 6 : 3);
+      if (headline.length) summaryItems.push({ report, indicators: headline });
+    }
+
+    // Ejecutivo: una ficha por informe con sus cifras clave, sin hojas.
+    if (executive) {
+      const key = summaryItems.find((item) => item.report.slug === report.slug)?.indicators ?? [];
+      if (!key.length) continue;
+      key.forEach((indicator) => credit(indicator.source, report));
+      chapters.push(report);
+      units.push({
+        key: `${report.slug}-ficha`,
+        kind: "capitulo",
+        report,
+        title: report.name,
+        breakBefore: true,
+        node: <ExecutiveSheet report={report} indicators={key} catalog={catalog} settings={settings} />,
+      });
+      continue;
+    }
+
     const body: Unit[] = [];
 
     for (const item of entry.indicators) {
@@ -595,7 +789,7 @@ export function compose(catalog: OpenDataCatalog, settings: BulletinSettings): C
     for (const item of entry.datasets) {
       if (!item.include) continue;
       const [kind, key] = [item.ref.slice(0, item.ref.indexOf(":")), item.ref.slice(item.ref.indexOf(":") + 1)];
-      const nodes: { node: ReactNode; source: string; title: string }[] = [];
+      const nodes: { node: ReactNode; source: string; title: string; tight?: boolean }[] = [];
       if (kind === "desglose") {
         const b = report.breakdowns.find((x) => x.id === key);
         if (b) nodes.push({ node: breakdownUnit(b, catalog, settings), source: b.source, title: b.title });
@@ -613,13 +807,13 @@ export function compose(catalog: OpenDataCatalog, settings: BulletinSettings): C
         if (h) nodes.push({ node: historyUnit(h), source: h.source, title: h.title });
       } else if (kind === "tabla") {
         const t = report.tables?.find((x) => x.id === key);
-        if (t) tableUnits(t, period).forEach((node) => nodes.push({ node, source: t.source, title: t.title }));
+        if (t) tableUnits(t, period).forEach(({ node, tight }) => nodes.push({ node, source: t.source, title: t.title, tight }));
       }
-      nodes.forEach(({ node, source, title }, index) => {
+      nodes.forEach(({ node, source, title, tight }, index) => {
         // Sin cifras, el conjunto no dibuja nada: siempre se omite.
         if (!node) return;
         credit(source, report);
-        body.push({ key: `${report.slug}-d-${item.ref}-${index}`, kind: "conjunto", report, title, node });
+        body.push({ key: `${report.slug}-d-${item.ref}-${index}`, kind: "conjunto", report, title, node, tight });
       });
     }
 
@@ -634,6 +828,17 @@ export function compose(catalog: OpenDataCatalog, settings: BulletinSettings): C
       node: <ChapterOpener report={report} catalog={catalog} settings={settings} count={body.length} />,
     });
     units.push(...body);
+  }
+
+  // El resumen abre el documento: siempre en el ejecutivo, a pedido en el completo.
+  if ((executive || settings.summary) && summaryItems.length) {
+    units.unshift({
+      key: "resumen",
+      kind: "resumen",
+      title: "Resumen ejecutivo",
+      breakBefore: true,
+      node: <ExecutiveSummary items={summaryItems.filter((item) => chapters.includes(item.report))} settings={settings} />,
+    });
   }
 
   return {

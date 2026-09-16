@@ -201,6 +201,7 @@ function DepartureBoard({ data, year, term, campus, campusName, setYear, setTerm
             </p>
             <p className="od-board__downloads">
               <BulletinDownload catalog={data} className="od-button od-button--signal" />
+              <BulletinDownload catalog={data} format="ejecutivo" className="od-button od-button--ghost" />
               <Link className="od-board__bulletins" to="/datos-abiertos/boletines">
                 Todos los boletines y ediciones
               </Link>

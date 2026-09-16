@@ -342,6 +342,9 @@ El boletín es papel, no pantalla: un documento A4 de 210×297 mm que se imprime
 - **Tabla:** las columnas de texto parten línea a la izquierda, las cifras van a la derecha; si aun así no cabe, la tabla se reduce hasta el margen.
 - **Apertura de capítulo:** regla superior y cuadro de código en el color de la línea del informe, cifras clave con la unidad debajo del número.
 - **Presentación y contenido:** la presentación va justificada; el contenido lista cada capítulo y, sangradas debajo, sus hojas con su página. Si no cabe bajo la presentación, sigue en páginas "Contenido (continuación)".
+- **Formato ejecutivo:** página "Resumen ejecutivo" (cada informe en una fila con sus tres cifras titulares) y una ficha por informe con hasta seis cifras clave en filas: qué mide, cifra y lectura, tendencia del total (primer y último año) y reparto por campus.
+- **Navegación:** las entradas del contenido, las pestañas de capítulo y el número de página del pie son enlaces internos que Chrome conserva en el PDF. Las pestañas van en el borde derecho, fuera del margen: franja fina en el color de cada informe y la del capítulo actual ancha, con su código.
+- **Tablas largas:** la hoja lleva las primeras 12 filas y el resto sigue en tramos de 14 pegados a la anterior, con el encabezado repetido y "continuación".
 - **Contraportada:** lista de oficinas que reportan en dos columnas (tres cuando pasan de 20) sobre el espacio blanco del modelo.
 
 ## Do's and Don'ts

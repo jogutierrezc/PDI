@@ -1679,6 +1679,20 @@ const routes = [
     session: true,
     expect: "Boletines del periodo",
     also: ["Boletín UDES en Cifras", "Contenido", "Plantilla", "Vista previa", "Oficinas que reportan", "Hoja de indicador, en todos"],
+    interact: async (window, tick) => {
+      // Pasar de completo a ejecutivo con la vista previa abierta: la paginación
+      // medida para el completo no debe usarse con el contenido del ejecutivo.
+      const group = window.document.querySelector('[aria-label="Tipo de boletín"]');
+      const button = [...(group?.querySelectorAll("button") ?? [])].find((b) => b.textContent.trim() === "Ejecutivo");
+      if (!button) throw new Error("falta el selector de tipo de boletín");
+      button.click();
+      await tick();
+      await tick();
+      const text = window.document.body.textContent ?? "";
+      if (!text.includes("Resumen ejecutivo")) throw new Error("el boletín ejecutivo no muestra su resumen");
+      [...group.querySelectorAll("button")].find((b) => b.textContent.trim() === "Completo").click();
+      await tick();
+    },
   },
   { path: "/admin/boletin/od-boletin-global", session: true, expect: "Descargar PDF", also: ["Presentación", "Contenido", "Oficinas que reportan"] },
   { path: "/datos-abiertos/boletines", expect: "Boletín UDES en Cifras", also: ["En vivo", "Ediciones en PDF", "Edición septiembre de 2026"] },

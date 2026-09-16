@@ -239,8 +239,10 @@
   right: 16mm;
   display: grid;
   align-content: start;
-  gap: 7mm;
 }
+
+.bol-content__body > * + * { margin-top: 7mm; }
+.bol-content__body > .bol-unit[data-tight] { margin-top: 2mm; }
 
 .bol-footer {
   position: absolute;
@@ -257,9 +259,59 @@
   font-size: 2.55mm;
 }
 
-.bol-footer span:last-child {
+.bol-footer a {
   color: var(--bol-navy);
   font-weight: 700;
+  text-decoration: none;
+}
+
+/* --- Pestañas de capítulo ----------------------------------------------------
+   Una por informe en el borde derecho, fuera del margen del cuerpo (que termina
+   a 194 mm). La del capítulo de la página sale ancha, con su código; las demás
+   son una franja fina en su color. Todas enlazan a su capítulo. */
+
+.bol-tabs {
+  position: absolute;
+  z-index: 2;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: 10mm;
+  pointer-events: none;
+}
+
+.bol-tab {
+  position: absolute;
+  right: 0;
+  display: grid;
+  place-items: center;
+  width: 3.2mm;
+  color: #ffffff;
+  background: var(--line);
+  border-radius: 1mm 0 0 1mm;
+  opacity: 0.45;
+  text-decoration: none;
+  pointer-events: auto;
+}
+
+.bol-tab span {
+  display: none;
+  font-size: 2.7mm;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  writing-mode: vertical-rl;
+  transform: rotate(180deg);
+}
+
+.bol-tab[data-current] {
+  width: 8.5mm;
+  opacity: 1;
+}
+
+.bol-tab[data-current] span { display: block; }
+
+@media screen {
+  .bol-tab:hover { opacity: 0.85; }
 }
 
 .bol-empty {
@@ -367,7 +419,23 @@
 .bol-back[data-density] .bol-back__body ul { gap: 2.6mm 6mm; }
 .bol-back[data-density] .bol-back__body li strong { font-size: 3mm; }
 .bol-back[data-density] .bol-back__body li span { font-size: 2.4mm; }
-.bol-back[data-density="max"] .bol-back__body ul { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.bol-back[data-density="max"] .bol-back__body ul,
+.bol-back[data-density="extrema"] .bol-back__body ul { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+
+/* Muchas oficinas: cuatro columnas sin reglas, para no bajar hasta la foto. */
+.bol-back[data-density="extrema"] .bol-back__body ul {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 1.8mm 4mm;
+}
+
+.bol-back[data-density="extrema"] .bol-back__body li {
+  gap: 0.3mm;
+  padding-top: 0;
+  border-top: 0;
+}
+
+.bol-back[data-density="extrema"] .bol-back__body li strong { font-size: 2.55mm; }
+.bol-back[data-density="extrema"] .bol-back__body li span { font-size: 2.05mm; }
 
 .bol-back__body > p {
   max-width: 120mm;
@@ -435,12 +503,18 @@
 }
 
 .bol-toc li {
+  border-bottom: 0.25mm solid var(--bol-rule);
+}
+
+/* Toda la fila es el enlace: en el PDF y en la web lleva a la página. */
+.bol-toc li > a {
   display: grid;
   grid-template-columns: 9mm auto 1fr auto;
   align-items: baseline;
   gap: 3mm;
   padding: 2.6mm 0;
-  border-bottom: 0.25mm solid var(--bol-rule);
+  color: inherit;
+  text-decoration: none;
 }
 
 .bol-toc__code {
@@ -457,15 +531,23 @@
   letter-spacing: 0.04em;
 }
 
-.bol-toc li[data-kind="cierre"] {
-  grid-template-columns: auto 1fr auto;
+.bol-toc li[data-kind="cierre"],
+.bol-toc li[data-kind="resumen"] {
   margin-top: 2mm;
+}
+
+.bol-toc li[data-kind="cierre"] > a,
+.bol-toc li[data-kind="resumen"] > a {
+  grid-template-columns: auto 1fr auto;
 }
 
 /* Hojas bajo su capítulo: sangradas, más pequeñas y sin regla propia. */
 .bol-toc li[data-kind="hoja"] {
-  padding: 0.9mm 0;
   border-bottom: 0;
+}
+
+.bol-toc li[data-kind="hoja"] > a {
+  padding: 0.9mm 0;
 }
 
 .bol-toc li[data-kind="hoja"] .bol-toc__name {
@@ -482,12 +564,21 @@
 
 .bol-toc li[data-kind="capitulo"] {
   margin-top: 1.5mm;
-  border-bottom: 0.25mm solid var(--bol-rule);
 }
 
-.bol-toc li[data-kind="capitulo"] + li[data-kind="hoja"] {
+.bol-toc li[data-kind="capitulo"] + li[data-kind="hoja"] > a {
   padding-top: 1.8mm;
 }
+
+@media screen {
+  .bol-toc li > a:hover .bol-toc__name { color: var(--bol-band); }
+}
+
+/* Índice apretado (ver tocDense en BulletinDocument). */
+.bol-toc[data-dense] li > a { padding-block: 1.5mm; }
+.bol-toc[data-dense] li[data-kind="hoja"] > a { padding-block: 0.4mm; }
+.bol-toc[data-dense] li[data-kind="capitulo"] + li[data-kind="hoja"] > a { padding-top: 1mm; }
+.bol-toc[data-dense] li[data-kind="capitulo"] { margin-top: 0.8mm; }
 
 .bol-intro__continued {
   color: var(--bol-navy);
@@ -752,6 +843,231 @@
 
 .bol-wide { max-width: 100%; }
 
+/* --- Continuación de una tabla larga ------------------------------------ */
+
+.bol-sheet--cont {
+  display: grid;
+  gap: 1.5mm;
+}
+
+.bol-cont {
+  color: var(--bol-ink-3);
+  font-size: 2.4mm;
+}
+
+.bol-cont b {
+  color: var(--bol-navy);
+  font-weight: 700;
+}
+
+/* --- Resumen ejecutivo ---------------------------------------------------- */
+
+.bol-summary {
+  display: grid;
+  gap: 4mm;
+}
+
+.bol-summary h2 {
+  color: var(--bol-navy);
+  font-size: 9mm;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+}
+
+.bol-summary__lede {
+  color: var(--bol-ink-2);
+  font-size: 3.2mm;
+}
+
+.bol-summary__list {
+  display: grid;
+  padding: 0;
+  list-style: none;
+}
+
+.bol-summary__list > li {
+  display: grid;
+  grid-template-columns: 46mm minmax(0, 1fr);
+  align-items: center;
+  gap: 5mm;
+  padding: 3mm 0;
+  border-bottom: 0.25mm solid var(--bol-rule);
+}
+
+.bol-summary__report {
+  display: grid;
+  grid-template-columns: 10mm minmax(0, 1fr);
+  align-items: center;
+  gap: 2.5mm;
+  color: var(--bol-navy);
+  font-size: 3.6mm;
+  font-weight: 800;
+  line-height: 1.15;
+  text-decoration: none;
+}
+
+.bol-summary__report .bol-chapter__code {
+  width: 10mm;
+  height: 10mm;
+  font-size: 3.6mm;
+  border-radius: 1mm;
+}
+
+.bol-summary__list dl {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 4mm;
+}
+
+.bol-summary__list dt {
+  color: var(--bol-ink-3);
+  font-size: 2.2mm;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  line-height: 1.25;
+  text-transform: uppercase;
+}
+
+.bol-summary__list dd {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0 1.2mm;
+  margin-top: 1mm;
+  color: var(--bol-navy);
+}
+
+.bol-summary__list dd b {
+  font-size: 5.4mm;
+  font-weight: 800;
+  line-height: 1.05;
+}
+
+.bol-summary__list dd small {
+  color: var(--bol-ink-2);
+  font-size: 2.5mm;
+  font-weight: 600;
+}
+
+/* --- Ficha ejecutiva ------------------------------------------------------ */
+
+.bol-exec {
+  display: grid;
+  gap: 4mm;
+  padding-top: 4mm;
+  border-top: 1.2mm solid var(--line);
+}
+
+.bol-exec h2 {
+  color: var(--bol-navy);
+  font-size: 9mm;
+  font-weight: 800;
+  line-height: 1.05;
+  letter-spacing: -0.02em;
+}
+
+.bol-exec__rows {
+  display: grid;
+  padding: 0;
+  list-style: none;
+}
+
+.bol-exec__rows > li {
+  display: grid;
+  grid-template-columns: 58mm 38mm 40mm minmax(0, 1fr);
+  align-items: start;
+  gap: 4mm;
+  padding: 3.4mm 0;
+  border-bottom: 0.25mm solid var(--bol-rule);
+}
+
+.bol-exec__what h3 {
+  color: var(--bol-navy);
+  font-size: 3.6mm;
+  font-weight: 800;
+  line-height: 1.2;
+}
+
+.bol-exec__what p {
+  display: -webkit-box;
+  overflow: hidden;
+  margin-top: 1mm;
+  color: var(--bol-ink-2);
+  font-size: 2.5mm;
+  line-height: 1.35;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+}
+
+.bol-exec__what small {
+  display: block;
+  margin-top: 1mm;
+  color: var(--bol-ink-3);
+  font-size: 2.2mm;
+}
+
+.bol-exec__figure b {
+  display: block;
+  color: var(--bol-navy);
+  font-size: 7.4mm;
+  font-weight: 800;
+  line-height: 1;
+  letter-spacing: -0.02em;
+}
+
+.bol-exec__figure b span { font-size: 4.2mm; }
+
+.bol-exec__figure small {
+  display: block;
+  margin-top: 0.6mm;
+  color: var(--bol-ink-2);
+  font-size: 2.5mm;
+  font-weight: 600;
+}
+
+.bol-exec__figure p {
+  margin-top: 1.4mm;
+  color: var(--bol-ink-2);
+  font-size: 2.3mm;
+  line-height: 1.3;
+}
+
+.bol-exec__split {
+  display: grid;
+  gap: 0.8mm;
+  padding: 0;
+  list-style: none;
+  font-size: 2.5mm;
+}
+
+.bol-exec__split li {
+  display: flex;
+  justify-content: space-between;
+  gap: 2mm;
+  color: var(--bol-ink-2);
+}
+
+.bol-exec__split b { color: var(--bol-ink); }
+.bol-exec__institutional { color: var(--bol-ink-3) !important; font-style: italic; }
+
+.bol-trend { max-width: 40mm; }
+
+.bol-trend__line {
+  fill: none;
+  stroke: var(--bol-band);
+  stroke-width: 0.7;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.bol-trend__dot { fill: var(--bol-navy); }
+
+.bol-trend__empty {
+  color: var(--bol-ink-3);
+  font-size: 2.3mm;
+  font-style: italic;
+}
+
 /* --- Gráficas ------------------------------------------------------------- */
 
 .bol-chart {
@@ -791,23 +1107,23 @@
 .bol-legend {
   display: flex;
   flex-wrap: wrap;
-  gap: 0.8mm 3.6mm;
+  gap: 0.8mm 2.6mm;
   padding: 0;
   color: var(--bol-ink-2);
-  font-size: 2.25mm;
+  font-size: 2.1mm;
   list-style: none;
 }
 
 .bol-legend li {
   display: inline-flex;
   align-items: center;
-  gap: 1.6mm;
+  gap: 1.1mm;
   white-space: nowrap;
 }
 
 .bol-legend svg {
   flex: none;
-  width: 5mm;
+  width: 3.8mm;
   height: 2mm;
 }
 
@@ -1046,6 +1362,11 @@
   }
 
   .bol-noprint {
+    display: none !important;
+  }
+
+  /* La copia de medida ya cumplió: fuera del PDF (sus títulos duplicarían los marcadores). */
+  .bol-measure {
     display: none !important;
   }
 

@@ -20,6 +20,7 @@ import type { OpenDataCatalog, Report } from "../datos-abiertos/data/types";
 import { bulletinFileUrl, usePublicBulletins } from "./data";
 import type { BulletinBundle } from "./data";
 import { bulletinSlug } from "./model";
+import type { BulletinFormat } from "./model";
 
 /**
  * Boletín publicado para un slug. "boletin-<informe>" sin fila propia se arma
@@ -34,7 +35,7 @@ export function resolvePublicBulletin(
   const own = bundle.bulletins.find((b) => b.slug === slug);
   if (own) return { row: own, derived: false };
   const report = catalog.reports.find((r) => bulletinSlug(r.slug) === slug);
-  const global = bundle.bulletins.find((b) => !b.report_id);
+  const global = bundle.bulletins.find((b) => b.slug === bulletinSlug(null));
   if (!report?.uuid || !global) return null;
   return {
     row: { ...global, id: `${global.id}:${report.slug}`, report_id: report.uuid, slug, title: `${global.title} · ${report.name}` },
@@ -55,21 +56,29 @@ export function BulletinDownload({
   report,
   className = "od-button od-button--ghost",
   label,
+  format = "completo",
 }: {
   catalog: OpenDataCatalog;
   /** Sin informe, el boletín global. */
   report?: Report | null;
   className?: string;
   label?: string;
+  /** "ejecutivo": el resumen ejecutivo publicado. */
+  format?: BulletinFormat;
 }) {
   const bundle = usePublicBulletins(catalog.period?.uuid);
-  const slug = bulletinSlug(report?.slug ?? null);
+  const slug = bulletinSlug(report?.slug ?? null, format);
   const found = resolvePublicBulletin(bundle.data, catalog, slug);
   if (!found) return null;
 
   const edition = latestEdition(bundle.data!, found.row, found.derived);
-  const text = label ?? (report ? "Boletín PDF" : "Descargar boletín global (PDF)");
-  const title = report ? `Boletín de ${report.name} en PDF` : "Boletín global de UDES en Cifras en PDF";
+  const executive = format === "ejecutivo";
+  const text = label ?? (executive ? "Resumen ejecutivo (PDF)" : report ? "Boletín PDF" : "Descargar boletín global (PDF)");
+  const title = executive
+    ? "Resumen ejecutivo de UDES en Cifras en PDF"
+    : report
+      ? `Boletín de ${report.name} en PDF`
+      : "Boletín global de UDES en Cifras en PDF";
 
   if (edition) {
     return (

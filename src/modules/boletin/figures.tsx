@@ -129,6 +129,34 @@ export function EvolutionChart({
   );
 }
 
+/**
+ * Tendencia de la ficha ejecutiva: la serie del total, con su primer y último
+ * año y su último punto marcado. Acompaña a la cifra; no la reemplaza.
+ */
+export function Trend({ years, values, format }: { years: number[]; values: (number | null)[]; format: ValueFormat }) {
+  const points = values.map((v, i) => ({ v, i })).filter((p): p is { v: number; i: number } => p.v !== null);
+  if (points.length < 2) return <p className="bol-trend__empty">Sin serie para comparar</p>;
+  const width = 40;
+  const height = 17;
+  const m = { top: 2, bottom: 5, side: 1.5 };
+  const min = Math.min(...points.map((p) => p.v));
+  const max = Math.max(...points.map((p) => p.v));
+  const span = max - min || Math.abs(max) || 1;
+  const x = (i: number) => m.side + (i / Math.max(1, years.length - 1)) * (width - m.side * 2);
+  const y = (v: number) => m.top + (1 - (v - min) / span) * (height - m.top - m.bottom);
+  const d = points.map((p, k) => `${k ? "L" : "M"}${x(p.i).toFixed(2)} ${y(p.v).toFixed(2)}`).join("");
+  const last = points[points.length - 1];
+  const first = points[0];
+  return (
+    <svg className="bol-chart bol-trend" viewBox={`0 0 ${width} ${height}`} role="img" aria-label={`De ${figure(first.v, format)} en ${years[first.i]} a ${figure(last.v, format)} en ${years[last.i]}`}>
+      <path className="bol-trend__line" d={d} />
+      <circle className="bol-trend__dot" cx={x(last.i)} cy={y(last.v)} r={0.9} />
+      <text className="bol-chart__year" x={x(first.i)} y={height - 0.6} textAnchor="start">{years[first.i]}</text>
+      <text className="bol-chart__year" x={x(last.i)} y={height - 0.6} textAnchor="end">{years[last.i]}</text>
+    </svg>
+  );
+}
+
 export function Legend({ series }: { series: Series[] }) {
   return (
     <ul className="bol-legend">

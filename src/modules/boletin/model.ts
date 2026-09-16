@@ -118,8 +118,20 @@ export interface BulletinReport {
   datasets: BulletinDataset[];
 }
 
+/**
+ * "completo": capítulo por informe con una hoja por indicador y conjunto.
+ * "ejecutivo": síntesis. Resumen con las cifras titulares de cada informe y una
+ * ficha por informe con sus cifras clave, tendencia y reparto por campus.
+ */
+export type BulletinFormat = "completo" | "ejecutivo";
+
 export interface BulletinSettings {
   version: 1;
+  format: BulletinFormat;
+  /** En el completo: abre con la página de resumen ejecutivo. El ejecutivo siempre la lleva. */
+  summary: boolean;
+  /** Pestañas de capítulo en el borde derecho, enlazadas. */
+  tabs: boolean;
   texts: BulletinTexts;
   images: BulletinImages;
   edition: BulletinEdition;
@@ -146,7 +158,7 @@ export const DEFAULT_IMAGES = {
   headerLogo: "/boletin/logo-udes-blanco.png",
 };
 
-export function defaultTexts(periodLabel: string): BulletinTexts {
+export function defaultTexts(periodLabel: string, format: "completo" | "ejecutivo" = "completo"): BulletinTexts {
   return {
     coverTitle: "Informe UDES en Cifras",
     coverSubtitle: "Principales estadísticas de las actividades académicas y administrativas",
@@ -156,7 +168,9 @@ export function defaultTexts(periodLabel: string): BulletinTexts {
     presentationTitle: "Presentación",
     presentation: [
       `El Boletín UDES en Cifras reúne las principales estadísticas de la Universidad de Santander para el periodo ${periodLabel}, a partir de lo que reporta cada oficina a la Dirección de Planeación Institucional.`,
-      "Cada indicador se presenta en su hoja: a la izquierda, qué mide, quién lo reporta y cómo se calcula; a la derecha, la cifra del corte, su evolución por año, el detalle por campus y la tabla de datos.",
+      format === "ejecutivo"
+        ? "Este resumen ejecutivo reúne en una ficha por informe sus cifras clave del corte, la tendencia del periodo y el reparto por campus. El detalle de cada indicador está en el boletín completo."
+        : "Cada indicador se presenta en su hoja: a la izquierda, qué mide, quién lo reporta y cómo se calcula; a la derecha, la cifra del corte, su evolución por año, el detalle por campus y la tabla de datos.",
     ].join("\n\n"),
     backTitle: "Oficinas que reportan",
     backNote: "Las cifras de este boletín son las que cada oficina reporta a la Dirección de Planeación Institucional.",
@@ -208,7 +222,7 @@ export function normalizeSettings(
 ): BulletinSettings {
   const saved = (raw && typeof raw === "object" ? raw : {}) as Partial<BulletinSettings>;
   const periodLabel = catalog.period?.label ?? (catalog.years.length ? `${catalog.years[0]}–${catalog.years[catalog.years.length - 1]}` : "");
-  const texts = { ...defaultTexts(periodLabel), ...(saved.texts ?? {}) };
+  const texts = { ...defaultTexts(periodLabel, saved.format === "ejecutivo" ? "ejecutivo" : "completo"), ...(saved.texts ?? {}) };
   const images: BulletinImages = {
     cover: null,
     back: null,
@@ -258,10 +272,12 @@ export function normalizeSettings(
     };
   });
 
-  return { version: 1, texts, images, edition, headerBadge, theme, cut, campus, skipEmpty: saved.skipEmpty ?? true, reports };
+  const format: BulletinFormat = saved.format === "ejecutivo" ? "ejecutivo" : "completo";
+  return { version: 1, format, summary: saved.summary ?? false, tabs: saved.tabs ?? true, texts, images, edition, headerBadge, theme, cut, campus, skipEmpty: saved.skipEmpty ?? true, reports };
 }
 
-/** "boletin-global", "boletin-poblacional". */
-export function bulletinSlug(reportSlug: string | null): string {
-  return reportSlug ? `boletin-${reportSlug}` : "boletin-global";
+/** "boletin-global", "boletin-poblacional", "boletin-ejecutivo", "boletin-ejecutivo-poblacional". */
+export function bulletinSlug(reportSlug: string | null, format: BulletinFormat = "completo"): string {
+  const base = format === "ejecutivo" ? "boletin-ejecutivo" : "boletin";
+  return reportSlug ? `${base}-${reportSlug}` : format === "ejecutivo" ? base : "boletin-global";
 }

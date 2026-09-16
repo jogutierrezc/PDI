@@ -37,7 +37,7 @@ import {
   useUploadBulletinImage,
 } from "../../../boletin/data";
 import { BULLETIN_FONTS, DEFAULT_EDITION, DEFAULT_IMAGES, DEFAULT_SHOW, DEFAULT_THEME, bulletinSlug, datasetRefs, normalizeSettings } from "../../../boletin/model";
-import type { BulletinFont, BulletinSettings, EditionAlign, HeaderBadge, IndicatorShow } from "../../../boletin/model";
+import type { BulletinFont, BulletinFormat, BulletinSettings, EditionAlign, HeaderBadge, IndicatorShow } from "../../../boletin/model";
 import type { StationProps } from "../OdAdmin";
 import { ConfirmButton, Panel, SaveState, StageEmpty } from "../ui";
 
@@ -64,7 +64,8 @@ export function BulletinStation({ data, report, periodId }: StationProps) {
   const [selectedId, setSelectedId] = useState<string | null>(null);
 
   const bulletins = bundle.data?.bulletins ?? [];
-  const global = bulletins.find((b) => !b.report_id);
+  const global = bulletins.find((b) => b.slug === bulletinSlug(null));
+  const executive = bulletins.find((b) => b.slug === bulletinSlug(null, "ejecutivo"));
   const selected = bulletins.find((b) => b.id === selectedId) ?? global ?? bulletins[0];
   const reportOf = (b: OdBulletinRow) => (b.report_id ? catalog.reports.find((r) => r.uuid === b.report_id) ?? null : null);
   const canEditBulletin = (b: { report_id: string | null }) => {
@@ -73,35 +74,41 @@ export function BulletinStation({ data, report, periodId }: StationProps) {
     return r ? canEditReport(r.slug) : false;
   };
 
-  const create = (target: Report | null) => {
-    const slug = bulletinSlug(target?.slug ?? null);
-    const title = target ? `Boletín UDES en Cifras · ${target.name}` : "Boletín UDES en Cifras";
+  const create = (target: Report | null, format: BulletinFormat = "completo") => {
+    const slug = bulletinSlug(target?.slug ?? null, format);
+    const base = format === "ejecutivo" ? "Resumen ejecutivo UDES en Cifras" : "Boletín UDES en Cifras";
+    const title = target ? `${base} · ${target.name}` : base;
     save.mutate(
       {
         period_id: periodId,
         report_id: target?.uuid ?? null,
         slug,
         title,
-        settings: normalizeSettings({}, catalog, target?.slug ?? null) as unknown as Record<string, unknown>,
+        settings: normalizeSettings({ format }, catalog, target?.slug ?? null) as unknown as Record<string, unknown>,
       },
       { onSuccess: (row) => setSelectedId((row as OdBulletinRow).id) },
     );
   };
 
-  const reportHasBulletin = report ? bulletins.some((b) => b.report_id === report.uuid) : true;
+  const reportHasBulletin = report ? bulletins.some((b) => b.slug === bulletinSlug(report.slug)) : true;
 
   return (
     <div className="oda-stack">
       <Panel
         id="oda-boletines"
         title="Boletines del periodo"
-        description="Un documento A4 con las cifras del periodo: uno global con todos los informes que tengan datos y, si hace falta, uno por informe. Se diseña aquí y se descarga en PDF."
+        description="Un documento A4 con las cifras del periodo: uno global con todos los informes que tengan datos, uno por informe si hace falta, y un resumen ejecutivo con las cifras clave de cada informe. Se diseña aquí y se descarga en PDF."
         actions={
           <>
             <SaveState pending={save.isPending} error={save.error} success={false} />
             {!global && canEditPeriod() && (
               <button type="button" className="button-primary" disabled={save.isPending || bundle.isPending} onClick={() => create(null)}>
                 <Icon name="plus" size={15} /> Crear boletín global
+              </button>
+            )}
+            {!executive && canEditPeriod() && (
+              <button type="button" className="button-secondary" disabled={save.isPending || bundle.isPending} onClick={() => create(null, "ejecutivo")}>
+                <Icon name="plus" size={15} /> Crear resumen ejecutivo
               </button>
             )}
             {report && !reportHasBulletin && canEditReport(report.slug) && (
@@ -477,6 +484,12 @@ function TemplateTab({
             </button>
           ))}
         </div>
+        <label className="oda-inline-check">
+          <input type="checkbox" checked={draft.tabs} onChange={(e) => setDraft({ ...draft, tabs: e.target.checked })} />
+          <span>
+            Pestañas de capítulo en el borde <small>una por informe, en su color y enlazada a su capítulo</small>
+          </span>
+        </label>
       </section>
 
       <section>
@@ -633,8 +646,37 @@ function ContentTab({ catalog, draft, setDraft }: { catalog: OpenDataCatalog; dr
     setReports(move(draft.reports, from, to));
   };
 
+  const executive = draft.format === "ejecutivo";
   return (
     <div className="oda-bulletin-content">
+      <div className="oda-bulletin-format">
+        <div className="oda-bulletin-align" role="group" aria-label="Tipo de boletín">
+          <span>Tipo de boletín</span>
+          {(
+            [
+              ["completo", "Completo"],
+              ["ejecutivo", "Ejecutivo"],
+            ] as [BulletinFormat, string][]
+          ).map(([value, label]) => (
+            <button key={value} type="button" aria-pressed={draft.format === value} onClick={() => setDraft({ ...draft, format: value })}>
+              {label}
+            </button>
+          ))}
+        </div>
+        <p className="oda-muted">
+          {executive
+            ? "Síntesis: una página de resumen con las cifras titulares de cada informe y una ficha por informe con hasta seis cifras clave, su tendencia y el reparto por campus. Toma los KPI del informe entre los indicadores incluidos."
+            : "Un capítulo por informe con una hoja por indicador y conjunto visual."}
+        </p>
+        {!executive && (
+          <label className="oda-inline-check">
+            <input type="checkbox" checked={draft.summary} onChange={(e) => setDraft({ ...draft, summary: e.target.checked })} />
+            <span>
+              Abrir con un resumen ejecutivo <small>una página con las cifras titulares de cada informe, antes de los capítulos</small>
+            </span>
+          </label>
+        )}
+      </div>
       <div className="oda-form-grid">
         <Field label="Corte">
           <select value={draft.cut} onChange={(e) => setDraft({ ...draft, cut: Number(e.target.value) })}>

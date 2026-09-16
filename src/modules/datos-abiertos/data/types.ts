@@ -184,14 +184,35 @@ export interface HistoryData {
   values: Record<string, Record<string, number | null>>;
 }
 
-/** Valores por departamento (código DANE) para un año y un campus. */
+export type MapMode = "origen" | "cobertura" | "entrante" | "saliente";
+
+/** Movilidad internacional: el mapa es del mundo y la clave es el país (ISO alfa-3). */
+export const isWorldMap = (mode: MapMode) => mode === "entrante" || mode === "saliente";
+
+/** Nombre de cada tipo de mapa, para la intranet y el rótulo de la gráfica. */
+export const MAP_MODE_TITLE: Record<MapMode, string> = {
+  origen: "Mapa por departamento",
+  cobertura: "Mapa por departamento",
+  entrante: "Movilidad entrante por país",
+  saliente: "Movilidad saliente por país",
+};
+
+/**
+ * Valores por territorio para un año y un campus. En los mapas por departamento
+ * la clave es el código DANE; en los mundiales, el país en ISO 3166-1 alfa-3.
+ */
 export interface MapDataset {
   id: string;
   uuid?: string;
   title: string;
   description: string;
-  /** "origen": de dónde vienen las personas que atiende cada campus, con flujos. */
-  mode: "origen" | "cobertura";
+  /**
+   * "origen": de dónde vienen las personas que atiende cada campus, con flujos.
+   * "cobertura": solo color por departamento.
+   * "entrante": participantes que llegan de otro país a un campus.
+   * "saliente": participantes que salen de un campus a otro país.
+   */
+  mode: MapMode;
   unit: string;
   source: string;
   officeId?: string | null;

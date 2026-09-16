@@ -530,6 +530,8 @@ function DatasetsEditor({ data, reportId, years, canEdit }: { data: StationProps
   const saveHistory = useSaveHistory();
   const remove = useDeleteDataset();
   const [adding, setAdding] = useState<DatasetKind | null>(null);
+  // Mapas: por departamento o de movilidad internacional, según la opción elegida.
+  const [addingMode, setAddingMode] = useState<OdMapMode>("origen");
   const [editing, setEditing] = useState<string | null>(null);
 
   const breakdowns = data.rows.breakdowns.filter((b) => b.report_id === reportId);
@@ -567,20 +569,38 @@ function DatasetsEditor({ data, reportId, years, canEdit }: { data: StationProps
           <SaveState pending={pending} error={error} success={success} />
           <label className="oda-add-select">
             <span className="sr-only">Añadir conjunto</span>
-            <select value="" disabled={!canEdit} onChange={(e) => setAdding((e.target.value || null) as DatasetKind | null)}>
+            <select
+              value=""
+              disabled={!canEdit}
+              onChange={(e) => {
+                const [kind, mode] = e.target.value.split(":");
+                setAddingMode((mode || "origen") as OdMapMode);
+                setAdding((kind || null) as DatasetKind | null);
+              }}
+            >
               <option value="">Añadir conjunto…</option>
               <option value="desglose">Desglose (circular o barras)</option>
               <option value="historico">Evolución histórica (periodos y categorías)</option>
               <option value="tuberia">Tubería de permanencia o deserción</option>
               <option value="calor">Mapa de calor</option>
               <option value="mapa">Mapa por departamento</option>
+              <option value="mapa:entrante">Mapa de movilidad entrante (país → campus)</option>
+              <option value="mapa:saliente">Mapa de movilidad saliente (campus → país)</option>
             </select>
           </label>
         </>
       }
     >
       {adding && (
-        <DatasetForm kind={adding} offices={offices} years={years} onCancel={() => setAdding(null)} onSubmit={(f) => create(adding, f)} />
+        <DatasetForm
+          key={`${adding}-${addingMode}`}
+          kind={adding}
+          offices={offices}
+          years={years}
+          initial={adding === "mapa" ? { mode: addingMode, unit: addingMode === "origen" ? "" : "participantes" } : undefined}
+          onCancel={() => setAdding(null)}
+          onSubmit={(f) => create(adding, f)}
+        />
       )}
 
       <ul className="oda-datasets">
@@ -615,7 +635,7 @@ function DatasetsEditor({ data, reportId, years, canEdit }: { data: StationProps
           </DatasetItem>
         ))}
         {maps.map((m) => (
-          <DatasetItem key={m.id} kind="Mapa" title={m.title} detail={`${m.mode === "origen" ? "origen con flujos" : "cobertura"} · ${m.unit} · ${yearsDetail(m.years)}`} canEdit={canEdit}
+          <DatasetItem key={m.id} kind="Mapa" title={m.title} detail={`${MAP_MODE_DETAIL[m.mode]} · ${m.unit} · ${yearsDetail(m.years)}`} canEdit={canEdit}
             editing={editing === m.id} onEdit={() => setEditing(m.id)} onDelete={() => remove.mutate({ table: "od_maps", id: m.id })}>
             <DatasetForm kind="mapa" offices={offices} years={years} initial={{ title: m.title, description: m.description, unit: m.unit, mode: m.mode, years: m.years, office_id: m.office_id ?? "" }}
               onCancel={() => setEditing(null)} onSubmit={(f) => saveMap.mutate({ id: m.id, report_id: reportId, title: f.title, description: f.description, unit: f.unit, mode: f.mode, years: f.years, office_id: f.office_id || null }, done)} />
@@ -647,6 +667,15 @@ function DatasetItem({ kind, title, detail, canEdit, editing, onEdit, onDelete, 
     </li>
   );
 }
+
+const WORLD_MODES: OdMapMode[] = ["entrante", "saliente"];
+
+const MAP_MODE_DETAIL: Record<OdMapMode, string> = {
+  origen: "origen con flujos",
+  cobertura: "cobertura",
+  entrante: "movilidad entrante por país",
+  saliente: "movilidad saliente por país",
+};
 
 interface DatasetFields {
   title: string; description: string; unit: string; format: OdValueFormat; chart: OdChartKind; mode: OdMapMode;
@@ -715,9 +744,19 @@ function DatasetForm({ kind, offices, years, initial, onSubmit, onCancel }: {
         {kind === "mapa" && (
           <label className="admin-field">
             <span>Tipo de mapa</span>
+            {/* Departamento y país no se mezclan: las cifras guardadas usan códigos distintos. */}
             <select value={f.mode} onChange={(e) => set({ mode: e.target.value as OdMapMode })}>
-              <option value="origen">Origen: con líneas de llegada a cada campus</option>
-              <option value="cobertura">Cobertura: solo color por departamento</option>
+              {WORLD_MODES.includes(f.mode) ? (
+                <>
+                  <option value="entrante">Movilidad entrante: del país de origen al campus</option>
+                  <option value="saliente">Movilidad saliente: del campus al país de destino</option>
+                </>
+              ) : (
+                <>
+                  <option value="origen">Origen: con líneas de llegada a cada campus</option>
+                  <option value="cobertura">Cobertura: solo color por departamento</option>
+                </>
+              )}
             </select>
           </label>
         )}

@@ -986,7 +986,8 @@ export type OdAggregation = "suma" | "reportado";
 export type OdTerm = "A" | "B" | "anual";
 /** Cómo sale la cifra del año a partir de los periodos A y B. */
 export type OdAnnualRule = "suma" | "ultimo" | "promedio" | "reportado";
-export type OdMapMode = "origen" | "cobertura";
+/** Por departamento: "origen" y "cobertura". Mundial (código ISO alfa-3): "entrante" y "saliente". */
+export type OdMapMode = "origen" | "cobertura" | "entrante" | "saliente";
 /** Qué se captura en cada etapa de una tubería. */
 export type OdPipelineMeasure = "estudiantes" | "permanencia" | "desercion";
 export type OdChartKind = "circular" | "barras" | "lineas";

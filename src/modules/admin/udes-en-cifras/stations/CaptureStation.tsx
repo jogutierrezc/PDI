@@ -39,6 +39,7 @@ import {
 import { ConfirmButton, Panel, PeriodInput, SaveState, StageEmpty, YearPicker, periodRange } from "../ui";
 import { parseCsv, parseNumber, toCsv } from "../sheet";
 import { ImportReport, profileFor } from "./ImportReport";
+import { MobilityCapture } from "./MobilityCapture";
 import { IMPORT_PROFILES } from "../import/investigacion";
 
 type Tab = "importar" | "indicadores" | "desgloses" | "historico" | "calor" | "mapas" | "tuberia";
@@ -746,7 +747,8 @@ function HeatmapCapture({ data, report, periodId, canEdit }: StationProps) {
 
 /* --- Mapas ------------------------------------------------------------------------------ */
 
-function MapCapture({ data, report, periodId, canEdit }: StationProps) {
+function MapCapture(props: StationProps) {
+  const { data, report, periodId, canEdit } = props;
   const maps = data.rows.maps.filter((m) => m.report_id === report!.uuid);
   const [active, setActive] = useState(maps[0]?.id);
   const map = maps.find((m) => m.id === active) ?? maps[0];
@@ -758,6 +760,11 @@ function MapCapture({ data, report, periodId, canEdit }: StationProps) {
   const [draft, setDraft] = useState<Record<CellKey, number | null>>({});
   const [via, setVia] = useState<OdImportKind>("rejilla");
   if (!map) return null;
+  if (map.mode === "entrante" || map.mode === "saliente") {
+    return (
+      <MobilityCapture key={map.id} {...props} maps={maps} map={map} onPickMap={(id) => { setActive(id); setDraft({}); }} />
+    );
+  }
 
   const campuses = data.rows.campuses;
   const values = data.rows.mapValues.filter((v) => v.map_id === map.id && v.year === year);
@@ -770,7 +777,7 @@ function MapCapture({ data, report, periodId, canEdit }: StationProps) {
   return (
     <Panel
       id="oda-mapas"
-      title="Mapas por departamento"
+      title="Mapas"
       description="Personas por departamento de origen (o de cobertura) y campus. Una casilla vacía quita el departamento del mapa."
       actions={
         <>

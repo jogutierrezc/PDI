@@ -2658,6 +2658,286 @@
   border-top: 2px dashed var(--od-flow);
 }
 
+/* --- Mapa del mundo: movilidad internacional -------------------------------
+   Las rutas usan pathLength="1": todo el trazo mide 1 y los guiones se piden en
+   fracciones del viaje. El trazo base se dibuja una vez (dashoffset 1 → 0). El
+   cometa y su estela son un único guion corto con un hueco de 2, así nunca
+   asoma una segunda copia; se desplazan juntos porque comparten el mismo
+   recorrido de la punta (de 0 a 1.2) y solo cambia su largo (--len). La onda de
+   llegada usa la misma duración y el mismo desfase, y estalla en el 70 %, que
+   es cuando la punta toca el destino. */
+
+.od-world {
+  display: grid;
+  gap: var(--space-6);
+}
+
+.od-world__canvas {
+  position: relative;
+  width: 100%;
+}
+
+.od-world__canvas svg {
+  display: block;
+  width: 100%;
+  height: auto;
+  overflow: visible;
+}
+
+.od-world__country {
+  fill: var(--od-seq-0);
+  stroke: var(--od-surface);
+  stroke-width: 0.5;
+  fill-opacity: 0.55;
+  transition:
+    fill 600ms ease,
+    fill-opacity 520ms ease calc(var(--i) * 40ms),
+    opacity var(--dur-base) ease;
+}
+
+.od-world__country[data-value] { cursor: pointer; }
+.od-world[data-seen] .od-world__country[data-value] { fill-opacity: 1; }
+.od-world__country[data-dim][data-value] { opacity: 0.45; }
+
+.od-world__country[data-active] {
+  stroke: var(--od-signal);
+  stroke-width: 1.6;
+}
+
+.od-world__country[data-home] {
+  fill: var(--od-flap-ink);
+  fill-opacity: 0.22;
+  stroke: var(--od-flap-ink);
+  stroke-width: 0.8;
+}
+
+.od-world__islet { cursor: pointer; transition: opacity var(--dur-base) ease; }
+.od-world__islet circle:last-child { stroke: var(--od-surface); stroke-width: 0.8; }
+.od-world__islet[data-dim] { opacity: 0.45; }
+
+.od-world__route { transition: opacity var(--dur-base) ease; }
+.od-world__route[data-dim] { opacity: 0.1; }
+
+.od-world__route path {
+  fill: none;
+  stroke-linecap: round;
+  pointer-events: none;
+}
+
+.od-world__track {
+  stroke: var(--od-flow);
+  stroke-dasharray: 1 1;
+  stroke-dashoffset: 1;
+  opacity: 0.5;
+  transition:
+    stroke-dashoffset 1100ms cubic-bezier(0.65, 0, 0.35, 1) calc(250ms + var(--i) * 70ms),
+    opacity var(--dur-base) ease;
+}
+
+.od-world[data-seen] .od-world__track { stroke-dashoffset: 0; }
+.od-world__route[data-active] .od-world__track { opacity: 0.95; }
+
+.od-world__trail,
+.od-world__comet {
+  stroke-dasharray: var(--len) 2;
+  stroke-dashoffset: var(--len);
+  opacity: 0;
+}
+
+.od-world__trail { --len: 0.18; stroke: var(--od-flow); }
+.od-world__comet { --len: 0.006; stroke: var(--od-signal); }
+
+.od-world__ripple {
+  fill: none;
+  stroke: var(--od-signal);
+  opacity: 0;
+  transform-box: fill-box;
+  transform-origin: center;
+  pointer-events: none;
+}
+
+/* Los cometas arrancan cuando las rutas ya están trazadas. */
+.od-world[data-seen][data-motion] .od-world__trail,
+.od-world[data-seen][data-motion] .od-world__comet {
+  animation: od-comet var(--dur) linear calc(1400ms + var(--delay)) infinite both;
+}
+
+.od-world[data-seen][data-motion] .od-world__trail { opacity: 0.55; }
+.od-world[data-seen][data-motion] .od-world__comet { opacity: 1; }
+
+.od-world[data-seen][data-motion] .od-world__ripple {
+  animation: od-arrive var(--dur) linear calc(1400ms + var(--delay)) infinite both;
+}
+
+@keyframes od-comet {
+  0% {
+    stroke-dashoffset: var(--len);
+    animation-timing-function: cubic-bezier(0.5, 0, 0.3, 1);
+  }
+  70% {
+    stroke-dashoffset: calc(var(--len) - 1);
+    animation-timing-function: linear;
+  }
+  80%,
+  100% { stroke-dashoffset: calc(var(--len) - 1.2); }
+}
+
+@keyframes od-arrive {
+  0%,
+  68% { transform: scale(0.3); opacity: 0; }
+  71% { transform: scale(0.6); opacity: 0.9; }
+  100% { transform: scale(2.6); opacity: 0; }
+}
+
+.od-world__hub-dot {
+  fill: var(--od-flap-ink);
+  stroke: var(--od-page);
+}
+
+.od-world__site { fill: var(--od-signal); }
+
+.od-world__hub-pulse {
+  fill: none;
+  stroke: var(--od-flap-ink);
+  stroke-width: 1.5;
+  opacity: 0;
+  transform-box: fill-box;
+  transform-origin: center;
+}
+
+.od-world[data-seen][data-motion] .od-world__hub-pulse {
+  animation: od-pulse 2.6s ease-out infinite;
+}
+
+.od-world__hub-label {
+  position: absolute;
+  z-index: 2;
+  display: grid;
+  padding: 3px var(--space-2);
+  color: var(--ink);
+  background: color-mix(in srgb, var(--od-surface) 88%, transparent);
+  border: 1px solid var(--line-strong);
+  border-radius: 6px;
+  box-shadow: var(--shadow-sm);
+  line-height: 1.15;
+  white-space: nowrap;
+  pointer-events: none;
+  transform: translate(14px, 6px);
+}
+
+.od-world__hub-label[data-side="left"] {
+  text-align: right;
+  transform: translate(calc(-100% - 14px), 6px);
+}
+
+.od-world__hub-label strong {
+  font-family: var(--font-sign);
+  font-size: 0.95rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+
+.od-world__hub-label span {
+  color: var(--ink-secondary);
+  font-size: var(--text-2xs);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.od-world__empty {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  margin: 0;
+  color: var(--ink-muted);
+  font-size: var(--text-sm);
+  pointer-events: none;
+}
+
+.od-world__panel {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.3fr) minmax(0, 1fr);
+  gap: var(--space-7);
+  align-items: start;
+}
+
+.od-world__ranking-wrap {
+  display: grid;
+  gap: var(--space-3);
+}
+
+.od-world__campuses {
+  display: grid;
+  gap: 2px;
+  margin: var(--space-3) 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.od-world__campuses button {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--space-3);
+  width: 100%;
+  padding: 5px var(--space-2);
+  color: var(--ink);
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  font: inherit;
+  font-size: var(--text-sm);
+  font-variant-numeric: tabular-nums;
+  cursor: pointer;
+  transition: background-color var(--dur-fast) ease, opacity var(--dur-base) ease;
+}
+
+.od-world__campuses button:hover { background: var(--od-board-raised); }
+.od-world__campuses button[aria-pressed="true"] { border-color: var(--od-signal); }
+.od-world__campuses button[data-dim] { opacity: 0.5; }
+
+/* Clave de la ruta: un guion que corre en el sentido del viaje. */
+.od-world__route-key {
+  position: relative;
+  display: inline-block;
+  flex: none;
+  width: 32px;
+  height: 2px;
+  overflow: hidden;
+  background: color-mix(in srgb, var(--od-flow) 45%, transparent);
+  border-radius: 1px;
+}
+
+.od-world__route-key::after {
+  content: "";
+  position: absolute;
+  inset-block: 0;
+  left: 0;
+  width: 10px;
+  background: linear-gradient(90deg, transparent, var(--od-signal));
+  border-radius: 1px;
+  transform: translateX(-10px);
+}
+
+.od-world[data-seen][data-motion] .od-world__route-key::after {
+  animation: od-route-key 1.8s cubic-bezier(0.5, 0, 0.3, 1) infinite;
+}
+
+@keyframes od-route-key {
+  to { transform: translateX(32px); }
+}
+
+@media (max-width: 900px) {
+  .od-world__panel { grid-template-columns: minmax(0, 1fr); gap: var(--space-5); }
+  .od-world__hub-label { display: none; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .od-world__track { stroke-dashoffset: 0; transition: opacity var(--dur-base) ease; }
+  .od-world__country { transition: fill 600ms ease, opacity var(--dur-base) ease; }
+  .od-world__country[data-value] { fill-opacity: 1; }
+}
+
 /* --- Mapa de calor --------------------------------------------------------- */
 
 .od-heat__bar {

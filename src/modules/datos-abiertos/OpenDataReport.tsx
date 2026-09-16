@@ -27,6 +27,7 @@ import { AnnualTermChart } from "./components/AnnualTermChart";
 import { YearFilter, useVisibleYears } from "./components/YearFilter";
 import { BreakdownChart } from "./components/BreakdownChart";
 import { ColombiaMap } from "./components/ColombiaMap";
+import { WorldMap } from "./components/WorldMap";
 import { Donut } from "./components/Donut";
 import { Heatmap } from "./components/Heatmap";
 import { HistoryCompare } from "./components/HistoryCompare";
@@ -53,7 +54,7 @@ import {
 } from "./data/open-data";
 import { ANNUAL_RULE_LABEL, cutCode, cutCodeLabel, cutLabel, fromCutCode } from "./data/terms";
 import type { CampusId, Indicator, OpenDataCatalog, Report, ReportBlock, Term } from "./data/types";
-import { ALL_CAMPUSES, DEFAULT_BLOCK_ORDER } from "./data/types";
+import { ALL_CAMPUSES, DEFAULT_BLOCK_ORDER, MAP_MODE_TITLE, isWorldMap } from "./data/types";
 import "./datos-abiertos.css";
 
 export function OpenDataReport() {
@@ -211,8 +212,16 @@ function ReportContent({ data, report, year, term, campus, setYear, setTerm, set
           block.settings.title || dataset.title,
           dataset.description,
           inSection,
-          <ChartFrame title={inSection ? block.settings.title || dataset.title : "Mapa por departamento"} subtitle={`Corte ${year} · ${dataset.unit}`} source={dataset.source}>
-            <ColombiaMap dataset={dataset} year={year} years={data.years} campus={campus} campuses={data.campuses} onSelectCampus={setCampus} />
+          <ChartFrame
+            title={inSection ? block.settings.title || dataset.title : isWorldMap(dataset.mode) ? MAP_MODE_TITLE[dataset.mode] : "Mapa por departamento"}
+            subtitle={`Corte ${year} · ${dataset.unit}`}
+            source={dataset.source}
+          >
+            {isWorldMap(dataset.mode) ? (
+              <WorldMap dataset={dataset} year={year} years={data.years} campus={campus} campuses={data.campuses} onSelectCampus={setCampus} />
+            ) : (
+              <ColombiaMap dataset={dataset} year={year} years={data.years} campus={campus} campuses={data.campuses} onSelectCampus={setCampus} />
+            )}
           </ChartFrame>,
         );
       }

@@ -424,15 +424,16 @@ export function assembleCatalog(rows: OpenDataRows): OpenDataCatalog {
           .sort((a, b) => a.cohort.localeCompare(b.cohort))
           .map((g) => {
             if (measure !== "desercion") return { cohort: g.cohort, campus: g.campus, remaining: g.raw, mainCause: g.mainCause };
-            // Deserción del tramo: de los que llegaron, qué % se retira. La
-            // cohorte entra al 100 % y cada tramo le quita su parte.
+            // Deserción acumulada: la cifra capturada ya es el % de la cohorte que
+            // se retiró al llegar a cada etapa. Se usa tal cual (lo que sigue es
+            // 100 menos ella); volver a encadenarla tramo por tramo contaría dos
+            // veces el porcentaje y inflaría la deserción.
             const remaining: (number | null)[] = [100];
             for (let i = 1; i < stageCount; i += 1) {
-              const before = remaining[i - 1];
-              const dropout = g.raw[i];
-              remaining.push(before === null || dropout === null ? null : Math.round(before * (1 - dropout / 100) * 100) / 100);
+              const lost = g.raw[i];
+              remaining.push(lost === null ? null : Math.round((100 - lost) * 100) / 100);
             }
-            return { cohort: g.cohort, campus: g.campus, remaining, dropout: g.raw, mainCause: g.mainCause };
+            return { cohort: g.cohort, campus: g.campus, remaining, mainCause: g.mainCause };
           });
 
         return {

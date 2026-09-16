@@ -1004,7 +1004,9 @@ export type OdBlockKind =
   | "tabla_dinamica"
   | "metodologia"
   | "historico"
-  | "tabla";
+  | "tabla"
+  /** Título de sección: agrupa los bloques que le siguen hasta el próximo separador. */
+  | "separador";
 /** Estado de un punto de un informe. */
 /** Cómo llega la cifra: por periodo académico (A y B) o una sola cifra por año. */
 export type OdReporting = "periodo" | "anual";
@@ -1265,6 +1267,10 @@ export interface OdReportBlockRow {
     mapLayout?: OdMapLayout;
     /** Mapa con panel denso y encuadre a los países con datos. */
     compact?: boolean;
+    /** Separador: una frase bajo su título. */
+    description?: string;
+    /** Distingue varios bloques del mismo tipo sin conjunto (separadores, tableros). Ver 0029. */
+    slot?: string;
   };
 }
 

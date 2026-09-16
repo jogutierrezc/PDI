@@ -807,13 +807,9 @@ function pipelineUnit(p: PipelineData, settings: BulletinSettings, catalog: Open
   const filled = (c: PipelineData["cohorts"][number]) => c.remaining.filter((v) => v !== null).length;
   const drawn = rows.slice().sort((a, b) => filled(a) - filled(b) || String(a.cohort).localeCompare(String(b.cohort))).pop();
   const percentText = (v: number | null) => (v === null ? "—" : `${formatValue(v, "decimal")} %`);
-  // Lo capturado, en su unidad: estudiantes en enteros; permanencia y deserción
-  // del tramo en % con un decimal, como se capturan.
-  const reported = (c: PipelineData["cohorts"][number]) =>
-    measure === "desercion"
-      ? p.stages.map((_, i) => (i === 0 ? "—" : percentText(c.dropout?.[i] ?? null)))
-      : p.stages.map((_, i) => (measure === "estudiantes" ? figure(c.remaining[i] ?? null, "entero") : percentText(c.remaining[i] ?? null)));
   // Lo que dibuja la tubería: % de la cohorte que ya se retiró al llegar a cada etapa.
+  // Es la única fila en %: con deserción es la cifra capturada; con permanencia,
+  // su complemento (repetir ambas sería contar dos veces la misma razón).
   const cumulative = (c: PipelineData["cohorts"][number]) => {
     const intake = c.remaining[0];
     return p.stages.map((_, i) => {
@@ -821,7 +817,7 @@ function pipelineUnit(p: PipelineData, settings: BulletinSettings, catalog: Open
       return intake && v !== null && v !== undefined ? (1 - v / intake) * 100 : null;
     });
   };
-  const reportedLabel = { estudiantes: "Estudiantes que siguen", permanencia: "% que sigue", desercion: "% que se retira en el tramo" }[measure];
+
   return (
     <DatasetSheet
       title={p.title}
@@ -829,7 +825,7 @@ function pipelineUnit(p: PipelineData, settings: BulletinSettings, catalog: Open
       source={p.source}
       notes={[
         ["Cifra", "Deserción acumulada en % de la cohorte que entró"],
-        ["Se captura", { estudiantes: "Estudiantes que siguen en cada etapa", permanencia: "% del flujo que sigue en cada etapa", desercion: "% de los que llegan a cada tramo que se retira en él" }[measure]],
+        ["Se captura", { estudiantes: "Estudiantes que siguen en cada etapa", permanencia: "% del flujo que sigue en cada etapa", desercion: "Deserción acumulada en cada etapa" }[measure]],
       ]}
       cut={rows.length > 1 ? `Cohortes ${rows[0].cohort} a ${rows[rows.length - 1].cohort}` : `${rows[0].cohort} · ${period}`}
       wide
@@ -840,21 +836,20 @@ function pipelineUnit(p: PipelineData, settings: BulletinSettings, catalog: Open
       </div>
       <DataTable
         head={["Cohorte", ...p.stages]}
-        caption={`Por cohorte: ${reportedLabel.toLowerCase()} (como se capturó) y la deserción acumulada que dibuja la tubería.${rows.length > 1 && drawn ? ` La tubería dibuja la cohorte ${drawn.cohort}.` : ""}`}
+        caption={`Deserción acumulada en % de la cohorte${measure === "estudiantes" ? "; debajo, los estudiantes que siguen" : ""}.${rows.length > 1 && drawn ? ` La tubería dibuja la cohorte ${drawn.cohort}.` : ""}`}
         rows={rows.flatMap((c) => {
           const lost = cumulative(c);
           const mark = rows.length > 1 && c === drawn;
           return [
             {
-              label: `${c.cohort} · ${reportedLabel}`,
-              cells: reported(c),
-            },
-            {
-              strong: true,
-              label: `${c.cohort} · deserción acumulada${mark ? " (dibujada)" : ""}`,
+              strong: mark,
+              label: `${c.cohort}${mark ? " (dibujada)" : ""}`,
               cells: lost.map((v) => percentText(v)),
               shade: lost.map((v) => (v === null ? null : v / 100)),
             },
+            ...(measure === "estudiantes"
+              ? [{ label: `${c.cohort} · estudiantes`, cells: p.stages.map((_, i) => figure(c.remaining[i] ?? null, "entero")) }]
+              : []),
           ];
         })}
       />

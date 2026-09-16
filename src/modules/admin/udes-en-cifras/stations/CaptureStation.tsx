@@ -909,10 +909,10 @@ function PipelineCapture({ data, report, periodId, canEdit }: StationProps) {
     },
     ...campuses.map((c) => ({ key: c.campus_id, label: c.label, format })),
   ];
-  // Deserción: una columna por tramo (hacia la etapa i). Estudiantes y permanencia: una por etapa.
+  // Deserción: una columna por etapa después del ingreso (al ingreso es 0). Estudiantes y permanencia: una por etapa.
   const columns: GridColumn[] =
     measure === "desercion"
-      ? pipeline.stages.slice(1).map((stage, i) => ({ key: String(i + 1), label: `→ ${stage}`, ariaLabel: `Deserción hacia ${stage}, % del tramo` }))
+      ? pipeline.stages.slice(1).map((stage, i) => ({ key: String(i + 1), label: stage, ariaLabel: `${stage}, deserción acumulada en % de la cohorte` }))
       : pipeline.stages.map((stage, i) => ({ key: String(i), label: stage, ariaLabel: percent ? `${stage}, % del flujo que sigue` : `${stage}, estudiantes` }));
 
   const storedValue = (campus: string, stage: string) => {
@@ -963,7 +963,7 @@ function PipelineCapture({ data, report, periodId, canEdit }: StationProps) {
           ? "Un solo flujo de cohortes, reportado junto. Estudiantes del flujo que siguen al llegar a cada etapa, por campus; el total se suma solo y el portal lo muestra como % del ingreso."
           : measure === "permanencia"
             ? "Un solo flujo de cohortes, reportado junto. Porcentaje del flujo que sigue en cada etapa (100 al ingreso), con decimales: 87,5. El total institucional se captura."
-            : "Un solo flujo de cohortes, reportado junto. Porcentaje de los que llegaron a cada tramo que se retira en él, con decimales: 12,5. El portal calcula la deserción acumulada. El total institucional se captura."
+            : "Un solo flujo de cohortes, reportado junto. Deserción acumulada: porcentaje de la cohorte que ya se retiró al llegar a cada etapa, con decimales: 22,7. Se muestra tal cual, sin volver a acumular. El total institucional se captura."
       }
       actions={
         <>

@@ -45,7 +45,8 @@ export type BlockKind =
   | "tabla_dinamica"
   | "metodologia"
   | "historico"
-  | "tabla";
+  | "tabla"
+  | "separador";
 
 export interface Campus {
   id: CampusId;
@@ -134,7 +135,7 @@ export interface HeatmapData {
   emptyMeaning: string;
 }
 
-/** Qué se captura en cada etapa: estudiantes, % de la cohorte que sigue o % que se retira en el tramo. */
+/** Qué se captura en cada etapa: estudiantes, % de la cohorte que sigue o % de la cohorte que ya se retiró (acumulado). */
 export type PipelineMeasure = "estudiantes" | "permanencia" | "desercion";
 
 /** Cohorte que avanza por etapas y pierde estudiantes entre una y otra. */
@@ -147,7 +148,7 @@ export interface PipelineCohort {
    * estudiantes, personas; en permanencia y deserción, % de la cohorte.
    */
   remaining: (number | null)[];
-  /** Solo con deserción: % que se retira en el tramo que termina en cada etapa. */
+  /** % que se retira en el tramo que termina en cada etapa, si se reportó aparte. */
   dropout?: (number | null)[];
   /** Causa principal de retiro en cada tramo (entre etapa i e i+1). */
   mainCause: string[];
@@ -247,6 +248,10 @@ export interface ReportBlock {
     mapLayout?: "combinado" | "lado_a_lado";
     /** Mapa con panel denso y encuadre a los países con datos. */
     compact?: boolean;
+    /** Separador: una frase bajo su título. */
+    description?: string;
+    /** Distingue varios bloques del mismo tipo sin conjunto (separadores, tableros). */
+    slot?: string;
   };
   /** Punto del informe al que pertenece. Sin punto, el bloque es de toda la ficha. */
   sectionKey?: string | null;
@@ -370,4 +375,5 @@ export const BLOCK_LABELS: Record<BlockKind, string> = {
   desgloses: "Desgloses",
   tabla_dinamica: "Tabla dinámica",
   metodologia: "Qué mide cada cifra",
+  separador: "Separador",
 };

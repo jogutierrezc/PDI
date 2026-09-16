@@ -512,7 +512,7 @@ type DatasetKind = "desglose" | "calor" | "mapa" | "tuberia" | "historico";
 const MEASURE_LABEL: Record<OdPipelineMeasure, string> = {
   estudiantes: "Estudiantes que siguen en cada etapa (el portal lo muestra en %)",
   permanencia: "Permanencia: % de la cohorte que sigue en cada etapa",
-  desercion: "Deserción: % que se retira en cada tramo",
+  desercion: "Deserción acumulada: % de la cohorte que ya se retiró al llegar a cada etapa",
 };
 
 /** Clave legible y única dentro del informe: "tuberia", "tuberia-2"… */

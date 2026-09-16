@@ -1269,6 +1269,8 @@ export interface OdReportBlockRow {
     compact?: boolean;
     /** Separador: una frase bajo su título. */
     description?: string;
+    /** Bloque de desgloses: claves de los desgloses que muestra. Sin ellas, los que ningún otro bloque eligió. */
+    breakdowns?: string[];
     /** Distingue varios bloques del mismo tipo sin conjunto (separadores, tableros). Ver 0029. */
     slot?: string;
   };

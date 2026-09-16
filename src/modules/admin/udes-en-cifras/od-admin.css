@@ -2995,3 +2995,158 @@
   padding-bottom: var(--space-4);
   border-bottom: 1px solid var(--line);
 }
+
+/* --- Separadores de la ficha ------------------------------------------------
+   El separador se lee como título de sección en la lista: franja de marca a la
+   izquierda y fondo propio. Los bloques de su grupo quedan sangrados. */
+
+.oda-block[data-kind="separador"] {
+  background: var(--surface-2);
+  border-left: 4px solid var(--brand-blue);
+}
+
+.oda-block[data-kind="separador"] .oda-block__body > strong {
+  font-size: var(--text-base);
+}
+
+.oda-block[data-grouped] { margin-left: var(--space-5); }
+
+.oda-block__group {
+  color: var(--ink);
+  font-weight: 700;
+}
+
+.oda-inline-field--wide { flex: 1 1 20rem; }
+
+.oda-block__picker {
+  flex-basis: 100%;
+  font-size: var(--text-xs);
+}
+
+.oda-block__picker summary {
+  cursor: pointer;
+  color: var(--ink-secondary);
+  font-weight: 700;
+}
+
+/* Un bloque sin elección que no muestra nada: se avisa en el tono de pendiente. */
+.oda-block__picker[data-empty] summary { color: var(--status-pending); }
+
+.oda-block__picker > div {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 14rem), 1fr));
+  gap: 2px var(--space-4);
+  margin-top: var(--space-2);
+}
+
+.oda-block__picker .oda-block__note { grid-column: 1 / -1; }
+
+.oda-block-adders {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2) var(--space-3);
+  margin-block: var(--space-4);
+}
+
+.oda-block-adders small {
+  flex-basis: 100%;
+  color: var(--ink-muted);
+  font-size: var(--text-xs);
+}
+
+.oda-schematic__divider {
+  margin-top: 6px;
+  padding: 2px 0 2px 6px;
+  border-left: 3px solid var(--brand-blue);
+  font-size: 0.6875rem;
+  font-weight: 800;
+}
+
+@media (max-width: 720px) {
+  .oda-block[data-grouped] { margin-left: var(--space-3); }
+}
+
+/* --- Pegar una tabla completa ------------------------------------------------ */
+
+.oda-paste {
+  margin-block: var(--space-3);
+  border: 1px dashed var(--line);
+  border-radius: var(--radius-xs);
+}
+
+.oda-paste > summary {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  color: var(--ink);
+  font-size: var(--text-sm);
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.oda-paste[open] > summary { border-bottom: 1px dashed var(--line); }
+
+.oda-paste__body {
+  display: grid;
+  gap: var(--space-3);
+  padding: var(--space-3);
+}
+
+.oda-paste__area {
+  width: 100%;
+  min-height: 4.5rem;
+  padding: var(--space-2) var(--space-3);
+  color: var(--ink);
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-xs);
+  font-family: var(--font-mono, ui-monospace, monospace);
+  font-size: var(--text-xs);
+  white-space: pre;
+  resize: vertical;
+}
+
+.oda-paste__preview {
+  display: grid;
+  gap: var(--space-2);
+  font-size: var(--text-sm);
+}
+
+.oda-paste__messages { display: grid; gap: var(--space-2); }
+
+.oda-paste__error,
+.oda-paste__warning {
+  margin: 0;
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-xs);
+  font-size: var(--text-xs);
+  line-height: 1.45;
+}
+
+.oda-paste__error {
+  color: var(--ink);
+  background: var(--status-risk-soft);
+  border-left: 3px solid var(--status-risk);
+}
+
+.oda-paste__warning {
+  color: var(--ink);
+  background: var(--status-pending-soft);
+  border-left: 3px solid var(--status-pending);
+}
+
+.oda-paste ul { padding-left: calc(var(--space-3) + 1rem); }
+
+.oda-paste__actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2) var(--space-3);
+}
+
+.oda-paste__actions small {
+  color: var(--ink-muted);
+  font-size: var(--text-xs);
+}

@@ -10,12 +10,14 @@
    abre página con sus hojas. Lo que ningún separador reclama queda en la parte
    general del informe, antes del primer grupo.
 
-   Reglas de reparto, en orden:
-   · Un indicador elegido en un tablero es del grupo de ese tablero.
-   · Un tablero sin indicadores elegidos se queda con los que nadie eligió
-     (el primero de esos tableros, en el orden de la ficha).
-   · Un conjunto es del grupo donde aparece su bloque por primera vez; un bloque
-     "Desgloses" sin desglose propio se queda con los desgloses sin bloque.
+   Reglas de reparto, en orden (las mismas para la ficha web y el Boletín):
+   · Un indicador elegido en un tablero es de ese tablero y de su grupo; un
+     desglose elegido en un bloque de desgloses, igual.
+   · Un tablero sin indicadores elegidos muestra los que ningún tablero eligió,
+     pero solo el primero de esos tableros: así no se repiten en cada sección.
+     Lo mismo con los bloques de desgloses sin elección.
+   · Un mapa, tubería, histórico, mapa de calor o tabla es del grupo donde
+     aparece su bloque por primera vez.
    ========================================================================== */
 
 import type { Report, ReportBlock } from "./types";
@@ -48,8 +50,46 @@ const DATASET_PREFIX: Partial<Record<ReportBlock["kind"], string>> = {
 /** "indicador:clave" para los indicadores; los conjuntos, con su prefijo. */
 export const indicatorRef = (id: string) => `indicador:${id}`;
 
+const visibleBlocks = (report: Report) => [...(report.blocks ?? [])].filter((b) => b.visible).sort((a, b) => a.position - b.position);
+const sameBlock = (a: ReportBlock, b: ReportBlock) => a === b || (Boolean(a.uuid) && a.uuid === b.uuid);
+
+/**
+ * Qué indicadores muestra un tablero y qué desgloses un bloque de desgloses.
+ * Lo elegido en el bloque; sin elección, lo que ningún bloque del mismo tipo
+ * eligió, y solo en el primero de esos bloques. Un bloque que no está en la
+ * ficha guardada (orden por defecto) lo muestra todo.
+ */
+export function blockPicks(report: Report) {
+  const blocks = visibleBlocks(report);
+  const pick = (kind: "kpis" | "desgloses", all: string[], explicit: (b: ReportBlock) => string[] | null) => {
+    const own = blocks.filter((b) => b.kind === kind);
+    const claimed = new Set(own.flatMap((b) => explicit(b) ?? []));
+    const restOwner = own.find((b) => explicit(b) === null);
+    const rest = all.filter((key) => !claimed.has(key));
+    return (block: ReportBlock): string[] => {
+      if (!own.some((b) => sameBlock(b, block))) return all;
+      const chosen = explicit(block);
+      if (chosen) return chosen.filter((key) => all.includes(key));
+      return restOwner && sameBlock(restOwner, block) ? rest : [];
+    };
+  };
+  return {
+    indicators: pick(
+      "kpis",
+      report.indicators.map((i) => i.id),
+      (b) => (b.settings.indicators?.length ? b.settings.indicators : null),
+    ),
+    breakdowns: pick(
+      "desgloses",
+      report.breakdowns.map((b) => b.id),
+      (b) => (b.refKey ? [b.refKey] : b.settings.breakdowns?.length ? b.settings.breakdowns : null),
+    ),
+  };
+}
+
 export function reportGroups(report: Report): ReportGrouping {
-  const blocks = [...(report.blocks ?? [])].filter((b) => b.visible).sort((a, b) => a.position - b.position);
+  const blocks = visibleBlocks(report);
+  const picks = blockPicks(report);
   const groups: ReportGroup[] = [];
   const owner = new Map<string, ReportGroup | null>();
   const claim = (ref: string, group: ReportGroup | null) => {
@@ -58,8 +98,6 @@ export function reportGroups(report: Report): ReportGrouping {
 
   // Primera pasada: lo que cada bloque nombra.
   let current: ReportGroup | null = null;
-  const restIndicators: (ReportGroup | null)[] = [];
-  const restBreakdowns: (ReportGroup | null)[] = [];
   blocks.forEach((block, index) => {
     if (block.kind === "separador") {
       current = {
@@ -73,13 +111,11 @@ export function reportGroups(report: Report): ReportGrouping {
       return;
     }
     if (block.kind === "kpis") {
-      if (block.settings.indicators?.length) block.settings.indicators.forEach((id) => claim(indicatorRef(id), current));
-      else restIndicators.push(current);
+      picks.indicators(block).forEach((id) => claim(indicatorRef(id), current));
       return;
     }
     if (block.kind === "desgloses") {
-      if (block.refKey) claim(`desglose:${block.refKey}`, current);
-      else restBreakdowns.push(current);
+      picks.breakdowns(block).forEach((key) => claim(`desglose:${key}`, current));
       return;
     }
     const prefix = DATASET_PREFIX[block.kind];
@@ -89,10 +125,6 @@ export function reportGroups(report: Report): ReportGrouping {
       if (block.kind === "mapa" && block.settings.mapWith) claim(`mapa:${block.settings.mapWith}`, current);
     }
   });
-
-  // Segunda pasada: lo que nadie nombró va al primer bloque que toma "el resto".
-  if (restIndicators.length) report.indicators.forEach((i) => claim(indicatorRef(i.id), restIndicators[0]));
-  if (restBreakdowns.length) report.breakdowns.forEach((b) => claim(`desglose:${b.id}`, restBreakdowns[0]));
 
   for (const [ref, group] of owner) {
     if (!group) continue;

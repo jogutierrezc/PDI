@@ -40,6 +40,7 @@ import { ConfirmButton, Panel, PeriodInput, SaveState, StageEmpty, YearPicker, p
 import { parseCsv, parseNumber, toCsv } from "../sheet";
 import { ImportReport, profileFor } from "./ImportReport";
 import { MobilityCapture } from "./MobilityCapture";
+import { PasteMessages, PasteTable, breakdownFromTable, heatmapFromTable } from "../PasteTable";
 import { IMPORT_PROFILES } from "../import/investigacion";
 
 type Tab = "importar" | "indicadores" | "desgloses" | "historico" | "calor" | "mapas" | "tuberia";
@@ -638,6 +639,74 @@ function BreakdownCapture({ data, report, periodId, canEdit }: StationProps) {
         disabled={!canEdit || saveBreakdown.isPending || save.isPending || changes > 0}
         onChange={(next) => saveBreakdown.mutate({ id: breakdown.id, report_id: breakdown.report_id, years: next })}
       />
+      {canEdit && (
+        <PasteTable
+          hint={
+            reporting === "anual"
+              ? "Categorías en la primera columna y un año por columna (2023, 2024…). También sirve con los años hacia abajo y las categorías a lo ancho."
+              : "Categorías en la primera columna y un corte por columna: 2024-1, 2024-2 y, si la cifra del año se reporta aparte, 2024. También sirve con los cortes hacia abajo."
+          }
+          render={(table, reset) => {
+            const read = breakdownFromTable(table, { years, reporting, calculated: rule !== "reportado" });
+            const fresh = read.labels.filter((l) => !labels.includes(l));
+            const missing = labels.filter((l) => !read.labels.includes(l));
+            const ok = read.errors.length === 0 && read.values.length > 0;
+            return (
+              <div className="oda-paste__preview">
+                <p>
+                  <strong>{read.labels.length} {read.labels.length === 1 ? "categoría" : "categorías"}</strong> · {read.values.filter((v) => v.value !== null).length} cifras
+                  {read.transposed ? " · la tabla venía con los cortes hacia abajo y se giró" : ""}
+                  {fresh.length > 0 ? ` · nuevas: ${fresh.join(", ")}` : ""}
+                </p>
+                <PasteMessages errors={read.errors} warnings={read.warnings} />
+                <div className="oda-paste__actions">
+                  <button
+                    type="button"
+                    className="button-primary"
+                    disabled={!ok}
+                    onClick={() => {
+                      const next = { ...draft };
+                      for (const { label, column, value } of read.values) {
+                        // Una casilla vacía solo cuenta si borra algo guardado.
+                        if (value === null && stored(label, column) === null) continue;
+                        next[cellKey(label, column)] = value;
+                      }
+                      setExtraLabels([...extraLabels, ...fresh.filter((l) => !extraLabels.includes(l))]);
+                      setRemoved(removed.filter((l) => !read.labels.includes(l)));
+                      setDraft(next);
+                      setVia("pegado");
+                      reset();
+                    }}
+                  >
+                    Pasar a la rejilla
+                  </button>
+                  {missing.length > 0 && ok && (
+                    <button
+                      type="button"
+                      className="button-ghost"
+                      onClick={() => {
+                        const next = { ...draft };
+                        for (const { label, column, value } of read.values) {
+                          if (value === null && stored(label, column) === null) continue;
+                          next[cellKey(label, column)] = value;
+                        }
+                        setExtraLabels([...extraLabels.filter((l) => read.labels.includes(l)), ...fresh.filter((l) => !extraLabels.includes(l))]);
+                        setRemoved([...removed, ...missing.filter((l) => !removed.includes(l))]);
+                        setDraft(next);
+                        setVia("pegado");
+                        reset();
+                      }}
+                    >
+                      Pasar y quitar las {missing.length} que no están en la tabla
+                    </button>
+                  )}
+                  <small>Revisa la rejilla y pulsa Guardar.</small>
+                </div>
+              </div>
+            );
+          }}
+        />
+      )}
       <DataGrid
         label={breakdown.title}
         rowHeader="Categoría"
@@ -697,7 +766,7 @@ function HeatmapCapture({ data, report, periodId, canEdit }: StationProps) {
     <Panel
       id="oda-calor"
       title="Mapas de calor"
-      description={`Casilla vacía = ${heatmap.empty_meaning}. Filas y columnas se definen en Estructura y KPI.`}
+      description={`Casilla vacía = ${heatmap.empty_meaning}. Filas y columnas se definen en Estructura y KPI, o pegando la tabla completa.`}
       actions={
         <>
           {heatmaps.length > 1 && (
@@ -732,6 +801,79 @@ function HeatmapCapture({ data, report, periodId, canEdit }: StationProps) {
       }
     >
       <p className="oda-panel__lede"><strong>{heatmap.title}</strong> · {heatmap.row_label} × {heatmap.column_label} · {heatmap.unit}</p>
+      {canEdit && (
+        <PasteTable
+          hint={`${heatmap.row_label || "Filas"} en la primera columna y ${(heatmap.column_label || "columnas").toLowerCase()} en la primera fila, con las cifras en el cruce. Si los rótulos coinciden con los de este mapa, las cifras pasan a la rejilla; si no, la tabla trae su propia estructura.`}
+          disabled={save.isPending}
+          render={(table, reset) => {
+            const read = heatmapFromTable(table);
+            const same =
+              read.rows.length === heatmap.rows.length && read.rows.every((r, i) => r === heatmap.rows[i]) &&
+              read.columns.length === heatmap.columns.length && read.columns.every((c, i) => c === heatmap.columns[i]);
+            const ok = read.errors.length === 0 && read.rows.length > 0;
+            const count = read.values.flat().filter((v) => v !== null).length;
+            const cellsOf = () =>
+              read.values.flatMap((row, r) => row.map((value, c) => ({ heatmap_id: heatmap.id, row_index: r, column_index: c, value })));
+            return (
+              <div className="oda-paste__preview">
+                <p>
+                  <strong>{read.rows.length} × {read.columns.length}</strong> · {count} cifras
+                  {same ? " · mismas filas y columnas que el mapa" : ` · estructura nueva (antes ${heatmap.rows.length} × ${heatmap.columns.length})`}
+                </p>
+                {!same && ok && (
+                  <p className="oda-paste__warning">
+                    Filas: {read.rows.slice(0, 8).join(", ")}{read.rows.length > 8 ? "…" : ""}. Columnas: {read.columns.slice(0, 8).join(", ")}{read.columns.length > 8 ? "…" : ""}.
+                    Al guardar se reemplazan las filas, las columnas y todas las cifras del mapa.
+                  </p>
+                )}
+                <PasteMessages errors={read.errors} />
+                <div className="oda-paste__actions">
+                  {same ? (
+                    <button
+                      type="button"
+                      className="button-primary"
+                      disabled={!ok}
+                      onClick={() => {
+                        const next = { ...draft };
+                        read.values.forEach((row, r) =>
+                          row.forEach((value, c) => {
+                            if (value === null && stored(String(r), String(c)) === null) return;
+                            next[cellKey(String(r), String(c))] = value;
+                          }),
+                        );
+                        setDraft(next);
+                        setVia("pegado");
+                        reset();
+                      }}
+                    >
+                      Pasar a la rejilla
+                    </button>
+                  ) : (
+                    <button
+                      type="button"
+                      className="button-primary"
+                      disabled={!ok || save.isPending}
+                      onClick={() =>
+                        save.mutate(
+                          {
+                            periodId, reportId: report!.uuid!, kind: "pegado",
+                            structure: { heatmapId: heatmap.id, rows: read.rows, columns: read.columns },
+                            cells: cellsOf().filter((cell) => cell.value !== null),
+                          },
+                          { onSuccess: () => { setDraft({}); reset(); } },
+                        )
+                      }
+                    >
+                      Guardar estructura y cifras
+                    </button>
+                  )}
+                  <small>{same ? "Revisa la rejilla y pulsa Guardar." : "Se guarda de inmediato."}</small>
+                </div>
+              </div>
+            );
+          }}
+        />
+      )}
       <DataGrid
         label={heatmap.title}
         rowHeader={heatmap.row_label || "Fila"}
@@ -897,6 +1039,10 @@ function PipelineCapture({ data, report, periodId, canEdit }: StationProps) {
   const format: "decimal" | "entero" = percent ? "decimal" : "entero";
   const campuses = data.rows.campuses;
   const label = flowLabel(from, to);
+  // La base solo acepta cohortes "2014-A" o "2014-A a 2023-B" (od_pipeline_values_cohort):
+  // un año borrado o a medio escribir se avisa aquí en vez de fallar al guardar.
+  const validYear = (year: number) => Number.isInteger(year) && year >= 1900 && year <= 2100;
+  const flowError = !validYear(from.year) || !validYear(to.year) ? "Escribe el año de las cohortes con cuatro cifras (por ejemplo, 2014)." : null;
   const renamed = Boolean(storedLabel) && label !== storedLabel;
 
   const rows: GridRow[] = [
@@ -983,8 +1129,8 @@ function PipelineCapture({ data, report, periodId, canEdit }: StationProps) {
               </select>
             </label>
           )}
-          <SaveState pending={save.isPending} error={save.error} success={save.isSuccess} idle={invalid ? `${invalid} fuera de 0-100` : undefined} />
-          <button type="button" className="button-primary" disabled={!canEdit || changes === 0 || invalid > 0 || save.isPending} onClick={commit}>
+          <SaveState pending={save.isPending} error={save.error} success={save.isSuccess} idle={flowError ? "Revisa las cohortes" : invalid ? `${invalid} fuera de 0-100` : undefined} />
+          <button type="button" className="button-primary" disabled={!canEdit || changes === 0 || invalid > 0 || Boolean(flowError) || save.isPending} onClick={commit}>
             Guardar {changes || ""}
           </button>
         </>
@@ -996,8 +1142,8 @@ function PipelineCapture({ data, report, periodId, canEdit }: StationProps) {
           <PeriodInput label="Desde" value={from} onChange={setFrom} />
           <PeriodInput label="Hasta" value={to} onChange={setTo} />
         </span>
-        <span className="oda-badge" data-tone={renamed ? "warn" : undefined}>
-          {renamed ? `Se guardará como ${label} (antes ${storedLabel})` : `Flujo ${label}`}
+        <span className="oda-badge" data-tone={renamed || flowError ? "warn" : undefined}>
+          {flowError ?? (renamed ? `Se guardará como ${periodText(label)} (antes ${periodText(storedLabel ?? "")})` : `Flujo ${periodText(label)}`)}
         </span>
       </div>
 

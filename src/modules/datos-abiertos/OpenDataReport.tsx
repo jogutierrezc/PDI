@@ -55,7 +55,8 @@ import {
   valueOf,
 } from "./data/open-data";
 import { ALL_YEARS, ANNUAL_RULE_LABEL, cutCode, cutCodeLabel, cutLabel, fromCutCode } from "./data/terms";
-import type { CampusId, Indicator, MapDataset, OpenDataCatalog, Report, ReportBlock, Term } from "./data/types";
+import type { Breakdown, CampusId, Indicator, MapDataset, OpenDataCatalog, Report, ReportBlock, Term } from "./data/types";
+import { blockPicks } from "./data/groups";
 import { ALL_CAMPUSES, DEFAULT_BLOCK_ORDER, MAP_MODE_TITLE, isMobilityMap, isWorldMap } from "./data/types";
 import "./datos-abiertos.css";
 
@@ -128,6 +129,11 @@ function ReportContent({ data, report, year, term, campus, setYear, setTerm, set
 
   const sections = report.sections ?? [];
   const blocks = orderedBlocks(report);
+  // Separadores: títulos de sección que agrupan los bloques siguientes.
+  const dividers = blocks.filter((b) => b.kind === "separador");
+  const dividerId = (b: ReportBlock) => `od-grupo-${b.settings.slot ?? b.position}`;
+  // Qué indicadores y desgloses muestra cada bloque: sin repetirse entre secciones.
+  const picks = blockPicks(report);
   // Un mapa emparejado con otro (combinado o lado a lado) sale en el bloque que
   // lo pide; su propio bloque se omite. Si dos bloques se piden mutuamente, gana
   // el primero en el orden de la ficha.
@@ -164,9 +170,10 @@ function ReportContent({ data, report, year, term, campus, setYear, setTerm, set
   const renderBlock = (block: ReportBlock, key: string, inSection: boolean): ReactNode => {
     switch (block.kind) {
       case "kpis": {
+        const chosen = picks.indicators(block);
         const picked = block.settings.indicators?.length
-          ? block.settings.indicators.map((id) => report.indicators.find((i) => i.id === id)).filter((i): i is Indicator => Boolean(i))
-          : boardIndicators;
+          ? chosen.map((id) => report.indicators.find((i) => i.id === id)).filter((i): i is Indicator => Boolean(i))
+          : boardIndicators.filter((i) => chosen.includes(i.id));
         if (picked.length === 0) return null;
         const board = (
           <KpiBoard
@@ -182,11 +189,13 @@ function ReportContent({ data, report, year, term, campus, setYear, setTerm, set
           />
         );
         if (inSection) return <div className="od-point__block" key={key}>{board}</div>;
+        // Puede haber un tablero por grupo: cada uno con su propio id.
+        const boardId = block.settings.slot ? `od-clave-${block.settings.slot}` : "od-clave";
         return (
-          <section className="od-keyrow" aria-labelledby="od-clave" key={key}>
+          <section className="od-keyrow" aria-labelledby={boardId} key={key}>
             <div className="u-container">
               <div className="od-keyrow__head">
-                <h2 id="od-clave">{block.settings.title || "Tablero de indicadores"}</h2>
+                <h2 id={boardId}>{block.settings.title || (block.settings.indicators?.length ? "Indicadores" : "Tablero de indicadores")}</h2>
                 <p>
                   {year === ALL_YEARS ? (
                     <>
@@ -196,7 +205,7 @@ function ReportContent({ data, report, year, term, campus, setYear, setTerm, set
                   ) : (
                     <>
                       {campusName} · corte {cutLabel(year, term)}
-                      {term ? "" : ", cifra del año calculada con los periodos A y B"}.
+                      {term ? "" : ", cifra del año calculada con los periodos 1 y 2"}.
                     </>
                   )}{" "}
                   Elige un indicador para verlo en la gráfica de evolución.
@@ -366,7 +375,8 @@ function ReportContent({ data, report, year, term, campus, setYear, setTerm, set
         return shell(key, `od-tabla-${table.id}`, block.settings.title || table.title, undefined, inSection, <TableBlock table={table} title={block.settings.title} />);
       }
       case "desgloses": {
-        const only = block.refKey ? report.breakdowns.filter((b) => b.id === block.refKey) : report.breakdowns;
+        const chosen = picks.breakdowns(block);
+        const only = chosen.map((key) => report.breakdowns.find((b) => b.id === key)).filter((b): b is Breakdown => Boolean(b));
         if (only.length === 0) return null;
         if (inSection) {
           return (
@@ -378,7 +388,7 @@ function ReportContent({ data, report, year, term, campus, setYear, setTerm, set
           );
         }
         return (
-          <Breakdowns key={key} breakdowns={only} year={year} campus={campus} setYear={setYear} title={block.settings.title} term={term} years={data.years} />
+          <Breakdowns key={key} anchor={block.settings.slot ? `od-desgloses-${block.settings.slot}` : "od-desgloses"} breakdowns={only} year={year} campus={campus} setYear={setYear} title={block.settings.title} term={term} years={data.years} />
         );
       }
       case "tabla_dinamica":
@@ -398,6 +408,25 @@ function ReportContent({ data, report, year, term, campus, setYear, setTerm, set
             </div>
           </section>
         );
+      case "separador": {
+        if (inSection) return null;
+        const number = dividers.indexOf(block) + 1;
+        const id = dividerId(block);
+        return (
+          <section className="od-divider" key={key} id={id} aria-labelledby={`${id}-titulo`} style={{ "--od-divider": `var(--od-line-${report.line})` } as CSSProperties}>
+            <div className="u-container od-divider__inner">
+              <span className="od-divider__number" aria-hidden="true">
+                {String(number).padStart(2, "0")}
+              </span>
+              <div className="od-divider__text">
+                <span className="od-divider__kicker">{report.name}</span>
+                <h2 id={`${id}-titulo`}>{block.settings.title || "Sin título"}</h2>
+                {block.settings.description && <p>{block.settings.description}</p>}
+              </div>
+            </div>
+          </section>
+        );
+      }
       case "metodologia":
         return (
           <section className="od-section" key={key} aria-labelledby="od-metodo">
@@ -493,6 +522,23 @@ function ReportContent({ data, report, year, term, campus, setYear, setTerm, set
           Un bloque sin datos no se pinta: una sección vacía no informa de nada.
           Un informe por puntos lee punto a punto; los bloques de toda la ficha
           (evolución, tabla dinámica, metodología) cierran después. */}
+      {dividers.length > 1 && (
+        <nav className="od-points-index od-divider-index" aria-labelledby="od-grupos">
+          <div className="u-container">
+            <h2 id="od-grupos">En esta ficha</h2>
+            <ol>
+              {dividers.map((divider, i) => (
+                <li key={dividerId(divider)}>
+                  <a href={`#${dividerId(divider)}`}>
+                    <b>{String(i + 1).padStart(2, "0")}</b>
+                    <span>{divider.settings.title || "Sin título"}</span>
+                  </a>
+                </li>
+              ))}
+            </ol>
+          </div>
+        </nav>
+      )}
       {sections.length > 0 && (
         <nav className="od-points-index" aria-labelledby="od-puntos">
           <div className="u-container">
@@ -807,6 +853,7 @@ function Evolution({
 /* --- Desgloses ------------------------------------------------------------- */
 
 function Breakdowns({
+  anchor,
   breakdowns,
   year,
   campus,
@@ -815,6 +862,8 @@ function Breakdowns({
   term,
   years,
 }: {
+  /** Id del título: puede haber un bloque de desgloses por sección. */
+  anchor: string;
   breakdowns: Report["breakdowns"];
   year: number;
   campus: CampusId;
@@ -825,10 +874,10 @@ function Breakdowns({
 }) {
 
   return (
-    <section className="od-section" aria-labelledby="od-desgloses">
+    <section className="od-section" aria-labelledby={anchor}>
       <div className="u-container">
         <header className="od-section__head">
-          <h2 id="od-desgloses">{title || "Desgloses"}</h2>
+          <h2 id={anchor}>{title || "Desgloses"}</h2>
           <p>
             Cómo se reparte la cifra por dentro. Los desgloses se publican para el total institucional
             {campus !== "todas" ? ", así que no cambian al elegir un campus" : ""}.

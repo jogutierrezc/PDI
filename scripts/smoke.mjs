@@ -1573,6 +1573,49 @@ const routes = [
     absent: [...SIN_DINERO],
   },
   {
+    path: "/datos-abiertos/sostenible",
+    note: "separadores (0029): franjas de sección, índice y un tablero por grupo",
+    expect: "En esta ficha",
+    also: ["Energía y agua", "Residuos y áreas verdes", "Lo que consume el campus y cuánto se renueva."],
+    absent: [...SIN_DINERO],
+    interact: async (window) => {
+      const dividers = [...window.document.querySelectorAll(".od-divider h2")].map((h) => h.textContent.trim());
+      if (dividers.join("|") !== "Energía y agua|Residuos y áreas verdes") throw new Error(`separadores en otro orden: ${dividers.join("|")}`);
+      const links = [...window.document.querySelectorAll(".od-divider-index a")].map((a) => a.getAttribute("href"));
+      if (links.some((href) => !window.document.querySelector(href))) throw new Error(`un enlace del índice no llega a su sección: ${links.join(" ")}`);
+      // Un tablero por grupo, cada uno con su id.
+      const boards = [...window.document.querySelectorAll(".od-keyrow h2")].map((h) => h.id);
+      if (boards.length !== 2 || new Set(boards).size !== 2) throw new Error(`tableros por grupo: ${boards.join(", ")}`);
+      // Cada bloque de desgloses muestra los suyos, sin repetirse entre secciones.
+      const sections = [...window.document.querySelectorAll("section")];
+      const titlesIn = (from, to) => {
+        const a = sections.indexOf(from);
+        const b = to ? sections.indexOf(to) : sections.length;
+        return sections.slice(a, b).map((section) => section.textContent).join(" ");
+      };
+      const [first, second] = window.document.querySelectorAll(".od-divider");
+      const one = titlesIn(first, second);
+      const two = titlesIn(second);
+      if (!one.includes("Emisiones por fuente") || one.includes("Residuos aprovechados por tipo")) throw new Error("la primera sección no muestra solo sus desgloses");
+      if (!two.includes("Residuos aprovechados por tipo") || two.includes("Emisiones por fuente")) throw new Error("la segunda sección no muestra solo sus desgloses");
+    },
+  },
+  {
+    path: "/datos-abiertos/boletines/boletin-sostenible",
+    note: "el boletín abre una sección por separador y la pone en el índice",
+    expect: "Energía y agua",
+    also: ["Residuos y áreas verdes", "sección 1 de 2", "sección 2 de 2"],
+    absent: [...SIN_DINERO],
+    interact: async (window) => {
+      // En el índice, cada desglose queda bajo su sección y no se repite.
+      const rows = [...window.document.querySelectorAll(".bol-pages .bol-toc li")].map((li) => li.textContent);
+      const at = (text) => rows.findIndex((row) => row.includes(text));
+      const order = ["Energía y agua", "Emisiones por fuente", "Residuos y áreas verdes", "Residuos aprovechados por tipo"].map(at);
+      if (order.some((i) => i < 0) || order.some((i, k) => k > 0 && i <= order[k - 1])) throw new Error(`índice del boletín: ${rows.join(" | ")}`);
+      if (rows.filter((row) => row.includes("Emisiones por fuente")).length !== 1) throw new Error("un desglose se repite en el índice");
+    },
+  },
+  {
     path: "/datos-abiertos/poblacional",
     note: "la vista combinada respeta cifras anuales, periodos y campus",
     expect: "Estudiantes matriculados",
@@ -1593,7 +1636,8 @@ const routes = [
       const campusChoice = [...window.document.querySelectorAll('.od-controls button')].find((b) => b.textContent.trim() === "Cúcuta");
       if (!campusChoice) throw new Error("falta el filtro de campus Cúcuta");
       campusChoice.click();
-      await tick();
+      // El cambio de campus rehace toda la ficha: se espera a la gráfica, no un tiempo fijo.
+      for (let i = 0; i < 15 && label2025() !== "2025. Global anual: 4.893 estudiantes. Periodo 1: 4.794 estudiantes. Periodo 2: 4.893 estudiantes"; i += 1) await tick();
       if (label2025() !== "2025. Global anual: 4.893 estudiantes. Periodo 1: 4.794 estudiantes. Periodo 2: 4.893 estudiantes") {
         throw new Error(`la vista combinada no filtró el campus: ${label2025()}`);
       }
@@ -1671,6 +1715,13 @@ const routes = [
   },
   { path: "/admin/udes-en-cifras/estructura/permanencia", session: true, expect: "Tablero de KPI", also: ["Ficha del informe", "Indicadores (4)", "Conjuntos visuales", "Titular"] },
   { path: "/admin/udes-en-cifras/diseno/poblacional", session: true, expect: "Bloques de la ficha", also: ["Así se lee la ficha", "Tabla dinámica"] },
+  {
+    path: "/admin/udes-en-cifras/diseno/sostenible",
+    session: true,
+    note: "separadores: título, descripción, grupo de cada bloque y tableros por grupo",
+    expect: "Añadir separador",
+    also: ["Título del separador", "Otro tablero de indicadores", "2 indicadores elegidos", "Otro bloque de desgloses", "1 desglose elegido", "los desgloses que ningún otro bloque de desgloses eligió"],
+  },
   { path: "/admin/udes-en-cifras/publicacion/sostenible", session: true, expect: "Estado de los informes", also: ["Revisar UDES Sostenible", "Bitácora de publicación"] },
   { path: "/admin/udes-en-cifras/periodo", session: true, expect: "Campus del periodo", also: ["Oficinas fuente", "Periodo 2020-2025"] },
   {
@@ -2071,6 +2122,56 @@ const routes = [
     also: ["Administradora de prueba", "Roles de acceso", "Editor de Investigación", "Estaciones del periodo"],
   },
   {
+    path: "/admin/udes-en-cifras/captura/poblacional",
+    note: "pegar una tabla completa en un desglose y en un mapa de calor",
+    session: true,
+    expect: "Pegar una tabla completa",
+    interact: async (window, tick) => {
+      const setter = Object.getOwnPropertyDescriptor(window.HTMLTextAreaElement.prototype, "value").set;
+      const openTab = async (name) => {
+        const tab = [...window.document.querySelectorAll(".oda-tab")].find((b) => b.textContent.startsWith(name));
+        if (!tab) throw new Error(`falta la pestaña ${name}`);
+        tab.click();
+        await tick();
+      };
+      const paste = async (panel, text) => {
+        const area = window.document.querySelector(`${panel} .oda-paste__area`);
+        if (!area) throw new Error(`falta la zona de pegado en ${panel}`);
+        setter.call(area, text);
+        area.dispatchEvent(new window.Event("input", { bubbles: true }));
+        await tick();
+        return window.document.querySelector(`${panel} .oda-paste__preview`)?.textContent ?? "";
+      };
+      const button = (panel, text) => [...window.document.querySelectorAll(`${panel} .oda-paste__actions button`)].find((b) => b.textContent.includes(text));
+      const table = (rows) => rows.map((row) => row.join("\t")).join("\n");
+
+      // Desglose: categorías en filas, cortes en columnas, cifras de Excel en español.
+      await openTab("Desgloses");
+      let preview = await paste("#oda-desgloses", table([["Nivel", "2024", "2025-1"], ["Pregrado nuevo", "1.234", "600"], ["Posgrado nuevo", "200,5", ""]]));
+      if (!preview.includes("2 categorías") || !preview.includes("3 cifras") || !preview.includes("nuevas: Pregrado nuevo, Posgrado nuevo")) {
+        throw new Error(`vista previa del desglose: ${preview}`);
+      }
+      button("#oda-desgloses", "Pasar a la rejilla").click();
+      await tick();
+      const rows = [...window.document.querySelectorAll("#oda-desgloses .oda-grid tbody th")].map((th) => th.textContent);
+      if (!rows.some((t) => t.includes("Pregrado nuevo"))) throw new Error("las categorías pegadas no llegaron a la rejilla");
+      // Con los cortes hacia abajo, se gira.
+      preview = await paste("#oda-desgloses", table([["Corte", "Pregrado", "Posgrado"], ["2024", "10", "2"], ["2025", "12", "3"]]));
+      if (!preview.includes("se giró") || !preview.includes("4 cifras")) throw new Error(`tabla girada: ${preview}`);
+      preview = await paste("#oda-desgloses", table([["Nivel", "Total"], ["Pregrado", "10"]]));
+      if (!preview.includes("no es un corte")) throw new Error(`un encabezado que no es corte debe avisarse: ${preview}`);
+
+      // Mapa de calor con las mismas filas y columnas: pasa a la rejilla.
+      await openTab("Mapas de calor");
+      const levels = ["Técnico y tecnológico", "Universitario", "Especialización", "Maestría", "Doctorado"];
+      preview = await paste("#oda-calor", table([["Nivel", "2020", "2021", "2022", "2023", "2024", "2025"], ...levels.map((r, i) => [r, String(i), "1", "2", "3", "4", "5"])]));
+      if (!preview.includes("mismas filas y columnas") || !button("#oda-calor", "Pasar a la rejilla")) throw new Error(`mapa de calor con la misma estructura: ${preview}`);
+      // Con otra estructura, se ofrece guardarla completa.
+      preview = await paste("#oda-calor", table([["Facultad", "Pregrado", "Posgrado"], ["Ingeniería", "10", "2"], ["Salud", "8", ""]]));
+      if (!preview.includes("estructura nueva") || !button("#oda-calor", "Guardar estructura y cifras")) throw new Error(`mapa de calor con estructura nueva: ${preview}`);
+    },
+  },
+  {
     path: "/admin/udes-en-cifras/captura/investigacion",
     as: "user-vi",
     session: true,
@@ -2328,6 +2429,28 @@ FIXTURES.v_faculty_actions_admin = [
 /* UDES en Cifras: las filas que deja la migración 0020, generadas junto con ella. */
 const OD_FIXTURES = JSON.parse(readFileSync(new URL("./fixtures/udes-en-cifras.json", import.meta.url), "utf8"));
 Object.assign(FIXTURES, OD_FIXTURES);
+
+/* Separadores (0029): la ficha de UDES Sostenible agrupa sus bloques en dos secciones. */
+{
+  const report = FIXTURES.od_reports.find((r) => r.slug === "sostenible");
+  const own = FIXTURES.od_report_blocks.filter((b) => b.report_id === report.id).sort((a, b) => a.position - b.position);
+  const rest = FIXTURES.od_report_blocks.filter((b) => b.report_id !== report.id);
+  const block = (kind, settings, ref_id = null) => ({ id: `od-bloque-sostenible-${kind}-${settings.slot ?? ref_id ?? "x"}`, report_id: report.id, kind, ref_id, section_id: null, visible: true, settings });
+  const kpis = own.find((b) => b.kind === "kpis");
+  const others = own.filter((b) => b.kind !== "kpis");
+  const ordered = [
+    block("separador", { title: "Energía y agua", description: "Lo que consume el campus y cuánto se renueva.", slot: "energia" }),
+    { ...kpis, settings: { ...kpis.settings, indicators: ["renovable", "agua"] } },
+    ...others.filter((b) => b.kind === "evolucion" || b.kind === "mapa_calor"),
+    // Sin elección: muestra los desgloses que el otro bloque no eligió (emisiones).
+    ...others.filter((b) => b.kind === "desgloses"),
+    block("separador", { title: "Residuos y áreas verdes", slot: "residuos" }),
+    block("kpis", { indicators: ["residuos", "areas-verdes"], slot: "residuos-kpis" }),
+    block("desgloses", { breakdowns: ["tipo-residuo"], slot: "residuos-desgloses" }),
+    ...others.filter((b) => b.kind !== "evolucion" && b.kind !== "mapa_calor" && b.kind !== "desgloses"),
+  ].map((b, i) => ({ ...b, position: i + 1 }));
+  FIXTURES.od_report_blocks = [...rest, ...ordered];
+}
 
 /* Boletín UDES en Cifras (0027): uno global publicado con una edición en PDF. */
 FIXTURES.od_bulletins = [

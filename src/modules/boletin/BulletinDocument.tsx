@@ -74,7 +74,16 @@ function paragraphs(text: string) {
 const anchorOf = (unit: Unit, i: number) =>
   unit.kind === "capitulo" && unit.report ? `cap-${unit.report.slug}` : unit.kind === "resumen" ? "resumen" : `u-${i}`;
 
-type TocEntry = { key: string; kind: "capitulo" | "hoja" | "resumen" | "cierre"; label: string; unit?: number; report?: Report; href: string };
+type TocEntry = {
+  key: string;
+  kind: "capitulo" | "seccion" | "hoja" | "resumen" | "cierre";
+  label: string;
+  unit?: number;
+  report?: Report;
+  href: string;
+  /** Hoja dentro de una sección: va un escalón más adentro. */
+  inSection?: boolean;
+};
 
 export function BulletinDocument({ catalog, settings, report, fitWidth, onReady }: BulletinDocumentProps) {
   const { units, chapters, offices } = useMemo(() => compose(catalog, settings), [catalog, settings]);
@@ -104,11 +113,13 @@ export function BulletinDocument({ catalog, settings, report, fitWidth, onReady 
         list.push({ key: unit.key, kind: "resumen", label: unit.title, unit: i, href: "#resumen" });
       } else if (unit.kind === "capitulo" && unit.report) {
         list.push({ key: unit.key, kind: "capitulo", label: unit.report.name, unit: i, report: unit.report, href: `#${anchorOf(unit, i)}` });
+      } else if (unit.kind === "seccion") {
+        list.push({ key: unit.key, kind: "seccion", label: unit.title, unit: i, report: unit.report, href: `#${anchorOf(unit, i)}` });
       } else if (!unit.tight) {
         const id = `${unit.report?.slug}|${unit.title}`;
         if (seen.has(id)) return;
         seen.add(id);
-        list.push({ key: unit.key, kind: "hoja", label: unit.title, unit: i, href: `#${anchorOf(unit, i)}` });
+        list.push({ key: unit.key, kind: "hoja", label: unit.title, unit: i, href: `#${anchorOf(unit, i)}`, inSection: Boolean(unit.section) });
       }
     });
     list.push({ key: "contraportada", kind: "cierre", label: settings.texts.backTitle, href: "#contraportada" });
@@ -224,10 +235,15 @@ export function BulletinDocument({ catalog, settings, report, fitWidth, onReady 
       key={entry.key}
       data-toc={measuring ? index : undefined}
       data-kind={entry.kind}
+      data-in-section={entry.inSection || undefined}
       style={entry.report ? ({ "--line": `var(--bol-line-${entry.report.line})` } as CSSProperties) : undefined}
     >
       <a href={measuring ? undefined : entry.href}>
-        {entry.kind === "capitulo" ? <span className="bol-toc__code">{entry.report!.code}</span> : entry.kind === "hoja" ? <span aria-hidden="true" /> : null}
+        {entry.kind === "capitulo" ? (
+          <span className="bol-toc__code">{entry.report!.code}</span>
+        ) : entry.kind === "hoja" || entry.kind === "seccion" ? (
+          <span aria-hidden="true" />
+        ) : null}
         <span className="bol-toc__name">{entry.label}</span>
         <span className="bol-toc__dots" aria-hidden="true" />
         <span className="bol-toc__page">{measuring ? "00" : pageOf(entry)}</span>
@@ -358,6 +374,7 @@ export function BulletinDocument({ catalog, settings, report, fitWidth, onReady 
 
           {pages?.map((list, index) => {
             const pageReport = units[list[0]?.i]?.report;
+            const pageSection = units[list[0]?.i]?.section;
             return (
               <ContentPage
                 key={index}
@@ -367,7 +384,7 @@ export function BulletinDocument({ catalog, settings, report, fitWidth, onReady 
                 current={pageReport?.slug}
                 number={index + firstSheetPage}
                 total={total}
-                chapter={pageReport?.name ?? ""}
+                chapter={pageReport ? `${pageReport.name}${pageSection ? ` · ${pageSection}` : ""}` : ""}
                 report={pageReport}
                 badge={settings.headerBadge}
                 cut={cut}

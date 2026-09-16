@@ -23,6 +23,8 @@ import { basisOf, changeBetween, formatCount, formatValue, periodBasisOf, valueO
 import { ALL_YEARS, ANNUAL_RULE_LABEL, cutLabel, TERMS } from "../datos-abiertos/data/terms";
 import type { AnnualRule, Term } from "../datos-abiertos/data/terms";
 import { isMobilityMap, isWorldMap } from "../datos-abiertos/data/types";
+import { indicatorRef, reportGroups } from "../datos-abiertos/data/groups";
+import type { ReportGroup } from "../datos-abiertos/data/groups";
 import type {
   Breakdown,
   Campus,
@@ -45,13 +47,16 @@ import type { BulletinSettings, IndicatorShow } from "./model";
 
 export interface Unit {
   key: string;
-  kind: "resumen" | "capitulo" | "indicador" | "conjunto";
+  /** "seccion": apertura de un separador de la ficha (Graduados) dentro del capítulo. */
+  kind: "resumen" | "capitulo" | "seccion" | "indicador" | "conjunto";
   /** Informe al que pertenece (el resumen no tiene): pie, cabecera, pestaña e índice. */
   report?: Report;
   /** Continuación de una tabla: va pegada a la anterior y no entra al índice. */
   tight?: boolean;
   /** Título de la hoja: nombre del indicador o del conjunto. */
   title: string;
+  /** Separador de la ficha al que pertenece: va en el pie de su página. */
+  section?: string;
   breakBefore?: boolean;
   node: ReactNode;
   /**
@@ -502,7 +507,20 @@ function IndicatorSheet({
 
 /* --- Apertura de capítulo --------------------------------------------------------- */
 
-function ChapterOpener({ report, catalog, settings, count }: { report: Report; catalog: OpenDataCatalog; settings: BulletinSettings; count: number }) {
+function ChapterOpener({
+  report,
+  catalog,
+  settings,
+  count,
+  sections = [],
+}: {
+  report: Report;
+  catalog: OpenDataCatalog;
+  settings: BulletinSettings;
+  count: number;
+  /** Separadores de la ficha que abren sección en este capítulo. */
+  sections?: string[];
+}) {
   const keys = report.keyIndicators
     .map((id) => report.indicators.find((i) => i.id === id))
     .filter((i): i is Indicator => Boolean(i))
@@ -535,9 +553,42 @@ function ChapterOpener({ report, catalog, settings, count }: { report: Report; c
           })}
         </dl>
       )}
+      {sections.length > 0 && (
+        <ol className="bol-chapter__sections">
+          {sections.map((title, i) => (
+            <li key={title + i}>
+              <b>{String(i + 1).padStart(2, "0")}</b>
+              {title}
+            </li>
+          ))}
+        </ol>
+      )}
       <p className="bol-chapter__meta">
         {cutText(settings.cut)} · {catalog.campuses.find((c) => c.id === settings.campus)?.name ?? "Todos los campus"} · {count}{" "}
         {count === 1 ? "hoja" : "hojas"} en este capítulo
+      </p>
+    </section>
+  );
+}
+
+/* --- Apertura de sección (separador de la ficha) ------------------------------------ */
+
+function SectionOpener({ report, group, number, total, titles }: { report: Report; group: ReportGroup; number: number; total: number; titles: string[] }) {
+  return (
+    <section className="bol-group" style={{ "--line": `var(--bol-line-${report.line})` } as CSSProperties}>
+      <p className="bol-group__kicker">
+        <span className="bol-group__code">{report.code}</span>
+        {report.name} · sección {number} de {total}
+      </p>
+      <div className="bol-group__title">
+        <span className="bol-group__number">{String(number).padStart(2, "0")}</span>
+        <div>
+          <h2>{group.title}</h2>
+          {group.description && <p>{group.description}</p>}
+        </div>
+      </div>
+      <p className="bol-group__meta">
+        {titles.length} {titles.length === 1 ? "hoja" : "hojas"}: {titles.join(" · ")}
       </p>
     </section>
   );
@@ -1279,6 +1330,8 @@ export function compose(catalog: OpenDataCatalog, settings: BulletinSettings): C
     }
 
     const body: Unit[] = [];
+    /** Indicador o conjunto de cada unidad del cuerpo: decide su sección. */
+    const refOf = new Map<Unit, string>();
 
     for (const item of entry.indicators) {
       if (!item.include) continue;
@@ -1294,6 +1347,7 @@ export function compose(catalog: OpenDataCatalog, settings: BulletinSettings): C
         node: <IndicatorSheet indicator={indicator} catalog={catalog} settings={settings} show={item.show} />,
         compact: <IndicatorSheet indicator={indicator} catalog={catalog} settings={settings} show={item.show} compact />,
       });
+      refOf.set(body[body.length - 1], indicatorRef(indicator.id));
     }
 
     for (const item of entry.datasets) {
@@ -1324,10 +1378,21 @@ export function compose(catalog: OpenDataCatalog, settings: BulletinSettings): C
         if (!node) return;
         credit(source, report);
         body.push({ key: `${report.slug}-d-${item.ref}-${index}`, kind: "conjunto", report, title, node, tight });
+        refOf.set(body[body.length - 1], item.ref);
       });
     }
 
     if (!body.length && settings.skipEmpty) continue;
+
+    // Separadores de la ficha: lo general del informe va primero; luego cada
+    // sección abre página con sus hojas, en el orden del boletín.
+    const { groups, groupOf } = reportGroups(report);
+    const general = body.filter((unit) => !groupOf(refOf.get(unit) ?? ""));
+    const sectioned = groups
+      .map((group) => ({ group, units: body.filter((unit) => groupOf(refOf.get(unit) ?? "") === group) }))
+      .filter((part) => part.units.length > 0);
+    const sheets = body.filter((unit) => !unit.tight).length;
+
     chapters.push(report);
     units.push({
       key: `${report.slug}-capitulo`,
@@ -1335,9 +1400,22 @@ export function compose(catalog: OpenDataCatalog, settings: BulletinSettings): C
       report,
       title: report.name,
       breakBefore: true,
-      node: <ChapterOpener report={report} catalog={catalog} settings={settings} count={body.length} />,
+      node: <ChapterOpener report={report} catalog={catalog} settings={settings} count={sheets} sections={sectioned.map((part) => part.group.title)} />,
     });
-    units.push(...body);
+    units.push(...general);
+    sectioned.forEach(({ group, units: own }, i) => {
+      const titles = Array.from(new Set(own.filter((unit) => !unit.tight).map((unit) => unit.title)));
+      units.push({
+        key: `${report.slug}-s-${group.key}`,
+        kind: "seccion",
+        report,
+        title: group.title,
+        section: group.title,
+        breakBefore: true,
+        node: <SectionOpener report={report} group={group} number={i + 1} total={sectioned.length} titles={titles} />,
+      });
+      units.push(...own.map((unit) => ({ ...unit, section: group.title })));
+    });
   }
 
   // El resumen abre el documento: siempre en el ejecutivo, a pedido en el completo.

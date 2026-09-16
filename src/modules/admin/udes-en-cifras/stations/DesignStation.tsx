@@ -6,6 +6,11 @@
    la gráfica con la que abre la evolución. Un conjunto que existe pero no
    tiene bloque se ofrece para añadirlo, así nada cargado se queda sin verse
    por olvido.
+
+   Separadores: un bloque con título ("Graduados") agrupa los que le siguen
+   hasta el próximo. Para que un grupo tenga sus indicadores, se le pone un
+   tablero de indicadores con los suyos elegidos. La ficha web los pinta como
+   franjas de sección y el Boletín abre página en cada uno (ver groups.ts).
    ========================================================================== */
 
 import { useState } from "react";
@@ -29,7 +34,11 @@ const BLOCK_HELP: Record<OdBlockKind, string> = {
   tabla_dinamica: "Todas las cifras, para armar la tabla propia y descargarla.",
   metodologia: "Qué mide cada indicador y quién lo reporta.",
   tabla: "Una tabla del informe: listado, ranking, fichas o cifras de un periodo.",
+  separador: "Agrupa los bloques que siguen, hasta el próximo separador. En el Boletín abre página.",
 };
+
+/** Clave corta para distinguir varios bloques del mismo tipo (ver 0029). */
+const newSlot = () => Math.random().toString(36).slice(2, 10);
 
 export function DesignStation({ data, report, canEdit }: StationProps) {
   if (!report?.uuid) return <StageEmpty title="Elige un informe">El diseño se decide ficha por ficha.</StageEmpty>;
@@ -51,6 +60,23 @@ function DesignEditor({ data, reportId, blocks, canEdit }: { data: StationProps[
   const breakdowns = data.rows.breakdowns.filter((b) => b.report_id === reportId);
   const tables = data.rows.tables.filter((t) => t.report_id === reportId);
   const sections = data.rows.sections.filter((s) => s.report_id === reportId);
+  const indicators = data.rows.indicators.filter((i) => i.report_id === reportId).sort((a, b) => a.position - b.position);
+  /** Separador bajo el que queda un bloque (el anterior más cercano). */
+  const groupOf = (index: number) => {
+    for (let i = index - 1; i >= 0; i -= 1) if (draft[i].kind === "separador") return draft[i];
+    return null;
+  };
+  /**
+   * Un tablero (o bloque de desgloses) sin elección: el primero muestra lo que
+   * nadie eligió; los siguientes, nada. Igual que en la ficha y el Boletín (groups.ts).
+   */
+  const restState = (block: DraftBlock, chose: (b: DraftBlock) => boolean): "elige" | "resto" | "vacio" => {
+    if (chose(block)) return "elige";
+    const first = draft.find((b) => b.kind === block.kind && b.visible && !chose(b));
+    return !block.visible || first?.tempId === block.tempId ? "resto" : "vacio";
+  };
+  const add = (block: Omit<DraftBlock, "position" | "tempId">) =>
+    setDraft(normalized([...draft, { ...block, position: draft.length + 1, tempId: `nuevo-${block.kind}-${block.settings.slot ?? block.ref_id}-${draft.length}` }]));
   const sectionOf = (b: DraftBlock) => {
     const s = b.section_id ? sections.find((x) => x.id === b.section_id) : undefined;
     return s ? (s.number !== null ? `Punto ${s.number} · ${s.title}` : s.title) : null;
@@ -63,6 +89,7 @@ function DesignEditor({ data, reportId, blocks, canEdit }: { data: StationProps[
     if (b.kind === "historico") return histories.find((h) => h.id === b.ref_id)?.title ?? "Evolución histórica sin conjunto";
     if (b.kind === "tabla") return tables.find((x) => x.id === b.ref_id)?.title ?? "Tabla sin conjunto";
     if (b.kind === "desgloses" && b.ref_id) return breakdowns.find((x) => x.id === b.ref_id)?.title ?? BLOCK_LABELS.desgloses;
+    if (b.kind === "separador") return "Separador sin título";
     return BLOCK_LABELS[b.kind];
   };
 
@@ -142,6 +169,8 @@ function DesignEditor({ data, reportId, blocks, canEdit }: { data: StationProps[
             <li
               key={block.tempId}
               className="oda-block"
+              data-kind={block.kind}
+              data-grouped={(block.kind !== "separador" && groupOf(index)) ? true : undefined}
               data-hidden={!block.visible || undefined}
               data-dragging={dragging === block.tempId || undefined}
               draggable={canEdit}
@@ -161,17 +190,52 @@ function DesignEditor({ data, reportId, blocks, canEdit }: { data: StationProps[
               <span className="oda-block__pos" aria-hidden="true">{index + 1}</span>
               <div className="oda-block__body">
                 <strong>{block.settings.title || nameOf(block)}</strong>
-                <small>{sectionOf(block) ? <><b className="oda-block__section">{sectionOf(block)}</b> · </> : null}{BLOCK_HELP[block.kind]}</small>
+                <small>
+                  {sectionOf(block) ? <><b className="oda-block__section">{sectionOf(block)}</b> · </> : null}
+                  {block.kind !== "separador" && groupOf(index) ? <><b className="oda-block__group">{groupOf(index)!.settings.title || "Separador sin título"}</b> · </> : null}
+                  {BLOCK_HELP[block.kind]}
+                </small>
                 <div className="oda-block__settings">
                   <label className="oda-inline-field">
-                    <span>Título propio</span>
+                    <span>{block.kind === "separador" ? "Título del separador" : "Título propio"}</span>
                     <input
                       value={block.settings.title ?? ""}
-                      placeholder={nameOf(block)}
+                      placeholder={block.kind === "separador" ? "Graduados" : nameOf(block)}
                       disabled={!canEdit}
                       onChange={(e) => patch(block.tempId, { settings: { ...block.settings, title: e.target.value || undefined } })}
                     />
                   </label>
+                  {block.kind === "separador" && (
+                    <label className="oda-inline-field oda-inline-field--wide">
+                      <span>Descripción</span>
+                      <input
+                        value={block.settings.description ?? ""}
+                        placeholder="Quiénes obtienen título y cómo se reparten"
+                        disabled={!canEdit}
+                        onChange={(e) => patch(block.tempId, { settings: { ...block.settings, description: e.target.value || undefined } })}
+                      />
+                    </label>
+                  )}
+                  {block.kind === "kpis" && indicators.length > 0 && (
+                    <Picker
+                      noun={{ one: "indicador", many: "indicadores", block: "tablero" }}
+                      options={indicators.map((i) => ({ key: i.key, label: i.label }))}
+                      chosen={block.settings.indicators ?? []}
+                      restState={restState(block, (b) => Boolean(b.settings.indicators?.length))}
+                      disabled={!canEdit}
+                      onChange={(list) => patch(block.tempId, { settings: { ...block.settings, indicators: list.length ? list : undefined } })}
+                    />
+                  )}
+                  {block.kind === "desgloses" && !block.ref_id && breakdowns.length > 0 && (
+                    <Picker
+                      noun={{ one: "desglose", many: "desgloses", block: "bloque de desgloses" }}
+                      options={breakdowns.map((b) => ({ key: b.key, label: b.title }))}
+                      chosen={block.settings.breakdowns ?? []}
+                      restState={restState(block, (b) => Boolean(b.ref_id || b.settings.breakdowns?.length))}
+                      disabled={!canEdit}
+                      onChange={(list) => patch(block.tempId, { settings: { ...block.settings, breakdowns: list.length ? list : undefined } })}
+                    />
+                  )}
                   {block.kind === "mapa" && mapOf(block) && (() => {
                     const own = mapOf(block)!;
                     const partner = maps.find((m) => m.key === block.settings.mapWith);
@@ -268,6 +332,39 @@ function DesignEditor({ data, reportId, blocks, canEdit }: { data: StationProps[
           ))}
         </ol>
 
+        {canEdit && (
+          <div className="oda-block-adders">
+            <button
+              type="button"
+              className="button-secondary"
+              onClick={() => add({ kind: "separador", ref_id: null, visible: true, settings: { title: "", slot: newSlot() } })}
+            >
+              <Icon name="plus" size={15} /> Añadir separador
+            </button>
+            {draft.some((b) => b.kind === "kpis") && (
+              <button
+                type="button"
+                className="button-ghost"
+                onClick={() => add({ kind: "kpis", ref_id: null, visible: true, settings: { slot: newSlot() } })}
+              >
+                <Icon name="plus" size={15} /> Otro tablero de indicadores
+              </button>
+            )}
+            {breakdowns.length > 0 && draft.some((b) => b.kind === "desgloses") && (
+              <button
+                type="button"
+                className="button-ghost"
+                onClick={() => add({ kind: "desgloses", ref_id: null, visible: true, settings: { slot: newSlot() } })}
+              >
+                <Icon name="plus" size={15} /> Otro bloque de desgloses
+              </button>
+            )}
+            <small>
+              Un separador agrupa los bloques que le siguen, hasta el próximo. Para que una sección muestre sus indicadores y desgloses, ponle debajo un tablero y un bloque de desgloses con los suyos elegidos: así no se repiten en cada sección.
+            </small>
+          </div>
+        )}
+
         {missing.length > 0 && canEdit && (
           <div className="oda-missing-blocks">
             <span>El informe tiene esto y la ficha no lo muestra:</span>
@@ -294,7 +391,7 @@ function DesignEditor({ data, reportId, blocks, canEdit }: { data: StationProps[
           <div className="oda-schematic__head" aria-hidden="true" />
           <div className="oda-schematic__bar" aria-hidden="true" />
           {draft.filter((b) => b.visible && !shownWith(b)).map((b) => (
-            <div key={b.tempId} className="oda-schematic__block" data-kind={b.kind}>
+            <div key={b.tempId} className={b.kind === "separador" ? "oda-schematic__divider" : "oda-schematic__block"} data-kind={b.kind}>
               <span>
                 {b.settings.title || nameOf(b)}
                 {b.kind === "mapa" && b.settings.mapWith && ` + ${maps.find((m) => m.key === b.settings.mapWith)?.title ?? ""}`}
@@ -304,5 +401,58 @@ function DesignEditor({ data, reportId, blocks, canEdit }: { data: StationProps[
         </div>
       </aside>
     </div>
+  );
+}
+
+/** Qué muestra un tablero de indicadores o un bloque de desgloses. */
+function Picker({
+  noun,
+  options,
+  chosen,
+  restState,
+  disabled,
+  onChange,
+}: {
+  noun: { one: string; many: string; block: string };
+  options: { key: string; label: string }[];
+  chosen: string[];
+  restState: "elige" | "resto" | "vacio";
+  disabled: boolean;
+  onChange: (list: string[]) => void;
+}) {
+  const summary =
+    restState === "elige"
+      ? `${chosen.length} ${chosen.length === 1 ? `${noun.one} elegido` : `${noun.many} elegidos`}`
+      : restState === "resto"
+        ? `los ${noun.many} que ningún otro ${noun.block} eligió`
+        : `ninguno: otro ${noun.block} sin elección ya muestra el resto`;
+  return (
+    <details className="oda-block__picker" data-empty={restState === "vacio" || undefined}>
+      <summary>
+        {noun.many.charAt(0).toUpperCase() + noun.many.slice(1)}: {summary}
+      </summary>
+      <div>
+        {options.map((option) => (
+          <label key={option.key} className="oda-check">
+            <input
+              type="checkbox"
+              disabled={disabled}
+              checked={chosen.includes(option.key)}
+              onChange={(e) =>
+                onChange(
+                  e.target.checked
+                    ? options.map((o) => o.key).filter((key) => key === option.key || chosen.includes(key))
+                    : chosen.filter((key) => key !== option.key),
+                )
+              }
+            />
+            {option.label}
+          </label>
+        ))}
+        <small className="oda-block__note">
+          Sin elegir ninguno, el primer {noun.block} sin elección muestra los {noun.many} que ningún otro eligió; los demás quedan vacíos.
+        </small>
+      </div>
+    </details>
   );
 }

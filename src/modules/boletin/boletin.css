@@ -553,6 +553,25 @@
   padding: 0.9mm 0;
 }
 
+/* Sección del capítulo: entre el capítulo y sus hojas. */
+.bol-toc li[data-kind="seccion"] { border-bottom: 0; }
+.bol-toc li[data-kind="seccion"] > a { padding: 1.4mm 0 0.4mm; }
+
+.bol-toc li[data-kind="seccion"] .bol-toc__name {
+  color: var(--bol-navy);
+  font-size: 3.2mm;
+  font-weight: 800;
+}
+
+.bol-toc li[data-kind="seccion"] .bol-toc__page {
+  color: var(--bol-navy);
+  font-size: 3.05mm;
+  font-weight: 800;
+}
+
+/* Hojas dentro de una sección: un escalón más adentro. */
+.bol-toc li[data-in-section] .bol-toc__name { padding-left: 3mm; }
+
 .bol-toc li[data-kind="hoja"] .bol-toc__name {
   color: var(--bol-ink-2);
   font-size: 3.05mm;
@@ -709,6 +728,97 @@
 .bol-chapter__meta {
   color: var(--bol-ink-3);
   font-size: 2.6mm;
+}
+
+/* Secciones del capítulo (separadores de la ficha), numeradas. */
+.bol-chapter__sections {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1.5mm 6mm;
+  padding: 0;
+  list-style: none;
+  color: var(--bol-navy);
+  font-size: 3.1mm;
+  font-weight: 700;
+}
+
+.bol-chapter__sections b {
+  margin-right: 1.6mm;
+  color: var(--line);
+  font-weight: 800;
+}
+
+/* --- Apertura de sección ------------------------------------------------------
+   Un separador de la ficha ("Graduados") dentro del capítulo: más liviano que la
+   apertura del capítulo, con el número de sección en el color del informe. Abre
+   página y lo siguen sus hojas. */
+
+.bol-group {
+  display: grid;
+  gap: 3mm;
+  padding-bottom: 4mm;
+  border-bottom: 0.6mm solid var(--line);
+}
+
+.bol-group__kicker {
+  display: flex;
+  align-items: center;
+  gap: 2mm;
+  color: var(--bol-ink-3);
+  font-size: 2.5mm;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.bol-group__code {
+  display: grid;
+  place-items: center;
+  height: 4.6mm;
+  padding-inline: 1.2mm;
+  color: #ffffff;
+  background: var(--line);
+  border-radius: 0.6mm;
+  font-size: 2.4mm;
+  font-weight: 800;
+}
+
+.bol-group__title {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: start;
+  gap: 4mm;
+}
+
+.bol-group__number {
+  color: var(--line);
+  font-size: 11mm;
+  font-weight: 800;
+  line-height: 0.9;
+  letter-spacing: -0.03em;
+  font-variant-numeric: tabular-nums;
+}
+
+.bol-group h2 {
+  color: var(--bol-navy);
+  font-size: 7.5mm;
+  font-weight: 800;
+  line-height: 1.05;
+  letter-spacing: -0.015em;
+}
+
+.bol-group__title p {
+  max-width: 140mm;
+  margin-top: 1.5mm;
+  color: var(--bol-ink-2);
+  font-size: 3.2mm;
+  line-height: 1.45;
+}
+
+.bol-group__meta {
+  color: var(--bol-ink-3);
+  font-size: 2.5mm;
+  line-height: 1.4;
 }
 
 /* --- Hoja: columna de notas y cuerpo --------------------------------------- */

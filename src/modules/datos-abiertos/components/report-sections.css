@@ -348,3 +348,82 @@
   .od-point__head { grid-template-columns: minmax(0, 1fr); }
   .od-cards__item dl div { grid-template-columns: minmax(0, 1fr); gap: 2px; }
 }
+
+/* --- Separadores de la ficha ----------------------------------------------------
+   Un título de sección que agrupa los bloques siguientes ("Graduados"). Se lee
+   como el rótulo de un andén: número en ficha de tablero, título en la letra
+   de señalización y una regla en el color de la línea del informe. */
+
+.od-divider {
+  padding-block: var(--space-10) var(--space-7);
+  /* Banda propia: el grupo se distingue de los bloques que agrupa. */
+  background: var(--od-board-raised);
+  border-top: 1px solid var(--line);
+  scroll-margin-top: calc(var(--header-h) + 5rem);
+}
+
+.od-divider__inner {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: start;
+  gap: var(--space-5);
+  padding-bottom: var(--space-5);
+  /* --od-divider: el color de la línea del informe, desde la ficha. */
+  border-bottom: 4px solid var(--od-divider, var(--ink));
+}
+
+.od-divider__number {
+  display: grid;
+  place-items: center;
+  min-width: 4rem;
+  height: 4rem;
+  padding-inline: var(--space-2);
+  color: #ffffff;
+  background: var(--od-divider, var(--ink));
+  border-radius: 6px;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.25);
+  font-family: var(--font-sign);
+  font-size: 2rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.od-divider__text {
+  display: grid;
+  gap: var(--space-1);
+}
+
+.od-divider__kicker {
+  color: var(--ink-muted);
+  font-family: var(--font-sign);
+  font-size: 0.9rem;
+  font-weight: 600;
+  letter-spacing: var(--tracking-wide);
+  text-transform: uppercase;
+}
+
+.od-divider h2 {
+  margin: 0;
+  color: var(--ink);
+  font-family: var(--font-sign);
+  font-size: clamp(2.8rem, 5.4vw, 4.4rem);
+  font-weight: 700;
+  line-height: 0.95;
+  /* Tal como se escribe en la intranet: inicial mayúscula, no todo en mayúsculas. */
+  text-transform: none;
+}
+
+.od-divider p {
+  max-width: 70ch;
+  margin: var(--space-2) 0 0;
+  color: var(--ink-secondary);
+  line-height: var(--leading-relaxed);
+}
+
+/* El bloque que sigue a un separador no repite la regla superior. */
+.od-divider + .od-section { border-top: 0; padding-top: var(--space-8); }
+
+@media (max-width: 640px) {
+  .od-divider__inner { gap: var(--space-3); }
+  .od-divider__number { min-width: 2.75rem; height: 2.75rem; font-size: 1.3rem; }
+}

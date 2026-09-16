@@ -293,7 +293,15 @@ export function useSaveHeatmap() {
 
 export function useSaveHeatmapCells() {
   return useOdMutation(
-    async ({ periodId, reportId, cells, kind }: { periodId: string; reportId: string; cells: OdHeatmapCellRow[]; kind: OdImportKind }) => {
+    async ({ periodId, reportId, cells, kind, structure }: {
+      periodId: string; reportId: string; cells: OdHeatmapCellRow[]; kind: OdImportKind;
+      /** Tabla pegada con otra estructura: se guardan filas y columnas y se rehace la matriz entera. */
+      structure?: { heatmapId: string; rows: string[]; columns: string[] };
+    }) => {
+      if (structure) {
+        await run(supabase.from("od_heatmaps").update({ rows: structure.rows, columns: structure.columns }).eq("id", structure.heatmapId));
+        await run(supabase.from("od_heatmap_cells").delete().eq("heatmap_id", structure.heatmapId));
+      }
       if (cells.length) {
         await run(supabase.from("od_heatmap_cells").upsert(cells, { onConflict: "heatmap_id,row_index,column_index" }));
       }

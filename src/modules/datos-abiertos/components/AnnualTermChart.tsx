@@ -23,8 +23,8 @@ interface AnnualTermChartProps {
 
 const SERIES = [
   { key: "annual", label: "Global anual", color: "var(--od-series-total)" },
-  { key: "a", label: "Periodo A", color: "var(--od-series-1)" },
-  { key: "b", label: "Periodo B", color: "var(--od-series-2)" },
+  { key: "a", label: "Periodo 1", color: "var(--od-series-1)" },
+  { key: "b", label: "Periodo 2", color: "var(--od-series-2)" },
 ] as const;
 
 /** Una misma escala, desde cero; los huecos interrumpen la línea anual. */
@@ -87,7 +87,7 @@ export function AnnualTermChart({ label, points, selectedYear, format, unit, ann
                     <g key={series.key}>
                       {value === null ? <text className="od-lines__tick" x={left + barW / 2} y={y(0) - 6} textAnchor="middle">—</text> :
                         <rect data-series={series.key} x={left} y={value === 0 ? y(0) - 1 : Math.min(y(value), y(0))} width={barW} height={Math.max(1, Math.abs(y(value) - y(0)))} fill={series.color} />}
-                      <text className="od-lines__tick" x={left + barW / 2} y={height - 28} textAnchor="middle">{barIndex === 0 ? "A" : "B"}</text>
+                      <text className="od-lines__tick" x={left + barW / 2} y={height - 28} textAnchor="middle">{barIndex === 0 ? "1" : "2"}</text>
                     </g>
                   );
                 })}

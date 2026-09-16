@@ -169,8 +169,8 @@ export function defaultTexts(periodLabel: string, format: "completo" | "ejecutiv
     presentation: [
       `El Boletín UDES en Cifras reúne las principales estadísticas de la Universidad de Santander para el periodo ${periodLabel}, a partir de lo que reporta cada oficina a la Dirección de Planeación Institucional.`,
       format === "ejecutivo"
-        ? "Este resumen ejecutivo reúne en una ficha por informe sus cifras clave del corte, la tendencia del periodo y el reparto por campus. El detalle de cada indicador está en el boletín completo."
-        : "Cada indicador se presenta en su hoja: a la izquierda, qué mide, quién lo reporta y cómo se calcula; a la derecha, la cifra del corte, su evolución por año, el detalle por campus y la tabla de datos.",
+        ? "Este resumen ejecutivo reúne en una ficha por informe sus cifras clave del corte con sus periodos académicos, la tendencia por periodo y por año, el reparto por campus y lo esencial de sus mapas, desgloses y tablas. El detalle de cada indicador está en el boletín completo."
+        : "Cada indicador se presenta en su hoja: a la izquierda, qué mide, quién lo reporta y cómo se calcula; a la derecha, la cifra del corte, su evolución por periodo académico y por año, el detalle por campus y la tabla de datos.",
     ].join("\n\n"),
     backTitle: "Oficinas que reportan",
     backNote: "Las cifras de este boletín son las que cada oficina reporta a la Dirección de Planeación Institucional.",

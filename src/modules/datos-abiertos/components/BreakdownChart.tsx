@@ -21,7 +21,7 @@
 import { useState } from "react";
 import type { CSSProperties } from "react";
 import { downloadText, formatValue, formatWithUnit } from "../data/open-data";
-import { ALL_YEARS, ANNUAL_RULE_LABEL, cutCode, cutCodeLabel, cutLabel, fromCutCode, TERMS } from "../data/terms";
+import { ALL_YEARS, ANNUAL_RULE_LABEL, cutCode, cutCodeLabel, cutLabel, fromCutCode, termLabel, TERMS } from "../data/terms";
 import type { Breakdown, BreakdownItem, Term } from "../data/types";
 import { AnnualTermChart } from "./AnnualTermChart";
 import { BarList } from "./Charts";
@@ -124,7 +124,7 @@ export function BreakdownChart({ breakdown, year, term, years, setYear }: {
   };
 
   const subtitle = series
-    ? `Total institucional · ${cuts.length ? `${cutLabel(cuts[0].year, cuts[0].term)} a ${cutLabel(cuts[cuts.length - 1].year, cuts[cuts.length - 1].term)}` : "sin cortes"}${term ? ` · solo periodo ${term}` : ""} · ${breakdown.unit}`
+    ? `Total institucional · ${cuts.length ? `${cutLabel(cuts[0].year, cuts[0].term)} a ${cutLabel(cuts[cuts.length - 1].year, cuts[cuts.length - 1].term)}` : "sin cortes"}${term ? ` · solo periodo ${termLabel(term)}` : ""} · ${breakdown.unit}`
     : `Total institucional · ${grouped ? `periodo ${cutLabel(year, null)} · promedio anual` : `corte ${selected ? cutLabel(selected.year, selected.term) : cutLabel(year, term)}`} · ${breakdown.unit}`;
   const selectedItems = selected ? itemsAt(selected) : [];
 
@@ -149,7 +149,7 @@ export function BreakdownChart({ breakdown, year, term, years, setYear }: {
               onChange={(value) => setPickedTerm(value as Term | "anual")}
               options={yearCuts.map((cut) => ({
                 value: cut.term ?? "anual",
-                label: cut.term ? `${year}-${cut.term}` : `${year} (año)`,
+                label: cut.term ? cutLabel(year, cut.term) : `${year} (año)`,
               }))}
             />
           )
@@ -304,7 +304,7 @@ export function BreakdownChart({ breakdown, year, term, years, setYear }: {
         />
       ) : (
         <AnnualTermChart
-          label={`${breakdown.title}, ${category}: cifra del año y periodos A y B`}
+          label={`${breakdown.title}, ${category}: cifra del año y periodos 1 y 2`}
           points={visible.years.map((y) => ({
             year: y,
             annual: breakdown.values[y]?.find((item) => item.label === category)?.value ?? null,
@@ -321,7 +321,7 @@ export function BreakdownChart({ breakdown, year, term, years, setYear }: {
 
       <p className="od-breakdown__note">
         {hasPeriods
-          ? "Los periodos A y B se muestran por separado, como se reportaron: no se suman en el año. La cifra del año solo aparece donde se reportó como año."
+          ? "Los periodos 1 y 2 se muestran por separado, como se reportaron: no se suman en el año. La cifra del año solo aparece donde se reportó como año."
           : "Cifras por año, como se reportaron."}
       </p>
 

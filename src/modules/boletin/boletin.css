@@ -24,6 +24,9 @@
   --bol-s3: #0f8a6e;
   --bol-s4: #6b3fa0;
   --bol-s5: #7f6200;
+  /* Periodos 1 y 2 apilados en su año: el tono de la franja, claro y pleno. */
+  --bol-term-1: color-mix(in srgb, var(--bol-band) 45%, #ffffff);
+  --bol-term-2: var(--bol-band);
   --bol-line-1: #1f5fbf;
   --bol-line-2: #0b7481;
   --bol-line-3: #a4471f;
@@ -809,6 +812,25 @@
   line-height: 1.35;
 }
 
+/* Periodos del corte bajo la cifra: "2024-1  812 · 2024-2  845". */
+.bol-anchor .bol-terms {
+  flex-basis: 100%;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6mm 4mm;
+  padding: 0;
+  list-style: none;
+  color: var(--bol-ink-2);
+  font-size: 2.8mm;
+}
+
+.bol-terms b {
+  color: var(--bol-navy);
+  font-weight: 800;
+}
+
+.bol-terms span { color: var(--bol-ink-3); }
+
 .bol-change {
   display: inline-flex;
   align-items: center;
@@ -834,6 +856,12 @@
 }
 
 .bol-figures[data-single] { grid-template-columns: minmax(0, 1fr); }
+
+/* Dos tablas de periodos seguidas (un tramo de años cada una). */
+.bol-period-tables {
+  display: grid;
+  gap: 2.4mm;
+}
 
 .bol-doc figure {
   display: grid;
@@ -974,7 +1002,8 @@
 
 .bol-exec__rows > li {
   display: grid;
-  grid-template-columns: 58mm 38mm 40mm minmax(0, 1fr);
+  /* Qué mide · cifra con sus periodos · tendencias por periodo y por año · campus. */
+  grid-template-columns: 46mm 33mm 58mm minmax(0, 1fr);
   align-items: start;
   gap: 4mm;
   padding: 3.4mm 0;
@@ -1052,6 +1081,99 @@
 
 .bol-trend { max-width: 40mm; }
 
+.bol-exec__trend {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 3mm;
+}
+
+.bol-exec__trend > div:only-child { grid-column: 1 / -1; }
+
+/* Dos tendencias lado a lado se ajustan a su media columna; una sola conserva su tamaño. */
+.bol-exec__trend > div:not(:only-child) .bol-trend { width: 100%; max-width: none; }
+
+.bol-exec__trend small {
+  display: block;
+  color: var(--bol-ink-3);
+  font-size: 2mm;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+}
+
+.bol-exec__figure .bol-terms {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.2mm 2.4mm;
+  margin-top: 1mm;
+  padding: 0;
+  list-style: none;
+  font-size: 2.2mm;
+  line-height: 1.3;
+  color: var(--bol-ink-2);
+}
+
+/* La cifra de la ficha es grande; la de cada periodo, de texto. */
+.bol-exec__figure .bol-terms b {
+  display: inline;
+  color: var(--bol-navy);
+  font-size: 2.3mm;
+  font-weight: 800;
+  letter-spacing: 0;
+}
+
+.bol-exec__figure .bol-terms span { color: var(--bol-ink-3); }
+
+/* Conjuntos del informe en la ficha ejecutiva: mapas, históricos, tablas. */
+.bol-exec__sets {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 3mm 6mm;
+}
+
+.bol-exec__sets > div {
+  display: grid;
+  gap: 0.6mm;
+  padding-top: 2mm;
+  border-top: 0.25mm solid var(--bol-rule);
+}
+
+.bol-exec__sets dt {
+  color: var(--bol-ink-2);
+  font-size: 2.5mm;
+  font-weight: 700;
+  line-height: 1.25;
+}
+
+.bol-exec__sets dd b {
+  color: var(--bol-navy);
+  font-size: 5.4mm;
+  font-weight: 800;
+  line-height: 1.05;
+}
+
+.bol-exec__sets dd small {
+  margin-left: 1.2mm;
+  color: var(--bol-ink-2);
+  font-size: 2.5mm;
+  font-weight: 600;
+}
+
+.bol-exec__sets dd p {
+  margin-top: 0.4mm;
+  color: var(--bol-ink-3);
+  font-size: 2.3mm;
+  line-height: 1.3;
+}
+
+.bol-exec__sets-title {
+  color: var(--bol-ink-3);
+  font-size: 2.3mm;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
 .bol-trend__line {
   fill: none;
   stroke: var(--bol-band);
@@ -1083,6 +1205,8 @@
 .bol-chart__grid { stroke: var(--bol-rule); stroke-width: 0.2; }
 .bol-chart__tick { fill: var(--bol-ink-3); font-size: 2.2px; }
 .bol-chart__year { fill: var(--bol-ink-2); font-size: 2.3px; }
+/* Número del periodo bajo cada punto; el año va debajo del par. */
+.bol-chart__term { fill: var(--bol-ink-3); font-size: 2px; font-weight: 600; }
 .bol-chart__year[data-highlight] { fill: var(--bol-navy); font-weight: 800; }
 .bol-chart__highlight { fill: color-mix(in srgb, var(--bol-band) 11%, transparent); }
 
@@ -1221,6 +1345,15 @@
   background: color-mix(in srgb, var(--bol-band) 10%, transparent);
   font-weight: 700;
 }
+
+/* Cifra del año junto a sus periodos: separa cada año y se lee como su cierre. */
+.bol-table thead th[data-year] { border-left: 0; }
+.bol-table td[data-year] {
+  color: var(--bol-navy);
+  font-weight: 700;
+  border-right: 0.35mm solid var(--bol-rule);
+}
+.bol-table thead th[data-year] { box-shadow: inset -0.35mm 0 0 color-mix(in srgb, #ffffff 35%, transparent); }
 
 .bol-table td[data-empty] { color: var(--bol-ink-3); }
 

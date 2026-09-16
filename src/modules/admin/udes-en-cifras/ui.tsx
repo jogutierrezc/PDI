@@ -213,8 +213,8 @@ export function PeriodInput<T extends "A" | "B" | "anual" = "A" | "B">({
         onChange={(e) => onChange({ ...value, year: Number(e.target.value) })}
       />
       <select value={value.term} aria-label={`${label}: periodo`} onChange={(e) => onChange({ ...value, term: e.target.value as T })}>
-        <option value="A">A</option>
-        <option value="B">B</option>
+        <option value="A">1</option>
+        <option value="B">2</option>
         {allowYear && <option value="anual">Año</option>}
       </select>
     </span>

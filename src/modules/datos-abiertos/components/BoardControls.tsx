@@ -6,7 +6,7 @@
    de ellos re-voltea todas las cifras a la vez: un control, todo el tablero.
    Sin ?corte, el tablero abre en "Todos": todo el periodo agrupado (promedio
    anual, o el último dato en las existencias). Sin ?periodo, las cifras son del
-   año completo (calculadas de A y B).
+   año completo (calculadas de los periodos 1 y 2).
    ========================================================================== */
 
 import { useCallback, useRef } from "react";
@@ -25,7 +25,7 @@ export function useBoardFilters(data: OpenDataCatalog | undefined) {
   const rawCampus = (params.get("campus") ?? params.get("sede")) as CampusId | null;
   const campus: CampusId = data?.campuses.some((c) => c.id === rawCampus) && rawCampus ? rawCampus : "todas";
   const rawTerm = params.get("periodo")?.toUpperCase();
-  // Los periodos A y B son de un año: con todo el periodo no aplican.
+  // Los periodos 1 y 2 son de un año: con todo el periodo no aplican.
   const term: Term | null = year !== ALL_YEARS && (rawTerm === "A" || rawTerm === "B") ? rawTerm : null;
 
   const update = useCallback(
@@ -146,8 +146,8 @@ export function BoardControls({
           label="Periodo"
           options={[
             { value: "anual", label: "Año" },
-            { value: "A", label: "A" },
-            { value: "B", label: "B" },
+            { value: "A", label: "1" },
+            { value: "B", label: "2" },
           ]}
           value={term ?? "anual"}
           onChange={(value) => setTerm(value === "anual" ? null : (value as Term))}

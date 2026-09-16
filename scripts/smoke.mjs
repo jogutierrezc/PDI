@@ -1587,14 +1587,14 @@ const routes = [
       }
       const label2025 = () => [...chart().querySelectorAll('[role="button"]')].find((b) => b.getAttribute("aria-label").startsWith("2025."))?.getAttribute("aria-label");
       // Matrícula usa el último periodo: anual = B, no A + B.
-      if (label2025() !== "2025. Global anual: 21.034 estudiantes. Periodo A: 20.620 estudiantes. Periodo B: 21.034 estudiantes") {
+      if (label2025() !== "2025. Global anual: 21.034 estudiantes. Periodo 1: 20.620 estudiantes. Periodo 2: 21.034 estudiantes") {
         throw new Error(`global o periodos incorrectos: ${label2025()}`);
       }
       const campusChoice = [...window.document.querySelectorAll('.od-controls button')].find((b) => b.textContent.trim() === "Cúcuta");
       if (!campusChoice) throw new Error("falta el filtro de campus Cúcuta");
       campusChoice.click();
       await tick();
-      if (label2025() !== "2025. Global anual: 4.893 estudiantes. Periodo A: 4.794 estudiantes. Periodo B: 4.893 estudiantes") {
+      if (label2025() !== "2025. Global anual: 4.893 estudiantes. Periodo 1: 4.794 estudiantes. Periodo 2: 4.893 estudiantes") {
         throw new Error(`la vista combinada no filtró el campus: ${label2025()}`);
       }
       const select = window.document.querySelector("#od-evolucion select");
@@ -1603,7 +1603,7 @@ const routes = [
       select.dispatchEvent(new window.Event("change", { bubbles: true }));
       await tick();
       // Primer ingreso sí suma ambos periodos.
-      if (label2025() !== "2025. Global anual: 1.011 estudiantes. Periodo A: 531 estudiantes. Periodo B: 480 estudiantes") {
+      if (label2025() !== "2025. Global anual: 1.011 estudiantes. Periodo 1: 531 estudiantes. Periodo 2: 480 estudiantes") {
         throw new Error(`la línea anual no respetó la regla de suma: ${label2025()}`);
       }
       const firstYear = chart().querySelector('[role="button"]');

@@ -30,7 +30,7 @@ const categoryColor = (index: number) => `var(--od-cat-${(index % 6) + 1})`;
 
 const toCode = (label: string) => {
   const [year, term] = label.split("-");
-  return cutCode(Number(year), term === "A" || term === "B" ? term : null);
+  return cutCode(Number(year), term === "A" || term === "1" ? "A" : term === "B" || term === "2" ? "B" : null);
 };
 
 export function HistoryCompare({ data }: { data: HistoryData }) {

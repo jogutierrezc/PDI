@@ -20,6 +20,9 @@ import { CAMPUS_POINTS, MAP_HEIGHT, MAP_WIDTH } from "../datos-abiertos/data/col
 
 export const SERIES_COLORS = ["var(--bol-s1)", "var(--bol-s2)", "var(--bol-s3)", "var(--bol-s4)", "var(--bol-s5)"];
 
+/** Periodo 1 y periodo 2 apilados en su año: el mismo tono, claro y oscuro. */
+export const TERM_COLORS = ["var(--bol-term-1)", "var(--bol-term-2)"];
+
 const compact = new Intl.NumberFormat("es-CO", { notation: "compact", maximumFractionDigits: 1 });
 
 /** Cifra corta para ejes: "1,2 mil", "35 %". */
@@ -47,6 +50,13 @@ function niceScale(min: number, max: number, format: ValueFormat): number[] {
 
 export const figure = (value: number | null, format: ValueFormat) => (value === null ? "—" : formatValue(value, format));
 
+/** Franja de resaltado recortada al área del gráfico. */
+function Band({ from, to, left, right, top, height }: { from: number; to: number; left: number; right: number; top: number; height: number }) {
+  const x0 = Math.max(left, from);
+  const x1 = Math.min(right, to);
+  return x1 > x0 ? <rect className="bol-chart__highlight" x={x0} y={top} width={x1 - x0} height={height} /> : null;
+}
+
 /* --- Evolución por año ------------------------------------------------------ */
 
 export interface Series {
@@ -56,12 +66,19 @@ export interface Series {
   dashed?: boolean;
 }
 
-/** Líneas por categoría del eje x: años, o etapas de una tubería. */
+/**
+ * Líneas por categoría del eje x: años, periodos o etapas de una tubería.
+ *
+ * Con `periodAxis`, el eje son periodos "2024-1", "2024-2": bajo cada punto va
+ * el número del periodo y bajo cada par, su año. Así caben doce periodos en el
+ * ancho de una columna sin acortar ningún rótulo.
+ */
 export function EvolutionChart({
   years,
   series,
   format,
   highlight,
+  periodAxis = false,
   width = 70,
   height = 46,
   label = "Evolución por año",
@@ -69,7 +86,9 @@ export function EvolutionChart({
   years: (number | string)[];
   series: Series[];
   format: ValueFormat;
+  /** Con `periodAxis`, un año resalta sus dos periodos. */
   highlight?: number | string;
+  periodAxis?: boolean;
   width?: number;
   height?: number;
   label?: string;
@@ -78,20 +97,42 @@ export function EvolutionChart({
   const ticks = niceScale(Math.min(...all, Infinity), Math.max(0, ...all), format);
   const bottom = ticks[0];
   const top = ticks[ticks.length - 1] || 1;
-  const m = { left: 10, right: 3, top: 3, bottom: 6 };
+  const m = { left: 10, right: 3, top: 3, bottom: periodAxis ? 8.6 : 6 };
   const innerW = width - m.left - m.right;
   const innerH = height - m.top - m.bottom;
   const x = (i: number) => m.left + (years.length === 1 ? innerW / 2 : (i / (years.length - 1)) * innerW);
   const y = (v: number) => m.top + innerH - ((v - bottom) / (top - bottom || 1)) * innerH;
   const slot = years.length > 1 ? innerW / (years.length - 1) : innerW;
-  const hi = highlight === undefined ? -1 : years.indexOf(highlight);
+  const hi = highlight === undefined || periodAxis ? -1 : years.indexOf(highlight);
+  // Periodos: pares de puntos por año, con el año centrado bajo el par.
+  const yearOf = (label: number | string) => String(label).split("-")[0];
+  const termOf = (label: number | string) => String(label).split("-")[1] ?? "";
+  const pairs = periodAxis
+    ? Array.from(new Set(years.map(yearOf))).map((yr) => {
+        const idx = years.map((l, i) => (yearOf(l) === yr ? i : -1)).filter((i) => i >= 0);
+        return { year: yr, first: idx[0], last: idx[idx.length - 1] };
+      })
+    : [];
   // Rótulos largos (etapas): se acortan y, si no caben, se alternan.
   const maxChars = Math.max(4, Math.floor(slot / 1.35));
   const short = (text: string) => (text.length > maxChars ? `${text.slice(0, maxChars - 1)}…` : text);
 
   return (
     <svg className="bol-chart" viewBox={`0 0 ${width} ${height}`} role="img" aria-label={label}>
-      {hi >= 0 && <rect className="bol-chart__highlight" x={x(hi) - Math.min(5, slot / 2)} y={m.top} width={Math.min(10, slot)} height={innerH} />}
+      {hi >= 0 && <Band from={x(hi) - Math.min(5, slot / 2)} to={x(hi) + Math.min(5, slot / 2)} left={m.left} right={width - m.right} top={m.top} height={innerH} />}
+      {pairs
+        .filter((pair) => highlight !== undefined && pair.year === String(highlight))
+        .map((pair) => (
+          <Band
+            key={`hi-${pair.year}`}
+            from={x(pair.first) - Math.min(3, slot / 2)}
+            to={x(pair.last) + Math.min(3, slot / 2)}
+            left={m.left}
+            right={width - m.right}
+            top={m.top}
+            height={innerH}
+          />
+        ))}
       {ticks.map((t) => (
         <g key={t}>
           <line className="bol-chart__grid" x1={m.left} x2={width - m.right} y1={y(t)} y2={y(t)} />
@@ -100,11 +141,31 @@ export function EvolutionChart({
           </text>
         </g>
       ))}
-      {years.map((year, i) => (
-        <text key={`${year}-${i}`} className="bol-chart__year" data-highlight={i === hi || undefined} x={x(i)} y={height - 1.6} textAnchor={i === 0 && typeof year === "string" ? "start" : i === years.length - 1 && typeof year === "string" ? "end" : "middle"}>
-          {short(String(year))}
-        </text>
-      ))}
+      {periodAxis
+        ? [
+            ...years.map((period, i) => (
+              <text key={`t-${period}-${i}`} className="bol-chart__term" x={x(i)} y={height - 4.6} textAnchor="middle">
+                {termOf(period)}
+              </text>
+            )),
+            ...pairs.map((pair) => (
+              <text
+                key={`y-${pair.year}`}
+                className="bol-chart__year"
+                data-highlight={highlight !== undefined && pair.year === String(highlight) ? true : undefined}
+                x={(x(pair.first) + x(pair.last)) / 2}
+                y={height - 0.9}
+                textAnchor="middle"
+              >
+                {pair.year}
+              </text>
+            )),
+          ]
+        : years.map((year, i) => (
+            <text key={`${year}-${i}`} className="bol-chart__year" data-highlight={i === hi || undefined} x={x(i)} y={height - 1.6} textAnchor={i === 0 && typeof year === "string" ? "start" : i === years.length - 1 && typeof year === "string" ? "end" : "middle"}>
+              {short(String(year))}
+            </text>
+          ))}
       {series.map((s) => {
         // Un año sin reportar corta la línea: no se inventa el tramo.
         const segments: string[] = [];
@@ -133,11 +194,21 @@ export function EvolutionChart({
  * Tendencia de la ficha ejecutiva: la serie del total, con su primer y último
  * año y su último punto marcado. Acompaña a la cifra; no la reemplaza.
  */
-export function Trend({ years, values, format }: { years: number[]; values: (number | null)[]; format: ValueFormat }) {
+export function Trend({
+  years,
+  values,
+  format,
+  height = 17,
+}: {
+  /** Años o periodos ("2024-1"). */
+  years: (number | string)[];
+  values: (number | null)[];
+  format: ValueFormat;
+  height?: number;
+}) {
   const points = values.map((v, i) => ({ v, i })).filter((p): p is { v: number; i: number } => p.v !== null);
   if (points.length < 2) return <p className="bol-trend__empty">Sin serie para comparar</p>;
   const width = 40;
-  const height = 17;
   const m = { top: 2, bottom: 5, side: 1.5 };
   const min = Math.min(...points.map((p) => p.v));
   const max = Math.max(...points.map((p) => p.v));
@@ -226,6 +297,10 @@ export function StackedColumns({
   categories,
   values,
   format,
+  totals: shownTotals,
+  colors = SERIES_COLORS,
+  highlight,
+  periodAxis = false,
   width = 128,
   height = 44,
 }: {
@@ -234,18 +309,40 @@ export function StackedColumns({
   /** values[categoría][periodo] */
   values: Record<string, Record<string, number | null>>;
   format: ValueFormat;
+  /**
+   * Cifra que se rotula sobre cada columna. Sin ella, la suma de lo apilado.
+   * Con ella (la cifra del año según su regla), un año al que le falta un
+   * periodo dibuja lo reportado pero no rotula un total que no existe.
+   */
+  totals?: (number | null)[];
+  colors?: string[];
+  /** Columna resaltada (su rótulo). */
+  highlight?: string;
+  /** Periodos "2024-1": bajo cada columna el número del periodo y bajo cada par, el año. */
+  periodAxis?: boolean;
   width?: number;
   height?: number;
 }) {
   const totals = periods.map((p) => categories.reduce((sum, c) => sum + (values[c]?.[p] ?? 0), 0));
+  const reported = periods.map((p) => categories.some((c) => values[c]?.[p] !== null && values[c]?.[p] !== undefined));
+  const labels = shownTotals ?? totals.map((t, i) => (reported[i] ? t : null));
   const ticks = niceScale(0, Math.max(0, ...totals), "entero");
   const top = ticks[ticks.length - 1] || 1;
-  const m = { left: 10, right: 2, top: 4, bottom: 6 };
+  const m = { left: 10, right: 2, top: 4, bottom: periodAxis ? 8.6 : 6 };
   const innerW = width - m.left - m.right;
   const innerH = height - m.top - m.bottom;
   const slot = innerW / Math.max(1, periods.length);
   const barW = Math.min(14, slot * 0.62);
   const y = (v: number) => m.top + innerH - (v / top) * innerH;
+  // Rótulo de cifra solo si cabe sobre la columna.
+  const valueFits = slot >= 9;
+  const cx = (i: number) => m.left + slot * i + slot / 2;
+  const pairs = periodAxis
+    ? Array.from(new Set(periods.map((p) => p.split("-")[0]))).map((yr) => {
+        const idx = periods.map((p, i) => (p.split("-")[0] === yr ? i : -1)).filter((i) => i >= 0);
+        return { year: yr, first: idx[0], last: idx[idx.length - 1] };
+      })
+    : [];
   return (
     <svg className="bol-chart" viewBox={`0 0 ${width} ${height}`} role="img" aria-label={periods.map((p, i) => `${p}: ${figure(totals[i], format)}`).join(", ")}>
       {ticks.map((t) => (
@@ -255,33 +352,45 @@ export function StackedColumns({
         </g>
       ))}
       {periods.map((period, i) => {
-        const cx = m.left + slot * i + slot / 2;
+        const x0 = cx(i);
         let acc = 0;
         return (
           <g key={period}>
+            {period === highlight && <rect className="bol-chart__highlight" x={x0 - slot / 2 + 0.4} y={m.top} width={slot - 0.8} height={innerH} />}
             {categories.map((c, ci) => {
               const v = values[c]?.[period];
               if (v === null || v === undefined || v <= 0) return null;
               const y0 = y(acc + v);
               const h = y(acc) - y0;
               acc += v;
-              return <rect key={c} x={cx - barW / 2} y={y0} width={barW} height={Math.max(0.2, h)} style={{ fill: SERIES_COLORS[ci % SERIES_COLORS.length] }} />;
+              return <rect key={c} x={x0 - barW / 2} y={y0} width={barW} height={Math.max(0.2, h)} style={{ fill: colors[ci % colors.length] }} />;
             })}
-            <text className="bol-chart__value" x={cx} y={y(totals[i]) - 1} textAnchor="middle">{figure(totals[i], format)}</text>
-            <text className="bol-chart__year" x={cx} y={height - 1.6} textAnchor="middle">{period}</text>
+            {valueFits && labels[i] !== null && (
+              <text className="bol-chart__value" x={x0} y={y(totals[i]) - 1} textAnchor="middle">{figure(labels[i], format)}</text>
+            )}
+            {periodAxis ? (
+              <text className="bol-chart__term" x={x0} y={height - 4.6} textAnchor="middle">{period.split("-")[1] ?? ""}</text>
+            ) : (
+              <text className="bol-chart__year" data-highlight={period === highlight || undefined} x={x0} y={height - 1.6} textAnchor="middle">{period}</text>
+            )}
           </g>
         );
       })}
+      {pairs.map((pair) => (
+        <text key={`y-${pair.year}`} className="bol-chart__year" x={(cx(pair.first) + cx(pair.last)) / 2} y={height - 0.9} textAnchor="middle">
+          {pair.year}
+        </text>
+      ))}
     </svg>
   );
 }
 
-export function SwatchLegend({ labels }: { labels: string[] }) {
+export function SwatchLegend({ labels, colors = SERIES_COLORS }: { labels: string[]; colors?: string[] }) {
   return (
     <ul className="bol-legend">
       {labels.map((label, i) => (
         <li key={label}>
-          <i className="bol-legend__swatch" style={{ background: SERIES_COLORS[i % SERIES_COLORS.length] }} />
+          <i className="bol-legend__swatch" style={{ background: colors[i % colors.length] }} />
           {label}
         </li>
       ))}
@@ -295,11 +404,14 @@ export function DataTable({
   head,
   rows,
   highlightCol,
+  yearCols,
   caption,
 }: {
   head: ReactNode[];
   rows: { label: ReactNode; cells: ReactNode[]; strong?: boolean; shade?: (number | null)[] }[];
   highlightCol?: number;
+  /** Columnas (índice de celda) con la cifra del año, junto a sus periodos. */
+  yearCols?: number[];
   caption?: ReactNode;
 }) {
   const columns = head.length;
@@ -314,7 +426,7 @@ export function DataTable({
       <thead>
         <tr>
           {head.map((h, i) => (
-            <th key={i} scope="col" data-highlight={i - 1 === highlightCol || undefined} data-text={textCols[i] || undefined}>
+            <th key={i} scope="col" data-highlight={i - 1 === highlightCol || undefined} data-year={yearCols?.includes(i - 1) || undefined} data-text={textCols[i] || undefined}>
               {h}
             </th>
           ))}
@@ -328,6 +440,7 @@ export function DataTable({
               <td
                 key={c}
                 data-highlight={c === highlightCol || undefined}
+                data-year={yearCols?.includes(c) || undefined}
                 data-empty={cell === "—" || undefined}
                 data-text={textCols[c + 1] || undefined}
                 style={row.shade?.[c] != null ? ({ "--shade": row.shade[c] } as CSSProperties) : undefined}

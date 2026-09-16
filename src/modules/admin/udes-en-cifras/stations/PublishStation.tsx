@@ -19,6 +19,7 @@ import type { CSSProperties } from "react";
 import { Link } from "react-router-dom";
 import { Icon } from "../../../../components/ui/Icon";
 import { formatValue } from "../../../datos-abiertos/data/open-data";
+import { cutLabel } from "../../../datos-abiertos/data/terms";
 import type { PublicationStatus } from "../../../../types/database";
 import type { StationProps } from "../OdAdmin";
 import { useOdPublications, useSavePeriod, useSetReportStatus } from "../od-data";
@@ -205,7 +206,7 @@ export function PublishStation({ data, report, periodId, canEdit, progress }: St
                           <tr key={`${v.indicator_id}-${v.year}-${v.term}-${v.campus_id}`}>
                             <th scope="row">{indicator?.label}</th>
                             <td>{campusName(v.campus_id)}</td>
-                            <td>{v.term === "anual" ? `${v.year} (año)` : `${v.year}-${v.term}`}</td>
+                            <td>{v.term === "anual" ? `${v.year} (año)` : cutLabel(v.year, v.term)}</td>
                             <td data-changed>{formatValue(v.value === null ? null : Number(v.value), indicator?.format ?? "entero")}</td>
                           </tr>
                         );

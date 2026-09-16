@@ -207,7 +207,7 @@ export function PivotTable({ report, years, campuses, year, term = null, campus 
             label="Detalle del corte"
             options={[
               { value: "anual", label: "Año" },
-              { value: "periodos", label: "A y B" },
+              { value: "periodos", label: "Periodos 1 y 2" },
             ]}
             value={detail}
             onChange={(next) => {

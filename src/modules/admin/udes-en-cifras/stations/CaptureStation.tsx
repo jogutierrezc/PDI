@@ -20,7 +20,7 @@ import { Icon } from "../../../../components/ui/Icon";
 import { downloadText, formatValue } from "../../../datos-abiertos/data/open-data";
 import { DEPARTMENTS } from "../../../datos-abiertos/data/colombia-map";
 import type { OdAnnualRule, OdImportKind, OdIndicatorRow, OdTerm } from "../../../../types/database";
-import { ANNUAL_RULE_LABEL, REPORTING_HINT, REPORTING_LABEL, annualFigure } from "../../../datos-abiertos/data/terms";
+import { ANNUAL_RULE_LABEL, REPORTING_HINT, REPORTING_LABEL, annualFigure, cutLabel, periodText, termLabel } from "../../../datos-abiertos/data/terms";
 import type { Reporting } from "../../../datos-abiertos/data/terms";
 import type { StationProps } from "../OdAdmin";
 import { DataGrid, cellKey } from "../DataGrid";
@@ -160,8 +160,8 @@ function IndicatorCapture({ data, report, periodId, canEdit }: StationProps) {
   const columns: GridColumn[] = shownYears.flatMap((y) => [
     ...(anyByTerm
       ? [
-          { key: `${y}-A`, label: "A", group: String(y), ariaLabel: `${y}, periodo A` },
-          { key: `${y}-B`, label: "B", group: String(y), ariaLabel: `${y}, periodo B` },
+          { key: `${y}-A`, label: "1", group: String(y), ariaLabel: `${y}, periodo 1` },
+          { key: `${y}-B`, label: "2", group: String(y), ariaLabel: `${y}, periodo 2` },
         ]
       : []),
     ...(annualShown ? [{ key: `${y}-anual`, label: "Año", group: String(y), ariaLabel: `${y}, cifra del año` }] : []),
@@ -200,7 +200,7 @@ function IndicatorCapture({ data, report, periodId, canEdit }: StationProps) {
       return `${indicator.label} no se reporta en ${year}. Cámbialo en "Años con dato".`;
     }
     if (byYear(indicator) && term !== "anual") {
-      return `${indicator.label} se reporta por año: sin periodos A y B. Se cambia en Estructura y KPI.`;
+      return `${indicator.label} se reporta por año: sin periodos 1 y 2. Se cambia en Estructura y KPI.`;
     }
     if (term === "anual" && indicator.annual_rule !== "reportado" && !byYear(indicator)) {
       return `Cifra del año: ${ANNUAL_RULE_LABEL[indicator.annual_rule].toLowerCase()}. Se cambia en Estructura y KPI.`;
@@ -240,7 +240,7 @@ function IndicatorCapture({ data, report, periodId, canEdit }: StationProps) {
      (2024-A, 2024-B y, si algún indicador la reporta aparte, 2024-anual). */
   const templateTerms: OdTerm[] = anyByTerm ? (anyReported ? ["A", "B", "anual"] : ["A", "B"]) : ["anual"];
   const downloadTemplate = () => {
-    const header = ["clave", "indicador", "unidad", "cifra del año", "campus", ...years.flatMap((y) => templateTerms.map((term) => `${y}-${term}`))];
+    const header = ["clave", "indicador", "unidad", "cifra del año", "campus", ...years.flatMap((y) => templateTerms.map((term) => (term === "anual" ? `${y}-anual` : cutLabel(y, term))))];
     const body = indicators.flatMap((indicator) =>
       [{ slug: "total", label: "Total institucional", id: TOTAL }, ...campuses.map((c) => ({ slug: c.slug, label: c.label, id: c.campus_id }))]
         .filter((c) => !(indicator.aggregation === "suma" && c.id === TOTAL))
@@ -274,15 +274,17 @@ function IndicatorCapture({ data, report, periodId, canEdit }: StationProps) {
     // Columnas "2024-A", "2024-B", "2024-anual" de los años del periodo.
     const cutCols = header
       .map((h, i) => {
-        const match = h.trim().match(/^(\d{4})-(a|b|anual)$/i);
+        // "2024-1" y "2024-2"; también "2024-A" y "2024-B" de plantillas anteriores.
+        const match = h.trim().match(/^(\d{4})-(1|2|a|b|anual)$/i);
         if (!match || !years.includes(Number(match[1]))) return null;
-        const term = (match[2].toLowerCase() === "anual" ? "anual" : match[2].toUpperCase()) as OdTerm;
+        const raw = match[2].toLowerCase();
+        const term = (raw === "anual" ? "anual" : raw === "1" || raw === "a" ? "A" : "B") as OdTerm;
         return { year: Number(match[1]), term, index: i };
       })
       .filter((c): c is { year: number; term: OdTerm; index: number } => c !== null);
     if (keyCol < 0 || campusCol < 0) errors.push('Faltan las columnas "clave" y "campus": usa la plantilla descargada.');
     if (cutCols.length === 0) {
-      errors.push(`No hay columnas de periodo del ${data.rows.period.label} (como "${years[0]}-A" y "${years[0]}-B"): descarga la plantilla de nuevo.`);
+      errors.push(`No hay columnas de periodo del ${data.rows.period.label} (como "${years[0]}-1" y "${years[0]}-2"): descarga la plantilla de nuevo.`);
     }
 
     lines.forEach((line, index) => {
@@ -296,22 +298,22 @@ function IndicatorCapture({ data, report, periodId, canEdit }: StationProps) {
       for (const { year, term, index: i } of cutCols) {
         const parsed = parseNumber(line[i] ?? "");
         if (!parsed.ok) {
-          errors.push(`Fila ${index + 2}, ${year}-${term}: ${parsed.reason}.`);
+          errors.push(`Fila ${index + 2}, ${term === "anual" ? `${year}-anual` : cutLabel(year, term)}: ${parsed.reason}.`);
           continue;
         }
         if (byYear(indicator) && term !== "anual") {
-          if (parsed.value !== null) errors.push(`Fila ${index + 2}, ${year}-${term}: "${indicator.label}" se reporta por año; el valor se ignora.`);
+          if (parsed.value !== null) errors.push(`Fila ${index + 2}, ${cutLabel(year, term)}: "${indicator.label}" se reporta por año; el valor se ignora.`);
           continue;
         }
         if (term === "anual" && indicator.annual_rule !== "reportado" && !byYear(indicator)) {
-          if (parsed.value !== null) errors.push(`Fila ${index + 2}, ${year}-anual: "${indicator.label}" calcula el año con A y B; el valor se ignora.`);
+          if (parsed.value !== null) errors.push(`Fila ${index + 2}, ${year}-anual: "${indicator.label}" calcula el año con los periodos 1 y 2; el valor se ignora.`);
           continue;
         }
         const before = stored.get(`${indicator.id}|${year}|${term}|${campus}`) ?? null;
         if (parsed.value !== before) {
           next[cellKey(`${indicator.id}::${campus}`, `${year}-${term}`)] = parsed.value;
           diff.push({
-            label: `${indicator.label} · ${campus === TOTAL ? "Total" : campuses.find((c) => c.campus_id === campus)?.label} · ${year}-${term === "anual" ? "año" : term}`,
+            label: `${indicator.label} · ${campus === TOTAL ? "Total" : campuses.find((c) => c.campus_id === campus)?.label} · ${term === "anual" ? `${year}-año` : cutLabel(year, term)}`,
             before,
             after: parsed.value,
             format: indicator.format,
@@ -331,7 +333,7 @@ function IndicatorCapture({ data, report, periodId, canEdit }: StationProps) {
       description={
         <>
           {indicators.length} indicadores × {campuses.length} campus × {years.length} años. Los indicadores por periodo se
-          capturan en A y B y la cifra del año sale de su regla; los que se reportan por año, en la columna Año. Vacío es "sin reportar", nunca cero. Pega un rango de Excel desde
+          capturan en los periodos 1 y 2 y la cifra del año sale de su regla; los que se reportan por año, en la columna Año. Vacío es "sin reportar", nunca cero. Pega un rango de Excel desde
           la casilla donde empieza.
         </>
       }
@@ -547,8 +549,8 @@ function BreakdownCapture({ data, report, periodId, canEdit }: StationProps) {
   const reporting: Reporting = breakdown.reporting ?? "periodo";
   const rule = reporting === "anual" ? "reportado" : breakdown.annual_rule ?? "reportado";
   const columns = years.flatMap((year) => ((reporting === "anual" ? ["anual"] : ["A", "B", "anual"]) as OdTerm[]).map((term) => ({
-    key: `${year}-${term}`, label: term === "anual" ? "Año" : term, group: String(year),
-    ariaLabel: `${year}, ${term === "anual" ? "cifra del año" : `periodo ${term}`}`,
+    key: `${year}-${term}`, label: term === "anual" ? "Año" : termLabel(term), group: String(year),
+    ariaLabel: `${year}, ${term === "anual" ? "cifra del año" : `periodo ${termLabel(term)}`}`,
   })));
   const stored = (label: string, column: string) => {
     const [year, term] = column.split("-");
@@ -565,7 +567,7 @@ function BreakdownCapture({ data, report, periodId, canEdit }: StationProps) {
     <Panel
       id="oda-desgloses"
       title="Desgloses"
-      description="Categorías para el total institucional, por periodo (A y B, el año sigue la regla del desglose) o con una cifra por año."
+      description="Categorías para el total institucional, por periodo (1 y 2, el año sigue la regla del desglose) o con una cifra por año."
       actions={
         <>
           {breakdowns.length > 1 && (
@@ -852,8 +854,8 @@ type PeriodValue = { year: number; term: "A" | "B" };
 /** "2014-A a 2023-B" → desde y hasta; "2014-A" → el mismo periodo en los dos. */
 function parseFlow(label: string | undefined, fallback: PeriodValue): { from: PeriodValue; to: PeriodValue } {
   const parse = (text: string | undefined): PeriodValue | null => {
-    const match = text?.trim().match(/^(\d{4})-(A|B)$/);
-    return match ? { year: Number(match[1]), term: match[2] as "A" | "B" } : null;
+    const match = text?.trim().match(/^(\d{4})-(A|B|1|2)$/);
+    return match ? { year: Number(match[1]), term: match[2] === "A" || match[2] === "1" ? "A" : "B" } : null;
   };
   const [a, b] = (label ?? "").split(" a ");
   const from = parse(a) ?? fallback;
@@ -1165,7 +1167,7 @@ function HistoryCapture({ data, report, periodId, canEdit }: StationProps) {
                   }}
                 >
                   <option value="">Quitar…</option>
-                  {periods.map((p) => <option key={`p-${p}`} value={`p::${p}`}>Periodo {p}</option>)}
+                  {periods.map((p) => <option key={`p-${p}`} value={`p::${p}`}>Periodo {periodText(p)}</option>)}
                   {categories.map((c) => <option key={`c-${c}`} value={`c::${c}`}>Categoría {c}</option>)}
                 </select>
               </label>
@@ -1176,11 +1178,11 @@ function HistoryCapture({ data, report, periodId, canEdit }: StationProps) {
 
       {periods.length === 0 ? (
         <StageEmpty title="Añade los periodos que quieres comparar">
-          Por ejemplo 2020-A y 2025-B, o años completos como 2011 y 2025 (elige "Año" en el periodo). Luego escribe el total y, si quieres, categorías como pregrado y posgrado.
+          Por ejemplo 2020-1 y 2025-2, o años completos como 2011 y 2025 (elige "Año" en el periodo). Luego escribe el total y, si quieres, categorías como pregrado y posgrado.
         </StageEmpty>
       ) : (
         <>
-          <p className="oda-panel__lede"><strong>{history.title}</strong> · {periods[0]} a {periods[periods.length - 1]} · {history.unit}</p>
+          <p className="oda-panel__lede"><strong>{history.title}</strong> · {periodText(periods[0] ?? "")} a {periodText(periods[periods.length - 1] ?? "")} · {history.unit}</p>
           <DataGrid
             label={history.title}
             rowHeader="Categoría"
@@ -1188,7 +1190,7 @@ function HistoryCapture({ data, report, periodId, canEdit }: StationProps) {
               { key: HISTORY_TOTAL, label: history.total_label, sub: "vacío = suma de categorías", groupStart: true, format: history.format },
               ...categories.map((c) => ({ key: c, label: c, format: history.format })),
             ]}
-            columns={periods.map((p) => ({ key: p, label: p }))}
+            columns={periods.map((p) => ({ key: p, label: periodText(p) }))}
             stored={stored}
             draft={draft}
             onDraft={setDraft}

@@ -10,11 +10,18 @@
    La hoja de indicador es el contrato del boletín: a la izquierda, la columna
    de notas (qué mide, quién reporta, cómo se calcula, corte); a la derecha, la
    cifra ancla, la evolución por año, el detalle por campus y la tabla.
+
+   Fidelidad a cómo se reporta: lo que llega por periodo académico se muestra
+   por periodo (2024-1, 2024-2) y, junto, la cifra del año que sale de su regla
+   (suma, promedio, último periodo). Lo que llega por año se muestra por año.
+   Nada se da por vacío porque le falte la cifra del año: si solo hay 2025-1,
+   la hoja muestra 2025-1.
    ========================================================================== */
 
 import type { CSSProperties, ReactNode } from "react";
 import { basisOf, changeBetween, formatCount, formatValue, periodBasisOf, valueOf } from "../datos-abiertos/data/open-data";
-import { ALL_YEARS, ANNUAL_RULE_LABEL, cutLabel } from "../datos-abiertos/data/terms";
+import { ALL_YEARS, ANNUAL_RULE_LABEL, cutLabel, TERMS } from "../datos-abiertos/data/terms";
+import type { AnnualRule, Term } from "../datos-abiertos/data/terms";
 import { isMobilityMap, isWorldMap } from "../datos-abiertos/data/types";
 import type {
   Breakdown,
@@ -27,11 +34,12 @@ import type {
   PipelineData,
   Report,
   TableData,
+  ValueFormat,
 } from "../datos-abiertos/data/types";
 import { DEPARTMENTS } from "../datos-abiertos/data/colombia-map";
 import { LeakyPipeline } from "../datos-abiertos/components/LeakyPipeline";
 import { COUNTRIES } from "../datos-abiertos/data/world-map";
-import { ChoroplethMap, DataTable, EvolutionChart, HBars, Legend, MapLegend, SERIES_COLORS, StackedColumns, SwatchLegend, Trend, figure } from "./figures";
+import { ChoroplethMap, DataTable, EvolutionChart, HBars, Legend, MapLegend, SERIES_COLORS, StackedColumns, SwatchLegend, TERM_COLORS, Trend, figure } from "./figures";
 import type { Series } from "./figures";
 import type { BulletinSettings, IndicatorShow } from "./model";
 
@@ -76,18 +84,83 @@ const yearsOf = (catalog: OpenDataCatalog, own?: number[]) => (own?.length ? cat
 const periodColumn = (settings: BulletinSettings) => settings.cut === ALL_YEARS;
 const cutText = (cut: number) => (cut === ALL_YEARS ? `Periodo ${cutLabel(ALL_YEARS, null)}` : `Corte ${cut}`);
 
+/* --- Periodos académicos -------------------------------------------------------- */
+
+interface PeriodCut {
+  year: number;
+  term: Term;
+  /** "2024-1" */
+  label: string;
+}
+
+const periodCutsOf = (years: number[]): PeriodCut[] =>
+  years.flatMap((year) => TERMS.map((term) => ({ year, term, label: cutLabel(year, term) })));
+
+const hasValue = (v: number | null | undefined): v is number => v !== null && v !== undefined;
+
+/**
+ * ¿El indicador llega por periodo académico? Se decide por lo reportado: si no
+ * hay ni una cifra de periodo (se reporta por año, o la cifra del año se captura
+ * aparte), la hoja es anual y no dibuja columnas de periodo vacías.
+ */
+const reportsByTerm = (indicator: Indicator) =>
+  indicator.reporting !== "anual" &&
+  Boolean(indicator.annualRule) &&
+  Object.values(indicator.terms ?? {}).some((byTerm) => TERMS.some((t) => Object.values(byTerm?.[t] ?? {}).some(hasValue)));
+
+/** Cómo sale la cifra del año, en minúscula y corto, para rótulos de gráfica. */
+const RULE_SHORT: Record<AnnualRule, string> = {
+  suma: "suma de los periodos 1 y 2",
+  promedio: "promedio de los periodos 1 y 2",
+  ultimo: "último periodo reportado",
+  reportado: "reportada como año",
+};
+
+/** Tramos de años para las tablas por periodo: tres años (nueve columnas) por tabla. */
+const YEARS_PER_TABLE = 3;
+const chunk = <T,>(list: T[], size: number): T[][] =>
+  Array.from({ length: Math.ceil(list.length / size) }, (_, i) => list.slice(i * size, i * size + size));
+
 /* --- Presencia de datos ------------------------------------------------------ */
 
 function indicatorHasData(indicator: Indicator, catalog: OpenDataCatalog): boolean {
-  return yearsOf(catalog, indicator.years).some((y) => Object.values(indicator.values[y] ?? {}).some((v) => v !== null && v !== undefined));
+  const years = yearsOf(catalog, indicator.years);
+  const annual = years.some((y) => Object.values(indicator.values[y] ?? {}).some(hasValue));
+  if (annual) return true;
+  // Un periodo reportado basta: la cifra del año puede faltar (año en curso).
+  return reportsByTerm(indicator) && years.some((y) => TERMS.some((t) => Object.values(indicator.terms?.[y]?.[t] ?? {}).some(hasValue)));
+}
+
+/**
+ * La cifra que representa al indicador en un corte: la del año (o del periodo
+ * agrupado) y, si falta, la del último periodo reportado de ese corte. Así un
+ * año en curso (solo 2025-1) no se lee como "sin reportar".
+ */
+function figureAt(indicator: Indicator, catalog: OpenDataCatalog, cut: number, campus: string): { value: number | null; period?: PeriodCut } {
+  const value = valueOf(indicator, cut, campus);
+  if (value !== null || !reportsByTerm(indicator)) return { value };
+  const years = cut === ALL_YEARS ? yearsOf(catalog, indicator.years) : [cut];
+  const last = periodCutsOf(years)
+    .filter((p) => valueOf(indicator, p.year, campus, p.term) !== null)
+    .pop();
+  return last ? { value: valueOf(indicator, last.year, campus, last.term), period: last } : { value: null };
 }
 
 function itemsAt(breakdown: Breakdown, key: number) {
   return (breakdown.values[key] ?? []).filter((i) => i.value !== null);
 }
 
-/** Años del desglose con alguna cifra. */
-const breakdownYears = (b: Breakdown, catalog: OpenDataCatalog) => yearsOf(catalog, b.years).filter((y) => itemsAt(b, y).length > 0);
+function termItemsAt(breakdown: Breakdown, year: number, term: Term) {
+  return (breakdown.terms?.[year]?.[term] ?? []).filter((i) => i.value !== null);
+}
+
+/** Como en los indicadores: por periodo solo si hay alguna cifra de periodo. */
+const breakdownByTerm = (b: Breakdown) =>
+  b.reporting !== "anual" && Object.values(b.terms ?? {}).some((byTerm) => TERMS.some((t) => (byTerm?.[t] ?? []).some((i) => i.value !== null)));
+
+/** Años del desglose con alguna cifra, del año o de un periodo. */
+const breakdownYears = (b: Breakdown, catalog: OpenDataCatalog) =>
+  yearsOf(catalog, b.years).filter((y) => itemsAt(b, y).length > 0 || (breakdownByTerm(b) && TERMS.some((t) => termItemsAt(b, y, t).length > 0)));
 
 function mapKey(map: MapDataset, cut: number, catalog: OpenDataCatalog): number | undefined {
   const has = (k: number) => Object.values(map.values[k] ?? {}).some((codes) => codes && Object.keys(codes).length > 0);
@@ -95,6 +168,80 @@ function mapKey(map: MapDataset, cut: number, catalog: OpenDataCatalog): number 
   if (has(cut)) return cut;
   const years = yearsOf(catalog, map.years).filter(has);
   return years[years.length - 1];
+}
+
+/**
+ * Tablas por periodo: cada año con sus periodos 1 y 2 y la cifra del año al
+ * lado, en tramos de tres años para que las cifras se lean a tamaño de papel.
+ * Con todo el periodo, la última tabla cierra con la cifra agrupada.
+ */
+function PeriodTables({
+  head,
+  years,
+  rows,
+  format,
+  highlightYear,
+  grouped,
+  caption,
+}: {
+  head: string;
+  years: number[];
+  rows: { label: string; strong?: boolean; at: (year: number, term: Term | null) => number | null; grouped?: number | null }[];
+  format: ValueFormat;
+  highlightYear?: number;
+  /** Rótulo de la columna agrupada ("2020–2025"), si va. */
+  grouped?: string;
+  caption?: ReactNode;
+}) {
+  const groups = chunk(years, YEARS_PER_TABLE);
+  return (
+    <div className="bol-period-tables">
+      {groups.map((group, g) => {
+        const last = g === groups.length - 1;
+        const columns = group.flatMap((year) => [
+          ...TERMS.map((term) => ({ label: cutLabel(year, term), year, term: term as Term | null })),
+          { label: String(year), year, term: null as Term | null },
+        ]);
+        const withGrouped = last && grouped !== undefined;
+        const yearCols = columns.map((c, i) => (c.term === null ? i : -1)).filter((i) => i >= 0);
+        const highlightCol = highlightYear === undefined ? (withGrouped ? columns.length : undefined) : columns.findIndex((c) => c.year === highlightYear && c.term === null);
+        return (
+          <DataTable
+            key={group.join("-")}
+            caption={g === 0 ? caption : undefined}
+            head={[head, ...columns.map((c) => c.label), ...(withGrouped ? [grouped!] : [])]}
+            yearCols={yearCols}
+            highlightCol={highlightCol === -1 ? undefined : highlightCol}
+            rows={rows.map((row) => ({
+              label: row.label,
+              strong: row.strong,
+              cells: [...columns.map((c) => figure(row.at(c.year, c.term), format)), ...(withGrouped ? [figure(row.grouped ?? null, format)] : [])],
+            }))}
+          />
+        );
+      })}
+    </div>
+  );
+}
+
+/** "2024-1 812 · 2024-2 845": los periodos del corte, bajo la cifra. */
+function TermsLine({ indicator, catalog, cut, campus }: { indicator: Indicator; catalog: OpenDataCatalog; cut: number; campus: string }) {
+  if (!reportsByTerm(indicator)) return null;
+  const years = cut === ALL_YEARS ? yearsOf(catalog, indicator.years) : [cut];
+  const cuts = periodCutsOf(years).filter((p) => valueOf(indicator, p.year, campus, p.term) !== null);
+  // Con todo el periodo, los dos últimos periodos con dato; con un año, los suyos.
+  const shown = cut === ALL_YEARS ? cuts.slice(-2) : periodCutsOf(years);
+  if (!cuts.length) return null;
+  return (
+    <ul className="bol-terms">
+      {cut === ALL_YEARS && <li><span>Últimos periodos</span></li>}
+      {shown.map((p) => (
+        <li key={p.label}>
+          <span>{p.label}</span> <b>{figure(valueOf(indicator, p.year, campus, p.term), indicator.format)}</b>
+        </li>
+      ))}
+    </ul>
+  );
 }
 
 /* --- Piezas comunes ----------------------------------------------------------- */
@@ -153,38 +300,82 @@ function IndicatorSheet({
   const years = yearsOf(catalog, indicator.years);
   const campuses = sites(catalog);
   const campusName = catalog.campuses.find((c) => c.id === campus)?.name ?? "Todos los campus";
-  const value = valueOf(indicator, cut, campus);
-  const previous = cut === ALL_YEARS ? null : valueOf(indicator, cut - 1, campus);
+  const byTerm = reportsByTerm(indicator);
+  const periods = byTerm ? periodCutsOf(years) : [];
+  const anchor = figureAt(indicator, catalog, cut, campus);
+  const value = anchor.value;
+  const previous = cut === ALL_YEARS || anchor.period ? null : valueOf(indicator, cut - 1, campus);
   const change = changeBetween(indicator, value, previous);
   const basis = cut === ALL_YEARS ? periodBasisOf(indicator, campus) : basisOf(indicator, cut, campus);
   const percent = indicator.format === "porcentaje";
   const unitText = percent || indicator.unit === "%" ? "%" : indicator.unit;
 
-  const withData = campuses.filter((c) => years.some((y) => valueOf(indicator, y, c.id) !== null));
-  const series: Series[] = [
-    ...withData.map((c, i) => ({ label: c.name, color: SERIES_COLORS[i % SERIES_COLORS.length], values: years.map((y) => valueOf(indicator, y, c.id)) })),
-    // "Total" y no "Total institucional": la leyenda cabe en una fila; la tabla lo dice completo.
-    { label: "Total", color: "var(--bol-navy)", dashed: withData.length > 0, values: years.map((y) => valueOf(indicator, y, "todas")) },
-  ].filter((s) => s.values.some((v) => v !== null));
+  const reported = (id: string) =>
+    years.some((y) => valueOf(indicator, y, id) !== null) || periods.some((p) => valueOf(indicator, p.year, id, p.term) !== null);
+  const withData = campuses.filter((c) => reported(c.id));
+  const seriesOf = (at: (id: string) => (number | null)[]): Series[] =>
+    [
+      ...withData.map((c, i) => ({ label: c.name, color: SERIES_COLORS[i % SERIES_COLORS.length], values: at(c.id) })),
+      // "Total" y no "Total institucional": la leyenda cabe en una fila; la tabla lo dice completo.
+      { label: "Total", color: "var(--bol-navy)", dashed: withData.length > 0, values: at("todas") },
+    ].filter((s) => s.values.some((v) => v !== null));
+  const annualSeries = seriesOf((id) => years.map((y) => valueOf(indicator, y, id)));
+  const periodSeries = byTerm ? seriesOf((id) => periods.map((p) => valueOf(indicator, p.year, id, p.term))) : [];
 
-  const campusItems = withData.map((c) => ({ label: c.name, value: valueOf(indicator, cut, c.id), strong: c.id === campus }));
+  const campusItems = withData.map((c) => ({ label: c.name, value: figureAt(indicator, catalog, cut, c.id).value, strong: c.id === campus }));
   const showCampus = !compact && show.campus && campusItems.some((i) => i.value !== null);
-  const showEvolution = show.evolution && series.length > 0 && years.length > 1;
+  const showEvolution = show.evolution && (annualSeries.length > 0 || periodSeries.length > 0) && (years.length > 1 || byTerm);
+  const campusCaption = `Por campus · ${cut === ALL_YEARS ? cutLabel(ALL_YEARS, null) : anchor.period?.label ?? cut}`;
 
-  const columns = [...years.map(String), ...(periodColumn(settings) ? [`${cutLabel(ALL_YEARS, null)}`] : [])];
+  // Cifra del año con sus periodos. Con la regla "suma", los periodos se apilan
+  // y la columna es el año; con las demás, la cifra del año va en línea.
+  const rule = indicator.annualRule;
+  const stacked = byTerm && rule === "suma";
+  const focus = campus;
+  const annualFigure = () =>
+    stacked ? (
+      <>
+        <StackedColumns
+          periods={years.map(String)}
+          categories={["Periodo 1", "Periodo 2"]}
+          values={{
+            "Periodo 1": Object.fromEntries(years.map((y) => [String(y), valueOf(indicator, y, focus, "A")])),
+            "Periodo 2": Object.fromEntries(years.map((y) => [String(y), valueOf(indicator, y, focus, "B")])),
+          }}
+          totals={years.map((y) => valueOf(indicator, y, focus))}
+          colors={TERM_COLORS}
+          highlight={cut === ALL_YEARS ? undefined : String(cut)}
+          format={indicator.format}
+          width={showCampus || compact ? 74 : 130}
+          height={compact ? 26 : 36}
+        />
+        <SwatchLegend labels={["Periodo 1", "Periodo 2"]} colors={TERM_COLORS} />
+      </>
+    ) : (
+      <>
+        <EvolutionChart
+          years={years}
+          series={annualSeries}
+          format={indicator.format}
+          highlight={cut === ALL_YEARS ? undefined : cut}
+          width={showCampus || (compact && byTerm) ? 74 : 130}
+          height={compact ? 24 : showCampus ? 36 : annualSeries.length > 1 ? 34 : 28}
+        />
+        {annualSeries.length > 1 && !byTerm && <Legend series={annualSeries} />}
+      </>
+    );
+
+  const grouped = periodColumn(settings) ? cutLabel(ALL_YEARS, null) : undefined;
+  const tableRows = [
+    ...withData.map((c) => ({ id: c.id, label: c.name, strong: false })),
+    { id: "todas", label: "Total institucional", strong: withData.length > 0 },
+  ];
+  const columns = [...years.map(String), ...(grouped ? [grouped] : [])];
   const highlightCol = cut === ALL_YEARS ? columns.length - 1 : years.indexOf(cut);
-  const rowFor = (id: string, label: string, strong?: boolean) => ({
-    label,
-    strong,
-    cells: [
-      ...years.map((y) => figure(valueOf(indicator, y, id), indicator.format)),
-      ...(periodColumn(settings) ? [figure(valueOf(indicator, ALL_YEARS, id), indicator.format)] : []),
-    ],
-  });
-  const tableRows = [...withData.map((c) => rowFor(c.id, c.name)), rowFor("todas", "Total institucional", withData.length > 0)];
   const calculation = [
-    indicator.annualRule ? `Año: ${ANNUAL_RULE_LABEL[indicator.annualRule].toLowerCase()}.` : null,
-    cut === ALL_YEARS ? (indicator.annualRule === "ultimo" ? "Periodo: último dato." : "Periodo: promedio anual.") : null,
+    byTerm ? "Se reporta por periodo académico (1 y 2)." : indicator.reporting === "anual" ? "Se reporta por año." : null,
+    rule && byTerm ? `Año: ${ANNUAL_RULE_LABEL[rule].toLowerCase()}.` : null,
+    cut === ALL_YEARS ? (rule === "ultimo" ? "Periodo: último dato." : "Periodo: promedio anual.") : null,
     indicator.aggregation === "reportado" ? "Total reportado aparte." : withData.length ? "Total: suma de campus." : null,
   ].filter(Boolean).join(" ");
 
@@ -211,6 +402,11 @@ function IndicatorSheet({
           <p>
             {value === null ? (
               <>Sin reportar en {cutText(cut).toLowerCase()}.</>
+            ) : anchor.period ? (
+              <>
+                {campusName} · periodo {anchor.period.label}
+                {cut !== ALL_YEARS && rule && rule !== "reportado" ? ` · la cifra del año (${RULE_SHORT[rule]}) aún no se completa` : ""}
+              </>
             ) : cut === ALL_YEARS ? (
               <>{campusName} · {basis ?? "periodo completo"}</>
             ) : change ? (
@@ -226,36 +422,79 @@ function IndicatorSheet({
               <>{campusName} · sin comparación con {cut - 1}{basis ? ` · ${basis}` : ""}</>
             )}
           </p>
+          <TermsLine indicator={indicator} catalog={catalog} cut={cut} campus={campus} />
         </div>
 
+        {showEvolution && byTerm && periodSeries.length > 0 && !compact && (
+          <figure>
+            <figcaption>Por periodo académico · como se reportó</figcaption>
+            <EvolutionChart
+              years={periods.map((p) => p.label)}
+              series={periodSeries}
+              format={indicator.format}
+              periodAxis
+              highlight={cut === ALL_YEARS ? undefined : cut}
+              width={130}
+              height={periodSeries.length > 1 ? 34 : 30}
+              label="Evolución por periodo académico"
+            />
+            {periodSeries.length > 1 && <Legend series={periodSeries} />}
+          </figure>
+        )}
+
         {(showEvolution || showCampus) && (
-          <div className="bol-figures" data-single={!(showEvolution && showCampus) || undefined}>
-            {showEvolution && (
+          <div className="bol-figures" data-single={!((showEvolution && showCampus) || (compact && byTerm && showEvolution)) || undefined}>
+            {showEvolution && compact && byTerm && periodSeries.length > 0 && (
               <figure>
-                <figcaption>Evolución por año</figcaption>
-                <EvolutionChart
-                  years={years}
-                  series={series}
-                  format={indicator.format}
-                  highlight={cut === ALL_YEARS ? undefined : cut}
-                  width={showCampus ? 74 : 130}
-                  height={showCampus ? 36 : compact ? 24 : series.length > 1 ? 34 : 28}
-                />
-                {series.length > 1 && <Legend series={series} />}
+                <figcaption>Por periodo académico</figcaption>
+                <EvolutionChart years={periods.map((p) => p.label)} series={periodSeries} format={indicator.format} periodAxis highlight={cut === ALL_YEARS ? undefined : cut} width={74} height={24} label="Evolución por periodo académico" />
+              </figure>
+            )}
+            {showEvolution && (annualSeries.length > 0 || stacked) && (
+              <figure>
+                <figcaption>{byTerm && rule ? `Cifra del año · ${RULE_SHORT[rule]}` : "Evolución por año"}</figcaption>
+                {annualFigure()}
               </figure>
             )}
             {showCampus && (
               <figure>
-                <figcaption>Por campus · {cut === ALL_YEARS ? cutLabel(ALL_YEARS, null) : cut}</figcaption>
+                <figcaption>{campusCaption}</figcaption>
                 <HBars items={campusItems} format={indicator.format} width={showEvolution ? 52 : 128} />
               </figure>
             )}
           </div>
         )}
 
-        {show.table && (
-          <DataTable head={[withData.length ? "Campus" : "Cifra", ...columns]} rows={tableRows} highlightCol={highlightCol} />
-        )}
+        {show.table &&
+          (byTerm ? (
+            <PeriodTables
+              head={withData.length ? "Campus" : "Cifra"}
+              years={years}
+              format={indicator.format}
+              highlightYear={cut === ALL_YEARS ? undefined : cut}
+              grouped={grouped}
+              caption={rule ? `Periodos 1 y 2 como se reportaron; en negrita, la cifra del año (${RULE_SHORT[rule]}).` : undefined}
+              rows={tableRows.map((row) => ({
+                label: row.label,
+                strong: row.strong,
+                at: (year, term) => valueOf(indicator, year, row.id, term),
+                grouped: valueOf(indicator, ALL_YEARS, row.id),
+              }))}
+            />
+          ) : (
+            <DataTable
+              head={[withData.length ? "Campus" : "Cifra", ...columns]}
+              highlightCol={highlightCol}
+              rows={tableRows.map((row) => ({
+                label: row.label,
+                strong: row.strong,
+                cells: [
+                  ...years.map((y) => figure(valueOf(indicator, y, row.id), indicator.format)),
+                  ...(grouped ? [figure(valueOf(indicator, ALL_YEARS, row.id), indicator.format)] : []),
+                ],
+              }))}
+            />
+          ))}
       </div>
     </article>
   );
@@ -280,13 +519,16 @@ function ChapterOpener({ report, catalog, settings, count }: { report: Report; c
       {keys.length > 0 && (
         <dl className="bol-chapter__keys">
           {keys.map((indicator) => {
-            const v = valueOf(indicator, settings.cut, settings.campus);
+            const { value: v, period } = figureAt(indicator, catalog, settings.cut, settings.campus);
             return (
               <div key={indicator.id}>
                 <dt>{indicator.label}</dt>
                 <dd>
                   <b>{figure(v, indicator.format)}</b>
-                  <small>{v === null ? "sin reportar" : indicator.format === "porcentaje" || indicator.unit === "%" ? "%" : indicator.unit}</small>
+                  <small>
+                    {v === null ? "sin reportar" : indicator.format === "porcentaje" || indicator.unit === "%" ? "%" : indicator.unit}
+                    {period ? ` · ${period.label}` : ""}
+                  </small>
                 </dd>
               </div>
             );
@@ -340,35 +582,128 @@ function DatasetSheet({
 function breakdownUnit(b: Breakdown, catalog: OpenDataCatalog, settings: BulletinSettings): ReactNode | null {
   const years = breakdownYears(b, catalog);
   if (!years.length) return null;
-  const key = settings.cut === ALL_YEARS && itemsAt(b, ALL_YEARS).length ? ALL_YEARS : years.includes(settings.cut) ? settings.cut : years[years.length - 1];
-  const labels = Array.from(new Set(years.flatMap((y) => itemsAt(b, y).map((i) => i.label))));
-  const items = labels.map((label) => ({ label, value: (b.values[key] ?? []).find((i) => i.label === label)?.value ?? null }));
+  const byTerm = breakdownByTerm(b);
   const withPeriod = settings.cut === ALL_YEARS && itemsAt(b, ALL_YEARS).length > 0;
-  const columns = [...years.map(String), ...(withPeriod ? [cutLabel(ALL_YEARS, null)] : [])];
+  const key = withPeriod ? ALL_YEARS : years.includes(settings.cut) ? settings.cut : years[years.length - 1];
+  const periods = byTerm ? periodCutsOf(years) : [];
+  const termValue = (label: string, year: number, term: Term) => (b.terms?.[year]?.[term] ?? []).find((i) => i.label === label)?.value ?? null;
+  const yearValue = (label: string, year: number) => (b.values[year] ?? []).find((i) => i.label === label)?.value ?? null;
+  const labels = Array.from(
+    new Set(years.flatMap((y) => [...itemsAt(b, y), ...(byTerm ? TERMS.flatMap((t) => termItemsAt(b, y, t)) : [])].map((i) => i.label))),
+  );
+
+  // Barras del corte: la cifra del año; si el año no cierra, su último periodo.
+  const keyPeriod =
+    byTerm && key !== ALL_YEARS && !itemsAt(b, key).length ? periodCutsOf([key]).filter((p) => termItemsAt(b, p.year, p.term).length).pop() : undefined;
+  const items = labels.map((label) => ({
+    label,
+    value: keyPeriod ? termValue(label, keyPeriod.year, keyPeriod.term) : (b.values[key] ?? []).find((i) => i.label === label)?.value ?? null,
+  }));
+  const keyText = key === ALL_YEARS ? `Promedio anual ${cutLabel(ALL_YEARS, null)}` : keyPeriod ? `Periodo ${keyPeriod.label}` : String(key);
+
+  // Partes de un todo (personas, programas): columnas apiladas. Tasas o más
+  // categorías de las que se distinguen por color: líneas o solo tabla.
+  const parts = b.unit !== "%" && b.format !== "porcentaje";
+  const chartable = labels.length > 0 && labels.length <= SERIES_COLORS.length;
+  const lineSeries = (at: (label: string) => (number | null)[]): Series[] =>
+    labels.map((label, i) => ({ label, color: SERIES_COLORS[i % SERIES_COLORS.length], values: at(label) })).filter((s) => s.values.some((v) => v !== null));
+  const byCategory = (cuts: string[], at: (label: string, index: number) => number | null) =>
+    Object.fromEntries(labels.map((label) => [label, Object.fromEntries(cuts.map((c, i) => [c, at(label, i)]))]));
+
+  const rule = b.annualRule;
+  const notes: [string, ReactNode][] = [
+    ["Corte", key === ALL_YEARS ? `${cutText(ALL_YEARS)} · promedio anual` : `${keyPeriod ? `Periodo ${keyPeriod.label}` : `Corte ${key}`}${key !== settings.cut ? " (último con dato)" : ""}`],
+    ["Alcance", "Total institucional"],
+    ...(byTerm && rule ? ([["Cómo se reporta", `Por periodo académico (1 y 2). Año: ${RULE_SHORT[rule]}.`]] as [string, ReactNode][]) : []),
+  ];
+
   return (
-    <DatasetSheet
-      title={b.title}
-      source={b.source}
-      notes={[
-        ["Corte", key === ALL_YEARS ? `${cutText(ALL_YEARS)} · promedio anual` : `Corte ${key}${key !== settings.cut ? " (último con dato)" : ""}`],
-        ["Alcance", "Total institucional"],
-      ]}
-    >
-      <figure className="bol-wide">
-        <figcaption>{key === ALL_YEARS ? `Promedio anual ${cutLabel(ALL_YEARS, null)}` : key} · {b.unit}</figcaption>
-        <HBars items={items} format={b.format} share={b.unit !== "%"} width={128} />
-      </figure>
-      <DataTable
-        head={["Categoría", ...columns]}
-        highlightCol={withPeriod ? columns.length - 1 : years.indexOf(key)}
-        rows={labels.map((label) => ({
-          label,
-          cells: [
-            ...years.map((y) => figure((b.values[y] ?? []).find((i) => i.label === label)?.value ?? null, b.format)),
-            ...(withPeriod ? [figure((b.values[ALL_YEARS] ?? []).find((i) => i.label === label)?.value ?? null, b.format)] : []),
-          ],
-        }))}
-      />
+    <DatasetSheet title={b.title} source={b.source} notes={notes}>
+      {(!byTerm || !chartable) && (
+        <figure className="bol-wide">
+          <figcaption>{keyText} · {b.unit}</figcaption>
+          <HBars items={items} format={b.format} share={parts} width={128} />
+        </figure>
+      )}
+      {byTerm && chartable && (
+        <figure>
+          <figcaption>Por periodo académico · como se reportó · {b.unit}</figcaption>
+          {parts ? (
+            <StackedColumns
+              periods={periods.map((p) => p.label)}
+              categories={labels}
+              values={byCategory(periods.map((p) => p.label), (label, i) => termValue(label, periods[i].year, periods[i].term))}
+              format={b.format}
+              periodAxis
+              width={130}
+              height={40}
+            />
+          ) : (
+            <EvolutionChart
+              years={periods.map((p) => p.label)}
+              series={lineSeries((label) => periods.map((p) => termValue(label, p.year, p.term)))}
+              format={b.format}
+              periodAxis
+              width={130}
+              height={34}
+              label="Por periodo académico"
+            />
+          )}
+          <SwatchLegend labels={labels} />
+        </figure>
+      )}
+      {byTerm && chartable && (
+        <figure>
+          <figcaption>Cifra del año{rule ? ` · ${RULE_SHORT[rule]}` : ""}</figcaption>
+          {parts ? (
+            <StackedColumns
+              periods={years.map(String)}
+              categories={labels}
+              values={byCategory(years.map(String), (label, i) => yearValue(label, years[i]))}
+              format={b.format}
+              highlight={key === ALL_YEARS ? undefined : String(key)}
+              width={130}
+              height={36}
+            />
+          ) : (
+            <EvolutionChart
+              years={years}
+              series={lineSeries((label) => years.map((y) => yearValue(label, y)))}
+              format={b.format}
+              highlight={key === ALL_YEARS ? undefined : key}
+              width={130}
+              height={30}
+            />
+          )}
+        </figure>
+      )}
+      {byTerm ? (
+        <PeriodTables
+          head="Categoría"
+          years={years}
+          format={b.format}
+          highlightYear={key === ALL_YEARS ? undefined : key}
+          grouped={withPeriod ? cutLabel(ALL_YEARS, null) : undefined}
+          caption={rule ? `Periodos 1 y 2 como se reportaron; en negrita, la cifra del año (${RULE_SHORT[rule]}).` : undefined}
+          rows={labels.map((label) => ({
+            label,
+            at: (year, term) => (term ? termValue(label, year, term) : yearValue(label, year)),
+            grouped: (b.values[ALL_YEARS] ?? []).find((i) => i.label === label)?.value ?? null,
+          }))}
+        />
+      ) : (
+        <DataTable
+          head={["Categoría", ...years.map(String), ...(withPeriod ? [cutLabel(ALL_YEARS, null)] : [])]}
+          highlightCol={withPeriod ? years.length : years.indexOf(key)}
+          rows={labels.map((label) => ({
+            label,
+            cells: [
+              ...years.map((y) => figure(yearValue(label, y), b.format)),
+              ...(withPeriod ? [figure((b.values[ALL_YEARS] ?? []).find((i) => i.label === label)?.value ?? null, b.format)] : []),
+            ],
+          }))}
+        />
+      )}
     </DatasetSheet>
   );
 }
@@ -467,17 +802,35 @@ function pipelineUnit(p: PipelineData, settings: BulletinSettings, catalog: Open
   if (!list.length && !p.cohorts.length) return null;
   const rows = list.length ? list : p.cohorts;
   const measure = p.measure ?? "estudiantes";
-  const format = measure === "estudiantes" ? "entero" : "decimal";
   const campusName = catalog.campuses.find((c) => c.id === settings.campus)?.name ?? "Todos los campus";
   // La misma cohorte que dibuja la tubería de la web: la de más etapas con dato y, a igualdad, la más reciente.
   const filled = (c: PipelineData["cohorts"][number]) => c.remaining.filter((v) => v !== null).length;
   const drawn = rows.slice().sort((a, b) => filled(a) - filled(b) || String(a.cohort).localeCompare(String(b.cohort))).pop();
+  const percentText = (v: number | null) => (v === null ? "—" : `${formatValue(v, "decimal")} %`);
+  // Lo capturado, en su unidad: estudiantes en enteros; permanencia y deserción
+  // del tramo en % con un decimal, como se capturan.
+  const reported = (c: PipelineData["cohorts"][number]) =>
+    measure === "desercion"
+      ? p.stages.map((_, i) => (i === 0 ? "—" : percentText(c.dropout?.[i] ?? null)))
+      : p.stages.map((_, i) => (measure === "estudiantes" ? figure(c.remaining[i] ?? null, "entero") : percentText(c.remaining[i] ?? null)));
+  // Lo que dibuja la tubería: % de la cohorte que ya se retiró al llegar a cada etapa.
+  const cumulative = (c: PipelineData["cohorts"][number]) => {
+    const intake = c.remaining[0];
+    return p.stages.map((_, i) => {
+      const v = c.remaining[i];
+      return intake && v !== null && v !== undefined ? (1 - v / intake) * 100 : null;
+    });
+  };
+  const reportedLabel = { estudiantes: "Estudiantes que siguen", permanencia: "% que sigue", desercion: "% que se retira en el tramo" }[measure];
   return (
     <DatasetSheet
       title={p.title}
       description={p.description}
       source={p.source}
-      notes={[["Cifra", "Deserción acumulada en % de la cohorte que entró"]]}
+      notes={[
+        ["Cifra", "Deserción acumulada en % de la cohorte que entró"],
+        ["Se captura", { estudiantes: "Estudiantes que siguen en cada etapa", permanencia: "% del flujo que sigue en cada etapa", desercion: "% de los que llegan a cada tramo que se retira en él" }[measure]],
+      ]}
       cut={rows.length > 1 ? `Cohortes ${rows[0].cohort} a ${rows[rows.length - 1].cohort}` : `${rows[0].cohort} · ${period}`}
       wide
     >
@@ -487,19 +840,22 @@ function pipelineUnit(p: PipelineData, settings: BulletinSettings, catalog: Open
       </div>
       <DataTable
         head={["Cohorte", ...p.stages]}
-        caption={rows.length > 1 && drawn ? `La tubería dibuja la cohorte ${drawn.cohort}, en negrita en la tabla.` : undefined}
-        rows={rows.map((c) => {
-          const first = c.remaining[0] ?? null;
-          return {
-            strong: rows.length > 1 && c === drawn,
-            label: String(c.cohort),
-            cells: p.stages.map((_, i) => figure(c.remaining[i] ?? null, format)),
-            shade: p.stages.map((_, i) => {
-              const v = c.remaining[i];
-              if (v === null || v === undefined) return null;
-              return measure === "estudiantes" ? (first ? v / first : null) : v / 100;
-            }),
-          };
+        caption={`Por cohorte: ${reportedLabel.toLowerCase()} (como se capturó) y la deserción acumulada que dibuja la tubería.${rows.length > 1 && drawn ? ` La tubería dibuja la cohorte ${drawn.cohort}.` : ""}`}
+        rows={rows.flatMap((c) => {
+          const lost = cumulative(c);
+          const mark = rows.length > 1 && c === drawn;
+          return [
+            {
+              label: `${c.cohort} · ${reportedLabel}`,
+              cells: reported(c),
+            },
+            {
+              strong: true,
+              label: `${c.cohort} · deserción acumulada${mark ? " (dibujada)" : ""}`,
+              cells: lost.map((v) => percentText(v)),
+              shade: lost.map((v) => (v === null ? null : v / 100)),
+            },
+          ];
         })}
       />
     </DatasetSheet>
@@ -599,14 +955,110 @@ function tableUnits(t: TableData, period: string): { node: ReactNode; tight: boo
 
 /* --- Formato ejecutivo -------------------------------------------------------------- */
 
-/** Cifras clave de un informe: sus KPI incluidos con datos; sin KPI, los primeros incluidos. */
+/** Cifras clave de un informe: sus KPI incluidos con datos; sin KPI con datos, los primeros incluidos con datos. */
 function executiveIndicators(report: Report, entry: BulletinSettings["reports"][number], catalog: OpenDataCatalog, limit: number): Indicator[] {
   const included = entry.indicators
     .filter((item) => item.include)
     .map((item) => report.indicators.find((i) => i.id === item.id))
     .filter((i): i is Indicator => Boolean(i) && indicatorHasData(i!, catalog));
   const keys = report.keyIndicators.map((id) => included.find((i) => i.id === id)).filter((i): i is Indicator => Boolean(i));
-  return (keys.length ? keys : included).slice(0, limit);
+  // Los KPI primero; si son menos que el límite, se completan con los demás.
+  return [...keys, ...included.filter((i) => !keys.includes(i))].slice(0, limit);
+}
+
+interface Highlight {
+  key: string;
+  title: string;
+  value: string;
+  unit: string;
+  note: string;
+}
+
+/**
+ * Lo esencial de los conjuntos incluidos de un informe (mapas, históricos,
+ * desgloses, tablas, tuberías). Un informe que reporta sobre todo en conjuntos
+ * —movilidad por país, producción en tablas— también tiene su ficha ejecutiva.
+ */
+function datasetHighlights(report: Report, entry: BulletinSettings["reports"][number], catalog: OpenDataCatalog, settings: BulletinSettings, limit: number): Highlight[] {
+  const list: Highlight[] = [];
+  for (const item of entry.datasets) {
+    if (!item.include || list.length >= limit) continue;
+    const kind = item.ref.slice(0, item.ref.indexOf(":"));
+    const key = item.ref.slice(item.ref.indexOf(":") + 1);
+    if (kind === "mapa") {
+      const m = report.maps?.find((x) => x.id === key);
+      const at = m ? mapKey(m, settings.cut, catalog) : undefined;
+      if (!m || at === undefined) continue;
+      const totals: Record<string, number> = {};
+      for (const [site, codes] of Object.entries(m.values[at] ?? {})) {
+        if (site === "todas" && sites(catalog).length) continue;
+        if (settings.campus !== "todas" && site !== settings.campus) continue;
+        for (const [code, v] of Object.entries(codes ?? {})) {
+          if (isWorldMap(m.mode) && code === "COL") continue;
+          totals[code] = (totals[code] ?? 0) + v;
+        }
+      }
+      const ranking = Object.entries(totals).sort((a, b) => b[1] - a[1]);
+      if (!ranking.length) continue;
+      const grand = ranking.reduce((sum, [, v]) => sum + v, 0);
+      const world = isWorldMap(m.mode);
+      list.push({
+        key: item.ref,
+        title: m.title,
+        value: formatCount(grand),
+        unit: m.unit,
+        note: `${m.reporting === "global" ? "Dato global" : at === ALL_YEARS ? cutLabel(ALL_YEARS, null) : `Corte ${at}`} · ${ranking.length} ${world ? (ranking.length === 1 ? "país" : "países") : ranking.length === 1 ? "departamento" : "departamentos"} · principal: ${NAMES[ranking[0][0]] ?? ranking[0][0]}`,
+      });
+    } else if (kind === "historico") {
+      const h = report.histories?.find((x) => x.id === key);
+      const shown = h?.periods.filter((p) => h.total[p] !== null && h.total[p] !== undefined) ?? [];
+      if (!h || !shown.length) continue;
+      const last = shown[shown.length - 1];
+      const first = shown[0];
+      list.push({
+        key: item.ref,
+        title: h.title,
+        value: figure(h.total[last] ?? null, h.format),
+        unit: h.unit,
+        note: shown.length > 1 ? `${last} · en ${first}: ${figure(h.total[first] ?? null, h.format)}` : last,
+      });
+    } else if (kind === "desglose") {
+      const b = report.breakdowns.find((x) => x.id === key);
+      const years = b ? breakdownYears(b, catalog) : [];
+      if (!b || !years.length) continue;
+      const at = settings.cut === ALL_YEARS && itemsAt(b, ALL_YEARS).length ? ALL_YEARS : years.includes(settings.cut) && itemsAt(b, settings.cut).length ? settings.cut : years.filter((y) => itemsAt(b, y).length).pop();
+      const lastTerm = at === undefined ? periodCutsOf(years).filter((p) => termItemsAt(b, p.year, p.term).length).pop() : undefined;
+      const items = at !== undefined ? itemsAt(b, at) : lastTerm ? termItemsAt(b, lastTerm.year, lastTerm.term) : [];
+      if (!items.length) continue;
+      const top = items.slice().sort((a, c) => (c.value ?? 0) - (a.value ?? 0))[0];
+      const parts = b.unit !== "%" && b.format !== "porcentaje";
+      const total = items.reduce((sum, i) => sum + (i.value ?? 0), 0);
+      const when = at === ALL_YEARS ? cutLabel(ALL_YEARS, null) : at !== undefined ? String(at) : lastTerm!.label;
+      list.push({
+        key: item.ref,
+        title: b.title,
+        value: figure(parts ? total : top.value, b.format),
+        unit: parts ? b.unit : `${b.unit} · ${top.label}`,
+        note: parts ? `${when} · mayor: ${top.label} (${formatValue(((top.value ?? 0) / (total || 1)) * 100, "decimal")} %)` : `${when} · la categoría más alta`,
+      });
+    } else if (kind === "tabla") {
+      const t = report.tables?.find((x) => x.id === key);
+      if (!t || !t.rows.length) continue;
+      list.push({ key: item.ref, title: t.title, value: formatCount(t.rows.length), unit: t.rows.length === 1 ? "registro" : "registros", note: t.description || "Detalle en el boletín completo" });
+    } else if (kind === "tuberia") {
+      const pl = (report.pipelines ?? (report.pipeline ? [report.pipeline] : [])).find((x) => x.id === key);
+      const cohorts = pl ? Array.from(new Set(pl.cohorts.map((c) => String(c.cohort)))) : [];
+      if (!pl || !cohorts.length) continue;
+      list.push({
+        key: item.ref,
+        title: pl.title,
+        value: formatCount(cohorts.length),
+        unit: cohorts.length === 1 ? "cohorte" : "cohortes",
+        note: cohorts.length > 1 ? `${cohorts[0]} a ${cohorts[cohorts.length - 1]} · ${pl.stages.length} etapas` : `${cohorts[0]} · ${pl.stages.length} etapas`,
+      });
+    }
+  }
+  return list;
 }
 
 function unitOf(indicator: Indicator) {
@@ -614,10 +1066,11 @@ function unitOf(indicator: Indicator) {
 }
 
 /** Lectura de la cifra del corte: variación frente al año anterior o cómo salió del periodo. */
-function readingOf(indicator: Indicator, settings: BulletinSettings, campusName: string): ReactNode {
+function readingOf(indicator: Indicator, catalog: OpenDataCatalog, settings: BulletinSettings, campusName: string): ReactNode {
   const { cut, campus } = settings;
-  const value = valueOf(indicator, cut, campus);
+  const { value, period } = figureAt(indicator, catalog, cut, campus);
   if (value === null) return "Sin reportar";
+  if (period) return `Periodo ${period.label}`;
   if (cut === ALL_YEARS) return periodBasisOf(indicator, campus) ?? "periodo completo";
   const previous = valueOf(indicator, cut - 1, campus);
   const change = changeBetween(indicator, value, previous);
@@ -630,7 +1083,13 @@ function readingOf(indicator: Indicator, settings: BulletinSettings, campusName:
   );
 }
 
-function ExecutiveSummary({ items, settings }: { items: { report: Report; indicators: Indicator[] }[]; settings: BulletinSettings }) {
+interface ExecutiveItem {
+  report: Report;
+  indicators: Indicator[];
+  sets: Highlight[];
+}
+
+function ExecutiveSummary({ items, catalog, settings }: { items: ExecutiveItem[]; catalog: OpenDataCatalog; settings: BulletinSettings }) {
   return (
     <section className="bol-summary">
       <h2>Resumen ejecutivo</h2>
@@ -638,7 +1097,7 @@ function ExecutiveSummary({ items, settings }: { items: { report: Report; indica
         Las cifras titulares de cada informe · {cutText(settings.cut)}. El detalle de cada una está en su capítulo.
       </p>
       <ol className="bol-summary__list">
-        {items.map(({ report, indicators }) => (
+        {items.map(({ report, indicators, sets }) => (
           <li key={report.slug} style={{ "--line": `var(--bol-line-${report.line})` } as CSSProperties}>
             <a className="bol-summary__report" href={`#cap-${report.slug}`}>
               <span className="bol-chapter__code">{report.code}</span>
@@ -646,17 +1105,29 @@ function ExecutiveSummary({ items, settings }: { items: { report: Report; indica
             </a>
             <dl>
               {indicators.slice(0, 3).map((indicator) => {
-                const v = valueOf(indicator, settings.cut, settings.campus);
+                const { value: v, period } = figureAt(indicator, catalog, settings.cut, settings.campus);
                 return (
                   <div key={indicator.id}>
                     <dt>{indicator.label}</dt>
                     <dd>
                       <b>{figure(v, indicator.format)}</b>
-                      <small>{v === null ? "sin reportar" : unitOf(indicator)}</small>
+                      <small>
+                        {v === null ? "sin reportar" : unitOf(indicator)}
+                        {period ? ` · ${period.label}` : ""}
+                      </small>
                     </dd>
                   </div>
                 );
               })}
+              {sets.slice(0, Math.max(0, 3 - indicators.length)).map((set) => (
+                <div key={set.key}>
+                  <dt>{set.title}</dt>
+                  <dd>
+                    <b>{set.value}</b>
+                    <small>{set.unit}</small>
+                  </dd>
+                </div>
+              ))}
             </dl>
           </li>
         ))}
@@ -665,9 +1136,11 @@ function ExecutiveSummary({ items, settings }: { items: { report: Report; indica
   );
 }
 
-function ExecutiveSheet({ report, indicators, catalog, settings }: { report: Report; indicators: Indicator[]; catalog: OpenDataCatalog; settings: BulletinSettings }) {
+function ExecutiveSheet({ item, catalog, settings }: { item: ExecutiveItem; catalog: OpenDataCatalog; settings: BulletinSettings }) {
+  const { report, indicators, sets } = item;
   const campusName = catalog.campuses.find((c) => c.id === settings.campus)?.name ?? "Todos los campus";
   const campuses = sites(catalog);
+  const count = indicators.length + sets.length;
   return (
     <section className="bol-exec" style={{ "--line": `var(--bol-line-${report.line})` } as CSSProperties}>
       <div className="bol-chapter__title">
@@ -678,49 +1151,80 @@ function ExecutiveSheet({ report, indicators, catalog, settings }: { report: Rep
         </div>
       </div>
       <p className="bol-chapter__meta">
-        {cutText(settings.cut)} · {campusName} · {indicators.length} {indicators.length === 1 ? "cifra clave" : "cifras clave"}
+        {cutText(settings.cut)} · {campusName} · {count} {count === 1 ? "cifra clave" : "cifras clave"}
       </p>
-      <ol className="bol-exec__rows">
-        {indicators.map((indicator) => {
-          const value = valueOf(indicator, settings.cut, settings.campus);
-          const years = yearsOf(catalog, indicator.years);
-          const split = campuses
-            .map((c) => ({ name: c.name, value: valueOf(indicator, settings.cut, c.id) }))
-            .filter((c) => c.value !== null);
-          return (
-            <li key={indicator.id}>
-              <div className="bol-exec__what">
-                <h3>{indicator.label}</h3>
-                <p>{indicator.definition}</p>
-                <small>Reporta: {indicator.source}</small>
+      {indicators.length > 0 && (
+        <ol className="bol-exec__rows">
+          {indicators.map((indicator) => {
+            const { value } = figureAt(indicator, catalog, settings.cut, settings.campus);
+            const years = yearsOf(catalog, indicator.years);
+            const byTerm = reportsByTerm(indicator);
+            const periods = byTerm ? periodCutsOf(years) : [];
+            const split = campuses
+              .map((c) => ({ name: c.name, value: figureAt(indicator, catalog, settings.cut, c.id).value }))
+              .filter((c) => c.value !== null);
+            return (
+              <li key={indicator.id}>
+                <div className="bol-exec__what">
+                  <h3>{indicator.label}</h3>
+                  <p>{indicator.definition}</p>
+                  <small>Reporta: {indicator.source}</small>
+                </div>
+                <div className="bol-exec__figure">
+                  <b>
+                    {figure(value, indicator.format)}
+                    {value !== null && unitOf(indicator) === "%" && <span> %</span>}
+                  </b>
+                  {value !== null && unitOf(indicator) !== "%" && <small>{indicator.unit}</small>}
+                  <p>{readingOf(indicator, catalog, settings, campusName)}</p>
+                  <TermsLine indicator={indicator} catalog={catalog} cut={settings.cut} campus={settings.campus} />
+                </div>
+                <div className="bol-exec__trend">
+                  {byTerm && (
+                    <div>
+                      <small>Por periodo</small>
+                      <Trend years={periods.map((p) => p.label)} values={periods.map((p) => valueOf(indicator, p.year, "todas", p.term))} format={indicator.format} height={15} />
+                    </div>
+                  )}
+                  <div>
+                    {byTerm && <small>Por año{indicator.annualRule ? ` · ${RULE_SHORT[indicator.annualRule]}` : ""}</small>}
+                    <Trend years={years} values={years.map((y) => valueOf(indicator, y, "todas"))} format={indicator.format} height={15} />
+                  </div>
+                </div>
+                <ul className="bol-exec__split">
+                  {split.length ? (
+                    split.map((c) => (
+                      <li key={c.name}>
+                        <span>{c.name}</span>
+                        <b>{figure(c.value, indicator.format)}</b>
+                      </li>
+                    ))
+                  ) : (
+                    <li className="bol-exec__institutional">Cifra institucional</li>
+                  )}
+                </ul>
+              </li>
+            );
+          })}
+        </ol>
+      )}
+      {sets.length > 0 && (
+        <>
+          {indicators.length > 0 && <p className="bol-exec__sets-title">Mapas, desgloses y tablas</p>}
+          <dl className="bol-exec__sets">
+            {sets.map((set) => (
+              <div key={set.key}>
+                <dt>{set.title}</dt>
+                <dd>
+                  <b>{set.value}</b>
+                  <small>{set.unit}</small>
+                  <p>{set.note}</p>
+                </dd>
               </div>
-              <div className="bol-exec__figure">
-                <b>
-                  {figure(value, indicator.format)}
-                  {value !== null && unitOf(indicator) === "%" && <span> %</span>}
-                </b>
-                {value !== null && unitOf(indicator) !== "%" && <small>{indicator.unit}</small>}
-                <p>{readingOf(indicator, settings, campusName)}</p>
-              </div>
-              <div className="bol-exec__trend">
-                <Trend years={years} values={years.map((y) => valueOf(indicator, y, "todas"))} format={indicator.format} />
-              </div>
-              <ul className="bol-exec__split">
-                {split.length ? (
-                  split.map((c) => (
-                    <li key={c.name}>
-                      <span>{c.name}</span>
-                      <b>{figure(c.value, indicator.format)}</b>
-                    </li>
-                  ))
-                ) : (
-                  <li className="bol-exec__institutional">Cifra institucional</li>
-                )}
-              </ul>
-            </li>
-          );
-        })}
-      </ol>
+            ))}
+          </dl>
+        </>
+      )}
     </section>
   );
 }
@@ -739,7 +1243,7 @@ export function compose(catalog: OpenDataCatalog, settings: BulletinSettings): C
   };
 
   const executive = settings.format === "ejecutivo";
-  const summaryItems: { report: Report; indicators: Indicator[] }[] = [];
+  const summaryItems: ExecutiveItem[] = [];
 
   for (const entry of settings.reports) {
     if (!entry.include || entry.removed) continue;
@@ -748,14 +1252,25 @@ export function compose(catalog: OpenDataCatalog, settings: BulletinSettings): C
 
     if (executive || settings.summary) {
       const headline = executiveIndicators(report, entry, catalog, executive ? 6 : 3);
-      if (headline.length) summaryItems.push({ report, indicators: headline });
+      // Los conjuntos completan la ficha; sin indicadores con datos, la llenan.
+      const sets = datasetHighlights(report, entry, catalog, settings, executive ? (headline.length >= 5 ? 2 : 4) : 3);
+      if (headline.length || sets.length) summaryItems.push({ report, indicators: headline, sets });
     }
 
     // Ejecutivo: una ficha por informe con sus cifras clave, sin hojas.
     if (executive) {
-      const key = summaryItems.find((item) => item.report.slug === report.slug)?.indicators ?? [];
-      if (!key.length) continue;
-      key.forEach((indicator) => credit(indicator.source, report));
+      const item = summaryItems.find((x) => x.report.slug === report.slug);
+      if (!item) continue;
+      item.indicators.forEach((indicator) => credit(indicator.source, report));
+      item.sets.forEach((set) => {
+        const source =
+          report.maps?.find((m) => `mapa:${m.id}` === set.key)?.source ??
+          report.histories?.find((h) => `historico:${h.id}` === set.key)?.source ??
+          report.breakdowns.find((b) => `desglose:${b.id}` === set.key)?.source ??
+          report.tables?.find((t) => `tabla:${t.id}` === set.key)?.source ??
+          (report.pipelines ?? []).find((p) => `tuberia:${p.id}` === set.key)?.source;
+        if (source) credit(source, report);
+      });
       chapters.push(report);
       units.push({
         key: `${report.slug}-ficha`,
@@ -763,7 +1278,7 @@ export function compose(catalog: OpenDataCatalog, settings: BulletinSettings): C
         report,
         title: report.name,
         breakBefore: true,
-        node: <ExecutiveSheet report={report} indicators={key} catalog={catalog} settings={settings} />,
+        node: <ExecutiveSheet item={item} catalog={catalog} settings={settings} />,
       });
       continue;
     }
@@ -837,7 +1352,7 @@ export function compose(catalog: OpenDataCatalog, settings: BulletinSettings): C
       kind: "resumen",
       title: "Resumen ejecutivo",
       breakBefore: true,
-      node: <ExecutiveSummary items={summaryItems.filter((item) => chapters.includes(item.report))} settings={settings} />,
+      node: <ExecutiveSummary items={summaryItems.filter((item) => chapters.includes(item.report))} catalog={catalog} settings={settings} />,
     });
   }
 

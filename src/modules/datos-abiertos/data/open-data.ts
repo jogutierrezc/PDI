@@ -10,7 +10,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { assembleCatalog, fetchOpenDataRows } from "./repository";
 import type { Breakdown, BreakdownItem, CampusId, Indicator, MapDataset, OpenDataCatalog, Report, Term, ValueFormat } from "./types";
-import { ALL_YEARS, ANNUAL_RULE_LABEL, annualBasis, setPeriodSpan, TERMS } from "./terms";
+import { ALL_YEARS, ANNUAL_RULE_LABEL, annualBasis, cutLabel, setPeriodSpan, TERMS } from "./terms";
 import { isWorldMap } from "./types";
 
 export const openDataKeys = {
@@ -149,14 +149,14 @@ export function hasTerms(indicator: Indicator): boolean {
   return Boolean(indicator.terms && indicator.annualRule);
 }
 
-/** Qué hay detrás de la cifra del corte, para el boleto: "A + B", "periodo B". */
+/** Qué hay detrás de la cifra del corte, para el boleto: "periodos 1 + 2", "periodo 2". */
 export function basisOf(indicator: Indicator, year: number, campus: CampusId, term?: Term | null): string | null {
   if (year === ALL_YEARS) return periodBasisOf(indicator, campus);
   if (term || !hasTerms(indicator) || valueOf(indicator, year, campus) === null) return null;
   return annualBasis(indicator.annualRule, indicator.annualFrom?.[year]?.[campus]);
 }
 
-/** Cortes en orden: años, o periodos A y B de cada año. */
+/** Cortes en orden: años, o periodos 1 y 2 de cada año. */
 export function cutsOf(years: number[], bySemester: boolean): { year: number; term: Term | null }[] {
   return bySemester ? years.flatMap((year) => TERMS.map((term) => ({ year, term }))) : years.map((year) => ({ year, term: null }));
 }
@@ -240,10 +240,10 @@ export function formatCutoff(iso: string): string {
 
 export function reportToCsv(report: Report, years: number[], campuses: { id: CampusId; name: string }[]): string {
   const escape = (text: string) => (/[;"\n]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text);
-  // Por año: el periodo A, el B y la cifra del año, en ese orden.
+  // Por año: el periodo 1, el 2 y la cifra del año, en ese orden.
   const cuts = years.flatMap((year) => [...TERMS.map((term) => ({ year, term })), { year, term: null as Term | null }]);
   const rows: string[] = [
-    ["Informe", "Indicador", "Unidad", "Campus", ...cuts.map((c) => (c.term ? `${c.year}-${c.term}` : `${c.year} (año)`)), "Cifra del año se calcula como", "Fuente"].join(";"),
+    ["Informe", "Indicador", "Unidad", "Campus", ...cuts.map((c) => (c.term ? cutLabel(c.year, c.term) : `${c.year} (año)`)), "Cifra del año se calcula como", "Fuente"].join(";"),
   ];
 
   for (const indicator of report.indicators) {

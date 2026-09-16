@@ -60,7 +60,7 @@ import type {
 } from "./types";
 import { ALL_CAMPUSES } from "./types";
 import type { Term, TermCampusValues } from "./types";
-import { annualFigure, TERMS } from "./terms";
+import { annualFigure, periodText, TERMS } from "./terms";
 
 export interface OpenDataRows {
   period: OdPeriod;
@@ -387,9 +387,10 @@ export function assembleCatalog(rows: OpenDataRows): OpenDataCatalog {
           .filter((v) => v.pipeline_id === p.id)
           .forEach((v) => {
             const campus = campusKey(v.campus_id);
-            const key = `${v.cohort}|${campus}`;
+            const key = `${periodText(v.cohort)}|${campus}`;
             const group = groups.get(key) ?? {
-              cohort: String(v.cohort),
+              // "2014-A" se muestra "2014-1": ver periodText.
+              cohort: periodText(v.cohort),
               campus,
               raw: Array.from({ length: stageCount }, () => null),
               mainCause: Array.from({ length: Math.max(0, stageCount - 1) }, () => ""),
@@ -444,7 +445,10 @@ export function assembleCatalog(rows: OpenDataRows): OpenDataCatalog {
       .filter((h) => h.report_id === report.id)
       .sort((a, b) => a.position - b.position)
       .map((h) => {
-        const list = rows.historyValues.filter((v) => v.history_id === h.id);
+        // Los periodos se guardan "2020-A"; en el portal y el boletín se leen "2020-1".
+        const list = rows.historyValues
+          .filter((v) => v.history_id === h.id)
+          .map((v) => ({ ...v, period_label: periodText(v.period_label) }));
         const periods = Array.from(new Set(list.map((v) => v.period_label))).sort();
         const categories = Array.from(
           new Map(

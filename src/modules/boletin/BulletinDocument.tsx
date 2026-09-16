@@ -159,8 +159,12 @@ export function BulletinDocument({ catalog, settings, report, fitWidth, onReady 
     // sigue en páginas con su propio encabezado.
     const introH = (measure.current.querySelector<HTMLElement>(":scope > [data-intro]")?.getBoundingClientRect().height ?? 0) / MM;
     const headH = (measure.current.querySelector<HTMLElement>(":scope > [data-toc-head]")?.getBoundingClientRect().height ?? 0) / MM;
+    // El alto de una fila cuenta su margen superior: capítulos, resumen y cierre
+    // se separan del anterior, y once filas de margen ya pisan el pie.
     const rowsOf = (selector: string) =>
-      Array.from(measure.current!.querySelectorAll<HTMLElement>(`:scope > ${selector} > [data-toc]`)).map((row) => row.getBoundingClientRect().height / MM);
+      Array.from(measure.current!.querySelectorAll<HTMLElement>(`:scope > ${selector} > [data-toc]`)).map(
+        (row) => (row.getBoundingClientRect().height + (parseFloat(getComputedStyle(row).marginTop) || 0)) / MM,
+      );
     // 5 mm: la separación entre el encabezado y la lista dentro de la sección.
     const LIST_GAP = 5;
     const packToc = (rowH: number[]) => {
@@ -282,8 +286,9 @@ export function BulletinDocument({ catalog, settings, report, fitWidth, onReady 
         </div>
       </dl>
       <p className="bol-intro__reading">
-        <b>Cómo leer las cifras.</b> Un guion (—) es un dato sin reportar, nunca un cero. Con todo el periodo, cada indicador muestra el
-        promedio anual de los años con dato; las existencias, como la matrícula, su último dato.
+        <b>Cómo leer las cifras.</b> Un guion (—) es un dato sin reportar, nunca un cero. Lo que se reporta por periodo académico se
+        muestra por periodo (2024-1, 2024-2) junto a la cifra del año, que sale de su regla: suma, promedio o último periodo. Con todo el
+        periodo, cada indicador muestra el promedio anual de los años con dato; las existencias, como la matrícula, su último dato.
       </p>
       <h2 id={anchored ? "contenido" : undefined}>Contenido</h2>
     </>

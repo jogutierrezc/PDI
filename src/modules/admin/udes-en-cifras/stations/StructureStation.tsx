@@ -279,7 +279,7 @@ function IndicatorsEditor({
     <Panel
       id="oda-indicadores"
       title={`Indicadores (${indicators.length})`}
-      description="Cada indicador dice cómo llega: por periodo (A y B, y la cifra del año sale de su regla) o con una sola cifra por año. El total institucional se suma de los campus o se captura aparte. Cada uno marca sus años con dato."
+      description="Cada indicador dice cómo llega: por periodo (1 y 2, y la cifra del año sale de su regla) o con una sola cifra por año. El total institucional se suma de los campus o se captura aparte. Cada uno marca sus años con dato."
       actions={
         <>
           <SaveState pending={save.isPending || remove.isPending} error={save.error ?? remove.error} success={save.isSuccess || remove.isSuccess} />
@@ -347,7 +347,7 @@ function IndicatorsEditor({
                 <td>{AGGREGATION_LABEL[indicator.aggregation]}</td>
                 <td>
                   {indicator.reporting === "anual" ? REPORTING_LABEL.anual : ANNUAL_RULE_LABEL[indicator.annual_rule]}
-                  <small>{indicator.reporting === "anual" ? "una cifra por año" : "periodos A y B"}</small>
+                  <small>{indicator.reporting === "anual" ? "una cifra por año" : "periodos 1 y 2"}</small>
                 </td>
                 <td>
                   {offices.find((o) => o.id === indicator.office_id)?.name ?? (
@@ -837,7 +837,7 @@ function DatasetForm({ kind, offices, years, initial, onSubmit, onCancel }: {
       </div>
       {kind === "tuberia" && (
         <p className="oda-form-note">
-          Cada tubería es un solo flujo de cohortes reportado junto (por ejemplo, 2014-A a 2023-B), que se indica en Captura,
+          Cada tubería es un solo flujo de cohortes reportado junto (por ejemplo, 2014-1 a 2023-2), que se indica en Captura,
           también si es anterior al periodo del informe. El portal la muestra como deserción acumulada en %. Los porcentajes
           admiten decimales: 12,5.
         </p>

@@ -1,9 +1,10 @@
 /* =============================================================================
-   Datos Abiertos · periodos académicos A y B.
+   Datos Abiertos · periodos académicos 1 y 2.
 
-   Cada año tiene dos periodos, A y B, y los indicadores se reportan por
-   periodo. La cifra del año no se guarda: sale de A y B según la regla anual
-   del indicador. Esta es la única implementación de esa regla; la usan el
+   Cada año tiene dos periodos académicos y los indicadores se reportan por
+   periodo. En la base se guardan como A y B; en pantalla y en papel se
+   numeran: 2024-1 y 2024-2 (ver termLabel y periodText). La cifra del año no
+   se guarda: sale de los dos periodos según la regla anual del indicador. Esta es la única implementación de esa regla; la usan el
    catálogo del portal y la rejilla de captura de la intranet, así que lo que
    Planeación ve al cargar es lo que el público ve al consultar.
    ========================================================================== */
@@ -11,21 +12,31 @@
 export type Term = "A" | "B";
 export const TERMS: Term[] = ["A", "B"];
 
+/** Número visible del periodo: A es el 1, B es el 2. */
+export const termLabel = (term: Term): string => (term === "A" ? "1" : "2");
+
+/**
+ * Rótulo visible de un periodo guardado como texto ("2020-A", "2014-B a
+ * 2023-A"): los periodos se numeran. Deja igual lo que no es un periodo.
+ */
+export const periodText = (text: string | number): string =>
+  String(text).replace(/\b(\d{4})-([AB])(?![A-Za-z0-9])/g, (_, year: string, term: Term) => `${year}-${termLabel(term)}`);
+
 export type AnnualRule = "suma" | "ultimo" | "promedio" | "reportado";
 
 export const ANNUAL_RULE_LABEL: Record<AnnualRule, string> = {
-  suma: "Suma de A y B",
+  suma: "Suma de los periodos 1 y 2",
   ultimo: "Último periodo reportado",
-  promedio: "Promedio de A y B",
+  promedio: "Promedio de los periodos 1 y 2",
   reportado: "Se reporta aparte",
 };
 
 /** Para qué sirve cada regla, en una línea (formulario del indicador). */
 export const ANNUAL_RULE_HINT: Record<AnnualRule, string> = {
   suma: "Flujos del año: graduados, admitidos, eventos.",
-  ultimo: "Existencias al cierre: matrícula, docentes, programas. Si falta B, se toma A.",
+  ultimo: "Existencias al cierre: matrícula, docentes, programas. Si falta el periodo 2, se toma el 1.",
   promedio: "Tasas y promedios: retención, deserción, relación estudiantes por docente.",
-  reportado: "La cifra del año no se deduce de A y B: se captura en su propia columna.",
+  reportado: "La cifra del año no se deduce de los periodos 1 y 2: se captura en su propia columna.",
 };
 
 export interface AnnualFigure {
@@ -54,7 +65,7 @@ export function annualFigure(rule: AnnualRule, a: number | null, b: number | nul
 
 /**
  * Un corte como número, para las gráficas que ordenan y eligen por número:
- * 2024 es el año; 20241 y 20242 son sus periodos A y B.
+ * 2024 es el año; 20241 y 20242 son sus periodos 1 y 2.
  */
 export function cutCode(year: number, term: Term | null | undefined): number {
   return term ? year * 10 + (term === "A" ? 1 : 2) : year;
@@ -82,10 +93,10 @@ export function setPeriodSpan(first: number, last: number) {
   periodSpan = first === last ? String(first) : `${first}–${last}`;
 }
 
-/** "2024", "2024-A" o, para todo el periodo, "2020–2025". */
+/** "2024", "2024-1" o, para todo el periodo, "2020–2025". */
 export function cutLabel(year: number, term: Term | null | undefined): string {
   if (year === ALL_YEARS) return periodSpan;
-  return term ? `${year}-${term}` : String(year);
+  return term ? `${year}-${termLabel(term)}` : String(year);
 }
 
 /** El corte anterior comparable: el año anterior, o el mismo periodo del año anterior. */
@@ -93,12 +104,12 @@ export function previousCutLabel(year: number, term: Term | null | undefined): s
   return cutLabel(year - 1, term);
 }
 
-/** Qué hay detrás de una cifra anual, dicho para el boleto: "A + B", "periodo B". */
+/** Qué hay detrás de una cifra anual, dicho para el boleto: "periodos 1 + 2", "periodo 2". */
 export function annualBasis(rule: AnnualRule | undefined, from: Term | undefined): string | null {
   if (!rule) return null;
-  if (rule === "suma") return "A + B";
-  if (rule === "promedio") return "promedio de A y B";
-  if (rule === "ultimo") return from ? `periodo ${from}` : null;
+  if (rule === "suma") return "periodos 1 + 2";
+  if (rule === "promedio") return "promedio de los periodos 1 y 2";
+  if (rule === "ultimo") return from ? `periodo ${termLabel(from)}` : null;
   return null;
 }
 
@@ -106,11 +117,11 @@ export function annualBasis(rule: AnnualRule | undefined, from: Term | undefined
 export type Reporting = "periodo" | "anual";
 
 export const REPORTING_LABEL: Record<Reporting, string> = {
-  periodo: "Por periodo (A y B)",
+  periodo: "Por periodo (1 y 2)",
   anual: "Por año",
 };
 
 export const REPORTING_HINT: Record<Reporting, string> = {
-  periodo: "Se capturan los periodos A y B; la cifra del año sale de la regla.",
-  anual: "Se captura una sola cifra por año, sin periodos A y B.",
+  periodo: "Se capturan los periodos 1 y 2; la cifra del año sale de la regla.",
+  anual: "Se captura una sola cifra por año, sin periodos 1 y 2.",
 };

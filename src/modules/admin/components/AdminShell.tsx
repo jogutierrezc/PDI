@@ -276,11 +276,11 @@ export function AdminShell({
 }
 
 /** Aviso reutilizable para quien solo puede leer. */
-export function ReadOnlyNotice() {
+export function ReadOnlyNotice({ children }: { children?: ReactNode }) {
   return (
     <p className="admin-readonly" role="note">
       <Icon name="lock" size={15} />
-      Tu rol permite consultar esta información, no modificarla.
+      {children ?? "Tu rol permite consultar esta información, no modificarla."}
     </p>
   );
 }

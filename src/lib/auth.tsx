@@ -104,7 +104,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
 
     const person = data && data.is_active ? (data as Profile) : null;
-    setProfile(person);
+    // Releer el perfil sin cambios no debe repintar toda la intranet.
+    setProfile((previous) => (JSON.stringify(previous) === JSON.stringify(person) ? previous : person));
 
     // El rol de acceso decide qué pantallas e informes se enseñan. Si no se
     // puede leer (base sin la migración 0024), la sesión sigue como antes.
@@ -116,14 +117,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       supabase.from("access_roles").select("*").eq("id", person.access_role_id).maybeSingle(),
       supabase.from("access_role_reports").select("report_slug").eq("access_role_id", person.access_role_id),
     ]);
-    setAccess(
-      role.data
-        ? {
-            role: role.data as AccessRole,
-            reports: (reports.data ?? []).map((row) => (row as { report_slug: string }).report_slug),
-          }
-        : null,
-    );
+    const next: AccessScope | null = role.data
+      ? {
+          role: role.data as AccessRole,
+          reports: (reports.data ?? []).map((row) => (row as { report_slug: string }).report_slug),
+        }
+      : null;
+    setAccess((previous) => (JSON.stringify(previous) === JSON.stringify(next) ? previous : next));
   }, []);
 
   useEffect(() => {
@@ -145,9 +145,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setLoading(false);
     });
 
+    // Un administrador puede cambiar el rol de alguien que ya tiene la intranet
+    // abierta. Al volver a la pestaña se relee el perfil, para que la nueva
+    // capacidad se aplique sin cerrar sesión.
+    const refresh = () => {
+      if (document.visibilityState !== "visible") return;
+      void supabase.auth.getSession().then(({ data }) => {
+        if (!cancelled && data.session) void loadProfile(data.session.user.id);
+      });
+    };
+    document.addEventListener("visibilitychange", refresh);
+
     return () => {
       cancelled = true;
       subscription.subscription.unsubscribe();
+      document.removeEventListener("visibilitychange", refresh);
     };
   }, [loadProfile]);
 

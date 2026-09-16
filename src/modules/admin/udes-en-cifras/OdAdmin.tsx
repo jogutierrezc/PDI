@@ -18,7 +18,7 @@ import type { CSSProperties } from "react";
 import { Link, NavLink, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { Icon } from "../../../components/ui/Icon";
 import { ErrorBlock, LoadingBlock } from "../../../components/ui/QueryState";
-import { useAuth } from "../../../lib/auth";
+import { roleLabels, useAuth } from "../../../lib/auth";
 import { AdminShell, ReadOnlyNotice } from "../components/AdminShell";
 import { BLOCK_LABELS } from "../../datos-abiertos/data/types";
 import type { Report } from "../../datos-abiertos/data/types";
@@ -68,7 +68,7 @@ export function OdAdmin() {
   const { station: stationParam, report: reportSlug } = useParams();
   const [params, setParams] = useSearchParams();
   const navigate = useNavigate();
-  const { hasRole, canSeeReport, canEditReport, canEditPeriod } = useAuth();
+  const { hasRole, canSeeReport, canEditReport, canEditPeriod, access, profile } = useAuth();
   // Un rol de área solo ve y escribe sus informes; lo común del periodo
   // (años, campus, informes nuevos) se le queda en lectura.
   const canEditAny = hasRole("planeacion");
@@ -159,7 +159,13 @@ export function OdAdmin() {
         </>
       }
     >
-      {!canEdit && <ReadOnlyNotice />}
+      {!canEdit && (
+        <ReadOnlyNotice>
+          {!canEditAny
+            ? `Tu rol${access ? ` «${access.role.name}»` : ""} tiene capacidad de ${roleLabels[profile?.role ?? "consulta"]}: consulta UDES en Cifras, no lo modifica. Para cargar y publicar informes, un administrador debe darle capacidad de Planeación en Usuarios y roles.`
+            : "Tu rol no tiene asignado este informe: lo consultas, no lo modificas."}
+        </ReadOnlyNotice>
+      )}
       {canEdit && !canManagePeriod && station === "periodo" && (
         <p className="oda-banner" role="note">
           <Icon name="alert" size={16} />

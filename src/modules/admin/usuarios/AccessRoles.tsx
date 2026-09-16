@@ -314,6 +314,11 @@ function AccessRoleForm({
             ))}
           </select>
           <small>{roleDescriptions[baseRole]}</small>
+          {(baseRole === "consulta" || baseRole === "responsable") && (allScreens || screens.includes("cifras")) && (
+            <small className="users-warning">
+              En UDES en Cifras esta capacidad solo consulta. Para cargar y publicar informes, elige Planeación.
+            </small>
+          )}
         </label>
 
         <fieldset className="admin-field">
@@ -360,6 +365,9 @@ function AccessRoleForm({
               <small>Los demás no aparecen en la intranet. El periodo queda en consulta.</small>
             </span>
           </label>
+          {!allReports && baseRole !== "admin" && picked.length === 0 && (
+            <small className="users-warning">Sin informes marcados, este rol no ve ni edita ningún informe.</small>
+          )}
           {!allReports && (
             <div className="users-screens">
               {reportOptions.length === 0 ? (

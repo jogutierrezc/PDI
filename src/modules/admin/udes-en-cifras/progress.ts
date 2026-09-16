@@ -10,7 +10,7 @@ import type { OdPublicationRow } from "../../../types/database";
 import type { OpenDataRows } from "../../datos-abiertos/data/repository";
 import type { Report } from "../../datos-abiertos/data/types";
 
-export type StationId = "periodo" | "estructura" | "captura" | "diseno" | "publicacion";
+export type StationId = "periodo" | "estructura" | "captura" | "diseno" | "publicacion" | "boletin";
 
 export const STATIONS: { id: StationId; number: number; label: string; hint: string }[] = [
   { id: "periodo", number: 1, label: "Periodo y campus", hint: "Años, corte, campus y oficinas" },
@@ -18,6 +18,7 @@ export const STATIONS: { id: StationId; number: number; label: string; hint: str
   { id: "captura", number: 3, label: "Captura", hint: "Cifras por año y campus" },
   { id: "diseno", number: 4, label: "Diseño visual", hint: "Orden y gráficas de cada ficha" },
   { id: "publicacion", number: 5, label: "Publicación", hint: "Revisar cambios y publicar" },
+  { id: "boletin", number: 6, label: "Boletín", hint: "Documento A4 en PDF con las cifras" },
 ];
 
 export type MarkState = "ok" | "pendiente" | "vacio";

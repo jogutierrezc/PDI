@@ -23,6 +23,7 @@ import type {
   OdDirection,
   OdIndicatorRow,
   OdMapMode,
+  OdMapReporting,
   OdPipelineMeasure,
   OdValueFormat,
 } from "../../../../types/database";
@@ -554,7 +555,7 @@ function DatasetsEditor({ data, reportId, years, canEdit }: { data: StationProps
     const base = { report_id: reportId, office_id: f.office_id || null };
     if (kind === "desglose") saveBreakdown.mutate({ ...base, key: uniqueKey(f.title, breakdowns.map((b) => b.key)), title: f.title, unit: f.unit, format: f.format, default_chart: f.chart, years: f.years, position: breakdowns.length + 1 }, done);
     if (kind === "calor") saveHeatmap.mutate({ ...base, key: uniqueKey(f.title, heatmaps.map((h) => h.key)), title: f.title, description: f.description, unit: f.unit, format: f.format, row_label: f.rowLabel, column_label: f.columnLabel, rows: lines(f.rows), columns: lines(f.columns), position: heatmaps.length + 1 }, done);
-    if (kind === "mapa") saveMap.mutate({ ...base, key: uniqueKey(f.title, maps.map((m) => m.key)), title: f.title, description: f.description, unit: f.unit, mode: f.mode, years: f.years, position: maps.length + 1 }, done);
+    if (kind === "mapa") saveMap.mutate({ ...base, key: uniqueKey(f.title, maps.map((m) => m.key)), title: f.title, description: f.description, unit: f.unit, mode: f.mode, reporting: reportingFor(f), years: reportingFor(f) === "global" ? null : f.years, position: maps.length + 1 }, done);
     if (kind === "tuberia") savePipeline.mutate({ ...base, key: uniqueKey(f.title, pipelines.map((p) => p.key)), title: f.title, description: f.description, measure: f.measure, stages: lines(f.rows), position: pipelines.length + 1 }, done);
     if (kind === "historico") saveHistory.mutate({ ...base, key: uniqueKey(f.title, histories.map((h) => h.key)), title: f.title, description: f.description, unit: f.unit, format: f.format, total_label: f.totalLabel || "Total", position: histories.length + 1 }, done);
   };
@@ -586,6 +587,7 @@ function DatasetsEditor({ data, reportId, years, canEdit }: { data: StationProps
               <option value="mapa">Mapa por departamento</option>
               <option value="mapa:entrante">Mapa de movilidad entrante (país → campus)</option>
               <option value="mapa:saliente">Mapa de movilidad saliente (campus → país)</option>
+              <option value="mapa:convenios">Mapa de convenios internacionales por país (mapa de calor)</option>
             </select>
           </label>
         </>
@@ -597,7 +599,13 @@ function DatasetsEditor({ data, reportId, years, canEdit }: { data: StationProps
           kind={adding}
           offices={offices}
           years={years}
-          initial={adding === "mapa" ? { mode: addingMode, unit: addingMode === "origen" ? "" : "participantes" } : undefined}
+          initial={
+            adding === "mapa"
+              ? addingMode === "convenios"
+                ? { mode: addingMode, unit: "convenios", reporting: "global" }
+                : { mode: addingMode, unit: addingMode === "origen" ? "" : "participantes" }
+              : undefined
+          }
           onCancel={() => setAdding(null)}
           onSubmit={(f) => create(adding, f)}
         />
@@ -635,10 +643,10 @@ function DatasetsEditor({ data, reportId, years, canEdit }: { data: StationProps
           </DatasetItem>
         ))}
         {maps.map((m) => (
-          <DatasetItem key={m.id} kind="Mapa" title={m.title} detail={`${MAP_MODE_DETAIL[m.mode]} · ${m.unit} · ${yearsDetail(m.years)}`} canEdit={canEdit}
+          <DatasetItem key={m.id} kind="Mapa" title={m.title} detail={`${MAP_MODE_DETAIL[m.mode]} · ${m.unit} · ${m.reporting === "global" ? "dato global, sin año" : yearsDetail(m.years)}`} canEdit={canEdit}
             editing={editing === m.id} onEdit={() => setEditing(m.id)} onDelete={() => remove.mutate({ table: "od_maps", id: m.id })}>
-            <DatasetForm kind="mapa" offices={offices} years={years} initial={{ title: m.title, description: m.description, unit: m.unit, mode: m.mode, years: m.years, office_id: m.office_id ?? "" }}
-              onCancel={() => setEditing(null)} onSubmit={(f) => saveMap.mutate({ id: m.id, report_id: reportId, title: f.title, description: f.description, unit: f.unit, mode: f.mode, years: f.years, office_id: f.office_id || null }, done)} />
+            <DatasetForm kind="mapa" offices={offices} years={years} initial={{ title: m.title, description: m.description, unit: m.unit, mode: m.mode, reporting: m.reporting ?? "anual", years: m.years, office_id: m.office_id ?? "" }}
+              onCancel={() => setEditing(null)} onSubmit={(f) => saveMap.mutate({ id: m.id, report_id: reportId, title: f.title, description: f.description, unit: f.unit, mode: f.mode, reporting: reportingFor(f), years: reportingFor(f) === "global" ? null : f.years, office_id: f.office_id || null }, done)} />
           </DatasetItem>
         ))}
         {total === 0 && !adding && (
@@ -668,17 +676,22 @@ function DatasetItem({ kind, title, detail, canEdit, editing, onEdit, onDelete, 
   );
 }
 
-const WORLD_MODES: OdMapMode[] = ["entrante", "saliente"];
+const WORLD_MODES: OdMapMode[] = ["entrante", "saliente", "convenios"];
+
+/** Solo los convenios pueden ser un dato global; los demás mapas van por año. */
+const reportingFor = (f: { mode: OdMapMode; reporting: OdMapReporting }): OdMapReporting =>
+  f.mode === "convenios" ? f.reporting : "anual";
 
 const MAP_MODE_DETAIL: Record<OdMapMode, string> = {
   origen: "origen con flujos",
   cobertura: "cobertura",
   entrante: "movilidad entrante por país",
   saliente: "movilidad saliente por país",
+  convenios: "convenios por país (mapa de calor)",
 };
 
 interface DatasetFields {
-  title: string; description: string; unit: string; format: OdValueFormat; chart: OdChartKind; mode: OdMapMode;
+  title: string; description: string; unit: string; format: OdValueFormat; chart: OdChartKind; mode: OdMapMode; reporting: OdMapReporting;
   rowLabel: string; columnLabel: string; rows: string; columns: string; office_id: string;
   measure: OdPipelineMeasure; totalLabel: string; years: number[] | null;
 }
@@ -692,7 +705,7 @@ function DatasetForm({ kind, offices, years, initial, onSubmit, onCancel }: {
   onCancel: () => void;
 }) {
   const [f, setF] = useState<DatasetFields>({
-    title: "", description: "", unit: kind === "historico" ? "estudiantes" : "", format: "entero", chart: "circular", mode: "origen",
+    title: "", description: "", unit: kind === "historico" ? "estudiantes" : "", format: "entero", chart: "circular", mode: "origen", reporting: "anual",
     rowLabel: "", columnLabel: "", rows: kind === "tuberia" ? "Ingreso\n2.º semestre\n4.º semestre\n6.º semestre\n8.º semestre\n10.º semestre\nGrado" : "", columns: "", office_id: "",
     measure: "estudiantes", totalLabel: kind === "historico" ? "Total" : "", years: null,
     ...initial,
@@ -750,6 +763,7 @@ function DatasetForm({ kind, offices, years, initial, onSubmit, onCancel }: {
                 <>
                   <option value="entrante">Movilidad entrante: del país de origen al campus</option>
                   <option value="saliente">Movilidad saliente: del campus al país de destino</option>
+                  <option value="convenios">Convenios: mapa de calor por país, sin rutas</option>
                 </>
               ) : (
                 <>
@@ -758,6 +772,20 @@ function DatasetForm({ kind, offices, years, initial, onSubmit, onCancel }: {
                 </>
               )}
             </select>
+          </label>
+        )}
+        {kind === "mapa" && f.mode === "convenios" && (
+          <label className="admin-field">
+            <span>Cómo se registra</span>
+            <select value={f.reporting} onChange={(e) => set({ reporting: e.target.value as OdMapReporting })}>
+              <option value="global">Dato global: una sola cifra por país, sin año</option>
+              <option value="anual">Por año: convenios inscritos cada año (en "Todos" se suman)</option>
+            </select>
+            {initial?.reporting && initial.reporting !== f.reporting && (
+              <small className="oda-field-warning">
+                Las cifras ya cargadas {initial.reporting === "global" ? "como dato global" : "por año"} dejan de verse; quedan guardadas por si vuelves a la forma anterior.
+              </small>
+            )}
           </label>
         )}
         {kind === "calor" && (
@@ -794,7 +822,7 @@ function DatasetForm({ kind, offices, years, initial, onSubmit, onCancel }: {
             </label>
           </>
         )}
-        {(kind === "desglose" || kind === "mapa") && (
+        {(kind === "desglose" || (kind === "mapa" && reportingFor(f) === "anual")) && (
           <div className="admin-field--wide">
             <YearPicker years={years} value={f.years} onChange={(next) => set({ years: next })} />
           </div>

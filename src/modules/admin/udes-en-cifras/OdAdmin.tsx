@@ -2,7 +2,8 @@
    Intranet · UDES en Cifras — estaciones del periodo.
 
    El periodo avanza por cinco estaciones fijas: Periodo y campus, Estructura
-   y KPI, Captura, Diseño visual y Publicación. La barra de arriba dice cuánto
+   y KPI, Captura, Diseño visual y Publicación. La sexta, Boletín, arma con
+   todo eso el documento A4 en PDF. La barra de arriba dice cuánto
    le falta a cada una; la lista de la izquierda marca cada informe en cada
    estación; a la derecha, la tira de vista previa muestra cómo quedará la
    ficha pública. Donde la estación necesita el ancho (Captura) o la pantalla
@@ -31,6 +32,8 @@ import { StructureStation } from "./stations/StructureStation";
 import { CaptureStation } from "./stations/CaptureStation";
 import { DesignStation } from "./stations/DesignStation";
 import { PublishStation } from "./stations/PublishStation";
+import { BulletinStation } from "./stations/BulletinStation";
+import { useBulletins } from "../../boletin/data";
 import "./od-admin.css";
 
 export interface StationProps {
@@ -76,6 +79,7 @@ export function OdAdmin() {
   const periodId = params.get("periodo") ?? periods.data?.find((p) => p.is_current)?.id ?? periods.data?.[0]?.id;
   const admin = useOdAdminData(periodId);
   const publications = useOdPublications(periodId);
+  const bulletins = useBulletins(periodId);
 
   const full = admin.data ?? undefined;
   // La lista de informes que esta persona puede ver. Los ajenos no se enseñan:
@@ -173,7 +177,13 @@ export function OdAdmin() {
         <FirstPeriod canEdit={canEdit} />
       ) : (
         <>
-          <StationBar station={station} data={data} progress={progress} hrefFor={hrefFor} />
+          <StationBar
+            station={station}
+            data={data}
+            progress={progress}
+            hrefFor={hrefFor}
+            bulletins={{ total: bulletins.data?.bulletins.length ?? 0, live: bulletins.data?.bulletins.filter((b) => b.status === "publicado").length ?? 0, editions: bulletins.data?.editions.length ?? 0 }}
+          />
 
           <div className="oda-workspace" data-station={station}>
             <ReportRail
@@ -201,6 +211,9 @@ export function OdAdmin() {
               )}
               {station === "publicacion" && (
                 <PublishStation data={data} report={report} periodId={periodId} canEdit={canEdit} progress={progress} />
+              )}
+              {station === "boletin" && (
+                <BulletinStation data={data} report={report} periodId={periodId} canEdit={canEdit} progress={progress} />
               )}
             </section>
 
@@ -232,11 +245,13 @@ function StationBar({
   data,
   progress,
   hrefFor,
+  bulletins,
 }: {
   station: StationId;
   data: AdminData;
   progress: Map<string, ReportProgress>;
   hrefFor: (station: StationId) => string;
+  bulletins: { total: number; live: number; editions: number };
 }) {
   const reports = Array.from(progress.values());
   const total = reports.length || 1;
@@ -270,6 +285,11 @@ function StationBar({
       value: `${reports.filter((p) => p.publicacion.status === "publicado").length} de ${total}`,
       state: reports.every((p) => p.publicacion.state === "ok") ? "ok" : reports.some((p) => p.publicacion.status === "publicado") ? "pendiente" : "vacio",
       detail: data.rows.period.status === "publicado" ? "periodo publicado" : "periodo en borrador",
+    },
+    boletin: {
+      value: bulletins.total ? `${bulletins.total} ${bulletins.total === 1 ? "boletín" : "boletines"}` : "Sin crear",
+      state: bulletins.total === 0 ? "vacio" : bulletins.live > 0 || bulletins.editions > 0 ? "ok" : "pendiente",
+      detail: `${bulletins.live} en vivo · ${bulletins.editions} ${bulletins.editions === 1 ? "edición" : "ediciones"} en PDF`,
     },
   };
 

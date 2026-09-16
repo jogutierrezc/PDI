@@ -9,8 +9,9 @@
 
 import { useQuery } from "@tanstack/react-query";
 import { assembleCatalog, fetchOpenDataRows } from "./repository";
-import type { CampusId, Indicator, OpenDataCatalog, Report, Term, ValueFormat } from "./types";
-import { ANNUAL_RULE_LABEL, annualBasis, TERMS } from "./terms";
+import type { Breakdown, BreakdownItem, CampusId, Indicator, MapDataset, OpenDataCatalog, Report, Term, ValueFormat } from "./types";
+import { ALL_YEARS, ANNUAL_RULE_LABEL, annualBasis, setPeriodSpan, TERMS } from "./terms";
+import { isWorldMap } from "./types";
 
 export const openDataKeys = {
   all: ["datos-abiertos"] as const,
@@ -28,7 +29,7 @@ export function useOpenDataCatalog() {
     queryKey: openDataKeys.catalog(preview),
     queryFn: async (): Promise<OpenDataCatalog | null> => {
       const rows = await fetchOpenDataRows({ includeDrafts: preview });
-      return rows ? assembleCatalog(rows) : null;
+      return rows ? withPeriodView(assembleCatalog(rows)) : null;
     },
   });
 }
@@ -37,8 +38,107 @@ export function findReport(data: OpenDataCatalog, slug: string | undefined): Rep
   return data.reports.find((report) => report.slug === slug);
 }
 
-/** Cifra de un corte: el año (sin periodo) o un periodo académico del año. */
+/* --- Todo el periodo ---------------------------------------------------------
+   Las cifras de todos los años se agrupan en el corte ALL_YEARS con promedios,
+   no sumas: sumar matrícula o tasas de seis años daría cifras falsas, y el
+   promedio conserva la forma de los datos (el reparto entre campus, países o
+   categorías es el mismo que el de la suma).
+   · Indicadores con regla "último periodo" (existencias: matrícula, docentes):
+     la cifra del último año con dato, porque promediar existencias no dice nada
+     que el último corte no diga mejor.
+   · Los demás indicadores, los desgloses y los mapas por departamento: promedio
+     anual de los años con dato. Un año sin reportar no cuenta como cero.
+   · Los mapas del mundo (movilidad y convenios por año): total del periodo.
+     Cada participante es un viaje distinto y cada convenio inscrito en un año
+     es uno nuevo, así que sumar los años no repite a nadie.
+   · Un mapa de dato global no tiene años: su cifra ya es la del periodo. */
+
+const average = (list: number[]) => list.reduce((a, b) => a + b, 0) / list.length;
+
+function groupIndicator(indicator: Indicator, years: number[]): Indicator {
+  const own = indicator.years ? years.filter((y) => indicator.years!.includes(y)) : years;
+  const campuses = new Set(own.flatMap((y) => Object.keys(indicator.values[y] ?? {})));
+  const values: Partial<Record<CampusId, number | null>> = {};
+  const basis: Partial<Record<CampusId, string>> = {};
+  for (const campus of campuses) {
+    const reported = own
+      .map((y) => ({ year: y, value: indicator.values[y]?.[campus] }))
+      .filter((p): p is { year: number; value: number } => p.value !== null && p.value !== undefined);
+    if (!reported.length) continue;
+    if (indicator.annualRule === "ultimo") {
+      const last = reported[reported.length - 1];
+      values[campus] = last.value;
+      basis[campus] = `último dato: ${last.year}`;
+    } else {
+      values[campus] = average(reported.map((p) => p.value));
+      basis[campus] = reported.length === 1 ? `solo ${reported[0].year}` : `promedio anual de ${reported.length} años`;
+    }
+  }
+  return { ...indicator, values: { ...indicator.values, [ALL_YEARS]: values }, periodBasis: basis };
+}
+
+function groupBreakdown(breakdown: Breakdown, years: number[]): Breakdown {
+  const own = (breakdown.years ? years.filter((y) => breakdown.years!.includes(y)) : years).filter((y) =>
+    (breakdown.values[y] ?? []).some((item) => item.value !== null),
+  );
+  if (!own.length) return breakdown;
+  const labels = Array.from(new Set(own.flatMap((y) => breakdown.values[y]!.map((item) => item.label))));
+  const items: BreakdownItem[] = labels.map((label) => {
+    const reported = own
+      .map((y) => breakdown.values[y]!.find((item) => item.label === label)?.value)
+      .filter((v): v is number => v !== null && v !== undefined);
+    return { label, value: reported.length ? average(reported) : null };
+  });
+  return { ...breakdown, values: { ...breakdown.values, [ALL_YEARS]: items } };
+}
+
+function groupMap(map: MapDataset, years: number[]): MapDataset {
+  // Un dato global ya viene en la clave ALL_YEARS: no hay años que agrupar.
+  if (map.reporting === "global") return map;
+  const own = (map.years ? years.filter((y) => map.years!.includes(y)) : years).filter((y) =>
+    Object.values(map.values[y] ?? {}).some((codes) => codes && Object.keys(codes).length > 0),
+  );
+  if (!own.length) return map;
+  // Movilidad: suma de los años. Por departamento: promedio sobre los años con
+  // dato del mapa, así un departamento que solo aparece un año pesa lo que pesó
+  // ese año dividido entre todos.
+  const divisor = isWorldMap(map.mode) ? 1 : own.length;
+  const grouped: Partial<Record<CampusId, Record<string, number>>> = {};
+  for (const y of own) {
+    for (const [campus, codes] of Object.entries(map.values[y] ?? {})) {
+      const target = (grouped[campus] ??= {});
+      for (const [code, value] of Object.entries(codes ?? {})) target[code] = (target[code] ?? 0) + value / divisor;
+    }
+  }
+  return { ...map, values: { ...map.values, [ALL_YEARS]: grouped } };
+}
+
+/** Añade al catálogo el corte "todo el periodo" (ALL_YEARS) con las cifras agrupadas. */
+export function withPeriodView(catalog: OpenDataCatalog): OpenDataCatalog {
+  const years = catalog.years;
+  if (years.length) setPeriodSpan(years[0], years[years.length - 1]);
+  return {
+    ...catalog,
+    reports: catalog.reports.map((report) => ({
+      ...report,
+      indicators: report.indicators.map((i) => groupIndicator(i, years)),
+      breakdowns: report.breakdowns.map((b) => groupBreakdown(b, years)),
+      maps: report.maps?.map((m) => groupMap(m, years)),
+    })),
+  };
+}
+
+/** Cómo salió la cifra de todo el periodo: "promedio anual de 6 años", "último dato: 2025". */
+export function periodBasisOf(indicator: Indicator, campus: CampusId): string | null {
+  return indicator.periodBasis?.[campus] ?? null;
+}
+
+/** Cifra de un corte: el año (sin periodo), un periodo académico del año o todo el periodo. */
 export function valueOf(indicator: Indicator, year: number, campus: CampusId, term?: Term | null): number | null {
+  if (year === ALL_YEARS) {
+    const value = indicator.values[ALL_YEARS]?.[campus];
+    return value === undefined ? null : value;
+  }
   if (indicator.years && !indicator.years.includes(year)) return null;
   const value = term ? indicator.terms?.[year]?.[term]?.[campus] : indicator.values[year]?.[campus];
   return value === undefined ? null : value;
@@ -51,6 +151,7 @@ export function hasTerms(indicator: Indicator): boolean {
 
 /** Qué hay detrás de la cifra del corte, para el boleto: "A + B", "periodo B". */
 export function basisOf(indicator: Indicator, year: number, campus: CampusId, term?: Term | null): string | null {
+  if (year === ALL_YEARS) return periodBasisOf(indicator, campus);
   if (term || !hasTerms(indicator) || valueOf(indicator, year, campus) === null) return null;
   return annualBasis(indicator.annualRule, indicator.annualFrom?.[year]?.[campus]);
 }
@@ -77,6 +178,16 @@ export function formatValue(value: number | null, format: ValueFormat): string {
   if (value === null) return "—";
   if (format === "entero") return integer.format(value);
   return oneDecimal.format(value);
+}
+
+/**
+ * Conteo de personas que puede venir promediado (todo el periodo): entero si lo
+ * es o si es grande; si no, un decimal, para que 0,3 participantes al año no
+ * se lea como cero.
+ */
+export function formatCount(value: number | null): string {
+  if (value === null) return "—";
+  return Number.isInteger(value) || Math.abs(value) >= 100 ? integer.format(value) : oneDecimal.format(value);
 }
 
 /** Cifra con su unidad, para lectores de pantalla y tooltips. */

@@ -1,9 +1,11 @@
 /* =============================================================================
-   Captura · mapas de movilidad internacional (entrante y saliente).
+   Captura · mapas del mundo: movilidad (entrante y saliente) y convenios.
 
    Lo mismo que un mapa por departamento, pero la fila es el país: país de
-   origen en entrante, país de destino en saliente. Cada casilla es el número
-   de participantes de ese país en un campus y un año.
+   origen en entrante, país de destino en saliente, país del convenio en
+   convenios. Cada casilla es la cifra de ese país en un campus y un año; un
+   mapa de convenios registrado como dato global no tiene año (se guarda con
+   year = 0) y la rejilla no pide corte.
 
    Hay 235 países posibles, así que la rejilla solo muestra los que ya tienen
    cifras en este mapa (en cualquier año) y los que se añaden con el buscador.
@@ -52,6 +54,36 @@ export function findCountry(text: string): string | null {
   return BY_NAME.get(normalize(text)) ?? null;
 }
 
+/** Textos de cada tipo de mapa del mundo. */
+const COPY: Record<"entrante" | "saliente" | "convenios", {
+  title: string; description: string; flow: string; row: string; add: string; amount: string;
+}> = {
+  entrante: {
+    title: "Movilidad entrante por país",
+    description: "Participantes que llegan de otro país a cada campus: una fila por país de origen, una columna por campus. Una casilla vacía quita el país del mapa.",
+    flow: "país de origen → campus",
+    row: "País de origen",
+    add: "Añadir país de origen",
+    amount: "participantes",
+  },
+  saliente: {
+    title: "Movilidad saliente por país",
+    description: "Participantes que salen de cada campus a otro país: una fila por país de destino, una columna por campus. Una casilla vacía quita el país del mapa.",
+    flow: "campus → país de destino",
+    row: "País de destino",
+    add: "Añadir país de destino",
+    amount: "participantes",
+  },
+  convenios: {
+    title: "Convenios internacionales por país",
+    description: "Número de convenios con cada país: una fila por país, una columna por campus que firma. Una casilla vacía quita el país del mapa.",
+    flow: "mapa de calor por país",
+    row: "País",
+    add: "Añadir país",
+    amount: "convenios",
+  },
+};
+
 export function MobilityCapture({ data, report, periodId, canEdit, maps, map, onPickMap }: StationProps & {
   maps: OdMapRow[];
   map: OdMapRow;
@@ -59,7 +91,9 @@ export function MobilityCapture({ data, report, periodId, canEdit, maps, map, on
 }) {
   const years = map.years && map.years.length ? data.catalog.years.filter((y) => map.years!.includes(y)) : data.catalog.years;
   const [pickedYear, setYear] = useState<number | null>(null);
-  const year = pickedYear !== null && years.includes(pickedYear) ? pickedYear : years[years.length - 1];
+  // Dato global: una sola cifra por país, guardada con year = 0.
+  const global = map.reporting === "global";
+  const year = global ? 0 : pickedYear !== null && years.includes(pickedYear) ? pickedYear : years[years.length - 1];
   const save = useSaveMapValues();
   const saveMap = useSaveMap();
   const [draft, setDraft] = useState<Record<CellKey, number | null>>({});
@@ -69,10 +103,11 @@ export function MobilityCapture({ data, report, periodId, canEdit, maps, map, on
   const [pasting, setPasting] = useState(false);
   const [pasted, setPasted] = useState("");
   const [problems, setProblems] = useState<string[]>([]);
-  const incoming = map.mode === "entrante";
+  const copy = COPY[map.mode as keyof typeof COPY] ?? COPY.entrante;
 
   const campuses = data.rows.campuses;
-  const allValues = data.rows.mapValues.filter((v) => v.map_id === map.id);
+  // Solo las cifras de la forma de registro vigente (global o por año).
+  const allValues = data.rows.mapValues.filter((v) => v.map_id === map.id && (global ? v.year === 0 : v.year !== 0));
   const values = allValues.filter((v) => v.year === year);
   const stored = (country: string, campus: string) => {
     const v = values.find((x) => x.department_code === country && x.campus_id === campus);
@@ -126,7 +161,7 @@ export function MobilityCapture({ data, report, periodId, canEdit, maps, map, on
       if (!country) return issues.push(`Fila ${index + 1}: no se reconoce el país "${countryText}".`);
       if (country === "COL") return issues.push(`Fila ${index + 1}: Colombia no es movilidad internacional.`);
       if (!campus) return issues.push(`Fila ${index + 1}: no se reconoce el campus "${campusText}".`);
-      if (!amount.ok || amount.value === null) return issues.push(`Fila ${index + 1}: "${amountText ?? ""}" no es un número de participantes.`);
+      if (!amount.ok || amount.value === null) return issues.push(`Fila ${index + 1}: "${amountText ?? ""}" no es un número de ${copy.amount}.`);
       const key = cellKey(country, campus.campus_id);
       sums[key] = (sums[key] ?? 0) + amount.value;
     });
@@ -142,12 +177,8 @@ export function MobilityCapture({ data, report, periodId, canEdit, maps, map, on
   return (
     <Panel
       id="oda-mapas"
-      title={incoming ? "Movilidad entrante por país" : "Movilidad saliente por país"}
-      description={
-        incoming
-          ? "Participantes que llegan de otro país a cada campus: una fila por país de origen, una columna por campus. Una casilla vacía quita el país del mapa."
-          : "Participantes que salen de cada campus a otro país: una fila por país de destino, una columna por campus. Una casilla vacía quita el país del mapa."
-      }
+      title={copy.title}
+      description={copy.description}
       actions={
         <>
           {maps.length > 1 && (
@@ -158,12 +189,14 @@ export function MobilityCapture({ data, report, periodId, canEdit, maps, map, on
               </select>
             </label>
           )}
-          <label className="oda-add-select">
-            <span className="sr-only">Año</span>
-            <select value={year} onChange={(e) => { setYear(Number(e.target.value)); reset(); }}>
-              {years.map((y) => <option key={y} value={y}>{y}</option>)}
-            </select>
-          </label>
+          {!global && (
+            <label className="oda-add-select">
+              <span className="sr-only">Año</span>
+              <select value={year} onChange={(e) => { setYear(Number(e.target.value)); reset(); }}>
+                {years.map((y) => <option key={y} value={y}>{y}</option>)}
+              </select>
+            </label>
+          )}
           <SaveState pending={save.isPending} error={save.error} success={save.isSuccess} />
           <button
             type="button"
@@ -192,14 +225,14 @@ export function MobilityCapture({ data, report, periodId, canEdit, maps, map, on
       }
     >
       <p className="oda-panel__lede">
-        <strong>{map.title}</strong> · corte {year} · {map.unit || "participantes"} · {incoming ? "país de origen → campus" : "campus → país de destino"}
+        <strong>{map.title}</strong> · {global ? "dato global, sin año" : `corte ${year}`} · {map.unit || copy.amount} · {copy.flow}
       </p>
-      <YearPicker
+      {!global && <YearPicker
         years={data.catalog.years}
         value={map.years}
         disabled={!canEdit || saveMap.isPending}
         onChange={(next) => saveMap.mutate({ id: map.id, report_id: map.report_id, years: next })}
-      />
+      />}
 
       {canEdit && (
         <div className="oda-mobility-tools">
@@ -211,7 +244,7 @@ export function MobilityCapture({ data, report, periodId, canEdit, maps, map, on
             }}
           >
             <label className="admin-field">
-              <span>{incoming ? "Añadir país de origen" : "Añadir país de destino"}</span>
+              <span>{copy.add}</span>
               <input
                 list={`oda-countries-${map.id}`}
                 value={search}
@@ -238,7 +271,7 @@ export function MobilityCapture({ data, report, periodId, canEdit, maps, map, on
         <div className="oda-inline-form">
           <label className="admin-field admin-field--wide">
             <span>
-              Filas copiadas de Excel <small>{incoming ? "País de origen" : "País de destino"} · Campus · No. de participantes. Las filas repetidas se suman.</small>
+              Filas copiadas de Excel <small>{copy.row} · Campus · No. de {copy.amount}. Las filas repetidas se suman.</small>
             </span>
             <textarea
               rows={6}
@@ -264,8 +297,8 @@ export function MobilityCapture({ data, report, periodId, canEdit, maps, map, on
         <p className="oda-muted">Todavía no hay países en este mapa. Añade uno con el buscador o pega la lista desde Excel.</p>
       ) : (
         <DataGrid
-          label={`${map.title}, ${year}`}
-          rowHeader={incoming ? "País de origen" : "País de destino"}
+          label={`${map.title}, ${global ? "dato global" : year}`}
+          rowHeader={copy.row}
           rows={rows}
           columns={campuses.map((c) => ({ key: c.campus_id, label: c.label }))}
           stored={stored}

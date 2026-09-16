@@ -69,8 +69,22 @@ export const cutCodeLabel = (code: number): string => {
   return cutLabel(year, term);
 };
 
-/** "2024" o "2024-A". */
+/**
+ * Corte "todo el periodo": no es un año. El catálogo guarda en esta clave las
+ * cifras agrupadas de todos los años (ver `withPeriodView` en open-data.ts),
+ * así cada bloque la lee como un corte más. Es el corte por defecto.
+ */
+export const ALL_YEARS = 0;
+
+// Rótulo del periodo ("2020–2025"): lo fija el catálogo al cargarse.
+let periodSpan = "todo el periodo";
+export function setPeriodSpan(first: number, last: number) {
+  periodSpan = first === last ? String(first) : `${first}–${last}`;
+}
+
+/** "2024", "2024-A" o, para todo el periodo, "2020–2025". */
 export function cutLabel(year: number, term: Term | null | undefined): string {
+  if (year === ALL_YEARS) return periodSpan;
   return term ? `${year}-${term}` : String(year);
 }
 

@@ -16,7 +16,8 @@
 import { useRef, useState } from "react";
 import { Icon } from "../../../components/ui/Icon";
 import type { CSSProperties } from "react";
-import { formatValue } from "../data/open-data";
+import { formatCount, formatValue } from "../data/open-data";
+import { ALL_YEARS, cutLabel } from "../data/terms";
 import type { Campus, CampusId, MapDataset } from "../data/types";
 import { CAMPUS_POINTS, DEPARTMENTS, MAP_HEIGHT, MAP_WIDTH } from "../data/colombia-map";
 import { ChartTooltip } from "./ChartFrame";
@@ -25,6 +26,8 @@ import { useInView, usePrefersReducedMotion, useWidth } from "./motion";
 const NAMES = Object.fromEntries(DEPARTMENTS.map((d) => [d.code, d.name]));
 const CENTROIDS = Object.fromEntries(DEPARTMENTS.map((d) => [d.code, d.c]));
 const BINS = 7;
+/** Por departamento, todo el periodo es el promedio anual (ver withPeriodView). */
+const GROUPED_AS = "promedio anual";
 
 interface ColombiaMapProps {
   dataset: MapDataset;
@@ -47,7 +50,10 @@ export function ColombiaMap({ dataset, year, years, campus, campuses, onSelectCa
 
   // Si el corte no tiene datos, se usa el último que sí los tenga y se dice.
   const available = years.filter((y) => dataset.values[y] && Object.keys(dataset.values[y]!).length > 0);
-  const shownYear = available.includes(year) ? year : available[available.length - 1];
+  // Todo el periodo se muestra agrupado si el mapa tiene cifras; si no, el último año con dato.
+  const groupedReady = year === ALL_YEARS && available.length > 0;
+  const shownYear = groupedReady ? ALL_YEARS : available.includes(year) ? year : available[available.length - 1];
+  const shownLabel = shownYear === ALL_YEARS ? `${cutLabel(ALL_YEARS, null)} · ${GROUPED_AS}` : shownYear === undefined ? "" : String(shownYear);
   const bySite: Record<string, Record<string, number>> = (dataset.values[shownYear] ?? {}) as Record<string, Record<string, number>>;
   // Los campus salen del periodo, no de una lista fija. Solo se dibujan los que
   // tienen ubicación conocida en el mapa.
@@ -106,7 +112,7 @@ export function ColombiaMap({ dataset, year, years, campus, campuses, onSelectCa
         <svg
           viewBox={`0 0 ${MAP_WIDTH} ${MAP_HEIGHT}`}
           role="img"
-          aria-label={`${dataset.title}, ${shownYear}. El detalle está en el ranking de departamentos.`}
+          aria-label={`${dataset.title}, ${shownLabel}. El detalle está en el ranking de departamentos.`}
           onPointerLeave={() => {
             setHover(null);
             setTip(null);
@@ -212,7 +218,7 @@ export function ColombiaMap({ dataset, year, years, campus, campuses, onSelectCa
               onClick={() => onSelectCampus?.(campus === site ? "todas" : site)}
             >
               <strong>{name}</strong>
-              <span>{formatValue(total, "entero")}</span>
+              <span>{formatCount(total)}</span>
             </button>
           );
         })}
@@ -223,12 +229,12 @@ export function ColombiaMap({ dataset, year, years, campus, campuses, onSelectCa
             {focusValue > 0 ? (
               <>
                 <span>
-                  {formatValue(focusValue, "entero")} {dataset.unit} · {formatValue((focusValue / grand) * 100, "decimal")} %
+                  {formatCount(focusValue)} {dataset.unit} · {formatValue((focusValue / grand) * 100, "decimal")} %
                 </span>
                 <span>Puesto {(rank.get(hover) ?? 0) + 1} de {ranking.length}</span>
               </>
             ) : (
-              <span>Sin {dataset.unit} en {shownYear}</span>
+              <span>Sin {dataset.unit} en {shownLabel}</span>
             )}
           </ChartTooltip>
         )}
@@ -236,12 +242,14 @@ export function ColombiaMap({ dataset, year, years, campus, campuses, onSelectCa
 
       <aside className="od-map__panel">
         <div className="od-map__total">
-          <span>{dataset.mode === "origen" ? "Estudiantes" : "Personas"} · {shownYear}</span>
-          <strong>{formatValue(grand, "entero")}</strong>
+          <span>{dataset.mode === "origen" ? "Estudiantes" : "Personas"} · {shownLabel}</span>
+          <strong>{formatCount(grand)}</strong>
           <small>
             {campus === "todas" ? "Todos los campus" : campuses.find((c) => c.id === campus)?.name} · {ranking.length} departamentos
           </small>
-          {shownYear !== year && <small className="od-map__note">El corte {year} no tiene este mapa: se muestra {shownYear}.</small>}
+          {shownYear !== year && shownYear !== undefined && (
+            <small className="od-map__note">El corte {cutLabel(year, null)} no tiene este mapa: se muestra {shownLabel}.</small>
+          )}
         </div>
 
         {pinned && (
@@ -258,7 +266,7 @@ export function ColombiaMap({ dataset, year, years, campus, campuses, onSelectCa
                 return (
                   <li key={site}>
                     <span>{campuses.find((c) => c.id === site)?.name}</span>
-                    <b>{formatValue(v, "entero")}</b>
+                    <b>{formatCount(v)}</b>
                   </li>
                 );
               })}
@@ -281,7 +289,7 @@ export function ColombiaMap({ dataset, year, years, campus, campuses, onSelectCa
               >
                 <span className="od-map__rank-name">{NAMES[code] ?? code}</span>
                 <span className="od-map__rank-value">
-                  {formatValue(value, "entero")}
+                  {formatCount(value)}
                   <small> · {formatValue((value / grand) * 100, "decimal")} %</small>
                 </span>
                 <span className="od-map__rank-bar" aria-hidden="true">

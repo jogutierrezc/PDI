@@ -28,6 +28,8 @@ import { YearFilter, useVisibleYears } from "./components/YearFilter";
 import { BreakdownChart } from "./components/BreakdownChart";
 import { ColombiaMap } from "./components/ColombiaMap";
 import { WorldMap } from "./components/WorldMap";
+import { AgreementsMap } from "./components/AgreementsMap";
+import { BulletinDownload } from "../boletin/BulletinDownload";
 import { Donut } from "./components/Donut";
 import { Heatmap } from "./components/Heatmap";
 import { HistoryCompare } from "./components/HistoryCompare";
@@ -52,9 +54,9 @@ import {
   useOpenDataCatalog,
   valueOf,
 } from "./data/open-data";
-import { ANNUAL_RULE_LABEL, cutCode, cutCodeLabel, cutLabel, fromCutCode } from "./data/terms";
+import { ALL_YEARS, ANNUAL_RULE_LABEL, cutCode, cutCodeLabel, cutLabel, fromCutCode } from "./data/terms";
 import type { CampusId, Indicator, MapDataset, OpenDataCatalog, Report, ReportBlock, Term } from "./data/types";
-import { ALL_CAMPUSES, DEFAULT_BLOCK_ORDER, MAP_MODE_TITLE, isWorldMap } from "./data/types";
+import { ALL_CAMPUSES, DEFAULT_BLOCK_ORDER, MAP_MODE_TITLE, isMobilityMap, isWorldMap } from "./data/types";
 import "./datos-abiertos.css";
 
 export function OpenDataReport() {
@@ -186,8 +188,18 @@ function ReportContent({ data, report, year, term, campus, setYear, setTerm, set
               <div className="od-keyrow__head">
                 <h2 id="od-clave">{block.settings.title || "Tablero de indicadores"}</h2>
                 <p>
-                  {campusName} · corte {cutLabel(year, term)}
-                  {term ? "" : ", cifra del año calculada con los periodos A y B"}. Elige un indicador para verlo en la gráfica de evolución.
+                  {year === ALL_YEARS ? (
+                    <>
+                      {campusName} · todo el periodo {cutLabel(year, term)}: promedio anual de cada indicador (las existencias, como la matrícula,
+                      muestran su último dato). Elige un año arriba para ver ese corte.
+                    </>
+                  ) : (
+                    <>
+                      {campusName} · corte {cutLabel(year, term)}
+                      {term ? "" : ", cifra del año calculada con los periodos A y B"}.
+                    </>
+                  )}{" "}
+                  Elige un indicador para verlo en la gráfica de evolución.
                 </p>
               </div>
               {board}
@@ -219,15 +231,21 @@ function ReportContent({ data, report, year, term, campus, setYear, setTerm, set
         const combined =
           partner !== undefined &&
           block.settings.mapLayout === "combinado" &&
-          isWorldMap(dataset.mode) &&
-          isWorldMap(partner.mode) &&
+          isMobilityMap(dataset.mode) &&
+          isMobilityMap(partner.mode) &&
           dataset.mode !== partner.mode;
         const mapOf = (d: MapDataset, compact: boolean) =>
-          isWorldMap(d.mode) ? (
+          d.mode === "convenios" ? (
+            <AgreementsMap dataset={d} compact={compact} year={year} years={data.years} campus={campus} campuses={data.campuses} onSelectCampus={setCampus} />
+          ) : isWorldMap(d.mode) ? (
             <WorldMap datasets={[d]} compact={compact} year={year} years={data.years} campus={campus} campuses={data.campuses} onSelectCampus={setCampus} />
           ) : (
             <ColombiaMap dataset={d} year={year} years={data.years} campus={campus} campuses={data.campuses} onSelectCampus={setCampus} />
           );
+        const mapCut = (d: MapDataset) =>
+          d.reporting === "global"
+            ? "Dato global"
+            : year === ALL_YEARS ? `Periodo ${cutLabel(year, null)} · ${isWorldMap(d.mode) ? "total" : "promedio anual"}` : `Corte ${year}`;
         const frameTitle = (d: MapDataset) => (isWorldMap(d.mode) ? MAP_MODE_TITLE[d.mode] : "Mapa por departamento");
 
         if (combined && partner) {
@@ -240,7 +258,7 @@ function ReportContent({ data, report, year, term, campus, setYear, setTerm, set
             inSection,
             <ChartFrame
               title={inSection ? heading : "Movilidad entrante y saliente por país"}
-              subtitle={`Corte ${year} · ${dataset.unit || partner.unit}`}
+              subtitle={`${mapCut(dataset)} · ${dataset.unit || partner.unit}`}
               source={[...new Set([dataset.source, partner.source].filter(Boolean))].join(" · ")}
             >
               <WorldMap
@@ -265,7 +283,7 @@ function ReportContent({ data, report, year, term, campus, setYear, setTerm, set
             inSection,
             <div className="od-pair">
               {[dataset, partner].map((d) => (
-                <ChartFrame key={d.id} title={d.title} subtitle={`Corte ${year} · ${d.unit}`} source={d.source} exportName={d.title}>
+                <ChartFrame key={d.id} title={d.title} subtitle={`${mapCut(d)} · ${d.unit}`} source={d.source} exportName={d.title}>
                   {mapOf(d, true)}
                 </ChartFrame>
               ))}
@@ -281,7 +299,7 @@ function ReportContent({ data, report, year, term, campus, setYear, setTerm, set
           inSection,
           <ChartFrame
             title={inSection ? block.settings.title || dataset.title : frameTitle(dataset)}
-            subtitle={`Corte ${year} · ${dataset.unit}`}
+            subtitle={`${mapCut(dataset)} · ${dataset.unit}`}
             source={dataset.source}
           >
             {mapOf(dataset, Boolean(block.settings.compact))}
@@ -462,9 +480,12 @@ function ReportContent({ data, report, year, term, campus, setYear, setTerm, set
             ))}
           </nav>
           <BoardControls data={data} year={year} term={term} campus={campus} setYear={setYear} setTerm={setTerm} setCampus={setCampus} />
-          <button type="button" className="od-button od-button--ghost od-report-bar__csv" onClick={download}>
-            <Icon name="download" size={16} /> CSV
-          </button>
+          <span className="od-report-bar__downloads">
+            <button type="button" className="od-button od-button--ghost" onClick={download}>
+              <Icon name="download" size={16} /> CSV
+            </button>
+            <BulletinDownload catalog={data} report={report} />
+          </span>
         </div>
       </div>
 
@@ -613,6 +634,7 @@ function Evolution({
       label: c.name,
       color: `var(--od-series-${(index % 3) + 1})`,
       values: cuts.map((c2) => valueOf(indicator, c2.year, c.id, c2.term)),
+      ...(year === ALL_YEARS ? { current: valueOf(indicator, ALL_YEARS, c.id) } : {}),
     }));
   const totalSeries: LineSeries = {
     id: "todas",
@@ -620,6 +642,7 @@ function Evolution({
     color: "var(--od-series-total)",
     dashed: true,
     values: cuts.map((c) => valueOf(indicator, c.year, "todas", c.term)),
+    ...(year === ALL_YEARS ? { current: valueOf(indicator, ALL_YEARS, "todas") } : {}),
   };
   const hasSites = siteSeries.some((s) => s.values.some((v) => v !== null));
   const series = hasSites ? [...siteSeries, totalSeries] : [totalSeries];
@@ -742,7 +765,7 @@ function Evolution({
 
           <ChartFrame
             title="Por campus"
-            subtitle={`Corte ${cut} · ${indicator.unit}`}
+            subtitle={`${year === ALL_YEARS ? `Periodo ${cut} · ${indicator.annualRule === "ultimo" ? "último dato" : "promedio anual"}` : `Corte ${cut}`} · ${indicator.unit}`}
             actions={
               summable ? (
                 <ViewSwitch

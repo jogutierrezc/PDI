@@ -45,6 +45,12 @@ colors:
   od-series-3: "#0f8a6e"
   od-seq-0: "#eef3fa"
   od-seq-7: "#0d366b"
+  bol-navy: "#072b58"
+  bol-band: "#4078b9"
+  bol-accent: "#e8892b"
+  bol-ink: "#16243a"
+  bol-rule: "#d6dee8"
+  bol-paper-2: "#eef3f9"
 typography:
   display:
     fontFamily: "Fraunces, Iowan Old Style, Georgia, serif"
@@ -84,6 +90,28 @@ typography:
     fontWeight: 600
     lineHeight: 1.3
     letterSpacing: "0.08em"
+  bulletin-header:
+    fontFamily: "Montserrat, Manrope, system-ui, sans-serif"
+    fontSize: "7.7mm"
+    fontWeight: 700
+    lineHeight: 1
+  bulletin-anchor:
+    fontFamily: "Montserrat, Manrope, system-ui, sans-serif"
+    fontSize: "9mm"
+    fontWeight: 800
+    lineHeight: 1
+    letterSpacing: "-0.02em"
+  bulletin-body:
+    fontFamily: "Montserrat, Manrope, system-ui, sans-serif"
+    fontSize: "2.6mm"
+    fontWeight: 500
+    lineHeight: 1.35
+  bulletin-label:
+    fontFamily: "Montserrat, Manrope, system-ui, sans-serif"
+    fontSize: "2.3mm"
+    fontWeight: 700
+    lineHeight: 1.3
+    letterSpacing: "0.06em"
 rounded:
   flap: "0.1em"
   ticket: "3px"
@@ -92,6 +120,8 @@ rounded:
   md: "16px"
   lg: "20px"
   pill: "999px"
+  bol-code: "0.8mm"
+  bol-tile: "1.2mm"
 spacing:
   "1": "4px"
   "2": "8px"
@@ -290,6 +320,29 @@ Celda de 0.7em × 1.24em partida en mitad superior (od-flap) e inferior (od-flap
 
 ### Origin Ticket (UDES en Cifras)
 Boleto de papel claro bajo cada cifra: oficina que reporta en negrita, campus y sello de corte en mayúsculas, muesca perforada a la izquierda. Debajo, el corte anterior en cian con su variación (puntos porcentuales para tasas, porcentaje para conteos).
+
+## Boletín UDES en Cifras (papel A4)
+
+El boletín es papel, no pantalla: un documento A4 de 210×297 mm que se imprime a PDF desde el navegador. Su marco lo fijó Planeación con tres páginas modelo (`Modelo Informe/Imagenes`): portada, contraportada y página de contenido. Vive en `src/modules/boletin/` y su plantilla (textos, imágenes, colores, fuente, contenido) se edita en la estación 6 de la intranet.
+
+**Creative North Star: "El anuario con columna de notas."** Cada indicador es una hoja documentada: a la izquierda, la columna de notas dice qué mide, quién lo reporta, cómo se calcula y a qué corte pertenece; a la derecha, el cuerpo lo prueba con la cifra ancla, la evolución, el reparto por campus y la tabla.
+
+### Named Rules
+**The Paper Is Not Themed Rule.** Los colores del boletín (`--bol-*`) no se redefinen en tema oscuro: el papel es blanco en los dos temas. Solo el visor que lo rodea usa los tokens de la aplicación.
+
+**The Millimetre Rule.** Dentro del documento todo se mide en milímetros: márgenes, radios (`bol-code` 0,8 mm, `bol-tile` 1,2 mm) y tipografía. Las gráficas son SVG con viewBox en milímetros, así que un `font-size` de 2,2 en un SVG son 2,2 mm impresos, no píxeles.
+
+**The Pinned Frame Rule.** La cabecera de las páginas de contenido reproduce el modelo al milímetro: barra azul marino de 9,1 mm con el logo blanco y la dependencia, franja azul de 18,4 mm con el título y el dibujo de edificios a la derecha, sin nada más: el capítulo va en el pie. Portada y contraportada son las imágenes del modelo; los textos de la plantilla se escriben encima solo donde la imagen no los trae. Desde la plantilla se pueden cambiar la portada, la contraportada, un fondo A4 para las páginas de contenido (si ya trae la cabecera dibujada, el boletín no pinta la suya), el dibujo de la franja y el logo de la barra.
+
+**The Plantilla Colours Rule.** `bol-navy`, `bol-band` y `bol-accent` son los valores por defecto de la plantilla y se pueden cambiar desde la intranet; las series de campus (`--bol-s2` a `--bol-s5`) y las líneas de informe repiten las del portal en claro. La fuente por defecto es Montserrat (la del modelo); Manrope, Source Sans 3, Roboto y Lato se cargan desde Google Fonts solo si la plantilla las elige.
+
+### Components
+- **Hoja de indicador:** columna de notas de 38 mm en `bol-paper-2` con rótulos en mayúsculas de 2,3 mm; cuerpo con título de 4,4 mm, cifra ancla Montserrat 800 de 9 mm, gráficas de 36 mm de alto y tabla de reglas finas con cabecera azul marino y la columna del corte resaltada. Tiene variante compacta para no dejar media página vacía.
+- **Hoja de conjunto:** desgloses en barras con participación; mapas coropléticos (Colombia o mundo, con rutas en movilidad) junto al ranking; tuberías con el mismo dibujo de la ficha web (LeakyPipeline en modo papel, quieto y escalado); evolución histórica en columnas apiladas; mapas de calor como tabla sombreada. Con muchas columnas, las notas pasan a una franja arriba.
+- **Tabla:** las columnas de texto parten línea a la izquierda, las cifras van a la derecha; si aun así no cabe, la tabla se reduce hasta el margen.
+- **Apertura de capítulo:** regla superior y cuadro de código en el color de la línea del informe, cifras clave con la unidad debajo del número.
+- **Presentación y contenido:** la presentación va justificada; el contenido lista cada capítulo y, sangradas debajo, sus hojas con su página. Si no cabe bajo la presentación, sigue en páginas "Contenido (continuación)".
+- **Contraportada:** lista de oficinas que reportan en dos columnas (tres cuando pasan de 20) sobre el espacio blanco del modelo.
 
 ## Do's and Don'ts
 

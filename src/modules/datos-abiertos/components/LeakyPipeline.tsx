@@ -13,6 +13,11 @@
 
    Recibe las mismas props que Pipeline, así se intercambian sin tocar el
    informe.
+
+   Modo papel (`print`): el mismo dibujo para el Boletín en PDF. Ancho fijo (el
+   boletín lo escala a la página), ya visible, sin animación, sin avisos y sin
+   desplazamiento; los colores son los del tema claro aunque la intranet esté en
+   oscuro.
    ========================================================================== */
 
 import { useId, useLayoutEffect, useRef, useState } from "react";
@@ -26,6 +31,8 @@ interface LeakyPipelineProps {
   data: PipelineData;
   campus: CampusId;
   campusName: string;
+  /** Dibujo estático para papel, a este ancho en px. */
+  print?: { width: number };
 }
 
 const H = 480;
@@ -65,13 +72,15 @@ const CALLOUT_TOP = 12;
 /** Alto que necesita un aviso para abrirse hacia arriba sin salirse del dibujo. */
 const TIP_ROOM = 150;
 
-export function LeakyPipeline({ data, campus, campusName }: LeakyPipelineProps) {
+export function LeakyPipeline({ data, campus, campusName, print }: LeakyPipelineProps) {
   const wrap = useRef<HTMLDivElement>(null);
   const calloutRef = useRef<HTMLElement>(null);
-  const available = useWidth(wrap, 980);
+  const measured = useWidth(wrap, 980);
+  const available = print ? print.width : measured;
   const width = Math.max(MIN_WIDTH, available);
   const narrow = available < MIN_WIDTH;
-  const seen = useInView(wrap);
+  const inView = useInView(wrap);
+  const seen = print ? true : inView;
   // Ids propios: puede haber varias tuberías en la misma página.
   const uid = useId().replace(/:/g, "");
   const ringId = `lp-ring-${uid}`;
@@ -88,12 +97,14 @@ export function LeakyPipeline({ data, campus, campusName }: LeakyPipelineProps) 
     observer.observe(node);
     return () => observer.disconnect();
   }, [narrow]);
-  const reduced = usePrefersReducedMotion();
+  const prefersReduced = usePrefersReducedMotion();
+  // En papel no hay movimiento: queda la tubería quieta con su gota colgando.
+  const reduced = print ? true : prefersReduced;
   const stages = data.stages;
 
   const [hover, setHover] = useState<Focus>(null);
   const [pinned, setPinned] = useState<Focus>(null);
-  const focus = hover ?? pinned;
+  const focus = print ? null : hover ?? pinned;
 
   // Un único flujo por tubería, del campus elegido; si no lo reporta, el total;
   // si tampoco, el primero que haya. Si quedan varias cohortes de capturas
@@ -272,7 +283,13 @@ export function LeakyPipeline({ data, campus, campusName }: LeakyPipelineProps) 
   );
 
   return (
-    <div className="lp" data-seen={seen || undefined} data-motion={!reduced || undefined}>
+    <div
+      className="lp"
+      data-seen={seen || undefined}
+      data-motion={!reduced || undefined}
+      data-paper={print ? true : undefined}
+      style={print ? { width: print.width } : undefined}
+    >
       <p className="lp__meta">
         {cohortLabel} · porcentaje acumulado de deserción
         {campus !== "todas" && row.campus !== campus && (

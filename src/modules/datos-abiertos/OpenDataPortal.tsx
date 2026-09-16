@@ -24,7 +24,8 @@ import { ImageFlap } from "./components/ImageFlap";
 import { EmptyPeriod, OpenDataLayout } from "./components/OpenDataLayout";
 import { SplitFlap } from "./components/SplitFlap";
 import { changeBetween, formatValue, keyIndicators, useOpenDataCatalog, valueOf } from "./data/open-data";
-import { cutLabel } from "./data/terms";
+import { ALL_YEARS, cutLabel } from "./data/terms";
+import { BulletinDownload } from "../boletin/BulletinDownload";
 import type { CampusId, Indicator, OpenDataCatalog, Report, Term } from "./data/types";
 import "./datos-abiertos.css";
 
@@ -97,7 +98,7 @@ function PortalContent({ data, year, term, campus, setYear, setTerm, setCampus, 
           <div className="u-container od-arrivals__inner">
             <p className="od-arrivals__head">
               <span>
-                Corte {cutLabel(year, term)} · {campusName}
+                {year === ALL_YEARS ? "Periodo" : "Corte"} {cutLabel(year, term)} · {campusName}
               </span>
               {data.illustrative && <span className="od-stamp">Cifras ilustrativas</span>}
             </p>
@@ -198,6 +199,12 @@ function DepartureBoard({ data, year, term, campus, campusName, setYear, setTerm
               {data.reports.length} informes del periodo {data.period?.label} con las cifras que reporta cada oficina de la universidad. Elige uno para abrir su ficha
               con la evolución, el detalle por campus y los datos para descargar.
             </p>
+            <p className="od-board__downloads">
+              <BulletinDownload catalog={data} className="od-button od-button--signal" />
+              <Link className="od-board__bulletins" to="/datos-abiertos/boletines">
+                Todos los boletines y ediciones
+              </Link>
+            </p>
           </div>
           <BoardControls data={data} year={year} term={term} campus={campus} setYear={setYear} setTerm={setTerm} setCampus={setCampus} />
         </div>
@@ -207,7 +214,7 @@ function DepartureBoard({ data, year, term, campus, campusName, setYear, setTerm
             <div className="od-departures__columns" aria-hidden="true">
               <span>Informe</span>
               <span>Cifra titular · {cutLabel(year, term)}</span>
-              <span>Corte anterior</span>
+              <span>{year === ALL_YEARS ? "Cómo se calcula" : "Corte anterior"}</span>
             </div>
 
             <ol className="od-departures__list">
@@ -355,7 +362,8 @@ function DepartureRow({ report, indicator, index, year, term, campus, cells, act
         )}
 
         <span className="od-row__previous">
-          {indicator && (
+          {indicator && year === ALL_YEARS && <span>{indicator.periodBasis?.[campus] ?? "sin cifras en el periodo"}</span>}
+          {indicator && year !== ALL_YEARS && (
             <>
               <span>
                 {cutLabel(year - 1, term)}: {previous === null ? "sin reportar" : formatValue(previous, indicator.format)}
@@ -411,7 +419,11 @@ function OriginAtlas({
             Ver el informe Poblacional <Icon name="arrow-right" size={16} />
           </Link>
         </div>
-        <ChartFrame title={dataset.title} subtitle={`Corte ${year} · ${dataset.unit}`} source={dataset.source}>
+        <ChartFrame
+          title={dataset.title}
+          subtitle={`${year === ALL_YEARS ? `Periodo ${cutLabel(year, null)} · promedio anual` : `Corte ${year}`} · ${dataset.unit}`}
+          source={dataset.source}
+        >
           <ColombiaMap
             dataset={dataset}
             year={year}

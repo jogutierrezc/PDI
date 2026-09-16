@@ -21,7 +21,7 @@ type DraftBlock = Omit<OdReportBlockRow, "id" | "report_id"> & { id?: string; te
 const BLOCK_HELP: Record<OdBlockKind, string> = {
   kpis: "Las cifras clave del informe, con variación y rastro de cortes.",
   evolucion: "El indicador elegido año a año, por campus.",
-  mapa: "Colombia por departamento o el mundo por país (movilidad), con rutas animadas.",
+  mapa: "Colombia por departamento, movilidad por país con rutas animadas o convenios por país como mapa de calor.",
   tuberia: "La deserción de una cohorte, tramo a tramo, en estudiantes o en %.",
   historico: "La cifra de un periodo frente a otro, con sus categorías y su peso en el total.",
   mapa_calor: "Matriz de dos dimensiones en escala azul.",
@@ -81,6 +81,7 @@ function DesignEditor({ data, reportId, blocks, canEdit }: { data: StationProps[
 
   const mapOf = (b: DraftBlock) => (b.kind === "mapa" ? maps.find((m) => m.id === b.ref_id) : undefined);
   const isWorld = (mode: string | undefined) => mode === "entrante" || mode === "saliente";
+  const canCompact = (mode: string | undefined) => isWorld(mode) || mode === "convenios";
   /** Bloque de mapa que ya muestra a este mapa junto al suyo (el primero en el orden gana). */
   const shownWith = (b: DraftBlock) => {
     const own = mapOf(b);
@@ -212,7 +213,7 @@ function DesignEditor({ data, reportId, blocks, canEdit }: { data: StationProps[
                             </select>
                           </label>
                         )}
-                        {isWorld(own.mode) && layout !== "lado_a_lado" && (
+                        {canCompact(own.mode) && layout !== "lado_a_lado" && (
                           <label className="oda-inline-check">
                             <input type="checkbox" checked={Boolean(block.settings.compact)} disabled={!canEdit} onChange={(e) => set({ compact: e.target.checked || undefined })} />
                             <span>Compacto <small>encuadre a los países con datos y panel al lado</small></span>

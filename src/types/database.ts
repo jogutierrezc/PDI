@@ -986,8 +986,10 @@ export type OdAggregation = "suma" | "reportado";
 export type OdTerm = "A" | "B" | "anual";
 /** Cómo sale la cifra del año a partir de los periodos A y B. */
 export type OdAnnualRule = "suma" | "ultimo" | "promedio" | "reportado";
-/** Por departamento: "origen" y "cobertura". Mundial (código ISO alfa-3): "entrante" y "saliente". */
-export type OdMapMode = "origen" | "cobertura" | "entrante" | "saliente";
+/** Por departamento: "origen" y "cobertura". Mundial (código ISO alfa-3): "entrante", "saliente" y "convenios". */
+export type OdMapMode = "origen" | "cobertura" | "entrante" | "saliente" | "convenios";
+/** "anual": una cifra por año. "global": una sola cifra sin año (year = 0). */
+export type OdMapReporting = "anual" | "global";
 export type OdMapLayout = "combinado" | "lado_a_lado";
 /** Qué se captura en cada etapa de una tubería. */
 export type OdPipelineMeasure = "estudiantes" | "permanencia" | "desercion";
@@ -1010,6 +1012,38 @@ export type OdSectionStatus = "completo" | "parcial" | "no_recibido" | "no_ofici
 /** Cómo se presenta una tabla: tabla, ranking, fichas o cifras de un periodo. */
 export type OdTableDisplay = "tabla" | "ranking" | "fichas" | "cifras";
 export type OdImportKind = "rejilla" | "pegado" | "plantilla";
+
+/** Boletín UDES en Cifras: la plantilla (od_bulletins, 0027). */
+export interface OdBulletinRow {
+  id: string;
+  period_id: string;
+  /** Nulo = boletín global. */
+  report_id: string | null;
+  slug: string;
+  title: string;
+  /** Plantilla completa (ver src/modules/boletin/model.ts). */
+  settings: Record<string, unknown>;
+  status: PublicationStatus;
+  updated_by: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+/** Edición congelada: un PDF emitido en una fecha (od_bulletin_editions, 0027). */
+export interface OdBulletinEditionRow {
+  id: string;
+  bulletin_id: string;
+  title: string;
+  period_label: string;
+  label: string;
+  cut_label: string;
+  file_path: string;
+  file_size: number;
+  status: "publicado" | "retirado";
+  note: string;
+  published_by: string | null;
+  published_at: string;
+}
 
 export interface OdPeriod {
   id: string;
@@ -1148,6 +1182,7 @@ export interface OdMapRow {
   title: string;
   description: string;
   mode: OdMapMode;
+  reporting: OdMapReporting;
   unit: string;
   office_id: string | null;
   /** Años con dato. null = todos los del periodo. */

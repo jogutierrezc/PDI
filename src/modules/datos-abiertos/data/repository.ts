@@ -371,7 +371,7 @@ export function assembleCatalog(rows: OpenDataRows): OpenDataCatalog {
             depts[v.department_code] = Number(v.value);
           });
         return {
-          id: m.key, uuid: m.id, title: m.title, description: m.description, mode: m.mode, unit: m.unit,
+          id: m.key, uuid: m.id, title: m.title, description: m.description, mode: m.mode, reporting: m.reporting ?? "anual", unit: m.unit,
           source: source(m.office_id), officeId: m.office_id, years: yearsOf(m.years), values,
         };
       });

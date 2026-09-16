@@ -68,6 +68,9 @@ export function OpenDataLayout({ children, title, className = "" }: OpenDataLayo
           <NavLink to="/datos-abiertos#informes" className="od-nav__link">
             Informes
           </NavLink>
+          <NavLink to="/datos-abiertos/boletines" className="od-nav__link">
+            Boletines
+          </NavLink>
           <NavLink to="/datos-abiertos#lectura" className="od-nav__link od-nav__link--wide">
             Cómo leer las cifras
           </NavLink>
@@ -103,6 +106,7 @@ export function OpenDataLayout({ children, title, className = "" }: OpenDataLayo
           </div>
           <nav aria-label="Enlaces del pie">
             <Link to="/datos-abiertos#informes">Informes</Link>
+            <Link to="/datos-abiertos/boletines">Boletines</Link>
             <Link to="/datos-abiertos#lectura">Cómo leer las cifras</Link>
             <Link to="/">Portal PDI</Link>
             <a href="mailto:planeacion@udes.edu.co">planeacion@udes.edu.co</a>

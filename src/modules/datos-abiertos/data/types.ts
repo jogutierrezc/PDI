@@ -86,6 +86,8 @@ export interface Indicator {
   annualRule?: AnnualRule;
   /** Cifras por periodo académico, tal como se reportaron. */
   terms?: TermCampusValues;
+  /** Todo el periodo: cómo salió la cifra agrupada de cada campus ("promedio anual de 6 años"). */
+  periodBasis?: Partial<Record<CampusId, string>>;
   /** Con la regla "ultimo": de qué periodo salió cada cifra anual. */
   annualFrom?: Record<number, Partial<Record<CampusId, Term>>>;
 }
@@ -184,10 +186,13 @@ export interface HistoryData {
   values: Record<string, Record<string, number | null>>;
 }
 
-export type MapMode = "origen" | "cobertura" | "entrante" | "saliente";
+export type MapMode = "origen" | "cobertura" | "entrante" | "saliente" | "convenios";
 
-/** Movilidad internacional: el mapa es del mundo y la clave es el país (ISO alfa-3). */
-export const isWorldMap = (mode: MapMode) => mode === "entrante" || mode === "saliente";
+/** Mapa del mundo: la clave es el país (ISO alfa-3). */
+export const isWorldMap = (mode: MapMode) => mode === "entrante" || mode === "saliente" || mode === "convenios";
+
+/** Movilidad: rutas entre un país y los campus. */
+export const isMobilityMap = (mode: MapMode) => mode === "entrante" || mode === "saliente";
 
 /** Nombre de cada tipo de mapa, para la intranet y el rótulo de la gráfica. */
 export const MAP_MODE_TITLE: Record<MapMode, string> = {
@@ -195,6 +200,7 @@ export const MAP_MODE_TITLE: Record<MapMode, string> = {
   cobertura: "Mapa por departamento",
   entrante: "Movilidad entrante por país",
   saliente: "Movilidad saliente por país",
+  convenios: "Convenios internacionales por país",
 };
 
 /**
@@ -211,8 +217,11 @@ export interface MapDataset {
    * "cobertura": solo color por departamento.
    * "entrante": participantes que llegan de otro país a un campus.
    * "saliente": participantes que salen de un campus a otro país.
+   * "convenios": convenios internacionales por país, como mapa de calor.
    */
   mode: MapMode;
+  /** "global": una sola cifra sin año, guardada en la clave ALL_YEARS (0). "anual": por año. */
+  reporting?: "anual" | "global";
   unit: string;
   source: string;
   officeId?: string | null;

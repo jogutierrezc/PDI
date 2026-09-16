@@ -26,15 +26,18 @@
 import { useRef, useState } from "react";
 import type { CSSProperties, PointerEvent } from "react";
 import { Icon } from "../../../components/ui/Icon";
-import { formatValue } from "../data/open-data";
+import { formatCount, formatValue } from "../data/open-data";
+import { ALL_YEARS, cutLabel } from "../data/terms";
 import type { Campus, CampusId, MapDataset } from "../data/types";
 import { COUNTRIES, WORLD_CAMPUS_POINTS, WORLD_HEIGHT, WORLD_WIDTH } from "../data/world-map";
+import { BY_CODE, HOME, fitBox } from "./world-geo";
+import type { Point } from "./world-geo";
 import { ChartTooltip } from "./ChartFrame";
 import { useInView, usePrefersReducedMotion, useWidth } from "./motion";
 
-const BY_CODE = Object.fromEntries(COUNTRIES.map((c) => [c.code, c]));
-const HOME = "COL";
 const BINS = 7;
+/** La movilidad de todo el periodo es la suma de los años (ver withPeriodView). */
+const GROUPED_AS = "total del periodo";
 
 type Direction = "entrante" | "saliente";
 type Show = "ambos" | Direction;
@@ -55,7 +58,6 @@ interface WorldMapProps {
   compact?: boolean;
 }
 
-type Point = [number, number];
 
 /** Arco de `from` a `to`, abombado hacia el norte: se lee como un vuelo. */
 function arc([x0, y0]: Point, [x1, y1]: Point, bend: number) {
@@ -73,24 +75,6 @@ function arc([x0, y0]: Point, [x1, y1]: Point, bend: number) {
   const cy = (y0 + y1) / 2 + ny * lift;
   const length = (chord + Math.hypot(cx - x0, cy - y0) + Math.hypot(x1 - cx, y1 - cy)) / 2;
   return { d: `M${x0} ${y0}Q${cx.toFixed(1)} ${cy.toFixed(1)} ${x1} ${y1}`, length };
-}
-
-/** Recuadro que contiene los puntos, con margen y proporción apaisada, dentro del mundo. */
-function fitBox(points: Point[]) {
-  if (points.length < 2) return { x: 0, y: 0, w: WORLD_WIDTH, h: WORLD_HEIGHT };
-  const xs = points.map((p) => p[0]);
-  const ys = points.map((p) => p[1]);
-  const ratio = 0.52;
-  let w = Math.max(420, Math.max(...xs) - Math.min(...xs) + 140);
-  let h = Math.max(...ys) - Math.min(...ys) + 110;
-  if (h > w * ratio) w = h / ratio;
-  h = w * ratio;
-  if (w >= WORLD_WIDTH || h >= WORLD_HEIGHT) return { x: 0, y: 0, w: WORLD_WIDTH, h: WORLD_HEIGHT };
-  const cx = (Math.max(...xs) + Math.min(...xs)) / 2;
-  const cy = (Math.max(...ys) + Math.min(...ys)) / 2;
-  const x = Math.min(WORLD_WIDTH - w, Math.max(0, cx - w / 2));
-  const y = Math.min(WORLD_HEIGHT - h, Math.max(0, cy - h / 2));
-  return { x, y, w, h };
 }
 
 export function WorldMap({ datasets, year, years, campus, campuses, onSelectCampus, compact = false }: WorldMapProps) {
@@ -115,7 +99,10 @@ export function WorldMap({ datasets, year, years, campus, campuses, onSelectCamp
   // Si el corte no tiene datos, se usa el último que sí los tenga y se dice.
   const hasYear = (y: number) => layers.some((d) => d.values[y] && Object.keys(d.values[y]!).length > 0);
   const available = years.filter(hasYear);
-  const shownYear = available.includes(year) ? year : available[available.length - 1];
+  // Todo el periodo se muestra agrupado si el mapa tiene cifras; si no, el último año con dato.
+  const groupedReady = year === ALL_YEARS && available.length > 0;
+  const shownYear = groupedReady ? ALL_YEARS : available.includes(year) ? year : available[available.length - 1];
+  const shownLabel = shownYear === ALL_YEARS ? `${cutLabel(ALL_YEARS, null)} · ${GROUPED_AS}` : shownYear === undefined ? "" : String(shownYear);
   const SITES = campuses.map((c) => c.id).filter((id) => id !== "todas");
   const activeSites = campus === "todas" ? SITES : SITES.filter((s) => s === campus);
   const campusName = (site: string) => campuses.find((c) => c.id === site)?.name ?? site;
@@ -232,7 +219,7 @@ export function WorldMap({ datasets, year, years, campus, campuses, onSelectCamp
           viewBox={`${box.x.toFixed(1)} ${box.y.toFixed(1)} ${box.w.toFixed(1)} ${box.h.toFixed(1)}`}
           role="img"
           data-framed={box.w < WORLD_WIDTH || undefined}
-          aria-label={`${title}, ${shownYear}. El detalle está en el ranking de países.`}
+          aria-label={`${title}, ${shownLabel}. El detalle está en el ranking de países.`}
           onPointerLeave={() => {
             setHover(null);
             setTip(null);
@@ -321,7 +308,7 @@ export function WorldMap({ datasets, year, years, campus, campuses, onSelectCamp
         >
           <strong>UDES</strong>
           <span>
-            {campus === "todas" ? "Colombia" : campusName(campus)} · {formatValue(grand, "entero")}
+            {campus === "todas" ? "Colombia" : campusName(campus)} · {formatCount(grand)}
           </span>
         </div>
 
@@ -333,19 +320,19 @@ export function WorldMap({ datasets, year, years, campus, campuses, onSelectCamp
                 {visible.map((d) => (
                   <span key={d.mode}>
                     {visible.length > 1 && <i className="od-world__dot" data-dir={dirOf(d)} />}
-                    {formatValue(byDir[dirOf(d)][hover] ?? 0, "entero")} {visible.length > 1 ? DIRECTION_LABEL[dirOf(d)].short.toLowerCase() : unit}
+                    {formatCount(byDir[dirOf(d)][hover] ?? 0)} {visible.length > 1 ? DIRECTION_LABEL[dirOf(d)].short.toLowerCase() : unit}
                   </span>
                 ))}
                 <span>{pct(totals[hover])} % · puesto {(rank.get(hover) ?? 0) + 1} de {ranking.length}</span>
               </>
             ) : (
-              <span>Sin {unit} en {shownYear}</span>
+              <span>Sin {unit} en {shownLabel}</span>
             )}
           </ChartTooltip>
         )}
 
         {ranking.length === 0 && (
-          <p className="od-world__empty">Sin participantes reportados {shownYear ? `en ${shownYear}` : "todavía"}.</p>
+          <p className="od-world__empty">Sin participantes reportados {shownLabel ? `en ${shownLabel}` : "todavía"}.</p>
         )}
       </div>
 
@@ -364,15 +351,15 @@ export function WorldMap({ datasets, year, years, campus, campuses, onSelectCamp
           <div className="od-map__total">
             <span>
               {soleDir ? DIRECTION_LABEL[soleDir].total : "Participantes en movilidad"}
-              {shownYear ? ` · ${shownYear}` : ""}
+              {shownLabel ? ` · ${shownLabel}` : ""}
             </span>
-            <strong>{formatValue(grand, "entero")}</strong>
+            <strong>{formatCount(grand)}</strong>
             {visible.length > 1 && (
               <span className="od-world__split">
                 {visible.map((d) => (
                   <b key={d.mode}>
                     <i className="od-world__dot" data-dir={dirOf(d)} />
-                    {formatValue(sum(byDir[dirOf(d)]), "entero")} {DIRECTION_LABEL[dirOf(d)].short.toLowerCase()}
+                    {formatCount(sum(byDir[dirOf(d)]))} {DIRECTION_LABEL[dirOf(d)].short.toLowerCase()}
                   </b>
                 ))}
               </span>
@@ -381,7 +368,7 @@ export function WorldMap({ datasets, year, years, campus, campuses, onSelectCamp
               {campus === "todas" ? "Todos los campus" : campusName(campus)} · {ranking.length} {ranking.length === 1 ? "país" : "países"}
             </small>
             {shownYear !== undefined && shownYear !== year && (
-              <small className="od-map__note">El corte {year} no tiene este mapa: se muestra {shownYear}.</small>
+              <small className="od-map__note">El corte {cutLabel(year, null)} no tiene este mapa: se muestra {shownLabel}.</small>
             )}
           </div>
           {SITES.length > 1 && (
@@ -395,7 +382,7 @@ export function WorldMap({ datasets, year, years, campus, campuses, onSelectCamp
                     onClick={() => onSelectCampus?.(campus === site ? "todas" : site)}
                   >
                     <span>{campusName(site)}</span>
-                    <b>{formatValue(siteTotal(site), "entero")}</b>
+                    <b>{formatCount(siteTotal(site))}</b>
                   </button>
                 </li>
               ))}
@@ -420,7 +407,7 @@ export function WorldMap({ datasets, year, years, campus, campuses, onSelectCamp
                       {visible.map((d) => (
                         <b key={d.mode}>
                           {visible.length > 1 && <i className="od-world__dot" data-dir={dirOf(d)} />}
-                          {formatValue(siteValues(d)[site]?.[pinned] ?? 0, "entero")}
+                          {formatCount(siteValues(d)[site]?.[pinned] ?? 0)}
                         </b>
                       ))}
                     </span>
@@ -445,7 +432,7 @@ export function WorldMap({ datasets, year, years, campus, campuses, onSelectCamp
                 >
                   <span className="od-world__rank-name">{BY_CODE[code]?.name ?? code}</span>
                   <span className="od-world__rank-value">
-                    {formatValue(value, "entero")}
+                    {formatCount(value)}
                     {!compact && <small> · {pct(value)} %</small>}
                   </span>
                   <span className="od-world__rank-bars" aria-hidden="true">
@@ -455,7 +442,7 @@ export function WorldMap({ datasets, year, years, campus, campuses, onSelectCamp
                   </span>
                   {visible.length > 1 && (
                     <span className="sr-only">
-                      {visible.map((d) => `${formatValue(byDir[dirOf(d)][code] ?? 0, "entero")} ${DIRECTION_LABEL[dirOf(d)].short.toLowerCase()}`).join(", ")}
+                      {visible.map((d) => `${formatCount(byDir[dirOf(d)][code] ?? 0)} ${DIRECTION_LABEL[dirOf(d)].short.toLowerCase()}`).join(", ")}
                     </span>
                   )}
                 </button>

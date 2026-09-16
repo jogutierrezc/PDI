@@ -760,7 +760,7 @@ function MapCapture(props: StationProps) {
   const [draft, setDraft] = useState<Record<CellKey, number | null>>({});
   const [via, setVia] = useState<OdImportKind>("rejilla");
   if (!map) return null;
-  if (map.mode === "entrante" || map.mode === "saliente") {
+  if (map.mode === "entrante" || map.mode === "saliente" || map.mode === "convenios") {
     return (
       <MobilityCapture key={map.id} {...props} maps={maps} map={map} onPickMap={(id) => { setActive(id); setDraft({}); }} />
     );

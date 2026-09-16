@@ -1488,9 +1488,39 @@
   }
 }
 
-.od-report-bar__csv {
+.od-report-bar__downloads {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
   margin-left: auto;
+}
+
+.od-report-bar__downloads .od-button {
   padding-inline: var(--space-4);
+}
+
+/* Boletín global bajo la presentación del tablero. Un párrafo vacío (sin
+   boletín publicado) no ocupa lugar. */
+.od-board__downloads {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-3) var(--space-5);
+  margin: var(--space-4) 0 0;
+}
+
+.od-board__downloads:not(:has(.od-button)) { display: none; }
+
+.od-board__bulletins {
+  color: var(--od-board-ink);
+  font-size: var(--text-sm);
+  font-weight: 700;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .od-board__bulletins:hover { color: var(--od-signal-text); }
 }
 
 /* --- Tablero de indicadores ------------------------------------------------ */
@@ -3158,6 +3188,79 @@
   .od-world__country[data-value] { fill-opacity: 1; }
 }
 
+/* --- Mapa de calor de convenios --------------------------------------------
+   Reutiliza el mapa del mundo (.od-world). Lo propio: el color entra como una
+   ola desde Colombia (--wave, la distancia de cada país) y cambia con una
+   transición suave; la leyenda es por tramos y apaga lo que no está en el suyo. */
+
+.od-agreements .od-agreements__country[data-value] {
+  fill-opacity: 0.12;
+  transition:
+    fill 700ms cubic-bezier(0.25, 1, 0.5, 1),
+    fill-opacity 650ms ease-out var(--wave),
+    opacity var(--dur-base) ease,
+    stroke var(--dur-fast) ease;
+}
+
+.od-agreements[data-seen] .od-agreements__country[data-value] { fill-opacity: 1; }
+.od-agreements .od-world__country[data-dim][data-value] { opacity: 0.25; }
+
+.od-agreements__legend {
+  display: grid;
+  gap: var(--space-2);
+  align-content: start;
+}
+
+.od-agreements__legend-title {
+  color: var(--ink-muted);
+  font-size: var(--text-2xs);
+  font-weight: 700;
+  letter-spacing: var(--tracking-wide);
+  text-transform: uppercase;
+}
+
+.od-agreements__bins {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px;
+}
+
+.od-agreements__bins button {
+  display: grid;
+  flex: 1 1 2.6rem;
+  gap: 3px;
+  min-width: 2.6rem;
+  padding: 2px 2px 4px;
+  color: var(--ink-secondary);
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  font: inherit;
+  font-size: var(--text-2xs);
+  font-variant-numeric: tabular-nums;
+  text-align: center;
+  cursor: pointer;
+  transition: border-color var(--dur-fast) ease, opacity var(--dur-fast) ease;
+}
+
+.od-agreements__bins button i {
+  display: block;
+  height: 10px;
+  border-radius: 3px;
+}
+
+.od-agreements__bins button[data-empty] { opacity: 0.45; }
+.od-agreements__bins button:hover,
+.od-agreements__bins button:focus-visible,
+.od-agreements__bins button[aria-pressed="true"] { border-color: var(--line-strong); }
+
+@media (prefers-reduced-motion: reduce) {
+  .od-agreements .od-agreements__country[data-value] {
+    fill-opacity: 1;
+    transition: fill 300ms ease, opacity var(--dur-base) ease;
+  }
+}
+
 /* --- Dos mapas en una fila ------------------------------------------------- */
 
 .od-pair {
@@ -3656,7 +3759,7 @@
 
   .od-report-bar { position: static; }
 
-  .od-report-bar__csv { margin-left: 0; }
+  .od-report-bar__downloads { margin-left: 0; }
 
   .od-report-head__facts > div {
     grid-template-columns: minmax(0, 1fr);

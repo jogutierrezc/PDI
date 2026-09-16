@@ -14,7 +14,7 @@
 import { useEffect, useState } from "react";
 import { Icon } from "../../../components/ui/Icon";
 import { cutsOf, downloadText, formatValue, valueOf } from "../data/open-data";
-import { cutLabel } from "../data/terms";
+import { ALL_YEARS, cutLabel } from "../data/terms";
 import type { Campus, CampusId, Indicator, Report, Term } from "../data/types";
 import { ViewSwitch } from "./ChartFrame";
 
@@ -22,8 +22,14 @@ type Dim = "indicador" | "campus" | "anio";
 
 const DIM_LABEL: Record<Dim, string> = { indicador: "Indicador", campus: "Campus", anio: "Corte" };
 
-/** "2024" → año; "2024-A" → periodo A de 2024. */
+const PERIOD_KEY = "periodo";
+
+/** Clave de un corte en la tabla: "2024", "2024-A" o "periodo" (todo el periodo). */
+const cutKey = (year: number, term: Term | null) => (year === ALL_YEARS ? PERIOD_KEY : cutLabel(year, term));
+
+/** "2024" → año; "2024-A" → periodo A de 2024; "periodo" → todo el periodo. */
 const parseCut = (key: string): { year: number; term: Term | null } => {
+  if (key === PERIOD_KEY) return { year: ALL_YEARS, term: null };
   const [year, term] = key.split("-");
   return { year: Number(year), term: term === "A" || term === "B" ? term : null };
 };
@@ -49,25 +55,27 @@ export function PivotTable({ report, years, campuses, year, term = null, campus 
   const [fixedIndicator, setFixedIndicator] = useState(report.keyIndicators[0] ?? report.indicators[0]?.id);
   const [fixedCampus, setFixedCampus] = useState<CampusId>(campus);
   const [detail, setDetail] = useState<"anual" | "periodos">(term ? "periodos" : "anual");
-  const [fixedCut, setFixedCut] = useState(cutLabel(year, term));
+  const [fixedCut, setFixedCut] = useState(cutKey(year, term));
   const [heat, setHeat] = useState<"si" | "no">("si");
   const [sort, setSort] = useState<{ col: string; dir: "desc" | "asc" } | null>(null);
 
   // Los filtros de la página mandan: al cambiar corte o campus arriba, la tabla los sigue.
   useEffect(() => setFixedCampus(campus), [campus]);
   useEffect(() => {
-    setFixedCut(cutLabel(year, term));
+    setFixedCut(cutKey(year, term));
     if (term) setDetail("periodos");
   }, [year, term]);
-  const cuts = cutsOf(years, detail === "periodos");
-  const selectedCut = cutLabel(year, term);
+  // Por año, la tabla abre con la columna del periodo agrupado (promedio anual) delante de los años.
+  const cuts = detail === "periodos" ? cutsOf(years, true) : [{ year: ALL_YEARS, term: null }, ...cutsOf(years, false)];
+  const selectedCut = cutKey(year, term);
+  const cutName = (y: number, t: Term | null) => (y === ALL_YEARS ? `${cutLabel(y, t)} (promedio)` : cutLabel(y, t));
 
   const fixedDim: Dim = (["indicador", "campus", "anio"] as Dim[]).find((d) => d !== rows && d !== cols)!;
 
   const members = (dim: Dim): Member[] => {
     if (dim === "indicador") return report.indicators.map((i) => ({ key: i.id, label: i.label, sub: i.unit }));
     if (dim === "campus") return campuses.map((c) => ({ key: c.id, label: c.name }));
-    return cuts.map((c) => ({ key: cutLabel(c.year, c.term), label: cutLabel(c.year, c.term) }));
+    return cuts.map((c) => ({ key: cutKey(c.year, c.term), label: cutName(c.year, c.term) }));
   };
 
   const indicatorOf = (r: Member, c: Member): Indicator | undefined => {
@@ -186,8 +194,8 @@ export function PivotTable({ report, years, campuses, year, term = null, campus 
           {fixedDim === "anio" && (
             <select value={fixedCut} onChange={(e) => setFixedCut(e.target.value)}>
               {cuts.map((c) => (
-                <option key={cutLabel(c.year, c.term)} value={cutLabel(c.year, c.term)}>
-                  {cutLabel(c.year, c.term)}
+                <option key={cutKey(c.year, c.term)} value={cutKey(c.year, c.term)}>
+                  {cutName(c.year, c.term)}
                 </option>
               ))}
             </select>
@@ -207,7 +215,8 @@ export function PivotTable({ report, years, campuses, year, term = null, campus 
               setDetail(next);
               // El corte fijo pasa al detalle elegido: 2024 ↔ 2024-B.
               const { year: y } = parseCut(fixedCut);
-              setFixedCut(next === "periodos" ? cutLabel(y, term ?? "B") : String(y));
+              const base = y === ALL_YEARS ? years[years.length - 1] : y;
+              setFixedCut(next === "periodos" ? cutLabel(base, term ?? "B") : String(base));
             }}
           />
         </div>

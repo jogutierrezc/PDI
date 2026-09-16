@@ -7,7 +7,7 @@
    ========================================================================== */
 
 import { basisOf, changeBetween, formatValue, formatWithUnit, valueOf } from "../data/open-data";
-import { cutLabel } from "../data/terms";
+import { ALL_YEARS, cutLabel } from "../data/terms";
 import type { CampusId, Indicator, Term } from "../data/types";
 import { SplitFlap } from "./SplitFlap";
 import type { FlapSize } from "./SplitFlap";
@@ -82,7 +82,9 @@ export function FigureTicket({
 
       <span className="od-figure__previous">
         <Pin letter={annotate?.[1]} />
-        {!hasPrevious ? (
+        {year === ALL_YEARS ? (
+          <>Periodo {cut}{basis ? ` · ${basis}` : ""}</>
+        ) : !hasPrevious ? (
           <>Primer corte publicado</>
         ) : previous === null ? (
           <>{previousCut}: sin reportar</>
@@ -106,8 +108,8 @@ export function FigureTicket({
         <span className="od-ticket">
           <span className="od-ticket__source">{indicator.source}</span>
           <span className="od-ticket__meta">
-            <span className="od-ticket__campus">{campusName} · </span>Corte {cut}
-            {basis && <span className="od-ticket__basis"> · {basis}</span>}
+            <span className="od-ticket__campus">{campusName} · </span>{year === ALL_YEARS ? "Periodo" : "Corte"} {cut}
+            {basis && year !== ALL_YEARS && <span className="od-ticket__basis"> · {basis}</span>}
           </span>
           {illustrative && <span className="od-ticket__stamp">Dato ilustrativo</span>}
         </span>

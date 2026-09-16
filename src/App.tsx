@@ -70,6 +70,15 @@ const OpenDataPortal = lazy(() =>
 const OpenDataReport = lazy(() =>
   import("./modules/datos-abiertos/OpenDataReport").then((m) => ({ default: m.OpenDataReport })),
 );
+const IntranetBulletinPage = lazy(() =>
+  import("./modules/boletin/BulletinViewer").then((m) => ({ default: m.IntranetBulletinPage })),
+);
+const PublicBulletinPage = lazy(() =>
+  import("./modules/boletin/BulletinViewer").then((m) => ({ default: m.PublicBulletinPage })),
+);
+const PublicBulletinList = lazy(() =>
+  import("./modules/boletin/BulletinViewer").then((m) => ({ default: m.PublicBulletinList })),
+);
 const OdAdmin = lazy(() =>
   import("./modules/admin/udes-en-cifras/OdAdmin").then((m) => ({ default: m.OdAdmin })),
 );
@@ -144,6 +153,8 @@ export default function App() {
           <Route path="/facultades/:slug" element={<FacultyDetail />} />
           <Route path="/desarrollo-tecnologico" element={<TechDevelopment />} />
           <Route path="/datos-abiertos" element={<OpenDataPortal />} />
+          <Route path="/datos-abiertos/boletines" element={<PublicBulletinList />} />
+          <Route path="/datos-abiertos/boletines/:slug" element={<PublicBulletinPage />} />
           <Route path="/datos-abiertos/:slug" element={<OpenDataReport />} />
           <Route path="/acceso-intranet" element={<LoginPortal />} />
 
@@ -226,6 +237,15 @@ export default function App() {
             element={
               <RequireRole minimum="consulta" screen="cifras">
                 <OdAdmin />
+              </RequireRole>
+            }
+          />
+          {/* Boletín: el documento solo, sin el marco de la intranet, para verlo e imprimirlo. */}
+          <Route
+            path="/admin/boletin/:id"
+            element={
+              <RequireRole minimum="consulta" screen="cifras">
+                <IntranetBulletinPage />
               </RequireRole>
             }
           />

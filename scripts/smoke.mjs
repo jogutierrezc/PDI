@@ -1673,6 +1673,24 @@ const routes = [
   { path: "/admin/udes-en-cifras/diseno/poblacional", session: true, expect: "Bloques de la ficha", also: ["Así se lee la ficha", "Tabla dinámica"] },
   { path: "/admin/udes-en-cifras/publicacion/sostenible", session: true, expect: "Estado de los informes", also: ["Revisar UDES Sostenible", "Bitácora de publicación"] },
   { path: "/admin/udes-en-cifras/periodo", session: true, expect: "Campus del periodo", also: ["Oficinas fuente", "Periodo 2020-2025"] },
+  {
+    path: "/admin/udes-en-cifras/boletin",
+    note: "Boletín: plantilla, contenido, vista previa paginada",
+    session: true,
+    expect: "Boletines del periodo",
+    also: ["Boletín UDES en Cifras", "Contenido", "Plantilla", "Vista previa", "Oficinas que reportan", "Hoja de indicador, en todos"],
+  },
+  { path: "/admin/boletin/od-boletin-global", session: true, expect: "Descargar PDF", also: ["Presentación", "Contenido", "Oficinas que reportan"] },
+  { path: "/datos-abiertos/boletines", expect: "Boletín UDES en Cifras", also: ["En vivo", "Ediciones en PDF", "Edición septiembre de 2026"] },
+  { path: "/datos-abiertos/boletines/boletin-global", expect: "Descargar PDF", also: ["Presentación", "Poblacional", "Oficinas que reportan"] },
+  {
+    path: "/datos-abiertos/boletines/boletin-poblacional",
+    note: "sin boletín propio, el informe usa la plantilla del global publicado",
+    expect: "Descargar PDF",
+    also: ["Boletín UDES en Cifras · Poblacional", "Estudiantes matriculados"],
+  },
+  { path: "/datos-abiertos", note: "descarga del boletín global en el tablero", expect: "Descargar boletín global (PDF)", also: ["Todos los boletines y ediciones"] },
+  { path: "/datos-abiertos/permanencia", note: "descarga del boletín del informe junto al CSV", expect: "Boletín PDF", also: ["CSV"] },
   { path: "/acceso-intranet", expect: "Intranet PDI" },
   { path: "/ruta-que-no-existe", expect: "Esta página no existe" },
   { path: "/admin/pilares", expect: "Intranet PDI", note: "sin sesión debe redirigir al acceso" },
@@ -2296,6 +2314,22 @@ FIXTURES.v_faculty_actions_admin = [
 /* UDES en Cifras: las filas que deja la migración 0020, generadas junto con ella. */
 const OD_FIXTURES = JSON.parse(readFileSync(new URL("./fixtures/udes-en-cifras.json", import.meta.url), "utf8"));
 Object.assign(FIXTURES, OD_FIXTURES);
+
+/* Boletín UDES en Cifras (0027): uno global publicado con una edición en PDF. */
+FIXTURES.od_bulletins = [
+  {
+    id: "od-boletin-global", period_id: "od-periodo-2020-2025", report_id: null, slug: "boletin-global",
+    title: "Boletín UDES en Cifras", settings: {}, status: "publicado", updated_by: null,
+    created_at: "2026-09-01T08:00:00Z", updated_at: "2026-09-01T08:00:00Z",
+  },
+];
+FIXTURES.od_bulletin_editions = [
+  {
+    id: "od-boletin-edicion-1", bulletin_id: "od-boletin-global", title: "Boletín UDES en Cifras", period_label: "2020-2025",
+    label: "Edición septiembre de 2026", cut_label: "Periodo 2020–2025", file_path: "ediciones/od-boletin-global/boletin.pdf",
+    file_size: 3200000, status: "publicado", note: "", published_by: null, published_at: "2026-09-02T08:00:00Z",
+  },
+];
 
 /* --- Ejecución -------------------------------------------------------------- */
 

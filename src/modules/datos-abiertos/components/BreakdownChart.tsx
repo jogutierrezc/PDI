@@ -21,7 +21,7 @@
 import { useState } from "react";
 import type { CSSProperties } from "react";
 import { downloadText, formatValue, formatWithUnit } from "../data/open-data";
-import { ANNUAL_RULE_LABEL, cutCode, cutCodeLabel, cutLabel, fromCutCode, TERMS } from "../data/terms";
+import { ALL_YEARS, ANNUAL_RULE_LABEL, cutCode, cutCodeLabel, cutLabel, fromCutCode, TERMS } from "../data/terms";
 import type { Breakdown, BreakdownItem, Term } from "../data/types";
 import { AnnualTermChart } from "./AnnualTermChart";
 import { BarList } from "./Charts";
@@ -75,7 +75,11 @@ export function BreakdownChart({ breakdown, year, term, years, setYear }: {
   };
 
   // El corte del año de la ficha: el periodo elegido aquí, o el último con dato.
-  const yearCuts = available.includes(year) ? cutsOf(year) : [];
+  // Todo el periodo: un único corte con el promedio anual de cada categoría.
+  const grouped = year === ALL_YEARS;
+  const yearCuts = grouped
+    ? reported(breakdown.values[ALL_YEARS]) ? [{ year: ALL_YEARS, term: null }] : []
+    : available.includes(year) ? cutsOf(year) : [];
   const [pickedTerm, setPickedTerm] = useState<Term | "anual" | null>(null);
   const selected =
     yearCuts.find((cut) => (cut.term ?? "anual") === pickedTerm) ?? yearCuts[yearCuts.length - 1];
@@ -121,7 +125,7 @@ export function BreakdownChart({ breakdown, year, term, years, setYear }: {
 
   const subtitle = series
     ? `Total institucional · ${cuts.length ? `${cutLabel(cuts[0].year, cuts[0].term)} a ${cutLabel(cuts[cuts.length - 1].year, cuts[cuts.length - 1].term)}` : "sin cortes"}${term ? ` · solo periodo ${term}` : ""} · ${breakdown.unit}`
-    : `Total institucional · corte ${selected ? cutLabel(selected.year, selected.term) : cutLabel(year, term)} · ${breakdown.unit}`;
+    : `Total institucional · ${grouped ? `periodo ${cutLabel(year, null)} · promedio anual` : `corte ${selected ? cutLabel(selected.year, selected.term) : cutLabel(year, term)}`} · ${breakdown.unit}`;
   const selectedItems = selected ? itemsAt(selected) : [];
 
   return (
@@ -178,7 +182,7 @@ export function BreakdownChart({ breakdown, year, term, years, setYear }: {
         !selected || !reported(selectedItems) ? (
           <div className="od-empty">
             <p>
-              {available.includes(year)
+              {grouped || available.includes(year)
                 ? `Este desglose no tiene cifras para ${cutLabel(year, term)}.`
                 : `Este desglose no reporta ${year}.`}
             </p>

@@ -21,6 +21,8 @@ export interface LineSeries {
   color: string;
   values: (number | null)[];
   dashed?: boolean;
+  /** Valor de la leyenda cuando el corte elegido no es un punto de la serie (todo el periodo). */
+  current?: number | null;
 }
 
 interface LineChartProps {
@@ -149,7 +151,7 @@ export function LineChart({
       <div className="od-legend" role="group" aria-label="Series visibles">
         {series.map((s) => {
           const on = !hidden.has(s.id);
-          const current = s.values[selectedIndex] ?? null;
+          const current = s.current !== undefined ? s.current : s.values[selectedIndex] ?? null;
           return (
             <button
               key={s.id}

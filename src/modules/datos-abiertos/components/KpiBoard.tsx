@@ -12,7 +12,7 @@
 
 import type { CSSProperties } from "react";
 import { basisOf, changeBetween, cutsOf, formatValue, formatWithUnit, valueOf } from "../data/open-data";
-import { cutLabel } from "../data/terms";
+import { ALL_YEARS, cutLabel } from "../data/terms";
 import type { CampusId, Indicator, Term } from "../data/types";
 import { SplitFlap } from "./SplitFlap";
 
@@ -33,6 +33,7 @@ export function KpiBoard({ indicators, years, year, term = null, campus, campusN
   const cuts = cutsOf(years, term !== null);
   const cut = cutLabel(year, term);
   const previousCut = cutLabel(year - 1, term);
+  const grouped = year === ALL_YEARS;
   return (
     <div className="od-kpis">
       {indicators.map((indicator, index) => {
@@ -71,7 +72,9 @@ export function KpiBoard({ indicators, years, year, term = null, campus, campusN
             </span>
 
             <span className="od-kpi__change" data-reading={change?.reading ?? "neutro"}>
-              {change ? (
+              {grouped ? (
+                <>Periodo {cut} · {basis ?? "sin cifras"}</>
+              ) : change ? (
                 <>
                   <svg viewBox="0 0 16 16" aria-hidden="true" data-dir={rising ? "up" : falling ? "down" : "flat"}>
                     <path d={rising ? "M8 3l5 6H3z" : falling ? "M8 13l5-6H3z" : "M3 7h10v2H3z"} />
@@ -104,7 +107,7 @@ export function KpiBoard({ indicators, years, year, term = null, campus, campusN
               <span className="od-stub__source">{indicator.source}</span>
               <span className="od-stub__meta">
                 {campusName} · {cut}
-                {basis ? ` · ${basis}` : ""}
+                {basis && !grouped ? ` · ${basis}` : ""}
                 {illustrative ? " · ilustrativo" : ""}
               </span>
             </span>

@@ -988,6 +988,7 @@ export type OdTerm = "A" | "B" | "anual";
 export type OdAnnualRule = "suma" | "ultimo" | "promedio" | "reportado";
 /** Por departamento: "origen" y "cobertura". Mundial (código ISO alfa-3): "entrante" y "saliente". */
 export type OdMapMode = "origen" | "cobertura" | "entrante" | "saliente";
+export type OdMapLayout = "combinado" | "lado_a_lado";
 /** Qué se captura en cada etapa de una tubería. */
 export type OdPipelineMeasure = "estudiantes" | "permanencia" | "desercion";
 export type OdChartKind = "circular" | "barras" | "lineas";
@@ -1219,7 +1220,17 @@ export interface OdReportBlockRow {
   section_id?: string | null;
   position: number;
   visible: boolean;
-  settings: { chart?: OdChartKind; title?: string; indicators?: string[] };
+  settings: {
+    chart?: OdChartKind;
+    title?: string;
+    indicators?: string[];
+    /** Mapas: clave (no id) del otro mapa que se muestra con este. La clave sobrevive a la copia de periodo. */
+    mapWith?: string;
+    /** "combinado": entrante y saliente en un solo mapa; "lado_a_lado": dos mapas en una fila. */
+    mapLayout?: OdMapLayout;
+    /** Mapa con panel denso y encuadre a los países con datos. */
+    compact?: boolean;
+  };
 }
 
 export interface OdSectionRequest {

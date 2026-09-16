@@ -1,21 +1,26 @@
 /* =============================================================================
    Mapa del mundo: movilidad internacional.
 
-   Dos lecturas del mismo dibujo, según el modo del conjunto:
+   Recibe uno o dos conjuntos:
    · "entrante": participantes que llegan de otro país a un campus de la UDES.
-     Las rutas nacen en el país de origen y terminan en Colombia.
+     Las rutas nacen en el país de origen y terminan en Colombia (ámbar).
    · "saliente": participantes que salen de un campus a otro país. Las rutas
-     nacen en Colombia y terminan en el país de destino.
+     nacen en Colombia y terminan en el país de destino (magenta).
+   Con los dos, el mapa es combinado: cada sentido con su color, un selector
+   para ver ambos o uno solo, y el ranking con las dos cifras por país. Las
+   rutas de ida y vuelta a un mismo país se abomban distinto para no pisarse.
 
    Cada país se colorea con la escala azul según sus participantes. Al entrar en
    pantalla las rutas se trazan de la más fuerte a la más débil; después un
    cometa con estela recorre cada una en el sentido del viaje y, al llegar,
-   deja una onda en el destino. Las rutas con más gente van más rápido y más
-   gruesas. Con "menos movimiento" las rutas quedan dibujadas y quietas.
+   deja una onda en el destino. Con "menos movimiento" quedan quietas.
 
-   Interacción: pasar por un país o por su fila del ranking lo resalta y aísla
-   su ruta; un clic lo fija y muestra el reparto por campus. El campus del
-   filtro de la página aísla sus cifras. El ranking es la vía accesible.
+   Compacto: el mapa se encuadra a los países con datos (Colombia incluida), el
+   panel pasa a un lado si cabe y el ranking se acorta a cinco filas. El
+   encuadre sale de todos los campus y ambos sentidos, así no salta al filtrar.
+
+   Interacción: pasar por un país o por su fila del ranking aísla su ruta; un
+   clic lo fija y muestra el reparto por campus. El ranking es la vía accesible.
    ========================================================================== */
 
 import { useRef, useState } from "react";
@@ -30,19 +35,30 @@ import { useInView, usePrefersReducedMotion, useWidth } from "./motion";
 const BY_CODE = Object.fromEntries(COUNTRIES.map((c) => [c.code, c]));
 const HOME = "COL";
 const BINS = 7;
-const MAX_ROUTES = 24;
+
+type Direction = "entrante" | "saliente";
+type Show = "ambos" | Direction;
+
+const DIRECTION_LABEL: Record<Direction, { total: string; short: string; route: string }> = {
+  entrante: { total: "Participantes entrantes", short: "Entrantes", route: "Del país de origen a la UDES" },
+  saliente: { total: "Participantes salientes", short: "Salientes", route: "De la UDES al país de destino" },
+};
 
 interface WorldMapProps {
-  dataset: MapDataset;
+  /** Uno o dos conjuntos de movilidad (entrante y/o saliente). */
+  datasets: MapDataset[];
   year: number;
   years: number[];
   campus: CampusId;
   campuses: Campus[];
   onSelectCampus?: (campus: CampusId) => void;
+  compact?: boolean;
 }
 
+type Point = [number, number];
+
 /** Arco de `from` a `to`, abombado hacia el norte: se lee como un vuelo. */
-function arc([x0, y0]: [number, number], [x1, y1]: [number, number]) {
+function arc([x0, y0]: Point, [x1, y1]: Point, bend: number) {
   const dx = x1 - x0;
   const dy = y1 - y0;
   const chord = Math.hypot(dx, dy) || 1;
@@ -52,15 +68,32 @@ function arc([x0, y0]: [number, number], [x1, y1]: [number, number]) {
     nx = -nx;
     ny = -ny;
   }
-  const lift = Math.min(150, chord * 0.26);
+  const lift = Math.min(150, chord * bend);
   const cx = (x0 + x1) / 2 + nx * lift;
   const cy = (y0 + y1) / 2 + ny * lift;
-  // Longitud aproximada de la curva: decide la duración del viaje.
   const length = (chord + Math.hypot(cx - x0, cy - y0) + Math.hypot(x1 - cx, y1 - cy)) / 2;
   return { d: `M${x0} ${y0}Q${cx.toFixed(1)} ${cy.toFixed(1)} ${x1} ${y1}`, length };
 }
 
-export function WorldMap({ dataset, year, years, campus, campuses, onSelectCampus }: WorldMapProps) {
+/** Recuadro que contiene los puntos, con margen y proporción apaisada, dentro del mundo. */
+function fitBox(points: Point[]) {
+  if (points.length < 2) return { x: 0, y: 0, w: WORLD_WIDTH, h: WORLD_HEIGHT };
+  const xs = points.map((p) => p[0]);
+  const ys = points.map((p) => p[1]);
+  const ratio = 0.52;
+  let w = Math.max(420, Math.max(...xs) - Math.min(...xs) + 140);
+  let h = Math.max(...ys) - Math.min(...ys) + 110;
+  if (h > w * ratio) w = h / ratio;
+  h = w * ratio;
+  if (w >= WORLD_WIDTH || h >= WORLD_HEIGHT) return { x: 0, y: 0, w: WORLD_WIDTH, h: WORLD_HEIGHT };
+  const cx = (Math.max(...xs) + Math.min(...xs)) / 2;
+  const cy = (Math.max(...ys) + Math.min(...ys)) / 2;
+  const x = Math.min(WORLD_WIDTH - w, Math.max(0, cx - w / 2));
+  const y = Math.min(WORLD_HEIGHT - h, Math.max(0, cy - h / 2));
+  return { x, y, w, h };
+}
+
+export function WorldMap({ datasets, year, years, campus, campuses, onSelectCampus, compact = false }: WorldMapProps) {
   const wrap = useRef<HTMLDivElement>(null);
   const seen = useInView(wrap);
   const reduced = usePrefersReducedMotion();
@@ -68,28 +101,46 @@ export function WorldMap({ dataset, year, years, campus, campuses, onSelectCampu
   const [hover, setHover] = useState<string | null>(null);
   const [pinned, setPinned] = useState<string | null>(null);
   const [tip, setTip] = useState<{ x: number; y: number } | null>(null);
+  const [show, setShow] = useState<Show>("ambos");
   const focus = hover ?? pinned;
-  const incoming = dataset.mode === "entrante";
+
+  const layers = (["entrante", "saliente"] as Direction[])
+    .map((mode) => datasets.find((d) => d.mode === mode))
+    .filter((d): d is MapDataset => Boolean(d));
+  const combined = layers.length === 2;
+  const visible = combined && show !== "ambos" ? layers.filter((l) => l.mode === show) : layers;
+  const dirOf = (d: MapDataset) => d.mode as Direction;
+  const unit = layers[0]?.unit || "participantes";
 
   // Si el corte no tiene datos, se usa el último que sí los tenga y se dice.
-  const available = years.filter((y) => dataset.values[y] && Object.keys(dataset.values[y]!).length > 0);
+  const hasYear = (y: number) => layers.some((d) => d.values[y] && Object.keys(d.values[y]!).length > 0);
+  const available = years.filter(hasYear);
   const shownYear = available.includes(year) ? year : available[available.length - 1];
-  const bySite = (dataset.values[shownYear] ?? {}) as Record<string, Record<string, number>>;
   const SITES = campuses.map((c) => c.id).filter((id) => id !== "todas");
   const activeSites = campus === "todas" ? SITES : SITES.filter((s) => s === campus);
   const campusName = (site: string) => campuses.find((c) => c.id === site)?.name ?? site;
+  const siteValues = (d: MapDataset) => (d.values[shownYear] ?? {}) as Record<string, Record<string, number>>;
 
-  const totals: Record<string, number> = {};
-  for (const site of activeSites) {
-    for (const [code, value] of Object.entries(bySite[site] ?? {})) {
-      if (code === HOME) continue;
-      totals[code] = (totals[code] ?? 0) + value;
+  /** totales[sentido][país] para los campus activos. */
+  const byDir: Record<Direction, Record<string, number>> = { entrante: {}, saliente: {} };
+  for (const d of layers) {
+    for (const site of activeSites) {
+      for (const [code, value] of Object.entries(siteValues(d)[site] ?? {})) {
+        if (code === HOME) continue;
+        byDir[dirOf(d)][code] = (byDir[dirOf(d)][code] ?? 0) + value;
+      }
     }
   }
-  const grand = Object.values(totals).reduce((a, b) => a + b, 0);
+  const totals: Record<string, number> = {};
+  for (const d of visible) {
+    for (const [code, value] of Object.entries(byDir[dirOf(d)])) totals[code] = (totals[code] ?? 0) + value;
+  }
+  const sum = (record: Record<string, number>) => Object.values(record).reduce((a, b) => a + b, 0);
+  const grand = sum(totals);
   const ranking = Object.entries(totals).sort((a, b) => b[1] - a[1]);
   const max = ranking[0]?.[1] ?? 1;
   const rank = new Map(ranking.map(([code], index) => [code, index]));
+  const maxByDir = Math.max(1, ...visible.flatMap((d) => Object.values(byDir[dirOf(d)])));
 
   // Escala logarítmica en siete tramos: el país con 2 participantes tiene que
   // distinguirse del que no tiene ninguno, aunque otro sume doscientos.
@@ -97,65 +148,91 @@ export function WorldMap({ dataset, year, years, campus, campuses, onSelectCampu
   const binOf = (value: number | undefined) => (value ? Math.max(1, Math.min(BINS, Math.ceil((Math.log10(value) / top) * BINS))) : 0);
   const thresholds = Array.from({ length: BINS }, (_, i) => Math.round(10 ** (((i + 1) / BINS) * top)));
 
-  const siteTotals = SITES.map((site) => ({
-    site,
-    total: Object.entries(bySite[site] ?? {}).reduce((sum, [code, v]) => (code === HOME ? sum : sum + v), 0),
-  }));
+  const siteTotal = (site: string, dir?: Direction) =>
+    visible
+      .filter((d) => !dir || dirOf(d) === dir)
+      .reduce((acc, d) => acc + Object.entries(siteValues(d)[site] ?? {}).reduce((s, [code, v]) => (code === HOME ? s : s + v), 0), 0);
 
   // Las ciudades de los campus quedan a pocos píxeles entre sí a escala mundial:
   // las rutas llegan al centro de los campus activos, no a cada uno.
   const sitePoints = activeSites.map((s) => WORLD_CAMPUS_POINTS[s]).filter(Boolean);
-  const hub: [number, number] = sitePoints.length
+  const hub: Point = sitePoints.length
     ? [
         Math.round((sitePoints.reduce((a, p) => a + p[0], 0) / sitePoints.length) * 10) / 10,
         Math.round((sitePoints.reduce((a, p) => a + p[1], 0) / sitePoints.length) * 10) / 10,
       ]
     : BY_CODE[HOME].c;
 
-  const scale = width / WORLD_WIDTH;
-  const stroke = (px: number) => px / Math.max(scale, 0.45);
-  const routes = ranking
-    .filter(([code]) => BY_CODE[code])
-    .slice(0, MAX_ROUTES)
-    .map(([code, value], index) => {
-      const place = BY_CODE[code].c;
-      const shape = incoming ? arc(place, hub) : arc(hub, place);
-      const strength = Math.sqrt(value / max);
-      // Más gente, viaje más ágil; más distancia, viaje más largo.
-      const duration = 2.2 + shape.length / 260 - strength * 0.9;
-      return {
-        code,
-        value,
-        index,
-        strength,
-        d: shape.d,
-        end: incoming ? hub : place,
-        duration,
-        // Desfase determinista: los cometas no salen todos a la vez.
-        delay: ((index * 0.618) % 1) * duration,
-      };
-    });
+  // Encuadre compacto: todos los países con dato en el periodo mostrado, de
+  // cualquier campus y sentido, para que el filtro no mueva la cámara.
+  const framed = new Set<string>();
+  for (const d of layers) for (const site of SITES) for (const code of Object.keys(siteValues(d)[site] ?? {})) framed.add(code);
+  const box = compact
+    ? fitBox([hub, ...[...framed].filter((c) => BY_CODE[c]).map((c) => BY_CODE[c].c)])
+    : { x: 0, y: 0, w: WORLD_WIDTH, h: WORLD_HEIGHT };
 
-  const focusValue = focus ? totals[focus] ?? 0 : 0;
-  const hubLeft = (hub[0] / WORLD_WIDTH) * 100;
-  const hubTop = (hub[1] / WORLD_HEIGHT) * 100;
-  const countryLabel = incoming ? "país de origen" : "país de destino";
+  const scale = width / box.w;
+  const stroke = (px: number) => px / Math.max(scale, 0.45);
+  const perLayer = combined && show === "ambos" ? (compact ? 10 : 14) : compact ? 14 : 24;
+  const routes = visible.flatMap((d, layerIndex) => {
+    const dir = dirOf(d);
+    const incoming = dir === "entrante";
+    // Ida y vuelta al mismo país: la entrante se abomba más que la saliente.
+    const bend = combined ? (incoming ? 0.32 : 0.12) : 0.26;
+    return Object.entries(byDir[dir])
+      .filter(([code]) => BY_CODE[code])
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, perLayer)
+      .map(([code, value], index) => {
+        const place = BY_CODE[code].c;
+        const shape = incoming ? arc(place, hub, bend) : arc(hub, place, bend);
+        const strength = Math.sqrt(value / maxByDir);
+        const duration = 2.2 + shape.length / 260 - strength * 0.9;
+        return {
+          key: `${dir}-${code}`,
+          dir,
+          code,
+          index,
+          strength,
+          d: shape.d,
+          end: incoming ? hub : place,
+          duration,
+          // Desfase determinista: los cometas no salen todos a la vez.
+          delay: (((index + layerIndex * 0.5) * 0.618) % 1) * duration,
+        };
+      });
+  });
+
+  const hubLeft = ((hub[0] - box.x) / box.w) * 100;
+  const hubTop = ((hub[1] - box.y) / box.h) * 100;
+  const rankRows = ranking.slice(0, compact ? 5 : 8);
+  const soleDir = visible.length === 1 ? dirOf(visible[0]) : null;
 
   const pointer = (code: string) => (event: PointerEvent) => {
-    const box = wrap.current?.getBoundingClientRect();
-    if (!box) return;
+    const rect = wrap.current?.getBoundingClientRect();
+    if (!rect) return;
     setHover(code);
-    setTip({ x: event.clientX - box.left, y: event.clientY - box.top - 12 });
+    setTip({ x: event.clientX - rect.left, y: event.clientY - rect.top - 12 });
   };
   const toggle = (code: string) => setPinned((p) => (p === code ? null : code));
+  const pct = (value: number) => formatValue((value / (grand || 1)) * 100, "decimal");
+  const title = layers.map((l) => l.title).join(" y ");
 
   return (
-    <div className="od-world" data-seen={seen || undefined} data-motion={!reduced || undefined} data-mode={dataset.mode}>
+    <div
+      className="od-world"
+      data-seen={seen || undefined}
+      data-motion={!reduced || undefined}
+      data-compact={compact || undefined}
+      data-combined={combined || undefined}
+    >
+      <div className="od-world__layout">
       <div ref={wrap} className="od-world__canvas">
         <svg
-          viewBox={`0 0 ${WORLD_WIDTH} ${WORLD_HEIGHT}`}
+          viewBox={`${box.x.toFixed(1)} ${box.y.toFixed(1)} ${box.w.toFixed(1)} ${box.h.toFixed(1)}`}
           role="img"
-          aria-label={`${dataset.title}, ${shownYear}. El detalle está en el ranking de países.`}
+          data-framed={box.w < WORLD_WIDTH || undefined}
+          aria-label={`${title}, ${shownYear}. El detalle está en el ranking de países.`}
           onPointerLeave={() => {
             setHover(null);
             setTip(null);
@@ -198,7 +275,6 @@ export function WorldMap({ dataset, year, years, campus, campuses, onSelectCampu
 
           <g className="od-world__routes" aria-hidden="true">
             {routes.map((route) => {
-              const dim = focus !== null && focus !== route.code;
               const base = 0.9 + route.strength * 2.6;
               const vars = {
                 "--i": route.index,
@@ -206,7 +282,14 @@ export function WorldMap({ dataset, year, years, campus, campuses, onSelectCampu
                 "--delay": `${route.delay.toFixed(2)}s`,
               } as CSSProperties;
               return (
-                <g key={route.code} className="od-world__route" data-dim={dim || undefined} data-active={focus === route.code || undefined} style={vars}>
+                <g
+                  key={route.key}
+                  className="od-world__route"
+                  data-dir={route.dir}
+                  data-dim={(focus !== null && focus !== route.code) || undefined}
+                  data-active={focus === route.code || undefined}
+                  style={vars}
+                >
                   <path className="od-world__track" d={route.d} pathLength={1} style={{ strokeWidth: stroke(base) }} />
                   {!reduced && (
                     <>
@@ -245,15 +328,18 @@ export function WorldMap({ dataset, year, years, campus, campuses, onSelectCampu
         {hover && tip && (
           <ChartTooltip x={tip.x} y={tip.y} align={tip.x < 140 ? "start" : tip.x > width - 140 ? "end" : "center"}>
             <strong>{BY_CODE[hover]?.name ?? hover}</strong>
-            {focusValue > 0 ? (
+            {(totals[hover] ?? 0) > 0 ? (
               <>
-                <span>
-                  {formatValue(focusValue, "entero")} {dataset.unit} · {formatValue((focusValue / grand) * 100, "decimal")} %
-                </span>
-                <span>{incoming ? "Hacia" : "Desde"} {campus === "todas" ? "la UDES" : campusName(campus)} · puesto {(rank.get(hover) ?? 0) + 1} de {ranking.length}</span>
+                {visible.map((d) => (
+                  <span key={d.mode}>
+                    {visible.length > 1 && <i className="od-world__dot" data-dir={dirOf(d)} />}
+                    {formatValue(byDir[dirOf(d)][hover] ?? 0, "entero")} {visible.length > 1 ? DIRECTION_LABEL[dirOf(d)].short.toLowerCase() : unit}
+                  </span>
+                ))}
+                <span>{pct(totals[hover])} % · puesto {(rank.get(hover) ?? 0) + 1} de {ranking.length}</span>
               </>
             ) : (
-              <span>Sin {dataset.unit} en {shownYear}</span>
+              <span>Sin {unit} en {shownYear}</span>
             )}
           </ChartTooltip>
         )}
@@ -264,21 +350,43 @@ export function WorldMap({ dataset, year, years, campus, campuses, onSelectCampu
       </div>
 
       <div className="od-world__panel">
-        <div className="od-map__total">
-          <span>
-            {incoming ? "Participantes entrantes" : "Participantes salientes"}
-            {shownYear ? ` · ${shownYear}` : ""}
-          </span>
-          <strong>{formatValue(grand, "entero")}</strong>
-          <small>
-            {campus === "todas" ? "Todos los campus" : campusName(campus)} · {ranking.length} {ranking.length === 1 ? "país" : "países"}
-          </small>
-          {shownYear !== undefined && shownYear !== year && (
-            <small className="od-map__note">El corte {year} no tiene este mapa: se muestra {shownYear}.</small>
+        <div className="od-world__summary">
+          {combined && (
+            <div className="od-world__show" role="group" aria-label="Sentido de la movilidad">
+              {(["ambos", "entrante", "saliente"] as Show[]).map((option) => (
+                <button key={option} type="button" aria-pressed={show === option} data-dir={option} onClick={() => setShow(option)}>
+                  {option !== "ambos" && <i className="od-world__dot" data-dir={option} />}
+                  {option === "ambos" ? "Ambos" : DIRECTION_LABEL[option].short}
+                </button>
+              ))}
+            </div>
           )}
+          <div className="od-map__total">
+            <span>
+              {soleDir ? DIRECTION_LABEL[soleDir].total : "Participantes en movilidad"}
+              {shownYear ? ` · ${shownYear}` : ""}
+            </span>
+            <strong>{formatValue(grand, "entero")}</strong>
+            {visible.length > 1 && (
+              <span className="od-world__split">
+                {visible.map((d) => (
+                  <b key={d.mode}>
+                    <i className="od-world__dot" data-dir={dirOf(d)} />
+                    {formatValue(sum(byDir[dirOf(d)]), "entero")} {DIRECTION_LABEL[dirOf(d)].short.toLowerCase()}
+                  </b>
+                ))}
+              </span>
+            )}
+            <small>
+              {campus === "todas" ? "Todos los campus" : campusName(campus)} · {ranking.length} {ranking.length === 1 ? "país" : "países"}
+            </small>
+            {shownYear !== undefined && shownYear !== year && (
+              <small className="od-map__note">El corte {year} no tiene este mapa: se muestra {shownYear}.</small>
+            )}
+          </div>
           {SITES.length > 1 && (
-            <ul className="od-world__campuses" aria-label={incoming ? "Campus de llegada" : "Campus de salida"}>
-              {siteTotals.map(({ site, total }) => (
+            <ul className="od-world__campuses" aria-label="Campus">
+              {SITES.map((site) => (
                 <li key={site}>
                   <button
                     type="button"
@@ -287,7 +395,7 @@ export function WorldMap({ dataset, year, years, campus, campuses, onSelectCampu
                     onClick={() => onSelectCampus?.(campus === site ? "todas" : site)}
                   >
                     <span>{campusName(site)}</span>
-                    <b>{formatValue(total, "entero")}</b>
+                    <b>{formatValue(siteTotal(site), "entero")}</b>
                   </button>
                 </li>
               ))}
@@ -308,15 +416,22 @@ export function WorldMap({ dataset, year, years, campus, campuses, onSelectCampu
                 {SITES.map((site) => (
                   <li key={site}>
                     <span>{campusName(site)}</span>
-                    <b>{formatValue(bySite[site]?.[pinned] ?? 0, "entero")}</b>
+                    <span className="od-world__pinned-values">
+                      {visible.map((d) => (
+                        <b key={d.mode}>
+                          {visible.length > 1 && <i className="od-world__dot" data-dir={dirOf(d)} />}
+                          {formatValue(siteValues(d)[site]?.[pinned] ?? 0, "entero")}
+                        </b>
+                      ))}
+                    </span>
                   </li>
                 ))}
               </ul>
             </div>
           )}
 
-          <ol className="od-map__ranking" aria-label={`Participantes por ${countryLabel}`}>
-            {ranking.slice(0, 8).map(([code, value]) => (
+          <ol className="od-world__ranking" aria-label="Participantes por país">
+            {rankRows.map(([code, value]) => (
               <li key={code}>
                 <button
                   type="button"
@@ -328,36 +443,51 @@ export function WorldMap({ dataset, year, years, campus, campuses, onSelectCampu
                   onBlur={() => setHover(null)}
                   onClick={() => toggle(code)}
                 >
-                  <span className="od-map__rank-name">{BY_CODE[code]?.name ?? code}</span>
-                  <span className="od-map__rank-value">
+                  <span className="od-world__rank-name">{BY_CODE[code]?.name ?? code}</span>
+                  <span className="od-world__rank-value">
                     {formatValue(value, "entero")}
-                    <small> · {formatValue((value / grand) * 100, "decimal")} %</small>
+                    {!compact && <small> · {pct(value)} %</small>}
                   </span>
-                  <span className="od-map__rank-bar" aria-hidden="true">
-                    <i style={{ width: `${(value / max) * 100}%` }} />
+                  <span className="od-world__rank-bars" aria-hidden="true">
+                    {visible.map((d) => (
+                      <i key={d.mode} data-dir={dirOf(d)} style={{ width: `${((byDir[dirOf(d)][code] ?? 0) / max) * 100}%` }} />
+                    ))}
                   </span>
+                  {visible.length > 1 && (
+                    <span className="sr-only">
+                      {visible.map((d) => `${formatValue(byDir[dirOf(d)][code] ?? 0, "entero")} ${DIRECTION_LABEL[dirOf(d)].short.toLowerCase()}`).join(", ")}
+                    </span>
+                  )}
                 </button>
               </li>
             ))}
           </ol>
+          {ranking.length > rankRows.length && (
+            <small className="od-world__more">y {ranking.length - rankRows.length} {ranking.length - rankRows.length === 1 ? "país más" : "países más"} en el mapa</small>
+          )}
         </div>
 
-        <div className="od-map__legend" aria-hidden="true">
-          <div className="od-map__ramp">
-            {Array.from({ length: BINS }, (_, i) => (
-              <i key={i} style={{ background: `var(--od-seq-${i + 1})` }} />
-            ))}
+        <div className="od-world__legend" aria-hidden="true">
+          <div>
+            <div className="od-map__ramp">
+              {Array.from({ length: BINS }, (_, i) => (
+                <i key={i} style={{ background: `var(--od-seq-${i + 1})` }} />
+              ))}
+            </div>
+            <div className="od-map__ramp-labels">
+              <span>1</span>
+              <span>{formatValue(thresholds[3], "entero")}</span>
+              <span>{formatValue(thresholds[BINS - 1], "entero")}</span>
+            </div>
           </div>
-          <div className="od-map__ramp-labels">
-            <span>1</span>
-            <span>{formatValue(thresholds[3], "entero")}</span>
-            <span>{formatValue(thresholds[BINS - 1], "entero")}</span>
-          </div>
-          <p>
-            <i className="od-world__route-key" data-reverse={incoming || undefined} />
-            {incoming ? "Del país de origen a la UDES" : "De la UDES al país de destino"}
-          </p>
+          {visible.map((d) => (
+            <p key={d.mode}>
+              <i className="od-world__route-key" data-dir={dirOf(d)} />
+              {DIRECTION_LABEL[dirOf(d)].route}
+            </p>
+          ))}
         </div>
+      </div>
       </div>
     </div>
   );

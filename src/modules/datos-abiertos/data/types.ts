@@ -228,7 +228,17 @@ export interface ReportBlock {
   refKey?: string | null;
   visible: boolean;
   position: number;
-  settings: { chart?: ChartKind; title?: string; indicators?: string[] };
+  settings: {
+    chart?: ChartKind;
+    title?: string;
+    indicators?: string[];
+    /** Mapas: clave (no id) del otro mapa que se muestra con este. La clave sobrevive a la copia de periodo. */
+    mapWith?: string;
+    /** "combinado": entrante y saliente en un solo mapa; "lado_a_lado": dos mapas en una fila. */
+    mapLayout?: "combinado" | "lado_a_lado";
+    /** Mapa con panel denso y encuadre a los países con datos. */
+    compact?: boolean;
+  };
   /** Punto del informe al que pertenece. Sin punto, el bloque es de toda la ficha. */
   sectionKey?: string | null;
 }

@@ -53,7 +53,7 @@ import {
   valueOf,
 } from "./data/open-data";
 import { ANNUAL_RULE_LABEL, cutCode, cutCodeLabel, cutLabel, fromCutCode } from "./data/terms";
-import type { CampusId, Indicator, OpenDataCatalog, Report, ReportBlock, Term } from "./data/types";
+import type { CampusId, Indicator, MapDataset, OpenDataCatalog, Report, ReportBlock, Term } from "./data/types";
 import { ALL_CAMPUSES, DEFAULT_BLOCK_ORDER, MAP_MODE_TITLE, isWorldMap } from "./data/types";
 import "./datos-abiertos.css";
 
@@ -126,6 +126,15 @@ function ReportContent({ data, report, year, term, campus, setYear, setTerm, set
 
   const sections = report.sections ?? [];
   const blocks = orderedBlocks(report);
+  // Un mapa emparejado con otro (combinado o lado a lado) sale en el bloque que
+  // lo pide; su propio bloque se omite. Si dos bloques se piden mutuamente, gana
+  // el primero en el orden de la ficha.
+  const pairedMaps = new Set<string>();
+  for (const b of blocks) {
+    if (b.kind === "mapa" && b.refKey && !pairedMaps.has(b.refKey) && b.settings.mapWith && b.settings.mapWith !== b.refKey) {
+      pairedMaps.add(b.settings.mapWith);
+    }
+  }
 
   /** Un bloque suelto es una sección de la ficha; dentro de un punto, el punto ya pone el título. */
   const shell = (key: string, id: string, title: string, description: string | undefined, inSection: boolean, children: ReactNode) =>
@@ -205,7 +214,65 @@ function ReportContent({ data, report, year, term, campus, setYear, setTerm, set
         ) : null;
       case "mapa": {
         const dataset = report.maps?.find((m) => m.id === block.refKey) ?? (block.refKey ? undefined : report.maps?.[0]);
-        if (!dataset) return null;
+        if (!dataset || pairedMaps.has(dataset.id)) return null;
+        const partner = block.settings.mapWith ? report.maps?.find((m) => m.id === block.settings.mapWith && m.id !== dataset.id) : undefined;
+        const combined =
+          partner !== undefined &&
+          block.settings.mapLayout === "combinado" &&
+          isWorldMap(dataset.mode) &&
+          isWorldMap(partner.mode) &&
+          dataset.mode !== partner.mode;
+        const mapOf = (d: MapDataset, compact: boolean) =>
+          isWorldMap(d.mode) ? (
+            <WorldMap datasets={[d]} compact={compact} year={year} years={data.years} campus={campus} campuses={data.campuses} onSelectCampus={setCampus} />
+          ) : (
+            <ColombiaMap dataset={d} year={year} years={data.years} campus={campus} campuses={data.campuses} onSelectCampus={setCampus} />
+          );
+        const frameTitle = (d: MapDataset) => (isWorldMap(d.mode) ? MAP_MODE_TITLE[d.mode] : "Mapa por departamento");
+
+        if (combined && partner) {
+          const heading = block.settings.title || "Movilidad internacional";
+          return shell(
+            key,
+            `od-mapa-${dataset.id}`,
+            heading,
+            [dataset.description, partner.description].filter(Boolean).join(" "),
+            inSection,
+            <ChartFrame
+              title={inSection ? heading : "Movilidad entrante y saliente por país"}
+              subtitle={`Corte ${year} · ${dataset.unit || partner.unit}`}
+              source={[...new Set([dataset.source, partner.source].filter(Boolean))].join(" · ")}
+            >
+              <WorldMap
+                datasets={[dataset, partner]}
+                compact={Boolean(block.settings.compact)}
+                year={year}
+                years={data.years}
+                campus={campus}
+                campuses={data.campuses}
+                onSelectCampus={setCampus}
+              />
+            </ChartFrame>,
+          );
+        }
+
+        if (partner) {
+          return shell(
+            key,
+            `od-mapa-${dataset.id}`,
+            block.settings.title || `${dataset.title} · ${partner.title}`,
+            dataset.description,
+            inSection,
+            <div className="od-pair">
+              {[dataset, partner].map((d) => (
+                <ChartFrame key={d.id} title={d.title} subtitle={`Corte ${year} · ${d.unit}`} source={d.source} exportName={d.title}>
+                  {mapOf(d, true)}
+                </ChartFrame>
+              ))}
+            </div>,
+          );
+        }
+
         return shell(
           key,
           `od-mapa-${dataset.id}`,
@@ -213,15 +280,11 @@ function ReportContent({ data, report, year, term, campus, setYear, setTerm, set
           dataset.description,
           inSection,
           <ChartFrame
-            title={inSection ? block.settings.title || dataset.title : isWorldMap(dataset.mode) ? MAP_MODE_TITLE[dataset.mode] : "Mapa por departamento"}
+            title={inSection ? block.settings.title || dataset.title : frameTitle(dataset)}
             subtitle={`Corte ${year} · ${dataset.unit}`}
             source={dataset.source}
           >
-            {isWorldMap(dataset.mode) ? (
-              <WorldMap dataset={dataset} year={year} years={data.years} campus={campus} campuses={data.campuses} onSelectCampus={setCampus} />
-            ) : (
-              <ColombiaMap dataset={dataset} year={year} years={data.years} campus={campus} campuses={data.campuses} onSelectCampus={setCampus} />
-            )}
+            {mapOf(dataset, Boolean(block.settings.compact))}
           </ChartFrame>,
         );
       }

@@ -236,6 +236,9 @@
   --od-seq-ink-light: #0d1c31;
   --od-seq-ink-dark: #ffffff;
   --od-flow: #d98200;
+  /* Segunda ruta del mapa de movilidad: salientes, frente al ámbar de entrantes. */
+  --od-flow-out: #c0306f;
+  --od-flow-out-head: #ff5c9a;
 
   --font-sign: "Barlow Condensed", "Arial Narrow", "Roboto Condensed", sans-serif;
   --text-sign-hero: clamp(2.7rem, 7.2vw, 6rem);
@@ -360,6 +363,8 @@
     --od-seq-ink-light: #ffffff;
     --od-seq-ink-dark: #06142b;
     --od-flow: #f6b93f;
+    --od-flow-out: #ff6fa3;
+    --od-flow-out-head: #ffc2d8;
 
     --shadow-xs: 0 1px 2px rgba(0, 0, 0, 0.4);
     --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.4), 0 2px 6px rgba(0, 0, 0, 0.3);
@@ -473,6 +478,8 @@
   --od-seq-ink-light: #ffffff;
   --od-seq-ink-dark: #06142b;
   --od-flow: #f6b93f;
+  --od-flow-out: #ff6fa3;
+  --od-flow-out-head: #ffc2d8;
 
   --shadow-xs: 0 1px 2px rgba(0, 0, 0, 0.4);
   --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.4), 0 2px 6px rgba(0, 0, 0, 0.3);

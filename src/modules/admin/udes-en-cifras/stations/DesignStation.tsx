@@ -21,7 +21,7 @@ type DraftBlock = Omit<OdReportBlockRow, "id" | "report_id"> & { id?: string; te
 const BLOCK_HELP: Record<OdBlockKind, string> = {
   kpis: "Las cifras clave del informe, con variación y rastro de cortes.",
   evolucion: "El indicador elegido año a año, por campus.",
-  mapa: "Colombia por departamento, con flujos hacia cada campus.",
+  mapa: "Colombia por departamento o el mundo por país (movilidad), con rutas animadas.",
   tuberia: "La deserción de una cohorte, tramo a tramo, en estudiantes o en %.",
   historico: "La cifra de un periodo frente a otro, con sus categorías y su peso en el total.",
   mapa_calor: "Matriz de dos dimensiones en escala azul.",
@@ -73,11 +73,25 @@ function DesignEditor({ data, reportId, blocks, canEdit }: { data: StationProps[
       .map((kind) => ({ kind, ref_id: null, label: BLOCK_LABELS[kind] })),
     ...(breakdowns.length && !draft.some((b) => b.kind === "desgloses") ? [{ kind: "desgloses" as OdBlockKind, ref_id: null, label: BLOCK_LABELS.desgloses }] : []),
     ...heatmaps.filter((h) => !draft.some((b) => b.ref_id === h.id)).map((h) => ({ kind: "mapa_calor" as OdBlockKind, ref_id: h.id, label: h.title })),
-    ...maps.filter((m) => !draft.some((b) => b.ref_id === m.id)).map((m) => ({ kind: "mapa" as OdBlockKind, ref_id: m.id, label: m.title })),
+    ...maps.filter((m) => !draft.some((b) => b.ref_id === m.id || (b.kind === "mapa" && b.settings.mapWith === m.key))).map((m) => ({ kind: "mapa" as OdBlockKind, ref_id: m.id, label: m.title })),
     ...pipelines.filter((p) => !draft.some((b) => b.ref_id === p.id)).map((p) => ({ kind: "tuberia" as OdBlockKind, ref_id: p.id, label: p.title })),
     ...histories.filter((h) => !draft.some((b) => b.ref_id === h.id)).map((h) => ({ kind: "historico" as OdBlockKind, ref_id: h.id, label: h.title })),
     ...tables.filter((x) => !draft.some((b) => b.ref_id === x.id)).map((x) => ({ kind: "tabla" as OdBlockKind, ref_id: x.id, label: x.title })),
   ];
+
+  const mapOf = (b: DraftBlock) => (b.kind === "mapa" ? maps.find((m) => m.id === b.ref_id) : undefined);
+  const isWorld = (mode: string | undefined) => mode === "entrante" || mode === "saliente";
+  /** Bloque de mapa que ya muestra a este mapa junto al suyo (el primero en el orden gana). */
+  const shownWith = (b: DraftBlock) => {
+    const own = mapOf(b);
+    if (!own) return null;
+    const host = draft.find((x) => x.tempId !== b.tempId && x.visible && x.kind === "mapa" && x.settings.mapWith === own.key);
+    if (!host) return null;
+    const hostIndex = draft.indexOf(host);
+    // Si este bloque también pide al otro y va antes, es él quien lo muestra.
+    if (b.visible && b.settings.mapWith && draft.indexOf(b) < hostIndex) return null;
+    return host;
+  };
 
   const normalized = (list: DraftBlock[]) => list.map((b, i) => ({ ...b, position: i + 1 }));
   const dirty = removed.length > 0 || JSON.stringify(normalized(draft).map(({ tempId, ...b }) => b)) !== JSON.stringify(initial.map(({ tempId, ...b }) => b));
@@ -157,6 +171,59 @@ function DesignEditor({ data, reportId, blocks, canEdit }: { data: StationProps[
                       onChange={(e) => patch(block.tempId, { settings: { ...block.settings, title: e.target.value || undefined } })}
                     />
                   </label>
+                  {block.kind === "mapa" && mapOf(block) && (() => {
+                    const own = mapOf(block)!;
+                    const partner = maps.find((m) => m.key === block.settings.mapWith);
+                    const canCombine = Boolean(partner && isWorld(own.mode) && isWorld(partner.mode) && own.mode !== partner.mode);
+                    const layout = partner ? (block.settings.mapLayout === "combinado" && canCombine ? "combinado" : "lado_a_lado") : null;
+                    const host = shownWith(block);
+                    const set = (change: Partial<DraftBlock["settings"]>) => patch(block.tempId, { settings: { ...block.settings, ...change } });
+                    return (
+                      <>
+                        <label className="oda-inline-field">
+                          <span>Mostrar junto a</span>
+                          <select
+                            value={block.settings.mapWith ?? ""}
+                            disabled={!canEdit}
+                            onChange={(e) => {
+                              const next = maps.find((m) => m.key === e.target.value);
+                              const combinable = Boolean(next && isWorld(own.mode) && isWorld(next.mode) && own.mode !== next.mode);
+                              set({
+                                mapWith: next?.key,
+                                // Entrante con saliente abre combinado; cualquier otra pareja, lado a lado.
+                                mapLayout: next ? (combinable ? "combinado" : "lado_a_lado") : undefined,
+                              });
+                            }}
+                          >
+                            <option value="">Solo este mapa</option>
+                            {maps.filter((m) => m.id !== own.id).map((m) => <option key={m.id} value={m.key}>{m.title}</option>)}
+                          </select>
+                        </label>
+                        {partner && (
+                          <label className="oda-inline-field">
+                            <span>Cómo</span>
+                            <select
+                              value={layout ?? "lado_a_lado"}
+                              disabled={!canEdit}
+                              onChange={(e) => set({ mapLayout: e.target.value as "combinado" | "lado_a_lado" })}
+                            >
+                              <option value="lado_a_lado">Dos mapas en una fila</option>
+                              {canCombine && <option value="combinado">Un solo mapa, entrante y saliente en dos colores</option>}
+                            </select>
+                          </label>
+                        )}
+                        {isWorld(own.mode) && layout !== "lado_a_lado" && (
+                          <label className="oda-inline-check">
+                            <input type="checkbox" checked={Boolean(block.settings.compact)} disabled={!canEdit} onChange={(e) => set({ compact: e.target.checked || undefined })} />
+                            <span>Compacto <small>encuadre a los países con datos y panel al lado</small></span>
+                          </label>
+                        )}
+                        {layout === "lado_a_lado" && <small className="oda-block__note">En una fila los dos mapas van en versión compacta; en el móvil se apilan.</small>}
+                        {partner && <small className="oda-block__note">El bloque propio de «{partner.title}» no se repite en la ficha.</small>}
+                        {host && <small className="oda-block__note">Se muestra dentro de «{host.settings.title || nameOf(host)}»: este bloque no se repite.</small>}
+                      </>
+                    );
+                  })()}
                   {block.kind === "evolucion" && (
                     <label className="oda-inline-field">
                       <span>Abre en</span>
@@ -225,9 +292,12 @@ function DesignEditor({ data, reportId, blocks, canEdit }: { data: StationProps[
         <div className="oda-schematic__page">
           <div className="oda-schematic__head" aria-hidden="true" />
           <div className="oda-schematic__bar" aria-hidden="true" />
-          {draft.filter((b) => b.visible).map((b) => (
+          {draft.filter((b) => b.visible && !shownWith(b)).map((b) => (
             <div key={b.tempId} className="oda-schematic__block" data-kind={b.kind}>
-              <span>{b.settings.title || nameOf(b)}</span>
+              <span>
+                {b.settings.title || nameOf(b)}
+                {b.kind === "mapa" && b.settings.mapWith && ` + ${maps.find((m) => m.key === b.settings.mapWith)?.title ?? ""}`}
+              </span>
             </div>
           ))}
         </div>

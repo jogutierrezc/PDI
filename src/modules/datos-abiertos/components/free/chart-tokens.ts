@@ -27,6 +27,15 @@ export interface ChartTokens {
   neg: string;
   negSoft: string;
   mid: string;
+  /**
+   * Tinta legible sobre cada tono de la paleta divergente. No se puede deducir
+   * del nombre: en claro el tono fuerte es oscuro y en oscuro es claro, así que
+   * cada uno trae su pareja y el contraste se mantiene en los dos temas.
+   */
+  posInk: string;
+  posSoftInk: string;
+  negInk: string;
+  negSoftInk: string;
 }
 
 /** Valores del tema claro, por si el documento no los resuelve (pruebas, impresión). */
@@ -45,6 +54,10 @@ const FALLBACK: ChartTokens = {
   neg: "#b9541f",
   negSoft: "#e79c69",
   mid: "#e9edf3",
+  posInk: "#ffffff",
+  posSoftInk: "#0d1c31",
+  negInk: "#ffffff",
+  negSoftInk: "#0d1c31",
 };
 
 export const MAX_CATEGORICAL = 6;
@@ -68,6 +81,10 @@ function read(): ChartTokens {
     neg: v("--od-div-neg-2", FALLBACK.neg),
     negSoft: v("--od-div-neg-1", FALLBACK.negSoft),
     mid: v("--od-div-mid", FALLBACK.mid),
+    posInk: v("--od-div-pos-2-ink", FALLBACK.posInk),
+    posSoftInk: v("--od-div-pos-1-ink", FALLBACK.posSoftInk),
+    negInk: v("--od-div-neg-2-ink", FALLBACK.negInk),
+    negSoftInk: v("--od-div-neg-1-ink", FALLBACK.negSoftInk),
   };
 }
 

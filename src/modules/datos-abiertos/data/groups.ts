@@ -23,6 +23,7 @@
 import type { Report, ReportBlock } from "./types";
 import { SABER_COMPETENCIES } from "./saber-pro";
 import type { SaberCompetency } from "./saber-pro";
+import { TYT_COMPETENCIES, isPaired } from "./saber-tyt";
 
 /** Referencia de una competencia de un conjunto Saber PRO: "saber:<clave>:<competencia>". */
 export const saberRef = (id: string, competency: SaberCompetency) => `saber:${id}:${competency}`;
@@ -142,8 +143,9 @@ export function reportGroups(report: Report): ReportGrouping {
       return;
     }
     if (block.kind === "saber_tyt") {
+      // Como en Saber PRO: una hoja por competencia con las dos pruebas.
       const shown = saberTytOf(report, block);
-      if (shown) claim("tyt:" + shown.id, current);
+      if (shown) TYT_COMPETENCIES.filter((c) => isPaired(c.key)).forEach((c) => claim(`tyt:${shown.id}:${c.key}`, current));
       return;
     }
     if (block.kind === "saber_pro") {

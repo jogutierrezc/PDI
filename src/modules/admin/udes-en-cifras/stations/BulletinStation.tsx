@@ -37,7 +37,7 @@ import {
   useUploadBulletinImage,
 } from "../../../boletin/data";
 import { BULLETIN_FONTS, DEFAULT_EDITION, DEFAULT_IMAGES, DEFAULT_SHOW, DEFAULT_THEME, bulletinSlug, datasetRefs, normalizeSettings } from "../../../boletin/model";
-import type { BulletinFont, BulletinFormat, BulletinSettings, EditionAlign, HeaderBadge, IndicatorShow } from "../../../boletin/model";
+import type { BulletinFont, BulletinFormat, BulletinSettings, EditionAlign, HeaderBadge, HeaderTint, IndicatorShow } from "../../../boletin/model";
 import type { StationProps } from "../OdAdmin";
 import { ConfirmButton, Panel, SaveState, StageEmpty } from "../ui";
 
@@ -470,6 +470,23 @@ function TemplateTab({
             <input value={texts.headerOffice} onChange={(e) => setText({ headerOffice: e.target.value })} />
           </Field>
         </div>
+        <div className="oda-bulletin-align" role="group" aria-label="Color de la barra y la franja">
+          <span>Color de la cabecera</span>
+          {(
+            [
+              ["informe", "El del informe"],
+              ["tema", "El del tema"],
+            ] as [HeaderTint, string][]
+          ).map(([value, label]) => (
+            <button key={value} type="button" aria-pressed={draft.headerTint === value} onClick={() => setDraft({ ...draft, headerTint: value })}>
+              {label}
+            </button>
+          ))}
+        </div>
+        <p className="oda-muted">
+          Con «el del informe», cada página toma el color de línea de su informe —el mismo de su insignia en el portal y de su pestaña—, y la barra lo repite
+          oscurecido. La portada, el contenido y el resumen siguen con el tema.
+        </p>
         <div className="oda-bulletin-align" role="group" aria-label="Insignia del informe sobre el dibujo de la franja">
           <span>Informe sobre el dibujo</span>
           {(

@@ -1,4 +1,4 @@
-// Vista previa temporal de los motores Beta y Alpha. Se borra al terminar.
+// Vista previa temporal del bloque Saber TyT. Se borra al terminar.
 import ReactDOM from "react-dom/client";
 import { BrowserRouter } from "react-router-dom";
 import "../src/styles/tokens.css";

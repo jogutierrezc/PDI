@@ -189,6 +189,12 @@ export interface AlphaFigures {
   /** Nube esperado|real en celdas de 5 puntos. */
   plane: Record<string, number>;
   quadrants: Record<string, number>;
+  /**
+   * Nube Saber 11|Saber TyT en celdas de 5 puntos: la que dibuja el plano de
+   * cuadrantes. Los cuatro conteos de `quadrants` dicen cuántos cayeron en cada
+   * uno, pero no dónde, y sin eso el plano no se puede dibujar.
+   */
+  quadPlane: Record<string, number>;
 }
 
 export const emptyFigures = (): AlphaFigures => ({
@@ -197,12 +203,24 @@ export const emptyFigures = (): AlphaFigures => ({
   alphaActual: null,
   alphaVa: null,
   alphaPositive: null,
+  quadPlane: {},
   plane: {},
   quadrants: {},
 });
 
 /** Celda de 5 puntos para el plano. */
 export const planeCell = (expected: number, actual: number) => `${Math.floor(expected / 5) * 5}|${Math.floor(actual / 5) * 5}`;
+
+/** Nube de una rejilla «x|y» en celdas de 5 puntos, lista para dibujar. */
+export function cellPoints(cloud: Record<string, number>) {
+  return Object.entries(cloud)
+    .map(([cell, count]) => {
+      const [x, y] = cell.split("|").map(Number);
+      return { x, y, count };
+    })
+    .filter((p) => Number.isFinite(p.x) && Number.isFinite(p.y))
+    .sort((a, b) => a.count - b.count);
+}
 
 /** Puntos del plano, listos para dibujar. */
 export function planePoints(plane: Record<string, number>) {

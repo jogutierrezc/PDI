@@ -27,8 +27,11 @@ import {
   ALPHA_FIT_LABEL,
   ALPHA_PREDICTORS,
   QUADRANT_LABEL,
+  cellPoints,
+  entryAxisOf,
   fitPredictors,
   planePoints,
+  quadrantOf,
 } from "../data/saber-alpha";
 import type { AlphaFit, AlphaModel, AlphaPredictor } from "../data/saber-alpha";
 import { tytFigure, tytInfo, tytPrograms } from "../data/saber-tyt";
@@ -189,37 +192,198 @@ export function AlphaPlane({
 export function AlphaQuadrants({ data, competency, figure }: { data: SaberTytData; competency: TytCompetency; figure: TytFigure }) {
   const t = useChartTokens();
   const wrap = useRef<HTMLDivElement>(null);
+  const width = Math.max(320, useWidth(wrap, 720));
   const seen = useInView(wrap);
   const reduced = usePrefersReducedMotion();
   const armed = seen || reduced;
+  const [tip, setTip] = useState<{ x: number; y: number; title: string; lines: string[] } | null>(null);
   const info = tytInfo(competency);
   const counts = figure.alpha.quadrants;
   const total = Object.values(counts).reduce((a, b) => a + b, 0);
   if (!total) return <p className="od-tyt__empty">Sin promedios nacionales de referencia para {info.label.toLowerCase()}.</p>;
-  const entryMean = data.alpha.nacional.saber11[competency === "rc" ? "m" : competency === "cc" ? "sc" : competency === "lc" ? "lc" : competency === "ing" ? "ing" : "global"];
+
+  // El mismo eje de entrada con el que se clasificó a cada evaluado (saber-tyt.ts):
+  // si la vista escogiera otro, el promedio dibujado no sería el que parte el plano.
+  const axis = entryAxisOf(competency);
+  const entryMean = data.alpha.nacional.saber11[axis ?? "global"];
   const exitMean = data.alpha.nacional.tyt[competency];
   const tone: Record<string, string> = { "1": t.pos, "2": t.posSoft, "3": t.neg, "4": t.negSoft };
+  const toneInk: Record<string, string> = { "1": t.posInk, "2": t.posSoftInk, "3": t.negInk, "4": t.negSoftInk };
+  // El orden es el del plano, no una lista: 2 arriba a la izquierda, 1 arriba a
+  // la derecha, 3 abajo a la izquierda, 4 abajo a la derecha.
   const order = ["2", "1", "3", "4"];
+  const cells = cellPoints(figure.alpha.quadPlane ?? {});
+  const mean = (value: number | undefined) => (value === undefined ? "—" : integer.format(value));
 
-  return (
-    <div className="od-tyt__quadrants" ref={wrap} data-armed={armed || undefined}>
-      <div className="od-tyt__quad-grid">
-        {order.map((q, i) => {
-          const share = ((counts[q] ?? 0) / total) * 100;
-          return (
-            <div key={q} className="od-tyt__quad" style={{ animationDelay: `${i * 80}ms` }}>
-              <span className="od-tyt__quad-bar" style={{ background: tone[q], height: `${Math.max(4, share)}%` }} aria-hidden="true" />
-              <strong>{pct(share)}</strong>
+  const summary = (
+    <ul className="od-tyt__quad-legend">
+      {order.map((q) => {
+        const share = ((counts[q] ?? 0) / total) * 100;
+        return (
+          <li key={q}>
+            <span className="od-tyt__quad-tag" style={{ background: tone[q], color: toneInk[q] }} aria-hidden="true">
+              {q}
+            </span>
+            <span className="od-tyt__quad-legend-text">
+              <b>{pct(share)}</b>
               <span>{QUADRANT_LABEL[q]}</span>
               <small>{integer.format(counts[q] ?? 0)} evaluados</small>
-            </div>
-          );
-        })}
+            </span>
+          </li>
+        );
+      })}
+    </ul>
+  );
+
+  // Sin la nube guardada (importaciones anteriores a la migración 0039) el plano
+  // no se puede dibujar: se dicen los cuatro conteos y por qué no hay plano.
+  if (!cells.length || entryMean === undefined || exitMean === undefined) {
+    return (
+      <div className="od-tyt__quadrants" ref={wrap} data-armed={armed || undefined}>
+        {summary}
+        <p className="od-tyt__note">
+          Los cuatro cuadrantes frente a los promedios nacionales:{" "}
+          {entryMean !== undefined ? `${integer.format(entryMean)} en el Saber 11` : "sin referencia de entrada"} y{" "}
+          {exitMean !== undefined ? `${integer.format(exitMean)} en el Saber TyT` : "sin referencia de salida"}.
+          {cells.length === 0 ? " El plano se dibuja con la próxima importación del cruce del ICFES, que ya guarda dónde cae cada evaluado." : ""}
+        </p>
       </div>
+    );
+  }
+
+  // Cada eje tiene su propia escala: el Saber 11 va sobre 100 y el Saber TyT
+  // sobre 200, así que un dominio compartido dejaría la nube en una esquina.
+  const pad = (values: number[], step: number) => {
+    const lo = Math.max(0, Math.floor((Math.min(...values) - step) / step) * step);
+    const hi = Math.ceil((Math.max(...values) + step) / step) * step;
+    return [lo, hi] as const;
+  };
+  const [xLo, xHi] = pad([...cells.map((c) => c.x), ...cells.map((c) => c.x + 5), entryMean], 5);
+  const [yLo, yHi] = pad([...cells.map((c) => c.y), ...cells.map((c) => c.y + 5), exitMean], 5);
+  const size = Math.min(width, 620);
+  const M = { top: 16, right: 16, bottom: 46, left: 54 };
+  const plot = size - M.left - M.right;
+  const height = M.top + plot + M.bottom;
+  const x = (v: number) => M.left + ((v - xLo) / (xHi - xLo)) * plot;
+  const y = (v: number) => M.top + plot - ((v - yLo) / (yHi - yLo)) * plot;
+  const xTicks = Array.from({ length: 5 }, (_, i) => xLo + ((xHi - xLo) / 4) * i);
+  const yTicks = Array.from({ length: 5 }, (_, i) => yLo + ((yHi - yLo) / 4) * i);
+  const maxN = Math.max(1, ...cells.map((c) => c.count));
+  const cx = x(entryMean);
+  const cy = y(exitMean);
+  // Un rótulo por cuadrante, pegado a su esquina del plano.
+  const corner: Record<string, { x: number; y: number }> = {
+    "2": { x: (M.left + cx) / 2, y: (M.top + cy) / 2 },
+    "1": { x: (cx + M.left + plot) / 2, y: (M.top + cy) / 2 },
+    "3": { x: (M.left + cx) / 2, y: (cy + M.top + plot) / 2 },
+    "4": { x: (cx + M.left + plot) / 2, y: (cy + M.top + plot) / 2 },
+  };
+  const show = (event: MouseEvent<SVGElement>, title: string, lines: string[]) => {
+    const host = wrap.current?.getBoundingClientRect();
+    const box = (event.currentTarget as SVGGraphicsElement).getBoundingClientRect();
+    if (host) setTip({ x: box.left - host.left + box.width / 2, y: box.top - host.top, title, lines });
+  };
+
+  return (
+    <div className="od-tyt__quadrants" ref={wrap}>
+      <div className="od-tyt__canvas" data-armed={armed || undefined}>
+        <svg width={size} height={height} role="img" aria-label={`Plano de cuadrantes: Saber 11 frente a ${info.exit}, partido por los promedios nacionales`}>
+          {/* Los cuatro cuadrantes, tenues: el color dice cuál es cada uno, la cifra de la leyenda dice cuánto pesa. */}
+          {order.map((q) => {
+            const left = q === "2" || q === "3";
+            const top = q === "1" || q === "2";
+            return (
+              <rect
+                key={q}
+                x={left ? M.left : cx}
+                y={top ? M.top : cy}
+                width={Math.max(0, left ? cx - M.left : M.left + plot - cx)}
+                height={Math.max(0, top ? cy - M.top : M.top + plot - cy)}
+                style={{ fill: tone[q], opacity: 0.07 }}
+              />
+            );
+          })}
+          {order.map((q) => (
+            <text key={`n${q}`} x={corner[q].x} y={corner[q].y} textAnchor="middle" className="od-tyt__quad-mark" style={{ fill: tone[q] }}>
+              {q}
+            </text>
+          ))}
+
+          {xTicks.map((v) => (
+            <g key={`x${v}`}>
+              <line x1={x(v)} x2={x(v)} y1={M.top} y2={M.top + plot} style={{ stroke: t.line }} />
+              <text x={x(v)} y={M.top + plot + 18} textAnchor="middle" className="od-tyt__tick">
+                {integer.format(Math.round(v))}
+              </text>
+            </g>
+          ))}
+          {yTicks.map((v) => (
+            <g key={`y${v}`}>
+              <line x1={M.left} x2={M.left + plot} y1={y(v)} y2={y(v)} style={{ stroke: t.line }} />
+              <text x={M.left - 8} y={y(v) + 4} textAnchor="end" className="od-tyt__tick">
+                {integer.format(Math.round(v))}
+              </text>
+            </g>
+          ))}
+
+          {cells.map((c, i) => {
+            const midX = c.x + 2.5;
+            const midY = c.y + 2.5;
+            const q = quadrantOf(midX, midY, entryMean, exitMean);
+            return (
+              <circle
+                key={`${c.x}-${c.y}`}
+                cx={x(midX)}
+                cy={y(midY)}
+                r={3 + (c.count / maxN) * 11}
+                className="od-tyt__dot od-tyt__dot--pop"
+                style={{ fill: tone[q], animationDelay: `${Math.min(600, i * 22)}ms` }}
+                onMouseEnter={(e) =>
+                  show(e, `Cuadrante ${q}`, [
+                    `Saber 11 entre ${integer.format(c.x)} y ${integer.format(c.x + 5)}`,
+                    `${info.exit} entre ${integer.format(c.y)} y ${integer.format(c.y + 5)}`,
+                    `${integer.format(c.count)} ${c.count === 1 ? "evaluado" : "evaluados"}`,
+                    QUADRANT_LABEL[q],
+                  ])
+                }
+                onMouseLeave={() => setTip(null)}
+              />
+            );
+          })}
+
+          {/* Los dos cortes del país: lo que convierte el plano en cuadrantes. */}
+          <line x1={cx} x2={cx} y1={M.top} y2={M.top + plot} className="od-tyt__cut" style={{ stroke: t.ink }} />
+          <line x1={M.left} x2={M.left + plot} y1={cy} y2={cy} className="od-tyt__cut" style={{ stroke: t.ink }} />
+          <text x={cx} y={M.top - 4} textAnchor="middle" className="od-tyt__cut-label" style={{ fill: t.secondary }}>
+            país {mean(entryMean)}
+          </text>
+          <text x={M.left + plot + 2} y={cy - 4} textAnchor="end" className="od-tyt__cut-label" style={{ fill: t.secondary }}>
+            país {mean(exitMean)}
+          </text>
+
+          <text x={M.left + plot / 2} y={height - 6} textAnchor="middle" className="od-tyt__axis">
+            Saber 11 · {info.entry}
+          </text>
+          <text transform={`rotate(-90 12 ${M.top + plot / 2})`} x={12} y={M.top + plot / 2} textAnchor="middle" className="od-tyt__axis">
+            Saber TyT · {info.exit}
+          </text>
+        </svg>
+        {tip && (
+          <ChartTooltip x={tip.x} y={tip.y}>
+            <strong>{tip.title}</strong>
+            {tip.lines.map((line) => (
+              <em key={line}>{line}</em>
+            ))}
+          </ChartTooltip>
+        )}
+      </div>
+
+      {summary}
+
       <p className="od-tyt__note">
-        Cuadrantes del artículo, frente a los promedios nacionales: {entryMean !== undefined ? `${integer.format(entryMean)} en el Saber 11` : "sin referencia de entrada"} y{" "}
-        {exitMean !== undefined ? `${integer.format(exitMean)} en el Saber TyT` : "sin referencia de salida"}. Quien está en «sobre el país solo al salir» entró por debajo del
-        promedio nacional y salió por encima.
+        Cada burbuja reúne a los evaluados de una celda de 5 puntos: la nube muestra la forma, nunca a una persona. Los dos cortes son los promedios nacionales
+        ({mean(entryMean)} en el Saber 11, {mean(exitMean)} en el {info.exit.toLowerCase()}) y son los que parten el plano en cuatro. El cuadrante 2, arriba a la izquierda, es el
+        que más dice: entraron por debajo del promedio del país y salieron por encima.
       </p>
     </div>
   );

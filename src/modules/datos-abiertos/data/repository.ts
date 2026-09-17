@@ -615,7 +615,7 @@ export function assembleCatalog(rows: OpenDataRows): OpenDataCatalog {
             transitions: r.transitions ?? {}, histogram: r.histogram ?? {}, scatter: r.scatter ?? {},
             alphaN: r.alpha_n ?? null, alphaExpected: num(r.alpha_expected), alphaActual: num(r.alpha_actual),
             alphaVa: num(r.alpha_va), alphaPositive: r.alpha_positive ?? null,
-            plane: r.plane ?? {}, quadrants: r.quadrants ?? {},
+            plane: r.plane ?? {}, quadrants: r.quadrants ?? {}, quadPlane: r.quad_plane ?? {},
           })),
       }));
 

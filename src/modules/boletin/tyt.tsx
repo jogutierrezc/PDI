@@ -32,7 +32,10 @@ import { DataTable } from "./figures";
 
 const integer = new Intl.NumberFormat("es-CO", { maximumFractionDigits: 0 });
 const decimal = new Intl.NumberFormat("es-CO", { minimumFractionDigits: 1, maximumFractionDigits: 1 });
-const signed = (n: number) => `${n > 0 ? "+" : n < 0 ? "−" : ""}${decimal.format(Math.abs(n))}`;
+const signed = (n: number) => {
+  const r = Math.round(n * 10) / 10;
+  return `${r > 0 ? "+" : r < 0 ? "−" : ""}${decimal.format(Math.abs(r))}`;
+};
 const pct = (n: number) => `${integer.format(Math.round(n))} %`;
 
 /** Con menos pareados que esto, el promedio de un programa no se compara. */
@@ -177,22 +180,38 @@ function TransitBars({ figure, width = 178 }: { figure: TytFigure; width?: numbe
 }
 
 /** El plano del Motor Alpha: esperado en el eje horizontal, real en el vertical. */
-function PlaneChart({ figure, size = 104 }: { figure: TytFigure; size?: number }) {
+function PlaneChart({ figure, size = 96 }: { figure: TytFigure; size?: number }) {
   const points = planePoints(figure.alpha.plane);
   if (!points.length) return null;
-  const all = [...points.map((p) => p.expected), ...points.map((p) => p.actual)];
-  const lo = Math.floor((Math.min(...all) - 5) / 10) * 10;
-  const hi = Math.ceil((Math.max(...all) + 10) / 10) * 10;
+  const spread = points
+    .flatMap((p) => [
+      { v: p.expected, n: p.count },
+      { v: p.actual, n: p.count },
+    ])
+    .sort((a, b) => a.v - b.v);
+  const total = spread.reduce((sum, d) => sum + d.n, 0);
+  const at = (share: number) => {
+    let seen = 0;
+    for (const d of spread) {
+      seen += d.n;
+      if (seen >= total * share) return d.v;
+    }
+    return spread[spread.length - 1].v;
+  };
+  const lo = Math.floor((at(0.005) - 5) / 10) * 10;
+  const hi = Math.ceil((at(0.995) + 10) / 10) * 10;
+  const inside = points.filter((p) => p.expected >= lo && p.expected <= hi && p.actual >= lo && p.actual <= hi);
+  const shown = inside.reduce((sum, p) => sum + p.count, 0);
   const M = { top: 3, right: 4, bottom: 9, left: 11 };
   const plot = size - M.left - M.right;
   const x = (v: number) => M.left + ((v - lo) / (hi - lo)) * plot;
   const y = (v: number) => M.top + plot - ((v - lo) / (hi - lo)) * plot;
   const height = M.top + plot + M.bottom;
-  const peak = Math.max(...points.map((p) => p.count));
+  const peak = Math.max(...inside.map((p) => p.count));
   const ticks = [lo, lo + (hi - lo) / 2, hi];
 
   return (
-    <svg className="bol-chart bol-tyt-plane" viewBox={`0 0 ${size} ${height}`} role="img" aria-label="Plano de valor agregado: puntaje esperado frente al real">
+    <svg className="bol-chart bol-tyt-plane" viewBox={`0 0 ${size} ${height}`} role="img" aria-label={`Plano de valor agregado: puntaje esperado frente al real; el cuadro recoge ${integer.format(shown)} de ${integer.format(total)} lecturas`}>
       {ticks.map((v) => (
         <g key={v}>
           <line className="bol-chart__grid" x1={x(v)} x2={x(v)} y1={M.top} y2={M.top + plot} />
@@ -206,7 +225,7 @@ function PlaneChart({ figure, size = 104 }: { figure: TytFigure; size?: number }
         </g>
       ))}
       <line className="bol-tyt-plane__diagonal" x1={x(lo)} y1={y(lo)} x2={x(hi)} y2={y(hi)} />
-      {points.map((p) => (
+      {inside.map((p) => (
         <circle
           key={`${p.expected}-${p.actual}`}
           cx={x(p.expected + 2.5)}
@@ -411,6 +430,7 @@ export function tytUnits(
             <figure className="bol-tyt-figure">
               <figcaption>Plano de valor agregado: esperado frente a real, en puntos de la prueba</figcaption>
               <PlaneChart figure={figure} />
+              <p className="bol-tyt-figure__foot">Cada burbuja es una celda de 5 × 5 puntos; su tamaño, cuántos evaluados caen en ella.</p>
             </figure>
             <div className="bol-tyt-alpha__side">
               <dl className="bol-saber-keys bol-tyt-keys">
@@ -475,7 +495,7 @@ export function tytUnits(
       ],
     }));
   if (tableRows.length) {
-    const head = ["Programa", "Entrada", "Salida", "VA percentil", "Evaluados", "Esperado", "Real", "VA puntos", "Evaluados"];
+    const head = ["Programa", "Entrada", "Salida", "VA percentil", "Con Saber 11", "Esperado", "Real", "VA puntos", "Con modelo"];
     const tableTitle = `${title} · por programa`;
     const chunks: { from: number; list: typeof tableRows }[] = [{ from: 0, list: tableRows.slice(0, TABLE_FIRST) }];
     for (let i = TABLE_FIRST; i < tableRows.length; i += TABLE_NEXT) chunks.push({ from: i, list: tableRows.slice(i, i + TABLE_NEXT) });
@@ -490,7 +510,7 @@ export function tytUnits(
                   description="Las cuatro primeras columnas de cifras son el Motor Beta, en percentiles; las cuatro últimas, el Motor Alpha, en puntos de la prueba de salida."
                   source={data.source}
                   notes={[
-                    ["Motor Beta", "Percentil medio de entrada y de salida dentro de la cohorte de la UDES, y su diferencia."],
+                    ["Motor Beta", "Percentil medio de entrada y de salida dentro de la cohorte de la UDES, y su diferencia. «Con Saber 11» son los evaluados que tienen las dos pruebas; «con modelo», los que además traen las competencias que pide la regresión."],
                     ["Motor Alpha", "Puntaje esperado por la regresión, puntaje real y su diferencia."],
                     ...(chunks.length > 1 ? ([["Filas", `1 a ${chunk.list.length} de ${tableRows.length} · continúa`]] as [string, ReactNode][]) : []),
                     ["Corte", cutNote],

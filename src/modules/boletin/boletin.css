@@ -36,6 +36,10 @@
   --bol-line-7: #43536b;
   --bol-line-8: #2e6b2f;
   --bol-line-9: #8a3b8f;
+  /* Cabecera: la barra y la franja. Cada página de informe las reescribe con
+     su color de línea cuando el boletín pinta la cabecera por informe. */
+  --bol-chrome-bar: var(--bol-navy);
+  --bol-chrome-band: var(--bol-band);
   --bol-route-in: var(--bol-accent);
   --bol-route-out: #ad2f58;
 
@@ -143,7 +147,7 @@
   height: 9.1mm;
   padding: 0 14mm 0 13.6mm;
   color: #ffffff;
-  background: var(--bol-navy);
+  background: var(--bol-chrome-bar);
 }
 
 .bol-header__bar img {
@@ -165,7 +169,7 @@
   height: 18.4mm;
   padding-left: 14mm;
   overflow: hidden;
-  background: var(--bol-band);
+  background: var(--bol-chrome-band);
 }
 
 .bol-header__band strong {
@@ -214,7 +218,7 @@
 }
 
 .bol-header__report[data-badge="relleno"] .bol-header__code {
-  color: var(--bol-navy);
+  color: var(--bol-chrome-bar);
   background: #ffffff;
   box-shadow: 0 0.4mm 1.4mm rgba(7, 43, 88, 0.35);
 }
@@ -2124,6 +2128,13 @@
 
 .bol-tyt-figure { margin: 0 0 3mm; }
 
+.bol-tyt-figure__foot {
+  margin: 1mm 0 0;
+  color: var(--bol-ink-3);
+  font-size: 2.2mm;
+  line-height: 1.3;
+}
+
 .bol-tyt-figure figcaption {
   margin-bottom: 1.2mm;
   color: var(--bol-ink-2);
@@ -2150,7 +2161,7 @@
 
 .bol-tyt-alpha {
   display: grid;
-  grid-template-columns: 104mm minmax(0, 1fr);
+  grid-template-columns: 96mm minmax(0, 1fr);
   gap: 5mm;
   align-items: start;
 }

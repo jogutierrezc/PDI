@@ -387,6 +387,7 @@ export function BulletinDocument({ catalog, settings, report, fitWidth, onReady 
                 chapter={pageReport ? `${pageReport.name}${pageSection ? ` · ${pageSection}` : ""}` : ""}
                 report={pageReport}
                 badge={settings.headerBadge}
+                tint={settings.headerTint}
                 cut={cut}
               >
                 {list.map(({ i, compact }) => (
@@ -431,6 +432,7 @@ function ContentPage({
   current,
   report,
   badge = "ninguna",
+  tint = "tema",
   number,
   total,
   chapter,
@@ -446,6 +448,8 @@ function ContentPage({
   /** Informe de la página: su insignia va sobre el dibujo de la franja. */
   report?: Report;
   badge?: BulletinSettings["headerBadge"];
+  /** Color de la cabecera: el del tema, o el de la línea del informe. */
+  tint?: BulletinSettings["headerTint"];
   number: number;
   total: number;
   chapter: string;
@@ -456,8 +460,17 @@ function ContentPage({
   const drawnHeader = Boolean(images.content && images.contentHasHeader);
   // Las pestañas reparten el alto del cuerpo; nunca más altas que 26 mm.
   const tabH = tabs.length ? Math.min(26, (BODY_H - (tabs.length - 1) * 1.5) / tabs.length) : 0;
+  // La cabecera del informe toma su color de línea; la barra, el mismo color
+  // oscurecido, para que el logo blanco siga leyéndose.
+  const chrome =
+    tint === "informe" && report
+      ? ({
+          "--bol-chrome-band": `var(--bol-line-${report.line})`,
+          "--bol-chrome-bar": `color-mix(in srgb, var(--bol-line-${report.line}) 58%, #04122a)`,
+        } as CSSProperties)
+      : undefined;
   return (
-    <section className="bol-page bol-content" aria-label={`Página ${number}`}>
+    <section className="bol-page bol-content" style={chrome} aria-label={`Página ${number}`}>
       {images.content && <img className="bol-page__art" src={images.content} alt="" />}
       {!drawnHeader && (
         <header className="bol-header">

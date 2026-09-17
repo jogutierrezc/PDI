@@ -93,6 +93,15 @@ export const DEFAULT_EDITION: BulletinEdition = { color: "#ffffff", align: "cent
 export type HeaderBadge = "relleno" | "contorno" | "ninguna";
 export const HEADER_BADGES: HeaderBadge[] = ["relleno", "contorno", "ninguna"];
 
+/**
+ * De qué color son la barra y la franja de la cabecera. "tema": los dos colores
+ * del boletín en todas las páginas. "informe": cada página toma el color de
+ * línea de su informe, el mismo de su insignia en el portal y de su pestaña, y
+ * las páginas sin informe (portada, contenido, resumen) siguen con el tema.
+ */
+export type HeaderTint = "tema" | "informe";
+export const HEADER_TINTS: HeaderTint[] = ["tema", "informe"];
+
 /** Lo que muestra la hoja de un indicador. */
 export interface IndicatorShow {
   evolution: boolean;
@@ -140,6 +149,8 @@ export interface BulletinSettings {
   images: BulletinImages;
   edition: BulletinEdition;
   headerBadge: HeaderBadge;
+  /** Color de la barra y la franja: del tema o del informe de cada página. */
+  headerTint: HeaderTint;
   theme: BulletinTheme;
   /** Año del corte, o ALL_YEARS (0) para todo el periodo. */
   cut: number;
@@ -263,6 +274,7 @@ export function normalizeSettings(
   const edition: BulletinEdition = { ...DEFAULT_EDITION, ...(saved.edition ?? {}) };
   if (!["izquierda", "centro", "derecha"].includes(edition.align)) edition.align = DEFAULT_EDITION.align;
   const headerBadge: HeaderBadge = HEADER_BADGES.includes(saved.headerBadge as HeaderBadge) ? (saved.headerBadge as HeaderBadge) : "relleno";
+  const headerTint: HeaderTint = HEADER_TINTS.includes(saved.headerTint as HeaderTint) ? (saved.headerTint as HeaderTint) : "informe";
   if (!BULLETIN_FONTS.includes(theme.font)) theme.font = DEFAULT_THEME.font;
   const cut = typeof saved.cut === "number" && (saved.cut === ALL_YEARS || catalog.years.includes(saved.cut)) ? saved.cut : ALL_YEARS;
   const campus = catalog.campuses.some((c) => c.id === saved.campus) ? saved.campus! : "todas";
@@ -299,7 +311,22 @@ export function normalizeSettings(
   });
 
   const format: BulletinFormat = saved.format === "ejecutivo" ? "ejecutivo" : "completo";
-  return { version: 1, format, summary: saved.summary ?? false, tabs: saved.tabs ?? true, texts, images, edition, headerBadge, theme, cut, campus, skipEmpty: saved.skipEmpty ?? true, reports };
+  return {
+    version: 1,
+    format,
+    summary: saved.summary ?? false,
+    tabs: saved.tabs ?? true,
+    texts,
+    images,
+    edition,
+    headerBadge,
+    headerTint,
+    theme,
+    cut,
+    campus,
+    skipEmpty: saved.skipEmpty ?? true,
+    reports,
+  };
 }
 
 /** "boletin-global", "boletin-poblacional", "boletin-ejecutivo", "boletin-ejecutivo-poblacional". */

@@ -48,6 +48,10 @@ const PAPER: ChartTokens = {
   neg: "#b9541f",
   negSoft: "#e79c69",
   mid: "#e9edf3",
+  posInk: "#ffffff",
+  posSoftInk: "#16243a",
+  negInk: "#ffffff",
+  negSoftInk: "#16243a",
 };
 
 const NATURAL = 680;

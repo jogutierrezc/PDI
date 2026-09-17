@@ -583,48 +583,91 @@
   align-items: center;
 }
 
-/* Cuadrantes: cuatro columnas con su barra, como en el artículo. */
-.od-tyt__quad-grid {
+/* Cuadrantes: el mismo plano del artículo. Cada burbuja es una celda de 5
+   puntos del cruce Saber 11 × Saber TyT, y los dos promedios del país lo
+   parten en cuatro. Los cortes son la gráfica, no una decoración: van en tinta
+   y con su valor rotulado. */
+.od-tyt__quadrants {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: var(--space-4);
-  align-items: end;
-  min-height: 16rem;
 }
 
-.od-tyt__quad {
+.od-tyt__cut {
+  stroke-width: 1.5;
+  stroke-dasharray: 5 4;
+}
+
+.od-tyt__cut-label {
+  font-family: var(--font-sign);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: var(--tracking-wide);
+  text-transform: uppercase;
+  font-variant-numeric: tabular-nums;
+}
+
+/* El número del cuadrante, al fondo de su cuarto del plano. */
+.od-tyt__quad-mark {
+  font-family: var(--font-sign);
+  font-size: 44px;
+  font-weight: 700;
+  opacity: 0.16;
+  pointer-events: none;
+}
+
+.od-tyt__quad-legend {
   display: grid;
-  align-content: end;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 13rem), 1fr));
+  gap: var(--space-3);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.od-tyt__quad-legend li {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: start;
   gap: var(--space-2);
-  height: 100%;
   padding: var(--space-3);
-  text-align: center;
   background: var(--od-board-raised);
   border-radius: var(--radius-xs);
 }
 
-.od-tyt__quad-bar {
-  align-self: end;
-  width: 100%;
-  border-radius: 3px 3px 0 0;
-  transform-origin: bottom center;
+.od-tyt__quad-legend-text {
+  display: grid;
+  gap: 1px;
+  min-width: 0;
 }
 
-.od-tyt__quad strong {
+.od-tyt__quad-legend b {
   color: var(--ink);
   font-family: var(--font-sign);
-  font-size: 1.6rem;
+  font-size: 1.5rem;
+  line-height: 1;
   font-variant-numeric: tabular-nums;
 }
 
-.od-tyt__quad span {
+.od-tyt__quad-legend span {
   color: var(--ink-secondary);
   font-size: var(--text-sm);
   font-weight: 700;
   line-height: 1.2;
 }
 
-.od-tyt__quad small { color: var(--ink-muted); font-size: var(--text-xs); font-weight: 600; }
+.od-tyt__quad-legend small { color: var(--ink-muted); font-size: var(--text-xs); font-weight: 600; }
+
+/* La tinta la pone el componente, emparejada con el tono (chart-tokens.ts). */
+.od-tyt__quad-tag {
+  display: grid;
+  place-items: center;
+  width: 1.4rem;
+  height: 1.4rem;
+  border-radius: var(--radius-pill);
+  font-family: var(--font-sign);
+  font-size: 0.95rem;
+  font-weight: 700;
+}
 
 /* El modelo: los dos ajustes, lado a lado. */
 .od-tyt__models {
@@ -729,7 +772,7 @@
 .od-tyt__diagram-quad[data-kind="4"] { fill: var(--od-div-neg-1); }
 
 @media (max-width: 720px) {
-  .od-tyt__quad-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .od-tyt__quad-mark { font-size: 32px; }
   .od-tyt__coefs li { grid-template-columns: minmax(5rem, 1fr) minmax(0, 1.2fr) 3rem; gap: var(--space-2); }
 }
 
@@ -764,7 +807,6 @@
 
 [data-armed] .od-tyt__value-bar--grow[data-neg] { transform-origin: right center; }
 
-[data-armed] .od-tyt__quad-bar { animation: od-tyt-rise 620ms cubic-bezier(0.16, 1, 0.3, 1) both; }
 
 [data-armed] .od-tyt__bar > span {
   transform-origin: left center;
@@ -774,7 +816,6 @@
 @media (prefers-reduced-motion: reduce) {
   [data-armed] .od-tyt__dot--pop,
   [data-armed] .od-tyt__value-bar--grow,
-  [data-armed] .od-tyt__quad-bar,
   [data-armed] .od-tyt__bar > span {
     animation: none;
   }

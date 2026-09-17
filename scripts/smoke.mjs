@@ -2180,6 +2180,26 @@ const routes = [
       if (!text.includes("Resumen ejecutivo")) throw new Error("el boletín ejecutivo no muestra su resumen");
       [...group.querySelectorAll("button")].find((b) => b.textContent.trim() === "Completo").click();
       await tick();
+
+      // La cabecera por informe pinta la barra y la franja con el color de línea
+      // del informe de la página; con el tema, las dos vuelven al color del boletín.
+      const plantilla = [...window.document.querySelectorAll('[role="tab"]')].find((b) => b.textContent.trim() === "Plantilla");
+      if (!plantilla) throw new Error("falta la pestaña de plantilla");
+      plantilla.click();
+      await tick();
+      const tint = window.document.querySelector('[aria-label="Color de la barra y la franja"]');
+      const byTheme = [...(tint?.querySelectorAll("button") ?? [])].find((b) => b.textContent.trim() === "El del tema");
+      if (!byTheme) throw new Error("falta el selector de color de la cabecera");
+      const tinted = () =>
+        [...window.document.querySelectorAll(".bol-page.bol-content")].some((page) => page.style.getPropertyValue("--bol-chrome-band"));
+      if (!tinted()) throw new Error("con «el del informe» ninguna página toma el color de su informe");
+      byTheme.click();
+      await tick();
+      if (tinted()) throw new Error("con «el del tema» la cabecera no debería llevar color de informe");
+      [...tint.querySelectorAll("button")].find((b) => b.textContent.trim() === "El del informe").click();
+      await tick();
+      [...window.document.querySelectorAll('[role="tab"]')].find((b) => b.textContent.trim() === "Contenido").click();
+      await tick();
     },
   },
   { path: "/admin/boletin/od-boletin-global", session: true, expect: "Descargar PDF", also: ["Presentación", "Contenido", "Oficinas que reportan"] },

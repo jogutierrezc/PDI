@@ -142,6 +142,8 @@ export interface TytResult {
   alphaPositive: number | null;
   plane: Record<string, number>;
   quadrants: Record<string, number>;
+  /** Nube Saber 11|Saber TyT en celdas de 5 puntos: el plano de cuadrantes. */
+  quadPlane: Record<string, number>;
 }
 
 export interface SaberTytData {
@@ -220,6 +222,7 @@ export function tytFigure(data: SaberTytData, competency: TytCompetency, year: n
   const scatter: Record<string, number> = {};
   const plane: Record<string, number> = {};
   const quadrants: Record<string, number> = {};
+  const quadPlane: Record<string, number> = {};
   let alphaN = 0;
   let alphaPositive = 0;
   const alphaSums = { expected: 0, actual: 0, va: 0 };
@@ -257,6 +260,7 @@ export function tytFigure(data: SaberTytData, competency: TytCompetency, year: n
     for (const [cell, count] of Object.entries(part.scatter)) scatter[cell] = (scatter[cell] ?? 0) + count;
     for (const [cell, count] of Object.entries(part.plane)) plane[cell] = (plane[cell] ?? 0) + count;
     for (const [q, count] of Object.entries(part.quadrants)) quadrants[q] = (quadrants[q] ?? 0) + count;
+    for (const [cell, count] of Object.entries(part.quadPlane ?? {})) quadPlane[cell] = (quadPlane[cell] ?? 0) + count;
     const an = part.alphaN ?? 0;
     if (an > 0) {
       alphaN += an;
@@ -288,6 +292,7 @@ export function tytFigure(data: SaberTytData, competency: TytCompetency, year: n
       alphaPositive: alphaN ? alphaPositive : null,
       plane,
       quadrants,
+      quadPlane,
     },
   };
 }
@@ -391,6 +396,7 @@ export function aggregateTytRecords(records: TytRecord[], fit: AlphaFit = "ampli
           alphaPositive: null,
           plane: {},
           quadrants: {},
+          quadPlane: {},
           exitSum: 0,
           entrySum: 0,
           deltaSum: 0,
@@ -436,16 +442,24 @@ export function aggregateTytRecords(records: TytRecord[], fit: AlphaFit = "ampli
         group.alphaExpectedSum += expected;
         group.alphaActualSum += rawExit;
         group.alphaVaSum += va;
-        if (va > 0) group.alphaPositive = (group.alphaPositive ?? 0) + 1;
+        // Con evaluados, «ninguno superó lo esperado» es un cero, no un vacío: si
+        // se quedara en null, la ficha lo dibujaría como sin reportar.
+        group.alphaPositive = (group.alphaPositive ?? 0) + (va > 0 ? 1 : 0);
         const spot = planeCell(expected, rawExit);
         group.plane[spot] = (group.plane[spot] ?? 0) + 1;
         const axis = entryAxis(key);
         const entryScore = axis ? alphaEntry(record)[axis] ?? null : record.entry.global ?? null;
         const entryMean = axis ? alpha.nacional.saber11[axis] : alpha.nacional.saber11.global;
         const exitMean = alpha.nacional.tyt[key];
-        if (entryScore !== null && entryMean !== undefined && exitMean !== undefined) {
-          const q = quadrantOf(entryScore, rawExit, entryMean, exitMean);
-          group.quadrants[q] = (group.quadrants[q] ?? 0) + 1;
+        if (entryScore !== null) {
+          // La nube no necesita los promedios del país; la clasificación sí. Se
+          // guarda igual, para que el plano se dibuje aunque falte una referencia.
+          const cell = planeCell(entryScore, rawExit);
+          group.quadPlane[cell] = (group.quadPlane[cell] ?? 0) + 1;
+          if (entryMean !== undefined && exitMean !== undefined) {
+            const q = quadrantOf(entryScore, rawExit, entryMean, exitMean);
+            group.quadrants[q] = (group.quadrants[q] ?? 0) + 1;
+          }
         }
       }
       groups.set(id, group);

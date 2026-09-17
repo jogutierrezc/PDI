@@ -484,6 +484,7 @@ function TytImport({ tyt, results, periodId, reportId, published, canEdit }: Sec
       alpha_positive: r.alphaPositive,
       plane: r.plane,
       quadrants: r.quadrants,
+      quad_plane: r.quadPlane,
     }));
     const summary = `${count(rows.length)} filas de ${yearsText(fileYears)} guardadas desde «${plan.fileName}».`;
     save.mutate(
@@ -697,7 +698,7 @@ function TytYears({ tyt, results, canEdit }: SectionProps) {
       transitions: r.transitions ?? {}, histogram: r.histogram ?? {}, scatter: r.scatter ?? {},
       alphaN: r.alpha_n ?? null, alphaExpected: number(r.alpha_expected ?? null), alphaActual: number(r.alpha_actual ?? null),
       alphaVa: number(r.alpha_va ?? null), alphaPositive: r.alpha_positive ?? null,
-      plane: r.plane ?? {}, quadrants: r.quadrants ?? {},
+      plane: r.plane ?? {}, quadrants: r.quadrants ?? {}, quadPlane: r.quad_plane ?? {},
     })),
   };
   const figure = tytFigure(stored, "global", null);

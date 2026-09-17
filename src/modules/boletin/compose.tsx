@@ -1615,8 +1615,8 @@ export function compose(catalog: OpenDataCatalog, settings: BulletinSettings): C
       } else if (kind === "tyt") {
         const parsed = parseTytKey(report, key);
         if (parsed) {
-          tytUnits(parsed.data, parsed.competency, settings.cut, DatasetSheet).forEach(({ node, title }) =>
-            nodes.push({ node, source: parsed.data.source, title }),
+          tytUnits(parsed.data, parsed.competency, settings.cut, DatasetSheet, TableContinuation).forEach(({ node, title, tight }) =>
+            nodes.push({ node, source: parsed.data.source, title, tight }),
           );
         }
       } else if (kind === "libre") {

@@ -1416,6 +1416,7 @@ export interface OdSaberTytResultRow {
   alpha_positive?: number | null;
   plane?: Record<string, number>;
   quadrants?: Record<string, number>;
+  quad_plane?: Record<string, number>;
 }
 
 /** Conjunto libre de un informe (0033). Columnas y vistas en jsonb: ver free-sets.ts. */

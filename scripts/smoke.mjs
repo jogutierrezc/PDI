@@ -1955,6 +1955,35 @@ const routes = [
     },
   },
   {
+    path: "/admin/udes-en-cifras/estructura/ensenanza",
+    session: true,
+    note: "Motor Beta en Estructura: el conjunto Saber TyT del informe, sin ofrecer un segundo",
+    expect: "Saber TyT (Motor Beta)",
+    also: ["Saber TyT · Motor Beta", "2 años cargados"],
+    interact: async (window) => {
+      const options = [...window.document.querySelectorAll(".oda-add-select option")].map((o) => o.textContent);
+      if (!options.every((o) => !o.includes("Motor Beta"))) throw new Error("con un conjunto Saber TyT no se debe ofrecer otro");
+    },
+  },
+  {
+    path: "/admin/udes-en-cifras/captura/ensenanza",
+    session: true,
+    note: "captura Saber TyT: el cruce se lee en el navegador y la lectura institucional sale de los años cargados",
+    expect: "Saber TyT",
+    interact: async (window, tick) => {
+      const tab = [...window.document.querySelectorAll(".oda-tab")].find((b) => b.textContent.startsWith("Saber TyT"));
+      if (!tab) throw new Error("falta la pestaña Saber TyT");
+      tab.click();
+      await tick();
+      const text = (id) => window.document.querySelector(`#${id}`)?.textContent ?? "";
+      if (!text("oda-tyt-importar").includes("estu_consecutivo")) throw new Error("la importación debe nombrar la columna que nunca se envía");
+      if (!text("oda-tyt-importar").includes("no se envía a ninguna parte")) throw new Error("la importación no dice que el consecutivo no sale del navegador");
+      const years = text("oda-tyt-anios");
+      if (!years.includes("2024") || !years.includes("Con las dos pruebas")) throw new Error(`años cargados: ${years.slice(0, 200)}`);
+      if (!/\+\d/.test(years)) throw new Error("los años cargados deben mostrar el valor agregado con su signo");
+    },
+  },
+  {
     path: "/admin/udes-en-cifras/estructura/infraestructura",
     session: true,
     note: "conjuntos libres en Estructura: temporalidad, periodo que cubre y columnas",
@@ -2916,6 +2945,65 @@ Object.assign(FIXTURES, OD_FIXTURES);
   FIXTURES.od_report_blocks = [
     ...FIXTURES.od_report_blocks,
     { id: "od-bloque-ensenanza-saber-pro", report_id: report.id, kind: "saber_pro", ref_id: null, section_id: null, position: last + 1, visible: true, settings: {} },
+  ];
+}
+
+/* Motor Beta (0035): Enseñanza con dos años y dos programas de tecnología,
+   cruzados Saber 11 → Saber TyT. Cada competencia lleva su tránsito entre
+   cuartos, el histograma del valor agregado y la nube entrada × salida; el
+   conjunto lleva las curvas de percentil de las dos pruebas, de 21 valores. */
+{
+  const report = FIXTURES.od_reports.find((r) => r.slug === "ensenanza");
+  const tytId = "od-tyt-ensenanza";
+  /** Curva de 21 puntajes (de 5 en 5 percentiles), de `from` a `to`. */
+  const curve = (from, to) => Array.from({ length: 21 }, (_, i) => Math.round((from + ((to - from) * i) / 20) * 100) / 100);
+  const competencies = ["global", "lc", "rc", "cc", "ing", "ce"];
+  FIXTURES.od_saber_tyt = [
+    {
+      id: tytId, report_id: report.id, key: "saber-tyt", title: "Saber TyT · Motor Beta",
+      description: "De dónde partieron los estudiantes de tecnología y a dónde llegaron, en rango percentil.",
+      note: "Fuente: ICFES. El percentil se calcula dentro de la cohorte histórica de la UDES; el valor agregado, solo sobre quienes tienen las dos pruebas.",
+      benchmarks: Object.fromEntries([
+        ...competencies.map((key) => [key, { entrada: curve(key === "global" ? 180 : 28, key === "global" ? 380 : 82), salida: curve(key === "global" ? 60 : 55, key === "global" ? 165 : 160) }]),
+        ["cn", { entrada: curve(30, 80), salida: [] }],
+      ]),
+      office_id: null, position: 1,
+    },
+  ];
+  const programs = ["Tecnología en Gestión Industrial", "Tecnología en Supervisión de Obras Civiles"];
+  /** Reparte n entre las claves, de forma estable. */
+  const spread = (n, keys) => Object.fromEntries(keys.map((key, i) => [key, Math.floor(n / keys.length) + (i < n % keys.length ? 1 : 0)]).filter(([, v]) => v > 0));
+  const results = [];
+  for (const year of [2023, 2024]) {
+    programs.forEach((program, pi) => {
+      const evaluated = 60 + pi * 20 + (year - 2023) * 10;
+      const paired = Math.round(evaluated * 0.82);
+      competencies.forEach((competency, ci) => {
+        const meanEntry = 41 + pi * 2 + ci;
+        const meanDelta = 6.5 + pi - ci * 0.5 + (year - 2023);
+        results.push({
+          id: `od-tyt-${year}-${pi}-${competency}`, tyt_id: tytId, year, level: "tecnologico", program, competency,
+          evaluated, mean_exit: Math.round((meanEntry + meanDelta) * 100) / 100, paired,
+          mean_entry: meanEntry, mean_delta: Math.round(meanDelta * 100) / 100, improved: Math.round(paired * 0.63),
+          raw_entry: competency === "global" ? 268 + pi * 4 : 48 + pi + ci, raw_exit: competency === "global" ? 112 + pi * 3 : 104 + pi + ci,
+          // De qué cuarto de entrada a qué cuarto de salida pasó cada uno.
+          transitions: {
+            1: spread(Math.round(paired * 0.3), ["1", "2", "3"]),
+            2: spread(Math.round(paired * 0.3), ["2", "3"]),
+            3: spread(Math.round(paired * 0.25), ["2", "3", "4"]),
+            4: spread(Math.round(paired * 0.15), ["3", "4"]),
+          },
+          histogram: spread(paired, ["-10", "-5", "0", "5", "10", "15"]),
+          scatter: spread(paired, ["20|35", "35|45", "45|55", "55|70", "70|80"]),
+        });
+      });
+    });
+  }
+  FIXTURES.od_saber_tyt_results = results;
+  const last = Math.max(...FIXTURES.od_report_blocks.filter((b) => b.report_id === report.id).map((b) => b.position));
+  FIXTURES.od_report_blocks = [
+    ...FIXTURES.od_report_blocks,
+    { id: "od-bloque-ensenanza-saber-tyt", report_id: report.id, kind: "saber_tyt", ref_id: null, section_id: null, position: last + 1, visible: true, settings: {} },
   ];
 }
 

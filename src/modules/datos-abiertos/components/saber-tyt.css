@@ -458,3 +458,88 @@
 @media (prefers-reduced-motion: reduce) {
   .od-tyt__competency { transition: none; }
 }
+
+/* --- Cómo funciona: texto justificado y su dibujo --------------------------------------- */
+
+.od-tyt__steps {
+  display: grid;
+  gap: var(--space-5);
+  margin: 0;
+  padding-left: var(--space-5);
+  color: var(--ink-secondary);
+  font-size: var(--text-sm);
+  line-height: 1.65;
+}
+
+.od-tyt__steps li {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 13.5rem;
+  gap: var(--space-5);
+  align-items: center;
+}
+
+.od-tyt__step-text {
+  max-width: 78ch;
+  text-align: justify;
+  text-justify: inter-word;
+  hyphens: auto;
+}
+
+.od-tyt__step-figure {
+  margin: 0;
+  padding: var(--space-3);
+  background: var(--od-board-raised);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-xs);
+}
+
+.od-tyt__diagram { display: block; width: 100%; height: auto; overflow: visible; }
+
+.od-tyt__diagram-label {
+  fill: var(--ink-muted);
+  font-family: var(--font-sans);
+  font-size: 7px;
+  font-weight: 600;
+}
+
+.od-tyt__diagram-value {
+  fill: var(--ink-secondary);
+  font-family: var(--font-sans);
+  font-size: 8px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.od-tyt__diagram-chip {
+  fill: var(--ink-secondary);
+  font-family: var(--font-sans);
+  font-size: 7.5px;
+  font-weight: 600;
+}
+
+.od-tyt__diagram-gain {
+  fill: var(--od-div-pos-2);
+  font-family: var(--font-sign);
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.od-tyt__diagram-track { fill: var(--line); }
+.od-tyt__diagram-scale { fill: var(--od-seq-3); }
+.od-tyt__diagram-plot { fill: var(--od-surface); stroke: var(--line-strong); stroke-width: 1; }
+.od-tyt__diagram-diagonal { stroke: var(--ink); stroke-width: 1.2; stroke-dasharray: 4 3; fill: none; }
+.od-tyt__diagram-link { stroke: var(--line-strong); stroke-width: 1.2; stroke-dasharray: 3 2; fill: none; }
+.od-tyt__diagram-arrow { stroke: var(--ink-muted); stroke-width: 1.2; fill: none; }
+.od-tyt__diagram-arrowhead { fill: var(--ink-muted); }
+.od-tyt__diagram-arrowhead[data-kind="gain"] { fill: var(--od-div-pos-2); }
+
+.od-tyt__diagram-dot { stroke: var(--od-surface); stroke-width: 1.5; }
+.od-tyt__diagram-dot[data-kind="entrada"] { fill: var(--od-cat-4); }
+.od-tyt__diagram-dot[data-kind="salida"] { fill: var(--od-div-pos-2); }
+.od-tyt__diagram-dot[data-kind="baja"] { fill: var(--od-div-neg-2); }
+.od-tyt__diagram-dot[data-kind="mix"] { fill: var(--od-signal); stroke: var(--od-signal-text); }
+
+@media (max-width: 900px) {
+  .od-tyt__steps li { grid-template-columns: minmax(0, 1fr); }
+  .od-tyt__step-figure { max-width: 16rem; }
+}

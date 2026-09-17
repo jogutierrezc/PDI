@@ -590,30 +590,140 @@ function ValueBars({ data, competency, year }: { data: SaberTytData; competency:
 
 /* --- Cómo funciona el motor --------------------------------------------------------------- */
 
+/**
+ * Cada paso del motor con su dibujo: un índice que hay que creer de palabra no
+ * sirve para decidir. Los cuatro dibujos son el mismo lenguaje de la ficha
+ * —percentiles de 0 a 100, azul cuando sube, terracota cuando baja— a escala
+ * de explicación.
+ */
+function StepFigure({ step }: { step: 1 | 2 | 3 | 4 }) {
+  if (step === 1) {
+    return (
+      <svg viewBox="0 0 200 118" role="img" aria-label="Dos escalas distintas se traducen a un mismo percentil" className="od-tyt__diagram">
+        <text x={0} y={10} className="od-tyt__diagram-label">Saber 11 · 0 a 100</text>
+        <rect x={0} y={16} width={200} height={9} rx={2} className="od-tyt__diagram-track" />
+        <circle cx={101} cy={20.5} r={5} className="od-tyt__diagram-dot" data-kind="entrada" />
+        <text x={107} y={24} className="od-tyt__diagram-value">50,5 puntos</text>
+
+        <text x={0} y={48} className="od-tyt__diagram-label">Saber TyT · 0 a 200</text>
+        <rect x={0} y={54} width={200} height={9} rx={2} className="od-tyt__diagram-track" />
+        <circle cx={102} cy={58.5} r={5} className="od-tyt__diagram-dot" data-kind="salida" />
+        <text x={108} y={62} className="od-tyt__diagram-value">102 puntos</text>
+
+        <path d="M101 28 L101 40 M102 66 L102 78" className="od-tyt__diagram-link" />
+        <text x={0} y={92} className="od-tyt__diagram-label">Percentil en la cohorte UDES</text>
+        <rect x={0} y={98} width={200} height={11} rx={2} className="od-tyt__diagram-scale" />
+        <circle cx={100} cy={103.5} r={5.5} className="od-tyt__diagram-dot" data-kind="mix" />
+        <text x={108} y={107} className="od-tyt__diagram-value">percentil 50</text>
+      </svg>
+    );
+  }
+  if (step === 2) {
+    const pairs = [
+      ["Lectura crítica", "Lectura crítica"],
+      ["Matemáticas", "Razonamiento cuant."],
+      ["Sociales y ciudadanas", "Comp. ciudadanas"],
+      ["Inglés", "Inglés"],
+    ];
+    return (
+      <svg viewBox="0 0 200 118" role="img" aria-label="Cada competencia del Saber 11 se empareja con la del Saber TyT" className="od-tyt__diagram">
+        <text x={0} y={9} className="od-tyt__diagram-label">Saber 11</text>
+        <text x={200} y={9} textAnchor="end" className="od-tyt__diagram-label">Saber TyT</text>
+        {pairs.map(([left, right], i) => {
+          const y = 20 + i * 24;
+          return (
+            <g key={left + right}>
+              <text x={0} y={y + 4} className="od-tyt__diagram-chip">{left}</text>
+              <path d={`M84 ${y} L116 ${y}`} className="od-tyt__diagram-arrow" markerEnd="url(#od-tyt-arrow)" />
+              <text x={200} y={y + 4} textAnchor="end" className="od-tyt__diagram-chip">{right}</text>
+            </g>
+          );
+        })}
+        <defs>
+          <marker id="od-tyt-arrow" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="5" markerHeight="5" orient="auto">
+            <path d="M0 0 L8 4 L0 8 z" className="od-tyt__diagram-arrowhead" />
+          </marker>
+        </defs>
+      </svg>
+    );
+  }
+  if (step === 3) {
+    return (
+      <svg viewBox="0 0 200 118" role="img" aria-label="El valor agregado es la resta entre el percentil de salida y el de entrada" className="od-tyt__diagram">
+        <rect x={0} y={44} width={200} height={11} rx={2} className="od-tyt__diagram-scale" />
+        <text x={0} y={38} className="od-tyt__diagram-label">0</text>
+        <text x={200} y={38} textAnchor="end" className="od-tyt__diagram-label">100</text>
+        <circle cx={60} cy={49.5} r={6} className="od-tyt__diagram-dot" data-kind="entrada" />
+        <circle cx={120} cy={49.5} r={6} className="od-tyt__diagram-dot" data-kind="salida" />
+        <text x={60} y={30} textAnchor="middle" className="od-tyt__diagram-value">entró en 30</text>
+        <text x={120} y={30} textAnchor="middle" className="od-tyt__diagram-value">salió en 60</text>
+        <path d="M60 72 L120 72" className="od-tyt__diagram-arrow" markerEnd="url(#od-tyt-arrow-3)" />
+        <text x={90} y={90} textAnchor="middle" className="od-tyt__diagram-gain">+30</text>
+        <text x={90} y={106} textAnchor="middle" className="od-tyt__diagram-label">puntos de percentil</text>
+        <defs>
+          <marker id="od-tyt-arrow-3" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="5" markerHeight="5" orient="auto">
+            <path d="M0 0 L8 4 L0 8 z" className="od-tyt__diagram-arrowhead" data-kind="gain" />
+          </marker>
+        </defs>
+      </svg>
+    );
+  }
+  return (
+    <svg viewBox="0 0 200 118" role="img" aria-label="En la dispersión, por encima de la diagonal la salida supera a la entrada" className="od-tyt__diagram">
+      <rect x={26} y={6} width={104} height={104} rx={3} className="od-tyt__diagram-plot" />
+      <path d="M26 110 L130 6" className="od-tyt__diagram-diagonal" />
+      <circle cx={62} cy={34} r={6} className="od-tyt__diagram-dot" data-kind="salida" />
+      <circle cx={96} cy={92} r={6} className="od-tyt__diagram-dot" data-kind="baja" />
+      <text x={136} y={36} className="od-tyt__diagram-value">sube de posición</text>
+      <text x={136} y={94} className="od-tyt__diagram-value">baja de posición</text>
+      <text x={78} y={117} textAnchor="middle" className="od-tyt__diagram-label">entrada</text>
+      <text x={14} y={58} textAnchor="middle" transform="rotate(-90 14 58)" className="od-tyt__diagram-label">salida</text>
+    </svg>
+  );
+}
+
+const STEPS: { title: string; body: string; step: 1 | 2 | 3 | 4 }[] = [
+  {
+    step: 1,
+    title: "Rango percentil",
+    body:
+      "Las dos pruebas no se pueden comparar en puntos: Saber 11 califica cada módulo de 0 a 100 y su puntaje global de 0 a 500, mientras que Saber TyT califica de 0 a 200. Por eso cada puntaje se traduce a su percentil dentro de la cohorte histórica de la universidad en esa misma prueba: 0 es el resultado más bajo del grupo y 100 el más alto. Así, medio centenar de puntos en una prueba y ciento dos en la otra pueden significar exactamente la misma posición.",
+  },
+  {
+    step: 2,
+    title: "Homologación de competencias",
+    body:
+      "El motor empareja las competencias que miden lo mismo aunque se llamen distinto: matemáticas con razonamiento cuantitativo, sociales y ciudadanas con competencias ciudadanas, y lectura crítica e inglés con su par. Comunicación escrita solo existe en la prueba de salida y ciencias naturales solo en la de entrada: se muestran, pero no se comparan, porque no tienen con qué.",
+  },
+  {
+    step: 3,
+    title: "Valor agregado",
+    body:
+      "Es una resta: el percentil de salida menos el percentil de entrada. Quien entró en el percentil 30 y salió en el 60 aporta treinta puntos de valor agregado, aunque su puntaje bruto no sea el más alto del país. La cifra de un programa es el promedio de sus evaluados que tienen las dos pruebas, y por eso al lado de cada cifra va cuántos son.",
+  },
+  {
+    step: 4,
+    title: "Tránsito y dispersión",
+    body:
+      "Cada evaluado entra y sale en un cuarto de la distribución. La vista de tránsito cuenta cuántos pasaron de cada cuarto de entrada a cada cuarto de salida, y la dispersión los sitúa frente a la diagonal de igualdad: por encima de esa línea la salida superó a la entrada, por debajo quedó atrás. El tamaño de cada punto dice cuántos evaluados lo sostienen.",
+  },
+];
+
 function Method({ note }: { note: string }) {
   return (
     <section className="od-tyt__method" aria-labelledby="od-tyt-metodo">
       <h3 id="od-tyt-metodo">Cómo funciona el Motor Beta</h3>
-      <ol>
-        <li>
-          <strong>Rango percentil.</strong> Las dos pruebas no se pueden comparar en puntos: Saber 11 califica cada módulo de 0 a 100 y su
-          global de 0 a 500; Saber TyT, de 0 a 200. Cada puntaje se traduce a su percentil dentro de la cohorte histórica de la
-          universidad en esa prueba: 0 es el resultado más bajo del grupo y 100 el más alto.
-        </li>
-        <li>
-          <strong>Homologación de competencias.</strong> Se emparejan las que miden lo mismo: matemáticas con razonamiento cuantitativo,
-          sociales y ciudadanas con competencias ciudadanas, y lectura crítica e inglés con su par. Comunicación escrita solo existe a la
-          salida y ciencias naturales solo a la entrada: se muestran, pero no se comparan.
-        </li>
-        <li>
-          <strong>Valor agregado.</strong> Es la resta: percentil de salida menos percentil de entrada. Quien entró en el percentil 30 y
-          salió en el 60 aporta +30, aunque su puntaje no sea el más alto del país. El del grupo es el promedio de sus evaluados con las
-          dos pruebas.
-        </li>
-        <li>
-          <strong>Tránsito.</strong> Cada evaluado entra y sale en un cuarto de la distribución. La vista de tránsito cuenta cuántos
-          pasaron de cada cuarto de entrada a cada uno de salida; la dispersión los sitúa frente a la diagonal de igualdad.
-        </li>
+      <ol className="od-tyt__steps">
+        {STEPS.map((item) => (
+          <li key={item.step}>
+            <div className="od-tyt__step-text">
+              <strong>{item.title}.</strong> {item.body}
+            </div>
+            <figure className="od-tyt__step-figure">
+              <StepFigure step={item.step} />
+            </figure>
+          </li>
+        ))}
       </ol>
       <p className="od-tyt__caveat">
         <strong>Cómo no leerlo.</strong> La referencia es la propia cohorte de la universidad, así que el promedio institucional siempre

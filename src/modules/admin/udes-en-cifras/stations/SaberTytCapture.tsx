@@ -629,6 +629,17 @@ function TytYears({ tyt, results, canEdit }: SectionProps) {
   if (years.length === 0) return null;
 
   const number = (value: number | string | null) => (value === null ? null : Number(value));
+  // La misma lectura que deja ver la importación, ahora sobre lo que está en la base.
+  const stored: SaberTytData = {
+    id: tyt.key, title: tyt.title, description: tyt.description, note: tyt.note, source: "", benchmarks: tyt.benchmarks ?? {},
+    results: results.map((r) => ({
+      year: r.year, level: r.level, program: r.program, competency: r.competency,
+      evaluated: r.evaluated, meanExit: number(r.mean_exit), paired: r.paired, meanEntry: number(r.mean_entry),
+      meanDelta: number(r.mean_delta), improved: r.improved, rawEntry: number(r.raw_entry), rawExit: number(r.raw_exit),
+      transitions: r.transitions ?? {}, histogram: r.histogram ?? {}, scatter: r.scatter ?? {},
+    })),
+  };
+  const figure = tytFigure(stored, "global", null);
 
   return (
     <Panel
@@ -638,6 +649,20 @@ function TytYears({ tyt, results, canEdit }: SectionProps) {
       description="Lo que hay hoy en la base, año por año. Borrar un año quita sus programas; las curvas de percentil se quedan como están hasta la próxima importación."
       actions={<SaveState pending={remove.isPending} error={remove.error} success={remove.isSuccess} />}
     >
+      <dl className="oda-import__facts oda-tyt__readout">
+        <div>
+          <dt>Percentil medio de entrada</dt>
+          <dd>{percentile(figure?.meanEntry)} <small>Saber 11, puntaje global</small></dd>
+        </div>
+        <div>
+          <dt>Percentil medio de salida</dt>
+          <dd>{percentile(figure?.meanExit)} <small>Saber TyT, puntaje global</small></dd>
+        </div>
+        <div>
+          <dt>Valor agregado (VAI)</dt>
+          <dd>{delta(figure?.meanDelta)} <small>puntos de percentil</small></dd>
+        </div>
+      </dl>
       <table className="oda-table oda-saber__table">
         <thead>
           <tr>

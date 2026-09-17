@@ -1645,6 +1645,17 @@ const routes = [
     },
   },
   {
+    path: "/datos-abiertos/ensenanza",
+    note: "Motor Beta (0035): la ficha pinta el bloque Saber TyT con el título del conjunto",
+    expect: "Saber TyT · Motor Beta",
+    absent: [...SIN_DINERO],
+    interact: async (window) => {
+      const section = window.document.querySelector('section.od-section.od-tyt[aria-labelledby="od-saber-tyt"]');
+      if (!section) throw new Error("falta la sección del bloque Saber TyT");
+      if (window.document.querySelector("h2#od-saber-tyt")?.textContent.trim() !== "Saber TyT · Motor Beta") throw new Error("el bloque Saber TyT no lleva el título del conjunto");
+    },
+  },
+  {
     path: "/datos-abiertos/infraestructura",
     note: "conjunto libre (0033): el bloque lleva el título del conjunto",
     expect: "Oferta y satisfacción por sede",
@@ -1980,7 +1991,13 @@ const routes = [
       if (!text("oda-tyt-importar").includes("no se envía a ninguna parte")) throw new Error("la importación no dice que el consecutivo no sale del navegador");
       const years = text("oda-tyt-anios");
       if (!years.includes("2024") || !years.includes("Con las dos pruebas")) throw new Error(`años cargados: ${years.slice(0, 200)}`);
-      if (!/\+\d/.test(years)) throw new Error("los años cargados deben mostrar el valor agregado con su signo");
+      // El motor corrió: percentil de entrada, de salida y valor agregado del puntaje global.
+      for (const label of ["Percentil medio de entrada", "Percentil medio de salida", "Valor agregado (VAI)"]) {
+        if (!years.includes(label)) throw new Error(`falta «${label}» en la lectura del Motor Beta`);
+      }
+      const readout = [...window.document.querySelectorAll("#oda-tyt-anios .oda-tyt__readout dd")].map((d) => d.textContent.trim());
+      if (!readout.slice(0, 2).every((v) => /^P\d/.test(v))) throw new Error(`los percentiles no se leen: ${readout.join(" | ")}`);
+      if (!/^[+-]\d/.test(readout[2] ?? "")) throw new Error(`el valor agregado debe llevar signo: ${readout[2]}`);
     },
   },
   {

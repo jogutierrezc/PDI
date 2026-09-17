@@ -417,21 +417,11 @@
   font-size: 1.35rem;
 }
 
-.od-tyt__method ol {
-  display: grid;
-  gap: var(--space-3);
-  max-width: 86ch;
-  margin: 0;
-  padding-left: var(--space-5);
-  color: var(--ink-secondary);
-  font-size: var(--text-sm);
-  line-height: 1.6;
-}
-
 .od-tyt__method strong { color: var(--ink); }
 
 .od-tyt__caveat {
-  max-width: 86ch;
+  text-align: justify;
+  text-justify: inter-word;
   margin: var(--space-5) 0 0;
   padding: var(--space-4);
   color: var(--ink-secondary);
@@ -459,27 +449,67 @@
   .od-tyt__competency { transition: none; }
 }
 
-/* --- Cómo funciona: texto justificado y su dibujo --------------------------------------- */
+/* --- Cómo funciona: cuatro tarjetas a lo ancho ------------------------------------------ */
 
 .od-tyt__steps {
   display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 28rem), 1fr));
   gap: var(--space-5);
   margin: 0;
-  padding-left: var(--space-5);
-  color: var(--ink-secondary);
-  font-size: var(--text-sm);
-  line-height: 1.65;
+  padding: 0;
+  list-style: none;
 }
 
+/* El dibujo a la izquierda y el texto a su lado: dos tarjetas por fila y una
+   medida de lectura cómoda en cada una. */
 .od-tyt__steps li {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 13.5rem;
-  gap: var(--space-5);
+  grid-template-columns: 10.5rem minmax(0, 1fr);
+  grid-template-rows: auto 1fr;
+  column-gap: var(--space-4);
+  row-gap: var(--space-2);
+  align-items: start;
+  padding: var(--space-4);
+  background: var(--od-board);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-xs);
+}
+
+.od-tyt__steps .od-tyt__step-figure {
+  grid-row: 1 / span 2;
+  align-self: center;
+}
+
+.od-tyt__steps h4,
+.od-tyt__steps .od-tyt__step-text { grid-column: 2; }
+
+.od-tyt__steps h4 {
+  display: flex;
   align-items: center;
+  gap: var(--space-3);
+  margin: 0;
+  color: var(--ink);
+  font-size: 1rem;
+  font-weight: 800;
+}
+
+.od-tyt__steps h4 span {
+  display: grid;
+  place-items: center;
+  width: 1.7rem;
+  height: 1.7rem;
+  color: var(--od-signal-ink);
+  font-family: var(--font-sign);
+  font-size: 1rem;
+  background: var(--od-signal);
+  border-radius: var(--radius-xs);
 }
 
 .od-tyt__step-text {
-  max-width: 78ch;
+  margin: 0;
+  color: var(--ink-secondary);
+  font-size: var(--text-sm);
+  line-height: 1.65;
   text-align: justify;
   text-justify: inter-word;
   hyphens: auto;
@@ -489,7 +519,6 @@
   margin: 0;
   padding: var(--space-3);
   background: var(--od-board-raised);
-  border: 1px solid var(--line);
   border-radius: var(--radius-xs);
 }
 
@@ -538,8 +567,3 @@
 .od-tyt__diagram-dot[data-kind="salida"] { fill: var(--od-div-pos-2); }
 .od-tyt__diagram-dot[data-kind="baja"] { fill: var(--od-div-neg-2); }
 .od-tyt__diagram-dot[data-kind="mix"] { fill: var(--od-signal); stroke: var(--od-signal-text); }
-
-@media (max-width: 900px) {
-  .od-tyt__steps li { grid-template-columns: minmax(0, 1fr); }
-  .od-tyt__step-figure { max-width: 16rem; }
-}

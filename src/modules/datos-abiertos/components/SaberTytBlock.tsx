@@ -716,12 +716,14 @@ function Method({ note }: { note: string }) {
       <ol className="od-tyt__steps">
         {STEPS.map((item) => (
           <li key={item.step}>
-            <div className="od-tyt__step-text">
-              <strong>{item.title}.</strong> {item.body}
-            </div>
             <figure className="od-tyt__step-figure">
               <StepFigure step={item.step} />
             </figure>
+            <h4>
+              <span aria-hidden="true">{item.step}</span>
+              {item.title}
+            </h4>
+            <p className="od-tyt__step-text">{item.body}</p>
           </li>
         ))}
       </ol>

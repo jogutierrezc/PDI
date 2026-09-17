@@ -47,6 +47,7 @@ import { assembleCatalog, fetchOpenDataRows } from "../../datos-abiertos/data/re
 import type { OpenDataRows } from "../../datos-abiertos/data/repository";
 import { openDataKeys } from "../../datos-abiertos/data/open-data";
 import type { TytBenchmarks } from "../../datos-abiertos/data/saber-tyt";
+import type { AlphaData } from "../../datos-abiertos/data/saber-alpha";
 import type { OpenDataCatalog } from "../../datos-abiertos/data/types";
 
 export const odAdminKeys = {
@@ -478,16 +479,18 @@ export function useSaveSaberTyt() {
 }
 
 /**
- * Resultados del Motor Beta: el cruce Saber 11 → Saber TyT se agrega en el
+ * Resultados de los dos motores: el cruce Saber 11 → Saber TyT se agrega en el
  * navegador y aquí solo llegan las filas por año, nivel, programa y competencia.
- * Reemplaza los años del archivo y escribe de nuevo las curvas de percentil: se
- * calculan sobre toda la cohorte, así que no se pueden mezclar con las viejas.
+ * Reemplaza los años del archivo y escribe de nuevo, en el conjunto, las curvas
+ * de percentil (Motor Beta) y los coeficientes del modelo (Motor Alpha): unas y
+ * otros se calculan sobre toda la cohorte, así que no se pueden mezclar con los
+ * viejos. Los promedios nacionales que ya tenga el conjunto se respetan.
  */
 export function useReplaceSaberTytResults() {
   return useOdMutation(
-    async ({ periodId, reportId, tytId, years, rows, benchmarks, fileName = "" }: {
+    async ({ periodId, reportId, tytId, years, rows, benchmarks, alpha, fileName = "" }: {
       periodId: string; reportId: string; tytId: string; years: number[];
-      rows: OdSaberTytResultRow[]; benchmarks: TytBenchmarks; fileName?: string;
+      rows: OdSaberTytResultRow[]; benchmarks: TytBenchmarks; alpha?: AlphaData; fileName?: string;
     }) => {
       if (years.length) {
         await run(supabase.from("od_saber_tyt_results").delete().eq("tyt_id", tytId).in("year", years));
@@ -495,7 +498,7 @@ export function useReplaceSaberTytResults() {
       for (let i = 0; i < rows.length; i += 500) {
         await run(supabase.from("od_saber_tyt_results").insert(rows.slice(i, i + 500)));
       }
-      await run(supabase.from("od_saber_tyt").update({ benchmarks }).eq("id", tytId));
+      await run(supabase.from("od_saber_tyt").update(alpha ? { benchmarks, alpha } : { benchmarks }).eq("id", tytId));
       await logImport(periodId, reportId, "plantilla", rows.length, fileName, { tabla: "od_saber_tyt_results", anios: years });
     },
   );

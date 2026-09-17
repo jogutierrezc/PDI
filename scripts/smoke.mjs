@@ -1998,6 +1998,31 @@ const routes = [
       const readout = [...window.document.querySelectorAll("#oda-tyt-anios .oda-tyt__readout dd")].map((d) => d.textContent.trim());
       if (!readout.slice(0, 2).every((v) => /^P\d/.test(v))) throw new Error(`los percentiles no se leen: ${readout.join(" | ")}`);
       if (!/^[+-]\d/.test(readout[2] ?? "")) throw new Error(`el valor agregado debe llevar signo: ${readout[2]}`);
+      // Motor Alpha (0037): el puntaje esperado, el real y el ajuste del modelo.
+      for (const label of ["Puntaje esperado medio", "Puntaje real medio", "Valor agregado (VA)", "Ajuste del modelo"]) {
+        if (!years.includes(label)) throw new Error(`falta «${label}» en la lectura del Motor Alpha`);
+      }
+      if (!years.includes("R² 0,588") || !years.includes("n = 1.204")) throw new Error(`el ajuste del modelo no se lee: ${years.slice(-260)}`);
+      if (!years.includes("Innovaciencia 2025")) throw new Error("la lectura del Motor Alpha debe citar el artículo del modelo");
+      // Motor Alpha (0037): los promedios nacionales se editan aquí y dicen de dónde salen.
+      const national = text("oda-tyt-nacional");
+      if (!national.includes("Innovaciencia 2025")) throw new Error("los promedios nacionales deben citar el artículo del que salen");
+      if (!national.includes("Ciencias naturales") || !national.includes("Comunicación escrita")) throw new Error(`faltan casillas del promedio nacional: ${national.slice(0, 200)}`);
+      const boxes = [...window.document.querySelectorAll("#oda-tyt-nacional input")];
+      if (boxes.length !== 6 + 6) throw new Error(`los promedios nacionales debían tener 12 casillas y tienen ${boxes.length}`);
+      if (boxes[0].value !== "57") throw new Error(`la casilla de matemáticas llega con ${boxes[0].value} en vez del promedio publicado`);
+      const guardar = [...window.document.querySelectorAll("#oda-tyt-nacional button")].find((b) => b.textContent.startsWith("Guardar"));
+      if (!guardar?.disabled) throw new Error("sin cambios no se debe poder guardar el promedio nacional");
+      const setter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, "value").set;
+      setter.call(boxes[0], "mil");
+      boxes[0].dispatchEvent(new window.Event("input", { bubbles: true }));
+      await tick();
+      if (!text("oda-tyt-nacional").includes("no son números")) throw new Error("una casilla que no es número debe avisarse");
+      if (!guardar.disabled) throw new Error("con una casilla que no es número no se debe poder guardar");
+      setter.call(boxes[0], "58.5");
+      boxes[0].dispatchEvent(new window.Event("input", { bubbles: true }));
+      await tick();
+      if (guardar.disabled) throw new Error("con un promedio válido se debe poder guardar");
     },
   },
   {
@@ -2984,6 +3009,22 @@ Object.assign(FIXTURES, OD_FIXTURES);
         ...competencies.map((key) => [key, { entrada: curve(key === "global" ? 180 : 28, key === "global" ? 380 : 82), salida: curve(key === "global" ? 60 : 55, key === "global" ? 165 : 160) }]),
         ["cn", { entrada: curve(30, 80), salida: [] }],
       ]),
+      // Motor Alpha (0037): el modelo reajustado sobre esta cohorte y los promedios del país.
+      alpha: {
+        nacional: {
+          saber11: { m: 57, lc: 58, sc: 55, cn: 56, ing: 61, global: 285 },
+          tyt: { ce: 94, rc: 90, lc: 97, cc: 96, ing: 100, global: 95 },
+        },
+        modelos: {
+          global: {
+            completo: { coef: { intercepto: 12.4, m: 0.71, lc: 0.58, cn: 0.22, sc: 0.31, ing: 0.19 }, r2: 0.612, n: 840, rmse: 9.84 },
+            ampliado: { coef: { intercepto: 14.1, m: 0.74, lc: 0.61, sc: 0.33, ing: 0.2 }, r2: 0.588, n: 1204, rmse: 10.37 },
+          },
+          lc: {
+            ampliado: { coef: { intercepto: 21.8, m: 0.34, lc: 0.79, sc: 0.28, ing: 0.12 }, r2: 0.471, n: 1204, rmse: 12.06 },
+          },
+        },
+      },
       office_id: null, position: 1,
     },
   ];
@@ -2998,6 +3039,8 @@ Object.assign(FIXTURES, OD_FIXTURES);
       competencies.forEach((competency, ci) => {
         const meanEntry = 41 + pi * 2 + ci;
         const meanDelta = 6.5 + pi - ci * 0.5 + (year - 2023);
+        const alphaExpected = Math.round((96 + pi * 2 - ci + (year - 2023) * 1.5) * 100) / 100;
+        const alphaVa = Math.round((3.2 + pi - ci * 0.4 + (year - 2023) * 0.6) * 100) / 100;
         results.push({
           id: `od-tyt-${year}-${pi}-${competency}`, tyt_id: tytId, year, level: "tecnologico", program, competency,
           evaluated, mean_exit: Math.round((meanEntry + meanDelta) * 100) / 100, paired,
@@ -3012,6 +3055,14 @@ Object.assign(FIXTURES, OD_FIXTURES);
           },
           histogram: spread(paired, ["-10", "-5", "0", "5", "10", "15"]),
           scatter: spread(paired, ["20|35", "35|45", "45|55", "55|70", "70|80"]),
+          // Motor Alpha: esperado, real, VA, el plano esperado × real y los cuadrantes del artículo.
+          alpha_n: paired,
+          alpha_expected: alphaExpected,
+          alpha_actual: Math.round((alphaExpected + alphaVa) * 100) / 100,
+          alpha_va: alphaVa,
+          alpha_positive: Math.round(paired * 0.57),
+          plane: spread(paired, ["85|85", "90|95", "95|100", "100|105", "105|110"]),
+          quadrants: spread(paired, ["1", "2", "3", "4"]),
         });
       });
     });

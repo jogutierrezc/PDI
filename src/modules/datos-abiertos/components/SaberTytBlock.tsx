@@ -41,20 +41,38 @@ import {
   tytYears,
 } from "../data/saber-tyt";
 import type { SaberTytData, TytCompetency, TytFigure, TytFilter } from "../data/saber-tyt";
+import { AlphaCoefficients, AlphaMethod, AlphaPlane, AlphaQuadrants, AlphaValueBars } from "./SaberAlphaViews";
 import { ChartFrame, ChartTooltip, ViewSwitch } from "./ChartFrame";
 import { SplitFlap } from "./SplitFlap";
 import { nivoTheme, useChartTokens } from "./free/chart-tokens";
-import { usePrefersReducedMotion, useWidth } from "./motion";
+import { useInView, usePrefersReducedMotion, useWidth } from "./motion";
 import "./saber-tyt.css";
+
+/** Los dos modelos de lectura del mismo conjunto. */
+type TytEngine = "beta" | "alpha";
+
+const ENGINES: { value: TytEngine; label: string }[] = [
+  { value: "beta", label: "Motor Beta" },
+  { value: "alpha", label: "Motor Alpha" },
+];
 
 type TytView = "perfil" | "dispersion" | "transito" | "valor";
 
-const VIEWS: { value: TytView; label: string }[] = [
-  { value: "perfil", label: "Perfil" },
-  { value: "dispersion", label: "Dispersión" },
-  { value: "transito", label: "Tránsito" },
-  { value: "valor", label: "Valor agregado" },
-];
+/** Cada motor nombra sus cuatro vistas; la cuarta es el valor agregado en los dos. */
+const VIEWS: Record<TytEngine, { value: TytView; label: string }[]> = {
+  beta: [
+    { value: "perfil", label: "Perfil" },
+    { value: "dispersion", label: "Dispersión" },
+    { value: "transito", label: "Tránsito" },
+    { value: "valor", label: "Valor agregado" },
+  ],
+  alpha: [
+    { value: "perfil", label: "Plano" },
+    { value: "dispersion", label: "Cuadrantes" },
+    { value: "transito", label: "El modelo" },
+    { value: "valor", label: "Valor agregado" },
+  ],
+};
 
 /** Con menos pareados que esto, un promedio de programa no dice nada. */
 const FEW = 10;
@@ -71,8 +89,11 @@ export function SaberTytBlock({ data, anchor, title }: { data: SaberTytData; anc
 
   const rawComp = params.get("tyt") as TytCompetency;
   const competency: TytCompetency = TYT_COMPETENCIES.some((c) => c.key === rawComp) ? rawComp : "lc";
+  const rawEngine = params.get("tyt-motor") as TytEngine;
+  const engine: TytEngine = ENGINES.some((e) => e.value === rawEngine) ? rawEngine : "beta";
+  const views = VIEWS[engine];
   const rawView = params.get("tyt-vista") as TytView;
-  const view: TytView = VIEWS.some((v) => v.value === rawView) ? rawView : "perfil";
+  const view: TytView = views.some((v) => v.value === rawView) ? rawView : "perfil";
   const program = programs.some((p) => p.name === params.get("tyt-programa")) ? params.get("tyt-programa")! : "";
   const yearParam = Number(params.get("tyt-anio"));
   const year = years.includes(yearParam) ? yearParam : null;
@@ -105,7 +126,10 @@ export function SaberTytBlock({ data, anchor, title }: { data: SaberTytData; anc
             <h2 id={anchor}>{title || data.title}</h2>
             {data.description && <p>{data.description}</p>}
           </div>
-          <ViewSwitch label="Vista del Motor Beta" value={view} onChange={(v) => set({ "tyt-vista": v === "perfil" ? "" : v })} options={VIEWS} />
+          <div className="od-tyt__switches">
+            <ViewSwitch label="Modelo de análisis" value={engine} onChange={(v) => set({ "tyt-motor": v === "beta" ? "" : v })} options={ENGINES} />
+            <ViewSwitch label={`Vista del ${engine === "beta" ? "Motor Beta" : "Motor Alpha"}`} value={view} onChange={(v) => set({ "tyt-vista": v === "perfil" ? "" : v })} options={views} />
+          </div>
         </header>
 
         <div className="od-tyt__board">
@@ -156,37 +180,71 @@ export function SaberTytBlock({ data, anchor, title }: { data: SaberTytData; anc
             <span className="od-tyt__level">{TYT_LEVEL_LABEL.tecnologico} · nivel SNIES</span>
           </div>
 
-          <Arrivals figure={figure} competency={competency} scope={scope} when={when} />
+          {engine === "beta" || !figure ? (
+            <Arrivals figure={figure} competency={competency} scope={scope} when={when} />
+          ) : (
+            <AlphaArrivals figure={figure} competency={competency} scope={scope} when={when} />
+          )}
         </div>
 
         {figure ? (
-          <>
-            {view === "perfil" && (
-              <ChartFrame title={`Perfil de entrada y salida · ${scope}`} subtitle={`Percentil por competencia · ${when}`} source={data.source} exportName="motor-beta-perfil">
-                <Profile data={data} year={year} filter={filter} />
-              </ChartFrame>
-            )}
-            {view === "dispersion" && (
-              <ChartFrame title={`Dispersión de valor agregado · ${info.label}`} subtitle={`Entrada frente a salida, en percentil · ${when}`} source={data.source} exportName="motor-beta-dispersion">
-                <Scatter data={data} competency={competency} year={year} filter={filter} figure={figure} />
-              </ChartFrame>
-            )}
-            {view === "transito" && (
-              <ChartFrame title={`Tránsito entre cuartos · ${info.label}`} subtitle={`De dónde salieron los que entraron en cada cuarto · ${scope} · ${when}`} source={data.source} exportName="motor-beta-transito">
-                <Transit figure={figure} />
-              </ChartFrame>
-            )}
-            {view === "valor" && (
-              <ChartFrame title={`Valor agregado por programa · ${info.label}`} subtitle={`Percentil de salida menos percentil de entrada · ${when}`} source={data.source} exportName="motor-beta-vai">
-                <ValueBars data={data} competency={competency} year={year} />
-              </ChartFrame>
-            )}
-          </>
+          engine === "beta" ? (
+            <>
+              {view === "perfil" && (
+                <ChartFrame title={`Perfil de entrada y salida · ${scope}`} subtitle={`Percentil por competencia · ${when}`} source={data.source} exportName="motor-beta-perfil">
+                  <Profile data={data} year={year} filter={filter} />
+                </ChartFrame>
+              )}
+              {view === "dispersion" && (
+                <ChartFrame title={`Dispersión de valor agregado · ${info.label}`} subtitle={`Entrada frente a salida, en percentil · ${when}`} source={data.source} exportName="motor-beta-dispersion">
+                  <Scatter data={data} competency={competency} year={year} filter={filter} figure={figure} />
+                </ChartFrame>
+              )}
+              {view === "transito" && (
+                <ChartFrame title={`Tránsito entre cuartos · ${info.label}`} subtitle={`De dónde salieron los que entraron en cada cuarto · ${scope} · ${when}`} source={data.source} exportName="motor-beta-transito">
+                  <Transit figure={figure} />
+                </ChartFrame>
+              )}
+              {view === "valor" && (
+                <ChartFrame
+                  title={`${isPaired(competency) ? "Valor agregado" : `Diagnóstico de ${info.exit ? "salida" : "entrada"}`} por programa · ${info.label}`}
+                  subtitle={`${isPaired(competency) ? "Percentil de salida menos percentil de entrada" : "Percentil medio en la única prueba que la evalúa"} · ${when}`}
+                  source={data.source}
+                  exportName="motor-beta-vai"
+                >
+                  <ValueBars data={data} competency={competency} year={year} />
+                </ChartFrame>
+              )}
+            </>
+          ) : (
+            <>
+              {view === "perfil" && (
+                <ChartFrame title={`Plano de valor agregado · ${info.label}`} subtitle={`Puntaje esperado frente al real · ${when}`} source={data.source} exportName="motor-alpha-plano">
+                  <AlphaPlane data={data} competency={competency} year={year} figure={figure} program={program} />
+                </ChartFrame>
+              )}
+              {view === "dispersion" && (
+                <ChartFrame title={`Cuadrantes frente al país · ${info.label}`} subtitle={`Promedios nacionales de las dos pruebas · ${scope} · ${when}`} source={data.source} exportName="motor-alpha-cuadrantes">
+                  <AlphaQuadrants data={data} competency={competency} figure={figure} />
+                </ChartFrame>
+              )}
+              {view === "transito" && (
+                <ChartFrame title={`El modelo · ${info.label}`} subtitle="Qué pesa cada competencia del Saber 11 en la predicción" source={data.source} exportName="motor-alpha-modelo">
+                  <AlphaCoefficients data={data} competency={competency} />
+                </ChartFrame>
+              )}
+              {view === "valor" && (
+                <ChartFrame title={`Valor agregado por programa · ${info.label}`} subtitle={`Puntaje real menos esperado, en puntos de la prueba · ${when}`} source={data.source} exportName="motor-alpha-vai">
+                  <AlphaValueBars data={data} competency={competency} year={year} />
+                </ChartFrame>
+              )}
+            </>
+          )
         ) : (
           <p className="od-tyt__empty">Sin resultados de {info.label.toLowerCase()} para este corte.</p>
         )}
 
-        <Method note={data.note} />
+        {engine === "beta" ? <Method note={data.note} /> : <AlphaMethod data={data} competency={competency} />}
       </div>
     </section>
   );
@@ -198,6 +256,8 @@ function Arrivals({ figure, competency, scope, when }: { figure: TytFigure | nul
   const info = tytInfo(competency);
   if (!figure) return <p className="od-tyt__empty">Sin resultados para este corte.</p>;
   const paired = Object.values(figure.transitions).reduce((sum, row) => sum + Object.values(row).reduce((a, b) => a + b, 0), 0);
+  const orphans = Math.max(0, figure.evaluated - paired);
+  const solo = !isPaired(competency);
   return (
     <dl className="od-tyt__arrivals">
       <div className="od-tyt__arrival">
@@ -231,9 +291,55 @@ function Arrivals({ figure, competency, scope, when }: { figure: TytFigure | nul
             label={figure.meanDelta === null ? "Sin valor agregado" : `${signed(figure.meanDelta)} puntos de percentil`}
           />
           <span className="od-tyt__sub">
-            {figure.improvedShare === null
-              ? `Sin pareja de pruebas en ${when}`
-              : `${pct(figure.improvedShare)} de ${integer.format(paired)} evaluados subió de percentil`}
+            {solo
+              ? competency === "ce"
+                ? "Sin pareja en el Saber 11: diagnóstico de salida"
+                : "Sin pareja en el Saber TyT: diagnóstico de entrada"
+              : figure.improvedShare === null
+                ? `Sin pareja de pruebas en ${when}`
+                : `${pct(figure.improvedShare)} de ${integer.format(paired)} evaluados subió de percentil${orphans > 0 ? ` · ${integer.format(orphans)} sin Saber 11 quedan fuera` : ""}`}
+          </span>
+        </dd>
+      </div>
+    </dl>
+  );
+}
+
+/** Lo que el modelo esperaba, lo que ocurrió y la distancia entre ambos. */
+function AlphaArrivals({ figure, competency, scope, when }: { figure: TytFigure; competency: TytCompetency; scope: string; when: string }) {
+  const info = tytInfo(competency);
+  const { alphaExpected, alphaActual, alphaVa, alphaN, alphaPositive } = figure.alpha;
+  if (!alphaN || alphaExpected === null || alphaActual === null) {
+    return <p className="od-tyt__empty">El Motor Alpha necesita las dos pruebas completas: no hay suficientes en {info.label.toLowerCase()} para este corte.</p>;
+  }
+  return (
+    <dl className="od-tyt__arrivals">
+      <div className="od-tyt__arrival">
+        <dt>Esperado · {info.exit || info.label}</dt>
+        <dd>
+          <SplitFlap value={integer.format(Math.round(alphaExpected))} size="lg" numeric label={`${decimal.format(alphaExpected)} puntos esperados`} />
+          <span className="od-tyt__sub">lo que el modelo preveía con su Saber 11</span>
+        </dd>
+      </div>
+      <div className="od-tyt__arrival">
+        <dt>Real · {when}</dt>
+        <dd>
+          <SplitFlap value={integer.format(Math.round(alphaActual))} size="lg" numeric delay={90} label={`${decimal.format(alphaActual)} puntos obtenidos`} />
+          <span className="od-tyt__sub">{integer.format(alphaN)} evaluados con las dos pruebas completas</span>
+        </dd>
+      </div>
+      <div className="od-tyt__arrival" data-lead>
+        <dt>Valor agregado · {scope}</dt>
+        <dd>
+          <SplitFlap
+            value={alphaVa === null ? "—" : `${alphaVa > 0 ? "+" : alphaVa < 0 ? "-" : ""}${integer.format(Math.abs(Math.round(alphaVa)))}`}
+            size="lg"
+            numeric
+            delay={180}
+            label={alphaVa === null ? "Sin valor agregado" : `${signed(alphaVa)} puntos frente a lo esperado`}
+          />
+          <span className="od-tyt__sub">
+            {alphaPositive !== null ? `${pct((alphaPositive / alphaN) * 100)} quedó por encima de lo esperado` : "sin comparación"}
           </span>
         </dd>
       </div>
@@ -337,6 +443,9 @@ function Scatter({
   const wrap = useRef<HTMLDivElement>(null);
   const width = Math.max(320, useWidth(wrap, 720));
   const [mode, setMode] = useState<ScatterMode>("programas");
+  const seen = useInView(wrap);
+  const reduced = usePrefersReducedMotion();
+  const armed = seen || reduced;
   const [tip, setTip] = useState<{ x: number; y: number; title: string; lines: string[] } | null>(null);
 
   const programs = tytPrograms(data)
@@ -384,7 +493,7 @@ function Scatter({
           </li>
         </ul>
       </div>
-      <div className="od-tyt__canvas">
+      <div className="od-tyt__canvas" data-armed={armed || undefined}>
         <svg width={size} height={height} role="img" aria-label="Dispersión de percentil de entrada frente a percentil de salida, con la diagonal de igualdad">
           {ticks.map((v) => (
             <g key={v}>
@@ -410,7 +519,7 @@ function Scatter({
                 cx={x(p.entry + 2.5)}
                 cy={y(p.exit + 2.5)}
                 r={4 + (p.count / maxCount) * 12}
-                className="od-tyt__dot"
+                className="od-tyt__dot od-tyt__dot--pop"
                 style={{ fill: p.above ? t.pos : t.neg }}
                 onMouseEnter={(e) => show(e, `Entrada ${p.entry}–${p.entry + 5} · salida ${p.exit}–${p.exit + 5}`, [`${integer.format(p.count)} ${p.count === 1 ? "evaluado" : "evaluados"}`])}
                 onMouseLeave={() => setTip(null)}
@@ -424,7 +533,7 @@ function Scatter({
                   cx={x(p.entry)}
                   cy={y(p.exit)}
                   r={5 + (p.pairs / maxPairs) * 10}
-                  className="od-tyt__dot"
+                  className="od-tyt__dot od-tyt__dot--pop"
                   data-few={p.pairs < FEW || undefined}
                   style={{ fill: p.exit > p.entry ? t.pos : t.neg }}
                   onMouseEnter={(e) =>
@@ -469,6 +578,10 @@ function Scatter({
 /* --- Tránsito entre cuartos ------------------------------------------------------------ */
 
 function Transit({ figure }: { figure: TytFigure }) {
+  const wrap = useRef<HTMLDivElement>(null);
+  const seen = useInView(wrap);
+  const reduced = usePrefersReducedMotion();
+  const armed = seen || reduced;
   const rows = transitionShares(figure).filter((r) => r.total > 0);
   if (!rows.length) return <p className="od-tyt__empty">Sin evaluados con las dos pruebas en este corte.</p>;
   const tone = ["var(--od-seq-2)", "var(--od-seq-4)", "var(--od-seq-5)", "var(--od-seq-7)"];
@@ -477,7 +590,7 @@ function Transit({ figure }: { figure: TytFigure }) {
   const lift = low ? (low.to[2].count + low.to[3].count) / (low.total || 1) : null;
 
   return (
-    <div className="od-tyt__transit">
+    <div className="od-tyt__transit" ref={wrap} data-armed={armed || undefined}>
       <ul className="od-tyt__legend" aria-label="Cuarto de salida">
         {["1", "2", "3", "4"].map((q, i) => (
           <li key={q}>
@@ -544,6 +657,13 @@ function Transit({ figure }: { figure: TytFigure }) {
 
 function ValueBars({ data, competency, year }: { data: SaberTytData; competency: TytCompetency; year: number | null }) {
   const t = useChartTokens();
+  const info = tytInfo(competency);
+  if (!isPaired(competency)) return <SoloDiagnosis data={data} competency={competency} year={year} />;
+  void info;
+  const wrap = useRef<HTMLDivElement>(null);
+  const seen = useInView(wrap);
+  const reduced = usePrefersReducedMotion();
+  const armed = seen || reduced;
   const rows = tytPrograms(data)
     .map((p) => {
       const figure = tytFigure(data, competency, year, { program: p.name });
@@ -556,20 +676,22 @@ function ValueBars({ data, competency, year }: { data: SaberTytData; competency:
   const max = Math.max(10, ...rows.map((r) => Math.abs(r.delta)));
 
   return (
-    <div className="od-tyt__value">
+    <div className="od-tyt__value" ref={wrap} data-armed={armed || undefined}>
       <ol className="od-tyt__value-rows">
-        {rows.map((row) => {
+        {rows.map((row, i) => {
           const half = (Math.abs(row.delta) / max) * 50;
           return (
             <li key={row.name} data-few={row.pairs < FEW || undefined}>
               <span className="od-tyt__value-name">{row.name}</span>
               <span className="od-tyt__value-track">
                 <span
-                  className="od-tyt__value-bar"
+                  className="od-tyt__value-bar od-tyt__value-bar--grow"
+                  data-neg={row.delta < 0 || undefined}
                   style={{
                     left: row.delta >= 0 ? "50%" : `${50 - half}%`,
                     width: `${half}%`,
                     background: row.delta >= 0 ? t.pos : t.neg,
+                    animationDelay: `${Math.min(500, i * 45)}ms`,
                   }}
                 />
               </span>
@@ -583,6 +705,54 @@ function ValueBars({ data, competency, year }: { data: SaberTytData; competency:
       </ol>
       <p className="od-tyt__note">
         Puntos de percentil que gana o pierde cada programa entre la entrada y la salida. En tinta tenue, los programas con menos de {FEW} evaluados con las dos pruebas.
+      </p>
+    </div>
+  );
+}
+
+/**
+ * Comunicación escrita y ciencias naturales no tienen con qué compararse, así
+ * que su vista no es una resta: es el diagnóstico de la prueba que sí las
+ * evalúa, programa por programa.
+ */
+function SoloDiagnosis({ data, competency, year }: { data: SaberTytData; competency: TytCompetency; year: number | null }) {
+  const info = tytInfo(competency);
+  const exitSide = Boolean(info.exit);
+  const rows = tytPrograms(data)
+    .map((p) => {
+      const figure = tytFigure(data, competency, year, { program: p.name });
+      const value = figure ? (exitSide ? figure.meanExit : figure.meanEntry) : null;
+      const raw = figure ? (exitSide ? figure.rawExit : figure.rawEntry) : null;
+      const count = figure ? (exitSide ? figure.evaluated : figure.paired) : 0;
+      return value !== null && count > 0 ? { name: p.name, value, raw, count } : null;
+    })
+    .filter((r): r is NonNullable<typeof r> => r !== null)
+    .sort((a, b) => b.value - a.value);
+  if (!rows.length) return <p className="od-tyt__empty">Sin resultados de {info.label.toLowerCase()} en este corte.</p>;
+
+  return (
+    <div className="od-tyt__value">
+      <p className="od-tyt__read">
+        {info.label} solo se evalúa en {exitSide ? "la prueba de salida" : "el Saber 11"}: no tiene pareja con la que restar, así que aquí
+        se lee como diagnóstico {exitSide ? "de salida" : "de entrada"}, programa por programa.
+      </p>
+      <ol className="od-tyt__value-rows">
+        {rows.map((row) => (
+          <li key={row.name} data-few={row.count < FEW || undefined}>
+            <span className="od-tyt__value-name">{row.name}</span>
+            <span className="od-tyt__value-track" data-solo>
+              <span className="od-tyt__value-bar" style={{ left: 0, width: `${row.value}%`, background: "var(--od-seq-4)" }} />
+            </span>
+            <span className="od-tyt__value-figure">
+              <strong>{decimal.format(row.value)}</strong>
+              <small>{integer.format(row.count)} eval.</small>
+            </span>
+          </li>
+        ))}
+      </ol>
+      <p className="od-tyt__note">
+        Percentil medio dentro de la cohorte histórica de la universidad, de 0 a 100. En tinta tenue, los programas con menos de {FEW}{" "}
+        evaluados.
       </p>
     </div>
   );
@@ -693,13 +863,13 @@ const STEPS: { title: string; body: string; step: 1 | 2 | 3 | 4 }[] = [
     step: 2,
     title: "Homologación de competencias",
     body:
-      "El motor empareja las competencias que miden lo mismo aunque se llamen distinto: matemáticas con razonamiento cuantitativo, sociales y ciudadanas con competencias ciudadanas, y lectura crítica e inglés con su par. Comunicación escrita solo existe en la prueba de salida y ciencias naturales solo en la de entrada: se muestran, pero no se comparan, porque no tienen con qué.",
+      "El motor empareja las competencias que miden lo mismo aunque se llamen distinto: matemáticas con razonamiento cuantitativo, sociales y ciudadanas con competencias ciudadanas, y lectura crítica e inglés con su par. Comunicación escrita solo existe en la prueba de salida y ciencias naturales solo en la de entrada: no se comparan, porque no tienen con qué, pero sirven como diagnóstico independiente —una de cómo llegan los estudiantes, la otra de cómo salen— y por eso el carril las muestra con esa marca.",
   },
   {
     step: 3,
     title: "Valor agregado",
     body:
-      "Es una resta: el percentil de salida menos el percentil de entrada. Quien entró en el percentil 30 y salió en el 60 aporta treinta puntos de valor agregado, aunque su puntaje bruto no sea el más alto del país. La cifra de un programa es el promedio de sus evaluados que tienen las dos pruebas, y por eso al lado de cada cifra va cuántos son.",
+      "Es una resta: el percentil de salida menos el percentil de entrada. Quien entró en el percentil 30 y salió en el 60 aporta treinta puntos de valor agregado, aunque su puntaje bruto no sea el más alto del país. La cifra de un programa es el promedio de sus evaluados que tienen las dos pruebas, y por eso al lado de cada cifra va cuántos son: en un grupo de cinco, un solo estudiante mueve el promedio varios puntos, mientras que en uno de cincuenta casi no se nota. Quien solo presentó la prueba de salida —porque validó el bachillerato, estudió fuera del país o no presentó el Saber 11— no entra en esta resta, pero sí cuenta en el percentil de salida y en el número de evaluados.",
   },
   {
     step: 4,
@@ -731,8 +901,10 @@ function Method({ note }: { note: string }) {
         <strong>Cómo no leerlo.</strong> La referencia es la propia cohorte de la universidad, así que el promedio institucional siempre
         queda en la mitad de la escala y el valor agregado del conjunto ronda el cero: lo que el motor compara son los programas y los
         años entre sí, no la universidad frente al país. Tampoco es una equivalencia entre pruebas: dice en qué posición quedó cada quien
-        dentro de cada una. Con las tablas de percentiles nacionales del ICFES, el mismo motor puede cambiar la referencia y responder
-        también esa pregunta.
+        dentro de cada una. Y antes de sacar conclusiones de un programa, mire cuántos evaluados lo sostienen: un valor agregado muy alto
+        o muy bajo con menos de {FEW} estudiantes pareados puede ser el efecto de una sola persona, mientras que el de un programa con
+        cincuenta es una tendencia. Con las tablas de percentiles nacionales del ICFES, el mismo motor puede cambiar la referencia y
+        responder también la pregunta de cómo va la universidad frente al país.
       </p>
       {note && <p className="od-tyt__note">{note}</p>}
     </section>

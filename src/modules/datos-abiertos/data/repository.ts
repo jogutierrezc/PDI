@@ -74,6 +74,7 @@ import type { RankingData } from "./rankings";
 import type { SaberProData } from "./saber-pro";
 import type { FreeSet } from "./free-sets";
 import type { SaberTytData } from "./saber-tyt";
+import { emptyAlpha } from "./saber-alpha";
 
 export interface OpenDataRows {
   period: OdPeriod;
@@ -604,6 +605,7 @@ export function assembleCatalog(rows: OpenDataRows): OpenDataCatalog {
       .map((t) => ({
         id: t.key, uuid: t.id, title: t.title, description: t.description, note: t.note,
         source: source(t.office_id), officeId: t.office_id, benchmarks: t.benchmarks ?? {},
+        alpha: t.alpha && Object.keys(t.alpha).length ? t.alpha : emptyAlpha(),
         results: (rows.saberTytResults ?? [])
           .filter((r) => r.tyt_id === t.id)
           .map((r) => ({
@@ -611,6 +613,9 @@ export function assembleCatalog(rows: OpenDataRows): OpenDataCatalog {
             evaluated: r.evaluated, meanExit: num(r.mean_exit), paired: r.paired, meanEntry: num(r.mean_entry),
             meanDelta: num(r.mean_delta), improved: r.improved, rawEntry: num(r.raw_entry), rawExit: num(r.raw_exit),
             transitions: r.transitions ?? {}, histogram: r.histogram ?? {}, scatter: r.scatter ?? {},
+            alphaN: r.alpha_n ?? null, alphaExpected: num(r.alpha_expected), alphaActual: num(r.alpha_actual),
+            alphaVa: num(r.alpha_va), alphaPositive: r.alpha_positive ?? null,
+            plane: r.plane ?? {}, quadrants: r.quadrants ?? {},
           })),
       }));
 

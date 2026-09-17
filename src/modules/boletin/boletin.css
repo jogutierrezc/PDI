@@ -2137,3 +2137,39 @@
   -webkit-print-color-adjust: exact;
   print-color-adjust: exact;
 }
+
+/* --- Saber TyT en el papel -------------------------------------------------- */
+
+/* Las cifras clave de la hoja, en una fila que no empuja el dibujo. */
+.bol-tyt-keys {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2mm 8mm;
+  margin: 0 0 2mm;
+}
+
+.bol-tyt-alpha {
+  display: grid;
+  grid-template-columns: 104mm minmax(0, 1fr);
+  gap: 5mm;
+  align-items: start;
+}
+
+.bol-tyt-alpha__side { display: grid; gap: 2mm; align-content: start; }
+
+.bol-tyt-alpha__note {
+  margin: 0;
+  color: var(--bol-ink-2);
+  font-size: 2.3mm;
+  line-height: 1.35;
+  text-align: justify;
+}
+
+.bol-tyt-plane__diagonal { stroke: var(--bol-ink); stroke-width: 0.25; stroke-dasharray: 1.2 0.8; }
+.bol-tyt-plane__dot { opacity: 0.78; }
+
+.bol-tyt-plane,
+.bol-tyt-coef {
+  -webkit-print-color-adjust: exact;
+  print-color-adjust: exact;
+}

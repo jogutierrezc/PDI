@@ -20,6 +20,9 @@
       percentiles, para dibujarla con su diagonal sin guardar a nadie.
    ========================================================================== */
 
+import { emptyAlpha, expectedOf, fitLinear, fitPredictors, planeCell, quadrantOf } from "./saber-alpha";
+import type { AlphaData, AlphaFigures, AlphaFit, AlphaPredictor } from "./saber-alpha";
+
 export type TytCompetency = "global" | "lc" | "rc" | "cc" | "ce" | "ing" | "cn";
 export type TytLevel = "tecnologico" | "tecnico_profesional" | "universitario";
 
@@ -131,6 +134,14 @@ export interface TytResult {
   histogram: Record<string, number>;
   /** Nube entrada × salida en celdas de 5 percentiles: "30|55". */
   scatter: Record<string, number>;
+  /** Motor Alpha: esperado, real, valor agregado, plano y cuadrantes (0037). */
+  alphaN: number | null;
+  alphaExpected: number | null;
+  alphaActual: number | null;
+  alphaVa: number | null;
+  alphaPositive: number | null;
+  plane: Record<string, number>;
+  quadrants: Record<string, number>;
 }
 
 export interface SaberTytData {
@@ -142,6 +153,8 @@ export interface SaberTytData {
   source: string;
   officeId?: string | null;
   benchmarks: TytBenchmarks;
+  /** Motor Alpha: coeficientes por competencia y promedios nacionales. */
+  alpha: AlphaData;
   results: TytResult[];
 }
 
@@ -166,6 +179,7 @@ export interface TytFigure {
   transitions: Record<string, Record<string, number>>;
   histogram: Record<string, number>;
   scatter: Record<string, number>;
+  alpha: AlphaFigures;
 }
 
 export const tytYears = (data: SaberTytData): number[] => Array.from(new Set(data.results.map((r) => r.year))).sort((a, b) => a - b);
@@ -204,6 +218,11 @@ export function tytFigure(data: SaberTytData, competency: TytCompetency, year: n
   const transitions: Record<string, Record<string, number>> = {};
   const histogram: Record<string, number> = {};
   const scatter: Record<string, number> = {};
+  const plane: Record<string, number> = {};
+  const quadrants: Record<string, number> = {};
+  let alphaN = 0;
+  let alphaPositive = 0;
+  const alphaSums = { expected: 0, actual: 0, va: 0 };
   for (const part of parts) {
     const n = part.evaluated ?? 0;
     const pair = part.paired ?? 0;
@@ -236,6 +255,16 @@ export function tytFigure(data: SaberTytData, competency: TytCompetency, year: n
     }
     for (const [bin, count] of Object.entries(part.histogram)) histogram[bin] = (histogram[bin] ?? 0) + count;
     for (const [cell, count] of Object.entries(part.scatter)) scatter[cell] = (scatter[cell] ?? 0) + count;
+    for (const [cell, count] of Object.entries(part.plane)) plane[cell] = (plane[cell] ?? 0) + count;
+    for (const [q, count] of Object.entries(part.quadrants)) quadrants[q] = (quadrants[q] ?? 0) + count;
+    const an = part.alphaN ?? 0;
+    if (an > 0) {
+      alphaN += an;
+      alphaPositive += part.alphaPositive ?? 0;
+      if (part.alphaExpected !== null) alphaSums.expected += part.alphaExpected * an;
+      if (part.alphaActual !== null) alphaSums.actual += part.alphaActual * an;
+      if (part.alphaVa !== null) alphaSums.va += part.alphaVa * an;
+    }
   }
   return {
     year,
@@ -251,6 +280,15 @@ export function tytFigure(data: SaberTytData, competency: TytCompetency, year: n
     transitions,
     histogram,
     scatter,
+    alpha: {
+      alphaN: alphaN || null,
+      alphaExpected: alphaN ? round2(alphaSums.expected / alphaN) : null,
+      alphaActual: alphaN ? round2(alphaSums.actual / alphaN) : null,
+      alphaVa: alphaN ? round2(alphaSums.va / alphaN) : null,
+      alphaPositive: alphaN ? alphaPositive : null,
+      plane,
+      quadrants,
+    },
   };
 }
 
@@ -298,7 +336,9 @@ const cell = (value: number) => Math.min(95, Math.floor(value / PERCENTILE_STEP)
  * programa y competencia. Las curvas se calculan sobre toda la cohorte, no año
  * por año: con treinta evaluados en un año no dirían nada.
  */
-export function aggregateTytRecords(records: TytRecord[]): { results: TytResult[]; benchmarks: TytBenchmarks } {
+export function aggregateTytRecords(records: TytRecord[], fit: AlphaFit = "ampliado"): { results: TytResult[]; benchmarks: TytBenchmarks; alpha: AlphaData } {
+  const alpha = fitAlpha(records);
+  const predictors = fitPredictors(fit);
   const benchmarks: TytBenchmarks = {};
   for (const { key } of TYT_COMPETENCIES) {
     const entrada = buildCurve(records.map((r) => r.entry[key]).filter((v): v is number => v !== null && v !== undefined));
@@ -312,6 +352,9 @@ export function aggregateTytRecords(records: TytRecord[]): { results: TytResult[
     deltaSum: number;
     rawEntrySum: number;
     rawExitSum: number;
+    alphaExpectedSum: number;
+    alphaActualSum: number;
+    alphaVaSum: number;
   }
   const groups = new Map<string, Bucket>();
   for (const record of records) {
@@ -341,11 +384,21 @@ export function aggregateTytRecords(records: TytRecord[]): { results: TytResult[
           transitions: {},
           histogram: {},
           scatter: {},
+          alphaN: null,
+          alphaExpected: null,
+          alphaActual: null,
+          alphaVa: null,
+          alphaPositive: null,
+          plane: {},
+          quadrants: {},
           exitSum: 0,
           entrySum: 0,
           deltaSum: 0,
           rawEntrySum: 0,
           rawExitSum: 0,
+          alphaExpectedSum: 0,
+          alphaActualSum: 0,
+          alphaVaSum: 0,
         } as Bucket);
 
       if (exit !== null && rawExit !== null) {
@@ -373,11 +426,33 @@ export function aggregateTytRecords(records: TytRecord[]): { results: TytResult[
         const at = `${cell(entry)}|${cell(exit)}`;
         group.scatter[at] = (group.scatter[at] ?? 0) + 1;
       }
+
+      // Motor Alpha: lo que el modelo esperaba de este estudiante y lo que obtuvo.
+      const model = alpha.modelos[key]?.[fit];
+      const expected = model ? expectedOf(model, fit, alphaEntry(record)) : null;
+      if (expected !== null && rawExit !== null) {
+        const va = round2(rawExit - expected);
+        group.alphaN = (group.alphaN ?? 0) + 1;
+        group.alphaExpectedSum += expected;
+        group.alphaActualSum += rawExit;
+        group.alphaVaSum += va;
+        if (va > 0) group.alphaPositive = (group.alphaPositive ?? 0) + 1;
+        const spot = planeCell(expected, rawExit);
+        group.plane[spot] = (group.plane[spot] ?? 0) + 1;
+        const axis = entryAxis(key);
+        const entryScore = axis ? alphaEntry(record)[axis] ?? null : record.entry.global ?? null;
+        const entryMean = axis ? alpha.nacional.saber11[axis] : alpha.nacional.saber11.global;
+        const exitMean = alpha.nacional.tyt[key];
+        if (entryScore !== null && entryMean !== undefined && exitMean !== undefined) {
+          const q = quadrantOf(entryScore, rawExit, entryMean, exitMean);
+          group.quadrants[q] = (group.quadrants[q] ?? 0) + 1;
+        }
+      }
       groups.set(id, group);
     }
   }
 
-  const results = Array.from(groups.values()).map(({ exitSum, entrySum, deltaSum, rawEntrySum, rawExitSum, ...row }) => {
+  const results = Array.from(groups.values()).map(({ exitSum, entrySum, deltaSum, rawEntrySum, rawExitSum, alphaExpectedSum, alphaActualSum, alphaVaSum, ...row }) => {
     const pairedBoth = Object.values(row.transitions).reduce((sum, at) => sum + Object.values(at).reduce((a, b) => a + b, 0), 0);
     return {
       ...row,
@@ -386,7 +461,53 @@ export function aggregateTytRecords(records: TytRecord[]): { results: TytResult[
       meanDelta: pairedBoth ? round2(deltaSum / pairedBoth) : null,
       rawEntry: row.paired ? round2(rawEntrySum / row.paired) : null,
       rawExit: row.evaluated ? round2(rawExitSum / row.evaluated) : null,
+      alphaExpected: row.alphaN ? round2(alphaExpectedSum / row.alphaN) : null,
+      alphaActual: row.alphaN ? round2(alphaActualSum / row.alphaN) : null,
+      alphaVa: row.alphaN ? round2(alphaVaSum / row.alphaN) : null,
     };
   });
-  return { results, benchmarks };
+  return { results, benchmarks, alpha };
+}
+
+/* --- Motor Alpha: el ajuste sobre toda la cohorte -------------------------------------- */
+
+/** Los puntajes del Saber 11 con los nombres que usa la ecuación publicada. */
+const alphaEntry = (record: TytRecord): Partial<Record<AlphaPredictor, number | null>> => ({
+  m: record.entry.rc ?? null,
+  lc: record.entry.lc ?? null,
+  cn: record.entry.cn ?? null,
+  sc: record.entry.cc ?? null,
+  ing: record.entry.ing ?? null,
+});
+
+/** Qué competencia del Saber 11 hace de eje de entrada en los cuadrantes. */
+const entryAxis = (competency: TytCompetency): AlphaPredictor | null =>
+  competency === "rc" ? "m" : competency === "cc" ? "sc" : competency === "lc" ? "lc" : competency === "ing" ? "ing" : null;
+
+/**
+ * Ajusta la regresión de cada competencia de salida sobre las del Saber 11,
+ * en sus dos versiones: la del artículo y la que deja fuera ciencias
+ * naturales, que cubre a muchos más estudiantes.
+ */
+export function fitAlpha(records: TytRecord[]): AlphaData {
+  const alpha = emptyAlpha();
+  for (const { key } of TYT_COMPETENCIES) {
+    if (key === "cn") continue;
+    for (const fit of ["completo", "ampliado"] as AlphaFit[]) {
+      const predictors = fitPredictors(fit);
+      const rows = records
+        .map((record) => {
+          const y = record.exit[key] ?? null;
+          const entry = alphaEntry(record);
+          const x = predictors.map((p) => entry[p] ?? null);
+          return y !== null && x.every((v): v is number => v !== null) ? { x: x as number[], y } : null;
+        })
+        .filter((row): row is { x: number[]; y: number } => row !== null);
+      const model = fitLinear(rows, predictors);
+      if (model) {
+        alpha.modelos[key] = { ...(alpha.modelos[key] ?? {}), [fit]: model };
+      }
+    }
+  }
+  return alpha;
 }

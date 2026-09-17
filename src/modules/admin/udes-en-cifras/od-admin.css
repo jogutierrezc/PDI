@@ -3393,6 +3393,33 @@
 
 .oda-tyt__readout dd { display: flex; flex-wrap: wrap; align-items: baseline; gap: var(--space-1); }
 
+/* Promedios nacionales del Motor Alpha: una fila por prueba. */
+
+.oda-tyt-national { display: grid; gap: var(--space-3); max-width: 62rem; }
+
+.oda-tyt-national__group { min-width: 0; padding: 0; border: 0; }
+
+.oda-tyt-national__group legend {
+  padding: 0 0 var(--space-1);
+  color: var(--ink-muted);
+  font-size: var(--text-2xs);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.oda-tyt-national__row {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(8rem, 1fr));
+  gap: var(--space-2);
+}
+
+.oda-tyt-national__field { display: grid; gap: 2px; min-width: 0; }
+
+.oda-tyt-national__field span { color: var(--ink-secondary); font-size: var(--text-xs); }
+
+.oda-tyt-national__field input { width: 100%; text-align: right; font-variant-numeric: tabular-nums; }
+
 /* --- Conjuntos libres (0033) ----------------------------------------------------
    Estructura: temporalidad y editor de columnas. Captura: la rejilla de filas,
    con casillas de texto alineadas a la izquierda y cifras a la derecha, y los

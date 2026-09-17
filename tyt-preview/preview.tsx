@@ -1,4 +1,4 @@
-// Vista previa temporal del Motor Beta. Se borra al terminar.
+// Vista previa temporal de los motores Beta y Alpha. Se borra al terminar.
 import ReactDOM from "react-dom/client";
 import { BrowserRouter } from "react-router-dom";
 import "../src/styles/tokens.css";
@@ -15,7 +15,7 @@ if (theme) document.documentElement.setAttribute("data-theme", theme);
 ReactDOM.createRoot(document.getElementById("root")!).render(
   <BrowserRouter>
     <main className="od-report-page" style={{ background: "var(--od-page)", minHeight: "100vh" }}>
-      <SaberTytBlock data={data as SaberTytData} anchor="od-saber-tyt" />
+      <SaberTytBlock data={data as unknown as SaberTytData} anchor="od-saber-tyt" />
     </main>
   </BrowserRouter>,
 );

@@ -16,7 +16,7 @@ function Sheet({ title, description, source, notes, children }: { title: string;
   );
 }
 const comp = (new URLSearchParams(location.search).get("c") ?? "rc") as "rc";
-const units = tytUnits(data as SaberTytData, comp, 0, Sheet);
+const units = tytUnits(data as unknown as SaberTytData, comp, 0, Sheet);
 const vars = { "--bol-navy": "#072b58", "--bol-band": "#4078b9", "--bol-accent": "#e8892b", "--bol-font": "Montserrat, sans-serif" } as CSSProperties;
 ReactDOM.createRoot(document.getElementById("root")!).render(
   <div className="bol-doc" style={vars}>

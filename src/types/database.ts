@@ -1383,6 +1383,8 @@ export interface OdSaberTytRow {
   note: string;
   /** Curva de percentiles por competencia: ver saber-tyt.ts. */
   benchmarks: import("../modules/datos-abiertos/data/saber-tyt").TytBenchmarks;
+  /** Motor Alpha: coeficientes y promedios nacionales (0037). */
+  alpha?: import("../modules/datos-abiertos/data/saber-alpha").AlphaData;
   office_id: string | null;
   position: number;
 }
@@ -1406,6 +1408,14 @@ export interface OdSaberTytResultRow {
   transitions: Record<string, Record<string, number>>;
   histogram: Record<string, number>;
   scatter: Record<string, number>;
+  /** Motor Alpha (0037). */
+  alpha_n?: number | null;
+  alpha_expected?: number | string | null;
+  alpha_actual?: number | string | null;
+  alpha_va?: number | string | null;
+  alpha_positive?: number | null;
+  plane?: Record<string, number>;
+  quadrants?: Record<string, number>;
 }
 
 /** Conjunto libre de un informe (0033). Columnas y vistas en jsonb: ver free-sets.ts. */

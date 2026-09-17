@@ -26,9 +26,11 @@ import {
   isPaired,
   tytFigure,
 } from "../../../datos-abiertos/data/saber-tyt";
+import { ALPHA_CITATION, ALPHA_FIT_LABEL, ALPHA_NATIONAL, ALPHA_PREDICTORS, emptyAlpha } from "../../../datos-abiertos/data/saber-alpha";
+import type { AlphaData, AlphaModel, AlphaPredictor } from "../../../datos-abiertos/data/saber-alpha";
 import type { SaberTytData, TytBenchmarks, TytCompetency, TytLevel, TytRecord, TytResult } from "../../../datos-abiertos/data/saber-tyt";
 import type { StationProps } from "../OdAdmin";
-import { useDeleteSaberTytYear, useReplaceSaberTytResults } from "../od-data";
+import { useDeleteSaberTytYear, useReplaceSaberTytResults, useSaveSaberTyt } from "../od-data";
 import { ConfirmButton, Panel, SaveState, StageEmpty } from "../ui";
 
 /* --- Estructura: definir el conjunto ------------------------------------------------ */
@@ -266,6 +268,12 @@ interface ImportPlan {
   missing: string[];
   /** Lectura institucional: entrada, salida y valor agregado del global. */
   readout: { entry: number | null; exit: number | null; delta: number | null } | null;
+  /** Motor Alpha: coeficientes ajustados sobre toda la cohorte del archivo. */
+  alpha: AlphaData;
+  /** Lectura Alpha del puntaje global: esperado, real y valor agregado. */
+  alphaReadout: { expected: number | null; actual: number | null; va: number | null } | null;
+  /** El ajuste del puntaje global con el que se calcularon esas cifras. */
+  alphaModel: AlphaModel | undefined;
 }
 
 /**
@@ -302,7 +310,8 @@ function planFrom(sheet: WorkbookSheet, fileName: string, level: TytLevel): Impo
   });
   if (records.length === 0) return `La hoja «${sheet.name}» no trae filas con año y programa.`;
 
-  const { results, benchmarks } = aggregateTytRecords(records);
+  // El ajuste "ampliado" (sin ciencias naturales) es el que cubre a más estudiantes.
+  const { results, benchmarks, alpha } = aggregateTytRecords(records, ALPHA_IMPORT_FIT);
   if (results.length === 0) return `La hoja «${sheet.name}» no trae puntajes válidos.`;
 
   const years = Array.from(new Set(records.map((r) => r.year)))
@@ -317,7 +326,7 @@ function planFrom(sheet: WorkbookSheet, fileName: string, level: TytLevel): Impo
       };
     });
 
-  const figure = tytFigure({ id: "", title: "", description: "", note: "", source: "", benchmarks, results } as SaberTytData, "global", null);
+  const figure = tytFigure({ id: "", title: "", description: "", note: "", source: "", benchmarks, alpha, results } as SaberTytData, "global", null);
   return {
     fileName,
     sheet: sheet.name,
@@ -328,6 +337,9 @@ function planFrom(sheet: WorkbookSheet, fileName: string, level: TytLevel): Impo
     skipped,
     missing: TYT_COMPETENCIES.filter((c) => (c.exit && layout.exit[c.key] === undefined) || (c.entry && layout.entry[c.key] === undefined)).map((c) => c.label),
     readout: figure ? { entry: figure.meanEntry, exit: figure.meanExit, delta: figure.meanDelta } : null,
+    alpha,
+    alphaReadout: figure ? { expected: figure.alpha.alphaExpected, actual: figure.alpha.alphaActual, va: figure.alpha.alphaVa } : null,
+    alphaModel: alpha.modelos.global?.[ALPHA_IMPORT_FIT],
   };
 }
 
@@ -340,11 +352,18 @@ function yearsText(years: number[]): string {
   return contiguous ? `${sorted[0]}–${sorted[sorted.length - 1]}` : sorted.join(", ");
 }
 
+/** El ajuste con el que se calculan las cifras por programa: sin ciencias naturales, cubre a más estudiantes. */
+const ALPHA_IMPORT_FIT = "ampliado" as const;
+
 const count = (n: number) => n.toLocaleString("es-CO");
 const percentile = (value: number | null | undefined) => (value === null || value === undefined ? "—" : `P${value.toLocaleString("es-CO", { maximumFractionDigits: 1 })}`);
 const delta = (value: number | null | undefined) =>
   value === null || value === undefined ? "—" : `${value > 0 ? "+" : ""}${value.toLocaleString("es-CO", { maximumFractionDigits: 1 })}`;
 const share = (part: number, whole: number) => (whole ? `${Math.round((part / whole) * 100)} %` : "—");
+/** Puntaje de la prueba, con un decimal. */
+const points = (value: number | null | undefined) => (value === null || value === undefined ? "—" : value.toLocaleString("es-CO", { maximumFractionDigits: 1 }));
+/** La cita del artículo del que sale el modelo, en una línea. */
+const ALPHA_SOURCE = `${ALPHA_CITATION.authors} «${ALPHA_CITATION.title}». ${ALPHA_CITATION.journal}.`;
 
 /* --- Captura ------------------------------------------------------------------------ */
 
@@ -374,6 +393,7 @@ export function SaberTytCapture({ data, report, periodId, canEdit }: StationProp
       )}
       <TytImport key={`importar-${tyt.id}`} {...props} />
       <TytYears key={`anios-${tyt.id}`} {...props} />
+      <TytNational key={`nacional-${tyt.id}-${JSON.stringify(tyt.alpha?.nacional ?? {})}`} {...props} />
     </div>
   );
 }
@@ -456,10 +476,22 @@ function TytImport({ tyt, results, periodId, reportId, published, canEdit }: Sec
       transitions: r.transitions,
       histogram: r.histogram,
       scatter: r.scatter,
+      // Motor Alpha (0037): lo que el modelo esperaba, lo que se obtuvo y dónde cae en el plano.
+      alpha_n: r.alphaN,
+      alpha_expected: r.alphaExpected,
+      alpha_actual: r.alphaActual,
+      alpha_va: r.alphaVa,
+      alpha_positive: r.alphaPositive,
+      plane: r.plane,
+      quadrants: r.quadrants,
     }));
     const summary = `${count(rows.length)} filas de ${yearsText(fileYears)} guardadas desde «${plan.fileName}».`;
     save.mutate(
-      { periodId, reportId, tytId: tyt.id, years: fileYears, rows, benchmarks: plan.benchmarks, fileName: plan.fileName },
+      {
+        periodId, reportId, tytId: tyt.id, years: fileYears, rows, benchmarks: plan.benchmarks, fileName: plan.fileName,
+        // Los promedios nacionales cargados en el conjunto mandan sobre los del artículo.
+        alpha: { ...plan.alpha, nacional: tyt.alpha?.nacional ?? plan.alpha.nacional },
+      },
       { onSuccess: () => { clear(); setDone(summary); } },
     );
   };
@@ -561,6 +593,31 @@ function TytImport({ tyt, results, periodId, reportId, published, canEdit }: Sec
                     <dd>{delta(plan.readout?.delta)} <small>puntos de percentil</small></dd>
                   </div>
                 </dl>
+                <dl className="oda-import__facts oda-tyt__readout">
+                  <div>
+                    <dt>Puntaje esperado medio</dt>
+                    <dd>{points(plan.alphaReadout?.expected)} <small>Motor Alpha, puntaje global</small></dd>
+                  </div>
+                  <div>
+                    <dt>Puntaje real medio</dt>
+                    <dd>{points(plan.alphaReadout?.actual)} <small>Saber TyT, puntaje global</small></dd>
+                  </div>
+                  <div>
+                    <dt>Valor agregado (VA)</dt>
+                    <dd>{delta(plan.alphaReadout?.va)} <small>puntos de la prueba</small></dd>
+                  </div>
+                  <div>
+                    <dt>Ajuste del modelo</dt>
+                    <dd>
+                      {plan.alphaModel ? `R² ${plan.alphaModel.r2.toLocaleString("es-CO", { maximumFractionDigits: 3 })}` : "—"}
+                      {" "}<small>{plan.alphaModel ? `n = ${count(plan.alphaModel.n)}` : "sin ajuste para el global"}</small>
+                    </dd>
+                  </div>
+                </dl>
+                <p className="oda-import__scope">
+                  El Motor Alpha usa la regresión publicada ({ALPHA_SOURCE}) reajustada sobre esta cohorte; las cifras por programa salen
+                  del ajuste «{ALPHA_FIT_LABEL[ALPHA_IMPORT_FIT].toLowerCase()}», porque cubre a más estudiantes.
+                </p>
                 <p className="oda-import__scope">
                   El motor ya corrió sobre todo el archivo: {count(plan.programs.length)} programas en {TYT_LEVEL_LABEL[level].toLowerCase()},
                   {" "}{plan.programs.slice(0, 4).join(", ")}{plan.programs.length > 4 ? "…" : ""}.
@@ -632,14 +689,19 @@ function TytYears({ tyt, results, canEdit }: SectionProps) {
   // La misma lectura que deja ver la importación, ahora sobre lo que está en la base.
   const stored: SaberTytData = {
     id: tyt.key, title: tyt.title, description: tyt.description, note: tyt.note, source: "", benchmarks: tyt.benchmarks ?? {},
+    alpha: tyt.alpha && Object.keys(tyt.alpha).length ? tyt.alpha : emptyAlpha(),
     results: results.map((r) => ({
       year: r.year, level: r.level, program: r.program, competency: r.competency,
       evaluated: r.evaluated, meanExit: number(r.mean_exit), paired: r.paired, meanEntry: number(r.mean_entry),
       meanDelta: number(r.mean_delta), improved: r.improved, rawEntry: number(r.raw_entry), rawExit: number(r.raw_exit),
       transitions: r.transitions ?? {}, histogram: r.histogram ?? {}, scatter: r.scatter ?? {},
+      alphaN: r.alpha_n ?? null, alphaExpected: number(r.alpha_expected ?? null), alphaActual: number(r.alpha_actual ?? null),
+      alphaVa: number(r.alpha_va ?? null), alphaPositive: r.alpha_positive ?? null,
+      plane: r.plane ?? {}, quadrants: r.quadrants ?? {},
     })),
   };
   const figure = tytFigure(stored, "global", null);
+  const model = stored.alpha.modelos.global?.[ALPHA_IMPORT_FIT];
 
   return (
     <Panel
@@ -661,6 +723,27 @@ function TytYears({ tyt, results, canEdit }: SectionProps) {
         <div>
           <dt>Valor agregado (VAI)</dt>
           <dd>{delta(figure?.meanDelta)} <small>puntos de percentil</small></dd>
+        </div>
+      </dl>
+      <dl className="oda-import__facts oda-tyt__readout">
+        <div>
+          <dt>Puntaje esperado medio</dt>
+          <dd>{points(figure?.alpha.alphaExpected)} <small>Motor Alpha, puntaje global</small></dd>
+        </div>
+        <div>
+          <dt>Puntaje real medio</dt>
+          <dd>{points(figure?.alpha.alphaActual)} <small>Saber TyT, puntaje global</small></dd>
+        </div>
+        <div>
+          <dt>Valor agregado (VA)</dt>
+          <dd>{delta(figure?.alpha.alphaVa)} <small>puntos de la prueba</small></dd>
+        </div>
+        <div>
+          <dt>Ajuste del modelo</dt>
+          <dd>
+            {model ? `R² ${model.r2.toLocaleString("es-CO", { maximumFractionDigits: 3 })}` : "—"}
+            {" "}<small>{model ? `n = ${count(model.n)}` : "sin ajuste guardado para el global"}</small>
+          </dd>
         </div>
       </dl>
       <table className="oda-table oda-saber__table">
@@ -705,6 +788,101 @@ function TytYears({ tyt, results, canEdit }: SectionProps) {
       </table>
       <p className="oda-muted oda-saber__legend">
         {TYT_COMPETENCIES.filter((c) => isPaired(c.key)).map((c) => `${c.code}: ${c.entry} → ${c.exit}`).join(" · ")}
+      </p>
+      <p className="oda-muted oda-saber__legend">
+        El puntaje esperado sale de la regresión publicada ({ALPHA_SOURCE}) reajustada sobre esta cohorte, con el ajuste
+        «{ALPHA_FIT_LABEL[ALPHA_IMPORT_FIT].toLowerCase()}».
+      </p>
+    </Panel>
+  );
+}
+
+/* --- 3. Promedios nacionales del Motor Alpha ----------------------------------------- */
+
+/** Las competencias del Saber TyT que tienen promedio nacional publicado. */
+const TYT_NATIONAL_KEYS = TYT_COMPETENCIES.filter((c) => c.exit).map((c) => c.key);
+
+function TytNational({ tyt, reportId, canEdit }: SectionProps) {
+  const save = useSaveSaberTyt();
+  const alpha: AlphaData = tyt.alpha && Object.keys(tyt.alpha).length ? tyt.alpha : emptyAlpha();
+  const nacional = alpha.nacional ?? ALPHA_NATIONAL;
+  const [draft, setDraft] = useState<Record<string, string>>({});
+
+  const stored = (key: string) => {
+    const [prueba, field] = key.split(":");
+    const value = prueba === "s11" ? nacional.saber11?.[field as AlphaPredictor | "global"] : nacional.tyt?.[field as TytCompetency];
+    return value === undefined || value === null ? "" : String(value);
+  };
+  const shown = (key: string) => draft[key] ?? stored(key);
+  const set = (key: string, value: string) => setDraft({ ...draft, [key]: value });
+
+  const entries = Object.entries(draft).filter(([key, value]) => value.trim() !== stored(key));
+  const wrong = entries.filter(([, value]) => value.trim() !== "" && !Number.isFinite(Number(value.replace(",", "."))));
+
+  const submit = () => {
+    const saber11: AlphaData["nacional"]["saber11"] = { ...nacional.saber11 };
+    const salida: AlphaData["nacional"]["tyt"] = { ...nacional.tyt };
+    for (const [key] of entries) {
+      const [prueba, field] = key.split(":");
+      const raw = shown(key).trim();
+      const value = raw === "" ? undefined : Math.round(Number(raw.replace(",", ".")) * 100) / 100;
+      const target = prueba === "s11" ? saber11 : salida;
+      if (value === undefined) delete (target as Record<string, number>)[field];
+      else (target as Record<string, number>)[field] = value;
+    }
+    save.mutate(
+      { id: tyt.id, report_id: reportId, alpha: { ...alpha, nacional: { saber11, tyt: salida } } },
+      { onSuccess: () => setDraft({}) },
+    );
+  };
+
+  const field = (key: string, label: string) => (
+    <label key={key} className="oda-tyt-national__field">
+      <span>{label}</span>
+      <input
+        type="text"
+        inputMode="decimal"
+        value={shown(key)}
+        disabled={!canEdit}
+        aria-label={label}
+        onChange={(e) => set(key, e.target.value)}
+      />
+    </label>
+  );
+
+  return (
+    <Panel
+      id="oda-tyt-nacional"
+      tone="quiet"
+      title="Promedios nacionales del Motor Alpha"
+      description="El punto de corte de los cuadrantes: por debajo del promedio del país o por encima, en la prueba de entrada y en la de salida. No cambian el puntaje esperado, solo en qué cuadrante cae cada grupo."
+      actions={
+        <>
+          <SaveState pending={save.isPending} error={save.error} success={save.isSuccess} idle={wrong.length ? "Hay casillas que no son números" : undefined} />
+          <button type="button" className="button-primary" disabled={!canEdit || entries.length === 0 || wrong.length > 0 || save.isPending} onClick={submit}>
+            Guardar {entries.length || ""}
+          </button>
+        </>
+      }
+    >
+      <div className="oda-tyt-national">
+        <fieldset className="oda-tyt-national__group" disabled={!canEdit}>
+          <legend>Saber 11 · prueba de entrada</legend>
+          <div className="oda-tyt-national__row">
+            {ALPHA_PREDICTORS.map((pr) => field(`s11:${pr.key}`, pr.label))}
+            {field("s11:global", "Puntaje global")}
+          </div>
+        </fieldset>
+        <fieldset className="oda-tyt-national__group" disabled={!canEdit}>
+          <legend>Saber TyT · prueba de salida</legend>
+          <div className="oda-tyt-national__row">
+            {TYT_NATIONAL_KEYS.map((key) => field(`tyt:${key}`, TYT_COMPETENCIES.find((c) => c.key === key)!.label))}
+          </div>
+        </fieldset>
+      </div>
+      <p className="oda-muted oda-saber__legend">
+        Vienen llenos con los promedios que publica el artículo del que sale el modelo —Saber 11 de 2014 a 2020 y Saber TyT de 2016 a 2023—,
+        no con cifras nuestras: {ALPHA_SOURCE} {ALPHA_CITATION.doi} · {ALPHA_CITATION.license}. Cámbialos cuando el ICFES publique otros.
       </p>
     </Panel>
   );

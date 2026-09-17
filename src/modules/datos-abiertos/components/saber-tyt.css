@@ -464,7 +464,7 @@
    medida de lectura cómoda en cada una. */
 .od-tyt__steps li {
   display: grid;
-  grid-template-columns: 10.5rem minmax(0, 1fr);
+  grid-template-columns: 12.5rem minmax(0, 1fr);
   grid-template-rows: auto 1fr;
   column-gap: var(--space-4);
   row-gap: var(--space-2);
@@ -567,3 +567,215 @@
 .od-tyt__diagram-dot[data-kind="salida"] { fill: var(--od-div-pos-2); }
 .od-tyt__diagram-dot[data-kind="baja"] { fill: var(--od-div-neg-2); }
 .od-tyt__diagram-dot[data-kind="mix"] { fill: var(--od-signal); stroke: var(--od-signal-text); }
+
+/* Una competencia sin pareja se lee de cero a cien, no a lado y lado del cero. */
+.od-tyt__value-track[data-solo] {
+  background: var(--od-board-raised);
+  border-radius: 3px;
+}
+
+/* --- Motor Alpha ------------------------------------------------------------------------ */
+
+.od-tyt__switches {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+  align-items: center;
+}
+
+/* Cuadrantes: cuatro columnas con su barra, como en el artículo. */
+.od-tyt__quad-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: var(--space-4);
+  align-items: end;
+  min-height: 16rem;
+}
+
+.od-tyt__quad {
+  display: grid;
+  align-content: end;
+  gap: var(--space-2);
+  height: 100%;
+  padding: var(--space-3);
+  text-align: center;
+  background: var(--od-board-raised);
+  border-radius: var(--radius-xs);
+}
+
+.od-tyt__quad-bar {
+  align-self: end;
+  width: 100%;
+  border-radius: 3px 3px 0 0;
+  transform-origin: bottom center;
+}
+
+.od-tyt__quad strong {
+  color: var(--ink);
+  font-family: var(--font-sign);
+  font-size: 1.6rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.od-tyt__quad span {
+  color: var(--ink-secondary);
+  font-size: var(--text-sm);
+  font-weight: 700;
+  line-height: 1.2;
+}
+
+.od-tyt__quad small { color: var(--ink-muted); font-size: var(--text-xs); font-weight: 600; }
+
+/* El modelo: los dos ajustes, lado a lado. */
+.od-tyt__models {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 24rem), 1fr));
+  gap: var(--space-5);
+}
+
+.od-tyt__model {
+  display: grid;
+  align-content: start;
+  gap: var(--space-4);
+  padding: var(--space-4);
+  background: var(--od-board);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-xs);
+}
+
+.od-tyt__model[data-stored] { border-color: var(--od-board-line-strong); box-shadow: var(--shadow-xs); }
+
+.od-tyt__model h4 {
+  margin: 0 0 var(--space-3);
+  color: var(--ink);
+  font-size: 0.95rem;
+  font-weight: 800;
+}
+
+.od-tyt__model header dl {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2) var(--space-5);
+  margin: 0;
+}
+
+.od-tyt__model header dt {
+  color: var(--ink-muted);
+  font-family: var(--font-sign);
+  font-size: 0.8rem;
+  font-weight: 600;
+  letter-spacing: var(--tracking-wide);
+  text-transform: uppercase;
+}
+
+.od-tyt__model header dd {
+  margin: 0;
+  color: var(--ink);
+  font-family: var(--font-sign);
+  font-size: 1.25rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.od-tyt__coefs {
+  display: grid;
+  gap: var(--space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.od-tyt__coefs li {
+  display: grid;
+  grid-template-columns: minmax(6rem, 9rem) minmax(0, 1fr) 3.6rem;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.od-tyt__coef-name { color: var(--ink-secondary); font-size: var(--text-sm); font-weight: 600; }
+
+.od-tyt__coef-value {
+  color: var(--ink);
+  font-size: var(--text-sm);
+  font-weight: 800;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.od-tyt__credit {
+  max-width: 90ch;
+  margin: var(--space-4) 0 0;
+  color: var(--ink-secondary);
+  font-size: var(--text-sm);
+  line-height: 1.6;
+  text-align: justify;
+  text-justify: inter-word;
+}
+
+.od-tyt__credit a { color: var(--brand-blue); }
+
+.od-tyt__diagram-bar[data-kind="esperado"] { fill: var(--od-seq-3); }
+.od-tyt__diagram-bar[data-kind="real"] { fill: var(--od-div-pos-2); }
+.od-tyt__diagram-value[data-on="dark"] { fill: #ffffff; }
+
+.od-tyt__diagram-quad {
+  font-family: var(--font-sign);
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.od-tyt__diagram-quad[data-kind="1"] { fill: var(--od-div-pos-2); }
+.od-tyt__diagram-quad[data-kind="2"] { fill: var(--od-div-pos-1); }
+.od-tyt__diagram-quad[data-kind="3"] { fill: var(--od-div-neg-2); }
+.od-tyt__diagram-quad[data-kind="4"] { fill: var(--od-div-neg-1); }
+
+@media (max-width: 720px) {
+  .od-tyt__quad-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .od-tyt__coefs li { grid-template-columns: minmax(5rem, 1fr) minmax(0, 1.2fr) 3rem; gap: var(--space-2); }
+}
+
+/* --- Movimiento: las gráficas llegan, no aparecen de golpe --------------------------------
+   Todo arranca desde el estado final y solo se anima al entrar en pantalla, una vez. Con
+   movimiento reducido no se anima nada: el gancho useInView ya deja `data-armed` puesto. */
+
+@keyframes od-tyt-pop {
+  from { opacity: 0; transform: scale(0.4); }
+  to { opacity: 1; transform: scale(1); }
+}
+
+@keyframes od-tyt-grow {
+  from { transform: scaleX(0); }
+  to { transform: scaleX(1); }
+}
+
+@keyframes od-tyt-rise {
+  from { transform: scaleY(0); }
+  to { transform: scaleY(1); }
+}
+
+[data-armed] .od-tyt__dot--pop {
+  transform-origin: center;
+  animation: od-tyt-pop 520ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+[data-armed] .od-tyt__value-bar--grow {
+  transform-origin: left center;
+  animation: od-tyt-grow 560ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+[data-armed] .od-tyt__value-bar--grow[data-neg] { transform-origin: right center; }
+
+[data-armed] .od-tyt__quad-bar { animation: od-tyt-rise 620ms cubic-bezier(0.16, 1, 0.3, 1) both; }
+
+[data-armed] .od-tyt__bar > span {
+  transform-origin: left center;
+  animation: od-tyt-grow 640ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  [data-armed] .od-tyt__dot--pop,
+  [data-armed] .od-tyt__value-bar--grow,
+  [data-armed] .od-tyt__quad-bar,
+  [data-armed] .od-tyt__bar > span {
+    animation: none;
+  }
+}

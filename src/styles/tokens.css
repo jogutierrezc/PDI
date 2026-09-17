@@ -235,6 +235,21 @@
   --od-seq-7: #0d366b;
   --od-seq-ink-light: #0d1c31;
   --od-seq-ink-dark: #ffffff;
+  /* Escala divergente (Saber PRO): terracota bajo el umbral, azul sobre él;
+     cuanto más lejos del centro, más contraste con la superficie. Cada paso
+     trae la tinta de su rótulo. */
+  --od-div-neg-3: #7c2f0d;
+  --od-div-neg-2: #b9541f;
+  --od-div-neg-1: #e79c69;
+  --od-div-mid: #e9edf3;
+  --od-div-pos-1: #6fa4e8;
+  --od-div-pos-2: #2a63b8;
+  --od-div-neg-3-ink: #ffffff;
+  --od-div-neg-2-ink: #ffffff;
+  --od-div-neg-1-ink: #0d1c31;
+  --od-div-mid-ink: #0d1c31;
+  --od-div-pos-1-ink: #0d1c31;
+  --od-div-pos-2-ink: #ffffff;
   --od-flow: #d98200;
   /* Segunda ruta del mapa de movilidad: salientes, frente al ámbar de entrantes. */
   --od-flow-out: #c0306f;
@@ -362,6 +377,18 @@
     --od-seq-7: #cde2fb;
     --od-seq-ink-light: #ffffff;
     --od-seq-ink-dark: #06142b;
+    --od-div-neg-3: #eea06c;
+    --od-div-neg-2: #cf6a33;
+    --od-div-neg-1: #86340e;
+    --od-div-mid: #1a2d4d;
+    --od-div-pos-1: #2c62ad;
+    --od-div-pos-2: #72aaf0;
+    --od-div-neg-3-ink: #06142b;
+    --od-div-neg-2-ink: #06142b;
+    --od-div-neg-1-ink: #ffffff;
+    --od-div-mid-ink: #e8eef7;
+    --od-div-pos-1-ink: #ffffff;
+    --od-div-pos-2-ink: #06142b;
     --od-flow: #f6b93f;
     --od-flow-out: #ff6fa3;
     --od-flow-out-head: #ffc2d8;
@@ -477,6 +504,18 @@
   --od-seq-7: #cde2fb;
   --od-seq-ink-light: #ffffff;
   --od-seq-ink-dark: #06142b;
+  --od-div-neg-3: #eea06c;
+  --od-div-neg-2: #cf6a33;
+  --od-div-neg-1: #86340e;
+  --od-div-mid: #1a2d4d;
+  --od-div-pos-1: #2c62ad;
+  --od-div-pos-2: #72aaf0;
+  --od-div-neg-3-ink: #06142b;
+  --od-div-neg-2-ink: #06142b;
+  --od-div-neg-1-ink: #ffffff;
+  --od-div-mid-ink: #e8eef7;
+  --od-div-pos-1-ink: #ffffff;
+  --od-div-pos-2-ink: #06142b;
   --od-flow: #f6b93f;
   --od-flow-out: #ff6fa3;
   --od-flow-out-head: #ffc2d8;

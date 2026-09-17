@@ -3364,3 +3364,25 @@
   font-style: normal;
   font-weight: 800;
 }
+
+/* --- Saber PRO: importación del ICFES y promedios de referencia ----------------- */
+
+.oda-saber { display: grid; gap: var(--space-4); }
+
+.oda-saber__privacy {
+  display: flex;
+  gap: var(--space-2);
+  max-width: 62rem;
+  margin: 0;
+  padding: var(--space-3);
+  color: var(--ink-secondary);
+  background: var(--surface-2);
+  border-radius: var(--radius-xs);
+  font-size: var(--text-sm);
+}
+
+.oda-saber__privacy svg { flex: none; margin-top: 3px; color: var(--status-done); }
+
+.oda-saber__table { max-width: 48rem; }
+
+.oda-saber__legend { font-size: var(--text-xs); }

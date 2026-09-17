@@ -2,9 +2,11 @@
    Rankings universitarios en la ficha.
 
    Cuatro vistas del mismo dato, con un selector:
-   · Medallas: una tarjeta por ranking. La posición mundial en un anillo del
-     color del ranking, Latinoamérica y Colombia al lado con su variación, las
-     estrellas QS por categoría, los ODS, las áreas y los campos propios.
+   · Medallas: cada ranking es una placa del tablero. La posición principal
+     llega volteando en paletas partidas, el corte anterior se lee en cian
+     debajo, los otros ámbitos ocupan celdas de la rejilla del tablero y el
+     boleto de origen cierra la placa. Estrellas QS, ODS, áreas y campos
+     propios siguen debajo, en voz baja: solo la posición voltea.
    · Tabla comparativa: todos los rankings en filas, las posiciones en columnas.
    · Evolución: la posición por edición. Escala logarítmica e invertida (el
      puesto 1 arriba): QS World (puesto 800) y un ranking nacional (puesto 5)
@@ -24,16 +26,23 @@ import {
   RANKING_VIEWS,
   SCOPE_LABEL,
   SDGS,
+  bandEnds,
   latestEdition,
   parseRank,
+  preferredScope,
   previousEdition,
   rankChange,
   rankOf,
+  rankScale,
+  rankingShortLabel,
+  rankSpan,
+  stackLabels,
 } from "../data/rankings";
 import type { ParsedRank, RankScope, RankingData, RankingEdition, RankingView } from "../data/rankings";
 import { formatValue } from "../data/open-data";
 import { ChartFrame, ViewSwitch } from "./ChartFrame";
 import { useWidth } from "./motion";
+import { SplitFlap } from "./SplitFlap";
 import "./rankings.css";
 
 const accentStyle = (accent: string) => ({ "--rk-accent": accent }) as CSSProperties;
@@ -85,8 +94,8 @@ export function RankingsBlock({ rankings, title, anchor }: { rankings: RankingDa
 
         {shownView === "medallas" && (
           <div className="od-rankings__grid">
-            {withData.map((ranking) => (
-              <RankingCard key={ranking.id} ranking={ranking} edition={at(ranking)} year={year} />
+            {withData.map((ranking, index) => (
+              <RankingCard key={ranking.id} ranking={ranking} edition={at(ranking)} year={year} index={index} />
             ))}
           </div>
         )}
@@ -99,6 +108,16 @@ export function RankingsBlock({ rankings, title, anchor }: { rankings: RankingDa
 }
 
 /* --- Medallas ------------------------------------------------------------------ */
+
+/** Celdas grandes mientras la posición quepa; una banda ("201–250") pide paleta menor. */
+const flapSize = (text: string) => (text.length <= 5 ? "lg" : text.length <= 7 ? "md" : "sm");
+
+/**
+ * ¿La variación ya nombra la edición anterior? Con bandas de por medio,
+ * `rankChange` dice "sube desde 1201–1400", y repetir el corte anterior al lado
+ * es decir dos veces lo mismo. Con un número de puestos, no.
+ */
+const namesPrevious = (change: ReturnType<typeof rankChange>) => Boolean(change && change.label.includes("desde"));
 
 function ChangeNote({ change }: { change: ReturnType<typeof rankChange> }) {
   if (!change) return null;
@@ -130,157 +149,259 @@ function RankText({ rank }: { rank: ParsedRank | null }) {
   return <>{rank.band ? rank.text : `#${rank.text.replace("=", "")}`}</>;
 }
 
-function RankingCard({ ranking, edition, year }: { ranking: RankingData; edition: RankingEdition | undefined; year: number | "ultima" }) {
+/**
+ * La posición principal llega como cualquier cifra del tablero: carácter a
+ * carácter, en su celda. El signo (# de puesto, = de empate) no es cifra y se
+ * queda fuera de las paletas.
+ */
+function LeadFlap({ rank, delay }: { rank: ParsedRank; delay: number }) {
+  const tied = !rank.band && rank.text.startsWith("=");
+  const digits = rank.band ? rank.text : rank.text.replace("=", "");
+  return (
+    <span className="od-rank__figure">
+      {!rank.band && (
+        <span className="od-rank__sigil" aria-hidden="true">
+          {tied ? "=" : "#"}
+        </span>
+      )}
+      <SplitFlap
+        value={digits}
+        size={flapSize(digits)}
+        delay={delay}
+        numeric
+        label={rank.band ? `Banda ${rank.text}` : `Puesto ${digits}${tied ? ", empatado" : ""}`}
+      />
+    </span>
+  );
+}
+
+/**
+ * Dónde cae la posición dentro de las instituciones que el ranking evaluó. Sin
+ * ese universo un puesto no se puede leer: el 325 de una lista de 1.500 no es
+ * el 325 de una lista de 400. Una banda ocupa su tramo, no un punto inventado.
+ */
+function RankScale({ rank, evaluated }: { rank: ParsedRank; evaluated: number }) {
+  const total = Math.max(evaluated, Math.ceil(rank.value));
+  const at = (n: number) => Math.min(100, Math.max(0, ((n - 1) / Math.max(1, total - 1)) * 100));
+  const low = rank.band ? Number(rank.text.split(/[–+]/)[0]) || rank.value : rank.value;
+  const highRaw = rank.band ? Number(rank.text.split("–")[1]) : rank.value;
+  const high = Number.isFinite(highRaw) ? highRaw : total;
+  const style = { "--from": `${at(low)}%`, "--to": `${at(high)}%` } as CSSProperties;
+  const shown = formatValue(total, "entero");
+  return (
+    <div className="od-rank__scale" style={style}>
+      <span className="od-rank__scale-track" aria-hidden="true">
+        <span className="od-rank__scale-mark" />
+      </span>
+      <span className="od-rank__scale-note">
+        <span aria-hidden="true">1</span>
+        <em>
+          {rank.band ? "dentro de" : "de"} {shown} instituciones evaluadas
+        </em>
+        <span aria-hidden="true">{shown}</span>
+      </span>
+    </div>
+  );
+}
+
+function RankingCard({
+  ranking,
+  edition,
+  year,
+  index,
+}: {
+  ranking: RankingData;
+  edition: RankingEdition | undefined;
+  year: number | "ultima";
+  index: number;
+}) {
   const system = RANKING_SYSTEMS[ranking.system];
+  const code = system.publisher || ranking.title.replace(/[^\p{L}]/gu, "").slice(0, 2).toUpperCase() || "RK";
+  const head = (
+    <header className="od-rank__head">
+      <span className="od-rank__badge" aria-hidden="true">
+        {code}
+      </span>
+      <div className="od-rank__ident">
+        <h3>{ranking.title}</h3>
+        {edition && (
+          <span className="od-rank__edition">
+            Edición {edition.year}
+            {year !== "ultima" && edition.year !== year ? ` · la más cercana a ${year}` : ""}
+          </span>
+        )}
+      </div>
+    </header>
+  );
+
   if (!edition) {
     return (
       <article className="od-rank" data-empty style={accentStyle(ranking.accent)}>
-        <header className="od-rank__head">
-          {system.publisher && <span className="od-rank__publisher">{system.publisher}</span>}
-          <h3>{ranking.title}</h3>
-        </header>
-        <p className="od-rank__missing">Sin edición {year === "ultima" ? "publicada" : `${year} ni anterior`}.</p>
+        {head}
+        <div className="od-rank__body">
+          <p className="od-rank__missing">Sin edición {year === "ultima" ? "publicada" : `${year} ni anterior`}.</p>
+        </div>
       </article>
     );
   }
+
   const previous = previousEdition(ranking, edition);
   const global = rankOf(edition, "global");
   const lead: RankScope = global ? "global" : rankOf(edition, "regional") ? "regional" : "national";
   const leadRank = rankOf(edition, lead);
+  const leadBefore = previous ? rankOf(previous, lead) : null;
+  const leadChange = leadBefore ? rankChange(leadRank, leadBefore) : null;
   const others = (["global", "regional", "national"] as RankScope[]).filter((s) => s !== lead && rankOf(edition, s));
-  const stale = year !== "ultima" && edition.year !== year;
 
   return (
     <article className="od-rank" style={accentStyle(ranking.accent)}>
-      <header className="od-rank__head">
-        {system.publisher && <span className="od-rank__publisher">{system.publisher}</span>}
-        <div>
-          <h3>{ranking.title}</h3>
-          <small>
-            Edición {edition.year}
-            {stale ? ` · la más cercana a ${year}` : ""}
-          </small>
-        </div>
-      </header>
+      {head}
 
-      {leadRank && (
-        <div className="od-rank__medal">
-          <svg className="od-rank__ring" viewBox="0 0 120 120" aria-hidden="true">
-            <circle cx="60" cy="60" r="54" />
-            <circle cx="60" cy="60" r="46" />
-          </svg>
+      <div className="od-rank__body">
+        {leadRank && (
           <div className="od-rank__lead">
-            <strong data-band={leadRank.band || undefined} data-long={leadRank.text.length > 7 || undefined}>
-              <RankText rank={leadRank} />
-            </strong>
-            <span>{SCOPE_LABEL[lead]}</span>
-          </div>
-          <div className="od-rank__lead-change">
-            <ChangeNote change={previous ? rankChange(leadRank, rankOf(previous, lead)) : null} />
-            {previous && <small>frente a {previous.year}</small>}
-            {edition.evaluated && <small>entre {formatValue(edition.evaluated, "entero")} instituciones</small>}
-          </div>
-        </div>
-      )}
-
-      {others.length > 0 && (
-        <dl className="od-rank__scopes">
-          {others.map((scope) => (
-            <div key={scope}>
-              <dt>{SCOPE_LABEL[scope]}</dt>
-              <dd>
-                <b>
-                  <RankText rank={rankOf(edition, scope)} />
-                </b>
-                <ChangeNote change={previous ? rankChange(rankOf(edition, scope), rankOf(previous, scope)) : null} />
-              </dd>
+            <span className="od-rank__scope">{SCOPE_LABEL[lead]}</span>
+            <LeadFlap rank={leadRank} delay={220 + index * 170} />
+            <div className="od-rank__trend">
+              <ChangeNote change={leadChange} />
+              {!leadBefore ? (
+                <span className="od-rank__previous">Primera edición con posición publicada</span>
+              ) : (
+                !namesPrevious(leadChange) && (
+                  <span className="od-rank__previous">
+                    {previous!.year}: <RankText rank={leadBefore} />
+                  </span>
+                )
+              )}
             </div>
-          ))}
-        </dl>
-      )}
+            {edition.evaluated ? <RankScale rank={leadRank} evaluated={edition.evaluated} /> : null}
+          </div>
+        )}
 
-      {edition.score !== null && (
-        <p className="od-rank__score">
-          Puntaje <b>{formatValue(edition.score, "decimal")}</b>
-        </p>
-      )}
-
-      {edition.stars.length > 0 && (
-        <div className="od-rank__section">
-          <h4>Estrellas por categoría</h4>
-          <ul className="od-rank__star-list">
-            {edition.stars.map((s) => (
-              <li key={s.category}>
-                <span>{s.category}</span>
-                <Stars value={s.stars} label={s.category} />
-              </li>
-            ))}
-          </ul>
-        </div>
-      )}
-
-      {edition.sdgs.length > 0 && (
-        <div className="od-rank__section">
-          <h4>ODS en los que participa</h4>
-          <ul className="od-rank__sdgs">
-            {edition.sdgs.map((s) => {
-              const sdg = SDGS[s.sdg - 1];
-              const rank = parseRank(s.global_rank);
+        {(others.length > 0 || edition.score !== null) && (
+          <dl className="od-rank__scopes">
+            {others.map((scope) => {
+              const rank = rankOf(edition, scope);
+              const before = previous ? rankOf(previous, scope) : null;
+              const change = before ? rankChange(rank, before) : null;
               return (
-                <li key={s.sdg} style={{ "--sdg": sdg.color } as CSSProperties} title={`ODS ${s.sdg}: ${sdg.name}${rank ? ` · puesto ${rank.text} mundial` : ""}`}>
-                  <b>{s.sdg}</b>
-                  {rank && <span>{rank.text}</span>}
-                </li>
+                <div key={scope}>
+                  <dt>{SCOPE_LABEL[scope]}</dt>
+                  <dd>
+                    <b>
+                      <RankText rank={rank} />
+                    </b>
+                    <ChangeNote change={change} />
+                    {before && !namesPrevious(change) && (
+                      <span className="od-rank__previous">
+                        {previous!.year}: <RankText rank={before} />
+                      </span>
+                    )}
+                  </dd>
+                </div>
               );
             })}
-          </ul>
-        </div>
-      )}
+            {edition.score !== null && (
+              <div>
+                <dt>Puntaje</dt>
+                <dd>
+                  <b>{formatValue(edition.score, "decimal")}</b>
+                </dd>
+              </div>
+            )}
+          </dl>
+        )}
 
-      {edition.subjects.length > 0 && (
-        <details className="od-rank__section od-rank__subjects">
-          <summary>
-            <h4>
-              {edition.subjects.length} {edition.subjects.length === 1 ? "área" : "áreas"} en el ranking
-            </h4>
-          </summary>
-          <table>
-            <thead>
-              <tr>
-                <th scope="col">Área</th>
-                <th scope="col">Mundial</th>
-                <th scope="col">Colombia</th>
-              </tr>
-            </thead>
-            <tbody>
-              {edition.subjects.map((s) => (
-                <tr key={s.subject}>
-                  <th scope="row">{s.subject}</th>
-                  <td>{parseRank(s.global_rank)?.text ?? "—"}</td>
-                  <td>{parseRank(s.national_rank)?.text ?? "—"}</td>
-                </tr>
+        {edition.stars.length > 0 && (
+          <div className="od-rank__section">
+            <h4>Estrellas por categoría</h4>
+            <ul className="od-rank__star-list">
+              {edition.stars.map((s) => (
+                <li key={s.category}>
+                  <span>{s.category}</span>
+                  <i aria-hidden="true" />
+                  <Stars value={s.stars} label={s.category} />
+                </li>
               ))}
-            </tbody>
-          </table>
-        </details>
-      )}
+            </ul>
+          </div>
+        )}
 
-      {edition.custom.length > 0 && (
-        <dl className="od-rank__custom">
-          {edition.custom.map((c) => (
-            <div key={c.label}>
-              <dt>{c.label}</dt>
-              <dd>{c.value || "—"}</dd>
-            </div>
-          ))}
-        </dl>
-      )}
+        {edition.sdgs.length > 0 && (
+          <div className="od-rank__section">
+            <h4>ODS en los que participa</h4>
+            <ul className="od-rank__sdgs">
+              {edition.sdgs.map((s) => {
+                const sdg = SDGS[s.sdg - 1];
+                const rank = parseRank(s.global_rank);
+                return (
+                  <li
+                    key={s.sdg}
+                    style={{ "--sdg": sdg.color } as CSSProperties}
+                    title={`ODS ${s.sdg}: ${sdg.name}${rank ? ` · puesto ${rank.text} mundial` : ""}`}
+                  >
+                    <b>{s.sdg}</b>
+                    {rank && <span>{rank.text}</span>}
+                  </li>
+                );
+              })}
+            </ul>
+          </div>
+        )}
 
-      {edition.note && <p className="od-rank__note">{edition.note}</p>}
-      <p className="od-rank__source">
-        {system.label}
-        {ranking.source ? ` · Reporta: ${ranking.source}` : ""}
-      </p>
+        {edition.subjects.length > 0 && (
+          <details className="od-rank__section od-rank__subjects">
+            <summary>
+              <h4>
+                {edition.subjects.length} {edition.subjects.length === 1 ? "área" : "áreas"} en el ranking
+              </h4>
+              <svg viewBox="0 0 12 12" aria-hidden="true">
+                <path d="M2.5 4.25 6 7.75l3.5-3.5" />
+              </svg>
+            </summary>
+            <table>
+              <thead>
+                <tr>
+                  <th scope="col">Área</th>
+                  <th scope="col">Mundial</th>
+                  <th scope="col">Colombia</th>
+                </tr>
+              </thead>
+              <tbody>
+                {edition.subjects.map((s) => (
+                  <tr key={s.subject}>
+                    <th scope="row">{s.subject}</th>
+                    <td>{parseRank(s.global_rank)?.text ?? "—"}</td>
+                    <td>{parseRank(s.national_rank)?.text ?? "—"}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </details>
+        )}
+
+        {edition.custom.length > 0 && (
+          <dl className="od-rank__custom">
+            {edition.custom.map((c) => (
+              <div key={c.label}>
+                <dt>{c.label}</dt>
+                <dd>{c.value || "—"}</dd>
+              </div>
+            ))}
+          </dl>
+        )}
+
+        {edition.note && <p className="od-rank__note">{edition.note}</p>}
+
+        <p className="od-rank__ticket">
+          <span className="od-ticket">
+            <span className="od-ticket__source">{ranking.source || system.label}</span>
+            <span className="od-ticket__meta">
+              {ranking.source ? `${system.label} · ` : ""}Edición {edition.year}
+            </span>
+          </span>
+        </p>
+      </div>
     </article>
   );
 }
@@ -343,94 +464,289 @@ function RankingsTable({ rankings, at }: { rankings: RankingData[]; at: (r: Rank
   );
 }
 
-/* --- Evolución ------------------------------------------------------------------------ */
+/* --- Evolución ------------------------------------------------------------------------
+
+   Dos formas de leer lo mismo, con un selector:
+   · Cada ranking: una tira por ranking, con su nombre, su escala y su última
+     posición rotulada. Nada se cruza, por muchos rankings que haya.
+   · Todos juntos: un solo lienzo. Los rótulos viven en una columna a la derecha,
+     se separan cuando chocan y cada uno lleva un hilo hasta su punto.
+
+   En los dos casos la escala es logarítmica e invertida (el puesto 1 arriba):
+   QS World en el puesto 1400 y un ranking nacional en el 16 se leen sin que
+   ninguno se aplaste contra el borde.
+   ------------------------------------------------------------------------------------ */
+
+type EvoMode = "separado" | "junto";
+
+interface EvoPoint {
+  year: number;
+  rank: ParsedRank;
+}
+
+interface EvoSeries {
+  ranking: RankingData;
+  points: EvoPoint[];
+}
 
 function RankingsEvolution({ rankings }: { rankings: RankingData[] }) {
   const scopes = (["global", "regional", "national"] as RankScope[]).filter((scope) =>
     rankings.some((r) => r.editions.filter((e) => rankOf(e, scope)).length > 0),
   );
-  const [scope, setScope] = useState<RankScope>(scopes[0] ?? "global");
-  const wrap = useRef<HTMLDivElement>(null);
-  const width = Math.max(320, useWidth(wrap, 860));
-  const series = rankings
-    .map((r) => ({ ranking: r, points: r.editions.map((e) => ({ year: e.year, rank: rankOf(e, scope) })).filter((p): p is { year: number; rank: ParsedRank } => p.rank !== null) }))
+  // Los botones conservan el orden de la tabla (mundial, Latinoamérica, Colombia),
+  // pero el que se abre es el más cercano que haya: el puesto en Colombia.
+  const [scope, setScope] = useState<RankScope>(preferredScope((sc) => scopes.includes(sc)) ?? scopes[0] ?? "global");
+  const [mode, setMode] = useState<EvoMode>("separado");
+
+  const series: EvoSeries[] = rankings
+    .map((r) => ({
+      ranking: r,
+      points: r.editions
+        .map((e) => ({ year: e.year, rank: rankOf(e, scope) }))
+        .filter((p): p is EvoPoint => p.rank !== null),
+    }))
     .filter((s) => s.points.length > 0);
-  const years = Array.from(new Set(series.flatMap((s) => s.points.map((p) => p.year)))).sort((a, b) => a - b);
-  const ranks = series.flatMap((s) => s.points.map((p) => p.rank.value));
-  const height = 320;
-  const m = { top: 24, right: 150, bottom: 36, left: 56 };
-  const innerW = width - m.left - m.right;
-  const innerH = height - m.top - m.bottom;
-  // Escala logarítmica invertida: el puesto 1 arriba.
-  // El dominio abarca los datos con margen: con QS World en 1000 y un ranking
-  // nacional en 10, la escala va de ~5 a ~1150; sin nacionales, no baja a 1.
-  const lo = Math.max(1, Math.min(...ranks) / 1.5);
-  const hi = Math.max(lo * 3, ...ranks);
-  const logLo = Math.log10(lo);
-  const logHi = Math.log10(hi * 1.15);
-  const x = (year: number) => m.left + (years.length === 1 ? innerW / 2 : ((year - years[0]) / (years[years.length - 1] - years[0])) * innerW);
-  const y = (rank: number) => m.top + ((Math.log10(Math.max(1, rank)) - logLo) / (logHi - logLo || 1)) * innerH;
-  // Marcas 1, 2, 5, 10, 20, 50… dentro del dominio.
-  const ticks = [0, 1, 2, 3, 4].flatMap((k) => [1, 2, 5].map((m) => m * 10 ** k)).filter((t) => t >= lo && t <= hi * 1.15);
+
+  const source = Array.from(new Set(rankings.map((r) => r.source).filter(Boolean))).join(" · ");
 
   return (
     <ChartFrame
       title="Evolución de la posición"
       subtitle={`Posición ${SCOPE_LABEL[scope].toLowerCase()} por edición · el puesto 1 arriba, escala logarítmica`}
-      actions={scopes.length > 1 ? <ViewSwitch label="Ámbito de la posición" value={scope} onChange={setScope} options={scopes.map((s) => ({ value: s, label: SCOPE_LABEL[s] }))} /> : undefined}
-      source={Array.from(new Set(rankings.map((r) => r.source).filter(Boolean))).join(" · ")}
+      actions={
+        <>
+          <ViewSwitch
+            label="Forma de la evolución"
+            value={mode}
+            onChange={setMode}
+            options={[
+              { value: "separado" as EvoMode, label: "Cada ranking" },
+              { value: "junto" as EvoMode, label: "Todos juntos" },
+            ]}
+          />
+          {scopes.length > 1 && (
+            <ViewSwitch
+              label="Ámbito de la posición"
+              value={scope}
+              onChange={setScope}
+              options={scopes.map((sc) => ({ value: sc, label: SCOPE_LABEL[sc] }))}
+            />
+          )}
+        </>
+      }
+      source={source}
     >
-      <div ref={wrap} className="od-rank-evo">
-        {series.length === 0 ? (
-          <p className="od-empty">Ningún ranking reporta posición {SCOPE_LABEL[scope].toLowerCase()}.</p>
-        ) : (
-          <svg width={width} height={height} role="img" aria-label={`Evolución de la posición ${SCOPE_LABEL[scope].toLowerCase()} en ${series.length} rankings`}>
-            {ticks.map((t) => (
-              <g key={t}>
-                <line className="od-rank-evo__grid" x1={m.left} x2={m.left + innerW} y1={y(t)} y2={y(t)} />
-                <text className="od-rank-evo__tick" x={m.left - 10} y={y(t)} dy="0.32em" textAnchor="end">
-                  #{t}
+      {series.length === 0 ? (
+        <p className="od-empty">Ningún ranking reporta posición {SCOPE_LABEL[scope].toLowerCase()}.</p>
+      ) : mode === "separado" ? (
+        <div className="od-evo-grid">
+          {series.map((s) => (
+            <EvoTrace key={s.ranking.id} series={s} scope={scope} />
+          ))}
+        </div>
+      ) : (
+        <EvoTogether series={series} scope={scope} />
+      )}
+    </ChartFrame>
+  );
+}
+
+/* --- Cada ranking en su tira --- */
+
+function EvoTrace({ series, scope }: { series: EvoSeries; scope: RankScope }) {
+  const wrap = useRef<HTMLDivElement>(null);
+  const width = Math.max(240, useWidth(wrap, 320));
+  const { ranking, points } = series;
+  const system = RANKING_SYSTEMS[ranking.system];
+  const code = system.publisher || ranking.title.replace(/[^\p{L}]/gu, "").slice(0, 2).toUpperCase() || "RK";
+
+  const height = 132;
+  const m = { top: 18, right: 72, bottom: 26, left: 46 };
+  const innerW = Math.max(40, width - m.left - m.right);
+  const innerH = height - m.top - m.bottom;
+  const years = points.map((p) => p.year);
+  const first = years[0];
+  const last = years[years.length - 1];
+  // Cada tira tiene su propia escala: es lo que deja leer un ranking nacional
+  // (#16) y uno mundial (#1401) con el mismo detalle.
+  const { y, ticks } = rankScale(
+    points.flatMap((p) => rankSpan(p.rank)),
+    m.top,
+    innerH,
+    { pad: 1.15, minRatio: 2.2, dense: true },
+  );
+  // Con una sola edición el punto va centrado: no hay recorrido que dibujar.
+  const x = (year: number) => m.left + (last === first ? innerW / 2 : ((year - first) / (last - first)) * innerW);
+  const shown = ticks.length > 3 ? ticks.filter((_, i) => i % Math.ceil(ticks.length / 3) === 0) : ticks;
+
+  const lastPoint = points[points.length - 1];
+  const beforeLast = points.length > 1 ? points[points.length - 2] : null;
+  const change = beforeLast ? rankChange(lastPoint.rank, beforeLast.rank) : null;
+
+  return (
+    <article className="od-evo" style={accentStyle(ranking.accent)}>
+      <header className="od-evo__head">
+        <span className="od-evo__badge" aria-hidden="true">
+          {code}
+        </span>
+        <h4>{ranking.title}</h4>
+      </header>
+
+      <div ref={wrap} className="od-evo__plot">
+        <svg
+          width={width}
+          height={height}
+          role="img"
+          aria-label={`${ranking.title}, posición ${SCOPE_LABEL[scope].toLowerCase()}: ${points
+            .map((p) => `${p.year}, ${p.rank.band ? `banda ${p.rank.text}` : `puesto ${p.rank.text}`}`)
+            .join("; ")}`}
+        >
+          {shown.map((t) => (
+            <g key={t}>
+              <line className="od-rank-evo__grid" x1={m.left} x2={m.left + innerW} y1={y(t)} y2={y(t)} />
+              <text className="od-rank-evo__tick" x={m.left - 8} y={y(t)} dy="0.32em" textAnchor="end">
+                #{t}
+              </text>
+            </g>
+          ))}
+
+          {points.length > 1 && (
+            <path
+              className="od-rank-evo__line"
+              d={points.map((p, i) => `${i ? "L" : "M"}${x(p.year).toFixed(1)} ${y(p.rank.value).toFixed(1)}`).join("")}
+            />
+          )}
+
+          {points.map((p) => {
+            const [from, to] = p.rank.band ? bandEnds(p.rank, p.rank.value) : [p.rank.value, p.rank.value];
+            return (
+              <g key={p.year}>
+                {p.rank.band && <line className="od-rank-evo__band" x1={x(p.year)} x2={x(p.year)} y1={y(from)} y2={y(to)} />}
+                <circle className="od-rank-evo__dot" cx={x(p.year)} cy={y(p.rank.value)} r={4.5}>
+                  <title>{`${p.year}: ${p.rank.text}`}</title>
+                </circle>
+                <text className="od-rank-evo__tick" x={x(p.year)} y={height - 8} textAnchor="middle">
+                  {p.year}
                 </text>
               </g>
-            ))}
-            {years.map((yr) => (
-              <text key={yr} className="od-rank-evo__tick" x={x(yr)} y={height - 12} textAnchor="middle">
-                {yr}
-              </text>
-            ))}
-            {series.map(({ ranking, points }) => {
-              const d = points.map((p, i) => `${i ? "L" : "M"}${x(p.year).toFixed(1)} ${y(p.rank.value).toFixed(1)}`).join("");
-              const last = points[points.length - 1];
-              return (
-                <g key={ranking.id} style={accentStyle(ranking.accent)}>
-                  {points.length > 1 && <path className="od-rank-evo__line" d={d} />}
-                  {points.map((p) => (
-                    <g key={p.year}>
-                      {p.rank.band && (
-                        <line
-                          className="od-rank-evo__band"
-                          x1={x(p.year)}
-                          x2={x(p.year)}
-                          y1={y(Number(p.rank.text.split(/[–+]/)[0]))}
-                          y2={y(Number(p.rank.text.split("–")[1] ?? p.rank.value))}
-                        />
-                      )}
-                      <circle className="od-rank-evo__dot" cx={x(p.year)} cy={y(p.rank.value)} r={5}>
-                        <title>{`${ranking.title} ${p.year}: ${p.rank.text}`}</title>
-                      </circle>
-                    </g>
-                  ))}
-                  <text className="od-rank-evo__label" x={x(last.year) + 12} y={y(last.rank.value)} dy="0.32em">
-                    <tspan className="od-rank-evo__value">{last.rank.text}</tspan>
-                    <tspan dx="6">{RANKING_SYSTEMS[ranking.system].short === "Ranking" ? ranking.title : RANKING_SYSTEMS[ranking.system].short}</tspan>
-                  </text>
-                </g>
-              );
-            })}
-          </svg>
-        )}
+            );
+          })}
+
+          <text
+            className="od-rank-evo__value"
+            x={Math.min(x(lastPoint.year) + 10, width - 2)}
+            y={y(lastPoint.rank.value)}
+            dy="0.32em"
+            textAnchor={x(lastPoint.year) + 10 > width - 2 ? "end" : "start"}
+          >
+            {lastPoint.rank.text}
+          </text>
+        </svg>
       </div>
-    </ChartFrame>
+
+      <footer className="od-evo__foot">
+        {change ? <ChangeNote change={change} /> : <span className="od-evo__single">Una sola edición publicada</span>}
+        {beforeLast && !namesPrevious(change) && (
+          <span className="od-rank__previous">
+            {beforeLast.year}: <RankText rank={beforeLast.rank} />
+          </span>
+        )}
+      </footer>
+    </article>
+  );
+}
+
+/* --- Todos juntos en un lienzo --- */
+
+function EvoTogether({ series, scope }: { series: EvoSeries[]; scope: RankScope }) {
+  const wrap = useRef<HTMLDivElement>(null);
+  // Por debajo de este ancho el lienzo no se aplasta: se desplaza dentro de su
+  // marco, como el resto de gráficas anchas del portal.
+  const width = Math.max(460, useWidth(wrap, 860));
+
+  const years = Array.from(new Set(series.flatMap((s) => s.points.map((p) => p.year)))).sort((a, b) => a - b);
+  const ranks = series.flatMap((s) => s.points.flatMap((p) => rankSpan(p.rank)));
+  // La columna de rótulos crece con el nombre más largo, hasta un tope: un
+  // nombre cortado por el borde es justo lo que esta vista viene a evitar.
+  const longest = Math.max(...series.map((s) => rankingShortLabel(s.ranking).length));
+  const gutter = Math.min(210, Math.max(120, 26 + longest * 7.4));
+  const height = Math.max(320, 86 + series.length * 46);
+  const m = { top: 20, right: gutter, bottom: 34, left: 56 };
+  const innerW = Math.max(60, width - m.left - m.right);
+  const innerH = height - m.top - m.bottom;
+  const { y, ticks } = rankScale(ranks, m.top, innerH, { pad: 1.25 });
+  const x = (year: number) =>
+    m.left + (years.length === 1 ? innerW / 2 : ((year - years[0]) / (years[years.length - 1] - years[0])) * innerW);
+
+  // Dos líneas por rótulo: la cifra y el nombre del ranking.
+  const labelX = m.left + innerW + 14;
+  const placed = stackLabels(
+    series.map((s) => y(s.points[s.points.length - 1].rank.value)),
+    30,
+    m.top + 12,
+    m.top + innerH - 10,
+  );
+
+  return (
+    <div ref={wrap} className="od-rank-evo">
+      <svg
+        width={width}
+        height={height}
+        role="img"
+        aria-label={`Evolución de la posición ${SCOPE_LABEL[scope].toLowerCase()} en ${series.length} rankings`}
+      >
+        {ticks.map((t) => (
+          <g key={t}>
+            <line className="od-rank-evo__grid" x1={m.left} x2={m.left + innerW} y1={y(t)} y2={y(t)} />
+            <text className="od-rank-evo__tick" x={m.left - 10} y={y(t)} dy="0.32em" textAnchor="end">
+              #{t}
+            </text>
+          </g>
+        ))}
+        {years.map((yr) => (
+          <text key={yr} className="od-rank-evo__tick" x={x(yr)} y={height - 12} textAnchor="middle">
+            {yr}
+          </text>
+        ))}
+
+        {series.map(({ ranking, points }, index) => {
+          const d = points.map((p, i) => `${i ? "L" : "M"}${x(p.year).toFixed(1)} ${y(p.rank.value).toFixed(1)}`).join("");
+          const last = points[points.length - 1];
+          const lastX = x(last.year);
+          const lastY = y(last.rank.value);
+          const labelY = placed[index];
+          return (
+            <g key={ranking.id} style={accentStyle(ranking.accent)}>
+              {points.length > 1 && <path className="od-rank-evo__line" d={d} />}
+              {points.map((p) => {
+                const [from, to] = p.rank.band ? bandEnds(p.rank, p.rank.value) : [p.rank.value, p.rank.value];
+                return (
+                  <g key={p.year}>
+                    {p.rank.band && <line className="od-rank-evo__band" x1={x(p.year)} x2={x(p.year)} y1={y(from)} y2={y(to)} />}
+                    <circle className="od-rank-evo__dot" cx={x(p.year)} cy={y(p.rank.value)} r={5}>
+                      <title>{`${ranking.title} ${p.year}: ${p.rank.text}`}</title>
+                    </circle>
+                  </g>
+                );
+              })}
+              {/* El hilo lleva del último punto a su rótulo, aunque el ranking deje de reportar antes. */}
+              <path
+                className="od-rank-evo__leader"
+                d={`M${(lastX + 7).toFixed(1)} ${lastY.toFixed(1)}H${(labelX - 24).toFixed(1)}L${(labelX - 8).toFixed(1)} ${labelY.toFixed(1)}H${labelX.toFixed(1)}`}
+              />
+              <text className="od-rank-evo__label" x={labelX} y={labelY} dy="0.32em">
+                <tspan className="od-rank-evo__value" x={labelX} dy="-0.32em">
+                  {last.rank.text}
+                </tspan>
+                <tspan x={labelX} dy="1.25em">
+                  {rankingShortLabel(ranking)}
+                </tspan>
+              </text>
+            </g>
+          );
+        })}
+      </svg>
+    </div>
   );
 }
 

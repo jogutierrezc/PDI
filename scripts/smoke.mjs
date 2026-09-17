@@ -1581,10 +1581,17 @@ const routes = [
     interact: async (window, tick) => {
       const view = (label) => [...window.document.querySelectorAll('[aria-label="Vista de los rankings"] button')].find((b) => b.textContent === label);
       const text = () => window.document.querySelector(".od-rankings")?.textContent ?? "";
-      // Medallas: bandas tal cual y la variación dicha en palabras (QS Latinoamérica 140 → 131).
-      for (const needle of ["QS World University Rankings", "1001–1200", "sube desde 1201–1400", "sube 9 puestos", "Employability"]) {
+      // Medallas: la variación dicha en palabras (QS Latinoamérica 140 → 131).
+      for (const needle of ["QS World University Rankings", "sube desde 1201–1400", "sube 9 puestos", "Employability"]) {
         if (!text().includes(needle)) throw new Error(`las medallas no muestran «${needle}»`);
       }
+      // La posición principal llega en paletas partidas: el valor vive en la etiqueta
+      // accesible de la paleta, porque cada carácter ocupa su propia celda.
+      for (const label of ["Banda 1001–1200", "Puesto 131"]) {
+        if (!window.document.querySelector(`.od-rank [aria-label="${label}"]`)) throw new Error(`las medallas no muestran «${label}»`);
+      }
+      // Cada placa cierra con su boleto de origen.
+      if (!window.document.querySelector(".od-rank__ticket .od-ticket")) throw new Error("las medallas no traen el boleto de origen");
       // Estrellas: 4 de 5 en Teaching.
       if (!window.document.querySelector('[aria-label="Teaching: 4 de 5 estrellas"]')) throw new Error("faltan las estrellas por categoría");
       view("Tabla comparativa").click();
@@ -1592,7 +1599,23 @@ const routes = [
       if (!window.document.querySelector(".od-rank-table") || !text().includes("131")) throw new Error("la tabla comparativa no se pintó");
       view("Evolución").click();
       await tick();
-      if (!window.document.querySelector(".od-rank-evo path.od-rank-evo__line")) throw new Error("la evolución no dibuja líneas");
+      // Por defecto, una tira por ranking: así ninguna se cruza con otra.
+      const traces = window.document.querySelectorAll(".od-evo-grid .od-evo");
+      if (traces.length < 2) throw new Error(`la evolución debía dibujar una tira por ranking y dibujó ${traces.length}`);
+      if (!window.document.querySelector(".od-evo path.od-rank-evo__line")) throw new Error("las tiras de la evolución no dibujan líneas");
+      const shape = (label) => [...window.document.querySelectorAll('[aria-label="Forma de la evolución"] button')].find((b) => b.textContent === label);
+      shape("Todos juntos").click();
+      await tick();
+      // El lienzo único rotula cada ranking y lleva su hilo hasta el punto.
+      const evoLabels = [...window.document.querySelectorAll(".od-rank-evo text.od-rank-evo__label")];
+      if (evoLabels.length < 2 || !window.document.querySelector(".od-rank-evo path.od-rank-evo__leader")) {
+        throw new Error("el lienzo único de la evolución no rotula cada ranking");
+      }
+      // Y ningún par de rótulos queda encima del otro: se empujan al colocarse.
+      const evoY = evoLabels.map((t) => Number(t.getAttribute("y"))).sort((a, b) => a - b);
+      for (let i = 1; i < evoY.length; i += 1) {
+        if (evoY[i] - evoY[i - 1] < 29) throw new Error(`dos rótulos de la evolución quedan a ${Math.round(evoY[i] - evoY[i - 1])}px`);
+      }
       view("Rueda de ODS").click();
       await tick();
       const lit = window.document.querySelectorAll(".od-sdg__segment[data-on]").length;
@@ -1609,11 +1632,81 @@ const routes = [
     },
   },
   {
-    path: "/datos-abiertos/boletines/boletin-visibilidad",
-    note: "el boletín trae una hoja por ranking con posiciones, estrellas y ODS",
-    expect: "QS World University Rankings",
-    also: ["THE Impact Rankings", "Salud y bienestar", "Estrellas por categoría", "Ediciones"],
+    path: "/datos-abiertos/ensenanza",
+    note: "Saber PRO (0031): bloque por competencia con su selector",
+    expect: "Resultados Saber PRO",
+    also: ["Lectura crítica", "Inglés"],
     absent: [...SIN_DINERO],
+    interact: async (window) => {
+      const section = window.document.querySelector('section[aria-labelledby="od-saber-pro"]');
+      if (!section) throw new Error("falta la sección del bloque Saber PRO");
+      if (window.document.querySelector("h2#od-saber-pro")?.textContent.trim() !== "Resultados Saber PRO") throw new Error("el bloque Saber PRO no lleva el título del conjunto");
+      if (![...section.querySelectorAll("button")].some((b) => b.textContent.includes("Lectura crítica"))) throw new Error("falta el selector de competencias");
+    },
+  },
+  {
+    path: "/datos-abiertos/boletines/boletin-ensenanza",
+    note: "Saber PRO en el boletín: por competencia, una hoja de niveles y una de brecha con el país",
+    expect: "Saber PRO · Puntaje global · reparto del puntaje",
+    also: ["Saber PRO · Inglés · niveles de desempeño", "Saber PRO · Lectura crítica · brecha con el país", "En B1 o B2, por sede y año"],
+    absent: [...SIN_DINERO],
+    interact: async (window, tick) => {
+      const waitFor = async (selector) => {
+        for (let i = 0; i < 40; i += 1) {
+          if (window.document.querySelector(selector)) return true;
+          await tick();
+        }
+        return false;
+      };
+      if (!(await waitFor(".bol-saber-ladder rect"))) throw new Error("la hoja de niveles no dibuja la escalera");
+      if (!window.document.querySelector(".bol-saber-ridges rect")) throw new Error("la hoja del puntaje global no dibuja su reparto");
+      const toned = window.document.querySelectorAll(".bol-saber-gap td[data-tone]");
+      if (toned.length === 0) throw new Error("la brecha con el país no marca ninguna casilla");
+      // Un programa con menos de 10 evaluados no se compara: va entre paréntesis y sin tono.
+      const few = [...window.document.querySelectorAll(".bol-saber-gap td[data-few]")];
+      if (!few.length || few.some((td) => !/^\(.+\)$/.test(td.textContent.trim()))) throw new Error("los programas con pocos evaluados no se marcan entre paréntesis");
+      // Cada sede abre su bloque con sus programas debajo, nunca sumados entre sedes.
+      const sedes = [...window.document.querySelectorAll('.bol-saber-gap tr[data-level="sede"] th')].map((th) => th.textContent.trim());
+      if (!sedes.includes("Bucaramanga") || !sedes.includes("Cúcuta")) throw new Error(`la brecha no separa las sedes: ${sedes.join(", ")}`);
+    },
+  },
+  {
+    path: "/datos-abiertos/boletines/boletin-visibilidad",
+    note: "el boletín trae una hoja por ranking con su evolución, y una con todos juntos",
+    expect: "QS World University Rankings",
+    also: ["THE Impact Rankings", "Salud y bienestar", "Estrellas por categoría", "Ediciones", "Evolución de los rankings"],
+    absent: [...SIN_DINERO],
+    interact: async (window, tick) => {
+      // El boletín no se pagina hasta que carga su fuente, y esa promesa resuelve
+      // cuando quiere: se espera a que el documento esté dibujado, no un rato fijo.
+      const waitFor = async (selector) => {
+        for (let i = 0; i < 40; i += 1) {
+          if (window.document.querySelector(selector)) return true;
+          await tick();
+        }
+        return false;
+      };
+      // Cada hoja de ranking con historia lleva su traza.
+      if (!(await waitFor(".bol-rank .bol-chart circle.bol-chart__dot"))) {
+        throw new Error("la hoja del ranking no dibuja su evolución");
+      }
+      // La hoja de conjunto: un rótulo y un hilo por ranking.
+      const ranks = [...window.document.querySelectorAll(".bol-chart text.bol-chart__rank")];
+      const leaders = window.document.querySelectorAll(".bol-chart path.bol-chart__leader");
+      if (leaders.length < 2 || ranks.length < 2) throw new Error("el lienzo con todos los rankings no rotula cada uno");
+      // Los rótulos del lienzo se empujan: nunca a menos de un renglón.
+      const ys = [...window.document.querySelectorAll(".bol-chart path.bol-chart__leader")]
+        .map((path) => Number(path.getAttribute("d").split("L")[1].split(" ")[1]))
+        .sort((a, b) => a - b);
+      for (let i = 1; i < ys.length; i += 1) {
+        if (ys[i] - ys[i - 1] < 6.1) throw new Error(`dos rótulos del boletín quedan a ${ys[i] - ys[i - 1]}mm`);
+      }
+      // El ámbito elegido es el más cercano que reportan dos rankings: Colombia.
+      const text = window.document.body.textContent;
+      if (!text.includes("Colombia · el más cercano que reportan al menos dos rankings")) {
+        throw new Error("la hoja de conjunto no eligió el ámbito más cercano");
+      }
+    },
   },
   {
     path: "/datos-abiertos/sostenible",
@@ -1788,6 +1881,44 @@ const routes = [
       input.dispatchEvent(new window.Event("input", { bubbles: true }));
       await tick();
       if (saveButton.disabled) throw new Error("con una banda válida se debe poder guardar");
+    },
+  },
+  {
+    path: "/admin/udes-en-cifras/estructura/ensenanza",
+    session: true,
+    note: "Saber PRO en Estructura: el conjunto del informe, sin ofrecer un segundo",
+    expect: "Saber PRO",
+    also: ["Resultados Saber PRO", "2 años cargados"],
+    interact: async (window) => {
+      const options = [...window.document.querySelectorAll(".oda-add-select option")].map((o) => o.textContent);
+      if (options.includes("Resultados Saber PRO (ICFES)")) throw new Error("con un conjunto Saber PRO no se debe ofrecer otro");
+    },
+  },
+  {
+    path: "/admin/udes-en-cifras/captura/ensenanza",
+    session: true,
+    note: "captura Saber PRO: importación en el navegador, años cargados y promedios oficial y nacional",
+    expect: "Saber PRO",
+    interact: async (window, tick) => {
+      const tab = [...window.document.querySelectorAll(".oda-tab")].find((b) => b.textContent.startsWith("Saber PRO"));
+      if (!tab) throw new Error("falta la pestaña Saber PRO");
+      tab.click();
+      await tick();
+      const text = (id) => window.document.querySelector(`#${id}`)?.textContent ?? "";
+      if (!text("oda-saber-importar").includes("no se envían a ninguna parte")) throw new Error("la importación no dice que los datos individuales no salen del navegador");
+      if (!text("oda-saber-anios").includes("2024") || !text("oda-saber-anios").includes("6 de 6")) throw new Error(`años cargados: ${text("oda-saber-anios").slice(0, 200)}`);
+      const inputs = window.document.querySelectorAll("#oda-saber-referencia .oda-grid td input");
+      if (inputs.length !== 2 * 2 * 6) throw new Error(`la rejilla de referencia debía tener 24 casillas y tiene ${inputs.length}`);
+      // Un promedio por encima de 300 no se puede guardar.
+      const setter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, "value").set;
+      setter.call(inputs[0], "350");
+      inputs[0].dispatchEvent(new window.Event("input", { bubbles: true }));
+      await tick();
+      inputs[0].dispatchEvent(new window.FocusEvent("focusout", { bubbles: true }));
+      await tick();
+      if (!text("oda-saber-referencia").includes("va de 0 a 300")) throw new Error("un promedio fuera de escala debe avisarse");
+      const save = [...window.document.querySelectorAll("#oda-saber-referencia button")].find((b) => b.textContent.startsWith("Guardar"));
+      if (!save?.disabled) throw new Error("con un promedio fuera de escala no se debe poder guardar");
     },
   },
   { path: "/admin/udes-en-cifras/diseno/poblacional", session: true, expect: "Bloques de la ficha", also: ["Así se lee la ficha", "Tabla dinámica"] },
@@ -2573,6 +2704,59 @@ Object.assign(FIXTURES, OD_FIXTURES);
   FIXTURES.od_report_blocks = [
     ...FIXTURES.od_report_blocks,
     { id: "od-bloque-visibilidad-rankings", report_id: report.id, kind: "rankings", ref_id: null, section_id: null, position: 3, visible: true, settings: {} },
+  ];
+}
+
+/* Saber PRO (0031): Enseñanza con dos años, dos sedes y dos programas, más
+   el promedio oficial y el nacional. Cúcuta · Ingeniería de Sistemas 2024
+   tiene 4 evaluados: el caso de un programa pequeño. */
+{
+  const report = FIXTURES.od_reports.find((r) => r.slug === "ensenanza");
+  const saberId = "od-saber-ensenanza";
+  FIXTURES.od_saber_pro = [
+    {
+      id: saberId, report_id: report.id, key: "saber-pro", title: "Resultados Saber PRO",
+      description: "Cómo les va a los estudiantes de la UDES en la prueba de Estado, competencia por competencia.",
+      note: "Fuente: ICFES. Un puntaje 0 o sin reporte no cuenta como evaluado.", office_id: null, position: 1,
+    },
+  ];
+  const competencies = ["global", "lc", "rc", "cc", "ce", "ing"];
+  const programs = [
+    { campus: "Bucaramanga", faculty: "Ciencias de la Salud", program: "Enfermería" },
+    { campus: "Bucaramanga", faculty: "Ingenierías", program: "Ingeniería de Sistemas" },
+    { campus: "Cúcuta", faculty: "Ciencias de la Salud", program: "Enfermería" },
+    { campus: "Cúcuta", faculty: "Ingenierías", program: "Ingeniería de Sistemas" },
+  ];
+  /** Reparte n evaluados entre las claves, de forma estable. */
+  const spread = (n, keys) => Object.fromEntries(keys.map((key, i) => [key, Math.floor(n / keys.length) + (i < n % keys.length ? 1 : 0)]).filter(([, v]) => v > 0));
+  const results = [];
+  for (const year of [2023, 2024]) {
+    programs.forEach((p, pi) => {
+      const evaluated = year === 2024 && p.campus === "Cúcuta" && p.program === "Ingeniería de Sistemas" ? 4 : 20 + pi * 6 + (year - 2023) * 3;
+      competencies.forEach((competency, ci) => {
+        const mean = 138 + pi * 3 + ci * 2 + (year - 2023) * 1.5;
+        const levels = competency === "global" ? {} : spread(evaluated, competency === "ing" ? ["-A1", "A1", "A2", "B1", "B2"] : ["1", "2", "3", "4"]);
+        const low = Math.floor(mean / 10) * 10 - 10;
+        results.push({
+          id: `od-saber-${year}-${pi}-${competency}`, saber_id: saberId, year, scope: "programa", ...p, competency, evaluated, mean,
+          levels, histogram: spread(evaluated, [String(low), String(low + 10), String(low + 20)]),
+        });
+      });
+    });
+    competencies.forEach((competency, ci) => {
+      for (const [scope, base] of [["institucion", 142], ["nacional", 148]]) {
+        results.push({
+          id: `od-saber-${year}-${scope}-${competency}`, saber_id: saberId, year, scope, campus: "", faculty: "", program: "", competency,
+          evaluated: null, mean: base + ci + (year - 2023), levels: {}, histogram: {},
+        });
+      }
+    });
+  }
+  FIXTURES.od_saber_pro_results = results;
+  const last = Math.max(...FIXTURES.od_report_blocks.filter((b) => b.report_id === report.id).map((b) => b.position));
+  FIXTURES.od_report_blocks = [
+    ...FIXTURES.od_report_blocks,
+    { id: "od-bloque-ensenanza-saber-pro", report_id: report.id, kind: "saber_pro", ref_id: null, section_id: null, position: last + 1, visible: true, settings: {} },
   ];
 }
 

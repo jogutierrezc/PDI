@@ -18,6 +18,8 @@
    indicador después no lo pierde en el boletín.
    ========================================================================== */
 
+import { SABER_COMPETENCIES } from "../datos-abiertos/data/saber-pro";
+import { saberRef } from "../datos-abiertos/data/groups";
 import { ALL_YEARS } from "../datos-abiertos/data/terms";
 import type { CampusId, OpenDataCatalog, Report } from "../datos-abiertos/data/types";
 
@@ -205,6 +207,15 @@ export function datasetRefs(report: Report): { ref: string; title: string }[] {
     });
   }
   report.rankings?.forEach((r) => add(`ranking:${r.id}`, r.title));
+  // Un lienzo con todos juntos solo tiene sentido con dos o más recorridos.
+  if ((report.rankings ?? []).filter((r) => r.editions.filter((e) => e.global_rank || e.regional_rank || e.national_rank).length > 1).length >= 2) {
+    add(`rankings-evo:${report.slug}`, "Evolución de los rankings");
+  }
+  // Saber PRO: una entrada por competencia, cada una con sus hojas de niveles y brecha.
+  report.saberPro?.forEach((sp) => {
+    if (!sp.results.length) return;
+    SABER_COMPETENCIES.forEach((c) => add(saberRef(sp.id, c.key), `Saber PRO · ${c.label}`));
+  });
   report.breakdowns.forEach((b) => add(`desglose:${b.id}`, b.title));
   report.maps?.forEach((m) => add(`mapa:${m.id}`, m.title));
   report.heatmaps?.forEach((h) => add(`calor:${h.id}`, h.title));

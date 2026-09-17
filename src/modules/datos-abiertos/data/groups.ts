@@ -21,6 +21,11 @@
    ========================================================================== */
 
 import type { Report, ReportBlock } from "./types";
+import { SABER_COMPETENCIES } from "./saber-pro";
+import type { SaberCompetency } from "./saber-pro";
+
+/** Referencia de una competencia de un conjunto Saber PRO: "saber:<clave>:<competencia>". */
+export const saberRef = (id: string, competency: SaberCompetency) => `saber:${id}:${competency}`;
 
 export interface ReportGroup {
   /** Clave estable del separador: su slot, o su posición. */
@@ -29,7 +34,7 @@ export interface ReportGroup {
   description?: string;
   /** Claves de indicador, en el orden del informe. */
   indicators: string[];
-  /** Referencias "desglose:clave", "mapa:clave", "calor:", "tuberia:", "historico:", "tabla:", "ranking:". */
+  /** Referencias "desglose:clave", "mapa:clave", "calor:", "tuberia:", "historico:", "tabla:", "ranking:", "saber:". */
   datasets: string[];
 }
 
@@ -46,6 +51,10 @@ const DATASET_PREFIX: Partial<Record<ReportBlock["kind"], string>> = {
   historico: "historico",
   tabla: "tabla",
 };
+
+/** El conjunto Saber PRO que muestra un bloque: el elegido o, sin elección, el primero. */
+export const saberProOf = (report: Report, block: ReportBlock) =>
+  report.saberPro?.find((sp) => sp.id === block.settings.saberPro) ?? report.saberPro?.[0];
 
 /** "indicador:clave" para los indicadores; los conjuntos, con su prefijo. */
 export const indicatorRef = (id: string) => `indicador:${id}`;
@@ -125,6 +134,12 @@ export function reportGroups(report: Report): ReportGrouping {
     }
     if (block.kind === "rankings") {
       picks.rankings(block).forEach((key) => claim(`ranking:${key}`, current));
+      return;
+    }
+    if (block.kind === "saber_pro") {
+      // Una hoja del boletín por competencia: todas son del grupo del bloque.
+      const shown = saberProOf(report, block);
+      if (shown) SABER_COMPETENCIES.forEach((c) => claim(saberRef(shown.id, c.key), current));
       return;
     }
     const prefix = DATASET_PREFIX[block.kind];

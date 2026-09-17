@@ -42,9 +42,11 @@ import {
   useSavePipeline,
   useSaveRanking,
   useSaveReport,
+  useSaveSaberPro,
 } from "../od-data";
 import { ConfirmButton, Panel, SaveState, StageEmpty, YearPicker, slugify } from "../ui";
 import { RankingForm } from "./RankingCapture";
+import { SaberProForm } from "./SaberProCapture";
 import { RANKING_SYSTEMS, RANKING_VIEWS } from "../../../datos-abiertos/data/rankings";
 
 const FORMAT_LABEL: Record<OdValueFormat, string> = { entero: "Entero", porcentaje: "Porcentaje", decimal: "Decimal" };
@@ -510,7 +512,7 @@ function IndicatorForm({
 
 /* --- Conjuntos visuales --------------------------------------------------------------------- */
 
-type DatasetKind = "desglose" | "calor" | "mapa" | "tuberia" | "historico" | "ranking";
+type DatasetKind = "desglose" | "calor" | "mapa" | "tuberia" | "historico" | "ranking" | "saber";
 
 const MEASURE_LABEL: Record<OdPipelineMeasure, string> = {
   estudiantes: "Estudiantes que siguen en cada etapa (el portal lo muestra en %)",
@@ -533,6 +535,7 @@ function DatasetsEditor({ data, reportId, years, canEdit }: { data: StationProps
   const savePipeline = useSavePipeline();
   const saveHistory = useSaveHistory();
   const saveRanking = useSaveRanking();
+  const saveSaberPro = useSaveSaberPro();
   const remove = useDeleteDataset();
   const [adding, setAdding] = useState<DatasetKind | null>(null);
   // Mapas: por departamento o de movilidad internacional, según la opción elegida.
@@ -545,13 +548,15 @@ function DatasetsEditor({ data, reportId, years, canEdit }: { data: StationProps
   const pipelines = data.rows.pipelines.filter((p) => p.report_id === reportId);
   const histories = data.rows.histories.filter((h) => h.report_id === reportId);
   const rankings = (data.rows.rankings ?? []).filter((r) => r.report_id === reportId).sort((a, b) => a.position - b.position);
+  const saberPro = (data.rows.saberPro ?? []).filter((sp) => sp.report_id === reportId).sort((a, b) => a.position - b.position);
+  const saberYears = (id: string) => new Set((data.rows.saberProResults ?? []).filter((r) => r.saber_id === id).map((r) => r.year)).size;
   const offices = data.rows.offices;
-  const mutations = [saveBreakdown, saveHeatmap, saveMap, savePipeline, saveHistory, saveRanking, remove];
+  const mutations = [saveBreakdown, saveHeatmap, saveMap, savePipeline, saveHistory, saveRanking, saveSaberPro, remove];
   const pending = mutations.some((m) => m.isPending);
   const error = mutations.find((m) => m.error)?.error ?? null;
   const success = mutations.some((m) => m.isSuccess);
   const done = { onSuccess: () => { setAdding(null); setEditing(null); } };
-  const total = breakdowns.length + heatmaps.length + maps.length + pipelines.length + histories.length + rankings.length;
+  const total = breakdowns.length + heatmaps.length + maps.length + pipelines.length + histories.length + rankings.length + saberPro.length;
 
   const lines = (text: string) => text.split("\n").map((s) => s.trim()).filter(Boolean);
   const yearsDetail = (list: number[] | null) => (list && list.length ? list.join(", ") : "todos los años");
@@ -594,6 +599,8 @@ function DatasetsEditor({ data, reportId, years, canEdit }: { data: StationProps
               <option value="mapa:saliente">Mapa de movilidad saliente (campus → país)</option>
               <option value="mapa:convenios">Mapa de convenios internacionales por país (mapa de calor)</option>
               <option value="ranking">Ranking universitario (QS, THE…)</option>
+              {/* Un informe suele tener un solo conjunto Saber PRO: se ofrece mientras no lo tenga. */}
+              {saberPro.length === 0 && <option value="saber">Resultados Saber PRO (ICFES)</option>}
             </select>
           </label>
         </>
@@ -611,7 +618,19 @@ function DatasetsEditor({ data, reportId, years, canEdit }: { data: StationProps
           }
         />
       )}
-      {adding && adding !== "ranking" && (
+      {adding === "saber" && (
+        <SaberProForm
+          offices={offices}
+          onCancel={() => setAdding(null)}
+          onSubmit={(f) =>
+            saveSaberPro.mutate(
+              { report_id: reportId, key: uniqueKey("saber pro", saberPro.map((sp) => sp.key)), title: f.title, description: f.description, note: f.note, office_id: f.office_id || null, position: saberPro.length + 1 },
+              done,
+            )
+          }
+        />
+      )}
+      {adding && adding !== "ranking" && adding !== "saber" && (
         <DatasetForm
           key={`${adding}-${addingMode}`}
           kind={adding}
@@ -673,6 +692,14 @@ function DatasetsEditor({ data, reportId, years, canEdit }: { data: StationProps
             <RankingForm offices={offices} initial={{ title: r.title, description: r.description, system: r.system, accent: r.accent, view: r.view, office_id: r.office_id ?? "" }}
               onCancel={() => setEditing(null)}
               onSubmit={(f) => saveRanking.mutate({ id: r.id, report_id: reportId, title: f.title, description: f.description, system: f.system, accent: f.accent, view: f.view, office_id: f.office_id || null }, done)} />
+          </DatasetItem>
+        ))}
+        {saberPro.map((sp) => (
+          <DatasetItem key={sp.id} kind="Saber PRO" title={sp.title} detail={saberYears(sp.id) ? `${saberYears(sp.id)} años cargados` : "sin resultados: impórtalos en Captura"} canEdit={canEdit}
+            editing={editing === sp.id} onEdit={() => setEditing(sp.id)} onDelete={() => remove.mutate({ table: "od_saber_pro", id: sp.id })}>
+            <SaberProForm offices={offices} initial={{ title: sp.title, description: sp.description, note: sp.note, office_id: sp.office_id ?? "" }}
+              onCancel={() => setEditing(null)}
+              onSubmit={(f) => saveSaberPro.mutate({ id: sp.id, report_id: reportId, title: f.title, description: f.description, note: f.note, office_id: f.office_id || null }, done)} />
           </DatasetItem>
         ))}
         {total === 0 && !adding && (

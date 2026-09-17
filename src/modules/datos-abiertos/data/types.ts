@@ -17,6 +17,7 @@
 import type { PublicationStatus } from "../../../types/database";
 import type { AnnualRule, Term } from "./terms";
 import type { RankingData } from "./rankings";
+import type { SaberProData } from "./saber-pro";
 
 export type { AnnualRule, Term } from "./terms";
 
@@ -48,7 +49,8 @@ export type BlockKind =
   | "historico"
   | "tabla"
   | "separador"
-  | "rankings";
+  | "rankings"
+  | "saber_pro";
 
 export interface Campus {
   id: CampusId;
@@ -258,6 +260,8 @@ export interface ReportBlock {
     slot?: string;
     /** Bloque de rankings: claves de los rankings que muestra. */
     rankings?: string[];
+    /** Bloque Saber PRO: clave del conjunto. Sin ella, el primero del informe. */
+    saberPro?: string;
   };
   /** Punto del informe al que pertenece. Sin punto, el bloque es de toda la ficha. */
   sectionKey?: string | null;
@@ -298,6 +302,8 @@ export interface Report {
   tables?: TableData[];
   /** Rankings universitarios (QS, THE…) con sus ediciones anuales. */
   rankings?: RankingData[];
+  /** Resultados Saber PRO por competencia, año, sede y programa. */
+  saberPro?: SaberProData[];
   /** Orden y visibilidad de los bloques de la ficha. Sin bloques, el orden por defecto. */
   blocks?: ReportBlock[];
   /** Nota metodológica o de alcance. */
@@ -385,4 +391,5 @@ export const BLOCK_LABELS: Record<BlockKind, string> = {
   metodologia: "Qué mide cada cifra",
   separador: "Separador",
   rankings: "Rankings",
+  saber_pro: "Resultados Saber PRO",
 };

@@ -1444,6 +1444,21 @@
 .bol-chart__dot { fill: var(--c); stroke: #ffffff; stroke-width: 0.25; }
 
 .bol-chart__label { fill: var(--bol-ink); font-size: 2.4px; }
+
+/* Evolución de un ranking: la banda ocupa su tramo, el hilo lleva del último
+   punto a su rótulo y las cifras van en tinta, no en el color del ranking. */
+.bol-chart__rank-band { stroke: var(--c); stroke-width: 1.6; stroke-linecap: round; opacity: 0.25; }
+
+.bol-chart__leader {
+  fill: none;
+  stroke: var(--c);
+  stroke-width: 0.15;
+  stroke-dasharray: 0.6 0.6;
+  opacity: 0.75;
+}
+
+.bol-chart__rank { fill: var(--bol-ink); font-size: 2.5px; font-weight: 700; }
+.bol-chart__series { fill: var(--bol-ink-2); font-size: 2.2px; }
 .bol-chart__track { fill: var(--bol-paper-2); }
 .bol-chart__bar { fill: var(--bol-band); }
 [data-strong] > .bol-chart__bar { fill: var(--bol-navy); }
@@ -1925,4 +1940,116 @@
 
 .od-bulletins__empty {
   color: var(--ink-muted);
+}
+
+/* --- Resultados Saber PRO ------------------------------------------------ */
+
+/* Escala divergente del papel: terracota bajo el umbral o el país, azul sobre
+   él. Fija, como el resto del papel: la misma del portal en claro. */
+.bol-doc {
+  --bol-div-neg-3: #7c2f0d;
+  --bol-div-neg-2: #b9541f;
+  --bol-div-neg-1: #e79c69;
+  --bol-div-mid: #e9edf3;
+  --bol-div-pos-1: #6fa4e8;
+  --bol-div-pos-2: #2a63b8;
+  --bol-div-neg-3-ink: #ffffff;
+  --bol-div-neg-2-ink: #ffffff;
+  --bol-div-neg-1-ink: #16243a;
+  --bol-div-mid-ink: #16243a;
+  --bol-div-pos-1-ink: #16243a;
+  --bol-div-pos-2-ink: #ffffff;
+}
+
+.bol-saber-keys {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2mm 8mm;
+  margin: 0 0 2.5mm;
+}
+
+.bol-saber-keys dt {
+  color: var(--bol-navy);
+  font-size: 2.2mm;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.bol-saber-keys dd {
+  display: flex;
+  align-items: baseline;
+  gap: 2mm;
+  margin: 0.6mm 0 0;
+  color: var(--bol-ink-2);
+  font-size: 2.5mm;
+}
+
+.bol-saber-keys b {
+  color: var(--bol-navy);
+  font-size: 7mm;
+  font-weight: 800;
+  line-height: 1;
+}
+
+.bol-saber-ladder,
+.bol-saber-ridges { margin: 1.5mm 0 3mm; }
+
+.bol-saber-ladder__axis { stroke: var(--bol-ink); stroke-width: 0.45; }
+.bol-saber-ladder__pct { font-size: 2.2px; font-weight: 700; }
+
+.bol-saber-ridges__mark { stroke: var(--bol-ink); stroke-width: 0.4; }
+.bol-saber-ridges__mark[data-national] { stroke: var(--bol-ink-2); stroke-dasharray: 0.9 0.6; }
+
+.bol-saber-gap thead th small {
+  display: block;
+  font-size: 1.8mm;
+  font-weight: 500;
+  opacity: 0.8;
+}
+
+.bol-saber-gap thead th { text-align: center; }
+.bol-saber-gap thead th:first-child { text-align: left; }
+
+.bol-saber-gap tbody th,
+.bol-saber-gap tbody td { padding-block: 0.45mm; }
+
+.bol-saber-gap tbody td {
+  font-weight: 700;
+  text-align: center;
+  border-bottom: 0.25mm solid #ffffff;
+  border-left: 0.25mm solid #ffffff;
+}
+
+.bol-saber-gap tr[data-level="udes"] th,
+.bol-saber-gap tr[data-level="sede"] th {
+  color: var(--bol-navy);
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.bol-saber-gap tr[data-level="sede"] > * { border-top: 0.5mm solid var(--bol-navy); }
+.bol-saber-gap tr[data-level="programa"] th { padding-left: 3mm; font-weight: 500; }
+
+.bol-saber-gap td[data-tone="neg-2"] { color: var(--bol-div-neg-2-ink); background: var(--bol-div-neg-2); }
+.bol-saber-gap td[data-tone="neg-1"] { color: var(--bol-div-neg-1-ink); background: var(--bol-div-neg-1); }
+.bol-saber-gap td[data-tone="mid"] { color: var(--bol-div-mid-ink); background: var(--bol-div-mid); }
+.bol-saber-gap td[data-tone="pos-1"] { color: var(--bol-div-pos-1-ink); background: var(--bol-div-pos-1); }
+.bol-saber-gap td[data-tone="pos-2"] { color: var(--bol-div-pos-2-ink); background: var(--bol-div-pos-2); }
+
+.bol-saber-gap td[data-few] {
+  color: var(--bol-ink-3);
+  font-style: italic;
+  font-weight: 500;
+}
+
+.bol-saber-gap td[data-empty] { color: var(--bol-ink-3); font-weight: 400; }
+
+/* La tinta del tono tiene que imprimirse aunque el navegador ahorre fondos. */
+.bol-saber-gap td,
+.bol-saber-ladder,
+.bol-saber-ridges {
+  -webkit-print-color-adjust: exact;
+  print-color-adjust: exact;
 }

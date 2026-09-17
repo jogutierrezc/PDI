@@ -38,6 +38,24 @@ export const SCOPE_LABEL: Record<RankScope, string> = {
   national: "Colombia",
 };
 
+/**
+ * Orden al elegir un solo ámbito, de lo cercano a lo lejano. Una gráfica de
+ * papel no tiene selector y tiene que decidir: para una universidad colombiana,
+ * el puesto en Colombia es el que primero se busca.
+ *
+ * No cambia el orden en que se muestran los tres juntos (mundial, Latinoamérica,
+ * Colombia), que sigue al de las columnas de la tabla comparativa.
+ */
+/** Nombre con el que se rotula un ranking donde no cabe su título entero. */
+export const rankingShortLabel = (ranking: { system: RankingSystem; title: string }) =>
+  RANKING_SYSTEMS[ranking.system].short === "Ranking" ? ranking.title : RANKING_SYSTEMS[ranking.system].short;
+
+export const SCOPE_PREFERENCE: RankScope[] = ["national", "regional", "global"];
+
+/** El ámbito preferido entre los que alguna de estas ediciones reporta. */
+export const preferredScope = (has: (scope: RankScope) => boolean): RankScope | null =>
+  SCOPE_PREFERENCE.find(has) ?? null;
+
 /** Categorías de QS Stars, en el orden en que QS las publica. Se pueden añadir otras. */
 export const QS_STAR_CATEGORIES = [
   "Teaching",
@@ -152,6 +170,78 @@ export function parseRank(raw: string | null | undefined): ParsedRank | null {
   match = text.match(/^(\d{1,5})\+$/);
   if (match) return { text: `${Number(match[1])}+`, value: Number(match[1]), band: true };
   return null;
+}
+
+/** Extremos de una banda ("801–1000", "1001+") para dibujarla como tramo. */
+export function bandEnds(rank: ParsedRank, fallback: number): [number, number] {
+  const from = Number(rank.text.split(/[–+]/)[0]) || rank.value;
+  const to = Number(rank.text.split("–")[1]);
+  return [from, Number.isFinite(to) ? to : fallback];
+}
+
+/** Los puestos que ocupa una posición: uno, o los dos extremos de su banda. */
+export const rankSpan = (rank: ParsedRank): number[] => (rank.band ? bandEnds(rank, rank.value) : [rank.value]);
+
+/**
+ * Escala logarítmica invertida sobre un dominio que sale de los datos, con
+ * margen: el puesto 1 arriba. Logarítmica porque un ranking nacional (#16) y
+ * uno mundial (#1401) tienen que leerse en el mismo dibujo sin aplastarse.
+ *
+ * `minRatio` evita las dos maneras de mentir con el eje: si el dominio se
+ * ciñera a los datos, moverse un puesto llenaría la gráfica de arriba abajo;
+ * si fuera siempre ancho, ningún movimiento se vería. Cuando los datos no
+ * alcanzan ese recorrido mínimo, el dominio crece por igual hacia los dos lados.
+ *
+ * Devuelve `y` en las unidades que reciba: píxeles en la ficha, milímetros en
+ * el Boletin.
+ */
+export function rankScale(
+  ranks: number[],
+  top: number,
+  height: number,
+  { pad = 1.5, minRatio = 3, dense = false }: { pad?: number; minRatio?: number; dense?: boolean } = {},
+) {
+  let low = Math.max(1, Math.min(...ranks) / pad);
+  let high = Math.max(...ranks) * pad;
+  const grow = Math.sqrt(minRatio / (high / low));
+  if (grow > 1) {
+    low = Math.max(1, low / grow);
+    high *= grow;
+  }
+  const logLow = Math.log10(low);
+  const span = Math.log10(high) - logLow || 1;
+  const y = (rank: number) => top + ((Math.log10(Math.max(1, rank)) - logLow) / span) * height;
+  // Marcas redondas dentro del dominio. En un lienzo estrecho hacen falta más
+  // escalones para que siempre caigan dos o tres.
+  const steps = dense ? [1, 1.5, 2, 3, 5, 7] : [1, 2, 5];
+  const ticks = [0, 1, 2, 3, 4]
+    .flatMap((k) => steps.map((m) => Math.round(m * 10 ** k)))
+    .filter((t) => t >= low && t <= high);
+  return { y, ticks };
+}
+
+/**
+ * Coloca rótulos que compiten por la misma columna: los que quedarían a menos
+ * de `gap` se empujan hacia abajo y, si el bloque se sale por el pie, sube
+ * entero. Devuelve una posición por rótulo, en el orden en que llegaron.
+ */
+export function stackLabels(wanted: number[], gap: number, top: number, bottom: number): number[] {
+  const order = wanted.map((y, i) => ({ y, i })).sort((a, b) => a.y - b.y);
+  let previous = -Infinity;
+  for (const item of order) {
+    item.y = Math.max(item.y, previous + gap, top);
+    previous = item.y;
+  }
+  if (order.length && order[order.length - 1].y > bottom) {
+    let next = Infinity;
+    for (let k = order.length - 1; k >= 0; k -= 1) {
+      order[k].y = Math.min(order[k].y, next - gap, bottom - (order.length - 1 - k) * gap);
+      next = order[k].y;
+    }
+  }
+  const out = new Array<number>(wanted.length);
+  for (const item of order) out[item.i] = item.y;
+  return out;
 }
 
 /** ¿Es una posición válida o vacía? Mismo criterio que od_rank_is_valid en la base. */

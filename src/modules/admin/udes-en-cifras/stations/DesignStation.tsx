@@ -36,6 +36,7 @@ const BLOCK_HELP: Record<OdBlockKind, string> = {
   tabla: "Una tabla del informe: listado, ranking, fichas o cifras de un periodo.",
   separador: "Agrupa los bloques que siguen, hasta el próximo separador. En el Boletín abre página.",
   rankings: "Posiciones en QS, THE y otros rankings, con medallas, tabla, evolución y rueda de ODS.",
+  saber_pro: "Resultados Saber PRO por competencia: niveles de desempeño, brecha con el país y evolución, filtrables por sede, facultad y programa.",
 };
 
 /** Clave corta para distinguir varios bloques del mismo tipo (ver 0029). */
@@ -61,6 +62,7 @@ function DesignEditor({ data, reportId, blocks, canEdit }: { data: StationProps[
   const breakdowns = data.rows.breakdowns.filter((b) => b.report_id === reportId);
   const tables = data.rows.tables.filter((t) => t.report_id === reportId);
   const rankings = (data.rows.rankings ?? []).filter((r) => r.report_id === reportId);
+  const saberPro = (data.rows.saberPro ?? []).filter((sp) => sp.report_id === reportId).sort((a, b) => a.position - b.position);
   const sections = data.rows.sections.filter((s) => s.report_id === reportId);
   const indicators = data.rows.indicators.filter((i) => i.report_id === reportId).sort((a, b) => a.position - b.position);
   /** Separador bajo el que queda un bloque (el anterior más cercano). */
@@ -102,6 +104,7 @@ function DesignEditor({ data, reportId, blocks, canEdit }: { data: StationProps[
       .map((kind) => ({ kind, ref_id: null, label: BLOCK_LABELS[kind] })),
     ...(breakdowns.length && !draft.some((b) => b.kind === "desgloses") ? [{ kind: "desgloses" as OdBlockKind, ref_id: null, label: BLOCK_LABELS.desgloses }] : []),
     ...(rankings.length && !draft.some((b) => b.kind === "rankings") ? [{ kind: "rankings" as OdBlockKind, ref_id: null, label: BLOCK_LABELS.rankings }] : []),
+    ...(saberPro.length && !draft.some((b) => b.kind === "saber_pro") ? [{ kind: "saber_pro" as OdBlockKind, ref_id: null, label: BLOCK_LABELS.saber_pro }] : []),
     ...heatmaps.filter((h) => !draft.some((b) => b.ref_id === h.id)).map((h) => ({ kind: "mapa_calor" as OdBlockKind, ref_id: h.id, label: h.title })),
     ...maps.filter((m) => !draft.some((b) => b.ref_id === m.id || (b.kind === "mapa" && b.settings.mapWith === m.key))).map((m) => ({ kind: "mapa" as OdBlockKind, ref_id: m.id, label: m.title })),
     ...pipelines.filter((p) => !draft.some((b) => b.ref_id === p.id)).map((p) => ({ kind: "tuberia" as OdBlockKind, ref_id: p.id, label: p.title })),
@@ -238,6 +241,19 @@ function DesignEditor({ data, reportId, blocks, canEdit }: { data: StationProps[
                       disabled={!canEdit}
                       onChange={(list) => patch(block.tempId, { settings: { ...block.settings, rankings: list.length ? list : undefined } })}
                     />
+                  )}
+                  {block.kind === "saber_pro" && saberPro.length > 1 && (
+                    <label className="oda-inline-field">
+                      <span>Resultados que muestra</span>
+                      <select
+                        value={block.settings.saberPro ?? ""}
+                        disabled={!canEdit}
+                        onChange={(e) => patch(block.tempId, { settings: { ...block.settings, saberPro: e.target.value || undefined } })}
+                      >
+                        <option value="">El primero del informe ({saberPro[0].title})</option>
+                        {saberPro.map((sp) => <option key={sp.id} value={sp.key}>{sp.title}</option>)}
+                      </select>
+                    </label>
                   )}
                   {block.kind === "desgloses" && !block.ref_id && breakdowns.length > 0 && (
                     <Picker

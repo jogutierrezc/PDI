@@ -34,6 +34,8 @@ import type {
   OdRankingRow,
   OdReportBlockRow,
   OdReportRow,
+  OdSaberProResultRow,
+  OdSaberProRow,
   OdValueRow,
   PublicationStatus,
 } from "../../../types/database";
@@ -256,7 +258,7 @@ async function ensureBlock(reportId: string, kind: OdBlockKind, refId: string | 
 
 /** Inserta o actualiza un conjunto; al insertarlo, le crea su bloque. */
 async function saveDataset(
-  table: "od_breakdowns" | "od_heatmaps" | "od_maps" | "od_pipelines" | "od_histories" | "od_rankings",
+  table: "od_breakdowns" | "od_heatmaps" | "od_maps" | "od_pipelines" | "od_histories" | "od_rankings" | "od_saber_pro",
   kind: OdBlockKind,
   row: { id?: string; report_id: string } & Record<string, unknown>,
 ) {
@@ -266,8 +268,8 @@ async function saveDataset(
     return;
   }
   const created = unwrap<{ id: string }>(await supabase.from(table).insert(fields).select("id").single());
-  // Desgloses y rankings comparten un bloque del informe; los demás, uno por conjunto.
-  await ensureBlock(row.report_id, kind, kind === "desgloses" || kind === "rankings" ? null : created.id);
+  // Desgloses, rankings y Saber PRO comparten un bloque del informe; los demás, uno por conjunto.
+  await ensureBlock(row.report_id, kind, kind === "desgloses" || kind === "rankings" || kind === "saber_pro" ? null : created.id);
 }
 
 export function useSaveBreakdown() {
@@ -405,8 +407,63 @@ export function useDeleteRankingEdition() {
   });
 }
 
+/* --- Saber PRO (0031) ----------------------------------------------------------- */
+
+const SABER_UNIQUE = "saber_id,year,scope,campus,faculty,program,competency";
+
+export function useSaveSaberPro() {
+  return useOdMutation(async (row: Partial<OdSaberProRow> & { report_id: string }) => saveDataset("od_saber_pro", "saber_pro", row));
+}
+
+/**
+ * Resultados por programa agregados en el navegador desde el Excel del ICFES.
+ * Reemplaza los años del archivo: borra sus filas de ámbito programa y sube
+ * las nuevas en tandas de 500. Los promedios oficial y nacional no se tocan.
+ */
+export function useReplaceSaberProResults() {
+  return useOdMutation(
+    async ({ periodId, reportId, saberId, years, rows, fileName = "" }: {
+      periodId: string; reportId: string; saberId: string; years: number[]; rows: OdSaberProResultRow[]; fileName?: string;
+    }) => {
+      if (years.length) {
+        await run(supabase.from("od_saber_pro_results").delete().eq("saber_id", saberId).eq("scope", "programa").in("year", years));
+      }
+      for (let i = 0; i < rows.length; i += 500) {
+        await run(supabase.from("od_saber_pro_results").insert(rows.slice(i, i + 500)));
+      }
+      await logImport(periodId, reportId, "plantilla", rows.length, fileName, { tabla: "od_saber_pro_results", anios: years });
+    },
+  );
+}
+
+/** Promedio oficial de la institución y nacional: se escriben las casillas con cifra y se borran las vaciadas. */
+export function useSaveSaberProReference() {
+  return useOdMutation(
+    async ({ periodId, reportId, saberId, rows, remove }: {
+      periodId: string; reportId: string; saberId: string; rows: OdSaberProResultRow[];
+      remove: { year: number; scope: "institucion" | "nacional"; competency: OdSaberProResultRow["competency"] }[];
+    }) => {
+      for (const cell of remove) {
+        await run(
+          supabase.from("od_saber_pro_results").delete()
+            .eq("saber_id", saberId).eq("year", cell.year).eq("scope", cell.scope).eq("competency", cell.competency),
+        );
+      }
+      if (rows.length) await run(supabase.from("od_saber_pro_results").upsert(rows, { onConflict: SABER_UNIQUE }));
+      await logImport(periodId, reportId, "rejilla", rows.length + remove.length, "", { tabla: "od_saber_pro_results" });
+    },
+  );
+}
+
+/** Borra un año completo: programas, promedio oficial y nacional. */
+export function useDeleteSaberProYear() {
+  return useOdMutation(async ({ saberId, year }: { saberId: string; year: number }) => {
+    await run(supabase.from("od_saber_pro_results").delete().eq("saber_id", saberId).eq("year", year));
+  });
+}
+
 export function useDeleteDataset() {
-  return useOdMutation(async ({ table, id }: { table: "od_breakdowns" | "od_heatmaps" | "od_maps" | "od_pipelines" | "od_histories" | "od_rankings"; id: string }) => {
+  return useOdMutation(async ({ table, id }: { table: "od_breakdowns" | "od_heatmaps" | "od_maps" | "od_pipelines" | "od_histories" | "od_rankings" | "od_saber_pro"; id: string }) => {
     await run(supabase.from(table).delete().eq("id", id));
   });
 }

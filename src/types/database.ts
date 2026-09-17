@@ -1008,7 +1008,9 @@ export type OdBlockKind =
   /** Título de sección: agrupa los bloques que le siguen hasta el próximo separador. */
   | "separador"
   /** Rankings universitarios del informe, con su selector de vista (0030). */
-  | "rankings";
+  | "rankings"
+  /** Resultados Saber PRO del informe, por competencia (0031). */
+  | "saber_pro";
 /** Estado de un punto de un informe. */
 /** Cómo llega la cifra: por periodo académico (A y B) o una sola cifra por año. */
 export type OdReporting = "periodo" | "anual";
@@ -1275,6 +1277,8 @@ export interface OdReportBlockRow {
     breakdowns?: string[];
     /** Bloque de rankings: claves de los rankings que muestra. Sin ellas, los que ningún otro bloque eligió. */
     rankings?: string[];
+    /** Bloque Saber PRO: clave del conjunto que muestra (0031). */
+    saberPro?: string;
     /** Distingue varios bloques del mismo tipo sin conjunto (separadores, tableros). Ver 0029. */
     slot?: string;
   };
@@ -1347,6 +1351,34 @@ export interface OdRankingEditionRow {
   subjects: { subject: string; global_rank: string; national_rank: string }[];
   custom: { label: string; value: string }[];
   note: string;
+}
+
+/** Resultados Saber PRO de un informe (0031). */
+export interface OdSaberProRow {
+  id: string;
+  report_id: string;
+  key: string;
+  title: string;
+  description: string;
+  note: string;
+  office_id: string | null;
+  position: number;
+}
+
+/** Resultado Saber PRO agregado: año × ámbito × competencia. Sin datos personales. */
+export interface OdSaberProResultRow {
+  id?: string;
+  saber_id: string;
+  year: number;
+  scope: "programa" | "institucion" | "nacional";
+  campus: string;
+  faculty: string;
+  program: string;
+  competency: "global" | "lc" | "rc" | "cc" | "ce" | "ing";
+  evaluated: number | null;
+  mean: number | string | null;
+  levels: Record<string, number>;
+  histogram: Record<string, number>;
 }
 
 export interface OdTableRecordRow {

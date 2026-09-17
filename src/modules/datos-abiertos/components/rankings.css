@@ -33,38 +33,72 @@
   font: inherit;
 }
 
-/* --- Medallas ----------------------------------------------------------------- */
+/* --- Medallas: la placa de llegada --------------------------------------------
+
+   Cada ranking es una placa del tablero, no una tarjeta con anillo. La posición
+   principal llega volteando en paletas partidas (una celda por cifra), el corte
+   anterior se lee en cian debajo, los otros ámbitos ocupan celdas de la rejilla
+   del tablero y el boleto de origen cierra la placa. Solo la posición voltea:
+   si todo se moviera, no llegaría nada.
+   -------------------------------------------------------------------------- */
 
 .od-rankings__grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(min(100%, 20rem), 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 21.5rem), 1fr));
   gap: var(--space-5);
-  align-items: start;
+  align-items: stretch;
 }
 
 .od-rank {
   --rk-accent: var(--od-line-1);
-  --rk-soft: color-mix(in srgb, var(--rk-accent) 12%, var(--od-board));
-  position: relative;
-  display: grid;
-  gap: var(--space-4);
-  padding: var(--space-5);
+  --rk-soft: color-mix(in srgb, var(--rk-accent) 13%, var(--od-board));
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  overflow: hidden;
   color: var(--od-board-ink);
   background: var(--od-board);
   border: 1px solid var(--od-board-line);
-  border-top: 4px solid var(--rk-accent);
   border-radius: var(--radius-sm);
   box-shadow: var(--shadow-sm);
 }
 
+/* Franja de identidad: la insignia y el nombre del ranking sobre un tinte de su
+   acento, cerrada por una regla de 1px. La identidad la da la insignia, no una
+   banda gruesa de color. */
 .od-rank__head {
   display: grid;
   grid-template-columns: auto minmax(0, 1fr);
   align-items: center;
   gap: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  background: var(--rk-soft);
+  border-bottom: 1px solid var(--rk-accent);
 }
 
-/* Los títulos del bloque usan la letra del portal, no la de los encabezados editoriales. */
+.od-rank__badge {
+  display: grid;
+  place-items: center;
+  min-width: 2.5rem;
+  height: 2.5rem;
+  padding-inline: var(--space-2);
+  color: #ffffff;
+  background: var(--rk-accent);
+  border-radius: var(--radius-xs);
+  font-family: var(--font-sign);
+  font-size: 1.3rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+}
+
+.od-rank__ident {
+  display: grid;
+  gap: 1px;
+  min-width: 0;
+}
+
+/* Los títulos del bloque usan la letra del portal, no la de los encabezados
+   editoriales; los rotulos de tablero usan la de señalización. */
 .od-rankings h3,
 .od-rankings h4 { font-family: inherit; }
 
@@ -73,98 +107,67 @@
   font-size: var(--text-base);
   font-weight: 700;
   line-height: 1.25;
+  text-wrap: balance;
 }
 
-.od-rank__head small {
+.od-rank__edition,
+.od-rank__scope,
+.od-rank__scopes dt,
+.od-rank__section h4 {
   color: var(--od-board-muted);
-  font-size: var(--text-xs);
-  font-weight: 600;
-}
-
-.od-rank__publisher {
-  display: grid;
-  place-items: center;
-  min-width: 2.75rem;
-  height: 2.75rem;
-  padding-inline: var(--space-2);
-  color: #ffffff;
-  background: var(--rk-accent);
-  border-radius: 8px;
   font-family: var(--font-sign);
-  font-size: 1.25rem;
-  font-weight: 700;
-  letter-spacing: 0.02em;
+  font-size: 0.85rem;
+  font-weight: 600;
+  letter-spacing: var(--tracking-wide);
+  text-transform: uppercase;
 }
 
-.od-rank__medal {
-  display: grid;
-  grid-template-columns: 7.5rem minmax(0, 1fr);
-  align-items: center;
+.od-rank__body {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
   gap: var(--space-4);
+  padding: var(--space-4) var(--space-5) var(--space-5);
 }
 
-.od-rank__ring {
-  grid-area: 1 / 1;
-  width: 7.5rem;
-  height: 7.5rem;
-}
-
-.od-rank__ring circle:first-child {
-  fill: var(--rk-soft);
-  stroke: var(--rk-accent);
-  stroke-width: 4;
-}
-
-.od-rank__ring circle:last-child {
-  fill: none;
-  stroke: var(--rk-accent);
-  stroke-width: 1;
-  stroke-dasharray: 2 3;
-  opacity: 0.7;
-}
+/* --- La posición principal --- */
 
 .od-rank__lead {
-  grid-area: 1 / 1;
   display: grid;
-  justify-items: center;
-  align-content: center;
-  text-align: center;
+  gap: var(--space-2);
+  padding: var(--space-4);
+  background: var(--od-board-raised);
+  border-radius: var(--radius-xs);
 }
 
-.od-rank__lead strong {
+.od-rank__figure {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  min-width: 0;
+}
+
+/* El signo no es cifra: se queda fuera de las paletas. */
+.od-rank__sigil {
+  color: var(--od-board-muted);
   font-family: var(--font-sign);
-  font-size: 2.6rem;
+  font-size: 1.7rem;
   font-weight: 700;
-  line-height: 0.9;
-  font-variant-numeric: tabular-nums;
-}
-
-.od-rank__lead strong[data-band] {
-  max-width: 6rem;
-  font-size: 1.45rem;
   line-height: 1;
 }
 
-.od-rank__lead strong[data-long] { font-size: 1.2rem; }
-
-.od-rank__lead span {
-  max-width: 5.6rem;
-  margin-top: 4px;
-  color: var(--od-board-muted);
-  font-size: 0.7rem;
-  font-weight: 700;
-  letter-spacing: 0.01em;
+.od-rank__trend {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 2px var(--space-3);
 }
 
-.od-rank__lead-change {
-  display: grid;
-  justify-items: start;
-  gap: 2px;
-}
-
-.od-rank__lead-change small {
-  color: var(--od-board-muted);
+.od-rank__previous {
+  color: var(--od-previous);
   font-size: var(--text-xs);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
 }
 
 .od-rank__change {
@@ -185,112 +188,155 @@
 .od-rank__change[data-tone="down"] { color: var(--status-risk); }
 .od-rank__change[data-tone="same"] { color: var(--od-board-muted); }
 
-.od-rank__scopes {
+/* Dónde cae el puesto dentro de las instituciones evaluadas: sin ese universo
+   un número de puesto no se puede leer. Una banda ocupa su tramo. */
+.od-rank__scale {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(8rem, 1fr));
-  gap: var(--space-2);
-  margin: 0;
+  gap: 6px;
+  margin-top: var(--space-2);
 }
 
-.od-rank__scopes > div {
+.od-rank__scale-track {
+  position: relative;
+  display: block;
+  height: 3px;
+  background: var(--od-board-line-strong);
+  border-radius: var(--radius-pill);
+}
+
+.od-rank__scale-mark {
+  position: absolute;
+  top: -2px;
+  bottom: -2px;
+  left: min(var(--from), calc(100% - 6px));
+  right: max(0px, calc(100% - var(--to)));
+  min-width: 6px;
+  background: var(--rk-accent);
+  border-radius: var(--radius-pill);
+}
+
+.od-rank__scale-note {
   display: grid;
-  gap: 2px;
-  padding: var(--space-3);
-  background: var(--od-board-raised);
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: baseline;
+  gap: var(--space-2);
+  color: var(--od-board-muted);
+  font-size: var(--text-2xs);
+  font-variant-numeric: tabular-nums;
+}
+
+.od-rank__scale-note > span {
+  font-family: var(--font-sign);
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
+.od-rank__scale-note em {
+  font-style: normal;
+  text-align: center;
+}
+
+/* --- Los otros ámbitos: celdas de la rejilla del tablero --- */
+
+.od-rank__scopes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1px;
+  margin: 0;
+  overflow: hidden;
+  background: var(--od-board-line);
+  border: 1px solid var(--od-board-line);
   border-radius: var(--radius-xs);
 }
 
-.od-rank__scopes dt {
-  color: var(--od-board-muted);
-  font-size: var(--text-2xs);
-  font-weight: 700;
-  letter-spacing: var(--tracking-wide);
-  text-transform: uppercase;
+/* La última celda de la fila se estira: la rejilla del tablero no deja huecos. */
+.od-rank__scopes > div {
+  display: grid;
+  flex: 1 1 7.5rem;
+  align-content: start;
+  gap: 3px;
+  min-width: 0;
+  padding: var(--space-3);
+  background: var(--od-board);
 }
 
 .od-rank__scopes dd {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: baseline;
-  gap: 2px var(--space-2);
+  display: grid;
+  gap: 1px;
   margin: 0;
 }
 
 .od-rank__scopes dd b {
   font-family: var(--font-sign);
-  font-size: 1.6rem;
+  font-size: 1.75rem;
   font-weight: 700;
   line-height: 1;
   font-variant-numeric: tabular-nums;
 }
 
 .od-rank__scopes .od-rank__change { font-size: var(--text-xs); }
-
 .od-rank__none { color: var(--od-board-muted); }
 
-.od-rank__score {
-  margin: 0;
-  color: var(--od-board-muted);
-  font-size: var(--text-sm);
-}
-
-.od-rank__score b {
-  color: var(--od-board-ink);
-  font-family: var(--font-sign);
-  font-size: 1.3rem;
-}
+/* --- Secciones --- */
 
 .od-rank__section {
   display: grid;
   gap: var(--space-2);
-  padding-top: var(--space-3);
+  padding-top: var(--space-4);
   border-top: 1px solid var(--od-board-line);
 }
 
-.od-rank__section h4 {
-  display: inline;
-  margin: 0;
-  color: var(--od-board-muted);
-  font-size: var(--text-2xs);
-  font-weight: 700;
-  letter-spacing: var(--tracking-wide);
-  text-transform: uppercase;
-}
+.od-rank__section h4 { margin: 0; }
 
+/* Guía de puntos entre la categoría y sus estrellas, como una lista de creditos. */
 .od-rank__star-list {
   display: grid;
-  gap: 6px;
+  gap: 7px;
   margin: 0;
   padding: 0;
   list-style: none;
 }
 
 .od-rank__star-list li {
-  display: flex;
+  display: grid;
+  grid-template-columns: minmax(0, auto) minmax(var(--space-3), 1fr) auto;
   align-items: center;
-  justify-content: space-between;
-  gap: var(--space-3);
+  gap: var(--space-2);
   font-size: var(--text-sm);
 }
 
+.od-rank__star-list li > span { min-width: 0; }
+
+.od-rank__star-list li > i {
+  height: 0;
+  border-bottom: 1px dotted var(--od-board-line-strong);
+}
+
+/* Encendida rellena, apagada solo contorno: la diferencia no es solo el color. */
 .od-rank__stars {
   display: inline-flex;
   flex: none;
-  gap: 1px;
+  gap: 2px;
 }
 
 .od-rank__stars svg {
-  width: 17px;
-  height: 17px;
-  fill: color-mix(in srgb, var(--od-board-muted) 22%, transparent);
+  width: 16px;
+  height: 16px;
+  fill: none;
+  stroke: var(--od-board-line-strong);
+  stroke-width: 1.4;
+  stroke-linejoin: round;
 }
 
-.od-rank__stars svg[data-on] { fill: var(--rk-accent); }
+.od-rank__stars svg[data-on] {
+  fill: var(--rk-accent);
+  stroke: var(--rk-accent);
+}
 
 .od-rank__sdgs {
   display: flex;
   flex-wrap: wrap;
-  gap: 6px;
+  gap: 5px;
   margin: 0;
   padding: 0;
   list-style: none;
@@ -302,28 +348,62 @@
   align-items: center;
   overflow: hidden;
   background: var(--od-board-raised);
-  border-radius: 6px;
+  border-radius: var(--radius-xs);
   font-size: var(--text-xs);
 }
 
 .od-rank__sdgs b {
   display: grid;
   place-items: center;
-  min-width: 1.9rem;
-  height: 1.9rem;
+  min-width: 1.85rem;
+  height: 1.85rem;
   color: #ffffff;
   background: var(--sdg);
   font-family: var(--font-sign);
-  font-size: 1rem;
+  font-size: 1.05rem;
+  font-weight: 700;
 }
 
 .od-rank__sdgs span {
-  padding-inline: var(--space-2);
+  padding-inline: var(--space-2) var(--space-3);
   font-weight: 700;
   font-variant-numeric: tabular-nums;
 }
 
-.od-rank__subjects summary { cursor: pointer; }
+.od-rank__subjects summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  list-style: none;
+  cursor: pointer;
+}
+
+.od-rank__subjects summary::-webkit-details-marker { display: none; }
+
+.od-rank__subjects summary svg {
+  flex: none;
+  width: 12px;
+  height: 12px;
+  fill: none;
+  stroke: var(--od-board-muted);
+  stroke-width: 1.6;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  transition: transform var(--dur-base) var(--ease-out);
+}
+
+.od-rank__subjects[open] summary svg { transform: rotate(180deg); }
+
+.od-rank__subjects summary:focus-visible {
+  outline: 2px solid var(--od-signal);
+  outline-offset: 3px;
+  border-radius: var(--radius-xs);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .od-rank__subjects summary svg { transition: none; }
+}
 
 .od-rank__subjects table {
   width: 100%;
@@ -338,14 +418,30 @@
   border-bottom: 1px solid var(--od-board-line);
 }
 
-.od-rank__subjects td { text-align: right; font-variant-numeric: tabular-nums; }
-.od-rank__subjects thead th { color: var(--od-board-muted); font-size: var(--text-2xs); font-weight: 700; }
+.od-rank__subjects td {
+  font-family: var(--font-sign);
+  font-size: 1.05rem;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.od-rank__subjects thead th {
+  color: var(--od-board-muted);
+  font-family: var(--font-sign);
+  font-size: 0.8rem;
+  font-weight: 600;
+  letter-spacing: var(--tracking-wide);
+  text-transform: uppercase;
+}
+
+.od-rank__subjects tbody tr:last-child th,
+.od-rank__subjects tbody tr:last-child td { border-bottom: 0; }
 
 .od-rank__custom {
   display: grid;
   gap: 6px;
   margin: 0;
-  padding-top: var(--space-3);
+  padding-top: var(--space-4);
   border-top: 1px solid var(--od-board-line);
 }
 
@@ -357,15 +453,35 @@
 }
 
 .od-rank__custom dt { color: var(--od-board-muted); }
-.od-rank__custom dd { margin: 0; font-weight: 700; text-align: right; }
+.od-rank__custom dd {
+  margin: 0;
+  font-weight: 700;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
 
 .od-rank__note,
-.od-rank__source,
 .od-rank__missing {
   margin: 0;
   color: var(--od-board-muted);
   font-size: var(--text-xs);
   line-height: 1.45;
+}
+
+/* El boleto cierra la placa: todas las placas de una fila terminan a la misma
+   altura aunque una traiga estrellas y otra no. */
+.od-rank__ticket {
+  margin: auto 0 0;
+  padding-top: var(--space-4);
+  border-top: 1px solid var(--od-board-line);
+}
+
+.od-rank__ticket .od-ticket { margin-top: 0; }
+.od-rank__ticket .od-ticket__meta { color: var(--od-ticket-muted); }
+
+.od-rank[data-empty] .od-rank__body {
+  justify-content: center;
+  min-height: 7rem;
 }
 
 /* --- Tabla comparativa --------------------------------------------------------- */
@@ -429,7 +545,13 @@
 .od-rank-table td small[data-tone="up"] { color: var(--status-done); }
 .od-rank-table td small[data-tone="down"] { color: var(--status-risk); }
 
-/* --- Evolución ------------------------------------------------------------------- */
+/* --- Evolución ------------------------------------------------------------------
+
+   Dos formas de la misma serie. En «cada ranking», una tira por ranking sobre la
+   superficie elevada del tablero, con su insignia, su nombre y su propia escala:
+   nada se cruza. En «todos juntos», un solo lienzo con los rótulos en una columna
+   a la derecha, separados entre sí y unidos a su punto por un hilo.
+   ---------------------------------------------------------------------------- */
 
 .od-rank-evo { overflow-x: auto; padding: var(--space-3) var(--space-4) var(--space-4); }
 .od-rank-evo svg { display: block; }
@@ -440,6 +562,97 @@
 .od-rank-evo__dot { fill: var(--od-surface); stroke: var(--rk-accent); stroke-width: 2.5; }
 .od-rank-evo__label { fill: var(--ink-secondary); font-size: 12px; font-weight: 600; }
 .od-rank-evo__value { fill: var(--ink); font-family: var(--font-sign); font-size: 15px; font-weight: 700; }
+
+/* El hilo del último punto a su rótulo: existe para que el ojo no tenga que
+   adivinar de qué línea es cada nombre, así que se ve poco y no compite. */
+.od-rank-evo__leader {
+  fill: none;
+  stroke: var(--rk-accent);
+  stroke-width: 1;
+  stroke-dasharray: 2 3;
+  opacity: 0.6;
+}
+
+.od-evo-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 19rem), 1fr));
+  gap: var(--space-4);
+  align-items: start;
+}
+
+.od-evo {
+  --rk-accent: var(--od-line-1);
+  display: grid;
+  gap: var(--space-2);
+  min-width: 0;
+  padding: var(--space-4);
+  background: var(--od-board-raised);
+  border-radius: var(--radius-xs);
+}
+
+.od-evo__head {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.od-evo__badge {
+  display: grid;
+  place-items: center;
+  min-width: 1.9rem;
+  height: 1.9rem;
+  padding-inline: 5px;
+  color: #ffffff;
+  background: var(--rk-accent);
+  border-radius: var(--radius-xs);
+  font-family: var(--font-sign);
+  font-size: 1rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+}
+
+/* Dos líneas reservadas para el nombre: los trazos de una fila arrancan a la
+   misma altura tanto si el título ocupa una línea como si ocupa dos. */
+.od-rankings .od-evo__head h4 {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  min-height: 2.5em;
+  margin: 0;
+  overflow: hidden;
+  color: var(--od-board-ink);
+  font-family: inherit;
+  font-size: var(--text-sm);
+  font-weight: 700;
+  letter-spacing: 0;
+  line-height: 1.25;
+  text-transform: none;
+}
+
+.od-evo__plot { min-width: 0; }
+.od-evo__plot svg { display: block; width: 100%; }
+
+/* Dentro de la tira manda la tinta del tablero: el gris de las gráficas sobre
+   blanco no llega al contraste que pide la superficie elevada. */
+.od-evo .od-rank-evo__tick { fill: var(--od-board-muted); font-size: 11px; }
+.od-evo .od-rank-evo__grid { stroke: var(--od-board-line-strong); }
+.od-evo .od-rank-evo__dot { fill: var(--od-board-raised); }
+.od-evo .od-rank-evo__value { fill: var(--od-board-ink); font-size: 14px; }
+
+.od-evo__foot {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 2px var(--space-3);
+  padding-top: var(--space-2);
+  border-top: 1px solid var(--od-board-line);
+}
+
+.od-evo__single {
+  color: var(--od-board-muted);
+  font-size: var(--text-xs);
+}
 
 /* --- Rueda de ODS ------------------------------------------------------------------ */
 
@@ -575,7 +788,7 @@
 @media (max-width: 760px) {
   .od-sdg { grid-template-columns: minmax(0, 1fr); padding: var(--space-4); }
   .od-sdg__wheel { max-width: 20rem; justify-self: center; }
-  .od-rank__medal { grid-template-columns: 6.5rem minmax(0, 1fr); }
-  .od-rank__ring { width: 6.5rem; height: 6.5rem; }
-  .od-rank__lead strong { font-size: 2.2rem; }
+  .od-rank__body { padding: var(--space-4); }
+  .od-rank .split-flap--lg { --flap-size: 2.3rem; }
+  .od-rank .split-flap--md { --flap-size: 1.6rem; }
 }

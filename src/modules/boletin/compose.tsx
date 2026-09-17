@@ -24,8 +24,8 @@ import { ALL_YEARS, ANNUAL_RULE_LABEL, cutLabel, TERMS } from "../datos-abiertos
 import type { AnnualRule, Term } from "../datos-abiertos/data/terms";
 import { isMobilityMap, isWorldMap } from "../datos-abiertos/data/types";
 import { indicatorRef, reportGroups } from "../datos-abiertos/data/groups";
-import { RANKING_SYSTEMS, SCOPE_LABEL, SDGS, latestEdition, parseRank, previousEdition, rankChange, rankOf } from "../datos-abiertos/data/rankings";
-import type { RankScope, RankingData } from "../datos-abiertos/data/rankings";
+import { RANKING_SYSTEMS, SCOPE_LABEL, SDGS, latestEdition, parseRank, preferredScope, previousEdition, rankChange, rankOf, rankingShortLabel } from "../datos-abiertos/data/rankings";
+import type { ParsedRank, RankScope, RankingData } from "../datos-abiertos/data/rankings";
 import type { ReportGroup } from "../datos-abiertos/data/groups";
 import type {
   Breakdown,
@@ -43,9 +43,11 @@ import type {
 import { DEPARTMENTS } from "../datos-abiertos/data/colombia-map";
 import { LeakyPipeline } from "../datos-abiertos/components/LeakyPipeline";
 import { COUNTRIES } from "../datos-abiertos/data/world-map";
-import { ChoroplethMap, DataTable, EvolutionChart, HBars, Legend, MapLegend, SERIES_COLORS, StackedColumns, SwatchLegend, TERM_COLORS, Trend, figure } from "./figures";
+import { ChoroplethMap, DataTable, EvolutionChart, HBars, Legend, MapLegend, RankEvolutionChart, RankTrace, SERIES_COLORS, StackedColumns, SwatchLegend, TERM_COLORS, Trend, figure } from "./figures";
+import type { RankLine } from "./figures";
 import type { Series } from "./figures";
 import type { BulletinSettings, IndicatorShow } from "./model";
+import { parseSaberKey, saberHighlight, saberUnits } from "./saber";
 
 export interface Unit {
   key: string;
@@ -945,6 +947,14 @@ function StarsPrint({ value }: { value: number }) {
   );
 }
 
+/** Las ediciones de un ranking que traen posición en ese ámbito, hasta el corte. */
+function rankPoints(r: RankingData, scope: RankScope, cut: number): { year: number; rank: ParsedRank }[] {
+  return r.editions
+    .filter((e) => cut === ALL_YEARS || e.year <= cut)
+    .map((e) => ({ year: e.year, rank: rankOf(e, scope) }))
+    .filter((pt): pt is { year: number; rank: ParsedRank } => pt.rank !== null);
+}
+
 /**
  * Hoja de un ranking: la edición del corte (o la más reciente), sus posiciones
  * con la variación frente a la edición anterior, estrellas, ODS, áreas, campos
@@ -960,6 +970,12 @@ function rankingUnit(r: RankingData, settings: BulletinSettings): ReactNode | nu
   const rankText = (text: string) => parseRank(text)?.text ?? "—";
   const editionNote =
     settings.cut !== ALL_YEARS && edition.year !== settings.cut ? `Edición ${edition.year} (la más reciente hasta ${settings.cut})` : `Edición ${edition.year}`;
+  // La traza toma el ámbito más cercano con al menos dos ediciones: en papel no
+  // hay selector, y el puesto en Colombia es el que primero se busca.
+  const traceScope = preferredScope((scope) => rankPoints(r, scope, settings.cut).length > 1);
+  const trace: RankLine | null = traceScope
+    ? { label: rankingShortLabel(r), color: r.accent, points: rankPoints(r, traceScope, settings.cut) }
+    : null;
   return (
     <DatasetSheet
       title={r.title}
@@ -998,6 +1014,15 @@ function rankingUnit(r: RankingData, settings: BulletinSettings): ReactNode | nu
               </div>
             )}
           </div>
+        )}
+
+        {trace && traceScope && (
+          <figure>
+            <figcaption>
+              Evolución de la posición {SCOPE_LABEL[traceScope].toLowerCase()} · el puesto 1 arriba, escala logarítmica
+            </figcaption>
+            <RankTrace line={trace} width={178} height={38} label={`Evolución de la posición de ${r.title}`} />
+          </figure>
         )}
 
         {edition.stars.length > 0 && (
@@ -1056,6 +1081,54 @@ function rankingUnit(r: RankingData, settings: BulletinSettings): ReactNode | nu
         )}
         {edition.note && <p className="bol-rank__note">{edition.note}</p>}
       </div>
+    </DatasetSheet>
+  );
+}
+
+/**
+ * Hoja de conjunto: todos los rankings del informe en un mismo lienzo, edición
+ * a edición. El ámbito es el más cercano que reporten al menos dos rankings
+ * —Colombia, si no Latinoamérica, si no el mundial— y la hoja lo dice.
+ *
+ * Debajo, la tabla con los mismos puestos: la gráfica enseña la forma del
+ * recorrido, la tabla da la cifra y deja la hoja legible sin el color.
+ */
+function rankingsEvolutionUnit(report: Report, settings: BulletinSettings): ReactNode | null {
+  const rankings = report.rankings ?? [];
+  const scope = preferredScope((sc) => rankings.filter((r) => rankPoints(r, sc, settings.cut).length > 1).length >= 2);
+  if (!scope) return null;
+  const lines: RankLine[] = rankings
+    .map((r) => ({ label: rankingShortLabel(r), color: r.accent, points: rankPoints(r, scope, settings.cut) }))
+    .filter((line) => line.points.length > 0);
+  if (lines.length < 2) return null;
+
+  const years = Array.from(new Set(lines.flatMap((line) => line.points.map((pt) => pt.year)))).sort((a, b) => a - b);
+  const cutNote = settings.cut === ALL_YEARS ? "Todas las ediciones publicadas" : `Ediciones hasta ${settings.cut}`;
+  return (
+    <DatasetSheet
+      title="Evolución de los rankings"
+      description={`Cómo se ha movido la UDES en cada ranking que sigue Planeación, edición a edición, en su posición ${SCOPE_LABEL[scope].toLowerCase()}.`}
+      source={Array.from(new Set(rankings.map((r) => r.source).filter(Boolean))).join(" · ")}
+      notes={[
+        ["Ámbito", `${SCOPE_LABEL[scope]} · el más cercano que reportan al menos dos rankings`],
+        ["Corte", cutNote],
+        ["Lectura", "El puesto 1 es el primero: bajar el número es subir en el ranking. La escala es logarítmica, así que un puesto nacional y uno mundial caben en el mismo dibujo."],
+        ["Bandas", "Un ranking que publica un tramo («801–1000») lo ocupa entero en vertical; no se inventa un punto medio."],
+      ]}
+      wide
+    >
+      <RankEvolutionChart lines={lines} width={178} label={`Evolución de la posición ${SCOPE_LABEL[scope].toLowerCase()} en ${lines.length} rankings`} />
+      <DataTable
+        caption={`Posición ${SCOPE_LABEL[scope].toLowerCase()} por edición`}
+        head={["Ranking", ...years.map(String)]}
+        rows={lines.map((line) => ({
+          label: line.label,
+          cells: years.map((year) => {
+            const pt = line.points.find((point) => point.year === year);
+            return pt ? (pt.rank.band ? pt.rank.text : `#${pt.rank.text.replace("=", "")}`) : "—";
+          }),
+        }))}
+      />
     </DatasetSheet>
   );
 }
@@ -1233,6 +1306,11 @@ function datasetHighlights(report: Report, entry: BulletinSettings["reports"][nu
         unit: rank && scope ? `puesto ${SCOPE_LABEL[scope].toLowerCase()}` : edition.sdgs.length ? "ODS" : "categorías con estrellas",
         note: `Edición ${edition.year}${change ? ` · ${change.label} frente a ${previous!.year}` : ""}`,
       });
+    } else if (kind === "saber") {
+      const parsed = parseSaberKey(key);
+      const sp = parsed ? report.saberPro?.find((x) => x.id === parsed.id) : undefined;
+      const highlight = sp && parsed ? saberHighlight(sp, parsed.competency, settings.cut) : null;
+      if (highlight) list.push({ key: item.ref, ...highlight });
     } else if (kind === "tabla") {
       const t = report.tables?.find((x) => x.id === key);
       if (!t || !t.rows.length) continue;
@@ -1461,6 +1539,7 @@ export function compose(catalog: OpenDataCatalog, settings: BulletinSettings): C
           report.breakdowns.find((b) => `desglose:${b.id}` === set.key)?.source ??
           report.tables?.find((t) => `tabla:${t.id}` === set.key)?.source ??
           report.rankings?.find((r) => `ranking:${r.id}` === set.key)?.source ??
+          report.saberPro?.find((sp) => set.key.startsWith(`saber:${sp.id}:`))?.source ??
           (report.pipelines ?? []).find((p) => `tuberia:${p.id}` === set.key)?.source;
         if (source) credit(source, report);
       });
@@ -1522,6 +1601,18 @@ export function compose(catalog: OpenDataCatalog, settings: BulletinSettings): C
       } else if (kind === "ranking") {
         const r = report.rankings?.find((x) => x.id === key);
         if (r) nodes.push({ node: rankingUnit(r, settings), source: r.source, title: r.title });
+      } else if (kind === "rankings-evo") {
+        const node = rankingsEvolutionUnit(report, settings);
+        const sources = Array.from(new Set((report.rankings ?? []).map((r) => r.source).filter(Boolean))).join(" · ");
+        if (node) nodes.push({ node, source: sources, title: "Evolución de los rankings" });
+      } else if (kind === "saber") {
+        const parsed = parseSaberKey(key);
+        const sp = parsed ? report.saberPro?.find((x) => x.id === parsed.id) : undefined;
+        if (sp && parsed) {
+          saberUnits(sp, parsed.competency, settings.cut, DatasetSheet, TableContinuation).forEach(({ node, title, tight }) =>
+            nodes.push({ node, source: sp.source, title, tight }),
+          );
+        }
       }
       nodes.forEach(({ node, source, title, tight }, index) => {
         // Sin cifras, el conjunto no dibuja nada: siempre se omite.

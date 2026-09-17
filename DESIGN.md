@@ -45,6 +45,11 @@ colors:
   od-series-3: "#0f8a6e"
   od-seq-0: "#eef3fa"
   od-seq-7: "#0d366b"
+  od-div-neg-2: "#b9541f"
+  od-div-neg-1: "#e79c69"
+  od-div-mid: "#e9edf3"
+  od-div-pos-1: "#6fa4e8"
+  od-div-pos-2: "#2a63b8"
   bol-navy: "#072b58"
   bol-band: "#4078b9"
   bol-accent: "#e8892b"
@@ -219,6 +224,7 @@ Institucional y frío en su base, con dos acentos de señal (ámbar y cian) que 
 - **Líneas de informe** (od-line-1 … od-line-9): una por informe, con tinta blanca ≥ 4.5:1, siempre junto al código de dos letras.
 - **Series por campus** (od-series-1..3): validadas todas contra todas para daltonismo y visión normal; siempre con leyenda.
 - **Escala azul secuencial** (od-seq-0 … od-seq-7): mapa de calor y mapa de Colombia; claro = poco, oscuro = mucho.
+- **Escala divergente** (od-div-neg-3 … od-div-pos-2): Saber PRO; terracota bajo un umbral o el promedio nacional, azul sobre él, gris azulado en el centro.
 - **Categorías de circulares** (od-cat-1..6, en tokens.css): orden fijo, nunca cíclico; la leyenda con cifra y porcentaje es obligatoria.
 
 ### Named Rules
@@ -326,9 +332,24 @@ Separador de la ficha de un informe ("Graduados"): banda en `--od-board-raised` 
 
 ### University Rankings (UDES en Cifras)
 Bloque "Rankings" con selector de vista (`RankingsBlock.tsx`). Cada ranking trae su color de acento (`--rk-accent`, elegido en la intranet), que marca identidad y nunca la cifra: insignia QS/THE, anillo de la medalla, estrellas encendidas, línea de evolución. Las cifras van en tinta del tablero y en la letra de señalización.
-- **Medallas:** tarjeta con borde superior del acento, posición principal dentro de un anillo, Latinoamérica y Colombia en celdas elevadas, variación dicha en palabras ("sube 9 puestos"; con bandas, "sube desde 1201–1400", nunca un número de puestos inventado con puntos medios), estrellas 0–5 por categoría, fichas de ODS en su color oficial, áreas plegables y campos propios.
-- **Tabla comparativa**, **Evolución** (escala logarítmica invertida, puesto 1 arriba; las bandas se dibujan como un trazo vertical translúcido) y **Rueda de ODS** (17 segmentos; los que participan se encienden en su color y se eligen con clic o teclado).
-- En el Boletín, una hoja por ranking: posiciones con variación, estrellas, tabla de ODS con su color, áreas, campos propios e historia de ediciones.
+- **Medallas:** cada ranking es una placa del tablero, no una tarjeta con anillo. Franja de identidad con la insignia QS/THE sobre un tinte del acento, cerrada por una regla de 1px del mismo color (nunca una banda gruesa). La posición principal llega volteando en paletas partidas, una celda por cifra, con el signo (# de puesto, = de empate) fuera de las celdas; debajo, la variación dicha en palabras ("sube 9 puestos"; con bandas, "sube desde 1201–1400", nunca un número de puestos inventado con puntos medios) y el corte anterior en cian. Cuando la edición dice cuántas instituciones evaluó, una escala fina sitúa el puesto dentro de ese universo y una banda ocupa su tramo, no un punto inventado. Los demás ámbitos y el puntaje son celdas de la rejilla del tablero, y la última estira hasta el borde para no dejar huecos. Estrellas 0–5 por categoría con guía de puntos, encendida rellena y apagada solo contorno; fichas de ODS en su color oficial, áreas plegables y campos propios. Cada placa cierra con su boleto de origen bajo una regla, así todas las de una fila terminan a la misma altura. Solo la posición voltea: si todo se moviera, no llegaría nada.
+- **Tabla comparativa** y **Rueda de ODS** (17 segmentos; los que participan se encienden en su color y se eligen con clic o teclado).
+- **Evolución:** escala logarítmica invertida (puesto 1 arriba) y las bandas dibujadas como un trazo vertical translúcido, en dos formas con selector propio. *Cada ranking* (por defecto) da una tira a cada uno sobre la superficie elevada del tablero, con su insignia, su nombre en dos líneas reservadas y **su propia escala**: así se leen con el mismo detalle un puesto mundial de cuatro cifras y uno nacional de dos, y nada se cruza por muchos rankings que haya. El dominio de cada tira sale de sus datos con un recorrido mínimo, para que un puesto de diferencia no llene la tira ni desaparezca. *Todos juntos* mantiene el lienzo único: los rótulos viven en una columna a la derecha —ancha según el nombre más largo—, se empujan entre sí cuando quedarían a menos de una línea y cada uno llega a su punto por un hilo punteado, aunque ese ranking deje de reportar antes del último año. Por debajo de cierto ancho el lienzo se desplaza dentro de su marco en vez de aplastarse.
+- En el Boletín, una hoja por ranking: posiciones con variación, **su traza de evolución** (el mismo dibujo de la ficha, en milímetros), estrellas, tabla de ODS con su color, áreas, campos propios e historia de ediciones. Cuando el informe sigue dos o más rankings con historia, una hoja de conjunto más, «Evolución de los rankings», los pone a todos en un lienzo con los rótulos en columna a la derecha y, debajo, la tabla con los mismos puestos: la gráfica enseña la forma del recorrido y la tabla da la cifra, así la hoja se lee sin el color.
+
+**The Nearest Scope Rule.** Donde hay que elegir un solo ámbito y no hay selector —el papel—, se toma el más cercano que el dato permita: Colombia, si no Latinoamérica, si no el mundial (`SCOPE_PREFERENCE`). En la ficha, ese mismo orden decide qué ámbito se abre en la Evolución, pero los botones y las columnas de la tabla conservan su orden de siempre (mundial, Latinoamérica, Colombia). La hoja de conjunto del Boletín además exige que dos rankings reporten ese ámbito: un lienzo con una sola línea no es una comparación.
+
+### Resultados Saber PRO (UDES en Cifras)
+Bloque `saber_pro` del informe Enseñanza (`SaberProBlock.tsx`, datos en `data/saber-pro.ts`, 0031). Todo gira alrededor de una competencia: un carril de seis paletas con código de dos letras (PG, LC, RC, CC, CE, IN) la elige, y la activa enciende su código en ámbar como cualquier control del tablero. Debajo, filtros de sede, facultad y programa, y una fila de llegadas con el promedio del corte, el nacional y la participación en niveles altos, en paletas partidas que voltean en ola al cambiar la competencia. Competencia, vista y filtros viajan en la URL (`sp`, `sp-vista`, `sp-sede`, `sp-facultad`, `sp-programa`).
+- **Niveles (escalera, vista por defecto):** por año, el reparto de evaluados en los niveles de desempeño, anclado en el umbral alto (nivel 3; B1 en inglés) con una regla de tinta de 2px. Lo que queda por debajo crece a la izquierda en terracota, lo que lo supera a la derecha en azul; cada tramo lleva su porcentaje y la columna derecha dice el % alto con su variación en p. p. El puntaje global no tiene niveles: la misma fila dibuja el reparto del puntaje en tramos de 10 puntos, partido en el promedio nacional (terracota debajo, azul encima), con el promedio del corte en línea continua y el nacional punteado.
+- **Brecha con el país:** tabla semántica sede → programa por año; cada casilla es la diferencia en puntos con el promedio nacional, en cinco pasos (10 o más bajo, 3 a 9 bajo, como el país, 3 a 9 sobre, 10 o más sobre) y siempre con su cifra con signo. Con menos de 10 evaluados la casilla va sin color, en cursiva y con contorno punteado; sin evaluados, rayada.
+- **Evolución:** `LineChart` con el promedio del corte y el nacional punteado.
+- Un año con solo el promedio oficial (2025) aparece en la brecha y la evolución, no en la escalera: no tiene reparto. Los niveles de la fila de llegadas salen del último año con resultados por evaluado y lo dicen en el rótulo. Menos de 30 evaluados atenúa la fila de la escalera.
+
+- **En el Boletín** (`boletin/saber.tsx`): una entrada por competencia en la plantilla (`saber:<conjunto>:<competencia>`), cada una con dos hojas anchas. *Niveles*: cifras clave (promedio y país, % alto y su cambio), la escalera de toda la UDES dibujada en milímetros y la tabla del % alto por sede y año; en el puntaje global, el reparto por tramos partido en el promedio nacional y la tabla del promedio por sede con la fila del país. *Brecha con el país*: la misma tabla de la ficha, en los cinco pasos con su cifra; con menos de 10 evaluados, la cifra va entre paréntesis y sin tono. Sigue en páginas de continuación y una sede nunca queda sola al pie. Los tonos son `--bol-div-*`, fijos como todo el papel.
+- Un programa es sede + nombre, como viene en la fuente; los evaluados sin código SNIES van en su propia fila ("Derecho · sin código SNIES"). En la ficha, elegir un programa sin sede fija también su sede: nunca se suman programas de sedes distintas.
+
+**The Diverging Scale Rule.** `--od-div-neg-3..1`, `--od-div-mid` y `--od-div-pos-1..2`, cada uno con su tinta `-ink`, son la escala de polaridad frente a un umbral: terracota debajo, azul encima, y cuanto más lejos del centro, más contraste con la superficie (en claro más oscuro, en oscuro más brillante). Validada en orden adyacente para daltonismo y visión normal en los dos temas; los pasos cercanos al centro no llegan a 3:1 con la superficie, por eso cada marca lleva su cifra. No es una serie categórica ni un estado.
 
 ## Boletín UDES en Cifras (papel A4)
 
@@ -347,7 +368,7 @@ El boletín es papel, no pantalla: un documento A4 de 210×297 mm que se imprime
 
 ### Components
 - **Hoja de indicador:** columna de notas de 38 mm en `bol-paper-2` con rótulos en mayúsculas de 2,3 mm; cuerpo con título de 4,4 mm, cifra ancla Montserrat 800 de 9 mm, gráficas de 36 mm de alto y tabla de reglas finas con cabecera azul marino y la columna del corte resaltada. Tiene variante compacta para no dejar media página vacía.
-- **Hoja de conjunto:** desgloses en barras con participación; mapas coropléticos (Colombia o mundo, con rutas en movilidad) junto al ranking; tuberías con el mismo dibujo de la ficha web (LeakyPipeline en modo papel, quieto y escalado); evolución histórica en columnas apiladas; mapas de calor como tabla sombreada. Con muchas columnas, las notas pasan a una franja arriba.
+- **Hoja de conjunto:** desgloses en barras con participación; mapas coropléticos (Colombia o mundo, con rutas en movilidad) junto al ranking; tuberías con el mismo dibujo de la ficha web (LeakyPipeline en modo papel, quieto y escalado); evolución histórica en columnas apiladas; mapas de calor como tabla sombreada; evolución de los rankings universitarios en escala logarítmica invertida, con el rótulo de cada uno en la columna derecha y un hilo hasta su último punto. Con muchas columnas, las notas pasan a una franja arriba.
 - **Tabla:** las columnas de texto parten línea a la izquierda, las cifras van a la derecha; si aun así no cabe, la tabla se reduce hasta el margen.
 - **Apertura de capítulo:** regla superior y cuadro de código en el color de la línea del informe, cifras clave con la unidad debajo del número.
 - **Presentación y contenido:** la presentación va justificada; el contenido lista cada capítulo y, sangradas debajo, sus hojas con su página. Si no cabe bajo la presentación, sigue en páginas "Contenido (continuación)".

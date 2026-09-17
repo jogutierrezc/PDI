@@ -13,6 +13,8 @@
 
 import type { CSSProperties, ReactNode } from "react";
 import { formatCount, formatValue } from "../datos-abiertos/data/open-data";
+import { rankScale, rankSpan, stackLabels } from "../datos-abiertos/data/rankings";
+import type { ParsedRank } from "../datos-abiertos/data/rankings";
 import type { ValueFormat } from "../datos-abiertos/data/types";
 import { DEPARTMENTS } from "../datos-abiertos/data/colombia-map";
 import { COUNTRIES, WORLD_CAMPUS_POINTS, WORLD_HEIGHT, WORLD_WIDTH } from "../datos-abiertos/data/world-map";
@@ -399,6 +401,162 @@ export function SwatchLegend({ labels, colors = SERIES_COLORS }: { labels: strin
 }
 
 /* --- Tablas ----------------------------------------------------------------- */
+
+/* --- Evolución de un ranking ------------------------------------------------
+   El puesto 1 arriba y escala logarítmica, como en la ficha. Una banda
+   ("801–1000") no es un punto: ocupa su tramo en vertical, y su texto se
+   imprime tal como lo publica el ranking.
+   -------------------------------------------------------------------------- */
+
+export interface RankLine {
+  /** Nombre corto del ranking, el que se rotula. */
+  label: string;
+  color: string;
+  points: { year: number; rank: ParsedRank }[];
+}
+
+const rankText = (rank: ParsedRank) => (rank.band ? rank.text : `#${rank.text.replace("=", "")}`);
+
+/**
+ * Una tira por ranking: su propia escala, para que un puesto nacional de dos
+ * cifras y uno mundial de cuatro se lean con el mismo detalle.
+ */
+export function RankTrace({
+  line,
+  width = 86,
+  height = 30,
+  label,
+}: {
+  line: RankLine;
+  width?: number;
+  height?: number;
+  label: string;
+}) {
+  const { points } = line;
+  if (!points.length) return null;
+  const m = { left: 11, right: 16, top: 3, bottom: 5.4 };
+  const innerW = width - m.left - m.right;
+  const innerH = height - m.top - m.bottom;
+  const first = points[0].year;
+  const last = points[points.length - 1].year;
+  const { y, ticks } = rankScale(points.flatMap((pt) => rankSpan(pt.rank)), m.top, innerH, { pad: 1.15, minRatio: 2.2, dense: true });
+  const x = (year: number) => m.left + (last === first ? innerW / 2 : ((year - first) / (last - first)) * innerW);
+  const shown = ticks.length > 3 ? ticks.filter((_, i) => i % Math.ceil(ticks.length / 3) === 0) : ticks;
+  const end = points[points.length - 1];
+
+  return (
+    <svg className="bol-chart" viewBox={`0 0 ${width} ${height}`} role="img" aria-label={label} style={{ "--c": line.color } as CSSProperties}>
+      {shown.map((t) => (
+        <g key={t}>
+          <line className="bol-chart__grid" x1={m.left} x2={m.left + innerW} y1={y(t)} y2={y(t)} />
+          <text className="bol-chart__tick" x={m.left - 1.2} y={y(t)} dy="0.8" textAnchor="end">
+            #{t}
+          </text>
+        </g>
+      ))}
+      {points.length > 1 && (
+        <path className="bol-chart__line" d={points.map((pt, i) => `${i ? "L" : "M"}${x(pt.year).toFixed(2)} ${y(pt.rank.value).toFixed(2)}`).join("")} />
+      )}
+      {points.map((pt) => {
+        const [from, to] = rankSpan(pt.rank).length === 2 ? (rankSpan(pt.rank) as [number, number]) : [pt.rank.value, pt.rank.value];
+        return (
+          <g key={pt.year}>
+            {pt.rank.band && <line className="bol-chart__rank-band" x1={x(pt.year)} x2={x(pt.year)} y1={y(from)} y2={y(to)} />}
+            <circle className="bol-chart__dot" cx={x(pt.year)} cy={y(pt.rank.value)} r={0.75} />
+            <text className="bol-chart__year" x={x(pt.year)} y={height - 1.4} textAnchor="middle">
+              {pt.year}
+            </text>
+          </g>
+        );
+      })}
+      <text className="bol-chart__rank" x={Math.min(x(end.year) + 1.6, width - 0.4)} y={y(end.rank.value)} dy="0.85" textAnchor={x(end.year) + 1.6 > width - 0.4 ? "end" : "start"}>
+        {rankText(end.rank)}
+      </text>
+    </svg>
+  );
+}
+
+/**
+ * Todos los rankings en un lienzo. Los rótulos van a una columna a la derecha
+ * —no al lado de su último punto— y se empujan entre sí cuando chocan, así que
+ * ninguno cae encima de otra línea; cada uno llega a su punto por un hilo,
+ * aunque ese ranking deje de reportar antes del último año.
+ */
+export function RankEvolutionChart({
+  lines,
+  width = 178,
+  label,
+}: {
+  lines: RankLine[];
+  width?: number;
+  label: string;
+}) {
+  const drawn = lines.filter((line) => line.points.length > 0);
+  if (!drawn.length) return null;
+  const years = Array.from(new Set(drawn.flatMap((line) => line.points.map((pt) => pt.year)))).sort((a, b) => a - b);
+  const longest = Math.max(...drawn.map((line) => line.label.length));
+  // La columna crece con el nombre más largo: un nombre cortado por el borde es
+  // justo lo que esta gráfica viene a evitar.
+  const gutter = Math.min(54, Math.max(26, 5 + longest * 1.42));
+  const height = Math.max(58, 24 + drawn.length * 9.5);
+  const m = { left: 13, right: gutter, top: 4, bottom: 6.6 };
+  const innerW = width - m.left - m.right;
+  const innerH = height - m.top - m.bottom;
+  const { y, ticks } = rankScale(drawn.flatMap((line) => line.points.flatMap((pt) => rankSpan(pt.rank))), m.top, innerH, { pad: 1.25 });
+  const x = (year: number) => m.left + (years.length === 1 ? innerW / 2 : ((year - years[0]) / (years[years.length - 1] - years[0])) * innerW);
+  const labelX = m.left + innerW + 3;
+  const placed = stackLabels(drawn.map((line) => y(line.points[line.points.length - 1].rank.value)), 6.2, m.top + 2.4, m.top + innerH - 2);
+
+  return (
+    <svg className="bol-chart" viewBox={`0 0 ${width} ${height}`} role="img" aria-label={label}>
+      {ticks.map((t) => (
+        <g key={t}>
+          <line className="bol-chart__grid" x1={m.left} x2={m.left + innerW} y1={y(t)} y2={y(t)} />
+          <text className="bol-chart__tick" x={m.left - 1.2} y={y(t)} dy="0.8" textAnchor="end">
+            #{t}
+          </text>
+        </g>
+      ))}
+      {years.map((year) => (
+        <text key={year} className="bol-chart__year" x={x(year)} y={height - 1.6} textAnchor="middle">
+          {year}
+        </text>
+      ))}
+      {drawn.map((line, index) => {
+        const end = line.points[line.points.length - 1];
+        const endX = x(end.year);
+        const endY = y(end.rank.value);
+        const labelY = placed[index];
+        return (
+          <g key={line.label} style={{ "--c": line.color } as CSSProperties}>
+            {line.points.length > 1 && (
+              <path className="bol-chart__line" d={line.points.map((pt, i) => `${i ? "L" : "M"}${x(pt.year).toFixed(2)} ${y(pt.rank.value).toFixed(2)}`).join("")} />
+            )}
+            {line.points.map((pt) => {
+              const span = rankSpan(pt.rank);
+              return (
+                <g key={pt.year}>
+                  {pt.rank.band && <line className="bol-chart__rank-band" x1={x(pt.year)} x2={x(pt.year)} y1={y(span[0])} y2={y(span[1])} />}
+                  <circle className="bol-chart__dot" cx={x(pt.year)} cy={y(pt.rank.value)} r={0.8} />
+                </g>
+              );
+            })}
+            <path
+              className="bol-chart__leader"
+              d={`M${(endX + 1.2).toFixed(2)} ${endY.toFixed(2)}H${(labelX - 4).toFixed(2)}L${(labelX - 1.4).toFixed(2)} ${labelY.toFixed(2)}H${labelX.toFixed(2)}`}
+            />
+            <text className="bol-chart__rank" x={labelX} y={labelY} dy="-0.2">
+              {rankText(end.rank)}
+            </text>
+            <text className="bol-chart__series" x={labelX} y={labelY} dy="2.9">
+              {line.label}
+            </text>
+          </g>
+        );
+      })}
+    </svg>
+  );
+}
 
 export function DataTable({
   head,

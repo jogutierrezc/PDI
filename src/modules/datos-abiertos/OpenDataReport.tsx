@@ -56,9 +56,11 @@ import {
 } from "./data/open-data";
 import { ALL_YEARS, ANNUAL_RULE_LABEL, cutCode, cutCodeLabel, cutLabel, fromCutCode } from "./data/terms";
 import type { Breakdown, CampusId, Indicator, MapDataset, OpenDataCatalog, Report, ReportBlock, Term } from "./data/types";
-import { blockPicks, saberProOf } from "./data/groups";
+import { blockPicks, saberProOf, saberTytOf } from "./data/groups";
 import { RankingsBlock } from "./components/RankingsBlock";
 import { SaberProBlock } from "./components/SaberProBlock";
+import { SaberTytBlock } from "./components/SaberTytBlock";
+import { FreeSetBlock } from "./components/FreeSetBlock";
 import { ALL_CAMPUSES, DEFAULT_BLOCK_ORDER, MAP_MODE_TITLE, isMobilityMap, isWorldMap } from "./data/types";
 import "./datos-abiertos.css";
 
@@ -416,6 +418,19 @@ function ReportContent({ data, report, year, term, campus, setYear, setTerm, set
         const shown = chosen.map((key) => report.rankings?.find((r) => r.id === key)).filter((r): r is NonNullable<typeof r> => Boolean(r));
         if (!shown.length) return null;
         return <RankingsBlock key={key} rankings={shown} title={block.settings.title} anchor={block.settings.slot ? `od-rankings-${block.settings.slot}` : "od-rankings"} />;
+      }
+      case "libre": {
+        if (inSection) return null;
+        const set = report.freeSets?.find((f) => f.id === block.refKey);
+        if (!set) return null;
+        const view = block.settings.view;
+        return <FreeSetBlock key={key} set={set} viewKey={view} title={block.settings.title} anchor={`od-libre-${set.id}${view ? `-${view}` : ""}`} />;
+      }
+      case "saber_tyt": {
+        if (inSection) return null;
+        const shown = saberTytOf(report, block);
+        if (!shown || shown.results.length === 0) return null;
+        return <SaberTytBlock key={key} data={shown} title={block.settings.title} anchor={block.settings.slot ? `od-saber-tyt-${block.settings.slot}` : "od-saber-tyt"} />;
       }
       case "saber_pro": {
         if (inSection) return null;

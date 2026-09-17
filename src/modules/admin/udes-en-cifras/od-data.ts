@@ -16,6 +16,8 @@ import type {
   OdBreakdownRow,
   OdBreakdownValueRow,
   OdBlockKind,
+  OdFreeSetRecordRow,
+  OdFreeSetRow,
   OdHeatmapCellRow,
   OdHeatmapRow,
   OdHistoryRow,
@@ -36,12 +38,15 @@ import type {
   OdReportRow,
   OdSaberProResultRow,
   OdSaberProRow,
+  OdSaberTytResultRow,
+  OdSaberTytRow,
   OdValueRow,
   PublicationStatus,
 } from "../../../types/database";
 import { assembleCatalog, fetchOpenDataRows } from "../../datos-abiertos/data/repository";
 import type { OpenDataRows } from "../../datos-abiertos/data/repository";
 import { openDataKeys } from "../../datos-abiertos/data/open-data";
+import type { TytBenchmarks } from "../../datos-abiertos/data/saber-tyt";
 import type { OpenDataCatalog } from "../../datos-abiertos/data/types";
 
 export const odAdminKeys = {
@@ -256,9 +261,12 @@ async function ensureBlock(reportId: string, kind: OdBlockKind, refId: string | 
   await run(supabase.from("od_report_blocks").insert({ report_id: reportId, kind, ref_id: refId, position, visible: true, settings: {} }));
 }
 
+type DatasetTable =
+  | "od_breakdowns" | "od_heatmaps" | "od_maps" | "od_pipelines" | "od_histories" | "od_rankings" | "od_saber_pro" | "od_saber_tyt" | "od_free_sets";
+
 /** Inserta o actualiza un conjunto; al insertarlo, le crea su bloque. */
 async function saveDataset(
-  table: "od_breakdowns" | "od_heatmaps" | "od_maps" | "od_pipelines" | "od_histories" | "od_rankings" | "od_saber_pro",
+  table: DatasetTable,
   kind: OdBlockKind,
   row: { id?: string; report_id: string } & Record<string, unknown>,
 ) {
@@ -268,8 +276,9 @@ async function saveDataset(
     return;
   }
   const created = unwrap<{ id: string }>(await supabase.from(table).insert(fields).select("id").single());
-  // Desgloses, rankings y Saber PRO comparten un bloque del informe; los demás, uno por conjunto.
-  await ensureBlock(row.report_id, kind, kind === "desgloses" || kind === "rankings" || kind === "saber_pro" ? null : created.id);
+  // Desgloses, rankings, Saber PRO y el Motor Beta comparten un bloque del informe; los demás, uno por conjunto.
+  const shared: OdBlockKind[] = ["desgloses", "rankings", "saber_pro", "saber_tyt"];
+  await ensureBlock(row.report_id, kind, shared.includes(kind) ? null : created.id);
 }
 
 export function useSaveBreakdown() {
@@ -462,8 +471,99 @@ export function useDeleteSaberProYear() {
   });
 }
 
+/* --- Motor Beta · Saber TyT (0035) ------------------------------------------------- */
+
+export function useSaveSaberTyt() {
+  return useOdMutation(async (row: Partial<OdSaberTytRow> & { report_id: string }) => saveDataset("od_saber_tyt", "saber_tyt", row));
+}
+
+/**
+ * Resultados del Motor Beta: el cruce Saber 11 → Saber TyT se agrega en el
+ * navegador y aquí solo llegan las filas por año, nivel, programa y competencia.
+ * Reemplaza los años del archivo y escribe de nuevo las curvas de percentil: se
+ * calculan sobre toda la cohorte, así que no se pueden mezclar con las viejas.
+ */
+export function useReplaceSaberTytResults() {
+  return useOdMutation(
+    async ({ periodId, reportId, tytId, years, rows, benchmarks, fileName = "" }: {
+      periodId: string; reportId: string; tytId: string; years: number[];
+      rows: OdSaberTytResultRow[]; benchmarks: TytBenchmarks; fileName?: string;
+    }) => {
+      if (years.length) {
+        await run(supabase.from("od_saber_tyt_results").delete().eq("tyt_id", tytId).in("year", years));
+      }
+      for (let i = 0; i < rows.length; i += 500) {
+        await run(supabase.from("od_saber_tyt_results").insert(rows.slice(i, i + 500)));
+      }
+      await run(supabase.from("od_saber_tyt").update({ benchmarks }).eq("id", tytId));
+      await logImport(periodId, reportId, "plantilla", rows.length, fileName, { tabla: "od_saber_tyt_results", anios: years });
+    },
+  );
+}
+
+/** Borra un año completo del Motor Beta; las curvas se quedan hasta la próxima importación. */
+export function useDeleteSaberTytYear() {
+  return useOdMutation(async ({ tytId, year }: { tytId: string; year: number }) => {
+    await run(supabase.from("od_saber_tyt_results").delete().eq("tyt_id", tytId).eq("year", year));
+  });
+}
+
+/* --- Conjuntos libres (0033) ------------------------------------------------------ */
+
+/**
+ * Definición de un conjunto libre: título, temporalidad, columnas y vistas.
+ * Al crearlo entra a la ficha con un bloque que muestra todas sus vistas.
+ * Si se guardan las vistas, los bloques que apuntaban a una vista que ya no
+ * existe se ajustan: se borran, salvo que sean los únicos del conjunto, que
+ * pasan a mostrar todas las vistas en vez de quedar vacíos.
+ */
+export function useSaveFreeSet() {
+  return useOdMutation(async (row: Partial<OdFreeSetRow> & { report_id: string }) => {
+    await saveDataset("od_free_sets", "libre", row);
+    if (!row.id || !row.views) return;
+    const keys = row.views.map((v) => v.key);
+    const blocks = unwrap<Pick<OdReportBlockRow, "id" | "settings">[]>(
+      await supabase.from("od_report_blocks").select("id,settings").eq("kind", "libre").eq("ref_id", row.id),
+    );
+    const stale = blocks.filter((b) => b.settings?.view && !keys.includes(b.settings.view));
+    if (!stale.length) return;
+    let drop = stale;
+    if (stale.length === blocks.length) {
+      const [first, ...others] = stale;
+      const { view, ...settings } = first.settings;
+      void view;
+      await run(supabase.from("od_report_blocks").update({ settings }).eq("id", first.id));
+      drop = others;
+    }
+    if (drop.length) await run(supabase.from("od_report_blocks").delete().in("id", drop.map((b) => b.id)));
+  });
+}
+
+/**
+ * Filas de un conjunto libre: se reemplazan todas. Se borran las del conjunto
+ * y se suben las nuevas en tandas de 500, con su posición en el orden dado.
+ * Cada fila lleva su tipo (dato, título de grupo o total) y su texto; el total
+ * se guarda sin casillas, que lo calcula el portal (0034).
+ */
+export function useReplaceFreeSetRows() {
+  return useOdMutation(
+    async ({ periodId, reportId, setId, rows, kind = "rejilla" }: {
+      periodId: string; reportId: string; setId: string; rows: Pick<OdFreeSetRecordRow, "year" | "kind" | "label" | "cells">[]; kind?: OdImportKind;
+    }) => {
+      await run(supabase.from("od_free_set_rows").delete().eq("set_id", setId));
+      const records: OdFreeSetRecordRow[] = rows.map((r, position) => ({
+        set_id: setId, position, year: r.year, kind: r.kind ?? "dato", label: r.label ?? "", cells: r.kind === "total" ? {} : r.cells,
+      }));
+      for (let i = 0; i < records.length; i += 500) {
+        await run(supabase.from("od_free_set_rows").insert(records.slice(i, i + 500)));
+      }
+      await logImport(periodId, reportId, kind, records.length, "", { tabla: "od_free_set_rows" });
+    },
+  );
+}
+
 export function useDeleteDataset() {
-  return useOdMutation(async ({ table, id }: { table: "od_breakdowns" | "od_heatmaps" | "od_maps" | "od_pipelines" | "od_histories" | "od_rankings" | "od_saber_pro"; id: string }) => {
+  return useOdMutation(async ({ table, id }: { table: DatasetTable; id: string }) => {
     await run(supabase.from(table).delete().eq("id", id));
   });
 }

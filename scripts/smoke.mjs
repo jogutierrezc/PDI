@@ -1645,6 +1645,39 @@ const routes = [
     },
   },
   {
+    path: "/datos-abiertos/infraestructura",
+    note: "conjunto libre (0033): el bloque lleva el título del conjunto",
+    expect: "Oferta y satisfacción por sede",
+    absent: [...SIN_DINERO],
+    interact: async (window) => {
+      const section = window.document.querySelector('section.od-section.od-free[aria-labelledby="od-libre-oferta-por-sede"]');
+      if (!section) throw new Error("falta la sección del conjunto libre");
+      const heading = window.document.getElementById("od-libre-oferta-por-sede");
+      if (heading?.tagName !== "H2" || !heading.textContent.includes("Oferta y satisfacción por sede")) throw new Error("el bloque del conjunto libre no lleva su título en un h2");
+      // 0034: la tabla muestra los títulos de grupo y los totales; las gráficas, no.
+      const table = section.querySelector(".od-free__table");
+      if (!table) throw new Error("falta la vista de tabla del conjunto libre");
+      if (!table.querySelector('tr[data-kind="grupo"]')) throw new Error("la tabla no marca los títulos de grupo");
+      if (!table.querySelector('tr[data-kind="total"]')) throw new Error("la tabla no marca los totales");
+      if (!table.textContent.includes("Total Bucaramanga")) throw new Error("la tabla no muestra el total de un grupo");
+    },
+  },
+  {
+    path: "/datos-abiertos/boletines/boletin-infraestructura",
+    note: "conjuntos libres en el boletín: una hoja por vista, con su corte",
+    expect: "Oferta y satisfacción por sede",
+    also: ["Periodo 2020–2025", "Cascada", "Gantt"],
+    absent: [...SIN_DINERO],
+    interact: async (window, tick) => {
+      for (let i = 0; i < 40 && !window.document.querySelector(".bol-free-chart svg"); i += 1) await tick();
+      const charts = window.document.querySelectorAll(".bol-free-chart svg");
+      if (charts.length < 3) throw new Error(`el boletín dibuja ${charts.length} gráficas de conjuntos libres`);
+      if (!window.document.querySelector(".bol-free-map svg")) throw new Error("la vista de mapa no llega al boletín");
+      const titles = [...window.document.querySelectorAll(".bol-sheet__head h3")].map((h) => h.textContent);
+      if (!titles.some((t) => t.includes("Oferta y satisfacción por sede ·"))) throw new Error("las hojas no llevan fuente · vista en el título");
+    },
+  },
+  {
     path: "/datos-abiertos/boletines/boletin-ensenanza",
     note: "Saber PRO en el boletín: por competencia, una hoja de niveles y una de brecha con el país",
     expect: "Saber PRO · Puntaje global · reparto del puntaje",
@@ -1920,6 +1953,132 @@ const routes = [
       const save = [...window.document.querySelectorAll("#oda-saber-referencia button")].find((b) => b.textContent.startsWith("Guardar"));
       if (!save?.disabled) throw new Error("con un promedio fuera de escala no se debe poder guardar");
     },
+  },
+  {
+    path: "/admin/udes-en-cifras/estructura/infraestructura",
+    session: true,
+    note: "conjuntos libres en Estructura: temporalidad, periodo que cubre y columnas",
+    expect: "Conjunto libre",
+    also: ["Oferta y satisfacción por sede", "8 columnas · 6 filas · 9 gráficas · por periodo 2020–2025", "Consumo de energía y agua por sede"],
+    interact: async (window, tick) => {
+      const options = [...window.document.querySelectorAll(".oda-add-select option")].map((o) => o.textContent);
+      if (!options.some((o) => o.startsWith("Conjunto libre"))) throw new Error("falta la opción de crear un conjunto libre");
+      const item = [...window.document.querySelectorAll(".oda-dataset")].find((li) => li.textContent.includes("Oferta y satisfacción por sede"));
+      [...item.querySelectorAll("button")].find((b) => b.textContent === "Editar").click();
+      await tick();
+      const form = item.querySelector("form");
+      if (!form?.querySelector('input[name="temporalidad"][value="periodo"]')?.checked) throw new Error("la temporalidad por periodo no queda marcada");
+      const period = [...form.querySelectorAll("label")].find((l) => l.textContent.startsWith("Periodo que cubre"))?.querySelector("input");
+      if (period?.value !== "2020–2025") throw new Error(`periodo que cubre: ${period?.value}`);
+      const columns = form.querySelectorAll(".oda-free-columns li").length;
+      if (columns !== 8) throw new Error(`el editor debía mostrar 8 columnas y muestra ${columns}`);
+      form.querySelector('input[name="temporalidad"][value="anual"]').click();
+      await tick();
+      if (!form.textContent.includes("no tienen año")) throw new Error("pasar a anual un conjunto con filas debe avisar que las filas no tienen año");
+    },
+  },
+  {
+    path: "/admin/udes-en-cifras/captura/infraestructura",
+    session: true,
+    note: "captura de un conjunto libre: rejilla por columnas, gráficas y una cifra pegada que no es número",
+    expect: "Conjuntos libres",
+    interact: async (window, tick) => {
+      const tab = [...window.document.querySelectorAll(".oda-tab")].find((b) => b.textContent.startsWith("Conjuntos libres"));
+      if (!tab) throw new Error("falta la pestaña Conjuntos libres");
+      tab.click();
+      await tick();
+      const panel = () => window.document.querySelector("#oda-libre-filas");
+      const cells = () => panel().querySelectorAll(".oda-grid td[data-kind] input");
+      const labels = () => panel().querySelectorAll(".oda-free-grid__label input");
+      if (cells().length !== 6 * 8) throw new Error(`la rejilla debía tener 48 casillas de datos y tiene ${cells().length}`);
+      if (labels().length !== 4) throw new Error(`la rejilla debía tener 4 títulos y totales y tiene ${labels().length}`);
+      if (!panel().textContent.includes("Se calcula al publicar sobre 2 filas de datos")) throw new Error("un total no dice sobre qué se calcula");
+      const views = window.document.querySelector("#oda-libre-vistas")?.textContent ?? "";
+      for (const title of ["Estudiantes y docentes por sede", "Estudiantes por programa", "Perfil de cada sede", "Reparto de la satisfacción", "Satisfacción por sede", "De programa en programa", "Programas en curso", "Estudiantes por departamento"]) {
+        if (!views.includes(title)) throw new Error(`falta la gráfica «${title}»`);
+      }
+      const save = () => [...panel().querySelectorAll("button")].find((b) => b.textContent.startsWith("Guardar"));
+      if (!save()?.disabled) throw new Error("sin cambios no se debe poder guardar");
+      // Un rango pegado con encabezados y una cifra que no es número.
+      const area = panel().querySelector(".oda-paste__area");
+      Object.getOwnPropertyDescriptor(window.HTMLTextAreaElement.prototype, "value").set.call(area, "Sede\tPrograma\tEstudiantes\nBucaramanga\tEnfermería\tmuchos\n");
+      area.dispatchEvent(new window.Event("input", { bubbles: true }));
+      await tick();
+      [...panel().querySelectorAll("button")].find((b) => b.textContent === "Reemplazar las filas").click();
+      await tick();
+      const wrong = panel().querySelector(".oda-grid td[data-error] input");
+      if (!wrong || wrong.value !== "muchos") throw new Error("la cifra pegada que no es número no se marca en la rejilla");
+      if (!panel().textContent.includes("no es un número")) throw new Error("la cifra pegada que no es número no dice por qué");
+      if (!save()?.disabled) throw new Error("con una cifra inválida no se debe poder guardar");
+      if (!panel().textContent.includes("con encabezados")) throw new Error("el pegado con encabezados no se casó por nombre");
+      Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, "value").set.call(wrong, "420");
+      wrong.dispatchEvent(new window.Event("input", { bubbles: true }));
+      await tick();
+      if (save()?.disabled) throw new Error("corregida la cifra, se debe poder guardar");
+    },
+  },
+  {
+    path: "/admin/udes-en-cifras/captura/infraestructura",
+    session: true,
+    note: "filas de un conjunto libre (0034): mover, duplicar, agrupar con un título y cerrar con un total",
+    expect: "Conjuntos libres",
+    interact: async (window, tick) => {
+      [...window.document.querySelectorAll(".oda-tab")].find((b) => b.textContent.startsWith("Conjuntos libres")).click();
+      await tick();
+      const panel = () => window.document.querySelector("#oda-libre-filas");
+      const rows = () => [...panel().querySelectorAll(".oda-grid tbody tr")];
+      const labels = () => panel().querySelectorAll(".oda-free-grid__label input");
+      const sedes = () => rows().map((tr) => tr.querySelector('td[data-kind="texto"] input')?.value).filter((v) => v !== undefined);
+      const save = () => [...panel().querySelectorAll("button")].find((b) => b.textContent.startsWith("Guardar"));
+      const click = async (row, label) => {
+        const button = [...row.querySelectorAll("button")].find((b) => (b.getAttribute("aria-label") ?? b.textContent).startsWith(label));
+        if (!button) throw new Error(`falta el botón «${label}» de la fila`);
+        button.click();
+        await tick();
+      };
+      const setValue = (input, value) => {
+        Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, "value").set.call(input, value);
+        input.dispatchEvent(new window.Event("input", { bubbles: true }));
+      };
+
+      if (sedes().join() !== "Bucaramanga,Bucaramanga,Cúcuta,Cúcuta,Valledupar,Bogotá") throw new Error(`orden inicial: ${sedes().join()}`);
+      // Subir: Valledupar pasa por delante de la segunda fila de Cúcuta.
+      await click(rows().find((tr) => tr.querySelector('td[data-kind="texto"] input')?.value === "Valledupar"), "Subir");
+      if (sedes().join() !== "Bucaramanga,Bucaramanga,Cúcuta,Valledupar,Cúcuta,Bogotá") throw new Error(`tras subir: ${sedes().join()}`);
+      // Duplicar: la copia queda justo debajo, con las mismas casillas.
+      await click(rows().find((tr) => tr.querySelector('td[data-kind="texto"] input')?.value === "Bucaramanga"), "Duplicar");
+      if (sedes().length !== 7 || sedes().slice(0, 3).join() !== "Bucaramanga,Bucaramanga,Bucaramanga") throw new Error(`tras duplicar: ${sedes().join()}`);
+      if (save()?.disabled) throw new Error("con la fila duplicada se debe poder guardar");
+      // Un título de grupo sin texto no se puede guardar.
+      setValue(labels()[0], "");
+      await tick();
+      if (!panel().textContent.includes("un título de grupo necesita su texto")) throw new Error("un título de grupo sin texto debe avisarse");
+      if (!save()?.disabled) throw new Error("con un título de grupo sin texto no se debe poder guardar");
+      setValue(labels()[0], "Bucaramanga");
+      await tick();
+      if (save()?.disabled) throw new Error("recuperado el título, se debe poder guardar");
+      // Añadir un título al final y convertirlo en el total de toda la fuente.
+      [...panel().querySelectorAll("button")].find((b) => b.textContent.includes("Añadir título de grupo")).click();
+      await tick();
+      if (labels().length !== 5) throw new Error(`tras añadir el título hay ${labels().length} títulos y totales`);
+      if (!save()?.disabled) throw new Error("el título nuevo está sin texto: no se debe poder guardar");
+      const last = rows()[rows().length - 1];
+      const kind = last.querySelector(".oda-free-grid__kind");
+      kind.value = "total";
+      kind.dispatchEvent(new window.Event("change", { bubbles: true }));
+      await tick();
+      setValue(labels()[labels().length - 1], "Total general");
+      await tick();
+      if (!panel().textContent.includes("Se calcula al publicar sobre 4 filas de datos")) throw new Error("el total nuevo no dice sobre qué se calcula");
+      if (save()?.disabled) throw new Error("con su texto, el total se debe poder guardar");
+    },
+  },
+  {
+    path: "/admin/udes-en-cifras/diseno/infraestructura",
+    session: true,
+    note: "bloques de conjunto libre: todas las vistas o una",
+    expect: "Todas las vistas (9)",
+    also: ["Consumo de energía y agua por sede · Energía por año", "Otra gráfica de «Oferta y satisfacción por sede»"],
   },
   { path: "/admin/udes-en-cifras/diseno/poblacional", session: true, expect: "Bloques de la ficha", also: ["Así se lee la ficha", "Tabla dinámica"] },
   {
@@ -2757,6 +2916,86 @@ Object.assign(FIXTURES, OD_FIXTURES);
   FIXTURES.od_report_blocks = [
     ...FIXTURES.od_report_blocks,
     { id: "od-bloque-ensenanza-saber-pro", report_id: report.id, kind: "saber_pro", ref_id: null, section_id: null, position: last + 1, visible: true, settings: {} },
+  ];
+}
+
+/* Conjuntos libres (0033): Infraestructura con uno por periodo (seis filas y
+   una gráfica de cada familia) y uno anual de dos años para líneas y área. */
+{
+  const report = FIXTURES.od_reports.find((r) => r.slug === "infraestructura");
+  const column = (key, label, kind, extra = {}) => ({ key, label, kind, ...extra });
+  const view = (key, title, type, fields) => ({ key, title, type, ...fields });
+  FIXTURES.od_free_sets = [
+    {
+      id: "od-libre-oferta", report_id: report.id, key: "oferta-por-sede", title: "Oferta y satisfacción por sede",
+      description: "Programas, estudiantes, docentes y satisfacción de cada sede en el periodo.",
+      temporality: "periodo", period_label: "2020–2025", office_id: "od-oficina-1", position: 1,
+      columns: [
+        column("sede", "Sede", "texto"),
+        column("programa", "Programa", "texto"),
+        column("departamento", "Departamento", "territorio", { territory: "departamento" }),
+        column("estudiantes", "Estudiantes", "cifra", { format: "entero", unit: "estudiantes" }),
+        column("satisfaccion", "Satisfacción", "cifra", { format: "decimal", unit: "puntos" }),
+        column("docentes", "Docentes", "cifra", { format: "entero", unit: "docentes" }),
+        column("inicio", "Inicio", "fecha"),
+        column("fin", "Fin", "fecha"),
+      ],
+      views: [
+        view("estudiantes-docentes", "Estudiantes y docentes por sede", "barras", { category: "sede", series: ["estudiantes", "docentes"], orientation: "vertical" }),
+        view("estudiantes-por-programa", "Estudiantes por programa", "dona", { category: "programa", series: ["estudiantes"] }),
+        view("perfil-por-sede", "Perfil de cada sede", "radar", { category: "sede", series: ["estudiantes", "satisfaccion", "docentes"] }),
+        view("reparto-satisfaccion", "Reparto de la satisfacción", "histograma", { series: ["satisfaccion"] }),
+        view("satisfaccion-por-sede", "Satisfacción por sede", "caja", { category: "sede", series: ["satisfaccion"] }),
+        view("suma-estudiantes", "De programa en programa", "cascada", { category: "programa", series: ["estudiantes"], total: true }),
+        view("programas-en-curso", "Programas en curso", "gantt", { category: "programa", start: "inicio", end: "fin" }),
+        view("estudiantes-por-departamento", "Estudiantes por departamento", "mapa", { category: "departamento", series: ["estudiantes"] }),
+        view("la-fuente", "La fuente, fila por fila", "tabla", {}),
+      ],
+    },
+    {
+      id: "od-libre-consumo", report_id: report.id, key: "consumo-por-sede", title: "Consumo de energía y agua por sede",
+      description: "", temporality: "anual", period_label: "", office_id: null, position: 2,
+      columns: [
+        column("sede", "Sede", "texto"),
+        column("energia", "Energía", "cifra", { format: "entero", unit: "kWh" }),
+        column("agua", "Agua", "cifra", { format: "entero", unit: "m³" }),
+      ],
+      views: [
+        view("energia-por-anio", "Energía por año", "lineas", { series: ["energia"] }),
+        view("agua-y-energia", "Agua y energía", "area", { series: ["energia", "agua"] }),
+      ],
+    },
+  ];
+  // Bogotá va por código DANE y sin satisfacción: un vacío, no un cero.
+  // Las filas se agrupan bajo dos títulos, cada uno con su total (0034): los
+  // totales los calcula el portal, así que se guardan sin casillas.
+  const oferta = [
+    ["grupo", "Bucaramanga"],
+    ["dato", "", "Bucaramanga", "Enfermería", "Santander", 420, 4.3, 32, "2020-02-01", "2024-12-15"],
+    ["dato", "", "Bucaramanga", "Ingeniería de Sistemas", "Santander", 380, 4.1, 28, "2021-01-15", "2025-06-30"],
+    ["total", "Total Bucaramanga"],
+    ["grupo", "Otras sedes"],
+    ["dato", "", "Cúcuta", "Enfermería", "Norte de Santander", 260, 4.0, 19, "2020-08-01", "2023-12-01"],
+    ["dato", "", "Cúcuta", "Derecho", "Norte de Santander", 310, 3.8, 22, "2022-02-01", "2025-11-30"],
+    ["dato", "", "Valledupar", "Medicina", "Cesar", 290, 4.4, 35, "2021-07-01", "2025-12-15"],
+    ["dato", "", "Bogotá", "Psicología", "11", 150, null, 12, "2023-01-15", "2025-12-15"],
+    ["total", "Total otras sedes"],
+  ];
+  const keys = FIXTURES.od_free_sets[0].columns.map((c) => c.key);
+  FIXTURES.od_free_set_rows = [
+    ...oferta.map(([kind, label, ...values], position) => ({
+      id: `od-libre-oferta-${position}`, set_id: "od-libre-oferta", position, year: null, kind, label,
+      cells: kind === "dato" ? Object.fromEntries(keys.map((key, i) => [key, values[i]])) : {},
+    })),
+    ...[[2024, "Bucaramanga", 182000, 9100], [2024, "Cúcuta", 96000, 5200], [2025, "Bucaramanga", 175500, 8800], [2025, "Cúcuta", 99000, 5050]].map(
+      ([year, sede, energia, agua], position) => ({ id: `od-libre-consumo-${position}`, set_id: "od-libre-consumo", position, year, kind: "dato", label: "", cells: { sede, energia, agua } }),
+    ),
+  ];
+  const last = Math.max(...FIXTURES.od_report_blocks.filter((b) => b.report_id === report.id).map((b) => b.position));
+  FIXTURES.od_report_blocks = [
+    ...FIXTURES.od_report_blocks,
+    { id: "od-bloque-infraestructura-libre", report_id: report.id, kind: "libre", ref_id: "od-libre-oferta", section_id: null, position: last + 1, visible: true, settings: {} },
+    { id: "od-bloque-infraestructura-libre-consumo", report_id: report.id, kind: "libre", ref_id: "od-libre-consumo", section_id: null, position: last + 2, visible: true, settings: { view: "energia-por-anio" } },
   ];
 }
 

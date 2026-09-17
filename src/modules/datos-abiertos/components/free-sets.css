@@ -1,0 +1,325 @@
+/* =============================================================================
+   Conjuntos libres.
+
+   Las vistas van en paneles del tablero (ChartFrame): las anchas ocupan la
+   fila, las pequeñas se emparejan. Leyendas en tinta con su muestra de color;
+   el tooltip de nivo toma la forma del del portal.
+   ========================================================================== */
+
+.od-free__when { display: flex; align-items: end; }
+
+.od-free__stamp {
+  padding: var(--space-2) var(--space-3);
+  color: var(--od-board-ink);
+  font-family: var(--font-sign);
+  font-size: 0.95rem;
+  font-weight: 600;
+  letter-spacing: var(--tracking-wide);
+  text-transform: uppercase;
+  background: var(--od-board);
+  border: 1px solid var(--od-board-line-strong);
+  border-radius: var(--radius-xs);
+}
+
+.od-free__grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-5);
+}
+
+.od-free__cell { min-width: 0; }
+.od-free__cell[data-span="full"] { grid-column: 1 / -1; }
+
+.od-free__canvas {
+  position: relative;
+  width: 100%;
+  min-width: 0;
+}
+
+.od-free__canvas--scroll { overflow-x: auto; }
+
+.od-free__svg { display: block; overflow: visible; }
+
+.od-free__tick {
+  fill: var(--ink-muted);
+  font-family: var(--font-sans);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+}
+
+.od-free__label {
+  fill: var(--ink-secondary);
+  font-family: var(--font-sans);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.od-free__value {
+  fill: var(--ink);
+  font-family: var(--font-sans);
+  font-size: 11px;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+}
+
+.od-free__connector { stroke-width: 1; stroke-dasharray: 3 3; }
+.od-free__today { stroke-width: 1.5; stroke-dasharray: 4 3; }
+
+.od-free__legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2) var(--space-5);
+  margin: 0 0 var(--space-4);
+  padding: 0;
+  color: var(--ink-secondary);
+  font-size: var(--text-sm);
+  font-weight: 600;
+  list-style: none;
+}
+
+.od-free__legend li {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.od-free__legend i {
+  width: 0.85rem;
+  height: 0.85rem;
+  border-radius: 3px;
+}
+
+.od-free__note {
+  max-width: 70ch;
+  margin: var(--space-3) 0 0;
+  color: var(--ink-muted);
+  font-size: var(--text-sm);
+}
+
+.od-free__tip {
+  display: grid;
+  gap: 2px;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.od-free__tip strong { font-size: var(--text-sm); }
+
+/* --- Circular y dona ------------------------------------------------------------ */
+
+.od-free__pie {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--space-4);
+  align-items: center;
+}
+
+.od-free__pie-plot {
+  position: relative;
+  margin-inline: auto;
+}
+
+.od-free__pie-total {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-content: center;
+  text-align: center;
+  pointer-events: none;
+}
+
+.od-free__pie-total strong {
+  color: var(--ink);
+  font-family: var(--font-sign);
+  font-size: 2rem;
+  font-weight: 700;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+
+.od-free__pie-total small {
+  color: var(--ink-muted);
+  font-size: var(--text-sm);
+  font-weight: 600;
+}
+
+.od-free__pie-list {
+  display: grid;
+  gap: var(--space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: var(--text-sm);
+}
+
+.od-free__pie-list li {
+  display: grid;
+  grid-template-columns: 0.85rem minmax(0, 1fr) auto 3.8rem;
+  align-items: center;
+  gap: var(--space-3);
+  padding-block: var(--space-1);
+  border-bottom: 1px solid var(--line);
+}
+
+.od-free__pie-list i { width: 0.85rem; height: 0.85rem; border-radius: 3px; }
+.od-free__pie-list span { color: var(--ink-secondary); font-weight: 600; }
+.od-free__pie-list b { color: var(--ink); font-variant-numeric: tabular-nums; }
+.od-free__pie-list small { color: var(--ink-muted); text-align: right; font-variant-numeric: tabular-nums; }
+
+/* --- Cifras clave -------------------------------------------------------------------- */
+
+.od-free__figures {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 12rem), 1fr));
+  gap: 1px;
+  overflow: hidden;
+  background: var(--od-board-line);
+  border: 1px solid var(--od-board-line);
+  border-radius: var(--radius-xs);
+}
+
+.od-free__figure {
+  display: grid;
+  align-content: start;
+  gap: var(--space-2);
+  padding: var(--space-4) var(--space-5);
+  background: var(--od-board);
+}
+
+.od-free__figure strong {
+  color: var(--od-board-ink);
+  font-size: var(--text-sm);
+  font-weight: 800;
+}
+
+.od-free__figure small {
+  color: var(--od-board-muted);
+  font-size: var(--text-xs);
+  font-weight: 600;
+}
+
+@media (max-width: 900px) {
+  .od-free__grid { grid-template-columns: minmax(0, 1fr); }
+}
+
+/* --- Mapa ------------------------------------------------------------------------------ */
+
+.od-free__map {
+  display: grid;
+  grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr);
+  gap: var(--space-6);
+  align-items: start;
+}
+
+.od-free__map-canvas { position: relative; }
+.od-free__map-canvas svg { display: block; width: 100%; height: auto; max-height: 34rem; margin-inline: auto; }
+
+.od-free__map-shape {
+  stroke: var(--od-surface);
+  stroke-width: 0.6;
+  transition: opacity 160ms ease;
+}
+
+.od-free__map-shape[data-active] { stroke: var(--ink); stroke-width: 1.4; }
+
+.od-free__map-side { display: grid; gap: var(--space-4); }
+
+.od-free__map-rank {
+  display: grid;
+  gap: 0;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: var(--text-sm);
+}
+
+.od-free__map-rank li {
+  display: grid;
+  grid-template-columns: 1.6rem minmax(0, 1fr) auto;
+  gap: var(--space-2);
+  padding-block: var(--space-2);
+  border-bottom: 1px solid var(--line);
+}
+
+.od-free__map-rank span { color: var(--ink-muted); font-variant-numeric: tabular-nums; }
+.od-free__map-rank b { color: var(--ink); font-weight: 700; }
+.od-free__map-rank em { color: var(--ink); font-style: normal; font-weight: 800; font-variant-numeric: tabular-nums; }
+
+.od-free__map-scale {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 2px;
+}
+
+.od-free__map-scale i { height: 0.6rem; border-radius: 2px; }
+.od-free__map-scale small { grid-column: span 3; color: var(--ink-muted); font-size: var(--text-xs); }
+.od-free__map-scale small:last-child { grid-column: span 4; text-align: right; }
+
+@media (max-width: 720px) {
+  .od-free__map { grid-template-columns: minmax(0, 1fr); }
+}
+
+/* --- Tabla de la fuente --------------------------------------------------------------- */
+
+.od-free__table {
+  max-height: 32rem;
+  overflow: auto;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-xs);
+}
+
+.od-free__table:focus-visible { outline: 2px solid var(--brand-blue); outline-offset: 2px; }
+
+.od-free__table table { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; }
+
+.od-free__table thead th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  padding: var(--space-2) var(--space-3);
+  color: var(--ink);
+  font-size: var(--text-sm);
+  font-weight: 800;
+  text-align: left;
+  background: var(--od-surface);
+  box-shadow: 0 1px 0 var(--line);
+}
+
+.od-free__table thead th small { color: var(--ink-muted); font-weight: 600; }
+.od-free__table th,
+.od-free__table td { text-align: left; }
+
+.od-free__table th[data-numeric],
+.od-free__table td[data-numeric] { text-align: right; }
+
+.od-free__table tbody td {
+  padding: var(--space-2) var(--space-3);
+  color: var(--ink-secondary);
+  font-size: var(--text-sm);
+  border-top: 1px solid var(--line);
+}
+
+.od-free__table tbody td[data-empty] { color: var(--ink-faint); }
+
+/* Un título de grupo abre su tramo; un total lo cierra en tinta. */
+.od-free__table tr[data-kind="grupo"] th {
+  padding: var(--space-3) var(--space-3) var(--space-2);
+  color: var(--ink);
+  font-family: var(--font-sign);
+  font-size: 1rem;
+  font-weight: 700;
+  letter-spacing: var(--tracking-wide);
+  text-align: left;
+  text-transform: uppercase;
+  background: var(--od-surface-2, var(--od-board-raised));
+  border-top: 1px solid var(--line-strong);
+}
+
+.od-free__table tr[data-kind="total"] td {
+  color: var(--ink);
+  font-weight: 800;
+  background: var(--od-board-raised);
+  border-top: 1px solid var(--line-strong);
+}
+
+.od-free__table tr[data-kind="total"] small { color: var(--ink-muted); font-weight: 600; }

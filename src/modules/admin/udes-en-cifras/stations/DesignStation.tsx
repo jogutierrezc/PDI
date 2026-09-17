@@ -37,6 +37,8 @@ const BLOCK_HELP: Record<OdBlockKind, string> = {
   separador: "Agrupa los bloques que siguen, hasta el próximo separador. En el Boletín abre página.",
   rankings: "Posiciones en QS, THE y otros rankings, con medallas, tabla, evolución y rueda de ODS.",
   saber_pro: "Resultados Saber PRO por competencia: niveles de desempeño, brecha con el país y evolución, filtrables por sede, facultad y programa.",
+  saber_tyt: "Motor Beta: de Saber 11 a Saber TyT en rango percentil, con el valor agregado por programa.",
+  libre: "Un conjunto libre con sus gráficas: elige una vista o muéstralas todas.",
 };
 
 /** Clave corta para distinguir varios bloques del mismo tipo (ver 0029). */
@@ -63,6 +65,8 @@ function DesignEditor({ data, reportId, blocks, canEdit }: { data: StationProps[
   const tables = data.rows.tables.filter((t) => t.report_id === reportId);
   const rankings = (data.rows.rankings ?? []).filter((r) => r.report_id === reportId);
   const saberPro = (data.rows.saberPro ?? []).filter((sp) => sp.report_id === reportId).sort((a, b) => a.position - b.position);
+  const saberTyt = (data.rows.saberTyt ?? []).filter((t) => t.report_id === reportId).sort((a, b) => a.position - b.position);
+  const freeSets = (data.rows.freeSets ?? []).filter((fs) => fs.report_id === reportId).sort((a, b) => a.position - b.position);
   const sections = data.rows.sections.filter((s) => s.report_id === reportId);
   const indicators = data.rows.indicators.filter((i) => i.report_id === reportId).sort((a, b) => a.position - b.position);
   /** Separador bajo el que queda un bloque (el anterior más cercano). */
@@ -93,6 +97,12 @@ function DesignEditor({ data, reportId, blocks, canEdit }: { data: StationProps[
     if (b.kind === "historico") return histories.find((h) => h.id === b.ref_id)?.title ?? "Evolución histórica sin conjunto";
     if (b.kind === "tabla") return tables.find((x) => x.id === b.ref_id)?.title ?? "Tabla sin conjunto";
     if (b.kind === "desgloses" && b.ref_id) return breakdowns.find((x) => x.id === b.ref_id)?.title ?? BLOCK_LABELS.desgloses;
+    if (b.kind === "libre") {
+      const set = freeSets.find((fs) => fs.id === b.ref_id);
+      if (!set) return "Conjunto libre sin conjunto";
+      const view = set.views.find((v) => v.key === b.settings.view);
+      return view ? `${set.title} · ${view.title}` : set.title;
+    }
     if (b.kind === "separador") return "Separador sin título";
     return BLOCK_LABELS[b.kind];
   };
@@ -105,11 +115,13 @@ function DesignEditor({ data, reportId, blocks, canEdit }: { data: StationProps[
     ...(breakdowns.length && !draft.some((b) => b.kind === "desgloses") ? [{ kind: "desgloses" as OdBlockKind, ref_id: null, label: BLOCK_LABELS.desgloses }] : []),
     ...(rankings.length && !draft.some((b) => b.kind === "rankings") ? [{ kind: "rankings" as OdBlockKind, ref_id: null, label: BLOCK_LABELS.rankings }] : []),
     ...(saberPro.length && !draft.some((b) => b.kind === "saber_pro") ? [{ kind: "saber_pro" as OdBlockKind, ref_id: null, label: BLOCK_LABELS.saber_pro }] : []),
+    ...(saberTyt.length && !draft.some((b) => b.kind === "saber_tyt") ? [{ kind: "saber_tyt" as OdBlockKind, ref_id: null, label: BLOCK_LABELS.saber_tyt }] : []),
     ...heatmaps.filter((h) => !draft.some((b) => b.ref_id === h.id)).map((h) => ({ kind: "mapa_calor" as OdBlockKind, ref_id: h.id, label: h.title })),
     ...maps.filter((m) => !draft.some((b) => b.ref_id === m.id || (b.kind === "mapa" && b.settings.mapWith === m.key))).map((m) => ({ kind: "mapa" as OdBlockKind, ref_id: m.id, label: m.title })),
     ...pipelines.filter((p) => !draft.some((b) => b.ref_id === p.id)).map((p) => ({ kind: "tuberia" as OdBlockKind, ref_id: p.id, label: p.title })),
     ...histories.filter((h) => !draft.some((b) => b.ref_id === h.id)).map((h) => ({ kind: "historico" as OdBlockKind, ref_id: h.id, label: h.title })),
     ...tables.filter((x) => !draft.some((b) => b.ref_id === x.id)).map((x) => ({ kind: "tabla" as OdBlockKind, ref_id: x.id, label: x.title })),
+    ...freeSets.filter((fs) => !draft.some((b) => b.ref_id === fs.id)).map((fs) => ({ kind: "libre" as OdBlockKind, ref_id: fs.id, label: fs.title })),
   ];
 
   const mapOf = (b: DraftBlock) => (b.kind === "mapa" ? maps.find((m) => m.id === b.ref_id) : undefined);
@@ -255,6 +267,19 @@ function DesignEditor({ data, reportId, blocks, canEdit }: { data: StationProps[
                       </select>
                     </label>
                   )}
+                  {block.kind === "saber_tyt" && saberTyt.length > 1 && (
+                    <label className="oda-inline-field">
+                      <span>Conjunto que muestra</span>
+                      <select
+                        value={block.settings.saberTyt ?? ""}
+                        disabled={!canEdit}
+                        onChange={(e) => patch(block.tempId, { settings: { ...block.settings, saberTyt: e.target.value || undefined } })}
+                      >
+                        <option value="">El primero del informe ({saberTyt[0].title})</option>
+                        {saberTyt.map((t) => <option key={t.id} value={t.key}>{t.title}</option>)}
+                      </select>
+                    </label>
+                  )}
                   {block.kind === "desgloses" && !block.ref_id && breakdowns.length > 0 && (
                     <Picker
                       noun={{ one: "desglose", many: "desgloses", block: "bloque de desgloses" }}
@@ -316,6 +341,23 @@ function DesignEditor({ data, reportId, blocks, canEdit }: { data: StationProps[
                         {partner && <small className="oda-block__note">El bloque propio de «{partner.title}» no se repite en la ficha.</small>}
                         {host && <small className="oda-block__note">Se muestra dentro de «{host.settings.title || nameOf(host)}»: este bloque no se repite.</small>}
                       </>
+                    );
+                  })()}
+                  {block.kind === "libre" && (() => {
+                    const set = freeSets.find((fs) => fs.id === block.ref_id);
+                    if (!set) return null;
+                    return (
+                      <label className="oda-inline-field">
+                        <span>Gráfica</span>
+                        <select
+                          value={block.settings.view ?? ""}
+                          disabled={!canEdit}
+                          onChange={(e) => patch(block.tempId, { settings: { ...block.settings, view: e.target.value || undefined } })}
+                        >
+                          <option value="">Todas las vistas ({set.views.length})</option>
+                          {set.views.map((v) => <option key={v.key} value={v.key}>{v.title}</option>)}
+                        </select>
+                      </label>
                     );
                   })()}
                   {block.kind === "evolucion" && (
@@ -397,6 +439,18 @@ function DesignEditor({ data, reportId, blocks, canEdit }: { data: StationProps[
                 <Icon name="plus" size={15} /> Otro bloque de desgloses
               </button>
             )}
+            {freeSets
+              .filter((fs) => fs.views.length > 1 && draft.some((b) => b.kind === "libre" && b.ref_id === fs.id))
+              .map((fs) => (
+                <button
+                  key={fs.id}
+                  type="button"
+                  className="button-ghost"
+                  onClick={() => add({ kind: "libre", ref_id: fs.id, visible: true, settings: { view: fs.views[0].key, slot: newSlot() } })}
+                >
+                  <Icon name="plus" size={15} /> Otra gráfica de «{fs.title}»
+                </button>
+              ))}
             <small>
               Un separador agrupa los bloques que le siguen, hasta el próximo. Para que una sección muestre sus indicadores y desgloses, ponle debajo un tablero y un bloque de desgloses con los suyos elegidos: así no se repiten en cada sección.
             </small>

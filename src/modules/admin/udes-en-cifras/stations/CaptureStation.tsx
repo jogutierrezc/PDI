@@ -42,10 +42,12 @@ import { ImportReport, profileFor } from "./ImportReport";
 import { MobilityCapture } from "./MobilityCapture";
 import { RankingCapture } from "./RankingCapture";
 import { SaberProCapture } from "./SaberProCapture";
+import { SaberTytCapture } from "./SaberTytCapture";
+import { FreeSetCapture } from "./FreeSetCapture";
 import { PasteMessages, PasteTable, breakdownFromTable, heatmapFromTable } from "../PasteTable";
 import { IMPORT_PROFILES } from "../import/investigacion";
 
-type Tab = "importar" | "indicadores" | "desgloses" | "historico" | "calor" | "mapas" | "tuberia" | "rankings" | "saber";
+type Tab = "importar" | "indicadores" | "desgloses" | "historico" | "calor" | "mapas" | "tuberia" | "rankings" | "saber" | "tyt" | "libres";
 const TOTAL = "total";
 
 export function CaptureStation(props: StationProps) {
@@ -64,6 +66,8 @@ export function CaptureStation(props: StationProps) {
     tuberia: data.rows.pipelines.filter((p) => p.report_id === report.uuid).length,
     rankings: (data.rows.rankings ?? []).filter((r) => r.report_id === report.uuid).length,
     saber: (data.rows.saberPro ?? []).filter((sp) => sp.report_id === report.uuid).length,
+    tyt: (data.rows.saberTyt ?? []).filter((t) => t.report_id === report.uuid).length,
+    libres: (data.rows.freeSets ?? []).filter((fs) => fs.report_id === report.uuid).length,
   };
   const tabs: { id: Tab; label: string }[] = [
     { id: "importar" as Tab, label: "Importar informe" },
@@ -75,6 +79,8 @@ export function CaptureStation(props: StationProps) {
     { id: "tuberia" as Tab, label: "Tuberías" },
     { id: "rankings" as Tab, label: "Rankings" },
     { id: "saber" as Tab, label: "Saber PRO" },
+    { id: "tyt" as Tab, label: "Saber TyT" },
+    { id: "libres" as Tab, label: "Conjuntos libres" },
   ].filter((t) => t.id === "indicadores" || t.id === "importar" || counts[t.id] > 0);
 
   return (
@@ -114,6 +120,8 @@ export function CaptureStation(props: StationProps) {
       {tab === "tuberia" && <PipelineCapture key={report.uuid} {...props} />}
       {tab === "rankings" && <RankingCapture key={report.uuid} {...props} />}
       {tab === "saber" && <SaberProCapture key={report.uuid} {...props} />}
+      {tab === "tyt" && <SaberTytCapture key={report.uuid} {...props} />}
+      {tab === "libres" && <FreeSetCapture key={report.uuid} {...props} />}
     </div>
   );
 }

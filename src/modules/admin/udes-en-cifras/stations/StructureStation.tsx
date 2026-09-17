@@ -9,7 +9,7 @@
       se elige una titular, que es la que representa al informe en el tablero
       público.
    Y al final, sus conjuntos visuales (desgloses, evoluciones históricas,
-   tuberías, mapas de calor, mapas), varios de cada tipo si hace falta: aquí se
+   tuberías, mapas de calor, mapas, conjuntos libres), varios de cada tipo si hace falta: aquí se
    definen; sus cifras se cargan en Captura.
    ========================================================================== */
 
@@ -34,6 +34,7 @@ import {
   useDeleteDataset,
   useDeleteIndicator,
   useSaveBreakdown,
+  useSaveFreeSet,
   useSaveHeatmap,
   useSaveHistory,
   useSaveIndicator,
@@ -43,10 +44,14 @@ import {
   useSaveRanking,
   useSaveReport,
   useSaveSaberPro,
+  useSaveSaberTyt,
 } from "../od-data";
 import { ConfirmButton, Panel, SaveState, StageEmpty, YearPicker, slugify } from "../ui";
 import { RankingForm } from "./RankingCapture";
 import { SaberProForm } from "./SaberProCapture";
+import { SaberTytForm } from "./SaberTytCapture";
+import { FreeSetForm } from "./FreeSetCapture";
+import { TEMPORALITY_LABEL } from "../../../datos-abiertos/data/free-sets";
 import { RANKING_SYSTEMS, RANKING_VIEWS } from "../../../datos-abiertos/data/rankings";
 
 const FORMAT_LABEL: Record<OdValueFormat, string> = { entero: "Entero", porcentaje: "Porcentaje", decimal: "Decimal" };
@@ -512,7 +517,7 @@ function IndicatorForm({
 
 /* --- Conjuntos visuales --------------------------------------------------------------------- */
 
-type DatasetKind = "desglose" | "calor" | "mapa" | "tuberia" | "historico" | "ranking" | "saber";
+type DatasetKind = "desglose" | "calor" | "mapa" | "tuberia" | "historico" | "ranking" | "saber" | "tyt" | "libre";
 
 const MEASURE_LABEL: Record<OdPipelineMeasure, string> = {
   estudiantes: "Estudiantes que siguen en cada etapa (el portal lo muestra en %)",
@@ -536,6 +541,8 @@ function DatasetsEditor({ data, reportId, years, canEdit }: { data: StationProps
   const saveHistory = useSaveHistory();
   const saveRanking = useSaveRanking();
   const saveSaberPro = useSaveSaberPro();
+  const saveSaberTyt = useSaveSaberTyt();
+  const saveFreeSet = useSaveFreeSet();
   const remove = useDeleteDataset();
   const [adding, setAdding] = useState<DatasetKind | null>(null);
   // Mapas: por departamento o de movilidad internacional, según la opción elegida.
@@ -550,13 +557,28 @@ function DatasetsEditor({ data, reportId, years, canEdit }: { data: StationProps
   const rankings = (data.rows.rankings ?? []).filter((r) => r.report_id === reportId).sort((a, b) => a.position - b.position);
   const saberPro = (data.rows.saberPro ?? []).filter((sp) => sp.report_id === reportId).sort((a, b) => a.position - b.position);
   const saberYears = (id: string) => new Set((data.rows.saberProResults ?? []).filter((r) => r.saber_id === id).map((r) => r.year)).size;
+  const saberTyt = (data.rows.saberTyt ?? []).filter((t) => t.report_id === reportId).sort((a, b) => a.position - b.position);
+  const tytYears = (id: string) => new Set((data.rows.saberTytResults ?? []).filter((r) => r.tyt_id === id).map((r) => r.year)).size;
+  const freeSets = (data.rows.freeSets ?? []).filter((fs) => fs.report_id === reportId).sort((a, b) => a.position - b.position);
+  // Las filas de datos; los títulos de grupo y los totales de 0034 no cuentan como cifras cargadas.
+  const freeRows = (id: string) => (data.rows.freeSetRows ?? []).filter((r) => r.set_id === id && (r.kind ?? "dato") === "dato");
+  /** Casillas con dato por columna, y todas las claves presentes en las filas (también de columnas quitadas). */
+  const freeFilled = (id: string) => {
+    const filled: Record<string, number> = {};
+    for (const row of freeRows(id)) {
+      for (const [key, value] of Object.entries(row.cells ?? {})) {
+        filled[key] = (filled[key] ?? 0) + (value === null || value === "" ? 0 : 1);
+      }
+    }
+    return filled;
+  };
   const offices = data.rows.offices;
-  const mutations = [saveBreakdown, saveHeatmap, saveMap, savePipeline, saveHistory, saveRanking, saveSaberPro, remove];
+  const mutations = [saveBreakdown, saveHeatmap, saveMap, savePipeline, saveHistory, saveRanking, saveSaberPro, saveSaberTyt, saveFreeSet, remove];
   const pending = mutations.some((m) => m.isPending);
   const error = mutations.find((m) => m.error)?.error ?? null;
   const success = mutations.some((m) => m.isSuccess);
   const done = { onSuccess: () => { setAdding(null); setEditing(null); } };
-  const total = breakdowns.length + heatmaps.length + maps.length + pipelines.length + histories.length + rankings.length + saberPro.length;
+  const total = breakdowns.length + heatmaps.length + maps.length + pipelines.length + histories.length + rankings.length + saberPro.length + saberTyt.length + freeSets.length;
 
   const lines = (text: string) => text.split("\n").map((s) => s.trim()).filter(Boolean);
   const yearsDetail = (list: number[] | null) => (list && list.length ? list.join(", ") : "todos los años");
@@ -574,7 +596,7 @@ function DatasetsEditor({ data, reportId, years, canEdit }: { data: StationProps
     <Panel
       id="oda-conjuntos"
       title="Conjuntos visuales"
-      description="Desgloses, mapas de calor, mapas, tuberías y evoluciones históricas: los que quieras de cada tipo. Al crearlos entran a la ficha como bloque visible; sus cifras se cargan en Captura y su lugar se ajusta en Diseño visual."
+      description="Desgloses, mapas de calor, mapas, tuberías, evoluciones históricas y conjuntos libres: los que quieras de cada tipo. Al crearlos entran a la ficha como bloque visible; sus cifras se cargan en Captura y su lugar se ajusta en Diseño visual."
       actions={
         <>
           <SaveState pending={pending} error={error} success={success} />
@@ -601,6 +623,9 @@ function DatasetsEditor({ data, reportId, years, canEdit }: { data: StationProps
               <option value="ranking">Ranking universitario (QS, THE…)</option>
               {/* Un informe suele tener un solo conjunto Saber PRO: se ofrece mientras no lo tenga. */}
               {saberPro.length === 0 && <option value="saber">Resultados Saber PRO (ICFES)</option>}
+              {/* El Motor Beta cruza dos pruebas de la misma persona: también uno por informe. */}
+              {saberTyt.length === 0 && <option value="tyt">Saber TyT · Motor Beta (Saber 11 → Saber TyT)</option>}
+              <option value="libre">Conjunto libre (columnas propias y sus gráficas)</option>
             </select>
           </label>
         </>
@@ -630,7 +655,35 @@ function DatasetsEditor({ data, reportId, years, canEdit }: { data: StationProps
           }
         />
       )}
-      {adding && adding !== "ranking" && adding !== "saber" && (
+      {adding === "tyt" && (
+        <SaberTytForm
+          offices={offices}
+          onCancel={() => setAdding(null)}
+          onSubmit={(f) =>
+            saveSaberTyt.mutate(
+              { report_id: reportId, key: uniqueKey("saber tyt", saberTyt.map((t) => t.key)), title: f.title, description: f.description, note: f.note, office_id: f.office_id || null, position: saberTyt.length + 1 },
+              done,
+            )
+          }
+        />
+      )}
+      {adding === "libre" && (
+        <FreeSetForm
+          offices={offices}
+          onCancel={() => setAdding(null)}
+          onSubmit={(f) =>
+            saveFreeSet.mutate(
+              {
+                report_id: reportId, key: uniqueKey(f.title, freeSets.map((fs) => fs.key)), title: f.title, description: f.description,
+                temporality: f.temporality, period_label: f.period_label, columns: f.columns, views: [], office_id: f.office_id || null,
+                position: freeSets.length + 1,
+              },
+              done,
+            )
+          }
+        />
+      )}
+      {adding && adding !== "ranking" && adding !== "saber" && adding !== "tyt" && adding !== "libre" && (
         <DatasetForm
           key={`${adding}-${addingMode}`}
           kind={adding}
@@ -702,6 +755,39 @@ function DatasetsEditor({ data, reportId, years, canEdit }: { data: StationProps
               onSubmit={(f) => saveSaberPro.mutate({ id: sp.id, report_id: reportId, title: f.title, description: f.description, note: f.note, office_id: f.office_id || null }, done)} />
           </DatasetItem>
         ))}
+        {saberTyt.map((t) => (
+          <DatasetItem key={t.id} kind="Saber TyT (Motor Beta)" title={t.title} detail={tytYears(t.id) ? `${tytYears(t.id)} años cargados` : "sin resultados: impórtalos en Captura"} canEdit={canEdit}
+            editing={editing === t.id} onEdit={() => setEditing(t.id)} onDelete={() => remove.mutate({ table: "od_saber_tyt", id: t.id })}>
+            <SaberTytForm offices={offices} initial={{ title: t.title, description: t.description, note: t.note, office_id: t.office_id ?? "" }}
+              onCancel={() => setEditing(null)}
+              onSubmit={(f) => saveSaberTyt.mutate({ id: t.id, report_id: reportId, title: f.title, description: f.description, note: f.note, office_id: f.office_id || null }, done)} />
+          </DatasetItem>
+        ))}
+        {freeSets.map((fs) => {
+          const rowCount = freeRows(fs.id).length;
+          const filled = freeFilled(fs.id);
+          return (
+            <DatasetItem key={fs.id} kind="Conjunto libre" title={fs.title}
+              detail={`${fs.columns.length} columnas · ${rowCount} filas · ${fs.views.length} gráficas · ${TEMPORALITY_LABEL[fs.temporality].split(":")[0].toLowerCase()}${fs.temporality === "periodo" && fs.period_label ? ` ${fs.period_label}` : ""}`}
+              canEdit={canEdit} editing={editing === fs.id} onEdit={() => setEditing(fs.id)} onDelete={() => remove.mutate({ table: "od_free_sets", id: fs.id })}>
+              <FreeSetForm
+                offices={offices}
+                initial={{ title: fs.title, description: fs.description, office_id: fs.office_id ?? "", temporality: fs.temporality, period_label: fs.period_label, columns: fs.columns }}
+                rowCount={rowCount}
+                filled={filled}
+                views={fs.views}
+                takenKeys={Object.keys(filled)}
+                onCancel={() => setEditing(null)}
+                onSubmit={(f) =>
+                  saveFreeSet.mutate(
+                    { id: fs.id, report_id: reportId, title: f.title, description: f.description, temporality: f.temporality, period_label: f.period_label, columns: f.columns, office_id: f.office_id || null },
+                    done,
+                  )
+                }
+              />
+            </DatasetItem>
+          );
+        })}
         {total === 0 && !adding && (
           <li className="oda-muted">Este informe no tiene conjuntos visuales. La ficha mostrará los indicadores, su evolución y la tabla dinámica.</li>
         )}

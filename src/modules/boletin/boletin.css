@@ -2053,3 +2053,87 @@
   -webkit-print-color-adjust: exact;
   print-color-adjust: exact;
 }
+
+/* --- Conjuntos libres ------------------------------------------------------ */
+
+/* Las gráficas de la ficha, a ancho fijo, en tinta de papel: sus leyendas y
+   notas usan tokens del portal, que en el papel se fijan a los del tema claro. */
+.bol-doc .bol-free-chart,
+.bol-doc .bol-free-map {
+  --ink: #16243a;
+  --ink-secondary: #4a5a70;
+  --ink-muted: #6f7d90;
+  --line: #d6dee8;
+  --font-sans: var(--bol-font);
+  --text-sm: 12px;
+  --text-xs: 11px;
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+}
+
+.bol-free-chart .od-free__legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 18px;
+  margin: 0 0 10px;
+  padding: 0;
+  color: var(--ink-secondary);
+  font-size: 12px;
+  font-weight: 600;
+  list-style: none;
+}
+
+.bol-free-chart .od-free__legend li { display: inline-flex; align-items: center; gap: 6px; }
+.bol-free-chart .od-free__legend i { width: 11px; height: 11px; border-radius: 3px; }
+.bol-free-chart .od-free__note { margin: 8px 0 0; color: var(--ink-muted); font-size: 12px; }
+.bol-free-chart .od-free__pie { display: grid; grid-template-columns: 360px minmax(0, 1fr); gap: 20px; align-items: center; }
+.bol-free-chart .od-free__pie-plot { position: relative; }
+.bol-free-chart .od-free__pie-total { position: absolute; inset: 0; display: grid; place-content: center; text-align: center; }
+.bol-free-chart .od-free__pie-total strong { color: var(--ink); font-size: 28px; font-weight: 800; }
+.bol-free-chart .od-free__pie-list { display: grid; gap: 4px; margin: 0; padding: 0; list-style: none; font-size: 12px; }
+.bol-free-chart .od-free__pie-list li { display: grid; grid-template-columns: 11px minmax(0, 1fr) auto 52px; gap: 10px; align-items: center; border-bottom: 1px solid var(--line); padding-block: 3px; }
+.bol-free-chart .od-free__pie-list i { width: 11px; height: 11px; border-radius: 3px; }
+.bol-free-chart .od-free__pie-list small { text-align: right; color: var(--ink-muted); }
+.bol-free-chart .od-free__tick { fill: var(--ink-muted); font-size: 11px; }
+.bol-free-chart .od-free__label { fill: var(--ink-secondary); font-size: 12px; font-weight: 600; }
+.bol-free-chart .od-free__value { fill: var(--ink); font-size: 11px; font-weight: 800; }
+.bol-free-chart .od-free__connector { stroke-width: 1; stroke-dasharray: 3 3; }
+.bol-free-chart .od-free__today { stroke-width: 1.5; stroke-dasharray: 4 3; }
+.bol-free-chart svg { overflow: visible; }
+
+.bol-free-map { display: grid; gap: 3mm; }
+
+.bol-free-chart,
+.bol-free-map {
+  -webkit-print-color-adjust: exact;
+  print-color-adjust: exact;
+}
+
+/* --- Motor Beta ------------------------------------------------------------ */
+
+/* La escala del papel para el tránsito: un solo azul, de claro a oscuro. */
+.bol-doc {
+  --bol-seq-1: #0d366b;
+  --bol-seq-2: #256abf;
+  --bol-seq-3: #6da7ec;
+  --bol-seq-4: #cde2fb;
+}
+
+.bol-tyt-figure { margin: 0 0 3mm; }
+
+.bol-tyt-figure figcaption {
+  margin-bottom: 1.2mm;
+  color: var(--bol-ink-2);
+  font-size: 2.4mm;
+}
+
+.bol-tyt-transit__pct { font-size: 2.1px; font-weight: 700; }
+
+.bol-tyt-value,
+.bol-tyt-transit {
+  -webkit-print-color-adjust: exact;
+  print-color-adjust: exact;
+}

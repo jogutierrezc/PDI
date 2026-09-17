@@ -1010,7 +1010,11 @@ export type OdBlockKind =
   /** Rankings universitarios del informe, con su selector de vista (0030). */
   | "rankings"
   /** Resultados Saber PRO del informe, por competencia (0031). */
-  | "saber_pro";
+  | "saber_pro"
+  /** Conjunto libre: una de sus vistas (settings.view) o todas (0033). */
+  | "libre"
+  /** Motor Beta: Saber 11 → Saber TyT en rango percentil (0035). */
+  | "saber_tyt";
 /** Estado de un punto de un informe. */
 /** Cómo llega la cifra: por periodo académico (A y B) o una sola cifra por año. */
 export type OdReporting = "periodo" | "anual";
@@ -1279,6 +1283,10 @@ export interface OdReportBlockRow {
     rankings?: string[];
     /** Bloque Saber PRO: clave del conjunto que muestra (0031). */
     saberPro?: string;
+    /** Bloque de conjunto libre: clave de la vista que muestra; sin ella, todas (0033). */
+    view?: string;
+    /** Bloque del Motor Beta: clave del conjunto Saber TyT (0035). */
+    saberTyt?: string;
     /** Distingue varios bloques del mismo tipo sin conjunto (separadores, tableros). Ver 0029. */
     slot?: string;
   };
@@ -1363,6 +1371,67 @@ export interface OdSaberProRow {
   note: string;
   office_id: string | null;
   position: number;
+}
+
+/** Motor Beta: el conjunto Saber TyT de un informe (0035). */
+export interface OdSaberTytRow {
+  id: string;
+  report_id: string;
+  key: string;
+  title: string;
+  description: string;
+  note: string;
+  /** Curva de percentiles por competencia: ver saber-tyt.ts. */
+  benchmarks: import("../modules/datos-abiertos/data/saber-tyt").TytBenchmarks;
+  office_id: string | null;
+  position: number;
+}
+
+/** Una fila del Motor Beta: año × nivel × programa × competencia, en percentiles. */
+export interface OdSaberTytResultRow {
+  id?: string;
+  tyt_id: string;
+  year: number;
+  level: "tecnologico" | "tecnico_profesional" | "universitario";
+  program: string;
+  competency: "global" | "lc" | "rc" | "cc" | "ce" | "ing" | "cn";
+  evaluated: number | null;
+  mean_exit: number | string | null;
+  paired: number | null;
+  mean_entry: number | string | null;
+  mean_delta: number | string | null;
+  improved: number | null;
+  raw_entry: number | string | null;
+  raw_exit: number | string | null;
+  transitions: Record<string, Record<string, number>>;
+  histogram: Record<string, number>;
+  scatter: Record<string, number>;
+}
+
+/** Conjunto libre de un informe (0033). Columnas y vistas en jsonb: ver free-sets.ts. */
+export interface OdFreeSetRow {
+  id: string;
+  report_id: string;
+  key: string;
+  title: string;
+  description: string;
+  temporality: "sin_tiempo" | "anual" | "periodo";
+  period_label: string;
+  columns: import("../modules/datos-abiertos/data/free-sets").FreeColumn[];
+  views: import("../modules/datos-abiertos/data/free-sets").FreeView[];
+  office_id: string | null;
+  position: number;
+}
+
+/** Una fila de un conjunto libre: dato, título de grupo o total (0034). */
+export interface OdFreeSetRecordRow {
+  id?: string;
+  set_id: string;
+  position: number;
+  year: number | null;
+  kind?: "dato" | "grupo" | "total";
+  label?: string;
+  cells: Record<string, string | number | null>;
 }
 
 /** Resultado Saber PRO agregado: año × ámbito × competencia. Sin datos personales. */

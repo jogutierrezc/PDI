@@ -3386,3 +3386,183 @@
 .oda-saber__table { max-width: 48rem; }
 
 .oda-saber__legend { font-size: var(--text-xs); }
+
+/* --- Motor Beta (0035): la lectura institucional del archivo antes de guardar --- */
+
+.oda-tyt__readout { max-width: 48rem; }
+
+.oda-tyt__readout dd { display: flex; flex-wrap: wrap; align-items: baseline; gap: var(--space-1); }
+
+/* --- Conjuntos libres (0033) ----------------------------------------------------
+   Estructura: temporalidad y editor de columnas. Captura: la rejilla de filas,
+   con casillas de texto alineadas a la izquierda y cifras a la derecha, y los
+   avisos (territorio no reconocido, fila sin año) en ámbar, sin bloquear. */
+
+.oda-free { display: grid; gap: var(--space-3); }
+
+.oda-free-fieldset {
+  display: grid;
+  gap: var(--space-2);
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.oda-free-fieldset > legend {
+  margin-bottom: var(--space-2);
+  padding: 0;
+  color: var(--ink-secondary);
+  font-size: var(--text-sm);
+  font-weight: 700;
+}
+
+.oda-free-temporality [role="radiogroup"],
+.oda-free-series {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2) var(--space-5);
+}
+
+.oda-free-columns > button { justify-self: start; }
+
+.oda-free-columns ol {
+  display: grid;
+  gap: var(--space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.oda-free-columns li {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: end;
+  gap: var(--space-2) var(--space-3);
+  padding: var(--space-2) var(--space-3);
+  background: var(--surface);
+  border: 1px solid var(--line-faint);
+  border-radius: var(--radius-xs);
+}
+
+.oda-free-columns__pos {
+  align-self: center;
+  min-width: 1.25rem;
+  color: var(--ink-muted);
+  font-size: var(--text-xs);
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+}
+
+.oda-free-columns__tools {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  margin-left: auto;
+}
+
+.oda-free-columns__tools small {
+  margin-right: var(--space-2);
+  color: var(--ink-muted);
+  font-size: var(--text-2xs);
+}
+
+.oda-free-columns__note { flex-basis: 100%; }
+
+.oda-free__problems {
+  margin: var(--space-3) 0 0;
+  padding-left: calc(var(--space-3) + 1rem);
+}
+
+.oda-free-grid tbody th,
+.oda-free-grid thead th:first-child {
+  width: 9rem;
+  min-width: 9rem;
+  color: var(--ink-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+/* Número de la fila y su tipo: dato, título de grupo o total. */
+.oda-free-grid tbody th {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-weight: 600;
+}
+
+.oda-free-grid__pos {
+  min-width: 1.25rem;
+  font-size: var(--text-xs);
+  font-weight: 800;
+}
+
+.oda-free-grid__kind {
+  min-width: 0;
+  flex: 1 1 auto;
+  padding: 2px var(--space-1);
+  color: var(--ink-secondary);
+  background: var(--surface-2);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-xs);
+  font: inherit;
+  font-size: var(--text-2xs);
+}
+
+/* Un título o un total ocupan la fila entera: su texto, y lo que hará el portal. */
+.oda-free-grid td.oda-free-grid__label {
+  padding: var(--space-2) var(--space-3);
+  background: var(--surface-2);
+}
+
+.oda-free-grid td.oda-free-grid__label input {
+  height: auto;
+  padding: var(--space-1) var(--space-2);
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-xs);
+  font-weight: 700;
+  text-align: left;
+}
+
+.oda-free-grid td.oda-free-grid__label small {
+  display: block;
+  margin-top: 2px;
+  color: var(--ink-muted);
+  font-size: var(--text-2xs);
+}
+
+.oda-free-grid td.oda-free-grid__label[data-error] input {
+  border-color: var(--status-risk);
+  color: var(--status-risk);
+}
+
+.oda-free-grid tr[data-row-kind="total"] td.oda-free-grid__label input { font-variant-numeric: tabular-nums; }
+
+.oda-free-grid thead th small {
+  display: block;
+  color: var(--ink-muted);
+  font-size: var(--text-2xs);
+  font-weight: 500;
+}
+
+.oda-free-grid thead th:is([data-kind="texto"], [data-kind="territorio"], [data-kind="fecha"]),
+.oda-free-grid td:is([data-kind="texto"], [data-kind="territorio"], [data-kind="fecha"]) input {
+  text-align: left;
+}
+
+.oda-free-grid td[data-kind="texto"] { min-width: 10rem; }
+
+.oda-free-grid td[data-warning] { background: var(--status-pending-soft); }
+
+.oda-free-grid td.oda-free-grid__tools {
+  width: 1%;
+  min-width: 10.5rem;
+  padding: 0 var(--space-1);
+  white-space: nowrap;
+  text-align: right;
+}
+
+.oda-free-grid td.oda-free-grid__tools .icon-button {
+  width: 30px;
+  height: 30px;
+}

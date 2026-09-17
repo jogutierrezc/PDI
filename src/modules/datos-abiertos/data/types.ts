@@ -18,6 +18,8 @@ import type { PublicationStatus } from "../../../types/database";
 import type { AnnualRule, Term } from "./terms";
 import type { RankingData } from "./rankings";
 import type { SaberProData } from "./saber-pro";
+import type { FreeSet } from "./free-sets";
+import type { SaberTytData } from "./saber-tyt";
 
 export type { AnnualRule, Term } from "./terms";
 
@@ -50,7 +52,9 @@ export type BlockKind =
   | "tabla"
   | "separador"
   | "rankings"
-  | "saber_pro";
+  | "saber_pro"
+  | "libre"
+  | "saber_tyt";
 
 export interface Campus {
   id: CampusId;
@@ -262,6 +266,10 @@ export interface ReportBlock {
     rankings?: string[];
     /** Bloque Saber PRO: clave del conjunto. Sin ella, el primero del informe. */
     saberPro?: string;
+    /** Bloque de conjunto libre: clave de la vista. Sin ella, todas las de la fuente. */
+    view?: string;
+    /** Bloque del Motor Beta: clave del conjunto. Sin ella, el primero del informe. */
+    saberTyt?: string;
   };
   /** Punto del informe al que pertenece. Sin punto, el bloque es de toda la ficha. */
   sectionKey?: string | null;
@@ -304,6 +312,10 @@ export interface Report {
   rankings?: RankingData[];
   /** Resultados Saber PRO por competencia, año, sede y programa. */
   saberPro?: SaberProData[];
+  /** Conjuntos libres: fuentes con columnas propias y sus gráficas. */
+  freeSets?: FreeSet[];
+  /** Motor Beta: Saber 11 → Saber TyT en rango percentil. */
+  saberTyt?: SaberTytData[];
   /** Orden y visibilidad de los bloques de la ficha. Sin bloques, el orden por defecto. */
   blocks?: ReportBlock[];
   /** Nota metodológica o de alcance. */
@@ -376,7 +388,7 @@ export interface TableData {
 }
 
 /** Bloques que apuntan a un conjunto concreto del informe. */
-export const DATASET_BLOCKS: BlockKind[] = ["mapa", "mapa_calor", "tuberia", "historico", "tabla"];
+export const DATASET_BLOCKS: BlockKind[] = ["mapa", "mapa_calor", "tuberia", "historico", "tabla", "libre"];
 
 export const BLOCK_LABELS: Record<BlockKind, string> = {
   kpis: "Tablero de indicadores",
@@ -392,4 +404,6 @@ export const BLOCK_LABELS: Record<BlockKind, string> = {
   separador: "Separador",
   rankings: "Rankings",
   saber_pro: "Resultados Saber PRO",
+  libre: "Conjunto libre",
+  saber_tyt: "Saber TyT · Motor Beta",
 };

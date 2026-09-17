@@ -50,7 +50,12 @@ const DATASET_PREFIX: Partial<Record<ReportBlock["kind"], string>> = {
   tuberia: "tuberia",
   historico: "historico",
   tabla: "tabla",
+  libre: "libre",
 };
+
+/** El conjunto Saber TyT (Motor Beta) que muestra un bloque. */
+export const saberTytOf = (report: Report, block: ReportBlock) =>
+  report.saberTyt?.find((t) => t.id === block.settings.saberTyt) ?? report.saberTyt?.[0];
 
 /** El conjunto Saber PRO que muestra un bloque: el elegido o, sin elección, el primero. */
 export const saberProOf = (report: Report, block: ReportBlock) =>
@@ -136,6 +141,11 @@ export function reportGroups(report: Report): ReportGrouping {
       picks.rankings(block).forEach((key) => claim(`ranking:${key}`, current));
       return;
     }
+    if (block.kind === "saber_tyt") {
+      const shown = saberTytOf(report, block);
+      if (shown) claim("tyt:" + shown.id, current);
+      return;
+    }
     if (block.kind === "saber_pro") {
       // Una hoja del boletín por competencia: todas son del grupo del bloque.
       const shown = saberProOf(report, block);
@@ -145,6 +155,11 @@ export function reportGroups(report: Report): ReportGrouping {
     const prefix = DATASET_PREFIX[block.kind];
     if (prefix && block.refKey) {
       claim(`${prefix}:${block.refKey}`, current);
+      // Conjunto libre: en el boletín cada vista es su hoja ("libre:<fuente>:<vista>").
+      if (block.kind === "libre") {
+        const set = report.freeSets?.find((f) => f.id === block.refKey);
+        set?.views.filter((v) => !block.settings.view || v.key === block.settings.view).forEach((v) => claim(`libre:${set.id}:${v.key}`, current));
+      }
       // Un mapa que se muestra junto a otro arrastra a su pareja.
       if (block.kind === "mapa" && block.settings.mapWith) claim(`mapa:${block.settings.mapWith}`, current);
     }

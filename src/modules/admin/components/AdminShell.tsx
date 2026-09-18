@@ -4,9 +4,17 @@
    su propio pie de guardado. Aquí viven una sola vez, y además es donde se
    decide qué entradas del menú ve cada rol.
 
-   La intranet atiende dos portales —el Plan de Desarrollo y UDES en Cifras—
-   más el mantenimiento del sistema, así que el menú se agrupa por portal. La
-   cabecera lleva la ruta (portal › pantalla) en lugar de un rótulo suelto.
+   La intranet atiende tres frentes —el Plan de Desarrollo, UDES en Cifras y
+   el Observatorio de Analítica— más el mantenimiento del sistema, así que el
+   menú se agrupa por portal. La cabecera lleva la ruta (portal › pantalla) en
+   lugar de un rótulo suelto.
+
+   El menú tiene tres anchos, que se recuerdan en este navegador:
+   · completo  rótulos y grupos; cada grupo se pliega desde su título.
+   · íconos    una columna estrecha: ícono con su nombre al pasar o enfocar.
+   · oculto    todo el ancho para el trabajo (la rejilla de Captura, el lienzo
+               de Diseño); el botón de la cabecera lo devuelve.
+   En el móvil el menú es siempre el cajón de antes.
    ========================================================================== */
 
 import { useEffect, useRef, useState } from "react";
@@ -30,7 +38,8 @@ export type AdminSection =
   | "development"
   | "users"
   | "repository"
-  | "cifras";
+  | "cifras"
+  | "observatorio";
 
 interface NavItem {
   id: AdminSection;
@@ -42,7 +51,7 @@ interface NavItem {
 }
 
 interface NavGroup {
-  id: "pdi" | "cifras" | "sistema";
+  id: "pdi" | "cifras" | "observatorio" | "sistema";
   label: string;
   items: NavItem[];
 }
@@ -74,6 +83,13 @@ const navigation: NavGroup[] = [
     ],
   },
   {
+    id: "observatorio",
+    label: "Observatorio de Analítica",
+    items: [
+      { id: "observatorio", label: "Taller del Observatorio", icon: "spark-chart", to: "/admin/observatorio", minimum: "consulta" },
+    ],
+  },
+  {
     id: "sistema",
     label: "Sistema",
     items: [
@@ -87,6 +103,27 @@ const navigation: NavGroup[] = [
   },
 ];
 
+
+type NavMode = "completo" | "iconos" | "oculto";
+const NAV_MODE_KEY = "intranet:menu";
+const NAV_GROUPS_KEY = "intranet:menu-grupos";
+
+function readStored<T>(key: string, fallback: T): T {
+  try {
+    const raw = window.localStorage.getItem(key);
+    return raw ? (JSON.parse(raw) as T) : fallback;
+  } catch {
+    return fallback;
+  }
+}
+
+function store(key: string, value: unknown) {
+  try {
+    window.localStorage.setItem(key, JSON.stringify(value));
+  } catch {
+    /* Sin almacenamiento (ventana privada): el menú vuelve a su ancho al recargar. */
+  }
+}
 
 interface AdminShellProps {
   section: AdminSection;
@@ -110,6 +147,18 @@ export function AdminShell({
   children,
 }: AdminShellProps) {
   const [navOpen, setNavOpen] = useState(false);
+  const [navMode, setNavModeState] = useState<NavMode>(() => readStored<NavMode>(NAV_MODE_KEY, "completo"));
+  const [folded, setFolded] = useState<string[]>(() => readStored<string[]>(NAV_GROUPS_KEY, []));
+  const setNavMode = (mode: NavMode) => {
+    setNavModeState(mode);
+    store(NAV_MODE_KEY, mode);
+  };
+  const toggleGroup = (id: string) =>
+    setFolded((current) => {
+      const next = current.includes(id) ? current.filter((g) => g !== id) : [...current, id];
+      store(NAV_GROUPS_KEY, next);
+      return next;
+    });
   const { resolved, toggle } = useTheme();
   const { profile, signOut, hasRole, canSee } = useAuth();
   const navigate = useNavigate();
@@ -144,19 +193,31 @@ export function AdminShell({
   }
 
   return (
-    <div ref={shellRef} className={`admin-shell${navOpen ? " nav-open" : ""}`}>
+    <div ref={shellRef} className={`admin-shell${navOpen ? " nav-open" : ""}`} data-nav={navMode}>
       <a className="skip-link" href="#admin-contenido">
         Saltar al contenido
       </a>
 
       <aside className="admin-sidebar" id="admin-nav">
-        <Link className="admin-brand" to="/admin/pilares">
-          <img src="/logo-udes.svg" alt="" width={95} height={34} />
-          <span>
-            <strong>Intranet UDES</strong>
-            <small>Planeación institucional</small>
-          </span>
-        </Link>
+        <div className="admin-sidebar__head">
+          <Link className="admin-brand" to="/admin/pilares" aria-label="Intranet UDES · inicio">
+            <img src="/logo-udes.svg" alt="" width={95} height={34} />
+            <span>
+              <strong>Intranet UDES</strong>
+              <small>Planeación institucional</small>
+            </span>
+          </Link>
+          <button
+            type="button"
+            className="icon-button admin-sidebar__fold"
+            aria-label={navMode === "iconos" ? "Expandir el menú" : "Contraer el menú a íconos"}
+            title={navMode === "iconos" ? "Expandir el menú" : "Contraer a íconos"}
+            aria-pressed={navMode === "iconos"}
+            onClick={() => setNavMode(navMode === "iconos" ? "completo" : "iconos")}
+          >
+            <Icon name="sidebar" size={17} />
+          </button>
+        </div>
 
         <nav className="admin-nav" aria-label="Navegación administrativa">
           {navigation.map((navGroup) => {
@@ -164,22 +225,45 @@ export function AdminShell({
             // qué permiso se entra a ellas.
             const items = navGroup.items.filter((item) => hasRole(item.minimum) && canSee(item.id));
             if (items.length === 0) return null;
+            // Plegado solo en el menú completo: en el de íconos cada grupo es
+            // una columna corta y plegarlo escondería la pantalla sin aviso.
+            const isFolded = navMode !== "iconos" && folded.includes(navGroup.id);
+            const holdsCurrent = items.some((item) => item.id === section);
             return (
-              <div className="admin-nav__group" key={navGroup.id}>
-                <span className="admin-nav__group-label" id={`admin-nav-${navGroup.id}`}>
-                  {navGroup.label}
-                </span>
-                <ul aria-labelledby={`admin-nav-${navGroup.id}`}>
+              <div className="admin-nav__group" key={navGroup.id} data-folded={isFolded || undefined}>
+                <button
+                  type="button"
+                  className="admin-nav__group-label"
+                  id={`admin-nav-${navGroup.id}`}
+                  aria-expanded={!isFolded}
+                  aria-controls={`admin-nav-${navGroup.id}-lista`}
+                  onClick={() => toggleGroup(navGroup.id)}
+                >
+                  <span className="admin-nav__group-name">{navGroup.label}</span>
+                  {isFolded && (
+                    <span className="admin-nav__group-count">
+                      {holdsCurrent && <i className="admin-nav__here" aria-hidden="true" />}
+                      {items.length}
+                      <span className="sr-only">
+                        {items.length === 1 ? " pantalla" : " pantallas"}
+                        {holdsCurrent ? ", incluye la actual" : ""}
+                      </span>
+                    </span>
+                  )}
+                  <Icon name="chevron-down" size={14} className="admin-nav__chevron" />
+                </button>
+                <ul id={`admin-nav-${navGroup.id}-lista`} aria-labelledby={`admin-nav-${navGroup.id}`} hidden={isFolded}>
                   {items.map((item) => (
                     <li key={item.id}>
                       <NavLink
                         to={item.to}
                         className={item.id === section ? "is-active" : ""}
                         aria-current={item.id === section ? "page" : undefined}
+                        data-tip={item.label}
                         onClick={() => setNavOpen(false)}
                       >
                         <Icon name={item.icon} size={17} />
-                        {item.label}
+                        <span className="admin-nav__text">{item.label}</span>
                       </NavLink>
                     </li>
                   ))}
@@ -197,21 +281,25 @@ export function AdminShell({
             </div>
           )}
 
-          <Link to="/">
+          <Link to="/" data-tip="Ver Portal PDI">
             <Icon name="external" size={16} />
-            Ver Portal PDI
+            <span className="admin-nav__text">Ver Portal PDI</span>
           </Link>
-          <Link to="/datos-abiertos">
+          <Link to="/datos-abiertos" data-tip="Ver UDES en Cifras">
             <Icon name="external" size={16} />
-            Ver UDES en Cifras
+            <span className="admin-nav__text">Ver UDES en Cifras</span>
           </Link>
-          <a href="mailto:planeacion@udes.edu.co">
+          <a href="mailto:planeacion@udes.edu.co" data-tip="Ayuda">
             <Icon name="document" size={16} />
-            Ayuda
+            <span className="admin-nav__text">Ayuda</span>
           </a>
-          <button type="button" onClick={handleSignOut}>
+          <button type="button" className="admin-sidebar__hide" data-tip="Ocultar el menú" onClick={() => setNavMode("oculto")}>
+            <Icon name="eye-off" size={16} />
+            <span className="admin-nav__text">Ocultar el menú</span>
+          </button>
+          <button type="button" onClick={handleSignOut} data-tip="Cerrar sesión">
             <Icon name="arrow-left" size={16} />
-            Cerrar sesión
+            <span className="admin-nav__text">Cerrar sesión</span>
           </button>
         </div>
       </aside>
@@ -238,13 +326,25 @@ export function AdminShell({
           >
             <Icon name={navOpen ? "close" : "menu"} size={18} />
           </button>
+          {navMode === "oculto" && (
+            <button
+              className="icon-button admin-nav-restore"
+              type="button"
+              aria-controls="admin-nav"
+              aria-label="Mostrar el menú"
+              title="Mostrar el menú"
+              onClick={() => setNavMode("completo")}
+            >
+              <Icon name="sidebar" size={18} />
+            </button>
+          )}
 
           <div className="admin-topbar__copy">
             {/* Ruta: portal › pantalla. Sustituye al rótulo suelto sobre el título. */}
             <nav className="admin-crumbs" aria-label="Ruta">
               <ol>
                 <li>{group?.label ?? kicker}</li>
-                {group && group.id !== "cifras" && kicker && kicker !== group.label && <li>{kicker}</li>}
+                {group && group.id !== "cifras" && group.id !== "observatorio" && kicker && kicker !== group.label && <li>{kicker}</li>}
                 <li aria-current="page">{title}</li>
               </ol>
             </nav>

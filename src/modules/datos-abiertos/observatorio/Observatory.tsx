@@ -1,5 +1,5 @@
 /* =============================================================================
-   Observatorio de Analítica Académica · MAQUETA CON DATOS DE EJEMPLO.
+   Observatorio de Analítica Académica.
 
    Vive en el mismo tablero de paletas que los informes de UDES en Cifras (el
    mismo mundo visual), con una diferencia de fondo: aquí no hay indicadores
@@ -12,10 +12,13 @@
    · ObservatoryHub: /datos-abiertos/observatorio.
    · ObservatoryTopic: /datos-abiertos/observatorio/:tema.
 
-   Toda cifra sale de observatorio/data.ts y se rotula «Datos de ejemplo».
+   Los temas que Planeación publica desde el taller de la intranet se leen de
+   Supabase (live.ts) y se dibujan con sus visores; los que aún no tienen nada
+   publicado siguen con la maqueta de observatorio/data.ts, rotulada «Datos
+   de ejemplo». Así el tablero pasa a datos reales tema por tema.
    ========================================================================== */
 
-import { useMemo, useRef, useState } from "react";
+import { Suspense, lazy, useMemo, useRef, useState } from "react";
 import type { CSSProperties } from "react";
 import { Link, useParams } from "react-router-dom";
 import { Icon } from "../../../components/ui/Icon";
@@ -26,6 +29,11 @@ import { SplitFlap } from "../components/SplitFlap";
 import { useInView, useWidth } from "../components/motion";
 import { OBS_TOPICS, findTopic } from "./data";
 import type { ObsTable, ObsTopic } from "./data";
+import { summarize, useObservatoryLive } from "./live";
+import { ContextBar } from "../../../components/layout/ContextBar";
+import type { LiveSummary, LiveTopic } from "./live";
+
+const LiveTopicBody = lazy(() => import("./LiveTopic"));
 import "../datos-abiertos.css";
 import "./observatorio.css";
 
@@ -36,16 +44,34 @@ const num = (v: number) => (Number.isInteger(v) ? integer.format(v) : decimal.fo
 const headlineText = (t: ObsTopic) =>
   t.headline.format === "porcentaje" ? `${decimal.format(t.headline.value)} %` : num(t.headline.value);
 const lineStyle = (line: number) => ({ "--line": `var(--od-line-${line})` }) as CSSProperties;
+const liveText = (s: LiveSummary) => (s.format === "porcentaje" ? `${one.format(s.value)} %` : s.format === "entero" ? integer.format(s.value) : decimal.format(s.value));
+const longDate = new Intl.DateTimeFormat("es-CO", { day: "numeric", month: "long", year: "numeric" });
+
+/** Los temas publicados, con su resumen para el tablero. */
+function useLive() {
+  const query = useObservatoryLive();
+  return useMemo(() => {
+    const map = new Map<string, { live: LiveTopic; summary: LiveSummary | null }>();
+    for (const [slug, live] of query.data ?? []) map.set(slug, { live, summary: summarize(live) });
+    return map;
+  }, [query.data]);
+}
 
 /** El aviso que acompaña a toda cifra del Observatorio mientras sea maqueta. */
-function ExampleNote({ compact = false }: { compact?: boolean }) {
+function ExampleNote({ compact = false, published = 0 }: { compact?: boolean; published?: number }) {
+  if (published >= OBS_TOPICS.length) return null;
+  const partial = published > 0;
   return (
     <p className="obs-note" data-compact={compact || undefined} role="note">
-      <span className="od-stamp">Datos de ejemplo</span>
+      <span className="od-stamp">{partial ? `${published} de ${OBS_TOPICS.length} con datos` : "Datos de ejemplo"}</span>
       <span>
-        {compact
-          ? "Maqueta: ninguna cifra de esta sección es real."
-          : "Esta es una maqueta del Observatorio. Ninguna cifra es real: sirven para diseñar las páginas mientras cada oficina define los conjuntos de datos que publicará."}
+        {partial
+          ? compact
+            ? "Las páginas marcadas «ejemplo» aún muestran datos de maqueta."
+            : `${published === 1 ? "Una página ya publica" : `${published} páginas ya publican`} datos reales. Las demás siguen con datos de ejemplo, marcados así, mientras cada oficina carga los suyos.`
+          : compact
+            ? "Maqueta: ninguna cifra de esta sección es real."
+            : "Esta es una maqueta del Observatorio. Ninguna cifra es real: sirven para diseñar las páginas mientras cada oficina define los conjuntos de datos que publicará."}
       </span>
     </p>
   );
@@ -56,6 +82,8 @@ function ExampleNote({ compact = false }: { compact?: boolean }) {
 export function ObservatoryBoard({ standalone = false }: { standalone?: boolean }) {
   const [active, setActive] = useState(OBS_TOPICS[0].slug);
   const topic = findTopic(active) ?? OBS_TOPICS[0];
+  const live = useLive();
+  const current = live.get(topic.slug);
 
   return (
     <section className="od-board obs-board" id="observatorio" aria-labelledby="obs-titulo">
@@ -76,18 +104,23 @@ export function ObservatoryBoard({ standalone = false }: { standalone?: boolean 
               </p>
             )}
           </div>
-          {!standalone && <ExampleNote compact />}
+          {!standalone && <ExampleNote compact published={live.size} />}
         </div>
 
         <div className="od-board__grid">
           <div className="od-departures">
             <div className="od-departures__columns" aria-hidden="true">
               <span>Página</span>
-              <span>Dato de ejemplo</span>
+              <span>Cifra</span>
               <span>Tendencia</span>
             </div>
             <ol className="od-departures__list">
-              {OBS_TOPICS.map((t, index) => (
+              {OBS_TOPICS.map((t, index) => {
+                const real = live.get(t.slug);
+                const summary = real?.summary;
+                const figure = summary ? liveText(summary) : real ? "—" : headlineText(t);
+                const label = summary ? summary.label : real ? "Datos publicados" : t.headline.label;
+                return (
                 <li key={t.slug}>
                   <Link
                     className="od-row"
@@ -107,19 +140,23 @@ export function ObservatoryBoard({ standalone = false }: { standalone?: boolean 
                     </span>
                     <span className="od-row__figure">
                       <span className="od-row__digits">
-                        <SplitFlap value={headlineText(t)} align="end" size="sm" delay={index * 70 + 140} numeric label={`${t.headline.label}: ${headlineText(t)} (dato de ejemplo)`} />
+                        <SplitFlap value={figure} align="end" size="sm" delay={index * 70 + 140} numeric label={`${label}: ${figure}${real ? "" : " (dato de ejemplo)"}`} />
                       </span>
-                      <span className="od-row__indicator">{t.headline.label}</span>
+                      <span className="od-row__indicator">
+                        {label}
+                        {!real && <span className="obs-sample-tag">ejemplo</span>}
+                      </span>
                     </span>
                     <span className="od-row__previous obs-spark">
-                      <Spark values={t.series.points.map(([, v]) => v)} />
+                      {real ? summary?.spark && summary.spark.length > 1 ? <Spark values={summary.spark} /> : null : <Spark values={t.series.points.map(([, v]) => v)} />}
                     </span>
                     <span className="od-row__go" aria-hidden="true">
                       <Icon name="arrow-right" size={20} />
                     </span>
                   </Link>
                 </li>
-              ))}
+                );
+              })}
             </ol>
           </div>
 
@@ -131,12 +168,26 @@ export function ObservatoryBoard({ standalone = false }: { standalone?: boolean 
                 </span>
                 <h3>{topic.name}</h3>
               </div>
-              <p className="obs-question">{topic.question}</p>
-              <MiniShare topic={topic} />
+              <p className="obs-question">{current?.live.config.intro || topic.question}</p>
+              {current ? (
+                current.summary?.share ? (
+                  <MiniShare title={current.summary.share.title} items={current.summary.share.items} />
+                ) : (
+                  <p className="obs-live-count">
+                    {current.live.views.length} {current.live.views.length === 1 ? "visor publicado" : "visores publicados"}
+                  </p>
+                )
+              ) : (
+                <MiniShare title={topic.share.title} items={topic.share.items} />
+              )}
               <Link className="od-button od-button--signal" to={`/datos-abiertos/observatorio/${topic.slug}`}>
                 Abrir la página <Icon name="arrow-right" size={17} />
               </Link>
-              <small className="od-platform__credit">Alimentará este conjunto: {topic.source} · datos de ejemplo</small>
+              <small className="od-platform__credit">
+                {current
+                  ? `Fuente: ${current.live.sources.join(", ") || topic.source}${current.live.updatedAt ? ` · actualizado el ${longDate.format(new Date(current.live.updatedAt))}` : ""}`
+                  : `Alimentará este conjunto: ${topic.source} · datos de ejemplo`}
+              </small>
             </div>
           </aside>
         </div>
@@ -159,18 +210,18 @@ function Spark({ values }: { values: number[] }) {
   );
 }
 
-function MiniShare({ topic }: { topic: ObsTopic }) {
-  const total = topic.share.items.reduce((s, [, v]) => s + v, 0);
+function MiniShare({ title, items }: { title: string; items: [string, number][] }) {
+  const total = items.reduce((s, [, v]) => s + v, 0) || 1;
   return (
     <figure className="obs-mini">
-      <figcaption>{topic.share.title}</figcaption>
+      <figcaption>{title}</figcaption>
       <span className="obs-mini__bar">
-        {topic.share.items.map(([label, v], k) => (
+        {items.map(([label, v], k) => (
           <i key={label} style={{ "--w": `${(v / total) * 100}%`, "--tone": `var(--od-inst-${(k % 6) + 1})` } as CSSProperties} title={`${label}: ${num(v)}`} />
         ))}
       </span>
       <span className="obs-mini__legend">
-        {topic.share.items.slice(0, 4).map(([label, v], k) => (
+        {items.slice(0, 4).map(([label, v], k) => (
           <span key={label} style={{ "--tone": `var(--od-inst-${(k % 6) + 1})` } as CSSProperties}>
             {label} <b>{Math.round((v / total) * 100)} %</b>
           </span>
@@ -183,8 +234,10 @@ function MiniShare({ topic }: { topic: ObsTopic }) {
 /* --- Portada del Observatorio ------------------------------------------------------- */
 
 export function ObservatoryHub() {
+  const live = useLive();
   return (
     <OpenDataLayout title="Observatorio de Analítica Académica | UDES en Cifras" className="obs-page">
+      <ObsBar current={null} published={live} />
       <section className="od-report-head obs-head" aria-labelledby="obs-hub">
         <div className="u-container">
           <Link className="od-back" to="/datos-abiertos">
@@ -198,7 +251,7 @@ export function ObservatoryHub() {
             Los datos de la vida académica de la Universidad de Santander, para explorarlos más allá de los indicadores: cada página responde una pregunta con
             su serie en el tiempo, su reparto y la tabla completa para ordenar, filtrar y descargar.
           </p>
-          <ExampleNote />
+          <ExampleNote published={live.size} />
         </div>
       </section>
       <ObservatoryBoard standalone />
@@ -211,6 +264,7 @@ export function ObservatoryHub() {
 export function ObservatoryTopic() {
   const { tema } = useParams();
   const topic = findTopic(tema);
+  const liveMap = useLive();
   if (!topic) {
     return (
       <OpenDataLayout title="Observatorio | UDES en Cifras" className="obs-page">
@@ -228,36 +282,14 @@ export function ObservatoryTopic() {
   const index = OBS_TOPICS.indexOf(topic);
   const prev = OBS_TOPICS[(index - 1 + OBS_TOPICS.length) % OBS_TOPICS.length];
   const next = OBS_TOPICS[(index + 1) % OBS_TOPICS.length];
+  const real = liveMap.get(topic.slug);
 
   return (
     <OpenDataLayout title={`${topic.name} · Observatorio | UDES en Cifras`} className="obs-page">
-      <div className="od-report-bar obs-bar">
-        <nav className="od-strip" aria-label="Cambiar de página del Observatorio">
-          {OBS_TOPICS.map((t) => {
-            const current = t.slug === topic.slug;
-            const label = current ? `Estás leyendo · ${t.name}` : `Abrir · ${t.name}`;
-            return (
-              <Link
-                key={t.slug}
-                to={`/datos-abiertos/observatorio/${t.slug}`}
-                className="od-strip__seg"
-                aria-current={current ? "page" : undefined}
-                aria-label={label}
-                data-label={label}
-                style={lineStyle(t.line)}
-              >
-                <span aria-hidden="true">{t.code}</span>
-              </Link>
-            );
-          })}
-        </nav>
-      </div>
+      <ObsBar current={topic.slug} published={liveMap} />
 
       <section className="od-report-head obs-head" aria-labelledby="obs-tema">
         <div className="u-container">
-          <Link className="od-back" to="/datos-abiertos/observatorio">
-            <Icon name="arrow-left" size={16} /> Observatorio de Analítica Académica
-          </Link>
           <div className="obs-head__row">
             <span className="od-report-head__code od-line" style={lineStyle(topic.line)}>
               <SplitFlap key={topic.slug} value={topic.code} size="lg" delay={80} />
@@ -267,30 +299,61 @@ export function ObservatoryTopic() {
             </span>
           </div>
           <h1 id="obs-tema">{topic.name}</h1>
-          <p className="obs-head__question">{topic.question}</p>
-          <dl className="od-report-head__facts">
-            <div>
-              <dt>Alimentará este conjunto</dt>
-              <dd>{topic.source}</dd>
-            </div>
-            <div>
-              <dt>{topic.headline.label}</dt>
-              <dd>
-                {headlineText(topic)} {topic.headline.format === "porcentaje" ? "" : topic.headline.unit}
-              </dd>
-            </div>
-          </dl>
-          <ExampleNote />
+          <p className="obs-head__question">{real?.live.config.intro || topic.question}</p>
+          {real ? (
+            <dl className="od-report-head__facts">
+              <div>
+                <dt>Fuente</dt>
+                <dd>{real.live.sources.join(", ") || topic.source}</dd>
+              </div>
+              {real.summary && (
+                <div>
+                  <dt>{real.summary.label}</dt>
+                  <dd>
+                    {liveText(real.summary)} {real.summary.format === "porcentaje" ? "" : real.summary.unit}
+                  </dd>
+                </div>
+              )}
+              {real.live.updatedAt && (
+                <div>
+                  <dt>Actualizado</dt>
+                  <dd>{longDate.format(new Date(real.live.updatedAt))}</dd>
+                </div>
+              )}
+            </dl>
+          ) : (
+            <>
+              <dl className="od-report-head__facts">
+                <div>
+                  <dt>Alimentará este conjunto</dt>
+                  <dd>{topic.source}</dd>
+                </div>
+                <div>
+                  <dt>{topic.headline.label}</dt>
+                  <dd>
+                    {headlineText(topic)} {topic.headline.format === "porcentaje" ? "" : topic.headline.unit}
+                  </dd>
+                </div>
+              </dl>
+              <ExampleNote />
+            </>
+          )}
         </div>
       </section>
 
-      <section className="od-section obs-views" aria-label={`Datos de ${topic.name}`}>
-        <div className="u-container obs-grid">
-          <SeriesPanel topic={topic} />
-          <SharePanel topic={topic} />
-          <TablePanel topic={topic} table={topic.table} />
-        </div>
-      </section>
+      {real ? (
+        <Suspense fallback={<div className="u-container obs-live__loading" aria-busy="true" />}>
+          <LiveTopicBody live={real.live} slug={topic.slug} />
+        </Suspense>
+      ) : (
+        <section className="od-section obs-views" aria-label={`Datos de ${topic.name}`}>
+          <div className="u-container obs-grid">
+            <SeriesPanel topic={topic} />
+            <SharePanel topic={topic} />
+            <TablePanel topic={topic} table={topic.table} />
+          </div>
+        </section>
+      )}
 
       <nav className="obs-pager u-container" aria-label="Otras páginas del Observatorio">
         <Link to={`/datos-abiertos/observatorio/${prev.slug}`} style={lineStyle(prev.line)}>
@@ -474,5 +537,35 @@ function TablePanel({ topic, table }: { topic: ObsTopic; table: ObsTable }) {
         </table>
       </div>
     </ChartFrame>
+  );
+}
+
+/* --- Barra de contexto del Observatorio ---------------------------------------------
+   La misma del Plan de Desarrollo: regresar, ir a los boletines y saltar
+   entre los catorce temas. Un punto ámbar
+   marca los temas que ya publican datos reales. */
+
+function ObsBar({ current, published }: { current: string | null; published: Map<string, unknown> }) {
+  return (
+    <ContextBar
+      label="Navegación del Observatorio"
+      back={current ? { to: "/datos-abiertos/observatorio", label: "Todas las páginas" } : { to: "/", label: "Planeación Institucional" }}
+      links={[{ label: "Boletines", to: "/datos-abiertos/boletines" }]}
+      itemsLabel="Temas del Observatorio"
+      items={OBS_TOPICS.map((t) => {
+        const here = t.slug === current;
+        const live = published.has(t.slug);
+        return {
+          key: t.slug,
+          to: `/datos-abiertos/observatorio/${t.slug}`,
+          code: t.code,
+          name: t.name,
+          tone: `var(--od-line-${t.line})`,
+          current: here,
+          flag: live,
+          label: `${here ? "Estás leyendo" : "Abrir"} · ${t.name} · ${live ? "datos publicados" : "datos de ejemplo"}`,
+        };
+      })}
+    />
   );
 }

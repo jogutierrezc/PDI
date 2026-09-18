@@ -1,15 +1,14 @@
 /* =============================================================================
    Marco del portal Datos Abiertos.
 
-   Portal aparte dentro del mismo código: cabecera y pie propios, sin la
-   navegación del PDI. Comparte el tema, la sesión y la caché de datos.
+   Portal aparte dentro del mismo código, con pie propio y la barra unificada
+   de los portales de Planeación. Comparte el tema, la sesión y la caché.
    ========================================================================== */
 
 import { useEffect } from "react";
 import type { ReactNode } from "react";
-import { Link, NavLink } from "react-router-dom";
-import { Icon } from "../../../components/ui/Icon";
-import { useTheme } from "../../../lib/theme";
+import { Link } from "react-router-dom";
+import { SiteHeader } from "../../../components/layout/SiteHeader";
 import { useOpenDataCatalog, formatCutoff } from "../data/open-data";
 
 interface OpenDataLayoutProps {
@@ -28,7 +27,7 @@ export function EmptyPeriod() {
           La Oficina de Planeación Institucional está preparando el periodo. Vuelve pronto o escribe a
           planeacion@udes.edu.co si necesitas un dato.
         </p>
-        <Link className="od-button od-button--signal" to="/">
+        <Link className="od-button od-button--signal" to="/pdi">
           Ir al Portal PDI
         </Link>
       </div>
@@ -37,7 +36,6 @@ export function EmptyPeriod() {
 }
 
 export function OpenDataLayout({ children, title, className = "" }: OpenDataLayoutProps) {
-  const { resolved, toggle } = useTheme();
   const catalog = useOpenDataCatalog();
 
   useEffect(() => {
@@ -54,44 +52,9 @@ export function OpenDataLayout({ children, title, className = "" }: OpenDataLayo
         Saltar al contenido
       </a>
 
-      <header className="od-header">
-        <Link className="od-brand" to="/datos-abiertos" aria-label="UDES en Cifras, ir al inicio del portal">
-          <span className="od-brand__logo">
-            <img src="/logo-udes.svg" alt="" width={95} height={34} decoding="async" />
-          </span>
-          <span className="od-brand__name">
-            UDES <strong>en Cifras</strong>
-          </span>
-        </Link>
-
-        <nav className="od-nav" aria-label="Datos Abiertos">
-          <NavLink to="/datos-abiertos#informes" className="od-nav__link">
-            Informes
-          </NavLink>
-          <NavLink to="/datos-abiertos/observatorio" className="od-nav__link">
-            Observatorio
-          </NavLink>
-          <NavLink to="/datos-abiertos/boletines" className="od-nav__link">
-            Boletines
-          </NavLink>
-          <NavLink to="/datos-abiertos#lectura" className="od-nav__link od-nav__link--wide">
-            Cómo leer las cifras
-          </NavLink>
-          <Link to="/" className="od-nav__link od-nav__link--wide">
-            Portal PDI
-          </Link>
-        </nav>
-
-        <button
-          className="od-icon-button"
-          type="button"
-          onClick={toggle}
-          aria-label={resolved === "dark" ? "Cambiar a tema claro" : "Cambiar a tema oscuro"}
-          title={resolved === "dark" ? "Tema claro" : "Tema oscuro"}
-        >
-          <Icon name={resolved === "dark" ? "sun" : "moon"} size={17} />
-        </button>
-      </header>
+      {/* La barra unificada de los portales de Planeación: UDES en Cifras y el
+          Observatorio se abren desde su menú ampliado. */}
+      <SiteHeader />
 
       <main id="contenido">{children}</main>
 
@@ -111,7 +74,8 @@ export function OpenDataLayout({ children, title, className = "" }: OpenDataLayo
             <Link to="/datos-abiertos#informes">Informes</Link>
             <Link to="/datos-abiertos/boletines">Boletines</Link>
             <Link to="/datos-abiertos#lectura">Cómo leer las cifras</Link>
-            <Link to="/">Portal PDI</Link>
+            <Link to="/pdi">Portal PDI</Link>
+            <Link to="/">Planeación Institucional</Link>
             <a href="mailto:planeacion@udes.edu.co">planeacion@udes.edu.co</a>
           </nav>
           <small>© {new Date().getFullYear()} Universidad de Santander. Datos publicados para consulta y reutilización citando la fuente.</small>

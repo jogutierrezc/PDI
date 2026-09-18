@@ -16,6 +16,8 @@ import type { AdminScreen, AppRole } from "./types/database";
 import type { ReactElement } from "react";
 
 import { Home } from "./routes/Home";
+const PlaneacionHome = lazy(() => import("./modules/planeacion/PlaneacionHome").then((m) => ({ default: m.PlaneacionHome })));
+const TeamPage = lazy(() => import("./modules/planeacion/TeamPage").then((m) => ({ default: m.TeamPage })));
 
 const Dashboard = lazy(() => import("./routes/Dashboard").then((m) => ({ default: m.Dashboard })));
 const NotFound = lazy(() => import("./routes/NotFound").then((m) => ({ default: m.NotFound })));
@@ -88,6 +90,12 @@ const PublicBulletinList = lazy(() =>
 const OdAdmin = lazy(() =>
   import("./modules/admin/udes-en-cifras/OdAdmin").then((m) => ({ default: m.OdAdmin })),
 );
+const ObsAdmin = lazy(() =>
+  import("./modules/admin/observatorio/ObsAdmin").then((m) => ({ default: m.ObsAdmin })),
+);
+const ObsBulletinPage = lazy(() =>
+  import("./modules/admin/observatorio/ObsBulletinPage").then((m) => ({ default: m.ObsBulletinPage })),
+);
 const LoginPortal = lazy(() => import("./modules/login/LoginPortal").then((m) => ({ default: m.LoginPortal })));
 const PillarManagement = lazy(() =>
   import("./modules/admin/gestion-pilares/PillarManagement").then((m) => ({ default: m.PillarManagement })),
@@ -148,7 +156,10 @@ export default function App() {
       <ScrollManager />
       <Suspense fallback={<RouteFallback />}>
         <Routes>
-          <Route path="/" element={<Home />} />
+          {/* La portada es el portal de Planeación; el PDI vive en /pdi. */}
+          <Route path="/" element={<PlaneacionHome />} />
+          <Route path="/pdi" element={<Home />} />
+          <Route path="/equipo" element={<TeamPage />} />
           <Route path="/tablero" element={<Dashboard />} />
           <Route path="/tablero/pilar/:slug" element={<PillarScorecard />} />
           <Route path="/implementacion" element={<ImplementationPortal />} />
@@ -254,6 +265,23 @@ export default function App() {
             element={
               <RequireRole minimum="consulta" screen="cifras">
                 <IntranetBulletinPage />
+              </RequireRole>
+            }
+          />
+          {/* Observatorio de Analítica: el taller (estación y tema en la ruta) y su boletín en A4. */}
+          <Route
+            path="/admin/observatorio/:station?/:topic?"
+            element={
+              <RequireRole minimum="consulta" screen="observatorio">
+                <ObsAdmin />
+              </RequireRole>
+            }
+          />
+          <Route
+            path="/admin/observatorio-boletin/:id"
+            element={
+              <RequireRole minimum="consulta" screen="observatorio">
+                <ObsBulletinPage />
               </RequireRole>
             }
           />

@@ -26,7 +26,8 @@ interface Entry {
 }
 
 const pages: Entry[] = [
-  { id: "page-home", title: "Inicio", hint: "Portada del PDI 2024-2028", group: "Páginas", to: "/", icon: "grid", keywords: "portada home principal" },
+  { id: "page-home", title: "Inicio del PDI", hint: "Portada del PDI 2024-2028", group: "Páginas", to: "/pdi", icon: "grid", keywords: "portada home principal" },
+  { id: "page-planeacion", title: "Planeación Institucional", hint: "Portal de la oficina: buscador, portales y equipo", group: "Páginas", to: "/", icon: "compass", keywords: "planeacion oficina portal equipo buscador" },
   { id: "page-impl", title: "Implementación del PDI", hint: "Avance de los pilares", group: "Páginas", to: "/implementacion", icon: "document", keywords: "pilares avance proyectos" },
   { id: "page-board", title: "Tablero PDI", hint: "Cumplimiento global y por pilar", group: "Páginas", to: "/tablero", icon: "grid", keywords: "dashboard indicadores seguimiento" },
   { id: "page-sdg", title: "PDI y los ODS", hint: "Aporte del plan a la Agenda 2030", group: "Páginas", to: "/ods", icon: "leaf", keywords: "ods objetivos desarrollo sostenible agenda 2030 naciones unidas sdg" },

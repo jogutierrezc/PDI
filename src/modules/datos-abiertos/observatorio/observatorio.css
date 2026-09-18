@@ -283,7 +283,53 @@
 .obs-pager a:last-child::before { order: 3; }
 .obs-pager small { display: block; color: var(--ink-muted); font-family: var(--font-sans); font-size: var(--text-xs); text-transform: none; }
 
+/* --- Páginas con datos publicados --------------------------------------------- */
+
+.obs-sample-tag {
+  display: inline-block;
+  margin-left: 6px;
+  padding: 0 5px;
+  color: var(--od-board-muted);
+  border: 1px dashed currentColor;
+  border-radius: 3px;
+  font-size: 0.7em;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  vertical-align: 1px;
+}
+
+.obs-live-count { margin: 0 0 var(--space-4); color: var(--od-board-muted); font-size: var(--text-sm); }
+
+.obs-live__body { display: grid; gap: var(--space-8); }
+.obs-live__section { display: grid; gap: var(--space-4); }
+
+.obs-live__heading {
+  margin: 0;
+  padding-bottom: var(--space-2);
+  color: var(--ink-secondary);
+  border-bottom: 1px solid var(--line);
+  font-family: var(--font-sign);
+  font-size: 1rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.obs-live__grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-5); align-items: start; }
+.obs-live__cell { min-width: 0; }
+.obs-live__cell--wide { grid-column: 1 / -1; }
+.obs-live__chart { min-width: 0; }
+.obs-live__loading { min-height: 24rem; }
+
+.obs-live[data-template="narrativo"] .obs-live__body { max-width: 52rem; }
+.obs-live[data-template="narrativo"] .obs-live__grid { grid-template-columns: minmax(0, 1fr); }
+.obs-live[data-template="comparativo"] .obs-live__grid { grid-template-columns: repeat(auto-fit, minmax(20rem, 1fr)); align-items: stretch; }
+.obs-live[data-template="comparativo"] .obs-live__cell--wide { grid-column: auto; }
+.obs-live[data-template="ficha"] .obs-live__cell:has(.obs-raw) { order: -1; grid-column: 1 / -1; }
+
 @media (max-width: 960px) {
+  .obs-live__grid { grid-template-columns: minmax(0, 1fr); }
   .obs-panel--series,
   .obs-panel--share { grid-column: span 12; }
 }

@@ -41,6 +41,7 @@ export const SCREEN_PATHS: Record<AdminScreen, string> = {
   budget: "/admin/presupuesto",
   repository: "/implementacion#repositorio",
   cifras: "/admin/udes-en-cifras",
+  observatorio: "/admin/observatorio",
   structure: "/admin/estructura",
   parameters: "/admin/parametros",
   development: "/admin/desarrollo",

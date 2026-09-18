@@ -10,6 +10,7 @@
    4. Cierre: pedir un dato que no está.
    ========================================================================== */
 
+import { ContextBar } from "../../components/layout/ContextBar";
 import { useMemo, useState } from "react";
 import type { CSSProperties } from "react";
 import { Link } from "react-router-dom";
@@ -64,7 +65,25 @@ export function OpenDataPortal() {
       ) : !catalog.data ? (
         <EmptyPeriod />
       ) : (
-        <PortalContent data={catalog.data} {...filters} />
+        <>
+          {/* La misma barra de las fichas: aquí sin informe actual. */}
+          <ContextBar
+            label="Navegación de UDES en Cifras"
+            back={{ to: "/", label: "Planeación Institucional" }}
+            links={[{ label: "Boletines", to: "/datos-abiertos/boletines" }]}
+            itemsLabel="Informes"
+            items={catalog.data.reports.map((r) => ({
+              key: r.slug,
+              to: `/datos-abiertos/${r.slug}`,
+              code: r.code,
+              name: r.name,
+              tone: `var(--od-line-${r.line})`,
+              current: false,
+              label: `Abrir · ${r.name}`,
+            }))}
+          />
+          <PortalContent data={catalog.data} {...filters} />
+        </>
       )}
     </OpenDataLayout>
   );
@@ -161,7 +180,7 @@ function PortalContent({ data, year, term, campus, setYear, setTerm, setCampus, 
             >
               Solicitar un dato
             </a>
-            <Link className="od-button od-button--ghost" to="/">
+            <Link className="od-button od-button--ghost" to="/pdi">
               Ir al Portal PDI
             </Link>
           </div>

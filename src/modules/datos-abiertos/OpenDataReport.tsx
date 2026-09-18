@@ -17,6 +17,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import type { CSSProperties, ReactNode } from "react";
+import { ContextBar } from "../../components/layout/ContextBar";
 import { Link, useParams } from "react-router-dom";
 import { Icon } from "../../components/ui/Icon";
 import { ErrorBlock, LoadingBlock } from "../../components/ui/QueryState";
@@ -529,12 +530,29 @@ function ReportContent({ data, report, year, term, campus, setYear, setTerm, set
 
   return (
     <>
+      {/* Regresar, boletines y los informes: la barra de contexto de los portales.
+          Cambiar de informe conserva el corte y el campus. */}
+      <ContextBar
+        label="Navegación de UDES en Cifras"
+        back={{ to: `/datos-abiertos${query}#informes`, label: "Todos los informes" }}
+        links={[{ label: "Boletines", to: "/datos-abiertos/boletines" }]}
+        itemsLabel="Informes"
+        items={data.reports.map((r) => {
+          const current = r.slug === report.slug;
+          return {
+            key: r.slug,
+            to: `/datos-abiertos/${r.slug}${query}`,
+            code: r.code,
+            name: r.name,
+            tone: `var(--od-line-${r.line})`,
+            current,
+            label: `${current ? "Estás leyendo" : "Abrir"} · ${r.name}`,
+          };
+        })}
+      />
       <section className="od-report-head" aria-labelledby="od-informe">
         <div className="u-container od-report-head__grid">
           <div className="od-report-head__text">
-            <Link className="od-back" to={`/datos-abiertos${query}#informes`}>
-              <Icon name="arrow-left" size={16} /> Tablero de informes
-            </Link>
             <span className="od-report-head__code od-line" style={lineStyle(report.line)}>
               <SplitFlap key={report.slug} value={report.code} size="lg" delay={80} />
             </span>
@@ -563,27 +581,6 @@ function ReportContent({ data, report, year, term, campus, setYear, setTerm, set
       </section>
 
       <div className="od-report-bar" data-open={barOpen || undefined}>
-        {/* Línea de informes: un tramo del color de cada uno. Al pasar dice cuál
-            se lee y cuál se abriría; un clic cambia de informe, con el mismo corte. */}
-        <nav className="od-strip" aria-label="Cambiar de informe">
-          {data.reports.map((r) => {
-            const current = r.slug === report.slug;
-            const label = current ? `Estás leyendo · ${r.name}` : `Abrir · ${r.name}`;
-            return (
-              <Link
-                key={r.slug}
-                to={`/datos-abiertos/${r.slug}${query}`}
-                className="od-strip__seg"
-                aria-current={current ? "page" : undefined}
-                aria-label={label}
-                data-label={label}
-                style={lineStyle(r.line)}
-              >
-                <span aria-hidden="true">{r.code}</span>
-              </Link>
-            );
-          })}
-        </nav>
         <div className="u-container od-report-bar__summary">
           <span className="od-report-bar__code" style={lineStyle(report.line)} aria-hidden="true">
             {report.code}
@@ -610,21 +607,6 @@ function ReportContent({ data, report, year, term, campus, setYear, setTerm, set
         </div>
         <div className="od-report-bar__panel" id="od-report-controls">
         <div className="u-container od-report-bar__inner">
-          <nav className="od-switcher" aria-label="Cambiar de informe">
-            {data.reports.map((r) => (
-              <Link
-                key={r.slug}
-                to={`/datos-abiertos/${r.slug}${query}`}
-                className="od-switcher__item"
-                aria-current={r.slug === report.slug ? "page" : undefined}
-                title={r.name}
-                style={lineStyle(r.line)}
-              >
-                <span aria-hidden="true">{r.code}</span>
-                <span className="sr-only">{r.name}</span>
-              </Link>
-            ))}
-          </nav>
           <BoardControls data={data} year={year} term={term} campus={campus} setYear={setYear} setTerm={setTerm} setCampus={setCampus} />
           <span className="od-report-bar__downloads">
             <button type="button" className="od-button od-button--ghost" onClick={download}>

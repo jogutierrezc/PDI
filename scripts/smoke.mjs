@@ -657,7 +657,34 @@ const FIXTURES = {
 
 const routes = [
   {
+    // La portada es el portal de Planeación: buscador, portales y lo reciente.
     path: "/",
+    expect: "La universidad, medida y planeada a la vista de todos.",
+    also: ["Nuestros portales", "UDES en Cifras", "Portal PDI", "Boletines", "Nuestro equipo", "Observatorio de Analítica", "Ambiente tecnológico"],
+    absent: [...SIN_DINERO, "billones", "USD"],
+  },
+  {
+    path: "/",
+    note: "el buscador encuentra en los portales y muestra la cifra simplificada",
+    expect: "La universidad, medida y planeada a la vista de todos.",
+    interact: async (window, tick) => {
+      const input = window.document.getElementById("pl-buscar");
+      if (!input) throw new Error("no está el campo del buscador");
+      const setValue = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, "value").set;
+      input.dispatchEvent(new window.FocusEvent("focus"));
+      setValue.call(input, "ambiente");
+      input.dispatchEvent(new window.Event("input", { bubbles: true }));
+      for (let i = 0; i < 6; i += 1) await tick();
+      const results = [...window.document.querySelectorAll(".pl-result")];
+      const hit = results.find((r) => r.textContent?.includes("Ambiente tecnológico"));
+      if (!hit) throw new Error(`el buscador no encontró el pilar (resultados: ${results.length})`);
+      if (!hit.querySelector(".pl-result__figure")) throw new Error("el pilar sale sin su cifra simplificada");
+      if (input.getAttribute("aria-expanded") !== "true") throw new Error("el combobox no anuncia que está abierto");
+    },
+  },
+  { path: "/equipo", expect: "Qué hacemos", also: ["Estadística institucional", "planeacion@udes.edu.co"] },
+  {
+    path: "/pdi",
     expect: "Aquí construimos futuro",
     also: [
       "Ambiente tecnológico",
@@ -682,7 +709,7 @@ const routes = [
     absent: [...SIN_DINERO, "billones", "USD"],
   },
   {
-    path: "/",
+    path: "/pdi",
     note: "la portada cambia de sede y arma la ruta con los pilares reales",
     expect: "Aquí construimos futuro",
     interact: async (window, tick) => {

@@ -36,7 +36,15 @@ export type IconName =
   | "chart"
   | "pin"
   | "compass"
-  | "download";
+  | "download"
+  | "sidebar"
+  | "upload"
+  | "shield"
+  | "eye"
+  | "eye-off"
+  | "layers"
+  | "filter"
+  | "spark-chart";
 
 const paths: Record<IconName, JSX.Element> = {
   /* --- Pilares ---------------------------------------------------------- */
@@ -181,6 +189,35 @@ const paths: Record<IconName, JSX.Element> = {
     </>
   ),
   download: <path d="M12 4v11M7.5 10.5 12 15l4.5-4.5M4.5 19.5h15" />,
+  /* Intranet: menú plegable y el taller del Observatorio. */
+  sidebar: (
+    <>
+      <rect x="3.5" y="4.5" width="17" height="15" rx="2" />
+      <path d="M9.5 4.5v15" />
+    </>
+  ),
+  upload: <path d="M12 15V4M7.5 8.5 12 4l4.5 4.5M4.5 19.5h15" />,
+  shield: (
+    <>
+      <path d="M12 3.5 5 6v5.6c0 4.2 2.9 7.6 7 8.9 4.1-1.3 7-4.7 7-8.9V6z" />
+      <path d="m9 12 2.2 2.2L15.2 10" />
+    </>
+  ),
+  eye: (
+    <>
+      <path d="M2.8 12S6.2 5.8 12 5.8 21.2 12 21.2 12 17.8 18.2 12 18.2 2.8 12 2.8 12Z" />
+      <circle cx="12" cy="12" r="2.8" />
+    </>
+  ),
+  "eye-off": <path d="M4 4l16 16M10.2 6a9.6 9.6 0 0 1 1.8-.2c5.8 0 9.2 6.2 9.2 6.2a16 16 0 0 1-2.6 3.3M6.4 7.6A15.6 15.6 0 0 0 2.8 12S6.2 18.2 12 18.2c1.6 0 3-.5 4.2-1.1M10 10a2.8 2.8 0 0 0 4 4" />,
+  layers: (
+    <>
+      <path d="m12 4 8.5 4.5L12 13 3.5 8.5z" />
+      <path d="m3.5 12.5 8.5 4.5 8.5-4.5M3.5 16.2 12 20.7l8.5-4.5" />
+    </>
+  ),
+  filter: <path d="M4 5.5h16l-6.2 7.2v5.6l-3.6 1.7v-7.3z" />,
+  "spark-chart": <path d="M3.5 17.5 9 11.5l4 3.5 7.5-8.5M15.5 6.5h5v5" />,
 };
 
 interface IconProps extends Omit<SVGProps<SVGSVGElement>, "name"> {

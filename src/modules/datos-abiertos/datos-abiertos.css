@@ -8,7 +8,8 @@
    ========================================================================== */
 
 .od {
-  --od-header-h: 64px;
+  /* Alto de la barra unificada (SiteHeader). */
+  --od-header-h: var(--header-h, 72px);
   min-height: 100vh;
   color: var(--ink);
   background: var(--od-page);

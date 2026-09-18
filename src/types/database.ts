@@ -43,6 +43,7 @@ export type AdminScreen =
   | "budget"
   | "repository"
   | "cifras"
+  | "observatorio"
   | "structure"
   | "parameters"
   | "development"

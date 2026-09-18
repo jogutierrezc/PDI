@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 import { Link } from "react-router-dom";
 import { TopBar } from "./TopBar";
+import { PdiBar } from "./PdiBar";
 import { useCurrentPeriod } from "../../data/queries";
 import { formatDate } from "../../data/pdi";
 
@@ -17,6 +18,8 @@ export function PublicLayout({ children, className = "" }: PublicLayoutProps) {
         Saltar al contenido
       </a>
       <TopBar />
+      {/* Regresar, cambiar de vista y de pilar: en Implementación, Tablero, facultades y campus. */}
+      <PdiBar />
       <main id="contenido">{children}</main>
       <SiteFooter />
     </div>
@@ -38,6 +41,7 @@ function SiteFooter() {
         </div>
 
         <nav aria-label="Enlaces del pie de página">
+          <Link to="/">Planeación Institucional</Link>
           <Link to="/tablero">Tablero PDI</Link>
           <Link to="/implementacion">Implementación</Link>
           <Link to="/ods">PDI y los ODS</Link>

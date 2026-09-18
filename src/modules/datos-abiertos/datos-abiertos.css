@@ -2126,6 +2126,29 @@
   border: 1px dashed var(--od-bar-empty);
 }
 
+/* Reserva estadística: aquí sí hay gente, pero son tan pocas que publicar la
+   cifra las señalaría. La pista se mantiene (hay dato, a diferencia del vacío)
+   y el relleno va rayado hasta el umbral: el valor real queda por debajo. */
+.od-barlist__item[data-reserved] .od-barlist__fill {
+  background-image: repeating-linear-gradient(
+    -45deg,
+    var(--od-bar-soft) 0 3px,
+    transparent 3px 6px
+  );
+  background-color: transparent;
+  border-radius: 0;
+}
+
+.od-barlist__item[data-reserved] .od-barlist__value {
+  color: var(--ink-secondary);
+}
+
+.od-barlist__item[data-reserved] .od-barlist__value abbr {
+  text-decoration: underline dotted currentColor;
+  text-underline-offset: 3px;
+  cursor: help;
+}
+
 /* --- Circular -------------------------------------------------------------- */
 
 .od-donut {

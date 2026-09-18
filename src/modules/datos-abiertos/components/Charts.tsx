@@ -17,7 +17,7 @@
 
 import { useRef, useState } from "react";
 import type { CSSProperties } from "react";
-import { formatValue, formatWithUnit } from "../data/open-data";
+import { formatCellWithUnit, formatReserved, formatValue, formatWithUnit, RESERVE_DEFAULT } from "../data/open-data";
 import type { ValueFormat } from "../data/types";
 import { useInView } from "./motion";
 
@@ -116,15 +116,17 @@ export function YearBars({ title, points, selectedYear, format, unit, onSelectYe
 }
 
 interface BarListProps {
-  items: { label: string; value: number | null; highlight?: boolean }[];
+  items: { label: string; value: number | null; highlight?: boolean; reserved?: boolean }[];
   format: ValueFormat;
   unit: string;
   /** Muestra además la participación de cada fila en el total. */
   share?: boolean;
   label: string;
+  /** Con umbral, las filas reservadas se escriben "< n" en vez de su cifra. */
+  reserveThreshold?: number;
 }
 
-export function BarList({ items, format, unit, share = false, label }: BarListProps) {
+export function BarList({ items, format, unit, share = false, label, reserveThreshold }: BarListProps) {
   const ref = useRef<HTMLUListElement>(null);
   const seen = useInView(ref);
   const max = Math.max(0, ...items.map((i) => i.value ?? 0)) || 1;
@@ -133,19 +135,35 @@ export function BarList({ items, format, unit, share = false, label }: BarListPr
   return (
     <ul ref={ref} className="od-barlist" data-seen={seen || undefined} aria-label={label}>
       {items.map((item, index) => {
-        const width = item.value === null ? 0 : (item.value / max) * 100;
-        const part = share && total > 0 && item.value !== null ? (item.value / total) * 100 : null;
+        const reserved = Boolean(item.reserved);
+        // La barra reservada llega hasta el umbral y va rayada: el dato real
+        // está por debajo de ahí, y la trama dice que no es una medición.
+        const width = reserved
+          ? Math.min(100, ((reserveThreshold ?? RESERVE_DEFAULT) / max) * 100)
+          : item.value === null
+            ? 0
+            : (item.value / max) * 100;
+        const part = share && total > 0 && item.value !== null && !reserved ? (item.value / total) * 100 : null;
         return (
           <li
             key={item.label}
             className="od-barlist__item"
             data-highlight={item.highlight || undefined}
-            data-empty={item.value === null || undefined}
-            title={`${item.label}: ${formatWithUnit(item.value, format, unit)}`}
+            data-empty={(!reserved && item.value === null) || undefined}
+            data-reserved={reserved || undefined}
+            title={`${item.label}: ${formatCellWithUnit(item.value, format, unit, reserved, reserveThreshold)}`}
           >
             <span className="od-barlist__label">{item.label}</span>
             <span className="od-barlist__value">
-              {item.value === null ? "Sin reportar" : formatValue(item.value, format)}
+              {reserved ? (
+                <abbr title={`Reservado: menos de ${reserveThreshold ?? RESERVE_DEFAULT} registros`}>
+                  {formatReserved(reserveThreshold)}
+                </abbr>
+              ) : item.value === null ? (
+                "Sin reportar"
+              ) : (
+                formatValue(item.value, format)
+              )}
               {part !== null && <small> · {formatValue(part, "decimal")} %</small>}
             </span>
             <span className="od-barlist__track" aria-hidden="true">

@@ -104,6 +104,12 @@ export interface Indicator {
 export interface BreakdownItem {
   label: string;
   value: number | null;
+  /**
+   * La celda tiene dato, pero tan pocos registros que publicarlo señalaría a
+   * personas concretas: se escribe "< n" y nunca su número. No es un vacío
+   * (ahí no hay dato) ni un cero (ahí no hay nadie).
+   */
+  reserved?: boolean;
 }
 
 export interface Breakdown {
@@ -115,6 +121,11 @@ export interface Breakdown {
   source: string;
   officeId?: string | null;
   defaultChart?: ChartKind;
+  /**
+   * Umbral de reserva estadística: por debajo de este número de registros la
+   * celda se publica como "< n". Sin umbral, el desglose no reserva nada.
+   */
+  reserveThreshold?: number;
   /** Años con dato. Sin lista, todos los del periodo. */
   years?: number[];
   /** Se publica para el total institucional; por campus no se desagrega. */

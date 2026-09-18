@@ -15,3 +15,9 @@ vite.config.d.ts
 .env
 .env.local
 .env.*.local
+
+# Microdatos con datos personales (DEI / Bienestar).
+# Contienen nombre, correo, código de estudiante y lugar de nacimiento:
+# nunca se publican ni se suben al repositorio. El portal consume solo
+# los agregados que produce scripts/build-bi-agregados.mjs.
+bi/

@@ -40,6 +40,8 @@ colors:
   od-line-7: "#43536b"
   od-line-8: "#2e6b2f"
   od-line-9: "#8a3b8f"
+  od-line-10: "#1a6b5a"
+  od-line-11: "#7a4a2b"
   od-series-1: "#1f5fbf"
   od-series-2: "#c2571a"
   od-series-3: "#0f8a6e"
@@ -221,7 +223,7 @@ Institucional y frío en su base, con dos acentos de señal (ámbar y cian) que 
 - **Tablero Noche** (od-board-night): el tablero en tema oscuro; en claro el tablero es blanco.
 
 ### Data palettes
-- **Líneas de informe** (od-line-1 … od-line-9): una por informe, con tinta blanca ≥ 4.5:1, siempre junto al código de dos letras.
+- **Líneas de informe** (od-line-1 … od-line-11): una por informe, con tinta blanca ≥ 4.5:1, siempre junto al código de dos letras. La escala nació con nueve; el pino (od-line-10, Diversidad, Equidad e Inclusión) y el siena (od-line-11, Bienestar Institucional) se añadieron midiéndolos contra el piso real del sistema, no contra un ideal: ΔE ≥ 15,8 en visión normal, ≥ 2,8 en deuteranopía y ≥ 6,9 en protanopía, que es la separación mínima que ya tenían los nueve entre sí. Bajo deuteranopía las líneas 3 y 5 son casi el mismo color: por eso el color nunca identifica solo.
 - **Series por campus** (od-series-1..3): validadas todas contra todas para daltonismo y visión normal; siempre con leyenda.
 - **Escala azul secuencial** (od-seq-0 … od-seq-7): mapa de calor y mapa de Colombia; claro = poco, oscuro = mucho.
 - **Escala divergente** (od-div-neg-3 … od-div-pos-2): Saber PRO; terracota bajo un umbral o el promedio nacional, azul sobre él, gris azulado en el centro.
@@ -231,6 +233,8 @@ Institucional y frío en su base, con dos acentos de señal (ámbar y cian) que 
 **The Reserved Status Rule.** Verde, ámbar y rojo de estado (status-done, status-pending, status-risk) significan completo, pendiente y riesgo, y viajan siempre con glifo y texto. Nunca se reutilizan como serie de datos ni como decoración.
 
 **The One Signal Rule.** El ámbar de señal existe solo dentro de UDES en Cifras y marca lo que acaba de llegar o lo que está activo. Si todo brilla en ámbar, nada llegó.
+
+**The Statistical Reserve Rule.** Una celda con menos registros que el umbral del desglose (`reserveThreshold`) se publica como «< n», nunca con su cifra: en un campus pequeño el número exacto señala a personas concretas. No es un vacío ni un cero, y se dibuja distinto de los dos: la pista de la barra se mantiene (sí hay dato) y el relleno va rayado hasta el umbral. La descarga en CSV respeta la reserva, o el umbral no serviría de nada. Los totales por categoría y el institucional siguen siendo exactos.
 
 **The Selected Theme Rule.** El tema oscuro es una paleta elegida y validada contra su propia superficie, no un volteo. Todo token nuevo se declara en :root y se redefine en los dos bloques oscuros de tokens.css.
 
@@ -262,7 +266,7 @@ Rejilla de espacio base 4px (space-1 = 4px … space-12 = 104px). Margen lateral
 
 **Intranet.** Barra lateral fija de 250px, agrupada por portal (Plan de Desarrollo, UDES en Cifras, Sistema), que se desplaza entera; cabecera pegajosa con ruta (portal › pantalla), título y acciones a la derecha. AdminShell publica su alto como `--admin-topbar-h` para que las cabeceras pegajosas de cada pantalla se coloquen debajo. UDES en Cifras organiza el trabajo en una barra de cinco estaciones, una lista de informes (16.5rem, 14rem por debajo de 1600px) y el área de trabajo; la vista previa es columna fija (14–15.5rem) en Estructura y Publicación desde 1280px, y cajón derecho en Captura y en pantallas medianas. Por debajo de 1100px todo va en una columna y las tiras de estaciones e informes se desplazan a lo ancho, dejando a la vista el elemento actual. Por debajo de 900px la barra lateral es un cajón con capa.
 
-**UDES en Cifras público.** Portada con vídeo a sangre completa y rótulo abajo a la izquierda; tablero de nueve informes; fichas con bloques en el orden que decide la intranet. Tablas, mapas y rejillas anchas se desplazan dentro de su marco; la página nunca se desplaza en horizontal.
+**UDES en Cifras público.** Portada con vídeo a sangre completa y rótulo abajo a la izquierda; tablero de once informes; fichas con bloques en el orden que decide la intranet. Tablas, mapas y rejillas anchas se desplazan dentro de su marco; la página nunca se desplaza en horizontal.
 
 **Densidad.** Paneles con 16–20px de relleno y 20px entre bloques; filas de rejilla de 36px; en el móvil la columna de rótulos de la rejilla baja a 8rem y los rótulos parten línea.
 
@@ -423,5 +427,6 @@ El boletín es papel, no pantalla: un documento A4 de 210×297 mm que se imprime
 - **Don't** use the signal amber, Barlow Condensed, or uppercase sign labels outside UDES en Cifras.
 - **Don't** show money figures on any public page.
 - **Don't** rest destructive links in red; red arrives on hover, focus, and confirmation.
-- **Don't** cycle categorical hues or generate a ninth line color; fold extras into "Otros".
+- **Don't** cycle categorical hues past `od-cat-6`; fold extras into "Otros". A twelfth report line needs the same measured proof the tenth and eleventh got, not a hue picked by eye.
+- **Don't** fold a minority category into "Otros" in an equity report. The six-colour ceiling belongs to pie charts; a long list of named groups goes in single-hue horizontal bars with direct labels, every group keeping its own name.
 - **Don't** add a thick colored side stripe to cards to signal category; category identity comes from the two-letter code and its line badge.

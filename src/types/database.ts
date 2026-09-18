@@ -1148,6 +1148,8 @@ export interface OdBreakdownRow {
   annual_rule: OdAnnualRule;
   /** Años con dato. null = todos los del periodo. */
   years: number[] | null;
+  /** Umbral de reserva estadística. null = el desglose no reserva nada. */
+  reserve_threshold?: number | null;
   position: number;
 }
 
@@ -1159,6 +1161,8 @@ export interface OdBreakdownValueRow {
   label: string;
   position: number;
   value: number | null;
+  /** Celda bajo el umbral de reserva: se publica "< n", nunca su cifra. */
+  reserved?: boolean;
 }
 
 export interface OdHeatmapRow {

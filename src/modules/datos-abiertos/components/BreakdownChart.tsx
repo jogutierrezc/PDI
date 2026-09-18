@@ -20,7 +20,7 @@
 
 import { useState } from "react";
 import type { CSSProperties } from "react";
-import { downloadText, formatValue, formatWithUnit } from "../data/open-data";
+import { downloadText, formatReserved, formatValue, formatWithUnit } from "../data/open-data";
 import { ALL_YEARS, ANNUAL_RULE_LABEL, cutCode, cutCodeLabel, cutLabel, fromCutCode, termLabel, TERMS } from "../data/terms";
 import type { Breakdown, BreakdownItem, Term } from "../data/types";
 import { AnnualTermChart } from "./AnnualTermChart";
@@ -69,6 +69,7 @@ export function BreakdownChart({ breakdown, year, term, years, setYear }: {
   const itemsAt = (cut: Cut): BreakdownItem[] => (cut.term ? breakdown.terms?.[cut.year]?.[cut.term] : breakdown.values[cut.year]) ?? [];
   const labels = Array.from(new Set(available.flatMap(cutsOf).flatMap((cut) => itemsAt(cut).map((item) => item.label))));
   const valueAt = (label: string, cut: Cut) => itemsAt(cut).find((item) => item.label === label)?.value ?? null;
+  const reservedAt = (label: string, cut: Cut) => Boolean(itemsAt(cut).find((item) => item.label === label)?.reserved);
   const totalAt = (cut: Cut) => {
     const parts = labels.map((label) => valueAt(label, cut)).filter((v): v is number => v !== null);
     return parts.length ? parts.reduce((a, b) => a + b, 0) : null;
@@ -115,6 +116,9 @@ export function BreakdownChart({ breakdown, year, term, years, setYear }: {
     const rows = cuts.map((cut) => [
       cutLabel(cut.year, cut.term),
       ...labels.map((label) => {
+        // La descarga respeta la reserva: el CSV no puede decir lo que la
+        // ficha calla, o el umbral no serviría de nada.
+        if (reservedAt(label, cut)) return formatReserved(breakdown.reserveThreshold);
         const v = valueAt(label, cut);
         return v === null ? "" : String(v).replace(".", ",");
       }),
@@ -123,10 +127,17 @@ export function BreakdownChart({ breakdown, year, term, years, setYear }: {
     downloadText(`desglose-${breakdown.id}.csv`, `﻿${[header, ...rows].map((row) => row.map(escape).join(";")).join("\n")}`);
   };
 
+  const selectedItems = selected ? itemsAt(selected) : [];
+  // Cuántas categorías del corte se callan por el umbral. Va en el subtítulo
+  // para que viaje también en la imagen exportada, no solo en la pantalla.
+  const reservedCount = selectedItems.filter((item) => item.reserved).length;
+  const reserveNote = reservedCount
+    ? ` · ${reservedCount} ${reservedCount === 1 ? "categoría reservada" : "categorías reservadas"} (${formatReserved(breakdown.reserveThreshold)})`
+    : "";
+
   const subtitle = series
     ? `Total institucional · ${cuts.length ? `${cutLabel(cuts[0].year, cuts[0].term)} a ${cutLabel(cuts[cuts.length - 1].year, cuts[cuts.length - 1].term)}` : "sin cortes"}${term ? ` · solo periodo ${termLabel(term)}` : ""} · ${breakdown.unit}`
-    : `Total institucional · ${grouped ? `periodo ${cutLabel(year, null)} · promedio anual` : `corte ${selected ? cutLabel(selected.year, selected.term) : cutLabel(year, term)}`} · ${breakdown.unit}`;
-  const selectedItems = selected ? itemsAt(selected) : [];
+    : `Total institucional · ${grouped ? `periodo ${cutLabel(year, null)} · promedio anual` : `corte ${selected ? cutLabel(selected.year, selected.term) : cutLabel(year, term)}`} · ${breakdown.unit}${reserveNote}`;
 
   return (
     <ChartFrame
@@ -206,6 +217,7 @@ export function BreakdownChart({ breakdown, year, term, years, setYear }: {
             format={breakdown.format}
             unit={breakdown.unit}
             share={partsOfWhole}
+            reserveThreshold={breakdown.reserveThreshold}
           />
         )
       ) : cuts.length === 0 ? (

@@ -197,6 +197,41 @@ export function formatWithUnit(value: number | null, format: ValueFormat, unit: 
   return unit === "%" ? `${figure} %` : `${figure} ${unit}`;
 }
 
+/* --- Reserva estadística -----------------------------------------------------
+   Una celda reservada no es un vacío ni un cero: tiene dato, pero tan pocos
+   registros que publicarlo señalaría a personas concretas. Se escribe siempre
+   como un techo ("< 5"), nunca como su número, y se dice en voz alta distinto
+   que un "sin reportar", porque significan cosas opuestas: aquí sí hay gente. */
+
+export const RESERVE_DEFAULT = 5;
+
+/** En pantalla: "< 5". */
+export function formatReserved(threshold = RESERVE_DEFAULT): string {
+  return `< ${threshold}`;
+}
+
+/** Cifra del desglose, respetando la reserva. */
+export function formatCell(
+  value: number | null,
+  format: ValueFormat,
+  reserved?: boolean,
+  threshold = RESERVE_DEFAULT,
+): string {
+  return reserved ? formatReserved(threshold) : formatValue(value, format);
+}
+
+/** Lo mismo, hablado: para lectores de pantalla y tooltips. */
+export function formatCellWithUnit(
+  value: number | null,
+  format: ValueFormat,
+  unit: string,
+  reserved?: boolean,
+  threshold = RESERVE_DEFAULT,
+): string {
+  if (!reserved) return formatWithUnit(value, format, unit);
+  return unit === "%" ? `menos de ${threshold} %` : `menos de ${threshold} ${unit}`;
+}
+
 export interface Change {
   /** Texto listo: "+3,6 %" o "−0,5 p. p." */
   label: string;

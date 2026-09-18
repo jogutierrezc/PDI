@@ -17,7 +17,7 @@ web
 Un solo código con dos portales públicos de la Oficina de Planeación Institucional:
 
 1. **Portal PDI** (`/`): seguimiento del Plan de Desarrollo Institucional 2024-2028 — pilares, áreas, líneas, proyectos, indicadores, ODS, facultades y campus.
-2. **Datos Abiertos · UDES en Cifras** (`/datos-abiertos`): vista estadística de la universidad con las principales cifras de las actividades académicas y administrativas, organizada en nueve informes: Poblacional, Permanencia, Visibilidad, Enseñanza, Extensión y Proyección Social, Investigación, Infraestructura Física y Tecnológica, UDES Sostenible y Plan de Desarrollo Institucional. Cada informe reúne cifras que reportan distintas oficinas de la universidad.
+2. **Datos Abiertos · UDES en Cifras** (`/datos-abiertos`): vista estadística de la universidad con las principales cifras de las actividades académicas y administrativas, organizada en once informes: Poblacional, Permanencia, Visibilidad, Enseñanza, Extensión y Proyección Social, Investigación, Infraestructura Física y Tecnológica, UDES Sostenible, Plan de Desarrollo Institucional, Diversidad, Equidad e Inclusión y Bienestar Institucional. Cada informe reúne cifras que reportan distintas oficinas de la universidad.
 
 El éxito es que cualquier persona encuentre la cifra oficial que busca en segundos, entienda de dónde sale y a qué corte corresponde, y pueda compartir el enlace de ese informe.
 

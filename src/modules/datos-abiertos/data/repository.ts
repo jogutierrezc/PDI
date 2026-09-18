@@ -380,16 +380,23 @@ export function assembleCatalog(rows: OpenDataRows): OpenDataCatalog {
           if (!yearRows.length) continue;
           terms[year] = {};
           for (const term of TERMS) {
-            terms[year][term] = yearRows.filter((v) => v.term === term).map((v) => ({ label: v.label, value: num(v.value) }));
+            terms[year][term] = yearRows
+              .filter((v) => v.term === term)
+              .map((v) => ({ label: v.label, value: num(v.value), reserved: v.reserved || undefined }));
           }
           values[year] = Array.from(new Set(yearRows.map((v) => v.label))).map((label) => {
-            const get = (term: string) => num(yearRows.find((v) => v.label === label && (v.term ?? "anual") === term)?.value);
-            return { label, value: annualFigure(rule, get("A"), get("B"), get("anual")).value };
+            const cells = yearRows.filter((v) => v.label === label);
+            const get = (term: string) => num(cells.find((v) => (v.term ?? "anual") === term)?.value);
+            // Reservada en cualquier periodo, reservada en la cifra del año: la
+            // suma de un corte público y uno reservado seguiría delatándolo.
+            const reserved = cells.some((v) => v.reserved);
+            return { label, value: annualFigure(rule, get("A"), get("B"), get("anual")).value, reserved: reserved || undefined };
           });
         }
         return {
           id: b.key, uuid: b.id, title: b.title, unit: b.unit, format: b.format,
           source: source(b.office_id), officeId: b.office_id, defaultChart: b.default_chart, years: yearsOf(b.years), values,
+          reserveThreshold: b.reserve_threshold ?? undefined,
           reporting: byYear ? "anual" : "periodo", annualRule: rule, terms: byYear ? undefined : terms,
         };
       });

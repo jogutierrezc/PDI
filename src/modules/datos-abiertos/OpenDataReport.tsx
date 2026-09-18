@@ -116,6 +116,18 @@ function ReportContent({ data, report, year, term, campus, setYear, setTerm, set
   const campusName = data.campuses.find((c) => c.id === campus)?.name ?? "Todos los campus";
   const keys = keyIndicators(report);
   const [pickedId, setPickedId] = useState<string | null>(null);
+  // La barra de informes, corte, campus y descargas se pliega sola al bajar:
+  // lo principal es la ficha. Quien la abre o la cierra decide (manual).
+  const [barManual, setBarManual] = useState<boolean | null>(null);
+  const [scrolled, setScrolled] = useState(false);
+  useEffect(() => {
+    const onScroll = () => setScrolled(window.scrollY > 480);
+    onScroll();
+    window.addEventListener("scroll", onScroll, { passive: true });
+    return () => window.removeEventListener("scroll", onScroll);
+  }, []);
+  const barOpen = barManual ?? !scrolled;
+  const cutSummary = year === ALL_YEARS ? `Todos · ${cutLabel(ALL_YEARS, null)}` : cutLabel(year, term);
   const selected = report.indicators.find((i) => i.id === pickedId) ?? keys[0] ?? report.indicators[0];
   const sources = useMemo(
     () => Array.from(new Set([...report.indicators.map((i) => i.source), ...report.breakdowns.map((b) => b.source)])),
@@ -550,7 +562,53 @@ function ReportContent({ data, report, year, term, campus, setYear, setTerm, set
         </div>
       </section>
 
-      <div className="od-report-bar">
+      <div className="od-report-bar" data-open={barOpen || undefined}>
+        {/* Línea de informes: un tramo del color de cada uno. Al pasar dice cuál
+            se lee y cuál se abriría; un clic cambia de informe, con el mismo corte. */}
+        <nav className="od-strip" aria-label="Cambiar de informe">
+          {data.reports.map((r) => {
+            const current = r.slug === report.slug;
+            const label = current ? `Estás leyendo · ${r.name}` : `Abrir · ${r.name}`;
+            return (
+              <Link
+                key={r.slug}
+                to={`/datos-abiertos/${r.slug}${query}`}
+                className="od-strip__seg"
+                aria-current={current ? "page" : undefined}
+                aria-label={label}
+                data-label={label}
+                style={lineStyle(r.line)}
+              >
+                <span aria-hidden="true">{r.code}</span>
+              </Link>
+            );
+          })}
+        </nav>
+        <div className="u-container od-report-bar__summary">
+          <span className="od-report-bar__code" style={lineStyle(report.line)} aria-hidden="true">
+            {report.code}
+          </span>
+          <span className="od-report-bar__name">{report.name}</span>
+          <span className="od-report-bar__chips">
+            <span>
+              Corte <b>{cutSummary}</b>
+            </span>
+            <span>
+              Campus <b>{campusName}</b>
+            </span>
+          </span>
+          <button
+            type="button"
+            className="od-report-bar__toggle"
+            aria-expanded={barOpen}
+            aria-controls="od-report-controls"
+            onClick={() => setBarManual(!barOpen)}
+          >
+            {barOpen ? "Ocultar filtros" : "Filtros, informes y descargas"}
+            <Icon name="chevron-down" size={16} />
+          </button>
+        </div>
+        <div className="od-report-bar__panel" id="od-report-controls">
         <div className="u-container od-report-bar__inner">
           <nav className="od-switcher" aria-label="Cambiar de informe">
             {data.reports.map((r) => (
@@ -574,6 +632,7 @@ function ReportContent({ data, report, year, term, campus, setYear, setTerm, set
             </button>
             <BulletinDownload catalog={data} report={report} />
           </span>
+        </div>
         </div>
       </div>
 

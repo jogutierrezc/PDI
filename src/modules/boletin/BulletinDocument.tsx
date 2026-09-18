@@ -61,6 +61,14 @@ const BODY_H = 297 - 27.5 - 10 - 16;
 /** Separación entre unidades; una continuación de tabla va pegada. */
 const GAP = 7;
 const TIGHT_GAP = 2;
+/**
+ * Hueco que ya no se deja en blanco: si la hoja que sigue no cabe y quedan al
+ * menos estos milímetros, entra antes otra hoja del mismo capítulo y sección
+ * que sí quepa (mirando las próximas LOOKAHEAD). El contenido se ordena por
+ * página, así que el índice sigue la lectura real.
+ */
+const FILL_MIN = 30;
+const LOOKAHEAD = 6;
 
 function paragraphs(text: string) {
   return text
@@ -97,7 +105,7 @@ export function BulletinDocument({ catalog, settings, report, fitWidth, onReady 
    */
   const [layout, setLayout] = useState<{
     signature: string;
-    pages: { i: number; compact: boolean }[][];
+    pages: { i: number; compact: boolean; zoom?: number }[][];
     tocPages: number[][];
     tocDense: boolean;
   } | null>(null);
@@ -115,7 +123,7 @@ export function BulletinDocument({ catalog, settings, report, fitWidth, onReady 
         list.push({ key: unit.key, kind: "capitulo", label: unit.report.name, unit: i, report: unit.report, href: `#${anchorOf(unit, i)}` });
       } else if (unit.kind === "seccion") {
         list.push({ key: unit.key, kind: "seccion", label: unit.title, unit: i, report: unit.report, href: `#${anchorOf(unit, i)}` });
-      } else if (!unit.tight) {
+      } else if (!unit.tight && unit.kind !== "tablero") {
         const id = `${unit.report?.slug}|${unit.title}`;
         if (seen.has(id)) return;
         seen.add(id);
@@ -145,25 +153,62 @@ export function BulletinDocument({ catalog, settings, report, fitWidth, onReady 
       const node = measure.current!.querySelector<HTMLElement>(`:scope > [data-unit="${i}"][data-variant="${variant}"]`);
       return node ? node.getBoundingClientRect().height / MM : null;
     };
-    const next: { i: number; compact: boolean }[][] = [];
-    let current: { i: number; compact: boolean }[] = [];
+    const next: { i: number; compact: boolean; zoom?: number }[][] = [];
+    let current: { i: number; compact: boolean; zoom?: number }[] = [];
     let used = 0;
-    units.forEach((unit, i) => {
-      const gap = current.length ? (unit.tight ? TIGHT_GAP : GAP) : 0;
+    const queue = units.map((_, i) => i);
+    // Lo que entra en el hueco: la hoja completa o su compacta, si alguna cabe.
+    const fitIn = (i: number, room: number) => {
       const full = heightOf(i, "full") ?? 0;
+      if (full <= room) return { h: full, compact: false };
       const small = heightOf(i, "compact");
+      return small !== null && small <= room ? { h: small, compact: true } : null;
+    };
+    // Una hoja se puede adelantar si es del mismo capítulo y sección, no abre
+    // página, no es continuación y no arrastra continuaciones propias.
+    const movable = (from: number, j: number) => {
+      const a = units[from];
+      const b = units[j];
+      return b.report === a.report && b.section === a.section && !b.breakBefore && !b.tight && !units[j + 1]?.tight;
+    };
+    while (queue.length) {
+      const i = queue[0];
+      const unit = units[i];
+      const gap = current.length ? (unit.tight ? TIGHT_GAP : GAP) : 0;
       const room = BODY_H - used - gap;
-      let compact = false;
-      if (current.length && !unit.breakBefore && full > room && small !== null && small <= room) compact = true;
-      const h = compact ? small! : full;
-      if (current.length && (unit.breakBefore || h > room)) {
+      const here = current.length && !unit.breakBefore ? fitIn(i, room) : null;
+      if (current.length && !unit.breakBefore && !here && room >= FILL_MIN && !unit.tight) {
+        // Hueco grande: se busca más adelante una hoja que lo llene.
+        let filled = false;
+        for (let k = 1; k < Math.min(queue.length, LOOKAHEAD + 1); k += 1) {
+          const j = queue[k];
+          if (units[j].breakBefore) break;
+          if (!movable(i, j)) continue;
+          const fit = fitIn(j, BODY_H - used - GAP);
+          if (!fit) continue;
+          used += GAP + fit.h;
+          current.push({ i: j, compact: fit.compact });
+          queue.splice(k, 1);
+          filled = true;
+          break;
+        }
+        if (filled) continue;
+      }
+      const full = heightOf(i, "full") ?? 0;
+      const compact = Boolean(here?.compact);
+      const h = here ? here.h : full;
+      if (current.length && (unit.breakBefore || !here)) {
         next.push(current);
         current = [];
         used = 0;
       }
-      used += (current.length ? gap : 0) + h;
-      current.push({ i, compact });
-    });
+      // Una hoja sola más alta que la página no se deja pisar el pie: se reduce
+      // en proporción hasta caber (la tipografía se achica, nada se corta).
+      const zoom = h > BODY_H ? BODY_H / h : undefined;
+      used += (current.length ? gap : 0) + (zoom ? BODY_H : h);
+      current.push({ i, compact, zoom });
+      queue.shift();
+    }
     if (current.length) next.push(current);
 
     // Contenido: bajo la presentación caben las filas que deje libres; el resto
@@ -228,6 +273,20 @@ export function BulletinDocument({ catalog, settings, report, fitWidth, onReady 
   pages?.forEach((list, index) => {
     for (const { i } of list) unitPage.set(i, index + firstSheetPage);
   });
+  // Orden de lectura real: si una hoja entró antes para llenar un hueco, el
+  // contenido la lista en su lugar, y los números de página siguen subiendo.
+  const readOrder = new Map<number, number>();
+  pages?.flat().forEach(({ i }, position) => readOrder.set(i, position));
+  const tocShown = [...toc];
+  for (let start = 0; start < tocShown.length; ) {
+    let end = start;
+    while (end < tocShown.length && tocShown[end].kind === "hoja" && tocShown[end].report === tocShown[start].report) end += 1;
+    if (end - start > 1) {
+      const run = tocShown.slice(start, end).sort((x, y) => (readOrder.get(x.unit!) ?? 0) - (readOrder.get(y.unit!) ?? 0));
+      tocShown.splice(start, run.length, ...run);
+    }
+    start = Math.max(end, start + 1);
+  }
   const pageOf = (entry: TocEntry) =>
     entry.kind === "cierre" ? total || "…" : entry.unit !== undefined ? unitPage.get(entry.unit) ?? "…" : "…";
   const tocRow = (entry: TocEntry, index: number, measuring = false) => (
@@ -360,7 +419,7 @@ export function BulletinDocument({ catalog, settings, report, fitWidth, onReady 
               <section className="bol-intro">
                 {g === 0 ? renderIntro(true) : <h2 className="bol-intro__continued">Contenido (continuación)</h2>}
                 <ol className="bol-toc" data-dense={tocDense || undefined}>
-                  {group.map((index) => tocRow(toc[index], index))}
+                  {group.map((index) => tocRow(tocShown[index], index))}
                 </ol>
               </section>
             </ContentPage>
@@ -390,8 +449,14 @@ export function BulletinDocument({ catalog, settings, report, fitWidth, onReady 
                 tint={settings.headerTint}
                 cut={cut}
               >
-                {list.map(({ i, compact }) => (
-                  <div key={units[i].key} id={anchorOf(units[i], i)} className="bol-unit" data-tight={units[i].tight || undefined}>
+                {list.map(({ i, compact, zoom }) => (
+                  <div
+                    key={units[i].key}
+                    id={anchorOf(units[i], i)}
+                    className="bol-unit"
+                    data-tight={units[i].tight || undefined}
+                    style={zoom ? ({ zoom } as CSSProperties) : undefined}
+                  >
                     {compact ? units[i].compact : units[i].node}
                   </div>
                 ))}

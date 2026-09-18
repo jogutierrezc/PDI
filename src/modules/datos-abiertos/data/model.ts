@@ -73,6 +73,26 @@ export function readOr(spec: ModelSpec, variable: ModelVariable, level: string, 
     : `${base}, pero la diferencia no es significativa al 5 % (p = ${fmtP(term.sig)}; ${ci}).`;
 }
 
+/**
+ * La categoría de referencia dicha en palabras. No es un dato que falte: es
+ * el punto de comparación de su variable, y por eso su Exp(B) vale 1.
+ */
+export function readReference(spec: ModelSpec, variable: ModelVariable): string {
+  const others = variable.levels.map((l) => l.label).join(" y ");
+  const base = `${variable.reference} es la categoría de referencia de ${variable.label.toLowerCase()}: ${others} se ${variable.levels.length > 1 ? "comparan" : "compara"} con ella, por eso su razón de probabilidades es 1.`;
+  if (!variable.overall) return base;
+  const joint = variable.overall.sig < spec.fit.significance ? "sí se asocia" : "no se asocia";
+  return `${base} En conjunto, ${variable.label.toLowerCase()} ${joint} con el promedio (Wald ${variable.overall.wald.toLocaleString("es-CO")}, ${variable.overall.df} gl; p = ${fmtP(variable.overall.sig)}).`;
+}
+
+/** Filas de un bosque o una tabla: la referencia primero y luego cada nivel. i = -1 es la referencia. */
+export function termRows(spec: ModelSpec) {
+  return spec.variables.flatMap((v) => [
+    { v, i: -1, label: v.reference, term: null as ModelTerm | null },
+    ...v.levels.map((l, i) => ({ v, i, label: l.label, term: l.term as ModelTerm | null })),
+  ]);
+}
+
 /** La tabla de clasificación leída: aciertos por grupo y global. */
 export function classificationOf(spec: ModelSpec) {
   const c = spec.classification;

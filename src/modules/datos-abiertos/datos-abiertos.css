@@ -1440,6 +1440,195 @@
   border-block: 1px solid var(--od-board-line-strong);
 }
 
+/* Línea de informes: cada tramo es un informe, en su color de línea. Se
+   engrosa al acercar el puntero y el tramo dice qué informe es. */
+.od-strip {
+  position: relative;
+  display: flex;
+  gap: 2px;
+  height: 6px;
+  transition: height var(--dur-base) var(--ease-out);
+}
+
+.od-strip:hover,
+.od-strip:focus-within { height: 14px; }
+
+.od-strip__seg {
+  position: relative;
+  flex: 1;
+  background: var(--line);
+  opacity: 0.55;
+  transition: opacity var(--dur-fast) ease, flex-grow var(--dur-base) var(--ease-out);
+}
+
+.od-strip__seg > span {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  color: var(--od-dei-tile-ink);
+  font-family: var(--font-sign);
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  opacity: 0;
+  transition: opacity var(--dur-fast) ease;
+}
+
+.od-strip:hover .od-strip__seg > span,
+.od-strip:focus-within .od-strip__seg > span { opacity: 1; }
+
+.od-strip__seg[aria-current="page"] { flex-grow: 2.4; opacity: 1; }
+
+.od-strip__seg:hover,
+.od-strip__seg:focus-visible { flex-grow: 2.4; opacity: 1; outline: none; }
+
+.od-strip__seg:focus-visible { box-shadow: inset 0 0 0 2px var(--od-signal); }
+
+/* El rótulo: «Estás leyendo · …» o «Abrir · …», bajo el tramo. */
+.od-strip__seg::after {
+  content: attr(data-label);
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 50%;
+  z-index: 2;
+  padding: 4px var(--space-2);
+  color: var(--page);
+  background: var(--ink);
+  border-radius: var(--radius-xs);
+  box-shadow: var(--shadow-md);
+  font-size: var(--text-xs);
+  font-weight: 600;
+  white-space: nowrap;
+  pointer-events: none;
+  opacity: 0;
+  translate: -50% -3px;
+  transition: opacity var(--dur-fast) ease, translate var(--dur-fast) var(--ease-out);
+}
+
+.od-strip__seg:first-child::after { left: 0; translate: 0 -3px; }
+.od-strip__seg:last-child::after { left: auto; right: 0; translate: 0 -3px; }
+
+.od-strip__seg:hover::after,
+.od-strip__seg:focus-visible::after { opacity: 1; translate: -50% 0; }
+.od-strip__seg:first-child:hover::after,
+.od-strip__seg:first-child:focus-visible::after,
+.od-strip__seg:last-child:hover::after,
+.od-strip__seg:last-child:focus-visible::after { translate: 0 0; }
+
+@media (prefers-reduced-motion: reduce) {
+  .od-strip,
+  .od-strip__seg,
+  .od-strip__seg::after { transition: none; }
+}
+
+/* Franja resumen: siempre visible; el panel completo se pliega debajo. */
+.od-report-bar__summary {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2) var(--space-4);
+  padding-block: var(--space-2);
+}
+
+.od-report-bar__code {
+  display: grid;
+  place-items: center;
+  min-width: 2.2rem;
+  height: 1.9rem;
+  padding-inline: 6px;
+  color: var(--od-dei-tile-ink);
+  background: var(--line);
+  border-radius: 4px;
+  font-family: var(--font-sign);
+  font-size: 1.05rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+}
+
+.od-report-bar__name {
+  font-family: var(--font-sign);
+  font-size: 1.1rem;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+}
+
+.od-report-bar__chips {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.od-report-bar__chips > span {
+  padding: 3px var(--space-3);
+  color: var(--od-board-muted);
+  background: var(--od-board-raised);
+  border-radius: 999px;
+  font-size: var(--text-xs);
+}
+
+.od-report-bar__chips b { color: var(--od-board-ink); font-weight: 700; }
+
+.od-report-bar__toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: 34px;
+  margin-left: auto;
+  padding: 2px var(--space-3);
+  color: var(--od-board-ink);
+  background: var(--od-flap-low);
+  border: 1px solid var(--od-board-line-strong);
+  border-radius: var(--radius-xs);
+  font-family: var(--font-sign);
+  font-size: 0.98rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  cursor: pointer;
+  transition: background-color var(--dur-base) ease, transform var(--dur-press) var(--ease-out);
+}
+
+.od-report-bar__toggle:active { transform: scale(0.97); }
+.od-report-bar__toggle:focus-visible { outline: 2px solid var(--brand-blue); outline-offset: 2px; }
+.od-report-bar__toggle svg { transition: transform var(--dur-base) var(--ease-out); }
+.od-report-bar[data-open] .od-report-bar__toggle svg { transform: rotate(180deg); }
+
+@media (hover: hover) and (pointer: fine) {
+  .od-report-bar__toggle:hover { background: var(--od-flap); }
+}
+
+.od-report-bar__panel {
+  display: grid;
+  grid-template-rows: 0fr;
+  transition: grid-template-rows 320ms var(--ease-out);
+}
+
+.od-report-bar[data-open] .od-report-bar__panel { grid-template-rows: 1fr; }
+
+.od-report-bar__panel > .od-report-bar__inner {
+  min-height: 0;
+  overflow: hidden;
+  visibility: hidden;
+  transition: visibility 0s linear 320ms;
+}
+
+.od-report-bar[data-open] .od-report-bar__panel > .od-report-bar__inner {
+  visibility: visible;
+  transition: none;
+  border-top: 1px dashed var(--od-board-line);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .od-report-bar__panel,
+  .od-report-bar__toggle svg { transition: none; }
+}
+
+@media (max-width: 720px) {
+  .od-report-bar__name { display: none; }
+}
+
 .od-report-bar__inner {
   display: flex;
   flex-wrap: wrap;

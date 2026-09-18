@@ -56,8 +56,11 @@ import { BIENESTAR_SLUG, DEI_SLUG } from "./model";
 
 export interface Unit {
   key: string;
-  /** "seccion": apertura de un separador de la ficha (Graduados) dentro del capítulo. */
-  kind: "resumen" | "capitulo" | "seccion" | "indicador" | "conjunto";
+  /**
+   * "seccion": apertura de un separador de la ficha (Graduados) dentro del capítulo.
+   * "tablero": microtablero de un informe en el resumen ejecutivo (no entra al índice).
+   */
+  kind: "resumen" | "capitulo" | "seccion" | "indicador" | "conjunto" | "tablero";
   /** Informe al que pertenece (el resumen no tiene): pie, cabecera, pestaña e índice. */
   report?: Report;
   /** Continuación de una tabla: va pegada a la anterior y no entra al índice. */
@@ -308,6 +311,16 @@ function SheetHead({ title, unit, description }: { title: string; unit?: string;
   );
 }
 
+/**
+ * Notas largas no caben en la columna de 38 mm: crecen más que el cuerpo o el
+ * texto se amontona. Desde este largo (caracteres de texto) van en una franja
+ * arriba y el cuerpo usa todo el ancho.
+ */
+const NOTES_SIDE_MAX = 260;
+const textLength = (node: ReactNode | null | undefined): number =>
+  typeof node === "string" || typeof node === "number" ? String(node).length : Array.isArray(node) ? node.reduce((s, n) => s + textLength(n), 0) : 0;
+const notesLength = (items: [string, ReactNode | null | undefined][]) => items.reduce((s, [label, v]) => s + (v ? label.length + textLength(v) : 0), 0);
+
 function Notes({ items }: { items: [string, ReactNode | null | undefined][] }) {
   return (
     <dl className="bol-notes">
@@ -436,19 +449,24 @@ function IndicatorSheet({
     indicator.aggregation === "reportado" ? "Total reportado aparte." : withData.length ? "Total: suma de campus." : null,
   ].filter(Boolean).join(" ");
 
+  const noteItems: [string, ReactNode | null | undefined][] = [
+    ["Qué mide", indicator.definition],
+    ["Reporta", indicator.source],
+    ["Cómo se calcula", compact ? null : calculation],
+    ["Lectura", compact ? null : DIRECTION_TEXT[indicator.direction]],
+    ["Corte", `${cutText(cut)} · ${campusName}`],
+  ];
+  const notesOnTop = show.notes && notesLength(noteItems) > NOTES_SIDE_MAX;
+
   return (
-    <article className="bol-sheet" data-notes={show.notes || undefined} data-compact={compact || undefined}>
-      {show.notes && (
-        <Notes
-          items={[
-            ["Qué mide", indicator.definition],
-            ["Reporta", indicator.source],
-            ["Cómo se calcula", compact ? null : calculation],
-            ["Lectura", compact ? null : DIRECTION_TEXT[indicator.direction]],
-            ["Corte", `${cutText(cut)} · ${campusName}`],
-          ]}
-        />
-      )}
+    <article
+      className="bol-sheet"
+      data-kind="indicador"
+      data-notes={(show.notes && !notesOnTop) || undefined}
+      data-wide={notesOnTop || undefined}
+      data-compact={compact || undefined}
+    >
+      {show.notes && <Notes items={noteItems} />}
       <div className="bol-sheet__body">
         <SheetHead title={indicator.label} unit={indicator.unit && indicator.unit !== "%" ? indicator.unit : undefined} />
         <div className="bol-anchor">
@@ -671,9 +689,11 @@ function DatasetSheet({
   children: ReactNode;
 }) {
   const hasCut = (notes ?? []).some(([label]) => label === "Corte");
+  const items: [string, ReactNode][] = [["Qué muestra", description], ["Reporta", source], ...(notes ?? []), ...(cut && !hasCut ? ([["Corte", cut]] as [string, ReactNode][]) : [])];
+  const onTop = wide || notesLength(items) > NOTES_SIDE_MAX;
   return (
-    <article className="bol-sheet" data-notes={wide ? undefined : true} data-wide={wide || undefined}>
-      <Notes items={[["Qué muestra", description], ["Reporta", source], ...(notes ?? []), ...(cut && !hasCut ? ([["Corte", cut]] as [string, ReactNode][]) : [])]} />
+    <article className="bol-sheet" data-notes={onTop ? undefined : true} data-wide={onTop || undefined}>
+      <Notes items={items} />
       <div className="bol-sheet__body">
         <SheetHead title={title} />
         {children}
@@ -895,6 +915,8 @@ function breakdownUnit(b: Breakdown, catalog: OpenDataCatalog, settings: Bulleti
 }
 
 function mapUnit(map: MapDataset, catalog: OpenDataCatalog, settings: BulletinSettings): ReactNode | null {
+  // Por municipio no es un mapa departamental: su hoja es dei:origen.
+  if (map.mode === "municipio") return null;
   const key = mapKey(map, settings.cut, catalog);
   if (key === undefined) return null;
   const active = sites(catalog).map((c) => c.id).filter((id) => settings.campus === "todas" || id === settings.campus);
@@ -1541,6 +1563,116 @@ function ExecutiveSummary({ items, catalog, settings }: { items: ExecutiveItem[]
   );
 }
 
+/* --- Resumen ejecutivo del boletín completo: microtableros ------------------------ */
+
+/** Cifras por microtablero; las demás se cuentan y quedan en el capítulo. */
+const BOARD_TILES = 8;
+
+function SummaryIntro({ items, catalog, settings }: { items: ExecutiveItem[]; catalog: OpenDataCatalog; settings: BulletinSettings }) {
+  const campusName = catalog.campuses.find((c) => c.id === settings.campus)?.name ?? "Todos los campus";
+  const total = items.reduce((s, i) => s + i.indicators.length + i.sets.length, 0);
+  return (
+    <section className="bol-summary bol-summary--boards">
+      <h2>Resumen ejecutivo</h2>
+      <p className="bol-summary__lede">
+        La Universidad de Santander en una mirada: un tablero por informe con las cifras que reporta cada oficina · {cutText(settings.cut)} ·{" "}
+        {campusName}. Para leer una cifra con su definición, su evolución por campus y su tabla, basta ir al capítulo de su informe.
+      </p>
+      <ul className="bol-summary__legend">
+        <li>
+          <b>{items.length}</b> informes
+        </li>
+        <li>
+          <b>{total}</b> cifras y conjuntos en este resumen
+        </li>
+        <li>
+          <span className="bol-board__arrow-key" aria-hidden="true">▲▼</span> variación frente al año anterior
+        </li>
+        <li>
+          <span className="bol-board__trend-key" aria-hidden="true" /> tendencia del periodo
+        </li>
+      </ul>
+    </section>
+  );
+}
+
+function SummaryBoard({ item, catalog, settings }: { item: ExecutiveItem; catalog: OpenDataCatalog; settings: BulletinSettings }) {
+  const { report, indicators, sets } = item;
+  const tiles = indicators.slice(0, BOARD_TILES);
+  const rest = indicators.length - tiles.length;
+  return (
+    <section className="bol-board" style={{ "--line": `var(--bol-line-${report.line})` } as CSSProperties}>
+      <header className="bol-board__head">
+        <span className="bol-chapter__code">{report.code}</span>
+        <div>
+          <h3>{report.name}</h3>
+          <p>{report.summary}</p>
+        </div>
+        <a href={`#cap-${report.slug}`}>Ver capítulo →</a>
+      </header>
+      {tiles.length > 0 && (
+        <div className="bol-board__tiles">
+          {tiles.map((indicator) => {
+            const { value, period } = figureAt(indicator, catalog, settings.cut, settings.campus);
+            const years = yearsOf(catalog, indicator.years);
+            const series = years.map((y) => valueOf(indicator, y, settings.campus));
+            const previous = settings.cut === ALL_YEARS || period ? null : valueOf(indicator, settings.cut - 1, settings.campus);
+            const change = changeBetween(indicator, value, previous);
+            return (
+              <div key={indicator.id} className="bol-board__tile">
+                <span className="bol-board__label">{indicator.label}</span>
+                <b className="bol-board__value">
+                  {figure(value, indicator.format)}
+                  <small> {value === null ? "sin reportar" : unitOf(indicator)}</small>
+                </b>
+                <span className="bol-board__meta">
+                  {change ? (
+                    <span className="bol-change" data-reading={change.reading}>
+                      <Arrow dir={value! > previous! ? "up" : value! < previous! ? "down" : "flat"} />
+                      {change.label}
+                    </span>
+                  ) : period ? (
+                    `periodo ${period.label}`
+                  ) : settings.cut === ALL_YEARS ? (
+                    periodBasisOf(indicator, settings.campus) ?? cutLabel(ALL_YEARS, null)
+                  ) : (
+                    String(settings.cut)
+                  )}
+                </span>
+                {series.filter((v) => v !== null).length > 1 && (
+                  <span className="bol-board__trend">
+                    <Trend years={years} values={series} format={indicator.format} height={9} />
+                  </span>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      )}
+      {(sets.length > 0 || rest > 0) && (
+        <ul className="bol-board__sets">
+          {sets.map((set) => (
+            <li key={set.key}>
+              <span>{set.title}</span>
+              <b>
+                {set.value} <small>{set.unit}</small>
+              </b>
+              <em>{set.note}</em>
+            </li>
+          ))}
+          {rest > 0 && (
+            <li className="bol-board__more">
+              <span>
+                y {rest} {rest === 1 ? "cifra más" : "cifras más"} en el capítulo
+              </span>
+            </li>
+          )}
+        </ul>
+      )}
+    </section>
+  );
+}
+
 function ExecutiveSheet({ item, catalog, settings }: { item: ExecutiveItem; catalog: OpenDataCatalog; settings: BulletinSettings }) {
   const { report, indicators, sets } = item;
   const campusName = catalog.campuses.find((c) => c.id === settings.campus)?.name ?? "Todos los campus";
@@ -1661,9 +1793,10 @@ export function compose(catalog: OpenDataCatalog, settings: BulletinSettings): C
     if (!report) continue;
 
     if (executive || settings.summary) {
-      const headline = executiveIndicators(report, entry, catalog, executive ? 6 : 3);
+      // En el completo, el microtablero lleva todas las cifras con dato del informe.
+      const headline = executiveIndicators(report, entry, catalog, executive ? 6 : BOARD_TILES + 20);
       // Los conjuntos completan la ficha; sin indicadores con datos, la llenan.
-      const sets = datasetHighlights(report, entry, catalog, settings, executive ? (headline.length >= 5 ? 2 : 4) : 3);
+      const sets = datasetHighlights(report, entry, catalog, settings, executive ? (headline.length >= 5 ? 2 : 4) : 4);
       if (headline.length || sets.length) summaryItems.push({ report, indicators: headline, sets });
     }
 
@@ -1861,13 +1994,34 @@ export function compose(catalog: OpenDataCatalog, settings: BulletinSettings): C
 
   // El resumen abre el documento: siempre en el ejecutivo, a pedido en el completo.
   if ((executive || settings.summary) && summaryItems.length) {
-    units.unshift({
-      key: "resumen",
-      kind: "resumen",
-      title: "Resumen ejecutivo",
-      breakBefore: true,
-      node: <ExecutiveSummary items={summaryItems.filter((item) => chapters.includes(item.report))} catalog={catalog} settings={settings} />,
-    });
+    const shown = summaryItems.filter((item) => chapters.includes(item.report));
+    if (executive) {
+      units.unshift({
+        key: "resumen",
+        kind: "resumen",
+        title: "Resumen ejecutivo",
+        breakBefore: true,
+        node: <ExecutiveSummary items={shown} catalog={catalog} settings={settings} />,
+      });
+    } else {
+      // Completo: una apertura y un microtablero por informe. Cada tablero es
+      // su propia unidad, así la paginación los reparte sin pisar el pie.
+      units.unshift(
+        {
+          key: "resumen",
+          kind: "resumen",
+          title: "Resumen ejecutivo",
+          breakBefore: true,
+          node: <SummaryIntro items={shown} catalog={catalog} settings={settings} />,
+        },
+        ...shown.map((item) => ({
+          key: `resumen-${item.report.slug}`,
+          kind: "tablero" as const,
+          title: item.report.name,
+          node: <SummaryBoard item={item} catalog={catalog} settings={settings} />,
+        })),
+      );
+    }
   }
 
   return {

@@ -179,7 +179,8 @@ export function deiUnits(
   if (view === "origen") {
     const map = report.maps?.find((m) => m.mode === "municipio");
     if (!map) return [];
-    const node = <OriginSheet map={map} year={year} campus={settings.campus} sites={sites.map((s) => s.id)} DatasetSheet={DatasetSheet} title={map.title || title} />;
+    const scope = settings.campus === ALL_CAMPUSES ? "todos los campus" : `solo ${sites.find((s) => s.id === settings.campus)?.name ?? settings.campus}`;
+    const node = <OriginSheet map={map} year={year} campus={settings.campus} scope={scope} sites={sites.map((s) => s.id)} DatasetSheet={DatasetSheet} title={map.title || title} />;
     return node ? [{ title: map.title || title, node }] : [];
   }
   return [];
@@ -327,7 +328,7 @@ function ShareColumns({ points }: { points: { label: string; n: number | null; b
 
 function Mosaic({ families }: { families: Family[] }) {
   const W = 178;
-  const H = 112;
+  const H = 94;
   const gap = 3;
   const head = 6;
   const sum = families.reduce((s, f) => s + f.total, 0);
@@ -512,6 +513,7 @@ function OriginSheet({
   map,
   year,
   campus,
+  scope,
   sites,
   DatasetSheet,
   title,
@@ -519,6 +521,8 @@ function OriginSheet({
   map: MapDataset;
   year: number;
   campus: string;
+  /** "todos los campus" o "solo Bucaramanga": el PDF dice de quién son las cifras. */
+  scope: string;
   sites: string[];
   DatasetSheet: Sheet;
   title: string;
@@ -552,7 +556,7 @@ function OriginSheet({
       description={map.description || "Calor por departamento de origen y un punto por municipio, del tamaño de su cifra."}
       source={map.source}
       notes={[
-        ["Corte", String(shown)],
+        ["Corte", `${shown} · ${scope}`],
         ["Reserva", "Un municipio con menos de 5 personas en un campus no se dibuja con su cifra."],
       ]}
       wide
@@ -577,7 +581,7 @@ function OriginSheet({
         </svg>
         <div>
           <p className="bol-dei__origin-total">
-            <b>{count(grand)}</b> con municipio de origen registrado
+            <b>{count(grand)}</b> con municipio de origen registrado · {scope}
           </p>
           <DataTable
             caption="Municipios que más aportan"

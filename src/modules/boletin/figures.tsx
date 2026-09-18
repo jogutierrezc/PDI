@@ -262,7 +262,12 @@ export function HBars({
   reservedThreshold?: number;
 }) {
   const row = 6.2;
-  const labelW = Math.min(24, width * 0.4);
+  // El ancho de los nombres sale del más largo (≈1,25 por carácter a 2,4 de
+  // cuerpo), entre un mínimo legible y el 42 % del ancho: así un nombre largo
+  // no se sale del lienzo ni pisa la columna de notas.
+  const longest = Math.max(4, ...items.map((i) => i.label.length));
+  const labelW = Math.max(Math.min(18, width * 0.3), Math.min(width * 0.42, longest * 1.25 + 2));
+  const maxChars = Math.floor((labelW - 2) / 1.25);
   const valueW = share ? 17 : 11;
   const barW = width - labelW - valueW - 2;
   const max = Math.max(0, ...items.map((i) => i.value ?? 0)) || 1;
@@ -281,7 +286,7 @@ export function HBars({
         return (
           <g key={item.label} data-strong={item.strong || undefined}>
             <text className="bol-chart__label" x={labelW - 1.5} y={top + row / 2} dy="0.9" textAnchor="end">
-              {item.label.length > 22 ? `${item.label.slice(0, 21)}…` : item.label}
+              {item.label.length > maxChars ? `${item.label.slice(0, maxChars - 1)}…` : item.label}
             </text>
             <rect className="bol-chart__track" x={labelW} y={top + 1.2} width={barW} height={row - 2.4} />
             {item.reserved ? (

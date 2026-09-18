@@ -304,7 +304,8 @@
 .od-model__row[data-on] .od-model__hit,
 .od-model__row:focus-visible .od-model__hit { fill: var(--od-board-raised); }
 
-.od-model__label { fill: var(--ink-secondary); font-size: 12px; font-weight: 600; }
+.od-model__label { fill: var(--ink); font-size: 12px; font-weight: 700; }
+.od-model__label-var { fill: var(--ink-muted); font-size: 10.5px; font-weight: 600; }
 .od-model__row[data-on] .od-model__label { fill: var(--ink); }
 
 .od-model__ci,
@@ -329,6 +330,11 @@
 
 .od-model__forest:not([data-seen]) .od-model__mark { transform: scale(0); }
 
+/* La referencia: un rombo hueco sobre la línea del 1, sin intervalo. */
+.od-model__refmark { fill: var(--od-surface); stroke: var(--od-board-ink); stroke-width: 1.4; }
+.od-model__row[data-ref] .od-model__label { fill: var(--ink-muted); font-style: italic; }
+.od-model__row[data-ref] .od-model__value tspan { fill: var(--ink-muted); font-style: italic; }
+
 .od-model__value { fill: var(--ink); font-size: 12px; font-weight: 700; font-variant-numeric: tabular-nums; }
 .od-model__value tspan { fill: var(--ink-muted); font-weight: 500; }
 
@@ -346,6 +352,7 @@
 .od-model__legend span[data-kind]::before { content: ""; width: 9px; height: 9px; border-radius: 2px; }
 .od-model__legend span[data-kind="sig"]::before { background: var(--od-series-1); }
 .od-model__legend span[data-kind="ns"]::before { border: 1.5px solid var(--od-board-muted); }
+.od-model__legend span[data-kind="ref"]::before { width: 8px; height: 8px; border: 1.5px solid var(--od-board-ink); border-radius: 1px; transform: rotate(45deg); }
 
 /* --- Calidad ------------------------------------------------------------------ */
 
@@ -371,7 +378,8 @@
 .od-model__cell {
   display: grid;
   gap: 2px;
-  min-height: 72px;
+  min-height: 104px;
+  padding: var(--space-2);
   place-content: center;
   text-align: center;
   background: color-mix(in oklab, var(--od-series-2) calc(var(--share) * 55%), var(--od-board-raised));
@@ -389,7 +397,21 @@
   font-variant-numeric: tabular-nums;
 }
 
-.od-model__cell em { color: var(--ink-secondary); font-size: var(--text-2xs); font-style: normal; }
+.od-model__cell em { max-width: 16ch; color: var(--ink-secondary); font-size: var(--text-2xs); font-style: normal; line-height: 1.3; }
+.od-model__cell-tag { font-size: var(--text-2xs); font-weight: 700; letter-spacing: 0.04em; color: var(--ink); }
+
+.od-model__howto {
+  margin-bottom: var(--space-4);
+  padding: var(--space-3) var(--space-4);
+  background: var(--od-board-raised);
+  border-radius: var(--radius-xs);
+  font-size: var(--text-xs);
+  line-height: 1.55;
+}
+
+.od-model__howto p { margin: 0 0 var(--space-2); }
+.od-model__howto ul { display: grid; gap: 4px; margin: 0; padding-left: 1.1rem; }
+.od-model__howto b { font-variant-numeric: tabular-nums; }
 
 .od-model__fit {
   display: grid;
@@ -444,8 +466,6 @@
 }
 
 .od-model__comp-bar > span {
-  display: grid;
-  place-items: center;
   width: var(--w);
   min-width: 2px;
   background: var(--tone);
@@ -455,22 +475,20 @@
 
 .od-model__sample:not([data-seen]) .od-model__comp-bar > span { transform: scaleX(0); }
 
-.od-model__comp-bar em {
-  overflow: hidden;
-  padding-inline: 4px;
-  color: var(--od-dei-tile-ink);
+/* La leyenda nombra cada color: ningún tramo queda sin decir qué es. */
+.od-model__comp-legend {
+  grid-column: 2;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px var(--space-3);
+  color: var(--ink-secondary);
   font-size: var(--text-2xs);
-  font-style: normal;
-  font-weight: 700;
-  text-overflow: ellipsis;
-  white-space: nowrap;
 }
 
-.od-model__comp-small {
-  grid-column: 2;
-  color: var(--ink-muted);
-  font-size: var(--text-2xs);
-}
+.od-model__comp-legend span { display: inline-flex; align-items: center; gap: 5px; }
+.od-model__comp-legend span::before { content: ""; width: 9px; height: 9px; background: var(--tone); border-radius: 2px; }
+.od-model__comp-legend b { color: var(--ink); font-variant-numeric: tabular-nums; }
+.od-model__comp-legend em { color: var(--ink-muted); font-style: normal; }
 
 .od-model__note {
   max-width: 80ch;
@@ -494,7 +512,7 @@
   .od-model__step { grid-template-columns: minmax(0, 7rem) minmax(0, 1fr) 3rem; }
   .od-model__sample { grid-template-columns: 1fr; }
   .od-model__comp { grid-template-columns: 1fr; }
-  .od-model__comp-small { grid-column: 1; }
+  .od-model__comp-legend { grid-column: 1; }
 }
 
 @media (prefers-reduced-motion: reduce) {

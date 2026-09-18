@@ -221,7 +221,7 @@ export function datasetRefs(report: Report): { ref: string; title: string }[] {
   // Primero en el orden que la intranet dio a la ficha; luego lo que no tiene bloque.
   for (const block of [...(report.blocks ?? [])].sort((a, b) => a.position - b.position)) {
     if (!block.refKey) continue;
-    if (block.kind === "mapa") add(`mapa:${block.refKey}`, report.maps?.find((m) => m.id === block.refKey)?.title ?? block.refKey);
+    if (block.kind === "mapa" && report.maps?.find((m) => m.id === block.refKey)?.mode !== "municipio") add(`mapa:${block.refKey}`, report.maps?.find((m) => m.id === block.refKey)?.title ?? block.refKey);
     if (block.kind === "mapa_calor") add(`calor:${block.refKey}`, report.heatmaps?.find((h) => h.id === block.refKey)?.title ?? block.refKey);
     if (block.kind === "tuberia") add(`tuberia:${block.refKey}`, (report.pipelines ?? []).find((p) => p.id === block.refKey)?.title ?? block.refKey);
     if (block.kind === "historico") add(`historico:${block.refKey}`, report.histories?.find((h) => h.id === block.refKey)?.title ?? block.refKey);
@@ -250,7 +250,9 @@ export function datasetRefs(report: Report): { ref: string; title: string }[] {
   // Conjuntos libres: una hoja por vista publicable.
   freeRefs(report.freeSets).forEach(({ ref, title }) => add(ref, title));
   report.breakdowns.forEach((b) => add(`desglose:${b.id}`, b.title));
-  report.maps?.forEach((m) => add(`mapa:${m.id}`, m.title));
+  // Un mapa por municipio ya tiene su hoja en las del tablero de la diversidad
+  // (dei:origen); como mapa departamental sumaría códigos de municipio.
+  report.maps?.filter((m) => m.mode !== "municipio").forEach((m) => add(`mapa:${m.id}`, m.title));
   report.heatmaps?.forEach((h) => add(`calor:${h.id}`, h.title));
   (report.pipelines ?? (report.pipeline ? [report.pipeline] : [])).forEach((p) => add(`tuberia:${p.id}`, p.title));
   report.histories?.forEach((h) => add(`historico:${h.id}`, h.title));
@@ -338,7 +340,8 @@ export function normalizeSettings(
   return {
     version: 1,
     format,
-    summary: saved.summary ?? false,
+    // Cada boletín abre con su resumen ejecutivo salvo que se quite a mano.
+    summary: saved.summary ?? true,
     tabs: saved.tabs ?? true,
     texts,
     images,

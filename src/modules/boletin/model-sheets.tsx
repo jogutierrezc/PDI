@@ -21,6 +21,7 @@ import {
   predict,
   referenceProfile,
   significant,
+  termRows,
 } from "../datos-abiertos/data/model";
 import type { ModelData, Report } from "../datos-abiertos/data/types";
 import { DataTable } from "./figures";
@@ -57,17 +58,35 @@ export function modelUnits(model: ModelData, DatasetSheet: Sheet): { node: React
   const factors = (
     <DatasetSheet title={`${model.title} · factores asociados`} description={spec.question} source={model.source} notes={notes} wide>
       <Forest model={model} />
+    </DatasetSheet>
+  );
+
+  // La tabla de coeficientes, como la da SPSS, en su propia hoja: con las
+  // filas de referencia y las pruebas conjuntas no cabe bajo el bosque.
+  const coefficients = (
+    <DatasetSheet
+      title={`${model.title} · coeficientes`}
+      description="Variables en la ecuación, paso final del modelo, tal como las publica SPSS."
+      source={model.source}
+      notes={[["Lectura", "Exp(B) mayor que 1 sube las posibilidades de un promedio alto frente a la referencia; menor que 1, las baja."]]}
+      wide
+    >
       <DataTable
-        caption={`Variables en la ecuación · significancia al ${fmtPct(spec.fit.significance * 100).replace(",0", "")} · en negrita, lo significativo`}
-        head={["Variable · nivel (frente a)", "B", "Error", "Wald", "Sig.", "Exp(B)", "IC 95 %"]}
+        caption={`Variables en la ecuación · significancia al ${fmtPct(spec.fit.significance * 100).replace(",0", "")} · en negrita, lo significativo · «referencia»: la categoría con la que se comparan las demás de su variable (Exp(B) = 1)`}
+        head={["Variable · nivel", "B", "Error", "Wald", "Sig.", "Exp(B)", "IC 95 %"]}
         rows={[
-          ...spec.variables.flatMap((v) =>
-            v.levels.map((l) => ({
-              label: `${v.label} · ${l.label} (${v.reference})`,
+          ...spec.variables.flatMap((v) => [
+            // Con varios niveles, la prueba de la variable en conjunto, como la da SPSS.
+            ...(v.overall
+              ? [{ label: `${v.label} (en conjunto, ${v.overall.df} gl)`, strong: v.overall.sig < spec.fit.significance, cells: ["", "", three.format(v.overall.wald), fmtP(v.overall.sig), "", ""] }]
+              : []),
+            { label: `${v.label} · ${v.reference}`, strong: false, cells: ["referencia", "", "", "", "1,00", ""] },
+            ...v.levels.map((l) => ({
+              label: `${v.label} · ${l.label}`,
               strong: significant(l.term, spec.fit.significance),
               cells: [fmtB(l.term.b), three.format(l.term.se), three.format(l.term.wald), fmtP(l.term.sig), fmtOr(l.term.or), `${fmtOr(l.term.lo)} a ${fmtOr(l.term.hi)}`],
             })),
-          ),
+          ]),
           {
             label: "Constante",
             strong: false,
@@ -95,6 +114,16 @@ export function modelUnits(model: ModelData, DatasetSheet: Sheet): { node: React
       ]}
       wide
     >
+      <p className="bol-model__howto">
+        <b>Cómo leer la tabla.</b> Cada fila es lo que de verdad pasó; cada columna, lo que el modelo pronosticó con lo que se
+        sabe al ingresar. De los {count(q.negTotal)} estudiantes que terminaron con {spec.response.negative}, acertó con{" "}
+        {count(spec.classification.negative.negative)} ({fmtPct(q.negCorrect)}); de los {count(q.posTotal)} que terminaron con{" "}
+        {spec.response.positive}, con {count(spec.classification.positive.positive)} ({fmtPct(q.posCorrect)}). En total acierta en{" "}
+        {count(spec.classification.negative.negative + spec.classification.positive.positive)} de {count(q.total)} casos, cerca
+        de {Math.round(q.overall / 10)} de cada 10. El R² dice qué parte de lo que hace variar el promedio explican estos
+        factores ({fmtPct(spec.fit.nagelkerke * 100)}); la prueba de Hosmer y Lemeshow, con p mayor que 0,05, indica que lo
+        que el modelo espera coincide con lo que pasó.
+      </p>
       <div className="bol-model__pair">
         <DataTable
           caption="Tabla de clasificación · observado frente a pronosticado"
@@ -147,10 +176,16 @@ export function modelUnits(model: ModelData, DatasetSheet: Sheet): { node: React
                 <span>{g.label}</span>
                 <span className="bol-model__comp-bar">
                   {g.items.map(([label, n], k) => (
-                    <i key={label} style={{ "--w": `${(n / total) * 100}%`, "--tone": `var(--od-etnia-${(k % 12) + 1})` } as CSSProperties} />
+                    <i key={label} style={{ "--w": `${(n / total) * 100}%`, "--tone": `var(--od-inst-${(k % 6) + 1})` } as CSSProperties} />
                   ))}
                 </span>
-                <small>{g.items.map(([label, n]) => `${label} ${fmtPct((n / total) * 100)}`).join(" · ")}</small>
+                <small className="bol-model__legend">
+                  {g.items.map(([label, n], k) => (
+                    <span key={label} style={{ "--tone": `var(--od-inst-${(k % 6) + 1})` } as CSSProperties}>
+                      {label} {fmtPct((n / total) * 100)}
+                    </span>
+                  ))}
+                </small>
               </div>
             );
           })}
@@ -161,6 +196,7 @@ export function modelUnits(model: ModelData, DatasetSheet: Sheet): { node: React
 
   return [
     { node: factors, title: `${model.title} · factores asociados` },
+    { node: coefficients, title: `${model.title} · coeficientes` },
     { node: quality, title: `${model.title} · calidad y perfiles` },
   ];
 }
@@ -171,9 +207,9 @@ const TICKS = [0.1, 0.25, 0.5, 1, 2, 4, 8];
 
 function Forest({ model }: { model: ModelData }) {
   const spec = model.spec;
-  const rows = spec.variables.flatMap((v) => v.levels.map((l) => ({ v, l })));
+  const rows = termRows(spec);
   const W = 178;
-  const row = 5.4;
+  const row = 4;
   const labelW = 64;
   const valueW = 30;
   const top = 7;
@@ -203,17 +239,23 @@ function Forest({ model }: { model: ModelData }) {
         </text>
         {rows.map((r, k) => {
           const y = top + k * row + row / 2;
-          const t = r.l.term;
-          const sig = significant(t, spec.fit.significance);
+          const t = r.term;
+          const sig = t ? significant(t, spec.fit.significance) : false;
           return (
-            <g key={`${r.v.key}-${r.l.label}`} data-sig={sig || undefined} data-up={t.or >= 1 || undefined} className="bol-model__row">
+            <g key={`${r.v.key}-${r.i}`} data-sig={sig || undefined} data-up={(t?.or ?? 1) >= 1 || undefined} data-ref={!t || undefined} className="bol-model__row">
               <text className="bol-chart__label" x={labelW} y={y} dy="0.9" textAnchor="end">
-                {r.v.label} · {r.l.label}
+                {r.v.label} · {r.label}
               </text>
-              <line className="bol-model__ci" x1={x(t.lo)} x2={x(t.hi)} y1={y} y2={y} />
-              <rect className="bol-model__mark" x={x(t.or) - 1.3} y={y - 1.3} width={2.6} height={2.6} rx={0.4} />
+              {t ? (
+                <>
+                  <line className="bol-model__ci" x1={x(t.lo)} x2={x(t.hi)} y1={y} y2={y} />
+                  <rect className="bol-model__mark" x={x(t.or) - 1.3} y={y - 1.3} width={2.6} height={2.6} rx={0.4} />
+                </>
+              ) : (
+                <path className="bol-model__refmark" d={`M${x(1)} ${y - 1.4} l1.4 1.4 l-1.4 1.4 l-1.4 -1.4z`} />
+              )}
               <text className="bol-chart__value" x={W} y={y} dy="0.9" textAnchor="end">
-                {fmtOr(t.or)} ({fmtOr(t.lo)}–{fmtOr(t.hi)})
+                {t ? `${fmtOr(t.or)} (${fmtOr(t.lo)}–${fmtOr(t.hi)})` : "referencia · 1,00"}
               </text>
             </g>
           );

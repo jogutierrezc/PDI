@@ -960,6 +960,18 @@
   gap: 3mm;
 }
 
+/* Hoja de indicador con las notas arriba: sus gráficas se dibujaron para el
+   ancho de la columna del cuerpo (≈135 mm); a todo el ancho crecerían en alto
+   y empujarían la hoja a otra página. Se quedan a su ancho natural. */
+.bol-sheet[data-kind="indicador"][data-wide] .bol-sheet__body {
+  max-width: 140mm;
+}
+
+.bol-sheet[data-kind="indicador"][data-wide] .bol-period-tables,
+.bol-sheet[data-kind="indicador"][data-wide] .bol-table-fit {
+  max-width: none;
+}
+
 .bol-sheet[data-wide] .bol-notes {
   grid-template-columns: repeat(auto-fit, minmax(40mm, 1fr));
   gap: 2mm 6mm;
@@ -2295,6 +2307,9 @@
 .bol-model__one { stroke: var(--bol-navy); stroke-width: 0.35; }
 .bol-model__ci { stroke: var(--bol-ink-3); stroke-width: 0.4; }
 .bol-model__mark { fill: #ffffff; stroke: var(--bol-ink-3); stroke-width: 0.35; }
+.bol-model__refmark { fill: #ffffff; stroke: var(--bol-navy); stroke-width: 0.35; }
+.bol-model__row[data-ref] .bol-chart__label,
+.bol-model__row[data-ref] .bol-chart__value { fill: var(--bol-ink-3); font-style: italic; font-weight: 500; }
 .bol-model__row[data-sig] .bol-model__ci { stroke: var(--bol-s2); stroke-width: 0.55; }
 .bol-model__row[data-sig] .bol-model__mark { fill: var(--bol-s2); stroke: #ffffff; }
 .bol-model__row[data-sig][data-up] .bol-model__ci { stroke: var(--bol-band); }
@@ -2319,3 +2334,123 @@
 .bol-model__comp-bar { display: flex; height: 3mm; overflow: hidden; border-radius: 0.6mm; }
 .bol-model__comp-bar i { width: var(--w); background: var(--tone); }
 .bol-model__comp small { grid-column: 2; color: var(--bol-ink-3); font-size: 2mm; }
+
+.bol-model__legend { display: flex; flex-wrap: wrap; gap: 0.6mm 2.4mm; }
+.bol-model__legend span { display: inline-flex; align-items: center; gap: 0.8mm; }
+.bol-model__legend span::before { content: ""; width: 2mm; height: 2mm; background: var(--tone); border-radius: 0.4mm; }
+.bol-model__howto { margin: 0 0 3mm; color: var(--bol-ink-2); font-size: 2.5mm; line-height: 1.5; }
+.bol-model__howto b { color: var(--bol-navy); }
+
+/* --- Resumen ejecutivo: microtableros ------------------------------------------- */
+
+.bol-summary--boards .bol-summary__lede { max-width: 150mm; }
+
+.bol-summary__legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1.5mm 6mm;
+  margin: 3mm 0 0;
+  padding: 0;
+  list-style: none;
+  color: var(--bol-ink-2);
+  font-size: 2.4mm;
+}
+
+.bol-summary__legend b { color: var(--bol-navy); font-size: 3.4mm; }
+.bol-board__arrow-key { color: var(--bol-s3); letter-spacing: -0.1em; }
+.bol-board__trend-key { display: inline-block; width: 6mm; height: 0.5mm; margin-right: 1mm; vertical-align: middle; background: var(--bol-band); }
+
+.bol-board {
+  display: grid;
+  gap: 2.4mm;
+  padding: 3mm 3.4mm 3.4mm;
+  background: #ffffff;
+  border: 0.25mm solid var(--bol-rule);
+  border-top: 1.2mm solid var(--line);
+  border-radius: 1.4mm;
+  break-inside: avoid;
+}
+
+.bol-board__head {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 3mm;
+}
+
+.bol-board__head .bol-chapter__code { width: 9mm; height: 9mm; font-size: 3.6mm; }
+.bol-board__head h3 { margin: 0; color: var(--bol-navy); font-size: 4mm; font-weight: 800; line-height: 1.1; }
+.bol-board__head p { margin: 0.6mm 0 0; color: var(--bol-ink-2); font-size: 2.3mm; line-height: 1.35; }
+
+.bol-board__head a {
+  color: var(--line);
+  font-size: 2.3mm;
+  font-weight: 700;
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.bol-board__tiles {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 1.6mm;
+}
+
+.bol-board__tile {
+  display: grid;
+  align-content: start;
+  gap: 0.6mm;
+  min-height: 19mm;
+  padding: 2mm 2.2mm;
+  background: var(--bol-paper-2);
+  border-radius: 1mm;
+}
+
+.bol-board__label {
+  display: -webkit-box;
+  overflow: hidden;
+  color: var(--bol-ink-2);
+  font-size: 2.1mm;
+  font-weight: 600;
+  line-height: 1.25;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+}
+
+.bol-board__value {
+  color: var(--bol-navy);
+  font-size: 4.6mm;
+  font-weight: 800;
+  line-height: 1.05;
+  font-variant-numeric: tabular-nums;
+}
+
+.bol-board__value small { color: var(--bol-ink-3); font-size: 2.1mm; font-weight: 600; }
+.bol-board__meta { color: var(--bol-ink-3); font-size: 2mm; }
+.bol-board__meta .bol-change { font-size: 2mm; }
+.bol-board__trend { display: block; height: 9mm; }
+.bol-board__trend svg { width: 100%; height: 100%; }
+
+.bol-board__sets {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1.2mm 4mm;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.bol-board__sets li {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 0 2mm;
+  padding: 1mm 0;
+  border-top: 0.2mm solid var(--bol-rule);
+  font-size: 2.2mm;
+}
+
+.bol-board__sets span { color: var(--bol-ink); font-weight: 600; }
+.bol-board__sets b { color: var(--bol-navy); font-size: 2.8mm; font-weight: 800; text-align: right; }
+.bol-board__sets b small { color: var(--bol-ink-3); font-size: 2mm; font-weight: 600; }
+.bol-board__sets em { grid-column: 1 / -1; color: var(--bol-ink-3); font-size: 2mm; font-style: normal; }
+.bol-board__more span { color: var(--bol-ink-3); font-style: italic; font-weight: 500; }

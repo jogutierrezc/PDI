@@ -289,6 +289,14 @@
   --od-etnia-10: #1f6f5c;
   --od-etnia-11: #4f46a8;
   --od-etnia-12: #7d4a26;
+  /* Paleta institucional pastel para composiciones de pocas partes: azules,
+     naranja, cobre y dorado, con su tinta. Van siempre con leyenda. */
+  --od-inst-1: #7fa7d9;
+  --od-inst-2: #f0a868;
+  --od-inst-3: #c08457;
+  --od-inst-4: #d9b44a;
+  --od-inst-5: #3f6fae;
+  --od-inst-6: #b9cde6;
   --od-dei-tile-shade: #06142b;
 
   --font-sign: "Barlow Condensed", "Arial Narrow", "Roboto Condensed", sans-serif;

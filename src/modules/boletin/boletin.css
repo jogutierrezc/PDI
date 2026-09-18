@@ -36,6 +36,10 @@
   --bol-line-7: #43536b;
   --bol-line-8: #2e6b2f;
   --bol-line-9: #8a3b8f;
+  /* Diversidad, Equidad e Inclusión y Bienestar Institucional (0041): sin
+     estas dos, su cabecera se pintaba transparente. */
+  --bol-line-10: #1a6b5a;
+  --bol-line-11: #7a4a2b;
   /* Cabecera: la barra y la franja. Cada página de informe las reescribe con
      su color de línea cuando el boletín pinta la cabecera por informe. */
   --bol-chrome-bar: var(--bol-navy);
@@ -1469,6 +1473,23 @@
 .bol-chart__value { fill: var(--bol-ink); font-size: 2.4px; font-weight: 700; }
 .bol-chart__empty { fill: var(--bol-ink-3); font-size: 2.2px; font-style: italic; }
 
+/* Reservada («< 5»): una muesca rayada, nunca una barra a escala. */
+.bol-chart__reserved {
+  fill: var(--bol-paper-2);
+  stroke: var(--bol-ink-3);
+  stroke-width: 0.25;
+  stroke-dasharray: 0.6 0.4;
+}
+
+.bol-reserve {
+  margin: 1.5mm 0 2.5mm;
+  color: var(--bol-ink-2, var(--bol-ink));
+  font-size: 2.3mm;
+  line-height: 1.45;
+}
+
+.bol-reserve b { color: var(--bol-navy); font-weight: 700; }
+
 .bol-legend {
   display: flex;
   flex-wrap: wrap;
@@ -2184,3 +2205,117 @@
   -webkit-print-color-adjust: exact;
   print-color-adjust: exact;
 }
+
+/* --- Diversidad, Equidad e Inclusión (dei.tsx) ------------------------------------
+   Estratos del 1 (tinta de la marca) al 6 (papel); mosaico con un color por
+   pueblo (--od-etnia-*, los mismos del portal); puntos de origen en el acento. */
+
+.bol-sheet {
+  --bol-seq-1: var(--bol-navy);
+  --bol-seq-2: color-mix(in srgb, var(--bol-navy) 55%, var(--bol-band));
+  --bol-seq-3: var(--bol-band);
+  --bol-seq-4: color-mix(in srgb, var(--bol-band) 62%, #ffffff);
+  --bol-seq-5: color-mix(in srgb, var(--bol-band) 38%, #ffffff);
+  --bol-seq-6: color-mix(in srgb, var(--bol-band) 18%, #ffffff);
+}
+
+.bol-dei__lead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6mm;
+  margin-bottom: 4mm;
+}
+
+.bol-dei__figure {
+  display: block;
+  color: var(--bol-navy);
+  font-size: 11mm;
+  font-weight: 800;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.02em;
+}
+
+.bol-dei__lead p { margin: 1mm 0 0; color: var(--bol-ink-2); font-size: 2.8mm; }
+.bol-dei__share b { color: var(--bol-accent); font-size: 4.2mm; font-weight: 800; }
+
+.bol-dei__waffle { width: 30mm; height: 30mm; flex: none; }
+.bol-dei__waffle rect { fill: var(--bol-paper-2); }
+.bol-dei__waffle rect[data-on] { fill: var(--bol-accent); }
+
+.bol-dei__col-on { fill: var(--bol-accent); }
+
+.bol-dei__mosaic { display: block; width: 100%; height: auto; }
+.bol-dei__family { fill: var(--bol-navy); font-size: 2.6px; font-weight: 700; }
+.bol-dei__tile-label { fill: #ffffff; font-size: 2.2px; font-weight: 700; }
+.bol-dei__tile-value { fill: #ffffff; font-size: 3.2px; font-weight: 800; font-variant-numeric: tabular-nums; }
+
+.bol-dei__reserve { margin-top: 2mm; font-size: 2.3mm; line-height: 1.5; color: var(--bol-ink-2); }
+.bol-dei__reserve p { margin: 0 0 1mm; }
+.bol-dei__reserve b { color: var(--bol-navy); }
+
+.bol-dei__seg { fill: var(--bol-navy); font-size: 2.1px; font-weight: 700; }
+.bol-dei__seg[data-deep] { fill: #ffffff; }
+.bol-dei__bracket { fill: var(--bol-ink-3); }
+.bol-dei__bracket[data-on] { fill: var(--bol-accent); }
+
+.bol-dei__legend {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 1mm 4mm;
+  margin: 0 0 2mm;
+  font-size: 2.4mm;
+  font-weight: 700;
+}
+
+.bol-dei__legend span { display: inline-flex; align-items: center; gap: 1.2mm; }
+.bol-dei__legend svg { width: 2.8mm; height: 2.8mm; fill: var(--tone); }
+.bol-dei__legend em { color: var(--bol-ink-3); font-style: normal; font-weight: 500; }
+.bol-dei__tick { stroke: var(--bol-rule, #d6dee8); stroke-width: 0.2; stroke-dasharray: 0.6 0.8; }
+.bol-dei__range { stroke: var(--bol-ink-3); stroke-width: 0.6; stroke-linecap: round; }
+.bol-dei__mark { stroke: #ffffff; stroke-width: 0.25; }
+
+.bol-dei__origin {
+  display: grid;
+  grid-template-columns: 92mm 1fr;
+  gap: 6mm;
+  align-items: start;
+}
+
+.bol-dei__dot { fill: color-mix(in srgb, var(--bol-accent) 78%, transparent); stroke: #ffffff; stroke-width: 1; }
+.bol-dei__site { fill: var(--bol-accent); stroke: var(--bol-navy); stroke-width: 1.4; }
+.bol-dei__origin-total { margin: 0 0 2mm; font-size: 2.6mm; color: var(--bol-ink-2); }
+.bol-dei__origin-total b { display: block; color: var(--bol-navy); font-size: 8mm; font-weight: 800; line-height: 1; }
+
+/* --- Modelo estadístico (model-sheets.tsx) --------------------------------------- */
+
+.bol-model__forest { display: block; width: 100%; height: auto; }
+.bol-model__one { stroke: var(--bol-navy); stroke-width: 0.35; }
+.bol-model__ci { stroke: var(--bol-ink-3); stroke-width: 0.4; }
+.bol-model__mark { fill: #ffffff; stroke: var(--bol-ink-3); stroke-width: 0.35; }
+.bol-model__row[data-sig] .bol-model__ci { stroke: var(--bol-s2); stroke-width: 0.55; }
+.bol-model__row[data-sig] .bol-model__mark { fill: var(--bol-s2); stroke: #ffffff; }
+.bol-model__row[data-sig][data-up] .bol-model__ci { stroke: var(--bol-band); }
+.bol-model__row[data-sig][data-up] .bol-model__mark { fill: var(--bol-band); }
+
+.bol-model__pair {
+  display: grid;
+  grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr);
+  gap: 6mm;
+  align-items: start;
+  margin-bottom: 4mm;
+}
+
+.bol-model__fit { display: grid; gap: 2.4mm; margin: 0; }
+.bol-model__fit dt { color: var(--bol-navy); font-size: 2.2mm; font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; }
+.bol-model__fit dd { margin: 0.6mm 0 0; color: var(--bol-ink-2); font-size: 2.5mm; }
+.bol-model__fit dd b { color: var(--bol-navy); font-size: 3.2mm; }
+
+.bol-model__comp { display: grid; grid-template-columns: 1fr 1fr; gap: 2mm 6mm; }
+.bol-model__comp > div { display: grid; grid-template-columns: 34mm 1fr; align-items: center; gap: 0.6mm 2mm; font-size: 2.3mm; }
+.bol-model__comp > div > span:first-child { font-weight: 700; color: var(--bol-navy); }
+.bol-model__comp-bar { display: flex; height: 3mm; overflow: hidden; border-radius: 0.6mm; }
+.bol-model__comp-bar i { width: var(--w); background: var(--tone); }
+.bol-model__comp small { grid-column: 2; color: var(--bol-ink-3); font-size: 2mm; }

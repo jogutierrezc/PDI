@@ -348,6 +348,29 @@ export function useSaveMapValues() {
   );
 }
 
+/**
+ * Mapa por municipio (0044): reemplaza de una vez las cifras de los años que
+ * trae la carga. Llegan ya contadas en el navegador, con la reserva aplicada
+ * (menos de 5 personas: reserved, sin valor); los años que no vienen quedan
+ * como estaban.
+ */
+export function useReplaceMapValues() {
+  return useOdMutation(
+    async ({ periodId, reportId, mapId, years, rows, fileName, kind }: {
+      periodId: string; reportId: string; mapId: string; years: number[];
+      rows: { year: number; campus_id: string; department_code: string; value: number | null; reserved: boolean }[];
+      fileName: string; kind: OdImportKind;
+    }) => {
+      if (years.length) await run(supabase.from("od_map_values").delete().eq("map_id", mapId).in("year", years));
+      const full = rows.map((r) => ({ map_id: mapId, ...r }));
+      for (let i = 0; i < full.length; i += 500) {
+        await run(supabase.from("od_map_values").insert(full.slice(i, i + 500)));
+      }
+      await logImport(periodId, reportId, kind, rows.length, fileName, { tabla: "od_map_values", anios: years });
+    },
+  );
+}
+
 export function useSavePipeline() {
   return useOdMutation(async (row: Partial<OdPipelineRow> & { report_id: string }) => saveDataset("od_pipelines", "tuberia", row));
 }

@@ -257,6 +257,40 @@
   --od-flow-out: #c0306f;
   --od-flow-out-head: #ff5c9a;
 
+  /* Tablero de diversidad: dos familias étnicas, los seis estratos (del más
+     bajo, el más oscuro) con su tinta, y los pares de género y zona. */
+  --od-dei-indigena: #6b3fa0;
+  --od-dei-negra: #a4471f;
+  --od-dei-e1: #0d366b;
+  --od-dei-e2: #184f95;
+  --od-dei-e3: #256abf;
+  --od-dei-e4: #6da7ec;
+  --od-dei-e5: #9ec5f4;
+  --od-dei-e6: #cde2fb;
+  --od-dei-e-ink-deep: #ffffff;
+  --od-dei-e-ink-pale: #0d1c31;
+  --od-dei-f: #7a5bd0;
+  --od-dei-m: #0f8a6e;
+  --od-dei-urbano: #1f5fbf;
+  --od-dei-rural: #2e6b2f;
+  --od-dei-hatch: rgba(13, 40, 84, 0.28);
+  --od-dei-tile-ink: #ffffff;
+  /* Doce tonos para los pueblos y comunidades del mosaico. Todos sostienen
+     tinta blanca por encima de 4,5:1, así que valen igual en los dos temas. */
+  --od-etnia-1: #7b3fb0;
+  --od-etnia-2: #b4461c;
+  --od-etnia-3: #0a7a86;
+  --od-etnia-4: #2f7a2f;
+  --od-etnia-5: #b42d5e;
+  --od-etnia-6: #2462c6;
+  --od-etnia-7: #8a6100;
+  --od-etnia-8: #9a3a9f;
+  --od-etnia-9: #c0392b;
+  --od-etnia-10: #1f6f5c;
+  --od-etnia-11: #4f46a8;
+  --od-etnia-12: #7d4a26;
+  --od-dei-tile-shade: #06142b;
+
   --font-sign: "Barlow Condensed", "Arial Narrow", "Roboto Condensed", sans-serif;
   --text-sign-hero: clamp(2.7rem, 7.2vw, 6rem);
   --ease-flap-fall: cubic-bezier(0.55, 0, 1, 0.45);
@@ -394,6 +428,36 @@
     --od-flow: #f6b93f;
     --od-flow-out: #ff6fa3;
     --od-flow-out-head: #ffc2d8;
+  --od-dei-indigena: #8a62c9;
+  --od-dei-negra: #b8582c;
+  --od-dei-e1: #cde2fb;
+  --od-dei-e2: #86b6ef;
+  --od-dei-e3: #5598e7;
+  --od-dei-e4: #1c5cab;
+  --od-dei-e5: #184f95;
+  --od-dei-e6: #10325e;
+  --od-dei-e-ink-deep: #06142b;
+  --od-dei-e-ink-pale: #ffffff;
+  --od-dei-f: #9085e9;
+  --od-dei-m: #2fa58a;
+  --od-dei-urbano: #4a86e0;
+  --od-dei-rural: #5fa35c;
+  --od-dei-hatch: rgba(148, 176, 214, 0.4);
+    --od-dei-indigena: #8a62c9;
+    --od-dei-negra: #b8582c;
+    --od-dei-e1: #cde2fb;
+    --od-dei-e2: #86b6ef;
+    --od-dei-e3: #5598e7;
+    --od-dei-e4: #1c5cab;
+    --od-dei-e5: #184f95;
+    --od-dei-e6: #10325e;
+    --od-dei-e-ink-deep: #06142b;
+    --od-dei-e-ink-pale: #ffffff;
+    --od-dei-f: #9085e9;
+    --od-dei-m: #2fa58a;
+    --od-dei-urbano: #4a86e0;
+    --od-dei-rural: #5fa35c;
+    --od-dei-hatch: rgba(148, 176, 214, 0.4);
 
     --shadow-xs: 0 1px 2px rgba(0, 0, 0, 0.4);
     --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.4), 0 2px 6px rgba(0, 0, 0, 0.3);

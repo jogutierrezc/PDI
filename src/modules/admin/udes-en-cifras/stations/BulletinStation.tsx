@@ -36,7 +36,8 @@ import {
   useSetEditionStatus,
   useUploadBulletinImage,
 } from "../../../boletin/data";
-import { BULLETIN_FONTS, DEFAULT_EDITION, DEFAULT_IMAGES, DEFAULT_SHOW, DEFAULT_THEME, bulletinSlug, datasetRefs, normalizeSettings } from "../../../boletin/model";
+import { BIENESTAR_SLUG, BULLETIN_FONTS, DEFAULT_EDITION, DEFAULT_IMAGES, DEFAULT_SHOW, DEFAULT_THEME, DEI_SLUG, bulletinSlug, datasetRefs, normalizeSettings } from "../../../boletin/model";
+import type { DeiPlacement } from "../../../boletin/model";
 import type { BulletinFont, BulletinFormat, BulletinSettings, EditionAlign, HeaderBadge, HeaderTint, IndicatorShow } from "../../../boletin/model";
 import type { StationProps } from "../OdAdmin";
 import { ConfirmButton, Panel, SaveState, StageEmpty } from "../ui";
@@ -714,6 +715,14 @@ function ContentTab({ catalog, draft, setDraft }: { catalog: OpenDataCatalog; dr
             ))}
           </select>
         </Field>
+        {!executive && draft.reports.some((r) => r.slug === DEI_SLUG) && draft.reports.some((r) => r.slug === BIENESTAR_SLUG) && (
+          <Field label="Diversidad, Equidad e Inclusión">
+            <select value={draft.deiPlacement} onChange={(e) => setDraft({ ...draft, deiPlacement: e.target.value as DeiPlacement })}>
+              <option value="capitulo">En su propio capítulo</option>
+              <option value="bienestar">Como sección de Bienestar Institucional</option>
+            </select>
+          </Field>
+        )}
         <label className="oda-inline-check admin-field--wide">
           <input type="checkbox" checked={draft.skipEmpty} onChange={(e) => setDraft({ ...draft, skipEmpty: e.target.checked })} />
           <span>

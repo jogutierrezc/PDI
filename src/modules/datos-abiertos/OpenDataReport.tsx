@@ -60,6 +60,9 @@ import { blockPicks, saberProOf, saberTytOf } from "./data/groups";
 import { RankingsBlock } from "./components/RankingsBlock";
 import { SaberProBlock } from "./components/SaberProBlock";
 import { SaberTytBlock } from "./components/SaberTytBlock";
+import { DiversityBoard } from "./components/DiversityBoard";
+import { OriginMap } from "./components/OriginMap";
+import { PredictiveModel } from "./components/PredictiveModel";
 import { FreeSetBlock } from "./components/FreeSetBlock";
 import { ALL_CAMPUSES, DEFAULT_BLOCK_ORDER, MAP_MODE_TITLE, isMobilityMap, isWorldMap } from "./data/types";
 import "./datos-abiertos.css";
@@ -240,6 +243,8 @@ function ReportContent({ data, report, year, term, campus, setYear, setTerm, set
       case "mapa": {
         const dataset = report.maps?.find((m) => m.id === block.refKey) ?? (block.refKey ? undefined : report.maps?.[0]);
         if (!dataset || pairedMaps.has(dataset.id)) return null;
+        // El tablero de la diversidad ya dibuja su mapa por municipio: no se repite.
+        if (dataset.mode === "municipio" && blocks.some((b) => b.kind === "diversidad" && b.visible)) return null;
         const partner = block.settings.mapWith ? report.maps?.find((m) => m.id === block.settings.mapWith && m.id !== dataset.id) : undefined;
         const combined =
           partner !== undefined &&
@@ -248,7 +253,9 @@ function ReportContent({ data, report, year, term, campus, setYear, setTerm, set
           isMobilityMap(partner.mode) &&
           dataset.mode !== partner.mode;
         const mapOf = (d: MapDataset, compact: boolean) =>
-          d.mode === "convenios" ? (
+          d.mode === "municipio" ? (
+            <OriginMap dataset={d} year={year} years={data.years} campus={campus} campuses={data.campuses} />
+          ) : d.mode === "convenios" ? (
             <AgreementsMap dataset={d} compact={compact} year={year} years={data.years} campus={campus} campuses={data.campuses} onSelectCampus={setCampus} />
           ) : isWorldMap(d.mode) ? (
             <WorldMap datasets={[d]} compact={compact} year={year} years={data.years} campus={campus} campuses={data.campuses} onSelectCampus={setCampus} />
@@ -259,7 +266,7 @@ function ReportContent({ data, report, year, term, campus, setYear, setTerm, set
           d.reporting === "global"
             ? "Dato global"
             : year === ALL_YEARS ? `Periodo ${cutLabel(year, null)} · ${isWorldMap(d.mode) ? "total" : "promedio anual"}` : `Corte ${year}`;
-        const frameTitle = (d: MapDataset) => (isWorldMap(d.mode) ? MAP_MODE_TITLE[d.mode] : "Mapa por departamento");
+        const frameTitle = (d: MapDataset) => (isWorldMap(d.mode) || d.mode === "municipio" ? MAP_MODE_TITLE[d.mode] : "Mapa por departamento");
 
         if (combined && partner) {
           const heading = block.settings.title || "Movilidad internacional";
@@ -431,6 +438,28 @@ function ReportContent({ data, report, year, term, campus, setYear, setTerm, set
         const shown = saberTytOf(report, block);
         if (!shown || shown.results.length === 0) return null;
         return <SaberTytBlock key={key} data={shown} title={block.settings.title} anchor={block.settings.slot ? `od-saber-tyt-${block.settings.slot}` : "od-saber-tyt"} />;
+      }
+      case "diversidad": {
+        if (inSection) return null;
+        return (
+          <DiversityBoard
+            key={key}
+            report={report}
+            campuses={data.campuses}
+            year={year}
+            campus={campus}
+            setYear={setYear}
+            setCampus={setCampus}
+            title={block.settings.title}
+            anchor={block.settings.slot ? `od-diversidad-${block.settings.slot}` : "od-diversidad"}
+          />
+        );
+      }
+      case "modelo": {
+        if (inSection) return null;
+        const model = report.models?.find((m) => m.id === block.refKey) ?? report.models?.[0];
+        if (!model) return null;
+        return <PredictiveModel key={key} model={model} title={block.settings.title} anchor={block.settings.slot ? `od-modelo-${block.settings.slot}` : "od-modelo"} />;
       }
       case "saber_pro": {
         if (inSection) return null;

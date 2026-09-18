@@ -987,7 +987,7 @@ export type OdTerm = "A" | "B" | "anual";
 /** Cómo sale la cifra del año a partir de los periodos A y B. */
 export type OdAnnualRule = "suma" | "ultimo" | "promedio" | "reportado";
 /** Por departamento: "origen" y "cobertura". Mundial (código ISO alfa-3): "entrante", "saliente" y "convenios". */
-export type OdMapMode = "origen" | "cobertura" | "entrante" | "saliente" | "convenios";
+export type OdMapMode = "origen" | "cobertura" | "entrante" | "saliente" | "convenios" | "municipio";
 /** "anual": una cifra por año. "global": una sola cifra sin año (year = 0). */
 export type OdMapReporting = "anual" | "global";
 export type OdMapLayout = "combinado" | "lado_a_lado";
@@ -1014,7 +1014,11 @@ export type OdBlockKind =
   /** Conjunto libre: una de sus vistas (settings.view) o todas (0033). */
   | "libre"
   /** Motor Beta: Saber 11 → Saber TyT en rango percentil (0035). */
-  | "saber_tyt";
+  | "saber_tyt"
+  /** Tablero propio de Diversidad, Equidad e Inclusión (0042). */
+  | "diversidad"
+  /** Modelo estadístico del informe (0046). */
+  | "modelo";
 /** Estado de un punto de un informe. */
 /** Cómo llega la cifra: por periodo académico (A y B) o una sola cifra por año. */
 export type OdReporting = "periodo" | "anual";
@@ -1204,12 +1208,30 @@ export interface OdMapRow {
   position: number;
 }
 
+/** Modelo estadístico publicado (0046). La forma de spec está en ModelSpec. */
+export interface OdModelRow {
+  id: string;
+  report_id: string;
+  key: string;
+  title: string;
+  description: string;
+  note: string;
+  spec: Record<string, unknown>;
+  office_id: string | null;
+  position: number;
+  created_at: string;
+  updated_at: string;
+}
+
 export interface OdMapValueRow {
   map_id: string;
   year: number;
   campus_id: string;
   department_code: string;
-  value: number;
+  /** null cuando la celda está reservada (0044). */
+  value: number | null;
+  /** Menos de 5 personas: la cifra no se publica (0044). */
+  reserved?: boolean;
 }
 
 export interface OdPipelineRow {

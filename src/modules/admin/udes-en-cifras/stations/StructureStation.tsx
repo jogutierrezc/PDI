@@ -827,6 +827,7 @@ const MAP_MODE_DETAIL: Record<OdMapMode, string> = {
   entrante: "movilidad entrante por país",
   saliente: "movilidad saliente por país",
   convenios: "convenios por país (mapa de calor)",
+  municipio: "origen por municipio, con zoom",
 };
 
 interface DatasetFields {
@@ -908,6 +909,7 @@ function DatasetForm({ kind, offices, years, initial, onSubmit, onCancel }: {
                 <>
                   <option value="origen">Origen: con líneas de llegada a cada campus</option>
                   <option value="cobertura">Cobertura: solo color por departamento</option>
+                  <option value="municipio">Origen por municipio: calor por departamento y puntos por ciudad, con zoom</option>
                 </>
               )}
             </select>

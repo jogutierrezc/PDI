@@ -252,11 +252,14 @@ export function HBars({
   format,
   share = false,
   width = 56,
+  reservedThreshold = 5,
 }: {
-  items: { label: string; value: number | null; strong?: boolean }[];
+  /** reserved: la celda existe pero tiene tan pocos registros que se publica «< n». */
+  items: { label: string; value: number | null; strong?: boolean; reserved?: boolean }[];
   format: ValueFormat;
   share?: boolean;
   width?: number;
+  reservedThreshold?: number;
 }) {
   const row = 6.2;
   const labelW = Math.min(24, width * 0.4);
@@ -266,7 +269,12 @@ export function HBars({
   const total = items.reduce((s, i) => s + (i.value ?? 0), 0);
   const height = items.length * row + 1;
   return (
-    <svg className="bol-chart" viewBox={`0 0 ${width} ${height}`} role="img" aria-label={items.map((i) => `${i.label}: ${figure(i.value, format)}`).join(", ")}>
+    <svg
+      className="bol-chart"
+      viewBox={`0 0 ${width} ${height}`}
+      role="img"
+      aria-label={items.map((i) => `${i.label}: ${i.reserved ? `menos de ${reservedThreshold}` : figure(i.value, format)}`).join(", ")}
+    >
       {items.map((item, index) => {
         const top = index * row + 0.5;
         const w = item.value === null ? 0 : Math.max(0.4, (item.value / max) * barW);
@@ -276,13 +284,15 @@ export function HBars({
               {item.label.length > 22 ? `${item.label.slice(0, 21)}…` : item.label}
             </text>
             <rect className="bol-chart__track" x={labelW} y={top + 1.2} width={barW} height={row - 2.4} />
-            {item.value === null ? (
+            {item.reserved ? (
+              <rect className="bol-chart__reserved" x={labelW} y={top + 1.2} width={3.2} height={row - 2.4} />
+            ) : item.value === null ? (
               <text className="bol-chart__empty" x={labelW + 1} y={top + row / 2} dy="0.9">sin reportar</text>
             ) : (
               <rect className="bol-chart__bar" x={labelW} y={top + 1.2} width={w} height={row - 2.4} />
             )}
             <text className="bol-chart__value" x={width} y={top + row / 2} dy="0.9" textAnchor="end">
-              {item.value === null ? "—" : figure(item.value, format)}
+              {item.reserved ? `< ${reservedThreshold}` : item.value === null ? "—" : figure(item.value, format)}
               {share && item.value !== null && total > 0 ? ` · ${formatValue((item.value / total) * 100, "decimal")} %` : ""}
             </text>
           </g>

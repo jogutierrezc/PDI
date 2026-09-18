@@ -21,3 +21,6 @@ vite.config.d.ts
 # nunca se publican ni se suben al repositorio. El portal consume solo
 # los agregados que produce scripts/build-bi-agregados.mjs.
 bi/
+
+# Microdatos del modelo predictivo (caracterización): nunca al repositorio.
+Modelo/*.xlsx

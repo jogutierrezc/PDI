@@ -1,0 +1,34 @@
+-- =============================================================================
+-- PDI · 0047 · Modelo predictivo del rendimiento académico (informe DE)
+--
+-- Regresión logística binaria del promedio del primer semestre (3,8 o más
+-- frente a menos de 3,8) para estudiantes de recién ingreso de grupos
+-- especiales, diversos y de protección constitucional, cohortes 2020-2023
+-- (1.539 casos).
+--
+-- Cifras transcritas del resultado de SPSS (Modelo/Resultadofinals11.spv:
+-- «Variables en la ecuación», paso 7; «Resumen del modelo»; «Prueba de Hosmer y
+-- Lemeshow»; «Tabla de clasificación»; «Codificaciones de variables
+-- categóricas») y del documento que lo explica. Solo agregados.
+--
+-- Requiere 0043 y 0046. Idempotente.
+-- =============================================================================
+
+insert into public.od_models (report_id, key, title, description, note, spec, office_id, position)
+values ((select id from public.od_reports where slug = 'diversidad-equidad-inclusion' and period_id = (select id from public.od_periods where label = '2020-2025')), 'rendimiento-primer-semestre',
+  'Modelo predictivo del rendimiento académico',
+  'Qué factores socioeconómicos y académicos, conocidos al ingresar, se asocian con un promedio alto en el primer semestre de los estudiantes de grupos de protección constitucional.',
+  'Es un modelo explicativo sobre las cohortes 2020-2023: describe asociaciones, no causas, y su probabilidad es la de un perfil, no el pronóstico de una persona. Explica el 27,3 % de la variación (R² de Nagelkerke) y clasifica bien el 68,6 % de los casos.',
+  '{"kind": "logistica", "question": "¿Qué factores, al ingresar, se asocian con que un estudiante de grupos de protección constitucional termine su primer semestre con promedio de 3,8 o más?", "response": {"label": "Promedio del primer semestre", "positive": "3,8 o más", "negative": "menos de 3,8"}, "method": "Regresión logística binaria · selección por pasos hacia adelante (Wald) · paso 7", "sample": {"n": 1539, "cohorts": "2020–2023", "population": "Estudiantes de recién ingreso que declararon pertenecer a un grupo especial, diverso o de protección constitucional: desplazados por la violencia, con discapacidad, de grupo étnico, pueblo indígena, comunidad negra o con capacidad excepcional.", "source": "Formularios de inscripción (DAVINCI-UDES) y resultados Saber 11"}, "fit": {"m2ll": 1771.065, "coxSnell": 0.204, "nagelkerke": 0.273, "hosmerLemeshowSig": 0.098, "cutoff": 0.5, "significance": 0.05}, "classification": {"negative": {"negative": 437, "positive": 267}, "positive": {"negative": 217, "positive": 618}}, "intercept": {"b": -1.472, "se": 0.378, "wald": 15.139, "sig": 0.0, "or": 0.23}, "variables": [{"key": "genero", "label": "Género", "reference": "Masculino", "levels": [{"label": "Femenino", "term": {"b": 0.733, "se": 0.128, "wald": 32.713, "df": 1, "sig": 0.0, "or": 2.082, "lo": 1.619, "hi": 2.677}}]}, {"key": "trabaja", "label": "Trabaja mientras estudia", "reference": "No", "levels": [{"label": "Sí", "term": {"b": 0.516, "se": 0.264, "wald": 3.824, "df": 1, "sig": 0.051, "or": 1.675, "lo": 0.999, "hi": 2.808}}]}, {"key": "campus", "label": "Campus", "reference": "Bucaramanga", "overall": {"wald": 8.495, "df": 2, "sig": 0.014}, "levels": [{"label": "Cúcuta", "term": {"b": -0.077, "se": 0.297, "wald": 0.068, "df": 1, "sig": 0.795, "or": 0.926, "lo": 0.517, "hi": 1.657}}, {"label": "Valledupar", "term": {"b": 0.414, "se": 0.162, "wald": 6.494, "df": 1, "sig": 0.011, "or": 1.513, "lo": 1.1, "hi": 2.079}}]}, {"key": "area", "label": "Área del programa", "reference": "Tecnologías", "overall": {"wald": 149.356, "df": 5, "sig": 0.0}, "levels": [{"label": "Ciencias económicas", "term": {"b": 0.94, "se": 0.425, "wald": 4.893, "df": 1, "sig": 0.027, "or": 2.561, "lo": 1.113, "hi": 5.891}}, {"label": "Ciencias exactas", "term": {"b": -1.811, "se": 0.476, "wald": 14.469, "df": 1, "sig": 0.0, "or": 0.164, "lo": 0.064, "hi": 0.416}}, {"label": "Ingenierías", "term": {"b": -0.163, "se": 0.415, "wald": 0.154, "df": 1, "sig": 0.694, "or": 0.85, "lo": 0.377, "hi": 1.915}}, {"label": "Ciencias de la salud", "term": {"b": -0.69, "se": 0.393, "wald": 3.091, "df": 1, "sig": 0.079, "or": 0.501, "lo": 0.232, "hi": 1.083}}, {"label": "Ciencias sociales", "term": {"b": 0.721, "se": 0.4, "wald": 3.256, "df": 1, "sig": 0.071, "or": 2.057, "lo": 0.94, "hi": 4.501}}]}, {"key": "saber-mat", "label": "Saber 11 · Matemáticas", "reference": "Niveles 1-2", "levels": [{"label": "Niveles 3-4", "term": {"b": 0.949, "se": 0.135, "wald": 49.657, "df": 1, "sig": 0.0, "or": 2.583, "lo": 1.984, "hi": 3.363}}]}, {"key": "saber-soc", "label": "Saber 11 · Sociales y ciudadanas", "reference": "Niveles 1-2", "levels": [{"label": "Niveles 3-4", "term": {"b": 0.584, "se": 0.152, "wald": 14.736, "df": 1, "sig": 0.0, "or": 1.794, "lo": 1.331, "hi": 2.417}}]}, {"key": "saber-cn", "label": "Saber 11 · Ciencias naturales", "reference": "Niveles 1-2", "levels": [{"label": "Niveles 3-4", "term": {"b": 0.748, "se": 0.159, "wald": 22.24, "df": 1, "sig": 0.0, "or": 2.112, "lo": 1.548, "hi": 2.882}}]}], "composition": [{"label": "Género", "items": [["Femenino", 980], ["Masculino", 559]]}, {"label": "Campus", "items": [["Bucaramanga", 281], ["Cúcuta", 72], ["Valledupar", 1186]]}, {"label": "Área del programa", "items": [["Ciencias de la salud", 581], ["Ciencias sociales", 517], ["Ciencias económicas", 160], ["Ingenierías", 149], ["Ciencias exactas", 97], ["Tecnologías", 35]]}, {"label": "Trabaja mientras estudia", "items": [["No", 1456], ["Sí", 83]]}, {"label": "Saber 11 · Matemáticas", "items": [["Niveles 1-2", 695], ["Niveles 3-4", 844]]}, {"label": "Saber 11 · Sociales y ciudadanas", "items": [["Niveles 1-2", 1085], ["Niveles 3-4", 454]]}, {"label": "Saber 11 · Ciencias naturales", "items": [["Niveles 1-2", 1087], ["Niveles 3-4", 452]]}, {"label": "Estrato", "items": [["Bajo", 1296], ["Medio", 229], ["Alto", 14]]}, {"label": "Edad al ingresar", "items": [["Menos de 20 años", 807], ["21 a 25 años", 635], ["Más de 26 años", 97]]}, {"label": "Zona de residencia", "items": [["Urbana", 1335], ["Rural", 204]]}]}'::jsonb,
+  (select id from public.od_offices where name = 'Planeación Institucional'),
+  1)
+on conflict (report_id, key) do update
+  set title = excluded.title, description = excluded.description, note = excluded.note,
+      spec = excluded.spec, office_id = excluded.office_id, position = excluded.position;
+
+-- El bloque va detrás del tablero de la diversidad.
+with r as (select (select id from public.od_reports where slug = 'diversidad-equidad-inclusion' and period_id = (select id from public.od_periods where label = '2020-2025')) as id)
+insert into public.od_report_blocks (report_id, kind, ref_id, position, visible, settings)
+select r.id, 'modelo', null, 1, true, '{}'::jsonb
+from r
+where not exists (select 1 from public.od_report_blocks b where b.report_id = r.id and b.kind = 'modelo');

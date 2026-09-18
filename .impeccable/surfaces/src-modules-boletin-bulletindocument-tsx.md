@@ -15,6 +15,8 @@ Constraints: page frame pinned by the user's model (Modelo Informe/Imagenes: por
 
 Memorable moment: every indicator reads as a yearbook sheet. A notes column on the left says what is measured, who reports it and how it is calculated; the body carries the anchor figure, its evolution, the campus split and the data table.
 
+DE y BI (2026-09-18): el informe DE abre con cinco hojas propias (dei:panorama, dei:mosaico, dei:estratos, dei:ines y dei:origen cuando hay cifras), dibujadas en milímetros con la paleta del boletín y un color por pueblo (--od-etnia-*). La plantilla decide si DE va en su capítulo o como sección de Bienestar Institucional (deiPlacement). Un dato que llega en un solo periodo al año se lee como serie anual rotulada con su periodo («2024-2»), no como columnas de periodo vacías. Lo reservado se escribe «< 5», nunca «sin reportar». Un desglose de más de 16 categorías se parte: barras y notas en la hoja, la tabla en continuación.
+
 ## Direction contract
 
 THESIS: A statistical yearbook with a notes column. Each indicator is a documented sheet: explanation in the margin, evidence in the body. It rejects the dashboard pasted onto paper (loose cards, decorative KPIs with no source).

@@ -1,0 +1,406 @@
+/* =============================================================================
+   Mapa de origen por municipio.
+
+   El lienzo a la izquierda y, a la derecha, la escala y la lista «En esta
+   vista». De lejos manda el calor (azules por departamento y resplandor
+   ámbar); al acercarse el resplandor se apaga y toman el relevo los puntos.
+   Los trazos y los puntos se dibujan a tamaño constante en pantalla: el
+   zoom agranda el país, no la tinta.
+   ========================================================================== */
+
+.od-omap {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 17rem;
+  gap: var(--space-6);
+  align-items: start;
+}
+
+.od-omap__stage {
+  position: relative;
+  overflow: hidden;
+  background: var(--od-board-raised);
+  border: 1px solid var(--od-board-line);
+  border-radius: var(--radius-xs);
+}
+
+.od-omap__svg {
+  display: block;
+  width: 100%;
+  height: auto;
+  max-height: 78vh;
+  touch-action: pan-y;
+  cursor: grab;
+  user-select: none;
+}
+
+.od-omap[data-dots] .od-omap__svg { touch-action: none; }
+.od-omap__svg:active { cursor: grabbing; }
+
+.od-omap__world { transform-origin: 0 0; }
+
+.od-omap__world[data-glide] { transition: transform 620ms var(--ease-out); }
+
+/* --- Departamentos: la escala azul ---------------------------------------------- */
+
+.od-omap__dept {
+  fill: var(--od-seq-0);
+  stroke: var(--od-board);
+  stroke-linejoin: round;
+  cursor: zoom-in;
+  transition: fill 400ms var(--ease-out), fill-opacity 400ms var(--ease-out);
+}
+
+.od-omap__dept[data-bin="1"] { fill: var(--od-seq-1); }
+.od-omap__dept[data-bin="2"] { fill: var(--od-seq-2); }
+.od-omap__dept[data-bin="3"] { fill: var(--od-seq-3); }
+.od-omap__dept[data-bin="4"] { fill: var(--od-seq-4); }
+.od-omap__dept[data-bin="5"] { fill: var(--od-seq-5); }
+.od-omap__dept[data-bin="6"] { fill: var(--od-seq-6); }
+.od-omap__dept[data-bin="7"] { fill: var(--od-seq-7); }
+
+@media (hover: hover) and (pointer: fine) {
+  .od-omap__dept:hover { fill-opacity: 0.8; }
+}
+
+/* Con los puntos a la vista, el color de fondo baja para no competir. */
+.od-omap[data-dots] .od-omap__dept { fill-opacity: 0.38; cursor: grab; }
+
+.od-omap__inset-label {
+  fill: var(--od-board-muted);
+  font-size: 5px;
+  pointer-events: none;
+}
+
+.od-omap__inset {
+  fill: none;
+  stroke: var(--od-board-line-strong);
+  stroke-dasharray: 3 3;
+}
+
+/* --- Calor --------------------------------------------------------------------- */
+
+.od-omap__hot-core { stop-color: var(--od-flow); stop-opacity: 0.7; }
+.od-omap__hot-mid { stop-color: var(--od-flow); stop-opacity: 0.28; }
+.od-omap__hot-edge { stop-color: var(--od-flow); stop-opacity: 0; }
+
+.od-omap__heat {
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 700ms var(--ease-out);
+}
+
+.od-omap[data-seen] .od-omap__heat { opacity: 1; }
+.od-omap[data-seen][data-dots] .od-omap__heat { opacity: 0; }
+
+/* --- Puntos por municipio ------------------------------------------------------- */
+
+.od-omap__dots {
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 360ms var(--ease-out);
+}
+
+.od-omap[data-dots] .od-omap__dots { opacity: 1; pointer-events: auto; }
+
+.od-omap__dot { cursor: zoom-in; }
+
+.od-omap__dot circle {
+  fill: color-mix(in oklab, var(--od-flow) 72%, transparent);
+  stroke: var(--od-board);
+  stroke-width: 1.2;
+  transition: fill var(--dur-fast) ease, stroke var(--dur-fast) ease;
+}
+
+.od-omap__dot[data-reserved] circle {
+  fill: none;
+  stroke: var(--od-board-ink);
+  stroke-width: 1.2;
+  stroke-dasharray: 2 1.6;
+}
+
+.od-omap__dot[data-hover] circle { fill: var(--od-signal); stroke: var(--od-board-ink); stroke-width: 1.6; }
+
+.od-omap__label {
+  fill: var(--od-board-ink);
+  font-size: 9.5px;
+  font-weight: 700;
+  paint-order: stroke;
+  stroke: var(--od-board-raised);
+  stroke-width: 3px;
+  stroke-linejoin: round;
+  pointer-events: none;
+}
+
+.od-omap__label tspan {
+  fill: var(--od-signal-text);
+  font-variant-numeric: tabular-nums;
+}
+
+/* --- Campus --------------------------------------------------------------------- */
+
+.od-omap__sites path {
+  fill: var(--od-signal);
+  stroke: var(--od-board-ink);
+  stroke-width: 1.4;
+}
+
+.od-omap__sites text {
+  fill: var(--od-board-ink);
+  font-family: var(--font-sign);
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  paint-order: stroke;
+  stroke: var(--od-board-raised);
+  stroke-width: 3px;
+}
+
+.od-omap__sites [data-off] { opacity: 0.35; }
+
+/* --- Controles ------------------------------------------------------------------ */
+
+.od-omap__controls {
+  position: absolute;
+  top: var(--space-3);
+  right: var(--space-3);
+  display: grid;
+  gap: 2px;
+  padding: 3px;
+  background: var(--od-board);
+  border: 1px solid var(--od-board-line);
+  border-radius: var(--radius-xs);
+  box-shadow: var(--shadow-md);
+}
+
+.od-omap__controls button {
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  color: var(--od-board-ink);
+  background: transparent;
+  border: 0;
+  border-radius: 5px;
+  cursor: pointer;
+  transition: background-color var(--dur-fast) ease, transform var(--dur-press) var(--ease-out);
+}
+
+.od-omap__controls button:active { transform: scale(0.94); }
+.od-omap__controls button:disabled { opacity: 0.35; cursor: default; }
+.od-omap__controls button:focus-visible { outline: 2px solid var(--brand-blue); outline-offset: 1px; }
+
+@media (hover: hover) and (pointer: fine) {
+  .od-omap__controls button:not(:disabled):hover { background: var(--od-flap-low); }
+}
+
+.od-omap__controls svg {
+  width: 16px;
+  height: 16px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.od-omap__hint {
+  position: absolute;
+  bottom: var(--space-3);
+  left: var(--space-3);
+  margin: 0;
+  padding: 3px var(--space-2);
+  color: var(--od-board-muted);
+  background: var(--od-board);
+  border-radius: 4px;
+  font-size: var(--text-2xs);
+  pointer-events: none;
+}
+
+/* --- Lateral: escala y lista ---------------------------------------------------- */
+
+.od-omap__side {
+  display: grid;
+  gap: var(--space-4);
+  min-width: 0;
+}
+
+.od-omap__scale {
+  display: grid;
+  gap: 6px;
+  color: var(--ink-secondary);
+  font-size: var(--text-2xs);
+}
+
+.od-omap__ramp {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  height: 10px;
+  overflow: hidden;
+  border-radius: 3px;
+}
+
+.od-omap__ramp i[data-bin="1"] { background: var(--od-seq-1); }
+.od-omap__ramp i[data-bin="2"] { background: var(--od-seq-2); }
+.od-omap__ramp i[data-bin="3"] { background: var(--od-seq-3); }
+.od-omap__ramp i[data-bin="4"] { background: var(--od-seq-4); }
+.od-omap__ramp i[data-bin="5"] { background: var(--od-seq-5); }
+.od-omap__ramp i[data-bin="6"] { background: var(--od-seq-6); }
+.od-omap__ramp i[data-bin="7"] { background: var(--od-seq-7); }
+
+.od-omap__ramp-ends {
+  display: flex;
+  justify-content: space-between;
+  font-variant-numeric: tabular-nums;
+}
+
+.od-omap__keys {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px var(--space-3);
+  margin-top: 4px;
+}
+
+.od-omap__keys span { display: inline-flex; align-items: center; gap: 5px; }
+
+.od-omap__key-dot,
+.od-omap__key-ring,
+.od-omap__key-site {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+}
+
+.od-omap__key-dot { background: var(--od-flow); border-radius: 50%; }
+.od-omap__key-ring { border: 1.5px dashed var(--ink); border-radius: 50%; }
+.od-omap__key-site { background: var(--od-signal); transform: rotate(45deg) scale(0.8); }
+
+.od-omap__count {
+  margin: 0;
+  color: var(--ink-secondary);
+  font-size: var(--text-xs);
+  line-height: 1.45;
+}
+
+.od-omap__count b {
+  display: block;
+  color: var(--ink);
+  font-family: var(--font-sign);
+  font-size: 2rem;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+
+.od-omap__list-title {
+  display: flex;
+  justify-content: space-between;
+  margin: 0;
+  color: var(--ink);
+  font-family: var(--font-sign);
+  font-size: 1rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.od-omap__list-title span { color: var(--ink-muted); font-variant-numeric: tabular-nums; }
+
+.od-omap__list {
+  display: grid;
+  gap: 2px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.od-omap__list button {
+  position: relative;
+  display: flex;
+  justify-content: space-between;
+  gap: var(--space-2);
+  width: 100%;
+  padding: 6px var(--space-2);
+  color: var(--ink);
+  text-align: left;
+  background: linear-gradient(var(--od-flow), var(--od-flow)) no-repeat left bottom / var(--w) 2px;
+  border: 0;
+  border-radius: 4px;
+  font-size: var(--text-xs);
+  cursor: pointer;
+  transition: background-color var(--dur-fast) ease;
+}
+
+.od-omap__list button:focus-visible { outline: 2px solid var(--brand-blue); outline-offset: 1px; }
+
+@media (hover: hover) and (pointer: fine) {
+  .od-omap__list button:hover { background-color: var(--od-board-raised); }
+}
+
+.od-omap__list-name {
+  display: grid;
+  min-width: 0;
+  font-weight: 700;
+}
+
+.od-omap__list-name em {
+  color: var(--ink-muted);
+  font-size: var(--text-2xs);
+  font-style: normal;
+  font-weight: 500;
+}
+
+.od-omap__list-value {
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.od-omap__pending {
+  position: absolute;
+  inset: 38% var(--space-5) auto;
+  display: grid;
+  gap: 4px;
+  max-width: 34ch;
+  margin-inline: auto;
+  padding: var(--space-4) var(--space-5);
+  color: var(--od-board-ink);
+  background: var(--od-board);
+  border: 1px dashed var(--od-board-line-strong);
+  border-radius: var(--radius-xs);
+  box-shadow: var(--shadow-md);
+  font-size: var(--text-xs);
+  line-height: 1.45;
+  text-align: center;
+}
+
+.od-omap__pending strong {
+  color: var(--od-signal-text);
+  font-family: var(--font-sign);
+  font-size: 1.1rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.od-omap[data-pending] .od-omap__dept { fill: var(--od-seq-0); cursor: default; }
+.od-omap[data-pending] .od-omap__ramp,
+.od-omap[data-pending] .od-omap__ramp-ends { opacity: 0.35; }
+.od-omap[data-pending] .od-omap__ramp-ends { visibility: hidden; }
+
+.od-omap__none,
+.od-omap__empty {
+  margin: 0;
+  color: var(--ink-muted);
+  font-size: var(--text-xs);
+}
+
+@media (max-width: 900px) {
+  .od-omap { grid-template-columns: 1fr; }
+  .od-omap__svg { max-height: none; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .od-omap__world[data-glide],
+  .od-omap__heat,
+  .od-omap__dots,
+  .od-omap__dept { transition: none; }
+}

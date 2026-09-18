@@ -50,6 +50,9 @@ import type { BulletinSettings, IndicatorShow } from "./model";
 import { parseSaberKey, saberHighlight, saberUnits } from "./saber";
 import { freeUnits, parseFreeKey } from "./free";
 import { parseTytKey, tytHighlight, tytUnits } from "./tyt";
+import { deiUnits } from "./dei";
+import { modelUnits } from "./model-sheets";
+import { BIENESTAR_SLUG, DEI_SLUG } from "./model";
 
 export interface Unit {
   key: string;
@@ -117,7 +120,28 @@ const hasValue = (v: number | null | undefined): v is number => v !== null && v 
 const reportsByTerm = (indicator: Indicator) =>
   indicator.reporting !== "anual" &&
   Boolean(indicator.annualRule) &&
+  !onlyTermOf(indicator) &&
   Object.values(indicator.terms ?? {}).some((byTerm) => TERMS.some((t) => Object.values(byTerm?.[t] ?? {}).some(hasValue)));
+
+/**
+ * El dato que llega una sola vez al año, siempre en el mismo periodo (el
+ * informe DE cuenta en el periodo 2). Dibujarlo por periodo deja una columna
+ * vacía por año; se lee como serie anual rotulada con su periodo ("2024-2").
+ * Hace falta que se repita en dos años o más: un año en curso con solo su
+ * periodo 1 no es esto.
+ */
+function onlyTermOf(indicator: Indicator): Term | null {
+  const used = TERMS.filter((t) => Object.values(indicator.terms ?? {}).some((byTerm) => Object.values(byTerm?.[t] ?? {}).some(hasValue)));
+  if (used.length !== 1) return null;
+  const withTerm = Object.entries(indicator.terms ?? {}).filter(([, byTerm]) => Object.values(byTerm?.[used[0]] ?? {}).some(hasValue));
+  // Solo si la cifra del año existe donde está el periodo: si no, la hoja
+  // sigue por periodo y nada se pierde por falta de cifra anual.
+  const annualEverywhere = withTerm.every(([year]) => Object.values(indicator.values[Number(year)] ?? {}).some(hasValue));
+  return withTerm.length >= 2 && annualEverywhere ? used[0] : null;
+}
+
+/** "periodo 2 de cada año", para rótulos. */
+const onlyTermText = (term: Term) => `periodo ${term === "A" ? 1 : 2} de cada año`;
 
 /** Cómo sale la cifra del año, en minúscula y corto, para rótulos de gráfica. */
 const RULE_SHORT: Record<AnnualRule, string> = {
@@ -157,17 +181,32 @@ function figureAt(indicator: Indicator, catalog: OpenDataCatalog, cut: number, c
   return last ? { value: valueOf(indicator, last.year, campus, last.term), period: last } : { value: null };
 }
 
-function itemsAt(breakdown: Breakdown, key: number) {
-  return (breakdown.values[key] ?? []).filter((i) => i.value !== null);
-}
+/** Una categoría con cifra o reservada («< 5»): las dos existen; el vacío no. */
+const present = (i: { value: number | null; reserved?: boolean }) => i.value !== null || Boolean(i.reserved);
 
 function termItemsAt(breakdown: Breakdown, year: number, term: Term) {
-  return (breakdown.terms?.[year]?.[term] ?? []).filter((i) => i.value !== null);
+  return (breakdown.terms?.[year]?.[term] ?? []).filter(present);
+}
+
+/** Como en los indicadores: el desglose que llega en un solo periodo al año. */
+function breakdownOnlyTerm(b: Breakdown): Term | null {
+  const used = TERMS.filter((t) => Object.values(b.terms ?? {}).some((byTerm) => (byTerm?.[t] ?? []).some(present)));
+  if (used.length !== 1) return null;
+  const years = Object.values(b.terms ?? {}).filter((byTerm) => (byTerm?.[used[0]] ?? []).some(present)).length;
+  return years >= 2 ? used[0] : null;
+}
+
+/** Categorías del año; si el desglose llega en un solo periodo, las de ese periodo. */
+function itemsAt(breakdown: Breakdown, key: number) {
+  const own = (breakdown.values[key] ?? []).filter(present);
+  if (own.length || key === ALL_YEARS) return own;
+  const only = breakdownOnlyTerm(breakdown);
+  return only ? termItemsAt(breakdown, key, only) : own;
 }
 
 /** Como en los indicadores: por periodo solo si hay alguna cifra de periodo. */
 const breakdownByTerm = (b: Breakdown) =>
-  b.reporting !== "anual" && Object.values(b.terms ?? {}).some((byTerm) => TERMS.some((t) => (byTerm?.[t] ?? []).some((i) => i.value !== null)));
+  b.reporting !== "anual" && !breakdownOnlyTerm(b) && Object.values(b.terms ?? {}).some((byTerm) => TERMS.some((t) => (byTerm?.[t] ?? []).some(present)));
 
 /** Años del desglose con alguna cifra, del año o de un periodo. */
 const breakdownYears = (b: Breakdown, catalog: OpenDataCatalog) =>
@@ -312,6 +351,7 @@ function IndicatorSheet({
   const campuses = sites(catalog);
   const campusName = catalog.campuses.find((c) => c.id === campus)?.name ?? "Todos los campus";
   const byTerm = reportsByTerm(indicator);
+  const only = onlyTermOf(indicator);
   const periods = byTerm ? periodCutsOf(years) : [];
   const anchor = figureAt(indicator, catalog, cut, campus);
   const value = anchor.value;
@@ -381,10 +421,16 @@ function IndicatorSheet({
     ...withData.map((c) => ({ id: c.id, label: c.name, strong: false })),
     { id: "todas", label: "Total institucional", strong: withData.length > 0 },
   ];
-  const columns = [...years.map(String), ...(grouped ? [grouped] : [])];
+  const columns = [...years.map((y) => (only ? cutLabel(y, only) : String(y))), ...(grouped ? [grouped] : [])];
   const highlightCol = cut === ALL_YEARS ? columns.length - 1 : years.indexOf(cut);
   const calculation = [
-    byTerm ? "Se reporta por periodo académico (1 y 2)." : indicator.reporting === "anual" ? "Se reporta por año." : null,
+    byTerm
+      ? "Se reporta por periodo académico (1 y 2)."
+      : only
+        ? `Se reporta una vez al año, en el ${onlyTermText(only).replace(" de cada año", "")}.`
+        : indicator.reporting === "anual"
+          ? "Se reporta por año."
+          : null,
     rule && byTerm ? `Año: ${ANNUAL_RULE_LABEL[rule].toLowerCase()}.` : null,
     cut === ALL_YEARS ? (rule === "ultimo" ? "Periodo: último dato." : "Periodo: promedio anual.") : null,
     indicator.aggregation === "reportado" ? "Total reportado aparte." : withData.length ? "Total: suma de campus." : null,
@@ -463,7 +509,7 @@ function IndicatorSheet({
             )}
             {showEvolution && (annualSeries.length > 0 || stacked) && (
               <figure>
-                <figcaption>{byTerm && rule ? `Cifra del año · ${RULE_SHORT[rule]}` : "Evolución por año"}</figcaption>
+                <figcaption>{byTerm && rule ? `Cifra del año · ${RULE_SHORT[rule]}` : only ? `Evolución · ${onlyTermText(only)}` : "Evolución por año"}</figcaption>
                 {annualFigure()}
               </figure>
             )}
@@ -636,27 +682,53 @@ function DatasetSheet({
   );
 }
 
-function breakdownUnit(b: Breakdown, catalog: OpenDataCatalog, settings: BulletinSettings): ReactNode | null {
+/** Más categorías que estas y la hoja se parte: barras y notas arriba, la tabla sigue en continuación. */
+const BREAKDOWN_LONG = 16;
+const BREAKDOWN_ROWS = 30;
+
+function breakdownUnit(b: Breakdown, catalog: OpenDataCatalog, settings: BulletinSettings): { node: ReactNode; tight: boolean }[] {
   const years = breakdownYears(b, catalog);
-  if (!years.length) return null;
+  if (!years.length) return [];
   const byTerm = breakdownByTerm(b);
+  const only = breakdownOnlyTerm(b);
+  const threshold = b.reserveThreshold ?? 5;
   const withPeriod = settings.cut === ALL_YEARS && itemsAt(b, ALL_YEARS).length > 0;
   const key = withPeriod ? ALL_YEARS : years.includes(settings.cut) ? settings.cut : years[years.length - 1];
   const periods = byTerm ? periodCutsOf(years) : [];
   const termValue = (label: string, year: number, term: Term) => (b.terms?.[year]?.[term] ?? []).find((i) => i.label === label)?.value ?? null;
-  const yearValue = (label: string, year: number) => (b.values[year] ?? []).find((i) => i.label === label)?.value ?? null;
-  const labels = Array.from(
+  const yearItem = (label: string, year: number) => itemsAt(b, year).find((i) => i.label === label);
+  const yearValue = (label: string, year: number) => yearItem(label, year)?.value ?? null;
+  // La celda de tabla: la cifra, «< 5» si está reservada, «—» si no se reportó.
+  const cellOf = (item: { value: number | null; reserved?: boolean } | undefined) =>
+    item?.reserved ? `< ${threshold}` : figure(item?.value ?? null, b.format);
+  const allLabels = Array.from(
     new Set(years.flatMap((y) => [...itemsAt(b, y), ...(byTerm ? TERMS.flatMap((t) => termItemsAt(b, y, t)) : [])].map((i) => i.label))),
   );
+  // En un desglose largo, las categorías sin nadie en ningún corte no llenan la
+  // tabla: se nombran en una línea.
+  const long = allLabels.length > BREAKDOWN_LONG;
+  // Alguien en algún corte: en la cifra del año o, si llega por periodo, en un periodo.
+  const someone = (i: { value: number | null; reserved?: boolean } | undefined) => Boolean(i?.reserved) || (i?.value ?? 0) > 0;
+  const everyone = (label: string) =>
+    years.some(
+      (y) =>
+        someone(yearItem(label, y)) ||
+        (byTerm && TERMS.some((t) => someone((b.terms?.[y]?.[t] ?? []).find((i) => i.label === label)))),
+    );
+  const labels = long ? allLabels.filter(everyone) : allLabels;
+  const nobody = long ? allLabels.filter((l) => !everyone(l)) : [];
 
   // Barras del corte: la cifra del año; si el año no cierra, su último periodo.
   const keyPeriod =
     byTerm && key !== ALL_YEARS && !itemsAt(b, key).length ? periodCutsOf([key]).filter((p) => termItemsAt(b, p.year, p.term).length).pop() : undefined;
-  const items = labels.map((label) => ({
-    label,
-    value: keyPeriod ? termValue(label, keyPeriod.year, keyPeriod.term) : (b.values[key] ?? []).find((i) => i.label === label)?.value ?? null,
-  }));
-  const keyText = key === ALL_YEARS ? `Promedio anual ${cutLabel(ALL_YEARS, null)}` : keyPeriod ? `Periodo ${keyPeriod.label}` : String(key);
+  const items = labels.map((label) => {
+    const item = keyPeriod ? (b.terms?.[keyPeriod.year]?.[keyPeriod.term] ?? []).find((i) => i.label === label) : key === ALL_YEARS ? (b.values[key] ?? []).find((i) => i.label === label) : yearItem(label, key);
+    return { label, value: item?.value ?? null, reserved: item?.reserved };
+  });
+  // Barras de un desglose largo: solo lo que tiene cifra; lo reservado se nombra aparte.
+  const barItems = long ? items.filter((i) => !i.reserved && (i.value ?? 0) > 0).sort((a, c) => (c.value ?? 0) - (a.value ?? 0)) : items;
+  const reservedNow = items.filter((i) => i.reserved).map((i) => i.label);
+  const keyText = key === ALL_YEARS ? `Promedio anual ${cutLabel(ALL_YEARS, null)}` : keyPeriod ? `Periodo ${keyPeriod.label}` : only ? cutLabel(key, only) : String(key);
 
   // Partes de un todo (personas, programas): columnas apiladas. Tasas o más
   // categorías de las que se distinguen por color: líneas o solo tabla.
@@ -672,15 +744,65 @@ function breakdownUnit(b: Breakdown, catalog: OpenDataCatalog, settings: Bulleti
     ["Corte", key === ALL_YEARS ? `${cutText(ALL_YEARS)} · promedio anual` : `${keyPeriod ? `Periodo ${keyPeriod.label}` : `Corte ${key}`}${key !== settings.cut ? " (último con dato)" : ""}`],
     ["Alcance", "Total institucional"],
     ...(byTerm && rule ? ([["Cómo se reporta", `Por periodo académico (1 y 2). Año: ${RULE_SHORT[rule]}.`]] as [string, ReactNode][]) : []),
+    ...(only ? ([["Cómo se reporta", `Una vez al año, en el ${onlyTermText(only).replace(" de cada año", "")}.`]] as [string, ReactNode][]) : []),
+    ...(b.reserveThreshold
+      ? ([["Reserva", `Con menos de ${threshold} registros la cifra se publica como «< ${threshold}»: en un grupo pequeño señalaría a personas concretas.`]] as [string, ReactNode][])
+      : []),
   ];
 
-  return (
+  const tableRows = labels.map((label) => ({
+    label,
+    cells: [
+      ...years.map((y) => cellOf(yearItem(label, y))),
+      ...(withPeriod ? [cellOf((b.values[ALL_YEARS] ?? []).find((i) => i.label === label))] : []),
+    ],
+  }));
+  const tableHead = ["Categoría", ...years.map((y) => (only ? cutLabel(y, only) : String(y))), ...(withPeriod ? [cutLabel(ALL_YEARS, null)] : [])];
+  const tableHighlight = withPeriod ? years.length : years.indexOf(key);
+  // Tabla larga: la hoja lleva las primeras filas y el resto sigue en continuación.
+  const firstRows = long && tableRows.length > BREAKDOWN_ROWS - 10 ? BREAKDOWN_ROWS - 14 : tableRows.length;
+  const rest: { from: number; rows: typeof tableRows }[] = [];
+  for (let i = firstRows; i < tableRows.length; i += BREAKDOWN_ROWS) rest.push({ from: i, rows: tableRows.slice(i, i + BREAKDOWN_ROWS) });
+
+  // Por periodo, cada año lleva tres columnas: con muchas categorías las tablas
+  // no caben bajo las barras y van enteras a la hoja siguiente.
+  const periodTables = byTerm ? (
+    <PeriodTables
+      head="Categoría"
+      years={years}
+      format={b.format}
+      highlightYear={key === ALL_YEARS ? undefined : key}
+      grouped={withPeriod ? cutLabel(ALL_YEARS, null) : undefined}
+      caption={rule ? `Periodos 1 y 2 como se reportaron; en negrita, la cifra del año (${RULE_SHORT[rule]}).` : undefined}
+      rows={labels.map((label) => ({
+        label,
+        at: (year, term) => (term ? termValue(label, year, term) : yearValue(label, year)),
+        grouped: (b.values[ALL_YEARS] ?? []).find((i) => i.label === label)?.value ?? null,
+      }))}
+    />
+  ) : null;
+
+  const sheet = (
     <DatasetSheet title={b.title} source={b.source} notes={notes}>
       {(!byTerm || !chartable) && (
         <figure className="bol-wide">
-          <figcaption>{keyText} · {b.unit}</figcaption>
-          <HBars items={items} format={b.format} share={parts} width={128} />
+          <figcaption>{keyText} · {b.unit}{long ? " · categorías con cifra" : ""}</figcaption>
+          <HBars items={barItems} format={b.format} share={parts} width={128} reservedThreshold={threshold} />
         </figure>
+      )}
+      {long && (reservedNow.length > 0 || nobody.length > 0) && (
+        <p className="bol-reserve">
+          {reservedNow.length > 0 && (
+            <>
+              <b>Con menos de {threshold} en {keyText}:</b> {reservedNow.join(" · ")}.{" "}
+            </>
+          )}
+          {nobody.length > 0 && (
+            <>
+              <b>Sin registros en ningún corte:</b> {nobody.join(" · ")}.
+            </>
+          )}
+        </p>
       )}
       {byTerm && chartable && (
         <figure>
@@ -735,34 +857,41 @@ function breakdownUnit(b: Breakdown, catalog: OpenDataCatalog, settings: Bulleti
         </figure>
       )}
       {byTerm ? (
-        <PeriodTables
-          head="Categoría"
-          years={years}
-          format={b.format}
-          highlightYear={key === ALL_YEARS ? undefined : key}
-          grouped={withPeriod ? cutLabel(ALL_YEARS, null) : undefined}
-          caption={rule ? `Periodos 1 y 2 como se reportaron; en negrita, la cifra del año (${RULE_SHORT[rule]}).` : undefined}
-          rows={labels.map((label) => ({
-            label,
-            at: (year, term) => (term ? termValue(label, year, term) : yearValue(label, year)),
-            grouped: (b.values[ALL_YEARS] ?? []).find((i) => i.label === label)?.value ?? null,
-          }))}
-        />
+        !long && periodTables
       ) : (
         <DataTable
-          head={["Categoría", ...years.map(String), ...(withPeriod ? [cutLabel(ALL_YEARS, null)] : [])]}
-          highlightCol={withPeriod ? years.length : years.indexOf(key)}
-          rows={labels.map((label) => ({
-            label,
-            cells: [
-              ...years.map((y) => figure(yearValue(label, y), b.format)),
-              ...(withPeriod ? [figure((b.values[ALL_YEARS] ?? []).find((i) => i.label === label)?.value ?? null, b.format)] : []),
-            ],
-          }))}
+          head={tableHead}
+          highlightCol={tableHighlight}
+          caption={only ? `Cifras del ${onlyTermText(only)}.` : undefined}
+          rows={tableRows.slice(0, firstRows)}
         />
       )}
     </DatasetSheet>
   );
+
+  return [
+    { node: sheet, tight: false },
+    ...(byTerm && long
+      ? [
+          {
+            tight: true,
+            node: (
+              <TableContinuation title={b.title} from={1} to={labels.length} total={labels.length}>
+                {periodTables}
+              </TableContinuation>
+            ),
+          },
+        ]
+      : []),
+    ...(byTerm ? [] : rest).map(({ from, rows }) => ({
+      tight: true,
+      node: (
+        <TableContinuation title={b.title} from={from + 1} to={from + rows.length} total={tableRows.length}>
+          <DataTable head={tableHead} highlightCol={tableHighlight} rows={rows} />
+        </TableContinuation>
+      ),
+    })),
+  ];
 }
 
 function mapUnit(map: MapDataset, catalog: OpenDataCatalog, settings: BulletinSettings): ReactNode | null {
@@ -1521,6 +1650,11 @@ export function compose(catalog: OpenDataCatalog, settings: BulletinSettings): C
   const executive = settings.format === "ejecutivo";
   const summaryItems: ExecutiveItem[] = [];
 
+  // Diversidad dentro de Bienestar: solo en el completo y si los dos entran.
+  const included = (slug: string) => settings.reports.some((r) => r.slug === slug && r.include && !r.removed);
+  const deiInside = !executive && settings.deiPlacement === "bienestar" && included(DEI_SLUG) && included(BIENESTAR_SLUG);
+  let deiSection: { report: Report; units: Unit[] } | null = null;
+
   for (const entry of settings.reports) {
     if (!entry.include || entry.removed) continue;
     const report = catalog.reports.find((r) => r.slug === entry.slug);
@@ -1589,7 +1723,7 @@ export function compose(catalog: OpenDataCatalog, settings: BulletinSettings): C
       const nodes: { node: ReactNode; source: string; title: string; tight?: boolean }[] = [];
       if (kind === "desglose") {
         const b = report.breakdowns.find((x) => x.id === key);
-        if (b) nodes.push({ node: breakdownUnit(b, catalog, settings), source: b.source, title: b.title });
+        if (b) breakdownUnit(b, catalog, settings).forEach(({ node, tight }) => nodes.push({ node, source: b.source, title: b.title, tight }));
       } else if (kind === "mapa") {
         const m = report.maps?.find((x) => x.id === key);
         if (m) nodes.push({ node: mapUnit(m, catalog, settings), source: m.source, title: m.title });
@@ -1626,6 +1760,13 @@ export function compose(catalog: OpenDataCatalog, settings: BulletinSettings): C
             nodes.push({ node, source: parsed.set.source, title, tight }),
           );
         }
+      } else if (kind === "modelo") {
+        const m = report.models?.find((x) => x.id === key);
+        if (m) modelUnits(m, DatasetSheet).forEach(({ node, title }) => nodes.push({ node, source: m.source, title }));
+      } else if (kind === "dei") {
+        deiUnits(report, key, catalog, settings, DatasetSheet).forEach(({ node, title }) =>
+          nodes.push({ node, source: report.indicators[0]?.source ?? "", title }),
+        );
       } else if (kind === "saber") {
         const parsed = parseSaberKey(key);
         const sp = parsed ? report.saberPro?.find((x) => x.id === parsed.id) : undefined;
@@ -1645,6 +1786,13 @@ export function compose(catalog: OpenDataCatalog, settings: BulletinSettings): C
     }
 
     if (!body.length && settings.skipEmpty) continue;
+
+    // Diversidad como sección de Bienestar: sus hojas esperan a que Bienestar
+    // cierre su capítulo y entran detrás, con su propia apertura de sección.
+    if (deiInside && report.slug === DEI_SLUG) {
+      deiSection = { report, units: body };
+      continue;
+    }
 
     // Separadores de la ficha: lo general del informe va primero; luego cada
     // sección abre página con sus hojas, en el orden del boletín.
@@ -1678,6 +1826,37 @@ export function compose(catalog: OpenDataCatalog, settings: BulletinSettings): C
       });
       units.push(...own.map((unit) => ({ ...unit, section: group.title })));
     });
+  }
+
+  if (deiSection) {
+    const host = chapters.find((r) => r.slug === BIENESTAR_SLUG);
+    const { report: dei, units: own } = deiSection;
+    if (host) {
+      // Detrás de la última hoja de Bienestar, con cabecera y pestaña de Bienestar.
+      let at = units.length;
+      for (let i = units.length - 1; i >= 0; i -= 1) {
+        if (units[i].report?.slug === BIENESTAR_SLUG) {
+          at = i + 1;
+          break;
+        }
+      }
+      const group = { key: "dei", title: dei.name, description: dei.summary, indicators: [], datasets: [] };
+      const titles = Array.from(new Set(own.filter((unit) => !unit.tight).map((unit) => unit.title)));
+      units.splice(
+        at,
+        0,
+        {
+          key: `${dei.slug}-seccion`,
+          kind: "seccion",
+          report: host,
+          title: dei.name,
+          section: dei.name,
+          breakBefore: true,
+          node: <SectionOpener report={host} group={group} number={1} total={1} titles={titles} />,
+        },
+        ...own.map((unit) => ({ ...unit, report: host, section: dei.name })),
+      );
+    }
   }
 
   // El resumen abre el documento: siempre en el ejecutivo, a pedido en el completo.

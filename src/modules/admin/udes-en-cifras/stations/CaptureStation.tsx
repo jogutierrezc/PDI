@@ -40,6 +40,7 @@ import { ConfirmButton, Panel, PeriodInput, SaveState, StageEmpty, YearPicker, p
 import { parseCsv, parseNumber, toCsv } from "../sheet";
 import { ImportReport, profileFor } from "./ImportReport";
 import { MobilityCapture } from "./MobilityCapture";
+import { OriginCapture } from "./OriginCapture";
 import { RankingCapture } from "./RankingCapture";
 import { SaberProCapture } from "./SaberProCapture";
 import { SaberTytCapture } from "./SaberTytCapture";
@@ -920,6 +921,11 @@ function MapCapture(props: StationProps) {
   const [draft, setDraft] = useState<Record<CellKey, number | null>>({});
   const [via, setVia] = useState<OdImportKind>("rejilla");
   if (!map) return null;
+  if (map.mode === "municipio") {
+    // 1.122 municipios no se capturan en una rejilla: se cargan desde el archivo
+    // de registros o una tabla contada, y se cuentan en el navegador.
+    return <OriginCapture key={map.id} {...props} maps={maps} map={map} onPickMap={(id) => { setActive(id); setDraft({}); }} />;
+  }
   if (map.mode === "entrante" || map.mode === "saliente" || map.mode === "convenios") {
     return (
       <MobilityCapture key={map.id} {...props} maps={maps} map={map} onPickMap={(id) => { setActive(id); setDraft({}); }} />

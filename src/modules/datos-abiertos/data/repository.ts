@@ -47,6 +47,7 @@ import type {
   OdFreeSetRecordRow,
   OdSaberTytRow,
   OdSaberTytResultRow,
+  OdModelRow,
   OdValueRow,
 } from "../../../types/database";
 import type {
@@ -65,6 +66,8 @@ import type {
   ReportSection,
   TableData,
   YearCampusValues,
+  ModelData,
+  ModelSpec,
 } from "./types";
 import { ALL_CAMPUSES } from "./types";
 import type { Term, TermCampusValues } from "./types";
@@ -107,6 +110,8 @@ export interface OpenDataRows {
   /** 0035: vacías si la base aún no tiene la migración. */
   saberTyt: OdSaberTytRow[];
   saberTytResults: OdSaberTytResultRow[];
+  /** 0046: vacía si la base aún no tiene la migración. */
+  models: OdModelRow[];
   tableRows: OdTableRecordRow[];
   blocks: OdReportBlockRow[];
 }
@@ -165,11 +170,11 @@ export async function fetchOpenDataRows({ periodId, includeDrafts = false }: Fet
   const empty: OpenDataRows = {
     period, campuses, offices, reports, indicators: [], values: [], breakdowns: [], breakdownValues: [],
     heatmaps: [], heatmapCells: [], maps: [], mapValues: [], pipelines: [], pipelineValues: [], histories: [],
-    historyValues: [], sections: [], tables: [], tableRows: [], rankings: [], rankingEditions: [], saberPro: [], saberProResults: [], freeSets: [], freeSetRows: [], saberTyt: [], saberTytResults: [], blocks: [],
+    historyValues: [], sections: [], tables: [], tableRows: [], rankings: [], rankingEditions: [], saberPro: [], saberProResults: [], freeSets: [], freeSetRows: [], saberTyt: [], saberTytResults: [], models: [], blocks: [],
   };
   if (reportIds.length === 0) return empty;
 
-  const [indicators, breakdowns, heatmaps, maps, pipelines, histories, sections, tables, rankings, saberPro, freeSets, saberTyt, blocks] = await Promise.all([
+  const [indicators, breakdowns, heatmaps, maps, pipelines, histories, sections, tables, rankings, saberPro, freeSets, saberTyt, models, blocks] = await Promise.all([
     supabase.from("od_indicators").select("*").in("report_id", reportIds).order("position").then(unwrap<OdIndicatorRow>),
     supabase.from("od_breakdowns").select("*").in("report_id", reportIds).order("position").then(unwrap<OdBreakdownRow>),
     supabase.from("od_heatmaps").select("*").in("report_id", reportIds).order("position").then(unwrap<OdHeatmapRow>),
@@ -182,6 +187,7 @@ export async function fetchOpenDataRows({ periodId, includeDrafts = false }: Fet
     supabase.from("od_saber_pro").select("*").in("report_id", reportIds).order("position").then(unwrapOptional<OdSaberProRow>),
     supabase.from("od_free_sets").select("*").in("report_id", reportIds).order("position").then(unwrapOptional<OdFreeSetRow>),
     supabase.from("od_saber_tyt").select("*").in("report_id", reportIds).order("position").then(unwrapOptional<OdSaberTytRow>),
+    supabase.from("od_models").select("*").in("report_id", reportIds).order("position").then(unwrapOptional<OdModelRow>),
     supabase.from("od_report_blocks").select("*").in("report_id", reportIds).order("position").then(unwrap<OdReportBlockRow>),
   ]);
 
@@ -250,7 +256,7 @@ export async function fetchOpenDataRows({ periodId, includeDrafts = false }: Fet
   return {
     ...empty, indicators, values, breakdowns, breakdownValues, heatmaps, heatmapCells, maps, mapValues, pipelines,
     pipelineValues, histories, historyValues, sections, tables, tableRows, rankings, rankingEditions, saberPro,
-    saberProResults, freeSets, freeSetRows, saberTyt, saberTytResults, blocks,
+    saberProResults, freeSets, freeSetRows, saberTyt, saberTytResults, models, blocks,
   };
 }
 
@@ -421,9 +427,15 @@ export function assembleCatalog(rows: OpenDataRows): OpenDataCatalog {
       .filter((m) => m.report_id === report.id)
       .map((m) => {
         const values: MapDataset["values"] = {};
+        const reserved: NonNullable<MapDataset["reserved"]> = {};
         rows.mapValues
           .filter((v) => v.map_id === m.id)
           .forEach((v) => {
+            // Menos de 5 personas (0044): la celda existe, pero sin cifra.
+            if (v.reserved || v.value === null) {
+              ((reserved[v.year] ??= {})[campusKey(v.campus_id)] ??= []).push(v.department_code);
+              return;
+            }
             const byCampus = (values[v.year] ??= {});
             const depts = (byCampus[campusKey(v.campus_id)] ??= {});
             depts[v.department_code] = Number(v.value);
@@ -431,6 +443,7 @@ export function assembleCatalog(rows: OpenDataRows): OpenDataCatalog {
         return {
           id: m.key, uuid: m.id, title: m.title, description: m.description, mode: m.mode, reporting: m.reporting ?? "anual", unit: m.unit,
           source: source(m.office_id), officeId: m.office_id, years: yearsOf(m.years), values,
+          reserved: Object.keys(reserved).length ? reserved : undefined,
         };
       });
 
@@ -626,6 +639,15 @@ export function assembleCatalog(rows: OpenDataRows): OpenDataCatalog {
           })),
       }));
 
+    // Modelos: la especificación se publica tal cual; una sin variables no se dibuja.
+    const models: ModelData[] = (rows.models ?? [])
+      .filter((m) => m.report_id === report.id && Array.isArray((m.spec as { variables?: unknown }).variables))
+      .sort((a, b) => a.position - b.position)
+      .map((m) => ({
+        id: m.key, uuid: m.id, title: m.title, description: m.description, note: m.note,
+        spec: m.spec as unknown as ModelSpec, source: source(m.office_id), officeId: m.office_id,
+      }));
+
     const blocks: ReportBlock[] = rows.blocks
       .filter((b) => b.report_id === report.id)
       .sort((a, b) => a.position - b.position)
@@ -657,6 +679,7 @@ export function assembleCatalog(rows: OpenDataRows): OpenDataCatalog {
       saberPro,
       freeSets,
       saberTyt,
+      models,
       blocks,
       note: report.note || undefined,
       status: report.status,

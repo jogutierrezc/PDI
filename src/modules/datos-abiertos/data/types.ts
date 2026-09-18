@@ -54,7 +54,9 @@ export type BlockKind =
   | "rankings"
   | "saber_pro"
   | "libre"
-  | "saber_tyt";
+  | "saber_tyt"
+  | "diversidad"
+  | "modelo";
 
 export interface Campus {
   id: CampusId;
@@ -206,7 +208,7 @@ export interface HistoryData {
   values: Record<string, Record<string, number | null>>;
 }
 
-export type MapMode = "origen" | "cobertura" | "entrante" | "saliente" | "convenios";
+export type MapMode = "origen" | "cobertura" | "entrante" | "saliente" | "convenios" | "municipio";
 
 /** Mapa del mundo: la clave es el país (ISO alfa-3). */
 export const isWorldMap = (mode: MapMode) => mode === "entrante" || mode === "saliente" || mode === "convenios";
@@ -221,6 +223,7 @@ export const MAP_MODE_TITLE: Record<MapMode, string> = {
   entrante: "Movilidad entrante por país",
   saliente: "Movilidad saliente por país",
   convenios: "Convenios internacionales por país",
+  municipio: "Origen por municipio",
 };
 
 /**
@@ -248,6 +251,8 @@ export interface MapDataset {
   /** Años con dato. Sin lista, todos los del periodo. */
   years?: number[];
   values: Record<number, Partial<Record<CampusId, Record<string, number>>>>;
+  /** Celdas con menos de 5 personas: existen pero sin cifra (mapas «municipio»). */
+  reserved?: Record<number, Partial<Record<CampusId, string[]>>>;
 }
 
 export interface ReportBlock {
@@ -284,6 +289,62 @@ export interface ReportBlock {
   };
   /** Punto del informe al que pertenece. Sin punto, el bloque es de toda la ficha. */
   sectionKey?: string | null;
+}
+
+/* --- Modelo estadístico (0046) ------------------------------------------------------ */
+
+/** Un coeficiente tal como lo publica SPSS en «Variables en la ecuación». */
+export interface ModelTerm {
+  b: number;
+  se: number;
+  wald: number;
+  df: number;
+  sig: number;
+  /** Exp(B): razón de probabilidades frente a la categoría de referencia. */
+  or: number;
+  /** Intervalo de confianza del 95 % para Exp(B). */
+  lo: number;
+  hi: number;
+}
+
+export interface ModelVariable {
+  key: string;
+  label: string;
+  /** La categoría contra la que se compara cada nivel (su B es 0). */
+  reference: string;
+  /** Prueba conjunta de la variable, si tiene más de un nivel. */
+  overall?: { wald: number; df: number; sig: number };
+  levels: { label: string; term: ModelTerm }[];
+}
+
+/** Regresión logística binaria: lo necesario para leerla, explorarla y dibujarla. */
+export interface ModelSpec {
+  kind: "logistica";
+  question: string;
+  response: { label: string; positive: string; negative: string };
+  method: string;
+  sample: { n: number; cohorts: string; population: string; source: string };
+  fit: { m2ll: number; coxSnell: number; nagelkerke: number; hosmerLemeshowSig: number; cutoff: number; significance: number };
+  /** Observado × pronosticado. */
+  classification: {
+    negative: { negative: number; positive: number };
+    positive: { negative: number; positive: number };
+  };
+  intercept: { b: number; se: number; wald: number; sig: number; or: number };
+  variables: ModelVariable[];
+  /** Composición de la muestra: [categoría, casos]. */
+  composition: { label: string; items: [string, number][] }[];
+}
+
+export interface ModelData {
+  id: string;
+  uuid?: string;
+  title: string;
+  description: string;
+  note: string;
+  spec: ModelSpec;
+  source: string;
+  officeId?: string | null;
 }
 
 export interface ReportImage {
@@ -327,6 +388,8 @@ export interface Report {
   freeSets?: FreeSet[];
   /** Motor Beta: Saber 11 → Saber TyT en rango percentil. */
   saberTyt?: SaberTytData[];
+  /** Modelos estadísticos publicados (0046). */
+  models?: ModelData[];
   /** Orden y visibilidad de los bloques de la ficha. Sin bloques, el orden por defecto. */
   blocks?: ReportBlock[];
   /** Nota metodológica o de alcance. */
@@ -417,4 +480,6 @@ export const BLOCK_LABELS: Record<BlockKind, string> = {
   saber_pro: "Resultados Saber PRO",
   libre: "Conjunto libre",
   saber_tyt: "Saber TyT · Motor Beta",
+  diversidad: "Tablero de la diversidad",
+  modelo: "Modelo predictivo",
 };

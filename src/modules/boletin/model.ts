@@ -22,6 +22,8 @@ import { SABER_COMPETENCIES } from "../datos-abiertos/data/saber-pro";
 import { saberRef } from "../datos-abiertos/data/groups";
 import { freeRefs } from "../datos-abiertos/data/free-sets";
 import { tytRefs } from "./tyt";
+import { deiRefs } from "./dei";
+import { modelRefs } from "./model-sheets";
 import { ALL_YEARS } from "../datos-abiertos/data/terms";
 import type { CampusId, OpenDataCatalog, Report } from "../datos-abiertos/data/types";
 
@@ -138,6 +140,15 @@ export interface BulletinReport {
  */
 export type BulletinFormat = "completo" | "ejecutivo";
 
+/**
+ * Dónde va Diversidad, Equidad e Inclusión en un boletín con varios informes:
+ * su propio capítulo, o como sección dentro de Bienestar Institucional. Si
+ * Bienestar no está en el boletín, va en su capítulo de todos modos.
+ */
+export type DeiPlacement = "capitulo" | "bienestar";
+export const DEI_SLUG = "diversidad-equidad-inclusion";
+export const BIENESTAR_SLUG = "bienestar-institucional";
+
 export interface BulletinSettings {
   version: 1;
   format: BulletinFormat;
@@ -157,6 +168,8 @@ export interface BulletinSettings {
   campus: CampusId;
   /** Omite indicadores y conjuntos sin cifras, e informes que se quedan vacíos. */
   skipEmpty: boolean;
+  /** Diversidad, Equidad e Inclusión: capítulo propio o sección de Bienestar. */
+  deiPlacement: DeiPlacement;
   reports: BulletinReport[];
 }
 
@@ -202,6 +215,9 @@ export function datasetRefs(report: Report): { ref: string; title: string }[] {
     seen.add(ref);
     list.push({ ref, title });
   };
+  // El tablero de la diversidad abre su informe con sus propias hojas.
+  deiRefs(report).forEach(({ ref, title }) => add(ref, title));
+  modelRefs(report).forEach(({ ref, title }) => add(ref, title));
   // Primero en el orden que la intranet dio a la ficha; luego lo que no tiene bloque.
   for (const block of [...(report.blocks ?? [])].sort((a, b) => a.position - b.position)) {
     if (!block.refKey) continue;
@@ -297,7 +313,15 @@ export function normalizeSettings(
     ];
     const refs = datasetRefs(report).map((d) => d.ref);
     const priorDatasets = new Map((prior?.datasets ?? []).map((d) => [d.ref, d]));
-    const datasetIds = [...(prior?.datasets ?? []).map((d) => d.ref).filter((ref) => refs.includes(ref)), ...refs.filter((ref) => !priorDatasets.has(ref))];
+    // Lo nuevo entra al final, salvo las hojas del tablero de la diversidad, que
+    // abren su informe como abren su ficha.
+    const fresh = refs.filter((ref) => !priorDatasets.has(ref));
+    const opens = (ref: string) => ref.startsWith("dei:") || ref.startsWith("modelo:");
+    const datasetIds = [
+      ...fresh.filter(opens),
+      ...(prior?.datasets ?? []).map((d) => d.ref).filter((ref) => refs.includes(ref)),
+      ...fresh.filter((ref) => !opens(ref)),
+    ];
     return {
       slug,
       include: prior?.include ?? true,
@@ -325,6 +349,7 @@ export function normalizeSettings(
     cut,
     campus,
     skipEmpty: saved.skipEmpty ?? true,
+    deiPlacement: saved.deiPlacement === "bienestar" ? "bienestar" : "capitulo",
     reports,
   };
 }

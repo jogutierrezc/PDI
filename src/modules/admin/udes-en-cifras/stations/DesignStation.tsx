@@ -39,6 +39,8 @@ const BLOCK_HELP: Record<OdBlockKind, string> = {
   saber_pro: "Resultados Saber PRO por competencia: niveles de desempeño, brecha con el país y evolución, filtrables por sede, facultad y programa.",
   saber_tyt: "Motor Beta: de Saber 11 a Saber TyT en rango percentil, con el valor agregado por programa.",
   libre: "Un conjunto libre con sus gráficas: elige una vista o muéstralas todas.",
+  modelo: "Modelo estadístico del informe: factores asociados con su intervalo, simulador de perfiles, calidad de la clasificación y la muestra.",
+  diversidad: "Tablero propio de Diversidad, Equidad e Inclusión: grupos de protección constitucional por corte y campus, mosaico étnico, discapacidad, estratos, género, zona e INES.",
 };
 
 /** Clave corta para distinguir varios bloques del mismo tipo (ver 0029). */
@@ -116,6 +118,9 @@ function DesignEditor({ data, reportId, blocks, canEdit }: { data: StationProps[
     ...(rankings.length && !draft.some((b) => b.kind === "rankings") ? [{ kind: "rankings" as OdBlockKind, ref_id: null, label: BLOCK_LABELS.rankings }] : []),
     ...(saberPro.length && !draft.some((b) => b.kind === "saber_pro") ? [{ kind: "saber_pro" as OdBlockKind, ref_id: null, label: BLOCK_LABELS.saber_pro }] : []),
     ...(saberTyt.length && !draft.some((b) => b.kind === "saber_tyt") ? [{ kind: "saber_tyt" as OdBlockKind, ref_id: null, label: BLOCK_LABELS.saber_tyt }] : []),
+    // El tablero de la diversidad lee los indicadores del informe DE por su clave.
+    ...(indicators.some((i) => i.key === "grupo-especial") && !draft.some((b) => b.kind === "diversidad") ? [{ kind: "diversidad" as OdBlockKind, ref_id: null, label: BLOCK_LABELS.diversidad }] : []),
+    ...((data.rows.models ?? []).some((m) => m.report_id === reportId) && !draft.some((b) => b.kind === "modelo") ? [{ kind: "modelo" as OdBlockKind, ref_id: null, label: BLOCK_LABELS.modelo }] : []),
     ...heatmaps.filter((h) => !draft.some((b) => b.ref_id === h.id)).map((h) => ({ kind: "mapa_calor" as OdBlockKind, ref_id: h.id, label: h.title })),
     ...maps.filter((m) => !draft.some((b) => b.ref_id === m.id || (b.kind === "mapa" && b.settings.mapWith === m.key))).map((m) => ({ kind: "mapa" as OdBlockKind, ref_id: m.id, label: m.title })),
     ...pipelines.filter((p) => !draft.some((b) => b.ref_id === p.id)).map((p) => ({ kind: "tuberia" as OdBlockKind, ref_id: p.id, label: p.title })),

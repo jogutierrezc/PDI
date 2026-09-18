@@ -19,6 +19,10 @@ Memorable moment: la portada escribe "UDES en Cifras" en paletas y, al bajar, un
 Unresolved: modelo de datos en Supabase y flujo de carga por oficina (siguiente fase).
 User changes after the direction round: tema claro/oscuro real en todo el portal; más tipos de gráfica dinámicos e interactivos (circulares, líneas, KPI, tubería de deserción, mapas animados de población y origen, mapa de calor azul, tablas dinámicas).
 
+DE (2026-09-18): la ficha de Diversidad, Equidad e Inclusión abre con un bloque propio, `diversidad` (DiversityBoard). Dentro del mismo mundo de tablero de paletas: consola de corte y campus, titular en paletas con rejilla de cien casillas, cinco llegadas con su reparto por campus, columnas corte a corte, un mosaico de pueblos y comunidades, discapacidad con la cobertura del registro, un espectro de estratos con la tabla por campus, género y zona, y el INES como puntos por grupo de interés. Las celdas reservadas («< 5») se dibujan rayadas y nunca se dimensionan por su valor. Los bloques genéricos del informe quedan ocultos, no borrados (0043).
+
+Mapa de origen (2026-09-18): tipo de mapa «municipio» (0044). De lejos, calor por departamento y resplandor ámbar; al acercarse (botones, doble clic, clic en departamento, pellizco o Ctrl + rueda; la rueda sola desplaza la página), un punto por municipio con su cifra; menos de 5 es anillo hueco «< 5». Sin cifras, el panel se dibuja igual con el aviso «Pendiente de carga». Se carga en la intranet desde el Excel de la caracterización (el navegador cuenta y solo sube conteos) o desde una tabla contada.
+
 ## Direction contract
 
 THESIS: Las cifras de la universidad llegan como llegan los vuelos: un tablero de paletas que voltea hasta asentarse en el dato oficial. Rechaza el portal "U en cifras" de contadores sueltos y rejilla de tarjetas con ícono.

@@ -73,6 +73,12 @@ const OpenDataReport = lazy(() =>
 const IntranetBulletinPage = lazy(() =>
   import("./modules/boletin/BulletinViewer").then((m) => ({ default: m.IntranetBulletinPage })),
 );
+const ObservatoryHub = lazy(() =>
+  import("./modules/datos-abiertos/observatorio/Observatory").then((m) => ({ default: m.ObservatoryHub })),
+);
+const ObservatoryTopic = lazy(() =>
+  import("./modules/datos-abiertos/observatorio/Observatory").then((m) => ({ default: m.ObservatoryTopic })),
+);
 const PublicBulletinPage = lazy(() =>
   import("./modules/boletin/BulletinViewer").then((m) => ({ default: m.PublicBulletinPage })),
 );
@@ -153,6 +159,8 @@ export default function App() {
           <Route path="/facultades/:slug" element={<FacultyDetail />} />
           <Route path="/desarrollo-tecnologico" element={<TechDevelopment />} />
           <Route path="/datos-abiertos" element={<OpenDataPortal />} />
+          <Route path="/datos-abiertos/observatorio" element={<ObservatoryHub />} />
+          <Route path="/datos-abiertos/observatorio/:tema" element={<ObservatoryTopic />} />
           <Route path="/datos-abiertos/boletines" element={<PublicBulletinList />} />
           <Route path="/datos-abiertos/boletines/:slug" element={<PublicBulletinPage />} />
           <Route path="/datos-abiertos/:slug" element={<OpenDataReport />} />

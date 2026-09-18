@@ -1001,7 +1001,7 @@
 .bol-sheet__body {
   display: grid;
   align-content: start;
-  gap: 2.6mm;
+  gap: 2.2mm;
   min-width: 0;
 }
 
@@ -1587,6 +1587,12 @@
 .bol-table tbody td {
   padding: 0.8mm 1.6mm;
   border-bottom: 0.2mm solid var(--bol-rule);
+}
+
+/* Tablas largas: filas más bajas para que la hoja quepa en su página. */
+.bol-table[data-rows="muchas"] tbody th,
+.bol-table[data-rows="muchas"] tbody td {
+  padding-block: 0.45mm;
 }
 
 .bol-table tbody th {

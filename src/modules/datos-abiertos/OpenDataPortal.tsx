@@ -27,6 +27,7 @@ import { changeBetween, formatValue, keyIndicators, useOpenDataCatalog, valueOf 
 import { ALL_YEARS, cutLabel } from "./data/terms";
 import { BulletinDownload } from "../boletin/BulletinDownload";
 import type { CampusId, Indicator, OpenDataCatalog, Report, Term } from "./data/types";
+import { ObservatoryBoard } from "./observatorio/Observatory";
 import "./datos-abiertos.css";
 
 /** Las cuatro cifras de la fila de llegadas: informe e indicador. */
@@ -137,6 +138,8 @@ function PortalContent({ data, year, term, campus, setYear, setTerm, setCampus, 
         setCampus={setCampus}
         query={query}
       />
+
+      <ObservatoryBoard />
 
       <OriginAtlas data={data} year={year} campus={campus} setCampus={setCampus} query={query} />
 

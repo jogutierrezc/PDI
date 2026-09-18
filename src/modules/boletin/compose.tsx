@@ -1954,7 +1954,9 @@ export function compose(catalog: OpenDataCatalog, settings: BulletinSettings): C
         report,
         title: group.title,
         section: group.title,
-        breakBefore: true,
+        // Una sección sigue el flujo (no abre página): entra bajo la apertura
+        // del capítulo o tras la hoja anterior, pegada siempre a su primera hoja.
+        breakBefore: false,
         node: <SectionOpener report={report} group={group} number={i + 1} total={sectioned.length} titles={titles} />,
       });
       units.push(...own.map((unit) => ({ ...unit, section: group.title })));
@@ -1984,7 +1986,7 @@ export function compose(catalog: OpenDataCatalog, settings: BulletinSettings): C
           report: host,
           title: dei.name,
           section: dei.name,
-          breakBefore: true,
+          breakBefore: false,
           node: <SectionOpener report={host} group={group} number={1} total={1} titles={titles} />,
         },
         ...own.map((unit) => ({ ...unit, report: host, section: dei.name })),

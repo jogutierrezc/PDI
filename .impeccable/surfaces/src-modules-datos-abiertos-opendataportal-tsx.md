@@ -23,6 +23,8 @@ DE (2026-09-18): la ficha de Diversidad, Equidad e Inclusión abre con un bloque
 
 Mapa de origen (2026-09-18): tipo de mapa «municipio» (0044). De lejos, calor por departamento y resplandor ámbar; al acercarse (botones, doble clic, clic en departamento, pellizco o Ctrl + rueda; la rueda sola desplaza la página), un punto por municipio con su cifra; menos de 5 es anillo hueco «< 5». Sin cifras, el panel se dibuja igual con el aviso «Pendiente de carga». Se carga en la intranet desde el Excel de la caracterización (el navegador cuenta y solo sube conteos) o desde una tabla contada.
 
+Observatorio de Analítica Académica (2026-09-18, MAQUETA): sección bajo el tablero de informes en /datos-abiertos, portada /datos-abiertos/observatorio y 14 páginas /datos-abiertos/observatorio/:tema. Mismo tablero de paletas (od-board, od-row, od-strip); a diferencia de los informes no publica indicadores sino conjuntos para explorar: cada página abre con una pregunta y trae serie, reparto y tabla (ordenable, filtrable, CSV). Todo sale de observatorio/data.ts, son DATOS DE EJEMPLO y cada vista lo dice («Datos de ejemplo»). Pendiente: fuente real por tema y carga desde la intranet.
+
 ## Direction contract
 
 THESIS: Las cifras de la universidad llegan como llegan los vuelos: un tablero de paletas que voltea hasta asentarse en el dato oficial. Rechaza el portal "U en cifras" de contadores sueltos y rejilla de tarjetas con ícono.

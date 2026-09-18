@@ -261,7 +261,8 @@ export function HBars({
   width?: number;
   reservedThreshold?: number;
 }) {
-  const row = 6.2;
+  // Con muchas categorías las barras van más juntas: la hoja cabe sin achicarse.
+  const row = items.length > 10 ? 4.8 : 6.2;
   // El ancho de los nombres sale del más largo (≈1,25 por carácter a 2,4 de
   // cuerpo), entre un mínimo legible y el 42 % del ancho: así un nombre largo
   // no se sale del lienzo ni pisa la columna de notas.
@@ -594,7 +595,7 @@ export function DataTable({
   const textCols = head.map((_, c) => c > 0 && rows.some((row) => isText(row.cells[c - 1])));
   return (
     <div className="bol-table-fit">
-    <table className="bol-table" data-density={columns > 11 ? "max" : columns > 7 ? "alta" : undefined}>
+    <table className="bol-table" data-density={columns > 11 ? "max" : columns > 7 ? "alta" : undefined} data-rows={rows.length > 10 ? "muchas" : undefined}>
       {caption && <caption>{caption}</caption>}
       <thead>
         <tr>

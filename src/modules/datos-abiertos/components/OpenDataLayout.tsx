@@ -68,6 +68,9 @@ export function OpenDataLayout({ children, title, className = "" }: OpenDataLayo
           <NavLink to="/datos-abiertos#informes" className="od-nav__link">
             Informes
           </NavLink>
+          <NavLink to="/datos-abiertos/observatorio" className="od-nav__link">
+            Observatorio
+          </NavLink>
           <NavLink to="/datos-abiertos/boletines" className="od-nav__link">
             Boletines
           </NavLink>

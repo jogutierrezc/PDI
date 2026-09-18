@@ -197,14 +197,19 @@ export function BulletinDocument({ catalog, settings, report, fitWidth, onReady 
       const full = heightOf(i, "full") ?? 0;
       const compact = Boolean(here?.compact);
       const h = here ? here.h : full;
-      if (current.length && (unit.breakBefore || !here)) {
+      // Una apertura de sección no queda sola al pie: si tras ella no cabe su
+      // primera hoja (ni en compacta), la sección pasa a la página siguiente.
+      const orphan =
+        unit.kind === "seccion" && here && queue.length > 1 && !fitIn(queue[1], BODY_H - used - gap - here.h - GAP);
+      if (current.length && (unit.breakBefore || !here || orphan)) {
         next.push(current);
         current = [];
         used = 0;
       }
       // Una hoja sola más alta que la página no se deja pisar el pie: se reduce
       // en proporción hasta caber (la tipografía se achica, nada se corta).
-      const zoom = h > BODY_H ? BODY_H / h : undefined;
+      // Deja 4 mm de aire sobre el pie: al ras se lee como si lo pisara.
+      const zoom = h > BODY_H ? (BODY_H - 4) / h : undefined;
       used += (current.length ? gap : 0) + (zoom ? BODY_H : h);
       current.push({ i, compact, zoom });
       queue.shift();

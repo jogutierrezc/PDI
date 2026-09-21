@@ -106,6 +106,9 @@ const PillarConfigurator = lazy(() =>
 const GlobalParameters = lazy(() =>
   import("./modules/admin/parametros/GlobalParameters").then((m) => ({ default: m.GlobalParameters })),
 );
+const OfficePageAdmin = lazy(() =>
+  import("./modules/admin/pagina/OfficePageAdmin").then((m) => ({ default: m.OfficePageAdmin })),
+);
 const UserManagement = lazy(() =>
   import("./modules/admin/usuarios/UserManagement").then((m) => ({ default: m.UserManagement })),
 );
@@ -177,6 +180,15 @@ export default function App() {
           <Route path="/datos-abiertos/:slug" element={<OpenDataReport />} />
           <Route path="/acceso-intranet" element={<LoginPortal />} />
 
+          {/* La portada de Planeación y la página del equipo, escritas desde la intranet. */}
+          <Route
+            path="/admin/pagina/:station?"
+            element={
+              <RequireRole minimum="consulta" screen="office">
+                <OfficePageAdmin />
+              </RequireRole>
+            }
+          />
           <Route
             path="/admin/pilares"
             element={

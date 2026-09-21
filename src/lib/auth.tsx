@@ -34,6 +34,7 @@ export interface AccessScope {
 /** Dónde vive cada pantalla del menú. Sirve para llevar a cada quien a la
  *  primera que sí puede abrir: un rol de área no empieza en Gestión de pilares. */
 export const SCREEN_PATHS: Record<AdminScreen, string> = {
+  office: "/admin/pagina",
   pillars: "/admin/pilares",
   projects: "/admin/proyectos",
   faculties: "/admin/facultades",

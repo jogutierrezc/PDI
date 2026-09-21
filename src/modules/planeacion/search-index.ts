@@ -8,7 +8,7 @@
      datos) y las tablas publicadas.
    · Plan de Desarrollo: páginas, pilares con su avance y proyectos.
    · Boletines y documentos públicos.
-   · La oficina: áreas y equipo.
+   · La oficina: áreas y equipo, tal como se publican desde la intranet.
 
    Solo entra lo publicado: las consultas son las mismas del portal público.
    Ninguna cifra de dinero entra al índice (regla del producto).
@@ -23,7 +23,7 @@ import type { Indicator, OpenDataCatalog } from "../datos-abiertos/data/types";
 import { OBS_TOPICS } from "../datos-abiertos/observatorio/data";
 import { summarize, useObservatoryLive } from "../datos-abiertos/observatorio/live";
 import { bulletinFileUrl, usePublicBulletins } from "../boletin/data";
-import { AREAS, TEAM } from "./content";
+import { useOfficePage } from "./page";
 
 export type Portal = "cifras" | "observatorio" | "pdi" | "boletines" | "documentos" | "oficina";
 
@@ -109,6 +109,7 @@ export function useSiteIndex() {
   const projects = useProjects();
   const documents = usePublicDocuments();
   const bulletins = usePublicBulletins(catalog.data?.period?.uuid);
+  const { page } = useOfficePage();
 
   const entries = useMemo(() => {
     const out: SearchEntry[] = [...OFFICE_PAGES, ...PDI_PAGES];
@@ -226,15 +227,21 @@ export function useSiteIndex() {
       });
     }
 
-    for (const area of AREAS) {
+    for (const area of page.areas) {
       out.push({ id: `a-${area.id}`, portal: "oficina", title: area.name, hint: area.does, to: "/equipo", keywords: "area oficina equipo" });
     }
-    for (const person of TEAM) {
-      if (!person.name.trim()) continue;
-      out.push({ id: `m-${person.name}`, portal: "oficina", title: person.name, hint: person.role, to: "/equipo", keywords: `${person.email ?? ""} equipo` });
+    for (const person of page.team.people) {
+      out.push({
+        id: `m-${person.id}`,
+        portal: "oficina",
+        title: person.name,
+        hint: [person.role, page.areas.find((a) => a.id === person.area)?.name].filter(Boolean).join(" · "),
+        to: "/equipo",
+        keywords: `${person.email} ${person.focus} equipo funcionario`,
+      });
     }
     return out;
-  }, [catalog.data, live.data, pillars.data, projects.data, documents.data, bulletins.data]);
+  }, [catalog.data, live.data, pillars.data, projects.data, documents.data, bulletins.data, page]);
 
   const loading = catalog.isPending || pillars.isPending || projects.isPending;
   return { entries, loading };

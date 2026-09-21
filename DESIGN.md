@@ -126,6 +126,7 @@ rounded:
   sm: "12px"
   md: "16px"
   lg: "20px"
+  xl: "26px"
   pill: "999px"
   bol-code: "0.8mm"
   bol-tile: "1.2mm"
@@ -181,6 +182,15 @@ components:
     rounded: "{rounded.flap}"
     width: "0.7em"
     height: "1.24em"
+  pl-person-card:
+    backgroundColor: "{colors.surface}"
+    textColor: "{colors.ink}"
+    rounded: "18px"
+  pl-rail-arrow:
+    backgroundColor: "{colors.surface}"
+    textColor: "{colors.brand-navy}"
+    rounded: "{rounded.pill}"
+    size: "42px"
 ---
 
 # Design System: PDI UDES · Portal, Intranet y UDES en Cifras
@@ -268,11 +278,15 @@ Rejilla de espacio base 4px (space-1 = 4px … space-12 = 104px). Margen lateral
 
 **UDES en Cifras público.** Portada con vídeo a sangre completa y rótulo abajo a la izquierda; tablero de once informes; fichas con bloques en el orden que decide la intranet. Tablas, mapas y rejillas anchas se desplazan dentro de su marco; la página nunca se desplaza en horizontal.
 
+**Portal de Planeación público.** Portada en bandas de ancho completo dentro del contenedor de 1312px, en este orden: encabezado con el plano y el buscador, mosaico de portales, la galería de la oficina, «Lo más reciente», el equipo y el bloque de cierre. Las bandas de carril separan con un respiro propio (la galería abre con clamp 56–96px) y su cabecera es título a la izquierda, bajada a su derecha y los mandos del carril cerrando la línea; por debajo de 720px los mandos bajan a su propia línea, repartidos a los extremos. La diapositiva de la galería mide `min(100%, 880px)` y la tarjeta de persona `clamp(212px, 22vw, 256px)` —`min(78%, 260px)` en el móvil, para que la siguiente asome por el borde—. La rejilla de `/equipo` repite esa misma tarjeta en `auto-fill` desde 232px. Como en el resto del sistema, el desplazamiento a lo ancho ocurre dentro del carril; la página nunca se desplaza en horizontal.
+
 **Densidad.** Paneles con 16–20px de relleno y 20px entre bloques; filas de rejilla de 36px; en el móvil la columna de rótulos de la rejilla baja a 8rem y los rótulos parten línea.
 
 ## Elevation & Depth
 
 Híbrido: la profundidad viene sobre todo de capas tonales (page, surface, surface-2, surface-3) y bordes translúcidos; las sombras son en capas, muy suaves y teñidas de azul marino, nunca un solo desenfoque gris. En oscuro las sombras se vuelven negras y más densas. El tablero tiene su propia profundidad física: cada paleta lleva una sombra de 1px y una bisagra, y al voltear se oscurece y se ilumina como una hoja real.
+
+**Divergencia observada (portal público de Planeación).** Las superficies `pl-*` no usan los tokens de sombra: escriben la suya literal y en una sola capa —azul marino de marca en las tarjetas y la ficha (rgba 10,45,99), casi negra bajo el buscador sobre el encabezado (rgba 2,12,32)—. Las dos bandas nuevas siguen esa práctica de su vecindario. Queda registrado como deuda del portal frente a **The Tinted Shadow Rule**, no como una segunda gramática de profundidad: una superficie nueva usa `--shadow-*`.
 
 ### Shadow Vocabulary
 - **Reposo** (`--shadow-xs: 0 1px 2px rgba(10,34,73,.06)`): paneles y botón secundario.
@@ -288,6 +302,8 @@ Híbrido: la profundidad viene sobre todo de capas tonales (page, surface, surfa
 ## Shapes
 
 Esquinas generosas en la interfaz y precisas en los objetos del tablero. Botones del PDI y la intranet en píldora (999px); campos a 12px; paneles a 16px; botones de icono y celdas enfocadas a 8px. Los objetos físicos del tablero conservan su forma real: la paleta con esquinas de 0.1em partida en dos mitades, el boleto de origen a 3px con muesca perforada (máscara radial) en el borde izquierdo y una línea de corte discontinua. Los sellos del tablero usan borde discontinuo a 4px. Las casillas vacías de la rejilla llevan un rayado diagonal de 135° en línea tenue, no un color.
+
+El portal público de Planeación conserva su propio juego de esquinas, más blandas que la escala de la aplicación y en su mayoría escritas a mano: 10px en los controles de la cabecera, 14px en el buscador, 18px en las tarjetas (las de «Qué hacemos» y la de persona), 22px en las teselas del mosaico y 26px —ahí sí, `rounded.xl`— en el bloque de cierre y en la ficha de una persona. Las fotografías de la galería van a `rounded.lg`; los retratos, tarjeta y ficha, en proporción 4/5 con el encuadre subido (`object-position: center 28%`) para que la cara no quede en el centro geométrico.
 
 ## Components
 
@@ -380,6 +396,44 @@ Bloque `libre` (`FreeSetBlock.tsx`, gráficas en `components/free/`, contrato en
 - **Filas con tipo** (0034): una fila es un **dato**, un **título de grupo** (agrupa las que siguen hasta el próximo título) o un **total**, que el portal calcula sobre las filas de datos de su grupo: suma las columnas de enteros y promedia las de decimales y porcentajes, y lo dice junto a su rótulo. Las gráficas solo leen las filas de datos, que un total junto a sus partes contaría dos veces; la tabla muestra los tres tipos, con el título en letra de señalización y el total en tinta sobre la superficie elevada.
 - **En el Boletín** (`boletin/free.tsx`): una entrada por vista (`libre:<fuente>:<vista>`), hoja ancha con notas (gráfica, lectura, corte). Las gráficas de la ficha se dibujan a 680 px con la paleta fija del papel y sin animación, dentro de `.bol-fit`, que las escala al cuerpo; el mapa usa el coroplético del boletín con su tabla, la tabla usa la del boletín con continuaciones y las cifras clave van en tinta.
 
+### Carril (Portal de Planeación)
+
+Los dos carruseles de la portada —las fotografías de la oficina y el equipo— son la misma mecánica (`rail.ts`) con los mismos mandos (`RailControls.tsx`): una lista que se desplaza de verdad a lo ancho con anclaje (`overflow-x: auto`, `scroll-snap-type: x mandatory`, barra de desplazamiento oculta), no diapositivas intercambiadas por JavaScript. Desplazarse de verdad es lo que conserva el gesto del móvil, la rueda horizontal del trackpad, el buscador de la página encontrando texto fuera de pantalla y el lector de pantalla leyendo la lista entera.
+
+- **Mandos:** en la cabecera de la banda, cerrando la línea: la escala de posición, el contador y las dos flechas. Flechas de 42px en círculo, superficie blanca con borde line-strong y tinta azul marino; al apuntarlas, azul suave con borde azul institucional; apagadas en tinta tenue y sin cursor; al pulsar, escala 0.94.
+- **Velo de borde:** cuando por un lado queda lista, el carril del equipo se desvanece en ese borde (`mask-image`: 72px a la derecha, 40px a la izquierda) y solo por el lado que queda algo. Una tarjeta cortada a cuchillo parece un nombre roto; el velo dice que la lista sigue sin un rótulo que lo cuente.
+- Con menos de dos elementos no hay mandos: una serie de uno no se navega.
+
+**The Graduated Position Rule.** La posición dentro de un carril se lee en una escala graduada —marcas de 13px que se encienden en azul institucional hasta la actual, y la actual el doble de alta y más gruesa— acompañada del contador «n / total» en numerales tabulares. No son puntos: la escala habla el lenguaje del plano del encabezado y el contador dice cuántos quedan sin obligar a contar marcas. La escala es un duplicado de las flechas, así que no recibe el tabulador; quien navega con el teclado no tiene por qué recorrer siete marcas para llegar al bloque siguiente.
+
+**The Measured Edge Rule.** «Anterior» y «siguiente» se apagan midiendo el desplazamiento real del carril (`scrollLeft` contra `scrollWidth − clientWidth`, con 2px de holgura), nunca contando elementos. En un carril donde caben cinco tarjetas de siete, el último elemento nunca llega a ser el anclado: contando, la flecha de «siguiente» se queda encendida para siempre al final de la lista. Una flecha encendida promete recorrido.
+
+**The Reader Advances Rule.** Ningún carril avanza solo. Un carrusel que se mueve por su cuenta roba el pie a quien lee despacio y obliga a perseguir el botón a quien navega con el teclado; aquí avanza quien mira. Con `prefers-reduced-motion`, el salto de una posición a otra es instantáneo en lugar de suave.
+
+### Franja de la galería (Portal de Planeación)
+
+Banda propia entre el mosaico de portales y «Lo más reciente», con la cabecera cerrada por una regla de 2px en azul marino. Cada diapositiva es una fotografía a 16/9 (4/3 por debajo de 900px) de `min(100%, 880px)`, esquina `rounded.lg`, sobre el marino noche del portal mientras carga. El pie va **sobre** la fotografía con su velo —degradado vertical de transparente a rgba(6,20,43,.88) al 62 %—, con el título en Fraunces, el texto a 58ch en azul claro y un enlace opcional que pasa a blanco al apuntarlo. El velo, y no una caja debajo: la fotografía sigue siendo la banda. La primera imagen carga `eager` y las demás `lazy`. Sin fotografías la banda no se dibuja.
+
+### Tarjeta de persona y su ficha (Portal de Planeación)
+
+La misma tarjeta y la misma ficha sirven al carril de la portada y a la rejilla de `/equipo`.
+
+- **Tarjeta:** retrato 4/5 arriba (o las iniciales en Fraunces sobre azul suave cuando no hay foto), nombre en 800, cargo, ficha de área en píldora azul suave y el foco recortado a tres líneas. Esquina 18px, borde line, superficie blanca. Al apuntarla sube 3px con sombra teñida; abierta, borde azul institucional con anillo de 1px y el chevron del pie girado. Quien no tiene nada más que contar —ni bio, ni formación, ni correo, ni enlaces— no se dibuja como si se pudiera abrir: su tarjeta es una tarjeta, no un botón que no lleva a ninguna parte.
+- **Ficha:** retrato a la izquierda (clamp 180–232px) y cuerpo a la derecha, esquina `rounded.xl`, sombra levantada; entra subiendo 10px con fundido en `--dur-slow`. Nombre en Fraunces, cargo con su área, el foco en azul marino a 62ch, la bio a 68ch, la formación en lista con viñeta azul de 5px y los contactos como enlaces del portal. Cierre en círculo de 36px arriba a la derecha. Una sola columna por debajo de 900px.
+- Al abrir, el foco entra en el nombre de la ficha; Escape la cierra y devuelve el foco a su tarjeta.
+
+**The File Opens In Place Rule.** La ficha de una persona se abre dentro de la página, bajo el carril o la rejilla, nunca en una ventana emergente: no es una tarea que haya que interrumpir. Así el resto del equipo sigue a la vista, se pasa de una persona a la siguiente sin cerrar nada, y en el móvil el detalle aparece bajo la tarjeta que se tocó en lugar de tapar la pantalla.
+
+### Vista previa fiel (intranet)
+
+La columna de vista previa de «Página de la oficina» dibuja la banda de verdad del portal —los mismos componentes públicos y la misma hoja de estilos— y no un esquema de cajas. Su marco (`.ofa-frame`) se dibuja como lo que es, una ventana a otra página y no un panel más: fondo de página del portal, borde line-strong, esquina `rounded.md` y una sombra hacia dentro que dice que lo de ahí no se toca. La copia se compone al ancho real del portal (1312px) y se reduce con `transform: scale()` medido contra el hueco disponible; como la transformación no ocupa sitio, el alto del marco se calcula y se aplica a mano. Desde 1280px es columna pegajosa bajo la cabecera de la intranet (24rem; 27rem desde 1500px); por debajo se pliega en un desplegable —«Ver cómo quedará»— colocado sobre los paneles y no al final de la columna, que al pie de un formulario de tres mil píxeles no lo abre nadie. La estación de publicación no lleva vista previa: su materia es la comparación y necesita el ancho.
+
+**The Inert Preview Rule.** Una vista previa es una imagen de la página, no la página: la copia lleva `inert` y `aria-hidden`, así que sus botones y enlaces no reciben el foco ni el tabulador y no entran en el árbol de accesibilidad. Un carrusel de mentira robando la tecla Tab en mitad de un formulario es exactamente la clase de detalle que hace desconfiar de una vista previa.
+
+### Lista de cambios antes de publicar (intranet)
+
+Publicar no es un botón a ciegas: la estación de publicación enseña primero qué ve el público ahora mismo (cifras en numerales tabulares con su fecha de publicación), después la lista de comprobaciones con su glifo y su tono —ámbar para lo pendiente, rojo para lo que impide publicar— y por último el detalle, línea por línea, de qué cambia. Cada línea nombra el campo y marca el tipo de cambio con su palabra y su color: «se añade» en verde de estado, «se quita» en rojo de estado, «cambia» en azul institucional y «se deja en blanco» en ámbar de estado. Sin diferencias, la lista lo dice con todas las letras («El borrador y lo publicado dicen lo mismo») en lugar de enseñar un cuadro vacío. La confirmación final es en línea, en la píldora azul suave de siempre.
+
 ## Boletín UDES en Cifras (papel A4)
 
 El boletín es papel, no pantalla: un documento A4 de 210×297 mm que se imprime a PDF desde el navegador. Su marco lo fijó Planeación con tres páginas modelo (`Modelo Informe/Imagenes`): portada, contraportada y página de contenido. Vive en `src/modules/boletin/` y su plantilla (textos, imágenes, colores, fuente, contenido) se edita en la estación 6 de la intranet.
@@ -421,6 +475,10 @@ El boletín es papel, no pantalla: un documento A4 de 210×297 mm que se imprime
 - **Do** confirm destructive or visibility-changing actions inline, naming the consequence.
 - **Do** keep wide tables, grids, and maps scrolling inside their own frame; the page body never scrolls horizontally.
 - **Do** set SVG chart colors through `style` with `var()`, not presentation attributes.
+- **Do** scroll a carousel for real (`overflow-x: auto` + `scroll-snap`), and measure its edges from `scrollLeft` against `scrollWidth − clientWidth`, never by counting items.
+- **Do** show a rail's position with the graduated scale plus the tabular `n / total` counter, and keep the scale out of the tab order.
+- **Do** let a band vanish when it has nothing to show: no gallery without photos, no team band without people, no frame promising a picture nobody uploaded.
+- **Do** build an in-app preview from the real public components at measured scale, and mark the copy `inert`.
 
 ### Don't:
 - **Don't** reuse status green, amber, or red as a data series or decoration.
@@ -430,3 +488,6 @@ El boletín es papel, no pantalla: un documento A4 de 210×297 mm que se imprime
 - **Don't** cycle categorical hues past `od-cat-6`; fold extras into "Otros". A twelfth report line needs the same measured proof the tenth and eleventh got, not a hue picked by eye.
 - **Don't** fold a minority category into "Otros" in an equity report. The six-colour ceiling belongs to pie charts; a long list of named groups goes in single-hue horizontal bars with direct labels, every group keeping its own name.
 - **Don't** add a thick colored side stripe to cards to signal category; category identity comes from the two-letter code and its line badge.
+- **Don't** mark a carousel's position with dots, and don't advance it on its own; the reader advances it.
+- **Don't** draw a preview as a diagram of boxes, and never let its controls take focus or the Tab key.
+- **Don't** make a card a button when there is nothing behind it; a person with no file is a card, not a control that leads nowhere.

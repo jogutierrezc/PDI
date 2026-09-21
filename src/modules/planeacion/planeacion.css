@@ -839,3 +839,288 @@
   .pl-office__links a svg { transition: none; }
   .pl-tile:hover { transform: none; }
 }
+
+/* --- La galería de la oficina ---------------------------------------------------------------
+   Una franja propia entre el mosaico y «Lo más reciente». El carril se
+   desplaza con anclaje; el pie va sobre la fotografía con su velo, como en el
+   bloque de UDES en Cifras, y la posición se lee en una escala graduada —el
+   lenguaje del plano del encabezado— en lugar de los puntos de siempre. */
+
+.pl-gallery { padding-top: clamp(56px, 7vw, 96px); }
+
+.pl-gallery__head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: var(--space-4) var(--space-8);
+  margin-bottom: var(--space-5);
+  padding-bottom: var(--space-4);
+  border-bottom: 2px solid var(--brand-navy);
+}
+.pl-gallery__head h2 { margin: 0; color: var(--brand-navy); font-family: var(--font-display); font-size: clamp(1.7rem, 2.6vw, 2.15rem); font-weight: 600; line-height: 1.1; }
+.pl-gallery__head p { flex: 1 1 22ch; max-width: 52ch; margin: 0; color: var(--ink-secondary); line-height: 1.6; }
+
+.pl-rail-controls { display: flex; align-items: center; gap: var(--space-4); }
+
+.pl-scale { display: flex; align-items: flex-end; gap: 3px; height: 18px; }
+
+.pl-scale button {
+  width: 13px;
+  height: 9px;
+  padding: 0;
+  background: transparent;
+  border: 0;
+  border-bottom: 2px solid var(--line-strong);
+  cursor: pointer;
+  transition: border-color var(--dur-fast) var(--ease-out);
+}
+
+.pl-scale button[data-on] { border-bottom-color: var(--brand-blue); }
+.pl-scale button[data-here] { height: 18px; border-bottom-width: 3px; }
+
+.pl-rail-count { color: var(--ink-muted); font-size: var(--text-sm); font-weight: 700; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.pl-rail-count b { color: var(--brand-navy); font-size: 1.05rem; }
+.pl-rail-count span[aria-hidden] { margin: 0 3px; }
+
+.pl-rail-arrows { display: flex; gap: var(--space-2); }
+
+.pl-rail-arrows button {
+  display: grid;
+  place-items: center;
+  width: 42px;
+  height: 42px;
+  color: var(--brand-navy);
+  background: var(--surface);
+  border: 1px solid var(--line-strong);
+  border-radius: 50%;
+  cursor: pointer;
+  transition: background var(--dur-fast) var(--ease-out), border-color var(--dur-fast) var(--ease-out), color var(--dur-fast) var(--ease-out);
+}
+
+.pl-rail-arrows button:not(:disabled):hover { color: var(--brand-blue-strong); background: var(--brand-blue-soft); border-color: var(--brand-blue); }
+.pl-rail-arrows button:disabled { color: var(--ink-faint); border-color: var(--line); cursor: default; }
+.pl-rail-arrows button:active:not(:disabled) { transform: scale(0.94); }
+
+.pl-gallery__rail,
+.pl-team__rail {
+  display: flex;
+  gap: var(--space-4);
+  margin: 0;
+  padding: 0;
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  scroll-snap-type: x mandatory;
+  scrollbar-width: none;
+  list-style: none;
+}
+
+.pl-gallery__rail::-webkit-scrollbar,
+.pl-team__rail::-webkit-scrollbar { display: none; }
+.pl-gallery__rail:focus-visible { outline: 2px solid var(--brand-blue); outline-offset: 4px; border-radius: var(--radius-lg); }
+
+/* La siguiente fotografía asoma por el borde: dice que la serie sigue sin
+   necesidad de un rótulo que lo cuente. */
+.pl-slide { flex: 0 0 min(100%, 880px); scroll-snap-align: start; }
+
+.pl-slide figure {
+  position: relative;
+  margin: 0;
+  aspect-ratio: 16 / 9;
+  overflow: hidden;
+  background: var(--pl-night);
+  border-radius: var(--radius-lg);
+}
+
+.pl-slide img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+
+.pl-slide figcaption {
+  position: absolute;
+  inset: auto 0 0 0;
+  display: grid;
+  gap: 4px;
+  padding: clamp(20px, 4vw, 36px) clamp(18px, 3vw, 32px) clamp(16px, 2.5vw, 26px);
+  color: var(--pl-on-navy);
+  background: linear-gradient(180deg, rgba(6, 20, 43, 0) 0%, rgba(6, 20, 43, 0.88) 62%);
+}
+
+.pl-slide figcaption strong { font-family: var(--font-display); font-size: clamp(1.15rem, 1.8vw, 1.5rem); font-weight: 600; line-height: 1.15; }
+.pl-slide figcaption > span { max-width: 58ch; color: var(--pl-on-navy-2); font-size: var(--text-sm); line-height: 1.55; }
+
+.pl-slide figcaption a {
+  justify-self: start;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: var(--space-1);
+  color: var(--pl-on-navy-3);
+  font-size: var(--text-sm);
+  font-weight: 800;
+  text-decoration: none;
+}
+
+.pl-slide figcaption a:hover { color: #ffffff; }
+.pl-slide figcaption a:focus-visible { outline: 2px solid var(--pl-on-navy-3); outline-offset: 3px; border-radius: 4px; }
+
+/* --- El equipo ------------------------------------------------------------------------------
+   Carril de personas y, al elegir una, su ficha abierta debajo. */
+
+/* Mismo ritmo que «Nuestros portales»: título a la izquierda, bajada a su
+   derecha; las flechas cierran la línea. */
+.pl-team__head { margin-bottom: var(--space-5); }
+.pl-team__head p { flex: 1 1 22ch; }
+
+.pl-team__rail { padding-bottom: var(--space-2); }
+
+/* Una tarjeta cortada por el borde parece un nombre roto; el velo dice que la
+   lista sigue. Solo en el lado por el que queda algo. */
+.pl-team__rail[data-more] { mask-image: linear-gradient(90deg, #000 calc(100% - 72px), transparent); }
+.pl-team__rail[data-less] { mask-image: linear-gradient(90deg, transparent, #000 40px); }
+.pl-team__rail[data-less][data-more] { mask-image: linear-gradient(90deg, transparent, #000 40px, #000 calc(100% - 72px), transparent); }
+.pl-team__rail > li { flex: 0 0 clamp(212px, 22vw, 256px); scroll-snap-align: start; display: flex; }
+
+.pl-person {
+  display: grid;
+  grid-template-rows: auto 1fr auto;
+  width: 100%;
+  padding: 0;
+  overflow: hidden;
+  color: inherit;
+  text-align: left;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  font: inherit;
+  transition: transform var(--dur-base) var(--ease-out), box-shadow var(--dur-base) var(--ease-out), border-color var(--dur-fast) var(--ease-out);
+}
+
+button.pl-person { cursor: pointer; }
+button.pl-person:hover { transform: translateY(-3px); box-shadow: 0 16px 34px rgba(10, 45, 99, 0.14); }
+button.pl-person:focus-visible { outline: 2px solid var(--brand-blue); outline-offset: 2px; }
+.pl-person[data-open] { border-color: var(--brand-blue); box-shadow: 0 0 0 1px var(--brand-blue); }
+
+.pl-person__photo { display: grid; place-items: center; aspect-ratio: 4 / 5; overflow: hidden; background: var(--brand-blue-soft); }
+.pl-person__photo img { width: 100%; height: 100%; object-fit: cover; object-position: center 28%; }
+.pl-person__photo > span { color: var(--brand-navy); font-family: var(--font-display); font-size: 2.4rem; font-weight: 600; }
+
+.pl-person__text { display: grid; align-content: start; gap: 3px; padding: var(--space-4) var(--space-4) var(--space-3); }
+.pl-person__text b { color: var(--ink); font-size: 1.02rem; font-weight: 800; line-height: 1.25; }
+.pl-person__text small { color: var(--ink-secondary); font-size: var(--text-sm); font-weight: 600; }
+
+.pl-person__area { justify-self: start; margin-top: 4px; padding: 3px 9px; color: var(--brand-navy); background: var(--brand-blue-soft); border-radius: var(--radius-pill); font-size: 0.7rem; font-weight: 800; }
+
+.pl-person__focus {
+  display: -webkit-box;
+  margin-top: 4px;
+  overflow: hidden;
+  color: var(--ink-muted);
+  font-size: var(--text-sm);
+  line-height: 1.45;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+}
+
+.pl-person__more {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 0 var(--space-4) var(--space-4);
+  color: var(--brand-blue-strong);
+  font-size: var(--text-xs);
+  font-weight: 800;
+}
+
+.pl-person__more svg { transition: transform var(--dur-base) var(--ease-out); }
+.pl-person[data-open] .pl-person__more svg { transform: rotate(180deg); }
+
+/* La ficha ---------------------------------------------------------------------------------- */
+
+.pl-file {
+  position: relative;
+  display: grid;
+  grid-template-columns: clamp(180px, 20vw, 232px) minmax(0, 1fr);
+  gap: var(--space-6) var(--space-7);
+  margin-top: var(--space-5);
+  padding: var(--space-6) var(--space-7);
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-xl);
+  box-shadow: 0 18px 40px rgba(10, 45, 99, 0.12);
+  animation: pl-file-in var(--dur-slow) var(--ease-out) both;
+}
+
+@keyframes pl-file-in {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: none; }
+}
+
+.pl-file__portrait { display: grid; place-items: center; aspect-ratio: 4 / 5; overflow: hidden; background: var(--brand-blue-soft); border-radius: var(--radius-md); }
+.pl-file__portrait img { width: 100%; height: 100%; object-fit: cover; object-position: center 28%; }
+.pl-file__portrait > span { color: var(--brand-navy); font-family: var(--font-display); font-size: 3.2rem; font-weight: 600; }
+
+.pl-file__body { display: grid; align-content: start; gap: var(--space-3); padding-right: var(--space-7); }
+.pl-file__body h3 { margin: 0; color: var(--brand-navy); font-family: var(--font-display); font-size: clamp(1.6rem, 2.4vw, 2.05rem); font-weight: 600; line-height: 1.1; }
+.pl-file__body h3:focus-visible { outline: 2px solid var(--brand-blue); outline-offset: 4px; border-radius: 4px; }
+
+.pl-file__role { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-3); margin: 0; color: var(--ink-secondary); font-size: 1.05rem; font-weight: 700; }
+.pl-file__area { padding: 4px 11px; color: var(--brand-navy); background: var(--brand-blue-soft); border-radius: var(--radius-pill); font-size: var(--text-xs); font-weight: 800; }
+
+.pl-file__focus { max-width: 62ch; margin: 0; color: var(--brand-navy); font-size: 1.05rem; font-weight: 600; line-height: 1.55; }
+.pl-file__bio { max-width: 68ch; margin: 0; color: var(--ink-secondary); line-height: 1.7; }
+
+.pl-file__block { display: grid; gap: var(--space-2); margin-top: var(--space-2); }
+.pl-file__block h4 { margin: 0; color: var(--ink-muted); font-size: var(--text-xs); font-weight: 800; }
+.pl-file__block ul { display: grid; gap: 5px; margin: 0; padding: 0; list-style: none; }
+.pl-file__block li { position: relative; padding-left: var(--space-4); color: var(--ink-secondary); font-size: var(--text-md); line-height: 1.5; }
+.pl-file__block li::before { content: ""; position: absolute; top: 0.62em; left: 0; width: 5px; height: 5px; background: var(--brand-blue); border-radius: 50%; }
+
+.pl-file__contact { display: flex; flex-wrap: wrap; gap: var(--space-2) var(--space-5); margin-top: var(--space-2); }
+.pl-file__contact .pl-link { gap: 5px; font-size: var(--text-md); }
+
+.pl-file__close {
+  position: absolute;
+  top: var(--space-4);
+  right: var(--space-4);
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  color: var(--ink-secondary);
+  background: var(--surface-2);
+  border: 1px solid var(--line);
+  border-radius: 50%;
+  cursor: pointer;
+  transition: color var(--dur-fast) var(--ease-out), background var(--dur-fast) var(--ease-out);
+}
+
+.pl-file__close:hover { color: var(--brand-navy); background: var(--surface-3); }
+
+@media (max-width: 900px) {
+  .pl-slide { flex: 0 0 100%; }
+  .pl-slide figure { aspect-ratio: 4 / 3; }
+  .pl-file { grid-template-columns: minmax(0, 1fr); padding: var(--space-5); }
+  .pl-file__portrait { max-width: 200px; }
+  .pl-file__body { padding-right: var(--space-6); }
+}
+
+@media (max-width: 720px) {
+  .pl-gallery__head,
+  .pl-team__head { align-items: flex-start; }
+  .pl-rail-controls { width: 100%; justify-content: space-between; }
+  .pl-team__rail > li { flex: 0 0 min(78%, 260px); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pl-gallery__rail,
+  .pl-team__rail { scroll-behavior: auto; }
+  .pl-person,
+  .pl-person__more svg,
+  .pl-scale button,
+  .pl-file__close { transition: none; }
+  button.pl-person:hover { transform: none; }
+  .pl-file { animation: none; }
+}
+
+/* La rejilla de /equipo: la misma tarjeta del carril, sin desplazamiento. */
+.pl-team__grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(232px, 1fr)); gap: var(--space-5); margin: 0; padding: 0; list-style: none; }
+.pl-team__grid > li { display: flex; }

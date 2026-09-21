@@ -28,6 +28,7 @@ import type { AppRole } from "../../../types/database";
 import "../admin.css";
 
 export type AdminSection =
+  | "office"
   | "pillars"
   | "projects"
   | "faculties"
@@ -51,12 +52,21 @@ interface NavItem {
 }
 
 interface NavGroup {
-  id: "pdi" | "cifras" | "observatorio" | "sistema";
+  id: "planeacion" | "pdi" | "cifras" | "observatorio" | "sistema";
   label: string;
   items: NavItem[];
 }
 
 const navigation: NavGroup[] = [
+  {
+    // La portada del portal es lo primero que ve quien llega de fuera, así que
+    // es también lo primero del menú de quien la escribe.
+    id: "planeacion",
+    label: "Portal de Planeación",
+    items: [
+      { id: "office", label: "Página de la oficina", icon: "document", to: "/admin/pagina", minimum: "consulta" },
+    ],
+  },
   {
     id: "pdi",
     label: "Plan de Desarrollo",

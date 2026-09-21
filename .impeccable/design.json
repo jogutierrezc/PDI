@@ -1,6 +1,6 @@
 {
   "schemaVersion": 2,
-  "generatedAt": "2026-09-15T17:50:07.854Z",
+  "generatedAt": "2026-09-21T00:00:00.000Z",
   "title": "Design System: PDI UDES · Portal, Intranet y UDES en Cifras",
   "extensions": {
     "colorMeta": {
@@ -893,6 +893,22 @@
       "description": "Acción principal del portal estadístico (Ver informes).",
       "html": "<button class=\"ds-od-signal\">Ver informes</button>",
       "css": ".ds-od-signal{display:inline-flex;align-items:center;gap:8px;padding:12px 20px;color:var(--od-signal-ink,#1d1402);background:var(--od-signal,#f6b93f);border:1px solid transparent;border-radius:8px;font:700 13px/1 var(--font-sans,Manrope,system-ui,sans-serif);cursor:pointer;transition:transform 140ms cubic-bezier(.23,1,.32,1),background-color 220ms ease}.ds-od-signal:hover{background:var(--od-signal-strong,#ffcc66)}.ds-od-signal:active{transform:scale(.97)}.ds-od-signal:focus-visible{outline:2px solid var(--od-signal,#f6b93f);outline-offset:2px}"
+    },
+    {
+      "name": "Mandos de un carril",
+      "kind": "custom",
+      "refersTo": "pl-rail-arrow",
+      "description": "Posición dentro de un carrusel del portal público: escala graduada, contador tabular y las dos flechas, que se apagan en los extremos de verdad.",
+      "html": "<div class=\"ds-rail-controls\"><span class=\"ds-rail-scale\" aria-hidden=\"true\"><button type=\"button\" tabindex=\"-1\" data-on></button><button type=\"button\" tabindex=\"-1\" data-on data-here></button><button type=\"button\" tabindex=\"-1\"></button><button type=\"button\" tabindex=\"-1\"></button><button type=\"button\" tabindex=\"-1\"></button></span><span class=\"ds-rail-count\"><b>2</b><span aria-hidden=\"true\">/</span>5</span><span class=\"ds-rail-arrows\"><button type=\"button\" aria-label=\"Fotografía anterior\"><svg width=\"18\" height=\"18\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M19 12H5\"/><path d=\"M12 19l-7-7 7-7\"/></svg></button><button type=\"button\" aria-label=\"Fotografía siguiente\"><svg width=\"18\" height=\"18\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M5 12h14\"/><path d=\"M12 5l7 7-7 7\"/></svg></button></span></div>",
+      "css": ".ds-rail-controls{display:flex;align-items:center;gap:16px;font-family:var(--font-sans,Manrope,system-ui,sans-serif)}.ds-rail-scale{display:flex;align-items:flex-end;gap:3px;height:18px}.ds-rail-scale button{width:13px;height:9px;padding:0;background:transparent;border:0;border-bottom:2px solid var(--line-strong,rgba(13,40,84,.2));cursor:pointer;transition:border-color 140ms cubic-bezier(.22,.61,.36,1)}.ds-rail-scale button[data-on]{border-bottom-color:var(--brand-blue,#2166d6)}.ds-rail-scale button[data-here]{height:18px;border-bottom-width:3px}.ds-rail-count{color:var(--ink-muted,#6b7c93);font-size:.875rem;font-weight:700;font-variant-numeric:tabular-nums;white-space:nowrap}.ds-rail-count b{color:var(--brand-navy,#0a2d63);font-size:1.05rem}.ds-rail-count span[aria-hidden]{margin:0 3px}.ds-rail-arrows{display:flex;gap:8px}.ds-rail-arrows button{display:grid;place-items:center;width:42px;height:42px;color:var(--brand-navy,#0a2d63);background:var(--surface,#fff);border:1px solid var(--line-strong,rgba(13,40,84,.2));border-radius:50%;cursor:pointer;transition:background 140ms ease,border-color 140ms ease,color 140ms ease}.ds-rail-arrows button:not(:disabled):hover{color:var(--brand-blue-strong,#1b52ad);background:var(--brand-blue-soft,#eaf1fd);border-color:var(--brand-blue,#2166d6)}.ds-rail-arrows button:focus-visible{outline:2px solid var(--brand-blue,#2166d6);outline-offset:2px}.ds-rail-arrows button:active:not(:disabled){transform:scale(.94)}.ds-rail-arrows button:disabled{color:var(--ink-faint,#93a2b6);border-color:var(--line,rgba(13,40,84,.11));cursor:default}"
+    },
+    {
+      "name": "Tarjeta de persona",
+      "kind": "card",
+      "refersTo": "pl-person-card",
+      "description": "El equipo en el portal público: la misma tarjeta en el carril de la portada y en la rejilla de /equipo. Sin ficha detrás no es un botón.",
+      "html": "<button type=\"button\" class=\"ds-person\" aria-expanded=\"false\"><span class=\"ds-person__photo\"><span aria-hidden=\"true\">MP</span></span><span class=\"ds-person__text\"><b>Miguel Oswaldo Pérez Pulido</b><small>Director de Planeación Institucional</small><span class=\"ds-person__area\">Plan de Desarrollo</span><span class=\"ds-person__focus\">Coordina la formulación y el seguimiento del Plan de Desarrollo con las facultades y los campus.</span></span><span class=\"ds-person__more\">Ver la ficha <svg width=\"15\" height=\"15\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M6 9l6 6 6-6\"/></svg></span></button>",
+      "css": ".ds-person{display:grid;grid-template-rows:auto 1fr auto;width:236px;padding:0;overflow:hidden;color:inherit;text-align:left;background:var(--surface,#fff);border:1px solid var(--line,rgba(13,40,84,.11));border-radius:18px;font-family:var(--font-sans,Manrope,system-ui,sans-serif);cursor:pointer;transition:transform 220ms cubic-bezier(.22,.61,.36,1),box-shadow 220ms cubic-bezier(.22,.61,.36,1),border-color 140ms ease}.ds-person:hover{transform:translateY(-3px);box-shadow:0 16px 34px rgba(10,45,99,.14)}.ds-person:focus-visible{outline:2px solid var(--brand-blue,#2166d6);outline-offset:2px}.ds-person[aria-expanded=true]{border-color:var(--brand-blue,#2166d6);box-shadow:0 0 0 1px var(--brand-blue,#2166d6)}.ds-person__photo{display:grid;place-items:center;aspect-ratio:4/5;overflow:hidden;background:var(--brand-blue-soft,#eaf1fd)}.ds-person__photo>span{color:var(--brand-navy,#0a2d63);font-family:var(--font-display,Fraunces,Georgia,serif);font-size:2.4rem;font-weight:600}.ds-person__text{display:grid;align-content:start;gap:3px;padding:16px 16px 12px}.ds-person__text b{color:var(--ink,#0d1c31);font-size:1.02rem;font-weight:800;line-height:1.25}.ds-person__text small{color:var(--ink-secondary,#45566d);font-size:.875rem;font-weight:600}.ds-person__area{justify-self:start;margin-top:4px;padding:3px 9px;color:var(--brand-navy,#0a2d63);background:var(--brand-blue-soft,#eaf1fd);border-radius:999px;font-size:.7rem;font-weight:800}.ds-person__focus{display:-webkit-box;margin-top:4px;overflow:hidden;color:var(--ink-muted,#6b7c93);font-size:.875rem;line-height:1.45;-webkit-box-orient:vertical;-webkit-line-clamp:3}.ds-person__more{display:flex;align-items:center;gap:5px;padding:0 16px 16px;color:var(--brand-blue-strong,#1b52ad);font-size:.75rem;font-weight:800}.ds-person__more svg{transition:transform 220ms cubic-bezier(.22,.61,.36,1)}.ds-person[aria-expanded=true] .ds-person__more svg{transform:rotate(180deg)}"
     }
   ],
   "narrative": {
@@ -935,6 +951,31 @@
         "name": "The Tinted Shadow Rule",
         "body": "Una sombra en tema claro se tiñe de azul marino (rgba 10,34,73) y se apila en dos capas. Una sombra gris neutra de un solo desenfoque no pertenece a este sistema.",
         "section": "elevation"
+      },
+      {
+        "name": "The Graduated Position Rule",
+        "body": "La posición dentro de un carril se lee en una escala graduada —marcas de 13px que se encienden en azul institucional hasta la actual, y la actual el doble de alta y más gruesa— acompañada del contador «n / total» en numerales tabulares. No son puntos: la escala habla el lenguaje del plano del encabezado y el contador dice cuántos quedan sin obligar a contar marcas. La escala es un duplicado de las flechas, así que no recibe el tabulador; quien navega con el teclado no tiene por qué recorrer siete marcas para llegar al bloque siguiente.",
+        "section": "components"
+      },
+      {
+        "name": "The Measured Edge Rule",
+        "body": "«Anterior» y «siguiente» se apagan midiendo el desplazamiento real del carril (scrollLeft contra scrollWidth − clientWidth, con 2px de holgura), nunca contando elementos. En un carril donde caben cinco tarjetas de siete, el último elemento nunca llega a ser el anclado: contando, la flecha de «siguiente» se queda encendida para siempre al final de la lista. Una flecha encendida promete recorrido.",
+        "section": "components"
+      },
+      {
+        "name": "The Reader Advances Rule",
+        "body": "Ningún carril avanza solo. Un carrusel que se mueve por su cuenta roba el pie a quien lee despacio y obliga a perseguir el botón a quien navega con el teclado; aquí avanza quien mira. Con prefers-reduced-motion, el salto de una posición a otra es instantáneo en lugar de suave.",
+        "section": "components"
+      },
+      {
+        "name": "The File Opens In Place Rule",
+        "body": "La ficha de una persona se abre dentro de la página, bajo el carril o la rejilla, nunca en una ventana emergente: no es una tarea que haya que interrumpir. Así el resto del equipo sigue a la vista, se pasa de una persona a la siguiente sin cerrar nada, y en el móvil el detalle aparece bajo la tarjeta que se tocó en lugar de tapar la pantalla.",
+        "section": "components"
+      },
+      {
+        "name": "The Inert Preview Rule",
+        "body": "Una vista previa es una imagen de la página, no la página: la copia lleva inert y aria-hidden, así que sus botones y enlaces no reciben el foco ni el tabulador y no entran en el árbol de accesibilidad. Un carrusel de mentira robando la tecla Tab en mitad de un formulario es exactamente la clase de detalle que hace desconfiar de una vista previa.",
+        "section": "components"
       }
     ],
     "dos": [
@@ -945,7 +986,11 @@
       "**Do** keep one primary action per work area, top right, in brand-blue.",
       "**Do** confirm destructive or visibility-changing actions inline, naming the consequence.",
       "**Do** keep wide tables, grids, and maps scrolling inside their own frame; the page body never scrolls horizontally.",
-      "**Do** set SVG chart colors through `style` with `var()`, not presentation attributes."
+      "**Do** set SVG chart colors through `style` with `var()`, not presentation attributes.",
+      "**Do** scroll a carousel for real (`overflow-x: auto` + `scroll-snap`), and measure its edges from `scrollLeft` against `scrollWidth − clientWidth`, never by counting items.",
+      "**Do** show a rail's position with the graduated scale plus the tabular `n / total` counter, and keep the scale out of the tab order.",
+      "**Do** let a band vanish when it has nothing to show: no gallery without photos, no team band without people, no frame promising a picture nobody uploaded.",
+      "**Do** build an in-app preview from the real public components at measured scale, and mark the copy `inert`."
     ],
     "donts": [
       "**Don't** reuse status green, amber, or red as a data series or decoration.",
@@ -953,7 +998,10 @@
       "**Don't** show money figures on any public page.",
       "**Don't** rest destructive links in red; red arrives on hover, focus, and confirmation.",
       "**Don't** cycle categorical hues or generate a ninth line color; fold extras into \"Otros\".",
-      "**Don't** add a thick colored side stripe to cards to signal category; category identity comes from the two-letter code and its line badge."
+      "**Don't** add a thick colored side stripe to cards to signal category; category identity comes from the two-letter code and its line badge.",
+      "**Don't** mark a carousel's position with dots, and don't advance it on its own; the reader advances it.",
+      "**Don't** draw a preview as a diagram of boxes, and never let its controls take focus or the Tab key.",
+      "**Don't** make a card a button when there is nothing behind it; a person with no file is a card, not a control that leads nowhere."
     ]
   }
 }

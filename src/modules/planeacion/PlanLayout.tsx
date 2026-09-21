@@ -10,10 +10,13 @@ import { useEffect } from "react";
 import type { ReactNode } from "react";
 import { Link } from "react-router-dom";
 import { SiteHeader } from "../../components/layout/SiteHeader";
-import { OFFICE } from "./content";
+import { useOfficePage } from "./page";
 import "./planeacion.css";
 
 export function PlanLayout({ title, children, onSearch }: { title: string; children: ReactNode; onSearch?: () => void }) {
+  const { page } = useOfficePage();
+  const office = page.office;
+
   useEffect(() => {
     document.title = title;
   }, [title]);
@@ -31,9 +34,10 @@ export function PlanLayout({ title, children, onSearch }: { title: string; child
         <div className="pl-container pl-footer__grid">
           <div className="pl-footer__brand">
             <img src="/logo-udes.svg" alt="Universidad de Santander" width={112} height={40} />
-            <strong>{OFFICE.name}</strong>
-            {OFFICE.address && <span>{OFFICE.address}</span>}
-            <a href={`mailto:${OFFICE.email}`}>{OFFICE.email}</a>
+            <strong>{office.name}</strong>
+            {office.address && <span>{office.address}</span>}
+            {office.phone && <a href={`tel:${office.phone.replace(/\s+/g, "")}`}>{office.phone}</a>}
+            <a href={`mailto:${office.email}`}>{office.email}</a>
           </div>
           <nav aria-label="Portales">
             <strong>Portales</strong>
@@ -50,7 +54,7 @@ export function PlanLayout({ title, children, onSearch }: { title: string; child
             <Link to="/acceso-intranet">Intranet</Link>
           </nav>
           <small className="pl-footer__legal">
-            © {new Date().getFullYear()} {OFFICE.university} · {OFFICE.name}
+            © {new Date().getFullYear()} {office.university} · {office.name}
           </small>
         </div>
       </footer>

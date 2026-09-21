@@ -29,6 +29,7 @@ const ROLES: AppRole[] = ["consulta", "responsable", "planeacion", "admin"];
 
 /** Las pantallas del menú, en el orden en que aparecen en él. */
 export const SCREEN_GROUPS: { label: string; screens: { id: AdminScreen; label: string }[] }[] = [
+  { label: "Portal de Planeación", screens: [{ id: "office", label: "Página de la oficina" }] },
   {
     label: "Plan de Desarrollo",
     screens: [

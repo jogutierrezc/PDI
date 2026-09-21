@@ -3,7 +3,13 @@
 
    Lo que la oficina dice de sí misma: su propósito, sus áreas, su equipo y sus
    accesos. Las cifras no viven aquí: salen de UDES en Cifras, del PDI y del
-   Observatorio. Se edita en este archivo.
+   Observatorio.
+
+   Desde la migración 0050 esto se edita en la intranet («Página de la
+   oficina») y se guarda en la base. Este archivo no desapareció: es el valor
+   por defecto —el que ve el portal mientras la oficina no haya publicado nada,
+   o si la base no responde—. Cambiar algo aquí sigue funcionando, pero exige
+   un despliegue; cambiarlo en la intranet, no.
 
    Equipo: una persona solo se publica cuando tiene nombre. Mientras la lista
    esté vacía, la página del equipo muestra las áreas de la oficina y el
@@ -69,6 +75,14 @@ export interface TeamMember {
   email?: string;
   /** Ruta de la foto en /public. Sin ella, iniciales. */
   photo?: string;
+  /** Una línea: en qué anda ahora. Se lee sin abrir la ficha. */
+  focus?: string;
+  /** El párrafo de la ficha ampliada. */
+  bio?: string;
+  /** Formación, una línea por título. */
+  education?: string[];
+  /** Perfiles públicos: ORCID, CvLAC, LinkedIn… */
+  links?: { label: string; url: string }[];
 }
 
 /** Se llena con los datos oficiales del equipo. Sin nombre, no se publica. */

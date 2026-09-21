@@ -8,8 +8,14 @@
       portal —el video y el tablero de UDES en Cifras, los pilares del PDI con
       su avance real, las portadas de los boletines, las áreas de la oficina,
       los catorce temas del Observatorio—, no tarjetas iguales.
-   3. Lo más reciente: lo que se ha publicado, con su fecha, sin redactar nada.
-   4. La oficina: propósito y accesos.
+   3. La galería de la oficina: las fotografías que sube Planeación.
+   4. Lo más reciente: lo que se ha publicado, con su fecha, sin redactar nada.
+   5. El equipo: quién lo hace, con su ficha ampliada.
+   6. La oficina: propósito y accesos.
+
+   Lo editorial —titulares, fotografías, equipo, áreas y accesos— ya no vive en
+   el código: se edita en la intranet («Página de la oficina») y llega aquí
+   publicado. Sin nada publicado, el portal usa los valores de content.ts.
 
    Colores: la escala azul UDES hace todo el trabajo; el ámbar de UDES en
    Cifras solo aparece en su bloque. Nada de cifras de dinero.
@@ -25,13 +31,17 @@ import { formatValue, useOpenDataCatalog } from "../datos-abiertos/data/open-dat
 import { OBS_TOPICS } from "../datos-abiertos/observatorio/data";
 import { useObservatoryLive } from "../datos-abiertos/observatorio/live";
 import { usePublicBulletins } from "../boletin/data";
-import { AREAS, OFFICE, OFFICE_LINKS, TEAM } from "./content";
+import { OfficeGallery } from "./OfficeGallery";
+import { useOfficePage } from "./page";
+import type { OfficeAreaItem, TeamPerson } from "./page";
 import { PlanLayout } from "./PlanLayout";
 import { SiteSearch } from "./SiteSearch";
+import { TeamCarousel } from "./TeamCarousel";
 
 export function PlaneacionHome() {
   const searchInput = useRef<HTMLInputElement>(null);
   const location = useLocation();
+  const { page } = useOfficePage();
 
   const focusSearch = () => {
     document.getElementById("buscar")?.scrollIntoView({ behavior: "smooth", block: "start" });
@@ -46,10 +56,8 @@ export function PlaneacionHome() {
       <section className="pl-hero" id="buscar" aria-labelledby="pl-titulo">
         <Blueprint />
         <div className="pl-container pl-hero__inner">
-          <h1 id="pl-titulo">La universidad, medida y planeada a la vista de todos.</h1>
-          <p className="pl-hero__lede">
-            Planeación Institucional reúne el Plan de Desarrollo, las cifras oficiales de la UDES, el Observatorio de Analítica y los boletines en un solo lugar.
-          </p>
+          <h1 id="pl-titulo">{page.home.title}</h1>
+          <p className="pl-hero__lede">{page.home.lede}</p>
           <SiteSearch inputRef={searchInput} />
         </div>
       </section>
@@ -57,34 +65,43 @@ export function PlaneacionHome() {
       <section className="pl-section pl-portals" aria-labelledby="pl-portales">
         <div className="pl-container">
           <div className="pl-section__head">
-            <h2 id="pl-portales">Nuestros portales</h2>
-            <p>Cada portal responde una pregunta distinta sobre la universidad. Todos se alimentan desde la intranet de Planeación.</p>
+            <h2 id="pl-portales">{page.home.portalsTitle}</h2>
+            <p>{page.home.portalsLede}</p>
           </div>
           <div className="pl-mosaic">
             <CifrasTile />
             <PdiTile />
             <BulletinsTile />
-            <TeamTile />
+            <TeamTile areas={page.areas} people={page.team.people} />
             <ObservatoryTile />
           </div>
         </div>
       </section>
 
+      <OfficeGallery title={page.gallery.title} lede={page.gallery.lede} slides={page.gallery.slides} />
+
       <Recent />
+
+      <TeamCarousel
+        title={page.team.title}
+        lede={page.team.lede}
+        people={page.team.people}
+        areas={page.areas}
+      />
 
       <section className="pl-section" aria-labelledby="pl-oficina">
         <div className="pl-container">
           <div className="pl-office">
             <div className="pl-office__text">
-              <h2 id="pl-oficina">Planear con datos, rendir cuentas con ellos.</h2>
-              <p>{OFFICE.purpose}</p>
+              <h2 id="pl-oficina">{page.home.closingTitle}</h2>
+              <p>{page.office.purpose}</p>
               <Link className="pl-link" to="/equipo">
                 Conocer la oficina <Icon name="arrow-right" size={16} />
               </Link>
             </div>
             <ul className="pl-office__links">
-              {OFFICE_LINKS.map((item) => (
-                <li key={item.to}>
+              {page.links.map((item) => (
+                <li key={item.id}>
                   <Link to={item.to}>
                     <span>{item.label}</span>
                     <small>{item.hint}</small>
@@ -315,8 +332,7 @@ function BulletinsTile() {
   );
 }
 
-function TeamTile() {
-  const people = TEAM.filter((p) => p.name.trim());
+function TeamTile({ areas, people }: { areas: OfficeAreaItem[]; people: TeamPerson[] }) {
   return (
     <article className="pl-tile pl-tile--team">
       <h3>
@@ -325,11 +341,13 @@ function TeamTile() {
         </Link>
       </h3>
       <p>Quiénes planean, miden y acompañan a cada oficina, y cómo escribirles.</p>
-      <ul className="pl-areas" aria-label="Áreas de la oficina">
-        {AREAS.map((a) => (
-          <li key={a.id}>{a.name}</li>
-        ))}
-      </ul>
+      {areas.length > 0 && (
+        <ul className="pl-areas" aria-label="Áreas de la oficina">
+          {areas.map((a) => (
+            <li key={a.id}>{a.name}</li>
+          ))}
+        </ul>
+      )}
       <span className="pl-cta" aria-hidden="true">
         {people.length ? `Conocer a las ${people.length} personas` : "Conocer la oficina"} <Icon name="arrow-right" size={16} />
       </span>

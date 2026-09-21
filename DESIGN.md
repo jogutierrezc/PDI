@@ -191,6 +191,22 @@ components:
     textColor: "{colors.brand-navy}"
     rounded: "{rounded.pill}"
     size: "42px"
+  dc-volume:
+    backgroundColor: "{colors.surface}"
+    textColor: "{colors.ink}"
+    rounded: "6px 16px 16px 6px"
+  dc-volume-dimmed:
+    backgroundColor: "{colors.surface-2}"
+    textColor: "{colors.ink-secondary}"
+  dc-year-chip:
+    backgroundColor: "{colors.surface}"
+    textColor: "{colors.ink-secondary}"
+    rounded: "{rounded.pill}"
+    padding: "7px 14px"
+  dc-year-chip-active:
+    backgroundColor: "{colors.brand-blue}"
+    textColor: "{colors.surface}"
+    rounded: "{rounded.pill}"
 ---
 
 # Design System: PDI UDES · Portal, Intranet y UDES en Cifras

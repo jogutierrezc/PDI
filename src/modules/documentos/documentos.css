@@ -40,7 +40,7 @@
   font-size: 1.02rem;
 }
 
-.dc-search__field input::placeholder { color: #6b7c93; }
+.dc-search__field input::placeholder { color: #5a6b82; }
 .dc-search__field input:focus-visible { outline: none; }
 .dc-search__field input::-webkit-search-cancel-button { cursor: pointer; }
 
@@ -67,14 +67,55 @@
 .dc-years button:hover { color: var(--brand-blue-strong); border-color: var(--brand-blue); }
 .dc-years button[aria-pressed="true"] { color: #ffffff; background: var(--brand-blue); border-color: var(--brand-blue); }
 
-.dc-years--column { flex-direction: column; align-items: stretch; }
-.dc-years--column button { text-align: left; }
+/* En la columna del tomo abierto siguen siendo fichas y se reparten en varias
+   líneas: estirarlas al ancho las convertía en botones principales y pesaban
+   más que el índice al que filtran. */
+.dc-open__years h2,
+.dc-parts h2 {
+  margin: 0 0 var(--space-3);
+  color: var(--ink-muted);
+  font-family: var(--font-sans);
+  font-size: var(--text-xs);
+  font-weight: 800;
+  letter-spacing: 0;
+}
+
+/* --- Las secciones del tomo -------------------------------------------------- */
+
+.dc-parts ul { display: grid; gap: 2px; margin: 0; padding: 0; list-style: none; }
+
+.dc-parts a {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding: var(--space-2) var(--space-3);
+  color: var(--ink-secondary);
+  border-radius: var(--radius-xs);
+  font-size: var(--text-base);
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.dc-parts a b { color: var(--ink-muted); font-size: var(--text-sm); font-variant-numeric: tabular-nums; }
+.dc-parts a:hover { color: var(--brand-blue-strong); background: var(--surface); }
+
+/* Lo elegido se marca igual en toda la columna —relleno azul y tinta blanca,
+   como la ficha del año activo—: la franja lateral de color era una segunda
+   gramática de selección a cuarenta píxeles de la primera. */
+.dc-parts a[aria-current="page"] {
+  color: #ffffff;
+  background: var(--brand-blue);
+}
+
+.dc-parts a[aria-current="page"]:hover { color: #ffffff; background: var(--brand-blue-strong); }
+.dc-parts a[aria-current="page"] b { color: rgba(255, 255, 255, 0.82); }
 
 /* --- La estantería ---------------------------------------------------------- */
 
 .dc-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(min(100%, 24rem), 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 19.5rem), 1fr));
   gap: var(--space-6);
   margin: 0;
   padding: 0;
@@ -99,8 +140,23 @@
   transition: transform var(--dur-base) var(--ease-out), box-shadow var(--dur-base) var(--ease-out);
 }
 
-.dc-volume:hover { transform: translateY(-4px); box-shadow: 0 3px 6px rgba(10, 34, 73, 0.09), 0 22px 44px rgba(10, 34, 73, 0.18); }
+.dc-volume:not([data-dimmed]):hover { transform: translateY(-4px); box-shadow: 0 3px 6px rgba(10, 34, 73, 0.09), 0 22px 44px rgba(10, 34, 73, 0.18); }
 .dc-volume:has(:focus-visible) { box-shadow: 0 0 0 3px var(--brand-blue); }
+
+/* Acotar por año no borra tomos: los apaga. La estantería conserva su forma y
+   se ve de un vistazo cuáles no guardan nada de ese año.
+
+   El velo cae sobre la tapa y el lomo, nunca sobre el texto: un título al 55%
+   de opacidad deja de cumplir el contraste mínimo y pasa de apagado a
+   ilegible. Lo que dice que el tomo está apagado es la tapa en gris, el fondo
+   hundido, la sombra que desaparece y el «0 documentos de 2018» del pie. */
+.dc-volume[data-dimmed] { background: var(--surface-2); box-shadow: none; }
+.dc-volume[data-dimmed] .dc-volume__cover { filter: grayscale(1); opacity: 0.45; }
+.dc-volume[data-dimmed] .dc-volume__spine { background: var(--ink-faint); }
+.dc-volume[data-dimmed] .dc-volume__band h3 { color: var(--ink-secondary); }
+.dc-volume__off { color: var(--ink-secondary); font-weight: 600; }
+.dc-volume__sections { color: var(--ink-muted); font-weight: 600; }
+.dc-volume__sections b { color: var(--brand-navy); font-variant-numeric: tabular-nums; }
 
 .dc-volume__spine {
   grid-row: 1 / -1;
@@ -152,7 +208,7 @@
   margin-top: var(--space-1);
 }
 
-.dc-volume__count { color: var(--ink-muted); font-size: var(--text-sm); font-weight: 700; }
+.dc-volume__count { color: var(--ink-secondary); font-size: var(--text-sm); font-weight: 700; }
 .dc-volume__count b { color: var(--brand-navy); font-size: 1.15rem; font-variant-numeric: tabular-nums; }
 .dc-volume__range { font-variant-numeric: tabular-nums; }
 
@@ -201,7 +257,15 @@
 
 /* --- El índice -------------------------------------------------------------- */
 
-.dc-index { display: grid; gap: var(--space-7); }
+.dc-index { display: grid; gap: var(--space-8); }
+
+.dc-part { display: grid; gap: var(--space-6); }
+
+/* La pestaña de la divisoria: manda sobre la marca de año, y se distingue por
+   voz y peso, no solo por tamaño. */
+.dc-part__tab { margin: 0; font-family: var(--font-display); font-size: var(--text-xl); font-weight: 600; line-height: 1.15; }
+.dc-part__tab a { color: var(--brand-navy); text-decoration: none; }
+.dc-part__tab a:hover { color: var(--brand-blue-strong); text-decoration: underline; }
 
 .dc-group { display: grid; gap: 0; }
 
@@ -219,7 +283,7 @@
   letter-spacing: 0;
 }
 
-.dc-group__year::after { content: ""; flex: 1 1 auto; height: 2px; background: var(--brand-navy); }
+.dc-group__year::after { content: ""; flex: 1 1 auto; height: 1px; background: var(--line-strong); }
 
 .dc-entries { margin: 0; padding: 0; list-style: none; }
 
@@ -237,7 +301,7 @@
 
 .dc-entry__body { display: grid; gap: var(--space-2); min-width: 0; }
 
-.dc-entry__body h3 {
+.dc-entry__body h4 {
   display: flex;
   flex-wrap: wrap;
   align-items: baseline;
@@ -250,8 +314,8 @@
   line-height: 1.25;
 }
 
-.dc-entry__body h3 a { color: inherit; text-decoration: none; }
-.dc-entry:hover .dc-entry__body h3 a { color: var(--brand-blue-strong); }
+.dc-entry__body h4 a { color: inherit; text-decoration: none; }
+.dc-entry:hover .dc-entry__body h4 a { color: var(--brand-blue-strong); }
 .dc-entry__body p { margin: 0; max-width: 72ch; color: var(--ink-secondary); font-size: var(--text-base); line-height: 1.55; }
 
 .dc-entry__version {
@@ -276,13 +340,22 @@
   display: inline-flex;
   align-items: center;
   gap: 5px;
-  color: var(--brand-blue-strong);
+  padding: 3px 10px 3px 6px;
+  color: var(--ink-secondary);
+  background: var(--surface-3);
+  border-radius: var(--radius-pill);
   font-size: var(--text-sm);
   font-weight: 700;
+  list-style: none;
   cursor: pointer;
 }
 
-.dc-versions summary:focus-visible { outline: 2px solid var(--brand-blue); outline-offset: 3px; border-radius: 4px; }
+.dc-versions summary::-webkit-details-marker { display: none; }
+.dc-versions summary:hover { color: var(--brand-blue-strong); }
+.dc-versions summary:focus-visible { outline: 2px solid var(--brand-blue); outline-offset: 2px; }
+.dc-versions summary svg { transition: transform var(--dur-base) var(--ease-out); }
+.dc-versions[open] summary { color: var(--brand-navy); }
+.dc-versions[open] summary svg { transform: rotate(180deg); }
 
 .dc-versions ul {
   display: grid;
@@ -351,6 +424,7 @@
 @media (prefers-reduced-motion: reduce) {
   .dc-volume,
   .dc-entry__go,
+  .dc-versions summary svg,
   .dc-years button { transition: none; }
   .dc-volume:hover { transform: none; }
   .dc-entry:hover .dc-entry__go { transform: none; }

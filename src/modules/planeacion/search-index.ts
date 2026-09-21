@@ -24,7 +24,7 @@ import { OBS_TOPICS } from "../datos-abiertos/observatorio/data";
 import { summarize, useObservatoryLive } from "../datos-abiertos/observatorio/live";
 import { bulletinFileUrl, usePublicBulletins } from "../boletin/data";
 import { useOfficePage } from "./page";
-import { documentHref, documentType, entriesOf, useDocLibrary } from "../documentos/data";
+import { documentHref, documentType, entriesOf, itemsUnder, useDocLibrary } from "../documentos/data";
 
 export type Portal = "cifras" | "observatorio" | "pdi" | "boletines" | "documentos" | "oficina";
 
@@ -230,9 +230,12 @@ export function useSiteIndex() {
       });
     }
 
-    // El repositorio documental: cada colección y cada documento vigente.
-    for (const collection of library.data?.collections ?? []) {
-      const items = library.data?.byCollection.get(collection.id) ?? [];
+    // El repositorio documental: cada colección, cada sección y cada documento
+    // vigente, con la ruta que lleva a su sitio exacto.
+    const shelf = library.data;
+    for (const collection of shelf?.collections ?? []) {
+      const sections = shelf?.sections.get(collection.id) ?? [];
+      const items = shelf ? itemsUnder(collection, shelf) : [];
       out.push({
         id: `dc-${collection.id}`,
         portal: "documentos",
@@ -241,6 +244,17 @@ export function useSiteIndex() {
         to: `/documentos/${collection.slug}`,
         keywords: "coleccion repositorio documental",
       });
+      for (const section of sections) {
+        const own = shelf?.byCollection.get(section.id) ?? [];
+        out.push({
+          id: `ds-${section.id}`,
+          portal: "documentos",
+          title: section.title,
+          hint: [collection.title, `${entriesOf(own).length} documentos`].join(" · "),
+          to: `/documentos/${collection.slug}/${section.slug}`,
+          keywords: `seccion ${section.subtitle} repositorio documental`,
+        });
+      }
       for (const { item } of entriesOf(items)) {
         const href = documentHref(item);
         out.push({

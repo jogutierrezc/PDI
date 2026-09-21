@@ -11,6 +11,10 @@
    Las versiones tampoco son una columna: un documento apunta con `supersedes`
    a la edición que reemplaza, y la vigente es la que nadie reemplaza. Así
    añadir una versión nueva es una fila más, no reescribir la anterior.
+
+   Una sección (migración 0052) es otra fila de la misma tabla con `parent_id`:
+   hereda tapa, estado y permisos sin duplicar nada. Un documento cuelga de la
+   colección o de una de sus secciones, y el lomo del tomo cuenta los dos.
    ========================================================================== */
 
 import { useQuery } from "@tanstack/react-query";
@@ -29,6 +33,8 @@ export type DocKind = "archivo" | "enlace";
 
 export interface DocCollection {
   id: string;
+  /** Nulo en una colección de primer nivel; la madre en una sección. */
+  parentId: string | null;
   slug: string;
   title: string;
   subtitle: string;
@@ -70,6 +76,7 @@ export interface DocEntry {
 
 export interface CollectionRow {
   id: string;
+  parent_id: string | null;
   slug: string;
   title: string;
   subtitle: string;
@@ -103,6 +110,7 @@ export interface ItemRow {
 
 export const collectionFrom = (r: CollectionRow): DocCollection => ({
   id: r.id,
+  parentId: r.parent_id ?? null,
   slug: r.slug,
   title: r.title,
   subtitle: r.subtitle ?? "",
@@ -115,6 +123,7 @@ export const collectionFrom = (r: CollectionRow): DocCollection => ({
 
 export const collectionTo = (c: Omit<DocCollection, "updatedAt">) => ({
   id: c.id,
+  parent_id: c.parentId,
   slug: c.slug,
   title: c.title,
   subtitle: c.subtitle,
@@ -263,12 +272,28 @@ export function documentType(item: DocItem): string {
 const MISSING = new Set(["PGRST205", "42P01"]);
 
 export interface DocLibrary {
+  /** Las colecciones de primer nivel: lo que se ve en la estantería. */
   collections: DocCollection[];
-  /** Todos los documentos visibles, agrupados por colección. */
+  /** Las secciones de cada colección, en su orden. */
+  sections: Map<string, DocCollection[]>;
+  /** Documentos por nodo, sea colección o sección. */
   byCollection: Map<string, DocItem[]>;
   /** Falta la migración: no hay repositorio que enseñar todavía. */
   missing: boolean;
 }
+
+/** Los documentos de una colección y de todas sus secciones. */
+export function itemsUnder(
+  collection: DocCollection,
+  library: { sections: Map<string, DocCollection[]>; byCollection: Map<string, DocItem[]> },
+): DocItem[] {
+  const own = library.byCollection.get(collection.id) ?? [];
+  const nested = (library.sections.get(collection.id) ?? []).flatMap(
+    (section) => library.byCollection.get(section.id) ?? [],
+  );
+  return [...own, ...nested];
+}
+
 
 
 async function fetchLibrary(): Promise<DocLibrary> {
@@ -280,15 +305,27 @@ async function fetchLibrary(): Promise<DocLibrary> {
   const failure = collections.error ?? items.error;
   if (failure) {
     if (MISSING.has(failure.code ?? "")) {
-      return { collections: [], byCollection: new Map(), missing: true };
+      return { collections: [], sections: new Map(), byCollection: new Map(), missing: true };
     }
     throw describeDatabaseError(failure);
   }
 
   // Los filtros van explícitos: una sesión de intranet también puede leer los
   // borradores, y el portal público no debe enseñárselos.
-  const published = (collections.data as CollectionRow[]).map(collectionFrom).filter((c) => c.status === "publicado");
-  const allowed = new Set(published.map((c) => c.id));
+  const all = (collections.data as CollectionRow[]).map(collectionFrom).filter((c) => c.status === "publicado");
+  const roots = all.filter((c) => c.parentId === null);
+  const rootIds = new Set(roots.map((c) => c.id));
+
+  const sections = new Map<string, DocCollection[]>();
+  for (const node of all) {
+    // Una sección cuya madre no esté publicada no entra, aunque ella lo esté.
+    if (node.parentId === null || !rootIds.has(node.parentId)) continue;
+    const list = sections.get(node.parentId);
+    if (list) list.push(node);
+    else sections.set(node.parentId, [node]);
+  }
+
+  const allowed = new Set([...rootIds, ...[...sections.values()].flat().map((s) => s.id)]);
   const byCollection = new Map<string, DocItem[]>();
   for (const row of items.data as ItemRow[]) {
     const item = itemFrom(row);
@@ -298,7 +335,7 @@ async function fetchLibrary(): Promise<DocLibrary> {
     else byCollection.set(item.collectionId, [item]);
   }
 
-  return { collections: published, byCollection, missing: false };
+  return { collections: roots, sections, byCollection, missing: false };
 }
 
 export function useDocLibrary() {

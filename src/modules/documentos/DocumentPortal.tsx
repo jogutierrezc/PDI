@@ -7,8 +7,14 @@
    que es lo que un repositorio le debe a quien busca algo concreto.
 
    El buscador no mira solo los nombres de las colecciones: entra en los
-   documentos. Quien escribe «acta 014» no está buscando una colección, está
-   buscando un papel, y el tomo que lo guarda se lo dice en la banda.
+   documentos —y en los de sus secciones—. Quien escribe «acta 014» no está
+   buscando una colección, está buscando un papel, y el tomo que lo guarda se
+   lo dice en la banda.
+
+   Los dos filtros se comportan distinto a propósito. Buscar deja fuera lo que
+   no responde: es una consulta, y la respuesta es una lista corta. Acotar por
+   año no borra ningún tomo, los apaga: la estantería conserva su forma y se ve
+   de un vistazo cuáles no guardan nada de ese año, que también es información.
    ========================================================================== */
 
 import { useMemo, useState } from "react";
@@ -21,6 +27,7 @@ import {
   documentFileUrl,
   entriesOf,
   fold,
+  itemsUnder,
   useDocLibrary,
   yearRange,
   yearsOf,
@@ -46,22 +53,25 @@ export function DocumentPortal() {
     const needle = fold(query.trim());
     return data.collections
       .map((collection) => {
-        const items = data.byCollection.get(collection.id) ?? [];
+        const sections = data.sections.get(collection.id) ?? [];
+        const items = itemsUnder(collection, data);
         const inYear = year === null ? items : items.filter((item) => coversYear(item, year));
         const matches = needle
           ? inYear.filter((item) => fold(`${item.title} ${item.description}`).includes(needle))
           : [];
+        // El nombre de una sección también responde: quien escribe «acuerdos»
+        // busca esa divisoria, no el tomo que la guarda.
         const titleHit = needle
-          ? fold(`${collection.title} ${collection.subtitle}`).includes(needle)
+          ? [collection, ...sections].some((node) => fold(`${node.title} ${node.subtitle}`).includes(needle))
           : false;
-        return { collection, items: inYear, matches, titleHit };
+        return { collection, sections, items: inYear, range: yearRange(items), matches, titleHit };
       })
-      .filter((row) => {
-        if (year !== null && row.items.length === 0) return false;
-        if (!needle) return true;
-        return row.titleHit || row.matches.length > 0;
-      });
+      // La búsqueda descarta; el año no. Quien acota por año sigue viendo la
+      // estantería entera, con los tomos vacíos apagados.
+      .filter((row) => !needle || row.titleHit || row.matches.length > 0);
   }, [data, query, year]);
+
+  const withSomething = shelf.filter((row) => row.items.length > 0).length;
 
   return (
     <PlanLayout title="Repositorio documental · Planeación Institucional">
@@ -94,7 +104,7 @@ export function DocumentPortal() {
       <section className="pl-section dc-shelf" aria-labelledby="dc-tomos">
         <div className="pl-container">
           <div className="pl-section__head dc-shelf__head">
-            <h2 id="dc-tomos">{query || year !== null ? "Resultados" : "Las colecciones"}</h2>
+            <h2 id="dc-tomos">{query ? "Resultados" : "Las colecciones"}</h2>
             {years.length > 1 && (
               <div className="dc-years" role="group" aria-label="Filtrar por año">
                 <button type="button" aria-pressed={year === null} onClick={() => setYear(null)}>
@@ -134,11 +144,7 @@ export function DocumentPortal() {
           ) : shelf.length === 0 ? (
             <p className="dc-empty">
               <strong>Ningún tomo responde a esa búsqueda.</strong>
-              {year !== null && query
-                ? `No hay documentos de ${year} que digan «${query}».`
-                : year !== null
-                  ? `Ninguna colección guarda documentos de ${year}.`
-                  : `Ningún documento ni colección dice «${query}».`}{" "}
+              {`Ningún documento, sección ni colección dice «${query}».`}{" "}
               <button
                 type="button"
                 className="pl-link"
@@ -151,13 +157,29 @@ export function DocumentPortal() {
               </button>
             </p>
           ) : (
-            <ul className="dc-grid">
-              {shelf.map(({ collection, items, matches }) => (
-                <li key={collection.id}>
-                  <Volume collection={collection} items={items} matches={matches.length} />
-                </li>
-              ))}
-            </ul>
+            <>
+              {year !== null && withSomething === 0 && (
+                <p className="dc-note" role="status">
+                  <Icon name="alert" size={16} />
+                  <span>Ningún tomo guarda documentos de {year}. Todos quedan apagados.</span>
+                </p>
+              )}
+              <ul className="dc-grid">
+                {shelf.map(({ collection, sections, items, range, matches }) => (
+                  <li key={collection.id}>
+                    <Volume
+                      collection={collection}
+                      sections={sections}
+                      items={items}
+                      range={range}
+                      matches={matches.length}
+                      dimmed={year !== null && items.length === 0}
+                      year={year}
+                    />
+                  </li>
+                ))}
+              </ul>
+            </>
           )}
         </div>
       </section>
@@ -169,19 +191,29 @@ export function DocumentPortal() {
 
 function Volume({
   collection,
+  sections,
   items,
+  range,
   matches,
+  dimmed,
+  year,
 }: {
   collection: DocCollection;
+  sections: DocCollection[];
+  /** Los documentos que pasan el filtro de año: de ahí sale el conteo. */
   items: DocItem[];
+  /** El rango del tomo entero, sin filtrar: el lomo no cambia con el filtro. */
+  range: string;
   matches: number;
+  /** El año elegido no encuentra nada aquí: el tomo se queda, apagado. */
+  dimmed: boolean;
+  year: number | null;
 }) {
   const cover = documentFileUrl(collection.cover);
-  const range = yearRange(items);
   const count = entriesOf(items).length;
 
   return (
-    <article className="dc-volume">
+    <article className="dc-volume" data-dimmed={dimmed || undefined}>
       <span className="dc-volume__spine" aria-hidden="true">
         <b>{range || "—"}</b>
       </span>
@@ -196,15 +228,27 @@ function Volume({
 
       <span className="dc-volume__band">
         <h3>
-          <Link className="pl-stretch" to={`/documentos/${collection.slug}`}>
-            {collection.title}
-          </Link>
+          {/* Un tomo apagado no se enlaza: el clic no llevaría a nada de ese año. */}
+          {dimmed ? (
+            collection.title
+          ) : (
+            <Link className="pl-stretch" to={`/documentos/${collection.slug}`}>
+              {collection.title}
+            </Link>
+          )}
         </h3>
         {collection.subtitle && <p>{collection.subtitle}</p>}
         <span className="dc-volume__foot">
+          {/* El lomo ya dice los años: la banda cuenta lo que el lomo no puede. */}
           <span className="dc-volume__count">
             <b>{count}</b> {count === 1 ? "documento" : "documentos"}
-            {range && <span className="dc-volume__range"> · {range}</span>}
+            {dimmed && year !== null && <span className="dc-volume__off"> de {year}</span>}
+            {sections.length > 0 && (
+              <span className="dc-volume__sections">
+                {" en "}
+                <b>{sections.length}</b> {sections.length === 1 ? "sección" : "secciones"}
+              </span>
+            )}
           </span>
           {matches > 0 && (
             <span className="dc-volume__match">

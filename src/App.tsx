@@ -189,7 +189,7 @@ export default function App() {
           <Route path="/datos-abiertos/:slug" element={<OpenDataReport />} />
           {/* El repositorio documental e histórico de la oficina. */}
           <Route path="/documentos" element={<DocumentPortal />} />
-          <Route path="/documentos/:slug" element={<CollectionPage />} />
+          <Route path="/documentos/:slug/:section?" element={<CollectionPage />} />
           <Route path="/acceso-intranet" element={<LoginPortal />} />
 
           {/* La portada de Planeación y la página del equipo, escritas desde la intranet. */}

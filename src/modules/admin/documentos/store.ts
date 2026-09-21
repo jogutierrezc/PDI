@@ -10,6 +10,9 @@
    El archivo se sube en cuanto se elige, no al guardar: así la fila nace con
    su peso y su tipo ya medidos, y quien carga escribe el título mirando el
    documento, no recordándolo.
+
+   La intranet ve el árbol entero —colecciones, sus secciones y los borradores
+   de ambas—, a diferencia del portal, que solo recibe lo publicado.
    ========================================================================== */
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -30,7 +33,11 @@ export const docAdminKey = ["documentos-admin"] as const;
 const MISSING = new Set(["PGRST205", "42P01"]);
 
 export interface DocAdminState {
+  /** Las colecciones de primer nivel. */
   collections: DocCollection[];
+  /** Las secciones de cada colección, en su orden. */
+  sections: Map<string, DocCollection[]>;
+  /** Documentos por nodo, sea colección o sección. */
   byCollection: Map<string, DocItem[]>;
   /** Falta la migración 0051: se puede mirar, no guardar. */
   missing: boolean;
@@ -45,7 +52,7 @@ async function fetchAdmin(): Promise<DocAdminState> {
   const failure = collections.error ?? items.error;
   if (failure) {
     if (MISSING.has(failure.code ?? "")) {
-      return { collections: [], byCollection: new Map(), missing: true };
+      return { collections: [], sections: new Map(), byCollection: new Map(), missing: true };
     }
     throw describeDatabaseError(failure);
   }
@@ -58,8 +65,18 @@ async function fetchAdmin(): Promise<DocAdminState> {
     else byCollection.set(item.collectionId, [item]);
   }
 
+  const all = (collections.data as CollectionRow[]).map(collectionFrom);
+  const sections = new Map<string, DocCollection[]>();
+  for (const node of all) {
+    if (node.parentId === null) continue;
+    const list = sections.get(node.parentId);
+    if (list) list.push(node);
+    else sections.set(node.parentId, [node]);
+  }
+
   return {
-    collections: (collections.data as CollectionRow[]).map(collectionFrom),
+    collections: all.filter((node) => node.parentId === null),
+    sections,
     byCollection,
     missing: false,
   };
@@ -95,12 +112,21 @@ export function useRemoveCollection() {
   const refresh = useRefresh();
   return useMutation({
     mutationFn: async (collection: DocCollection) => {
-      // Los documentos caen con la colección (on delete cascade); sus archivos
-      // no, así que se borran aquí antes de perder las rutas.
-      const { data } = await supabase.from("doc_items").select("path").eq("collection_id", collection.id);
+      // Las secciones y los documentos caen con la colección (on delete
+      // cascade); sus archivos no, así que se recogen aquí antes de perder las
+      // rutas —los de la colección y los de cada una de sus secciones—.
+      const { data: children } = await supabase
+        .from("doc_collections")
+        .select("id,cover")
+        .eq("parent_id", collection.id);
+      const nodes = (children ?? []) as { id: string; cover: string | null }[];
+      const ids = [collection.id, ...nodes.map((node) => node.id)];
+
+      const { data } = await supabase.from("doc_items").select("path").in("collection_id", ids);
       const paths = ((data ?? []) as { path: string | null }[])
         .map((row) => row.path)
         .filter((path): path is string => Boolean(path));
+      for (const node of nodes) if (node.cover) paths.push(node.cover);
       if (collection.cover) paths.push(collection.cover);
 
       const { error } = await supabase.from("doc_collections").delete().eq("id", collection.id);

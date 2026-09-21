@@ -127,7 +127,7 @@ export function ItemRows({
       title={rows.length ? `${rows.length} ${rows.length === 1 ? "documento" : "documentos"}` : "Documentos"}
       description={
         rows.length
-          ? `${published} publicados. El orden de la lista ordena el índice dentro de cada año.`
+          ? `${published} ${published === 1 ? "publicado" : "publicados"}. Dentro de cada año, el índice del portal sigue este orden.`
           : "Sube archivos al repositorio o añade enlaces a documentos que viven fuera."
       }
       actions={
@@ -142,7 +142,7 @@ export function ItemRows({
               onChange={(event) => void addFiles(event.target.files)}
             />
             <button type="button" className="button-secondary" onClick={addLink}>
-              <Icon name="external" size={15} /> Añadir un enlace
+              <Icon name="external" size={15} /> Añadir enlace
             </button>
             <button
               type="button"

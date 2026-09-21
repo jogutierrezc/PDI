@@ -2,8 +2,13 @@
    Intranet · Documentos.
 
    El repositorio documental e histórico de la oficina, visto desde dentro: a
-   la izquierda la lista de colecciones con su estado y su conteo, a la derecha
-   la colección elegida —su tapa y sus datos arriba, sus documentos debajo—.
+   la izquierda la lista de colecciones —con sus secciones colgando de cada
+   una— y a la derecha la elegida: su tapa y sus datos arriba, sus documentos
+   debajo.
+
+   Una sección es otra colección con madre, así que se edita con el mismo
+   formulario. Solo hay un nivel, y lo impide la base: una sección no puede
+   tener secciones.
 
    No hay asistente de estaciones aquí, y es deliberado: cargar un repositorio
    no es un proceso con principio y final como cerrar un periodo, son visitas
@@ -20,7 +25,7 @@ import { ErrorBlock, LoadingBlock } from "../../../components/ui/QueryState";
 import { useAuth } from "../../../lib/auth";
 import { AdminShell, ReadOnlyNotice } from "../components/AdminShell";
 import { ConfirmButton, Panel, slugify } from "../udes-en-cifras/ui";
-import { documentFileUrl, entriesOf, yearRange } from "../../documentos/data";
+import { documentFileUrl, entriesOf, itemsUnder, yearRange } from "../../documentos/data";
 import type { DocCollection, DocItem } from "../../documentos/data";
 import { ItemRows } from "./ItemRows";
 import {
@@ -35,9 +40,11 @@ import {
 import "../udes-en-cifras/od-admin.css";
 import "./documents-admin.css";
 
-/** Una colección nueva, todavía sin identificador de la base. */
-const blankCollection = (position: number): Omit<DocCollection, "updatedAt"> => ({
+/** Una colección nueva, todavía sin identificador de la base. Con `parent`
+ *  nace como sección de esa colección. */
+const blankCollection = (position: number, parent: string | null = null): Omit<DocCollection, "updatedAt"> => ({
   id: crypto.randomUUID(),
+  parentId: parent,
   slug: "",
   title: "",
   subtitle: "",
@@ -63,8 +70,15 @@ export function DocumentsAdmin() {
   const canEdit = hasRole("planeacion") && !state?.missing;
 
   const collections = state?.collections ?? [];
-  const current = draft ?? collections.find((c) => c.slug === slug) ?? collections[0] ?? null;
+  const sections = state?.sections ?? new Map<string, DocCollection[]>();
+  /** Colecciones y secciones en una sola lista: el slug de la ruta busca aquí. */
+  const nodes = [...collections, ...[...sections.values()].flat()];
+  const current = draft ?? nodes.find((c) => c.slug === slug) ?? collections[0] ?? null;
   const items = current && !draft ? (state?.byCollection.get(current.id) ?? []) : [];
+  /** La colección madre cuando lo elegido es una sección. */
+  const parent = current?.parentId ? (collections.find((c) => c.id === current.parentId) ?? null) : null;
+  /** De qué colección colgaría una sección nueva: de la elegida, o de su madre. */
+  const sectionHome = current ? (current.parentId ? parent : current) : null;
 
   useEffect(() => {
     if (!notice) return;
@@ -77,17 +91,33 @@ export function DocumentsAdmin() {
     setError("");
   }
 
+  function startSection() {
+    if (!sectionHome) return;
+    setDraft(blankCollection((sections.get(sectionHome.id)?.length ?? 0) + 1, sectionHome.id));
+    setError("");
+  }
+
   return (
     <AdminShell
       section="documents"
       kicker="Documentos"
-      title={current ? current.title || "Colección nueva" : "Repositorio documental"}
-      description="Las colecciones del portal Documentos, con sus archivos y enlaces. Cada fila decide por su cuenta si está publicada."
+      title={current ? current.title || (draft?.parentId ? "Sección nueva" : "Colección nueva") : "Repositorio documental"}
+      description="Las colecciones del portal Documentos, sus secciones y los archivos y enlaces que guardan. Cada fila decide por su cuenta si está publicada."
       actions={
         <>
           <a className="button-secondary" href="/documentos" target="_blank" rel="noopener noreferrer">
             <Icon name="external" size={15} /> Ver el portal
           </a>
+          {canEdit && sectionHome && !draft && (
+            <button
+              className="button-secondary"
+              type="button"
+              onClick={startSection}
+              title={`Nueva sección en «${sectionHome.title}»`}
+            >
+              <Icon name="plus" size={15} /> Nueva sección
+            </button>
+          )}
           {canEdit && (
             <button className="button-primary" type="button" onClick={startNew}>
               <Icon name="plus" size={16} /> Nueva colección
@@ -135,6 +165,7 @@ export function DocumentsAdmin() {
         <div className="oda-workspace doc-workspace">
           <CollectionRail
             collections={collections}
+            sections={sections}
             counts={state?.byCollection ?? new Map()}
             active={current?.id ?? null}
             draft={draft}
@@ -159,7 +190,10 @@ export function DocumentsAdmin() {
                   key={current.id}
                   collection={current}
                   isNew={Boolean(draft)}
-                  existing={collections}
+                  parent={parent ?? (draft?.parentId ? (collections.find((c) => c.id === draft.parentId) ?? null) : null)}
+                  roots={collections}
+                  existing={nodes}
+                  sections={current.parentId ? [] : (sections.get(current.id) ?? [])}
                   items={items}
                   canEdit={canEdit}
                   notify={setNotice}
@@ -206,25 +240,30 @@ export function DocumentsAdmin() {
 
 function CollectionRail({
   collections,
+  sections,
   counts,
   active,
   draft,
   onPick,
 }: {
   collections: DocCollection[];
+  sections: Map<string, DocCollection[]>;
   counts: Map<string, DocItem[]>;
   active: string | null;
   draft: Omit<DocCollection, "updatedAt"> | null;
   onPick: (collection: DocCollection) => void;
 }) {
   const published = collections.filter((c) => c.status === "publicado").length;
+  const sectionCount = [...sections.values()].flat().length;
   return (
     <aside className="oda-rail doc-rail" aria-label="Colecciones del repositorio">
       <div className="oda-rail__head">
         <strong>
           {collections.length} {collections.length === 1 ? "colección" : "colecciones"}
         </strong>
-        <span className="doc-rail__legend">{published} publicadas</span>
+        <span className="doc-rail__legend">
+          {published} publicadas{sectionCount > 0 ? ` · ${sectionCount} secciones` : ""}
+        </span>
       </div>
       <ul>
         {draft && (
@@ -241,9 +280,11 @@ function CollectionRail({
           </li>
         )}
         {collections.map((collection) => {
-          const items = counts.get(collection.id) ?? [];
+          const own = counts.get(collection.id) ?? [];
+          const all = itemsUnder(collection, { sections, byCollection: counts });
           const cover = documentFileUrl(collection.cover);
-          const range = yearRange(items);
+          const range = yearRange(all);
+          const children = sections.get(collection.id) ?? [];
           return (
             <li key={collection.id}>
               <button
@@ -266,10 +307,45 @@ function CollectionRail({
                     {range ? ` · ${range}` : ""}
                   </small>
                 </span>
-                <span className="doc-rail__count" aria-label={`${entriesOf(items).length} documentos`}>
-                  {entriesOf(items).length}
+                <span className="doc-rail__count" aria-label={`${entriesOf(all).length} documentos en total`}>
+                  {entriesOf(all).length}
                 </span>
               </button>
+
+              {children.length > 0 && (
+                <ul className="doc-rail__sections">
+                  {children.map((child) => {
+                    const childItems = counts.get(child.id) ?? [];
+                    return (
+                      <li key={child.id}>
+                        <button
+                          type="button"
+                          className="oda-rail__item doc-rail__item doc-rail__item--section"
+                          aria-current={!draft && child.id === active ? "true" : undefined}
+                          onClick={() => onPick(child)}
+                        >
+                          <span className="oda-rail__name">
+                            {child.title}
+                            <small>{child.status === "publicado" ? "Publicada" : "Borrador"}</small>
+                          </span>
+                          <span
+                            className="doc-rail__count"
+                            aria-label={`${entriesOf(childItems).length} documentos`}
+                          >
+                            {entriesOf(childItems).length}
+                          </span>
+                        </button>
+                      </li>
+                    );
+                  })}
+                </ul>
+              )}
+              {/* Los documentos sueltos del tomo, cuando además tiene secciones. */}
+              {children.length > 0 && own.length > 0 && (
+                <p className="doc-rail__loose">
+                  {entriesOf(own).length} sin sección
+                </p>
+              )}
             </li>
           );
         })}
@@ -283,7 +359,10 @@ function CollectionRail({
 function CollectionForm({
   collection,
   isNew,
+  parent,
+  roots,
   existing,
+  sections,
   items,
   canEdit,
   notify,
@@ -293,7 +372,13 @@ function CollectionForm({
 }: {
   collection: Omit<DocCollection, "updatedAt">;
   isNew: boolean;
+  /** La colección madre cuando esto es una sección. */
+  parent: DocCollection | null;
+  /** Las colecciones de primer nivel, para poder mudar una sección. */
+  roots: DocCollection[];
   existing: DocCollection[];
+  /** Las secciones propias, cuando esto es una colección de primer nivel. */
+  sections: DocCollection[];
   items: DocItem[];
   canEdit: boolean;
   notify: (message: string) => void;
@@ -311,7 +396,12 @@ function CollectionForm({
 
   const cover = documentFileUrl(form.cover);
   const dirty = useMemo(() => JSON.stringify(form) !== JSON.stringify(collection), [form, collection]);
-  const slugTaken = existing.some((c) => c.slug === form.slug && c.id !== form.id);
+  // La dirección es única dentro de su madre: dos colecciones distintas pueden
+  // tener cada una su sección «Acuerdos».
+  const slugTaken = existing.some(
+    (c) => c.slug === form.slug && c.parentId === form.parentId && c.id !== form.id,
+  );
+  const isSection = form.parentId !== null;
   const problem = !form.title.trim()
     ? "La colección necesita un nombre."
     : !form.slug
@@ -353,15 +443,23 @@ function CollectionForm({
 
   return (
     <Panel
-      title={isNew ? "La colección nueva" : "La colección"}
-      description="La tapa, el nombre y el subtítulo son lo que se lee en la estantería del portal. El lomo —los años y el conteo— se calcula de sus documentos."
+      title={isSection ? (isNew ? "La sección nueva" : "La sección") : isNew ? "La colección nueva" : "La colección"}
+      description={
+        isSection
+          ? "Una divisoria dentro de la colección. Su tapa no sale en la estantería: allí manda la del tomo."
+          : "La tapa, el nombre y el subtítulo son lo que se lee en la estantería del portal. El lomo —los años y el conteo— se calcula de sus documentos y de los de sus secciones."
+      }
       actions={
         canEdit && (
           <>
             {!isNew && (
               <ConfirmButton
                 label="Eliminar"
-                confirmLabel={`Se borra la colección, sus ${items.length} documentos y sus archivos.`}
+                confirmLabel={
+                  sections.length
+                    ? `Se borran la colección, sus ${sections.length === 1 ? "1 sección" : `${sections.length} secciones`}, los documentos de todas y sus archivos.`
+                    : `Se borra ${isSection ? "la sección" : "la colección"}, sus ${items.length} documentos y sus archivos.`
+                }
                 onConfirm={onRemove}
               />
             )}
@@ -371,7 +469,7 @@ function CollectionForm({
               disabled={save.isPending || (!dirty && !isNew)}
               onClick={submit}
             >
-              {save.isPending ? "Guardando…" : isNew ? "Crear la colección" : "Guardar"}
+              {save.isPending ? "Guardando…" : isNew ? (isSection ? "Crear la sección" : "Crear la colección") : "Guardar"}
             </button>
           </>
         )
@@ -405,6 +503,7 @@ function CollectionForm({
               </button>
               <small className="doc-hint">
                 Se recorta a lo ancho (4:3). Hasta {formatBytes(MAX_COVER_BYTES)}.
+                {isSection ? " En una sección es opcional: no se ve en el portal." : ""}
               </small>
             </>
           )}
@@ -442,7 +541,8 @@ function CollectionForm({
               onChange={(event) => set("slug", slugify(event.target.value))}
             />
             <small className="doc-hint">
-              /documentos/<b>{form.slug || "…"}</b>
+              /documentos/{parent ? `${parent.slug}/` : ""}
+              <b>{form.slug || "…"}</b>
               {slugTaken && <span className="doc-warn"> · ya está en uso</span>}
             </small>
           </label>
@@ -474,6 +574,27 @@ function CollectionForm({
             )}
           </label>
 
+          {isSection && (
+            <label className="admin-field">
+              <span>Sección de</span>
+              <select
+                value={form.parentId ?? ""}
+                disabled={!canEdit}
+                onChange={(event) => set("parentId", event.target.value || null)}
+              >
+                {roots.map((root) => (
+                  <option key={root.id} value={root.id}>
+                    {root.title}
+                  </option>
+                ))}
+              </select>
+              <small className="doc-hint">
+                Cambiarla la muda de tomo, con sus documentos.
+                {parent ? ` Ahora cuelga de «${parent.title}».` : ""}
+              </small>
+            </label>
+          )}
+
           <label className="admin-field">
             <span>Estado</span>
             <select
@@ -482,12 +603,22 @@ function CollectionForm({
               onChange={(event) => set("status", event.target.value as DocCollection["status"])}
             >
               <option value="borrador">Borrador · solo la intranet</option>
-              <option value="publicado">Publicada · visible en el portal</option>
+              <option value="publicado">{isSection ? "Publicada · visible en su colección" : "Publicada · visible en el portal"}</option>
             </select>
             <small className="doc-hint">
-              Una colección en borrador esconde también sus documentos, aunque estén publicados.
+              {isSection
+                ? "Una sección en borrador esconde sus documentos, y una colección en borrador esconde sus secciones."
+                : "Una colección en borrador esconde también sus secciones y sus documentos, aunque estén publicados."}
             </small>
           </label>
+
+          {!isSection && sections.length > 0 && (
+            <p className="admin-field admin-field--wide doc-hint">
+              Esta colección tiene {sections.length === 1 ? "1 sección" : `${sections.length} secciones`}: en el
+              portal, sus documentos se listan bajo la divisoria de cada una, y los que cargues aquí van
+              primero, sin sección.
+            </p>
+          )}
         </div>
       </div>
     </Panel>

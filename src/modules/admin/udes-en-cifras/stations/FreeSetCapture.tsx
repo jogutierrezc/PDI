@@ -28,7 +28,6 @@ import {
   CHART_TYPES,
   COLUMN_KIND_LABEL,
   TEMPORALITY_LABEL,
-  comparePeriods,
   compareSource,
   freeTotalAt,
   territoryCode,
@@ -988,7 +987,6 @@ function ViewForm({ set, initial, takenKeys, onSubmit, onCancel }: {
   const categories = set.columns.filter((c) => (spec.category === "territorio" ? c.kind === "territorio" : c.kind === "texto" || c.kind === "territorio"));
   /** Lo que la gráfica comparada deduciría ahora mismo, para decirlo en la pista. */
   const compareNow = spec.compare ? compareSource(set, view) : null;
-  const periodsNow = spec.compare ? comparePeriods(set, view, set.rows.filter((r) => r.kind === "dato")) : [];
   const otherTexts = set.columns.filter((c) => (c.kind === "texto" || c.kind === "territorio") && c.key !== v.category);
   const series = v.series ?? [];
 
@@ -1024,7 +1022,15 @@ function ViewForm({ set, initial, takenKeys, onSubmit, onCancel }: {
           <label className="admin-field">
             <span>{v.type === "gantt" ? "Tareas" : v.type === "mapa" ? "Territorio" : v.type === "caja" ? "Grupos" : "Categorías"}</span>
             <select value={v.category ?? ""} onChange={(e) => patch({ category: e.target.value || undefined })}>
-              <option value="">{spec.category === "opcional" ? (v.type === "caja" ? "Sin grupos: una sola caja" : "Sin categoría") : "Elige una columna…"}</option>
+              <option value="">
+                {spec.category === "opcional"
+                  ? v.type === "caja"
+                    ? "Sin grupos: una sola caja"
+                    : v.type === "barras_comparadas"
+                      ? "Sin categorías: una barra por periodo"
+                      : "Sin categoría"
+                  : "Elige una columna…"}
+              </option>
               {categories.map((c) => <option key={c.key} value={c.key}>{c.label}</option>)}
             </select>
           </label>
@@ -1044,8 +1050,8 @@ function ViewForm({ set, initial, takenKeys, onSubmit, onCancel }: {
               <small className="oda-field-hint">
                 {compareNow
                   ? compareNow.kind === "anual"
-                    ? `Se comparan los años de la fuente${periodsNow.length ? `: ${periodsNow.join(" y ")}` : ""}.`
-                    : `Se comparan los valores de «${compareNow.label}»${periodsNow.length ? `: ${periodsNow.join(" y ")}` : ""}.`
+                    ? "Se comparan los años de la fuente."
+                    : `Se comparan los valores de «${compareNow.label}».`
                   : "Esta fuente todavía no tiene con qué comparar."}
                 {" "}Con dos, la gráfica dice además cuánto varió.
               </small>

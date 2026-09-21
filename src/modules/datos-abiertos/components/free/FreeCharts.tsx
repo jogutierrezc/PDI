@@ -36,6 +36,7 @@ import {
   histogramBins,
   numberOf,
   periodOf,
+  periodTotals,
   territoryCode,
   textOf,
 } from "../../data/free-sets";
@@ -204,8 +205,25 @@ const seriesOf = (set: FreeSet, view: FreeView) =>
    variación que sube no es un logro ni una alarma mientras nadie diga de qué
    indicador se trata. El signo basta para leerla. */
 
+/**
+ * Cuánto varió una cifra entre dos periodos, ya escrito.
+ *
+ * Sin las dos cifras no hay variación que contar: mejor nada que un cero. El
+ * porcentaje se calla cuando el punto de partida es cero, porque «subió un
+ * infinito por ciento» no es una lectura.
+ */
+function deltaText(before: number | null | undefined, after: number | null | undefined, measure: FreeColumn) {
+  if (before === null || before === undefined || after === null || after === undefined) return null;
+  const diff = after - before;
+  const pct = before === 0 ? null : (diff / Math.abs(before)) * 100;
+  const sign = diff > 0 ? "+" : diff < 0 ? "−" : "";
+  const size = formatValue(Math.abs(diff), measure.format ?? "decimal");
+  return pct === null ? `${sign}${size}` : `${sign}${size} (${sign}${formatValue(Math.abs(pct), "decimal")} %)`;
+}
+
 function CompareBars({ t, animate, set, view, rows }: ChartProps) {
-  const category = columnOf(set, view.category)!;
+  // Sin categorías la gráfica sigue teniendo sentido: un total por periodo.
+  const category = columnOf(set, view.category);
   const measure = seriesOf(set, view)[0];
   const source = compareSource(set, view);
   if (!measure) return <Note>Elige la cifra que se compara.</Note>;
@@ -222,7 +240,10 @@ function CompareBars({ t, animate, set, view, rows }: ChartProps) {
   if (periods.length < 2) return <Note>Hace falta más de un periodo para comparar.</Note>;
 
   const shown = periods.slice(0, MAX_CATEGORICAL);
-  const groups = compareTotals(rows, category.key, shown, (row) => periodOf(row, source), measure.key, view.sort);
+  const keyOf = (row: FreeRow) => periodOf(row, source);
+  const groups = category
+    ? compareTotals(rows, category.key, shown, keyOf, measure.key, view.sort)
+    : periodTotals(rows, shown, keyOf, measure.key, measure.label);
   if (!groups.length) return <Note>La fuente no tiene filas para esta gráfica.</Note>;
 
   const horizontal = view.orientation === "horizontal";
@@ -236,8 +257,23 @@ function CompareBars({ t, animate, set, view, rows }: ChartProps) {
   const leftMargin = horizontal ? Math.min(220, 12 + longest * 6.4) : 64;
   const height = horizontal ? Math.max(240, groups.length * (shown.length * 16 + 16) + 70) : HEIGHT;
   const rotate = !horizontal && groups.length > 5;
+  // Un grupo solo: las barras se juntan para no quedar como dos muros.
+  const single = !category;
   /** La variación solo se dibuja cuando comparar quiere decir «antes y después». */
   const pair = shown.length === 2 ? shown : null;
+
+  // Los textos se escriben aquí, antes de dibujar, porque el margen derecho de
+  // la gráfica horizontal tiene que caber el más largo: si se calculan dentro
+  // de la capa, el margen ya está decidido y la variación sale cortada.
+  const deltas = new Map<string, string>();
+  if (pair) {
+    for (const group of groups) {
+      const text = deltaText(group.values[pair[0]], group.values[pair[1]], measure);
+      if (text) deltas.set(group.label, text);
+    }
+  }
+  const widestDelta = Math.max(0, ...[...deltas.values()].map((text) => text.length));
+  const rightMargin = horizontal && deltas.size ? Math.min(180, 16 + widestDelta * 6.2) : 18;
 
   return (
     <>
@@ -255,8 +291,8 @@ function CompareBars({ t, animate, set, view, rows }: ChartProps) {
             indexBy="categoria"
             groupMode="grouped"
             layout={horizontal ? "horizontal" : "vertical"}
-            margin={{ top: pair ? 30 : 12, right: horizontal && pair ? 76 : 18, bottom: rotate ? 92 : 44, left: leftMargin }}
-            padding={0.3}
+            margin={{ top: pair ? 30 : 12, right: rightMargin, bottom: rotate ? 92 : 44, left: leftMargin }}
+            padding={single ? 0.55 : 0.3}
             innerPadding={3}
             borderRadius={3}
             colors={({ id }) => t.cats[shown.indexOf(String(id))]}
@@ -280,7 +316,12 @@ function CompareBars({ t, animate, set, view, rows }: ChartProps) {
             labelTextColor={(d) => inkOn(d.color, t)}
             layers={
               pair
-                ? ["grid", "axes", "bars", (props) => <Deltas {...props} t={t} measure={measure} pair={pair} horizontal={horizontal} />]
+                ? [
+                    "grid",
+                    "axes",
+                    "bars",
+                    (props) => <Deltas {...props} t={t} deltas={deltas} horizontal={horizontal} limit={width - rightMargin} />,
+                  ]
                 : undefined
             }
             tooltip={({ id, value, indexValue }) => (
@@ -297,15 +338,16 @@ function CompareBars({ t, animate, set, view, rows }: ChartProps) {
 function Deltas({
   bars,
   t,
-  measure,
-  pair,
+  deltas,
   horizontal,
+  limit,
 }: {
-  bars: readonly { x: number; y: number; width: number; height: number; data: { id: string | number; value: number | null; indexValue: string | number } }[];
+  bars: readonly { x: number; y: number; width: number; height: number; data: { indexValue: string | number } }[];
   t: ChartTokens;
-  measure: FreeColumn;
-  pair: string[];
+  deltas: Map<string, string>;
   horizontal: boolean;
+  /** Borde derecho del lienzo: el texto no lo cruza. */
+  limit: number;
 }) {
   const groups = new Map<string, typeof bars[number][]>();
   for (const bar of bars) {
@@ -316,24 +358,21 @@ function Deltas({
   return (
     <g>
       {[...groups.entries()].map(([label, list]) => {
-        const before = list.find((b) => String(b.data.id) === pair[0])?.data.value;
-        const after = list.find((b) => String(b.data.id) === pair[1])?.data.value;
-        // Sin las dos cifras no hay variación que contar: mejor nada que un cero.
-        if (before === null || before === undefined || after === null || after === undefined) return null;
-        const diff = after - before;
-        const pct = before === 0 ? null : (diff / Math.abs(before)) * 100;
-        const sign = diff > 0 ? "+" : diff < 0 ? "−" : "";
-        const text = `${sign}${formatValue(Math.abs(diff), measure.format ?? "decimal")}${pct === null ? "" : ` (${sign}${formatValue(Math.abs(pct), "decimal")} %)`}`;
+        const text = deltas.get(label);
+        if (!text) return null;
 
         const left = Math.min(...list.map((b) => b.x));
         const right = Math.max(...list.map((b) => b.x + b.width));
         const top = Math.min(...list.map((b) => b.y));
         const bottom = Math.max(...list.map((b) => b.y + b.height));
+        // Ancho aproximado: la cifra es tabular, así que basta con contar.
+        const half = (text.length * 6.2) / 2;
+        const middle = Math.min(Math.max((left + right) / 2, half + 2), limit - half);
 
         return (
           <text
             key={label}
-            x={horizontal ? right + 8 : (left + right) / 2}
+            x={horizontal ? right + 8 : middle}
             y={horizontal ? (top + bottom) / 2 : top - 8}
             textAnchor={horizontal ? "start" : "middle"}
             dominantBaseline={horizontal ? "middle" : "auto"}

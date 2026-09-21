@@ -131,13 +131,49 @@ function unwrapOptional<T>({ data, error }: Result<T>): T[] {
   return unwrap({ data, error });
 }
 
-/** Trae todas las filas de una consulta, página a página. */
-async function fetchAll<T>(page: (from: number, to: number) => PromiseLike<Result<T>>): Promise<T[]> {
+/**
+ * Trae todas las filas de una consulta, página a página.
+ *
+ * Se avanza por la clave —«dame las siguientes a esta»— y no por
+ * desplazamiento. Con `range(2000, 2999)` la base tiene que recorrer *y
+ * autorizar* también las 2.000 filas que se salta, de modo que cada página
+ * sale más cara que la anterior; sobre `od_saber_pro_results`, con la
+ * instancia fría, la tercera tardaba el doble que la primera y la consulta
+ * llegó a agotar el tiempo del servidor. Pidiendo por clave, toda página
+ * cuesta lo mismo que la primera.
+ *
+ * El orden en que lleguen da igual: el ensamblado siempre reordena por su
+ * propia columna o indexa por clave, nunca confía en el orden de llegada.
+ */
+/**
+ * Trae todas las filas de una consulta que no tiene columna `id`.
+ *
+ * `od_heatmap_cells` y `od_map_values` se identifican por una clave compuesta,
+ * así que no hay una sola columna por la que avanzar. Siguen paginando por
+ * desplazamiento —son cientos de filas, no miles, y ahí el sobrecoste no se
+ * nota—, pero ordenando por la clave *completa*: con `order("department_code")`
+ * a secas, dos filas con el mismo departamento podían repetirse o perderse
+ * justo en el corte entre dos páginas.
+ */
+async function fetchAllByOffset<T>(page: (from: number, to: number) => PromiseLike<Result<T>>): Promise<T[]> {
   const rows: T[] = [];
   for (let from = 0; ; from += PAGE) {
     const chunk = unwrap(await page(from, from + PAGE - 1));
     rows.push(...chunk);
     if (chunk.length < PAGE) return rows;
+  }
+}
+
+async function fetchAll<T>(page: (after: string | null) => PromiseLike<Result<T & { id: string }>>): Promise<T[]> {
+  const rows: (T & { id: string })[] = [];
+  let after: string | null = null;
+  for (;;) {
+    // Anotado a mano: si no, TypeScript intenta deducir el tipo de la página
+    // a partir del cursor que esa misma página produce, y se muerde la cola.
+    const chunk: (T & { id: string })[] = unwrap(await page(after));
+    rows.push(...chunk);
+    if (chunk.length < PAGE) return rows;
+    after = chunk[chunk.length - 1].id;
   }
 }
 
@@ -196,59 +232,64 @@ export async function fetchOpenDataRows({ periodId, includeDrafts = false }: Fet
 
   const [values, breakdownValues, heatmapCells, mapValues, pipelineValues, historyValues, tableRows, rankingEditions, saberProResults, freeSetRows, saberTytResults] = await Promise.all([
     indicators.length
-      ? fetchAll<OdValueRow>((from, to) =>
-          supabase.from("od_values").select("indicator_id,year,term,campus_id,value,updated_at")
-            .in("indicator_id", ids(indicators)).order("id").range(from, to),
+      ? fetchAll<OdValueRow>((after) =>
+          (after === null ? supabase.from("od_values").select("id,indicator_id,year,term,campus_id,value,updated_at")
+              .in("indicator_id", ids(indicators)) : (supabase.from("od_values").select("id,indicator_id,year,term,campus_id,value,updated_at")
+              .in("indicator_id", ids(indicators))).gt("id", after)).order("id").limit(PAGE),
         )
       : none,
     breakdowns.length
-      ? fetchAll<OdBreakdownValueRow>((from, to) =>
-          supabase.from("od_breakdown_values").select("*").in("breakdown_id", ids(breakdowns)).order("position").range(from, to),
+      ? fetchAll<OdBreakdownValueRow>((after) =>
+          (after === null ? supabase.from("od_breakdown_values").select("*").in("breakdown_id", ids(breakdowns)) : (supabase.from("od_breakdown_values").select("*").in("breakdown_id", ids(breakdowns))).gt("id", after)).order("id").limit(PAGE),
         )
       : none,
     heatmaps.length
-      ? fetchAll<OdHeatmapCellRow>((from, to) =>
-          supabase.from("od_heatmap_cells").select("*").in("heatmap_id", ids(heatmaps)).order("row_index").range(from, to),
+      ? fetchAllByOffset<OdHeatmapCellRow>((from, to) =>
+          supabase.from("od_heatmap_cells").select("*").in("heatmap_id", ids(heatmaps))
+            .order("heatmap_id").order("row_index").order("column_index").range(from, to),
         )
       : none,
     maps.length
-      ? fetchAll<OdMapValueRow>((from, to) =>
-          supabase.from("od_map_values").select("*").in("map_id", ids(maps)).order("department_code").range(from, to),
+      ? fetchAllByOffset<OdMapValueRow>((from, to) =>
+          supabase.from("od_map_values").select("*").in("map_id", ids(maps))
+            .order("map_id").order("year").order("campus_id").order("department_code").range(from, to),
         )
       : none,
     pipelines.length
-      ? fetchAll<OdPipelineValueRow>((from, to) =>
-          supabase.from("od_pipeline_values").select("*").in("pipeline_id", ids(pipelines)).order("cohort").range(from, to),
+      ? fetchAll<OdPipelineValueRow>((after) =>
+          (after === null ? supabase.from("od_pipeline_values").select("*").in("pipeline_id", ids(pipelines)) : (supabase.from("od_pipeline_values").select("*").in("pipeline_id", ids(pipelines))).gt("id", after)).order("id").limit(PAGE),
         )
       : none,
     histories.length
-      ? fetchAll<OdHistoryValueRow>((from, to) =>
-          supabase.from("od_history_values").select("*").in("history_id", ids(histories)).order("period_label").range(from, to),
+      ? fetchAll<OdHistoryValueRow>((after) =>
+          (after === null ? supabase.from("od_history_values").select("*").in("history_id", ids(histories)) : (supabase.from("od_history_values").select("*").in("history_id", ids(histories))).gt("id", after)).order("id").limit(PAGE),
         )
       : none,
     tables.length
-      ? fetchAll<OdTableRecordRow>((from, to) =>
-          supabase.from("od_table_rows").select("*").in("table_id", ids(tables)).order("position").range(from, to),
+      ? fetchAll<OdTableRecordRow>((after) =>
+          (after === null ? supabase.from("od_table_rows").select("*").in("table_id", ids(tables)) : (supabase.from("od_table_rows").select("*").in("table_id", ids(tables))).gt("id", after)).order("id").limit(PAGE),
         )
       : none,
     rankings.length
       ? supabase.from("od_ranking_editions").select("*").in("ranking_id", ids(rankings)).order("year").then(unwrapOptional<OdRankingEditionRow>)
       : none,
     saberPro.length
-      ? fetchAll<OdSaberProResultRow>((from, to) =>
-          supabase.from("od_saber_pro_results")
-            .select("saber_id,year,scope,campus,faculty,program,competency,evaluated,mean,levels,histogram")
-            .in("saber_id", ids(saberPro)).order("id").range(from, to),
+      ? fetchAll<OdSaberProResultRow>((after) =>
+          (after === null ? supabase.from("od_saber_pro_results")
+              .select("id,saber_id,year,scope,campus,faculty,program,competency,evaluated,mean,levels,histogram")
+              .in("saber_id", ids(saberPro)) : (supabase.from("od_saber_pro_results")
+              .select("id,saber_id,year,scope,campus,faculty,program,competency,evaluated,mean,levels,histogram")
+              .in("saber_id", ids(saberPro))).gt("id", after)).order("id").limit(PAGE),
         )
       : none,
     freeSets.length
-      ? fetchAll<OdFreeSetRecordRow>((from, to) =>
-          supabase.from("od_free_set_rows").select("set_id,position,year,kind,label,cells").in("set_id", ids(freeSets)).order("set_id").order("position").range(from, to),
+      ? fetchAll<OdFreeSetRecordRow>((after) =>
+          (after === null ? supabase.from("od_free_set_rows").select("id,set_id,position,year,kind,label,cells").in("set_id", ids(freeSets)) : (supabase.from("od_free_set_rows").select("id,set_id,position,year,kind,label,cells").in("set_id", ids(freeSets))).gt("id", after)).order("id").limit(PAGE),
         )
       : none,
     saberTyt.length
-      ? fetchAll<OdSaberTytResultRow>((from, to) =>
-          supabase.from("od_saber_tyt_results").select("*").in("tyt_id", ids(saberTyt)).order("id").range(from, to),
+      ? fetchAll<OdSaberTytResultRow>((after) =>
+          (after === null ? supabase.from("od_saber_tyt_results").select("*").in("tyt_id", ids(saberTyt)) : (supabase.from("od_saber_tyt_results").select("*").in("tyt_id", ids(saberTyt))).gt("id", after)).order("id").limit(PAGE),
         )
       : none,
   ]);

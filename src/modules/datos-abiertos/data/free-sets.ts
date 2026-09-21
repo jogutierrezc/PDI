@@ -155,8 +155,8 @@ export const CHART_TYPES: Record<
   barras: { label: "Barras", hint: "Compara una o varias cifras entre categorías.", category: "texto", series: "varias" },
   barras_comparadas: {
     label: "Barras comparadas",
-    hint: "La misma cifra en cada categoría, con una barra por periodo. Los periodos los toma de la fuente; con dos, dice además cuánto varió.",
-    category: "texto",
+    hint: "Una cifra con una barra por periodo. Con categorías, un grupo de barras por categoría; sin ellas, el total de cada periodo. Con dos periodos dice además cuánto varió.",
+    category: "opcional",
     series: "una",
     compare: true,
   },
@@ -281,9 +281,12 @@ export function compareSource(set: FreeSet, view: FreeView): CompareSource | nul
   const forced = usable(columnOf(set, view.compare));
   if (forced) return { kind: "columna", label: forced.label, column: forced };
 
-  if (set.temporality === "anual" && freeYears(set).length >= 2) {
-    return { kind: "anual", label: "Año" };
-  }
+  // Estructural, nunca por los datos: el editor de la intranet trabaja con el
+  // conjunto sin filas cargadas, y «¿tiene dos años?» es una pregunta que solo
+  // puede responder quien tiene las filas delante. Si la fuente es anual, ya
+  // hay con qué comparar; que haya un año o seis lo dice la gráfica al
+  // dibujarse.
+  if (set.temporality === "anual") return { kind: "anual", label: "Año" };
 
   const guess = set.columns.find((c) => Boolean(usable(c)));
   if (guess) return { kind: "columna", label: guess.label, column: guess };
@@ -358,6 +361,32 @@ export function compareTotals(
     groups = [...groups].sort((a, b) => sign * ((a.values[lead] ?? -Infinity) - (b.values[lead] ?? -Infinity)));
   }
   return groups;
+}
+
+/**
+ * El total de una cifra en cada periodo, sin cruzar nada.
+ *
+ * Es el caso de una fuente que solo trae la cifra y el año: comparar periodos
+ * no necesita categorías, son dos barras. Se devuelve con la forma de
+ * `compareTotals` —un grupo único— para que la gráfica no tenga que saber cuál
+ * de los dos caminos la trajo.
+ */
+export function periodTotals(
+  rows: FreeRow[],
+  keys: string[],
+  keyOf: (row: FreeRow) => string,
+  measure: string,
+  label: string,
+) {
+  const values: Record<string, number | null> = {};
+  for (const row of rows) {
+    const key = keyOf(row);
+    if (!key || !keys.includes(key)) continue;
+    const value = numberOf(row.cells[measure]);
+    if (value === null) continue;
+    values[key] = (values[key] ?? 0) + value;
+  }
+  return [{ label, values }];
 }
 
 /** Tramos de un histograma: Sturges si no se pide número, bordes redondos. */
@@ -445,7 +474,7 @@ export function viewProblems(set: FreeSet, view: FreeView): string[] {
   if (spec.dates && (columnOf(set, view.start)?.kind !== "fecha" || columnOf(set, view.end)?.kind !== "fecha")) problems.push("Elige las columnas de inicio y fin.");
   if (spec.compare && !compareSource(set, view)) {
     problems.push(
-      "Esta fuente no tiene con qué comparar: hace falta que sea anual con dos años o más, o que tenga otra columna de texto además de la de categorías.",
+      "Esta fuente no tiene con qué comparar: tiene que ser anual, o tener otra columna de texto además de la de categorías.",
     );
   }
   if (view.type === "radar" && series.length < 3) problems.push("El radar necesita al menos tres cifras (una por eje).");

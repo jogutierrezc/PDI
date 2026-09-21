@@ -4,10 +4,13 @@
 -- El bloque «Grid de imágenes» pone fotografías dentro de una ficha, en dos
 -- columnas, y las mismas imágenes viajan al boletín en papel.
 --
--- Solo hace falta un bucket. Qué imágenes lleva cada bloque vive en
+-- Aquí solo va el bucket. Qué imágenes lleva cada bloque vive en
 -- `od_blocks.settings`, que ya es jsonb: una lista de rutas con su texto
--- alternativo y su pie. `od_blocks.kind` no tiene restricción de valores, así
--- que el tipo nuevo no necesita tocar el esquema.
+-- alternativo y su pie.
+--
+-- Ojo: esta migración dio por hecho que `od_blocks.kind` admitía cualquier
+-- texto, y no es cierto —es el enum `od_block_kind`—. El valor «imagenes» lo
+-- añade la 0054; sin ella, la intranet falla al crear el bloque.
 --
 -- Público en lectura —salen en una ficha pública— y escritura con capacidad de
 -- Planeación sobre la pantalla de UDES en Cifras. La política no puede saber

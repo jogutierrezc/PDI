@@ -24,3 +24,4 @@ bi/
 
 # Microdatos del modelo predictivo (caracterización): nunca al repositorio.
 Modelo/*.xlsx
+supabase/.temp/

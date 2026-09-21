@@ -37,6 +37,7 @@ export interface Profile {
 /** Pantallas de la intranet que un rol de acceso puede abrir. */
 export type AdminScreen =
   | "office"
+  | "documents"
   | "pillars"
   | "projects"
   | "faculties"

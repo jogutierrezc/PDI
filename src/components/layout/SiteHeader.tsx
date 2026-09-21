@@ -146,10 +146,9 @@ export function SiteHeader({ onSearch }: { onSearch?: () => void }) {
           <NavLink to="/datos-abiertos/boletines" className="sh-nav__link">
             Boletines
           </NavLink>
-          {/* Link y no NavLink: apunta a un ancla de Implementación y se marcaría activo en todo el PDI. */}
-          <Link to="/implementacion#repositorio" className="sh-nav__link">
+          <NavLink to="/documentos" className="sh-nav__link">
             Documentos
-          </Link>
+          </NavLink>
         </nav>
 
         <div className="sh-tools">
@@ -203,7 +202,7 @@ export function SiteHeader({ onSearch }: { onSearch?: () => void }) {
             <Link to="/datos-abiertos/boletines" onClick={close}>
               Boletines
             </Link>
-            <Link to="/implementacion#repositorio" onClick={close}>
+            <Link to="/documentos" onClick={close}>
               Documentos
             </Link>
             <Link to="/acceso-intranet" onClick={close}>

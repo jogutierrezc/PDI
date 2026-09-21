@@ -35,6 +35,7 @@ export interface AccessScope {
  *  primera que sí puede abrir: un rol de área no empieza en Gestión de pilares. */
 export const SCREEN_PATHS: Record<AdminScreen, string> = {
   office: "/admin/pagina",
+  documents: "/admin/documentos",
   pillars: "/admin/pilares",
   projects: "/admin/proyectos",
   faculties: "/admin/facultades",

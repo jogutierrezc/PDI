@@ -29,6 +29,7 @@ import "../admin.css";
 
 export type AdminSection =
   | "office"
+  | "documents"
   | "pillars"
   | "projects"
   | "faculties"
@@ -65,6 +66,7 @@ const navigation: NavGroup[] = [
     label: "Portal de Planeación",
     items: [
       { id: "office", label: "Página de la oficina", icon: "document", to: "/admin/pagina", minimum: "consulta" },
+      { id: "documents", label: "Documentos", icon: "layers", to: "/admin/documentos", minimum: "consulta" },
     ],
   },
   {

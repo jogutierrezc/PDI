@@ -49,7 +49,7 @@ export function PlanLayout({ title, children, onSearch }: { title: string; child
           <nav aria-label="La oficina">
             <strong>La oficina</strong>
             <Link to="/equipo">Nuestro equipo</Link>
-            <Link to="/implementacion#repositorio">Documentos</Link>
+            <Link to="/documentos">Documentos</Link>
             <Link to="/desarrollo-tecnologico">Desarrollo tecnológico</Link>
             <Link to="/acceso-intranet">Intranet</Link>
           </nav>

@@ -106,6 +106,15 @@ const PillarConfigurator = lazy(() =>
 const GlobalParameters = lazy(() =>
   import("./modules/admin/parametros/GlobalParameters").then((m) => ({ default: m.GlobalParameters })),
 );
+const DocumentPortal = lazy(() =>
+  import("./modules/documentos/DocumentPortal").then((m) => ({ default: m.DocumentPortal })),
+);
+const CollectionPage = lazy(() =>
+  import("./modules/documentos/CollectionPage").then((m) => ({ default: m.CollectionPage })),
+);
+const DocumentsAdmin = lazy(() =>
+  import("./modules/admin/documentos/DocumentsAdmin").then((m) => ({ default: m.DocumentsAdmin })),
+);
 const OfficePageAdmin = lazy(() =>
   import("./modules/admin/pagina/OfficePageAdmin").then((m) => ({ default: m.OfficePageAdmin })),
 );
@@ -178,6 +187,9 @@ export default function App() {
           <Route path="/datos-abiertos/boletines" element={<PublicBulletinList />} />
           <Route path="/datos-abiertos/boletines/:slug" element={<PublicBulletinPage />} />
           <Route path="/datos-abiertos/:slug" element={<OpenDataReport />} />
+          {/* El repositorio documental e histórico de la oficina. */}
+          <Route path="/documentos" element={<DocumentPortal />} />
+          <Route path="/documentos/:slug" element={<CollectionPage />} />
           <Route path="/acceso-intranet" element={<LoginPortal />} />
 
           {/* La portada de Planeación y la página del equipo, escritas desde la intranet. */}
@@ -186,6 +198,14 @@ export default function App() {
             element={
               <RequireRole minimum="consulta" screen="office">
                 <OfficePageAdmin />
+              </RequireRole>
+            }
+          />
+          <Route
+            path="/admin/documentos/:slug?"
+            element={
+              <RequireRole minimum="consulta" screen="documents">
+                <DocumentsAdmin />
               </RequireRole>
             }
           />

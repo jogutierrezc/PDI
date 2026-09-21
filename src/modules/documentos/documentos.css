@@ -1,0 +1,357 @@
+/* =============================================================================
+   Portal Documentos.
+
+   Hereda el mundo de Planeación (pl-*): marino de marca en las franjas, azul
+   institucional solo para acción y foco, papel azulado de página. Lo propio de
+   aquí es el tomo: lomo marino escrito en vertical, tapa fotográfica y banda de
+   superficie con un filete que las separa, como la tela que une la tapa con el
+   lomo de un libro encuadernado.
+
+   Ni ámbar de señal ni rotulación condensada: eso vive en UDES en Cifras.
+   ========================================================================== */
+
+.dc-hero { padding-block: clamp(36px, 5vw, 64px); }
+
+/* --- El buscador del repositorio ------------------------------------------- */
+
+.dc-search { display: block; max-width: 640px; margin-top: var(--space-4); }
+
+.dc-search__field {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  height: 56px;
+  padding-inline: var(--space-5);
+  color: var(--pl-navy);
+  background: #ffffff;
+  border-radius: 14px;
+  box-shadow: 0 14px 30px rgba(2, 12, 32, 0.28);
+}
+
+.dc-search__field:focus-within { box-shadow: 0 0 0 3px var(--pl-plan), 0 14px 30px rgba(2, 12, 32, 0.3); }
+.dc-search__field > svg { flex: none; color: #5a6b82; }
+
+.dc-search__field input {
+  width: 100%;
+  color: var(--pl-navy);
+  background: none;
+  border: 0;
+  font: inherit;
+  font-size: 1.02rem;
+}
+
+.dc-search__field input::placeholder { color: #6b7c93; }
+.dc-search__field input:focus-visible { outline: none; }
+.dc-search__field input::-webkit-search-cancel-button { cursor: pointer; }
+
+/* --- Filtros de año --------------------------------------------------------- */
+
+.dc-shelf__head { align-items: flex-end; }
+
+.dc-years { display: flex; flex-wrap: wrap; gap: var(--space-2); }
+
+.dc-years button {
+  padding: 7px 14px;
+  color: var(--ink-secondary);
+  background: var(--surface);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-pill);
+  font: inherit;
+  font-size: var(--text-sm);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  cursor: pointer;
+  transition: color var(--dur-fast) var(--ease-out), background var(--dur-fast) var(--ease-out), border-color var(--dur-fast) var(--ease-out);
+}
+
+.dc-years button:hover { color: var(--brand-blue-strong); border-color: var(--brand-blue); }
+.dc-years button[aria-pressed="true"] { color: #ffffff; background: var(--brand-blue); border-color: var(--brand-blue); }
+
+.dc-years--column { flex-direction: column; align-items: stretch; }
+.dc-years--column button { text-align: left; }
+
+/* --- La estantería ---------------------------------------------------------- */
+
+.dc-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 24rem), 1fr));
+  gap: var(--space-6);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.dc-grid > li { display: flex; }
+
+/* El tomo: lomo, tapa y banda. El lomo es una columna propia de la rejilla,
+   así que la tapa nunca se le monta encima. */
+.dc-volume {
+  position: relative;
+  display: grid;
+  grid-template-columns: 34px minmax(0, 1fr);
+  grid-template-rows: auto auto;
+  width: 100%;
+  overflow: hidden;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 6px 16px 16px 6px;
+  box-shadow: 0 2px 4px rgba(10, 34, 73, 0.07), 0 12px 28px rgba(10, 34, 73, 0.1);
+  transition: transform var(--dur-base) var(--ease-out), box-shadow var(--dur-base) var(--ease-out);
+}
+
+.dc-volume:hover { transform: translateY(-4px); box-shadow: 0 3px 6px rgba(10, 34, 73, 0.09), 0 22px 44px rgba(10, 34, 73, 0.18); }
+.dc-volume:has(:focus-visible) { box-shadow: 0 0 0 3px var(--brand-blue); }
+
+.dc-volume__spine {
+  grid-row: 1 / -1;
+  display: grid;
+  place-items: center;
+  padding-block: var(--space-4);
+  color: var(--pl-on-navy);
+  background: var(--pl-navy);
+  /* Dos filetes claros: el nervio de la encuadernación. */
+  box-shadow: inset -1px 0 0 rgba(255, 255, 255, 0.22), inset -5px 0 0 rgba(255, 255, 255, 0.1);
+}
+
+.dc-volume__spine b {
+  font-size: var(--text-sm);
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.04em;
+  writing-mode: vertical-rl;
+  transform: rotate(180deg);
+}
+
+.dc-volume__cover {
+  display: grid;
+  place-items: center;
+  aspect-ratio: 4 / 3;
+  overflow: hidden;
+  background: var(--brand-blue-soft);
+}
+
+.dc-volume__cover img { width: 100%; height: 100%; object-fit: cover; }
+.dc-volume__cover > span { color: var(--brand-navy); font-family: var(--font-display); font-size: var(--text-3xl); font-weight: 600; }
+
+.dc-volume__band {
+  display: grid;
+  align-content: start;
+  gap: var(--space-2);
+  padding: var(--space-5);
+  border-top: 1px solid var(--line);
+}
+
+.dc-volume__band h3 { margin: 0; color: var(--brand-navy); font-family: var(--font-display); font-size: 1.35rem; font-weight: 600; line-height: 1.15; }
+.dc-volume__band p { margin: 0; color: var(--ink-secondary); font-size: var(--text-base); line-height: 1.5; }
+
+.dc-volume__foot {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--space-2) var(--space-4);
+  margin-top: var(--space-1);
+}
+
+.dc-volume__count { color: var(--ink-muted); font-size: var(--text-sm); font-weight: 700; }
+.dc-volume__count b { color: var(--brand-navy); font-size: 1.15rem; font-variant-numeric: tabular-nums; }
+.dc-volume__range { font-variant-numeric: tabular-nums; }
+
+.dc-volume__match {
+  padding: 3px 10px;
+  color: var(--brand-blue-strong);
+  background: var(--brand-blue-soft);
+  border-radius: var(--radius-pill);
+  font-size: var(--text-xs);
+  font-weight: 800;
+}
+
+/* --- El tomo abierto -------------------------------------------------------- */
+
+.dc-open__grid {
+  display: grid;
+  grid-template-columns: clamp(15rem, 24vw, 20rem) minmax(0, 1fr);
+  gap: var(--space-8);
+  align-items: start;
+}
+
+.dc-open__plate {
+  position: sticky;
+  top: var(--space-6);
+  display: grid;
+  gap: var(--space-5);
+}
+
+.dc-open__cover {
+  display: grid;
+  place-items: center;
+  aspect-ratio: 4 / 3;
+  overflow: hidden;
+  background: var(--brand-blue-soft);
+  border-radius: var(--radius-md);
+  box-shadow: 0 2px 4px rgba(10, 34, 73, 0.07), 0 14px 30px rgba(10, 34, 73, 0.12);
+}
+
+.dc-open__cover img { width: 100%; height: 100%; object-fit: cover; }
+.dc-open__cover > span { color: var(--brand-navy); font-family: var(--font-display); font-size: var(--text-4xl); font-weight: 600; }
+
+.dc-open__facts { display: flex; flex-wrap: wrap; gap: var(--space-5); margin: 0; }
+.dc-open__facts > div { display: grid; gap: 2px; }
+.dc-open__facts dt { color: var(--ink-muted); font-size: var(--text-xs); font-weight: 700; }
+.dc-open__facts dd { margin: 0; color: var(--brand-navy); font-size: var(--text-xl); font-weight: 800; font-variant-numeric: tabular-nums; }
+
+/* --- El índice -------------------------------------------------------------- */
+
+.dc-index { display: grid; gap: var(--space-7); }
+
+.dc-group { display: grid; gap: 0; }
+
+/* La pestaña del año: el rótulo y el filete que recorre el resto del ancho. */
+.dc-group__year {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  margin: 0;
+  color: var(--brand-navy);
+  font-family: var(--font-sans);
+  font-size: var(--text-md);
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0;
+}
+
+.dc-group__year::after { content: ""; flex: 1 1 auto; height: 2px; background: var(--brand-navy); }
+
+.dc-entries { margin: 0; padding: 0; list-style: none; }
+
+.dc-entry {
+  position: relative;
+  display: grid;
+  grid-template-columns: 2.6rem minmax(0, 1fr) auto;
+  gap: var(--space-4);
+  align-items: start;
+  padding: var(--space-5) 0;
+  border-bottom: 1px solid var(--line);
+}
+
+.dc-entry__number { color: var(--ink-faint); font-size: var(--text-sm); font-weight: 800; font-variant-numeric: tabular-nums; line-height: 1.7; }
+
+.dc-entry__body { display: grid; gap: var(--space-2); min-width: 0; }
+
+.dc-entry__body h3 {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--space-2) var(--space-3);
+  margin: 0;
+  color: var(--ink);
+  font-family: var(--font-display);
+  font-size: 1.2rem;
+  font-weight: 600;
+  line-height: 1.25;
+}
+
+.dc-entry__body h3 a { color: inherit; text-decoration: none; }
+.dc-entry:hover .dc-entry__body h3 a { color: var(--brand-blue-strong); }
+.dc-entry__body p { margin: 0; max-width: 72ch; color: var(--ink-secondary); font-size: var(--text-base); line-height: 1.55; }
+
+.dc-entry__version {
+  padding: 2px 9px;
+  color: var(--brand-navy);
+  background: var(--brand-blue-soft);
+  border-radius: var(--radius-pill);
+  font-family: var(--font-sans);
+  font-size: var(--text-xs);
+  font-weight: 800;
+}
+
+.dc-entry__meta { color: var(--ink-muted); font-size: var(--text-sm); font-weight: 700; font-variant-numeric: tabular-nums; }
+
+.dc-entry__go { color: var(--brand-blue); transition: transform var(--dur-fast) var(--ease-out); }
+.dc-entry:hover .dc-entry__go { transform: translateY(2px); }
+
+/* Las ediciones retiradas: consultables, nunca compitiendo con la vigente. */
+.dc-versions { position: relative; z-index: 2; margin-top: var(--space-1); }
+
+.dc-versions summary {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  color: var(--brand-blue-strong);
+  font-size: var(--text-sm);
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.dc-versions summary:focus-visible { outline: 2px solid var(--brand-blue); outline-offset: 3px; border-radius: 4px; }
+
+.dc-versions ul {
+  display: grid;
+  gap: var(--space-2);
+  margin: var(--space-3) 0 0;
+  padding: 0 0 0 var(--space-4);
+  list-style: none;
+  border-left: 1px solid var(--line-strong);
+}
+
+.dc-versions li { display: grid; gap: 1px; }
+.dc-versions li a { color: var(--brand-blue-strong); font-size: var(--text-base); font-weight: 700; text-decoration: none; }
+.dc-versions li a:hover { text-decoration: underline; }
+.dc-versions li small { color: var(--ink-muted); font-size: var(--text-xs); font-weight: 600; font-variant-numeric: tabular-nums; }
+
+/* --- Avisos ----------------------------------------------------------------- */
+
+.dc-note {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-3);
+  margin: 0;
+  padding: var(--space-4) var(--space-5);
+  color: var(--ink);
+  background: var(--status-pending-soft);
+  border: 1px solid color-mix(in srgb, var(--status-pending) 35%, transparent);
+  border-radius: var(--radius-sm);
+  font-size: var(--text-base);
+}
+
+.dc-note svg { flex: none; margin-top: 2px; color: var(--status-pending); }
+
+.dc-empty {
+  display: grid;
+  gap: var(--space-2);
+  justify-items: start;
+  max-width: 62ch;
+  margin: 0;
+  padding: var(--space-7) 0;
+  color: var(--ink-secondary);
+  line-height: 1.6;
+}
+
+.dc-empty strong { color: var(--brand-navy); font-family: var(--font-display); font-size: 1.35rem; font-weight: 600; }
+.dc-empty .pl-link { background: none; border: 0; font: inherit; font-weight: 800; cursor: pointer; }
+
+/* --- Adaptación -------------------------------------------------------------- */
+
+@media (max-width: 1024px) {
+  .dc-open__grid { grid-template-columns: minmax(0, 1fr); gap: var(--space-6); }
+  .dc-open__plate { position: static; grid-template-columns: clamp(9rem, 26vw, 14rem) minmax(0, 1fr); align-items: start; }
+  .dc-open__cover { grid-row: span 2; }
+  .dc-years--column { flex-direction: row; flex-wrap: wrap; }
+}
+
+@media (max-width: 720px) {
+  .dc-search__field { height: 52px; padding-inline: var(--space-4); }
+  .dc-grid { gap: var(--space-5); }
+  .dc-volume__band { padding: var(--space-4); }
+  .dc-open__plate { grid-template-columns: minmax(0, 1fr); }
+  .dc-open__cover { grid-row: auto; max-width: 16rem; }
+  .dc-entry { grid-template-columns: 2rem minmax(0, 1fr); row-gap: var(--space-2); }
+  .dc-entry__go { grid-column: 2; justify-self: start; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .dc-volume,
+  .dc-entry__go,
+  .dc-years button { transition: none; }
+  .dc-volume:hover { transform: none; }
+  .dc-entry:hover .dc-entry__go { transform: none; }
+}

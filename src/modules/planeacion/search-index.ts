@@ -7,7 +7,7 @@
    · Observatorio: los catorce temas (con su cifra titular si ya publican
      datos) y las tablas publicadas.
    · Plan de Desarrollo: páginas, pilares con su avance y proyectos.
-   · Boletines y documentos públicos.
+   · Boletines, el repositorio documental y los documentos públicos del plan.
    · La oficina: áreas y equipo, tal como se publican desde la intranet.
 
    Solo entra lo publicado: las consultas son las mismas del portal público.
@@ -24,6 +24,7 @@ import { OBS_TOPICS } from "../datos-abiertos/observatorio/data";
 import { summarize, useObservatoryLive } from "../datos-abiertos/observatorio/live";
 import { bulletinFileUrl, usePublicBulletins } from "../boletin/data";
 import { useOfficePage } from "./page";
+import { documentHref, documentType, entriesOf, useDocLibrary } from "../documentos/data";
 
 export type Portal = "cifras" | "observatorio" | "pdi" | "boletines" | "documentos" | "oficina";
 
@@ -98,6 +99,7 @@ const OFFICE_PAGES: SearchEntry[] = [
   { id: "o-cifras", portal: "cifras", title: "UDES en Cifras", hint: "Las cifras oficiales de la universidad", to: "/datos-abiertos", keywords: "datos abiertos estadisticas informes" },
   { id: "o-obs", portal: "observatorio", title: "Observatorio de Analítica Académica", hint: "Catorce temas para explorar el dato", to: "/datos-abiertos/observatorio", keywords: "analitica datos temas" },
   { id: "o-bol", portal: "boletines", title: "Boletines", hint: "El boletín estadístico en PDF", to: "/datos-abiertos/boletines", keywords: "boletin estadistico pdf descargar" },
+  { id: "o-docs", portal: "documentos", title: "Repositorio documental", hint: "Actas, normativa, informes y soportes históricos", to: "/documentos", keywords: "documentos repositorio archivo historico actas normativa" },
   { id: "o-login", portal: "oficina", title: "Acceso a la intranet", hint: "Para el equipo que carga y publica", to: "/acceso-intranet", keywords: "login intranet admin" },
 ];
 
@@ -110,6 +112,7 @@ export function useSiteIndex() {
   const documents = usePublicDocuments();
   const bulletins = usePublicBulletins(catalog.data?.period?.uuid);
   const { page } = useOfficePage();
+  const library = useDocLibrary();
 
   const entries = useMemo(() => {
     const out: SearchEntry[] = [...OFFICE_PAGES, ...PDI_PAGES];
@@ -227,6 +230,34 @@ export function useSiteIndex() {
       });
     }
 
+    // El repositorio documental: cada colección y cada documento vigente.
+    for (const collection of library.data?.collections ?? []) {
+      const items = library.data?.byCollection.get(collection.id) ?? [];
+      out.push({
+        id: `dc-${collection.id}`,
+        portal: "documentos",
+        title: collection.title,
+        hint: collection.subtitle || `${entriesOf(items).length} documentos`,
+        to: `/documentos/${collection.slug}`,
+        keywords: "coleccion repositorio documental",
+      });
+      for (const { item } of entriesOf(items)) {
+        const href = documentHref(item);
+        out.push({
+          id: `di-${item.id}`,
+          portal: "documentos",
+          title: item.title,
+          hint: [collection.title, documentType(item), item.year !== null ? String(item.year) : ""]
+            .filter(Boolean)
+            .join(" · "),
+          // Un documento se abre donde vive; su colección queda a un paso.
+          to: href ?? `/documentos/${collection.slug}`,
+          external: Boolean(href && /^https?:/i.test(href)),
+          keywords: `${item.description} ${item.version} documento repositorio`,
+        });
+      }
+    }
+
     for (const area of page.areas) {
       out.push({ id: `a-${area.id}`, portal: "oficina", title: area.name, hint: area.does, to: "/equipo", keywords: "area oficina equipo" });
     }
@@ -241,7 +272,7 @@ export function useSiteIndex() {
       });
     }
     return out;
-  }, [catalog.data, live.data, pillars.data, projects.data, documents.data, bulletins.data, page]);
+  }, [catalog.data, live.data, pillars.data, projects.data, documents.data, bulletins.data, page, library.data]);
 
   const loading = catalog.isPending || pillars.isPending || projects.isPending;
   return { entries, loading };

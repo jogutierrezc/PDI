@@ -41,7 +41,8 @@ export type AdminSection =
   | "users"
   | "repository"
   | "cifras"
-  | "observatorio";
+  | "observatorio"
+  | "tableros";
 
 interface NavItem {
   id: AdminSection;
@@ -53,7 +54,7 @@ interface NavItem {
 }
 
 interface NavGroup {
-  id: "planeacion" | "pdi" | "cifras" | "observatorio" | "sistema";
+  id: "planeacion" | "pdi" | "cifras" | "observatorio" | "tableros" | "sistema";
   label: string;
   items: NavItem[];
 }
@@ -99,6 +100,16 @@ const navigation: NavGroup[] = [
     label: "Observatorio de Analítica",
     items: [
       { id: "observatorio", label: "Taller del Observatorio", icon: "spark-chart", to: "/admin/observatorio", minimum: "consulta" },
+    ],
+  },
+  {
+    // Cada unidad con sus propios tableros. Va después del Observatorio porque
+    // es lo mismo repartido: allí un observatorio institucional, aquí uno por
+    // facultad, programa u oficina.
+    id: "tableros",
+    label: "Mis Tableros",
+    items: [
+      { id: "tableros", label: "Unidades y tableros", icon: "layers", to: "/admin/tableros", minimum: "consulta" },
     ],
   },
   {
@@ -356,7 +367,7 @@ export function AdminShell({
             <nav className="admin-crumbs" aria-label="Ruta">
               <ol>
                 <li>{group?.label ?? kicker}</li>
-                {group && group.id !== "cifras" && group.id !== "observatorio" && kicker && kicker !== group.label && <li>{kicker}</li>}
+                {group && group.id !== "cifras" && group.id !== "observatorio" && group.id !== "tableros" && kicker && kicker !== group.label && <li>{kicker}</li>}
                 <li aria-current="page">{title}</li>
               </ol>
             </nav>

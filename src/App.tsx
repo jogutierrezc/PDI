@@ -75,6 +75,15 @@ const OpenDataReport = lazy(() =>
 const IntranetBulletinPage = lazy(() =>
   import("./modules/boletin/BulletinViewer").then((m) => ({ default: m.IntranetBulletinPage })),
 );
+const BoardsAdmin = lazy(() =>
+  import("./modules/tableros/BoardsAdmin").then((m) => ({ default: m.BoardsAdmin })),
+);
+const BoardWorkshop = lazy(() =>
+  import("./modules/tableros/BoardWorkshop").then((m) => ({ default: m.BoardWorkshop })),
+);
+const BoardPage = lazy(() =>
+  import("./modules/tableros/BoardPage").then((m) => ({ default: m.BoardPage })),
+);
 const ObservatoryHub = lazy(() =>
   import("./modules/datos-abiertos/observatorio/Observatory").then((m) => ({ default: m.ObservatoryHub })),
 );
@@ -181,6 +190,9 @@ export default function App() {
           <Route path="/facultades" element={<FacultyPortal />} />
           <Route path="/facultades/:slug" element={<FacultyDetail />} />
           <Route path="/desarrollo-tecnologico" element={<TechDevelopment />} />
+          {/* El tablero de una unidad: misma dirección sea privado o público.
+              Lo que cambia es a quién le responde la base, no la ruta. */}
+          <Route path="/tableros/:unidad/:tablero" element={<BoardPage />} />
           <Route path="/datos-abiertos" element={<OpenDataPortal />} />
           <Route path="/datos-abiertos/observatorio" element={<ObservatoryHub />} />
           <Route path="/datos-abiertos/observatorio/:tema" element={<ObservatoryTopic />} />
@@ -282,6 +294,22 @@ export default function App() {
             }
           />
           {/* UDES en Cifras: estación e informe en la ruta, periodo en ?periodo=. */}
+          <Route
+            path="/admin/tableros/:unidad/tablero/:tablero/:estacion?"
+            element={
+              <RequireRole minimum="consulta" screen="tableros">
+                <BoardWorkshop />
+              </RequireRole>
+            }
+          />
+          <Route
+            path="/admin/tableros/:unidad?/:vista?"
+            element={
+              <RequireRole minimum="consulta" screen="tableros">
+                <BoardsAdmin />
+              </RequireRole>
+            }
+          />
           {/* Una sola ruta con segmentos opcionales: cambiar de estación no desmonta el módulo. */}
           <Route
             path="/admin/udes-en-cifras/:station?/:report?"

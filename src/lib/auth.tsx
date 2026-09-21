@@ -44,6 +44,7 @@ export const SCREEN_PATHS: Record<AdminScreen, string> = {
   repository: "/implementacion#repositorio",
   cifras: "/admin/udes-en-cifras",
   observatorio: "/admin/observatorio",
+  tableros: "/admin/tableros",
   structure: "/admin/estructura",
   parameters: "/admin/parametros",
   development: "/admin/desarrollo",
@@ -81,6 +82,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
   const [access, setAccess] = useState<AccessScope | null>(null);
+  /** ¿Está en alguna unidad de Mis Tableros? Pertenecer ES el permiso. */
+  const [inAnyUnit, setInAnyUnit] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -109,6 +112,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const person = data && data.is_active ? (data as Profile) : null;
     // Releer el perfil sin cambios no debe repintar toda la intranet.
     setProfile((previous) => (JSON.stringify(previous) === JSON.stringify(person) ? previous : person));
+
+    // Pertenecer a una unidad abre «Mis Tableros» sin que haga falta marcarlo
+    // además en el rol de acceso. Son dos puertas para lo mismo, y quien mete a
+    // alguien en una facultad da por hecho —con razón— que ya puede entrar.
+    // Sin la migración 0057 esto falla y se queda en falso, que es lo de antes.
+    const belongs = person
+      ? await supabase.from("unit_members").select("id").eq("profile_id", person.id).limit(1)
+      : null;
+    setInAnyUnit(Boolean(belongs?.data?.length));
 
     // El rol de acceso decide qué pantallas e informes se enseñan. Si no se
     // puede leer (base sin la migración 0024), la sesión sigue como antes.
@@ -191,6 +203,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     await supabase.auth.signOut();
     setProfile(null);
     setAccess(null);
+    setInAnyUnit(false);
     setSession(null);
   }, []);
 
@@ -212,10 +225,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     (screen: AdminScreen) => {
       if (!profile?.is_active) return false;
       if (screen === "users" && RANK[profile.role] < RANK.admin) return false;
+      // Mis Tableros se gana perteneciendo a una unidad, no marcándolo aparte.
+      if (screen === "tableros" && inAnyUnit) return true;
       if (!access) return true;
       return access.role.all_screens || access.role.screens.includes(screen);
     },
-    [profile, access],
+    [profile, access, inAnyUnit],
   );
 
   const reachesReport = useCallback(

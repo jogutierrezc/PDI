@@ -29,11 +29,17 @@ interface ChartFrameProps {
   exportName?: string;
   /** false para paneles que no son una gráfica. */
   exportable?: boolean;
+  /**
+   * Quién firma la imagen descargada. Por defecto el portal estadístico; un
+   * tablero de unidad pone el suyo, porque una gráfica que sale de aquí tiene
+   * que decir de qué oficina viene y no de cuál se parece.
+   */
+  stamp?: string;
 }
 
 const stampDate = new Intl.DateTimeFormat("es-CO", { day: "numeric", month: "long", year: "numeric" });
 
-export function ChartFrame({ title, subtitle, source, actions, children, className = "", id, exportName, exportable = true }: ChartFrameProps) {
+export function ChartFrame({ title, subtitle, source, actions, children, className = "", id, exportName, exportable = true, stamp }: ChartFrameProps) {
   const figure = useRef<HTMLElement>(null);
   const [busy, setBusy] = useState<ImageFormat | null>(null);
   const [failed, setFailed] = useState(false);
@@ -87,7 +93,7 @@ export function ChartFrame({ title, subtitle, source, actions, children, classNa
       <div className="od-frame__body">{children}</div>
       {source && <p className="od-frame__source">Reporta: {source}</p>}
       <p className="od-frame__stamp" aria-hidden="true">
-        <span>UDES en Cifras · Universidad de Santander</span>
+        <span>{stamp ?? "UDES en Cifras"} · Universidad de Santander</span>
         <span>Descargada el {stampDate.format(new Date())}</span>
       </p>
     </figure>

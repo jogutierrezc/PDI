@@ -7,13 +7,18 @@
    abrirse al cruzar la barra), con clic o con teclado (Enter/Espacio). Escape
    lo cierra y devuelve el foco al botón; cambiar de página también.
 
-   En móvil (< 1024 px) todo va en un cajón con acordeón.
+   El último sitio de la barra es una puerta o una persona: sin sesión lleva a
+   la intranet, con sesión abre lo que solo esa persona puede abrir.
+
+   En móvil (< 1180 px) todo va en un cajón con acordeón.
    ========================================================================== */
 
 import { Suspense, lazy, useEffect, useRef, useState } from "react";
 import { Link, NavLink, useLocation, useNavigate } from "react-router-dom";
 import { Icon } from "../ui/Icon";
 import { useTheme } from "../../lib/theme";
+import { useAuth } from "../../lib/auth";
+import { SessionMenu } from "./SessionMenu";
 import type { PortalId } from "./MegaPanel";
 import "./site-header.css";
 
@@ -25,7 +30,14 @@ const PORTALS: { id: PortalId; label: string; match: (path: string) => boolean }
   { id: "observatorio", label: "Observatorio", match: (p) => p.startsWith("/datos-abiertos/observatorio") },
 ];
 
-const OPEN_DELAY = 140;
+/* Abrir al pasar el cursor pide intención, no un roce. Cruzar la barra para
+   llegar al buscador pasa por encima de tres botones; con la espera corta de
+   antes, los tres panales se asomaban y se iban, y eso es lo que se veía feo.
+   260 ms es más que un barrido y menos que una duda. */
+const OPEN_DELAY = 260;
+/* Cambiar de portal con uno ya abierto tampoco es instantáneo: si lo fuera,
+   recorrer la barra encendería todos los paneles de camino. */
+const SWITCH_DELAY = 90;
 const CLOSE_DELAY = 220;
 
 export function SiteHeader({ onSearch }: { onSearch?: () => void }) {
@@ -33,21 +45,32 @@ export function SiteHeader({ onSearch }: { onSearch?: () => void }) {
   const [mobile, setMobile] = useState(false);
   const [everOpened, setEverOpened] = useState(false);
   const { resolved, toggle } = useTheme();
+  const { profile } = useAuth();
   const location = useLocation();
   const navigate = useNavigate();
   const header = useRef<HTMLElement>(null);
   const buttons = useRef<Partial<Record<PortalId, HTMLButtonElement | null>>>({});
   const timer = useRef<number>();
+  /** Qué portal está esperando para abrirse. Sirve para cancelarlo al salir. */
+  const pending = useRef<PortalId | null>(null);
   const finePointer = typeof window !== "undefined" && window.matchMedia("(hover: hover) and (pointer: fine)").matches;
 
   const show = (id: PortalId | null) => {
     window.clearTimeout(timer.current);
+    pending.current = null;
     if (id) setEverOpened(true);
     setOpen(id);
   };
   const later = (id: PortalId | null, delay: number) => {
     window.clearTimeout(timer.current);
+    pending.current = id;
     timer.current = window.setTimeout(() => show(id), delay);
+  };
+  /** Salir del botón antes de que se cumpla la espera cancela la apertura. */
+  const abandon = (id: PortalId) => {
+    if (pending.current !== id) return;
+    window.clearTimeout(timer.current);
+    pending.current = null;
   };
 
   // Cambiar de página cierra todo.
@@ -135,7 +158,8 @@ export function SiteHeader({ onSearch }: { onSearch?: () => void }) {
                 aria-expanded={open === p.id}
                 aria-controls="sh-panel"
                 data-current={current || undefined}
-                onPointerEnter={() => finePointer && later(p.id, open ? 0 : OPEN_DELAY)}
+                onPointerEnter={() => finePointer && later(p.id, open ? SWITCH_DELAY : OPEN_DELAY)}
+                onPointerLeave={() => finePointer && abandon(p.id)}
                 onClick={() => show(open === p.id ? null : p.id)}
               >
                 {p.label}
@@ -158,9 +182,7 @@ export function SiteHeader({ onSearch }: { onSearch?: () => void }) {
           <button type="button" className="sh-icon" onClick={toggle} aria-label={resolved === "dark" ? "Cambiar a tema claro" : "Cambiar a tema oscuro"}>
             <Icon name={resolved === "dark" ? "sun" : "moon"} size={17} />
           </button>
-          <Link className="sh-intranet" to="/acceso-intranet">
-            <Icon name="lock" size={15} /> Intranet
-          </Link>
+          <SessionMenu />
           <button
             type="button"
             className="sh-icon sh-menu-toggle"
@@ -205,9 +227,20 @@ export function SiteHeader({ onSearch }: { onSearch?: () => void }) {
             <Link to="/documentos" onClick={close}>
               Documentos
             </Link>
-            <Link to="/acceso-intranet" onClick={close}>
-              Intranet
-            </Link>
+            {profile ? (
+              <>
+                <Link to="/admin/tableros" onClick={close}>
+                  Mis Tableros
+                </Link>
+                <Link to="/admin" onClick={close}>
+                  Intranet · {profile.full_name?.trim() || profile.email}
+                </Link>
+              </>
+            ) : (
+              <Link to="/acceso-intranet" onClick={close}>
+                Intranet
+              </Link>
+            )}
           </nav>
         </div>
       )}

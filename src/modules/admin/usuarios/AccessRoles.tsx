@@ -49,6 +49,7 @@ export const SCREEN_GROUPS: { label: string; screens: { id: AdminScreen; label: 
   },
   { label: "UDES en Cifras", screens: [{ id: "cifras", label: "Estaciones del periodo" }] },
   { label: "Observatorio de Analítica", screens: [{ id: "observatorio", label: "Taller del Observatorio" }] },
+  { label: "Mis Tableros", screens: [{ id: "tableros", label: "Unidades y tableros" }] },
   {
     label: "Sistema",
     screens: [
@@ -351,6 +352,9 @@ function AccessRoleForm({
                     />
                     {screen.label}
                     {screen.id === "users" && <small> · solo tiene efecto con capacidad de administración</small>}
+                    {screen.id === "tableros" && (
+                      <small> · quien pertenece a una unidad lo ve aunque no se marque aquí</small>
+                    )}
                   </label>
                 ))}
               </div>

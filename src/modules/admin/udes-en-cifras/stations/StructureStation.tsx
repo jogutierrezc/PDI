@@ -42,17 +42,20 @@ import {
   useSaveMap,
   useSavePipeline,
   useSaveRanking,
+  useSaveMedalBoard,
   useSaveReport,
   useSaveSaberPro,
   useSaveSaberTyt,
 } from "../od-data";
 import { ConfirmButton, Panel, SaveState, StageEmpty, YearPicker, slugify } from "../ui";
 import { RankingForm } from "./RankingCapture";
+import { MedalBoardForm } from "./MedalCapture";
 import { SaberProForm } from "./SaberProCapture";
 import { SaberTytForm } from "./SaberTytCapture";
 import { FreeSetForm } from "./FreeSetCapture";
 import { TEMPORALITY_LABEL } from "../../../datos-abiertos/data/free-sets";
 import { RANKING_SYSTEMS, RANKING_VIEWS } from "../../../datos-abiertos/data/rankings";
+import { MEDAL_SORT, orderedTiers } from "../../../datos-abiertos/data/medals";
 
 const FORMAT_LABEL: Record<OdValueFormat, string> = { entero: "Entero", porcentaje: "Porcentaje", decimal: "Decimal" };
 const DIRECTION_LABEL: Record<OdDirection, string> = { sube: "Subir es mejor", baja: "Bajar es mejor", neutro: "Neutro" };
@@ -519,7 +522,7 @@ function IndicatorForm({
 
 /* --- Conjuntos visuales --------------------------------------------------------------------- */
 
-type DatasetKind = "desglose" | "calor" | "mapa" | "tuberia" | "historico" | "ranking" | "saber" | "tyt" | "libre";
+type DatasetKind = "desglose" | "calor" | "mapa" | "tuberia" | "historico" | "ranking" | "medallero" | "saber" | "tyt" | "libre";
 
 const MEASURE_LABEL: Record<OdPipelineMeasure, string> = {
   estudiantes: "Estudiantes que siguen en cada etapa (el portal lo muestra en %)",
@@ -542,6 +545,7 @@ function DatasetsEditor({ data, reportId, years, canEdit }: { data: StationProps
   const savePipeline = useSavePipeline();
   const saveHistory = useSaveHistory();
   const saveRanking = useSaveRanking();
+  const saveMedalBoard = useSaveMedalBoard();
   const saveSaberPro = useSaveSaberPro();
   const saveSaberTyt = useSaveSaberTyt();
   const saveFreeSet = useSaveFreeSet();
@@ -557,6 +561,7 @@ function DatasetsEditor({ data, reportId, years, canEdit }: { data: StationProps
   const pipelines = data.rows.pipelines.filter((p) => p.report_id === reportId);
   const histories = data.rows.histories.filter((h) => h.report_id === reportId);
   const rankings = (data.rows.rankings ?? []).filter((r) => r.report_id === reportId).sort((a, b) => a.position - b.position);
+  const medalBoards = (data.rows.medalBoards ?? []).filter((m) => m.report_id === reportId).sort((a, b) => a.position - b.position);
   const saberPro = (data.rows.saberPro ?? []).filter((sp) => sp.report_id === reportId).sort((a, b) => a.position - b.position);
   const saberYears = (id: string) => new Set((data.rows.saberProResults ?? []).filter((r) => r.saber_id === id).map((r) => r.year)).size;
   const saberTyt = (data.rows.saberTyt ?? []).filter((t) => t.report_id === reportId).sort((a, b) => a.position - b.position);
@@ -575,12 +580,12 @@ function DatasetsEditor({ data, reportId, years, canEdit }: { data: StationProps
     return filled;
   };
   const offices = data.rows.offices;
-  const mutations = [saveBreakdown, saveHeatmap, saveMap, savePipeline, saveHistory, saveRanking, saveSaberPro, saveSaberTyt, saveFreeSet, remove];
+  const mutations = [saveBreakdown, saveHeatmap, saveMap, savePipeline, saveHistory, saveRanking, saveMedalBoard, saveSaberPro, saveSaberTyt, saveFreeSet, remove];
   const pending = mutations.some((m) => m.isPending);
   const error = mutations.find((m) => m.error)?.error ?? null;
   const success = mutations.some((m) => m.isSuccess);
   const done = { onSuccess: () => { setAdding(null); setEditing(null); } };
-  const total = breakdowns.length + heatmaps.length + maps.length + pipelines.length + histories.length + rankings.length + saberPro.length + saberTyt.length + freeSets.length;
+  const total = breakdowns.length + heatmaps.length + maps.length + pipelines.length + histories.length + rankings.length + medalBoards.length + saberPro.length + saberTyt.length + freeSets.length;
 
   const lines = (text: string) => text.split("\n").map((s) => s.trim()).filter(Boolean);
   const yearsDetail = (list: number[] | null) => (list && list.length ? list.join(", ") : "todos los años");
@@ -623,6 +628,7 @@ function DatasetsEditor({ data, reportId, years, canEdit }: { data: StationProps
               <option value="mapa:saliente">Mapa de movilidad saliente (campus → país)</option>
               <option value="mapa:convenios">Mapa de convenios internacionales por país (mapa de calor)</option>
               <option value="ranking">Ranking universitario (QS, THE…)</option>
+              <option value="medallero">Medallero (juegos, festivales, concursos)</option>
               {/* Un informe suele tener un solo conjunto Saber PRO: se ofrece mientras no lo tenga. */}
               {saberPro.length === 0 && <option value="saber">Resultados Saber PRO (ICFES)</option>}
               {/* El Motor Beta cruza dos pruebas de la misma persona: también uno por informe. */}
@@ -640,6 +646,26 @@ function DatasetsEditor({ data, reportId, years, canEdit }: { data: StationProps
           onSubmit={(f) =>
             saveRanking.mutate(
               { report_id: reportId, key: uniqueKey(f.title, rankings.map((r) => r.key)), title: f.title, description: f.description, system: f.system, accent: f.accent, view: f.view, office_id: f.office_id || null, position: rankings.length + 1 },
+              done,
+            )
+          }
+        />
+      )}
+      {adding === "medallero" && (
+        <MedalBoardForm
+          offices={offices}
+          onCancel={() => setAdding(null)}
+          onSubmit={(f) =>
+            saveMedalBoard.mutate(
+              {
+                report_id: reportId,
+                key: uniqueKey(f.title, medalBoards.map((m) => m.key)),
+                title: f.title, description: f.description, row_label: f.row_label,
+                reporting: f.reporting, scope: f.scope,
+                fixed_year: f.fixed_year ? Number(f.fixed_year) : null,
+                sort: f.sort, tiers: f.tiers, note: f.note,
+                office_id: f.office_id || null, position: medalBoards.length + 1,
+              },
               done,
             )
           }
@@ -739,6 +765,41 @@ function DatasetsEditor({ data, reportId, years, canEdit }: { data: StationProps
             editing={editing === m.id} onEdit={() => setEditing(m.id)} onDelete={() => remove.mutate({ table: "od_maps", id: m.id })}>
             <DatasetForm kind="mapa" offices={offices} years={years} initial={{ title: m.title, description: m.description, unit: m.unit, mode: m.mode, reporting: m.reporting ?? "anual", years: m.years, office_id: m.office_id ?? "" }}
               onCancel={() => setEditing(null)} onSubmit={(f) => saveMap.mutate({ id: m.id, report_id: reportId, title: f.title, description: f.description, unit: f.unit, mode: f.mode, reporting: reportingFor(f), years: reportingFor(f) === "global" ? null : f.years, office_id: f.office_id || null }, done)} />
+          </DatasetItem>
+        ))}
+        {medalBoards.map((m) => (
+          <DatasetItem
+            key={m.id}
+            kind="Medallero"
+            title={m.title}
+            detail={`${m.row_label} · ${orderedTiers(m).map((t) => t.label).join(", ")} · ${MEDAL_SORT[m.sort].label.toLowerCase()}`}
+            canEdit={canEdit}
+            editing={editing === m.id}
+            onEdit={() => setEditing(m.id)}
+            onDelete={() => remove.mutate({ table: "od_medal_boards", id: m.id })}
+          >
+            <MedalBoardForm
+              offices={offices}
+              initial={{
+                title: m.title, description: m.description, row_label: m.row_label,
+                reporting: m.reporting, scope: m.scope,
+                fixed_year: m.fixed_year ? String(m.fixed_year) : "",
+                sort: m.sort, tiers: orderedTiers(m), note: m.note, office_id: m.office_id ?? "",
+              }}
+              onCancel={() => setEditing(null)}
+              onSubmit={(f) =>
+                saveMedalBoard.mutate(
+                  {
+                    id: m.id, report_id: reportId,
+                    title: f.title, description: f.description, row_label: f.row_label,
+                    reporting: f.reporting, scope: f.scope,
+                    fixed_year: f.fixed_year ? Number(f.fixed_year) : null,
+                    sort: f.sort, tiers: f.tiers, note: f.note, office_id: f.office_id || null,
+                  },
+                  done,
+                )
+              }
+            />
           </DatasetItem>
         ))}
         {rankings.map((r) => (

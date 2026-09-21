@@ -48,6 +48,8 @@ import type {
   OdSaberTytRow,
   OdSaberTytResultRow,
   OdModelRow,
+  OdMedalBoardRow,
+  OdMedalEntryRow,
   OdValueRow,
 } from "../../../types/database";
 import type {
@@ -74,6 +76,7 @@ import type { Term, TermCampusValues } from "./types";
 import { annualFigure, periodText, TERMS } from "./terms";
 import { editionFromRow } from "./rankings";
 import type { RankingData } from "./rankings";
+import type { MedalBoard } from "./medals";
 import type { SaberProData } from "./saber-pro";
 import type { FreeSet } from "./free-sets";
 import type { SaberTytData } from "./saber-tyt";
@@ -112,6 +115,9 @@ export interface OpenDataRows {
   saberTytResults: OdSaberTytResultRow[];
   /** 0046: vacía si la base aún no tiene la migración. */
   models: OdModelRow[];
+  /** 0056: vacías si la base aún no tiene la migración. */
+  medalBoards: OdMedalBoardRow[];
+  medalEntries: OdMedalEntryRow[];
   tableRows: OdTableRecordRow[];
   blocks: OdReportBlockRow[];
 }
@@ -132,20 +138,6 @@ function unwrapOptional<T>({ data, error }: Result<T>): T[] {
 }
 
 /**
- * Trae todas las filas de una consulta, página a página.
- *
- * Se avanza por la clave —«dame las siguientes a esta»— y no por
- * desplazamiento. Con `range(2000, 2999)` la base tiene que recorrer *y
- * autorizar* también las 2.000 filas que se salta, de modo que cada página
- * sale más cara que la anterior; sobre `od_saber_pro_results`, con la
- * instancia fría, la tercera tardaba el doble que la primera y la consulta
- * llegó a agotar el tiempo del servidor. Pidiendo por clave, toda página
- * cuesta lo mismo que la primera.
- *
- * El orden en que lleguen da igual: el ensamblado siempre reordena por su
- * propia columna o indexa por clave, nunca confía en el orden de llegada.
- */
-/**
  * Trae todas las filas de una consulta que no tiene columna `id`.
  *
  * `od_heatmap_cells` y `od_map_values` se identifican por una clave compuesta,
@@ -164,6 +156,20 @@ async function fetchAllByOffset<T>(page: (from: number, to: number) => PromiseLi
   }
 }
 
+/**
+ * Trae todas las filas de una consulta, página a página.
+ *
+ * Se avanza por la clave —«dame las siguientes a esta»— y no por
+ * desplazamiento. Con `range(2000, 2999)` la base tiene que recorrer *y
+ * autorizar* también las 2.000 filas que se salta, de modo que cada página
+ * sale más cara que la anterior; sobre `od_saber_pro_results`, con la
+ * instancia fría, la tercera tardaba el doble que la primera y la consulta
+ * llegó a agotar el tiempo del servidor. Pidiendo por clave, toda página
+ * cuesta lo mismo que la primera.
+ *
+ * El orden en que lleguen da igual: el ensamblado siempre reordena por su
+ * propia columna o indexa por clave, nunca confía en el orden de llegada.
+ */
 async function fetchAll<T>(page: (after: string | null) => PromiseLike<Result<T & { id: string }>>): Promise<T[]> {
   const rows: (T & { id: string })[] = [];
   let after: string | null = null;
@@ -206,11 +212,11 @@ export async function fetchOpenDataRows({ periodId, includeDrafts = false }: Fet
   const empty: OpenDataRows = {
     period, campuses, offices, reports, indicators: [], values: [], breakdowns: [], breakdownValues: [],
     heatmaps: [], heatmapCells: [], maps: [], mapValues: [], pipelines: [], pipelineValues: [], histories: [],
-    historyValues: [], sections: [], tables: [], tableRows: [], rankings: [], rankingEditions: [], saberPro: [], saberProResults: [], freeSets: [], freeSetRows: [], saberTyt: [], saberTytResults: [], models: [], blocks: [],
+    historyValues: [], sections: [], tables: [], tableRows: [], rankings: [], rankingEditions: [], saberPro: [], saberProResults: [], freeSets: [], freeSetRows: [], saberTyt: [], saberTytResults: [], models: [], blocks: [], medalBoards: [], medalEntries: [],
   };
   if (reportIds.length === 0) return empty;
 
-  const [indicators, breakdowns, heatmaps, maps, pipelines, histories, sections, tables, rankings, saberPro, freeSets, saberTyt, models, blocks] = await Promise.all([
+  const [indicators, breakdowns, heatmaps, maps, pipelines, histories, sections, tables, rankings, saberPro, freeSets, saberTyt, models, medalBoards, blocks] = await Promise.all([
     supabase.from("od_indicators").select("*").in("report_id", reportIds).order("position").then(unwrap<OdIndicatorRow>),
     supabase.from("od_breakdowns").select("*").in("report_id", reportIds).order("position").then(unwrap<OdBreakdownRow>),
     supabase.from("od_heatmaps").select("*").in("report_id", reportIds).order("position").then(unwrap<OdHeatmapRow>),
@@ -224,13 +230,14 @@ export async function fetchOpenDataRows({ periodId, includeDrafts = false }: Fet
     supabase.from("od_free_sets").select("*").in("report_id", reportIds).order("position").then(unwrapOptional<OdFreeSetRow>),
     supabase.from("od_saber_tyt").select("*").in("report_id", reportIds).order("position").then(unwrapOptional<OdSaberTytRow>),
     supabase.from("od_models").select("*").in("report_id", reportIds).order("position").then(unwrapOptional<OdModelRow>),
+    supabase.from("od_medal_boards").select("*").in("report_id", reportIds).order("position").then(unwrapOptional<OdMedalBoardRow>),
     supabase.from("od_report_blocks").select("*").in("report_id", reportIds).order("position").then(unwrap<OdReportBlockRow>),
   ]);
 
   const ids = (rows: { id: string }[]) => rows.map((r) => r.id);
   const none = Promise.resolve([] as never[]);
 
-  const [values, breakdownValues, heatmapCells, mapValues, pipelineValues, historyValues, tableRows, rankingEditions, saberProResults, freeSetRows, saberTytResults] = await Promise.all([
+  const [values, breakdownValues, heatmapCells, mapValues, pipelineValues, historyValues, tableRows, rankingEditions, saberProResults, freeSetRows, saberTytResults, medalEntries] = await Promise.all([
     indicators.length
       ? fetchAll<OdValueRow>((after) =>
           (after === null ? supabase.from("od_values").select("id,indicator_id,year,term,campus_id,value,updated_at")
@@ -292,12 +299,15 @@ export async function fetchOpenDataRows({ periodId, includeDrafts = false }: Fet
           (after === null ? supabase.from("od_saber_tyt_results").select("*").in("tyt_id", ids(saberTyt)) : (supabase.from("od_saber_tyt_results").select("*").in("tyt_id", ids(saberTyt))).gt("id", after)).order("id").limit(PAGE),
         )
       : none,
+    medalBoards.length
+      ? supabase.from("od_medal_entries").select("*").in("board_id", ids(medalBoards)).order("position").then(unwrapOptional<OdMedalEntryRow>)
+      : none,
   ]);
 
   return {
     ...empty, indicators, values, breakdowns, breakdownValues, heatmaps, heatmapCells, maps, mapValues, pipelines,
     pipelineValues, histories, historyValues, sections, tables, tableRows, rankings, rankingEditions, saberPro,
-    saberProResults, freeSets, freeSetRows, saberTyt, saberTytResults, models, blocks,
+    saberProResults, freeSets, freeSetRows, saberTyt, saberTytResults, models, blocks, medalBoards, medalEntries,
   };
 }
 
@@ -631,6 +641,23 @@ export function assembleCatalog(rows: OpenDataRows): OpenDataCatalog {
         editions: (rows.rankingEditions ?? []).filter((e) => e.ranking_id === r.id).map(editionFromRow).sort((a, b) => a.year - b.year),
       }));
 
+    const medals: MedalBoard[] = (rows.medalBoards ?? [])
+      .filter((b) => b.report_id === report.id)
+      .sort((a, b) => a.position - b.position)
+      .map((b) => ({
+        id: b.key, uuid: b.id, title: b.title, description: b.description,
+        rowLabel: b.row_label, reporting: b.reporting, scope: b.scope,
+        fixedYear: b.fixed_year, sort: b.sort,
+        tiers: Array.isArray(b.tiers) ? b.tiers : [],
+        note: b.note, source: source(b.office_id), officeId: b.office_id,
+        entries: (rows.medalEntries ?? [])
+          .filter((e) => e.board_id === b.id)
+          .map((e) => ({
+            year: e.year, term: e.term, label: e.label,
+            counts: e.counts ?? {}, note: e.note ?? "", position: e.position,
+          })),
+      }));
+
     const saberPro: SaberProData[] = (rows.saberPro ?? [])
       .filter((sp) => sp.report_id === report.id)
       .sort((a, b) => a.position - b.position)
@@ -717,6 +744,7 @@ export function assembleCatalog(rows: OpenDataRows): OpenDataCatalog {
       sections,
       tables,
       rankings,
+      medals,
       saberPro,
       freeSets,
       saberTyt,

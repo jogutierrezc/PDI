@@ -36,6 +36,7 @@ import type {
   OdPublicationRow,
   OdRankingEditionRow,
   OdRankingRow,
+  OdMedalBoardRow,
   OdReportBlockRow,
   OdReportRow,
   OdSaberProResultRow,
@@ -334,7 +335,7 @@ async function ensureBlock(reportId: string, kind: OdBlockKind, refId: string | 
 }
 
 type DatasetTable =
-  | "od_breakdowns" | "od_heatmaps" | "od_maps" | "od_pipelines" | "od_histories" | "od_rankings" | "od_saber_pro" | "od_saber_tyt" | "od_free_sets";
+  | "od_breakdowns" | "od_heatmaps" | "od_maps" | "od_pipelines" | "od_histories" | "od_rankings" | "od_saber_pro" | "od_saber_tyt" | "od_free_sets" | "od_medal_boards";
 
 /** Inserta o actualiza un conjunto; al insertarlo, le crea su bloque. */
 async function saveDataset(
@@ -349,7 +350,7 @@ async function saveDataset(
   }
   const created = unwrap<{ id: string }>(await supabase.from(table).insert(fields).select("id").single());
   // Desgloses, rankings, Saber PRO y el Motor Beta comparten un bloque del informe; los demás, uno por conjunto.
-  const shared: OdBlockKind[] = ["desgloses", "rankings", "saber_pro", "saber_tyt"];
+  const shared: OdBlockKind[] = ["desgloses", "rankings", "saber_pro", "saber_tyt", "medallero"];
   await ensureBlock(row.report_id, kind, shared.includes(kind) ? null : created.id);
 }
 
@@ -509,6 +510,62 @@ export function useDeleteRankingEdition() {
   return useOdMutation(async ({ rankingId, year }: { rankingId: string; year: number }) => {
     await run(supabase.from("od_ranking_editions").delete().eq("ranking_id", rankingId).eq("year", year));
   });
+}
+
+/* --- Medallero (0056) --------------------------------------------------------- */
+
+export function useSaveMedalBoard() {
+  return useOdMutation(async (row: Partial<OdMedalBoardRow> & { report_id: string }) => saveDataset("od_medal_boards", "medallero", row));
+}
+
+export function useDeleteMedalBoard() {
+  return useOdMutation(async (boardId: string) => {
+    await run(supabase.from("od_medal_boards").delete().eq("id", boardId));
+  });
+}
+
+/**
+ * Guarda las filas de un corte de un medallero.
+ *
+ * Se reemplaza el corte entero —se borra lo que ya no está y se sube lo que
+ * queda— porque la captura trabaja con la tabla de un año delante: quitar una
+ * fila de la rejilla tiene que quitarla de la base, y una tabla sin esa fila
+ * no puede decirlo de otra forma.
+ */
+export function useSaveMedalEntries() {
+  return useOdMutation(
+    async ({
+      periodId,
+      reportId,
+      boardId,
+      year,
+      term,
+      entries,
+    }: {
+      periodId: string;
+      reportId: string;
+      boardId: string;
+      year: number;
+      term: "A" | "B" | null;
+      entries: { label: string; counts: Record<string, number | null>; note: string; position: number }[];
+    }) => {
+      const keep = entries.map((e) => e.label);
+      let clear = supabase.from("od_medal_entries").delete().eq("board_id", boardId).eq("year", year);
+      clear = term === null ? clear.is("term", null) : clear.eq("term", term);
+      if (keep.length) clear = clear.not("label", "in", `(${keep.map((l) => `"${l.replace(/"/g, '""')}"`).join(",")})`);
+      await run(clear);
+
+      if (entries.length) {
+        await run(
+          supabase.from("od_medal_entries").upsert(
+            entries.map((e) => ({ board_id: boardId, year, term, label: e.label, counts: e.counts, note: e.note, position: e.position })),
+            { onConflict: "board_id,year,term,label" },
+          ),
+        );
+      }
+      await logImport(periodId, reportId, "rejilla", entries.length, "", { tabla: "od_medal_entries", anio: year });
+    },
+  );
 }
 
 /* --- Saber PRO (0031) ----------------------------------------------------------- */

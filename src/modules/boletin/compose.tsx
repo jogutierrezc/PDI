@@ -27,6 +27,7 @@ import { isMobilityMap, isWorldMap } from "../datos-abiertos/data/types";
 import { indicatorRef, reportGroups } from "../datos-abiertos/data/groups";
 import { RANKING_SYSTEMS, SCOPE_LABEL, SDGS, latestEdition, parseRank, preferredScope, previousEdition, rankChange, rankOf, rankingShortLabel } from "../datos-abiertos/data/rankings";
 import type { ParsedRank, RankScope, RankingData } from "../datos-abiertos/data/rankings";
+import { medalHeadline, medalUnits } from "./medals";
 import type { ReportGroup } from "../datos-abiertos/data/groups";
 import type {
   Breakdown,
@@ -1445,6 +1446,11 @@ function datasetHighlights(report: Report, entry: BulletinSettings["reports"][nu
         unit: parts ? b.unit : `${b.unit} · ${top.label}`,
         note: parts ? `${when} · mayor: ${top.label} (${formatValue(((top.value ?? 0) / (total || 1)) * 100, "decimal")} %)` : `${when} · la categoría más alta`,
       });
+    } else if (kind === "medallero") {
+      const board = report.medals?.find((x) => x.id === key);
+      const head = board ? medalHeadline(board, settings.cut) : null;
+      if (!head) continue;
+      list.push({ key: item.ref, title: head.title, value: head.value, unit: head.unit, note: head.note });
     } else if (kind === "ranking") {
       const r = report.rankings?.find((x) => x.id === key);
       const edition = r ? latestEdition(r, settings.cut === ALL_YEARS ? undefined : settings.cut) : undefined;
@@ -1876,6 +1882,13 @@ export function compose(catalog: OpenDataCatalog, settings: BulletinSettings): C
       } else if (kind === "ranking") {
         const r = report.rankings?.find((x) => x.id === key);
         if (r) nodes.push({ node: rankingUnit(r, settings), source: r.source, title: r.title });
+      } else if (kind === "medallero") {
+        const board = report.medals?.find((x) => x.id === key);
+        if (board) {
+          medalUnits(board, settings.cut, DatasetSheet, TableContinuation).forEach(({ node, title, tight }) =>
+            nodes.push({ node, source: board.source, title, tight }),
+          );
+        }
       } else if (kind === "rankings-evo") {
         const node = rankingsEvolutionUnit(report, settings);
         const sources = Array.from(new Set((report.rankings ?? []).map((r) => r.source).filter(Boolean))).join(" · ");

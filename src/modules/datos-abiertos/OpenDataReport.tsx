@@ -60,6 +60,7 @@ import { ALL_YEARS, ANNUAL_RULE_LABEL, cutCode, cutCodeLabel, cutLabel, fromCutC
 import type { Breakdown, CampusId, Indicator, MapDataset, OpenDataCatalog, Report, ReportBlock, Term } from "./data/types";
 import { blockPicks, saberProOf, saberTytOf } from "./data/groups";
 import { RankingsBlock } from "./components/RankingsBlock";
+import { MedalBoardBlock } from "./components/MedalBoardBlock";
 import { SaberProBlock } from "./components/SaberProBlock";
 import { SaberTytBlock } from "./components/SaberTytBlock";
 import { DiversityBoard } from "./components/DiversityBoard";
@@ -439,6 +440,20 @@ function ReportContent({ data, report, year, term, campus, setYear, setTerm, set
         const shown = chosen.map((key) => report.rankings?.find((r) => r.id === key)).filter((r): r is NonNullable<typeof r> => Boolean(r));
         if (!shown.length) return null;
         return <RankingsBlock key={key} rankings={shown} title={block.settings.title} anchor={block.settings.slot ? `od-rankings-${block.settings.slot}` : "od-rankings"} />;
+      }
+      case "medallero": {
+        if (inSection) return null;
+        const chosen = picks.medals(block);
+        const shown = chosen.map((key) => report.medals?.find((m) => m.id === key)).filter((m): m is NonNullable<typeof m> => Boolean(m));
+        if (!shown.length) return null;
+        return (
+          <MedalBoardBlock
+            key={key}
+            boards={shown}
+            title={block.settings.title}
+            anchor={block.settings.slot ? `od-medallero-${block.settings.slot}` : "od-medallero"}
+          />
+        );
       }
       case "libre": {
         if (inSection) return null;

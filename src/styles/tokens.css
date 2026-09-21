@@ -177,6 +177,18 @@
   --od-signal-ink: #1d1402;
   --od-signal-text: #8a5700;
   --od-previous: #0a6f7c;
+
+  /* Medallero (0056): tres metales y nada más. La cuarta categoría en adelante
+     no es un metal —se dibuja como anillo sin relleno—, porque inventar un
+     cuarto color obligaría a separarlo de la plata y no hay sitio. Medidos
+     contra el piso del sistema: tinta >= 4.5:1, disco >= 3:1 sobre la
+     superficie y ΔE >= 15.8 con el ámbar de señal, que no es una medalla. */
+  --od-medal-1: #8f660e;
+  --od-medal-1-ink: #ffffff;
+  --od-medal-2: #657183;
+  --od-medal-2-ink: #ffffff;
+  --od-medal-3: #a2542a;
+  --od-medal-3-ink: #ffffff;
   --od-scrim: rgba(255, 255, 255, 0.9);
   --od-hero-ink: #0a2d63;
   --od-shadow-panel: 0 2px 4px rgba(10, 34, 73, 0.05), 0 18px 40px rgba(10, 34, 73, 0.1);
@@ -391,6 +403,18 @@
     --od-board-muted: #9aaecb;
     --od-signal-text: #f6b93f;
     --od-previous: #6fd3de;
+  --od-medal-1: #caa33c;
+  --od-medal-1-ink: #201704;
+  --od-medal-2: #b3bfcd;
+  --od-medal-2-ink: #151d29;
+  --od-medal-3: #c97b45;
+  --od-medal-3-ink: #2a1608;
+    --od-medal-1: #caa33c;
+    --od-medal-1-ink: #201704;
+    --od-medal-2: #b3bfcd;
+    --od-medal-2-ink: #151d29;
+    --od-medal-3: #c97b45;
+    --od-medal-3-ink: #2a1608;
     --od-scrim: rgba(6, 20, 43, 0.94);
     --od-hero-ink: #f3f6fb;
     --od-shadow-panel: 0 24px 48px rgba(0, 0, 0, 0.35);

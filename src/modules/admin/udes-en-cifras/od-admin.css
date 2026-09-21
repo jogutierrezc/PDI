@@ -3771,3 +3771,131 @@
   .oda-grid-images__list li { grid-template-columns: auto auto minmax(0, 1fr); }
   .oda-grid-images__actions { grid-column: 1 / -1; justify-content: flex-end; }
 }
+
+/* --- Medallero (MedalCapture.tsx) --------------------------------------------
+   El editor enseña el metal de cada categoría junto a su nombre, arriba en la
+   cabecera y en el formulario, para que quien captura vea lo mismo que va a
+   salir publicado. De la cuarta categoría en adelante no hay metal: anillo. */
+
+.oda-tiers {
+  margin: var(--space-4) 0 0;
+  padding: var(--space-4);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  background: var(--surface-2);
+}
+
+.oda-tiers legend {
+  padding: 0 var(--space-2);
+  color: var(--ink-secondary);
+  font-size: var(--text-sm);
+  font-weight: 700;
+}
+
+.oda-tiers__list {
+  display: grid;
+  gap: var(--space-2);
+  margin: var(--space-3) 0;
+  padding: 0;
+  list-style: none;
+}
+
+.oda-tiers__item {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.oda-tiers__item input { flex: 1 1 auto; min-width: 0; }
+
+/* El número del puesto lleva el metal: es la misma pieza que la ficha dibuja. */
+.oda-tiers__rank {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.5rem;
+  height: 1.5rem;
+  border-radius: 999px;
+  font-size: var(--text-xs);
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+}
+
+.oda-tiers__rank[data-metal="1"] { background: var(--od-medal-1); color: var(--od-medal-1-ink); }
+.oda-tiers__rank[data-metal="2"] { background: var(--od-medal-2); color: var(--od-medal-2-ink); }
+.oda-tiers__rank[data-metal="3"] { background: var(--od-medal-3); color: var(--od-medal-3-ink); }
+.oda-tiers__rank[data-metal="rest"] { border: 1.5px solid var(--line-strong); color: var(--ink-secondary); }
+
+.oda-icon-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  color: var(--ink-muted);
+  cursor: pointer;
+}
+
+.oda-icon-button:hover { color: var(--status-risk); border-color: var(--status-risk); }
+.oda-icon-button:focus-visible { outline: 2px solid var(--brand-blue); outline-offset: 1px; }
+
+.admin-field--wide { grid-column: 1 / -1; }
+
+/* El corte que se está capturando: año, y periodo si reporta por periodo. */
+.oda-cut {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-4);
+  margin-bottom: var(--space-4);
+}
+
+/* Como en el resto del sistema, lo ancho se desplaza dentro de su marco. */
+.oda-scroll { overflow-x: auto; }
+
+.oda-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin-top: var(--space-3);
+}
+
+.oda-medal-grid { width: 100%; }
+
+.oda-medal-grid__grip { width: 2.25rem; }
+
+.oda-medal-grid th.oda-medal-grid__tier {
+  white-space: nowrap;
+}
+
+.oda-medal-grid th.oda-medal-grid__tier .oda-tiers__rank {
+  margin-right: var(--space-1);
+  vertical-align: middle;
+}
+
+.oda-medal-grid td.oda-medal-grid__tier { width: 5.5rem; }
+
+.oda-medal-grid td.oda-medal-grid__tier input {
+  width: 100%;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+
+.oda-medal-grid tr[data-dragging] { background: var(--brand-blue-soft); }
+
+.oda-medal-grid tr { position: relative; }
+
+.oda-medal-grid tr[data-drop] td::after,
+.oda-medal-grid tr[data-drop] th::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: var(--brand-blue);
+}
+
+.oda-medal-grid tr[data-drop="antes"] td::after { top: -1px; }
+.oda-medal-grid tr[data-drop="despues"] td::after { bottom: -1px; }

@@ -45,10 +45,11 @@ import { RankingCapture } from "./RankingCapture";
 import { SaberProCapture } from "./SaberProCapture";
 import { SaberTytCapture } from "./SaberTytCapture";
 import { FreeSetCapture } from "./FreeSetCapture";
+import { MedalCapture } from "./MedalCapture";
 import { PasteMessages, PasteTable, breakdownFromTable, heatmapFromTable } from "../PasteTable";
 import { IMPORT_PROFILES } from "../import/investigacion";
 
-type Tab = "importar" | "indicadores" | "desgloses" | "historico" | "calor" | "mapas" | "tuberia" | "rankings" | "saber" | "tyt" | "libres";
+type Tab = "importar" | "indicadores" | "desgloses" | "historico" | "calor" | "mapas" | "tuberia" | "rankings" | "saber" | "tyt" | "libres" | "medalleros";
 const TOTAL = "total";
 
 export function CaptureStation(props: StationProps) {
@@ -69,6 +70,7 @@ export function CaptureStation(props: StationProps) {
     saber: (data.rows.saberPro ?? []).filter((sp) => sp.report_id === report.uuid).length,
     tyt: (data.rows.saberTyt ?? []).filter((t) => t.report_id === report.uuid).length,
     libres: (data.rows.freeSets ?? []).filter((fs) => fs.report_id === report.uuid).length,
+    medalleros: (data.rows.medalBoards ?? []).filter((m) => m.report_id === report.uuid).length,
   };
   const tabs: { id: Tab; label: string }[] = [
     { id: "importar" as Tab, label: "Importar informe" },
@@ -82,6 +84,7 @@ export function CaptureStation(props: StationProps) {
     { id: "saber" as Tab, label: "Saber PRO" },
     { id: "tyt" as Tab, label: "Saber TyT" },
     { id: "libres" as Tab, label: "Conjuntos libres" },
+    { id: "medalleros" as Tab, label: "Medalleros" },
   ].filter((t) => t.id === "indicadores" || t.id === "importar" || counts[t.id] > 0);
 
   return (
@@ -123,6 +126,7 @@ export function CaptureStation(props: StationProps) {
       {tab === "saber" && <SaberProCapture key={report.uuid} {...props} />}
       {tab === "tyt" && <SaberTytCapture key={report.uuid} {...props} />}
       {tab === "libres" && <FreeSetCapture key={report.uuid} {...props} />}
+      {tab === "medalleros" && <MedalCapture key={report.uuid} {...props} />}
     </div>
   );
 }

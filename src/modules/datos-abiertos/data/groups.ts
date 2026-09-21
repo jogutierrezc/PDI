@@ -76,7 +76,7 @@ const sameBlock = (a: ReportBlock, b: ReportBlock) => a === b || (Boolean(a.uuid
  */
 export function blockPicks(report: Report) {
   const blocks = visibleBlocks(report);
-  const pick = (kind: "kpis" | "desgloses" | "rankings", all: string[], explicit: (b: ReportBlock) => string[] | null) => {
+  const pick = (kind: "kpis" | "desgloses" | "rankings" | "medallero", all: string[], explicit: (b: ReportBlock) => string[] | null) => {
     const own = blocks.filter((b) => b.kind === kind);
     const claimed = new Set(own.flatMap((b) => explicit(b) ?? []));
     const restOwner = own.find((b) => explicit(b) === null);
@@ -103,6 +103,11 @@ export function blockPicks(report: Report) {
       "rankings",
       (report.rankings ?? []).map((r) => r.id),
       (b) => (b.settings.rankings?.length ? b.settings.rankings : null),
+    ),
+    medals: pick(
+      "medallero",
+      (report.medals ?? []).map((m) => m.id),
+      (b) => (b.settings.medalleros?.length ? b.settings.medalleros : null),
     ),
   };
 }

@@ -43,6 +43,7 @@ const BLOCK_HELP: Record<OdBlockKind, string> = {
   modelo: "Modelo estadístico del informe: factores asociados con su intervalo, simulador de perfiles, calidad de la clasificación y la muestra.",
   imagenes: "Fotografías en dos columnas, dentro de la ficha y en el boletín.",
   diversidad: "Tablero propio de Diversidad, Equidad e Inclusión: grupos de protección constitucional por corte y campus, mosaico étnico, discapacidad, estratos, género, zona e INES.",
+  medallero: "Lo que gana la universidad cuando compite: juegos, festivales y concursos, con su podio y su tabla de medallas.",
 };
 
 /** Clave corta para distinguir varios bloques del mismo tipo (ver 0029). */
@@ -69,6 +70,7 @@ function DesignEditor({ data, reportId, reportSlug, blocks, canEdit }: { data: S
   const breakdowns = data.rows.breakdowns.filter((b) => b.report_id === reportId);
   const tables = data.rows.tables.filter((t) => t.report_id === reportId);
   const rankings = (data.rows.rankings ?? []).filter((r) => r.report_id === reportId);
+  const medalBoards = (data.rows.medalBoards ?? []).filter((m) => m.report_id === reportId);
   const saberPro = (data.rows.saberPro ?? []).filter((sp) => sp.report_id === reportId).sort((a, b) => a.position - b.position);
   const saberTyt = (data.rows.saberTyt ?? []).filter((t) => t.report_id === reportId).sort((a, b) => a.position - b.position);
   const freeSets = (data.rows.freeSets ?? []).filter((fs) => fs.report_id === reportId).sort((a, b) => a.position - b.position);
@@ -119,6 +121,7 @@ function DesignEditor({ data, reportId, reportSlug, blocks, canEdit }: { data: S
       .map((kind) => ({ kind, ref_id: null, label: BLOCK_LABELS[kind] })),
     ...(breakdowns.length && !draft.some((b) => b.kind === "desgloses") ? [{ kind: "desgloses" as OdBlockKind, ref_id: null, label: BLOCK_LABELS.desgloses }] : []),
     ...(rankings.length && !draft.some((b) => b.kind === "rankings") ? [{ kind: "rankings" as OdBlockKind, ref_id: null, label: BLOCK_LABELS.rankings }] : []),
+    ...(medalBoards.length && !draft.some((b) => b.kind === "medallero") ? [{ kind: "medallero" as OdBlockKind, ref_id: null, label: BLOCK_LABELS.medallero }] : []),
     ...(saberPro.length && !draft.some((b) => b.kind === "saber_pro") ? [{ kind: "saber_pro" as OdBlockKind, ref_id: null, label: BLOCK_LABELS.saber_pro }] : []),
     ...(saberTyt.length && !draft.some((b) => b.kind === "saber_tyt") ? [{ kind: "saber_tyt" as OdBlockKind, ref_id: null, label: BLOCK_LABELS.saber_tyt }] : []),
     // El tablero de la diversidad lee los indicadores del informe DE por su clave.
@@ -269,6 +272,16 @@ function DesignEditor({ data, reportId, reportSlug, blocks, canEdit }: { data: S
                       restState={restState(block, (b) => Boolean(b.settings.rankings?.length))}
                       disabled={!canEdit}
                       onChange={(list) => patch(block.tempId, { settings: { ...block.settings, rankings: list.length ? list : undefined } })}
+                    />
+                  )}
+                  {block.kind === "medallero" && medalBoards.length > 0 && (
+                    <Picker
+                      noun={{ one: "medallero", many: "medalleros", block: "bloque de medalleros" }}
+                      options={medalBoards.map((m) => ({ key: m.key, label: m.title }))}
+                      chosen={block.settings.medalleros ?? []}
+                      restState={restState(block, (b) => Boolean(b.settings.medalleros?.length))}
+                      disabled={!canEdit}
+                      onChange={(list) => patch(block.tempId, { settings: { ...block.settings, medalleros: list.length ? list : undefined } })}
                     />
                   )}
                   {block.kind === "saber_pro" && saberPro.length > 1 && (
@@ -443,6 +456,16 @@ function DesignEditor({ data, reportId, reportSlug, blocks, canEdit }: { data: S
                 onClick={() => add({ kind: "kpis", ref_id: null, visible: true, settings: { slot: newSlot() } })}
               >
                 <Icon name="plus" size={15} /> Otro tablero de indicadores
+              </button>
+            )}
+            {medalBoards.length > 1 && draft.some((b) => b.kind === "medallero") && (
+              <button
+                type="button"
+                className="button-secondary oda-add"
+                disabled={!canEdit}
+                onClick={() => add({ kind: "medallero", ref_id: null, visible: true, settings: { slot: newSlot() } })}
+              >
+                <Icon name="plus" size={15} /> Otro bloque de medalleros
               </button>
             )}
             {rankings.length > 1 && draft.some((b) => b.kind === "rankings") && (

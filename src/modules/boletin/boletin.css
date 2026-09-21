@@ -2497,3 +2497,64 @@
   font-size: 2.3mm;
   line-height: 1.35;
 }
+
+/* --- Medallero (medals.tsx) ---------------------------------------------------
+   El disco de metal es lo que distingue un medallero de una tabla de tres
+   columnas, así que viaja al papel. Los colores son fijos: el papel no tiene
+   tema. En milímetros, como todo el documento. */
+
+.bol-medal__disc {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 4.4mm;
+  height: 4.4mm;
+  padding: 0 0.7mm;
+  border-radius: 2.2mm;
+  font-size: 2.4mm;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+}
+
+.bol-medal__none { color: #98a4b4; }
+
+.bol-medal__cell,
+.bol-medal__total,
+.bol-medal__rank {
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+
+.bol-medal__rank {
+  display: inline-block;
+  min-width: 4mm;
+  margin-right: 1.2mm;
+  color: #6f7d90;
+  font-weight: 700;
+}
+.bol-medal__total { font-weight: 700; }
+
+.bol-medal__note { color: #6f7d90; font-size: 2.1mm; }
+
+.bol-medal__years { margin-top: 5mm; }
+
+.bol-medal__years caption {
+  margin-bottom: 1.4mm;
+  color: #16243a;
+  font-size: 2.4mm;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-align: left;
+  text-transform: uppercase;
+}
+
+/* El año del corte, marcado sin color: en papel el tono se pierde al imprimir
+   en gris, y una fila en negrita sigue leyéndose. */
+.bol-medal__years tr[data-current] td { font-weight: 700; }
+
+.bol-medal__legend {
+  margin: 3mm 0 0;
+  color: #6f7d90;
+  font-size: 2.2mm;
+}

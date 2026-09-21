@@ -243,6 +243,15 @@ export function datasetRefs(report: Report): { ref: string; title: string }[] {
     });
   }
   report.rankings?.forEach((r) => add(`ranking:${r.id}`, r.title));
+  // Medalleros: igual que los rankings, primero los que nombra su bloque.
+  for (const block of [...(report.blocks ?? [])].sort((a, b) => a.position - b.position)) {
+    if (block.kind !== "medallero") continue;
+    (block.settings.medalleros ?? []).forEach((key) => {
+      const board = report.medals?.find((m) => m.id === key);
+      if (board) add(`medallero:${board.id}`, board.title);
+    });
+  }
+  report.medals?.forEach((m) => add(`medallero:${m.id}`, m.title));
   // Un lienzo con todos juntos solo tiene sentido con dos o más recorridos.
   if ((report.rankings ?? []).filter((r) => r.editions.filter((e) => e.global_rank || e.regional_rank || e.national_rank).length > 1).length >= 2) {
     add(`rankings-evo:${report.slug}`, "Evolución de los rankings");

@@ -17,6 +17,7 @@
 import type { PublicationStatus } from "../../../types/database";
 import type { AnnualRule, Term } from "./terms";
 import type { RankingData } from "./rankings";
+import type { MedalBoard } from "./medals";
 import type { SaberProData } from "./saber-pro";
 import type { FreeSet } from "./free-sets";
 import type { SaberTytData } from "./saber-tyt";
@@ -57,7 +58,8 @@ export type BlockKind =
   | "saber_tyt"
   | "diversidad"
   | "imagenes"
-  | "modelo";
+  | "modelo"
+  | "medallero";
 
 export interface Campus {
   id: CampusId;
@@ -283,6 +285,8 @@ export interface ReportBlock {
     slot?: string;
     /** Bloque de rankings: claves de los rankings que muestra. */
     rankings?: string[];
+    /** Medalleros que enseña este bloque; vacío, los que no reclamó otro. */
+    medalleros?: string[];
     /** Bloque Saber PRO: clave del conjunto. Sin ella, el primero del informe. */
     saberPro?: string;
     /** Bloque de conjunto libre: clave de la vista. Sin ella, todas las de la fuente. */
@@ -389,6 +393,8 @@ export interface Report {
   tables?: TableData[];
   /** Rankings universitarios (QS, THE…) con sus ediciones anuales. */
   rankings?: RankingData[];
+  /** Medalleros: lo que gana la universidad cuando compite (0056). */
+  medals?: MedalBoard[];
   /** Resultados Saber PRO por competencia, año, sede y programa. */
   saberPro?: SaberProData[];
   /** Conjuntos libres: fuentes con columnas propias y sus gráficas. */
@@ -490,4 +496,5 @@ export const BLOCK_LABELS: Record<BlockKind, string> = {
   diversidad: "Tablero de la diversidad",
   imagenes: "Grid de imágenes",
   modelo: "Modelo predictivo",
+  medallero: "Medallero",
 };

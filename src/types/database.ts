@@ -1020,6 +1020,8 @@ export type OdBlockKind =
   | "saber_tyt"
   /** Tablero propio de Diversidad, Equidad e Inclusión (0042). */
   | "diversidad"
+  /** Medallero: lo que gana la universidad cuando compite (0056). */
+  | "medallero"
   /** Modelo estadístico del informe (0046). */
   | "modelo"
   /** Grid de fotografías a dos columnas, en la ficha y en el boletín (0053). */
@@ -1312,6 +1314,8 @@ export interface OdReportBlockRow {
     breakdowns?: string[];
     /** Bloque de rankings: claves de los rankings que muestra. Sin ellas, los que ningún otro bloque eligió. */
     rankings?: string[];
+    /** Medalleros que enseña este bloque; vacío, los que no reclamó otro. */
+    medalleros?: string[];
     /** Bloque Saber PRO: clave del conjunto que muestra (0031). */
     saberPro?: string;
     /** Bloque de conjunto libre: clave de la vista que muestra; sin ella, todas (0033). */
@@ -1523,4 +1527,39 @@ export interface OdPublicationRow {
   note: string;
   published_by: string | null;
   published_at: string;
+}
+
+/* --- Medallero (0056) --------------------------------------------------------- */
+
+/** Un medallero de un informe: sus categorías de medalla y cómo se ordena. */
+export interface OdMedalBoardRow {
+  id: string;
+  report_id: string;
+  key: string;
+  title: string;
+  description: string;
+  /** Cabecera de la columna de filas: «Competencia», «Campus»… la escribe la oficina. */
+  row_label: string;
+  reporting: "anual" | "periodo";
+  scope: "acumulado" | "por_ano";
+  fixed_year: number | null;
+  sort: "medallero" | "manual";
+  /** [{key,label,position}]; la posición 1 es la categoría más alta. */
+  tiers: { key: string; label: string; position: number }[];
+  office_id: string | null;
+  note: string;
+  position: number;
+}
+
+/** Una fila de un medallero en un corte: su rótulo y sus medallas por categoría. */
+export interface OdMedalEntryRow {
+  id?: string;
+  board_id: string;
+  year: number;
+  term: "A" | "B" | null;
+  label: string;
+  /** Solo lo capturado: lo que falta es «no compitió», que no es un cero. */
+  counts: Record<string, number | null>;
+  note: string;
+  position: number;
 }

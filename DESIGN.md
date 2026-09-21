@@ -286,6 +286,8 @@ Institucional y frío en su base, con dos acentos de señal (ámbar y cian) que 
 
 **The Sign Belongs To The Board Rule.** Barlow Condensed y las mayúsculas espaciadas no salen del portal estadístico; la intranet y el PDI hablan en Manrope.
 
+**The Index Speaks Twice Rule.** Cuando un índice agrupa en dos niveles —la divisoria de un tomo y, dentro de ella, el año—, los dos se distinguen por voz antes que por tamaño: la divisoria en Fraunces (1.35–1.65rem, 600) y el año en Manrope 800 a 1.0625rem con numerales tabulares, cerrado por un filete que recorre lo que queda de ancho. Dos rótulos del mismo palo separados solo por dos puntos de tamaño se leen como una lista plana, y quien busca el acta de 2023 acaba contando sangrías para saber en qué nivel está.
+
 ## Layout
 
 Rejilla de espacio base 4px (space-1 = 4px … space-12 = 104px). Margen lateral fluido (gutter: clamp 16–40px) y ancho de lectura de 68ch; contenido público hasta 1220px.
@@ -295,6 +297,8 @@ Rejilla de espacio base 4px (space-1 = 4px … space-12 = 104px). Margen lateral
 **UDES en Cifras público.** Portada con vídeo a sangre completa y rótulo abajo a la izquierda; tablero de once informes; fichas con bloques en el orden que decide la intranet. Tablas, mapas y rejillas anchas se desplazan dentro de su marco; la página nunca se desplaza en horizontal.
 
 **Portal de Planeación público.** Portada en bandas de ancho completo dentro del contenedor de 1312px, en este orden: encabezado con el plano y el buscador, mosaico de portales, la galería de la oficina, «Lo más reciente», el equipo y el bloque de cierre. Las bandas de carril separan con un respiro propio (la galería abre con clamp 56–96px) y su cabecera es título a la izquierda, bajada a su derecha y los mandos del carril cerrando la línea; por debajo de 720px los mandos bajan a su propia línea, repartidos a los extremos. La diapositiva de la galería mide `min(100%, 880px)` y la tarjeta de persona `clamp(212px, 22vw, 256px)` —`min(78%, 260px)` en el móvil, para que la siguiente asome por el borde—. La rejilla de `/equipo` repite esa misma tarjeta en `auto-fill` desde 232px. Como en el resto del sistema, el desplazamiento a lo ancho ocurre dentro del carril; la página nunca se desplaza en horizontal.
+
+**Repositorio documental (Documentos).** Franja marina corta —título, una línea de qué guarda y el buscador de 640px— y, sobre papel azulado, la fila de fichas de año y la estantería: rejilla de `auto-fill` desde 19.5rem, tres tomos por fila dentro del contenedor de 1312px, dos en tableta y uno por debajo de 720px. El tomo abierto son dos columnas: la de datos a `clamp(15rem, 24vw, 20rem)`, pegajosa a 24px, con la tapa, las cifras, las secciones y los años; el índice ocupa el resto. Por debajo de 1024px esa columna se acuesta —tapa a la izquierda, secciones y años a su derecha, las fichas de año en varias líneas— y por debajo de 720px cae a una sola columna con la tapa a 16rem. En la intranet, el carril de colecciones mide 17.5rem y por debajo de 1100px la pantalla pasa a columna única.
 
 **Densidad.** Paneles con 16–20px de relleno y 20px entre bloques; filas de rejilla de 36px; en el móvil la columna de rótulos de la rejilla baja a 8rem y los rótulos parten línea.
 
@@ -320,6 +324,8 @@ Híbrido: la profundidad viene sobre todo de capas tonales (page, surface, surfa
 Esquinas generosas en la interfaz y precisas en los objetos del tablero. Botones del PDI y la intranet en píldora (999px); campos a 12px; paneles a 16px; botones de icono y celdas enfocadas a 8px. Los objetos físicos del tablero conservan su forma real: la paleta con esquinas de 0.1em partida en dos mitades, el boleto de origen a 3px con muesca perforada (máscara radial) en el borde izquierdo y una línea de corte discontinua. Los sellos del tablero usan borde discontinuo a 4px. Las casillas vacías de la rejilla llevan un rayado diagonal de 135° en línea tenue, no un color.
 
 El portal público de Planeación conserva su propio juego de esquinas, más blandas que la escala de la aplicación y en su mayoría escritas a mano: 10px en los controles de la cabecera, 14px en el buscador, 18px en las tarjetas (las de «Qué hacemos» y la de persona), 22px en las teselas del mosaico y 26px —ahí sí, `rounded.xl`— en el bloque de cierre y en la ficha de una persona. Las fotografías de la galería van a `rounded.lg`; los retratos, tarjeta y ficha, en proporción 4/5 con el encuadre subido (`object-position: center 28%`) para que la cara no quede en el centro geométrico.
+
+El tomo del repositorio es la excepción medida a ese juego de esquinas: `6px 16px 16px 6px`, apretada del lado del lomo y generosa del lado de las hojas, porque un libro encuadernado no redondea igual los dos costados. El lomo no es un borde pintado: es una columna de 34px de la rejilla del tomo, con dos filetes blancos hacia dentro (`inset -1px` al 22 % y `inset -5px` al 10 %) que hacen el nervio de la encuadernación, y la tapa nunca se le monta encima. La tapa va a 4/3 y la banda se separa de ella con un filete de 1px.
 
 ## Components
 

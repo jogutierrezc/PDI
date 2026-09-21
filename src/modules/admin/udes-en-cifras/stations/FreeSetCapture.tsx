@@ -24,7 +24,16 @@ import { useMemo, useRef, useState } from "react";
 import type { ClipboardEvent, KeyboardEvent } from "react";
 import { Icon } from "../../../../components/ui/Icon";
 import type { OdFreeSetRecordRow, OdFreeSetRow, OdReportBlockRow, OdValueFormat } from "../../../../types/database";
-import { CHART_TYPES, COLUMN_KIND_LABEL, TEMPORALITY_LABEL, freeTotalAt, territoryCode, viewProblems } from "../../../datos-abiertos/data/free-sets";
+import {
+  CHART_TYPES,
+  COLUMN_KIND_LABEL,
+  TEMPORALITY_LABEL,
+  comparePeriods,
+  compareSource,
+  freeTotalAt,
+  territoryCode,
+  viewProblems,
+} from "../../../datos-abiertos/data/free-sets";
 import type {
   FreeCell,
   FreeChartType,
@@ -862,7 +871,10 @@ function cleanView(v: FreeView): FreeView {
   if (BARS.includes(v.type)) out.orientation = v.orientation ?? "vertical";
   if (SORTABLE.includes(v.type) && v.sort && v.sort !== "fuente") out.sort = v.sort;
   if (v.type === "histograma" && v.bins) out.bins = v.bins;
-  if (spec.compare && v.compare) out.compare = v.compare;
+  if (spec.compare) {
+    if (v.compare) out.compare = v.compare;
+    if (v.compareAll) out.compareAll = true;
+  }
   if (spec.dates) {
     if (v.start) out.start = v.start;
     if (v.end) out.end = v.end;
@@ -974,6 +986,10 @@ function ViewForm({ set, initial, takenKeys, onSubmit, onCancel }: {
   const numbers = set.columns.filter((c) => c.kind === "cifra");
   const dates = set.columns.filter((c) => c.kind === "fecha");
   const categories = set.columns.filter((c) => (spec.category === "territorio" ? c.kind === "territorio" : c.kind === "texto" || c.kind === "territorio"));
+  /** Lo que la gráfica comparada deduciría ahora mismo, para decirlo en la pista. */
+  const compareNow = spec.compare ? compareSource(set, view) : null;
+  const periodsNow = spec.compare ? comparePeriods(set, view, set.rows.filter((r) => r.kind === "dato")) : [];
+  const otherTexts = set.columns.filter((c) => (c.kind === "texto" || c.kind === "territorio") && c.key !== v.category);
   const series = v.series ?? [];
 
   const submit = () => {
@@ -1015,22 +1031,40 @@ function ViewForm({ set, initial, takenKeys, onSubmit, onCancel }: {
         )}
 
         {spec.compare && (
-          <label className="admin-field">
-            <span>Comparar por</span>
-            <select value={v.compare ?? ""} onChange={(e) => patch({ compare: e.target.value || undefined })}>
-              <option value="">Elige una columna…</option>
-              {set.columns
-                .filter((c) => (c.kind === "texto" || c.kind === "territorio") && c.key !== v.category)
-                .map((c) => (
-                  <option key={c.key} value={c.key}>
-                    {c.label}
-                  </option>
-                ))}
-            </select>
-            <small className="oda-field-hint">
-              El periodo, el año o lo que separe las barras. Con dos valores, la gráfica dice además cuánto varió.
-            </small>
-          </label>
+          <>
+            <label className="admin-field">
+              <span>Periodos</span>
+              <select
+                value={v.compareAll ? "todos" : "dos"}
+                onChange={(e) => patch({ compareAll: e.target.value === "todos" || undefined })}
+              >
+                <option value="dos">Los dos últimos</option>
+                <option value="todos">Todos los que tenga la fuente</option>
+              </select>
+              <small className="oda-field-hint">
+                {compareNow
+                  ? compareNow.kind === "anual"
+                    ? `Se comparan los años de la fuente${periodsNow.length ? `: ${periodsNow.join(" y ")}` : ""}.`
+                    : `Se comparan los valores de «${compareNow.label}»${periodsNow.length ? `: ${periodsNow.join(" y ")}` : ""}.`
+                  : "Esta fuente todavía no tiene con qué comparar."}
+                {" "}Con dos, la gráfica dice además cuánto varió.
+              </small>
+            </label>
+            {otherTexts.length > 0 && (
+              <label className="admin-field">
+                <span>Comparar por <small>opcional</small></span>
+                <select value={v.compare ?? ""} onChange={(e) => patch({ compare: e.target.value || undefined })}>
+                  <option value="">Automático</option>
+                  {otherTexts.map((c) => (
+                    <option key={c.key} value={c.key}>
+                      {c.label}
+                    </option>
+                  ))}
+                </select>
+                <small className="oda-field-hint">Solo si quieres separar las barras por otra cosa.</small>
+              </label>
+            )}
+          </>
         )}
 
         {spec.series === "una" && (

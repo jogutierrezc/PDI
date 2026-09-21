@@ -88,11 +88,15 @@ export interface FreeView {
   /** Columnas de cifra que se dibujan. Circular, histograma, caja, cascada y mapa usan la primera. */
   series?: string[];
   /**
-   * Barras comparadas: la columna de texto que reparte cada categoría en
-   * varias barras —normalmente el periodo—. Es la segunda dimensión: la
-   * categoría manda en el eje y esta decide cuántas barras hay dentro.
+   * Barras comparadas: con qué se reparte cada categoría en varias barras.
+   *
+   * Normalmente se deja vacío: la gráfica lo deduce de la fuente —los años,
+   * si es anual; si no, la primera columna de texto que no sea la de
+   * categorías—. Solo se rellena para forzar otra columna.
    */
   compare?: string;
+  /** Barras comparadas: todos los periodos en vez de los dos últimos. */
+  compareAll?: boolean;
   /** Barras: vertical u horizontal. */
   orientation?: "vertical" | "horizontal";
   /** Orden de las categorías. */
@@ -151,7 +155,7 @@ export const CHART_TYPES: Record<
   barras: { label: "Barras", hint: "Compara una o varias cifras entre categorías.", category: "texto", series: "varias" },
   barras_comparadas: {
     label: "Barras comparadas",
-    hint: "La misma cifra en cada categoría, repartida en una barra por periodo (o por la columna que elijas). Con dos, dice además cuánto varió.",
+    hint: "La misma cifra en cada categoría, con una barra por periodo. Los periodos los toma de la fuente; con dos, dice además cuánto varió.",
     category: "texto",
     series: "una",
     compare: true,
@@ -255,8 +259,64 @@ export function categoryTotals(rows: FreeRow[], category: string, series: string
 }
 
 /**
- * El cruce de dos columnas de texto contra una cifra: una fila por categoría y,
- * dentro, una casilla por cada valor de la columna que compara.
+ * Con qué se comparan las barras, deducido de la fuente.
+ *
+ * Los periodos de un conjunto anual no son una columna: viven en la fila
+ * (`row.year`), y pedirle a quien captura que elija «la columna del periodo»
+ * era pedirle algo que no existe. El orden de preferencia es el que responde
+ * a lo que casi siempre se quiere: los años si los hay, y si no, la primera
+ * columna de texto que no sea ya la de categorías.
+ */
+export type CompareSource =
+  | { kind: "anual"; label: string }
+  | { kind: "columna"; label: string; column: FreeColumn };
+
+export function compareSource(set: FreeSet, view: FreeView): CompareSource | null {
+  const usable = (column: FreeColumn | undefined) =>
+    column && column.kind !== "cifra" && column.kind !== "fecha" && column.key !== view.category
+      ? column
+      : undefined;
+
+  // Lo elegido a mano manda sobre la deducción.
+  const forced = usable(columnOf(set, view.compare));
+  if (forced) return { kind: "columna", label: forced.label, column: forced };
+
+  if (set.temporality === "anual" && freeYears(set).length >= 2) {
+    return { kind: "anual", label: "Año" };
+  }
+
+  const guess = set.columns.find((c) => Boolean(usable(c)));
+  if (guess) return { kind: "columna", label: guess.label, column: guess };
+  return null;
+}
+
+/** Los periodos que se van a dibujar, en su orden y ya recortados. */
+export function comparePeriods(set: FreeSet, view: FreeView, rows: FreeRow[]): string[] {
+  const source = compareSource(set, view);
+  if (!source) return [];
+  const all =
+    source.kind === "anual"
+      ? freeYears(set).map(String)
+      : (() => {
+          const seen: string[] = [];
+          for (const row of rows) {
+            const value = textOf(row.cells[source.column.key]);
+            if (value && !seen.includes(value)) seen.push(value);
+          }
+          return seen;
+        })();
+  // Por defecto, los dos últimos: comparar es poner dos cosas al lado, y una
+  // fuente de seis años daría seis barras por categoría sin que nadie lo pida.
+  return view.compareAll ? all : all.slice(-2);
+}
+
+/** De qué periodo es una fila, sea por su año o por una columna. */
+export const periodOf = (row: FreeRow, source: CompareSource): string =>
+  source.kind === "anual" ? (row.year === null ? "" : String(row.year)) : textOf(row.cells[source.column.key]);
+
+/**
+ * El cruce de las categorías contra los periodos: una fila por categoría y,
+ * dentro, una casilla por periodo.
  *
  * El orden de las barras sale del orden de aparición en la fuente, no del
  * alfabeto: «2020-2022» antes que «2023-2025» es lo que quiere quien captura,
@@ -267,19 +327,18 @@ export function categoryTotals(rows: FreeRow[], category: string, series: string
 export function compareTotals(
   rows: FreeRow[],
   category: string,
-  compare: string,
+  keys: string[],
+  keyOf: (row: FreeRow) => string,
   measure: string,
   sort: FreeView["sort"] = "fuente",
 ) {
-  const keys: string[] = [];
   const order: string[] = [];
   const totals = new Map<string, Record<string, number | null>>();
 
   for (const row of rows) {
     const label = textOf(row.cells[category]);
-    const key = textOf(row.cells[compare]);
-    if (!label || !key) continue;
-    if (!keys.includes(key)) keys.push(key);
+    const key = keyOf(row);
+    if (!label || !key || !keys.includes(key)) continue;
     if (!totals.has(label)) {
       order.push(label);
       totals.set(label, {});
@@ -298,7 +357,7 @@ export function compareTotals(
     const sign = sort === "desc" ? -1 : 1;
     groups = [...groups].sort((a, b) => sign * ((a.values[lead] ?? -Infinity) - (b.values[lead] ?? -Infinity)));
   }
-  return { keys, groups };
+  return groups;
 }
 
 /** Tramos de un histograma: Sturges si no se pide número, bordes redondos. */
@@ -384,10 +443,10 @@ export function viewProblems(set: FreeSet, view: FreeView): string[] {
   const series = (view.series ?? []).map((key) => columnOf(set, key)).filter((c) => c?.kind === "cifra");
   if (spec.series !== "ninguna" && series.length === 0) problems.push("Elige al menos una columna de cifras.");
   if (spec.dates && (columnOf(set, view.start)?.kind !== "fecha" || columnOf(set, view.end)?.kind !== "fecha")) problems.push("Elige las columnas de inicio y fin.");
-  if (spec.compare) {
-    const compare = columnOf(set, view.compare);
-    if (!compare || compare.kind === "cifra") problems.push("Elige la columna que compara: el periodo, el año o lo que separe las barras.");
-    else if (compare.key === view.category) problems.push("La columna que compara tiene que ser distinta de la de categorías.");
+  if (spec.compare && !compareSource(set, view)) {
+    problems.push(
+      "Esta fuente no tiene con qué comparar: hace falta que sea anual con dos años o más, o que tenga otra columna de texto además de la de categorías.",
+    );
   }
   if (view.type === "radar" && series.length < 3) problems.push("El radar necesita al menos tres cifras (una por eje).");
   return problems;

@@ -25,6 +25,8 @@ import {
   CHART_TYPES,
   categoryTotals,
   columnOf,
+  comparePeriods,
+  compareSource,
   compareTotals,
   dateOf,
   freeAllRowsAt,
@@ -33,6 +35,7 @@ import {
   freeYears,
   histogramBins,
   numberOf,
+  periodOf,
   territoryCode,
   textOf,
 } from "../../data/free-sets";
@@ -203,14 +206,25 @@ const seriesOf = (set: FreeSet, view: FreeView) =>
 
 function CompareBars({ t, animate, set, view, rows }: ChartProps) {
   const category = columnOf(set, view.category)!;
-  const compare = columnOf(set, view.compare);
   const measure = seriesOf(set, view)[0];
-  if (!compare || !measure) return <Note>Elige la columna de categorías, la que compara y la cifra.</Note>;
+  const source = compareSource(set, view);
+  if (!measure) return <Note>Elige la cifra que se compara.</Note>;
+  if (!source) {
+    return (
+      <Note>
+        Esta fuente no tiene con qué comparar: hace falta que sea anual con dos años o más, o que tenga otra
+        columna de texto además de la de categorías.
+      </Note>
+    );
+  }
 
-  const { keys, groups } = compareTotals(rows, category.key, compare.key, measure.key, view.sort);
+  const periods = comparePeriods(set, view, rows);
+  if (periods.length < 2) return <Note>Hace falta más de un periodo para comparar.</Note>;
+
+  const shown = periods.slice(0, MAX_CATEGORICAL);
+  const groups = compareTotals(rows, category.key, shown, (row) => periodOf(row, source), measure.key, view.sort);
   if (!groups.length) return <Note>La fuente no tiene filas para esta gráfica.</Note>;
 
-  const shown = keys.slice(0, MAX_CATEGORICAL);
   const horizontal = view.orientation === "horizontal";
   const data = groups.map(({ label, values }) => {
     const datum: Record<string, string | number> = { categoria: label };
@@ -220,20 +234,16 @@ function CompareBars({ t, animate, set, view, rows }: ChartProps) {
 
   const longest = Math.max(...groups.map((g) => g.label.length));
   const leftMargin = horizontal ? Math.min(220, 12 + longest * 6.4) : 64;
-  const height = horizontal
-    ? Math.max(240, groups.length * (shown.length * 16 + 16) + 70)
-    : HEIGHT;
+  const height = horizontal ? Math.max(240, groups.length * (shown.length * 16 + 16) + 70) : HEIGHT;
   const rotate = !horizontal && groups.length > 5;
   /** La variación solo se dibuja cuando comparar quiere decir «antes y después». */
   const pair = shown.length === 2 ? shown : null;
 
   return (
     <>
-      <Legend items={shown.map((key, i) => ({ label: key, color: t.cats[i] }))} />
-      {keys.length > shown.length && (
-        <Note>
-          Se dibujan los {shown.length} primeros valores de «{compare.label}»; la fuente trae {keys.length}.
-        </Note>
+      <Legend items={shown.map((key, i) => ({ label: `${source.label} ${key}`, color: t.cats[i] }))} />
+      {periods.length > shown.length && (
+        <Note>Se dibujan los {shown.length} primeros periodos; la fuente trae {periods.length}.</Note>
       )}
       <Frame height={height}>
         {(width) => (
@@ -268,9 +278,13 @@ function CompareBars({ t, animate, set, view, rows }: ChartProps) {
             labelSkipWidth={34}
             labelSkipHeight={16}
             labelTextColor={(d) => inkOn(d.color, t)}
-            layers={pair ? ["grid", "axes", "bars", (props) => <Deltas {...props} t={t} measure={measure} pair={pair} horizontal={horizontal} />] : undefined}
+            layers={
+              pair
+                ? ["grid", "axes", "bars", (props) => <Deltas {...props} t={t} measure={measure} pair={pair} horizontal={horizontal} />]
+                : undefined
+            }
             tooltip={({ id, value, indexValue }) => (
-              <Tip title={String(indexValue)} lines={[`${compare.label} ${id}: ${fmt(measure, value)}`]} />
+              <Tip title={String(indexValue)} lines={[`${source.label} ${id}: ${fmt(measure, value)}`]} />
             )}
           />
         )}

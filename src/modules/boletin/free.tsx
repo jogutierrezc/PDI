@@ -16,6 +16,7 @@ import { ALL_YEARS } from "../datos-abiertos/data/terms";
 import {
   CHART_TYPES,
   columnOf,
+  compareSource,
   freeAllRowsAt,
   freeRowsAt,
   freeTotalAt,
@@ -57,7 +58,9 @@ const PAPER: ChartTokens = {
 const NATURAL = 680;
 const TABLE_FIRST = 26;
 const TABLE_NEXT = 40;
-const USES_ALL_YEARS = ["lineas", "area", "gantt"];
+// Las barras comparadas necesitan la serie entera: con las filas de un solo
+// año no hay dos periodos que poner al lado.
+const USES_ALL_YEARS = ["lineas", "area", "gantt", "barras_comparadas"];
 
 type SheetComponent = (props: {
   title: string;
@@ -98,7 +101,7 @@ export function freeUnits(set: FreeSet, view: FreeView, cut: number, Sheet: Shee
   const rows = freeRowsAt(set, year);
   if (!rows.length) return [];
   const title = `${set.title} · ${view.title}`;
-  const compared = view.type === "barras_comparadas" ? columnOf(set, view.compare) : null;
+  const compared = view.type === "barras_comparadas" ? compareSource(set, view) : null;
   const notes: [string, ReactNode][] = [
     ["Gráfica", CHART_TYPES[view.type].label],
     ["Lectura", CHART_TYPES[view.type].hint],

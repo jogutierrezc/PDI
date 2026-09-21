@@ -20,6 +20,7 @@ import { BLOCK_LABELS } from "../../../datos-abiertos/data/types";
 import type { StationProps } from "../OdAdmin";
 import { useSaveBlocks } from "../od-data";
 import { Panel, SaveState, StageEmpty } from "../ui";
+import { ImageGrid } from "./ImageGrid";
 
 type DraftBlock = Omit<OdReportBlockRow, "id" | "report_id"> & { id?: string; tempId: string };
 
@@ -40,6 +41,7 @@ const BLOCK_HELP: Record<OdBlockKind, string> = {
   saber_tyt: "Motor Beta: de Saber 11 a Saber TyT en rango percentil, con el valor agregado por programa.",
   libre: "Un conjunto libre con sus gráficas: elige una vista o muéstralas todas.",
   modelo: "Modelo estadístico del informe: factores asociados con su intervalo, simulador de perfiles, calidad de la clasificación y la muestra.",
+  imagenes: "Fotografías en dos columnas, dentro de la ficha y en el boletín.",
   diversidad: "Tablero propio de Diversidad, Equidad e Inclusión: grupos de protección constitucional por corte y campus, mosaico étnico, discapacidad, estratos, género, zona e INES.",
 };
 
@@ -49,11 +51,12 @@ const newSlot = () => Math.random().toString(36).slice(2, 10);
 export function DesignStation({ data, report, canEdit }: StationProps) {
   if (!report?.uuid) return <StageEmpty title="Elige un informe">El diseño se decide ficha por ficha.</StageEmpty>;
   const blocks = data.rows.blocks.filter((b) => b.report_id === report.uuid).sort((a, b) => a.position - b.position);
-  return <DesignEditor key={report.uuid + blocks.map((b) => `${b.id}${b.position}${b.visible}${JSON.stringify(b.settings)}`).join()} data={data} reportId={report.uuid} blocks={blocks} canEdit={canEdit} />;
+  return <DesignEditor key={report.uuid + blocks.map((b) => `${b.id}${b.position}${b.visible}${JSON.stringify(b.settings)}`).join()} data={data} reportId={report.uuid} reportSlug={report.slug} blocks={blocks} canEdit={canEdit} />;
 }
 
-function DesignEditor({ data, reportId, blocks, canEdit }: { data: StationProps["data"]; reportId: string; blocks: OdReportBlockRow[]; canEdit: boolean }) {
+function DesignEditor({ data, reportId, reportSlug, blocks, canEdit }: { data: StationProps["data"]; reportId: string; reportSlug: string; blocks: OdReportBlockRow[]; canEdit: boolean }) {
   const save = useSaveBlocks();
+  const [imageError, setImageError] = useState("");
   const initial: DraftBlock[] = blocks.map((b) => ({ ...b, tempId: b.id }));
   const [draft, setDraft] = useState<DraftBlock[]>(initial);
   const [removed, setRemoved] = useState<string[]>([]);
@@ -164,7 +167,7 @@ function DesignEditor({ data, reportId, blocks, canEdit }: { data: StationProps[
         description="Arrastra para ordenar o usa las flechas. Ocultar no borra: el bloque vuelve cuando lo muestres."
         actions={
           <>
-            <SaveState pending={save.isPending} error={save.error} success={save.isSuccess} />
+            <SaveState pending={save.isPending} error={save.error || (imageError ? new Error(imageError) : null)} success={save.isSuccess} />
             {dirty && (
               <button type="button" className="button-ghost" onClick={() => { setDraft(initial); setRemoved([]); }}>
                 Descartar
@@ -238,6 +241,15 @@ function DesignEditor({ data, reportId, blocks, canEdit }: { data: StationProps[
                         onChange={(e) => patch(block.tempId, { settings: { ...block.settings, description: e.target.value || undefined } })}
                       />
                     </label>
+                  )}
+                  {block.kind === "imagenes" && (
+                    <ImageGrid
+                      reportSlug={reportSlug}
+                      settings={block.settings}
+                      disabled={!canEdit}
+                      onChange={(settings) => patch(block.tempId, { settings: { ...block.settings, ...settings } })}
+                      onError={setImageError}
+                    />
                   )}
                   {block.kind === "kpis" && indicators.length > 0 && (
                     <Picker
@@ -416,6 +428,13 @@ function DesignEditor({ data, reportId, blocks, canEdit }: { data: StationProps[
               onClick={() => add({ kind: "separador", ref_id: null, visible: true, settings: { title: "", slot: newSlot() } })}
             >
               <Icon name="plus" size={15} /> Añadir separador
+            </button>
+            <button
+              type="button"
+              className="button-secondary"
+              onClick={() => add({ kind: "imagenes", ref_id: null, visible: true, settings: { images: [], columns: 2, slot: newSlot() } })}
+            >
+              <Icon name="plus" size={15} /> Añadir grid de imágenes
             </button>
             {draft.some((b) => b.kind === "kpis") && (
               <button

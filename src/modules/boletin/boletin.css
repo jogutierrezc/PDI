@@ -2460,3 +2460,40 @@
 .bol-board__sets b small { color: var(--bol-ink-3); font-size: 2mm; font-weight: 600; }
 .bol-board__sets em { grid-column: 1 / -1; color: var(--bol-ink-3); font-size: 2mm; font-style: normal; }
 .bol-board__more span { color: var(--bol-ink-3); font-style: italic; font-weight: 500; }
+
+/* --- Grid de imágenes en papel ----------------------------------------------
+   Las mismas dos columnas de la ficha. La fotografía conserva su proporción y
+   se le pone un tope de alto: una foto vertical a media página empuja el resto
+   de la hoja fuera del A4, y en papel no hay desplazamiento que lo arregle. */
+
+.bol-gallery {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 4mm;
+}
+
+.bol-gallery[data-columns="1"] { grid-template-columns: minmax(0, 1fr); }
+
+.bol-gallery figure {
+  display: grid;
+  gap: 1.4mm;
+  margin: 0;
+  /* Una fotografía nunca se parte entre dos hojas. */
+  break-inside: avoid;
+}
+
+.bol-gallery img {
+  width: 100%;
+  height: auto;
+  max-height: 78mm;
+  object-fit: cover;
+  border-radius: 1.2mm;
+}
+
+.bol-gallery[data-columns="1"] img { max-height: 96mm; }
+
+.bol-gallery figcaption {
+  color: var(--bol-ink, #16243a);
+  font-size: 2.3mm;
+  line-height: 1.35;
+}

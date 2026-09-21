@@ -655,6 +655,17 @@ const G = "var(--obs-thumb-4)";
 const L = "var(--obs-thumb-line)";
 
 const THUMBS: Record<ObsChartType, ReactNode> = {
+  // Dos parejas: lo que distingue a las barras comparadas de las normales no
+  // es la altura, es que cada categoría trae más de una barra.
+  barras_comparadas: (
+    <>
+      <rect x="11" y="24" width="7" height="18" rx="1.5" fill={P} />
+      <rect x="19" y="18" width="7" height="24" rx="1.5" fill={Q} />
+      <rect x="33" y="29" width="7" height="13" rx="1.5" fill={P} />
+      <rect x="41" y="20" width="7" height="22" rx="1.5" fill={Q} />
+      <path d="M6 42h58" stroke={L} />
+    </>
+  ),
   barras: (
     <>
       <rect x="10" y="22" width="9" height="20" rx="1.5" fill={P} />

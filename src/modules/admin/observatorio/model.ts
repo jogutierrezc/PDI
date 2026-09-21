@@ -260,6 +260,7 @@ const EXTRA: Record<ObsExtraType, ChartSpec> = {
 
 const FAMILY_OF: Record<FreeChartType, ChartFamily> = {
   barras: "Comparar",
+  barras_comparadas: "Comparar",
   barras_apiladas: "Comparar",
   barras_100: "Reparto",
   radar: "Comparar",

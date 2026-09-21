@@ -18,7 +18,8 @@
    la hoja muestra 2025-1.
    ========================================================================== */
 
-import type { CSSProperties, ReactNode } from "react";
+import type { CSSProperties, ReactNode } from "react";import { reportImageUrl } from "../datos-abiertos/data/images";
+
 import { basisOf, changeBetween, formatCount, formatValue, periodBasisOf, valueOf } from "../datos-abiertos/data/open-data";
 import { ALL_YEARS, ANNUAL_RULE_LABEL, cutLabel, TERMS } from "../datos-abiertos/data/terms";
 import type { AnnualRule, Term } from "../datos-abiertos/data/terms";
@@ -1892,6 +1893,33 @@ export function compose(catalog: OpenDataCatalog, settings: BulletinSettings): C
           freeUnits(parsed.set, parsed.view, settings.cut, DatasetSheet, TableContinuation).forEach(({ node, title, tight }) =>
             nodes.push({ node, source: parsed.set.source, title, tight }),
           );
+        }
+      } else if (kind === "imagenes") {
+        const block = (report.blocks ?? []).find((b) => b.kind === "imagenes" && (b.settings.slot ?? "1") === key);
+        const images = (block?.settings.images ?? []).filter((img) => img.path?.trim());
+        if (images.length) {
+          nodes.push({
+            node: (
+              <DatasetSheet
+                title={block?.settings.title || "Imágenes"}
+                description={block?.settings.description ?? ""}
+                source={report.name}
+                notes={[["Qué muestra", `${images.length} ${images.length === 1 ? "fotografía" : "fotografías"}`]]}
+                wide
+              >
+                <div className="bol-gallery" data-columns={block?.settings.columns === 1 ? 1 : 2}>
+                  {images.map((image, i) => (
+                    <figure key={`${image.path}-${i}`}>
+                      <img src={reportImageUrl(image.path) ?? ""} alt={image.alt} />
+                      {image.caption && <figcaption>{image.caption}</figcaption>}
+                    </figure>
+                  ))}
+                </div>
+              </DatasetSheet>
+            ),
+            source: report.name,
+            title: block?.settings.title || "Imágenes",
+          });
         }
       } else if (kind === "modelo") {
         const m = report.models?.find((x) => x.id === key);

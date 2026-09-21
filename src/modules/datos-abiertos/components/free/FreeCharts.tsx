@@ -25,6 +25,7 @@ import {
   CHART_TYPES,
   categoryTotals,
   columnOf,
+  compareTotals,
   dateOf,
   freeAllRowsAt,
   freeRowsAt,
@@ -152,6 +153,8 @@ export function FreeChart({ set, view, year }: { set: FreeSet; view: FreeView; y
     case "barras_apiladas":
     case "barras_100":
       return <Bars {...common} />;
+    case "barras_comparadas":
+      return <CompareBars {...common} />;
     case "circular":
     case "dona":
       return <PieChart {...common} />;
@@ -187,6 +190,148 @@ interface ChartProps {
 
 const seriesOf = (set: FreeSet, view: FreeView) =>
   (view.series ?? []).map((key) => columnOf(set, key)).filter((c): c is FreeColumn => c?.kind === "cifra");
+
+/* --- Barras comparadas -------------------------------------------------------------
+   Una cifra, dos dimensiones: la categoría va al eje y la columna que compara
+   —el periodo, casi siempre— reparte cada categoría en varias barras.
+
+   Cuando hay exactamente dos, la gráfica dice además cuánto varió cada
+   categoría. Esa cifra se escribe en tinta, nunca en verde ni en rojo: el
+   verde y el rojo de este sistema significan «completo» y «en riesgo», y una
+   variación que sube no es un logro ni una alarma mientras nadie diga de qué
+   indicador se trata. El signo basta para leerla. */
+
+function CompareBars({ t, animate, set, view, rows }: ChartProps) {
+  const category = columnOf(set, view.category)!;
+  const compare = columnOf(set, view.compare);
+  const measure = seriesOf(set, view)[0];
+  if (!compare || !measure) return <Note>Elige la columna de categorías, la que compara y la cifra.</Note>;
+
+  const { keys, groups } = compareTotals(rows, category.key, compare.key, measure.key, view.sort);
+  if (!groups.length) return <Note>La fuente no tiene filas para esta gráfica.</Note>;
+
+  const shown = keys.slice(0, MAX_CATEGORICAL);
+  const horizontal = view.orientation === "horizontal";
+  const data = groups.map(({ label, values }) => {
+    const datum: Record<string, string | number> = { categoria: label };
+    for (const key of shown) if (values[key] !== null && values[key] !== undefined) datum[key] = values[key]!;
+    return datum;
+  });
+
+  const longest = Math.max(...groups.map((g) => g.label.length));
+  const leftMargin = horizontal ? Math.min(220, 12 + longest * 6.4) : 64;
+  const height = horizontal
+    ? Math.max(240, groups.length * (shown.length * 16 + 16) + 70)
+    : HEIGHT;
+  const rotate = !horizontal && groups.length > 5;
+  /** La variación solo se dibuja cuando comparar quiere decir «antes y después». */
+  const pair = shown.length === 2 ? shown : null;
+
+  return (
+    <>
+      <Legend items={shown.map((key, i) => ({ label: key, color: t.cats[i] }))} />
+      {keys.length > shown.length && (
+        <Note>
+          Se dibujan los {shown.length} primeros valores de «{compare.label}»; la fuente trae {keys.length}.
+        </Note>
+      )}
+      <Frame height={height}>
+        {(width) => (
+          <Bar
+            width={width}
+            height={height}
+            data={data}
+            keys={shown}
+            indexBy="categoria"
+            groupMode="grouped"
+            layout={horizontal ? "horizontal" : "vertical"}
+            margin={{ top: pair ? 30 : 12, right: horizontal && pair ? 76 : 18, bottom: rotate ? 92 : 44, left: leftMargin }}
+            padding={0.3}
+            innerPadding={3}
+            borderRadius={3}
+            colors={({ id }) => t.cats[shown.indexOf(String(id))]}
+            theme={nivoTheme(t)}
+            animate={animate}
+            enableGridX={horizontal}
+            enableGridY={!horizontal}
+            axisBottom={
+              horizontal
+                ? { tickSize: 0, tickPadding: 8, format: (v) => shortFmt(measure, Number(v)) }
+                : { tickSize: 0, tickPadding: 8, tickRotation: rotate ? -38 : 0 }
+            }
+            axisLeft={
+              horizontal
+                ? { tickSize: 0, tickPadding: 8 }
+                : { tickSize: 0, tickPadding: 8, format: (v) => shortFmt(measure, Number(v)) }
+            }
+            valueFormat={(v) => shortFmt(measure, v)}
+            labelSkipWidth={34}
+            labelSkipHeight={16}
+            labelTextColor={(d) => inkOn(d.color, t)}
+            layers={pair ? ["grid", "axes", "bars", (props) => <Deltas {...props} t={t} measure={measure} pair={pair} horizontal={horizontal} />] : undefined}
+            tooltip={({ id, value, indexValue }) => (
+              <Tip title={String(indexValue)} lines={[`${compare.label} ${id}: ${fmt(measure, value)}`]} />
+            )}
+          />
+        )}
+      </Frame>
+    </>
+  );
+}
+
+/** La variación entre las dos barras de cada categoría, sobre el grupo. */
+function Deltas({
+  bars,
+  t,
+  measure,
+  pair,
+  horizontal,
+}: {
+  bars: readonly { x: number; y: number; width: number; height: number; data: { id: string | number; value: number | null; indexValue: string | number } }[];
+  t: ChartTokens;
+  measure: FreeColumn;
+  pair: string[];
+  horizontal: boolean;
+}) {
+  const groups = new Map<string, typeof bars[number][]>();
+  for (const bar of bars) {
+    const key = String(bar.data.indexValue);
+    groups.set(key, [...(groups.get(key) ?? []), bar]);
+  }
+
+  return (
+    <g>
+      {[...groups.entries()].map(([label, list]) => {
+        const before = list.find((b) => String(b.data.id) === pair[0])?.data.value;
+        const after = list.find((b) => String(b.data.id) === pair[1])?.data.value;
+        // Sin las dos cifras no hay variación que contar: mejor nada que un cero.
+        if (before === null || before === undefined || after === null || after === undefined) return null;
+        const diff = after - before;
+        const pct = before === 0 ? null : (diff / Math.abs(before)) * 100;
+        const sign = diff > 0 ? "+" : diff < 0 ? "−" : "";
+        const text = `${sign}${formatValue(Math.abs(diff), measure.format ?? "decimal")}${pct === null ? "" : ` (${sign}${formatValue(Math.abs(pct), "decimal")} %)`}`;
+
+        const left = Math.min(...list.map((b) => b.x));
+        const right = Math.max(...list.map((b) => b.x + b.width));
+        const top = Math.min(...list.map((b) => b.y));
+        const bottom = Math.max(...list.map((b) => b.y + b.height));
+
+        return (
+          <text
+            key={label}
+            x={horizontal ? right + 8 : (left + right) / 2}
+            y={horizontal ? (top + bottom) / 2 : top - 8}
+            textAnchor={horizontal ? "start" : "middle"}
+            dominantBaseline={horizontal ? "middle" : "auto"}
+            style={{ fill: t.secondary, fontSize: 11, fontWeight: 700, fontVariantNumeric: "tabular-nums" }}
+          >
+            {text}
+          </text>
+        );
+      })}
+    </g>
+  );
+}
 
 /* --- Barras ------------------------------------------------------------------------ */
 

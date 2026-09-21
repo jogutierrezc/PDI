@@ -98,9 +98,13 @@ export function freeUnits(set: FreeSet, view: FreeView, cut: number, Sheet: Shee
   const rows = freeRowsAt(set, year);
   if (!rows.length) return [];
   const title = `${set.title} · ${view.title}`;
+  const compared = view.type === "barras_comparadas" ? columnOf(set, view.compare) : null;
   const notes: [string, ReactNode][] = [
     ["Gráfica", CHART_TYPES[view.type].label],
     ["Lectura", CHART_TYPES[view.type].hint],
+    // Una gráfica comparada no se entiende sin saber qué se está comparando:
+    // en papel no hay leyenda que se pueda señalar con el cursor.
+    ...(compared ? ([["Compara", compared.label]] as [string, ReactNode][]) : []),
     ["Corte", cutText(set, view, year, cut)],
   ];
   const sheet = (children: ReactNode, extra: [string, ReactNode][] = []) => (

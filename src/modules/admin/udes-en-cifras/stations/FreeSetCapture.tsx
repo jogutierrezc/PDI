@@ -836,7 +836,7 @@ function FreeRowsEditor({ set, rows, periodId, published, canEdit }: {
 /* --- 2. Gráficas (vistas) ------------------------------------------------------------------ */
 
 const TYPE_GROUPS: { label: string; types: FreeChartType[] }[] = [
-  { label: "Comparar", types: ["barras", "barras_apiladas", "barras_100", "radar"] },
+  { label: "Comparar", types: ["barras", "barras_comparadas", "barras_apiladas", "barras_100", "radar"] },
   { label: "Reparto", types: ["circular", "dona", "cascada"] },
   { label: "Distribución", types: ["histograma", "caja"] },
   { label: "Tiempo", types: ["lineas", "area", "gantt"] },
@@ -844,8 +844,8 @@ const TYPE_GROUPS: { label: string; types: FreeChartType[] }[] = [
   { label: "Otros", types: ["cifras", "tabla"] },
 ];
 
-const BARS: FreeChartType[] = ["barras", "barras_apiladas", "barras_100"];
-const SORTABLE: FreeChartType[] = ["barras", "barras_apiladas", "barras_100", "circular", "dona"];
+const BARS: FreeChartType[] = ["barras", "barras_comparadas", "barras_apiladas", "barras_100"];
+const SORTABLE: FreeChartType[] = ["barras", "barras_comparadas", "barras_apiladas", "barras_100", "circular", "dona"];
 const SORT_LABEL: Record<NonNullable<FreeView["sort"]>, string> = {
   fuente: "Como vienen en la fuente",
   desc: "De mayor a menor",
@@ -862,6 +862,7 @@ function cleanView(v: FreeView): FreeView {
   if (BARS.includes(v.type)) out.orientation = v.orientation ?? "vertical";
   if (SORTABLE.includes(v.type) && v.sort && v.sort !== "fuente") out.sort = v.sort;
   if (v.type === "histograma" && v.bins) out.bins = v.bins;
+  if (spec.compare && v.compare) out.compare = v.compare;
   if (spec.dates) {
     if (v.start) out.start = v.start;
     if (v.end) out.end = v.end;
@@ -1010,6 +1011,25 @@ function ViewForm({ set, initial, takenKeys, onSubmit, onCancel }: {
               <option value="">{spec.category === "opcional" ? (v.type === "caja" ? "Sin grupos: una sola caja" : "Sin categoría") : "Elige una columna…"}</option>
               {categories.map((c) => <option key={c.key} value={c.key}>{c.label}</option>)}
             </select>
+          </label>
+        )}
+
+        {spec.compare && (
+          <label className="admin-field">
+            <span>Comparar por</span>
+            <select value={v.compare ?? ""} onChange={(e) => patch({ compare: e.target.value || undefined })}>
+              <option value="">Elige una columna…</option>
+              {set.columns
+                .filter((c) => (c.kind === "texto" || c.kind === "territorio") && c.key !== v.category)
+                .map((c) => (
+                  <option key={c.key} value={c.key}>
+                    {c.label}
+                  </option>
+                ))}
+            </select>
+            <small className="oda-field-hint">
+              El periodo, el año o lo que separe las barras. Con dos valores, la gráfica dice además cuánto varió.
+            </small>
           </label>
         )}
 

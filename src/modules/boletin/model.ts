@@ -227,6 +227,13 @@ export function datasetRefs(report: Report): { ref: string; title: string }[] {
     if (block.kind === "historico") add(`historico:${block.refKey}`, report.histories?.find((h) => h.id === block.refKey)?.title ?? block.refKey);
     if (block.kind === "tabla") add(`tabla:${block.refKey}`, report.tables?.find((t) => t.id === block.refKey)?.title ?? block.refKey);
   }
+  // Los grid de imágenes no tienen conjunto al que apuntar: se distinguen por
+  // su `slot`, como los separadores y los tableros (ver 0029).
+  for (const block of [...(report.blocks ?? [])].sort((a, b) => a.position - b.position)) {
+    if (block.kind !== "imagenes") continue;
+    const slot = block.settings.slot ?? "1";
+    if ((block.settings.images ?? []).length) add(`imagenes:${slot}`, block.settings.title || "Grid de imágenes");
+  }
   // Rankings: en el orden de su bloque en la ficha, luego los demás.
   for (const block of [...(report.blocks ?? [])].sort((a, b) => a.position - b.position)) {
     if (block.kind !== "rankings") continue;

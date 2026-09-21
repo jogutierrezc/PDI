@@ -62,6 +62,7 @@ export interface FreeRow {
 
 export type FreeChartType =
   | "barras"
+  | "barras_comparadas"
   | "barras_apiladas"
   | "barras_100"
   | "circular"
@@ -86,6 +87,12 @@ export interface FreeView {
   category?: string;
   /** Columnas de cifra que se dibujan. Circular, histograma, caja, cascada y mapa usan la primera. */
   series?: string[];
+  /**
+   * Barras comparadas: la columna de texto que reparte cada categoría en
+   * varias barras —normalmente el periodo—. Es la segunda dimensión: la
+   * categoría manda en el eje y esta decide cuántas barras hay dentro.
+   */
+  compare?: string;
   /** Barras: vertical u horizontal. */
   orientation?: "vertical" | "horizontal";
   /** Orden de las categorías. */
@@ -130,9 +137,25 @@ export const COLUMN_KIND_LABEL: Record<FreeColumnKind, string> = {
 /** Qué pide cada gráfica, para la intranet y para validar una vista. */
 export const CHART_TYPES: Record<
   FreeChartType,
-  { label: string; hint: string; category: "texto" | "territorio" | "ninguna" | "opcional"; series: "una" | "varias" | "ninguna"; dates?: boolean; needsYears?: boolean }
+  {
+    label: string;
+    hint: string;
+    category: "texto" | "territorio" | "ninguna" | "opcional";
+    series: "una" | "varias" | "ninguna";
+    dates?: boolean;
+    needsYears?: boolean;
+    /** Pide una segunda columna de texto que reparte cada categoría. */
+    compare?: boolean;
+  }
 > = {
   barras: { label: "Barras", hint: "Compara una o varias cifras entre categorías.", category: "texto", series: "varias" },
+  barras_comparadas: {
+    label: "Barras comparadas",
+    hint: "La misma cifra en cada categoría, repartida en una barra por periodo (o por la columna que elijas). Con dos, dice además cuánto varió.",
+    category: "texto",
+    series: "una",
+    compare: true,
+  },
   barras_apiladas: { label: "Barras apiladas", hint: "Cada barra suma sus cifras: el total y sus partes.", category: "texto", series: "varias" },
   barras_100: { label: "Barras al 100 %", hint: "El reparto de cada categoría entre sus partes, en porcentaje.", category: "texto", series: "varias" },
   circular: { label: "Circular", hint: "El reparto de un total entre pocas categorías (hasta 6; el resto va a «Otros»).", category: "texto", series: "una" },
@@ -231,6 +254,53 @@ export function categoryTotals(rows: FreeRow[], category: string, series: string
   return list.sort((a, b) => ((sort === "desc" ? -1 : 1) * ((a.values[lead] ?? -Infinity) - (b.values[lead] ?? -Infinity))));
 }
 
+/**
+ * El cruce de dos columnas de texto contra una cifra: una fila por categoría y,
+ * dentro, una casilla por cada valor de la columna que compara.
+ *
+ * El orden de las barras sale del orden de aparición en la fuente, no del
+ * alfabeto: «2020-2022» antes que «2023-2025» es lo que quiere quien captura,
+ * y ordenar alfabéticamente rompería cualquier periodo que no empiece por su
+ * año. Una casilla sin filas se queda en nulo y no se dibuja, que no es lo
+ * mismo que un cero.
+ */
+export function compareTotals(
+  rows: FreeRow[],
+  category: string,
+  compare: string,
+  measure: string,
+  sort: FreeView["sort"] = "fuente",
+) {
+  const keys: string[] = [];
+  const order: string[] = [];
+  const totals = new Map<string, Record<string, number | null>>();
+
+  for (const row of rows) {
+    const label = textOf(row.cells[category]);
+    const key = textOf(row.cells[compare]);
+    if (!label || !key) continue;
+    if (!keys.includes(key)) keys.push(key);
+    if (!totals.has(label)) {
+      order.push(label);
+      totals.set(label, {});
+    }
+    const value = numberOf(row.cells[measure]);
+    if (value === null) continue;
+    const entry = totals.get(label)!;
+    entry[key] = (entry[key] ?? 0) + value;
+  }
+
+  let groups = order.map((label) => ({ label, values: totals.get(label)! }));
+  if (sort !== "fuente" && keys.length) {
+    // Se ordena por el último valor comparado: en una serie de periodos, el
+    // más reciente es el que interesa mirar de mayor a menor.
+    const lead = keys[keys.length - 1];
+    const sign = sort === "desc" ? -1 : 1;
+    groups = [...groups].sort((a, b) => sign * ((a.values[lead] ?? -Infinity) - (b.values[lead] ?? -Infinity)));
+  }
+  return { keys, groups };
+}
+
 /** Tramos de un histograma: Sturges si no se pide número, bordes redondos. */
 export function histogramBins(values: number[], count?: number) {
   if (!values.length) return [];
@@ -314,6 +384,11 @@ export function viewProblems(set: FreeSet, view: FreeView): string[] {
   const series = (view.series ?? []).map((key) => columnOf(set, key)).filter((c) => c?.kind === "cifra");
   if (spec.series !== "ninguna" && series.length === 0) problems.push("Elige al menos una columna de cifras.");
   if (spec.dates && (columnOf(set, view.start)?.kind !== "fecha" || columnOf(set, view.end)?.kind !== "fecha")) problems.push("Elige las columnas de inicio y fin.");
+  if (spec.compare) {
+    const compare = columnOf(set, view.compare);
+    if (!compare || compare.kind === "cifra") problems.push("Elige la columna que compara: el periodo, el año o lo que separe las barras.");
+    else if (compare.key === view.category) problems.push("La columna que compara tiene que ser distinta de la de categorías.");
+  }
   if (view.type === "radar" && series.length < 3) problems.push("El radar necesita al menos tres cifras (una por eje).");
   return problems;
 }

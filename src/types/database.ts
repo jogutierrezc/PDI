@@ -1021,7 +1021,9 @@ export type OdBlockKind =
   /** Tablero propio de Diversidad, Equidad e Inclusión (0042). */
   | "diversidad"
   /** Modelo estadístico del informe (0046). */
-  | "modelo";
+  | "modelo"
+  /** Grid de fotografías a dos columnas, en la ficha y en el boletín (0053). */
+  | "imagenes";
 /** Estado de un punto de un informe. */
 /** Cómo llega la cifra: por periodo académico (A y B) o una sola cifra por año. */
 export type OdReporting = "periodo" | "anual";
@@ -1318,6 +1320,10 @@ export interface OdReportBlockRow {
     saberTyt?: string;
     /** Distingue varios bloques del mismo tipo sin conjunto (separadores, tableros). Ver 0029. */
     slot?: string;
+    /** Grid de imágenes: las fotografías, en su orden (0053). */
+    images?: { path: string; alt: string; caption?: string }[];
+    /** Grid de imágenes: cuántas por fila. Dos por defecto. */
+    columns?: 1 | 2;
   };
 }
 

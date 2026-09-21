@@ -56,6 +56,7 @@ export type BlockKind =
   | "libre"
   | "saber_tyt"
   | "diversidad"
+  | "imagenes"
   | "modelo";
 
 export interface Campus {
@@ -255,6 +256,8 @@ export interface MapDataset {
   reserved?: Record<number, Partial<Record<CampusId, string[]>>>;
 }
 
+import type { GridImage } from "./images";
+
 export interface ReportBlock {
   uuid?: string;
   kind: BlockKind;
@@ -286,6 +289,10 @@ export interface ReportBlock {
     view?: string;
     /** Bloque del Motor Beta: clave del conjunto. Sin ella, el primero del informe. */
     saberTyt?: string;
+    /** Grid de imágenes: las fotografías, en su orden. */
+    images?: GridImage[];
+    /** Grid de imágenes: cuántas caben por fila. Dos por defecto. */
+    columns?: 1 | 2;
   };
   /** Punto del informe al que pertenece. Sin punto, el bloque es de toda la ficha. */
   sectionKey?: string | null;
@@ -481,5 +488,6 @@ export const BLOCK_LABELS: Record<BlockKind, string> = {
   libre: "Conjunto libre",
   saber_tyt: "Saber TyT · Motor Beta",
   diversidad: "Tablero de la diversidad",
+  imagenes: "Grid de imágenes",
   modelo: "Modelo predictivo",
 };

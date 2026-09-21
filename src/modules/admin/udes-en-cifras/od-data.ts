@@ -1,3 +1,4 @@
+import { FriendlyError } from "../../../data/errors";
 /* =============================================================================
    UDES en Cifras · datos de la intranet.
 
@@ -8,6 +9,7 @@
    ========================================================================== */
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { REPORT_BUCKET } from "../../datos-abiertos/data/images";
 import { supabase } from "../../../lib/supabase";
 import { describeDatabaseError } from "../../../data/errors";
 import type { DatabaseError } from "../../../data/errors";
@@ -204,6 +206,58 @@ export function useReorderReports() {
       await run(supabase.from("od_reports").update({ position: row.position }).eq("id", row.id));
     }
   });
+}
+
+/* --- Imágenes de un informe (0053) ------------------------------------------ */
+
+export const MAX_REPORT_IMAGE_BYTES = 8 * 1024 * 1024;
+
+const IMAGE_TYPES = ["image/jpeg", "image/png", "image/webp", "image/avif"];
+
+/**
+ * Sube una fotografía del grid y devuelve su ruta en el bucket «informes».
+ *
+ * El sello de tiempo delante evita que subir dos veces «jornada.jpg»
+ * sobrescriba la primera, y que el navegador siga enseñando la anterior desde
+ * su caché.
+ */
+export async function uploadReportImage(reportSlug: string, file: File): Promise<string> {
+  if (!IMAGE_TYPES.includes(file.type)) {
+    throw new FriendlyError(`«${file.name}» no es una imagen admitida. Sube un JPG, PNG, WebP o AVIF.`);
+  }
+  if (file.size > MAX_REPORT_IMAGE_BYTES) {
+    throw new FriendlyError(
+      `«${file.name}» pesa más de 8 MB, el tope del almacenamiento de informes. Redúcela antes de subirla.`,
+    );
+  }
+  const clean =
+    file.name
+      .normalize("NFD")
+      .replace(/[̀-ͯ]/g, "")
+      .replace(/[^a-zA-Z0-9._-]+/g, "-")
+      .replace(/^-+|-+$/g, "")
+      .toLowerCase() || "imagen";
+  const path = `${reportSlug}/${Date.now()}-${clean}`;
+  const { error } = await supabase.storage.from(REPORT_BUCKET).upload(path, file, {
+    contentType: file.type,
+    upsert: false,
+  });
+  if (error) {
+    throw new FriendlyError(
+      /bucket/i.test(error.message)
+        ? 'No existe el bucket "informes" en Storage. Aplica la migración 0053 o créalo a mano: público en lectura, 8 MB por archivo.'
+        : `No se pudo subir la imagen: ${error.message}`,
+    );
+  }
+  return path;
+}
+
+/** Borra una imagen del bucket. Un fallo aquí no debe tumbar la edición. */
+export async function removeReportImage(path: string | null | undefined) {
+  const value = (path ?? "").trim();
+  if (!value || value.startsWith("/") || /^(https?:)?\/\//i.test(value)) return;
+  const { error } = await supabase.storage.from(REPORT_BUCKET).remove([value]);
+  if (error) console.warn("No se pudo borrar la imagen:", error.message);
 }
 
 export function useSaveIndicator() {

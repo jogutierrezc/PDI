@@ -55,6 +55,7 @@ import {
   useOpenDataCatalog,
   valueOf,
 } from "./data/open-data";
+import { imagesOf, reportImageUrl } from "./data/images";
 import { ALL_YEARS, ANNUAL_RULE_LABEL, cutCode, cutCodeLabel, cutLabel, fromCutCode } from "./data/terms";
 import type { Breakdown, CampusId, Indicator, MapDataset, OpenDataCatalog, Report, ReportBlock, Term } from "./data/types";
 import { blockPicks, saberProOf, saberTytOf } from "./data/groups";
@@ -495,6 +496,35 @@ function ReportContent({ data, report, year, term, campus, setYear, setTerm, set
                 <h2 id={`${id}-titulo`}>{block.settings.title || "Sin título"}</h2>
                 {block.settings.description && <p>{block.settings.description}</p>}
               </div>
+            </div>
+          </section>
+        );
+      }
+      case "imagenes": {
+        const images = imagesOf(block.settings.images);
+        // Un grid sin fotografías no deja un hueco con la promesa de una foto
+        // que nadie subió: no se dibuja.
+        if (!images.length) return null;
+        const columns = block.settings.columns === 1 ? 1 : 2;
+        return (
+          <section className="od-section od-gallery" key={key}>
+            <div className="u-container">
+              {block.settings.title && (
+                <header className="od-section__head">
+                  <h2>{block.settings.title}</h2>
+                  {block.settings.description && <p>{block.settings.description}</p>}
+                </header>
+              )}
+              <ul className="od-gallery__grid" data-columns={columns}>
+                {images.map((image, i) => (
+                  <li key={`${image.path}-${i}`}>
+                    <figure>
+                      <img src={reportImageUrl(image.path) ?? ""} alt={image.alt} loading="lazy" decoding="async" />
+                      {image.caption && <figcaption>{image.caption}</figcaption>}
+                    </figure>
+                  </li>
+                ))}
+              </ul>
             </div>
           </section>
         );

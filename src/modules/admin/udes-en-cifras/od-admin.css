@@ -3697,3 +3697,77 @@
 @media (prefers-reduced-motion: reduce) {
   .oda-rail__item { transition: none; }
 }
+
+/* --- Grid de imágenes de un informe ------------------------------------------
+   La miniatura manda: el texto alternativo se escribe mirando la fotografía, y
+   una lista de nombres de archivo no sirve para escribirlo. */
+
+.oda-grid-images { display: grid; gap: var(--space-3); }
+
+.oda-grid-images__head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2) var(--space-3);
+}
+
+.oda-grid-images__warn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  color: var(--status-pending);
+  font-size: var(--text-2xs);
+  font-weight: 700;
+}
+
+.oda-grid-images__list { display: grid; gap: var(--space-2); margin: 0; padding: 0; list-style: none; }
+
+.oda-grid-images__list li {
+  position: relative;
+  display: grid;
+  grid-template-columns: auto auto minmax(0, 1fr) auto;
+  gap: var(--space-3);
+  align-items: center;
+  padding: var(--space-2);
+  background: var(--surface-2);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-xs);
+}
+
+.oda-grid-images__list li[data-dragging] {
+  background: var(--surface);
+  border-color: var(--brand-blue);
+  box-shadow: var(--shadow-md);
+}
+
+.oda-grid-images__list li[data-drop]::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: var(--brand-blue);
+  border-radius: 1px;
+}
+
+.oda-grid-images__list li[data-drop="antes"]::after { top: -2px; }
+.oda-grid-images__list li[data-drop="despues"]::after { bottom: -2px; }
+
+.oda-grid-images__thumb {
+  display: block;
+  width: 72px;
+  height: 54px;
+  overflow: hidden;
+  background: var(--surface-3);
+  border-radius: 5px;
+}
+
+.oda-grid-images__thumb img { width: 100%; height: 100%; object-fit: cover; }
+
+.oda-grid-images__fields { display: grid; gap: var(--space-2); min-width: 0; }
+.oda-grid-images__actions { display: flex; align-items: center; gap: 2px; }
+
+@media (max-width: 900px) {
+  .oda-grid-images__list li { grid-template-columns: auto auto minmax(0, 1fr); }
+  .oda-grid-images__actions { grid-column: 1 / -1; justify-content: flex-end; }
+}

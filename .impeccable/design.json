@@ -909,6 +909,30 @@
       "description": "El equipo en el portal público: la misma tarjeta en el carril de la portada y en la rejilla de /equipo. Sin ficha detrás no es un botón.",
       "html": "<button type=\"button\" class=\"ds-person\" aria-expanded=\"false\"><span class=\"ds-person__photo\"><span aria-hidden=\"true\">MP</span></span><span class=\"ds-person__text\"><b>Miguel Oswaldo Pérez Pulido</b><small>Director de Planeación Institucional</small><span class=\"ds-person__area\">Plan de Desarrollo</span><span class=\"ds-person__focus\">Coordina la formulación y el seguimiento del Plan de Desarrollo con las facultades y los campus.</span></span><span class=\"ds-person__more\">Ver la ficha <svg width=\"15\" height=\"15\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M6 9l6 6 6-6\"/></svg></span></button>",
       "css": ".ds-person{display:grid;grid-template-rows:auto 1fr auto;width:236px;padding:0;overflow:hidden;color:inherit;text-align:left;background:var(--surface,#fff);border:1px solid var(--line,rgba(13,40,84,.11));border-radius:18px;font-family:var(--font-sans,Manrope,system-ui,sans-serif);cursor:pointer;transition:transform 220ms cubic-bezier(.22,.61,.36,1),box-shadow 220ms cubic-bezier(.22,.61,.36,1),border-color 140ms ease}.ds-person:hover{transform:translateY(-3px);box-shadow:0 16px 34px rgba(10,45,99,.14)}.ds-person:focus-visible{outline:2px solid var(--brand-blue,#2166d6);outline-offset:2px}.ds-person[aria-expanded=true]{border-color:var(--brand-blue,#2166d6);box-shadow:0 0 0 1px var(--brand-blue,#2166d6)}.ds-person__photo{display:grid;place-items:center;aspect-ratio:4/5;overflow:hidden;background:var(--brand-blue-soft,#eaf1fd)}.ds-person__photo>span{color:var(--brand-navy,#0a2d63);font-family:var(--font-display,Fraunces,Georgia,serif);font-size:2.4rem;font-weight:600}.ds-person__text{display:grid;align-content:start;gap:3px;padding:16px 16px 12px}.ds-person__text b{color:var(--ink,#0d1c31);font-size:1.02rem;font-weight:800;line-height:1.25}.ds-person__text small{color:var(--ink-secondary,#45566d);font-size:.875rem;font-weight:600}.ds-person__area{justify-self:start;margin-top:4px;padding:3px 9px;color:var(--brand-navy,#0a2d63);background:var(--brand-blue-soft,#eaf1fd);border-radius:999px;font-size:.7rem;font-weight:800}.ds-person__focus{display:-webkit-box;margin-top:4px;overflow:hidden;color:var(--ink-muted,#6b7c93);font-size:.875rem;line-height:1.45;-webkit-box-orient:vertical;-webkit-line-clamp:3}.ds-person__more{display:flex;align-items:center;gap:5px;padding:0 16px 16px;color:var(--brand-blue-strong,#1b52ad);font-size:.75rem;font-weight:800}.ds-person__more svg{transition:transform 220ms cubic-bezier(.22,.61,.36,1)}.ds-person[aria-expanded=true] .ds-person__more svg{transform:rotate(180deg)}"
+    },
+    {
+      "name": "Tomo del repositorio",
+      "kind": "card",
+      "refersTo": "dc-volume",
+      "description": "Una colección del portal Documentos: lomo marino con el rango de años en vertical, tapa fotográfica 4/3 y banda con el nombre y el conteo. Con data-dimmed queda apagada por el filtro de año sin salir de la estantería.",
+      "html": "<article class=\"ds-volume\"><span class=\"ds-volume__spine\" aria-hidden=\"true\"><b>2018–2025</b></span><span class=\"ds-volume__cover\"><span aria-hidden=\"true\">D</span></span><span class=\"ds-volume__band\"><h3><a href=\"#\">Documentos Institucionales</a></h3><p>Estatutos, reglamentos y acuerdos vigentes</p><span class=\"ds-volume__foot\"><span class=\"ds-volume__count\"><b>6</b> documentos <span class=\"ds-volume__sections\">en <b>3</b> secciones</span></span></span></span></article>",
+      "css": ".ds-volume{position:relative;display:grid;grid-template-columns:34px minmax(0,1fr);grid-template-rows:auto auto;width:320px;overflow:hidden;font-family:var(--font-sans,Manrope,system-ui,sans-serif);background:var(--surface,#fff);border:1px solid var(--line,rgba(13,40,84,.11));border-radius:6px 16px 16px 6px;box-shadow:0 2px 4px rgba(10,34,73,.07),0 12px 28px rgba(10,34,73,.1);transition:transform 220ms cubic-bezier(.22,.61,.36,1),box-shadow 220ms cubic-bezier(.22,.61,.36,1)}.ds-volume:not([data-dimmed]):hover{transform:translateY(-4px);box-shadow:0 3px 6px rgba(10,34,73,.09),0 22px 44px rgba(10,34,73,.18)}.ds-volume:has(:focus-visible){box-shadow:0 0 0 3px var(--brand-blue,#2166d6)}.ds-volume__spine{grid-row:1/-1;display:grid;place-items:center;padding-block:16px;color:#fff;background:var(--pl-navy,#0a2d63);box-shadow:inset -1px 0 0 rgba(255,255,255,.22),inset -5px 0 0 rgba(255,255,255,.1)}.ds-volume__spine b{font-size:.8125rem;font-weight:800;font-variant-numeric:tabular-nums;letter-spacing:.04em;writing-mode:vertical-rl;transform:rotate(180deg)}.ds-volume__cover{display:grid;place-items:center;aspect-ratio:4/3;overflow:hidden;background:var(--brand-blue-soft,#eaf1fd)}.ds-volume__cover>span{color:var(--brand-navy,#0a2d63);font-family:var(--font-display,Fraunces,Georgia,serif);font-size:2.4rem;font-weight:600}.ds-volume__band{display:grid;align-content:start;gap:8px;padding:20px;border-top:1px solid var(--line,rgba(13,40,84,.11))}.ds-volume__band h3{margin:0;font-family:var(--font-display,Fraunces,Georgia,serif);font-size:1.35rem;font-weight:600;line-height:1.15}.ds-volume__band h3 a{color:var(--brand-navy,#0a2d63);text-decoration:none}.ds-volume__band p{margin:0;color:var(--ink-secondary,#45566d);font-size:.9375rem;line-height:1.5}.ds-volume__foot{display:flex;flex-wrap:wrap;align-items:baseline;gap:8px 16px;margin-top:4px}.ds-volume__count{color:var(--ink-secondary,#45566d);font-size:.8125rem;font-weight:700}.ds-volume__count b{color:var(--brand-navy,#0a2d63);font-size:1.15rem;font-variant-numeric:tabular-nums}.ds-volume__sections{color:var(--ink-muted,#6b7c93);font-weight:600}.ds-volume[data-dimmed]{background:var(--surface-2,#f8fafd);box-shadow:none}.ds-volume[data-dimmed] .ds-volume__cover{filter:grayscale(1);opacity:.45}.ds-volume[data-dimmed] .ds-volume__spine{background:var(--ink-faint,#93a2b6)}.ds-volume[data-dimmed] .ds-volume__band h3{color:var(--ink-secondary,#45566d)}"
+    },
+    {
+      "name": "Ficha de año",
+      "kind": "chip",
+      "refersTo": "dc-year-chip",
+      "description": "El filtro por año del repositorio y de un tomo abierto. La elegida es la única marca de selección de su columna: relleno azul institucional con tinta blanca.",
+      "html": "<div class=\"ds-years\" role=\"group\" aria-label=\"Filtrar por año\"><button type=\"button\" aria-pressed=\"true\">Todos los años</button><button type=\"button\" aria-pressed=\"false\">2025</button><button type=\"button\" aria-pressed=\"false\">2024</button></div>",
+      "css": ".ds-years{display:flex;flex-wrap:wrap;gap:8px;font-family:var(--font-sans,Manrope,system-ui,sans-serif)}.ds-years button{padding:7px 14px;color:var(--ink-secondary,#45566d);background:var(--surface,#fff);border:1px solid var(--line-strong,rgba(13,40,84,.2));border-radius:999px;font:inherit;font-size:.8125rem;font-weight:700;font-variant-numeric:tabular-nums;cursor:pointer;transition:color 140ms ease,background 140ms ease,border-color 140ms ease}.ds-years button:hover{color:var(--brand-blue-strong,#1b52ad);border-color:var(--brand-blue,#2166d6)}.ds-years button:focus-visible{outline:2px solid var(--brand-blue,#2166d6);outline-offset:2px}.ds-years button[aria-pressed=\"true\"]{color:#fff;background:var(--brand-blue,#2166d6);border-color:var(--brand-blue,#2166d6)}"
+    },
+    {
+      "name": "Pliegue de ediciones anteriores",
+      "kind": "custom",
+      "refersTo": "dc-volume",
+      "description": "Las versiones retiradas de un documento, plegadas bajo la vigente en un <details>. La píldora en superficie 3 y el chevron que gira la separan de los enlaces de archivo que tiene encima.",
+      "html": "<details class=\"ds-versions\"><summary><svg width=\"14\" height=\"14\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M6 9l6 6 6-6\"/></svg>2 ediciones anteriores</summary><ul><li><a href=\"#\">Reglamento estudiantil · v2</a><small>2021 · PDF · 3,4 MB</small></li><li><a href=\"#\">Reglamento estudiantil · v1</a><small>2018 · PDF · 3,1 MB</small></li></ul></details>",
+      "css": ".ds-versions{position:relative;font-family:var(--font-sans,Manrope,system-ui,sans-serif)}.ds-versions summary{display:inline-flex;align-items:center;gap:5px;padding:3px 10px 3px 6px;color:var(--ink-secondary,#45566d);background:var(--surface-3,#eef3fa);border-radius:999px;font-size:.8125rem;font-weight:700;list-style:none;cursor:pointer}.ds-versions summary::-webkit-details-marker{display:none}.ds-versions summary:hover{color:var(--brand-blue-strong,#1b52ad)}.ds-versions summary:focus-visible{outline:2px solid var(--brand-blue,#2166d6);outline-offset:2px}.ds-versions summary svg{transition:transform 220ms cubic-bezier(.22,.61,.36,1)}.ds-versions[open] summary{color:var(--brand-navy,#0a2d63)}.ds-versions[open] summary svg{transform:rotate(180deg)}.ds-versions ul{display:grid;gap:8px;margin:12px 0 0;padding:0 0 0 16px;list-style:none;border-left:1px solid var(--line-strong,rgba(13,40,84,.2))}.ds-versions li{display:grid;gap:1px}.ds-versions li a{color:var(--brand-blue-strong,#1b52ad);font-size:.9375rem;font-weight:700;text-decoration:none}.ds-versions li a:hover{text-decoration:underline}.ds-versions li small{color:var(--ink-muted,#6b7c93);font-size:.75rem;font-weight:600;font-variant-numeric:tabular-nums}"
     }
   ],
   "narrative": {
@@ -976,6 +1000,31 @@
         "name": "The Inert Preview Rule",
         "body": "Una vista previa es una imagen de la página, no la página: la copia lleva inert y aria-hidden, así que sus botones y enlaces no reciben el foco ni el tabulador y no entran en el árbol de accesibilidad. Un carrusel de mentira robando la tecla Tab en mitad de un formulario es exactamente la clase de detalle que hace desconfiar de una vista previa.",
         "section": "components"
+      },
+      {
+        "name": "The Index Speaks Twice Rule",
+        "body": "Cuando un índice agrupa en dos niveles —la divisoria de un tomo y, dentro de ella, el año—, los dos se distinguen por voz antes que por tamaño: la divisoria en Fraunces (1.35–1.65rem, 600) y el año en Manrope 800 a 1.0625rem con numerales tabulares, cerrado por un filete que recorre lo que queda de ancho. Dos rótulos del mismo palo separados solo por dos puntos de tamaño se leen como una lista plana, y quien busca el acta de 2023 acaba contando sangrías para saber en qué nivel está.",
+        "section": "typography"
+      },
+      {
+        "name": "The Dimmed Shelf Rule",
+        "body": "Los dos filtros del repositorio no hacen lo mismo, y es a propósito. Buscar es una consulta: deja fuera lo que no responde. Acotar por año no borra ningún tomo, los apaga en su sitio. La estantería conserva su forma y se ve de un vistazo cuáles no guardan nada de ese año, que también es información; el lomo sigue diciendo el rango completo y el pie cuenta lo filtrado.",
+        "section": "components"
+      },
+      {
+        "name": "The Veil Spares The Text Rule",
+        "body": "Lo que apaga un elemento es el velo sobre su imagen y su cromo —gris y 45 % de opacidad en la tapa, tinta tenue en el lomo—, el fondo hundido y la sombra que desaparece; nunca la opacidad del texto. Un título al 45 % deja de cumplir el contraste mínimo y pasa de apagado a ilegible: aquí el título de un tomo apagado se mantiene en 7,16:1. Apagado es un estado, no una dificultad de lectura.",
+        "section": "components"
+      },
+      {
+        "name": "The One Selection Mark Rule",
+        "body": "Dentro de un mismo aparte hay una sola manera de decir «esto es lo elegido»: relleno azul institucional con tinta blanca, igual en la lista de secciones que en las fichas de año que están cuarenta píxeles más abajo. Una franja lateral de color conviviendo con un relleno azul son dos gramáticas de selección discutiendo en la misma columna; además, el filete de color a la izquierda es de lo que este suelo no hace por encima de 1px.",
+        "section": "components"
+      },
+      {
+        "name": "The Nested List Stays Vertical Rule",
+        "body": "Una lista que cuelga de otra —las secciones bajo su colección en el carril de la intranet— no se convierte en tira horizontal al estrecharse, aunque su vecindario (oda-rail) sí lo haga por debajo de 1100px. Una tira reparte padres e hijos en la misma línea y la relación desaparece: la lista anidada se queda en rejilla vertical con su sangría y su filete, y lo que se recorta es el ancho del nombre, no la jerarquía.",
+        "section": "components"
       }
     ],
     "dos": [
@@ -990,7 +1039,10 @@
       "**Do** scroll a carousel for real (`overflow-x: auto` + `scroll-snap`), and measure its edges from `scrollLeft` against `scrollWidth − clientWidth`, never by counting items.",
       "**Do** show a rail's position with the graduated scale plus the tabular `n / total` counter, and keep the scale out of the tab order.",
       "**Do** let a band vanish when it has nothing to show: no gallery without photos, no team band without people, no frame promising a picture nobody uploaded.",
-      "**Do** build an in-app preview from the real public components at measured scale, and mark the copy `inert`."
+      "**Do** build an in-app preview from the real public components at measured scale, and mark the copy `inert`.",
+      "**Do** dim a filtered-out card instead of removing it when the shape of the set is itself information: veil the picture and the chrome, keep the text at full ink, and let the footer name the filtered count.",
+      "**Do** distinguish two stacked levels of grouping by voice (Fraunces over Manrope) before reaching for size.",
+      "**Do** keep a nested list vertical at every width; the indentation and its left rule are the relationship."
     ],
     "donts": [
       "**Don't** reuse status green, amber, or red as a data series or decoration.",
@@ -1001,7 +1053,9 @@
       "**Don't** add a thick colored side stripe to cards to signal category; category identity comes from the two-letter code and its line badge.",
       "**Don't** mark a carousel's position with dots, and don't advance it on its own; the reader advances it.",
       "**Don't** draw a preview as a diagram of boxes, and never let its controls take focus or the Tab key.",
-      "**Don't** make a card a button when there is nothing behind it; a person with no file is a card, not a control that leads nowhere."
+      "**Don't** make a card a button when there is nothing behind it; a person with no file is a card, not a control that leads nowhere. A dimmed volume is not a link either: the click would land on nothing from that year.",
+      "**Don't** run two selection marks in one aside; a filled brand-blue row and a colored side stripe are the same claim said twice.",
+      "**Don't** dim a card by dropping the opacity of its text; the veil belongs on the picture, never on the words."
     ]
   }
 }

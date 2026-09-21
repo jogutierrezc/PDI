@@ -446,6 +446,24 @@ La misma tarjeta y la misma ficha sirven al carril de la portada y a la rejilla 
 
 **The File Opens In Place Rule.** La ficha de una persona se abre dentro de la página, bajo el carril o la rejilla, nunca en una ventana emergente: no es una tarea que haya que interrumpir. Así el resto del equipo sigue a la vista, se pasa de una persona a la siguiente sin cerrar nada, y en el móvil el detalle aparece bajo la tarjeta que se tocó en lugar de tapar la pantalla.
 
+### Tomo y estantería (Portal Documentos)
+
+Cada colección del repositorio es un tomo encuadernado, no una tarjeta con una foto de adorno: se puede descartar sin abrirlo, que es lo que un repositorio le debe a quien busca un papel concreto.
+
+- **El tomo** (`.dc-volume`): rejilla de dos columnas —lomo de 34px y cuerpo— sobre superficie blanca, borde `line` y sombra en dos capas teñida de marino. El lomo es el marino del portal (`--pl-navy`, que en oscuro baja a #081d40) con tinta blanca y el rango de años en `writing-mode: vertical-rl` y numerales tabulares. La tapa es la fotografía a 4/3 sobre azul suave, o la inicial del nombre en Fraunces cuando no hay foto. La banda lleva el título en Fraunces (1.35rem, 600), el subtítulo y un pie que cuenta los documentos y, si las hay, en cuántas secciones. Al apuntarlo sube 4px y la sombra se abre; el foco del enlace se dibuja sobre el tomo entero (`:has(:focus-visible)`), no alrededor del texto. Una ficha azul suave al pie dice cuántas coincidencias trae cuando hay búsqueda.
+- **El tomo apagado** (`[data-dimmed]`): fondo hundido a `surface-2`, sin sombra, tapa en `grayscale(1)` al 45 % y lomo en tinta tenue. El lomo conserva el rango completo del tomo; el pie es el que cuenta lo filtrado («0 documentos de 2018»). Sin enlace: apagado no se abre.
+- **El índice:** entradas numeradas en tinta tenue (2.6rem de columna), título en Fraunces 1.2rem que se vuelve azul al apuntar la fila, descripción a 72ch, tipo y peso del archivo en la línea de abajo, y a la derecha el glifo de descarga o de enlace externo, que baja 2px al apuntarlo. Cada entrada cierra con un filete `line`; la versión vigente lleva su ficha «v4» en píldora azul suave.
+- **El pliegue de ediciones anteriores** (`.dc-versions`): un `<details>` cuyo resumen es una píldora en `surface-3` con el chevron dibujado que gira al abrirse. Las ediciones retiradas cuelgan de un filete izquierdo, con su enlace y su fecha en numerales tabulares. Es deliberadamente distinto de los enlaces de archivo que tiene encima: consultable, nunca compitiendo con la vigente.
+- **Su editor en la intranet:** carril de colecciones con la tapa en miniatura (38×30px) en lugar de un código de color —en un repositorio la portada es parte de la identidad del tomo—, y las secciones colgando de su colección con sangría y filete izquierdo. Cada fila de documento dice su tipo con glifo y palabra, nunca solo con color.
+
+**The Dimmed Shelf Rule.** Los dos filtros del repositorio no hacen lo mismo, y es a propósito. Buscar es una consulta: deja fuera lo que no responde. Acotar por año no borra ningún tomo, los apaga en su sitio. La estantería conserva su forma y se ve de un vistazo cuáles no guardan nada de ese año, que también es información; el lomo sigue diciendo el rango completo y el pie cuenta lo filtrado.
+
+**The Veil Spares The Text Rule.** Lo que apaga un elemento es el velo sobre su imagen y su cromo —gris y 45 % de opacidad en la tapa, tinta tenue en el lomo—, el fondo hundido y la sombra que desaparece; nunca la opacidad del texto. Un título al 45 % deja de cumplir el contraste mínimo y pasa de apagado a ilegible: aquí el título de un tomo apagado se mantiene en 7,16:1. Apagado es un estado, no una dificultad de lectura.
+
+**The One Selection Mark Rule.** Dentro de un mismo aparte hay una sola manera de decir «esto es lo elegido»: relleno azul institucional con tinta blanca, igual en la lista de secciones que en las fichas de año que están cuarenta píxeles más abajo. Una franja lateral de color conviviendo con un relleno azul son dos gramáticas de selección discutiendo en la misma columna; además, el filete de color a la izquierda es de lo que este suelo no hace por encima de 1px.
+
+**The Nested List Stays Vertical Rule.** Una lista que cuelga de otra —las secciones bajo su colección en el carril de la intranet— no se convierte en tira horizontal al estrecharse, aunque su vecindario (`oda-rail`) sí lo haga por debajo de 1100px. Una tira reparte padres e hijos en la misma línea y la relación desaparece: la lista anidada se queda en rejilla vertical con su sangría y su filete, y lo que se recorta es el ancho del nombre, no la jerarquía.
+
 ### Vista previa fiel (intranet)
 
 La columna de vista previa de «Página de la oficina» dibuja la banda de verdad del portal —los mismos componentes públicos y la misma hoja de estilos— y no un esquema de cajas. Su marco (`.ofa-frame`) se dibuja como lo que es, una ventana a otra página y no un panel más: fondo de página del portal, borde line-strong, esquina `rounded.md` y una sombra hacia dentro que dice que lo de ahí no se toca. La copia se compone al ancho real del portal (1312px) y se reduce con `transform: scale()` medido contra el hueco disponible; como la transformación no ocupa sitio, el alto del marco se calcula y se aplica a mano. Desde 1280px es columna pegajosa bajo la cabecera de la intranet (24rem; 27rem desde 1500px); por debajo se pliega en un desplegable —«Ver cómo quedará»— colocado sobre los paneles y no al final de la columna, que al pie de un formulario de tres mil píxeles no lo abre nadie. La estación de publicación no lleva vista previa: su materia es la comparación y necesita el ancho.
@@ -501,6 +519,9 @@ El boletín es papel, no pantalla: un documento A4 de 210×297 mm que se imprime
 - **Do** show a rail's position with the graduated scale plus the tabular `n / total` counter, and keep the scale out of the tab order.
 - **Do** let a band vanish when it has nothing to show: no gallery without photos, no team band without people, no frame promising a picture nobody uploaded.
 - **Do** build an in-app preview from the real public components at measured scale, and mark the copy `inert`.
+- **Do** dim a filtered-out card instead of removing it when the shape of the set is itself information: veil the picture and the chrome, keep the text at full ink, and let the footer name the filtered count.
+- **Do** distinguish two stacked levels of grouping by voice (Fraunces over Manrope) before reaching for size.
+- **Do** keep a nested list vertical at every width; the indentation and its left rule are the relationship.
 
 ### Don't:
 - **Don't** reuse status green, amber, or red as a data series or decoration.
@@ -512,4 +533,6 @@ El boletín es papel, no pantalla: un documento A4 de 210×297 mm que se imprime
 - **Don't** add a thick colored side stripe to cards to signal category; category identity comes from the two-letter code and its line badge.
 - **Don't** mark a carousel's position with dots, and don't advance it on its own; the reader advances it.
 - **Don't** draw a preview as a diagram of boxes, and never let its controls take focus or the Tab key.
-- **Don't** make a card a button when there is nothing behind it; a person with no file is a card, not a control that leads nowhere.
+- **Don't** make a card a button when there is nothing behind it; a person with no file is a card, not a control that leads nowhere. A dimmed volume is not a link either: the click would land on nothing from that year.
+- **Don't** run two selection marks in one aside; a filled brand-blue row and a colored side stripe are the same claim said twice.
+- **Don't** dim a card by dropping the opacity of its text; the veil belongs on the picture, never on the words.

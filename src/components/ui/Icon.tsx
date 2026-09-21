@@ -44,7 +44,8 @@ export type IconName =
   | "eye-off"
   | "layers"
   | "filter"
-  | "spark-chart";
+  | "spark-chart"
+  | "grip";
 
 const paths: Record<IconName, JSX.Element> = {
   /* --- Pilares ---------------------------------------------------------- */
@@ -218,6 +219,18 @@ const paths: Record<IconName, JSX.Element> = {
   ),
   filter: <path d="M4 5.5h16l-6.2 7.2v5.6l-3.6 1.7v-7.3z" />,
   "spark-chart": <path d="M3.5 17.5 9 11.5l4 3.5 7.5-8.5M15.5 6.5h5v5" />,
+  // Seis puntos rellenos: el asa de arrastre de toda la vida. Va con `fill`
+  // porque un punto de 1,5 px dibujado a trazo se ve como un anillo.
+  grip: (
+    <g fill="currentColor" stroke="none">
+      <circle cx="9" cy="6" r="1.5" />
+      <circle cx="15" cy="6" r="1.5" />
+      <circle cx="9" cy="12" r="1.5" />
+      <circle cx="15" cy="12" r="1.5" />
+      <circle cx="9" cy="18" r="1.5" />
+      <circle cx="15" cy="18" r="1.5" />
+    </g>
+  ),
 };
 
 interface IconProps extends Omit<SVGProps<SVGSVGElement>, "name"> {

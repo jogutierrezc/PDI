@@ -20,9 +20,10 @@ import { Icon } from "../../../components/ui/Icon";
 import { ErrorBlock, LoadingBlock } from "../../../components/ui/QueryState";
 import { roleLabels, useAuth } from "../../../lib/auth";
 import { AdminShell, ReadOnlyNotice } from "../components/AdminShell";
+import { moved, useReorder } from "../components/reorder";
 import { BLOCK_LABELS } from "../../datos-abiertos/data/types";
 import type { Report } from "../../datos-abiertos/data/types";
-import { useCreateReport, useOdAdminData, useOdPeriods, useOdPublications } from "./od-data";
+import { useCreateReport, useOdAdminData, useOdPeriods, useOdPublications, useReorderReports, useSaveReport } from "./od-data";
 import { slugify } from "./ui";
 import type { AdminData } from "./od-data";
 import { periodProgress, reportProgress, STATIONS, statusLabels } from "./progress";
@@ -370,8 +371,26 @@ function ReportRail({
 }) {
   const period = periodProgress(data.rows);
   const create = useCreateReport();
+  const reorder = useReorderReports();
   const [adding, setAdding] = useState(false);
+  const [ordering, setOrdering] = useState(false);
   const [name, setName] = useState("");
+  /** El orden que ya se ve mientras las once escrituras viajan. Sin esto la
+   *  lista volvería un instante a su sitio anterior después de soltar. */
+  const [pending, setPending] = useState<typeof data.catalog.reports | null>(null);
+  const reports = pending ?? data.catalog.reports;
+
+  const move = (from: number, to: number) => {
+    if (from === to) return;
+    const next = moved(reports, from, to);
+    setPending(next);
+    reorder.mutate(
+      next.map((report, index) => ({ id: report.uuid ?? "", position: index + 1 })).filter((row) => row.id),
+      { onSettled: () => setPending(null) },
+    );
+  };
+
+  const drag = useReorder(reports.length, move);
   const slug = slugify(name);
   const code = name
     .normalize("NFD")
@@ -388,19 +407,81 @@ function ReportRail({
   return (
     <aside className="oda-rail" aria-label="Informes del periodo">
       <div className="oda-rail__head">
-        <strong>{data.catalog.reports.length} informes</strong>
-        <span className="oda-rail__legend" aria-hidden="true">
-          {STATIONS.map((s) => (
-            <span key={s.id} title={s.label}>
-              {s.number}
-            </span>
-          ))}
-        </span>
+        <strong>{reports.length} informes</strong>
+        {/* Ordenar es un acto aparte: el carril de todos los días se queda
+            limpio y las asas solo aparecen cuando se van a usar. */}
+        {canEdit && (
+          <button
+            type="button"
+            className="oda-link-button"
+            aria-pressed={ordering}
+            onClick={() => setOrdering((on) => !on)}
+          >
+            {ordering ? "Listo" : "Ordenar"}
+          </button>
+        )}
+        {!ordering && (
+          <span className="oda-rail__legend" aria-hidden="true">
+            {STATIONS.map((s) => (
+              <span key={s.id} title={s.label}>
+                {s.number}
+              </span>
+            ))}
+          </span>
+        )}
       </div>
-      <ul ref={list}>
-        {data.catalog.reports.map((r) => {
+
+      {ordering && (
+        <p className="oda-rail__hint">
+          Arrastra por el asa, o usa las flechas. Este es el orden del tablero público.
+        </p>
+      )}
+      <ul ref={list} data-ordering={ordering || undefined}>
+        {reports.map((r, index) => {
           const p = progress.get(r.slug);
           const current = r.slug === active && station !== "periodo";
+          if (ordering) {
+            return (
+              <li
+                key={r.slug}
+                ref={drag.setRow(index)}
+                data-dragging={drag.dragging === index || undefined}
+                data-drop={drag.marker === index ? "antes" : drag.marker === index + 1 && index === reports.length - 1 ? "despues" : undefined}
+              >
+                <div className="oda-rail__item oda-rail__item--order">
+                  <span className="oda-grip" {...drag.handle(index, `Mover ${r.name}. Arrastra, o usa las flechas arriba y abajo.`)}>
+                    <Icon name="grip" size={16} />
+                  </span>
+                  <span className="oda-code" style={{ "--line": `var(--od-line-${r.line})` } as CSSProperties}>
+                    {r.code}
+                  </span>
+                  <span className="oda-rail__name">{r.name}</span>
+                  <span className="oda-rail__order">
+                    <button
+                      type="button"
+                      className="icon-button"
+                      disabled={index === 0}
+                      aria-label={`Subir ${r.name}`}
+                      title="Subir"
+                      onClick={() => move(index, index - 1)}
+                    >
+                      <Icon name="arrow-left" size={14} />
+                    </button>
+                    <button
+                      type="button"
+                      className="icon-button"
+                      disabled={index === reports.length - 1}
+                      aria-label={`Bajar ${r.name}`}
+                      title="Bajar"
+                      onClick={() => move(index, index + 1)}
+                    >
+                      <Icon name="arrow-right" size={14} />
+                    </button>
+                  </span>
+                </div>
+              </li>
+            );
+          }
           return (
             <li key={r.slug}>
               <button type="button" className="oda-rail__item" aria-current={current ? "true" : undefined} onClick={() => onPick(r.slug)}>

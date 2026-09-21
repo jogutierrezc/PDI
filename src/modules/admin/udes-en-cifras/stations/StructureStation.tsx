@@ -125,10 +125,12 @@ function ReportForm({ row, canEdit }: { row: StationProps["data"]["rows"]["repor
             ))}
           </div>
         </fieldset>
-        <label className="admin-field">
+        <div className="admin-field">
           <span>Orden en el tablero</span>
-          <input type="number" min={1} value={form.position} disabled={!canEdit} onChange={(e) => setForm({ ...form, position: Number(e.target.value) })} />
-        </label>
+          <p className="oda-muted">
+            Puesto <b>{form.position}</b>. Se cambia arrastrando en la lista de informes, con «Ordenar».
+          </p>
+        </div>
         <label className="admin-field admin-field--wide">
           <span>
             Resumen <small>{form.summary.length}/140</small>

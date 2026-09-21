@@ -189,6 +189,23 @@ export function useSaveReport() {
   });
 }
 
+/**
+ * El orden de los informes del periodo.
+ *
+ * Renumera de uno en adelante todas las filas en vez de tocar solo las que se
+ * movieron: `position` es un entero libre y arrastrar sobre una numeración con
+ * huecos deja empates que ordenan distinto en cada carga. Once escrituras y
+ * una sola invalidación al final, que es lo que evita que la lista dé saltos
+ * mientras se guarda.
+ */
+export function useReorderReports() {
+  return useOdMutation(async (rows: { id: string; position: number }[]) => {
+    for (const row of rows) {
+      await run(supabase.from("od_reports").update({ position: row.position }).eq("id", row.id));
+    }
+  });
+}
+
 export function useSaveIndicator() {
   return useOdMutation(async (row: Partial<OdIndicatorRow> & { report_id: string }) => {
     const { id, ...fields } = row;

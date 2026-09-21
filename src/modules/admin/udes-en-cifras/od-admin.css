@@ -3623,3 +3623,77 @@
 }
 
 .oda-origin__periods .oda-field-hint { flex-basis: 100%; margin: 0; }
+
+/* --- Ordenar los informes ---------------------------------------------------
+   Modo aparte: el carril de todos los días conserva sus marcas de estación y
+   solo al entrar en «Ordenar» aparecen las asas. Arrastrar convive con las
+   flechas, que son la única vía para quien navega con teclado. */
+
+.oda-rail__hint {
+  margin: 0 var(--space-3) var(--space-2);
+  color: var(--ink-muted);
+  font-size: var(--text-2xs);
+  line-height: var(--leading-normal);
+}
+
+.oda-rail ul[data-ordering] li {
+  position: relative;
+}
+
+/* La marca de caída: una regla azul en el punto de inserción, no un hueco que
+   se abre. El hueco obliga a recalcular toda la lista en cada movimiento del
+   puntero; la regla dice lo mismo y no mueve nada. */
+.oda-rail ul[data-ordering] li[data-drop]::after {
+  content: "";
+  position: absolute;
+  left: var(--space-2);
+  right: var(--space-2);
+  height: 2px;
+  background: var(--brand-blue);
+  border-radius: 1px;
+}
+
+.oda-rail ul[data-ordering] li[data-drop="antes"]::after { top: -1px; }
+.oda-rail ul[data-ordering] li[data-drop="despues"]::after { bottom: -1px; }
+
+.oda-rail__item--order {
+  grid-template-columns: auto auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--space-2);
+  cursor: default;
+  background: var(--surface-2);
+  border: 1px solid var(--line);
+}
+
+.oda-rail ul[data-ordering] li[data-dragging] .oda-rail__item--order {
+  background: var(--surface);
+  border-color: var(--brand-blue);
+  box-shadow: var(--shadow-md);
+  opacity: 0.9;
+}
+
+.oda-grip {
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 28px;
+  color: var(--ink-faint);
+  border-radius: 5px;
+  cursor: grab;
+}
+
+.oda-grip:hover { color: var(--ink-secondary); background: var(--surface-3); }
+.oda-grip:focus-visible { outline: 2px solid var(--brand-blue); outline-offset: 1px; }
+.oda-rail ul[data-ordering] li[data-dragging] .oda-grip { color: var(--brand-blue); cursor: grabbing; }
+
+.oda-rail__item--order .oda-rail__name {
+  font-size: var(--text-sm);
+  font-weight: 700;
+}
+
+.oda-rail__order { display: flex; gap: 2px; }
+.oda-rail__order .icon-button { width: 26px; height: 26px; }
+
+@media (prefers-reduced-motion: reduce) {
+  .oda-rail__item { transition: none; }
+}

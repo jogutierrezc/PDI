@@ -77,7 +77,7 @@ Modelo en Supabase y migraciones, importador real con reporte descargable, edici
 ## Fase 2 · importador de la matriz (2026-09-23)
 
 - **El Excel se lee en el navegador** (`src/modules/impacto/import/matrix.ts`, con ExcelJS cargado solo al importar) y la base recibe lo normalizado por la RPC `imp_import_catalog` (0066), en una sola transacción.
-- **Resultado con la vr7**: 106 indicadores (37 · 27 · 42), 93 oficiales, 13 sugeridos, 413 hallazgos en 19 tipos.
+- **Resultado con la vr7**: 106 indicadores (37 · 27 · 42), 93 oficiales, 13 sugeridos, 428 hallazgos en 19 tipos.
 - **Unidad de medida**: se mapea a las seis del catálogo solo cuando la celda trae una sola medida. Las que traen dos («N° proyectos / proporción», 20 casos) o ninguna reconocible (5) quedan vacías con hallazgo; la unidad la fija Planeación en la ficha.
 - **Porcentajes escritos como fracción** (0.69 con unidad «% docentes», 9 casos): se importan tal cual y se reportan. No se multiplica por 100 sin que alguien lo confirme.
 - **Líneas base**: «Por definir» (81) y «No existe» (10) quedan vacías con hallazgo; «≥13 horas» también (texto, 1 caso).

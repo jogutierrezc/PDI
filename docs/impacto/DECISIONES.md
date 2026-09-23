@@ -218,3 +218,10 @@ Modelo en Supabase y migraciones, importador real con reporte descargable, edici
 - **Niveles nuevos (0075):** técnico profesional (`tecnico`), tecnológico (`tecnologico`) y especialización médico-quirúrgica (`especializacion_medicoquirurgica`), en los programas y en «Aplica a» de los indicadores. `pregrado` sigue siendo el valor del profesional universitario (en pantalla, «Profesional universitario»): renombrarlo movería datos existentes. La plantilla de estructura reconoce cómo lo escribe la gente («Tecnólogo», «Técnica profesional», «Especialización-Medicoquirurgica»…).
 - **No se tocan indicadores:** un programa de estos niveles solo recibe los indicadores que marquen su nivel en «Aplica a». Las versiones publicadas no cambian; se marcan en el borrador siguiente, ahora también desde la hoja del catálogo (columna «Aplica a», con «Todos» o niveles separados por coma).
 - **Slug de unidades nuevas:** se recortaba a 48 caracteres después de quitar los guiones de los bordes, así que un nombre largo podía terminar en «-» y la base lo rechazaba (`units_slug_format`), como en «Facultad de Ciencias Económicas, Administrativas y Contables». Ahora se quitan después de recortar.
+
+## Portal · oferta de programas por facultad, campus y nivel (2026-09-23)
+
+- La lente «Programas» de la portada es ahora la oferta: filtros combinables por facultad, campus y nivel de formación (incluidos los de 0075), con el resumen «n programas · facultad · campus» y el filtro en la dirección (`/impacto?lente=programa&facultad=…&campus=…&nivel=…`) para compartir el enlace.
+- Cada opción dice cuántos programas quedarían con los otros filtros puestos; las que dejarían la lista vacía se ven apagadas. Si aun así no hay nada, se dice por qué («Ninguna facultad ofrece programas en Bogotá todavía»).
+- Cada programa muestra su nivel y sus sedes activas. La oferta sale de `imp_portal_structure` (0072), que ya traía facultad, nivel y sedes activas: no hizo falta migración.
+- Desde la página de una facultad o de un campus hay un enlace a su oferta ya filtrada.

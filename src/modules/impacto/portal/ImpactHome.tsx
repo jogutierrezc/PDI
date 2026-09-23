@@ -10,15 +10,16 @@
       ejemplo, la sección no se muestra.
    ========================================================================== */
 
-import { useMemo, useState } from "react";
+import { useMemo } from "react";
 import type { CSSProperties } from "react";
-import { Link } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import { Icon } from "../../../components/ui/Icon";
 import { FUNCTIONS } from "../data/catalog";
 import { INSTITUTION, LENSES, entitiesOf, formatValue, resolveScope, statFor, statsFor } from "../data/lens";
 import type { IndicatorStat, LensKind, PortalData, PortalFaculty } from "../data/lens";
 import { ImpactLayout } from "./ImpactLayout";
 import { PortalGate } from "./PortalGate";
+import { ProgramOffer } from "./ProgramOffer";
 import { SourceNote, pebbleShape, riverCounts } from "./shared";
 import { ValueRiver } from "./ValueRiver";
 
@@ -32,7 +33,17 @@ export function ImpactHome() {
 function Home({ data }: { data: PortalData }) {
   const stats = useMemo(() => statsFor(data, INSTITUTION), [data]);
   const counts = useMemo(() => riverCounts(stats), [stats]);
-  const [lens, setLens] = useState<LensKind>("facultad");
+  // La lente va en la dirección: un enlace a la oferta filtrada abre la
+  // portada en programas, con sus filtros (ProgramOffer).
+  const [params, setParams] = useSearchParams();
+  const asked = params.get("lente") as LensKind | null;
+  const filtered = params.has("facultad") || params.has("campus") || params.has("nivel");
+  const lens: LensKind = asked && LENSES.some((l) => l.kind === asked) ? asked : filtered ? "programa" : "facultad";
+  const setLens = (kind: LensKind) => {
+    const next = new URLSearchParams(params);
+    next.set("lente", kind);
+    setParams(next, { replace: true, preventScrollReset: true });
+  };
   const entities = entitiesOf(data, lens);
   const total = data.indicators.length;
   const official = data.indicators.filter((i) => i.estado === "oficial").length;
@@ -99,7 +110,12 @@ function Home({ data }: { data: PortalData }) {
             ))}
           </div>
 
-          {entities.length === 0 ? (
+          {lens === "programa" && data.programs.length > 0 ? (
+            <ProgramOffer
+              data={data}
+              withData={(slug) => statsFor(data, resolveScope(data, "programa", slug)!).filter((s) => s.current).length}
+            />
+          ) : entities.length === 0 ? (
             <p className="imp-level__empty" id="lente-panel" role="tabpanel" aria-labelledby={`lente-${lens}`}>
               Aún no hay {LENSES.find((l) => l.kind === lens)?.plural.toLowerCase()} con programas en la estructura de Impacto.
             </p>

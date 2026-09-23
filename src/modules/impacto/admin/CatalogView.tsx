@@ -13,6 +13,7 @@ import { Icon } from "../../../components/ui/Icon";
 import { CALC_LABEL, FUNCTIONS, INDICATORS, LEVELS, MODE_LABEL, functionById } from "../data/catalog";
 import { MATRIX_FINDINGS, MATRIX_SOURCE } from "../data/matriz.generated";
 import type { FunctionId, Indicator, Level } from "../data/types";
+import { MatrixImport } from "./MatrixImport";
 import { actions, useImpactStore } from "./store";
 
 type SheetFilter = "todas" | "piloto" | "completa" | "incompleta";
@@ -57,9 +58,11 @@ export function CatalogView() {
 
   return (
     <>
+      <MatrixImport />
+
       <section className="admin-card ia-summary">
         <div className="ia-summary__source">
-          <h2>Matriz importada</h2>
+          <h2>Catálogo del prototipo</h2>
           <p>
             <code>{MATRIX_SOURCE}</code> · hojas de Investigación, Enseñanza y Extensión. La hoja Consolidado no se importa.
           </p>
@@ -98,10 +101,6 @@ export function CatalogView() {
               </li>
             ))}
           </ul>
-          <button type="button" className="button-ghost" disabled title="Llega con el importador (fase 2)">
-            <Icon name="download" size={15} />
-            Descargar el reporte de hallazgos
-          </button>
         </div>
       </section>
 

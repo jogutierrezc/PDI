@@ -43,8 +43,8 @@ export interface TestDb {
   db: PGlite;
   /** Consulta como dueño de las tablas (se salta RLS). */
   q: Query;
-  /** Un bloque con la sesión de una persona. Se revierte al final. */
-  asUser: <T>(userId: string | null, work: (q: Query) => Promise<T>) => Promise<T>;
+  /** Un bloque con la sesión de una persona. Se revierte al final, salvo con `commit`. */
+  asUser: <T>(userId: string | null, work: (q: Query) => Promise<T>, options?: { commit?: boolean }) => Promise<T>;
   close: () => Promise<void>;
 }
 
@@ -63,14 +63,17 @@ export async function createTestDb({ seed = true } = {}): Promise<TestDb> {
 
   const q: Query = async (sql, params) => (await db.query(sql, params)).rows as never;
 
-  const asUser: TestDb["asUser"] = async (userId, work) => {
+  const asUser: TestDb["asUser"] = async (userId, work, options = {}) => {
     await db.exec("begin");
+    let ok = false;
     try {
       await db.exec(userId ? "set local role authenticated" : "set local role anon");
       await db.query("select set_config('request.jwt.claim.sub', $1, true)", [userId ?? ""]);
-      return await work(q);
+      const result = await work(q);
+      ok = true;
+      return result;
     } finally {
-      await db.exec("rollback");
+      await db.exec(ok && options.commit ? "commit" : "rollback");
     }
   };
 

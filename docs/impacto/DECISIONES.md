@@ -73,3 +73,19 @@ Modelo en Supabase y migraciones, importador real con reporte descargable, edici
 - Los 14 ODS de PORTADA son los que se siembran; un ODS fuera de la lista será hallazgo del importador, no se agrega para que cuadre.
 - **Vitest 2** (no 5): Vitest 5 pide Vite 6+ y el proyecto usa Vite 5.
 - **Corrección en 0061**: `board_under_review(target)` comparaba contra la columna `board_reviews.target` en vez del parámetro, y Postgres rechazaba la función al crearla. Ahora usa `board_under_review.target`.
+
+## Fase 2 · importador de la matriz (2026-09-23)
+
+- **El Excel se lee en el navegador** (`src/modules/impacto/import/matrix.ts`, con ExcelJS cargado solo al importar) y la base recibe lo normalizado por la RPC `imp_import_catalog` (0066), en una sola transacción.
+- **Resultado con la vr7**: 106 indicadores (37 · 27 · 42), 93 oficiales, 13 sugeridos, 413 hallazgos en 19 tipos.
+- **Unidad de medida**: se mapea a las seis del catálogo solo cuando la celda trae una sola medida. Las que traen dos («N° proyectos / proporción», 20 casos) o ninguna reconocible (5) quedan vacías con hallazgo; la unidad la fija Planeación en la ficha.
+- **Porcentajes escritos como fracción** (0.69 con unidad «% docentes», 9 casos): se importan tal cual y se reportan. No se multiplica por 100 sin que alguien lo confirme.
+- **Líneas base**: «Por definir» (81) y «No existe» (10) quedan vacías con hallazgo; «≥13 horas» también (texto, 1 caso).
+- **Metas «Por definir»** (108) no se guardan como meta; se reportan.
+- **Proyectos**: «Proyecto N» se normaliza a PrN y se reporta (83). No se reconocen y se reportan: cinco «Proyecto 8» en Extensión (PORTADA define siete) y un «r6» en Investigación (probable Pr6); no se corrigen.
+- **ODS 2 y 7** en I32 no están en la lista de PORTADA: se importan como alineación y se reportan.
+- **Responsables múltiples** (45 celdas): se conserva el texto; el validador único lo fija la ficha. Por defecto, la vicerrectoría de la función.
+- **Años de meta**: el año sale del encabezado de cada hoja; Extensión (META 2025) se reporta frente a META 2026 de las otras dos.
+- **Reimportar**: si ya hay un borrador, se niega; `imp_discard_draft` lo borra. Al crear un borrador se copia la ficha técnica de la última versión publicada por código de indicador.
+- **Reporte de hallazgos**: Excel (hoja «Hallazgos» con filtros y hoja «Resumen» por tipo) y CSV con `;` y BOM, que Excel en español abre sin romper tildes.
+- **Prueba de humo**: el simulador de Supabase no entendía `gt`, `lt` ni `order` y la paginación por llave de UDES en Cifras no terminaba; corregido.

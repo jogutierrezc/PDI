@@ -2822,9 +2822,31 @@ function applyFilters(rows, params) {
     result = result.filter((row) => matches(row[key], operator, value));
   }
 
+  result = applyOrder(result, params.get("order"));
   const offset = Number(params.get("offset") ?? 0);
   const limit = params.has("limit") ? Number(params.get("limit")) : undefined;
   return limit === undefined ? result.slice(offset) : result.slice(offset, offset + limit);
+}
+
+/**
+ * La lista de un filtro in.(…) partida una sola vez. Antes se partía y se
+ * limpiaba con expresiones regulares por cada fila: con las listas de ids de
+ * UDES en Cifras contra tablas de miles de filas, la portada y /datos-abiertos
+ * no terminaban nunca y la prueba moría sin memoria.
+ */
+const IN_LISTS = new Map();
+function inList(value) {
+  let set = IN_LISTS.get(value);
+  if (!set) {
+    set = new Set(
+      value
+        .replace(/^\(|\)$/g, "")
+        .split(",")
+        .map((item) => item.trim().replace(/^"|"$/g, "")),
+    );
+    IN_LISTS.set(value, set);
+  }
+  return set;
 }
 
 function matches(actual, operator, value) {
@@ -2834,13 +2856,8 @@ function matches(actual, operator, value) {
     case "neq":
       return String(actual) !== value;
     // in.("a","b") — así piden las tablas hijas de UDES en Cifras sus padres.
-    case "in": {
-      const wanted = value
-        .replace(/^\(|\)$/g, "")
-        .split(",")
-        .map((item) => item.trim().replace(/^"|"$/g, ""));
-      return wanted.includes(String(actual));
-    }
+    case "in":
+      return inList(value).has(String(actual));
     case "is":
       return value === "null" ? actual === null : String(actual) === value;
     // not.is.null y compañía: PostgREST antepone `not.` al operador. Mientras
@@ -2863,9 +2880,51 @@ function matches(actual, operator, value) {
         .filter(Boolean);
       return wanted.every((item) => actual.map(String).includes(item));
     }
+    // gt/gte/lt/lte: la paginación por llave (id > último, ordenado por id)
+    // de UDES en Cifras. Mientras cayeron en el `default`, el simulador
+    // devolvía siempre la primera página, la paginación no terminaba y la
+    // prueba moría sin memoria en / y en /datos-abiertos.
+    case "gt":
+      return compare(actual, value) > 0;
+    case "gte":
+      return compare(actual, value) >= 0;
+    case "lt":
+      return compare(actual, value) < 0;
+    case "lte":
+      return compare(actual, value) <= 0;
     default:
       return true;
   }
+}
+
+/** Compara como lo haría Postgres: números como números, lo demás como texto. */
+function compare(actual, value) {
+  if (actual === null || actual === undefined) return Number.NaN;
+  const a = Number(actual);
+  const b = Number(value);
+  if (typeof actual === "number" && !Number.isNaN(b)) return a - b;
+  const left = String(actual);
+  return left < value ? -1 : left > value ? 1 : 0;
+}
+
+/** order=col.asc,col2.desc — hace falta para que la paginación por llave sea estable. */
+function applyOrder(rows, order) {
+  if (!order) return rows;
+  const keys = order.split(",").map((part) => {
+    const [column, direction] = part.split(".");
+    return { column, sign: direction === "desc" ? -1 : 1 };
+  });
+  return [...rows].sort((x, y) => {
+    for (const { column, sign } of keys) {
+      const a = x[column];
+      const b = y[column];
+      if (a === b) continue;
+      if (a === null || a === undefined) return 1;
+      if (b === null || b === undefined) return -1;
+      return (typeof a === "number" && typeof b === "number" ? a - b : String(a) < String(b) ? -1 : 1) * sign;
+    }
+    return 0;
+  });
 }
 
 // v_projects_admin es v_projects con el valor de formulación de vuelta. Se arma

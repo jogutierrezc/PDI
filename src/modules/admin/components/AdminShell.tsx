@@ -44,7 +44,8 @@ export type AdminSection =
   | "observatorio"
   | "tableros"
   | "transfer"
-  | "impacto";
+  | "impacto"
+  | "institution";
 
 interface NavItem {
   id: AdminSection;
@@ -132,6 +133,9 @@ const navigation: NavGroup[] = [
       { id: "structure", label: "Normalizar estructura", icon: "settings", to: "/admin/estructura", minimum: "consulta" },
       { id: "parameters", label: "Parámetros globales", icon: "settings", to: "/admin/parametros", minimum: "consulta" },
       { id: "development", label: "Desarrollo tecnológico", icon: "code", to: "/admin/desarrollo", minimum: "consulta" },
+      // Vicerrectorías, facultades y programas: de aquí salen las unidades de
+      // Impacto y de Mis Tableros.
+      { id: "institution", label: "Estructura institucional", icon: "community", to: "/admin/estructura-institucional", minimum: "admin" },
       { id: "users", label: "Usuarios y roles", icon: "user", to: "/admin/usuarios", minimum: "admin" },
       // Copia otro servidor de Supabase en este. Reemplaza datos: solo administración.
       { id: "transfer", label: "Traslado de datos", icon: "upload", to: "/admin/traslado", minimum: "admin" },

@@ -52,7 +52,8 @@ export type AdminScreen =
   | "development"
   | "users"
   | "transfer"
-  | "impacto";
+  | "impacto"
+  | "institution";
 
 /** Un rol de acceso: qué puede hacer, qué pantallas ve y sobre qué informes escribe. */
 export interface AccessRole {
@@ -66,6 +67,12 @@ export interface AccessRole {
   all_reports: boolean;
   is_system: boolean;
   position: number;
+  /** Capacidades de Impacto (0063). */
+  capabilities?: string[];
+  /** global: va en el perfil; unidad: va en una pertenencia (0073). */
+  scope?: "global" | "unidad";
+  /** Papel en Mis Tableros de quien entra a una unidad con este rol (0073). */
+  unit_role?: "visor" | "editor" | "jefe" | null;
   created_at?: string;
   updated_at?: string;
 }

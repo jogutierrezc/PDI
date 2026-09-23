@@ -136,6 +136,9 @@ const ImpactIndicator = lazy(() =>
   import("./modules/impacto/portal/ImpactIndicator").then((m) => ({ default: m.ImpactIndicator })),
 );
 const ImpactAdmin = lazy(() => import("./modules/impacto/admin/ImpactAdmin").then((m) => ({ default: m.ImpactAdmin })));
+const InstitutionView = lazy(() =>
+  import("./modules/admin/institucion/InstitutionView").then((m) => ({ default: m.InstitutionView })),
+);
 const DataTransfer = lazy(() =>
   import("./modules/admin/traslado/DataTransfer").then((m) => ({ default: m.DataTransfer })),
 );
@@ -367,7 +370,7 @@ export default function App() {
             }
           />
           <Route
-            path="/admin/usuarios"
+            path="/admin/usuarios/:vista?"
             element={
               <RequireRole minimum="admin" screen="users">
                 <UserManagement />
@@ -412,6 +415,14 @@ export default function App() {
             element={
               <RequireRole minimum="consulta" screen="impacto">
                 <ImpactAdmin />
+              </RequireRole>
+            }
+          />
+          <Route
+            path="/admin/estructura-institucional/:unidad?"
+            element={
+              <RequireRole minimum="admin" screen="institution">
+                <InstitutionView />
               </RequireRole>
             }
           />

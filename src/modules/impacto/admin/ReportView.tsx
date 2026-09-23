@@ -38,6 +38,7 @@ import {
 import type { CaptureRow } from "../data/capture-db";
 import { formatValue, unitLabel } from "../data/lens";
 import { CaptureSheet } from "./CaptureSheet";
+import { ExcelImport, downloadTemplate } from "./ExcelImport";
 import { StatePill } from "./parts";
 import { RETURN_REASONS, STATE_LABEL } from "./store";
 
@@ -62,6 +63,7 @@ export function ReportView() {
   const [periodId, setPeriodId] = useState<string | null>(null);
   const [mode, setModeState] = useState<Mode>(readMode);
   const [selected, setSelected] = useState<string | null>(null);
+  const [importing, setImporting] = useState(false);
   const program = programs.data?.find((p) => p.program_id === programId) ?? programs.data?.[0] ?? null;
   const period = periods.data?.find((p) => p.id === periodId) ?? periods.data?.[0] ?? null;
   const rows = useCaptureRows(period?.id ?? null, program?.program_id ?? null);
@@ -115,6 +117,8 @@ export function ReportView() {
         programId={program.program_id}
         mode={mode}
         onMode={setMode}
+        onDownload={() => downloadTemplate({ periodId: period.id, programId: program.program_id, programName: program.program_name, programCode: program.program_code, rows: list })}
+        onImport={() => setImporting(true)}
         onPick={(id) => {
           setSelected(id);
           setMode("sencillo");
@@ -154,6 +158,8 @@ export function ReportView() {
       {rows.error && <p className="ia-error">{rows.error.message}</p>}
       {rows.isPending && <p className="ia-muted">Cargando los registros…</p>}
 
+      {importing && rows.data && <ExcelImport rows={list} onClose={() => setImporting(false)} />}
+
       {rows.data &&
         (mode === "hoja" ? (
           <CaptureSheet rows={list} />
@@ -176,6 +182,8 @@ function Board({
   programId,
   mode,
   onMode,
+  onDownload,
+  onImport,
   onPick,
   chooser,
 }: {
@@ -188,6 +196,8 @@ function Board({
   programId: string;
   mode: Mode;
   onMode: (m: Mode) => void;
+  onDownload: () => Promise<void>;
+  onImport: () => void;
   onPick: (id: string) => void;
   chooser: ReactNode;
 }) {
@@ -196,6 +206,7 @@ function Board({
   const [certified, setCertified] = useState(false);
   const [error, setError] = useState("");
   const [done, setDone] = useState("");
+  const [downloading, setDownloading] = useState(false);
 
   const open = rows.filter((r) => editable(r.state));
   const complete = rows.filter((r) => blocking(issuesOf(r)).length === 0);
@@ -254,11 +265,22 @@ function Board({
             <Icon name="table" size={14} /> Hoja de cálculo
           </button>
         </div>
-        <button type="button" className="button-ghost" disabled title="Llega en la fase 6">
+        <button
+          type="button"
+          className="button-ghost"
+          disabled={downloading || rows.length === 0}
+          onClick={() => {
+            setDownloading(true);
+            setError("");
+            onDownload()
+              .catch((cause: unknown) => setError(cause instanceof Error ? cause.message : "No se pudo generar la plantilla."))
+              .finally(() => setDownloading(false));
+          }}
+        >
           <Icon name="download" size={15} />
-          Descargar plantilla Excel
+          {downloading ? "Generando…" : "Descargar plantilla Excel"}
         </button>
-        <button type="button" className="button-ghost" disabled title="Llega en la fase 6">
+        <button type="button" className="button-ghost" disabled={open.length === 0} onClick={onImport}>
           <Icon name="upload" size={15} />
           Importar Excel
         </button>
@@ -328,6 +350,12 @@ function Board({
       {done && (
         <p className="admin-notice" role="status">
           <Icon name="check" size={15} /> {done}
+        </p>
+      )}
+      {error && !sending && (
+        <p className="ia-error" role="alert">
+          <Icon name="alert" size={15} />
+          {error}
         </p>
       )}
     </section>

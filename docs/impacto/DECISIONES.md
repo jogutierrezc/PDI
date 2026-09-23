@@ -124,6 +124,19 @@ Modelo en Supabase y migraciones, importador real con reporte descargable, edici
 - **Mi reporte** se muestra a quien captura en algún programa (`imp_my_programs`), no por el «Ver como» del prototipo. La ficha abre primero lo devuelto.
 - **Observaciones** del programa se guardan en los dos modos.
 
+## Fase 6 · plantilla Excel e importación (2026-09-23)
+
+- **Plantilla firmada por la base** (`imp_sign_template`, 0070): cada descarga queda en `imp_templates` con programa, periodo, versión del catálogo, fecha de generación y asignaciones. La huella es HMAC-SHA256 de esos datos con una clave que vive en `imp_secrets` (sin acceso desde la aplicación). La hoja CONTROL va *muy oculta* y lleva esos datos y la huella.
+- **Protección de hojas**: clave aleatoria por plantilla, guardada en la base y no mostrada. Es una comodidad para no escribir donde no toca; la garantía real es la huella. ExcelJS no protege la estructura del libro: cada hoja se protege por separado (sin insertar ni borrar filas o columnas).
+- **Rechazo del archivo completo** (con el motivo en español): hojas o encabezados cambiados, CONTROL incompleto, huella que no coincide («fue alterada»), otro programa, periodo cerrado, otra versión del catálogo o asignaciones que cambiaron después de generar la plantilla. «Versión de catálogo vigente» = la del periodo.
+- **La validación sigue en un solo lugar**: la vista previa usa `validate.ts` igual que la captura en línea; la base revisa pertenencia a la plantilla, estado editable y permisos. Cada error dice fila y columna.
+- **V07 (evidencia obligatoria) se exige al enviar, no al importar**: los archivos se suben después en la plataforma; un enlace en la columna S cuenta como evidencia.
+- **Celda vacía no borra**: solo se mandan los campos escritos y distintos de lo guardado. Filas de registros enviados o aprobados salen como «omitida» en la vista previa y como error si llegaran a la base.
+- **Conflicto**: si el registro se guardó en línea después de generar la plantilla y ya tenía datos, la fila queda «en conflicto» y la dirección elige, fila por fila, cuál conservar (por defecto, lo guardado en línea).
+- **IMPORTACION_TODO_O_NADA** vive en `imp_settings` (por defecto `false`: carga parcial) y lo cambia quien tenga `impacto.periodo`. Con `true`, un error en el navegador o en la base cancela todo el archivo.
+- **Bitácora**: cada importación deja un lote en `imp_import_batches` (leídas, cargadas, con error, informe) y sus registros en `imp_import_batch_records`; ambos solo admiten inserción. Los registros cargados quedan en borrador con canal `excel`; importar nunca envía.
+- **Devolver errores**: «Plantilla con errores marcados» descarga el mismo archivo con la columna V «Errores» y las celdas en rojo; ese archivo se puede corregir y volver a importar.
+
 ## Fase 7 · flujo de estados y bandejas (2026-09-23)
 
 - **Una sola función decide** (`imp_review`, 0071): recibe uno o varios registros y una acción (`aprobar`, `devolver`, `validar`). El papel de quien pregunta sale del estado del registro: en `enviado` o `devuelto_decanatura` decide la decanatura (`impacto.aprobar` en el programa o en una unidad superior); en `aprobado_decanatura`, la vicerrectoría de la función del indicador (`impacto.validar`). Todo o nada: si un registro del lote no se puede, no se mueve ninguno.

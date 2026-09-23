@@ -2612,6 +2612,22 @@ const routes = [
     },
   },
   {
+    path: "/admin/impacto/reporte",
+    note: "plantilla Excel: descargar e importar",
+    expect: "Descargar plantilla Excel",
+    session: true,
+    interact: async (window, tick) => {
+      const button = [...window.document.querySelectorAll("button")].find((b) => b.textContent.includes("Importar Excel"));
+      if (!button) throw new Error("no se encontró el botón «Importar Excel»");
+      if (button.disabled) throw new Error("«Importar Excel» está deshabilitado con registros editables");
+      button.click();
+      await tick();
+      const text = window.document.body.textContent ?? "";
+      if (!text.includes("Importar la plantilla Excel")) throw new Error("no se abrió el panel de importación");
+      if (!text.includes("Se cargan las filas válidas")) throw new Error("el panel no dice la política de importación");
+    },
+  },
+  {
     path: "/admin/estructura",
     expect: "Normalizar la estructura",
     session: true,
@@ -3484,6 +3500,8 @@ FIXTURES.od_bulletin_editions = [
     record_id: "imp-rv2", at: "2026-09-22T15:00:00Z", from_state: "aprobado_decanatura", to_state: "devuelto_decanatura",
     reason: "variacion_sin_justificar", comment: "Explique el salto frente a 2026-1.", actor: null,
   });
+
+  FIXTURES.imp_settings = [{ key: "importacion_todo_o_nada", value: false }];
   FIXTURES.units = [
     { id: "imp-prog-a", name: "Programa de Prueba A", code: "PR-A", snies_code: "900001", kind: "programa",
       campuses: [{ campus: { id: "c1", name: "Bucaramanga", slug: "bucaramanga" } }] },

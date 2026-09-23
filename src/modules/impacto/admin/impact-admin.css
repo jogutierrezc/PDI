@@ -1681,3 +1681,30 @@
   color: var(--ink-muted);
   font-size: var(--text-xs);
 }
+
+/* --- Revisión sobre la base (fase 7) ------------------------------------------- */
+
+/* Las pestañas Decanatura / Vicerrectoría usan la misma píldora que las vistas. */
+.ia-views button {
+  padding: var(--space-2) var(--space-4);
+  color: var(--ink-secondary);
+  background: none;
+  border: 0;
+  border-radius: var(--radius-pill);
+  font-size: var(--text-sm);
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.ia-views button.is-active {
+  color: var(--ink-on-accent);
+  background: var(--brand-navy);
+}
+
+.ia-views[role="tablist"] {
+  justify-self: start;
+}
+
+.ia-review__evidence {
+  overflow-wrap: anywhere;
+}

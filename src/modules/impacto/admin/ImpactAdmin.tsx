@@ -1,42 +1,41 @@
 /* =============================================================================
-   Impacto · intranet (prototipo).
+   Impacto · intranet.
 
    Una sola pantalla con cuatro vistas, una por trabajo:
      · Catálogo   Planeación importa la matriz, completa fichas y publica.
-     · Periodo    Planeación abre 2026-2 y revisa las asignaciones.
-     · Mi reporte El director captura y envía el paquete de su programa.
+     · Periodo    Planeación abre el periodo y revisa las asignaciones.
+     · Mi reporte El programa captura y envía su paquete.
      · Revisión   Decanatura aprueba o devuelve; cada vicerrectoría valida
                   lo de su función.
 
-   Mientras no hay modelo en Supabase, «Ver como» cambia de persona para
-   recorrer el circuito completo en una sola sesión.
+   Cada vista la ve quien tiene ese trabajo en la base, no un selector: el
+   «Ver como» del prototipo se retiró con la fase 7.
+     · Catálogo y Periodo: Planeación o más (la base exige además
+       impacto.catalogo e impacto.periodo).
+     · Mi reporte: quien captura en algún programa (imp_my_programs).
+     · Revisión: quien aprueba en algún programa o valida alguna función
+       (imp_my_review_scope).
    ========================================================================== */
 
 import { useEffect } from "react";
 import { NavLink, useNavigate, useParams } from "react-router-dom";
 import { AdminShell } from "../../admin/components/AdminShell";
-import { Icon } from "../../../components/ui/Icon";
 import { useAuth } from "../../../lib/auth";
 import { useMyPrograms } from "../data/capture-db";
+import { useReviewScope } from "../data/review-db";
 import { CatalogView } from "./CatalogView";
 import { PeriodView } from "./PeriodView";
 import { ReportView } from "./ReportView";
 import { ReviewView } from "./ReviewView";
-import { PEOPLE, actions, me, useImpactStore } from "./store";
-import type { Role } from "./store";
 import "./impact-admin.css";
 
 type View = "catalogo" | "periodo" | "reporte" | "revision";
 
-// Catálogo y Periodo ya trabajan sobre la base: los abre quien tenga
-// Planeación o más en su sesión real (la base exige además impacto.catalogo e
-// impacto.periodo). Las demás vistas siguen con el «Ver como» del prototipo
-// hasta sus fases.
-const VIEWS: { id: View; label: string; roles: Role[] }[] = [
-  { id: "catalogo", label: "Catálogo", roles: [] },
-  { id: "periodo", label: "Periodo", roles: [] },
-  { id: "reporte", label: "Mi reporte", roles: [] },
-  { id: "revision", label: "Revisión", roles: ["decano", "vicerrector"] },
+const VIEWS: { id: View; label: string }[] = [
+  { id: "catalogo", label: "Catálogo" },
+  { id: "periodo", label: "Periodo" },
+  { id: "reporte", label: "Mi reporte" },
+  { id: "revision", label: "Revisión" },
 ];
 
 const DESCRIPTION: Record<View, string> = {
@@ -47,30 +46,29 @@ const DESCRIPTION: Record<View, string> = {
 };
 
 export function ImpactAdmin() {
-  const state = useImpactStore();
-  const person = me(state);
   const { vista } = useParams();
   const navigate = useNavigate();
   const { hasRole } = useAuth();
   const programs = useMyPrograms();
-  // Catálogo y Periodo: Planeación o más. Mi reporte: quien captura en algún
-  // programa. Revisión sigue con el «Ver como» del prototipo hasta la fase 7.
+  const scope = useReviewScope();
+  const pending = programs.isPending || scope.isPending;
+
+  const reviews = (scope.data?.deanPrograms.length ?? 0) > 0 || (scope.data?.functions.length ?? 0) > 0;
   const allowed = VIEWS.filter((v) =>
-    v.id === "reporte" ? (programs.data?.length ?? 0) > 0 : v.roles.length === 0 ? hasRole("planeacion") : v.roles.includes(person.role),
+    v.id === "reporte" ? (programs.data?.length ?? 0) > 0 : v.id === "revision" ? reviews : hasRole("planeacion"),
   );
   const view = allowed.find((v) => v.id === vista) ?? allowed[0] ?? null;
 
-  // Cambiar de persona lleva a su primera vista.
-  // No se decide a dónde ir hasta saber si la persona captura en algún programa.
+  // No se decide a dónde ir hasta saber qué trabajos tiene la persona.
   useEffect(() => {
-    if (programs.isPending) return;
+    if (pending) return;
     if (view && vista !== view.id) navigate(`/admin/impacto/${view.id}`, { replace: true });
-  }, [vista, view, navigate, programs.isPending]);
+  }, [vista, view, navigate, pending]);
 
-  if (!view || (programs.isPending && vista === "reporte")) {
+  if (!view || (pending && (vista === "reporte" || vista === "revision"))) {
     return (
       <AdminShell section="impacto" kicker="Impacto" title="Reporte de impacto">
-        {programs.isPending ? (
+        {pending ? (
           <p className="ia-muted">Cargando…</p>
         ) : (
           <section className="admin-card ia-empty-state">
@@ -88,21 +86,9 @@ export function ImpactAdmin() {
       kicker="Impacto"
       title={view.id === "reporte" ? "Mi reporte del periodo" : view.label}
       description={DESCRIPTION[view.id]}
-      actions={
-        <label className="ia-as">
-          <span>Ver como</span>
-          <select value={person.id} onChange={(e) => actions.become(e.target.value)}>
-            {PEOPLE.map((p) => (
-              <option key={p.id} value={p.id}>
-                {p.name}
-              </option>
-            ))}
-          </select>
-        </label>
-      }
     >
-      <div className="ia-bar">
-        {allowed.length > 1 && (
+      {allowed.length > 1 && (
+        <div className="ia-bar">
           <nav className="ia-views" aria-label="Vistas de Impacto">
             {allowed.map((v) => (
               <NavLink key={v.id} to={`/admin/impacto/${v.id}`} className={v.id === view.id ? "is-active" : undefined}>
@@ -110,15 +96,8 @@ export function ImpactAdmin() {
               </NavLink>
             ))}
           </nav>
-        )}
-        <p className="ia-proto">
-          <Icon name="alert" size={14} />
-          Prototipo: los datos viven en este navegador.
-          <button type="button" onClick={() => actions.reset()}>
-            Reiniciar el recorrido
-          </button>
-        </p>
-      </div>
+        </div>
+      )}
 
       {view.id === "catalogo" && <CatalogView />}
       {view.id === "periodo" && <PeriodView />}

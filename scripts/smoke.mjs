@@ -2579,6 +2579,39 @@ const routes = [
     also: ["Numerador o valor", "Confirma precargado", "89,6 %", "Este indicador exige evidencia"],
   },
   {
+    path: "/admin/impacto/revision",
+    note: "bandeja de decanatura: paquete del programa, devolución de la vicerrectoría y separación de funciones",
+    expect: "Decanatura · Facultad de Prueba",
+    session: true,
+    also: [
+      "Esperan su decisión",
+      "Programa de Prueba B",
+      "Tasa de retención estudiantil",
+      "430 ÷ 480",
+      "La vicerrectoría lo devolvió: Variación sin justificar",
+      "Aprobar de nuevo",
+      "Lo capturó usted: no puede aprobarlo.",
+    ],
+    absent: ["Ver como", "Prototipo: los datos viven en este navegador."],
+  },
+  {
+    path: "/admin/impacto/revision",
+    note: "bandeja de la vicerrectoría: solo su función, valida o devuelve a la decanatura",
+    expect: "Vicerrectoría · Enseñanza",
+    session: true,
+    interact: async (window, tick) => {
+      const tab = [...window.document.querySelectorAll('[role="tab"]')].find((b) => b.textContent.includes("Vicerrectoría"));
+      if (!tab) throw new Error("no está la pestaña de la vicerrectoría");
+      tab.click();
+      await tick();
+      const text = window.document.body.textContent;
+      if (!text.includes("Vicerrectoría · Enseñanza")) throw new Error("no cambió a la bandeja de la vicerrectoría");
+      if (!text.includes("Profesores con título de Maestría y Doctorado")) throw new Error("no aparece el registro aprobado por la decanatura");
+      if (!text.includes("Validar")) throw new Error("no aparece el botón para validar");
+      if (text.includes("Innovaciones pedagógicas")) throw new Error("la vicerrectoría ve lo que aún está en la decanatura");
+    },
+  },
+  {
     path: "/admin/estructura",
     expect: "Normalizar la estructura",
     session: true,
@@ -3427,6 +3460,30 @@ FIXTURES.od_bulletin_editions = [
   FIXTURES.imp_evidence = [];
   FIXTURES.imp_transitions = [];
   FIXTURES.imp_import_batch_records = [];
+
+  // Revisión (0071): la persona de la sesión es decanatura del Programa B y
+  // vicerrectoría de Enseñanza. Un registro lo capturó ella misma.
+  FIXTURES["rpc:imp_my_review_scope"] = {
+    deanPrograms: [{ id: "imp-prog-b", name: "Programa de Prueba B", faculty: "Facultad de Prueba" }],
+    functions: ["ensenanza"],
+  };
+  const rev = { ...cap, program_id: "imp-prog-b", program_name: "Programa de Prueba B", captured_by: "otra-persona", updated_by: "otra-persona" };
+  FIXTURES.imp_capture_rows.push(
+    { ...rev, id: "imp-rv1", code: "E04", name: "Tasa de retención estudiantil", function_id: "ensenanza", level: "procesos", calc_type: "razon",
+      unit: "porcentaje", factor: 100, aggregation: "razon_de_sumas", campus_id: "c1", campus_name: "Bucaramanga", state: "enviado",
+      numerator_def: "Siguen matriculados", denominator_def: "Matriculados el periodo anterior", numerator: 430, denominator: 480, value: 89.583 },
+    { ...rev, id: "imp-rv2", code: "E13", name: "Innovaciones pedagógicas implementadas y documentadas", function_id: "ensenanza", level: "productos",
+      calc_type: "conteo", state: "devuelto_decanatura", numerator: 7, value: 7, justification: "Se sumaron dos cohortes nuevas." },
+    { ...rev, id: "imp-rv3", code: "E01", name: "Profesores con título de Maestría y Doctorado", function_id: "ensenanza", level: "insumos",
+      calc_type: "razon", unit: "porcentaje", factor: 100, denominator_def: "Profesores del programa", state: "aprobado_decanatura",
+      numerator: 18, denominator: 22, value: 81.818 },
+    { ...rev, id: "imp-rv4", code: "X04", name: "Profesores vinculados a extensión", function_id: "extension", level: "insumos",
+      calc_type: "conteo", state: "enviado", numerator: 4, value: 4, captured_by: "user-admin", updated_by: "user-admin" },
+  );
+  FIXTURES.imp_transitions.push({
+    record_id: "imp-rv2", at: "2026-09-22T15:00:00Z", from_state: "aprobado_decanatura", to_state: "devuelto_decanatura",
+    reason: "variacion_sin_justificar", comment: "Explique el salto frente a 2026-1.", actor: null,
+  });
   FIXTURES.units = [
     { id: "imp-prog-a", name: "Programa de Prueba A", code: "PR-A", snies_code: "900001", kind: "programa",
       campuses: [{ campus: { id: "c1", name: "Bucaramanga", slug: "bucaramanga" } }] },

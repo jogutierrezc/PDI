@@ -123,3 +123,14 @@ Modelo en Supabase y migraciones, importador real con reporte descargable, edici
 - **Valor del periodo anterior**: el del mismo indicador, programa y sede en el último periodo anterior **validado**; sin él, V05 no se aplica.
 - **Mi reporte** se muestra a quien captura en algún programa (`imp_my_programs`), no por el «Ver como» del prototipo. La ficha abre primero lo devuelto.
 - **Observaciones** del programa se guardan en los dos modos.
+
+## Fase 7 · flujo de estados y bandejas (2026-09-23)
+
+- **Una sola función decide** (`imp_review`, 0071): recibe uno o varios registros y una acción (`aprobar`, `devolver`, `validar`). El papel de quien pregunta sale del estado del registro: en `enviado` o `devuelto_decanatura` decide la decanatura (`impacto.aprobar` en el programa o en una unidad superior); en `aprobado_decanatura`, la vicerrectoría de la función del indicador (`impacto.validar`). Todo o nada: si un registro del lote no se puede, no se mueve ninguno.
+- **Devolver** lleva a `devuelto_programa` si decide la decanatura y a `devuelto_decanatura` si decide la vicerrectoría, que nunca devuelve al programa. Exige motivo de la lista cerrada y comentario.
+- **Validado no cambia**: `imp_transition_allowed` no tiene salida desde `validado` y el RLS de captura no lo deja editar.
+- **Separación de funciones** (`imp_is_own_record`): no aprueba ni valida quien capturó el registro (`captured_by`), quien lo guardó por última vez (`updated_by`) ni quien lo envió (actor de una transición a `enviado`). Ir más allá de `captured_by` evita que alguien capture en nombre de otro y luego se apruebe.
+- **Bandejas**: se leen de `imp_capture_rows` (la misma vista de la captura, con su RLS), filtradas por el alcance que devuelve `imp_my_review_scope()`: los programas donde la persona aprueba y las funciones que valida. En lugar de una función de bandeja aparte, la vista ya trae todo lo que la revisión muestra. Solo periodos abiertos.
+- **«Aprobar el paquete»** toma los registros `enviado` del programa que la persona puede aprobar (sin los suyos); lo devuelto por la vicerrectoría se reaprueba uno a uno, porque ya trae observaciones. La vicerrectoría tiene «Validar todo» con el mismo criterio.
+- Quien es a la vez decanatura y vicerrectoría ve **dos bandejas en pestañas**.
+- **Se retiró el «Ver como» y el aviso de prototipo** de la intranet: cada vista la ve quien tiene ese trabajo en la base. `admin/store.ts` se conserva porque exporta `STATE_LABEL` y `RETURN_REASONS`, que usan la captura y la hoja; su estado de prototipo (`useImpactStore`, `PEOPLE`, `actions`) ya no lo usa ninguna pantalla de la intranet.

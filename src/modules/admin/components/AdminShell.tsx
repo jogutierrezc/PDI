@@ -43,7 +43,8 @@ export type AdminSection =
   | "cifras"
   | "observatorio"
   | "tableros"
-  | "transfer";
+  | "transfer"
+  | "impacto";
 
 interface NavItem {
   id: AdminSection;
@@ -55,7 +56,7 @@ interface NavItem {
 }
 
 interface NavGroup {
-  id: "planeacion" | "pdi" | "cifras" | "observatorio" | "tableros" | "sistema";
+  id: "planeacion" | "pdi" | "cifras" | "observatorio" | "impacto" | "tableros" | "sistema";
   label: string;
   items: NavItem[];
 }
@@ -101,6 +102,15 @@ const navigation: NavGroup[] = [
     label: "Observatorio de Analítica",
     items: [
       { id: "observatorio", label: "Taller del Observatorio", icon: "spark-chart", to: "/admin/observatorio", minimum: "consulta" },
+    ],
+  },
+  {
+    // La medición del impacto de las tres funciones sustantivas: cada programa
+    // reporta, la decanatura aprueba y la vicerrectoría valida.
+    id: "impacto",
+    label: "Impacto Institucional",
+    items: [
+      { id: "impacto", label: "Reporte de impacto", icon: "spark-chart", to: "/admin/impacto", minimum: "consulta" },
     ],
   },
   {
@@ -370,7 +380,7 @@ export function AdminShell({
             <nav className="admin-crumbs" aria-label="Ruta">
               <ol>
                 <li>{group?.label ?? kicker}</li>
-                {group && group.id !== "cifras" && group.id !== "observatorio" && group.id !== "tableros" && kicker && kicker !== group.label && <li>{kicker}</li>}
+                {group && group.id !== "cifras" && group.id !== "observatorio" && group.id !== "impacto" && group.id !== "tableros" && kicker && kicker !== group.label && <li>{kicker}</li>}
                 <li aria-current="page">{title}</li>
               </ol>
             </nav>

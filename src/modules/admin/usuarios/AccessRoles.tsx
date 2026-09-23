@@ -49,6 +49,7 @@ export const SCREEN_GROUPS: { label: string; screens: { id: AdminScreen; label: 
   },
   { label: "UDES en Cifras", screens: [{ id: "cifras", label: "Estaciones del periodo" }] },
   { label: "Observatorio de Analítica", screens: [{ id: "observatorio", label: "Taller del Observatorio" }] },
+  { label: "Impacto Institucional", screens: [{ id: "impacto", label: "Reporte de impacto" }] },
   { label: "Mis Tableros", screens: [{ id: "tableros", label: "Unidades y tableros" }] },
   {
     label: "Sistema",

@@ -130,6 +130,12 @@ const OfficePageAdmin = lazy(() =>
 const UserManagement = lazy(() =>
   import("./modules/admin/usuarios/UserManagement").then((m) => ({ default: m.UserManagement })),
 );
+const ImpactHome = lazy(() => import("./modules/impacto/portal/ImpactHome").then((m) => ({ default: m.ImpactHome })));
+const ImpactUnit = lazy(() => import("./modules/impacto/portal/ImpactUnit").then((m) => ({ default: m.ImpactUnit })));
+const ImpactIndicator = lazy(() =>
+  import("./modules/impacto/portal/ImpactIndicator").then((m) => ({ default: m.ImpactIndicator })),
+);
+const ImpactAdmin = lazy(() => import("./modules/impacto/admin/ImpactAdmin").then((m) => ({ default: m.ImpactAdmin })));
 const DataTransfer = lazy(() =>
   import("./modules/admin/traslado/DataTransfer").then((m) => ({ default: m.DataTransfer })),
 );
@@ -353,6 +359,47 @@ export default function App() {
             element={
               <RequireRole minimum="admin" screen="users">
                 <UserManagement />
+              </RequireRole>
+            }
+          />
+          {/* Impacto Institucional: portal de consulta con sesión, no público. */}
+          <Route
+            path="/impacto"
+            element={
+              <RequireRole minimum="consulta">
+                <ImpactHome />
+              </RequireRole>
+            }
+          />
+          <Route
+            path="/impacto/institucion"
+            element={
+              <RequireRole minimum="consulta">
+                <ImpactUnit institution />
+              </RequireRole>
+            }
+          />
+          <Route
+            path="/impacto/indicador/:codigo"
+            element={
+              <RequireRole minimum="consulta">
+                <ImpactIndicator />
+              </RequireRole>
+            }
+          />
+          <Route
+            path="/impacto/:lente/:slug"
+            element={
+              <RequireRole minimum="consulta">
+                <ImpactUnit />
+              </RequireRole>
+            }
+          />
+          <Route
+            path="/admin/impacto/:vista?"
+            element={
+              <RequireRole minimum="consulta" screen="impacto">
+                <ImpactAdmin />
               </RequireRole>
             }
           />

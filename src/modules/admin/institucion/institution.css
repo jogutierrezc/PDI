@@ -391,7 +391,10 @@
   border-color: var(--brand-blue);
 }
 
+/* admin-field da width: 100% a sus inputs; una casilla no lo quiere. */
 .inst-campus input {
+  flex: none;
+  width: auto;
   margin-top: 3px;
   accent-color: var(--brand-blue);
 }
@@ -448,8 +451,11 @@
   max-width: 60ch;
 }
 
+/* Ancho fijo: la ficha no es tan ancha como para que cinco columnas crezcan
+   a su gusto; las acciones van apiladas en la última. */
 .inst-people__table {
   width: 100%;
+  table-layout: fixed;
   border-collapse: collapse;
   font-size: var(--text-sm);
 }
@@ -470,10 +476,14 @@
   text-transform: uppercase;
 }
 
+.inst-people__table thead th:nth-child(1) { width: 26%; }
+.inst-people__table thead th:nth-child(2) { width: 22%; }
+.inst-people__table thead th:nth-child(3) { width: 19%; }
+.inst-people__table thead th:nth-child(4) { width: 19%; }
+.inst-people__table thead th:nth-child(5) { width: 14%; }
+
 .inst-people__table tbody th {
-  display: grid;
-  gap: 2px;
-  min-width: 11rem;
+  overflow-wrap: anywhere;
 }
 
 .inst-people__table tbody th small,
@@ -490,7 +500,7 @@
 .inst-people__table input,
 .inst-people__table select {
   width: 100%;
-  min-width: 9rem;
+  min-width: 0;
   padding: var(--space-2);
   color: var(--ink);
   background: var(--surface-2);
@@ -519,12 +529,19 @@
   text-underline-offset: 3px;
 }
 
-.inst-people__actions {
-  white-space: nowrap;
+.inst-people__actions > * {
+  display: flex;
+  width: 100%;
+  justify-content: center;
 }
 
 .inst-people__actions > * + * {
-  margin-left: var(--space-2);
+  margin-top: var(--space-2);
+}
+
+.inst-people__actions .inst-confirm {
+  flex-direction: column;
+  gap: var(--space-2);
 }
 
 .inst-people__actions [data-tone="danger"] {
@@ -930,5 +947,12 @@
   .inst-campus,
   .inst-add__results button {
     transition: none;
+  }
+}
+
+/* En el teléfono la tabla de personas conserva sus columnas y se desplaza. */
+@media (max-width: 40rem) {
+  .inst-people__table {
+    min-width: 40rem;
   }
 }

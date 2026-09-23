@@ -69,3 +69,5 @@ create or replace function storage.filename(name text) returns text
 language sql immutable as $$ select (string_to_array(name, '/'))[array_length(string_to_array(name, '/'), 1)] $$;
 
 grant usage on schema auth, storage, public to anon, authenticated, service_role;
+-- Como en Supabase: los permisos de tabla están; lo que decide son las políticas.
+grant select, insert, update, delete on storage.objects, storage.buckets to authenticated;

@@ -2538,6 +2538,21 @@ const routes = [
     ],
   },
   {
+    path: "/admin/impacto/reporte",
+    note: "captura en modo sencillo: ficha, precargado y devolución",
+    expect: "Programa de Prueba A",
+    session: true,
+    also: ["Asignados", "Enviar a decanatura", "Sencillo", "Hoja de cálculo", "Estudiantes vinculados a semilleros", "Devuelto: Evidencia insuficiente", "Adjunte el listado del SIGIIP."],
+  },
+  {
+    path: "/admin/impacto/reporte",
+    note: "captura en modo hoja de cálculo: celdas, valor calculado y validación",
+    expect: "Guardar cambios",
+    session: true,
+    storage: { "impacto:modo-captura": "hoja" },
+    also: ["Numerador o valor", "Confirma precargado", "89,6 %", "Este indicador exige evidencia"],
+  },
+  {
     path: "/admin/estructura",
     expect: "Normalizar la estructura",
     session: true,
@@ -3358,6 +3373,34 @@ FIXTURES.od_bulletin_editions = [
       indicator: { id: "imp-i34", code: "I34", name: "Desempeño académico en formación investigativa", capture_mode: "manual", report_level: "programa" },
       program, campus: null, record: [] },
   ];
+  // Mi reporte: el Programa A captura en 2026-2.
+  FIXTURES["rpc:imp_my_programs"] = [
+    { program_id: "imp-prog-a", program_name: "Programa de Prueba A", program_code: "PR-A", faculty_name: "Facultad de Prueba", can_send: true },
+  ];
+  const cap = {
+    assignment_id: "a", value: null, comparison_value: null, n_responses: null, num_comparison: null, den_comparison: null, text_value: null,
+    confirms_preloaded: null, preloaded: null, no_data: null, justification: "", observations: "", state: "borrador", channel: "en_linea",
+    version: 1, captured_by: null, updated_at: "2026-09-22T10:00:00Z", program_id: "imp-prog-a", period_id: "imp-p1", period_code: "2026-2",
+    period_state: "abierto", cutoff_program: "2026-10-15", program_name: "Programa de Prueba A", campus_id: null, campus_name: null,
+    description: "", unit: "numero", numerator_def: "", denominator_def: null, factor: 1, aggregation: "suma", direction: "mayor_mejor",
+    periodicity: "semestral", capture_mode: "manual", evidence_type: null, evidence_required: false, variation_threshold: 30,
+    range_min: null, range_max: null, n_minimum: null, allows_over_one: false, target_numeric: null, target_text: null,
+    previous_value: null, previous_period: null, return_reason: null, return_comment: null, evidence_count: 0,
+  };
+  FIXTURES.imp_capture_rows = [
+    { ...cap, id: "imp-r1", code: "E04", name: "Tasa de retención estudiantil", function_id: "ensenanza", level: "procesos", calc_type: "razon",
+      unit: "porcentaje", factor: 100, aggregation: "razon_de_sumas", capture_mode: "precargado", campus_id: "c1", campus_name: "Bucaramanga",
+      numerator_def: "Siguen matriculados", denominator_def: "Matriculados el periodo anterior", numerator: 430, denominator: 480,
+      preloaded: { numerator: 430, denominator: 480, n: null, file: "registro.csv", at: "2026-09-21T10:00:00Z" }, target_text: "+1 pp vs LB" },
+    { ...cap, id: "imp-r2", code: "E13", name: "Innovaciones pedagógicas implementadas y documentadas", function_id: "ensenanza", level: "productos",
+      calc_type: "conteo", numerator_def: "Innovaciones documentadas", evidence_required: true, evidence_type: "Acta del comité curricular", numerator: 3 },
+    { ...cap, id: "imp-r3", code: "I01", name: "Estudiantes vinculados a semilleros", function_id: "investigacion", level: "insumos", calc_type: "conteo",
+      numerator_def: "Estudiantes activos en semilleros", state: "devuelto_programa", numerator: 55, return_reason: "evidencia_insuficiente",
+      return_comment: "Adjunte el listado del SIGIIP." },
+  ];
+  FIXTURES.imp_evidence = [];
+  FIXTURES.imp_transitions = [];
+  FIXTURES.imp_import_batch_records = [];
   FIXTURES.units = [
     { id: "imp-prog-a", name: "Programa de Prueba A", code: "PR-A", snies_code: "900001", kind: "programa",
       campuses: [{ campus: { id: "c1", name: "Bucaramanga", slug: "bucaramanga" } }] },
@@ -3417,6 +3460,7 @@ for (const route of routes) {
     );
   }
   if (route.theme) dom.window.localStorage.setItem("pdi-theme", route.theme);
+  for (const [key, value] of Object.entries(route.storage ?? {})) dom.window.localStorage.setItem(key, value);
 
   // El cliente de Supabase toma fetch de globalThis al construirse, que dentro
   // de jsdom es el window.

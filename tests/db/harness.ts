@@ -14,6 +14,9 @@ import { PGlite } from "@electric-sql/pglite";
 import { pgcrypto } from "@electric-sql/pglite/contrib/pgcrypto";
 import { readFileSync, readdirSync } from "node:fs";
 import { join, resolve } from "node:path";
+import ExcelJS from "exceljs";
+import { importMatrix } from "../../src/modules/impacto/import/matrix";
+import { PILOT_SHEETS } from "../../src/modules/impacto/data/pilot-sheets";
 
 const ROOT = resolve(__dirname, "../..");
 const MIGRATIONS = join(ROOT, "supabase/migrations");
@@ -151,3 +154,28 @@ export async function publishedFixture(q: Query) {
     countRecordId: countRecord.id,
   };
 }
+
+/** Deja la vr7 publicada con las 13 fichas del piloto. La usan las pruebas de las fases 4 en adelante. */
+export async function publishPilotCatalog(db: TestDb) {
+  const book = new ExcelJS.Workbook();
+  await book.xlsx.readFile(join(ROOT, "UDES_Matriz_Impacto_Institucional_vr7.xlsx"));
+  const payload = JSON.stringify({ sourceFile: "vr7.xlsx", ...importMatrix(book) });
+  return db.asUser(
+    PEOPLE.admin,
+    async (q) => {
+      const [{ r }] = await q<{ r: { versionId: string } }>("select imp_import_catalog($1::jsonb) as r", [payload]);
+      for (const { name, columns } of PILOT_SHEETS) {
+        const keys = Object.keys(columns);
+        await q(`update imp_indicators set ${keys.map((k, i) => `${k} = $${i + 2}`).join(", ")} where version_id = $1 and name = $${keys.length + 2}`, [
+          r.versionId,
+          ...Object.values(columns),
+          name,
+        ]);
+      }
+      await q("select imp_publish_catalog($1)", [r.versionId]);
+      return r.versionId;
+    },
+    { commit: true },
+  );
+}
+

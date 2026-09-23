@@ -10,11 +10,7 @@
    ========================================================================== */
 
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import ExcelJS from "exceljs";
-import { resolve } from "node:path";
-import { importMatrix } from "../../src/modules/impacto/import/matrix";
-import { PILOT_SHEETS } from "../../src/modules/impacto/data/pilot-sheets";
-import { PEOPLE, UNITS, createTestDb, errorOf } from "./harness";
+import { PEOPLE, UNITS, createTestDb, errorOf, publishPilotCatalog } from "./harness";
 import type { Query, TestDb } from "./harness";
 
 let t: TestDb;
@@ -26,30 +22,6 @@ const admin = <T>(work: (q: Query) => Promise<T>) => t.asUser(PEOPLE.admin, work
 // Siempre con la versión de la vr7: una prueba de abajo publica otra más nueva.
 const preview = (code: string) =>
   t.asUser(PEOPLE.admin, (q) => q<Candidate>("select * from imp_preview_assignments($1, $2)", [code, versionId]));
-
-/** Deja la vr7 publicada con las 13 fichas del piloto. Sirve también a la fase 5. */
-export async function publishPilotCatalog(db: TestDb) {
-  const book = new ExcelJS.Workbook();
-  await book.xlsx.readFile(resolve(__dirname, "../../UDES_Matriz_Impacto_Institucional_vr7.xlsx"));
-  const payload = JSON.stringify({ sourceFile: "vr7.xlsx", ...importMatrix(book) });
-  return db.asUser(
-    PEOPLE.admin,
-    async (q) => {
-      const [{ r }] = await q<{ r: { versionId: string } }>("select imp_import_catalog($1::jsonb) as r", [payload]);
-      for (const { name, columns } of PILOT_SHEETS) {
-        const keys = Object.keys(columns);
-        await q(`update imp_indicators set ${keys.map((k, i) => `${k} = $${i + 2}`).join(", ")} where version_id = $1 and name = $${keys.length + 2}`, [
-          r.versionId,
-          ...Object.values(columns),
-          name,
-        ]);
-      }
-      await q("select imp_publish_catalog($1)", [r.versionId]);
-      return r.versionId;
-    },
-    { commit: true },
-  );
-}
 
 beforeAll(async () => {
   t = await createTestDb();

@@ -111,3 +111,15 @@ Modelo en Supabase y migraciones, importador real con reporte descargable, edici
 - **Archivo de precargados**: CSV (`;` o `,`, con BOM y comillas) o la primera hoja de un Excel, con encabezados indicador, programa_snies, programa, sede, numerador, denominador y n. La pantalla genera la plantilla del periodo con una fila por registro precargado.
 - **Cerrar** un periodo impide cargar precargados y cambiar asignaciones.
 - La vista **Periodo** ya trabaja sobre la base y, como el Catálogo, la abre la sesión real con Planeación o más.
+
+## Fase 5 · captura en línea (2026-09-23)
+
+- **Dos modos de trabajo** (pedido del usuario) sobre los mismos registros y el mismo servicio de validación: **sencillo** (lista y ficha de un indicador) y **hoja de cálculo** (rejilla tipo Excel: edición en la celda, flechas, Tab, Enter, F2, Escape, Supr, Ctrl+C, Ctrl+V desde Excel, Ctrl+S; editables en amarillo, bloqueadas en gris, errores en rojo). El modo se recuerda en el navegador. Las columnas de la hoja son las de la plantilla de la fase 6.
+- **Validaciones**: viven solo en `validate.ts` y las usan los dos modos (y la importación de la fase 6). La base garantiza lo estructural (no negativos, valor calculado, flujo, permisos) y no repite reglas V01–V12.
+- **Conflictos**: guardar compara `version`; si alguien guardó antes, no se pisa y se avisa.
+- **Quién capturó**: un disparador anota `captured_by` la primera vez que alguien con `impacto.capturar` en el programa escribe datos (un precargado no cuenta) y `updated_by` en cada guardado. Es la base de la separación de funciones de la fase 7.
+- **Evidencias**: bucket privado `impacto`, una carpeta por registro (`<registro>/<archivo>`); PDF, Excel o imagen de hasta 10 MB, o un enlace. Se ven con enlace firmado de 5 minutos. Se agregan y quitan al momento, sin esperar a «Guardar».
+- **Envío** (`imp_submit_program`): lo hace quien tenga `impacto.enviar` en el programa, con la certificación; mueve a «enviado» todos los registros en borrador o devueltos y deja una transición por registro con el texto de la certificación.
+- **Valor del periodo anterior**: el del mismo indicador, programa y sede en el último periodo anterior **validado**; sin él, V05 no se aplica.
+- **Mi reporte** se muestra a quien captura en algún programa (`imp_my_programs`), no por el «Ver como» del prototipo. La ficha abre primero lo devuelto.
+- **Observaciones** del programa se guardan en los dos modos.

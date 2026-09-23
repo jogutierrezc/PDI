@@ -17,6 +17,7 @@ import { NavLink, useNavigate, useParams } from "react-router-dom";
 import { AdminShell } from "../../admin/components/AdminShell";
 import { Icon } from "../../../components/ui/Icon";
 import { useAuth } from "../../../lib/auth";
+import { useMyPrograms } from "../data/capture-db";
 import { CatalogView } from "./CatalogView";
 import { PeriodView } from "./PeriodView";
 import { ReportView } from "./ReportView";
@@ -34,7 +35,7 @@ type View = "catalogo" | "periodo" | "reporte" | "revision";
 const VIEWS: { id: View; label: string; roles: Role[] }[] = [
   { id: "catalogo", label: "Catálogo", roles: [] },
   { id: "periodo", label: "Periodo", roles: [] },
-  { id: "reporte", label: "Mi reporte", roles: ["director"] },
+  { id: "reporte", label: "Mi reporte", roles: [] },
   { id: "revision", label: "Revisión", roles: ["decano", "vicerrector"] },
 ];
 
@@ -51,13 +52,35 @@ export function ImpactAdmin() {
   const { vista } = useParams();
   const navigate = useNavigate();
   const { hasRole } = useAuth();
-  const allowed = VIEWS.filter((v) => (v.roles.length === 0 ? hasRole("planeacion") : v.roles.includes(person.role)));
-  const view = allowed.find((v) => v.id === vista) ?? allowed[0];
+  const programs = useMyPrograms();
+  // Catálogo y Periodo: Planeación o más. Mi reporte: quien captura en algún
+  // programa. Revisión sigue con el «Ver como» del prototipo hasta la fase 7.
+  const allowed = VIEWS.filter((v) =>
+    v.id === "reporte" ? (programs.data?.length ?? 0) > 0 : v.roles.length === 0 ? hasRole("planeacion") : v.roles.includes(person.role),
+  );
+  const view = allowed.find((v) => v.id === vista) ?? allowed[0] ?? null;
 
   // Cambiar de persona lleva a su primera vista.
+  // No se decide a dónde ir hasta saber si la persona captura en algún programa.
   useEffect(() => {
-    if (vista !== view.id) navigate(`/admin/impacto/${view.id}`, { replace: true });
-  }, [vista, view.id, navigate]);
+    if (programs.isPending) return;
+    if (view && vista !== view.id) navigate(`/admin/impacto/${view.id}`, { replace: true });
+  }, [vista, view, navigate, programs.isPending]);
+
+  if (!view || (programs.isPending && vista === "reporte")) {
+    return (
+      <AdminShell section="impacto" kicker="Impacto" title="Reporte de impacto">
+        {programs.isPending ? (
+          <p className="ia-muted">Cargando…</p>
+        ) : (
+          <section className="admin-card ia-empty-state">
+            <h2>No tiene tareas en Impacto</h2>
+            <p>Para reportar, revisar o administrar, Planeación debe asignarle un rol de Impacto en su unidad (Usuarios y roles).</p>
+          </section>
+        )}
+      </AdminShell>
+    );
+  }
 
   return (
     <AdminShell

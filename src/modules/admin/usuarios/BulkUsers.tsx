@@ -12,10 +12,12 @@
    quita a nadie de donde ya estaba.
    ========================================================================== */
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import type { ChangeEvent } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Icon } from "../../../components/ui/Icon";
+import { DataGrid } from "../../../components/sheet/DataGrid";
+import type { GridColumn } from "../../../components/sheet/DataGrid";
 import { keys, useAccessRoles } from "../../../data/queries";
 import { useCreateUser } from "../../../data/mutations";
 import { supabase } from "../../../lib/supabase";
@@ -35,12 +37,18 @@ export function BulkUsers({ profiles, units }: { profiles: Profile[]; units: Uni
   const createUser = useCreateUser();
   const client = useQueryClient();
   const [fileName, setFileName] = useState("");
-  const [plan, setPlan] = useState<UsersPlan | null>(null);
+  // La hoja leída, editable en pantalla: el plan se recalcula con cada celda.
+  const [sheetRows, setSheetRows] = useState<string[][] | null>(null);
+  const [edited, setEdited] = useState(false);
   const [reading, setReading] = useState(false);
   const [applying, setApplying] = useState(false);
   const [outcomes, setOutcomes] = useState<Outcome[]>([]);
   const [error, setError] = useState("");
   const roles = access.data?.roles ?? [];
+  const plan: UsersPlan | null = useMemo(
+    () => (sheetRows ? planUsers(sheetRows, { roles, units, profiles }) : null),
+    [sheetRows, roles, units, profiles],
+  );
 
   async function downloadTemplate() {
     setError("");
@@ -126,7 +134,8 @@ export function BulkUsers({ profiles, units }: { profiles: Profile[]; units: Uni
     if (!file) return;
     setError("");
     setOutcomes([]);
-    setPlan(null);
+    setSheetRows(null);
+    setEdited(false);
     setFileName(file.name);
     setReading(true);
     try {
@@ -145,7 +154,7 @@ export function BulkUsers({ profiles, units }: { profiles: Profile[]; units: Uni
       const cleaned = rows
         .map((row) => row ?? [])
         .filter((row, index) => index === 0 || row[0] !== "nombre.apellido@udes.edu.co");
-      setPlan(planUsers(cleaned, { roles, units, profiles }));
+      setSheetRows(cleaned);
     } catch (failure) {
       setError(failure instanceof Error ? `No se pudo leer el archivo: ${failure.message}` : "No se pudo leer el archivo.");
     } finally {
@@ -256,6 +265,26 @@ export function BulkUsers({ profiles, units }: { profiles: Profile[]; units: Uni
               )}
             </p>
           </header>
+          {sheetRows && sheetRows.length > 0 && outcomes.length === 0 && (
+            <UsersSheet
+              rows={sheetRows}
+              plan={plan}
+              onChange={(index, cells) => {
+                setSheetRows((current) => {
+                  if (!current) return current;
+                  const next = current.slice();
+                  next[index] = cells;
+                  return next;
+                });
+                setEdited(true);
+              }}
+              onAddRow={() => {
+                setSheetRows((current) => (current ? [...current, USER_COLUMNS.map(() => "")] : current));
+                setEdited(true);
+              }}
+            />
+          )}
+          {edited && outcomes.length === 0 && <p className="users-hint">Con correcciones en pantalla: lo que se aplica es lo que ve en la hoja.</p>}
           {plan.errors.map((text) => (
             <p key={text} className="admin-error" role="alert">
               <Icon name="alert" size={16} /> {text}
@@ -268,7 +297,7 @@ export function BulkUsers({ profiles, units }: { profiles: Profile[]; units: Uni
           </ul>
           <footer className="us-savebar">
             {plan.errorCount > 0 ? (
-              <small className="us-raised">Corrija el archivo y vuelva a subirlo: con errores no se aplica nada.</small>
+              <small className="us-raised">Corrija las celdas en rojo de la hoja (F8 salta a la siguiente): con errores no se aplica nada.</small>
             ) : outcomes.length > 0 && !applying ? (
               <small className={failed ? "us-raised" : "users-hint"}>
                 {failed ? `${failed} no se pudieron aplicar; las demás quedaron listas.` : "Listo: se aplicó todo."}
@@ -328,5 +357,79 @@ function PreviewRow({ person, outcome }: { person: PlannedPerson; outcome?: Outc
         {label[state]}
       </span>
     </li>
+  );
+}
+
+/* --- La hoja leída, editable ---------------------------------------------------- */
+
+type SheetRow = { index: number; cells: string[] };
+
+const LETTER_INDEX = (letter: string) => letter.charCodeAt(0) - 65;
+
+function UsersSheet({
+  rows,
+  plan,
+  onChange,
+  onAddRow,
+}: {
+  rows: string[][];
+  plan: UsersPlan;
+  onChange: (index: number, cells: string[]) => void;
+  onAddRow: () => void;
+}) {
+  const data: SheetRow[] = rows.slice(1).map((cells, offset) => ({ index: offset + 1, cells: USER_COLUMNS.map((_, i) => cells[i] ?? "") }));
+
+  // «Fila 3, columna E (Unidad (código)): …» → fila 3, columna 4.
+  const errors = useMemo(() => {
+    const map = new Map<string, string>();
+    const all = plan.people.flatMap((person) => person.errors);
+    for (const message of all) {
+      const hit = /^Fila (\d+), columna ([A-H])[^:]*:\s*(.*)$/.exec(message);
+      if (!hit) continue;
+      const key = `${hit[1]}|${LETTER_INDEX(hit[2])}`;
+      map.set(key, map.has(key) ? `${map.get(key)} · ${hit[3]}` : hit[3]);
+    }
+    return map;
+  }, [plan]);
+
+  const columns: GridColumn<SheetRow, string[]>[] = USER_COLUMNS.map((label, i) => ({
+    key: `c${i}`,
+    label,
+    width: [240, 200, 170, 170, 120, 150, 180, 190][i],
+    choices: i === 5 ? ["", "Gestor", "Contribuyente", "Consulta"] : undefined,
+    show: (_, draft) => draft[i] ?? "",
+    write: (draft, raw) => {
+      const next = draft.slice();
+      next[i] = raw.trim();
+      return { draft: next };
+    },
+  }));
+
+  return (
+    <DataGrid<SheetRow, string[]>
+      label="Hoja de personas"
+      rows={data}
+      rowId={(row) => String(row.index)}
+      initial={(row) => row.cells}
+      columns={columns}
+      frozen={2}
+      rowLabel={(row) => String(row.index + 1)}
+      toolbar={
+        <button type="button" className="button-ghost" onClick={onAddRow}>
+          <Icon name="plus" size={14} /> Añadir fila
+        </button>
+      }
+      onDraftChange={(row, draft) => onChange(row.index, draft)}
+      cellError={(row, _draft, key) => errors.get(`${row.index + 1}|${key.slice(1)}`)}
+      status={(row) => {
+        const line = row.index + 1;
+        if (row.cells.every((cell) => !cell.trim())) return { text: "Vacía: se omite", tone: "muted" };
+        const own = [...errors.entries()].filter(([key]) => key.startsWith(`${line}|`)).map(([, text]) => text);
+        if (own.length) return { text: `${own[0]}${own.length > 1 ? ` (+${own.length - 1})` : ""}`, tone: "bad" };
+        const person = plan.people.find((p) => p.lines.includes(line));
+        if (person?.errors.length) return { text: person.errors[0].replace(/^Fila \d+, /, ""), tone: "bad" };
+        return { text: person?.existingId ? "Se actualiza" : "Se crea", tone: person?.existingId ? "warn" : "ok" };
+      }}
+    />
   );
 }

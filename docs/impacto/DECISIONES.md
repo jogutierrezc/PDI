@@ -225,3 +225,9 @@ Modelo en Supabase y migraciones, importador real con reporte descargable, edici
 - Cada opción dice cuántos programas quedarían con los otros filtros puestos; las que dejarían la lista vacía se ven apagadas. Si aun así no hay nada, se dice por qué («Ninguna facultad ofrece programas en Bogotá todavía»).
 - Cada programa muestra su nivel y sus sedes activas. La oferta sale de `imp_portal_structure` (0072), que ya traía facultad, nivel y sedes activas: no hizo falta migración.
 - Desde la página de una facultad o de un campus hay un enlace a su oferta ya filtrada.
+
+## Hojas de cálculo más cerca de Excel, y cargas que se corrigen en pantalla (2026-09-23)
+
+- **Una sola hoja de cálculo para toda la intranet** (`src/components/sheet/DataGrid`), con sus propios estilos. La celda activa siempre queda a la vista; Re Pág/Av Pág, Ctrl+Inicio/Fin; encabezado y primeras columnas fijos; rangos con Mayús (copiar, vaciar, Ctrl+D rellena abajo); errores en la celda, en su título y en la barra de estado, y «Siguiente error» (F8). El color nunca va solo: el motivo se dice por escrito.
+- **Las vistas previas de las cargas masivas son hojas editables.** En la estructura institucional y en usuarios, lo leído del Excel se abre tal cual y se corrige en la celda; al escribir se vuelve a validar con la misma lógica que al subirlo. Se puede añadir una fila, vaciarla para omitirla y descargar lo corregido. Aplicar sigue siendo todo o nada (estructura) o persona por persona (usuarios), y solo se habilita sin errores.
+- **Un rechazo de la base vuelve a su fila.** Si al aplicar la base rechaza «Hoja X, fila n», esa fila se marca en la hoja con el motivo en palabras (p. ej. un slug inválido) y no se guarda nada.

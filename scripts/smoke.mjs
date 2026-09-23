@@ -2868,6 +2868,42 @@ const routes = [
     also: ["Súbala diligenciada", "Descargar plantilla"],
   },
   {
+    path: "/admin/usuarios/carga",
+    expect: "Descargue la plantilla",
+    session: true,
+    note: "carga de usuarios: la hoja leída se corrige en la celda",
+    interact: async (window, tick) => {
+      const { default: ExcelJS } = await import("exceljs");
+      const book = new ExcelJS.Workbook();
+      const sheet = book.addWorksheet("Personas");
+      sheet.addRow(["Correo", "Nombre", "Dependencia", "Rol global", "Unidad (código)", "Función en la unidad", "Cargo", "Rol de Impacto"]);
+      sheet.addRow(["nueva@udes.edu.co", "Persona Nueva", "", "Consulta", "PR-A", "Jefa", "", ""]);
+      const buffer = await book.xlsx.writeBuffer();
+      const file = new window.File([buffer], "usuarios.xlsx");
+      if (!file.arrayBuffer) file.arrayBuffer = async () => buffer;
+      const input = window.document.querySelector('input[type="file"]');
+      Object.defineProperty(input, "files", { value: [file], configurable: true });
+      input.dispatchEvent(new window.Event("change", { bubbles: true }));
+      for (let i = 0; i < 20 && !window.document.querySelector('[role="grid"]'); i += 1) await tick();
+      let text = window.document.body.textContent;
+      if (!text.includes("no es una función")) throw new Error(`no se marcó la función inválida: ${text.slice(-300)}`);
+      const grid = window.document.querySelector('[role="grid"]');
+      grid.focus();
+      grid.dispatchEvent(new window.KeyboardEvent("keydown", { key: "F8", bubbles: true }));
+      await tick();
+      grid.dispatchEvent(new window.KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
+      await tick();
+      const select = grid.querySelector("select");
+      if (!select) throw new Error("la función no se edita con una lista");
+      select.value = "Gestor";
+      select.dispatchEvent(new window.Event("change", { bubbles: true }));
+      await tick();
+      text = window.document.body.textContent;
+      if (text.includes("no es una función")) throw new Error("el error no se fue al elegir Gestor");
+      if (!text.includes("Se crea")) throw new Error("la fila corregida no quedó lista");
+    },
+  },
+  {
     path: "/admin/udes-en-cifras/captura/poblacional",
     note: "pegar una tabla completa en un desglose y en un mapa de calor",
     session: true,

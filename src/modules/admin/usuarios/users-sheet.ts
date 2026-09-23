@@ -72,8 +72,8 @@ export interface UsersPlan {
   errorCount: number;
 }
 
-export const normalize = (text: string) =>
-  text
+export const normalize = (text: string | null | undefined) =>
+  String(text ?? "")
     .normalize("NFD")
     .replace(/[̀-ͯ]/g, "")
     .replace(/\s+/g, " ")

@@ -167,3 +167,19 @@ Modelo en Supabase y migraciones, importador real con reporte descargable, edici
 - **Una sola historia de punta a punta** (`tests/db/impacto-aceptacion.test.ts`, 37 casos) recorre los once criterios con el código real de la aplicación y RLS real: la vr7, las fichas del piloto, el servicio único de validación, la plantilla Excel armada, diligenciada y releída, el flujo y la consolidación. **Once de once criterios cumplen**; el detalle está en [ACEPTACION.md](ACEPTACION.md).
 - **Riesgos abiertos** (detalle en ACEPTACION.md, «Notas y riesgos»): V01–V09 los aplica la pantalla y no el envío en la base; la hora de la plantilla va al segundo y un guardado en el mismo segundo sale en conflicto (del lado seguro); cerrar un periodo no exige que todo esté validado.
 - El portal ya lee la base (cierre de la fase 7, migración 0072): solo cifras validadas de la última versión publicada.
+
+## Estructura institucional (2026-09-23)
+
+- **Una pantalla, dos paneles** (`/admin/estructura-institucional/:unidad?`): el árbol a la izquierda y la ficha de la unidad a la derecha. La carga masiva (`?carga`) y la unidad nueva (`/nueva`) ocupan el mismo lugar; no hay modales salvo la confirmación de borrar.
+- **Dos líneas en el árbol.** La continua es la herencia (`parent_id`); la punteada, el organigrama (`reports_to`, facultad → vicerrectoría). Se dibujan distinto porque significan cosas distintas: la segunda no da acceso a nada, y la ficha de la facultad lo dice.
+- **La clase de una unidad no se cambia** después de crearla. Pasar un programa a oficina rompería sus asignaciones y registros de Impacto; si hace falta, se crea la unidad correcta.
+- **Un programa pide facultad, nivel y modalidad** en el formulario. La base los admite nulos, pero de ellos depende qué indicadores le aplican. El SNIES es opcional y solo lleva dígitos.
+- **Borrar** solo se ofrece a una unidad sin unidades debajo y sin personas. Si aun así tiene registros de Impacto, la base lo rechaza y la pantalla lo explica.
+- **Las personas de la unidad** se ven aquí en solo lectura y se editan en Usuarios y roles (`/admin/usuarios/personas?persona=<id>`).
+- **Carga masiva de programas.** El parser (`institucion/programs-sheet.ts`) es puro y tiene sus pruebas.
+  - Normaliza solo la forma de escribir: tildes, mayúsculas, «A distancia», y la sede escrita por slug, nombre o código.
+  - Un valor que no se reconoce es un error «Fila n, columna X».
+  - Reconoce los programas existentes igual que `admin_import_programs`: por SNIES y, si no lo tiene, por código.
+  - El slug de un programa existente no cambia.
+  - Aplicar es todo o nada: el botón no se habilita mientras haya una sola fila con error.
+- **La plantilla trae los programas que ya existen**, así que sirve también para corregir en bloque. Incluye una hoja LISTAS con las facultades, sedes, niveles y modalidades válidos.

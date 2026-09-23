@@ -3641,6 +3641,91 @@ FIXTURES.od_bulletin_editions = [
   ];
 }
 
+/* Estructura institucional (0073): dos vicerrectorías, una facultad que
+   depende de una de ellas por organigrama y dos programas, uno completo y
+   otro sin SNIES ni sedes. Se añade al árbol que ya trae Impacto. */
+{
+  const campus = (id, name, slug) => ({ campus: { id, name, slug } });
+  FIXTURES.units.push(
+    { id: "inst-vi", parent_id: null, kind: "vicerrectoria", code: "VI", name: "Vicerrectoría de Investigaciones",
+      slug: "vicerrectoria-investigaciones", description: "", position: 1, substantive_function: "investigacion",
+      snies_code: null, degree_level: null, modality: null, reports_to: null },
+    { id: "inst-va", parent_id: null, kind: "vicerrectoria", code: "VA", name: "Vicerrectoría Académica",
+      slug: "vicerrectoria-academica", description: "", position: 2, substantive_function: "ensenanza",
+      snies_code: null, degree_level: null, modality: null, reports_to: null },
+    { id: "inst-fit", parent_id: null, kind: "facultad", code: "FIT", name: "Facultad de Ingenierías y Tecnologías",
+      slug: "facultad-ingenierias", description: "", position: 3, substantive_function: null,
+      snies_code: null, degree_level: null, modality: null, reports_to: "inst-va" },
+    { id: "inst-isi", parent_id: "inst-fit", kind: "programa", code: "ISI", name: "Ingeniería de Sistemas",
+      slug: "ingenieria-de-sistemas", description: "", position: 1, substantive_function: null,
+      snies_code: "1234", degree_level: "pregrado", modality: "presencial", reports_to: null,
+      campuses: [campus("c1", "Bucaramanga", "bucaramanga")] },
+    { id: "inst-iin", parent_id: "inst-fit", kind: "programa", code: "IIN", name: "Ingeniería Industrial",
+      slug: "ingenieria-industrial", description: "", position: 2, substantive_function: null,
+      snies_code: null, degree_level: "pregrado", modality: "virtual", reports_to: null, campuses: [] },
+  );
+  FIXTURES.imp_program_campuses = [
+    ...(FIXTURES.imp_program_campuses ?? []),
+    { program_id: "inst-isi", campus_id: "c1", active: true },
+    { program_id: "inst-isi", campus_id: "c2", active: false },
+  ];
+  FIXTURES.access_roles.push({
+    id: "rol-imp-director", key: "impacto_director", name: "Dirección de programa", description: "Captura y envía a decanatura.",
+    base_role: "consulta", screens: ["impacto"], all_screens: false, all_reports: false, is_system: true, position: 21,
+    capabilities: ["impacto.capturar", "impacto.enviar"], scope: "unidad", unit_role: "editor",
+  });
+  FIXTURES.unit_members = [
+    ...(FIXTURES.unit_members ?? []),
+    { id: "inst-m1", unit_id: "inst-isi", profile_id: "user-vi", role: "editor", access_role_id: "rol-imp-director",
+      profiles: { full_name: "Directora de Sistemas", email: "sistemas@udes.edu.co" } },
+  ];
+
+  routes.push(
+    {
+      path: "/admin/estructura-institucional",
+      expect: "Estructura institucional",
+      session: true,
+      note: "el árbol por vicerrectorías y lo que le falta a Impacto",
+      also: ["Vicerrectoría de Investigaciones", "Valida investigación", "Facultad de Ingenierías y Tecnologías", "Qué falta para que Impacto funcione", "Ingeniería Industrial", "sin SNIES"],
+    },
+    {
+      path: "/admin/estructura-institucional/ingenieria-de-sistemas",
+      expect: "Sedes donde se ofrece",
+      session: true,
+      note: "la ficha de un programa con sus sedes y su gente",
+      also: ["Código SNIES", "Inactiva · se ofrecía antes", "Personas de la unidad", "Directora de Sistemas", "Dirección de programa"],
+      interact: async (window, tick) => {
+        const snies = [...window.document.querySelectorAll(".inst-form input")].find((input) => input.value === "1234");
+        if (!snies) throw new Error("el SNIES del programa no llegó a la ficha");
+        const facultad = [...window.document.querySelectorAll(".inst-form select")].find((select) => select.value === "inst-fit");
+        if (!facultad) throw new Error("la facultad del programa no quedó elegida");
+        await tick();
+      },
+    },
+    {
+      path: "/admin/estructura-institucional/facultad-ingenierias",
+      expect: "Vicerrectoría de la que depende",
+      session: true,
+      note: "el organigrama de una facultad no da herencia",
+      also: ["no le da a la vicerrectoría acceso", "Programa en esta facultad"],
+    },
+    {
+      path: "/admin/estructura-institucional/nueva",
+      expect: "Nueva unidad",
+      session: true,
+      note: "crear una unidad empieza por la clase",
+      also: ["Clase de unidad", "Vicerrectoría", "Crear unidad"],
+    },
+    {
+      path: "/admin/estructura-institucional?carga",
+      expect: "Cargar programas desde Excel",
+      session: true,
+      note: "la carga masiva de programas, sin modal",
+      also: ["Descargar plantilla", "Elegir el Excel", "Revise y aplique"],
+    },
+  );
+}
+
 /* --- Ejecución -------------------------------------------------------------- */
 
 let failures = 0;

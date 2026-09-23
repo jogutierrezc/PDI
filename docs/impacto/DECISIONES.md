@@ -161,3 +161,9 @@ Modelo en Supabase y migraciones, importador real con reporte descargable, edici
 - **Se retiró «Dato ilustrativo»**: la nota dice que solo hay cifras validadas y qué versión del catálogo se muestra. El ejemplo de la razón de sumas de la portada usa una cifra real (E04 si puede) y no aparece si no hay al menos dos facultades con cifra.
 - **`demo.ts` se conserva**: lo importa aún el estado de prototipo de `admin/store.ts`, que ninguna pantalla usa. Se borran juntos cuando se limpie ese estado.
 - **Prueba de humo**: una ruta puede cambiar sus RPC con `fixtures` (y responder un error con `__status`); hay rutas del portal con datos, sin cifras validadas, sin catálogo y sin la migración.
+
+## Fase 8 · pruebas de aceptación (2026-09-23)
+
+- **Una sola historia de punta a punta** (`tests/db/impacto-aceptacion.test.ts`, 37 casos) recorre los once criterios con el código real de la aplicación y RLS real: la vr7, las fichas del piloto, el servicio único de validación, la plantilla Excel armada, diligenciada y releída, el flujo y la consolidación. **Once de once criterios cumplen**; el detalle está en [ACEPTACION.md](ACEPTACION.md).
+- **Riesgos abiertos** (detalle en ACEPTACION.md, «Notas y riesgos»): V01–V09 los aplica la pantalla y no el envío en la base; la hora de la plantilla va al segundo y un guardado en el mismo segundo sale en conflicto (del lado seguro); cerrar un periodo no exige que todo esté validado.
+- El portal ya lee la base (cierre de la fase 7, migración 0072): solo cifras validadas de la última versión publicada.

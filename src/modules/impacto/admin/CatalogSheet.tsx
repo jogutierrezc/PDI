@@ -13,9 +13,9 @@
 import { FUNCTIONS, LEVELS } from "../data/catalog";
 import { useSaveSheets } from "../data/catalog-db";
 import type { DbIndicator, SheetPatch } from "../data/catalog-db";
-import { DataGrid, choiceCell, numberCell, yesNo } from "./DataGrid";
+import { DataGrid, choiceCell, normalize, numberCell, yesNo } from "./DataGrid";
 import type { GridColumn, WriteResult } from "./DataGrid";
-import { AGG, CALC, DIRECTION, FACTOR, MODE, PERIODICITY, REPORT, UNITS } from "./labels";
+import { AGG, CALC, DEGREES, DIRECTION, FACTOR, MODE, PERIODICITY, REPORT, UNITS } from "./labels";
 
 type Draft = Required<
   Pick<
@@ -37,7 +37,7 @@ type Draft = Required<
     | "n_minimum"
     | "in_pilot"
   >
-> & { factor: "1" | "100" | null };
+> & { factor: "1" | "100" | null; applies_degrees: string[] };
 
 const FIELDS: (keyof Draft)[] = [
   "calc_type",
@@ -57,6 +57,7 @@ const FIELDS: (keyof Draft)[] = [
   "range_max",
   "n_minimum",
   "in_pilot",
+  "applies_degrees",
 ];
 
 const initial = (i: DbIndicator): Draft => ({
@@ -77,6 +78,7 @@ const initial = (i: DbIndicator): Draft => ({
   range_max: i.range_max,
   n_minimum: i.n_minimum,
   in_pilot: i.in_pilot,
+  applies_degrees: [...(i.applies_degrees ?? [])],
 });
 
 const fmt = (v: number | null | undefined) => (v === null || v === undefined ? "" : v.toLocaleString("es-CO", { maximumFractionDigits: 4 }));
@@ -114,6 +116,51 @@ function flag(field: "evidence_required" | "in_pilot") {
   };
 }
 
+/**
+ * «Aplica a»: niveles separados por coma o punto y coma, o «Todos». Se leen
+ * sin tildes y con los nombres cortos que usa la gente (técnico, tecnólogo,
+ * universitario, médico-quirúrgica…).
+ */
+const DEGREE_ALIASES: Record<string, string> = {
+  tecnico: "tecnico",
+  tecnica: "tecnico",
+  tecnologico: "tecnologico",
+  tecnologo: "tecnologico",
+  tecnologia: "tecnologico",
+  pregrado: "pregrado",
+  universitario: "pregrado",
+  profesional: "pregrado",
+  especializacion: "especializacion",
+  "medico-quirurgica": "especializacion_medicoquirurgica",
+  medicoquirurgica: "especializacion_medicoquirurgica",
+  "especializacion medico-quirurgica": "especializacion_medicoquirurgica",
+  "especializacion medicoquirurgica": "especializacion_medicoquirurgica",
+  maestria: "maestria",
+  doctorado: "doctorado",
+};
+for (const [value, label] of DEGREES) DEGREE_ALIASES[normalize(label)] = value;
+
+const degreesCell = {
+  show: (_: DbIndicator, d: Draft) =>
+    d.applies_degrees.length === DEGREES.length
+      ? "Todos"
+      : DEGREES.filter(([v]) => d.applies_degrees.includes(v))
+          .map(([, l]) => l)
+          .join(", "),
+  write: (d: Draft, raw: string): WriteResult<Draft> => {
+    const text = normalize(raw);
+    if (!text) return { draft: { ...d, applies_degrees: [] } };
+    if (text === "todos" || text === "todas") return { draft: { ...d, applies_degrees: DEGREES.map(([v]) => v) } };
+    const picked: string[] = [];
+    for (const part of text.split(/[;,]/).map((p) => p.trim()).filter(Boolean)) {
+      const value = DEGREE_ALIASES[part];
+      if (!value) return { error: `«${part}» no es un nivel. Use ${DEGREES.map(([, l]) => l).join(", ")} o «Todos».` };
+      if (!picked.includes(value)) picked.push(value);
+    }
+    return { draft: { ...d, applies_degrees: DEGREES.map(([v]) => v as string).filter((v) => picked.includes(v)) } };
+  },
+};
+
 function choice<V extends string>(pairs: readonly (readonly [V, string])[], field: keyof Draft) {
   const cell = choiceCell<Draft, V>(pairs, field);
   return { choices: cell.choices, show: (_: DbIndicator, d: Draft) => cell.show(d), write: (d: Draft, raw: string) => cell.write(d, raw) };
@@ -143,6 +190,7 @@ export function CatalogSheet({ rows, editable }: { rows: DbIndicator[]; editable
     { key: "direction", label: "Sentido", width: 130, ...choice(DIRECTION, "direction") },
     { key: "periodicity", label: "Periodicidad", width: 110, ...choice(PERIODICITY, "periodicity") },
     { key: "report_level", label: "Nivel de reporte", width: 140, ...choice(REPORT, "report_level") },
+    { key: "applies_degrees", label: "Aplica a", width: 260, ...degreesCell },
     { key: "capture_mode", label: "Modo de captura", width: 120, ...choice(MODE, "capture_mode") },
     { key: "evidence_type", label: "Evidencia", width: 180, ...text("evidence_type") },
     { key: "evidence_required", label: "Evidencia obligatoria", width: 110, ...flag("evidence_required") },
@@ -177,6 +225,10 @@ export function CatalogSheet({ rows, editable }: { rows: DbIndicator[]; editable
             const before = initial(row);
             const patch: SheetPatch = {};
             for (const field of FIELDS) {
+              if (field === "applies_degrees") {
+                if (before.applies_degrees.join() !== draft.applies_degrees.join()) patch.applies_degrees = draft.applies_degrees;
+                continue;
+              }
               if (before[field] === draft[field]) continue;
               if (field === "factor") patch.factor = draft.factor === null ? null : (Number(draft.factor) as 1 | 100);
               else (patch as Record<string, unknown>)[field] = draft[field];

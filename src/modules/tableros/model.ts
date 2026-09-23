@@ -376,7 +376,10 @@ export function slugify(text: string): string {
     .replace(/[̀-ͯ]/g, "")
     .replace(/[^a-z0-9]+/g, "-")
     .replace(/^-|-$/g, "")
-    .slice(0, 48);
+    .slice(0, 48)
+    // Cortar a 48 puede dejar un guion al final («…economicas-»), y la base
+    // rechaza ese slug (units_slug_format): se quita después de cortar.
+    .replace(/-+$/, "");
 }
 
 /** Un slug que no choque con los que ya hay. */

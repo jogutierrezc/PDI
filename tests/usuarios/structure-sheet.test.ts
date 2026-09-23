@@ -66,6 +66,46 @@ describe("utilidades", () => {
   });
 });
 
+describe("slugs de unidades nuevas", () => {
+  it("un nombre largo no deja el slug terminado en guion", () => {
+    const result = parseStructureWorkbook(
+      {
+        Facultades: [
+          FAC,
+          ["FCEAC", "Facultad de Ciencias Económicas, Administrativas y Contables", "VA"],
+          ["FCSHA", "Facultad de Ciencias Sociales, Humanidades y Artes de Santander", "VA"],
+        ],
+      },
+      context,
+    );
+    expect(result.problems).toEqual([]);
+    for (const row of rowsToImport(result)) {
+      expect(row.slug).toMatch(/^[a-z0-9]+(-[a-z0-9]+)*$/);
+      expect(row.slug.length).toBeLessThanOrEqual(48);
+    }
+  });
+});
+
+describe("niveles técnico, tecnológico y médico-quirúrgico (0075)", () => {
+  it("se reconocen como los escribe la gente", () => {
+    const result = parseStructureWorkbook(
+      {
+        Programas: [
+          PRO,
+          ["3001", "TSI", "Técnico Profesional en Sistemas", "FCS", "Técnico profesional", "Presencial", "Bucaramanga"],
+          ["3002", "TGS", "Tecnología en Gestión de Sistemas", "FCS", "Tecnólogo", "Virtual", "Cúcuta"],
+          ["3003", "TGE", "Tecnología en Gestión Empresarial", "FCS", "tecnologica", "Virtual", "Cúcuta"],
+          ["3004", "ECG", "Especialización en Cirugía General", "FCS", "Especialización-Medicoquirurgica", "Presencial", "Bucaramanga"],
+        ],
+      },
+      context,
+    );
+    expect(result.problems).toEqual([]);
+    const payload = rowsToImport(result);
+    expect(payload.map((row) => row.degree_level)).toEqual(["tecnico", "tecnologico", "tecnologico", "especializacion_medicoquirurgica"]);
+  });
+});
+
 describe("el libro de la estructura", () => {
   it("pide al menos una hoja de la plantilla", () => {
     const result = parseStructureWorkbook({ Hoja1: [["x"]] }, context);
@@ -136,7 +176,7 @@ describe("el libro de la estructura", () => {
         "Vicerrectorías": [VICE, ["VX", "Vicerrectoría X", "Bienestar"]],
         Facultades: [FAC, ["FXX", "", "NOVI"]],
         Oficinas: [OFI, ["FCS", "Pisada", ""], ["OFX", "Oficina X", "FCS"]],
-        Programas: [PRO, ["12A", "DER", "Derecho nocturno", "ZZZ", "Tecnólogo", "remota", "Pasto"]],
+        Programas: [PRO, ["12A", "DER", "Derecho nocturno", "ZZZ", "Diplomado", "remota", "Pasto"]],
       },
       context,
     );
@@ -150,7 +190,7 @@ describe("el libro de la estructura", () => {
       "Hoja Programas, fila 2, columna A: el SNIES «12A» no es un número.",
       "Hoja Programas, fila 2, columna B: el código DER ya es del programa con SNIES 1001.",
       "Hoja Programas, fila 2, columna D: no existe la facultad «ZZZ».",
-      "Hoja Programas, fila 2, columna E: «Tecnólogo» no es un nivel. Use Pregrado, Especialización, Maestría, Doctorado.",
+      "Hoja Programas, fila 2, columna E: «Diplomado» no es un nivel. Use Técnico profesional, Tecnológico, Profesional universitario, Especialización, Especialización médico-quirúrgica, Maestría, Doctorado.",
       "Hoja Programas, fila 2, columna F: «remota» no es una modalidad. Use Presencial, Virtual, A distancia, Dual, Híbrida.",
       "Hoja Programas, fila 2, columna G: no existe la sede «Pasto».",
     ]);
@@ -198,7 +238,7 @@ describe("la plantilla", () => {
       "Listas",
     ]);
     const nivel = again.getWorksheet("Programas")!.getCell("E2").dataValidation;
-    expect(nivel).toMatchObject({ type: "list", formulae: ["'Listas'!$B$2:$B$5"] });
+    expect(nivel).toMatchObject({ type: "list", formulae: ["'Listas'!$B$2:$B$8"] });
     const facultad = again.getWorksheet("Programas")!.getCell("D40").dataValidation;
     expect(facultad.formulae?.[0]).toContain("'Facultades'!$A$2");
 

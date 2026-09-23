@@ -181,6 +181,39 @@ describe("estructura institucional", () => {
   });
 });
 
+describe("niveles de formación (0075)", () => {
+  it("un programa puede ser técnico, tecnológico o especialización médico-quirúrgica", async () => {
+    for (const level of ["tecnico", "tecnologico", "especializacion_medicoquirurgica"]) {
+      await t.asUser(ADMIN, (q) =>
+        q("select admin_save_unit($1::jsonb)", [
+          JSON.stringify({ id: UNITS.programaB, kind: "programa", parent_id: UNITS.facultad, code: "PR-B", name: "Programa de Prueba B", snies_code: "900002", degree_level: level, modality: "virtual" }),
+        ]),
+      );
+    }
+    const message = await t.asUser(ADMIN, (q) =>
+      errorOf(
+        q("select admin_save_unit($1::jsonb)", [
+          JSON.stringify({ id: UNITS.programaB, kind: "programa", parent_id: UNITS.facultad, code: "PR-B", name: "Programa de Prueba B", degree_level: "diplomado" }),
+        ]),
+      ),
+    );
+    expect(message).toContain("units_degree_level_check");
+  });
+
+  it("un indicador puede aplicar a los niveles nuevos", async () => {
+    const [v] = await t.q<{ id: string }>("insert into imp_catalog_versions (number, source_file) values (77, 'x.xlsx') returning id");
+    await t.q(
+      `insert into imp_indicators (version_id, code, function_id, level, name, applies_degrees)
+       values ($1, 'E98', 'ensenanza', 'insumos', 'Prueba de niveles', '{tecnico,tecnologico,especializacion_medicoquirurgica}')`,
+      [v.id],
+    );
+    const message = await errorOf(
+      t.q("insert into imp_indicators (version_id, code, function_id, level, name, applies_degrees) values ($1, 'E99', 'ensenanza', 'insumos', 'x', '{diplomado}')", [v.id]),
+    );
+    expect(message).toContain("imp_indicators_degrees");
+  });
+});
+
 describe("carga masiva de programas", () => {
   const row = (over: Record<string, unknown>) => ({
     line: 2,

@@ -6,13 +6,17 @@
 
 import type { UnitKind, UnitRole } from "../../tableros/model";
 
-export type DegreeLevel = "pregrado" | "especializacion" | "maestria" | "doctorado";
+export type DegreeLevel = "tecnico" | "tecnologico" | "pregrado" | "especializacion" | "especializacion_medicoquirurgica" | "maestria" | "doctorado";
 export type Modality = "presencial" | "virtual" | "distancia" | "dual" | "hibrida";
 export type SubstantiveFunction = "investigacion" | "ensenanza" | "extension";
 
+/** En el orden de la formación. «pregrado» en la base es el profesional universitario (0075). */
 export const DEGREE_LABEL: Record<DegreeLevel, string> = {
-  pregrado: "Pregrado",
+  tecnico: "Técnico profesional",
+  tecnologico: "Tecnológico",
+  pregrado: "Profesional universitario",
   especializacion: "Especialización",
+  especializacion_medicoquirurgica: "Especialización médico-quirúrgica",
   maestria: "Maestría",
   doctorado: "Doctorado",
 };

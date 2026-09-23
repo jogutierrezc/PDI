@@ -156,7 +156,7 @@ export const SHEETS: SheetDef[] = [
       CODE,
       NAME,
       { key: "facultad", header: "Facultad (código)", hint: "La facultad a la que pertenece.", width: 18 },
-      { key: "nivel", header: "Nivel", hint: "Pregrado, Especialización, Maestría o Doctorado.", width: 18 },
+      { key: "nivel", header: "Nivel", hint: "Técnico profesional, Tecnológico, Profesional universitario, Especialización, Especialización médico-quirúrgica, Maestría o Doctorado.", width: 18 },
       { key: "modalidad", header: "Modalidad", hint: "Presencial, Virtual, A distancia, Dual o Híbrida.", width: 16 },
       {
         key: "sedes",
@@ -181,10 +181,34 @@ export function normalize(text: unknown): string {
 /** El encabezado sin su aclaración entre paréntesis: «Facultad (código)» → «facultad». */
 const headerKey = (text: unknown) => normalize(text).replace(/\s*\(.*\)\s*$/, "");
 
+/** Cómo lo escribe la gente, sin tildes ni mayúsculas: el SNIES y los catálogos dicen cosas distintas. */
 const DEGREES: Record<string, DegreeLevel> = {
+  tecnico: "tecnico",
+  "tecnico profesional": "tecnico",
+  "formacion tecnica profesional": "tecnico",
+  tecnica: "tecnico",
+  "tecnica profesional": "tecnico",
+  tecnologico: "tecnologico",
+  tecnologica: "tecnologico",
+  tecnologia: "tecnologico",
+  tecnologo: "tecnologico",
+  "formacion tecnologica": "tecnologico",
   pregrado: "pregrado",
   profesional: "pregrado",
+  universitario: "pregrado",
+  universitaria: "pregrado",
+  "profesional universitario": "pregrado",
+  "universitario (pregrado)": "pregrado",
   especializacion: "especializacion",
+  "especializacion medicoquirurgica": "especializacion_medicoquirurgica",
+  "especializacion medico quirurgica": "especializacion_medicoquirurgica",
+  "especializacion medico-quirurgica": "especializacion_medicoquirurgica",
+  "especializacion-medicoquirurgica": "especializacion_medicoquirurgica",
+  "especialidad medico quirurgica": "especializacion_medicoquirurgica",
+  "especialidad medico-quirurgica": "especializacion_medicoquirurgica",
+  "medicoquirurgica": "especializacion_medicoquirurgica",
+  "medico-quirurgica": "especializacion_medicoquirurgica",
+  especializacion_medicoquirurgica: "especializacion_medicoquirurgica",
   maestria: "maestria",
   doctorado: "doctorado",
 };

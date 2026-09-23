@@ -10,7 +10,7 @@ export type FunctionId = "investigacion" | "ensenanza" | "extension";
 export type Level = "insumos" | "procesos" | "productos" | "impacto";
 export type CatalogState = "oficial" | "sugerido";
 export type CampusId = "bucaramanga" | "cucuta" | "valledupar" | "bogota";
-export type Degree = "pregrado" | "especializacion" | "maestria" | "doctorado";
+export type Degree = "tecnico" | "tecnologico" | "pregrado" | "especializacion" | "especializacion_medicoquirurgica" | "maestria" | "doctorado";
 
 /** Una fila de la matriz tal como la trae la vr7. */
 export interface MatrixIndicator {

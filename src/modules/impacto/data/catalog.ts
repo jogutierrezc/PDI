@@ -36,8 +36,11 @@ export const CAMPUS: { id: CampusId; name: string }[] = [
 export const campusName = (id: CampusId | null) => CAMPUS.find((c) => c.id === id)?.name ?? "Todas las sedes";
 
 export const DEGREES: Record<Degree, string> = {
-  pregrado: "Pregrado",
+  tecnico: "Técnico profesional",
+  tecnologico: "Tecnológico",
+  pregrado: "Profesional universitario",
   especializacion: "Especialización",
+  especializacion_medicoquirurgica: "Especialización médico-quirúrgica",
   maestria: "Maestría",
   doctorado: "Doctorado",
 };
@@ -71,7 +74,7 @@ export const PROGRAMS: Program[] = [
   { slug: "tec-gestion", name: "Tecnología en Gestión Empresarial", faculty: "formacion-tecnica-y-tecnologica", degree: "pregrado", campus: ["bucaramanga", "cucuta"] },
 ];
 
-const ALL: Degree[] = ["pregrado", "especializacion", "maestria", "doctorado"];
+const ALL: Degree[] = ["tecnico", "tecnologico", "pregrado", "especializacion", "especializacion_medicoquirurgica", "maestria", "doctorado"];
 
 /**
  * Ficha técnica de los 13 del piloto. Valores razonables del prototipo; cada

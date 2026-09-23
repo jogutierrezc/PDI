@@ -37,8 +37,11 @@ export const MODE = [
   ["calculado", "Calculado"],
 ] as const;
 export const DEGREES = [
-  ["pregrado", "Pregrado"],
+  ["tecnico", "Técnico profesional"],
+  ["tecnologico", "Tecnológico"],
+  ["pregrado", "Profesional universitario"],
   ["especializacion", "Especialización"],
+  ["especializacion_medicoquirurgica", "Especialización médico-quirúrgica"],
   ["maestria", "Maestría"],
   ["doctorado", "Doctorado"],
 ] as const;

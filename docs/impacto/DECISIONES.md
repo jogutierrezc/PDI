@@ -47,3 +47,13 @@ Umbral de variación por defecto: 30 %. Vicerrectoría validadora: la de la func
 
 ### Pendiente (fases 1–8)
 Modelo en Supabase y migraciones, importador real con reporte descargable, edición persistente de fichas y versiones, carga de precargados, plantilla Excel con HMAC y su importación, pruebas de aceptación.
+
+## Fase 0 · exploración y plan (2026-09-23)
+
+- **Estructura existente**: se reutilizan `units`, `unit_members` y `campuses` en lugar de crear `unidad_organizacional`, `usuario_rol` y `sede`. (Usuario.)
+- **Roles configurables**: `access_roles` gana capacidades de Impacto y `unit_members` gana el rol con el que cada persona trabaja en cada unidad. Planeación puede crear roles nuevos. (Usuario.)
+- **Dependencias aprobadas**: ExcelJS, Vitest y PGlite. (Usuario.)
+- **Semillas de prueba fuera de las migraciones**: `supabase/seed/impacto_prueba.sql`. (Usuario.)
+- Tablas nuevas con prefijo `imp_` y nombres en inglés, como el resto del esquema; la correspondencia con la especificación está en PLAN.md.
+- HMAC de la plantilla con `pgcrypto` y clave guardada en la base, fuera del alcance de `anon` y `authenticated`.
+- La matriz vr7 queda en la raíz del repositorio (`UDES_Matriz_Impacto_Institucional_vr7.xlsx`), donde la dejó el usuario, y no en `docs/impacto/`.

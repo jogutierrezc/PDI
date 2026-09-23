@@ -13,20 +13,26 @@ import { Link, useParams } from "react-router-dom";
 import { Icon } from "../../../components/ui/Icon";
 import { FUNCTIONS, LEVELS } from "../data/catalog";
 import { INSTITUTION, LENSES, entitiesOf, resolveScope, statsFor } from "../data/lens";
-import type { LensKind } from "../data/lens";
+import type { LensKind, PortalData } from "../data/lens";
 import type { FunctionId } from "../data/types";
 import { ImpactLayout } from "./ImpactLayout";
-import { IllustrativeNote, IndicatorPebble, riverCounts } from "./shared";
+import { PortalGate } from "./PortalGate";
+import { IndicatorPebble, SourceNote, riverCounts } from "./shared";
 import { ValueRiver } from "./ValueRiver";
 
 export function ImpactUnit({ institution = false }: { institution?: boolean }) {
+  return <PortalGate title="Impacto Institucional">{(data) => <Unit data={data} institution={institution} />}</PortalGate>;
+}
+
+function Unit({ data, institution }: { data: PortalData; institution: boolean }) {
   const { lente, slug } = useParams();
-  const scope = institution ? INSTITUTION : resolveScope(lente, slug);
-  const stats = useMemo(() => (scope ? statsFor(scope) : []), [scope]);
+  const scope = useMemo(() => (institution ? INSTITUTION : resolveScope(data, lente, slug)), [data, institution, lente, slug]);
+  const stats = useMemo(() => (scope ? statsFor(data, scope) : []), [data, scope]);
   const counts = useMemo(() => riverCounts(stats), [stats]);
   const [only, setOnly] = useState<FunctionId | null>(null);
   // Lo sencillo primero: se ven las cifras; lo que aún no se reporta, a un clic.
-  const [withData, setWithData] = useState(true);
+  // Sin ninguna cifra validada, se abre con todo para no mostrar una página vacía.
+  const [withData, setWithData] = useState(data.records.length > 0);
 
   if (!scope) {
     return (
@@ -43,7 +49,7 @@ export function ImpactUnit({ institution = false }: { institution?: boolean }) {
   }
 
   const lens = LENSES.find((l) => l.kind === scope.kind);
-  const siblings = scope.kind === "institucion" ? [] : entitiesOf(scope.kind as LensKind);
+  const siblings = scope.kind === "institucion" ? [] : entitiesOf(data, scope.kind as LensKind);
   const functions = FUNCTIONS.filter((f) => scope.functions.includes(f.id) && (!only || only === f.id));
   const reported = stats.filter((s) => s.current).length;
 
@@ -149,7 +155,7 @@ export function ImpactUnit({ institution = false }: { institution?: boolean }) {
       })}
 
       <div className="u-container imp-closing">
-        <IllustrativeNote />
+        <SourceNote data={data} />
       </div>
     </ImpactLayout>
   );

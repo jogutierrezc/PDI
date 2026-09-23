@@ -4,6 +4,10 @@
    Tres periodos de reportes de los 13 indicadores del piloto, por programa y
    sede, generados con una semilla fija para que cada recarga muestre lo mismo.
    Toda vista que las use dice «Dato ilustrativo».
+
+   Desde el cierre de la fase 7 el portal ya no las usa (lee la base con portal-db.ts);
+   solo queda el estado de prototipo de admin/store.ts, que ninguna pantalla
+   usa. Se borran cuando se limpie ese estado.
    ========================================================================== */
 
 import { PILOT_INDICATORS, PROGRAMS, applies } from "./catalog";

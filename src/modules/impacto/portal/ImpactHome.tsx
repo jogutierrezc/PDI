@@ -5,29 +5,37 @@
       cadena de valor, con el conteo de la matriz vr7.
    2. Las lentes: vicerrectorías, facultades, programas y campus. Cada una es
       una piedra que lleva a su propia cadena de valor.
-   3. Cómo se lee una cifra: la razón de sumas, con una cifra de verdad del
-      prototipo en lugar de una explicación abstracta.
+   3. Cómo se lee una cifra: la razón de sumas, con una cifra validada en
+      lugar de una explicación abstracta. Si aún no hay una que sirva de
+      ejemplo, la sección no se muestra.
    ========================================================================== */
 
 import { useMemo, useState } from "react";
 import type { CSSProperties } from "react";
 import { Link } from "react-router-dom";
 import { Icon } from "../../../components/ui/Icon";
-import { FACULTIES, FUNCTIONS, INDICATORS, indicatorByCode } from "../data/catalog";
+import { FUNCTIONS } from "../data/catalog";
 import { INSTITUTION, LENSES, entitiesOf, formatValue, resolveScope, statFor, statsFor } from "../data/lens";
-import type { LensKind } from "../data/lens";
+import type { IndicatorStat, LensKind, PortalData, PortalFaculty } from "../data/lens";
 import { ImpactLayout } from "./ImpactLayout";
-import { IllustrativeNote, pebbleShape, riverCounts } from "./shared";
+import { PortalGate } from "./PortalGate";
+import { SourceNote, pebbleShape, riverCounts } from "./shared";
 import { ValueRiver } from "./ValueRiver";
 
-/** La cifra con la que se explica la razón de sumas. */
-const EXAMPLE = "E04";
+/** La cifra con la que se explica la razón de sumas, si tiene con qué. */
+const PREFERRED_EXAMPLE = "E04";
 
 export function ImpactHome() {
-  const stats = useMemo(() => statsFor(INSTITUTION), []);
+  return <PortalGate title="Portada">{(data) => <Home data={data} />}</PortalGate>;
+}
+
+function Home({ data }: { data: PortalData }) {
+  const stats = useMemo(() => statsFor(data, INSTITUTION), [data]);
   const counts = useMemo(() => riverCounts(stats), [stats]);
   const [lens, setLens] = useState<LensKind>("facultad");
-  const official = INDICATORS.filter((i) => i.estado === "oficial").length;
+  const entities = entitiesOf(data, lens);
+  const total = data.indicators.length;
+  const official = data.indicators.filter((i) => i.estado === "oficial").length;
 
   return (
     <ImpactLayout title="Portada">
@@ -37,7 +45,7 @@ export function ImpactHome() {
             <h1>Impacto Institucional</h1>
             <p className="imp-lede">
               Cómo la investigación, la enseñanza y la extensión convierten lo que la universidad tiene en cambios que
-              se pueden medir. {INDICATORS.length} indicadores, de los insumos al impacto real.
+              se pueden medir. {total} indicadores, de los insumos al impacto real.
             </p>
             <ul className="imp-hero__functions">
               {FUNCTIONS.map((f) => (
@@ -50,7 +58,7 @@ export function ImpactHome() {
               ))}
             </ul>
             <p className="imp-hero__fine">
-              {official} oficiales y {INDICATORS.length - official} sugeridos en el catálogo. Los sugeridos se ven, pero
+              {official} oficiales y {total - official} sugeridos en el catálogo. Los sugeridos se ven, pero
               no se reportan hasta que el catálogo los adopte.
             </p>
             <div className="imp-hero__actions">
@@ -86,57 +94,78 @@ export function ImpactHome() {
                 onClick={() => setLens(l.kind)}
               >
                 {l.plural}
-                <span>{entitiesOf(l.kind).length}</span>
+                <span>{entitiesOf(data, l.kind).length}</span>
               </button>
             ))}
           </div>
 
-          <ul className="imp-stones" id="lente-panel" role="tabpanel" aria-labelledby={`lente-${lens}`}>
-            {entitiesOf(lens).map((entity) => {
-              const scope = resolveScope(lens, entity.slug)!;
-              const withData = statsFor(scope).filter((s) => s.current).length;
-              const tone = lens === "vicerrectoria" ? FUNCTIONS.find((f) => f.id === entity.slug)?.tone : undefined;
-              return (
-                <li key={entity.slug}>
-                  <Link
-                    to={`/impacto/${lens}/${entity.slug}`}
-                    className="imp-stone"
-                    style={{ "--shape": pebbleShape(entity.slug), ...(tone ? { "--tone": tone } : {}) } as CSSProperties}
-                  >
-                    <span className="imp-stone__detail">{entity.detail}</span>
-                    <strong>{entity.name}</strong>
-                    <span className="imp-stone__count">
-                      {withData} {withData === 1 ? "indicador con cifra" : "indicadores con cifra"}
-                    </span>
-                  </Link>
-                </li>
-              );
-            })}
-          </ul>
+          {entities.length === 0 ? (
+            <p className="imp-level__empty" id="lente-panel" role="tabpanel" aria-labelledby={`lente-${lens}`}>
+              Aún no hay {LENSES.find((l) => l.kind === lens)?.plural.toLowerCase()} con programas en la estructura de Impacto.
+            </p>
+          ) : (
+            <ul className="imp-stones" id="lente-panel" role="tabpanel" aria-labelledby={`lente-${lens}`}>
+              {entities.map((entity) => {
+                const scope = resolveScope(data, lens, entity.slug)!;
+                const withData = statsFor(data, scope).filter((s) => s.current).length;
+                const tone = lens === "vicerrectoria" ? FUNCTIONS.find((f) => f.id === entity.slug)?.tone : undefined;
+                return (
+                  <li key={entity.slug}>
+                    <Link
+                      to={`/impacto/${lens}/${entity.slug}`}
+                      className="imp-stone"
+                      style={{ "--shape": pebbleShape(entity.slug), ...(tone ? { "--tone": tone } : {}) } as CSSProperties}
+                    >
+                      <span className="imp-stone__detail">{entity.detail}</span>
+                      <strong>{entity.name}</strong>
+                      <span className="imp-stone__count">
+                        {withData} {withData === 1 ? "indicador con cifra" : "indicadores con cifra"}
+                      </span>
+                    </Link>
+                  </li>
+                );
+              })}
+            </ul>
+          )}
         </div>
       </section>
 
-      <ReadingGuide />
+      <ReadingGuide data={data} />
 
       <div className="u-container imp-closing">
-        <IllustrativeNote />
+        <SourceNote data={data} />
       </div>
     </ImpactLayout>
   );
 }
 
+/** Una razón de sumas con cifra institucional y al menos dos facultades con cifra, prefiriendo E04. */
+function pickExample(data: PortalData) {
+  const candidates = data.indicators
+    .filter((i) => i.ficha?.agregacion === "razon_de_sumas")
+    .sort((a, b) => Number(b.codigo === PREFERRED_EXAMPLE) - Number(a.codigo === PREFERRED_EXAMPLE));
+  for (const indicator of candidates) {
+    const whole = statFor(data, indicator, INSTITUTION);
+    if (!whole.current) continue;
+    const parts: { faculty: PortalFaculty; stat: IndicatorStat }[] = data.faculties
+      .map((faculty) => ({ faculty, stat: statFor(data, indicator, resolveScope(data, "facultad", faculty.slug)!) }))
+      .filter((p) => Boolean(p.stat.current?.denominador))
+      .slice(0, 4);
+    if (parts.length >= 2) return { indicator, whole, parts };
+  }
+  return null;
+}
+
 /** La razón de sumas explicada con una cifra que se puede comprobar. */
-function ReadingGuide() {
-  const indicator = indicatorByCode.get(EXAMPLE)!;
-  const whole = statFor(indicator, INSTITUTION);
-  const parts = FACULTIES.map((f) => ({ faculty: f, stat: statFor(indicator, resolveScope("facultad", f.slug)!) }))
-    .filter((p) => p.stat.current)
-    .slice(0, 4);
-  if (!whole.current) return null;
+function ReadingGuide({ data }: { data: PortalData }) {
+  const example = useMemo(() => pickExample(data), [data]);
+  if (!example) return null;
+  const { indicator, whole, parts } = example;
   const average = parts.reduce((t, p) => t + (p.stat.current?.valor ?? 0), 0) / parts.length;
   const num = parts.reduce((t, p) => t + (p.stat.current?.numerador ?? 0), 0);
   const den = parts.reduce((t, p) => t + (p.stat.current?.denominador ?? 0), 0);
   const factor = indicator.ficha?.factor ?? 1;
+  const together = ["Las dos juntas", "Las tres juntas", "Las cuatro juntas"][parts.length - 2];
 
   return (
     <section className="imp-reading" aria-labelledby="lectura-titulo">
@@ -144,15 +173,15 @@ function ReadingGuide() {
         <div>
           <h2 id="lectura-titulo">Una cifra de facultad no es un promedio</h2>
           <p>
-            La {indicator.nombre.toLowerCase()} de una facultad suma los estudiantes que siguen de todos sus programas y
-            los divide entre todos los que estaban. Así un programa de 900 estudiantes pesa lo que le corresponde frente
-            a uno de 40.
+            La cifra de una facultad en «{indicator.nombre}» suma los numeradores de todos sus programas y los divide
+            entre la suma de sus denominadores. Así un programa de 900 estudiantes pesa lo que le corresponde frente a
+            uno de 40.
           </p>
           <p>
             Por eso cada cifra del portal muestra su numerador y su denominador, y ningún porcentaje se guarda sin
             ellos.
           </p>
-          <Link className="imp-link" to={`/impacto/indicador/${EXAMPLE}`}>
+          <Link className="imp-link" to={`/impacto/indicador/${indicator.codigo}`}>
             Ver la ficha de {indicator.codigo}
             <Icon name="arrow-right" size={14} />
           </Link>
@@ -166,9 +195,9 @@ function ReadingGuide() {
             <thead>
               <tr>
                 <th scope="col">Facultad</th>
-                <th scope="col">Siguen</th>
-                <th scope="col">Estaban</th>
-                <th scope="col">Tasa</th>
+                <th scope="col">Numerador</th>
+                <th scope="col">Denominador</th>
+                <th scope="col">Valor</th>
               </tr>
             </thead>
             <tbody>
@@ -184,14 +213,14 @@ function ReadingGuide() {
           </table>
           <dl>
             <div>
-              <dt>Las cuatro juntas, razón de sumas</dt>
+              <dt>{together}, razón de sumas</dt>
               <dd>
                 {num.toLocaleString("es-CO")} ÷ {den.toLocaleString("es-CO")} ={" "}
                 <strong>{formatValue(indicator, (num / den) * factor)}</strong>
               </dd>
             </div>
             <div className="imp-sum__wrong">
-              <dt>Promedio de las tasas de estas cuatro (lo que no se hace)</dt>
+              <dt>Promedio de los valores de estas {parts.length} (lo que no se hace)</dt>
               <dd>
                 <s>{formatValue(indicator, average)}</s>
               </dd>

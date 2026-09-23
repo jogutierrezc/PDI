@@ -108,7 +108,10 @@ export const MODULES: ModuleDef[] = [
   {
     id: "impacto",
     label: "Impacto Institucional",
-    screens: [{ id: "impacto", label: "Reporte de impacto" }],
+    screens: [
+      { id: "impacto", label: "Reporte de impacto" },
+      { id: "impacto_audit", label: "Auditar Impacto", note: "pide capacidad de Planeación" },
+    ],
     levels: {
       ver: { hint: "Entra al reporte de impacto; lo que hace allí depende de sus roles en las unidades.", needs: "consulta" },
       administrar: { hint: "Configura el catálogo de indicadores y los periodos.", needs: "consulta" },

@@ -38,44 +38,27 @@ import {
 import type { CaptureRow } from "../data/capture-db";
 import { formatValue, unitLabel } from "../data/lens";
 import { CaptureSheet } from "./CaptureSheet";
+import type { WorkMode } from "./view-mode";
 import { ExcelImport, downloadTemplate } from "./ExcelImport";
 import { StatePill } from "./parts";
 import { RETURN_REASONS, STATE_LABEL } from "./store";
 
-type Mode = "sencillo" | "hoja";
-const MODE_KEY = "impacto:modo-captura";
+type Mode = WorkMode;
 const MAX_FILE = 10 * 1024 * 1024;
 const FILE_TYPES = /\.(pdf|xlsx?|png|jpe?g|webp)$/i;
 const CALC_LABEL = { conteo: "Conteo", razon: "Razón", puntaje: "Puntaje", comparacion: "Comparación", texto: "Texto" } as const;
 
-function readMode(): Mode {
-  try {
-    return window.localStorage.getItem(MODE_KEY) === "hoja" ? "hoja" : "sencillo";
-  } catch {
-    return "sencillo";
-  }
-}
-
-export function ReportView() {
+export function ReportView({ mode, onMode: setMode }: { mode: Mode; onMode: (mode: Mode) => void }) {
   const programs = useMyPrograms();
   const periods = useOpenPeriods();
   const [programId, setProgramId] = useState<string | null>(null);
   const [periodId, setPeriodId] = useState<string | null>(null);
-  const [mode, setModeState] = useState<Mode>(readMode);
   const [selected, setSelected] = useState<string | null>(null);
   const [importing, setImporting] = useState(false);
   const program = programs.data?.find((p) => p.program_id === programId) ?? programs.data?.[0] ?? null;
   const period = periods.data?.find((p) => p.id === periodId) ?? periods.data?.[0] ?? null;
   const rows = useCaptureRows(period?.id ?? null, program?.program_id ?? null);
 
-  const setMode = (m: Mode) => {
-    setModeState(m);
-    try {
-      window.localStorage.setItem(MODE_KEY, m);
-    } catch {
-      /* Sin almacenamiento: el modo vuelve a sencillo al recargar. */
-    }
-  };
 
   if (programs.isPending || periods.isPending) return <p className="ia-muted">Cargando…</p>;
   if (programs.error || periods.error) {
@@ -257,14 +240,6 @@ function Board({
         <i style={{ transform: `scaleX(${done_pct / 100})` }} />
       </div>
       <div className="ia-board__actions">
-        <div className="ia-mode" role="group" aria-label="Forma de trabajo">
-          <button type="button" aria-pressed={mode === "sencillo"} onClick={() => onMode("sencillo")}>
-            <Icon name="columns" size={14} /> Sencillo
-          </button>
-          <button type="button" aria-pressed={mode === "hoja"} onClick={() => onMode("hoja")}>
-            <Icon name="table" size={14} /> Hoja de cálculo
-          </button>
-        </div>
         <button
           type="button"
           className="button-ghost"

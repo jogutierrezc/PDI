@@ -16,52 +16,7 @@ import type { DbFinding, DbIndicator, SheetPatch } from "../data/catalog-db";
 import { FINDING_LABEL } from "../import/matrix";
 import type { FindingKind } from "../import/matrix";
 
-const UNITS = [
-  ["numero", "Número"],
-  ["porcentaje", "Porcentaje"],
-  ["razon", "Razón"],
-  ["puntaje", "Puntaje"],
-  ["moneda_cop", "Pesos (COP)"],
-  ["horas", "Horas"],
-] as const;
-const CALC = [
-  ["conteo", "Conteo"],
-  ["razon", "Razón"],
-  ["puntaje", "Puntaje"],
-  ["comparacion", "Comparación"],
-  ["texto", "Texto"],
-] as const;
-const AGG = [
-  ["suma", "Suma"],
-  ["razon_de_sumas", "Razón de sumas"],
-  ["promedio_ponderado", "Promedio ponderado"],
-  ["no_agregable", "No agregable"],
-] as const;
-const REPORT = [
-  ["programa_sede", "Programa y sede"],
-  ["programa", "Programa"],
-  ["facultad", "Facultad"],
-  ["institucional", "Institución"],
-] as const;
-const MODE = [
-  ["manual", "Manual"],
-  ["precargado", "Precargado"],
-  ["encuesta", "Encuesta"],
-  ["calculado", "Calculado"],
-] as const;
-const DEGREES = [
-  ["pregrado", "Pregrado"],
-  ["especializacion", "Especialización"],
-  ["maestria", "Maestría"],
-  ["doctorado", "Doctorado"],
-] as const;
-const MODALITIES = [
-  ["presencial", "Presencial"],
-  ["virtual", "Virtual"],
-  ["distancia", "A distancia"],
-  ["dual", "Dual"],
-  ["hibrida", "Híbrida"],
-] as const;
+import { AGG, CALC, DEGREES, MODALITIES, MODE, REPORT, UNITS } from "./labels";
 
 type Form = Required<SheetPatch>;
 

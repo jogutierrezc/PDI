@@ -45,6 +45,7 @@ export type AdminSection =
   | "tableros"
   | "transfer"
   | "impacto"
+  | "impacto_audit"
   | "institution";
 
 interface NavItem {
@@ -112,6 +113,8 @@ const navigation: NavGroup[] = [
     label: "Impacto Institucional",
     items: [
       { id: "impacto", label: "Reporte de impacto", icon: "spark-chart", to: "/admin/impacto", minimum: "consulta" },
+      // Cuánto va cada programa, decanatura y vicerrectoría: solo Planeación.
+      { id: "impacto_audit", label: "Auditar Impacto", icon: "chart", to: "/admin/impacto/auditar", minimum: "planeacion" },
     ],
   },
   {

@@ -8,6 +8,8 @@
       agregar con justificación, y la carga de valores precargados.
    ========================================================================== */
 
+import { PeriodSheet } from "./PeriodSheet";
+import type { WorkMode } from "./view-mode";
 import { useMemo, useState } from "react";
 import { Icon } from "../../../components/ui/Icon";
 import { downloadBlob } from "../../admin/traslado/transfer";
@@ -41,7 +43,7 @@ function nextCode(periods: Period[]): string {
   return term === 1 ? `${year}-2` : `${year + 1}-1`;
 }
 
-export function PeriodView() {
+export function PeriodView({ mode = "sencillo" }: { mode?: WorkMode }) {
   const periods = usePeriods();
   const [selected, setSelected] = useState<string | null>(null);
   const list = periods.data ?? [];
@@ -69,7 +71,7 @@ export function PeriodView() {
         </section>
       )}
 
-      {current && <PeriodDetail key={current.id} period={current} />}
+      {current && <PeriodDetail key={current.id} period={current} mode={mode} />}
 
       {periods.data && <OpenPeriod suggested={nextCode(list)} onOpened={setSelected} />}
     </>
@@ -449,7 +451,7 @@ function AddForm({
 
 /* --- Un periodo ya abierto ---------------------------------------------------------------- */
 
-function PeriodDetail({ period }: { period: Period }) {
+function PeriodDetail({ period, mode }: { period: Period; mode: WorkMode }) {
   const assignments = usePeriodAssignments(period.id);
   const close = useClosePeriod();
   const add = useAddAssignment();
@@ -525,6 +527,9 @@ function PeriodDetail({ period }: { period: Period }) {
         {error && <p className="ia-error">{error}</p>}
       </section>
 
+      {mode === "hoja" ? (
+        <PeriodSheet period={period} assignments={rows} />
+      ) : (
       <section className="admin-card" aria-labelledby="asignaciones-titulo">
         <div className="admin-card__head">
           <div>
@@ -547,6 +552,7 @@ function PeriodDetail({ period }: { period: Period }) {
           />
         )}
       </section>
+      )}
 
       {isOpen && <Preload period={period} assignments={active} />}
     </>

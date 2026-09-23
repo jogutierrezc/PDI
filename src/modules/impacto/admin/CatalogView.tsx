@@ -10,6 +10,8 @@
         incompleta, y dice cuál.
    ========================================================================== */
 
+import { CatalogSheet } from "./CatalogSheet";
+import type { WorkMode } from "./view-mode";
 import { useMemo, useState } from "react";
 import type { CSSProperties } from "react";
 import { Icon } from "../../../components/ui/Icon";
@@ -33,7 +35,7 @@ import { SheetEditor } from "./SheetEditor";
 
 type SheetFilter = "todas" | "piloto" | "completa" | "incompleta";
 
-export function CatalogView() {
+export function CatalogView({ mode = "sencillo" }: { mode?: WorkMode }) {
   const versions = useCatalogVersions();
   const [versionId, setVersionId] = useState<string | null>(null);
   const current: CatalogVersion | null =
@@ -179,6 +181,9 @@ export function CatalogView() {
             </label>
           </div>
 
+          {mode === "hoja" ? (
+            <CatalogSheet rows={rows} editable={editable} />
+          ) : (
           <div className="ia-split">
             <section className="admin-card ia-list" aria-label="Indicadores">
               <p className="ia-list__count">{indicators.isPending ? "Cargando…" : `${rows.length} de ${list.length}`}</p>
@@ -217,6 +222,7 @@ export function CatalogView() {
               <SheetEditor key={`${chosen.id}-${chosen.version_state}`} indicator={chosen} editable={editable} findings={findings.data ?? []} />
             )}
           </div>
+          )}
 
           <FindingsPanel findings={findings.data ?? []} />
 

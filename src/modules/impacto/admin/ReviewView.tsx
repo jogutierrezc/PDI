@@ -25,13 +25,15 @@ import { formatValue, unitLabel } from "../data/lens";
 import { DEAN_PENDING, VICE_PENDING, isOwn, useReview, useReviewRows, useReviewScope } from "../data/review-db";
 import type { ReviewAction, ReviewScope } from "../data/review-db";
 import { StatePill } from "./parts";
+import { ReviewSheet } from "./ReviewSheet";
+import type { WorkMode } from "./view-mode";
 import { DbHistory } from "./ReportView";
 import { RETURN_REASONS } from "./store";
 import type { ReturnReason } from "./store";
 
 type Desk = "decanatura" | "vicerrectoria";
 
-export function ReviewView() {
+export function ReviewView({ mode = "sencillo" }: { mode?: WorkMode }) {
   const scope = useReviewScope();
   const rows = useReviewRows(scope.data);
   const { profile } = useAuth();
@@ -71,12 +73,12 @@ export function ReviewView() {
           ))}
         </div>
       )}
-      <ReviewDesk key={current} desk={current} rows={list} scope={scope.data!} me={profile?.id} />
+      <ReviewDesk key={current} desk={current} rows={list} scope={scope.data!} me={profile?.id} mode={mode} />
     </>
   );
 }
 
-function ReviewDesk({ desk, rows, scope, me }: { desk: Desk; rows: CaptureRow[]; scope: ReviewScope; me: string | undefined }) {
+function ReviewDesk({ desk, rows, scope, me, mode }: { desk: Desk; rows: CaptureRow[]; scope: ReviewScope; me: string | undefined; mode: WorkMode }) {
   const isDean = desk === "decanatura";
   const pendingStates: readonly string[] = isDean ? DEAN_PENDING : VICE_PENDING;
   const queue = rows.filter((r) => pendingStates.includes(r.state));
@@ -121,6 +123,8 @@ function ReviewDesk({ desk, rows, scope, me }: { desk: Desk; rows: CaptureRow[];
         </dl>
       </section>
 
+      {mode === "hoja" && queue.length > 0 && <ReviewSheet rows={queue} isDean={isDean} me={me} />}
+
       {queue.length === 0 && (
         <section className="admin-card ia-empty-state">
           <h2>Nada pendiente</h2>
@@ -132,7 +136,7 @@ function ReviewDesk({ desk, rows, scope, me }: { desk: Desk; rows: CaptureRow[];
         </section>
       )}
 
-      {byProgram.map(([id, list]) => (
+      {mode === "sencillo" && byProgram.map(([id, list]) => (
         <ProgramPackage key={id} rows={list} isDean={isDean} me={me} />
       ))}
     </>

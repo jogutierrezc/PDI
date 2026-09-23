@@ -53,6 +53,7 @@ export type AdminScreen =
   | "users"
   | "transfer"
   | "impacto"
+  | "impacto_audit"
   | "institution";
 
 /** Un rol de acceso: qué puede hacer, qué pantallas ve y sobre qué informes escribe. */

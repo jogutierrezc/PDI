@@ -51,6 +51,7 @@ export const SCREEN_PATHS: Record<AdminScreen, string> = {
   users: "/admin/usuarios",
   transfer: "/admin/traslado",
   impacto: "/admin/impacto",
+  impacto_audit: "/admin/impacto/auditar",
   institution: "/admin/estructura-institucional",
 };
 

@@ -23,19 +23,22 @@ import { AdminShell } from "../../admin/components/AdminShell";
 import { useAuth } from "../../../lib/auth";
 import { useMyPrograms } from "../data/capture-db";
 import { useReviewScope } from "../data/review-db";
+import { AuditView } from "./AuditView";
 import { CatalogView } from "./CatalogView";
 import { PeriodView } from "./PeriodView";
 import { ReportView } from "./ReportView";
 import { ReviewView } from "./ReviewView";
+import { ModeSwitch, useWorkMode } from "./view-mode";
 import "./impact-admin.css";
 
-type View = "catalogo" | "periodo" | "reporte" | "revision";
+type View = "catalogo" | "periodo" | "reporte" | "revision" | "auditar";
 
 const VIEWS: { id: View; label: string }[] = [
   { id: "catalogo", label: "Catálogo" },
   { id: "periodo", label: "Periodo" },
   { id: "reporte", label: "Mi reporte" },
   { id: "revision", label: "Revisión" },
+  { id: "auditar", label: "Auditar Impacto" },
 ];
 
 const DESCRIPTION: Record<View, string> = {
@@ -43,19 +46,27 @@ const DESCRIPTION: Record<View, string> = {
   periodo: "Abrir el periodo, fijar las fechas de corte y revisar qué le toca reportar a cada programa.",
   reporte: "Lo que su programa debe reportar este periodo. Guarde cuando quiera; al final, envíelo a decanatura.",
   revision: "Los registros que esperan su decisión. Apruebe o devuelva con un motivo.",
+  auditar: "Cuánto va cada programa, decanatura, vicerrectoría y oficina responsable en el periodo, con los datos reportados.",
 };
 
 export function ImpactAdmin() {
   const { vista } = useParams();
   const navigate = useNavigate();
-  const { hasRole } = useAuth();
+  const { hasRole, canSee } = useAuth();
   const programs = useMyPrograms();
   const scope = useReviewScope();
   const pending = programs.isPending || scope.isPending;
+  const [mode, setMode] = useWorkMode();
 
   const reviews = (scope.data?.deanPrograms.length ?? 0) > 0 || (scope.data?.functions.length ?? 0) > 0;
   const allowed = VIEWS.filter((v) =>
-    v.id === "reporte" ? (programs.data?.length ?? 0) > 0 : v.id === "revision" ? reviews : hasRole("planeacion"),
+    v.id === "reporte"
+      ? (programs.data?.length ?? 0) > 0
+      : v.id === "revision"
+        ? reviews
+        : v.id === "auditar"
+          ? hasRole("planeacion") && canSee("impacto_audit")
+          : hasRole("planeacion"),
   );
   const view = allowed.find((v) => v.id === vista) ?? allowed[0] ?? null;
 
@@ -82,13 +93,13 @@ export function ImpactAdmin() {
 
   return (
     <AdminShell
-      section="impacto"
+      section={view.id === "auditar" ? "impacto_audit" : "impacto"}
       kicker="Impacto"
       title={view.id === "reporte" ? "Mi reporte del periodo" : view.label}
       description={DESCRIPTION[view.id]}
     >
-      {allowed.length > 1 && (
-        <div className="ia-bar">
+      <div className="ia-bar">
+        {allowed.length > 1 ? (
           <nav className="ia-views" aria-label="Vistas de Impacto">
             {allowed.map((v) => (
               <NavLink key={v.id} to={`/admin/impacto/${v.id}`} className={v.id === view.id ? "is-active" : undefined}>
@@ -96,13 +107,17 @@ export function ImpactAdmin() {
               </NavLink>
             ))}
           </nav>
-        </div>
-      )}
+        ) : (
+          <span />
+        )}
+        <ModeSwitch mode={mode} onMode={setMode} />
+      </div>
 
-      {view.id === "catalogo" && <CatalogView />}
-      {view.id === "periodo" && <PeriodView />}
-      {view.id === "reporte" && <ReportView />}
-      {view.id === "revision" && <ReviewView />}
+      {view.id === "catalogo" && <CatalogView mode={mode} />}
+      {view.id === "periodo" && <PeriodView mode={mode} />}
+      {view.id === "reporte" && <ReportView mode={mode} onMode={setMode} />}
+      {view.id === "revision" && <ReviewView mode={mode} />}
+      {view.id === "auditar" && <AuditView mode={mode} />}
     </AdminShell>
   );
 }

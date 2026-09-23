@@ -2573,7 +2573,7 @@ const routes = [
     note: "captura en modo sencillo: ficha, precargado y devolución",
     expect: "Programa de Prueba A",
     session: true,
-    also: ["Asignados", "Enviar a decanatura", "Sencillo", "Hoja de cálculo", "Estudiantes vinculados a semilleros", "Devuelto: Evidencia insuficiente", "Adjunte el listado del SIGIIP."],
+    also: ["Asignados", "Enviar a decanatura", "Vista sencilla", "Hoja de cálculo", "Estudiantes vinculados a semilleros", "Devuelto: Evidencia insuficiente", "Adjunte el listado del SIGIIP."],
   },
   {
     path: "/admin/impacto/reporte",
@@ -2615,6 +2615,45 @@ const routes = [
       if (!text.includes("Validar")) throw new Error("no aparece el botón para validar");
       if (text.includes("Innovaciones pedagógicas")) throw new Error("la vicerrectoría ve lo que aún está en la decanatura");
     },
+  },
+  {
+    path: "/admin/impacto/catalogo",
+    note: "catálogo en hoja de cálculo: una fila por indicador con su ficha técnica",
+    expect: "Copiar la hoja",
+    session: true,
+    storage: { "impacto:modo-captura": "hoja" },
+    also: ["Tipo de cálculo", "Agregación", "Nivel de reporte", "Estudiantes vinculados a semilleros", "Copiar la hoja", "Falta el tipo de cálculo"],
+  },
+  {
+    path: "/admin/impacto/periodo",
+    note: "periodo en hoja de cálculo: asignaciones con Activa y justificación",
+    expect: "Justificación del cambio",
+    session: true,
+    storage: { "impacto:modo-captura": "hoja" },
+    also: ["Registros de todos los programas", "Justificación del cambio", "Programa de Prueba A", "Aplicar cambios"],
+  },
+  {
+    path: "/admin/impacto/revision",
+    note: "bandeja de revisión en hoja: decisión, motivo y comentario por fila",
+    expect: "Motivo de devolución",
+    session: true,
+    storage: { "impacto:modo-captura": "hoja" },
+    also: ["Decisión", "Motivo de devolución", "Aplicar decisiones", "Tasa de retención estudiantil", "Lo capturó usted: lo decide otra persona"],
+  },
+  {
+    path: "/admin/impacto/auditar",
+    note: "Auditar Impacto: avance por programa, decanatura, vicerrectoría y oficina",
+    expect: "Auditar Impacto",
+    session: true,
+    also: ["Periodo 2026-2", "Con dato", "Validados", "Programas", "Decanaturas", "Vicerrectorías", "Oficinas responsables", "Actividad", "pendientes"],
+  },
+  {
+    path: "/admin/impacto/auditar",
+    note: "Auditar Impacto en hoja de cálculo",
+    expect: "Últ. movimiento",
+    session: true,
+    storage: { "impacto:modo-captura": "hoja" },
+    also: ["Avance", "Pendientes", "Devueltos", "Atrasado"],
   },
   {
     path: "/admin/impacto/reporte",

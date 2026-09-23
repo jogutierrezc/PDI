@@ -203,3 +203,12 @@ Modelo en Supabase y migraciones, importador real con reporte descargable, edici
   - Se puede subir solo una hoja.
   - Aplicar es todo o nada. La base procesa vicerrectorías → facultades → oficinas → programas, y engancha en una segunda pasada la oficina que depende de otra que venía después.
   - `admin_import_programs` (0073) queda como está, aunque la pantalla ya no la usa.
+
+## Vista sencilla u hoja de cálculo, y Auditar Impacto (2026-09-23)
+
+- **Una sola elección de vista para todo Impacto.** «Vista sencilla · Hoja de cálculo» sale en la barra de Impacto y vale para Catálogo, Periodo, Mi reporte, Revisión y Auditar. Se recuerda en el navegador con la misma clave de antes (`impacto:modo-captura`), así que quien ya usaba la hoja en «Mi reporte» la conserva. Es comodidad, no permiso: lo que cada quien escribe lo deciden sus capacidades y la base.
+- **Una hoja genérica (`DataGrid`)** con la misma mecánica que la de «Mi reporte»: teclado de Excel, pegar bloques, cambios acumulados, filtro y «Copiar la hoja» para llevar lo filtrado a Excel. «Mi reporte» conserva su hoja propia (CaptureSheet), que ya estaba probada con el servicio de validación.
+- **Catálogo en hoja:** una fila por indicador con la ficha técnica. Código, función, nivel y nombre vienen de la matriz y no se editan (se corrigen reimportando). Solo se escribe en una versión en borrador.
+- **Periodo en hoja:** asignaciones con «Activa» y justificación en la misma fila (la base la vuelve a exigir), y una segunda hoja de solo lectura con los registros de todos los programas.
+- **Revisión en hoja:** columnas Decisión, Motivo y Comentario. Lo aprobado se envía junto; lo devuelto, agrupado por motivo y comentario. Lo que la persona capturó queda bloqueado.
+- **Auditar Impacto** (pantalla `impacto_audit`, asignable en la matriz de roles, pide capacidad de Planeación): avance del periodo por programa (enviados ÷ asignados), decanatura (aprobados ÷ recibidos), vicerrectoría (validados ÷ aprobados por la decanatura de su función) y oficina responsable según la matriz (validados ÷ todos sus registros), más la bitácora de actividad. Los porcentajes se calculan al vuelo con su cuenta (x de y) y no se guardan. «Atrasado» = pasó la fecha de corte de esa mano con algo pendiente. Lo de menos avance sale primero. Solo lee: RLS decide qué se ve.

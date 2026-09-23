@@ -133,6 +133,33 @@ create trigger access_roles_scope_guard
   before update of scope on public.access_roles
   for each row execute function public.access_roles_scope_guard();
 
+-- La capacidad de un rol se puede cambiar desde la matriz. Quien ya lo lleva
+-- tiene que recibirla: profiles.role es lo que leen todas las políticas. Sin
+-- esto, la persona seguiría con la capacidad de antes hasta que alguien le
+-- volviera a asignar el rol. El guardián del último administrador (0024) sigue
+-- actuando sobre cada perfil, así que no se puede dejar el portal sin ninguno.
+create or replace function public.access_roles_resync_profiles()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  if new.base_role is distinct from old.base_role then
+    update public.profiles p
+       set role = new.base_role
+     where p.access_role_id = new.id
+       and p.role is distinct from new.base_role;
+  end if;
+  return new;
+end;
+$$;
+
+drop trigger if exists access_roles_resync_profiles on public.access_roles;
+create trigger access_roles_resync_profiles
+  after update of base_role on public.access_roles
+  for each row execute function public.access_roles_resync_profiles();
+
 -- Roles de partida que faltaban. No son de fábrica: se pueden borrar.
 insert into public.access_roles (key, name, description, base_role, screens, all_screens, all_reports, is_system, position, scope)
 values

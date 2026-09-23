@@ -33,10 +33,15 @@ export const UNIT_KIND: Record<UnitKind, { label: string; plural: string }> = {
   otra: { label: "Otra unidad", plural: "Otras unidades" },
 };
 
+/**
+ * La función de una persona en una unidad. En la base siguen llamándose
+ * visor, editor y jefe; en pantalla se nombran por lo que hacen con los datos
+ * de la unidad, que es como lo dice Planeación.
+ */
 export const UNIT_ROLE: Record<UnitRole, { label: string; hint: string }> = {
-  visor: { label: "Visor", hint: "Abre los tableros de la unidad y descarga sus datos." },
-  editor: { label: "Editor", hint: "Además sube tablas, arma visores y prepara boletines." },
-  jefe: { label: "Jefe", hint: "Además crea y borra tableros, reparte accesos y pide publicar." },
+  visor: { label: "Consulta", hint: "Ve los tableros y los datos de la unidad y los descarga." },
+  editor: { label: "Contribuyente", hint: "Aporta los datos de la unidad: sube tablas, arma visores y prepara boletines." },
+  jefe: { label: "Gestor", hint: "Responde por los datos de la unidad: además crea y borra tableros, reparte accesos y pide publicar." },
 };
 
 /** De menor a mayor. Sirve para comparar y para ordenar. */

@@ -29,6 +29,7 @@
    ========================================================================== */
 
 import type { AccessRole, AdminScreen, AppRole } from "../../../types/database";
+import { UNIT_ROLE } from "../../tableros/model";
 
 export type Level = "none" | "ver" | "editar" | "administrar";
 export type Scope = "global" | "unidad";
@@ -155,10 +156,11 @@ export const IMPACT_ACTIONS: { id: string; label: string; hint: string; scope: S
   { id: "impacto.periodo", label: "Periodos", hint: "Abre periodos, revisa asignaciones y carga precargados.", scope: "global" },
 ];
 
+/** Función en la unidad (Mis Tableros), con las etiquetas de tableros/model.ts. */
 export const BOARD_ROLE_LABEL: Record<BoardRole, { level: Level; label: string; hint: string }> = {
-  visor: { level: "ver", label: "Ver", hint: "Abre los tableros de la unidad y descarga sus datos." },
-  editor: { level: "editar", label: "Editar", hint: "Además sube tablas, arma visores y prepara boletines." },
-  jefe: { level: "administrar", label: "Administrar", hint: "Además crea y borra tableros, reparte accesos y pide publicar." },
+  visor: { level: "ver", ...UNIT_ROLE.visor },
+  editor: { level: "editar", ...UNIT_ROLE.editor },
+  jefe: { level: "administrar", ...UNIT_ROLE.jefe },
 };
 
 /* --- La matriz ------------------------------------------------------------------ */
@@ -342,7 +344,7 @@ export const TEMPLATES: { id: Exclude<TemplateId, "personalizada">; label: strin
     label: "Consulta",
     hint: {
       global: "Ve toda la intranet y no cambia nada.",
-      unidad: "Ve los tableros de su unidad; en Impacto no hace nada.",
+      unidad: "Consulta los datos de su unidad; en Impacto no hace nada.",
     },
   },
   {
@@ -350,7 +352,7 @@ export const TEMPLATES: { id: Exclude<TemplateId, "personalizada">; label: strin
     label: "Editor",
     hint: {
       global: "Escribe y publica en el Portal, el Plan, UDES en Cifras y el Observatorio.",
-      unidad: "Captura y envía lo que reporta su unidad; edita sus tableros.",
+      unidad: "Contribuyente: captura y envía lo que reporta su unidad.",
     },
   },
   {
@@ -366,7 +368,7 @@ export const TEMPLATES: { id: Exclude<TemplateId, "personalizada">; label: strin
     label: "Administrador",
     hint: {
       global: "Todo, incluidas la estructura institucional, las personas y los roles.",
-      unidad: "Todo en su unidad: captura, envía, aprueba, valida y reparte los tableros.",
+      unidad: "Gestor: todo en su unidad, incluido repartir accesos.",
     },
   },
 ];
@@ -447,7 +449,7 @@ export function describe(matrix: Matrix, reportNames: Map<string, string> = new 
     );
     return [
       actions.length > 0 ? `En Impacto, en su unidad: ${list(actions)}.` : "En Impacto solo consulta.",
-      `En Mis Tableros: ${BOARD_ROLE_LABEL[matrix.boardRole].label.toLowerCase()} (${BOARD_ROLE_LABEL[matrix.boardRole].hint.toLowerCase()})`,
+      `En la unidad es ${BOARD_ROLE_LABEL[matrix.boardRole].label.toLowerCase()}: ${BOARD_ROLE_LABEL[matrix.boardRole].hint.charAt(0).toLowerCase()}${BOARD_ROLE_LABEL[matrix.boardRole].hint.slice(1)}`,
     ];
   }
   const byLevel: Record<Exclude<Level, "none">, string[]> = { ver: [], editar: [], administrar: [] };

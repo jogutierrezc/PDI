@@ -76,6 +76,20 @@ describe("alcance de los roles", () => {
   });
 });
 
+describe("cambiar la capacidad de un rol en uso", () => {
+  it("la reciben quienes ya lo llevan", async () => {
+    const [custom] = await t.q<{ id: string }>(
+      "insert into access_roles (key, name, base_role, all_screens) values ('prueba_cap', 'Prueba', 'consulta', true) returning id",
+    );
+    await t.q("update profiles set access_role_id = $1 where id = $2", [custom.id, PEOPLE.ve]);
+    await t.asUser(ADMIN, (q) => q("update access_roles set base_role = 'planeacion' where id = $1", [custom.id]), {
+      commit: true,
+    });
+    const [row] = await t.q<{ role: string }>("select role from profiles where id = $1", [PEOPLE.ve]);
+    expect(row.role).toBe("planeacion");
+  });
+});
+
 describe("estructura institucional", () => {
   it("solo la administración guarda unidades", async () => {
     const message = await t.asUser(PEOPLE.admin, (q) =>

@@ -534,6 +534,11 @@ const FIXTURES = {
     { id: "rol-planeacion", key: "planeacion", name: "Planeación", description: "Edita cualquier pilar y decide qué se publica.", base_role: "planeacion", screens: [], all_screens: true, all_reports: true, is_system: true, position: 3 },
     { id: "rol-admin", key: "admin", name: "Administrador", description: "Todo lo anterior, más la gestión de usuarios.", base_role: "admin", screens: [], all_screens: true, all_reports: true, is_system: true, position: 4 },
     { id: "rol-vi", key: "editor-investigacion", name: "Editor de Investigación", description: "Carga y publica el informe de Investigación.", base_role: "planeacion", screens: ["cifras"], all_screens: false, all_reports: false, is_system: false, position: 5 },
+    { id: "rol-director", key: "impacto_director", name: "Dirección de programa", description: "Captura y envía a decanatura lo que reporta su programa.", base_role: "consulta", screens: ["impacto"], all_screens: false, all_reports: false, is_system: true, position: 21, scope: "unidad", capabilities: ["impacto.capturar", "impacto.enviar"], unit_role: "editor" },
+  ],
+  // Dónde trabaja cada persona (0057 + 0063): la vicerrectoría dirige un programa.
+  unit_members: [
+    { id: "um-1", unit_id: "imp-prog-a", profile_id: "user-vi", access_role_id: "rol-director", role: "editor" },
   ],
   access_role_reports: [{ access_role_id: "rol-vi", report_slug: "investigacion" }],
   web_projects: [
@@ -2785,8 +2790,43 @@ const routes = [
     path: "/admin/usuarios",
     expect: "Usuarios y roles",
     session: true,
-    note: "los roles de acceso se administran junto a las personas",
-    also: ["Administradora de prueba", "Roles de acceso", "Editor de Investigación", "Estaciones del periodo"],
+    note: "personas en lista, con su rol global y sus unidades",
+    also: ["Administradora de prueba", "Vicerrectoría de Investigaciones", "Editor de Investigación", "Elija una persona"],
+  },
+  {
+    path: "/admin/usuarios?persona=user-vi",
+    expect: "Qué hace en toda la universidad",
+    session: true,
+    note: "la ficha: rol global, dónde trabaja y lo que podrá hacer en palabras",
+    also: ["Dónde trabaja", "Lo que podrá hacer", "En UDES en Cifras escribe: Investigación.", "Dirección de programa"],
+  },
+  {
+    path: "/admin/usuarios?nueva=1",
+    expect: "Crear usuario",
+    session: true,
+    note: "el asistente de tres pasos",
+    also: ["Quién es", "Qué hace en toda la universidad", "Dónde trabaja", "Enviar invitación"],
+  },
+  {
+    path: "/admin/usuarios/roles?rol=rol-vi",
+    expect: "Editor de Investigación",
+    session: true,
+    note: "la matriz del rol: plantilla, niveles por módulo y resumen",
+    also: ["En toda la intranet", "En una unidad", "Personalizada", "UDES en Cifras", "Quien lleve este rol", "Capacidad resultante"],
+  },
+  {
+    path: "/admin/usuarios/roles?rol=rol-director",
+    expect: "Dirección de programa",
+    session: true,
+    note: "un rol de unidad: acciones de Impacto y papel en Mis Tableros",
+    also: ["Capturar", "Validar", "Función en la unidad", "Contribuyente", "En Impacto, en su unidad: capturar y enviar."],
+  },
+  {
+    path: "/admin/usuarios/carga",
+    expect: "Descargue la plantilla",
+    session: true,
+    note: "carga masiva de usuarios y asignaciones",
+    also: ["Súbala diligenciada", "Descargar plantilla"],
   },
   {
     path: "/admin/udes-en-cifras/captura/poblacional",

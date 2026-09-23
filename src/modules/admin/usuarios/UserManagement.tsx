@@ -1,504 +1,92 @@
 /* =============================================================================
    Usuarios y roles.
 
-   El alta pasa por la Edge Function admin-users porque crear una cuenta exige
-   la clave de servicio, que no puede estar en el navegador. El cambio de rol,
-   en cambio, es un UPDATE normal: las políticas RLS ya lo limitan a
-   administradores y un disparador impide dejar el portal sin ninguno.
+   Tres vistas bajo la misma pantalla, cada una con su dirección:
 
-   Cada persona lleva un rol de acceso (abajo, en su propio panel): de él salen
-   su capacidad, las pantallas que ve y los informes de UDES en Cifras que
-   escribe. Cambiar de rol de acceso cambia las tres cosas a la vez, porque la
-   base sincroniza profiles.role con la capacidad del rol elegido.
+     /admin/usuarios            Personas: lista y ficha (o el asistente).
+     /admin/usuarios/roles      Roles: lista y matriz del rol abierto.
+     /admin/usuarios/carga      Carga masiva de usuarios y asignaciones.
+
+   La persona o el rol abiertos van en la dirección (?persona=, ?rol=), así
+   que se pueden enlazar: la ficha de una unidad en Estructura institucional
+   lleva directo a la persona.
+
+   El alta pasa por la Edge Function admin-users porque crear una cuenta exige
+   la clave de servicio. Lo demás son escrituras normales o funciones de 0073,
+   y RLS decide: esta pantalla no concede nada que la base no conceda.
    ========================================================================== */
 
-import { useMemo, useState } from "react";
-import type { FormEvent } from "react";
+import { useState } from "react";
+import { NavLink, useNavigate, useParams } from "react-router-dom";
 import { AdminShell } from "../components/AdminShell";
 import { Icon } from "../../../components/ui/Icon";
-import { Modal, ModalActions } from "../../../components/ui/Modal";
-import { EmptyBlock, ErrorBlock, LoadingBlock } from "../../../components/ui/QueryState";
-import { useAccessRoles, usePillarOwners, usePillars, useProfiles } from "../../../data/queries";
-import {
-  useCreateUser,
-  useDeleteUser,
-  useSendPasswordReset,
-  useUpdateProfile,
-} from "../../../data/mutations";
-import { roleDescriptions, roleLabels, useAuth } from "../../../lib/auth";
-import { formatDate } from "../../../data/pdi";
-import type { AccessRole, AppRole, Profile } from "../../../types/database";
-import { AccessRolesPanel, SCREEN_LABELS } from "./AccessRoles";
+import { useProfiles } from "../../../data/queries";
+import { BulkUsers } from "./BulkUsers";
+import { PeopleView } from "./PeopleView";
+import { useMemberships, useUnitOptions } from "./people-db";
+import { RolesView } from "./RolesView";
+import "./usuarios.css";
 
-const ROLES: AppRole[] = ["consulta", "responsable", "planeacion", "admin"];
+const VIEWS = [
+  { id: "personas", label: "Personas", path: "/admin/usuarios" },
+  { id: "roles", label: "Roles", path: "/admin/usuarios/roles" },
+  { id: "carga", label: "Carga masiva", path: "/admin/usuarios/carga" },
+] as const;
 
 export function UserManagement() {
+  const { vista } = useParams();
+  const navigate = useNavigate();
+  const view = VIEWS.find((item) => item.id === vista) ?? VIEWS[0];
   const profiles = useProfiles();
-  const pillars = usePillars();
-  const owners = usePillarOwners();
-  const access = useAccessRoles();
-  const { profile: me } = useAuth();
-
-  const [creating, setCreating] = useState(false);
-  const [pendingDelete, setPendingDelete] = useState<Profile | null>(null);
+  const memberships = useMemberships();
+  const units = useUnitOptions();
   const [notice, setNotice] = useState("");
-  const [error, setError] = useState("");
-  const [query, setQuery] = useState("");
-
-  const createUser = useCreateUser();
-  const deleteUser = useDeleteUser();
-  const updateProfile = useUpdateProfile();
-  const sendReset = useSendPasswordReset();
-
-  /** El rol de acceso de fábrica que corresponde a una capacidad, para los
-   *  perfiles creados antes de que existieran los roles de acceso. */
-  const systemRoleId = (role: AppRole) =>
-    (access.data?.roles ?? []).find((item) => item.is_system && item.key === role)?.id;
-
-  /** Qué alcanza esta persona, en una línea. */
-  const scopeOf = (person: Profile) => {
-    const role = (access.data?.roles ?? []).find((item) => item.id === person.access_role_id);
-    if (!role) return "Toda la intranet";
-    const screens = role.all_screens
-      ? "Todas las pantallas"
-      : role.screens.length === 0
-        ? "Ninguna pantalla"
-        : role.screens.map((screen) => SCREEN_LABELS[screen] ?? screen).join(", ");
-    const reports = (access.data?.reports ?? [])
-      .filter((row) => row.access_role_id === role.id)
-      .map((row) => row.report_slug);
-    const scope = role.all_reports
-      ? "todos los informes"
-      : reports.length === 0
-        ? "ningún informe"
-        : `informes: ${reports.join(", ")}`;
-    return `${screens} · ${scope}`;
-  };
-
-  const rows = useMemo(() => {
-    const list = profiles.data ?? [];
-    const needle = query.trim().toLowerCase();
-    if (!needle) return list;
-    return list.filter((person) =>
-      `${person.full_name} ${person.email} ${person.unit ?? ""}`.toLowerCase().includes(needle),
-    );
-  }, [profiles.data, query]);
-
-  const activeAdmins = (profiles.data ?? []).filter(
-    (person) => person.role === "admin" && person.is_active,
-  ).length;
-
-  function pillarsOf(profileId: string) {
-    const ids = (owners.data ?? [])
-      .filter((row) => row.profile_id === profileId)
-      .map((row) => row.pillar_id);
-    return (pillars.data ?? []).filter((pillar) => ids.includes(pillar.id));
-  }
-
-  /** Cambiar de rol de acceso cambia también la capacidad: la base sincroniza
-   *  profiles.role con la del rol elegido. */
-  async function changeAccessRole(person: Profile, roleId: string) {
-    const role = (access.data?.roles ?? []).find((item) => item.id === roleId);
-    setError("");
-    setNotice("");
-    try {
-      await updateProfile.mutateAsync({ id: person.id, values: { access_role_id: roleId } });
-      setNotice(`${person.full_name || person.email} ahora entra como ${role?.name ?? "otro rol"}.`);
-    } catch (updateError) {
-      setError(updateError instanceof Error ? updateError.message : "No se pudo cambiar el rol.");
-    }
-  }
-
-  async function toggleActive(person: Profile) {
-    setError("");
-    setNotice("");
-    try {
-      await updateProfile.mutateAsync({ id: person.id, values: { is_active: !person.is_active } });
-      setNotice(
-        `${person.full_name || person.email} quedó ${person.is_active ? "desactivado" : "activo"}.`,
-      );
-    } catch (updateError) {
-      setError(updateError instanceof Error ? updateError.message : "No se pudo cambiar el estado.");
-    }
-  }
-
-  async function resetPassword(person: Profile) {
-    setError("");
-    setNotice("");
-    try {
-      await sendReset.mutateAsync(person.email);
-      setNotice(`Se envió un enlace de acceso a ${person.email}.`);
-    } catch (resetError) {
-      setError(resetError instanceof Error ? resetError.message : "No se pudo enviar el enlace.");
-    }
-  }
-
-  async function confirmDelete() {
-    if (!pendingDelete) return;
-    setError("");
-    try {
-      await deleteUser.mutateAsync(pendingDelete.id);
-      setNotice(`Se eliminó la cuenta de ${pendingDelete.email}.`);
-      setPendingDelete(null);
-    } catch (deleteError) {
-      setError(deleteError instanceof Error ? deleteError.message : "No se pudo eliminar el usuario.");
-      setPendingDelete(null);
-    }
-  }
 
   return (
     <AdminShell
       section="users"
-      kicker="Administración · Personas"
+      kicker="Sistema"
       title="Usuarios y roles"
-      description="Quién entra a la intranet, con qué rol de acceso, qué pantallas ve y sobre qué informes escribe."
+      description="Quién entra a la intranet, qué hace en toda la universidad y en qué unidades trabaja."
       actions={
-        <button className="button-primary" type="button" onClick={() => setCreating(true)}>
+        <button className="button-primary" type="button" onClick={() => navigate("/admin/usuarios?nueva=1")}>
           <Icon name="plus" size={16} /> Crear usuario
         </button>
       }
     >
+      <nav className="us-views" aria-label="Vistas de usuarios y roles">
+        {VIEWS.map((item) => (
+          <NavLink key={item.id} to={item.path} end className={item.id === view.id ? "is-active" : undefined}>
+            {item.label}
+          </NavLink>
+        ))}
+      </nav>
+
       {notice && (
         <p className="admin-notice" role="status">
-          <Icon name="check" size={16} />
-          {notice}
+          <Icon name="check" size={16} /> {notice}
+          <button type="button" className="us-icon-button" aria-label="Cerrar el aviso" onClick={() => setNotice("")}>
+            <Icon name="close" size={14} />
+          </button>
         </p>
       )}
 
-      {error && (
+      {(memberships.isError || units.isError) && (
         <p className="admin-error" role="alert">
-          <Icon name="alert" size={16} />
-          {error}
+          <Icon name="alert" size={16} /> No se pudieron leer las unidades: ¿falta aplicar la migración 0073?
         </p>
       )}
 
-      <section className="role-legend" aria-label="Qué puede hacer cada rol">
-        {ROLES.map((role) => (
-          <div key={role}>
-            <strong>{roleLabels[role]}</strong>
-            <small>{roleDescriptions[role]}</small>
-          </div>
-        ))}
-      </section>
-
-      <div className="users-toolbar">
-        <label className="users-search">
-          <Icon name="search" size={16} />
-          <span className="sr-only">Buscar usuarios</span>
-          <input
-            type="search"
-            value={query}
-            onChange={(event) => setQuery(event.target.value)}
-            placeholder="Buscar por nombre, correo o dependencia…"
-          />
-        </label>
-        <span className="users-count">
-          {rows.length} de {profiles.data?.length ?? 0} personas
-        </span>
-      </div>
-
-      {profiles.isPending ? (
-        <LoadingBlock rows={5} label="Cargando usuarios" />
-      ) : profiles.isError ? (
-        <ErrorBlock error={profiles.error} onRetry={() => void profiles.refetch()} />
-      ) : rows.length === 0 ? (
-        <EmptyBlock
-          title="Sin usuarios que coincidan"
-          hint={query ? "Prueba con otro término de búsqueda." : "Crea el primer usuario del portal."}
-        />
-      ) : (
-        <div className="table-scroll">
-          <table className="users-table">
-            <caption className="sr-only">Usuarios de la intranet con su rol, estado y pilares asignados</caption>
-            <thead>
-              <tr>
-                <th scope="col">Persona</th>
-                <th scope="col">Rol de acceso</th>
-                <th scope="col">Alcance</th>
-                <th scope="col">Estado</th>
-                <th scope="col">Acciones</th>
-              </tr>
-            </thead>
-            <tbody>
-              {rows.map((person) => {
-                const isMe = person.id === me?.id;
-                // Un administrador no puede degradarse ni desactivarse si es el
-                // último: el disparador lo rechazaría, así que se desactiva el
-                // control en vez de dejar que falle.
-                const isLastAdmin = person.role === "admin" && person.is_active && activeAdmins <= 1;
-                const assigned = pillarsOf(person.id);
-
-                return (
-                  <tr key={person.id} className={person.is_active ? undefined : "is-inactive"}>
-                    <th scope="row">
-                      <strong>
-                        {person.full_name || "Sin nombre"}
-                        {isMe && <span className="record-flag">Tú</span>}
-                      </strong>
-                      <small>{person.email}</small>
-                      {person.unit && <small>{person.unit}</small>}
-                    </th>
-
-                    <td>
-                      <label className="sr-only" htmlFor={`role-${person.id}`}>
-                        Rol de acceso de {person.full_name || person.email}
-                      </label>
-                      <select
-                        id={`role-${person.id}`}
-                        value={person.access_role_id ?? systemRoleId(person.role) ?? ""}
-                        disabled={isLastAdmin || updateProfile.isPending}
-                        onChange={(event) => void changeAccessRole(person, event.target.value)}
-                      >
-                        {(access.data?.roles ?? []).map((role) => (
-                          <option key={role.id} value={role.id}>
-                            {role.name}
-                          </option>
-                        ))}
-                      </select>
-                      <small className="users-hint">{roleLabels[person.role]}</small>
-                      {isLastAdmin && <small className="users-hint">Único administrador activo</small>}
-                    </td>
-
-                    <td>
-                      <span className="users-scope">{scopeOf(person)}</span>
-                      {person.role === "responsable" && (
-                        <small className="users-hint">
-                          {assigned.length > 0
-                            ? `Pilares: ${assigned.map((pillar) => pillar.name).join(", ")}`
-                            : "Sin pilares · asígnalos en Gestión de pilares"}
-                        </small>
-                      )}
-                    </td>
-
-                    <td>
-                      <span className={`status-badge status-badge--${person.is_active ? "cumplida" : "pendiente"}`}>
-                        <span className="status-badge__glyph" aria-hidden="true">
-                          {person.is_active ? "✓" : "○"}
-                        </span>
-                        {person.is_active ? "Activo" : "Inactivo"}
-                      </span>
-                      <small className="users-hint">Desde {formatDate(person.created_at)}</small>
-                    </td>
-
-                    <td>
-                      <div className="users-actions">
-                        <button
-                          type="button"
-                          className="button-ghost"
-                          onClick={() => void resetPassword(person)}
-                          disabled={sendReset.isPending}
-                        >
-                          Enviar acceso
-                        </button>
-                        <button
-                          type="button"
-                          className="button-ghost"
-                          onClick={() => void toggleActive(person)}
-                          disabled={isLastAdmin || isMe}
-                        >
-                          {person.is_active ? "Desactivar" : "Activar"}
-                        </button>
-                        <button
-                          type="button"
-                          className="button-ghost"
-                          data-tone="danger"
-                          onClick={() => setPendingDelete(person)}
-                          disabled={isMe || isLastAdmin}
-                          aria-label={`Eliminar la cuenta de ${person.email}`}
-                        >
-                          Eliminar
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
-      )}
-
-      <AccessRolesPanel profiles={profiles.data ?? []} />
-
-      {creating && (
-        <CreateUserModal
-          roles={access.data?.roles ?? []}
-          pending={createUser.isPending}
-          onClose={() => setCreating(false)}
-          onSubmit={async (input) => {
-            setError("");
-            try {
-              const result = await createUser.mutateAsync(input);
-              setNotice(
-                result.invited
-                  ? `Se envió una invitación a ${input.email}.`
-                  : `Se creó la cuenta de ${input.email}.`,
-              );
-              setCreating(false);
-            } catch (createError) {
-              setError(createError instanceof Error ? createError.message : "No se pudo crear el usuario.");
-            }
-          }}
+      {view.id === "personas" && (
+        <PeopleView
+          profiles={profiles}
+          memberships={memberships.data ?? []}
+          units={units.data ?? []}
+          onNotice={setNotice}
         />
       )}
-
-      {pendingDelete && (
-        <Modal
-          title="Eliminar usuario"
-          description={`La cuenta de ${pendingDelete.email} se eliminará por completo, junto con sus asignaciones de pilar. Si solo quieres retirarle el acceso temporalmente, desactívala en su lugar.`}
-          onClose={() => setPendingDelete(null)}
-        >
-          <div className="modal-actions">
-            <button className="button-ghost" type="button" onClick={() => setPendingDelete(null)}>
-              Cancelar
-            </button>
-            <button
-              className="button-danger"
-              type="button"
-              onClick={confirmDelete}
-              disabled={deleteUser.isPending}
-            >
-              {deleteUser.isPending ? "Eliminando…" : "Eliminar cuenta"}
-            </button>
-          </div>
-        </Modal>
-      )}
+      {view.id === "roles" && <RolesView profiles={profiles.data ?? []} memberships={memberships.data ?? []} />}
+      {view.id === "carga" && <BulkUsers profiles={profiles.data ?? []} units={units.data ?? []} />}
     </AdminShell>
-  );
-}
-
-function CreateUserModal({
-  roles,
-  pending,
-  onSubmit,
-  onClose,
-}: {
-  roles: AccessRole[];
-  pending: boolean;
-  onSubmit: (input: {
-    email: string;
-    full_name: string;
-    role: AppRole;
-    access_role_id?: string | null;
-    unit?: string;
-    password?: string;
-  }) => void | Promise<void>;
-  onClose: () => void;
-}) {
-  const [email, setEmail] = useState("");
-  const [fullName, setFullName] = useState("");
-  const [unit, setUnit] = useState("");
-  const [accessRoleId, setAccessRoleId] = useState(roles.find((item) => item.key === "consulta")?.id ?? roles[0]?.id ?? "");
-  const accessRole = roles.find((item) => item.id === accessRoleId);
-  const [mode, setMode] = useState<"invite" | "password">("invite");
-  const [password, setPassword] = useState("");
-
-  function handleSubmit(event: FormEvent) {
-    event.preventDefault();
-    void onSubmit({
-      email,
-      full_name: fullName,
-      role: accessRole?.base_role ?? "consulta",
-      access_role_id: accessRoleId || null,
-      unit: unit.trim() || undefined,
-      password: mode === "password" ? password : undefined,
-    });
-  }
-
-  return (
-    <Modal
-      title="Crear usuario"
-      description="La cuenta se crea en Supabase y entra con el rol de acceso elegido: esas son las pantallas y los informes que verá."
-      onClose={onClose}
-    >
-      <form className="modal-form" onSubmit={handleSubmit}>
-        <label className="admin-field">
-          <span>Nombre completo</span>
-          <input required value={fullName} onChange={(event) => setFullName(event.target.value)} />
-        </label>
-
-        <label className="admin-field">
-          <span>Correo institucional</span>
-          <input
-            required
-            type="email"
-            value={email}
-            onChange={(event) => setEmail(event.target.value)}
-            placeholder="nombre.apellido@udes.edu.co"
-            autoCapitalize="none"
-            spellCheck={false}
-          />
-        </label>
-
-        <label className="admin-field">
-          <span>Dependencia</span>
-          <input
-            value={unit}
-            onChange={(event) => setUnit(event.target.value)}
-            placeholder="Ej. Dirección TIC"
-          />
-        </label>
-
-        <label className="admin-field">
-          <span>Rol de acceso</span>
-          <select value={accessRoleId} onChange={(event) => setAccessRoleId(event.target.value)}>
-            {roles.map((option) => (
-              <option key={option.id} value={option.id}>
-                {option.name}
-              </option>
-            ))}
-          </select>
-          <small>
-            {accessRole?.description || roleDescriptions[accessRole?.base_role ?? "consulta"]}
-            {accessRole && !accessRole.all_reports ? " · solo los informes de su rol en UDES en Cifras" : ""}
-          </small>
-        </label>
-
-        <fieldset className="admin-field">
-          <legend>Cómo entra por primera vez</legend>
-          <label className="radio-row">
-            <input
-              type="radio"
-              name="mode"
-              checked={mode === "invite"}
-              onChange={() => setMode("invite")}
-            />
-            <span>
-              <strong>Enviar invitación</strong>
-              <small>Recibe un correo y elige su propia contraseña. Recomendado.</small>
-            </span>
-          </label>
-          <label className="radio-row">
-            <input
-              type="radio"
-              name="mode"
-              checked={mode === "password"}
-              onChange={() => setMode("password")}
-            />
-            <span>
-              <strong>Fijar una contraseña ahora</strong>
-              <small>Útil si no hay correo saliente configurado todavía.</small>
-            </span>
-          </label>
-        </fieldset>
-
-        {mode === "password" && (
-          <label className="admin-field">
-            <span>Contraseña inicial</span>
-            <input
-              required
-              type="text"
-              minLength={8}
-              value={password}
-              onChange={(event) => setPassword(event.target.value)}
-              placeholder="Mínimo 8 caracteres"
-            />
-            <small>Compártela por un canal seguro y pide que la cambie al entrar.</small>
-          </label>
-        )}
-
-        <ModalActions onCancel={onClose} submitLabel={pending ? "Creando…" : "Crear usuario"} />
-      </form>
-    </Modal>
   );
 }

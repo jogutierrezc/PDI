@@ -49,6 +49,7 @@ export const SCREEN_PATHS: Record<AdminScreen, string> = {
   parameters: "/admin/parametros",
   development: "/admin/desarrollo",
   users: "/admin/usuarios",
+  transfer: "/admin/traslado",
 };
 
 interface AuthContextValue {
@@ -224,7 +225,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const canSee = useCallback(
     (screen: AdminScreen) => {
       if (!profile?.is_active) return false;
-      if (screen === "users" && RANK[profile.role] < RANK.admin) return false;
+      // Usuarios y traslado de datos piden administración siempre.
+      if ((screen === "users" || screen === "transfer") && RANK[profile.role] < RANK.admin) return false;
       // Mis Tableros se gana perteneciendo a una unidad, no marcándolo aparte.
       if (screen === "tableros" && inAnyUnit) return true;
       if (!access) return true;

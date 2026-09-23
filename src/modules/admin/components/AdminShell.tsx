@@ -42,7 +42,8 @@ export type AdminSection =
   | "repository"
   | "cifras"
   | "observatorio"
-  | "tableros";
+  | "tableros"
+  | "transfer";
 
 interface NavItem {
   id: AdminSection;
@@ -122,6 +123,8 @@ const navigation: NavGroup[] = [
       { id: "parameters", label: "Parámetros globales", icon: "settings", to: "/admin/parametros", minimum: "consulta" },
       { id: "development", label: "Desarrollo tecnológico", icon: "code", to: "/admin/desarrollo", minimum: "consulta" },
       { id: "users", label: "Usuarios y roles", icon: "user", to: "/admin/usuarios", minimum: "admin" },
+      // Copia otro servidor de Supabase en este. Reemplaza datos: solo administración.
+      { id: "transfer", label: "Traslado de datos", icon: "upload", to: "/admin/traslado", minimum: "admin" },
     ],
   },
 ];

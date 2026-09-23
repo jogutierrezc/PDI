@@ -130,6 +130,9 @@ const OfficePageAdmin = lazy(() =>
 const UserManagement = lazy(() =>
   import("./modules/admin/usuarios/UserManagement").then((m) => ({ default: m.UserManagement })),
 );
+const DataTransfer = lazy(() =>
+  import("./modules/admin/traslado/DataTransfer").then((m) => ({ default: m.DataTransfer })),
+);
 
 /** Puerta de las rutas internas. Recuerda a dónde iba la persona.
  *  `screen` es la pantalla del menú: un rol de acceso que no la tiene tampoco
@@ -350,6 +353,14 @@ export default function App() {
             element={
               <RequireRole minimum="admin" screen="users">
                 <UserManagement />
+              </RequireRole>
+            }
+          />
+          <Route
+            path="/admin/traslado"
+            element={
+              <RequireRole minimum="admin" screen="transfer">
+                <DataTransfer />
               </RequireRole>
             }
           />

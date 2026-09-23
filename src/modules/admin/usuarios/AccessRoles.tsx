@@ -57,6 +57,7 @@ export const SCREEN_GROUPS: { label: string; screens: { id: AdminScreen; label: 
       { id: "parameters", label: "Parámetros globales" },
       { id: "development", label: "Desarrollo tecnológico" },
       { id: "users", label: "Usuarios y roles" },
+      { id: "transfer", label: "Traslado de datos" },
     ],
   },
 ];

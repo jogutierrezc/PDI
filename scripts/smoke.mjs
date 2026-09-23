@@ -2523,6 +2523,21 @@ const routes = [
     ],
   },
   {
+    path: "/admin/impacto/periodo",
+    note: "periodo abierto, asignaciones, precargados y apertura del siguiente",
+    expect: "Periodo 2026-2",
+    session: true,
+    also: [
+      "Asignaciones activas",
+      "Programa de Prueba A",
+      "Valores precargados",
+      "1 registro de indicadores precargados en 2026-2",
+      "Plantilla CSV del periodo",
+      "Abrir un periodo",
+      "Ver las asignaciones de 2027-1",
+    ],
+  },
+  {
     path: "/admin/estructura",
     expect: "Normalizar la estructura",
     session: true,
@@ -3325,6 +3340,28 @@ FIXTURES.od_bulletin_editions = [
   FIXTURES.imp_baselines = [];
   FIXTURES.imp_alignments = [{ indicator_id: "imp-i01", kind: "pilar", code: "1" }, { indicator_id: "imp-i01", kind: "ods", code: "4" }];
   FIXTURES["rpc:imp_indicator_missing"] = ["tipo de cálculo", "unidad"];
+
+  // Periodo 2026-2 abierto con tres asignaciones del programa de prueba.
+  FIXTURES.imp_periods = [
+    { id: "imp-p1", code: "2026-2", state: "abierto", catalog_version_id: "imp-v1", cutoff_program: "2026-10-15",
+      cutoff_faculty: "2026-10-25", cutoff_vice: "2026-11-05", opened_at: "2026-09-21T10:00:00Z", version: { number: 1 } },
+  ];
+  const program = { id: "imp-prog-a", name: "Programa de Prueba A", code: "PR-A", snies_code: "900001", parent: { name: "Facultad de Prueba" } };
+  FIXTURES.imp_assignments = [
+    { id: "imp-a1", period_id: "imp-p1", active: true, manual: false, justification: "", program_id: program.id, campus_id: "c1",
+      indicator: { id: "imp-e04", code: "E04", name: "Tasa de retención estudiantil", capture_mode: "precargado", report_level: "programa_sede" },
+      program, campus: { name: "Bucaramanga", slug: "bucaramanga" }, record: [{ state: "borrador" }] },
+    { id: "imp-a2", period_id: "imp-p1", active: true, manual: false, justification: "", program_id: program.id, campus_id: null,
+      indicator: { id: "imp-e13", code: "E13", name: "Innovaciones pedagógicas implementadas y documentadas", capture_mode: "manual", report_level: "programa" },
+      program, campus: null, record: [{ state: "enviado" }] },
+    { id: "imp-a3", period_id: "imp-p1", active: false, manual: false, justification: "El programa no hizo innovaciones este año.", program_id: program.id, campus_id: null,
+      indicator: { id: "imp-i34", code: "I34", name: "Desempeño académico en formación investigativa", capture_mode: "manual", report_level: "programa" },
+      program, campus: null, record: [] },
+  ];
+  FIXTURES.units = [
+    { id: "imp-prog-a", name: "Programa de Prueba A", code: "PR-A", snies_code: "900001", kind: "programa",
+      campuses: [{ campus: { id: "c1", name: "Bucaramanga", slug: "bucaramanga" } }] },
+  ];
 }
 
 /* --- Ejecución -------------------------------------------------------------- */

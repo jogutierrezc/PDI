@@ -7,6 +7,9 @@ import type { Workbook } from "exceljs";
 import { FINDING_LABEL, countFindings } from "./matrix";
 import type { Finding } from "./matrix";
 
+/** Marca de orden de bytes: Excel en español la necesita para leer bien las tildes de un CSV. */
+const BOM = String.fromCharCode(0xfeff);
+
 const HEADERS = ["Hoja", "Fila", "Columna", "Tipo de hallazgo", "Valor encontrado", "Sugerencia"] as const;
 
 const row = (f: Finding) => [f.sheet, f.row ?? "", f.column ?? "", FINDING_LABEL[f.kind], f.value, f.suggestion];
@@ -18,7 +21,7 @@ export function findingsToCsv(findings: Finding[]): string {
     return /[;"\n\r]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text;
   };
   const body = [HEADERS, ...findings.map(row)].map((r) => r.map(escape).join(";")).join("\r\n");
-  return `﻿${body}\r\n`;
+  return `${BOM}${body}\r\n`;
 }
 
 /** Libro de Excel: hoja «Hallazgos» con filtros y hoja «Resumen» por tipo. */

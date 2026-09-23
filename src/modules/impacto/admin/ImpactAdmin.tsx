@@ -27,12 +27,13 @@ import "./impact-admin.css";
 
 type View = "catalogo" | "periodo" | "reporte" | "revision";
 
-// El catálogo ya trabaja sobre la base: lo abre quien tenga Planeación o más
-// en su sesión real (la base exige además impacto.catalogo). Las demás vistas
-// siguen con el «Ver como» del prototipo hasta sus fases.
+// Catálogo y Periodo ya trabajan sobre la base: los abre quien tenga
+// Planeación o más en su sesión real (la base exige además impacto.catalogo e
+// impacto.periodo). Las demás vistas siguen con el «Ver como» del prototipo
+// hasta sus fases.
 const VIEWS: { id: View; label: string; roles: Role[] }[] = [
   { id: "catalogo", label: "Catálogo", roles: [] },
-  { id: "periodo", label: "Periodo", roles: ["administrador"] },
+  { id: "periodo", label: "Periodo", roles: [] },
   { id: "reporte", label: "Mi reporte", roles: ["director"] },
   { id: "revision", label: "Revisión", roles: ["decano", "vicerrector"] },
 ];
@@ -50,7 +51,7 @@ export function ImpactAdmin() {
   const { vista } = useParams();
   const navigate = useNavigate();
   const { hasRole } = useAuth();
-  const allowed = VIEWS.filter((v) => (v.id === "catalogo" ? hasRole("planeacion") : v.roles.includes(person.role)));
+  const allowed = VIEWS.filter((v) => (v.roles.length === 0 ? hasRole("planeacion") : v.roles.includes(person.role)));
   const view = allowed.find((v) => v.id === vista) ?? allowed[0];
 
   // Cambiar de persona lleva a su primera vista.

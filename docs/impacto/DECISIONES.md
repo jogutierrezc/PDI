@@ -100,3 +100,14 @@ Modelo en Supabase y migraciones, importador real con reporte descargable, edici
 - **Hallazgos**: se marcan resueltos o aceptados con nota, en cualquier versión; un disparador registra quién y cuándo, y reabrir lo borra.
 - **Fichas del piloto precargables**: «Precargar las fichas propuestas del piloto» escribe en el borrador las 13 fichas de este documento, emparejadas por nombre del indicador (no por código). Planeación las revisa antes de publicar; no se publican solas.
 - **Prueba de humo**: el simulador responde las RPC desde `FIXTURES["rpc:nombre"]`, y hay una ruta para el Catálogo.
+
+## Fase 4 · periodos, asignaciones y precargados (2026-09-23)
+
+- **Reglas de asignación** (`imp_assignment_candidates`, 0068): oficial en la versión del periodo, **ficha completa**, periodicidad (anuales solo en `-2`), reporte por programa o por programa y sede, programa con al menos una sede activa, nivel de formación en «aplica a» y, si la ficha nombra modalidades, la del programa entre ellas. Exigir la ficha completa no estaba escrito en la especificación: sin ella no se sabe qué pedir ni cómo validarlo.
+- **Abrir es en dos pasos**: `imp_preview_assignments` no escribe nada; `imp_open_period` crea periodo, asignaciones y un registro en borrador por cada una activa, en una sola transacción.
+- **Quitar** deja la asignación con `active = false` y su justificación; **agregar** la marca `manual` con la suya. Ninguna se borra. Con el periodo abierto, `imp_set_assignment` no quita una asignación cuyo registro ya salió del programa.
+- **Programa activo** = tiene al menos una sede activa en `imp_program_campuses`; `units` no tiene una marca propia de activo.
+- **Precargados** (`imp_load_preloaded`): el programa se identifica por código SNIES o por el código de la unidad; la sede por su nombre o slug. Se carga en el registro, se guarda aparte lo que llegó (`imp_records.preloaded`: numerador, denominador, n, archivo, fecha y quién) y `confirms_preloaded` vuelve a nulo para que el programa confirme o declare la discrepancia. Nunca sobrescribe un registro enviado. Devuelve cuántas filas cargó y el motivo de cada una que no.
+- **Archivo de precargados**: CSV (`;` o `,`, con BOM y comillas) o la primera hoja de un Excel, con encabezados indicador, programa_snies, programa, sede, numerador, denominador y n. La pantalla genera la plantilla del periodo con una fila por registro precargado.
+- **Cerrar** un periodo impide cargar precargados y cambiar asignaciones.
+- La vista **Periodo** ya trabaja sobre la base y, como el Catálogo, la abre la sesión real con Planeación o más.

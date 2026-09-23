@@ -155,7 +155,7 @@ describe("reporte descargable", () => {
     const csv = findingsToCsv(result.findings);
     // Sin trim(): se comería el BOM, que es parte de lo que se prueba.
     const lines = csv.replace(/\r\n$/, "").split("\r\n");
-    expect(lines[0]).toBe("﻿Hoja;Fila;Columna;Tipo de hallazgo;Valor encontrado;Sugerencia");
+    expect(lines[0]).toBe(String.fromCharCode(0xfeff) + "Hoja;Fila;Columna;Tipo de hallazgo;Valor encontrado;Sugerencia");
     expect(lines).toHaveLength(result.findings.length + 1);
   });
 

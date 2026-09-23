@@ -168,18 +168,38 @@ Modelo en Supabase y migraciones, importador real con reporte descargable, edici
 - **Riesgos abiertos** (detalle en ACEPTACION.md, «Notas y riesgos»): V01–V09 los aplica la pantalla y no el envío en la base; la hora de la plantilla va al segundo y un guardado en el mismo segundo sale en conflicto (del lado seguro); cerrar un periodo no exige que todo esté validado.
 - El portal ya lee la base (cierre de la fase 7, migración 0072): solo cifras validadas de la última versión publicada.
 
+## Usuarios y roles · rediseño (2026-09-23)
+
+- **La matriz de roles no concede nada nuevo.** Sin acceso · Ver · Editar · Administrar por módulo se traduce a las columnas de siempre (`base_role`, `screens`, `all_screens`, informes, `capabilities`); las políticas RLS no cambian (0073). Como la base no separa ver de editar por módulo, la capacidad del rol es la mayor que pida alguno de sus módulos, y la pantalla avisa en cada módulo que por eso queda «subido» («En realidad podrá editar…»). Separarlo de verdad pediría cambiar políticas: queda fuera.
+- **Dos alcances de rol.** Global (va en la persona) y de unidad (va en `unit_members`). Un rol de unidad no puede ser el rol global de nadie y viceversa; un rol en uso no cambia de alcance (disparadores en 0073).
+- **Plantillas.** Consulta · Editor · Revisor · Administrador. «Revisor» solo existe como rol de unidad: en la intranet revisar es aprobar (decanatura) o validar (vicerrectoría), y eso se da en una unidad. El rol de fábrica «Planeación» coincide exactamente con «Editor». Cualquier otra combinación se muestra como «Personalizada»; la plantilla no se guarda, se deduce.
+- **Roles de fábrica.** Su capacidad no cambia desde la matriz (la pantalla lo impide y explica por qué); sí sus pantallas e informes.
+- **Cambiar la capacidad de un rol en uso la cambia a quienes lo llevan.** Antes `profiles.role` quedaba con la anterior; 0073 añade el disparador `access_roles_resync_profiles`.
+- **Función en la unidad: Gestor · Contribuyente · Consulta.** Son los papeles de Mis Tableros (jefe · editor · visor) nombrados por lo que hacen con los datos, a pedido del usuario; solo cambian las etiquetas (`UNIT_ROLE`). Además, cargo libre por unidad (0074) y rol de Impacto opcional.
+- **Crear usuario en tres pasos**, sin nada escrito hasta el final. Si la cuenta se crea y las unidades fallan, se dice y se abre la ficha para completarla.
+- **Carga masiva de usuarios:** solo se aplica sin errores; las cuentas nuevas pasan por la Edge Function una por una (no es una transacción) y se informa persona por persona; las unidades se añaden, nunca se quitan.
 ## Estructura institucional (2026-09-23)
 
-- **Una pantalla, dos paneles** (`/admin/estructura-institucional/:unidad?`): el árbol a la izquierda y la ficha de la unidad a la derecha. La carga masiva (`?carga`) y la unidad nueva (`/nueva`) ocupan el mismo lugar; no hay modales salvo la confirmación de borrar.
-- **Dos líneas en el árbol.** La continua es la herencia (`parent_id`); la punteada, el organigrama (`reports_to`, facultad → vicerrectoría). Se dibujan distinto porque significan cosas distintas: la segunda no da acceso a nada, y la ficha de la facultad lo dice.
+- **Una pantalla, dos paneles** (`/admin/estructura-institucional/:unidad?`): el árbol a la izquierda y la ficha de la unidad a la derecha. La carga masiva (`?carga`) y la unidad nueva (`/nueva?clase=…&padre=…`) ocupan el mismo lugar. No hay modales salvo la confirmación de borrar.
+- **Dos ramas visibles.** Académica (vicerrectorías → facultades → programas) y Administrativa (oficinas y dependencias; `otra` se muestra como «Otra dependencia»). Cada rama trae sus cifras y sus atajos para crear. Una vicerrectoría con oficinas aparece en las dos ramas.
+- **Dos líneas en el árbol.**
+  - La continua es la herencia (`parent_id`). Una oficina cuelga de una vicerrectoría o de otra oficina, y ahí la herencia de Mis Tableros sí se quiere.
+  - La punteada es el organigrama (`reports_to`, facultad → vicerrectoría). No da acceso a nada, y la ficha de la facultad lo dice.
 - **La clase de una unidad no se cambia** después de crearla. Pasar un programa a oficina rompería sus asignaciones y registros de Impacto; si hace falta, se crea la unidad correcta.
 - **Un programa pide facultad, nivel y modalidad** en el formulario. La base los admite nulos, pero de ellos depende qué indicadores le aplican. El SNIES es opcional y solo lleva dígitos.
 - **Borrar** solo se ofrece a una unidad sin unidades debajo y sin personas. Si aun así tiene registros de Impacto, la base lo rechaza y la pantalla lo explica.
-- **Las personas de la unidad** se ven aquí en solo lectura y se editan en Usuarios y roles (`/admin/usuarios/personas?persona=<id>`).
-- **Carga masiva de programas.** El parser (`institucion/programs-sheet.ts`) es puro y tiene sus pruebas.
-  - Normaliza solo la forma de escribir: tildes, mayúsculas, «A distancia», y la sede escrita por slug, nombre o código.
-  - Un valor que no se reconoce es un error «Fila n, columna X».
-  - Reconoce los programas existentes igual que `admin_import_programs`: por SNIES y, si no lo tiene, por código.
-  - El slug de un programa existente no cambia.
-  - Aplicar es todo o nada: el botón no se habilita mientras haya una sola fila con error.
-- **La plantilla trae los programas que ya existen**, así que sirve también para corregir en bloque. Incluye una hoja LISTAS con las facultades, sedes, niveles y modalidades válidos.
+- **Las personas se editan en la ficha de la unidad.**
+  - Cada fila muestra persona, cargo, función (Gestor · Contribuyente · Consulta, las etiquetas de `UNIT_ROLE`) y rol de Impacto (solo los roles de alcance `unidad`, opcional).
+  - Añadir busca entre los perfiles activos. La función por defecto sale del `unit_role` del rol de Impacto elegido, mientras no se toque a mano.
+  - Guardar usa `admin_set_memberships(persona, [fila], false)`, que no toca las demás unidades de la persona. Quitar borra la fila de `unit_members`, con una confirmación en la misma fila.
+  - «Ver en Usuarios» lleva a `/admin/usuarios?persona=<id>`.
+- **Cargo (`unit_members.title`, 0074).** Es texto libre y solo nombra; no da permisos. En `admin_set_memberships` un cargo nulo conserva el que tenía y uno vacío lo borra.
+- **Carga masiva de toda la estructura (0074, `admin_import_units`).**
+  - Es un libro con las hojas Instrucciones, Vicerrectorías, Facultades, Oficinas, Programas y Listas. Trae lo que ya existe, así que sirve también para corregir en bloque.
+  - Las listas desplegables de facultad y vicerrectoría toman los códigos de la hoja misma, de modo que una unidad nueva ya aparece en la lista de las demás hojas.
+  - La lista «Depende de» de Oficinas solo sugiere, porque una oficina puede depender de otra escrita en la misma hoja.
+  - El parser (`institucion/structure-sheet.ts`) es puro y tiene sus pruebas. Normaliza solo la forma de escribir; lo que no reconoce es un error «Hoja X, fila n, columna Y». Resuelve padres que vienen en el mismo libro, pero si el código ya existe en la base, manda su clase: el libro no la cambia.
+  - Reconoce lo existente igual que la base: por código, sin importar mayúsculas, y un programa antes por su SNIES. El slug de lo existente no cambia.
+  - Se puede subir solo una hoja.
+  - Aplicar es todo o nada. La base procesa vicerrectorías → facultades → oficinas → programas, y engancha en una segunda pasada la oficina que depende de otra que venía después.
+  - `admin_import_programs` (0073) queda como está, aunque la pantalla ya no la usa.

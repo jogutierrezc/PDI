@@ -534,6 +534,11 @@ const FIXTURES = {
     { id: "rol-planeacion", key: "planeacion", name: "Planeación", description: "Edita cualquier pilar y decide qué se publica.", base_role: "planeacion", screens: [], all_screens: true, all_reports: true, is_system: true, position: 3 },
     { id: "rol-admin", key: "admin", name: "Administrador", description: "Todo lo anterior, más la gestión de usuarios.", base_role: "admin", screens: [], all_screens: true, all_reports: true, is_system: true, position: 4 },
     { id: "rol-vi", key: "editor-investigacion", name: "Editor de Investigación", description: "Carga y publica el informe de Investigación.", base_role: "planeacion", screens: ["cifras"], all_screens: false, all_reports: false, is_system: false, position: 5 },
+    { id: "rol-director", key: "impacto_director", name: "Dirección de programa", description: "Captura y envía a decanatura lo que reporta su programa.", base_role: "consulta", screens: ["impacto"], all_screens: false, all_reports: false, is_system: true, position: 21, scope: "unidad", capabilities: ["impacto.capturar", "impacto.enviar"], unit_role: "editor" },
+  ],
+  // Dónde trabaja cada persona (0057 + 0063): la vicerrectoría dirige un programa.
+  unit_members: [
+    { id: "um-1", unit_id: "imp-prog-a", profile_id: "user-vi", access_role_id: "rol-director", role: "editor" },
   ],
   access_role_reports: [{ access_role_id: "rol-vi", report_slug: "investigacion" }],
   web_projects: [
@@ -2785,8 +2790,43 @@ const routes = [
     path: "/admin/usuarios",
     expect: "Usuarios y roles",
     session: true,
-    note: "los roles de acceso se administran junto a las personas",
-    also: ["Administradora de prueba", "Roles de acceso", "Editor de Investigación", "Estaciones del periodo"],
+    note: "personas en lista, con su rol global y sus unidades",
+    also: ["Administradora de prueba", "Vicerrectoría de Investigaciones", "Editor de Investigación", "Elija una persona"],
+  },
+  {
+    path: "/admin/usuarios?persona=user-vi",
+    expect: "Qué hace en toda la universidad",
+    session: true,
+    note: "la ficha: rol global, dónde trabaja y lo que podrá hacer en palabras",
+    also: ["Dónde trabaja", "Lo que podrá hacer", "En UDES en Cifras escribe: Investigación.", "Dirección de programa"],
+  },
+  {
+    path: "/admin/usuarios?nueva=1",
+    expect: "Crear usuario",
+    session: true,
+    note: "el asistente de tres pasos",
+    also: ["Quién es", "Qué hace en toda la universidad", "Dónde trabaja", "Enviar invitación"],
+  },
+  {
+    path: "/admin/usuarios/roles?rol=rol-vi",
+    expect: "Editor de Investigación",
+    session: true,
+    note: "la matriz del rol: plantilla, niveles por módulo y resumen",
+    also: ["En toda la intranet", "En una unidad", "Personalizada", "UDES en Cifras", "Quien lleve este rol", "Capacidad resultante"],
+  },
+  {
+    path: "/admin/usuarios/roles?rol=rol-director",
+    expect: "Dirección de programa",
+    session: true,
+    note: "un rol de unidad: acciones de Impacto y papel en Mis Tableros",
+    also: ["Capturar", "Validar", "Función en la unidad", "Contribuyente", "En Impacto, en su unidad: capturar y enviar."],
+  },
+  {
+    path: "/admin/usuarios/carga",
+    expect: "Descargue la plantilla",
+    session: true,
+    note: "carga masiva de usuarios y asignaciones",
+    also: ["Súbala diligenciada", "Descargar plantilla"],
   },
   {
     path: "/admin/udes-en-cifras/captura/poblacional",
@@ -3641,43 +3681,42 @@ FIXTURES.od_bulletin_editions = [
   ];
 }
 
-/* Estructura institucional (0073): dos vicerrectorías, una facultad que
-   depende de una de ellas por organigrama y dos programas, uno completo y
-   otro sin SNIES ni sedes. Se añade al árbol que ya trae Impacto. */
+/* Estructura institucional (0073, 0074): dos vicerrectorías, una facultad
+   que depende de una de ellas por organigrama, dos programas (uno completo y
+   otro sin SNIES ni sedes) y, en la rama administrativa, una oficina que
+   cuelga de una vicerrectoría y otra de ella. Se añade a lo que ya traen
+   Impacto y Usuarios. */
 {
   const campus = (id, name, slug) => ({ campus: { id, name, slug } });
+  const base = { description: "", substantive_function: null, snies_code: null, degree_level: null, modality: null, reports_to: null };
   FIXTURES.units.push(
-    { id: "inst-vi", parent_id: null, kind: "vicerrectoria", code: "VI", name: "Vicerrectoría de Investigaciones",
-      slug: "vicerrectoria-investigaciones", description: "", position: 1, substantive_function: "investigacion",
-      snies_code: null, degree_level: null, modality: null, reports_to: null },
-    { id: "inst-va", parent_id: null, kind: "vicerrectoria", code: "VA", name: "Vicerrectoría Académica",
-      slug: "vicerrectoria-academica", description: "", position: 2, substantive_function: "ensenanza",
-      snies_code: null, degree_level: null, modality: null, reports_to: null },
-    { id: "inst-fit", parent_id: null, kind: "facultad", code: "FIT", name: "Facultad de Ingenierías y Tecnologías",
-      slug: "facultad-ingenierias", description: "", position: 3, substantive_function: null,
-      snies_code: null, degree_level: null, modality: null, reports_to: "inst-va" },
-    { id: "inst-isi", parent_id: "inst-fit", kind: "programa", code: "ISI", name: "Ingeniería de Sistemas",
-      slug: "ingenieria-de-sistemas", description: "", position: 1, substantive_function: null,
-      snies_code: "1234", degree_level: "pregrado", modality: "presencial", reports_to: null,
+    { ...base, id: "inst-vi", parent_id: null, kind: "vicerrectoria", code: "VI", name: "Vicerrectoría de Investigaciones",
+      slug: "vicerrectoria-investigaciones", position: 1, substantive_function: "investigacion" },
+    { ...base, id: "inst-va", parent_id: null, kind: "vicerrectoria", code: "VA", name: "Vicerrectoría Académica",
+      slug: "vicerrectoria-academica", position: 2, substantive_function: "ensenanza" },
+    { ...base, id: "inst-fit", parent_id: null, kind: "facultad", code: "FIT", name: "Facultad de Ingenierías y Tecnologías",
+      slug: "facultad-ingenierias", position: 3, reports_to: "inst-va" },
+    { ...base, id: "inst-isi", parent_id: "inst-fit", kind: "programa", code: "ISI", name: "Ingeniería de Sistemas",
+      slug: "ingenieria-de-sistemas", position: 1, snies_code: "1234", degree_level: "pregrado", modality: "presencial",
       campuses: [campus("c1", "Bucaramanga", "bucaramanga")] },
-    { id: "inst-iin", parent_id: "inst-fit", kind: "programa", code: "IIN", name: "Ingeniería Industrial",
-      slug: "ingenieria-industrial", description: "", position: 2, substantive_function: null,
-      snies_code: null, degree_level: "pregrado", modality: "virtual", reports_to: null, campuses: [] },
+    { ...base, id: "inst-iin", parent_id: "inst-fit", kind: "programa", code: "IIN", name: "Ingeniería Industrial",
+      slug: "ingenieria-industrial", position: 2, degree_level: "pregrado", modality: "virtual", campuses: [] },
+    { ...base, id: "inst-cal", parent_id: "inst-va", kind: "oficina", code: "CAL", name: "Oficina de Aseguramiento de la Calidad",
+      slug: "oficina-calidad", position: 1 },
+    { ...base, id: "inst-aut", parent_id: "inst-cal", kind: "otra", code: "AUT", name: "Comité de Autoevaluación",
+      slug: "comite-autoevaluacion", position: 1 },
   );
   FIXTURES.imp_program_campuses = [
     ...(FIXTURES.imp_program_campuses ?? []),
     { program_id: "inst-isi", campus_id: "c1", active: true },
     { program_id: "inst-isi", campus_id: "c2", active: false },
   ];
-  FIXTURES.access_roles.push({
-    id: "rol-imp-director", key: "impacto_director", name: "Dirección de programa", description: "Captura y envía a decanatura.",
-    base_role: "consulta", screens: ["impacto"], all_screens: false, all_reports: false, is_system: true, position: 21,
-    capabilities: ["impacto.capturar", "impacto.enviar"], scope: "unidad", unit_role: "editor",
-  });
+  // Alguien que no está en los perfiles del resto de las pruebas: así no les
+  // cambia lo que ven.
   FIXTURES.unit_members = [
     ...(FIXTURES.unit_members ?? []),
-    { id: "inst-m1", unit_id: "inst-isi", profile_id: "user-vi", role: "editor", access_role_id: "rol-imp-director",
-      profiles: { full_name: "Directora de Sistemas", email: "sistemas@udes.edu.co" } },
+    { id: "inst-m1", unit_id: "inst-isi", profile_id: "user-sistemas", role: "editor", access_role_id: "rol-director",
+      title: "Directora del programa", profiles: { full_name: "Directora de Sistemas", email: "sistemas@udes.edu.co" } },
   ];
 
   routes.push(
@@ -3685,21 +3724,39 @@ FIXTURES.od_bulletin_editions = [
       path: "/admin/estructura-institucional",
       expect: "Estructura institucional",
       session: true,
-      note: "el árbol por vicerrectorías y lo que le falta a Impacto",
-      also: ["Vicerrectoría de Investigaciones", "Valida investigación", "Facultad de Ingenierías y Tecnologías", "Qué falta para que Impacto funcione", "Ingeniería Industrial", "sin SNIES"],
+      note: "las dos ramas y lo que le falta a Impacto",
+      also: [
+        "Académica", "Administrativa", "Vicerrectoría de Investigaciones", "Valida investigación",
+        "Facultad de Ingenierías y Tecnologías", "Oficina de Aseguramiento de la Calidad", "Comité de Autoevaluación",
+        "Qué falta para que Impacto funcione", "Ingeniería Industrial", "sin SNIES",
+      ],
     },
     {
       path: "/admin/estructura-institucional/ingenieria-de-sistemas",
       expect: "Sedes donde se ofrece",
       session: true,
-      note: "la ficha de un programa con sus sedes y su gente",
-      also: ["Código SNIES", "Inactiva · se ofrecía antes", "Personas de la unidad", "Directora de Sistemas", "Dirección de programa"],
+      note: "la ficha de un programa con sus sedes y su gente, editable",
+      also: ["Código SNIES", "Inactiva · se ofrecía antes", "Personas de la unidad", "Directora de Sistemas", "Función en la unidad", "Rol de Impacto"],
       interact: async (window, tick) => {
         const snies = [...window.document.querySelectorAll(".inst-form input")].find((input) => input.value === "1234");
         if (!snies) throw new Error("el SNIES del programa no llegó a la ficha");
         const facultad = [...window.document.querySelectorAll(".inst-form select")].find((select) => select.value === "inst-fit");
         if (!facultad) throw new Error("la facultad del programa no quedó elegida");
+        const cargo = window.document.querySelector(".inst-people__table input");
+        if (!cargo || cargo.value !== "Directora del programa") throw new Error("el cargo de la persona no llegó a la ficha");
+        const rol = [...window.document.querySelectorAll(".inst-people__table select")].find((select) => select.value === "rol-director");
+        if (!rol) throw new Error("el rol de Impacto de la persona no quedó elegido");
+        // Cambiar el cargo deja la fila con cambios y ofrece guardar.
+        const setter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, "value").set;
+        setter.call(cargo, "Director del programa");
+        cargo.dispatchEvent(new window.Event("input", { bubbles: true }));
         await tick();
+        const guardar = [...window.document.querySelectorAll(".inst-people__actions button")].find((b) => b.textContent === "Guardar");
+        if (!guardar) throw new Error("cambiar el cargo no ofrece guardar");
+        // Añadir persona abre el buscador en la misma ficha.
+        [...window.document.querySelectorAll(".inst-people button")].find((b) => b.textContent.includes("Añadir persona")).click();
+        await tick();
+        if (!window.document.querySelector(".inst-add input[type=search]")) throw new Error("añadir persona no abre el buscador");
       },
     },
     {
@@ -3710,17 +3767,28 @@ FIXTURES.od_bulletin_editions = [
       also: ["no le da a la vicerrectoría acceso", "Programa en esta facultad"],
     },
     {
-      path: "/admin/estructura-institucional/nueva",
-      expect: "Nueva unidad",
+      path: "/admin/estructura-institucional/oficina-calidad",
+      expect: "Depende de",
       session: true,
-      note: "crear una unidad empieza por la clase",
-      also: ["Clase de unidad", "Vicerrectoría", "Crear unidad"],
+      note: "una oficina cuelga de una vicerrectoría y hereda",
+      also: ["Aquí sí hay herencia", "Dependencia debajo", "Vicerrectoría Académica"],
+    },
+    {
+      path: "/admin/estructura-institucional/nueva?clase=oficina&padre=vicerrectoria-academica",
+      expect: "Nueva oficina o dependencia",
+      session: true,
+      note: "crear una dependencia con su padre ya elegido",
+      also: ["Clase de unidad", "Otra dependencia", "Crear unidad"],
+      interact: async (window) => {
+        const padre = [...window.document.querySelectorAll(".inst-form select")].find((select) => select.value === "inst-va");
+        if (!padre) throw new Error("la vicerrectoría pedida no quedó como padre");
+      },
     },
     {
       path: "/admin/estructura-institucional?carga",
-      expect: "Cargar programas desde Excel",
+      expect: "Cargar la estructura desde Excel",
       session: true,
-      note: "la carga masiva de programas, sin modal",
+      note: "la carga masiva de toda la estructura, sin modal",
       also: ["Descargar plantilla", "Elegir el Excel", "Revise y aplique"],
     },
   );

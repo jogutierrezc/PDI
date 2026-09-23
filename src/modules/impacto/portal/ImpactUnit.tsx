@@ -74,6 +74,12 @@ function Unit({ data, institution }: { data: PortalData; institution: boolean })
                   reparten entre sedes.
                 </p>
               )}
+              {(scope.kind === "facultad" || scope.kind === "campus") && (
+                <Link className="imp-link" to={`/impacto?lente=programa&${scope.kind}=${scope.slug}#lentes`}>
+                  Ver la oferta de programas {scope.kind === "facultad" ? "de la facultad" : "del campus"}
+                  <Icon name="arrow-right" size={14} />
+                </Link>
+              )}
             </div>
             <ValueRiver counts={counts} functions={scope.functions} selected={only} onSelect={setOnly} compact />
           </div>

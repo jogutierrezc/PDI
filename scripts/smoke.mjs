@@ -3833,6 +3833,39 @@ FIXTURES.od_bulletin_editions = [
   );
 }
 
+/* Portal de Impacto: la oferta de programas filtrable por facultad, campus y
+   nivel, con el filtro en la dirección. Usa la estructura del portal de
+   arriba (Derecho en Bucaramanga y Cúcuta; Sistemas solo en Bucaramanga). */
+routes.push(
+  {
+    path: "/impacto?lente=programa",
+    expect: "2 programas · toda la universidad",
+    session: true,
+    note: "oferta de programas: filtros, nivel y sedes de cada programa",
+    also: ["Facultad", "Campus", "Nivel de formación", "Todas las facultades", "Profesional universitario", "Bucaramanga · Cúcuta"],
+  },
+  {
+    path: "/impacto?lente=programa&facultad=ciencias-sociales&campus=cucuta",
+    expect: "1 programa · Facultad de Ciencias Sociales · Cúcuta",
+    session: true,
+    note: "oferta filtrada desde la dirección: facultad y campus combinados",
+    also: ["Derecho", "Quitar filtros"],
+    absent: ["Ingeniería de Sistemas"],
+  },
+  {
+    path: "/impacto?campus=bogota",
+    expect: "Ninguna facultad ofrece programas en Bogotá todavía.",
+    session: true,
+    note: "una sede sin oferta lo dice en palabras",
+  },
+  {
+    path: "/impacto/facultad/ciencias-sociales",
+    expect: "Ver la oferta de programas de la facultad",
+    session: true,
+    note: "desde la facultad se llega a su oferta filtrada",
+  },
+);
+
 /* --- Ejecución -------------------------------------------------------------- */
 
 let failures = 0;

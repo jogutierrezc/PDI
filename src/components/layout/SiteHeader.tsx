@@ -19,6 +19,7 @@ import { Icon } from "../ui/Icon";
 import { useTheme } from "../../lib/theme";
 import { useAuth } from "../../lib/auth";
 import { SessionMenu } from "./SessionMenu";
+import { useIntranetLinks } from "./intranet-links";
 import type { PortalId } from "./MegaPanel";
 import "./site-header.css";
 
@@ -46,6 +47,7 @@ export function SiteHeader({ onSearch }: { onSearch?: () => void }) {
   const [everOpened, setEverOpened] = useState(false);
   const { resolved, toggle } = useTheme();
   const { profile } = useAuth();
+  const intranet = useIntranetLinks();
   const location = useLocation();
   const navigate = useNavigate();
   const header = useRef<HTMLElement>(null);
@@ -238,12 +240,16 @@ export function SiteHeader({ onSearch }: { onSearch?: () => void }) {
                 <Link to="/impacto" onClick={close}>
                   Impacto Institucional
                 </Link>
-                <Link to="/admin/tableros" onClick={close}>
-                  Mis Tableros
-                </Link>
-                <Link to="/admin" onClick={close}>
-                  Intranet · {profile.full_name?.trim() || profile.email}
-                </Link>
+                {intranet.links.some((l) => l.screen === "tableros") && (
+                  <Link to="/admin/tableros" onClick={close}>
+                    Mis Tableros
+                  </Link>
+                )}
+                {intranet.home && (
+                  <Link to={intranet.home} onClick={close}>
+                    Intranet · {profile.full_name?.trim() || profile.email}
+                  </Link>
+                )}
               </>
             ) : (
               <Link to="/acceso-intranet" onClick={close}>

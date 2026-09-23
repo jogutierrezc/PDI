@@ -170,6 +170,18 @@ function RequireRole({
   return children;
 }
 
+/**
+ * /admin a secas: la primera pantalla que esta persona puede abrir. Antes no
+ * existía y el botón «Intranet» terminaba en «No encontrada».
+ */
+function AdminHome() {
+  const { loading, profile, home } = useAuth();
+  const location = useLocation();
+  if (loading) return <RouteFallback />;
+  if (!profile) return <Navigate to="/acceso-intranet" replace state={{ from: location.pathname }} />;
+  return <Navigate to={home === "/" ? "/sin-permiso" : home} replace />;
+}
+
 /** Marca de carga discreta. */
 export function RouteFallback() {
   return (
@@ -412,6 +424,7 @@ export default function App() {
             }
           />
 
+          <Route path="/admin" element={<AdminHome />} />
           <Route path="/sin-permiso" element={<Forbidden />} />
           <Route path="*" element={<NotFound />} />
         </Routes>

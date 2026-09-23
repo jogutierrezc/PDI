@@ -19,6 +19,7 @@ import { Link, useLocation } from "react-router-dom";
 import { Icon } from "../ui/Icon";
 import { useAuth } from "../../lib/auth";
 import type { Profile } from "../../types/database";
+import { useIntranetLinks } from "./intranet-links";
 
 /** Las iniciales con las que se reconoce a alguien de un vistazo. */
 function initials(profile: Profile): string {
@@ -33,6 +34,7 @@ const shortName = (profile: Profile) => profile.full_name?.trim().split(/\s+/)[0
 
 export function SessionMenu() {
   const { profile, signOut } = useAuth();
+  const { home, links } = useIntranetLinks();
   const [open, setOpen] = useState(false);
   const location = useLocation();
   const box = useRef<HTMLDivElement>(null);
@@ -91,15 +93,33 @@ export function SessionMenu() {
             <small>{profile.email}</small>
           </div>
 
-          <MyBoards />
+          {links.some((l) => l.screen === "tableros") && <MyBoards />}
+
+          {/* Solo lo que esta persona puede abrir: el mismo criterio del menú de la intranet. */}
+          {links.length > 0 ? (
+            <div className="sh-me__intranet">
+              <p className="sh-me__label">Tu intranet</p>
+              <ul>
+                {links.map((l) => (
+                  <li key={l.screen}>
+                    <Link to={l.to} onClick={() => setOpen(false)}>
+                      <Icon name={l.icon} size={15} />
+                      {l.label}
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ) : (
+            <p className="sh-me__empty">Tu cuenta aún no tiene pantallas de la intranet asignadas. Pídeselas a Planeación Institucional.</p>
+          )}
 
           <div className="sh-me__links">
-            <Link to="/admin/tableros" onClick={() => setOpen(false)}>
-              <Icon name="layers" size={16} /> Mis Tableros
-            </Link>
-            <Link to="/admin" onClick={() => setOpen(false)}>
-              <Icon name="settings" size={16} /> Intranet
-            </Link>
+            {home && (
+              <Link to={home} onClick={() => setOpen(false)}>
+                <Icon name="settings" size={16} /> Ir a la intranet
+              </Link>
+            )}
             <button
               type="button"
               onClick={() => {

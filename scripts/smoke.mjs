@@ -665,6 +665,32 @@ const routes = [
   },
   {
     path: "/",
+    note: "el menú de la persona ofrece solo las pantallas que puede abrir, y ninguna lleva a /admin a secas",
+    expect: "La universidad, medida y planeada a la vista de todos.",
+    session: true,
+    interact: async (window, tick) => {
+      const trigger = window.document.querySelector(".sh-me__trigger");
+      if (!trigger) throw new Error("no está el botón de la persona");
+      trigger.click();
+      await tick();
+      await tick();
+      const panel = window.document.getElementById("sh-me-panel");
+      if (!panel) throw new Error("el panel de la persona no abre");
+      const hrefs = [...panel.querySelectorAll("a")].map((a) => a.getAttribute("href"));
+      if (hrefs.includes("/admin")) throw new Error("un enlace sigue llevando a /admin, que no es una pantalla");
+      if (!panel.textContent.includes("Tu intranet")) throw new Error("no aparece la lista de la intranet");
+      if (!panel.textContent.includes("Ir a la intranet")) throw new Error("no aparece el acceso a la intranet");
+      if (!hrefs.some((h) => h && h.startsWith("/admin/"))) throw new Error("ningún acceso lleva a una pantalla de la intranet");
+    },
+  },
+  {
+    path: "/admin",
+    note: "/admin a secas lleva a la primera pantalla que la persona puede abrir",
+    expect: "Página de la oficina",
+    session: true,
+  },
+  {
+    path: "/",
     note: "el buscador encuentra en los portales y muestra la cifra simplificada",
     expect: "La universidad, medida y planeada a la vista de todos.",
     interact: async (window, tick) => {

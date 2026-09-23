@@ -9,11 +9,12 @@
 import type { CSSProperties } from "react";
 import { Link, useParams, useSearchParams } from "react-router-dom";
 import { Icon } from "../../../components/ui/Icon";
-import { CALC_LABEL, LEVELS, MODE_LABEL, functionById, indicatorByCode } from "../data/catalog";
+import { CALC_LABEL, LEVELS, MODE_LABEL, functionById } from "../data/catalog";
 import { GAP_LABEL, INSTITUTION, breakdownFor, formatValue, resolveScope, statFor, unitLabel } from "../data/lens";
-import type { IndicatorStat } from "../data/lens";
+import type { IndicatorStat, PortalData } from "../data/lens";
 import { ImpactLayout } from "./ImpactLayout";
-import { Change, IllustrativeNote } from "./shared";
+import { PortalGate } from "./PortalGate";
+import { Change, SourceNote } from "./shared";
 
 const AGG_TEXT = {
   suma: "Suma de lo que reporta cada programa.",
@@ -23,18 +24,25 @@ const AGG_TEXT = {
 } as const;
 
 export function ImpactIndicator() {
+  return <PortalGate title="Indicador">{(data) => <IndicatorSheet data={data} />}</PortalGate>;
+}
+
+function IndicatorSheet({ data }: { data: PortalData }) {
   const { codigo } = useParams();
   const [params] = useSearchParams();
-  const indicator = codigo ? indicatorByCode.get(codigo.toUpperCase()) : undefined;
+  const indicator = codigo ? data.indicatorByCode.get(codigo.toUpperCase()) : undefined;
   const [kind, slug] = (params.get("en") ?? "").split(":");
-  const scope = (kind && slug ? resolveScope(kind, slug) : INSTITUTION) ?? INSTITUTION;
+  const scope = (kind && slug ? resolveScope(data, kind, slug) : INSTITUTION) ?? INSTITUTION;
 
   if (!indicator) {
     return (
       <ImpactLayout title="Indicador no encontrado">
         <div className="u-container imp-missing">
           <h1>No encontramos ese indicador</h1>
-          <p>Los códigos van de I01 a I37, de E01 a E27 y de X01 a X42.</p>
+          <p>
+            No está en la versión {data.version?.number} del catálogo publicado. Los códigos empiezan por I
+            (Investigación), E (Enseñanza) o X (Extensión).
+          </p>
           <Link className="button-primary" to="/impacto">
             Ir a Impacto Institucional
           </Link>
@@ -45,10 +53,10 @@ export function ImpactIndicator() {
 
   const fn = functionById[indicator.funcion];
   const sheet = indicator.ficha;
-  const stat = statFor(indicator, scope);
+  const stat = statFor(data, indicator, scope);
   const back = scope.kind === "institucion" ? "/impacto/institucion" : `/impacto/${scope.kind}/${scope.slug}`;
   const level = LEVELS.find((l) => l.id === indicator.nivel)!;
-  const parts = breakdownFor(indicator, scope).filter((p) => p.stat.current);
+  const parts = breakdownFor(data, indicator, scope).filter((p) => p.stat.current);
 
   return (
     <ImpactLayout title={`${indicator.codigo} · ${indicator.nombre}`}>
@@ -98,11 +106,11 @@ export function ImpactIndicator() {
             <aside className="imp-facts" aria-label="Lo que dice la matriz">
               <dl>
                 <div>
-                  <dt>Línea base 2023</dt>
+                  <dt>Línea base{indicator.lineaBaseAnio ? ` ${indicator.lineaBaseAnio}` : ""}</dt>
                   <dd>{indicator.lineaBase || "—"}</dd>
                 </div>
                 <div>
-                  <dt>Meta {indicator.meta.anio}</dt>
+                  <dt>Meta{indicator.meta.anio ? ` ${indicator.meta.anio}` : ""}</dt>
                   <dd>{indicator.meta.valor || "—"}</dd>
                 </div>
                 <div>
@@ -198,7 +206,7 @@ export function ImpactIndicator() {
             </section>
           )}
 
-          <IllustrativeNote />
+          <SourceNote data={data} />
         </div>
       </article>
     </ImpactLayout>

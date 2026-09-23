@@ -85,6 +85,21 @@
   color: var(--status-pending);
 }
 
+/* La procedencia de una cifra real no es un aviso: va en calma. */
+.imp-note--source {
+  background: var(--surface);
+  border: 1px solid var(--line);
+}
+
+.imp-note--source svg {
+  color: var(--status-done);
+}
+
+/* Cargando o con error: el mismo aire que la página que va a llegar. */
+.imp-state {
+  padding: var(--space-10) 0;
+}
+
 /* --- Portada ------------------------------------------------------------------ */
 
 .imp-hero {

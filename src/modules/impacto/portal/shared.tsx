@@ -1,6 +1,6 @@
 /* =============================================================================
-   Piezas comunes del portal: conteos del río, la piedra de un indicador y el
-   aviso de datos ilustrativos.
+   Piezas comunes del portal: conteos del río, la piedra de un indicador y la
+   nota de procedencia de las cifras.
    ========================================================================== */
 
 import type { CSSProperties } from "react";
@@ -8,7 +8,7 @@ import { Link } from "react-router-dom";
 import { Icon } from "../../../components/ui/Icon";
 import { FUNCTIONS, LEVELS, functionById } from "../data/catalog";
 import { GAP_LABEL, formatValue, unitLabel } from "../data/lens";
-import type { IndicatorStat, Scope } from "../data/lens";
+import type { IndicatorStat, PortalData, Scope } from "../data/lens";
 import type { RiverCounts } from "./ValueRiver";
 
 export function riverCounts(stats: IndicatorStat[]): RiverCounts {
@@ -77,12 +77,28 @@ export function IndicatorPebble({ stat, scope }: { stat: IndicatorStat; scope: S
   );
 }
 
-export function IllustrativeNote() {
+/** De dónde salen las cifras: solo lo validado, con la versión del catálogo que se muestra. */
+export function SourceNote({ data }: { data: PortalData }) {
+  if (data.records.length === 0) {
+    return (
+      <p className="imp-note" role="note">
+        <Icon name="clock" size={14} />
+        <span>
+          Aún no hay cifras validadas. El catálogo ya está publicado: cada indicador se ve hueco hasta que la
+          vicerrectoría de su función valide el primer registro.
+        </span>
+      </p>
+    );
+  }
+  const published = data.version?.publishedAt
+    ? new Date(data.version.publishedAt).toLocaleDateString("es-CO", { day: "numeric", month: "long", year: "numeric" })
+    : null;
   return (
-    <p className="imp-note" role="note">
-      <Icon name="alert" size={14} />
+    <p className="imp-note imp-note--source" role="note">
+      <Icon name="check" size={14} />
       <span>
-        Prototipo: el catálogo es la matriz vr7 real; las cifras de programas son <strong>datos ilustrativos</strong>.
+        Solo cifras <strong>validadas</strong> por la vicerrectoría de cada función. Catálogo versión {data.version?.number}
+        {published ? `, publicado el ${published}` : ""}.
       </span>
     </p>
   );

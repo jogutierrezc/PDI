@@ -22,6 +22,8 @@ export interface MatrixIndicator {
   descripcion: string;
   unidad: string;
   lineaBase: string;
+  /** Año de la línea base, cuando viene de la base (cierre de la fase 7). */
+  lineaBaseAnio?: number | null;
   meta: { anio: number; valor: string };
   meta2028: string;
   responsable: string;

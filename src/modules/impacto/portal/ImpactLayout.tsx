@@ -10,7 +10,6 @@ import { useEffect } from "react";
 import type { ReactNode } from "react";
 import { Link } from "react-router-dom";
 import { SiteHeader } from "../../../components/layout/SiteHeader";
-import { MATRIX_SOURCE } from "../data/matriz.generated";
 import "./impacto.css";
 
 export function ImpactLayout({ title, children }: { title: string; children: ReactNode }) {
@@ -34,7 +33,8 @@ export function ImpactLayout({ title, children }: { title: string; children: Rea
           <div>
             <strong>Universidad de Santander · Impacto Institucional</strong>
             <span>
-              Catálogo tomado de {MATRIX_SOURCE}. Las cifras de programas son un prototipo con datos ilustrativos.
+              El catálogo es la última versión publicada por Planeación. Solo se muestran cifras validadas por las
+              vicerrectorías.
             </span>
           </div>
           <nav aria-label="Enlaces del pie">

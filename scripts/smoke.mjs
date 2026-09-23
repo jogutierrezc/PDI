@@ -2628,6 +2628,69 @@ const routes = [
     },
   },
   {
+    path: "/impacto",
+    note: "portal sobre la base: catálogo publicado, lentes reales y solo cifras validadas",
+    expect: "Impacto Institucional",
+    session: true,
+    also: [
+      "4 indicadores, de los insumos al impacto real",
+      "Facultad de Ciencias Sociales",
+      "Una cifra de facultad no es un promedio",
+      "970 ÷ 1.100",
+      "Solo cifras validadas",
+      "Catálogo versión 1",
+    ],
+    absent: ["datos ilustrativos", "Dato ilustrativo", "Medicina Veterinaria y Zootecnia"],
+  },
+  {
+    path: "/impacto/institucion",
+    note: "toda la universidad: razón de sumas de lo validado y cambio frente al periodo anterior",
+    expect: "Universidad de Santander",
+    session: true,
+    also: ["Tasa de retención estudiantil", "88,2 %", "frente a 2025-2", "Innovaciones pedagógicas"],
+    absent: ["datos ilustrativos"],
+  },
+  {
+    path: "/impacto/campus/bucaramanga",
+    note: "lente de campus: solo lo que se reporta por sede",
+    expect: "Campus Bucaramanga",
+    session: true,
+    also: ["87,8 %", "los que se reportan por programa no se reparten entre sedes"],
+    absent: ["Innovaciones pedagógicas"],
+  },
+  {
+    path: "/impacto/indicador/E04?en=facultad:ciencias-sociales",
+    note: "ficha del indicador con su cuenta y el reparto por programa",
+    expect: "Tasa de retención estudiantil",
+    session: true,
+    also: ["630 ÷ 700", "En qué se reparte", "Derecho", "Por periodo", "Meta 2026", "+1 pp vs LB", "Línea base 2023"],
+    absent: ["datos ilustrativos"],
+  },
+  {
+    path: "/impacto/institucion",
+    note: "catálogo publicado sin cifras validadas: todo hueco y dice por qué",
+    expect: "Aún no hay cifras validadas",
+    session: true,
+    fixtures: { "rpc:imp_portal_records": [] },
+    also: ["Sin cifras validadas en esta lente", "Fuera del piloto", "Sugerido: aún no se reporta"],
+  },
+  {
+    path: "/impacto",
+    note: "sin catálogo publicado: estado vacío",
+    expect: "Aún no hay cifras que mostrar",
+    session: true,
+    fixtures: { "rpc:imp_portal_catalog": { version: null, indicators: [] }, "rpc:imp_portal_records": [] },
+    also: ["Ir a Impacto en la intranet"],
+  },
+  {
+    path: "/impacto/indicador/E04",
+    note: "base sin la migración 0072: error con qué hacer",
+    expect: "No se pudo cargar Impacto Institucional",
+    session: true,
+    fixtures: { "rpc:imp_portal_catalog": { __status: 404, code: "PGRST202", message: "Could not find the function public.imp_portal_catalog" } },
+    also: ["0072_impacto_portal.sql", "Reintentar"],
+  },
+  {
     path: "/admin/estructura",
     expect: "Normalizar la estructura",
     session: true,
@@ -2844,7 +2907,7 @@ const html = `<!doctype html><html lang="es"><body><div id="root"></div></body><
  * red silencioso — todas las pantallas se quedaban en "cargando" sin decir por
  * qué.
  */
-function makeFetch(session, broken = false, userId = "user-admin") {
+function makeFetch(session, broken = false, userId = "user-admin", overrides = {}) {
   // Estado propio de cada prueba: el refetch debe leer lo que se guardó.
   const odValues = structuredClone(FIXTURES.od_values ?? []);
   return async (input, init = {}) => {
@@ -2884,8 +2947,17 @@ function makeFetch(session, broken = false, userId = "user-admin") {
     // Datos
     const parsed = new URL(url);
     // Las RPC salen de FIXTURES["rpc:nombre"]; sin fixture, una lista vacía.
+    // Una ruta puede cambiar alguna con `fixtures`; con `__status`, responde ese error.
     const rpc = parsed.pathname.match(/\/rest\/v1\/rpc\/([a-z_]+)/)?.[1];
-    if (rpc) return reply(FIXTURES[`rpc:${rpc}`] ?? []);
+    if (rpc) {
+      const key = `rpc:${rpc}`;
+      const body = key in overrides ? overrides[key] : (FIXTURES[key] ?? []);
+      if (body && body.__status) {
+        const { __status, ...error } = body;
+        return reply(error, __status);
+      }
+      return reply(body);
+    }
     const table = parsed.pathname.match(/\/rest\/v1\/([a-z_]+)/)?.[1];
     if (table === "od_values" && init.method === "POST") {
       // Contrato de od_values_term_unique, incluida la igualdad de campus nulos.
@@ -3501,6 +3573,67 @@ FIXTURES.od_bulletin_editions = [
     reason: "variacion_sin_justificar", comment: "Explique el salto frente a 2026-1.", actor: null,
   });
 
+  // Portal (0072): catálogo publicado, estructura real y solo registros validados.
+  const portalSheet = {
+    unit: "porcentaje", calc_type: "razon", numerator_def: "Siguen matriculados", denominator_def: "Matriculados el periodo anterior",
+    factor: 100, aggregation: "razon_de_sumas", direction: "mayor_mejor", periodicity: "semestral", report_level: "programa_sede",
+    applies_degrees: ["pregrado"], capture_mode: "precargado", evidence_type: null, evidence_required: false, variation_threshold: 15,
+    range_min: null, range_max: null, n_minimum: null, allows_over_one: false, in_pilot: true, sheet_complete: true,
+  };
+  const portalBare = {
+    unit: null, calc_type: null, numerator_def: null, denominator_def: null, factor: null, aggregation: null, direction: null,
+    periodicity: null, report_level: null, applies_degrees: [], capture_mode: null, evidence_type: null, evidence_required: false,
+    variation_threshold: 30, range_min: null, range_max: null, n_minimum: null, allows_over_one: false, in_pilot: false, sheet_complete: false,
+  };
+  const portalIndicator = (code, function_id, level, name, extra = {}) => ({
+    code, function_id, level, catalog_state: "oficial", name, description: "", unit_original: "", responsible_original: "",
+    source: "", origin: "", targets: [], baseline: null, alignments: [], ...portalBare, ...extra,
+  });
+  FIXTURES["rpc:imp_portal_catalog"] = {
+    version: { id: "imp-v1", number: 1, source_file: "UDES_Matriz_Impacto_Institucional_vr7.xlsx", published_at: "2026-09-19T10:00:00Z" },
+    indicators: [
+      portalIndicator("I01", "investigacion", "insumos", "Estudiantes vinculados a semilleros", { unit_original: "1920" }),
+      portalIndicator("E04", "ensenanza", "procesos", "Tasa de retención estudiantil", {
+        ...portalSheet, unit_original: "% estudiantes", source: "Registro y Control",
+        targets: [{ year: 2026, numeric: null, text: "+1 pp vs LB" }], baseline: { year: 2023, value: 86.5 },
+        alignments: [{ kind: "pilar", code: "2" }, { kind: "ods", code: "4" }],
+      }),
+      portalIndicator("E13", "ensenanza", "productos", "Innovaciones pedagógicas implementadas y documentadas", {
+        ...portalSheet, unit: "numero", calc_type: "conteo", numerator_def: "Innovaciones documentadas", denominator_def: null, factor: 1,
+        aggregation: "suma", report_level: "programa", periodicity: "anual", capture_mode: "manual", unit_original: "N° innovaciones",
+      }),
+      portalIndicator("X38", "extension", "impacto", "Indicador sugerido de prueba", { catalog_state: "sugerido" }),
+    ],
+  };
+  FIXTURES["rpc:imp_portal_structure"] = {
+    faculties: [
+      { id: "imp-fcs", slug: "ciencias-sociales", code: "FCS", name: "Facultad de Ciencias Sociales" },
+      { id: "imp-fit", slug: "ingenierias-y-tecnologias", code: "FIT", name: "Facultad de Ingenierías y Tecnologías" },
+    ],
+    programs: [
+      { id: "imp-derecho", slug: "derecho", code: "DER", name: "Derecho", faculty_id: "imp-fcs", degree_level: "pregrado", modality: "presencial", campus_ids: ["imp-c-bga", "imp-c-cuc"] },
+      { id: "imp-sistemas", slug: "ingenieria-de-sistemas", code: "ISI", name: "Ingeniería de Sistemas", faculty_id: "imp-fit", degree_level: "pregrado", modality: "presencial", campus_ids: ["imp-c-bga"] },
+    ],
+    campuses: [
+      { id: "imp-c-bga", slug: "bucaramanga", name: "Bucaramanga" },
+      { id: "imp-c-cuc", slug: "cucuta", name: "Cúcuta" },
+      { id: "imp-c-bog", slug: "bogota", name: "Bogotá" },
+    ],
+  };
+  const measure = (code, program_id, campus_id, period_code, numerator, denominator = null) => ({
+    code, program_id, campus_id, period_code, numerator, denominator, n_responses: null, num_comparison: null, den_comparison: null,
+    value: denominator ? (numerator / denominator) * 100 : numerator, comparison_value: null,
+  });
+  FIXTURES["rpc:imp_portal_records"] = [
+    measure("E04", "imp-derecho", "imp-c-bga", "2025-2", 400, 500),
+    measure("E04", "imp-sistemas", "imp-c-bga", "2025-2", 300, 400),
+    measure("E04", "imp-derecho", "imp-c-bga", "2026-1", 450, 500),
+    measure("E04", "imp-derecho", "imp-c-cuc", "2026-1", 180, 200),
+    measure("E04", "imp-sistemas", "imp-c-bga", "2026-1", 340, 400),
+    measure("E13", "imp-derecho", null, "2026-1", 3),
+    measure("E13", "imp-sistemas", null, "2026-1", 2),
+  ];
+
   FIXTURES.imp_settings = [{ key: "importacion_todo_o_nada", value: false }];
   FIXTURES.units = [
     { id: "imp-prog-a", name: "Programa de Prueba A", code: "PR-A", snies_code: "900001", kind: "programa",
@@ -3565,7 +3698,7 @@ for (const route of routes) {
 
   // El cliente de Supabase toma fetch de globalThis al construirse, que dentro
   // de jsdom es el window.
-  dom.window.fetch = makeFetch(Boolean(route.session), Boolean(route.broken), route.as ?? "user-admin");
+  dom.window.fetch = makeFetch(Boolean(route.session), Boolean(route.broken), route.as ?? "user-admin", route.fixtures ?? {});
   dom.window.Headers = Headers;
   dom.window.Response = Response;
   dom.window.Request = Request;

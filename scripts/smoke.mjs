@@ -2508,6 +2508,21 @@ const routes = [
     },
   },
   {
+    path: "/admin/impacto/catalogo",
+    note: "catálogo sobre la base: versiones, fichas, hallazgos y publicación",
+    expect: "Importar la matriz",
+    session: true,
+    also: [
+      "Versión 2",
+      "Estudiantes vinculados a semilleros",
+      "Ficha incompleta. Falta: tipo de cálculo, unidad.",
+      "Hallazgos del importador",
+      "Número en la columna de unidad",
+      "Falta completar la ficha de",
+      "Precargar las fichas propuestas del piloto",
+    ],
+  },
+  {
     path: "/admin/estructura",
     expect: "Normalizar la estructura",
     session: true,
@@ -2763,6 +2778,9 @@ function makeFetch(session, broken = false, userId = "user-admin") {
 
     // Datos
     const parsed = new URL(url);
+    // Las RPC salen de FIXTURES["rpc:nombre"]; sin fixture, una lista vacía.
+    const rpc = parsed.pathname.match(/\/rest\/v1\/rpc\/([a-z_]+)/)?.[1];
+    if (rpc) return reply(FIXTURES[`rpc:${rpc}`] ?? []);
     const table = parsed.pathname.match(/\/rest\/v1\/([a-z_]+)/)?.[1];
     if (table === "od_values" && init.method === "POST") {
       // Contrato de od_values_term_unique, incluida la igualdad de campus nulos.
@@ -3276,6 +3294,38 @@ FIXTURES.od_bulletin_editions = [
     file_size: 3200000, status: "publicado", note: "", published_by: null, published_at: "2026-09-02T08:00:00Z",
   },
 ];
+
+/* Impacto (0064–0067): el borrador de la versión 2 con tres indicadores. */
+{
+  const base = {
+    version_id: "imp-v2", matrix_sheet: "1. INVESTIGACIÓN", description: "", unit_original: "", responsible_original: "VI",
+    source: "SIGIIP", numerator_def: null, denominator_def: null, factor: null, aggregation: null, direction: null,
+    periodicity: null, report_level: null, applies_degrees: [], applies_modalities: [], capture_mode: null,
+    evidence_type: null, evidence_required: false, variation_threshold: 30, range_min: null, range_max: null,
+    n_minimum: null, allows_over_one: false, validator_function: "investigacion", in_pilot: false, unit: null,
+    calc_type: null, sheet_complete: false, open_findings: 0, version_state: "borrador", catalog_state: "oficial",
+  };
+  FIXTURES.imp_catalog_versions = [
+    { id: "imp-v2", number: 2, state: "borrador", source_file: "UDES_Matriz_Impacto_Institucional_vr7.xlsx", notes: "Copia de la versión 1", created_at: "2026-09-20T10:00:00Z", published_at: null },
+    { id: "imp-v1", number: 1, state: "publicada", source_file: "UDES_Matriz_Impacto_Institucional_vr7.xlsx", notes: "", created_at: "2026-09-18T10:00:00Z", published_at: "2026-09-19T10:00:00Z" },
+  ];
+  FIXTURES.imp_indicators_admin = [
+    { ...base, id: "imp-i01", code: "I01", function_id: "investigacion", level: "insumos", name: "Estudiantes vinculados a semilleros", matrix_row: 5, unit_original: "1920", in_pilot: true, open_findings: 2 },
+    { ...base, id: "imp-e04", code: "E04", function_id: "ensenanza", level: "procesos", name: "Tasa de retención estudiantil", matrix_sheet: "2. ENSEÑANZA", matrix_row: 8,
+      unit: "porcentaje", calc_type: "razon", numerator_def: "Siguen matriculados", denominator_def: "Matriculados el periodo anterior", factor: 100,
+      aggregation: "razon_de_sumas", direction: "mayor_mejor", periodicity: "semestral", report_level: "programa_sede", applies_degrees: ["pregrado"],
+      capture_mode: "precargado", validator_function: "ensenanza", in_pilot: true, sheet_complete: true },
+    { ...base, id: "imp-x38", code: "X38", function_id: "extension", level: "impacto", catalog_state: "sugerido", name: "Indicador sugerido de prueba", matrix_sheet: "3. EXTENSIÓN", matrix_row: 41, validator_function: "extension" },
+  ];
+  FIXTURES.imp_import_findings = [
+    { id: "imp-f1", version_id: "imp-v2", sheet: "1. INVESTIGACIÓN", row_number: 5, column_name: "E", kind: "unidad_numerica", value: "1920", suggestion: "Es un número donde va la unidad: probablemente la línea base desplazada de columna.", state: "abierto", note: "", resolved_at: null },
+    { id: "imp-f2", version_id: "imp-v2", sheet: "1. INVESTIGACIÓN", row_number: 5, column_name: "F", kind: "linea_base_por_definir", value: "Por definir", suggestion: "Registrar la línea base cuando exista; queda vacía.", state: "abierto", note: "", resolved_at: null },
+  ];
+  FIXTURES.imp_targets = [];
+  FIXTURES.imp_baselines = [];
+  FIXTURES.imp_alignments = [{ indicator_id: "imp-i01", kind: "pilar", code: "1" }, { indicator_id: "imp-i01", kind: "ods", code: "4" }];
+  FIXTURES["rpc:imp_indicator_missing"] = ["tipo de cálculo", "unidad"];
+}
 
 /* --- Ejecución -------------------------------------------------------------- */
 

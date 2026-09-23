@@ -16,6 +16,7 @@ import { useEffect } from "react";
 import { NavLink, useNavigate, useParams } from "react-router-dom";
 import { AdminShell } from "../../admin/components/AdminShell";
 import { Icon } from "../../../components/ui/Icon";
+import { useAuth } from "../../../lib/auth";
 import { CatalogView } from "./CatalogView";
 import { PeriodView } from "./PeriodView";
 import { ReportView } from "./ReportView";
@@ -26,15 +27,18 @@ import "./impact-admin.css";
 
 type View = "catalogo" | "periodo" | "reporte" | "revision";
 
+// El catálogo ya trabaja sobre la base: lo abre quien tenga Planeación o más
+// en su sesión real (la base exige además impacto.catalogo). Las demás vistas
+// siguen con el «Ver como» del prototipo hasta sus fases.
 const VIEWS: { id: View; label: string; roles: Role[] }[] = [
-  { id: "catalogo", label: "Catálogo", roles: ["administrador"] },
+  { id: "catalogo", label: "Catálogo", roles: [] },
   { id: "periodo", label: "Periodo", roles: ["administrador"] },
   { id: "reporte", label: "Mi reporte", roles: ["director"] },
   { id: "revision", label: "Revisión", roles: ["decano", "vicerrector"] },
 ];
 
 const DESCRIPTION: Record<View, string> = {
-  catalogo: "Los 106 indicadores de la matriz vr7, sus fichas técnicas y la versión publicada del catálogo.",
+  catalogo: "Los indicadores de la matriz importada, sus fichas técnicas, los hallazgos del importador y la publicación de versiones.",
   periodo: "Abrir el periodo, fijar las fechas de corte y revisar qué le toca reportar a cada programa.",
   reporte: "Lo que su programa debe reportar este periodo. Guarde cuando quiera; al final, envíelo a decanatura.",
   revision: "Los registros que esperan su decisión. Apruebe o devuelva con un motivo.",
@@ -45,7 +49,8 @@ export function ImpactAdmin() {
   const person = me(state);
   const { vista } = useParams();
   const navigate = useNavigate();
-  const allowed = VIEWS.filter((v) => v.roles.includes(person.role));
+  const { hasRole } = useAuth();
+  const allowed = VIEWS.filter((v) => (v.id === "catalogo" ? hasRole("planeacion") : v.roles.includes(person.role)));
   const view = allowed.find((v) => v.id === vista) ?? allowed[0];
 
   // Cambiar de persona lleva a su primera vista.

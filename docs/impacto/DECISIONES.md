@@ -89,3 +89,14 @@ Modelo en Supabase y migraciones, importador real con reporte descargable, edici
 - **Reimportar**: si ya hay un borrador, se niega; `imp_discard_draft` lo borra. Al crear un borrador se copia la ficha técnica de la última versión publicada por código de indicador.
 - **Reporte de hallazgos**: Excel (hoja «Hallazgos» con filtros y hoja «Resumen» por tipo) y CSV con `;` y BOM, que Excel en español abre sin romper tildes.
 - **Prueba de humo**: el simulador de Supabase no entendía `gt`, `lt` ni `order` y la paginación por llave de UDES en Cifras no terminaba; corregido.
+
+## Fase 3 · administración del catálogo (2026-09-23)
+
+- **La vista Catálogo trabaja sobre la base** (0067). La abre quien tenga Planeación o más en su sesión real; la base exige además `impacto.catalogo`. Las vistas Periodo, Mi reporte y Revisión siguen con el «Ver como» del prototipo hasta sus fases.
+- **Estado de la ficha** en la vista `imp_indicators_admin` (`sheet_complete`) y lo que falta en palabras (`imp_sheet_missing` / `imp_indicator_missing`): tipo de cálculo, numerador, denominador (si es razón o comparación), factor, agregación, sentido, periodicidad, nivel de reporte, niveles de formación, modo de captura, unidad, vicerrectoría validadora, n mínimo (si es puntaje) y tipo de evidencia (si es obligatoria).
+- **Publicar** (`imp_publish_catalog`) se niega si un indicador en piloto tiene la ficha incompleta, y nombra los códigos; también si no hay ninguno en piloto.
+- **Cambiar algo publicado** es `imp_new_draft`: copia la última versión publicada (fichas, metas, líneas base, alineaciones) a la versión siguiente en borrador. La publicada no cambia. Los hallazgos no se copian: son del archivo importado.
+- **Códigos**: se asignan al importar en el orden de la matriz, se editan a mano (únicos por versión) y `imp_renumber_codes` los vuelve a asignar en el orden de la matriz.
+- **Hallazgos**: se marcan resueltos o aceptados con nota, en cualquier versión; un disparador registra quién y cuándo, y reabrir lo borra.
+- **Fichas del piloto precargables**: «Precargar las fichas propuestas del piloto» escribe en el borrador las 13 fichas de este documento, emparejadas por nombre del indicador (no por código). Planeación las revisa antes de publicar; no se publican solas.
+- **Prueba de humo**: el simulador responde las RPC desde `FIXTURES["rpc:nombre"]`, y hay una ruta para el Catálogo.

@@ -57,3 +57,19 @@ Modelo en Supabase y migraciones, importador real con reporte descargable, edici
 - Tablas nuevas con prefijo `imp_` y nombres en inglés, como el resto del esquema; la correspondencia con la especificación está en PLAN.md.
 - HMAC de la plantilla con `pgcrypto` y clave guardada en la base, fuera del alcance de `anon` y `authenticated`.
 - La matriz vr7 queda en la raíz del repositorio (`UDES_Matriz_Impacto_Institucional_vr7.xlsx`), donde la dejó el usuario, y no en `docs/impacto/`.
+
+## Fase 1 · modelo de datos (2026-09-23)
+
+- **Migraciones**: 0063 (estructura y roles), 0064 (modelo), 0065 (catálogos de PORTADA). Se aplican en orden en el editor SQL.
+- **Bogotá** se agrega a `campuses` en **borrador**: existe para Impacto y el portal público de campus no la muestra hasta publicarla.
+- **Capacidades de Impacto** en `access_roles.capabilities` (`impacto.catalogo`, `.periodo`, `.capturar`, `.enviar`, `.aprobar`, `.validar`) y rol por unidad en `unit_members.access_role_id`. Cinco roles de partida marcados como del sistema.
+- **Capturar no se hereda** (`imp_can(cap, unidad, inherit => false)`); aprobar sí baja de la facultad a sus programas; validar va por la función de la vicerrectoría (`units.substantive_function`).
+- La administración (`profiles.role = admin`) conserva las capacidades globales de Impacto, como en 0061.
+- **Estado de la ficha** calculado (`imp_sheet_complete(indicador)`), no marcado a mano.
+- **Valor del registro** calculado por un disparador; lo que mande el cliente se ignora. `version` sube en cada cambio para detectar conflictos con plantillas viejas.
+- **Quitar una asignación** es `active = false` con justificación obligatoria; agregar a mano exige justificación.
+- **Bitácoras** (`imp_transitions`, `imp_import_batches`, `imp_import_batch_records`): disparadores que rechazan UPDATE, DELETE y TRUNCATE también para el dueño, y sin permisos de escritura para `authenticated`. Se escriben solo desde funciones `security definer` (fases 6 y 7).
+- **Transiciones permitidas** en `imp_transition_allowed`; devolver exige motivo de la lista y comentario.
+- Los 14 ODS de PORTADA son los que se siembran; un ODS fuera de la lista será hallazgo del importador, no se agrega para que cuadre.
+- **Vitest 2** (no 5): Vitest 5 pide Vite 6+ y el proyecto usa Vite 5.
+- **Corrección en 0061**: `board_under_review(target)` comparaba contra la columna `board_reviews.target` en vez del parámetro, y Postgres rechazaba la función al crearla. Ahora usa `board_under_review.target`.

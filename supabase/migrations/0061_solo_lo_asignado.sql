@@ -62,8 +62,11 @@ security definer
 set search_path = public
 as $$
   select exists (
+    -- `board_under_review.target` y no `target` a secas: board_reviews tiene
+    -- una columna con ese nombre (la visibilidad pedida) y en una función SQL
+    -- la columna gana al parámetro.
     select 1 from public.board_reviews r
-     where r.board_id = target and r.state = 'pendiente'
+     where r.board_id = board_under_review.target and r.state = 'pendiente'
   );
 $$;
 

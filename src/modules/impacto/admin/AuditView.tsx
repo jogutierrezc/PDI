@@ -344,6 +344,7 @@ function AuditSheet({ rows, tab }: { rows: AuditRow[]; tab: Tab }) {
   return (
     <DataGrid<AuditRow, null>
       label={`Auditoría por ${unit.toLowerCase()}`}
+      frozen={1}
       rows={rows}
       rowId={(r) => r.id}
       initial={() => null}

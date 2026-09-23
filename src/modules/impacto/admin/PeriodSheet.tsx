@@ -56,10 +56,10 @@ function AssignmentsSheet({ period, rows }: { period: Period; rows: Assignment[]
   );
 
   const columns: GridColumn<Assignment, AssignmentDraft>[] = [
-    { key: "faculty", label: "Facultad", width: 190, show: (a) => a.program.parent?.name ?? "Sin facultad" },
     { key: "program", label: "Programa", width: 210, show: (a) => a.program.name },
-    { key: "snies", label: "SNIES", width: 80, show: (a) => a.program.snies_code ?? "" },
     { key: "code", label: "Código", width: 72, show: (a) => a.indicator.code },
+    { key: "faculty", label: "Facultad", width: 190, show: (a) => a.program.parent?.name ?? "Sin facultad" },
+    { key: "snies", label: "SNIES", width: 80, show: (a) => a.program.snies_code ?? "" },
     { key: "name", label: "Indicador", width: 260, show: (a) => a.indicator.name },
     { key: "campus", label: "Sede", width: 110, show: (a) => a.campus?.name ?? "Por programa" },
     { key: "record", label: "Registro", width: 150, show: (a) => (a.record?.[0] ? STATE_LABEL[a.record[0].state as keyof typeof STATE_LABEL] ?? a.record[0].state : "Sin registro") },
@@ -87,6 +87,7 @@ function AssignmentsSheet({ period, rows }: { period: Period; rows: Assignment[]
   return (
     <DataGrid<Assignment, AssignmentDraft>
       label="Asignaciones del periodo"
+      frozen={2}
       rows={sorted}
       rowId={(a) => a.id}
       initial={(a) => ({ active: a.active, reason: "" })}
@@ -158,6 +159,7 @@ function RecordsSheet({ period }: { period: Period }) {
   return (
     <DataGrid<CaptureRow, null>
       label="Registros de todos los programas"
+      frozen={1}
       rows={records.data ?? []}
       rowId={(r) => r.id}
       initial={() => null}

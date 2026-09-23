@@ -172,9 +172,9 @@ export function CatalogSheet({ rows, editable }: { rows: DbIndicator[]; editable
 
   const columns: GridColumn<DbIndicator, Draft>[] = [
     { key: "code", label: "Código", width: 72, show: (i) => i.code },
+    { key: "name", label: "Indicador", width: 280, show: (i) => i.name },
     { key: "fn", label: "Función", width: 110, show: (i) => FUNCTIONS.find((f) => f.id === i.function_id)?.name ?? "" },
     { key: "level", label: "Nivel", width: 90, show: (i) => LEVELS.find((l) => l.id === i.level)?.name ?? "" },
-    { key: "name", label: "Indicador", width: 280, show: (i) => i.name },
     { key: "calc_type", label: "Tipo de cálculo", width: 120, ...choice(CALC, "calc_type") },
     { key: "unit", label: "Unidad", width: 110, ...choice(UNITS, "unit") },
     { key: "numerator_def", label: "Numerador", width: 220, ...text("numerator_def") },
@@ -207,6 +207,7 @@ export function CatalogSheet({ rows, editable }: { rows: DbIndicator[]; editable
   return (
     <DataGrid<DbIndicator, Draft>
       label="Catálogo en hoja de cálculo"
+      frozen={2}
       rows={rows}
       rowId={(i) => i.id}
       initial={initial}

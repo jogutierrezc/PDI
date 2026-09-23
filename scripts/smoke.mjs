@@ -3828,7 +3828,57 @@ FIXTURES.od_bulletin_editions = [
       expect: "Cargar la estructura desde Excel",
       session: true,
       note: "la carga masiva de toda la estructura, sin modal",
-      also: ["Descargar plantilla", "Elegir el Excel", "Revise y aplique"],
+      also: ["Descargar plantilla", "Elegir el Excel", "Revise, corrija y aplique"],
+    },
+    {
+      path: "/admin/estructura-institucional?carga",
+      expect: "Cargar la estructura desde Excel",
+      session: true,
+      note: "la vista previa es una hoja editable: el error se corrige en la celda y se revalida",
+      interact: async (window, tick) => {
+        const { default: ExcelJS } = await import("exceljs");
+        const book = new ExcelJS.Workbook();
+        const sheet = book.addWorksheet("Facultades");
+        sheet.addRow(["Código", "Nombre", "Vicerrectoría (código)"]);
+        sheet.addRow(["FCEAC", "", "VA"]);
+        const buffer = await book.xlsx.writeBuffer();
+        const file = new window.File([buffer], "estructura.xlsx");
+        if (!file.arrayBuffer) file.arrayBuffer = async () => buffer;
+        const input = window.document.querySelector('input[type="file"]');
+        if (!input) throw new Error("no está el campo para subir el Excel");
+        Object.defineProperty(input, "files", { value: [file], configurable: true });
+        input.dispatchEvent(new window.Event("change", { bubbles: true }));
+        for (let i = 0; i < 20 && !window.document.querySelector('[role="grid"]'); i += 1) await tick();
+        let text = window.document.body.textContent;
+        if (!text.includes("falta el nombre")) {
+          const said = window.document.querySelector(".admin-error")?.textContent ?? text.slice(-300);
+          throw new Error(`no se marcó el nombre vacío como error: ${said}`);
+        }
+        if (!text.includes("1 celda con error")) throw new Error("no se cuentan las celdas con error");
+        const apply = [...window.document.querySelectorAll("button")].find((b) => b.textContent.startsWith("Aplicar"));
+        if (!apply?.disabled) throw new Error("se puede aplicar con errores");
+
+        // Ir al error y escribir el nombre en la celda, como en Excel.
+        const grid = window.document.querySelector('[role="grid"]');
+        grid.focus();
+        grid.dispatchEvent(new window.KeyboardEvent("keydown", { key: "F8", bubbles: true }));
+        await tick();
+        grid.dispatchEvent(new window.KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
+        await tick();
+        const editor = grid.querySelector("input");
+        if (!editor) throw new Error("Enter no abrió la celda para editar");
+        const setter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, "value").set;
+        setter.call(editor, "Facultad de Ciencias Económicas, Administrativas y Contables");
+        editor.dispatchEvent(new window.Event("input", { bubbles: true }));
+        editor.dispatchEvent(new window.KeyboardEvent("keydown", { key: "Enter", bubbles: true }));
+        await tick();
+        text = window.document.body.textContent;
+        if (text.includes("celda con error")) throw new Error("el error no se fue al corregir la celda");
+        if (!text.includes("Se crea")) throw new Error("la fila corregida no quedó lista para crearse");
+        if (!text.includes("con correcciones en pantalla")) throw new Error("no se avisa que hay correcciones en pantalla");
+        const ready = [...window.document.querySelectorAll("button")].find((b) => b.textContent.startsWith("Aplicar"));
+        if (ready?.disabled) throw new Error("con todo corregido, Aplicar sigue deshabilitado");
+      },
     },
   );
 }

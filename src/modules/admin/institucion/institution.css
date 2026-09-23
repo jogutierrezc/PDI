@@ -768,8 +768,10 @@
 }
 
 .inst-preview__file {
-  display: inline-flex;
+  display: flex;
+  flex-wrap: wrap;
   align-items: center;
+  justify-content: space-between;
   gap: var(--space-2);
   margin: 0;
   color: var(--ink-secondary);
@@ -955,4 +957,24 @@
   .inst-people__table {
     min-width: 40rem;
   }
+}
+
+.inst-preview__file > span {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.inst-edited {
+  color: var(--status-pending);
+  font-style: normal;
+  font-weight: 600;
+}
+
+/* La hoja editable de cada pestaña del libro va dentro de su sección, sin otra tarjeta encima. */
+.inst-sheetpreview .dg.admin-card {
+  padding: 0;
+  background: none;
+  border: 0;
+  box-shadow: none;
 }

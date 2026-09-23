@@ -90,6 +90,7 @@ export function ReviewSheet({ rows, isDean, me }: { rows: CaptureRow[]; isDean: 
   return (
     <DataGrid<CaptureRow, Draft>
       label="Bandeja de revisión en hoja de cálculo"
+      frozen={1}
       rows={rows}
       rowId={(r) => r.id}
       initial={() => ({ decision: null, reason: null, comment: "" })}

@@ -1755,56 +1755,6 @@
   color: var(--status-risk);
 }
 
-/* --- Hoja de cálculo genérica (DataGrid) ------------------------------------------ */
-
-.ia-dg__tools {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: var(--space-2);
-}
-
-.ia-dg__tools .button-ghost {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-1);
-}
-
-.ia-dg__filter {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-2);
-  padding: var(--space-2) var(--space-3);
-  color: var(--ink-muted);
-  background: var(--surface-2);
-  border: 1px solid var(--line);
-  border-radius: var(--radius-pill);
-}
-
-.ia-dg__filter:focus-within {
-  border-color: var(--brand-blue);
-  box-shadow: var(--ring);
-}
-
-.ia-dg__filter input {
-  width: 14rem;
-  max-width: 50vw;
-  color: var(--ink);
-  background: transparent;
-  border: 0;
-  outline: none;
-  font-size: var(--text-sm);
-}
-
-.ia-dg__legend {
-  margin: 0;
-}
-
-.ia-dg__empty {
-  padding: var(--space-6);
-  text-align: center;
-}
-
 .ia-dg__tabs-wrap {
   display: grid;
   gap: var(--space-3);

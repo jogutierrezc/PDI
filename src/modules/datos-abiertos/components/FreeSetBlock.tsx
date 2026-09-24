@@ -10,6 +10,10 @@
 
    Una vista incompleta (le falta una columna) no se publica: la intranet lo
    avisa al armarla.
+
+   Debajo de las gráficas, plegada, la tabla de origen: las filas tal como se
+   cargaron. Sale una vez por conjunto (la ficha la pide en su último bloque)
+   y no si el conjunto ya tiene su propia vista de tabla.
    ========================================================================== */
 
 import { useState } from "react";
@@ -30,12 +34,32 @@ export function temporalityText(set: FreeSet, year: number | null) {
   return year === null ? "Todos los años" : `Año ${year}`;
 }
 
-export function FreeSetBlock({ set, viewKey, title, anchor }: { set: FreeSet; viewKey?: string; title?: string; anchor: string }) {
+/** La tabla de origen: una vista de tabla que no se guarda, armada al vuelo. */
+const SOURCE_VIEW: FreeView = { key: "__origen", title: "Datos de origen", type: "tabla" };
+
+export function FreeSetBlock({
+  set,
+  viewKey,
+  exclude = [],
+  withSource = false,
+  title,
+  anchor,
+}: {
+  set: FreeSet;
+  viewKey?: string;
+  /** Vistas que tienen su propio bloque en la ficha: aquí no se repiten. */
+  exclude?: string[];
+  /** Pone la tabla de origen, plegada, debajo de las gráficas. */
+  withSource?: boolean;
+  title?: string;
+  anchor: string;
+}) {
   const years = freeYears(set);
   const [year, setYear] = useState<number | null>(years.length ? years[years.length - 1] : null);
-  const views = set.views.filter((v) => (!viewKey || v.key === viewKey) && viewProblems(set, v).length === 0);
+  const views = set.views.filter((v) => (viewKey ? v.key === viewKey : !exclude.includes(v.key)) && viewProblems(set, v).length === 0);
   if (!views.length || !set.rows.length) return null;
   const usesYear = set.temporality === "anual" && views.some((v) => !USES_ALL_YEARS.includes(v.type));
+  const showSource = withSource && !set.views.some((v) => v.type === "tabla" && viewProblems(set, v).length === 0);
 
   return (
     <section className="od-section od-free" aria-labelledby={anchor}>
@@ -68,6 +92,17 @@ export function FreeSetBlock({ set, viewKey, title, anchor }: { set: FreeSet; vi
             <FreeViewPanel key={view.key} set={set} view={view} year={set.temporality === "anual" && !USES_ALL_YEARS.includes(view.type) ? year : null} />
           ))}
         </div>
+
+        {showSource && (
+          <details className="od-free__source">
+            <summary>
+              Ver datos de origen
+              <small>{usesYear && year !== null ? ` · año ${year}` : ` · ${set.rows.length} ${set.rows.length === 1 ? "fila" : "filas"}`}</small>
+            </summary>
+            <FreeChart set={set} view={{ ...SOURCE_VIEW, title: `${set.title} · datos de origen` }} year={usesYear ? year : null} />
+            {set.source && <p className="od-free__source-note">Fuente: {set.source}</p>}
+          </details>
+        )}
       </div>
     </section>
   );

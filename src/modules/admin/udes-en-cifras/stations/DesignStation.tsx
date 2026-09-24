@@ -376,6 +376,9 @@ function DesignEditor({ data, reportId, reportSlug, blocks, canEdit }: { data: S
                   {block.kind === "libre" && (() => {
                     const set = freeSets.find((fs) => fs.id === block.ref_id);
                     if (!set) return null;
+                    // Las vistas con bloque propio no se repiten en el de «todas»: la ficha las salta.
+                    const own = new Set(draft.filter((b) => b.kind === "libre" && b.ref_id === set.id && b.settings.view).map((b) => b.settings.view));
+                    const rest = set.views.filter((v) => !own.has(v.key)).length;
                     return (
                       <label className="oda-inline-field">
                         <span>Gráfica</span>
@@ -384,7 +387,7 @@ function DesignEditor({ data, reportId, reportSlug, blocks, canEdit }: { data: S
                           disabled={!canEdit}
                           onChange={(e) => patch(block.tempId, { settings: { ...block.settings, view: e.target.value || undefined } })}
                         >
-                          <option value="">Todas las vistas ({set.views.length})</option>
+                          <option value="">{own.size ? `Las demás vistas (${rest})` : `Todas las vistas (${set.views.length})`}</option>
                           {set.views.map((v) => <option key={v.key} value={v.key}>{v.title}</option>)}
                         </select>
                       </label>

@@ -21,6 +21,7 @@
 import type { CSSProperties, ReactNode } from "react";import { reportImageUrl } from "../datos-abiertos/data/images";
 
 import { basisOf, changeBetween, formatCount, formatValue, periodBasisOf, valueOf } from "../datos-abiertos/data/open-data";
+import { changeText, heatmapCompare, signed } from "../datos-abiertos/data/heatmap-compare";
 import { ALL_YEARS, ANNUAL_RULE_LABEL, cutLabel, TERMS } from "../datos-abiertos/data/terms";
 import type { AnnualRule, Term } from "../datos-abiertos/data/terms";
 import { isMobilityMap, isWorldMap } from "../datos-abiertos/data/types";
@@ -50,7 +51,7 @@ import type { RankLine } from "./figures";
 import type { Series } from "./figures";
 import type { BulletinSettings, IndicatorShow } from "./model";
 import { parseSaberKey, saberHighlight, saberUnits } from "./saber";
-import { freeUnits, parseFreeKey } from "./free";
+import { freeSourceUnits, freeUnits, parseFreeKey } from "./free";
 import { parseTytKey, tytHighlight, tytUnits } from "./tyt";
 import { deiUnits } from "./dei";
 import { modelUnits } from "./model-sheets";
@@ -804,13 +805,33 @@ function breakdownUnit(b: Breakdown, catalog: OpenDataCatalog, settings: Bulleti
     />
   ) : null;
 
+  // Composición fijada en la intranet: sin periodos, las partes de cada año
+  // apiladas a lo largo del periodo en vez de las barras de un solo corte.
+  const composition = !byTerm && parts && chartable && years.length > 1 && b.defaultChart === "composicion";
+
   const sheet = (
     <DatasetSheet title={b.title} source={b.source} notes={notes}>
-      {(!byTerm || !chartable) && (
-        <figure className="bol-wide">
-          <figcaption>{keyText} · {b.unit}{long ? " · categorías con cifra" : ""}</figcaption>
-          <HBars items={barItems} format={b.format} share={parts} width={128} reservedThreshold={threshold} />
+      {composition ? (
+        <figure>
+          <figcaption>Composición por año · {b.unit}</figcaption>
+          <StackedColumns
+            periods={years.map(String)}
+            categories={labels}
+            values={byCategory(years.map(String), (label, i) => yearValue(label, years[i]))}
+            format={b.format}
+            highlight={key === ALL_YEARS ? undefined : String(key)}
+            width={130}
+            height={36}
+          />
+          <SwatchLegend labels={labels} />
         </figure>
+      ) : (
+        (!byTerm || !chartable) && (
+          <figure className="bol-wide">
+            <figcaption>{keyText} · {b.unit}{long ? " · categorías con cifra" : ""}</figcaption>
+            <HBars items={barItems} format={b.format} share={parts} width={128} reservedThreshold={threshold} />
+          </figure>
+        )
       )}
       {long && (reservedNow.length > 0 || nobody.length > 0) && (
         <p className="bol-reserve">
@@ -981,26 +1002,80 @@ function mapUnit(map: MapDataset, catalog: OpenDataCatalog, settings: BulletinSe
   );
 }
 
-function heatmapUnit(h: HeatmapData, period: string): ReactNode | null {
+/** Con más filas que estas, la comparativa no cabe bajo la matriz: va en su propia hoja. */
+const HEATMAP_COMPARE_INLINE = 12;
+
+/**
+ * Mapa de calor: la matriz sombreada y, debajo, la comparativa de la primera
+ * a la última columna con dato (la misma de la ficha). Una matriz larga deja
+ * la comparativa en la hoja siguiente.
+ */
+function heatmapUnits(h: HeatmapData, period: string): { node: ReactNode; title: string }[] {
   const all = h.values.flat().filter((v): v is number => v !== null);
-  if (!all.length) return null;
+  if (!all.length) return [];
   const max = Math.max(...all);
   const min = Math.min(...all);
-  return (
-    <DatasetSheet title={h.title} description={h.description} source={h.source} notes={[["Casilla vacía", h.emptyMeaning], ["Unidad", h.unit]]} cut={period} wide={h.columns.length > 7}>
-      <DataTable
-        head={[h.rowLabel, ...h.columns]}
-        rows={h.rows.map((row, r) => ({
-          label: row,
-          cells: h.columns.map((_, c) => figure(h.values[r]?.[c] ?? null, h.format)),
-          shade: h.columns.map((_, c) => {
-            const v = h.values[r]?.[c];
-            return v === null || v === undefined ? null : max === min ? 0.5 : (v - min) / (max - min);
-          }),
-        }))}
-      />
-    </DatasetSheet>
+  const compare = heatmapCompare(h);
+  const notes: [string, ReactNode][] = [["Casilla vacía", h.emptyMeaning], ["Unidad", h.unit]];
+  const matrix = (
+    <DataTable
+      head={[h.rowLabel, ...h.columns]}
+      rows={h.rows.map((row, r) => ({
+        label: row,
+        cells: h.columns.map((_, c) => figure(h.values[r]?.[c] ?? null, h.format)),
+        shade: h.columns.map((_, c) => {
+          const v = h.values[r]?.[c];
+          return v === null || v === undefined ? null : max === min ? 0.5 : (v - min) / (max - min);
+        }),
+      }))}
+    />
   );
+  const comparison = compare && (
+    <DataTable
+      caption={`Comparativa ${compare.fromLabel}–${compare.toLabel}${compare.points ? " · diferencia en puntos porcentuales" : ""}`}
+      head={[h.rowLabel, compare.fromLabel, compare.toLabel, compare.points ? "Dif. (p. p.)" : "Diferencia", "Variación"]}
+      rows={compare.rows.map((row) => ({
+        label: row.label,
+        strong: row.total,
+        cells: [figure(row.from, h.format), figure(row.to, h.format), signed(row.diff, h.format), changeText(row.change)],
+      }))}
+    />
+  );
+  const compareNote: [string, ReactNode][] = compare
+    ? [["Comparativa", `Cada ${h.rowLabel.toLowerCase()} de ${compare.fromLabel} a ${compare.toLabel}: diferencia y variación en %.`]]
+    : [];
+  const wide = h.columns.length > 7;
+  if (!comparison || h.rows.length <= HEATMAP_COMPARE_INLINE) {
+    return [
+      {
+        title: h.title,
+        node: (
+          <DatasetSheet title={h.title} description={h.description} source={h.source} notes={[...notes, ...compareNote]} cut={period} wide={wide}>
+            {matrix}
+            {comparison}
+          </DatasetSheet>
+        ),
+      },
+    ];
+  }
+  return [
+    {
+      title: h.title,
+      node: (
+        <DatasetSheet title={h.title} description={h.description} source={h.source} notes={notes} cut={period} wide={wide}>
+          {matrix}
+        </DatasetSheet>
+      ),
+    },
+    {
+      title: `${h.title} · comparativa`,
+      node: (
+        <DatasetSheet title={`${h.title} · comparativa`} description={h.description} source={h.source} notes={[...notes, ...compareNote]} cut={period}>
+          {comparison}
+        </DatasetSheet>
+      ),
+    },
+  ];
 }
 
 /** Ancho al que se dibuja la tubería antes de escalarla al ancho del cuerpo. */
@@ -1869,7 +1944,7 @@ export function compose(catalog: OpenDataCatalog, settings: BulletinSettings): C
         if (m) nodes.push({ node: mapUnit(m, catalog, settings), source: m.source, title: m.title });
       } else if (kind === "calor") {
         const h = report.heatmaps?.find((x) => x.id === key);
-        if (h) nodes.push({ node: heatmapUnit(h, period), source: h.source, title: h.title });
+        if (h) heatmapUnits(h, period).forEach(({ node, title }) => nodes.push({ node, source: h.source, title }));
       } else if (kind === "tuberia") {
         const p = (report.pipelines ?? (report.pipeline ? [report.pipeline] : [])).find((x) => x.id === key);
         if (p) nodes.push({ node: pipelineUnit(p, settings, catalog, period), source: p.source, title: p.title });
@@ -1906,6 +1981,14 @@ export function compose(catalog: OpenDataCatalog, settings: BulletinSettings): C
           freeUnits(parsed.set, parsed.view, settings.cut, DatasetSheet, TableContinuation).forEach(({ node, title, tight }) =>
             nodes.push({ node, source: parsed.set.source, title, tight }),
           );
+          // Tras la última gráfica del conjunto que entra al boletín, su tabla de origen.
+          const setId = parsed.set.id;
+          const lastOfSet = entry.datasets.filter((d) => d.include && d.ref.startsWith(`libre:${setId}:`) && parseFreeKey(report, d.ref.slice(6))).pop();
+          if (lastOfSet === item) {
+            freeSourceUnits(parsed.set, settings.cut, DatasetSheet, TableContinuation).forEach(({ node, title, tight }) =>
+              nodes.push({ node, source: parsed.set.source, title, tight }),
+            );
+          }
         }
       } else if (kind === "imagenes") {
         const block = (report.blocks ?? []).find((b) => b.kind === "imagenes" && (b.settings.slot ?? "1") === key);

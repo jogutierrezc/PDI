@@ -166,6 +166,18 @@ function ReportContent({ data, report, year, term, campus, setYear, setTerm, set
     }
   }
 
+  // Conjuntos libres: una vista con bloque propio no se repite en el bloque de
+  // «todas las vistas» del mismo conjunto, y la tabla de origen va una sola vez,
+  // debajo del último bloque que dibuja algo de ese conjunto.
+  const ownFreeViews = new Set(blocks.filter((b) => b.kind === "libre" && b.refKey && b.settings.view).map((b) => `${b.refKey}:${b.settings.view}`));
+  const lastFreeBlock = new Map<string, ReportBlock>();
+  for (const b of blocks) {
+    const set = b.kind === "libre" ? report.freeSets?.find((f) => f.id === b.refKey) : undefined;
+    if (!set) continue;
+    const draws = b.settings.view ? set.views.some((v) => v.key === b.settings.view) : set.views.some((v) => !ownFreeViews.has(`${set.id}:${v.key}`));
+    if (draws) lastFreeBlock.set(set.id, b);
+  }
+
   /** Un bloque suelto es una sección de la ficha; dentro de un punto, el punto ya pone el título. */
   const shell = (key: string, id: string, title: string, description: string | undefined, inSection: boolean, children: ReactNode) =>
     inSection ? (
@@ -460,7 +472,17 @@ function ReportContent({ data, report, year, term, campus, setYear, setTerm, set
         const set = report.freeSets?.find((f) => f.id === block.refKey);
         if (!set) return null;
         const view = block.settings.view;
-        return <FreeSetBlock key={key} set={set} viewKey={view} title={block.settings.title} anchor={`od-libre-${set.id}${view ? `-${view}` : ""}`} />;
+        return (
+          <FreeSetBlock
+            key={key}
+            set={set}
+            viewKey={view}
+            exclude={view ? undefined : set.views.filter((v) => ownFreeViews.has(`${set.id}:${v.key}`)).map((v) => v.key)}
+            withSource={lastFreeBlock.get(set.id) === block}
+            title={block.settings.title}
+            anchor={`od-libre-${set.id}${view ? `-${view}` : ""}`}
+          />
+        );
       }
       case "saber_tyt": {
         if (inSection) return null;

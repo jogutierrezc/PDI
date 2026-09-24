@@ -87,7 +87,15 @@ export function BreakdownChart({ breakdown, year, term, years, setYear }: {
 
   const partsOfWhole = breakdown.unit !== "%" && available.flatMap(cutsOf).every((cut) => itemsAt(cut).every((i) => i.value === null || i.value >= 0));
   const hasPeriods = available.some((y) => hasTerm(y, "A") || hasTerm(y, "B"));
-  const [view, setView] = useState<View>(breakdown.unit === "%" || breakdown.defaultChart === "barras" ? "barras" : "circular");
+  // La vista de entrada es la que fija la intranet. Composición pide partes de
+  // un todo y más de un corte; si no los hay, abre en barras (una tasa) o circular.
+  const [view, setView] = useState<View>(() =>
+    breakdown.defaultChart === "composicion" && partsOfWhole && cuts.length > 1
+      ? "composicion"
+      : breakdown.unit === "%" || breakdown.defaultChart === "barras"
+        ? "barras"
+        : "circular",
+  );
   const shownView: View =
     (view === "circular" || view === "composicion") && !partsOfWhole ? "barras" : view === "combinada" && (!hasPeriods || term) ? "lineas" : view;
   const series = shownView === "composicion" || shownView === "lineas" || shownView === "combinada";

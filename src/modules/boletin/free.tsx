@@ -9,6 +9,9 @@
    papel y sin animación; el documento las escala al ancho del cuerpo. El mapa
    usa el coroplético del boletín; la tabla, la tabla del boletín con sus
    continuaciones; las cifras clave, números en tinta.
+
+   Después de la última vista de una fuente va su tabla de origen, salvo que
+   la fuente ya tenga una vista de tabla (ver freeSourceUnits).
    ========================================================================== */
 
 import type { ReactNode } from "react";
@@ -231,4 +234,13 @@ export function freeUnits(set: FreeSet, view: FreeView, cut: number, Sheet: Shee
       ),
     },
   ];
+}
+
+/**
+ * La tabla de origen de una fuente: sus filas tal como se cargaron, después
+ * de sus gráficas. Nada si la fuente ya publica su propia vista de tabla.
+ */
+export function freeSourceUnits(set: FreeSet, cut: number, Sheet: SheetComponent, Continuation: ContinuationComponent): { node: ReactNode; title: string; tight?: boolean }[] {
+  if (set.views.some((v) => v.type === "tabla" && viewProblems(set, v).length === 0)) return [];
+  return freeUnits(set, { key: "__origen", title: "Datos de origen", type: "tabla" }, cut, Sheet, Continuation);
 }

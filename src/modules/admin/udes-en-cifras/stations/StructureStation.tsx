@@ -731,7 +731,7 @@ function DatasetsEditor({ data, reportId, years, canEdit }: { data: StationProps
 
       <ul className="oda-datasets">
         {breakdowns.map((b) => (
-          <DatasetItem key={b.id} kind="Desglose" title={b.title} detail={`${b.unit} · ${b.default_chart === "barras" ? "barras" : "circular"} · ${yearsDetail(b.years)}`} canEdit={canEdit}
+          <DatasetItem key={b.id} kind="Desglose" title={b.title} detail={`${b.unit} · ${b.default_chart === "barras" ? "barras" : b.default_chart === "composicion" ? "composición" : "circular"} · ${yearsDetail(b.years)}`} canEdit={canEdit}
             editing={editing === b.id} onEdit={() => setEditing(b.id)} onDelete={() => remove.mutate({ table: "od_breakdowns", id: b.id })}>
             <DatasetForm kind="desglose" offices={offices} years={years} initial={{ title: b.title, unit: b.unit, format: b.format, chart: b.default_chart, years: b.years, office_id: b.office_id ?? "" }}
               onCancel={() => setEditing(null)} onSubmit={(f) => saveBreakdown.mutate({ id: b.id, report_id: reportId, title: f.title, unit: f.unit, format: f.format, default_chart: f.chart, years: f.years, office_id: f.office_id || null }, done)} />
@@ -954,6 +954,7 @@ function DatasetForm({ kind, offices, years, initial, onSubmit, onCancel }: {
             <select value={f.chart} onChange={(e) => set({ chart: e.target.value as OdChartKind })}>
               <option value="circular">Circular</option>
               <option value="barras">Barras</option>
+              <option value="composicion">Composición (varios cortes)</option>
             </select>
           </label>
         )}

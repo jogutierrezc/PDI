@@ -38,7 +38,7 @@ export type Direction = "sube" | "baja" | "neutro";
 /** "suma": el total institucional es la suma de los campus. "reportado": se captura aparte. */
 export type Aggregation = "suma" | "reportado";
 
-export type ChartKind = "circular" | "barras" | "lineas";
+export type ChartKind = "circular" | "barras" | "lineas" | "composicion";
 
 export type BlockKind =
   | "kpis"

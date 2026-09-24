@@ -1007,7 +1007,7 @@ export type OdMapReporting = "anual" | "global";
 export type OdMapLayout = "combinado" | "lado_a_lado";
 /** Qué se captura en cada etapa de una tubería. */
 export type OdPipelineMeasure = "estudiantes" | "permanencia" | "desercion";
-export type OdChartKind = "circular" | "barras" | "lineas";
+export type OdChartKind = "circular" | "barras" | "lineas" | "composicion";
 export type OdBlockKind =
   | "kpis"
   | "evolucion"

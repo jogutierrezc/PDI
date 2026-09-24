@@ -4305,3 +4305,14 @@
 @media (max-width: 720px) {
   .od-gallery__grid { grid-template-columns: minmax(0, 1fr); gap: var(--space-4); }
 }
+
+/* Comparativa del mapa de calor: primera contra última columna con dato. */
+.od-heat__compare .od-table { min-width: 34rem; }
+.od-heat__compare tr[data-kind="total"] > * { border-top: 1px solid var(--line-strong); font-weight: 700; color: var(--ink); }
+.od-heat__compare td[data-trend] { font-weight: 600; color: var(--ink); }
+.od-heat__compare td[data-trend="baja"] { color: var(--ink-secondary); }
+.od-heat__note {
+  margin: var(--space-3) 0 0;
+  color: var(--ink-muted);
+  font-size: var(--text-xs);
+}

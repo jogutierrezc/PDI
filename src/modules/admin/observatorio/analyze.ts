@@ -513,6 +513,7 @@ export function fitEncoding(dataset: ObsDataset, type: ObsChartType, current: Pa
   let series: string[] | undefined;
   if (spec.series === "una") series = (keptSeries.length ? keptSeries : rec?.encoding.series ?? nums.map((n) => n.key)).slice(0, 1);
   else if (spec.series === "varias") series = keptSeries.length ? keptSeries : rec?.encoding.series ?? nums.slice(0, type === "puntos" ? 2 : 3).map((n) => n.key);
+  else if (spec.series === "dos") series = keptSeries.length >= 2 ? keptSeries.slice(0, 2) : rec?.encoding.series?.slice(0, 2) ?? nums.slice(0, 2).map((n) => n.key);
   else if (spec.series === "tres") series = keptSeries.length >= 3 ? keptSeries.slice(0, 3) : rec?.encoding.series ?? nums.slice(0, 3).map((n) => n.key);
   else if (type === "tabla") series = nums.map((n) => n.key);
   if (type === "radar" && series && series.length < 3) series = nums.slice(0, 6).map((n) => n.key);

@@ -65,6 +65,7 @@ export type FreeChartType =
   | "barras_comparadas"
   | "barras_apiladas"
   | "barras_100"
+  | "barras_linea"
   | "circular"
   | "dona"
   | "radar"
@@ -145,7 +146,8 @@ export const CHART_TYPES: Record<
     label: string;
     hint: string;
     category: "texto" | "territorio" | "ninguna" | "opcional";
-    series: "una" | "varias" | "ninguna";
+    /** "dos": la primera cifra en barras y la segunda en línea, cada una con su eje. */
+    series: "una" | "dos" | "varias" | "ninguna";
     dates?: boolean;
     needsYears?: boolean;
     /** Pide una segunda columna de texto que reparte cada categoría. */
@@ -162,6 +164,12 @@ export const CHART_TYPES: Record<
   },
   barras_apiladas: { label: "Barras apiladas", hint: "Cada barra suma sus cifras: el total y sus partes.", category: "texto", series: "varias" },
   barras_100: { label: "Barras al 100 %", hint: "El reparto de cada categoría entre sus partes, en porcentaje.", category: "texto", series: "varias" },
+  barras_linea: {
+    label: "Barras y línea",
+    hint: "Dos cifras de escala distinta, cada una con su eje: la primera en barras (a la izquierda) y la segunda en línea (a la derecha). En una fuente anual, un año por barra y, con categorías, la barra repartida entre ellas.",
+    category: "opcional",
+    series: "dos",
+  },
   circular: { label: "Circular", hint: "El reparto de un total entre pocas categorías (hasta 6; el resto va a «Otros»).", category: "texto", series: "una" },
   dona: { label: "Dona", hint: "Como la circular, con el total en el centro.", category: "texto", series: "una" },
   radar: { label: "Radar", hint: "El perfil de varias categorías en las mismas dimensiones (cada cifra es un eje).", category: "texto", series: "varias" },
@@ -478,5 +486,9 @@ export function viewProblems(set: FreeSet, view: FreeView): string[] {
     );
   }
   if (view.type === "radar" && series.length < 3) problems.push("El radar necesita al menos tres cifras (una por eje).");
+  if (spec.series === "dos" && (series.length < 2 || view.series?.[0] === view.series?.[1])) {
+    problems.push("Elige dos cifras distintas: una para las barras y otra para la línea.");
+  }
+  if (view.type === "barras_linea" && set.temporality !== "anual" && !category) problems.push("Sin años, elige la columna de categorías: cada una es una barra.");
   return problems;
 }

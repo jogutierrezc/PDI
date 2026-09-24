@@ -193,7 +193,7 @@ export interface ChartSpec {
   /** Dónde nació el tipo: los conjuntos libres o un bloque de informe. */
   origin: "Conjuntos libres" | "Informes";
   category: "texto" | "territorio" | "municipio" | "ninguna" | "opcional";
-  series: "una" | "varias" | "tres" | "ninguna";
+  series: "una" | "dos" | "varias" | "tres" | "ninguna";
   category2?: boolean;
   dates?: boolean;
 }
@@ -263,6 +263,7 @@ const FAMILY_OF: Record<FreeChartType, ChartFamily> = {
   barras_comparadas: "Comparar",
   barras_apiladas: "Comparar",
   barras_100: "Reparto",
+  barras_linea: "Comparar",
   radar: "Comparar",
   circular: "Reparto",
   dona: "Reparto",
@@ -336,6 +337,7 @@ export function obsViewProblems(dataset: ObsDataset | undefined, view: Pick<ObsV
   if (spec.series === "una" || spec.series === "varias") {
     if (!series.length) problems.push("Falta al menos una cifra.");
   }
+  if (spec.series === "dos" && (series.length < 2 || view.series?.[0] === view.series?.[1])) problems.push("Faltan dos cifras: la de las barras y la de la línea.");
   if (spec.series === "tres" && series.length < 3) problems.push("El bosque pide tres cifras: estimación, límite inferior y superior.");
   if (spec.dates && (columnOf(set, view.start)?.kind !== "fecha" || columnOf(set, view.end)?.kind !== "fecha")) problems.push("Faltan las fechas de inicio y fin.");
   if (view.type === "radar" && series.length < 3) problems.push("El radar necesita al menos tres cifras.");

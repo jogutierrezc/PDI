@@ -116,7 +116,7 @@ export function DesignStation({ state, topic, canEdit, go }: ObsStationProps) {
         const current = d.series ?? [];
         if (current.includes(key)) return d;
         const one = spec.series === "una";
-        return { ...d, series: one ? [key] : spec.series === "tres" ? [...current, key].slice(-3) : [...current, key] };
+        return { ...d, series: one ? [key] : spec.series === "tres" ? [...current, key].slice(-3) : spec.series === "dos" ? [...current, key].slice(-2) : [...current, key] };
       }
       if (c.kind === "cifra") return d;
       return { ...d, [shelf]: key };
@@ -252,7 +252,7 @@ export function DesignStation({ state, topic, canEdit, go }: ObsStationProps) {
             shelf("category", spec.category === "territorio" || spec.category === "municipio" ? "Territorio" : spec.category2 ? "Filas" : "Categoría", draft.category ? [draft.category] : [])
           )}
           {spec.category2 && shelf("category2", "Columnas", draft.category2 ? [draft.category2] : [])}
-          {spec.series !== "ninguna" && shelf("series", spec.series === "tres" ? "Estimación · inferior · superior" : "Cifras", draft.series ?? [], spec.series !== "una")}
+          {spec.series !== "ninguna" && shelf("series", spec.series === "tres" ? "Estimación · inferior · superior" : spec.series === "dos" ? "Barras · línea" : "Cifras", draft.series ?? [], spec.series !== "una")}
           <div className="obs-shelf-options">
             {["barras", "barras_apiladas", "barras_100"].includes(draft.type) && (
               <div className="obs-segment obs-segment--small" role="group" aria-label="Orientación">

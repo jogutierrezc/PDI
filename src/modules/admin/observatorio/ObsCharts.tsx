@@ -675,6 +675,16 @@ const THUMBS: Record<ObsChartType, ReactNode> = {
       <path d="M6 42h58" stroke={L} />
     </>
   ),
+  // Barras con una línea encima: dos cifras, dos ejes.
+  barras_linea: (
+    <>
+      {[10, 23, 36, 49].map((x, i) => (
+        <rect key={x} x={x} y={[26, 18, 22, 14][i]} width="9" height={[16, 24, 20, 28][i]} rx="1.5" fill={P} />
+      ))}
+      <path d="M14.5 20L27.5 12L40.5 16L53.5 8" fill="none" stroke={Q} strokeWidth="2" strokeLinejoin="round" />
+      <path d="M6 42h58" stroke={L} />
+    </>
+  ),
   barras_apiladas: (
     <>
       {[10, 23, 36, 49].map((x, i) => (

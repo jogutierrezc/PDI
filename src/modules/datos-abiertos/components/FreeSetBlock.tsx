@@ -26,7 +26,7 @@ import "./free-sets.css";
 const NARROW: FreeChartType[] = ["circular", "dona", "radar", "histograma", "caja", "cifras"];
 // Las barras comparadas necesitan la serie entera: con las filas de un
 // solo año no hay dos periodos que poner al lado.
-const USES_ALL_YEARS: FreeChartType[] = ["lineas", "area", "gantt", "barras_comparadas"];
+const USES_ALL_YEARS: FreeChartType[] = ["lineas", "area", "gantt", "barras_comparadas", "barras_linea"];
 
 export function temporalityText(set: FreeSet, year: number | null) {
   if (set.temporality === "periodo") return set.periodLabel ? `Periodo ${set.periodLabel}` : "Dato del periodo";

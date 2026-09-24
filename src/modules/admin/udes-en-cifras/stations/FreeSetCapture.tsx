@@ -847,7 +847,7 @@ const TYPE_GROUPS: { label: string; types: FreeChartType[] }[] = [
   { label: "Comparar", types: ["barras", "barras_comparadas", "barras_apiladas", "barras_100", "radar"] },
   { label: "Reparto", types: ["circular", "dona", "cascada"] },
   { label: "Distribución", types: ["histograma", "caja"] },
-  { label: "Tiempo", types: ["lineas", "area", "gantt"] },
+  { label: "Tiempo", types: ["lineas", "area", "barras_linea", "gantt"] },
   { label: "Territorio", types: ["mapa"] },
   { label: "Otros", types: ["cifras", "tabla"] },
 ];
@@ -866,7 +866,7 @@ function cleanView(v: FreeView): FreeView {
   const out: FreeView = { key: v.key, title: v.title.trim(), type: v.type };
   if (v.description?.trim()) out.description = v.description.trim();
   if (spec.category !== "ninguna" && v.category) out.category = v.category;
-  if (spec.series !== "ninguna" && v.series?.length) out.series = spec.series === "una" ? v.series.slice(0, 1) : v.series;
+  if (spec.series !== "ninguna" && v.series?.length) out.series = spec.series === "una" ? v.series.slice(0, 1) : spec.series === "dos" ? v.series.slice(0, 2) : v.series;
   if (BARS.includes(v.type)) out.orientation = v.orientation ?? "vertical";
   if (SORTABLE.includes(v.type) && v.sort && v.sort !== "fuente") out.sort = v.sort;
   if (v.type === "histograma" && v.bins) out.bins = v.bins;
@@ -1081,6 +1081,31 @@ function ViewForm({ set, initial, takenKeys, onSubmit, onCancel }: {
               {numbers.map((c) => <option key={c.key} value={c.key}>{c.label}</option>)}
             </select>
           </label>
+        )}
+
+        {spec.series === "dos" && (
+          <>
+            <label className="admin-field">
+              <span>Barras <small>eje izquierdo</small></span>
+              <select value={series[0] ?? ""} onChange={(e) => patch({ series: [e.target.value, series[1] ?? ""].filter(Boolean) })}>
+                <option value="">Elige una columna…</option>
+                {numbers.map((c) => <option key={c.key} value={c.key}>{c.label}</option>)}
+              </select>
+              <small className="oda-field-hint">P. ej. presupuesto ejecutado.</small>
+            </label>
+            <label className="admin-field">
+              <span>Línea <small>eje derecho</small></span>
+              <select
+                value={series[1] ?? ""}
+                disabled={!series[0]}
+                onChange={(e) => patch({ series: [series[0], e.target.value].filter(Boolean) })}
+              >
+                <option value="">Elige una columna…</option>
+                {numbers.filter((c) => c.key !== series[0]).map((c) => <option key={c.key} value={c.key}>{c.label}</option>)}
+              </select>
+              <small className="oda-field-hint">P. ej. número de proyectos.</small>
+            </label>
+          </>
         )}
 
         {spec.series === "varias" && (

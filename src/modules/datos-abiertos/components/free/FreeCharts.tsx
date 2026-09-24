@@ -159,6 +159,8 @@ export function FreeChart({ set, view, year }: { set: FreeSet; view: FreeView; y
       return <Bars {...common} />;
     case "barras_comparadas":
       return <CompareBars {...common} />;
+    case "barras_linea":
+      return <BarsLine {...common} />;
     case "circular":
     case "dona":
       return <PieChart {...common} />;
@@ -450,6 +452,226 @@ function Bars({ t, animate, set, view, rows }: ChartProps) {
       {allSeries.length > MAX_CATEGORICAL && <Note>Se dibujan las seis primeras cifras; el resto está en la tabla.</Note>}
       <SrTable caption={view.title} head={[category.label, ...series.map((s) => s.label)]} rows={totals.map((d) => [d.label, ...series.map((s) => fmt(s, d.values[s.key]))])} />
     </>
+  );
+}
+
+/* --- Barras y línea -------------------------------------------------------------------
+   Dos cifras de escala distinta en la misma gráfica, cada una con su eje: la
+   primera en barras (eje izquierdo) y la segunda en línea (eje derecho). El
+   caso que la pidió: presupuesto ejecutado y número de proyectos de las
+   convocatorias de investigación.
+
+   En una fuente anual cada año es una barra y, con categorías, la barra se
+   reparte entre ellas (la convocatoria); la línea es el total del año. Sin
+   años, cada categoría es una barra. La línea suma si su cifra es un conteo y
+   promedia si es una tasa: sumar porcentajes no da nada. */
+
+const compact = new Intl.NumberFormat("es-CO", { notation: "compact", maximumFractionDigits: 1 });
+const axisFmt = (column: FreeColumn, value: number) => (Math.abs(value) >= 10000 ? compact.format(value) : shortFmt(column, value));
+const additive = (column: FreeColumn) => column.unit !== "%" && column.format !== "porcentaje";
+
+function BarsLine({ t, animate, set, view, rows }: ChartProps) {
+  const [bar, line] = seriesOf(set, view);
+  const category = columnOf(set, view.category);
+  const byYear = set.temporality === "anual";
+  if (!bar || !line) return <Note>Elige dos cifras: una para las barras y otra para la línea.</Note>;
+  if (!byYear && !category) return <Note>Elige la columna de categorías: cada una es una barra.</Note>;
+
+  // El eje: los años de la fuente o, sin años, las categorías en su orden.
+  const xOf = (row: FreeRow) => (byYear ? (row.year === null ? "" : String(row.year)) : textOf(row.cells[category!.key]));
+  const xs = byYear ? freeYears(set).map(String) : Array.from(new Set(rows.map(xOf).filter(Boolean)));
+  // Con años y categorías, cada barra se reparte entre las categorías (seis a lo sumo; el resto, «Otras»).
+  const stacked = byYear && category !== undefined;
+  const allParts = stacked ? Array.from(new Set(rows.map((r) => textOf(r.cells[category!.key])).filter(Boolean))) : [];
+  const parts = allParts.length > MAX_CATEGORICAL ? [...allParts.slice(0, MAX_CATEGORICAL - 1), "Otras"] : allParts;
+  const partOf = (row: FreeRow) => {
+    const label = textOf(row.cells[category!.key]);
+    return parts.includes(label) ? label : "Otras";
+  };
+  const keys = stacked ? parts : [bar.label];
+
+  const data = xs.map((x) => {
+    const here = rows.filter((r) => xOf(r) === x);
+    const datum: Record<string, string | number> = { x };
+    for (const key of keys) {
+      const values = here
+        .filter((r) => !stacked || partOf(r) === key)
+        .map((r) => numberOf(r.cells[bar.key]))
+        .filter((v): v is number => v !== null);
+      if (values.length) datum[key] = values.reduce((a, b) => a + b, 0);
+    }
+    return datum;
+  });
+  const lineValues = xs.map((x) => {
+    const values = rows
+      .filter((r) => xOf(r) === x)
+      .map((r) => numberOf(r.cells[line.key]))
+      .filter((v): v is number => v !== null);
+    if (!values.length) return null;
+    const sum = values.reduce((a, b) => a + b, 0);
+    return additive(line) ? sum : sum / values.length;
+  });
+  const barTotals = data.map((d) => keys.reduce((acc, k) => acc + (typeof d[k] === "number" ? (d[k] as number) : 0), 0));
+  if (!xs.length || (barTotals.every((v) => v === 0) && lineValues.every((v) => v === null))) {
+    return <Note>La fuente no tiene filas para esta gráfica.</Note>;
+  }
+
+  // Cuatro tramos de paso redondo en el eje derecho: 0, 10, 20, 30, 40 y no 0, 6, 13, 19, 25.
+  const lineStep = niceCeil(Math.max(0, ...lineValues.filter((v): v is number => v !== null)) / 4 || 0.25);
+  const lineMax = lineStep * 4;
+  const rotate = !byYear && xs.length > 6;
+  const lineColor = t.total;
+
+  return (
+    <>
+      <Legend
+        items={[
+          ...keys.map((k, i) => ({ label: stacked ? k : bar.label, color: t.cats[i] })),
+          { label: `${line.label} (línea, eje derecho)`, color: lineColor },
+        ]}
+      />
+      {stacked && <Note>Barras: {bar.label.toLowerCase()} repartido por {category!.label.toLowerCase()} (eje izquierdo).</Note>}
+      {allParts.length > MAX_CATEGORICAL && <Note>Se reparten las cinco primeras categorías; las demás van juntas en «Otras».</Note>}
+      <Frame>
+        {(width) => (
+          <Bar
+            width={width}
+            height={HEIGHT}
+            data={data}
+            keys={keys}
+            indexBy="x"
+            groupMode="stacked"
+            margin={{ top: 24, right: 64, bottom: rotate ? 92 : 44, left: 72 }}
+            padding={0.32}
+            borderRadius={2}
+            colors={({ id }) => t.cats[keys.indexOf(String(id))]}
+            theme={nivoTheme(t)}
+            animate={animate}
+            enableGridY
+            enableLabel={false}
+            axisBottom={{ tickSize: 0, tickPadding: 8, tickRotation: rotate ? -38 : 0 }}
+            axisLeft={{ tickSize: 0, tickPadding: 8, format: (v) => axisFmt(bar, Number(v)) }}
+            valueFormat={(v) => fmt(bar, v)}
+            layers={[
+              "grid",
+              "axes",
+              "bars",
+              (props) => (
+                <LineLayer
+                  xs={xs}
+                  values={lineValues}
+                  max={lineMax}
+                  column={line}
+                  color={lineColor}
+                  t={t}
+                  innerWidth={props.innerWidth}
+                  innerHeight={props.innerHeight}
+                  xScale={props.xScale as unknown as LineLayerProps["xScale"]}
+                />
+              ),
+            ]}
+            tooltip={({ id, value, indexValue }) => {
+              const at = xs.indexOf(String(indexValue));
+              return (
+                <Tip
+                  title={String(indexValue)}
+                  lines={[
+                    ...(stacked
+                      ? [`${id}: ${fmt(bar, value)}`, `${bar.label} del año: ${fmt(bar, barTotals[at] ?? null)}`]
+                      : [`${bar.label}: ${fmt(bar, value)}`]),
+                    `${line.label}: ${fmt(line, lineValues[at] ?? null)}`,
+                  ]}
+                />
+              );
+            }}
+            role="img"
+            ariaLabel={view.title}
+          />
+        )}
+      </Frame>
+      <SrTable
+        caption={view.title}
+        head={[byYear ? "Año" : category!.label, ...(stacked ? keys : []), stacked ? `${bar.label} total` : bar.label, line.label]}
+        rows={xs.map((x, i) => [
+          x,
+          ...(stacked ? keys.map((k) => fmt(bar, typeof data[i][k] === "number" ? (data[i][k] as number) : null)) : []),
+          fmt(bar, barTotals[i]),
+          fmt(line, lineValues[i]),
+        ])}
+      />
+    </>
+  );
+}
+
+interface LineLayerProps {
+  xs: string[];
+  values: (number | null)[];
+  max: number;
+  column: FreeColumn;
+  color: string;
+  t: ChartTokens;
+  innerWidth: number;
+  innerHeight: number;
+  xScale: ((value: string) => number | undefined) & { bandwidth: () => number };
+}
+
+/** La línea con su eje derecho y la cifra sobre cada punto. Un vacío corta la línea: no es cero. */
+function LineLayer({ xs, values, max, column, color, t, innerWidth, innerHeight, xScale }: LineLayerProps) {
+  const band = xScale.bandwidth();
+  const y = (v: number) => innerHeight - (v / max) * innerHeight;
+  const points = xs.map((x, i) => {
+    const v = values[i];
+    const left = xScale(x);
+    return v === null || left === undefined ? null : { x: left + band / 2, y: y(v), v, label: x };
+  });
+  // Tramos continuos: un año sin dato parte la línea en dos.
+  const runs: { x: number; y: number }[][] = [[]];
+  for (const p of points) {
+    if (p) runs[runs.length - 1].push(p);
+    else if (runs[runs.length - 1].length) runs.push([]);
+  }
+  const ticks = [0, 0.25, 0.5, 0.75, 1].map((f) => f * max);
+  return (
+    <g>
+      <g transform={`translate(${innerWidth + 10},0)`} aria-hidden="true">
+        {ticks.map((v) => (
+          <text key={v} x={0} y={y(v)} dominantBaseline="middle" style={{ fill: t.muted, fontSize: 11, fontFamily: t.font }}>
+            {axisFmt(column, v)}
+          </text>
+        ))}
+      </g>
+      {runs
+        .filter((run) => run.length > 1)
+        .map((run, i) => (
+          <polyline key={i} points={run.map((p) => `${p.x},${p.y}`).join(" ")} fill="none" stroke={color} strokeWidth={2.5} strokeLinejoin="round" strokeLinecap="round" />
+        ))}
+      {points.map((p) =>
+        p ? (
+          <g key={p.label}>
+            <circle cx={p.x} cy={p.y} r={4.5} fill={t.surface} stroke={color} strokeWidth={2.5}>
+              <title>{`${p.label} · ${column.label}: ${fmt(column, p.v)}`}</title>
+            </circle>
+            <text
+              x={p.x}
+              y={p.y - 10}
+              textAnchor="middle"
+              style={{
+                fill: color,
+                fontSize: 11,
+                fontWeight: 700,
+                fontFamily: t.font,
+                fontVariantNumeric: "tabular-nums",
+                paintOrder: "stroke",
+                stroke: t.surface,
+                strokeWidth: 3,
+              }}
+            >
+              {axisFmt(column, p.v)}
+            </text>
+          </g>
+        ) : null,
+      )}
+    </g>
   );
 }
 

@@ -63,7 +63,7 @@ const TABLE_FIRST = 26;
 const TABLE_NEXT = 40;
 // Las barras comparadas necesitan la serie entera: con las filas de un solo
 // año no hay dos periodos que poner al lado.
-const USES_ALL_YEARS = ["lineas", "area", "gantt", "barras_comparadas"];
+const USES_ALL_YEARS = ["lineas", "area", "gantt", "barras_comparadas", "barras_linea"];
 
 type SheetComponent = (props: {
   title: string;

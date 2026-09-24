@@ -27,7 +27,11 @@
   gap: var(--space-5);
 }
 
-.od-free__cell { min-width: 0; }
+.od-free__cell { position: relative; min-width: 0; }
+/* El tooltip sale del panel en vez de cortarse en su borde, y por encima del vecino. */
+.od-free__cell:hover { z-index: 2; }
+.od-free__cell .od-frame { overflow: visible; }
+.od-free__cell .od-frame__head { border-radius: var(--radius-sm) var(--radius-sm) 0 0; }
 .od-free__cell[data-span="full"] { grid-column: 1 / -1; }
 
 .od-free__canvas {
@@ -99,11 +103,15 @@
 .od-free__tip {
   display: grid;
   gap: 2px;
+  width: max-content;
+  max-width: 19rem;
   font-variant-numeric: tabular-nums;
-  white-space: nowrap;
+  line-height: 1.4;
+  overflow-wrap: anywhere;
 }
 
 .od-free__tip strong { font-size: var(--text-sm); }
+.od-free__tip span { opacity: 0.85; }
 
 /* --- Circular y dona ------------------------------------------------------------ */
 

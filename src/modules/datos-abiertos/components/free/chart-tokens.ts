@@ -118,10 +118,12 @@ export function nivoTheme(t: ChartTokens) {
     labels: { text: { fontFamily: t.font, fontSize: 11, fontWeight: 700 } },
     dots: { text: { fill: t.secondary, fontSize: 11 } },
     crosshair: { line: { stroke: t.ink, strokeWidth: 1, strokeOpacity: 0.35 } },
+    // Invertido, como .od-tip del resto del portal: fondo en tinta y texto del
+    // color del panel. Con el fondo del panel, el tooltip se perdía sobre la gráfica.
     tooltip: {
       container: {
-        background: t.surface,
-        color: t.ink,
+        background: t.ink,
+        color: t.surface,
         fontFamily: t.font,
         fontSize: 12,
         borderRadius: 8,

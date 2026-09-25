@@ -95,6 +95,7 @@
 }
 
 .admin-sidebar__foot {
+  position: relative;
   display: grid;
   gap: 2px;
   margin-top: auto;
@@ -2042,6 +2043,8 @@ fieldset.admin-field legend {
 
   .admin-shell[data-nav="iconos"] { grid-template-columns: 68px minmax(0, 1fr); }
   .admin-shell[data-nav="oculto"] { grid-template-columns: 0 minmax(0, 1fr); }
+  .admin-shell[data-bar="menus"][data-nav="oculto"] .admin-sidebar,
+  .admin-shell[data-bar="riel"][data-nav="oculto"] .admin-sidebar { display: none; }
 
   .admin-shell[data-nav="oculto"] .admin-sidebar {
     visibility: hidden;
@@ -2142,4 +2145,394 @@ fieldset.admin-field legend {
 @media (prefers-reduced-motion: reduce) {
   .admin-shell,
   .admin-nav__chevron { transition: none; }
+}
+
+/* === Perfil y barras de navegación =========================================
+   El pie de la barra dejó de ser una lista de enlaces: ahora es el perfil, y
+   detrás de él vive lo que no es una pantalla de trabajo. Y el mismo menú se
+   dibuja de tres maneras —lateral, menús arriba, riel de carpetas— según lo
+   que cada quien haya elegido en su perfil.
+   ========================================================================== */
+
+.admin-profile {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  width: 100%;
+  padding: var(--space-2) var(--space-3);
+  background: transparent;
+  border: 0;
+  border-radius: var(--radius-xs);
+  text-align: left;
+  cursor: pointer;
+  transition: background-color var(--dur-base) ease;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .admin-profile:hover { background: var(--surface-3); }
+}
+
+.admin-profile[aria-expanded="true"] { background: var(--surface-3); }
+.admin-profile[aria-expanded="true"] .admin-nav__chevron { transform: rotate(180deg); }
+
+.admin-profile__av {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 30px;
+  height: 30px;
+  background: var(--brand-navy);
+  border-radius: var(--radius-xs);
+  color: #fff;
+  font-size: var(--text-2xs);
+  font-weight: 800;
+  letter-spacing: 0.02em;
+}
+
+.admin-profile__av--lg { width: 36px; height: 36px; font-size: var(--text-sm); }
+
+.admin-profile__id {
+  display: grid;
+  gap: 1px;
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.admin-profile__id .admin-identity__name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--text-sm);
+}
+
+/* --- El menú del perfil ---------------------------------------------------- */
+
+/* Fija a la ventana, no a la columna: `.admin-sidebar` tiene overflow-y auto y
+   recortaba el menú. La posición exacta la mide el componente al abrirlo. */
+.admin-menu--carpeta { width: 288px; }
+
+.admin-menu {
+  position: fixed;
+  z-index: var(--z-modal);
+  width: 252px;
+  max-height: calc(100vh - var(--space-7));
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+  padding: var(--space-2);
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  box-shadow: var(--shadow-xl);
+  animation: admin-menu-in var(--dur-fast) var(--ease-out) both;
+}
+
+@keyframes admin-menu-in {
+  from { opacity: 0; transform: translateY(6px) scale(0.985); }
+}
+
+.admin-menu hr {
+  height: 1px;
+  margin: var(--space-2) var(--space-3);
+  background: var(--line);
+  border: 0;
+}
+
+.admin-menu__who {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-2) var(--space-3) var(--space-3);
+}
+
+.admin-menu__who span { display: grid; gap: 2px; min-width: 0; }
+.admin-menu__who strong {
+  display: block;
+  color: var(--ink);
+  font-size: var(--text-sm);
+  font-weight: 800;
+  overflow-wrap: anywhere;
+}
+.admin-menu__who small {
+  color: var(--brand-blue);
+  font-size: var(--text-2xs);
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.admin-menu__head {
+  padding: var(--space-2) var(--space-3) var(--space-1);
+  color: var(--ink-secondary);
+  font-size: var(--text-2xs);
+  font-weight: 800;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+}
+
+.admin-menu ul {
+  display: grid;
+  gap: 1px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.admin-menu a,
+.admin-menu button {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  width: 100%;
+  min-height: 36px;
+  padding: var(--space-2) var(--space-3);
+  color: var(--ink-secondary);
+  background: transparent;
+  border: 0;
+  border-radius: var(--radius-xs);
+  font: inherit;
+  font-size: var(--text-sm);
+  font-weight: 600;
+  text-align: left;
+  text-decoration: none;
+  cursor: pointer;
+  transition: color var(--dur-base) ease, background-color var(--dur-base) ease;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .admin-menu a:hover,
+  .admin-menu button:hover { color: var(--brand-navy); background: var(--surface-3); }
+}
+
+.admin-menu__label { flex: 1 1 auto; min-width: 0; }
+/* La pista de cada barra explica en una línea qué cambia al elegirla. */
+.admin-menu__label small {
+  display: block;
+  margin-top: 1px;
+  color: var(--ink-secondary);
+  font-size: var(--text-2xs);
+  font-weight: 600;
+  line-height: var(--leading-normal);
+}
+
+.admin-menu button.is-active { color: var(--brand-blue); background: var(--brand-blue-soft); font-weight: 700; }
+.admin-menu button.is-active .admin-menu__label small { color: var(--brand-blue); }
+.admin-menu__check { flex: none; color: var(--brand-blue); }
+.admin-menu .admin-menu__out { color: var(--status-risk); }
+
+@media (hover: hover) and (pointer: fine) {
+  .admin-menu .admin-menu__out:hover { color: var(--status-risk); background: rgba(208, 59, 59, 0.08); }
+}
+
+/* El ícono del grupo solo se usa en el riel; en las otras dos manda el rótulo. */
+.admin-nav__group-icon { display: none; }
+.admin-nav__rail-here { display: none; }
+
+@media (min-width: 901px) {
+  /* --- Barra de menús ------------------------------------------------------ */
+  /* Una sola fila arriba. Cada carpeta se abre al pulsarla y se cierra al
+     elegir una pantalla: el ancho y el alto quedan para el trabajo. */
+  .admin-shell[data-bar="menus"] {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: auto minmax(0, 1fr);
+  }
+
+  .admin-shell[data-bar="menus"] .admin-sidebar {
+    position: sticky;
+    top: 0;
+    z-index: var(--z-header);
+    height: auto;
+    flex-direction: row;
+    align-items: center;
+    gap: var(--space-4);
+    padding: var(--space-2) var(--space-4);
+    overflow: visible;
+    border-right: 0;
+    border-bottom: 1px solid var(--line);
+  }
+
+  .admin-shell[data-bar="menus"] .admin-sidebar__head { flex: none; gap: var(--space-3); }
+  .admin-shell[data-bar="menus"] .admin-brand {
+    grid-auto-flow: column;
+    align-items: center;
+    gap: var(--space-3);
+    padding: var(--space-1) var(--space-2);
+  }
+  .admin-shell[data-bar="menus"] .admin-brand img { height: 26px; }
+  .admin-shell[data-bar="menus"] .admin-brand small { display: none; }
+  .admin-shell[data-bar="menus"] .admin-brand strong { white-space: nowrap; }
+  .admin-shell[data-bar="menus"] .admin-sidebar__fold { display: none; }
+
+  .admin-shell[data-bar="menus"] .admin-nav {
+    display: flex;
+    flex: 1 1 auto;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 1px;
+    min-height: 0;
+    margin-inline: 0;
+    padding-inline: 0;
+    overflow: visible;
+  }
+
+  .admin-shell[data-bar="menus"] .admin-nav__group { position: relative; display: block; }
+
+  .admin-shell[data-bar="menus"] .admin-sidebar__foot {
+    flex: none;
+    position: relative;
+    margin-top: 0;
+    padding-top: 0;
+    border-top: 0;
+  }
+
+  .admin-shell[data-bar="menus"] .admin-profile { width: auto; }
+  .admin-shell[data-bar="menus"] .admin-profile__id { display: none; }
+  .admin-shell[data-bar="menus"] .admin-menu { animation-name: admin-menu-down; }
+
+  @keyframes admin-menu-down {
+    from { opacity: 0; transform: translateY(-6px) scale(0.985); }
+  }
+
+  /* --- Riel de carpetas ---------------------------------------------------- */
+  /* Un riel estrecho con las siete carpetas y, al lado, la abierta. Cambiar de
+     portal es un clic, sin plegar ni desplazar nada. */
+  .admin-shell[data-bar="riel"] { grid-template-columns: 78px 252px minmax(0, 1fr); }
+  .admin-shell[data-bar="riel"] .admin-body { grid-column: 3; }
+
+  .admin-shell[data-bar="riel"] .admin-sidebar {
+    align-items: center;
+    gap: var(--space-4);
+    padding: var(--space-4) var(--space-2);
+    overflow: visible;
+  }
+
+  .admin-shell[data-bar="riel"] .admin-sidebar__head { flex-direction: column; align-items: center; }
+  .admin-shell[data-bar="riel"] .admin-brand { justify-items: center; padding: 0; }
+  .admin-shell[data-bar="riel"] .admin-brand img { height: 26px; max-width: 52px; object-fit: contain; }
+  .admin-shell[data-bar="riel"] .admin-brand span { display: none; }
+  .admin-shell[data-bar="riel"] .admin-sidebar__fold { display: none; }
+
+  .admin-shell[data-bar="riel"] .admin-nav {
+    gap: 2px;
+    width: 100%;
+    justify-items: center;
+    margin-inline: 0;
+    padding-inline: 0;
+    overflow: visible;
+  }
+
+  .admin-shell[data-bar="riel"] .admin-nav__group { position: static; width: 100%; justify-items: center; }
+
+  .admin-shell[data-bar="riel"] .admin-nav__group-label {
+    position: relative;
+    flex-direction: column;
+    gap: 5px;
+    width: 62px;
+    min-height: 58px;
+    padding: var(--space-2) 2px;
+    border-radius: var(--radius-xs);
+    font-size: 0.59375rem;
+    font-weight: 800;
+    letter-spacing: 0.01em;
+    text-align: center;
+    text-transform: none;
+  }
+
+  .admin-shell[data-bar="riel"] .admin-nav__group-icon { display: block; flex: none; }
+  .admin-shell[data-bar="riel"] .admin-nav__group-name { flex: none; line-height: 1.2; }
+  .admin-shell[data-bar="riel"] .admin-nav__chevron { display: none; }
+
+  .admin-shell[data-bar="riel"] .admin-nav__group-label[aria-expanded="true"] {
+    color: var(--brand-blue);
+    background: var(--brand-blue-soft);
+  }
+
+  /* Marca azul en el borde: la carpeta que guarda la pantalla abierta. */
+  .admin-shell[data-bar="riel"] .admin-nav__rail-here {
+    display: block;
+    position: absolute;
+    top: 50%;
+    left: -10px;
+    width: 3px;
+    height: 26px;
+    margin-top: -13px;
+    background: var(--brand-blue);
+    border-radius: 0 var(--radius-pill) var(--radius-pill) 0;
+  }
+
+  /* La columna de la carpeta abierta: segunda columna de la rejilla, no una capa. */
+  .admin-shell[data-bar="riel"] .admin-nav__fly {
+    position: fixed;
+    top: 0;
+    left: 78px;
+    z-index: var(--z-sticky);
+    display: grid;
+    align-content: start;
+    gap: 2px;
+    width: 252px;
+    height: 100vh;
+    padding: var(--space-4) var(--space-3);
+    background: var(--surface-2);
+    border-right: 1px solid var(--line);
+    overflow-y: auto;
+    scrollbar-width: thin;
+  }
+
+  /* `display: grid` le gana al atributo `hidden` del navegador: sin esta línea
+     las siete columnas se dibujaban una encima de otra y mandaba la última. */
+  .admin-shell[data-bar="riel"] .admin-nav__fly[hidden] { display: none; }
+
+  .admin-shell[data-bar="riel"] .admin-nav__fly-head {
+    padding: var(--space-2) var(--space-3) var(--space-3);
+    color: var(--ink);
+    font-size: var(--text-sm);
+    font-weight: 800;
+    letter-spacing: -0.012em;
+  }
+
+  .admin-shell[data-bar="riel"] .admin-sidebar__foot { border-top: 0; }
+  .admin-shell[data-bar="riel"] .admin-profile { justify-content: center; padding: var(--space-2); }
+  .admin-shell[data-bar="riel"] .admin-profile__id,
+  .admin-shell[data-bar="riel"] .admin-profile .admin-nav__chevron { display: none; }
+
+  /* Oculta la barra: también las dos nuevas. */
+  /* Las dos se pegan arriba: sin este desplazamiento la cabecera de la pantalla
+     se subía debajo de la barra y una tapaba a la otra al desplazar. */
+  /* La cabecera de la pantalla se pega DEBAJO de la barra, y por debajo de ella
+     también en el apilamiento: si no, se traga los paneles de las carpetas, que
+     cuelgan sobre el contenido. Le basta con estar sobre la rejilla que pasa. */
+  .admin-shell[data-bar="menus"] .admin-topbar { top: var(--admin-bar-h, 52px); z-index: 1; }
+
+  .admin-shell[data-bar="menus"][data-nav="oculto"] { grid-template-rows: minmax(0, 1fr); }
+  .admin-shell[data-bar="riel"][data-nav="oculto"] { grid-template-columns: minmax(0, 1fr); }
+  .admin-shell[data-bar="riel"][data-nav="oculto"] .admin-body { grid-column: auto; }
+  .admin-shell[data-bar="riel"][data-nav="oculto"] .admin-nav__fly { display: none; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .admin-menu { animation: none; }
+}
+
+/* El menú del perfil no se contrae con la barra: aunque la columna esté en
+   íconos, sus filas siguen siendo filas con su rótulo. */
+@media (min-width: 901px) {
+  .admin-shell[data-nav="iconos"] .admin-profile {
+    justify-content: center;
+    width: 44px;
+    height: 40px;
+    padding: 0;
+  }
+
+  .admin-shell[data-nav="iconos"] .admin-profile__id,
+  .admin-shell[data-nav="iconos"] .admin-profile .admin-nav__chevron { display: none; }
+
+
+  .admin-shell[data-nav="iconos"] .admin-menu a,
+  .admin-shell[data-nav="iconos"] .admin-menu button {
+    justify-content: flex-start;
+    width: 100%;
+    height: auto;
+    min-height: 36px;
+    padding: var(--space-2) var(--space-3);
+  }
 }

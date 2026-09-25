@@ -82,9 +82,9 @@ function Sparkline({ points, tone }: { points: { year: number; value: number }[]
   );
 }
 
-export function IndicatorStandingList({ rows }: { rows: IndicatorStanding[] }) {
+export function IndicatorStandingList({ rows, label = "Cumplimiento por indicador", onOpen }: { rows: IndicatorStanding[]; label?: string; onOpen?: (id: string) => void }) {
   return (
-    <div className="ist-list" role="table" aria-label="Cumplimiento por indicador">
+    <div className="ist-list" role="table" aria-label={label}>
       <div role="row" className="ist-list__head">
         <span role="columnheader">
           <span className="sr-only">Estado</span>
@@ -103,7 +103,14 @@ export function IndicatorStandingList({ rows }: { rows: IndicatorStanding[] }) {
             <StandingGlyph standing={r.standing} />
           </span>
           <span role="cell" className="ist-list__name">
-            <strong>{r.indicator.name}</strong>
+            {onOpen ? (
+              <button type="button" className="ist-list__open" onClick={() => onOpen(r.indicator.id)}>
+                {r.indicator.name}
+                <span className="sr-only"> · ver ficha</span>
+              </button>
+            ) : (
+              <strong>{r.indicator.name}</strong>
+            )}
             <span>
               <b>{r.indicator.code}</b>
               <em style={{ "--tone": FUNCTION_TONE[r.indicator.fn] } as CSSProperties}>{FUNCTION_LABEL[r.indicator.fn]}</em>

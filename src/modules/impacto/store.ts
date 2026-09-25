@@ -16,7 +16,7 @@ import { describeDatabaseError } from "../../data/errors";
 import type { DatabaseError } from "../../data/errors";
 import { suggest, type Criterion } from "./motor";
 import { mergeWeights, type PiloWeights } from "./pilo/recommend";
-import { FUNCTION_LABEL, parseFigure, parseTarget } from "./model";
+import { FUNCTION_LABEL } from "./model";
 import type {
   Adoption,
   Alignment,
@@ -769,59 +769,6 @@ export function useApplySync() {
 
 /* --- Indicadores propios de los programas (0084) ------------------------------------ */
 
-export interface ProgramIndicatorInput {
-  id?: string;
-  programId: string;
-  campusId: string;
-  fn: Indicator["fn"];
-  stage: Indicator["stage"];
-  name: string;
-  description: string;
-  unitLabel: string;
-  measure: Indicator["measure"];
-  parentId: string | null;
-  baselineText: string;
-  target2026: string;
-  target2028: string;
-}
-
-export function useSaveProgramIndicator() {
-  return useImpactMutation(async (input: ProgramIndicatorInput) => {
-    const fields = {
-      fn: input.fn,
-      stage: input.stage,
-      name: input.name.trim(),
-      description: input.description.trim(),
-      unit_label: input.unitLabel.trim(),
-      measure: input.measure,
-      parent_id: input.parentId,
-      baseline_text: input.baselineText.trim(),
-      baseline_num: parseFigure(input.baselineText),
-      target_2026: input.target2026.trim(),
-      target_2026_num: parseTarget(input.target2026),
-      target_2028: input.target2028.trim(),
-      target_2028_num: parseTarget(input.target2028),
-    };
-    if (input.id) {
-      return run<{ id: string }>(supabase.from("imp_indicators").update(fields).eq("id", input.id).select("id").single());
-    }
-    return run<{ id: string }>(
-      supabase
-        .from("imp_indicators")
-        .insert({
-          ...fields,
-          code: "",
-          owner_unit_id: input.programId,
-          program_id: input.programId,
-          campus_id: input.campusId,
-          status: "publicado",
-        })
-        .select("id")
-        .single(),
-    );
-  });
-}
-
 /** Retirar un indicador del programa: deja de verse; lo reportado se conserva. */
 export function useRetireProgramIndicator() {
   return useImpactMutation(async ({ id, retired }: { id: string; retired: boolean }) => {
@@ -1041,4 +988,12 @@ export function useAddAlignments() {
       );
     },
   );
+}
+
+/** Quita cruces con pilares y ODS por su id (al editar un indicador en el asistente). */
+export function useRemoveAlignments() {
+  return useImpactMutation(async (ids: string[]) => {
+    if (!ids.length) return;
+    await run(supabase.from("imp_alignments").delete().in("id", ids).select("id"));
+  });
 }

@@ -17,7 +17,7 @@ import { Suspense, lazy, useEffect, useRef, useState } from "react";
 import { Link, NavLink, useLocation, useNavigate } from "react-router-dom";
 import { Icon } from "../ui/Icon";
 import { useTheme } from "../../lib/theme";
-import { useAuth } from "../../lib/auth";
+import { INTRANET_HOME, useAuth } from "../../lib/auth";
 import { SessionMenu } from "./SessionMenu";
 import { useIntranetLinks } from "./intranet-links";
 import type { PortalId } from "./MegaPanel";
@@ -190,6 +190,13 @@ export function SiteHeader({ onSearch }: { onSearch?: () => void }) {
           <button type="button" className="sh-icon" onClick={toggle} aria-label={resolved === "dark" ? "Cambiar a tema claro" : "Cambiar a tema oscuro"}>
             <Icon name={resolved === "dark" ? "sun" : "moon"} size={17} />
           </button>
+          {/* Con sesión, el panel de la intranet queda a un clic desde cualquier portal. */}
+          {profile && (
+            <Link className="sh-dash" to={INTRANET_HOME} title="Panel de la intranet">
+              <Icon name="grid" size={16} />
+              <span className="sh-dash__label">Panel</span>
+            </Link>
+          )}
           <SessionMenu />
           <button
             type="button"

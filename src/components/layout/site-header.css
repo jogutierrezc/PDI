@@ -96,6 +96,27 @@
 
 .sh-intranet:hover { color: #ffffff; background: #1b52ad; }
 .sh-menu-toggle { display: none; }
+
+/* «Panel»: con sesión, el lanzador de la intranet a un clic. */
+.sh-dash {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  height: 44px;
+  min-width: 44px;
+  padding: 0 14px;
+  color: var(--brand-navy);
+  background: var(--surface);
+  border: 1px solid var(--line-strong);
+  border-radius: 10px;
+  font-size: var(--text-sm);
+  font-weight: 700;
+  text-decoration: none;
+  white-space: nowrap;
+  transition: background-color var(--dur-fast) ease, border-color var(--dur-fast) ease;
+}
+
+.sh-dash:hover { background: var(--brand-blue-soft); border-color: var(--brand-blue); }
 .sh :is(a, button):focus-visible { outline: 2px solid var(--brand-blue); outline-offset: 2px; }
 
 /* --- Panel ------------------------------------------------------------------------ */
@@ -376,6 +397,15 @@
 }
 
 @media (max-width: 720px) {
+  .sh-dash { justify-content: center; padding: 0; }
+  .sh-dash__label {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
+  }
   .sh-me__name { display: none; }
   .sh-me__trigger > svg { display: none; }
   .sh-me__panel { width: min(20rem, calc(100vw - var(--space-6))); }
@@ -396,6 +426,7 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
+  .sh-dash { transition: none; }
   .sh-panel,
   .sh-card { animation: none; }
   .sh-nav__menu svg,

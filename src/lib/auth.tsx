@@ -11,7 +11,7 @@
    usuario sin permisos vería botones que no funcionan, no datos que no debería.
    ========================================================================== */
 
-import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import type { Session } from "@supabase/supabase-js";
 import { supabase } from "./supabase";
@@ -119,6 +119,26 @@ export function screenVisible(
   return access.role.all_screens || access.role.screens.includes(screen);
 }
 
+/** El panel de la intranet: el lanzador. Sin sesión activa, la portada. */
+export const INTRANET_HOME = "/admin";
+
+export function intranetHome(profile: Profile | null): string {
+  return profile?.is_active ? INTRANET_HOME : "/";
+}
+
+/**
+ * A dónde llevar a alguien que acaba de iniciar sesión. Si una guarda lo mandó
+ * al login desde una pantalla interna, vuelve a ella; si no —o si «de dónde
+ * venía» es el propio login, «Sin permiso» o una dirección externa—, al panel.
+ */
+export function afterLoginPath(from: unknown, profile: Profile | null): string {
+  const home = intranetHome(profile);
+  if (typeof from !== "string" || !from.startsWith("/") || from.startsWith("//")) return home;
+  const path = from.split(/[?#]/)[0].replace(/\/+$/, "") || "/";
+  if (path === "/" || path === "/acceso-intranet" || path === "/sin-permiso") return home;
+  return from;
+}
+
 /** Exportado para montar la intranet con una sesión simulada (pruebas y bancos de pruebas). */
 export const AuthContext = createContext<AuthContextValue | null>(null);
 
@@ -132,12 +152,36 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  /** Turno de la última lectura del perfil: una lectura vieja que termina tarde
+   *  (p. ej. la de antes de cerrar sesión) no pisa a la más reciente. */
+  const ticket = useRef(0);
+
   // Carga el perfil de la sesión activa. Un usuario autenticado sin perfil
   // activo se trata como no autorizado.
+  //
+  // Todo (perfil, unidades, lado de Impacto, rol de acceso) se lee primero y se
+  // publica al final, de una vez. Antes el perfil se publicaba antes que el rol
+  // de acceso: en ese instante el login ya veía un perfil y redirigía con
+  // permisos a medio cargar —canSee() sin rol de acceso dice «sí» a todo—, así
+  // que la persona acababa en una pantalla ajena y rebotaba a «Sin permiso».
   const loadProfile = useCallback(async (userId: string | undefined) => {
+    const mine = ++ticket.current;
+    const publish = (
+      person: Profile | null,
+      scope: AccessScope | null,
+      anyUnit: boolean,
+      side: ImpactoSide,
+    ) => {
+      if (mine !== ticket.current) return;
+      // Releer el perfil sin cambios no debe repintar toda la intranet.
+      setProfile((previous) => (JSON.stringify(previous) === JSON.stringify(person) ? previous : person));
+      setAccess((previous) => (JSON.stringify(previous) === JSON.stringify(scope) ? previous : scope));
+      setInAnyUnit(anyUnit);
+      setImpactoSide(side);
+    };
+
     if (!userId) {
-      setProfile(null);
-      setAccess(null);
+      publish(null, null, false, null);
       return;
     }
 
@@ -148,25 +192,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       .maybeSingle();
 
     if (profileError) {
-      setError(profileError.message);
-      setProfile(null);
-      setAccess(null);
+      if (mine === ticket.current) setError(profileError.message);
+      publish(null, null, false, null);
       return;
     }
 
     const person = data && data.is_active ? (data as Profile) : null;
-    // Releer el perfil sin cambios no debe repintar toda la intranet.
-    setProfile((previous) => (JSON.stringify(previous) === JSON.stringify(person) ? previous : person));
+    if (!person) {
+      publish(null, null, false, null);
+      return;
+    }
 
     // Pertenecer a una unidad abre «Mis Tableros» sin que haga falta marcarlo
     // además en el rol de acceso. Son dos puertas para lo mismo, y quien mete a
     // alguien en una facultad da por hecho —con razón— que ya puede entrar.
     // Sin la migración 0057 esto falla y se queda en falso, que es lo de antes.
-    const belongs = person
-      ? await supabase.from("unit_members").select("unit_id, units(kind)").eq("profile_id", person.id)
-      : null;
-    const rows = (belongs?.data ?? []) as { unit_id: string; units: { kind: string } | { kind: string }[] | null }[];
-    setInAnyUnit(rows.length > 0);
+    const belongs = await supabase.from("unit_members").select("unit_id, units(kind)").eq("profile_id", person.id);
+    const rows = (belongs.data ?? []) as { unit_id: string; units: { kind: string } | { kind: string }[] | null }[];
 
     // En Impacto: ¿programa (o facultad), vicerrectoría u oficina con función, o ambos?
     const kindOf = (r: (typeof rows)[number]) => (Array.isArray(r.units) ? r.units[0]?.kind : r.units?.kind) ?? "";
@@ -176,25 +218,25 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const fns = await supabase.from("imp_unit_functions").select("unit_id").in("unit_id", rows.map((r) => r.unit_id));
       functionSide = (fns.data ?? []).length > 0;
     }
-    setImpactoSide(functionSide ? (programSide ? "ambos" : "funcion") : programSide ? "programa" : null);
+    const side: ImpactoSide = functionSide ? (programSide ? "ambos" : "funcion") : programSide ? "programa" : null;
 
     // El rol de acceso decide qué pantallas e informes se enseñan. Si no se
     // puede leer (base sin la migración 0024), la sesión sigue como antes.
-    if (!person?.access_role_id) {
-      setAccess(null);
-      return;
+    let scope: AccessScope | null = null;
+    if (person.access_role_id) {
+      const [role, reports] = await Promise.all([
+        supabase.from("access_roles").select("*").eq("id", person.access_role_id).maybeSingle(),
+        supabase.from("access_role_reports").select("report_slug").eq("access_role_id", person.access_role_id),
+      ]);
+      scope = role.data
+        ? {
+            role: role.data as AccessRole,
+            reports: (reports.data ?? []).map((row) => (row as { report_slug: string }).report_slug),
+          }
+        : null;
     }
-    const [role, reports] = await Promise.all([
-      supabase.from("access_roles").select("*").eq("id", person.access_role_id).maybeSingle(),
-      supabase.from("access_role_reports").select("report_slug").eq("access_role_id", person.access_role_id),
-    ]);
-    const next: AccessScope | null = role.data
-      ? {
-          role: role.data as AccessRole,
-          reports: (reports.data ?? []).map((row) => (row as { report_slug: string }).report_slug),
-        }
-      : null;
-    setAccess((previous) => (JSON.stringify(previous) === JSON.stringify(next) ? previous : next));
+
+    publish(person, scope, rows.length > 0, side);
   }, []);
 
   useEffect(() => {
@@ -257,6 +299,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const signOut = useCallback(async () => {
     await supabase.auth.signOut();
+    ticket.current += 1;
     setProfile(null);
     setAccess(null);
     setInAnyUnit(false);
@@ -303,10 +346,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     [hasRole, access],
   );
 
-  const home = useMemo(() => {
-    const first = (Object.keys(SCREEN_PATHS) as AdminScreen[]).find((screen) => canSee(screen));
-    return first ? SCREEN_PATHS[first] : "/";
-  }, [canSee]);
+  // El panel de la intranet es el lanzador (/admin): enseña justo las pantallas
+  // que esta persona puede abrir, así que sirve para cualquier rol. Antes era
+  // «la primera pantalla visible», que para casi todos resultaba ser la página
+  // de la oficina, no el panel.
+  const home = intranetHome(profile);
 
   const value = useMemo(
     () => ({

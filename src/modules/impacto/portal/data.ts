@@ -13,7 +13,21 @@ import { describeDatabaseError } from "../../../data/errors";
 import type { DatabaseError } from "../../../data/errors";
 import type { Direction, Measure, Stage, SubstantiveFunction } from "../model";
 
-export interface PortalIndicator {
+/** Lo que explica la ficha metodológica (0093). Vacío si la base aún no lo trae. */
+export interface SheetFields {
+  numerator: string;
+  denominator: string;
+  source: string;
+  responsible: string;
+  projectsText: string;
+  /** objetivo, metodoCalculo, interpretacion, periodicidad, notas… (de la herramienta anterior). */
+  sheet: Record<string, unknown>;
+  baselineYear: number;
+  target2028: string;
+  target2028Num: number | null;
+}
+
+export interface PortalIndicator extends SheetFields {
   id: string;
   code: string;
   fn: SubstantiveFunction;
@@ -32,12 +46,8 @@ export interface PortalIndicator {
   mandatory: boolean;
 }
 
-export interface ProgramIndicator {
-  id: string;
-  code: string;
-  fn: SubstantiveFunction;
-  stage: Stage;
-  name: string;
+/** Un indicador propio de un programa en una sede: va aparte de las fichas. */
+export interface ProgramIndicator extends PortalIndicator {
   programId: string;
   campusId: string | null;
   parentId: string | null;
@@ -73,7 +83,16 @@ export interface PortalData {
   unitFunctions: { unitId: string; fn: SubstantiveFunction }[];
   campuses: { id: string; slug: string; name: string }[];
   offer: { programId: string; campusId: string }[];
-  adoptions: { indicatorId: string; programId: string; campusId: string; target2026Num: number | null }[];
+  adoptions: {
+    indicatorId: string;
+    programId: string;
+    campusId: string;
+    target2026Num: number | null;
+    baselineText: string;
+    target2026: string;
+    target2028: string;
+    target2028Num: number | null;
+  }[];
   values: PortalValue[];
 }
 
@@ -82,33 +101,43 @@ const num = (v: unknown): number | null => (v === null || v === undefined || v =
 const str = (v: unknown) => (typeof v === "string" ? v : "");
 const list = (v: unknown): Raw[] => (Array.isArray(v) ? (v as Raw[]) : []);
 
+function toIndicator(r: Raw): PortalIndicator {
+  const sheet = r.sheet && typeof r.sheet === "object" && !Array.isArray(r.sheet) ? (r.sheet as Record<string, unknown>) : {};
+  return {
+    id: str(r.id),
+    code: str(r.code),
+    fn: r.fn as SubstantiveFunction,
+    stage: r.stage as Stage,
+    suggested: Boolean(r.suggested),
+    dimensionId: (r.dimension_id as string | null) ?? null,
+    name: str(r.name),
+    description: str(r.description),
+    unitLabel: str(r.unit_label),
+    measure: (r.measure as Measure) ?? "numero",
+    direction: (r.direction as Direction) ?? "sube",
+    baselineNum: num(r.baseline_num),
+    baselineText: str(r.baseline_text),
+    target2026: str(r.target_2026),
+    target2026Num: num(r.target_2026_num),
+    mandatory: Boolean(r.mandatory),
+    numerator: str(r.numerator),
+    denominator: str(r.denominator),
+    source: str(r.source),
+    responsible: str(r.responsible),
+    projectsText: str(r.projects_text),
+    sheet,
+    baselineYear: Number(r.baseline_year ?? 2023) || 2023,
+    target2028: str(r.target_2028),
+    target2028Num: num(r.target_2028_num),
+  };
+}
+
 /** Convierte la respuesta de la base en el modelo del portal. Exportada para las pruebas. */
 export function toPortalData(raw: Raw): PortalData {
   return {
-    indicators: list(raw.indicators).map((r) => ({
-      id: str(r.id),
-      code: str(r.code),
-      fn: r.fn as SubstantiveFunction,
-      stage: r.stage as Stage,
-      suggested: Boolean(r.suggested),
-      dimensionId: (r.dimension_id as string | null) ?? null,
-      name: str(r.name),
-      description: str(r.description),
-      unitLabel: str(r.unit_label),
-      measure: (r.measure as Measure) ?? "numero",
-      direction: (r.direction as Direction) ?? "sube",
-      baselineNum: num(r.baseline_num),
-      baselineText: str(r.baseline_text),
-      target2026: str(r.target_2026),
-      target2026Num: num(r.target_2026_num),
-      mandatory: Boolean(r.mandatory),
-    })),
+    indicators: list(raw.indicators).map(toIndicator),
     programIndicators: list(raw.program_indicators).map((r) => ({
-      id: str(r.id),
-      code: str(r.code),
-      fn: r.fn as SubstantiveFunction,
-      stage: r.stage as Stage,
-      name: str(r.name),
+      ...toIndicator(r),
       programId: str(r.program_id),
       campusId: (r.campus_id as string | null) ?? null,
       parentId: (r.parent_id as string | null) ?? null,
@@ -148,6 +177,10 @@ export function toPortalData(raw: Raw): PortalData {
       programId: str(r.program_id),
       campusId: str(r.campus_id),
       target2026Num: num(r.target_2026_num),
+      baselineText: str(r.baseline_text),
+      target2026: str(r.target_2026),
+      target2028: str(r.target_2028),
+      target2028Num: num(r.target_2028_num),
     })),
     values: list(raw.values).map((r) => ({
       indicatorId: str(r.indicator_id),

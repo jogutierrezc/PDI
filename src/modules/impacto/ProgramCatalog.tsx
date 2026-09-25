@@ -10,19 +10,18 @@
                               por función y, dentro, por ficha relacionada.
 
    Crear, editar o retirar un indicador propio es del programa (editor o jefe
-   en esa sede). La vicerrectoría de la función los ve y los reorganiza
-   desde su lado.
+   en esa sede), con el mismo asistente de cinco pasos y la guía de Mr. Pilo
+   que usan las vicerrectorías. La vicerrectoría de la función los ve y los
+   reorganiza desde su lado.
    ========================================================================== */
 
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import { Icon } from "../../components/ui/Icon";
 import { StageEmpty } from "../admin/udes-en-cifras/ui";
 import {
   FUNCTIONS,
   FUNCTION_LABEL,
-  MEASURE_LABEL,
-  STAGES,
   STAGE_LABEL,
   byChain,
   displayValue,
@@ -30,21 +29,55 @@ import {
   type Indicator,
   type Measure,
   type ProgramSite,
-  type Stage,
   type SubstantiveFunction,
 } from "./model";
-import {
-  useAdoptions,
-  useRetireProgramIndicator,
-  useSaveProgramIndicator,
-  useValues,
-  type Catalog,
-  type ImpactBase,
-  type ProgramIndicatorInput,
-} from "./store";
+import { useAdoptions, useRetireProgramIndicator, useValues, type Catalog, type ImpactBase } from "./store";
+import { NewIndicatorWizard, originOf } from "./NewIndicatorWizard";
+
+/** Un indicador del programa en blanco, para el asistente. */
+function blankOwn(site: ProgramSite, fn: SubstantiveFunction, parentId: string | null, base: ImpactBase): Indicator {
+  return {
+    id: "",
+    code: "",
+    fn,
+    stage: "procesos",
+    suggested: false,
+    dimensionId: base.dimensions.find((d) => d.fn === fn)?.id ?? null,
+    ownerUnitId: site.programId,
+    name: "",
+    description: "",
+    unitLabel: "",
+    measure: "numero",
+    numerator: "",
+    denominator: "",
+    direction: "sube",
+    baselineYear: 2023,
+    baselineText: "",
+    baselineNum: null,
+    target2026: "",
+    target2026Num: null,
+    target2028: "",
+    target2028Num: null,
+    source: "",
+    responsible: "",
+    projectsText: "",
+    cesu: [],
+    sheet: {},
+    programReports: true,
+    status: "publicado",
+    position: 0,
+    updatedAt: "",
+    programId: site.programId,
+    campusId: site.campusId,
+    parentId,
+    mandatory: false,
+    legacyId: null,
+  };
+}
 
 export function ProgramCatalog({
   site,
+  base,
   catalog,
   canEdit,
   onChoose,
@@ -69,7 +102,8 @@ export function ProgramCatalog({
   );
   const ids = useMemo(() => [...adopted, ...own].map((i) => i.id), [adopted, own]);
   const values = useValues(ids, site);
-  const [editing, setEditing] = useState<ProgramIndicatorInput | null>(null);
+  const [editing, setEditing] = useState<{ draft: Indicator; origin: { x: string; y: string } } | null>(null);
+  const newButton = useRef<HTMLButtonElement>(null);
   const [showRetired, setShowRetired] = useState(false);
   const retire = useRetireProgramIndicator();
 
@@ -84,49 +118,21 @@ export function ProgramCatalog({
   const retiredCount = own.filter((i) => i.status === "retirado").length;
 
   const startNew = (fn: SubstantiveFunction = "ensenanza", parentId: string | null = null) =>
-    setEditing({
-      programId: site.programId,
-      campusId: site.campusId,
-      fn,
-      stage: "procesos",
-      name: "",
-      description: "",
-      unitLabel: "",
-      measure: "numero",
-      parentId,
-      baselineText: "",
-      target2026: "",
-      target2028: "",
-    });
+    setEditing({ draft: blankOwn(site, fn, parentId, base), origin: originOf(newButton.current) });
 
-  const startEdit = (i: Indicator) =>
-    setEditing({
-      id: i.id,
-      programId: site.programId,
-      campusId: site.campusId,
-      fn: i.fn,
-      stage: i.stage,
-      name: i.name,
-      description: i.description,
-      unitLabel: i.unitLabel,
-      measure: i.measure,
-      parentId: i.parentId,
-      baselineText: i.baselineText,
-      target2026: i.target2026,
-      target2028: i.target2028,
-    });
+  const startEdit = (i: Indicator, from: Element | null) => setEditing({ draft: i, origin: originOf(from) });
 
   if (adoptions.isPending) return <p className="admin-loading">Cargando el catálogo del programa…</p>;
 
   return (
-    <div className="imp-mine" data-editing={editing ? "" : undefined}>
+    <div className="imp-mine">
       <div className="imp-mine__main">
         <div className="imp-toolbar">
           <span className="imp-progress-line">
             <b>{adopted.length}</b> fichas institucionales · <b>{own.length - retiredCount}</b> indicadores del programa
           </span>
           {canEdit && (
-            <button type="button" className="button-secondary imp-toolbar__new" onClick={() => startNew()}>
+            <button ref={newButton} type="button" className="button-secondary imp-toolbar__new" onClick={() => startNew()}>
               <Icon name="plus" size={15} /> Nuevo indicador del programa
             </button>
           )}
@@ -232,7 +238,7 @@ export function ProgramCatalog({
                                 <td className="imp-col-code"><span className="imp-code" data-own="">{i.code.split("-").pop()}</span></td>
                                 <th scope="row" className="imp-name">
                                   {canEdit ? (
-                                    <button type="button" onClick={() => startEdit(i)}>{i.name}</button>
+                                    <button type="button" onClick={(e) => startEdit(i, e.currentTarget)}>{i.name}</button>
                                   ) : (
                                     i.name
                                   )}
@@ -267,10 +273,15 @@ export function ProgramCatalog({
       </div>
 
       {editing && (
-        <ProgramIndicatorForm
-          value={editing}
-          fichas={catalog.indicators.filter((i) => i.status === "publicado")}
+        <NewIndicatorWizard
+          key={editing.draft.id || "nuevo"}
+          draft={editing.draft}
+          origin={editing.origin}
+          base={base}
+          catalog={catalog}
+          site={site}
           onClose={() => setEditing(null)}
+          onCreated={() => setEditing(null)}
         />
       )}
     </div>
@@ -297,122 +308,5 @@ function FunctionTable({ fn, own = false, children }: { fn: SubstantiveFunction;
         <tbody>{children}</tbody>
       </table>
     </div>
-  );
-}
-
-/* --- Crear o editar un indicador del programa ---------------------------------------- */
-
-function ProgramIndicatorForm({
-  value,
-  fichas,
-  onClose,
-}: {
-  value: ProgramIndicatorInput;
-  fichas: Indicator[];
-  onClose: () => void;
-}) {
-  const [form, setForm] = useState(value);
-  const save = useSaveProgramIndicator();
-  const set = <K extends keyof ProgramIndicatorInput>(key: K, v: ProgramIndicatorInput[K]) => setForm((f) => ({ ...f, [key]: v }));
-  const parents = fichas.filter((i) => i.fn === form.fn).sort(byChain);
-  const problem = !form.name.trim() ? "Escriba el nombre del indicador." : null;
-
-  const submit = async () => {
-    if (problem) return;
-    try {
-      await save.mutateAsync(form);
-      onClose();
-    } catch {
-      // El error se muestra en el pie (save.error).
-    }
-  };
-
-  return (
-    <aside className="imp-mine__form" aria-label={form.id ? "Editar indicador del programa" : "Nuevo indicador del programa"}>
-      <header>
-        <h2>{form.id ? "Editar indicador" : "Nuevo indicador del programa"}</h2>
-        <button type="button" className="imp-icon-button" aria-label="Cerrar" onClick={onClose}>
-          <Icon name="close" size={16} />
-        </button>
-      </header>
-      <div className="imp-mine__fields">
-        <label className="admin-field">
-          <span>Nombre</span>
-          <input value={form.name} onChange={(e) => set("name", e.target.value)} placeholder="Ej. Estudiantes en tutorías entre pares" autoFocus />
-        </label>
-        <label className="admin-field">
-          <span>Qué mide</span>
-          <textarea rows={3} value={form.description} onChange={(e) => set("description", e.target.value)} />
-        </label>
-        <div className="imp-mine__row">
-          <label className="admin-field">
-            <span>Función</span>
-            <select
-              value={form.fn}
-              onChange={(e) => setForm((f) => ({ ...f, fn: e.target.value as SubstantiveFunction, parentId: null }))}
-            >
-              {FUNCTIONS.map((fn) => (
-                <option key={fn} value={fn}>{FUNCTION_LABEL[fn]}</option>
-              ))}
-            </select>
-          </label>
-          <label className="admin-field">
-            <span>Eslabón</span>
-            <select value={form.stage} onChange={(e) => set("stage", e.target.value as Stage)}>
-              {STAGES.map((s) => (
-                <option key={s} value={s}>{STAGE_LABEL[s]}</option>
-              ))}
-            </select>
-          </label>
-        </div>
-        <label className="admin-field">
-          <span>Relacionado con (opcional)</span>
-          <select value={form.parentId ?? ""} onChange={(e) => set("parentId", e.target.value || null)}>
-            <option value="">Ninguna ficha: es solo del programa</option>
-            {parents.map((p) => (
-              <option key={p.id} value={p.id}>{p.code} · {p.name}</option>
-            ))}
-          </select>
-        </label>
-        <div className="imp-mine__row">
-          <label className="admin-field">
-            <span>Forma de medir</span>
-            <select value={form.measure} onChange={(e) => set("measure", e.target.value as Measure)}>
-              {(Object.keys(MEASURE_LABEL) as Measure[]).map((m) => (
-                <option key={m} value={m}>{MEASURE_LABEL[m]}</option>
-              ))}
-            </select>
-          </label>
-          <label className="admin-field">
-            <span>Unidad</span>
-            <input value={form.unitLabel} onChange={(e) => set("unitLabel", e.target.value)} placeholder="Ej. N.º estudiantes" />
-          </label>
-        </div>
-        <div className="imp-mine__row imp-mine__row--3">
-          <label className="admin-field">
-            <span>Línea base</span>
-            <input value={form.baselineText} onChange={(e) => set("baselineText", e.target.value)} />
-          </label>
-          <label className="admin-field">
-            <span>Meta 2026</span>
-            <input value={form.target2026} onChange={(e) => set("target2026", e.target.value)} />
-          </label>
-          <label className="admin-field">
-            <span>Meta 2028</span>
-            <input value={form.target2028} onChange={(e) => set("target2028", e.target.value)} />
-          </label>
-        </div>
-      </div>
-      <footer>
-        {save.error && (
-          <p className="admin-error" role="alert"><Icon name="alert" size={15} /> {save.error.message}</p>
-        )}
-        {problem && form.name !== value.name && <span className="imp-small imp-muted">{problem}</span>}
-        <button type="button" className="button-ghost" onClick={onClose}>Cancelar</button>
-        <button type="button" className="button-primary" disabled={Boolean(problem) || save.isPending} onClick={submit}>
-          {save.isPending ? "Guardando…" : form.id ? "Guardar cambios" : "Crear indicador"}
-        </button>
-      </footer>
-    </aside>
   );
 }

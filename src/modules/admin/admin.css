@@ -2761,3 +2761,27 @@ fieldset.admin-field legend {
   .admin-shell[data-bar="menus"] .admin-profile .admin-nav__chevron { display: none; }
   .admin-shell[data-bar="menus"] .admin-profile { padding: 0 5px; }
 }
+
+/* --- Botón «Panel» de la cabecera ---------------------------------------------- */
+/* Vuelve al lanzador (/admin). Objetivo de 44 px; en el teléfono queda solo el
+   ícono, con el rótulo aún disponible para lectores de pantalla. */
+.admin-topbar__panel {
+  min-height: 44px;
+  padding-block: 0;
+  text-decoration: none;
+}
+
+.admin-topbar__panel:hover { color: var(--brand-navy); background: var(--brand-blue-soft); border-color: var(--brand-blue); }
+.admin-topbar__panel:focus-visible { outline: 2px solid var(--brand-blue); outline-offset: 2px; }
+
+@media (max-width: 640px) {
+  .admin-topbar__panel { width: 44px; padding-inline: 0; }
+  .admin-topbar__panel-label {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
+  }
+}

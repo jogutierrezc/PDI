@@ -3,7 +3,7 @@ import type { FormEvent } from "react";
 import { Link, Navigate, useLocation } from "react-router-dom";
 import { TopBar } from "../../components/layout/TopBar";
 import { Icon } from "../../components/ui/Icon";
-import { useAuth } from "../../lib/auth";
+import { afterLoginPath, useAuth } from "../../lib/auth";
 import { isSupabaseConfigured } from "../../lib/supabase";
 import "./login.css";
 
@@ -17,11 +17,11 @@ export function LoginPortal() {
 
   const location = useLocation();
   const errorId = useId();
-  const { profile, loading, signIn, requestPasswordReset, home } = useAuth();
+  const { profile, loading, signIn, requestPasswordReset } = useAuth();
 
   // A dónde iba la persona antes de que la guarda la mandara aquí; si venía de
-  // ninguna parte, a la primera pantalla que su rol le deja abrir.
-  const from = (location.state as { from?: string } | null)?.from ?? home;
+  // ninguna parte, al panel de la intranet (el lanzador de /admin).
+  const from = afterLoginPath((location.state as { from?: unknown } | null)?.from, profile);
 
   useEffect(() => {
     document.title = "Acceso intranet | PDI 2024-2028";

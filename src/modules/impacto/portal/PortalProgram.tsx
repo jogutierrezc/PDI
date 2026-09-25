@@ -8,7 +8,7 @@
    Todo el estado vive en la dirección: ?sede=&funcion=&indicador=.
    ========================================================================== */
 
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import type { CSSProperties } from "react";
 import { Link, useParams, useSearchParams } from "react-router-dom";
 import { FUNCTIONS, FUNCTION_LABEL, FUNCTION_TONE, formatFigure } from "../model";
@@ -16,7 +16,9 @@ import { campusFigures, globalFigure, isFunction, programsOf } from "./analysis"
 import type { PortalData } from "./data";
 import { CampusBars } from "./charts";
 import { PiloBanner, PortalGate, PortalLayout, SectionHead } from "./parts";
-import { LAGGING_BELOW, countStandings, cutYear, median, measured, programStandingNote, programStandings, stageCounts, withTarget } from "./standing";
+import { IndicatorSheetDialog } from "./IndicatorSheetDialog";
+import { ProgramNetwork } from "./ProgramNetwork";
+import { LAGGING_BELOW, countStandings, ownStandings, cutYear, median, measured, programStandingNote, programStandings, stageCounts, withTarget } from "./standing";
 import { IndicatorStandingList, Pebble, Pebbles, StageCountGrid, StandingBar, StandingLegend } from "./standingCharts";
 
 export function PortalProgram() {
@@ -31,6 +33,9 @@ function ProgramView({ data, slug }: { data: PortalData; slug: string }) {
   const fnParam = params.get("funcion") ?? undefined;
   const fn = isFunction(fnParam) ? fnParam : null;
   const rows = useMemo(() => (program ? programStandings(data, program.id, sede?.id ?? null) : []), [data, program, sede]);
+  const own = useMemo(() => (program ? ownStandings(data, program.id, sede?.id ?? null) : []), [data, program, sede]);
+  const [openId, setOpenId] = useState<string | null>(null);
+  const opened = openId ? (data.indicators.find((i) => i.id === openId) ?? data.programIndicators.find((i) => i.id === openId)) : undefined;
 
   const set = (key: string, value: string | null) => {
     const next = new URLSearchParams(params);
@@ -109,7 +114,9 @@ function ProgramView({ data, slug }: { data: PortalData; slug: string }) {
         <div className="u-container ist-stack">
           {rows.length === 0 ? (
             <div className="ipo-card">
-              <p className="ipo-muted">Este programa aún no ha elegido indicadores de la matriz{sede ? ` en ${sede.name}` : ""}.</p>
+              <p className="ipo-muted">
+                Este programa aún no ha elegido fichas institucionales{sede ? ` en ${sede.name}` : ""}.{own.length ? " Sus indicadores propios están abajo." : ""}
+              </p>
             </div>
           ) : (
             <>
@@ -189,7 +196,7 @@ function ProgramView({ data, slug }: { data: PortalData; slug: string }) {
                     ))}
                   </div>
                 </div>
-                <IndicatorStandingList rows={shown} />
+                <IndicatorStandingList rows={shown} onOpen={setOpenId} />
                 <p className="ist-foot">
                   Avance = cifra más reciente del programa ÷ meta 2026 que fijó para cada sede (sin sede elegida, el promedio de sus sedes). En los indicadores que
                   deben bajar se invierte. Un indicador sin cifra no cuenta como cero: se muestra aparte.
@@ -225,8 +232,30 @@ function ProgramView({ data, slug }: { data: PortalData; slug: string }) {
               </div>
             </>
           )}
+              {own.length > 0 && (
+                <div className="ipo-card" data-tour="ipo-prog-own">
+                  <SectionHead
+                    title={`Indicadores propios del programa · ${own.length}`}
+                    hint="Los que creó el programa, aparte de las fichas institucionales, con las metas que les puso en su sede."
+                  />
+                  <StandingBar counts={countStandings(own)} />
+                  <IndicatorStandingList rows={own} label="Cumplimiento de los indicadores propios del programa" onOpen={setOpenId} />
+                </div>
+              )}
+
+              {(rows.length > 0 || own.length > 0) && (
+              <div className="ipo-card" data-tour="ipo-prog-network">
+                <SectionHead
+                  title="Mapa de red"
+                  hint="Sus indicadores unidos por los pilares del PDI y los ODS que comparten; en el centro, el programa. Toque uno para ver con quién se conecta y abrir su ficha."
+                />
+                <ProgramNetwork data={data} programId={program.id} programName={program.name} campusId={sede?.id ?? null} onOpen={setOpenId} />
+              </div>
+              )}
+
         </div>
       </section>
+      {opened && <IndicatorSheetDialog data={data} indicator={opened} programId={program.id} onClose={() => setOpenId(null)} />}
     </PortalLayout>
   );
 }

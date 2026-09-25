@@ -16,7 +16,7 @@
    ========================================================================== */
 
 import { createContext, useCallback, useContext, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
-import type { CSSProperties, ReactNode } from "react";
+import type { ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { useLocation, useNavigate } from "react-router-dom";
 import gsap from "gsap";
@@ -27,6 +27,7 @@ import { PiloAvatar } from "../pilo/PiloAvatar";
 import { VoiceToggle } from "../pilo/VoiceToggle";
 import { speak, stopSpeaking, useVoice } from "../pilo/voice";
 import { tourById, type Tour } from "./tours";
+import { placeBubble, stickyTopInset } from "./placement";
 import "./tour.css";
 
 type Status = "completado" | "descartado" | "en_curso";
@@ -162,6 +163,28 @@ interface Box {
 }
 
 const PAD = 8;
+/** Separación entre el anillo del hueco y el globo. */
+const GAP = PAD + 16;
+
+/** El tamaño de la ventana, al día: el globo se recoloca al girar o redimensionar. */
+function useViewport() {
+  const read = () => ({ width: window.innerWidth, height: window.innerHeight });
+  const [viewport, setViewport] = useState(read);
+  useEffect(() => {
+    const update = () =>
+      setViewport((v) => {
+        const next = read();
+        return v.width === next.width && v.height === next.height ? v : next;
+      });
+    window.addEventListener("resize", update);
+    window.visualViewport?.addEventListener("resize", update);
+    return () => {
+      window.removeEventListener("resize", update);
+      window.visualViewport?.removeEventListener("resize", update);
+    };
+  }, []);
+  return viewport;
+}
 
 function TourOverlay({
   tour,
@@ -180,11 +203,13 @@ function TourOverlay({
   const location = useLocation();
   const [box, setBox] = useState<Box | null>(null);
   const [searching, setSearching] = useState(true);
+  const root = useRef<HTMLDivElement>(null);
   const hole = useRef<HTMLDivElement>(null);
   const bubble = useRef<HTMLElement>(null);
   const [bubbleHeight, setBubbleHeight] = useState(0);
   const previousFocus = useRef<Element | null>(null);
   const first = useRef(true);
+  const viewport = useViewport();
 
   useEffect(() => {
     previousFocus.current = document.activeElement;
@@ -228,7 +253,7 @@ function TourOverlay({
       if (element) {
         window.clearInterval(poll);
         found = element;
-        element.scrollIntoView({ block: "center", behavior: reduced() ? "auto" : "smooth" });
+        bringIntoView(element, root.current);
         measure();
         observer = new ResizeObserver(measure);
         observer.observe(element);
@@ -263,14 +288,30 @@ function TourOverlay({
     }
   }, [box]);
 
-  // El globo entra con cada parada; se mide su alto para ubicarlo.
+  // Se mide el alto del globo para ubicarlo, y se vuelve a medir cuando su
+  // contenido o la ventana lo cambian (texto que se parte en más líneas).
   useLayoutEffect(() => {
     const node = bubble.current;
     if (!node) return;
-    setBubbleHeight(node.offsetHeight);
+    const read = () => setBubbleHeight(node.scrollHeight);
+    read();
+    const observer = new ResizeObserver(read);
+    observer.observe(node);
+    return () => observer.disconnect();
+  }, []);
+
+  // El globo entra con cada parada. GSAP solo mueve «y»: la posición la da
+  // placeBubble con top/left, sin transform. Antes el globo centrado usaba
+  // translate(-50%, -50%) y GSAP se quedaba con ese -50 % en su caché
+  // (xPercent/yPercent): al encontrar el elemento el globo seguía corrido
+  // medio alto hacia arriba y, con el elemento arriba, se salía de la ventana.
+  useLayoutEffect(() => {
+    const node = bubble.current;
+    if (!node) return;
+    setBubbleHeight(node.scrollHeight);
     node.querySelector<HTMLElement>("h2")?.focus();
     if (reduced()) return;
-    gsap.fromTo(node, { opacity: 0, y: 8 }, { opacity: 1, y: 0, duration: 0.24, ease: "expo.out" });
+    gsap.fromTo(node, { opacity: 0, y: 8 }, { opacity: 1, y: 0, duration: 0.24, ease: "expo.out", clearProps: "transform" });
   }, [index, searching]);
 
   // Mr. Pilo narra cada parada cuando la encuentra (si su voz está prendida).
@@ -292,30 +333,23 @@ function TourOverlay({
     return () => window.removeEventListener("keydown", onKey);
   }, [index, last, onEnd, onMove]);
 
-  // Dónde va el globo: debajo del elemento si cabe; si no, encima; si el
-  // elemento ocupa casi toda la pantalla, dentro de él, abajo a la derecha.
-  // Sin elemento, al centro. Siempre dentro de la ventana.
-  const width = Math.min(400, window.innerWidth - 32);
-  const height = bubbleHeight || 280;
-  const clampTop = (top: number) => Math.min(Math.max(16, top), window.innerHeight - height - 16);
-  let placement: CSSProperties;
-  if (box && !searching) {
-    const left = Math.min(Math.max(16, box.left + box.width / 2 - width / 2), window.innerWidth - width - 16);
-    const below = box.top + box.height + PAD + 16;
-    const above = box.top - PAD - 16 - height;
-    if (below + height + 16 <= window.innerHeight) placement = { top: below, left, width };
-    else if (above >= 16) placement = { top: above, left, width };
-    else placement = { top: clampTop(window.innerHeight - height - 24), left: window.innerWidth - width - 24, width };
-  } else {
-    placement = { top: "50%", left: "50%", width, transform: "translate(-50%, -50%)" };
-  }
+  // Dónde va el globo: debajo del elemento si cabe; si no, encima, a un lado
+  // o, si nada cabe, en la esquina. Sin elemento, al centro. Siempre dentro
+  // de la ventana (ver placement.ts).
+  const spot = placeBubble({
+    target: box && !searching ? box : null,
+    bubbleHeight,
+    viewport,
+    gap: GAP,
+  });
+  const placement = { top: spot.top, left: spot.left, width: spot.width, maxHeight: spot.maxHeight };
 
   return createPortal(
-    <div className="tour" data-centered={!box || searching ? "" : undefined}>
+    <div ref={root} className="tour" data-centered={!box || searching ? "" : undefined}>
       {/* Atrapa los clics fuera del globo: el recorrido no se rompe por un clic al aire. */}
       <div className="tour__catch" aria-hidden="true" />
       {box && !searching ? <div ref={hole} className="tour__hole" aria-hidden="true" /> : <div className="tour__dim" aria-hidden="true" />}
-      <section ref={bubble} className="tour__bubble" role="dialog" aria-modal="true" aria-labelledby="tour-title" style={placement}>
+      <section ref={bubble} className="tour__bubble" role="dialog" aria-modal="true" aria-labelledby="tour-title" style={placement} data-side={spot.side}>
         <header>
           <span className="tour__face">
             <PiloAvatar mood={searching ? "piensa" : step.mood ?? "feliz"} size={52} alive={speaking} />
@@ -353,4 +387,21 @@ function TourOverlay({
     </div>,
     document.body,
   );
+}
+
+/**
+ * Trae el elemento a la vista sin dejarlo bajo la cabecera fija de la página:
+ * centrado si cabe, y si es más alto que el hueco libre, con su borde de
+ * arriba justo debajo de la cabecera. scroll-margin-top se pone solo para
+ * esta llamada: el destino del desplazamiento se calcula en el acto.
+ */
+function bringIntoView(element: Element, ignore: Element | null) {
+  const node = element as HTMLElement;
+  const inset = stickyTopInset(document, ignore);
+  const free = window.innerHeight - inset;
+  const tall = element.getBoundingClientRect().height + GAP * 2 > free;
+  const previous = node.style?.scrollMarginTop ?? "";
+  if (node.style) node.style.scrollMarginTop = `${inset + GAP}px`;
+  element.scrollIntoView({ block: tall ? "start" : "center", behavior: reduced() ? "auto" : "smooth" });
+  if (node.style) node.style.scrollMarginTop = previous;
 }

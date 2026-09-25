@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { screenVisible, type AccessScope } from "./auth";
+import { afterLoginPath, screenVisible, type AccessScope } from "./auth";
 import type { Profile } from "../types/database";
 
 const person = (role: Profile["role"]): Profile => ({
@@ -34,5 +34,28 @@ describe("screenVisible: el menú y el lanzador enseñan solo lo que se puede us
   it("sin sesión activa no se ve nada", () => {
     expect(screenVisible("office", { profile: { ...person("admin"), is_active: false }, access: null, inAnyUnit: false, impactoSide: null })).toBe(false);
     expect(screenVisible("office", { profile: null, access: null, inAnyUnit: false, impactoSide: null })).toBe(false);
+  });
+});
+
+describe("afterLoginPath: al iniciar sesión se llega al panel", () => {
+  const me = person("consulta");
+
+  it("sin destino previo, al lanzador de la intranet", () => {
+    expect(afterLoginPath(undefined, me)).toBe("/admin");
+  });
+
+  it("respeta la pantalla interna de la que venía la guarda", () => {
+    expect(afterLoginPath("/admin/udes-en-cifras/captura", me)).toBe("/admin/udes-en-cifras/captura");
+    expect(afterLoginPath("/impacto", me)).toBe("/impacto");
+  });
+
+  it("nunca devuelve al login, a «Sin permiso», a la portada ni fuera del sitio", () => {
+    for (const from of ["/acceso-intranet", "/sin-permiso", "/", "//evil.example", "https://evil.example", 42]) {
+      expect(afterLoginPath(from, me)).toBe("/admin");
+    }
+  });
+
+  it("sin perfil activo no hay panel", () => {
+    expect(afterLoginPath(undefined, null)).toBe("/");
   });
 });

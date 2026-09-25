@@ -166,6 +166,36 @@ export function programStandings(data: PortalData, programId: string, campusId: 
   return sortByAttention(out);
 }
 
+/**
+ * Los indicadores propios del programa (van aparte de las fichas): el mismo
+ * estado, con la meta que el programa les puso en su sede.
+ */
+export function ownStandings(data: PortalData, programId: string, campusId: string | null = null): IndicatorStanding[] {
+  const out: IndicatorStanding[] = [];
+  for (const indicator of data.programIndicators) {
+    if (indicator.programId !== programId || (campusId && indicator.campusId !== campusId)) continue;
+    const mine = data.values.filter((v) => v.indicatorId === indicator.id && !v.notApplicable && v.valueNum !== null);
+    const last = mine.reduce<PortalValue | undefined>((best, v) => (!best || v.year > best.year ? v : best), undefined);
+    const value = last ? (last.valueNum as number) : null;
+    const target = indicator.target2026Num;
+    const pct = progress(value, target, indicator.direction);
+    const years = [...new Set(mine.map((v) => v.year))].sort((a, b) => a - b);
+    out.push({
+      indicator,
+      programId,
+      value,
+      year: last?.year ?? null,
+      target,
+      pct,
+      standing: standingOf(pct, target !== null),
+      trend: years.map((year) => ({ year, value: mean(mine.filter((v) => v.year === year).map((v) => v.valueNum as number)) as number })),
+      campuses: 1,
+      reportedCampuses: last ? 1 : 0,
+    });
+  }
+  return sortByAttention(out);
+}
+
 /** Primero lo rezagado, luego lo que no tiene cifra; dentro de cada grupo, el avance más bajo. */
 export function sortByAttention<T extends { standing: Standing; pct: number | null; indicator: { code: string } }>(rows: T[]): T[] {
   return [...rows].sort(

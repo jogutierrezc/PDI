@@ -23,7 +23,7 @@ import { Link, NavLink, useNavigate } from "react-router-dom";
 import { Icon } from "../../../components/ui/Icon";
 import type { IconName } from "../../../components/ui/Icon";
 import { useTheme } from "../../../lib/theme";
-import { roleLabels, useAuth } from "../../../lib/auth";
+import { INTRANET_HOME, roleLabels, useAuth } from "../../../lib/auth";
 import type { AppRole } from "../../../types/database";
 import "../admin.css";
 
@@ -725,6 +725,11 @@ export function AdminShell({
 
             <div className="admin-topbar__actions">
               {actions}
+              {/* Volver al panel (el lanzador) desde cualquier pantalla, sin abrir menús. */}
+              <Link className="button-secondary admin-topbar__panel" to={INTRANET_HOME} title="Panel de la intranet">
+                <Icon name="grid" size={16} />
+                <span className="admin-topbar__panel-label">Panel</span>
+              </Link>
               <button
                 className="icon-button theme-toggle"
                 type="button"

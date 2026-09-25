@@ -1,5 +1,6 @@
 /* =============================================================================
-   Impacto · Nuevo indicador, a pantalla completa (vicerrectorías y oficinas).
+   Impacto · Nuevo indicador, a pantalla completa (vicerrectorías, oficinas
+   y programas).
 
    Crear una ficha es la tarea más delicada del catálogo: de ella dependen lo
    que los programas eligen y reportan. Por eso no va en el panel lateral sino
@@ -15,6 +16,12 @@
    A la derecha, siempre, «Así la verán los programas». Nada se guarda hasta
    el paso final (o «Guardar borrador», disponible desde que hay nombre).
    La ficha y sus cruces se guardan juntos.
+
+   Con un programa (`site`), el mismo asistente crea o edita un indicador
+   propio del programa en esa sede, que va aparte de las fichas: elige su
+   función, Mr. Pilo le sugiere con qué ficha institucional relacionarlo (por
+   las palabras del nombre), el código lo pone la base (P-PROG-SEDE-001) y se
+   guarda directo en el catálogo del programa, sin borrador.
    ========================================================================== */
 
 import { useLayoutEffect, useMemo, useRef, useState } from "react";
@@ -26,7 +33,9 @@ import { sdgById } from "../../data/pdi";
 import { PiloAvatar, type PiloMood } from "../../components/pilo/PiloAvatar";
 import type { ImpactAccess } from "./access";
 import { suggest } from "./motor";
+import { similarity, words } from "./pilo/curate";
 import {
+  FUNCTIONS,
   FUNCTION_LABEL,
   MEASURE_LABEL,
   STAGES,
@@ -37,9 +46,20 @@ import {
   parseTarget,
   type Indicator,
   type Measure,
+  type ProgramSite,
   type Stage,
+  type SubstantiveFunction,
 } from "./model";
-import { toMotorCriteria, toPayload, useAddAlignments, useCriteria, useSaveIndicator, type Catalog, type ImpactBase } from "./store";
+import {
+  toMotorCriteria,
+  toPayload,
+  useAddAlignments,
+  useCriteria,
+  useRemoveAlignments,
+  useSaveIndicator,
+  type Catalog,
+  type ImpactBase,
+} from "./store";
 import { EASE_OUT, reducedMotion } from "./pilo/motion";
 import "./new-indicator.css";
 
@@ -61,19 +81,32 @@ const HINT: Record<Step, { mood: PiloMood; text: string }> = {
   5: { mood: "bien", text: "Publicada, los programas la pueden elegir. En borrador solo la ve su vicerrectoría." },
 };
 
+/** Lo que dice Mr. Pilo cuando quien crea es un programa. */
+const PROGRAM_HINT: Record<Step, { mood: PiloMood; text: string }> = {
+  1: { mood: "feliz", text: "Diga qué cuenta y de quién: «Estudiantes en tutorías entre pares», no «Tutorías». Si se parece a una ficha de la vicerrectoría, relaciónelo: así suma a la cadena institucional." },
+  2: { mood: "idea", text: "Si es un porcentaje, escriba sobre qué total. Con numerador y denominador la cifra se calcula sola en la captura." },
+  3: { mood: "piensa", text: "La línea base y las metas son las del programa en esta sede. Si la meta depende de otra cifra («+2 pp»), escríbala así." },
+  4: { mood: "idea", text: "Le sugiero pilares y ODS por las palabras del indicador. Elija los que de verdad correspondan." },
+  5: { mood: "bien", text: "Queda en el catálogo del programa. Su vicerrectoría lo ve y puede relacionarlo con una ficha." },
+};
+
 export function NewIndicatorWizard({
   draft,
   base,
   catalog,
   access,
   origin,
+  site,
   onClose,
   onCreated,
 }: {
   draft: Indicator;
   base: ImpactBase;
   catalog: Catalog;
-  access: ImpactAccess;
+  /** Las vicerrectorías: a nombre de qué unidad. Un programa no lo necesita. */
+  access?: ImpactAccess;
+  /** Un indicador propio de este programa en esta sede (crear o editar). */
+  site?: ProgramSite;
   /** Dónde está el botón que la abrió: la ventana crece desde ahí. */
   origin: { x: string; y: string };
   onClose: () => void;
@@ -81,16 +114,47 @@ export function NewIndicatorWizard({
 }) {
   const [step, setStep] = useState<Step>(1);
   const [form, setForm] = useState<Indicator>(draft);
-  const [picked, setPicked] = useState<string[]>([]);
+  const program = Boolean(site);
+  const editing = Boolean(draft.id);
+  // Al editar, los cruces que ya tiene.
+  const current = useMemo(
+    () =>
+      catalog.alignments
+        .filter((a) => a.indicatorId === draft.id && draft.id)
+        .map((a) => ({ id: a.id, key: a.target === "pilar" ? `pilar:${a.pillarId}` : `ods:${a.sdg}` })),
+    [catalog.alignments, draft.id],
+  );
+  const [picked, setPicked] = useState<string[]>(() => current.map((c) => c.key));
   const save = useSaveIndicator();
   const addAlignments = useAddAlignments();
+  const removeAlignments = useRemoveAlignments();
   const criteria = useCriteria();
   const scene = useRef<HTMLDivElement>(null);
   const panel = useRef<HTMLElement>(null);
-  const owners = access.ownersFor(form.fn);
+  const owners = access?.ownersFor(form.fn) ?? [];
   const dimensions = base.dimensions.filter((d) => d.fn === form.fn);
   const set = <K extends keyof Indicator>(key: K, value: Indicator[K]) => setForm((f) => ({ ...f, [key]: value }));
-  const duplicate = catalog.indicators.some((i) => i.code === form.code.trim().toUpperCase());
+  const duplicate = !program && catalog.indicators.some((i) => i.code === form.code.trim().toUpperCase());
+  const hints = program ? PROGRAM_HINT : HINT;
+
+  // Un programa: las fichas de su función con las que puede relacionarlo, y las
+  // que Mr. Pilo sugiere porque comparten palabras con el nombre.
+  const fichas = useMemo(
+    () => catalog.indicators.filter((i) => !i.programId && i.status === "publicado" && i.fn === form.fn).sort((a, b) => a.code.localeCompare(b.code, "es", { numeric: true })),
+    [catalog.indicators, form.fn],
+  );
+  const related = useMemo(() => {
+    const mine = words(`${form.name} ${form.description}`);
+    if (!program || mine.size === 0) return [];
+    return fichas
+      .map((f) => ({ ficha: f, score: similarity(mine, words(`${f.name} ${f.description}`)) }))
+      .filter((r) => r.score >= 0.15)
+      .sort((a, b) => b.score - a.score)
+      .slice(0, 3);
+  }, [program, fichas, form.name, form.description]);
+  const parent = fichas.find((f) => f.id === form.parentId);
+  const chooseFn = (fn: SubstantiveFunction) =>
+    setForm((f) => (f.fn === fn ? f : { ...f, fn, parentId: null, dimensionId: base.dimensions.find((d) => d.fn === fn)?.id ?? null }));
 
   // Lo que sugiere el motor con lo escrito hasta ahora.
   const suggestions = useMemo(
@@ -114,7 +178,7 @@ export function NewIndicatorWizard({
 
   const missing = missingInSheet(form);
   const canNext: Record<Step, boolean> = {
-    1: form.name.trim().length > 3 && !duplicate && /^[A-Z]{1,4}[0-9]{1,3}$/.test(form.code.trim().toUpperCase()),
+    1: form.name.trim().length > 3 && (program || (!duplicate && /^[A-Z]{1,4}[0-9]{1,3}$/.test(form.code.trim().toUpperCase()))),
     2: Boolean(form.measure),
     3: true,
     4: true,
@@ -178,19 +242,27 @@ export function NewIndicatorWizard({
   const persist = async (publish: boolean) => {
     const payload = toPayload({
       ...form,
-      code: form.code.trim().toUpperCase(),
+      code: program ? form.code : form.code.trim().toUpperCase(),
       name: form.name.trim(),
-      status: publish ? "publicado" : "borrador",
+      // Un indicador de programa va directo a su catálogo: no tiene borrador.
+      status: program ? (form.status === "retirado" ? "retirado" : "publicado") : publish ? "publicado" : "borrador",
+      ownerUnitId: program && site ? site.programId : form.ownerUnitId,
       baselineNum: parseFigure(form.baselineText),
       target2026Num: parseTarget(form.target2026),
       target2028Num: parseTarget(form.target2028),
     });
-    delete payload.id;
+    if (!editing) delete payload.id;
+    // El código de un indicador de programa lo pone la base, y no cambia al editar.
+    if (program) delete (payload as { code?: string }).code;
     try {
       const row = (await save.mutateAsync(payload)) as { id: string };
-      if (picked.length) {
+      const had = new Set(current.map((c) => c.key));
+      const gone = current.filter((c) => !picked.includes(c.key)).map((c) => c.id);
+      if (gone.length) await removeAlignments.mutateAsync(gone);
+      const fresh = picked.filter((key) => !had.has(key));
+      if (fresh.length) {
         await addAlignments.mutateAsync(
-          picked.map((key) => {
+          fresh.map((key) => {
             const [target, id] = key.split(":");
             return target === "pilar" ? { indicatorId: row.id, target: "pilar" as const, pillarId: id } : { indicatorId: row.id, target: "ods" as const, sdg: Number(id) };
           }),
@@ -211,8 +283,8 @@ export function NewIndicatorWizard({
   );
 
   const style = { "--nw-x": origin.x, "--nw-y": origin.y } as CSSProperties;
-  const busy = save.isPending || addAlignments.isPending;
-  const error = save.error ?? addAlignments.error;
+  const busy = save.isPending || addAlignments.isPending || removeAlignments.isPending;
+  const error = save.error ?? addAlignments.error ?? removeAlignments.error;
 
   return createPortal(
     <div ref={scene} className="nw" role="dialog" aria-modal="true" aria-labelledby="nw-title" style={style} onKeyDown={onKeyDown}>
@@ -222,12 +294,14 @@ export function NewIndicatorWizard({
         </button>
         <div className="nw__title">
           <span>
-            {owners.find((o) => o.id === form.ownerUnitId)?.name ?? FUNCTION_LABEL[form.fn]} · código {form.code || "—"}
+            {site
+              ? `${site.programName} · ${site.campusName} · ${form.code ? `código ${form.code}` : "código automático"}`
+              : `${owners.find((o) => o.id === form.ownerUnitId)?.name ?? FUNCTION_LABEL[form.fn]} · código ${form.code || "—"}`}
           </span>
-          <strong id="nw-title">Nuevo indicador</strong>
+          <strong id="nw-title">{program ? (editing ? "Editar indicador del programa" : "Nuevo indicador del programa") : "Nuevo indicador"}</strong>
         </div>
         <button type="button" className="button-secondary" disabled={!canNext[1] || busy} onClick={() => void persist(false)}>
-          Guardar borrador
+          {program ? "Guardar ahora" : "Guardar borrador"}
         </button>
       </header>
 
@@ -248,8 +322,8 @@ export function NewIndicatorWizard({
             })}
           </ol>
           <div className="nw__pilo">
-            <PiloAvatar mood={HINT[step].mood} size={48} />
-            <p>{HINT[step].text}</p>
+            <PiloAvatar mood={hints[step].mood} size={48} />
+            <p>{hints[step].text}</p>
           </div>
         </nav>
 
@@ -258,8 +332,24 @@ export function NewIndicatorWizard({
             <>
               <header data-anim>
                 <h2 tabIndex={-1} data-autofocus>¿Qué mide?</h2>
-                <p>El nombre y la descripción son lo primero que leen los programas al elegir.</p>
+                <p>
+                  {program
+                    ? "Un indicador propio del programa: va aparte de las fichas institucionales, pero puede relacionarse con una."
+                    : "El nombre y la descripción son lo primero que leen los programas al elegir."}
+                </p>
               </header>
+              {program && (
+                <div className="nw-field" data-anim>
+                  <span>Función sustantiva</span>
+                  <div className="nw-seg" role="group" aria-label="Función">
+                    {FUNCTIONS.map((fn) => (
+                      <button key={fn} type="button" aria-pressed={form.fn === fn} onClick={() => chooseFn(fn)}>
+                        {FUNCTION_LABEL[fn]}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
               {field(
                 "Nombre del indicador",
                 <textarea rows={2} value={form.name} onChange={(e) => set("name", e.target.value)} placeholder="Ej. Estudiantes con desempeño alto en Saber PRO" />,
@@ -275,12 +365,26 @@ export function NewIndicatorWizard({
                     ))}
                   </select>,
                 )}
-                {field(
-                  "Código",
-                  <input value={form.code} onChange={(e) => set("code", e.target.value.toUpperCase())} aria-invalid={duplicate || undefined} />,
-                  duplicate ? "Ese código ya existe." : "Se propone el siguiente libre.",
-                )}
-                {owners.length > 1 &&
+                {!program &&
+                  field(
+                    "Código",
+                    <input value={form.code} onChange={(e) => set("code", e.target.value.toUpperCase())} aria-invalid={duplicate || undefined} />,
+                    duplicate ? "Ese código ya existe." : "Se propone el siguiente libre.",
+                  )}
+                {program &&
+                  field(
+                    "Relacionado con la ficha",
+                    <select value={form.parentId ?? ""} onChange={(e) => set("parentId", e.target.value || null)}>
+                      <option value="">Ninguna: es solo del programa</option>
+                      {fichas.map((f) => (
+                        <option key={f.id} value={f.id}>
+                          {f.code} · {f.name}
+                        </option>
+                      ))}
+                    </select>,
+                    "Opcional. Relacionado, suma a la cadena de esa ficha.",
+                  )}
+                {!program && owners.length > 1 &&
                   field(
                     "A nombre de",
                     <select value={form.ownerUnitId} onChange={(e) => set("ownerUnitId", e.target.value)}>
@@ -300,6 +404,29 @@ export function NewIndicatorWizard({
                   ))}
                 </div>
               </div>
+              {program && related.length > 0 && !form.parentId && (
+                <div className="nw-related" data-anim>
+                  <PiloAvatar mood="idea" size={40} />
+                  <div>
+                    <strong>Se parece a {related.length === 1 ? "esta ficha" : "estas fichas"} de la vicerrectoría</strong>
+                    <ul>
+                      {related.map((r) => (
+                        <li key={r.ficha.id}>
+                          <button type="button" onClick={() => setForm((f) => ({ ...f, parentId: r.ficha.id, stage: r.ficha.stage }))}>
+                            <b>{r.ficha.code}</b> {r.ficha.name}
+                            <small>Relacionar · comparte {Math.round(r.score * 100)} % de palabras</small>
+                          </button>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                </div>
+              )}
+              {program && parent && (
+                <p className="nw-ready" data-anim>
+                  <Icon name="check" size={16} /> Relacionado con <b>{parent.code}</b> {parent.name}: sus cifras suman a esa ficha en la cadena.
+                </p>
+              )}
             </>
           )}
 
@@ -307,7 +434,7 @@ export function NewIndicatorWizard({
             <>
               <header data-anim>
                 <h2 tabIndex={-1} data-autofocus>¿Cómo se mide?</h2>
-                <p>Una ficha clara hace que todos los programas reporten lo mismo.</p>
+                <p>{program ? "Escrito claro, el programa reporta lo mismo cada año, lo haga quien lo haga." : "Una ficha clara hace que todos los programas reporten lo mismo."}</p>
               </header>
               <div className="nw-field" data-anim>
                 <span>Forma de medir</span>
@@ -346,13 +473,14 @@ export function NewIndicatorWizard({
             <>
               <header data-anim>
                 <h2 tabIndex={-1} data-autofocus>Línea base y metas</h2>
-                <p>Las de la UDES. Cada programa pondrá después las suyas.</p>
+                <p>{site ? `Las del programa en ${site.campusName}.` : "Las de la UDES. Cada programa pondrá después las suyas."}</p>
               </header>
               <div className="nw__row nw__row--3" data-anim>
                 {field(`Línea base ${form.baselineYear}`, <input value={form.baselineText} onChange={(e) => set("baselineText", e.target.value)} placeholder="Ej. 72%" />)}
                 {field("Meta 2026", <input value={form.target2026} onChange={(e) => set("target2026", e.target.value)} placeholder="Ej. ≥ 80%" />)}
                 {field("Meta 2028", <input value={form.target2028} onChange={(e) => set("target2028", e.target.value)} placeholder="Ej. 85%" />)}
               </div>
+              {!program && (
               <label className="nw-check" data-anim>
                 <input type="checkbox" checked={form.programReports} onChange={(e) => set("programReports", e.target.checked)} />
                 <span>
@@ -360,6 +488,9 @@ export function NewIndicatorWizard({
                   <small>Desmárquelo si la cifra solo la tiene la vicerrectoría (acreditación CNA, por ejemplo): los programas la consultan.</small>
                 </span>
               </label>
+              )}
+              {!program && (
+              <>
               {field(
                 "Condiciones de calidad CESU (opcional)",
                 <input
@@ -368,6 +499,8 @@ export function NewIndicatorWizard({
                   placeholder="Ej. C23, C39"
                 />,
                 "Las que respalda: suben la ficha en las propuestas de Mr. Pilo para acreditación.",
+              )}
+              </>
               )}
             </>
           )}
@@ -416,8 +549,12 @@ export function NewIndicatorWizard({
           {step === 5 && (
             <>
               <header data-anim>
-                <h2 tabIndex={-1} data-autofocus>Revisar y publicar</h2>
-                <p>Publicada, los programas la ven y la pueden elegir. En borrador, solo su vicerrectoría.</p>
+                <h2 tabIndex={-1} data-autofocus>{program ? "Revisar y guardar" : "Revisar y publicar"}</h2>
+                <p>
+                  {program
+                    ? "Queda en el catálogo del programa, aparte de las fichas institucionales. Su vicerrectoría lo ve y puede relacionarlo con una ficha."
+                    : "Publicada, los programas la ven y la pueden elegir. En borrador, solo su vicerrectoría."}
+                </p>
               </header>
               {missing.length > 0 ? (
                 <div className="nw-missing" data-anim>
@@ -427,14 +564,22 @@ export function NewIndicatorWizard({
                       <li key={m}>{m}</li>
                     ))}
                   </ul>
-                  <span>Puede publicarla igual y completarla después desde el catálogo.</span>
+                  <span>{program ? "Puede guardarlo igual y completarlo después." : "Puede publicarla igual y completarla después desde el catálogo."}</span>
                 </div>
               ) : (
                 <p className="nw-ready" data-anim>
-                  <Icon name="check" size={16} /> La ficha está completa.
+                  <Icon name="check" size={16} /> {program ? "El indicador está completo." : "La ficha está completa."}
                 </p>
               )}
               <dl className="nw-summary" data-anim>
+                {program && (
+                  <>
+                    <dt>Función</dt>
+                    <dd>{FUNCTION_LABEL[form.fn]}</dd>
+                    <dt>Relacionado con</dt>
+                    <dd>{parent ? `${parent.code} · ${parent.name}` : "Ninguna ficha: es solo del programa"}</dd>
+                  </>
+                )}
                 <dt>Eslabón</dt>
                 <dd>{STAGE_LABEL[form.stage]}</dd>
                 <dt>Se mide</dt>
@@ -461,7 +606,11 @@ export function NewIndicatorWizard({
             )}
             {step < 5 ? (
               <button type="button" className="button-primary" disabled={!canNext[step]} onClick={() => setStep((step + 1) as Step)}>
-                Siguiente: {STEPS[step].label.toLowerCase()} <Icon name="arrow-right" size={15} />
+                Siguiente: {(program && step === 4 ? "Revisar y guardar" : STEPS[step].label).toLowerCase()} <Icon name="arrow-right" size={15} />
+              </button>
+            ) : program ? (
+              <button type="button" className="button-primary" disabled={busy || !canNext[1]} onClick={() => void persist(true)}>
+                {busy ? "Guardando…" : editing ? "Guardar cambios" : "Guardar en el catálogo del programa"}
               </button>
             ) : (
               <>
@@ -476,14 +625,16 @@ export function NewIndicatorWizard({
           </footer>
         </section>
 
-        <aside className="nw__preview" aria-label="Así la verán los programas">
-          <span className="nw__preview-label">Así la verán los programas</span>
+        <aside className="nw__preview" aria-label={program ? "Así lo verá su vicerrectoría" : "Así la verán los programas"}>
+          <span className="nw__preview-label">{program ? "Así lo verá su vicerrectoría" : "Así la verán los programas"}</span>
           <article>
             <span className="nw__preview-tags">
-              <b>{form.code || "—"}</b>
+              <b>{form.code || (program ? "P-…" : "—")}</b>
               <i>{STAGE_LABEL[form.stage]}</i>
-              <i data-tone="wait">Borrador</i>
+              {program ? <i>{FUNCTION_LABEL[form.fn]}</i> : <i data-tone="wait">Borrador</i>}
+              {program && <i data-tone="wait">Del programa</i>}
             </span>
+            {program && parent && <small>Relacionado con {parent.code} · {parent.name}</small>}
             <strong>{form.name.trim() || "Nombre del indicador"}</strong>
             {form.description && <p>{form.description}</p>}
             <small>
@@ -493,7 +644,7 @@ export function NewIndicatorWizard({
             {form.source && <small>Fuente: {form.source}</small>}
             {(form.target2026 || form.target2028) && (
               <small>
-                Metas UDES: {[form.target2026 && `2026 ${form.target2026}`, form.target2028 && `2028 ${form.target2028}`].filter(Boolean).join(" · ")}
+                {program ? "Metas del programa" : "Metas UDES"}: {[form.target2026 && `2026 ${form.target2026}`, form.target2028 && `2028 ${form.target2028}`].filter(Boolean).join(" · ")}
               </small>
             )}
           </article>

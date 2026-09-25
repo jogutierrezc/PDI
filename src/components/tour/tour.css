@@ -42,6 +42,10 @@
   background: var(--surface);
   border-radius: var(--radius-lg);
   box-shadow: var(--shadow-xl);
+  /* Nunca más alto que la ventana (el alto máximo lo pone placement.ts): si el
+     texto no cabe, se desplaza por dentro y el globo no se sale. */
+  overflow-y: auto;
+  overscroll-behavior: contain;
 }
 
 .tour__bubble header {

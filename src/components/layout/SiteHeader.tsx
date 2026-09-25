@@ -10,10 +10,13 @@
    El último sitio de la barra es una puerta o una persona: sin sesión lleva a
    la intranet, con sesión abre lo que solo esa persona puede abrir.
 
-   En móvil (< 1180 px) todo va en un cajón con acordeón.
+   En móvil (< 1180 px) todo va en un cajón con acordeón. Por encima, si la
+   fila entera no cabe (con sesión hay más: «Oferta», «Panel» y la persona),
+   la barra se mide a sí misma y también pasa al cajón: nunca se sale de la
+   pantalla, sea cual sea el ancho, la letra o el nombre.
    ========================================================================== */
 
-import { Suspense, lazy, useEffect, useRef, useState } from "react";
+import { Suspense, lazy, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { Link, NavLink, useLocation, useNavigate } from "react-router-dom";
 import { Icon } from "../ui/Icon";
 import { useTheme } from "../../lib/theme";
@@ -51,6 +54,9 @@ export function SiteHeader({ onSearch }: { onSearch?: () => void }) {
   const location = useLocation();
   const navigate = useNavigate();
   const header = useRef<HTMLElement>(null);
+  const bar = useRef<HTMLDivElement>(null);
+  /** La fila completa no cabe: los enlaces pasan al cajón, como en móvil. */
+  const [compact, setCompact] = useState(false);
   const buttons = useRef<Partial<Record<PortalId, HTMLButtonElement | null>>>({});
   const timer = useRef<number>();
   /** Qué portal está esperando para abrirse. Sirve para cancelarlo al salir. */
@@ -74,6 +80,40 @@ export function SiteHeader({ onSearch }: { onSearch?: () => void }) {
     window.clearTimeout(timer.current);
     pending.current = null;
   };
+
+  // ¿Cabe la fila completa? Marca + enlaces + herramientas (sin el botón del
+  // cajón) contra el ancho útil de la barra. Con la barra compacta los enlaces
+  // siguen midiéndose (ocultos y fuera del flujo), así que la cuenta es la misma
+  // en los dos estados y no oscila. Por debajo de 1180 px manda el CSS.
+  useLayoutEffect(() => {
+    const el = bar.current;
+    const nav = el?.querySelector<HTMLElement>(".sh-nav");
+    const brand = el?.querySelector<HTMLElement>(".sh-brand");
+    const tools = el?.querySelector<HTMLElement>(".sh-tools");
+    if (!el || !nav || !brand || !tools || typeof ResizeObserver === "undefined") return;
+    const fit = () => {
+      const navWidth = nav.scrollWidth;
+      if (!navWidth) return;
+      const barStyle = getComputedStyle(el);
+      const gap = parseFloat(barStyle.columnGap) || 0;
+      const toggleBtn = tools.querySelector<HTMLElement>(".sh-menu-toggle");
+      const toggleWidth = toggleBtn?.offsetWidth ? toggleBtn.offsetWidth + (parseFloat(getComputedStyle(tools).columnGap) || 0) : 0;
+      const need = brand.offsetWidth + navWidth + tools.offsetWidth - toggleWidth + gap * 2;
+      const room = el.clientWidth - parseFloat(barStyle.paddingLeft) - parseFloat(barStyle.paddingRight);
+      setCompact(need > room);
+    };
+    fit();
+    const observer = new ResizeObserver(fit);
+    [el, nav, brand, tools].forEach((node) => observer.observe(node));
+    return () => observer.disconnect();
+  }, []);
+
+  // Al cambiar de modo se cierra lo que el otro modo tenía abierto.
+  useEffect(() => {
+    if (compact) show(null);
+    else setMobile(false);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [compact]);
 
   // Cambiar de página cierra todo.
   useEffect(() => {
@@ -133,8 +173,8 @@ export function SiteHeader({ onSearch }: { onSearch?: () => void }) {
   };
 
   return (
-    <header ref={header} className="sh" data-open={open ?? undefined} onPointerLeave={() => finePointer && open && later(null, CLOSE_DELAY)} onPointerEnter={() => window.clearTimeout(timer.current)}>
-      <div className="sh-bar">
+    <header ref={header} className="sh" data-open={open ?? undefined} data-compact={compact || undefined} onPointerLeave={() => finePointer && open && later(null, CLOSE_DELAY)} onPointerEnter={() => window.clearTimeout(timer.current)}>
+      <div ref={bar} className="sh-bar">
         <Link className="sh-brand" to="/" aria-label="Planeación Institucional, inicio">
           <img src="/logo-udes.svg" alt="" width={95} height={34} decoding="async" />
           <span>

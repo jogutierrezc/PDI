@@ -1504,6 +1504,7 @@
 
 .ist-head-side { display: grid; justify-items: end; gap: var(--space-3); }
 .ist-cut { color: var(--ink-muted); font-size: var(--text-sm); font-weight: 700; }
+.ist-pdf { display: inline-flex; align-items: center; min-height: 44px; text-decoration: none; }
 
 /* Las cifras de arriba: piedras, cada una con sus radios. */
 .ist-pebbles { display: grid; grid-template-columns: repeat(auto-fit, minmax(13rem, 1fr)); gap: var(--space-4); }

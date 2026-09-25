@@ -156,6 +156,12 @@ const ImpactPortalFaculty = lazy(() =>
 const ImpactPortalPrograms = lazy(() =>
   import("./modules/impacto/portal/PortalPrograms").then((m) => ({ default: m.PortalPrograms })),
 );
+const ImpactVicerrectoriaBulletin = lazy(() =>
+  import("./modules/impacto/boletin/ImpactBulletin").then((m) => ({ default: m.VicerrectoriaBulletinPage })),
+);
+const ImpactProgramBulletin = lazy(() =>
+  import("./modules/impacto/boletin/ImpactBulletin").then((m) => ({ default: m.ProgramBulletinPage })),
+);
 const ImpactPortalProgram = lazy(() =>
   import("./modules/impacto/portal/PortalProgram").then((m) => ({ default: m.PortalProgram })),
 );
@@ -455,6 +461,23 @@ export default function App() {
             element={
               <RequireRole minimum="consulta">
                 <ImpactPortalProgram />
+              </RequireRole>
+            }
+          />
+          {/* Boletín de Seguimiento (PDF) de una vicerrectoría o de un programa. */}
+          <Route
+            path="/impacto/boletin/vicerrectoria/:fn"
+            element={
+              <RequireRole minimum="consulta">
+                <ImpactVicerrectoriaBulletin />
+              </RequireRole>
+            }
+          />
+          <Route
+            path="/impacto/boletin/programa/:slug"
+            element={
+              <RequireRole minimum="consulta">
+                <ImpactProgramBulletin />
               </RequireRole>
             }
           />

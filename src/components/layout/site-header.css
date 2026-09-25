@@ -99,6 +99,7 @@
 
 /* «Panel»: con sesión, el lanzador de la intranet a un clic. */
 .sh-dash {
+  position: relative;
   display: inline-flex;
   align-items: center;
   gap: var(--space-2);
@@ -375,6 +376,23 @@
 
 /* --- Adaptación ------------------------------------------------------------------------- */
 
+/* Por encima de 1180 px, cuando la fila completa no cabe (SiteHeader la mide y
+   pone data-compact): lo mismo que el cajón de móvil. Los enlaces no se quitan
+   del todo, se ocultan fuera del flujo para que la barra pueda seguir
+   midiéndolos y volver a mostrarlos en cuanto quepan. */
+.sh[data-compact] .sh-nav {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: max-content;
+  visibility: hidden;
+  pointer-events: none;
+}
+.sh[data-compact] .sh-menu-toggle { display: grid; }
+.sh[data-compact] .sh-tools { margin-left: auto; }
+.sh[data-compact] .sh-panel,
+.sh[data-compact] .sh-scrim { display: none; }
+
 @media (max-width: 1320px) {
   .sh-brand small { display: none; }
   .sh-nav__link { padding: 0 9px; }
@@ -392,11 +410,14 @@
   .sh-tools { margin-left: auto; }
   .sh-panel,
   .sh-scrim { display: none; }
-  .sh-panel__grid { grid-template-columns: 220px minmax(0, 1fr); }
-  .sh-detail { display: none; }
-}
-
-@media (max-width: 720px) {
+  /* Con el cajón, lo único que cede ancho es el nombre de la oficina (con
+     puntos suspensivos): las herramientas no se encogen y, con sesión, entre
+     600 y 760 px no cabían a su lado. */
+  .sh-brand { flex: 0 1 auto; min-width: 0; }
+  .sh-brand > span { min-width: 0; }
+  .sh-brand strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  /* Con el cajón, «Panel» queda en su ícono: el rótulo no cabía junto a la
+     persona entre 721 y 900 px. Sigue siendo su nombre accesible. */
   .sh-dash { justify-content: center; padding: 0; }
   .sh-dash__label {
     position: absolute;
@@ -406,6 +427,11 @@
     clip: rect(0 0 0 0);
     white-space: nowrap;
   }
+  .sh-panel__grid { grid-template-columns: 220px minmax(0, 1fr); }
+  .sh-detail { display: none; }
+}
+
+@media (max-width: 720px) {
   .sh-me__name { display: none; }
   .sh-me__trigger > svg { display: none; }
   .sh-me__panel { width: min(20rem, calc(100vw - var(--space-6))); }
@@ -413,10 +439,9 @@
 
 @media (max-width: 560px) {
   .sh-bar { gap: var(--space-3); }
-  .sh-brand { min-width: 0; }
-  .sh-brand > span { min-width: 0; padding-left: var(--space-3); }
+  .sh-brand > span { padding-left: var(--space-3); }
   .sh-brand img { height: 30px; }
-  .sh-brand strong { overflow: hidden; font-size: 0.95rem; text-overflow: ellipsis; white-space: nowrap; }
+  .sh-brand strong { font-size: 0.95rem; }
   .sh-tools .sh-icon:nth-child(2) { display: none; }
 }
 

@@ -125,6 +125,10 @@
   top: 0;
   z-index: var(--z-sticky);
   display: grid;
+  /* Una columna del ancho de la cabecera, nunca del contenido: con la columna
+     «auto» por defecto, el título y la descripción (en una línea, sin partir)
+     la estiraban hasta su ancho entero y la fila se salía de la pantalla. */
+  grid-template-columns: minmax(0, 1fr);
   background: var(--surface-glass);
   border-bottom: 1px solid var(--line);
   backdrop-filter: blur(14px);
@@ -192,7 +196,10 @@
   align-items: center;
   justify-content: flex-end;
   gap: var(--space-2);
-  flex: 0 1 auto;
+  /* Las acciones no ceden ancho: lo cede el título (con puntos suspensivos).
+     Solo si ellas solas pasan del 70 % de la fila se parten en dos líneas. */
+  flex: 0 0 auto;
+  max-width: 70%;
   min-width: 0;
 }
 
@@ -1105,6 +1112,7 @@
   .admin-topbar__copy { flex-wrap: wrap; flex-basis: calc(100% - 56px); }
   .admin-crumbs { display: none; }
   .admin-topbar .admin-topbar__meta { flex-basis: 100%; margin-left: 0; padding-left: 0; border-left: 0; }
+  .admin-topbar__actions { max-width: 100%; }
 }
 
 /* =============================================================================
@@ -2763,9 +2771,11 @@ fieldset.admin-field legend {
 }
 
 /* --- Botón «Panel» de la cabecera ---------------------------------------------- */
-/* Vuelve al lanzador (/admin). Objetivo de 44 px; en el teléfono queda solo el
-   ícono, con el rótulo aún disponible para lectores de pantalla. */
+/* Vuelve al lanzador (/admin). Objetivo de 44 px; por debajo de 1100 px (el
+   teléfono, la tableta y la columna lateral estrecha) queda solo el ícono, con
+   el rótulo aún disponible para lectores de pantalla. */
 .admin-topbar__panel {
+  position: relative;
   min-height: 44px;
   padding-block: 0;
   text-decoration: none;
@@ -2774,7 +2784,7 @@ fieldset.admin-field legend {
 .admin-topbar__panel:hover { color: var(--brand-navy); background: var(--brand-blue-soft); border-color: var(--brand-blue); }
 .admin-topbar__panel:focus-visible { outline: 2px solid var(--brand-blue); outline-offset: 2px; }
 
-@media (max-width: 640px) {
+@media (max-width: 1100px) {
   .admin-topbar__panel { width: 44px; padding-inline: 0; }
   .admin-topbar__panel-label {
     position: absolute;

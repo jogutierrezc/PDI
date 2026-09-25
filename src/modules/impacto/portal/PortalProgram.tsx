@@ -106,6 +106,9 @@ function ProgramView({ data, slug }: { data: PortalData; slug: string }) {
               </div>
             )}
             <span className="ist-cut">{year ? `Corte ${year} · meta 2026` : "Sin cifras todavía · meta 2026"}</span>
+            <Link className="button-secondary ist-pdf" to={`/impacto/boletin/programa/${program.slug}${sede ? `?sede=${sede.slug}` : ""}`}>
+              Boletín PDF
+            </Link>
           </div>
         </div>
       </section>

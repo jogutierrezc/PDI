@@ -151,6 +151,10 @@ function FunctionView({ data, fn }: { data: PortalData; fn: SubstantiveFunction 
               hasta el impacto real y qué programas los han tomado.
             </p>
           </div>
+          <div className="ist-head-side">
+          <Link className="button-secondary ist-pdf" to={`/impacto/boletin/vicerrectoria/${FN_SLUG[fn]}`}>
+            Boletín PDF
+          </Link>
           <div className="ipo-minikpis">
             <div>
               <strong>{own.length}</strong>
@@ -166,6 +170,7 @@ function FunctionView({ data, fn }: { data: PortalData; fn: SubstantiveFunction 
               <strong>{connected.length}</strong>
               <span>programas conectados</span>
             </div>
+          </div>
           </div>
         </div>
       </section>

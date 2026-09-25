@@ -29,7 +29,8 @@ import {
   type ImpactBase,
 } from "../store";
 import { USAGE_TEXT, analyzeProposals, analyzeUsage } from "./curate";
-import { AVATAR_LG, PiloClose, PiloLauncher, PiloScene, PiloSpeech, type PiloOrigin } from "./PiloLauncher";
+import { PiloAvatar, type PiloMood } from "../../../components/pilo/PiloAvatar";
+import { PiloClose, PiloLauncher, PiloScene, PiloSpeech, type PiloOrigin } from "./PiloLauncher";
 
 type Tab = "alertas" | "propuestas" | "uso";
 
@@ -160,13 +161,28 @@ function Curator({
         : `Así se usa cada ficha: cuántos programas la siguen, cuántos ya reportaron y cuántos la adaptaron con indicadores propios.`;
 
   const loading = adoptions.isPending || values.isPending;
+  const mood: PiloMood = loading
+    ? "piensa"
+    : tab === "alertas"
+      ? alerts.some((a) => a.severity === "critica")
+        ? "cuidado"
+        : alerts.length
+          ? "idea"
+          : "excelente"
+      : tab === "propuestas"
+        ? analysis.ideas.length || analysis.links.length
+          ? "idea"
+          : "bien"
+        : "piensa2";
 
   return (
     <PiloScene origin={origin} onClose={onClose} titleId={titleId} focusKey={tab}>
       <aside className="pilo__side">
         <PiloClose onClose={onClose} />
         <div className="pilo__intro">
-          <img className="pilo__avatar" src={AVATAR_LG} alt="" width={132} height={132} />
+          <span className="pilo__avatar">
+            <PiloAvatar mood={mood} size={116} alive />
+          </span>
           <h1 id={titleId}>Hola, soy Mr. Pilo</h1>
           <PiloSpeech text={speech} />
         </div>

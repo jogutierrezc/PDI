@@ -43,8 +43,9 @@ const SCREENS: { screen: AdminScreen; label: string; icon: IconName }[] = [
 ];
 
 export function useIntranetLinks(): { home: string | null; links: IntranetLink[] } {
-  const { profile, canSee, home } = useAuth();
+  const { profile, canSee } = useAuth();
   if (!profile?.is_active) return { home: null, links: [] };
   const links = SCREENS.filter((s) => canSee(s.screen)).map((s) => ({ ...s, to: SCREEN_PATHS[s.screen] }));
-  return { home: links.length ? home : null, links };
+  // «Ir a la intranet» abre el lanzador, que muestra justo esas pantallas.
+  return { home: links.length ? "/admin" : null, links };
 }

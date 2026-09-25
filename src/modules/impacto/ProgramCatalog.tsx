@@ -319,8 +319,12 @@ function ProgramIndicatorForm({
 
   const submit = async () => {
     if (problem) return;
-    await save.mutateAsync(form);
-    onClose();
+    try {
+      await save.mutateAsync(form);
+      onClose();
+    } catch {
+      // El error se muestra en el pie (save.error).
+    }
   };
 
   return (

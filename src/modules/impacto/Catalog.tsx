@@ -9,7 +9,7 @@
    vicerrectoría u oficina que lleva la función. Lo demás, consulta.
    ========================================================================== */
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, useRef } from "react";
 import type { ReactNode } from "react";
 import { Icon } from "../../components/ui/Icon";
 import { SaveState } from "../admin/udes-en-cifras/ui";
@@ -30,6 +30,8 @@ import {
   type Stage,
   type SubstantiveFunction,
 } from "./model";
+import { useSearchParams } from "react-router-dom";
+import { NewIndicatorWizard, originOf } from "./NewIndicatorWizard";
 import { toPayload, useSaveIndicator, type Catalog as CatalogData, type ImpactBase } from "./store";
 import { AlignmentEditor, AlignmentChips } from "./Alignments";
 
@@ -59,6 +61,10 @@ export function Catalog({
   const [status, setStatus] = useState<"todas" | "completas" | "pendientes">("todas");
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [draft, setDraft] = useState<Indicator | null>(null);
+  // La ficha nueva se crea en el asistente a pantalla completa, no en el panel.
+  const [creating, setCreating] = useState<{ draft: Indicator; origin: { x: string; y: string } } | null>(null);
+  const newButton = useRef<HTMLButtonElement>(null);
+  const [params, setParams] = useSearchParams();
   const [folded, setFoldedState] = useState(readFold);
   const setFolded = (next: boolean) => {
     setFoldedState(next);
@@ -96,8 +102,8 @@ export function Catalog({
     const owner = owners[0];
     if (!owner) return;
     setSelectedId(null);
-    setFolded(false);
-    setDraft({
+    setDraft(null);
+    setCreating({ origin: originOf(newButton.current), draft: {
       id: "",
       code: nextCode(fn, catalog.indicators),
       fn,
@@ -133,8 +139,18 @@ export function Catalog({
       parentId: null,
       mandatory: false,
       legacyId: null,
-    });
+    } });
   };
+
+  // Desde el lanzador: /admin/impacto/catalogo?nuevo=1 abre el asistente.
+  useEffect(() => {
+    if (params.get("nuevo") !== "1" || !owners.length) return;
+    const next = new URLSearchParams(params);
+    next.delete("nuevo");
+    setParams(next, { replace: true });
+    startNew();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [params, owners.length]);
 
   const toggleStage = (stage: Stage) =>
     setStages((current) => (current.includes(stage) ? current.filter((s) => s !== stage) : [...current, stage]));
@@ -164,7 +180,7 @@ export function Catalog({
             ))}
           </div>
           {owners.length > 0 && (
-            <button type="button" className="button-primary imp-toolbar__new" onClick={startNew}>
+            <button ref={newButton} type="button" className="button-primary imp-toolbar__new" data-tour="imp-new" onClick={startNew}>
               <Icon name="plus" size={15} /> Nuevo indicador
             </button>
           )}
@@ -212,6 +228,22 @@ export function Catalog({
           </table>
         </div>
       </div>
+
+      {creating && (
+        <NewIndicatorWizard
+          draft={creating.draft}
+          origin={creating.origin}
+          base={base}
+          catalog={catalog}
+          access={access}
+          onClose={() => setCreating(null)}
+          onCreated={(id) => {
+            setCreating(null);
+            setSelectedId(id);
+            setFolded(false);
+          }}
+        />
+      )}
 
       {selected && (
         <Sheet

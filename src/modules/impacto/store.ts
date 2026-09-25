@@ -1018,3 +1018,27 @@ export function useSaveSourceFigures() {
     onSuccess: () => client.invalidateQueries({ queryKey: ["impacto", "pilo"] }),
   });
 }
+
+/** Varios cruces con pilares y ODS de una vez, puestos a mano (el asistente de ficha nueva). */
+export function useAddAlignments() {
+  return useImpactMutation(
+    async (rows: { indicatorId: string; target: "pilar" | "ods"; pillarId?: string; sdg?: number }[]) => {
+      if (!rows.length) return;
+      await run(
+        supabase
+          .from("imp_alignments")
+          .insert(
+            rows.map((r) => ({
+              indicator_id: r.indicatorId,
+              target: r.target,
+              pillar_id: r.pillarId ?? null,
+              sdg: r.sdg ?? null,
+              origin: "manual",
+              confirmed: true,
+            })),
+          )
+          .select("id"),
+      );
+    },
+  );
+}

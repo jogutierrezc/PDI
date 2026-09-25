@@ -47,7 +47,7 @@ export type AdminSection =
   | "transfer"
   | "institution";
 
-interface NavItem {
+export interface NavItem {
   id: AdminSection;
   label: string;
   icon: IconName;
@@ -56,7 +56,7 @@ interface NavItem {
   minimum: AppRole;
 }
 
-interface NavGroup {
+export interface NavGroup {
   id: "planeacion" | "pdi" | "cifras" | "observatorio" | "impacto" | "tableros" | "sistema";
   label: string;
   /** Ícono y nombre corto: el riel solo tiene 78 px, ahí no cabe el rótulo largo. */
@@ -65,7 +65,8 @@ interface NavGroup {
   items: NavItem[];
 }
 
-const navigation: NavGroup[] = [
+/** El menú de la intranet. El lanzador (/admin) lo reutiliza con los mismos permisos. */
+export const navigation: NavGroup[] = [
   {
     // La portada del portal es lo primero que ve quien llega de fuera, así que
     // es también lo primero del menú de quien la escribe.
@@ -400,7 +401,7 @@ export function AdminShell({
 
       <aside ref={sidebarRef} className="admin-sidebar" id="admin-nav">
         <div className="admin-sidebar__head">
-          <Link className="admin-brand" to="/admin/pilares" aria-label="Intranet UDES · inicio">
+          <Link className="admin-brand" to="/admin" aria-label="Intranet UDES · inicio">
             <img src="/logo-udes.svg" alt="" width={95} height={34} />
             <span>
               <strong>Intranet UDES</strong>

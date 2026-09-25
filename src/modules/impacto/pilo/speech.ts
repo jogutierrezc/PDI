@@ -7,6 +7,7 @@
    lo dice con nombre y apellido. Sin emojis: es la intranet.
    ========================================================================== */
 
+import type { PiloMood } from "../../../components/pilo/PiloAvatar";
 import { FUNCTION_LABEL, STAGE_LABEL, type Stage, type SubstantiveFunction } from "../model";
 
 export interface SpeechContext {
@@ -26,6 +27,24 @@ export interface SpeechContext {
   selected: number;
   added: number;
   total: number;
+  /** Todavía cargando lo que necesita para proponer. */
+  loading?: boolean;
+}
+
+/** La cara que pone Mr. Pilo según lo que está diciendo. */
+export function piloMood(step: 1 | 2 | 3 | 4, c: SpeechContext): PiloMood {
+  switch (step) {
+    case 1:
+      return c.goalsCount === 0 ? "feliz" : c.missingFns.length ? "duda" : "bien";
+    case 2:
+      return c.sourcePeriods.length ? "idea" : "piensa";
+    case 3:
+      if (c.loading) return "piensa2";
+      if (c.gaps.length) return "cuidado";
+      return c.impossible.length ? "duda" : "idea";
+    case 4:
+      return c.added ? "excelente" : "bien";
+  }
 }
 
 const join = (items: string[]) =>

@@ -77,7 +77,18 @@ interface AuthContextValue {
   canEditPeriod: () => boolean;
   /** Primera pantalla que esta persona sí puede abrir. */
   home: string;
+  /** Su lugar en Impacto, por sus unidades. */
+  impactoSide: ImpactoSide;
+  /** ¿Pertenece a alguna unidad? */
+  inAnyUnit: boolean;
 }
+
+/**
+ * Dónde trabaja la persona en Impacto, según sus unidades: en un programa o
+ * facultad, en una vicerrectoría u oficina con función sustantiva, en ambos
+ * o en ninguno. Decide si Impacto aparece y qué recorrido le toca.
+ */
+export type ImpactoSide = "programa" | "funcion" | "ambos" | null;
 
 const AuthContext = createContext<AuthContextValue | null>(null);
 
@@ -87,6 +98,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [access, setAccess] = useState<AccessScope | null>(null);
   /** ¿Está en alguna unidad de Mis Tableros? Pertenecer ES el permiso. */
   const [inAnyUnit, setInAnyUnit] = useState(false);
+  const [impactoSide, setImpactoSide] = useState<ImpactoSide>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -121,9 +133,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     // alguien en una facultad da por hecho —con razón— que ya puede entrar.
     // Sin la migración 0057 esto falla y se queda en falso, que es lo de antes.
     const belongs = person
-      ? await supabase.from("unit_members").select("id").eq("profile_id", person.id)
+      ? await supabase.from("unit_members").select("unit_id, units(kind)").eq("profile_id", person.id)
       : null;
-    setInAnyUnit((belongs?.data ?? []).length > 0);
+    const rows = (belongs?.data ?? []) as { unit_id: string; units: { kind: string } | { kind: string }[] | null }[];
+    setInAnyUnit(rows.length > 0);
+
+    // En Impacto: ¿programa (o facultad), vicerrectoría u oficina con función, o ambos?
+    const kindOf = (r: (typeof rows)[number]) => (Array.isArray(r.units) ? r.units[0]?.kind : r.units?.kind) ?? "";
+    const programSide = rows.some((r) => kindOf(r) === "programa" || kindOf(r) === "facultad");
+    let functionSide = false;
+    if (rows.length) {
+      const fns = await supabase.from("imp_unit_functions").select("unit_id").in("unit_id", rows.map((r) => r.unit_id));
+      functionSide = (fns.data ?? []).length > 0;
+    }
+    setImpactoSide(functionSide ? (programSide ? "ambos" : "funcion") : programSide ? "programa" : null);
 
     // El rol de acceso decide qué pantallas e informes se enseñan. Si no se
     // puede leer (base sin la migración 0024), la sesión sigue como antes.
@@ -207,6 +230,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setProfile(null);
     setAccess(null);
     setInAnyUnit(false);
+    setImpactoSide(null);
     setSession(null);
   }, []);
 
@@ -232,13 +256,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         return false;
       }
       // Mis Tableros se gana perteneciendo a una unidad, no marcándolo aparte.
-      // Mis Tableros e Impacto se ganan perteneciendo a una unidad: lo que se ve
-      // dentro lo recorta la base según esa pertenencia.
-      if ((screen === "tableros" || screen === "impacto") && inAnyUnit) return true;
+      if (screen === "tableros" && inAnyUnit) return true;
+      // Impacto, solo a quien tiene algo que hacer en él: un programa o una
+      // unidad con función sustantiva, Planeación sin unidades (lo lee todo)
+      // y la administración. Pertenecer a una oficina sin función no basta.
+      if (screen === "impacto") {
+        if (RANK[profile.role] >= RANK.admin || impactoSide) return true;
+        if (RANK[profile.role] >= RANK.planeacion && !inAnyUnit) return true;
+        return false;
+      }
       if (!access) return true;
       return access.role.all_screens || access.role.screens.includes(screen);
     },
-    [profile, access, inAnyUnit],
+    [profile, access, inAnyUnit, impactoSide],
   );
 
   const reachesReport = useCallback(
@@ -269,11 +299,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const value = useMemo(
     () => ({
       session, profile, loading, error, signIn, signOut, requestPasswordReset, hasRole,
-      access, canSee, canSeeReport: reachesReport, canEditReport, canEditPeriod, home,
+      access, canSee, canSeeReport: reachesReport, canEditReport, canEditPeriod, home, impactoSide, inAnyUnit,
     }),
     [
       session, profile, loading, error, signIn, signOut, requestPasswordReset, hasRole,
-      access, canSee, reachesReport, canEditReport, canEditPeriod, home,
+      access, canSee, reachesReport, canEditReport, canEditPeriod, home, impactoSide, inAnyUnit,
     ],
   );
 

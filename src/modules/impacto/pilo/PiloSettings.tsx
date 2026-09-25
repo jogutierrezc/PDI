@@ -193,6 +193,14 @@ function SourceLoader({ base, canEdit }: { base: ImpactBase; canEdit: boolean })
   const ready = (parsed?.groups ?? []).filter((g) => target(g.key));
 
   const submit = async () => {
+    try {
+      await saveReady();
+    } catch {
+      // El error se muestra en la barra (saveFigures.error).
+    }
+  };
+
+  const saveReady = async () => {
     const rows = ready.map((g) => {
       const [programId, campusId] = target(g.key).split("|");
       return {

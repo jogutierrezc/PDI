@@ -11,11 +11,14 @@
 import { Suspense, lazy } from "react";
 import { Navigate, Route, Routes, useLocation } from "react-router-dom";
 import { ScrollManager } from "./components/layout/ScrollManager";
+import { TourProvider } from "./components/tour/TourProvider";
+import { TourFab } from "./components/tour/TourFab";
 import { useAuth } from "./lib/auth";
 import type { AdminScreen, AppRole } from "./types/database";
 import type { ReactElement } from "react";
 
 import { Home } from "./routes/Home";
+const Launcher = lazy(() => import("./modules/admin/launcher/Launcher").then((m) => ({ default: m.Launcher })));
 const PlaneacionHome = lazy(() => import("./modules/planeacion/PlaneacionHome").then((m) => ({ default: m.PlaneacionHome })));
 const TeamPage = lazy(() => import("./modules/planeacion/TeamPage").then((m) => ({ default: m.TeamPage })));
 
@@ -175,12 +178,13 @@ function RequireRole({
  * /admin a secas: la primera pantalla que esta persona puede abrir. Antes no
  * existía y el botón «Intranet» terminaba en «No encontrada».
  */
+/** /admin: el lanzador, lo primero al entrar a la intranet. */
 function AdminHome() {
-  const { loading, profile, home } = useAuth();
+  const { loading, profile } = useAuth();
   const location = useLocation();
   if (loading) return <RouteFallback />;
   if (!profile) return <Navigate to="/acceso-intranet" replace state={{ from: location.pathname }} />;
-  return <Navigate to={home === "/" ? "/sin-permiso" : home} replace />;
+  return <Launcher />;
 }
 
 /** Marca de carga discreta. */
@@ -195,7 +199,7 @@ export function RouteFallback() {
 
 export default function App() {
   return (
-    <>
+    <TourProvider>
       <ScrollManager />
       <Suspense fallback={<RouteFallback />}>
         <Routes>
@@ -414,6 +418,7 @@ export default function App() {
           <Route path="*" element={<NotFound />} />
         </Routes>
       </Suspense>
-    </>
+      <TourFab />
+    </TourProvider>
   );
 }

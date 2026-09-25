@@ -210,3 +210,22 @@ describe("Mr. Pilo: pesos, obligatorias y fuentes (0085)", () => {
     expect(await t.asUser(PEOPLE.ve, (q) => q("select 1 from imp_source_figures"))).toHaveLength(1);
   });
 });
+
+describe("Recorridos guiados (0087)", () => {
+  it("cada persona guarda y lee solo sus recorridos", async () => {
+    await t.asUser(
+      PEOPLE.director,
+      (q) => q("insert into user_tours (profile_id, tour_id, status) values ($1, 'intranet-programa', 'completado')", [PEOPLE.director]),
+      { commit: true },
+    );
+    expect(await t.asUser(PEOPLE.director, (q) => q("select tour_id from user_tours"))).toHaveLength(1);
+    expect(await t.asUser(PEOPLE.otroDirector, (q) => q("select tour_id from user_tours"))).toHaveLength(0);
+    expect(
+      await errorOf(
+        t.asUser(PEOPLE.otroDirector, (q) =>
+          q("insert into user_tours (profile_id, tour_id) values ($1, 'intranet-programa')", [PEOPLE.director]),
+        ),
+      ),
+    ).toMatch(/row-level security/);
+  });
+});

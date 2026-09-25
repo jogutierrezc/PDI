@@ -669,7 +669,7 @@ const routes = [
   },
   {
     path: "/",
-    note: "el menú de la persona ofrece solo las pantallas que puede abrir, y ninguna lleva a /admin a secas",
+    note: "el menú de la persona ofrece solo las pantallas que puede abrir, e «Ir a la intranet» abre el lanzador",
     expect: "La universidad, medida y planeada a la vista de todos.",
     session: true,
     interact: async (window, tick) => {
@@ -681,7 +681,8 @@ const routes = [
       const panel = window.document.getElementById("sh-me-panel");
       if (!panel) throw new Error("el panel de la persona no abre");
       const hrefs = [...panel.querySelectorAll("a")].map((a) => a.getAttribute("href"));
-      if (hrefs.includes("/admin")) throw new Error("un enlace sigue llevando a /admin, que no es una pantalla");
+      // /admin es el lanzador: «Ir a la intranet» lleva ahí; las demás entradas, a su pantalla.
+      if (hrefs.filter((h) => h === "/admin").length > 1) throw new Error("más de un enlace lleva al lanzador");
       if (!panel.textContent.includes("Tu intranet")) throw new Error("no aparece la lista de la intranet");
       if (!panel.textContent.includes("Ir a la intranet")) throw new Error("no aparece el acceso a la intranet");
       if (!hrefs.some((h) => h && h.startsWith("/admin/"))) throw new Error("ningún acceso lleva a una pantalla de la intranet");
@@ -689,7 +690,7 @@ const routes = [
   },
   {
     path: "/admin",
-    note: "/admin a secas lleva a la primera pantalla que la persona puede abrir",
+    note: "/admin a secas abre el lanzador con las pantallas que la persona puede abrir",
     expect: "Página de la oficina",
     session: true,
   },
@@ -2656,7 +2657,15 @@ const routes = [
     session: true,
     note: "la matriz del rol: plantilla, niveles por módulo y resumen",
     also: ["Roles de acceso", "Personalizada", "UDES en Cifras", "Quien lleve este rol", "Capacidad resultante"],
-    absent: ["Impacto", "En una unidad"],
+    // «Impacto» ya no se busca ausente: volvió (0078) y la administración lo ve en su menú.
+    absent: ["En una unidad"],
+  },
+  {
+    path: "/admin",
+    expect: "¿Dónde quiere trabajar hoy?",
+    session: true,
+    note: "el lanzador: saludo y los módulos que la persona puede usar",
+    also: ["Recorrido guiado", "Portal de Planeación"],
   },
   {
     path: "/admin/usuarios/carga",

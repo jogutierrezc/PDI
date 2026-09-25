@@ -338,3 +338,14 @@ export function nextCode(fn: SubstantiveFunction, indicators: Pick<Indicator, "c
 export function byChain(a: Indicator, b: Indicator): number {
   return STAGES.indexOf(a.stage) - STAGES.indexOf(b.stage) || a.position - b.position || a.code.localeCompare(b.code);
 }
+
+/**
+ * El mensaje de un error para la pantalla: el amable y, si la base dijo otra
+ * cosa, sus palabras exactas entre paréntesis, para poder diagnosticar.
+ */
+export function errorText(error: unknown): string {
+  if (!error) return "";
+  const e = error as { message?: string; original?: string };
+  const message = e.message ?? String(error);
+  return e.original && e.original !== message ? `${message} (${e.original})` : message;
+}

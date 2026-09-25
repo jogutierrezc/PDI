@@ -143,3 +143,14 @@ describe("imp_peer_adoptions", () => {
     void campus;
   });
 });
+
+describe("0086: la sincronización no depende de cada GRANT", () => {
+  it("la administración sincroniza aunque el historial solo tenga permiso de lectura", async () => {
+    await t.q("revoke insert on imp_sync_runs from authenticated");
+    const [{ r }] = await t.asUser(PEOPLE.admin, apply({ summary: { prueba: 1 } }));
+    expect(r).toMatchObject({ cifras: 0 });
+    await t.q("grant insert on imp_sync_runs to authenticated");
+    // Quien no es administración sigue sin poder.
+    expect(await errorOf(t.asUser(PEOPLE.director, apply({})))).toMatch(/Solo la administración/);
+  });
+});

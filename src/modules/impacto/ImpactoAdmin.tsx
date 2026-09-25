@@ -48,6 +48,8 @@ import { PiloBot } from "./pilo/PiloBot";
 import { PiloCurator } from "./pilo/PiloCurator";
 import { PiloSettings } from "./pilo/PiloSettings";
 import { SyncPanel } from "./sync/SyncPanel";
+import { useTour } from "../../components/tour/TourProvider";
+import { intranetTourFor } from "../../components/tour/tours";
 import "../admin/udes-en-cifras/od-admin.css";
 import "./impacto.css";
 
@@ -71,7 +73,9 @@ export function ImpactoAdmin() {
   const { vista } = useParams();
   const [params, setParams] = useSearchParams();
   const navigate = useNavigate();
-  const { profile, hasRole } = useAuth();
+  const { profile, hasRole, impactoSide } = useAuth();
+  const { start: startTour } = useTour();
+  const tourId = intranetTourFor({ admin: hasRole("admin"), impactoSide });
   const base = useImpactBase(profile?.id);
   const catalog = useCatalog(Boolean(base.data && !base.data.missing));
 
@@ -223,10 +227,24 @@ export function ImpactoAdmin() {
       </div>
     ) : null;
 
+  // El recorrido del rol, desde la parada de la vista que se está mirando.
+  const tour = tourId ? (
+    <button
+      type="button"
+      className="imp-help"
+      aria-label="Recorrido guiado de Impacto"
+      title="Recorrido guiado"
+      onClick={() => startTour(tourId, 1)}
+    >
+      <Icon name="compass" size={17} />
+    </button>
+  ) : null;
+
   const actions =
-    picker || pilo ? (
+    picker || pilo || tour ? (
       <>
         {picker}
+        {tour}
         {pilo}
       </>
     ) : undefined;

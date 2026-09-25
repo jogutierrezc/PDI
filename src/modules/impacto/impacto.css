@@ -1063,3 +1063,20 @@
   .imp-mine__row,
   .imp-mine__row--3 { grid-template-columns: minmax(0, 1fr); }
 }
+
+/* El botón del recorrido guiado, en la cabecera. */
+.imp-help {
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  color: var(--brand-navy);
+  background: var(--surface);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-pill);
+  cursor: pointer;
+  transition: transform 160ms var(--ease-out);
+}
+
+.imp-help:active { transform: scale(0.97); }
+.imp-help:focus-visible { outline: 3px solid var(--brand-blue); outline-offset: 2px; }

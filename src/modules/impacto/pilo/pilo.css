@@ -54,13 +54,11 @@
   border-radius: var(--radius-pill);
 }
 
-.pilo-btn__face img {
-  width: 36px;
-  height: 36px;
+.pilo-btn__face .pilo-avatar {
   transition: transform var(--dur-slow) var(--ease-out);
 }
 
-.pilo-btn[data-intent] .pilo-btn__face img {
+.pilo-btn[data-intent] .pilo-btn__face .pilo-avatar {
   transform: rotate(-8deg) scale(1.06);
 }
 
@@ -192,6 +190,9 @@
 }
 
 .pilo__avatar {
+  display: grid;
+  place-items: center;
+  box-sizing: border-box;
   width: 132px;
   height: 132px;
   padding: var(--space-2);
@@ -409,7 +410,7 @@
       0 0 0 4px color-mix(in srgb, var(--pilo-accent) 38%, transparent),
       var(--shadow-md);
   }
-  .pilo-btn:hover .pilo-btn__face img { transform: rotate(-8deg) scale(1.06); }
+  .pilo-btn:hover .pilo-btn__face .pilo-avatar { transform: rotate(-8deg) scale(1.06); }
   .pilo-tile:hover { box-shadow: inset 0 0 0 1px var(--brand-blue), var(--shadow-sm); }
   .pilo-tile[aria-pressed="true"]:hover { box-shadow: inset 0 0 0 2px var(--brand-blue), var(--shadow-sm); }
 }
@@ -794,7 +795,7 @@
   .pilo-size:active { transform: none; }
   .pilo-btn,
   .pilo-tile,
-  .pilo-btn__face img { transition: none; }
+  .pilo-btn__face .pilo-avatar { transition: none; }
   .pilo-btn:hover,
   .pilo-tile:hover { transform: none; }
   .pilo-peek i::after { animation: none; transform: none; }

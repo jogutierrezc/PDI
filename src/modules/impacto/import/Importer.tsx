@@ -11,7 +11,7 @@ import { Icon } from "../../../components/ui/Icon";
 import { downloadBlob } from "../../admin/traslado/transfer";
 import { workbookToTables } from "../../admin/institucion/structure-sheet";
 import type { ImpactAccess } from "../access";
-import { FUNCTION_LABEL, type SubstantiveFunction } from "../model";
+import { FUNCTION_LABEL, errorText, type SubstantiveFunction } from "../model";
 import { useImportValues, useValues, type Catalog, type ImpactBase } from "../store";
 import { DATA_SHEET, fillTemplate, parseImport, type ImportContext, type ImportParse } from "./template";
 import "./import.css";
@@ -98,9 +98,13 @@ export function Importer({
     : null;
 
   const load = async () => {
-    const result = await importValues.mutateAsync(toLoad.map((r) => r.row));
-    setDone(result);
-    setParsed(null);
+    try {
+      const result = await importValues.mutateAsync(toLoad.map((r) => r.row));
+      setDone(result);
+      setParsed(null);
+    } catch {
+      // El error se muestra en la barra (importValues.error).
+    }
   };
 
   if (indicators.length === 0) {
@@ -224,7 +228,7 @@ export function Importer({
                   <strong>{toLoad.length} cifras para cargar.</strong> Las iguales no se tocan.
                 </span>
                 {importValues.error && (
-                  <span className="imp-sync__error" role="alert"><Icon name="alert" size={15} /> {importValues.error.message}</span>
+                  <span className="imp-sync__error" role="alert"><Icon name="alert" size={15} /> {errorText(importValues.error)}</span>
                 )}
                 <button type="button" className="button-secondary" onClick={() => setParsed(null)}>Descartar</button>
                 <button type="button" className="button-primary" disabled={!toLoad.length || importValues.isPending} onClick={load}>

@@ -30,6 +30,7 @@ import {
   type Resolutions,
   type SyncContext,
 } from "./legacy";
+import { errorText } from "../model";
 import "./sync.css";
 
 type Connection =
@@ -176,9 +177,13 @@ export function SyncPanel({ base, catalog }: { base: ImpactBase; catalog: Catalo
 
   const run = async () => {
     if (!plan) return;
-    const result = await apply.mutateAsync(toBatch(plan, url.trim()));
-    setApplied(result);
-    setReview(null);
+    try {
+      const result = await apply.mutateAsync(toBatch(plan, url.trim()));
+      setApplied(result);
+      setReview(null);
+    } catch {
+      // El error se muestra en la barra (apply.error).
+    }
   };
 
   const total = plan ? changeCount(plan) : 0;
@@ -379,7 +384,7 @@ export function SyncPanel({ base, catalog }: { base: ImpactBase; catalog: Catalo
           </span>
           {apply.error && (
             <span className="imp-sync__error" role="alert">
-              <Icon name="alert" size={15} /> {apply.error.message}
+              <Icon name="alert" size={15} /> {errorText(apply.error)}
             </span>
           )}
           <button type="button" className="button-secondary" onClick={() => setReview(null)} disabled={apply.isPending}>

@@ -15,6 +15,7 @@ import { createContext, useCallback, useContext, useEffect, useLayoutEffect, use
 import type { CSSProperties, KeyboardEvent as ReactKeyboardEvent, MutableRefObject, PointerEvent as ReactPointerEvent, ReactNode } from "react";
 import gsap from "gsap";
 import { playEntrance, playExit, playSpeech, playStep } from "./motion";
+import { PiloAvatar } from "../../../components/pilo/PiloAvatar";
 import { createPortal } from "react-dom";
 import { Icon } from "../../../components/ui/Icon";
 import "./pilo.css";
@@ -98,7 +99,7 @@ export function PiloLauncher({
           onClick={show}
         >
           <span className="pilo-btn__face">
-            <img src={AVATAR} srcSet={`${AVATAR} 1x, ${AVATAR_2X} 2x`} alt="" width={40} height={40} />
+            <PiloAvatar mood={intent ? "idea" : "feliz"} size={36} />
           </span>
           <span className="pilo-btn__text">
             <strong>Mr. Pilo Bot</strong>

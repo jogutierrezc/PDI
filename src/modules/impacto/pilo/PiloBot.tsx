@@ -16,7 +16,7 @@
 
 import { useEffect, useId, useMemo, useRef, useState } from "react";
 import { Icon } from "../../../components/ui/Icon";
-import { FUNCTION_LABEL, STAGE_LABEL, type ProgramSite, type Stage, type SubstantiveFunction } from "../model";
+import { FUNCTION_LABEL, STAGE_LABEL, errorText, type ProgramSite, type Stage, type SubstantiveFunction } from "../model";
 import {
   useAdoptMany,
   useAdoptions,
@@ -40,9 +40,10 @@ import {
   type PiloIndicator,
   type PiloPick,
 } from "./recommend";
-import { AVATAR_LG, PiloClose, PiloLauncher, PiloScene, PiloSpeech, type PiloOrigin } from "./PiloLauncher";
+import { PiloClose, PiloLauncher, PiloScene, PiloSpeech, type PiloOrigin } from "./PiloLauncher";
 import { playPulse } from "./motion";
-import { describeGaps, piloSpeech } from "./speech";
+import { describeGaps, piloMood, piloSpeech, type SpeechContext } from "./speech";
+import { PiloAvatar } from "../../../components/pilo/PiloAvatar";
 
 type Step = 1 | 2 | 3 | 4;
 
@@ -212,18 +213,22 @@ function PiloGuide({
   };
 
   const confirm = async () => {
-    const count = await adopt.mutateAsync({
-      indicatorIds: toAdd.map((p) => p.indicator.id),
-      programId: site.programId,
-      campusId: site.campusId,
-    });
-    setAdded(count);
-    setStep(4);
+    try {
+      const count = await adopt.mutateAsync({
+        indicatorIds: toAdd.map((p) => p.indicator.id),
+        programId: site.programId,
+        campusId: site.campusId,
+      });
+      setAdded(count);
+      setStep(4);
+    } catch {
+      // El error se muestra en el pie (adopt.error).
+    }
   };
 
   const loading = adoptions.isPending || values.isPending || settings.isPending;
   const periods = [...new Set([...sourcePeriods.values()].flat())].sort();
-  const speech = piloSpeech(step, {
+  const speechContext: SpeechContext = {
     programName: site.programName,
     campusName: site.campusName,
     goalsCount: goals.length,
@@ -237,14 +242,19 @@ function PiloGuide({
     selected: chosen.length,
     added,
     total: adopted.size + own.length,
-  });
+    loading,
+  };
+  const speech = piloSpeech(step, speechContext);
+  const mood = piloMood(step, speechContext);
 
   return (
     <PiloScene origin={origin} onClose={onClose} titleId={titleId} focusKey={step}>
       <aside className="pilo__side">
         <PiloClose onClose={onClose} />
         <div className="pilo__intro">
-          <img className="pilo__avatar" src={AVATAR_LG} alt="" width={132} height={132} />
+          <span className="pilo__avatar">
+            <PiloAvatar mood={mood} size={116} alive />
+          </span>
           <h1 id={titleId}>Hola, soy Mr. Pilo</h1>
           <PiloSpeech text={speech} />
         </div>
@@ -498,7 +508,7 @@ function PiloGuide({
             </span>
             {adopt.error && (
               <span className="pilo__error" role="alert">
-                <Icon name="alert" size={14} /> {adopt.error.message}
+                <Icon name="alert" size={14} /> {errorText(adopt.error)}
               </span>
             )}
             {step > 1 && (

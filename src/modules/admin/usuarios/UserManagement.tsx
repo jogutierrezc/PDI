@@ -17,8 +17,8 @@
    ========================================================================== */
 
 import { useState } from "react";
-import { NavLink, useNavigate, useParams } from "react-router-dom";
-import { AdminShell } from "../components/AdminShell";
+import { useNavigate, useParams } from "react-router-dom";
+import { AdminRail, AdminRailTab, AdminShell } from "../components/AdminShell";
 import { Icon } from "../../../components/ui/Icon";
 import { useProfiles } from "../../../data/queries";
 import { BulkUsers } from "./BulkUsers";
@@ -48,20 +48,21 @@ export function UserManagement() {
       kicker="Sistema"
       title="Usuarios y roles"
       description="Quién entra a la intranet, qué hace en toda la universidad y en qué unidades trabaja."
+      rail={
+        <AdminRail label="Vistas de usuarios y roles">
+          {VIEWS.map((item) => (
+            <AdminRailTab key={item.id} to={item.path} current={item.id === view.id}>
+              {item.label}
+            </AdminRailTab>
+          ))}
+        </AdminRail>
+      }
       actions={
         <button className="button-primary" type="button" onClick={() => navigate("/admin/usuarios?nueva=1")}>
           <Icon name="plus" size={16} /> Crear usuario
         </button>
       }
     >
-      <nav className="us-views" aria-label="Vistas de usuarios y roles">
-        {VIEWS.map((item) => (
-          <NavLink key={item.id} to={item.path} end className={item.id === view.id ? "is-active" : undefined}>
-            {item.label}
-          </NavLink>
-        ))}
-      </nav>
-
       {notice && (
         <p className="admin-notice" role="status">
           <Icon name="check" size={16} /> {notice}

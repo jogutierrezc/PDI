@@ -75,6 +75,9 @@ const OpenDataReport = lazy(() =>
 const IntranetBulletinPage = lazy(() =>
   import("./modules/boletin/BulletinViewer").then((m) => ({ default: m.IntranetBulletinPage })),
 );
+const ImpactoAdmin = lazy(() =>
+  import("./modules/impacto/ImpactoAdmin").then((m) => ({ default: m.ImpactoAdmin })),
+);
 const BoardsAdmin = lazy(() =>
   import("./modules/tableros/BoardsAdmin").then((m) => ({ default: m.BoardsAdmin })),
 );
@@ -313,6 +316,14 @@ export default function App() {
             }
           />
           {/* UDES en Cifras: estación e informe en la ruta, periodo en ?periodo=. */}
+          <Route
+            path="/admin/impacto/:vista?"
+            element={
+              <RequireRole minimum="consulta" screen="impacto">
+                <ImpactoAdmin />
+              </RequireRole>
+            }
+          />
           <Route
             path="/admin/tableros/:unidad/tablero/:tablero/:estacion?"
             element={

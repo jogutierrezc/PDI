@@ -6,36 +6,6 @@
    En pantallas estrechas el detalle baja debajo de la lista.
    ========================================================================== */
 
-/* --- Vistas ------------------------------------------------------------------------ */
-
-.us-views {
-  display: inline-flex;
-  justify-self: start;
-  gap: var(--space-1);
-  padding: var(--space-1);
-  background: var(--surface);
-  border: 1px solid var(--line);
-  border-radius: var(--radius-pill);
-}
-
-.us-views a {
-  padding: var(--space-2) var(--space-5);
-  color: var(--ink-secondary);
-  border-radius: var(--radius-pill);
-  font-size: var(--text-sm);
-  font-weight: 700;
-  transition: color var(--dur-fast) var(--ease-out), background var(--dur-fast) var(--ease-out);
-}
-
-.us-views a:hover {
-  color: var(--ink);
-}
-
-.us-views a.is-active {
-  color: var(--ink-on-accent);
-  background: var(--brand-navy);
-}
-
 .admin-notice .us-icon-button {
   margin-left: auto;
 }
@@ -830,7 +800,7 @@
   font-size: var(--text-sm);
 }
 
-/* Primer renglón: la unidad y quitar. Segundo: función, cargo y rol de Impacto. */
+/* Primer renglón: la unidad y quitar. Segundo: función, cargo y, en un programa de varias sedes, la sede. */
 .us-member {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(0, 1.3fr) minmax(0, 1.3fr) auto;
@@ -1190,7 +1160,6 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .us-views a,
   .us-item,
   .us-option,
   .us-template,

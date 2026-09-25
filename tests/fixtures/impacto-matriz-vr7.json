@@ -1,0 +1,1574 @@
+[
+ {
+  "code": "I01",
+  "functionLabel": "Investigación",
+  "name": "Estudiantes vinculados a semilleros",
+  "description": "Registro de estudiantes activos en semilleros",
+  "dimension": "Formación investigativa",
+  "objective": "Cuantificar los recursos y condiciones de partida disponibles en relación con «Estudiantes vinculados a semilleros», dentro de la dimensión 'Formación Investigativa' de la función de Investigación.",
+  "pillars": [
+   1,
+   3
+  ],
+  "sdgs": [
+   4,
+   9
+  ]
+ },
+ {
+  "code": "I02",
+  "functionLabel": "Investigación",
+  "name": "Estudiantes vinculados a Proyectos",
+  "description": "Registro de estudiantes participando en proyectos de investigación / Número de trabajos de grado en los diferentes niveles de formación en modalidad de investigación",
+  "dimension": "Formación investigativa",
+  "objective": "Cuantificar los recursos y condiciones de partida disponibles en relación con «Estudiantes vinculados a Proyectos», dentro de la dimensión 'Formación Investigativa' de la función de Investigación.",
+  "pillars": [
+   1,
+   3
+  ],
+  "sdgs": [
+   4,
+   9
+  ]
+ },
+ {
+  "code": "I03",
+  "functionLabel": "Investigación",
+  "name": "Profesores en actividades de formación investigativa",
+  "description": "Profesores realizando cursos de investigación, maestrías de investigación o doctorados / Profesores que dirigen o tutorean trabajos de grado en modalidad de investigación",
+  "dimension": "Formación investigativa",
+  "objective": "Cuantificar los recursos y condiciones de partida disponibles en relación con «Profesores en actividades de formación investigativa», dentro de la dimensión 'Capacidad Investigativa Institucional' de la función de Investigación.",
+  "pillars": [
+   1,
+   2
+  ],
+  "sdgs": [
+   4,
+   9
+  ]
+ },
+ {
+  "code": "I04",
+  "functionLabel": "Investigación",
+  "name": "Profesores en actividades de investigación",
+  "description": "Registro de profesores con actividades de investigación en su plan de trabajo",
+  "dimension": "Investigación, creación e innovación",
+  "objective": "Cuantificar los recursos y condiciones de partida disponibles en relación con «Profesores en actividades de investigación», dentro de la dimensión 'Capacidad Investigativa Institucional' de la función de Investigación.",
+  "pillars": [
+   2,
+   3
+  ],
+  "sdgs": [
+   4,
+   9
+  ]
+ },
+ {
+  "code": "I05",
+  "functionLabel": "Investigación",
+  "name": "Semilleros de investigación activos",
+  "description": "Semilleros de investigación formalizados y avalados en la VI",
+  "dimension": "Formación investigativa",
+  "objective": "Cuantificar los recursos y condiciones de partida disponibles en relación con «Semilleros de investigación activos», dentro de la dimensión 'Formación Investigativa' de la función de Investigación.",
+  "pillars": [
+   1,
+   3
+  ],
+  "sdgs": [
+   4,
+   9
+  ]
+ },
+ {
+  "code": "I06",
+  "functionLabel": "Investigación",
+  "name": "Grupos de investigación activos",
+  "description": "Grupos de investigación avalados por la UDES",
+  "dimension": "Investigación, creación e innovación",
+  "objective": "Cuantificar los recursos y condiciones de partida disponibles en relación con «Grupos de investigación activos», dentro de la dimensión 'Capacidad Investigativa Institucional' de la función de Investigación.",
+  "pillars": [
+   3,
+   4
+  ],
+  "sdgs": [
+   9,
+   17
+  ]
+ },
+ {
+  "code": "I07",
+  "functionLabel": "Investigación",
+  "name": "Presupuesto UDES para Actividades de Ciencia, Tecnología e Innovación (ACTI)",
+  "description": "Presupuesto anual de actividades de investigación (investigación, desarrollo experimental, formación investigativa, servicios técnicos derivados de investigación)",
+  "dimension": "Investigación, creación e innovación",
+  "objective": "Cuantificar los recursos y condiciones de partida disponibles en relación con «Presupuesto UDES para Actividades de Ciencia, Tecnología e Innovación (ACTI)», dentro de la dimensión 'Capacidad Investigativa Institucional' de la función de Investigación.",
+  "pillars": [
+   4,
+   3
+  ],
+  "sdgs": [
+   9,
+   17
+  ]
+ },
+ {
+  "code": "I08",
+  "functionLabel": "Investigación",
+  "name": "Tasa de Inserción Científica Avanzada",
+  "description": "(N° Est. Posgrado Co-investigadores / N° Total Est.Posgrado activos) × 100",
+  "dimension": "Formación investigativa",
+  "objective": "Cuantificar los recursos y condiciones de partida disponibles en relación con «Tasa de Inserción Científica Avanzada», dentro de la dimensión 'Formación Investigativa' de la función de Investigación.",
+  "pillars": [
+   1,
+   3
+  ],
+  "sdgs": [
+   4
+  ]
+ },
+ {
+  "code": "I09",
+  "functionLabel": "Investigación",
+  "name": "Efectividad en Propiedad Intelectual",
+  "description": "Patentes, registros de software o secretos industriales derivados de tesis de posgrado. Impacto en Guías Clínicas: Protocolos u hojas de ruta modificadas en hospitales por residentes médicos.",
+  "dimension": "Investigación, creación e innovación",
+  "objective": "Cuantificar los recursos y condiciones de partida disponibles en relación con «Efectividad en Propiedad Intelectual», dentro de la dimensión 'Capacidad Investigativa Institucional' de la función de Investigación.",
+  "pillars": [
+   2,
+   3
+  ],
+  "sdgs": [
+   3,
+   9
+  ]
+ },
+ {
+  "code": "I10",
+  "functionLabel": "Investigación",
+  "name": "Proyectos formulados/presentados a convocatorias internas",
+  "description": "Proporción de proyectos presentados a convocatorias INTERNAS en relación con el número de proyectos formulados en el Banco de Proyectos",
+  "dimension": "Investigación, creación e innovación",
+  "objective": "Monitorear el avance de las actividades en ejecución en relación con «Proyectos formulados/presentados a convocatorias internas», dentro de la dimensión 'Gestión de la Investigación' de la función de Investigación.",
+  "pillars": [
+   3,
+   4
+  ],
+  "sdgs": [
+   9,
+   17
+  ]
+ },
+ {
+  "code": "I11",
+  "functionLabel": "Investigación",
+  "name": "Proyectos formulados/presentados a convocatorias externas",
+  "description": "Proporción de proyectos presentados a convocatorias EXTERNAS en relación con el número de proyectos formulados en el Banco de Proyectos",
+  "dimension": "Investigación, creación e innovación",
+  "objective": "Monitorear el avance de las actividades en ejecución en relación con «Proyectos formulados/presentados a convocatorias externas», dentro de la dimensión 'Gestión de la Investigación' de la función de Investigación.",
+  "pillars": [
+   3,
+   6
+  ],
+  "sdgs": [
+   9,
+   17
+  ]
+ },
+ {
+  "code": "I12",
+  "functionLabel": "Investigación",
+  "name": "Proyectos formulados/presentados en colaboración internacional",
+  "description": "Proporción de proyectos presentados en colaboración en relación con el número de proyectos formulados en el Banco de Proyectos",
+  "dimension": "Investigación, creación e innovación",
+  "objective": "Monitorear el avance de las actividades en ejecución en relación con «Proyectos formulados/presentados en colaboración internacional», dentro de la dimensión 'Gestión de la Investigación' de la función de Investigación.",
+  "pillars": [
+   3,
+   6
+  ],
+  "sdgs": [
+   17,
+   9
+  ]
+ },
+ {
+  "code": "I13",
+  "functionLabel": "Investigación",
+  "name": "Estudiantes de semillero reconocidos en eventos de investigación",
+  "description": "Proporción de estudiantes que logran reconocimiento en eventos institucionales, departamentales, nacionales e internacionales de Red Colsi u otras organizaciones académicas",
+  "dimension": "Formación investigativa",
+  "objective": "Monitorear el avance de las actividades en ejecución en relación con «Estudiantes de semillero reconocidos en eventos de investigación», dentro de la dimensión 'Formación Investigativa' de la función de Investigación.",
+  "pillars": [
+   1,
+   6
+  ],
+  "sdgs": [
+   4
+  ]
+ },
+ {
+  "code": "I14",
+  "functionLabel": "Investigación",
+  "name": "Jóvenes investigadores en formación",
+  "description": "Jóvenes investigadores en formación en ambientes de investigación UDES",
+  "dimension": "Formación investigativa",
+  "objective": "Monitorear el avance de las actividades en ejecución en relación con «Jóvenes investigadores en formación», dentro de la dimensión 'Formación Investigativa' de la función de Investigación.",
+  "pillars": [
+   1,
+   3
+  ],
+  "sdgs": [
+   4,
+   8
+  ]
+ },
+ {
+  "code": "I15",
+  "functionLabel": "Investigación",
+  "name": "Profesores reconocidos y categorizados ante MinCiencias",
+  "description": "Proporción de profesores categorizados en MinCiencias como Investigadores Junior, Asociado, Senior o Emérito en convocatoria MinCiencias",
+  "dimension": "Investigación, creación e innovación",
+  "objective": "Monitorear el avance de las actividades en ejecución en relación con «Profesores reconocidos y categorizados ante MinCiencias», dentro de la dimensión 'Capacidad Investigativa Institucional' de la función de Investigación.",
+  "pillars": [
+   3,
+   4
+  ],
+  "sdgs": [
+   9,
+   17
+  ]
+ },
+ {
+  "code": "I16",
+  "functionLabel": "Investigación",
+  "name": "Grupos reconocidos y categorizados ante MinCiencias en A1 y A",
+  "description": "Proporción de grupos categorizados en A1 y A en convocatoria MinCiencias",
+  "dimension": "Investigación, creación e innovación",
+  "objective": "Monitorear el avance de las actividades en ejecución en relación con «Grupos reconocidos y categorizados ante MinCiencias en A1 y A», dentro de la dimensión 'Capacidad Investigativa Institucional' de la función de Investigación.",
+  "pillars": [
+   3,
+   4
+  ],
+  "sdgs": [
+   9,
+   17
+  ]
+ },
+ {
+  "code": "I17",
+  "functionLabel": "Investigación",
+  "name": "Índice de proyectos consolidados de alto impacto soportados en infraestructura científica y tecnológica",
+  "description": "(N° de proyectos finalizados con impacto verificado en el sector externo que requirieron el uso crítico de infraestructura UDES / Total de proyectos finalizados que utilizaron la infraestructura en el periodo t) × 100",
+  "dimension": "Investigación, creación e innovación",
+  "objective": "Monitorear el avance de las actividades en ejecución en relación con «Índice de proyectos consolidados de alto impacto soportados en infraestructura científica y tecnológica», dentro de la dimensión 'Gestión de la Investigación' de la función de Investigación.",
+  "pillars": [
+   2,
+   3
+  ],
+  "sdgs": [
+   9,
+   17
+  ]
+ },
+ {
+  "code": "I18",
+  "functionLabel": "Investigación",
+  "name": "Proyectos en ejecución/ejecutados en convocatorias internas",
+  "description": "Número y proporción de proyectos en ejecución/ejecutados en relación con los proyectos presentados en convocatorias INTERNAS",
+  "dimension": "Investigación, creación e innovación",
+  "objective": "Cuantificar los resultados y productos concretos generados en relación con «Proyectos en ejecución/ejecutados en convocatorias internas», dentro de la dimensión 'Nuevo Conocimiento' de la función de Investigación.",
+  "pillars": [
+   3,
+   4
+  ],
+  "sdgs": [
+   9,
+   17
+  ]
+ },
+ {
+  "code": "I19",
+  "functionLabel": "Investigación",
+  "name": "Proyectos en ejecución/ejecutados en convocatorias externas",
+  "description": "Número y proporción de proyectos en ejecución/ejecutados en relación con los proyectos presentados en convocatorias EXTERNAS",
+  "dimension": "Investigación, creación e innovación",
+  "objective": "Cuantificar los resultados y productos concretos generados en relación con «Proyectos en ejecución/ejecutados en convocatorias externas», dentro de la dimensión 'Nuevo Conocimiento' de la función de Investigación.",
+  "pillars": [
+   3,
+   6
+  ],
+  "sdgs": [
+   9,
+   17
+  ]
+ },
+ {
+  "code": "I20",
+  "functionLabel": "Investigación",
+  "name": "Proyectos en ejecución/ejecutados en colaboración interinstitucional/internacional/Intersectorial",
+  "description": "Número y proporción de proyectos en ejecución/ejecutados en relación con los proyectos presentados en convocatorias de COLABORACIÓN interinstitucional/internacional/intersectorial",
+  "dimension": "Investigación, creación e innovación",
+  "objective": "Cuantificar los resultados y productos concretos generados en relación con «Proyectos en ejecución/ejecutados en colaboración interinstitucional/internacional/Intersectorial», dentro de la dimensión 'Nuevo Conocimiento' de la función de Investigación.",
+  "pillars": [
+   3,
+   6
+  ],
+  "sdgs": [
+   17,
+   9
+  ]
+ },
+ {
+  "code": "I21",
+  "functionLabel": "Investigación",
+  "name": "Productos de nuevo conocimiento derivado de la ejecución de proyectos UDES",
+  "description": "Número de artículos científicos, desarrollos experimentales, capítulos de libro, libros derivados de investigación en relación con los proyectos ejecutados",
+  "dimension": "Investigación, creación e innovación",
+  "objective": "Cuantificar los resultados y productos concretos generados en relación con «Productos de nuevo conocimiento derivado de la ejecución de proyectos UDES», dentro de la dimensión 'Nuevo Conocimiento' de la función de Investigación.",
+  "pillars": [
+   3,
+   6
+  ],
+  "sdgs": [
+   4,
+   9
+  ]
+ },
+ {
+  "code": "I22",
+  "functionLabel": "Investigación",
+  "name": "Productos de Apropiación social del conocimiento derivados de la ejecución de proyectos UDES",
+  "description": "Número y proporción de eventos científicos, material de divulgación de resultados, actividades de socialización a autoridades gubernamentales, comunidades y públicos de interés, conformación y participación en redes de conocimiento.",
+  "dimension": "Apropiación social del conocimiento",
+  "objective": "Cuantificar los resultados y productos concretos generados en relación con «Productos de Apropiación social del conocimiento derivados de la ejecución de proyectos UDES», dentro de la dimensión 'Apropiación Social del Conocimiento' de la función de Investigación.",
+  "pillars": [
+   6,
+   1
+  ],
+  "sdgs": [
+   4,
+   10,
+   17
+  ]
+ },
+ {
+  "code": "I23",
+  "functionLabel": "Investigación",
+  "name": "Productos de formación en investigación de alto nivel (Maestrías/Doctorados) derivados de la ejecución de proyectos UDES",
+  "description": "Número y proporción de magísteres (en investigación) y doctores formados",
+  "dimension": "Formación investigativa",
+  "objective": "Cuantificar los resultados y productos concretos generados en relación con «Productos de formación en investigación de alto nivel (Maestrías/Doctorados) derivados de la ejecución de proyectos UDES», dentro de la dimensión 'Formación Investigativa' de la función de Investigación.",
+  "pillars": [
+   1,
+   3
+  ],
+  "sdgs": [
+   4,
+   9
+  ]
+ },
+ {
+  "code": "I24",
+  "functionLabel": "Investigación",
+  "name": "Productos de creación artística/cultural derivados de la ejecución de proyectos UDES",
+  "description": "Número y proporción de obras, diseños y procesos de nuevo conocimiento, que impliquen aportes nuevos originales e inéditos al arte, a la arquitectura, al diseño, a la cultura y al conocimiento en general",
+  "dimension": "Apropiación social del conocimiento",
+  "objective": "Cuantificar los resultados y productos concretos generados en relación con «Productos de creación artística/cultural derivados de la ejecución de proyectos UDES», dentro de la dimensión 'Apropiación Social del Conocimiento' de la función de Investigación.",
+  "pillars": [
+   1,
+   6
+  ],
+  "sdgs": [
+   4,
+   11
+  ]
+ },
+ {
+  "code": "I25",
+  "functionLabel": "Investigación",
+  "name": "Servicios y consultorías derivados de la ejecución de proyectos UDES",
+  "description": "Número y proporción de servicios y consultorías técnicas y científicas desarrolladas tanto al interior de la UDES como en el sector productivo",
+  "dimension": "Investigación, creación e innovación",
+  "objective": "Cuantificar los resultados y productos concretos generados en relación con «Servicios y consultorías derivados de la ejecución de proyectos UDES», dentro de la dimensión 'Transferencia y Uso del Conocimiento' de la función de Investigación.",
+  "pillars": [
+   3,
+   6
+  ],
+  "sdgs": [
+   8,
+   9
+  ]
+ },
+ {
+  "code": "I26",
+  "functionLabel": "Investigación",
+  "name": "Productos de desarrollo tecnológico derivados de la ejecución de proyectos UDES",
+  "description": "Número y proporción de productos tecnológicos validados y certificados, productos empresariales, regulaciones, normas, reglamentos o legislaciones, así como conceptos e informes técnicos derivados de la ejecución de proyectos UDES.",
+  "dimension": "Investigación, creación e innovación",
+  "objective": "Cuantificar los resultados y productos concretos generados en relación con «Productos de desarrollo tecnológico derivados de la ejecución de proyectos UDES», dentro de la dimensión 'Transferencia y Uso del Conocimiento' de la función de Investigación.",
+  "pillars": [
+   2,
+   3
+  ],
+  "sdgs": [
+   9,
+   8
+  ]
+ },
+ {
+  "code": "I27",
+  "functionLabel": "Investigación",
+  "name": "Graduados UDES que participaron en semilleros de investigación o programa de jóvenes investigadores vinculados al SNCTI",
+  "description": "Proporción de graduados UDES que participaron en semilleros de investigación o programa de jóvenes investigadores que se encuentran vinculados al SNCTI en la ventana de 2 o más años posteriores a su egreso",
+  "dimension": "Formación investigativa",
+  "objective": "Evidenciar el efecto o cambio de mediano/largo plazo atribuible en relación con «Graduados UDES que participaron en semilleros de investigación o programa de jóvenes investigadores vinculados al SNCTI», dentro de la dimensión 'Impacto en Trayectorias de Vida' de la función de Investigación.",
+  "pillars": [
+   1,
+   6
+  ],
+  "sdgs": [
+   4,
+   8
+  ]
+ },
+ {
+  "code": "I28",
+  "functionLabel": "Investigación",
+  "name": "Productos de I+D+i+c que aportan a los focos de investigación UDES (Salud Planetaria, Seguridad Alimentaria, Transición energética)",
+  "description": "Proporción de productos (en todas sus tipologías del modelo de reconocimiento MinCiencias) que aportan a los focos con respecto al número total de productos I+D+i+c en la misma ventana de tiempo analizada.",
+  "dimension": "Investigación, creación e innovación",
+  "objective": "Evidenciar el efecto o cambio de mediano/largo plazo atribuible en relación con «Productos de I+D+i+c que aportan a los focos de investigación UDES (Salud Planetaria, Seguridad Alimentaria, Transición energética)», dentro de la dimensión 'Impacto Social y Territorial' de la función de Investigación.",
+  "pillars": [
+   5,
+   6
+  ],
+  "sdgs": [
+   3,
+   2,
+   7,
+   13
+  ]
+ },
+ {
+  "code": "I29",
+  "functionLabel": "Investigación",
+  "name": "Productos de I+D+i+c transferidos a los sectores de aplicación (local, regional, nacional e internacional)",
+  "description": "Proporción de productos que se han transferido a través de servicios, consultorías, licencias o capacitaciones al sector externo con respecto al número total de productos I+D+i+c en la misma ventana de tiempo analizada.",
+  "dimension": "Investigación, creación e innovación",
+  "objective": "Evidenciar el efecto o cambio de mediano/largo plazo atribuible en relación con «Productos de I+D+i+c transferidos a los sectores de aplicación (local, regional, nacional e internacional)», dentro de la dimensión 'Transferencia y Uso del Conocimiento' de la función de Investigación.",
+  "pillars": [
+   3,
+   6
+  ],
+  "sdgs": [
+   9,
+   8,
+   17
+  ]
+ },
+ {
+  "code": "I30",
+  "functionLabel": "Investigación",
+  "name": "Políticas públicas que involucran o se sustentan en productos de I+D+i+c derivados de proyectos UDES",
+  "description": "Políticas públicas a nivel local, regional, nacional e internacional que citan productos de I+D+i+c UDES",
+  "dimension": "Investigación, creación e innovación",
+  "objective": "Evidenciar el efecto o cambio de mediano/largo plazo atribuible en relación con «Políticas públicas que involucran o se sustentan en productos de I+D+i+c derivados de proyectos UDES», dentro de la dimensión 'Impacto Social y Territorial' de la función de Investigación.",
+  "pillars": [
+   4,
+   6
+  ],
+  "sdgs": [
+   16,
+   17
+  ]
+ },
+ {
+  "code": "I31",
+  "functionLabel": "Investigación",
+  "name": "Métricas cienciométricas y posicionamiento en rankings",
+  "description": "Índices, indicadores y posicionamientos en sistemas de rankings cienciométricos (Scimago, WoS, QS, THE, Google Scholar, entre otros)",
+  "dimension": "Investigación, creación e innovación",
+  "objective": "Evidenciar el efecto o cambio de mediano/largo plazo atribuible en relación con «Métricas cienciométricas y posicionamiento en rankings», dentro de la dimensión 'Posicionamiento Institucional' de la función de Investigación.",
+  "pillars": [
+   3,
+   4
+  ],
+  "sdgs": [
+   4,
+   9,
+   17
+  ]
+ },
+ {
+  "code": "I32",
+  "functionLabel": "Investigación",
+  "name": "Productos de I+D+i+c que aportan a las metas de los ODS en Colombia, LAC y global",
+  "description": "Número y proporción de productos de I+D+i+c derivados de proyectos UDES que evidencian aportes a los ODS en función de las metas establecidas para Colombia y el mundo",
+  "dimension": "Investigación, creación e innovación",
+  "objective": "Evidenciar el efecto o cambio de mediano/largo plazo atribuible en relación con «Productos de I+D+i+c que aportan a las metas de los ODS en Colombia, LAC y global», dentro de la dimensión 'Impacto Social y Territorial' de la función de Investigación.",
+  "pillars": [
+   5,
+   6
+  ],
+  "sdgs": [
+   1,
+   17
+  ]
+ },
+ {
+  "code": "I33",
+  "functionLabel": "Investigación",
+  "name": "Emprendimientos de base científica/tecnológica derivados de productos de I+D+i+c desarrollados en proyectos UDES",
+  "description": "Número y proporción de empresas creadas de base científica o tecnológica, spin-offs, startups, o número de empresas ya constituidas que innovan con productos o servicios derivados de la investigación UDES",
+  "dimension": "Investigación, creación e innovación",
+  "objective": "Evidenciar el efecto o cambio de mediano/largo plazo atribuible en relación con «Emprendimientos de base científica/tecnológica derivados de productos de I+D+i+c desarrollados en proyectos UDES», dentro de la dimensión 'Transferencia y Uso del Conocimiento' de la función de Investigación.",
+  "pillars": [
+   3,
+   2
+  ],
+  "sdgs": [
+   8,
+   9
+  ]
+ },
+ {
+  "code": "I34",
+  "functionLabel": "Investigación",
+  "name": "Desempeño académico de estudiantes en actividades de formación investigativa (semilleros y jóvenes investigadores)",
+  "description": "Resultados de aprendizaje demostrados en pruebas de desempeño académico institucionales (CMIRA) y nacionales (SABER-PRO) de estudiantes que participaron en semilleros de investigación en relación con los que no participaron.",
+  "dimension": "Formación investigativa",
+  "objective": "Evidenciar el efecto o cambio de mediano/largo plazo atribuible en relación con «Desempeño académico de estudiantes en actividades de formación investigativa (semilleros y jóvenes investigadores)», dentro de la dimensión 'Impacto en Trayectorias de Vida' de la función de Investigación.",
+  "pillars": [
+   1,
+   3
+  ],
+  "sdgs": [
+   4,
+   9
+  ]
+ },
+ {
+  "code": "I35",
+  "functionLabel": "Investigación",
+  "name": "Desempeño profesional de graduados que participaron en actividades de formación investigativa (semilleros y jóvenes investigadores)",
+  "description": "Desempeño profesional comparado de graduados que participaron en semilleros de investigación y jóvenes investigadores",
+  "dimension": "Formación investigativa",
+  "objective": "Evidenciar el efecto o cambio de mediano/largo plazo atribuible en relación con «Desempeño profesional de graduados que participaron en actividades de formación investigativa (semilleros y jóvenes investigadores)», dentro de la dimensión 'Impacto en Trayectorias de Vida' de la función de Investigación.",
+  "pillars": [
+   1,
+   6
+  ],
+  "sdgs": [
+   4,
+   8
+  ]
+ },
+ {
+  "code": "I36",
+  "functionLabel": "Investigación",
+  "name": "Índice de liderazgo y transferencia de la comunidad científica",
+  "description": "(N° de investigadores UDES que lideran redes internacionales, patentes concedidas o consultorías de política pública / Total de investigadores clasificados en el año t) × 100",
+  "dimension": "Investigación, creación e innovación",
+  "objective": "Evidenciar el efecto o cambio de mediano/largo plazo atribuible en relación con «Índice de liderazgo y transferencia de la comunidad científica», dentro de la dimensión 'Posicionamiento Institucional' de la función de Investigación.",
+  "pillars": [
+   3,
+   4
+  ],
+  "sdgs": [
+   9,
+   17
+  ]
+ },
+ {
+  "code": "I37",
+  "functionLabel": "Investigación",
+  "name": "Percepción de la comunidad institucional sobre la coherencia entre la identidad declarada y los resultados de docencia, investigación, extensión y bienestar",
+  "description": "Calificación promedio obtenida en la encuesta institucional aplicada a estudiantes, profesores, personal administrativo y graduados sobre la coherencia entre la identidad declarada y los resultados de las funciones sustantivas y el bienestar.",
+  "dimension": null,
+  "objective": "Evidenciar el efecto o cambio atribuible — indicador incorporado para cerrar una brecha identificada frente al Acuerdo 01/2025 CESU en relación con «Percepción de la comunidad institucional sobre la coherencia entre la identidad declarada y los resultados de docencia, investigación, extensión y bienestar», dentro de la dimensión Por definir de la función de Investigación.",
+  "pillars": [],
+  "sdgs": []
+ },
+ {
+  "code": "E01",
+  "functionLabel": "Enseñanza",
+  "name": "Profesores con título de Maestría y Doctorado",
+  "description": "Porcentaje del cuerpo docente con título de especialización, maestría o doctorado.",
+  "dimension": "Práctica Profesional",
+  "objective": "Cuantificar los recursos y condiciones de partida disponibles en relación con «Profesores con título de Maestría y Doctorado», dentro de la dimensión 'Práctica Profesoral' de la función de Enseñanza.",
+  "pillars": [
+   1,
+   4
+  ],
+  "sdgs": [
+   4
+  ]
+ },
+ {
+  "code": "E02",
+  "functionLabel": "Enseñanza",
+  "name": "Perfil Profesor de Posgrados",
+  "description": "(N° Profesores con Ph.D. o Subespecialidad / Total Profesores Posgrado) × 100",
+  "dimension": "Práctica Profesional",
+  "objective": "Cuantificar los recursos y condiciones de partida disponibles en relación con «Perfil Profesor de Posgrados», dentro de la dimensión 'Práctica Profesoral' de la función de Enseñanza.",
+  "pillars": [
+   1,
+   4
+  ],
+  "sdgs": [
+   4
+  ]
+ },
+ {
+  "code": "E03",
+  "functionLabel": "Enseñanza",
+  "name": "Estudiantes beneficiados por el programa de acompañamiento institucional (PAIPE)",
+  "description": "Número de estudiantes que participan en programas de tutoría académica, asesorías psicopedagógicas, nivelación y apoyo integral por período académico.",
+  "dimension": "Permanencia",
+  "objective": "Monitorear el avance de las actividades en ejecución en relación con «Estudiantes beneficiados por el programa de acompañamiento institucional (PAIPE)», dentro de la dimensión 'Permanencia' de la función de Enseñanza.",
+  "pillars": [
+   1,
+   2
+  ],
+  "sdgs": [
+   4,
+   10
+  ]
+ },
+ {
+  "code": "E04",
+  "functionLabel": "Enseñanza",
+  "name": "Tasa de retención estudiantil",
+  "description": "Porcentaje de estudiantes que permanecen en el programa de un semestre a otro.",
+  "dimension": "Permanencia",
+  "objective": "Monitorear el avance de las actividades en ejecución en relación con «Tasa de retención estudiantil», dentro de la dimensión 'Permanencia' de la función de Enseñanza.",
+  "pillars": [
+   1,
+   2
+  ],
+  "sdgs": [
+   4,
+   10
+  ]
+ },
+ {
+  "code": "E05",
+  "functionLabel": "Enseñanza",
+  "name": "Tasa de deserción acumulada",
+  "description": "Porcentaje acumulado de estudiantes que abandonan el programa antes de graduarse.",
+  "dimension": "Permanencia",
+  "objective": "Monitorear el avance de las actividades en ejecución en relación con «Tasa de deserción acumulada», dentro de la dimensión 'Permanencia' de la función de Enseñanza.",
+  "pillars": [
+   1,
+   2
+  ],
+  "sdgs": [
+   4,
+   10
+  ]
+ },
+ {
+  "code": "E06",
+  "functionLabel": "Enseñanza",
+  "name": "Movilidad académica (saliente y entrante) Productos derivados del procesos de internacionalización",
+  "description": "Número de estudiantes y docentes en intercambios nacionales e internacionales por período.",
+  "dimension": "Experiencia del Estudiante",
+  "objective": "Monitorear el avance de las actividades en ejecución en relación con «Movilidad académica (saliente y entrante) Productos derivados del procesos de internacionalización», dentro de la dimensión 'Experiencia del Estudiante' de la función de Enseñanza.",
+  "pillars": [
+   1,
+   6
+  ],
+  "sdgs": [
+   4,
+   17
+  ]
+ },
+ {
+  "code": "E07",
+  "functionLabel": "Enseñanza",
+  "name": "Autoevaluación y evaluación profesoral",
+  "description": "Porcentaje de profesores evaluados por estudiantes, pares académicos y autoevaluación con resultados documentados y planes de mejoramiento implementados por período.",
+  "dimension": "Práctica Profesional",
+  "objective": "Monitorear el avance de las actividades en ejecución en relación con «Autoevaluación y evaluación profesoral», dentro de la dimensión 'Práctica Profesoral' de la función de Enseñanza.",
+  "pillars": [
+   1,
+   4
+  ],
+  "sdgs": [
+   4,
+   16
+  ]
+ },
+ {
+  "code": "E10",
+  "functionLabel": "Enseñanza",
+  "name": "Tasa de graduación oportuna",
+  "description": "Porcentaje de estudiantes que se gradúan respecto a los que ingresaron en la cohorte.",
+  "dimension": "Experiencia del Estudiante",
+  "objective": "Cuantificar los resultados y productos concretos generados en relación con «Tasa de graduación oportuna», dentro de la dimensión 'Experiencia del Estudiante' de la función de Enseñanza.",
+  "pillars": [
+   1
+  ],
+  "sdgs": [
+   4
+  ]
+ },
+ {
+  "code": "E11",
+  "functionLabel": "Enseñanza",
+  "name": "Resultados Saber Pro",
+  "description": "Desempeño promedio de los estudiantes UDES en Pruebas Saber Pro vs. referente nacional.",
+  "dimension": "Aprendizaje",
+  "objective": "Cuantificar los resultados y productos concretos generados en relación con «Resultados Saber Pro», dentro de la dimensión 'Experiencia del Estudiante' de la función de Enseñanza.",
+  "pillars": [
+   1
+  ],
+  "sdgs": [
+   4
+  ]
+ },
+ {
+  "code": "E12",
+  "functionLabel": "Enseñanza",
+  "name": "Programas académicos con acreditación CNA",
+  "description": "Número de programas académicos con acreditación de alta calidad vigente del CNA / N° de programas acreditables",
+  "dimension": "Experiencia del Estudiante",
+  "objective": "Cuantificar los resultados y productos concretos generados en relación con «Programas académicos con acreditación CNA», dentro de la dimensión 'Aprendizaje' de la función de Enseñanza.",
+  "pillars": [
+   4,
+   1
+  ],
+  "sdgs": [
+   4,
+   16
+  ]
+ },
+ {
+  "code": "E13",
+  "functionLabel": "Enseñanza",
+  "name": "Oferta de educación continuada y posgrado",
+  "description": "Número de programas de educación continua, diplomados y posgrados activos.",
+  "dimension": "Experiencia del Estudiante",
+  "objective": "Cuantificar los resultados y productos concretos generados en relación con «Oferta de educación continuada y posgrado», dentro de la dimensión 'Experiencia del Estudiante' de la función de Enseñanza.",
+  "pillars": [
+   1,
+   6
+  ],
+  "sdgs": [
+   4,
+   8
+  ]
+ },
+ {
+  "code": "E14",
+  "functionLabel": "Enseñanza",
+  "name": "Innovaciones pedagógicas implementadas y documentadas",
+  "description": "Número de innovaciones pedagógicas (estrategias didácticas, metodologías activas, uso de TIC en aula, proyectos interdisciplinares) formalmente documentadas, evaluadas y socializadas.",
+  "dimension": "Experiencia del Estudiante",
+  "objective": "Cuantificar los resultados y productos concretos generados en relación con «Innovaciones pedagógicas implementadas y documentadas», dentro de la dimensión 'Práctica Profesoral' de la función de Enseñanza.",
+  "pillars": [
+   1,
+   2
+  ],
+  "sdgs": [
+   4,
+   9
+  ]
+ },
+ {
+  "code": "E16",
+  "functionLabel": "Enseñanza",
+  "name": "Valor agregado académico",
+  "description": "Incremento en el desempeño académico de los estudiantes medido por la diferencia entre resultados Saber Pro y Saber 11, ajustado por características socioeconómicas de entrada.",
+  "dimension": "Aprendizaje",
+  "objective": "Evidenciar el efecto o cambio de mediano/largo plazo atribuible en relación con «Valor agregado académico», dentro de la dimensión 'Permanencia' de la función de Enseñanza.",
+  "pillars": [
+   1
+  ],
+  "sdgs": [
+   4
+  ]
+ },
+ {
+  "code": "E17",
+  "functionLabel": "Enseñanza",
+  "name": "Tasa de empleabilidad de graduados",
+  "description": "Porcentaje de graduados que se encuentran vinculados laboralmente en cargos relacionados con su área de formación dentro de los 12 meses posteriores a su graduación.",
+  "dimension": "Experiencia del Estudiante",
+  "objective": "Evidenciar el efecto o cambio de mediano/largo plazo atribuible en relación con «Tasa de empleabilidad de graduados», dentro de la dimensión 'Permanencia' de la función de Enseñanza.",
+  "pillars": [
+   1,
+   3
+  ],
+  "sdgs": [
+   4,
+   8
+  ]
+ },
+ {
+  "code": "E18",
+  "functionLabel": "Enseñanza",
+  "name": "Percepción de empleadores sobre graduados",
+  "description": "Calificación promedio dada por empleadores a las competencias de los graduados UDES.",
+  "dimension": "Práctica Profesional",
+  "objective": "Evidenciar el efecto o cambio de mediano/largo plazo atribuible en relación con «Percepción de empleadores sobre graduados», dentro de la dimensión 'Permanencia' de la función de Enseñanza.",
+  "pillars": [
+   1,
+   6
+  ],
+  "sdgs": [
+   4,
+   8
+  ]
+ },
+ {
+  "code": "E19",
+  "functionLabel": "Enseñanza",
+  "name": "Graduados en cargos de liderazgo",
+  "description": "Porcentaje de graduados que ocupan cargos directivos o de toma de decisiones.",
+  "dimension": "Práctica Profesional",
+  "objective": "Evidenciar el efecto o cambio de mediano/largo plazo atribuible en relación con «Graduados en cargos de liderazgo», dentro de la dimensión 'Permanencia' de la función de Enseñanza.",
+  "pillars": [
+   1,
+   3
+  ],
+  "sdgs": [
+   8,
+   5
+  ]
+ },
+ {
+  "code": "E20",
+  "functionLabel": "Enseñanza",
+  "name": "Impacto de la internacionalización",
+  "description": "Evidencias del impacto de la internacionalización en las trayectorias de los graduados",
+  "dimension": "Experiencia del Estudiante",
+  "objective": "Evidenciar el efecto o cambio de mediano/largo plazo atribuible en relación con «Impacto de la internacionalización», dentro de la dimensión 'Experiencia del Estudiante/ Práctica Profesoral' de la función de Enseñanza.",
+  "pillars": [
+   1,
+   6
+  ],
+  "sdgs": [
+   4,
+   17,
+   10
+  ]
+ },
+ {
+  "code": "E21",
+  "functionLabel": "Enseñanza",
+  "name": "Reconocimientos a graduados UDES",
+  "description": "Número de distinciones, premios o reconocimientos públicos recibidos por graduados.",
+  "dimension": "Experiencia del Estudiante",
+  "objective": "Evidenciar el efecto o cambio de mediano/largo plazo atribuible en relación con «Reconocimientos a graduados UDES», dentro de la dimensión 'Permanencia' de la función de Enseñanza.",
+  "pillars": [
+   6
+  ],
+  "sdgs": [
+   4
+  ]
+ },
+ {
+  "code": "E22",
+  "functionLabel": "Enseñanza",
+  "name": "Tasa de vinculación efectiva en prácticas empresariales",
+  "description": "Porcentaje de estudiantes habilitados para práctica que realizan su práctica empresarial en organizaciones del sector productivo formal, con evaluación satisfactoria por parte del empleador.",
+  "dimension": "Práctica Profesional",
+  "objective": "Evidenciar el efecto o cambio de mediano/largo plazo atribuible en relación con «Tasa de vinculación efectiva en prácticas empresariales», dentro de la dimensión 'Permanencia' de la función de Enseñanza.",
+  "pillars": [
+   1,
+   3
+  ],
+  "sdgs": [
+   4,
+   8
+  ]
+ },
+ {
+  "code": "E23",
+  "functionLabel": "Enseñanza",
+  "name": "Percepción de la comunidad institucional sobre la coherencia entre la identidad declarada y los resultados de docencia, investigación, extensión y bienestar",
+  "description": "Calificación promedio obtenida en la encuesta institucional aplicada a estudiantes, profesores, personal administrativo y graduados sobre la coherencia entre la identidad declarada y los resultados de las funciones sustantivas y el bienestar.",
+  "dimension": null,
+  "objective": "Evidenciar el efecto o cambio atribuible — indicador incorporado para cerrar una brecha identificada frente al Acuerdo 01/2025 CESU en relación con «Percepción de la comunidad institucional sobre la coherencia entre la identidad declarada y los resultados de docencia, investigación, extensión y bienestar», dentro de la dimensión Por definir de la función de Enseñanza.",
+  "pillars": [],
+  "sdgs": []
+ },
+ {
+  "code": "E24",
+  "functionLabel": "Enseñanza",
+  "name": "Porcentaje de sesiones del máximo órgano de gobierno académico (Consejo Superior) con participación de representantes de estamentos",
+  "description": "(N° de sesiones realizadas con participación de representantes de estamentos / N° total de sesiones ejecutadas) × 100.",
+  "dimension": "Práctica Profesional",
+  "objective": "Evidenciar el efecto o cambio atribuible — indicador incorporado para cerrar una brecha identificada frente al Acuerdo 01/2025 CESU en relación con «Porcentaje de sesiones del máximo órgano de gobierno académico (Consejo Superior) con participación de representantes de estamentos», dentro de la dimensión Por definir de la función de Enseñanza.",
+  "pillars": [],
+  "sdgs": []
+ },
+ {
+  "code": "E25",
+  "functionLabel": "Enseñanza",
+  "name": "Porcentaje de planes de mejoramiento derivados de autoevaluación institucional con seguimiento documentado a su efecto",
+  "description": "(N° de planes de mejoramiento derivados de la autoevaluación institucional con evidencia documentada / N° total de planes de mejoramiento formulados) × 100.",
+  "dimension": "Práctica Profesional",
+  "objective": "Evidenciar el efecto o cambio atribuible — indicador incorporado para cerrar una brecha identificada frente al Acuerdo 01/2025 CESU en relación con «Porcentaje de planes de mejoramiento derivados de autoevaluación institucional con seguimiento documentado a su efecto», dentro de la dimensión Por definir de la función de Enseñanza.",
+  "pillars": [],
+  "sdgs": []
+ },
+ {
+  "code": "E26",
+  "functionLabel": "Enseñanza",
+  "name": "Número de programas o proyectos académicos inter/transdisciplinares implementados en respuesta a necesidades del contexto",
+  "description": "Número de programas o proyectos académicos de carácter inter o transdisciplinar implementados en el periodo, con evidencia de la necesidad del contexto que atienden y de los resultados obtenidos.",
+  "dimension": "Experiencia del Estudiante",
+  "objective": "Evidenciar el efecto o cambio atribuible — indicador incorporado para cerrar una brecha identificada frente al Acuerdo 01/2025 CESU en relación con «Número de programas o proyectos académicos inter/transdisciplinares implementados en respuesta a necesidades del contexto», dentro de la dimensión Por definir de la función de Enseñanza.",
+  "pillars": [],
+  "sdgs": []
+ },
+ {
+  "code": "E27",
+  "functionLabel": "Enseñanza",
+  "name": "Incidencia de la estabilidad y renovación de la planta profesoral en los resultados institucionales de docencia, investigación y extensión",
+  "description": "Relación entre los indicadores de estabilidad y renovación de la planta profesoral (permanencia, tipo de vinculación, relevo generacional) y los resultados institucionales de docencia, investigación y extensión en el periodo.",
+  "dimension": "Práctica Profesional",
+  "objective": "Evidenciar el efecto o cambio atribuible — indicador incorporado para cerrar una brecha identificada frente al Acuerdo 01/2025 CESU en relación con «Incidencia de la estabilidad y renovación de la planta profesoral en los resultados institucionales de docencia, investigación y extensión», dentro de la dimensión Por definir de la función de Enseñanza.",
+  "pillars": [],
+  "sdgs": []
+ },
+ {
+  "code": "E28",
+  "functionLabel": "Enseñanza",
+  "name": "Efecto de los mecanismos de permanencia estudiantil en las tasas de permanencia y graduación",
+  "description": "N° de estudiantes que permanecieron y se graduaron luego de aplicárseles mecanismos de permanencia (Programas de acompañamiento institucional, transferencias, homologaciones) / N° de estudiantes a los que se les aplicaron mecanismos de permanencia (Programas de acompañamiento institucional, transferencias, homologaciones) × 100",
+  "dimension": "Permanencia",
+  "objective": "Evidenciar el efecto o cambio atribuible — indicador incorporado para cerrar una brecha identificada frente al Acuerdo 01/2025 CESU en relación con «Efecto de los mecanismos de permanencia estudiantil en las tasas de permanencia y graduación», dentro de la dimensión Por definir de la función de Enseñanza.",
+  "pillars": [],
+  "sdgs": []
+ },
+ {
+  "code": "E29",
+  "functionLabel": "Enseñanza",
+  "name": "Efecto de becas o estímulos en la permanencia y graduación de estudiantes, desagregado por tipo de beca",
+  "description": "N° de estudiantes que reciben becas o estímulos y permanecieron y se graduaron / N° de estudiantes que recibieron becas o estímulos × 100",
+  "dimension": "Permanencia",
+  "objective": "Evidenciar el efecto o cambio atribuible — indicador incorporado para cerrar una brecha identificada frente al Acuerdo 01/2025 CESU en relación con «Efecto de becas o estímulos en la permanencia y graduación de estudiantes, desagregado por tipo de beca», dentro de la dimensión Por definir de la función de Enseñanza.",
+  "pillars": [],
+  "sdgs": []
+ },
+ {
+  "code": "X01",
+  "functionLabel": "Extensión",
+  "name": "Convenios activos con sector externo",
+  "description": "Número de convenios vigentes con entidades públicas, empresas, comunidades y ONG para desarrollo regional",
+  "dimension": "Institucional Formativo",
+  "objective": "Cuantificar los recursos y condiciones de partida disponibles en relación con «Convenios activos con sector externo», dentro de la dimensión 'Institucional Formativo' de la función de Extensión.",
+  "pillars": [
+   3,
+   6
+  ],
+  "sdgs": [
+   17,
+   8
+  ]
+ },
+ {
+  "code": "X02",
+  "functionLabel": "Extensión",
+  "name": "Presupuesto destinado a extensión",
+  "description": "Porcentaje del presupuesto institucional asignado a proyectos de extensión y proyección social",
+  "dimension": "Mesosocial Intersectorial",
+  "objective": "Cuantificar los recursos y condiciones de partida disponibles en relación con «Presupuesto destinado a extensión», dentro de la dimensión 'Mesosocial Intersectorial' de la función de Extensión.",
+  "pillars": [
+   4
+  ],
+  "sdgs": [
+   17
+  ]
+ },
+ {
+  "code": "X03",
+  "functionLabel": "Extensión",
+  "name": "Municipios o territorios con presencia UDES",
+  "description": "Número de municipios donde la UDES desarrolla actividades de extensión contribuyendo al desarrollo regional",
+  "dimension": "Institucional Formativo",
+  "objective": "Monitorear el avance de las actividades en ejecución en relación con «Municipios o territorios con presencia UDES», dentro de la dimensión 'Institucional Formativo' de la función de Extensión.",
+  "pillars": [
+   6
+  ],
+  "sdgs": [
+   11,
+   17
+  ]
+ },
+ {
+  "code": "X04",
+  "functionLabel": "Extensión",
+  "name": "Profesores vinculados a extensión",
+  "description": "Número de profesores vinculados a programas /proyectos de extensión",
+  "dimension": "Institucional Formativo",
+  "objective": "Monitorear el avance de las actividades en ejecución en relación con «Profesores vinculados a extensión», dentro de la dimensión 'Institucional Formativo' de la función de Extensión.",
+  "pillars": [
+   6
+  ],
+  "sdgs": [
+   4,
+   17
+  ]
+ },
+ {
+  "code": "X05",
+  "functionLabel": "Extensión",
+  "name": "Estudiantes y graduados vinculados a proyectos",
+  "description": "Número de estudiantes de semilleros/proyectos de grado y graduados vinculados a programas/proyectos de extensión (Gestión del conocimiento)",
+  "dimension": "Institucional Formativo",
+  "objective": "Monitorear el avance de las actividades en ejecución en relación con «Estudiantes y graduados vinculados a proyectos», dentro de la dimensión 'Institucional Formativo' de la función de Extensión.",
+  "pillars": [
+   3
+  ],
+  "sdgs": [
+   4
+  ]
+ },
+ {
+  "code": "X06",
+  "functionLabel": "Extensión",
+  "name": "Emprendimientos identificados/apoyados",
+  "description": "Número de emprendimientos sociales, ambientales o productivos identificados, asesorados o apoyados (Innovación y emprendimiento)",
+  "dimension": "Institucional Formativo",
+  "objective": "Monitorear el avance de las actividades en ejecución en relación con «Emprendimientos identificados/apoyados», dentro de la dimensión 'Institucional Formativo' de la función de Extensión.",
+  "pillars": [
+   3,
+   6
+  ],
+  "sdgs": [
+   8,
+   9
+  ]
+ },
+ {
+  "code": "X07",
+  "functionLabel": "Extensión",
+  "name": "Proyectos de proyección social activos",
+  "description": "Número de proyectos de extensión y proyección social en ejecución vinculando ámbitos sociales y productivos",
+  "dimension": "Microsocial Territorial",
+  "objective": "Monitorear el avance de las actividades en ejecución en relación con «Proyectos de proyección social activos», dentro de la dimensión 'Microsocial Territorial' de la función de Extensión.",
+  "pillars": [
+   6,
+   5
+  ],
+  "sdgs": [
+   1,
+   3
+  ]
+ },
+ {
+  "code": "X08",
+  "functionLabel": "Extensión",
+  "name": "Ingresos por servicios de extensión",
+  "description": "Ingresos generados por asesorías, consultorías y servicios especializados al sector productivo",
+  "dimension": "Mesosocial Intersectorial",
+  "objective": "Monitorear el avance de las actividades en ejecución en relación con «Ingresos por servicios de extensión», dentro de la dimensión 'Mesosocial Intersectorial' de la función de Extensión.",
+  "pillars": [
+   3,
+   4
+  ],
+  "sdgs": [
+   8,
+   9
+  ]
+ },
+ {
+  "code": "X09",
+  "functionLabel": "Extensión",
+  "name": "Percepción de apoyo institucional",
+  "description": "Percepción de apoyo institucional que personas/grupos tienen frente a problemáticas desde el proyecto (Colaboración productiva)",
+  "dimension": "Mesosocial Intersectorial",
+  "objective": "Monitorear el avance de las actividades en ejecución en relación con «Percepción de apoyo institucional», dentro de la dimensión 'Mesosocial Intersectorial' de la función de Extensión.",
+  "pillars": [
+   6
+  ],
+  "sdgs": [
+   17
+  ]
+ },
+ {
+  "code": "X10",
+  "functionLabel": "Extensión",
+  "name": "Aliados con acciones ejecutadas",
+  "description": "Número de aliados institucionales con acciones ejecutadas / Número de aliados proyectados (Desarrollo redes)",
+  "dimension": "Mesosocial Intersectorial",
+  "objective": "Monitorear el avance de las actividades en ejecución en relación con «Aliados con acciones ejecutadas», dentro de la dimensión 'Mesosocial Intersectorial' de la función de Extensión.",
+  "pillars": [
+   3,
+   6
+  ],
+  "sdgs": [
+   17
+  ]
+ },
+ {
+  "code": "X11",
+  "functionLabel": "Extensión",
+  "name": "Tecnologías en inventario DTT con TRL validado",
+  "description": "Número de productos tecnológicos con evidencias verificadas, TRL determinado y registro en el Inventario Institucional (DESARROLLATEC)",
+  "dimension": "Microsocial Territorial",
+  "objective": "Monitorear el avance de las actividades en ejecución en relación con «Tecnologías en inventario DTT con TRL validado», dentro de la dimensión 'Microsocial Territorial' de la función de Extensión.",
+  "pillars": [
+   2,
+   6
+  ],
+  "sdgs": [
+   9,
+   17
+  ]
+ },
+ {
+  "code": "X12",
+  "functionLabel": "Extensión",
+  "name": "% de tecnologías que aumentan TRL en el periodo",
+  "description": "(N° tecnologías con aumento de TRL / N° tecnologías con TRL medido) × 100. Requiere medición periódica y trazabilidad",
+  "dimension": "Microsocial Territorial",
+  "objective": "Monitorear el avance de las actividades en ejecución en relación con «% de tecnologías que aumentan TRL en el periodo», dentro de la dimensión 'Microsocial Territorial' de la función de Extensión.",
+  "pillars": [
+   2,
+   6
+  ],
+  "sdgs": [
+   9,
+   17
+  ]
+ },
+ {
+  "code": "X13",
+  "functionLabel": "Extensión",
+  "name": "Espacios de participación y transferencia social del conocimiento",
+  "description": "Número de espacios de participación, transferencia social del conocimiento desarrollados a partir del proyecto (Desarrollo Regional), incluyendo ferias, ruedas de negocio, jornadas de salud, foros ciudadanos y eventos de impacto social organizados por la UDES con el entorno. (Integra el indicador 'Eventos de vinculación con el entorno')",
+  "dimension": "Institucional Formativo",
+  "objective": "Cuantificar los resultados y productos concretos generados en relación con «Espacios de participación y transferencia social del conocimiento», dentro de la dimensión 'Institucional Formativo' de la función de Extensión.",
+  "pillars": [
+   6
+  ],
+  "sdgs": [
+   4,
+   11,
+   17
+  ]
+ },
+ {
+  "code": "X14",
+  "functionLabel": "Extensión",
+  "name": "Publicaciones derivadas de proyectos de extensión",
+  "description": "Artículos, capítulos, libros sobre experiencias, sistematizaciones o resultados de proyectos de extensión",
+  "dimension": "Institucional Formativo",
+  "objective": "Cuantificar los resultados y productos concretos generados en relación con «Publicaciones derivadas de proyectos de extensión», dentro de la dimensión 'Institucional Formativo' de la función de Extensión.",
+  "pillars": [
+   6
+  ],
+  "sdgs": [
+   4
+  ]
+ },
+ {
+  "code": "X15",
+  "functionLabel": "Extensión",
+  "name": "Nuevos proyectos de investigación surgidos",
+  "description": "Número de nuevos proyectos de investigación (interna/externa) que surgen del proyecto/programa, sometidos y avalados (Innovación)",
+  "dimension": "Institucional Formativo",
+  "objective": "Cuantificar los resultados y productos concretos generados en relación con «Nuevos proyectos de investigación surgidos», dentro de la dimensión 'Institucional Formativo' de la función de Extensión.",
+  "pillars": [
+   3
+  ],
+  "sdgs": [
+   9
+  ]
+ },
+ {
+  "code": "X16",
+  "functionLabel": "Extensión",
+  "name": "Proyectos de aula desarrollados",
+  "description": "Número de proyectos de aula desarrollados durante el proceso de implementación del proyecto/programa (Innovación)",
+  "dimension": "Microsocial Territorial",
+  "objective": "Cuantificar los resultados y productos concretos generados en relación con «Proyectos de aula desarrollados», dentro de la dimensión 'Microsocial Territorial' de la función de Extensión.",
+  "pillars": [
+   1,
+   6
+  ],
+  "sdgs": [
+   4
+  ]
+ },
+ {
+  "code": "X17",
+  "functionLabel": "Extensión",
+  "name": "Resultados de investigación transferidos",
+  "description": "Número de resultados de investigación transferidos/transferibles desde proyectos de extensión (Desarrollo Regional)",
+  "dimension": "Institucional Formativo",
+  "objective": "Cuantificar los resultados y productos concretos generados en relación con «Resultados de investigación transferidos», dentro de la dimensión 'Institucional Formativo' de la función de Extensión.",
+  "pillars": [
+   6,
+   2
+  ],
+  "sdgs": [
+   9
+  ]
+ },
+ {
+  "code": "X18",
+  "functionLabel": "Extensión",
+  "name": "Beneficiarios directos de proyectos",
+  "description": "Número de personas, familias u organizaciones del ámbito social y productivo atendidas directamente",
+  "dimension": "Microsocial Territorial",
+  "objective": "Cuantificar los resultados y productos concretos generados en relación con «Beneficiarios directos de proyectos», dentro de la dimensión 'Microsocial Territorial' de la función de Extensión.",
+  "pillars": [
+   6
+  ],
+  "sdgs": [
+   1,
+   10
+  ]
+ },
+ {
+  "code": "X19",
+  "functionLabel": "Extensión",
+  "name": "Programas de educación continuada ofertados",
+  "description": "Diplomados, cursos de actualización ejecutados para fortalecimiento de capacidades sociales y productivas",
+  "dimension": "Microsocial Territorial",
+  "objective": "Cuantificar los resultados y productos concretos generados en relación con «Programas de educación continuada ofertados», dentro de la dimensión 'Microsocial Territorial' de la función de Extensión.",
+  "pillars": [
+   1,
+   3,
+   6
+  ],
+  "sdgs": [
+   4,
+   8
+  ]
+ },
+ {
+  "code": "X20",
+  "functionLabel": "Extensión",
+  "name": "Personas/grupos que lideran procesos territoriales",
+  "description": "Porcentaje de personas, grupos, instituciones que lideran procesos en los territorios de aplicación (Vinculación social)",
+  "dimension": "Microsocial Territorial",
+  "objective": "Cuantificar los resultados y productos concretos generados en relación con «Personas/grupos que lideran procesos territoriales», dentro de la dimensión 'Microsocial Territorial' de la función de Extensión.",
+  "pillars": [
+   6
+  ],
+  "sdgs": [
+   16,
+   11
+  ]
+ },
+ {
+  "code": "X21",
+  "functionLabel": "Extensión",
+  "name": "Activos de propiedad intelectual asociados a tecnologías DTT",
+  "description": "Número de activos de PI (divulgaciones, solicitudes, registros, concesiones) vinculados a productos del inventario DTT institucional",
+  "dimension": "Microsocial Territorial",
+  "objective": "Cuantificar los resultados y productos concretos generados en relación con «Activos de propiedad intelectual asociados a tecnologías DTT», dentro de la dimensión 'Microsocial Territorial' de la función de Extensión.",
+  "pillars": [
+   2,
+   3,
+   6
+  ],
+  "sdgs": [
+   9,
+   17
+  ]
+ },
+ {
+  "code": "X22",
+  "functionLabel": "Extensión",
+  "name": "Percepción de cambios favorables en problemáticas atendidas",
+  "description": "Porcentaje de participantes que perciben cambios concretos favorables en las dinámicas o problemáticas atendidas (Solución de problemas)",
+  "dimension": "Microsocial Territorial",
+  "objective": "Evidenciar el efecto o cambio de mediano/largo plazo atribuible en relación con «Percepción de cambios favorables en problemáticas atendidas», dentro de la dimensión 'Microsocial Territorial' de la función de Extensión.",
+  "pillars": [
+   6
+  ],
+  "sdgs": [
+   1,
+   11
+  ]
+ },
+ {
+  "code": "X23",
+  "functionLabel": "Extensión",
+  "name": "Satisfacción en resolución intersectorial de problemas",
+  "description": "Nivel de satisfacción de los participantes o comunidad frente a la resolución interinstitucional e intersectorial de problemas desde el proyecto (Colaboración sector productivo)",
+  "dimension": "Mesosocial Intersectorial",
+  "objective": "Evidenciar el efecto o cambio de mediano/largo plazo atribuible en relación con «Satisfacción en resolución intersectorial de problemas», dentro de la dimensión 'Mesosocial Intersectorial' de la función de Extensión.",
+  "pillars": [
+   3,
+   6
+  ],
+  "sdgs": [
+   17,
+   16
+  ]
+ },
+ {
+  "code": "X24",
+  "functionLabel": "Extensión",
+  "name": "Fortalecimiento de capacidades para convivencia pacífica",
+  "description": "Porcentaje de personas, familias, grupos que expresan cambios positivos en áreas de fortalecimiento de capacidades para convivencia pacífica (Promoción convivencia pacífica)",
+  "dimension": "Microsocial Territorial",
+  "objective": "Evidenciar el efecto o cambio de mediano/largo plazo atribuible en relación con «Fortalecimiento de capacidades para convivencia pacífica», dentro de la dimensión 'Microsocial Territorial' de la función de Extensión.",
+  "pillars": [
+   6
+  ],
+  "sdgs": [
+   16,
+   5
+  ]
+ },
+ {
+  "code": "X25",
+  "functionLabel": "Extensión",
+  "name": "Cambios positivos en prácticas de cuidado y organización",
+  "description": "Porcentaje de participantes que expresan cambios positivos en prácticas de cuidado del entorno, organización o trabajo (Vinculación ámbito social)",
+  "dimension": "Microsocial Territorial",
+  "objective": "Evidenciar el efecto o cambio de mediano/largo plazo atribuible en relación con «Cambios positivos en prácticas de cuidado y organización», dentro de la dimensión 'Microsocial Territorial' de la función de Extensión.",
+  "pillars": [
+   6
+  ],
+  "sdgs": [
+   3,
+   8
+  ]
+ },
+ {
+  "code": "X26",
+  "functionLabel": "Extensión",
+  "name": "Nuevas oportunidades educativas/laborales encontradas",
+  "description": "Porcentaje de participantes que encontraron nuevas oportunidades educativas, laborales, ocupacionales a partir de su participación",
+  "dimension": "Microsocial Territorial",
+  "objective": "Evidenciar el efecto o cambio de mediano/largo plazo atribuible en relación con «Nuevas oportunidades educativas/laborales encontradas», dentro de la dimensión 'Microsocial Territorial' de la función de Extensión.",
+  "pillars": [
+   6,
+   3
+  ],
+  "sdgs": [
+   4,
+   8
+  ]
+ },
+ {
+  "code": "X27",
+  "functionLabel": "Extensión",
+  "name": "Apreciación sobre aportes al bienestar",
+  "description": "Apreciación de los participantes sobre los aportes, aplicaciones o efectos de los resultados sobre el bienestar (Solución problemas)",
+  "dimension": "Microsocial Territorial",
+  "objective": "Evidenciar el efecto o cambio de mediano/largo plazo atribuible en relación con «Apreciación sobre aportes al bienestar», dentro de la dimensión 'Microsocial Territorial' de la función de Extensión.",
+  "pillars": [
+   6
+  ],
+  "sdgs": [
+   3,
+   11
+  ]
+ },
+ {
+  "code": "X28",
+  "functionLabel": "Extensión",
+  "name": "Valoración ampliación acciones interinstitucionales",
+  "description": "Valoración de actores clave frente a ampliación/funcionamiento de acciones interinstitucionales (Desarrollo redes)",
+  "dimension": "Mesosocial Intersectorial",
+  "objective": "Evidenciar el efecto o cambio de mediano/largo plazo atribuible en relación con «Valoración ampliación acciones interinstitucionales», dentro de la dimensión 'Mesosocial Intersectorial' de la función de Extensión.",
+  "pillars": [
+   6,
+   3
+  ],
+  "sdgs": [
+   17
+  ]
+ },
+ {
+  "code": "X29",
+  "functionLabel": "Extensión",
+  "name": "Pertinencia de la intervención intersectorial",
+  "description": "Apreciación de participantes sobre pertinencia de intervención intersectorial en cambios incorporados (Adaptabilidad)",
+  "dimension": "Mesosocial Intersectorial",
+  "objective": "Evidenciar el efecto o cambio de mediano/largo plazo atribuible en relación con «Pertinencia de la intervención intersectorial», dentro de la dimensión 'Mesosocial Intersectorial' de la función de Extensión.",
+  "pillars": [
+   6
+  ],
+  "sdgs": [
+   17
+  ]
+ },
+ {
+  "code": "X30",
+  "functionLabel": "Extensión",
+  "name": "Calidad de servicios interinstitucionales",
+  "description": "Apreciación frente a calidad de servicios interinstitucionales promovidos desde el proyecto (Fomento innovación)",
+  "dimension": "Mesosocial Intersectorial",
+  "objective": "Evidenciar el efecto o cambio de mediano/largo plazo atribuible en relación con «Calidad de servicios interinstitucionales», dentro de la dimensión 'Mesosocial Intersectorial' de la función de Extensión.",
+  "pillars": [
+   2,
+   6
+  ],
+  "sdgs": [
+   9
+  ]
+ },
+ {
+  "code": "X31",
+  "functionLabel": "Extensión",
+  "name": "Proyectos alineados a ODS y Plan Regional",
+  "description": "Porcentaje de proyectos que responden a ODS o prioridades del Plan de Desarrollo Departamental",
+  "dimension": "Macrosocial Contextual",
+  "objective": "Evidenciar el efecto o cambio de mediano/largo plazo atribuible en relación con «Proyectos alineados a ODS y Plan Regional», dentro de la dimensión 'Macrosocial Contextual' de la función de Extensión.",
+  "pillars": [
+   5,
+   6
+  ],
+  "sdgs": []
+ },
+ {
+  "code": "X32",
+  "functionLabel": "Extensión",
+  "name": "Conservación y sostenibilidad ambiental",
+  "description": "Proyectos con impacto documentado en conservación, restauración o educación ambiental",
+  "dimension": "Macrosocial Contextual",
+  "objective": "Evidenciar el efecto o cambio de mediano/largo plazo atribuible en relación con «Conservación y sostenibilidad ambiental», dentro de la dimensión 'Macrosocial Contextual' de la función de Extensión.",
+  "pillars": [
+   5
+  ],
+  "sdgs": [
+   13,
+   15,
+   6
+  ]
+ },
+ {
+  "code": "X33",
+  "functionLabel": "Extensión",
+  "name": "Acuerdos de transferencia tecnológica formalizados (DTT)",
+  "description": "Número de acuerdos de transferencia (licencias, cesiones, co-desarrollo, contratos con cláusula de explotación) firmados en el periodo",
+  "dimension": "Microsocial Territorial",
+  "objective": "Evidenciar el efecto o cambio de mediano/largo plazo atribuible en relación con «Acuerdos de transferencia tecnológica formalizados (DTT)», dentro de la dimensión 'Microsocial Territorial' de la función de Extensión.",
+  "pillars": [
+   2,
+   3,
+   6
+  ],
+  "sdgs": [
+   9,
+   17
+  ]
+ },
+ {
+  "code": "X34",
+  "functionLabel": "Extensión",
+  "name": "Ingresos por transferencia tecnológica (licencias/regalías)",
+  "description": "Ingresos anuales derivados de licencias, regalías o cesiones de tecnologías desarrolladas por la UDES a través de la Coordinación DTT",
+  "dimension": "Microsocial Territorial",
+  "objective": "Evidenciar el efecto o cambio de mediano/largo plazo atribuible en relación con «Ingresos por transferencia tecnológica (licencias/regalías)», dentro de la dimensión 'Microsocial Territorial' de la función de Extensión.",
+  "pillars": [
+   2,
+   3,
+   6
+  ],
+  "sdgs": [
+   9,
+   17
+  ]
+ },
+ {
+  "code": "X35",
+  "functionLabel": "Extensión",
+  "name": "Índice de sinergia territorial e innovación abierta",
+  "description": "(Alianzas interinstitucionales con proyectos cofinanciados que aportaron a las metas de los Planes de Desarrollo Municipal y Departamental / Total de convenios activos con el Estado, empresa o cooperación internacional) × 100",
+  "dimension": "Macrosocial Contextual",
+  "objective": "Evidenciar el efecto o cambio de mediano/largo plazo atribuible en relación con «Índice de sinergia territorial e innovación abierta», dentro de la dimensión 'Macrosocial Contextual' de la función de Extensión.",
+  "pillars": [
+   5,
+   6
+  ],
+  "sdgs": [
+   11,
+   17
+  ]
+ },
+ {
+  "code": "X36",
+  "functionLabel": "Extensión",
+  "name": "Tasa de sostenibilidad y apropiación comunitaria",
+  "description": "(Programas de extensión que continúan operando de manera autónoma por la comunidad/sector productivo post-intervención UDES / Total de proyectos de proyección social finalizados en los últimos 4 años) × 100",
+  "dimension": "Microsocial Territorial",
+  "objective": "Evidenciar el efecto o cambio de mediano/largo plazo atribuible en relación con «Tasa de sostenibilidad y apropiación comunitaria», dentro de la dimensión 'Microsocial Territorial' de la función de Extensión.",
+  "pillars": [
+   6,
+   5
+  ],
+  "sdgs": [
+   1,
+   11
+  ]
+ },
+ {
+  "code": "X37",
+  "functionLabel": "Extensión",
+  "name": "Índice de retorno de pertinencia posgradual y movilidad profesional",
+  "description": "(Graduados de posgrado que lideran procesos de transformación institucional o innovación en sus organizaciones en los primeros cinco años de grado / Total de graduados de posgrado de la cohorte x encuestados) × 100.",
+  "dimension": "Institucional Formativo",
+  "objective": "Evidenciar el efecto o cambio de mediano/largo plazo atribuible en relación con «Índice de retorno de pertinencia posgradual y movilidad profesional», dentro de la dimensión 'Institucional Formativo' de la función de Extensión.",
+  "pillars": [
+   1,
+   3
+  ],
+  "sdgs": [
+   4,
+   8
+  ]
+ },
+ {
+  "code": "X38",
+  "functionLabel": "Extensión",
+  "name": "Percepción de la comunidad institucional sobre la coherencia entre la identidad declarada y los resultados de docencia, investigación, extensión y bienestar",
+  "description": "Calificación promedio obtenida en la encuesta institucional aplicada a estudiantes, profesores, personal administrativo y graduados sobre la coherencia entre la identidad declarada y los resultados de las funciones sustantivas y el bienestar.",
+  "dimension": null,
+  "objective": "Evidenciar el efecto o cambio atribuible — indicador incorporado para cerrar una brecha identificada frente al Acuerdo 01/2025 CESU en relación con «Percepción de la comunidad institucional sobre la coherencia entre la identidad declarada y los resultados de docencia, investigación, extensión y bienestar», dentro de la dimensión Por definir de la función de Extensión.",
+  "pillars": [],
+  "sdgs": []
+ },
+ {
+  "code": "X39",
+  "functionLabel": "Extensión",
+  "name": "Proyectos de extensión con componente de patrimonio cultural/artístico y su impacto documentado",
+  "description": "Número y proporción de proyectos de extensión con componente de patrimonio cultural o artístico que cuentan con evidencia documentada de su impacto social, cultural y artístico en el territorio.",
+  "dimension": "Microsocial Territorial",
+  "objective": "Evidenciar el efecto o cambio atribuible — indicador incorporado para cerrar una brecha identificada frente al Acuerdo 01/2025 CESU en relación con «Proyectos de extensión con componente de patrimonio cultural/artístico y su impacto documentado», dentro de la dimensión Por definir de la función de Extensión.",
+  "pillars": [],
+  "sdgs": []
+ },
+ {
+  "code": "X40",
+  "functionLabel": "Extensión",
+  "name": "Índice de impacto de los programas de bienestar institucional en la calidad de vida de estudiantes, profesores y personal administrativo",
+  "description": "Índice compuesto construido a partir de la medición de calidad de vida percibida y de la participación en políticas, programas y actividades de bienestar, aplicado a estudiantes, profesores y personal administrativo.",
+  "dimension": "Microsocial Territorial",
+  "objective": "Evidenciar el efecto o cambio atribuible — indicador incorporado para cerrar una brecha identificada frente al Acuerdo 01/2025 CESU en relación con «Índice de impacto de los programas de bienestar institucional en la calidad de vida de estudiantes, profesores y personal administrativo», dentro de la dimensión Por definir de la función de Extensión.",
+  "pillars": [],
+  "sdgs": []
+ },
+ {
+  "code": "X41",
+  "functionLabel": "Extensión",
+  "name": "Efecto de los programas de acompañamiento psicosocial y académico en la permanencia y graduación oportuna",
+  "description": "Diferencia en las tasas de permanencia y graduación oportuna entre estudiantes que participaron en los programas de acompañamiento académico, psicosocial y económico y quienes no participaron.",
+  "dimension": "Institucional Formativo",
+  "objective": "Evidenciar el efecto o cambio atribuible — indicador incorporado para cerrar una brecha identificada frente al Acuerdo 01/2025 CESU en relación con «Efecto de los programas de acompañamiento psicosocial y académico en la permanencia y graduación oportuna», dentro de la dimensión Por definir de la función de Extensión.",
+  "pillars": [],
+  "sdgs": []
+ },
+ {
+  "code": "X42",
+  "functionLabel": "Extensión",
+  "name": "Participación de egresados en programas de educación continua o posgrado UDES derivada de las estrategias de vinculación con egresados",
+  "description": "(N° de egresados que se matriculan en programas de educación continua o posgrado UDES a partir de las estrategias de vinculación / N° total de egresados alcanzados por dichas estrategias) × 100.",
+  "dimension": "Institucional Formativo",
+  "objective": "Evidenciar el efecto o cambio atribuible — indicador incorporado para cerrar una brecha identificada frente al Acuerdo 01/2025 CESU en relación con «Participación de egresados en programas de educación continua o posgrado UDES derivada de las estrategias de vinculación con egresados», dentro de la dimensión Por definir de la función de Extensión.",
+  "pillars": [],
+  "sdgs": []
+ }
+]

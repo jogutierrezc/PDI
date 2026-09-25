@@ -31,15 +31,16 @@ beforeAll(async () => {
 afterAll(() => t?.close());
 
 describe("Impacto retirado (0077)", () => {
-  it("no queda nada imp_* ni los roles de Impacto", async () => {
-    const [objects] = await t.q<{ n: number }>(
-      `select (select count(*) from pg_class c join pg_namespace n on n.oid = c.relnamespace
-                where n.nspname = 'public' and c.relname like 'imp\\_%')
-            + (select count(*) from pg_proc p join pg_namespace n on n.oid = p.pronamespace
-                where n.nspname = 'public' and p.proname like 'imp\\_%') as n`,
-    );
-    expect(Number(objects.n)).toBe(0);
-    const roles = await t.q("select key from access_roles where key like 'impacto\\_%' or 'impacto' = any (screens)");
+  // El rediseño (0078) vuelve a crear tablas imp_*, pero ninguna del modelo viejo.
+  it("no queda nada del modelo viejo ni los roles de Impacto", async () => {
+    const old = [
+      "imp_assignments", "imp_baselines", "imp_catalog_versions", "imp_evidence", "imp_import_batch_records",
+      "imp_import_batches", "imp_import_findings", "imp_master_catalog", "imp_periods", "imp_program_campuses",
+      "imp_records", "imp_secrets", "imp_settings", "imp_targets", "imp_templates", "imp_transitions",
+    ];
+    const left = await t.q("select relname from pg_class where relname = any($1)", [old]);
+    expect(left).toEqual([]);
+    const roles = await t.q("select key from access_roles where key like 'impacto\\_%'");
     expect(roles).toEqual([]);
   });
 

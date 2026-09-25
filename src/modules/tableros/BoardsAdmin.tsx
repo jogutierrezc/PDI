@@ -19,7 +19,7 @@
 import { useMemo, useState } from "react";
 import type React from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
-import { AdminShell } from "../admin/components/AdminShell";
+import { AdminRail, AdminRailTab, AdminShell } from "../admin/components/AdminShell";
 import { Icon } from "../../components/ui/Icon";
 import { useAuth } from "../../lib/auth";
 import { ConfirmButton, Panel, SaveState, StageEmpty } from "../admin/udes-en-cifras/ui";
@@ -106,6 +106,23 @@ export function BoardsAdmin() {
           ? `${UNIT_KIND[current.kind].label} · ${describeRole(myRole, isPlaneacion)}`
           : "Cada unidad arma sus propios tableros con sus propios datos."
       }
+      rail={
+        current ? (
+          <AdminRail label="Qué ver de esta unidad">
+            <AdminRailTab current={view === "tableros"} onSelect={() => go(current, "tableros")}>
+              Tableros
+            </AdminRailTab>
+            <AdminRailTab current={view === "personas"} onSelect={() => go(current, "personas")}>
+              Personas
+            </AdminRailTab>
+            {isPlaneacion && (
+              <AdminRailTab current={view === "revision"} count={pending.length} onSelect={() => go(current, "revision")}>
+                Revisión
+              </AdminRailTab>
+            )}
+          </AdminRail>
+        ) : undefined
+      }
       actions={
         isPlaneacion && pending.length > 0 ? (
           <Link
@@ -157,22 +174,6 @@ export function BoardsAdmin() {
           />
 
           <div className="tb__work">
-            {current && (
-              <nav className="tb__views" aria-label="Qué ver de esta unidad">
-                <button type="button" className="tb__view" aria-current={view === "tableros"} onClick={() => go(current, "tableros")}>
-                  Tableros
-                </button>
-                <button type="button" className="tb__view" aria-current={view === "personas"} onClick={() => go(current, "personas")}>
-                  Personas
-                </button>
-                {isPlaneacion && (
-                  <button type="button" className="tb__view" aria-current={view === "revision"} onClick={() => go(current, "revision")}>
-                    Revisión
-                    {pending.length > 0 && <span className="tb__count">{pending.length}</span>}
-                  </button>
-                )}
-              </nav>
-            )}
 
             {!current ? (
               <StageEmpty title="Elige una unidad">El árbol de la izquierda lleva a los tableros de cada una.</StageEmpty>

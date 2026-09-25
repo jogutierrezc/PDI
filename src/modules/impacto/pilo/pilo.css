@@ -1,0 +1,1096 @@
+/* =============================================================================
+   Mr. Pilo Bot.
+
+   El único momento con puesta en escena de la intranet: la guía se abre como
+   un círculo que crece desde el botón (clip-path, salida exponencial) sobre
+   un fondo marino, con un panel claro donde se trabaja. Todo lo demás es la
+   intranet de siempre: rótulos en negrita, azul para la acción y la
+   selección, color de función solo como punto de identidad.
+   ========================================================================== */
+
+/* --- El botón ---------------------------------------------------------------------- */
+
+.pilo-anchor {
+  position: relative;
+  display: inline-flex;
+}
+
+.pilo-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: 46px;
+  padding: 3px var(--space-4) 3px 3px;
+  color: var(--pilo-stage-ink);
+  background: var(--pilo-stage);
+  border: 0;
+  border-radius: var(--radius-pill);
+  font: inherit;
+  cursor: pointer;
+  transition:
+    transform var(--dur-base) var(--ease-out),
+    box-shadow var(--dur-base) var(--ease-out);
+}
+
+.pilo-btn[data-intent] {
+  transform: translateY(-1px);
+  box-shadow:
+    0 0 0 4px color-mix(in srgb, var(--pilo-accent) 38%, transparent),
+    var(--shadow-md);
+}
+
+.pilo-btn:focus-visible {
+  outline: 3px solid var(--brand-blue);
+  outline-offset: 3px;
+}
+
+.pilo-btn__face {
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  overflow: hidden;
+  background: var(--surface);
+  border-radius: var(--radius-pill);
+}
+
+.pilo-btn__face img {
+  width: 36px;
+  height: 36px;
+  transition: transform var(--dur-slow) var(--ease-out);
+}
+
+.pilo-btn[data-intent] .pilo-btn__face img {
+  transform: rotate(-8deg) scale(1.06);
+}
+
+.pilo-btn__text {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  line-height: 1.15;
+  white-space: nowrap;
+}
+
+.pilo-btn__text strong {
+  font-size: var(--text-sm);
+  font-weight: 800;
+}
+
+.pilo-btn__text small {
+  color: var(--pilo-stage-muted);
+  font-size: var(--text-2xs);
+  font-weight: 600;
+}
+
+/* El aviso mientras se decide la intención. */
+.pilo-peek {
+  position: absolute;
+  top: calc(100% + 12px);
+  right: 0;
+  z-index: 40;
+  display: grid;
+  gap: var(--space-2);
+  width: 320px;
+  padding: var(--space-4);
+  color: var(--ink-secondary);
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-lg);
+  font-size: var(--text-sm);
+  line-height: 1.5;
+  pointer-events: none;
+}
+
+.pilo-peek strong {
+  color: var(--brand-navy);
+  font-weight: 800;
+}
+
+.pilo-peek i {
+  display: block;
+  height: 4px;
+  background: color-mix(in srgb, var(--brand-teal) 18%, var(--surface-3));
+  border-radius: var(--radius-pill);
+  overflow: hidden;
+}
+
+.pilo-peek i::after {
+  content: "";
+  display: block;
+  width: 100%;
+  height: 100%;
+  background: var(--brand-teal);
+  border-radius: inherit;
+  transform-origin: left;
+  animation: pilo-intent 400ms linear forwards;
+}
+
+@keyframes pilo-intent {
+  from { transform: scaleX(0); }
+  to { transform: scaleX(1); }
+}
+
+@media (max-width: 900px) {
+  .pilo-btn { padding-right: 3px; }
+  .pilo-btn__text { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
+  .pilo-peek { display: none; }
+}
+
+/* --- La escena --------------------------------------------------------------------- */
+
+.pilo {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: grid;
+  grid-template-columns: minmax(300px, 400px) minmax(0, 1fr);
+  color: var(--pilo-stage-ink);
+  background: var(--pilo-stage);
+  /* La entrada y la salida (el círculo desde el botón) las anima GSAP: motion.ts. */
+}
+
+.pilo ::selection {
+  color: var(--pilo-accent-ink);
+  background: var(--pilo-accent);
+}
+
+.pilo__side {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-7);
+  min-width: 0;
+  min-height: 0;
+  padding: var(--space-8) var(--space-8) var(--space-7);
+  overflow-y: auto;
+}
+
+.pilo__close {
+  align-self: flex-start;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: 40px;
+  padding: 0 var(--space-4);
+  color: var(--pilo-stage-ink);
+  background: var(--pilo-stage-line);
+  border: 0;
+  border-radius: var(--radius-pill);
+  font: inherit;
+  font-size: var(--text-sm);
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.pilo__close:hover { background: color-mix(in srgb, var(--pilo-stage-ink) 20%, transparent); }
+.pilo__close:focus-visible { outline: 3px solid var(--pilo-accent); outline-offset: 3px; }
+
+.pilo__intro {
+  display: grid;
+  gap: var(--space-4);
+}
+
+.pilo__avatar {
+  width: 132px;
+  height: 132px;
+  padding: var(--space-2);
+  background: var(--pilo-stage-ink);
+  border-radius: 38px;
+  box-shadow: var(--shadow-xl);
+}
+
+.pilo__intro h1 {
+  margin: 0;
+  color: var(--pilo-stage-ink);
+  font-family: var(--font-display);
+  font-size: var(--text-3xl);
+  line-height: 1.08;
+  letter-spacing: -0.025em;
+}
+
+.pilo__intro p {
+  max-width: 34ch;
+  margin: 0;
+  color: var(--pilo-stage-muted);
+  font-size: var(--text-md);
+  line-height: 1.55;
+}
+
+.pilo__steps {
+  display: grid;
+  gap: var(--space-1);
+  margin: auto 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.pilo__steps li {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-2) var(--space-3);
+  color: var(--pilo-stage-muted);
+  border-radius: var(--radius-sm);
+  font-size: var(--text-sm);
+  font-weight: 600;
+}
+
+.pilo__steps li > span {
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  border: 1.5px solid color-mix(in srgb, var(--pilo-stage-muted) 60%, transparent);
+  border-radius: var(--radius-pill);
+  font-size: var(--text-xs);
+  font-weight: 800;
+}
+
+.pilo__steps li[data-state="current"] {
+  color: var(--pilo-stage-ink);
+  background: var(--pilo-stage-line);
+  font-weight: 800;
+}
+
+.pilo__steps li[data-state="current"] > span {
+  color: var(--pilo-accent-ink);
+  background: var(--pilo-accent);
+  border-color: transparent;
+}
+
+.pilo__steps li[data-state="done"] > span {
+  color: var(--pilo-stage-ink);
+  background: var(--brand-blue);
+  border-color: transparent;
+}
+
+.pilo__site {
+  margin: 0;
+  color: var(--pilo-stage-muted);
+  font-size: var(--text-xs);
+  line-height: 1.5;
+}
+
+/* --- El panel de trabajo --------------------------------------------------------- */
+
+.pilo__panel {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  margin: var(--space-6) var(--space-6) var(--space-6) 0;
+  color: var(--ink);
+  background: var(--surface);
+  border-radius: var(--radius-xl);
+  box-shadow: var(--shadow-xl);
+  overflow: hidden;
+}
+
+.pilo__head {
+  display: grid;
+  gap: var(--space-2);
+  padding: var(--space-8) var(--space-8) 0;
+}
+
+.pilo__head--row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: var(--space-5);
+}
+
+.pilo__head h2 {
+  margin: 0;
+  color: var(--brand-navy);
+  font-family: var(--font-display);
+  font-size: var(--text-2xl);
+  letter-spacing: -0.02em;
+  text-wrap: balance;
+}
+
+.pilo__head h2:focus { outline: none; }
+
+.pilo__head p {
+  margin: var(--space-1) 0 0;
+  color: var(--ink-secondary);
+  font-size: var(--text-md);
+}
+
+.pilo-fn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--ink-secondary);
+  font-size: var(--text-2xs);
+  font-weight: 800;
+}
+
+.pilo-fn i,
+.pilo__group h3 i {
+  width: 8px;
+  height: 8px;
+  background: var(--fn, var(--ink-faint));
+  border-radius: var(--radius-pill);
+}
+
+/* Paso 1: las metas. */
+.pilo__goals {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  align-items: start;
+  gap: var(--space-5);
+  flex: 1;
+  padding: var(--space-6) var(--space-8);
+  overflow-y: auto;
+}
+
+/* Una columna por función: su punto de color, su nombre y cuántos lleva. */
+.pilo__fn {
+  display: grid;
+  gap: var(--space-2);
+}
+
+.pilo__fn h3 {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin: 0 0 var(--space-1);
+  color: var(--brand-navy);
+  font-size: var(--text-sm);
+  font-weight: 800;
+}
+
+.pilo__fn h3 i {
+  width: 10px;
+  height: 10px;
+  background: var(--fn, var(--ink-faint));
+  border-radius: var(--radius-pill);
+}
+
+.pilo__fn h3 span {
+  margin-left: auto;
+  color: var(--ink-muted);
+  font-size: var(--text-2xs);
+  font-weight: 700;
+}
+
+.pilo__fn h3 span[data-missing] {
+  color: color-mix(in srgb, var(--status-pending) 72%, var(--ink));
+}
+
+.pilo-tile {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  min-height: 0;
+  padding: var(--space-3) var(--space-8) var(--space-3) var(--space-4);
+  color: var(--ink);
+  text-align: left;
+  background: var(--surface-2);
+  border: 0;
+  border-radius: var(--radius-md);
+  box-shadow: inset 0 0 0 1px var(--line-strong);
+  font: inherit;
+  cursor: pointer;
+  transition:
+    transform 160ms var(--ease-out),
+    box-shadow 160ms var(--ease-out),
+    background-color 160ms var(--ease-out);
+}
+
+/* El hover solo con mouse: en pantallas táctiles el toque lo dispararía de más. */
+@media (hover: hover) and (pointer: fine) {
+  .pilo-btn:hover {
+    transform: translateY(-1px);
+    box-shadow:
+      0 0 0 4px color-mix(in srgb, var(--pilo-accent) 38%, transparent),
+      var(--shadow-md);
+  }
+  .pilo-btn:hover .pilo-btn__face img { transform: rotate(-8deg) scale(1.06); }
+  .pilo-tile:hover { box-shadow: inset 0 0 0 1px var(--brand-blue), var(--shadow-sm); }
+  .pilo-tile[aria-pressed="true"]:hover { box-shadow: inset 0 0 0 2px var(--brand-blue), var(--shadow-sm); }
+}
+
+/* Presionar responde: 0.97, 160 ms. */
+.pilo-btn:active,
+.pilo-tile:active,
+.pilo-size:active { transform: scale(0.97); }
+
+.pilo-tile[aria-pressed="true"] {
+  background: var(--brand-blue-soft);
+  box-shadow: inset 0 0 0 2px var(--brand-blue);
+}
+
+.pilo-tile:focus-visible,
+.pilo-size:focus-visible {
+  outline: 3px solid var(--brand-blue);
+  outline-offset: 3px;
+}
+
+.pilo-tile strong {
+  color: var(--brand-navy);
+  font-size: var(--text-sm);
+  font-weight: 800;
+  line-height: 1.3;
+}
+
+.pilo-tile small {
+  margin-top: auto;
+  color: var(--ink-secondary);
+  font-size: var(--text-xs);
+}
+
+.pilo-tile__check {
+  position: absolute;
+  top: var(--space-3);
+  right: var(--space-3);
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  color: var(--ink-on-accent);
+  background: var(--brand-blue);
+  border-radius: var(--radius-pill);
+}
+
+/* Paso 2: el tamaño. */
+.pilo__sizes {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--space-4);
+  padding: var(--space-7) var(--space-8) var(--space-5);
+}
+
+.pilo-size {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-2);
+  padding: var(--space-6);
+  color: var(--ink);
+  text-align: left;
+  background: var(--surface-2);
+  border: 0;
+  border-radius: var(--radius-lg);
+  box-shadow: inset 0 0 0 1px var(--line-strong);
+  font: inherit;
+  cursor: pointer;
+  transition:
+    transform 160ms var(--ease-out),
+    box-shadow 160ms var(--ease-out),
+    background-color 160ms var(--ease-out);
+}
+
+.pilo-size[aria-pressed="true"] {
+  background: var(--brand-blue-soft);
+  box-shadow: inset 0 0 0 2px var(--brand-blue);
+}
+
+.pilo-size__name {
+  color: var(--ink-secondary);
+  font-size: var(--text-sm);
+  font-weight: 800;
+}
+
+.pilo-size__n {
+  color: var(--brand-navy);
+  font-family: var(--font-display);
+  font-size: 4rem;
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+}
+
+.pilo-size__unit {
+  color: var(--brand-navy);
+  font-size: var(--text-sm);
+  font-weight: 700;
+}
+
+.pilo-size__hint {
+  color: var(--ink-secondary);
+  font-size: var(--text-sm);
+  line-height: 1.5;
+}
+
+.pilo-size__rec {
+  margin-top: var(--space-1);
+  padding: 3px 10px;
+  color: color-mix(in srgb, var(--brand-teal) 70%, var(--ink));
+  background: color-mix(in srgb, var(--brand-teal) 14%, var(--surface));
+  border-radius: var(--radius-pill);
+  font-size: var(--text-2xs);
+  font-weight: 800;
+}
+
+.pilo__prefer {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-3);
+  margin: 0 var(--space-8);
+  padding: var(--space-4);
+  background: var(--surface-2);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+}
+
+.pilo__prefer input,
+.pilo-pick input {
+  width: 20px;
+  height: 20px;
+  margin: 2px 0 0;
+  accent-color: var(--brand-blue);
+}
+
+.pilo__prefer > span { display: grid; gap: var(--space-1); }
+.pilo__prefer strong { color: var(--brand-navy); font-size: var(--text-sm); }
+.pilo__prefer span span { color: var(--ink-secondary); font-size: var(--text-sm); }
+
+/* Paso 3: la propuesta. */
+.pilo-chain {
+  display: flex;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.pilo-chain li {
+  display: grid;
+  justify-items: center;
+  gap: 2px;
+  min-width: 78px;
+  padding: var(--space-2) var(--space-3);
+  color: var(--pilo-stage-ink);
+  background: var(--pilo-stage);
+  border-radius: var(--radius-sm);
+}
+
+.pilo-chain li span { font-size: var(--text-2xs); font-weight: 700; }
+.pilo-chain li strong { font-size: var(--text-lg); font-variant-numeric: tabular-nums; }
+
+.pilo-chain li[data-empty] {
+  color: color-mix(in srgb, var(--status-pending) 72%, var(--ink));
+  background: var(--surface);
+  outline: 1.5px dashed var(--status-pending);
+  outline-offset: -1.5px;
+}
+
+.pilo__gap {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-3);
+  margin: var(--space-4) var(--space-8) 0;
+  padding: var(--space-3) var(--space-4);
+  color: color-mix(in srgb, var(--status-pending) 55%, var(--ink));
+  background: var(--status-pending-soft);
+  border-radius: var(--radius-md);
+  font-size: var(--text-sm);
+}
+
+.pilo__gap > span { flex: 1 1 280px; }
+
+.pilo__gap button {
+  min-height: 36px;
+  padding: 0 var(--space-4);
+  color: var(--brand-navy);
+  background: var(--surface);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-pill);
+  font: inherit;
+  font-size: var(--text-sm);
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.pilo__gap button:hover { background: var(--surface-2); }
+
+.pilo__list {
+  flex: 1;
+  min-height: 0;
+  padding: var(--space-3) var(--space-8) var(--space-4);
+  overflow-y: auto;
+  scrollbar-color: var(--line-strong) transparent;
+}
+
+.pilo__group { padding-bottom: var(--space-3); }
+
+.pilo__goal h4 {
+  margin: var(--space-2) 0 0;
+  padding: var(--space-2) var(--space-1) var(--space-1);
+  color: var(--brand-navy);
+  font-size: var(--text-xs);
+  font-weight: 800;
+}
+
+.pilo__group h3 {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin: 0;
+  padding: var(--space-3) var(--space-1) var(--space-2);
+  color: var(--ink-muted);
+  font-size: var(--text-xs);
+  font-weight: 800;
+}
+
+.pilo-pick {
+  display: grid;
+  grid-template-columns: 24px 52px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-1);
+  border-top: 1px solid var(--line);
+  cursor: pointer;
+  transition: opacity var(--dur-base) var(--ease-out);
+}
+
+.pilo-pick[data-off] { opacity: 0.5; }
+.pilo-pick[data-kept] { cursor: default; }
+
+.pilo-pick__code {
+  color: var(--brand-navy);
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+}
+
+.pilo-pick__body { display: grid; gap: 3px; min-width: 0; }
+.pilo-pick__body strong { font-size: var(--text-sm); }
+.pilo-pick__body span { color: var(--ink-secondary); font-size: var(--text-xs); }
+
+.pilo-pick__stage {
+  padding: 3px 10px;
+  color: var(--ink-secondary);
+  background: var(--surface-3);
+  border-radius: var(--radius-pill);
+  font-size: var(--text-2xs);
+  font-weight: 700;
+}
+
+.pilo__empty {
+  max-width: 56ch;
+  color: var(--ink-secondary);
+}
+
+/* Paso 4: listo. */
+.pilo__done {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-4);
+  padding: var(--space-8);
+  text-align: center;
+}
+
+.pilo__done-mark {
+  display: grid;
+  place-items: center;
+  width: 72px;
+  height: 72px;
+  color: var(--status-done);
+  background: var(--status-done-soft);
+  border-radius: var(--radius-pill);
+}
+
+.pilo__done h2 {
+  max-width: 24ch;
+  margin: 0;
+  color: var(--brand-navy);
+  font-family: var(--font-display);
+  font-size: var(--text-3xl);
+  letter-spacing: -0.02em;
+  text-wrap: balance;
+}
+
+.pilo__done h2:focus { outline: none; }
+
+.pilo__done p {
+  max-width: 52ch;
+  margin: 0;
+  color: var(--ink-secondary);
+  line-height: 1.55;
+}
+
+.pilo__done-actions { display: flex; flex-wrap: wrap; justify-content: center; gap: var(--space-2); }
+
+.pilo__foot {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-3);
+  margin-top: auto;
+  padding: var(--space-4) var(--space-8);
+  border-top: 1px solid var(--line);
+}
+
+.pilo__foot > span:first-child {
+  flex: 1 1 240px;
+  color: var(--ink-muted);
+  font-size: var(--text-sm);
+}
+
+.pilo__error {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  color: var(--status-risk);
+  font-size: var(--text-sm);
+  font-weight: 700;
+}
+
+/* --- Pantallas medianas y móvil ------------------------------------------------ */
+
+@media (max-width: 1100px) {
+  .pilo__goals { grid-template-columns: minmax(0, 1fr); }
+  .pilo { grid-template-columns: minmax(260px, 320px) minmax(0, 1fr); }
+  .pilo__side { padding: var(--space-6); gap: var(--space-5); }
+  .pilo__avatar { width: 96px; height: 96px; border-radius: 28px; }
+  .pilo__sizes { grid-template-columns: minmax(0, 1fr); }
+  .pilo-size { flex-direction: row; flex-wrap: wrap; align-items: baseline; padding: var(--space-4) var(--space-5); }
+  .pilo-size__n { font-size: var(--text-3xl); }
+  .pilo-size__hint { flex-basis: 100%; }
+}
+
+@media (max-width: 720px) {
+  .pilo { grid-template-columns: minmax(0, 1fr); grid-template-rows: auto minmax(0, 1fr); }
+  .pilo__side { flex-direction: row; flex-wrap: wrap; align-items: center; gap: var(--space-3); padding: var(--space-4); overflow: visible; }
+  .pilo__close { order: 3; flex-shrink: 0; }
+  .pilo__intro { display: flex; flex: 1; min-width: 0; align-items: center; gap: var(--space-3); }
+  .pilo__avatar { width: 48px; height: 48px; padding: 4px; border-radius: 14px; }
+  .pilo__intro h1 { font-size: var(--text-lg); }
+  .pilo__intro p,
+  .pilo__steps,
+  .pilo__site { display: none; }
+  .pilo__panel { margin: 0; border-radius: var(--radius-xl) var(--radius-xl) 0 0; overflow-y: auto; }
+  .pilo__foot { position: sticky; bottom: 0; background: var(--surface); }
+  .pilo__head { padding: var(--space-5) var(--space-4) 0; }
+  .pilo__head h2 { font-size: var(--text-xl); }
+  .pilo__goals { display: flex; flex-direction: column; gap: var(--space-4); padding: var(--space-4); }
+  .pilo-tile { flex-shrink: 0; min-height: 0; padding-right: var(--space-8); }
+  .pilo__sizes { padding: var(--space-4); }
+  .pilo__prefer { margin: 0 var(--space-4); }
+  .pilo__head--row > div { min-width: 0; }
+  .pilo-chain { width: 100%; }
+  .pilo-chain li { flex: 1; min-width: 0; }
+  .pilo__gap { margin: var(--space-3) var(--space-4) 0; }
+  .pilo__list { padding: var(--space-2) var(--space-4); }
+  .pilo-pick { grid-template-columns: 24px minmax(0, 1fr); }
+  .pilo-pick__code { display: none; }
+  .pilo-pick__stage { grid-column: 2; justify-self: start; }
+  .pilo__foot { padding: var(--space-3) var(--space-4); }
+  .pilo__foot > span:first-child { flex-basis: 100%; }
+  .pilo__foot .button-primary { flex: 1; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pilo-btn:active,
+  .pilo-tile:active,
+  .pilo-size:active { transform: none; }
+  .pilo-btn,
+  .pilo-tile,
+  .pilo-btn__face img { transition: none; }
+  .pilo-btn:hover,
+  .pilo-tile:hover { transform: none; }
+  .pilo-peek i::after { animation: none; transform: none; }
+}
+
+/* --- La cadena por función (paso 3) ------------------------------------------------ */
+
+.pilo-matrix {
+  display: grid;
+  gap: 4px;
+  margin: var(--space-4) var(--space-8) 0;
+}
+
+.pilo-matrix > div {
+  display: grid;
+  grid-template-columns: minmax(120px, 1.2fr) repeat(4, minmax(0, 1fr));
+  gap: 4px;
+  align-items: stretch;
+}
+
+.pilo-matrix__head > span {
+  color: var(--ink-muted);
+  font-size: var(--text-2xs);
+  font-weight: 700;
+  text-align: center;
+}
+
+.pilo-matrix [role="rowheader"] {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  color: var(--brand-navy);
+  font-size: var(--text-xs);
+  font-weight: 800;
+}
+
+.pilo-matrix [role="rowheader"] i {
+  width: 8px;
+  height: 8px;
+  background: var(--fn, var(--ink-faint));
+  border-radius: var(--radius-pill);
+}
+
+.pilo-matrix [role="cell"] {
+  display: grid;
+  place-items: center;
+  min-height: 32px;
+  color: var(--pilo-stage-ink);
+  background: var(--pilo-stage);
+  border-radius: var(--radius-sm);
+  font-size: var(--text-sm);
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+}
+
+.pilo-matrix [role="cell"][data-empty] {
+  color: color-mix(in srgb, var(--status-pending) 72%, var(--ink));
+  background: var(--surface);
+  outline: 1.5px dashed var(--status-pending);
+  outline-offset: -1.5px;
+}
+
+.pilo__gap-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  flex-basis: 100%;
+}
+
+.pilo__note {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-2);
+  margin: var(--space-3) var(--space-8) 0;
+  color: var(--ink-secondary);
+  font-size: var(--text-sm);
+  line-height: 1.5;
+}
+
+.pilo__note svg { flex-shrink: 0; margin-top: 3px; color: var(--status-pending); }
+
+/* --- Mr. Pilo para vicerrectorías ------------------------------------------------ */
+
+.pilo__tabs { margin-top: auto; }
+
+.pilo__tabs button {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  width: 100%;
+  padding: var(--space-2) var(--space-3);
+  color: var(--pilo-stage-muted);
+  text-align: left;
+  background: transparent;
+  border: 0;
+  border-radius: var(--radius-sm);
+  font: inherit;
+  font-size: var(--text-sm);
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color 160ms var(--ease-out), color 160ms var(--ease-out);
+}
+
+.pilo__tabs button > span {
+  display: grid;
+  place-items: center;
+  min-width: 26px;
+  height: 26px;
+  padding: 0 6px;
+  border: 1.5px solid color-mix(in srgb, var(--pilo-stage-muted) 60%, transparent);
+  border-radius: var(--radius-pill);
+  font-size: var(--text-xs);
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+}
+
+.pilo__tabs button[data-state="current"] {
+  color: var(--pilo-stage-ink);
+  background: var(--pilo-stage-line);
+  font-weight: 800;
+}
+
+.pilo__tabs button[data-state="current"] > span {
+  color: var(--pilo-accent-ink);
+  background: var(--pilo-accent);
+  border-color: transparent;
+}
+
+.pilo__tabs button:focus-visible { outline: 3px solid var(--pilo-accent); outline-offset: 2px; }
+
+.pilo-alerts {
+  display: grid;
+  gap: var(--space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.pilo-alerts li {
+  display: grid;
+  grid-template-columns: 104px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  background: var(--surface-2);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+}
+
+.pilo-alerts__sev {
+  justify-self: start;
+  padding: 3px 10px;
+  border-radius: var(--radius-pill);
+  font-size: var(--text-2xs);
+  font-weight: 800;
+}
+
+.pilo-alerts li[data-severity="critica"] .pilo-alerts__sev {
+  color: color-mix(in srgb, var(--status-risk) 80%, var(--ink));
+  background: var(--status-risk-soft);
+}
+
+.pilo-alerts li[data-severity="importante"] .pilo-alerts__sev {
+  color: color-mix(in srgb, var(--status-pending) 72%, var(--ink));
+  background: var(--status-pending-soft);
+}
+
+.pilo-alerts li[data-severity="oportunidad"] .pilo-alerts__sev {
+  color: var(--brand-navy);
+  background: var(--brand-blue-soft);
+}
+
+.pilo-alerts__body { display: grid; gap: 2px; min-width: 0; font-size: var(--text-sm); }
+.pilo-alerts__body span { color: var(--ink-secondary); font-size: var(--text-xs); line-height: 1.5; }
+
+.pilo-idea,
+.pilo-usage {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-1);
+  border-top: 1px solid var(--line);
+}
+
+.pilo-usage { grid-template-columns: 52px minmax(0, 1fr) auto; }
+
+.pilo-pick__body .pilo-usage__flag {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-1);
+  color: color-mix(in srgb, var(--status-pending) 60%, var(--ink));
+}
+
+.pilo-usage__flag svg { flex-shrink: 0; margin-top: 2px; }
+
+.pilo-usage__mandatory {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  color: var(--ink-secondary);
+  font-size: var(--text-xs);
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.pilo-usage__mandatory input { width: 18px; height: 18px; accent-color: var(--brand-blue); }
+
+/* --- Ajustes de Mr. Pilo (Planeación) -------------------------------------------- */
+
+.pilo-settings {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-6);
+  padding-bottom: var(--space-8);
+}
+
+.pilo-settings__block {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  padding: var(--space-5) var(--space-6);
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+}
+
+.pilo-settings__block > header h2 {
+  margin: 0;
+  color: var(--brand-navy);
+  font-family: var(--font-display);
+  font-size: var(--text-lg);
+}
+
+.pilo-settings__block > header p {
+  max-width: 76ch;
+  margin: var(--space-1) 0 0;
+  color: var(--ink-secondary);
+  font-size: var(--text-sm);
+  line-height: 1.5;
+}
+
+.pilo-settings__weights {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  gap: var(--space-3);
+}
+
+.pilo-weight {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 84px;
+  grid-template-rows: auto auto;
+  column-gap: var(--space-3);
+  align-items: center;
+  padding: var(--space-3) var(--space-4);
+  background: var(--surface-2);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+}
+
+.pilo-weight__label { display: grid; gap: 2px; grid-row: 1 / 3; }
+.pilo-weight__label strong { color: var(--ink); font-size: var(--text-sm); }
+.pilo-weight__label small { color: var(--ink-secondary); font-size: var(--text-xs); line-height: 1.4; }
+
+.pilo-weight input {
+  width: 100%;
+  min-height: 36px;
+  padding: 0 var(--space-2);
+  color: var(--brand-navy);
+  text-align: right;
+  background: var(--surface);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-sm);
+  font: inherit;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+}
+
+.pilo-weight__default {
+  color: var(--ink-muted);
+  font-size: var(--text-2xs);
+  text-align: right;
+}
+
+.pilo-weight__default[data-changed] { color: var(--brand-blue); font-weight: 700; }
+
+.pilo-settings__codes .imp-chip { max-width: 100%; }
+
+@media (max-width: 720px) {
+  .pilo-matrix { margin: var(--space-3) var(--space-4) 0; }
+  .pilo-matrix > div { grid-template-columns: 88px repeat(4, minmax(0, 1fr)); }
+  .pilo-matrix__head > span { font-size: 0.625rem; }
+  .pilo__note { margin: var(--space-3) var(--space-4) 0; }
+  .pilo-alerts li { grid-template-columns: minmax(0, 1fr); }
+  .pilo-usage { grid-template-columns: minmax(0, 1fr); }
+  .pilo-usage .pilo-pick__code { display: none; }
+}
+
+.pilo-settings__block > .imp-import__file { align-self: flex-start; }

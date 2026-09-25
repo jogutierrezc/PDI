@@ -261,7 +261,7 @@ function PersonDetail({
   const initial = useMemo(
     () =>
       memberships.map((m) =>
-        newDraft({ unitId: m.unitId, boardRole: m.role, title: m.title }),
+        newDraft({ unitId: m.unitId, boardRole: m.role, title: m.title, campusId: m.campusId }),
       ),
     [memberships],
   );
@@ -269,7 +269,7 @@ function PersonDetail({
   // Tras guardar, la lista vuelve de la base: se toma como punto de partida.
   // Solo si cambió de verdad, para no borrar lo que se está editando cuando
   // la consulta se repite al volver a la pestaña.
-  const signature = JSON.stringify(memberships.map((m) => [m.unitId, m.role, m.title]));
+  const signature = JSON.stringify(memberships.map((m) => [m.unitId, m.role, m.title, m.campusId]));
   useEffect(() => setDrafts(initial), [signature]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const globalRoles = roles;

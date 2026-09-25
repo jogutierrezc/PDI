@@ -43,6 +43,7 @@ export type AdminSection =
   | "cifras"
   | "observatorio"
   | "tableros"
+  | "impacto"
   | "transfer"
   | "institution";
 
@@ -56,7 +57,7 @@ interface NavItem {
 }
 
 interface NavGroup {
-  id: "planeacion" | "pdi" | "cifras" | "observatorio" | "tableros" | "sistema";
+  id: "planeacion" | "pdi" | "cifras" | "observatorio" | "impacto" | "tableros" | "sistema";
   label: string;
   /** Ícono y nombre corto: el riel solo tiene 78 px, ahí no cabe el rótulo largo. */
   icon: IconName;
@@ -113,6 +114,18 @@ const navigation: NavGroup[] = [
     label: "Observatorio de Analítica",
     items: [
       { id: "observatorio", label: "Taller del Observatorio", icon: "spark-chart", to: "/admin/observatorio", minimum: "consulta" },
+    ],
+  },
+  {
+    // La medición del impacto de las tres funciones sustantivas: las
+    // vicerrectorías definen y reportan, los programas eligen y aportan. Lo
+    // que ve cada quien lo reparte su pertenencia, no este menú.
+    id: "impacto",
+    icon: "shield",
+    short: "Impacto",
+    label: "Indicadores de Impacto",
+    items: [
+      { id: "impacto", label: "Indicadores de impacto", icon: "spark-chart", to: "/admin/impacto", minimum: "consulta" },
     ],
   },
   {
@@ -180,6 +193,11 @@ function initials(name: string, email: string) {
   return (first + last).toUpperCase();
 }
 
+/** El nombre de pila para la barra de menús, como en la de los portales. */
+function firstName(name: string, email: string) {
+  return name.trim().split(/\s+/)[0] || email.split("@")[0];
+}
+
 function readStored<T>(key: string, fallback: T): T {
   try {
     const raw = window.localStorage.getItem(key);
@@ -204,6 +222,9 @@ interface AdminShellProps {
   description?: string;
   /** Botonera de la cabecera. */
   actions?: ReactNode;
+  /** Riel de la pantalla: sus vistas o estaciones, en el borde bajo de la
+      cabecera (ver AdminRail). Así no ocupan una fila propia en el contenido. */
+  rail?: ReactNode;
   /** Barra fija inferior de guardado. */
   footer?: ReactNode;
   children: ReactNode;
@@ -215,6 +236,7 @@ export function AdminShell({
   title,
   description,
   actions,
+  rail,
   footer,
   children,
 }: AdminShellProps) {
@@ -263,7 +285,8 @@ export function AdminShell({
     setMenuStyle(
       bar === "menus"
         ? {
-            top: clamp(rect.bottom + 8, window.innerHeight - 120),
+            // Cuelga del borde de la barra, como el de los portales, no del botón.
+            top: clamp((sidebarRef.current?.getBoundingClientRect().bottom ?? rect.bottom) + 6, window.innerHeight - 120),
             right: clamp(window.innerWidth - rect.right, window.innerWidth - MENU_WIDTH - 8),
           }
         : {
@@ -419,6 +442,7 @@ export function AdminShell({
                   id={`admin-nav-${navGroup.id}`}
                   aria-expanded={isOpen}
                   aria-current={bar === "riel" && holdsCurrent ? "true" : undefined}
+                  data-current={(bar === "menus" && holdsCurrent) || undefined}
                   aria-controls={`admin-nav-${navGroup.id}-lista`}
                   data-tip={navGroup.label}
                   onClick={(event) => {
@@ -430,7 +454,7 @@ export function AdminShell({
                     if (bar === "menus") {
                       const rect = event.currentTarget.getBoundingClientRect();
                       setPanelStyle({
-                        top: Math.round(rect.bottom + 8),
+                        top: Math.round((sidebarRef.current?.getBoundingClientRect().bottom ?? rect.bottom) + 6),
                         left: Math.round(Math.max(8, Math.min(rect.left, window.innerWidth - PANEL_WIDTH - 8))),
                       });
                     }
@@ -441,6 +465,8 @@ export function AdminShell({
                 >
                   <Icon name={navGroup.icon} size={19} className="admin-nav__group-icon" />
                   <span className="admin-nav__group-name">{bar === "riel" ? navGroup.short : navGroup.label}</span>
+                  {/* En la barra de menús, si el ancho no da para los rótulos largos, entran los cortos. */}
+                  {bar === "menus" && <span className="admin-nav__group-short">{navGroup.short}</span>}
                   {bar === "lateral" && isFolded && (
                     <span className="admin-nav__group-count">
                       {holdsCurrent && <i className="admin-nav__here" aria-hidden="true" />}
@@ -490,6 +516,17 @@ export function AdminShell({
             una pantalla de trabajo: salir a los portales, la ayuda, la barra y
             el cierre de sesión. */}
         <div className="admin-sidebar__foot">
+          {/* En la barra de menús el tema sube a la barra, como en los portales. */}
+          {bar === "menus" && (
+            <button
+              type="button"
+              className="admin-bar-icon"
+              onClick={toggle}
+              aria-label={resolved === "dark" ? "Cambiar a tema claro" : "Cambiar a tema oscuro"}
+            >
+              <Icon name={resolved === "dark" ? "sun" : "moon"} size={17} />
+            </button>
+          )}
           <button
             type="button"
             className="admin-profile"
@@ -505,6 +542,7 @@ export function AdminShell({
             </span>
             <span className="admin-profile__id">
               <span className="admin-identity__name">{profile ? profile.full_name || profile.email : "Sesión"}</span>
+              <span className="admin-identity__first">{profile ? firstName(profile.full_name ?? "", profile.email ?? "") : "Sesión"}</span>
               <span className="admin-identity__role">{profile ? roleLabels[profile.role] : ""}</span>
             </span>
             <Icon name="chevron-down" size={14} className="admin-nav__chevron" />
@@ -635,54 +673,65 @@ export function AdminShell({
       )}
 
       <div className="admin-body">
-        <header ref={topbarRef} className="admin-topbar">
-          <button
-            className="icon-button admin-nav-toggle"
-            type="button"
-            aria-expanded={navOpen}
-            aria-controls="admin-nav"
-            aria-label={navOpen ? "Cerrar menú" : "Abrir menú"}
-            onClick={() => setNavOpen((open) => !open)}
-          >
-            <Icon name={navOpen ? "close" : "menu"} size={18} />
-          </button>
-          {navMode === "oculto" && (
+        {/* Una sola línea: portal › título · de qué se trata, y las acciones. El
+            riel de la pantalla, si lo trae, cierra la cabecera por abajo. Antes
+            eran cuatro filas —ruta, título, descripción y, más abajo, las
+            pestañas— y se comían el alto que la rejilla necesita. */}
+        <header ref={topbarRef} className="admin-topbar" data-rail={rail ? "" : undefined}>
+          <div className="admin-topbar__row">
             <button
-              className="icon-button admin-nav-restore"
+              className="icon-button admin-nav-toggle"
               type="button"
+              aria-expanded={navOpen}
               aria-controls="admin-nav"
-              aria-label="Mostrar el menú"
-              title="Mostrar el menú"
-              onClick={() => setNavMode("completo")}
+              aria-label={navOpen ? "Cerrar menú" : "Abrir menú"}
+              onClick={() => setNavOpen((open) => !open)}
             >
-              <Icon name="sidebar" size={18} />
+              <Icon name={navOpen ? "close" : "menu"} size={18} />
             </button>
-          )}
+            {navMode === "oculto" && (
+              <button
+                className="icon-button admin-nav-restore"
+                type="button"
+                aria-controls="admin-nav"
+                aria-label="Mostrar el menú"
+                title="Mostrar el menú"
+                onClick={() => setNavMode("completo")}
+              >
+                <Icon name="sidebar" size={18} />
+              </button>
+            )}
 
-          <div className="admin-topbar__copy">
-            {/* Ruta: portal › pantalla. Sustituye al rótulo suelto sobre el título. */}
-            <nav className="admin-crumbs" aria-label="Ruta">
-              <ol>
-                <li>{group?.label ?? kicker}</li>
-                {group && group.id !== "cifras" && group.id !== "observatorio" && group.id !== "tableros" && kicker && kicker !== group.label && <li>{kicker}</li>}
-                <li aria-current="page">{title}</li>
-              </ol>
-            </nav>
-            <h1>{title}</h1>
-            {description && <p>{description}</p>}
-          </div>
+            <div className="admin-topbar__copy">
+              {/* La ruta lleva hasta el título, que es su último tramo. */}
+              <nav className="admin-crumbs" aria-label="Ruta">
+                <ol>
+                  <li>{group?.label ?? kicker}</li>
+                  {group && group.id !== "cifras" && group.id !== "observatorio" && group.id !== "impacto" && kicker && kicker !== group.label && <li>{kicker}</li>}
+                </ol>
+              </nav>
+              <h1>{title}</h1>
+              {/* Una línea, no un párrafo: el texto entero queda en el título del elemento. */}
+              {description && (
+                <p className="admin-topbar__meta" title={description}>
+                  {description}
+                </p>
+              )}
+            </div>
 
-          <div className="admin-topbar__actions">
-            {actions}
-            <button
-              className="icon-button theme-toggle"
-              type="button"
-              onClick={toggle}
-              aria-label={resolved === "dark" ? "Cambiar a tema claro" : "Cambiar a tema oscuro"}
-            >
-              <Icon name={resolved === "dark" ? "sun" : "moon"} size={17} />
-            </button>
+            <div className="admin-topbar__actions">
+              {actions}
+              <button
+                className="icon-button theme-toggle"
+                type="button"
+                onClick={toggle}
+                aria-label={resolved === "dark" ? "Cambiar a tema claro" : "Cambiar a tema oscuro"}
+              >
+                <Icon name={resolved === "dark" ? "sun" : "moon"} size={17} />
+              </button>
+            </div>
           </div>
+          {rail && <div className="admin-topbar__rail">{rail}</div>}
         </header>
 
         <main className="admin-main" id="admin-contenido">
@@ -692,6 +741,50 @@ export function AdminShell({
         {footer && <footer className="admin-savebar">{footer}</footer>}
       </div>
     </div>
+  );
+}
+
+/**
+ * El riel de una pantalla: sus vistas o estaciones, colgadas del borde bajo de
+ * la cabecera. Va en la prop `rail` de AdminShell.
+ */
+export function AdminRail({ label, children }: { label: string; children: ReactNode }) {
+  return (
+    <nav className="admin-rail" aria-label={label}>
+      {children}
+    </nav>
+  );
+}
+
+export function AdminRailTab({
+  current,
+  count,
+  to,
+  onSelect,
+  children,
+}: {
+  current: boolean;
+  /** Cuántos hay detrás, si importa saberlo antes de entrar. */
+  count?: number;
+  /** Con dirección es un enlace; si no, un botón que cambia la vista. */
+  to?: string;
+  onSelect?: () => void;
+  children: ReactNode;
+}) {
+  const content = (
+    <>
+      {children}
+      {count !== undefined && count > 0 && <span className="admin-rail__count">{count}</span>}
+    </>
+  );
+  return to ? (
+    <Link to={to} className="admin-rail__tab" aria-current={current ? "page" : undefined}>
+      {content}
+    </Link>
+  ) : (
+    <button type="button" className="admin-rail__tab" aria-current={current ? "page" : undefined} onClick={onSelect}>
+      {content}
+    </button>
   );
 }
 

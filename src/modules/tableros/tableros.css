@@ -23,48 +23,6 @@
   min-width: 0;
 }
 
-/* --- Las vistas de una unidad y las estaciones del taller -------------------- */
-
-.tb__views {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--space-5);
-  border-bottom: 1px solid var(--line);
-}
-
-.tb__view {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-2);
-  padding: var(--space-3) 0;
-  border: 0;
-  border-bottom: 2px solid transparent;
-  margin-bottom: -1px;
-  background: none;
-  color: var(--ink-secondary);
-  font: inherit;
-  font-weight: 600;
-  cursor: pointer;
-}
-
-.tb__view[aria-current="true"] {
-  border-bottom-color: var(--brand-blue);
-  color: var(--brand-navy);
-  font-weight: 700;
-}
-
-.tb__view:focus-visible { outline: 2px solid var(--brand-blue); outline-offset: 2px; }
-
-.tb__count {
-  padding: 1px var(--space-2);
-  border-radius: 999px;
-  background: var(--surface-3);
-  color: var(--ink-secondary);
-  font-size: var(--text-xs);
-  font-weight: 700;
-  font-variant-numeric: tabular-nums;
-}
-
 .tb-pending { display: inline-flex; align-items: center; gap: var(--space-2); }
 
 /* --- El árbol ---------------------------------------------------------------- */

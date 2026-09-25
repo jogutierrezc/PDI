@@ -31,6 +31,8 @@ export interface Membership {
   role: UnitRole;
   /** Cargo (0074); vacío si la base aún no lo tiene. */
   title: string;
+  /** Sede a la que se limita (0078); null = todas. */
+  campusId: string | null;
 }
 
 /** Lo que se envía para una persona: unidad y, si se elige, su función en ella. */
@@ -39,12 +41,22 @@ export interface MembershipInput {
   role?: UnitRole | null;
   /** Cargo; nulo conserva el que tenga (0074). */
   title?: string | null;
+  /** Sede (0082); null = todas. Sin la clave, conserva la que tenga. */
+  campus_id?: string | null;
+}
+
+/** En qué sedes se ofrece cada programa, con el nombre de la sede. */
+export interface ProgramOffer {
+  campuses: { id: string; name: string }[];
+  /** Programa → sedes activas donde se ofrece. */
+  byProgram: Map<string, string[]>;
 }
 
 export const peopleKeys = {
   all: [...keys.all, "personas"] as const,
   units: () => [...peopleKeys.all, "unidades"] as const,
   memberships: () => [...peopleKeys.all, "pertenencias"] as const,
+  offer: () => [...peopleKeys.all, "oferta"] as const,
 };
 
 type Row<T> = { data: T | null; error: { message: string; code?: string; details?: string; hint?: string } | null };
@@ -77,7 +89,7 @@ export function useMemberships() {
     queryFn: async (): Promise<Membership[]> => {
       const rows = unwrap(
         (await supabase.from("unit_members").select("*")) as Row<
-          { id: string; unit_id: string; profile_id: string; role: UnitRole; title?: string | null }[]
+          { id: string; unit_id: string; profile_id: string; role: UnitRole; title?: string | null; campus_id?: string | null }[]
         >,
       );
       return rows.map((m) => ({
@@ -86,8 +98,29 @@ export function useMemberships() {
         profileId: m.profile_id,
         role: m.role,
         title: m.title ?? "",
+        campusId: m.campus_id ?? null,
       }));
     },
+  });
+}
+
+/** Las sedes y la oferta por sede, para limitar una pertenencia a un programa. */
+export function useProgramOffer() {
+  return useQuery({
+    queryKey: peopleKeys.offer(),
+    queryFn: async (): Promise<ProgramOffer> => {
+      const [campuses, offer] = await Promise.all([
+        supabase.from("campuses").select("id,name").order("position"),
+        supabase.from("program_campuses").select("program_id,campus_id,active"),
+      ]);
+      const byProgram = new Map<string, string[]>();
+      for (const row of unwrap(offer as Row<{ program_id: string; campus_id: string; active: boolean | null }[]>)) {
+        if (row.active === false) continue;
+        byProgram.set(row.program_id, [...(byProgram.get(row.program_id) ?? []), row.campus_id]);
+      }
+      return { campuses: unwrap(campuses as Row<{ id: string; name: string }[]>), byProgram };
+    },
+    staleTime: 60 * 1000,
   });
 }
 

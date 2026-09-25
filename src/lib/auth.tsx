@@ -45,6 +45,7 @@ export const SCREEN_PATHS: Record<AdminScreen, string> = {
   cifras: "/admin/udes-en-cifras",
   observatorio: "/admin/observatorio",
   tableros: "/admin/tableros",
+  impacto: "/admin/impacto",
   structure: "/admin/estructura",
   parameters: "/admin/parametros",
   development: "/admin/desarrollo",
@@ -231,7 +232,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         return false;
       }
       // Mis Tableros se gana perteneciendo a una unidad, no marcándolo aparte.
-      if (screen === "tableros" && inAnyUnit) return true;
+      // Mis Tableros e Impacto se ganan perteneciendo a una unidad: lo que se ve
+      // dentro lo recorta la base según esa pertenencia.
+      if ((screen === "tableros" || screen === "impacto") && inAnyUnit) return true;
       if (!access) return true;
       return access.role.all_screens || access.role.screens.includes(screen);
     },

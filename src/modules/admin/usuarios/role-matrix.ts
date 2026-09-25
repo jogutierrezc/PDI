@@ -27,7 +27,7 @@ import type { AccessRole, AdminScreen, AppRole } from "../../../types/database";
 import { UNIT_ROLE } from "../../tableros/model";
 
 export type Level = "none" | "ver" | "editar" | "administrar";
-export type ModuleId = "portal" | "plan" | "cifras" | "observatorio" | "tableros" | "sistema";
+export type ModuleId = "portal" | "plan" | "cifras" | "observatorio" | "impacto" | "tableros" | "sistema";
 export type TemplateId = "consulta" | "editor" | "administrador" | "personalizada";
 export type BoardRole = "visor" | "editor" | "jefe";
 
@@ -97,6 +97,14 @@ export const MODULES: ModuleDef[] = [
     levels: {
       ver: { hint: "Ve los temas y boletines en preparación.", needs: "consulta" },
       editar: { hint: "Prepara y publica temas y boletines.", needs: "planeacion" },
+    },
+  },
+  {
+    id: "impacto",
+    label: "Indicadores de Impacto",
+    screens: [{ id: "impacto", label: "Indicadores de impacto", note: "vicerrectorías, oficinas y programas lo ven por su pertenencia" }],
+    levels: {
+      ver: { hint: "Consulta las fichas y cifras de todas las funciones (con capacidad de Planeación).", needs: "consulta" },
     },
   },
   {
@@ -191,8 +199,8 @@ export function capacityOf(matrix: Matrix): AppRole {
 export function effectiveLevel(matrix: Matrix, id: ModuleId): Level {
   const choice = matrix.modules[id];
   if (choice.level === "none" || choice.screens.length === 0) return "none";
-  // Mis Tableros no depende de la capacidad: el trabajo se da por unidad.
-  if (id === "tableros") return "ver";
+  // Mis Tableros e Impacto no dependen de la capacidad: el trabajo se da por unidad.
+  if (id === "tableros" || id === "impacto") return "ver";
   const capacity = capacityOf(matrix);
   const module = moduleOf(id);
   let best: Level = choice.level;
@@ -246,7 +254,7 @@ export function decompile(role: Pick<AccessRole, "base_role" | "screens" | "all_
   // esa capacidad le permite. Es lo que la base hace cumplir.
   const capacity = role.base_role;
   for (const module of MODULES) {
-    if (modules[module.id].level === "none" || module.id === "tableros") continue;
+    if (modules[module.id].level === "none" || module.id === "tableros" || module.id === "impacto") continue;
     let best: Level = "ver";
     for (const [level, def] of Object.entries(module.levels) as [Exclude<Level, "none">, { needs: AppRole }][]) {
       if (module.id === "cifras" && level === "administrar" && !role.all_reports) continue;
@@ -283,6 +291,7 @@ export function templateMatrix(template: Exclude<TemplateId, "personalizada">): 
     modules.plan = full("plan", "administrar");
     modules.cifras = full("cifras", "administrar");
     modules.observatorio = full("observatorio", "editar");
+    modules.impacto = full("impacto", "ver");
     modules.tableros = full("tableros", "ver");
     modules.sistema = full("sistema", "ver");
     return base;

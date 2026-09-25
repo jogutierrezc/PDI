@@ -47,6 +47,7 @@ export type AdminScreen =
   | "cifras"
   | "observatorio"
   | "tableros"
+  | "impacto"
   | "structure"
   | "parameters"
   | "development"

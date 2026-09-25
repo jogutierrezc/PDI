@@ -29,8 +29,12 @@ describe("plantillas", () => {
     expect(compile(tpl("administrador"))).toMatchObject({ base_role: "admin", all_screens: true, all_reports: true });
   });
 
-  it("ya no hay módulo de Impacto en la matriz", () => {
-    expect(Object.keys(tpl("administrador").modules)).not.toContain("impacto");
+  // Impacto volvió rediseñado (0078): como Mis Tableros, se ve por pertenencia
+  // y en la matriz solo se abre para consultar.
+  it("Impacto está en la matriz y no sube de «ver» por la capacidad del rol", () => {
+    const admin = tpl("administrador");
+    expect(admin.modules.impacto).toEqual({ level: "ver", screens: ["impacto"] });
+    expect(effectiveLevel(admin, "impacto")).toBe("ver");
   });
 });
 

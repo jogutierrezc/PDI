@@ -116,21 +116,36 @@
   min-width: 0;
 }
 
+/* Cabecera compacta: una línea de 56 px (ruta › título · de qué se trata |
+   acciones) y, si la pantalla lo trae, su riel de vistas en el borde bajo. Lo
+   que antes eran cuatro filas cabe en una, y el alto queda para trabajar. */
 .admin-topbar {
+  --topbar-pad: var(--space-7);
   position: sticky;
   top: 0;
   z-index: var(--z-sticky);
-  display: flex;
-  align-items: flex-start;
-  gap: var(--space-4);
-  padding: var(--space-6) var(--space-7);
+  display: grid;
   background: var(--surface-glass);
   border-bottom: 1px solid var(--line);
   backdrop-filter: blur(14px);
   -webkit-backdrop-filter: blur(14px);
 }
 
+.admin-topbar__row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  min-height: 56px;
+  padding: var(--space-2) var(--topbar-pad);
+}
+
+/* Con riel, la línea de arriba se acerca a él: son una sola pieza. */
+.admin-topbar[data-rail] .admin-topbar__row { padding-bottom: 0; }
+
 .admin-topbar__copy {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-2);
   flex: 1 1 auto;
   min-width: 0;
 }
@@ -145,26 +160,103 @@
 }
 
 .admin-topbar h1 {
-  margin-top: var(--space-2);
-  font-size: var(--text-xl);
+  flex: 0 1 auto;
+  min-width: 0;
+  margin: 0;
+  overflow: hidden;
+  font-size: var(--text-lg);
+  line-height: 1.25;
+  letter-spacing: -0.018em;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
-.admin-topbar p {
-  margin-top: var(--space-2);
-  max-width: var(--measure);
-  color: var(--ink-secondary);
+/* De qué se trata, en una línea que cede primero cuando falta ancho. */
+.admin-topbar .admin-topbar__meta {
+  flex: 0 10 auto;
+  min-width: 4ch;
+  margin: 0 0 0 var(--space-2);
+  padding-left: var(--space-3);
+  overflow: hidden;
+  border-left: 1px solid var(--line-strong);
+  color: var(--ink-muted);
   font-size: var(--text-sm);
-  line-height: var(--leading-normal);
+  line-height: 1.3;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .admin-topbar__actions {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
+  justify-content: flex-end;
   gap: var(--space-2);
   flex: 0 1 auto;
   min-width: 0;
 }
+
+/* --- Riel de la pantalla ------------------------------------------------------- */
+/* Las vistas de la pantalla, con la misma voz que la barra de menús: negrita y
+   subrayado azul en la actual. Si no caben, se desplazan dentro del riel. */
+.admin-topbar__rail {
+  padding: 0 var(--topbar-pad);
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.admin-topbar__rail::-webkit-scrollbar { display: none; }
+
+.admin-rail {
+  display: flex;
+  gap: 2px;
+  margin-left: -12px;
+}
+
+.admin-rail__tab {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  gap: var(--space-2);
+  height: 40px;
+  padding: 0 12px;
+  color: var(--ink-secondary);
+  background: transparent;
+  border: 0;
+  border-radius: 8px 8px 0 0;
+  font: inherit;
+  font-size: var(--text-sm);
+  font-weight: 700;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: background-color var(--dur-fast) ease, color var(--dur-fast) ease, box-shadow var(--dur-fast) ease;
+}
+
+.admin-rail__tab[aria-current="page"] {
+  color: var(--brand-blue-strong);
+  box-shadow: inset 0 -2px 0 var(--brand-blue);
+}
+
+.admin-rail__tab:focus-visible { outline: 2px solid var(--brand-blue); outline-offset: -2px; }
+
+@media (hover: hover) and (pointer: fine) {
+  .admin-rail__tab:hover { color: var(--ink); background: var(--surface-2); }
+  .admin-rail__tab[aria-current="page"]:hover { color: var(--brand-blue-strong); }
+}
+
+.admin-rail__count {
+  min-width: 20px;
+  padding: 1px 6px;
+  color: var(--ink-secondary);
+  background: var(--surface-3);
+  border-radius: 999px;
+  font-size: var(--text-xs);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  text-align: center;
+}
+
+.admin-rail__tab[aria-current="page"] .admin-rail__count { color: var(--brand-blue-strong); background: var(--brand-blue-soft); }
 
 .admin-nav-toggle {
   display: none;
@@ -991,11 +1083,12 @@
     display: grid;
   }
 
-  .admin-topbar,
   .admin-main,
   .admin-savebar {
     padding-inline: var(--gutter);
   }
+
+  .admin-topbar { --topbar-pad: var(--gutter); }
 }
 
 @media (max-width: 640px) {
@@ -1007,9 +1100,11 @@
     grid-column: 1 / -1;
   }
 
-  .admin-topbar {
-    flex-wrap: wrap;
-  }
+  /* En el teléfono la ruta cede su sitio y la descripción baja a su línea. */
+  .admin-topbar__row { flex-wrap: wrap; row-gap: var(--space-1); }
+  .admin-topbar__copy { flex-wrap: wrap; flex-basis: calc(100% - 56px); }
+  .admin-crumbs { display: none; }
+  .admin-topbar .admin-topbar__meta { flex-basis: 100%; margin-left: 0; padding-left: 0; border-left: 0; }
 }
 
 /* =============================================================================
@@ -1880,16 +1975,25 @@ fieldset.admin-field legend {
 
 
 
+/* En la línea de la cabecera: la ruta nunca parte en dos ni le quita el sitio
+   al título; si es larga, se corta ella. */
+.admin-crumbs {
+  flex: 0 1 auto;
+  min-width: 0;
+  max-width: 42%;
+  overflow: hidden;
+}
+
 .admin-crumbs ol {
   display: flex;
-  flex-wrap: wrap;
-  gap: var(--space-1) var(--space-2);
+  gap: var(--space-2);
   margin: 0;
   padding: 0;
   list-style: none;
   color: var(--ink-muted);
-  font-size: var(--text-xs);
+  font-size: var(--text-sm);
   font-weight: 600;
+  white-space: nowrap;
 }
 
 .admin-crumbs li {
@@ -1898,8 +2002,9 @@ fieldset.admin-field legend {
   gap: var(--space-2);
 }
 
-/* Separador dibujado: un chevron de trazo, no un carácter suelto. */
-.admin-crumbs li + li::before {
+/* Separador dibujado: un chevron de trazo, no un carácter suelto. Va tras
+   cada tramo, porque el último tramo de la ruta es el título. */
+.admin-crumbs li::after {
   content: "";
   width: 5px;
   height: 5px;
@@ -2324,6 +2429,11 @@ fieldset.admin-field legend {
   .admin-menu .admin-menu__out:hover { color: var(--status-risk); background: rgba(208, 59, 59, 0.08); }
 }
 
+/* Solo existen para la barra de menús (ver abajo). */
+.admin-nav__group-short,
+.admin-identity__first,
+.admin-bar-icon { display: none; }
+
 /* El ícono del grupo solo se usa en el riel; en las otras dos manda el rótulo. */
 .admin-nav__group-icon { display: none; }
 .admin-nav__rail-here { display: none; }
@@ -2337,15 +2447,19 @@ fieldset.admin-field legend {
     grid-template-rows: auto minmax(0, 1fr);
   }
 
+  /* Se viste como la barra de los portales (site-header.css): 72 px, marca con
+     filete, rótulos en negrita con subrayado azul y botones cuadrados de 44 px.
+     Quien pasa del portal a la intranet no cambia de barra, cambia de menú. */
   .admin-shell[data-bar="menus"] .admin-sidebar {
     position: sticky;
     top: 0;
     z-index: var(--z-header);
     height: auto;
+    min-height: 72px;
     flex-direction: row;
     align-items: center;
-    gap: var(--space-4);
-    padding: var(--space-2) var(--space-4);
+    gap: var(--space-5);
+    padding: 0 clamp(16px, 3.5vw, 56px);
     overflow: visible;
     border-right: 0;
     border-bottom: 1px solid var(--line);
@@ -2353,31 +2467,74 @@ fieldset.admin-field legend {
 
   .admin-shell[data-bar="menus"] .admin-sidebar__head { flex: none; gap: var(--space-3); }
   .admin-shell[data-bar="menus"] .admin-brand {
-    grid-auto-flow: column;
+    display: flex;
     align-items: center;
-    gap: var(--space-3);
-    padding: var(--space-1) var(--space-2);
+    gap: var(--space-4);
+    padding: 0;
+    color: inherit;
+    text-decoration: none;
   }
-  .admin-shell[data-bar="menus"] .admin-brand img { height: 26px; }
-  .admin-shell[data-bar="menus"] .admin-brand small { display: none; }
-  .admin-shell[data-bar="menus"] .admin-brand strong { white-space: nowrap; }
+  .admin-shell[data-bar="menus"] .admin-brand img { height: 36px; }
+  .admin-shell[data-bar="menus"] .admin-brand > span {
+    display: grid;
+    gap: 1px;
+    padding-left: var(--space-4);
+    border-left: 1px solid var(--line-strong);
+  }
+  .admin-shell[data-bar="menus"] .admin-brand strong {
+    font-size: 1.12rem;
+    font-weight: 600;
+    line-height: 1.1;
+    white-space: nowrap;
+  }
+  .admin-shell[data-bar="menus"] .admin-brand small { font-weight: 600; white-space: nowrap; }
   .admin-shell[data-bar="menus"] .admin-sidebar__fold { display: none; }
 
   .admin-shell[data-bar="menus"] .admin-nav {
     display: flex;
-    flex: 1 1 auto;
-    flex-wrap: wrap;
+    flex: 0 1 auto;
     align-items: center;
-    gap: 1px;
+    gap: 2px;
     min-height: 0;
-    margin-inline: 0;
+    margin: 0 0 0 auto;
     padding-inline: 0;
     overflow: visible;
   }
 
   .admin-shell[data-bar="menus"] .admin-nav__group { position: relative; display: block; }
 
+  .admin-shell[data-bar="menus"] .admin-nav__group-label {
+    gap: 6px;
+    width: auto;
+    height: 44px;
+    min-height: 44px;
+    padding: 0 12px;
+    color: var(--ink);
+    border-radius: 10px;
+    font-size: var(--text-sm);
+    font-weight: 700;
+    letter-spacing: 0;
+    white-space: nowrap;
+    transition: background-color var(--dur-fast) ease, color var(--dur-fast) ease;
+  }
+  .admin-shell[data-bar="menus"] .admin-nav__group-name { flex: none; }
+  .admin-shell[data-bar="menus"] .admin-nav__chevron { color: currentColor; transform: none; }
+  .admin-shell[data-bar="menus"] .admin-nav__group-label[data-current] {
+    color: var(--brand-blue-strong);
+    box-shadow: inset 0 -2px 0 var(--brand-blue);
+    border-radius: 10px 10px 0 0;
+  }
+  .admin-shell[data-bar="menus"] .admin-nav__group-label[aria-expanded="true"] {
+    color: var(--brand-blue-strong);
+    background: var(--brand-blue-soft);
+    box-shadow: inset 0 -3px 0 var(--brand-blue);
+  }
+  .admin-shell[data-bar="menus"] .admin-nav__group-label[aria-expanded="true"] .admin-nav__chevron { transform: rotate(180deg); }
+
   .admin-shell[data-bar="menus"] .admin-sidebar__foot {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
     flex: none;
     position: relative;
     margin-top: 0;
@@ -2385,8 +2542,58 @@ fieldset.admin-field legend {
     border-top: 0;
   }
 
-  .admin-shell[data-bar="menus"] .admin-profile { width: auto; }
-  .admin-shell[data-bar="menus"] .admin-profile__id { display: none; }
+  .admin-shell[data-bar="menus"] .admin-bar-icon {
+    display: grid;
+    place-items: center;
+    width: 44px;
+    height: 44px;
+    color: var(--brand-navy);
+    background: var(--surface);
+    border: 1px solid var(--line-strong);
+    border-radius: 10px;
+    cursor: pointer;
+  }
+
+  /* El perfil, como el botón de sesión de los portales: iniciales y nombre de pila. */
+  .admin-shell[data-bar="menus"] .admin-profile {
+    gap: var(--space-2);
+    width: auto;
+    height: 44px;
+    padding: 0 var(--space-3) 0 6px;
+    color: var(--ink);
+    background: var(--surface);
+    border: 1px solid var(--line-strong);
+    border-radius: 10px;
+    font-size: var(--text-sm);
+    font-weight: 700;
+    transition: background-color var(--dur-fast) ease, border-color var(--dur-fast) ease;
+  }
+  .admin-shell[data-bar="menus"] .admin-profile[aria-expanded="true"] { background: var(--brand-blue-soft); border-color: var(--brand-blue); }
+  .admin-shell[data-bar="menus"] .admin-profile__av { width: 32px; height: 32px; border-radius: 8px; font-size: var(--text-xs); }
+  .admin-shell[data-bar="menus"] .admin-profile__id { display: block; flex: none; }
+  .admin-shell[data-bar="menus"] .admin-profile__id > :not(.admin-identity__first) { display: none; }
+  .admin-shell[data-bar="menus"] .admin-identity__first {
+    display: block;
+    max-width: 9ch;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .admin-shell[data-bar="menus"] .admin-profile .admin-nav__chevron { color: currentColor; }
+
+  @media (hover: hover) and (pointer: fine) {
+    .admin-shell[data-bar="menus"] .admin-nav__group-label:hover { color: var(--ink); background: var(--surface-2); }
+    .admin-shell[data-bar="menus"] .admin-nav__group-label[data-current]:hover,
+    .admin-shell[data-bar="menus"] .admin-nav__group-label[aria-expanded="true"]:hover { color: var(--brand-blue-strong); }
+    .admin-shell[data-bar="menus"] .admin-bar-icon:hover { background: var(--brand-blue-soft); border-color: var(--brand-blue); }
+    .admin-shell[data-bar="menus"] .admin-profile:hover { background: var(--surface-2); border-color: var(--brand-blue); }
+  }
+
+  .admin-shell[data-bar="menus"] :is(.admin-bar-icon, .admin-profile):focus-visible { outline: 2px solid var(--brand-blue); outline-offset: 2px; }
+
+  /* El tema ya está en la barra: la cabecera de la pantalla no lo repite. */
+  .admin-shell[data-bar="menus"] .admin-topbar .theme-toggle { display: none; }
+
   .admin-shell[data-bar="menus"] .admin-menu { animation-name: admin-menu-down; }
 
   @keyframes admin-menu-down {
@@ -2535,4 +2742,22 @@ fieldset.admin-field legend {
     min-height: 36px;
     padding: var(--space-2) var(--space-3);
   }
+}
+
+/* Barra de menús, más estrecha: primero los rótulos cortos y el subtítulo de la
+   marca (como hace la barra de los portales a 1320 px), luego el nombre. Nunca
+   se parte en dos filas. */
+@media (min-width: 901px) and (max-width: 1480px) {
+  .admin-shell[data-bar="menus"] .admin-nav__group-name { display: none; }
+  .admin-shell[data-bar="menus"] .admin-nav__group-short { display: inline; }
+  .admin-shell[data-bar="menus"] .admin-brand small { display: none; }
+  .admin-shell[data-bar="menus"] .admin-nav__group-label { padding: 0 9px; }
+}
+
+@media (min-width: 901px) and (max-width: 1100px) {
+  .admin-shell[data-bar="menus"] .admin-sidebar { gap: var(--space-3); }
+  .admin-shell[data-bar="menus"] .admin-brand > span { display: none; }
+  .admin-shell[data-bar="menus"] .admin-identity__first,
+  .admin-shell[data-bar="menus"] .admin-profile .admin-nav__chevron { display: none; }
+  .admin-shell[data-bar="menus"] .admin-profile { padding: 0 5px; }
 }

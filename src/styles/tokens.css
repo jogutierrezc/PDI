@@ -15,6 +15,13 @@
   --brand-blue-strong: #1b52ad;
   --brand-blue-soft: #eaf1fd;
   --brand-teal: #0096a5;
+  /* Mr. Pilo Bot: la escena de la guía, marino en los dos temas. */
+  --pilo-stage: #0a2d63;
+  --pilo-stage-ink: #ffffff;
+  --pilo-stage-muted: #c3d5f2;
+  --pilo-stage-line: rgba(255, 255, 255, 0.14);
+  --pilo-accent: #7fe7f0;
+  --pilo-accent-ink: #0a2d63;
 
   /* --- Planos ------------------------------------------------------------- */
   --page: #f4f7fb;
@@ -338,6 +345,12 @@
     --brand-blue-strong: #7fb0f6;
     --brand-blue-soft: rgba(92, 155, 242, 0.14);
     --brand-teal: #37b6c4;
+    --pilo-stage: #071a38;
+    --pilo-stage-ink: #f1f6ff;
+    --pilo-stage-muted: #a9bddf;
+    --pilo-stage-line: rgba(255, 255, 255, 0.12);
+    --pilo-accent: #7fe7f0;
+    --pilo-accent-ink: #06142b;
 
     --page: #0b1017;
     --page-alt: #0e141d;
@@ -511,6 +524,12 @@
   --brand-blue-strong: #7fb0f6;
   --brand-blue-soft: rgba(92, 155, 242, 0.14);
   --brand-teal: #37b6c4;
+  --pilo-stage: #071a38;
+  --pilo-stage-ink: #f1f6ff;
+  --pilo-stage-muted: #a9bddf;
+  --pilo-stage-line: rgba(255, 255, 255, 0.12);
+  --pilo-accent: #7fe7f0;
+  --pilo-accent-ink: #06142b;
 
   --page: #0b1017;
   --page-alt: #0e141d;

@@ -13,7 +13,7 @@
 
 import { useMemo, useRef, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
-import { AdminShell } from "../admin/components/AdminShell";
+import { AdminRail, AdminRailTab, AdminShell } from "../admin/components/AdminShell";
 import { Icon } from "../../components/ui/Icon";
 import { useAuth } from "../../lib/auth";
 import { ConfirmButton, Panel, SaveState, StageEmpty } from "../admin/udes-en-cifras/ui";
@@ -118,6 +118,20 @@ export function BoardWorkshop() {
       kicker={`${unit.name} · ${board.title}`}
       title={current.label}
       description={current.hint}
+      rail={
+        <AdminRail label="Estaciones del taller">
+          {STATIONS.map((s) => (
+            <AdminRailTab
+              key={s.id}
+              current={station === s.id}
+              count={s.id === "datos" ? datasets.length : s.id === "visores" ? views.length : undefined}
+              onSelect={() => navigate(`/admin/tableros/${unit.slug}/tablero/${board.slug}/${s.id}`)}
+            >
+              {s.label}
+            </AdminRailTab>
+          ))}
+        </AdminRail>
+      }
       actions={
         <>
           <span className="tb-list__see" data-level={board.visibility}>
@@ -138,22 +152,6 @@ export function BoardWorkshop() {
             : "Eres visor en esta unidad: puedes abrir y descargar, no cambiar."}
         </p>
       )}
-
-      <nav className="tb__views" aria-label="Estaciones del taller">
-        {STATIONS.map((s) => (
-          <button
-            key={s.id}
-            type="button"
-            className="tb__view"
-            aria-current={station === s.id}
-            onClick={() => navigate(`/admin/tableros/${unit.slug}/tablero/${board.slug}/${s.id}`)}
-          >
-            {s.label}
-            {s.id === "datos" && datasets.length > 0 && <span className="tb__count">{datasets.length}</span>}
-            {s.id === "visores" && views.length > 0 && <span className="tb__count">{views.length}</span>}
-          </button>
-        ))}
-      </nav>
 
       {content.isPending ? (
         <p className="admin-loading">Cargando el tablero…</p>

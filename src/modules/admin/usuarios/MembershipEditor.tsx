@@ -1,5 +1,6 @@
 /* =============================================================================
-   Dónde trabaja una persona: unidad, función y cargo.
+   Dónde trabaja una persona: unidad, función, cargo y, en un programa que se
+   ofrece en varias sedes, la sede (vacía: todas).
 
    La función dice qué hace con los datos de la unidad (Gestor, Contribuyente
    o Consulta: el papel de Mis Tableros); el cargo es texto libre para
@@ -13,7 +14,7 @@
 import { useMemo } from "react";
 import { Icon } from "../../../components/ui/Icon";
 import { UNIT_KIND, type UnitKind, type UnitRole } from "../../tableros/model";
-import type { UnitOption } from "./people-db";
+import { useProgramOffer, type UnitOption } from "./people-db";
 import { BOARD_ROLE_LABEL } from "./role-matrix";
 
 export interface MembershipDraft {
@@ -23,6 +24,8 @@ export interface MembershipDraft {
   boardRole: UnitRole | null;
   /** Cargo, texto libre. */
   title: string;
+  /** Sede a la que se limita; null = todas. */
+  campusId: string | null;
 }
 
 const KIND_ORDER: UnitKind[] = ["vicerrectoria", "facultad", "programa", "oficina", "otra"];
@@ -33,6 +36,7 @@ export const newDraft = (partial: Partial<MembershipDraft> = {}): MembershipDraf
   unitId: "",
   boardRole: null,
   title: "",
+  campusId: null,
   ...partial,
 });
 
@@ -48,6 +52,14 @@ export function MembershipEditor({
   disabled?: boolean;
 }) {
   const byId = useMemo(() => new Map(units.map((unit) => [unit.id, unit])), [units]);
+  const offer = useProgramOffer().data;
+  const campusName = useMemo(() => new Map((offer?.campuses ?? []).map((c) => [c.id, c.name])), [offer]);
+  /** Las sedes donde se ofrece un programa; vacío si no es programa o se ofrece en una sola. */
+  const campusesOf = (unit: UnitOption | undefined) => {
+    if (!unit || unit.kind !== "programa") return [];
+    const ids = offer?.byProgram.get(unit.id) ?? [];
+    return ids.length > 1 ? ids : [];
+  };
   const grouped = useMemo(
     () =>
       KIND_ORDER.map((kind) => ({
@@ -69,6 +81,7 @@ export function MembershipEditor({
       {value.map((row, index) => {
         const unit = byId.get(row.unitId);
         const duplicated = row.unitId && value.findIndex((other) => other.unitId === row.unitId) !== index;
+        const campuses = campusesOf(unit);
         return (
           <div key={row.key} className="us-member">
             <label className="admin-field">
@@ -76,7 +89,7 @@ export function MembershipEditor({
               <select
                 value={row.unitId}
                 disabled={disabled}
-                onChange={(event) => patch(row.key, { unitId: event.target.value })}
+                onChange={(event) => patch(row.key, { unitId: event.target.value, campusId: null })}
               >
                 <option value="">Elija una unidad…</option>
                 {grouped.map((group) => (
@@ -117,6 +130,23 @@ export function MembershipEditor({
                 onChange={(event) => patch(row.key, { title: event.target.value })}
               />
             </label>
+            {campuses.length > 0 && (
+              <label className="admin-field">
+                <span>Sede</span>
+                <select
+                  value={row.campusId ?? ""}
+                  disabled={disabled}
+                  onChange={(event) => patch(row.key, { campusId: event.target.value || null })}
+                >
+                  <option value="">Todas las sedes</option>
+                  {campuses.map((id) => (
+                    <option key={id} value={id}>
+                      {campusName.get(id) ?? "Sede"}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            )}
             <button
               type="button"
               className="us-icon-button"
@@ -163,4 +193,5 @@ export const toInput = (value: MembershipDraft[]) =>
     unit_id: row.unitId,
     role: row.boardRole,
     title: row.title.trim() || null,
+    campus_id: row.campusId,
   }));

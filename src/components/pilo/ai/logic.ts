@@ -1,7 +1,9 @@
 /* =============================================================================
    Mr. Pilo con IA · las reglas, sin red ni base.
 
-   Lo usa la función del servidor (Deno) y lo prueba Vitest. Aquí se decide:
+   Lo usan el portal y Vitest, y va copiado dentro de la función del servidor
+   (supabase/functions/pilo-ia/index.ts: el editor de Supabase solo acepta un
+   archivo; la prueba logic-sync vigila que sean iguales). Aquí se decide:
    - si quien pregunta puede usar esa función en ese portal (canUse);
    - qué se le pide al modelo y con qué límites (buildMessages);
    - cómo se lee la respuesta aunque no venga como JSON limpio (parseAnswer);
@@ -38,6 +40,8 @@ export const FN_OF: Record<Exclude<Action, "probar">, Fn> = { resumir: "resumir"
 /** ¿Puede esta persona (null = sin sesión) usar la acción en el portal? */
 export function canUse(rules: Rules, portal: string, action: Action, role: Role | null): { ok: true } | { ok: false; reason: string } {
   if (action === "probar") return role === "admin" ? { ok: true } : { ok: false, reason: "Solo la administración prueba la conexión." };
+  // La muestra de voz de la configuración: solo la administración, en cualquier estado.
+  if (portal === "prueba") return role === "admin" ? { ok: true } : { ok: false, reason: "Solo la administración prueba la voz." };
   if (!rules.enabled) return { ok: false, reason: "Mr. Pilo con IA está apagado." };
   const fn = FN_OF[action];
   if (!fn) return { ok: false, reason: "Acción desconocida." };
@@ -160,4 +164,54 @@ export function verifyNumbers(answer: string, source: string): { verified: boole
     return true;
   });
   return { verified: unknown.length === 0, unknown };
+}
+
+/* --- La dirección del proveedor ---------------------------------------------------- */
+
+/**
+ * Los proveedores conocidos traen todo puesto: quien configura solo elige y
+ * pega la clave. Sus direcciones no se toman de la configuración (así un dato
+ * mal escrito no rompe nada); el modelo sí se puede cambiar.
+ */
+export const TEXT_PRESETS: Record<string, { url: string; model: string }> = {
+  mistral: { url: "https://api.mistral.ai/v1/chat/completions", model: "mistral-small-latest" },
+  // Free.ai: https://api.free.ai, POST /v1/chat/ (respuesta como la de OpenAI).
+  freeai: { url: "https://api.free.ai/v1/chat/", model: "qwen7b" },
+};
+
+/** Voz de Free.ai: POST /v1/tts/ {text, model, voice} → {audio_url}. em_alex es masculina en español. */
+export const SPEECH_PRESETS: Record<string, { url: string; model: string; voice: string; format: "freeai" | "openai" }> = {
+  freeai: { url: "https://api.free.ai/v1/tts/", model: "kokoro", voice: "em_alex", format: "freeai" },
+};
+
+/** Un nombre de modelo, no una ruta ni una dirección pegada por error. */
+const looksLikeModel = (model: string) => /^[\w.:-][\w.:/-]*$/.test(model) && !/^https?:/.test(model);
+
+/** La dirección y el modelo de texto que se usan de verdad. */
+export function textTarget(provider: string, base: string, path: string, model: string): { url: string; model: string } {
+  const preset = TEXT_PRESETS[provider];
+  if (preset) return { url: preset.url, model: looksLikeModel(model) ? model : preset.model };
+  return { url: endpoint(provider, base, path || "/chat/completions"), model };
+}
+
+/** La dirección, el modelo, la voz y el formato de la voz avanzada. */
+export function speechTarget(provider: string, base: string, path: string, model: string, voice: string) {
+  const preset = SPEECH_PRESETS[provider];
+  if (preset) {
+    return { url: preset.url, model: looksLikeModel(model) ? model : preset.model, voice: looksLikeModel(voice) ? voice : preset.voice, format: preset.format };
+  }
+  return { url: endpoint(provider, base, path || "/audio/speech"), model, voice, format: "openai" as const };
+}
+
+/**
+ * Une la dirección del servicio y la ruta sin duplicar ni perder la versión:
+ * "https://api.mistral.ai" + "/chat/completions" → ".../v1/chat/completions";
+ * "…/v1" + "/v1/chat/completions" → ".../v1/chat/completions".
+ */
+export function endpoint(provider: string, base: string, path: string): string {
+  let b = base.trim().replace(/\/+$/, "");
+  let p = "/" + path.trim().replace(/^\/+/, "");
+  if (/\/v1$/.test(b) && p.startsWith("/v1/")) p = p.slice(3);
+  if (provider === "mistral" && !/\/v1$/.test(b) && !p.startsWith("/v1/")) b = `${b}/v1`;
+  return `${b}${p}`;
 }

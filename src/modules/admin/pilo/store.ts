@@ -46,6 +46,9 @@ const DEFAULT_PORTALS: Record<Portal, PortalRule> = {
   impacto: { on: false, aud: "admin", fns: ["leer", "sintetizar", "explicar"] },
 };
 
+/** Un nombre de modelo, no una ruta pegada por error («/tts-1»). */
+const validModel = (m: string) => (/^[\w.:-][\w.:/-]*$/.test(m) && !/^https?:/.test(m) ? m : "");
+
 /**
  * La fila tal como venga, con valores por defecto para lo que falte: así una
  * base con una versión anterior de la migración no rompe la pantalla.
@@ -58,9 +61,11 @@ export function normalizeSettings(raw: Record<string, unknown>): PiloSettings {
   return {
     enabled: Boolean(raw.enabled),
     provider,
-    base_url: str("base_url", ""),
-    chat_path: str("chat_path", "/chat/completions"),
-    text_model: str("text_model", ""),
+    // Vacíos con Mistral: se muestran (y se usan en el servidor) los de Mistral,
+    // no un texto de ejemplo que parece escrito y no lo está.
+    base_url: str("base_url", "") || PROVIDERS[provider].base,
+    chat_path: str("chat_path", "") || "/chat/completions",
+    text_model: validModel(str("text_model", "")) || PROVIDERS[provider].model,
     speech_provider: (["freeai", "otro", "navegador"] as const).find((p) => p === raw.speech_provider) ?? "navegador",
     speech_base_url: str("speech_base_url", ""),
     speech_path: str("speech_path", "/audio/speech"),
@@ -105,9 +110,19 @@ export interface LogRow {
 
 /** Valores de partida de cada proveedor de texto. La dirección y el modelo se pueden cambiar. */
 export const PROVIDERS: Record<Provider, { label: string; base: string; model: string; hint: string }> = {
-  mistral: { label: "Mistral", base: "https://api.mistral.ai/v1", model: "mistral-small-latest", hint: "Su clave de La Plateforme de Mistral." },
-  freeai: { label: "Free.ai", base: "", model: "", hint: "La dirección y el modelo que indique Free.ai." },
-  otro: { label: "Otro compatible", base: "", model: "", hint: "Cualquier servicio con el formato de OpenAI (/chat/completions)." },
+  mistral: {
+    label: "Mistral",
+    base: "https://api.mistral.ai/v1",
+    model: "mistral-small-latest",
+    hint: "Pegue su clave de console.mistral.ai. Todo lo demás ya está puesto.",
+  },
+  freeai: {
+    label: "Free.ai",
+    base: "https://api.free.ai",
+    model: "qwen7b",
+    hint: "Pegue su clave de free.ai (empieza por «sk-free-»). Todo lo demás ya está puesto.",
+  },
+  otro: { label: "Otro compatible", base: "", model: "", hint: "Cualquier servicio con el formato de OpenAI: escriba su dirección, el modelo y la ruta." },
 };
 
 export const pilokeys = {

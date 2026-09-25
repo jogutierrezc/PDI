@@ -11,8 +11,8 @@ import { useQuery } from "@tanstack/react-query";
 import { useLocation } from "react-router-dom";
 import { supabase } from "../../../lib/supabase";
 import { useAuth } from "../../../lib/auth";
-import { canUse } from "../../../../supabase/functions/pilo-ia/logic";
-import type { Action, Fn, Portal, PortalRule, Role, Rules } from "../../../../supabase/functions/pilo-ia/logic";
+import { canUse } from "./logic";
+import type { Action, Fn, Portal, PortalRule, Role, Rules } from "./logic";
 
 export type { Fn, Portal, PortalRule, Rules };
 

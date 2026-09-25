@@ -10,7 +10,7 @@
    alternativo y lo que muestren escrito. Solo lo que se ve publicado.
    ========================================================================== */
 
-import type { Section } from "../../../../supabase/functions/pilo-ia/logic";
+import type { Section } from "./logic";
 
 export interface PageSection extends Section {
   element: HTMLElement;

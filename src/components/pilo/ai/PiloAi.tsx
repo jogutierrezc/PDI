@@ -24,7 +24,7 @@ import type { PiloResult } from "./client";
 import { usePiloAiHere } from "./config";
 import { collectSections, pageTitle, readingScript } from "./page";
 import type { PageSection } from "./page";
-import { answerText } from "../../../../supabase/functions/pilo-ia/logic";
+import { answerText } from "./logic";
 import "./pilo-ai.css";
 
 type View = "menu" | "escuchar" | "resumir" | "sintetizar" | "explicar";

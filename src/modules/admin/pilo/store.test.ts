@@ -10,6 +10,9 @@ describe("la configuración de Mr. Pilo, venga como venga de la base", () => {
     expect(s.functions).toEqual({ leer: true, resumir: true, sintetizar: true, explicar: false });
     expect(s.portals.cifras.on).toBe(false);
     expect(s.portals.impacto.aud).toBe("admin");
+    // Sin dirección ni modelo, los de Mistral (no un texto de ejemplo vacío).
+    expect(s.base_url).toBe("https://api.mistral.ai/v1");
+    expect(s.text_model).toBe("mistral-small-latest");
   });
 
   it("con 0090, respeta lo guardado", () => {

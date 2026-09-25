@@ -18,7 +18,7 @@ import { ErrorBlock, LoadingBlock } from "../../../components/ui/QueryState";
 import { PiloAvatar } from "../../../components/pilo/PiloAvatar";
 import { SpeakerIcon } from "../../../components/pilo/VoiceToggle";
 import { speak } from "../../../components/pilo/voice";
-import { testPilo } from "../../../components/pilo/ai/client";
+import { sayWithPilo, testPilo } from "../../../components/pilo/ai/client";
 import { PORTAL_LABEL } from "../../../components/pilo/ai/config";
 import type { Fn, Portal } from "../../../components/pilo/ai/config";
 import { PROVIDERS, useKeyStatus, usePiloLog, usePiloSettings, useSavePiloSettings, useSetKey } from "./store";
@@ -146,6 +146,28 @@ function Editor({ initial }: { initial: PiloSettings }) {
   };
 
   const today = keys.data?.today ?? 0;
+  const advancedVoice = s.voice_engine === "proveedor";
+  const otherKeys = (Object.keys(PROVIDERS) as Provider[])
+    .filter((p) => p !== s.provider && keys.data?.keys?.[p]?.has)
+    .map((p) => `${PROVIDERS[p].label} (••••${keys.data?.keys?.[p]?.last4})`);
+  const [sampling, setSampling] = useState(false);
+  const [sampleText, setSampleText] = useState("Escuche cómo suena Mr. Pilo.");
+  const sample = async () => {
+    const line = "Hola, soy Mr. Pilo. Le leo las cifras de la universidad.";
+    setSampling(true);
+    try {
+      if (advancedVoice && !dirty) {
+        setSampleText("Pidiendo la voz a Free.ai…");
+        const used = await sayWithPilo(line, { portal: "prueba" as Portal, advanced: true, rate: s.voice_rate, pitch: s.voice_pitch });
+        setSampleText(used === "proveedor" ? "Sonó la voz de Free.ai." : "Free.ai no respondió: sonó la voz del navegador. Revise la clave de Free.ai.");
+      } else {
+        setSampleText(advancedVoice ? "Guarde los cambios para oír la voz de Free.ai. Ahora suena la del navegador." : "Voz del navegador.");
+        await speak(line, { force: true, rate: s.voice_rate, pitch: s.voice_pitch });
+      }
+    } finally {
+      setSampling(false);
+    }
+  };
 
   return (
     <div className="pis">
@@ -167,47 +189,63 @@ function Editor({ initial }: { initial: PiloSettings }) {
         </div>
       </section>
 
-      <Card n={1} title="Conexión para resumir y sintetizar" aside={<small>{PROVIDERS[s.provider].hint}</small>}>
-        <div className="pis-seg" role="group" aria-label="Proveedor de texto">
+      <Card n={1} title="Conexión para resumir y sintetizar" aside={<small>Elija el servicio y pegue su clave</small>}>
+        <div className="pis-seg" role="group" aria-label="Servicio de texto">
           {(Object.keys(PROVIDERS) as Provider[]).map((p) => (
             <button key={p} type="button" aria-pressed={s.provider === p} onClick={() => pickProvider(p)}>
               {PROVIDERS[p].label}
             </button>
           ))}
         </div>
-        <div className="pis-grid pis-grid--3">
-          <label>
-            Dirección del servicio
-            <input type="url" value={s.base_url} placeholder="https://…" onChange={(e) => set("base_url", e.target.value.trim())} />
-          </label>
-          <label>
-            Modelo
-            <input value={s.text_model} placeholder="mistral-small-latest" onChange={(e) => set("text_model", e.target.value.trim())} />
-          </label>
-          <label>
-            Ruta
-            <input value={s.chat_path} onChange={(e) => set("chat_path", e.target.value.trim())} />
-          </label>
-        </div>
+        <p className="pis-lead">{PROVIDERS[s.provider].hint}</p>
+
         {keys.data?.keys ? (
-          <div className="pis-keys">
-            {(Object.keys(PROVIDERS) as Provider[]).map((p) => (
-              <KeyField
-                key={p}
-                which={p}
-                label={`Clave de ${PROVIDERS[p].label}`}
-                inUse={s.provider === p}
-                has={keys.data?.keys?.[p]?.has ?? false}
-                last4={keys.data?.keys?.[p]?.last4 ?? ""}
-              />
-            ))}
-          </div>
+          <KeyField
+            key={s.provider}
+            which={s.provider}
+            label={`Clave de ${PROVIDERS[s.provider].label}`}
+            has={keys.data.keys[s.provider]?.has ?? false}
+            last4={keys.data.keys[s.provider]?.last4 ?? ""}
+          />
         ) : (
           <>
-            <p className="pis-warn">Falta aplicar la migración 0091 para guardar una clave por proveedor. Mientras tanto hay una sola clave, la del proveedor elegido.</p>
-            <KeyField which="texto" label={`Clave de ${PROVIDERS[s.provider].label}`} inUse has={keys.data?.has_key ?? false} last4={keys.data?.last4 ?? ""} />
+            <p className="pis-warn">Falta aplicar la migración 0091 para guardar una clave por servicio. Mientras tanto hay una sola clave.</p>
+            <KeyField which="texto" label={`Clave de ${PROVIDERS[s.provider].label}`} has={keys.data?.has_key ?? false} last4={keys.data?.last4 ?? ""} />
           </>
         )}
+        {otherKeys.length > 0 && <p className="pis-small">También hay clave guardada de {otherKeys.join(" y ")}.</p>}
+
+        {s.provider === "otro" ? (
+          <div className="pis-grid pis-grid--3">
+            <label>
+              Dirección del servicio
+              <input type="url" value={s.base_url} placeholder="https://…/v1" onChange={(e) => set("base_url", e.target.value.trim())} />
+            </label>
+            <label>
+              Modelo
+              <input value={s.text_model} placeholder="Nombre del modelo" onChange={(e) => set("text_model", e.target.value.trim())} />
+            </label>
+            <label>
+              Ruta
+              <input value={s.chat_path} onChange={(e) => set("chat_path", e.target.value.trim())} />
+            </label>
+          </div>
+        ) : (
+          <details className="pis-adv">
+            <summary>Opciones avanzadas</summary>
+            <div className="pis-grid">
+              <label>
+                Modelo (vacío: {PROVIDERS[s.provider].model})
+                <input
+                  value={s.text_model === PROVIDERS[s.provider].model ? "" : s.text_model}
+                  placeholder={PROVIDERS[s.provider].model}
+                  onChange={(e) => set("text_model", e.target.value.trim() || PROVIDERS[s.provider].model)}
+                />
+              </label>
+            </div>
+          </details>
+        )}
+
         <div className="pis-row">
           <p className="pis-note">Las claves nunca llegan al navegador: cada pedido pasa por la función del servidor, que revisa quién pregunta, en qué portal y cuánto se ha usado hoy.</p>
           <button type="button" className="button-primary" onClick={runTest} disabled={test.state === "busy" || !connected}>
@@ -222,72 +260,63 @@ function Editor({ initial }: { initial: PiloSettings }) {
       </Card>
 
       <Card n={2} title="La voz de Mr. Pilo">
-        <div className="pis-choice" role="group" aria-label="Motor de voz">
-          <button type="button" aria-pressed={s.voice_engine === "proveedor"} onClick={() => set("voice_engine", "proveedor")}>
-            <strong>Voz avanzada</strong>
-            <span>Natural y expresiva, con Free.ai u otro servicio de voz. Usa cupo.</span>
+        <div className="pis-choice" role="group" aria-label="Voz">
+          <button
+            type="button"
+            aria-pressed={advancedVoice}
+            onClick={() => setS((prev) => ({ ...prev, voice_engine: "proveedor", speech_provider: prev.speech_provider === "otro" ? "otro" : "freeai" }))}
+          >
+            <strong>Voz de Free.ai</strong>
+            <span>Masculina y natural (em_alex). Usa la clave de Free.ai y su cupo.</span>
           </button>
-          <button type="button" aria-pressed={s.voice_engine === "navegador"} onClick={() => set("voice_engine", "navegador")}>
+          <button type="button" aria-pressed={!advancedVoice} onClick={() => set("voice_engine", "navegador")}>
             <strong>Voz del navegador</strong>
-            <span>Gratis. Siempre es el respaldo si la avanzada no responde.</span>
+            <span>Gratis, sin clave. Siempre es el respaldo si la otra no responde.</span>
           </button>
         </div>
-        {s.voice_engine === "proveedor" && (
-          <>
-            <div className="pis-seg" role="group" aria-label="Servicio de voz">
-              {(
-                [
-                  ["freeai", "Free.ai"],
-                  ["otro", "Otro compatible"],
-                ] as const
-              ).map(([id, label]) => (
-                <button key={id} type="button" aria-pressed={s.speech_provider === id} onClick={() => set("speech_provider", id)}>
-                  {label}
-                </button>
-              ))}
-            </div>
-            <div className="pis-grid pis-grid--3">
-              <label>
-                Dirección del servicio de voz
-                <input type="url" value={s.speech_base_url} placeholder="Igual que la de texto" onChange={(e) => set("speech_base_url", e.target.value.trim())} />
-              </label>
-              <label>
-                Modelo de voz
-                <input value={s.speech_model} placeholder="[modelo de voz]" onChange={(e) => set("speech_model", e.target.value.trim())} />
-              </label>
-              <label>
-                Voz (masculina)
-                <input value={s.speech_voice} placeholder="[nombre de la voz]" onChange={(e) => set("speech_voice", e.target.value.trim())} />
-              </label>
-            </div>
-            <KeyField
-              which="voz"
-              label={`Clave propia para la voz (opcional; vacía: se usa la de ${s.speech_provider === "otro" ? "«Otro compatible»" : "Free.ai"})`}
-              has={keys.data?.keys?.voz?.has ?? keys.data?.has_speech_key ?? false}
-              last4={keys.data?.keys?.voz?.last4 ?? keys.data?.speech_last4 ?? ""}
-            />
-          </>
+
+        {advancedVoice && s.speech_provider !== "otro" && keys.data?.keys && !keys.data.keys.freeai?.has && (
+          <KeyField which="freeai" label="Clave de Free.ai (hace falta para su voz)" has={false} last4="" />
         )}
+
         <div className="pis-grid pis-grid--3">
           <label>
             Velocidad · {s.voice_rate.toLocaleString("es-CO", { minimumFractionDigits: 1 })}×
             <input type="range" min={0.7} max={1.3} step={0.1} value={s.voice_rate} onChange={(e) => set("voice_rate", Number(e.target.value))} />
           </label>
           <label>
-            Tono · {s.voice_pitch < 0.95 ? "más grave" : s.voice_pitch > 1.05 ? "más agudo" : "natural"}
+            Tono de la voz del navegador · {s.voice_pitch < 0.95 ? "más grave" : s.voice_pitch > 1.05 ? "más agudo" : "natural"}
             <input type="range" min={0.8} max={1.2} step={0.1} value={s.voice_pitch} onChange={(e) => set("voice_pitch", Number(e.target.value))} />
           </label>
           <div className="pis-sample">
-            <button
-              type="button"
-              aria-label="Escuchar muestra con la voz del navegador"
-              onClick={() => void speak("Hola, soy Mr. Pilo. Le leo las cifras de la universidad.", { force: true, rate: s.voice_rate, pitch: s.voice_pitch })}
-            >
+            <button type="button" aria-label="Escuchar una muestra" onClick={sample} disabled={sampling}>
               <SpeakerIcon size={18} />
             </button>
-            <span>Muestra con la voz del navegador. La avanzada se oye en los portales.</span>
+            <span>{sampleText}</span>
           </div>
         </div>
+
+        {advancedVoice && (
+          <details className="pis-adv">
+            <summary>Opciones avanzadas de la voz</summary>
+            <div className="pis-grid pis-grid--3">
+              <label>
+                Modelo de voz (vacío: kokoro)
+                <input value={s.speech_model} placeholder="kokoro" onChange={(e) => set("speech_model", e.target.value.trim())} />
+              </label>
+              <label>
+                Voz (vacío: em_alex, masculina)
+                <input value={s.speech_voice} placeholder="em_alex" onChange={(e) => set("speech_voice", e.target.value.trim())} />
+              </label>
+            </div>
+            <KeyField
+              which="voz"
+              label="Clave solo para la voz (opcional, si es distinta de la de Free.ai)"
+              has={keys.data?.keys?.voz?.has ?? false}
+              last4={keys.data?.keys?.voz?.last4 ?? ""}
+            />
+          </details>
+        )}
       </Card>
 
       <Card n={3} title="Qué puede hacer">

@@ -8,7 +8,7 @@
 
 import { supabase, readFunctionError } from "../../../lib/supabase";
 import { speak, stopSpeaking } from "../voice";
-import type { Answer, Section } from "../../../../supabase/functions/pilo-ia/logic";
+import type { Answer, Section } from "./logic";
 import type { Portal } from "./config";
 
 export type { Answer };

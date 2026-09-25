@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { buildMessages, canUse, clipSections, numbersIn, parseAnswer, verifyNumbers } from "../../../../supabase/functions/pilo-ia/logic";
-import type { Rules } from "../../../../supabase/functions/pilo-ia/logic";
+import { buildMessages, canUse, clipSections, numbersIn, parseAnswer, verifyNumbers } from "./logic";
+import type { Rules } from "./logic";
 
 const rules: Rules = {
   enabled: true,
@@ -66,5 +66,30 @@ describe("la revisión de números", () => {
     const source = "Bucaramanga | 2024 | 12345\nBogotá | 2024 | 4321";
     expect(verifyNumbers("En 2024 Bucaramanga tuvo 12.345, tres veces Bogotá.", source)).toEqual({ verified: true, unknown: [] });
     expect(verifyNumbers("Bogotá tuvo 5.000 estudiantes.", source)).toEqual({ verified: false, unknown: ["5000"] });
+  });
+});
+
+describe("la dirección del proveedor", () => {
+  it("con Mistral, nunca pierde ni duplica el /v1", async () => {
+    const { endpoint } = await import("./logic");
+    expect(endpoint("mistral", "https://api.mistral.ai", "/chat/completions")).toBe("https://api.mistral.ai/v1/chat/completions");
+    expect(endpoint("mistral", "https://api.mistral.ai/v1/", "chat/completions")).toBe("https://api.mistral.ai/v1/chat/completions");
+    expect(endpoint("otro", "https://x.ai/v1", "/v1/chat/completions")).toBe("https://x.ai/v1/chat/completions");
+    expect(endpoint("otro", "https://x.ai/api", "/chat/completions")).toBe("https://x.ai/api/chat/completions");
+  });
+
+  it("Mistral y Free.ai traen todo puesto; un dato mal escrito no rompe nada", async () => {
+    const { textTarget, speechTarget } = await import("./logic");
+    expect(textTarget("mistral", "", "", "")).toEqual({ url: "https://api.mistral.ai/v1/chat/completions", model: "mistral-small-latest" });
+    expect(textTarget("mistral", "https://api.mistral.ai/v1", "/chat/completions", "mistral-large-latest").model).toBe("mistral-large-latest");
+    // Lo que pasó de verdad: dirección de la web y una ruta en el campo del modelo.
+    expect(textTarget("freeai", "https://free.ai/api", "/audio/speech", "/tts-1")).toEqual({ url: "https://api.free.ai/v1/chat/", model: "qwen7b" });
+    expect(speechTarget("freeai", "https://free.ai/api", "/audio/speech", "/tts-1", "")).toEqual({
+      url: "https://api.free.ai/v1/tts/",
+      model: "kokoro",
+      voice: "em_alex",
+      format: "freeai",
+    });
+    expect(speechTarget("otro", "https://voz.ejemplo.ai/v1", "", "tts-1", "onyx")).toMatchObject({ url: "https://voz.ejemplo.ai/v1/audio/speech", format: "openai" });
   });
 });

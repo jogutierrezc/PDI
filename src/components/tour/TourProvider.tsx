@@ -24,6 +24,8 @@ import { supabase } from "../../lib/supabase";
 import { useAuth } from "../../lib/auth";
 import { Icon } from "../ui/Icon";
 import { PiloAvatar } from "../pilo/PiloAvatar";
+import { VoiceToggle } from "../pilo/VoiceToggle";
+import { speak, stopSpeaking, useVoice } from "../pilo/voice";
 import { tourById, type Tour } from "./tours";
 import "./tour.css";
 
@@ -271,6 +273,14 @@ function TourOverlay({
     gsap.fromTo(node, { opacity: 0, y: 8 }, { opacity: 1, y: 0, duration: 0.24, ease: "expo.out" });
   }, [index, searching]);
 
+  // Mr. Pilo narra cada parada cuando la encuentra (si su voz está prendida).
+  const { enabled: voiceOn, speaking } = useVoice();
+  useEffect(() => {
+    if (searching || !voiceOn) return;
+    void speak(`${step.title}. ${step.body}`);
+  }, [index, searching, voiceOn, step.title, step.body]);
+  useEffect(() => () => stopSpeaking(), []);
+
   // Teclado: Esc sale; flechas mueven.
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
@@ -308,7 +318,7 @@ function TourOverlay({
       <section ref={bubble} className="tour__bubble" role="dialog" aria-modal="true" aria-labelledby="tour-title" style={placement}>
         <header>
           <span className="tour__face">
-            <PiloAvatar mood={searching ? "piensa" : step.mood ?? "feliz"} size={52} />
+            <PiloAvatar mood={searching ? "piensa" : step.mood ?? "feliz"} size={52} alive={speaking} />
           </span>
           <div>
             <span className="tour__count">
@@ -318,6 +328,7 @@ function TourOverlay({
               {step.title}
             </h2>
           </div>
+          <VoiceToggle className="tour__voice" />
         </header>
         <p>{searching ? "Un momento, busco dónde está…" : step.body}</p>
         <div className="tour__dots" aria-hidden="true">

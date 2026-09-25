@@ -3594,6 +3594,112 @@ routes.push(
   },
 );
 
+/* Portal de Impacto: la foto de imp_portal_snapshot (0088) pinta el río, los
+   lazos, la matriz y las vistas por vicerrectoría, facultad y programa. Sin la
+   migración, el portal lo dice en vez de fallar. */
+const PORTAL_SNAPSHOT = {
+  dimensions: [
+    { id: "d-ici", fn: "investigacion", name: "Investigación, creación e innovación", position: 1 },
+    { id: "d-asc", fn: "investigacion", name: "Apropiación social del conocimiento", position: 2 },
+    { id: "d-pp", fn: "ensenanza", name: "Práctica profesional", position: 1 },
+    { id: "d-mt", fn: "extension", name: "Microsocial territorial", position: 1 },
+  ],
+  indicators: [
+    ["i01", "I01", "investigacion", "insumos", "d-ici", "Grupos de investigación activos"],
+    ["i02", "I02", "investigacion", "procesos", "d-ici", "Proyectos presentados a convocatorias"],
+    ["i03", "I03", "investigacion", "productos", "d-ici", "Productos de nuevo conocimiento"],
+    ["i04", "I04", "investigacion", "impacto", "d-ici", "Productos transferidos a los sectores"],
+    ["i05", "I05", "investigacion", "productos", "d-asc", "Productos de apropiación social"],
+    ["i06", "I06", "investigacion", "impacto", "d-asc", "Políticas públicas sustentadas en I+D+i"],
+    ["e01", "E01", "ensenanza", "insumos", "d-pp", "Profesores con maestría y doctorado"],
+    ["e17", "E17", "ensenanza", "impacto", "d-pp", "Tasa de empleabilidad de graduados"],
+    ["x01", "X01", "extension", "insumos", "d-mt", "Convenios activos con el sector externo"],
+    ["x22", "X22", "extension", "impacto", "d-mt", "Percepción de cambios favorables"],
+  ].map(([id, code, fn, stage, dimension_id, name], position) => ({
+    id, code, fn, stage, dimension_id, name, position, suggested: false, description: "", unit_label: "Porcentaje",
+    measure: "porcentaje", direction: "sube", baseline_num: 60, baseline_text: "60%", target_2026: "80%",
+    target_2026_num: 80, mandatory: false,
+  })),
+  program_indicators: [],
+  refs: [],
+  alignments: [
+    { indicator_id: "i04", target: "ods", sdg: 9 },
+    { indicator_id: "x22", target: "ods", sdg: 9 },
+    { indicator_id: "i01", target: "ods", sdg: 4 },
+    { indicator_id: "e17", target: "ods", sdg: 4 },
+  ],
+  pillars: [],
+  units: [
+    { id: "u-vi", parent_id: null, kind: "vicerrectoria", code: "VI", name: "Vicerrectoría de Investigaciones", slug: "vi" },
+    { id: "u-fi", parent_id: null, kind: "facultad", code: "FIT", name: "Facultad de Ingenierías y Tecnologías", slug: "facultad-ingenierias" },
+    { id: "u-sis", parent_id: "u-fi", kind: "programa", code: "SIS", name: "Ingeniería de Sistemas", slug: "ingenieria-sistemas" },
+    { id: "u-ind", parent_id: "u-fi", kind: "programa", code: "IND", name: "Ingeniería Industrial", slug: "ingenieria-industrial" },
+  ],
+  unit_functions: [{ unit_id: "u-vi", fn: "investigacion" }],
+  campuses: [
+    { id: "c-bga", slug: "bucaramanga", name: "Bucaramanga" },
+    { id: "c-cuc", slug: "cucuta", name: "Cúcuta" },
+  ],
+  offer: [
+    { program_id: "u-sis", campus_id: "c-bga" },
+    { program_id: "u-sis", campus_id: "c-cuc" },
+    { program_id: "u-ind", campus_id: "c-bga" },
+  ],
+  adoptions: [
+    { indicator_id: "e17", program_id: "u-sis", campus_id: "c-bga", target_2026_num: 80 },
+    { indicator_id: "e17", program_id: "u-sis", campus_id: "c-cuc", target_2026_num: 80 },
+    { indicator_id: "i01", program_id: "u-sis", campus_id: "c-bga", target_2026_num: null },
+  ],
+  values: [
+    { indicator_id: "i04", year: 2025, program_id: null, campus_id: null, value_num: 84, not_applicable: false, has_text: false },
+    { indicator_id: "e17", year: 2025, program_id: "u-sis", campus_id: "c-bga", value_num: 82, not_applicable: false, has_text: false },
+    { indicator_id: "e17", year: 2025, program_id: "u-sis", campus_id: "c-cuc", value_num: 71, not_applicable: false, has_text: false },
+  ],
+};
+
+routes.push(
+  {
+    path: "/impacto",
+    session: true,
+    fixtures: { "rpc:imp_portal_snapshot": PORTAL_SNAPSHOT },
+    expect: "Impacto Institucional",
+    note: "portal de Impacto: el río, los lazos, la matriz y las metas",
+    also: ["La matriz de cadena de valor", "Las tres funciones y sus vínculos", "Mirar por unidad", "Cadena completa", "Falta: insumos, procesos", "Metas 2026 de la universidad", "Recorrido con Mr. Pilo"],
+  },
+  {
+    path: "/impacto/vicerrectoria/investigacion",
+    session: true,
+    fixtures: { "rpc:imp_portal_snapshot": PORTAL_SNAPSHOT },
+    expect: "Vicerrectoría de Investigaciones",
+    note: "la vista de una vicerrectoría: su cauce, su cadena y sus resultados",
+    also: ["La cadena de cada dimensión", "Impacto real: línea base, cifra y meta", "Programas conectados a Investigación", "105% de la meta"],
+  },
+  {
+    path: "/impacto/facultad/facultad-ingenierias?sede=cucuta",
+    session: true,
+    fixtures: { "rpc:imp_portal_snapshot": PORTAL_SNAPSHOT },
+    expect: "Mapa de conexión de los programas",
+    note: "una facultad filtrada por sede: solo sus programas de esa sede",
+    also: ["Ingeniería de Sistemas", "Los más elegidos por sus programas", "Sin conexión"],
+    absent: ["Ingeniería Industrial"],
+  },
+  {
+    path: "/impacto/programas?por=facultad&programa=ingenieria-sistemas",
+    session: true,
+    fixtures: { "rpc:imp_portal_snapshot": PORTAL_SNAPSHOT },
+    expect: "¿A qué función se conecta cada programa?",
+    note: "programas por facultad, con la cadena y las cifras por sede del elegido",
+    also: ["2 programas coinciden con el filtro", "Facultad de Ingenierías y Tecnologías", "Su cadena sumando todas sus sedes.", "Promedio de 1 programa, 2025"],
+  },
+  {
+    path: "/impacto",
+    session: true,
+    fixtures: { "rpc:imp_portal_snapshot": { __status: 404, code: "PGRST202", message: "Could not find the function public.imp_portal_snapshot" } },
+    expect: "El portal aún no está listo",
+    note: "sin la migración 0088 el portal lo dice, no se rompe",
+  },
+);
+
 /* --- Ejecución -------------------------------------------------------------- */
 
 let failures = 0;

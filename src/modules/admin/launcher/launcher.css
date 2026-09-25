@@ -294,6 +294,31 @@
 
 .ln__side { display: flex; flex-direction: column; gap: var(--space-4); }
 
+.ln__portal {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  gap: var(--space-4);
+  align-items: center;
+  padding: var(--space-4) var(--space-5);
+  color: var(--pilo-stage-ink);
+  text-decoration: none;
+  background: var(--pilo-stage);
+  border-radius: var(--radius-lg);
+  transition: transform 160ms var(--ease-out);
+}
+
+.ln__portal:active { transform: scale(0.98); }
+.ln__portal .pilo-avatar { background: var(--pilo-stage-ink); border-radius: var(--radius-md); }
+.ln__portal span { display: grid; gap: 2px; }
+.ln__portal strong { font-family: var(--font-display); font-size: var(--text-lg); }
+.ln__portal small { color: var(--pilo-stage-muted); font-size: var(--text-sm); line-height: var(--leading-normal); }
+
+@media (hover: hover) and (pointer: fine) {
+  .ln__portal:hover > svg { transform: translateX(3px); }
+}
+
+.ln__portal > svg { transition: transform 160ms var(--ease-out); }
+
 .ln__pending {
   padding: var(--space-5);
   background: var(--surface);

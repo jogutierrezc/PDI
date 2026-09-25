@@ -246,8 +246,17 @@ export function Launcher() {
           )}
         </section>
 
-        {pending.length > 0 && (
-          <aside className="ln__side" data-anim>
+        <aside className="ln__side" data-anim>
+          {/* El Portal de Impacto lo ve toda persona con sesión. */}
+          <Link to="/impacto" className="ln__portal" data-tour="launcher-portal">
+            <PiloAvatar mood="idea" size={52} />
+            <span>
+              <strong>Portal de Impacto</strong>
+              <small>La matriz de indicadores, sus vínculos y resultados, por vicerrectoría, facultad y programa.</small>
+            </span>
+            <Icon name="arrow-right" size={16} />
+          </Link>
+          {pending.length > 0 && (
             <section className="ln__pending">
               <h2>Pendientes</h2>
               <ul>
@@ -260,8 +269,8 @@ export function Launcher() {
                 ))}
               </ul>
             </section>
-          </aside>
-        )}
+          )}
+        </aside>
       </main>
     </div>
   );

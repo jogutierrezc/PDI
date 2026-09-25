@@ -54,7 +54,7 @@ export const SCREEN_PATHS: Record<AdminScreen, string> = {
   institution: "/admin/estructura-institucional",
 };
 
-interface AuthContextValue {
+export interface AuthContextValue {
   session: Session | null;
   profile: Profile | null;
   /** true mientras se resuelve la sesión inicial: evita parpadeos de "no autorizado". */
@@ -90,7 +90,36 @@ interface AuthContextValue {
  */
 export type ImpactoSide = "programa" | "funcion" | "ambos" | null;
 
-const AuthContext = createContext<AuthContextValue | null>(null);
+/**
+ * ¿Ve esta pantalla de la intranet? Espejo de has_screen(), en una función
+ * pura para que el menú, el lanzador y las pruebas usen la misma regla.
+ */
+export function screenVisible(
+  screen: AdminScreen,
+  who: { profile: Profile | null; access: AccessScope | null; inAnyUnit: boolean; impactoSide: ImpactoSide },
+): boolean {
+  const { profile, access, inAnyUnit, impactoSide } = who;
+  if (!profile?.is_active) return false;
+  // Usuarios, traslado de datos y estructura institucional piden administración siempre.
+  if ((screen === "users" || screen === "transfer" || screen === "institution") && RANK[profile.role] < RANK.admin) {
+    return false;
+  }
+  // Mis Tableros se gana perteneciendo a una unidad, no marcándolo aparte.
+  if (screen === "tableros" && inAnyUnit) return true;
+  // Impacto, solo a quien tiene algo que hacer en él: un programa o una
+  // unidad con función sustantiva, Planeación sin unidades (lo lee todo)
+  // y la administración. Pertenecer a una oficina sin función no basta.
+  if (screen === "impacto") {
+    if (RANK[profile.role] >= RANK.admin || impactoSide) return true;
+    if (RANK[profile.role] >= RANK.planeacion && !inAnyUnit) return true;
+    return false;
+  }
+  if (!access) return true;
+  return access.role.all_screens || access.role.screens.includes(screen);
+}
+
+/** Exportado para montar la intranet con una sesión simulada (pruebas y bancos de pruebas). */
+export const AuthContext = createContext<AuthContextValue | null>(null);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
@@ -249,25 +278,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // Espejo de has_screen(): la pantalla de usuarios siempre pide administración,
   // y un perfil sin rol de acceso ve lo de siempre.
   const canSee = useCallback(
-    (screen: AdminScreen) => {
-      if (!profile?.is_active) return false;
-      // Usuarios y traslado de datos piden administración siempre.
-      if ((screen === "users" || screen === "transfer" || screen === "institution") && RANK[profile.role] < RANK.admin) {
-        return false;
-      }
-      // Mis Tableros se gana perteneciendo a una unidad, no marcándolo aparte.
-      if (screen === "tableros" && inAnyUnit) return true;
-      // Impacto, solo a quien tiene algo que hacer en él: un programa o una
-      // unidad con función sustantiva, Planeación sin unidades (lo lee todo)
-      // y la administración. Pertenecer a una oficina sin función no basta.
-      if (screen === "impacto") {
-        if (RANK[profile.role] >= RANK.admin || impactoSide) return true;
-        if (RANK[profile.role] >= RANK.planeacion && !inAnyUnit) return true;
-        return false;
-      }
-      if (!access) return true;
-      return access.role.all_screens || access.role.screens.includes(screen);
-    },
+    (screen: AdminScreen) => screenVisible(screen, { profile, access, inAnyUnit, impactoSide }),
     [profile, access, inAnyUnit, impactoSide],
   );
 

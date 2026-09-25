@@ -60,6 +60,37 @@
   border-radius: var(--radius-md);
 }
 
+.tour__bubble header > div { flex: 1; min-width: 0; }
+
+/* El altavoz: prende o apaga la narración. Mientras habla, late suave. */
+.tour__voice {
+  display: grid;
+  place-items: center;
+  align-self: flex-start;
+  flex-shrink: 0;
+  width: 40px;
+  height: 40px;
+  padding: 0;
+  color: var(--brand-navy);
+  background: var(--surface-2);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-pill);
+  cursor: pointer;
+  transition: transform 160ms var(--ease-out), background-color var(--dur-fast) ease;
+}
+
+.tour__voice[aria-pressed="false"] { color: var(--ink-muted); }
+.tour__voice:active { transform: scale(0.95); }
+.tour__voice:focus-visible { outline: 3px solid var(--brand-blue); outline-offset: 2px; }
+
+@media (prefers-reduced-motion: no-preference) {
+  .tour__voice[data-speaking] { animation: tour-voice 1.1s ease-in-out infinite; }
+}
+
+@keyframes tour-voice {
+  50% { box-shadow: 0 0 0 5px color-mix(in srgb, var(--brand-blue) 22%, transparent); }
+}
+
 .tour__count {
   color: var(--ink-muted);
   font-size: var(--text-xs);

@@ -244,6 +244,22 @@ export const TOURS: Tour[] = [
       { target: "#lectura", title: "Cómo leer las cifras", body: "Qué significa cada corte, qué es una reserva estadística y por qué un vacío no es un cero.", mood: "excelente" },
     ],
   },
+  {
+    id: "portal-impacto",
+    title: "Conozca el Portal de Impacto",
+    scope: "intranet",
+    home: "/impacto",
+    steps: [
+      { route: "/impacto", target: "[data-tour='ipo-river']", title: "El río de la cadena de valor", body: "Tres cauces, uno por función, cruzan los cuatro eslabones: insumos, procesos, productos e impacto real. El ancho es cuántos indicadores hay; el hilo intenso, cuántos ya tienen cifra.", mood: "feliz" },
+      { route: "/impacto", target: "[data-tour='ipo-views']", title: "Cuatro miradas", body: "La universidad entera, cada vicerrectoría, cada facultad y cada programa, por sede o por facultad.", mood: "bien" },
+      { route: "/impacto", target: "[data-tour='ipo-links']", title: "Los lazos entre funciones", body: "El grosor del lazo dice cuántos pilares y ODS comparten Investigación, Enseñanza y Extensión. El más delgado es donde hay más por hacer juntos.", mood: "idea" },
+      { route: "/impacto", target: "[data-tour='ipo-matrix']", title: "La matriz", body: "Cada dimensión y sus cuatro eslabones. Si falta uno, la cadena está rota y se ve en rojo punteado.", mood: "cuidado" },
+      { route: "/impacto", target: "[data-tour='ipo-results']", title: "Los resultados", body: "Cuántos indicadores hay por eslabón y cómo van las metas 2026 con las cifras registradas en la intranet.", mood: "idea" },
+      { route: "/impacto/vicerrectoria/investigacion", target: "[data-tour='ipo-fn-matrix']", title: "Una vicerrectoría", body: "Su cauce, sus lazos, la cadena de cada dimensión y qué programas eligieron sus indicadores.", mood: "bien" },
+      { route: "/impacto/programas", target: "[data-tour='ipo-prog-filters']", title: "Programas por sede y facultad", body: "Filtre por sede y por facultad, agrupe como prefiera y elija un programa para ver su cadena y sus cifras por sede.", mood: "idea" },
+      { route: "/impacto/programas", target: "[data-tour='ipo-tour']", title: "Aquí estaré", body: "Cada gráfica tiene mi carita: tóquela y se la explico con sus propios datos. Este recorrido se repite desde aquí.", mood: "excelente" },
+    ],
+  },
 ];
 
 export const tourById = (id: string) => TOURS.find((t) => t.id === id);

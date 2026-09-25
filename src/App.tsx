@@ -137,6 +137,21 @@ const UserManagement = lazy(() =>
   import("./modules/admin/usuarios/UserManagement").then((m) => ({ default: m.UserManagement })),
 );
 const OfferPage = lazy(() => import("./modules/oferta/OfferPage").then((m) => ({ default: m.OfferPage })));
+const ImpactPortalHome = lazy(() =>
+  import("./modules/impacto/portal/PortalHome").then((m) => ({ default: m.PortalHome })),
+);
+const ImpactPortalFunction = lazy(() =>
+  import("./modules/impacto/portal/PortalFunction").then((m) => ({ default: m.PortalFunction })),
+);
+const ImpactPortalFaculties = lazy(() =>
+  import("./modules/impacto/portal/PortalFaculty").then((m) => ({ default: m.PortalFaculties })),
+);
+const ImpactPortalFaculty = lazy(() =>
+  import("./modules/impacto/portal/PortalFaculty").then((m) => ({ default: m.PortalFaculty })),
+);
+const ImpactPortalPrograms = lazy(() =>
+  import("./modules/impacto/portal/PortalPrograms").then((m) => ({ default: m.PortalPrograms })),
+);
 const InstitutionView = lazy(() =>
   import("./modules/admin/institucion/InstitutionView").then((m) => ({ default: m.InstitutionView })),
 );
@@ -384,6 +399,47 @@ export default function App() {
             element={
               <RequireRole minimum="admin" screen="users">
                 <UserManagement />
+              </RequireRole>
+            }
+          />
+          {/* Portal de Impacto: estructura, vínculos y resultados, para toda sesión activa. */}
+          <Route
+            path="/impacto"
+            element={
+              <RequireRole minimum="consulta">
+                <ImpactPortalHome />
+              </RequireRole>
+            }
+          />
+          <Route
+            path="/impacto/vicerrectoria/:fn"
+            element={
+              <RequireRole minimum="consulta">
+                <ImpactPortalFunction />
+              </RequireRole>
+            }
+          />
+          <Route
+            path="/impacto/facultades"
+            element={
+              <RequireRole minimum="consulta">
+                <ImpactPortalFaculties />
+              </RequireRole>
+            }
+          />
+          <Route
+            path="/impacto/facultad/:slug"
+            element={
+              <RequireRole minimum="consulta">
+                <ImpactPortalFaculty />
+              </RequireRole>
+            }
+          />
+          <Route
+            path="/impacto/programas"
+            element={
+              <RequireRole minimum="consulta">
+                <ImpactPortalPrograms />
               </RequireRole>
             }
           />

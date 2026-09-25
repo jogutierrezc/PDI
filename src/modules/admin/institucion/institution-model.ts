@@ -69,7 +69,6 @@ export interface InstMember {
   unitId: string;
   profileId: string;
   role: UnitRole;
-  accessRoleId: string | null;
   /** Cargo en la unidad (0074), texto libre. */
   title: string | null;
   name: string;

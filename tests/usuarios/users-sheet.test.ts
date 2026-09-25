@@ -2,13 +2,13 @@ import { describe, expect, it } from "vitest";
 import { planUsers, USER_COLUMNS } from "../../src/modules/admin/usuarios/users-sheet";
 import type { AccessRole } from "../../src/types/database";
 
-const role = (id: string, name: string, scope: "global" | "unidad"): AccessRole => ({
+const role = (id: string, name: string): AccessRole => ({
   id, key: id, name, description: "", base_role: "consulta", screens: [], all_screens: true, all_reports: true,
-  is_system: false, position: 0, scope, capabilities: [],
+  is_system: false, position: 0,
 });
 
 const context = {
-  roles: [role("consulta", "Consulta", "global"), role("director", "Dirección de programa", "unidad"), role("decano", "Decanatura", "unidad")],
+  roles: [role("consulta", "Consulta"), role("editor", "Editor")],
   units: [
     { id: "u-med", parentId: "u-fcs", kind: "programa" as const, code: "MED", name: "Medicina", slug: "medicina" },
     { id: "u-fcs", parentId: null, kind: "facultad" as const, code: "FCS", name: "Ciencias de la Salud", slug: "fcs" },
@@ -22,8 +22,8 @@ describe("carga masiva de usuarios", () => {
   it("agrupa por correo y reconoce roles y unidades sin tildes ni mayúsculas", () => {
     const plan = planUsers(
       sheet(
-        ["Ana.Perez@udes.edu.co", "Ana Pérez", "Medicina", "consulta", "med", "gestor", "Directora", "direccion de programa"],
-        ["ana.perez@udes.edu.co", "", "", "", "FCS", "", "", "Decanatura"],
+        ["Ana.Perez@udes.edu.co", "Ana Pérez", "Medicina", "consulta", "med", "gestor", "Directora"],
+        ["ana.perez@udes.edu.co", "", "", "", "FCS", "", ""],
       ),
       context,
     );
@@ -31,44 +31,42 @@ describe("carga masiva de usuarios", () => {
     expect(plan.people).toHaveLength(1);
     const [ana] = plan.people;
     expect(ana).toMatchObject({ email: "ana.perez@udes.edu.co", name: "Ana Pérez", existingId: null, globalRoleId: "consulta", lines: [2, 3] });
-    expect(ana.assignments.map((a) => [a.unitId, a.accessRoleId, a.board, a.title])).toEqual([
-      ["u-med", "director", "jefe", "Directora"],
-      ["u-fcs", "decano", null, ""],
+    expect(ana.assignments.map((a) => [a.unitId, a.board, a.title])).toEqual([
+      ["u-med", "jefe", "Directora"],
+      ["u-fcs", null, ""],
     ]);
   });
 
   it("una persona existente solo necesita sus unidades", () => {
-    const plan = planUsers(sheet(["ya.existe@udes.edu.co", "", "", "", "MED", "Contribuyente", "", ""]), context);
+    const plan = planUsers(sheet(["ya.existe@udes.edu.co", "", "", "", "MED", "Contribuyente", ""]), context);
     expect(plan.errorCount).toBe(0);
     expect(plan.people[0]).toMatchObject({ existingId: "p-1", globalRoleId: null });
-    expect(plan.people[0].assignments[0]).toMatchObject({ unitId: "u-med", accessRoleId: null, roleLabel: "Sin rol de Impacto", board: "editor" });
+    expect(plan.people[0].assignments[0]).toMatchObject({ unitId: "u-med", board: "editor" });
   });
 
   it("los errores dicen fila y columna", () => {
     const plan = planUsers(
       sheet(
-        ["no-es-correo", "X", "", "Consulta", "", "", "", ""],
-        ["nueva@udes.edu.co", "", "", "Decanatura", "NOPE", "jefa", "", "Consulta"],
+        ["no-es-correo", "X", "", "Consulta", "", "", ""],
+        ["nueva@udes.edu.co", "", "", "Decanatura", "NOPE", "jefa", ""],
       ),
       context,
     );
     const all = plan.people.flatMap((p) => p.errors);
     expect(all).toContain("Fila 2, columna A (Correo): «no-es-correo» no es un correo.");
-    expect(all).toContain("Fila 3, columna D (Rol global): «Decanatura» se da en una unidad: va en la columna H.");
+    expect(all).toContain("Fila 3, columna D (Rol global): no existe el rol «Decanatura».");
     expect(all).toContain("Fila 3, columna E (Unidad (código)): no existe la unidad «NOPE».");
-    expect(all).toContain("Fila 3, columna H (Rol de Impacto): «Consulta» es de toda la intranet: va en la columna D.");
     expect(all).toContain("Fila 3, columna F (Función en la unidad): «jefa» no es una función: use Gestor, Contribuyente o Consulta.");
     expect(all).toContain("Fila 3, columna B (Nombre): nueva@udes.edu.co es nueva y necesita nombre.");
   });
 
   it("no deja la misma unidad dos veces ni dos roles globales distintos", () => {
-    const extra = { ...context, roles: [...context.roles, role("editor", "Editor", "global")] };
     const plan = planUsers(
       sheet(
-        ["a@udes.edu.co", "A", "", "Consulta", "MED", "", "", ""],
-        ["a@udes.edu.co", "", "", "Editor", "MED", "", "", "Decanatura"],
+        ["a@udes.edu.co", "A", "", "Consulta", "MED", "", ""],
+        ["a@udes.edu.co", "", "", "Editor", "MED", "", ""],
       ),
-      extra,
+      context,
     );
     const errors = plan.people[0].errors;
     expect(errors.some((e) => e.includes("otra fila de a@udes.edu.co le da «Consulta»"))).toBe(true);
@@ -82,7 +80,7 @@ describe("carga masiva de usuarios", () => {
   });
 
   it("las filas vacías se ignoran", () => {
-    const plan = planUsers(sheet(["", "", "", "", "", "", "", ""], ["a@udes.edu.co", "A", "", "Consulta", "", "", "", ""]), context);
+    const plan = planUsers(sheet(["", "", "", "", "", "", ""], ["a@udes.edu.co", "A", "", "Consulta", "", "", ""]), context);
     expect(plan.people).toHaveLength(1);
     expect(plan.errorCount).toBe(0);
   });

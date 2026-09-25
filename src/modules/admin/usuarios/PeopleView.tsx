@@ -69,9 +69,7 @@ export function PeopleView({
       if (filter === "inactivas" && person.is_active) return false;
       const mine = memberships.filter((m) => m.profileId === person.id);
       if (filter === "sin-unidad" && mine.length > 0) return false;
-      if (roleFilter && person.access_role_id !== roleFilter && !mine.some((m) => m.accessRoleId === roleFilter)) {
-        return false;
-      }
+      if (roleFilter && person.access_role_id !== roleFilter) return false;
       if (!needle) return true;
       const units = mine.map((m) => unitById.get(m.unitId)?.name ?? "").join(" ");
       return `${person.full_name} ${person.email} ${person.unit ?? ""} ${units}`
@@ -263,7 +261,7 @@ function PersonDetail({
   const initial = useMemo(
     () =>
       memberships.map((m) =>
-        newDraft({ unitId: m.unitId, accessRoleId: m.accessRoleId, boardRole: m.role, title: m.title }),
+        newDraft({ unitId: m.unitId, boardRole: m.role, title: m.title }),
       ),
     [memberships],
   );
@@ -271,10 +269,10 @@ function PersonDetail({
   // Tras guardar, la lista vuelve de la base: se toma como punto de partida.
   // Solo si cambió de verdad, para no borrar lo que se está editando cuando
   // la consulta se repite al volver a la pestaña.
-  const signature = JSON.stringify(memberships.map((m) => [m.unitId, m.accessRoleId, m.role, m.title]));
+  const signature = JSON.stringify(memberships.map((m) => [m.unitId, m.role, m.title]));
   useEffect(() => setDrafts(initial), [signature]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const globalRoles = roles.filter((role) => (role.scope ?? "global") === "global");
+  const globalRoles = roles;
   const systemRoleId = (key: string) => roles.find((role) => role.is_system && role.key === key)?.id;
   const globalId = person.access_role_id ?? systemRoleId(person.role) ?? "";
   const global = roles.find((role) => role.id === globalId);
@@ -289,7 +287,7 @@ function PersonDetail({
   const summary = personSummary(
     global,
     reports,
-    drafts.filter((d) => d.unitId).map((d) => ({ unit: unitById.get(d.unitId), role: roles.find((r) => r.id === d.accessRoleId), board: d.boardRole, title: d.title })),
+    drafts.filter((d) => d.unitId).map((d) => ({ unit: unitById.get(d.unitId), board: d.boardRole, title: d.title })),
     new Map((reportOptions.data ?? []).map((report) => [report.slug, report.name])),
   );
   const myPillars = (pillars.data ?? []).filter((pillar) =>
@@ -411,11 +409,11 @@ function PersonDetail({
         <header>
           <h3 id="donde-trabaja">Dónde trabaja</h3>
           <small>
-            En cada unidad: su función con los datos (Gestor, Contribuyente o Consulta), su cargo y, si reporta o
-            revisa en Impacto, su rol. Lo que se guarda es exactamente esta lista.
+            En cada unidad: su función con los datos (Gestor, Contribuyente o Consulta) y su cargo. Lo que se guarda
+            es exactamente esta lista.
           </small>
         </header>
-        <MembershipEditor value={drafts} onChange={setDrafts} units={units} roles={roles} disabled={saveMemberships.isPending} />
+        <MembershipEditor value={drafts} onChange={setDrafts} units={units} disabled={saveMemberships.isPending} />
         {dirty && (
           <div className="us-savebar">
             {problem && <small className="us-raised">{problem}</small>}

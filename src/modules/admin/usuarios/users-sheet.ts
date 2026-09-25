@@ -5,10 +5,10 @@
    unidad). Columnas:
 
      Correo · Nombre · Dependencia · Rol global · Unidad (código) ·
-     Función en la unidad · Cargo · Rol de Impacto
+     Función en la unidad · Cargo
 
    La función es Gestor, Contribuyente o Consulta (qué hace con los datos de
-   la unidad); el cargo, texto libre; el rol de Impacto, opcional.
+   la unidad); el cargo, texto libre.
 
    Nada de aquí escribe: devuelve, por persona, si se crea o se actualiza, su
    rol global, sus unidades y los errores con fila y columna. La pantalla
@@ -16,6 +16,7 @@
    los códigos de unidad se comparan sin tildes ni mayúsculas.
    ========================================================================== */
 
+import type { CellValue } from "exceljs";
 import type { AccessRole, Profile } from "../../../types/database";
 import { type UnitRole } from "../../tableros/model";
 import type { UnitOption } from "./people-db";
@@ -28,9 +29,8 @@ export const USER_COLUMNS = [
   "Unidad (código)",
   "Función en la unidad",
   "Cargo",
-  "Rol de Impacto",
 ] as const;
-const LETTERS = ["A", "B", "C", "D", "E", "F", "G", "H"];
+const LETTERS = ["A", "B", "C", "D", "E", "F", "G"];
 
 /** Función en la unidad por su nombre en pantalla o en la base. */
 const FUNCTIONS: Record<string, UnitRole> = {
@@ -46,9 +46,7 @@ export interface PlannedAssignment {
   line: number;
   unitId: string;
   unitLabel: string;
-  accessRoleId: string | null;
-  roleLabel: string;
-  /** Función en la unidad; null = la del rol de Impacto, o Consulta. */
+  /** Función en la unidad; null = la que ya tenía, o Consulta. */
   board: UnitRole | null;
   title: string;
 }
@@ -155,9 +153,7 @@ export function planUsers(
     if (values[3]) {
       const role = roleByName.get(normalize(values[3]));
       if (!role) person.errors.push(at(3, `no existe el rol «${values[3]}».`));
-      else if ((role.scope ?? "global") !== "global") {
-        person.errors.push(at(3, `«${role.name}» se da en una unidad: va en la columna H.`));
-      } else if (person.globalRoleId && person.globalRoleId !== role.id) {
+      else if (person.globalRoleId && person.globalRoleId !== role.id) {
         person.errors.push(at(3, `otra fila de ${email} le da «${person.globalRoleLabel}».`));
       } else {
         person.globalRoleId = role.id;
@@ -165,7 +161,7 @@ export function planUsers(
       }
     }
 
-    if (values[4] || values[5] || values[6] || values[7]) {
+    if (values[4] || values[5] || values[6]) {
       const unit = values[4] ? unitByCode.get(normalize(values[4])) : undefined;
       if (!values[4]) person.errors.push(at(4, "falta la unidad."));
       else if (!unit) person.errors.push(at(4, `no existe la unidad «${values[4]}».`));
@@ -176,18 +172,6 @@ export function planUsers(
         if (!board) person.errors.push(at(5, `«${values[5]}» no es una función: use Gestor, Contribuyente o Consulta.`));
       }
 
-      let accessRoleId: string | null = null;
-      let roleLabel = "Sin rol de Impacto";
-      if (values[7]) {
-        const role = roleByName.get(normalize(values[7]));
-        if (!role) person.errors.push(at(7, `no existe el rol «${values[7]}».`));
-        else if (role.scope !== "unidad") person.errors.push(at(7, `«${role.name}» es de toda la intranet: va en la columna D.`));
-        else {
-          accessRoleId = role.id;
-          roleLabel = role.name;
-          board = board ?? role.unit_role ?? null;
-        }
-      }
       if (unit) {
         if (person.assignments.some((a) => a.unitId === unit.id)) {
           person.errors.push(at(4, `${email} ya tiene «${unit.code}» en otra fila: en cada unidad va una sola función.`));
@@ -196,8 +180,6 @@ export function planUsers(
             line,
             unitId: unit.id,
             unitLabel: `${unit.name} · ${unit.code}`,
-            accessRoleId,
-            roleLabel,
             board,
             title: values[6],
           });
@@ -218,4 +200,19 @@ export function planUsers(
   const list = [...people.values()];
   const errors = list.length === 0 ? ["La hoja no trae ninguna persona."] : [];
   return { people: list, errors, errorCount: errors.length + list.reduce((n, p) => n + p.errors.length, 0) };
+}
+
+/** El texto de una celda de Excel, sea cual sea su forma: texto enriquecido, fórmula, hipervínculo o fecha. */
+export function cellText(value: CellValue): string {
+  if (value === null || value === undefined) return "";
+  if (typeof value === "string") return value;
+  if (typeof value === "number" || typeof value === "boolean") return String(value);
+  if (value instanceof Date) return value.toISOString().slice(0, 10);
+  if (typeof value === "object") {
+    if ("richText" in value && Array.isArray(value.richText)) return value.richText.map((part) => part.text).join("");
+    if ("result" in value) return cellText(value.result as CellValue);
+    if ("text" in value) return String(value.text);
+    if ("error" in value) return "";
+  }
+  return String(value);
 }

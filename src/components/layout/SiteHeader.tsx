@@ -175,10 +175,10 @@ export function SiteHeader({ onSearch }: { onSearch?: () => void }) {
           <NavLink to="/documentos" className="sh-nav__link">
             Documentos
           </NavLink>
-          {/* Impacto Institucional pide sesión: sin ella, la entrada no existe. */}
+          {/* La oferta de programas pide sesión: sin ella, la entrada no existe. */}
           {profile && (
-            <NavLink to="/impacto" className="sh-nav__link">
-              Impacto
+            <NavLink to="/oferta" className="sh-nav__link">
+              Oferta
             </NavLink>
           )}
         </nav>
@@ -237,8 +237,8 @@ export function SiteHeader({ onSearch }: { onSearch?: () => void }) {
             </Link>
             {profile ? (
               <>
-                <Link to="/impacto" onClick={close}>
-                  Impacto Institucional
+                <Link to="/oferta" onClick={close}>
+                  Oferta de programas
                 </Link>
                 {intranet.links.some((l) => l.screen === "tableros") && (
                   <Link to="/admin/tableros" onClick={close}>

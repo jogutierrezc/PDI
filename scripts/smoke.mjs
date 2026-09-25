@@ -534,11 +534,10 @@ const FIXTURES = {
     { id: "rol-planeacion", key: "planeacion", name: "Planeación", description: "Edita cualquier pilar y decide qué se publica.", base_role: "planeacion", screens: [], all_screens: true, all_reports: true, is_system: true, position: 3 },
     { id: "rol-admin", key: "admin", name: "Administrador", description: "Todo lo anterior, más la gestión de usuarios.", base_role: "admin", screens: [], all_screens: true, all_reports: true, is_system: true, position: 4 },
     { id: "rol-vi", key: "editor-investigacion", name: "Editor de Investigación", description: "Carga y publica el informe de Investigación.", base_role: "planeacion", screens: ["cifras"], all_screens: false, all_reports: false, is_system: false, position: 5 },
-    { id: "rol-director", key: "impacto_director", name: "Dirección de programa", description: "Captura y envía a decanatura lo que reporta su programa.", base_role: "consulta", screens: ["impacto"], all_screens: false, all_reports: false, is_system: true, position: 21, scope: "unidad", capabilities: ["impacto.capturar", "impacto.enviar"], unit_role: "editor" },
   ],
-  // Dónde trabaja cada persona (0057 + 0063): la vicerrectoría dirige un programa.
+  // Dónde trabaja cada persona (0057): la vicerrectoría es Contribuyente en un programa.
   unit_members: [
-    { id: "um-1", unit_id: "imp-prog-a", profile_id: "user-vi", access_role_id: "rol-director", role: "editor" },
+    { id: "um-1", unit_id: "imp-prog-a", profile_id: "user-vi", role: "editor" },
   ],
   access_role_reports: [{ access_role_id: "rol-vi", report_slug: "investigacion" }],
   web_projects: [
@@ -2539,202 +2538,6 @@ const routes = [
     },
   },
   {
-    path: "/admin/impacto/catalogo",
-    note: "catálogo sobre la base: versiones, fichas, hallazgos y publicación",
-    expect: "Importar la matriz",
-    session: true,
-    also: [
-      "Versión 2",
-      "Estudiantes vinculados a semilleros",
-      "Ficha incompleta. Falta: tipo de cálculo, unidad.",
-      "Hallazgos del importador",
-      "Número en la columna de unidad",
-      "Falta completar la ficha de",
-      "Precargar las fichas propuestas del piloto",
-    ],
-  },
-  {
-    path: "/admin/impacto/periodo",
-    note: "periodo abierto, asignaciones, precargados y apertura del siguiente",
-    expect: "Periodo 2026-2",
-    session: true,
-    also: [
-      "Asignaciones activas",
-      "Programa de Prueba A",
-      "Valores precargados",
-      "1 registro de indicadores precargados en 2026-2",
-      "Plantilla CSV del periodo",
-      "Abrir un periodo",
-      "Ver las asignaciones de 2027-1",
-    ],
-  },
-  {
-    path: "/admin/impacto/reporte",
-    note: "captura en modo sencillo: ficha, precargado y devolución",
-    expect: "Programa de Prueba A",
-    session: true,
-    also: ["Asignados", "Enviar a decanatura", "Vista sencilla", "Hoja de cálculo", "Estudiantes vinculados a semilleros", "Devuelto: Evidencia insuficiente", "Adjunte el listado del SIGIIP."],
-  },
-  {
-    path: "/admin/impacto/reporte",
-    note: "captura en modo hoja de cálculo: celdas, valor calculado y validación",
-    expect: "Guardar cambios",
-    session: true,
-    storage: { "impacto:modo-captura": "hoja" },
-    also: ["Numerador o valor", "Confirma precargado", "89,6 %", "Este indicador exige evidencia"],
-  },
-  {
-    path: "/admin/impacto/revision",
-    note: "bandeja de decanatura: paquete del programa, devolución de la vicerrectoría y separación de funciones",
-    expect: "Decanatura · Facultad de Prueba",
-    session: true,
-    also: [
-      "Esperan su decisión",
-      "Programa de Prueba B",
-      "Tasa de retención estudiantil",
-      "430 ÷ 480",
-      "La vicerrectoría lo devolvió: Variación sin justificar",
-      "Aprobar de nuevo",
-      "Lo capturó usted: no puede aprobarlo.",
-    ],
-    absent: ["Ver como", "Prototipo: los datos viven en este navegador."],
-  },
-  {
-    path: "/admin/impacto/revision",
-    note: "bandeja de la vicerrectoría: solo su función, valida o devuelve a la decanatura",
-    expect: "Vicerrectoría · Enseñanza",
-    session: true,
-    interact: async (window, tick) => {
-      const tab = [...window.document.querySelectorAll('[role="tab"]')].find((b) => b.textContent.includes("Vicerrectoría"));
-      if (!tab) throw new Error("no está la pestaña de la vicerrectoría");
-      tab.click();
-      await tick();
-      const text = window.document.body.textContent;
-      if (!text.includes("Vicerrectoría · Enseñanza")) throw new Error("no cambió a la bandeja de la vicerrectoría");
-      if (!text.includes("Profesores con título de Maestría y Doctorado")) throw new Error("no aparece el registro aprobado por la decanatura");
-      if (!text.includes("Validar")) throw new Error("no aparece el botón para validar");
-      if (text.includes("Innovaciones pedagógicas")) throw new Error("la vicerrectoría ve lo que aún está en la decanatura");
-    },
-  },
-  {
-    path: "/admin/impacto/catalogo",
-    note: "catálogo en hoja de cálculo: una fila por indicador con su ficha técnica",
-    expect: "Copiar la hoja",
-    session: true,
-    storage: { "impacto:modo-captura": "hoja" },
-    also: ["Tipo de cálculo", "Agregación", "Nivel de reporte", "Estudiantes vinculados a semilleros", "Copiar la hoja", "Falta el tipo de cálculo"],
-  },
-  {
-    path: "/admin/impacto/periodo",
-    note: "periodo en hoja de cálculo: asignaciones con Activa y justificación",
-    expect: "Justificación del cambio",
-    session: true,
-    storage: { "impacto:modo-captura": "hoja" },
-    also: ["Registros de todos los programas", "Justificación del cambio", "Programa de Prueba A", "Aplicar cambios"],
-  },
-  {
-    path: "/admin/impacto/revision",
-    note: "bandeja de revisión en hoja: decisión, motivo y comentario por fila",
-    expect: "Motivo de devolución",
-    session: true,
-    storage: { "impacto:modo-captura": "hoja" },
-    also: ["Decisión", "Motivo de devolución", "Aplicar decisiones", "Tasa de retención estudiantil", "Lo capturó usted: lo decide otra persona"],
-  },
-  {
-    path: "/admin/impacto/auditar",
-    note: "Auditar Impacto: avance por programa, decanatura, vicerrectoría y oficina",
-    expect: "Auditar Impacto",
-    session: true,
-    also: ["Periodo 2026-2", "Con dato", "Validados", "Programas", "Decanaturas", "Vicerrectorías", "Oficinas responsables", "Actividad", "pendientes"],
-  },
-  {
-    path: "/admin/impacto/auditar",
-    note: "Auditar Impacto en hoja de cálculo",
-    expect: "Últ. movimiento",
-    session: true,
-    storage: { "impacto:modo-captura": "hoja" },
-    also: ["Avance", "Pendientes", "Devueltos", "Atrasado"],
-  },
-  {
-    path: "/admin/impacto/reporte",
-    note: "plantilla Excel: descargar e importar",
-    expect: "Descargar plantilla Excel",
-    session: true,
-    interact: async (window, tick) => {
-      const button = [...window.document.querySelectorAll("button")].find((b) => b.textContent.includes("Importar Excel"));
-      if (!button) throw new Error("no se encontró el botón «Importar Excel»");
-      if (button.disabled) throw new Error("«Importar Excel» está deshabilitado con registros editables");
-      button.click();
-      await tick();
-      const text = window.document.body.textContent ?? "";
-      if (!text.includes("Importar la plantilla Excel")) throw new Error("no se abrió el panel de importación");
-      if (!text.includes("Se cargan las filas válidas")) throw new Error("el panel no dice la política de importación");
-    },
-  },
-  {
-    path: "/impacto",
-    note: "portal sobre la base: catálogo publicado, lentes reales y solo cifras validadas",
-    expect: "Impacto Institucional",
-    session: true,
-    also: [
-      "4 indicadores, de los insumos al impacto real",
-      "Facultad de Ciencias Sociales",
-      "Una cifra de facultad no es un promedio",
-      "970 ÷ 1.100",
-      "Solo cifras validadas",
-      "Catálogo versión 1",
-    ],
-    absent: ["datos ilustrativos", "Dato ilustrativo", "Medicina Veterinaria y Zootecnia"],
-  },
-  {
-    path: "/impacto/institucion",
-    note: "toda la universidad: razón de sumas de lo validado y cambio frente al periodo anterior",
-    expect: "Universidad de Santander",
-    session: true,
-    also: ["Tasa de retención estudiantil", "88,2 %", "frente a 2025-2", "Innovaciones pedagógicas"],
-    absent: ["datos ilustrativos"],
-  },
-  {
-    path: "/impacto/campus/bucaramanga",
-    note: "lente de campus: solo lo que se reporta por sede",
-    expect: "Campus Bucaramanga",
-    session: true,
-    also: ["87,8 %", "los que se reportan por programa no se reparten entre sedes"],
-    absent: ["Innovaciones pedagógicas"],
-  },
-  {
-    path: "/impacto/indicador/E04?en=facultad:ciencias-sociales",
-    note: "ficha del indicador con su cuenta y el reparto por programa",
-    expect: "Tasa de retención estudiantil",
-    session: true,
-    also: ["630 ÷ 700", "En qué se reparte", "Derecho", "Por periodo", "Meta 2026", "+1 pp vs LB", "Línea base 2023"],
-    absent: ["datos ilustrativos"],
-  },
-  {
-    path: "/impacto/institucion",
-    note: "catálogo publicado sin cifras validadas: todo hueco y dice por qué",
-    expect: "Aún no hay cifras validadas",
-    session: true,
-    fixtures: { "rpc:imp_portal_records": [] },
-    also: ["Sin cifras validadas en esta lente", "Fuera del piloto", "Sugerido: aún no se reporta"],
-  },
-  {
-    path: "/impacto",
-    note: "sin catálogo publicado: estado vacío",
-    expect: "Aún no hay cifras que mostrar",
-    session: true,
-    fixtures: { "rpc:imp_portal_catalog": { version: null, indicators: [] }, "rpc:imp_portal_records": [] },
-    also: ["Ir a Impacto en la intranet"],
-  },
-  {
-    path: "/impacto/indicador/E04",
-    note: "base sin la migración 0072: error con qué hacer",
-    expect: "No se pudo cargar Impacto Institucional",
-    session: true,
-    fixtures: { "rpc:imp_portal_catalog": { __status: 404, code: "PGRST202", message: "Could not find the function public.imp_portal_catalog" } },
-    also: ["0072_impacto_portal.sql", "Reintentar"],
-  },
-  {
     path: "/admin/estructura",
     expect: "Normalizar la estructura",
     session: true,
@@ -2837,7 +2640,8 @@ const routes = [
     expect: "Qué hace en toda la universidad",
     session: true,
     note: "la ficha: rol global, dónde trabaja y lo que podrá hacer en palabras",
-    also: ["Dónde trabaja", "Lo que podrá hacer", "En UDES en Cifras escribe: Investigación.", "Dirección de programa"],
+    also: ["Dónde trabaja", "Lo que podrá hacer", "En UDES en Cifras escribe: Investigación.", "contribuyente de sus datos"],
+    absent: ["Rol de Impacto", "Dirección de programa"],
   },
   {
     path: "/admin/usuarios?nueva=1",
@@ -2851,14 +2655,8 @@ const routes = [
     expect: "Editor de Investigación",
     session: true,
     note: "la matriz del rol: plantilla, niveles por módulo y resumen",
-    also: ["En toda la intranet", "En una unidad", "Personalizada", "UDES en Cifras", "Quien lleve este rol", "Capacidad resultante"],
-  },
-  {
-    path: "/admin/usuarios/roles?rol=rol-director",
-    expect: "Dirección de programa",
-    session: true,
-    note: "un rol de unidad: acciones de Impacto y papel en Mis Tableros",
-    also: ["Capturar", "Validar", "Función en la unidad", "Contribuyente", "En Impacto, en su unidad: capturar y enviar."],
+    also: ["Roles de acceso", "Personalizada", "UDES en Cifras", "Quien lleve este rol", "Capacidad resultante"],
+    absent: ["Impacto", "En una unidad"],
   },
   {
     path: "/admin/usuarios/carga",
@@ -2876,8 +2674,8 @@ const routes = [
       const { default: ExcelJS } = await import("exceljs");
       const book = new ExcelJS.Workbook();
       const sheet = book.addWorksheet("Personas");
-      sheet.addRow(["Correo", "Nombre", "Dependencia", "Rol global", "Unidad (código)", "Función en la unidad", "Cargo", "Rol de Impacto"]);
-      sheet.addRow(["nueva@udes.edu.co", "Persona Nueva", "", "Consulta", "PR-A", "Jefa", "", ""]);
+      sheet.addRow(["Correo", "Nombre", "Dependencia", "Rol global", "Unidad (código)", "Función en la unidad", "Cargo"]);
+      sheet.addRow(["nueva@udes.edu.co", "Persona Nueva", "", "Consulta", "PR-A", "Jefa", ""]);
       const buffer = await book.xlsx.writeBuffer();
       const file = new window.File([buffer], "usuarios.xlsx");
       if (!file.arrayBuffer) file.arrayBuffer = async () => buffer;
@@ -3587,180 +3385,18 @@ FIXTURES.od_bulletin_editions = [
   },
 ];
 
-/* Impacto (0064–0067): el borrador de la versión 2 con tres indicadores. */
-{
-  const base = {
-    version_id: "imp-v2", matrix_sheet: "1. INVESTIGACIÓN", description: "", unit_original: "", responsible_original: "VI",
-    source: "SIGIIP", numerator_def: null, denominator_def: null, factor: null, aggregation: null, direction: null,
-    periodicity: null, report_level: null, applies_degrees: [], applies_modalities: [], capture_mode: null,
-    evidence_type: null, evidence_required: false, variation_threshold: 30, range_min: null, range_max: null,
-    n_minimum: null, allows_over_one: false, validator_function: "investigacion", in_pilot: false, unit: null,
-    calc_type: null, sheet_complete: false, open_findings: 0, version_state: "borrador", catalog_state: "oficial",
-  };
-  FIXTURES.imp_catalog_versions = [
-    { id: "imp-v2", number: 2, state: "borrador", source_file: "UDES_Matriz_Impacto_Institucional_vr7.xlsx", notes: "Copia de la versión 1", created_at: "2026-09-20T10:00:00Z", published_at: null },
-    { id: "imp-v1", number: 1, state: "publicada", source_file: "UDES_Matriz_Impacto_Institucional_vr7.xlsx", notes: "", created_at: "2026-09-18T10:00:00Z", published_at: "2026-09-19T10:00:00Z" },
-  ];
-  FIXTURES.imp_indicators_admin = [
-    { ...base, id: "imp-i01", code: "I01", function_id: "investigacion", level: "insumos", name: "Estudiantes vinculados a semilleros", matrix_row: 5, unit_original: "1920", in_pilot: true, open_findings: 2 },
-    { ...base, id: "imp-e04", code: "E04", function_id: "ensenanza", level: "procesos", name: "Tasa de retención estudiantil", matrix_sheet: "2. ENSEÑANZA", matrix_row: 8,
-      unit: "porcentaje", calc_type: "razon", numerator_def: "Siguen matriculados", denominator_def: "Matriculados el periodo anterior", factor: 100,
-      aggregation: "razon_de_sumas", direction: "mayor_mejor", periodicity: "semestral", report_level: "programa_sede", applies_degrees: ["pregrado"],
-      capture_mode: "precargado", validator_function: "ensenanza", in_pilot: true, sheet_complete: true },
-    { ...base, id: "imp-x38", code: "X38", function_id: "extension", level: "impacto", catalog_state: "sugerido", name: "Indicador sugerido de prueba", matrix_sheet: "3. EXTENSIÓN", matrix_row: 41, validator_function: "extension" },
-  ];
-  FIXTURES.imp_import_findings = [
-    { id: "imp-f1", version_id: "imp-v2", sheet: "1. INVESTIGACIÓN", row_number: 5, column_name: "E", kind: "unidad_numerica", value: "1920", suggestion: "Es un número donde va la unidad: probablemente la línea base desplazada de columna.", state: "abierto", note: "", resolved_at: null },
-    { id: "imp-f2", version_id: "imp-v2", sheet: "1. INVESTIGACIÓN", row_number: 5, column_name: "F", kind: "linea_base_por_definir", value: "Por definir", suggestion: "Registrar la línea base cuando exista; queda vacía.", state: "abierto", note: "", resolved_at: null },
-  ];
-  FIXTURES.imp_targets = [];
-  FIXTURES.imp_baselines = [];
-  FIXTURES.imp_alignments = [{ indicator_id: "imp-i01", kind: "pilar", code: "1" }, { indicator_id: "imp-i01", kind: "ods", code: "4" }];
-  FIXTURES["rpc:imp_indicator_missing"] = ["tipo de cálculo", "unidad"];
-
-  // Periodo 2026-2 abierto con tres asignaciones del programa de prueba.
-  FIXTURES.imp_periods = [
-    { id: "imp-p1", code: "2026-2", state: "abierto", catalog_version_id: "imp-v1", cutoff_program: "2026-10-15",
-      cutoff_faculty: "2026-10-25", cutoff_vice: "2026-11-05", opened_at: "2026-09-21T10:00:00Z", version: { number: 1 } },
-  ];
-  const program = { id: "imp-prog-a", name: "Programa de Prueba A", code: "PR-A", snies_code: "900001", parent: { name: "Facultad de Prueba" } };
-  FIXTURES.imp_assignments = [
-    { id: "imp-a1", period_id: "imp-p1", active: true, manual: false, justification: "", program_id: program.id, campus_id: "c1",
-      indicator: { id: "imp-e04", code: "E04", name: "Tasa de retención estudiantil", capture_mode: "precargado", report_level: "programa_sede" },
-      program, campus: { name: "Bucaramanga", slug: "bucaramanga" }, record: [{ state: "borrador" }] },
-    { id: "imp-a2", period_id: "imp-p1", active: true, manual: false, justification: "", program_id: program.id, campus_id: null,
-      indicator: { id: "imp-e13", code: "E13", name: "Innovaciones pedagógicas implementadas y documentadas", capture_mode: "manual", report_level: "programa" },
-      program, campus: null, record: [{ state: "enviado" }] },
-    { id: "imp-a3", period_id: "imp-p1", active: false, manual: false, justification: "El programa no hizo innovaciones este año.", program_id: program.id, campus_id: null,
-      indicator: { id: "imp-i34", code: "I34", name: "Desempeño académico en formación investigativa", capture_mode: "manual", report_level: "programa" },
-      program, campus: null, record: [] },
-  ];
-  // Mi reporte: el Programa A captura en 2026-2.
-  FIXTURES["rpc:imp_my_programs"] = [
-    { program_id: "imp-prog-a", program_name: "Programa de Prueba A", program_code: "PR-A", faculty_name: "Facultad de Prueba", can_send: true },
-  ];
-  const cap = {
-    assignment_id: "a", value: null, comparison_value: null, n_responses: null, num_comparison: null, den_comparison: null, text_value: null,
-    confirms_preloaded: null, preloaded: null, no_data: null, justification: "", observations: "", state: "borrador", channel: "en_linea",
-    version: 1, captured_by: null, updated_at: "2026-09-22T10:00:00Z", program_id: "imp-prog-a", period_id: "imp-p1", period_code: "2026-2",
-    period_state: "abierto", cutoff_program: "2026-10-15", program_name: "Programa de Prueba A", campus_id: null, campus_name: null,
-    description: "", unit: "numero", numerator_def: "", denominator_def: null, factor: 1, aggregation: "suma", direction: "mayor_mejor",
-    periodicity: "semestral", capture_mode: "manual", evidence_type: null, evidence_required: false, variation_threshold: 30,
-    range_min: null, range_max: null, n_minimum: null, allows_over_one: false, target_numeric: null, target_text: null,
-    previous_value: null, previous_period: null, return_reason: null, return_comment: null, evidence_count: 0,
-  };
-  FIXTURES.imp_capture_rows = [
-    { ...cap, id: "imp-r1", code: "E04", name: "Tasa de retención estudiantil", function_id: "ensenanza", level: "procesos", calc_type: "razon",
-      unit: "porcentaje", factor: 100, aggregation: "razon_de_sumas", capture_mode: "precargado", campus_id: "c1", campus_name: "Bucaramanga",
-      numerator_def: "Siguen matriculados", denominator_def: "Matriculados el periodo anterior", numerator: 430, denominator: 480,
-      preloaded: { numerator: 430, denominator: 480, n: null, file: "registro.csv", at: "2026-09-21T10:00:00Z" }, target_text: "+1 pp vs LB" },
-    { ...cap, id: "imp-r2", code: "E13", name: "Innovaciones pedagógicas implementadas y documentadas", function_id: "ensenanza", level: "productos",
-      calc_type: "conteo", numerator_def: "Innovaciones documentadas", evidence_required: true, evidence_type: "Acta del comité curricular", numerator: 3 },
-    { ...cap, id: "imp-r3", code: "I01", name: "Estudiantes vinculados a semilleros", function_id: "investigacion", level: "insumos", calc_type: "conteo",
-      numerator_def: "Estudiantes activos en semilleros", state: "devuelto_programa", numerator: 55, return_reason: "evidencia_insuficiente",
-      return_comment: "Adjunte el listado del SIGIIP." },
-  ];
-  FIXTURES.imp_evidence = [];
-  FIXTURES.imp_transitions = [];
-  FIXTURES.imp_import_batch_records = [];
-
-  // Revisión (0071): la persona de la sesión es decanatura del Programa B y
-  // vicerrectoría de Enseñanza. Un registro lo capturó ella misma.
-  FIXTURES["rpc:imp_my_review_scope"] = {
-    deanPrograms: [{ id: "imp-prog-b", name: "Programa de Prueba B", faculty: "Facultad de Prueba" }],
-    functions: ["ensenanza"],
-  };
-  const rev = { ...cap, program_id: "imp-prog-b", program_name: "Programa de Prueba B", captured_by: "otra-persona", updated_by: "otra-persona" };
-  FIXTURES.imp_capture_rows.push(
-    { ...rev, id: "imp-rv1", code: "E04", name: "Tasa de retención estudiantil", function_id: "ensenanza", level: "procesos", calc_type: "razon",
-      unit: "porcentaje", factor: 100, aggregation: "razon_de_sumas", campus_id: "c1", campus_name: "Bucaramanga", state: "enviado",
-      numerator_def: "Siguen matriculados", denominator_def: "Matriculados el periodo anterior", numerator: 430, denominator: 480, value: 89.583 },
-    { ...rev, id: "imp-rv2", code: "E13", name: "Innovaciones pedagógicas implementadas y documentadas", function_id: "ensenanza", level: "productos",
-      calc_type: "conteo", state: "devuelto_decanatura", numerator: 7, value: 7, justification: "Se sumaron dos cohortes nuevas." },
-    { ...rev, id: "imp-rv3", code: "E01", name: "Profesores con título de Maestría y Doctorado", function_id: "ensenanza", level: "insumos",
-      calc_type: "razon", unit: "porcentaje", factor: 100, denominator_def: "Profesores del programa", state: "aprobado_decanatura",
-      numerator: 18, denominator: 22, value: 81.818 },
-    { ...rev, id: "imp-rv4", code: "X04", name: "Profesores vinculados a extensión", function_id: "extension", level: "insumos",
-      calc_type: "conteo", state: "enviado", numerator: 4, value: 4, captured_by: "user-admin", updated_by: "user-admin" },
-  );
-  FIXTURES.imp_transitions.push({
-    record_id: "imp-rv2", at: "2026-09-22T15:00:00Z", from_state: "aprobado_decanatura", to_state: "devuelto_decanatura",
-    reason: "variacion_sin_justificar", comment: "Explique el salto frente a 2026-1.", actor: null,
-  });
-
-  // Portal (0072): catálogo publicado, estructura real y solo registros validados.
-  const portalSheet = {
-    unit: "porcentaje", calc_type: "razon", numerator_def: "Siguen matriculados", denominator_def: "Matriculados el periodo anterior",
-    factor: 100, aggregation: "razon_de_sumas", direction: "mayor_mejor", periodicity: "semestral", report_level: "programa_sede",
-    applies_degrees: ["pregrado"], capture_mode: "precargado", evidence_type: null, evidence_required: false, variation_threshold: 15,
-    range_min: null, range_max: null, n_minimum: null, allows_over_one: false, in_pilot: true, sheet_complete: true,
-  };
-  const portalBare = {
-    unit: null, calc_type: null, numerator_def: null, denominator_def: null, factor: null, aggregation: null, direction: null,
-    periodicity: null, report_level: null, applies_degrees: [], capture_mode: null, evidence_type: null, evidence_required: false,
-    variation_threshold: 30, range_min: null, range_max: null, n_minimum: null, allows_over_one: false, in_pilot: false, sheet_complete: false,
-  };
-  const portalIndicator = (code, function_id, level, name, extra = {}) => ({
-    code, function_id, level, catalog_state: "oficial", name, description: "", unit_original: "", responsible_original: "",
-    source: "", origin: "", targets: [], baseline: null, alignments: [], ...portalBare, ...extra,
-  });
-  FIXTURES["rpc:imp_portal_catalog"] = {
-    version: { id: "imp-v1", number: 1, source_file: "UDES_Matriz_Impacto_Institucional_vr7.xlsx", published_at: "2026-09-19T10:00:00Z" },
-    indicators: [
-      portalIndicator("I01", "investigacion", "insumos", "Estudiantes vinculados a semilleros", { unit_original: "1920" }),
-      portalIndicator("E04", "ensenanza", "procesos", "Tasa de retención estudiantil", {
-        ...portalSheet, unit_original: "% estudiantes", source: "Registro y Control",
-        targets: [{ year: 2026, numeric: null, text: "+1 pp vs LB" }], baseline: { year: 2023, value: 86.5 },
-        alignments: [{ kind: "pilar", code: "2" }, { kind: "ods", code: "4" }],
-      }),
-      portalIndicator("E13", "ensenanza", "productos", "Innovaciones pedagógicas implementadas y documentadas", {
-        ...portalSheet, unit: "numero", calc_type: "conteo", numerator_def: "Innovaciones documentadas", denominator_def: null, factor: 1,
-        aggregation: "suma", report_level: "programa", periodicity: "anual", capture_mode: "manual", unit_original: "N° innovaciones",
-      }),
-      portalIndicator("X38", "extension", "impacto", "Indicador sugerido de prueba", { catalog_state: "sugerido" }),
-    ],
-  };
-  FIXTURES["rpc:imp_portal_structure"] = {
-    faculties: [
-      { id: "imp-fcs", slug: "ciencias-sociales", code: "FCS", name: "Facultad de Ciencias Sociales" },
-      { id: "imp-fit", slug: "ingenierias-y-tecnologias", code: "FIT", name: "Facultad de Ingenierías y Tecnologías" },
-    ],
-    programs: [
-      { id: "imp-derecho", slug: "derecho", code: "DER", name: "Derecho", faculty_id: "imp-fcs", degree_level: "pregrado", modality: "presencial", campus_ids: ["imp-c-bga", "imp-c-cuc"] },
-      { id: "imp-sistemas", slug: "ingenieria-de-sistemas", code: "ISI", name: "Ingeniería de Sistemas", faculty_id: "imp-fit", degree_level: "pregrado", modality: "presencial", campus_ids: ["imp-c-bga"] },
-    ],
-    campuses: [
-      { id: "imp-c-bga", slug: "bucaramanga", name: "Bucaramanga" },
-      { id: "imp-c-cuc", slug: "cucuta", name: "Cúcuta" },
-      { id: "imp-c-bog", slug: "bogota", name: "Bogotá" },
-    ],
-  };
-  const measure = (code, program_id, campus_id, period_code, numerator, denominator = null) => ({
-    code, program_id, campus_id, period_code, numerator, denominator, n_responses: null, num_comparison: null, den_comparison: null,
-    value: denominator ? (numerator / denominator) * 100 : numerator, comparison_value: null,
-  });
-  FIXTURES["rpc:imp_portal_records"] = [
-    measure("E04", "imp-derecho", "imp-c-bga", "2025-2", 400, 500),
-    measure("E04", "imp-sistemas", "imp-c-bga", "2025-2", 300, 400),
-    measure("E04", "imp-derecho", "imp-c-bga", "2026-1", 450, 500),
-    measure("E04", "imp-derecho", "imp-c-cuc", "2026-1", 180, 200),
-    measure("E04", "imp-sistemas", "imp-c-bga", "2026-1", 340, 400),
-    measure("E13", "imp-derecho", null, "2026-1", 3),
-    measure("E13", "imp-sistemas", null, "2026-1", 2),
-  ];
-
-  FIXTURES.imp_settings = [{ key: "importacion_todo_o_nada", value: false }];
-  FIXTURES.units = [
-    { id: "imp-prog-a", name: "Programa de Prueba A", code: "PR-A", snies_code: "900001", kind: "programa",
-      campuses: [{ campus: { id: "c1", name: "Bucaramanga", slug: "bucaramanga" } }] },
-  ];
-}
+/* El programa de prueba en el que trabaja la vicerrectoría (Usuarios y la
+   carga masiva lo nombran por su código, PR-A). */
+FIXTURES.units = [
+  { id: "imp-prog-a", parent_id: null, kind: "programa", name: "Programa de Prueba A", code: "PR-A", slug: "programa-prueba-a",
+    snies_code: "900001", position: 0, campuses: [{ campus: { id: "c1", name: "Bucaramanga", slug: "bucaramanga" } }] },
+];
 
 /* Estructura institucional (0073, 0074): dos vicerrectorías, una facultad
    que depende de una de ellas por organigrama, dos programas (uno completo y
    otro sin SNIES ni sedes) y, en la rama administrativa, una oficina que
    cuelga de una vicerrectoría y otra de ella. Se añade a lo que ya traen
-   Impacto y Usuarios. */
+   Usuarios y el programa de prueba. */
 {
   const campus = (id, name, slug) => ({ campus: { id, name, slug } });
   const base = { description: "", substantive_function: null, snies_code: null, degree_level: null, modality: null, reports_to: null };
@@ -3781,8 +3417,8 @@ FIXTURES.od_bulletin_editions = [
     { ...base, id: "inst-aut", parent_id: "inst-cal", kind: "otra", code: "AUT", name: "Comité de Autoevaluación",
       slug: "comite-autoevaluacion", position: 1 },
   );
-  FIXTURES.imp_program_campuses = [
-    ...(FIXTURES.imp_program_campuses ?? []),
+  FIXTURES.program_campuses = [
+    ...(FIXTURES.program_campuses ?? []),
     { program_id: "inst-isi", campus_id: "c1", active: true },
     { program_id: "inst-isi", campus_id: "c2", active: false },
   ];
@@ -3790,7 +3426,7 @@ FIXTURES.od_bulletin_editions = [
   // cambia lo que ven.
   FIXTURES.unit_members = [
     ...(FIXTURES.unit_members ?? []),
-    { id: "inst-m1", unit_id: "inst-isi", profile_id: "user-sistemas", role: "editor", access_role_id: "rol-director",
+    { id: "inst-m1", unit_id: "inst-isi", profile_id: "user-sistemas", role: "editor",
       title: "Directora del programa", profiles: { full_name: "Directora de Sistemas", email: "sistemas@udes.edu.co" } },
   ];
 
@@ -3799,11 +3435,11 @@ FIXTURES.od_bulletin_editions = [
       path: "/admin/estructura-institucional",
       expect: "Estructura institucional",
       session: true,
-      note: "las dos ramas y lo que le falta a Impacto",
+      note: "las dos ramas y lo que le falta a la estructura",
       also: [
-        "Académica", "Administrativa", "Vicerrectoría de Investigaciones", "Valida investigación",
+        "Académica", "Administrativa", "Vicerrectoría de Investigaciones", "Lidera investigación",
         "Facultad de Ingenierías y Tecnologías", "Oficina de Aseguramiento de la Calidad", "Comité de Autoevaluación",
-        "Qué falta para que Impacto funcione", "Ingeniería Industrial", "sin SNIES",
+        "Qué le falta a la estructura", "Ingeniería Industrial", "sin SNIES",
       ],
     },
     {
@@ -3811,7 +3447,8 @@ FIXTURES.od_bulletin_editions = [
       expect: "Sedes donde se ofrece",
       session: true,
       note: "la ficha de un programa con sus sedes y su gente, editable",
-      also: ["Código SNIES", "Inactiva · se ofrecía antes", "Personas de la unidad", "Directora de Sistemas", "Función en la unidad", "Rol de Impacto"],
+      also: ["Código SNIES", "Inactiva · se ofrecía antes", "Personas de la unidad", "Directora de Sistemas", "Función en la unidad"],
+      absent: ["Rol de Impacto"],
       interact: async (window, tick) => {
         const snies = [...window.document.querySelectorAll(".inst-form input")].find((input) => input.value === "1234");
         if (!snies) throw new Error("el SNIES del programa no llegó a la ficha");
@@ -3819,8 +3456,8 @@ FIXTURES.od_bulletin_editions = [
         if (!facultad) throw new Error("la facultad del programa no quedó elegida");
         const cargo = window.document.querySelector(".inst-people__table input");
         if (!cargo || cargo.value !== "Directora del programa") throw new Error("el cargo de la persona no llegó a la ficha");
-        const rol = [...window.document.querySelectorAll(".inst-people__table select")].find((select) => select.value === "rol-director");
-        if (!rol) throw new Error("el rol de Impacto de la persona no quedó elegido");
+        const funcion = [...window.document.querySelectorAll(".inst-people__table select")].find((select) => select.value === "editor");
+        if (!funcion) throw new Error("la función de la persona no quedó elegida");
         // Cambiar el cargo deja la fila con cambios y ofrece guardar.
         const setter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, "value").set;
         setter.call(cargo, "Director del programa");
@@ -3919,36 +3556,32 @@ FIXTURES.od_bulletin_editions = [
   );
 }
 
-/* Portal de Impacto: la oferta de programas filtrable por facultad, campus y
-   nivel, con el filtro en la dirección. Usa la estructura del portal de
-   arriba (Derecho en Bucaramanga y Cúcuta; Sistemas solo en Bucaramanga). */
+/* Oferta de programas: filtrable por facultad, campus y nivel, con el filtro
+   en la dirección. Lee la estructura de arriba: el programa de prueba (sin
+   facultad ni nivel), Sistemas (activo en Bucaramanga, ya no en Cúcuta) e
+   Industrial (sin sedes). */
 routes.push(
   {
-    path: "/impacto?lente=programa",
-    expect: "2 programas · toda la universidad",
+    path: "/oferta",
+    expect: "3 programas · toda la universidad",
     session: true,
     note: "oferta de programas: filtros, nivel y sedes de cada programa",
-    also: ["Facultad", "Campus", "Nivel de formación", "Todas las facultades", "Profesional universitario", "Bucaramanga · Cúcuta"],
+    also: ["Oferta de programas", "Facultad", "Campus", "Nivel de formación", "Todas las facultades", "Profesional universitario", "Sin sede activa"],
+    absent: ["Cúcuta ·", "Impacto"],
   },
   {
-    path: "/impacto?lente=programa&facultad=ciencias-sociales&campus=cucuta",
-    expect: "1 programa · Facultad de Ciencias Sociales · Cúcuta",
+    path: "/oferta?facultad=facultad-ingenierias&campus=bucaramanga",
+    expect: "1 programa · Facultad de Ingenierías y Tecnologías · Bucaramanga",
     session: true,
     note: "oferta filtrada desde la dirección: facultad y campus combinados",
-    also: ["Derecho", "Quitar filtros"],
-    absent: ["Ingeniería de Sistemas"],
+    also: ["Ingeniería de Sistemas", "Quitar filtros"],
+    absent: ["Ingeniería Industrial"],
   },
   {
-    path: "/impacto?campus=bogota",
-    expect: "Ninguna facultad ofrece programas en Bogotá todavía.",
+    path: "/oferta?nivel=maestria",
+    expect: "No hay programas de nivel maestría en la estructura todavía.",
     session: true,
-    note: "una sede sin oferta lo dice en palabras",
-  },
-  {
-    path: "/impacto/facultad/ciencias-sociales",
-    expect: "Ver la oferta de programas de la facultad",
-    session: true,
-    note: "desde la facultad se llega a su oferta filtrada",
+    note: "un nivel sin programas lo dice en palabras",
   },
 );
 

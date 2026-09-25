@@ -1,8 +1,8 @@
 /* =============================================================================
-   Personas: dónde trabaja cada una y con qué rol.
+   Personas: dónde trabaja cada una y qué hace allí.
 
-   Las pertenencias (`unit_members`) son las de Mis Tableros; desde 0063 llevan
-   además un rol de unidad (`access_role_id`) que da las acciones de Impacto.
+   Las pertenencias (`unit_members`) son las de Mis Tableros: la unidad, la
+   función de la persona en ella (Gestor, Contribuyente o Consulta) y su cargo.
    Se escriben todas juntas por persona con `admin_set_memberships` (0073), en
    una transacción: el paso 3 del asistente y la ficha de la persona enseñan la
    lista entera, y lo que se guarda es lo que queda.
@@ -28,16 +28,14 @@ export interface Membership {
   id: string;
   unitId: string;
   profileId: string;
-  accessRoleId: string | null;
   role: UnitRole;
   /** Cargo (0074); vacío si la base aún no lo tiene. */
   title: string;
 }
 
-/** Lo que se envía para una persona: unidad, rol de unidad y, si se elige, papel en Mis Tableros. */
+/** Lo que se envía para una persona: unidad y, si se elige, su función en ella. */
 export interface MembershipInput {
   unit_id: string;
-  access_role_id: string | null;
   role?: UnitRole | null;
   /** Cargo; nulo conserva el que tenga (0074). */
   title?: string | null;
@@ -79,14 +77,13 @@ export function useMemberships() {
     queryFn: async (): Promise<Membership[]> => {
       const rows = unwrap(
         (await supabase.from("unit_members").select("*")) as Row<
-          { id: string; unit_id: string; profile_id: string; access_role_id: string | null; role: UnitRole; title?: string | null }[]
+          { id: string; unit_id: string; profile_id: string; role: UnitRole; title?: string | null }[]
         >,
       );
       return rows.map((m) => ({
         id: m.id,
         unitId: m.unit_id,
         profileId: m.profile_id,
-        accessRoleId: m.access_role_id,
         role: m.role,
         title: m.title ?? "",
       }));

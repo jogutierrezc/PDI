@@ -1,8 +1,9 @@
 /* =============================================================================
    Estructura institucional · lectura y escritura.
 
-   Lee el árbol de `units` con lo que Impacto le pide (0063, 0073), la oferta
-   por sede, las sedes y quién trabaja en cada unidad. Escribe solo por las
+   Lee el árbol de `units` con los datos de programa (0063, 0073), la oferta
+   por sede (`program_campuses`, 0077), las sedes y quién trabaja en cada
+   unidad. Escribe solo por las
    funciones de 0073 —admin_save_unit y admin_import_programs—, que hacen en
    una transacción la unidad y sus sedes y responden con un mensaje claro si
    quien pide no es administración.
@@ -70,7 +71,6 @@ interface MemberRow {
   unit_id: string;
   profile_id: string;
   role: UnitRole;
-  access_role_id?: string | null;
   title?: string | null;
   profiles: { full_name: string | null; email: string | null } | null;
 }
@@ -104,15 +104,10 @@ async function loadUnits(): Promise<{ units: InstUnit[]; ready: boolean }> {
 }
 
 async function loadMembers(): Promise<InstMember[]> {
-  // Con 0074 trae el cargo; sin ella, sin cargo; sin 0063, sin rol de Impacto.
+  // Con 0074 trae el cargo; sin ella, sin cargo.
   let result = (await supabase
     .from("unit_members")
-    .select("id,unit_id,profile_id,role,access_role_id,title,profiles(full_name,email)")) as Result<MemberRow[]>;
-  if (result.error && MISSING_COLUMN.has(result.error.code ?? "")) {
-    result = (await supabase
-      .from("unit_members")
-      .select("id,unit_id,profile_id,role,access_role_id,profiles(full_name,email)")) as Result<MemberRow[]>;
-  }
+    .select("id,unit_id,profile_id,role,title,profiles(full_name,email)")) as Result<MemberRow[]>;
   if (result.error && MISSING_COLUMN.has(result.error.code ?? "")) {
     result = (await supabase.from("unit_members").select("id,unit_id,profile_id,role,profiles(full_name,email)")) as Result<MemberRow[]>;
   }
@@ -121,7 +116,6 @@ async function loadMembers(): Promise<InstMember[]> {
     unitId: m.unit_id,
     profileId: m.profile_id,
     role: m.role,
-    accessRoleId: m.access_role_id ?? null,
     title: m.title ?? null,
     name: m.profiles?.full_name?.trim() || m.profiles?.email || "Sin nombre",
     email: m.profiles?.email ?? "",
@@ -140,7 +134,7 @@ export function useInstitution() {
           .order("position")
           .then((r) => rows<Campus>(r as Result<Campus[]>)),
         supabase
-          .from("imp_program_campuses")
+          .from("program_campuses")
           .select("program_id,campus_id,active")
           .then((r) =>
             rows<{ program_id: string; campus_id: string; active: boolean | null }>(
@@ -204,8 +198,8 @@ function useInstitutionMutation<TInput, TOutput>(fn: (input: TInput) => Promise<
       await Promise.all([
         client.invalidateQueries({ queryKey: institutionKeys.all }),
         client.invalidateQueries({ queryKey: boardKeys.all }),
-        // El portal de Impacto y su intranet leen programas y sedes.
-        client.invalidateQueries({ queryKey: ["impacto"] }),
+        // La oferta de programas lee programas y sedes.
+        client.invalidateQueries({ queryKey: ["oferta"] }),
       ]);
     },
   });
@@ -225,7 +219,7 @@ export function useDeleteUnit() {
     if (error) {
       if (error.code === "23503") {
         throw new FriendlyError("La unidad tiene datos que dependen de ella y no se puede borrar.", {
-          advice: "Si ya no se usa, déjela sin personas y consérvela; los registros de Impacto la necesitan.",
+          advice: "Si ya no se usa, déjela sin personas y consérvela.",
           original: error.message,
           retryable: false,
         });
@@ -250,7 +244,6 @@ export interface MembershipInput {
   profileId: string;
   unitId: string;
   role: UnitRole;
-  accessRoleId: string | null;
   /** null conserva el que tenga; texto vacío lo borra. */
   title: string | null;
 }
@@ -263,7 +256,7 @@ export function useSaveMembership() {
   return useInstitutionMutation(async (input: MembershipInput) => {
     const { error } = await supabase.rpc("admin_set_memberships", {
       p_profile: input.profileId,
-      p_rows: [{ unit_id: input.unitId, role: input.role, access_role_id: input.accessRoleId, title: input.title }],
+      p_rows: [{ unit_id: input.unitId, role: input.role, title: input.title }],
       p_replace: false,
     });
     if (error) throw rpcError(error as DatabaseError, "0074_estructura_carga_y_personas.sql");

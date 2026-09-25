@@ -112,7 +112,7 @@ export const SHEETS: SheetDef[] = [
       {
         key: "funcion",
         header: "Función sustantiva",
-        hint: "La que valida en Impacto: Investigación, Enseñanza o Extensión. Vacía si no valida ninguna.",
+        hint: "La que lidera: Investigación, Enseñanza o Extensión. Vacía si no lidera ninguna.",
         optional: true,
         width: 22,
       },

@@ -46,7 +46,7 @@ export function UserWizard({
   const [unit, setUnit] = useState("");
   const [mode, setMode] = useState<"invite" | "password">("invite");
   const [password, setPassword] = useState("");
-  const globalRoles = roles.filter((role) => (role.scope ?? "global") === "global");
+  const globalRoles = roles;
   const [roleId, setRoleId] = useState(globalRoles.find((role) => role.key === "consulta")?.id ?? globalRoles[0]?.id ?? "");
   const [drafts, setDrafts] = useState<MembershipDraft[]>([]);
   const [error, setError] = useState("");
@@ -57,7 +57,7 @@ export function UserWizard({
   const summary = personSummary(
     role,
     reports,
-    drafts.filter((d) => d.unitId).map((d) => ({ unit: unitById.get(d.unitId), role: roles.find((r) => r.id === d.accessRoleId), board: d.boardRole, title: d.title })),
+    drafts.filter((d) => d.unitId).map((d) => ({ unit: unitById.get(d.unitId), board: d.boardRole, title: d.title })),
     new Map((reportOptions.data ?? []).map((report) => [report.slug, report.name])),
   );
   const problem = membershipProblem(drafts);
@@ -221,9 +221,9 @@ export function UserWizard({
         <>
           <p className="users-hint">
             Opcional. En cada programa, facultad u oficina: su función con los datos (Gestor, Contribuyente o
-            Consulta), su cargo y, si reporta o revisa en Impacto, su rol. También puede hacerlo después desde su ficha.
+            Consulta) y su cargo. También puede hacerlo después desde su ficha.
           </p>
-          <MembershipEditor value={drafts} onChange={setDrafts} units={units} roles={roles} disabled={saving} />
+          <MembershipEditor value={drafts} onChange={setDrafts} units={units} disabled={saving} />
           <aside className="us-summary" aria-label="Lo que podrá hacer">
             <h3>{fullName.trim() || "La persona"} podrá</h3>
             <ul>

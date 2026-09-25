@@ -1,20 +1,17 @@
 /* =============================================================================
-   Dónde trabaja una persona: unidad, función, cargo y rol de Impacto.
+   Dónde trabaja una persona: unidad, función y cargo.
 
    La función dice qué hace con los datos de la unidad (Gestor, Contribuyente
    o Consulta: el papel de Mis Tableros); el cargo es texto libre para
-   reconocerla («Directora del programa»); el rol de Impacto, opcional, da las
-   acciones de reporte y revisión.
+   reconocerla («Directora del programa»).
 
    Lo usan el paso 3 del asistente y la ficha de la persona. La lista que se
    ve es la que queda al guardar (admin_set_memberships reemplaza), así que
-   también salen las pertenencias que alguien creó desde Mis Tableros sin rol
-   de Impacto: se muestran «Sin rol de Impacto» y no se pierden.
+   también salen las pertenencias que alguien creó desde Mis Tableros.
    ========================================================================== */
 
 import { useMemo } from "react";
 import { Icon } from "../../../components/ui/Icon";
-import type { AccessRole } from "../../../types/database";
 import { UNIT_KIND, type UnitKind, type UnitRole } from "../../tableros/model";
 import type { UnitOption } from "./people-db";
 import { BOARD_ROLE_LABEL } from "./role-matrix";
@@ -22,8 +19,7 @@ import { BOARD_ROLE_LABEL } from "./role-matrix";
 export interface MembershipDraft {
   key: string;
   unitId: string;
-  accessRoleId: string | null;
-  /** Función en la unidad; null = la que diga el rol (o la que ya tenía). */
+  /** Función en la unidad; null = la que ya tenía, o Consulta. */
   boardRole: UnitRole | null;
   /** Cargo, texto libre. */
   title: string;
@@ -31,27 +27,10 @@ export interface MembershipDraft {
 
 const KIND_ORDER: UnitKind[] = ["vicerrectoria", "facultad", "programa", "oficina", "otra"];
 
-/** Qué clase de unidad espera cada acción de Impacto. */
-const EXPECTS: Record<string, { kinds: UnitKind[]; text: string }> = {
-  "impacto.capturar": { kinds: ["programa"], text: "capturar se hace en un programa" },
-  "impacto.enviar": { kinds: ["programa"], text: "enviar se hace en un programa" },
-  "impacto.aprobar": { kinds: ["facultad"], text: "aprobar se da en una facultad y alcanza a sus programas" },
-  "impacto.validar": { kinds: ["vicerrectoria"], text: "validar se da en una vicerrectoría con función sustantiva" },
-};
-
-/** Avisos de una pareja unidad + rol que la base aceptaría pero no servirían. */
-export function membershipWarnings(unit: UnitOption | undefined, role: AccessRole | undefined): string[] {
-  if (!unit || !role) return [];
-  return (role.capabilities ?? [])
-    .filter((cap) => EXPECTS[cap] && !EXPECTS[cap].kinds.includes(unit.kind))
-    .map((cap) => `En ${UNIT_KIND[unit.kind].label.toLowerCase()} no sirve: ${EXPECTS[cap].text}.`);
-}
-
 let seq = 0;
 export const newDraft = (partial: Partial<MembershipDraft> = {}): MembershipDraft => ({
   key: `m${++seq}`,
   unitId: "",
-  accessRoleId: null,
   boardRole: null,
   title: "",
   ...partial,
@@ -61,16 +40,13 @@ export function MembershipEditor({
   value,
   onChange,
   units,
-  roles,
   disabled = false,
 }: {
   value: MembershipDraft[];
   onChange: (next: MembershipDraft[]) => void;
   units: UnitOption[];
-  roles: AccessRole[];
   disabled?: boolean;
 }) {
-  const unitRoles = roles.filter((role) => role.scope === "unidad");
   const byId = useMemo(() => new Map(units.map((unit) => [unit.id, unit])), [units]);
   const grouped = useMemo(
     () =>
@@ -88,15 +64,10 @@ export function MembershipEditor({
   return (
     <div className="us-members">
       {value.length === 0 && (
-        <p className="us-members__empty">
-          Todavía no trabaja en ninguna unidad. Sin unidad no reporta ni revisa en Impacto, pero sí entra con su rol
-          de toda la intranet.
-        </p>
+        <p className="us-members__empty">Todavía no trabaja en ninguna unidad. Sin unidad entra con su rol de toda la intranet.</p>
       )}
       {value.map((row, index) => {
         const unit = byId.get(row.unitId);
-        const role = unitRoles.find((item) => item.id === row.accessRoleId);
-        const warnings = membershipWarnings(unit, role);
         const duplicated = row.unitId && value.findIndex((other) => other.unitId === row.unitId) !== index;
         return (
           <div key={row.key} className="us-member">
@@ -127,14 +98,14 @@ export function MembershipEditor({
                 disabled={disabled}
                 onChange={(event) => patch(row.key, { boardRole: (event.target.value || null) as UnitRole | null })}
               >
-                <option value="">
-                  {role?.unit_role ? `Según el rol (${BOARD_ROLE_LABEL[role.unit_role].label})` : "Consulta"}
-                </option>
-                {(Object.keys(BOARD_ROLE_LABEL) as UnitRole[]).map((board) => (
-                  <option key={board} value={board}>
-                    {BOARD_ROLE_LABEL[board].label}
-                  </option>
-                ))}
+                <option value="">Consulta</option>
+                {(Object.keys(BOARD_ROLE_LABEL) as UnitRole[])
+                  .filter((board) => board !== "visor")
+                  .map((board) => (
+                    <option key={board} value={board}>
+                      {BOARD_ROLE_LABEL[board].label}
+                    </option>
+                  ))}
               </select>
             </label>
             <label className="admin-field">
@@ -146,21 +117,6 @@ export function MembershipEditor({
                 onChange={(event) => patch(row.key, { title: event.target.value })}
               />
             </label>
-            <label className="admin-field">
-              <span>Rol de Impacto</span>
-              <select
-                value={row.accessRoleId ?? ""}
-                disabled={disabled}
-                onChange={(event) => patch(row.key, { accessRoleId: event.target.value || null })}
-              >
-                <option value="">Sin rol de Impacto</option>
-                {unitRoles.map((item) => (
-                  <option key={item.id} value={item.id}>
-                    {item.name}
-                  </option>
-                ))}
-              </select>
-            </label>
             <button
               type="button"
               className="us-icon-button"
@@ -170,17 +126,12 @@ export function MembershipEditor({
             >
               <Icon name="close" size={15} />
             </button>
-            {(warnings.length > 0 || duplicated || role?.description) && (
+            {(duplicated || row.boardRole) && (
               <div className="us-member__notes">
-                {role?.description && <small>{role.description}</small>}
-                {warnings.map((warning) => (
-                  <small key={warning} className="us-raised">
-                    <Icon name="alert" size={13} /> {warning}
-                  </small>
-                ))}
+                {row.boardRole && <small>{BOARD_ROLE_LABEL[row.boardRole].hint}</small>}
                 {duplicated && (
                   <small className="us-raised">
-                    <Icon name="alert" size={13} /> Esta unidad ya está en la lista: en cada unidad va un solo rol.
+                    <Icon name="alert" size={13} /> Esta unidad ya está en la lista: en cada unidad va una sola función.
                   </small>
                 )}
               </div>
@@ -210,7 +161,6 @@ export function membershipProblem(value: MembershipDraft[]): string | null {
 export const toInput = (value: MembershipDraft[]) =>
   value.map((row) => ({
     unit_id: row.unitId,
-    access_role_id: row.accessRoleId,
     role: row.boardRole,
     title: row.title.trim() || null,
   }));

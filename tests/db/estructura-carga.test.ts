@@ -69,7 +69,7 @@ describe("carga de toda la estructura", () => {
       { code: "CG-VA", kind: "vicerrectoria", parent: null, reports: null },
     ]);
     const [offer] = await t.q<{ slug: string }>(
-      "select c.slug from imp_program_campuses pc join campuses c on c.id = pc.campus_id join units u on u.id = pc.program_id where u.code = 'CG-P'",
+      "select c.slug from program_campuses pc join campuses c on c.id = pc.campus_id join units u on u.id = pc.program_id where u.code = 'CG-P'",
     );
     expect(offer.slug).toBe("cucuta");
   });

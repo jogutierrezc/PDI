@@ -22,11 +22,10 @@ import { keys, useAccessRoles } from "../../../data/queries";
 import { useCreateUser } from "../../../data/mutations";
 import { supabase } from "../../../lib/supabase";
 import type { Profile } from "../../../types/database";
-import { cellText } from "../../impacto/import/matrix";
 import { downloadBlob } from "../traslado/transfer";
 import { UNIT_KIND, UNIT_ROLE } from "../../tableros/model";
 import { peopleKeys, setMemberships, type UnitOption } from "./people-db";
-import { planUsers, USER_COLUMNS, type PlannedPerson, type UsersPlan } from "./users-sheet";
+import { cellText, planUsers, USER_COLUMNS, type PlannedPerson, type UsersPlan } from "./users-sheet";
 
 const XLSX = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
 
@@ -56,7 +55,7 @@ export function BulkUsers({ profiles, units }: { profiles: Profile[]; units: Uni
       const { default: ExcelJS } = await import("exceljs");
       const book = new ExcelJS.Workbook();
       const sheet = book.addWorksheet("Personas", { views: [{ state: "frozen", ySplit: 1 }] });
-      sheet.columns = USER_COLUMNS.map((header, i) => ({ header, width: [34, 30, 24, 28, 18, 20, 28, 28][i] }));
+      sheet.columns = USER_COLUMNS.map((header, i) => ({ header, width: [34, 30, 24, 28, 18, 20, 28][i] }));
       sheet.getRow(1).font = { bold: true };
       sheet.addRow([
         "nombre.apellido@udes.edu.co",
@@ -66,14 +65,12 @@ export function BulkUsers({ profiles, units }: { profiles: Profile[]; units: Uni
         "MED",
         "Gestor",
         "Director del programa",
-        "Dirección de programa",
       ]);
       sheet.getRow(2).font = { italic: true, color: { argb: "FF6B7C93" } };
 
       const lists = book.addWorksheet("Listas");
       lists.columns = [
-        { header: "Roles globales", width: 32 },
-        { header: "Roles de unidad", width: 32 },
+        { header: "Roles", width: 32 },
         { header: "Código", width: 14 },
         { header: "Unidad", width: 48 },
         { header: "Clase", width: 16 },
@@ -81,16 +78,14 @@ export function BulkUsers({ profiles, units }: { profiles: Profile[]; units: Uni
         { header: "Qué hace", width: 70 },
       ];
       lists.getRow(1).font = { bold: true };
-      const globals = roles.filter((r) => (r.scope ?? "global") === "global").map((r) => r.name);
-      const locals = roles.filter((r) => r.scope === "unidad").map((r) => r.name);
+      const globals = roles.map((r) => r.name);
       const sorted = [...units].sort((a, b) => a.code.localeCompare(b.code, "es"));
       const functions = (["jefe", "editor", "visor"] as const).map((key) => UNIT_ROLE[key]);
-      const height = Math.max(globals.length, locals.length, sorted.length, functions.length);
+      const height = Math.max(globals.length, sorted.length, functions.length);
       for (let i = 0; i < height; i += 1) {
         const unit = sorted[i];
         lists.addRow([
           globals[i] ?? "",
-          locals[i] ?? "",
           unit?.code ?? "",
           unit?.name ?? "",
           unit ? UNIT_KIND[unit.kind].label : "",
@@ -108,17 +103,12 @@ export function BulkUsers({ profiles, units }: { profiles: Profile[]; units: Uni
         sheet.getCell(`E${row}`).dataValidation = {
           type: "list",
           allowBlank: true,
-          formulae: [`Listas!$C$2:$C$${sorted.length + 1}`],
+          formulae: [`Listas!$B$2:$B$${sorted.length + 1}`],
         };
         sheet.getCell(`F${row}`).dataValidation = {
           type: "list",
           allowBlank: true,
-          formulae: [`Listas!$F$2:$F$${functions.length + 1}`],
-        };
-        sheet.getCell(`H${row}`).dataValidation = {
-          type: "list",
-          allowBlank: true,
-          formulae: [`Listas!$B$2:$B$${locals.length + 1}`],
+          formulae: [`Listas!$E$2:$E$${functions.length + 1}`],
         };
       }
       const buffer = await book.xlsx.writeBuffer();
@@ -191,7 +181,6 @@ export function BulkUsers({ profiles, units }: { profiles: Profile[]; units: Uni
             id,
             person.assignments.map((a) => ({
               unit_id: a.unitId,
-              access_role_id: a.accessRoleId,
               role: a.board,
               title: a.title || null,
             })),
@@ -225,7 +214,7 @@ export function BulkUsers({ profiles, units }: { profiles: Profile[]; units: Uni
           <h3>Descargue la plantilla</h3>
           <p>
             Una fila por unidad: la misma persona puede ocupar varias filas. En cada unidad diga su función con los
-            datos (Gestor, Contribuyente o Consulta), su cargo y, si reporta en Impacto, su rol. La hoja «Listas» trae
+            datos (Gestor, Contribuyente o Consulta) y su cargo. La hoja «Listas» trae
             los roles y los códigos de unidad de esta intranet.
           </p>
           <button type="button" className="button-ghost" onClick={() => void downloadTemplate()} disabled={access.isPending}>
@@ -343,7 +332,6 @@ function PreviewRow({ person, outcome }: { person: PlannedPerson; outcome?: Outc
           <span key={a.line} className="us-tag us-tag--unit">
             {a.unitLabel} · {a.board ? UNIT_ROLE[a.board].label : "Consulta"}
             {a.title ? ` · ${a.title}` : ""}
-            {a.accessRoleId ? ` · ${a.roleLabel}` : ""}
           </span>
         ))}
         {person.errors.map((text) => (

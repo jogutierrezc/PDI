@@ -8,39 +8,35 @@ import {
   raisedModules,
   templateMatrix,
   templateOf,
-  type Matrix,
 } from "../../src/modules/admin/usuarios/role-matrix";
 
-const tpl = (id: "consulta" | "editor" | "revisor" | "administrador", scope: "global" | "unidad" = "global") =>
-  templateMatrix(id, scope) as Matrix;
+const tpl = (id: "consulta" | "editor" | "administrador") => templateMatrix(id);
 
-describe("plantillas globales", () => {
+describe("plantillas", () => {
   it("Consulta ve todo sin capacidad", () => {
     const columns = compile(tpl("consulta"));
-    expect(columns).toMatchObject({ base_role: "consulta", all_screens: true, all_reports: true, capabilities: [] });
+    expect(columns).toEqual({ base_role: "consulta", screens: [], all_screens: true, all_reports: true, reports: [] });
   });
 
   it("Editor pide Planeación y es lo mismo que el rol Planeación de fábrica", () => {
     const columns = compile(tpl("editor"));
-    expect(columns).toMatchObject({ base_role: "planeacion", all_screens: true, all_reports: true, capabilities: [] });
+    expect(columns).toMatchObject({ base_role: "planeacion", all_screens: true, all_reports: true });
     // Ve la pantalla de usuarios, pero la base la cierra sin administración.
     expect(effectiveLevel(tpl("editor"), "sistema")).toBe("ver");
   });
 
-  it("Administrador pide administración y lleva catálogo y periodos", () => {
-    const columns = compile(tpl("administrador"));
-    expect(columns).toMatchObject({ base_role: "admin", all_screens: true, all_reports: true });
-    expect(columns.capabilities.sort()).toEqual(["impacto.catalogo", "impacto.periodo"]);
+  it("Administrador pide administración", () => {
+    expect(compile(tpl("administrador"))).toMatchObject({ base_role: "admin", all_screens: true, all_reports: true });
   });
 
-  it("Revisor global no existe: revisar se hace en una unidad", () => {
-    expect(templateMatrix("revisor", "global")).toBeNull();
+  it("ya no hay módulo de Impacto en la matriz", () => {
+    expect(Object.keys(tpl("administrador").modules)).not.toContain("impacto");
   });
 });
 
 describe("los roles de fábrica se leen como su plantilla", () => {
   const system = (base_role: "consulta" | "planeacion" | "admin") =>
-    decompile({ base_role, screens: [], all_screens: true, all_reports: true, capabilities: [] }, []);
+    decompile({ base_role, screens: [], all_screens: true, all_reports: true }, []);
 
   it("Consulta, Planeación (Editor) y Administrador", () => {
     expect(templateOf(system("consulta"))).toBe("consulta");
@@ -92,39 +88,6 @@ describe("la capacidad es la mayor que pide un módulo", () => {
     expect(columns.all_screens).toBe(false);
     expect(columns.screens).toContain("pillars");
     expect(columns.screens).not.toContain("budget");
-  });
-});
-
-describe("roles de unidad", () => {
-  it("las plantillas dan acciones de unidad y papel en Mis Tableros", () => {
-    expect(compile(tpl("editor", "unidad"))).toMatchObject({
-      scope: "unidad",
-      base_role: "consulta",
-      screens: ["impacto"],
-      capabilities: ["impacto.capturar", "impacto.enviar"],
-      unit_role: "editor",
-    });
-    expect(compile(tpl("revisor", "unidad")).capabilities).toEqual(["impacto.aprobar", "impacto.validar"]);
-  });
-
-  it("los roles de Impacto de partida se reconocen", () => {
-    const director = decompile(
-      { base_role: "consulta", screens: ["impacto"], all_screens: false, all_reports: false, scope: "unidad", capabilities: ["impacto.capturar", "impacto.enviar"], unit_role: "editor" },
-      [],
-    );
-    expect(templateOf(director)).toBe("editor");
-    const decano = decompile(
-      { base_role: "consulta", screens: ["impacto"], all_screens: false, all_reports: false, scope: "unidad", capabilities: ["impacto.aprobar"] },
-      [],
-    );
-    expect(templateOf(decano)).toBe("personalizada");
-    expect(describeRole(decano)[0]).toBe("En Impacto, en su unidad: aprobar.");
-  });
-
-  it("un rol de unidad no guarda acciones globales", () => {
-    const matrix = tpl("administrador", "unidad");
-    matrix.capabilities.push("impacto.catalogo");
-    expect(compile(matrix).capabilities).not.toContain("impacto.catalogo");
   });
 });
 

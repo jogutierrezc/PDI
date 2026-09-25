@@ -85,7 +85,7 @@ export function UserManagement() {
           onNotice={setNotice}
         />
       )}
-      {view.id === "roles" && <RolesView profiles={profiles.data ?? []} memberships={memberships.data ?? []} />}
+      {view.id === "roles" && <RolesView profiles={profiles.data ?? []} />}
       {view.id === "carga" && <BulkUsers profiles={profiles.data ?? []} units={units.data ?? []} />}
     </AdminShell>
   );

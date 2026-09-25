@@ -2,9 +2,9 @@
    Estructura institucional, roles y usuarios (0073).
 
    Lo que importa probar: que solo la administración escribe la estructura y
-   las pertenencias, que la sede de un programa se desactiva y no se borra,
-   que la carga masiva es todo o nada, y que un rol de unidad sigue dando sus
-   capacidades de Impacto donde se asigna (las políticas no cambiaron).
+   las pertenencias, que la sede de un programa se desactiva y no se borra, y
+   que la carga masiva es todo o nada. Y que retirar Impacto (0077) se llevó
+   lo suyo sin tocar lo de la estructura.
    ========================================================================== */
 
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
@@ -30,21 +30,34 @@ beforeAll(async () => {
 
 afterAll(() => t?.close());
 
-const roleId = async (key: string) =>
-  (await t.q<{ id: string }>("select id from access_roles where key = $1", [key]))[0].id;
-
-describe("alcance de los roles", () => {
-  it("los roles de Impacto por unidad quedan como roles de unidad", async () => {
-    const rows = await t.q<{ key: string; scope: string }>(
-      "select key, scope from access_roles where key like 'impacto_%' order by key",
+describe("Impacto retirado (0077)", () => {
+  it("no queda nada imp_* ni los roles de Impacto", async () => {
+    const [objects] = await t.q<{ n: number }>(
+      `select (select count(*) from pg_class c join pg_namespace n on n.oid = c.relnamespace
+                where n.nspname = 'public' and c.relname like 'imp\\_%')
+            + (select count(*) from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+                where n.nspname = 'public' and p.proname like 'imp\\_%') as n`,
     );
-    expect(Object.fromEntries(rows.map((r) => [r.key, r.scope]))).toEqual({
-      impacto_admin: "global",
-      impacto_decano: "unidad",
-      impacto_director: "unidad",
-      impacto_reportante: "unidad",
-      impacto_vicerrector: "unidad",
-    });
+    expect(Number(objects.n)).toBe(0);
+    const roles = await t.q("select key from access_roles where key like 'impacto\\_%' or 'impacto' = any (screens)");
+    expect(roles).toEqual([]);
+  });
+
+  it("los roles ya no tienen alcance ni capacidades, ni las pertenencias rol de Impacto", async () => {
+    const columns = await t.q<{ column: string }>(
+      `select table_name || '.' || column_name as column from information_schema.columns
+        where table_schema = 'public'
+          and ((table_name = 'access_roles' and column_name in ('scope', 'unit_role', 'capabilities'))
+            or (table_name = 'unit_members' and column_name = 'access_role_id'))`,
+    );
+    expect(columns).toEqual([]);
+  });
+
+  it("conserva la función de cada persona en su unidad y la oferta por sede", async () => {
+    const [members] = await t.q<{ n: number }>("select count(*)::int as n from unit_members where role = 'jefe'");
+    expect(members.n).toBeGreaterThan(0);
+    const [offer] = await t.q<{ n: number }>("select count(*)::int as n from program_campuses");
+    expect(offer.n).toBe(7);
   });
 
   it("trae el rol de partida Editor de UDES en Cifras", async () => {
@@ -52,27 +65,6 @@ describe("alcance de los roles", () => {
       "select base_role, screens, all_reports from access_roles where key = 'editor_cifras'",
     );
     expect(row).toEqual({ base_role: "planeacion", screens: ["cifras"], all_reports: false });
-  });
-
-  it("un rol de unidad no puede ser el rol global de nadie", async () => {
-    const director = await roleId("impacto_director");
-    const message = await errorOf(
-      t.q("update profiles set access_role_id = $1 where id = $2", [director, PEOPLE.vx]),
-    );
-    expect(message).toContain("se da en una unidad");
-  });
-
-  it("un rol global no va en una unidad", async () => {
-    const consulta = await roleId("consulta");
-    const message = await errorOf(
-      t.q("update unit_members set access_role_id = $1 where profile_id = $2", [consulta, PEOPLE.director]),
-    );
-    expect(message).toContain("en una unidad solo van roles de unidad");
-  });
-
-  it("un rol en uso no cambia de alcance", async () => {
-    const message = await errorOf(t.q("update access_roles set scope = 'global' where key = 'impacto_director'"));
-    expect(message).toContain("no puede pasar a ser de toda la intranet");
   });
 });
 
@@ -133,7 +125,7 @@ describe("estructura institucional", () => {
       { commit: true },
     );
     const campuses = await t.q<{ slug: string; active: boolean }>(
-      `select c.slug, pc.active from imp_program_campuses pc join campuses c on c.id = pc.campus_id
+      `select c.slug, pc.active from program_campuses pc join campuses c on c.id = pc.campus_id
         where pc.program_id = $1 order by c.slug`,
       [id],
     );
@@ -199,19 +191,6 @@ describe("niveles de formación (0075)", () => {
     );
     expect(message).toContain("units_degree_level_check");
   });
-
-  it("un indicador puede aplicar a los niveles nuevos", async () => {
-    const [v] = await t.q<{ id: string }>("insert into imp_catalog_versions (number, source_file) values (77, 'x.xlsx') returning id");
-    await t.q(
-      `insert into imp_indicators (version_id, code, function_id, level, name, applies_degrees)
-       values ($1, 'E98', 'ensenanza', 'insumos', 'Prueba de niveles', '{tecnico,tecnologico,especializacion_medicoquirurgica}')`,
-      [v.id],
-    );
-    const message = await errorOf(
-      t.q("insert into imp_indicators (version_id, code, function_id, level, name, applies_degrees) values ($1, 'E99', 'ensenanza', 'insumos', 'x', '{diplomado}')", [v.id]),
-    );
-    expect(message).toContain("imp_indicators_degrees");
-  });
 });
 
 describe("carga masiva de programas", () => {
@@ -270,50 +249,46 @@ describe("dónde trabaja una persona", () => {
     expect(message).toContain("Solo la administración");
   });
 
-  it("asigna, toma el papel de Mis Tableros del rol y da la capacidad en esa unidad", async () => {
-    const director = await roleId("impacto_director");
-    await t.q("update access_roles set unit_role = 'editor' where id = $1", [director]);
+  it("asigna con su función; sin función, Consulta", async () => {
     await t.asUser(
       ADMIN,
       (q) =>
         q("select admin_set_memberships($1, $2::jsonb)", [
           PEOPLE.vx,
-          JSON.stringify([{ unit_id: UNITS.programaB, access_role_id: director }]),
+          JSON.stringify([{ unit_id: UNITS.programaB, role: "editor" }, { unit_id: UNITS.maestria }]),
         ]),
       { commit: true },
     );
     const members = await t.q<{ unit_id: string; role: string }>(
-      "select unit_id, role from unit_members where profile_id = $1",
+      "select unit_id, role from unit_members where profile_id = $1 order by unit_id",
       [PEOPLE.vx],
     );
-    expect(members).toEqual([{ unit_id: UNITS.programaB, role: "editor" }]);
-    const can = await t.asUser(PEOPLE.vx, async (q) =>
-      (await q<{ ok: boolean }>("select imp_can('impacto.capturar', $1) as ok", [UNITS.programaB]))[0].ok,
-    );
-    expect(can).toBe(true);
+    expect(members).toEqual([
+      { unit_id: UNITS.programaB, role: "editor" },
+      { unit_id: UNITS.maestria, role: "visor" },
+    ]);
   });
 
   it("reemplazar quita las que no vienen; añadir las conserva", async () => {
-    const decano = await roleId("impacto_decano");
     await t.asUser(
       ADMIN,
       (q) =>
         q("select admin_set_memberships($1, $2::jsonb, false)", [
           PEOPLE.vx,
-          JSON.stringify([{ unit_id: UNITS.facultad, access_role_id: decano, role: "jefe" }]),
+          JSON.stringify([{ unit_id: UNITS.facultad, role: "jefe" }]),
         ]),
       { commit: true },
     );
     expect(
       (await t.q("select 1 from unit_members where profile_id = $1", [PEOPLE.vx])).length,
-    ).toBe(2);
+    ).toBe(3);
 
     await t.asUser(
       ADMIN,
       (q) =>
         q("select admin_set_memberships($1, $2::jsonb)", [
           PEOPLE.vx,
-          JSON.stringify([{ unit_id: UNITS.facultad, access_role_id: decano }]),
+          JSON.stringify([{ unit_id: UNITS.facultad }]),
         ]),
       { commit: true },
     );

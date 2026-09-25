@@ -1,23 +1,25 @@
 -- =============================================================================
--- Impacto · datos de PRUEBA
+-- Estructura institucional · datos de PRUEBA
 --
 -- NO es una migración y no se aplica en producción. Lo cargan las pruebas
 -- (tests/db) sobre un Postgres en memoria; en Supabase, solo en un proyecto
 -- de pruebas.
 --
---   · Las tres vicerrectorías, con la función que validan.
+--   · Las tres vicerrectorías, con su función sustantiva.
 --   · Una facultad de prueba con tres programas: dos de pregrado y una
---     maestría, ofertados en Bucaramanga y Cúcuta.
---   · Una persona por rol, cada una con su rol en su unidad.
+--     maestría, ofertados en Bucaramanga y Cúcuta; y otra facultad con un
+--     programa en Valledupar.
+--   · Unas personas, cada una con su función en su unidad (jefe = Gestor,
+--     editor = Contribuyente).
 --
 -- Los ids son fijos para que las pruebas puedan nombrarlos.
--- Requiere las migraciones hasta 0065. Idempotente.
+-- Requiere las migraciones hasta 0077. Idempotente.
 -- =============================================================================
 
 -- --- Personas -----------------------------------------------------------------
 
 insert into auth.users (id, email, raw_user_meta_data) values
-  ('00000000-0000-4000-a000-000000000001', 'admin.impacto@prueba.udes.edu.co',  '{"full_name": "Administración de Impacto"}'),
+  ('00000000-0000-4000-a000-000000000001', 'planeacion@prueba.udes.edu.co',     '{"full_name": "Planeación de Prueba"}'),
   ('00000000-0000-4000-a000-000000000002', 'director.a@prueba.udes.edu.co',     '{"full_name": "Dirección del Programa A"}'),
   ('00000000-0000-4000-a000-000000000003', 'reportante.a@prueba.udes.edu.co',   '{"full_name": "Reportante del Programa A"}'),
   ('00000000-0000-4000-a000-000000000004', 'decano@prueba.udes.edu.co',         '{"full_name": "Decanatura de Prueba"}'),
@@ -35,12 +37,6 @@ select u.id, u.email, u.raw_user_meta_data ->> 'full_name'
  where u.email like '%@prueba.udes.edu.co'
 on conflict (id) do nothing;
 
--- La administración de Impacto es global: va en el perfil.
-update public.profiles p
-   set access_role_id = r.id
-  from public.access_roles r
- where r.key = 'impacto_admin' and p.id = '00000000-0000-4000-a000-000000000001';
-
 -- --- Unidades -------------------------------------------------------------------
 
 insert into public.units (id, kind, code, name, slug, substantive_function, position) values
@@ -49,8 +45,8 @@ insert into public.units (id, kind, code, name, slug, substantive_function, posi
   ('00000000-0000-4000-b000-000000000003', 'vicerrectoria', 'PR-VX', 'Vicerrectoría de Extensión (prueba)', 'prueba-vx', 'extension', 3)
 on conflict (id) do nothing;
 
--- Las facultades no cuelgan de una vicerrectoría: la vicerrectoría valida por
--- función, no por árbol, y colgarlas le daría visibilidad sobre todo.
+-- Las facultades no cuelgan de una vicerrectoría (eso es `reports_to`, 0073):
+-- colgarlas le daría, por herencia, la vista de todo.
 insert into public.units (id, parent_id, kind, code, name, slug, position) values
   ('00000000-0000-4000-b000-000000000010', null, 'facultad', 'PR-FAC', 'Facultad de Prueba', 'prueba-facultad', 1),
   ('00000000-0000-4000-b000-000000000020', null, 'facultad', 'PR-OTRA', 'Otra Facultad de Prueba', 'prueba-otra-facultad', 2)
@@ -65,7 +61,7 @@ on conflict (id) do nothing;
 
 -- Oferta por sede: los tres programas de la facultad de prueba en Bucaramanga
 -- y Cúcuta; el de la otra facultad solo en Valledupar.
-insert into public.imp_program_campuses (program_id, campus_id)
+insert into public.program_campuses (program_id, campus_id)
 select p.id, c.id
   from (values
     ('00000000-0000-4000-b000-000000000011'::uuid, 'bucaramanga'),
@@ -79,18 +75,17 @@ select p.id, c.id
   join public.campuses c on c.slug = p.campus
 on conflict do nothing;
 
--- --- Quién trabaja dónde y con qué rol ----------------------------------------
+-- --- Quién trabaja dónde ----------------------------------------------------------
 
-insert into public.unit_members (unit_id, profile_id, role, access_role_id)
-select m.unit_id, m.profile_id, m.unit_role::public.unit_role, r.id
+insert into public.unit_members (unit_id, profile_id, role)
+select m.unit_id, m.profile_id, m.unit_role::public.unit_role
   from (values
-    ('00000000-0000-4000-b000-000000000011'::uuid, '00000000-0000-4000-a000-000000000002'::uuid, 'jefe',   'impacto_director'),
-    ('00000000-0000-4000-b000-000000000011'::uuid, '00000000-0000-4000-a000-000000000003'::uuid, 'editor', 'impacto_reportante'),
-    ('00000000-0000-4000-b000-000000000010'::uuid, '00000000-0000-4000-a000-000000000004'::uuid, 'jefe',   'impacto_decano'),
-    ('00000000-0000-4000-b000-000000000001'::uuid, '00000000-0000-4000-a000-000000000005'::uuid, 'jefe',   'impacto_vicerrector'),
-    ('00000000-0000-4000-b000-000000000002'::uuid, '00000000-0000-4000-a000-000000000006'::uuid, 'jefe',   'impacto_vicerrector'),
-    ('00000000-0000-4000-b000-000000000003'::uuid, '00000000-0000-4000-a000-000000000007'::uuid, 'jefe',   'impacto_vicerrector'),
-    ('00000000-0000-4000-b000-000000000021'::uuid, '00000000-0000-4000-a000-000000000008'::uuid, 'jefe',   'impacto_director')
-  ) as m(unit_id, profile_id, unit_role, role_key)
-  join public.access_roles r on r.key = m.role_key
-on conflict (unit_id, profile_id) do update set access_role_id = excluded.access_role_id, role = excluded.role;
+    ('00000000-0000-4000-b000-000000000011'::uuid, '00000000-0000-4000-a000-000000000002'::uuid, 'jefe'),
+    ('00000000-0000-4000-b000-000000000011'::uuid, '00000000-0000-4000-a000-000000000003'::uuid, 'editor'),
+    ('00000000-0000-4000-b000-000000000010'::uuid, '00000000-0000-4000-a000-000000000004'::uuid, 'jefe'),
+    ('00000000-0000-4000-b000-000000000001'::uuid, '00000000-0000-4000-a000-000000000005'::uuid, 'jefe'),
+    ('00000000-0000-4000-b000-000000000002'::uuid, '00000000-0000-4000-a000-000000000006'::uuid, 'jefe'),
+    ('00000000-0000-4000-b000-000000000003'::uuid, '00000000-0000-4000-a000-000000000007'::uuid, 'jefe'),
+    ('00000000-0000-4000-b000-000000000021'::uuid, '00000000-0000-4000-a000-000000000008'::uuid, 'jefe')
+  ) as m(unit_id, profile_id, unit_role)
+on conflict (unit_id, profile_id) do update set role = excluded.role;

@@ -1,10 +1,10 @@
 /* =============================================================================
    Sistema → Estructura institucional.
 
-   Las unidades con las que trabajan Impacto (quién captura, aprueba y valida)
-   y Mis Tableros (quién ve y edita qué tablero). Antes solo se creaban en Mis
-   Tableros, y el formulario de allá no pedía lo que Impacto necesita: SNIES,
-   nivel, modalidad, sedes y la función que valida cada vicerrectoría.
+   Las unidades de la universidad: con ellas trabajan Mis Tableros (quién ve y
+   edita qué tablero) y la oferta de programas. Antes solo se creaban en Mis
+   Tableros, y el formulario de allá no pedía los datos de un programa: SNIES,
+   nivel, modalidad y sedes, ni la función sustantiva de cada vicerrectoría.
 
    A la izquierda, el árbol, en dos ramas:
 
@@ -18,8 +18,7 @@
        unidad, lo es en lo que cuelga de ella (una oficina bajo su
        vicerrectoría, un programa bajo su facultad);
      · la punteada es el organigrama (`reports_to`): de qué vicerrectoría
-       depende una facultad. No da acceso a nada; la vicerrectoría valida por
-       función, no por árbol.
+       depende una facultad. No da acceso a nada.
 
    A la derecha, la ficha de la unidad elegida —con sus personas, que se
    añaden, cambian y quitan aquí—, el formulario de una nueva o la carga
@@ -33,11 +32,9 @@ import { AdminShell } from "../components/AdminShell";
 import { Icon } from "../../../components/ui/Icon";
 import { Modal } from "../../../components/ui/Modal";
 import { EmptyBlock, ErrorBlock, LoadingBlock } from "../../../components/ui/QueryState";
-import { useAccessRoles } from "../../../data/queries";
 import { freeSlug, UNIT_ROLE } from "../../tableros/model";
 import type { UnitKind, UnitRole } from "../../tableros/model";
 import { useProfiles } from "../../tableros/store";
-import type { AccessRole } from "../../../types/database";
 import {
   DEGREE_LABEL,
   FUNCTION_LABEL,
@@ -70,7 +67,7 @@ const isOffice = (unit: InstUnit) => unit.kind === "oficina" || unit.kind === "o
 const byOrder = (a: InstUnit, b: InstUnit) => a.position - b.position || a.name.localeCompare(b.name, "es");
 const byName = (a: InstUnit, b: InstUnit) => a.name.localeCompare(b.name, "es");
 
-/** Lo que le falta a un programa para que Impacto pueda asignarle indicadores. */
+/** Lo que le falta a un programa para estar completo en la estructura. */
 function programGaps(unit: InstUnit, data: Institution): string[] {
   if (unit.kind !== "programa") return [];
   const gaps: string[] = [];
@@ -97,7 +94,7 @@ export function InstitutionView() {
       section="institution"
       kicker="Sistema"
       title="Estructura institucional"
-      description="Vicerrectorías, facultades, programas y dependencias: las unidades con las que trabajan Impacto y Mis Tableros."
+      description="Vicerrectorías, facultades, programas y dependencias: las unidades de Mis Tableros y de la oferta de programas."
       actions={
         <div className="inst-actions">
           <Link className="button-secondary" to={`${BASE}?carga`}>
@@ -326,7 +323,7 @@ function UnitLink({
   const detail =
     unit.kind === "vicerrectoria"
       ? unit.substantiveFunction
-        ? `Valida ${FUNCTION_LABEL[unit.substantiveFunction].toLowerCase()}`
+        ? `Lidera ${FUNCTION_LABEL[unit.substantiveFunction].toLowerCase()}`
         : "Sin función sustantiva"
       : unit.kind === "programa"
         ? [unit.degreeLevel ? DEGREE_LABEL[unit.degreeLevel] : null, unit.sniesCode ? `SNIES ${unit.sniesCode}` : null]
@@ -373,15 +370,15 @@ function Overview({ data }: { data: Institution }) {
   const empty = data.units.filter((unit) => !data.members.some((member) => member.unitId === unit.id));
   return (
     <section className="inst-sheet" aria-labelledby="inst-overview">
-      <h2 id="inst-overview">Qué falta para que Impacto funcione</h2>
+      <h2 id="inst-overview">Qué le falta a la estructura</h2>
       <p className="inst-lead">
         Cada programa necesita su SNIES, su nivel y las sedes donde se ofrece; cada función sustantiva, una vicerrectoría
-        que la valide; y cada unidad, las personas que trabajan en ella. Elija una unidad en el árbol para completarla, o
+        que la lidere; y cada unidad, las personas que trabajan en ella. Elija una unidad en el árbol para completarla, o
         cargue la estructura entera desde Excel.
       </p>
       {missingFunctions.length === 0 && incomplete.length === 0 ? (
         <p className="admin-notice" role="status">
-          <Icon name="check" size={16} /> Los programas y las vicerrectorías están completos para Impacto.
+          <Icon name="check" size={16} /> Los programas y las vicerrectorías están completos.
         </p>
       ) : (
         <ul className="inst-todo">
@@ -389,7 +386,7 @@ function Overview({ data }: { data: Institution }) {
             <li key={fn}>
               <Icon name="alert" size={15} />
               <span>
-                Ninguna vicerrectoría valida <strong>{FUNCTION_LABEL[fn].toLowerCase()}</strong>.
+                Ninguna vicerrectoría lidera <strong>{FUNCTION_LABEL[fn].toLowerCase()}</strong>.
               </span>
             </li>
           ))}
@@ -478,7 +475,6 @@ function UnitSheet({ unit, data }: { unit: InstUnit | null; data: Institution })
   const [params] = useSearchParams();
   const save = useSaveUnit();
   const remove = useDeleteUnit();
-  const access = useAccessRoles();
   const requestedKind = params.get("clase") as UnitKind | null;
   const requestedParent = data.units.find((item) => item.slug === params.get("padre"));
   const [draft, setDraft] = useState<Draft>(() =>
@@ -720,7 +716,7 @@ function UnitSheet({ unit, data }: { unit: InstUnit | null; data: Institution })
 
           {draft.kind === "vicerrectoria" && (
             <label className="admin-field inst-grid__wide">
-              <span>Función sustantiva que valida en Impacto</span>
+              <span>Función sustantiva que lidera</span>
               <select
                 value={draft.substantiveFunction}
                 onChange={(event) => set("substantiveFunction", event.target.value as SubstantiveFunction | "")}
@@ -732,11 +728,9 @@ function UnitSheet({ unit, data }: { unit: InstUnit | null; data: Institution })
                   </option>
                 ))}
               </select>
-              <small>Quien tenga el rol de Vicerrectoría aquí valida los indicadores de esta función, de todas las facultades.</small>
               {sameFunction && (
                 <small className="users-warning">
-                  {sameFunction.name} también valida {FUNCTION_LABEL[sameFunction.substantiveFunction!].toLowerCase()}: las dos
-                  verían los mismos registros.
+                  {sameFunction.name} también lidera {FUNCTION_LABEL[sameFunction.substantiveFunction!].toLowerCase()}.
                 </small>
               )}
             </label>
@@ -754,8 +748,7 @@ function UnitSheet({ unit, data }: { unit: InstUnit | null; data: Institution })
                 ))}
               </select>
               <small>
-                Es el organigrama y nada más: no le da a la vicerrectoría acceso a los datos de la facultad. En Impacto la
-                vicerrectoría valida por función sustantiva, no por dependencia.
+                Es el organigrama y nada más: no le da a la vicerrectoría acceso a los datos de la facultad.
               </small>
             </label>
           )}
@@ -841,12 +834,12 @@ function UnitSheet({ unit, data }: { unit: InstUnit | null; data: Institution })
         {unit && deleteBlock && <p className="inst-hint">Para borrarla: {deleteBlock.toLowerCase()} Déjela vacía primero.</p>}
       </form>
 
-      {unit && <People unit={unit} members={members} roles={access.data?.roles ?? []} ready={data.ready} />}
+      {unit && <People unit={unit} members={members} ready={data.ready} />}
 
       {confirmDelete && unit && (
         <Modal
           title={`Borrar ${unit.name}`}
-          description="La unidad desaparece del árbol, de Impacto y de Mis Tableros. Si tiene registros de Impacto, la base no dejará borrarla."
+          description="La unidad desaparece del árbol, de la oferta de programas y de Mis Tableros. Si tiene datos que dependen de ella, la base no dejará borrarla."
           onClose={() => setConfirmDelete(false)}
         >
           <div className="modal-actions">
@@ -865,14 +858,12 @@ function UnitSheet({ unit, data }: { unit: InstUnit | null; data: Institution })
 
 /* --- Personas de la unidad ------------------------------------------------------------ */
 
-function People({ unit, members, roles, ready }: { unit: InstUnit; members: InstMember[]; roles: AccessRole[]; ready: boolean }) {
+function People({ unit, members, ready }: { unit: InstUnit; members: InstMember[]; ready: boolean }) {
   const profiles = useProfiles();
   const saveMember = useSaveMembership();
   const [adding, setAdding] = useState(false);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
-  const unitRoles = roles.filter((role) => role.scope === "unidad");
-  const roleName = new Map(roles.map((role) => [role.id, role.name]));
   const sorted = [...members].sort((a, b) => a.name.localeCompare(b.name, "es"));
 
   useEffect(() => {
@@ -887,8 +878,7 @@ function People({ unit, members, roles, ready }: { unit: InstUnit; members: Inst
         <div>
           <h3 id="inst-people-title">Personas de la unidad</h3>
           <p className="inst-hint">
-            La función dice qué hace en la unidad y en lo que cuelga de ella; el rol de Impacto, qué acciones tiene en el
-            reporte. El cargo es solo un nombre.
+            La función dice qué hace en la unidad y en lo que cuelga de ella. El cargo es solo un nombre.
           </p>
         </div>
         {!adding && (
@@ -915,7 +905,6 @@ function People({ unit, members, roles, ready }: { unit: InstUnit; members: Inst
           members={members}
           profiles={profiles.data ?? []}
           loading={profiles.isPending}
-          unitRoles={unitRoles}
           pending={saveMember.isPending}
           onCancel={() => setAdding(false)}
           onAdd={async (input, who) => {
@@ -936,13 +925,12 @@ function People({ unit, members, roles, ready }: { unit: InstUnit; members: Inst
       ) : (
         <div className="table-scroll">
           <table className="inst-people__table">
-            <caption className="sr-only">Personas de {unit.name}, con su cargo, su función y su rol de Impacto</caption>
+            <caption className="sr-only">Personas de {unit.name}, con su cargo y su función</caption>
             <thead>
               <tr>
                 <th scope="col">Persona</th>
                 <th scope="col">Cargo</th>
                 <th scope="col">Función en la unidad</th>
-                <th scope="col">Rol de Impacto</th>
                 <th scope="col">
                   <span className="sr-only">Acciones</span>
                 </th>
@@ -951,10 +939,8 @@ function People({ unit, members, roles, ready }: { unit: InstUnit; members: Inst
             <tbody>
               {sorted.map((member) => (
                 <MemberRow
-                  key={`${member.id}-${member.role}-${member.accessRoleId}-${member.title}`}
+                  key={`${member.id}-${member.role}-${member.title}`}
                   member={member}
-                  unitRoles={unitRoles}
-                  roleName={roleName}
                   ready={ready}
                   onSaved={(message) => {
                     setError("");
@@ -971,58 +957,28 @@ function People({ unit, members, roles, ready }: { unit: InstUnit; members: Inst
   );
 }
 
-function RoleSelects({
-  role,
-  accessRoleId,
-  unitRoles,
-  onRole,
-  onAccessRole,
-  label,
-}: {
-  role: UnitRole;
-  accessRoleId: string;
-  unitRoles: AccessRole[];
-  onRole: (role: UnitRole) => void;
-  onAccessRole: (id: string) => void;
-  label: string;
-}) {
+function RoleSelect({ role, onRole, label }: { role: UnitRole; onRole: (role: UnitRole) => void; label: string }) {
   return (
-    <>
-      <td>
-        <select aria-label={`Función en la unidad de ${label}`} value={role} onChange={(event) => onRole(event.target.value as UnitRole)}>
-          {BOARD_ROLES.map((option) => (
-            <option key={option} value={option}>
-              {UNIT_ROLE[option].label}
-            </option>
-          ))}
-        </select>
-        <small>{UNIT_ROLE[role].hint}</small>
-      </td>
-      <td>
-        <select aria-label={`Rol de Impacto de ${label}`} value={accessRoleId} onChange={(event) => onAccessRole(event.target.value)}>
-          <option value="">Sin rol de Impacto</option>
-          {unitRoles.map((option) => (
-            <option key={option.id} value={option.id}>
-              {option.name}
-            </option>
-          ))}
-        </select>
-      </td>
-    </>
+    <td>
+      <select aria-label={`Función en la unidad de ${label}`} value={role} onChange={(event) => onRole(event.target.value as UnitRole)}>
+        {BOARD_ROLES.map((option) => (
+          <option key={option} value={option}>
+            {UNIT_ROLE[option].label}
+          </option>
+        ))}
+      </select>
+      <small>{UNIT_ROLE[role].hint}</small>
+    </td>
   );
 }
 
 function MemberRow({
   member,
-  unitRoles,
-  roleName,
   ready,
   onSaved,
   onError,
 }: {
   member: InstMember;
-  unitRoles: AccessRole[];
-  roleName: Map<string, string>;
   ready: boolean;
   onSaved: (message: string) => void;
   onError: (message: string) => void;
@@ -1031,11 +987,8 @@ function MemberRow({
   const remove = useRemoveMembership();
   const [title, setTitle] = useState(member.title ?? "");
   const [role, setRole] = useState<UnitRole>(member.role);
-  const [accessRoleId, setAccessRoleId] = useState(member.accessRoleId ?? "");
   const [confirming, setConfirming] = useState(false);
-  const dirty = title !== (member.title ?? "") || role !== member.role || accessRoleId !== (member.accessRoleId ?? "");
-  // Un rol de acceso que ya no es de unidad (o que no se puede leer) se muestra, no se pierde.
-  const orphan = member.accessRoleId && !unitRoles.some((option) => option.id === member.accessRoleId);
+  const dirty = title !== (member.title ?? "") || role !== member.role;
 
   async function persist() {
     try {
@@ -1043,7 +996,6 @@ function MemberRow({
         profileId: member.profileId,
         unitId: member.unitId,
         role,
-        accessRoleId: accessRoleId || null,
         title: title.trim(),
       });
       onSaved(`Se guardó a ${member.name}.`);
@@ -1079,18 +1031,8 @@ function MemberRow({
           placeholder="Ej. Director del programa"
         />
       </td>
-      <RoleSelects
-        role={role}
-        accessRoleId={orphan ? "" : accessRoleId}
-        unitRoles={unitRoles}
-        onRole={setRole}
-        onAccessRole={setAccessRoleId}
-        label={member.name}
-      />
+      <RoleSelect role={role} onRole={setRole} label={member.name} />
       <td className="inst-people__actions">
-        {orphan && accessRoleId === member.accessRoleId && (
-          <small className="users-warning">Tiene «{roleName.get(member.accessRoleId!) ?? "otro rol"}», que no es de unidad.</small>
-        )}
         {confirming ? (
           <span className="inst-confirm" role="group" aria-label={`¿Quitar a ${member.name}?`}>
             <span>¿Quitar?</span>
@@ -1129,7 +1071,6 @@ function AddPerson({
   members,
   profiles,
   loading,
-  unitRoles,
   pending,
   onCancel,
   onAdd,
@@ -1138,28 +1079,19 @@ function AddPerson({
   members: InstMember[];
   profiles: ProfileOption[];
   loading: boolean;
-  unitRoles: AccessRole[];
   pending: boolean;
   onCancel: () => void;
-  onAdd: (input: { profileId: string; unitId: string; role: UnitRole; accessRoleId: string | null; title: string }, who: string) => void | Promise<void>;
+  onAdd: (input: { profileId: string; unitId: string; role: UnitRole; title: string }, who: string) => void | Promise<void>;
 }) {
   const [query, setQuery] = useState("");
   const [picked, setPicked] = useState<ProfileOption | null>(null);
   const [title, setTitle] = useState("");
-  const [accessRoleId, setAccessRoleId] = useState("");
   const [role, setRole] = useState<UnitRole>("visor");
-  const [roleTouched, setRoleTouched] = useState(false);
   const inUnit = useMemo(() => new Set(members.map((member) => member.profileId)), [members]);
   const needle = normalize(query);
   const options = needle
     ? profiles.filter((person) => !inUnit.has(person.id) && normalize(`${person.name} ${person.email}`).includes(needle)).slice(0, 8)
     : [];
-
-  function chooseAccessRole(id: string) {
-    setAccessRoleId(id);
-    // La función por defecto sale del rol, mientras no se haya elegido otra.
-    if (!roleTouched) setRole((unitRoles.find((option) => option.id === id)?.unit_role as UnitRole | null | undefined) ?? "visor");
-  }
 
   return (
     <div className="inst-add" role="group" aria-label={`Añadir una persona a ${unit.name}`}>
@@ -1207,7 +1139,7 @@ function AddPerson({
           className="inst-add__form"
           onSubmit={(event) => {
             event.preventDefault();
-            void onAdd({ profileId: picked.id, unitId: unit.id, role, accessRoleId: accessRoleId || null, title: title.trim() }, picked.name);
+            void onAdd({ profileId: picked.id, unitId: unit.id, role, title: title.trim() }, picked.name);
           }}
         >
           <p className="inst-add__who">
@@ -1221,18 +1153,6 @@ function AddPerson({
               <span>Cargo</span>
               <input value={title} onChange={(event) => setTitle(event.target.value)} placeholder="Ej. Coordinadora de calidad" />
             </label>
-            <label className="admin-field">
-              <span>Rol de Impacto</span>
-              <select value={accessRoleId} onChange={(event) => chooseAccessRole(event.target.value)}>
-                <option value="">Sin rol de Impacto</option>
-                {unitRoles.map((option) => (
-                  <option key={option.id} value={option.id}>
-                    {option.name}
-                  </option>
-                ))}
-              </select>
-              {accessRoleId && <small>{unitRoles.find((option) => option.id === accessRoleId)?.description}</small>}
-            </label>
             <fieldset className="admin-field inst-grid__wide inst-roles">
               <legend>Función en la unidad</legend>
               <div className="inst-roles__options">
@@ -1242,10 +1162,7 @@ function AddPerson({
                       type="radio"
                       name="funcion"
                       checked={role === option}
-                      onChange={() => {
-                        setRole(option);
-                        setRoleTouched(true);
-                      }}
+                      onChange={() => setRole(option)}
                     />
                     <span>
                       <strong>{UNIT_ROLE[option].label}</strong>

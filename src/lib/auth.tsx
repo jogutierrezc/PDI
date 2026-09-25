@@ -50,8 +50,6 @@ export const SCREEN_PATHS: Record<AdminScreen, string> = {
   development: "/admin/desarrollo",
   users: "/admin/usuarios",
   transfer: "/admin/traslado",
-  impacto: "/admin/impacto",
-  impacto_audit: "/admin/impacto/auditar",
   institution: "/admin/estructura-institucional",
 };
 
@@ -88,8 +86,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [access, setAccess] = useState<AccessScope | null>(null);
   /** ¿Está en alguna unidad de Mis Tableros? Pertenecer ES el permiso. */
   const [inAnyUnit, setInAnyUnit] = useState(false);
-  /** ¿Lleva un rol de acceso en alguna unidad (0063)? Abre el reporte de Impacto. */
-  const [hasUnitRole, setHasUnitRole] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -124,11 +120,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     // alguien en una facultad da por hecho —con razón— que ya puede entrar.
     // Sin la migración 0057 esto falla y se queda en falso, que es lo de antes.
     const belongs = person
-      ? await supabase.from("unit_members").select("id,access_role_id").eq("profile_id", person.id)
+      ? await supabase.from("unit_members").select("id").eq("profile_id", person.id)
       : null;
-    const memberships = (belongs?.data ?? []) as { id: string; access_role_id?: string | null }[];
-    setInAnyUnit(memberships.length > 0);
-    setHasUnitRole(memberships.some((row) => Boolean(row.access_role_id)));
+    setInAnyUnit((belongs?.data ?? []).length > 0);
 
     // El rol de acceso decide qué pantallas e informes se enseñan. Si no se
     // puede leer (base sin la migración 0024), la sesión sigue como antes.
@@ -212,7 +206,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setProfile(null);
     setAccess(null);
     setInAnyUnit(false);
-    setHasUnitRole(false);
     setSession(null);
   }, []);
 
@@ -239,13 +232,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
       // Mis Tableros se gana perteneciendo a una unidad, no marcándolo aparte.
       if (screen === "tableros" && inAnyUnit) return true;
-      // Y el reporte de Impacto, teniendo un rol de unidad (dirección de
-      // programa, decanatura…): ese rol se da en la unidad, no en el perfil.
-      if (screen === "impacto" && hasUnitRole) return true;
       if (!access) return true;
       return access.role.all_screens || access.role.screens.includes(screen);
     },
-    [profile, access, inAnyUnit, hasUnitRole],
+    [profile, access, inAnyUnit],
   );
 
   const reachesReport = useCallback(

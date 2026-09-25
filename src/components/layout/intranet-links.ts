@@ -33,7 +33,6 @@ const SCREENS: { screen: AdminScreen; label: string; icon: IconName }[] = [
   { screen: "repository", label: "Repositorio", icon: "document" },
   { screen: "cifras", label: "UDES en Cifras", icon: "table" },
   { screen: "observatorio", label: "Observatorio", icon: "spark-chart" },
-  { screen: "impacto", label: "Reporte de impacto", icon: "spark-chart" },
   { screen: "tableros", label: "Mis Tableros", icon: "layers" },
   { screen: "structure", label: "Normalizar estructura", icon: "settings" },
   { screen: "parameters", label: "Parámetros globales", icon: "settings" },

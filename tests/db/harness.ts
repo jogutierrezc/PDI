@@ -14,9 +14,6 @@ import { PGlite } from "@electric-sql/pglite";
 import { pgcrypto } from "@electric-sql/pglite/contrib/pgcrypto";
 import { readFileSync, readdirSync } from "node:fs";
 import { join, resolve } from "node:path";
-import ExcelJS from "exceljs";
-import { importMatrix } from "../../src/modules/impacto/import/matrix";
-import { PILOT_SHEETS } from "../../src/modules/impacto/data/pilot-sheets";
 
 const ROOT = resolve(__dirname, "../..");
 const MIGRATIONS = join(ROOT, "supabase/migrations");
@@ -62,7 +59,7 @@ export async function createTestDb({ seed = true } = {}): Promise<TestDb> {
       throw new Error(`La migración ${file} falló: ${(error as Error).message}`);
     }
   }
-  if (seed) await db.exec(readFileSync(join(ROOT, "supabase/seed/impacto_prueba.sql"), "utf8"));
+  if (seed) await db.exec(readFileSync(join(ROOT, "supabase/seed/estructura_prueba.sql"), "utf8"));
 
   const q: Query = async (sql, params) => (await db.query(sql, params)).rows as never;
 
@@ -92,90 +89,3 @@ export async function errorOf(promise: Promise<unknown>): Promise<string> {
   }
   throw new Error("Se esperaba un error y la operación terminó bien.");
 }
-
-/**
- * Un catálogo mínimo para probar la operación: versión 1 publicada con una
- * razón (E04) y un conteo (E13), un periodo 2026-2 y una asignación de cada
- * uno al programa A en Bucaramanga, con su registro en borrador.
- */
-export async function publishedFixture(q: Query) {
-  const [version] = await q<{ id: string }>(
-    "insert into imp_catalog_versions (number, source_file) values (1, 'vr7.xlsx') returning id",
-  );
-  const sheet = `unit, calc_type, numerator_def, factor, aggregation, direction, periodicity, report_level,
-                 applies_degrees, capture_mode, validator_function, in_pilot`;
-  const [ratio] = await q<{ id: string }>(
-    `insert into imp_indicators (version_id, code, function_id, level, name, ${sheet}, denominator_def)
-     values ($1, 'E04', 'ensenanza', 'procesos', 'Tasa de retención estudiantil',
-             'porcentaje', 'razon', 'Siguen matriculados', 100, 'razon_de_sumas', 'mayor_mejor', 'semestral',
-             'programa_sede', '{pregrado}', 'precargado', 'ensenanza', true, 'Matriculados el periodo anterior')
-     returning id`,
-    [version.id],
-  );
-  const [count] = await q<{ id: string }>(
-    `insert into imp_indicators (version_id, code, function_id, level, name, ${sheet})
-     values ($1, 'E13', 'ensenanza', 'productos', 'Innovaciones pedagógicas',
-             'numero', 'conteo', 'Innovaciones documentadas', 1, 'suma', 'mayor_mejor', 'anual',
-             'programa', '{pregrado,maestria}', 'manual', 'ensenanza', true)
-     returning id`,
-    [version.id],
-  );
-  await q("update imp_catalog_versions set state = 'publicada', published_at = now() where id = $1", [version.id]);
-
-  const [period] = await q<{ id: string }>(
-    `insert into imp_periods (code, catalog_version_id, cutoff_program, cutoff_faculty, cutoff_vice)
-     values ('2026-2', $1, '2026-10-15', '2026-10-25', '2026-11-05') returning id`,
-    [version.id],
-  );
-  const [bucaramanga] = await q<{ id: string }>("select id from campuses where slug = 'bucaramanga'");
-  const [ratioAssignment] = await q<{ id: string }>(
-    "insert into imp_assignments (period_id, indicator_id, program_id, campus_id) values ($1, $2, $3, $4) returning id",
-    [period.id, ratio.id, UNITS.programaA, bucaramanga.id],
-  );
-  const [countAssignment] = await q<{ id: string }>(
-    "insert into imp_assignments (period_id, indicator_id, program_id) values ($1, $2, $3) returning id",
-    [period.id, count.id, UNITS.programaA],
-  );
-  const [ratioRecord] = await q<{ id: string }>(
-    "insert into imp_records (assignment_id) values ($1) returning id",
-    [ratioAssignment.id],
-  );
-  const [countRecord] = await q<{ id: string }>(
-    "insert into imp_records (assignment_id) values ($1) returning id",
-    [countAssignment.id],
-  );
-  return {
-    versionId: version.id,
-    ratioId: ratio.id,
-    countId: count.id,
-    periodId: period.id,
-    bucaramangaId: bucaramanga.id,
-    ratioRecordId: ratioRecord.id,
-    countRecordId: countRecord.id,
-  };
-}
-
-/** Deja la vr7 publicada con las 13 fichas del piloto. La usan las pruebas de las fases 4 en adelante. */
-export async function publishPilotCatalog(db: TestDb) {
-  const book = new ExcelJS.Workbook();
-  await book.xlsx.readFile(join(ROOT, "UDES_Matriz_Impacto_Institucional_vr7.xlsx"));
-  const payload = JSON.stringify({ sourceFile: "vr7.xlsx", ...importMatrix(book) });
-  return db.asUser(
-    PEOPLE.admin,
-    async (q) => {
-      const [{ r }] = await q<{ r: { versionId: string } }>("select imp_import_catalog($1::jsonb) as r", [payload]);
-      for (const { name, columns } of PILOT_SHEETS) {
-        const keys = Object.keys(columns);
-        await q(`update imp_indicators set ${keys.map((k, i) => `${k} = $${i + 2}`).join(", ")} where version_id = $1 and name = $${keys.length + 2}`, [
-          r.versionId,
-          ...Object.values(columns),
-          name,
-        ]);
-      }
-      await q("select imp_publish_catalog($1)", [r.versionId]);
-      return r.versionId;
-    },
-    { commit: true },
-  );
-}
-

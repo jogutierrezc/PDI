@@ -44,8 +44,6 @@ export type AdminSection =
   | "observatorio"
   | "tableros"
   | "transfer"
-  | "impacto"
-  | "impacto_audit"
   | "institution";
 
 interface NavItem {
@@ -58,7 +56,7 @@ interface NavItem {
 }
 
 interface NavGroup {
-  id: "planeacion" | "pdi" | "cifras" | "observatorio" | "impacto" | "tableros" | "sistema";
+  id: "planeacion" | "pdi" | "cifras" | "observatorio" | "tableros" | "sistema";
   label: string;
   items: NavItem[];
 }
@@ -107,17 +105,6 @@ const navigation: NavGroup[] = [
     ],
   },
   {
-    // La medición del impacto de las tres funciones sustantivas: cada programa
-    // reporta, la decanatura aprueba y la vicerrectoría valida.
-    id: "impacto",
-    label: "Impacto Institucional",
-    items: [
-      { id: "impacto", label: "Reporte de impacto", icon: "spark-chart", to: "/admin/impacto", minimum: "consulta" },
-      // Cuánto va cada programa, decanatura y vicerrectoría: solo Planeación.
-      { id: "impacto_audit", label: "Auditar Impacto", icon: "chart", to: "/admin/impacto/auditar", minimum: "planeacion" },
-    ],
-  },
-  {
     // Cada unidad con sus propios tableros. Va después del Observatorio porque
     // es lo mismo repartido: allí un observatorio institucional, aquí uno por
     // facultad, programa u oficina.
@@ -137,7 +124,7 @@ const navigation: NavGroup[] = [
       { id: "parameters", label: "Parámetros globales", icon: "settings", to: "/admin/parametros", minimum: "consulta" },
       { id: "development", label: "Desarrollo tecnológico", icon: "code", to: "/admin/desarrollo", minimum: "consulta" },
       // Vicerrectorías, facultades y programas: de aquí salen las unidades de
-      // Impacto y de Mis Tableros.
+      // Mis Tableros y la oferta de programas.
       { id: "institution", label: "Estructura institucional", icon: "community", to: "/admin/estructura-institucional", minimum: "admin" },
       { id: "users", label: "Usuarios y roles", icon: "user", to: "/admin/usuarios", minimum: "admin" },
       // Copia otro servidor de Supabase en este. Reemplaza datos: solo administración.
@@ -387,7 +374,7 @@ export function AdminShell({
             <nav className="admin-crumbs" aria-label="Ruta">
               <ol>
                 <li>{group?.label ?? kicker}</li>
-                {group && group.id !== "cifras" && group.id !== "observatorio" && group.id !== "impacto" && group.id !== "tableros" && kicker && kicker !== group.label && <li>{kicker}</li>}
+                {group && group.id !== "cifras" && group.id !== "observatorio" && group.id !== "tableros" && kicker && kicker !== group.label && <li>{kicker}</li>}
                 <li aria-current="page">{title}</li>
               </ol>
             </nav>

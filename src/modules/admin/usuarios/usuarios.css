@@ -509,8 +509,7 @@
 
 .us-scope,
 .us-templates,
-.us-rolepick,
-.us-unit__block {
+.us-rolepick {
   display: grid;
   gap: var(--space-2);
   margin: 0;
@@ -523,8 +522,7 @@
 }
 
 .us-scope legend,
-.us-templates legend,
-.us-unit__block legend {
+.us-templates legend {
   display: flex;
   align-items: center;
   gap: var(--space-2);
@@ -562,14 +560,12 @@
   accent-color: var(--brand-blue);
 }
 
-.us-option span,
-.us-action span {
+.us-option span {
   display: grid;
   gap: 2px;
 }
 
-.us-option strong,
-.us-action strong {
+.us-option strong {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
@@ -578,8 +574,7 @@
   font-size: var(--text-sm);
 }
 
-.us-option small,
-.us-action small {
+.us-option small {
   color: var(--ink-muted);
   font-size: var(--text-xs);
   line-height: var(--leading-normal);
@@ -704,11 +699,6 @@
   gap: var(--space-1);
 }
 
-.us-levels--wide {
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  max-width: 28rem;
-}
-
 .us-level {
   position: relative;
   display: grid;
@@ -787,46 +777,13 @@
 }
 
 .us-screens input,
-.us-reports input,
-.us-action input {
+.us-reports input {
   accent-color: var(--brand-blue);
 }
 
 .us-reports {
   display: grid;
   gap: var(--space-2);
-}
-
-.us-actions {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(min(100%, 14rem), 1fr));
-  gap: var(--space-2);
-}
-
-.us-action {
-  display: flex;
-  align-items: flex-start;
-  gap: var(--space-3);
-  padding: var(--space-3);
-  background: var(--surface-2);
-  border: 1px solid var(--line);
-  border-radius: var(--radius-sm);
-  cursor: pointer;
-}
-
-.us-action:has(input:checked) {
-  background: var(--brand-blue-soft);
-  border-color: var(--brand-blue);
-}
-
-.us-action input {
-  flex: none;
-  margin-top: 3px;
-}
-
-.us-unit {
-  display: grid;
-  gap: var(--space-6);
 }
 
 /* --- Resumen en palabras ----------------------------------------------------------------- */

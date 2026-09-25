@@ -11,30 +11,24 @@
      all_screens
      all_reports / qué informes de UDES en Cifras alcanza.
      reports
-     capabilities  acciones de Impacto.
-     unit_role     papel en Mis Tableros de quien entra a una unidad con el rol.
 
    Por eso la capacidad del rol es la MAYOR que pide alguno de sus módulos, y
    un módulo que se marcó «Ver» puede acabar editando si otro pidió más: la
    matriz lo dice (`effectiveLevel` y `raisedModules`) en vez de esconderlo.
    Separar ver de editar por módulo pediría cambiar las políticas RLS; se
-   acordó no hacerlo (docs/impacto/DECISIONES.md).
+   acordó no hacerlo.
 
-   Un rol GLOBAL va en el perfil de la persona; un rol DE UNIDAD va en una
-   pertenencia (dirección de programa, decanatura…). Sus matrices son
-   distintas porque la base usa cosas distintas de cada uno: del global, la
-   capacidad, las pantallas, los informes y las acciones de Impacto que no son
-   de una unidad (catálogo, periodos); del de unidad, solo las acciones de
-   Impacto que se ejercen en ella y el papel en Mis Tableros.
+   El rol va en el perfil de la persona. Lo que hace en cada unidad donde
+   trabaja —Gestor, Contribuyente o Consulta— no es un rol de acceso: es su
+   función en esa pertenencia (unit_members.role).
    ========================================================================== */
 
 import type { AccessRole, AdminScreen, AppRole } from "../../../types/database";
 import { UNIT_ROLE } from "../../tableros/model";
 
 export type Level = "none" | "ver" | "editar" | "administrar";
-export type Scope = "global" | "unidad";
-export type ModuleId = "portal" | "plan" | "cifras" | "observatorio" | "impacto" | "tableros" | "sistema";
-export type TemplateId = "consulta" | "editor" | "revisor" | "administrador" | "personalizada";
+export type ModuleId = "portal" | "plan" | "cifras" | "observatorio" | "tableros" | "sistema";
+export type TemplateId = "consulta" | "editor" | "administrador" | "personalizada";
 export type BoardRole = "visor" | "editor" | "jefe";
 
 export const LEVEL_LABEL: Record<Level, string> = {
@@ -51,7 +45,7 @@ export interface ModuleDef {
   id: ModuleId;
   label: string;
   screens: { id: AdminScreen; label: string; note?: string }[];
-  /** Niveles que tiene sentido elegir en un rol global, con lo que significa cada uno. */
+  /** Niveles que tiene sentido elegir, con lo que significa cada uno. */
   levels: Partial<Record<Exclude<Level, "none">, { hint: string; needs: AppRole }>>;
 }
 
@@ -106,18 +100,6 @@ export const MODULES: ModuleDef[] = [
     },
   },
   {
-    id: "impacto",
-    label: "Impacto Institucional",
-    screens: [
-      { id: "impacto", label: "Reporte de impacto" },
-      { id: "impacto_audit", label: "Auditar Impacto", note: "pide capacidad de Planeación" },
-    ],
-    levels: {
-      ver: { hint: "Entra al reporte de impacto; lo que hace allí depende de sus roles en las unidades.", needs: "consulta" },
-      administrar: { hint: "Configura el catálogo de indicadores y los periodos.", needs: "consulta" },
-    },
-  },
-  {
     id: "tableros",
     label: "Mis Tableros",
     screens: [{ id: "tableros", label: "Unidades y tableros", note: "quien pertenece a una unidad lo ve de todos modos" }],
@@ -149,16 +131,6 @@ export const SCREEN_LABELS = Object.fromEntries(
   MODULES.flatMap((module) => module.screens.map((screen) => [screen.id, screen.label])),
 ) as Record<AdminScreen, string>;
 
-/** Acciones de Impacto. Las de unidad se ejercen donde se da el rol; las globales, en toda la universidad. */
-export const IMPACT_ACTIONS: { id: string; label: string; hint: string; scope: Scope }[] = [
-  { id: "impacto.capturar", label: "Capturar", hint: "Llena los registros de su programa.", scope: "unidad" },
-  { id: "impacto.enviar", label: "Enviar", hint: "Envía el paquete del programa a decanatura.", scope: "unidad" },
-  { id: "impacto.aprobar", label: "Aprobar", hint: "Aprueba o devuelve lo de los programas de su facultad.", scope: "unidad" },
-  { id: "impacto.validar", label: "Validar", hint: "Valida los registros de la función de su vicerrectoría.", scope: "unidad" },
-  { id: "impacto.catalogo", label: "Catálogo", hint: "Importa la matriz, edita fichas y publica versiones.", scope: "global" },
-  { id: "impacto.periodo", label: "Periodos", hint: "Abre periodos, revisa asignaciones y carga precargados.", scope: "global" },
-];
-
 /** Función en la unidad (Mis Tableros), con las etiquetas de tableros/model.ts. */
 export const BOARD_ROLE_LABEL: Record<BoardRole, { level: Level; label: string; hint: string }> = {
   visor: { level: "ver", ...UNIT_ROLE.visor },
@@ -175,27 +147,19 @@ export interface ModuleChoice {
 }
 
 export interface Matrix {
-  scope: Scope;
   modules: Record<ModuleId, ModuleChoice>;
   /** UDES en Cifras: todos los informes o estos. */
   allReports: boolean;
   reports: string[];
-  /** Acciones de Impacto. */
-  capabilities: string[];
-  /** Solo en roles de unidad: papel en Mis Tableros. */
-  boardRole: BoardRole;
 }
 
 /** Lo que se guarda en access_roles (más la lista de informes). */
 export interface RoleColumns {
-  scope: Scope;
   base_role: AppRole;
   screens: AdminScreen[];
   all_screens: boolean;
   all_reports: boolean;
   reports: string[];
-  capabilities: string[];
-  unit_role: BoardRole | null;
 }
 
 const moduleOf = (id: ModuleId) => MODULES.find((module) => module.id === id)!;
@@ -208,9 +172,8 @@ function emptyModules(): Record<ModuleId, ModuleChoice> {
   >;
 }
 
-/** Capacidad que pide un rol global: la mayor de sus módulos. */
+/** Capacidad que pide un rol: la mayor de sus módulos. */
 export function capacityOf(matrix: Matrix): AppRole {
-  if (matrix.scope === "unidad") return "consulta";
   let best: AppRole = "consulta";
   for (const module of MODULES) {
     const choice = matrix.modules[module.id];
@@ -227,15 +190,8 @@ export function capacityOf(matrix: Matrix): AppRole {
  */
 export function effectiveLevel(matrix: Matrix, id: ModuleId): Level {
   const choice = matrix.modules[id];
-  if (matrix.scope === "unidad") {
-    if (id === "impacto") return matrix.capabilities.length > 0 ? "editar" : "ver";
-    if (id === "tableros") return BOARD_ROLE_LABEL[matrix.boardRole].level;
-    return "none";
-  }
   if (choice.level === "none" || choice.screens.length === 0) return "none";
-  // Impacto y Mis Tableros no dependen de la capacidad.
-  if (id === "impacto" && capacityOf(matrix) === "admin") return "administrar";
-  if (id === "impacto") return matrix.capabilities.some((cap) => cap === "impacto.catalogo" || cap === "impacto.periodo") ? "administrar" : "ver";
+  // Mis Tableros no depende de la capacidad: el trabajo se da por unidad.
   if (id === "tableros") return "ver";
   const capacity = capacityOf(matrix);
   const module = moduleOf(id);
@@ -252,7 +208,6 @@ export function effectiveLevel(matrix: Matrix, id: ModuleId): Level {
 
 /** Módulos en los que podrá hacer más de lo que se eligió, por la capacidad del rol. */
 export function raisedModules(matrix: Matrix): ModuleId[] {
-  if (matrix.scope === "unidad") return [];
   return MODULES.filter((module) => {
     const chosen = matrix.modules[module.id].level;
     return chosen !== "none" && LEVEL_RANK[effectiveLevel(matrix, module.id)] > LEVEL_RANK[chosen];
@@ -261,18 +216,6 @@ export function raisedModules(matrix: Matrix): ModuleId[] {
 
 /** Matriz → columnas de access_roles. */
 export function compile(matrix: Matrix): RoleColumns {
-  if (matrix.scope === "unidad") {
-    return {
-      scope: "unidad",
-      base_role: "consulta",
-      screens: ["impacto"],
-      all_screens: false,
-      all_reports: false,
-      reports: [],
-      capabilities: IMPACT_ACTIONS.filter((a) => a.scope === "unidad" && matrix.capabilities.includes(a.id)).map((a) => a.id),
-      unit_role: matrix.boardRole,
-    };
-  }
   const screens = MODULES.flatMap((module) => {
     const choice = matrix.modules[module.id];
     if (choice.level === "none") return [];
@@ -280,54 +223,30 @@ export function compile(matrix: Matrix): RoleColumns {
   });
   const cifras = matrix.modules.cifras.level !== "none" && matrix.modules.cifras.screens.length > 0;
   const allReports = cifras && (matrix.allReports || matrix.modules.cifras.level === "administrar");
-  const impactAdmin = matrix.modules.impacto.level === "administrar";
   return {
-    scope: "global",
     base_role: capacityOf(matrix),
     screens: screens.length === ALL_SCREENS.length ? [] : screens,
     all_screens: screens.length === ALL_SCREENS.length,
     all_reports: allReports,
     reports: cifras && !allReports ? [...matrix.reports].sort() : [],
-    // Catálogo y periodos solo cuando Impacto se administra.
-    capabilities: impactAdmin
-      ? IMPACT_ACTIONS.filter((a) => a.scope === "global" && matrix.capabilities.includes(a.id)).map((a) => a.id)
-      : [],
-    unit_role: null,
   };
 }
 
 /** Columnas de un rol guardado → matriz, para editarlo. */
-export function decompile(role: Pick<AccessRole, "base_role" | "screens" | "all_screens" | "all_reports"> & {
-  scope?: Scope;
-  capabilities?: string[];
-  unit_role?: BoardRole | null;
-}, reports: string[]): Matrix {
-  const scope: Scope = role.scope ?? "global";
-  const capabilities = [...(role.capabilities ?? [])];
+export function decompile(role: Pick<AccessRole, "base_role" | "screens" | "all_screens" | "all_reports">, reports: string[]): Matrix {
   const modules = emptyModules();
-  if (scope === "unidad") {
-    return { scope, modules, allReports: false, reports: [], capabilities, boardRole: role.unit_role ?? "visor" };
-  }
   const seen = role.all_screens ? ALL_SCREENS : role.screens;
-  const draft: Matrix = { scope, modules, allReports: role.all_reports, reports: [...reports], capabilities, boardRole: "visor" };
+  const draft: Matrix = { modules, allReports: role.all_reports, reports: [...reports] };
   for (const module of MODULES) {
     const screens = module.screens.map((screen) => screen.id).filter((screen) => seen.includes(screen));
     if (screens.length === 0) continue;
     modules[module.id] = { level: "ver", screens };
   }
-  // La administración tiene el catálogo y los periodos aunque su rol no los
-  // marque (imp_can_global): la matriz lo enseña así.
-  if (role.base_role === "admin" && modules.impacto.level !== "none") {
-    for (const cap of ["impacto.catalogo", "impacto.periodo"]) if (!capabilities.includes(cap)) capabilities.push(cap);
-  }
-  if (capabilities.some((cap) => cap === "impacto.catalogo" || cap === "impacto.periodo") && modules.impacto.level !== "none") {
-    modules.impacto.level = "administrar";
-  }
   // La capacidad guardada se reparte: cada módulo toma el nivel más alto que
   // esa capacidad le permite. Es lo que la base hace cumplir.
   const capacity = role.base_role;
   for (const module of MODULES) {
-    if (modules[module.id].level === "none" || module.id === "impacto" || module.id === "tableros") continue;
+    if (modules[module.id].level === "none" || module.id === "tableros") continue;
     let best: Level = "ver";
     for (const [level, def] of Object.entries(module.levels) as [Exclude<Level, "none">, { needs: AppRole }][]) {
       if (module.id === "cifras" && level === "administrar" && !role.all_reports) continue;
@@ -341,62 +260,20 @@ export function decompile(role: Pick<AccessRole, "base_role" | "screens" | "all_
 
 /* --- Plantillas ------------------------------------------------------------------ */
 
-export const TEMPLATES: { id: Exclude<TemplateId, "personalizada">; label: string; hint: Record<Scope, string> }[] = [
-  {
-    id: "consulta",
-    label: "Consulta",
-    hint: {
-      global: "Ve toda la intranet y no cambia nada.",
-      unidad: "Consulta los datos de su unidad; en Impacto no hace nada.",
-    },
-  },
-  {
-    id: "editor",
-    label: "Editor",
-    hint: {
-      global: "Escribe y publica en el Portal, el Plan, UDES en Cifras y el Observatorio.",
-      unidad: "Contribuyente: captura y envía lo que reporta su unidad.",
-    },
-  },
-  {
-    id: "revisor",
-    label: "Revisor",
-    hint: {
-      global: "Revisar se hace desde una unidad: decanatura o vicerrectoría. Elija «En una unidad».",
-      unidad: "Aprueba o valida lo que reportan otros; no captura.",
-    },
-  },
-  {
-    id: "administrador",
-    label: "Administrador",
-    hint: {
-      global: "Todo, incluidas la estructura institucional, las personas y los roles.",
-      unidad: "Gestor: todo en su unidad, incluido repartir accesos.",
-    },
-  },
+export const TEMPLATES: { id: Exclude<TemplateId, "personalizada">; label: string; hint: string }[] = [
+  { id: "consulta", label: "Consulta", hint: "Ve toda la intranet y no cambia nada." },
+  { id: "editor", label: "Editor", hint: "Escribe y publica en el Portal, el Plan, UDES en Cifras y el Observatorio." },
+  { id: "administrador", label: "Administrador", hint: "Todo, incluidas la estructura institucional, las personas y los roles." },
 ];
 
 function full(id: ModuleId, level: Level): ModuleChoice {
   return { level, screens: allOf(id) };
 }
 
-/** La matriz de una plantilla. `revisor` global no existe: devuelve null. */
-export function templateMatrix(template: Exclude<TemplateId, "personalizada">, scope: Scope): Matrix | null {
+/** La matriz de una plantilla. */
+export function templateMatrix(template: Exclude<TemplateId, "personalizada">): Matrix {
   const modules = emptyModules();
-  if (scope === "unidad") {
-    const byTemplate: Record<typeof template, { capabilities: string[]; boardRole: BoardRole }> = {
-      consulta: { capabilities: [], boardRole: "visor" },
-      editor: { capabilities: ["impacto.capturar", "impacto.enviar"], boardRole: "editor" },
-      revisor: { capabilities: ["impacto.aprobar", "impacto.validar"], boardRole: "visor" },
-      administrador: {
-        capabilities: ["impacto.capturar", "impacto.enviar", "impacto.aprobar", "impacto.validar"],
-        boardRole: "jefe",
-      },
-    };
-    return { scope, modules, allReports: false, reports: [], ...byTemplate[template] };
-  }
-  if (template === "revisor") return null;
-  const base: Matrix = { scope, modules, allReports: true, reports: [], capabilities: [], boardRole: "visor" };
+  const base: Matrix = { modules, allReports: true, reports: [] };
   if (template === "consulta") {
     for (const module of MODULES) modules[module.id] = full(module.id, "ver");
     return base;
@@ -406,7 +283,6 @@ export function templateMatrix(template: Exclude<TemplateId, "personalizada">, s
     modules.plan = full("plan", "administrar");
     modules.cifras = full("cifras", "administrar");
     modules.observatorio = full("observatorio", "editar");
-    modules.impacto = full("impacto", "ver");
     modules.tableros = full("tableros", "ver");
     modules.sistema = full("sistema", "ver");
     return base;
@@ -415,26 +291,21 @@ export function templateMatrix(template: Exclude<TemplateId, "personalizada">, s
     const levels = Object.keys(module.levels) as Level[];
     modules[module.id] = full(module.id, levels[levels.length - 1]);
   }
-  base.capabilities = ["impacto.catalogo", "impacto.periodo"];
   return base;
 }
 
 const sameColumns = (a: RoleColumns, b: RoleColumns) =>
-  a.scope === b.scope &&
   a.base_role === b.base_role &&
   a.all_screens === b.all_screens &&
   a.all_reports === b.all_reports &&
   [...a.screens].sort().join() === [...b.screens].sort().join() &&
-  [...a.reports].sort().join() === [...b.reports].sort().join() &&
-  [...a.capabilities].sort().join() === [...b.capabilities].sort().join() &&
-  (a.unit_role ?? null) === (b.unit_role ?? null);
+  [...a.reports].sort().join() === [...b.reports].sort().join();
 
 /** Qué plantilla es una matriz; «personalizada» si no coincide con ninguna. */
 export function templateOf(matrix: Matrix): TemplateId {
   const columns = compile(matrix);
   for (const template of TEMPLATES) {
-    const candidate = templateMatrix(template.id, matrix.scope);
-    if (candidate && sameColumns(columns, compile(candidate))) return template.id;
+    if (sameColumns(columns, compile(templateMatrix(template.id)))) return template.id;
   }
   return "personalizada";
 }
@@ -446,15 +317,6 @@ const list = (items: string[]) =>
 
 /** Lo que podrá hacer quien lleve el rol, en frases cortas. */
 export function describe(matrix: Matrix, reportNames: Map<string, string> = new Map()): string[] {
-  if (matrix.scope === "unidad") {
-    const actions = IMPACT_ACTIONS.filter((a) => a.scope === "unidad" && matrix.capabilities.includes(a.id)).map((a) =>
-      a.label.toLowerCase(),
-    );
-    return [
-      actions.length > 0 ? `En Impacto, en su unidad: ${list(actions)}.` : "En Impacto solo consulta.",
-      `En la unidad es ${BOARD_ROLE_LABEL[matrix.boardRole].label.toLowerCase()}: ${BOARD_ROLE_LABEL[matrix.boardRole].hint.charAt(0).toLowerCase()}${BOARD_ROLE_LABEL[matrix.boardRole].hint.slice(1)}`,
-    ];
-  }
   const byLevel: Record<Exclude<Level, "none">, string[]> = { ver: [], editar: [], administrar: [] };
   for (const module of MODULES) {
     const level = effectiveLevel(matrix, module.id);

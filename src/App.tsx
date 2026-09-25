@@ -130,12 +130,7 @@ const OfficePageAdmin = lazy(() =>
 const UserManagement = lazy(() =>
   import("./modules/admin/usuarios/UserManagement").then((m) => ({ default: m.UserManagement })),
 );
-const ImpactHome = lazy(() => import("./modules/impacto/portal/ImpactHome").then((m) => ({ default: m.ImpactHome })));
-const ImpactUnit = lazy(() => import("./modules/impacto/portal/ImpactUnit").then((m) => ({ default: m.ImpactUnit })));
-const ImpactIndicator = lazy(() =>
-  import("./modules/impacto/portal/ImpactIndicator").then((m) => ({ default: m.ImpactIndicator })),
-);
-const ImpactAdmin = lazy(() => import("./modules/impacto/admin/ImpactAdmin").then((m) => ({ default: m.ImpactAdmin })));
+const OfferPage = lazy(() => import("./modules/oferta/OfferPage").then((m) => ({ default: m.OfferPage })));
 const InstitutionView = lazy(() =>
   import("./modules/admin/institucion/InstitutionView").then((m) => ({ default: m.InstitutionView })),
 );
@@ -377,44 +372,12 @@ export default function App() {
               </RequireRole>
             }
           />
-          {/* Impacto Institucional: portal de consulta con sesión, no público. */}
+          {/* Oferta de programas: se consulta con sesión. */}
           <Route
-            path="/impacto"
+            path="/oferta"
             element={
               <RequireRole minimum="consulta">
-                <ImpactHome />
-              </RequireRole>
-            }
-          />
-          <Route
-            path="/impacto/institucion"
-            element={
-              <RequireRole minimum="consulta">
-                <ImpactUnit institution />
-              </RequireRole>
-            }
-          />
-          <Route
-            path="/impacto/indicador/:codigo"
-            element={
-              <RequireRole minimum="consulta">
-                <ImpactIndicator />
-              </RequireRole>
-            }
-          />
-          <Route
-            path="/impacto/:lente/:slug"
-            element={
-              <RequireRole minimum="consulta">
-                <ImpactUnit />
-              </RequireRole>
-            }
-          />
-          <Route
-            path="/admin/impacto/:vista?"
-            element={
-              <RequireRole minimum="consulta" screen="impacto">
-                <ImpactAdmin />
+                <OfferPage />
               </RequireRole>
             }
           />

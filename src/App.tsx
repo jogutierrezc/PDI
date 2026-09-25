@@ -13,6 +13,7 @@ import { Navigate, Route, Routes, useLocation } from "react-router-dom";
 import { ScrollManager } from "./components/layout/ScrollManager";
 import { TourProvider } from "./components/tour/TourProvider";
 import { TourFab } from "./components/tour/TourFab";
+import { PiloAi } from "./components/pilo/ai/PiloAi";
 import { useAuth } from "./lib/auth";
 import type { AdminScreen, AppRole } from "./types/database";
 import type { ReactElement } from "react";
@@ -135,6 +136,9 @@ const OfficePageAdmin = lazy(() =>
 );
 const UserManagement = lazy(() =>
   import("./modules/admin/usuarios/UserManagement").then((m) => ({ default: m.UserManagement })),
+);
+const PiloAiSettings = lazy(() =>
+  import("./modules/admin/pilo/PiloAiSettings").then((m) => ({ default: m.PiloAiSettings })),
 );
 const OfferPage = lazy(() => import("./modules/oferta/OfferPage").then((m) => ({ default: m.OfferPage })));
 const ImpactPortalHome = lazy(() =>
@@ -443,6 +447,15 @@ export default function App() {
               </RequireRole>
             }
           />
+          {/* Mr. Pilo con IA: la conexión, las funciones y a quién se abre. */}
+          <Route
+            path="/admin/mr-pilo"
+            element={
+              <RequireRole minimum="admin" screen="pilo">
+                <PiloAiSettings />
+              </RequireRole>
+            }
+          />
           {/* Oferta de programas: se consulta con sesión. */}
           <Route
             path="/oferta"
@@ -475,6 +488,7 @@ export default function App() {
         </Routes>
       </Suspense>
       <TourFab />
+      <PiloAi />
     </TourProvider>
   );
 }

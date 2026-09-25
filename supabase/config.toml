@@ -7,6 +7,12 @@ project_id = "pdi-udes"
 # Authorization tal cual, sin que la plataforma la valide antes.
 verify_jwt = false
 
+[functions.pilo-ia]
+# Mr. Pilo con IA también atiende a visitantes sin sesión cuando un portal está
+# en «Público»: la función identifica a quien pregunta y aplica la audiencia de
+# cada portal por su cuenta.
+verify_jwt = false
+
 [functions.sync-facultades]
 # Admite dos formas de identificarse —la sesión del portal o la cabecera
 # x-sync-token de un cron— y las comprueba por su cuenta. Validar antes un JWT

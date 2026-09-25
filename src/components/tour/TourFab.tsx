@@ -12,6 +12,7 @@ import { useLocation } from "react-router-dom";
 import { PiloAvatar } from "../pilo/PiloAvatar";
 import { useTour } from "./TourProvider";
 import { publicTourFor } from "./tours";
+import { usePiloAiHere } from "../pilo/ai/config";
 
 const PEEK_KEY = "recorridos:ofrecido";
 
@@ -19,6 +20,8 @@ export function TourFab() {
   const { pathname } = useLocation();
   const { start, active, isDone } = useTour();
   const tour = publicTourFor(pathname);
+  // Donde está Mr. Pilo con IA, él ofrece el recorrido desde su panel.
+  const ai = usePiloAiHere();
   const [peek, setPeek] = useState(false);
 
   useEffect(() => {
@@ -42,7 +45,7 @@ export function TourFab() {
     return () => window.clearTimeout(timer);
   }, [tour, isDone]);
 
-  if (!tour || active) return null;
+  if (!tour || active || ai.active) return null;
 
   return (
     <div className="tour-fab">

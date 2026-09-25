@@ -114,8 +114,12 @@ export function useVoice() {
   return { supported: voiceSupported(), enabled: on && voiceSupported(), speaking: talking, setEnabled: setVoiceEnabled };
 }
 
-/** Lee un texto en voz alta si la voz está prendida (o si se fuerza, por un botón «Escuchar»). */
-export async function speak(text: string, options: { force?: boolean } = {}) {
+/**
+ * Lee un texto en voz alta si la voz está prendida (o si se fuerza, por un
+ * botón «Escuchar»). La promesa se cumple cuando termina de hablar, para
+ * poder leer una página parte por parte.
+ */
+export async function speak(text: string, options: { force?: boolean; rate?: number; pitch?: number } = {}): Promise<void> {
   if (!voiceSupported() || (!enabled && !options.force)) return;
   const clean = text.replace(/\s+/g, " ").trim();
   if (!clean) return;
@@ -126,19 +130,22 @@ export async function speak(text: string, options: { force?: boolean } = {}) {
   utterance.lang = voice?.lang ?? "es-CO";
   if (voice) utterance.voice = voice;
   // Con voz masculina, su tono natural; si el equipo solo tiene voces femeninas, más grave.
-  utterance.rate = 1.02;
-  utterance.pitch = voice && isMale(voice.name) ? 0.95 : 0.6;
+  utterance.rate = options.rate ?? 1.02;
+  utterance.pitch = (voice && isMale(voice.name) ? 0.95 : 0.6) * (options.pitch ?? 1);
   utterance.onstart = () => {
     speaking = true;
     emit();
   };
-  const end = () => {
-    speaking = false;
-    emit();
-  };
-  utterance.onend = end;
-  utterance.onerror = end;
-  synth.speak(utterance);
+  return new Promise<void>((resolve) => {
+    const end = () => {
+      speaking = false;
+      emit();
+      resolve();
+    };
+    utterance.onend = end;
+    utterance.onerror = end;
+    synth.speak(utterance);
+  });
 }
 
 export function stopSpeaking() {

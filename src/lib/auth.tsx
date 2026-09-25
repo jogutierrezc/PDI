@@ -52,6 +52,7 @@ export const SCREEN_PATHS: Record<AdminScreen, string> = {
   users: "/admin/usuarios",
   transfer: "/admin/traslado",
   institution: "/admin/estructura-institucional",
+  pilo: "/admin/mr-pilo",
 };
 
 export interface AuthContextValue {
@@ -101,7 +102,7 @@ export function screenVisible(
   const { profile, access, inAnyUnit, impactoSide } = who;
   if (!profile?.is_active) return false;
   // Usuarios, traslado de datos y estructura institucional piden administración siempre.
-  if ((screen === "users" || screen === "transfer" || screen === "institution") && RANK[profile.role] < RANK.admin) {
+  if ((screen === "users" || screen === "transfer" || screen === "institution" || screen === "pilo") && RANK[profile.role] < RANK.admin) {
     return false;
   }
   // Mis Tableros se gana perteneciendo a una unidad, no marcándolo aparte.

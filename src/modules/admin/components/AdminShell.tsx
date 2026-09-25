@@ -45,7 +45,8 @@ export type AdminSection =
   | "tableros"
   | "impacto"
   | "transfer"
-  | "institution";
+  | "institution"
+  | "pilo";
 
 export interface NavItem {
   id: AdminSection;
@@ -156,6 +157,8 @@ export const navigation: NavGroup[] = [
       // Mis Tableros y la oferta de programas.
       { id: "institution", label: "Estructura institucional", icon: "community", to: "/admin/estructura-institucional", minimum: "admin" },
       { id: "users", label: "Usuarios y roles", icon: "user", to: "/admin/usuarios", minimum: "admin" },
+      // Voz, resúmenes y síntesis con IA en los portales: la conexión y a quién se abre.
+      { id: "pilo", label: "Mr. Pilo con IA", icon: "spark", to: "/admin/mr-pilo", minimum: "admin" },
       // Copia otro servidor de Supabase en este. Reemplaza datos: solo administración.
       { id: "transfer", label: "Traslado de datos", icon: "upload", to: "/admin/traslado", minimum: "admin" },
     ],

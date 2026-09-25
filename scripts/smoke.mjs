@@ -540,6 +540,25 @@ const FIXTURES = {
     { id: "um-1", unit_id: "imp-prog-a", profile_id: "user-vi", role: "editor" },
   ],
   access_role_reports: [{ access_role_id: "rol-vi", report_slug: "investigacion" }],
+  // Mr. Pilo con IA (0089): la fila de configuración, como la ve la administración.
+  pilo_ai_settings: [
+    {
+      id: 1, enabled: true, provider: "mistral", base_url: "https://api.mistral.ai/v1", chat_path: "/chat/completions",
+      text_model: "mistral-small-latest", speech_provider: "navegador", speech_base_url: "", speech_path: "/audio/speech",
+      speech_model: "", speech_voice: "", voice_engine: "navegador", voice_rate: 1, voice_pitch: 1,
+      functions: { leer: true, resumir: true, sintetizar: true, explicar: true },
+      portals: {
+        cifras: { on: true, aud: "publico", fns: ["leer", "resumir", "sintetizar", "explicar"] },
+        pdi: { on: false, aud: "admin", fns: ["leer", "resumir"] },
+        observatorio: { on: false, aud: "admin", fns: ["leer", "resumir"] },
+        impacto: { on: false, aud: "admin", fns: ["leer", "sintetizar", "explicar"] },
+      },
+      daily_limit: 200, max_rows: 500, cache_days: 30, updated_at: "2026-09-25T12:00:00Z",
+    },
+  ],
+  pilo_ai_log: [
+    { id: 1, created_at: "2026-09-25T10:42:00Z", portal: "cifras", action: "resumir", subject: "Población estudiantil", status: "listo", cached: false, ms: 2100 },
+  ],
   web_projects: [
     {
       id: "w1",
@@ -3658,6 +3677,38 @@ const PORTAL_SNAPSHOT = {
 };
 
 routes.push(
+  {
+    path: "/admin/mr-pilo",
+    session: true,
+    fixtures: { "rpc:pilo_ai_key_status": { has_key: true, last4: "7F2A", has_speech_key: false, speech_last4: "", updated_at: null, today: 12 } },
+    expect: "Mr. Pilo con IA",
+    note: "configuración de Mr. Pilo con IA: Mistral, voz, funciones y portales",
+    also: ["Conexión para resumir y sintetizar", "Mistral", "Guardada en el servidor · termina en ••••7F2A", "Dónde aparece y para quién", "UDES en Cifras", "12 de 200 pedidos", "Población estudiantil", "Todo guardado."],
+  },
+  {
+    path: "/datos-abiertos",
+    fixtures: {
+      "rpc:pilo_ai_public_config": {
+        enabled: true, speech_ready: false, voice_engine: "navegador", voice_rate: 1, voice_pitch: 1,
+        functions: { leer: true, resumir: true, sintetizar: true, explicar: true },
+        portals: { cifras: { on: true, aud: "publico", fns: ["leer", "resumir"] } },
+      },
+    },
+    expect: "Tablero de informes",
+    note: "Mr. Pilo con IA en UDES en Cifras, abierto al público",
+    interact: async (window, tick) => {
+      const button = window.document.querySelector("[aria-label='Abrir a Mr. Pilo']");
+      if (!button) throw new Error("no apareció el botón de Mr. Pilo");
+      button.click();
+      await tick();
+      const panel = window.document.querySelector(".pai-panel")?.textContent ?? "";
+      for (const text of ["Hola, ¿le ayudo?", "Escuchar la página", "Resumir esta página"]) {
+        if (!panel.includes(text)) throw new Error(`el panel no muestra «${text}»`);
+      }
+      // Sintetizar no está activo en este portal: no se ofrece.
+      if (panel.includes("Sintetizar")) throw new Error("se ofrece Sintetizar sin estar activo en el portal");
+    },
+  },
   {
     path: "/impacto",
     session: true,

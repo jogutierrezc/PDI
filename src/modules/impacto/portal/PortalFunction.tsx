@@ -1,9 +1,11 @@
 /* =============================================================================
    Portal de Impacto · la vista de una vicerrectoría (una función).
 
-   Su cauce del río, su matriz de cadena de valor, a qué otras funciones se
-   enlaza, cómo van sus indicadores de impacto real frente a la meta y qué
-   programas, facultad por facultad, eligieron indicadores suyos.
+   Primero, cómo van sus indicadores sumando todas las facultades y todos
+   los programas: el cumplimiento por facultad, la cifra institucional de
+   cada indicador junto al reparto de los programas que lo eligieron y el
+   avance mediano por facultad. Después, su cauce del río, su matriz de
+   cadena de valor, sus lazos, el impacto real y los programas conectados.
    ========================================================================== */
 
 import { useMemo } from "react";
@@ -29,6 +31,9 @@ import type { PortalData } from "./data";
 import { ValueMatrixTable } from "./charts";
 import { PiloBanner, PortalGate, PortalLayout, SectionHead } from "./parts";
 import { ValueRiver } from "./ValueRiver";
+import { countStandings, gridOf, groupStandingNote, metShare, spreads, standingOf, standingsOf, withTarget } from "./standing";
+import { InstitutionRows, Pebble, Pebbles, StandingHeatmap, StandingLegend, StandingRows } from "./standingCharts";
+import type { StackedRow } from "./standingCharts";
 
 export function PortalFunction() {
   const { fn } = useParams();
@@ -41,6 +46,13 @@ function FunctionView({ data, fn }: { data: PortalData; fn: SubstantiveFunction 
   const counts = useMemo(() => riverCounts(data), [data]);
   const links = useMemo(() => functionLinks(data).filter((l) => l.a === fn || l.b === fn), [data, fn]);
   const programs = useMemo(() => programsOf(data), [data]);
+  const standings = useMemo(() => {
+    const all = standingsOf(data, programs);
+    for (const [id, list] of all) all.set(id, list.filter((r) => r.indicator.fn === fn));
+    return all;
+  }, [data, programs, fn]);
+  const names = useMemo(() => new Map(programs.map((p) => [p.id, p.name])), [programs]);
+  const spreadRows = useMemo(() => spreads(standings, names), [standings, names]);
 
   const vr = data.units.find((u) => u.kind === "vicerrectoria" && data.unitFunctions.some((f) => f.unitId === u.id && f.fn === fn));
   const own = data.indicators.filter((i) => i.fn === fn);
@@ -85,6 +97,41 @@ function FunctionView({ data, fn }: { data: PortalData; fn: SubstantiveFunction 
       }
     : { mood: "duda", title: "Sin cifras todavía", lines: ["Cuando la vicerrectoría registre la cifra de la UDES en Captura, aquí se verá contra su meta."] };
 
+  // Cumplimiento: programa × indicador de esta función, sumado por facultad.
+  const adopting = programs.filter((p) => (standings.get(p.id) ?? []).length > 0);
+  const allRows = adopting.flatMap((p) => standings.get(p.id) ?? []);
+  const standing = countStandings(allRows);
+  const reporting = adopting.filter((p) => (standings.get(p.id) ?? []).some((r) => r.value !== null)).length;
+  const groups = new Map<string, { key: string; name: string; slug: string | null; programs: typeof adopting }>();
+  for (const p of adopting) {
+    const key = p.faculty?.id ?? "sin";
+    const g = groups.get(key) ?? { key, name: p.faculty?.name ?? "Sin facultad", slug: p.faculty?.slug ?? null, programs: [] };
+    g.programs.push(p);
+    groups.set(key, g);
+  }
+  const perFaculty = [...groups.values()]
+    .map((g) => ({ ...g, counts: countStandings(g.programs.flatMap((p) => standings.get(p.id) ?? [])) }))
+    .sort((a, b) => (metShare(b.counts) ?? -1) - (metShare(a.counts) ?? -1) || a.name.localeCompare(b.name, "es"));
+  const stacked: StackedRow[] = [
+    { key: "total", name: "Toda la UDES", detail: `${adopting.length} prog.`, counts: standing, total: true },
+    ...perFaculty.map((g) => ({
+      key: g.key,
+      name: g.name,
+      to: g.slug ? `/impacto/facultad/${g.slug}` : undefined,
+      detail: `${g.programs.length} prog.`,
+      counts: g.counts,
+    })),
+  ];
+  const institution = spreadRows.map((sp) => {
+    const value = globalFigure(data, sp.indicator.id);
+    const target = sp.indicator.target2026Num;
+    return { spread: sp, udes: { value: value?.valueNum ?? null, target, pct: progress(value?.valueNum ?? null, target, sp.indicator.direction) } };
+  });
+  const udesMeasured = institution.filter((r) => r.udes.pct !== null);
+  const udesMet = udesMeasured.filter((r) => standingOf(r.udes.pct, true) === "cumplida");
+  const heatCells = spreadRows.map((sp) => perFaculty.map((g) => gridOf(g.programs.flatMap((p) => standings.get(p.id) ?? []), [sp.indicator.id])[0]));
+  const standingNote = groupStandingNote(spreadRows, perFaculty.map((g) => ({ name: g.name, counts: g.counts })), FUNCTION_LABEL[fn]);
+
   return (
     <PortalLayout title={FUNCTION_LABEL[fn]}>
       <section className="ipo-unit-head" style={{ "--tone": FUNCTION_TONE[fn] } as CSSProperties}>
@@ -123,7 +170,90 @@ function FunctionView({ data, fn }: { data: PortalData; fn: SubstantiveFunction 
         </div>
       </section>
 
-      <section className="ipo-section">
+      <section className="ipo-section" aria-labelledby="cumplimiento-titulo">
+        <div className="u-container ist-stack">
+          <h2 id="cumplimiento-titulo" className="sr-only">
+            Cumplimiento de los indicadores de {FUNCTION_LABEL[fn]}
+          </h2>
+          <Pebbles>
+            <Pebble label="Programas que eligieron sus indicadores" value={adopting.length} note={`${allRows.length} indicadores elegidos en total`} />
+            <Pebble label="Programas que reportan" value={reporting} of={`de ${adopting.length}`} note={`${standing.sin_cifra} cifras pendientes`} />
+            <Pebble
+              label="Metas de programa cumplidas"
+              value={metShare(standing) === null ? "—" : `${metShare(standing)} %`}
+              note={`${standing.cumplida} de ${withTarget(standing)} con meta`}
+              tone="bien"
+            />
+            <Pebble
+              label="Cifra institucional en meta"
+              value={udesMet.length}
+              of={`de ${udesMeasured.length} con cifra`}
+              note={udesMet.length ? udesMet.slice(0, 2).map((r) => r.spread.indicator.name).join(" · ") : "La UDES aún no cumple ninguna"}
+            />
+          </Pebbles>
+
+          {adopting.length === 0 ? (
+            <div className="ipo-card">
+              <p className="ipo-muted">Ningún programa ha elegido todavía indicadores de {FUNCTION_LABEL[fn]}.</p>
+            </div>
+          ) : (
+            <>
+              <div className="ipo-card" data-tour="ipo-fn-standing">
+                <div className="ipo-head">
+                  <div>
+                    <h2>Cumplimiento por facultad</h2>
+                    <p>Todos los indicadores de {FUNCTION_LABEL[fn]} que eligieron sus programas, en su estado frente a la meta 2026.</p>
+                  </div>
+                </div>
+                <StandingRows rows={stacked} label={`Cumplimiento de ${FUNCTION_LABEL[fn]} por facultad`} unit="Facultad" />
+                <StandingLegend />
+              </div>
+
+              <div className="ipo-card">
+                <div className="ipo-head">
+                  <div>
+                    <h2>Cada indicador: la UDES y sus programas</h2>
+                    <p>
+                      La cifra institucional frente a su meta y cómo se reparten los programas que lo eligieron: la caja es la mitad central, la raya la mediana,
+                      los bigotes el más bajo y el más alto.
+                    </p>
+                  </div>
+                </div>
+                <InstitutionRows rows={institution} />
+              </div>
+
+              <div className="ipo-card">
+                <div className="ipo-head">
+                  <div>
+                    <h2>Indicador por facultad</h2>
+                    <p>Avance mediano de los programas de cada facultad. «·» ningún programa lo eligió; «○» sin cifra.</p>
+                  </div>
+                </div>
+                <StandingHeatmap
+                  caption={`Avance mediano por facultad en los indicadores de ${FUNCTION_LABEL[fn]}`}
+                  rows={spreadRows.map((sp) => ({
+                    key: sp.indicator.id,
+                    name: (
+                      <>
+                        <b className="ist-code" style={{ "--tone": FUNCTION_TONE[fn] } as CSSProperties}>
+                          {sp.indicator.code}
+                        </b>{" "}
+                        {sp.indicator.name}
+                      </>
+                    ),
+                  }))}
+                  cols={perFaculty.map((g) => ({ key: g.key, code: "", name: g.name, fn }))}
+                  cells={heatCells}
+                />
+              </div>
+
+              <PiloBanner note={standingNote} />
+            </>
+          )}
+        </div>
+      </section>
+
+      <section className="ipo-section ipo-section--surface">
         <div className="u-container ipo-two ipo-two--wide">
           <div className="ipo-card" data-tour="ipo-fn-river">
             <SectionHead title="Su cauce" hint="De los insumos al impacto real." note={riverNote(counts)} />
@@ -156,7 +286,7 @@ function FunctionView({ data, fn }: { data: PortalData; fn: SubstantiveFunction 
         </div>
       </section>
 
-      <section className="ipo-section ipo-section--surface" aria-labelledby="cadena-titulo" data-tour="ipo-fn-matrix">
+      <section className="ipo-section" aria-labelledby="cadena-titulo" data-tour="ipo-fn-matrix">
         <div className="u-container">
           <SectionHead id="cadena-titulo" title="La cadena de cada dimensión" hint="Pase el cursor por una cifra para ver los códigos." />
           <ValueMatrixTable rows={rows} caption={`Matriz de cadena de valor de ${FUNCTION_LABEL[fn]}`} />
@@ -164,7 +294,7 @@ function FunctionView({ data, fn }: { data: PortalData; fn: SubstantiveFunction 
         </div>
       </section>
 
-      <section className="ipo-section">
+      <section className="ipo-section ipo-section--surface">
         <div className="u-container ipo-two">
           <div className="ipo-card">
             <SectionHead title="Impacto real: línea base, cifra y meta" note={resultsNote} />

@@ -156,6 +156,9 @@ const ImpactPortalFaculty = lazy(() =>
 const ImpactPortalPrograms = lazy(() =>
   import("./modules/impacto/portal/PortalPrograms").then((m) => ({ default: m.PortalPrograms })),
 );
+const ImpactPortalProgram = lazy(() =>
+  import("./modules/impacto/portal/PortalProgram").then((m) => ({ default: m.PortalProgram })),
+);
 const InstitutionView = lazy(() =>
   import("./modules/admin/institucion/InstitutionView").then((m) => ({ default: m.InstitutionView })),
 );
@@ -444,6 +447,14 @@ export default function App() {
             element={
               <RequireRole minimum="consulta">
                 <ImpactPortalPrograms />
+              </RequireRole>
+            }
+          />
+          <Route
+            path="/impacto/programa/:slug"
+            element={
+              <RequireRole minimum="consulta">
+                <ImpactPortalProgram />
               </RequireRole>
             }
           />

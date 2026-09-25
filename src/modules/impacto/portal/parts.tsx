@@ -30,7 +30,7 @@ const VIEWS = [
   { to: "/impacto", label: "Institucional", match: (p: string) => p === "/impacto" },
   { to: "/impacto/vicerrectoria/investigacion", label: "Vicerrectorías", match: (p: string) => p.startsWith("/impacto/vicerrectoria") },
   { to: "/impacto/facultades", label: "Facultades", match: (p: string) => p.startsWith("/impacto/facultad") },
-  { to: "/impacto/programas", label: "Programas", match: (p: string) => p.startsWith("/impacto/programas") },
+  { to: "/impacto/programas", label: "Programas", match: (p: string) => p.startsWith("/impacto/programa") },
 ];
 
 export function PortalLayout({ title, children }: { title: string; children: ReactNode }) {

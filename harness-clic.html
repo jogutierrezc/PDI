@@ -1,0 +1,184 @@
+<!doctype html>
+<!-- Banco de pruebas temporal: comprueba que el clic llega a cada opción del
+     menú del perfil en las tres barras. Borrar al terminar. -->
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<title>Prueba de clic en el menú del perfil</title>
+<link rel="stylesheet" href="/src/styles/tokens.css?v=1790315998">
+<link rel="stylesheet" href="/src/styles/base.css?v=1790315998">
+<link rel="stylesheet" href="/src/styles/app.css?v=1790315998">
+<link rel="stylesheet" href="/src/modules/admin/admin.css?v=1790315998">
+<style>
+  body { margin: 0; }
+  #informe { position: fixed; inset: auto 16px 16px auto; z-index: 999; width: 560px; padding: 14px 16px; background: #0b1220; border: 1px solid #2b3a52; border-radius: 12px; color: #e8eef7; font: 500 13px/1.7 ui-monospace, monospace; }
+  #informe b { display: block; margin-bottom: 6px; font-size: 14px; }
+  .ok { color: #6ee7a0; }
+  .mal { color: #ff8a8a; font-weight: 700; }
+</style>
+</head>
+<body>
+<div class="admin-shell" id="shell" data-nav="completo" data-bar="lateral">
+  <a class="skip-link" href="#admin-contenido">Saltar al contenido</a>
+  <aside class="admin-sidebar" id="admin-nav">
+    <div class="admin-sidebar__head">
+      <a class="admin-brand" href="#"><img src="/logo-udes.svg" alt="" width="95" height="34"><span><strong>Intranet UDES</strong><small>Planeación institucional</small></span></a>
+    </div>
+    <nav class="admin-nav" aria-label="Navegación administrativa" id="nav"></nav>
+    <div class="admin-sidebar__foot">
+      <button type="button" class="admin-profile" id="pf" aria-expanded="false" aria-haspopup="true" aria-controls="admin-perfil">
+        <span class="admin-profile__av" aria-hidden="true">JG</span>
+        <span class="admin-profile__id"><span class="admin-identity__name">Jose Gutiérrez</span><span class="admin-identity__role">Planeación</span></span>
+        <svg class="admin-nav__chevron" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M6 9.5 12 15l6-5.5"/></svg>
+      </button>
+    </div>
+  </aside>
+
+  <!-- Igual que en el componente: el menú vive FUERA de la barra. -->
+  <div class="admin-menu" id="admin-perfil" hidden>
+    <p class="admin-menu__head" id="h-barra">Barra de navegación</p>
+    <ul role="group" aria-labelledby="h-barra">
+      <li><button type="button" id="op-lateral" data-bar-pick="lateral"><span class="admin-menu__label">Lateral</span></button></li>
+      <li><button type="button" id="op-menus" data-bar-pick="menus"><span class="admin-menu__label">Barra de menús</span></button></li>
+      <li><button type="button" id="op-riel" data-bar-pick="riel"><span class="admin-menu__label">Riel de carpetas</span></button></li>
+    </ul>
+    <hr>
+    <ul>
+      <li><a href="#" id="op-portal"><span class="admin-menu__label">Portal PDI</span></a></li>
+      <li><button type="button" id="op-salir" class="admin-menu__out"><span class="admin-menu__label">Cerrar sesión</span></button></li>
+    </ul>
+  </div>
+
+  <div class="admin-menu admin-menu--carpeta" id="panel-carpeta" hidden>
+    <p class="admin-menu__head">Plan de Desarrollo</p>
+    <ul><li><a href="#" data-item="Proyectos"><span class="admin-menu__label">Proyectos</span></a></li>
+    <li><a href="#" data-item="Presupuesto"><span class="admin-menu__label">Presupuesto</span></a></li></ul>
+  </div>
+
+  <div class="admin-body">
+    <header class="admin-topbar">
+      <div class="admin-topbar__copy"><h1>Proyectos</h1></div>
+      <div class="admin-topbar__actions"><button type="button" class="button button--primary">Nuevo proyecto</button></div>
+    </header>
+    <main class="admin-main" id="admin-contenido"><div class="admin-card"><p>Contenido.</p></div></main>
+  </div>
+</div>
+<div id="informe"><b>Prueba de clic</b></div>
+
+<script type="module">
+// (módulo: se permite await de nivel superior)
+const GROUPS = [
+  ['planeacion', 'Portal de Planeación', 'Planeación', ['Página de la oficina', 'Documentos']],
+  ['pdi', 'Plan de Desarrollo', 'Plan', ['Gestión de pilares', 'Proyectos', 'PDI por facultad', 'PDI por campus', 'Presupuesto', 'Repositorio']],
+  ['cifras', 'UDES en Cifras', 'Cifras', ['Estaciones del periodo']],
+  ['observatorio', 'Observatorio de Analítica', 'Observatorio', ['Taller del Observatorio']],
+  ['impacto', 'Indicadores de Impacto', 'Impacto', ['Reporte de impacto', 'Auditoría']],
+  ['tableros', 'Mis Tableros', 'Tableros', ['Unidades y tableros']],
+  ['sistema', 'Sistema', 'Sistema', ['Normalizar estructura', 'Parámetros globales', 'Desarrollo tecnológico', 'Estructura institucional', 'Usuarios y roles', 'Traslado de datos']],
+];
+const shell = document.getElementById('shell');
+const nav = document.getElementById('nav');
+const menu = document.getElementById('admin-perfil');
+const boton = document.getElementById('pf');
+const informe = document.getElementById('informe');
+let bar = 'lateral';
+let open = null;
+const chevron = '<svg class="admin-nav__chevron" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M6 9.5 12 15l6-5.5"/></svg>';
+const dot = '<svg class="admin-nav__group-icon" width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><rect x="4" y="4" width="16" height="16" rx="3"/></svg>';
+
+function paint() {
+  shell.dataset.bar = bar;
+  nav.innerHTML = GROUPS.map(([id, label, short, items]) => {
+    const railOpen = bar === 'riel' ? (open || 'pdi') : open;
+    const isOpen = bar === 'lateral' ? true : railOpen === id;
+    const cls = bar === 'riel' ? 'admin-nav__fly' : bar === 'menus' ? 'admin-nav__panel' : '';
+    return `<div class="admin-nav__group">
+      <button type="button" class="admin-nav__group-label" id="g-${id}" aria-expanded="${isOpen}" data-group="${id}">
+        ${dot}<span class="admin-nav__group-name">${bar === 'riel' ? short : label}</span>${chevron}
+      </button>
+      <ul class="${cls}" aria-labelledby="g-${id}" ${isOpen ? '' : 'hidden'}>
+        ${bar === 'riel' ? `<li class="admin-nav__fly-head">${label}</li>` : ''}
+        ${items.map((t) => `<li><a href="#" data-item="${t}"><span class="admin-nav__text">${t}</span></a></li>`).join('')}
+      </ul>
+    </div>`;
+  }).join('');
+}
+
+function abrir() {
+  menu.hidden = false;
+  boton.setAttribute('aria-expanded', 'true');
+  const rect = boton.getBoundingClientRect();
+  const cl = (v, max) => Math.round(Math.max(8, Math.min(v, max)));
+  menu.style.cssText = bar === 'menus'
+    ? `top:${cl(rect.bottom + 8, innerHeight - 120)}px;right:${cl(innerWidth - rect.right, innerWidth - 260)}px`
+    : `bottom:${cl(innerHeight - rect.top + 8, innerHeight - 120)}px;left:${cl(bar === 'riel' ? rect.right + 8 : rect.left, innerWidth - 260)}px`;
+}
+
+// ¿Qué elemento recibe de verdad el clic en el centro de cada opción?
+function prueba(id) {
+  const objetivo = document.getElementById(id);
+  const r = objetivo.getBoundingClientRect();
+  if (r.width === 0) return { id, ok: false, quien: 'sin tamaño' };
+  const encima = document.elementFromPoint(Math.round(r.left + r.width / 2), Math.round(r.top + r.height / 2));
+  const ok = Boolean(encima && (encima === objetivo || objetivo.contains(encima)));
+  return { id, ok, quien: encima ? (encima.id || encima.className || encima.tagName) : 'nada' };
+}
+
+document.querySelectorAll('[data-bar-pick]').forEach((b) => b.addEventListener('click', () => { shell.dataset.bar = b.dataset.barPick; }));
+const lineas = [];
+for (const modo of ['lateral', 'menus', 'riel']) {
+  bar = modo;
+  open = modo === 'menus' ? 'pdi' : null;
+  paint();
+  abrir();
+  const r = ['op-lateral', 'op-menus', 'op-riel', 'op-portal', 'op-salir'].map(prueba);
+  const fallos = r.filter((x) => !x.ok);
+  lineas.push(`<div>${modo.padEnd(8, ' ')} menú: ${fallos.length === 0
+    ? '<span class="ok">5/5 reciben el clic</span>'
+    : `<span class="mal">BLOQUEADO por ${fallos[0].quien}</span>`}</div>`);
+  // y en la barra de menús, ¿se puede pulsar una pantalla del panel abierto?
+  if (modo === 'menus') {
+    const rotulo = document.getElementById('g-pdi');
+    const rr0 = rotulo.getBoundingClientRect();
+    const carpeta = document.getElementById('panel-carpeta');
+    carpeta.hidden = false;
+    carpeta.style.cssText = `top:${Math.round(rr0.bottom + 8)}px;left:${Math.round(Math.max(8, Math.min(rr0.left, innerWidth - 296)))}px`;
+    const enlace = carpeta.querySelector('[data-item="Proyectos"]');
+    const rr = enlace.getBoundingClientRect();
+    const encima = document.elementFromPoint(Math.round(rr.left + rr.width / 2), Math.round(rr.top + rr.height / 2));
+    const ok = encima && enlace.contains(encima);
+    lineas.push(`<div>menus    panel de carpeta: ${ok ? '<span class="ok">el enlace recibe el clic</span>' : `<span class="mal">BLOQUEADO por ${encima ? (encima.id || encima.className) : 'nada'}</span>`}</div>`);
+  }
+  menu.hidden = true;
+  document.getElementById('panel-carpeta').hidden = true;
+}
+// y que elegir de verdad cambie la barra
+bar = 'lateral';
+paint();
+abrir();
+document.getElementById('op-riel').click();
+lineas.push(`<div>seleccionar: ${shell.dataset.bar === 'riel' ? '<span class="ok">cambia de barra</span>' : '<span class="mal">no cambia</span>'}</div>`);
+// diagnóstico: quién apila sobre quién en la barra de menús
+bar = 'menus'; open = 'pdi'; paint(); abrir();
+
+const topbar = document.querySelector('.admin-topbar');
+const aside = document.querySelector('.admin-sidebar');
+const z = (el) => { const c = getComputedStyle(el); return `${c.position}/z:${c.zIndex}`; };
+
+
+
+const enlace2 = document.getElementById('panel-carpeta').querySelector('[data-item="Proyectos"]');
+const r2 = enlace2.getBoundingClientRect();
+const pila = document.elementsFromPoint(Math.round(r2.left + r2.width / 2), Math.round(r2.top + r2.height / 2));
+lineas.push(`<div>pila: ${pila.slice(0, 4).map((e) => e.id || (typeof e.className === 'string' ? e.className.split(' ')[0] : e.tagName)).join(' > ')}</div>`);
+
+menu.hidden = true;
+informe.innerHTML = '<b>Prueba de clic</b>' + lineas.join('');
+menu.hidden = true;
+bar = 'lateral';
+paint();
+
+
+</script>
+</body>
+</html>

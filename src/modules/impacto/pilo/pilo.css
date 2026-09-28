@@ -141,7 +141,9 @@
 .pilo {
   position: fixed;
   inset: 0;
-  z-index: 1000;
+  /* Por encima de cualquier otra capa a pantalla completa (Nuevo indicador usa 1000);
+     solo el recorrido guiado (1200) va encima. */
+  z-index: 1100;
   display: grid;
   grid-template-columns: minmax(300px, 400px) minmax(0, 1fr);
   color: var(--pilo-stage-ink);
@@ -1095,3 +1097,17 @@
 }
 
 .pilo-settings__block > .imp-import__file { align-self: flex-start; }
+
+/* Volver a la conversación desde la guía por pasos. */
+.pilo__tochat {
+  align-self: flex-start;
+  padding: 6px 12px;
+  border: 1px solid var(--pilo-stage-line);
+  border-radius: 999px;
+  background: none;
+  color: var(--pilo-stage-ink);
+  font: inherit;
+  font-size: var(--text-xs);
+  font-weight: 700;
+  cursor: pointer;
+}

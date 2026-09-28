@@ -8,7 +8,7 @@
 
 import { supabase, readFunctionError } from "../../../lib/supabase";
 import { speak, stopSpeaking } from "../voice";
-import type { Answer, Mesh, Section } from "./logic";
+import type { Answer, Mesh, NeedAnswer, NeedInput, Section } from "./logic";
 import type { Portal } from "./config";
 
 export type { Answer };
@@ -95,6 +95,16 @@ export async function askQuestion(question: string, history: { q: string; a: str
 /** «Me sirvió» / «No me sirvió». Si falla, no pasa nada: es una opinión, no un dato. */
 export async function rateAnswer(answerId: number, vote: "up" | "down") {
   await supabase.functions.invoke("pilo-ia", { body: { action: "calificar", portal: "pregunta", answerId, vote } }).catch(() => undefined);
+}
+
+/* --- Mr. Pilo Bot: entender la necesidad de un programa ------------------------------ */
+
+export async function interpretNeed(need: NeedInput): Promise<NeedAnswer & { cached?: boolean }> {
+  const { data, error } = await supabase.functions.invoke<NeedAnswer & { cached?: boolean }>("pilo-ia", {
+    body: { action: "entender", portal: "impacto", need },
+  });
+  if (error) throw await failure(error);
+  return data as NeedAnswer & { cached?: boolean };
 }
 
 export async function testPilo(): Promise<{ ok: boolean; ms?: number; error?: string }> {

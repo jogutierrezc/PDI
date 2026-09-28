@@ -35,7 +35,7 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2.58.0";
 // --- lógica: copia exacta de src/components/pilo/ai/logic.ts (la prueba logic-sync lo vigila)
 // Va dentro para que la función sea un solo archivo y se pueda desplegar
 // también pegándola en el editor del panel de Supabase.
-export type Action = "resumir" | "sintetizar" | "explicar" | "voz" | "probar" | "preguntar";
+export type Action = "resumir" | "sintetizar" | "explicar" | "voz" | "probar" | "preguntar" | "entender";
 export type Fn = "leer" | "resumir" | "sintetizar" | "explicar" | "preguntar";
 export type Audience = "admin" | "sesion" | "publico";
 export type Portal = "cifras" | "pdi" | "observatorio" | "impacto" | "pregunta";
@@ -60,11 +60,16 @@ export interface Section {
 }
 
 export const PORTALS: Portal[] = ["cifras", "pdi", "observatorio", "impacto", "pregunta"];
-export const FN_OF: Record<Exclude<Action, "probar">, Fn> = { resumir: "resumir", sintetizar: "sintetizar", explicar: "explicar", voz: "leer", preguntar: "preguntar" };
+export const FN_OF: Record<Exclude<Action, "probar">, Fn> = { resumir: "resumir", sintetizar: "sintetizar", explicar: "explicar", voz: "leer", preguntar: "preguntar", entender: "sintetizar" };
 
 /** ¿Puede esta persona (null = sin sesión) usar la acción en el portal? */
 export function canUse(rules: Rules, portal: string, action: Action, role: Role | null): { ok: true } | { ok: false; reason: string } {
   if (action === "probar") return role === "admin" ? { ok: true } : { ok: false, reason: "Solo la administración prueba la conexión." };
+  // Entender la necesidad de un programa (Mr. Pilo Bot, en Impacto): con la IA encendida y sesión.
+  if (action === "entender") {
+    if (!rules.enabled) return { ok: false, reason: "Mr. Pilo con IA está apagado." };
+    return role ? { ok: true } : { ok: false, reason: "Inicie sesión para que Pilo entienda su necesidad." };
+  }
   // La muestra de voz de la configuración: solo la administración, en cualquier estado.
   if (portal === "prueba") return role === "admin" ? { ok: true } : { ok: false, reason: "Solo la administración prueba la voz." };
   // «Pregúntele a Pilo» tiene su propio interruptor: responde de memoria aunque la IA esté apagada.
@@ -626,6 +631,74 @@ export function mapContext(mesh: Mesh, ids: string[]): string {
     .filter(Boolean)
     .join("\n");
 }
+
+/* --- Mr. Pilo Bot: entender la necesidad de un programa ------------------------------ */
+
+/**
+ * Lo que manda Mr. Pilo Bot: lo que escribió el programa y las listas
+ * cerradas de donde la IA puede elegir (los impactos y las fichas ya
+ * construidas que la búsqueda de palabras dejó como candidatas).
+ */
+export interface NeedInput {
+  program: string;
+  text: string;
+  goals: { id: string; fn: string; title: string }[];
+  indicators: { id: string; code: string; name: string; fn: string; stage: string }[];
+}
+
+export interface NeedAnswer {
+  summary: string;
+  goals: string[];
+  indicators: { id: string; reason: string }[];
+}
+
+const NEED_TASK = [
+  "Un director de programa académico te cuenta lo que su programa necesita o quiere lograr.",
+  "Elige, solo de las listas que te doy, los impactos (máximo 4) y las fichas de indicador (máximo 6) que mejor responden a lo que pide.",
+  "Para cada ficha, di en una frase corta por qué responde a lo que pidió.",
+  "Resume en una o dos frases, en usted, lo que entendiste que necesita el programa.",
+  "Si nada de las listas responde, deja las listas vacías y dilo en el resumen.",
+  'Formato: {"resumen":"...","impactos":["id"],"fichas":[{"id":"...","porque":"..."}]}',
+].join(" ");
+
+export function buildNeedMessages(input: NeedInput) {
+  const goals = input.goals.map((g) => `${g.id} · ${g.fn} · ${g.title}`).join("\n");
+  const indicators = input.indicators
+    .slice(0, 40)
+    .map((i) => `${i.id} · ${i.code} · ${i.fn} · ${i.stage} · ${i.name.slice(0, 160)}`)
+    .join("\n");
+  return [
+    { role: "system", content: PERSONA },
+    {
+      role: "user",
+      content: `${NEED_TASK}\n\nPrograma: ${input.program.slice(0, 160)}\n\nImpactos (id · función · impacto):\n${goals}\n\nFichas ya construidas (id · código · función · eslabón · nombre):\n${indicators || "(ninguna)"}\n\nLo que escribió el programa: ${input.text.slice(0, 800)}`,
+    },
+  ];
+}
+
+/** Lee la respuesta y deja solo ids que estaban en las listas: la IA no puede inventar fichas. */
+export function parseNeed(raw: string, goalIds: Set<string>, indicatorIds: Set<string>): NeedAnswer {
+  const text = raw.trim();
+  const start = text.indexOf("{");
+  const end = text.lastIndexOf("}");
+  let data: { resumen?: unknown; impactos?: unknown; fichas?: unknown } = {};
+  if (start >= 0 && end > start) {
+    try {
+      data = JSON.parse(text.slice(start, end + 1));
+    } catch {
+      /* no era JSON */
+    }
+  }
+  const goals = (Array.isArray(data.impactos) ? data.impactos : []).filter((g): g is string => typeof g === "string" && goalIds.has(g)).slice(0, 4);
+  const indicators = (Array.isArray(data.fichas) ? data.fichas : [])
+    .map((f) => (f && typeof f === "object" ? (f as { id?: unknown; porque?: unknown }) : {}))
+    .filter((f) => typeof f.id === "string" && indicatorIds.has(f.id))
+    .map((f) => ({ id: f.id as string, reason: typeof f.porque === "string" ? f.porque.slice(0, 200) : "" }))
+    .filter((f, i, all) => all.findIndex((x) => x.id === f.id) === i)
+    .slice(0, 6);
+  const summary = typeof data.resumen === "string" ? data.resumen.slice(0, 400) : "";
+  return { summary, goals, indicators };
+}
 // --- fin de la lógica -------------------------------------------------------------
 
 // El origen permitido se pone en cada respuesta, según quién llama (allowOrigin).
@@ -727,6 +800,7 @@ async function handle(request: Request): Promise<Response> {
     history?: { q: string; a: string }[];
     answerId?: number;
     vote?: string;
+    need?: NeedInput;
   };
   try {
     body = await request.json();
@@ -734,7 +808,7 @@ async function handle(request: Request): Promise<Response> {
     return json({ error: "El pedido no es JSON." }, 400);
   }
   const requested = body.action;
-  if (!requested || !["resumir", "sintetizar", "explicar", "voz", "probar", "preguntar", "calificar"].includes(requested)) {
+  if (!requested || !["resumir", "sintetizar", "explicar", "voz", "probar", "preguntar", "calificar", "entender"].includes(requested)) {
     return json({ error: "Acción desconocida." }, 400);
   }
   // Calificar una respuesta pide los mismos permisos que preguntar.
@@ -1065,6 +1139,52 @@ async function handle(request: Request): Promise<Response> {
       }
       await log("listo", "Prueba de conexión");
       return json({ ok: true, ms: Date.now() - started, url: target.url, model: target.model });
+    }
+
+    // --- Mr. Pilo Bot: entender lo que necesita un programa ------------------------------
+    if (action === "entender") {
+      const need = body.need;
+      if (!need || typeof need.text !== "string" || need.text.trim().length < 3 || !Array.isArray(need.goals) || !Array.isArray(need.indicators)) {
+        return json({ error: "Escriba lo que necesita el programa." }, 400);
+      }
+      const clean: NeedInput = {
+        program: String(need.program ?? "").slice(0, 160),
+        text: need.text.replace(/\s+/g, " ").trim().slice(0, 800),
+        goals: need.goals.slice(0, 30).map((g) => ({ id: String(g.id).slice(0, 40), fn: String(g.fn).slice(0, 20), title: String(g.title).slice(0, 160) })),
+        indicators: need.indicators.slice(0, 40).map((i) => ({ id: String(i.id).slice(0, 60), code: String(i.code).slice(0, 20), name: String(i.name).slice(0, 200), fn: String(i.fn).slice(0, 20), stage: String(i.stage).slice(0, 20) })),
+      };
+      const key = await sha256(JSON.stringify(["entender", target.model, clean]));
+      if (settings.cache_days > 0) {
+        const { data: hit } = await admin.from("pilo_ai_cache").select("result, created_at").eq("key", key).maybeSingle();
+        if (hit && Date.now() - new Date(hit.created_at).getTime() < settings.cache_days * 86400_000) {
+          await log("listo", `entender · ${clean.text}`, true);
+          return json({ ...hit.result, cached: true });
+        }
+      }
+      const response = await callProvider(target.url, {
+        method: "POST",
+        headers,
+        body: JSON.stringify({
+          model: target.model,
+          messages: buildNeedMessages(clean),
+          temperature: 0.1,
+          max_tokens: 700,
+          ...(settings.provider === "mistral" ? { response_format: { type: "json_object" } } : {}),
+        }),
+      });
+      if (!response.ok) {
+        const detail = await providerDetail(response);
+        await log(`error ${response.status}`, `entender · ${detail}`);
+        if (response.status === 429) return json({ error: LIMIT_429, code: "limite_proveedor" }, 429);
+        return json({ error: `El proveedor respondió ${response.status}${detail ? `: ${detail}` : ""}.`, code: "proveedor" }, 502);
+      }
+      const data = await response.json();
+      const result = parseNeed(String(data?.choices?.[0]?.message?.content ?? ""), new Set(clean.goals.map((g) => g.id)), new Set(clean.indicators.map((i) => i.id)));
+      if (settings.cache_days > 0 && (result.goals.length || result.indicators.length)) {
+        await admin.from("pilo_ai_cache").upsert({ key, result, created_at: new Date().toISOString() });
+      }
+      await log("listo", `entender · ${clean.text}`);
+      return json({ ...result, cached: false });
     }
 
     // --- Resumir, sintetizar, explicar ------------------------------------------------

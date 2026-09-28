@@ -44,6 +44,7 @@ import { PiloClose, PiloLauncher, PiloScene, PiloSpeech, type PiloOrigin } from 
 import { playPulse } from "./motion";
 import { describeGaps, piloMood, piloSpeech, type SpeechContext } from "./speech";
 import { PiloAvatar } from "../../../components/pilo/PiloAvatar";
+import { PiloChat } from "./chat/PiloChat";
 
 type Step = 1 | 2 | 3 | 4;
 
@@ -54,9 +55,19 @@ export function PiloBot({ site, base, catalog, canEdit }: { site: ProgramSite; b
       peekTitle={`Personalice los indicadores de ${site.programName}`}
       peekText="Tres pasos y Mr. Pilo le propone qué seguir, con la cadena completa y el porqué de cada uno."
     >
-      {({ origin, onClose }) => <PiloGuide site={site} base={base} catalog={catalog} canEdit={canEdit} origin={origin} onClose={onClose} />}
+      {({ origin, onClose }) => <PiloBotScene site={site} base={base} catalog={catalog} canEdit={canEdit} origin={origin} onClose={onClose} />}
     </PiloLauncher>
   );
+}
+
+/**
+ * La escena abre en la conversación (chat/PiloChat.tsx); la guía por pasos
+ * de siempre sigue a un clic («Guía por pasos») y de ella se vuelve a
+ * conversar. Las dos usan el mismo motor (recommend).
+ */
+function PiloBotScene(props: { site: ProgramSite; base: ImpactBase; catalog: Catalog; canEdit: boolean; origin: PiloOrigin; onClose: () => void }) {
+  const [mode, setMode] = useState<"chat" | "guia">("chat");
+  return mode === "chat" ? <PiloChat {...props} onClassic={() => setMode("guia")} /> : <PiloGuide {...props} onChat={() => setMode("chat")} />;
 }
 
 function PiloGuide({
@@ -66,6 +77,7 @@ function PiloGuide({
   canEdit,
   origin,
   onClose,
+  onChat,
 }: {
   site: ProgramSite;
   base: ImpactBase;
@@ -73,6 +85,7 @@ function PiloGuide({
   canEdit: boolean;
   origin: PiloOrigin;
   onClose: () => void;
+  onChat?: () => void;
 }) {
   const titleId = useId();
   const [step, setStep] = useState<Step>(1);
@@ -251,6 +264,11 @@ function PiloGuide({
     <PiloScene origin={origin} onClose={onClose} titleId={titleId} focusKey={step}>
       <aside className="pilo__side">
         <PiloClose onClose={onClose} />
+        {onChat && (
+          <button type="button" className="pilo__tochat" onClick={onChat}>
+            Conversar con Pilo
+          </button>
+        )}
         <div className="pilo__intro">
           <span className="pilo__avatar">
             <PiloAvatar mood={mood} size={116} alive />

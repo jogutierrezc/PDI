@@ -12,7 +12,7 @@
      y cómo se le pregunta al modelo con los pasajes de la memoria (buildAskMessages).
    ========================================================================== */
 
-export type Action = "resumir" | "sintetizar" | "explicar" | "voz" | "probar" | "preguntar";
+export type Action = "resumir" | "sintetizar" | "explicar" | "voz" | "probar" | "preguntar" | "entender";
 export type Fn = "leer" | "resumir" | "sintetizar" | "explicar" | "preguntar";
 export type Audience = "admin" | "sesion" | "publico";
 export type Portal = "cifras" | "pdi" | "observatorio" | "impacto" | "pregunta";
@@ -37,11 +37,16 @@ export interface Section {
 }
 
 export const PORTALS: Portal[] = ["cifras", "pdi", "observatorio", "impacto", "pregunta"];
-export const FN_OF: Record<Exclude<Action, "probar">, Fn> = { resumir: "resumir", sintetizar: "sintetizar", explicar: "explicar", voz: "leer", preguntar: "preguntar" };
+export const FN_OF: Record<Exclude<Action, "probar">, Fn> = { resumir: "resumir", sintetizar: "sintetizar", explicar: "explicar", voz: "leer", preguntar: "preguntar", entender: "sintetizar" };
 
 /** ¿Puede esta persona (null = sin sesión) usar la acción en el portal? */
 export function canUse(rules: Rules, portal: string, action: Action, role: Role | null): { ok: true } | { ok: false; reason: string } {
   if (action === "probar") return role === "admin" ? { ok: true } : { ok: false, reason: "Solo la administración prueba la conexión." };
+  // Entender la necesidad de un programa (Mr. Pilo Bot, en Impacto): con la IA encendida y sesión.
+  if (action === "entender") {
+    if (!rules.enabled) return { ok: false, reason: "Mr. Pilo con IA está apagado." };
+    return role ? { ok: true } : { ok: false, reason: "Inicie sesión para que Pilo entienda su necesidad." };
+  }
   // La muestra de voz de la configuración: solo la administración, en cualquier estado.
   if (portal === "prueba") return role === "admin" ? { ok: true } : { ok: false, reason: "Solo la administración prueba la voz." };
   // «Pregúntele a Pilo» tiene su propio interruptor: responde de memoria aunque la IA esté apagada.
@@ -602,4 +607,72 @@ export function mapContext(mesh: Mesh, ids: string[]): string {
     })
     .filter(Boolean)
     .join("\n");
+}
+
+/* --- Mr. Pilo Bot: entender la necesidad de un programa ------------------------------ */
+
+/**
+ * Lo que manda Mr. Pilo Bot: lo que escribió el programa y las listas
+ * cerradas de donde la IA puede elegir (los impactos y las fichas ya
+ * construidas que la búsqueda de palabras dejó como candidatas).
+ */
+export interface NeedInput {
+  program: string;
+  text: string;
+  goals: { id: string; fn: string; title: string }[];
+  indicators: { id: string; code: string; name: string; fn: string; stage: string }[];
+}
+
+export interface NeedAnswer {
+  summary: string;
+  goals: string[];
+  indicators: { id: string; reason: string }[];
+}
+
+const NEED_TASK = [
+  "Un director de programa académico te cuenta lo que su programa necesita o quiere lograr.",
+  "Elige, solo de las listas que te doy, los impactos (máximo 4) y las fichas de indicador (máximo 6) que mejor responden a lo que pide.",
+  "Para cada ficha, di en una frase corta por qué responde a lo que pidió.",
+  "Resume en una o dos frases, en usted, lo que entendiste que necesita el programa.",
+  "Si nada de las listas responde, deja las listas vacías y dilo en el resumen.",
+  'Formato: {"resumen":"...","impactos":["id"],"fichas":[{"id":"...","porque":"..."}]}',
+].join(" ");
+
+export function buildNeedMessages(input: NeedInput) {
+  const goals = input.goals.map((g) => `${g.id} · ${g.fn} · ${g.title}`).join("\n");
+  const indicators = input.indicators
+    .slice(0, 40)
+    .map((i) => `${i.id} · ${i.code} · ${i.fn} · ${i.stage} · ${i.name.slice(0, 160)}`)
+    .join("\n");
+  return [
+    { role: "system", content: PERSONA },
+    {
+      role: "user",
+      content: `${NEED_TASK}\n\nPrograma: ${input.program.slice(0, 160)}\n\nImpactos (id · función · impacto):\n${goals}\n\nFichas ya construidas (id · código · función · eslabón · nombre):\n${indicators || "(ninguna)"}\n\nLo que escribió el programa: ${input.text.slice(0, 800)}`,
+    },
+  ];
+}
+
+/** Lee la respuesta y deja solo ids que estaban en las listas: la IA no puede inventar fichas. */
+export function parseNeed(raw: string, goalIds: Set<string>, indicatorIds: Set<string>): NeedAnswer {
+  const text = raw.trim();
+  const start = text.indexOf("{");
+  const end = text.lastIndexOf("}");
+  let data: { resumen?: unknown; impactos?: unknown; fichas?: unknown } = {};
+  if (start >= 0 && end > start) {
+    try {
+      data = JSON.parse(text.slice(start, end + 1));
+    } catch {
+      /* no era JSON */
+    }
+  }
+  const goals = (Array.isArray(data.impactos) ? data.impactos : []).filter((g): g is string => typeof g === "string" && goalIds.has(g)).slice(0, 4);
+  const indicators = (Array.isArray(data.fichas) ? data.fichas : [])
+    .map((f) => (f && typeof f === "object" ? (f as { id?: unknown; porque?: unknown }) : {}))
+    .filter((f) => typeof f.id === "string" && indicatorIds.has(f.id))
+    .map((f) => ({ id: f.id as string, reason: typeof f.porque === "string" ? f.porque.slice(0, 200) : "" }))
+    .filter((f, i, all) => all.findIndex((x) => x.id === f.id) === i)
+    .slice(0, 6);
+  const summary = typeof data.resumen === "string" ? data.resumen.slice(0, 400) : "";
+  return { summary, goals, indicators };
 }

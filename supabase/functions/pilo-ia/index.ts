@@ -209,6 +209,8 @@ export const TEXT_PRESETS: Record<string, { url: string; model: string }> = {
   mistral: { url: "https://api.mistral.ai/v1/chat/completions", model: "mistral-small-latest" },
   // Free.ai: https://api.free.ai, POST /v1/chat/ (respuesta como la de OpenAI).
   freeai: { url: "https://api.free.ai/v1/chat/", model: "qwen7b" },
+  // NVIDIA: https://integrate.api.nvidia.com, formato de OpenAI.
+  nvidia: { url: "https://integrate.api.nvidia.com/v1/chat/completions", model: "google/gemma-4-31b-it" },
 };
 
 /** Voz de Free.ai: POST /v1/tts/ {text, model, voice} → {audio_url}. em_alex es masculina en español. */
@@ -243,6 +245,11 @@ export function speechTarget(provider: string, base: string, path: string, model
 export function endpoint(provider: string, base: string, path: string): string {
   let b = base.trim().replace(/\/+$/, "");
   let p = "/" + path.trim().replace(/^\/+/, "");
+  // Una ruta escrita dos veces («/chat/completions/chat/completions») se deja en una.
+  const half = p.slice(0, p.length / 2);
+  if (p.length > 2 && p.length % 2 === 0 && half + half === p) p = half;
+  // Si pegaron la dirección completa («…/v1/chat/completions»), ya trae la ruta.
+  if (p !== "/" && b.toLowerCase().endsWith(p.toLowerCase())) return b;
   if (/\/v1$/.test(b) && p.startsWith("/v1/")) p = p.slice(3);
   if (provider === "mistral" && !/\/v1$/.test(b) && !p.startsWith("/v1/")) b = `${b}/v1`;
   return `${b}${p}`;

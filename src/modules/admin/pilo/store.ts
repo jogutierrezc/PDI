@@ -13,7 +13,7 @@ import type { DatabaseError } from "../../../data/errors";
 import type { Fn, Portal, PortalRule } from "../../../components/pilo/ai/config";
 import type { MemorySource } from "./memory";
 
-export type Provider = "mistral" | "freeai" | "otro";
+export type Provider = "mistral" | "freeai" | "nvidia" | "otro";
 export type SpeechProvider = "freeai" | "otro" | "navegador";
 
 export interface PiloSettings {
@@ -66,7 +66,7 @@ const validModel = (m: string) => (/^[\w.:-][\w.:/-]*$/.test(m) && !/^https?:/.t
 export function normalizeSettings(raw: Record<string, unknown>): PiloSettings {
   const str = (k: string, d: string) => (typeof raw[k] === "string" ? (raw[k] as string) : d);
   const num = (k: string, d: number) => (raw[k] === null || raw[k] === undefined || raw[k] === "" ? d : Number(raw[k]));
-  const provider = (["mistral", "freeai", "otro"] as const).find((p) => p === raw.provider) ?? "mistral";
+  const provider = (["mistral", "freeai", "nvidia", "otro"] as const).find((p) => p === raw.provider) ?? "mistral";
   const portals = { ...DEFAULT_PORTALS, ...((raw.portals as Record<Portal, PortalRule>) ?? {}) };
   return {
     enabled: Boolean(raw.enabled),
@@ -98,7 +98,7 @@ export function normalizeSettings(raw: Record<string, unknown>): PiloSettings {
   };
 }
 
-export type KeySlot = "mistral" | "freeai" | "otro" | "voz";
+export type KeySlot = "mistral" | "freeai" | "nvidia" | "otro" | "voz";
 
 export interface KeyStatus {
   /** Una por proveedor (0091). Sin 0091, no viene. */
@@ -135,6 +135,12 @@ export const PROVIDERS: Record<Provider, { label: string; base: string; model: s
     base: "https://api.free.ai",
     model: "qwen7b",
     hint: "Pegue su clave de free.ai (empieza por «sk-free-»). Todo lo demás ya está puesto.",
+  },
+  nvidia: {
+    label: "NVIDIA",
+    base: "https://integrate.api.nvidia.com/v1",
+    model: "google/gemma-4-31b-it",
+    hint: "Pegue su clave de build.nvidia.com (empieza por «nvapi-»). Todo lo demás ya está puesto; el modelo se cambia en opciones avanzadas.",
   },
   otro: { label: "Otro compatible", base: "", model: "", hint: "Cualquier servicio con el formato de OpenAI: escriba su dirección, el modelo y la ruta." },
 };

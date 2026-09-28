@@ -84,6 +84,12 @@ describe("la dirección del proveedor", () => {
     expect(textTarget("mistral", "https://api.mistral.ai/v1", "/chat/completions", "mistral-large-latest").model).toBe("mistral-large-latest");
     // Lo que pasó de verdad: dirección de la web y una ruta en el campo del modelo.
     expect(textTarget("freeai", "https://free.ai/api", "/audio/speech", "/tts-1")).toEqual({ url: "https://api.free.ai/v1/chat/", model: "qwen7b" });
+    expect(textTarget("otro", "https://integrate.api.nvidia.com/v1/chat/completions", "/chat/completions", "google/gemma-4-31b-it").url).toBe("https://integrate.api.nvidia.com/v1/chat/completions");
+    expect(textTarget("otro", "https://integrate.api.nvidia.com/v1/chat/completions/", "", "m").url).toBe("https://integrate.api.nvidia.com/v1/chat/completions");
+    expect(textTarget("otro", "https://integrate.api.nvidia.com/v1", "/chat/completions/chat/completions", "m").url).toBe("https://integrate.api.nvidia.com/v1/chat/completions");
+    expect(textTarget("nvidia", "https://integrate.api.nvidia.com/v1", "/chat/completions/chat/completions", "").url).toBe("https://integrate.api.nvidia.com/v1/chat/completions");
+    expect(textTarget("nvidia", "", "", "")).toEqual({ url: "https://integrate.api.nvidia.com/v1/chat/completions", model: "google/gemma-4-31b-it" });
+    expect(textTarget("nvidia", "", "", "meta/llama-3.3-70b-instruct").model).toBe("meta/llama-3.3-70b-instruct");
     expect(speechTarget("freeai", "https://free.ai/api", "/audio/speech", "/tts-1", "")).toEqual({
       url: "https://api.free.ai/v1/tts/",
       model: "kokoro",

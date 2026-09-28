@@ -22,6 +22,8 @@ export interface PiloAiConfig extends Rules {
   speechReady: boolean;
   voiceRate: number;
   voicePitch: number;
+  /** Pregúntele a Pilo (0094): abierta o no, para quién, con bienvenida y con IA. */
+  pregunta: { on: boolean; aud: PortalRule["aud"]; welcome: boolean; ai: boolean };
 }
 
 export const PORTAL_LABEL: Record<Portal, string> = {
@@ -29,6 +31,7 @@ export const PORTAL_LABEL: Record<Portal, string> = {
   pdi: "Plan de Desarrollo",
   observatorio: "Observatorio",
   impacto: "Portal de Impacto",
+  pregunta: "Pregúntele a Pilo",
 };
 
 /** El portal de una ruta, o null si Mr. Pilo con IA no tiene nada que hacer ahí. */
@@ -59,6 +62,11 @@ export function usePiloAiConfig() {
         speechReady: Boolean(raw.speech_ready),
         voiceRate: Number(raw.voice_rate ?? 1),
         voicePitch: Number(raw.voice_pitch ?? 1),
+        pregunta: (() => {
+          const p = (raw.pregunta ?? {}) as Record<string, unknown>;
+          const aud = p.aud === "admin" || p.aud === "sesion" ? p.aud : "publico";
+          return { on: Boolean(p.on), aud, welcome: p.welcome !== false, ai: Boolean(p.ai) };
+        })(),
       };
     },
   });

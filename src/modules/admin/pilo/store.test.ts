@@ -7,9 +7,14 @@ describe("la configuración de Mr. Pilo, venga como venga de la base", () => {
     expect(s.provider).toBe("mistral");
     expect(s.needs0090).toBe(true);
     expect(s.voice_rate).toBe(1.1);
-    expect(s.functions).toEqual({ leer: true, resumir: true, sintetizar: true, explicar: false });
+    expect(s.functions).toEqual({ leer: true, resumir: true, sintetizar: true, explicar: false, preguntar: true });
     expect(s.portals.cifras.on).toBe(false);
     expect(s.portals.impacto.aud).toBe("admin");
+    // Sin 0094, Pregúntele a Pilo queda cerrada y con todas sus memorias, y no se manda al guardar.
+    expect(s.needs0094).toBe(true);
+    expect(s.portals.pregunta).toEqual({ on: false, aud: "publico", fns: ["preguntar"] });
+    expect(s.memory_sources).toEqual({ cifras: true, boletines: true, pdi: true, observatorio: true, impacto: true });
+    expect(s.pregunta_welcome).toBe(true);
     // Sin dirección ni modelo, los de Mistral (no un texto de ejemplo vacío).
     expect(s.base_url).toBe("https://api.mistral.ai/v1");
     expect(s.text_model).toBe("mistral-small-latest");

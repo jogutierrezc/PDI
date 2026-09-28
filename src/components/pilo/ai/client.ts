@@ -47,6 +47,54 @@ export async function askPilo(action: "resumir" | "sintetizar" | "explicar", por
   return data as PiloResult;
 }
 
+/* --- Pregúntele a Pilo ------------------------------------------------------------ */
+
+export type AskKind = "regla" | "memoria" | "extracto" | "ia" | "nada" | "curada" | "capciosa";
+
+export interface AskSource {
+  n: number;
+  ref: string;
+  source: string;
+  title: string;
+  section: string;
+  path: string;
+  cut: string;
+  office: string;
+  excerpt: string;
+}
+
+export interface AskStep {
+  step: string;
+  status: "ok" | "skip" | "ai";
+  detail: string;
+  ms: number;
+}
+
+export interface AskResult {
+  kind: AskKind;
+  text: string;
+  sources: AskSource[];
+  trail: AskStep[];
+  answerId?: number | null;
+  /** La emoción de Pilo que pide el catálogo (atrevido, emocionado, loco, pensar). */
+  mood?: string;
+  verified?: boolean;
+  unknown?: string[];
+}
+
+export async function askQuestion(question: string, history: { q: string; a: string }[] = []): Promise<AskResult> {
+  const { data, error } = await supabase.functions.invoke<AskResult>("pilo-ia", {
+    body: { action: "preguntar", portal: "pregunta", question, history },
+  });
+  if (error) throw await failure(error);
+  return data as AskResult;
+}
+
+/** «Me sirvió» / «No me sirvió». Si falla, no pasa nada: es una opinión, no un dato. */
+export async function rateAnswer(answerId: number, vote: "up" | "down") {
+  await supabase.functions.invoke("pilo-ia", { body: { action: "calificar", portal: "pregunta", answerId, vote } }).catch(() => undefined);
+}
+
 export async function testPilo(): Promise<{ ok: boolean; ms?: number; error?: string }> {
   const { data, error } = await supabase.functions.invoke<{ ok: boolean; ms?: number; error?: string }>("pilo-ia", { body: { action: "probar" } });
   if (error) throw await failure(error);

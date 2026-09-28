@@ -11,6 +11,7 @@ import { supabase } from "../../../lib/supabase";
 import { describeDatabaseError } from "../../../data/errors";
 import type { DatabaseError } from "../../../data/errors";
 import type { Fn, Portal, PortalRule } from "../../../components/pilo/ai/config";
+import type { MemorySource } from "./memory";
 
 export type Provider = "mistral" | "freeai" | "otro";
 export type SpeechProvider = "freeai" | "otro" | "navegador";
@@ -35,8 +36,14 @@ export interface PiloSettings {
   max_rows: number;
   cache_days: number;
   updated_at?: string;
+  /** Pregúntele a Pilo (0094): qué fuentes usa su memoria y si muestra la bienvenida. */
+  memory_sources: Record<MemorySource, boolean>;
+  pregunta_welcome: boolean;
+  memory_indexed_at?: string | null;
   /** La base aún no tiene la migración 0090 (Mistral y voz aparte). */
   needs0090?: boolean;
+  /** La base aún no tiene la migración 0094 (Pregúntele a Pilo). */
+  needs0094?: boolean;
 }
 
 const DEFAULT_PORTALS: Record<Portal, PortalRule> = {
@@ -44,7 +51,10 @@ const DEFAULT_PORTALS: Record<Portal, PortalRule> = {
   pdi: { on: false, aud: "admin", fns: ["leer", "resumir"] },
   observatorio: { on: false, aud: "admin", fns: ["leer", "resumir"] },
   impacto: { on: false, aud: "admin", fns: ["leer", "sintetizar", "explicar"] },
+  pregunta: { on: false, aud: "publico", fns: ["preguntar"] },
 };
+
+const ALL_SOURCES: Record<MemorySource, boolean> = { cifras: true, boletines: true, pdi: true, observatorio: true, impacto: true };
 
 /** Un nombre de modelo, no una ruta pegada por error («/tts-1»). */
 const validModel = (m: string) => (/^[\w.:-][\w.:/-]*$/.test(m) && !/^https?:/.test(m) ? m : "");
@@ -74,13 +84,17 @@ export function normalizeSettings(raw: Record<string, unknown>): PiloSettings {
     voice_engine: raw.voice_engine === "proveedor" ? "proveedor" : "navegador",
     voice_rate: num("voice_rate", 1),
     voice_pitch: num("voice_pitch", 1),
-    functions: { ...{ leer: true, resumir: true, sintetizar: true, explicar: true }, ...((raw.functions as Partial<Record<Fn, boolean>>) ?? {}) },
+    functions: { leer: true, resumir: true, sintetizar: true, explicar: true, preguntar: true, ...((raw.functions as Partial<Record<Fn, boolean>>) ?? {}) } as Record<Fn, boolean>,
     portals,
     daily_limit: num("daily_limit", 200),
     max_rows: num("max_rows", 500),
     cache_days: num("cache_days", 30),
     updated_at: str("updated_at", ""),
+    memory_sources: { ...ALL_SOURCES, ...((raw.memory_sources as Partial<Record<MemorySource, boolean>>) ?? {}) },
+    pregunta_welcome: raw.pregunta_welcome === undefined ? true : Boolean(raw.pregunta_welcome),
+    memory_indexed_at: (raw.memory_indexed_at as string | null | undefined) ?? null,
     needs0090: !("provider" in raw),
+    needs0094: !("memory_sources" in raw),
   };
 }
 
@@ -174,10 +188,12 @@ export function useSavePiloSettings() {
   const client = useQueryClient();
   return useMutation({
     mutationFn: async (settings: PiloSettings) => {
-      const { updated_at: _ignored, needs0090, ...all } = settings;
+      const { updated_at: _ignored, needs0090, needs0094, memory_indexed_at: _indexed, ...all } = settings;
       // Sin 0090 no existen las columnas nuevas: no se mandan.
       const rest: Record<string, unknown> = { ...all };
       if (needs0090) for (const k of ["provider", "speech_provider", "speech_base_url"]) delete rest[k];
+      // Sin 0094, tampoco las de Pregúntele a Pilo.
+      if (needs0094) for (const k of ["memory_sources", "pregunta_welcome"]) delete rest[k];
       const { data: user } = await supabase.auth.getUser();
       const { error } = await supabase
         .from("pilo_ai_settings")

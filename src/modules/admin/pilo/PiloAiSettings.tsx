@@ -23,6 +23,8 @@ import { PORTAL_LABEL } from "../../../components/pilo/ai/config";
 import type { Fn, Portal } from "../../../components/pilo/ai/config";
 import { PROVIDERS, useKeyStatus, usePiloLog, usePiloSettings, useSavePiloSettings, useSetKey } from "./store";
 import type { KeySlot, PiloSettings, Provider } from "./store";
+import { PreguntaCard } from "./PreguntaCard";
+import { CatalogCard } from "./CatalogCard";
 import "./pilo-settings.css";
 
 const FNS: { id: Fn; name: string; short: string; desc: string }[] = [
@@ -390,8 +392,12 @@ function Editor({ initial }: { initial: PiloSettings }) {
         <p className="pis-warn">«Público» gasta cupo con cada visitante. Conviene empezar con «Solo administración», revisar la bitácora una semana y abrir portal por portal.</p>
       </Card>
 
+      <PreguntaCard n={5} s={s} set={set} setPortal={setPortal} Switch={Switch} />
+
+      <CatalogCard n={6} />
+
       <div className="pis-two">
-        <Card n={5} title="Límites y cuidado">
+        <Card n={7} title="Límites y cuidado">
           <div className="pis-grid pis-grid--3">
             <label>
               Pedidos por día
@@ -425,7 +431,7 @@ function Editor({ initial }: { initial: PiloSettings }) {
           </div>
         </Card>
 
-        <Card n={6} title="Últimos pedidos">
+        <Card n={8} title="Últimos pedidos">
           {(log.data ?? []).length === 0 ? (
             <p className="pis-note">Todavía no hay pedidos.</p>
           ) : (

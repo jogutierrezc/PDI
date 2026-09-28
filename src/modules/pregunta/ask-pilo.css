@@ -1318,3 +1318,113 @@
   white-space: nowrap;
   text-overflow: ellipsis;
 }
+
+.ap-badge[data-kind="curada"],
+.ap-badge[data-kind="malla"] {
+  background: var(--ap-mem-soft);
+  color: var(--ap-mem);
+}
+
+.ap-badge[data-kind="capciosa"] {
+  background: var(--ap-primary-soft);
+  color: var(--ap-primary-text);
+}
+
+/* --- El mapa de una respuesta (MeshAnswer.tsx) ------------------------------------------
+   El Mapa numerado leído de arriba abajo: cada nivel entra 18px y un filete
+   une cada fila con la de arriba. El nodo de la respuesta va resaltado. */
+
+.apm {
+  padding: 12px 14px;
+  border-radius: 12px;
+  border: 1px solid var(--ap-line);
+  background: var(--ap-soft);
+}
+
+.apm-tree {
+  display: grid;
+  gap: 2px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.apm-row {
+  position: relative;
+  padding-left: calc(var(--d) * 18px);
+}
+
+.apm-row:not(:first-child)::before {
+  content: "";
+  position: absolute;
+  left: calc(var(--d) * 18px - 11px);
+  top: -2px;
+  width: 8px;
+  height: 17px;
+  border-left: 1.5px solid var(--ap-line-2);
+  border-bottom: 1.5px solid var(--ap-line-2);
+  border-bottom-left-radius: 4px;
+}
+
+.apm-row > a,
+.apm-row > span {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 8px;
+  max-width: 100%;
+  padding: 4px 8px;
+  border-radius: 8px;
+  color: var(--ap-ink);
+  text-decoration: none;
+  font-size: 0.84rem;
+  font-weight: 600;
+  transition: background-color 160ms ease;
+}
+
+.apm-row small {
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: var(--ap-ink-3);
+  white-space: nowrap;
+}
+
+.apm-label {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.apm-code {
+  flex: none;
+  padding: 1px 6px;
+  border-radius: 5px;
+  background: var(--ap-surface);
+  border: 1px solid var(--ap-line-2);
+  font-size: 0.7rem;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  color: var(--ap-ink-2);
+}
+
+.apm-row[data-focus] > a,
+.apm-row[data-focus] > span {
+  background: var(--ap-primary-soft);
+  color: var(--ap-primary-text);
+}
+
+.apm-row[data-focus] .apm-code {
+  background: var(--ap-primary);
+  border-color: var(--ap-primary);
+  color: var(--ap-primary-ink);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .apm-row > a:hover {
+    background: var(--ap-soft-2);
+  }
+}
+
+.apm-more {
+  margin: 8px 0 0;
+  font-size: 0.78rem;
+  color: var(--ap-ink-3);
+}

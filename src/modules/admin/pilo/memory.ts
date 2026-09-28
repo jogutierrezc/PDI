@@ -36,7 +36,7 @@
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "../../../lib/supabase";
-import { usePillars, useProjects } from "../../../data/queries";
+import { usePillars, useProjects, useStructure } from "../../../data/queries";
 import { formatValue, useOpenDataCatalog, valueOf } from "../../datos-abiertos/data/open-data";
 import { ALL_CAMPUSES } from "../../datos-abiertos/data/types";
 import { ALL_YEARS } from "../../datos-abiertos/data/terms";
@@ -54,6 +54,8 @@ import { functionLinks, goalStates, goalsNote, linksNote, programChain, programN
 import { programStandingNote, programStandings } from "../../impacto/portal/standing";
 import type { ProjectWithLinks } from "../../../types/database";
 import type { PillarWithProgress } from "../../../data/queries";
+import { meshFromRows, pdiMesh } from "./mesh";
+import type { MeshPayload } from "./mesh";
 
 export type MemorySource = "cifras" | "boletines" | "pdi" | "observatorio" | "impacto";
 
@@ -603,6 +605,8 @@ export interface SourceProblem {
 export interface MemoryBuild {
   /** Solo las fuentes listas para enviar. */
   rows: Partial<Record<MemorySource, MemoryRow[]>>;
+  /** La malla de cada fuente lista (0097); sus pasajes nuevos ya van en `rows`. */
+  meshes?: Partial<Record<MemorySource, MeshPayload>>;
   problems: SourceProblem[];
 }
 
@@ -663,22 +667,42 @@ export function useMemoryInputs() {
   const projects = useProjects();
   const bulletins = usePublicBulletins(catalog.data?.period?.uuid);
   const impact = usePortalData();
-  const loading = catalog.isPending || live.isPending || pillars.isPending || projects.isPending || (Boolean(catalog.data?.period?.uuid) && bulletins.isPending);
-  const build = (): MemoryBuild =>
-    buildSources({
-      cifras: () => cifrasRows(need(catalog, "el catálogo de UDES en Cifras")),
-      boletines: () => {
+  const structure = useStructure();
+  const loading =
+    catalog.isPending || live.isPending || pillars.isPending || projects.isPending || structure.isPending || (Boolean(catalog.data?.period?.uuid) && bulletins.isPending);
+  const build = (): MemoryBuild => {
+    const meshes: Partial<Record<MemorySource, MeshPayload>> = {};
+    // Cada fuente trae su malla; los pasajes que nacen de ella (raíz, áreas, líneas) van con los suyos.
+    const withMesh = (source: MemorySource, make: () => MemoryRow[]) => () => {
+      const rows = make();
+      let mesh: MeshPayload;
+      try {
+        mesh = source === "pdi" ? pdiMesh(need(pillars, "los pilares"), need(structure, "la estructura del plan"), need(projects, "los proyectos")) : meshFromRows(source, rows);
+      } catch {
+        // Sin malla la fuente igual se guarda: sus pasajes no dependen de ella.
+        return rows;
+      }
+      meshes[source] = mesh;
+      const own = new Set(rows.map((r) => r.ref));
+      return [...rows, ...mesh.rows.filter((r) => !own.has(r.ref))];
+    };
+    const built = buildSources({
+      cifras: withMesh("cifras", () => cifrasRows(need(catalog, "el catálogo de UDES en Cifras"))),
+      boletines: withMesh("boletines", () => {
         const period = need(catalog, "el catálogo de UDES en Cifras");
         return bulletinRows(need(bulletins, "los boletines"), { periodLabel: period?.period?.label, years: period?.years });
-      },
-      pdi: () => pdiRows(need(pillars, "los pilares"), need(projects, "los proyectos")),
-      observatorio: () => observatoryRows(need(live, "el Observatorio")),
-      impacto: () => {
+      }),
+      pdi: withMesh("pdi", () => pdiRows(need(pillars, "los pilares"), need(projects, "los proyectos"))),
+      observatorio: withMesh("observatorio", () => observatoryRows(need(live, "el Observatorio"))),
+      impacto: withMesh("impacto", () => {
         const data = need(impact, "el Portal de Impacto");
         if (!data) throw new Error(impact.isPending ? "Todavía se estaba leyendo: vuelva a intentarlo en un momento." : "Su consulta no respondió con esta sesión.");
         return impactRows(data);
-      },
+      }),
     });
+    for (const source of Object.keys(meshes) as MemorySource[]) if (!built.rows[source]) delete meshes[source];
+    return { ...built, meshes };
+  };
   return { loading, impactReady: Boolean(impact.data), build };
 }
 
@@ -763,6 +787,10 @@ export interface ReplaceResult {
   changed: number;
   removed: number;
   total: number;
+  /** La malla que se guardó (0097), o por qué no. */
+  nodes?: number;
+  edges?: number;
+  meshError?: string;
 }
 
 export interface ReplaceOutcome {
@@ -777,7 +805,7 @@ export interface ReplaceOutcome {
 export function useReplaceMemory() {
   const client = useQueryClient();
   return useMutation({
-    mutationFn: async (rows: Partial<Record<MemorySource, MemoryRow[]>>): Promise<ReplaceOutcome> => {
+    mutationFn: async ({ rows, meshes = {} }: Pick<MemoryBuild, "rows" | "meshes">): Promise<ReplaceOutcome> => {
       const done: ReplaceResult[] = [];
       const failed: SourceProblem[] = [];
       for (const { id: source } of MEMORY_SOURCES) {
@@ -788,7 +816,19 @@ export function useReplaceMemory() {
           const { data, error } = await supabase.rpc("pilo_memory_replace", { p_source: source, p_rows: list as never });
           if (error) throw error;
           const r = (isRecord(data) ? data : {}) as Partial<ReplaceResult>;
-          done.push({ source, added: numberOrNull(r.added) ?? 0, changed: numberOrNull(r.changed) ?? 0, removed: numberOrNull(r.removed) ?? 0, total: numberOrNull(r.total) ?? list.length });
+          const result: ReplaceResult = { source, added: numberOrNull(r.added) ?? 0, changed: numberOrNull(r.changed) ?? 0, removed: numberOrNull(r.removed) ?? 0, total: numberOrNull(r.total) ?? list.length };
+          // La malla, después de sus pasajes: si falla (sin 0097), los pasajes ya quedaron.
+          const mesh = meshes[source];
+          if (mesh) {
+            const g = await supabase.rpc("pilo_graph_replace", { p_source: source, p_nodes: mesh.nodes as never, p_edges: mesh.edges as never });
+            if (g.error) result.meshError = /pilo_graph_replace|function/i.test(g.error.message) ? "Falta la migración 0097 para guardar la malla." : problemMessage(new Error(g.error.message));
+            else {
+              const m = (isRecord(g.data) ? g.data : {}) as Record<string, unknown>;
+              result.nodes = numberOrNull(m.nodes) ?? mesh.nodes.length;
+              result.edges = numberOrNull(m.edges) ?? mesh.edges.length;
+            }
+          }
+          done.push(result);
         } catch (error) {
           // PostgREST devuelve un objeto con `message`, no un Error.
           const reason = error instanceof Error ? error : new Error(clean(isRecord(error) ? error.message : error));

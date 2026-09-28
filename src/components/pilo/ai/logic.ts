@@ -284,7 +284,7 @@ const ASK_TASK = [
   'Formato: {"respuesta":"...","sin_datos":false}',
 ].join(" ");
 
-export function buildAskMessages(question: string, passages: Passage[], history: { q: string; a: string }[] = []) {
+export function buildAskMessages(question: string, passages: Passage[], history: { q: string; a: string }[] = [], map = "") {
   const body = passages
     .map((p, i) => `[${i + 1}] ${p.title}${p.section ? ` · ${p.section}` : ""}${p.cut ? ` (corte ${p.cut})` : ""}\n${p.body.slice(0, 1600)}`)
     .join("\n\n");
@@ -294,7 +294,10 @@ export function buildAskMessages(question: string, passages: Passage[], history:
     .join("\n");
   return [
     { role: "system", content: PERSONA },
-    { role: "user", content: `${ASK_TASK}\n\n${before ? `${before}\n\n` : ""}Pasajes:\n${body}\n\nPregunta: ${question.slice(0, 500)}` },
+    {
+      role: "user",
+      content: `${ASK_TASK}\n\n${before ? `${before}\n\n` : ""}${map ? `Dónde queda cada cosa (la malla de la memoria):\n${map.slice(0, 1800)}\n\n` : ""}Pasajes:\n${body}\n\nPregunta: ${question.slice(0, 500)}`,
+    },
   ];
 }
 
@@ -453,4 +456,149 @@ export function matchCatalog(question: string, entries: CatalogEntry[], min = 0.
     }
   }
   return best;
+}
+
+/* --- La malla de la memoria (0097) ----------------------------------------------------- */
+
+/**
+ * Un nodo de la malla: un pilar, un área, una línea, un proyecto, un informe,
+ * un indicador, un tema… Su id es el mismo del pasaje que lo describe, así la
+ * búsqueda de texto y la malla se encuentran sin traducir nada.
+ */
+export interface MeshNode {
+  id: string;
+  source: string;
+  type: string;
+  code: string;
+  label: string;
+  path: string;
+}
+
+/** Una relación. «contiene» va de padre a hijo (pilar → área → línea → proyecto). */
+export interface MeshEdge {
+  from: string;
+  to: string;
+  rel: string;
+}
+
+export interface Mesh {
+  nodes: MeshNode[];
+  edges: MeshEdge[];
+}
+
+export const TYPE_LABEL: Record<string, [string, string, "m" | "f"]> = {
+  fuente: ["fuente", "fuentes", "f"],
+  pilar: ["pilar", "pilares", "m"],
+  // «un área», «del área»: la a tónica pide el artículo masculino.
+  area: ["área estratégica", "áreas estratégicas", "m"],
+  linea: ["línea de acción", "líneas de acción", "f"],
+  proyecto: ["proyecto", "proyectos", "m"],
+  informe: ["informe", "informes", "m"],
+  indicador: ["indicador", "indicadores", "m"],
+  tema: ["tema", "temas", "m"],
+  tabla: ["tabla de datos", "tablas de datos", "f"],
+  boletin: ["boletín", "boletines", "m"],
+  edicion: ["edición en PDF", "ediciones en PDF", "f"],
+  programa: ["programa", "programas", "m"],
+};
+
+const typeName = (t: string, many = false) => (TYPE_LABEL[t] ? TYPE_LABEL[t][many ? 1 : 0] : t);
+const article = (t: string) => (TYPE_LABEL[t]?.[2] === "f" ? "una" : "un");
+/** «P1 · Personalización», o solo el nombre si no tiene número. */
+export const nodeName = (n: MeshNode) => (n.code ? `${n.code} · ${n.label}` : n.label);
+
+/** Los padres de un nodo por «contiene», del más cercano al más lejano (sin repetir). */
+export function parentsOf(mesh: Mesh, id: string): MeshNode[] {
+  const byId = new Map(mesh.nodes.map((n) => [n.id, n]));
+  return mesh.edges.filter((e) => e.to === id && e.rel === "contiene").map((e) => byId.get(e.from)).filter(Boolean) as MeshNode[];
+}
+
+/** La ruta de un nodo hasta la raíz, subiendo por el primer padre: [raíz, …, nodo]. */
+export function pathTo(mesh: Mesh, id: string): MeshNode[] {
+  const byId = new Map(mesh.nodes.map((n) => [n.id, n]));
+  const out: MeshNode[] = [];
+  const seen = new Set<string>();
+  let current = byId.get(id);
+  while (current && !seen.has(current.id)) {
+    seen.add(current.id);
+    out.unshift(current);
+    current = parentsOf(mesh, current.id)[0];
+  }
+  return out;
+}
+
+export function childrenOf(mesh: Mesh, id: string): MeshNode[] {
+  const byId = new Map(mesh.nodes.map((n) => [n.id, n]));
+  return mesh.edges.filter((e) => e.from === id && e.rel === "contiene").map((e) => byId.get(e.to)).filter(Boolean) as MeshNode[];
+}
+
+/** ¿La pregunta es sobre la estructura (qué contiene, de qué hace parte, cuántos hay)? */
+export function isStructural(question: string): boolean {
+  const t = normalizeQuestion(question);
+  return (
+    /\b(estructura|mapa|compone|componen|conforma|conforman|organiza|jerarquia)\b/.test(t) ||
+    /\b(que|cuales|cuantos|cuantas) (son )?(los |las )?(pilares|areas|lineas|proyectos|informes|indicadores|temas|tablas|programas)\b/.test(t) ||
+    /\b(tiene|tienen|incluye|incluyen|contiene|contienen|agrupa)\b.*\b(pilares|areas|lineas|proyectos|informes|indicadores|temas|tablas|programas)\b/.test(t) ||
+    /\b(a|en) (que|cual) (pilar|area|linea|informe|tema)\b|\b(pertenece|hace parte|depende|cuelga)\b/.test(t)
+  );
+}
+
+const listNames = (nodes: MeshNode[], max = 12) => {
+  const names = nodes.slice(0, max).map(nodeName);
+  const rest = nodes.length - names.length;
+  if (rest > 0) return `${names.join(", ")} y ${rest} más`;
+  return names.length > 1 ? `${names.slice(0, -1).join(", ")} y ${names[names.length - 1]}` : names[0] ?? "";
+};
+
+/**
+ * La respuesta de estructura, sin IA: dónde queda el nodo (su ruta), qué
+ * contiene (por tipo) y, si cuelga de varios lados, con qué más se vincula.
+ * El texto cita con [1] el pasaje del propio nodo.
+ */
+export function describeNode(mesh: Mesh, id: string): string {
+  const node = mesh.nodes.find((n) => n.id === id);
+  if (!node) return "";
+  const route = pathTo(mesh, id).filter((n) => n.type !== "fuente");
+  const up = route.slice(0, -1).reverse();
+  const parts: string[] = [];
+  if (node.type === "fuente") parts.push(`${node.label} [1].`);
+  else if (up.length) {
+    const chain = up.map((p) => `${TYPE_LABEL[p.type]?.[2] === "f" ? "de la" : "del"} ${typeName(p.type)} ${nodeName(p)}`).join(", ");
+    parts.push(`«${nodeName(node)}» es ${article(node.type)} ${typeName(node.type)} ${chain} [1].`);
+  }
+  else parts.push(`«${nodeName(node)}» es ${article(node.type)} ${typeName(node.type)} [1].`);
+  const kids = childrenOf(mesh, id);
+  const byType = new Map<string, MeshNode[]>();
+  for (const k of kids) byType.set(k.type, [...(byType.get(k.type) ?? []), k]);
+  for (const [type, list] of byType) {
+    parts.push(`${node.type === "fuente" ? "Tiene" : "Contiene"} ${list.length} ${typeName(type, list.length !== 1)}: ${listNames(list)}.`);
+  }
+  const others = parentsOf(mesh, id).slice(1);
+  if (others.length) parts.push(`También se vincula con ${listNames(others)}.`);
+  if (!kids.length && node.type !== "fuente" && !others.length && !up.length) parts.push("No tiene elementos por debajo en lo publicado.");
+  return parts.join(" ");
+}
+
+/** La parte de la malla que se dibuja con una respuesta: la ruta del nodo y lo que contiene. */
+export function focusMesh(mesh: Mesh, id: string, maxChildren = 24): Mesh & { focus: string } {
+  const route = pathTo(mesh, id);
+  const kids = childrenOf(mesh, id).slice(0, maxChildren);
+  const extra = parentsOf(mesh, id).slice(1);
+  const keep = new Map([...route, ...kids, ...extra].map((n) => [n.id, n]));
+  return {
+    focus: id,
+    nodes: [...keep.values()],
+    edges: mesh.edges.filter((e) => e.rel === "contiene" && keep.has(e.from) && keep.has(e.to)),
+  };
+}
+
+/** Para la IA: la ruta de cada pasaje en la malla, una línea por pasaje. */
+export function mapContext(mesh: Mesh, ids: string[]): string {
+  return ids
+    .map((id, i) => {
+      const route = pathTo(mesh, id).filter((n) => n.type !== "fuente");
+      return route.length > 1 ? `[${i + 1}] ${route.map(nodeName).join(" › ")}` : "";
+    })
+    .filter(Boolean)
+    .join("\n");
 }

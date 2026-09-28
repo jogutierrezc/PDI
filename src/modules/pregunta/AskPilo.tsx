@@ -28,6 +28,7 @@ import type { MojiMood, PiloMojiHandle } from "./Pilo";
 import { markWelcome, newId, seenWelcome, TEMAS, useConversations, useTema } from "./store";
 import type { Conversation, Tema, Turn } from "./store";
 import { Welcome } from "./Welcome";
+import { MeshAnswer } from "./MeshAnswer";
 import "./ask-pilo.css";
 
 const reduced = () => typeof window !== "undefined" && window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
@@ -59,9 +60,10 @@ const BADGE: Record<AskKind, string> = {
   nada: "Sin fuentes · sin IA",
   curada: "Respuesta de Planeación · sin IA",
   capciosa: "Respuesta rápida de Pilo",
+  malla: "De la malla de la memoria · sin IA",
 };
 
-const MOOD_OF: Record<AskKind, MojiMood> = { memoria: "feliz", extracto: "atento", ia: "feliz", regla: "cuidado", nada: "duda", curada: "feliz", capciosa: "cuidado" };
+const MOOD_OF: Record<AskKind, MojiMood> = { memoria: "feliz", extracto: "atento", ia: "feliz", regla: "cuidado", nada: "duda", curada: "feliz", capciosa: "cuidado", malla: "feliz" };
 
 /* --- Iconos (un solo trazo, 2.2) --------------------------------------------------------- */
 
@@ -481,6 +483,7 @@ function TurnView({
   voice: ChatProps["voice"];
 }) {
   const [trail, setTrail] = useState(false);
+  const [map, setMap] = useState<boolean | null>(null);
   const [copied, setCopied] = useState(false);
   const body = useRef<HTMLDivElement>(null);
   const face = useRef<PiloMojiHandle>(null);
@@ -556,6 +559,11 @@ function TurnView({
                     Cómo respondí {I.chev}
                   </button>
                 )}
+                {a.graph && a.graph.nodes.length > 1 && (
+                  <button type="button" className="ap-trail-btn" aria-expanded={map ?? a.kind === "malla"} onClick={() => setMap(!(map ?? a.kind === "malla"))}>
+                    Ver en el mapa {I.chev}
+                  </button>
+                )}
               </div>
               {trail && (
                 <ol className="ap-trail">
@@ -590,6 +598,7 @@ function TurnView({
                   </p>
                 ))}
               </div>
+              {a.graph && a.graph.nodes.length > 1 && (map ?? a.kind === "malla") && <MeshAnswer graph={a.graph} animate={live} />}
               {a.unknown && a.unknown.length > 0 && <p className="ap-warn">Revise estos números antes de citarlos: no los encontré en las fuentes ({a.unknown.join(", ")}).</p>}
               {a.sources.length > 0 && (
                 <div className="ap-srcs" aria-label="Fuentes">

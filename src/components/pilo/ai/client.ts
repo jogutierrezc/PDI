@@ -8,7 +8,7 @@
 
 import { supabase, readFunctionError } from "../../../lib/supabase";
 import { speak, stopSpeaking } from "../voice";
-import type { Answer, Section } from "./logic";
+import type { Answer, Mesh, Section } from "./logic";
 import type { Portal } from "./config";
 
 export type { Answer };
@@ -49,7 +49,7 @@ export async function askPilo(action: "resumir" | "sintetizar" | "explicar", por
 
 /* --- Pregúntele a Pilo ------------------------------------------------------------ */
 
-export type AskKind = "regla" | "memoria" | "extracto" | "ia" | "nada" | "curada" | "capciosa";
+export type AskKind = "regla" | "memoria" | "extracto" | "ia" | "nada" | "curada" | "capciosa" | "malla";
 
 export interface AskSource {
   n: number;
@@ -78,6 +78,8 @@ export interface AskResult {
   answerId?: number | null;
   /** La emoción de Pilo que pide el catálogo (atrevido, emocionado, loco, pensar). */
   mood?: string;
+  /** El tramo de la malla de la memoria que se dibuja con la respuesta (0097). */
+  graph?: Mesh & { focus: string };
   verified?: boolean;
   unknown?: string[];
 }

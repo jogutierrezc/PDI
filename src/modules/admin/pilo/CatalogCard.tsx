@@ -10,6 +10,7 @@
    veces sirvió cada entrada y un interruptor para dejarla de usar.
 
    Se aplica al momento, como las claves: no espera a «Guardar cambios».
+   Es la sección «Catálogo» del módulo (PiloAiSettings).
    ========================================================================== */
 
 import { useMemo, useState } from "react";
@@ -19,6 +20,8 @@ import { downloadBlob } from "../traslado/transfer";
 import { workbookToTables } from "../institucion/structure-sheet";
 import { COLUMNS, EXAMPLES, fillCatalogTemplate, parseCatalogTable, SHEET_NAME } from "./catalog-sheet";
 import type { CatalogKind, CatalogRow, ParseResult } from "./catalog-sheet";
+import { Icon } from "../../../components/ui/Icon";
+import { Group, StatusMark, Switch } from "./ui";
 
 interface Entry extends CatalogRow {
   kind: CatalogKind;
@@ -47,7 +50,7 @@ const LEAD: Record<CatalogKind, string> = {
     "Microexpresiones: respuestas cortas y rápidas para preguntas capciosas (salarios, la vida personal de Pilo, bromas). Se disparan cuando la pregunta trae las palabras de un disparador, y Pilo las dice con la emoción elegida.",
 };
 
-export function CatalogCard({ n }: { n: number }) {
+export function CatalogSection() {
   const client = useQueryClient();
   const catalog = useCatalog();
   const [kind, setKind] = useState<CatalogKind>("capciosa");
@@ -121,123 +124,129 @@ export function CatalogCard({ n }: { n: number }) {
   const missing = catalog.data === null;
 
   return (
-    <section className="pis-card pis-cat" aria-labelledby={`pis-${n}`}>
-      <header>
-        <h2 id={`pis-${n}`}>{n} · Catálogo de Pilo</h2>
-        <small>Respuestas oficiales y microexpresiones, escritas en Excel</small>
-      </header>
+    <>
       {missing && <p className="pis-warn">Falta aplicar la migración 0096 en la base para guardar el catálogo.</p>}
 
-      <div className="pis-seg" role="group" aria-label="Clase del catálogo">
-        {(["capciosa", "respuesta"] as CatalogKind[]).map((k) => (
-          <button
-            key={k}
-            type="button"
-            aria-pressed={kind === k}
-            onClick={() => {
-              setKind(k);
-              setParsed(null);
-              setMessage(null);
-            }}
-          >
-            {SHEET_NAME[k]} <span className="pis-cat__n">{count(k)}</span>
-          </button>
-        ))}
-      </div>
-      <p className="pis-lead">{LEAD[kind]}</p>
-
-      <div className="pis-cat__actions">
-        <button type="button" className="button-secondary" onClick={() => download("plantilla")} disabled={Boolean(busy)}>
-          {busy === "plantilla" ? "Armando…" : "Descargar plantilla"}
-        </button>
-        <button type="button" className="button-secondary" onClick={() => download("actual")} disabled={Boolean(busy) || rows.length === 0}>
-          {busy === "actual" ? "Armando…" : "Descargar lo que hay"}
-        </button>
-        <label className="button-primary pis-cat__file" aria-disabled={missing || Boolean(busy) || undefined}>
-          {busy === "leer" ? "Leyendo…" : "Importar Excel"}
-          <input
-            type="file"
-            accept=".xlsx"
-            disabled={missing || Boolean(busy)}
-            onChange={(e) => {
-              void read(e.target.files?.[0]);
-              e.target.value = "";
-            }}
-          />
-        </label>
-      </div>
-      <p className="pis-small">
-        Columnas: {COLUMNS[kind].map((c) => c.header).join(" · ")}. La plantilla trae ejemplos y una hoja «Cómo llenarla».
-      </p>
-
-      {parsed && (
-        <div className="pis-cat__preview" role="status">
-          <strong>
-            {parsed.file}: {parsed.result.valid.length} {parsed.result.valid.length === 1 ? "fila lista" : "filas listas"}
-            {errors.length ? ` · ${errors.length} ${errors.length === 1 ? "error" : "errores"}` : ""}
-          </strong>
-          {errors.length > 0 && (
-            <ul className="pis-cat__errors">
-              {errors.slice(0, 12).map((e, i) => (
-                <li key={i}>{e}</li>
-              ))}
-              {errors.length > 12 && <li>… y {errors.length - 12} más.</li>}
-            </ul>
-          )}
-          <label className="pis-cat__replace">
-            <input type="checkbox" checked={replace} onChange={(e) => setReplace(e.target.checked)} />
-            Reemplazar: borrar las {kind === "respuesta" ? "respuestas" : "capciosas"} guardadas que no vengan en este libro
-          </label>
-          <div className="pis-cat__actions">
-            <button type="button" className="button-secondary" onClick={() => setParsed(null)}>
-              Cancelar
-            </button>
+      <Group title="Clase" aside={<small>Se aplica al momento, como las claves</small>}>
+        <div className="pis-seg" role="radiogroup" aria-label="Clase del catálogo">
+          {(["capciosa", "respuesta"] as CatalogKind[]).map((k) => (
             <button
+              key={k}
               type="button"
-              className="button-primary"
-              disabled={!parsed.result.valid.length || importRows.isPending}
-              onClick={() => importRows.mutate({ k: kind, valid: parsed.result.valid, all: replace })}
+              role="radio"
+              aria-checked={kind === k}
+              onClick={() => {
+                setKind(k);
+                setParsed(null);
+                setMessage(null);
+              }}
             >
-              {importRows.isPending ? "Importando…" : `Importar ${parsed.result.valid.length}${errors.length ? " (sin las que tienen error)" : ""}`}
+              {SHEET_NAME[k]} <span className="pis-seg__n">{count(k)}</span>
             </button>
-          </div>
+          ))}
         </div>
-      )}
-      {message && (
-        <p className={message.ok ? "pis-small" : "pis-test"} role="status">
-          {message.text}
-        </p>
-      )}
+        <p className="pis-lead">{LEAD[kind]}</p>
+      </Group>
 
-      {rows.length === 0 ? (
-        <p className="pis-small">Todavía no hay {kind === "respuesta" ? "respuestas" : "capciosas"}. Descargue la plantilla, escríbalas e impórtelas.</p>
-      ) : (
-        <ul className="pis-cat__list">
-          {rows.map((e) => (
-            <li key={e.key} data-off={!e.active || undefined}>
-              <code>{e.key}</code>
-              <span>
-                <strong>{kind === "respuesta" ? e.question : e.question || e.triggers.join(" · ")}</strong>
-                <small>{e.answer}</small>
-                {kind === "capciosa" && <small>Disparadores: {e.triggers.join(" · ")}</small>}
-              </span>
-              <em>
-                {e.mood} · {e.hits} {e.hits === 1 ? "uso" : "usos"}
-              </em>
+      <Group title="Escribirlas en Excel">
+        <div className="pis-actions">
+          <button type="button" className="button-secondary" onClick={() => download("plantilla")} disabled={Boolean(busy)}>
+            <Icon name="download" size={16} />
+            {busy === "plantilla" ? "Armando…" : "Descargar plantilla"}
+          </button>
+          <button type="button" className="button-secondary" onClick={() => download("actual")} disabled={Boolean(busy) || rows.length === 0}>
+            <Icon name="download" size={16} />
+            {busy === "actual" ? "Armando…" : "Descargar lo que hay"}
+          </button>
+          <label className="button-primary pis-file" aria-disabled={missing || Boolean(busy) || undefined}>
+            <Icon name="upload" size={16} />
+            {busy === "leer" ? "Leyendo…" : "Importar Excel"}
+            <input
+              type="file"
+              accept=".xlsx"
+              disabled={missing || Boolean(busy)}
+              onChange={(e) => {
+                void read(e.target.files?.[0]);
+                e.target.value = "";
+              }}
+            />
+          </label>
+        </div>
+        <p className="pis-small">
+          Columnas: {COLUMNS[kind].map((c) => c.header).join(" · ")}. La plantilla trae ejemplos y una hoja «Cómo llenarla».
+        </p>
+
+        {parsed && (
+          <div className="pis-preview" role="status">
+            <p className="pis-preview__head">
+              <StatusMark tone={errors.length ? "warn" : "ok"}>{parsed.file}</StatusMark>
+              {parsed.result.valid.length} {parsed.result.valid.length === 1 ? "fila lista" : "filas listas"}
+              {errors.length ? ` · ${errors.length} ${errors.length === 1 ? "error" : "errores"}` : ""}
+            </p>
+            {errors.length > 0 && (
+              <ul className="pis-preview__errors">
+                {errors.slice(0, 12).map((e, i) => (
+                  <li key={i}>{e}</li>
+                ))}
+                {errors.length > 12 && <li>… y {errors.length - 12} más.</li>}
+              </ul>
+            )}
+            <label className="pis-preview__replace" data-on={replace || undefined}>
+              <input type="checkbox" checked={replace} onChange={(e) => setReplace(e.target.checked)} />
+              Reemplazar: borrar las {kind === "respuesta" ? "respuestas" : "capciosas"} guardadas que no vengan en este libro
+            </label>
+            <div className="pis-actions">
+              <button type="button" className="button-secondary" onClick={() => setParsed(null)}>
+                Cancelar
+              </button>
               <button
                 type="button"
-                role="switch"
-                aria-checked={e.active}
-                aria-label={`Usar ${e.key}`}
-                className="pis-switch"
-                onClick={() => toggle.mutate({ key: e.key, active: !e.active })}
+                className="button-primary"
+                disabled={!parsed.result.valid.length || importRows.isPending}
+                onClick={() => importRows.mutate({ k: kind, valid: parsed.result.valid, all: replace })}
               >
-                <i />
+                {importRows.isPending ? "Importando…" : `Importar ${parsed.result.valid.length}${errors.length ? " (sin las que tienen error)" : ""}`}
               </button>
-            </li>
-          ))}
-        </ul>
-      )}
-    </section>
+            </div>
+          </div>
+        )}
+        {message && (
+          <p className="pis-result" role="status">
+            <StatusMark tone={message.ok ? "ok" : "fail"}>{message.text}</StatusMark>
+          </p>
+        )}
+      </Group>
+
+      <Group
+        title={kind === "respuesta" ? "Respuestas guardadas" : "Capciosas guardadas"}
+        aside={rows.length ? <small>{rows.filter((e) => e.active).length} en uso de {rows.length}</small> : null}
+      >
+        {toggle.isError && (
+          <p className="pis-error" role="alert">
+            No se cambió: {(toggle.error as Error).message}
+          </p>
+        )}
+        {rows.length === 0 ? (
+          <p className="pis-small">Todavía no hay {kind === "respuesta" ? "respuestas" : "capciosas"}. Descargue la plantilla, escríbalas e impórtelas.</p>
+        ) : (
+          <ul className="pis-cat">
+            {rows.map((e) => (
+              <li key={e.key} data-off={!e.active || undefined}>
+                <code>{e.key}</code>
+                <span>
+                  <strong>{kind === "respuesta" ? e.question : e.question || e.triggers.join(" · ")}</strong>
+                  <small>{e.answer}</small>
+                  {kind === "capciosa" && <small>Disparadores: {e.triggers.join(" · ")}</small>}
+                </span>
+                <em>
+                  {e.mood} · {e.hits} {e.hits === 1 ? "uso" : "usos"}
+                </em>
+                <Switch on={e.active} onChange={(active) => toggle.mutate({ key: e.key, active })} label={`Usar ${e.key}`} />
+              </li>
+            ))}
+          </ul>
+        )}
+      </Group>
+    </>
   );
 }

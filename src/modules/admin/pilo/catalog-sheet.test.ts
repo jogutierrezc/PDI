@@ -40,6 +40,7 @@ describe("el catálogo de Pilo en Excel", () => {
         ["C-3", "", "ok", "Cuesta $ 5.000", "", "NO"],
         ["", "", "", "", "", ""],
         ["C-4", "Edad", "cuantos años | edad", "Tengo los años de la universidad.", "", "no"],
+        ["C-5", "Plata", "salario, sueldo; cuanto gana", "No se publica.", "", ""],
       ],
     });
     const errors = r.rows.flatMap((x) => x.errors);
@@ -49,7 +50,10 @@ describe("el catálogo de Pilo en Excel", () => {
     expect(errors.some((e) => /fila 3, columna «Activa»/.test(e))).toBe(true);
     expect(errors.some((e) => /fila 4, columna «Disparadores»: «ok» es demasiado corto/.test(e))).toBe(true);
     expect(errors.some((e) => /fila 4, columna «Respuesta»: no se publican cifras de dinero/.test(e))).toBe(true);
-    expect(r.valid).toEqual([expect.objectContaining({ key: "C-4", active: false, triggers: ["cuantos años", "edad"], mood: "atrevido" })]);
+    expect(r.valid).toEqual([
+      expect.objectContaining({ key: "C-4", active: false, triggers: ["cuantos años", "edad"], mood: "atrevido" }),
+      expect.objectContaining({ key: "C-5", triggers: ["salario", "sueldo", "cuanto gana"] }),
+    ]);
   });
 
   it("sin la columna obligatoria, lo dice y no lee nada", () => {

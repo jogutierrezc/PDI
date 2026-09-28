@@ -63,7 +63,7 @@ export const COLUMNS: Record<CatalogKind, Column[]> = {
   capciosa: [
     { id: "key", header: "Clave", width: 10, required: true, help: "Única y corta: C-001, C-002… Importar otra vez la misma clave la actualiza." },
     { id: "tema", header: "Tema", width: 24, help: "Para usted: de qué trata (salarios, vida personal de Pilo…)." },
-    { id: "triggers", header: "Disparadores", width: 36, required: true, help: "Palabras que activan la respuesta, un grupo por línea o separados por |. Todas las palabras del grupo deben estar en la pregunta, en cualquier orden." },
+    { id: "triggers", header: "Disparadores", width: 36, required: true, help: "Palabras que activan la respuesta, separadas por coma, punto y coma, | o una por línea (salario, sueldo, cuánto gana). Si un disparador tiene varias palabras, todas deben estar en la pregunta, en cualquier orden." },
     { id: "answer", header: "Respuesta", width: 60, required: true, help: "La microexpresión: corta, rápida y con gracia, en usted." },
     { id: "mood", header: "Emoción", width: 13, help: "Cómo la dice Pilo: atrevido (por defecto), emocionado, loco o pensar." },
     { id: "active", header: "Activa", width: 8, help: "SI o NO." },
@@ -250,7 +250,11 @@ export function parseCatalogTable(kind: CatalogKind, tables: Record<string, stri
       if (sourcePath && !/^(\/|https?:\/\/)/i.test(sourcePath)) errors.push(`${where("Ruta de la fuente")}: debe empezar por / (una página del portal) o por https://.`);
     } else {
       question = get("tema");
-      triggers = list(get("triggers"));
+      // Los disparadores también se separan por coma y punto y coma: es como los escribe la gente.
+      triggers = list(get("triggers"))
+        .flatMap((t) => t.split(/[,;]/))
+        .map((t) => t.trim())
+        .filter(Boolean);
       if (!triggers.length) errors.push(`${where("Disparadores")}: falta al menos un disparador.`);
       const short = triggers.find((t) => fold(t).replace(/[^a-z0-9ñ ]/g, "").trim().length < 3);
       if (short) errors.push(`${where("Disparadores")}: «${short}» es demasiado corto; se dispararía con casi cualquier pregunta.`);

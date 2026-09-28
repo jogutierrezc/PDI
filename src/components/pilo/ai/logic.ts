@@ -441,7 +441,8 @@ export function matchCatalog(question: string, entries: CatalogEntry[], min = 0.
   let best: { entry: CatalogEntry; score: number } | null = null;
   for (const e of entries) {
     if (e.kind !== "capciosa") continue;
-    for (const t of e.triggers) {
+    // «salario, sueldo; cuánto gana» son tres disparadores, no uno: así los escribe la gente.
+    for (const t of e.triggers.flatMap((x) => x.split(/[,;]/))) {
       if (!hasTrigger(qnorm, t)) continue;
       const score = normalizeQuestion(t).split(" ").length;
       if (!best || score > best.score) best = { entry: e, score };

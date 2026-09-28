@@ -51,4 +51,10 @@ describe("el catálogo de Planeación", () => {
     expect(matchCatalog("¿Qué significa PDI?", catalog)?.entry.key).toBe("R-001");
     expect(matchCatalog("¿Cuántos estudiantes hay?", catalog)).toBeNull();
   });
+
+  it("una celda con comas son varios disparadores, no uno", () => {
+    const withCommas = [entry({ key: "C-9", triggers: ["salario, sueldo; cuanto gana"], answer: "No se publica." })];
+    expect(matchCatalog("¿Cuál es el sueldo del decano?", withCommas)?.entry.key).toBe("C-9");
+    expect(matchCatalog("¿Cuánto gana un profesor?", withCommas)?.entry.key).toBe("C-9");
+  });
 });

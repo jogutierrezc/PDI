@@ -141,6 +141,9 @@ const UserManagement = lazy(() =>
 const PiloAiSettings = lazy(() =>
   import("./modules/admin/pilo/PiloAiSettings").then((m) => ({ default: m.PiloAiSettings })),
 );
+const PiloPresentation = lazy(() =>
+  import("./modules/admin/pilo/presentacion/Presentation").then((m) => ({ default: m.Presentation })),
+);
 const OfferPage = lazy(() => import("./modules/oferta/OfferPage").then((m) => ({ default: m.OfferPage })));
 const ImpactPortalHome = lazy(() =>
   import("./modules/impacto/portal/PortalHome").then((m) => ({ default: m.PortalHome })),
@@ -489,6 +492,15 @@ export default function App() {
             element={
               <RequireRole minimum="admin" screen="pilo">
                 <PiloAiSettings />
+              </RequireRole>
+            }
+          />
+          {/* La capa profunda de Pilo: la presentación, solo para la administración. */}
+          <Route
+            path="/admin/mr-pilo/presentacion"
+            element={
+              <RequireRole minimum="admin" screen="pilo">
+                <PiloPresentation />
               </RequireRole>
             }
           />

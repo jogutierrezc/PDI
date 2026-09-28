@@ -232,7 +232,18 @@ export function MemorySection({ ed, indexedAt, onIndexed }: { ed: EditorApi; ind
         )}
       </Group>
 
-      <Group title="Malla de la memoria" aside={<small>Cómo se conecta lo que sabe Pilo</small>} id="pis-malla">
+      <Group
+        title="Malla de la memoria"
+        aside={
+          <span className="pis-malla__aside">
+            <small>Cómo se conecta lo que sabe Pilo</small>
+            <Link className="button-secondary" to="/admin/mr-pilo/presentacion">
+              Presentar la capa profunda
+            </Link>
+          </span>
+        }
+        id="pis-malla"
+      >
         <MeshView onAskRefresh={() => refreshRef.current?.focus()} />
       </Group>
 

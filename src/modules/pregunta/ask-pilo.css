@@ -1428,3 +1428,89 @@
   font-size: 0.78rem;
   color: var(--ap-ink-3);
 }
+
+/* --- Escritura y lectura (AnswerText.tsx) -------------------------------------------------
+   El cursor parpadea al paso de la escritura; la frase que Pilo lee lleva un
+   fondo suave del color de lectura. «Leer en voz alta» en la barra lee sola
+   cada respuesta nueva. */
+
+.ap-after {
+  display: contents;
+}
+
+.ap-a__text[data-typing] {
+  cursor: pointer;
+}
+
+.ap-caret {
+  display: inline-block;
+  width: 2px;
+  height: 1.05em;
+  margin-left: 2px;
+  vertical-align: -0.15em;
+  border-radius: 1px;
+  background: var(--ap-primary);
+  animation: ap-caret 1s steps(2, jump-none) infinite;
+}
+
+@keyframes ap-caret {
+  50% {
+    opacity: 0;
+  }
+}
+
+.ap-sent {
+  border-radius: 4px;
+  transition: background-color 200ms ease, box-shadow 200ms ease;
+}
+
+.ap-sent[data-reading] {
+  background: var(--ap-mark);
+  box-shadow: 0 0 0 3px var(--ap-mark);
+}
+
+.ap-readall {
+  flex: none;
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  height: 38px;
+  padding: 0 13px;
+  border-radius: 999px;
+  border: 1px solid var(--ap-line);
+  background: var(--ap-soft);
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: var(--ap-ink-2);
+  transition: background-color 180ms ease, color 180ms ease, border-color 180ms ease, transform 140ms var(--ap-ease);
+}
+
+.ap-readall:active {
+  transform: scale(0.96);
+}
+
+.ap-readall[aria-pressed="true"] {
+  border-color: var(--ap-primary);
+  background: var(--ap-primary-soft);
+  color: var(--ap-primary-text);
+}
+
+.ap-readall + .ap-temas {
+  margin-left: 0;
+}
+
+@media (max-width: 600px) {
+  .ap-readall span {
+    display: none;
+  }
+  .ap-readall {
+    padding: 0 10px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ap-caret {
+    animation: none;
+  }
+}

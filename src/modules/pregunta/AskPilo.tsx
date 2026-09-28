@@ -29,6 +29,7 @@ import { markWelcome, newId, seenWelcome, TEMAS, useConversations, useTema } fro
 import type { Conversation, Tema, Turn } from "./store";
 import { Welcome } from "./Welcome";
 import { MeshAnswer } from "./MeshAnswer";
+import { AnswerText, parseAnswer, useTypewriter } from "./AnswerText";
 import "./ask-pilo.css";
 
 const reduced = () => typeof window !== "undefined" && window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
@@ -79,6 +80,7 @@ const I = {
   send: <Svg size={18}><path d="M12 19V5M5 12l7-7 7 7" /></Svg>,
   chev: <Svg size={12}><path d="M6 9l6 6 6-6" /></Svg>,
   speak: <Svg><path d="M4 10v4h4l5 4V6L8 10z" /><path d="M16.5 9a4 4 0 0 1 0 6M19 6.5a7.5 7.5 0 0 1 0 11" /></Svg>,
+  stop: <Svg><rect x="6.5" y="6.5" width="11" height="11" rx="2" /></Svg>,
   copy: <Svg><rect x="8" y="8" width="12" height="12" rx="2.5" /><path d="M16 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h2" /></Svg>,
   up: <Svg><path d="M7 11v9H4v-9zM7 11l4-8c1.7 0 2.6 1 2.3 2.7L12.8 9H19a2 2 0 0 1 2 2.3l-1.2 7A2 2 0 0 1 17.8 20H7" /></Svg>,
   ext: <Svg size={15}><path d="M14 4h6v6M20 4l-9 9M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5" /></Svg>,
@@ -192,6 +194,25 @@ function Chat({ tema, setTema, role, audience, welcome, voice }: ChatProps) {
   const [source, setSource] = useState<{ turn: Turn; n: number; trigger: HTMLElement | null } | null>(null);
   const [showWelcome, setShowWelcome] = useState(() => welcome && !seenWelcome());
   const [scrolled, setScrolled] = useState(false);
+  // Las respuestas que acaban de llegar se escriben palabra por palabra; las del historial, no.
+  const [fresh, setFresh] = useState<Set<string>>(() => new Set());
+  const [autoRead, setAutoRead] = useState(() => {
+    try {
+      return window.localStorage.getItem("pilo-pregunta:leer") === "1";
+    } catch {
+      return false;
+    }
+  });
+  const toggleAutoRead = () =>
+    setAutoRead((on) => {
+      try {
+        window.localStorage.setItem("pilo-pregunta:leer", on ? "0" : "1");
+      } catch {
+        /* sin almacenamiento: vale para esta visita */
+      }
+      if (on) stopPilo();
+      return !on;
+    });
   const scroll = useRef<HTMLDivElement>(null);
   const input = useRef<HTMLTextAreaElement>(null);
   const hello = useRef<PiloMojiHandle>(null);
@@ -224,6 +245,7 @@ function Chat({ tema, setTema, role, audience, welcome, voice }: ChatProps) {
     toBottom();
     try {
       const answer = await askQuestion(q, history);
+      setFresh((f) => new Set(f).add(turn.id));
       patchTurn(conv.id, turn.id, { answer });
     } catch (e) {
       patchTurn(conv.id, turn.id, { error: (e as Error).message || "No pude hablar con Pilo ahora." });
@@ -364,6 +386,10 @@ function Chat({ tema, setTema, role, audience, welcome, voice }: ChatProps) {
             </span>
             <b>{current?.title ?? "Nueva conversación"}</b>
           </div>
+          <button type="button" className="ap-readall" aria-pressed={autoRead} onClick={toggleAutoRead} title="Leer en voz alta cada respuesta nueva">
+            {I.speak}
+            <span>Leer en voz alta</span>
+          </button>
           <div className="ap-temas" role="group" aria-label="Tema de color">
             {TEMAS.map((t) => (
               <button key={t.id} type="button" aria-pressed={tema === t.id} onClick={() => setTema(t.id)} title={t.label}>
@@ -388,6 +414,15 @@ function Chat({ tema, setTema, role, audience, welcome, voice }: ChatProps) {
                     active={source?.turn.id === t.id ? source.n : null}
                     onSource={(n, trigger) => setSource({ turn: t, n, trigger })}
                     onRetry={() => void ask(t.q, t.id)}
+                    fresh={fresh.has(t.id)}
+                    autoRead={autoRead}
+                    onTyped={() =>
+                      setFresh((f) => {
+                        const next = new Set(f);
+                        next.delete(t.id);
+                        return next;
+                      })
+                    }
                     onVote={(vote) => {
                       patchTurn(current.id, t.id, { vote });
                       if (t.answer?.answerId) void rateAnswer(t.answer.answerId, vote);
@@ -473,9 +508,15 @@ function TurnView({
   onRetry,
   onVote,
   voice,
+  fresh,
+  autoRead,
+  onTyped,
 }: {
   turn: Turn;
   live: boolean;
+  fresh: boolean;
+  autoRead: boolean;
+  onTyped: () => void;
   active: number | null;
   onSource: (n: number, trigger: HTMLElement) => void;
   onRetry: () => void;
@@ -490,7 +531,44 @@ function TurnView({
   const a = turn.answer;
   const pending = !a && !turn.error;
 
-  // Mientras busca, Pilo mira arriba pensando; al responder, habla un momento.
+  const parsed = useMemo(() => parseAnswer(a?.text ?? ""), [a?.text]);
+  const [reading, setReading] = useState<number | null>(null);
+  const readRun = useRef(0);
+  const after = useRef<HTMLDivElement>(null);
+
+  /** Leer la respuesta frase por frase: la que suena se resalta y Pilo mueve el pico. */
+  const read = async () => {
+    if (reading !== null) {
+      readRun.current += 1;
+      stopPilo();
+      setReading(null);
+      face.current?.talk(false);
+      return;
+    }
+    const mine = ++readRun.current;
+    face.current?.talk(true);
+    for (let k = 0; k < parsed.sentences.length; k++) {
+      if (mine !== readRun.current) return;
+      setReading(k);
+      const used = await sayWithPilo(parsed.sentences[k].spoken, { portal: "pregunta", ...voice });
+      if (used === "cancelado") break;
+    }
+    if (mine === readRun.current) {
+      setReading(null);
+      face.current?.talk(false);
+    }
+  };
+
+  // Otra lectura (de otra respuesta) cancela esta: sayWithPilo responde «cancelado».
+  useEffect(() => () => void (readRun.current += 1), []);
+
+  const { shown, typing, finish } = useTypewriter(parsed.count, Boolean(a) && fresh, () => {
+    face.current?.talk(false);
+    onTyped();
+    if (autoRead) void read();
+  });
+
+  // Mientras busca, Pilo mira arriba pensando; mientras escribe, habla.
   useEffect(() => {
     if (!live) return;
     if (pending) {
@@ -498,19 +576,23 @@ function TurnView({
       return;
     }
     face.current?.look(0, 0.2);
-    face.current?.talk(true);
-    const t = window.setTimeout(() => face.current?.talk(false), 1300);
-    return () => window.clearTimeout(t);
-  }, [pending, live]);
+    if (typing) face.current?.talk(true);
+  }, [pending, live, typing]);
 
-  // La respuesta llega por partes, 50 ms entre cada una.
+  // Terminada la escritura, llega lo demás (mapa, fuentes, acciones), 50 ms entre cada cosa.
+  const wasTyping = useRef(false);
   useLayoutEffect(() => {
-    if (!live || pending || !body.current || reduced()) return;
+    if (typing) {
+      wasTyping.current = true;
+      return;
+    }
+    if (!wasTyping.current || !after.current || reduced()) return;
+    wasTyping.current = false;
     const ctx = gsap.context(() => {
-      gsap.from(body.current!.children, { autoAlpha: 0, y: 8, duration: 0.35, stagger: 0.05, ease: "power3.out" });
-    }, body);
+      gsap.from(after.current!.children, { autoAlpha: 0, y: 8, duration: 0.35, stagger: 0.05, ease: "power3.out" });
+    }, after);
     return () => ctx.revert();
-  }, [live, pending]);
+  }, [typing]);
 
   const plain = a ? a.text.replace(/\s*\[\d+\]/g, "") : "";
   const copy = async () => {
@@ -580,24 +662,9 @@ function TurnView({
                   ))}
                 </ol>
               )}
-              <div className="ap-a__text">
-                {a.text.split(/\n{2,}/).map((para, i) => (
-                  <p key={i}>
-                    {para.split(/(\[\d+\])/).map((part, j) => {
-                      const m = part.match(/^\[(\d+)\]$/);
-                      if (!m) return part;
-                      const n = Number(m[1]);
-                      const s = a.sources.find((x) => x.n === n);
-                      if (!s) return null;
-                      return (
-                        <button key={j} type="button" className="ap-cite" aria-pressed={active === n} aria-label={`Fuente ${n}: ${s.title}`} onClick={(e) => onSource(n, e.currentTarget)}>
-                          {n}
-                        </button>
-                      );
-                    })}
-                  </p>
-                ))}
-              </div>
+              <AnswerText parsed={parsed} shown={shown} typing={typing} reading={reading} sources={a.sources} active={active} onSource={onSource} onFinish={finish} />
+              {!typing && (
+              <div className="ap-after" ref={after}>
               {a.graph && a.graph.nodes.length > 1 && (map ?? a.kind === "malla") && <MeshAnswer graph={a.graph} animate={live} />}
               {a.unknown && a.unknown.length > 0 && <p className="ap-warn">Revise estos números antes de citarlos: no los encontré en las fuentes ({a.unknown.join(", ")}).</p>}
               {a.sources.length > 0 && (
@@ -616,8 +683,9 @@ function TurnView({
                 </div>
               )}
               <div className="ap-acts">
-                <button type="button" className="ap-ic" onClick={() => void sayWithPilo(plain, { portal: "pregunta", ...voice })} aria-label="Escuchar la respuesta">
-                  {I.speak}
+                <button type="button" className="ap-ic" onClick={() => void read()} aria-pressed={reading !== null} aria-label={reading !== null ? "Dejar de leer" : "Escuchar la respuesta"}>
+                  {reading !== null ? I.stop : I.speak}
+                  {reading !== null && <span>Leyendo</span>}
                 </button>
                 <button type="button" className="ap-ic" onClick={copy} aria-label={copied ? "Copiada" : "Copiar la respuesta con sus fuentes"}>
                   {I.copy}
@@ -634,6 +702,8 @@ function TurnView({
                   </>
                 )}
               </div>
+              </div>
+              )}
             </>
           )}
         </div>

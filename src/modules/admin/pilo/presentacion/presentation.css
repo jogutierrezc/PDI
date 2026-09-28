@@ -1,0 +1,456 @@
+/* La capa profunda de Pilo · una sola escena, pensada para proyectar: la
+   noche de Pilo con su cian. No cambia con el tema de la intranet (como el
+   escenario de Pilo, --pilo-stage); los colores de las fuentes son los del
+   tablero en su versión clara sobre fondo oscuro. */
+
+.cpp {
+  --cpp-night: #040d1f;
+  --cpp-night-2: #071a38;
+  --cpp-night-3: #0b2750;
+  --cpp-ink: #eef4ff;
+  --cpp-ink-2: #b9c9e6;
+  --cpp-ink-3: #8196ba;
+  --cpp-line: rgba(185, 201, 230, 0.14);
+  --cpp-cyan: #7fe7f0;
+  --cpp-cyan-ink: #04212a;
+  --cpp-ease: cubic-bezier(0.23, 1, 0.32, 1);
+  position: fixed;
+  inset: 0;
+  z-index: 200;
+  display: grid;
+  grid-template-columns: minmax(300px, 34%) 1fr;
+  grid-template-rows: auto 1fr auto;
+  color-scheme: dark;
+  color: var(--cpp-ink);
+  font: 500 15px/1.55 "Manrope", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  -webkit-font-smoothing: antialiased;
+  background: radial-gradient(90% 90% at 68% 50%, var(--cpp-night-3) 0%, var(--cpp-night-2) 38%, var(--cpp-night) 78%);
+}
+
+.cpp ::selection {
+  background: var(--cpp-cyan);
+  color: var(--cpp-cyan-ink);
+}
+
+.cpp :where(button) {
+  font: inherit;
+  color: inherit;
+  background: none;
+  border: 0;
+  padding: 0;
+  cursor: pointer;
+}
+
+.cpp :focus-visible {
+  outline: 2px solid var(--cpp-cyan);
+  outline-offset: 3px;
+  border-radius: 8px;
+}
+
+.cpp-top {
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 18px 28px 0;
+}
+
+.cpp-brand {
+  display: flex;
+  flex-direction: column;
+  font-size: 0.75rem;
+  font-weight: 700;
+  line-height: 1.2;
+  color: var(--cpp-ink-3);
+}
+
+.cpp-brand b {
+  font-size: 0.84rem;
+  font-weight: 800;
+  color: var(--cpp-ink);
+}
+
+.cpp-tag {
+  margin-left: auto;
+  padding: 5px 11px;
+  border-radius: 999px;
+  border: 1px solid var(--cpp-line);
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: var(--cpp-ink-3);
+}
+
+.cpp-ghost {
+  display: inline-flex;
+  align-items: center;
+  padding: 8px 13px;
+  border-radius: 999px;
+  border: 1px solid var(--cpp-line);
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: var(--cpp-ink-2);
+  text-decoration: none;
+  transition: background-color 180ms ease, color 180ms ease, transform 140ms var(--cpp-ease);
+}
+
+.cpp-ghost:active {
+  transform: scale(0.96);
+}
+
+/* --- La narración ------------------------------------------------------------------ */
+
+.cpp-story {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 18px;
+  min-height: 0;
+  padding: 12px 8px 12px 44px;
+}
+
+.cpp-story h1 {
+  margin: 0;
+  max-width: 14ch;
+  font: 700 clamp(2rem, 2.6vw + 1rem, 3.3rem) / 1.04 "Fraunces", "Iowan Old Style", Georgia, serif;
+  letter-spacing: -0.03em;
+  text-wrap: balance;
+  color: var(--cpp-ink);
+}
+
+.cpp-story p {
+  margin: 0;
+  max-width: 42ch;
+  font-size: 1.02rem;
+  line-height: 1.6;
+  color: var(--cpp-ink-2);
+}
+
+.cpp-story p b {
+  color: var(--cpp-ink);
+  font-weight: 700;
+}
+
+.cpp-layer {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 0.78rem;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+  color: var(--cpp-cyan);
+}
+
+.cpp-layer i {
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 8px;
+  background: rgba(127, 231, 240, 0.12);
+  font-style: normal;
+  font-variant-numeric: tabular-nums;
+}
+
+.cpp-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.cpp-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 11px 6px 8px;
+  border-radius: 999px;
+  border: 1px solid var(--cpp-line);
+  background: rgba(255, 255, 255, 0.03);
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: var(--cpp-ink-2);
+  transition: opacity 180ms ease, transform 140ms var(--cpp-ease);
+}
+
+button.cpp-chip:active {
+  transform: scale(0.96);
+}
+
+.cpp-chip[data-off] {
+  opacity: 0.45;
+}
+
+.cpp-chip i {
+  display: inline-block;
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+}
+
+.cpp-meter {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 18px;
+}
+
+.cpp-meter div {
+  display: grid;
+}
+
+.cpp-meter b {
+  font: 700 1.7rem/1 "Fraunces", Georgia, serif;
+  font-variant-numeric: tabular-nums;
+}
+
+.cpp-meter small {
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: var(--cpp-ink-3);
+}
+
+.cpp-q {
+  align-self: flex-start;
+  max-width: 40ch;
+  padding: 12px 16px;
+  border-radius: 18px 18px 18px 4px;
+  background: var(--cpp-ink);
+  color: #0a1830;
+  font-weight: 700;
+  box-shadow: 0 14px 34px rgba(0, 0, 0, 0.4);
+}
+
+.cpp-ans {
+  display: grid;
+  gap: 10px;
+  max-width: 44ch;
+  padding: 14px 16px;
+  border-radius: 14px;
+  border: 1px solid var(--cpp-line);
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.cpp-story .cpp-ans p {
+  color: var(--cpp-ink);
+  font-size: 0.95rem;
+}
+
+.cpp-badge {
+  justify-self: start;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: rgba(127, 231, 240, 0.12);
+  font-size: 0.7rem;
+  font-weight: 800;
+  color: var(--cpp-cyan);
+}
+
+.cpp-cite {
+  display: inline-grid;
+  place-items: center;
+  min-width: 19px;
+  height: 19px;
+  padding: 0 5px;
+  border-radius: 6px;
+  vertical-align: 2px;
+  background: var(--cpp-cyan);
+  color: var(--cpp-cyan-ink);
+  font-size: 0.68rem;
+  font-weight: 800;
+}
+
+.cpp-credits {
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: var(--cpp-ink-3);
+}
+
+.cpp-credits b {
+  color: var(--cpp-cyan);
+}
+
+/* --- El lienzo ------------------------------------------------------------------------ */
+
+.cpp-stage {
+  position: relative;
+  min-width: 0;
+  min-height: 0;
+}
+
+.cpp-stage canvas {
+  position: absolute;
+  inset: 0;
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.cpp-tip {
+  position: absolute;
+  display: grid;
+  max-width: 280px;
+  padding: 9px 12px;
+  border-radius: 10px;
+  border: 1px solid var(--cpp-line);
+  background: rgba(4, 13, 31, 0.94);
+  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.5);
+  font-size: 0.78rem;
+  line-height: 1.45;
+  pointer-events: none;
+  opacity: 0;
+  transform: translateY(4px);
+  transition: opacity 140ms ease, transform 140ms var(--cpp-ease);
+}
+
+.cpp-tip[data-on] {
+  opacity: 1;
+  transform: none;
+}
+
+.cpp-tip b {
+  font-size: 0.84rem;
+  color: var(--cpp-ink);
+}
+
+.cpp-tip span {
+  color: var(--cpp-ink-3);
+}
+
+/* --- El riel de pasos --------------------------------------------------------------------- */
+
+.cpp-rail {
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 10px 28px 20px;
+}
+
+.cpp-steps {
+  flex: 1;
+  display: flex;
+  gap: 6px;
+  min-width: 0;
+}
+
+.cpp-step {
+  flex: 1;
+  display: grid;
+  gap: 7px;
+  min-width: 0;
+  padding: 6px 2px;
+  text-align: left;
+}
+
+.cpp-step i {
+  position: relative;
+  display: block;
+  height: 3px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: var(--cpp-line);
+}
+
+.cpp-step i::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: var(--cpp-cyan);
+  transform: scaleX(var(--f, 0));
+  transform-origin: left;
+  transition: transform 420ms var(--cpp-ease);
+}
+
+.cpp-step span {
+  overflow: hidden;
+  font-size: 0.7rem;
+  font-weight: 700;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  color: var(--cpp-ink-3);
+  transition: color 180ms ease;
+}
+
+.cpp-step[aria-current="step"] span {
+  color: var(--cpp-ink);
+}
+
+.cpp-nav {
+  display: flex;
+  gap: 8px;
+}
+
+.cpp-round {
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  border: 1px solid var(--cpp-line);
+  color: var(--cpp-ink);
+  transition: background-color 180ms ease, opacity 180ms ease, transform 140ms var(--cpp-ease);
+}
+
+.cpp-round:active {
+  transform: scale(0.94);
+}
+
+.cpp-round:disabled {
+  opacity: 0.3;
+  cursor: default;
+}
+
+.cpp-round--main {
+  border-color: var(--cpp-cyan);
+  background: var(--cpp-cyan);
+  color: var(--cpp-cyan-ink);
+}
+
+.cpp-keys {
+  font-size: 0.7rem;
+  white-space: nowrap;
+  color: var(--cpp-ink-3);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .cpp-ghost:hover {
+    background: rgba(255, 255, 255, 0.06);
+    color: var(--cpp-ink);
+  }
+  .cpp-round:not(:disabled):hover {
+    background: rgba(255, 255, 255, 0.08);
+  }
+  .cpp-round--main:not(:disabled):hover {
+    background: #a6f0f5;
+  }
+}
+
+@media (max-width: 900px) {
+  .cpp {
+    overflow-y: auto;
+    grid-template-columns: 1fr;
+    grid-template-rows: auto auto minmax(420px, 62vh) auto;
+  }
+  .cpp-story {
+    padding: 8px 20px 0;
+  }
+  .cpp-top {
+    flex-wrap: wrap;
+    padding: 14px 20px 0;
+  }
+  .cpp-tag,
+  .cpp-keys,
+  .cpp-step span {
+    display: none;
+  }
+  .cpp-rail {
+    padding: 10px 20px 18px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .cpp-step i::after,
+  .cpp-tip {
+    transition: none;
+  }
+}

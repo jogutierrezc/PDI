@@ -640,3 +640,6 @@
   .pis-switch, .pis-switch i, .pis-usage i span { transition-duration: 0ms; }
   .pis-fact:active, .pis-choice button:active, .pis-check:active, .pis-sample button:active { transform: none; }
 }
+
+/* El enlace a la presentación, junto al título de la malla. */
+.pis-malla__aside { display: inline-flex; flex-wrap: wrap; align-items: center; gap: var(--space-3); }

@@ -24,6 +24,8 @@ import { freeRefs } from "../datos-abiertos/data/free-sets";
 import { tytRefs } from "./tyt";
 import { deiRefs } from "./dei";
 import { modelRefs } from "./model-sheets";
+import { normalizeAnalysis } from "./analysis";
+import type { BulletinAnalysis } from "./analysis";
 import { ALL_YEARS } from "../datos-abiertos/data/terms";
 import type { CampusId, OpenDataCatalog, Report } from "../datos-abiertos/data/types";
 
@@ -137,8 +139,10 @@ export interface BulletinReport {
  * "completo": capítulo por informe con una hoja por indicador y conjunto.
  * "ejecutivo": síntesis. Resumen con las cifras titulares de cada informe y una
  * ficha por informe con sus cifras clave, tendencia y reparto por campus.
+ * "analisis": documento escrito por Mr. Pilo con las cifras de los informes
+ * incluidos (ver analysis.ts).
  */
-export type BulletinFormat = "completo" | "ejecutivo";
+export type BulletinFormat = "completo" | "ejecutivo" | "analisis";
 
 /**
  * Dónde va Diversidad, Equidad e Inclusión en un boletín con varios informes:
@@ -171,6 +175,8 @@ export interface BulletinSettings {
   /** Diversidad, Equidad e Inclusión: capítulo propio o sección de Bienestar. */
   deiPlacement: DeiPlacement;
   reports: BulletinReport[];
+  /** Solo en «analisis»: el encargo y lo que escribió Pilo. */
+  analysis?: BulletinAnalysis;
 }
 
 export const DEFAULT_THEME: BulletinTheme = { navy: "#072b58", band: "#4078b9", accent: "#e8892b", font: "Montserrat" };
@@ -186,7 +192,24 @@ export const DEFAULT_IMAGES = {
   headerLogo: "/boletin/logo-udes-blanco.png",
 };
 
-export function defaultTexts(periodLabel: string, format: "completo" | "ejecutivo" = "completo"): BulletinTexts {
+export function defaultTexts(periodLabel: string, format: BulletinFormat = "completo"): BulletinTexts {
+  if (format === "analisis") {
+    return {
+      coverTitle: "Análisis de los datos",
+      coverSubtitle: "Lectura de las cifras de UDES en Cifras",
+      coverOffice: "Planeación Institucional",
+      headerTitle: "Análisis de los datos",
+      headerOffice: "Dirección de Planeación Institucional",
+      presentationTitle: "Presentación",
+      presentation: [
+        `Este documento lee las cifras de UDES en Cifras del periodo ${periodLabel} y las pone en contexto: qué cambió, dónde y por qué importa para las decisiones de la Universidad de Santander.`,
+        "El texto lo redactó Mr. Pilo, el asistente de la Dirección de Planeación Institucional, a partir de las cifras que reporta cada oficina. Cada número se comparó con esas cifras antes de publicar, y el equipo de Planeación revisó el documento.",
+      ].join("\n\n"),
+      backTitle: "Oficinas que reportan",
+      backNote: "Las cifras de este análisis son las que cada oficina reporta a la Dirección de Planeación Institucional.",
+      footer: "Análisis de los datos · UDES en Cifras",
+    };
+  }
   return {
     coverTitle: "Informe UDES en Cifras",
     coverSubtitle: "Principales estadísticas de las actividades académicas y administrativas",
@@ -293,7 +316,8 @@ export function normalizeSettings(
 ): BulletinSettings {
   const saved = (raw && typeof raw === "object" ? raw : {}) as Partial<BulletinSettings>;
   const periodLabel = catalog.period?.label ?? (catalog.years.length ? `${catalog.years[0]}–${catalog.years[catalog.years.length - 1]}` : "");
-  const texts = { ...defaultTexts(periodLabel, saved.format === "ejecutivo" ? "ejecutivo" : "completo"), ...(saved.texts ?? {}) };
+  const savedFormat: BulletinFormat = saved.format === "ejecutivo" || saved.format === "analisis" ? saved.format : "completo";
+  const texts = { ...defaultTexts(periodLabel, savedFormat), ...(saved.texts ?? {}) };
   const images: BulletinImages = {
     cover: null,
     back: null,
@@ -352,7 +376,7 @@ export function normalizeSettings(
     };
   });
 
-  const format: BulletinFormat = saved.format === "ejecutivo" ? "ejecutivo" : "completo";
+  const format = savedFormat;
   return {
     version: 1,
     format,
@@ -370,11 +394,16 @@ export function normalizeSettings(
     skipEmpty: saved.skipEmpty ?? true,
     deiPlacement: saved.deiPlacement === "bienestar" ? "bienestar" : "capitulo",
     reports,
+    ...(format === "analisis" ? { analysis: normalizeAnalysis(saved.analysis) } : {}),
   };
 }
 
-/** "boletin-global", "boletin-poblacional", "boletin-ejecutivo", "boletin-ejecutivo-poblacional". */
+/**
+ * "boletin-global", "boletin-poblacional", "boletin-ejecutivo", "boletin-ejecutivo-poblacional".
+ * Los análisis pueden ser varios por periodo: llevan su propia marca («boletin-analisis-lx3k2»).
+ */
 export function bulletinSlug(reportSlug: string | null, format: BulletinFormat = "completo"): string {
+  if (format === "analisis") return `boletin-analisis-${Date.now().toString(36)}`;
   const base = format === "ejecutivo" ? "boletin-ejecutivo" : "boletin";
   return reportSlug ? `${base}-${reportSlug}` : format === "ejecutivo" ? base : "boletin-global";
 }

@@ -12,7 +12,7 @@
      y cómo se le pregunta al modelo con los pasajes de la memoria (buildAskMessages).
    ========================================================================== */
 
-export type Action = "resumir" | "sintetizar" | "explicar" | "voz" | "probar" | "preguntar" | "entender";
+export type Action = "resumir" | "sintetizar" | "explicar" | "voz" | "probar" | "preguntar" | "entender" | "analizar";
 export type Fn = "leer" | "resumir" | "sintetizar" | "explicar" | "preguntar";
 export type Audience = "admin" | "sesion" | "publico";
 export type Portal = "cifras" | "pdi" | "observatorio" | "impacto" | "pregunta";
@@ -24,10 +24,16 @@ export interface PortalRule {
   fns: Fn[];
 }
 
+/** Los informes de Impacto con Pilo (0100): de un programa, una facultad o una vicerrectoría. */
+export type ReportKind = "programa" | "facultad" | "vicerrectoria";
+export const REPORT_KINDS: ReportKind[] = ["programa", "facultad", "vicerrectoria"];
+
 export interface Rules {
   enabled: boolean;
   functions: Partial<Record<Fn, boolean>>;
   portals: Partial<Record<Portal, PortalRule>>;
+  /** A quién más, además de la administración, se abren los informes de Impacto (0100). */
+  impacto_report?: Partial<Record<ReportKind, boolean>>;
 }
 
 export interface Section {
@@ -37,7 +43,7 @@ export interface Section {
 }
 
 export const PORTALS: Portal[] = ["cifras", "pdi", "observatorio", "impacto", "pregunta"];
-export const FN_OF: Record<Exclude<Action, "probar">, Fn> = { resumir: "resumir", sintetizar: "sintetizar", explicar: "explicar", voz: "leer", preguntar: "preguntar", entender: "sintetizar" };
+export const FN_OF: Record<Exclude<Action, "probar">, Fn> = { resumir: "resumir", sintetizar: "sintetizar", explicar: "explicar", voz: "leer", preguntar: "preguntar", entender: "sintetizar", analizar: "sintetizar" };
 
 /** ¿Puede esta persona (null = sin sesión) usar la acción en el portal? */
 export function canUse(rules: Rules, portal: string, action: Action, role: Role | null): { ok: true } | { ok: false; reason: string } {
@@ -46,6 +52,19 @@ export function canUse(rules: Rules, portal: string, action: Action, role: Role 
   if (action === "entender") {
     if (!rules.enabled) return { ok: false, reason: "Mr. Pilo con IA está apagado." };
     return role ? { ok: true } : { ok: false, reason: "Inicie sesión para que Pilo entienda su necesidad." };
+  }
+  // «Análisis de los datos» (boletines de UDES en Cifras): quien arma boletines, con la IA encendida.
+  if (action === "analizar") {
+    if (!rules.enabled) return { ok: false, reason: "Mr. Pilo con IA está apagado: enciéndalo en Mr. Pilo con IA › Conexión." };
+    // Informes de Impacto: de la administración, salvo que ella los abra a programas,
+    // decanaturas o vicerrectorías. Qué unidad le toca a cada quien lo decide la base.
+    if (portal === "impacto") {
+      if (role === "admin") return { ok: true };
+      const open = REPORT_KINDS.some((k) => rules.impacto_report?.[k] === true);
+      if (!open) return { ok: false, reason: "Por ahora los informes de impacto con Pilo son solo de la administración." };
+      return role ? { ok: true } : { ok: false, reason: "Inicie sesión para escribir un informe de impacto." };
+    }
+    return role === "admin" || role === "planeacion" ? { ok: true } : { ok: false, reason: "El análisis de los datos es para Planeación y la administración." };
   }
   // La muestra de voz de la configuración: solo la administración, en cualquier estado.
   if (portal === "prueba") return role === "admin" ? { ok: true } : { ok: false, reason: "Solo la administración prueba la voz." };
@@ -683,3 +702,247 @@ export function parseNeed(raw: string, goalIds: Set<string>, indicatorIds: Set<s
   const summary = typeof data.resumen === "string" ? data.resumen.slice(0, 400) : "";
   return { summary, goals, indicators };
 }
+
+/* --- Análisis de los datos (boletín de UDES en Cifras) -------------------------------- */
+
+export type AnalysisFormat = "ejecutivo" | "tecnico" | "sedes" | "tendencias" | "libre";
+export type AnalysisLength = "breve" | "estandar" | "extenso";
+export type AnalysisTone = "institucional" | "divulgativo" | "tecnico";
+
+export interface AnalysisBrief {
+  format: AnalysisFormat;
+  /** Para quién es: «Consejo Superior», «Decanos y directores»… */
+  audience: string;
+  tone: AnalysisTone;
+  length: AnalysisLength;
+  alerts: boolean;
+  recommendations: boolean;
+  method: boolean;
+  /** Las indicaciones propias de quien encarga el análisis. */
+  prompt: string;
+}
+
+export interface AnalysisInput {
+  brief: AnalysisBrief;
+  /** Un capítulo por informe o el cierre del documento. */
+  part: "capitulo" | "cierre";
+  title: string;
+  /** Las cifras, ya calculadas (sin IA): una línea por dato. En el cierre, lo dicho en cada capítulo. */
+  facts: string;
+  /** Pasajes del Plan de Desarrollo, si se pidió cruzar con el PDI. */
+  context?: string;
+  /** El nombre del documento; sin él, el análisis de UDES en Cifras. */
+  doc?: string;
+}
+
+export interface AnalysisPart {
+  summary: string;
+  paragraphs: string[];
+  alerts: string[];
+  recommendations: string[];
+}
+
+const ANALYSIS_FORMAT: Record<AnalysisFormat, string> = {
+  ejecutivo: "Informe ejecutivo: los hallazgos que importan para decidir, con sus cifras titulares, sin detalle metodológico.",
+  tecnico: "Informe técnico: lectura completa de las series, variaciones entre años, diferencias entre sedes y límites de los datos.",
+  sedes: "Comparativo por sede: pon las sedes lado a lado y señala la brecha de cada una frente al total institucional.",
+  tendencias: "Tendencias y alertas: lo que sube, lo que cae y lo que se aleja de lo esperado según la dirección de cada indicador.",
+  libre: "Sigue las indicaciones de quien encarga el análisis.",
+};
+
+const ANALYSIS_TONE: Record<AnalysisTone, string> = {
+  institucional: "Tono institucional, sobrio y preciso.",
+  divulgativo: "Tono divulgativo: explica cada cifra para quien no es experto.",
+  tecnico: "Tono técnico: usa el vocabulario de planeación y estadística con precisión.",
+};
+
+/** Cuánto escribe cada llamada según la longitud pedida. */
+export const ANALYSIS_SIZE: Record<AnalysisLength, { paragraphs: string; tokens: number }> = {
+  breve: { paragraphs: "2 párrafos de 60 a 90 palabras", tokens: 1000 },
+  estandar: { paragraphs: "3 o 4 párrafos de 80 a 120 palabras", tokens: 1800 },
+  extenso: { paragraphs: "5 a 7 párrafos de 90 a 140 palabras", tokens: 2800 },
+};
+
+const ANALYST = [
+  "Eres Mr. Pilo, analista de la Oficina de Planeación Institucional de la Universidad de Santander (UDES).",
+  "Escribes como escribe un buen analista humano en un informe institucional: prosa natural y fluida, en español de Colombia y en tercera persona.",
+  "Alterna frases cortas y largas, enlaza las ideas con conectores (además, en cambio, por eso, sin embargo) y no repitas la misma estructura en cada frase.",
+  "Interpreta: no enumeres cifras una tras otra; elige las que importan y di qué significan.",
+  "Evita frases de relleno y fórmulas como «cabe destacar», «es importante mencionar» o «en conclusión».",
+  "Cada dato de la lista trae su número de fuente entre corchetes, como [2]: cuando uses una cifra, pon ese número justo después, así: «bajó a 9,6 % [2]».",
+  "Solo usas las cifras que vienen en los datos: no inventes números, porcentajes, causas ni comparaciones que no estén.",
+  "Puedes decir «subió» o «bajó», pero cada número que escribas debe estar en los datos, tal como aparece.",
+  "Un dato vacío no es un cero: dilo como «sin reporte».",
+  "Si una causa no se puede afirmar con los datos, preséntala como hipótesis a revisar.",
+  "No menciones ni infieras datos de personas.",
+  "Cada párrafo desarrolla una idea: la cifra, cómo cambió, qué la explica según los datos y qué significa para la universidad.",
+  "Escribe texto corrido: sin Markdown, sin asteriscos, sin viñetas ni títulos dentro de los párrafos.",
+  "Responde solo con el JSON que se pide, sin texto antes ni después.",
+].join(" ");
+
+export function buildAnalysisMessages(input: AnalysisInput) {
+  const { brief } = input;
+  const size = ANALYSIS_SIZE[brief.length];
+  const wants = [
+    `"resumen": una frase con el hallazgo principal`,
+    `"parrafos": [${size.paragraphs} de análisis]`,
+    brief.alerts ? `"alertas": [1 a 3 alertas cortas, lo que preocupa según los datos]` : `"alertas": []`,
+    brief.recommendations ? `"recomendaciones": [2 a 4 recomendaciones concretas]` : `"recomendaciones": []`,
+  ];
+  const task =
+    input.part === "cierre"
+      ? `Escribe el cierre del documento «${input.title}»: integra lo que dicen los capítulos sin repetirlos uno por uno y termina con lo que conviene decidir.`
+      : `Escribe el capítulo «${input.title}» del documento ${input.doc || "Análisis de los datos de UDES en Cifras"}.${brief.method ? " En el último párrafo, una nota breve de cómo se leyeron las cifras (corte, sedes, qué falta)." : ""}`;
+  const lines = [
+    task,
+    ANALYSIS_FORMAT[brief.format],
+    `Público: ${brief.audience.slice(0, 80) || "Directivos de la universidad"}. ${ANALYSIS_TONE[brief.tone]}`,
+    brief.prompt.trim() ? `Indicaciones de quien encarga el análisis (síguelas si los datos lo permiten): ${brief.prompt.trim().slice(0, 1200)}` : "",
+    `Formato: {${wants.join(", ")}}`,
+    "",
+    input.part === "cierre"
+      ? "Lo que dice cada capítulo (en el cierre no pongas números de fuente entre corchetes):"
+      : "Datos (ya calculados; son los únicos números que puedes usar; el número entre corchetes es la fuente):",
+    input.facts.slice(0, 9000),
+    input.context ? `\nPlan de Desarrollo Institucional (para conectar, no para sacar cifras):\n${input.context.slice(0, 2400)}` : "",
+  ];
+  return [
+    { role: "system", content: ANALYST },
+    { role: "user", content: lines.filter((l) => l !== "").join("\n") },
+  ];
+}
+
+/** Quita el formato de Markdown que algunos modelos meten igual: negritas, viñetas, títulos. */
+function plain(text: string): string {
+  return text
+    .replace(/\*\*(.+?)\*\*/g, "$1")
+    .replace(/__(.+?)__/g, "$1")
+    .replace(/(^|\s)\*(\S.*?\S|\S)\*(?=\s|[.,;:]|$)/g, "$1$2")
+    .replace(/^\s*#{1,6}\s*/gm, "")
+    .replace(/^\s*(?:[-*•]|\d+[.)])\s+/gm, "")
+    .replace(/[ \t]+\n/g, "\n")
+    .trim();
+}
+
+/** Una lista, venga como lista o como un texto con párrafos o líneas. */
+function listOf(v: unknown, max: number, len: number, split: RegExp): string[] {
+  const items = Array.isArray(v) ? v : typeof v === "string" ? v.split(split) : [];
+  return items
+    .map((x) => (typeof x === "string" ? x : x && typeof x === "object" ? String(Object.values(x as Record<string, unknown>).find((y) => typeof y === "string") ?? "") : ""))
+    .map((x) => plain(x).slice(0, len))
+    .filter((x) => x.length > 0)
+    .slice(0, max);
+}
+
+/** El valor de un campo con cualquiera de sus nombres (con o sin tilde, en inglés). */
+function field(data: Record<string, unknown>, names: string[]): unknown {
+  const fold = (s: string) => s.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
+  const wanted = names.map(fold);
+  const key = Object.keys(data).find((k) => wanted.includes(fold(k)));
+  return key ? data[key] : undefined;
+}
+
+const PARAGRAPHS = ["parrafos", "paragraphs", "analisis", "texto", "desarrollo", "cuerpo"];
+const SUMMARY = ["resumen", "summary", "hallazgo", "hallazgo_principal", "idea_principal"];
+const ALERTS = ["alertas", "alerts", "alerta"];
+const RECOMMENDATIONS = ["recomendaciones", "recommendations", "recomendacion"];
+
+function fromData(data: Record<string, unknown>): AnalysisPart | null {
+  const paragraphs = listOf(field(data, PARAGRAPHS), 10, 2400, /\n\s*\n/);
+  const summaryRaw = field(data, SUMMARY);
+  const summary = typeof summaryRaw === "string" ? plain(summaryRaw).slice(0, 400) : "";
+  if (!paragraphs.length && !summary) return null;
+  return {
+    summary,
+    paragraphs,
+    alerts: listOf(field(data, ALERTS), 4, 400, /\n+/),
+    recommendations: listOf(field(data, RECOMMENDATIONS), 6, 400, /\n+/),
+  };
+}
+
+/**
+ * JSON cortado (el modelo llegó al tope de palabras) o mal cerrado: se rescatan
+ * los textos completos de cada campo, así no se pierde lo que sí escribió.
+ */
+function rescue(text: string): AnalysisPart | null {
+  const strings = (from: number) => {
+    const out: string[] = [];
+    const re = /"((?:[^"\\]|\\.)*)"/g;
+    re.lastIndex = from;
+    let m: RegExpExecArray | null;
+    let last = from;
+    let stopped = false;
+    while ((m = re.exec(text))) {
+      // Termina al llegar al siguiente campo («"alertas":»).
+      if (/^\s*:/.test(text.slice(re.lastIndex))) {
+        stopped = true;
+        break;
+      }
+      last = re.lastIndex;
+      try {
+        out.push(JSON.parse(`"${m[1]}"`));
+      } catch {
+        out.push(m[1]);
+      }
+    }
+    // Un texto que quedó abierto (la respuesta se cortó): lo escrito hasta ahí.
+    const open = stopped ? null : /^[\s,[]*"((?:[^"\\]|\\.){40,})$/.exec(text.slice(last));
+    if (open) out.push(open[1].replace(/\\n/g, "\n").replace(/\\"/g, '"').replace(/\s+\S*$/, "") + "…");
+    return out;
+  };
+  const at = (names: string[]) => {
+    const fold = (s: string) => s.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
+    const re = /"([^"]+)"\s*:/g;
+    let m: RegExpExecArray | null;
+    while ((m = re.exec(text))) if (names.includes(fold(m[1]))) return re.lastIndex;
+    return -1;
+  };
+  const read = (names: string[]) => {
+    const i = at(names);
+    return i < 0 ? [] : strings(i);
+  };
+  const paragraphs = read(PARAGRAPHS).map(plain).filter(Boolean).slice(0, 10);
+  const summary = plain(read(SUMMARY)[0] ?? "").slice(0, 400);
+  if (!paragraphs.length && !summary) return null;
+  return {
+    summary,
+    paragraphs,
+    alerts: read(ALERTS).map(plain).filter(Boolean).slice(0, 4),
+    recommendations: read(RECOMMENDATIONS).map(plain).filter(Boolean).slice(0, 6),
+  };
+}
+
+/**
+ * Lee lo que escribió la IA, venga como venga: JSON limpio, JSON dentro de un
+ * bloque de código, con los campos con tilde o en inglés, con listas como
+ * texto, cortado a medias, o solo texto. Nunca deja llaves ni comillas del
+ * JSON en el documento.
+ */
+export function parseAnalysis(raw: string): AnalysisPart {
+  const text = raw.trim().replace(/^```[a-z]*\s*/i, "").replace(/\s*```\s*$/, "").trim();
+  const start = text.indexOf("{");
+  const end = text.lastIndexOf("}");
+  if (start >= 0 && end > start) {
+    try {
+      const parsed = fromData(JSON.parse(text.slice(start, end + 1)) as Record<string, unknown>);
+      if (parsed) return parsed;
+    } catch {
+      /* JSON mal formado o cortado: se rescata abajo */
+    }
+  }
+  if (start >= 0) {
+    const rescued = rescue(text.slice(start));
+    if (rescued) return rescued;
+  }
+  const paragraphs = plain(text.replace(/[{}[\]]/g, ""))
+    .split(/\n\s*\n/)
+    .map((p) => p.trim())
+    .filter((p) => p.length > 0 && !/^"?\w+"?\s*:\s*$/.test(p))
+    .slice(0, 10);
+  return { summary: "", paragraphs, alerts: [], recommendations: [] };
+}
+
+/** Todo el texto de una parte, para verificar sus cifras. */
+export const analysisText = (part: AnalysisPart) =>
+  // Las citas («[2]») no son cifras: no se verifican.
+  [part.summary, ...part.paragraphs, ...part.alerts, ...part.recommendations].join("\n").replace(/\[\d{1,2}\]/g, "");

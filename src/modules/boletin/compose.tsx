@@ -56,6 +56,7 @@ import { parseTytKey, tytHighlight, tytUnits } from "./tyt";
 import { deiUnits } from "./dei";
 import { modelUnits } from "./model-sheets";
 import { BIENESTAR_SLUG, DEI_SLUG } from "./model";
+import { analysisUnits } from "./analysis-sheets";
 
 export interface Unit {
   key: string;
@@ -1860,6 +1861,14 @@ export function compose(catalog: OpenDataCatalog, settings: BulletinSettings): C
     if (!offices.has(source)) offices.set(source, new Set());
     offices.get(source)!.add(report.name);
   };
+  const officeList = () =>
+    [...offices.entries()].map(([name, reports]) => ({ name, reports: [...reports] })).sort((a, b) => a.name.localeCompare(b.name, "es"));
+
+  // Análisis de los datos: el texto de Pilo, sus cifras clave, gráficas compactas y fuentes (analysis-sheets.tsx).
+  if (settings.format === "analisis") {
+    const written = analysisUnits(catalog, settings, credit);
+    return { ...written, offices: officeList() };
+  }
 
   const executive = settings.format === "ejecutivo";
   const summaryItems: ExecutiveItem[] = [];

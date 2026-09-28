@@ -1,0 +1,583 @@
+/* =============================================================================
+   Indicadores de Impacto · el informe con Mr. Pilo.
+
+   Dos partes:
+   · la ventana (el encargo, el avance y la vista previa): superficie del
+     sistema, con los tokens de tokens.css, en tema claro y oscuro;
+   · el papel del informe: el diseño del «Análisis de los datos» (clases
+     bol-analysis de boletin.css). Como el boletín, el papel es papel: es
+     blanco y usa la paleta fija del boletín (--bol-*) en los dos temas.
+   ========================================================================== */
+
+/* --- El botón, en la cabecera de Impacto ------------------------------------------------ */
+
+.imp-rep-trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: 40px;
+  padding: 0 var(--space-4) 0 var(--space-1);
+  color: var(--pilo-stage-ink);
+  background: var(--pilo-stage);
+  border: 0;
+  border-radius: var(--radius-pill);
+  font: inherit;
+  font-size: var(--text-sm);
+  font-weight: 700;
+  cursor: pointer;
+  transition: transform 160ms var(--ease-out);
+}
+
+.imp-rep-trigger:active { transform: scale(0.97); }
+.imp-rep-trigger:focus-visible { outline: 3px solid var(--pilo-accent); outline-offset: 2px; }
+.imp-rep-trigger[data-busy] span { color: var(--pilo-accent); }
+
+/* --- La ventana en pantallas pequeñas ----------------------------------------------------
+   El cuerpo se desplaza dentro del panel; en un teléfono o una pantalla baja,
+   el panel ocupa toda la pantalla y las acciones quedan fijas a la vista. */
+
+.modal-panel:has(.imp-rep-root) .modal-panel__body {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+@media (max-width: 640px), (max-height: 680px) {
+  .modal-backdrop:has(.imp-rep-root) { padding: 0; }
+
+  .modal-panel:has(.imp-rep-root) {
+    width: 100%;
+    height: 100dvh;
+    max-height: none;
+    padding: var(--space-4);
+    border-radius: 0;
+  }
+
+  .modal-panel:has(.imp-rep-root) .modal-panel__description { display: none; }
+  .modal-panel:has(.imp-rep-root) .modal-panel__body { margin-top: var(--space-3); }
+}
+
+/* --- El encargo ------------------------------------------------------------------------- */
+
+.imp-rep-form {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(16rem, 20rem);
+  gap: var(--space-5) var(--space-6);
+  align-items: start;
+}
+
+.imp-rep-form__main {
+  display: grid;
+  gap: var(--space-5);
+  min-width: 0;
+}
+
+.imp-rep-group {
+  display: grid;
+  gap: var(--space-3);
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.imp-rep-group legend {
+  margin-bottom: var(--space-3);
+  padding: 0;
+  color: var(--ink);
+  font-size: var(--text-md);
+  font-weight: 800;
+}
+
+.imp-rep-row {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-3) var(--space-4);
+}
+
+.imp-rep-cards {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: var(--space-2);
+}
+
+.imp-rep-cards button {
+  display: grid;
+  align-content: start;
+  gap: var(--space-1);
+  min-height: 84px;
+  padding: var(--space-3);
+  color: var(--ink);
+  text-align: left;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  font: inherit;
+  cursor: pointer;
+  transition: border-color 160ms var(--ease-out), background-color 160ms var(--ease-out);
+}
+
+.imp-rep-cards button strong { font-size: var(--text-sm); }
+.imp-rep-cards button small { color: var(--ink-secondary); font-size: var(--text-xs); line-height: 1.4; }
+
+.imp-rep-cards button[aria-checked="true"] {
+  background: var(--surface-2);
+  border-color: var(--brand-blue);
+  box-shadow: inset 0 0 0 1px var(--brand-blue);
+}
+
+.imp-rep-cards button:focus-visible,
+.imp-rep-ideas button:focus-visible,
+.imp-rep-saved__open:focus-visible,
+.imp-rep-icon:focus-visible,
+.imp-rep-steps__retry:focus-visible {
+  outline: 3px solid var(--brand-blue);
+  outline-offset: 2px;
+}
+
+.imp-rep-ideas {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.imp-rep-ideas button {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  min-height: 30px;
+  padding: 0 var(--space-3);
+  color: var(--ink-secondary);
+  background: var(--surface-2);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-pill);
+  font: inherit;
+  font-size: var(--text-xs);
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.imp-rep-ideas button:hover { color: var(--ink); }
+
+.imp-rep-check {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  color: var(--ink-secondary);
+  font-size: var(--text-sm);
+}
+
+.imp-rep-check input { width: 18px; height: 18px; accent-color: var(--brand-blue); }
+
+/* El plan: lo que Pilo va a escribir, en su escenario. */
+.imp-rep-plan {
+  position: sticky;
+  top: 0;
+  display: grid;
+  gap: var(--space-3);
+  padding: var(--space-5);
+  color: var(--pilo-stage-ink);
+  background: var(--pilo-stage);
+  border-radius: var(--radius-md);
+}
+
+.imp-rep-plan__head {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.imp-rep-plan__head div { display: grid; gap: 2px; min-width: 0; }
+.imp-rep-plan__head strong { font-size: var(--text-md); line-height: 1.25; }
+.imp-rep-plan__head span { color: var(--pilo-stage-muted); font-size: var(--text-xs); }
+
+.imp-rep-plan__note,
+.imp-rep-plan__fine,
+.imp-rep-plan__time { margin: 0; color: var(--pilo-stage-muted); font-size: var(--text-sm); line-height: 1.45; }
+
+.imp-rep-plan__fine { font-size: var(--text-xs); }
+.imp-rep-plan__time { display: inline-flex; align-items: center; gap: var(--space-1); color: var(--pilo-accent); font-weight: 700; }
+
+.imp-rep-plan__list {
+  display: grid;
+  gap: var(--space-1);
+  margin: 0;
+  padding-left: var(--space-5);
+  font-size: var(--text-sm);
+  font-weight: 700;
+}
+
+.imp-rep-plan__list li::marker { color: var(--pilo-accent); }
+.imp-rep-plan__list small { color: var(--pilo-stage-muted); font-weight: 500; }
+
+.imp-rep-plan__warn {
+  margin: 0;
+  padding: var(--space-2) var(--space-3);
+  color: var(--status-pending);
+  background: var(--status-pending-soft);
+  border-radius: var(--radius-xs);
+  font-size: var(--text-sm);
+}
+
+.imp-rep-plan .imp-rep-plan__warn { color: var(--pilo-stage-ink); }
+
+.imp-rep-go {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  min-height: 44px;
+}
+
+.imp-rep-empty,
+.imp-rep-waiting {
+  margin: 0;
+  padding: var(--space-6);
+  color: var(--ink-secondary);
+  text-align: center;
+  background: var(--surface-2);
+  border-radius: var(--radius-md);
+}
+
+/* Informes guardados */
+.imp-rep-saved { display: grid; gap: var(--space-2); min-width: 0; }
+.imp-rep-saved h3 { margin: 0; color: var(--ink); font-size: var(--text-base); }
+
+.imp-rep-saved ul {
+  display: grid;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+}
+
+.imp-rep-saved li {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: var(--space-1);
+  padding: var(--space-1) var(--space-2);
+}
+
+.imp-rep-saved li + li { border-top: 1px solid var(--line); }
+
+.imp-rep-saved__open {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: var(--space-2);
+  min-height: 44px;
+  padding: 0 var(--space-2);
+  color: var(--ink-secondary);
+  text-align: left;
+  background: none;
+  border: 0;
+  border-radius: var(--radius-xs);
+  font: inherit;
+  cursor: pointer;
+}
+
+.imp-rep-saved__open span { display: grid; min-width: 0; }
+.imp-rep-saved__open strong { overflow: hidden; color: var(--ink); font-size: var(--text-sm); text-overflow: ellipsis; white-space: nowrap; }
+.imp-rep-saved__open small { color: var(--ink-muted); font-size: var(--text-xs); }
+.imp-rep-saved__open:hover { background: var(--surface-2); }
+
+.imp-rep-icon {
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  color: var(--ink-secondary);
+  background: none;
+  border: 0;
+  border-radius: var(--radius-pill);
+  cursor: pointer;
+}
+
+.imp-rep-icon:hover { color: var(--ink); background: var(--surface-2); }
+
+/* --- El resultado ------------------------------------------------------------------------ */
+
+.imp-rep-result { display: grid; gap: var(--space-4); }
+
+/* La barra del resultado se queda arriba mientras se lee la hoja: el estado y las acciones, siempre a la vista. */
+.imp-rep-bar {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3) var(--space-5);
+  padding: var(--space-3) var(--space-4);
+  color: var(--pilo-stage-ink);
+  background: var(--pilo-stage);
+  border-radius: var(--radius-md);
+}
+
+.imp-rep-bar__status {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: var(--space-3);
+  min-width: 0;
+}
+
+.imp-rep-bar__status div { display: grid; gap: 2px; }
+.imp-rep-bar__status strong { font-size: var(--text-base); }
+.imp-rep-bar__status span { color: var(--pilo-stage-muted); font-size: var(--text-sm); }
+
+.imp-rep-bar__actions { display: flex; flex-wrap: wrap; gap: var(--space-2); }
+
+.imp-rep-bar__actions > * {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.imp-rep-pdf { text-decoration: none; }
+.imp-rep-pdf[aria-disabled] { cursor: not-allowed; opacity: 0.55; }
+
+.imp-rep-steps {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(12rem, 1fr));
+  gap: var(--space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.imp-rep-steps li {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: 2px var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  background: var(--surface-2);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+}
+
+.imp-rep-steps__dot {
+  grid-row: span 2;
+  width: 10px;
+  height: 10px;
+  background: var(--ink-muted);
+  border-radius: 50%;
+}
+
+.imp-rep-steps li[data-state="escribe"] .imp-rep-steps__dot { background: var(--status-active); animation: imp-rep-pulse 1.2s ease-in-out infinite; }
+.imp-rep-steps li[data-state="listo"] .imp-rep-steps__dot { background: var(--status-done); }
+.imp-rep-steps li[data-state="error"] { background: var(--status-risk-soft); }
+.imp-rep-steps li[data-state="error"] .imp-rep-steps__dot { background: var(--status-risk); }
+
+.imp-rep-steps__name { overflow: hidden; color: var(--ink); font-size: var(--text-sm); font-weight: 700; text-overflow: ellipsis; white-space: nowrap; }
+.imp-rep-steps small { color: var(--ink-muted); font-size: var(--text-xs); }
+.imp-rep-steps__error { grid-column: 1 / -1; color: var(--status-risk); font-size: var(--text-xs); line-height: 1.4; }
+
+.imp-rep-steps__retry {
+  grid-column: 1 / -1;
+  justify-self: start;
+  min-height: 32px;
+  padding: 0 var(--space-3);
+  color: var(--ink);
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-pill);
+  font: inherit;
+  font-size: var(--text-xs);
+  font-weight: 700;
+  cursor: pointer;
+}
+
+@keyframes imp-rep-pulse {
+  50% { opacity: 0.35; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .imp-rep-steps li[data-state="escribe"] .imp-rep-steps__dot { animation: none; }
+  .imp-rep-trigger { transition: none; }
+}
+
+/* La mesa donde se ve la hoja. */
+.imp-rep-sheet {
+  padding: var(--space-5);
+  overflow-x: auto;
+  background: var(--surface-2);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+}
+
+.imp-rep-notice {
+  display: grid;
+  place-items: center;
+  min-height: 60vh;
+  padding: var(--space-6);
+  color: var(--ink-secondary);
+  text-align: center;
+}
+
+/* La barra de acción de las pantallas estrechas (en las anchas, el botón va en el plan). */
+.imp-rep-footer { display: none; }
+
+@media (max-width: 900px), (max-height: 680px) {
+  .imp-rep-form { grid-template-columns: minmax(0, 1fr); }
+  .imp-rep-plan { position: static; }
+  .imp-rep-plan .imp-rep-go { display: none; }
+  .imp-rep-cards { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+
+  .imp-rep-footer {
+    position: sticky;
+    bottom: 0;
+    z-index: 2;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-2) var(--space-3);
+    padding: var(--space-3) 0;
+    color: var(--ink-secondary);
+    background: var(--surface);
+    border-top: 1px solid var(--line);
+    font-size: var(--text-sm);
+    font-weight: 700;
+  }
+}
+
+@media (max-width: 560px) {
+  .imp-rep-row { grid-template-columns: minmax(0, 1fr); }
+  .imp-rep-sheet { padding: var(--space-2); }
+  .imp-rep-footer .imp-rep-go { flex: 1 1 100%; }
+  .imp-rep-bar { gap: var(--space-2); padding: var(--space-2) var(--space-3); }
+  .imp-rep-bar__status > :first-child { width: 32px; height: 32px; }
+  .imp-rep-bar__status span { display: none; }
+  .imp-rep-bar__actions { flex-wrap: nowrap; width: 100%; }
+  .imp-rep-bar__actions > * { flex: 1 1 0; justify-content: center; min-height: 40px; padding-inline: var(--space-3); white-space: nowrap; }
+  .imp-rep-paper { padding: 8mm 6mm 10mm; }
+  .imp-rep-bars li { grid-template-columns: minmax(0, 1fr) 28mm 16mm; gap: 2mm; }
+  .imp-rep-paper .bol-analysis__card { grid-template-columns: minmax(0, 1fr); gap: 2mm; }
+  .imp-rep-paper .bol-analysis__keys dd b { font-size: 4.6mm; white-space: nowrap; }
+}
+
+/* --- El papel ---------------------------------------------------------------------------- */
+
+/* La hoja de la ventana: papel blanco (como el boletín, no cambia con el tema). */
+.imp-rep-paper {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 4mm;
+  max-width: 210mm;
+  margin: 0 auto;
+  padding: 14mm 16mm 16mm;
+  background: #ffffff;
+  border-radius: 1mm;
+  box-shadow: 0 1px 2px rgba(10, 34, 73, 0.1), 0 12px 32px rgba(10, 34, 73, 0.14);
+}
+
+.imp-rep-paper__cover {
+  display: grid;
+  gap: 1.5mm;
+  padding-bottom: 5mm;
+  border-bottom: 0.8mm solid var(--bol-navy);
+}
+
+.imp-rep-paper__cover img { width: 46mm; height: auto; margin-bottom: 3mm; }
+
+.imp-rep-paper__cover h1 {
+  margin: 0;
+  color: var(--bol-navy);
+  font-size: 9mm;
+  font-weight: 800;
+  line-height: 1.08;
+  letter-spacing: -0.02em;
+  text-wrap: balance;
+}
+
+.imp-rep-paper__cover > p:last-child { color: var(--bol-ink-2); font-size: 3.4mm; font-weight: 600; }
+
+/* La ficha del informe usa un párrafo (no un enlace) como título: arriba, como en el boletín. */
+.bol-analysis__card > p.bol-summary__report { align-self: start; }
+
+.imp-rep-paper__block + .imp-rep-paper__block:has(> .imp-rep-opener),
+.imp-rep-paper__block + .imp-rep-paper__block:has(> .bol-analysis__head) { margin-top: 6mm; }
+
+/* La gráfica de avance: una barra por indicador, con las marcas del 70 % y del 100 %. */
+.imp-rep-bars {
+  display: grid;
+  gap: 2mm;
+  margin: 0;
+  padding: 3mm 0;
+}
+
+.imp-rep-bars figcaption { display: grid; gap: 0.4mm; color: var(--bol-navy); font-size: 3mm; line-height: 1.3; }
+.imp-rep-bars figcaption small { color: var(--bol-ink-3); font-size: 2.5mm; font-weight: 600; }
+
+.imp-rep-bars ul {
+  display: grid;
+  gap: 1.4mm;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.imp-rep-bars li {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 52mm 20mm;
+  align-items: center;
+  gap: 3mm;
+  font-size: 2.7mm;
+  line-height: 1.3;
+}
+
+.imp-rep-bars__name { overflow: hidden; color: var(--bol-ink-2); text-overflow: ellipsis; white-space: nowrap; }
+.imp-rep-bars__name b { color: var(--bol-ink); }
+
+.imp-rep-bars__track {
+  position: relative;
+  height: 2.6mm;
+  background: var(--bol-paper-2);
+  border-radius: 1.3mm;
+}
+
+.imp-rep-bars__track i {
+  position: absolute;
+  inset: 0 auto 0 0;
+  background: var(--bar, var(--bol-band));
+  border-radius: 1.3mm;
+}
+
+.imp-rep-bars__track em {
+  position: absolute;
+  top: -0.8mm;
+  bottom: -0.8mm;
+  width: 0.3mm;
+  background: var(--bol-ink-3);
+}
+
+.imp-rep-bars__value { color: var(--bol-ink); font-weight: 800; white-space: nowrap; }
+
+.imp-rep-bars li[data-standing="cumplida"] { --bar: var(--bol-s3); }
+.imp-rep-bars li[data-standing="en_camino"] { --bar: var(--bol-band); }
+.imp-rep-bars li[data-standing="rezagada"] { --bar: var(--bol-line-6); }
+.imp-rep-bars li[data-standing="rezagada"] .imp-rep-bars__value { color: var(--bol-line-6); }
+.imp-rep-bars li[data-standing="sin_cifra"] .imp-rep-bars__value,
+.imp-rep-bars li[data-standing="sin_meta"] .imp-rep-bars__value { color: var(--bol-ink-3); font-weight: 600; }
+
+/* Las cifras para revisar: solo en la ventana. */
+.imp-rep-review {
+  margin: 0;
+  padding: 2mm 3mm;
+  color: var(--bol-ink);
+  background: var(--bol-paper-2);
+  border-left: 0.8mm solid var(--bol-accent);
+  font-size: 2.9mm;
+  line-height: 1.45;
+}
+
+@media print {
+  .imp-rep-review { display: none; }
+}

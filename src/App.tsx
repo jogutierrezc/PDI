@@ -83,6 +83,9 @@ const IntranetBulletinPage = lazy(() =>
 const ImpactoAdmin = lazy(() =>
   import("./modules/impacto/ImpactoAdmin").then((m) => ({ default: m.ImpactoAdmin })),
 );
+const ImpactReportPrint = lazy(() =>
+  import("./modules/impacto/informe/ReportPrintPage").then((m) => ({ default: m.ReportPrintPage })),
+);
 const BoardsAdmin = lazy(() =>
   import("./modules/tableros/BoardsAdmin").then((m) => ({ default: m.BoardsAdmin })),
 );
@@ -358,6 +361,15 @@ export default function App() {
             element={
               <RequireRole minimum="consulta" screen="impacto">
                 <ImpactoAdmin />
+              </RequireRole>
+            }
+          />
+          {/* Informe de Impacto con Mr. Pilo: el documento solo, en páginas carta, para imprimirlo. */}
+          <Route
+            path="/admin/impacto-informe/:id"
+            element={
+              <RequireRole minimum="consulta" screen="impacto">
+                <ImpactReportPrint />
               </RequireRole>
             }
           />

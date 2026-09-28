@@ -75,7 +75,7 @@ function useLightTheme() {
   }, []);
 }
 
-function Shell({ title, back, status, children }: { title: string; back: { to: string; label: string }; status: ReactNode; children: (onReady: (n: number) => void) => ReactNode }) {
+export function Shell({ title, back, status, children }: { title: string; back: { to: string; label: string }; status: ReactNode; children: (onReady: (n: number) => void) => ReactNode }) {
   const [pages, setPages] = useState(0);
   useLightTheme();
   useEffect(() => {
@@ -249,7 +249,7 @@ function Running({ label, cut }: { label: string; cut: number | null }) {
   );
 }
 
-const Rule = () => (
+export const Rule = () => (
   <div className="ibol-rule" aria-hidden="true">
     {FUNCTIONS.map((f) => (
       <span key={f} style={{ background: FUNCTION_TONE[f] }} />
@@ -257,7 +257,7 @@ const Rule = () => (
   </div>
 );
 
-function Footer({ page, total }: { page: number; total: number }) {
+export function Footer({ page, total }: { page: number; total: number }) {
   return (
     <footer className="ibol-footer">
       <Rule />

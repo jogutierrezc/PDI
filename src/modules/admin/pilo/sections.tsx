@@ -3,7 +3,8 @@
 
    Conexión      el servicio de texto, su clave y la prueba.
    Voz           la voz avanzada (Free.ai u otro) o la del navegador.
-   Dónde aparece las cuatro funciones y la tabla portal por portal.
+   Dónde aparece las cuatro funciones, la tabla portal por portal y a quién
+                 más se abren los informes de Impacto (0100).
    Uso           los topes, el uso de hoy y la bitácora de pedidos.
 
    Todo lo que se toca aquí espera a «Guardar cambios»; las claves no, se
@@ -19,6 +20,7 @@ import { speak } from "../../../components/pilo/voice";
 import { sayWithPilo } from "../../../components/pilo/ai/client";
 import { PORTAL_LABEL } from "../../../components/pilo/ai/config";
 import type { Fn, Portal, PortalRule } from "../../../components/pilo/ai/config";
+import type { ReportKind } from "../../../components/pilo/ai/logic";
 import { PROVIDERS, usePiloLog } from "./store";
 import type { KeyStatus, PiloSettings, Provider } from "./store";
 import { Group, KeyField, StatusMark, Switch } from "./ui";
@@ -340,7 +342,55 @@ export function PortalsSection({ ed }: { ed: EditorApi }) {
         </div>
         <p className="pis-warn">«Público» gasta cupo con cada visitante. Conviene empezar con «Solo administración», revisar la bitácora una semana y abrir portal por portal.</p>
       </Group>
+
+      <ReportsGroup ed={ed} />
     </>
+  );
+}
+
+/* --- Informes de Impacto (0100) --------------------------------------------------------------- */
+
+const REPORT_ACTORS: { id: ReportKind; name: string; desc: string }[] = [
+  { id: "programa", name: "Programas", desc: "La dirección y el equipo de cada programa, sobre su programa (y la decanatura, sobre los de su facultad)." },
+  { id: "facultad", name: "Decanaturas", desc: "Cada decanatura, sobre su facultad: sus programas lado a lado, función por función." },
+  { id: "vicerrectoria", name: "Vicerrectorías", desc: "Cada vicerrectoría u oficina, sobre su función en toda la universidad y por facultad." },
+];
+
+/**
+ * Quién más, además de la administración, pide el «Informe con Pilo» en
+ * Indicadores de Impacto. Cada quien solo sobre su unidad: lo decide la base.
+ */
+function ReportsGroup({ ed }: { ed: EditorApi }) {
+  const { s, set } = ed;
+  const opened = REPORT_ACTORS.filter((a) => s.impacto_report[a.id]).length;
+  return (
+    <Group title="Informes de Impacto con Pilo" aside={<small>{opened ? `Abiertos a ${opened} de 3` : "Solo la administración"}</small>}>
+      <p className="pis-small">
+        El botón «Informe con Pilo» de Indicadores de Impacto escribe el informe de un programa, una facultad o una vicerrectoría. La administración siempre lo
+        tiene; aquí se abre a los demás, cada quien sobre las unidades a las que pertenece. Cada informe gasta una llamada por capítulo y una por el cierre.
+      </p>
+      <ul className="pis-fns">
+        {REPORT_ACTORS.map((a) => (
+          <li key={a.id} className="pis-fn" data-on={s.impacto_report[a.id] || undefined}>
+            <span className="pis-fn__icon" aria-hidden="true">
+              {a.name.slice(0, 2)}
+            </span>
+            <span className="pis-fn__text">
+              <strong>{a.name}</strong>
+              <small>{a.desc}</small>
+            </span>
+            <Switch
+              on={s.impacto_report[a.id]}
+              disabled={s.needs0100}
+              onChange={(v) => set("impacto_report", { ...s.impacto_report, [a.id]: v })}
+              label={`Abrir los informes de Impacto a ${a.name.toLowerCase()}`}
+            />
+          </li>
+        ))}
+      </ul>
+      {s.needs0100 && <p className="pis-warn">Falta aplicar la migración 0100 en la base para abrir los informes a los demás.</p>}
+      {!s.enabled && <p className="pis-warn">Mr. Pilo con IA está apagado: nadie puede escribir informes hasta encenderlo.</p>}
+    </Group>
   );
 }
 

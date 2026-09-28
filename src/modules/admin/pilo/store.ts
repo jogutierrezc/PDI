@@ -11,6 +11,7 @@ import { supabase } from "../../../lib/supabase";
 import { describeDatabaseError } from "../../../data/errors";
 import type { DatabaseError } from "../../../data/errors";
 import type { Fn, Portal, PortalRule } from "../../../components/pilo/ai/config";
+import type { ReportKind } from "../../../components/pilo/ai/logic";
 import type { MemorySource } from "./memory";
 
 export type Provider = "mistral" | "freeai" | "nvidia" | "otro";
@@ -40,6 +41,10 @@ export interface PiloSettings {
   memory_sources: Record<MemorySource, boolean>;
   pregunta_welcome: boolean;
   memory_indexed_at?: string | null;
+  /** Informes de Impacto con Pilo (0100): a quién más, además de la administración, se abren. */
+  impacto_report: Record<ReportKind, boolean>;
+  /** La base aún no tiene la migración 0100 (informes de Impacto). */
+  needs0100?: boolean;
   /** La base aún no tiene la migración 0090 (Mistral y voz aparte). */
   needs0090?: boolean;
   /** La base aún no tiene la migración 0094 (Pregúntele a Pilo). */
@@ -93,6 +98,11 @@ export function normalizeSettings(raw: Record<string, unknown>): PiloSettings {
     memory_sources: { ...ALL_SOURCES, ...((raw.memory_sources as Partial<Record<MemorySource, boolean>>) ?? {}) },
     pregunta_welcome: raw.pregunta_welcome === undefined ? true : Boolean(raw.pregunta_welcome),
     memory_indexed_at: (raw.memory_indexed_at as string | null | undefined) ?? null,
+    impacto_report: (() => {
+      const r = (raw.impacto_report ?? {}) as Partial<Record<ReportKind, unknown>>;
+      return { programa: r.programa === true, facultad: r.facultad === true, vicerrectoria: r.vicerrectoria === true };
+    })(),
+    needs0100: !("impacto_report" in raw),
     needs0090: !("provider" in raw),
     needs0094: !("memory_sources" in raw),
   };
@@ -194,12 +204,14 @@ export function useSavePiloSettings() {
   const client = useQueryClient();
   return useMutation({
     mutationFn: async (settings: PiloSettings) => {
-      const { updated_at: _ignored, needs0090, needs0094, memory_indexed_at: _indexed, ...all } = settings;
+      const { updated_at: _ignored, needs0090, needs0094, needs0100, memory_indexed_at: _indexed, ...all } = settings;
       // Sin 0090 no existen las columnas nuevas: no se mandan.
       const rest: Record<string, unknown> = { ...all };
       if (needs0090) for (const k of ["provider", "speech_provider", "speech_base_url"]) delete rest[k];
       // Sin 0094, tampoco las de Pregúntele a Pilo.
       if (needs0094) for (const k of ["memory_sources", "pregunta_welcome"]) delete rest[k];
+      // Sin 0100, tampoco el interruptor de los informes de Impacto.
+      if (needs0100) delete rest.impacto_report;
       const { data: user } = await supabase.auth.getUser();
       const { error } = await supabase
         .from("pilo_ai_settings")

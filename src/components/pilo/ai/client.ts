@@ -8,7 +8,7 @@
 
 import { supabase, readFunctionError } from "../../../lib/supabase";
 import { speak, stopSpeaking } from "../voice";
-import type { Answer, Mesh, NeedAnswer, NeedInput, Section } from "./logic";
+import type { AnalysisBrief, AnalysisPart, Answer, Mesh, NeedAnswer, NeedInput, ReportKind, Section } from "./logic";
 import type { Portal } from "./config";
 
 export type { Answer };
@@ -105,6 +105,44 @@ export async function interpretNeed(need: NeedInput): Promise<NeedAnswer & { cac
   });
   if (error) throw await failure(error);
   return data as NeedAnswer & { cached?: boolean };
+}
+
+/* --- Análisis de los datos (boletines de UDES en Cifras) ------------------------------- */
+
+export interface AnalysisResult extends AnalysisPart {
+  /** Números del texto que no están en las cifras: quedan para revisar. */
+  unknown: string[];
+  verified: boolean;
+  model: string;
+  /** La IA llegó al tope de palabras: el final puede quedar corto. */
+  truncated?: boolean;
+  cached?: boolean;
+}
+
+/**
+ * Escribe un capítulo (o el cierre) con las cifras ya calculadas. Por defecto,
+ * para los boletines de UDES en Cifras; los informes de Impacto mandan
+ * `portal: "impacto"`, el nombre del documento y la unidad (`scope`).
+ */
+export async function analyzePart(
+  input: {
+    brief: AnalysisBrief;
+    part: "capitulo" | "cierre";
+    title: string;
+    facts: string;
+    pdi: boolean;
+    /** Sin lo guardado: para «Volver a escribir». */
+    fresh?: boolean;
+    doc?: string;
+    scope?: { kind: ReportKind; ref: string; campus: string | null };
+  },
+  portal: "cifras" | "impacto" = "cifras",
+): Promise<AnalysisResult> {
+  const { data, error } = await supabase.functions.invoke<AnalysisResult>("pilo-ia", {
+    body: { action: "analizar", portal, analysis: input },
+  });
+  if (error) throw await failure(error);
+  return data as AnalysisResult;
 }
 
 export async function testPilo(): Promise<{ ok: boolean; ms?: number; error?: string }> {

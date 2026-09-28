@@ -43,6 +43,7 @@ export function parseSection(value: string | null | undefined): SectionId {
 const SECTION_FIELDS: Partial<Record<SectionId, (keyof PiloSettings)[]>> = {
   conexion: ["provider", "base_url", "chat_path", "text_model"],
   voz: ["voice_engine", "speech_provider", "speech_base_url", "speech_path", "speech_model", "speech_voice", "voice_rate", "voice_pitch"],
+  portales: ["impacto_report"],
   memoria: ["memory_sources"],
   uso: ["daily_limit", "max_rows", "cache_days"],
 };

@@ -337,7 +337,7 @@ export function BulletinDocument({ catalog, settings, report, fitWidth, onReady 
   const cut = settings.cut === ALL_YEARS ? `Periodo ${cutLabel(ALL_YEARS, null)}` : `Corte ${settings.cut}`;
   const campusName = catalog.campuses.find((c) => c.id === settings.campus)?.name;
   const edition = [
-    settings.format === "ejecutivo" ? "Resumen ejecutivo" : null,
+    settings.format === "ejecutivo" ? "Resumen ejecutivo" : settings.format === "analisis" ? "Análisis de los datos" : null,
     report ? report.name : null,
     catalog.period?.label ? `Periodo ${catalog.period.label}` : null,
     settings.cut === ALL_YEARS ? null : `Corte ${settings.cut}`,
@@ -430,7 +430,7 @@ export function BulletinDocument({ catalog, settings, report, fitWidth, onReady 
             </ContentPage>
           ))}
 
-          {chapters.length === 0 && (
+          {chapters.length === 0 && settings.format !== "analisis" && (
             <ContentPage texts={texts} images={settings.images} tabs={[]} number={firstSheetPage} total={total} chapter="" cut={cut}>
               <p className="bol-empty">No hay cifras que mostrar con este contenido. Revisa qué informes e indicadores están incluidos.</p>
             </ContentPage>

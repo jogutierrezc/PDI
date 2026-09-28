@@ -41,8 +41,10 @@ import type { DeiPlacement } from "../../../boletin/model";
 import type { BulletinFont, BulletinFormat, BulletinSettings, EditionAlign, HeaderBadge, HeaderTint, IndicatorShow } from "../../../boletin/model";
 import type { StationProps } from "../OdAdmin";
 import { ConfirmButton, Panel, SaveState, StageEmpty } from "../ui";
+import { AnalysisTab } from "./AnalysisTab";
+import { analysisIndicators } from "../../../boletin/analysis";
 
-type Tab = "plantilla" | "contenido" | "publicacion";
+type Tab = "analisis" | "plantilla" | "contenido" | "publicacion";
 
 const SHOW_LABEL: Record<keyof IndicatorShow, string> = { evolution: "Evolución", campus: "Por campus", table: "Tabla", notes: "Notas" };
 
@@ -77,15 +79,27 @@ export function BulletinStation({ data, report, periodId }: StationProps) {
 
   const create = (target: Report | null, format: BulletinFormat = "completo") => {
     const slug = bulletinSlug(target?.slug ?? null, format);
-    const base = format === "ejecutivo" ? "Resumen ejecutivo UDES en Cifras" : "Boletín UDES en Cifras";
+    const base = format === "ejecutivo" ? "Resumen ejecutivo UDES en Cifras" : format === "analisis" ? "Análisis de los datos" : "Boletín UDES en Cifras";
     const title = target ? `${base} · ${target.name}` : base;
+    const settings = normalizeSettings({ format }, catalog, target?.slug ?? null);
+    // Un análisis empieza leyendo tres informes con cifras; el resto se suma en «Fuentes».
+    if (format === "analisis") {
+      let picked = 0;
+      settings.reports = settings.reports.map((entry) => {
+        const report = catalog.reports.find((r) => r.slug === entry.slug);
+        const readable = report ? analysisIndicators(report, entry, catalog, 1).length > 0 : false;
+        const include = readable && picked < 3;
+        if (include) picked += 1;
+        return { ...entry, include };
+      });
+    }
     save.mutate(
       {
         period_id: periodId,
         report_id: target?.uuid ?? null,
         slug,
         title,
-        settings: normalizeSettings({ format }, catalog, target?.slug ?? null) as unknown as Record<string, unknown>,
+        settings: settings as unknown as Record<string, unknown>,
       },
       { onSuccess: (row) => setSelectedId((row as OdBulletinRow).id) },
     );
@@ -110,6 +124,11 @@ export function BulletinStation({ data, report, periodId }: StationProps) {
             {!executive && canEditPeriod() && (
               <button type="button" className="button-secondary" disabled={save.isPending || bundle.isPending} onClick={() => create(null, "ejecutivo")}>
                 <Icon name="plus" size={15} /> Crear resumen ejecutivo
+              </button>
+            )}
+            {canEditPeriod() && (
+              <button type="button" className="button-secondary oda-new-analysis" disabled={save.isPending || bundle.isPending} onClick={() => create(null, "analisis")}>
+                <Icon name="spark" size={15} /> Nuevo análisis con Mr. Pilo
               </button>
             )}
             {report && !reportHasBulletin && canEditReport(report.slug) && (
@@ -143,7 +162,7 @@ export function BulletinStation({ data, report, periodId }: StationProps) {
                     <span className="oda-bulletin__name">
                       {b.title}
                       <small>
-                        {r ? `Informe ${r.name}` : "Global"} · {b.status === "publicado" ? "en vivo en el portal" : "borrador"} · {editions.length}{" "}
+                        {r ? `Informe ${r.name}` : (b.settings as { format?: string } | null)?.format === "analisis" ? "Análisis con Mr. Pilo" : "Global"} · {b.status === "publicado" ? "en vivo en el portal" : "borrador"} · {editions.length}{" "}
                         {editions.length === 1 ? "edición" : "ediciones"}
                       </small>
                     </span>
@@ -200,7 +219,8 @@ function BulletinEditor({
   const initial = useMemo(() => normalizeSettings(row.settings, catalog, report?.slug ?? null), [row.settings, catalog, report?.slug]);
   const [draft, setDraft] = useState<BulletinSettings>(initial);
   const [title, setTitle] = useState(row.title);
-  const [tab, setTab] = useState<Tab>("contenido");
+  const isAnalysis = initial.format === "analisis";
+  const [tab, setTab] = useState<Tab>(isAnalysis ? "analisis" : "contenido");
   const save = useSaveBulletin();
   const dirty = title !== row.title || JSON.stringify(draft) !== JSON.stringify(initial);
 
@@ -217,6 +237,9 @@ function BulletinEditor({
 
   const persist = () =>
     save.mutate({ id: row.id, period_id: row.period_id, title: title.trim() || row.title, settings: draft as unknown as Record<string, unknown> });
+  /** Al terminar de escribir, el análisis queda guardado (la IA no se vuelve a pagar por un descuido). */
+  const persistWith = (settings: BulletinSettings) =>
+    save.mutate({ id: row.id, period_id: row.period_id, title: title.trim() || row.title, settings: settings as unknown as Record<string, unknown> });
 
   const preview = useRef<HTMLDivElement>(null);
   const previewWidth = useWidth(preview, 360);
@@ -229,9 +252,11 @@ function BulletinEditor({
           id="oda-boletin"
           title={row.title}
           description={
-            report
-              ? `Boletín del informe ${report.name}.`
-              : "Boletín global: un capítulo por cada informe incluido que tenga cifras."
+            isAnalysis
+              ? "Análisis de los datos: Mr. Pilo escribe un capítulo por informe con sus cifras y un cierre. Se revisa, se ajusta y se publica como los demás boletines."
+              : report
+                ? `Boletín del informe ${report.name}.`
+                : "Boletín global: un capítulo por cada informe incluido que tenga cifras."
           }
           actions={
             <>
@@ -257,11 +282,17 @@ function BulletinEditor({
         >
           <div className="oda-tabs" role="tablist" aria-label="Partes del boletín">
             {(
-              [
-                ["contenido", "Contenido"],
-                ["plantilla", "Plantilla"],
-                ["publicacion", "Publicación"],
-              ] as [Tab, string][]
+              (isAnalysis
+                ? [
+                    ["analisis", "Análisis con Pilo"],
+                    ["plantilla", "Plantilla"],
+                    ["publicacion", "Publicación"],
+                  ]
+                : [
+                    ["contenido", "Contenido"],
+                    ["plantilla", "Plantilla"],
+                    ["publicacion", "Publicación"],
+                  ]) as [Tab, string][]
             ).map(([id, label]) => (
               <button key={id} type="button" role="tab" aria-selected={tab === id} className="oda-tab" onClick={() => setTab(id)}>
                 {label}
@@ -269,6 +300,7 @@ function BulletinEditor({
             ))}
           </div>
 
+          {tab === "analisis" && <AnalysisTab catalog={catalog} draft={draft} setDraft={setDraft} canEdit={canEdit} onWritten={persistWith} />}
           <fieldset className="oda-bulletin-fields" disabled={!canEdit}>
             {tab === "plantilla" && (
               <TemplateTab row={row} title={title} setTitle={setTitle} draft={draft} setDraft={setDraft} />

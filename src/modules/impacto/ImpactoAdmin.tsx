@@ -18,6 +18,10 @@
      Importar            la plantilla de Excel para cargar cifras
      + Mr. Pilo Bot      alertas, propuestas de los programas y uso de las fichas
 
+   En la cabecera, «Informe con Pilo» (informe/): el informe escrito de un
+   programa, una facultad o una vicerrectoría. De la administración, salvo que
+   ella lo abra a los demás en Mr. Pilo con IA.
+
    Administración y Planeación sin unidad: todo lo anterior, más el
    diccionario del motor, los ajustes de Mr. Pilo y (administración) la
    sincronización con la hoja anterior.
@@ -48,6 +52,7 @@ import { PiloBot } from "./pilo/PiloBot";
 import { PiloCurator } from "./pilo/PiloCurator";
 import { PiloSettings } from "./pilo/PiloSettings";
 import { SyncPanel } from "./sync/SyncPanel";
+import { ReportButton } from "./informe/ReportButton";
 import { useTour } from "../../components/tour/TourProvider";
 import { intranetTourFor } from "../../components/tour/tours";
 import "../admin/udes-en-cifras/od-admin.css";
@@ -240,11 +245,15 @@ export function ImpactoAdmin() {
     </button>
   ) : null;
 
+  // «Informe con Pilo»: de la administración, o de quien ella se lo abra (0100).
+  const report = access && base.data && !base.data.missing ? <ReportButton base={base.data} admin={access.admin} /> : null;
+
   const actions =
-    picker || pilo || tour ? (
+    picker || pilo || tour || report ? (
       <>
         {picker}
         {tour}
+        {report}
         {pilo}
       </>
     ) : undefined;

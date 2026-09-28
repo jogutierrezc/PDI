@@ -475,7 +475,7 @@
   gap: 3mm;
   max-width: 70ch;
   text-align: justify;
-  hyphens: auto;
+  hyphens: manual;
   font-size: 3.7mm;
   line-height: 1.55;
 }
@@ -2557,4 +2557,335 @@
   margin: 3mm 0 0;
   color: #6f7d90;
   font-size: 2.2mm;
+}
+
+/* --- Análisis de los datos (analysis-sheets.tsx) -------------------------------------
+   El texto de Mr. Pilo en el papel del boletín: justificado y sin guiones que
+   corten palabras, con las cifras en negrita y las citas en voladita; fichas
+   de hallazgos con sus cifras clave; gráficas compactas y fuentes al pie. */
+
+.bol-analysis__kicker {
+  margin: 0 0 1mm;
+  color: var(--bol-ink-3);
+  font-size: 2.7mm;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.bol-analysis__prose {
+  margin: 0;
+  color: var(--bol-ink);
+  font-size: 3.45mm;
+  line-height: 1.68;
+  text-align: justify;
+  text-justify: inter-word;
+  hyphens: manual;
+  overflow-wrap: normal;
+  word-break: normal;
+}
+
+.bol-analysis__fig {
+  color: var(--bol-navy);
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.bol-analysis__cite {
+  margin-left: 0.3mm;
+  color: var(--bol-band);
+  font-size: 0.62em;
+  font-weight: 800;
+  line-height: 0;
+  vertical-align: super;
+}
+
+/* Cifras clave: valor, unidad y variación leída según la dirección del indicador. */
+.bol-analysis__keys {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 3mm;
+  margin: 0;
+}
+
+.bol-analysis__keys > div {
+  display: grid;
+  align-content: start;
+  gap: 0.6mm;
+  padding: 2.6mm 3mm;
+  border: 0.25mm solid var(--bol-rule);
+  border-top: 0.8mm solid var(--line, var(--bol-band));
+  border-radius: 1.5mm;
+}
+
+.bol-analysis__keys dt {
+  color: var(--bol-ink-2);
+  font-size: 2.6mm;
+  font-weight: 700;
+  line-height: 1.25;
+}
+
+.bol-analysis__keys dd {
+  margin: 0;
+}
+
+.bol-analysis__keys dd b {
+  color: var(--bol-navy);
+  font-size: 5.6mm;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.02em;
+}
+
+.bol-analysis__keys dd small {
+  color: var(--bol-ink-3);
+  font-size: 2.6mm;
+  font-weight: 700;
+}
+
+.bol-analysis__delta {
+  color: var(--bol-ink-3);
+  font-size: 2.5mm;
+  font-weight: 700;
+}
+
+.bol-analysis__delta[data-reading="mejora"] {
+  color: #1d7a52;
+}
+
+.bol-analysis__delta[data-reading="empeora"] {
+  color: #b23a2b;
+}
+
+/* Hallazgos principales: una ficha por capítulo. */
+.bol-analysis__card {
+  display: grid;
+  grid-template-columns: 40mm minmax(0, 1fr);
+  gap: 5mm;
+  padding: 4mm 0;
+  border-bottom: 0.25mm solid var(--bol-rule);
+}
+
+.bol-analysis__card > a {
+  align-self: start;
+}
+
+.bol-analysis__card > div {
+  display: grid;
+  gap: 2.6mm;
+}
+
+.bol-analysis__finding {
+  margin: 0;
+  color: var(--bol-ink);
+  font-size: 3.4mm;
+  font-weight: 600;
+  line-height: 1.5;
+  text-align: justify;
+  hyphens: manual;
+}
+
+.bol-analysis__card .bol-analysis__keys dd b {
+  font-size: 4.6mm;
+}
+
+.bol-analysis__alert {
+  margin: 0;
+  padding: 2mm 3mm;
+  border-left: 0.8mm solid var(--bol-accent);
+  background: color-mix(in srgb, var(--bol-accent) 9%, #ffffff);
+  color: var(--bol-ink);
+  font-size: 3mm;
+  line-height: 1.45;
+}
+
+.bol-analysis__alert > b:first-child {
+  color: color-mix(in srgb, var(--bol-accent) 65%, #3a2000);
+}
+
+/* Alertas y recomendaciones del capítulo */
+.bol-analysis__callout {
+  display: grid;
+  gap: 1.5mm;
+  padding: 3.5mm 5mm;
+  border-left: 1.2mm solid var(--bol-band);
+  border-radius: 0 2mm 2mm 0;
+  background: color-mix(in srgb, var(--bol-band) 8%, #ffffff);
+}
+
+.bol-analysis__callout[data-tone="alerta"] {
+  border-left-color: var(--bol-accent);
+  background: color-mix(in srgb, var(--bol-accent) 10%, #ffffff);
+}
+
+.bol-analysis__callout h4,
+.bol-analysis__sources h4 {
+  margin: 0;
+  color: var(--bol-navy);
+  font-size: 3mm;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.bol-analysis__callout p,
+.bol-analysis__callout ol {
+  margin: 0;
+  color: var(--bol-ink);
+  font-size: 3.3mm;
+  line-height: 1.55;
+  text-align: justify;
+  hyphens: manual;
+}
+
+.bol-analysis__callout ol {
+  display: grid;
+  gap: 1.2mm;
+  padding-left: 5mm;
+  list-style: decimal;
+}
+
+.bol-analysis__callout ol li::marker {
+  color: var(--bol-band);
+  font-weight: 800;
+}
+
+/* Gráficas compactas: dos por fila */
+.bol-analysis__charts {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 5mm;
+  padding: 3mm 0;
+}
+
+.bol-analysis__charts figure {
+  display: grid;
+  gap: 1.5mm;
+  margin: 0;
+}
+
+.bol-analysis__charts figcaption {
+  color: var(--bol-navy);
+  font-size: 3mm;
+  line-height: 1.3;
+}
+
+.bol-analysis__charts figcaption small {
+  display: block;
+  color: var(--bol-ink-3);
+  font-size: 2.5mm;
+  font-weight: 600;
+}
+
+.bol-analysis__charts svg {
+  width: 100%;
+  height: auto;
+}
+
+.bol-analysis__legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1mm 3mm;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  color: var(--bol-ink-2);
+  font-size: 2.4mm;
+  font-weight: 600;
+}
+
+.bol-analysis__legend i {
+  display: inline-block;
+  width: 4mm;
+  height: 0.7mm;
+  margin-right: 1mm;
+  vertical-align: middle;
+}
+
+.bol-analysis__legend i[data-dashed] {
+  height: 0;
+  border-top: 0.6mm dashed currentColor;
+  background: none !important;
+}
+
+/* Fuentes citadas */
+.bol-analysis__sources {
+  display: grid;
+  gap: 1.5mm;
+  padding-top: 2.5mm;
+  border-top: 0.25mm solid var(--bol-rule);
+}
+
+.bol-analysis__sources ol {
+  display: grid;
+  gap: 0.8mm;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.bol-analysis__sources li {
+  display: grid;
+  grid-template-columns: 7mm minmax(0, 1fr);
+  color: var(--bol-ink-2);
+  font-size: 2.6mm;
+  line-height: 1.4;
+}
+
+.bol-analysis__sources li > span {
+  color: var(--bol-band);
+  font-weight: 800;
+}
+
+.bol-analysis__sources p {
+  margin: 0;
+}
+
+.bol-analysis__sources b {
+  color: var(--bol-ink);
+}
+
+.bol-analysis__sources--compact {
+  display: block;
+  margin: 0;
+  padding-top: 2mm;
+  color: var(--bol-ink-2);
+  font-size: 2.5mm;
+  line-height: 1.45;
+}
+
+/* Encabezado de cada parte (hallazgos, capítulos y cierre): el diseño de las
+   conclusiones. Título grande, subtítulo contenido y, si hay, sus cifras. */
+.bol-analysis__head {
+  display: grid;
+  gap: 3mm;
+  padding-bottom: 1mm;
+}
+
+.bol-analysis__head .bol-analysis__kicker {
+  margin: 0 0 -1.5mm;
+}
+
+.bol-analysis__head h2 {
+  margin: 0;
+  color: var(--bol-navy);
+  font-size: 8mm;
+  font-weight: 800;
+  line-height: 1.1;
+  letter-spacing: -0.02em;
+  text-wrap: balance;
+}
+
+.bol-analysis__subtitle {
+  margin: 0;
+  max-width: 150mm;
+  color: var(--bol-ink-2);
+  font-size: 3.6mm;
+  font-weight: 600;
+  line-height: 1.45;
+  text-wrap: pretty;
+}
+
+.bol-analysis__head .bol-analysis__keys {
+  margin-top: 1mm;
 }

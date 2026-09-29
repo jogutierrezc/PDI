@@ -153,6 +153,25 @@ export async function testPilo(): Promise<{ ok: boolean; ms?: number; error?: st
 
 /* --- Voz ------------------------------------------------------------------------ */
 
+/**
+ * La prueba de la configuración: pide la voz del servicio (con un estilo de
+ * NVIDIA, si se dice cuál) y devuelve el audio o por qué no sonó, sin caer en
+ * la del navegador.
+ */
+export async function cloneFishVoice(style: string): Promise<{ id: string; state: string }> {
+  const { data, error } = await supabase.functions.invoke<{ id: string; state: string }>("pilo-ia", { body: { action: "voz", portal: "prueba", clone: style } });
+  if (error) throw await failure(error);
+  return data as { id: string; state: string };
+}
+
+export async function probeVoice(text: string, style?: string): Promise<{ audio: Blob; ms: number } | { error: string }> {
+  const started = performance.now();
+  const { data, error } = await supabase.functions.invoke<Blob>("pilo-ia", { body: { action: "voz", portal: "prueba", text, style } });
+  if (error) return { error: (await failure(error)).message };
+  if (!(data instanceof Blob) || data.size === 0) return { error: "El servicio de voz no devolvió audio." };
+  return { audio: data, ms: Math.round(performance.now() - started) };
+}
+
 let audio: HTMLAudioElement | null = null;
 let token = 0;
 
@@ -167,16 +186,49 @@ export function stopPilo() {
  * Lee el texto y se cumple al terminar. Devuelve qué voz sonó; con otra
  * lectura de por medio (stopPilo), se cumple sin sonar.
  */
+/**
+ * El audio de la voz de IA, pedido una sola vez por texto: lo que se pidió por
+ * adelantado (prefetchPilo) se reutiliza al leer. null si el servicio no dio audio.
+ */
+const audios = new Map<string, Promise<Blob | null>>();
+function audioFor(text: string, portal: Portal, style?: string): Promise<Blob | null> {
+  const key = `${portal}|${style ?? ""}|${text}`;
+  const known = audios.get(key);
+  if (known) return known;
+  const asked = supabase.functions
+    .invoke<Blob>("pilo-ia", { body: { action: "voz", portal, text, style } })
+    .then(({ data, error }) => (!error && data instanceof Blob && data.size > 0 ? data : null))
+    .catch(() => null)
+    .then((blob) => {
+      // Lo que falló se puede volver a pedir más tarde.
+      if (!blob) audios.delete(key);
+      return blob;
+    });
+  audios.set(key, asked);
+  // Solo las últimas: una conversación larga no llena la memoria.
+  if (audios.size > 40) audios.delete(audios.keys().next().value as string);
+  return asked;
+}
+
+/**
+ * Pide por adelantado el audio de las frases que vienen, para que suenen sin
+ * pausas entre una y otra. Pocas a la vez: cada una gasta del cupo del servicio.
+ */
+export function prefetchPilo(texts: string[], options: { portal: Portal | null; advanced: boolean; style?: string }) {
+  if (!options.advanced || !options.portal) return;
+  for (const text of texts) if (text.trim()) void audioFor(text, options.portal, options.style);
+}
+
 export async function sayWithPilo(
   text: string,
-  options: { portal: Portal | null; advanced: boolean; rate?: number; pitch?: number },
+  options: { portal: Portal | null; advanced: boolean; rate?: number; pitch?: number; style?: string },
 ): Promise<"proveedor" | "navegador" | "cancelado"> {
   stopPilo();
   const mine = ++token;
   if (options.advanced && options.portal) {
-    const { data, error } = await supabase.functions.invoke<Blob>("pilo-ia", { body: { action: "voz", portal: options.portal, text } });
+    const data = await audioFor(text, options.portal, options.style);
     if (mine !== token) return "cancelado";
-    if (!error && data instanceof Blob && data.size > 0) {
+    if (data) {
       const url = URL.createObjectURL(data);
       const player = new Audio(url);
       player.playbackRate = options.rate ?? 1;

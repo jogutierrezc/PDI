@@ -21,7 +21,7 @@ import { useAuth } from "../../lib/auth";
 import { usePiloAiConfig } from "../../components/pilo/ai/config";
 import { canUse } from "../../components/pilo/ai/logic";
 import type { Role } from "../../components/pilo/ai/logic";
-import { askQuestion, rateAnswer, sayWithPilo, stopPilo } from "../../components/pilo/ai/client";
+import { askQuestion, prefetchPilo, rateAnswer, sayWithPilo, stopPilo } from "../../components/pilo/ai/client";
 import type { AskKind, AskResult, AskSource } from "../../components/pilo/ai/client";
 import { Pilo as PiloMoji } from "./Pilo";
 import type { MojiMood, PiloMojiHandle } from "./Pilo";
@@ -536,6 +536,12 @@ function TurnView({
   const readRun = useRef(0);
   const after = useRef<HTMLDivElement>(null);
 
+  const spoken = useMemo(() => parsed.sentences.map((x) => x.spoken), [parsed]);
+  // Con «Leer en voz alta», el audio de las primeras frases se pide mientras Pilo escribe.
+  useEffect(() => {
+    if (a && fresh && autoRead) prefetchPilo(spoken.slice(0, 2), { portal: "pregunta", advanced: voice.advanced });
+  }, [a, fresh, autoRead, spoken, voice.advanced]);
+
   /** Leer la respuesta frase por frase: la que suena se resalta y Pilo mueve el pico. */
   const read = async () => {
     if (reading !== null) {
@@ -550,7 +556,9 @@ function TurnView({
     for (let k = 0; k < parsed.sentences.length; k++) {
       if (mine !== readRun.current) return;
       setReading(k);
-      const used = await sayWithPilo(parsed.sentences[k].spoken, { portal: "pregunta", ...voice });
+      // Mientras suena esta frase, se piden las dos que siguen: así no hay pausas.
+      prefetchPilo(spoken.slice(k + 1, k + 3), { portal: "pregunta", advanced: voice.advanced });
+      const used = await sayWithPilo(spoken[k], { portal: "pregunta", ...voice });
       if (used === "cancelado") break;
     }
     if (mine === readRun.current) {

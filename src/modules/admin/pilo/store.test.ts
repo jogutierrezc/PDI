@@ -24,4 +24,14 @@ describe("la configuración de Mr. Pilo, venga como venga de la base", () => {
     const s = normalizeSettings({ provider: "freeai", speech_provider: "otro", voice_engine: "proveedor" });
     expect(s).toMatchObject({ provider: "freeai", speech_provider: "otro", voice_engine: "proveedor", needs0090: false });
   });
+
+  it("la voz de NVIDIA (0101): sin la migración, español y calidad media; con ella, lo guardado", () => {
+    const before = normalizeSettings({ provider: "nvidia" });
+    expect(before).toMatchObject({ needs0101: true, voice_language: "es-US", voice_quality: 20, voice_styles: [], voice_portal_styles: {} });
+    const style = { id: "cercano", name: "Cercano", path: "muestras/cercano.wav", seconds: 5 };
+    const after = normalizeSettings({ speech_provider: "nvidia", voice_styles: [style], voice_style: "cercano", voice_quality: 30, voice_portal_styles: { pregunta: "cercano" } });
+    expect(normalizeSettings({ speech_provider: "fishaudio", fish_model: "s1" })).toMatchObject({ speech_provider: "fishaudio", fish_model: "s1", needs0102: false });
+    expect(before).toMatchObject({ fish_model: "s2.1-pro-free", needs0102: true });
+    expect(after).toMatchObject({ needs0101: false, speech_provider: "nvidia", voice_styles: [style], voice_quality: 30, voice_portal_styles: { pregunta: "cercano" } });
+  });
 });

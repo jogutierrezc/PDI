@@ -183,7 +183,7 @@ function Editor({ initial }: { initial: PiloSettings }) {
   const set = <K extends keyof PiloSettings>(key: K, value: PiloSettings[K]) => setS((prev) => ({ ...prev, [key]: value }));
   const setPortal: EditorApi["setPortal"] = (id, patch) =>
     setS((prev) => ({ ...prev, portals: { ...prev.portals, [id]: { ...prev.portals[id], ...patch } } }));
-  const ed: EditorApi = { s, setS, set, setPortal, dirty, keys: keys.data };
+  const ed: EditorApi = { s, saved, setS, set, setPortal, dirty, keys: keys.data };
 
   const runTest = async () => {
     if (dirty) {

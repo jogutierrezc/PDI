@@ -22,6 +22,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { Icon } from "../../../components/ui/Icon";
+import type { Fn } from "../../../components/pilo/ai/config";
 import { MEMORY_SOURCES, useHideAnswer, useMemoryCounts, useMemoryInputs, useReplaceMemory, useSavedAnswers, useTryMemory } from "./memory";
 import type { MemorySource, ReplaceResult, SourceProblem } from "./memory";
 import { AudiencePicker } from "./sections";
@@ -35,6 +36,10 @@ import { revealList } from "./motion";
 export function PreguntaSection({ ed }: { ed: EditorApi }) {
   const { s, set, setPortal } = ed;
   const rule = s.portals.pregunta ?? { on: false, aud: "publico", fns: ["preguntar"] };
+  // «Leer» en Pregúntele a Pilo: las respuestas suenan con la voz de IA (la de Voz), no con la del navegador.
+  const speaks = rule.fns.includes("leer");
+  const fns = (voice: boolean): Fn[] => (voice ? ["preguntar", "leer"] : ["preguntar"]);
+  const voiceName = s.voice_engine !== "proveedor" ? "" : s.speech_provider === "nvidia" ? "NVIDIA" : s.speech_provider === "fishaudio" ? "Fish Audio" : "Free.ai";
   const answers = useSavedAnswers();
   const hide = useHideAnswer();
 
@@ -58,13 +63,26 @@ export function PreguntaSection({ ed }: { ed: EditorApi }) {
           <div>
             <dt>Página abierta</dt>
             <dd>
-              <Switch on={rule.on} onChange={(v) => setPortal("pregunta", { on: v, fns: ["preguntar"] })} label="Pregúntele a Pilo abierta" />
+              <Switch on={rule.on} onChange={(v) => setPortal("pregunta", { on: v, fns: fns(speaks) })} label="Pregúntele a Pilo abierta" />
             </dd>
           </div>
           <div>
             <dt>Para quién</dt>
             <dd>
-              <AudiencePicker value={rule.aud} label="Para quién es Pregúntele a Pilo" onPick={(aud) => setPortal("pregunta", { aud, fns: ["preguntar"] })} />
+              <AudiencePicker value={rule.aud} label="Para quién es Pregúntele a Pilo" onPick={(aud) => setPortal("pregunta", { aud, fns: fns(speaks) })} />
+            </dd>
+          </div>
+          <div>
+            <dt>
+              Leer las respuestas con la voz de Pilo
+              <small>
+                {!voiceName
+                  ? "En Voz está elegida la del navegador: elija NVIDIA o Free.ai para que suene la de Pilo."
+                  : `Con la voz de ${voiceName} y su estilo; si no responde, con la del navegador.`}
+              </small>
+            </dt>
+            <dd>
+              <Switch on={speaks} onChange={(v) => setPortal("pregunta", { fns: fns(v) })} label="Leer las respuestas con la voz de Pilo" />
             </dd>
           </div>
           <div>

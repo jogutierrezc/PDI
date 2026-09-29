@@ -224,6 +224,10 @@
 .pis-grid label { display: grid; gap: var(--space-2); min-width: 0; color: var(--ink); font-size: var(--text-sm); font-weight: 800; }
 
 .pis-grid input:not([type="range"]),
+.pis-grid select,
+.pis-voices input:not([type="radio"]),
+.pis-voices__portal select,
+.pis-voices__tone select,
 .pis-key input,
 .pis-probe input {
   width: 100%;
@@ -242,6 +246,9 @@
 }
 
 .pis-grid input:not([type="range"]):focus,
+.pis-grid select:focus,
+.pis-voices input:not([type="radio"]):focus,
+.pis-voices__portal select:focus,
 .pis-key input:focus,
 .pis-probe input:focus { border-color: var(--brand-blue); outline: none; box-shadow: var(--ring); }
 
@@ -356,7 +363,39 @@
 .pis-choice strong { color: var(--brand-navy); }
 .pis-choice span { color: var(--ink-secondary); font-size: var(--text-sm); }
 
-.pis-sample {
+
+/* Voz de NVIDIA: los estilos (muestras) y cómo se agregan. */
+.pis-voices { display: grid; gap: var(--space-3); }
+.pis-voices h4 { margin: 0; color: var(--brand-navy); font-size: var(--text-sm); }
+.pis-voices ul { display: grid; gap: var(--space-2); margin: 0; padding: 0; list-style: none; }
+
+.pis-voices li {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+}
+
+.pis-voices li[data-main] { border-color: var(--brand-blue); box-shadow: inset 0 0 0 1px var(--brand-blue); }
+.pis-voices__main { display: flex; flex: 1 1 14rem; align-items: center; gap: var(--space-3); cursor: pointer; }
+.pis-voices__main input { width: 18px; height: 18px; accent-color: var(--brand-blue); }
+.pis-voices__main span { display: grid; gap: 2px; }
+.pis-voices__main small { color: var(--ink-muted); font-size: var(--text-xs); font-variant-numeric: tabular-nums; }
+.pis-voices__tone select { min-height: 40px; }
+.pis-voices__actions { display: inline-flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); }
+.pis-voices__add { display: flex; flex-wrap: wrap; align-items: flex-end; gap: var(--space-2); }
+.pis-voices__add label,
+.pis-voices__portal { display: grid; gap: var(--space-2); color: var(--ink); font-size: var(--text-sm); font-weight: 800; }
+.pis-voices__add label { flex: 1 1 14rem; }
+.pis-voices__add button { min-height: 44px; }
+.pis-voices__portal { max-width: 24rem; }
+.pis-grid label small { font-weight: 600; }
+
   display: flex;
   align-items: center;
   gap: var(--space-3);

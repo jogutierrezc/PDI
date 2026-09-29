@@ -946,3 +946,264 @@ export function parseAnalysis(raw: string): AnalysisPart {
 export const analysisText = (part: AnalysisPart) =>
   // Las citas («[2]») no son cifras: no se verifican.
   [part.summary, ...part.paragraphs, ...part.alerts, ...part.recommendations].join("\n").replace(/\[\d{1,2}\]/g, "");
+
+/* --- Voz de NVIDIA (Magpie TTS Zeroshot) ------------------------------------------ */
+
+/**
+ * NVIDIA sirve sus voces por gRPC (Riva), no con el formato de OpenAI. gRPC es
+ * HTTP/2 con cada mensaje en protobuf y un prefijo de 5 bytes, así que basta
+ * fetch: sin librerías, también en la función del servidor. El modelo se
+ * elige con la cabecera function-id; la voz, con una muestra de 3 a 10 s.
+ */
+export const RIVA_URL = "https://grpc.nvcf.nvidia.com/nvidia.riva.tts.RivaSpeechSynthesis/Synthesize";
+/** La frecuencia del audio que se pide (y la de las muestras que se guardan). */
+export const RIVA_RATE = 22050;
+/** Un function-id de NVIDIA: un UUID. */
+export const looksLikeFunctionId = (id: string) => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id.trim());
+
+/** Un estilo de la voz de Pilo: una muestra grabada en el bucket pilo-voz (0101). */
+export interface VoiceStyle {
+  id: string;
+  name: string;
+  path: string;
+  seconds: number;
+  /** Fish Audio (0102): el id de la voz creada con esta muestra y su tono («calm»). */
+  fish_id?: string;
+  tone?: string;
+}
+
+function joinBytes(parts: Uint8Array[]): Uint8Array {
+  const all = new Uint8Array(parts.reduce((n, p) => n + p.length, 0));
+  let at = 0;
+  for (const p of parts) {
+    all.set(p, at);
+    at += p.length;
+  }
+  return all;
+}
+
+function pbVarint(n: number): number[] {
+  const out: number[] = [];
+  let v = Math.max(0, Math.floor(n));
+  while (v > 0x7f) {
+    out.push((v % 128) | 0x80);
+    v = Math.floor(v / 128);
+  }
+  out.push(v);
+  return out;
+}
+const pbBytes = (field: number, bytes: Uint8Array) => joinBytes([new Uint8Array([...pbVarint(field * 8 + 2), ...pbVarint(bytes.length)]), bytes]);
+const pbText = (field: number, text: string) => pbBytes(field, new TextEncoder().encode(text));
+const pbInt = (field: number, n: number) => new Uint8Array([...pbVarint(field * 8), ...pbVarint(n)]);
+
+/** Los campos de un mensaje protobuf, sin su esquema: número y valor (entero o bytes). */
+export function pbFields(buf: Uint8Array): { field: number; value: number | Uint8Array }[] {
+  const out: { field: number; value: number | Uint8Array }[] = [];
+  let i = 0;
+  const varint = () => {
+    let n = 0;
+    let scale = 1;
+    let b = 0;
+    do {
+      if (i >= buf.length) throw new Error("protobuf cortado");
+      b = buf[i++];
+      n += (b & 0x7f) * scale;
+      scale *= 128;
+    } while (b & 0x80);
+    return n;
+  };
+  while (i < buf.length) {
+    const tag = varint();
+    const field = Math.floor(tag / 8);
+    const wire = tag % 8;
+    if (wire === 0) out.push({ field, value: varint() });
+    else if (wire === 2) {
+      const n = varint();
+      if (i + n > buf.length) throw new Error("protobuf cortado");
+      out.push({ field, value: buf.subarray(i, i + n) });
+      i += n;
+    } else if (wire === 5) i += 4;
+    else if (wire === 1) i += 8;
+    else throw new Error(`protobuf: tipo ${wire}`);
+  }
+  return out;
+}
+
+/**
+ * El pedido de Synthesize ya enmarcado para gRPC (riva_tts.proto):
+ * text=1, language_code=2, encoding=3 (LINEAR_PCM=1), sample_rate_hz=4,
+ * voice_name=5, zero_shot_data=6 {audio_prompt=1, sample_rate_hz=2, encoding=3, quality=4}.
+ */
+export function rivaRequest(input: {
+  text: string;
+  language: string;
+  voice?: string;
+  prompt?: { pcm: Uint8Array; rate: number };
+  quality?: number;
+}): Uint8Array<ArrayBuffer> {
+  const parts = [pbText(1, input.text), pbText(2, input.language), pbInt(3, 1), pbInt(4, RIVA_RATE)];
+  if (input.voice) parts.push(pbText(5, input.voice));
+  if (input.prompt) {
+    const quality = Math.min(40, Math.max(1, Math.round(input.quality ?? 20)));
+    parts.push(pbBytes(6, joinBytes([pbBytes(1, input.prompt.pcm), pbInt(2, input.prompt.rate), pbInt(3, 1), pbInt(4, quality)])));
+  }
+  const message = joinBytes(parts);
+  const frame = new Uint8Array(5 + message.length);
+  new DataView(frame.buffer).setUint32(1, message.length);
+  frame.set(message, 5);
+  return frame;
+}
+
+/** El audio (PCM de 16 bits) de la respuesta gRPC; null si no trae ninguno. */
+export function rivaAudio(body: Uint8Array): Uint8Array | null {
+  const chunks: Uint8Array[] = [];
+  let at = 0;
+  while (at + 5 <= body.length) {
+    const n = new DataView(body.buffer, body.byteOffset + at).getUint32(1);
+    const message = body.subarray(at + 5, at + 5 + n);
+    at += 5 + n;
+    for (const f of pbFields(message)) if (f.field === 1 && f.value instanceof Uint8Array) chunks.push(f.value);
+  }
+  const pcm = joinBytes(chunks);
+  return pcm.length > 0 ? pcm : null;
+}
+
+/** Un WAV de PCM 16 bits: sus muestras y frecuencia. null si no es un WAV así. */
+export function readWav(bytes: Uint8Array): { pcm: Uint8Array; rate: number; channels: number } | null {
+  if (bytes.length < 44) return null;
+  const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+  const tag = (at: number) => String.fromCharCode(bytes[at], bytes[at + 1], bytes[at + 2], bytes[at + 3]);
+  if (tag(0) !== "RIFF" || tag(8) !== "WAVE") return null;
+  let at = 12;
+  let rate = 0;
+  let channels = 0;
+  let bits = 0;
+  let format = 0;
+  while (at + 8 <= bytes.length) {
+    const id = tag(at);
+    const size = view.getUint32(at + 4, true);
+    if (id === "fmt ") {
+      format = view.getUint16(at + 8, true);
+      channels = view.getUint16(at + 10, true);
+      rate = view.getUint32(at + 12, true);
+      bits = view.getUint16(at + 22, true);
+    } else if (id === "data") {
+      if (format !== 1 || bits !== 16 || !rate) return null;
+      return { pcm: bytes.subarray(at + 8, Math.min(bytes.length, at + 8 + size)), rate, channels };
+    }
+    at += 8 + size + (size % 2);
+  }
+  return null;
+}
+
+/** PCM de 16 bits, mono, envuelto en WAV para que el navegador lo toque. */
+export function wavFile(pcm: Uint8Array, rate: number): Uint8Array<ArrayBuffer> {
+  const out = new Uint8Array(44 + pcm.length);
+  const view = new DataView(out.buffer);
+  const tag = (at: number, text: string) => [...text].forEach((c, k) => view.setUint8(at + k, c.charCodeAt(0)));
+  tag(0, "RIFF");
+  view.setUint32(4, 36 + pcm.length, true);
+  tag(8, "WAVE");
+  tag(12, "fmt ");
+  view.setUint32(16, 16, true);
+  view.setUint16(20, 1, true);
+  view.setUint16(22, 1, true);
+  view.setUint32(24, rate, true);
+  view.setUint32(28, rate * 2, true);
+  view.setUint16(32, 2, true);
+  view.setUint16(34, 16, true);
+  tag(36, "data");
+  view.setUint32(40, pcm.length, true);
+  out.set(pcm, 44);
+  return out;
+}
+
+/** Une varios PCM en uno. */
+export const joinPcm = (parts: Uint8Array[]) => joinBytes(parts);
+
+/**
+ * El texto en trozos que el modelo lee de una vez: por frases, sin pasar de
+ * `max` caracteres (una frase más larga se corta en comas o espacios).
+ */
+export function speechChunks(text: string, max = 300): string[] {
+  const clean = text.replace(/\s+/g, " ").trim();
+  if (!clean) return [];
+  const sentences = clean.match(/[^.!?…]+(?:[.!?…]+["»)]*|$)/g) ?? [clean];
+  const pieces: string[] = [];
+  for (const raw of sentences) {
+    let s = raw.trim();
+    while (s.length > max) {
+      const cut = Math.max(s.lastIndexOf(", ", max), s.lastIndexOf("; ", max), s.lastIndexOf(" ", max));
+      const at = cut > max / 3 ? cut + 1 : max;
+      pieces.push(s.slice(0, at).trim());
+      s = s.slice(at).trim();
+    }
+    if (s) pieces.push(s);
+  }
+  const out: string[] = [];
+  for (const p of pieces) {
+    const last = out.length - 1;
+    if (last >= 0 && out[last].length + 1 + p.length <= max) out[last] = `${out[last]} ${p}`;
+    else out.push(p);
+  }
+  return out;
+}
+
+/** El estilo que suena en un portal: el pedido (solo en la prueba), el del portal o el de siempre. */
+export function styleFor(
+  styles: VoiceStyle[],
+  portal: string,
+  byPortal: Record<string, string> | null | undefined,
+  main: string,
+  asked?: string,
+): VoiceStyle | null {
+  const find = (id: string | undefined) => (id ? styles.find((s) => s.id === id) : undefined);
+  return find(portal === "prueba" ? asked : undefined) ?? find(byPortal?.[portal]) ?? find(main) ?? styles[0] ?? null;
+}
+
+/* --- Voz de Fish Audio (0102) ------------------------------------------------------ */
+
+/**
+ * Fish Audio: POST /v1/tts con JSON, el modelo en la cabecera «model» y la voz
+ * por su id (reference_id), que se crea una vez desde una muestra (POST /model).
+ * Sus modelos S2 entienden etiquetas de emoción al empezar cada frase: «[calm]».
+ */
+export const FISH_TTS_URL = "https://api.fish.audio/v1/tts";
+export const FISH_MODEL_URL = "https://api.fish.audio/model";
+/** s2.1-pro-free es gratis (con uso razonable) hasta el 30 de noviembre de 2026. */
+export const FISH_MODELS = ["s2.1-pro-free", "s2.1-pro", "s2-pro", "s1"] as const;
+export const FISH_DEFAULT_MODEL = "s2.1-pro-free";
+
+/**
+ * El id de una voz de Fish Audio (32 caracteres hexadecimales), aunque se pegue
+ * el enlace completo («https://fish.audio/m/<id>/»). Vacío si no hay uno.
+ */
+export const fishVoiceId = (input: string) => (input.match(/[0-9a-f]{32}/i)?.[0] ?? "").toLowerCase();
+
+/** El modelo de Fish Audio que se usa: uno de los conocidos o el gratuito. */
+export const fishModel = (model: string) => ((FISH_MODELS as readonly string[]).includes(model) ? model : FISH_DEFAULT_MODEL);
+
+/** Una etiqueta de tono de Fish Audio («calm», «soft tone»): solo letras y espacios. */
+export const cleanTone = (tone: string) =>
+  tone
+    .toLowerCase()
+    .replace(/[^a-z ]/g, "")
+    .replace(/\s+/g, " ")
+    .trim()
+    .slice(0, 30);
+
+/**
+ * El texto con el tono al comienzo de cada frase, que es donde Fish Audio lo
+ * respeta: «[calm] Hola. [calm] Soy Pilo.». Sin tono, el texto tal cual.
+ */
+export function fishText(text: string, tone: string): string {
+  const clean = text.replace(/\s+/g, " ").trim();
+  const tag = cleanTone(tone);
+  if (!tag || !clean) return clean;
+  const sentences = clean.match(/[^.!?…]+(?:[.!?…]+["»)]*|$)/g) ?? [clean];
+  return sentences
+    .map((s) => s.trim())
+    .filter(Boolean)
+    .map((s) => `[${tag}] ${s}`)
+    .join(" ");
+}

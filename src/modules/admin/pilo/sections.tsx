@@ -2,7 +2,7 @@
    Intranet · Mr. Pilo con IA · las secciones de configuración.
 
    Conexión      el servicio de texto, su clave y la prueba.
-   Voz           la voz avanzada (Free.ai u otro) o la del navegador.
+   Voz           la voz avanzada (NVIDIA, Free.ai u otro) o la del navegador.
    Dónde aparece las cuatro funciones, la tabla portal por portal y a quién
                  más se abren los informes de Impacto (0100).
    Uso           los topes, el uso de hoy y la bitácora de pedidos.
@@ -24,9 +24,12 @@ import type { ReportKind } from "../../../components/pilo/ai/logic";
 import { PROVIDERS, usePiloLog } from "./store";
 import type { KeyStatus, PiloSettings, Provider } from "./store";
 import { Group, KeyField, StatusMark, Switch } from "./ui";
+import { VoiceStyles } from "./VoiceStyles";
 
 export interface EditorApi {
   s: PiloSettings;
+  /** Lo que está guardado en la base. */
+  saved: PiloSettings;
   setS: Dispatch<SetStateAction<PiloSettings>>;
   set: <K extends keyof PiloSettings>(key: K, value: PiloSettings[K]) => void;
   setPortal: (id: Portal, patch: Partial<PortalRule>) => void;
@@ -174,19 +177,27 @@ export function ConnectionSection({ ed, test, onTest }: { ed: EditorApi; test: T
 
 export function VoiceSection({ ed }: { ed: EditorApi }) {
   const { s, setS, set, dirty, keys } = ed;
-  const advancedVoice = s.voice_engine === "proveedor";
+  const choice: "freeai" | "nvidia" | "fishaudio" | "navegador" =
+    s.voice_engine !== "proveedor" ? "navegador" : s.speech_provider === "nvidia" || s.speech_provider === "fishaudio" ? s.speech_provider : "freeai";
+  const who = choice === "nvidia" ? "NVIDIA" : choice === "fishaudio" ? "Fish Audio" : "Free.ai";
   const [sampling, setSampling] = useState(false);
   const [sampleText, setSampleText] = useState("Escuche cómo suena Mr. Pilo.");
+  const pick = (next: typeof choice) =>
+    setS((prev) =>
+      next === "navegador"
+        ? { ...prev, voice_engine: "navegador" }
+        : { ...prev, voice_engine: "proveedor", speech_provider: next !== "freeai" ? next : prev.speech_provider === "otro" ? "otro" : "freeai" },
+    );
   const sample = async () => {
     const line = "Hola, soy Mr. Pilo. Le leo las cifras de la universidad.";
     setSampling(true);
     try {
-      if (advancedVoice && !dirty) {
-        setSampleText("Pidiendo la voz a Free.ai…");
+      if (choice !== "navegador" && !dirty) {
+        setSampleText(`Pidiendo la voz a ${who}…`);
         const used = await sayWithPilo(line, { portal: "prueba" as Portal, advanced: true, rate: s.voice_rate, pitch: s.voice_pitch });
-        setSampleText(used === "proveedor" ? "Sonó la voz de Free.ai." : "Free.ai no respondió: sonó la voz del navegador. Revise la clave de Free.ai.");
+        setSampleText(used === "proveedor" ? `Sonó la voz de ${who}.` : `${who} no respondió: sonó la voz del navegador. Revise la clave de ${who}.`);
       } else {
-        setSampleText(advancedVoice ? "Guarde los cambios para oír la voz de Free.ai. Ahora suena la del navegador." : "Voz del navegador.");
+        setSampleText(choice !== "navegador" ? `Guarde los cambios para oír la voz de ${who}. Ahora suena la del navegador.` : "Voz del navegador.");
         await speak(line, { force: true, rate: s.voice_rate, pitch: s.voice_pitch });
       }
     } finally {
@@ -198,24 +209,29 @@ export function VoiceSection({ ed }: { ed: EditorApi }) {
     <>
       <Group title="Con qué voz lee">
         <div className="pis-choice" role="radiogroup" aria-label="Voz">
-          <button
-            type="button"
-            role="radio"
-            aria-checked={advancedVoice}
-            onClick={() => setS((prev) => ({ ...prev, voice_engine: "proveedor", speech_provider: prev.speech_provider === "otro" ? "otro" : "freeai" }))}
-          >
+          <button type="button" role="radio" aria-checked={choice === "nvidia"} onClick={() => pick("nvidia")}>
+            <strong>Voz de NVIDIA</strong>
+            <span>La voz propia de Pilo, clonada de una muestra (Magpie TTS Zeroshot). Usa la clave de NVIDIA.</span>
+          </button>
+          <button type="button" role="radio" aria-checked={choice === "fishaudio"} onClick={() => pick("fishaudio")}>
+            <strong>Voz de Fish Audio</strong>
+            <span>La voz propia de Pilo, clonada de la misma muestra, con un tono por estilo (tranquilo, entusiasta…). Gratis hasta el 30 de noviembre de 2026.</span>
+          </button>
+          <button type="button" role="radio" aria-checked={choice === "freeai"} onClick={() => pick("freeai")}>
             <strong>Voz de Free.ai</strong>
             <span>Masculina y natural (em_alex). Usa la clave de Free.ai y su cupo.</span>
           </button>
-          <button type="button" role="radio" aria-checked={!advancedVoice} onClick={() => set("voice_engine", "navegador")}>
+          <button type="button" role="radio" aria-checked={choice === "navegador"} onClick={() => pick("navegador")}>
             <strong>Voz del navegador</strong>
             <span>Gratis, sin clave. Siempre es el respaldo si la otra no responde.</span>
           </button>
         </div>
-        {advancedVoice && s.speech_provider !== "otro" && keys?.keys && !keys.keys.freeai?.has && (
+        {choice === "freeai" && s.speech_provider !== "otro" && keys?.keys && !keys.keys.freeai?.has && (
           <KeyField which="freeai" label="Clave de Free.ai (hace falta para su voz)" has={false} last4="" />
         )}
       </Group>
+
+      {(choice === "nvidia" || choice === "fishaudio") && <VoiceStyles key={choice} ed={ed} provider={choice} />}
 
       <Group title="Cómo suena">
         <div className="pis-grid pis-grid--3">
@@ -234,8 +250,14 @@ export function VoiceSection({ ed }: { ed: EditorApi }) {
             <span role="status">{sampleText}</span>
           </div>
         </div>
+        {choice === "nvidia" && (
+          <p className="pis-small">Con NVIDIA, el tono y la manera de hablar los pone la muestra: para otro tono, grabe otro estilo. La velocidad sí se aplica.</p>
+        )}
+        {choice === "fishaudio" && (
+          <p className="pis-small">Con Fish Audio, la voz la pone la muestra y el tono se elige en cada estilo. La velocidad sí se aplica; el tono de arriba es solo del navegador.</p>
+        )}
 
-        {advancedVoice && (
+        {choice === "freeai" && (
           <details className="pis-adv">
             <summary>Opciones avanzadas de la voz</summary>
             <div className="pis-grid pis-grid--3">

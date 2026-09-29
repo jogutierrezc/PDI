@@ -11,11 +11,11 @@ import { supabase } from "../../../lib/supabase";
 import { describeDatabaseError } from "../../../data/errors";
 import type { DatabaseError } from "../../../data/errors";
 import type { Fn, Portal, PortalRule } from "../../../components/pilo/ai/config";
-import type { ReportKind } from "../../../components/pilo/ai/logic";
+import type { ReportKind, VoiceStyle } from "../../../components/pilo/ai/logic";
 import type { MemorySource } from "./memory";
 
 export type Provider = "mistral" | "freeai" | "nvidia" | "otro";
-export type SpeechProvider = "freeai" | "otro" | "navegador";
+export type SpeechProvider = "freeai" | "nvidia" | "fishaudio" | "otro" | "navegador";
 
 export interface PiloSettings {
   enabled: boolean;
@@ -31,6 +31,15 @@ export interface PiloSettings {
   voice_engine: "proveedor" | "navegador";
   voice_rate: number;
   voice_pitch: number;
+  /** Voz de NVIDIA (0101): el function-id de Magpie TTS Zeroshot, el idioma, la calidad y las muestras. */
+  speech_function_id: string;
+  voice_language: string;
+  voice_quality: number;
+  voice_styles: VoiceStyle[];
+  voice_style: string;
+  voice_portal_styles: Partial<Record<Portal, string>>;
+  /** Fish Audio (0102): el modelo (s2.1-pro-free es el gratuito). */
+  fish_model: string;
   functions: Record<Fn, boolean>;
   portals: Record<Portal, PortalRule>;
   daily_limit: number;
@@ -45,6 +54,10 @@ export interface PiloSettings {
   impacto_report: Record<ReportKind, boolean>;
   /** La base aún no tiene la migración 0100 (informes de Impacto). */
   needs0100?: boolean;
+  /** La base aún no tiene la migración 0101 (voz de NVIDIA). */
+  needs0101?: boolean;
+  /** La base aún no tiene la migración 0102 (voz de Fish Audio). */
+  needs0102?: boolean;
   /** La base aún no tiene la migración 0090 (Mistral y voz aparte). */
   needs0090?: boolean;
   /** La base aún no tiene la migración 0094 (Pregúntele a Pilo). */
@@ -81,7 +94,7 @@ export function normalizeSettings(raw: Record<string, unknown>): PiloSettings {
     base_url: str("base_url", "") || PROVIDERS[provider].base,
     chat_path: str("chat_path", "") || "/chat/completions",
     text_model: validModel(str("text_model", "")) || PROVIDERS[provider].model,
-    speech_provider: (["freeai", "otro", "navegador"] as const).find((p) => p === raw.speech_provider) ?? "navegador",
+    speech_provider: (["freeai", "nvidia", "fishaudio", "otro", "navegador"] as const).find((p) => p === raw.speech_provider) ?? "navegador",
     speech_base_url: str("speech_base_url", ""),
     speech_path: str("speech_path", "/audio/speech"),
     speech_model: str("speech_model", ""),
@@ -89,6 +102,13 @@ export function normalizeSettings(raw: Record<string, unknown>): PiloSettings {
     voice_engine: raw.voice_engine === "proveedor" ? "proveedor" : "navegador",
     voice_rate: num("voice_rate", 1),
     voice_pitch: num("voice_pitch", 1),
+    speech_function_id: str("speech_function_id", ""),
+    voice_language: str("voice_language", "") || "es-US",
+    voice_quality: num("voice_quality", 20),
+    voice_styles: Array.isArray(raw.voice_styles) ? (raw.voice_styles as VoiceStyle[]) : [],
+    voice_style: str("voice_style", ""),
+    voice_portal_styles: (raw.voice_portal_styles as Partial<Record<Portal, string>>) ?? {},
+    fish_model: str("fish_model", "") || "s2.1-pro-free",
     functions: { leer: true, resumir: true, sintetizar: true, explicar: true, preguntar: true, ...((raw.functions as Partial<Record<Fn, boolean>>) ?? {}) } as Record<Fn, boolean>,
     portals,
     daily_limit: num("daily_limit", 200),
@@ -103,12 +123,14 @@ export function normalizeSettings(raw: Record<string, unknown>): PiloSettings {
       return { programa: r.programa === true, facultad: r.facultad === true, vicerrectoria: r.vicerrectoria === true };
     })(),
     needs0100: !("impacto_report" in raw),
+    needs0101: !("voice_styles" in raw),
+    needs0102: !("fish_model" in raw),
     needs0090: !("provider" in raw),
     needs0094: !("memory_sources" in raw),
   };
 }
 
-export type KeySlot = "mistral" | "freeai" | "nvidia" | "otro" | "voz";
+export type KeySlot = "mistral" | "freeai" | "nvidia" | "fishaudio" | "otro" | "voz";
 
 export interface KeyStatus {
   /** Una por proveedor (0091). Sin 0091, no viene. */
@@ -204,7 +226,7 @@ export function useSavePiloSettings() {
   const client = useQueryClient();
   return useMutation({
     mutationFn: async (settings: PiloSettings) => {
-      const { updated_at: _ignored, needs0090, needs0094, needs0100, memory_indexed_at: _indexed, ...all } = settings;
+      const { updated_at: _ignored, needs0090, needs0094, needs0100, needs0101, needs0102, memory_indexed_at: _indexed, ...all } = settings;
       // Sin 0090 no existen las columnas nuevas: no se mandan.
       const rest: Record<string, unknown> = { ...all };
       if (needs0090) for (const k of ["provider", "speech_provider", "speech_base_url"]) delete rest[k];
@@ -212,6 +234,16 @@ export function useSavePiloSettings() {
       if (needs0094) for (const k of ["memory_sources", "pregunta_welcome"]) delete rest[k];
       // Sin 0100, tampoco el interruptor de los informes de Impacto.
       if (needs0100) delete rest.impacto_report;
+      // Sin 0101, tampoco la voz de NVIDIA.
+      if (needs0101) {
+        for (const k of ["speech_function_id", "voice_language", "voice_quality", "voice_styles", "voice_style", "voice_portal_styles"]) delete rest[k];
+        if (rest.speech_provider === "nvidia") rest.speech_provider = "navegador";
+      }
+      // Sin 0102, tampoco Fish Audio.
+      if (needs0102) {
+        delete rest.fish_model;
+        if (rest.speech_provider === "fishaudio") rest.speech_provider = "navegador";
+      }
       const { data: user } = await supabase.auth.getUser();
       const { error } = await supabase
         .from("pilo_ai_settings")

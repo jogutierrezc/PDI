@@ -53,6 +53,13 @@ describe("los roles de fábrica se leen como su plantilla", () => {
     expect(templateOf(matrix)).toBe("personalizada");
     expect(effectiveLevel(matrix, "plan")).toBe("editar");
     expect(effectiveLevel(matrix, "portal")).toBe("ver");
+    // Reportes Institucionales: responsable captura y valida plantillas.
+    expect(effectiveLevel(matrix, "reportes")).toBe("editar");
+  });
+
+  it("Reportes Institucionales: Consulta ve, Planeación administra catálogos", () => {
+    expect(effectiveLevel(system("consulta"), "reportes")).toBe("ver");
+    expect(effectiveLevel(system("planeacion"), "reportes")).toBe("administrar");
   });
 });
 

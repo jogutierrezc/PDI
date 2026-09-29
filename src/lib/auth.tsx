@@ -53,6 +53,7 @@ export const SCREEN_PATHS: Record<AdminScreen, string> = {
   transfer: "/admin/traslado",
   institution: "/admin/estructura-institucional",
   pilo: "/admin/mr-pilo",
+  reportes: "/admin/reportes-institucionales",
 };
 
 export interface AuthContextValue {

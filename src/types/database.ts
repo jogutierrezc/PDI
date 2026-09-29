@@ -54,7 +54,8 @@ export type AdminScreen =
   | "users"
   | "transfer"
   | "institution"
-  | "pilo";
+  | "pilo"
+  | "reportes";
 
 /** Un rol de acceso: qué puede hacer, qué pantallas ve y sobre qué informes escribe. */
 export interface AccessRole {

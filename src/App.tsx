@@ -178,6 +178,9 @@ const InstitutionView = lazy(() =>
 const DataTransfer = lazy(() =>
   import("./modules/admin/traslado/DataTransfer").then((m) => ({ default: m.DataTransfer })),
 );
+const ReportesInstitucionales = lazy(() =>
+  import("./modules/reportes/ReportesInstitucionales").then((m) => ({ default: m.ReportesInstitucionales })),
+);
 
 /** Puerta de las rutas internas. Recuerda a dónde iba la persona.
  *  `screen` es la pantalla del menú: un rol de acceso que no la tiene tampoco
@@ -386,6 +389,15 @@ export default function App() {
             element={
               <RequireRole minimum="consulta" screen="tableros">
                 <BoardsAdmin />
+              </RequireRole>
+            }
+          />
+          {/* Reportes Institucionales (SNIES y CNA): una ruta con segmentos opcionales. */}
+          <Route
+            path="/admin/reportes-institucionales/:seccion?/:plantilla?"
+            element={
+              <RequireRole minimum="consulta" screen="reportes">
+                <ReportesInstitucionales />
               </RequireRole>
             }
           />

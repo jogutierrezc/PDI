@@ -37,6 +37,7 @@ const GROUP_TEXT: Record<NavGroup["id"], string> = {
   observatorio: "El taller de análisis y sus boletines",
   impacto: "Los indicadores de impacto, sus metas y sus cifras",
   tableros: "Los tableros de datos de sus unidades",
+  reportes: "Las plantillas SNIES por periodo: captura, validación y envío",
   sistema: "Estructura, usuarios, parámetros y traslado de datos",
 };
 

@@ -27,7 +27,7 @@ import type { AccessRole, AdminScreen, AppRole } from "../../../types/database";
 import { UNIT_ROLE } from "../../tableros/model";
 
 export type Level = "none" | "ver" | "editar" | "administrar";
-export type ModuleId = "portal" | "plan" | "cifras" | "observatorio" | "impacto" | "tableros" | "sistema";
+export type ModuleId = "portal" | "plan" | "cifras" | "observatorio" | "impacto" | "tableros" | "reportes" | "sistema";
 export type TemplateId = "consulta" | "editor" | "administrador" | "personalizada";
 export type BoardRole = "visor" | "editor" | "jefe";
 
@@ -113,6 +113,16 @@ export const MODULES: ModuleDef[] = [
     screens: [{ id: "tableros", label: "Unidades y tableros", note: "quien pertenece a una unidad lo ve de todos modos" }],
     levels: {
       ver: { hint: "Ve la lista de unidades y tableros; el trabajo se da por unidad.", needs: "consulta" },
+    },
+  },
+  {
+    id: "reportes",
+    label: "Reportes Institucionales",
+    screens: [{ id: "reportes", label: "SNIES y CNA" }],
+    levels: {
+      ver: { hint: "Consulta el tablero de entregas y las plantillas, sin cambiarlas.", needs: "consulta" },
+      editar: { hint: "Captura y valida plantillas.", needs: "responsable" },
+      administrar: { hint: "Catálogos y reapertura.", needs: "planeacion" },
     },
   },
   {
@@ -293,6 +303,7 @@ export function templateMatrix(template: Exclude<TemplateId, "personalizada">): 
     modules.observatorio = full("observatorio", "editar");
     modules.impacto = full("impacto", "ver");
     modules.tableros = full("tableros", "ver");
+    modules.reportes = full("reportes", "administrar");
     modules.sistema = full("sistema", "ver");
     return base;
   }

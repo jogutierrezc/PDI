@@ -46,7 +46,8 @@ export type AdminSection =
   | "impacto"
   | "transfer"
   | "institution"
-  | "pilo";
+  | "pilo"
+  | "reportes";
 
 export interface NavItem {
   id: AdminSection;
@@ -58,7 +59,7 @@ export interface NavItem {
 }
 
 export interface NavGroup {
-  id: "planeacion" | "pdi" | "cifras" | "observatorio" | "impacto" | "tableros" | "sistema";
+  id: "planeacion" | "pdi" | "cifras" | "observatorio" | "impacto" | "tableros" | "reportes" | "sistema";
   label: string;
   /** Ícono y nombre corto: el riel solo tiene 78 px, ahí no cabe el rótulo largo. */
   icon: IconName;
@@ -140,6 +141,18 @@ export const navigation: NavGroup[] = [
     label: "Mis Tableros",
     items: [
       { id: "tableros", label: "Unidades y tableros", icon: "layers", to: "/admin/tableros", minimum: "consulta" },
+    ],
+  },
+  {
+    // Lo que la Universidad le entrega al Estado: las plantillas SNIES por
+    // periodo (y CNA, en borrador). Se captura con nombres y se exporta con
+    // los códigos oficiales.
+    id: "reportes",
+    icon: "upload",
+    short: "Reportes",
+    label: "Reportes Institucionales",
+    items: [
+      { id: "reportes", label: "SNIES y CNA", icon: "table", to: "/admin/reportes-institucionales", minimum: "consulta" },
     ],
   },
   {

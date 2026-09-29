@@ -478,16 +478,51 @@ export interface CatalogEntry {
 }
 
 /**
+ * Palabras de relleno que no hacen falta para reconocer un disparador: la gente
+ * pregunta de tú o de usted, con artículo o sin él («eres una IA», «¿es usted IA?»).
+ */
+const TRIGGER_FILLER = new Set(
+  (
+    "el la los las lo un una unos unas al del de a en con por para sin sobre y o u que " +
+    "tu tus te ti usted ustedes vos su sus se me mi mis nos le les yo " +
+    "es eres soy son ser sos esta estas estan estoy"
+  ).split(" "),
+);
+
+/** La raíz corta de una palabra: sin plural, sin «n» de verbo y sin la última vocal (novia, novio → novi). */
+function triggerStem(word: string): string {
+  if (word.length <= 3) return word;
+  const stem = word.replace(/(es|s|n)$/, "").replace(/[aeo]$/, "");
+  return stem.length >= 3 ? stem : word;
+}
+
+/** Una palabra del disparador está en la pregunta: igual, como comienzo de otra o con la misma raíz. */
+function triggerWordIn(word: string, questionWords: string[]): boolean {
+  const stem = triggerStem(word);
+  return questionWords.some((q) => q.startsWith(word) || (q.length >= 4 && q.length >= word.length - 2 && word.startsWith(q)) || triggerStem(q) === stem);
+}
+
+/**
  * ¿La pregunta trae el disparador? Todas sus palabras, sin tildes ni
- * mayúsculas y en cualquier orden, como comienzo de una palabra de la
- * pregunta («salario rector» dispara con «¿cuál es el salario del rector?»).
+ * mayúsculas y en cualquier orden, sin contar las de relleno y admitiendo
+ * plurales, femeninos y el tú o el usted («salario rector» dispara con «¿cuál
+ * es el salario del rector?»; «tienes pareja», con «¿Pilo tiene parejas?»).
  */
 export function hasTrigger(qnorm: string, trigger: string): boolean {
-  const words = normalizeQuestion(trigger).split(" ").filter((w) => w.length >= 2);
-  if (!words.length) return false;
-  const padded = ` ${qnorm} `;
-  return words.every((w) => padded.includes(` ${w}`));
+  const all = normalizeQuestion(trigger).split(" ").filter((w) => w.length >= 2);
+  // Si todo es relleno («eres tú»), se exigen todas las palabras tal cual.
+  const words = all.filter((w) => !TRIGGER_FILLER.has(w));
+  const needed = words.length ? words : all;
+  if (!needed.length) return false;
+  const questionWords = qnorm.split(" ").filter(Boolean);
+  return needed.every((w) => triggerWordIn(w, questionWords));
 }
+
+/** Lo específico de un disparador: cuántas palabras suyas no son de relleno. */
+const triggerWeight = (trigger: string) => {
+  const all = normalizeQuestion(trigger).split(" ").filter((w) => w.length >= 2);
+  return all.filter((w) => !TRIGGER_FILLER.has(w)).length || all.length;
+};
 
 /**
  * Lo que responde el catálogo, si responde. Primero las capciosas (gana el
@@ -501,9 +536,9 @@ export function matchCatalog(question: string, entries: CatalogEntry[], min = 0.
   for (const e of entries) {
     if (e.kind !== "capciosa") continue;
     // «salario, sueldo; cuánto gana» son tres disparadores, no uno: así los escribe la gente.
-    for (const t of e.triggers.flatMap((x) => x.split(/[,;]/))) {
+    for (const t of e.triggers.flatMap((x) => x.split(/[,;|\n]/))) {
       if (!hasTrigger(qnorm, t)) continue;
-      const score = normalizeQuestion(t).split(" ").length;
+      const score = triggerWeight(t);
       if (!best || score > best.score) best = { entry: e, score };
     }
   }

@@ -63,7 +63,7 @@ export const COLUMNS: Record<CatalogKind, Column[]> = {
   capciosa: [
     { id: "key", header: "Clave", width: 10, required: true, help: "Única y corta: C-001, C-002… Importar otra vez la misma clave la actualiza." },
     { id: "tema", header: "Tema", width: 24, help: "Para usted: de qué trata (salarios, vida personal de Pilo…)." },
-    { id: "triggers", header: "Disparadores", width: 36, required: true, help: "Palabras que activan la respuesta, separadas por coma, punto y coma, | o una por línea (salario, sueldo, cuánto gana). Si un disparador tiene varias palabras, todas deben estar en la pregunta, en cualquier orden." },
+    { id: "triggers", header: "Disparadores", width: 36, required: true, help: "Palabras que activan la respuesta, separadas por coma, punto y coma, | o una por línea (salario, sueldo, cuánto gana). Si un disparador tiene varias palabras, todas deben estar en la pregunta, en cualquier orden; no cuentan las de relleno (el, una, eres, usted) y valen plural, femenino y tú o usted (tienes = tiene)." },
     { id: "answer", header: "Respuesta", width: 60, required: true, help: "La microexpresión: corta, rápida y con gracia, en usted." },
     { id: "mood", header: "Emoción", width: 13, help: "Cómo la dice Pilo: atrevido (por defecto), emocionado, loco o pensar." },
     { id: "active", header: "Activa", width: 8, help: "SI o NO." },

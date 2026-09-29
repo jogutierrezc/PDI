@@ -36,7 +36,8 @@ describe("el catálogo de Planeación", () => {
     const q = normalizeQuestion("¿Cuál es el SALARIO del rector?");
     expect(hasTrigger(q, "salario rector")).toBe(true);
     expect(hasTrigger(q, "rector salario")).toBe(true);
-    expect(hasTrigger(q, "salarios")).toBe(false);
+    // Plural y singular son la misma palabra.
+    expect(hasTrigger(q, "salarios")).toBe(true);
     expect(hasTrigger(normalizeQuestion("¿tienes novia?"), "novia")).toBe(true);
     expect(hasTrigger(normalizeQuestion("¿cómo va la novedad?"), "novia")).toBe(false);
   });
@@ -56,5 +57,31 @@ describe("el catálogo de Planeación", () => {
     const withCommas = [entry({ key: "C-9", triggers: ["salario, sueldo; cuanto gana"], answer: "No se publica." })];
     expect(matchCatalog("¿Cuál es el sueldo del decano?", withCommas)?.entry.key).toBe("C-9");
     expect(matchCatalog("¿Cuánto gana un profesor?", withCommas)?.entry.key).toBe("C-9");
+  });
+
+  it("reconoce la capciosa aunque se pregunte de usted, en plural o en otro género", () => {
+    const has = (question: string, trigger: string) => hasTrigger(normalizeQuestion(question), trigger);
+    expect(has("¿Pilo tiene pareja?", "tienes pareja")).toBe(true);
+    expect(has("¿Usted está casado?", "estas casado")).toBe(true);
+    expect(has("¿Es usted una IA?", "eres una ia")).toBe(true);
+    expect(has("¿Eres un robot?", "eres un robot")).toBe(true);
+    expect(has("¿Tiene novio?", "novia")).toBe(true);
+    expect(has("¿Cuánto ganan los profesores?", "cuanto gana")).toBe(true);
+    expect(has("¿Cuáles son los salarios?", "salario")).toBe(true);
+  });
+
+  it("no se dispara con palabras que solo se parecen", () => {
+    const has = (question: string, trigger: string) => hasTrigger(normalizeQuestion(question), trigger);
+    expect(has("¿Dónde queda la sala de juntas?", "salarios")).toBe(false);
+    expect(has("¿Qué novedades hay en el PDI?", "novia")).toBe(false);
+    expect(has("¿Cuántos estudiantes hay?", "cuanto gana")).toBe(false);
+    expect(has("¿Qué es el PDI?", "eres una ia")).toBe(false);
+    // Un disparador que es solo relleno exige sus palabras tal cual.
+    expect(has("¿Qué es el PDI?", "eres tu")).toBe(false);
+  });
+
+  it("disparadores separados por | o por línea también cuentan", () => {
+    const piped = [entry({ key: "C-8", triggers: ["novia | tienes pareja\nestas casado"], answer: "Solo los datos." })];
+    expect(matchCatalog("¿Está casado Pilo?", piped)?.entry.key).toBe("C-8");
   });
 });

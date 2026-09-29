@@ -649,6 +649,41 @@
   border-top: 1px solid var(--od-board-line);
 }
 
+/* Con los tres ámbitos, una fila por ámbito: su nombre, la variación y el corte anterior. */
+.od-evo__foot[data-several] { display: grid; gap: 4px; }
+
+.od-evo__change {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 2px var(--space-3);
+}
+
+.od-evo__change > b {
+  min-width: 6.5rem;
+  color: var(--od-board-ink);
+  font-size: var(--text-xs);
+  font-weight: 700;
+}
+
+/* Leyenda de ámbitos: trazo y forma del punto, en tinta neutra porque el
+   color es del ranking. */
+.od-scope-legend {
+  --rk-accent: var(--ink-secondary);
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2) var(--space-5);
+  margin: 0 0 var(--space-3);
+  padding: 0 var(--space-4);
+  color: var(--ink-secondary);
+  font-size: var(--text-sm);
+  list-style: none;
+}
+
+.od-scope-legend li { display: inline-flex; align-items: center; gap: var(--space-2); }
+.od-scope-legend svg { display: block; overflow: visible; }
+.od-scope-legend .od-rank-evo__dot { fill: var(--od-surface); }
+
 .od-evo__single {
   color: var(--od-board-muted);
   font-size: var(--text-xs);

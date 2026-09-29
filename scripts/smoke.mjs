@@ -1680,6 +1680,10 @@ const routes = [
       const traces = window.document.querySelectorAll(".od-evo-grid .od-evo");
       if (traces.length < 2) throw new Error(`la evolución debía dibujar una tira por ranking y dibujó ${traces.length}`);
       if (!window.document.querySelector(".od-evo path.od-rank-evo__line")) throw new Error("las tiras de la evolución no dibujan líneas");
+      // Con varios ámbitos se abren todos a la vez: cada uno con su trazo y su leyenda.
+      const legend = window.document.querySelector(".od-scope-legend")?.textContent ?? "";
+      if (!legend.includes("Colombia") || !legend.includes("Mundial")) throw new Error(`la evolución debía abrir con los ámbitos juntos y su leyenda («${legend}»)`);
+      if (!window.document.querySelector(".od-evo path.od-rank-evo__line[stroke-dasharray]")) throw new Error("los ámbitos de la evolución no se distinguen por el trazo");
       const shape = (label) => [...window.document.querySelectorAll('[aria-label="Forma de la evolución"] button')].find((b) => b.textContent === label);
       shape("Todos juntos").click();
       await tick();
@@ -1808,25 +1812,28 @@ const routes = [
         return false;
       };
       // Cada hoja de ranking con historia lleva su traza.
-      if (!(await waitFor(".bol-rank .bol-chart circle.bol-chart__dot"))) {
+      if (!(await waitFor(".bol-rank .bol-chart path.bol-chart__dot"))) {
         throw new Error("la hoja del ranking no dibuja su evolución");
       }
-      // La hoja de conjunto: un rótulo y un hilo por ranking.
+      // La hoja de conjunto: un rótulo y un hilo por ranking y ámbito.
       const ranks = [...window.document.querySelectorAll(".bol-chart text.bol-chart__rank")];
       const leaders = window.document.querySelectorAll(".bol-chart path.bol-chart__leader");
       if (leaders.length < 2 || ranks.length < 2) throw new Error("el lienzo con todos los rankings no rotula cada uno");
-      // Los rótulos del lienzo se empujan: nunca a menos de un renglón.
-      const ys = [...window.document.querySelectorAll(".bol-chart path.bol-chart__leader")]
-        .map((path) => Number(path.getAttribute("d").split("L")[1].split(" ")[1]))
-        .sort((a, b) => a - b);
-      for (let i = 1; i < ys.length; i += 1) {
-        if (ys[i] - ys[i - 1] < 6.1) throw new Error(`dos rótulos del boletín quedan a ${ys[i] - ys[i - 1]}mm`);
+      // Los rótulos de cada lienzo se empujan: nunca a menos de un renglón.
+      for (const svg of window.document.querySelectorAll("svg.bol-chart")) {
+        const ys = [...svg.querySelectorAll("path.bol-chart__leader")]
+          .map((path) => Number(path.getAttribute("d").split("L")[1].split(" ")[1]))
+          .sort((a, b) => a - b);
+        for (let i = 1; i < ys.length; i += 1) {
+          if (ys[i] - ys[i - 1] < 6.1) throw new Error(`dos rótulos del boletín quedan a ${ys[i] - ys[i - 1]}mm`);
+        }
       }
-      // El ámbito elegido es el más cercano que reportan dos rankings: Colombia.
+      // Los ámbitos van juntos, cada uno con su trazo y su leyenda.
+      const legend = window.document.querySelector(".bol-legend--scopes")?.textContent ?? "";
+      if (!legend.includes("Mundial") || !legend.includes("Colombia")) throw new Error(`el boletín no lleva la leyenda de ámbitos («${legend}»)`);
+      if (!window.document.querySelector(".bol-chart path.bol-chart__line[stroke-dasharray]")) throw new Error("los ámbitos del boletín no se distinguen por el trazo");
       const text = window.document.body.textContent;
-      if (!text.includes("Colombia · el más cercano que reportan al menos dos rankings")) {
-        throw new Error("la hoja de conjunto no eligió el ámbito más cercano");
-      }
+      if (!text.includes("en el mismo dibujo")) throw new Error("la hoja de conjunto no dice que lleva los ámbitos juntos");
     },
   },
   {

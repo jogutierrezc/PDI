@@ -13,8 +13,8 @@
 
 import type { CSSProperties, ReactNode } from "react";
 import { formatCount, formatValue } from "../datos-abiertos/data/open-data";
-import { rankScale, rankSpan, stackLabels } from "../datos-abiertos/data/rankings";
-import type { ParsedRank } from "../datos-abiertos/data/rankings";
+import { SCOPE_LABEL, rankScale, rankSpan, scopeDash, scopeMarkPath, stackLabels } from "../datos-abiertos/data/rankings";
+import type { ParsedRank, RankScope } from "../datos-abiertos/data/rankings";
 import type { ValueFormat } from "../datos-abiertos/data/types";
 import { DEPARTMENTS } from "../datos-abiertos/data/colombia-map";
 import { COUNTRIES, WORLD_CAMPUS_POINTS, WORLD_HEIGHT, WORLD_WIDTH } from "../datos-abiertos/data/world-map";
@@ -429,6 +429,29 @@ export interface RankLine {
   label: string;
   color: string;
   points: { year: number; rank: ParsedRank }[];
+  /**
+   * Ámbito de la posición. Cuando las líneas de una gráfica traen ámbitos
+   * distintos, cada uno lleva su trazo y su forma de punto (SCOPE_MARK) y la
+   * gráfica, su leyenda de ámbitos.
+   */
+  scope?: RankScope;
+}
+
+/** Trazo y punto de cada ámbito, en tinta: el color es del ranking. */
+export function ScopeLegend({ scopes }: { scopes: RankScope[] }) {
+  return (
+    <ul className="bol-legend bol-legend--scopes">
+      {scopes.map((scope) => (
+        <li key={scope}>
+          <svg viewBox="0 0 12 4" aria-hidden="true">
+            <line x1="0.6" x2="11.4" y1="2" y2="2" strokeDasharray={scopeDash(scope, 0.6)} />
+            <path d={scopeMarkPath(scope, 6, 2, 0.95)} />
+          </svg>
+          {SCOPE_LABEL[scope]}
+        </li>
+      ))}
+    </ul>
+  );
 }
 
 const rankText = (rank: ParsedRank) => (rank.band ? rank.text : `#${rank.text.replace("=", "")}`);
@@ -501,20 +524,26 @@ export function RankTrace({
 export function RankEvolutionChart({
   lines,
   width = 178,
+  height: minHeight = 58,
   label,
 }: {
   lines: RankLine[];
   width?: number;
+  /** Alto mínimo; crece con el número de líneas. */
+  height?: number;
   label: string;
 }) {
   const drawn = lines.filter((line) => line.points.length > 0);
   if (!drawn.length) return null;
+  // Con más de un ámbito en el lienzo, cada línea lleva el trazo y el punto del suyo.
+  const scopes = (["global", "regional", "national"] as RankScope[]).filter((sc) => drawn.some((line) => line.scope === sc));
+  const marked = scopes.length > 1;
   const years = Array.from(new Set(drawn.flatMap((line) => line.points.map((pt) => pt.year)))).sort((a, b) => a - b);
   const longest = Math.max(...drawn.map((line) => line.label.length));
   // La columna crece con el nombre más largo: un nombre cortado por el borde es
   // justo lo que esta gráfica viene a evitar.
   const gutter = Math.min(54, Math.max(26, 5 + longest * 1.42));
-  const height = Math.max(58, 24 + drawn.length * 9.5);
+  const height = Math.max(minHeight, 24 + drawn.length * 9.5);
   const m = { left: 13, right: gutter, top: 4, bottom: 6.6 };
   const innerW = width - m.left - m.right;
   const innerH = height - m.top - m.bottom;
@@ -523,7 +552,7 @@ export function RankEvolutionChart({
   const labelX = m.left + innerW + 3;
   const placed = stackLabels(drawn.map((line) => y(line.points[line.points.length - 1].rank.value)), 6.2, m.top + 2.4, m.top + innerH - 2);
 
-  return (
+  const chart = (
     <svg className="bol-chart" viewBox={`0 0 ${width} ${height}`} role="img" aria-label={label}>
       {ticks.map((t) => (
         <g key={t}>
@@ -544,16 +573,20 @@ export function RankEvolutionChart({
         const endY = y(end.rank.value);
         const labelY = placed[index];
         return (
-          <g key={line.label} style={{ "--c": line.color } as CSSProperties}>
+          <g key={`${line.label}-${line.scope ?? ""}`} style={{ "--c": line.color } as CSSProperties}>
             {line.points.length > 1 && (
-              <path className="bol-chart__line" d={line.points.map((pt, i) => `${i ? "L" : "M"}${x(pt.year).toFixed(2)} ${y(pt.rank.value).toFixed(2)}`).join("")} />
+              <path
+                className="bol-chart__line"
+                d={line.points.map((pt, i) => `${i ? "L" : "M"}${x(pt.year).toFixed(2)} ${y(pt.rank.value).toFixed(2)}`).join("")}
+                strokeDasharray={marked && line.scope ? scopeDash(line.scope, 0.6) : undefined}
+              />
             )}
             {line.points.map((pt) => {
               const span = rankSpan(pt.rank);
               return (
                 <g key={pt.year}>
                   {pt.rank.band && <line className="bol-chart__rank-band" x1={x(pt.year)} x2={x(pt.year)} y1={y(span[0])} y2={y(span[1])} />}
-                  <circle className="bol-chart__dot" cx={x(pt.year)} cy={y(pt.rank.value)} r={0.8} />
+                  <path className="bol-chart__dot" d={scopeMarkPath(marked && line.scope ? line.scope : "global", x(pt.year), y(pt.rank.value), marked ? 0.9 : 0.8)} />
                 </g>
               );
             })}
@@ -571,6 +604,14 @@ export function RankEvolutionChart({
         );
       })}
     </svg>
+  );
+  return marked ? (
+    <>
+      <ScopeLegend scopes={scopes} />
+      {chart}
+    </>
+  ) : (
+    chart
   );
 }
 

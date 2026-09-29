@@ -24,8 +24,12 @@ import type { CSSProperties } from "react";
 import {
   RANKING_SYSTEMS,
   RANKING_VIEWS,
+  SCOPES,
   SCOPE_LABEL,
   SDGS,
+  scopeDash,
+  scopeMarkPath,
+  scopesPhrase,
   bandEnds,
   latestEdition,
   parseRank,
@@ -472,12 +476,18 @@ function RankingsTable({ rankings, at }: { rankings: RankingData[]; at: (r: Rank
    · Todos juntos: un solo lienzo. Los rótulos viven en una columna a la derecha,
      se separan cuando chocan y cada uno lleva un hilo hasta su punto.
 
+   El ámbito se elige (mundial, Latinoamérica, Colombia) o se ven los tres a la
+   vez en la misma gráfica: el color sigue siendo del ranking y el ámbito lo
+   dicen el trazo, la forma del punto y el rótulo (SCOPE_MARK).
+
    En los dos casos la escala es logarítmica e invertida (el puesto 1 arriba):
    QS World en el puesto 1400 y un ranking nacional en el 16 se leen sin que
    ninguno se aplaste contra el borde.
    ------------------------------------------------------------------------------------ */
 
 type EvoMode = "separado" | "junto";
+/** Un ámbito, o todos los que haya en la misma gráfica. */
+type ScopeChoice = RankScope | "todos";
 
 interface EvoPoint {
   year: number;
@@ -486,33 +496,39 @@ interface EvoPoint {
 
 interface EvoSeries {
   ranking: RankingData;
+  scope: RankScope;
   points: EvoPoint[];
 }
 
-function RankingsEvolution({ rankings }: { rankings: RankingData[] }) {
-  const scopes = (["global", "regional", "national"] as RankScope[]).filter((scope) =>
-    rankings.some((r) => r.editions.filter((e) => rankOf(e, scope)).length > 0),
-  );
-  // Los botones conservan el orden de la tabla (mundial, Latinoamérica, Colombia),
-  // pero el que se abre es el más cercano que haya: el puesto en Colombia.
-  const [scope, setScope] = useState<RankScope>(preferredScope((sc) => scopes.includes(sc)) ?? scopes[0] ?? "global");
-  const [mode, setMode] = useState<EvoMode>("separado");
+const rankWords = (rank: ParsedRank) => (rank.band ? `banda ${rank.text}` : `puesto ${rank.text}`);
 
-  const series: EvoSeries[] = rankings
-    .map((r) => ({
-      ranking: r,
-      points: r.editions
-        .map((e) => ({ year: e.year, rank: rankOf(e, scope) }))
-        .filter((p): p is EvoPoint => p.rank !== null),
-    }))
-    .filter((s) => s.points.length > 0);
+function RankingsEvolution({ rankings }: { rankings: RankingData[] }) {
+  const scopes = SCOPES.filter((scope) => rankings.some((r) => r.editions.filter((e) => rankOf(e, scope)).length > 0));
+  // Con más de un ámbito se abren todos juntos: la comparación entre el puesto
+  // mundial, el latinoamericano y el nacional es lo que esta vista viene a dar.
+  const [scope, setScope] = useState<ScopeChoice>(scopes.length > 1 ? "todos" : (preferredScope((sc) => scopes.includes(sc)) ?? scopes[0] ?? "global"));
+  const [mode, setMode] = useState<EvoMode>("separado");
+  const shown = scope === "todos" ? scopes : [scope];
+  const marked = shown.length > 1;
+
+  const series: EvoSeries[] = rankings.flatMap((r) =>
+    shown
+      .map((sc) => ({
+        ranking: r,
+        scope: sc,
+        points: r.editions.map((e) => ({ year: e.year, rank: rankOf(e, sc) })).filter((p): p is EvoPoint => p.rank !== null),
+      }))
+      .filter((s) => s.points.length > 0),
+  );
+  const groups = rankings.map((r) => series.filter((s) => s.ranking === r)).filter((g) => g.length > 0);
 
   const source = Array.from(new Set(rankings.map((r) => r.source).filter(Boolean))).join(" · ");
+  const phrase = marked ? scopesPhrase(shown) : SCOPE_LABEL[shown[0]].toLowerCase();
 
   return (
     <ChartFrame
       title="Evolución de la posición"
-      subtitle={`Posición ${SCOPE_LABEL[scope].toLowerCase()} por edición · el puesto 1 arriba, escala logarítmica`}
+      subtitle={`Posición ${phrase} por edición · el puesto 1 arriba, escala logarítmica`}
       actions={
         <>
           <ViewSwitch
@@ -529,7 +545,10 @@ function RankingsEvolution({ rankings }: { rankings: RankingData[] }) {
               label="Ámbito de la posición"
               value={scope}
               onChange={setScope}
-              options={scopes.map((sc) => ({ value: sc, label: SCOPE_LABEL[sc] }))}
+              options={[
+                { value: "todos" as ScopeChoice, label: scopes.length === 3 ? "Los tres" : "Ambos" },
+                ...scopes.map((sc) => ({ value: sc as ScopeChoice, label: SCOPE_LABEL[sc] })),
+              ]}
             />
           )}
         </>
@@ -537,51 +556,125 @@ function RankingsEvolution({ rankings }: { rankings: RankingData[] }) {
       source={source}
     >
       {series.length === 0 ? (
-        <p className="od-empty">Ningún ranking reporta posición {SCOPE_LABEL[scope].toLowerCase()}.</p>
-      ) : mode === "separado" ? (
-        <div className="od-evo-grid">
-          {series.map((s) => (
-            <EvoTrace key={s.ranking.id} series={s} scope={scope} />
-          ))}
-        </div>
+        <p className="od-empty">Ningún ranking reporta posición {phrase}.</p>
       ) : (
-        <EvoTogether series={series} scope={scope} />
+        <>
+          {marked && <ScopeLegend scopes={shown} />}
+          {mode === "separado" ? (
+            <div className="od-evo-grid">
+              {groups.map((g) => (
+                <EvoTrace key={g[0].ranking.id} group={g} marked={marked} />
+              ))}
+            </div>
+          ) : (
+            <EvoTogether series={series} marked={marked} phrase={phrase} />
+          )}
+        </>
       )}
     </ChartFrame>
   );
 }
 
+/** Qué trazo y qué punto lleva cada ámbito. Sin color: el color es del ranking. */
+function ScopeLegend({ scopes }: { scopes: RankScope[] }) {
+  return (
+    <ul className="od-scope-legend" aria-label="Ámbitos de la posición">
+      {scopes.map((sc) => (
+        <li key={sc}>
+          <svg viewBox="0 0 40 14" width="40" height="14" aria-hidden="true">
+            <line className="od-rank-evo__line" x1="3" x2="37" y1="7" y2="7" strokeDasharray={scopeDash(sc, 2.5)} />
+            <path className="od-rank-evo__dot" d={scopeMarkPath(sc, 20, 7, 4)} />
+          </svg>
+          {SCOPE_LABEL[sc]}
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+/** La línea de una serie con sus puntos y sus bandas. */
+function EvoLine({
+  series,
+  x,
+  y,
+  marked,
+  r,
+  name,
+}: {
+  series: EvoSeries;
+  x: (year: number) => number;
+  y: (rank: number) => number;
+  marked: boolean;
+  r: number;
+  name: string;
+}) {
+  const { points, scope } = series;
+  return (
+    <>
+      {points.length > 1 && (
+        <path
+          className="od-rank-evo__line"
+          d={points.map((p, i) => `${i ? "L" : "M"}${x(p.year).toFixed(1)} ${y(p.rank.value).toFixed(1)}`).join("")}
+          strokeDasharray={marked ? scopeDash(scope, 2.5) : undefined}
+        />
+      )}
+      {points.map((p) => {
+        const [from, to] = p.rank.band ? bandEnds(p.rank, p.rank.value) : [p.rank.value, p.rank.value];
+        return (
+          <g key={p.year}>
+            {p.rank.band && <line className="od-rank-evo__band" x1={x(p.year)} x2={x(p.year)} y1={y(from)} y2={y(to)} />}
+            <path className="od-rank-evo__dot" d={scopeMarkPath(marked ? scope : "global", x(p.year), y(p.rank.value), r)}>
+              <title>{`${name} ${p.year}: ${p.rank.text}`}</title>
+            </path>
+          </g>
+        );
+      })}
+    </>
+  );
+}
+
 /* --- Cada ranking en su tira --- */
 
-function EvoTrace({ series, scope }: { series: EvoSeries; scope: RankScope }) {
+function EvoTrace({ group, marked }: { group: EvoSeries[]; marked: boolean }) {
   const wrap = useRef<HTMLDivElement>(null);
   const width = Math.max(240, useWidth(wrap, 320));
-  const { ranking, points } = series;
+  const ranking = group[0].ranking;
   const system = RANKING_SYSTEMS[ranking.system];
   const code = system.publisher || ranking.title.replace(/[^\p{L}]/gu, "").slice(0, 2).toUpperCase() || "RK";
+  // Varias líneas en la tira: más alto y con una columna de rótulos que dice
+  // el ámbito de cada una.
+  const labelled = marked && group.length > 1;
 
-  const height = 132;
-  const m = { top: 18, right: 72, bottom: 26, left: 46 };
+  const height = labelled ? 196 : 132;
+  const m = { top: 18, right: labelled ? 112 : 72, bottom: 26, left: 46 };
   const innerW = Math.max(40, width - m.left - m.right);
   const innerH = height - m.top - m.bottom;
-  const years = points.map((p) => p.year);
+  const years = Array.from(new Set(group.flatMap((s) => s.points.map((p) => p.year)))).sort((a, b) => a - b);
   const first = years[0];
   const last = years[years.length - 1];
   // Cada tira tiene su propia escala: es lo que deja leer un ranking nacional
-  // (#16) y uno mundial (#1401) con el mismo detalle.
+  // (#16) y uno mundial (#1401) con el mismo detalle. Los ámbitos de un mismo
+  // ranking comparten la de su tira, así se ve cuál queda más arriba.
   const { y, ticks } = rankScale(
-    points.flatMap((p) => rankSpan(p.rank)),
+    group.flatMap((s) => s.points.flatMap((p) => rankSpan(p.rank))),
     m.top,
     innerH,
     { pad: 1.15, minRatio: 2.2, dense: true },
   );
   // Con una sola edición el punto va centrado: no hay recorrido que dibujar.
   const x = (year: number) => m.left + (last === first ? innerW / 2 : ((year - first) / (last - first)) * innerW);
-  const shown = ticks.length > 3 ? ticks.filter((_, i) => i % Math.ceil(ticks.length / 3) === 0) : ticks;
+  const most = labelled ? 5 : 3;
+  const shown = ticks.length > most ? ticks.filter((_, i) => i % Math.ceil(ticks.length / most) === 0) : ticks;
 
-  const lastPoint = points[points.length - 1];
-  const beforeLast = points.length > 1 ? points[points.length - 2] : null;
-  const change = beforeLast ? rankChange(lastPoint.rank, beforeLast.rank) : null;
+  const labelX = m.left + innerW + 14;
+  const placed = labelled
+    ? stackLabels(
+        group.map((s) => y(s.points[s.points.length - 1].rank.value)),
+        30,
+        m.top + 10,
+        m.top + innerH - 6,
+      )
+    : [];
 
   return (
     <article className="od-evo" style={accentStyle(ranking.accent)}>
@@ -597,9 +690,9 @@ function EvoTrace({ series, scope }: { series: EvoSeries; scope: RankScope }) {
           width={width}
           height={height}
           role="img"
-          aria-label={`${ranking.title}, posición ${SCOPE_LABEL[scope].toLowerCase()}: ${points
-            .map((p) => `${p.year}, ${p.rank.band ? `banda ${p.rank.text}` : `puesto ${p.rank.text}`}`)
-            .join("; ")}`}
+          aria-label={`${ranking.title}. ${group
+            .map((s) => `Posición ${SCOPE_LABEL[s.scope].toLowerCase()}: ${s.points.map((p) => `${p.year}, ${rankWords(p.rank)}`).join("; ")}`)
+            .join(". ")}`}
         >
           {shown.map((t) => (
             <g key={t}>
@@ -609,48 +702,68 @@ function EvoTrace({ series, scope }: { series: EvoSeries; scope: RankScope }) {
               </text>
             </g>
           ))}
+          {years.map((yr) => (
+            <text key={yr} className="od-rank-evo__tick" x={x(yr)} y={height - 8} textAnchor="middle">
+              {yr}
+            </text>
+          ))}
 
-          {points.length > 1 && (
-            <path
-              className="od-rank-evo__line"
-              d={points.map((p, i) => `${i ? "L" : "M"}${x(p.year).toFixed(1)} ${y(p.rank.value).toFixed(1)}`).join("")}
-            />
-          )}
-
-          {points.map((p) => {
-            const [from, to] = p.rank.band ? bandEnds(p.rank, p.rank.value) : [p.rank.value, p.rank.value];
+          {group.map((s, index) => {
+            const end = s.points[s.points.length - 1];
+            const endX = x(end.year);
+            const endY = y(end.rank.value);
             return (
-              <g key={p.year}>
-                {p.rank.band && <line className="od-rank-evo__band" x1={x(p.year)} x2={x(p.year)} y1={y(from)} y2={y(to)} />}
-                <circle className="od-rank-evo__dot" cx={x(p.year)} cy={y(p.rank.value)} r={4.5}>
-                  <title>{`${p.year}: ${p.rank.text}`}</title>
-                </circle>
-                <text className="od-rank-evo__tick" x={x(p.year)} y={height - 8} textAnchor="middle">
-                  {p.year}
-                </text>
+              <g key={s.scope}>
+                <EvoLine series={s} x={x} y={y} marked={marked} r={4.5} name={SCOPE_LABEL[s.scope]} />
+                {labelled ? (
+                  <>
+                    <path
+                      className="od-rank-evo__leader"
+                      d={`M${(endX + 7).toFixed(1)} ${endY.toFixed(1)}H${(labelX - 20).toFixed(1)}L${(labelX - 6).toFixed(1)} ${placed[index].toFixed(1)}H${labelX.toFixed(1)}`}
+                    />
+                    <text className="od-rank-evo__label" x={labelX} y={placed[index]} dy="0.32em">
+                      <tspan className="od-rank-evo__value" x={labelX} dy="-0.32em">
+                        {end.rank.text}
+                      </tspan>
+                      <tspan x={labelX} dy="1.25em">
+                        {SCOPE_LABEL[s.scope]}
+                      </tspan>
+                    </text>
+                  </>
+                ) : (
+                  <text
+                    className="od-rank-evo__value"
+                    x={Math.min(endX + 10, width - 2)}
+                    y={endY}
+                    dy="0.32em"
+                    textAnchor={endX + 10 > width - 2 ? "end" : "start"}
+                  >
+                    {end.rank.text}
+                  </text>
+                )}
               </g>
             );
           })}
-
-          <text
-            className="od-rank-evo__value"
-            x={Math.min(x(lastPoint.year) + 10, width - 2)}
-            y={y(lastPoint.rank.value)}
-            dy="0.32em"
-            textAnchor={x(lastPoint.year) + 10 > width - 2 ? "end" : "start"}
-          >
-            {lastPoint.rank.text}
-          </text>
         </svg>
       </div>
 
-      <footer className="od-evo__foot">
-        {change ? <ChangeNote change={change} /> : <span className="od-evo__single">Una sola edición publicada</span>}
-        {beforeLast && !namesPrevious(change) && (
-          <span className="od-rank__previous">
-            {beforeLast.year}: <RankText rank={beforeLast.rank} />
-          </span>
-        )}
+      <footer className="od-evo__foot" data-several={labelled || undefined}>
+        {group.map((s) => {
+          const end = s.points[s.points.length - 1];
+          const before = s.points.length > 1 ? s.points[s.points.length - 2] : null;
+          const change = before ? rankChange(end.rank, before.rank) : null;
+          return (
+            <span key={s.scope} className="od-evo__change">
+              {labelled && <b>{SCOPE_LABEL[s.scope]}</b>}
+              {change ? <ChangeNote change={change} /> : <span className="od-evo__single">Una sola edición publicada</span>}
+              {before && !namesPrevious(change) && (
+                <span className="od-rank__previous">
+                  {before.year}: <RankText rank={before.rank} />
+                </span>
+              )}
+            </span>
+          );
+        })}
       </footer>
     </article>
   );
@@ -658,18 +771,19 @@ function EvoTrace({ series, scope }: { series: EvoSeries; scope: RankScope }) {
 
 /* --- Todos juntos en un lienzo --- */
 
-function EvoTogether({ series, scope }: { series: EvoSeries[]; scope: RankScope }) {
+function EvoTogether({ series, marked, phrase }: { series: EvoSeries[]; marked: boolean; phrase: string }) {
   const wrap = useRef<HTMLDivElement>(null);
   // Por debajo de este ancho el lienzo no se aplasta: se desplaza dentro de su
   // marco, como el resto de gráficas anchas del portal.
   const width = Math.max(460, useWidth(wrap, 860));
+  const name = (s: EvoSeries) => (marked ? `${rankingShortLabel(s.ranking)} · ${SCOPE_LABEL[s.scope]}` : rankingShortLabel(s.ranking));
 
   const years = Array.from(new Set(series.flatMap((s) => s.points.map((p) => p.year)))).sort((a, b) => a - b);
   const ranks = series.flatMap((s) => s.points.flatMap((p) => rankSpan(p.rank)));
   // La columna de rótulos crece con el nombre más largo, hasta un tope: un
   // nombre cortado por el borde es justo lo que esta vista viene a evitar.
-  const longest = Math.max(...series.map((s) => rankingShortLabel(s.ranking).length));
-  const gutter = Math.min(210, Math.max(120, 26 + longest * 7.4));
+  const longest = Math.max(...series.map((s) => name(s).length));
+  const gutter = Math.min(marked ? 260 : 210, Math.max(120, 26 + longest * 7.4));
   const height = Math.max(320, 86 + series.length * 46);
   const m = { top: 20, right: gutter, bottom: 34, left: 56 };
   const innerW = Math.max(60, width - m.left - m.right);
@@ -678,7 +792,7 @@ function EvoTogether({ series, scope }: { series: EvoSeries[]; scope: RankScope 
   const x = (year: number) =>
     m.left + (years.length === 1 ? innerW / 2 : ((year - years[0]) / (years[years.length - 1] - years[0])) * innerW);
 
-  // Dos líneas por rótulo: la cifra y el nombre del ranking.
+  // Dos líneas por rótulo: la cifra y el nombre del ranking (y su ámbito).
   const labelX = m.left + innerW + 14;
   const placed = stackLabels(
     series.map((s) => y(s.points[s.points.length - 1].rank.value)),
@@ -689,12 +803,7 @@ function EvoTogether({ series, scope }: { series: EvoSeries[]; scope: RankScope 
 
   return (
     <div ref={wrap} className="od-rank-evo">
-      <svg
-        width={width}
-        height={height}
-        role="img"
-        aria-label={`Evolución de la posición ${SCOPE_LABEL[scope].toLowerCase()} en ${series.length} rankings`}
-      >
+      <svg width={width} height={height} role="img" aria-label={`Evolución de la posición ${phrase} en ${new Set(series.map((s) => s.ranking.id)).size} rankings`}>
         {ticks.map((t) => (
           <g key={t}>
             <line className="od-rank-evo__grid" x1={m.left} x2={m.left + innerW} y1={y(t)} y2={y(t)} />
@@ -709,26 +818,14 @@ function EvoTogether({ series, scope }: { series: EvoSeries[]; scope: RankScope 
           </text>
         ))}
 
-        {series.map(({ ranking, points }, index) => {
-          const d = points.map((p, i) => `${i ? "L" : "M"}${x(p.year).toFixed(1)} ${y(p.rank.value).toFixed(1)}`).join("");
-          const last = points[points.length - 1];
+        {series.map((s, index) => {
+          const last = s.points[s.points.length - 1];
           const lastX = x(last.year);
           const lastY = y(last.rank.value);
           const labelY = placed[index];
           return (
-            <g key={ranking.id} style={accentStyle(ranking.accent)}>
-              {points.length > 1 && <path className="od-rank-evo__line" d={d} />}
-              {points.map((p) => {
-                const [from, to] = p.rank.band ? bandEnds(p.rank, p.rank.value) : [p.rank.value, p.rank.value];
-                return (
-                  <g key={p.year}>
-                    {p.rank.band && <line className="od-rank-evo__band" x1={x(p.year)} x2={x(p.year)} y1={y(from)} y2={y(to)} />}
-                    <circle className="od-rank-evo__dot" cx={x(p.year)} cy={y(p.rank.value)} r={5}>
-                      <title>{`${ranking.title} ${p.year}: ${p.rank.text}`}</title>
-                    </circle>
-                  </g>
-                );
-              })}
+            <g key={`${s.ranking.id}-${s.scope}`} style={accentStyle(s.ranking.accent)}>
+              <EvoLine series={s} x={x} y={y} marked={marked} r={5} name={`${s.ranking.title}${marked ? ` · ${SCOPE_LABEL[s.scope]}` : ""}`} />
               {/* El hilo lleva del último punto a su rótulo, aunque el ranking deje de reportar antes. */}
               <path
                 className="od-rank-evo__leader"
@@ -739,7 +836,7 @@ function EvoTogether({ series, scope }: { series: EvoSeries[]; scope: RankScope 
                   {last.rank.text}
                 </tspan>
                 <tspan x={labelX} dy="1.25em">
-                  {rankingShortLabel(ranking)}
+                  {name(s)}
                 </tspan>
               </text>
             </g>

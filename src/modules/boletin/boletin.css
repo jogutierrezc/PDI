@@ -1534,6 +1534,12 @@
 
 .bol-legend line { stroke-width: 0.9; }
 
+/* Ámbitos de un ranking: el trazo y la forma del punto, en tinta. */
+.bol-legend--scopes { margin: 0 0 1mm; }
+.bol-legend--scopes svg { width: 6mm; height: 2mm; overflow: visible; }
+.bol-legend--scopes line { fill: none; stroke: var(--bol-ink-2); stroke-width: 0.6; stroke-linecap: round; }
+.bol-legend--scopes path { fill: var(--bol-ink-2); stroke: #ffffff; stroke-width: 0.25; }
+
 /* --- Tablas --------------------------------------------------------------- */
 
 .bol-table {

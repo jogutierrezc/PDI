@@ -26,7 +26,7 @@ import { ALL_YEARS, ANNUAL_RULE_LABEL, cutLabel, TERMS } from "../datos-abiertos
 import type { AnnualRule, Term } from "../datos-abiertos/data/terms";
 import { isMobilityMap, isWorldMap } from "../datos-abiertos/data/types";
 import { indicatorRef, reportGroups } from "../datos-abiertos/data/groups";
-import { RANKING_SYSTEMS, SCOPE_LABEL, SDGS, latestEdition, parseRank, preferredScope, previousEdition, rankChange, rankOf, rankingShortLabel } from "../datos-abiertos/data/rankings";
+import { RANKING_SYSTEMS, SCOPES, SCOPE_LABEL, SDGS, latestEdition, parseRank, previousEdition, rankChange, rankOf, rankingShortLabel, scopesPhrase } from "../datos-abiertos/data/rankings";
 import type { ParsedRank, RankScope, RankingData } from "../datos-abiertos/data/rankings";
 import { medalHeadline, medalUnits } from "./medals";
 import type { ReportGroup } from "../datos-abiertos/data/groups";
@@ -1201,12 +1201,14 @@ function rankingUnit(r: RankingData, settings: BulletinSettings): ReactNode | nu
   const rankText = (text: string) => parseRank(text)?.text ?? "—";
   const editionNote =
     settings.cut !== ALL_YEARS && edition.year !== settings.cut ? `Edición ${edition.year} (la más reciente hasta ${settings.cut})` : `Edición ${edition.year}`;
-  // La traza toma el ámbito más cercano con al menos dos ediciones: en papel no
-  // hay selector, y el puesto en Colombia es el que primero se busca.
-  const traceScope = preferredScope((scope) => rankPoints(r, scope, settings.cut).length > 1);
-  const trace: RankLine | null = traceScope
-    ? { label: rankingShortLabel(r), color: r.accent, points: rankPoints(r, traceScope, settings.cut) }
-    : null;
+  // En papel no hay selector: la traza lleva los ámbitos que el ranking reporta
+  // (mundial, Latinoamérica, Colombia) en el mismo dibujo, cada uno con su
+  // trazo, para que se vea cuál queda más arriba edición a edición.
+  const trace: RankLine[] = SCOPES.map((scope) => ({ label: SCOPE_LABEL[scope], color: r.accent, scope, points: rankPoints(r, scope, settings.cut) })).filter(
+    (line) => line.points.length > 0,
+  );
+  const traced = trace.some((line) => line.points.length > 1);
+  const tracePhrase = scopesPhrase(trace.map((line) => line.scope!));
   return (
     <DatasetSheet
       title={r.title}
@@ -1247,12 +1249,14 @@ function rankingUnit(r: RankingData, settings: BulletinSettings): ReactNode | nu
           </div>
         )}
 
-        {trace && traceScope && (
+        {traced && (
           <figure>
-            <figcaption>
-              Evolución de la posición {SCOPE_LABEL[traceScope].toLowerCase()} · el puesto 1 arriba, escala logarítmica
-            </figcaption>
-            <RankTrace line={trace} width={178} height={38} label={`Evolución de la posición de ${r.title}`} />
+            <figcaption>Evolución de la posición {tracePhrase} · el puesto 1 arriba, escala logarítmica</figcaption>
+            {trace.length > 1 ? (
+              <RankEvolutionChart lines={trace} width={178} height={50} label={`Evolución de la posición ${tracePhrase} de ${r.title}`} />
+            ) : (
+              <RankTrace line={trace[0]} width={178} height={38} label={`Evolución de la posición ${tracePhrase} de ${r.title}`} />
+            )}
           </figure>
         )}
 
@@ -1318,46 +1322,58 @@ function rankingUnit(r: RankingData, settings: BulletinSettings): ReactNode | nu
 
 /**
  * Hoja de conjunto: todos los rankings del informe en un mismo lienzo, edición
- * a edición. El ámbito es el más cercano que reporten al menos dos rankings
- * —Colombia, si no Latinoamérica, si no el mundial— y la hoja lo dice.
+ * a edición, con los tres ámbitos a la vez (mundial, Latinoamérica, Colombia).
+ * El color es del ranking; el ámbito lo dicen el trazo y la forma del punto.
  *
  * Debajo, la tabla con los mismos puestos: la gráfica enseña la forma del
  * recorrido, la tabla da la cifra y deja la hoja legible sin el color.
  */
 function rankingsEvolutionUnit(report: Report, settings: BulletinSettings): ReactNode | null {
   const rankings = report.rankings ?? [];
-  const scope = preferredScope((sc) => rankings.filter((r) => rankPoints(r, sc, settings.cut).length > 1).length >= 2);
-  if (!scope) return null;
-  const lines: RankLine[] = rankings
-    .map((r) => ({ label: rankingShortLabel(r), color: r.accent, points: rankPoints(r, scope, settings.cut) }))
-    .filter((line) => line.points.length > 0);
-  if (lines.length < 2) return null;
+  const moving = rankings.filter((r) => SCOPES.some((sc) => rankPoints(r, sc, settings.cut).length > 1));
+  if (moving.length < 2) return null;
+  const drawn = rankings.flatMap((r) =>
+    SCOPES.map((scope) => ({ ranking: r, scope, points: rankPoints(r, scope, settings.cut) })).filter((line) => line.points.length > 0),
+  );
+  const scopes = SCOPES.filter((sc) => drawn.some((line) => line.scope === sc));
+  const phrase = scopesPhrase(scopes);
+  const lines: RankLine[] = drawn.map(({ ranking, scope, points }) => ({
+    label: scopes.length > 1 ? `${rankingShortLabel(ranking)} · ${SCOPE_LABEL[scope]}` : rankingShortLabel(ranking),
+    color: ranking.accent,
+    scope,
+    points,
+  }));
 
   const years = Array.from(new Set(lines.flatMap((line) => line.points.map((pt) => pt.year)))).sort((a, b) => a - b);
   const cutNote = settings.cut === ALL_YEARS ? "Todas las ediciones publicadas" : `Ediciones hasta ${settings.cut}`;
   return (
     <DatasetSheet
       title="Evolución de los rankings"
-      description={`Cómo se ha movido la UDES en cada ranking que sigue Planeación, edición a edición, en su posición ${SCOPE_LABEL[scope].toLowerCase()}.`}
+      description={`Cómo se ha movido la UDES en cada ranking que sigue Planeación, edición a edición, en su posición ${phrase}.`}
       source={Array.from(new Set(rankings.map((r) => r.source).filter(Boolean))).join(" · ")}
       notes={[
-        ["Ámbito", `${SCOPE_LABEL[scope]} · el más cercano que reportan al menos dos rankings`],
+        [
+          "Ámbitos",
+          scopes.length > 1
+            ? `${scopes.map((sc) => SCOPE_LABEL[sc]).join(", ")} en el mismo dibujo · línea continua y círculo, mundial; rayas y rombo, Latinoamérica; puntos y triángulo, Colombia`
+            : SCOPE_LABEL[scopes[0]],
+        ],
         ["Corte", cutNote],
         ["Lectura", "El puesto 1 es el primero: bajar el número es subir en el ranking. La escala es logarítmica, así que un puesto nacional y uno mundial caben en el mismo dibujo."],
         ["Bandas", "Un ranking que publica un tramo («801–1000») lo ocupa entero en vertical; no se inventa un punto medio."],
       ]}
       wide
     >
-      <RankEvolutionChart lines={lines} width={178} label={`Evolución de la posición ${SCOPE_LABEL[scope].toLowerCase()} en ${lines.length} rankings`} />
+      <RankEvolutionChart lines={lines} width={178} label={`Evolución de la posición ${phrase} en ${moving.length} rankings`} />
       <DataTable
-        caption={`Posición ${SCOPE_LABEL[scope].toLowerCase()} por edición`}
-        head={["Ranking", ...years.map(String)]}
-        rows={lines.map((line) => ({
-          label: line.label,
-          cells: years.map((year) => {
+        caption={`Posición ${phrase} por edición`}
+        head={["Ranking", "Ámbito", ...years.map(String)]}
+        rows={lines.map((line, i) => ({
+          label: rankingShortLabel(drawn[i].ranking),
+          cells: [SCOPE_LABEL[line.scope!], ...years.map((year) => {
             const pt = line.points.find((point) => point.year === year);
             return pt ? (pt.rank.band ? pt.rank.text : `#${pt.rank.text.replace("=", "")}`) : "—";
-          }),
+          })],
         }))}
       />
     </DatasetSheet>

@@ -56,6 +56,49 @@ export const SCOPE_PREFERENCE: RankScope[] = ["national", "regional", "global"];
 export const preferredScope = (has: (scope: RankScope) => boolean): RankScope | null =>
   SCOPE_PREFERENCE.find(has) ?? null;
 
+/** Los tres ámbitos en el orden de las columnas de la tabla comparativa. */
+export const SCOPES: RankScope[] = ["global", "regional", "national"];
+
+/**
+ * Cómo se distingue cada ámbito cuando los tres van en la misma gráfica. El
+ * color ya es del ranking, así que el ámbito lo dicen el trazo y la forma del
+ * punto (y su rótulo): continuo y círculo el mundial, rayas y rombo
+ * Latinoamérica, puntos y triángulo Colombia. Se lee también en blanco y negro.
+ *
+ * El trazo va en múltiplos del grueso de la línea: sirve igual en píxeles que
+ * en milímetros.
+ */
+export const SCOPE_MARK: Record<RankScope, { dash: number[]; shape: "circle" | "diamond" | "triangle" }> = {
+  global: { dash: [], shape: "circle" },
+  regional: { dash: [3, 1.8], shape: "diamond" },
+  national: { dash: [0.05, 1.7], shape: "triangle" },
+};
+
+/** "mundial, en Latinoamérica y en Colombia": los ámbitos dichos en una frase. */
+export function scopesPhrase(scopes: RankScope[]): string {
+  const words = scopes.map((sc) => (sc === "global" ? "mundial" : `en ${SCOPE_LABEL[sc]}`));
+  return words.length > 1 ? `${words.slice(0, -1).join(", ")} y ${words[words.length - 1]}` : (words[0] ?? "");
+}
+
+/** `stroke-dasharray` del ámbito para una línea de ese grueso; vacío si es continua. */
+export const scopeDash = (scope: RankScope, stroke: number): string | undefined =>
+  SCOPE_MARK[scope].dash.length ? SCOPE_MARK[scope].dash.map((d) => +(d * stroke).toFixed(3)).join(" ") : undefined;
+
+/** Contorno del punto del ámbito, centrado en (cx, cy), con radio aproximado `r`. */
+export function scopeMarkPath(scope: RankScope, cx: number, cy: number, r: number): string {
+  const f = (n: number) => n.toFixed(2);
+  const shape = SCOPE_MARK[scope].shape;
+  if (shape === "diamond") {
+    const d = r * 1.3;
+    return `M${f(cx)} ${f(cy - d)}L${f(cx + d)} ${f(cy)}L${f(cx)} ${f(cy + d)}L${f(cx - d)} ${f(cy)}Z`;
+  }
+  if (shape === "triangle") {
+    const d = r * 1.35;
+    return `M${f(cx)} ${f(cy - d)}L${f(cx + d * 0.95)} ${f(cy + d * 0.7)}L${f(cx - d * 0.95)} ${f(cy + d * 0.7)}Z`;
+  }
+  return `M${f(cx - r)} ${f(cy)}a${r} ${r} 0 1 0 ${f(2 * r)} 0a${r} ${r} 0 1 0 ${f(-2 * r)} 0Z`;
+}
+
 /** Categorías de QS Stars, en el orden en que QS las publica. Se pueden añadir otras. */
 export const QS_STAR_CATEGORIES = [
   "Teaching",

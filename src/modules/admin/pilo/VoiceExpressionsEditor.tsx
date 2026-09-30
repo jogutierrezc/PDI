@@ -92,7 +92,9 @@ export function VoiceExpressionsEditor({ ed, choice }: { ed: EditorApi; choice: 
           title="Restablecer las frases sugeridas para esta emoción"
           style={{ minHeight: "32px", fontSize: "var(--text-xs)", padding: "0 0.75rem" }}
         >
-          <Icon name="refresh" size={13} />
+          <svg width={13} height={13} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+            <path d="M4 12a8 8 0 1 0 2.4-5.7M4 4v4h4" />
+          </svg>
           Restablecer sugeridas
         </button>
       </div>
@@ -142,7 +144,9 @@ export function VoiceExpressionsEditor({ ed, choice }: { ed: EditorApi; choice: 
                 title="Quitar esta expresión"
                 aria-label={`Quitar expresión «${phrase}»`}
               >
-                <Icon name="trash" size={13} />
+                <svg width={13} height={13} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                  <path d="M5 7h14M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3" />
+                </svg>
               </button>
             </div>
           </li>

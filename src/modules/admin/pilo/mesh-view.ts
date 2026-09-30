@@ -60,7 +60,7 @@ const SECTION_FIELDS: Partial<Record<SectionId, (keyof PiloSettings)[]>> = {
     "fish_model",
   ],
   portales: ["impacto_report"],
-  memoria: ["memory_sources"],
+  memoria: ["memory_sources", "embed_model"],
   uso: ["daily_limit", "max_rows", "cache_days"],
 };
 

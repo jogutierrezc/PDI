@@ -35,7 +35,7 @@
    ========================================================================== */
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { supabase } from "../../../lib/supabase";
+import { readFunctionError, supabase } from "../../../lib/supabase";
 import { usePillars, useProjects, useStructure } from "../../../data/queries";
 import { formatValue, useOpenDataCatalog, valueOf } from "../../datos-abiertos/data/open-data";
 import { ALL_CAMPUSES } from "../../datos-abiertos/data/types";
@@ -219,6 +219,76 @@ function indicatorBody(indicator: Indicator, catalog: OpenDataCatalog, label: st
   if (source) parts.push(`Lo reporta ${source}`);
   if (catalog.illustrative) parts.push("Estas cifras están marcadas como dato ilustrativo en el portal.");
   return { body: parts.join(" "), cut: catalog.illustrative && cut ? `${cut} · ilustrativo` : cut };
+}
+
+/** La serie completa de un indicador, para `pilo_facts_replace` (0107). */
+export interface FactRow {
+  ref: string;
+  report: string;
+  label: string;
+  unit: string;
+  format: ValueFormat;
+  definition: string;
+  office: string;
+  path: string;
+  period: string;
+  illustrative: boolean;
+  series: { y: number; t: "A" | "B" | null; c: string; v: number }[];
+}
+
+/**
+ * Las cifras en vivo de Pilo: cada indicador publicado con todas sus cifras
+ * (año, periodo 1 y 2, cada sede y toda la UDES), tal como las calcula el
+ * portal. El total de la UDES va con sede "". Sin dinero, como la memoria.
+ */
+export function factRows(catalog: OpenDataCatalog | null | undefined): FactRow[] {
+  if (!catalog) return [];
+  const period = clean(catalog.period?.label);
+  const years = arrayOf<unknown>(catalog.years).filter((y): y is number => typeof y === "number" && Number.isFinite(y) && y !== ALL_YEARS);
+  const campusName = new Map<string, string>([[ALL_CAMPUSES, ""]]);
+  for (const c of arrayOf<{ id?: unknown; name?: unknown }>(catalog.campuses)) {
+    if (typeof c.id === "string" && c.id !== ALL_CAMPUSES && clean(c.name)) campusName.set(c.id, clean(c.name));
+  }
+  const out: FactRow[] = [];
+  for (const report of arrayOf<OpenDataCatalog["reports"][number]>(catalog.reports)) {
+    const slug = clean(report.slug);
+    const name = clean(report.name);
+    if (!slug || !name || isMoney(name)) continue;
+    for (const indicator of arrayOf<Indicator>(report.indicators)) {
+      const label = clean(indicator.label);
+      const id = clean(indicator.id);
+      if (!label || !id || isMoney(indicator.unit) || isMoney(label)) continue;
+      const series: FactRow["series"] = [];
+      const add = (y: number, t: "A" | "B" | null, cells: Partial<Record<string, number | null>> | undefined) => {
+        for (const [key, raw] of Object.entries(cells ?? {})) {
+          const v = numberOrNull(raw);
+          const c = campusName.get(key);
+          if (v !== null && c !== undefined) series.push({ y, t, c, v });
+        }
+      };
+      for (const y of years) {
+        if (indicator.years && !indicator.years.includes(y)) continue;
+        add(y, null, indicator.values?.[y]);
+        add(y, "A", indicator.terms?.[y]?.A);
+        add(y, "B", indicator.terms?.[y]?.B);
+      }
+      if (!series.length) continue;
+      out.push({
+        ref: `cifras:${slug}:${id}`.slice(0, LIMITS.ref),
+        report: clip(name, 300),
+        label: clip(label, 300),
+        unit: clip(clean(indicator.unit), 60),
+        format: indicator.format === "porcentaje" || indicator.format === "decimal" ? indicator.format : "entero",
+        definition: clip(noMoney(clean(indicator.definition)), 1200),
+        office: clip(clean(indicator.source), LIMITS.office),
+        path: `/datos-abiertos/${slug}`,
+        period,
+        illustrative: Boolean(catalog.illustrative),
+        series,
+      });
+    }
+  }
+  return out;
 }
 
 export function cifrasRows(catalog: OpenDataCatalog | null | undefined): MemoryRow[] {
@@ -607,6 +677,8 @@ export interface MemoryBuild {
   rows: Partial<Record<MemorySource, MemoryRow[]>>;
   /** La malla de cada fuente lista (0097); sus pasajes nuevos ya van en `rows`. */
   meshes?: Partial<Record<MemorySource, MeshPayload>>;
+  /** Las cifras en vivo (0107): van con UDES en Cifras, solo si esa fuente quedó lista. */
+  facts?: FactRow[];
   problems: SourceProblem[];
 }
 
@@ -701,7 +773,16 @@ export function useMemoryInputs() {
       }),
     });
     for (const source of Object.keys(meshes) as MemorySource[]) if (!built.rows[source]) delete meshes[source];
-    return { ...built, meshes };
+    let facts: FactRow[] | undefined;
+    if (built.rows.cifras) {
+      try {
+        facts = factRows(catalog.data);
+      } catch {
+        // Sin series Pilo sigue respondiendo con la última cifra de la memoria.
+        facts = undefined;
+      }
+    }
+    return { ...built, meshes, facts };
   };
   return { loading, impactReady: Boolean(impact.data), build };
 }
@@ -768,15 +849,105 @@ export interface MemoryHit {
   section: string;
   cut: string;
   rank: number;
+  /** Con la búsqueda por significado (0108): por dónde lo halló y cuánto se parece (coseno). */
+  via?: "palabras" | "significado" | "ambas";
+  sim?: number | null;
 }
 
-/** Probar la memoria: los pasajes que Pilo encontraría para una pregunta. */
+/* --- Búsqueda por significado (0108) ------------------------------------------------------ */
+
+export interface EmbedStatus {
+  model: string;
+  memory_total: number;
+  memory_done: number;
+  facts_total: number;
+  facts_done: number;
+  /** Las respuestas oficiales del catálogo (0109): sin esa migración, 0. */
+  catalog_total: number;
+  catalog_done: number;
+}
+
+/** Pide a pilo-ia un paso del índice. Los errores llegan en español desde la función. */
+async function indexStep<T>(body: Record<string, unknown>): Promise<T> {
+  const { data, error } = await supabase.functions.invoke<T>("pilo-ia", { body: { action: "indexar", ...body } });
+  if (error) throw new Error((await readFunctionError(error)) ?? "No pude hablar con Mr. Pilo ahora.");
+  return data as T;
+}
+
+const statusOf = (raw: unknown): EmbedStatus | null => {
+  if (!isRecord(raw)) return null;
+  return {
+    model: clean(raw.model),
+    memory_total: numberOrNull(raw.memory_total) ?? 0,
+    memory_done: numberOrNull(raw.memory_done) ?? 0,
+    facts_total: numberOrNull(raw.facts_total) ?? 0,
+    facts_done: numberOrNull(raw.facts_done) ?? 0,
+    catalog_total: numberOrNull(raw.catalog_total) ?? 0,
+    catalog_done: numberOrNull(raw.catalog_done) ?? 0,
+  };
+};
+
+/** Lo que falta por indexar. */
+export const pendingOf = (s: EmbedStatus | null) =>
+  s ? Math.max(0, s.memory_total - s.memory_done) + Math.max(0, s.facts_total - s.facts_done) + Math.max(0, s.catalog_total - s.catalog_done) : 0;
+
+/** Cuántos vectores están al día. El error dice por qué no se puede (proveedor, migración). */
+export function useEmbedStatus(enabled = true) {
+  return useQuery({
+    queryKey: ["pilo-ia", "memoria", "significado"],
+    enabled,
+    retry: false,
+    queryFn: async (): Promise<EmbedStatus | null> => statusOf((await indexStep<{ status?: unknown }>({ step: "estado" })).status),
+  });
+}
+
+/**
+ * Indexa por lotes de 64 hasta que no quede nada, avisando el avance. Si un
+ * lote no guarda nada (el proveedor falla en silencio), se detiene en vez de
+ * repetir para siempre.
+ */
+export function useIndexMemory() {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: async (onProgress?: (s: EmbedStatus) => void): Promise<EmbedStatus | null> => {
+      let last: EmbedStatus | null = null;
+      for (let round = 0; round < 200; round++) {
+        const r = await indexStep<{ saved?: number; status?: unknown }>({ step: "lote" });
+        last = statusOf(r.status);
+        if (last) onProgress?.(last);
+        if (!pendingOf(last) || !r.saved) break;
+      }
+      return last;
+    },
+    onSettled: () => client.invalidateQueries({ queryKey: ["pilo-ia", "memoria", "significado"] }),
+  });
+}
+
+/** Los modelos de embeddings que el proveedor tiene activos hoy (NVIDIA retira modelos seguido). */
+export function useEmbedModels() {
+  return useMutation({
+    mutationFn: async (): Promise<{ current: string; models: string[] }> => {
+      const r = await indexStep<{ current?: string; models?: string[] }>({ step: "modelos" });
+      return { current: clean(r.current), models: arrayOf<string>(r.models).map(clean).filter(Boolean) };
+    },
+  });
+}
+
+/**
+ * Probar la memoria: los pasajes que Pilo encontraría. Con la función (0108)
+ * es la búsqueda híbrida de verdad; si no responde, solo por palabras.
+ */
 export function useTryMemory() {
   return useMutation({
-    mutationFn: async (q: string): Promise<MemoryHit[]> => {
-      const { data, error } = await supabase.rpc("pilo_memory_search", { p_q: q, p_sources: null as never, p_limit: 5 });
-      if (error) throw error;
-      return (data ?? []) as MemoryHit[];
+    mutationFn: async (q: string): Promise<{ hits: MemoryHit[]; semantic: boolean; note?: string }> => {
+      try {
+        const r = await indexStep<{ hits?: MemoryHit[]; semantic?: boolean; error?: string }>({ step: "probar", q });
+        return { hits: r.hits ?? [], semantic: Boolean(r.semantic), note: r.semantic ? undefined : r.error };
+      } catch (error) {
+        const { data, error: rpcError } = await supabase.rpc("pilo_memory_search", { p_q: q, p_sources: null as never, p_limit: 5 });
+        if (rpcError) throw rpcError;
+        return { hits: (data ?? []) as MemoryHit[], semantic: false, note: error instanceof Error ? error.message : undefined };
+      }
     },
   });
 }
@@ -791,11 +962,24 @@ export interface ReplaceResult {
   nodes?: number;
   edges?: number;
   meshError?: string;
+  /** Las cifras en vivo que se guardaron (0107), o por qué no. */
+  facts?: number;
+  factsError?: string;
 }
 
 export interface ReplaceOutcome {
   done: ReplaceResult[];
   failed: SourceProblem[];
+}
+
+/** Guarda las series de UDES en Cifras. Devuelve por qué no se guardaron, o nada. */
+async function replaceFacts(facts: FactRow[], result: ReplaceResult): Promise<string | undefined> {
+  const bytes = new TextEncoder().encode(JSON.stringify(facts)).length;
+  if (bytes > MAX_PAYLOAD_BYTES) return `Las cifras en vivo pesan ${(bytes / 1024 / 1024).toFixed(1).replace(".", ",")} MB, más de los 4 MB que se envían de una vez.`;
+  const { data, error } = await supabase.rpc("pilo_facts_replace", { p_rows: facts as never });
+  if (error) return /pilo_facts_replace|function/i.test(error.message) ? "Falta la migración 0107 para guardar las cifras en vivo." : problemMessage(new Error(error.message));
+  result.facts = numberOrNull(isRecord(data) ? data.total : null) ?? facts.length;
+  return undefined;
 }
 
 /**
@@ -805,7 +989,7 @@ export interface ReplaceOutcome {
 export function useReplaceMemory() {
   const client = useQueryClient();
   return useMutation({
-    mutationFn: async ({ rows, meshes = {} }: Pick<MemoryBuild, "rows" | "meshes">): Promise<ReplaceOutcome> => {
+    mutationFn: async ({ rows, meshes = {}, facts }: Pick<MemoryBuild, "rows" | "meshes" | "facts">): Promise<ReplaceOutcome> => {
       const done: ReplaceResult[] = [];
       const failed: SourceProblem[] = [];
       for (const { id: source } of MEMORY_SOURCES) {
@@ -828,6 +1012,8 @@ export function useReplaceMemory() {
               result.edges = numberOrNull(m.edges) ?? mesh.edges.length;
             }
           }
+          // Las cifras en vivo, con UDES en Cifras: si fallan (sin 0107), la memoria ya quedó.
+          if (source === "cifras" && facts?.length) result.factsError = await replaceFacts(facts, result);
           done.push(result);
         } catch (error) {
           // PostgREST devuelve un objeto con `message`, no un Error.

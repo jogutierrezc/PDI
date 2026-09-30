@@ -12,7 +12,7 @@
      y cómo se le pregunta al modelo con los pasajes de la memoria (buildAskMessages).
    ========================================================================== */
 
-export type Action = "resumir" | "sintetizar" | "explicar" | "voz" | "probar" | "preguntar" | "entender" | "analizar";
+export type Action = "resumir" | "sintetizar" | "explicar" | "voz" | "probar" | "preguntar" | "entender" | "analizar" | "indexar";
 export type Fn = "leer" | "resumir" | "sintetizar" | "explicar" | "preguntar";
 export type Audience = "admin" | "sesion" | "publico";
 export type Portal = "cifras" | "pdi" | "observatorio" | "impacto" | "pregunta";
@@ -43,11 +43,13 @@ export interface Section {
 }
 
 export const PORTALS: Portal[] = ["cifras", "pdi", "observatorio", "impacto", "pregunta"];
-export const FN_OF: Record<Exclude<Action, "probar">, Fn> = { resumir: "resumir", sintetizar: "sintetizar", explicar: "explicar", voz: "leer", preguntar: "preguntar", entender: "sintetizar", analizar: "sintetizar" };
+export const FN_OF: Record<Exclude<Action, "probar" | "indexar">, Fn> = { resumir: "resumir", sintetizar: "sintetizar", explicar: "explicar", voz: "leer", preguntar: "preguntar", entender: "sintetizar", analizar: "sintetizar" };
 
 /** ¿Puede esta persona (null = sin sesión) usar la acción en el portal? */
 export function canUse(rules: Rules, portal: string, action: Action, role: Role | null): { ok: true } | { ok: false; reason: string } {
   if (action === "probar") return role === "admin" ? { ok: true } : { ok: false, reason: "Solo la administración prueba la conexión." };
+  // Indexar la memoria por significado (0108): mantenimiento de la administración, con o sin IA encendida.
+  if (action === "indexar") return role === "admin" ? { ok: true } : { ok: false, reason: "Solo la administración indexa la memoria de Pilo." };
   // Entender la necesidad de un programa (Mr. Pilo Bot, en Impacto): con la IA encendida y sesión.
   if (action === "entender") {
     if (!rules.enabled) return { ok: false, reason: "Mr. Pilo con IA está apagado." };
@@ -309,9 +311,11 @@ export const RULE_TEXT: Record<Rule, string> = {
 
 const ASK_TASK = [
   "Responde la pregunta con los pasajes numerados, en 2 a 5 frases.",
+  "Si la pregunta sigue la conversación (pide un dato más específico sobre lo que ya respondiste: una sede, un año, un periodo, una comparación), respóndela en ese contexto, sin repetir lo ya dicho.",
   "Después de cada dato pon entre corchetes el número del pasaje de donde sale, por ejemplo [1] o [2].",
   "Di el corte o periodo de las cifras cuando el pasaje lo trae.",
-  "Si los pasajes no alcanzan para responder, dilo y marca sin_datos en true.",
+  "No evadas: si los pasajes traen solo parte de lo pedido, responde con esa parte y di con claridad qué no está publicado; en ese caso sin_datos va en false.",
+  "Marca sin_datos en true solo si ningún pasaje trae nada de lo que se pregunta.",
   'Formato: {"respuesta":"...","sin_datos":false}',
 ].join(" ");
 
@@ -321,7 +325,7 @@ export function buildAskMessages(question: string, passages: Passage[], history:
     .join("\n\n");
   const before = history
     .slice(-2)
-    .map((h) => `Antes preguntaron: ${h.q.slice(0, 200)}\nY respondiste: ${h.a.slice(0, 400)}`)
+    .map((h) => `Antes preguntaron: ${h.q.slice(0, 200)}\nY respondiste: ${h.a.slice(0, 600)}`)
     .join("\n");
   return [
     { role: "system", content: PERSONA },
@@ -430,6 +434,408 @@ export function renumber<T>(text: string, passages: T[]): { text: string; passag
     text: text.replace(/\[(\d+)\]/g, (_m, n) => (map.has(Number(n)) ? `[${map.get(Number(n))}]` : "")),
     passages: order.map((n) => passages[n - 1]),
   };
+}
+
+/* --- Las cifras en vivo (0107) --------------------------------------------------------
+   La memoria guarda de cada indicador su última cifra; `pilo_facts` guarda la
+   serie entera (año, periodo y sede), armada con el mismo cálculo del portal.
+   Con ella Pilo da la cifra exacta que se pidió («matriculados en Cúcuta en
+   2023-2»). Aquí se decide qué corte se pidió, qué cifras se muestran y cómo
+   se dicen, con o sin IA. */
+
+export type FactTerm = "A" | "B";
+
+/** Una cifra de la serie: año, periodo (null = el año), sede ("" = toda la UDES) y valor. */
+export interface FactPoint {
+  y: number;
+  t: FactTerm | null;
+  c: string;
+  v: number;
+}
+
+/** Un indicador de UDES en Cifras con su serie completa. */
+export interface Fact {
+  ref: string;
+  report: string;
+  label: string;
+  unit: string;
+  format: string;
+  definition: string;
+  office: string;
+  path: string;
+  period: string;
+  illustrative: boolean;
+  series: FactPoint[];
+}
+
+/** El corte que pide la pregunta. */
+export interface Slots {
+  years: number[];
+  term: FactTerm | null;
+  campus: string[];
+  /** «por sede», «cada campus»: todas las sedes. */
+  byCampus: boolean;
+}
+
+const CAMPUS_GENERIC = new Set(["campus", "sede", "seccional", "udes", "ciudad", "extension"]);
+
+/** Las palabras con que se reconoce una sede en una pregunta: «Campus Cúcuta» → cucuta. */
+function campusWords(name: string): string[] {
+  const words = normalizeQuestion(name)
+    .split(" ")
+    .filter((w) => w.length >= 4 && !CAMPUS_GENERIC.has(w));
+  return words.includes("bucaramanga") ? [...words, "bga"] : words;
+}
+
+/** ¿Dos nombres son la misma sede? «Campus Cúcuta» y «Cúcuta» lo son. */
+export function sameCampus(a: string, b: string): boolean {
+  if (normalizeQuestion(a) === normalizeQuestion(b)) return true;
+  const x = campusWords(a);
+  return x.length > 0 && campusWords(b).some((w) => x.includes(w));
+}
+
+/**
+ * Las sedes que Pilo reconoce: las de las series (con el nombre que usan las
+ * cifras) y las demás de la universidad, aunque no tengan cifras publicadas.
+ * Así «¿y en Cúcuta?» se entiende, y si no hay cifra, se dice.
+ */
+export function knownCampuses(series: string[], others: string[]): string[] {
+  const out = [...new Set(series.map((c) => c.trim()).filter(Boolean))];
+  for (const name of others.map((c) => c.trim()).filter(Boolean)) if (!out.some((c) => sameCampus(c, name))) out.push(name);
+  return out;
+}
+
+/** Sede, año y periodo que pide la pregunta. Sin nada de eso, los campos quedan vacíos. */
+export function parseSlots(question: string, campuses: string[]): Slots {
+  const t = normalizeQuestion(question);
+  const years = [...new Set((t.match(/\b20\d\d\b/g) ?? []).map(Number))].sort((a, b) => a - b);
+  let term: FactTerm | null = null;
+  // «2023-2» llega como «2023 2»; «de 2023 a 2025» no es un periodo A.
+  if (/\b(primer|1er|1)( semestre| periodo)\b|\b(semestre|periodo) (1|uno|a)\b|\b20\d\d 1\b/.test(t)) term = "A";
+  else if (/\b(segundo|2do|2)( semestre| periodo)\b|\b(semestre|periodo) (2|dos|b)\b|\b20\d\d 2\b/.test(t)) term = "B";
+  const campus = campuses.filter((name) => campusWords(name).some((w) => new RegExp(`\\b${w}\\b`).test(t)));
+  const byCampus = /\bpor (sede|campus|seccional)|\b(cada|todas las|todos los|las|los) (sedes|campus|seccionales)\b|\bsedes\b/.test(t);
+  return { years, term, campus, byCampus };
+}
+
+export const hasSlots = (s: Slots) => s.years.length > 0 || s.term !== null || s.campus.length > 0 || s.byCampus;
+
+/**
+ * ¿La pregunta sigue la anterior? «¿Y en Cúcuta?», «¿y en 2023?», «¿eso cómo
+ * se compara?»: empieza con «y», se refiere a algo ya dicho o es corta y solo
+ * cambia el corte.
+ */
+export function isFollowUp(question: string, campuses: string[]): boolean {
+  const t = normalizeQuestion(question);
+  if (!t) return false;
+  if (/^(y|e|pero|ahora|tambien|entonces)\b/.test(t)) return true;
+  if (/\b(eso|esa|ese|esos|esas|esto|aquello|lo mismo|el anterior|la anterior|ahi|alli)\b/.test(t)) return true;
+  return t.split(" ").length <= 4 && hasSlots(parseSlots(question, campuses));
+}
+
+/** El corte de una pregunta de seguimiento: lo que dice ahora manda; lo que calla, lo pone la anterior. */
+export function mergeSlots(before: Slots, now: Slots): Slots {
+  const place = now.campus.length > 0 || now.byCampus;
+  return {
+    years: now.years.length ? now.years : before.years,
+    term: now.term ?? (now.years.length ? null : before.term),
+    campus: place ? now.campus : before.campus,
+    byCampus: place ? now.byCampus : before.byCampus,
+  };
+}
+
+/** Las palabras de la pregunta más las que usan los informes: «alumnos» también busca «estudiantes». */
+const SYNONYMS: [RegExp, string][] = [
+  [/\balumn[oa]s?\b|\bestudiantado\b/, "estudiantes"],
+  [/\bprofesor(es|as?)?\b|\bmaestros?\b/, "docentes"],
+  [/\bmatricul/, "matriculados estudiantes"],
+  [/\binscrit|\baspirant/, "inscritos aspirantes"],
+  [/\bgraduad|\begresad|\bgrados?\b/, "graduados"],
+  [/\bdesert|\babandon|\bretir/, "desercion"],
+  [/\bpermanen|\bretencion/, "permanencia"],
+  [/\bcarreras?\b|\bpregrados?\b/, "programas"],
+  [/\bsedes?\b|\bseccional/, "campus"],
+  [/\bprimiparos?\b|\bnuevos\b|\bprimer ingreso\b/, "primer curso nuevos"],
+  [/\binvestigador|\bgrupos? de investigacion/, "investigacion"],
+];
+
+export function expandQuery(question: string): string {
+  const t = normalizeQuestion(question);
+  const extra = SYNONYMS.filter(([re]) => re.test(t)).map(([, add]) => add);
+  return [question, ...extra].join(" ").slice(0, 600);
+}
+
+/** ¿Pide una cifra? */
+export const wantsFigure = (question: string) =>
+  /\b(cuant[oa]s?|numero|cantidad|total|tasa|porcentaje|indice|cifras?|promedio|valor|evolucion|como (va|fue|ha|esta)|comportamiento|crecio|aumento|bajo|disminuy)/.test(normalizeQuestion(question));
+
+/**
+ * ¿Dos preguntas piden el mismo corte? Una respuesta guardada de 2024 no
+ * sirve para 2023 aunque las dos preguntas se parezcan en todo lo demás.
+ */
+export function sameCut(a: string, b: string, campuses: string[]): boolean {
+  const x = parseSlots(a, campuses);
+  const y = parseSlots(b, campuses);
+  const places = (s: Slots) => s.campus.map((c) => campusWords(c).join(" ") || normalizeQuestion(c)).sort().join("|");
+  return x.years.join() === y.years.join() && x.term === y.term && places(x) === places(y) && x.byCampus === y.byCampus;
+}
+
+const termText = (t: FactTerm) => (t === "A" ? "1" : "2");
+export const cutText = (p: Pick<FactPoint, "y" | "t">) => (p.t ? `${p.y}-${termText(p.t)}` : String(p.y));
+const placeText = (c: string) => c || "toda la UDES";
+const INTEGER = new Intl.NumberFormat("es-CO", { maximumFractionDigits: 0 });
+const DECIMAL = new Intl.NumberFormat("es-CO", { minimumFractionDigits: 1, maximumFractionDigits: 1 });
+
+/** La cifra como la escribe el portal: «1.234 estudiantes», «12,5 %». */
+export function figureText(value: number, format: string, unit: string): string {
+  const f = format === "entero" ? INTEGER.format(value) : DECIMAL.format(value);
+  return format === "porcentaje" || unit.trim() === "%" ? `${f} %` : `${f} ${unit.trim()}`.trim();
+}
+
+/**
+ * Las cifras del indicador para ese corte. Sin sede, toda la UDES; sin año,
+ * los dos últimos con dato (uno solo si se comparan sedes); sin periodo, la
+ * cifra del año. Lo pedido que no está se devuelve en `missing`: un dato sin
+ * reportar no es un cero.
+ */
+export function pickCuts(fact: Fact, slots: Slots, max = 8): { points: FactPoint[]; missing: string[] } {
+  // El total de la UDES va con sede "": solo es igual a otro "".
+  const same = (a: string, b: string) => (a && b ? sameCampus(a, b) : a === b);
+  const sedes = [...new Set(fact.series.map((p) => p.c).filter(Boolean))];
+  let places = slots.campus.length ? slots.campus : slots.byCampus ? sedes : [""];
+  let pool = fact.series.filter((p) => places.some((c) => same(p.c, c)));
+  // Un indicador sin total de la UDES (no se suma entre sedes): se dan las sedes.
+  if (!pool.length && !slots.campus.length) {
+    places = sedes;
+    pool = fact.series.filter((p) => p.c);
+  }
+  const annual = pool.filter((p) => p.t === null);
+  let chosen = slots.term ? pool.filter((p) => p.t === slots.term) : annual.length ? annual : pool.filter((p) => p.t !== null);
+  const missing: string[] = [];
+  if (slots.years.length) {
+    chosen = chosen.filter((p) => slots.years.includes(p.y));
+    // Un año falta si no está en las sedes que sí tienen cifras; si ninguna sede
+    // pedida tiene cifras, lo que falta es la sede, no el año.
+    const withData = pool.length > 0;
+    for (const y of slots.years) {
+      const absent = withData ? !chosen.some((p) => p.y === y) : !fact.series.some((p) => p.y === y);
+      if (absent) missing.push(slots.term ? `${y}-${termText(slots.term)}` : String(y));
+    }
+  } else {
+    const keep = places.length > 1 ? 1 : 2;
+    const recent = [...new Set(chosen.map((p) => p.y))].sort((a, b) => b - a).slice(0, keep);
+    chosen = chosen.filter((p) => recent.includes(p.y));
+  }
+  for (const c of slots.campus) if (!chosen.some((p) => same(p.c, c)) && !missing.includes(c)) missing.push(c);
+  const order = (p: FactPoint) => places.findIndex((c) => same(p.c, c));
+  chosen.sort((a, b) => order(a) - order(b) || b.y - a.y || (a.t ?? "").localeCompare(b.t ?? ""));
+  return { points: chosen.slice(0, max), missing };
+}
+
+const pointLine = (fact: Fact, p: FactPoint) => `${placeText(p.c)}, ${cutText(p)}: ${figureText(p.v, fact.format, fact.unit)}`;
+const asSentence = (s: string) => {
+  const t = s.replace(/\s+/g, " ").trim().replace(/[.\s]+$/, "");
+  return t ? `${t}.` : "";
+};
+
+/** Las cifras elegidas como un pasaje más, para citarlo igual que la memoria. */
+export function factPassage(fact: Fact, points: FactPoint[], missing: string[]): Passage {
+  const body = [
+    `${fact.label}${fact.report ? ` (informe ${fact.report})` : ""}.`,
+    points.length ? `${points.map((p) => pointLine(fact, p)).join("; ")}.` : "",
+    missing.length ? `Sin cifra publicada para ${missing.join(", ")}: un dato sin reportar no es un cero.` : "",
+    fact.definition ? `Qué mide: ${asSentence(fact.definition)}` : "",
+    fact.office ? `Lo reporta ${asSentence(fact.office)}` : "",
+    fact.illustrative ? "Cifras marcadas como dato ilustrativo en el portal." : "",
+  ]
+    .filter(Boolean)
+    .join(" ");
+  return {
+    ref: `dato:${fact.ref}`,
+    source: "cifras",
+    title: fact.label,
+    section: `Cifras de UDES en Cifras${fact.report ? ` · Informe ${fact.report}` : ""}`,
+    body,
+    path: fact.path,
+    cut: [...new Set(points.map(cutText))].join(", ").slice(0, 60),
+    office: fact.office,
+  };
+}
+
+/** Sin IA: la cifra dicha con una plantilla, con su cita. Nada inventado. */
+export function dataAnswer(fact: Fact, points: FactPoint[], missing: string[]): string {
+  const parts: string[] = [];
+  if (points.length === 1) {
+    const p = points[0];
+    parts.push(`Según UDES en Cifras, «${fact.label}» en ${placeText(p.c)} fue ${figureText(p.v, fact.format, fact.unit)} en ${cutText(p)} [1].`);
+  } else if (points.length) {
+    parts.push(`Según UDES en Cifras, «${fact.label}»: ${points.map((p) => pointLine(fact, p)).join("; ")} [1].`);
+  }
+  if (missing.length) parts.push(`${points.length ? "No hay" : `«${fact.label}» no tiene`} cifra publicada para ${missing.join(", ")}: un dato sin reportar no es un cero.${points.length ? "" : " [1]"}`);
+  if (fact.illustrative) parts.push("Ojo: el portal marca estas cifras como dato ilustrativo.");
+  return parts.join(" ");
+}
+
+/**
+ * Entender con IA, solo cuando las reglas no alcanzan: la pregunta se refiere
+ * a algo ya dicho («¿eso cómo se compara?») o nada coincidió. El modelo no
+ * responde: reescribe la pregunta para que se entienda sola y propone
+ * palabras para buscar.
+ */
+export function buildUnderstandMessages(question: string, history: { q: string; a: string }[] = []) {
+  const before = history
+    .slice(-2)
+    .map((h) => `Antes preguntaron: ${h.q.slice(0, 200)}\nY se respondió: ${h.a.slice(0, 300)}`)
+    .join("\n");
+  return [
+    { role: "system", content: "Ayudas al buscador de Mr. Pilo, el guía de datos de la Universidad de Santander (UDES). No respondes preguntas: las preparas para buscar. Responde solo con el JSON que se pide." },
+    {
+      role: "user",
+      content: [
+        "Si la pregunta depende de la conversación (por ejemplo «¿y en Cúcuta?», «¿y el año pasado?», «¿y por programa?», «¿eso cómo se compara?»), reescríbela para que se entienda sola: con el indicador, la sede, el año y el periodo de lo que se venía hablando, cambiando solo lo que ahora se pide.",
+        "Si no depende, déjala igual. Después da hasta 6 palabras clave o sinónimos como los usaría un informe institucional (por ejemplo: alumnos → estudiantes matriculados).",
+        'Formato: {"pregunta":"...","buscar":["..."]}',
+        before ? `\n${before}` : "",
+        `\nPregunta: ${question.slice(0, 500)}`,
+      ].join("\n"),
+    },
+  ];
+}
+
+/* --- Búsqueda por significado (0108) ---------------------------------------------------
+   Cada pasaje de la memoria y cada indicador de las cifras en vivo guardan un
+   vector (embedding) que dice de qué habla. La pregunta se convierte en otro
+   vector y se buscan los más cercanos: así «¿cuántos se fueron?» encuentra
+   «tasa de deserción» aunque no compartan palabras. No reemplaza la búsqueda
+   por palabras, que acierta mejor con nombres propios y códigos: las dos
+   listas se funden (fusión por rangos recíprocos). */
+
+/** Las dimensiones del vector: la columna de la base es vector(1024). */
+export const EMBED_DIM = 1024;
+/** Por debajo de este parecido (coseno) un pasaje no cuenta como cercano. */
+export const SEMANTIC_MIN = 0.3;
+/**
+ * Una respuesta oficial del catálogo se da por significado solo si se parece
+ * mucho (0109): es la palabra de Planeación y no debe darse a una pregunta
+ * que solo roza el tema.
+ */
+export const CATALOG_SEMANTIC_MIN = 0.8;
+
+export interface EmbedTarget {
+  url: string;
+  model: string;
+  /** NVIDIA pide decir si el texto es pregunta o pasaje, y cuántas dimensiones. */
+  nvidia: boolean;
+}
+
+/** Quién ofrece embeddings con la misma clave del texto. Los demás proveedores no buscan por significado. */
+export const EMBED_PRESETS: Record<string, EmbedTarget> = {
+  // NVIDIA retira modelos seguido (llama-3.2-nv-embedqa-1b-v2 en mayo, llama-nemotron-embed-1b-v2 en
+  // agosto de 2026): la administración puede elegir otro con «Ver modelos disponibles».
+  nvidia: { url: "https://integrate.api.nvidia.com/v1/embeddings", model: "nvidia/nemotron-3-embed-1b", nvidia: true },
+  mistral: { url: "https://api.mistral.ai/v1/embeddings", model: "mistral-embed", nvidia: false },
+};
+
+export const embedTarget = (provider: string): EmbedTarget | null => EMBED_PRESETS[provider] ?? null;
+
+/**
+ * El pedido de embeddings. «full»: con dimensiones y recorte (NVIDIA);
+ * «plain»: solo pregunta o pasaje, para el modelo que no acepta lo demás.
+ */
+export function embedBody(target: EmbedTarget, input: string[], kind: "query" | "passage", mode: "full" | "plain" = "full") {
+  if (!target.nvidia) return { model: target.model, input };
+  return mode === "full"
+    ? { model: target.model, input, input_type: kind, dimensions: EMBED_DIM, truncate: "END", encoding_format: "float" }
+    : { model: target.model, input, input_type: kind };
+}
+
+/**
+ * El vector a la medida de la base (1024). Uno más largo se recorta y se
+ * normaliza: los modelos de embeddings de NVIDIA se entrenan para que sus
+ * primeras dimensiones basten (Matryoshka). Uno más corto no sirve.
+ */
+export function fitVector(v: number[]): number[] | null {
+  if (v.length === EMBED_DIM) return v;
+  if (v.length < EMBED_DIM) return null;
+  const cut = v.slice(0, EMBED_DIM);
+  const norm = Math.sqrt(cut.reduce((sum, x) => sum + x * x, 0));
+  return norm > 0 ? cut.map((x) => x / norm) : null;
+}
+
+/** ¿El proveedor dice que el modelo ya no existe (retirado o mal escrito)? */
+export const modelGone = (status: number, detail: string) => status === 410 || status === 404 || /end of life|no longer available|not found|does not exist/i.test(detail);
+
+/** De la lista de modelos del proveedor (/v1/models), los de embeddings. */
+export function embedModelsIn(data: unknown): string[] {
+  const list = (data as { data?: unknown } | null)?.data;
+  if (!Array.isArray(list)) return [];
+  return [...new Set(list.map((m) => String((m as { id?: unknown })?.id ?? "")).filter((id) => /embed/i.test(id)))].sort();
+}
+
+/** Los vectores de la respuesta, en el orden de lo enviado y a la medida de la base; null si falta uno o es corto. */
+export function parseEmbeddings(data: unknown, count: number): number[][] | null {
+  const list = (data as { data?: unknown } | null)?.data;
+  if (!Array.isArray(list) || list.length !== count) return null;
+  const out: number[][] = new Array(count);
+  for (const [i, item] of list.entries()) {
+    const row = item as { index?: unknown; embedding?: unknown };
+    const at = typeof row.index === "number" ? row.index : i;
+    const v = row.embedding;
+    if (!Array.isArray(v) || !v.every((x) => typeof x === "number" && Number.isFinite(x))) return null;
+    const fit = fitVector(v as number[]);
+    if (!fit || at < 0 || at >= count) return null;
+    out[at] = fit;
+  }
+  return out.every(Boolean) ? out : null;
+}
+
+/** El vector como lo lee pgvector: «[0.1,0.2,…]». */
+export const vectorText = (v: number[]) => `[${v.map((x) => Number(x.toFixed(6))).join(",")}]`;
+
+/**
+ * Funde la búsqueda por palabras y la de significado. Cada lista aporta
+ * 1/(k + puesto); un pasaje que está en las dos suma ambas. `rank` queda
+ * de 0 a 1 frente al primero, como lo usa el resto de la página.
+ */
+export function fuseHits<T extends { ref: string }>(
+  lexical: (T & { rank: number })[],
+  semantic: (T & { sim: number })[],
+  k = 60,
+): (T & { rank: number; via: "palabras" | "significado" | "ambas"; sim?: number })[] {
+  const score = new Map<string, { row: T; s: number; lex: boolean; sem: boolean; sim?: number }>();
+  lexical.forEach((row, i) => score.set(row.ref, { row, s: 1 / (k + i + 1), lex: true, sem: false }));
+  semantic.forEach((row, i) => {
+    const had = score.get(row.ref);
+    if (had) Object.assign(had, { s: had.s + 1 / (k + i + 1), sem: true, sim: row.sim });
+    else score.set(row.ref, { row, s: 1 / (k + i + 1), lex: false, sem: true, sim: row.sim });
+  });
+  const sorted = [...score.values()].sort((a, b) => b.s - a.s);
+  const top = sorted[0]?.s ?? 1;
+  return sorted.map(({ row, s, lex, sem, sim }) => {
+    const { sim: _drop, ...rest } = row as T & { sim?: number };
+    return { ...(rest as T), rank: s / top, via: lex && sem ? "ambas" : lex ? "palabras" : "significado", ...(sim !== undefined ? { sim } : {}) };
+  });
+}
+
+export function parseUnderstand(raw: string, fallback: string): { question: string; terms: string[] } {
+  const text = raw.trim();
+  const start = text.indexOf("{");
+  const end = text.lastIndexOf("}");
+  if (start >= 0 && end > start) {
+    try {
+      const data = JSON.parse(text.slice(start, end + 1)) as { pregunta?: unknown; buscar?: unknown };
+      const question = typeof data.pregunta === "string" && data.pregunta.trim().length >= 2 ? data.pregunta.replace(/\s+/g, " ").trim().slice(0, 500) : fallback;
+      const terms = (Array.isArray(data.buscar) ? data.buscar : [])
+        .filter((t): t is string => typeof t === "string")
+        .map((t) => t.replace(/\s+/g, " ").trim().slice(0, 40))
+        .filter(Boolean)
+        .slice(0, 6);
+      return { question, terms };
+    } catch {
+      /* no era JSON */
+    }
+  }
+  return { question: fallback, terms: [] };
 }
 
 /* --- El catálogo de Planeación (0096) ----------------------------------------------- */
@@ -541,11 +947,34 @@ export function extractKeywords(question: string): string[] {
   return [...new Set(words)];
 }
 
+/** Las palabras que dicen de qué trata un texto: sin relleno, sin palabras de pregunta, de 3 letras o más. */
+const contentWords = (text: string) =>
+  normalizeQuestion(text)
+    .split(" ")
+    .filter((w) => w.length >= 3 && !QUESTION_STOP.has(w) && !TRIGGER_FILLER.has(w));
+
+/**
+ * Qué parte de lo esencial de la pregunta cubren esas palabras (0 a 1). Una
+ * respuesta oficial sobre «qué es la UDES» no cubre «cuántos estudiantes
+ * matriculados tiene la UDES»: de estudiantes, matriculados y udes, solo udes.
+ */
+export function coverage(question: string, words: string[]): number {
+  const asked = extractKeywords(question);
+  if (!asked.length) return 1;
+  return asked.filter((k) => triggerWordIn(k, words)).length / asked.length;
+}
+
+/** Cuánto de lo preguntado debe cubrir una respuesta oficial para darse por palabras. */
+export const CATALOG_COVERAGE = 0.6;
+
 /**
  * Lo que responde el catálogo, si responde. Primero las capciosas (gana el
  * disparador más largo, el más específico); luego las respuestas, por
  * disparadores propios, por parecido directo o despojada de cortesías
- * («hola pilo cuéntame qué es el PDI» → «qué es el PDI»).
+ * («hola pilo cuéntame qué es el PDI» → «qué es el PDI»). Por palabras clave
+ * o por un disparador de una palabra, la respuesta debe cubrir lo esencial de
+ * la pregunta (CATALOG_COVERAGE), salvo el disparador de varias palabras, que es deliberado:
+ * que la pregunta nombre a la UDES no la vuelve «qué es la UDES».
  */
 export function matchCatalog(question: string, entries: CatalogEntry[], min = 0.65): { entry: CatalogEntry; score: number } | null {
   const qnorm = normalizeQuestion(question);
@@ -569,6 +998,10 @@ export function matchCatalog(question: string, entries: CatalogEntry[], min = 0.
     if (e.triggers && e.triggers.length > 0) {
       for (const t of e.triggers.flatMap((x) => x.split(/[,;|\n]/))) {
         if (!t.trim() || !hasTrigger(qnorm, t)) continue;
+        // Un disparador de una sola palabra («udes») sale en muchas preguntas: debe
+        // cubrir lo esencial. Uno de varias palabras («cifras oficiales») es deliberado.
+        const tw = contentWords(t);
+        if (tw.length <= 1 && coverage(question, tw) < CATALOG_COVERAGE) continue;
         const score = 0.85 + 0.05 * triggerWeight(t);
         if (!best || score > best.score) best = { entry: e, score };
       }
@@ -588,12 +1021,14 @@ export function matchCatalog(question: string, entries: CatalogEntry[], min = 0.
         best = { entry: e, score };
       }
 
-      // 3. Coincidencia de contenido esencial (palabras clave del objetivo)
-      const targetWords = targetStripped.split(" ").filter((w) => w.length >= 2 && !QUESTION_STOP.has(w));
+      // 3. Coincidencia de contenido esencial: todas las palabras clave del objetivo
+      //    están en la pregunta y cubren lo esencial de ella. Sin relleno: «es» no
+      //    puede coincidir con «estudiantes».
+      const targetWords = contentWords(targetStripped);
       const queryWords = qstripped.split(" ").filter(Boolean);
       if (targetWords.length >= 1 && queryWords.length >= 1) {
         const matchesAll = targetWords.every((w) => triggerWordIn(w, queryWords));
-        if (matchesAll) {
+        if (matchesAll && coverage(question, targetWords) >= CATALOG_COVERAGE) {
           const kwScore = 0.80 + Math.min(0.15, targetWords.length * 0.04);
           if (!best || kwScore > best.score) best = { entry: e, score: kwScore };
         }

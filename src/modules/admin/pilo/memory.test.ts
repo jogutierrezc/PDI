@@ -9,7 +9,7 @@
    ========================================================================== */
 
 import { describe, expect, it } from "vitest";
-import { BODY_MAX, MIN_BODY, bulletinRows, buildSources, cifrasRows, clean, finalize, impactRows, noMoney, observatoryRows, pdiRows, problemMessage, sentence } from "./memory";
+import { BODY_MAX, MIN_BODY, bulletinRows, buildSources, cifrasRows, clean, factRows, finalize, impactRows, noMoney, observatoryRows, pdiRows, problemMessage, sentence } from "./memory";
 import type { MemoryRow } from "./memory";
 import type { Indicator, OpenDataCatalog } from "../../datos-abiertos/data/types";
 import type { PillarWithProgress } from "../../../data/queries";
@@ -167,6 +167,53 @@ describe("cifrasRows", () => {
     expect(cifrasRows(undefined)).toEqual([]);
     expect(cifrasRows(null)).toEqual([]);
     expect(() => cifrasRows(any({ years: null, campuses: null, reports: [any({ slug: "x", name: "X", indicators: [indicator({})] })] }))).not.toThrow();
+  });
+});
+
+describe("factRows (cifras en vivo, 0107)", () => {
+  it("guarda la serie entera de cada indicador, sin dinero ni el corte de todo el periodo", () => {
+    const rows = factRows(catalog());
+    const refs = rows.map((r) => r.ref);
+    expect(refs).toContain("cifras:poblacional:matricula");
+    expect(refs).not.toContain("cifras:poblacional:gasto");
+    expect(refs).not.toContain("cifras:poblacional:costo");
+    expect(refs).not.toContain("cifras:poblacional:roto");
+    const m = rows.find((r) => r.ref === "cifras:poblacional:matricula")!;
+    expect(m.series).toEqual([
+      { y: 2024, t: null, c: "", v: 1000 },
+      { y: 2024, t: null, c: "Bucaramanga", v: 600 },
+      { y: 2025, t: null, c: "", v: 1100 },
+      { y: 2025, t: null, c: "Bucaramanga", v: 700 },
+      { y: 2025, t: null, c: "123", v: 400 },
+    ]);
+    expect(m).toMatchObject({ report: "Poblacional", label: "Matrícula total", unit: "estudiantes", format: "entero", path: "/datos-abiertos/poblacional", period: "2020–2025", illustrative: false });
+    // "abc" no es cifra; "12" sí.
+    expect(rows.find((r) => r.ref === "cifras:poblacional:texto")!.series).toEqual([{ y: 2024, t: null, c: "", v: 12 }]);
+  });
+
+  it("incluye los periodos 1 y 2", () => {
+    const rows = factRows(
+      catalog({
+        reports: [
+          any({
+            slug: "p",
+            name: "P",
+            indicators: [indicator({ values: { 2025: { todas: 30 } }, terms: { 2025: { A: { todas: 10, bucaramanga: 4 }, B: { todas: 20 } } } })],
+          }),
+        ],
+      }),
+    );
+    expect(rows[0].series).toEqual([
+      { y: 2025, t: null, c: "", v: 30 },
+      { y: 2025, t: "A", c: "", v: 10 },
+      { y: 2025, t: "A", c: "Bucaramanga", v: 4 },
+      { y: 2025, t: "B", c: "", v: 20 },
+    ]);
+  });
+
+  it("sin catálogo o con catálogo deforme no se cae", () => {
+    expect(factRows(undefined)).toEqual([]);
+    expect(() => factRows(any({ years: null, campuses: null, reports: [any({ slug: "x", name: "X", indicators: [indicator({})] })] }))).not.toThrow();
   });
 });
 

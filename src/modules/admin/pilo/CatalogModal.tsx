@@ -6,13 +6,18 @@
    1. El módulo Catálogo (+ Nueva respuesta / + Nueva capciosa, o Editar).
    2. Pregúntele a Pilo (botón "Al catálogo" en cualquier respuesta).
    3. La sección de Respuestas Guardadas (botón "Hacer parte del catálogo").
+   4. La bandeja de lo que Pilo no supo (0109): «Responder».
+
+   La clave sugerida (R-001, C-001…) sale de las claves que ya existen. Si
+   quien abre el modal no las pasa, el modal las consulta: una clave repetida
+   reemplazaría en silencio la entrada que ya la tiene.
 
    Guarda a través del RPC pilo_catalog_import o inserción directa (0105).
    ========================================================================== */
 
 import { useEffect, useMemo, useState } from "react";
 import type { FormEvent } from "react";
-import { useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "../../../lib/supabase";
 import { Modal } from "../../../components/ui/Modal";
 import { Switch } from "./ui";
@@ -37,10 +42,21 @@ export function CatalogModal({
   defaultKind = "respuesta",
   initialEntry,
   isEditing = false,
-  existingKeys = [],
+  existingKeys,
   onSaved,
 }: CatalogModalProps) {
   const client = useQueryClient();
+  // Sin claves de quien abre el modal, se leen de la base (cuelga de ["pilo-ia", "catalogo"]: se refresca al guardar).
+  const ownKeys = useQuery({
+    queryKey: ["pilo-ia", "catalogo", "claves"],
+    enabled: open && !existingKeys,
+    queryFn: async (): Promise<string[]> => {
+      const { data, error } = await supabase.from("pilo_catalog").select("key");
+      if (error) return [];
+      return ((data ?? []) as { key: string }[]).map((r) => r.key);
+    },
+  });
+  const keys = useMemo(() => existingKeys ?? ownKeys.data ?? [], [existingKeys, ownKeys.data]);
   const [kind, setKind] = useState<CatalogKind>(defaultKind);
   const [key, setKey] = useState("");
   const [question, setQuestion] = useState("");
@@ -61,7 +77,7 @@ export function CatalogModal({
     const prefix = kind === "capciosa" ? "C" : "R";
     let maxNum = 0;
     const regex = new RegExp(`^${prefix}-(\\d+)$`, "i");
-    for (const k of existingKeys) {
+    for (const k of keys) {
       const match = k.match(regex);
       if (match) {
         const n = parseInt(match[1], 10);
@@ -69,7 +85,7 @@ export function CatalogModal({
       }
     }
     return `${prefix}-${String(maxNum + 1).padStart(3, "0")}`;
-  }, [kind, existingKeys]);
+  }, [kind, keys]);
 
   useEffect(() => {
     if (!open) return;
@@ -112,6 +128,10 @@ export function CatalogModal({
     }
     if (!/^[A-Z0-9._-]{1,40}$/.test(cleanKey)) {
       setError("La clave solo puede tener letras, números, guion o punto, sin espacios.");
+      return;
+    }
+    if (!isEditing && keys.some((k) => k.toUpperCase() === cleanKey)) {
+      setError(`Ya hay una entrada con la clave ${cleanKey}: elija otra para no reemplazarla.`);
       return;
     }
 

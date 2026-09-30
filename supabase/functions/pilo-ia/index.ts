@@ -18,7 +18,10 @@
      { action: "probar" }                        → { ok, ms } (solo administración)
      { action: "preguntar", portal: "pregunta", question, history? }
                                                  → { kind, text, sources, trail, answerId?, mood?, graph? }
-     { action: "calificar", portal: "pregunta", answerId, vote: "up" | "down" }
+     { action: "calificar", portal: "pregunta", answerId?, vote: "up" | "down", question?, text?, kind? }
+                                                 «No me sirvió» anota la pregunta en la bandeja (0109)
+     { action: "indexar", step: "estado" | "lote" | "probar" | "modelos", q? }   (solo administración, 0108)
+                                                 → { status } · { saved, status } · { semantic, hits } · { models }
      { action: "analizar", portal: "cifras" | "impacto", analysis: {brief, part, title, facts, pdi, doc?, scope?} }
                                                  → { summary, paragraphs, alerts, recommendations, unknown, verified }
 
@@ -27,6 +30,15 @@
    memoria (0094) y su malla (0097, para lo que es de estructura) van primero; la IA
    solo redacta si hace falta, y si no hay IA o cupo, se responde con los
    pasajes tal cual. Funciona aunque la IA no esté conectada.
+   Antes de buscar, Pilo entiende el corte (sede, año, periodo) y une la
+   pregunta de seguimiento con la anterior; la IA solo reescribe la pregunta
+   cuando las reglas no alcanzan. Las cifras en vivo (0107) dan la cifra
+   exacta de ese corte, con el mismo cálculo de UDES en Cifras. Con NVIDIA o
+   Mistral, la búsqueda es híbrida (0108): por palabras y por significado
+   (embeddings), fundidas por rangos recíprocos.
+   Pilo aprende (0109): lo que no supo, lo que no sirvió y lo que la IA dijo
+   sin fuente va a una bandeja; Planeación lo responde en el catálogo, que
+   también se reconoce por significado.
 
    Despliegue (un solo archivo: también se puede pegar en el editor de Supabase,
    con «Verify JWT» apagado):
@@ -40,7 +52,8 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2.58.0";
 // --- lógica: copia exacta de src/components/pilo/ai/logic.ts (la prueba logic-sync lo vigila)
 // Va dentro para que la función sea un solo archivo y se pueda desplegar
 // también pegándola en el editor del panel de Supabase.
-export type Action = "resumir" | "sintetizar" | "explicar" | "voz" | "probar" | "preguntar" | "entender" | "analizar";
+
+export type Action = "resumir" | "sintetizar" | "explicar" | "voz" | "probar" | "preguntar" | "entender" | "analizar" | "indexar";
 export type Fn = "leer" | "resumir" | "sintetizar" | "explicar" | "preguntar";
 export type Audience = "admin" | "sesion" | "publico";
 export type Portal = "cifras" | "pdi" | "observatorio" | "impacto" | "pregunta";
@@ -71,11 +84,13 @@ export interface Section {
 }
 
 export const PORTALS: Portal[] = ["cifras", "pdi", "observatorio", "impacto", "pregunta"];
-export const FN_OF: Record<Exclude<Action, "probar">, Fn> = { resumir: "resumir", sintetizar: "sintetizar", explicar: "explicar", voz: "leer", preguntar: "preguntar", entender: "sintetizar", analizar: "sintetizar" };
+export const FN_OF: Record<Exclude<Action, "probar" | "indexar">, Fn> = { resumir: "resumir", sintetizar: "sintetizar", explicar: "explicar", voz: "leer", preguntar: "preguntar", entender: "sintetizar", analizar: "sintetizar" };
 
 /** ¿Puede esta persona (null = sin sesión) usar la acción en el portal? */
 export function canUse(rules: Rules, portal: string, action: Action, role: Role | null): { ok: true } | { ok: false; reason: string } {
   if (action === "probar") return role === "admin" ? { ok: true } : { ok: false, reason: "Solo la administración prueba la conexión." };
+  // Indexar la memoria por significado (0108): mantenimiento de la administración, con o sin IA encendida.
+  if (action === "indexar") return role === "admin" ? { ok: true } : { ok: false, reason: "Solo la administración indexa la memoria de Pilo." };
   // Entender la necesidad de un programa (Mr. Pilo Bot, en Impacto): con la IA encendida y sesión.
   if (action === "entender") {
     if (!rules.enabled) return { ok: false, reason: "Mr. Pilo con IA está apagado." };
@@ -337,9 +352,11 @@ export const RULE_TEXT: Record<Rule, string> = {
 
 const ASK_TASK = [
   "Responde la pregunta con los pasajes numerados, en 2 a 5 frases.",
+  "Si la pregunta sigue la conversación (pide un dato más específico sobre lo que ya respondiste: una sede, un año, un periodo, una comparación), respóndela en ese contexto, sin repetir lo ya dicho.",
   "Después de cada dato pon entre corchetes el número del pasaje de donde sale, por ejemplo [1] o [2].",
   "Di el corte o periodo de las cifras cuando el pasaje lo trae.",
-  "Si los pasajes no alcanzan para responder, dilo y marca sin_datos en true.",
+  "No evadas: si los pasajes traen solo parte de lo pedido, responde con esa parte y di con claridad qué no está publicado; en ese caso sin_datos va en false.",
+  "Marca sin_datos en true solo si ningún pasaje trae nada de lo que se pregunta.",
   'Formato: {"respuesta":"...","sin_datos":false}',
 ].join(" ");
 
@@ -349,7 +366,7 @@ export function buildAskMessages(question: string, passages: Passage[], history:
     .join("\n\n");
   const before = history
     .slice(-2)
-    .map((h) => `Antes preguntaron: ${h.q.slice(0, 200)}\nY respondiste: ${h.a.slice(0, 400)}`)
+    .map((h) => `Antes preguntaron: ${h.q.slice(0, 200)}\nY respondiste: ${h.a.slice(0, 600)}`)
     .join("\n");
   return [
     { role: "system", content: PERSONA },
@@ -458,6 +475,408 @@ export function renumber<T>(text: string, passages: T[]): { text: string; passag
     text: text.replace(/\[(\d+)\]/g, (_m, n) => (map.has(Number(n)) ? `[${map.get(Number(n))}]` : "")),
     passages: order.map((n) => passages[n - 1]),
   };
+}
+
+/* --- Las cifras en vivo (0107) --------------------------------------------------------
+   La memoria guarda de cada indicador su última cifra; `pilo_facts` guarda la
+   serie entera (año, periodo y sede), armada con el mismo cálculo del portal.
+   Con ella Pilo da la cifra exacta que se pidió («matriculados en Cúcuta en
+   2023-2»). Aquí se decide qué corte se pidió, qué cifras se muestran y cómo
+   se dicen, con o sin IA. */
+
+export type FactTerm = "A" | "B";
+
+/** Una cifra de la serie: año, periodo (null = el año), sede ("" = toda la UDES) y valor. */
+export interface FactPoint {
+  y: number;
+  t: FactTerm | null;
+  c: string;
+  v: number;
+}
+
+/** Un indicador de UDES en Cifras con su serie completa. */
+export interface Fact {
+  ref: string;
+  report: string;
+  label: string;
+  unit: string;
+  format: string;
+  definition: string;
+  office: string;
+  path: string;
+  period: string;
+  illustrative: boolean;
+  series: FactPoint[];
+}
+
+/** El corte que pide la pregunta. */
+export interface Slots {
+  years: number[];
+  term: FactTerm | null;
+  campus: string[];
+  /** «por sede», «cada campus»: todas las sedes. */
+  byCampus: boolean;
+}
+
+const CAMPUS_GENERIC = new Set(["campus", "sede", "seccional", "udes", "ciudad", "extension"]);
+
+/** Las palabras con que se reconoce una sede en una pregunta: «Campus Cúcuta» → cucuta. */
+function campusWords(name: string): string[] {
+  const words = normalizeQuestion(name)
+    .split(" ")
+    .filter((w) => w.length >= 4 && !CAMPUS_GENERIC.has(w));
+  return words.includes("bucaramanga") ? [...words, "bga"] : words;
+}
+
+/** ¿Dos nombres son la misma sede? «Campus Cúcuta» y «Cúcuta» lo son. */
+export function sameCampus(a: string, b: string): boolean {
+  if (normalizeQuestion(a) === normalizeQuestion(b)) return true;
+  const x = campusWords(a);
+  return x.length > 0 && campusWords(b).some((w) => x.includes(w));
+}
+
+/**
+ * Las sedes que Pilo reconoce: las de las series (con el nombre que usan las
+ * cifras) y las demás de la universidad, aunque no tengan cifras publicadas.
+ * Así «¿y en Cúcuta?» se entiende, y si no hay cifra, se dice.
+ */
+export function knownCampuses(series: string[], others: string[]): string[] {
+  const out = [...new Set(series.map((c) => c.trim()).filter(Boolean))];
+  for (const name of others.map((c) => c.trim()).filter(Boolean)) if (!out.some((c) => sameCampus(c, name))) out.push(name);
+  return out;
+}
+
+/** Sede, año y periodo que pide la pregunta. Sin nada de eso, los campos quedan vacíos. */
+export function parseSlots(question: string, campuses: string[]): Slots {
+  const t = normalizeQuestion(question);
+  const years = [...new Set((t.match(/\b20\d\d\b/g) ?? []).map(Number))].sort((a, b) => a - b);
+  let term: FactTerm | null = null;
+  // «2023-2» llega como «2023 2»; «de 2023 a 2025» no es un periodo A.
+  if (/\b(primer|1er|1)( semestre| periodo)\b|\b(semestre|periodo) (1|uno|a)\b|\b20\d\d 1\b/.test(t)) term = "A";
+  else if (/\b(segundo|2do|2)( semestre| periodo)\b|\b(semestre|periodo) (2|dos|b)\b|\b20\d\d 2\b/.test(t)) term = "B";
+  const campus = campuses.filter((name) => campusWords(name).some((w) => new RegExp(`\\b${w}\\b`).test(t)));
+  const byCampus = /\bpor (sede|campus|seccional)|\b(cada|todas las|todos los|las|los) (sedes|campus|seccionales)\b|\bsedes\b/.test(t);
+  return { years, term, campus, byCampus };
+}
+
+export const hasSlots = (s: Slots) => s.years.length > 0 || s.term !== null || s.campus.length > 0 || s.byCampus;
+
+/**
+ * ¿La pregunta sigue la anterior? «¿Y en Cúcuta?», «¿y en 2023?», «¿eso cómo
+ * se compara?»: empieza con «y», se refiere a algo ya dicho o es corta y solo
+ * cambia el corte.
+ */
+export function isFollowUp(question: string, campuses: string[]): boolean {
+  const t = normalizeQuestion(question);
+  if (!t) return false;
+  if (/^(y|e|pero|ahora|tambien|entonces)\b/.test(t)) return true;
+  if (/\b(eso|esa|ese|esos|esas|esto|aquello|lo mismo|el anterior|la anterior|ahi|alli)\b/.test(t)) return true;
+  return t.split(" ").length <= 4 && hasSlots(parseSlots(question, campuses));
+}
+
+/** El corte de una pregunta de seguimiento: lo que dice ahora manda; lo que calla, lo pone la anterior. */
+export function mergeSlots(before: Slots, now: Slots): Slots {
+  const place = now.campus.length > 0 || now.byCampus;
+  return {
+    years: now.years.length ? now.years : before.years,
+    term: now.term ?? (now.years.length ? null : before.term),
+    campus: place ? now.campus : before.campus,
+    byCampus: place ? now.byCampus : before.byCampus,
+  };
+}
+
+/** Las palabras de la pregunta más las que usan los informes: «alumnos» también busca «estudiantes». */
+const SYNONYMS: [RegExp, string][] = [
+  [/\balumn[oa]s?\b|\bestudiantado\b/, "estudiantes"],
+  [/\bprofesor(es|as?)?\b|\bmaestros?\b/, "docentes"],
+  [/\bmatricul/, "matriculados estudiantes"],
+  [/\binscrit|\baspirant/, "inscritos aspirantes"],
+  [/\bgraduad|\begresad|\bgrados?\b/, "graduados"],
+  [/\bdesert|\babandon|\bretir/, "desercion"],
+  [/\bpermanen|\bretencion/, "permanencia"],
+  [/\bcarreras?\b|\bpregrados?\b/, "programas"],
+  [/\bsedes?\b|\bseccional/, "campus"],
+  [/\bprimiparos?\b|\bnuevos\b|\bprimer ingreso\b/, "primer curso nuevos"],
+  [/\binvestigador|\bgrupos? de investigacion/, "investigacion"],
+];
+
+export function expandQuery(question: string): string {
+  const t = normalizeQuestion(question);
+  const extra = SYNONYMS.filter(([re]) => re.test(t)).map(([, add]) => add);
+  return [question, ...extra].join(" ").slice(0, 600);
+}
+
+/** ¿Pide una cifra? */
+export const wantsFigure = (question: string) =>
+  /\b(cuant[oa]s?|numero|cantidad|total|tasa|porcentaje|indice|cifras?|promedio|valor|evolucion|como (va|fue|ha|esta)|comportamiento|crecio|aumento|bajo|disminuy)/.test(normalizeQuestion(question));
+
+/**
+ * ¿Dos preguntas piden el mismo corte? Una respuesta guardada de 2024 no
+ * sirve para 2023 aunque las dos preguntas se parezcan en todo lo demás.
+ */
+export function sameCut(a: string, b: string, campuses: string[]): boolean {
+  const x = parseSlots(a, campuses);
+  const y = parseSlots(b, campuses);
+  const places = (s: Slots) => s.campus.map((c) => campusWords(c).join(" ") || normalizeQuestion(c)).sort().join("|");
+  return x.years.join() === y.years.join() && x.term === y.term && places(x) === places(y) && x.byCampus === y.byCampus;
+}
+
+const termText = (t: FactTerm) => (t === "A" ? "1" : "2");
+export const cutText = (p: Pick<FactPoint, "y" | "t">) => (p.t ? `${p.y}-${termText(p.t)}` : String(p.y));
+const placeText = (c: string) => c || "toda la UDES";
+const INTEGER = new Intl.NumberFormat("es-CO", { maximumFractionDigits: 0 });
+const DECIMAL = new Intl.NumberFormat("es-CO", { minimumFractionDigits: 1, maximumFractionDigits: 1 });
+
+/** La cifra como la escribe el portal: «1.234 estudiantes», «12,5 %». */
+export function figureText(value: number, format: string, unit: string): string {
+  const f = format === "entero" ? INTEGER.format(value) : DECIMAL.format(value);
+  return format === "porcentaje" || unit.trim() === "%" ? `${f} %` : `${f} ${unit.trim()}`.trim();
+}
+
+/**
+ * Las cifras del indicador para ese corte. Sin sede, toda la UDES; sin año,
+ * los dos últimos con dato (uno solo si se comparan sedes); sin periodo, la
+ * cifra del año. Lo pedido que no está se devuelve en `missing`: un dato sin
+ * reportar no es un cero.
+ */
+export function pickCuts(fact: Fact, slots: Slots, max = 8): { points: FactPoint[]; missing: string[] } {
+  // El total de la UDES va con sede "": solo es igual a otro "".
+  const same = (a: string, b: string) => (a && b ? sameCampus(a, b) : a === b);
+  const sedes = [...new Set(fact.series.map((p) => p.c).filter(Boolean))];
+  let places = slots.campus.length ? slots.campus : slots.byCampus ? sedes : [""];
+  let pool = fact.series.filter((p) => places.some((c) => same(p.c, c)));
+  // Un indicador sin total de la UDES (no se suma entre sedes): se dan las sedes.
+  if (!pool.length && !slots.campus.length) {
+    places = sedes;
+    pool = fact.series.filter((p) => p.c);
+  }
+  const annual = pool.filter((p) => p.t === null);
+  let chosen = slots.term ? pool.filter((p) => p.t === slots.term) : annual.length ? annual : pool.filter((p) => p.t !== null);
+  const missing: string[] = [];
+  if (slots.years.length) {
+    chosen = chosen.filter((p) => slots.years.includes(p.y));
+    // Un año falta si no está en las sedes que sí tienen cifras; si ninguna sede
+    // pedida tiene cifras, lo que falta es la sede, no el año.
+    const withData = pool.length > 0;
+    for (const y of slots.years) {
+      const absent = withData ? !chosen.some((p) => p.y === y) : !fact.series.some((p) => p.y === y);
+      if (absent) missing.push(slots.term ? `${y}-${termText(slots.term)}` : String(y));
+    }
+  } else {
+    const keep = places.length > 1 ? 1 : 2;
+    const recent = [...new Set(chosen.map((p) => p.y))].sort((a, b) => b - a).slice(0, keep);
+    chosen = chosen.filter((p) => recent.includes(p.y));
+  }
+  for (const c of slots.campus) if (!chosen.some((p) => same(p.c, c)) && !missing.includes(c)) missing.push(c);
+  const order = (p: FactPoint) => places.findIndex((c) => same(p.c, c));
+  chosen.sort((a, b) => order(a) - order(b) || b.y - a.y || (a.t ?? "").localeCompare(b.t ?? ""));
+  return { points: chosen.slice(0, max), missing };
+}
+
+const pointLine = (fact: Fact, p: FactPoint) => `${placeText(p.c)}, ${cutText(p)}: ${figureText(p.v, fact.format, fact.unit)}`;
+const asSentence = (s: string) => {
+  const t = s.replace(/\s+/g, " ").trim().replace(/[.\s]+$/, "");
+  return t ? `${t}.` : "";
+};
+
+/** Las cifras elegidas como un pasaje más, para citarlo igual que la memoria. */
+export function factPassage(fact: Fact, points: FactPoint[], missing: string[]): Passage {
+  const body = [
+    `${fact.label}${fact.report ? ` (informe ${fact.report})` : ""}.`,
+    points.length ? `${points.map((p) => pointLine(fact, p)).join("; ")}.` : "",
+    missing.length ? `Sin cifra publicada para ${missing.join(", ")}: un dato sin reportar no es un cero.` : "",
+    fact.definition ? `Qué mide: ${asSentence(fact.definition)}` : "",
+    fact.office ? `Lo reporta ${asSentence(fact.office)}` : "",
+    fact.illustrative ? "Cifras marcadas como dato ilustrativo en el portal." : "",
+  ]
+    .filter(Boolean)
+    .join(" ");
+  return {
+    ref: `dato:${fact.ref}`,
+    source: "cifras",
+    title: fact.label,
+    section: `Cifras de UDES en Cifras${fact.report ? ` · Informe ${fact.report}` : ""}`,
+    body,
+    path: fact.path,
+    cut: [...new Set(points.map(cutText))].join(", ").slice(0, 60),
+    office: fact.office,
+  };
+}
+
+/** Sin IA: la cifra dicha con una plantilla, con su cita. Nada inventado. */
+export function dataAnswer(fact: Fact, points: FactPoint[], missing: string[]): string {
+  const parts: string[] = [];
+  if (points.length === 1) {
+    const p = points[0];
+    parts.push(`Según UDES en Cifras, «${fact.label}» en ${placeText(p.c)} fue ${figureText(p.v, fact.format, fact.unit)} en ${cutText(p)} [1].`);
+  } else if (points.length) {
+    parts.push(`Según UDES en Cifras, «${fact.label}»: ${points.map((p) => pointLine(fact, p)).join("; ")} [1].`);
+  }
+  if (missing.length) parts.push(`${points.length ? "No hay" : `«${fact.label}» no tiene`} cifra publicada para ${missing.join(", ")}: un dato sin reportar no es un cero.${points.length ? "" : " [1]"}`);
+  if (fact.illustrative) parts.push("Ojo: el portal marca estas cifras como dato ilustrativo.");
+  return parts.join(" ");
+}
+
+/**
+ * Entender con IA, solo cuando las reglas no alcanzan: la pregunta se refiere
+ * a algo ya dicho («¿eso cómo se compara?») o nada coincidió. El modelo no
+ * responde: reescribe la pregunta para que se entienda sola y propone
+ * palabras para buscar.
+ */
+export function buildUnderstandMessages(question: string, history: { q: string; a: string }[] = []) {
+  const before = history
+    .slice(-2)
+    .map((h) => `Antes preguntaron: ${h.q.slice(0, 200)}\nY se respondió: ${h.a.slice(0, 300)}`)
+    .join("\n");
+  return [
+    { role: "system", content: "Ayudas al buscador de Mr. Pilo, el guía de datos de la Universidad de Santander (UDES). No respondes preguntas: las preparas para buscar. Responde solo con el JSON que se pide." },
+    {
+      role: "user",
+      content: [
+        "Si la pregunta depende de la conversación (por ejemplo «¿y en Cúcuta?», «¿y el año pasado?», «¿y por programa?», «¿eso cómo se compara?»), reescríbela para que se entienda sola: con el indicador, la sede, el año y el periodo de lo que se venía hablando, cambiando solo lo que ahora se pide.",
+        "Si no depende, déjala igual. Después da hasta 6 palabras clave o sinónimos como los usaría un informe institucional (por ejemplo: alumnos → estudiantes matriculados).",
+        'Formato: {"pregunta":"...","buscar":["..."]}',
+        before ? `\n${before}` : "",
+        `\nPregunta: ${question.slice(0, 500)}`,
+      ].join("\n"),
+    },
+  ];
+}
+
+/* --- Búsqueda por significado (0108) ---------------------------------------------------
+   Cada pasaje de la memoria y cada indicador de las cifras en vivo guardan un
+   vector (embedding) que dice de qué habla. La pregunta se convierte en otro
+   vector y se buscan los más cercanos: así «¿cuántos se fueron?» encuentra
+   «tasa de deserción» aunque no compartan palabras. No reemplaza la búsqueda
+   por palabras, que acierta mejor con nombres propios y códigos: las dos
+   listas se funden (fusión por rangos recíprocos). */
+
+/** Las dimensiones del vector: la columna de la base es vector(1024). */
+export const EMBED_DIM = 1024;
+/** Por debajo de este parecido (coseno) un pasaje no cuenta como cercano. */
+export const SEMANTIC_MIN = 0.3;
+/**
+ * Una respuesta oficial del catálogo se da por significado solo si se parece
+ * mucho (0109): es la palabra de Planeación y no debe darse a una pregunta
+ * que solo roza el tema.
+ */
+export const CATALOG_SEMANTIC_MIN = 0.8;
+
+export interface EmbedTarget {
+  url: string;
+  model: string;
+  /** NVIDIA pide decir si el texto es pregunta o pasaje, y cuántas dimensiones. */
+  nvidia: boolean;
+}
+
+/** Quién ofrece embeddings con la misma clave del texto. Los demás proveedores no buscan por significado. */
+export const EMBED_PRESETS: Record<string, EmbedTarget> = {
+  // NVIDIA retira modelos seguido (llama-3.2-nv-embedqa-1b-v2 en mayo, llama-nemotron-embed-1b-v2 en
+  // agosto de 2026): la administración puede elegir otro con «Ver modelos disponibles».
+  nvidia: { url: "https://integrate.api.nvidia.com/v1/embeddings", model: "nvidia/nemotron-3-embed-1b", nvidia: true },
+  mistral: { url: "https://api.mistral.ai/v1/embeddings", model: "mistral-embed", nvidia: false },
+};
+
+export const embedTarget = (provider: string): EmbedTarget | null => EMBED_PRESETS[provider] ?? null;
+
+/**
+ * El pedido de embeddings. «full»: con dimensiones y recorte (NVIDIA);
+ * «plain»: solo pregunta o pasaje, para el modelo que no acepta lo demás.
+ */
+export function embedBody(target: EmbedTarget, input: string[], kind: "query" | "passage", mode: "full" | "plain" = "full") {
+  if (!target.nvidia) return { model: target.model, input };
+  return mode === "full"
+    ? { model: target.model, input, input_type: kind, dimensions: EMBED_DIM, truncate: "END", encoding_format: "float" }
+    : { model: target.model, input, input_type: kind };
+}
+
+/**
+ * El vector a la medida de la base (1024). Uno más largo se recorta y se
+ * normaliza: los modelos de embeddings de NVIDIA se entrenan para que sus
+ * primeras dimensiones basten (Matryoshka). Uno más corto no sirve.
+ */
+export function fitVector(v: number[]): number[] | null {
+  if (v.length === EMBED_DIM) return v;
+  if (v.length < EMBED_DIM) return null;
+  const cut = v.slice(0, EMBED_DIM);
+  const norm = Math.sqrt(cut.reduce((sum, x) => sum + x * x, 0));
+  return norm > 0 ? cut.map((x) => x / norm) : null;
+}
+
+/** ¿El proveedor dice que el modelo ya no existe (retirado o mal escrito)? */
+export const modelGone = (status: number, detail: string) => status === 410 || status === 404 || /end of life|no longer available|not found|does not exist/i.test(detail);
+
+/** De la lista de modelos del proveedor (/v1/models), los de embeddings. */
+export function embedModelsIn(data: unknown): string[] {
+  const list = (data as { data?: unknown } | null)?.data;
+  if (!Array.isArray(list)) return [];
+  return [...new Set(list.map((m) => String((m as { id?: unknown })?.id ?? "")).filter((id) => /embed/i.test(id)))].sort();
+}
+
+/** Los vectores de la respuesta, en el orden de lo enviado y a la medida de la base; null si falta uno o es corto. */
+export function parseEmbeddings(data: unknown, count: number): number[][] | null {
+  const list = (data as { data?: unknown } | null)?.data;
+  if (!Array.isArray(list) || list.length !== count) return null;
+  const out: number[][] = new Array(count);
+  for (const [i, item] of list.entries()) {
+    const row = item as { index?: unknown; embedding?: unknown };
+    const at = typeof row.index === "number" ? row.index : i;
+    const v = row.embedding;
+    if (!Array.isArray(v) || !v.every((x) => typeof x === "number" && Number.isFinite(x))) return null;
+    const fit = fitVector(v as number[]);
+    if (!fit || at < 0 || at >= count) return null;
+    out[at] = fit;
+  }
+  return out.every(Boolean) ? out : null;
+}
+
+/** El vector como lo lee pgvector: «[0.1,0.2,…]». */
+export const vectorText = (v: number[]) => `[${v.map((x) => Number(x.toFixed(6))).join(",")}]`;
+
+/**
+ * Funde la búsqueda por palabras y la de significado. Cada lista aporta
+ * 1/(k + puesto); un pasaje que está en las dos suma ambas. `rank` queda
+ * de 0 a 1 frente al primero, como lo usa el resto de la página.
+ */
+export function fuseHits<T extends { ref: string }>(
+  lexical: (T & { rank: number })[],
+  semantic: (T & { sim: number })[],
+  k = 60,
+): (T & { rank: number; via: "palabras" | "significado" | "ambas"; sim?: number })[] {
+  const score = new Map<string, { row: T; s: number; lex: boolean; sem: boolean; sim?: number }>();
+  lexical.forEach((row, i) => score.set(row.ref, { row, s: 1 / (k + i + 1), lex: true, sem: false }));
+  semantic.forEach((row, i) => {
+    const had = score.get(row.ref);
+    if (had) Object.assign(had, { s: had.s + 1 / (k + i + 1), sem: true, sim: row.sim });
+    else score.set(row.ref, { row, s: 1 / (k + i + 1), lex: false, sem: true, sim: row.sim });
+  });
+  const sorted = [...score.values()].sort((a, b) => b.s - a.s);
+  const top = sorted[0]?.s ?? 1;
+  return sorted.map(({ row, s, lex, sem, sim }) => {
+    const { sim: _drop, ...rest } = row as T & { sim?: number };
+    return { ...(rest as T), rank: s / top, via: lex && sem ? "ambas" : lex ? "palabras" : "significado", ...(sim !== undefined ? { sim } : {}) };
+  });
+}
+
+export function parseUnderstand(raw: string, fallback: string): { question: string; terms: string[] } {
+  const text = raw.trim();
+  const start = text.indexOf("{");
+  const end = text.lastIndexOf("}");
+  if (start >= 0 && end > start) {
+    try {
+      const data = JSON.parse(text.slice(start, end + 1)) as { pregunta?: unknown; buscar?: unknown };
+      const question = typeof data.pregunta === "string" && data.pregunta.trim().length >= 2 ? data.pregunta.replace(/\s+/g, " ").trim().slice(0, 500) : fallback;
+      const terms = (Array.isArray(data.buscar) ? data.buscar : [])
+        .filter((t): t is string => typeof t === "string")
+        .map((t) => t.replace(/\s+/g, " ").trim().slice(0, 40))
+        .filter(Boolean)
+        .slice(0, 6);
+      return { question, terms };
+    } catch {
+      /* no era JSON */
+    }
+  }
+  return { question: fallback, terms: [] };
 }
 
 /* --- El catálogo de Planeación (0096) ----------------------------------------------- */
@@ -569,11 +988,34 @@ export function extractKeywords(question: string): string[] {
   return [...new Set(words)];
 }
 
+/** Las palabras que dicen de qué trata un texto: sin relleno, sin palabras de pregunta, de 3 letras o más. */
+const contentWords = (text: string) =>
+  normalizeQuestion(text)
+    .split(" ")
+    .filter((w) => w.length >= 3 && !QUESTION_STOP.has(w) && !TRIGGER_FILLER.has(w));
+
+/**
+ * Qué parte de lo esencial de la pregunta cubren esas palabras (0 a 1). Una
+ * respuesta oficial sobre «qué es la UDES» no cubre «cuántos estudiantes
+ * matriculados tiene la UDES»: de estudiantes, matriculados y udes, solo udes.
+ */
+export function coverage(question: string, words: string[]): number {
+  const asked = extractKeywords(question);
+  if (!asked.length) return 1;
+  return asked.filter((k) => triggerWordIn(k, words)).length / asked.length;
+}
+
+/** Cuánto de lo preguntado debe cubrir una respuesta oficial para darse por palabras. */
+export const CATALOG_COVERAGE = 0.6;
+
 /**
  * Lo que responde el catálogo, si responde. Primero las capciosas (gana el
  * disparador más largo, el más específico); luego las respuestas, por
  * disparadores propios, por parecido directo o despojada de cortesías
- * («hola pilo cuéntame qué es el PDI» → «qué es el PDI»).
+ * («hola pilo cuéntame qué es el PDI» → «qué es el PDI»). Por palabras clave
+ * o por un disparador de una palabra, la respuesta debe cubrir lo esencial de
+ * la pregunta (CATALOG_COVERAGE), salvo el disparador de varias palabras, que es deliberado:
+ * que la pregunta nombre a la UDES no la vuelve «qué es la UDES».
  */
 export function matchCatalog(question: string, entries: CatalogEntry[], min = 0.65): { entry: CatalogEntry; score: number } | null {
   const qnorm = normalizeQuestion(question);
@@ -597,6 +1039,10 @@ export function matchCatalog(question: string, entries: CatalogEntry[], min = 0.
     if (e.triggers && e.triggers.length > 0) {
       for (const t of e.triggers.flatMap((x) => x.split(/[,;|\n]/))) {
         if (!t.trim() || !hasTrigger(qnorm, t)) continue;
+        // Un disparador de una sola palabra («udes») sale en muchas preguntas: debe
+        // cubrir lo esencial. Uno de varias palabras («cifras oficiales») es deliberado.
+        const tw = contentWords(t);
+        if (tw.length <= 1 && coverage(question, tw) < CATALOG_COVERAGE) continue;
         const score = 0.85 + 0.05 * triggerWeight(t);
         if (!best || score > best.score) best = { entry: e, score };
       }
@@ -616,12 +1062,14 @@ export function matchCatalog(question: string, entries: CatalogEntry[], min = 0.
         best = { entry: e, score };
       }
 
-      // 3. Coincidencia de contenido esencial (palabras clave del objetivo)
-      const targetWords = targetStripped.split(" ").filter((w) => w.length >= 2 && !QUESTION_STOP.has(w));
+      // 3. Coincidencia de contenido esencial: todas las palabras clave del objetivo
+      //    están en la pregunta y cubren lo esencial de ella. Sin relleno: «es» no
+      //    puede coincidir con «estudiantes».
+      const targetWords = contentWords(targetStripped);
       const queryWords = qstripped.split(" ").filter(Boolean);
       if (targetWords.length >= 1 && queryWords.length >= 1) {
         const matchesAll = targetWords.every((w) => triggerWordIn(w, queryWords));
-        if (matchesAll) {
+        if (matchesAll && coverage(question, targetWords) >= CATALOG_COVERAGE) {
           const kwScore = 0.80 + Math.min(0.15, targetWords.length * 0.04);
           if (!best || kwScore > best.score) best = { entry: e, score: kwScore };
         }
@@ -1348,6 +1796,7 @@ export function fishText(text: string, tone: string): string {
     .map((s) => `[${tag}] ${s}`)
     .join(" ");
 }
+
 // --- fin de la lógica -------------------------------------------------------------
 
 // El origen permitido se pone en cada respuesta, según quién llama (allowOrigin).
@@ -1411,6 +1860,10 @@ async function providerDetail(response: Response) {
  */
 /** El catálogo se lee a lo sumo una vez por minuto en cada instancia de la función. */
 let catalogCache: { at: number; rows: CatalogEntry[] } | null = null;
+/** Las sedes de las cifras en vivo (0107), con la misma espera. */
+let campusCache: { at: number; rows: string[] } | null = null;
+/** ¿Hay vectores de ese modelo? Sin ellos no se gasta una llamada por pregunta. */
+let embedCache: { at: number; model: string; ready: boolean } | null = null;
 
 function allowOrigin(origin: string | null): string {
   const list = (Deno.env.get("ALLOWED_ORIGIN") ?? "*")
@@ -1449,11 +1902,16 @@ async function handle(request: Request): Promise<Response> {
     history?: { q: string; a: string }[];
     answerId?: number;
     vote?: string;
+    /** Al calificar una respuesta sin id: qué tipo de respuesta era. */
+    kind?: string;
     /** La muestra de la configuración: qué estilo de la voz de NVIDIA probar. */
     style?: string;
     /** La configuración: crear en Fish Audio la voz de este estilo (con su muestra). */
     clone?: string;
     need?: NeedInput;
+    /** Indexar por significado (0108): qué paso y, al probar, la pregunta. */
+    step?: string;
+    q?: string;
     analysis?: {
       brief?: Record<string, unknown>;
       part?: string;
@@ -1473,7 +1931,7 @@ async function handle(request: Request): Promise<Response> {
     return json({ error: "El pedido no es JSON." }, 400);
   }
   const requested = body.action;
-  if (!requested || !["resumir", "sintetizar", "explicar", "voz", "probar", "preguntar", "calificar", "entender", "analizar"].includes(requested)) {
+  if (!requested || !["resumir", "sintetizar", "explicar", "voz", "probar", "preguntar", "calificar", "entender", "analizar", "indexar"].includes(requested)) {
     return json({ error: "Acción desconocida." }, 400);
   }
   // Calificar una respuesta pide los mismos permisos que preguntar.
@@ -1536,12 +1994,132 @@ async function handle(request: Request): Promise<Response> {
     return (count ?? 0) >= settings.daily_limit;
   };
   // Preguntar revisa el cupo solo antes de llamar a la IA: la memoria no gasta.
-  if (action !== "probar" && !asking && (await overLimit())) {
+  if (action !== "probar" && action !== "indexar" && !asking && (await overLimit())) {
     await log("limite", body.page ?? "");
     return json({ error: "Mr. Pilo llegó al límite de pedidos de hoy.", advice: "Mañana vuelve; mientras tanto puede leer con la voz del navegador.", code: "limite" }, 429);
   }
 
   const headers = { Authorization: `Bearer ${textKey}`, "Content-Type": "application/json" };
+
+  /* --- Búsqueda por significado (0108) ------------------------------------------ */
+  // Otro modelo si el de partida se retira (0109); vacío, el de partida.
+  const preset = embedTarget(settings.provider ?? "mistral");
+  const embedder = preset && String(settings.embed_model ?? "").trim() ? { ...preset, model: String(settings.embed_model).trim() } : preset;
+
+  /** La bandeja de lo que Pilo no supo (0109). Sin esa migración, no anota y sigue. */
+  const learn = async (question: string, reason: "sin_respuesta" | "no_sirvio" | "revisar", kind: string, answer: string, answerId: number | null = null) => {
+    const q = question.replace(/\s+/g, " ").trim().slice(0, 500);
+    const qn = normalizeQuestion(q);
+    if (qn.length < 2) return;
+    await admin.rpc("pilo_inbox_add", { p_question: q, p_qnorm: qn, p_reason: reason, p_kind: kind.slice(0, 20), p_answer: answer.slice(0, 6000), p_answer_id: answerId });
+  };
+  /** Vectores de varios textos con la clave del texto; si falla, por qué. */
+  // Si el modelo no acepta dimensiones ni recorte, se repite el pedido sin ellos; un
+  // vector más largo que 1024 se recorta y normaliza (fitVector).
+  const embed = async (input: string[], kind: "query" | "passage", ms = 20_000): Promise<{ vectors: number[][] | null; error?: string; gone?: boolean }> => {
+    if (!embedder || !textKey || !input.length) return { vectors: null, error: "sin proveedor de embeddings" };
+    try {
+      const ask = (mode: "full" | "plain") =>
+        callProvider(embedder.url, { method: "POST", headers, signal: AbortSignal.timeout(ms), body: JSON.stringify(embedBody(embedder, input, kind, mode)) });
+      let r = await ask("full");
+      if (!r.ok && embedder.nvidia && (r.status === 400 || r.status === 422)) {
+        await r.body?.cancel();
+        r = await ask("plain");
+      }
+      if (!r.ok) {
+        const detail = await providerDetail(r);
+        if (modelGone(r.status, detail)) {
+          return { vectors: null, gone: true, error: `el modelo «${embedder.model}» ya no está disponible en el proveedor (${r.status}). Elija otro en Búsqueda por significado › Opciones avanzadas › Ver modelos disponibles` };
+        }
+        return { vectors: null, error: `${r.status} ${detail}`.trim() };
+      }
+      const vectors = parseEmbeddings(await r.json(), input.length);
+      return vectors ? { vectors } : { vectors: null, error: `los vectores no llegaron completos o miden menos de ${EMBED_DIM}` };
+    } catch (error) {
+      return { vectors: null, error: String(error).slice(0, 200) };
+    }
+  };
+  /** ¿Hay algo indexado con este modelo? Se pregunta a lo sumo una vez por minuto. */
+  const semanticReady = async (): Promise<boolean> => {
+    if (!embedder) return false;
+    if (embedCache && embedCache.model === embedder.model && Date.now() - embedCache.at < 60_000) return embedCache.ready;
+    const { data, error } = await admin.rpc("pilo_embed_status", { p_model: embedder.model });
+    const st = (data ?? {}) as { memory_done?: number; facts_done?: number };
+    const ready = !error && Number(st.memory_done ?? 0) + Number(st.facts_done ?? 0) > 0;
+    embedCache = { at: Date.now(), model: embedder.model, ready };
+    return ready;
+  };
+
+  /**
+   * Indexar la memoria (solo administración). «estado»: cuántos vectores
+   * están al día; «lote»: convierte los siguientes 64 textos (la página
+   * repite hasta terminar); «probar»: los cinco pasajes que Pilo encontraría,
+   * con la búsqueda híbrida.
+   */
+  async function indexMemory(): Promise<Response> {
+    if (!embedder) {
+      return json({ error: "Este proveedor no ofrece búsqueda por significado.", advice: "Use NVIDIA o Mistral en Conexión: la misma clave sirve para los embeddings." }, 400);
+    }
+    const model = embedder.model;
+    const status = async () => {
+      const { data, error } = await admin.rpc("pilo_embed_status", { p_model: model });
+      if (error) throw new Error(/pilo_embed_status|function/i.test(error.message) ? "Falta la migración 0108 para buscar por significado." : error.message);
+      return data as Record<string, unknown>;
+    };
+    try {
+      const what = String(body.step ?? "estado");
+      if (what === "estado") return json({ ok: true, status: await status() });
+      if (what === "lote") {
+        const { data, error } = await admin.rpc("pilo_embed_pending", { p_model: model, p_limit: 64 });
+        if (error) throw new Error(/pilo_embed_pending|function/i.test(error.message) ? "Falta la migración 0108 para buscar por significado." : error.message);
+        const rows = (data ?? []) as { kind: string; ref: string; body: string }[];
+        let saved = 0;
+        for (let i = 0; i < rows.length; i += 16) {
+          const chunk = rows.slice(i, i + 16);
+          const e = await embed(chunk.map((r) => r.body || r.ref), "passage");
+          if (!e.vectors) {
+            await log("error · indexar", e.error ?? "");
+            return json({ error: `El proveedor no devolvió los vectores: ${e.error ?? "sin detalle"}.`, saved, status: await status() }, 502);
+          }
+          const vectors = e.vectors;
+          const payload = chunk.map((r, j) => ({ kind: r.kind, ref: r.ref, embedding: vectorText(vectors[j]) }));
+          const { data: n, error: se } = await admin.rpc("pilo_embed_save", { p_model: model, p_rows: payload });
+          if (se) throw new Error(se.message);
+          saved += Number(n ?? 0);
+        }
+        embedCache = null;
+        if (saved) await log("listo · indexar", `${saved} vectores`, true);
+        return json({ ok: true, saved, status: await status() });
+      }
+      if (what === "modelos") {
+        // Los modelos de embeddings que el proveedor tiene activos hoy, con la misma clave.
+        const r = await callProvider(embedder.url.replace(/\/embeddings$/, "/models"), { headers, signal: AbortSignal.timeout(15_000) });
+        if (!r.ok) return json({ error: `El proveedor no dio su lista de modelos (${r.status}): ${await providerDetail(r)}` }, 502);
+        return json({ ok: true, current: model, models: embedModelsIn(await r.json()) });
+      }
+      if (what === "probar") {
+        const q = String(body.q ?? "").replace(/\s+/g, " ").trim().slice(0, 500);
+        if (q.length < 2) return json({ error: "Escriba una pregunta." }, 400);
+        const e = await embed([q], "query", 10_000);
+        const [lex, sem] = await Promise.all([
+          admin.rpc("pilo_memory_search", { p_q: q, p_sources: null, p_limit: 8 }),
+          e.vectors ? admin.rpc("pilo_memory_semantic", { p_embedding: vectorText(e.vectors[0]), p_model: model, p_sources: null, p_limit: 8, p_min: SEMANTIC_MIN }) : Promise.resolve({ data: [], error: null }),
+        ]);
+        if (lex.error) throw new Error(lex.error.message);
+        type Row = Passage & { updated_at: string };
+        const hits = fuseHits((lex.data ?? []) as (Row & { rank: number })[], (sem.error ? [] : sem.data ?? []) as (Row & { sim: number })[]).slice(0, 5);
+        return json({
+          ok: true,
+          semantic: Boolean(e.vectors) && !sem.error,
+          error: e.vectors ? undefined : e.error,
+          hits: hits.map((h) => ({ ref: h.ref, source: h.source, title: h.title, section: h.section, cut: h.cut, rank: h.rank, via: h.via, sim: h.sim ?? null })),
+        });
+      }
+      return json({ error: "Paso desconocido." }, 400);
+    } catch (error) {
+      return json({ error: error instanceof Error ? error.message : String(error) }, 500);
+    }
+  }
 
   /**
    * La voz de NVIDIA (Magpie TTS Zeroshot, 0101): clona la muestra del estilo
@@ -1743,7 +2321,8 @@ async function handle(request: Request): Promise<Response> {
     // Qué memorias se usan: las encendidas; Impacto pide sesión, como su portal.
     const on = (settings.memory_sources ?? {}) as Record<string, boolean>;
     const sources = ["cifras", "boletines", "pdi", "observatorio", "impacto"].filter((s) => on[s] !== false && (s !== "impacto" || role));
-    type Hit = Passage & { rank: number; updated_at: string };
+    type Row = Passage & { updated_at: string };
+    type Hit = Row & { rank: number; via?: "palabras" | "significado" | "ambas"; sim?: number };
     const shape = (p: Passage, i: number) => ({
       n: i + 1,
       ref: p.ref,
@@ -1755,20 +2334,124 @@ async function handle(request: Request): Promise<Response> {
       office: p.office,
       excerpt: p.body.slice(0, 900),
     });
+    // La pregunta como la entendió la IA en su contexto (vacía si no hizo falta).
+    // Vuelve a la página, que la manda como historia: así el contexto se encadena.
+    let rewritten = "";
     const reply = async (kind: string, text: string, passages: Passage[], extra: Record<string, unknown> = {}) => {
       await log(kind === "ia" ? "listo" : `listo · ${kind}`, question, kind !== "ia");
-      return json({ kind, text, sources: passages.map(shape), trail, ...extra });
+      return json({ kind, text, sources: passages.map(shape), trail, ...(rewritten ? { asked: rewritten } : {}), ...extra });
     };
-    const search = async (): Promise<Hit[]> => {
-      const { data, error } = await admin.rpc("pilo_memory_search", { p_q: question, p_sources: sources, p_limit: 8 });
-      if (error) throw new Error(`memoria: ${error.message}`);
-      return (data ?? []) as Hit[];
+    // El vector de cada texto buscado, una sola vez aunque lo pidan la memoria y las cifras a la par.
+    const vectors = new Map<string, Promise<string | null>>();
+    const queryVector = (q: string): Promise<string | null> => {
+      let found = vectors.get(q);
+      if (!found) {
+        found = (async () => {
+          if (!(await semanticReady())) return null;
+          const e = await embed([q], "query", 6_000);
+          return e.vectors ? vectorText(e.vectors[0]) : null;
+        })();
+        vectors.set(q, found);
+      }
+      return found;
+    };
+    const model = embedder?.model ?? "";
+    // Por palabras y, si hay vectores, por significado; las dos listas se funden.
+    const search = async (q = question): Promise<Hit[]> => {
+      const v = await queryVector(q);
+      const [lex, sem] = await Promise.all([
+        admin.rpc("pilo_memory_search", { p_q: q, p_sources: sources, p_limit: 8 }),
+        v ? admin.rpc("pilo_memory_semantic", { p_embedding: v, p_model: model, p_sources: sources, p_limit: 8, p_min: SEMANTIC_MIN }) : Promise.resolve({ data: [], error: null }),
+      ]);
+      if (lex.error) throw new Error(`memoria: ${lex.error.message}`);
+      return fuseHits((lex.data ?? []) as (Row & { rank: number })[], (sem.error ? [] : sem.data ?? []) as (Row & { sim: number })[]);
+    };
+    // Las cifras en vivo (0107). Sin esa migración, o con UDES en Cifras apagada, nada.
+    type FactHit = Fact & { rank: number; via?: "palabras" | "significado" | "ambas"; sim?: number };
+    const searchFacts = async (q: string): Promise<FactHit[]> => {
+      if (!sources.includes("cifras")) return [];
+      const v = await queryVector(q);
+      const [lex, sem] = await Promise.all([
+        admin.rpc("pilo_facts_search", { p_q: q, p_limit: 3 }),
+        v ? admin.rpc("pilo_facts_semantic", { p_embedding: v, p_model: model, p_limit: 3, p_min: SEMANTIC_MIN }) : Promise.resolve({ data: [], error: null }),
+      ]);
+      return fuseHits((lex.error ? [] : lex.data ?? []) as (Fact & { rank: number })[], (sem.error ? [] : sem.data ?? []) as (Fact & { sim: number })[]);
+    };
+    // Las sedes de las series y, además, todas las de la universidad (tabla campuses):
+    // una sede sin cifras publicadas también se reconoce, para decir que no hay dato.
+    const loadCampuses = async (): Promise<string[]> => {
+      if (campusCache && Date.now() - campusCache.at < 60_000) return campusCache.rows;
+      const [facts, all] = await Promise.all([admin.rpc("pilo_facts_campuses"), admin.from("campuses").select("name")]);
+      const names = (v: unknown) => (Array.isArray(v) ? v : []).map((c) => (typeof c === "string" ? c : String((c as { name?: unknown })?.name ?? ""))).filter((c) => c.trim());
+      const rows = knownCampuses(facts.error ? [] : names(facts.data), all.error ? [] : names(all.data));
+      campusCache = { at: Date.now(), rows };
+      return rows;
     };
 
-    // 0. El catálogo de Planeación (0096): respuestas oficiales y microexpresiones
-    //    para capciosas. Va primero: lo que Planeación escribió manda.
+    // 0. Entender primero, cuando hay conversación. Si hay IA, lee la pregunta en
+    //    su contexto y la reescribe completa («¿y en 2023?» → «¿Cuántos estudiantes
+    //    matriculados hubo en Cúcuta en 2023?»); todo lo demás (catálogo, cifras,
+    //    memoria, redacción) trabaja con esa pregunta. Sin IA, las reglas unen la
+    //    pregunta de seguimiento con la anterior.
+    const campuses = await loadCampuses();
+    const aiOn = connected && settings.enabled && (settings.functions ?? {}).preguntar !== false;
+    let limited: boolean | null = null;
+    const noAiReason = async (): Promise<string> => {
+      if (!aiOn) return "La IA está apagada: respondo con lo publicado tal cual.";
+      if (limited === null) limited = await overLimit();
+      return limited ? "Se acabó el cupo de IA de hoy: respondo con lo publicado tal cual." : "";
+    };
+    const prev = history.length ? String(history[history.length - 1].q) : "";
+    const followUp = history.length > 0 && isFollowUp(question, campuses);
+    const follow = followUp ? prev : "";
+    const own = parseSlots(question, campuses);
+    let slots = follow ? mergeSlots(parseSlots(follow, campuses), own) : own;
+    let query = expandQuery(follow ? `${follow} ${question}` : question);
+    let triedAi = false;
+    const understand = async (): Promise<boolean> => {
+      if (triedAi) return false;
+      triedAi = true;
+      if (await noAiReason()) return false;
+      try {
+        const r = await callProvider(target.url, {
+          method: "POST",
+          headers,
+          signal: AbortSignal.timeout(15_000),
+          body: JSON.stringify({
+            model: target.model,
+            messages: buildUnderstandMessages(question, history),
+            temperature: 0,
+            max_tokens: 200,
+            ...(settings.provider === "mistral" ? { response_format: { type: "json_object" } } : {}),
+          }),
+        });
+        if (!r.ok) {
+          await r.body?.cancel();
+          return false;
+        }
+        const d = await r.json();
+        const u = parseUnderstand(String(d?.choices?.[0]?.message?.content ?? ""), question);
+        if (normalizeQuestion(u.question) !== normalizeQuestion(question)) {
+          rewritten = u.question;
+          slots = mergeSlots(slots, parseSlots(u.question, campuses));
+        }
+        if (!rewritten && !u.terms.length) return false;
+        query = expandQuery(`${rewritten || question} ${u.terms.join(" ")}`);
+        return true;
+      } catch {
+        return false;
+      }
+    };
+    if (history.length) await understand();
+    // Lo que de verdad se pregunta. Una de seguimiento que nadie reescribió no
+    // va al catálogo ni a las respuestas guardadas: sola no dice qué pide.
+    const asked = rewritten || question;
+    const loose = followUp && !rewritten;
+
+    // 1. El catálogo de Planeación (0096): respuestas oficiales y microexpresiones
+    //    para capciosas. Va antes que las reglas: lo que Planeación escribió manda.
     const catalog = await loadCatalog();
-    const hit = matchCatalog(question, catalog);
+    const hit = matchCatalog(asked, loose ? catalog.filter((c) => c.kind === "capciosa") : catalog);
     if (hit) {
       const e = hit.entry;
       void admin.rpc("pilo_catalog_hit", { p_key: e.key });
@@ -1785,24 +2468,45 @@ async function handle(request: Request): Promise<Response> {
     }
     step("Catálogo", "skip", catalog.length ? "Nada del catálogo coincide." : "El catálogo está vacío.");
 
-    // 1. Reglas: saludos, quién es Pilo, dinero, datos de personas, el futuro.
-    const rule = ruleFor(question);
+    // 2. Reglas: saludos, quién es Pilo, dinero, datos de personas, el futuro.
+    const rule = ruleFor(asked);
     if (rule && rule.rule !== "futuro") {
       step("Reglas", "ok", "La pregunta se responde con una regla fija de Pilo.");
       return reply("regla", RULE_TEXT[rule.rule], []);
     }
     if (rule?.rule === "futuro") {
-      const found = (await search()).slice(0, 1);
+      const found = (await search(asked)).slice(0, 1);
       step("Reglas", "ok", `Pide un dato de ${rule.year}, que aún no existe: se responde con lo último publicado.`);
       const text = `${RULE_TEXT.futuro}${found.length ? ` Lo más reciente publicado sobre eso está en «${found[0].title}»${found[0].cut ? ` (corte ${found[0].cut})` : ""} [1].` : ""}`;
       return reply("regla", text, found);
     }
     step("Reglas", "skip", "Ninguna regla aplica.");
 
-    // 2. Respuestas guardadas: casi la misma pregunta, con sus fuentes sin cambios.
-    const qnorm = normalizeQuestion(question);
-    const { data: candidates } = await admin.rpc("pilo_answer_candidates", { p_qnorm: qnorm });
-    const saved = pickSaved(qnorm, (candidates ?? []) as { id: number; question: string; qnorm: string; answer: string; refs: string[]; fresh: boolean }[]);
+    // 2b. El catálogo por significado (0109): la respuesta oficial también sirve
+    //     cuando la pregunta llega con otras palabras. Solo si se parece mucho.
+    const officialVec = !loose && catalog.some((c) => c.kind === "respuesta") ? await queryVector(expandQuery(asked)) : null;
+    if (officialVec) {
+      const { data: near } = await admin.rpc("pilo_catalog_semantic", { p_embedding: officialVec, p_model: model, p_min: CATALOG_SEMANTIC_MIN });
+      const top = ((near ?? []) as { key: string; sim: number }[])[0];
+      const e = top ? catalog.find((c) => c.key === top.key && c.kind === "respuesta") : undefined;
+      if (e) {
+        void admin.rpc("pilo_catalog_hit", { p_key: e.key });
+        const source: Passage[] = e.source_title
+          ? [{ ref: `catalogo:${e.key}`, source: "catalogo", title: e.source_title, section: "Respuesta de Planeación", body: e.answer, path: e.source_path, cut: e.cut, office: e.office }]
+          : [];
+        step("Catálogo por significado", "ok", `Respuesta oficial de Planeación (${e.key}): la pregunta dice lo mismo con otras palabras (${Math.round(top.sim * 100)} % de parecido).`);
+        const text = source.length && !/\[1\]/.test(e.answer) ? `${e.answer} [1]` : e.answer;
+        return reply("curada", text, source, { mood: e.mood });
+      }
+      step("Catálogo por significado", "skip", "Ninguna respuesta oficial se parece lo suficiente.");
+    }
+
+    // 3. Respuestas guardadas: casi la misma pregunta, con sus fuentes sin cambios
+    //    y el mismo corte (una respuesta de 2024 no sirve para 2023).
+    const qnorm = normalizeQuestion(asked);
+    const { data: candidates } = loose ? { data: [] } : await admin.rpc("pilo_answer_candidates", { p_qnorm: qnorm });
+    const sameCutOnly = ((candidates ?? []) as { id: number; question: string; qnorm: string; answer: string; refs: string[]; fresh: boolean }[]).filter((c) => sameCut(asked, c.question, campuses));
+    const saved = loose ? null : pickSaved(qnorm, sameCutOnly);
     if (saved) {
       const { data: rows } = await admin.from("pilo_memory").select("ref, source, title, section, body, path, cut, office").in("ref", saved.refs);
       const byRef = new Map(((rows ?? []) as Passage[]).map((r) => [r.ref, r]));
@@ -1814,23 +2518,63 @@ async function handle(request: Request): Promise<Response> {
     }
     step("Respuestas guardadas", "skip", (candidates ?? []).length ? "Había preguntas parecidas, pero no iguales o sus fuentes cambiaron." : "No había una pregunta igual guardada.");
 
-    // 3. La memoria: los pasajes más cercanos de lo publicado.
-    const found = await search();
-    if (!found.length) {
+    // 4. El corte que se pide y la búsqueda: cifras en vivo y memoria. Si con las
+    //    reglas no se encontró nada, la IA intenta entender la pregunta (una vez).
+    const lookup = () => Promise.all([wantsFigure(query) || hasSlots(slots) ? searchFacts(query) : Promise.resolve([] as FactHit[]), search(query)]);
+    let [facts, found] = await lookup();
+    if (!facts.length && !found.length && (await understand())) [facts, found] = await lookup();
+    const cutParts = [
+      slots.campus.length ? `sede ${slots.campus.join(", ")}` : slots.byCampus ? "todas las sedes" : "",
+      slots.years.length ? `año ${slots.years.join(", ")}` : "",
+      slots.term ? `periodo ${slots.term === "A" ? 1 : 2}` : "",
+    ].filter(Boolean);
+    const understood = [
+      follow ? `Sigue a «${follow.slice(0, 80)}».` : "",
+      rewritten ? `La IA la entendió como «${rewritten.slice(0, 120)}».` : "",
+      cutParts.length ? `Pide: ${cutParts.join(" · ")}.` : "",
+    ].filter(Boolean);
+    step("Entender", understood.length ? (rewritten ? "ai" : "ok") : "skip", understood.length ? understood.join(" ") : "Pregunta directa, sin sede, año ni periodo.");
+
+    // 4a. Las cifras en vivo: la cifra exacta de ese corte, del mismo cálculo del portal.
+    const topFact = facts[0]?.rank ?? 0;
+    const dataPassages: Passage[] = [];
+    let lead: { fact: Fact; points: FactPoint[]; missing: string[] } | null = null;
+    for (const f of facts.filter((x) => x.rank >= topFact * 0.6).slice(0, 2)) {
+      const { points, missing } = pickCuts(f, slots);
+      if (!points.length && !missing.length) continue;
+      dataPassages.push(factPassage(f, points, missing));
+      lead ??= { fact: f, points, missing };
+    }
+    if (dataPassages.length) {
+      const d = dataPassages[0];
+      step("Cifras", "ok", `«${d.title}»${d.cut ? ` en ${d.cut}` : ""}${lead?.missing.length ? `; sin cifra para ${lead.missing.join(", ")}` : ""}.`);
+    } else if (wantsFigure(query) || hasSlots(slots)) {
+      step("Cifras", "skip", facts.length ? "Ningún indicador tiene cifras para ese corte." : "Ningún indicador de UDES en Cifras coincide.");
+    }
+
+    // 4b. La memoria: los pasajes más cercanos de lo publicado.
+    const memory = found
+      .filter((p) => p.rank >= (found[0]?.rank ?? 0) * 0.3 && !dataPassages.some((d) => d.ref === `dato:${p.ref}`))
+      .slice(0, dataPassages.length ? 3 : 5);
+    const passages: Passage[] = [...dataPassages, ...memory];
+    if (!passages.length) {
       step("Fuentes", "skip", "Ningún pasaje de lo publicado responde la pregunta.");
       step("IA", "skip", "Sin fuentes no se redacta.");
+      await learn(asked, "sin_respuesta", "nada", NOTHING_TEXT);
       return reply("nada", NOTHING_TEXT, []);
     }
-    const passages = found.filter((p) => p.rank >= found[0].rank * 0.3).slice(0, 5);
     const names: Record<string, string> = { cifras: "UDES en Cifras", boletines: "Boletines", pdi: "Plan de Desarrollo", observatorio: "Observatorio", impacto: "Portal de Impacto" };
-    const where = [...new Set(passages.map((p) => names[p.source] ?? p.source))].join(", ");
-    step("Fuentes", "ok", `${passages.length} ${passages.length === 1 ? "pasaje" : "pasajes"} en ${where}.`);
+    if (memory.length) {
+      const where = [...new Set(memory.map((p) => names[p.source] ?? p.source))].join(", ");
+      const bySense = memory.filter((p) => p.via === "significado").length;
+      step("Fuentes", "ok", `${memory.length} ${memory.length === 1 ? "pasaje" : "pasajes"} en ${where}${bySense ? ` (${bySense} ${bySense === 1 ? "hallado" : "hallados"} solo por significado)` : ""}.`);
+    } else step("Fuentes", "skip", "La memoria no suma nada a la cifra.");
 
-    // 3b. La malla (0097): dónde queda cada pasaje y qué contiene. Sin 0097, vacía.
-    const mesh = await meshAround(passages.map((p) => p.ref), sources);
-    const inMesh = passages.filter((p) => mesh.nodes.some((n) => n.id === p.ref));
+    // 4c. La malla (0097): dónde queda cada pasaje y qué contiene. Sin 0097, vacía.
+    const mesh = await meshAround(memory.map((p) => p.ref), sources);
+    const inMesh = memory.filter((p) => mesh.nodes.some((n) => n.id === p.ref));
     const drawFor = (ref: string | undefined) => (ref && mesh.nodes.some((n) => n.id === ref) ? { graph: focusMesh(mesh, ref) } : {});
-    if (isStructural(question) && inMesh.length) {
+    if (isStructural(asked) && inMesh.length && !dataPassages.length) {
       const focus = inMesh[0];
       const text = describeNode(mesh, focus.ref);
       if (text) {
@@ -1841,19 +2585,20 @@ async function handle(request: Request): Promise<Response> {
     }
     if (mesh.nodes.length) step("Malla", "ok", `Ubiqué ${inMesh.length} de los pasajes en la malla.`);
 
-    // 4. La IA redacta, si está conectada y hay cupo; si no, los pasajes tal cual.
-    const aiOn = connected && settings.enabled && (settings.functions ?? {}).preguntar !== false;
-    const noAi = !aiOn ? "La IA está apagada: respondo con los pasajes tal cual." : (await overLimit()) ? "Se acabó el cupo de IA de hoy: respondo con los pasajes tal cual." : "";
+    // 5. La IA redacta, si está conectada y hay cupo; si no, la cifra con su
+    //    plantilla o los pasajes tal cual.
+    const noAi = await noAiReason();
     if (noAi) {
       step("IA", "skip", noAi);
-      return reply("extracto", extractAnswer(passages), passages.slice(0, 2), drawFor(passages[0]?.ref));
+      if (lead) return reply("dato", dataAnswer(lead.fact, lead.points, lead.missing), [dataPassages[0]]);
+      return reply("extracto", extractAnswer(memory), memory.slice(0, 2), drawFor(memory[0]?.ref));
     }
     const response = await callProvider(target.url, {
       method: "POST",
       headers,
       body: JSON.stringify({
         model: target.model,
-        messages: buildAskMessages(question, passages, history, mapContext(mesh, passages.map((p) => p.ref))),
+        messages: buildAskMessages(asked, passages, history, mapContext(mesh, memory.map((p) => p.ref))),
         temperature: 0.2,
         max_tokens: 600,
         ...(settings.provider === "mistral" ? { response_format: { type: "json_object" } } : {}),
@@ -1862,43 +2607,68 @@ async function handle(request: Request): Promise<Response> {
     if (!response.ok) {
       const detail = await providerDetail(response);
       await log(`error ${response.status}`, `${question} · ${detail}`);
-      step("IA", "skip", `El proveedor no respondió (${response.status}): respondo con los pasajes tal cual.`);
-      return reply("extracto", extractAnswer(passages), passages.slice(0, 2), drawFor(passages[0]?.ref));
+      step("IA", "skip", `El proveedor no respondió (${response.status}): respondo con lo publicado tal cual.`);
+      if (lead) return reply("dato", dataAnswer(lead.fact, lead.points, lead.missing), [dataPassages[0]]);
+      return reply("extracto", extractAnswer(memory), memory.slice(0, 2), drawFor(memory[0]?.ref));
     }
     const data = await response.json();
     const parsed = parseAsk(String(data?.choices?.[0]?.message?.content ?? ""), passages.length);
-    if (parsed.noData || !parsed.text) {
+    // Sin evadir: si el modelo dio parte de lo pedido con sus citas, esa respuesta
+    // se da (y dice qué falta). Solo sin nada citado es «no lo encontré».
+    const partial = parsed.noData && citedIn(parsed.text).length > 0;
+    if (!parsed.text || (parsed.noData && !partial)) {
       step("IA", "ai", "Leyó los pasajes y no alcanzan para responder.");
       await log("listo · sin datos", question);
-      return json({ kind: "nada", text: parsed.text || NOTHING_TEXT, sources: [], trail });
+      await learn(asked, "sin_respuesta", "nada", parsed.text || NOTHING_TEXT);
+      return json({ kind: "nada", text: parsed.text || NOTHING_TEXT, sources: [], trail, ...(rewritten ? { asked: rewritten } : {}) });
     }
+    // Lo que falta también le sirve a Planeación: va a la bandeja.
+    if (partial) await learn(asked, "sin_respuesta", "ia", parsed.text);
     const cited = renumber(parsed.text, passages);
     const plain = cited.text.replace(/\[\d+\]/g, " ");
     const check = verifyNumbers(plain, passages.map((p) => `${p.title} ${p.section} ${p.cut} ${p.body}`).join("\n"));
     step("IA", "ai", check.verified ? `Redactó con ${passages.length} pasajes. Cada número está en las fuentes.` : `Redactó con ${passages.length} pasajes. Revise: ${check.unknown.join(", ")}.`);
     let answerId: number | null = null;
-    if (check.verified && cited.passages.length) {
+    // Lo que cita cifras en vivo no se guarda: la próxima vez se consulta de nuevo.
+    if (check.verified && !partial && cited.passages.length && !cited.passages.some((p) => p.ref.startsWith("dato:"))) {
       const { data: row } = await admin
         .from("pilo_answers")
-        .insert({ question, qnorm, kind: "ia", answer: cited.text, refs: cited.passages.map((p) => p.ref) })
+        .insert({ question: asked, qnorm, kind: "ia", answer: cited.text, refs: cited.passages.map((p) => p.ref) })
         .select("id")
         .maybeSingle();
       answerId = (row as { id: number } | null)?.id ?? null;
     }
     await log(check.verified ? "listo" : "revisar", question);
-    return json({ kind: "ia", text: cited.text, sources: cited.passages.map(shape), trail, answerId, verified: check.verified, unknown: check.unknown, ...drawFor(cited.passages[0]?.ref) });
+    if (!check.verified) await learn(asked, "revisar", "ia", cited.text);
+    return json({ kind: "ia", text: cited.text, sources: cited.passages.map(shape), trail, answerId, verified: check.verified, unknown: check.unknown, ...(rewritten ? { asked: rewritten } : {}), ...drawFor(cited.passages[0]?.ref) });
   }
 
   try {
     // --- Pregúntele a Pilo ---------------------------------------------------------
     if (requested === "calificar") {
       const id = Number(body.answerId);
-      if (Number.isInteger(id) && id > 0 && (body.vote === "up" || body.vote === "down")) {
-        await admin.rpc("pilo_answer_vote", { p_id: id, p_vote: body.vote });
+      const saved = Number.isInteger(id) && id > 0;
+      if (body.vote === "up" || body.vote === "down") {
+        if (saved) await admin.rpc("pilo_answer_vote", { p_id: id, p_vote: body.vote });
+        // «No me sirvió» enseña: la pregunta va a la bandeja. Con una respuesta
+        // guardada, lo que se anota sale de la base, no de lo que manda la página.
+        if (body.vote === "down") {
+          let q = String(body.question ?? "");
+          let a = String(body.text ?? "");
+          if (saved) {
+            const { data: row } = await admin.from("pilo_answers").select("question, answer").eq("id", id).maybeSingle();
+            if (row) {
+              q = String(row.question);
+              a = String(row.answer);
+            }
+          }
+          await learn(q, "no_sirvio", saved ? "memoria" : String(body.kind ?? ""), a, saved ? id : null);
+        }
       }
       return json({ ok: true });
     }
     if (asking) return await answerQuestion();
+    if (action === "indexar") return await indexMemory();
 
     // --- Voz -------------------------------------------------------------------
     if (action === "voz") {

@@ -49,7 +49,7 @@ export async function askPilo(action: "resumir" | "sintetizar" | "explicar", por
 
 /* --- Pregúntele a Pilo ------------------------------------------------------------ */
 
-export type AskKind = "regla" | "memoria" | "extracto" | "ia" | "nada" | "curada" | "capciosa" | "malla";
+export type AskKind = "regla" | "memoria" | "extracto" | "ia" | "nada" | "curada" | "capciosa" | "malla" | "dato";
 
 export interface AskSource {
   n: number;
@@ -76,6 +76,12 @@ export interface AskResult {
   sources: AskSource[];
   trail: AskStep[];
   answerId?: number | null;
+  /**
+   * La pregunta como la entendió Pilo en su contexto («¿y en 2023?» → «¿Cuántos
+   * matriculados hubo en Cúcuta en 2023?»). La página la manda como historia en
+   * la siguiente pregunta: así el contexto se encadena.
+   */
+  asked?: string;
   /** La emoción de Pilo que pide el catálogo (atrevido, emocionado, loco, pensar). */
   mood?: string;
   /** El tramo de la malla de la memoria que se dibuja con la respuesta (0097). */
@@ -92,9 +98,17 @@ export async function askQuestion(question: string, history: { q: string; a: str
   return data as AskResult;
 }
 
-/** «Me sirvió» / «No me sirvió». Si falla, no pasa nada: es una opinión, no un dato. */
-export async function rateAnswer(answerId: number, vote: "up" | "down") {
-  await supabase.functions.invoke("pilo-ia", { body: { action: "calificar", portal: "pregunta", answerId, vote } }).catch(() => undefined);
+/**
+ * «Me sirvió» / «No me sirvió». Una respuesta guardada suma su voto; «No me
+ * sirvió» en cualquier respuesta lleva la pregunta a la bandeja de Planeación
+ * (0109), para que Pilo aprenda. Si falla, no pasa nada: es una opinión, no un dato.
+ */
+export async function rateAnswer(input: { answerId?: number | null; vote: "up" | "down"; question: string; text: string; kind: AskKind }) {
+  const { answerId, vote, question, text, kind } = input;
+  if (!answerId && vote === "up") return;
+  await supabase.functions
+    .invoke("pilo-ia", { body: { action: "calificar", portal: "pregunta", answerId: answerId ?? undefined, vote, question, text, kind } })
+    .catch(() => undefined);
 }
 
 /* --- Mr. Pilo Bot: entender la necesidad de un programa ------------------------------ */

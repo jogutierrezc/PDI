@@ -65,9 +65,10 @@ const BADGE: Record<AskKind, string> = {
   curada: "Respuesta de Planeación · sin IA",
   capciosa: "Respuesta rápida de Pilo",
   malla: "De la malla de la memoria · sin IA",
+  dato: "Cifra de UDES en Cifras · sin IA",
 };
 
-const MOOD_OF: Record<AskKind, MojiMood> = { memoria: "feliz", extracto: "atento", ia: "feliz", regla: "cuidado", nada: "duda", curada: "feliz", capciosa: "cuidado", malla: "feliz" };
+const MOOD_OF: Record<AskKind, MojiMood> = { memoria: "feliz", extracto: "atento", ia: "feliz", regla: "cuidado", nada: "duda", curada: "feliz", capciosa: "cuidado", malla: "feliz", dato: "feliz" };
 
 /* --- Iconos (un solo trazo, 2.2) --------------------------------------------------------- */
 
@@ -262,7 +263,8 @@ function Chat({ tema, setTema, role, audience, welcome, voice }: ChatProps) {
     const conv: Conversation = current ?? { id: newId(), title: q.slice(0, 80), at: Date.now(), turns: [] };
     const turn: Turn = { id: newId(), q };
     const before = conv.turns.filter((t) => t.id !== replaceTurn);
-    const history = before.filter((t) => t.answer).slice(-2).map((t) => ({ q: t.q, a: t.answer!.text }));
+    // Con la pregunta ya entendida en su contexto: la de seguimiento siguiente sabe de qué se hablaba.
+    const history = before.filter((t) => t.answer).slice(-2).map((t) => ({ q: t.answer!.asked || t.q, a: t.answer!.text }));
     setConvs((list) => [{ ...conv, at: Date.now(), turns: [...before, turn] }, ...list.filter((c) => c.id !== conv.id)]);
     setCurrentId(conv.id);
     setBusy(true);
@@ -449,7 +451,7 @@ function Chat({ tema, setTema, role, audience, welcome, voice }: ChatProps) {
                     }
                     onVote={(vote) => {
                       patchTurn(current.id, t.id, { vote });
-                      if (t.answer?.answerId) void rateAnswer(t.answer.answerId, vote);
+                      if (t.answer) void rateAnswer({ answerId: t.answer.answerId, vote, question: t.q, text: t.answer.text, kind: t.answer.kind });
                     }}
                     voice={voice}
                     isAdmin={role === "admin"}

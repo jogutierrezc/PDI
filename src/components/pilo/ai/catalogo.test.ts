@@ -104,4 +104,17 @@ describe("el catálogo de Planeación", () => {
     expect(matchCatalog("¿Dónde están los datos abiertos?", withRespTriggers)?.entry.key).toBe("R-005");
     expect(matchCatalog("Quiero consultar las cifras oficiales de la udes", withRespTriggers)?.entry.key).toBe("R-005");
   });
+
+  it("que la pregunta nombre a la UDES no la vuelve «qué es la UDES»", () => {
+    const udes = [
+      entry({ key: "R-003", kind: "respuesta", question: "¿Qué es la UDES?", answer: "La UDES es una universidad privada." }),
+      entry({ key: "R-004", kind: "respuesta", question: "¿Quién es el rector?", triggers: ["udes"], answer: "El rector es…" }),
+    ];
+    // «es» ya no coincide con «estudiantes», y la entrada debe cubrir lo esencial.
+    expect(matchCatalog("¿Cuántos estudiantes matriculados tiene la UDES?", udes)).toBeNull();
+    expect(matchCatalog("¿Cuántos programas tiene la UDES en Cúcuta?", udes)).toBeNull();
+    // La pregunta de verdad sigue respondiéndose.
+    expect(matchCatalog("hola pilo, ¿qué es la UDES?", udes)?.entry.key).toBe("R-003");
+    expect(matchCatalog("¿Qué es la udes?", udes)?.entry.key).toBe("R-003");
+  });
 });

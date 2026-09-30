@@ -524,14 +524,61 @@ const triggerWeight = (trigger: string) => {
   return all.filter((w) => !TRIGGER_FILLER.has(w)).length || all.length;
 };
 
+/** Quita frases de cortesía o relleno conversacional al inicio o final de una pregunta. */
+export function stripConversational(qnorm: string): string {
+  let s = qnorm;
+  const prefixes = [
+    /^(hola|buenas|buenos dias|buenas tardes|buenas noches)(\s+pilo)?\b\s*/,
+    /^(mr\s+pilo|pilo)\b\s*/,
+    /^(por favor|porfa)\b\s*/,
+    /^(me puedes decir|puedes decirme|podrias decirme|podrías decirme)\b\s*/,
+    /^(quisiera saber|quiero saber|me gustaria saber|me gustaría saber)\b\s*/,
+    /^(cuentame|cuéntame|dime|explicame|explícame|ayudame|ayúdame)\b\s*/,
+    /^(tengo una pregunta|tengo una duda|una pregunta|una consulta)\b\s*/,
+    /^(sabe usted|sabes)\b\s*/,
+  ];
+  let changed = true;
+  while (changed) {
+    changed = false;
+    for (const p of prefixes) {
+      const next = s.replace(p, "").trim();
+      if (next !== s && next.length >= 2) {
+        s = next;
+        changed = true;
+      }
+    }
+  }
+  s = s.replace(/\s+(por favor|porfa|gracias)$/, "").trim();
+  return s || qnorm;
+}
+
+/** Palabras comunes en preguntas que no definen el tema de la consulta. */
+export const QUESTION_STOP = new Set(
+  (
+    "como cual cuales cuanto cuanta cuantos cuantas donde cuando quien quienes que " +
+    "hay tiene tienen existe existen sirve significa sobre de del al en para por " +
+    "el la los las un una unos unas"
+  ).split(" "),
+);
+
+/** Extrae las palabras clave esenciales de una pregunta, sin cortesías ni palabras de relleno. */
+export function extractKeywords(question: string): string[] {
+  const norm = normalizeQuestion(question);
+  const stripped = stripConversational(norm);
+  const words = stripped.split(" ").filter((w) => w.length >= 3 && !QUESTION_STOP.has(w) && !TRIGGER_FILLER.has(w));
+  return [...new Set(words)];
+}
+
 /**
  * Lo que responde el catálogo, si responde. Primero las capciosas (gana el
  * disparador más largo, el más específico); luego las respuestas, por
- * parecido con la pregunta o alguna de sus variantes (0,72 o más).
+ * disparadores propios, por parecido directo o despojada de cortesías
+ * («hola pilo cuéntame qué es el PDI» → «qué es el PDI»).
  */
-export function matchCatalog(question: string, entries: CatalogEntry[], min = 0.72): { entry: CatalogEntry; score: number } | null {
+export function matchCatalog(question: string, entries: CatalogEntry[], min = 0.65): { entry: CatalogEntry; score: number } | null {
   const qnorm = normalizeQuestion(question);
   if (!qnorm) return null;
+  const qstripped = stripConversational(qnorm);
   let best: { entry: CatalogEntry; score: number } | null = null;
   for (const e of entries) {
     if (e.kind !== "capciosa") continue;
@@ -545,9 +592,40 @@ export function matchCatalog(question: string, entries: CatalogEntry[], min = 0.
   if (best) return best;
   for (const e of entries) {
     if (e.kind !== "respuesta") continue;
+
+    // 1. Disparadores / palabras clave explícitos en la respuesta
+    if (e.triggers && e.triggers.length > 0) {
+      for (const t of e.triggers.flatMap((x) => x.split(/[,;|\n]/))) {
+        if (!t.trim() || !hasTrigger(qnorm, t)) continue;
+        const score = 0.85 + 0.05 * triggerWeight(t);
+        if (!best || score > best.score) best = { entry: e, score };
+      }
+    }
+
+    // 2. Parecido con la pregunta y variantes (con o sin cortesías)
     for (const q of [e.question, ...e.variants]) {
-      const score = similarity(qnorm, normalizeQuestion(q));
-      if (score >= min && (!best || score > best.score)) best = { entry: e, score };
+      if (!q.trim()) continue;
+      const target = normalizeQuestion(q);
+      const targetStripped = stripConversational(target);
+
+      const scoreDirect = similarity(qnorm, target);
+      const scoreStripped = similarity(qstripped, targetStripped);
+      const score = Math.max(scoreDirect, scoreStripped);
+
+      if (score >= min && (!best || score > best.score)) {
+        best = { entry: e, score };
+      }
+
+      // 3. Coincidencia de contenido esencial (palabras clave del objetivo)
+      const targetWords = targetStripped.split(" ").filter((w) => w.length >= 2 && !QUESTION_STOP.has(w));
+      const queryWords = qstripped.split(" ").filter(Boolean);
+      if (targetWords.length >= 1 && queryWords.length >= 1) {
+        const matchesAll = targetWords.every((w) => triggerWordIn(w, queryWords));
+        if (matchesAll) {
+          const kwScore = 0.80 + Math.min(0.15, targetWords.length * 0.04);
+          if (!best || kwScore > best.score) best = { entry: e, score: kwScore };
+        }
+      }
     }
   }
   return best;

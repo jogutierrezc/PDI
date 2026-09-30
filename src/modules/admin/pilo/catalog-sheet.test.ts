@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import ExcelJS from "exceljs";
-import { EXAMPLES, fillCatalogTemplate, parseCatalogTable } from "./catalog-sheet";
+import { EXAMPLES, detectCatalogKind, fillCatalogTemplate, parseCatalogTable } from "./catalog-sheet";
 import { workbookToTables } from "../institucion/structure-sheet";
 
 async function roundTrip(kind: "respuesta" | "capciosa") {
@@ -60,5 +60,28 @@ describe("el catálogo de Pilo en Excel", () => {
     const r = parseCatalogTable("respuesta", { Respuestas: [["Clave", "Respuesta"], ["R-1", "Hola"]] });
     expect(r.problems).toEqual(["Hoja «Respuestas»: falta la columna «Pregunta»."]);
     expect(r.valid).toEqual([]);
+  });
+
+  it("reconoce alias de columnas y genera claves si faltan", () => {
+    const r = parseCatalogTable("respuesta", {
+      "Respuestas locales": [
+        ["Preguntas", "Respuestas", "Disparadores"],
+        ["¿Qué es el PDI?", "Es el plan de desarrollo institucional.", "pdi, plan de desarrollo"],
+        ["¿Dónde están las cifras?", "En el portal de datos abiertos.", "cifras oficiales"],
+      ],
+    });
+    expect(r.problems).toEqual([]);
+    expect(r.valid).toHaveLength(2);
+    expect(r.valid[0].key).toBe("R-001");
+    expect(r.valid[0].triggers).toEqual(["pdi", "plan de desarrollo"]);
+    expect(r.valid[1].key).toBe("R-002");
+    expect(r.valid[1].triggers).toEqual(["cifras oficiales"]);
+  });
+
+  it("detectCatalogKind identifica automáticamente el tipo de libro", () => {
+    expect(detectCatalogKind({ "Respuestas oficiales": [["Pregunta", "Respuesta"]] })).toBe("respuesta");
+    expect(detectCatalogKind({ "Capciosas": [["Tema", "Disparadores", "Respuesta"]] })).toBe("capciosa");
+    expect(detectCatalogKind({ "Hoja 1": [["Preguntas frecuentes", "Respuesta"]] })).toBe("respuesta");
+    expect(detectCatalogKind({ "Hoja 1": [["Tema", "Triggers", "Respuesta"]] })).toBe("capciosa");
   });
 });

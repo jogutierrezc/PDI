@@ -84,4 +84,24 @@ describe("el catálogo de Planeación", () => {
     const piped = [entry({ key: "C-8", triggers: ["novia | tienes pareja\nestas casado"], answer: "Solo los datos." })];
     expect(matchCatalog("¿Está casado Pilo?", piped)?.entry.key).toBe("C-8");
   });
+
+  it("reconoce la respuesta oficial aunque la pregunta traiga saludos o frases conversacionales", () => {
+    expect(matchCatalog("Hola Pilo, ¿me puedes decir qué es el PDI?", catalog)?.entry.key).toBe("R-001");
+    expect(matchCatalog("Buenos días, quisiera saber qué significa PDI por favor", catalog)?.entry.key).toBe("R-001");
+    expect(matchCatalog("Cuéntame qué es el PDI", catalog)?.entry.key).toBe("R-001");
+  });
+
+  it("reconoce respuestas oficiales por sus disparadores / palabras clave", () => {
+    const withRespTriggers = [
+      entry({
+        key: "R-005",
+        kind: "respuesta",
+        question: "¿Dónde veo los datos?",
+        triggers: ["datos abiertos", "cifras oficiales"],
+        answer: "En UDES en Cifras.",
+      }),
+    ];
+    expect(matchCatalog("¿Dónde están los datos abiertos?", withRespTriggers)?.entry.key).toBe("R-005");
+    expect(matchCatalog("Quiero consultar las cifras oficiales de la udes", withRespTriggers)?.entry.key).toBe("R-005");
+  });
 });

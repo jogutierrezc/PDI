@@ -18,10 +18,11 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "../../../lib/supabase";
 import { downloadBlob } from "../traslado/transfer";
 import { workbookToTables } from "../institucion/structure-sheet";
-import { COLUMNS, EXAMPLES, fillCatalogTemplate, parseCatalogTable, SHEET_NAME } from "./catalog-sheet";
+import { COLUMNS, EXAMPLES, detectCatalogKind, fillCatalogTemplate, parseCatalogTable, SHEET_NAME } from "./catalog-sheet";
 import type { CatalogKind, CatalogRow, ParseResult } from "./catalog-sheet";
 import { Icon } from "../../../components/ui/Icon";
 import { Group, StatusMark, Switch } from "./ui";
+import { CatalogModal } from "./CatalogModal";
 
 interface Entry extends CatalogRow {
   kind: CatalogKind;
@@ -58,6 +59,8 @@ export function CatalogSection() {
   const [replace, setReplace] = useState(false);
   const [busy, setBusy] = useState<string | null>(null);
   const [message, setMessage] = useState<{ ok: boolean; text: string } | null>(null);
+  const [modalOpen, setModalOpen] = useState(false);
+  const [editingEntry, setEditingEntry] = useState<Entry | null>(null);
 
   const rows = useMemo(() => (catalog.data ?? []).filter((e) => e.kind === kind), [catalog.data, kind]);
   const count = (k: CatalogKind) => (catalog.data ?? []).filter((e) => e.kind === k).length;
@@ -111,7 +114,10 @@ export function CatalogSection() {
       const { default: ExcelJS } = await import("exceljs");
       const book = new ExcelJS.Workbook();
       await book.xlsx.load(await file.arrayBuffer());
-      setParsed({ file: file.name, result: parseCatalogTable(kind, workbookToTables(book)) });
+      const tables = workbookToTables(book);
+      const targetKind = detectCatalogKind(tables) ?? kind;
+      if (targetKind !== kind) setKind(targetKind);
+      setParsed({ file: file.name, result: parseCatalogTable(targetKind, tables) });
     } catch (e) {
       setParsed(null);
       setMessage({ ok: false, text: `No se pudo leer el archivo: ${(e as Error).message}` });
@@ -148,8 +154,19 @@ export function CatalogSection() {
         <p className="pis-lead">{LEAD[kind]}</p>
       </Group>
 
-      <Group title="Escribirlas en Excel">
+      <Group title="Agregar o importar">
         <div className="pis-actions">
+          <button
+            type="button"
+            className="button-primary"
+            onClick={() => {
+              setEditingEntry(null);
+              setModalOpen(true);
+            }}
+          >
+            <Icon name="plus" size={16} />
+            {kind === "respuesta" ? "Nueva respuesta" : "Nueva capciosa"}
+          </button>
           <button type="button" className="button-secondary" onClick={() => download("plantilla")} disabled={Boolean(busy)}>
             <Icon name="download" size={16} />
             {busy === "plantilla" ? "Armando…" : "Descargar plantilla"}
@@ -158,7 +175,7 @@ export function CatalogSection() {
             <Icon name="download" size={16} />
             {busy === "actual" ? "Armando…" : "Descargar lo que hay"}
           </button>
-          <label className="button-primary pis-file" aria-disabled={missing || Boolean(busy) || undefined}>
+          <label className="button-secondary pis-file" aria-disabled={missing || Boolean(busy) || undefined}>
             <Icon name="upload" size={16} />
             {busy === "leer" ? "Leyendo…" : "Importar Excel"}
             <input
@@ -173,7 +190,7 @@ export function CatalogSection() {
           </label>
         </div>
         <p className="pis-small">
-          Columnas: {COLUMNS[kind].map((c) => c.header).join(" · ")}. La plantilla trae ejemplos y una hoja «Cómo llenarla».
+          Cree respuestas directamente o impórtelas en Excel con columnas: {COLUMNS[kind].map((c) => c.header).join(" · ")}.
         </p>
 
         {parsed && (
@@ -227,7 +244,7 @@ export function CatalogSection() {
           </p>
         )}
         {rows.length === 0 ? (
-          <p className="pis-small">Todavía no hay {kind === "respuesta" ? "respuestas" : "capciosas"}. Descargue la plantilla, escríbalas e impórtelas.</p>
+          <p className="pis-small">Todavía no hay {kind === "respuesta" ? "respuestas" : "capciosas"}. Cree una con «+ Nueva {kind === "respuesta" ? "respuesta" : "capciosa"}» o descargue la plantilla para importarlas en Excel.</p>
         ) : (
           <ul className="pis-cat">
             {rows.map((e) => (
@@ -236,17 +253,53 @@ export function CatalogSection() {
                 <span>
                   <strong>{kind === "respuesta" ? e.question : e.question || e.triggers.join(" · ")}</strong>
                   <small>{e.answer}</small>
-                  {kind === "capciosa" && <small>Disparadores: {e.triggers.join(" · ")}</small>}
+                  {e.triggers && e.triggers.length > 0 && (
+                    <small>Disparadores: {e.triggers.join(" · ")}</small>
+                  )}
+                  {kind === "respuesta" && e.variants && e.variants.length > 0 && (
+                    <small>Variantes: {e.variants.join(" · ")}</small>
+                  )}
+                  {kind === "respuesta" && e.source_title && (
+                    <small>Fuente: {e.source_title} {e.source_path ? `(${e.source_path})` : ""}</small>
+                  )}
                 </span>
                 <em>
                   {e.mood} · {e.hits} {e.hits === 1 ? "uso" : "usos"}
                 </em>
-                <Switch on={e.active} onChange={(active) => toggle.mutate({ key: e.key, active })} label={`Usar ${e.key}`} />
+                <div className="pis-cat__actions">
+                  <button
+                    type="button"
+                    className="button-secondary"
+                    onClick={() => {
+                      setEditingEntry(e);
+                      setModalOpen(true);
+                    }}
+                    title={`Editar ${e.key}`}
+                  >
+                    Editar
+                  </button>
+                  <Switch on={e.active} onChange={(active) => toggle.mutate({ key: e.key, active })} label={`Usar ${e.key}`} />
+                </div>
               </li>
             ))}
           </ul>
         )}
       </Group>
+
+      <CatalogModal
+        open={modalOpen}
+        onClose={() => {
+          setModalOpen(false);
+          setEditingEntry(null);
+        }}
+        defaultKind={kind}
+        initialEntry={editingEntry}
+        isEditing={Boolean(editingEntry)}
+        existingKeys={(catalog.data ?? []).map((e) => e.key)}
+        onSaved={() => {
+          void client.invalidateQueries({ queryKey: KEY });
+        }}
+      />
     </>
   );
 }

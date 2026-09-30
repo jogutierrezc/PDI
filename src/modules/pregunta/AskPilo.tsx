@@ -30,6 +30,8 @@ import type { Conversation, Tema, Turn } from "./store";
 import { Welcome } from "./Welcome";
 import { MeshAnswer } from "./MeshAnswer";
 import { AnswerText, parseAnswer, useTypewriter } from "./AnswerText";
+import { CatalogModal } from "../admin/pilo/CatalogModal";
+import type { CatalogMood } from "../admin/pilo/catalog-sheet";
 import "./ask-pilo.css";
 
 const reduced = () => typeof window !== "undefined" && window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
@@ -93,6 +95,12 @@ const I = {
     </svg>
   ),
   trash: <Svg size={14}><path d="M5 7h14M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3" /></Svg>,
+  catalog: (
+    <Svg size={14}>
+      <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20" />
+      <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z" />
+    </Svg>
+  ),
   blanco: <Svg><circle cx="12" cy="12" r="4.5" /><path d="M12 2.5v2M12 19.5v2M4.6 4.6 6 6M18 18l1.4 1.4M2.5 12h2M19.5 12h2M4.6 19.4 6 18M18 6l1.4-1.4" /></Svg>,
   soleado: (
     <svg width="16" height="16" viewBox="0 0 24 24" aria-hidden="true">
@@ -196,6 +204,7 @@ function Chat({ tema, setTema, role, audience, welcome, voice }: ChatProps) {
   const [scrolled, setScrolled] = useState(false);
   // Las respuestas que acaban de llegar se escriben palabra por palabra; las del historial, no.
   const [fresh, setFresh] = useState<Set<string>>(() => new Set());
+  const [catalogTurn, setCatalogTurn] = useState<Turn | null>(null);
   const [autoRead, setAutoRead] = useState(() => {
     try {
       return window.localStorage.getItem("pilo-pregunta:leer") === "1";
@@ -428,6 +437,8 @@ function Chat({ tema, setTema, role, audience, welcome, voice }: ChatProps) {
                       if (t.answer?.answerId) void rateAnswer(t.answer.answerId, vote);
                     }}
                     voice={voice}
+                    isAdmin={role === "admin"}
+                    onCatalog={() => setCatalogTurn(t)}
                   />
                 ))}
               </div>
@@ -468,6 +479,28 @@ function Chat({ tema, setTema, role, audience, welcome, voice }: ChatProps) {
       <div className="ap-scrim" data-on={sideOpen || (source && window.matchMedia("(max-width: 900px)").matches) || undefined} onClick={() => { setSideOpen(false); setSource(null); }} />
 
       {showWelcome && <Welcome tema={tema} target={slot} onDone={finishWelcome} />}
+
+      {role === "admin" && (
+        <CatalogModal
+          open={Boolean(catalogTurn)}
+          onClose={() => setCatalogTurn(null)}
+          defaultKind="respuesta"
+          initialEntry={
+            catalogTurn
+              ? {
+                  kind: "respuesta",
+                  question: catalogTurn.q,
+                  answer: catalogTurn.answer ? catalogTurn.answer.text.replace(/\s*\[\d+\]/g, "").trim() : "",
+                  mood: (catalogTurn.answer?.mood as CatalogMood) || "emocionado",
+                  source_title: catalogTurn.answer?.sources?.[0]?.title ?? "Planeación Institucional · Pregúntele a Pilo",
+                  source_path: catalogTurn.answer?.sources?.[0]?.path ?? "/pregunta",
+                  cut: catalogTurn.answer?.sources?.[0]?.cut ?? "",
+                }
+              : null
+          }
+          isEditing={false}
+        />
+      )}
     </div>
   );
 }
@@ -511,6 +544,8 @@ function TurnView({
   fresh,
   autoRead,
   onTyped,
+  isAdmin,
+  onCatalog,
 }: {
   turn: Turn;
   live: boolean;
@@ -522,6 +557,8 @@ function TurnView({
   onRetry: () => void;
   onVote: (v: "up" | "down") => void;
   voice: ChatProps["voice"];
+  isAdmin?: boolean;
+  onCatalog?: () => void;
 }) {
   const [trail, setTrail] = useState(false);
   const [map, setMap] = useState<boolean | null>(null);
@@ -699,6 +736,18 @@ function TurnView({
                   {I.copy}
                   {copied && <span>Copiada</span>}
                 </button>
+                {isAdmin && (
+                  <button
+                    type="button"
+                    className="ap-ic"
+                    onClick={onCatalog}
+                    aria-label="Agregar al catálogo de respuestas oficiales de Pilo"
+                    title="Agregar al catálogo oficial de Pilo"
+                  >
+                    {I.catalog}
+                    <span>Al catálogo</span>
+                  </button>
+                )}
                 {a.kind !== "regla" && (
                   <>
                     <button type="button" className="ap-ic" aria-pressed={turn.vote === "up"} onClick={() => onVote("up")} aria-label="Me sirvió">

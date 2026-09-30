@@ -24,6 +24,7 @@ export const MOODS = ["emocionado", "atrevido", "loco", "pensar"] as const;
 export type CatalogMood = (typeof MOODS)[number];
 
 export interface CatalogRow {
+  kind?: CatalogKind;
   key: string;
   question: string;
   variants: string[];
@@ -49,9 +50,10 @@ export const SHEET_NAME: Record<CatalogKind, string> = { respuesta: "Respuestas"
 
 export const COLUMNS: Record<CatalogKind, Column[]> = {
   respuesta: [
-    { id: "key", header: "Clave", width: 10, required: true, help: "Única y corta: R-001, R-002… Importar otra vez la misma clave la actualiza." },
+    { id: "key", header: "Clave", width: 10, required: true, help: "Única y corta: R-001, R-002… Si se deja vacía se genera automáticamente. Importar otra vez la misma clave la actualiza." },
     { id: "question", header: "Pregunta", width: 42, required: true, help: "La pregunta como la haría el público." },
     { id: "variants", header: "Variantes", width: 42, help: "Otras formas de preguntar lo mismo, una por línea (Alt+Enter) o separadas por |." },
+    { id: "triggers", header: "Disparadores", width: 36, help: "Opcional. Palabras clave que activan la respuesta (ej: pdi, plan de desarrollo), separadas por comas o líneas." },
     { id: "answer", header: "Respuesta", width: 60, required: true, help: "Lo que dice Pilo. Corta y clara, en usted. Sin cifras de dinero ni datos de personas." },
     { id: "mood", header: "Emoción", width: 13, help: "Cómo la dice Pilo: emocionado (por defecto), atrevido, loco o pensar." },
     { id: "source_title", header: "Fuente", width: 30, help: "Opcional. El nombre de la página o documento de donde sale." },
@@ -61,13 +63,29 @@ export const COLUMNS: Record<CatalogKind, Column[]> = {
     { id: "active", header: "Activa", width: 8, help: "SI o NO. Con NO, Pilo no la usa pero queda guardada." },
   ],
   capciosa: [
-    { id: "key", header: "Clave", width: 10, required: true, help: "Única y corta: C-001, C-002… Importar otra vez la misma clave la actualiza." },
+    { id: "key", header: "Clave", width: 10, required: true, help: "Única y corta: C-001, C-002… Si se deja vacía se genera automáticamente. Importar otra vez la misma clave la actualiza." },
     { id: "tema", header: "Tema", width: 24, help: "Para usted: de qué trata (salarios, vida personal de Pilo…)." },
     { id: "triggers", header: "Disparadores", width: 36, required: true, help: "Palabras que activan la respuesta, separadas por coma, punto y coma, | o una por línea (salario, sueldo, cuánto gana). Si un disparador tiene varias palabras, todas deben estar en la pregunta, en cualquier orden; no cuentan las de relleno (el, una, eres, usted) y valen plural, femenino y tú o usted (tienes = tiene)." },
     { id: "answer", header: "Respuesta", width: 60, required: true, help: "La microexpresión: corta, rápida y con gracia, en usted." },
     { id: "mood", header: "Emoción", width: 13, help: "Cómo la dice Pilo: atrevido (por defecto), emocionado, loco o pensar." },
     { id: "active", header: "Activa", width: 8, help: "SI o NO." },
   ],
+};
+
+/** Alias comunes de encabezados para reconocer tablas armadas libremente en Excel. */
+export const HEADER_ALIASES: Record<string, string[]> = {
+  key: ["clave", "id", "codigo", "código", "key", "item", "nro", "numero", "número"],
+  question: ["pregunta", "preguntas", "question", "consulta", "duda"],
+  tema: ["tema", "asunto", "categoria", "categoría", "topic", "titulo", "título"],
+  variants: ["variantes", "variante", "variants", "otras preguntas", "otras formas", "sinonimos", "sinónimos"],
+  triggers: ["disparadores", "disparador", "triggers", "trigger", "palabras clave", "palabras claves", "keywords", "disparador(es)"],
+  answer: ["respuesta", "respuestas", "answer", "lo que dice pilo", "texto"],
+  mood: ["emocion", "emoción", "mood", "tono", "expresion", "expresión"],
+  source_title: ["fuente", "source", "origen", "fuente titulo", "fuente_titulo", "nombre fuente", "documento"],
+  source_path: ["ruta de la fuente", "ruta", "enlace", "url", "link", "path", "source_path", "direccion", "dirección"],
+  cut: ["corte", "periodo", "período", "ano", "año", "cut", "vigencia"],
+  office: ["oficina", "responsable", "dependencia", "unidad", "office", "reporta"],
+  active: ["activa", "activo", "estado", "active", "en uso", "habilitada", "habilitado"],
 };
 
 /** Ejemplos para empezar: solo afirmaciones que ya son ciertas en los portales. */
@@ -77,6 +95,7 @@ export const EXAMPLES: Record<CatalogKind, Partial<CatalogRow & { tema: string }
       key: "R-001",
       question: "¿Qué es el PDI?",
       variants: ["¿Qué significa PDI?", "¿Para qué sirve el Plan de Desarrollo?"],
+      triggers: ["pdi", "plan de desarrollo institucional"],
       answer: "El PDI es el Plan de Desarrollo Institucional 2024-2028 de la UDES: sus pilares, proyectos e indicadores, y cómo avanzan. Todo está en el Portal PDI.",
       mood: "emocionado",
       source_title: "Portal PDI",
@@ -87,6 +106,7 @@ export const EXAMPLES: Record<CatalogKind, Partial<CatalogRow & { tema: string }
       key: "R-002",
       question: "¿Dónde encuentro las cifras oficiales de la universidad?",
       variants: ["¿Qué es UDES en Cifras?", "¿Dónde veo los datos abiertos?"],
+      triggers: ["cifras oficiales", "datos abiertos"],
       answer: "En UDES en Cifras: once informes con las cifras oficiales de la universidad, cada una con su corte y la oficina que la reporta.",
       mood: "emocionado",
       source_title: "UDES en Cifras",
@@ -191,12 +211,39 @@ export interface ParseResult {
 }
 
 /**
+ * Detecta si un libro de Excel corresponde a «Respuestas» o «Capciosas»
+ * examinando nombres de hoja y encabezados.
+ */
+export function detectCatalogKind(tables: Record<string, string[][]>): CatalogKind | null {
+  for (const [name, table] of Object.entries(tables)) {
+    const fName = fold(name);
+    if (fName.includes("respuest")) return "respuesta";
+    if (fName.includes("capcios")) return "capciosa";
+    const headers = (table[0] ?? []).map((h) => fold(h ?? ""));
+    if (headers.some((h) => (HEADER_ALIASES.question ?? []).some((a) => h === a || h.startsWith(a)))) return "respuesta";
+    if (headers.some((h) => (HEADER_ALIASES.triggers ?? []).some((a) => h === a || h.startsWith(a)))) return "capciosa";
+  }
+  return null;
+}
+
+/**
  * Lee la hoja de la clase (por su nombre, o la primera que no sea de
  * instrucciones) desde una tabla de textos (fila 1: encabezados).
  */
 export function parseCatalogTable(kind: CatalogKind, tables: Record<string, string[][]>): ParseResult {
   const cols = COLUMNS[kind];
-  const name = Object.keys(tables).find((n) => fold(n) === fold(SHEET_NAME[kind])) ?? Object.keys(tables).find((n) => !fold(n).startsWith("como"));
+  // 1. Buscar primero la hoja con el nombre de la clase
+  let name = Object.keys(tables).find((n) => fold(n) === fold(SHEET_NAME[kind]));
+  // 2. Si no, buscar hoja que contenga la palabra clave de la clase
+  if (!name) {
+    const keyword = kind === "respuesta" ? "respuest" : "capcios";
+    name = Object.keys(tables).find((n) => fold(n).includes(keyword));
+  }
+  // 3. Si no, la primera hoja que no sea de instrucciones
+  if (!name) {
+    name = Object.keys(tables).find((n) => !fold(n).startsWith("como") && !fold(n).startsWith("instruc"));
+  }
+
   const out: ParseResult = { kind, problems: [], rows: [], valid: [] };
   if (!name) {
     out.problems.push(`El libro no tiene la hoja «${SHEET_NAME[kind]}».`);
@@ -206,9 +253,10 @@ export function parseCatalogTable(kind: CatalogKind, tables: Record<string, stri
   const headers = (table[0] ?? []).map((h) => fold(h ?? ""));
   const at: Partial<Record<Column["id"], number>> = {};
   for (const c of cols) {
-    const i = headers.indexOf(fold(c.header));
+    const aliases = HEADER_ALIASES[c.id] ?? [fold(c.header)];
+    const i = headers.findIndex((h) => aliases.some((a) => fold(h) === a || fold(h).startsWith(a)));
     if (i >= 0) at[c.id] = i;
-    else if (c.required) out.problems.push(`Hoja «${name}»: falta la columna «${c.header}».`);
+    else if (c.required && c.id !== "key") out.problems.push(`Hoja «${name}»: falta la columna «${c.header}».`);
   }
   if (out.problems.length) return out;
 
@@ -219,9 +267,12 @@ export function parseCatalogTable(kind: CatalogKind, tables: Record<string, stri
     if (cols.every((c) => !get(c.id))) return; // fila vacía
     const errors: string[] = [];
     const where = (col: string) => `Hoja «${name}», fila ${line}, columna «${col}»`;
-    const key = get("key").toUpperCase();
-    if (!key) errors.push(`${where("Clave")}: falta la clave.`);
-    else if (!/^[A-Z0-9._-]{1,40}$/.test(key)) errors.push(`${where("Clave")}: use solo letras, números, punto, guion o guion bajo (sin espacios).`);
+    let key = get("key").toUpperCase();
+    if (!key) {
+      const prefix = kind === "capciosa" ? "C" : "R";
+      key = `${prefix}-${String(i + 1).padStart(3, "0")}`;
+    }
+    if (!/^[A-Z0-9._-]{1,40}$/.test(key)) errors.push(`${where("Clave")}: use solo letras, números, punto, guion o guion bajo (sin espacios).`);
     else if (seen.has(key)) errors.push(`${where("Clave")}: «${key}» ya está en la fila ${seen.get(key)}.`);
     if (key) seen.set(key, line);
 
@@ -248,6 +299,12 @@ export function parseCatalogTable(kind: CatalogKind, tables: Record<string, stri
       variants = list(get("variants"));
       sourcePath = get("source_path");
       if (sourcePath && !/^(\/|https?:\/\/)/i.test(sourcePath)) errors.push(`${where("Ruta de la fuente")}: debe empezar por / (una página del portal) o por https://.`);
+      if (at["triggers"] !== undefined) {
+        triggers = list(get("triggers"))
+          .flatMap((t) => t.split(/[,;]/))
+          .map((t) => t.trim())
+          .filter(Boolean);
+      }
     } else {
       question = get("tema");
       // Los disparadores también se separan por coma y punto y coma: es como los escribe la gente.

@@ -30,6 +30,8 @@ import type { EditorApi } from "./sections";
 import { Group, StatusMark, Switch, plural, when } from "./ui";
 import { MeshView } from "./MeshView";
 import { revealList } from "./motion";
+import { CatalogModal } from "./CatalogModal";
+import type { CatalogRow } from "./catalog-sheet";
 
 /* --- Pregúntele a Pilo ---------------------------------------------------------------------- */
 
@@ -42,6 +44,20 @@ export function PreguntaSection({ ed }: { ed: EditorApi }) {
   const voiceName = s.voice_engine !== "proveedor" ? "" : s.speech_provider === "nvidia" ? "NVIDIA" : s.speech_provider === "fishaudio" ? "Fish Audio" : "Free.ai";
   const answers = useSavedAnswers();
   const hide = useHideAnswer();
+  const [modalOpen, setModalOpen] = useState(false);
+  const [catalogEntry, setCatalogEntry] = useState<Partial<CatalogRow> | null>(null);
+
+  const promoteToCatalog = (a: { question: string; answer: string }) => {
+    const cleanAnswer = a.answer.replace(/\s*\[\d+\]/g, "").trim();
+    setCatalogEntry({
+      kind: "respuesta",
+      question: a.question,
+      answer: cleanAnswer,
+      source_title: "Planeación Institucional · Pregúntele a Pilo",
+      source_path: "/pregunta",
+    });
+    setModalOpen(true);
+  };
 
   return (
     <>
@@ -118,14 +134,36 @@ export function PreguntaSection({ ed }: { ed: EditorApi }) {
                   {when(a.created_at)} · sirvió {a.up} · no sirvió {a.down}
                   {a.hidden ? " · oculta" : ""}
                 </em>
-                <button type="button" className="button-secondary" onClick={() => hide.mutate({ id: a.id, hidden: !a.hidden })} disabled={hide.isPending}>
-                  {a.hidden ? "Volver a usar" : "Ocultar"}
-                </button>
+                <div className="pis-cat__actions">
+                  <button
+                    type="button"
+                    className="button-secondary pis-to-cat"
+                    onClick={() => promoteToCatalog(a)}
+                    title="Agregar esta respuesta al catálogo oficial de Pilo"
+                  >
+                    <Icon name="spark" size={14} />
+                    Al catálogo
+                  </button>
+                  <button type="button" className="button-secondary" onClick={() => hide.mutate({ id: a.id, hidden: !a.hidden })} disabled={hide.isPending}>
+                    {a.hidden ? "Volver a usar" : "Ocultar"}
+                  </button>
+                </div>
               </li>
             ))}
           </ul>
         )}
       </Group>
+
+      <CatalogModal
+        open={modalOpen}
+        onClose={() => {
+          setModalOpen(false);
+          setCatalogEntry(null);
+        }}
+        defaultKind="respuesta"
+        initialEntry={catalogEntry}
+        isEditing={false}
+      />
     </>
   );
 }

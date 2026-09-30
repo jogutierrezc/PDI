@@ -13,6 +13,7 @@ import type { DatabaseError } from "../../../data/errors";
 import type { Fn, Portal, PortalRule } from "../../../components/pilo/ai/config";
 import type { ReportKind, VoiceStyle } from "../../../components/pilo/ai/logic";
 import type { MemorySource } from "./memory";
+import { DEFAULT_VOICE_PATTERNS } from "../../../components/pilo/ai/voice-expressions";
 
 export type Provider = "mistral" | "freeai" | "nvidia" | "otro";
 export type SpeechProvider = "freeai" | "nvidia" | "fishaudio" | "otro" | "navegador";
@@ -52,6 +53,12 @@ export interface PiloSettings {
   memory_indexed_at?: string | null;
   /** Informes de Impacto con Pilo (0100): a quién más, además de la administración, se abren. */
   impacto_report: Record<ReportKind, boolean>;
+  /** Expresiones emocionales y microexpresiones orales (0106). */
+  voice_expressions: boolean;
+  voice_modulation: boolean;
+  voice_patterns: Record<string, string[]>;
+  /** La base aún no tiene la migración 0106 (expresiones orales de voz). */
+  needs0106?: boolean;
   /** La base aún no tiene la migración 0100 (informes de Impacto). */
   needs0100?: boolean;
   /** La base aún no tiene la migración 0101 (voz de NVIDIA). */
@@ -122,6 +129,10 @@ export function normalizeSettings(raw: Record<string, unknown>): PiloSettings {
       const r = (raw.impacto_report ?? {}) as Partial<Record<ReportKind, unknown>>;
       return { programa: r.programa === true, facultad: r.facultad === true, vicerrectoria: r.vicerrectoria === true };
     })(),
+    voice_expressions: raw.voice_expressions === undefined ? true : Boolean(raw.voice_expressions),
+    voice_modulation: raw.voice_modulation === undefined ? true : Boolean(raw.voice_modulation),
+    voice_patterns: (raw.voice_patterns && typeof raw.voice_patterns === "object" ? raw.voice_patterns : DEFAULT_VOICE_PATTERNS) as Record<string, string[]>,
+    needs0106: !("voice_expressions" in raw),
     needs0100: !("impacto_report" in raw),
     needs0101: !("voice_styles" in raw),
     needs0102: !("fish_model" in raw),
@@ -226,7 +237,7 @@ export function useSavePiloSettings() {
   const client = useQueryClient();
   return useMutation({
     mutationFn: async (settings: PiloSettings) => {
-      const { updated_at: _ignored, needs0090, needs0094, needs0100, needs0101, needs0102, memory_indexed_at: _indexed, ...all } = settings;
+      const { updated_at: _ignored, needs0090, needs0094, needs0100, needs0101, needs0102, needs0106, memory_indexed_at: _indexed, ...all } = settings;
       // Sin 0090 no existen las columnas nuevas: no se mandan.
       const rest: Record<string, unknown> = { ...all };
       if (needs0090) for (const k of ["provider", "speech_provider", "speech_base_url"]) delete rest[k];
@@ -243,6 +254,12 @@ export function useSavePiloSettings() {
       if (needs0102) {
         delete rest.fish_model;
         if (rest.speech_provider === "fishaudio") rest.speech_provider = "navegador";
+      }
+      // Sin 0106, tampoco las expresiones de voz.
+      if (needs0106) {
+        delete rest.voice_expressions;
+        delete rest.voice_modulation;
+        delete rest.voice_patterns;
       }
       const { data: user } = await supabase.auth.getUser();
       const { error } = await supabase

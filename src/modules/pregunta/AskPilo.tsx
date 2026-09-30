@@ -32,6 +32,7 @@ import { MeshAnswer } from "./MeshAnswer";
 import { AnswerText, parseAnswer, useTypewriter } from "./AnswerText";
 import { CatalogModal } from "../admin/pilo/CatalogModal";
 import type { CatalogMood } from "../admin/pilo/catalog-sheet";
+import { enrichSpokenSentences } from "../../components/pilo/ai/voice-expressions";
 import "./ask-pilo.css";
 
 const reduced = () => typeof window !== "undefined" && window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
@@ -177,7 +178,14 @@ export function AskPilo() {
       role={role}
       audience={rules.pregunta.aud}
       welcome={rules.pregunta.welcome}
-      voice={{ advanced: rules.speechReady && canUse(rules, "pregunta", "voz", role).ok, rate: rules.voiceRate, pitch: rules.voicePitch }}
+      voice={{
+        advanced: rules.speechReady && canUse(rules, "pregunta", "voz", role).ok,
+        rate: rules.voiceRate,
+        pitch: rules.voicePitch,
+        expressions: rules.voiceExpressions,
+        modulation: rules.voiceModulation,
+        patterns: rules.voicePatterns,
+      }}
     />
   );
 }
@@ -190,7 +198,14 @@ interface ChatProps {
   role: Role | null;
   audience: "admin" | "sesion" | "publico";
   welcome: boolean;
-  voice: { advanced: boolean; rate: number; pitch: number };
+  voice: {
+    advanced: boolean;
+    rate: number;
+    pitch: number;
+    expressions?: boolean;
+    modulation?: boolean;
+    patterns?: Record<string, string[]>;
+  };
 }
 
 function Chat({ tema, setTema, role, audience, welcome, voice }: ChatProps) {
@@ -573,7 +588,19 @@ function TurnView({
   const readRun = useRef(0);
   const after = useRef<HTMLDivElement>(null);
 
-  const spoken = useMemo(() => parsed.sentences.map((x) => x.spoken), [parsed]);
+  const enrichedVoice = useMemo(() => {
+    const raw = parsed.sentences.map((x) => x.spoken);
+    return enrichSpokenSentences(raw, {
+      mood: a?.mood,
+      expressionsEnabled: voice.expressions !== false,
+      patterns: voice.patterns,
+      modulationEnabled: voice.modulation !== false,
+      baseRate: voice.rate,
+      basePitch: voice.pitch,
+    });
+  }, [parsed, a?.mood, voice.expressions, voice.patterns, voice.modulation, voice.rate, voice.pitch]);
+
+  const spoken = enrichedVoice.sentences;
   // Con «Leer en voz alta», el audio de las primeras frases se pide mientras Pilo escribe.
   useEffect(() => {
     if (a && fresh && autoRead) prefetchPilo(spoken.slice(0, 2), { portal: "pregunta", advanced: voice.advanced });
@@ -595,7 +622,12 @@ function TurnView({
       setReading(k);
       // Mientras suena esta frase, se piden las dos que siguen: así no hay pausas.
       prefetchPilo(spoken.slice(k + 1, k + 3), { portal: "pregunta", advanced: voice.advanced });
-      const used = await sayWithPilo(spoken[k], { portal: "pregunta", ...voice });
+      const used = await sayWithPilo(spoken[k], {
+        portal: "pregunta",
+        ...voice,
+        rate: enrichedVoice.rate,
+        pitch: enrichedVoice.pitch,
+      });
       if (used === "cancelado") break;
     }
     if (mine === readRun.current) {

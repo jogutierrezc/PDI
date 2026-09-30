@@ -13,6 +13,7 @@ import { supabase } from "../../../lib/supabase";
 import { useAuth } from "../../../lib/auth";
 import { canUse } from "./logic";
 import type { Action, Fn, Portal, PortalRule, Role, Rules } from "./logic";
+import { DEFAULT_VOICE_PATTERNS } from "./voice-expressions";
 
 export type { Fn, Portal, PortalRule, Rules };
 
@@ -22,6 +23,10 @@ export interface PiloAiConfig extends Rules {
   speechReady: boolean;
   voiceRate: number;
   voicePitch: number;
+  /** Expresiones y microexpresiones orales de Mr. Pilo (0106). */
+  voiceExpressions: boolean;
+  voiceModulation: boolean;
+  voicePatterns: Record<string, string[]>;
   /** Pregúntele a Pilo (0094): abierta o no, para quién, con bienvenida y con IA. */
   pregunta: { on: boolean; aud: PortalRule["aud"]; welcome: boolean; ai: boolean };
 }
@@ -62,6 +67,9 @@ export function usePiloAiConfig() {
         speechReady: Boolean(raw.speech_ready),
         voiceRate: Number(raw.voice_rate ?? 1),
         voicePitch: Number(raw.voice_pitch ?? 1),
+        voiceExpressions: raw.voice_expressions === undefined ? true : Boolean(raw.voice_expressions),
+        voiceModulation: raw.voice_modulation === undefined ? true : Boolean(raw.voice_modulation),
+        voicePatterns: (raw.voice_patterns && typeof raw.voice_patterns === "object" ? raw.voice_patterns : DEFAULT_VOICE_PATTERNS) as Record<string, string[]>,
         pregunta: (() => {
           const p = (raw.pregunta ?? {}) as Record<string, unknown>;
           const aud = p.aud === "admin" || p.aud === "sesion" ? p.aud : "publico";

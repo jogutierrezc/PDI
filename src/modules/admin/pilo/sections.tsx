@@ -25,6 +25,7 @@ import { PROVIDERS, usePiloLog } from "./store";
 import type { KeyStatus, PiloSettings, Provider } from "./store";
 import { Group, KeyField, StatusMark, Switch } from "./ui";
 import { VoiceStyles } from "./VoiceStyles";
+import { VoiceExpressionsEditor } from "./VoiceExpressionsEditor";
 
 export interface EditorApi {
   s: PiloSettings;
@@ -278,6 +279,43 @@ export function VoiceSection({ ed }: { ed: EditorApi }) {
             />
           </details>
         )}
+      </Group>
+
+      <Group
+        title="Expresiones y naturalidad oral"
+        aside={<small>Entonaciones y microexpresiones según el ánimo</small>}
+      >
+        <p className="pis-lead">
+          Pilo puede pronunciar expresiones orales naturales antes de leer cada respuesta (ej: «¡Claro que sí!», «Veamos...») y adaptar su velocidad y tono a la emoción del tema, sin alterar el texto oficial de la pantalla.
+        </p>
+
+        <dl className="pis-opts">
+          <div>
+            <dt>Microexpresiones al hablar</dt>
+            <dd>
+              <Switch
+                on={s.voice_expressions}
+                onChange={(v) => set("voice_expressions", v)}
+                label="Usar microexpresiones orales al hablar"
+              />
+            </dd>
+          </div>
+          <div>
+            <dt>
+              Modulación emocional automática
+              <small>Ajusta el ritmo y la entonación sutilmente si la respuesta es entusiasta, reflexiva o de cuidado.</small>
+            </dt>
+            <dd>
+              <Switch
+                on={s.voice_modulation}
+                onChange={(v) => set("voice_modulation", v)}
+                label="Modulación emocional automática"
+              />
+            </dd>
+          </div>
+        </dl>
+
+        {s.voice_expressions && <VoiceExpressionsEditor ed={ed} choice={choice} />}
       </Group>
     </>
   );

@@ -490,6 +490,17 @@ html.pilo-embed-doc .route-fallback {
   text-decoration: none;
 }
 
+/* Quién pregunta (0113): un enlace discreto para cambiarlo, junto al de la página. */
+.ap .pe-rol {
+  margin-left: 6px;
+  padding: 5px 6px;
+  border-radius: 6px;
+  font: inherit;
+  color: var(--ap-ink-2);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
 /* --- Esquina izquierda ---------------------------------------------------------- */
 
 .pe[data-lado="izq"] .pe-fab {
@@ -546,6 +557,7 @@ html.pilo-embed-doc .route-fallback {
     background: var(--ap-soft);
   }
 
+  .ap .pe-rol:hover,
   .pe-foot a:hover {
     color: var(--ap-primary-text);
     text-decoration: underline;

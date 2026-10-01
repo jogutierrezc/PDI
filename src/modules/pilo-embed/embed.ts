@@ -6,9 +6,16 @@
    mínimos: el marco dice qué tamaño necesita y la página anfitriona dice si
    lo está mostrando a pantalla completa (móvil). Nada de lo conversado sale
    del marco.
+
+   Hay un chat por espacio de Pilo (0113): el de siempre en /pilo-embed y
+   Mr. Pilo en Enseñanza en /pilo-ensenanza-embed (data-pilo="ensenanza" en la
+   línea que se pega). Cada uno tiene su propio interruptor y su lista de
+   portales autorizados.
    ========================================================================== */
 
 import type { Tema } from "../pregunta/store";
+import { ASK_SPACES, isAskSpace } from "../pregunta/space";
+import type { SpaceId } from "../pregunta/space";
 
 export type Lado = "der" | "izq";
 
@@ -18,17 +25,36 @@ export type FrameState = "oculto" | "cerrado" | "saludo" | "abierto";
 export interface EmbedParams {
   tema: Tema;
   lado: Lado;
+  /** El espacio del marco, cuando no es el de siempre. */
+  space?: SpaceId;
 }
 
-/** Lo que pidió la página anfitriona en la dirección del marco (?tema=…&lado=…). */
-export function readParams(search: string): EmbedParams {
+/**
+ * Lo que pidió la página anfitriona en la dirección del marco (?tema=…&lado=…).
+ * El espacio lo fija la ruta del marco, no la dirección: solo se anota cuando
+ * no es el de siempre.
+ */
+export function readParams(search: string, space: SpaceId = "planeacion"): EmbedParams {
   const q = new URLSearchParams(search);
   const tema = (q.get("tema") ?? "").trim().toLowerCase();
   const lado = (q.get("lado") ?? "").trim().toLowerCase();
   return {
     tema: tema === "soleado" || tema === "negro" ? tema : "blanco",
     lado: lado.startsWith("izq") ? "izq" : "der",
+    ...(isAskSpace(space) && space !== "planeacion" ? { space } : {}),
   };
+}
+
+type Widget = { on: boolean; origins: string[] };
+
+/**
+ * El interruptor y los portales autorizados del chat de un espacio: el de
+ * siempre los tiene en `widget` (0111); los demás, en `spaces[espacio].widget`
+ * (0113). null si el espacio no existe en la configuración.
+ */
+export function spaceWidget(config: { widget?: Widget | null; spaces?: Record<string, { widget?: Widget | null } | undefined> | null } | null | undefined, space: SpaceId = "planeacion"): Widget | null {
+  if (!config) return null;
+  return (space === "planeacion" ? config.widget : config.spaces?.[space]?.widget) ?? null;
 }
 
 export const frameMessage = (state: FrameState) => ({ source: "pilo-embed", type: "estado", state }) as const;
@@ -76,14 +102,18 @@ export function widgetAllowed(widget: { on: boolean; origins: string[] } | null 
   return widget.origins.some((o) => normalizeOrigin(o) === host);
 }
 
-/** La línea que se pega en el otro portal. */
-export function widgetSnippet(origin: string, tema: Tema, lado: Lado): string {
-  return `<script src="${origin.replace(/\/+$/, "")}/pilo.js" data-tema="${tema}" data-esquina="${lado === "izq" ? "izquierda" : "derecha"}" defer></script>`;
+/** La línea que se pega en el otro portal. Otro espacio de Pilo se pide con `data-pilo`. */
+export function widgetSnippet(origin: string, tema: Tema, lado: Lado, space: SpaceId = "planeacion"): string {
+  const pilo = isAskSpace(space) && space !== "planeacion" ? ` data-pilo="${space}"` : "";
+  return `<script src="${origin.replace(/\/+$/, "")}/pilo.js"${pilo} data-tema="${tema}" data-esquina="${lado === "izq" ? "izquierda" : "derecha"}" defer></script>`;
 }
 
-/** A dónde lleva una fuente: su página en el portal, o Pregúntele a Pilo si no tiene una. */
-export function sourceUrl(path: string | null | undefined, origin: string): string {
+/** La ruta del marco de un espacio (la misma que arma public/pilo.js). */
+export const embedRoute = (space: SpaceId = "planeacion"): string => (ASK_SPACES[space] ?? ASK_SPACES.planeacion).embedRoute;
+
+/** A dónde lleva una fuente: su página en el portal, o la página de ese Pilo (Pregúntele a Pilo, si no se dice otra) cuando no tiene una. */
+export function sourceUrl(path: string | null | undefined, origin: string, fallback = "/pregunta"): string {
   const p = (path ?? "").trim();
   if (/^https?:\/\//i.test(p)) return p;
-  return `${origin.replace(/\/+$/, "")}${p.startsWith("/") ? p : "/pregunta"}`;
+  return `${origin.replace(/\/+$/, "")}${p.startsWith("/") ? p : fallback}`;
 }

@@ -145,6 +145,9 @@ const UserManagement = lazy(() =>
 const PiloAiSettings = lazy(() =>
   import("./modules/admin/pilo/PiloAiSettings").then((m) => ({ default: m.PiloAiSettings })),
 );
+const PiloEnsenanzaSettings = lazy(() =>
+  import("./modules/admin/pilo-ensenanza/PiloEnsenanza").then((m) => ({ default: m.PiloEnsenanzaSettings })),
+);
 const PiloPresentation = lazy(() =>
   import("./modules/admin/pilo/presentacion/Presentation").then((m) => ({ default: m.Presentation })),
 );
@@ -249,6 +252,9 @@ export default function App() {
           <Route path="/pregunta" element={<AskPilo />} />
           {/* El chat emergente de Pilo, para verse dentro de un marco en otros portales (public/pilo.js). */}
           <Route path="/pilo-embed" element={<PiloEmbed />} />
+          {/* Mr. Pilo en Enseñanza (0113): la misma página y el mismo chat emergente, en su propio espacio. */}
+          <Route path="/pilo-ensenanza" element={<AskPilo key="ensenanza" space="ensenanza" />} />
+          <Route path="/pilo-ensenanza-embed" element={<PiloEmbed key="ensenanza" space="ensenanza" />} />
           <Route path="/tablero" element={<Dashboard />} />
           <Route path="/tablero/pilar/:slug" element={<PillarScorecard />} />
           <Route path="/implementacion" element={<ImplementationPortal />} />
@@ -519,6 +525,15 @@ export default function App() {
             element={
               <RequireRole minimum="admin" screen="pilo">
                 <PiloAiSettings />
+              </RequireRole>
+            }
+          />
+          {/* Mr. Pilo en Enseñanza: el segundo Pilo, con su página, su memoria, su catálogo y su bitácora. */}
+          <Route
+            path="/admin/mr-pilo-ensenanza"
+            element={
+              <RequireRole minimum="admin" screen="pilo_ensenanza">
+                <PiloEnsenanzaSettings />
               </RequireRole>
             }
           />

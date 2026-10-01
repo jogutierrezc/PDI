@@ -370,6 +370,11 @@
 .ap-code[data-s="observatorio"] { background: #0b7481; }
 .ap-code[data-s="impacto"] { background: #2e6b2f; }
 .ap-code[data-s="catalogo"] { background: #0a2d63; }
+/* Mr. Pilo en Enseñanza (0113): sus fuentes, con los mismos tonos de la paleta. */
+.ap-code[data-s="innovacion"] { background: #a4471f; }
+.ap-code[data-s="politicas"] { background: #1f5fbf; }
+.ap-code[data-s="global"] { background: #0b7481; }
+.ap-code[data-s="moodle"] { background: #6b3fa0; }
 
 .ap-side__foot {
   display: grid;

@@ -4,7 +4,7 @@
   "status": "in_progress",
   "strategy": "full-collaborate",
   "currentPhase": "5-optimization",
-  "nextAction": "Pilo terminado en código: falta aplicar 0110, desplegar pilo-ia y probar en real. CSV: falta verificación visual",
+  "nextAction": "Pilo Enseñanza: hechas 0113-0116, función, lectores, intranet. En curso: página+emergente (E, con el arreglo de texto oculto). Luego UN agente: Memoria (documentos, Moodle, mapa) + voz de la presentación",
   "gate": null,
   "branch": "main",
   "scope": "export-csv-conjuntos-visuales",

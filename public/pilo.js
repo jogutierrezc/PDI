@@ -9,14 +9,33 @@
    Crea un marco (iframe) hacia /pilo-embed de este mismo portal: ahí viven el
    botón, el saludo y el chat. Aquí solo se le da al marco el tamaño que pide.
    Los estilos de la página anfitriona no entran al marco, ni los suyos salen.
+
+   Mr. Pilo en Enseñanza, la Inteligencia Artificial de la Universidad de
+   Santander, se pide con data-pilo="ensenanza": su marco va a
+   /pilo-ensenanza-embed. Los dos Pilos pueden vivir en la misma página, una
+   línea por cada uno; conviene ponerlos en esquinas distintas.
    ========================================================================== */
 (function () {
   "use strict";
-  if (window.__piloEmbed) return;
-  window.__piloEmbed = true;
-
   var script = document.currentScript;
   if (!script || !script.src) return;
+
+  // Qué Pilo: el de siempre, o el de otro espacio. Lo que no se conoce cae en el de siempre.
+  var SPACES = {
+    planeacion: { route: "/pilo-embed", title: "Chat con Pilo, de Planeación UDES", guard: "__piloEmbed" },
+    ensenanza: {
+      route: "/pilo-ensenanza-embed",
+      title: "Chat con Pilo, la Inteligencia Artificial de la Universidad de Santander",
+      guard: "__piloEmbed_ensenanza",
+    },
+  };
+  var asked = (script.getAttribute("data-pilo") || "").toLowerCase();
+  var space = Object.prototype.hasOwnProperty.call(SPACES, asked) ? SPACES[asked] : SPACES.planeacion;
+
+  // Un marco por espacio: la misma línea pegada dos veces no duplica a Pilo.
+  if (window[space.guard]) return;
+  window[space.guard] = true;
+
   var origin = new URL(script.src).origin;
   var tema = (script.getAttribute("data-tema") || "blanco").toLowerCase();
   var left = /^izq/i.test(script.getAttribute("data-esquina") || script.getAttribute("data-lado") || "");
@@ -42,6 +61,8 @@
     var size = SIZE[state] || SIZE.cerrado;
     s.width = full ? "100%" : size[0] + "px";
     s.height = full ? "100%" : size[1] + "px";
+    // Abierto queda por encima del otro Pilo, si lo hay en la página.
+    s.zIndex = state === "abierto" ? "2147483001" : "2147483000";
   }
 
   function tellFrame() {
@@ -51,8 +72,8 @@
 
   function mount() {
     frame = document.createElement("iframe");
-    frame.src = origin + "/pilo-embed?tema=" + encodeURIComponent(tema) + "&lado=" + (left ? "izq" : "der");
-    frame.title = "Chat con Pilo, de Planeación UDES";
+    frame.src = origin + space.route + "?tema=" + encodeURIComponent(tema) + "&lado=" + (left ? "izq" : "der");
+    frame.title = space.title;
     frame.setAttribute("allow", "autoplay");
     frame.setAttribute("allowtransparency", "true");
     // color-scheme igual al del marco: si difieren, el navegador le pinta un fondo opaco.
@@ -64,6 +85,7 @@
     document.body.appendChild(frame);
   }
 
+  // Cada cargador solo atiende a su propio marco: los mensajes del otro Pilo no lo mueven.
   window.addEventListener("message", function (e) {
     if (!frame || e.source !== frame.contentWindow || e.origin !== origin) return;
     var m = e.data;

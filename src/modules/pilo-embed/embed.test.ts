@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
-import { frameMessage, hostOrigin, normalizeOrigin, readHostMessage, readParams, sourceUrl, widgetAllowed, widgetSnippet } from "./embed";
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
+import { embedRoute, frameMessage, hostOrigin, normalizeOrigin, readHostMessage, readParams, sourceUrl, spaceWidget, widgetAllowed, widgetSnippet } from "./embed";
 
 describe("readParams", () => {
   it("sin nada pedido: blanco y a la derecha", () => {
@@ -93,5 +95,77 @@ describe("widgetAllowed", () => {
 describe("widgetSnippet", () => {
   it("arma la línea con el tema y la esquina", () => {
     expect(widgetSnippet("https://portal.example/", "negro", "izq")).toBe('<script src="https://portal.example/pilo.js" data-tema="negro" data-esquina="izquierda" defer></script>');
+  });
+});
+
+/* --- Los espacios de Pilo (0113): el chat de Mr. Pilo en Enseñanza ------------------------ */
+
+describe("readParams con un espacio", () => {
+  it("el de siempre no anota espacio: el resultado es el de antes", () => {
+    expect(readParams("?tema=negro", "planeacion")).toEqual({ tema: "negro", lado: "der" });
+  });
+
+  it("otro espacio queda anotado, con el mismo tema y la misma esquina", () => {
+    expect(readParams("?tema=soleado&lado=izq", "ensenanza")).toEqual({ tema: "soleado", lado: "izq", space: "ensenanza" });
+    expect(readParams("", "ensenanza")).toEqual({ tema: "blanco", lado: "der", space: "ensenanza" });
+  });
+
+  it("el espacio no se toma de la dirección: lo fija la ruta del marco", () => {
+    expect(readParams("?space=ensenanza&espacio=ensenanza")).toEqual({ tema: "blanco", lado: "der" });
+  });
+});
+
+describe("widgetSnippet con un espacio", () => {
+  it("el de siempre no cambia, se diga o no el espacio", () => {
+    expect(widgetSnippet("https://portal.example/", "negro", "izq", "planeacion")).toBe(widgetSnippet("https://portal.example/", "negro", "izq"));
+  });
+
+  it("Enseñanza se pide con data-pilo", () => {
+    expect(widgetSnippet("https://portal.example", "blanco", "der", "ensenanza")).toBe('<script src="https://portal.example/pilo.js" data-pilo="ensenanza" data-tema="blanco" data-esquina="derecha" defer></script>');
+  });
+});
+
+describe("spaceWidget: cada chat tiene su interruptor y su lista", () => {
+  const self = "https://portal.example";
+  const config = {
+    widget: { on: true, origins: ["https://www.udes.edu.co"] },
+    spaces: { ensenanza: { widget: { on: true, origins: ["https://aulas.udes.edu.co"] } } },
+  };
+
+  it("el de siempre lee `widget`; Enseñanza, `spaces.ensenanza.widget`", () => {
+    expect(spaceWidget(config)).toEqual(config.widget);
+    expect(spaceWidget(config, "planeacion")).toEqual(config.widget);
+    expect(spaceWidget(config, "ensenanza")).toEqual(config.spaces.ensenanza.widget);
+  });
+
+  it("un portal autorizado para un Pilo no lo está para el otro", () => {
+    expect(widgetAllowed(spaceWidget(config, "ensenanza"), "https://aulas.udes.edu.co", self)).toBe(true);
+    expect(widgetAllowed(spaceWidget(config, "ensenanza"), "https://www.udes.edu.co", self)).toBe(false);
+    expect(widgetAllowed(spaceWidget(config, "planeacion"), "https://aulas.udes.edu.co", self)).toBe(false);
+  });
+
+  it("sin la migración 0113 no hay ficha: otros portales no; este portal sí puede intentarlo", () => {
+    expect(spaceWidget({ widget: config.widget, spaces: {} }, "ensenanza")).toBeNull();
+    expect(spaceWidget(null, "ensenanza")).toBeNull();
+    expect(widgetAllowed(spaceWidget({ widget: config.widget }, "ensenanza"), "https://aulas.udes.edu.co", self)).toBe(false);
+  });
+});
+
+describe("la página de cada Pilo", () => {
+  it("una fuente sin página propia lleva a la del Pilo que respondió", () => {
+    expect(sourceUrl("", "https://portal.example", "/pilo-ensenanza")).toBe("https://portal.example/pilo-ensenanza");
+    expect(sourceUrl("/pilo-ensenanza", "https://portal.example")).toBe("https://portal.example/pilo-ensenanza");
+  });
+
+  it("el cargador (public/pilo.js) y la página conocen las mismas rutas de marco", () => {
+    const loader = readFileSync(resolve(process.cwd(), "public/pilo.js"), "utf8");
+    expect(embedRoute()).toBe("/pilo-embed");
+    expect(embedRoute("ensenanza")).toBe("/pilo-ensenanza-embed");
+    expect(loader).toContain(`route: "${embedRoute()}"`);
+    expect(loader).toContain(`route: "${embedRoute("ensenanza")}"`);
+    expect(loader).toContain('getAttribute("data-pilo")');
+    // La guarda del de siempre no cambia de nombre; la de Enseñanza es otra: los dos caben en una página.
+    expect(loader).toContain('guard: "__piloEmbed"');
+    expect(loader).toContain('guard: "__piloEmbed_ensenanza"');
   });
 });

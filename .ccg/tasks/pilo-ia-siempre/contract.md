@@ -248,3 +248,216 @@ Pedido directo del dueño: nada de respuestas rápidas ni capciosas sueltas; se 
 - Una **capciosa** del catálogo ya no responde sola. Su microexpresión entra en `[OFICIAL]` (primera, con su `mood`) y redacta el modelo: llega como `kind: "ia"` por el flujo. Sale tal cual, como `kind: "capciosa"` en JSON, solo si no hay IA (apagada o sin cupo); si el modelo falla, es el respaldo oficial con `fallback`.
 - Sin modelo solo queda lo **vetado** (dinero de la universidad, datos de personas).
 - **Tiempos**: sin tope aparte para la primera señal; la redacción espera `PLATFORM_CAP_MS` − 20 s (130 s; con el secreto `PILO_PLATFORM_CAP_MS=400000`, 380 s).
+
+## Anexo · Espacios y rol del visitante (0113, «Pilo Enseñanza», fase 1)
+
+Servidor: `supabase/functions/pilo-ia/index.ts` · lógica pura: `logic.ts` (`SPACES`, `spaceOfPortal`, `spaceSources`, `spaceProfile`, `parseRol`, `roleInstruction`, `catalogForRol`, `roleFace`, `withRole`, `visitorSeed`) · migración: `supabase/migrations/0113_pilo_espacios.sql`.
+
+**Para `portal: "pregunta"` (y todo portal que no sea `ensenanza`) nada de este contrato cambia**: ni los campos, ni los eventos, ni lo que la función le manda a la base. `rol` se ignora ahí.
+
+### A.1 El espacio sale del portal
+
+| `portal` | Espacio | Fuentes de memoria (las fija el servidor) |
+|---|---|---|
+| `pregunta` y cualquier otro | `planeacion` | `cifras`, `boletines`, `pdi`, `observatorio`, `impacto` (con sesión), como hoy |
+| `ensenanza` | `ensenanza` | `innovacion`, `politicas`, `global`, `moodle` ∩ las encendidas (`true`) en `pilo_spaces.memory_sources` |
+
+- No hay campo `space` en `preguntar`, `calificar` ni `voz`: si la página lo manda, se ignora. Tampoco se aceptan fuentes de la página.
+- El portal `ensenanza` no se configura en `pilo_ai_settings.portals`: su regla sale de su fila en `pilo_spaces` (`"on"`, `aud`) y solo tiene `preguntar` y `leer` (voz). Lo que hubiera en `pilo_ai_settings.portals.ensenanza` se descarta. Sin fila, apagado o con otra audiencia → 403, como un portal cerrado.
+- Sin sesión solo se buscan pasajes `vis = 'publico'` (`p_public_only = true`); con sesión, también `sesion`. `oculto`, nunca.
+- `pilo_spaces.ai = false` → el espacio responde con lo publicado, sin modelo (JSON, como «IA apagada»).
+- La conexión, el modelo, la clave, la voz y los topes de redacción son los de `pilo_ai_settings`: no se duplican.
+
+### A.2 Campo `rol` (pedido)
+
+```json
+{ "action": "preguntar", "portal": "ensenanza", "question": "¿Qué dice la política de evaluación?", "rol": "estudiante", "stream": true }
+```
+
+| Acción | Campo | Regla |
+|---|---|---|
+| `preguntar` | `rol` | opcional: `"estudiante"` o `"profesor"`. Ausente o cualquier otra cosa → `general`. Solo cuenta con `portal: "ensenanza"` |
+| `calificar` | `rol` | igual; queda en la fila de la bandeja |
+| `voz` | `rol` | igual; elige el estilo de voz (`pilo_spaces.roles[rol].voice_style`). El campo `style` de la página no cuenta (solo en `portal: "prueba"`, como hoy) |
+
+Qué cambia con el rol (solo en `ensenanza`):
+- **Redacción**: una instrucción fija por rol (nunca texto de la página) más el `tone` que puso la administración para ese rol (≤ 300 caracteres, como dato). `general` no añade nada.
+- **Catálogo**: entradas con `rol` vacío o igual al de quien pregunta.
+- **Respuestas guardadas**: separadas por espacio y rol (`general` se guarda como `''`).
+- **Lo que se busca en la memoria no cambia** con el rol.
+- **Bitácora y bandeja** guardan `space` y `rol` (`''`, `estudiante` o `profesor`); nada identifica al visitante.
+
+### A.3 Campos nuevos en la respuesta (solo `portal: "ensenanza"`)
+
+En el JSON sin stream, en `meta` y en `done`. Lo de siempre no cambia; esto solo se suma, al final:
+
+| Campo | Significado |
+|---|---|
+| `rol` | `estudiante | profesor | general`: para quién se redactó (lo que el servidor entendió) |
+| `expression` | la cara de partida del rol (`pilo_spaces.roles[rol].expression`). **Solo** si la respuesta no trae `mood` ni `expression` propios |
+| `mood` | el ánimo de partida del rol, con la misma condición. **El `mood` del catálogo manda siempre**: si viene, no llega ni `expression` ni el `mood` del rol |
+
+Con `rol: "general"` no llegan `expression` ni `mood` de rol. Los errores HTTP no llevan campos nuevos.
+
+### A.4 Cupo, límite por visitante y bitácora
+
+- **Cupo de texto por espacio**: `ensenanza` cuenta solo sus `preguntar` con IA contra `pilo_spaces.daily_limit`; `planeacion` cuenta solo sus filas contra `pilo_ai_settings.daily_limit`. Ninguno gasta el del otro. La voz se cuenta por espacio contra `voice_daily_limit`.
+- **Límite por visitante**: `pilo_spaces.visitor_limit` / `visitor_window_seconds`; la huella incluye el espacio, así que las ventanas de los dos Pilos son independientes. El 429 (`code: "visitante"`) es el mismo.
+- **Calificar**: una respuesta guardada solo se califica desde su propio espacio; el `answerId` de otro Pilo no vota y la opinión se anota con lo que mandó la página.
+
+### A.5 `indexar` con `space` (solo administración)
+
+```json
+{ "action": "indexar", "step": "estado" | "lote" | "probar" | "catalogo" | "modelos", "space": "ensenanza", "q": "…" }
+```
+- `space` ausente → `planeacion`, como hoy. Presente: debe ser `planeacion` o `ensenanza` (otro → 400 «Espacio desconocido.») y quien llama debe ser administración (si no → 403).
+- Las respuestas tienen la misma forma; los conteos, los pendientes y las pruebas son los de ese espacio.
+
+### A.6 Sin la migración 0113
+
+| Pedido | Respuesta |
+|---|---|
+| Cualquier portal de siempre | **igual que hoy**: mismas consultas y mismos parámetros (la función lo detecta con una lectura de `pilo_spaces`, recordada 60 s) |
+| `portal: "ensenanza"` (`preguntar`, `calificar`, `voz`) o `indexar` con `space: "ensenanza"` | `500` `{ "error": "Falta la migración 0113 de los espacios de Mr. Pilo.", "advice": "…", "code": "migracion", "detail": "…" }`, sin tocar la memoria ni al proveedor |
+
+Orden de despliegue recomendado: primero la migración, después la función.
+
+### A.7 Lo que la función le manda a la base (para quien mantenga 0113)
+
+Solo fuera de `planeacion`: `p_space` en `pilo_memory_search`, `pilo_memory_semantic` (ambas con `p_public_only`), `pilo_answer_candidates` (con `p_rol` y `p_public_only`), `pilo_catalog_active`, `pilo_catalog_semantic`, `pilo_catalog_near`, `pilo_graph_around`, `pilo_embed_status`, `pilo_embed_pending`, `pilo_inbox_add` (con `p_rol`); columnas `space` y `rol` en lo que inserta en `pilo_ai_log` y `pilo_answers`; filtro `space` (y `vis`) al leer `pilo_memory` y `pilo_answers`. Sin cambio: `pilo_visitor_hit`, `pilo_embed_save`, `pilo_catalog_hit`, `pilo_answer_vote`, `pilo_facts_*`. La prueba estática `aislamiento-funcion.test.ts` vigila que ninguna consulta nueva olvide el espacio.
+
+## Anexo B · Mapa de conexiones y Moodle (0115 y 0116, «Pilo Enseñanza», fases 4 y 5)
+
+Servidor: `supabase/functions/pilo-ia/index.ts` (`comprehendMap`, `moodleSync`, y el paso 2e' de `answerWork`) · lógica pura: `logic.ts` (`topicSlug`, `globalRefs`, `buildComprehendMessages`, `parseComprehend`, `mapLabel`, `comprehendRows`, `docOutline`, `mapNeighbors`, `passageWhere`, `MOODLE_ALLOWED`, `moodleEndpoint`, `privateAddress`, `moodleForm`, `moodleClean`, `moodleFault`, `moodleSite`, `htmlToText`, `redactContacts`, `moodleExtras`, `moodlePassages`) · migraciones: `0114_pilo_documentos.sql`, `0115_pilo_mapa.sql`, `0116_pilo_moodle.sql`.
+
+**Para `portal: "pregunta"` (el Pilo de siempre) nada cambia**: no se llama a `pilo_graph_neighbors`, no hay paso `mapa`, las fuentes no llevan `via` y el pedido al modelo es idéntico. Las dos acciones nuevas rechazan `space: "planeacion"`.
+
+### B.1 Lo común a `comprender` y `moodle`
+
+- Solo administración (sesión con rol `admin`); el espacio va en el cuerpo (`space`), debe existir y no puede ser `planeacion`. El `portal` no cuenta.
+- Sirven con la IA apagada o sin conectar, no miran ni gastan el cupo del día ni el límite por visitante, y quedan en `pilo_ai_log` con `action = 'comprender'` o `'moodle'` y el `space`.
+
+| Caso | Respuesta |
+|---|---|
+| Sin sesión de administración | `403` `{ "error": "Solo la administración arma el mapa de conexiones de Pilo." }` (o «…conecta a Pilo con Moodle.») |
+| `space` ausente o desconocido | `400` `{ "error": "Espacio desconocido." }` |
+| `space: "planeacion"` | `400` `{ "error": "Ese espacio no tiene documentos propios: ni mapa de conexiones ni cursos de Moodle." }` |
+| `step` desconocido | `400` `{ "error": "Paso desconocido." }` |
+| Falta 0113 / 0115 / 0116 | `500` `{ "error": "Falta la migración 01xx …", "advice": "…", "code": "migracion" }` |
+
+### B.2 `comprender` — de qué trata cada pasaje
+
+```json
+{ "action": "comprender", "space": "ensenanza", "step": "estado" | "lote", "doc": "<uuid, opcional>" }
+```
+`doc` limita a los pasajes de un documento; si no es un uuid → `400` «Ese documento no es válido.»
+
+**`estado`** → `200`
+```json
+{ "ok": true, "ai": true, "status": { "space": "ensenanza", "total": 120, "mapped": 84, "pending": 36, "topics": 41, "refs": 9 } }
+```
+Sin IA (sin conectar, apagada o `pilo_spaces.ai = false`): `"ai": false, "basic": true, "note": "Sin IA, el mapa es el básico: la estructura de cada documento … y las normas que cita. …"`.
+
+**`lote`** → siempre `200` si algo se pudo intentar. Toma hasta 18 pasajes pendientes (`pilo_map_pending`) y hace hasta 3 pedidos al modelo de 6 pasajes cada uno, en serie, con 60 s para todo el lote. La página repite hasta `done: true` o hasta que venga `stopped`.
+```json
+{ "ok": true, "ai": true, "asked": 18, "saved": 12, "failed": 0, "calls": 2, "done": false,
+  "stopped": "limite_proveedor", "note": "El proveedor limitó los pedidos (429)…", "status": { "…": "como en estado" } }
+```
+| Campo | Significado |
+|---|---|
+| `asked` | pasajes pendientes que entraron al lote |
+| `saved` | pasajes guardados en el mapa (`pilo_map_save`); quedan marcados aunque no tengan temas |
+| `failed` | pasajes de pedidos cuya respuesta no se pudo leer: siguen pendientes |
+| `calls` | pedidos al modelo |
+| `done` | `status.pending === 0` |
+| `stopped` | solo si el lote paró antes: `limite_proveedor` (429: lo guardado queda), `proveedor`, `tiempo`, `red`, `formato` (el modelo no devolvió nada legible y no se guardó nada: no insistir sola) |
+
+Sin IA: `{ "ok": true, "ai": false, "basic": true, "note": "…", "asked": 0, "saved": 0, "failed": 0, "calls": 0, "done": true, "status": {…} }`, sin tocar al proveedor.
+
+Seguridad: las instrucciones van fijas en el mensaje de sistema; los temas existentes y los pasajes, como datos entre `<<<DATOS … DATOS>>>` y pasados por `safeData`, en el del usuario. Lo que devuelve el modelo se valida: etiquetas de 3 a 60 caracteres, sin direcciones web, sin marcas del pedido, sin datos de personas ni dinero; a lo sumo 4 temas y 3 referencias por pasaje. Un tema cuya llave (`topicSlug`) ya existe conserva su nombre. Las referencias halladas por reglas (`globalRefs`) van primero.
+
+Lo que se le manda a `pilo_map_save`: `[{ "ref": "doc:<uuid>:<n>", "topics": [{ "id": "tema:<llave>", "label": "…" }], "refs": [{ "id": "ref:<llave>", "label": "…" }] }]`.
+
+### B.3 El mapa al preguntar: paso `mapa` y `via: "mapa"`
+
+Solo con `portal: "ensenanza"`, solo cuando va a escribir el modelo y solo si la búsqueda halló algo. Con los 3 primeros pasajes se llama a `pilo_graph_neighbors(p_refs, p_space, p_sources, p_public_only, p_limit: 3)`; sin sesión, `p_public_only = true` (un visitante nunca recibe un vecino `sesion`).
+
+- **Sin 0115, o sin vecinos**: la respuesta es exactamente la de la fase 1 (mismos pasos, mismas fuentes, mismo pedido al modelo). Si la base no tiene la función, no se vuelve a preguntar por un minuto.
+- **Con vecinos** (hasta 3):
+  - van **después** de los pasajes directos en `sources` (de `meta` y de `done`) y llevan un campo más: `"via": "mapa"`. Los directos no llevan `via`. Se citan con su número, como cualquier fuente.
+  - evento `step` nuevo, después de `memoria` y antes de `meta`:
+    ```
+    event: step
+    data: {"id":"mapa","label":"Siguiendo las conexiones","state":"start"}
+
+    event: step
+    data: {"id":"mapa","label":"Siguiendo las conexiones","detail":"2 pasajes relacionados por Evaluación formativa y ODS 4","state":"done"}
+    ```
+    El detalle es una cuenta y, si se saben, los temas que los unen (cortos; nunca contenido, dinero ni datos de personas). También aparece en `steps` del `done` y hay una entrada `{ "step": "Mapa", … }` en `trail`.
+  - en el pedido al modelo, la línea de cada pasaje dice dónde queda: `[2] Innovación educativa › Guía de aprendizaje activo › Evaluar para aprender · temas: Evaluación formativa, UNESCO` (como dato, por `safeData`).
+  - si no cabe todo en el contexto, los vecinos son lo primero que se queda fuera.
+  - una respuesta que cita un vecino que no es público no se guarda (misma regla de la fase 1).
+- Sin IA (apagada, sin cupo) no se siguen conexiones: lo publicado sale tal cual.
+
+### B.4 `moodle` — leer cursos por la API
+
+```json
+{ "action": "moodle", "space": "ensenanza", "step": "probar" | "categorias" | "cursos" | "curso", "category": 3, "course": 42 }
+```
+La dirección sale de `pilo_spaces.moodle_url` y el token de `pilo_space_secret.moodle_token` (leído con el rol de servicio): **ninguno de los dos viaja en el pedido de la página**. `probar` funciona con `moodle_on` apagado; los demás pasos lo exigen encendido.
+
+| Paso | Llama a Moodle | Respuesta `200` |
+|---|---|---|
+| `probar` | `core_webservice_get_site_info` | `{ "ok": true, "site": { "name", "release", "url" }, "functions": { "<función>": true|false, … }, "usable": ["…"], "missing": ["…"], "ms": 412 }`. `functions` tiene las 10 de la lista cerrada y dice cuáles puede usar el token. Guarda `{name, release, functions}` en `pilo_spaces.moodle_site` y la fecha en `moodle_checked_at`. Nunca devuelve el usuario técnico. |
+| `categorias` | `core_course_get_categories` | `{ "ok": true, "categories": [{ "id", "name", "parent", "depth", "courses" }] }` (solo las visibles) |
+| `cursos` (`category`) | `core_course_get_courses_by_field` (`field=category`) | `{ "ok": true, "category": 3, "saved": 12, "courses": [{ "id", "shortname", "fullname", "category_id", "category_name", "time_modified", "visible" }] }`. Los anota con `pilo_moodle_courses_save` (no los elige ni cambia su visibilidad). |
+| `curso` (`course`) | `core_course_get_courses_by_field` (`field=id`), `core_course_get_contents` y hasta 3 de `mod_{page,book,label,url,resource,folder}_get_*_by_courses` | ver abajo |
+
+**`curso`**: uno por llamada, a lo sumo 5 pedidos a Moodle de 20 s cada uno y 90 s en total. Las funciones `mod_*` solo se piden para los tipos de actividad que el curso tiene y que `probar` marcó como usables (sin haber probado, solo las páginas); la que falle o no alcance va en `skipped` y el curso se lee con lo demás.
+```json
+{ "ok": true, "course": { "id": 42, "fullname": "Didáctica general", "shortname": "DID-01" }, "selected": false,
+  "doc": "<uuid>", "unchanged": false, "passages": 37, "added": 37, "changed": 0, "removed": 0, "mapped": true,
+  "activities": 14, "dropped": 0, "redacted": 2, "calls": 3, "skipped": [], "ms": 2380 }
+```
+| Campo | Significado |
+|---|---|
+| `doc` | el documento de la memoria (`pilo_docs`: `origin = 'moodle'`, `kind = 'curso'`, `source = 'moodle'`, `external_id` = id del curso). Sus pasajes heredan `vis` del curso (`sesion` de partida) |
+| `unchanged` | `true` si la huella del contenido es la misma de la última lectura: no se reescribe nada (`added/changed/removed` en 0) |
+| `selected` | si el curso está elegido (`pilo_moodle_courses.selected`). Un curso sin elegir se lee igual, pero la base deja sus pasajes ocultos |
+| `mapped` | si quedó su estructura en el mapa (`pilo_doc_outline`; `false` sin 0115) |
+| `activities` | actividades con texto propio · `dropped`: pasajes que pasaron de 400 · `redacted`: correos, teléfonos y documentos omitidos |
+| `empty: true, passages: 0, note` | el curso no tiene contenido legible |
+
+Qué se lee: el nombre y el resumen del curso y de cada sección, y de cada actividad su nombre y su descripción (más el contenido de las páginas y la presentación de libros, etiquetas, enlaces, recursos y carpetas). De un foro o una tarea, solo nombre y descripción. **Nunca** matrícula, participantes, notas, entregas, mensajes, publicaciones de foro, archivos ni fechas. Lo oculto (`visible = 0`, `uservisible = false`) no entra. Cada pasaje: `title` = el curso, `section` = «sección › actividad», `path` = la dirección de la actividad.
+
+Errores (el texto nunca lleva el token ni la consulta de una dirección):
+
+| Estado | `code` | Cuándo |
+|---|---|---|
+| `400` | `config` | falta la dirección o el token; la dirección no es https, es una IP (escrita como sea), `localhost`, un nombre de red interna, lleva usuario, puerto, consulta o ancla, o resuelve a una red interna |
+| `400` | `apagado` | `moodle_on = false` (salvo `probar`) |
+| `400` | — | falta `category` o `course` |
+| `404` | `moodle` | Moodle no encontró el curso |
+| `502` | `token` | Moodle no aceptó el token (`invalidtoken`) |
+| `502` | `moodle` | otro error de Moodle (llega como JSON con `exception`, aun con HTTP 200), una respuesta que no es JSON o un estado distinto de 200 |
+| `502` | `red` | no hubo conexión, o Moodle respondió con una redirección (no se siguen) |
+| `504` | `tiempo` | Moodle tardó más de 20 s, o se acabaron los 90 s |
+| `500` | `migracion` / `interno` | falta 0114/0116, o falló la base |
+
+En `curso`, un fallo de Moodle queda además en `pilo_moodle_courses.status = 'error'` y `error` (limpio). Los estados que escribe: `leido`, `sin_cambios`, `vacio`, `error`.
+
+Cómo se llama a Moodle: `POST {moodle_url}/webservice/rest/server.php` (ruta fija), `Content-Type: application/x-www-form-urlencoded`, cuerpo `wstoken=…&wsfunction=…&moodlewsrestformat=json&…`, `redirect: "error"`. Solo las funciones de `MOODLE_ALLOWED`; cualquier otra se rechaza antes de salir.
+
+### B.5 Lo que la función le manda a la base (para quien mantenga 0114–0116)
+
+- `pilo_graph_neighbors { p_refs, p_space, p_sources, p_public_only, p_limit: 3 }` y, si hay vecinos, lecturas de `pilo_edges` (`space`, `rel in (trata, cita)`, `from_id in (…)`) y `pilo_nodes` (`space`, `id in (…)`) para los temas.
+- `pilo_map_status { p_space, p_doc }`, `pilo_map_pending { p_space, p_doc, p_limit: 18 }`, `pilo_map_topics { p_space, p_limit: 80 }`, `pilo_map_save { p_space, p_rows }`.
+- Lectura de `pilo_space_secret` (`space`), actualización de `pilo_spaces` (`moodle_site`, `moodle_checked_at`), `pilo_moodle_courses_save { p_space, p_rows }`, lectura de `pilo_moodle_courses` (`space`, `course_id`), `pilo_moodle_course_set { p_space, p_course, p_patch: { doc_id?, content_hash?, status, error, synced?, time_modified? } }`.
+- `pilo_doc_save { p_space, p_doc: { id, origin: "moodle", kind: "curso", source: "moodle", title, external_id, vis } }`, `pilo_doc_replace { p_doc, p_rows: [{ seq, title, section, body, path, cut }] }`, `pilo_doc_outline { p_doc, p_nodes: [{ id, label, path?, props? }], p_edges: [{ from, to, rel: "contiene" | "cita" }] }`. Estas dos últimas no llevan espacio: trabajan sobre el documento que `pilo_doc_save` creó o halló con `p_space` (están en la lista de `aislamiento-funcion.test.ts`, con esa razón).
+
+### B.6 Sin verificar (no hay Deno ni un Moodle de prueba)
+
+- La versión del Moodle de la UDES y cuáles funciones tiene activas: `probar` lo dice con el token real. Las cinco `mod_{book,label,url,resource,folder}_get_*_by_courses` están por confirmar.
+- Que el modelo configurado devuelva JSON de forma fiable en `comprender` (solo Mistral recibe `response_format`); si no, el lote termina con `stopped: "formato"`.
+- Los topes de tiempo contra la plataforma real (60 s por lote, 90 s por curso, frente al corte de 150 s).
+- `Deno.resolveDns` en el entorno de Supabase: si no está disponible, la revisión de que el nombre no resuelva a una red interna se omite (queda la revisión del nombre y `redirect: "error"`).

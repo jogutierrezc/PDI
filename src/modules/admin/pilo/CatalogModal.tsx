@@ -21,8 +21,10 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "../../../lib/supabase";
 import { Modal } from "../../../components/ui/Modal";
 import { Switch } from "./ui";
-import { MOODS } from "./catalog-sheet";
-import type { CatalogKind, CatalogMood, CatalogRow } from "./catalog-sheet";
+import { CATALOG_ROLES, MOODS, ROL_LABEL } from "./catalog-sheet";
+import type { CatalogKind, CatalogMood, CatalogRol, CatalogRow } from "./catalog-sheet";
+import { CATALOG_PREFIX, DEFAULT_SPACE, SPACE_COPY, isDefaultSpace, keyFitsSpace, nextCatalogKey, spaceArgs } from "./space";
+import type { PiloSpace } from "./space";
 import { extractKeywords } from "../../../components/pilo/ai/logic";
 import "./pilo-settings.css";
 
@@ -34,6 +36,8 @@ export interface CatalogModalProps {
   isEditing?: boolean;
   existingKeys?: string[];
   onSaved?: (entry: CatalogRow) => void;
+  /** De qué Pilo es la entrada (0113): decide el prefijo de la clave y si se pregunta «para quién». */
+  space?: PiloSpace;
 }
 
 export function CatalogModal({
@@ -44,7 +48,9 @@ export function CatalogModal({
   isEditing = false,
   existingKeys,
   onSaved,
+  space = DEFAULT_SPACE,
 }: CatalogModalProps) {
+  const own = !isDefaultSpace(space);
   const client = useQueryClient();
   // Sin claves de quien abre el modal, se leen de la base (cuelga de ["pilo-ia", "catalogo"]: se refresca al guardar).
   const ownKeys = useQuery({
@@ -69,23 +75,12 @@ export function CatalogModal({
   const [cut, setCut] = useState("");
   const [office, setOffice] = useState("");
   const [active, setActive] = useState(true);
+  const [rol, setRol] = useState<CatalogRol>("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   // Calcula la siguiente clave sugerida (R-001, C-001...)
-  const suggestedKey = useMemo(() => {
-    const prefix = kind === "capciosa" ? "C" : "R";
-    let maxNum = 0;
-    const regex = new RegExp(`^${prefix}-(\\d+)$`, "i");
-    for (const k of keys) {
-      const match = k.match(regex);
-      if (match) {
-        const n = parseInt(match[1], 10);
-        if (n > maxNum) maxNum = n;
-      }
-    }
-    return `${prefix}-${String(maxNum + 1).padStart(3, "0")}`;
-  }, [kind, keys]);
+  const suggestedKey = useMemo(() => nextCatalogKey(space, kind, keys), [space, kind, keys]);
 
   useEffect(() => {
     if (!open) return;
@@ -112,6 +107,7 @@ export function CatalogModal({
     setCut(initialEntry?.cut ?? "");
     setOffice(initialEntry?.office ?? "");
     setActive(initialEntry?.active ?? true);
+    setRol(CATALOG_ROLES.find((r) => r === initialEntry?.rol) ?? "");
     setError(null);
   }, [open, defaultKind, initialEntry, isEditing, suggestedKey]);
 
@@ -128,6 +124,11 @@ export function CatalogModal({
     }
     if (!/^[A-Z0-9._-]{1,40}$/.test(cleanKey)) {
       setError("La clave solo puede tener letras, números, guion o punto, sin espacios.");
+      return;
+    }
+    if (!isEditing && !keyFitsSpace(space, kind, cleanKey)) {
+      const prefix = CATALOG_PREFIX[space][kind];
+      setError(`En ${SPACE_COPY[space].screen} las claves empiezan por ${prefix}- (por ejemplo ${suggestedKey}): así no chocan con las del otro Mr. Pilo.`);
       return;
     }
     if (!isEditing && keys.some((k) => k.toUpperCase() === cleanKey)) {
@@ -186,15 +187,23 @@ export function CatalogModal({
       cut: kind === "respuesta" ? cut.trim() : "",
       office: kind === "respuesta" ? office.trim() : "",
       active,
+      ...(own ? { rol } : {}),
     };
 
     setBusy(true);
     try {
-      const { error: rpcErr } = await supabase.rpc("pilo_catalog_import", {
+      const { data: saved, error: rpcErr } = await supabase.rpc("pilo_catalog_import", {
         p_kind: kind,
         p_rows: [cleanRow] as never,
         p_replace: false,
+        ...spaceArgs(space),
       });
+
+      // En otro espacio no hay camino alterno: escribir directo podría pisar una clave del otro Pilo.
+      if (rpcErr && own) throw rpcErr;
+      if (own && Number((saved as { rejected?: number } | null)?.rejected ?? 0) > 0) {
+        throw new Error(`La clave ${cleanKey} ya es del otro Mr. Pilo: elija otra.`);
+      }
 
       if (rpcErr) {
         // Si falla por RLS o falta de función, intentar upsert directo con migración 0105
@@ -226,7 +235,7 @@ export function CatalogModal({
       title={title}
       description={
         kind === "respuesta"
-          ? "Esta respuesta se guardará en el catálogo oficial de Planeación. Pilo la responderá de forma prioritaria, sin IA, cada vez que alguien pregunte algo similar."
+          ? `Esta respuesta se guardará en el catálogo oficial de ${own ? SPACE_COPY[space].screen : "Planeación"}. Pilo la responderá de forma prioritaria, sin IA, cada vez que alguien pregunte algo similar.`
           : "Microexpresión rápida que Pilo dirá de inmediato cuando la pregunta traiga los disparadores indicados."
       }
       onClose={onClose}
@@ -424,6 +433,20 @@ export function CatalogModal({
                 onChange={(e) => setOffice(e.target.value)}
               />
             </div>
+          </div>
+        )}
+
+        {own && (
+          <div className="pis-modal-field">
+            <label htmlFor="cat-rol">Para quién</label>
+            <select id="cat-rol" value={rol} onChange={(e) => setRol(e.target.value as CatalogRol)}>
+              {CATALOG_ROLES.map((r) => (
+                <option key={r || "todos"} value={r}>
+                  {ROL_LABEL[r]}
+                </option>
+              ))}
+            </select>
+            <small>«Todos» sirve a cualquiera. Con un rol, Pilo solo la usa cuando quien pregunta eligió ese rol.</small>
           </div>
         )}
 

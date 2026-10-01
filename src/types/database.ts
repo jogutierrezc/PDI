@@ -55,6 +55,7 @@ export type AdminScreen =
   | "transfer"
   | "institution"
   | "pilo"
+  | "pilo_ensenanza"
   | "reportes";
 
 /** Un rol de acceso: qué puede hacer, qué pantallas ve y sobre qué informes escribe. */

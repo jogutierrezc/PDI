@@ -53,6 +53,7 @@ export const SCREEN_PATHS: Record<AdminScreen, string> = {
   transfer: "/admin/traslado",
   institution: "/admin/estructura-institucional",
   pilo: "/admin/mr-pilo",
+  pilo_ensenanza: "/admin/mr-pilo-ensenanza",
   reportes: "/admin/reportes-institucionales",
 };
 
@@ -103,7 +104,7 @@ export function screenVisible(
   const { profile, access, inAnyUnit, impactoSide } = who;
   if (!profile?.is_active) return false;
   // Usuarios, traslado de datos y estructura institucional piden administración siempre.
-  if ((screen === "users" || screen === "transfer" || screen === "institution" || screen === "pilo") && RANK[profile.role] < RANK.admin) {
+  if ((screen === "users" || screen === "transfer" || screen === "institution" || screen === "pilo" || screen === "pilo_ensenanza") && RANK[profile.role] < RANK.admin) {
     return false;
   }
   // Mis Tableros se gana perteneciendo a una unidad, no marcándolo aparte.

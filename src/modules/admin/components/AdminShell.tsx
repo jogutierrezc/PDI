@@ -47,6 +47,7 @@ export type AdminSection =
   | "transfer"
   | "institution"
   | "pilo"
+  | "pilo_ensenanza"
   | "reportes";
 
 export interface NavItem {
@@ -172,6 +173,8 @@ export const navigation: NavGroup[] = [
       { id: "users", label: "Usuarios y roles", icon: "user", to: "/admin/usuarios", minimum: "admin" },
       // Voz, resúmenes y síntesis con IA en los portales: la conexión y a quién se abre.
       { id: "pilo", label: "Mr. Pilo con IA", icon: "spark", to: "/admin/mr-pilo", minimum: "admin" },
+      // El segundo Pilo: su página, su memoria, su catálogo y su bitácora. Comparte la conexión y la voz con el de arriba.
+      { id: "pilo_ensenanza", label: "Mr. Pilo en Enseñanza", icon: "compass", to: "/admin/mr-pilo-ensenanza", minimum: "admin" },
       // Copia otro servidor de Supabase en este. Reemplaza datos: solo administración.
       { id: "transfer", label: "Traslado de datos", icon: "upload", to: "/admin/traslado", minimum: "admin" },
     ],

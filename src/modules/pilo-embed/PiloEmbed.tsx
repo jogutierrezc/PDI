@@ -11,6 +11,11 @@
    El acceso es el de Pregúntele a Pilo: si allá no está abierto para el
    público, aquí no se pinta nada y el marco se esconde. Y solo se pinta en
    este portal o en los que la administración autorizó (0111).
+
+   El mismo chat sirve a los dos Pilos (space.ts): /pilo-embed es el de
+   siempre y /pilo-ensenanza-embed es Mr. Pilo en Enseñanza, con sus textos,
+   su acceso y su lista de portales (0113). Ese, la primera vez, pregunta en
+   su saludo quién habla (estudiante o profesor).
    ========================================================================== */
 
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
@@ -18,32 +23,41 @@ import type { FormEvent, ReactNode } from "react";
 import gsap from "gsap";
 import { useAuth } from "../../lib/auth";
 import { usePiloAiConfig } from "../../components/pilo/ai/config";
+import type { SpaceConfig } from "../../components/pilo/ai/config";
 import { canUse } from "../../components/pilo/ai/logic";
 import type { Role } from "../../components/pilo/ai/logic";
 import { askQuestionStream, buildHistory, PiloError, prefetchPilo, sayWithPilo, stopPilo } from "../../components/pilo/ai/client";
-import type { AskMeta } from "../../components/pilo/ai/client";
+import type { AskHandlers, AskMeta, AskOptions, AskPortal } from "../../components/pilo/ai/client";
 import { enrichSpokenSentences } from "../../components/pilo/ai/voice-expressions";
 import { Pilo as PiloMoji } from "../pregunta/Pilo";
-import { newId } from "../pregunta/store";
+import { newId, readRol, storageKey, writeRol } from "../pregunta/store";
 import type { Turn } from "../pregunta/store";
+import { ASK_SPACES, asksRol, ROLE_OPTIONS, ROLE_QUESTION, roleView, wireRol } from "../pregunta/space";
+import type { Rol, SpaceId, SpaceProfile } from "../pregunta/space";
+import { RolePicker } from "../pregunta/RolePicker";
 import { AnswerText, parseAnswer, useTypewriter } from "../pregunta/AnswerText";
 import { toPlain } from "../pregunta/markdown";
 import { interruptedTurn, notesOf, reduceSteps, showsSources, waitingLine } from "../pregunta/answer-state";
 import type { ThinkStep } from "../pregunta/answer-state";
-import { frameMessage, hostOrigin, readHostMessage, readParams, sourceUrl, widgetAllowed } from "./embed";
+import { frameMessage, hostOrigin, readHostMessage, readParams, sourceUrl, spaceWidget, widgetAllowed } from "./embed";
 import type { FrameState } from "./embed";
 import "../pregunta/ask-pilo.css";
 import "./pilo-embed.css";
 
 const reduced = () => typeof window !== "undefined" && window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
 
-const EASE = "expo.out";
-const KEY_TURNS = "pilo-embed:turnos";
-const KEY_HELLO = "pilo-embed:saludo";
-const KEY_READ = "pilo-embed:leer";
-const MAX_TURNS = 30;
+/**
+ * La limpieza de una animación de entrada: la lleva a su final antes de
+ * soltarla. Un `kill()` a secas deja el elemento como iba —oculto o
+ * desenfocado— si lo interrumpe otro render o el desmontaje simulado del modo
+ * estricto de React.
+ */
+const endVisible = (tween: gsap.core.Tween) => () => {
+  tween.progress(1).kill();
+};
 
-const SUGGESTIONS = ["¿Qué es UDES en Cifras?", "¿Cómo va el Plan de Desarrollo?", "¿Qué programas ofrece la UDES?"];
+const EASE = "expo.out";
+const MAX_TURNS = 30;
 
 const session = {
   get(key: string): string | null {
@@ -92,6 +106,10 @@ const I = {
 };
 
 interface Voice {
+  /** El portal que viaja con la voz, y el rol y el ánimo de partida de quien pregunta (otro espacio). */
+  portal: AskPortal;
+  rol?: Rol;
+  mood?: string;
   advanced: boolean;
   rate: number;
   pitch: number;
@@ -110,10 +128,12 @@ interface Live {
 
 /* --- Quién entra ----------------------------------------------------------------------------- */
 
-export function PiloEmbed() {
+export function PiloEmbed({ space = "planeacion" }: { space?: SpaceId }) {
+  const here = ASK_SPACES[space] ?? ASK_SPACES.planeacion;
+  const usual = here.id === "planeacion";
   const config = usePiloAiConfig();
   const { profile, loading } = useAuth();
-  const params = useMemo(() => readParams(window.location.search), []);
+  const params = useMemo(() => readParams(window.location.search, here.id), [here.id]);
   const role = (profile?.is_active ? profile.role : null) as Role | null;
 
   // El marco es transparente: el fondo del portal no se pinta, y su esquema de
@@ -128,20 +148,29 @@ export function PiloEmbed() {
   const rules = config.data;
   // Quién aloja el marco: este portal siempre puede; otro, solo si la administración lo autorizó (0111).
   const hosted = useMemo(() => hostOrigin(window.location.ancestorOrigins, document.referrer), []);
-  const allowed = Boolean(rules && widgetAllowed(rules.widget, hosted, window.location.origin) && canUse({ ...rules, portals: { ...rules.portals, pregunta: { on: rules.pregunta.on, aud: rules.pregunta.aud, fns: ["preguntar"] } } }, "pregunta", "preguntar", role).ok);
+  // El de siempre se abre con «pregunta» de la configuración; otro espacio, con su ficha (0113). Sin ficha, no se pinta.
+  const cfg: SpaceConfig | null = usual ? null : (rules?.spaces[here.id] ?? null);
+  const door = !rules ? null : usual ? rules.pregunta : cfg;
+  const injected = rules && door ? { ...rules, portals: { ...rules.portals, [here.portal]: { on: door.on, aud: door.aud, fns: here.fns } } } : null;
+  const allowed = Boolean(rules && injected && widgetAllowed(spaceWidget(rules, here.id), hosted, window.location.origin) && canUse(injected, here.portal, "preguntar", role).ok);
 
   useEffect(() => {
     if (!waiting && !allowed) frame("oculto");
   }, [waiting, allowed]);
 
-  if (waiting || !rules || !allowed) return null;
+  if (waiting || !rules || !injected || !allowed) return null;
 
   return (
     <Widget
+      // Cada espacio monta su propio chat: nada de un Pilo queda en la memoria del otro.
+      key={here.id}
+      space={here}
+      cfg={cfg}
       tema={params.tema}
       lado={params.lado}
       voice={{
-        advanced: rules.speechReady && canUse(rules, "pregunta", "voz", role).ok,
+        portal: here.portal,
+        advanced: rules.speechReady && canUse(usual ? rules : injected, here.portal, "voz", role).ok,
         rate: rules.voiceRate,
         pitch: rules.voicePitch,
         expressions: rules.voiceExpressions,
@@ -154,9 +183,9 @@ export function PiloEmbed() {
 
 /* --- El botón, el saludo y el chat ------------------------------------------------------------- */
 
-function loadTurns(): Turn[] {
+function loadTurns(key: string): Turn[] {
   try {
-    const parsed = JSON.parse(session.get(KEY_TURNS) ?? "[]") as Turn[];
+    const parsed = JSON.parse(session.get(key) ?? "[]") as Turn[];
     if (!Array.isArray(parsed)) return [];
     return parsed.filter((t) => t && typeof t.q === "string" && typeof t.id === "string" && (typeof t.answer?.text === "string" || typeof t.error === "string")).slice(-MAX_TURNS);
   } catch {
@@ -164,11 +193,35 @@ function loadTurns(): Turn[] {
   }
 }
 
-function Widget({ tema, lado, voice }: { tema: string; lado: string; voice: Voice }) {
+function Widget({ space, cfg, tema, lado, voice: baseVoice }: { space: SpaceProfile; cfg: SpaceConfig | null; tema: string; lado: string; voice: Voice }) {
+  // Lo de esta visita (sessionStorage), bajo el prefijo del chat de este espacio: el de siempre conserva «pilo-embed:*».
+  const KEY_TURNS = storageKey(space.embedPrefix, "turnos");
+  const KEY_HELLO = storageKey(space.embedPrefix, "saludo");
+  const KEY_READ = storageKey(space.embedPrefix, "leer");
+  const usual = space.id === "planeacion";
+  // Quién pregunta: solo en los espacios que lo piden. Se recuerda por navegador y por espacio, igual que en la página.
+  const askRol = asksRol(space, cfg);
+  const [rol, setRol] = useState<Rol | null>(() => (askRol ? readRol(space.storagePrefix) : null));
+  const [asking, setAsking] = useState(false);
+  const pickRol = (chosen: Rol) => {
+    writeRol(space.storagePrefix, chosen);
+    setRol(chosen);
+    setAsking(false);
+    input.current?.focus({ preventScroll: true });
+  };
+  const view = useMemo(() => roleView(space, cfg, rol), [space, cfg, rol]);
+  const sent = wireRol(rol);
+  // Lo que viaja a la función además de la pregunta. En el Pilo de siempre, nada: el pedido es el de siempre.
+  const wire: AskOptions | undefined = useMemo(() => (usual ? undefined : { portal: space.portal, rol: sent }), [usual, space.portal, sent]);
+  const voice = useMemo(() => (usual ? baseVoice : { ...baseVoice, rol: sent, mood: view.mood }), [usual, baseVoice, sent, view.mood]);
+  const suggestions = sent ? view.suggestions.slice(0, 3).map((x) => x.q) : space.widget.suggestions;
+  const greeting = cfg?.greeting || space.widget.greeting;
+  const home = sourceUrl(space.route, window.location.origin);
+
   const [open, setOpen] = useState(false);
   const [hello, setHello] = useState(false);
   const [full, setFull] = useState(false);
-  const [turns, setTurns] = useState<Turn[]>(loadTurns);
+  const [turns, setTurns] = useState<Turn[]>(() => loadTurns(KEY_TURNS));
   const [live, setLive] = useState<Live | null>(null);
   const [busy, setBusy] = useState(false);
   const [draft, setDraft] = useState("");
@@ -221,12 +274,14 @@ function Widget({ tema, lado, voice }: { tema: string; lado: string; voice: Voic
 
   useLayoutEffect(() => {
     if (!hello || !bubble.current || reduced()) return;
-    const tween = gsap.fromTo(bubble.current, { opacity: 0, scale: 0.86, y: 8, filter: "blur(4px)" }, { opacity: 1, scale: 1, y: 0, filter: "blur(0px)", duration: 0.34, ease: EASE, clearProps: "filter" });
-    return () => void tween.kill();
+    const tween = gsap.fromTo(bubble.current, { opacity: 0, scale: 0.86, y: 8, filter: "blur(4px)" }, { opacity: 1, scale: 1, y: 0, filter: "blur(0px)", duration: 0.34, ease: EASE, clearProps: "opacity,filter,transform" });
+    return endVisible(tween);
   }, [hello]);
 
   useEffect(() => {
     session.set(KEY_TURNS, JSON.stringify(turns.filter((t) => t.answer || t.error).slice(-MAX_TURNS)));
+    // La llave no cambia mientras el chat vive: cada espacio monta el suyo.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [turns]);
 
   /* Al salir, el pedido en curso se cancela y Pilo se calla. */
@@ -349,7 +404,7 @@ function Widget({ tema, lado, voice }: { tema: string; lado: string; voice: Voic
     setStatus("Pilo está pensando.");
     toBottom();
     try {
-      const answer = await askQuestionStream(q, history, {
+      const handlers: AskHandlers = {
         signal: ctl.signal,
         onMeta: (meta) => {
           if (run.current !== mine) return;
@@ -366,7 +421,8 @@ function Widget({ tema, lado, voice }: { tema: string; lado: string; voice: Voic
           mine.text += text;
           show();
         },
-      });
+      };
+      const answer = wire ? await askQuestionStream(q, history, handlers, wire) : await askQuestionStream(q, history, handlers);
       if (run.current !== mine) return;
       setFresh((f) => new Map(f).set(turn.id, mine.text.trim() ? "en vivo" : "entera"));
       patchTurn(turn.id, { answer });
@@ -421,16 +477,19 @@ function Widget({ tema, lado, voice }: { tema: string; lado: string; voice: Voic
     });
 
   const working = busy && !live?.text;
-  const headline = reading ? "Hablando" : working ? "Pensando" : busy ? "Escribiendo" : "Cifras de la UDES";
+  const headline = reading ? "Hablando" : working ? "Pensando" : busy ? "Escribiendo" : space.widget.idle;
+  // La primera vez (o al pedir cambiarlo), el saludo pregunta quién habla.
+  const picking = askRol && (rol === null || asking);
+  const who = ROLE_OPTIONS.find((o) => o.id === rol)?.short;
   const shut = open && full;
 
   return (
-    <div className="ap pe" data-tema={tema} data-lado={lado} data-open={open || undefined} data-full={shut || undefined} data-reading={reading || undefined}>
+    <div className="ap pe" data-tema={tema} data-espacio={space.accent ?? undefined} data-lado={lado} data-open={open || undefined} data-full={shut || undefined} data-reading={reading || undefined}>
       {open && (
         <div className="pe-panel" ref={panel} role="dialog" aria-label="Chat con Pilo">
           <header className="pe-head">
             <div className="pe-face">
-              <PiloMoji size={64} mood={working ? "piensa" : "feliz"} talking={reading || (busy && !working)} alive />
+              <PiloMoji size={64} mood={working ? "piensa" : "feliz"} emotion={working ? undefined : view.expression} talking={reading || (busy && !working)} alive />
             </div>
             <div className="pe-id">
               <strong>Pilo</strong>
@@ -464,7 +523,7 @@ function Widget({ tema, lado, voice }: { tema: string; lado: string; voice: Voic
               pinned.current = s.scrollHeight - s.scrollTop - s.clientHeight < 48;
             }}
           >
-            <div className="pe-msg pe-msg--p">Hola, soy Pilo. Pregúnteme por las cifras de la UDES y le digo de dónde sale cada una.</div>
+            <div className="pe-msg pe-msg--p">{greeting}</div>
             {turns.map((t) => (
               <TurnView
                 key={t.id}
@@ -476,14 +535,16 @@ function Widget({ tema, lado, voice }: { tema: string; lado: string; voice: Voic
                 voice={voice}
                 onTyped={() => typed(t.id)}
                 onRetry={() => void ask(t.q, t.id)}
+                home={home}
                 onReading={(on) => setReadingId((cur) => (on ? t.id : cur === t.id ? null : cur))}
               />
             ))}
+            {picking && <RolePicker variant="chat" value={rol} onPick={pickRol} legend={ROLE_QUESTION} />}
           </div>
 
           {turns.length === 0 && (
             <div className="pe-chips">
-              {SUGGESTIONS.map((s) => (
+              {suggestions.map((s) => (
                 <button key={s} type="button" onClick={() => void ask(s)}>
                   {s}
                 </button>
@@ -498,9 +559,14 @@ function Widget({ tema, lado, voice }: { tema: string; lado: string; voice: Voic
             </button>
           </form>
           <p className="pe-foot">
-            <a href={sourceUrl("/pregunta", window.location.origin)} target="_blank" rel="noopener">
-              Abrir Pregúntele a Pilo {I.out}
+            <a href={home} target="_blank" rel="noopener">
+              {space.widget.open} {I.out}
             </a>
+            {askRol && rol !== null && !asking && (
+              <button type="button" className="pe-rol" onClick={() => { setAsking(true); toBottom(); }} aria-label={`Quién pregunta: ${who}. Cambiar`}>
+                {who} · cambiar
+              </button>
+            )}
           </p>
           <div className="ap-sr" role="status" aria-live="polite">
             {status}
@@ -510,7 +576,7 @@ function Widget({ tema, lado, voice }: { tema: string; lado: string; voice: Voic
 
       {hello && !open && (
         <button type="button" className="pe-hello" ref={bubble} onClick={openPanel}>
-          ¿Busca una cifra de la UDES? Pregúnteme.
+          {space.widget.hello}
         </button>
       )}
 
@@ -547,7 +613,10 @@ function TurnView({
   onTyped,
   onRetry,
   onReading,
+  home,
 }: {
+  /** La página de este Pilo: a donde lleva una fuente que no tiene la suya. */
+  home: string;
   turn: Turn;
   stream: Live | null;
   fresh: "entera" | "en vivo" | undefined;
@@ -578,21 +647,21 @@ function TurnView({
   /* La pregunta sale desde la caja de texto hacia su lugar. */
   useLayoutEffect(() => {
     if (!animate || !question.current || reduced()) return;
-    const tween = gsap.fromTo(question.current, { opacity: 0, y: 18, scale: 0.92 }, { opacity: 1, y: 0, scale: 1, duration: 0.3, ease: EASE, clearProps: "transform" });
-    return () => void tween.kill();
+    const tween = gsap.fromTo(question.current, { opacity: 0, y: 18, scale: 0.92 }, { opacity: 1, y: 0, scale: 1, duration: 0.3, ease: EASE, clearProps: "opacity,transform" });
+    return endVisible(tween);
   }, [animate]);
 
   useLayoutEffect(() => {
     if (!working || !think.current || reduced()) return;
-    const tween = gsap.fromTo(think.current, { opacity: 0, y: 10 }, { opacity: 1, y: 0, duration: 0.28, ease: EASE, delay: 0.12 });
-    return () => void tween.kill();
+    const tween = gsap.fromTo(think.current, { opacity: 0, y: 10 }, { opacity: 1, y: 0, duration: 0.28, ease: EASE, delay: 0.12, clearProps: "opacity,transform" });
+    return endVisible(tween);
   }, [working]);
 
-  /* Cada paso releva al anterior con un fundido borroso. */
+  /* Cada paso releva al anterior con un fundido borroso. Si llega otro paso a medio fundido, este termina nítido antes de soltarse. */
   useLayoutEffect(() => {
     if (!step || !stepText.current || reduced()) return;
-    const tween = gsap.fromTo(stepText.current, { opacity: 0, y: 7, filter: "blur(4px)" }, { opacity: 1, y: 0, filter: "blur(0px)", duration: 0.26, ease: EASE, clearProps: "filter" });
-    return () => void tween.kill();
+    const tween = gsap.fromTo(stepText.current, { opacity: 0, y: 7, filter: "blur(4px)" }, { opacity: 1, y: 0, filter: "blur(0px)", duration: 0.26, ease: EASE, clearProps: "opacity,filter,transform" });
+    return endVisible(tween);
   }, [step]);
 
   /* --- la voz: frase por frase, la que suena se resalta --- */
@@ -603,16 +672,16 @@ function TurnView({
     () =>
       enrichSpokenSentences(
         parsed.sentences.map((x) => x.spoken),
-        { mood: a?.mood, expressionsEnabled: voice.expressions !== false, patterns: voice.patterns, modulationEnabled: voice.modulation !== false, baseRate: voice.rate, basePitch: voice.pitch },
+        { mood: a?.mood ?? voice.mood, expressionsEnabled: voice.expressions !== false, patterns: voice.patterns, modulationEnabled: voice.modulation !== false, baseRate: voice.rate, basePitch: voice.pitch },
       ),
-    [parsed, a?.mood, voice.expressions, voice.patterns, voice.modulation, voice.rate, voice.pitch],
+    [parsed, a?.mood, voice.mood, voice.expressions, voice.patterns, voice.modulation, voice.rate, voice.pitch],
   );
   const spoken = enriched.sentences;
 
   // Con «Leer en voz alta», el audio de las primeras frases se pide en cuanto la respuesta está completa.
   useEffect(() => {
-    if (a && fresh && autoRead && !incomplete) prefetchPilo(spoken.slice(0, 2), { portal: "pregunta", advanced: voice.advanced });
-  }, [a, fresh, autoRead, incomplete, spoken, voice.advanced]);
+    if (a && fresh && autoRead && !incomplete) prefetchPilo(spoken.slice(0, 2), { portal: voice.portal, advanced: voice.advanced, rol: voice.rol });
+  }, [a, fresh, autoRead, incomplete, spoken, voice.advanced, voice.portal, voice.rol]);
 
   const read = async () => {
     if (reading !== null) {
@@ -629,8 +698,8 @@ function TurnView({
       if (!spoken[k]?.trim()) continue;
       setReading(k);
       // Mientras suena esta frase, se piden las dos que siguen: así no hay pausas.
-      prefetchPilo(spoken.slice(k + 1, k + 3), { portal: "pregunta", advanced: voice.advanced });
-      const used = await sayWithPilo(spoken[k], { portal: "pregunta", ...voice, rate: enriched.rate, pitch: enriched.pitch });
+      prefetchPilo(spoken.slice(k + 1, k + 3), { portal: voice.portal, advanced: voice.advanced, rol: voice.rol });
+      const used = await sayWithPilo(spoken[k], { ...voice, rate: enriched.rate, pitch: enriched.pitch });
       if (used === "cancelado") break;
     }
     if (mine === readRun.current) {
@@ -677,13 +746,14 @@ function TurnView({
     }
     if (!wasWriting.current || !after.current || reduced()) return;
     wasWriting.current = false;
-    const tween = gsap.from(after.current.children, { opacity: 0, y: 6, duration: 0.3, stagger: 0.05, ease: EASE });
-    return () => void tween.kill();
+    // Con principio y final dichos: un `from` a secas tomaría como final la opacidad a medio camino de otro fundido.
+    const tween = gsap.fromTo(after.current.children, { opacity: 0, y: 6 }, { opacity: 1, y: 0, duration: 0.3, stagger: 0.05, ease: EASE, clearProps: "opacity,transform" });
+    return endVisible(tween);
   }, [writing, Boolean(a)]);
 
   const open = (n: number) => {
     const src = sources.find((s) => s.n === n);
-    if (src) window.open(sourceUrl(src.path, window.location.origin), "_blank", "noopener");
+    if (src) window.open(sourceUrl(src.path, window.location.origin, new URL(home).pathname), "_blank", "noopener");
   };
 
   const notes = a && !incomplete ? notesOf(a) : [];
@@ -733,7 +803,7 @@ function TurnView({
           {a.unknown && a.unknown.length > 0 && <p className="pe-note pe-note--warn">Revise estos números antes de citarlos: no los encontré en las fuentes ({a.unknown.join(", ")}).</p>}
           <div className="pe-meta">
             {links.map((s) => (
-              <a key={s.n} href={sourceUrl(s.path, window.location.origin)} target="_blank" rel="noopener" title={s.title}>
+              <a key={s.n} href={sourceUrl(s.path, window.location.origin, new URL(home).pathname)} target="_blank" rel="noopener" title={s.title}>
                 {I.doc}
                 <span>{s.title}</span>
               </a>

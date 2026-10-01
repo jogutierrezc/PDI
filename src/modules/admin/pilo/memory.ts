@@ -56,6 +56,8 @@ import type { ProjectWithLinks } from "../../../types/database";
 import type { PillarWithProgress } from "../../../data/queries";
 import { meshFromRows, pdiMesh } from "./mesh";
 import type { MeshPayload } from "./mesh";
+import { DEFAULT_SPACE, isDefaultSpace, readInSpace, spaceArgs, spaceBody, spaceKey } from "./space";
+import type { PiloSpace } from "./space";
 
 export type MemorySource = "cifras" | "boletines" | "pdi" | "observatorio" | "impacto";
 
@@ -814,20 +816,27 @@ export interface SavedAnswer {
   up: number;
   down: number;
   hidden: boolean;
+  /** Para quién se redactó (0113): «estudiante», «profesor» o vacío. Solo en espacios con rol. */
+  rol?: string;
 }
 
-export function useSavedAnswers() {
+const ANSWER_COLUMNS = "id, question, answer, created_at, hits, up, down, hidden";
+
+/** Las respuestas guardadas de un espacio (0113): las de un Pilo no se ven en el otro. */
+export async function fetchSavedAnswers(space: PiloSpace = DEFAULT_SPACE): Promise<{ rows: SavedAnswer[]; total: number } | null> {
+  const { data, error, count } = await readInSpace(space, (scoped) => {
+    // «rol» solo existe con 0113: el Pilo de siempre no lo pide.
+    const query = supabase.from("pilo_answers").select(isDefaultSpace(space) ? ANSWER_COLUMNS : `${ANSWER_COLUMNS}, rol`, { count: "exact" });
+    return (scoped ? query.eq("space", space) : query).order("created_at", { ascending: false }).limit(8);
+  });
+  if (error) return null;
+  return { rows: (data ?? []) as unknown as SavedAnswer[], total: count ?? 0 };
+}
+
+export function useSavedAnswers(space: PiloSpace = DEFAULT_SPACE) {
   return useQuery({
-    queryKey: ["pilo-ia", "memoria", "respuestas"],
-    queryFn: async (): Promise<{ rows: SavedAnswer[]; total: number } | null> => {
-      const { data, error, count } = await supabase
-        .from("pilo_answers")
-        .select("id, question, answer, created_at, hits, up, down, hidden", { count: "exact" })
-        .order("created_at", { ascending: false })
-        .limit(8);
-      if (error) return null;
-      return { rows: (data ?? []) as SavedAnswer[], total: count ?? 0 };
-    },
+    queryKey: ["pilo-ia", "memoria", "respuestas", ...spaceKey(space)],
+    queryFn: () => fetchSavedAnswers(space),
   });
 }
 
@@ -844,6 +853,7 @@ export function useHideAnswer() {
 
 export interface MemoryHit {
   ref: string;
+  /** En otro espacio (0113) las fuentes son otras: llegan como texto. */
   source: MemorySource;
   title: string;
   section: string;
@@ -867,9 +877,12 @@ export interface EmbedStatus {
   catalog_done: number;
 }
 
-/** Pide a pilo-ia un paso del índice. Los errores llegan en español desde la función. */
-async function indexStep<T>(body: Record<string, unknown>): Promise<T> {
-  const { data, error } = await supabase.functions.invoke<T>("pilo-ia", { body: { action: "indexar", ...body } });
+/**
+ * Pide a pilo-ia un paso del índice. Los errores llegan en español desde la
+ * función. El espacio viaja solo si no es el de partida (0113).
+ */
+export async function indexStep<T>(body: Record<string, unknown>, space: PiloSpace = DEFAULT_SPACE): Promise<T> {
+  const { data, error } = await supabase.functions.invoke<T>("pilo-ia", { body: { action: "indexar", ...body, ...spaceBody(space) } });
   if (error) throw new Error((await readFunctionError(error)) ?? "No pude hablar con Mr. Pilo ahora.");
   return data as T;
 }
@@ -892,12 +905,12 @@ export const pendingOf = (s: EmbedStatus | null) =>
   s ? Math.max(0, s.memory_total - s.memory_done) + Math.max(0, s.facts_total - s.facts_done) + Math.max(0, s.catalog_total - s.catalog_done) : 0;
 
 /** Cuántos vectores están al día. El error dice por qué no se puede (proveedor, migración). */
-export function useEmbedStatus(enabled = true) {
+export function useEmbedStatus(enabled = true, space: PiloSpace = DEFAULT_SPACE) {
   return useQuery({
-    queryKey: ["pilo-ia", "memoria", "significado"],
+    queryKey: ["pilo-ia", "memoria", "significado", ...spaceKey(space)],
     enabled,
     retry: false,
-    queryFn: async (): Promise<EmbedStatus | null> => statusOf((await indexStep<{ status?: unknown }>({ step: "estado" })).status),
+    queryFn: async (): Promise<EmbedStatus | null> => statusOf((await indexStep<{ status?: unknown }>({ step: "estado" }, space)).status),
   });
 }
 
@@ -906,13 +919,13 @@ export function useEmbedStatus(enabled = true) {
  * lote no guarda nada (el proveedor falla en silencio), se detiene en vez de
  * repetir para siempre.
  */
-export function useIndexMemory() {
+export function useIndexMemory(space: PiloSpace = DEFAULT_SPACE) {
   const client = useQueryClient();
   return useMutation({
     mutationFn: async (onProgress?: (s: EmbedStatus) => void): Promise<EmbedStatus | null> => {
       let last: EmbedStatus | null = null;
       for (let round = 0; round < 200; round++) {
-        const r = await indexStep<{ saved?: number; status?: unknown }>({ step: "lote" });
+        const r = await indexStep<{ saved?: number; status?: unknown }>({ step: "lote" }, space);
         last = statusOf(r.status);
         if (last) onProgress?.(last);
         if (!pendingOf(last) || !r.saved) break;
@@ -937,14 +950,14 @@ export function useEmbedModels() {
  * Probar la memoria: los pasajes que Pilo encontraría. Con la función (0108)
  * es la búsqueda híbrida de verdad; si no responde, solo por palabras.
  */
-export function useTryMemory() {
+export function useTryMemory(space: PiloSpace = DEFAULT_SPACE) {
   return useMutation({
     mutationFn: async (q: string): Promise<{ hits: MemoryHit[]; semantic: boolean; note?: string }> => {
       try {
-        const r = await indexStep<{ hits?: MemoryHit[]; semantic?: boolean; error?: string }>({ step: "probar", q });
+        const r = await indexStep<{ hits?: MemoryHit[]; semantic?: boolean; error?: string }>({ step: "probar", q }, space);
         return { hits: r.hits ?? [], semantic: Boolean(r.semantic), note: r.semantic ? undefined : r.error };
       } catch (error) {
-        const { data, error: rpcError } = await supabase.rpc("pilo_memory_search", { p_q: q, p_sources: null as never, p_limit: 5 });
+        const { data, error: rpcError } = await supabase.rpc("pilo_memory_search", { p_q: q, p_sources: null as never, p_limit: 5, ...spaceArgs(space) });
         if (rpcError) throw rpcError;
         return { hits: (data ?? []) as MemoryHit[], semantic: false, note: error instanceof Error ? error.message : undefined };
       }
@@ -964,10 +977,10 @@ export interface CatalogHit {
 }
 
 /** Probar el catálogo (0112): las entradas que Pilo encontraría para una pregunta. */
-export function useTryCatalog() {
+export function useTryCatalog(space: PiloSpace = DEFAULT_SPACE) {
   return useMutation({
     mutationFn: async (q: string): Promise<{ hits: CatalogHit[]; semantic: boolean; min: number; note?: string }> => {
-      const r = await indexStep<{ hits?: CatalogHit[]; semantic?: boolean; min?: number; error?: string }>({ step: "catalogo", q });
+      const r = await indexStep<{ hits?: CatalogHit[]; semantic?: boolean; min?: number; error?: string }>({ step: "catalogo", q }, space);
       return { hits: r.hits ?? [], semantic: Boolean(r.semantic), min: r.min ?? 0.8, note: r.semantic ? undefined : r.error };
     },
   });

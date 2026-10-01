@@ -14,6 +14,8 @@ import type { Fn, Portal, PortalRule } from "../../../components/pilo/ai/config"
 import type { ReportKind, VoiceStyle } from "../../../components/pilo/ai/logic";
 import type { MemorySource } from "./memory";
 import { DEFAULT_VOICE_PATTERNS } from "../../../components/pilo/ai/voice-expressions";
+import { DEFAULT_SPACE, readInSpace, spaceKey } from "./space";
+import type { PiloSpace } from "./space";
 
 export type Provider = "mistral" | "freeai" | "nvidia" | "otro";
 export type SpeechProvider = "freeai" | "nvidia" | "fishaudio" | "otro" | "navegador";
@@ -231,6 +233,9 @@ export interface LogRow {
   status: string;
   cached: boolean;
   ms: number | null;
+  /** A qué Pilo fue el pedido y para quién (0113). Sin 0113, no vienen. */
+  space?: string;
+  rol?: string;
 }
 
 /** Valores de partida de cada proveedor de texto. La dirección y el modelo se pueden cambiar. */
@@ -290,14 +295,20 @@ export function useKeyStatus() {
   });
 }
 
-export function usePiloLog() {
+/** Los últimos pedidos de un espacio (0113): la bitácora de un Pilo no trae los del otro. */
+export async function fetchPiloLog(space: PiloSpace = DEFAULT_SPACE, limit = 20): Promise<LogRow[]> {
+  const { data, error } = await readInSpace(space, (scoped) => {
+    const query = supabase.from("pilo_ai_log").select("*");
+    return (scoped ? query.eq("space", space) : query).order("created_at", { ascending: false }).limit(limit);
+  });
+  if (error) return [];
+  return (data ?? []) as LogRow[];
+}
+
+export function usePiloLog(space: PiloSpace = DEFAULT_SPACE) {
   return useQuery({
-    queryKey: pilokeys.log,
-    queryFn: async (): Promise<LogRow[]> => {
-      const { data, error } = await supabase.from("pilo_ai_log").select("*").order("created_at", { ascending: false }).limit(20);
-      if (error) return [];
-      return (data ?? []) as LogRow[];
-    },
+    queryKey: [...pilokeys.log, ...spaceKey(space)],
+    queryFn: () => fetchPiloLog(space),
   });
 }
 

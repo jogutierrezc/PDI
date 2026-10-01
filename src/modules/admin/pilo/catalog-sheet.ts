@@ -23,6 +23,24 @@ export type CatalogKind = "respuesta" | "capciosa";
 export const MOODS = ["emocionado", "atrevido", "loco", "pensar"] as const;
 export type CatalogMood = (typeof MOODS)[number];
 
+/** Para quién es una entrada (0113): vacío es «todos». Solo los espacios con rol lo usan. */
+export const CATALOG_ROLES = ["", "estudiante", "profesor"] as const;
+export type CatalogRol = (typeof CATALOG_ROLES)[number];
+export const ROL_LABEL: Record<CatalogRol, string> = { "": "Todos", estudiante: "Estudiante", profesor: "Profesor" };
+
+/**
+ * Lo que cambia de un espacio a otro (0113). Sin opciones, todo es como
+ * siempre: prefijos R y C, sin columna «Para quién».
+ */
+export interface SheetOptions {
+  /** Prefijo de las claves por clase. Si viene, toda clave debe llevarlo. */
+  prefix?: Record<CatalogKind, string>;
+  /** Con columna «Para quién» (todos, estudiante o profesor). */
+  rol?: boolean;
+  /** El nombre de la pantalla de la intranet, para la hoja de instrucciones. */
+  screen?: string;
+}
+
 export interface CatalogRow {
   kind?: CatalogKind;
   key: string;
@@ -36,6 +54,8 @@ export interface CatalogRow {
   cut: string;
   office: string;
   active: boolean;
+  /** Para quién (0113). Sin él, la base guarda «todos». */
+  rol?: CatalogRol;
 }
 
 interface Column {
@@ -72,6 +92,25 @@ export const COLUMNS: Record<CatalogKind, Column[]> = {
   ],
 };
 
+const ROL_COLUMN: Column = { id: "rol", header: "Para quién", width: 14, help: "Opcional. todos (por defecto), estudiante o profesor: a quién le sirve esta entrada." };
+
+/** Las columnas de una clase; con `rol`, «Para quién» va antes de «Activa». */
+export function columnsFor(kind: CatalogKind, opts: SheetOptions = {}): Column[] {
+  const cols = COLUMNS[kind];
+  if (!opts.rol) return cols;
+  const at = cols.findIndex((c) => c.id === "active");
+  return [...cols.slice(0, at), ROL_COLUMN, ...cols.slice(at)];
+}
+
+/** «todos», «estudiantes», «docente»… → el rol; null si no se entiende. */
+export function parseRolCell(text: string): CatalogRol | null {
+  const t = fold(text);
+  if (!t || ["todos", "todas", "todo", "cualquiera", "general", "ambos"].includes(t)) return "";
+  if (/^estudiantes?$/.test(t)) return "estudiante";
+  if (/^(profesor(es|a|as)?|docentes?)$/.test(t)) return "profesor";
+  return null;
+}
+
 /** Alias comunes de encabezados para reconocer tablas armadas libremente en Excel. */
 export const HEADER_ALIASES: Record<string, string[]> = {
   key: ["clave", "id", "codigo", "código", "key", "item", "nro", "numero", "número"],
@@ -86,6 +125,7 @@ export const HEADER_ALIASES: Record<string, string[]> = {
   cut: ["corte", "periodo", "período", "ano", "año", "cut", "vigencia"],
   office: ["oficina", "responsable", "dependencia", "unidad", "office", "reporta"],
   active: ["activa", "activo", "estado", "active", "en uso", "habilitada", "habilitado"],
+  rol: ["para quien", "rol", "audiencia", "dirigido a", "destinatario"],
 };
 
 /** Ejemplos para empezar: solo afirmaciones que ya son ciertas en los portales. */
@@ -148,8 +188,10 @@ function styleHeader(sheet: Worksheet, count: number) {
 }
 
 /** Llena un libro con la hoja de datos de una clase y su hoja de instrucciones. */
-export function fillCatalogTemplate(book: Workbook, kind: CatalogKind, rows: Partial<CatalogRow & { tema: string }>[] = EXAMPLES[kind]) {
-  const cols = COLUMNS[kind];
+export function fillCatalogTemplate(book: Workbook, kind: CatalogKind, rows: Partial<CatalogRow & { tema: string }>[] = EXAMPLES[kind], opts: SheetOptions = {}) {
+  const cols = columnsFor(kind, opts);
+  const screen = opts.screen ?? "Mr. Pilo con IA";
+  const section = opts.screen ? "Catálogo" : "Catálogo de Pilo";
   const sheet = book.addWorksheet(SHEET_NAME[kind], { views: [{ state: "frozen", ySplit: 1 }] });
   sheet.columns = cols.map((c) => ({ header: c.header, key: c.id, width: c.width }));
   styleHeader(sheet, cols.length);
@@ -161,6 +203,7 @@ export function fillCatalogTemplate(book: Workbook, kind: CatalogKind, rows: Par
       cols.map((c) => {
         if (c.id === "active") return r.active === false ? "NO" : "SI";
         if (c.id === "tema") return r.tema ?? r.question ?? "";
+        if (c.id === "rol") return r.rol ? r.rol : "todos";
         const v = r[c.id as keyof CatalogRow];
         return Array.isArray(v) ? v.join("\n") : (v ?? "");
       }),
@@ -172,6 +215,7 @@ export function fillCatalogTemplate(book: Workbook, kind: CatalogKind, rows: Par
   for (let r = 2; r <= 1000; r++) {
     sheet.getCell(r, moodCol).dataValidation = { type: "list", allowBlank: true, formulae: [`"${MOODS.join(",")}"`] };
     sheet.getCell(r, activeCol).dataValidation = { type: "list", allowBlank: true, formulae: ['"SI,NO"'] };
+    if (opts.rol) sheet.getCell(r, cols.findIndex((c) => c.id === "rol") + 1).dataValidation = { type: "list", allowBlank: true, formulae: ['"todos,estudiante,profesor"'] };
   }
   sheet.eachRow((row, n) => {
     if (n > 1) row.alignment = { vertical: "top", wrapText: true };
@@ -189,8 +233,8 @@ export function fillCatalogTemplate(book: Workbook, kind: CatalogKind, rows: Par
     c: "Importar",
     h:
       kind === "respuesta"
-        ? "En la intranet: Mr. Pilo con IA → Catálogo de Pilo → Respuestas → Importar Excel. Pilo usa estas respuestas antes que todo, sin IA, cuando la pregunta se parece a la Pregunta o a una Variante."
-        : "En la intranet: Mr. Pilo con IA → Catálogo de Pilo → Capciosas → Importar Excel. Pilo responde con la microexpresión, al instante y sin IA, cuando la pregunta trae un grupo de disparadores.",
+        ? `En la intranet: ${screen} → ${section} → Respuestas → Importar Excel. Pilo usa estas respuestas antes que todo, sin IA, cuando la pregunta se parece a la Pregunta o a una Variante.`
+        : `En la intranet: ${screen} → ${section} → Capciosas → Importar Excel. Pilo responde con la microexpresión, al instante y sin IA, cuando la pregunta trae un grupo de disparadores.`,
   });
   help.eachRow((row) => (row.alignment = { vertical: "top", wrapText: true }));
 }
@@ -230,8 +274,9 @@ export function detectCatalogKind(tables: Record<string, string[][]>): CatalogKi
  * Lee la hoja de la clase (por su nombre, o la primera que no sea de
  * instrucciones) desde una tabla de textos (fila 1: encabezados).
  */
-export function parseCatalogTable(kind: CatalogKind, tables: Record<string, string[][]>): ParseResult {
-  const cols = COLUMNS[kind];
+export function parseCatalogTable(kind: CatalogKind, tables: Record<string, string[][]>, opts: SheetOptions = {}): ParseResult {
+  const cols = columnsFor(kind, opts);
+  const prefix = opts.prefix?.[kind] ?? (kind === "capciosa" ? "C" : "R");
   // 1. Buscar primero la hoja con el nombre de la clase
   let name = Object.keys(tables).find((n) => fold(n) === fold(SHEET_NAME[kind]));
   // 2. Si no, buscar hoja que contenga la palabra clave de la clase
@@ -268,11 +313,10 @@ export function parseCatalogTable(kind: CatalogKind, tables: Record<string, stri
     const errors: string[] = [];
     const where = (col: string) => `Hoja «${name}», fila ${line}, columna «${col}»`;
     let key = get("key").toUpperCase();
-    if (!key) {
-      const prefix = kind === "capciosa" ? "C" : "R";
-      key = `${prefix}-${String(i + 1).padStart(3, "0")}`;
-    }
+    if (!key) key = `${prefix}-${String(i + 1).padStart(3, "0")}`;
     if (!/^[A-Z0-9._-]{1,40}$/.test(key)) errors.push(`${where("Clave")}: use solo letras, números, punto, guion o guion bajo (sin espacios).`);
+    // La clave es global: en un espacio con prefijo propio, una clave sin él chocaría con la del otro Pilo.
+    else if (opts.prefix && !key.startsWith(`${prefix}-`)) errors.push(`${where("Clave")}: «${key}» debe empezar por ${prefix}- (por ejemplo ${prefix}-001).`);
     else if (seen.has(key)) errors.push(`${where("Clave")}: «${key}» ya está en la fila ${seen.get(key)}.`);
     if (key) seen.set(key, line);
 
@@ -288,6 +332,9 @@ export function parseCatalogTable(kind: CatalogKind, tables: Record<string, stri
     const activeText = fold(get("active"));
     const active = !activeText || ["si", "sí", "s", "x", "1", "true", "verdadero"].includes(activeText);
     if (activeText && !active && !["no", "n", "0", "false", "falso"].includes(activeText)) errors.push(`${where("Activa")}: escriba SI o NO.`);
+
+    const rol = opts.rol ? parseRolCell(get("rol")) : "";
+    if (rol === null) errors.push(`${where("Para quién")}: escriba todos, estudiante o profesor.`);
 
     let question = "";
     let variants: string[] = [];
@@ -331,6 +378,7 @@ export function parseCatalogTable(kind: CatalogKind, tables: Record<string, stri
           cut: kind === "respuesta" ? get("cut") : "",
           office: kind === "respuesta" ? get("office") : "",
           active,
+          ...(opts.rol ? { rol: rol ?? "" } : {}),
         };
     out.rows.push({ line, row, errors });
     if (row) out.valid.push(row);

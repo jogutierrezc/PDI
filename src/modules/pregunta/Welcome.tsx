@@ -13,29 +13,51 @@
    Se puede saltar siempre (Saltar o Escape) y avanzar con «Siguiente»; la voz
    es opcional. Con movimiento reducido, todo son fundidos. Los colores son los
    del tema elegido (--ap-stage-*).
+
+   La escena es una sola para todos los espacios de Pilo (space.ts): cambian
+   las frases, el título y las muestras. Un espacio que pregunta el rol
+   (Mr. Pilo en Enseñanza) cierra con un momento más: «¿quién pregunta?»; al
+   elegir, la escena se cierra igual. Quien salta la bienvenida lo responde
+   después, en el saludo de la página.
    ========================================================================== */
 
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import type { RefObject } from "react";
 import gsap from "gsap";
 import { Pilo as PiloMoji } from "./Pilo";
-import type { MojiMood, PiloMojiHandle } from "./Pilo";
+import type { PiloMojiHandle } from "./Pilo";
 import { speak, stopSpeaking } from "../../components/pilo/voice";
 import type { Tema } from "./store";
+import { ASK_SPACES, ROLE_QUESTION } from "./space";
+import type { Rol, SpaceProfile } from "./space";
+import { RolePicker } from "./RolePicker";
 import "./welcome.css";
 
 const reduced = () => typeof window !== "undefined" && window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
 const finePointer = () => typeof window !== "undefined" && window.matchMedia?.("(hover: hover) and (pointer: fine)").matches;
 
-const BEATS: { say: string; mood: MojiMood; look: [number, number] }[] = [
-  { say: "¡Hola! Soy Mr. Pilo, el guía de la Oficina de Planeación Institucional de la UDES.", mood: "feliz", look: [0, -0.1] },
-  { say: "Pregúnteme como le preguntaría a una persona: por cifras, el Plan de Desarrollo, los boletines o el Observatorio.", mood: "atento", look: [0, 0.7] },
-  { say: "Le respondo sobre lo que necesite: las cifras de la UDES llevan su fuente para que la revise, y le aviso cuando algo es conocimiento general.", mood: "sorpresa", look: [0.2, 0.8] },
-];
-
-const TITLE = "Pregúntele a Mr. Pilo";
-
-export function Welcome({ tema, target, onDone }: { tema: Tema; target: RefObject<HTMLElement>; onDone: () => void }) {
+export function Welcome({
+  tema,
+  target,
+  onDone,
+  space = ASK_SPACES.planeacion,
+  askRol = false,
+  rol = null,
+  onRol,
+}: {
+  tema: Tema;
+  target: RefObject<HTMLElement>;
+  onDone: () => void;
+  /** El espacio de Pilo: sus frases, su título y sus muestras. */
+  space?: SpaceProfile;
+  /** Cerrar preguntando quién habla (estudiante o profesor). */
+  askRol?: boolean;
+  rol?: Rol | null;
+  onRol?: (rol: Rol) => void;
+}) {
+  const BEATS = space.beats;
+  const TITLE = space.title;
+  const total = BEATS.length + (askRol ? 1 : 0);
   const stage = useRef<HTMLDivElement>(null);
   const holder = useRef<HTMLDivElement>(null);
   const pilo = useRef<PiloMojiHandle>(null);
@@ -144,19 +166,38 @@ export function Welcome({ tema, target, onDone }: { tema: Tema; target: RefObjec
     // La voz se reinicia desde el momento actual si se enciende a medio camino.
   }, [beat, voiceOn, done]);
 
-  // El botón final aparece.
+  // El botón final aparece. En un espacio que pregunta el rol, en su lugar llega la pregunta con sus opciones.
   useLayoutEffect(() => {
     if (!done) return;
     const root = stage.current!;
     const ctx = gsap.context(() => {
       gsap.set(".apw-seg i", { scaleX: 1 });
-      root.querySelectorAll<HTMLElement>(".apw-demo").forEach((d, k) => gsap.set(d, { autoAlpha: k === 2 ? 1 : 0 }));
-      gsap.fromTo(cta.current, { autoAlpha: 0, y: 14, scale: 0.96 }, { autoAlpha: 1, y: 0, scale: 1, duration: reduced() ? 0.2 : 0.5, ease: "back.out(1.8)" });
+      root.querySelectorAll<HTMLElement>(".apw-demo").forEach((d, k) => gsap.set(d, { autoAlpha: !askRol && k === 2 ? 1 : 0 }));
+      if (!askRol) {
+        gsap.fromTo(cta.current, { autoAlpha: 0, y: 14, scale: 0.96 }, { autoAlpha: 1, y: 0, scale: 1, duration: reduced() ? 0.2 : 0.5, ease: "back.out(1.8)" });
+      } else if (reduced()) {
+        gsap.fromTo(".apw-role", { autoAlpha: 0 }, { autoAlpha: 1, duration: 0.2 });
+      } else {
+        // Solo opacidad y transform: al texto nunca se le pone desenfoque.
+        gsap.fromTo(".apw-bubble .w", { autoAlpha: 0, y: 8 }, { autoAlpha: 1, y: 0, duration: 0.35, stagger: 0.05, ease: "power3.out" });
+        gsap.fromTo(".apw-role .ap-rolp__b", { autoAlpha: 0, y: 16, scale: 0.94 }, { autoAlpha: 1, y: 0, scale: 1, duration: 0.5, stagger: 0.08, delay: 0.25, ease: "back.out(1.6)" });
+      }
     }, root);
     pilo.current?.mood("feliz");
     pilo.current?.look(0, 0.5);
-    cta.current?.focus({ preventScroll: true });
-    return () => ctx.revert();
+    if (askRol) {
+      root.querySelector<HTMLElement>(".apw-role button")?.focus({ preventScroll: true });
+      if (voiceOn) {
+        pilo.current?.talk(true);
+        void speak(ROLE_QUESTION, { force: true }).finally(() => pilo.current?.talk(false));
+      }
+    } else cta.current?.focus({ preventScroll: true });
+    return () => {
+      ctx.revert();
+      if (askRol) stopSpeaking();
+    };
+    // La voz que se enciende después no repite la pregunta.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [done]);
 
   const advance = () => {
@@ -202,10 +243,18 @@ export function Welcome({ tema, target, onDone }: { tema: Tema; target: RefObjec
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  /** Quien elige su rol entra a la página por la misma salida. */
+  const pick = (chosen: Rol) => {
+    onRol?.(chosen);
+    finish();
+  };
+
   const b = beat >= 0 ? BEATS[beat] : null;
+  const asking = done && askRol;
+  const say = asking ? ROLE_QUESTION : b?.say;
 
   return (
-    <div className="apw" ref={stage} data-tema={tema} role="dialog" aria-modal="true" aria-labelledby="apw-title">
+    <div className="apw" ref={stage} data-tema={tema} data-espacio={space.accent ?? undefined} role="dialog" aria-modal="true" aria-labelledby="apw-title">
       <div className="apw-bg">
         <div className="apw-glow" />
         <div className="apw-rings" aria-hidden="true">
@@ -216,8 +265,8 @@ export function Welcome({ tema, target, onDone }: { tema: Tema; target: RefObjec
       </div>
       <header className="apw-top">
         <div className="apw-brand">
-          <b>Planeación Institucional</b>
-          Universidad de Santander
+          <b>{space.brand.strong}</b>
+          {space.brand.text}
         </div>
         <button type="button" className="apw-sbtn apw-push" aria-pressed={voiceOn} onClick={() => setVoiceOn((v) => !v)}>
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
@@ -248,8 +297,8 @@ export function Welcome({ tema, target, onDone }: { tema: Tema; target: RefObjec
             </span>
           ))}
         </h1>
-        <p className="apw-bubble" aria-live="polite" key={beat}>
-          {b?.say.split(" ").map((w, i) => (
+        <p className="apw-bubble" aria-live="polite" key={asking ? "rol" : beat}>
+          {say?.split(" ").map((w, i) => (
             <span key={i} className="w">
               {w}{" "}
             </span>
@@ -258,53 +307,57 @@ export function Welcome({ tema, target, onDone }: { tema: Tema; target: RefObjec
         <div className="apw-exhibit">
           <div className="apw-demo" data-beat="0">
             <div className="apw-knows">
-              {[
-                ["cifras", "CI", "UDES en Cifras"],
-                ["boletines", "BO", "Boletines"],
-                ["pdi", "PD", "Plan de Desarrollo"],
-                ["observatorio", "OB", "Observatorio"],
-                ["impacto", "IM", "Portal de Impacto"],
-              ].map(([id, code, name]) => (
-                <span key={id} className="apw-know apw-item">
-                  <span className="ap-code" data-s={id}>
-                    {code}
+              {space.sources
+                .filter((s) => !s.hidden)
+                .map(({ id, code, name }) => (
+                  <span key={id} className="apw-know apw-item">
+                    <span className="ap-code" data-s={id}>
+                      {code}
+                    </span>
+                    {name}
                   </span>
-                  {name}
-                </span>
-              ))}
+                ))}
             </div>
           </div>
           <div className="apw-demo" data-beat="1">
             <div className="apw-qs">
-              <span className="apw-qchip apw-item">¿Cuántos estudiantes hay por sede?</span>
-              <span className="apw-qchip apw-item">¿Cómo va el pilar Personalización?</span>
-              <span className="apw-qchip apw-item">¿Qué dice el último boletín?</span>
-              <span className="apw-qchip apw-qchip--trick apw-item">¿Cuánto presupuesto tiene el PDI?</span>
+              {space.demo.questions.map((x) => (
+                <span key={x.q} className={x.trick ? "apw-qchip apw-qchip--trick apw-item" : "apw-qchip apw-item"}>
+                  {x.q}
+                </span>
+              ))}
             </div>
           </div>
           <div className="apw-demo" data-beat="2">
             <div className="apw-mini">
-              <span className="apw-mini__badge">Con fuentes de la UDES</span>
+              <span className="apw-mini__badge">{space.demo.mini.badge}</span>
               <p>
-                El Plan de Desarrollo tiene sus pilares con avance publicado, y cada cifra dice de dónde sale <span className="apw-cite">1</span>
+                {space.demo.mini.text} <span className="apw-cite">1</span>
               </p>
               <div className="apw-tick">
-                <b>Plan de Desarrollo · Implementación</b>
-                <em>CON SU CORTE</em>
+                <b>{space.demo.mini.ticket}</b>
+                <em>{space.demo.mini.stamp}</em>
               </div>
             </div>
           </div>
+          {asking && (
+            <div className="apw-role">
+              <RolePicker variant="stage" value={rol} onPick={pick} />
+            </div>
+          )}
         </div>
       </div>
 
       <footer className="apw-foot">
         <div className="apw-segs" aria-hidden="true">
-          {BEATS.map((_, i) => (
+          {Array.from({ length: total }, (_, i) => (
             <span key={i} className="apw-seg">
               <i />
             </span>
           ))}
-          <small className="ap-num">{Math.max(1, beat + 1)} de 3</small>
+          <small className="ap-num">
+            {asking ? total : Math.max(1, beat + 1)} de {total}
+          </small>
         </div>
         <div className="apw-actions">
           {!done && (
@@ -312,7 +365,7 @@ export function Welcome({ tema, target, onDone }: { tema: Tema; target: RefObjec
               Siguiente
             </button>
           )}
-          <button type="button" className="apw-cta" ref={cta} onClick={finish} hidden={!done}>
+          <button type="button" className="apw-cta" ref={cta} onClick={finish} hidden={!done || askRol}>
             Hacer mi primera pregunta
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
               <path d="M5 12h14M13 6l6 6-6 6" />

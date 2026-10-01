@@ -38,6 +38,8 @@ import { chainOf, clipLabel, countBySource, edgeKey, indexMesh, layoutPdi, PDI_C
 import type { Chain, MeshIndex, PdiColumn, PdiLayout, ViewNode } from "./mesh-view";
 import { drawChain, drawerIn, drawerOut, swapPanel } from "./motion";
 import { plural } from "./ui";
+import { DEFAULT_SPACE, readInSpace, spaceKey } from "./space";
+import type { PiloSpace } from "./space";
 import "./mesh-view.css";
 
 type Via = "pointer" | "keyboard";
@@ -58,14 +60,17 @@ function useNarrow(query = "(max-width: 1100px)") {
   return narrow;
 }
 
-/** El pasaje de un nodo: mismo ref en pilo_memory. Solo lectura. */
-function usePassage(ref: string | null) {
+/** El pasaje de un nodo: mismo ref en pilo_memory, dentro de su espacio (0113). Solo lectura. */
+export function usePassage(ref: string | null, space: PiloSpace = DEFAULT_SPACE) {
   return useQuery({
-    queryKey: ["pilo-ia", "memoria", "pasaje", ref],
+    queryKey: ["pilo-ia", "memoria", "pasaje", ref, ...spaceKey(space)],
     enabled: Boolean(ref),
     staleTime: 60_000,
     queryFn: async () => {
-      const { data, error } = await supabase.from("pilo_memory").select("ref, title, section, body, path, cut, office").eq("ref", ref!).maybeSingle();
+      const { data, error } = await readInSpace(space, (scoped) => {
+        const query = supabase.from("pilo_memory").select("ref, title, section, body, path, cut, office").eq("ref", ref!);
+        return (scoped ? query.eq("space", space) : query).maybeSingle();
+      });
       if (error) throw error;
       return data as { ref: string; title: string; section: string; body: string; path: string; cut: string; office: string } | null;
     },
@@ -221,7 +226,7 @@ export function MeshView({ onAskRefresh }: { onAskRefresh: () => void }) {
 
 /* --- Buscar un nodo ------------------------------------------------------------------------------ */
 
-function MeshSearch({ index, onPick }: { index: MeshIndex; onPick: (id: string) => void }) {
+export function MeshSearch({ index, onPick }: { index: MeshIndex; onPick: (id: string) => void }) {
   const [q, setQ] = useState("");
   const [open, setOpen] = useState(false);
   const [active, setActive] = useState(0);
@@ -496,7 +501,7 @@ function PdiCanvas({
 
 const PAGE = 60;
 
-function MeshTree({
+export function MeshTree({
   index,
   root,
   chain,
@@ -599,9 +604,22 @@ function MeshTree({
 
 const KIDS_SHOWN = 24;
 
-function NodePanel({ index, node, onSelect, animate }: { index: MeshIndex; node: ViewNode; onSelect: (id: string | null, how?: Via) => void; animate: boolean }) {
+export function NodePanel({
+  index,
+  node,
+  onSelect,
+  animate,
+  space = DEFAULT_SPACE,
+}: {
+  index: MeshIndex;
+  node: ViewNode;
+  onSelect: (id: string | null, how?: Via) => void;
+  animate: boolean;
+  /** De qué Pilo es la malla (0113): su pasaje se busca en ese espacio. */
+  space?: PiloSpace;
+}) {
   const body = useRef<HTMLDivElement>(null);
-  const passage = usePassage(node.id);
+  const passage = usePassage(node.id, space);
   const [allKids, setAllKids] = useState(false);
   const [fullText, setFullText] = useState(false);
   const route = useMemo(() => routeOf(index, node.id), [index, node.id]);

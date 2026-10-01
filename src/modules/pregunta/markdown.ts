@@ -12,6 +12,12 @@
 
    Solo enlaza direcciones http(s). Las tablas no se dibujan: cada fila queda
    como una línea legible.
+
+   Regla de la casa: lo que no se reconoce como marca se pinta como texto.
+   Ninguna palabra de la respuesta desaparece por parecerse a una marca: un
+   número largo entre corchetes no es una cita, lo que va entre paréntesis
+   tras unos corchetes y no es una dirección sigue siendo texto, y lo escrito
+   en la misma línea que abre un bloque de código no se descarta.
    ========================================================================== */
 
 export interface Piece {
@@ -124,7 +130,8 @@ function inlineRuns(s: string, streaming: boolean, nextLink: () => number): Run[
     }
 
     if (c === "[") {
-      const cite = /^\[(\d+)\]/.exec(rest);
+      // Una cita es un número corto: «[2024]» o «[012]» son texto de la respuesta, no fuentes.
+      const cite = /^\[(\d{1,2})\]/.exec(rest);
       if (cite) {
         flush();
         runs.push({ text: cite[1], bold, italic, cite: true });
@@ -132,7 +139,11 @@ function inlineRuns(s: string, streaming: boolean, nextLink: () => number): Run[
         continue;
       }
       const link = /^\[([^\]\n]+)\]\(\s*((?:[^()\s]|\([^()\s]*\))*)[^)\n]*(\))?/.exec(rest);
-      if (link && (link[3] || (streaming && i + link[0].length === s.length))) {
+      // Lo que va entre paréntesis ¿es una dirección (o un intento de una), o es texto de la respuesta?
+      // A medias (sin cerrar) también vale el comienzo de una dirección: «(htt».
+      const target = link ? link[2] : "";
+      const isTarget = /^(?:[a-z][a-z0-9+.-]*:|\/|#|\?|\.{1,2}\/|www\.)/i.test(target) || (link !== null && !link[3] && /^[a-z][a-z0-9+.-]*$|^$/i.test(target));
+      if (link && isTarget && (link[3] || (streaming && i + link[0].length === s.length))) {
         flush();
         const href = link[3] ? safeUrl(link[2]) : null;
         // Sin dirección segura queda el texto, sin enlace.
@@ -164,7 +175,8 @@ function inlineRuns(s: string, streaming: boolean, nextLink: () => number): Run[
       while (s[i + n] === c && n < 3) n += 1;
       const before = i > 0 ? s[i - 1] : "";
       const after = s[i + n] ?? "";
-      const inWord = c === "_" && before !== "" && WORD.test(before) && after !== "" && WORD.test(after);
+      // Dentro de una palabra el guion bajo es texto («guion_bajo»); entre dos cifras, el asterisco es una multiplicación («2*3*4»).
+      const inWord = (c === "_" && before !== "" && WORD.test(before) && after !== "" && WORD.test(after)) || (c === "*" && n === 1 && /\d/.test(before) && /\d/.test(after));
       const canOpen = after !== "" && !/\s/.test(after) && !inWord;
       const canClose = before !== "" && !/\s/.test(before) && !inWord;
       const wantsBold = n >= 2;
@@ -226,7 +238,7 @@ function sentenceOf(pieces: Piece[]): Sentence {
 /* --- Bloques ---------------------------------------------------------------------------- */
 
 const FENCE = /^\s{0,3}(`{3,}|~{3,})/;
-const HEAD = /^\s{0,3}(#{1,6})\s+(.+?)\s*#*\s*$/;
+const HEAD = /^\s{0,3}(#{1,6})\s+(.+?)(?:\s+#+)?\s*$/;
 const RULE = /^\s{0,3}([-*_])(?:\s*\1){2,}\s*$/;
 const ITEM = /^(\s*)(?:([-*+•])|(\d{1,3})[.)])\s+(\S.*)$/;
 const TABLE_SEP = /^\s*\|?\s*:?-{2,}:?\s*(?:\|\s*:?-{2,}:?\s*)*\|?\s*$/;
@@ -345,10 +357,14 @@ export function parseMarkdown(text: string, options: ParseOptions = {}): Parsed 
     const line = lines[k].replace(/\t/g, "  ");
 
     const fence = FENCE.exec(line);
-    if (fence) {
+    // «```texto``` y sigue» en una sola línea no abre un bloque: es código en línea dentro de un párrafo.
+    const info = fence ? line.slice(fence[0].length).trim() : "";
+    if (fence && !info.includes(fence[1][0].repeat(3))) {
       flush();
       const mark = fence[1][0];
       const body: string[] = [];
+      // Tras la marca va, si acaso, el nombre del lenguaje (una palabra). Si hay más, es texto: abre el bloque.
+      if (/\s/.test(info)) body.push(info);
       k += 1;
       // Sin cierre (la respuesta va a medias o el modelo lo olvidó), el bloque llega hasta el final.
       while (k < lines.length && !new RegExp(`^\\s{0,3}\\${mark}{3,}\\s*$`).test(lines[k])) {
@@ -407,6 +423,25 @@ export function parseMarkdown(text: string, options: ParseOptions = {}): Parsed 
   flush();
 
   return { blocks, paragraphs, sentences, count: order };
+}
+
+/**
+ * Todo lo que la página pinta de una respuesta, en orden y con las citas como
+ * «[n]»: palabras, espacios, código y el número de cada ítem de una lista
+ * ordenada. Sirve para comprobar que el análisis no pierde texto.
+ */
+export function visibleText(parsed: Parsed): string {
+  const say = (group: Sentence[]) => group.map((s) => s.pieces.map((p) => (p.kind === "cite" ? `[${p.value}]` : p.kind === "break" ? "\n" : p.value)).join("")).join(" ");
+  return parsed.blocks
+    .map((b) => {
+      if (b.kind === "code") return b.text;
+      if (b.kind === "list") {
+        let n = b.start;
+        return b.items.map((i) => `${b.ordered && i.depth === 0 ? `${n++}. ` : ""}${say(i.sentences)}`).join("\n");
+      }
+      return say(b.sentences);
+    })
+    .join("\n");
 }
 
 /** Los grupos de frases de un bloque de texto. */

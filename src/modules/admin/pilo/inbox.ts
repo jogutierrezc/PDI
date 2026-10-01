@@ -9,6 +9,8 @@
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "../../../lib/supabase";
+import { DEFAULT_SPACE, isDefaultSpace, readInSpace, spaceKey } from "./space";
+import type { PiloSpace } from "./space";
 
 export type InboxReason = "sin_respuesta" | "no_sirvio" | "revisar" | "general";
 
@@ -22,6 +24,8 @@ export interface InboxItem {
   times: number;
   first_at: string;
   last_at: string;
+  /** Para quién era (0113): «estudiante», «profesor» o vacío. Solo en espacios con rol. */
+  rol?: string;
 }
 
 export const REASON_LABEL: Record<InboxReason, string> = {
@@ -45,21 +49,24 @@ export const reasonHint = (reason: string): string => (REASON_HINT as Record<str
 
 const inboxKey = ["pilo-ia", "bandeja"] as const;
 
+const INBOX_COLUMNS = "id, question, reason, kind, answer, answer_id, times, first_at, last_at";
+
+/** La bandeja de un espacio (0113): cada Pilo tiene la suya. Sin 0109, null. */
+export async function fetchInbox(limit = 12, space: PiloSpace = DEFAULT_SPACE): Promise<{ rows: InboxItem[]; total: number } | null> {
+  const { data, error, count } = await readInSpace(space, (scoped) => {
+    // «rol» solo existe con 0113: el Pilo de siempre no lo pide.
+    const query = supabase.from("pilo_inbox").select(isDefaultSpace(space) ? INBOX_COLUMNS : `${INBOX_COLUMNS}, rol`, { count: "exact" }).eq("status", "pendiente");
+    return (scoped ? query.eq("space", space) : query).order("times", { ascending: false }).order("last_at", { ascending: false }).limit(limit);
+  });
+  if (error) return null;
+  return { rows: (data ?? []) as unknown as InboxItem[], total: count ?? 0 };
+}
+
 /** Lo pendiente: lo más preguntado primero. Sin 0109, null. */
-export function useInbox(limit = 12) {
+export function useInbox(limit = 12, space: PiloSpace = DEFAULT_SPACE) {
   return useQuery({
-    queryKey: [...inboxKey, limit],
-    queryFn: async (): Promise<{ rows: InboxItem[]; total: number } | null> => {
-      const { data, error, count } = await supabase
-        .from("pilo_inbox")
-        .select("id, question, reason, kind, answer, answer_id, times, first_at, last_at", { count: "exact" })
-        .eq("status", "pendiente")
-        .order("times", { ascending: false })
-        .order("last_at", { ascending: false })
-        .limit(limit);
-      if (error) return null;
-      return { rows: (data ?? []) as InboxItem[], total: count ?? 0 };
-    },
+    queryKey: [...inboxKey, limit, ...spaceKey(space)],
+    queryFn: () => fetchInbox(limit, space),
   });
 }
 

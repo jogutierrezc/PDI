@@ -6,6 +6,11 @@
    - Las conversaciones: las últimas 20, con sus respuestas y fuentes, para
      volver a ellas sin preguntar de nuevo. Nunca salen del navegador.
    - Si ya vio la bienvenida.
+   - En los espacios que lo preguntan (0113), quién pregunta: estudiante,
+     profesor o «prefiero no decir».
+   Cada espacio de Pilo guarda lo suyo bajo su prefijo (space.ts): el de
+   siempre conserva «pilo-pregunta:*», así que lo que ya estaba guardado se
+   sigue leyendo. El tema es uno solo para todos.
    Todo va entre try/catch: en modo privado o con el almacenamiento bloqueado,
    la página funciona igual, solo que sin recordar.
    ========================================================================== */
@@ -14,6 +19,8 @@ import { useCallback, useEffect, useState } from "react";
 import { useTheme } from "../../lib/theme";
 import type { AskResult } from "../../components/pilo/ai/client";
 import type { Think } from "./answer-state";
+import { parseStoredRol } from "./space";
+import type { Rol } from "./space";
 
 export type Tema = "blanco" | "soleado" | "negro";
 
@@ -23,9 +30,15 @@ export const TEMAS: { id: Tema; label: string }[] = [
   { id: "negro", label: "Negro" },
 ];
 
-const KEY_TEMA = "pilo-pregunta:tema";
-const KEY_CONVS = "pilo-pregunta:conversaciones";
-export const KEY_WELCOME = "pilo-pregunta:bienvenida";
+/** El prefijo del Pilo de siempre: sus llaves no cambian. */
+export const DEFAULT_PREFIX = "pilo-pregunta";
+
+/** La llave de un dato de un espacio: «<prefijo>:<nombre>». */
+export const storageKey = (prefix: string, name: string) => `${prefix}:${name}`;
+
+// El tema se comparte entre los espacios: es una preferencia de la persona, no de un Pilo.
+const KEY_TEMA = storageKey(DEFAULT_PREFIX, "tema");
+export const KEY_WELCOME = storageKey(DEFAULT_PREFIX, "bienvenida");
 
 function read(key: string): string | null {
   try {
@@ -57,8 +70,19 @@ export function useTema(): [Tema, (t: Tema) => void] {
   return [chosen ?? (resolved === "dark" ? "negro" : "blanco"), set];
 }
 
-export const seenWelcome = () => read(KEY_WELCOME) === "1";
-export const markWelcome = (seen: boolean) => write(KEY_WELCOME, seen ? "1" : null);
+export const seenWelcome = (prefix: string = DEFAULT_PREFIX) => read(storageKey(prefix, "bienvenida")) === "1";
+export const markWelcome = (seen: boolean, prefix: string = DEFAULT_PREFIX) => write(storageKey(prefix, "bienvenida"), seen ? "1" : null);
+
+/** Una preferencia de la página (p. ej. «leer»), por espacio. */
+export const readFlag = (prefix: string, name: string) => read(storageKey(prefix, name)) === "1";
+export const writeFlag = (prefix: string, name: string, on: boolean) => write(storageKey(prefix, name), on ? "1" : "0");
+
+/* --- Quién pregunta (0113) ------------------------------------------------------------ */
+
+/** El rol elegido en este navegador para ese espacio; null si aún no ha elegido. */
+export const readRol = (prefix: string): Rol | null => parseStoredRol(read(storageKey(prefix, "rol")));
+/** Guarda el rol («general» = prefiere no decir); null lo olvida y se vuelve a preguntar. */
+export const writeRol = (prefix: string, rol: Rol | null) => write(storageKey(prefix, "rol"), rol === null ? null : (parseStoredRol(rol) ?? "general"));
 
 /* --- Conversaciones ------------------------------------------------------------------ */
 
@@ -83,9 +107,9 @@ export interface Conversation {
 
 export const newId = () => `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 7)}`;
 
-function loadConversations(): Conversation[] {
+export function loadConversations(prefix: string = DEFAULT_PREFIX): Conversation[] {
   try {
-    const parsed = JSON.parse(read(KEY_CONVS) ?? "[]") as Conversation[];
+    const parsed = JSON.parse(read(storageKey(prefix, "conversaciones")) ?? "[]") as Conversation[];
     if (!Array.isArray(parsed)) return [];
     // Lo guardado antes de «IA siempre» no trae grounding, pasos ni marcas: se lee igual.
     return parsed
@@ -106,8 +130,8 @@ function loadConversations(): Conversation[] {
   }
 }
 
-export function useConversations() {
-  const [list, setList] = useState<Conversation[]>(loadConversations);
+export function useConversations(prefix: string = DEFAULT_PREFIX) {
+  const [list, setList] = useState<Conversation[]>(() => loadConversations(prefix));
   useEffect(() => {
     // Solo se guardan los turnos terminados (o marcados como incompletos): lo que
     // aún se está escribiendo vive fuera de esta lista y no se recuerda.
@@ -115,7 +139,9 @@ export function useConversations() {
       .map((c) => ({ ...c, turns: c.turns.filter((t) => t.answer || t.error) }))
       .filter((c) => c.turns.length)
       .slice(0, 20);
-    write(KEY_CONVS, JSON.stringify(done));
+    write(storageKey(prefix, "conversaciones"), JSON.stringify(done));
+    // El prefijo no cambia mientras la página vive: cada espacio monta la suya.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [list]);
   return [list, setList] as const;
 }

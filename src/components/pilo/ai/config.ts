@@ -31,6 +31,68 @@ export interface PiloAiConfig extends Rules {
   pregunta: { on: boolean; aud: PortalRule["aud"]; welcome: boolean; ai: boolean };
   /** El chat emergente en otros portales (0111): si se permite y en cuáles. */
   widget: { on: boolean; origins: string[] };
+  /** Los otros espacios de Pilo (0113), por su id: hoy, «ensenanza». Vacío sin la migración. */
+  spaces: Record<string, SpaceConfig>;
+  /** La configuración pública ya trae `spaces`: la migración 0113 está aplicada. */
+  spacesReady: boolean;
+}
+
+/** Lo que cambia con el rol de quien pregunta, tal como lo deja la administración. */
+export interface SpaceRoleConfig {
+  suggestions: string[];
+  expression: string;
+  mood: string;
+}
+
+/** Lo público de un espacio (0113): ni el enfoque, ni el tono, ni el estilo de voz, ni los cupos. */
+export interface SpaceConfig {
+  on: boolean;
+  aud: PortalRule["aud"];
+  welcome: boolean;
+  ai: boolean;
+  name: string;
+  greeting: string;
+  askRol: boolean;
+  roles: { estudiante: SpaceRoleConfig; profesor: SpaceRoleConfig };
+  /** Las fuentes de memoria encendidas. */
+  sources: Record<string, boolean>;
+  widget: { on: boolean; origins: string[] };
+}
+
+const record = (v: unknown): Record<string, unknown> => (v && typeof v === "object" && !Array.isArray(v) ? (v as Record<string, unknown>) : {});
+const words = (v: unknown, max: number): string => (typeof v === "string" ? v.replace(/\s+/g, " ").trim().slice(0, max) : "");
+/** Una cara o un ánimo: una sola palabra en minúsculas, como las acepta el servidor. */
+const face = (v: unknown): string => (typeof v === "string" && /^[a-z][a-z_-]{0,29}$/.test(v.trim()) ? v.trim() : "");
+
+function parseRole(v: unknown): SpaceRoleConfig {
+  const r = record(v);
+  const suggestions = Array.isArray(r.suggestions) ? r.suggestions.map((s) => words(s, 160)).filter(Boolean).slice(0, 6) : [];
+  return { suggestions, expression: face(r.expression), mood: face(r.mood) };
+}
+
+/** `spaces` de pilo_ai_public_config(), con valores de partida seguros: cerrado y solo para la administración. */
+export function parseSpaces(raw: unknown): Record<string, SpaceConfig> {
+  const out: Record<string, SpaceConfig> = {};
+  for (const [id, value] of Object.entries(record(raw))) {
+    if (!/^[a-z]{3,20}$/.test(id)) continue;
+    const s = record(value);
+    const roles = record(s.roles);
+    const widget = record(s.widget);
+    const flags = record(s.sources);
+    out[id] = {
+      on: s.on === true,
+      aud: s.aud === "publico" || s.aud === "sesion" ? s.aud : "admin",
+      welcome: s.welcome !== false,
+      ai: s.ai === true,
+      name: words(s.name, 120),
+      greeting: words(s.greeting, 300),
+      askRol: s.ask_rol !== false,
+      roles: { estudiante: parseRole(roles.estudiante), profesor: parseRole(roles.profesor) },
+      sources: Object.fromEntries(Object.entries(flags).map(([k, v]) => [k, v === true])),
+      widget: { on: widget.on === true, origins: Array.isArray(widget.origins) ? widget.origins.filter((o): o is string => typeof o === "string") : [] },
+    };
+  }
+  return out;
 }
 
 export const PORTAL_LABEL: Record<Portal, string> = {
@@ -81,6 +143,8 @@ export function usePiloAiConfig() {
           const w = (raw.widget ?? {}) as Record<string, unknown>;
           return { on: w.on === true, origins: Array.isArray(w.origins) ? w.origins.filter((o): o is string => typeof o === "string") : [] };
         })(),
+        spaces: parseSpaces(raw.spaces),
+        spacesReady: Boolean(raw.spaces && typeof raw.spaces === "object"),
       };
     },
   });

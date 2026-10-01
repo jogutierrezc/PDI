@@ -556,8 +556,29 @@ const FIXTURES = {
       daily_limit: 200, max_rows: 500, cache_days: 30, updated_at: "2026-09-25T12:00:00Z",
     },
   ],
+  // Con 0113 cada pedido dice de qué Pilo es (space) y para quién (rol).
   pilo_ai_log: [
-    { id: 1, created_at: "2026-09-25T10:42:00Z", portal: "cifras", action: "resumir", subject: "Población estudiantil", status: "listo", cached: false, ms: 2100 },
+    { id: 1, created_at: "2026-09-25T10:42:00Z", portal: "cifras", action: "resumir", subject: "Población estudiantil", status: "listo", cached: false, ms: 2100, space: "planeacion", rol: "" },
+    { id: 2, created_at: "2026-09-30T15:05:00Z", portal: "ensenanza", action: "preguntar", subject: "¿Qué dice la política de evaluación?", status: "listo", cached: false, ms: 3400, space: "ensenanza", rol: "profesor" },
+  ],
+  // Mr. Pilo en Enseñanza (0113): su ficha, y un catálogo con una entrada de cada Pilo.
+  pilo_spaces: [
+    {
+      id: "ensenanza", name: "Mr. Pilo en Enseñanza", on: true, aud: "sesion", ai: true, welcome: true,
+      intro: "la Inteligencia Artificial de la Universidad de Santander", focus: "", greeting: "", ask_rol: true,
+      roles: {
+        estudiante: { tone: "Cercano y con ejemplos.", suggestions: ["¿Cómo me evalúan por competencias?"], voice_style: "", expression: "feliz", mood: "emocionado" },
+        profesor: { tone: "", suggestions: [], voice_style: "", expression: "graduado", mood: "atento" },
+      },
+      memory_sources: { innovacion: true, politicas: true, global: true, moodle: false }, memory_indexed_at: null,
+      daily_limit: 150, visitor_limit: 20, visitor_window_seconds: 600, widget_on: false, widget_origins: [], updated_at: "2026-09-30T12:00:00Z",
+    },
+  ],
+  pilo_catalog: [
+    { key: "R-001", space: "planeacion", rol: "", kind: "respuesta", question: "¿Qué es el PDI?", variants: [], triggers: [], answer: "El Plan de Desarrollo Institucional 2024-2028.", mood: "emocionado", source_title: "", source_path: "", cut: "", office: "", active: true, hits: 3, updated_at: "2026-09-20T12:00:00Z" },
+    { key: "C-001", space: "planeacion", rol: "", kind: "capciosa", question: "Salarios", variants: [], triggers: ["salario", "sueldo"], answer: "Los salarios no se publican en los portales.", mood: "atrevido", source_title: "", source_path: "", cut: "", office: "", active: true, hits: 2, updated_at: "2026-09-20T12:00:00Z" },
+    { key: "EC-001", space: "ensenanza", rol: "estudiante", kind: "capciosa", question: "Hacer la tarea", variants: [], triggers: ["hazme la tarea"], answer: "La tarea es suya, pero la ruta la armamos juntos.", mood: "atrevido", source_title: "", source_path: "", cut: "", office: "", active: true, hits: 4, updated_at: "2026-09-30T12:00:00Z" },
+    { key: "ER-001", space: "ensenanza", rol: "profesor", kind: "respuesta", question: "¿Qué es la evaluación formativa?", variants: [], triggers: [], answer: "La que acompaña el aprendizaje mientras ocurre.", mood: "pensar", source_title: "", source_path: "", cut: "", office: "", active: true, hits: 1, updated_at: "2026-09-30T12:00:00Z" },
   ],
   web_projects: [
     {
@@ -2922,7 +2943,8 @@ function makeFetch(session, broken = false, userId = "user-admin", overrides = {
       }
       return reply(values);
     }
-    const rows = applyFilters(table === "od_values" ? odValues : table ? (FIXTURES[table] ?? []) : [], parsed.searchParams);
+    // Una ruta puede cambiar una tabla con `fixtures` (como hace con las RPC): por ejemplo, dejarla sin filas.
+    const rows = applyFilters(table === "od_values" ? odValues : table ? (overrides[table] ?? FIXTURES[table] ?? []) : [], parsed.searchParams);
 
     // PostgREST devuelve un objeto, no un array, cuando se pide .single().
     const wantsObject = String(headers.get("Accept") ?? "").includes("pgrst.object");
@@ -3691,6 +3713,56 @@ routes.push(
     expect: "Mr. Pilo con IA",
     note: "configuración de Mr. Pilo con IA: Mistral, voz, funciones y portales",
     also: ["Conexión para resumir y sintetizar", "Mistral", "Guardada en el servidor · termina en ••••7F2A", "Dónde aparece y para quién", "UDES en Cifras", "12 de 200 pedidos", "Población estudiantil", "Todo guardado."],
+  },
+  {
+    path: "/admin/mr-pilo-ensenanza",
+    session: true,
+    expect: "Mr. Pilo en Enseñanza",
+    note: "Mr. Pilo en Enseñanza: su ficha, cómo le habla a cada rol y que comparte conexión y voz",
+    also: [
+      "Abierto para quien tiene sesión", "Pregúntele a Pilo", "Bitácora de uso", "Conexión y voz", "Mr. Pilo con IA",
+      "Cómo le habla a cada quien", "Preguntar el rol en el primer uso", "Estudiante", "Profesor", "¿Cómo me evalúan por competencias?",
+      "Cupos de este Pilo", 'data-pilo="ensenanza"', "Todo guardado.",
+    ],
+    // Ni pestañas de conexión o voz, ni el aviso de migración cuando la ficha existe.
+    absent: ["Probar la conexión", "Con qué voz lee", "Falta aplicar la migración 0113"],
+  },
+  {
+    path: "/admin/mr-pilo-ensenanza?seccion=catalogo",
+    session: true,
+    expect: "Catálogo de este Pilo",
+    note: "el catálogo de Enseñanza: solo sus entradas (ER-), con para quién; ninguna de Planeación",
+    also: ["Capciosas 1", "Respuestas 1", "EC-001", "Hacer la tarea", "Estudiante · atrevido · 4 usos", "empiezan por EC-", "Lo que Pilo no supo"],
+    absent: ["Salarios", "Los salarios no se publican"],
+  },
+  {
+    path: "/admin/mr-pilo-ensenanza?seccion=bitacora",
+    session: true,
+    fixtures: { "rpc:pilo_space_usage": { space: "ensenanza", today: 14, limit: 150, by_rol: { estudiante: 9, profesor: 3, "": 2 }, today_voice: 5 } },
+    expect: "Bitácora de uso",
+    note: "la bitácora de Enseñanza: su uso de hoy por rol y solo sus pedidos",
+    also: ["14 de 150 preguntas con IA", "Quién preguntó hoy", "Estudiantes", "Sin rol", "¿Qué dice la política de evaluación?"],
+    absent: ["Población estudiantil"],
+  },
+  {
+    path: "/admin/mr-pilo-ensenanza?seccion=memoria",
+    session: true,
+    expect: "La memoria de este Pilo",
+    note: "la memoria de Enseñanza: sus fuentes, su índice y lo que llega en la próxima entrega",
+    also: ["Innovación educativa", "Políticas institucionales", "Búsqueda por significado", "Documentos", "Mapa de conexiones", "Moodle", "Llega en la próxima entrega", "Respuestas guardadas"],
+  },
+  {
+    path: "/admin/mr-pilo-ensenanza",
+    session: true,
+    fixtures: { pilo_spaces: [] },
+    expect: "Falta aplicar la migración 0113",
+    note: "Mr. Pilo en Enseñanza sin la migración 0113: lo dice y apaga los controles",
+    interact: async (window) => {
+      const sheet = window.document.querySelector("fieldset.pen-sheet");
+      if (!sheet?.disabled) throw new Error("los controles no quedaron apagados sin la migración 0113");
+      const save = [...window.document.querySelectorAll(".pis-save button")];
+      if (!save.length || save.some((button) => !button.disabled)) throw new Error("se puede guardar sin la migración 0113");
+    },
   },
   {
     path: "/datos-abiertos",

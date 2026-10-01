@@ -18,13 +18,15 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "../../../lib/supabase";
 import { downloadBlob } from "../traslado/transfer";
 import { workbookToTables } from "../institucion/structure-sheet";
-import { COLUMNS, EXAMPLES, detectCatalogKind, fillCatalogTemplate, parseCatalogTable, SHEET_NAME } from "./catalog-sheet";
-import type { CatalogKind, CatalogRow, ParseResult } from "./catalog-sheet";
+import { EXAMPLES, ROL_LABEL, columnsFor, detectCatalogKind, fillCatalogTemplate, parseCatalogTable, SHEET_NAME } from "./catalog-sheet";
+import type { CatalogKind, CatalogRol, CatalogRow, ParseResult, SheetOptions } from "./catalog-sheet";
 import { Icon } from "../../../components/ui/Icon";
 import { Group, StatusMark, Switch } from "./ui";
 import { CatalogModal } from "./CatalogModal";
 import { useEmbedStatus, useIndexMemory, useTryCatalog } from "./memory";
 import type { EmbedStatus } from "./memory";
+import { CATALOG_PREFIX, DEFAULT_SPACE, SPACE_COPY, isDefaultSpace, readInSpace, spaceArgs, spaceKey } from "./space";
+import type { PiloSpace } from "./space";
 
 interface Entry extends CatalogRow {
   kind: CatalogKind;
@@ -35,15 +37,44 @@ interface Entry extends CatalogRow {
 const KEY = ["pilo-ia", "catalogo"] as const;
 const XLSX = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
 
-function useCatalog() {
-  return useQuery({
-    queryKey: KEY,
-    queryFn: async (): Promise<Entry[] | null> => {
-      const { data, error } = await supabase.from("pilo_catalog").select("*").order("key");
-      if (error) return null; // sin 0096
-      return (data ?? []) as Entry[];
-    },
+/** El catálogo de un espacio (0113): las entradas de un Pilo no aparecen en el otro. Sin su migración, null. */
+export async function fetchCatalog(space: PiloSpace = DEFAULT_SPACE): Promise<Entry[] | null> {
+  const { data, error } = await readInSpace(space, (scoped) => {
+    const query = supabase.from("pilo_catalog").select("*");
+    return (scoped ? query.eq("space", space) : query).order("key");
   });
+  if (error) return null; // sin 0096 (o sin 0113, en otro espacio)
+  return (data ?? []) as Entry[];
+}
+
+function useCatalog(space: PiloSpace) {
+  return useQuery({
+    queryKey: [...KEY, ...spaceKey(space)],
+    queryFn: () => fetchCatalog(space),
+  });
+}
+
+/** Lo que el Excel de un espacio tiene de propio: sus prefijos, la columna «Para quién» y el nombre de su pantalla. */
+export function sheetOptions(space: PiloSpace = DEFAULT_SPACE): SheetOptions {
+  return isDefaultSpace(space) ? {} : { prefix: CATALOG_PREFIX[space], rol: true, screen: SPACE_COPY[space].screen };
+}
+
+interface ImportResult {
+  added: number;
+  updated: number;
+  removed: number;
+  total: number;
+  /** Claves que ya son del otro Pilo (0113): no se tocan. */
+  rejected?: number;
+  rejected_keys?: string[];
+}
+
+/** «Listo: 2 nuevas, 1 actualizada…», y lo que no entró por ser del otro Pilo. */
+export function importSummary(r: ImportResult): string {
+  const base = `Listo: ${r.added} nuevas, ${r.updated} actualizadas${r.removed ? `, ${r.removed} borradas` : ""}. Hay ${r.total} en total.`;
+  if (!r.rejected) return base;
+  const keys = (r.rejected_keys ?? []).slice(0, 6).join(", ");
+  return `${base} ${r.rejected === 1 ? "Una clave ya es" : `${r.rejected} claves ya son`} del otro Mr. Pilo y no se ${r.rejected === 1 ? "tocó" : "tocaron"}${keys ? `: ${keys}` : ""}.`;
 }
 
 const LEAD: Record<CatalogKind, string> = {
@@ -53,9 +84,23 @@ const LEAD: Record<CatalogKind, string> = {
     "Microexpresiones: respuestas cortas para preguntas capciosas (salarios, la vida personal de Pilo, bromas). Cuando la pregunta trae las palabras de un disparador o se le parece por significado, la IA responde con esa microexpresión como base y con la emoción elegida. Tal cual sale solo si no hay IA.",
 };
 
-export function CatalogSection() {
+export function CatalogSection({
+  space = DEFAULT_SPACE,
+  examples,
+  lead,
+}: {
+  /** De qué Pilo es el catálogo (0113). */
+  space?: PiloSpace;
+  /** Los ejemplos de la plantilla de este espacio; sin ellos, los de siempre. */
+  examples?: typeof EXAMPLES;
+  /** Qué es cada clase, dicho para este espacio; sin él, el texto de siempre. */
+  lead?: Record<CatalogKind, string>;
+}) {
   const client = useQueryClient();
-  const catalog = useCatalog();
+  const catalog = useCatalog(space);
+  const own = !isDefaultSpace(space);
+  const sheet = sheetOptions(space);
+  const copy = SPACE_COPY[space];
   const [kind, setKind] = useState<CatalogKind>("capciosa");
   const [parsed, setParsed] = useState<{ file: string; result: ParseResult } | null>(null);
   const [replace, setReplace] = useState(false);
@@ -69,12 +114,12 @@ export function CatalogSection() {
 
   const importRows = useMutation({
     mutationFn: async ({ k, valid, all }: { k: CatalogKind; valid: CatalogRow[]; all: boolean }) => {
-      const { data, error } = await supabase.rpc("pilo_catalog_import", { p_kind: k, p_rows: valid as never, p_replace: all });
+      const { data, error } = await supabase.rpc("pilo_catalog_import", { p_kind: k, p_rows: valid as never, p_replace: all, ...spaceArgs(space) });
       if (error) throw error;
-      return data as { added: number; updated: number; removed: number; total: number };
+      return data as ImportResult;
     },
     onSuccess: (r) => {
-      setMessage({ ok: true, text: `Listo: ${r.added} nuevas, ${r.updated} actualizadas${r.removed ? `, ${r.removed} borradas` : ""}. Hay ${r.total} en total.` });
+      setMessage({ ok: !r.rejected, text: importSummary(r) });
       setParsed(null);
       setReplace(false);
       void client.invalidateQueries({ queryKey: KEY });
@@ -97,10 +142,10 @@ export function CatalogSection() {
       const { default: ExcelJS } = await import("exceljs");
       const book = new ExcelJS.Workbook();
       book.creator = "Planeación Institucional · UDES";
-      fillCatalogTemplate(book, kind, which === "plantilla" ? EXAMPLES[kind] : rows);
+      fillCatalogTemplate(book, kind, which === "plantilla" ? (examples ?? EXAMPLES)[kind] : rows, sheet);
       const buffer = await book.xlsx.writeBuffer();
       const name = kind === "respuesta" ? "respuestas" : "capciosas";
-      downloadBlob(new Blob([buffer], { type: XLSX }), which === "plantilla" ? `pilo-${name}-plantilla.xlsx` : `pilo-${name}.xlsx`);
+      downloadBlob(new Blob([buffer], { type: XLSX }), which === "plantilla" ? `${copy.file}-${name}-plantilla.xlsx` : `${copy.file}-${name}.xlsx`);
     } catch (e) {
       setMessage({ ok: false, text: `No se pudo armar el archivo: ${(e as Error).message}` });
     } finally {
@@ -119,7 +164,7 @@ export function CatalogSection() {
       const tables = workbookToTables(book);
       const targetKind = detectCatalogKind(tables) ?? kind;
       if (targetKind !== kind) setKind(targetKind);
-      setParsed({ file: file.name, result: parseCatalogTable(targetKind, tables) });
+      setParsed({ file: file.name, result: parseCatalogTable(targetKind, tables, sheet) });
     } catch (e) {
       setParsed(null);
       setMessage({ ok: false, text: `No se pudo leer el archivo: ${(e as Error).message}` });
@@ -133,7 +178,7 @@ export function CatalogSection() {
 
   return (
     <>
-      {missing && <p className="pis-warn">Falta aplicar la migración 0096 en la base para guardar el catálogo.</p>}
+      {missing && <p className="pis-warn">Falta aplicar la migración {copy.migration} en la base para guardar el catálogo.</p>}
 
       <Group title="Clase" aside={<small>Se aplica al momento, como las claves</small>}>
         <div className="pis-seg" role="radiogroup" aria-label="Clase del catálogo">
@@ -153,10 +198,10 @@ export function CatalogSection() {
             </button>
           ))}
         </div>
-        <p className="pis-lead">{LEAD[kind]}</p>
+        <p className="pis-lead">{(lead ?? LEAD)[kind]}</p>
       </Group>
 
-      <CatalogMemory />
+      <CatalogMemory space={space} />
 
       <Group title="Agregar o importar">
         <div className="pis-actions">
@@ -194,7 +239,8 @@ export function CatalogSection() {
           </label>
         </div>
         <p className="pis-small">
-          Cree respuestas directamente o impórtelas en Excel con columnas: {COLUMNS[kind].map((c) => c.header).join(" · ")}.
+          Cree respuestas directamente o impórtelas en Excel con columnas: {columnsFor(kind, sheet).map((c) => c.header).join(" · ")}.
+          {own ? ` Las claves de este Pilo empiezan por ${CATALOG_PREFIX[space][kind]}- (las del otro no se pisan).` : ""}
         </p>
 
         {parsed && (
@@ -268,6 +314,7 @@ export function CatalogSection() {
                   )}
                 </span>
                 <em>
+                  {own ? `${ROL_LABEL[(e.rol ?? "") as CatalogRol] ?? "Todos"} · ` : ""}
                   {e.mood} · {e.hits} {e.hits === 1 ? "uso" : "usos"}
                 </em>
                 <div className="pis-cat__actions">
@@ -300,6 +347,7 @@ export function CatalogSection() {
         initialEntry={editingEntry}
         isEditing={Boolean(editingEntry)}
         existingKeys={(catalog.data ?? []).map((e) => e.key)}
+        space={space}
         onSaved={() => {
           void client.invalidateQueries({ queryKey: KEY });
         }}
@@ -315,10 +363,10 @@ const VIA_LABEL = { palabras: "por palabras", significado: "por significado" } a
  * (0112: respuestas y capciosas), el botón que sincroniza las que faltan y una
  * prueba que dice qué entradas encontraría Pilo para una pregunta.
  */
-function CatalogMemory() {
-  const status = useEmbedStatus();
-  const indexer = useIndexMemory();
-  const tryIt = useTryCatalog();
+function CatalogMemory({ space }: { space: PiloSpace }) {
+  const status = useEmbedStatus(true, space);
+  const indexer = useIndexMemory(space);
+  const tryIt = useTryCatalog(space);
   const [progress, setProgress] = useState<EmbedStatus | null>(null);
   const [probe, setProbe] = useState("");
   const now = progress ?? status.data ?? null;

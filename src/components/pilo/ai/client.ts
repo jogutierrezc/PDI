@@ -9,8 +9,20 @@
 import { supabase, readFunctionError } from "../../../lib/supabase";
 import { speak, stopSpeaking } from "../voice";
 import { directVoice, playPiloAudio, stopPiloAudio } from "./voice-player";
-import type { AnalysisBrief, AnalysisPart, Answer, Mesh, NeedAnswer, NeedInput, ReportKind, Section } from "./logic";
+import type { AnalysisBrief, AnalysisPart, Answer, Mesh, NeedAnswer, NeedInput, ReportKind, Section, SpacePortal } from "./logic";
 import type { Portal } from "./config";
+
+/** Un portal de siempre o el de otro espacio de Pilo (0113): de ahí saca el servidor el espacio. */
+export type AskPortal = Portal | SpacePortal;
+
+/** A qué Pilo se le habla y quién pregunta. Sin esto, es Pregúntele a Pilo, como siempre. */
+export interface AskOptions {
+  portal?: AskPortal;
+  /** «estudiante» o «profesor»; cualquier otra cosa no se manda (el servidor entiende «general»). Solo cuenta en `ensenanza`. */
+  rol?: string | null;
+}
+
+const rolOf = (rol: string | null | undefined): "estudiante" | "profesor" | undefined => (rol === "estudiante" || rol === "profesor" ? rol : undefined);
 
 export type { Answer };
 
@@ -88,8 +100,12 @@ export interface AskResult {
    * la siguiente pregunta: así el contexto se encadena.
    */
   asked?: string;
-  /** La emoción de Pilo que pide el catálogo (atrevido, emocionado, loco, pensar). */
+  /** La emoción de Pilo que pide el catálogo (atrevido, emocionado, loco, pensar); en otro espacio, si no hay, el ánimo de partida del rol. */
   mood?: string;
+  /** Solo en otro espacio (0113): para quién se redactó, según el servidor. */
+  rol?: string;
+  /** Solo en otro espacio: la cara de partida del rol, cuando la respuesta no trae ánimo propio. */
+  expression?: string;
   /** El tramo de la malla de la memoria que se dibuja con la respuesta (0097). */
   graph?: Mesh & { focus: string };
   verified?: boolean;
@@ -124,6 +140,8 @@ export interface AskMeta {
   official?: boolean;
   model?: string;
   mood?: string;
+  rol?: string;
+  expression?: string;
   /** Todas las fuentes que se le dieron al modelo, con el número con que las cita mientras escribe. */
   sources: AskSource[];
   trail: AskStep[];
@@ -322,6 +340,10 @@ export function askHttpError(status: number, body: unknown, retryAfter?: string 
   const said = typeof b.error === "string" && b.error.trim() ? b.error.trim() : "";
   const advice = typeof b.advice === "string" && b.advice.trim() ? b.advice.trim() : "";
   const code = typeof b.code === "string" ? b.code : "";
+  // Otro espacio de Pilo sin su migración (0113): no es un fallo de la pregunta ni algo que se arregle reintentando.
+  if (code === "migracion") {
+    return new PiloError("Este Pilo todavía no está instalado: a la base de datos le falta la migración 0113 de los espacios. No es un problema de su pregunta; la administración debe aplicarla.", "migracion");
+  }
   if (status === 429) {
     const fromBody = Number(b.retry_after);
     const wait = Number.isFinite(fromBody) && fromBody > 0 ? Math.ceil(fromBody) : retryAfterSeconds(retryAfter);
@@ -402,13 +424,19 @@ export function buildHistory(turns: { q: string; a?: string | null }[]): { q: st
   return out;
 }
 
+/** El cuerpo de `preguntar` con flujo. Sin opciones es, byte a byte, el de siempre. */
+export function askBody(question: string, history: { q: string; a: string }[], opts: AskOptions = {}) {
+  const rol = rolOf(opts.rol);
+  return { action: "preguntar" as const, portal: opts.portal ?? "pregunta", question, history, stream: true as const, ...(rol ? { rol } : {}) };
+}
+
 /**
  * Pregunta y ve escribirse la respuesta. Va con `fetch` directo (functions.invoke
  * no entrega el flujo por partes), con las mismas cabeceras: la clave anónima y,
  * si hay sesión, su token. Se cumple con el objeto final; avisa `meta` y cada
  * `delta` por el camino. Si el servidor responde JSON, llega entero y sin avisos.
  */
-export async function askQuestionStream(question: string, history: { q: string; a: string }[] = [], handlers: AskHandlers = {}): Promise<AskResult> {
+export async function askQuestionStream(question: string, history: { q: string; a: string }[] = [], handlers: AskHandlers = {}, opts: AskOptions = {}): Promise<AskResult> {
   const base = (import.meta.env.VITE_SUPABASE_URL ?? "http://localhost:54321").replace(/\/+$/, "");
   const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY ?? "public-anon-key";
   let token = anonKey;
@@ -423,7 +451,7 @@ export async function askQuestionStream(question: string, history: { q: string; 
     response = await fetch(`${base}/functions/v1/pilo-ia`, {
       method: "POST",
       headers: { "Content-Type": "application/json", apikey: anonKey, Authorization: `Bearer ${token}` },
-      body: JSON.stringify({ action: "preguntar", portal: "pregunta", question, history, stream: true }),
+      body: JSON.stringify(askBody(question, history, opts)),
       signal: handlers.signal,
     });
   } catch (e) {
@@ -438,11 +466,25 @@ export async function askQuestionStream(question: string, history: { q: string; 
  * sirvió» en cualquier respuesta lleva la pregunta a la bandeja de Planeación
  * (0109), para que Pilo aprenda. Si falla, no pasa nada: es una opinión, no un dato.
  */
-export async function rateAnswer(input: { answerId?: number | null; vote: "up" | "down"; question: string; text: string; kind: AskKind }) {
+export interface RateInput extends AskOptions {
+  answerId?: number | null;
+  vote: "up" | "down";
+  question: string;
+  text: string;
+  kind: AskKind;
+}
+
+/** El cuerpo de `calificar`. Sin portal ni rol es el de siempre. */
+export function rateBody(input: RateInput) {
   const { answerId, vote, question, text, kind } = input;
-  if (!answerId && vote === "up") return;
+  const rol = rolOf(input.rol);
+  return { action: "calificar" as const, portal: input.portal ?? "pregunta", answerId: answerId ?? undefined, vote, question, text, kind, ...(rol ? { rol } : {}) };
+}
+
+export async function rateAnswer(input: RateInput) {
+  if (!input.answerId && input.vote === "up") return;
   await supabase.functions
-    .invoke("pilo-ia", { body: { action: "calificar", portal: "pregunta", answerId: answerId ?? undefined, vote, question, text, kind } })
+    .invoke("pilo-ia", { body: rateBody(input) })
     .catch(() => undefined);
 }
 
@@ -538,18 +580,36 @@ export function stopPilo() {
  * adelantado (prefetchPilo) se reutiliza al leer. null si el servicio no dio audio.
  */
 const audios = new Map<string, Promise<Blob | null>>();
-function audioFor(text: string, portal: Portal, style?: string): Promise<Blob | null> {
-  const key = `${portal}|${style ?? ""}|${text}`;
+
+/** Los portales de otros espacios de Pilo: su voz no va por la vía directa. */
+const SPACE_VOICE: readonly string[] = ["ensenanza"];
+
+/** La llave del audio guardado: el rol entra porque cambia el estilo de la voz. Sin rol, la de siempre. */
+export function audioKey(text: string, portal: string, style?: string, rol?: string | null): string {
+  const r = rolOf(rol);
+  return r ? `${portal}|${style ?? ""}|rol:${r}|${text}` : `${portal}|${style ?? ""}|${text}`;
+}
+
+/** El cuerpo de `voz`. Sin rol es el de siempre. */
+export function voiceBody(text: string, portal: string, style?: string, rol?: string | null) {
+  const r = rolOf(rol);
+  return { action: "voz" as const, portal, text, style, ...(r ? { rol: r } : {}) };
+}
+
+function audioFor(text: string, portal: AskPortal, style?: string, rol?: string | null): Promise<Blob | null> {
+  const key = audioKey(text, portal, style, rol);
   const known = audios.get(key);
   if (known) return known;
   const usual = () =>
     supabase.functions
-      .invoke<Blob>("pilo-ia", { body: { action: "voz", portal, text, style } })
+      .invoke<Blob>("pilo-ia", { body: voiceBody(text, portal, style, rol) })
       .then(({ data, error }) => (!error && data instanceof Blob && data.size > 0 ? data : null))
       .catch(() => null);
   // Primero la vía directa (Vercel), que responde antes; si no está o tropieza, la de siempre.
   // Un estilo pedido a propósito (la prueba de la configuración) solo lo sabe dar la de siempre.
-  const asked = (style ? usual() : directVoice(text).then((blob) => blob ?? usual()))
+  // Otro espacio de Pilo tampoco va por la directa: esa no sabe de su cupo, su bitácora ni la voz de cada rol.
+  const viaFunction = Boolean(style) || SPACE_VOICE.includes(portal);
+  const asked = (viaFunction ? usual() : directVoice(text).then((blob) => blob ?? usual()))
     .then((blob) => {
       // Lo que falló se puede volver a pedir más tarde.
       if (!blob) audios.delete(key);
@@ -565,19 +625,19 @@ function audioFor(text: string, portal: Portal, style?: string): Promise<Blob | 
  * Pide por adelantado el audio de las frases que vienen, para que suenen sin
  * pausas entre una y otra. Pocas a la vez: cada una gasta del cupo del servicio.
  */
-export function prefetchPilo(texts: string[], options: { portal: Portal | null; advanced: boolean; style?: string }) {
+export function prefetchPilo(texts: string[], options: { portal: AskPortal | null; advanced: boolean; style?: string; rol?: string | null }) {
   if (!options.advanced || !options.portal) return;
-  for (const text of texts) if (text.trim()) void audioFor(text, options.portal, options.style);
+  for (const text of texts) if (text.trim()) void audioFor(text, options.portal, options.style, options.rol);
 }
 
 export async function sayWithPilo(
   text: string,
-  options: { portal: Portal | null; advanced: boolean; rate?: number; pitch?: number; style?: string },
+  options: { portal: AskPortal | null; advanced: boolean; rate?: number; pitch?: number; style?: string; rol?: string | null },
 ): Promise<"proveedor" | "navegador" | "cancelado"> {
   stopPilo();
   const mine = ++token;
   if (options.advanced && options.portal) {
-    const data = await audioFor(text, options.portal, options.style);
+    const data = await audioFor(text, options.portal, options.style, options.rol);
     if (mine !== token) return "cancelado";
     if (data) {
       const done = await playPiloAudio(data, options.rate ?? 1);

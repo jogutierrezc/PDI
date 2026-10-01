@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { parseMarkdown, safeUrl, toPlain } from "./markdown";
+import { parseMarkdown, safeUrl, toPlain, visibleText } from "./markdown";
 import type { Block, Piece } from "./markdown";
 
 const pieces = (text: string, options?: { streaming?: boolean }) => parseMarkdown(text, options).sentences.flatMap((s) => s.pieces);
@@ -186,5 +186,85 @@ describe("Markdown a medias, mientras la respuesta se escribe", () => {
 describe("el texto sin marcas (copiar, catálogo, anuncio)", () => {
   it("quita marcas y citas y conserva las listas", () => {
     expect(toPlain(parseMarkdown("## Sedes\n\nHay **tres** [1]:\n\n1. Bucaramanga [2]\n2. Cúcuta\n\n- *Valledupar*"))).toBe("Sedes\n\nHay tres:\n\n1. Bucaramanga\n2. Cúcuta\n\n- Valledupar");
+  });
+});
+
+/* --- Nada se pierde -------------------------------------------------------------------------
+   El dueño vio respuestas con partes ocultas. El análisis no puede ser la causa: toda letra y
+   todo número de la respuesta que no sea una marca (la dirección de un enlace, el nombre del
+   lenguaje de un bloque de código) tiene que quedar en lo que se pinta, también a medias. */
+
+/** Las letras y los números, en orden: lo que no puede faltar. */
+const letters = (s: string) => (s.match(/[\p{L}\p{N}]+/gu) ?? []).join(" ");
+
+/** Lo que sí es marca aunque tenga letras: la dirección de un enlace `](…)` y el lenguaje de un bloque. */
+const withoutMarkup = (s: string) =>
+  s
+    .replace(/\]\(\s*(?:[a-z][a-z0-9+.-]*:|\/|#|www\.)[^)\n]*\)?/gi, "]")
+    .replace(/\]\([a-z][a-z0-9+.-]*$/i, "]")
+    .replace(/^(\s{0,3}(?:`{3,}|~{3,}))[^\s`~]+[ \t]*$/gm, "$1");
+
+const SAMPLES = [
+  "La UDES tiene **tres sedes** y *varios* programas. Vea `pilo_memory` y siga.",
+  "## Evaluación por resultados\n\nSe evalúa lo que el estudiante *demuestra*, no lo que el curso cubre.\n\n- Rúbricas claras\n- Evidencias de aprendizaje\n  - Portafolio\n  - Proyecto\n\n> Una cita textual de la política.\n\nFin del texto.",
+  "Primero un párrafo.\n\n```\nconst nota = 4.5;\nconsole.log(nota);\n```\n\nY después otro párrafo con [un enlace](https://www.udes.edu.co/politicas) y más texto.",
+  "| Sede | Estudiantes |\n|---|---|\n| Bucaramanga | muchos |\n| Cúcuta | varios |\n\nTexto tras la tabla.",
+  "Texto con <b>etiquetas</b> y <script>alert(uno)</script> que se ven como texto.\n\n___\n\nDespués del filete.",
+  "Un guion_bajo en medio, 2*3*4 sin cursiva, un asterisco * suelto y un _ suelto también.",
+  "### Título con C#\n\nUna línea\ncon salto y otra frase. ¿Y una pregunta? ¡Claro! Sí… quizá.",
+];
+
+describe("el análisis no pierde texto", () => {
+  it("cada letra y cada número de la respuesta queda en lo que se pinta", () => {
+    for (const text of SAMPLES) expect(letters(visibleText(parseMarkdown(text)))).toBe(letters(withoutMarkup(text)));
+  });
+
+  it("tampoco a medias: en cada punto de la escritura, con lo que quedó sin cerrar", () => {
+    for (const text of SAMPLES) {
+      for (let cut = 1; cut <= text.length; cut++) {
+        const part = text.slice(0, cut);
+        // A medias, la última línea puede ser solo la marca de lo que viene («-», «##»): esa aún no se pinta.
+        const expected = letters(withoutMarkup(part));
+        const got = letters(visibleText(parseMarkdown(part, { streaming: true })));
+        expect(got, `a los ${cut} caracteres de «${text.slice(0, 24)}…»`).toBe(expected);
+      }
+    }
+  });
+
+  it("un número largo entre corchetes es texto, no una cita que pueda quedar sin fuente", () => {
+    const parsed = parseMarkdown("Según el Acuerdo [012] de [2024], aplica [1].");
+    expect(parsed.sentences[0].pieces.filter((p) => p.kind === "cite").map((p) => p.value)).toEqual(["1"]);
+    expect(visibleText(parsed)).toBe("Según el Acuerdo [012] de [2024], aplica [1].");
+    expect(toPlain(parsed)).toContain("[2024]");
+  });
+
+  it("unos corchetes seguidos de un paréntesis que no es una dirección se quedan como están", () => {
+    expect(visibleText(parseMarkdown("Vea [la nota](véase el anexo dos) antes."))).toBe("Vea [la nota](véase el anexo dos) antes.");
+    expect(visibleText(parseMarkdown("El conjunto [a, b](c, d) es otro."))).toBe("El conjunto [a, b](c, d) es otro.");
+    // Una dirección que no es http(s) sí es marca: queda el texto, sin enlace.
+    expect(visibleText(parseMarkdown("Abra [el portal](javascript:alert(1)) ya."))).toContain("el portal");
+    expect(visibleText(parseMarkdown("Abra [el portal](/datos-abiertos) ya."))).toBe("Abra el portal ya.");
+  });
+
+  it("lo escrito en la línea que abre un bloque de código no se descarta", () => {
+    expect(letters(visibleText(parseMarkdown("```así se escribe``` y luego sigue el texto")))).toBe("así se escribe y luego sigue el texto");
+    expect(letters(visibleText(parseMarkdown("``` esto no es un lenguaje\ncuerpo\n```\nfinal")))).toBe("esto no es un lenguaje cuerpo final");
+    // El nombre del lenguaje sí es marca.
+    expect(letters(visibleText(parseMarkdown("```python\nx = 1\n```")))).toBe("x 1");
+  });
+
+  it("un bloque de código sin cerrar llega hasta el final, entero", () => {
+    expect(letters(visibleText(parseMarkdown("Antes.\n```\nuno\ndos\n\ntres")))).toBe("Antes uno dos tres");
+  });
+
+  it("un título conserva el «#» que es suyo", () => {
+    expect(visibleText(parseMarkdown("## Lenguaje C#"))).toBe("Lenguaje C#");
+    expect(visibleText(parseMarkdown("## Cerrado con marcas ##"))).toBe("Cerrado con marcas");
+  });
+
+  it("una comilla de código o una negrita sin cerrar no se comen el resto", () => {
+    expect(letters(visibleText(parseMarkdown("Use la tecla ` y siga leyendo hasta el final.")))).toBe("Use la tecla y siga leyendo hasta el final");
+    expect(letters(visibleText(parseMarkdown("Esto es **importante y nunca se cierra.\n\nOtro párrafo.")))).toBe("Esto es importante y nunca se cierra Otro párrafo");
+    expect(letters(visibleText(parseMarkdown("Un [corchete sin cerrar y un (paréntesis también.")))).toBe("Un corchete sin cerrar y un paréntesis también");
   });
 });

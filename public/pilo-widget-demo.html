@@ -16,12 +16,14 @@
   <body>
     <main>
       <h1>Página de prueba de otro portal</h1>
-      <p>Esta página no usa los estilos del portal de Planeación, a propósito: sirve para ver a Pilo alojado en un sitio ajeno. El botón debe aparecer en la esquina inferior derecha.</p>
-      <p>Para probar otras variantes, cambie los atributos del <code>&lt;script&gt;</code> al final de este archivo: <code>data-tema</code> acepta blanco, soleado o negro; <code>data-esquina</code> acepta derecha o izquierda.</p>
-      <p>Baje por la página para comprobar que el botón se queda en su esquina.</p>
+      <p>Esta página no usa los estilos del portal de Planeación, a propósito: sirve para ver a Pilo alojado en un sitio ajeno. Aquí están los dos: el Pilo de Planeación en la esquina inferior derecha y Mr. Pilo en Enseñanza, la Inteligencia Artificial de la Universidad de Santander, en la inferior izquierda.</p>
+      <p>Cada uno se pega con su propia línea. El de Enseñanza lleva <code>data-pilo="ensenanza"</code>; sin ese atributo, la línea trae al Pilo de Planeación. Un Pilo que no esté abierto para quien mira la página sencillamente no aparece.</p>
+      <p>Para probar otras variantes, cambie los atributos de los <code>&lt;script&gt;</code> al final de este archivo: <code>data-tema</code> acepta blanco, soleado o negro; <code>data-esquina</code> acepta derecha o izquierda. Si van los dos en la misma página, póngalos en esquinas distintas.</p>
+      <p>Baje por la página para comprobar que los botones se quedan en su esquina.</p>
       <p style="height: 900px"></p>
       <p>Fin de la página de prueba.</p>
     </main>
     <script src="/pilo.js" data-tema="blanco" data-esquina="derecha" defer></script>
+    <script src="/pilo.js" data-pilo="ensenanza" data-tema="blanco" data-esquina="izquierda" defer></script>
   </body>
 </html>

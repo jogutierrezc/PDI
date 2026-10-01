@@ -12,6 +12,12 @@
      · la lectura: Pilo lee frase por frase y la frase que suena se resalta.
    Con movimiento reducido, el texto aparece sin fundidos ni escritura.
    Las citas son botones que abren su fuente, dentro de cualquier bloque.
+
+   El texto nunca depende de que una animación termine para verse: el fundido
+   en vivo parte de opacidad 0, así que todo lo que lo interrumpe (la respuesta
+   termina, el componente se desmonta, React en modo estricto simula un
+   desmontaje) lo lleva primero a su final y limpia el estilo en línea. Un
+   `kill()` a secas dejaría la frase invisible.
    ========================================================================== */
 
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
@@ -111,27 +117,50 @@ export function AnswerText({
   // En vivo: solo lo que acaba de llegar se funde; lo ya escrito no se mueve.
   const seen = useRef(0);
   const tweens = useRef<gsap.core.Tween[]>([]);
+  /** Todo lo que se estaba fundiendo queda visible ya: los fundidos van a su final y no queda opacidad en línea. */
+  const settle = (units?: HTMLElement[]) => {
+    for (const t of tweens.current) t.progress(1).kill();
+    tweens.current = [];
+    const all = units ?? Array.from(root.current?.querySelectorAll<HTMLElement>(".ap-sent, .ap-pre") ?? []);
+    if (!all.length) return;
+    gsap.killTweensOf(all, "opacity,filter");
+    gsap.set(all, { clearProps: "opacity,filter" });
+  };
   useLayoutEffect(() => {
     const el = root.current;
     if (!el) return;
     const units = Array.from(el.querySelectorAll<HTMLElement>(".ap-sent, .ap-pre"));
-    const fresh = streaming ? units.slice(seen.current) : [];
+    if (!streaming) {
+      // La respuesta ya no se escribe (terminó, se cortó o viene del historial): nada puede quedar a medio fundir.
+      seen.current = units.length;
+      settle(units);
+      return;
+    }
+    const fresh = units.slice(seen.current);
     seen.current = units.length;
     if (!fresh.length || reduced()) return;
-    tweens.current = tweens.current.filter((t) => t.isActive());
-    tweens.current.push(gsap.fromTo(fresh, { opacity: 0 }, { opacity: 1, duration: 0.4, stagger: 0.06, ease: "power3.out", overwrite: "auto", clearProps: "opacity,filter" }));
+    tweens.current = tweens.current.filter((t) => t.progress() < 1);
+    // `overwrite: true`: si React reutilizó un nodo que aún se fundía, este fundido lo releva entero.
+    tweens.current.push(gsap.fromTo(fresh, { opacity: 0 }, { opacity: 1, duration: 0.4, stagger: 0.06, ease: "power3.out", overwrite: true, clearProps: "opacity,filter" }));
   }, [parsed, streaming]);
-  useEffect(
+  // Al desmontar —de verdad o en el desmontaje simulado del modo estricto de React, donde el
+  // nodo sigue en pantalla— los fundidos terminan y la cuenta vuelve a cero para el remontaje.
+  useLayoutEffect(
     () => () => {
-      for (const t of tweens.current) t.kill();
+      settle();
+      seen.current = 0;
     },
+    // Solo al desmontar.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     [],
   );
 
   const cite = (p: Piece, key: number) => {
     const n = Number(p.value);
     const src = sources.find((x) => x.n === n);
-    if (!src) return null;
+    // Un número entre corchetes que no es una fuente: mientras se escribe se calla (el servidor lo
+    // quita al terminar); en una respuesta terminada es texto y se ve como texto.
+    if (!src) return streaming ? null : <span key={key}>[{p.value}]</span>;
     return (
       <button
         key={key}

@@ -733,7 +733,7 @@ export function PiloChat({
                 </div>
               ) : (
                 <div key={m.id} className="pbc-msg pbc-msg--pilo">
-                  <img src={`${import.meta.env.BASE_URL}pilo-svg/emocionado.svg`} alt="" width={28} height={28} />
+                  <img src={`${import.meta.env.BASE_URL}pilo-moods/feliz-160.webp`} alt="" width={28} height={28} />
                   <div className="pbc-bub">
                     {!m.plain && <span className="pbc-badge" data-ai={m.ai || undefined}>{m.ai ? "Lectura de Pilo · con IA" : "Sin IA"}</span>}
                     {m.body}
@@ -743,7 +743,7 @@ export function PiloChat({
             )}
             {busy && (
               <div className="pbc-msg pbc-msg--pilo">
-                <img src={`${import.meta.env.BASE_URL}pilo-svg/pensar.svg`} alt="" width={28} height={28} />
+                <img src={`${import.meta.env.BASE_URL}pilo-moods/piensa-160.webp`} alt="" width={28} height={28} />
                 <span className="pbc-dots" aria-label="Pilo está pensando">
                   <i />
                   <i />

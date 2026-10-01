@@ -2350,7 +2350,8 @@ export function streamVisible(raw: string, final: boolean, ctx: MoneyContext): s
   // Una envoltura (JSON o cerca de código) no se muestra a medias.
   if (!final && /^(\{|```)/.test(text)) return "";
   const parts = sentencesOf(text);
-  if (!final && parts.length && !/\s$/.test(parts[parts.length - 1])) parts.pop();
+  // La última solo sale si ya terminó: punto y espacio, o salto de línea.
+  if (!final && parts.length && !/(?:[.!?…]\s+|\n\s*)$/.test(parts[parts.length - 1])) parts.pop();
   return parts.filter((s) => !moneyBlocked(s, ctx)).join("");
 }
 

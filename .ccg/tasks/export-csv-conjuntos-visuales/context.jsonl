@@ -1,0 +1,7 @@
+{"_example": "Fill with {\"file\": \"path\", \"reason\": \"why\"}. Seed rows are skipped."}
+{"file": ".ccg/tasks/export-csv-conjuntos-visuales/requirements.md", "reason": "requisitos, alcance y supuestos"}
+{"file": ".ccg/tasks/export-csv-conjuntos-visuales/analysis.md", "reason": "hallazgos de reserva estadística y alternativas"}
+{"file": ".ccg/tasks/export-csv-conjuntos-visuales/plan.md", "reason": "plan por capas y formato de cada CSV"}
+{"file": "DESIGN.md", "reason": "sistema visual y reglas de movimiento"}
+{"file": "src/modules/datos-abiertos/OpenDataReport.tsx", "reason": "renderBlock: reglas de visibilidad que el registro replica"}
+{"file": "src/modules/datos-abiertos/data/groups.ts", "reason": "blockPicks y referencias de conjuntos"}

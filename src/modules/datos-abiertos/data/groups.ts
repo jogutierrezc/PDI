@@ -20,6 +20,7 @@
      aparece su bloque por primera vez.
    ========================================================================== */
 
+import { DEFAULT_BLOCK_ORDER } from "./types";
 import type { Report, ReportBlock } from "./types";
 import { SABER_COMPETENCIES } from "./saber-pro";
 import type { SaberCompetency } from "./saber-pro";
@@ -180,4 +181,87 @@ export function reportGroups(report: Report): ReportGrouping {
   report.indicators.forEach((i) => owner.get(indicatorRef(i.id))?.indicators.push(i.id));
 
   return { groups, groupOf: (ref) => owner.get(ref) ?? undefined };
+}
+
+/* --- Qué pinta la ficha -------------------------------------------------------------
+   Reglas que comparten la ficha (OpenDataReport) y el registro de descargas
+   (export-registry): qué bloques salen y en qué orden, qué mapa va dentro de
+   otro y dónde cae la tabla de origen de un conjunto libre. Viven aquí para
+   que el selector de CSV ofrezca, por construcción, lo que la ficha dibuja. */
+
+/** Orden de la ficha: el de la intranet, o el de siempre si el informe no declara bloques. */
+export function orderedBlocks(report: Report): ReportBlock[] {
+  if (report.blocks && report.blocks.length > 0) {
+    return [...report.blocks].filter((block) => block.visible).sort((x, y) => x.position - y.position);
+  }
+  const blocks: ReportBlock[] = [];
+  for (const kind of DEFAULT_BLOCK_ORDER) {
+    if (kind === "mapa") {
+      (report.maps ?? []).forEach((m) => blocks.push({ kind, refKey: m.id, visible: true, position: blocks.length, settings: {} }));
+    } else if (kind === "tuberia") {
+      (report.pipelines ?? []).forEach((p) => blocks.push({ kind, refKey: p.id, visible: true, position: blocks.length, settings: {} }));
+    } else if (kind === "historico") {
+      (report.histories ?? []).forEach((h) => blocks.push({ kind, refKey: h.id, visible: true, position: blocks.length, settings: {} }));
+    } else if (kind === "mapa_calor") {
+      (report.heatmaps ?? []).forEach((h) => blocks.push({ kind, refKey: h.id, visible: true, position: blocks.length, settings: {} }));
+    } else {
+      blocks.push({ kind, refKey: null, visible: true, position: blocks.length, settings: {} });
+    }
+  }
+  return blocks;
+}
+
+/**
+ * Un mapa emparejado con otro (combinado o lado a lado) sale en el bloque que
+ * lo pide; su propio bloque se omite. Si dos bloques se piden mutuamente, gana
+ * el primero en el orden de la ficha. Devuelve las claves de los mapas que
+ * van dentro de otro bloque.
+ */
+export function pairedMaps(blocks: ReportBlock[]): Set<string> {
+  const paired = new Set<string>();
+  for (const b of blocks) {
+    if (b.kind === "mapa" && b.refKey && !paired.has(b.refKey) && b.settings.mapWith && b.settings.mapWith !== b.refKey) {
+      paired.add(b.settings.mapWith);
+    }
+  }
+  return paired;
+}
+
+/**
+ * Conjuntos libres: las vistas con bloque propio ("<conjunto>:<vista>"). Una
+ * vista así no se repite en el bloque de «todas las vistas» del mismo conjunto.
+ */
+export function ownFreeViews(blocks: ReportBlock[]): Set<string> {
+  return new Set(blocks.filter((b) => b.kind === "libre" && b.refKey && b.settings.view).map((b) => `${b.refKey}:${b.settings.view}`));
+}
+
+/**
+ * Conjuntos libres: el último bloque que dibuja algo de cada conjunto. Debajo
+ * de ese va, una sola vez, la tabla de origen.
+ */
+export function lastFreeBlock(report: Report, blocks: ReportBlock[]): Map<string, ReportBlock> {
+  const own = ownFreeViews(blocks);
+  const last = new Map<string, ReportBlock>();
+  for (const b of blocks) {
+    const set = b.kind === "libre" ? report.freeSets?.find((f) => f.id === b.refKey) : undefined;
+    if (!set) continue;
+    const draws = b.settings.view ? set.views.some((v) => v.key === b.settings.view) : set.views.some((v) => !own.has(`${set.id}:${v.key}`));
+    if (draws) last.set(set.id, b);
+  }
+  return last;
+}
+
+/** ¿El bloque va dentro de un punto del informe? Si su punto no existe, es de toda la ficha. */
+export function inSectionOf(report: Report, block: ReportBlock): boolean {
+  return Boolean(block.sectionKey) && (report.sections ?? []).some((s) => s.key === block.sectionKey);
+}
+
+/**
+ * Los bloques en el orden en que se leen: primero los de cada punto, punto a
+ * punto, y después los de toda la ficha.
+ */
+export function pageBlocks(report: Report, blocks: ReportBlock[] = orderedBlocks(report)): { block: ReportBlock; inSection: boolean }[] {
+  const inPoints = (report.sections ?? []).flatMap((section) => blocks.filter((b) => b.sectionKey === section.key));
+  const loose = blocks.filter((b) => !inSectionOf(report, b));
+  return [...inPoints.map((block) => ({ block, inSection: true })), ...loose.map((block) => ({ block, inSection: false }))];
 }

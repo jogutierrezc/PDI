@@ -22,8 +22,8 @@ import { Suspense, lazy, useMemo, useRef, useState } from "react";
 import type { CSSProperties } from "react";
 import { Link, useParams } from "react-router-dom";
 import { Icon } from "../../../components/ui/Icon";
-import { downloadText } from "../data/open-data";
 import { ChartFrame } from "../components/ChartFrame";
+import type { CsvFile, CsvTable } from "../data/csv-export";
 import { OpenDataLayout } from "../components/OpenDataLayout";
 import { SplitFlap } from "../components/SplitFlap";
 import { useInView, useWidth } from "../components/motion";
@@ -46,6 +46,12 @@ const headlineText = (t: ObsTopic) =>
 const lineStyle = (line: number) => ({ "--line": `var(--od-line-${line})` }) as CSSProperties;
 const liveText = (s: LiveSummary) => (s.format === "porcentaje" ? `${one.format(s.value)} %` : s.format === "entero" ? integer.format(s.value) : decimal.format(s.value));
 const longDate = new Intl.DateTimeFormat("es-CO", { day: "numeric", month: "long", year: "numeric" });
+
+/** El CSV de un panel de la maqueta: su archivo y el nombre con que se anuncia. */
+const sampleCsv = (slug: string, part: string, name: string, build: CsvFile["build"]) => ({
+  files: [{ filename: `observatorio-${slug}-${part}datos-de-ejemplo.csv`, build }],
+  name,
+});
 
 /** Los temas publicados, con su resumen para el tablero. */
 function useLive() {
@@ -392,7 +398,7 @@ function SeriesPanel({ topic }: { topic: ObsTopic }) {
   const change = ((last - first) / (first || 1)) * 100;
 
   return (
-    <ChartFrame className="obs-panel obs-panel--series" title={topic.series.title} subtitle={`${topic.series.unit} · ${points[0][0]}–${points[points.length - 1][0]} · datos de ejemplo`} source={topic.source} exportName={`observatorio-${topic.slug}-serie`}>
+    <ChartFrame className="obs-panel obs-panel--series" title={topic.series.title} subtitle={`${topic.series.unit} · ${points[0][0]}–${points[points.length - 1][0]} · datos de ejemplo`} source={topic.source} exportName={`observatorio-${topic.slug}-serie`} csv={sampleCsv(topic.slug, "serie-", topic.series.title, () => ({ header: ["Periodo", "Valor", "Unidad"], rows: points.map(([label, v]) => [label, v, topic.series.unit]) }))}>
       <p className="obs-reading" aria-live="polite">
         <b>{points[shown][0]}:</b> {num(points[shown][1])} {topic.series.unit}
         <span>
@@ -430,7 +436,7 @@ function SharePanel({ topic }: { topic: ObsTopic }) {
   const total = topic.share.items.reduce((s, [, v]) => s + v, 0);
   const max = Math.max(...topic.share.items.map(([, v]) => v));
   return (
-    <ChartFrame className="obs-panel obs-panel--share" title={topic.share.title} subtitle={`${num(total)} ${topic.share.unit} · datos de ejemplo`} source={topic.source} exportName={`observatorio-${topic.slug}-reparto`}>
+    <ChartFrame className="obs-panel obs-panel--share" title={topic.share.title} subtitle={`${num(total)} ${topic.share.unit} · datos de ejemplo`} source={topic.source} exportName={`observatorio-${topic.slug}-reparto`} csv={sampleCsv(topic.slug, "reparto-", topic.share.title, () => ({ header: ["Categoría", "Valor", "Unidad"], rows: topic.share.items.map(([label, v]) => [label, v, topic.share.unit]) }))}>
       <div ref={ref} className="obs-share" data-seen={seen || undefined}>
         {topic.share.items.map(([label, v], k) => (
           <div key={label} className="obs-share__row" style={{ "--w": `${(v / max) * 100}%`, "--tone": `var(--od-inst-${(k % 6) + 1})`, "--k": k } as CSSProperties}>
@@ -468,11 +474,11 @@ function TablePanel({ topic, table }: { topic: ObsTopic; table: ObsTable }) {
   const cell = (v: string | number | undefined, unit?: string) =>
     typeof v === "number" ? `${num(v)}${unit === "%" ? " %" : unit ? ` ${unit}` : ""}` : v ?? "—";
 
-  const csv = () => {
-    const head = table.columns.map((c) => c.label).join(";");
-    const body = table.rows.map((r) => table.columns.map((c) => String(r[c.key] ?? "")).join(";")).join("\n");
-    downloadText(`observatorio-${topic.slug}-datos-de-ejemplo.csv`, `${head}\n${body}\n`);
-  };
+  // Toda la tabla, no el filtro: números como números, texto como texto y lo que falta, vacío.
+  const csvTable = (): CsvTable => ({
+    header: table.columns.map((c) => c.label),
+    rows: table.rows.map((r) => table.columns.map((c) => r[c.key] ?? null)),
+  });
 
   return (
     <ChartFrame
@@ -481,16 +487,12 @@ function TablePanel({ topic, table }: { topic: ObsTopic; table: ObsTable }) {
       subtitle={`${table.rows.length} filas · clic en una columna para ordenar · datos de ejemplo`}
       source={topic.source}
       exportable={false}
+      csv={sampleCsv(topic.slug, "", table.title, csvTable)}
       actions={
-        <>
-          <label className="obs-search">
-            <span className="sr-only">Filtrar la tabla</span>
-            <input type="search" placeholder="Filtrar…" value={query} onChange={(e) => setQuery(e.target.value)} />
-          </label>
-          <button type="button" className="od-button od-button--ghost obs-csv" onClick={csv}>
-            <Icon name="download" size={15} /> CSV
-          </button>
-        </>
+        <label className="obs-search">
+          <span className="sr-only">Filtrar la tabla</span>
+          <input type="search" placeholder="Filtrar…" value={query} onChange={(e) => setQuery(e.target.value)} />
+        </label>
       }
     >
       <div className="obs-table-wrap">

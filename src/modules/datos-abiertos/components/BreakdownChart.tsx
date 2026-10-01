@@ -20,12 +20,13 @@
 
 import { useState } from "react";
 import type { CSSProperties } from "react";
-import { downloadText, formatReserved, formatValue, formatWithUnit } from "../data/open-data";
+import { formatReserved, formatValue, formatWithUnit } from "../data/open-data";
 import { ALL_YEARS, ANNUAL_RULE_LABEL, cutCode, cutCodeLabel, cutLabel, fromCutCode, termLabel, TERMS } from "../data/terms";
 import type { Breakdown, BreakdownItem, Term } from "../data/types";
 import { AnnualTermChart } from "./AnnualTermChart";
 import { BarList } from "./Charts";
 import { ChartFrame, ViewSwitch } from "./ChartFrame";
+import type { CsvSource } from "./CsvAction";
 import { Donut } from "./Donut";
 import { LineChart } from "./LineChart";
 import { YearFilter, useVisibleYears } from "./YearFilter";
@@ -43,12 +44,13 @@ const oneDecimal = new Intl.NumberFormat("es-CO", { minimumFractionDigits: 1, ma
 const categoryColor = (index: number) => `var(--od-cat-${(index % 6) + 1})`;
 const sameCut = (a: Cut | undefined, b: Cut | undefined) => Boolean(a && b && a.year === b.year && a.term === b.term);
 
-export function BreakdownChart({ breakdown, year, term, years, setYear }: {
+export function BreakdownChart({ breakdown, year, term, years, setYear, csv }: {
   breakdown: Breakdown;
   year: number;
   term: Term | null;
   years: number[];
   setYear: (year: number) => void;
+  csv?: CsvSource;
 }) {
   const rule = breakdown.annualRule ?? "reportado";
   const available = breakdown.years ?? years;
@@ -118,23 +120,6 @@ export function BreakdownChart({ breakdown, year, term, years, setYear }: {
     ...(hasPeriods && !term ? [{ value: "combinada" as const, label: "Líneas y barras" }] : []),
   ];
 
-  const download = () => {
-    const escape = (v: string) => (/[;"\n]/.test(v) ? `"${v.replace(/"/g, '""')}"` : v);
-    const header = ["Corte", ...labels, ...(partsOfWhole ? ["Total"] : [])];
-    const rows = cuts.map((cut) => [
-      cutLabel(cut.year, cut.term),
-      ...labels.map((label) => {
-        // La descarga respeta la reserva: el CSV no puede decir lo que la
-        // ficha calla, o el umbral no serviría de nada.
-        if (reservedAt(label, cut)) return formatReserved(breakdown.reserveThreshold);
-        const v = valueAt(label, cut);
-        return v === null ? "" : String(v).replace(".", ",");
-      }),
-      ...(partsOfWhole ? [String(totalAt(cut) ?? "").replace(".", ",")] : []),
-    ]);
-    downloadText(`desglose-${breakdown.id}.csv`, `﻿${[header, ...rows].map((row) => row.map(escape).join(";")).join("\n")}`);
-  };
-
   const selectedItems = selected ? itemsAt(selected) : [];
   // Cuántas categorías del corte se callan por el umbral. Va en el subtítulo
   // para que viaje también en la imagen exportada, no solo en la pantalla.
@@ -152,6 +137,7 @@ export function BreakdownChart({ breakdown, year, term, years, setYear }: {
       title={breakdown.title}
       subtitle={subtitle}
       source={breakdown.source}
+      csv={csv}
       className="od-breakdown"
       exportName={`${breakdown.title}-${series ? "serie" : selected ? cutLabel(selected.year, selected.term) : year}`}
       actions={<ViewSwitch label={`Tipo de gráfica: ${breakdown.title}`} value={shownView} onChange={setView} options={options} />}
@@ -347,9 +333,6 @@ export function BreakdownChart({ breakdown, year, term, years, setYear }: {
 
       <details className="od-breakdown-table" data-export-ignore>
         <summary>Ver datos por corte</summary>
-        <button type="button" className="od-button od-button--line" onClick={download}>
-          Descargar CSV
-        </button>
         <div className="od-table-wrap" tabIndex={0} role="region" aria-label={`Datos de ${breakdown.title}, desplazable`}>
           <table className="od-table">
             <caption className="sr-only">

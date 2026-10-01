@@ -1,0 +1,208 @@
+/* =============================================================================
+   Selector de descarga en CSV (ExportSelector.tsx).
+
+   Todo cuelga de .od-pick, el envoltorio que el componente pone dentro del
+   cuerpo del Modal; no se toca .modal-panel. El Modal desplaza su cuerpo, así
+   que la lista corre dentro y el pie se queda pegado abajo, con el color de la
+   superficie del modal y una línea arriba. El sello de las filas
+   (.od-pick__row[data-sealing]) lo define chart-export.css.
+   ========================================================================== */
+
+.od-pick {
+  display: flex;
+  flex-direction: column;
+}
+
+.od-pick__tools {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin-bottom: var(--space-3);
+  color: var(--ink-muted);
+  font-size: var(--text-sm);
+}
+
+.od-pick__link {
+  min-height: 32px;
+  padding: 0 var(--space-1);
+  color: var(--od-signal-text);
+  background: transparent;
+  border: 0;
+  border-radius: var(--radius-xs);
+  font: inherit;
+  font-weight: 600;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+
+.od-pick__link:disabled {
+  color: var(--ink-muted);
+  cursor: default;
+}
+
+/* --- Lista ----------------------------------------------------------------- */
+
+.od-pick__list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+}
+
+.od-pick__group {
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.od-pick__group legend {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-3);
+  width: 100%;
+  padding: 0 0 var(--space-2);
+  margin-bottom: var(--space-1);
+  color: var(--ink);
+  border-bottom: 1px solid var(--line);
+  font-family: var(--font-sign);
+  font-size: 0.95rem;
+  font-weight: 600;
+  letter-spacing: var(--tracking-wide);
+  text-transform: uppercase;
+}
+
+.od-pick__count {
+  margin-left: auto;
+  color: var(--ink-muted);
+  font-size: var(--text-xs);
+  font-weight: 500;
+  letter-spacing: 0;
+  text-transform: none;
+  font-variant-numeric: tabular-nums;
+}
+
+.od-pick__row {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-3);
+  min-height: 36px;
+  padding: var(--space-2) var(--space-2);
+  color: var(--ink);
+  border-radius: var(--radius-xs);
+  font-size: var(--text-sm);
+  line-height: var(--leading-normal);
+  cursor: pointer;
+  transition: background-color var(--dur-fast) ease;
+}
+
+.od-pick__row input {
+  flex: none;
+  width: 1rem;
+  height: 1rem;
+  margin: 0.2rem 0 0;
+  accent-color: var(--od-series-1);
+}
+
+.od-pick__text {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.od-pick__row small {
+  display: block;
+  margin-top: 2px;
+  color: var(--ink-muted);
+  font-size: var(--text-xs);
+}
+
+.od-pick__row:focus-within {
+  background: var(--surface-2);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .od-pick__row:hover { background: var(--surface-2); }
+}
+
+@media (pointer: coarse) {
+  .od-pick__row { min-height: 44px; align-items: center; }
+  .od-pick__row input { margin-top: 0; }
+  .od-pick__link { min-height: 44px; padding: 0 var(--space-2); }
+}
+
+.od-pick__group:disabled .od-pick__row {
+  color: var(--ink-secondary);
+  cursor: default;
+}
+
+.od-pick__note {
+  margin: var(--space-5) 0 var(--space-4);
+  color: var(--ink-muted);
+  font-size: var(--text-xs);
+  line-height: var(--leading-normal);
+}
+
+/* --- Pie fijo ---------------------------------------------------------------- */
+
+.od-pick__footer {
+  position: sticky;
+  bottom: 0;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-4);
+  padding: var(--space-4) 0 0;
+  background: var(--surface);
+  border-top: 1px solid var(--line);
+}
+
+.od-pick__status {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  min-width: 0;
+  color: var(--ink-secondary);
+  font-size: var(--text-sm);
+  font-variant-numeric: tabular-nums;
+}
+
+.od-pick__error {
+  color: var(--ink);
+  font-weight: 600;
+}
+
+.od-pick__buttons {
+  display: flex;
+  flex: none;
+  gap: var(--space-3);
+}
+
+.od-pick__buttons .od-button:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+@media (max-width: 480px) {
+  .od-pick__footer {
+    flex-direction: column;
+    align-items: stretch;
+    gap: var(--space-3);
+  }
+
+  .od-pick__buttons {
+    flex-direction: column-reverse;
+  }
+
+  .od-pick__buttons .od-button {
+    width: 100%;
+    white-space: normal;
+  }
+}
+
+/* Con movimiento reducido solo el color cambia con transición. */
+@media (prefers-reduced-motion: reduce) {
+  .od-pick__row { transition: none; }
+  .od-pick__buttons .od-button { transition: background-color var(--dur-base) ease, border-color var(--dur-base) ease, color var(--dur-base) ease; }
+  .od-pick__buttons .od-button:active { transform: none; }
+}

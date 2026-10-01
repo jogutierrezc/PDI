@@ -58,6 +58,142 @@
   font-size: var(--text-2xs);
 }
 
+/* =============================================================================
+   Acción «CSV» por conjunto (CsvAction)
+   Misma voz que .od-export__option: rótulo de señalética, callada por defecto,
+   ámbar solo al señalarla. Sin relleno ni caja: el relleno ámbar es de la
+   acción principal de la página.
+   ========================================================================== */
+
+/* Pie del marco cuando hay CSV: la fuente a la izquierda, la acción a la derecha.
+   Si falta espacio, la acción baja a su propia línea, alineada a la derecha. */
+.od-frame__foot {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  column-gap: var(--space-4);
+  border-top: 1px solid var(--line);
+}
+
+.od-frame__foot .od-frame__source {
+  flex: 1 1 16rem;
+  border-top: 0;
+}
+
+.od-frame__foot .od-csv {
+  margin-inline-start: auto;
+  padding-inline-end: var(--space-3);
+}
+
+.od-csv {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.od-csv__button {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  min-height: 28px;
+  padding: 0 var(--space-2);
+  color: var(--ink-muted);
+  background: transparent;
+  border: 0;
+  border-radius: 6px;
+  font-family: var(--font-sign);
+  font-size: 0.8rem;
+  font-weight: 600;
+  letter-spacing: var(--tracking-wide);
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: color var(--dur-fast) ease;
+}
+
+.od-csv__label {
+  display: inline-block;
+  min-width: 3.4ch; /* «CSV», «…» y «Descargado» no mueven el pie al cambiar */
+}
+
+/* El destello ámbar del volteo (csv-motion.ts) */
+.od-csv__label[data-flap] {
+  color: var(--od-signal-text);
+}
+
+.od-csv__button:disabled {
+  cursor: progress;
+}
+
+.od-csv__button:focus-visible {
+  outline: 2px solid var(--od-signal);
+  outline-offset: 1px;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .od-csv__button:not(:disabled):hover {
+    color: var(--od-signal-text);
+  }
+}
+
+/* Punteros gruesos: objetivo de 44 px sin engordar el pie (el área crece con un pseudo-elemento). */
+@media (pointer: coarse) {
+  .od-csv__button {
+    position: relative;
+  }
+
+  .od-csv__button::after {
+    content: "";
+    position: absolute;
+    inset: -8px -4px;
+  }
+}
+
+/* Estado: se lee en voz alta siempre; solo se ve cuando algo falló. */
+.od-csv__status {
+  color: var(--ink-muted);
+  font-size: var(--text-2xs);
+}
+
+.od-csv__status[data-state="quiet"] {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+/* Sin marco: la acción sola, alineada a la derecha al final de un bloque. */
+.od-csv--block {
+  display: flex;
+  justify-content: flex-end;
+  margin-block-start: var(--space-2);
+}
+
+/* Al imprimir tampoco: un botón no dice nada en papel. */
+@media print {
+  .od-csv { display: none; }
+}
+
+/* Sello de las filas del selector (csv-motion.ts · sellarFilas): un barrido ámbar
+   de izquierda a derecha, que se desvanece. Solo transform y opacity. */
+.od-pick__row[data-sealing] {
+  position: relative;
+}
+
+.od-pick__row[data-sealing]::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: color-mix(in srgb, var(--od-signal) 28%, transparent);
+  border-radius: inherit;
+  pointer-events: none;
+  transform: scaleX(var(--od-pick-seal, 0));
+  transform-origin: left center;
+  opacity: calc(1 - var(--od-pick-fade, 0));
+}
+
 /* Sello de procedencia: solo aparece en la imagen exportada. */
 .od-frame__stamp {
   display: none;

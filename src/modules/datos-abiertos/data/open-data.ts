@@ -10,8 +10,11 @@
 import { useQuery } from "@tanstack/react-query";
 import { assembleCatalog, fetchOpenDataRows } from "./repository";
 import type { Breakdown, BreakdownItem, CampusId, Indicator, MapDataset, OpenDataCatalog, Report, Term, ValueFormat } from "./types";
-import { ALL_YEARS, ANNUAL_RULE_LABEL, annualBasis, cutLabel, setPeriodSpan, TERMS } from "./terms";
+import { ALL_YEARS, annualBasis, setPeriodSpan, TERMS } from "./terms";
 import { isWorldMap } from "./types";
+import { indicatorsToTable, toCsvText } from "./csv-export";
+import { downloadText } from "./download";
+import { formatReserved, RESERVE_DEFAULT, valueOf } from "./reserve";
 
 export const openDataKeys = {
   all: ["datos-abiertos"] as const,
@@ -133,16 +136,9 @@ export function periodBasisOf(indicator: Indicator, campus: CampusId): string | 
   return indicator.periodBasis?.[campus] ?? null;
 }
 
-/** Cifra de un corte: el año (sin periodo), un periodo académico del año o todo el periodo. */
-export function valueOf(indicator: Indicator, year: number, campus: CampusId, term?: Term | null): number | null {
-  if (year === ALL_YEARS) {
-    const value = indicator.values[ALL_YEARS]?.[campus];
-    return value === undefined ? null : value;
-  }
-  if (indicator.years && !indicator.years.includes(year)) return null;
-  const value = term ? indicator.terms?.[year]?.[term]?.[campus] : indicator.values[year]?.[campus];
-  return value === undefined ? null : value;
-}
+// `valueOf` (la cifra de un corte) vive en reserve.ts, sin Supabase detrás, para
+// que el exportador de CSV lo lea en las pruebas. Aquí se sigue ofreciendo.
+export { valueOf };
 
 /** ¿El indicador trae cifras por periodo? */
 export function hasTerms(indicator: Indicator): boolean {
@@ -201,14 +197,10 @@ export function formatWithUnit(value: number | null, format: ValueFormat, unit: 
    Una celda reservada no es un vacío ni un cero: tiene dato, pero tan pocos
    registros que publicarlo señalaría a personas concretas. Se escribe siempre
    como un techo ("< 5"), nunca como su número, y se dice en voz alta distinto
-   que un "sin reportar", porque significan cosas opuestas: aquí sí hay gente. */
+   que un "sin reportar", porque significan cosas opuestas: aquí sí hay gente.
+   El umbral y su escritura ("< 5") viven en reserve.ts. */
 
-export const RESERVE_DEFAULT = 5;
-
-/** En pantalla: "< 5". */
-export function formatReserved(threshold = RESERVE_DEFAULT): string {
-  return `< ${threshold}`;
-}
+export { formatReserved, RESERVE_DEFAULT };
 
 /** Cifra del desglose, respetando la reserva. */
 export function formatCell(
@@ -273,37 +265,10 @@ export function formatCutoff(iso: string): string {
    Datos abiertos que no se pueden bajar no son abiertos. Separador punto y
    coma y BOM: es lo que Excel en español abre sin preguntar. */
 
+/** Los indicadores del informe en CSV: los arma y los escribe csv-export.ts, como a todos los demás conjuntos. */
 export function reportToCsv(report: Report, years: number[], campuses: { id: CampusId; name: string }[]): string {
-  const escape = (text: string) => (/[;"\n]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text);
-  // Por año: el periodo 1, el 2 y la cifra del año, en ese orden.
-  const cuts = years.flatMap((year) => [...TERMS.map((term) => ({ year, term })), { year, term: null as Term | null }]);
-  const rows: string[] = [
-    ["Informe", "Indicador", "Unidad", "Campus", ...cuts.map((c) => (c.term ? cutLabel(c.year, c.term) : `${c.year} (año)`)), "Cifra del año se calcula como", "Fuente"].join(";"),
-  ];
-
-  for (const indicator of report.indicators) {
-    for (const campus of campuses) {
-      const cells = cuts.map(({ year, term }) => {
-        const value = valueOf(indicator, year, campus.id, term);
-        return value === null ? "" : String(value).replace(".", ",");
-      });
-      if (cells.every((cell) => cell === "")) continue;
-      rows.push(
-        [report.name, indicator.label, indicator.unit, campus.name, ...cells, indicator.annualRule ? ANNUAL_RULE_LABEL[indicator.annualRule] : "", indicator.source].map(escape).join(";"),
-      );
-    }
-  }
-
-  return `﻿${rows.join("\n")}`;
+  return toCsvText(indicatorsToTable({ reportName: report.name, indicators: report.indicators, years, campuses }));
 }
 
-export function downloadText(filename: string, text: string, type = "text/csv;charset=utf-8") {
-  const url = URL.createObjectURL(new Blob([text], { type }));
-  const link = document.createElement("a");
-  link.href = url;
-  link.download = filename;
-  document.body.append(link);
-  link.click();
-  link.remove();
-  setTimeout(() => URL.revokeObjectURL(url), 1000);
-}
+// La descarga vive en download.ts, que no arrastra Supabase. Aquí se sigue ofreciendo.
+export { downloadText };

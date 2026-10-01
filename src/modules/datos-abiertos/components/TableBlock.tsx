@@ -16,6 +16,7 @@ import type { CSSProperties } from "react";
 import { formatValue } from "../data/open-data";
 import type { TableData } from "../data/types";
 import { ChartFrame } from "./ChartFrame";
+import type { CsvSource } from "./CsvAction";
 import "./report-sections.css";
 
 type Cell = string | number | null;
@@ -43,7 +44,7 @@ function renderCell(column: Column, value: Cell) {
   return String(value);
 }
 
-export function TableBlock({ table, title }: { table: TableData; title?: string }) {
+export function TableBlock({ table, title, csv }: { table: TableData; title?: string; csv?: CsvSource }) {
   const numericColumns = table.columns.filter(numeric);
   // La columna que manda en un ranking: la de mayor magnitud.
   const measure = useMemo(() => {
@@ -82,7 +83,7 @@ export function TableBlock({ table, title }: { table: TableData; title?: string 
     const labelCol = table.columns.find((c) => c.key === "etiqueta") ?? table.columns[0];
     const valueCol = table.columns.find((c) => c.key === "valor") ?? numericColumns[0];
     return (
-      <ChartFrame title={frameTitle} subtitle={table.description} source={table.source} exportName={frameTitle}>
+      <ChartFrame title={frameTitle} subtitle={table.description} source={table.source} exportName={frameTitle} csv={csv}>
         <ul className="od-figures">
           {table.rows.map((row, index) => {
             const raw = valueCol ? row[valueCol.key] : null;
@@ -108,7 +109,7 @@ export function TableBlock({ table, title }: { table: TableData; title?: string 
   if (table.display === "fichas") {
     const [titleCol, ...rest] = table.columns;
     return (
-      <ChartFrame title={frameTitle} subtitle={table.description} source={table.source} exportName={frameTitle}>
+      <ChartFrame title={frameTitle} subtitle={table.description} source={table.source} exportName={frameTitle} csv={csv}>
         <ul className="od-cards">
           {table.rows.map((row, index) => (
             <li key={index} className="od-cards__item">
@@ -139,6 +140,7 @@ export function TableBlock({ table, title }: { table: TableData; title?: string 
       subtitle={`${table.description}${table.description ? " · " : ""}${table.rows.length} filas`}
       source={table.source}
       exportName={frameTitle}
+      csv={csv}
     >
       <div className="od-table-wrap" tabIndex={0} role="region" aria-label={`${frameTitle}, desplazable`}>
         <table className="od-table od-tableblock" data-display={table.display}>

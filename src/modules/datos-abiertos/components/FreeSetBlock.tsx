@@ -20,6 +20,8 @@ import { useState } from "react";
 import { CHART_TYPES, freeYears, viewProblems } from "../data/free-sets";
 import type { FreeChartType, FreeSet, FreeView } from "../data/free-sets";
 import { ChartFrame } from "./ChartFrame";
+import { CsvAction } from "./CsvAction";
+import type { CsvSource } from "./CsvAction";
 import { FreeChart, hasOwnFrame } from "./free/FreeCharts";
 import "./free-sets.css";
 
@@ -44,6 +46,7 @@ export function FreeSetBlock({
   withSource = false,
   title,
   anchor,
+  csv,
 }: {
   set: FreeSet;
   viewKey?: string;
@@ -53,6 +56,8 @@ export function FreeSetBlock({
   withSource?: boolean;
   title?: string;
   anchor: string;
+  /** Archivo del conjunto para el botón «CSV»; lo arma la ficha. */
+  csv?: CsvSource;
 }) {
   const years = freeYears(set);
   const [year, setYear] = useState<number | null>(years.length ? years[years.length - 1] : null);
@@ -89,7 +94,7 @@ export function FreeSetBlock({
 
         <div className="od-free__grid">
           {views.map((view) => (
-            <FreeViewPanel key={view.key} set={set} view={view} year={set.temporality === "anual" && !USES_ALL_YEARS.includes(view.type) ? year : null} />
+            <FreeViewPanel key={view.key} set={set} view={view} year={set.temporality === "anual" && !USES_ALL_YEARS.includes(view.type) ? year : null} csv={csv} />
           ))}
         </div>
 
@@ -101,6 +106,7 @@ export function FreeSetBlock({
             </summary>
             <FreeChart set={set} view={{ ...SOURCE_VIEW, title: `${set.title} · datos de origen` }} year={usesYear ? year : null} />
             {set.source && <p className="od-free__source-note">Fuente: {set.source}</p>}
+            {csv && <CsvAction {...csv} />}
           </details>
         )}
       </div>
@@ -108,7 +114,7 @@ export function FreeSetBlock({
   );
 }
 
-function FreeViewPanel({ set, view, year }: { set: FreeSet; view: FreeView; year: number | null }) {
+function FreeViewPanel({ set, view, year, csv }: { set: FreeSet; view: FreeView; year: number | null; csv?: CsvSource }) {
   const span = NARROW.includes(view.type) ? "half" : "full";
   if (hasOwnFrame(view)) {
     return (
@@ -125,6 +131,7 @@ function FreeViewPanel({ set, view, year }: { set: FreeSet; view: FreeView; year
         subtitle={[CHART_TYPES[view.type].label, when, view.description].filter(Boolean).join(" · ")}
         source={set.source}
         exportName={`${set.title}-${view.title}`}
+        csv={csv}
       >
         <FreeChart set={set} view={view} year={year} />
       </ChartFrame>

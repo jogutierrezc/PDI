@@ -1,0 +1,12 @@
+{
+  "id": "export-csv-conjuntos-visuales",
+  "title": "Exportar en CSV cada conjunto visual (opción bajo cada bloque) y descarga global con selector",
+  "status": "in_progress",
+  "strategy": "full-collaborate",
+  "currentPhase": "4-implementation",
+  "nextAction": "Revisión de integración: diff, pruebas, build y verificación visual",
+  "gate": null,
+  "branch": "main",
+  "scope": "export-csv-conjuntos-visuales",
+  "createdAt": "2026-10-01T10:16:55-05:00"
+}

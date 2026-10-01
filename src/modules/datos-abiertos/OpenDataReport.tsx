@@ -45,20 +45,23 @@ import { SplitFlap } from "./components/SplitFlap";
 import { ReportSectionView, SECTION_STATUS_LABEL } from "./components/ReportSection";
 import { TableBlock } from "./components/TableBlock";
 import {
-  downloadText,
   findReport,
   cutsOf,
   formatCutoff,
   hasTerms,
   keyIndicators,
-  reportToCsv,
   useOpenDataCatalog,
   valueOf,
 } from "./data/open-data";
 import { imagesOf, reportImageUrl } from "./data/images";
 import { ALL_YEARS, ANNUAL_RULE_LABEL, cutCode, cutCodeLabel, cutLabel, fromCutCode } from "./data/terms";
 import type { Breakdown, CampusId, Indicator, MapDataset, OpenDataCatalog, Report, ReportBlock, Term } from "./data/types";
-import { blockPicks, saberProOf, saberTytOf } from "./data/groups";
+import { blockPicks, inSectionOf, lastFreeBlock as lastFreeBlockOf, orderedBlocks, ownFreeViews as ownFreeViewsOf, pairedMaps as pairedMapsOf, saberProOf, saberTytOf } from "./data/groups";
+import { csvZipName } from "./data/csv-export";
+import { EXPORT_GROUPS, exportsOfBlock, readmeText, reportExports, sourceOf } from "./data/export-registry";
+import type { ExportEntry, ExportSource } from "./data/export-registry";
+import { CsvAction } from "./components/CsvAction";
+import { ExportSelector } from "./components/ExportSelector";
 import { RankingsBlock } from "./components/RankingsBlock";
 import { MedalBoardBlock } from "./components/MedalBoardBlock";
 import { SaberProBlock } from "./components/SaberProBlock";
@@ -67,7 +70,7 @@ import { DiversityBoard } from "./components/DiversityBoard";
 import { OriginMap } from "./components/OriginMap";
 import { PredictiveModel } from "./components/PredictiveModel";
 import { FreeSetBlock } from "./components/FreeSetBlock";
-import { ALL_CAMPUSES, DEFAULT_BLOCK_ORDER, MAP_MODE_TITLE, isMobilityMap, isWorldMap } from "./data/types";
+import { ALL_CAMPUSES, MAP_MODE_TITLE, isMobilityMap, isWorldMap } from "./data/types";
 import "./datos-abiertos.css";
 
 export function OpenDataReport() {
@@ -123,6 +126,8 @@ function ReportContent({ data, report, year, term, campus, setYear, setTerm, set
   // lo principal es la ficha. Quien la abre o la cierra decide (manual).
   const [barManual, setBarManual] = useState<boolean | null>(null);
   const [scrolled, setScrolled] = useState(false);
+  // Selector de descargas en CSV: un diálogo que se abre desde la barra.
+  const [picking, setPicking] = useState(false);
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 480);
     onScroll();
@@ -142,9 +147,21 @@ function ReportContent({ data, report, year, term, campus, setYear, setTerm, set
   const nextReport = data.reports[(index + 1) % data.reports.length];
   const lineStyle = (line: number) => ({ "--line": `var(--od-line-${line})` }) as CSSProperties;
 
-  const download = () => {
-    downloadText(`udes-en-cifras-${report.slug}.csv`, reportToCsv(report, data.years, data.campuses));
+  // Lo que se puede bajar en CSV: los conjuntos que la ficha pinta, en su orden.
+  // La acción de cada bloque y el selector de la barra leen la misma lista, así
+  // el archivo de un bloque es el mismo que entrega el selector.
+  const exports = useMemo(() => reportExports(report, data), [report, data]);
+  const zipName = csvZipName(report.slug);
+  /** Varios archivos de un mismo bloque bajan en un zip con el nombre del bloque. */
+  const csvOf = (entries: ExportEntry[], name: string, zip: string): ExportSource | undefined =>
+    sourceOf(entries, name, csvZipName(`${report.slug}-${zip}`));
+  /** La descarga de un conjunto por su id en el registro ("mapa:<clave>", "desglose:<clave>"…). */
+  const csvById = (id: string, name?: string): ExportSource | undefined => {
+    const entry = exports.find((e) => e.id === id);
+    return entry ? csvOf([entry], name ?? entry.label, id.replace(":", "-")) : undefined;
   };
+  // Todos los indicadores del informe: lo que leen la evolución y la tabla dinámica.
+  const indicatorsCsv = csvOf(exports.filter((e) => e.group === EXPORT_GROUPS.indicadores), `los indicadores de ${report.name}`, "indicadores");
 
   // Primero los KPI clave, luego el resto de indicadores del informe.
   const boardIndicators = [...keys, ...report.indicators.filter((i) => !report.keyIndicators.includes(i.id))];
@@ -159,24 +176,13 @@ function ReportContent({ data, report, year, term, campus, setYear, setTerm, set
   // Un mapa emparejado con otro (combinado o lado a lado) sale en el bloque que
   // lo pide; su propio bloque se omite. Si dos bloques se piden mutuamente, gana
   // el primero en el orden de la ficha.
-  const pairedMaps = new Set<string>();
-  for (const b of blocks) {
-    if (b.kind === "mapa" && b.refKey && !pairedMaps.has(b.refKey) && b.settings.mapWith && b.settings.mapWith !== b.refKey) {
-      pairedMaps.add(b.settings.mapWith);
-    }
-  }
+  const pairedMaps = pairedMapsOf(blocks);
 
   // Conjuntos libres: una vista con bloque propio no se repite en el bloque de
   // «todas las vistas» del mismo conjunto, y la tabla de origen va una sola vez,
   // debajo del último bloque que dibuja algo de ese conjunto.
-  const ownFreeViews = new Set(blocks.filter((b) => b.kind === "libre" && b.refKey && b.settings.view).map((b) => `${b.refKey}:${b.settings.view}`));
-  const lastFreeBlock = new Map<string, ReportBlock>();
-  for (const b of blocks) {
-    const set = b.kind === "libre" ? report.freeSets?.find((f) => f.id === b.refKey) : undefined;
-    if (!set) continue;
-    const draws = b.settings.view ? set.views.some((v) => v.key === b.settings.view) : set.views.some((v) => !ownFreeViews.has(`${set.id}:${v.key}`));
-    if (draws) lastFreeBlock.set(set.id, b);
-  }
+  const ownFreeViews = ownFreeViewsOf(blocks);
+  const lastFreeBlock = lastFreeBlockOf(report, blocks);
 
   /** Un bloque suelto es una sección de la ficha; dentro de un punto, el punto ya pone el título. */
   const shell = (key: string, id: string, title: string, description: string | undefined, inSection: boolean, children: ReactNode) =>
@@ -222,7 +228,10 @@ function ReportContent({ data, report, year, term, campus, setYear, setTerm, set
             onSelect={pickIndicator}
           />
         );
-        if (inSection) return <div className="od-point__block" key={key}>{board}</div>;
+        // Los indicadores de este tablero, en CSV: la acción va bajo la rejilla.
+        const boardCsv = csvOf(exportsOfBlock(exports, block), block.settings.title || "el tablero de indicadores", `indicadores-${block.settings.slot ?? "tablero"}`);
+        const boardAction = boardCsv && <CsvAction {...boardCsv} className="od-csv--block" />;
+        if (inSection) return <div className="od-point__block" key={key}>{board}{boardAction}</div>;
         // Puede haber un tablero por grupo: cada uno con su propio id.
         const boardId = block.settings.slot ? `od-clave-${block.settings.slot}` : "od-clave";
         return (
@@ -246,6 +255,7 @@ function ReportContent({ data, report, year, term, campus, setYear, setTerm, set
                 </p>
               </div>
               {board}
+              {boardAction}
             </div>
           </section>
         );
@@ -265,6 +275,7 @@ function ReportContent({ data, report, year, term, campus, setYear, setTerm, set
             setYear={setYear}
             setTerm={setTerm}
             defaultView={block.settings.chart === "barras" ? "barras" : "lineas"}
+            csv={indicatorsCsv}
           />
         ) : null;
       case "mapa": {
@@ -307,6 +318,7 @@ function ReportContent({ data, report, year, term, campus, setYear, setTerm, set
               title={inSection ? heading : "Movilidad entrante y saliente por país"}
               subtitle={`${mapCut(dataset)} · ${dataset.unit || partner.unit}`}
               source={[...new Set([dataset.source, partner.source].filter(Boolean))].join(" · ")}
+              csv={csvOf(exports.filter((e) => e.id === `mapa:${dataset.id}` || e.id === `mapa:${partner.id}`), heading, `mapa-${dataset.id}`)}
             >
               <WorldMap
                 datasets={[dataset, partner]}
@@ -330,7 +342,7 @@ function ReportContent({ data, report, year, term, campus, setYear, setTerm, set
             inSection,
             <div className="od-pair">
               {[dataset, partner].map((d) => (
-                <ChartFrame key={d.id} title={d.title} subtitle={`${mapCut(d)} · ${d.unit}`} source={d.source} exportName={d.title}>
+                <ChartFrame key={d.id} title={d.title} subtitle={`${mapCut(d)} · ${d.unit}`} source={d.source} exportName={d.title} csv={csvById(`mapa:${d.id}`)}>
                   {mapOf(d, true)}
                 </ChartFrame>
               ))}
@@ -348,6 +360,7 @@ function ReportContent({ data, report, year, term, campus, setYear, setTerm, set
             title={inSection ? block.settings.title || dataset.title : frameTitle(dataset)}
             subtitle={`${mapCut(dataset)} · ${dataset.unit}`}
             source={dataset.source}
+            csv={csvById(`mapa:${dataset.id}`)}
           >
             {mapOf(dataset, Boolean(block.settings.compact))}
           </ChartFrame>,
@@ -366,6 +379,7 @@ function ReportContent({ data, report, year, term, campus, setYear, setTerm, set
             title={inSection ? block.settings.title || pipeline.title : "Deserción acumulada"}
             subtitle={`${campusName} · deserción acumulada en % · pasa por una unión para leer el tramo`}
             source={pipeline.source}
+            csv={csvById(`tuberia:${pipeline.id}`)}
           >
             <LeakyPipeline key={pipeline.id} data={pipeline} campus={campus} campusName={campusName} />
           </ChartFrame>,
@@ -384,6 +398,7 @@ function ReportContent({ data, report, year, term, campus, setYear, setTerm, set
             title={inSection ? block.settings.title || history.title : "Evolución histórica"}
             subtitle={`${history.periods[0]} a ${history.periods[history.periods.length - 1]} · ${history.unit}`}
             source={history.source}
+            csv={csvById(`historico:${history.id}`)}
           >
             <HistoryCompare key={history.id} data={history} />
           </ChartFrame>,
@@ -402,6 +417,7 @@ function ReportContent({ data, report, year, term, campus, setYear, setTerm, set
             title={inSection ? block.settings.title || heatmap.title : "Mapa de calor"}
             subtitle={`${inSection && heatmap.description ? `${heatmap.description} · ` : ""}${heatmap.rowLabel} × ${heatmap.columnLabel} · ${heatmap.unit}`}
             source={heatmap.source}
+            csv={csvById(`mapa_calor:${heatmap.id}`)}
           >
             <Heatmap data={heatmap} />
           </ChartFrame>,
@@ -410,7 +426,7 @@ function ReportContent({ data, report, year, term, campus, setYear, setTerm, set
       case "tabla": {
         const table = report.tables?.find((x) => x.id === block.refKey);
         if (!table || table.rows.length === 0) return null;
-        return shell(key, `od-tabla-${table.id}`, block.settings.title || table.title, undefined, inSection, <TableBlock table={table} title={block.settings.title} />);
+        return shell(key, `od-tabla-${table.id}`, block.settings.title || table.title, undefined, inSection, <TableBlock table={table} title={block.settings.title} csv={csvById(`tabla:${table.id}`)} />);
       }
       case "desgloses": {
         const chosen = picks.breakdowns(block);
@@ -420,13 +436,13 @@ function ReportContent({ data, report, year, term, campus, setYear, setTerm, set
           return (
             <div className="od-point__block od-breakdowns" key={key}>
               {only.map((breakdown) => (
-                <BreakdownChart key={breakdown.id} breakdown={breakdown} year={year} term={term} years={data.years} setYear={setYear} />
+                <BreakdownChart key={breakdown.id} breakdown={breakdown} year={year} term={term} years={data.years} setYear={setYear} csv={csvById(`desglose:${breakdown.id}`)} />
               ))}
             </div>
           );
         }
         return (
-          <Breakdowns key={key} anchor={block.settings.slot ? `od-desgloses-${block.settings.slot}` : "od-desgloses"} breakdowns={only} year={year} campus={campus} setYear={setYear} title={block.settings.title} term={term} years={data.years} />
+          <Breakdowns key={key} anchor={block.settings.slot ? `od-desgloses-${block.settings.slot}` : "od-desgloses"} breakdowns={only} year={year} campus={campus} setYear={setYear} title={block.settings.title} term={term} years={data.years} csvOf={(id) => csvById(`desglose:${id}`)} />
         );
       }
       case "tabla_dinamica":
@@ -440,7 +456,7 @@ function ReportContent({ data, report, year, term, campus, setYear, setTerm, set
                   clic en el encabezado y descarga exactamente lo que ves.
                 </p>
               </header>
-              <ChartFrame title="Todas las cifras del informe" subtitle="Indicador · campus · corte" source={sources.join(" · ")}>
+              <ChartFrame title="Todas las cifras del informe" subtitle="Indicador · campus · corte" source={sources.join(" · ")} csv={indicatorsCsv}>
                 <PivotTable key={report.slug} report={report} years={data.years} campuses={data.campuses} year={year} term={term} campus={campus} />
               </ChartFrame>
             </div>
@@ -451,7 +467,13 @@ function ReportContent({ data, report, year, term, campus, setYear, setTerm, set
         const chosen = picks.rankings(block);
         const shown = chosen.map((key) => report.rankings?.find((r) => r.id === key)).filter((r): r is NonNullable<typeof r> => Boolean(r));
         if (!shown.length) return null;
-        return <RankingsBlock key={key} rankings={shown} title={block.settings.title} anchor={block.settings.slot ? `od-rankings-${block.settings.slot}` : "od-rankings"} />;
+        // Una sola acción para todos los rankings del bloque.
+        const rankingsCsv = csvOf(
+          exports.filter((e) => shown.some((r) => e.id === `ranking:${r.id}`)),
+          block.settings.title || "los rankings",
+          `rankings${block.settings.slot ? `-${block.settings.slot}` : ""}`,
+        );
+        return <RankingsBlock key={key} rankings={shown} title={block.settings.title} anchor={block.settings.slot ? `od-rankings-${block.settings.slot}` : "od-rankings"} csv={rankingsCsv} />;
       }
       case "medallero": {
         if (inSection) return null;
@@ -464,6 +486,7 @@ function ReportContent({ data, report, year, term, campus, setYear, setTerm, set
             boards={shown}
             title={block.settings.title}
             anchor={block.settings.slot ? `od-medallero-${block.settings.slot}` : "od-medallero"}
+            csvOf={(id) => csvById(`medallero:${id}`)}
           />
         );
       }
@@ -481,6 +504,7 @@ function ReportContent({ data, report, year, term, campus, setYear, setTerm, set
             withSource={lastFreeBlock.get(set.id) === block}
             title={block.settings.title}
             anchor={`od-libre-${set.id}${view ? `-${view}` : ""}`}
+            csv={csvById(`libre:${set.id}`)}
           />
         );
       }
@@ -488,7 +512,7 @@ function ReportContent({ data, report, year, term, campus, setYear, setTerm, set
         if (inSection) return null;
         const shown = saberTytOf(report, block);
         if (!shown || shown.results.length === 0) return null;
-        return <SaberTytBlock key={key} data={shown} title={block.settings.title} anchor={block.settings.slot ? `od-saber-tyt-${block.settings.slot}` : "od-saber-tyt"} />;
+        return <SaberTytBlock key={key} data={shown} title={block.settings.title} anchor={block.settings.slot ? `od-saber-tyt-${block.settings.slot}` : "od-saber-tyt"} csv={csvById(`saber_tyt:${shown.id}`)} />;
       }
       case "diversidad": {
         if (inSection) return null;
@@ -503,6 +527,7 @@ function ReportContent({ data, report, year, term, campus, setYear, setTerm, set
             setCampus={setCampus}
             title={block.settings.title}
             anchor={block.settings.slot ? `od-diversidad-${block.settings.slot}` : "od-diversidad"}
+            csvOf={(frame) => csvById(`dei:${frame}`)}
           />
         );
       }
@@ -510,13 +535,13 @@ function ReportContent({ data, report, year, term, campus, setYear, setTerm, set
         if (inSection) return null;
         const model = report.models?.find((m) => m.id === block.refKey) ?? report.models?.[0];
         if (!model) return null;
-        return <PredictiveModel key={key} model={model} title={block.settings.title} anchor={block.settings.slot ? `od-modelo-${block.settings.slot}` : "od-modelo"} />;
+        return <PredictiveModel key={key} model={model} title={block.settings.title} anchor={block.settings.slot ? `od-modelo-${block.settings.slot}` : "od-modelo"} csv={csvById(`modelo:${model.id}`)} />;
       }
       case "saber_pro": {
         if (inSection) return null;
         const shown = saberProOf(report, block);
         if (!shown || shown.results.length === 0) return null;
-        return <SaberProBlock key={key} data={shown} title={block.settings.title} anchor={block.settings.slot ? `od-saber-pro-${block.settings.slot}` : "od-saber-pro"} />;
+        return <SaberProBlock key={key} data={shown} title={block.settings.title} anchor={block.settings.slot ? `od-saber-pro-${block.settings.slot}` : "od-saber-pro"} csv={csvById(`saber_pro:${shown.id}`)} />;
       }
       case "separador": {
         if (inSection) return null;
@@ -676,7 +701,19 @@ function ReportContent({ data, report, year, term, campus, setYear, setTerm, set
         <div className="u-container od-report-bar__inner">
           <BoardControls data={data} year={year} term={term} campus={campus} setYear={setYear} setTerm={setTerm} setCampus={setCampus} />
           <span className="od-report-bar__downloads">
-            <button type="button" className="od-button od-button--ghost" onClick={download}>
+            <button
+              type="button"
+              className="od-button od-button--ghost"
+              aria-haspopup="dialog"
+              disabled={exports.length === 0}
+              title={exports.length === 0 ? "Este informe todavía no tiene datos para descargar" : "Elegir qué datos descargar"}
+              onClick={() => {
+                // La barra se pliega sola al bajar: se fija abierta para que el foco
+                // pueda volver a este botón cuando el diálogo se cierre.
+                setBarManual(true);
+                setPicking(true);
+              }}
+            >
               <Icon name="download" size={16} /> CSV
             </button>
             <BulletinDownload catalog={data} report={report} />
@@ -684,6 +721,16 @@ function ReportContent({ data, report, year, term, campus, setYear, setTerm, set
         </div>
         </div>
       </div>
+      {picking && (
+        <ExportSelector
+          key={report.slug}
+          reportName={report.name}
+          zipName={zipName}
+          entries={exports}
+          readme={(chosen) => readmeText(report, data, chosen)}
+          onClose={() => setPicking(false)}
+        />
+      )}
 
       {/* La intranet decide qué bloques salen y en qué orden (od_report_blocks).
           Un bloque sin datos no se pinta: una sección vacía no informa de nada.
@@ -735,7 +782,7 @@ function ReportContent({ data, report, year, term, campus, setYear, setTerm, set
           </ReportSectionView>
         );
       })}
-      {blocks.filter((b) => !sections.length || !b.sectionKey || !sections.some((s) => s.key === b.sectionKey)).map((block, blockIndex) =>
+      {blocks.filter((b) => !inSectionOf(report, b)).map((block, blockIndex) =>
         renderBlock(block, `${block.kind}-${block.refKey ?? blockIndex}`, false),
       )}
 
@@ -771,28 +818,6 @@ function ReportContent({ data, report, year, term, campus, setYear, setTerm, set
 
 /* --- Evolución y campus ----------------------------------------------------- */
 
-/** Orden de la ficha: el de la intranet, o el de siempre si el informe no declara bloques. */
-function orderedBlocks(report: Report): ReportBlock[] {
-  if (report.blocks && report.blocks.length > 0) {
-    return [...report.blocks].filter((block) => block.visible).sort((x, y) => x.position - y.position);
-  }
-  const blocks: ReportBlock[] = [];
-  for (const kind of DEFAULT_BLOCK_ORDER) {
-    if (kind === "mapa") {
-      (report.maps ?? []).forEach((m) => blocks.push({ kind, refKey: m.id, visible: true, position: blocks.length, settings: {} }));
-    } else if (kind === "tuberia") {
-      (report.pipelines ?? []).forEach((p) => blocks.push({ kind, refKey: p.id, visible: true, position: blocks.length, settings: {} }));
-    } else if (kind === "historico") {
-      (report.histories ?? []).forEach((h) => blocks.push({ kind, refKey: h.id, visible: true, position: blocks.length, settings: {} }));
-    } else if (kind === "mapa_calor") {
-      (report.heatmaps ?? []).forEach((h) => blocks.push({ kind, refKey: h.id, visible: true, position: blocks.length, settings: {} }));
-    } else {
-      blocks.push({ kind, refKey: null, visible: true, position: blocks.length, settings: {} });
-    }
-  }
-  return blocks;
-}
-
 function Evolution({
   data,
   indicator,
@@ -805,6 +830,7 @@ function Evolution({
   setYear,
   setTerm,
   defaultView = "lineas",
+  csv,
 }: {
   data: OpenDataCatalog;
   indicator: Indicator;
@@ -817,6 +843,8 @@ function Evolution({
   setYear: (year: number) => void;
   setTerm: (term: Term | null) => void;
   defaultView?: "lineas" | "barras";
+  /** Los indicadores del informe en CSV. */
+  csv?: ExportSource;
 }) {
   const [view, setView] = useState<"lineas" | "barras" | "combinada">(defaultView);
   const [siteView, setSiteView] = useState<"barras" | "circular">("barras");
@@ -908,6 +936,7 @@ function Evolution({
             title="Evolución por corte"
             subtitle={`${view === "lineas" ? "Por campus" : campusName} · ${view === "combinada" ? "global anual y periodos A y B" : bySemester ? "periodos A y B" : "por año"} · ${indicator.unit}`}
             source={indicator.source}
+            csv={csv}
             actions={
               <>
                 {hasTerms(indicator) && view !== "combinada" && (
@@ -1028,6 +1057,7 @@ function Breakdowns({
   title,
   term,
   years,
+  csvOf,
 }: {
   /** Id del título: puede haber un bloque de desgloses por sección. */
   anchor: string;
@@ -1038,6 +1068,8 @@ function Breakdowns({
   title?: string;
   term: Term | null;
   years: number[];
+  /** La descarga en CSV de cada desglose, por su clave. */
+  csvOf: (id: string) => ExportSource | undefined;
 }) {
 
   return (
@@ -1052,7 +1084,7 @@ function Breakdowns({
         </header>
 
         <div className="od-breakdowns">
-          {breakdowns.map((breakdown) => <BreakdownChart key={breakdown.id} breakdown={breakdown} year={year} term={term} years={years} setYear={setYear} />)}
+          {breakdowns.map((breakdown) => <BreakdownChart key={breakdown.id} breakdown={breakdown} year={year} term={term} years={years} setYear={setYear} csv={csvOf(breakdown.id)} />)}
         </div>
       </div>
     </section>

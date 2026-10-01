@@ -45,13 +45,15 @@ import {
 import type { ParsedRank, RankScope, RankingData, RankingEdition, RankingView } from "../data/rankings";
 import { formatValue } from "../data/open-data";
 import { ChartFrame, ViewSwitch } from "./ChartFrame";
+import { CsvAction } from "./CsvAction";
+import type { CsvSource } from "./CsvAction";
 import { useWidth } from "./motion";
 import { SplitFlap } from "./SplitFlap";
 import "./rankings.css";
 
 const accentStyle = (accent: string) => ({ "--rk-accent": accent }) as CSSProperties;
 
-export function RankingsBlock({ rankings, title, anchor }: { rankings: RankingData[]; title?: string; anchor: string }) {
+export function RankingsBlock({ rankings, title, anchor, csv }: { rankings: RankingData[]; title?: string; anchor: string; csv?: CsvSource }) {
   const withData = rankings.filter((r) => latestEdition(r));
   const years = useMemo(
     () => Array.from(new Set(withData.flatMap((r) => r.editions.map((e) => e.year)))).sort((a, b) => b - a),
@@ -97,15 +99,19 @@ export function RankingsBlock({ rankings, title, anchor }: { rankings: RankingDa
         </header>
 
         {shownView === "medallas" && (
-          <div className="od-rankings__grid">
-            {withData.map((ranking, index) => (
-              <RankingCard key={ranking.id} ranking={ranking} edition={at(ranking)} year={year} index={index} />
-            ))}
-          </div>
+          <>
+            <div className="od-rankings__grid">
+              {withData.map((ranking, index) => (
+                <RankingCard key={ranking.id} ranking={ranking} edition={at(ranking)} year={year} index={index} />
+              ))}
+            </div>
+            {/* Las tarjetas no tienen marco: un solo botón para todas, bajo la cuadrícula. */}
+            {csv && <CsvAction {...csv} className="od-csv--block" />}
+          </>
         )}
-        {shownView === "tabla" && <RankingsTable rankings={withData} at={at} />}
-        {shownView === "evolucion" && <RankingsEvolution rankings={withData} />}
-        {shownView === "ods" && <SdgWheel rankings={withData.filter((r) => r.editions.some((e) => e.sdgs.length))} year={year} />}
+        {shownView === "tabla" && <RankingsTable rankings={withData} at={at} csv={csv} />}
+        {shownView === "evolucion" && <RankingsEvolution rankings={withData} csv={csv} />}
+        {shownView === "ods" && <SdgWheel rankings={withData.filter((r) => r.editions.some((e) => e.sdgs.length))} year={year} csv={csv} />}
       </div>
     </section>
   );
@@ -412,7 +418,7 @@ function RankingCard({
 
 /* --- Tabla comparativa ------------------------------------------------------------ */
 
-function RankingsTable({ rankings, at }: { rankings: RankingData[]; at: (r: RankingData) => RankingEdition | undefined }) {
+function RankingsTable({ rankings, at, csv }: { rankings: RankingData[]; at: (r: RankingData) => RankingEdition | undefined; csv?: CsvSource }) {
   const cell = (ranking: RankingData, edition: RankingEdition | undefined, scope: RankScope) => {
     const rank = rankOf(edition, scope);
     const previous = edition ? previousEdition(ranking, edition) : undefined;
@@ -429,7 +435,7 @@ function RankingsTable({ rankings, at }: { rankings: RankingData[]; at: (r: Rank
     );
   };
   return (
-    <ChartFrame title="Posición en cada ranking" subtitle="Edición elegida · variación frente a la edición anterior" source={Array.from(new Set(rankings.map((r) => r.source).filter(Boolean))).join(" · ")}>
+    <ChartFrame title="Posición en cada ranking" subtitle="Edición elegida · variación frente a la edición anterior" source={Array.from(new Set(rankings.map((r) => r.source).filter(Boolean))).join(" · ")} csv={csv}>
       <div className="od-rank-table__scroll">
         <table className="od-rank-table">
           <thead>
@@ -502,7 +508,7 @@ interface EvoSeries {
 
 const rankWords = (rank: ParsedRank) => (rank.band ? `banda ${rank.text}` : `puesto ${rank.text}`);
 
-function RankingsEvolution({ rankings }: { rankings: RankingData[] }) {
+function RankingsEvolution({ rankings, csv }: { rankings: RankingData[]; csv?: CsvSource }) {
   const scopes = SCOPES.filter((scope) => rankings.some((r) => r.editions.filter((e) => rankOf(e, scope)).length > 0));
   // Con más de un ámbito se abren todos juntos: la comparación entre el puesto
   // mundial, el latinoamericano y el nacional es lo que esta vista viene a dar.
@@ -554,6 +560,7 @@ function RankingsEvolution({ rankings }: { rankings: RankingData[] }) {
         </>
       }
       source={source}
+      csv={csv}
     >
       {series.length === 0 ? (
         <p className="od-empty">Ningún ranking reporta posición {phrase}.</p>
@@ -849,7 +856,7 @@ function EvoTogether({ series, marked, phrase }: { series: EvoSeries[]; marked: 
 
 /* --- Rueda de ODS ----------------------------------------------------------------------- */
 
-function SdgWheel({ rankings, year }: { rankings: RankingData[]; year: number | "ultima" }) {
+function SdgWheel({ rankings, year, csv }: { rankings: RankingData[]; year: number | "ultima"; csv?: CsvSource }) {
   const [rankingId, setRankingId] = useState(rankings[0]?.id);
   const ranking = rankings.find((r) => r.id === rankingId) ?? rankings[0];
   const edition = ranking ? latestEdition(ranking, year === "ultima" ? undefined : year) : undefined;
@@ -887,6 +894,7 @@ function SdgWheel({ rankings, year }: { rankings: RankingData[]; year: number | 
         ) : undefined
       }
       source={ranking.source}
+      csv={csv}
     >
       <div className="od-sdg">
         <svg className="od-sdg__wheel" viewBox={`0 0 ${size} ${size}`} role="group" aria-label="Rueda de los 17 ODS">

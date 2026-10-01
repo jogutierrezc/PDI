@@ -33,16 +33,21 @@ import {
 } from "../data/medals";
 import type { MedalBoard, MedalStanding, MedalTier } from "../data/medals";
 import { ViewSwitch } from "./ChartFrame";
+import { CsvAction } from "./CsvAction";
+import type { CsvSource } from "./CsvAction";
 import "./medals.css";
 
 export function MedalBoardBlock({
   boards,
   title,
   anchor,
+  csvOf,
 }: {
   boards: MedalBoard[];
   title?: string;
   anchor: string;
+  /** Archivo del medallero abierto (clave: board.id) para el botón «CSV». */
+  csvOf?: (key: string) => CsvSource | undefined;
 }) {
   const withData = boards.filter(hasMedals);
   const [openId, setOpenId] = useState<string | null>(null);
@@ -71,7 +76,7 @@ export function MedalBoardBlock({
           )}
         </header>
 
-        <MedalTable key={board.id} board={board} />
+        <MedalTable key={board.id} board={board} csv={csvOf?.(board.id)} />
       </div>
     </section>
   );
@@ -79,7 +84,7 @@ export function MedalBoardBlock({
 
 /* --- Un medallero -------------------------------------------------------------- */
 
-function MedalTable({ board }: { board: MedalBoard }) {
+function MedalTable({ board, csv }: { board: MedalBoard; csv?: CsvSource }) {
   const years = medalYears(board);
   const [chosen, setChosen] = useState<number | null>(null);
   const year = board.scope === "acumulado" ? null : (chosen ?? openingYear(board));
@@ -183,6 +188,7 @@ function MedalTable({ board }: { board: MedalBoard }) {
           {board.note && <span className="md__note">{board.note}</span>}
         </p>
       )}
+      {csv && <CsvAction {...csv} className="od-csv--block" />}
     </div>
   );
 }

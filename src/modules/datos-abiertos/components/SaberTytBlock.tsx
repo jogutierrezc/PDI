@@ -43,6 +43,7 @@ import {
 import type { SaberTytData, TytCompetency, TytFigure, TytFilter } from "../data/saber-tyt";
 import { AlphaCoefficients, AlphaMethod, AlphaPlane, AlphaQuadrants, AlphaValueBars } from "./SaberAlphaViews";
 import { ChartFrame, ChartTooltip, ViewSwitch } from "./ChartFrame";
+import type { CsvSource } from "./CsvAction";
 import { SplitFlap } from "./SplitFlap";
 import { nivoTheme, useChartTokens } from "./free/chart-tokens";
 import { useInView, usePrefersReducedMotion, useWidth } from "./motion";
@@ -82,7 +83,7 @@ const decimal = new Intl.NumberFormat("es-CO", { minimumFractionDigits: 1, maxim
 const signed = (n: number) => `${n > 0 ? "+" : n < 0 ? "−" : ""}${decimal.format(Math.abs(n))}`;
 const pct = (n: number) => `${integer.format(Math.round(n))} %`;
 
-export function SaberTytBlock({ data, anchor, title }: { data: SaberTytData; anchor: string; title?: string }) {
+export function SaberTytBlock({ data, anchor, title, csv }: { data: SaberTytData; anchor: string; title?: string; csv?: CsvSource }) {
   const [params, setParams] = useSearchParams();
   const years = useMemo(() => tytYears(data), [data]);
   const programs = useMemo(() => tytPrograms(data), [data]);
@@ -191,17 +192,17 @@ export function SaberTytBlock({ data, anchor, title }: { data: SaberTytData; anc
           engine === "beta" ? (
             <>
               {view === "perfil" && (
-                <ChartFrame title={`Perfil de entrada y salida · ${scope}`} subtitle={`Percentil por competencia · ${when}`} source={data.source} exportName="motor-beta-perfil">
+                <ChartFrame title={`Perfil de entrada y salida · ${scope}`} subtitle={`Percentil por competencia · ${when}`} source={data.source} exportName="motor-beta-perfil" csv={csv}>
                   <Profile data={data} year={year} filter={filter} />
                 </ChartFrame>
               )}
               {view === "dispersion" && (
-                <ChartFrame title={`Dispersión de valor agregado · ${info.label}`} subtitle={`Entrada frente a salida, en percentil · ${when}`} source={data.source} exportName="motor-beta-dispersion">
+                <ChartFrame title={`Dispersión de valor agregado · ${info.label}`} subtitle={`Entrada frente a salida, en percentil · ${when}`} source={data.source} exportName="motor-beta-dispersion" csv={csv}>
                   <Scatter data={data} competency={competency} year={year} filter={filter} figure={figure} />
                 </ChartFrame>
               )}
               {view === "transito" && (
-                <ChartFrame title={`Tránsito entre cuartos · ${info.label}`} subtitle={`De dónde salieron los que entraron en cada cuarto · ${scope} · ${when}`} source={data.source} exportName="motor-beta-transito">
+                <ChartFrame title={`Tránsito entre cuartos · ${info.label}`} subtitle={`De dónde salieron los que entraron en cada cuarto · ${scope} · ${when}`} source={data.source} exportName="motor-beta-transito" csv={csv}>
                   <Transit figure={figure} />
                 </ChartFrame>
               )}
@@ -211,6 +212,7 @@ export function SaberTytBlock({ data, anchor, title }: { data: SaberTytData; anc
                   subtitle={`${isPaired(competency) ? "Percentil de salida menos percentil de entrada" : "Percentil medio en la única prueba que la evalúa"} · ${when}`}
                   source={data.source}
                   exportName="motor-beta-vai"
+                  csv={csv}
                 >
                   <ValueBars data={data} competency={competency} year={year} />
                 </ChartFrame>
@@ -219,22 +221,22 @@ export function SaberTytBlock({ data, anchor, title }: { data: SaberTytData; anc
           ) : (
             <>
               {view === "perfil" && (
-                <ChartFrame title={`Plano de valor agregado · ${info.label}`} subtitle={`Puntaje esperado frente al real · ${when}`} source={data.source} exportName="motor-alpha-plano">
+                <ChartFrame title={`Plano de valor agregado · ${info.label}`} subtitle={`Puntaje esperado frente al real · ${when}`} source={data.source} exportName="motor-alpha-plano" csv={csv}>
                   <AlphaPlane data={data} competency={competency} year={year} figure={figure} program={program} />
                 </ChartFrame>
               )}
               {view === "dispersion" && (
-                <ChartFrame title={`Cuadrantes frente al país · ${info.label}`} subtitle={`Promedios nacionales de las dos pruebas · ${scope} · ${when}`} source={data.source} exportName="motor-alpha-cuadrantes">
+                <ChartFrame title={`Cuadrantes frente al país · ${info.label}`} subtitle={`Promedios nacionales de las dos pruebas · ${scope} · ${when}`} source={data.source} exportName="motor-alpha-cuadrantes" csv={csv}>
                   <AlphaQuadrants data={data} competency={competency} figure={figure} />
                 </ChartFrame>
               )}
               {view === "transito" && (
-                <ChartFrame title={`El modelo · ${info.label}`} subtitle="Qué pesa cada competencia del Saber 11 en la predicción" source={data.source} exportName="motor-alpha-modelo">
+                <ChartFrame title={`El modelo · ${info.label}`} subtitle="Qué pesa cada competencia del Saber 11 en la predicción" source={data.source} exportName="motor-alpha-modelo" csv={csv}>
                   <AlphaCoefficients data={data} competency={competency} />
                 </ChartFrame>
               )}
               {view === "valor" && (
-                <ChartFrame title={`Valor agregado por programa · ${info.label}`} subtitle={`Puntaje real menos esperado, en puntos de la prueba · ${when}`} source={data.source} exportName="motor-alpha-vai">
+                <ChartFrame title={`Valor agregado por programa · ${info.label}`} subtitle={`Puntaje real menos esperado, en puntos de la prueba · ${when}`} source={data.source} exportName="motor-alpha-vai" csv={csv}>
                   <AlphaValueBars data={data} competency={competency} year={year} />
                 </ChartFrame>
               )}

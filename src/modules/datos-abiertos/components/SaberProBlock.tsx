@@ -44,6 +44,7 @@ import {
 } from "../data/saber-pro";
 import type { SaberCompetency, SaberFigure, SaberFilter, SaberLevelScale, SaberProData } from "../data/saber-pro";
 import { ChartFrame, ChartTooltip, ViewSwitch } from "./ChartFrame";
+import type { CsvSource } from "./CsvAction";
 import { LineChart } from "./LineChart";
 import { useInView, usePrefersReducedMotion } from "./motion";
 import { SplitFlap } from "./SplitFlap";
@@ -127,7 +128,7 @@ function scopeName(filter: SaberFilter) {
 
 /* --- Bloque --------------------------------------------------------------------- */
 
-export function SaberProBlock({ data, anchor, title }: { data: SaberProData; anchor: string; title?: string }) {
+export function SaberProBlock({ data, anchor, title, csv }: { data: SaberProData; anchor: string; title?: string; csv?: CsvSource }) {
   const state = useSaberState(data);
   const { competency, view, filter, set } = state;
   const years = useMemo(() => saberYears(data), [data]);
@@ -230,6 +231,7 @@ export function SaberProBlock({ data, anchor, title }: { data: SaberProData; anc
             subtitle={`${name} · ${years[0]}–${years[years.length - 1]}`}
             source={data.source}
             exportName={`saber-pro-niveles-${competency}`}
+            csv={csv}
           >
             {levelScale(competency) ? (
               <LevelLadder key={competency} figures={figures} scale={levelScale(competency)!} competency={competency} years={years} />
@@ -244,12 +246,13 @@ export function SaberProBlock({ data, anchor, title }: { data: SaberProData; anc
             subtitle="Puntos sobre o bajo el país, por sede y programa"
             source={data.source}
             exportName={`saber-pro-brecha-${competency}`}
+            csv={csv}
           >
             <GapMatrix data={data} competency={competency} years={years} filter={filter} />
           </ChartFrame>
         )}
         {view === "evolucion" && (
-          <ChartFrame title={`Promedio · ${info.label}`} subtitle={`${name} frente al país`} source={data.source} exportName={`saber-pro-evolucion-${competency}`}>
+          <ChartFrame title={`Promedio · ${info.label}`} subtitle={`${name} frente al país`} source={data.source} exportName={`saber-pro-evolucion-${competency}`} csv={csv}>
             <LineChart
               label={`Promedio de ${info.label} de ${name} y promedio nacional por año`}
               years={years}

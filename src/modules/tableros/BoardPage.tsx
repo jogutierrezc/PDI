@@ -21,6 +21,8 @@ import { ObsChart } from "../admin/observatorio/ObsCharts";
 // procedencia. No se rehace aquí: una gráfica de un tablero se descarga
 // igual que una del portal estadístico, y con el nombre de su unidad.
 import { ChartFrame } from "../datos-abiertos/components/ChartFrame";
+import { freeSetToTable } from "../datos-abiertos/data/csv-export";
+import { slugify } from "../datos-abiertos/data/slug";
 import type { ObsChartType, ObsDataset, ObsView } from "../admin/observatorio/model";
 import { UNIT_KIND, VISIBILITY } from "./model";
 import type { BoardDataset } from "./model";
@@ -136,6 +138,10 @@ export function BoardPage() {
                           source={dataset.source || undefined}
                           exportName={`${unit?.slug ?? "tablero"}-${title}`}
                           stamp={unit?.name ?? board.title}
+                          csv={{
+                            files: [{ filename: `${slugify(unit?.name ?? board.title)}-${slugify(dataset.title, "datos")}.csv`, build: () => freeSetToTable(dataset) }],
+                            name: dataset.title,
+                          }}
                         >
                           <ObsChart dataset={asObsDataset(dataset)} view={drawable} />
                         </ChartFrame>

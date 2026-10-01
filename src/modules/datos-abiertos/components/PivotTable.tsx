@@ -13,7 +13,9 @@
 
 import { useEffect, useState } from "react";
 import { Icon } from "../../../components/ui/Icon";
-import { cutsOf, downloadText, formatValue, valueOf } from "../data/open-data";
+import { toCsvText } from "../data/csv-export";
+import { downloadText } from "../data/download";
+import { cutsOf, formatValue, valueOf } from "../data/open-data";
 import { ALL_YEARS, cutLabel } from "../data/terms";
 import type { Campus, CampusId, Indicator, Report, Term } from "../data/types";
 import { ViewSwitch } from "./ChartFrame";
@@ -141,17 +143,12 @@ export function PivotTable({ report, years, campuses, year, term = null, campus 
   };
 
   const download = () => {
-    const escape = (text: string) => (/[;"\n]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text);
-    const lines = [[DIM_LABEL[rows], ...colMembers.map((c) => c.label)].map(escape).join(";")];
-    for (const r of sortedRows) {
-      lines.push(
-        [r.label, ...colMembers.map((c) => {
-          const { value } = cell(r, c);
-          return value === null ? "" : String(value).replace(".", ",");
-        })].map(escape).join(";"),
-      );
-    }
-    downloadText(`udes-en-cifras-${report.slug}-tabla-dinamica.csv`, `﻿${lines.join("\n")}`);
+    // El escritor común pone la coma decimal, las comillas y la guarda de fórmulas.
+    const csv = toCsvText({
+      header: [DIM_LABEL[rows], ...colMembers.map((c) => c.label)],
+      rows: sortedRows.map((r) => [r.label, ...colMembers.map((c) => cell(r, c).value)]),
+    });
+    downloadText(`udes-en-cifras-${report.slug}-tabla-dinamica.csv`, csv);
   };
 
   const dims: { value: Dim; label: string }[] = [

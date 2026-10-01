@@ -18,17 +18,12 @@
    ========================================================================== */
 
 import { toJpeg, toPng } from "html-to-image";
+import { slugify } from "../data/slug";
 
 export type ImageFormat = "png" | "jpg";
 
-export const slugify = (text: string) =>
-  text
-    .normalize("NFD")
-    .replace(/[̀-ͯ]/g, "")
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-|-$/g, "")
-    .slice(0, 60) || "grafica";
+// El nombre del archivo sale del mismo sitio que el de los CSV.
+export { slugify };
 
 /** Color de fondo real del panel: un JPG no tiene transparencia. */
 function backgroundOf(node: HTMLElement): string {

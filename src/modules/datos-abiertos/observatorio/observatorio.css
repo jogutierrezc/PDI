@@ -210,7 +210,6 @@
 }
 
 .obs-search input:focus-visible { outline: 2px solid var(--brand-blue); outline-offset: 1px; }
-.obs-csv { min-height: 34px; }
 
 .obs-table-wrap { overflow-x: auto; }
 

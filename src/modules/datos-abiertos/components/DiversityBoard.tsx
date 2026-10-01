@@ -25,6 +25,7 @@ import { ALL_YEARS } from "../data/terms";
 import type { Breakdown, BreakdownItem, Campus, CampusId, HeatmapData, Indicator, MapDataset, Report } from "../data/types";
 import { ALL_CAMPUSES } from "../data/types";
 import { ChartFrame, ChartTooltip, ViewSwitch, niceCeil } from "./ChartFrame";
+import type { CsvSource } from "./CsvAction";
 import { useInView, useWidth } from "./motion";
 import { OriginMap } from "./OriginMap";
 import { BD, IND, INES_KEY, TERM, cell, cut, familyOf, itemsOf, published, squarify, sumOf, toneOf } from "../data/dei";
@@ -70,9 +71,11 @@ interface DiversityBoardProps {
   setCampus: (campus: CampusId) => void;
   anchor: string;
   title?: string;
+  /** Archivo de cada marco para el botón «CSV» (claves: mapa, corte, etnico, discapacidad, estratos, genero-zona, ines). */
+  csvOf?: (key: string) => CsvSource | undefined;
 }
 
-export function DiversityBoard({ report, campuses, year, campus, setYear, setCampus, anchor, title }: DiversityBoardProps) {
+export function DiversityBoard({ report, campuses, year, campus, setYear, setCampus, anchor, title, csvOf }: DiversityBoardProps) {
   const ind = useMemo(() => new Map(report.indicators.map((i) => [i.id, i])), [report]);
   const bd = useMemo(() => new Map(report.breakdowns.map((b) => [b.id, b])), [report]);
   const grupo = ind.get(IND.grupo);
@@ -149,9 +152,10 @@ export function DiversityBoard({ report, campuses, year, campus, setYear, setCam
             siteName={siteName}
             baseOf={baseOf}
             onPick={setYear}
+            csv={csvOf?.("corte")}
           />
 
-          <EthnicMosaic indigena={bd.get(BD.indigena)} negra={bd.get(BD.negra)} year={active} lens={lens} siteName={siteName} />
+          <EthnicMosaic indigena={bd.get(BD.indigena)} negra={bd.get(BD.negra)} year={active} lens={lens} siteName={siteName} csv={csvOf?.("etnico")} />
 
           <ChartFrame
             className="od-dei__panel od-dei__panel--origin"
@@ -160,6 +164,7 @@ export function DiversityBoard({ report, campuses, year, campus, setYear, setCam
             source={origin?.source || grupo.source}
             exportName="dei-mapa-origen"
             exportable={originYears.length > 0}
+            csv={csvOf?.("mapa")}
           >
             <OriginMap dataset={origin ?? PENDING_ORIGIN} year={active} years={originYears} campus={lens} campuses={campuses} />
           </ChartFrame>
@@ -171,13 +176,14 @@ export function DiversityBoard({ report, campuses, year, campus, setYear, setCam
             year={active}
             lens={lens}
             siteName={siteName}
+            csv={csvOf?.("discapacidad")}
           />
 
-          <StrataSpectrum estrato={bd.get(BD.estrato)} bajo={ind.get(IND.estratoBajo)} years={years} year={active} lens={lens} sites={sites} siteName={siteName} />
+          <StrataSpectrum estrato={bd.get(BD.estrato)} bajo={ind.get(IND.estratoBajo)} years={years} year={active} lens={lens} sites={sites} siteName={siteName} csv={csvOf?.("estratos")} />
 
-          <Splits genero={bd.get(BD.genero)} zona={bd.get(BD.zona)} years={years} year={active} lens={lens} siteName={siteName} />
+          <Splits genero={bd.get(BD.genero)} zona={bd.get(BD.zona)} years={years} year={active} lens={lens} siteName={siteName} csv={csvOf?.("genero-zona")} />
 
-          {ines && <InesDots data={ines} />}
+          {ines && <InesDots data={ines} csv={csvOf?.("ines")} />}
         </div>
       </div>
     </section>
@@ -419,6 +425,7 @@ function CutColumns({
   siteName,
   baseOf,
   onPick,
+  csv,
 }: {
   grupo: Indicator;
   years: number[];
@@ -427,6 +434,7 @@ function CutColumns({
   siteName: (id: CampusId) => string;
   baseOf: (y: number) => number | null;
   onPick: (y: number) => void;
+  csv?: CsvSource;
 }) {
   const ref = useRef<HTMLDivElement>(null);
   const seen = useInView(ref);
@@ -452,6 +460,7 @@ function CutColumns({
       }
       source={grupo.source}
       exportName="dei-corte-a-corte"
+      csv={csv}
     >
       <div ref={ref} className="od-dei__cols" data-seen={seen || undefined}>
         <span className="od-dei__cols-top" aria-hidden="true">
@@ -494,12 +503,14 @@ function EthnicMosaic({
   year,
   lens,
   siteName,
+  csv,
 }: {
   indigena: Breakdown | undefined;
   negra: Breakdown | undefined;
   year: number;
   lens: CampusId;
   siteName: (id: CampusId) => string;
+  csv?: CsvSource;
 }) {
   const box = useRef<HTMLDivElement>(null);
   const width = useWidth(box, 1080);
@@ -538,6 +549,7 @@ function EthnicMosaic({
       subtitle={`Estudiantes por pueblo o comunidad declarada · corte ${cut(year)} · total institucional`}
       source={indigena?.source ?? negra?.source}
       exportName="dei-mosaico-etnico"
+      csv={csv}
     >
       <InstitutionalNote lens={lens} siteName={siteName} />
       <div
@@ -672,6 +684,7 @@ function Disability({
   year,
   lens,
   siteName,
+  csv,
 }: {
   tipo: Breakdown | undefined;
   cobertura: Indicator | undefined;
@@ -679,6 +692,7 @@ function Disability({
   year: number;
   lens: CampusId;
   siteName: (id: CampusId) => string;
+  csv?: CsvSource;
 }) {
   const ref = useRef<HTMLDivElement>(null);
   const seen = useInView(ref);
@@ -699,6 +713,7 @@ function Disability({
       subtitle={`Estudiantes por tipo · corte ${cut(year)} · total institucional`}
       source={tipo.source}
       exportName="dei-discapacidad"
+      csv={csv}
     >
       <InstitutionalNote lens={lens} siteName={siteName} />
       <div ref={ref} className="od-dei__bars" data-seen={seen || undefined} key={year}>
@@ -751,6 +766,7 @@ function StrataSpectrum({
   lens,
   sites,
   siteName,
+  csv,
 }: {
   estrato: Breakdown | undefined;
   bajo: Indicator | undefined;
@@ -759,6 +775,7 @@ function StrataSpectrum({
   lens: CampusId;
   sites: Campus[];
   siteName: (id: CampusId) => string;
+  csv?: CsvSource;
 }) {
   const ref = useRef<HTMLDivElement>(null);
   const seen = useInView(ref);
@@ -782,6 +799,7 @@ function StrataSpectrum({
       subtitle="Reparto de los estudiantes con estrato registrado, del 1 al 6"
       source={estrato.source}
       exportName="dei-estratos"
+      csv={csv}
     >
       <div ref={ref} className="od-dei__strata" data-seen={seen || undefined}>
         <div className="od-dei__strata-legend" aria-hidden="true">
@@ -874,6 +892,7 @@ function Splits({
   year,
   lens,
   siteName,
+  csv,
 }: {
   genero: Breakdown | undefined;
   zona: Breakdown | undefined;
@@ -881,6 +900,7 @@ function Splits({
   year: number;
   lens: CampusId;
   siteName: (id: CampusId) => string;
+  csv?: CsvSource;
 }) {
   const pairs = [
     { b: genero, title: "Género registrado", tones: ["var(--od-dei-f)", "var(--od-dei-m)"] },
@@ -895,6 +915,7 @@ function Splits({
       subtitle={`Corte ${cut(year)} · total institucional`}
       source={pairs[0].b?.source}
       exportName="dei-genero-zona"
+      csv={csv}
     >
       <InstitutionalNote lens={lens} siteName={siteName} />
       <div className="od-dei__splits">
@@ -955,7 +976,7 @@ function Mark({ shape, x, y, r = 6 }: { shape: (typeof INES_MARKS)[number]; x: n
   return <path d={`M${x} ${y - r * 1.15} L${x + r * 1.15} ${y} L${x} ${y + r * 1.15} L${x - r * 1.15} ${y}Z`} />;
 }
 
-function InesDots({ data }: { data: HeatmapData }) {
+function InesDots({ data, csv }: { data: HeatmapData; csv?: CsvSource }) {
   const box = useRef<HTMLDivElement>(null);
   const width = useWidth(box, 1080);
   const seen = useInView(box);
@@ -991,6 +1012,7 @@ function InesDots({ data }: { data: HeatmapData }) {
       subtitle={`INES · puntaje 0-100 de los doce factores según quién responde · la escala empieza en ${lo}`}
       source={data.source}
       exportName="dei-ines"
+      csv={csv}
       actions={
         <ViewSwitch
           label="Orden de los factores"

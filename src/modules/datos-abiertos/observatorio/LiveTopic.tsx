@@ -9,18 +9,13 @@
    índice del portal no las necesita.
    ========================================================================== */
 
-import { Icon } from "../../../components/ui/Icon";
 import { ChartFrame } from "../components/ChartFrame";
-import { downloadText } from "../data/open-data";
+import { freeSetToTable } from "../data/csv-export";
+import { slugify } from "../data/slug";
 import { ObsChart } from "../../admin/observatorio/ObsCharts";
 import { SECTION_LABEL } from "../../admin/observatorio/model";
 import type { ObsDataset, ObsView } from "../../admin/observatorio/model";
-import { toCsv } from "../../admin/udes-en-cifras/sheet";
 import type { LiveTopic } from "./live";
-
-function csvOf(dataset: ObsDataset) {
-  return toCsv([dataset.columns.map((c) => c.label), ...dataset.rows.filter((r) => r.kind === "dato").map((r) => dataset.columns.map((c) => (r.cells[c.key] ?? "") as string | number))]);
-}
 
 export default function LiveTopicBody({ live, slug }: { live: LiveTopic; slug: string }) {
   const { config, views, datasets } = live;
@@ -56,11 +51,7 @@ function LiveView({ view, dataset, slug, wide }: { view: ObsView; dataset: ObsDa
       source={`${dataset.source || "Observatorio de Analítica Académica"}${dataset.anonymization ? ` · anonimizada, conteos menores que ${dataset.anonymization.threshold} en reserva` : ""}`}
       exportName={`observatorio-${slug}-${view.title}`}
       exportable={view.type !== "tabla"}
-      actions={
-        <button type="button" className="od-button od-button--ghost obs-csv" onClick={() => downloadText(`observatorio-${slug}-${dataset.title}.csv`, csvOf(dataset))}>
-          <Icon name="download" size={15} /> CSV
-        </button>
-      }
+      csv={{ files: [{ filename: `observatorio-${slug}-${slugify(dataset.title, "datos")}.csv`, build: () => freeSetToTable(dataset) }], name: dataset.title }}
     >
       <div className="obs-live__chart">
         <ObsChart dataset={dataset} view={view} />

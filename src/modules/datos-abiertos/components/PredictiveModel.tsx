@@ -36,6 +36,7 @@ import {
 import type { Profile } from "../data/model";
 import type { ModelData, ModelVariable } from "../data/types";
 import { ChartFrame, ViewSwitch } from "./ChartFrame";
+import type { CsvSource } from "./CsvAction";
 import { useInView, useWidth } from "./motion";
 import { SplitFlap } from "./SplitFlap";
 import "./predictive-model.css";
@@ -44,7 +45,7 @@ const integer = new Intl.NumberFormat("es-CO", { maximumFractionDigits: 0 });
 const count = (n: number) => integer.format(n);
 const three = new Intl.NumberFormat("es-CO", { minimumFractionDigits: 3, maximumFractionDigits: 3 });
 
-export function PredictiveModel({ model, anchor, title }: { model: ModelData; anchor: string; title?: string }) {
+export function PredictiveModel({ model, anchor, title, csv }: { model: ModelData; anchor: string; title?: string; csv?: CsvSource }) {
   const spec = model.spec;
   const [profile, setProfile] = useState<Profile>(() => referenceProfile(spec));
   const quality = classificationOf(spec);
@@ -76,9 +77,9 @@ export function PredictiveModel({ model, anchor, title }: { model: ModelData; an
         <Simulator model={model} profile={profile} setProfile={setProfile} />
 
         <div className="od-model__grid">
-          <Forest model={model} />
-          <Quality model={model} />
-          <Sample model={model} />
+          <Forest model={model} csv={csv} />
+          <Quality model={model} csv={csv} />
+          <Sample model={model} csv={csv} />
         </div>
 
         {model.note && <p className="od-model__note">{model.note}</p>}
@@ -194,7 +195,7 @@ function Simulator({ model, profile, setProfile }: { model: ModelData; profile: 
 
 const TICKS = [0.1, 0.25, 0.5, 1, 2, 4, 8];
 
-function Forest({ model }: { model: ModelData }) {
+function Forest({ model, csv }: { model: ModelData; csv?: CsvSource }) {
   const spec = model.spec;
   const box = useRef<HTMLDivElement>(null);
   const width = useWidth(box, 720);
@@ -230,6 +231,7 @@ function Forest({ model }: { model: ModelData }) {
       subtitle="Razón de probabilidades (Exp(B)) con su intervalo del 95 % · escala logarítmica"
       source={model.source}
       exportName="modelo-factores"
+      csv={csv}
       actions={
         <ViewSwitch
           label="Orden de los factores"
@@ -325,7 +327,7 @@ function Forest({ model }: { model: ModelData }) {
 
 /* --- Calidad ------------------------------------------------------------------------ */
 
-function Quality({ model }: { model: ModelData }) {
+function Quality({ model, csv }: { model: ModelData; csv?: CsvSource }) {
   const spec = model.spec;
   const q = classificationOf(spec);
   const c = spec.classification;
@@ -342,6 +344,7 @@ function Quality({ model }: { model: ModelData }) {
       subtitle={`Tabla de clasificación · punto de corte ${fmtPctRound(spec.fit.cutoff * 100)}`}
       source={model.source}
       exportName="modelo-calidad"
+      csv={csv}
     >
       <div className="od-model__howto">
         <p>
@@ -424,7 +427,7 @@ function Quality({ model }: { model: ModelData }) {
 /* --- Muestra ------------------------------------------------------------------------ */
 
 
-function Sample({ model }: { model: ModelData }) {
+function Sample({ model, csv }: { model: ModelData; csv?: CsvSource }) {
   const spec = model.spec;
   const ref = useRef<HTMLDivElement>(null);
   const seen = useInView(ref);
@@ -435,6 +438,7 @@ function Sample({ model }: { model: ModelData }) {
       subtitle={`${count(spec.sample.n)} estudiantes · cohortes ${spec.sample.cohorts} · ${spec.sample.source}`}
       source={model.source}
       exportName="modelo-muestra"
+      csv={csv}
     >
       <p className="od-model__population">{spec.sample.population}</p>
       <div ref={ref} className="od-model__sample" data-seen={seen || undefined}>

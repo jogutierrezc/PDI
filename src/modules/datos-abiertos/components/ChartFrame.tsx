@@ -15,6 +15,8 @@ import type { ReactNode } from "react";
 import { Icon } from "../../../components/ui/Icon";
 import { exportChart } from "./chart-export";
 import type { ImageFormat } from "./chart-export";
+import { CsvAction } from "./CsvAction";
+import type { CsvSource } from "./CsvAction";
 import "./chart-export.css";
 
 interface ChartFrameProps {
@@ -35,11 +37,13 @@ interface ChartFrameProps {
    * que decir de qué oficina viene y no de cuál se parece.
    */
   stamp?: string;
+  /** Datos del conjunto en CSV: pone la acción «CSV» en el pie, junto a la fuente. */
+  csv?: Omit<CsvSource, "name"> & { name?: string };
 }
 
 const stampDate = new Intl.DateTimeFormat("es-CO", { day: "numeric", month: "long", year: "numeric" });
 
-export function ChartFrame({ title, subtitle, source, actions, children, className = "", id, exportName, exportable = true, stamp }: ChartFrameProps) {
+export function ChartFrame({ title, subtitle, source, actions, children, className = "", id, exportName, exportable = true, stamp, csv }: ChartFrameProps) {
   const figure = useRef<HTMLElement>(null);
   const [busy, setBusy] = useState<ImageFormat | null>(null);
   const [failed, setFailed] = useState(false);
@@ -91,7 +95,14 @@ export function ChartFrame({ title, subtitle, source, actions, children, classNa
         )}
       </figcaption>
       <div className="od-frame__body">{children}</div>
-      {source && <p className="od-frame__source">Reporta: {source}</p>}
+      {csv ? (
+        <div className="od-frame__foot" data-export-ignore={source ? undefined : ""}>
+          {source && <p className="od-frame__source">Reporta: {source}</p>}
+          <CsvAction {...csv} name={csv.name ?? title} />
+        </div>
+      ) : (
+        source && <p className="od-frame__source">Reporta: {source}</p>
+      )}
       <p className="od-frame__stamp" aria-hidden="true">
         <span>{stamp ?? "UDES en Cifras"} · Universidad de Santander</span>
         <span>Descargada el {stampDate.format(new Date())}</span>

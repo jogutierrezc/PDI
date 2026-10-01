@@ -8,6 +8,7 @@
 
 import { supabase, readFunctionError } from "../../../lib/supabase";
 import { speak, stopSpeaking } from "../voice";
+import { directVoice, playPiloAudio, stopPiloAudio } from "./voice-player";
 import type { AnalysisBrief, AnalysisPart, Answer, Mesh, NeedAnswer, NeedInput, ReportKind, Section } from "./logic";
 import type { Portal } from "./config";
 
@@ -520,13 +521,11 @@ export async function probeVoice(text: string, style?: string): Promise<{ audio:
   return { audio: data, ms: Math.round(performance.now() - started) };
 }
 
-let audio: HTMLAudioElement | null = null;
 let token = 0;
 
 export function stopPilo() {
   token += 1;
-  audio?.pause();
-  audio = null;
+  stopPiloAudio();
   stopSpeaking();
 }
 
@@ -543,10 +542,14 @@ function audioFor(text: string, portal: Portal, style?: string): Promise<Blob | 
   const key = `${portal}|${style ?? ""}|${text}`;
   const known = audios.get(key);
   if (known) return known;
-  const asked = supabase.functions
-    .invoke<Blob>("pilo-ia", { body: { action: "voz", portal, text, style } })
-    .then(({ data, error }) => (!error && data instanceof Blob && data.size > 0 ? data : null))
-    .catch(() => null)
+  const usual = () =>
+    supabase.functions
+      .invoke<Blob>("pilo-ia", { body: { action: "voz", portal, text, style } })
+      .then(({ data, error }) => (!error && data instanceof Blob && data.size > 0 ? data : null))
+      .catch(() => null);
+  // Primero la vía directa (Vercel), que responde antes; si no está o tropieza, la de siempre.
+  // Un estilo pedido a propósito (la prueba de la configuración) solo lo sabe dar la de siempre.
+  const asked = (style ? usual() : directVoice(text).then((blob) => blob ?? usual()))
     .then((blob) => {
       // Lo que falló se puede volver a pedir más tarde.
       if (!blob) audios.delete(key);
@@ -577,16 +580,7 @@ export async function sayWithPilo(
     const data = await audioFor(text, options.portal, options.style);
     if (mine !== token) return "cancelado";
     if (data) {
-      const url = URL.createObjectURL(data);
-      const player = new Audio(url);
-      player.playbackRate = options.rate ?? 1;
-      audio = player;
-      const done = await new Promise<boolean>((resolve) => {
-        player.onended = () => resolve(true);
-        player.onerror = () => resolve(false);
-        player.play().catch(() => resolve(false));
-      });
-      URL.revokeObjectURL(url);
+      const done = await playPiloAudio(data, options.rate ?? 1);
       if (mine !== token) return "cancelado";
       if (done) return "proveedor";
     }

@@ -15,9 +15,12 @@
    Pedido (POST, JSON):
      { action: "resumir" | "sintetizar" | "explicar", portal, page, sections: [{title, kind, text}] }
      { action: "voz", portal, text }            → audio (application/octet-stream)
-     { action: "probar" }                        → { ok, ms } (solo administración)
-     { action: "preguntar", portal: "pregunta", question, history? }
-                                                 → { kind, text, sources, trail, answerId?, mood?, graph? }
+     { action: "probar" }                        → { ok, ms, system_role, stream, reasoning, … } (solo administración)
+     { action: "preguntar", portal: "pregunta", question, history?, stream? }
+                                                 → { kind, text, sources, trail, answerId?, mood?, graph?, grounding?, intent?, … }
+                                                 con stream: true y si escribe el modelo → text/event-stream
+                                                 (meta → delta… → done | error). El contrato completo está en
+                                                 .ccg/tasks/pilo-ia-siempre/contract.md
      { action: "calificar", portal: "pregunta", answerId?, vote: "up" | "down", question?, text?, kind? }
                                                  «No me sirvió» anota la pregunta en la bandeja (0109)
      { action: "indexar", step: "estado" | "lote" | "probar" | "modelos", q? }   (solo administración, 0108)
@@ -25,17 +28,21 @@
      { action: "analizar", portal: "cifras" | "impacto", analysis: {brief, part, title, facts, pdi, doc?, scope?} }
                                                  → { summary, paragraphs, alerts, recommendations, unknown, verified }
 
-   «Preguntar» (la página Pregúntele a Pilo) gasta lo menos posible: el
-   catálogo de Planeación (0096), reglas, respuestas ya dadas, búsqueda en la
-   memoria (0094) y su malla (0097, para lo que es de estructura) van primero; la IA
-   solo redacta si hace falta, y si no hay IA o cupo, se responde con los
-   pasajes tal cual. Funciona aunque la IA no esté conectada.
-   Antes de buscar, Pilo entiende el corte (sede, año, periodo) y une la
-   pregunta de seguimiento con la anterior; la IA solo reescribe la pregunta
-   cuando las reglas no alcanzan. Las cifras en vivo (0107) dan la cifra
-   exacta de ese corte, con el mismo cálculo de UDES en Cifras. Con NVIDIA o
-   Mistral, la búsqueda es híbrida (0108): por palabras y por significado
-   (embeddings), fundidas por rangos recíprocos.
+   «Preguntar» (la página Pregúntele a Pilo) responde siempre con IA (0110), con
+   lo que Pilo sabe por delante. Un enrutador por reglas etiqueta la pregunta
+   sin bloquearla: solo lo vetado (el dinero de la universidad, los datos de
+   personas) y las capciosas del catálogo salen sin modelo. El catálogo de
+   Planeación (0096), las respuestas ya dadas, las cifras en vivo (0107) y la
+   memoria (0094, híbrida por palabras y por significado, 0108) se buscan a
+   la vez, y todo va al modelo en un solo pedido por bloques: [OFICIAL],
+   [GUARDADA], [CIFRAS], [PASAJES], la conversación como turnos reales y la
+   pregunta. El corte (sede, año, periodo) y la pregunta de seguimiento se
+   entienden por reglas, sin una llamada previa al modelo. La respuesta sale
+   por partes (SSE) y, al terminar, se podan las citas, se revisan los números,
+   se filtra el dinero y se marca si es información citada o conocimiento
+   general. Sin IA, sin cupo o si el proveedor falla o tarda, responde con lo
+   publicado tal cual: funciona aunque la IA no esté conectada.
+   La voz tiene su propio cupo y la página pública, un límite por visitante.
    Pilo aprende (0109): lo que no supo, lo que no sirvió y lo que la IA dijo
    sin fuente va a una bandeja; Planeación lo responde en el catálogo, que
    también se reconoce por significado.
@@ -2906,7 +2913,8 @@ async function handle(request: Request): Promise<Response> {
   const embedder = preset && String(settings.embed_model ?? "").trim() ? { ...preset, model: String(settings.embed_model).trim() } : preset;
 
   /** La bandeja de lo que Pilo no supo (0109). Sin esa migración, no anota y sigue. */
-  const learn = async (question: string, reason: "sin_respuesta" | "no_sirvio" | "revisar", kind: string, answer: string, answerId: number | null = null) => {
+  // «general» (0110): la IA respondió de conocimiento general, sin fuente institucional.
+  const learn = async (question: string, reason: "sin_respuesta" | "no_sirvio" | "revisar" | "general", kind: string, answer: string, answerId: number | null = null) => {
     const q = question.replace(/\s+/g, " ").trim().slice(0, 500);
     const qn = normalizeQuestion(q);
     if (qn.length < 2) return;
@@ -3199,17 +3207,40 @@ async function handle(request: Request): Promise<Response> {
     return rows;
   }
 
+  /** En qué iba «preguntar» cuando algo falló: el error final lo dice tal cual. */
+  type Stage = "leer el pedido" | "buscar en lo publicado" | "redactar la respuesta" | "guardar la respuesta";
+  let stage = "leer el pedido" as Stage;
+
   /**
-   * Pregúntele a Pilo, por capas: catálogo → reglas → respuestas guardadas → memoria →
-   * IA. Cada capa deja su paso en `trail`, que la página muestra en «Cómo
-   * respondí». Solo la IA cuenta para el cupo del día.
+   * Pregúntele a Pilo con IA siempre (0110). La respuesta la escribe el modelo,
+   * con lo que Pilo sabe por delante:
+   *   1. un enrutador por reglas etiqueta la pregunta; solo lo vetado (dinero de
+   *      la universidad, datos de personas) y las capciosas del catálogo salen
+   *      sin modelo;
+   *   2. catálogo, respuestas guardadas, cifras en vivo y memoria se buscan a la
+   *      vez (sin una llamada previa al modelo para «entender»);
+   *   3. todo va en un solo pedido por bloques ([OFICIAL], [GUARDADA], [CIFRAS],
+   *      [PASAJES]), con la conversación como turnos reales;
+   *   4. con `stream: true`, la respuesta sale por partes (meta → delta… → done);
+   *   5. al terminar se podan las citas, se revisan los números, se filtra el
+   *      dinero y se marca si es información citada o conocimiento general.
+   * Sin IA (apagada, sin cupo, caída o lenta), responde lo publicado tal cual,
+   * como antes. Cada paso queda en `trail` («Cómo respondí»). Solo la IA
+   * cuenta para el cupo del día.
    */
   async function answerQuestion(): Promise<Response> {
-    const question = String(body.question ?? "").replace(/\s+/g, " ").trim().slice(0, 500);
+    const question = String(body.question ?? "").replace(/\s+/g, " ").trim().slice(0, ASK_QUESTION_CHARS);
     if (question.length < 2) return json({ error: "Escriba su pregunta." }, 400);
-    const history = (Array.isArray(body.history) ? body.history : [])
-      .filter((h) => h && typeof h.q === "string" && typeof h.a === "string")
-      .slice(-2);
+    const turnstile = await visitorCheck("p");
+    if (!turnstile.ok) {
+      return json(
+        { error: "Va muy rápido: espere un momento antes de volver a preguntar.", advice: `Podrá preguntar de nuevo en ${turnstile.retry} s.`, code: "visitante", retry_after: turnstile.retry },
+        429,
+        { "Retry-After": String(turnstile.retry) },
+      );
+    }
+    const history = cleanHistory(body.history);
+    const wantStream = body.stream === true && ask.stream;
     type Step = { step: string; status: "ok" | "skip" | "ai"; detail: string; ms: number };
     const trail: Step[] = [];
     let t0 = Date.now();
@@ -3222,25 +3253,7 @@ async function handle(request: Request): Promise<Response> {
     const sources = ["cifras", "boletines", "pdi", "observatorio", "impacto"].filter((s) => on[s] !== false && (s !== "impacto" || role));
     type Row = Passage & { updated_at: string };
     type Hit = Row & { rank: number; via?: "palabras" | "significado" | "ambas"; sim?: number };
-    const shape = (p: Passage, i: number) => ({
-      n: i + 1,
-      ref: p.ref,
-      source: p.source,
-      title: p.title,
-      section: p.section,
-      path: p.path,
-      cut: p.cut,
-      office: p.office,
-      excerpt: p.body.slice(0, 900),
-    });
-    // La pregunta como la entendió la IA en su contexto (vacía si no hizo falta).
-    // Vuelve a la página, que la manda como historia: así el contexto se encadena.
-    let rewritten = "";
-    const reply = async (kind: string, text: string, passages: Passage[], extra: Record<string, unknown> = {}) => {
-      await log(kind === "ia" ? "listo" : `listo · ${kind}`, question, kind !== "ia");
-      return json({ kind, text, sources: passages.map(shape), trail, ...(rewritten ? { asked: rewritten } : {}), ...extra });
-    };
-    // El vector de cada texto buscado, una sola vez aunque lo pidan la memoria y las cifras a la par.
+    // El vector de cada texto buscado, una sola vez aunque lo pidan el catálogo, la memoria y las cifras a la par.
     const vectors = new Map<string, Promise<string | null>>();
     const queryVector = (q: string): Promise<string | null> => {
       let found = vectors.get(q);
@@ -3256,7 +3269,7 @@ async function handle(request: Request): Promise<Response> {
     };
     const model = embedder?.model ?? "";
     // Por palabras y, si hay vectores, por significado; las dos listas se funden.
-    const search = async (q = question): Promise<Hit[]> => {
+    const search = async (q: string): Promise<Hit[]> => {
       const v = await queryVector(q);
       const [lex, sem] = await Promise.all([
         admin.rpc("pilo_memory_search", { p_q: q, p_sources: sources, p_limit: 8 }),
@@ -3287,154 +3300,123 @@ async function handle(request: Request): Promise<Response> {
       return rows;
     };
 
-    // 0. Entender primero, cuando hay conversación. Si hay IA, lee la pregunta en
-    //    su contexto y la reescribe completa («¿y en 2023?» → «¿Cuántos estudiantes
-    //    matriculados hubo en Cúcuta en 2023?»); todo lo demás (catálogo, cifras,
-    //    memoria, redacción) trabaja con esa pregunta. Sin IA, las reglas unen la
-    //    pregunta de seguimiento con la anterior.
-    const campuses = await loadCampuses();
+    stage = "buscar en lo publicado";
+    const [campuses, catalog] = await Promise.all([loadCampuses(), loadCatalog()]);
     const aiOn = connected && settings.enabled && (settings.functions ?? {}).preguntar !== false;
-    let limited: boolean | null = null;
     const noAiReason = async (): Promise<string> => {
       if (!aiOn) return "La IA está apagada: respondo con lo publicado tal cual.";
-      if (limited === null) limited = await overLimit();
-      return limited ? "Se acabó el cupo de IA de hoy: respondo con lo publicado tal cual." : "";
+      return (await overLimit()) ? "Se acabó el cupo de IA de hoy: respondo con lo publicado tal cual." : "";
     };
-    const prev = history.length ? String(history[history.length - 1].q) : "";
-    const followUp = history.length > 0 && isFollowUp(question, campuses);
-    const follow = followUp ? prev : "";
-    const own = parseSlots(question, campuses);
-    let slots = follow ? mergeSlots(parseSlots(follow, campuses), own) : own;
-    let query = expandQuery(follow ? `${follow} ${question}` : question);
-    let triedAi = false;
-    const understand = async (): Promise<boolean> => {
-      if (triedAi) return false;
-      triedAi = true;
-      if (await noAiReason()) return false;
-      try {
-        const r = await callProvider(target.url, {
-          method: "POST",
-          headers,
-          signal: AbortSignal.timeout(15_000),
-          body: JSON.stringify({
-            model: target.model,
-            messages: buildUnderstandMessages(question, history),
-            temperature: 0,
-            max_tokens: 200,
-            ...(settings.provider === "mistral" ? { response_format: { type: "json_object" } } : {}),
-          }),
-        });
-        if (!r.ok) {
-          await r.body?.cancel();
-          return false;
-        }
-        const d = await r.json();
-        const u = parseUnderstand(String(d?.choices?.[0]?.message?.content ?? ""), question);
-        if (normalizeQuestion(u.question) !== normalizeQuestion(question)) {
-          rewritten = u.question;
-          slots = mergeSlots(slots, parseSlots(u.question, campuses));
-        }
-        if (!rewritten && !u.terms.length) return false;
-        query = expandQuery(`${rewritten || question} ${u.terms.join(" ")}`);
-        return true;
-      } catch {
-        return false;
-      }
+
+    // 1. El enrutador: etiqueta la pregunta sin bloquearla. Las capciosas del
+    //    catálogo salen tal cual y lo vetado, con su negativa; lo demás, al modelo.
+    const route = routeQuestion(question, catalog);
+    // La pregunta de seguimiento se une con las anteriores por reglas (sede, año, periodo).
+    const chain = followChain(question, history, campuses);
+    const { slots, query, asked } = chain;
+    const loose = chain.follow.length > 0;
+    let intent: Intent = route.intent;
+    if (intent === "general" && loose && routeIntent(chain.follow.join(" ")).intent === "institucional") intent = "institucional";
+    const chatty = intent === "saludo" || intent === "charla";
+
+    /** Anota el pedido y arma el objeto de la respuesta (el mismo con o sin streaming). */
+    const settle = async (kind: string, text: string, passages: Passage[], extra: Record<string, unknown> = {}, grounding?: Grounding) => {
+      await log(`listo · ${kind}`, question, true);
+      return askPayload({ kind, text, passages, trail, asked, intent, grounding, extra });
     };
-    if (history.length) await understand();
-    // Lo que de verdad se pregunta. Una de seguimiento que nadie reescribió no
-    // va al catálogo ni a las respuestas guardadas: sola no dice qué pide.
-    const asked = rewritten || question;
-    const loose = followUp && !rewritten;
+    const hitCatalog = (key: string) => {
+      admin.rpc("pilo_catalog_hit", { p_key: key }).then(
+        () => undefined,
+        () => undefined,
+      );
+    };
 
-    // 1. El catálogo de Planeación (0096): respuestas oficiales y microexpresiones
-    //    para capciosas. Va antes que las reglas: lo que Planeación escribió manda.
-    const catalog = await loadCatalog();
-    const hit = matchCatalog(asked, loose ? catalog.filter((c) => c.kind === "capciosa") : catalog);
-    if (hit) {
-      const e = hit.entry;
-      void admin.rpc("pilo_catalog_hit", { p_key: e.key });
-      if (e.kind === "capciosa") {
-        step("Catálogo", "ok", `Pregunta capciosa: respondo con la microexpresión ${e.key}.`);
-        return reply("capciosa", e.answer, [], { mood: e.mood });
-      }
-      const source: Passage[] = e.source_title
-        ? [{ ref: `catalogo:${e.key}`, source: "catalogo", title: e.source_title, section: "Respuesta de Planeación", body: e.answer, path: e.source_path, cut: e.cut, office: e.office }]
-        : [];
-      step("Catálogo", "ok", `Respuesta oficial de Planeación (${e.key}), parecida en ${Math.round(hit.score * 100)} %.`);
-      const text = source.length && !/\[1\]/.test(e.answer) ? `${e.answer} [1]` : e.answer;
-      return reply("curada", text, source, { mood: e.mood });
+    if (route.intent === "capciosa" && route.entry) {
+      const e = route.entry;
+      hitCatalog(e.key);
+      step("Enrutador", "ok", `Pregunta capciosa: respondo con la microexpresión ${e.key}, tal cual.`);
+      return json(await settle("capciosa", e.answer, [], { mood: e.mood }));
     }
-    step("Catálogo", "skip", catalog.length ? "Nada del catálogo coincide." : "El catálogo está vacío.");
+    if (route.intent === "vetado" && route.veto) {
+      step("Enrutador", "ok", route.veto === "dinero" ? "Pide cifras de dinero de la universidad: no son públicas y no se dan." : "Pide datos de personas: no se dan.");
+      return json(await settle("regla", RULE_TEXT[route.veto], []));
+    }
+    const label: Record<string, string> = { saludo: "Es un saludo", charla: "Es conversación", institucional: "Es sobre la universidad", general: "Es de tema general" };
+    step("Enrutador", "ok", `${label[intent] ?? "Pregunta"}: la responde la IA, con lo que Pilo sabe por delante.`);
 
-    // 2. Reglas: saludos, quién es Pilo, dinero, datos de personas, el futuro.
-    const rule = ruleFor(asked);
-    if (rule && rule.rule !== "futuro") {
-      step("Reglas", "ok", "La pregunta se responde con una regla fija de Pilo.");
-      return reply("regla", RULE_TEXT[rule.rule], []);
-    }
-    if (rule?.rule === "futuro") {
-      const found = (await search(asked)).slice(0, 1);
-      step("Reglas", "ok", `Pide un dato de ${rule.year}, que aún no existe: se responde con lo último publicado.`);
-      const text = `${RULE_TEXT.futuro}${found.length ? ` Lo más reciente publicado sobre eso está en «${found[0].title}»${found[0].cut ? ` (corte ${found[0].cut})` : ""} [1].` : ""}`;
-      return reply("regla", text, found);
-    }
-    step("Reglas", "skip", "Ninguna regla aplica.");
-
-    // 2b. El catálogo por significado (0109): la respuesta oficial también sirve
-    //     cuando la pregunta llega con otras palabras. Solo si se parece mucho.
-    const officialVec = !loose && catalog.some((c) => c.kind === "respuesta") ? await queryVector(expandQuery(asked)) : null;
-    if (officialVec) {
-      const { data: near } = await admin.rpc("pilo_catalog_semantic", { p_embedding: officialVec, p_model: model, p_min: CATALOG_SEMANTIC_MIN });
+    // 2. La búsqueda, toda a la vez: el catálogo por significado, las respuestas
+    //    guardadas, las cifras en vivo, la memoria y el cupo. Un saludo no busca.
+    //    Una de seguimiento no va sola al catálogo ni a las guardadas: sola no dice qué pide.
+    const qnorm = normalizeQuestion(question);
+    const responses = catalog.filter((c) => c.kind === "respuesta");
+    const wantFacts = !chatty && (wantsFigure(query) || hasSlots(slots));
+    type Saved = { id: number; question: string; qnorm: string; answer: string; refs: string[]; fresh: boolean };
+    const officialBySense = async (): Promise<{ entry: CatalogEntry; sim: number } | null> => {
+      if (chatty || loose || !responses.length) return null;
+      const v = await queryVector(query);
+      if (!v) return null;
+      const { data: near } = await admin.rpc("pilo_catalog_semantic", { p_embedding: v, p_model: model, p_min: CATALOG_SEMANTIC_MIN });
       const top = ((near ?? []) as { key: string; sim: number }[])[0];
-      const e = top ? catalog.find((c) => c.key === top.key && c.kind === "respuesta") : undefined;
-      if (e) {
-        void admin.rpc("pilo_catalog_hit", { p_key: e.key });
-        const source: Passage[] = e.source_title
-          ? [{ ref: `catalogo:${e.key}`, source: "catalogo", title: e.source_title, section: "Respuesta de Planeación", body: e.answer, path: e.source_path, cut: e.cut, office: e.office }]
-          : [];
-        step("Catálogo por significado", "ok", `Respuesta oficial de Planeación (${e.key}): la pregunta dice lo mismo con otras palabras (${Math.round(top.sim * 100)} % de parecido).`);
-        const text = source.length && !/\[1\]/.test(e.answer) ? `${e.answer} [1]` : e.answer;
-        return reply("curada", text, source, { mood: e.mood });
-      }
-      step("Catálogo por significado", "skip", "Ninguna respuesta oficial se parece lo suficiente.");
-    }
+      const entry = top ? responses.find((c) => c.key === top.key) : undefined;
+      return entry ? { entry, sim: top.sim } : null;
+    };
+    const savedCandidates = async (): Promise<Saved[]> => {
+      if (chatty || loose) return [];
+      const { data } = await admin.rpc("pilo_answer_candidates", { p_qnorm: qnorm });
+      return (data ?? []) as Saved[];
+    };
+    const [bySense, candidates, facts, found, aiOff] = await Promise.all([
+      officialBySense(),
+      savedCandidates(),
+      wantFacts ? searchFacts(query) : Promise.resolve([] as FactHit[]),
+      chatty ? Promise.resolve([] as Hit[]) : search(query),
+      noAiReason(),
+    ]);
 
-    // 3. Respuestas guardadas: casi la misma pregunta, con sus fuentes sin cambios
-    //    y el mismo corte (una respuesta de 2024 no sirve para 2023).
-    const qnorm = normalizeQuestion(asked);
-    const { data: candidates } = loose ? { data: [] } : await admin.rpc("pilo_answer_candidates", { p_qnorm: qnorm });
-    const sameCutOnly = ((candidates ?? []) as { id: number; question: string; qnorm: string; answer: string; refs: string[]; fresh: boolean }[]).filter((c) => sameCut(asked, c.question, campuses));
-    const saved = loose ? null : pickSaved(qnorm, sameCutOnly);
+    // 2a. El catálogo de Planeación (0096, 0109): la respuesta oficial es la base
+    //     obligatoria del modelo, por palabras o por significado.
+    const byWords = chatty || loose ? null : matchCatalog(question, responses);
+    const officialEntries = [byWords?.entry, bySense?.entry].filter((e, i, all): e is CatalogEntry => Boolean(e) && all.findIndex((x) => x?.key === e?.key) === i).slice(0, 2);
+    const officialPassage = (e: CatalogEntry): Passage => ({
+      ref: `catalogo:${e.key}`,
+      source: "catalogo",
+      title: e.source_title || e.question,
+      section: "Respuesta de Planeación",
+      body: e.answer,
+      path: e.source_path,
+      cut: e.cut,
+      office: e.office,
+    });
+    for (const e of officialEntries) hitCatalog(e.key);
+    if (officialEntries.length) {
+      const how = [byWords ? `por palabras (${Math.round(byWords.score * 100)} %)` : "", bySense ? `por significado (${Math.round(bySense.sim * 100)} %)` : ""].filter(Boolean).join(" y ");
+      step("Catálogo", "ok", `Respuesta oficial de Planeación (${officialEntries.map((e) => e.key).join(", ")}), reconocida ${how}: es la base de la respuesta.`);
+    } else if (!chatty) step("Catálogo", "skip", loose ? "Pregunta de seguimiento: el catálogo no se consulta sin su contexto." : catalog.length ? "Nada del catálogo coincide." : "El catálogo está vacío.");
+
+    // 2b. Respuestas guardadas: casi la misma pregunta, con sus fuentes sin cambios
+    //     y el mismo corte (una respuesta de 2024 no sirve para 2023).
+    const saved = pickSaved(
+      qnorm,
+      candidates.filter((c) => sameCut(question, c.question, campuses)),
+    );
+    let savedPassages: Passage[] = [];
     if (saved) {
       const { data: rows } = await admin.from("pilo_memory").select("ref, source, title, section, body, path, cut, office").in("ref", saved.refs);
       const byRef = new Map(((rows ?? []) as Passage[]).map((r) => [r.ref, r]));
-      const passages = saved.refs.map((r) => byRef.get(r)).filter(Boolean) as Passage[];
-      await admin.from("pilo_answers").update({ last_hit_at: new Date().toISOString() }).eq("id", saved.id);
+      savedPassages = saved.refs.map((r) => byRef.get(r)).filter(Boolean) as Passage[];
       step("Respuestas guardadas", "ok", `Ya se había respondido «${saved.question}», y sus fuentes no han cambiado.`);
-      step("IA", "skip", "No hizo falta.");
-      return reply("memoria", saved.answer, passages, { answerId: saved.id });
-    }
-    step("Respuestas guardadas", "skip", (candidates ?? []).length ? "Había preguntas parecidas, pero no iguales o sus fuentes cambiaron." : "No había una pregunta igual guardada.");
+    } else if (!chatty && !loose) step("Respuestas guardadas", "skip", candidates.length ? "Había preguntas parecidas, pero no iguales o sus fuentes cambiaron." : "No había una pregunta igual guardada.");
 
-    // 4. El corte que se pide y la búsqueda: cifras en vivo y memoria. Si con las
-    //    reglas no se encontró nada, la IA intenta entender la pregunta (una vez).
-    const lookup = () => Promise.all([wantsFigure(query) || hasSlots(slots) ? searchFacts(query) : Promise.resolve([] as FactHit[]), search(query)]);
-    let [facts, found] = await lookup();
-    if (!facts.length && !found.length && (await understand())) [facts, found] = await lookup();
+    // 2c. El corte que se pide.
     const cutParts = [
       slots.campus.length ? `sede ${slots.campus.join(", ")}` : slots.byCampus ? "todas las sedes" : "",
       slots.years.length ? `año ${slots.years.join(", ")}` : "",
       slots.term ? `periodo ${slots.term === "A" ? 1 : 2}` : "",
     ].filter(Boolean);
-    const understood = [
-      follow ? `Sigue a «${follow.slice(0, 80)}».` : "",
-      rewritten ? `La IA la entendió como «${rewritten.slice(0, 120)}».` : "",
-      cutParts.length ? `Pide: ${cutParts.join(" · ")}.` : "",
-    ].filter(Boolean);
-    step("Entender", understood.length ? (rewritten ? "ai" : "ok") : "skip", understood.length ? understood.join(" ") : "Pregunta directa, sin sede, año ni periodo.");
+    const understood = [loose ? `Sigue a «${chain.follow.join(CHAIN_SEP).slice(0, 120)}».` : "", cutParts.length ? `Pide: ${cutParts.join(" · ")}.` : ""].filter(Boolean);
+    if (!chatty) step("Entender", understood.length ? "ok" : "skip", understood.length ? understood.join(" ") : "Pregunta directa, sin sede, año ni periodo.");
 
-    // 4a. Las cifras en vivo: la cifra exacta de ese corte, del mismo cálculo del portal.
+    // 2d. Las cifras en vivo: la cifra exacta de ese corte, del mismo cálculo del portal.
     const topFact = facts[0]?.rank ?? 0;
     const dataPassages: Passage[] = [];
     let lead: { fact: Fact; points: FactPoint[]; missing: string[] } | null = null;
@@ -3447,99 +3429,273 @@ async function handle(request: Request): Promise<Response> {
     if (dataPassages.length) {
       const d = dataPassages[0];
       step("Cifras", "ok", `«${d.title}»${d.cut ? ` en ${d.cut}` : ""}${lead?.missing.length ? `; sin cifra para ${lead.missing.join(", ")}` : ""}.`);
-    } else if (wantsFigure(query) || hasSlots(slots)) {
+    } else if (wantFacts) {
       step("Cifras", "skip", facts.length ? "Ningún indicador tiene cifras para ese corte." : "Ningún indicador de UDES en Cifras coincide.");
     }
 
-    // 4b. La memoria: los pasajes más cercanos de lo publicado.
+    // 2e. La memoria: los pasajes más cercanos de lo publicado.
     const memory = found
       .filter((p) => p.rank >= (found[0]?.rank ?? 0) * 0.3 && !dataPassages.some((d) => d.ref === `dato:${p.ref}`))
       .slice(0, dataPassages.length ? 3 : 5);
-    const passages: Passage[] = [...dataPassages, ...memory];
-    if (!passages.length) {
-      step("Fuentes", "skip", "Ningún pasaje de lo publicado responde la pregunta.");
-      step("IA", "skip", "Sin fuentes no se redacta.");
-      await learn(asked, "sin_respuesta", "nada", NOTHING_TEXT);
-      return reply("nada", NOTHING_TEXT, []);
-    }
     const names: Record<string, string> = { cifras: "UDES en Cifras", boletines: "Boletines", pdi: "Plan de Desarrollo", observatorio: "Observatorio", impacto: "Portal de Impacto" };
     if (memory.length) {
       const where = [...new Set(memory.map((p) => names[p.source] ?? p.source))].join(", ");
-      const bySense = memory.filter((p) => p.via === "significado").length;
-      step("Fuentes", "ok", `${memory.length} ${memory.length === 1 ? "pasaje" : "pasajes"} en ${where}${bySense ? ` (${bySense} ${bySense === 1 ? "hallado" : "hallados"} solo por significado)` : ""}.`);
-    } else step("Fuentes", "skip", "La memoria no suma nada a la cifra.");
+      const bySenseOnly = memory.filter((p) => p.via === "significado").length;
+      step("Fuentes", "ok", `${memory.length} ${memory.length === 1 ? "pasaje" : "pasajes"} en ${where}${bySenseOnly ? ` (${bySenseOnly} ${bySenseOnly === 1 ? "hallado" : "hallados"} solo por significado)` : ""}.`);
+    } else if (!chatty) step("Fuentes", "skip", dataPassages.length ? "La memoria no suma nada a la cifra." : "Ningún pasaje de lo publicado coincide con la pregunta.");
 
-    // 4c. La malla (0097): dónde queda cada pasaje y qué contiene. Sin 0097, vacía.
+    // 2f. La malla (0097): dónde queda cada pasaje y qué contiene. Sin 0097, vacía.
     const mesh = await meshAround(memory.map((p) => p.ref), sources);
     const inMesh = memory.filter((p) => mesh.nodes.some((n) => n.id === p.ref));
     const drawFor = (ref: string | undefined) => (ref && mesh.nodes.some((n) => n.id === ref) ? { graph: focusMesh(mesh, ref) } : {});
-    if (isStructural(asked) && inMesh.length && !dataPassages.length) {
-      const focus = inMesh[0];
-      const text = describeNode(mesh, focus.ref);
-      if (text) {
-        step("Malla", "ok", `La pregunta es de estructura: respondo con la malla de «${focus.title}».`);
-        step("IA", "skip", "No hizo falta.");
-        return reply("malla", text, [focus], drawFor(focus.ref));
-      }
-    }
     if (mesh.nodes.length) step("Malla", "ok", `Ubiqué ${inMesh.length} de los pasajes en la malla.`);
 
-    // 5. La IA redacta, si está conectada y hay cupo; si no, la cifra con su
-    //    plantilla o los pasajes tal cual.
-    const noAi = await noAiReason();
-    if (noAi) {
-      step("IA", "skip", noAi);
-      if (lead) return reply("dato", dataAnswer(lead.fact, lead.points, lead.missing), [dataPassages[0]]);
-      return reply("extracto", extractAnswer(memory), memory.slice(0, 2), drawFor(memory[0]?.ref));
+    /**
+     * Sin modelo (apagado, sin cupo, caído o lento): lo que Pilo sabe, tal cual y
+     * en el orden de siempre. null si no hay nada publicado con qué responder.
+     */
+    const deterministic = async (extra: Record<string, unknown> = {}) => {
+      if (officialEntries.length) {
+        const e = officialEntries[0];
+        const source = e.source_title ? [officialPassage(e)] : [];
+        const text = source.length && !/\[1\]/.test(e.answer) ? `${e.answer} [1]` : e.answer;
+        return settle("curada", text, source, { mood: e.mood, ...extra }, "oficial");
+      }
+      if (saved) {
+        await admin.from("pilo_answers").update({ last_hit_at: new Date().toISOString() }).eq("id", saved.id);
+        return settle("memoria", saved.answer, savedPassages, { answerId: saved.id, ...extra }, "oficial");
+      }
+      if (isStructural(question) && inMesh.length && !dataPassages.length) {
+        const focus = inMesh[0];
+        const text = describeNode(mesh, focus.ref);
+        if (text) return settle("malla", text, [focus], { ...drawFor(focus.ref), ...extra }, "oficial");
+      }
+      if (lead) return settle("dato", dataAnswer(lead.fact, lead.points, lead.missing), [dataPassages[0]], extra, "oficial");
+      if (memory.length) return settle("extracto", extractAnswer(memory), memory.slice(0, 2), { ...drawFor(memory[0]?.ref), ...extra }, "oficial");
+      if (chatty && route.rule) return settle("regla", RULE_TEXT[route.rule], [], extra);
+      return null;
+    };
+
+    // 3. Sin IA o sin cupo: lo publicado tal cual, como siempre.
+    if (aiOff) {
+      step("IA", "skip", aiOff);
+      const out = await deterministic();
+      if (out) return json(out);
+      await learn(asked || question, "sin_respuesta", "nada", NOTHING_TEXT);
+      return json(await settle("nada", NOTHING_TEXT, []));
     }
-    const response = await callProvider(target.url, {
-      method: "POST",
-      headers,
-      body: JSON.stringify({
-        model: target.model,
-        messages: buildAskMessages(asked, passages, history, mapContext(mesh, memory.map((p) => p.ref))),
-        temperature: 0.2,
-        max_tokens: 600,
-        ...(settings.provider === "mistral" ? { response_format: { type: "json_object" } } : {}),
-      }),
+
+    // 4. Un solo pedido por bloques, en orden de prioridad y con una sola numeración.
+    const plan = planAsk({
+      official: officialEntries.map(officialPassage),
+      saved: saved ? { answer: saved.answer, passages: savedPassages } : null,
+      facts: dataPassages,
+      passages: memory,
+      budgetTokens: ask.contextTokens,
     });
-    if (!response.ok) {
-      const detail = await providerDetail(response);
-      await log(`error ${response.status}`, `${question} · ${detail}`);
-      step("IA", "skip", `El proveedor no respondió (${response.status}): respondo con lo publicado tal cual.`);
-      if (lead) return reply("dato", dataAnswer(lead.fact, lead.points, lead.missing), [dataPassages[0]]);
-      return reply("extracto", extractAnswer(memory), memory.slice(0, 2), drawFor(memory[0]?.ref));
+    const map = plan.sources
+      .map((p, i) => {
+        const way = pathTo(mesh, p.ref).filter((n) => n.type !== "fuente");
+        return way.length > 1 ? `[${i + 1}] ${way.map(nodeName).join(" › ")}` : "";
+      })
+      .filter(Boolean)
+      .join("\n");
+    const today = new Intl.DateTimeFormat("es-CO", { dateStyle: "long", timeZone: "America/Bogota" }).format(new Date());
+    const messages = buildAskMessages(plan, { question, history, map, hints: route.hints, today, turns: ask.turns });
+    const mood = plan.official ? officialEntries[0]?.mood : undefined;
+
+    type Draft =
+      | { ok: true; raw: string; finish: string; usage: ChatUsage | null; partial: boolean; why?: string }
+      | { ok: false; why: "tiempo" | "proveedor" | "limite_proveedor" | "vacio" | "red" | "cancelado"; status?: number; detail: string };
+
+    /**
+     * La redacción. Con `onDelta`, por partes: solo salen frases completas, sin
+     * razonamiento y sin cifras de dinero. Tiene tope de tiempo; si se corta con
+     * algo ya escrito, eso se conserva como respuesta parcial.
+     */
+    const draft = async (onDelta: ((text: string) => void) | null, abort: AbortController): Promise<Draft> => {
+      const ctx: MoneyContext = { institutional: intent === "institucional", known: new Set(numbersIn(plan.sources.map((p) => `${p.title} ${p.section} ${p.cut} ${p.body}`).join("\n"))) };
+      let timedOut = false;
+      const stop = () => {
+        timedOut = true;
+        abort.abort();
+      };
+      // Sin streaming, la primera señal es la respuesta entera: solo vale el tope total.
+      let first: ReturnType<typeof setTimeout> | undefined = onDelta ? setTimeout(stop, DRAFT_FIRST_TOKEN_MS) : undefined;
+      const total = setTimeout(stop, DRAFT_TOTAL_MS);
+      const reader = createChatReader();
+      let raw = "";
+      let shown = "";
+      const show = (final: boolean) => {
+        if (!onDelta) return;
+        const visible = streamVisible(raw, final, ctx);
+        if (visible.length <= shown.length || !visible.startsWith(shown)) return;
+        onDelta(visible.slice(shown.length));
+        shown = visible;
+      };
+      try {
+        const { response } = await chat(messages, { temperature: ask.temperature, max_tokens: ask.maxTokens, stream: Boolean(onDelta), signal: abort.signal });
+        if (!response.ok) {
+          const detail = await providerDetail(response);
+          return { ok: false, why: response.status === 429 ? "limite_proveedor" : "proveedor", status: response.status, detail };
+        }
+        const decoder = new TextDecoder();
+        const incoming = response.body?.getReader();
+        while (incoming) {
+          const { value, done } = await incoming.read();
+          if (done) break;
+          // Cualquier trozo (también el razonamiento de un modelo que piensa) es señal de vida.
+          if (first) {
+            clearTimeout(first);
+            first = undefined;
+          }
+          const piece = reader.push(decoder.decode(value, { stream: true }));
+          if (piece) {
+            raw += piece;
+            show(false);
+          }
+        }
+        const end = reader.end();
+        raw = end.text;
+        if (!cleanDraft(raw).trim()) {
+          if (end.error) return { ok: false, why: "proveedor", detail: end.error };
+          return { ok: false, why: "vacio", detail: `finish_reason=${end.finish || "?"}${end.reasoning ? " · solo llegó razonamiento (suba el tope de tokens o use un modelo sin razonamiento)" : ""}` };
+        }
+        show(true);
+        return { ok: true, raw, finish: end.finish, usage: end.usage, partial: Boolean(end.error), ...(end.error ? { why: "proveedor" } : {}) };
+      } catch (error) {
+        const why = abort.signal.aborted ? (timedOut ? "tiempo" : "cancelado") : "red";
+        if (why !== "cancelado" && cleanDraft(raw).trim()) return { ok: true, raw, finish: "", usage: null, partial: true, why };
+        return { ok: false, why, detail: String(error).slice(0, 200) };
+      } finally {
+        clearTimeout(first);
+        clearTimeout(total);
+      }
+    };
+
+    /** Lo que se hace con lo redactado: revisarlo, anotarlo, guardarlo si se puede y armar el objeto final. */
+    const conclude = async (out: Draft): Promise<{ payload: Record<string, unknown> } | { failure: { message: string; code: string; status: number } }> => {
+      stage = "guardar la respuesta";
+      const fin = out.ok ? finishAnswer(out.raw, plan.sources, { question, intent }) : null;
+      if (!out.ok || !fin || fin.empty) {
+        const why = out.ok ? "vacio" : out.why;
+        const detail = out.ok ? "la respuesta quedó vacía al revisarla" : out.detail;
+        if (why === "cancelado") {
+          await log("cancelado", question, true);
+          return { failure: { message: "Se canceló la pregunta.", code: "cancelado", status: 499 } };
+        }
+        await log(`error ${!out.ok && out.status ? out.status : why}`, `${question} · ${detail}`);
+        const said =
+          why === "tiempo"
+            ? `El proveedor de IA tardó más de lo que puedo esperar (${Math.round(DRAFT_TOTAL_MS / 1000)} s)`
+            : why === "limite_proveedor"
+              ? "El proveedor de IA limitó los pedidos (429)"
+              : why === "vacio"
+                ? "El modelo de IA no devolvió texto"
+                : why === "red"
+                  ? "No pude conectarme con el proveedor de IA"
+                  : `El proveedor de IA respondió con un error${!out.ok && out.status ? ` (${out.status})` : ""}`;
+        step("IA", "skip", `${said}: respondo con lo publicado tal cual.`);
+        const plainAnswer = await deterministic({ fallback: why });
+        if (plainAnswer) return { payload: plainAnswer };
+        trail[trail.length - 1].detail = `${said}, y no hay nada publicado con qué responder sin ella.`;
+        await learn(asked || question, "sin_respuesta", "nada", "");
+        return {
+          failure: {
+            message: `${said} y no encontré nada publicado con qué responder sin ella. Intente de nuevo en un momento.`,
+            code: why === "tiempo" ? "tiempo" : why === "limite_proveedor" ? "limite_proveedor" : "proveedor",
+            status: why === "tiempo" ? 504 : why === "limite_proveedor" ? 429 : 502,
+          },
+        };
+      }
+      const truncated = out.finish === "length";
+      const usedSaved = Boolean(saved && plan.saved);
+      const based = [
+        plan.official ? "la respuesta oficial" : "",
+        plan.saved ? "una respuesta guardada" : "",
+        plan.facts ? `${plan.facts} ${plan.facts === 1 ? "cifra" : "cifras"}` : "",
+        plan.passages ? `${plan.passages} ${plan.passages === 1 ? "pasaje" : "pasajes"}` : "",
+      ].filter(Boolean);
+      step(
+        "IA",
+        "ai",
+        [
+          based.length ? `Redactó con ${based.join(", ")}.` : "Redactó sin fuentes de la universidad.",
+          fin.grounding === "general" ? "No citó nada: es conocimiento general, no información oficial de la UDES." : fin.grounding === "mixta" ? "Parte de la respuesta no cita fuente: es conocimiento general." : "",
+          fin.verified ? (fin.grounding === "general" ? "" : "Cada número está en las fuentes.") : `Revise: ${fin.unknown.join(", ")}.`,
+          fin.filtered.length ? "Se quitó una cifra de dinero que no está publicada." : "",
+          out.partial ? "La redacción se cortó: se muestra lo que alcanzó a escribir." : truncated ? "Llegó al tope de palabras: el final puede quedar corto." : "",
+        ]
+          .filter(Boolean)
+          .join(" "),
+      );
+      // La bandeja (0109, 0110): la cifra sin fuente, lo que no se pudo sustentar y lo dicho de conocimiento general.
+      if (!fin.verified) await learn(asked || question, "revisar", "ia", fin.text);
+      else if (fin.grounding === "general" && !chatty) await learn(asked || question, plan.sources.length === 0 && intent === "institucional" ? "sin_respuesta" : "general", "ia", fin.text);
+      // Se guarda solo lo verificado y citado de la memoria: nunca cifras en vivo (`dato:`),
+      // ni el catálogo, ni conocimiento general, ni un seguimiento, ni algo cortado.
+      let answerId: number | null = usedSaved && saved ? saved.id : null;
+      const savable =
+        fin.verified &&
+        fin.grounding === "oficial" &&
+        !out.partial &&
+        !truncated &&
+        !loose &&
+        !fin.filtered.length &&
+        fin.passages.length > 0 &&
+        !fin.passages.some((p) => p.ref.startsWith("dato:") || p.ref.startsWith("catalogo:"));
+      if (usedSaved && saved) await admin.from("pilo_answers").update({ last_hit_at: new Date().toISOString() }).eq("id", saved.id);
+      else if (savable) {
+        const { data: row } = await admin
+          .from("pilo_answers")
+          .insert({ question, qnorm, kind: "ia", answer: fin.text, refs: fin.passages.map((p) => p.ref) })
+          .select("id")
+          .maybeSingle();
+        answerId = (row as { id: number } | null)?.id ?? null;
+      }
+      await log(out.partial ? "parcial" : fin.verified ? "listo" : "revisar", question);
+      return {
+        payload: askPayload({
+          kind: "ia",
+          text: fin.text,
+          passages: fin.passages,
+          trail,
+          asked,
+          intent,
+          grounding: fin.grounding,
+          extra: {
+            answerId,
+            verified: fin.verified,
+            unknown: fin.unknown,
+            model: target.model,
+            ...(mood ? { mood } : {}),
+            ...(fin.filtered.length ? { filtered: fin.filtered } : {}),
+            ...(out.partial ? { partial: true, notice: out.why === "tiempo" ? "El proveedor de IA tardó demasiado: esta respuesta quedó incompleta." : "La conexión con el proveedor de IA se cortó: esta respuesta quedó incompleta." } : {}),
+            ...(truncated ? { truncated: true } : {}),
+            ...(out.finish ? { finish: out.finish } : {}),
+            ...(out.usage ? { usage: out.usage } : {}),
+            ...drawFor(fin.passages.find((p) => mesh.nodes.some((n) => n.id === p.ref))?.ref),
+          },
+        }),
+      };
+    };
+
+    // 5. Redactar: por partes si la página lo pidió, o de una vez.
+    stage = "redactar la respuesta";
+    if (wantStream) {
+      const abort = new AbortController();
+      return sseResponse(
+        async (send) => {
+          send("meta", { asked, intent, sources: plan.sources.map(sourceShape), trail: [...trail], official: plan.official > 0, model: target.model, ...(mood ? { mood } : {}) });
+          const end = await conclude(await draft((text) => send("delta", { text }), abort));
+          if ("payload" in end) send("done", end.payload);
+          else send("error", { message: end.failure.message, code: end.failure.code });
+        },
+        () => abort.abort(),
+      );
     }
-    const data = await response.json();
-    const parsed = parseAsk(String(data?.choices?.[0]?.message?.content ?? ""), passages.length);
-    // Sin evadir: si el modelo dio parte de lo pedido con sus citas, esa respuesta
-    // se da (y dice qué falta). Solo sin nada citado es «no lo encontré».
-    const partial = parsed.noData && citedIn(parsed.text).length > 0;
-    if (!parsed.text || (parsed.noData && !partial)) {
-      step("IA", "ai", "Leyó los pasajes y no alcanzan para responder.");
-      await log("listo · sin datos", question);
-      await learn(asked, "sin_respuesta", "nada", parsed.text || NOTHING_TEXT);
-      return json({ kind: "nada", text: parsed.text || NOTHING_TEXT, sources: [], trail, ...(rewritten ? { asked: rewritten } : {}) });
-    }
-    // Lo que falta también le sirve a Planeación: va a la bandeja.
-    if (partial) await learn(asked, "sin_respuesta", "ia", parsed.text);
-    const cited = renumber(parsed.text, passages);
-    const plain = cited.text.replace(/\[\d+\]/g, " ");
-    const check = verifyNumbers(plain, passages.map((p) => `${p.title} ${p.section} ${p.cut} ${p.body}`).join("\n"));
-    step("IA", "ai", check.verified ? `Redactó con ${passages.length} pasajes. Cada número está en las fuentes.` : `Redactó con ${passages.length} pasajes. Revise: ${check.unknown.join(", ")}.`);
-    let answerId: number | null = null;
-    // Lo que cita cifras en vivo no se guarda: la próxima vez se consulta de nuevo.
-    if (check.verified && !partial && cited.passages.length && !cited.passages.some((p) => p.ref.startsWith("dato:"))) {
-      const { data: row } = await admin
-        .from("pilo_answers")
-        .insert({ question: asked, qnorm, kind: "ia", answer: cited.text, refs: cited.passages.map((p) => p.ref) })
-        .select("id")
-        .maybeSingle();
-      answerId = (row as { id: number } | null)?.id ?? null;
-    }
-    await log(check.verified ? "listo" : "revisar", question);
-    if (!check.verified) await learn(asked, "revisar", "ia", cited.text);
-    return json({ kind: "ia", text: cited.text, sources: cited.passages.map(shape), trail, answerId, verified: check.verified, unknown: check.unknown, ...(rewritten ? { asked: rewritten } : {}), ...drawFor(cited.passages[0]?.ref) });
+    const end = await conclude(await draft(null, new AbortController()));
+    return "payload" in end ? json(end.payload) : json({ error: end.failure.message, code: end.failure.code }, end.failure.status);
   }
 
   try {
@@ -3547,7 +3703,8 @@ async function handle(request: Request): Promise<Response> {
     if (requested === "calificar") {
       const id = Number(body.answerId);
       const saved = Number.isInteger(id) && id > 0;
-      if (body.vote === "up" || body.vote === "down") {
+      // Calificar también tiene su límite por visitante: pasado, la opinión no se anota.
+      if ((body.vote === "up" || body.vote === "down") && (await visitorCheck("c")).ok) {
         if (saved) await admin.rpc("pilo_answer_vote", { p_id: id, p_vote: body.vote });
         // «No me sirvió» enseña: la pregunta va a la bandeja. Con una respuesta
         // guardada, lo que se anota sale de la base, no de lo que manda la página.
@@ -3619,11 +3776,14 @@ async function handle(request: Request): Promise<Response> {
 
     // --- Probar la conexión -------------------------------------------------------
     if (action === "probar") {
-      const response = await callProvider(target.url, {
-        method: "POST",
-        headers,
-        body: JSON.stringify({ model: target.model, messages: [{ role: "user", content: "Responde solo: OK" }], max_tokens: 5 }),
+      // La misma forma de mensajes de una pregunta real: persona y reglas en el rol
+      // `system` (o dobladas en el primer mensaje, si el modelo no lo acepta), un
+      // turno anterior y la pregunta.
+      const probe = buildAskMessages(planAsk({ official: [], saved: null, facts: [], passages: [] }), {
+        question: "Responda solo con la palabra: OK",
+        history: [{ q: "Hola", a: "¡Hola! Soy Mr. Pilo." }],
       });
+      const { response, folded } = await chat(probe, { temperature: 0, max_tokens: 16, signal: AbortSignal.timeout(DRAFT_FIRST_TOKEN_MS) });
       if (!response.ok) {
         const detail = await providerDetail(response);
         await log(`error ${response.status}`, `Prueba de conexión · ${detail}`);
@@ -3636,8 +3796,52 @@ async function handle(request: Request): Promise<Response> {
               : `El proveedor respondió ${response.status}${detail ? `: ${detail}` : ""}. Se llamó a ${target.url} con el modelo «${target.model}».`,
         });
       }
-      await log("listo", "Prueba de conexión");
-      return json({ ok: true, ms: Date.now() - started, url: target.url, model: target.model });
+      const whole = readChatChunk(await response.text());
+      const ms = Date.now() - started;
+      // Y por partes, como escribe «Pregúntele a Pilo»: ¿llega como SSE o el proveedor ignora `stream`?
+      let stream: "sse" | "json" | "error" = "error";
+      let streamError = "";
+      let reasoning = Boolean(whole?.reasoning);
+      let streamedText = "";
+      let finish = whole?.finish ?? "";
+      try {
+        const live = await chat(probe, { temperature: 0, max_tokens: 16, stream: true, signal: AbortSignal.timeout(DRAFT_FIRST_TOKEN_MS) });
+        if (!live.response.ok) streamError = `${live.response.status} ${await providerDetail(live.response)}`.trim();
+        else {
+          const reader = createChatReader();
+          reader.push(await live.response.text());
+          const end = reader.end();
+          stream = end.error && !end.text ? "error" : end.streamed ? "sse" : "json";
+          streamError = end.error;
+          reasoning = reasoning || end.reasoning;
+          streamedText = end.text;
+          finish = end.finish || finish;
+        }
+      } catch (error) {
+        streamError = String(error).slice(0, 200);
+      }
+      const sample = cleanDraft(whole?.text ?? "").slice(0, 80);
+      const notes = [
+        folded ? "rol system rechazado: la persona va en el primer mensaje" : "rol system aceptado",
+        stream === "sse" ? "streaming por partes" : stream === "json" ? "ignora stream (responde entero)" : `streaming falló${streamError ? `: ${streamError}` : ""}`,
+        reasoning ? "manda razonamiento aparte" : "",
+        !sample && !cleanDraft(streamedText) ? `sin texto en la respuesta (finish_reason=${finish || "?"})` : "",
+      ].filter(Boolean);
+      await log("listo", `Prueba de conexión · ${notes.join(" · ")}`);
+      return json({
+        ok: true,
+        ms,
+        url: target.url,
+        model: target.model,
+        // Lo nuevo (0110): qué forma de mensajes aceptó el modelo y cómo responde por partes.
+        system_role: folded ? "user" : "system",
+        stream,
+        ...(streamError ? { stream_error: streamError } : {}),
+        reasoning,
+        finish,
+        sample,
+        notes,
+      });
     }
 
     // --- Mr. Pilo Bot: entender lo que necesita un programa ------------------------------
@@ -3702,22 +3906,13 @@ async function handle(request: Request): Promise<Response> {
           return json({ ...hit.result, cached: true });
         }
       }
-      const response = await callProvider(target.url, {
-        method: "POST",
-        headers,
-        // Un capítulo largo en un proveedor lento puede tardar: se corta antes del límite de la función.
-        signal: AbortSignal.timeout(130_000),
-        body: JSON.stringify({
-          model: target.model,
-          messages: buildAnalysisMessages(input),
-          temperature: 0.3,
-          max_tokens: ANALYSIS_SIZE[brief.length].tokens,
-          ...(settings.provider === "mistral" ? { response_format: { type: "json_object" } } : {}),
-        }),
-      }).catch((error: unknown) => {
-        if (error instanceof DOMException && (error.name === "TimeoutError" || error.name === "AbortError")) return null;
-        throw error;
-      });
+      // Un capítulo largo en un proveedor lento puede tardar: se corta antes del límite de la función.
+      const response = await chat(buildAnalysisMessages(input), { temperature: 0.3, max_tokens: ANALYSIS_SIZE[brief.length].tokens, json: true, signal: AbortSignal.timeout(130_000) })
+        .then((r) => r.response)
+        .catch((error: unknown) => {
+          if (error instanceof DOMException && (error.name === "TimeoutError" || error.name === "AbortError")) return null;
+          throw error;
+        });
       if (!response) {
         await log("error tiempo", `analizar · ${input.title}`);
         return json({ error: "El proveedor tardó demasiado en escribir este capítulo. Vuelva a intentarlo o elija una longitud más corta.", code: "tiempo" }, 504);
@@ -3761,17 +3956,7 @@ async function handle(request: Request): Promise<Response> {
           return json({ ...hit.result, cached: true });
         }
       }
-      const response = await callProvider(target.url, {
-        method: "POST",
-        headers,
-        body: JSON.stringify({
-          model: target.model,
-          messages: buildNeedMessages(clean),
-          temperature: 0.1,
-          max_tokens: 700,
-          ...(settings.provider === "mistral" ? { response_format: { type: "json_object" } } : {}),
-        }),
-      });
+      const { response } = await chat(buildNeedMessages(clean), { temperature: 0.1, max_tokens: 700, json: true });
       if (!response.ok) {
         const detail = await providerDetail(response);
         await log(`error ${response.status}`, `entender · ${detail}`);
@@ -3802,18 +3987,7 @@ async function handle(request: Request): Promise<Response> {
       }
     }
 
-    const response = await callProvider(target.url, {
-      method: "POST",
-      headers,
-      body: JSON.stringify({
-        model: target.model,
-        messages: buildMessages(action, page, sections),
-        temperature: 0.2,
-        max_tokens: 700,
-        // Mistral (y los compatibles que lo aceptan) devuelven JSON limpio.
-        ...(settings.provider === "mistral" ? { response_format: { type: "json_object" } } : {}),
-      }),
-    });
+    const { response } = await chat(buildMessages(action, page, sections), { temperature: 0.2, max_tokens: 700, json: true });
     if (!response.ok) {
       const detail = await providerDetail(response);
       await log(`error ${response.status}`, `${page} · ${detail}`);
@@ -3831,12 +4005,32 @@ async function handle(request: Request): Promise<Response> {
     await log(check.verified ? "listo" : "revisar", page);
     return json({ ...result, cached: false });
   } catch (error) {
+    const detail = String(error).slice(0, 300);
     if (asking) {
-      const missing = /pilo_memory|pilo_answer/.test(String(error));
-      await log(missing ? "error · falta 0094" : "error", String(body.question ?? "").slice(0, 200));
-      return json({ error: missing ? "La memoria de Pilo aún no está lista (falta la migración 0094)." : "No pude buscar en la memoria ahora.", detail: String(error), code: "memoria" }, 502);
+      // El mensaje dice en qué paso falló, no una causa supuesta.
+      const missing = /pilo_memory|pilo_answer/.test(detail) && /does not exist|could not find|schema cache|no existe/i.test(detail);
+      const searching = stage === "buscar en lo publicado";
+      await log(missing ? "error · falta 0094" : `error · ${stage}`, `${String(body.question ?? "").slice(0, 120)} · ${detail}`).then(
+        () => undefined,
+        () => undefined,
+      );
+      return json(
+        {
+          error: missing ? "La memoria de Pilo aún no está lista (falta la migración 0094)." : `Algo falló dentro de Pilo al ${stage}. Intente de nuevo en un momento.`,
+          detail,
+          code: missing || searching ? "memoria" : "interno",
+        },
+        missing || searching ? 502 : 500,
+      );
     }
-    await log("sin conexión", body.page ?? "");
-    return json({ error: "No pude hablar con el proveedor.", detail: String(error), code: "red" }, 502);
+    // Un fallo de red o un corte por tiempo es del proveedor; lo demás, de la función.
+    const network = error instanceof TypeError || (error instanceof DOMException && (error.name === "TimeoutError" || error.name === "AbortError"));
+    await log(network ? "sin conexión" : "error interno", `${body.page ?? ""} · ${detail}`.slice(0, 200)).then(
+      () => undefined,
+      () => undefined,
+    );
+    return network
+      ? json({ error: "No pude hablar con el proveedor.", detail, code: "red" }, 502)
+      : json({ error: "Algo falló dentro de la función de Mr. Pilo, antes de hablar con el proveedor.", detail, code: "interno" }, 500);
   }
 }

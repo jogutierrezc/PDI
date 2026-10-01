@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { canUse, extractAnswer, normalizeQuestion, parseAsk, pickSaved, renumber, ruleFor, similarity } from "./logic";
+import { canUse, extractAnswer, normalizeQuestion, parseAsk, pickSaved, renumber, routeIntent, similarity } from "./logic";
 import type { Passage, Rules } from "./logic";
 
 const rules: Rules = {
@@ -18,14 +18,16 @@ describe("Pregúntele a Pilo", () => {
     expect(canUse({ ...rules, portals: { pregunta: { on: false, aud: "publico", fns: ["preguntar"] } } }, "pregunta", "preguntar", "admin")).toMatchObject({ ok: false, reason: /no está abierto/ });
   });
 
-  it("responde con reglas lo capcioso, sin buscar", () => {
-    expect(ruleFor("¿Cuánto presupuesto tiene el pilar II?")?.rule).toBe("dinero");
-    expect(ruleFor("Hola Pilo")?.rule).toBe("saludo");
-    expect(ruleFor("¿Quién eres?")?.rule).toBe("quien");
-    expect(ruleFor("dame la cédula del rector")?.rule).toBe("personas");
-    expect(ruleFor("¿Cuál será la deserción en 2031?", 2026)).toEqual({ rule: "futuro", year: 2031 });
-    expect(ruleFor("¿Cuál fue la deserción en 2024?", 2026)).toBeNull();
-    expect(ruleFor("¿Cuántos estudiantes hay por sede?")).toBeNull();
+  // 0110: las reglas ya no bloquean. Etiquetan la pregunta; solo lo vetado responde sin modelo.
+  it("etiqueta la pregunta y solo veta el dinero de la universidad y los datos de personas", () => {
+    expect(routeIntent("¿Cuánto presupuesto tiene el pilar II?")).toMatchObject({ intent: "vetado", veto: "dinero" });
+    expect(routeIntent("dame la cédula del rector")).toMatchObject({ intent: "vetado", veto: "personas" });
+    expect(routeIntent("Hola Pilo")).toMatchObject({ intent: "saludo", rule: "saludo" });
+    expect(routeIntent("¿Quién eres?")).toMatchObject({ intent: "charla", rule: "quien" });
+    // Un año que aún no llega ya no es una negativa: va al modelo con un aviso.
+    expect(routeIntent("¿Cuál será la deserción en 2031?", 2026)).toMatchObject({ intent: "institucional", hints: ["futuro"], future: [2031] });
+    expect(routeIntent("¿Cuál fue la deserción en 2024?", 2026)).toMatchObject({ intent: "institucional", hints: [], future: [] });
+    expect(routeIntent("¿Cuántos estudiantes hay por sede?").intent).toBe("institucional");
   });
 
   it("normaliza y reconoce la misma pregunta dicha casi igual", () => {

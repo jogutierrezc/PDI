@@ -14,6 +14,7 @@ import {
   parseSlots,
   parseUnderstand,
   pickCuts,
+  planAsk,
   sameCampus,
   sameCut,
   verifyNumbers,
@@ -192,10 +193,13 @@ describe("Pilo conversa: entiende el contexto y no evade", () => {
     expect(text).toContain("Pregunta: ¿y en Cúcuta?");
   });
 
+  // 0110: la conversación va como turnos reales (usuario y asistente), no como texto dentro del pedido.
   it("al redactar, responde en el contexto y da lo que hay sin evadir", () => {
-    const text = buildAskMessages("¿Cuántos estudiantes matriculados hubo en Cúcuta en 2024?", [], history).map((m) => m.content).join(" ");
-    expect(text).toContain("respóndela en ese contexto");
-    expect(text).toContain("No evadas");
-    expect(text).toContain("Y respondiste: En Bucaramanga hubo 17.476");
+    const messages = buildAskMessages(planAsk({ official: [], saved: null, facts: [], passages: [] }), { question: "¿Cuántos estudiantes matriculados hubo en Cúcuta en 2024?", history });
+    expect(messages[0].content).toContain("respóndela en ese contexto");
+    expect(messages[0].content).toContain("No evadas");
+    expect(messages.slice(1).map((m) => m.role)).toEqual(["user", "assistant", "user"]);
+    // La cita de la respuesta anterior es de otra numeración: no pasa.
+    expect(messages[2].content).toBe("En Bucaramanga hubo 17.476 estudiantes matriculados en 2024.");
   });
 });

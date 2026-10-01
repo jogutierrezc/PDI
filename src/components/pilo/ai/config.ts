@@ -29,6 +29,8 @@ export interface PiloAiConfig extends Rules {
   voicePatterns: Record<string, string[]>;
   /** Pregúntele a Pilo (0094): abierta o no, para quién, con bienvenida y con IA. */
   pregunta: { on: boolean; aud: PortalRule["aud"]; welcome: boolean; ai: boolean };
+  /** El chat emergente en otros portales (0111): si se permite y en cuáles. */
+  widget: { on: boolean; origins: string[] };
 }
 
 export const PORTAL_LABEL: Record<Portal, string> = {
@@ -74,6 +76,10 @@ export function usePiloAiConfig() {
           const p = (raw.pregunta ?? {}) as Record<string, unknown>;
           const aud = p.aud === "admin" || p.aud === "sesion" ? p.aud : "publico";
           return { on: Boolean(p.on), aud, welcome: p.welcome !== false, ai: Boolean(p.ai) };
+        })(),
+        widget: (() => {
+          const w = (raw.widget ?? {}) as Record<string, unknown>;
+          return { on: w.on === true, origins: Array.isArray(w.origins) ? w.origins.filter((o): o is string => typeof o === "string") : [] };
         })(),
       };
     },

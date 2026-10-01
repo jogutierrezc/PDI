@@ -33,6 +33,8 @@ interface World {
   hits: number;
   /** Sin la migración 0110: la función del límite no existe. */
   noVisitorTable: boolean;
+  /** La búsqueda en la memoria falla (la base no responde). */
+  memoryFails?: boolean;
   logs: Row[];
   inbox: Row[];
   saved: Row[];
@@ -127,7 +129,7 @@ function fakeClient(w: World) {
         case "pilo_embed_status":
           return { data: { memory_done: 0, facts_done: 0 }, error: null };
         case "pilo_memory_search":
-          return { data: w.memory, error: null };
+          return w.memoryFails ? { data: null, error: { message: "tiempo agotado en la base" } } : { data: w.memory, error: null };
         case "pilo_facts_search":
           return { data: w.facts, error: null };
         case "pilo_answer_candidates":
@@ -169,6 +171,7 @@ afterAll(() => {
 });
 
 afterEach(() => {
+  vi.useRealTimers();
   vi.unstubAllGlobals();
 });
 
@@ -201,11 +204,18 @@ const ask = (handler: Handler, body: Row, headers: Record<string, string> = {}) 
     }),
   );
 
-/** Los eventos del flujo, en orden, con su JSON leído. */
-async function events(response: Response): Promise<{ event: string; data: Record<string, unknown> }[]> {
+type Ev = { event: string; data: Record<string, unknown> };
+
+const parseEvents = (text: string): Ev[] => {
   const sse = createSseParser();
-  return [...sse.push(await response.text()), ...sse.flush()].map((e) => ({ event: e.event, data: JSON.parse(e.data) as Record<string, unknown> }));
-}
+  return [...sse.push(text), ...sse.flush()].map((e) => ({ event: e.event, data: JSON.parse(e.data) as Record<string, unknown> }));
+};
+
+/** Todos los eventos del flujo, en orden, con su JSON leído: también los pasos (`step`) y el razonamiento (`thinking`). */
+const allEvents = async (response: Response): Promise<Ev[]> => parseEvents(await response.text());
+
+/** Los eventos de siempre (meta, delta, done, error): lo que ve una página que ignora los opcionales. */
+const events = async (response: Response): Promise<Ev[]> => (await allEvents(response)).filter((e) => e.event !== "step" && e.event !== "thinking");
 
 const sseBody = (parts: string[], finish = "stop") => {
   const encoder = new TextEncoder();
@@ -284,18 +294,22 @@ describe("preguntar, por partes", () => {
     expect(w.saved).toEqual([]);
   });
 
-  it("lo vetado y las capciosas responden con JSON, sin modelo", async () => {
+  it("lo vetado responde con JSON, sin modelo; la capciosa es base del modelo", async () => {
     const w = world();
     w.catalog = [{ key: "C-001", kind: "capciosa", question: "", variants: [], triggers: ["tienes novia"], answer: "¡Solo tengo ojos para los datos!", mood: "atrevido", source_title: "", source_path: "", cut: "", office: "" }];
-    const calls = provider(stream("no debería llamarse"));
+    const calls = provider(stream("Mi corazón es de los datos. "));
     const handler = await boot(w);
     const money = await ask(handler, { question: "¿Cuánto presupuesto tiene el pilar II?", stream: true });
     expect(money.headers.get("Content-Type")).toContain("application/json");
     expect(await money.json()).toMatchObject({ kind: "regla", intent: "vetado", sources: [], text: expect.stringContaining("presupuesto") });
-    const tricky = await ask(handler, { question: "Pilo, ¿tienes novia?", stream: true });
-    expect(await tricky.json()).toMatchObject({ kind: "capciosa", intent: "capciosa", text: "¡Solo tengo ojos para los datos!", mood: "atrevido" });
     expect(calls).toHaveLength(0);
-    expect(w.logs.every((l) => l.cached === true)).toBe(true);
+    // La capciosa ya no sale sola: su microexpresión va en [OFICIAL] y escribe el modelo.
+    const tricky = await events(await ask(handler, { question: "Pilo, ¿tienes novia?", stream: true }));
+    expect(calls).toHaveLength(1);
+    const prompt = (calls[0].body.messages as { content: string }[]).map((m) => m.content).join(" ");
+    expect(prompt).toContain("[OFICIAL]");
+    expect(prompt).toContain("¡Solo tengo ojos para los datos!");
+    expect(tricky[tricky.length - 1].data).toMatchObject({ kind: "ia", text: expect.stringContaining("Mi corazón es de los datos") });
   });
 
   it("la respuesta oficial del catálogo va como base y no se guarda", async () => {
@@ -452,6 +466,9 @@ describe("sin stream, como antes", () => {
     expect(response.headers.get("Content-Type")).toContain("application/json");
     const data = (await response.json()) as Row;
     expect(Object.keys(data).slice(0, 4)).toEqual(["kind", "text", "sources", "trail"]);
+    // Los pasos y su resumen son del flujo: el JSON sigue como estaba.
+    expect(data.steps).toBeUndefined();
+    expect(data.seconds).toBeUndefined();
     expect(data).toMatchObject({ kind: "ia", text: "En 2024 hubo 20.500 estudiantes [1].", answerId: 77, verified: true, unknown: [], grounding: "oficial" });
     expect((data.sources as Row[])[0]).toEqual({ n: 1, ref: "cifras:matriculados", source: "cifras", title: "Estudiantes matriculados", section: "Población", path: "/cifras/poblacion", cut: "2024", office: "Registro", excerpt: passage.body });
     expect(calls[0].body.stream).toBeUndefined();
@@ -565,5 +582,283 @@ describe("probar la conexión", () => {
   it("solo la administración la prueba", async () => {
     const response = await ask(await boot(world()), { action: "probar" });
     expect(response.status).toBe(403);
+  });
+});
+
+/** Un flujo del proveedor con los `delta` que se le den (contenido, razonamiento o ambos). */
+const deltas = (...parts: Row[]) => () =>
+  new Response([...parts.map((delta) => `data: ${JSON.stringify({ choices: [{ delta }] })}\n\n`), `data: ${JSON.stringify({ choices: [{ delta: {}, finish_reason: "stop" }] })}\n\n`, "data: [DONE]\n\n"].join(""), {
+    headers: { "Content-Type": "text/event-stream" },
+  });
+
+type StepData = { id: string; label: string; detail?: string; state: string };
+const stepsOf = (all: Ev[]) => all.filter((e) => e.event === "step").map((e) => e.data as unknown as StepData);
+const at = (all: Ev[], event: string, id?: string, state?: string) => all.findIndex((e) => e.event === event && (!id || (e.data.id === id && e.data.state === state)));
+/** Cada paso empieza una vez y termina una vez, en ese orden. */
+const expectClosed = (steps: StepData[]) => {
+  for (const id of new Set(steps.map((s) => s.id))) expect(steps.filter((s) => s.id === id).map((s) => s.state)).toEqual(["start", "done"]);
+};
+
+describe("lo que Pilo va haciendo (step)", () => {
+  it("cuenta cada paso en el orden real: step… → meta → delta… → done, y cierra todos", async () => {
+    const w = world();
+    provider(stream("En 2024 hubo 20.500 estudiantes matriculados [1]. ", "Es la cifra de toda la UDES [1]."));
+    const response = await ask(await boot(w), { question: "¿Cuántos estudiantes matriculados hay?", stream: true });
+    const all = await allEvents(response);
+    expect(all[0]).toEqual({ event: "step", data: { id: "entender", label: "Entendiendo la pregunta", state: "start" } });
+    expect(all[1].data).toEqual({ id: "entender", label: "Entendiendo la pregunta", detail: "pregunta sobre la UDES", state: "done" });
+    expect(all[all.length - 1].event).toBe("done");
+    const steps = stepsOf(all);
+    expectClosed(steps);
+    expect([...new Set(steps.map((s) => s.id))]).toEqual(["entender", "catalogo", "guardadas", "cifras", "memoria", "redactar", "verificar"]);
+    // Las capas de la búsqueda empiezan todas antes de que termine la primera.
+    const search = ["catalogo", "guardadas", "cifras", "memoria"];
+    const lastStart = Math.max(...search.map((id) => at(all, "step", id, "start")));
+    const firstDone = Math.min(...search.map((id) => at(all, "step", id, "done")));
+    expect(lastStart).toBeLessThan(firstDone);
+    // meta llega con la búsqueda terminada; redactar empieza antes del primer trozo y termina después del último.
+    const meta = at(all, "meta");
+    const firstDelta = at(all, "delta");
+    const lastDelta = all.map((e) => e.event).lastIndexOf("delta");
+    expect(Math.max(...search.map((id) => at(all, "step", id, "done")))).toBeLessThan(meta);
+    expect(at(all, "step", "redactar", "start")).toBeGreaterThan(meta);
+    expect(at(all, "step", "redactar", "start")).toBeLessThan(firstDelta);
+    expect(at(all, "step", "redactar", "done")).toBeGreaterThan(lastDelta);
+    expect(at(all, "step", "verificar", "start")).toBeGreaterThan(at(all, "step", "redactar", "done"));
+    expect(at(all, "step", "verificar", "done")).toBe(all.length - 2);
+    // Los detalles son cuentas ciertas, sin contenido de los pasajes ni nada interno.
+    const detail = (id: string, state: string) => steps.find((s) => s.id === id && s.state === state)?.detail;
+    expect(detail("catalogo", "done")).toBe("sin resultados");
+    expect(detail("guardadas", "done")).toBe("sin resultados");
+    expect(detail("cifras", "done")).toBe("sin resultados");
+    expect(detail("memoria", "done")).toBe("1 pasaje");
+    expect(detail("redactar", "start")).toBe("con 1 pasaje");
+    expect(detail("redactar", "done")).toBe("con 1 pasaje");
+    expect(detail("verificar", "done")).toBe("cada número está en las fuentes");
+    const said = JSON.stringify(steps).toLowerCase();
+    for (const secret of ["20.500", "nvidia", "gemma", "pilo_", "clave", "rank", "%"]) expect(said).not.toContain(secret);
+    // El resumen queda en done, para guardar «cómo respondí»; lo demás de done no cambia.
+    const done = all[all.length - 1].data;
+    expect(done).toMatchObject({ kind: "ia", grounding: "oficial", verified: true, answerId: 77 });
+    expect((done.steps as Row[]).map((s) => s.id).sort()).toEqual(["catalogo", "cifras", "entender", "guardadas", "memoria", "redactar", "verificar"]);
+    for (const s of done.steps as Row[]) expect(s).toMatchObject({ label: expect.any(String), ms: expect.any(Number) });
+    expect(done.seconds).toEqual(expect.any(Number));
+  });
+
+  it("dice lo que entendió de un seguimiento y solo busca donde tiene sentido", async () => {
+    const w = world();
+    provider(stream("En Cúcuta no tengo la cifra publicada. "));
+    const all = await allEvents(await ask(await boot(w), { question: "¿y en Cúcuta?", history: [{ q: "¿Cuántos estudiantes matriculados hay?", a: "En 2024 hubo 20.500 [1]." }], stream: true }));
+    const steps = stepsOf(all);
+    expect(steps.find((s) => s.id === "entender" && s.state === "done")?.detail).toBe("sigue la conversación · sede Cúcuta");
+    // Un seguimiento no va solo al catálogo ni a las guardadas: esos pasos no se anuncian.
+    expect(steps.some((s) => s.id === "catalogo" || s.id === "guardadas")).toBe(false);
+    expect(steps.some((s) => s.id === "cifras")).toBe(true);
+    expectClosed(steps);
+  });
+
+  it("con cifras en vivo dice cuántas y de qué indicador, sin el valor", async () => {
+    const w = world();
+    w.facts = [
+      {
+        ref: "permanencia",
+        report: "Permanencia",
+        label: "Tasa de permanencia",
+        unit: "%",
+        format: "percent",
+        definition: "",
+        office: "Registro",
+        path: "/cifras/permanencia",
+        period: "anual",
+        illustrative: false,
+        rank: 0.9,
+        series: [
+          { y: 2023, t: null, c: "", v: 87.5 },
+          { y: 2024, t: null, c: "", v: 88.25 },
+        ],
+      },
+    ];
+    provider(stream("En 2024 la permanencia fue la publicada [1]. "));
+    const all = await allEvents(await ask(await boot(w), { question: "¿Cuál fue la tasa de permanencia en 2024?", stream: true }));
+    const steps = stepsOf(all);
+    expect(steps.find((s) => s.id === "entender" && s.state === "done")?.detail).toBe("pregunta sobre la UDES · año 2024");
+    expect(steps.find((s) => s.id === "cifras" && s.state === "done")?.detail).toBe("1 cifra de Tasa de permanencia 2024");
+    expect(steps.find((s) => s.id === "redactar" && s.state === "start")?.detail).toMatch(/^con 1 indicador/);
+    expect(JSON.stringify(steps)).not.toMatch(/88|87/);
+    expectClosed(steps);
+  });
+
+  it("si no hay nada institucional, lo dice sin rodeos", async () => {
+    const w = world();
+    w.memory = [];
+    provider(stream("La capital de Francia es París. "));
+    const all = await allEvents(await ask(await boot(w), { question: "¿Cuál es la capital de Francia?", stream: true }));
+    const steps = stepsOf(all);
+    expect(steps.find((s) => s.id === "memoria" && s.state === "done")?.detail).toBe("sin resultados");
+    expect(steps.find((s) => s.id === "redactar" && s.state === "start")?.detail).toBe("No hay datos de la UDES sobre esto; respondo con conocimiento general");
+    expect(steps.find((s) => s.id === "verificar" && s.state === "done")?.detail).toBe("sin cifras de la UDES que verificar");
+  });
+
+  it("un saludo no anuncia búsquedas", async () => {
+    provider(stream("¡Hola! Soy Mr. Pilo. "));
+    const all = await allEvents(await ask(await boot(world()), { question: "hola pilo", stream: true }));
+    expect([...new Set(stepsOf(all).map((s) => s.id))]).toEqual(["entender", "redactar", "verificar"]);
+    expect(stepsOf(all)[1].detail).toBe("es un saludo");
+  });
+
+  it("si el proveedor falla, los pasos se cierran igual y el final sigue siendo done o error", async () => {
+    const w = world();
+    provider(() => new Response(JSON.stringify({ error: { message: "Internal error" } }), { status: 500 }));
+    const all = await allEvents(await ask(await boot(w), { question: "¿Cuántos estudiantes matriculados hay?", stream: true }));
+    const steps = stepsOf(all);
+    expectClosed(steps);
+    expect(steps.find((s) => s.id === "redactar" && s.state === "done")?.detail).toBe("el modelo no respondió");
+    expect(steps.some((s) => s.id === "verificar")).toBe(false);
+    expect(all[all.length - 1].event).toBe("done");
+    expect(all[all.length - 1].data).toMatchObject({ kind: "extracto", fallback: "proveedor", steps: expect.any(Array) });
+    // Sin nada publicado, termina en error, también con los pasos cerrados.
+    const w2 = world();
+    w2.memory = [];
+    const bad = await allEvents(await ask(await boot(w2), { question: "¿Cuál es la capital de Francia?", stream: true }));
+    expect(bad[bad.length - 1].event).toBe("error");
+    expectClosed(stepsOf(bad));
+  });
+
+  it("si la búsqueda falla con el flujo ya abierto, termina en un evento error con los pasos cerrados", async () => {
+    const w = world();
+    w.memoryFails = true;
+    const calls = provider(stream("no debería llamarse"));
+    const response = await ask(await boot(w), { question: "¿Cuántos estudiantes matriculados hay?", stream: true });
+    expect(response.status).toBe(200);
+    expect(response.headers.get("Content-Type")).toContain("text/event-stream");
+    const all = await allEvents(response);
+    expect(all[all.length - 1]).toMatchObject({ event: "error", data: { code: "memoria", message: expect.stringContaining("buscar en lo publicado") } });
+    expect(all.filter((e) => e.event === "error" || e.event === "done")).toHaveLength(1);
+    expectClosed(stepsOf(all));
+    expect(calls).toHaveLength(0);
+    expect(w.logs.some((l) => String(l.status).startsWith("error · buscar"))).toBe(true);
+    // Sin stream, el mismo fallo sigue siendo el error HTTP de siempre.
+    const w2 = world();
+    w2.memoryFails = true;
+    const plain = await ask(await boot(w2), { question: "¿Cuántos estudiantes matriculados hay?" });
+    expect(plain.status).toBe(502);
+    expect(await plain.json()).toMatchObject({ code: "memoria" });
+  });
+});
+
+describe("lo que Pilo piensa (thinking)", () => {
+  it("el razonamiento aparte va como thinking, antes de escribir, y no entra en la respuesta", async () => {
+    const w = world();
+    provider(
+      deltas(
+        { reasoning_content: "Me preguntan por los matriculados. " },
+        { reasoning_content: "La fuente 1 trae la cifra de 2024; no son 99.999. " },
+        { reasoning_content: "El presupuesto sería de $ 5.000.000.000. " },
+        { reasoning_content: "Respondo corto" },
+        { content: "En 2024 hubo 20.500 estudiantes matriculados [1]. " },
+        { reasoning_content: "Esto ya llegó tarde. " },
+        { content: "Es la cifra de toda la UDES [1]." },
+      ),
+    );
+    const all = await allEvents(await ask(await boot(w), { question: "¿Cuántos estudiantes matriculados hay?", stream: true }));
+    const thinking = all.filter((e) => e.event === "thinking").map((e) => String(e.data.text)).join("");
+    expect(thinking).toBe("Me preguntan por los matriculados. La fuente 1 trae la cifra de 2024; no son 99.999. Respondo corto");
+    // Todo el razonamiento sale antes del primer trozo de la respuesta y después de empezar a redactar.
+    const kinds = all.map((e) => e.event);
+    expect(kinds.lastIndexOf("thinking")).toBeLessThan(kinds.indexOf("delta"));
+    expect(kinds.indexOf("thinking")).toBeGreaterThan(at(all, "step", "redactar", "start"));
+    // Ni la cifra de dinero ni lo que llegó tarde se muestran.
+    expect(JSON.stringify(all)).not.toContain("5.000.000.000");
+    expect(JSON.stringify(all)).not.toContain("llegó tarde");
+    // La respuesta, lo guardado y la revisión de cifras no ven el razonamiento.
+    const done = all[all.length - 1].data;
+    expect(done).toMatchObject({ kind: "ia", text: "En 2024 hubo 20.500 estudiantes matriculados [1]. Es la cifra de toda la UDES [1].", verified: true, unknown: [] });
+    expect(JSON.stringify(done)).not.toContain("Me preguntan");
+    expect(all.filter((e) => e.event === "delta").map((e) => e.data.text).join("")).toBe(done.text);
+    expect(w.saved).toHaveLength(1);
+    expect(w.saved[0].answer).toBe(done.text);
+  });
+
+  it("un bloque <think> partido entre trozos también sale como thinking y fuera del texto", async () => {
+    const w = world();
+    provider(deltas({ content: "<thi" }, { content: "nk>Busco la cifra. Está en la fuente 1.</th" }, { content: "ink>En 2024 hubo 20.500 estudiantes [1]. " }, { content: "Listo." }));
+    const all = await allEvents(await ask(await boot(w), { question: "¿Cuántos estudiantes matriculados hay?", stream: true }));
+    expect(all.filter((e) => e.event === "thinking").map((e) => e.data.text).join("")).toBe("Busco la cifra. Está en la fuente 1.");
+    const shown = all.filter((e) => e.event === "delta").map((e) => e.data.text).join("");
+    expect(shown).toBe("En 2024 hubo 20.500 estudiantes [1]. Listo.");
+    expect(all[all.length - 1].data).toMatchObject({ kind: "ia", text: shown });
+    expect(JSON.stringify(all.filter((e) => e.event !== "thinking"))).not.toContain("Busco la cifra");
+  });
+
+  it("un modelo que no razona no manda thinking, y sin stream el razonamiento no aparece", async () => {
+    const w = world();
+    provider(stream("En 2024 hubo 20.500 estudiantes [1]. "));
+    const all = await allEvents(await ask(await boot(w), { question: "¿Cuántos estudiantes matriculados hay?", stream: true }));
+    expect(all.some((e) => e.event === "thinking")).toBe(false);
+    provider(() => new Response(JSON.stringify({ choices: [{ message: { reasoning_content: "Pienso en secreto.", content: "<think>y aquí</think>En 2024 hubo 20.500 estudiantes [1]." }, finish_reason: "stop" }] })));
+    const plain = await (await ask(await boot(world()), { question: "¿Cuántos estudiantes matriculados hay?" })).text();
+    expect(JSON.parse(plain)).toMatchObject({ kind: "ia", text: "En 2024 hubo 20.500 estudiantes [1]." });
+    expect(plain).not.toContain("secreto");
+    expect(plain).not.toContain("y aquí");
+  });
+
+  it("le pide al modelo razonar en español y breve, sin exigirlo", async () => {
+    const calls = provider(stream("Hola. "));
+    await allEvents(await ask(await boot(world()), { question: "¿Cuántos estudiantes matriculados hay?", stream: true }));
+    const system = (calls[0].body.messages as { content: string }[])[0].content;
+    expect(system).toMatch(/Si antes de responder razonas aparte, hazlo en español y con brevedad/);
+  });
+});
+
+describe("el flujo se mantiene vivo y se suelta", () => {
+  it("mientras el modelo no da su primera palabra van comentarios «: ping», sin dañar los eventos", async () => {
+    const w = world();
+    const handler = await boot(w);
+    vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout", "setInterval", "clearInterval"] });
+    let release: (r: Response) => void = () => undefined;
+    const called = vi.fn();
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(() => {
+        called();
+        return new Promise<Response>((ok) => (release = ok));
+      }),
+    );
+    const response = await ask(handler, { question: "¿Cuántos estudiantes matriculados hay?", stream: true });
+    const reading = response.text();
+    await vi.advanceTimersByTimeAsync(25_000);
+    expect(called).toHaveBeenCalledTimes(1);
+    release(stream("En 2024 hubo 20.500 estudiantes [1]. ")());
+    const text = await reading;
+    expect(text.match(/^: ping$/gm)).toHaveLength(2);
+    // Los comentarios caen entre eventos enteros: todo lo demás se lee igual.
+    for (const block of text.split("\n\n").filter(Boolean)) expect(block).toMatch(/^(: ping|event: \w+\ndata: \{.*\})$/s);
+    const all = parseEvents(text);
+    expect(all[all.length - 1]).toMatchObject({ event: "done", data: { kind: "ia", text: "En 2024 hubo 20.500 estudiantes [1]." } });
+    expect(all.map((e) => e.event).indexOf("delta")).toBeGreaterThan(-1);
+    // Al terminar, el latido se detiene.
+    expect(vi.getTimerCount()).toBe(0);
+  });
+
+  it("si la página se va, se cancela el pedido al proveedor", async () => {
+    const w = world();
+    const seen: { signal: AbortSignal | null } = { signal: null };
+    vi.stubGlobal(
+      "fetch",
+      vi.fn((_url: string, init: RequestInit) => {
+        seen.signal = init.signal ?? null;
+        return new Promise<Response>((_ok, fail) => init.signal?.addEventListener("abort", () => fail(new DOMException("cancelado", "AbortError"))));
+      }),
+    );
+    const response = await ask(await boot(w), { question: "¿Cuántos estudiantes matriculados hay?", stream: true });
+    const reader = response.body!.getReader();
+    const first = await reader.read();
+    expect(new TextDecoder().decode(first.value)).toContain("event: step");
+    await vi.waitFor(() => expect(seen.signal).not.toBeNull());
+    expect(seen.signal?.aborted).toBe(false);
+    await reader.cancel();
+    expect(seen.signal?.aborted).toBe(true);
+    await vi.waitFor(() => expect(w.logs.some((l) => l.status === "cancelado")).toBe(true));
+    expect(w.saved).toEqual([]);
   });
 });

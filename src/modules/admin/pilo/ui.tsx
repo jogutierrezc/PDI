@@ -136,7 +136,74 @@ export function KeyField({ which, label, has, last4 }: { which: KeySlot | "texto
   );
 }
 
-export const when = (iso: string | null | undefined) =>
+/**
+ * Un número con margen (el mismo de la base). Lo que se escribe fuera de margen
+ * no se guarda en el estado: el campo lo marca y, al salir, vuelve al último
+ * valor bueno. El valor de partida se ve como sugerencia.
+ */
+export function NumField({
+  label,
+  hint,
+  value,
+  min,
+  max,
+  whole,
+  step,
+  def,
+  disabled,
+  onCommit,
+}: {
+  label: string;
+  hint?: string;
+  value: number;
+  min: number;
+  max: number;
+  whole: boolean;
+  step?: number;
+  def: number;
+  disabled?: boolean;
+  onCommit: (v: number) => void;
+}) {
+  const [draft, setDraft] = useState(String(value));
+  useEffect(() => setDraft((d) => (Number(d) === value && d.trim() !== "" ? d : String(value))), [value]);
+  const n = Number(draft);
+  const bad = draft.trim() === "" || !Number.isFinite(n) || n < min || n > max || (whole && !Number.isInteger(n));
+  const range = `${min.toLocaleString("es-CO")} a ${max.toLocaleString("es-CO")}`;
+  return (
+    <label>
+      {label}
+      <input
+        type="number"
+        inputMode={whole ? "numeric" : "decimal"}
+        min={min}
+        max={max}
+        step={step ?? (whole ? 1 : 0.1)}
+        value={draft}
+        placeholder={String(def)}
+        disabled={disabled}
+        aria-invalid={bad || undefined}
+        onChange={(e) => {
+          setDraft(e.target.value);
+          const v = Number(e.target.value);
+          if (e.target.value.trim() !== "" && Number.isFinite(v) && v >= min && v <= max && (!whole || Number.isInteger(v))) onCommit(v);
+        }}
+        onBlur={() => bad && setDraft(String(value))}
+      />
+      <small data-bad={bad || undefined}>
+        {bad ? (
+          <>
+            <Icon name="alert" size={12} /> Entre {range}
+            {whole ? ", sin decimales" : ""}.
+          </>
+        ) : (
+          `${hint ? `${hint} · ` : ""}De partida ${def.toLocaleString("es-CO")} · de ${range}`
+        )}
+      </small>
+    </label>
+  );
+}
+
+export const when =(iso: string | null | undefined) =>
   iso ? new Date(iso).toLocaleString("es-CO", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" }) : "nunca";
 
 export const plural = (n: number, one: string, many: string) => `${n.toLocaleString("es-CO")} ${n === 1 ? one : many}`;

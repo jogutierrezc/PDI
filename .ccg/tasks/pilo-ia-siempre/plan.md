@@ -7,7 +7,7 @@ Modelo: Gemma 4 (NVIDIA). Síntomas que ve el dueño: «No encontré eso…» y 
 ## Decisiones del dueño
 1. **IA siempre + streaming**: un solo prompt con bloques por prioridad; la respuesta se escribe en vivo.
 2. **Cualquier tema**: lo que no venga de la base se marca como conocimiento general.
-3. **Catálogo como base obligatoria**: el modelo adapta la respuesta oficial sin contradecirla; las capciosas salen textuales.
+3. **Catálogo como base obligatoria**: el modelo adapta la respuesta oficial sin contradecirla. (Cambiado el 2026-10-01: las capciosas también pasan por el modelo; textuales solo si no hay IA.)
 
 ## Reglas que no cambian
 - Toda cifra institucional sale de la base (`pilo_facts`, `pilo_memory`) y va citada `[n]`; nunca de la memoria del modelo.

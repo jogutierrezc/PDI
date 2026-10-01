@@ -23,6 +23,7 @@ const Launcher = lazy(() => import("./modules/admin/launcher/Launcher").then((m)
 const PlaneacionHome = lazy(() => import("./modules/planeacion/PlaneacionHome").then((m) => ({ default: m.PlaneacionHome })));
 const TeamPage = lazy(() => import("./modules/planeacion/TeamPage").then((m) => ({ default: m.TeamPage })));
 const AskPilo = lazy(() => import("./modules/pregunta/AskPilo").then((m) => ({ default: m.AskPilo })));
+const PiloEmbed = lazy(() => import("./modules/pilo-embed/PiloEmbed").then((m) => ({ default: m.PiloEmbed })));
 
 const Dashboard = lazy(() => import("./routes/Dashboard").then((m) => ({ default: m.Dashboard })));
 const NotFound = lazy(() => import("./routes/NotFound").then((m) => ({ default: m.NotFound })));
@@ -246,6 +247,8 @@ export default function App() {
           <Route path="/pdi" element={<Home />} />
           <Route path="/equipo" element={<TeamPage />} />
           <Route path="/pregunta" element={<AskPilo />} />
+          {/* El chat emergente de Pilo, para verse dentro de un marco en otros portales (public/pilo.js). */}
+          <Route path="/pilo-embed" element={<PiloEmbed />} />
           <Route path="/tablero" element={<Dashboard />} />
           <Route path="/tablero/pilar/:slug" element={<PillarScorecard />} />
           <Route path="/implementacion" element={<ImplementationPortal />} />

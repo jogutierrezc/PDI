@@ -29,8 +29,7 @@ import { useSearchParams } from "react-router-dom";
 import { AdminShell } from "../components/AdminShell";
 import { ErrorBlock, LoadingBlock } from "../../../components/ui/QueryState";
 import { PiloAvatar } from "../../../components/pilo/PiloAvatar";
-import { testPilo } from "../../../components/pilo/ai/client";
-import { PROVIDERS, useKeyStatus, usePiloSettings, useSavePiloSettings } from "./store";
+import { PROVIDERS, probeConnection, useKeyStatus, usePiloSettings, useSavePiloSettings } from "./store";
 import type { PiloSettings } from "./store";
 import { useMemoryCounts } from "./memory";
 import { dirtySections, joinNames, parseSection, SECTIONS } from "./mesh-view";
@@ -192,8 +191,8 @@ function Editor({ initial }: { initial: PiloSettings }) {
     }
     setTest({ state: "busy", text: "Probando…" });
     try {
-      const r = await testPilo();
-      setTest(r.ok ? { state: "ok", text: `Respondió en ${r.ms} ms` } : { state: "fail", text: r.error ?? "No respondió." });
+      const r = await probeConnection();
+      setTest(r.ok ? { state: "ok", text: `Respondió en ${r.ms} ms`, probe: r } : { state: "fail", text: r.error ?? "No respondió.", probe: r });
     } catch (e) {
       setTest({ state: "fail", text: (e as Error).message });
     }

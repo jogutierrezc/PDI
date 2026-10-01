@@ -1,10 +1,12 @@
 /* =============================================================================
    Pregúntele a Pilo (/pregunta).
 
-   Una conversación con Mr. Pilo sobre la Planeación Institucional de la UDES.
-   Cada respuesta dice cómo se obtuvo (regla, respuesta guardada, lo publicado
-   tal cual o redactada con IA) y trae sus fuentes numeradas: una cita abre la
-   fuente al lado, con el pasaje resaltado y el enlace a la página exacta.
+   Una conversación con Mr. Pilo. Pilo redacta siempre con IA y la respuesta
+   se escribe en vivo (el servidor la manda por partes); mientras trabaja se
+   ven los pasos reales que reporta el servidor («Pensando…»). Cada respuesta
+   dice de dónde sale: información oficial de la UDES con sus fuentes
+   numeradas, una mezcla, o conocimiento general. Una cita abre la fuente al
+   lado, con el pasaje resaltado y el enlace a la página exacta.
 
    Quién entra lo decide la administración en «Mr. Pilo con IA»: público, con
    sesión o solo administración. Qué memorias usa Pilo también es interno; el
@@ -13,7 +15,7 @@
    recuerdan en el navegador (store.ts).
    ========================================================================== */
 
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from "react";
 import type { FormEvent, ReactNode } from "react";
 import { Link, useLocation } from "react-router-dom";
 import gsap from "gsap";
@@ -21,8 +23,8 @@ import { useAuth } from "../../lib/auth";
 import { usePiloAiConfig } from "../../components/pilo/ai/config";
 import { canUse } from "../../components/pilo/ai/logic";
 import type { Role } from "../../components/pilo/ai/logic";
-import { askQuestion, prefetchPilo, rateAnswer, sayWithPilo, stopPilo } from "../../components/pilo/ai/client";
-import type { AskKind, AskResult, AskSource } from "../../components/pilo/ai/client";
+import { askQuestionStream, buildHistory, PiloError, prefetchPilo, rateAnswer, sayWithPilo, stopPilo } from "../../components/pilo/ai/client";
+import type { AskKind, AskMeta, AskSource, AskStep } from "../../components/pilo/ai/client";
 import { Pilo as PiloMoji } from "./Pilo";
 import type { MojiMood, PiloMojiHandle } from "./Pilo";
 import { markWelcome, newId, seenWelcome, TEMAS, useConversations, useTema } from "./store";
@@ -30,6 +32,9 @@ import type { Conversation, Tema, Turn } from "./store";
 import { Welcome } from "./Welcome";
 import { MeshAnswer } from "./MeshAnswer";
 import { AnswerText, parseAnswer, useTypewriter } from "./AnswerText";
+import { toPlain } from "./markdown";
+import { badgeOf, compactThink, interruptedTurn, notesOf, reduceSteps, secondsText, showsSources, waitingLine } from "./answer-state";
+import type { ThinkStep } from "./answer-state";
 import { CatalogModal } from "../admin/pilo/CatalogModal";
 import type { CatalogMood } from "../admin/pilo/catalog-sheet";
 import { enrichSpokenSentences } from "../../components/pilo/ai/voice-expressions";
@@ -56,17 +61,29 @@ const SUGGESTIONS: { q: string; hint: string; trick?: boolean }[] = [
   { q: "¿Cuánto presupuesto tiene el pilar Ambiente tecnológico?", hint: "Pregunta capciosa", trick: true },
 ];
 
-const BADGE: Record<AskKind, string> = {
-  memoria: "De la memoria · sin IA",
-  extracto: "De lo publicado · sin IA",
-  ia: "Redactada con IA · cifras verificadas",
-  regla: "Regla de Pilo · sin IA",
-  nada: "Sin fuentes · sin IA",
-  curada: "Respuesta de Planeación · sin IA",
-  capciosa: "Respuesta rápida de Pilo",
-  malla: "De la malla de la memoria · sin IA",
-  dato: "Cifra de UDES en Cifras · sin IA",
-};
+/** Lo que se ve de una respuesta mientras el servidor la escribe. No se guarda: al terminar pasa al turno. */
+interface Live {
+  turnId: string;
+  text: string;
+  meta: AskMeta | null;
+  /** Los pasos que reporta el servidor; vacío con una función anterior. */
+  steps: ThinkStep[];
+  thinking: string;
+  startedAt: number;
+  /** Cuánto pensó antes de empezar a escribir (ms); null mientras no escribe. */
+  thoughtMs: number | null;
+}
+
+/** La fuente abierta al lado: se guarda entera, porque al terminar la respuesta las citas se renumeran. */
+interface OpenSource {
+  turnId: string;
+  q: string;
+  src: AskSource;
+  trigger: HTMLElement | null;
+}
+
+/** El razonamiento en vivo no crece sin límite en memoria. */
+const THINKING_LIVE = 8000;
 
 const MOOD_OF: Record<AskKind, MojiMood> = { memoria: "feliz", extracto: "atento", ia: "feliz", regla: "cuidado", nada: "duda", curada: "feliz", capciosa: "cuidado", malla: "feliz", dato: "feliz" };
 
@@ -90,6 +107,7 @@ const I = {
   ext: <Svg size={15}><path d="M14 4h6v6M20 4l-9 9M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5" /></Svg>,
   replay: <Svg size={15}><path d="M4 12a8 8 0 1 0 2.4-5.7M4 4v4h4" /></Svg>,
   check: <Svg size={11}><path d="M5 12l5 5 9-10" /></Svg>,
+  alert: <Svg size={12}><path d="M12 4 3 20h18zM12 10v4M12 17.2v.3" /></Svg>,
   dash: <Svg size={10}><path d="M6 12h12" /></Svg>,
   spark: (
     <svg width="11" height="11" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
@@ -215,11 +233,15 @@ function Chat({ tema, setTema, role, audience, welcome, voice }: ChatProps) {
   const [busy, setBusy] = useState(false);
   const [draft, setDraft] = useState("");
   const [sideOpen, setSideOpen] = useState(false);
-  const [source, setSource] = useState<{ turn: Turn; n: number; trigger: HTMLElement | null } | null>(null);
+  const [source, setSource] = useState<OpenSource | null>(null);
   const [showWelcome, setShowWelcome] = useState(() => welcome && !seenWelcome());
   const [scrolled, setScrolled] = useState(false);
-  // Las respuestas que acaban de llegar se escriben palabra por palabra; las del historial, no.
-  const [fresh, setFresh] = useState<Set<string>>(() => new Set());
+  // Las respuestas que acaban de llegar: «entera» se escribe palabra por palabra; «en vivo» ya se vio escribir.
+  const [fresh, setFresh] = useState<Map<string, "entera" | "en vivo">>(() => new Map());
+  const [live, setLive] = useState<Live | null>(null);
+  // Para lectores de pantalla: se anuncia que Pilo piensa y, al final, la respuesta entera (no cada frase).
+  const [status, setStatus] = useState("");
+  const run = useRef<{ ctl: AbortController; convId: string; turnId: string; text: string; meta: AskMeta | null; steps: ThinkStep[]; thinking: string; startedAt: number; thoughtMs: number | null } | null>(null);
   const [catalogTurn, setCatalogTurn] = useState<Turn | null>(null);
   const [autoRead, setAutoRead] = useState(() => {
     try {
@@ -245,39 +267,141 @@ function Chat({ tema, setTema, role, audience, welcome, voice }: ChatProps) {
 
   const current = convs.find((c) => c.id === currentId) ?? null;
 
+  // La página sigue a la respuesta solo si la persona está al final: si subió a leer, no se la mueve.
+  const pinned = useRef(true);
+  const lastTop = useRef(0);
+  const followUntil = useRef(0);
+  const col = useRef<HTMLDivElement>(null);
+  const writing = useRef(false);
+  writing.current = busy || fresh.size > 0;
+
   const toBottom = useCallback(() => {
+    pinned.current = true;
     requestAnimationFrame(() => {
       const s = scroll.current;
       if (s) s.scrollTo({ top: s.scrollHeight, behavior: reduced() ? "auto" : "smooth" });
     });
   }, []);
 
+  const onScroll = (s: HTMLDivElement) => {
+    setScrolled(s.scrollTop > 4);
+    if (s.scrollHeight - s.scrollTop - s.clientHeight < 56) pinned.current = true;
+    else if (s.scrollTop < lastTop.current - 2) pinned.current = false;
+    lastTop.current = s.scrollTop;
+  };
+
+  useEffect(() => {
+    const s = scroll.current;
+    const c = col.current;
+    if (!s || !c || typeof ResizeObserver === "undefined") return;
+    const ro = new ResizeObserver(() => {
+      if (!pinned.current || !(writing.current || performance.now() < followUntil.current)) return;
+      s.scrollTop = s.scrollHeight;
+    });
+    ro.observe(c);
+    return () => ro.disconnect();
+  }, []);
+
   const patchTurn = (convId: string, turnId: string, patch: Partial<Turn>) =>
     setConvs((list) => list.map((c) => (c.id !== convId ? c : { ...c, turns: c.turns.map((t) => (t.id === turnId ? { ...t, ...patch } : t)) })));
 
+  const seconds = (r: { startedAt: number; thoughtMs: number | null }) => (r.thoughtMs ?? Date.now() - r.startedAt) / 1000;
+
+  /** En qué queda el turno de un flujo que se corta: lo escrito, marcado como incompleto. */
+  const settle = (r: NonNullable<typeof run.current>, message?: string): Partial<Turn> => ({
+    ...interruptedTurn(r.text, r.meta, message),
+    think: compactThink(r.steps, r.thinking, seconds(r)),
+  });
+
+  /** Detener: el pedido se cancela y lo escrito se conserva. */
+  const stop = () => {
+    const r = run.current;
+    if (!r) return;
+    run.current = null;
+    r.ctl.abort();
+    patchTurn(r.convId, r.turnId, settle(r));
+    setLive(null);
+    setBusy(false);
+    setStatus(r.text.trim() ? "Detuvo la respuesta: quedó incompleta." : "Detuvo la pregunta.");
+    followUntil.current = performance.now() + 800;
+    input.current?.focus({ preventScroll: true });
+  };
+
   const ask = async (raw: string, replaceTurn?: string) => {
     const q = raw.replace(/\s+/g, " ").trim();
-    if (!q || busy) return;
+    if (!q) return;
     setSource(null);
     stopPilo();
+    // Otra pregunta mientras Pilo escribe: la anterior se corta y queda como incompleta.
+    const cut = run.current;
+    const cutPatch = cut ? settle(cut) : null;
+    if (cut) {
+      run.current = null;
+      cut.ctl.abort();
+    }
+    const patched = (turns: Turn[]) => (cut && cutPatch ? turns.map((t) => (t.id === cut.turnId ? { ...t, ...cutPatch } : t)) : turns);
     const conv: Conversation = current ?? { id: newId(), title: q.slice(0, 80), at: Date.now(), turns: [] };
     const turn: Turn = { id: newId(), q };
-    const before = conv.turns.filter((t) => t.id !== replaceTurn);
-    // Con la pregunta ya entendida en su contexto: la de seguimiento siguiente sabe de qué se hablaba.
-    const history = before.filter((t) => t.answer).slice(-2).map((t) => ({ q: t.answer!.asked || t.q, a: t.answer!.text }));
-    setConvs((list) => [{ ...conv, at: Date.now(), turns: [...before, turn] }, ...list.filter((c) => c.id !== conv.id)]);
+    const before = patched(conv.turns.filter((t) => t.id !== replaceTurn));
+    // Lo que la persona escribió y el texto final de cada respuesta: el servidor arma el contexto.
+    const history = buildHistory(before.map((t) => ({ q: t.q, a: t.answer?.text })));
+    setConvs((list) => [{ ...conv, at: Date.now(), turns: [...before, turn] }, ...list.filter((c) => c.id !== conv.id).map((c) => (cut && c.id === cut.convId ? { ...c, turns: patched(c.turns) } : c))]);
     setCurrentId(conv.id);
+    const ctl = new AbortController();
+    const mine = { ctl, convId: conv.id, turnId: turn.id, text: "", meta: null as AskMeta | null, steps: [] as ThinkStep[], thinking: "", startedAt: Date.now(), thoughtMs: null as number | null };
+    run.current = mine;
+    const show = () => setLive({ turnId: mine.turnId, text: mine.text, meta: mine.meta, steps: mine.steps, thinking: mine.thinking, startedAt: mine.startedAt, thoughtMs: mine.thoughtMs });
+    show();
     setBusy(true);
+    setStatus("Pilo está pensando.");
     toBottom();
     try {
-      const answer = await askQuestion(q, history);
-      setFresh((f) => new Set(f).add(turn.id));
-      patchTurn(conv.id, turn.id, { answer });
+      const answer = await askQuestionStream(q, history, {
+        signal: ctl.signal,
+        onMeta: (meta) => {
+          if (run.current !== mine) return;
+          mine.meta = meta;
+          show();
+        },
+        onStep: (step) => {
+          if (run.current !== mine) return;
+          mine.steps = reduceSteps(mine.steps, step);
+          show();
+        },
+        onThinking: (text) => {
+          if (run.current !== mine) return;
+          mine.thinking = (mine.thinking + text).slice(-THINKING_LIVE);
+          show();
+        },
+        onDelta: (text) => {
+          if (run.current !== mine) return;
+          if (mine.thoughtMs === null) mine.thoughtMs = Date.now() - mine.startedAt;
+          mine.text += text;
+          show();
+        },
+      });
+      if (run.current !== mine) return;
+      setFresh((f) => new Map(f).set(turn.id, mine.text.trim() ? "en vivo" : "entera"));
+      // Los pasos que guarda el turno son los que trae `done`; sin ellos (función anterior), los vistos en vivo.
+      const { steps: doneSteps, seconds: total, ...rest } = answer;
+      const kept = Array.isArray(doneSteps) && doneSteps.length ? doneSteps.reduce<ThinkStep[]>((all, s) => reduceSteps(all, { id: s.id, label: s.label, detail: s.detail, state: "done" }), []) : mine.steps;
+      // «Pensó durante»: hasta la primera frase; si llegó entera, el total que dice el servidor.
+      const thoughtFor = mine.thoughtMs !== null || typeof total !== "number" ? seconds(mine) : total;
+      patchTurn(conv.id, turn.id, { answer: rest, think: compactThink(kept, mine.thinking, thoughtFor) });
+      setStatus(`Pilo respondió: ${toPlain(parseAnswer(answer.text))}`);
     } catch (e) {
-      patchTurn(conv.id, turn.id, { error: (e as Error).message || "No pude hablar con Pilo ahora." });
+      // Cortado por «Detener» o por otra pregunta: ya quedó resuelto.
+      if (run.current !== mine) return;
+      const message = (e instanceof PiloError && e.code === "cancelado" ? "" : (e as Error).message) || "No pude hablar con Pilo ahora.";
+      patchTurn(conv.id, turn.id, settle(mine, message));
+      setStatus(mine.text.trim() ? "La respuesta quedó incompleta." : "");
     } finally {
-      setBusy(false);
-      toBottom();
+      if (run.current === mine) {
+        run.current = null;
+        setLive(null);
+        setBusy(false);
+        followUntil.current = performance.now() + 800;
+      }
     }
   };
 
@@ -297,6 +421,12 @@ function Chat({ tema, setTema, role, audience, welcome, voice }: ChatProps) {
   };
 
   const remove = (id: string) => {
+    if (run.current?.convId === id) {
+      run.current.ctl.abort();
+      run.current = null;
+      setLive(null);
+      setBusy(false);
+    }
     setConvs((list) => list.filter((c) => c.id !== id));
     if (id === currentId) startNew();
   };
@@ -319,7 +449,15 @@ function Chat({ tema, setTema, role, audience, welcome, voice }: ChatProps) {
     return () => window.removeEventListener("keydown", onKey);
   }, [showWelcome]);
 
-  useEffect(() => () => stopPilo(), []);
+  // Al salir de la página, el pedido en curso se cancela.
+  useEffect(
+    () => () => {
+      run.current?.ctl.abort();
+      run.current = null;
+      stopPilo();
+    },
+    [],
+  );
 
   const finishWelcome = () => {
     markWelcome(true);
@@ -426,8 +564,8 @@ function Chat({ tema, setTema, role, audience, welcome, voice }: ChatProps) {
           </div>
         </header>
 
-        <div className="ap-scroll" ref={scroll} onScroll={(e) => setScrolled(e.currentTarget.scrollTop > 4)}>
-          <div className="ap-col">
+        <div className="ap-scroll" ref={scroll} onScroll={(e) => onScroll(e.currentTarget)}>
+          <div className="ap-col" ref={col}>
             {!current ? (
               <Hello slot={slot} moji={hello} hidden={showWelcome} onAsk={(q) => void ask(q)} />
             ) : (
@@ -437,18 +575,20 @@ function Chat({ tema, setTema, role, audience, welcome, voice }: ChatProps) {
                     key={t.id}
                     turn={t}
                     live={i === current.turns.length - 1}
-                    active={source?.turn.id === t.id ? source.n : null}
-                    onSource={(n, trigger) => setSource({ turn: t, n, trigger })}
+                    stream={live?.turnId === t.id ? live : null}
+                    activeRef={source?.turnId === t.id ? source.src.ref : null}
+                    onSource={(src, trigger) => setSource({ turnId: t.id, q: t.q, src, trigger })}
                     onRetry={() => void ask(t.q, t.id)}
-                    fresh={fresh.has(t.id)}
+                    fresh={fresh.get(t.id) ?? null}
                     autoRead={autoRead}
-                    onTyped={() =>
+                    onTyped={() => {
+                      followUntil.current = performance.now() + 800;
                       setFresh((f) => {
-                        const next = new Set(f);
+                        const next = new Map(f);
                         next.delete(t.id);
                         return next;
-                      })
-                    }
+                      });
+                    }}
                     onVote={(vote) => {
                       patchTurn(current.id, t.id, { vote });
                       if (t.answer) void rateAnswer({ answerId: t.answer.answerId, vote, question: t.q, text: t.answer.text, kind: t.answer.kind });
@@ -475,6 +615,7 @@ function Chat({ tema, setTema, role, audience, welcome, voice }: ChatProps) {
               value={draft}
               maxLength={500}
               placeholder="Pregunte por una cifra, un pilar, un boletín…"
+              aria-describedby="ap-note"
               onChange={(e) => setDraft(e.target.value)}
               onKeyDown={(e) => {
                 if (e.key === "Enter" && !e.shiftKey) {
@@ -483,11 +624,22 @@ function Chat({ tema, setTema, role, audience, welcome, voice }: ChatProps) {
                 }
               }}
             />
-            <button type="submit" className="ap-send" disabled={busy || !draft.trim()} aria-label="Preguntar">
-              {I.send}
-            </button>
+            {busy && !draft.trim() ? (
+              <button key="stop" type="button" className="ap-send" data-stop="" onClick={stop} aria-label="Detener la respuesta" title="Detener la respuesta">
+                {I.stop}
+              </button>
+            ) : (
+              <button key="send" type="submit" className="ap-send" disabled={!draft.trim()} aria-label={busy ? "Detener y preguntar esto" : "Preguntar"}>
+                {I.send}
+              </button>
+            )}
           </form>
-          <p className="ap-note">Pilo responde con lo que publica la Oficina de Planeación y dice de dónde sale cada dato.</p>
+          <p className="ap-note" id="ap-note">
+            Pilo redacta con IA. Las cifras de la UDES llevan su fuente; lo demás va marcado como conocimiento general.
+          </p>
+          <div className="ap-sr" role="status" aria-live="polite">
+            {status}
+          </div>
         </div>
 
         <SourceDrawer source={source} onClose={() => setSource(null)} />
@@ -507,7 +659,7 @@ function Chat({ tema, setTema, role, audience, welcome, voice }: ChatProps) {
               ? {
                   kind: "respuesta",
                   question: catalogTurn.q,
-                  answer: catalogTurn.answer ? catalogTurn.answer.text.replace(/\s*\[\d+\]/g, "").trim() : "",
+                  answer: catalogTurn.answer ? toPlain(parseAnswer(catalogTurn.answer.text)) : "",
                   mood: (catalogTurn.answer?.mood as CatalogMood) || "emocionado",
                   source_title: catalogTurn.answer?.sources?.[0]?.title ?? "Planeación Institucional · Pregúntele a Pilo",
                   source_path: catalogTurn.answer?.sources?.[0]?.path ?? "/pregunta",
@@ -533,7 +685,7 @@ function Hello({ slot, moji, hidden, onAsk }: { slot: React.RefObject<HTMLDivEle
         </div>
         <h1>¿Qué quiere saber de la Planeación de la UDES?</h1>
         <p>
-          Pregunte en sus palabras. Busco primero en lo que ya respondí y en lo publicado en los portales; solo redacto con IA cuando hace falta. Cada dato trae su fuente.
+          Pregunte en sus palabras, sobre la UDES o sobre lo que necesite. Redacto con IA: las cifras de la universidad salen de lo publicado y llevan su fuente, y le aviso cuando algo es conocimiento general.
         </p>
       </section>
       <div className="ap-sugs">
@@ -550,10 +702,109 @@ function Hello({ slot, moji, hidden, onAsk }: { slot: React.RefObject<HTMLDivEle
 
 /* --- Un turno: la pregunta y lo que responde Pilo -------------------------------------------- */
 
+/** Los segundos que lleva Pilo trabajando; el reloj solo corre mientras trabaja. */
+function useElapsed(startedAt: number | undefined, running: boolean): number {
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    if (!running) return;
+    setNow(Date.now());
+    const t = window.setInterval(() => setNow(Date.now()), 1000);
+    return () => window.clearInterval(t);
+  }, [running]);
+  return running && startedAt ? Math.max(0, Math.floor((now - startedAt) / 1000)) : 0;
+}
+
+/** ¿Se ve en pantalla? Fuera de ella, los indicadores de actividad se pausan. */
+function useOnScreen(ref: React.RefObject<HTMLElement>, enabled: boolean): boolean {
+  const [on, setOn] = useState(true);
+  useEffect(() => {
+    const el = ref.current;
+    if (!enabled || !el || typeof IntersectionObserver === "undefined") {
+      setOn(true);
+      return;
+    }
+    const io = new IntersectionObserver(([entry]) => setOn(entry.isIntersecting));
+    io.observe(el);
+    return () => io.disconnect();
+  }, [ref, enabled]);
+  return on;
+}
+
+const ms = (n: number) => (n >= 1000 ? `${(n / 1000).toFixed(1).replace(".", ",")} s` : `${n} ms`);
+
+/**
+ * Cómo respondió Pilo, en un solo lugar: los pasos que reportó el servidor
+ * («Pensando…»), su razonamiento si el proveedor lo manda, y el rastro técnico
+ * de la respuesta. Se abre y se cierra con una rejilla (0fr → 1fr), sin medir
+ * alturas; los pasos nuevos entran con un escalón corto.
+ */
+function ThinkBody({ id, open, steps, thinking, trail, working }: { id: string; open: boolean; steps: ThinkStep[]; thinking: string; trail: AskStep[]; working: boolean }) {
+  const root = useRef<HTMLDivElement>(null);
+  const seen = useRef(0);
+  const wasOpen = useRef(open);
+  useLayoutEffect(() => {
+    const el = root.current;
+    if (!el) return;
+    const rows = Array.from(el.querySelectorAll<HTMLElement>("li"));
+    const opened = open && !wasOpen.current;
+    wasOpen.current = open;
+    const fresh = opened ? rows : open ? rows.slice(seen.current) : [];
+    seen.current = rows.length;
+    if (!fresh.length || reduced()) return;
+    const tween = gsap.fromTo(fresh, { autoAlpha: 0, y: 6 }, { autoAlpha: 1, y: 0, duration: 0.3, stagger: 0.04, ease: "power3.out", clearProps: "opacity,visibility,transform" });
+    return () => {
+      tween.progress(1).kill();
+    };
+  }, [open, steps.length, trail.length]);
+
+  return (
+    <div className="ap-think" id={id} ref={root} data-open={open || undefined} aria-hidden={!open}>
+      <div className="ap-think__in">
+        {steps.length > 0 && (
+          <ol className="ap-trail">
+            {steps.map((s) => {
+              const active = working && s.state === "start";
+              return (
+                <li key={s.id} data-state={active ? "start" : "done"}>
+                  <span className="ap-st" data-s={active ? "now" : "ok"}>
+                    {active ? <i className="ap-pulse" /> : I.check}
+                  </span>
+                  <span>
+                    <b>{s.label}</b>
+                    {s.detail ? ` · ${s.detail}` : ""}
+                    <span className="ap-sr">{active ? " (en curso)" : " (listo)"}</span>
+                  </span>
+                </li>
+              );
+            })}
+          </ol>
+        )}
+        {thinking && <p className="ap-think__text">{thinking}</p>}
+        {trail.length > 0 && (
+          <ol className="ap-trail">
+            {trail.map((s, i) => (
+              <li key={i}>
+                <span className="ap-st" data-s={s.status}>
+                  {s.status === "ok" ? I.check : s.status === "ai" ? I.spark : I.dash}
+                </span>
+                <span>
+                  <b>{s.step}.</b> {s.detail}
+                </span>
+                <em className="ap-num">{ms(s.ms)}</em>
+              </li>
+            ))}
+          </ol>
+        )}
+      </div>
+    </div>
+  );
+}
+
 function TurnView({
   turn,
   live,
-  active,
+  stream,
+  activeRef,
   onSource,
   onRetry,
   onVote,
@@ -565,27 +816,60 @@ function TurnView({
   onCatalog,
 }: {
   turn: Turn;
+  /** El último turno de la conversación. */
   live: boolean;
-  fresh: boolean;
+  /** Lo que el servidor va mandando de este turno, mientras lo escribe. */
+  stream: Live | null;
+  fresh: "entera" | "en vivo" | null;
   autoRead: boolean;
   onTyped: () => void;
-  active: number | null;
-  onSource: (n: number, trigger: HTMLElement) => void;
+  /** La fuente abierta al lado, por su referencia (los números cambian al terminar). */
+  activeRef: string | null;
+  onSource: (src: AskSource, trigger: HTMLElement) => void;
   onRetry: () => void;
   onVote: (v: "up" | "down") => void;
   voice: ChatProps["voice"];
   isAdmin?: boolean;
   onCatalog?: () => void;
 }) {
-  const [trail, setTrail] = useState(false);
+  const [how, setHow] = useState(false);
   const [map, setMap] = useState<boolean | null>(null);
   const [copied, setCopied] = useState(false);
   const body = useRef<HTMLDivElement>(null);
   const face = useRef<PiloMojiHandle>(null);
+  const howId = useId();
   const a = turn.answer;
   const pending = !a && !turn.error;
+  // Pilo ya escribe: llegó la primera frase y la respuesta aún no termina.
+  const streaming = pending && Boolean(stream?.text);
+  const working = pending && !streaming;
+  const incomplete = Boolean(a && turn.incomplete);
 
-  const parsed = useMemo(() => parseAnswer(a?.text ?? ""), [a?.text]);
+  const text = a?.text ?? stream?.text ?? "";
+  const sources = useMemo(() => a?.sources ?? stream?.meta?.sources ?? [], [a, stream?.meta]);
+  const parsed = useMemo(() => parseAnswer(text, { streaming }), [text, streaming]);
+  const active = activeRef ? (sources.find((s) => s.ref === activeRef)?.n ?? null) : null;
+  const openSource = (n: number, trigger: HTMLElement) => {
+    const src = sources.find((s) => s.n === n);
+    if (src) onSource(src, trigger);
+  };
+
+  /* «Pensando…»: solo lo que reporta el servidor. */
+  const steps = stream?.steps ?? turn.think?.steps ?? [];
+  const thinking = stream ? stream.thinking.slice(-1200) : (turn.think?.thinking ?? "");
+  const trail = a?.trail ?? [];
+  // Con pasos del servidor, el rastro técnico queda para la administración: un solo relato para quien pregunta.
+  const shownTrail = steps.length > 0 && !isAdmin ? [] : trail;
+  const elapsed = useElapsed(stream?.startedAt, working);
+  const thought = stream ? (stream.thoughtMs === null ? null : stream.thoughtMs / 1000) : (turn.think?.seconds ?? null);
+  const hasHow = steps.length > 0 || Boolean(thinking) || shownTrail.length > 0;
+  const onScreen = useOnScreen(body, pending);
+
+  // Al llegar la primera frase, el panel se recoge en una línea.
+  useEffect(() => {
+    if (streaming) setHow(false);
+  }, [streaming]);
+
   const [reading, setReading] = useState<number | null>(null);
   const readRun = useRef(0);
   const after = useRef<HTMLDivElement>(null);
@@ -603,10 +887,10 @@ function TurnView({
   }, [parsed, a?.mood, voice.expressions, voice.patterns, voice.modulation, voice.rate, voice.pitch]);
 
   const spoken = enrichedVoice.sentences;
-  // Con «Leer en voz alta», el audio de las primeras frases se pide mientras Pilo escribe.
+  // Con «Leer en voz alta», el audio de las primeras frases se pide en cuanto la respuesta está completa.
   useEffect(() => {
-    if (a && fresh && autoRead) prefetchPilo(spoken.slice(0, 2), { portal: "pregunta", advanced: voice.advanced });
-  }, [a, fresh, autoRead, spoken, voice.advanced]);
+    if (a && fresh && autoRead && !incomplete) prefetchPilo(spoken.slice(0, 2), { portal: "pregunta", advanced: voice.advanced });
+  }, [a, fresh, autoRead, incomplete, spoken, voice.advanced]);
 
   /** Leer la respuesta frase por frase: la que suena se resalta y Pilo mueve el pico. */
   const read = async () => {
@@ -621,6 +905,7 @@ function TurnView({
     face.current?.talk(true);
     for (let k = 0; k < parsed.sentences.length; k++) {
       if (mine !== readRun.current) return;
+      if (!spoken[k]?.trim()) continue;
       setReading(k);
       // Mientras suena esta frase, se piden las dos que siguen: así no hay pausas.
       prefetchPilo(spoken.slice(k + 1, k + 3), { portal: "pregunta", advanced: voice.advanced });
@@ -641,42 +926,56 @@ function TurnView({
   // Otra lectura (de otra respuesta) cancela esta: sayWithPilo responde «cancelado».
   useEffect(() => () => void (readRun.current += 1), []);
 
-  const { shown, typing, finish } = useTypewriter(parsed.count, Boolean(a) && fresh, () => {
+  // Una respuesta que llega entera se escribe sola, breve; la que se vio escribir en vivo, no.
+  const { shown, typing, finish } = useTypewriter(parsed.count, Boolean(a) && fresh === "entera", () => {
     face.current?.talk(false);
     onTyped();
-    if (autoRead) void read();
+    if (autoRead && !incomplete) void read();
   });
+
+  // La que se escribió en vivo se lee una sola vez, ya completa: el texto final, no cada parte.
+  const readLive = useRef(read);
+  readLive.current = read;
+  useEffect(() => {
+    if (!a || fresh !== "en vivo") return;
+    face.current?.talk(false);
+    onTyped();
+    if (autoRead && !incomplete) void readLive.current();
+    // Solo al llegar la respuesta final.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [Boolean(a), fresh]);
 
   // Mientras busca, Pilo mira arriba pensando; mientras escribe, habla.
   useEffect(() => {
     if (!live) return;
-    if (pending) {
+    if (working) {
       face.current?.look(0.5, -0.7);
       return;
     }
     face.current?.look(0, 0.2);
-    if (typing) face.current?.talk(true);
-  }, [pending, live, typing]);
+    if (typing || streaming) face.current?.talk(true);
+  }, [working, live, typing, streaming]);
 
   // Terminada la escritura, llega lo demás (mapa, fuentes, acciones), 50 ms entre cada cosa.
-  const wasTyping = useRef(false);
+  const wasWriting = useRef(false);
+  const writing = typing || streaming;
   useLayoutEffect(() => {
-    if (typing) {
-      wasTyping.current = true;
+    if (writing) {
+      wasWriting.current = true;
       return;
     }
-    if (!wasTyping.current || !after.current || reduced()) return;
-    wasTyping.current = false;
+    if (!wasWriting.current || !after.current || reduced()) return;
+    wasWriting.current = false;
     const ctx = gsap.context(() => {
       gsap.from(after.current!.children, { autoAlpha: 0, y: 8, duration: 0.35, stagger: 0.05, ease: "power3.out" });
     }, after);
     return () => ctx.revert();
-  }, [typing]);
+  }, [writing, Boolean(a)]);
 
-  const plain = a ? a.text.replace(/\s*\[\d+\]/g, "") : "";
   const copy = async () => {
     try {
-      await navigator.clipboard.writeText(`${plain}\n\n${(a?.sources ?? []).map((s) => `[${s.n}] ${s.title} · ${location.origin}${s.path}`).join("\n")}`);
+      const listed = a && showsSources(a) ? a.sources.map((s) => `[${s.n}] ${s.title}${s.path ? ` · ${/^https?:/i.test(s.path) ? s.path : `${location.origin}${s.path}`}` : ""}`) : [];
+      await navigator.clipboard.writeText([toPlain(parsed), listed.join("\n")].filter(Boolean).join("\n\n"));
       setCopied(true);
       window.setTimeout(() => setCopied(false), 1500);
     } catch {
@@ -684,23 +983,30 @@ function TurnView({
     }
   };
 
+  const badge = a ? badgeOf(a, incomplete) : null;
+  const notes = a && !incomplete ? notesOf(a) : [];
+  const headline = working ? waitingLine({ steps, meta: stream?.meta ?? null, seconds: elapsed }) : thought !== null ? `Pensó durante ${secondsText(thought)}` : "Cómo respondí";
+  const head = (
+    <>
+      {working && (
+        <span className="ap-dots" aria-hidden="true">
+          <i />
+          <i />
+          <i />
+        </span>
+      )}
+      <span>{headline}</span>
+      {working && elapsed >= 3 && <span className="ap-num ap-how__time">{secondsText(elapsed)}</span>}
+    </>
+  );
+
   return (
     <>
       <div className="ap-q">{turn.q}</div>
       <div className="ap-a">
-        <PiloMoji ref={face} size={42} mood={pending ? "piensa" : a ? MOOD_OF[a.kind] : "cuidado"} emotion={pending ? undefined : a?.mood} />
-        <div className="ap-a__body" ref={body} aria-live={live ? "polite" : undefined}>
-          {pending && (
-            <div className="ap-thinking">
-              <span className="ap-dots" aria-hidden="true">
-                <i />
-                <i />
-                <i />
-              </span>
-              Buscando en lo que conozco…
-            </div>
-          )}
-          {turn.error && (
+        <PiloMoji ref={face} size={42} mood={pending ? "piensa" : a ? (incomplete ? "duda" : MOOD_OF[a.kind]) : "cuidado"} emotion={pending ? undefined : a?.mood} />
+        <div className="ap-a__body" ref={body} aria-busy={pending} data-paused={pending && !onScreen ? "" : undefined}>
+          {turn.error && !a && (
             <div className="ap-error" role="alert">
               <span>{turn.error}</span>
               <button type="button" onClick={onRetry}>
@@ -708,92 +1014,97 @@ function TurnView({
               </button>
             </div>
           )}
-          {a && (
+          {(a || pending) && (
             <>
-              <div className="ap-prov">
-                <span className="ap-badge" data-kind={a.kind}>
-                  {a.kind === "ia" ? I.spark : null}
-                  {a.kind === "ia" && a.verified === false ? "Redactada con IA · revise las cifras" : BADGE[a.kind]}
-                </span>
-                {a.trail.length > 0 && (
-                  <button type="button" className="ap-trail-btn" aria-expanded={trail} onClick={() => setTrail((v) => !v)}>
-                    Cómo respondí {I.chev}
-                  </button>
+              <div className="ap-prov" data-working={working || undefined}>
+                {a && badge && (
+                  <span className="ap-badge" data-kind={a.kind} data-tone={badge.tone}>
+                    {badge.icon ? I[badge.icon] : null}
+                    {badge.text}
+                  </span>
                 )}
-                {a.graph && a.graph.nodes.length > 1 && (
+                {a && !incomplete && a.kind === "ia" && a.verified === false && (
+                  <span className="ap-badge" data-tone="aviso">
+                    {I.alert}
+                    Revise las cifras
+                  </span>
+                )}
+                {hasHow ? (
+                  <button type="button" className="ap-trail-btn ap-how" aria-expanded={how} aria-controls={howId} onClick={() => setHow((v) => !v)}>
+                    {head}
+                    {I.chev}
+                  </button>
+                ) : working || thought !== null ? (
+                  <span className="ap-how">{head}</span>
+                ) : null}
+                {a?.graph && a.graph.nodes.length > 1 && (
                   <button type="button" className="ap-trail-btn" aria-expanded={map ?? a.kind === "malla"} onClick={() => setMap(!(map ?? a.kind === "malla"))}>
                     Ver en el mapa {I.chev}
                   </button>
                 )}
               </div>
-              {trail && (
-                <ol className="ap-trail">
-                  {a.trail.map((s, i) => (
-                    <li key={i}>
-                      <span className="ap-st" data-s={s.status}>
-                        {s.status === "ok" ? I.check : s.status === "ai" ? I.spark : I.dash}
-                      </span>
-                      <span>
-                        <b>{s.step}.</b> {s.detail}
-                      </span>
-                      <em className="ap-num">{s.ms >= 1000 ? `${(s.ms / 1000).toFixed(1).replace(".", ",")} s` : `${s.ms} ms`}</em>
-                    </li>
-                  ))}
-                </ol>
-              )}
-              <AnswerText parsed={parsed} shown={shown} typing={typing} reading={reading} sources={a.sources} active={active} onSource={onSource} onFinish={finish} />
-              {!typing && (
-              <div className="ap-after" ref={after}>
-              {a.graph && a.graph.nodes.length > 1 && (map ?? a.kind === "malla") && <MeshAnswer graph={a.graph} animate={live} />}
-              {a.unknown && a.unknown.length > 0 && <p className="ap-warn">Revise estos números antes de citarlos: no los encontré en las fuentes ({a.unknown.join(", ")}).</p>}
-              {a.sources.length > 0 && (
-                <div className="ap-srcs" aria-label="Fuentes">
-                  {a.sources.map((s) => (
-                    <button key={s.n} type="button" className="ap-src" aria-pressed={active === s.n} onClick={(e) => onSource(s.n, e.currentTarget)}>
-                      <span className="ap-src__n">{s.n}</span>
-                      <span className="ap-code" data-s={s.source}>
-                        {codeOf(s.source)}
-                      </span>
-                      <span>
-                        {s.title} {s.cut && <small>· {s.cut}</small>}
-                      </span>
-                    </button>
-                  ))}
+              {hasHow && <ThinkBody id={howId} open={how} steps={steps} thinking={thinking} trail={shownTrail} working={working} />}
+              {text && <AnswerText parsed={parsed} shown={shown} typing={typing} streaming={streaming} reading={reading} sources={sources} active={active} onSource={openSource} onFinish={finish} />}
+              {notes.map((note) => (
+                <p key={note} className="ap-quiet">
+                  {I.dash}
+                  <span>{note}</span>
+                </p>
+              ))}
+              {a && incomplete && (
+                <div className="ap-cut">
+                  <span>{turn.error ? `${turn.error} Lo que alcanzó a escribir quedó incompleto.` : "Detuvo la respuesta: lo escrito quedó incompleto."}</span>
+                  <button type="button" onClick={onRetry}>
+                    Preguntar de nuevo
+                  </button>
                 </div>
               )}
-              <div className="ap-acts">
-                <button type="button" className="ap-ic" onClick={() => void read()} aria-pressed={reading !== null} aria-label={reading !== null ? "Dejar de leer" : "Escuchar la respuesta"}>
-                  {reading !== null ? I.stop : I.speak}
-                  {reading !== null && <span>Leyendo</span>}
-                </button>
-                <button type="button" className="ap-ic" onClick={copy} aria-label={copied ? "Copiada" : "Copiar la respuesta con sus fuentes"}>
-                  {I.copy}
-                  {copied && <span>Copiada</span>}
-                </button>
-                {isAdmin && (
-                  <button
-                    type="button"
-                    className="ap-ic"
-                    onClick={onCatalog}
-                    aria-label="Agregar al catálogo de respuestas oficiales de Pilo"
-                    title="Agregar al catálogo oficial de Pilo"
-                  >
-                    {I.catalog}
-                    <span>Al catálogo</span>
-                  </button>
-                )}
-                {a.kind !== "regla" && (
-                  <>
-                    <button type="button" className="ap-ic" aria-pressed={turn.vote === "up"} onClick={() => onVote("up")} aria-label="Me sirvió">
-                      {I.up}
+              {a && !typing && (
+                <div className="ap-after" ref={after}>
+                  {a.graph && a.graph.nodes.length > 1 && (map ?? a.kind === "malla") && <MeshAnswer graph={a.graph} animate={live} />}
+                  {a.unknown && a.unknown.length > 0 && <p className="ap-warn">Revise estos números antes de citarlos: no los encontré en las fuentes ({a.unknown.join(", ")}).</p>}
+                  {showsSources(a) && (
+                    <div className="ap-srcs" aria-label="Fuentes">
+                      {a.sources.map((s) => (
+                        <button key={s.n} type="button" className="ap-src" aria-pressed={active === s.n} onClick={(e) => onSource(s, e.currentTarget)}>
+                          <span className="ap-src__n">{s.n}</span>
+                          <span className="ap-code" data-s={s.source}>
+                            {codeOf(s.source)}
+                          </span>
+                          <span>
+                            {s.title} {s.cut && <small>· {s.cut}</small>}
+                          </span>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                  <div className="ap-acts">
+                    <button type="button" className="ap-ic" onClick={() => void read()} aria-pressed={reading !== null} aria-label={reading !== null ? "Dejar de leer" : "Escuchar la respuesta"}>
+                      {reading !== null ? I.stop : I.speak}
+                      {reading !== null && <span>Leyendo</span>}
                     </button>
-                    <button type="button" className="ap-ic" aria-pressed={turn.vote === "down"} onClick={() => onVote("down")} aria-label="No me sirvió">
-                      <span style={{ display: "inline-flex", transform: "scaleY(-1)" }}>{I.up}</span>
+                    <button type="button" className="ap-ic" onClick={copy} aria-label={copied ? "Copiada" : "Copiar la respuesta con sus fuentes"}>
+                      {I.copy}
+                      {copied && <span>Copiada</span>}
                     </button>
-                  </>
-                )}
-              </div>
-              </div>
+                    {isAdmin && !incomplete && (
+                      <button type="button" className="ap-ic" onClick={onCatalog} aria-label="Agregar al catálogo de respuestas oficiales de Pilo" title="Agregar al catálogo oficial de Pilo">
+                        {I.catalog}
+                        <span>Al catálogo</span>
+                      </button>
+                    )}
+                    {a.kind !== "regla" && !incomplete && (
+                      <>
+                        <button type="button" className="ap-ic" aria-pressed={turn.vote === "up"} onClick={() => onVote("up")} aria-label="Me sirvió">
+                          {I.up}
+                        </button>
+                        <button type="button" className="ap-ic" aria-pressed={turn.vote === "down"} onClick={() => onVote("down")} aria-label="No me sirvió">
+                          <span style={{ display: "inline-flex", transform: "scaleY(-1)" }}>{I.up}</span>
+                        </button>
+                      </>
+                    )}
+                  </div>
+                </div>
               )}
             </>
           )}
@@ -829,10 +1140,10 @@ function highlight(text: string, question: string): ReactNode[] {
   return out;
 }
 
-function SourceDrawer({ source, onClose }: { source: { turn: Turn; n: number; trigger: HTMLElement | null } | null; onClose: () => void }) {
+function SourceDrawer({ source, onClose }: { source: OpenSource | null; onClose: () => void }) {
   const closeBtn = useRef<HTMLButtonElement>(null);
   const [shown, setShown] = useState(source);
-  const s: AskSource | undefined = shown?.turn.answer?.sources.find((x) => x.n === shown.n);
+  const s: AskSource | undefined = shown?.src;
 
   useEffect(() => {
     if (source) {
@@ -848,7 +1159,7 @@ function SourceDrawer({ source, onClose }: { source: { turn: Turn; n: number; tr
     trigger?.focus({ preventScroll: true });
   };
 
-  const excerpt = useMemo(() => (s && shown ? highlight(s.excerpt, shown.turn.q) : null), [s, shown]);
+  const excerpt = useMemo(() => (s && shown ? highlight(s.excerpt, shown.q) : null), [s, shown]);
   const external = s ? /^https?:/i.test(s.path) : false;
 
   return (

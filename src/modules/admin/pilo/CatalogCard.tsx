@@ -23,6 +23,8 @@ import type { CatalogKind, CatalogRow, ParseResult } from "./catalog-sheet";
 import { Icon } from "../../../components/ui/Icon";
 import { Group, StatusMark, Switch } from "./ui";
 import { CatalogModal } from "./CatalogModal";
+import { useEmbedStatus, useIndexMemory, useTryCatalog } from "./memory";
+import type { EmbedStatus } from "./memory";
 
 interface Entry extends CatalogRow {
   kind: CatalogKind;
@@ -46,9 +48,9 @@ function useCatalog() {
 
 const LEAD: Record<CatalogKind, string> = {
   respuesta:
-    "Preguntas con la respuesta oficial de Planeación. Pilo la da tal cual, sin IA, cuando la pregunta se parece a la escrita o a una de sus variantes, y cita la fuente si la tiene.",
+    "Preguntas con la respuesta oficial de Planeación. Cuando la pregunta se parece a la escrita o a una de sus variantes, es la base obligatoria de lo que redacta la IA: Pilo no la contradice y cita la fuente si la tiene. Tal cual sale solo si no hay IA.",
   capciosa:
-    "Microexpresiones: respuestas cortas y rápidas para preguntas capciosas (salarios, la vida personal de Pilo, bromas). Se disparan cuando la pregunta trae las palabras de un disparador, y Pilo las dice con la emoción elegida.",
+    "Microexpresiones: respuestas cortas para preguntas capciosas (salarios, la vida personal de Pilo, bromas). Cuando la pregunta trae las palabras de un disparador o se le parece por significado, la IA responde con esa microexpresión como base y con la emoción elegida. Tal cual sale solo si no hay IA.",
 };
 
 export function CatalogSection() {
@@ -153,6 +155,8 @@ export function CatalogSection() {
         </div>
         <p className="pis-lead">{LEAD[kind]}</p>
       </Group>
+
+      <CatalogMemory />
 
       <Group title="Agregar o importar">
         <div className="pis-actions">
@@ -301,5 +305,96 @@ export function CatalogSection() {
         }}
       />
     </>
+  );
+}
+
+const VIA_LABEL = { palabras: "por palabras", significado: "por significado" } as const;
+
+/**
+ * El catálogo dentro de la memoria de Pilo: cuántas entradas tienen su vector
+ * (0112: respuestas y capciosas), el botón que sincroniza las que faltan y una
+ * prueba que dice qué entradas encontraría Pilo para una pregunta.
+ */
+function CatalogMemory() {
+  const status = useEmbedStatus();
+  const indexer = useIndexMemory();
+  const tryIt = useTryCatalog();
+  const [progress, setProgress] = useState<EmbedStatus | null>(null);
+  const [probe, setProbe] = useState("");
+  const now = progress ?? status.data ?? null;
+  const pending = now ? Math.max(0, now.catalog_total - now.catalog_done) : 0;
+  const synced = Boolean(now) && pending === 0;
+
+  return (
+    <Group title="Memoria de Pilo" aside={<small>{now?.model ? `Modelo ${now.model}` : "Búsqueda por significado"}</small>}>
+      <div className="pis-row">
+        <p className="pis-note">
+          Cada entrada del catálogo guarda un vector con su pregunta, sus variantes y sus disparadores. Así Pilo la encuentra aunque le pregunten con otras palabras, y la IA la
+          usa como base de su respuesta. Sincronice después de agregar, importar o cambiar entradas.
+        </p>
+        <button
+          type="button"
+          className="button-secondary"
+          onClick={() => indexer.mutate(setProgress, { onSettled: () => setProgress(null) })}
+          disabled={indexer.isPending || status.isPending || status.isError || !now || synced}
+        >
+          {indexer.isPending ? "Sincronizando…" : synced ? "Al día" : "Sincronizar con la memoria"}
+        </button>
+      </div>
+      {status.isError ? (
+        <p className="pis-warn">{(status.error as Error).message}</p>
+      ) : now ? (
+        <p className="pis-small" role="status">
+          <StatusMark tone={synced ? "ok" : "warn"}>{synced ? "Sincronizado" : "Falta sincronizar"}</StatusMark> {now.catalog_done.toLocaleString("es-CO")} de{" "}
+          {now.catalog_total.toLocaleString("es-CO")} entradas activas están en la memoria
+          {pending ? ` · faltan ${pending.toLocaleString("es-CO")}` : " · todo al día"}.
+        </p>
+      ) : (
+        <p className="pis-small">{status.isPending ? "Revisando la memoria…" : "Sin datos de la memoria."}</p>
+      )}
+      {indexer.isError && (
+        <p className="pis-error" role="alert">
+          No terminó de sincronizar: {(indexer.error as Error).message}
+        </p>
+      )}
+
+      <form
+        className="pis-probe"
+        onSubmit={(e) => {
+          e.preventDefault();
+          if (probe.trim()) tryIt.mutate(probe.trim());
+        }}
+      >
+        <input value={probe} onChange={(e) => setProbe(e.target.value)} placeholder="Pruebe una pregunta como la haría el público" aria-label="Pregunta para probar el catálogo" />
+        <button type="submit" className="button-secondary" disabled={!probe.trim() || tryIt.isPending}>
+          {tryIt.isPending ? "Buscando…" : "Probar el catálogo"}
+        </button>
+      </form>
+      {tryIt.isError && (
+        <p className="pis-error" role="alert">
+          {(tryIt.error as Error).message}
+        </p>
+      )}
+      {tryIt.data && !tryIt.data.semantic && <p className="pis-small">Solo por palabras{tryIt.data.note ? `: ${tryIt.data.note}` : "."}</p>}
+      {tryIt.data &&
+        (tryIt.data.hits.length === 0 ? (
+          <p className="pis-small">Ninguna entrada del catálogo coincide: Pilo respondería con el resto de su memoria y con la IA.</p>
+        ) : (
+          <ol className="pis-hits">
+            {tryIt.data.hits.map((h) => (
+              <li key={h.key}>
+                <span className="pis-code">{h.key}</span>
+                <span>
+                  <strong>{h.question}</strong>
+                  <small>
+                    {SHEET_NAME[h.kind]} · {VIA_LABEL[h.via]} · {h.used ? "Pilo la usaría como base" : `no alcanza el ${Math.round(tryIt.data.min * 100)} % que hace falta`}
+                  </small>
+                </span>
+                <em title="Qué tanto se parece a la pregunta">{Math.round(h.score * 100)}</em>
+              </li>
+            ))}
+          </ol>
+        ))}
+    </Group>
   );
 }

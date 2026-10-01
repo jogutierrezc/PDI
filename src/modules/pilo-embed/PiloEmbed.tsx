@@ -1,0 +1,752 @@
+/* =============================================================================
+   Pilo en otros portales · el chat emergente (/pilo-embed).
+
+   Esta página se ve dentro de un marco que pone public/pilo.js en otra página:
+   un botón con la cara de Pilo, un saludo y, al abrirlo, un chat pequeño. Es
+   el mismo Pilo de Pregúntele a Pilo: pregunta a la misma función, escribe la
+   respuesta en vivo, cuenta en qué paso va y la lee con su voz. Lo que cambia
+   es el tamaño: aquí no hay historial, mapa ni panel de fuentes; para eso se
+   abre Pregúntele a Pilo en otra pestaña.
+
+   El acceso es el de Pregúntele a Pilo: si allá no está abierto para el
+   público, aquí no se pinta nada y el marco se esconde. Y solo se pinta en
+   este portal o en los que la administración autorizó (0111).
+   ========================================================================== */
+
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import type { FormEvent, ReactNode } from "react";
+import gsap from "gsap";
+import { useAuth } from "../../lib/auth";
+import { usePiloAiConfig } from "../../components/pilo/ai/config";
+import { canUse } from "../../components/pilo/ai/logic";
+import type { Role } from "../../components/pilo/ai/logic";
+import { askQuestionStream, buildHistory, PiloError, prefetchPilo, sayWithPilo, stopPilo } from "../../components/pilo/ai/client";
+import type { AskMeta } from "../../components/pilo/ai/client";
+import { enrichSpokenSentences } from "../../components/pilo/ai/voice-expressions";
+import { Pilo as PiloMoji } from "../pregunta/Pilo";
+import { newId } from "../pregunta/store";
+import type { Turn } from "../pregunta/store";
+import { AnswerText, parseAnswer, useTypewriter } from "../pregunta/AnswerText";
+import { toPlain } from "../pregunta/markdown";
+import { interruptedTurn, notesOf, reduceSteps, showsSources, waitingLine } from "../pregunta/answer-state";
+import type { ThinkStep } from "../pregunta/answer-state";
+import { frameMessage, hostOrigin, readHostMessage, readParams, sourceUrl, widgetAllowed } from "./embed";
+import type { FrameState } from "./embed";
+import "../pregunta/ask-pilo.css";
+import "./pilo-embed.css";
+
+const reduced = () => typeof window !== "undefined" && window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
+
+const EASE = "expo.out";
+const KEY_TURNS = "pilo-embed:turnos";
+const KEY_HELLO = "pilo-embed:saludo";
+const KEY_READ = "pilo-embed:leer";
+const MAX_TURNS = 30;
+
+const SUGGESTIONS = ["¿Qué es UDES en Cifras?", "¿Cómo va el Plan de Desarrollo?", "¿Qué programas ofrece la UDES?"];
+
+const session = {
+  get(key: string): string | null {
+    try {
+      return window.sessionStorage.getItem(key);
+    } catch {
+      return null;
+    }
+  },
+  set(key: string, value: string) {
+    try {
+      window.sessionStorage.setItem(key, value);
+    } catch {
+      /* sin almacenamiento: vale para esta página */
+    }
+  },
+};
+
+const frame = (state: FrameState) => {
+  try {
+    window.parent.postMessage(frameMessage(state), "*");
+  } catch {
+    /* fuera de un marco no hay a quién avisar */
+  }
+};
+
+function Svg({ children, size = 18, sw = 1.9 }: { children: ReactNode; size?: number; sw?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={sw} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      {children}
+    </svg>
+  );
+}
+
+const I = {
+  close: <Svg size={24} sw={2.4}><path d="M6 6l12 12M18 6 6 18" /></Svg>,
+  down: <Svg sw={2}><path d="m6 9.5 6 6 6-6" /></Svg>,
+  send: <Svg size={17} sw={2.2}><path d="M12 19V5M5.5 11.5 12 5l6.5 6.5" /></Svg>,
+  stop: <svg width="13" height="13" viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="4" width="16" height="16" rx="3" fill="currentColor" /></svg>,
+  mute: <Svg><path d="M4 9.5v5h3.5L12 18.5v-13L7.5 9.5H4z" /><path d="m16.5 9.5 4 5M20.5 9.5l-4 5" /></Svg>,
+  sound: <Svg><path d="M4 9.5v5h3.5L12 18.5v-13L7.5 9.5H4z" /><path d="M15.5 9a4.2 4.2 0 0 1 0 6M18.3 6.5a8 8 0 0 1 0 11" /></Svg>,
+  listen: <Svg size={13} sw={2}><path d="M4 9.5v5h3.5L12 18.5v-13L7.5 9.5H4z" /><path d="M15.5 9a4.2 4.2 0 0 1 0 6" /></Svg>,
+  doc: <Svg size={13} sw={2}><path d="M7 3.5h7l4 4v13H7z" /><path d="M14 3.5v4h4" /></Svg>,
+  out: <Svg size={13} sw={2}><path d="M14 4h6v6M20 4l-9 9M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5" /></Svg>,
+  fresh: <Svg><path d="M12 5v14M5 12h14" /></Svg>,
+};
+
+interface Voice {
+  advanced: boolean;
+  rate: number;
+  pitch: number;
+  expressions?: boolean;
+  modulation?: boolean;
+  patterns?: Record<string, string[]>;
+}
+
+interface Live {
+  turnId: string;
+  text: string;
+  meta: AskMeta | null;
+  steps: ThinkStep[];
+  startedAt: number;
+}
+
+/* --- Quién entra ----------------------------------------------------------------------------- */
+
+export function PiloEmbed() {
+  const config = usePiloAiConfig();
+  const { profile, loading } = useAuth();
+  const params = useMemo(() => readParams(window.location.search), []);
+  const role = (profile?.is_active ? profile.role : null) as Role | null;
+
+  // El marco es transparente: el fondo del portal no se pinta, y su esquema de
+  // color queda fijo en claro para coincidir con el que declara pilo.js.
+  useLayoutEffect(() => {
+    const root = document.documentElement;
+    root.classList.add("pilo-embed-doc");
+    return () => root.classList.remove("pilo-embed-doc");
+  }, []);
+
+  const waiting = config.isPending || loading;
+  const rules = config.data;
+  // Quién aloja el marco: este portal siempre puede; otro, solo si la administración lo autorizó (0111).
+  const hosted = useMemo(() => hostOrigin(window.location.ancestorOrigins, document.referrer), []);
+  const allowed = Boolean(rules && widgetAllowed(rules.widget, hosted, window.location.origin) && canUse({ ...rules, portals: { ...rules.portals, pregunta: { on: rules.pregunta.on, aud: rules.pregunta.aud, fns: ["preguntar"] } } }, "pregunta", "preguntar", role).ok);
+
+  useEffect(() => {
+    if (!waiting && !allowed) frame("oculto");
+  }, [waiting, allowed]);
+
+  if (waiting || !rules || !allowed) return null;
+
+  return (
+    <Widget
+      tema={params.tema}
+      lado={params.lado}
+      voice={{
+        advanced: rules.speechReady && canUse(rules, "pregunta", "voz", role).ok,
+        rate: rules.voiceRate,
+        pitch: rules.voicePitch,
+        expressions: rules.voiceExpressions,
+        modulation: rules.voiceModulation,
+        patterns: rules.voicePatterns,
+      }}
+    />
+  );
+}
+
+/* --- El botón, el saludo y el chat ------------------------------------------------------------- */
+
+function loadTurns(): Turn[] {
+  try {
+    const parsed = JSON.parse(session.get(KEY_TURNS) ?? "[]") as Turn[];
+    if (!Array.isArray(parsed)) return [];
+    return parsed.filter((t) => t && typeof t.q === "string" && typeof t.id === "string" && (typeof t.answer?.text === "string" || typeof t.error === "string")).slice(-MAX_TURNS);
+  } catch {
+    return [];
+  }
+}
+
+function Widget({ tema, lado, voice }: { tema: string; lado: string; voice: Voice }) {
+  const [open, setOpen] = useState(false);
+  const [hello, setHello] = useState(false);
+  const [full, setFull] = useState(false);
+  const [turns, setTurns] = useState<Turn[]>(loadTurns);
+  const [live, setLive] = useState<Live | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [draft, setDraft] = useState("");
+  const [readingId, setReadingId] = useState<string | null>(null);
+  const reading = readingId !== null;
+  const [status, setStatus] = useState("");
+  // Las respuestas que acaban de llegar: «entera» se escribe palabra por palabra; «en vivo» ya se vio escribir.
+  const [fresh, setFresh] = useState<Map<string, "entera" | "en vivo">>(() => new Map());
+  const [autoRead, setAutoRead] = useState(() => session.get(KEY_READ) === "1");
+  const run = useRef<{ ctl: AbortController; turnId: string; text: string; meta: AskMeta | null; steps: ThinkStep[]; startedAt: number } | null>(null);
+  const panel = useRef<HTMLDivElement>(null);
+  const log = useRef<HTMLDivElement>(null);
+  const input = useRef<HTMLInputElement>(null);
+  const fab = useRef<HTMLButtonElement>(null);
+  const bubble = useRef<HTMLButtonElement>(null);
+  const closing = useRef(false);
+  const pinned = useRef(true);
+  // Los turnos que nacieron en esta visita entran animados; los recordados, no.
+  const born = useRef(new Set<string>());
+
+  /* El tamaño del marco sigue a lo que se ve. Al abrir se pide antes de pintar (openPanel). */
+  useEffect(() => {
+    if (!open) frame(hello ? "saludo" : "cerrado");
+  }, [open, hello]);
+
+  useEffect(() => {
+    const onMessage = (e: MessageEvent) => {
+      if (e.source !== window.parent) return;
+      const m = readHostMessage(e.data);
+      if (m) setFull(m.full);
+    };
+    window.addEventListener("message", onMessage);
+    return () => window.removeEventListener("message", onMessage);
+  }, []);
+
+  /* El saludo: una vez por visita, a los pocos segundos, y se retira solo. */
+  useEffect(() => {
+    if (session.get(KEY_HELLO) === "1") return;
+    let hide = 0;
+    const show = window.setTimeout(() => {
+      session.set(KEY_HELLO, "1");
+      setHello(true);
+      hide = window.setTimeout(() => setHello(false), 9000);
+    }, 2600);
+    return () => {
+      window.clearTimeout(show);
+      window.clearTimeout(hide);
+    };
+  }, []);
+
+  useLayoutEffect(() => {
+    if (!hello || !bubble.current || reduced()) return;
+    const tween = gsap.fromTo(bubble.current, { opacity: 0, scale: 0.86, y: 8, filter: "blur(4px)" }, { opacity: 1, scale: 1, y: 0, filter: "blur(0px)", duration: 0.34, ease: EASE, clearProps: "filter" });
+    return () => void tween.kill();
+  }, [hello]);
+
+  useEffect(() => {
+    session.set(KEY_TURNS, JSON.stringify(turns.filter((t) => t.answer || t.error).slice(-MAX_TURNS)));
+  }, [turns]);
+
+  /* Al salir, el pedido en curso se cancela y Pilo se calla. */
+  useEffect(
+    () => () => {
+      run.current?.ctl.abort();
+      run.current = null;
+      stopPilo();
+    },
+    [],
+  );
+
+  const toBottom = () => {
+    pinned.current = true;
+    requestAnimationFrame(() => {
+      const s = log.current;
+      if (s) s.scrollTop = s.scrollHeight;
+    });
+  };
+
+  // El chat sigue a la respuesta solo si la persona está al final: si subió a leer, no se la mueve.
+  useEffect(() => {
+    const s = log.current;
+    if (s && pinned.current) s.scrollTop = s.scrollHeight;
+  }, [turns, live, open]);
+
+  /* --- abrir y cerrar --- */
+
+  const openPanel = () => {
+    if (open) return;
+    setHello(false);
+    frame("abierto");
+    setOpen(true);
+  };
+
+  const closePanel = () => {
+    if (!open || closing.current) return;
+    stopPilo();
+    const done = () => {
+      closing.current = false;
+      setOpen(false);
+      requestAnimationFrame(() => fab.current?.focus({ preventScroll: true }));
+    };
+    const el = panel.current;
+    if (!el || reduced()) return done();
+    closing.current = true;
+    // Sale más rápido de lo que entró.
+    gsap.to(el, { opacity: 0, scale: 0.94, y: 10, duration: 0.18, ease: "power2.out", onComplete: done });
+  };
+
+  useLayoutEffect(() => {
+    const el = panel.current;
+    if (!open || !el) return;
+    toBottom();
+    const focus = window.setTimeout(() => input.current?.focus({ preventScroll: true }), 120);
+    if (reduced()) return () => window.clearTimeout(focus);
+    const ctx = gsap.context(() => {
+      gsap
+        .timeline({ defaults: { ease: EASE } })
+        .fromTo(el, { opacity: 0, scale: 0.88, y: 16, filter: "blur(8px)" }, { opacity: 1, scale: 1, y: 0, filter: "blur(0px)", duration: 0.42, clearProps: "filter" })
+        .fromTo(".pe-face", { opacity: 0, y: 30, scale: 0.5, rotate: -24 }, { opacity: 1, y: 0, scale: 1, rotate: 0, duration: 0.62, ease: "back.out(2.4)" }, 0.08)
+        .fromTo(".pe-id > *", { opacity: 0, y: 8 }, { opacity: 1, y: 0, duration: 0.3, stagger: 0.05 }, 0.14)
+        .fromTo(".pe-log, .pe-chips, .pe-form, .pe-foot", { opacity: 0, y: 10 }, { opacity: 1, y: 0, duration: 0.34, stagger: 0.04 }, 0.16);
+    }, el);
+    return () => {
+      window.clearTimeout(focus);
+      ctx.revert();
+    };
+  }, [open]);
+
+  useEffect(() => {
+    if (!open) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") closePanel();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+    // closePanel solo lee refs y `open`, que aquí es verdadero.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open]);
+
+  /* --- preguntar --- */
+
+  const patchTurn = (id: string, patch: Partial<Turn>) => setTurns((list) => list.map((t) => (t.id === id ? { ...t, ...patch } : t)));
+
+  /** Detener: el pedido se cancela y lo escrito se conserva. */
+  const stop = () => {
+    const r = run.current;
+    if (!r) return;
+    run.current = null;
+    r.ctl.abort();
+    patchTurn(r.turnId, interruptedTurn(r.text, r.meta));
+    setLive(null);
+    setBusy(false);
+    setStatus(r.text.trim() ? "Detuvo la respuesta: quedó incompleta." : "Detuvo la pregunta.");
+  };
+
+  const ask = async (raw: string, replaceTurn?: string) => {
+    const q = raw.replace(/\s+/g, " ").trim();
+    if (!q) return;
+    stopPilo();
+    // Otra pregunta mientras Pilo escribe: la anterior se corta y queda como incompleta.
+    const cut = run.current;
+    const cutPatch = cut ? interruptedTurn(cut.text, cut.meta) : null;
+    if (cut) {
+      run.current = null;
+      cut.ctl.abort();
+    }
+    const before = turns.filter((t) => t.id !== replaceTurn).map((t) => (cut && cutPatch && t.id === cut.turnId ? { ...t, ...cutPatch } : t));
+    const history = buildHistory(before.map((t) => ({ q: t.q, a: t.answer?.text })));
+    const turn: Turn = { id: newId(), q };
+    born.current.add(turn.id);
+    setTurns([...before, turn].slice(-MAX_TURNS));
+    const ctl = new AbortController();
+    const mine = { ctl, turnId: turn.id, text: "", meta: null as AskMeta | null, steps: [] as ThinkStep[], startedAt: Date.now() };
+    run.current = mine;
+    const show = () => setLive({ turnId: mine.turnId, text: mine.text, meta: mine.meta, steps: mine.steps, startedAt: mine.startedAt });
+    show();
+    setBusy(true);
+    setStatus("Pilo está pensando.");
+    toBottom();
+    try {
+      const answer = await askQuestionStream(q, history, {
+        signal: ctl.signal,
+        onMeta: (meta) => {
+          if (run.current !== mine) return;
+          mine.meta = meta;
+          show();
+        },
+        onStep: (step) => {
+          if (run.current !== mine) return;
+          mine.steps = reduceSteps(mine.steps, step);
+          show();
+        },
+        onDelta: (text) => {
+          if (run.current !== mine) return;
+          mine.text += text;
+          show();
+        },
+      });
+      if (run.current !== mine) return;
+      setFresh((f) => new Map(f).set(turn.id, mine.text.trim() ? "en vivo" : "entera"));
+      patchTurn(turn.id, { answer });
+      setStatus(`Pilo respondió: ${toPlain(parseAnswer(answer.text))}`);
+    } catch (e) {
+      // Cortado por «Detener» o por otra pregunta: ya quedó resuelto.
+      if (run.current !== mine) return;
+      const message = (e instanceof PiloError && e.code === "cancelado" ? "" : (e as Error).message) || "No pude hablar con Pilo ahora.";
+      patchTurn(turn.id, interruptedTurn(mine.text, mine.meta, message));
+      setStatus(mine.text.trim() ? "La respuesta quedó incompleta." : "");
+    } finally {
+      if (run.current === mine) {
+        run.current = null;
+        setLive(null);
+        setBusy(false);
+      }
+    }
+  };
+
+  const submit = (e: FormEvent) => {
+    e.preventDefault();
+    if (busy) return stop();
+    const v = draft;
+    setDraft("");
+    void ask(v);
+  };
+
+  const startNew = () => {
+    run.current?.ctl.abort();
+    run.current = null;
+    stopPilo();
+    setLive(null);
+    setBusy(false);
+    setTurns([]);
+    setStatus("");
+    input.current?.focus({ preventScroll: true });
+  };
+
+  const toggleAutoRead = () =>
+    setAutoRead((on) => {
+      session.set(KEY_READ, on ? "0" : "1");
+      if (on) stopPilo();
+      return !on;
+    });
+
+  const typed = (id: string) =>
+    setFresh((f) => {
+      if (!f.has(id)) return f;
+      const next = new Map(f);
+      next.delete(id);
+      return next;
+    });
+
+  const working = busy && !live?.text;
+  const headline = reading ? "Hablando" : working ? "Pensando" : busy ? "Escribiendo" : "Cifras de la UDES";
+  const shut = open && full;
+
+  return (
+    <div className="ap pe" data-tema={tema} data-lado={lado} data-open={open || undefined} data-full={shut || undefined} data-reading={reading || undefined}>
+      {open && (
+        <div className="pe-panel" ref={panel} role="dialog" aria-label="Chat con Pilo">
+          <header className="pe-head">
+            <div className="pe-face">
+              <PiloMoji size={64} mood={working ? "piensa" : "feliz"} talking={reading || (busy && !working)} alive />
+            </div>
+            <div className="pe-id">
+              <strong>Pilo</strong>
+              <span>{headline}</span>
+            </div>
+            <div className="pe-wave" aria-hidden="true">
+              <i />
+              <i />
+              <i />
+              <i />
+              <i />
+            </div>
+            {turns.length > 0 && (
+              <button type="button" className="pe-ib" onClick={startNew} aria-label="Empezar una conversación nueva" title="Conversación nueva">
+                {I.fresh}
+              </button>
+            )}
+            <button type="button" className="pe-ib" aria-pressed={autoRead} onClick={toggleAutoRead} aria-label="Leer las respuestas en voz alta" title="Leer las respuestas en voz alta">
+              {autoRead ? I.sound : I.mute}
+            </button>
+            <button type="button" className="pe-ib" onClick={closePanel} aria-label="Cerrar el chat">
+              {I.down}
+            </button>
+          </header>
+
+          <div
+            className="pe-log"
+            ref={log}
+            onScroll={(e) => {
+              const s = e.currentTarget;
+              pinned.current = s.scrollHeight - s.scrollTop - s.clientHeight < 48;
+            }}
+          >
+            <div className="pe-msg pe-msg--p">Hola, soy Pilo. Pregúnteme por las cifras de la UDES y le digo de dónde sale cada una.</div>
+            {turns.map((t) => (
+              <TurnView
+                key={t.id}
+                turn={t}
+                stream={live && live.turnId === t.id ? live : null}
+                fresh={fresh.get(t.id)}
+                animate={born.current.has(t.id)}
+                autoRead={autoRead}
+                voice={voice}
+                onTyped={() => typed(t.id)}
+                onRetry={() => void ask(t.q, t.id)}
+                onReading={(on) => setReadingId((cur) => (on ? t.id : cur === t.id ? null : cur))}
+              />
+            ))}
+          </div>
+
+          {turns.length === 0 && (
+            <div className="pe-chips">
+              {SUGGESTIONS.map((s) => (
+                <button key={s} type="button" onClick={() => void ask(s)}>
+                  {s}
+                </button>
+              ))}
+            </div>
+          )}
+
+          <form className="pe-form" onSubmit={submit}>
+            <input ref={input} id="pe-pregunta" type="text" value={draft} maxLength={500} autoComplete="off" placeholder="Escriba su pregunta" aria-label="Su pregunta para Pilo" onChange={(e) => setDraft(e.target.value)} />
+            <button type="submit" className="pe-send" disabled={!busy && !draft.trim()} aria-label={busy ? "Detener la respuesta" : "Enviar la pregunta"}>
+              {busy ? I.stop : I.send}
+            </button>
+          </form>
+          <p className="pe-foot">
+            <a href={sourceUrl("/pregunta", window.location.origin)} target="_blank" rel="noopener">
+              Abrir Pregúntele a Pilo {I.out}
+            </a>
+          </p>
+          <div className="ap-sr" role="status" aria-live="polite">
+            {status}
+          </div>
+        </div>
+      )}
+
+      {hello && !open && (
+        <button type="button" className="pe-hello" ref={bubble} onClick={openPanel}>
+          ¿Busca una cifra de la UDES? Pregúnteme.
+        </button>
+      )}
+
+      <button type="button" className="pe-fab" ref={fab} hidden={shut} aria-expanded={open} aria-label={open ? "Cerrar el chat con Pilo" : "Abrir el chat con Pilo"} onClick={open ? closePanel : openPanel}>
+        <span className="pe-fab__face">
+          <PiloMoji size={70} mood="feliz" alive={!open} />
+        </span>
+        <span className="pe-fab__x">{I.close}</span>
+      </button>
+    </div>
+  );
+}
+
+/* --- Un turno: la pregunta y su respuesta ------------------------------------------------------ */
+
+/** Los segundos que lleva pensando; se actualiza solo mientras `on`. */
+function useElapsed(startedAt: number | undefined, on: boolean): number {
+  const [, tick] = useState(0);
+  useEffect(() => {
+    if (!on) return;
+    const t = window.setInterval(() => tick((n) => n + 1), 1000);
+    return () => window.clearInterval(t);
+  }, [on]);
+  return startedAt ? (Date.now() - startedAt) / 1000 : 0;
+}
+
+function TurnView({
+  turn,
+  stream,
+  fresh,
+  animate,
+  autoRead,
+  voice,
+  onTyped,
+  onRetry,
+  onReading,
+}: {
+  turn: Turn;
+  stream: Live | null;
+  fresh: "entera" | "en vivo" | undefined;
+  animate: boolean;
+  autoRead: boolean;
+  voice: Voice;
+  onTyped: () => void;
+  onRetry: () => void;
+  onReading: (on: boolean) => void;
+}) {
+  const a = turn.answer;
+  const pending = !a && !turn.error;
+  // Pilo ya escribe: llegó la primera frase y la respuesta aún no termina.
+  const streaming = pending && Boolean(stream?.text);
+  const working = pending && !streaming;
+  const incomplete = Boolean(a && turn.incomplete);
+  const text = a?.text ?? stream?.text ?? "";
+  const sources = useMemo(() => a?.sources ?? stream?.meta?.sources ?? [], [a, stream?.meta]);
+  const parsed = useMemo(() => parseAnswer(text, { streaming }), [text, streaming]);
+  const elapsed = useElapsed(stream?.startedAt, working);
+  const step = working ? waitingLine({ steps: stream?.steps ?? [], meta: stream?.meta ?? null, seconds: elapsed }) : "";
+
+  const question = useRef<HTMLDivElement>(null);
+  const think = useRef<HTMLDivElement>(null);
+  const stepText = useRef<HTMLSpanElement>(null);
+  const after = useRef<HTMLDivElement>(null);
+
+  /* La pregunta sale desde la caja de texto hacia su lugar. */
+  useLayoutEffect(() => {
+    if (!animate || !question.current || reduced()) return;
+    const tween = gsap.fromTo(question.current, { opacity: 0, y: 18, scale: 0.92 }, { opacity: 1, y: 0, scale: 1, duration: 0.3, ease: EASE, clearProps: "transform" });
+    return () => void tween.kill();
+  }, [animate]);
+
+  useLayoutEffect(() => {
+    if (!working || !think.current || reduced()) return;
+    const tween = gsap.fromTo(think.current, { opacity: 0, y: 10 }, { opacity: 1, y: 0, duration: 0.28, ease: EASE, delay: 0.12 });
+    return () => void tween.kill();
+  }, [working]);
+
+  /* Cada paso releva al anterior con un fundido borroso. */
+  useLayoutEffect(() => {
+    if (!step || !stepText.current || reduced()) return;
+    const tween = gsap.fromTo(stepText.current, { opacity: 0, y: 7, filter: "blur(4px)" }, { opacity: 1, y: 0, filter: "blur(0px)", duration: 0.26, ease: EASE, clearProps: "filter" });
+    return () => void tween.kill();
+  }, [step]);
+
+  /* --- la voz: frase por frase, la que suena se resalta --- */
+
+  const [reading, setReading] = useState<number | null>(null);
+  const readRun = useRef(0);
+  const enriched = useMemo(
+    () =>
+      enrichSpokenSentences(
+        parsed.sentences.map((x) => x.spoken),
+        { mood: a?.mood, expressionsEnabled: voice.expressions !== false, patterns: voice.patterns, modulationEnabled: voice.modulation !== false, baseRate: voice.rate, basePitch: voice.pitch },
+      ),
+    [parsed, a?.mood, voice.expressions, voice.patterns, voice.modulation, voice.rate, voice.pitch],
+  );
+  const spoken = enriched.sentences;
+
+  // Con «Leer en voz alta», el audio de las primeras frases se pide en cuanto la respuesta está completa.
+  useEffect(() => {
+    if (a && fresh && autoRead && !incomplete) prefetchPilo(spoken.slice(0, 2), { portal: "pregunta", advanced: voice.advanced });
+  }, [a, fresh, autoRead, incomplete, spoken, voice.advanced]);
+
+  const read = async () => {
+    if (reading !== null) {
+      readRun.current += 1;
+      stopPilo();
+      setReading(null);
+      onReading(false);
+      return;
+    }
+    const mine = ++readRun.current;
+    onReading(true);
+    for (let k = 0; k < parsed.sentences.length; k++) {
+      if (mine !== readRun.current) return;
+      if (!spoken[k]?.trim()) continue;
+      setReading(k);
+      // Mientras suena esta frase, se piden las dos que siguen: así no hay pausas.
+      prefetchPilo(spoken.slice(k + 1, k + 3), { portal: "pregunta", advanced: voice.advanced });
+      const used = await sayWithPilo(spoken[k], { portal: "pregunta", ...voice, rate: enriched.rate, pitch: enriched.pitch });
+      if (used === "cancelado") break;
+    }
+    if (mine === readRun.current) {
+      setReading(null);
+      onReading(false);
+    }
+  };
+
+  // Otra lectura (de otra respuesta) cancela esta: sayWithPilo responde «cancelado».
+  useEffect(
+    () => () => {
+      if (readRun.current > 0) onReading(false);
+      readRun.current += 1;
+    },
+    // Solo al quitar el turno.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [],
+  );
+
+  // Una respuesta que llega entera se escribe sola, breve; la que se vio escribir en vivo, no.
+  const { shown, typing, finish } = useTypewriter(parsed.count, Boolean(a) && fresh === "entera", () => {
+    onTyped();
+    if (autoRead && !incomplete) void read();
+  });
+
+  // La que se escribió en vivo se lee una sola vez, ya completa.
+  const readLive = useRef(read);
+  readLive.current = read;
+  useEffect(() => {
+    if (!a || fresh !== "en vivo") return;
+    onTyped();
+    if (autoRead && !incomplete) void readLive.current();
+    // Solo al llegar la respuesta final.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [Boolean(a), fresh]);
+
+  /* Terminada la escritura, llegan las fuentes y «Escuchar». */
+  const wasWriting = useRef(false);
+  const writing = typing || streaming;
+  useLayoutEffect(() => {
+    if (writing) {
+      wasWriting.current = true;
+      return;
+    }
+    if (!wasWriting.current || !after.current || reduced()) return;
+    wasWriting.current = false;
+    const tween = gsap.from(after.current.children, { opacity: 0, y: 6, duration: 0.3, stagger: 0.05, ease: EASE });
+    return () => void tween.kill();
+  }, [writing, Boolean(a)]);
+
+  const open = (n: number) => {
+    const src = sources.find((s) => s.n === n);
+    if (src) window.open(sourceUrl(src.path, window.location.origin), "_blank", "noopener");
+  };
+
+  const notes = a && !incomplete ? notesOf(a) : [];
+  // Varias citas pueden salir de la misma página: aquí se enlaza una sola vez.
+  const links = a && showsSources(a) ? a.sources.filter((s, i, all) => all.findIndex((x) => x.title === s.title && x.path === s.path) === i).slice(0, 3) : [];
+
+  return (
+    <>
+      <div className="pe-msg pe-msg--u" ref={question}>
+        {turn.q}
+      </div>
+
+      {working && (
+        <div className="pe-think" ref={think}>
+          <PiloMoji size={34} mood="piensa" />
+          <span ref={stepText}>{step}</span>
+          <span className="ap-dots" aria-hidden="true">
+            <i />
+            <i />
+            <i />
+          </span>
+        </div>
+      )}
+
+      {text && (
+        <div className="pe-msg pe-msg--p" aria-busy={pending}>
+          <AnswerText parsed={parsed} shown={shown} typing={typing} streaming={streaming} reading={reading} sources={sources} active={null} onSource={open} onFinish={finish} />
+        </div>
+      )}
+
+      {turn.error && (
+        <div className="pe-error" role="alert">
+          <span>{a ? `${turn.error} Lo que alcanzó a escribir quedó incompleto.` : turn.error}</span>
+          <button type="button" onClick={onRetry}>
+            Preguntar de nuevo
+          </button>
+        </div>
+      )}
+
+      {a && !typing && (
+        <div className="pe-after" ref={after}>
+          {notes.map((note) => (
+            <p key={note} className="pe-note">
+              {note}
+            </p>
+          ))}
+          {a.unknown && a.unknown.length > 0 && <p className="pe-note pe-note--warn">Revise estos números antes de citarlos: no los encontré en las fuentes ({a.unknown.join(", ")}).</p>}
+          <div className="pe-meta">
+            {links.map((s) => (
+              <a key={s.n} href={sourceUrl(s.path, window.location.origin)} target="_blank" rel="noopener" title={s.title}>
+                {I.doc}
+                <span>{s.title}</span>
+              </a>
+            ))}
+            {text.trim() && (
+              <button type="button" aria-pressed={reading !== null} onClick={() => void read()}>
+                {I.listen}
+                {reading !== null ? "Detener" : "Escuchar"}
+              </button>
+            )}
+          </div>
+        </div>
+      )}
+    </>
+  );
+}

@@ -5,11 +5,14 @@
 
    PreguntaSection
    - Si la página está abierta y para quién (público, con sesión o solo
-     administración), si muestra la bienvenida y si la IA redacta cuando la
-     memoria no alcanza. Esto se guarda con «Guardar cambios», como el resto.
+     administración), si muestra la bienvenida y si Pilo redacta con IA. Esto
+     se guarda con «Guardar cambios», como el resto.
+   - Cómo redacta (0110): por partes o entera, dónde va su persona, largo,
+     temperatura, contexto y turnos; y el límite por visitante.
    - Lo que Pilo no supo (0109): la bandeja de preguntas sin respuesta, que no
-     sirvieron o con una cifra sin fuente. «Responder» la lleva al catálogo;
-     desde ese momento Pilo la da primero, también dicha con otras palabras.
+     sirvieron, con una cifra sin fuente o contestadas de conocimiento general
+     (0110). «Responder» la lleva al catálogo; desde ese momento Pilo la toma
+     como base obligatoria de su redacción, también dicha con otras palabras.
    - Las respuestas guardadas: las últimas, con cuántas veces sirvieron; una
      respuesta se puede ocultar para que no se vuelva a dar.
 
@@ -33,15 +36,30 @@ import { MEMORY_SOURCES, pendingOf, useEmbedModels, useEmbedStatus, useHideAnswe
 import type { EmbedStatus, MemorySource, ReplaceResult, SourceProblem } from "./memory";
 import { AudiencePicker } from "./sections";
 import type { EditorApi } from "./sections";
-import { Group, StatusMark, Switch, plural, when } from "./ui";
+import { Group, NumField, StatusMark, Switch, plural, when } from "./ui";
+import { ASK_LIMITS } from "./store";
+import type { SystemRole } from "./store";
 import { MeshView } from "./MeshView";
 import { revealList } from "./motion";
 import { CatalogModal } from "./CatalogModal";
-import { REASON_LABEL, useCloseInbox, useInbox } from "./inbox";
+import { reasonHint, reasonLabel, useCloseInbox, useInbox } from "./inbox";
 import type { InboxItem } from "./inbox";
 import type { CatalogRow } from "./catalog-sheet";
 
 /* --- Pregúntele a Pilo ---------------------------------------------------------------------- */
+
+const SYSTEM_ROLES: { id: SystemRole; label: string; note: string }[] = [
+  { id: "auto", label: "Automática", note: "Con rol «system»; si el servicio lo rechaza, la pasa dentro del primer mensaje y lo recuerda." },
+  { id: "system", label: "Con rol system", note: "Siempre aparte, como instrucción del sistema. Falla si el servicio no lo acepta." },
+  { id: "user", label: "Dentro del mensaje", note: "Nunca manda el rol «system»: la persona va en el primer mensaje. Para servicios que lo rechazan." },
+];
+
+/** «10 minutos», «90 segundos», «2 horas»: la ventana dicha como se lee. */
+function spanOf(seconds: number): string {
+  if (seconds < 120) return plural(seconds, "segundo", "segundos");
+  if (seconds < 7200) return plural(Math.round(seconds / 60), "minuto", "minutos");
+  return plural(Math.round(seconds / 3600), "hora", "horas");
+}
 
 export function PreguntaSection({ ed }: { ed: EditorApi }) {
   const { s, set, setPortal } = ed;
@@ -99,8 +117,9 @@ export function PreguntaSection({ ed }: { ed: EditorApi }) {
         }
       >
         <p className="pis-lead">
-          Una página pública donde cualquiera le pregunta a Pilo por la Planeación de la UDES. Responde primero con reglas, respuestas ya dadas y lo publicado; la IA solo
-          redacta cuando hace falta, y funciona aunque la IA esté apagada.
+          Una página pública donde cualquiera le pregunta a Pilo por la Planeación de la UDES. Pilo siempre redacta con IA: parte de las respuestas del catálogo (la base
+          obligatoria), las respuestas guardadas, las cifras en vivo y la memoria. Los temas generales también los contesta, marcados como conocimiento general. Si la IA
+          está apagada o sin cupo, responde con lo publicado tal cual.
         </p>
         <dl className="pis-opts">
           <div>
@@ -137,13 +156,118 @@ export function PreguntaSection({ ed }: { ed: EditorApi }) {
           <div>
             <dt>
               Redactar con IA
-              <small>{s.enabled ? "Cuando la memoria no alcance." : "Mr. Pilo con IA está apagado: responde con lo publicado tal cual."}</small>
+              <small>
+                {!s.enabled
+                  ? "Mr. Pilo con IA está apagado: responde con lo publicado tal cual."
+                  : s.functions.preguntar === false
+                    ? "Apagado: responde con lo publicado tal cual."
+                    : "Siempre, sobre el catálogo, lo guardado, las cifras y la memoria."}
+              </small>
             </dt>
             <dd>
-              <Switch on={s.functions.preguntar !== false} onChange={(v) => set("functions", { ...s.functions, preguntar: v })} label="Redactar con IA cuando la memoria no alcance" />
+              <Switch on={s.functions.preguntar !== false} onChange={(v) => set("functions", { ...s.functions, preguntar: v })} label="Redactar siempre con IA" />
             </dd>
           </div>
         </dl>
+      </Group>
+
+      <Group title="Cómo redacta" aside={<small>Valores de partida si no cambia nada</small>}>
+        {s.needs0110 && <p className="pis-warn">Falta aplicar la migración 0110 en la base para cambiar cómo redacta Pilo. Mientras tanto usa los valores de partida.</p>}
+        <dl className="pis-opts">
+          <div>
+            <dt>
+              Responder por partes
+              <small>La página muestra la respuesta mientras se escribe. Apagado: aparece entera, de una vez.</small>
+            </dt>
+            <dd>
+              <Switch on={s.ask_stream} disabled={s.needs0110} onChange={(v) => set("ask_stream", v)} label="Responder por partes" />
+            </dd>
+          </div>
+          <div>
+            <dt>
+              Persona de Pilo
+              <small>{SYSTEM_ROLES.find((r) => r.id === s.system_role)?.note}</small>
+            </dt>
+            <dd>
+              <span className="pis-seg pis-seg--sm" role="radiogroup" aria-label="Dónde va la persona de Pilo">
+                {SYSTEM_ROLES.map((r) => (
+                  <button key={r.id} type="button" role="radio" aria-checked={s.system_role === r.id} disabled={s.needs0110} onClick={() => set("system_role", r.id)}>
+                    {r.label}
+                  </button>
+                ))}
+              </span>
+            </dd>
+          </div>
+        </dl>
+        <div className="pis-grid pis-grid--3">
+          <NumField
+            label="Largo de la respuesta (tokens)"
+            hint="Un token son unas cuatro letras"
+            {...ASK_LIMITS.ask_max_tokens}
+            value={s.ask_max_tokens}
+            disabled={s.needs0110}
+            onCommit={(v) => set("ask_max_tokens", v)}
+          />
+          <NumField
+            label="Temperatura"
+            hint="0 repite lo mismo; 1 varía más"
+            {...ASK_LIMITS.ask_temperature}
+            step={0.1}
+            value={s.ask_temperature}
+            disabled={s.needs0110}
+            onCommit={(v) => set("ask_temperature", v)}
+          />
+        </div>
+        <details className="pis-adv">
+          <summary>Opciones avanzadas</summary>
+          <div className="pis-grid pis-grid--3">
+            <NumField
+              label="Contexto (tokens)"
+              hint="Cuánto del catálogo, las cifras y la memoria cabe en el pedido"
+              {...ASK_LIMITS.ask_context_tokens}
+              value={s.ask_context_tokens}
+              disabled={s.needs0110}
+              onCommit={(v) => set("ask_context_tokens", v)}
+            />
+            <NumField
+              label="Turnos de conversación"
+              hint="Cuántos turnos anteriores recuerda"
+              {...ASK_LIMITS.ask_history_turns}
+              value={s.ask_history_turns}
+              disabled={s.needs0110}
+              onCommit={(v) => set("ask_history_turns", v)}
+            />
+          </div>
+        </details>
+      </Group>
+
+      <Group title="Límite por visitante" aside={<small>Solo la página pública</small>}>
+        <p className="pis-small">
+          Frena a quien pregunta sin pausa y cuida el cupo de todos. Se cuenta por una huella que cambia cada día, nunca por la dirección IP. La administración no tiene límite;
+          una misma red admite diez veces más, por las oficinas y salones donde varias personas comparten dirección.
+        </p>
+        <div className="pis-grid pis-grid--3">
+          <NumField
+            label="Preguntas por visitante"
+            hint="0 quita el límite"
+            {...ASK_LIMITS.visitor_limit}
+            value={s.visitor_limit}
+            disabled={s.needs0110}
+            onCommit={(v) => set("visitor_limit", v)}
+          />
+          <NumField
+            label="Duración de la ventana (segundos)"
+            {...ASK_LIMITS.visitor_window_seconds}
+            value={s.visitor_window_seconds}
+            disabled={s.needs0110}
+            onCommit={(v) => set("visitor_window_seconds", v)}
+          />
+        </div>
+        <p className="pis-small" role="status">
+          {s.visitor_limit === 0
+            ? "Sin límite por visitante."
+            : `Cada visitante puede hacer ${plural(s.visitor_limit, "pregunta", "preguntas")} cada ${spanOf(s.visitor_window_seconds)}.`}
+        </p>
       </Group>
 
       <Group title="Lo que Pilo no supo" aside={inbox.data ? <small>{plural(inbox.data.total, "pendiente", "pendientes")}</small> : null}>
@@ -151,20 +275,27 @@ export function PreguntaSection({ ed }: { ed: EditorApi }) {
           <p className="pis-small">Falta aplicar la migración 0109 para que Pilo anote lo que no supo responder.</p>
         ) : !inbox.data || inbox.data.rows.length === 0 ? (
           <p className="pis-small">
-            Nada pendiente. Aquí llegan las preguntas que Pilo no pudo responder, las que alguien marcó «No me sirvió» y las que la IA redactó con una cifra sin fuente.
+            Nada pendiente. Aquí llegan las preguntas que Pilo no pudo responder, las que alguien marcó «No me sirvió», las que la IA redactó con una cifra sin fuente y las
+            que contestó de conocimiento general.
           </p>
         ) : (
           <>
             <p className="pis-small">
-              Responda las más preguntadas: la respuesta entra al catálogo y desde ese momento Pilo la da primero, sin IA, aunque la pregunten con otras palabras.
+              Responda las más preguntadas: la respuesta entra al catálogo y desde ese momento Pilo parte de ella (es la base obligatoria de su redacción), aunque la
+              pregunten con otras palabras.
             </p>
+            {inbox.data.rows.some((r) => r.reason === "general") && (
+              <p className="pis-small">
+                <StatusMark tone="warn">Conocimiento general</StatusMark> {reasonHint("general")}
+              </p>
+            )}
             <ul className="pis-answers">
               {inbox.data.rows.map((item) => (
                 <li key={item.id}>
                   <span>
                     <strong>{item.question}</strong>
                     <small>
-                      {REASON_LABEL[item.reason]}
+                      {reasonLabel(item.reason)}
                       {item.answer ? ` · Pilo dijo: ${item.answer.replace(/\s*\[\d+\]/g, "").slice(0, 140)}${item.answer.length > 140 ? "…" : ""}` : ""}
                     </small>
                   </span>

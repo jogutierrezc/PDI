@@ -59,9 +59,10 @@ const SECTION_FIELDS: Partial<Record<SectionId, (keyof PiloSettings)[]>> = {
     "voice_portal_styles",
     "fish_model",
   ],
-  portales: ["impacto_report"],
+  portales: ["impacto_report", "widget_on", "widget_origins"],
+  pregunta: ["ask_temperature", "ask_max_tokens", "ask_context_tokens", "ask_history_turns", "system_role", "ask_stream", "visitor_limit", "visitor_window_seconds"],
   memoria: ["memory_sources", "embed_model"],
-  uso: ["daily_limit", "max_rows", "cache_days"],
+  uso: ["daily_limit", "voice_daily_limit", "max_rows", "cache_days"],
 };
 
 const same = (a: unknown, b: unknown) => JSON.stringify(a) === JSON.stringify(b);

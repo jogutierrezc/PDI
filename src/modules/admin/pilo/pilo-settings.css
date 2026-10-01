@@ -259,6 +259,19 @@
 .pis-error { margin: 0; color: var(--status-risk); font-size: var(--text-sm); font-weight: 700; }
 .pis-result { margin: 0; font-size: var(--text-sm); }
 
+/* Lo que encontró «Probar conexión»: cada hallazgo con su glifo y su palabra, y debajo qué hace Pilo. */
+.pis-result { display: grid; gap: var(--space-3); }
+.pis-findings { display: grid; gap: var(--space-2); margin: 0; padding: var(--space-3) var(--space-4); list-style: none; background: var(--surface-2); border: 1px solid var(--line); border-radius: var(--radius-sm); }
+.pis-findings li { display: grid; grid-template-columns: minmax(14rem, auto) minmax(0, 1fr); gap: var(--space-3); align-items: baseline; }
+.pis-findings small { color: var(--ink-secondary); font-size: var(--text-sm); line-height: var(--leading-normal); }
+
+/* Un número fuera de margen: el borde y el texto lo dicen, no solo el color. */
+.pis-grid input[aria-invalid="true"] { border-color: var(--status-risk); }
+.pis-grid label small[data-bad] { display: inline-flex; align-items: center; gap: 4px; color: var(--status-risk); font-weight: 700; }
+.pis-grid input:disabled, .pis-seg button:disabled { opacity: 0.6; cursor: not-allowed; }
+.pis-usage + .pis-usage { margin-top: var(--space-4); }
+@media (max-width: 720px) { .pis-findings li { grid-template-columns: minmax(0, 1fr); gap: var(--space-1); } }
+
 .pis-note {
   max-width: 72ch;
   margin: 0;
@@ -851,4 +864,35 @@
 }
 .pis-patterns__add button {
   min-height: 38px;
+}
+
+/* --- Dónde aparece › Pilo en otros portales (0111) ------------------------------------------- */
+
+.pis-origins,
+.pis-snippet { display: grid; gap: var(--space-3); min-width: 0; }
+.pis-origins > strong,
+.pis-snippet > strong { color: var(--ink); font-size: var(--text-sm); font-weight: 800; }
+.pis-origins ul { display: grid; gap: 0; margin: 0; padding: 0; list-style: none; border: 1px solid var(--line); border-radius: var(--radius-sm); }
+.pis-origins li { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); min-width: 0; padding: var(--space-2) var(--space-4); }
+.pis-origins li + li { border-top: 1px solid var(--line); }
+.pis-origins li span { min-width: 0; overflow-wrap: anywhere; color: var(--ink); font-size: var(--text-sm); font-weight: 600; }
+.pis-origins__add { grid-template-columns: minmax(0, 28rem) auto; justify-content: start; }
+
+.pis-snippet pre {
+  margin: 0;
+  padding: var(--space-4);
+  overflow-x: auto;
+  color: var(--ink);
+  background: var(--surface-2);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  font-family: ui-monospace, "SF Mono", "Cascadia Mono", Menlo, Consolas, monospace;
+  font-size: var(--text-sm);
+  line-height: var(--leading-normal);
+}
+.pis-snippet pre:focus-visible { outline: 2px solid var(--brand-blue); outline-offset: 1px; }
+.pis-snippet .button-primary { display: inline-flex; align-items: center; gap: var(--space-2); }
+
+@media (max-width: 560px) {
+  .pis-origins__add { grid-template-columns: minmax(0, 1fr); }
 }

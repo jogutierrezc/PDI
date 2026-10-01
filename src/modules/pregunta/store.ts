@@ -13,6 +13,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { useTheme } from "../../lib/theme";
 import type { AskResult } from "../../components/pilo/ai/client";
+import type { Think } from "./answer-state";
 
 export type Tema = "blanco" | "soleado" | "negro";
 
@@ -67,6 +68,10 @@ export interface Turn {
   answer?: AskResult;
   error?: string;
   vote?: "up" | "down";
+  /** La respuesta se interrumpió (se cortó el flujo o la persona la detuvo): `answer` es lo que alcanzó a escribirse. */
+  incomplete?: boolean;
+  /** «Pensando…» en compacto: los pasos que reportó el servidor y cuánto tardó. */
+  think?: Think;
 }
 
 export interface Conversation {
@@ -81,7 +86,21 @@ export const newId = () => `${Date.now().toString(36)}${Math.random().toString(3
 function loadConversations(): Conversation[] {
   try {
     const parsed = JSON.parse(read(KEY_CONVS) ?? "[]") as Conversation[];
-    return Array.isArray(parsed) ? parsed.filter((c) => c && Array.isArray(c.turns)).slice(0, 20) : [];
+    if (!Array.isArray(parsed)) return [];
+    // Lo guardado antes de «IA siempre» no trae grounding, pasos ni marcas: se lee igual.
+    return parsed
+      .filter((c) => c && Array.isArray(c.turns))
+      .slice(0, 20)
+      .map((c) => ({
+        ...c,
+        turns: c.turns
+          .filter((t) => t && typeof t.q === "string")
+          .map((t) =>
+            t.answer && typeof t.answer.text === "string"
+              ? { ...t, answer: { ...t.answer, sources: Array.isArray(t.answer.sources) ? t.answer.sources : [], trail: Array.isArray(t.answer.trail) ? t.answer.trail : [] } }
+              : { ...t, answer: undefined },
+          ),
+      }));
   } catch {
     return [];
   }
@@ -90,7 +109,8 @@ function loadConversations(): Conversation[] {
 export function useConversations() {
   const [list, setList] = useState<Conversation[]>(loadConversations);
   useEffect(() => {
-    // Solo se guardan los turnos terminados: una pregunta a medio responder no se recuerda.
+    // Solo se guardan los turnos terminados (o marcados como incompletos): lo que
+    // aún se está escribiendo vive fuera de esta lista y no se recuerda.
     const done = list
       .map((c) => ({ ...c, turns: c.turns.filter((t) => t.answer || t.error) }))
       .filter((c) => c.turns.length)

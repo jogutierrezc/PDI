@@ -10,7 +10,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "../../../lib/supabase";
 
-export type InboxReason = "sin_respuesta" | "no_sirvio" | "revisar";
+export type InboxReason = "sin_respuesta" | "no_sirvio" | "revisar" | "general";
 
 export interface InboxItem {
   id: number;
@@ -28,7 +28,20 @@ export const REASON_LABEL: Record<InboxReason, string> = {
   sin_respuesta: "No encontró respuesta",
   no_sirvio: "No le sirvió a quien preguntó",
   revisar: "La IA dijo una cifra sin fuente",
+  general: "Respondió de conocimiento general",
 };
+
+/** Qué quiere decir cada motivo, en una línea y con la salida que sugiere. */
+export const REASON_HINT: Record<InboxReason, string> = {
+  sin_respuesta: "Era sobre la universidad y no había nada publicado que la respondiera.",
+  no_sirvio: "Quien preguntó marcó «No me sirvió».",
+  revisar: "La IA escribió una cifra que no está en ninguna fuente: conviene revisarla.",
+  general: "Pilo contestó sin fuente institucional, marcado como conocimiento general. Si es un tema que la universidad debería decir con su voz, agregue una respuesta al catálogo o los datos.",
+};
+
+/** El motivo, aunque la base traiga uno que esta pantalla aún no conoce. */
+export const reasonLabel = (reason: string): string => (REASON_LABEL as Record<string, string>)[reason] ?? reason;
+export const reasonHint = (reason: string): string => (REASON_HINT as Record<string, string>)[reason] ?? "";
 
 const inboxKey = ["pilo-ia", "bandeja"] as const;
 

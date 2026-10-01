@@ -22,7 +22,12 @@ export interface PiloResult {
 }
 
 export class PiloError extends Error {
-  constructor(message: string, readonly code: string = "") {
+  constructor(
+    message: string,
+    readonly code: string = "",
+    /** Segundos que hay que esperar antes de volver a preguntar (429). */
+    readonly retryAfter?: number,
+  ) {
     super(message);
   }
 }
@@ -88,14 +93,343 @@ export interface AskResult {
   graph?: Mesh & { focus: string };
   verified?: boolean;
   unknown?: string[];
+  /** Cómo leyó el servidor la pregunta: saludo, charla, institucional, general, vetado o capciosa. */
+  intent?: AskIntent;
+  /** De dónde sale lo que dice: de lo publicado, en parte, o de conocimiento general. */
+  grounding?: AskGrounding;
+  /** El modelo falló y se respondió con lo publicado, tal cual. */
+  fallback?: string;
+  /** La redacción se cortó a medias: `text` es lo que alcanzó a escribir. */
+  partial?: boolean;
+  notice?: string;
+  /** Llegó al tope de extensión: el final puede quedar corto. */
+  truncated?: boolean;
+  filtered?: string[];
+  finish?: string;
+  usage?: { prompt?: number; completion?: number; total?: number };
+  model?: string;
+  /** Solo en el flujo: los pasos terminados y los segundos totales, para guardar «cómo respondí». */
+  steps?: { id: string; label: string; detail?: string; ms?: number }[];
+  seconds?: number;
 }
 
+export type AskIntent = "saludo" | "charla" | "institucional" | "general" | "vetado" | "capciosa";
+export type AskGrounding = "oficial" | "mixta" | "general";
+
+/** Lo que Pilo encontró antes de redactar (evento `meta` del flujo). */
+export interface AskMeta {
+  asked: string;
+  intent?: AskIntent;
+  official?: boolean;
+  model?: string;
+  mood?: string;
+  /** Todas las fuentes que se le dieron al modelo, con el número con que las cita mientras escribe. */
+  sources: AskSource[];
+  trail: AskStep[];
+}
+
+/** Una etapa real del trabajo del servidor (evento `step`): empieza y, más tarde, termina. */
+export interface AskThinkStep {
+  id: string;
+  label: string;
+  detail?: string;
+  state: "start" | "done";
+}
+
+export type AskEvent =
+  | { type: "meta"; meta: AskMeta }
+  | { type: "step"; step: AskThinkStep }
+  | { type: "thinking"; text: string }
+  | { type: "delta"; text: string }
+  | { type: "done"; result: AskResult }
+  | { type: "error"; message: string; code: string };
+
+export interface AskHandlers {
+  onMeta?: (meta: AskMeta) => void;
+  /** Opcionales: una función anterior no los manda. */
+  onStep?: (step: AskThinkStep) => void;
+  onThinking?: (text: string) => void;
+  onDelta?: (text: string) => void;
+  /** Cancela el pedido: otra pregunta, salir de la página o «Detener». */
+  signal?: AbortSignal;
+}
+
+/** Sin flujo: la respuesta llega entera. Se conserva para quien no necesita verla escribirse. */
 export async function askQuestion(question: string, history: { q: string; a: string }[] = []): Promise<AskResult> {
   const { data, error } = await supabase.functions.invoke<AskResult>("pilo-ia", {
     body: { action: "preguntar", portal: "pregunta", question, history },
   });
   if (error) throw await failure(error);
   return data as AskResult;
+}
+
+/* --- El flujo (SSE): funciones puras, probadas en node -------------------------------- */
+
+export interface SseMessage {
+  event: string;
+  data: string;
+}
+
+/**
+ * Lee un flujo `text/event-stream` por partes. Una parte puede cortar una línea
+ * por la mitad o traer varios eventos; los comentarios (`: ping`) se ignoran.
+ */
+export function createSseParser() {
+  let buffer = "";
+  let event = "";
+  let data: string[] = [];
+  const line = (raw: string, out: SseMessage[]) => {
+    if (raw === "") {
+      if (data.length) out.push({ event: event || "message", data: data.join("\n") });
+      event = "";
+      data = [];
+      return;
+    }
+    if (raw.startsWith(":")) return;
+    const cut = raw.indexOf(":");
+    const field = cut === -1 ? raw : raw.slice(0, cut);
+    const value = cut === -1 ? "" : raw.slice(cut + 1).replace(/^ /, "");
+    if (field === "event") event = value;
+    else if (field === "data") data.push(value);
+  };
+  return {
+    push(chunk: string): SseMessage[] {
+      const out: SseMessage[] = [];
+      buffer += chunk;
+      for (;;) {
+        const at = buffer.search(/\r\n|\n|\r/);
+        // Un \r al final puede ser la mitad de un \r\n: se espera a la parte siguiente.
+        if (at === -1 || (buffer[at] === "\r" && at === buffer.length - 1)) break;
+        const size = buffer[at] === "\r" && buffer[at + 1] === "\n" ? 2 : 1;
+        line(buffer.slice(0, at), out);
+        buffer = buffer.slice(at + size);
+      }
+      return out;
+    },
+    /** El flujo se cerró: lo que quedó sin su línea en blanco final también cuenta. */
+    flush(): SseMessage[] {
+      const out: SseMessage[] = [];
+      if (buffer) line(buffer.replace(/\r$/, ""), out);
+      buffer = "";
+      line("", out);
+      return out;
+    },
+  };
+}
+
+const list = <T,>(v: unknown): T[] => (Array.isArray(v) ? (v as T[]) : []);
+
+/** El objeto final, con lo mínimo en su sitio aunque el servidor mande de menos. */
+export function toAskResult(raw: unknown): AskResult | null {
+  const o = raw as Partial<AskResult> | null;
+  if (!o || typeof o !== "object" || typeof o.kind !== "string" || typeof o.text !== "string") return null;
+  return { ...(o as AskResult), sources: list<AskSource>(o.sources), trail: list<AskStep>(o.trail) };
+}
+
+/** Un mensaje del flujo como evento de la pregunta; null si no se entiende (se ignora). */
+export function toAskEvent(message: SseMessage): AskEvent | null {
+  let body: Record<string, unknown>;
+  try {
+    const parsed: unknown = JSON.parse(message.data);
+    if (!parsed || typeof parsed !== "object") return null;
+    body = parsed as Record<string, unknown>;
+  } catch {
+    return null;
+  }
+  if (message.event === "meta") {
+    return {
+      type: "meta",
+      meta: { ...(body as unknown as AskMeta), asked: typeof body.asked === "string" ? body.asked : "", sources: list<AskSource>(body.sources), trail: list<AskStep>(body.trail) },
+    };
+  }
+  if (message.event === "step") {
+    if (typeof body.id !== "string" || !body.id.trim()) return null;
+    return {
+      type: "step",
+      step: {
+        id: body.id.trim(),
+        label: typeof body.label === "string" ? body.label : "",
+        ...(typeof body.detail === "string" && body.detail ? { detail: body.detail } : {}),
+        state: body.state === "done" ? "done" : "start",
+      },
+    };
+  }
+  if (message.event === "thinking") return typeof body.text === "string" && body.text ? { type: "thinking", text: body.text } : null;
+  if (message.event === "delta") return typeof body.text === "string" && body.text ? { type: "delta", text: body.text } : null;
+  if (message.event === "done") {
+    const result = toAskResult(body);
+    return result ? { type: "done", result } : null;
+  }
+  if (message.event === "error") {
+    return { type: "error", message: typeof body.message === "string" && body.message ? body.message : "Pilo no pudo terminar la respuesta.", code: typeof body.code === "string" ? body.code : "" };
+  }
+  return null;
+}
+
+const isAbort = (e: unknown) => (e as { name?: string })?.name === "AbortError";
+
+/**
+ * Consume el flujo ya decodificado: avisa `meta` y cada `delta`, y se cumple
+ * con el objeto de `done`. Un evento `error`, o un flujo que se cierra sin
+ * `done`, se rechaza con PiloError (lo ya escrito lo conserva quien llama).
+ */
+export async function consumeAskStream(chunks: AsyncIterable<string>, handlers: AskHandlers = {}): Promise<AskResult> {
+  const parser = createSseParser();
+  const take = (messages: SseMessage[]): AskResult | null => {
+    for (const message of messages) {
+      const event = toAskEvent(message);
+      if (!event) continue;
+      if (event.type === "meta") handlers.onMeta?.(event.meta);
+      else if (event.type === "step") handlers.onStep?.(event.step);
+      else if (event.type === "thinking") handlers.onThinking?.(event.text);
+      else if (event.type === "delta") handlers.onDelta?.(event.text);
+      else if (event.type === "done") return event.result;
+      else throw new PiloError(event.message, event.code || "proveedor");
+    }
+    return null;
+  };
+  try {
+    for await (const chunk of chunks) {
+      if (handlers.signal?.aborted) throw new PiloError("", "cancelado");
+      const result = take(parser.push(chunk));
+      if (result) return result;
+    }
+    const result = take(parser.flush());
+    if (result) return result;
+  } catch (e) {
+    if (e instanceof PiloError) throw e;
+    if (isAbort(e) || handlers.signal?.aborted) throw new PiloError("", "cancelado");
+    throw new PiloError("Se cortó la conexión mientras Pilo escribía.", "cortado");
+  }
+  throw new PiloError("La respuesta se cortó antes de terminar.", "cortado");
+}
+
+const waitText = (seconds: number) => (seconds >= 90 ? `${Math.round(seconds / 60)} min` : `${Math.max(1, Math.round(seconds))} s`);
+
+/** `Retry-After` en segundos: puede venir como número o como fecha. */
+export function retryAfterSeconds(header: string | null | undefined, now = Date.now()): number | undefined {
+  if (!header) return undefined;
+  const n = Number(header);
+  if (Number.isFinite(n)) return n > 0 ? Math.ceil(n) : undefined;
+  const at = Date.parse(header);
+  return Number.isFinite(at) && at > now ? Math.ceil((at - now) / 1000) : undefined;
+}
+
+/** Un estado HTTP de error como un mensaje que la persona entiende y puede seguir. */
+export function askHttpError(status: number, body: unknown, retryAfter?: string | null): PiloError {
+  const b = (body && typeof body === "object" ? body : {}) as { error?: unknown; advice?: unknown; code?: unknown; retry_after?: unknown };
+  const said = typeof b.error === "string" && b.error.trim() ? b.error.trim() : "";
+  const advice = typeof b.advice === "string" && b.advice.trim() ? b.advice.trim() : "";
+  const code = typeof b.code === "string" ? b.code : "";
+  if (status === 429) {
+    const fromBody = Number(b.retry_after);
+    const wait = Number.isFinite(fromBody) && fromBody > 0 ? Math.ceil(fromBody) : retryAfterSeconds(retryAfter);
+    const base = said || "Va muy rápido: espere un momento antes de volver a preguntar.";
+    const when = advice || (wait ? `Podrá preguntar de nuevo en ${waitText(wait)}.` : "");
+    return new PiloError(when ? `${base} ${when}` : base, code || "limite", wait);
+  }
+  if (said) return new PiloError(advice ? `${said} ${advice}` : said, code || `http_${status}`);
+  if (status === 401 || status === 403) return new PiloError("Pregúntele a Pilo no está abierto para usted en este momento.", code || "acceso");
+  if (status === 413) return new PiloError("La conversación es demasiado larga para enviarla. Empiece una conversación nueva.", code || "tamano");
+  if (status === 504) return new PiloError("Pilo tardó demasiado en responder. Intente de nuevo en un momento.", code || "tiempo");
+  if (status >= 500) return new PiloError("Pilo tuvo un problema al responder. Intente de nuevo en un momento.", code || "interno");
+  return new PiloError("No pude hablar con Pilo ahora.", code || `http_${status}`);
+}
+
+/** Lee la respuesta de `preguntar`: un flujo o un JSON, según lo que diga su `Content-Type`. */
+export async function readAskResponse(response: Response, handlers: AskHandlers = {}): Promise<AskResult> {
+  const type = (response.headers.get("content-type") ?? "").toLowerCase();
+  if (!response.ok) {
+    let body: unknown = null;
+    try {
+      body = await response.json();
+    } catch {
+      /* sin cuerpo, o no es JSON */
+    }
+    throw askHttpError(response.status, body, response.headers.get("retry-after"));
+  }
+  if (type.includes("text/event-stream") && response.body) {
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder();
+    async function* chunks() {
+      try {
+        for (;;) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          yield decoder.decode(value, { stream: true });
+        }
+        const rest = decoder.decode();
+        if (rest) yield rest;
+      } finally {
+        reader.cancel().catch(() => undefined);
+      }
+    }
+    return consumeAskStream(chunks(), handlers);
+  }
+  // Respuestas sin modelo, IA apagada o una función anterior que no conoce `stream`: JSON entero.
+  let body: unknown;
+  try {
+    body = await response.json();
+  } catch (e) {
+    if (isAbort(e) || handlers.signal?.aborted) throw new PiloError("", "cancelado");
+    throw new PiloError("Pilo respondió algo que no pude leer. Intente de nuevo.", "formato");
+  }
+  const result = toAskResult(body);
+  if (result) return result;
+  const said = (body as { error?: unknown } | null)?.error;
+  throw new PiloError(typeof said === "string" && said ? said : "Pilo respondió algo que no pude leer. Intente de nuevo.", "formato");
+}
+
+/** Lo que el servidor acepta de historia (contrato §1). */
+export const HISTORY_TURNS = 12;
+const HISTORY_Q = 500;
+const HISTORY_A = 2000;
+/** El cuerpo entero no puede pasar de 48.000 caracteres: se deja margen para la pregunta. */
+const HISTORY_BUDGET = 44_000;
+
+/**
+ * La historia que viaja con la pregunta: los últimos 12 turnos respondidos, del
+ * más viejo al más nuevo, con lo que la persona escribió (`q`) y el texto final
+ * de la respuesta (`a`), recortados a lo que el servidor acepta.
+ */
+export function buildHistory(turns: { q: string; a?: string | null }[]): { q: string; a: string }[] {
+  const out = turns
+    .filter((t) => t.q.trim() && (t.a ?? "").trim())
+    .slice(-HISTORY_TURNS)
+    .map((t) => ({ q: t.q.trim().slice(0, HISTORY_Q), a: (t.a as string).trim().slice(0, HISTORY_A) }));
+  while (out.length && JSON.stringify(out).length > HISTORY_BUDGET) out.shift();
+  return out;
+}
+
+/**
+ * Pregunta y ve escribirse la respuesta. Va con `fetch` directo (functions.invoke
+ * no entrega el flujo por partes), con las mismas cabeceras: la clave anónima y,
+ * si hay sesión, su token. Se cumple con el objeto final; avisa `meta` y cada
+ * `delta` por el camino. Si el servidor responde JSON, llega entero y sin avisos.
+ */
+export async function askQuestionStream(question: string, history: { q: string; a: string }[] = [], handlers: AskHandlers = {}): Promise<AskResult> {
+  const base = (import.meta.env.VITE_SUPABASE_URL ?? "http://localhost:54321").replace(/\/+$/, "");
+  const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY ?? "public-anon-key";
+  let token = anonKey;
+  try {
+    token = (await supabase.auth.getSession()).data.session?.access_token ?? anonKey;
+  } catch {
+    /* sin sesión: con la clave anónima */
+  }
+  if (handlers.signal?.aborted) throw new PiloError("", "cancelado");
+  let response: Response;
+  try {
+    response = await fetch(`${base}/functions/v1/pilo-ia`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", apikey: anonKey, Authorization: `Bearer ${token}` },
+      body: JSON.stringify({ action: "preguntar", portal: "pregunta", question, history, stream: true }),
+      signal: handlers.signal,
+    });
+  } catch (e) {
+    if (isAbort(e) || handlers.signal?.aborted) throw new PiloError("", "cancelado");
+    throw new PiloError("No pude conectarme con Pilo. Revise su conexión a internet e intente de nuevo.", "red");
+  }
+  return readAskResponse(response, handlers);
 }
 
 /**

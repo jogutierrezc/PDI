@@ -4,7 +4,7 @@
   "status": "in_progress",
   "strategy": "full-collaborate",
   "currentPhase": "5-optimization",
-  "nextAction": "Ronda 1: sin críticos; fix-dev corrige avisos. En paralelo, Pilo servidor (pilo-1)",
+  "nextAction": "Pilo terminado en código: falta aplicar 0110, desplegar pilo-ia y probar en real. CSV: falta verificación visual",
   "gate": null,
   "branch": "main",
   "scope": "export-csv-conjuntos-visuales",

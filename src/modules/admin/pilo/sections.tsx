@@ -21,10 +21,12 @@ import { sayWithPilo } from "../../../components/pilo/ai/client";
 import { PORTAL_LABEL } from "../../../components/pilo/ai/config";
 import type { Fn, Portal, PortalRule } from "../../../components/pilo/ai/config";
 import type { ReportKind } from "../../../components/pilo/ai/logic";
-import { PROVIDERS, usePiloLog } from "./store";
-import type { KeyStatus, PiloSettings, Provider } from "./store";
-import { Group, KeyField, StatusMark, Switch } from "./ui";
+import { ASK_LIMITS, PROVIDERS, usePiloLog } from "./store";
+import type { KeyStatus, PiloSettings, ProbeResult, Provider } from "./store";
+import { Group, KeyField, NumField, StatusMark, Switch } from "./ui";
+import type { Tone } from "./ui";
 import { VoiceStyles } from "./VoiceStyles";
+import { WidgetGroup } from "./WidgetGroup";
 import { VoiceExpressionsEditor } from "./VoiceExpressionsEditor";
 
 export interface EditorApi {
@@ -38,7 +40,51 @@ export interface EditorApi {
   keys: KeyStatus | null | undefined;
 }
 
-export type TestState = { state: "idle" | "busy" | "ok" | "fail"; text: string };
+export type TestState = {
+  state: "idle" | "busy" | "ok" | "fail";
+  text: string;
+  /** Lo que dijo la prueba (0110), si la función lo devolvió. */
+  probe?: ProbeResult;
+};
+
+/** Lo que la prueba descubrió del proveedor, en palabras (0110). Una función anterior no lo dice: no se inventa. */
+export function probeFindings(p: ProbeResult | undefined): { id: string; tone: Tone; title: string; detail: string }[] {
+  if (!p) return [];
+  const out: { id: string; tone: Tone; title: string; detail: string }[] = [];
+  if (p.system_role === "system") {
+    out.push({ id: "rol", tone: "ok", title: "Acepta el rol «system»", detail: "La persona de Pilo viaja aparte, como instrucción del sistema." });
+  } else if (p.system_role === "user") {
+    out.push({
+      id: "rol",
+      tone: "warn",
+      title: "No acepta el rol «system»",
+      detail: "Pilo pone su persona dentro del primer mensaje y responde igual. Para no gastar un pedido fallido en cada arranque, fije «Persona de Pilo» en «Dentro del mensaje».",
+    });
+  }
+  if (p.stream === "sse") {
+    out.push({ id: "partes", tone: "ok", title: "Responde por partes", detail: "La página muestra la respuesta mientras se escribe." });
+  } else if (p.stream === "json") {
+    out.push({ id: "partes", tone: "warn", title: "Ignora el pedido de responder por partes", detail: "Contesta entera: la página la verá aparecer de una vez, sin perder nada." });
+  } else if (p.stream === "error") {
+    out.push({
+      id: "partes",
+      tone: "fail",
+      title: "Falló al responder por partes",
+      detail: p.stream_error || "Pilo puede seguir respondiendo entero; apague «Responder por partes» para no insistir.",
+    });
+  }
+  if (p.reasoning === true) {
+    out.push({
+      id: "razonamiento",
+      tone: "warn",
+      title: "El modelo razona aparte",
+      detail: "Ese razonamiento gasta parte del tope de la respuesta. Si salen respuestas cortas o vacías, suba «Largo de la respuesta» o use un modelo sin razonamiento.",
+    });
+  } else if (p.reasoning === false) {
+    out.push({ id: "razonamiento", tone: "ok", title: "No manda razonamiento aparte", detail: "Todo el tope de la respuesta se usa para escribirla." });
+  }
+  return out;
+}
 
 export const FNS: { id: Fn; name: string; short: string; desc: string }[] = [
   { id: "leer", name: "Escuchar", short: "Es", desc: "Lee en voz alta la página, un resumen o una explicación, con voz masculina." },
@@ -78,6 +124,7 @@ export function AudiencePicker({ value, label, onPick }: { value: string; label:
 export function ConnectionSection({ ed, test, onTest }: { ed: EditorApi; test: TestState; onTest: () => void }) {
   const { s, setS, set, keys } = ed;
   const connected = Boolean(keys?.has_key && s.base_url);
+  const findings = probeFindings(test.probe);
   const pickProvider = (p: Provider) =>
     setS((prev) => {
       const before = PROVIDERS[prev.provider];
@@ -165,9 +212,19 @@ export function ConnectionSection({ ed, test, onTest }: { ed: EditorApi; test: T
         </div>
         {!connected && <p className="pis-small">Para probar hace falta una clave guardada y la dirección del servicio.</p>}
         {(test.state === "ok" || test.state === "fail") && (
-          <p role="status" className="pis-result">
+          <div role="status" className="pis-result">
             <StatusMark tone={test.state === "ok" ? "ok" : "fail"}>{test.text}</StatusMark>
-          </p>
+            {findings.length > 0 && (
+              <ul className="pis-findings" aria-label="Lo que la prueba encontró">
+                {findings.map((f) => (
+                  <li key={f.id}>
+                    <StatusMark tone={f.tone}>{f.title}</StatusMark>
+                    <small>{f.detail}</small>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
         )}
       </Group>
     </>
@@ -403,6 +460,8 @@ export function PortalsSection({ ed }: { ed: EditorApi }) {
         <p className="pis-warn">«Público» gasta cupo con cada visitante. Conviene empezar con «Solo administración», revisar la bitácora una semana y abrir portal por portal.</p>
       </Group>
 
+      <WidgetGroup ed={ed} />
+
       <ReportsGroup ed={ed} />
     </>
   );
@@ -456,6 +515,28 @@ function ReportsGroup({ ed }: { ed: EditorApi }) {
 
 /* --- Uso y bitácora ------------------------------------------------------------------------- */
 
+/** Un contador de hoy contra su tope: el número, la barra y lo que pasa al llegar. */
+function Meter({ label, used, limit, unit, full }: { label: string; used: number; limit: number; unit: string; full: string }) {
+  const share = limit > 0 ? Math.min(100, (used / limit) * 100) : 0;
+  const high = limit === 0 ? used > 0 : share >= 90;
+  return (
+    <div className="pis-usage">
+      <div>
+        <strong>
+          {used.toLocaleString("es-CO")}{" "}
+          <span>
+            de {limit.toLocaleString("es-CO")} {unit}
+          </span>
+        </strong>
+        <small>{limit === 0 ? <StatusMark tone="warn">{`Tope en 0. ${full}`}</StatusMark> : high ? <StatusMark tone="warn">{`Casi en el tope. ${full}`}</StatusMark> : "Se reinicia cada día."}</small>
+      </div>
+      <i role="meter" aria-valuemin={0} aria-valuemax={limit} aria-valuenow={used} aria-label={label}>
+        <span style={{ transform: `scaleX(${share / 100})` }} data-high={high || undefined} />
+      </i>
+    </div>
+  );
+}
+
 const LOG_TONE = (status: string, cached: boolean) =>
   cached || status === "listo" ? ("ok" as const) : status === "revisar" || status === "limite" ? ("warn" as const) : ("fail" as const);
 
@@ -463,29 +544,43 @@ export function UsageSection({ ed }: { ed: EditorApi }) {
   const { s, set, keys } = ed;
   const log = usePiloLog();
   const today = keys?.today ?? 0;
-  const share = Math.min(100, (today / Math.max(1, s.daily_limit)) * 100);
+  // Sin 0110 la función no cuenta la voz aparte: «today» trae las dos juntas.
+  const voice = keys?.today_voice;
   return (
     <>
-      <Group title="Uso de hoy">
-        <div className="pis-usage">
-          <div>
-            <strong>
-              {today.toLocaleString("es-CO")} <span>de {s.daily_limit.toLocaleString("es-CO")} pedidos</span>
-            </strong>
-            <small>{share >= 90 ? "Casi en el tope: al llegar, Mr. Pilo lee con la voz del navegador y lo dice." : "Se reinicia cada día."}</small>
-          </div>
-          <i role="meter" aria-valuemin={0} aria-valuemax={s.daily_limit} aria-valuenow={today} aria-label="Uso de hoy">
-            <span style={{ transform: `scaleX(${share / 100})` }} data-high={share >= 90 || undefined} />
-          </i>
-        </div>
+      <Group title="Uso de hoy" aside={voice === undefined && keys ? <small>Texto y voz juntos, hasta aplicar 0110</small> : undefined}>
+        <Meter
+          label="Uso de texto de hoy"
+          used={today}
+          limit={s.daily_limit}
+          unit={voice === undefined ? "pedidos" : "pedidos de texto"}
+          full="Sin cupo, Pilo no redacta con IA: responde con el catálogo, lo guardado y la memoria, y lo dice."
+        />
+        {voice !== undefined && (
+          <Meter
+            label="Uso de voz de hoy"
+            used={voice}
+            limit={s.voice_daily_limit}
+            unit="lecturas con voz"
+            full="Sin cupo, Mr. Pilo lee con la voz del navegador y lo dice."
+          />
+        )}
       </Group>
 
       <Group title="Límites y cuidado">
         <div className="pis-grid pis-grid--3">
           <label>
-            Pedidos por día
+            Pedidos de texto por día
             <input type="number" min={0} value={s.daily_limit} onChange={(e) => set("daily_limit", Math.max(0, Number(e.target.value)))} />
           </label>
+          <NumField
+            label="Lecturas con voz por día"
+            hint="Aparte del cupo de texto"
+            {...ASK_LIMITS.voice_daily_limit}
+            value={s.voice_daily_limit}
+            disabled={s.needs0110}
+            onCommit={(v) => set("voice_daily_limit", v)}
+          />
           <label>
             Filas máx. por pedido
             <input type="number" min={10} max={5000} value={s.max_rows} onChange={(e) => set("max_rows", Number(e.target.value))} />
@@ -495,6 +590,7 @@ export function UsageSection({ ed }: { ed: EditorApi }) {
             <input type="number" min={0} max={365} value={s.cache_days} onChange={(e) => set("cache_days", Number(e.target.value))} />
           </label>
         </div>
+        {s.needs0110 && <p className="pis-warn">Falta aplicar la migración 0110 en la base para fijar el cupo de la voz aparte del de texto.</p>}
         <ul className="pis-list">
           <li>Solo se envía lo que está publicado en la página: nunca nombres, códigos ni datos personales.</li>
           <li>Cada resumen dice «hecho con IA» y de qué tabla o gráfica sale.</li>

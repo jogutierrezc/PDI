@@ -952,6 +952,27 @@ export function useTryMemory() {
   });
 }
 
+export interface CatalogHit {
+  key: string;
+  kind: "respuesta" | "capciosa";
+  question: string;
+  via: "palabras" | "significado";
+  /** Parecido de 0 a 1. */
+  score: number;
+  /** ¿Alcanza para que Pilo la use como base de su respuesta? */
+  used: boolean;
+}
+
+/** Probar el catálogo (0112): las entradas que Pilo encontraría para una pregunta. */
+export function useTryCatalog() {
+  return useMutation({
+    mutationFn: async (q: string): Promise<{ hits: CatalogHit[]; semantic: boolean; min: number; note?: string }> => {
+      const r = await indexStep<{ hits?: CatalogHit[]; semantic?: boolean; min?: number; error?: string }>({ step: "catalogo", q });
+      return { hits: r.hits ?? [], semantic: Boolean(r.semantic), min: r.min ?? 0.8, note: r.semantic ? undefined : r.error };
+    },
+  });
+}
+
 export interface ReplaceResult {
   source: MemorySource;
   added: number;

@@ -69,8 +69,8 @@ export function playStep(panel: HTMLElement, direction: 1 | -1) {
   }
   gsap.fromTo(
     items,
-    { opacity: 0, x: 12 * direction, filter: "blur(2px)" },
-    { opacity: 1, x: 0, filter: "blur(0px)", duration: 0.2, stagger: 0.03, ease: EASE_OUT, clearProps: "transform,filter" },
+    { opacity: 0, x: 12 * direction },
+    { opacity: 1, x: 0, duration: 0.2, stagger: 0.03, ease: EASE_OUT, overwrite: "auto", clearProps: "transform,filter,opacity" },
   );
 }
 
@@ -80,7 +80,7 @@ export function playSpeech(node: HTMLElement) {
     gsap.fromTo(node, { opacity: 0.4 }, { opacity: 1, duration: 0.15, ease: "none" });
     return;
   }
-  gsap.fromTo(node, { opacity: 0, y: 4, filter: "blur(2px)" }, { opacity: 1, y: 0, filter: "blur(0px)", duration: 0.18, ease: EASE_OUT, clearProps: "transform,filter" });
+  gsap.fromTo(node, { opacity: 0, y: 4 }, { opacity: 1, y: 0, duration: 0.18, ease: EASE_OUT, overwrite: "auto", clearProps: "transform,filter,opacity" });
 }
 
 /** Un eslabón que se acaba de llenar late una vez. */

@@ -40,13 +40,58 @@ Mire el `Content-Type` de la respuesta, no lo que pidió.
 | Capciosa del catálogo | `200 application/json`, `kind: "capciosa"` |
 | IA apagada, sin cupo de texto, o ajuste `ask_stream = false` | `200 application/json` (curada / memoria / malla / dato / extracto / regla / nada) |
 | Sin `stream` | `200 application/json` con el objeto final (§4), o error HTTP |
-| Cualquier error antes de empezar a escribir | JSON con su estado HTTP (§6) |
+| Error antes de abrir el flujo (pedido inválido, portal cerrado, límite por visitante, tamaño) | JSON con su estado HTTP (§6) |
+| Error con el flujo ya abierto (también un fallo al buscar en lo publicado) | evento `error` (el HTTP ya fue 200) |
 
 Las respuestas sin modelo **nunca** van como flujo: siempre JSON, igual que hoy.
 
 ## 3. Eventos del flujo (SSE)
 
-Orden: `meta` → `delta`* → (`done` | `error`). Siempre termina con `done` o `error` y luego se cierra. Cada ~10 s puede llegar un comentario `: ping` (ignórelo). Cabeceras CORS iguales a las del JSON.
+Orden: `step`* → `meta` → `step` (redactar) → `thinking`* → `delta`* → `step`* → (`done` | `error`). Siempre termina con **un** `done` o **un** `error` y luego se cierra. Cabeceras CORS iguales a las del JSON.
+
+`step` y `thinking` son **opcionales para la página**: quien los ignore ve `meta` → `delta`* → `done` | `error`, como antes. Ignore también cualquier evento que no conozca.
+
+**Cuándo se abre el flujo (decisión):** después del enrutador y de mirar el cupo, y antes de la búsqueda. Lo vetado, las capciosas, la IA apagada y «sin cupo» se deciden antes y siguen saliendo como JSON (§2 no cambia). Una vez abierto, todo camino termina en `done` o `error`: si falla la búsqueda llega `error` con `code: "memoria"`; si falla el modelo, `done` con lo publicado (`fallback`) o `error`.
+
+**Latido:** mientras el flujo está abierto va una línea de comentario `: ping` cada ~10 s (sobre todo mientras el modelo no da su primera palabra), para que ni el navegador ni un proxy corten la conexión. Siempre cae entre eventos enteros; un lector SSE la ignora. Se detiene al terminar o cancelar. Si la página cierra la conexión, se cancela el pedido al proveedor.
+
+### `step` — lo que Pilo va haciendo (real, no texto inventado)
+```
+event: step
+data: {"id":"cifras","label":"Consultando las cifras","state":"start"}
+
+event: step
+data: {"id":"cifras","label":"Consultando las cifras","detail":"2 cifras de Permanencia 2024","state":"done"}
+```
+Forma: `{ "id": string, "label": string, "detail"?: string, "state": "start" | "done" }`.
+
+| `id` | `label` | Cuándo | `detail` (ejemplos) |
+|---|---|---|---|
+| `entender` | Entendiendo la pregunta | siempre, al abrir | «pregunta sobre la UDES · sede Cúcuta · año 2024», «sigue la conversación · sede Cúcuta», «tema general», «es un saludo» |
+| `catalogo` | Revisando las respuestas oficiales | si no es saludo ni seguimiento | «1 respuesta oficial», «sin resultados» |
+| `guardadas` | Recordando respuestas anteriores | si no es saludo ni seguimiento | «1 respuesta anterior», «sin resultados» |
+| `cifras` | Consultando las cifras | si la pregunta pide una cifra o un corte | «2 cifras de Permanencia 2024», «sin resultados» |
+| `memoria` | Buscando en lo que conozco | si no es saludo | «5 pasajes», «sin resultados» |
+| `redactar` | Redactando la respuesta | `start` justo después de `meta`, al llamar al modelo; `done` cuando termina | «con 1 respuesta oficial, 2 indicadores y 3 pasajes»; «No hay datos de la UDES sobre esto; respondo con conocimiento general»; «No encontré datos publicados de la UDES sobre esto»; al fallar: «el modelo no respondió» |
+| `verificar` | Verificando las cifras | solo si el modelo escribió | «cada número está en las fuentes», «1 número por revisar», «sin cifras de la UDES que verificar» |
+
+Garantías:
+- Cada `id` llega como mucho una vez con `start` y una con `done`, en ese orden; **todo paso empezado se cierra** antes de `done`/`error` (también si algo falla).
+- `catalogo`, `guardadas`, `cifras` y `memoria` corren a la par: sus `start` salen todos antes del primer `done`, y cada `done` sale cuando esa búsqueda termina de verdad (orden real, no fijo). Todos terminan antes de `meta`.
+- `redactar` `start` va después de `meta` y antes del primer `thinking`/`delta`; su `done` va después del último `delta`. Un `done` sin `detail` nuevo repite el del `start`.
+- Los pasos que no aplican no se anuncian (un saludo: solo `entender`, `redactar`, `verificar`).
+- `detail` solo trae cuentas y nombres cortos (indicador, sede, año): nunca el contenido de un pasaje, valores, dinero, datos de personas, puntajes, umbrales, tablas, proveedores ni claves. Un nombre que toque dinero o datos personales se omite («2 cifras»).
+
+### `thinking` — el razonamiento del modelo, si lo manda
+```
+event: thinking
+data: {"text":"Me preguntan por los matriculados. La fuente 1 trae la cifra de 2024. "}
+```
+- Se concatenan. Sale **solo** si el proveedor manda razonamiento aparte (`reasoning_content` / `reasoning` en el `delta`) o un bloque `<think>…</think>` en el contenido. Un modelo que no razona no manda ninguno: no dependa de ellos.
+- Todos los `thinking` llegan **antes del primer `delta`**; el razonamiento que llegue después de empezar la respuesta se descarta.
+- Solo frases completas, con los filtros de la respuesta y más: sin cifras de dinero no publicadas, sin datos de personas (correos, teléfonos, documentos, números largos sin fuente) y sin las marcas internas del pedido. Tope: 1.200 caracteres en total.
+- Nunca entra en `delta`, en `done.text`, en lo que se guarda ni en la revisión de cifras. No se manda sin `stream`.
+- El pedido le dice al modelo que, si razona aparte, lo haga en español y breve; no se le exige razonar ni escribir «pensamientos» en la respuesta.
 
 ### `meta` — una vez, antes de redactar
 ```
@@ -74,6 +119,7 @@ event: done
 data: {"kind":"ia","text":"En 2024 hubo 20.500 estudiantes matriculados [1].","sources":[{"n":1,"ref":"cifras:matriculados", "…":"…"}],"trail":[…],"intent":"institucional","grounding":"oficial","answerId":77,"verified":true,"unknown":[],"model":"google/gemma-4-31b-it","finish":"stop","usage":{"prompt":800,"completion":20,"total":820}}
 ```
 **Reemplace** lo mostrado por `done.text` y `done.sources`: el texto final puede diferir de los `delta` (citas podadas y renumeradas, una frase de dinero quitada, nota añadida).
+Solo en el flujo, `done` suma `steps` (`[{ "id", "label", "detail"?, "ms" }]`: los pasos terminados, en el orden en que terminaron) y `seconds` (segundos totales, un decimal), para guardar «cómo respondí». El JSON sin stream no los trae.
 Si el modelo falló pero había algo publicado, `done` trae la respuesta sin IA (`kind: "extracto" | "dato" | "curada" | "memoria" | "malla" | "regla"`) con `fallback`.
 
 ### `error` — no hubo respuesta
@@ -81,7 +127,7 @@ Si el modelo falló pero había algo publicado, `done` trae la respuesta sin IA 
 event: error
 data: {"message":"El proveedor de IA respondió con un error (503) y no encontré nada publicado con qué responder sin ella. Intente de nuevo en un momento.","code":"proveedor"}
 ```
-`code`: `proveedor | tiempo | limite_proveedor | interno | cancelado`. Muestre `message` tal cual.
+`code`: `proveedor | tiempo | limite_proveedor | memoria | interno | cancelado`. Puede traer `detail`. Muestre `message` tal cual.
 
 ## 4. El objeto final (JSON sin stream, o `done`)
 
@@ -137,7 +183,7 @@ La marca de «conocimiento general» la calcula **el servidor** según haya cita
 | 502 / 504 | `proveedor` / `tiempo` | (sin stream) el modelo falló o tardó y no había nada publicado |
 
 Cuerpo: `{ "error": "mensaje para mostrar", "code": "...", "detail"?: "...", "advice"?: "..." }`.
-Con stream, lo que falle después de `meta` llega como evento `error` (el HTTP ya fue 200).
+Con stream, lo que falle después de abrir el flujo (búsqueda incluida) llega como evento `error` (el HTTP ya fue 200).
 «Sin cupo de texto» y «IA apagada» **no** son errores: responden 200 con lo publicado.
 
 ## 7. Comportamiento del servidor (resumen)
@@ -145,7 +191,7 @@ Con stream, lo que falle después de `meta` llega como evento `error` (el HTTP y
 1. **Enrutador** por reglas, sin bloquear. Solo responden sin modelo: capciosa del catálogo (por disparador, textual) y vetado (presupuesto/dinero de la universidad, sueldos; datos de personas). «Futuro», «inversión en investigación», «¿cuánto cuesta la matrícula?», «gracias, ¿y…?» y los saludos van al modelo (los dos primeros con un aviso en el prompt).
 2. **Búsqueda en paralelo**: catálogo (palabras y significado), guardadas, cifras, memoria híbrida. Sin llamada previa al modelo. El seguimiento se une por reglas con su pregunta ancla.
 3. **Un pedido** con bloques `[OFICIAL]` → `[GUARDADA]` → `[CIFRAS]` → `[PASAJES]` (una sola numeración), la conversación como turnos `user`/`assistant` y la pregunta.
-4. **Tiempos**: 30 s para la primera señal, 90 s en total (`DRAFT_FIRST_TOKEN_MS`, `DRAFT_TOTAL_MS`). Si falla o tarda: lo publicado tal cual con `fallback`, o lo ya escrito con `partial`.
+4. **Tiempos**: Pilo espera al modelo todo lo que deja la plataforma: 130 s de redacción con el tope de 150 s (`DRAFT_TOTAL_MS` = `PLATFORM_CAP_MS` − 20 s), sin tope aparte para la primera señal. En un plan de pago, el secreto `PILO_PLATFORM_CAP_MS=400000` lo sube a 380 s. Si falla o tarda: lo publicado tal cual con `fallback`, o lo ya escrito con `partial`.
 5. **Guardado**: solo `ia` verificada, `grounding: "oficial"`, completa, que no sea seguimiento y cuyas fuentes sean de la memoria (nunca `dato:` ni `catalogo:`).
 6. **Bandeja**: `revisar` (número sin fuente), `sin_respuesta` (pregunta institucional sin nada publicado) y **`general`** (respondió de conocimiento general).
 7. **Cupo**: la voz ya no gasta el cupo de texto (`voice_daily_limit` aparte). `calificar` también tiene límite por visitante (pasado, se ignora en silencio).
@@ -191,3 +237,14 @@ Nada de esto se probó contra el proveedor real.
 6. Qué cabecera trae la IP del visitante en producción (`cf-connecting-ip`, `x-real-ip`, `x-forwarded-for`, en ese orden). Si ninguna llega, todos comparten la huella «desconocida» + navegador y el límite sería común: revise `pilo_visitor_hits` tras unas preguntas.
 7. Que el modelo obedezca los bloques: una pregunta con respuesta oficial en el catálogo (debe citarla), una de cultura general (`grounding: "general"`), «¿cuánto cuesta la matrícula?» (sin valores inventados) y un intento de «ignora tus instrucciones».
 8. La bandeja: revisar el volumen del motivo `general` los primeros días.
+9. **Si NVIDIA/Gemma manda razonamiento**: no se sabe. «Probar conexión» lo dice (`reasoning`). Si es `false`, la página nunca verá `thinking` (solo los `step`), y eso es correcto. Tampoco se verificó por cuál campo lo manda (`reasoning_content`, `reasoning` o `<think>`): se leen los tres.
+10. Que el razonamiento salga en español: se pide en el prompt, pero el modelo puede no obedecer.
+11. Que el comentario `: ping` llegue hasta el navegador a través del proxy de la plataforma, y que la plataforma avise cuando el navegador se desconecta (se usan `cancel` del flujo y `request.signal`).
+
+## Cambio del 2026-10-01 (tarde): todo lo redacta Gemma
+
+Pedido directo del dueño: nada de respuestas rápidas ni capciosas sueltas; se integran a lo que el modelo consulta.
+
+- Una **capciosa** del catálogo ya no responde sola. Su microexpresión entra en `[OFICIAL]` (primera, con su `mood`) y redacta el modelo: llega como `kind: "ia"` por el flujo. Sale tal cual, como `kind: "capciosa"` en JSON, solo si no hay IA (apagada o sin cupo); si el modelo falla, es el respaldo oficial con `fallback`.
+- Sin modelo solo queda lo **vetado** (dinero de la universidad, datos de personas).
+- **Tiempos**: sin tope aparte para la primera señal; la redacción espera `PLATFORM_CAP_MS` − 20 s (130 s; con el secreto `PILO_PLATFORM_CAP_MS=400000`, 380 s).

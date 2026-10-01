@@ -30,7 +30,7 @@ const finePointer = () => typeof window !== "undefined" && window.matchMedia?.("
 const BEATS: { say: string; mood: MojiMood; look: [number, number] }[] = [
   { say: "¡Hola! Soy Mr. Pilo, el guía de la Oficina de Planeación Institucional de la UDES.", mood: "feliz", look: [0, -0.1] },
   { say: "Pregúnteme como le preguntaría a una persona: por cifras, el Plan de Desarrollo, los boletines o el Observatorio.", mood: "atento", look: [0, 0.7] },
-  { say: "Le respondo con lo que publica la universidad, y cada dato trae su fuente para que la revise.", mood: "sorpresa", look: [0.2, 0.8] },
+  { say: "Le respondo sobre lo que necesite: las cifras de la UDES llevan su fuente para que la revise, y le aviso cuando algo es conocimiento general.", mood: "sorpresa", look: [0.2, 0.8] },
 ];
 
 const TITLE = "Pregúntele a Mr. Pilo";
@@ -284,7 +284,7 @@ export function Welcome({ tema, target, onDone }: { tema: Tema; target: RefObjec
           </div>
           <div className="apw-demo" data-beat="2">
             <div className="apw-mini">
-              <span className="apw-mini__badge">De la memoria · sin IA</span>
+              <span className="apw-mini__badge">Con fuentes de la UDES</span>
               <p>
                 El Plan de Desarrollo tiene sus pilares con avance publicado, y cada cifra dice de dónde sale <span className="apw-cite">1</span>
               </p>

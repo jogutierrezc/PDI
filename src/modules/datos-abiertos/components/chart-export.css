@@ -66,7 +66,9 @@
    ========================================================================== */
 
 /* Pie del marco cuando hay CSV: la fuente a la izquierda, la acción a la derecha.
-   Si falta espacio, la acción baja a su propia línea, alineada a la derecha. */
+   Si falta espacio, la acción baja a su propia línea, alineada a la derecha; lo
+   decide el ancho del marco, nunca el cambio de rótulo (el botón ya reserva el
+   del más largo). */
 .od-frame__foot {
   display: flex;
   flex-wrap: wrap;
@@ -92,13 +94,17 @@
   gap: var(--space-2);
 }
 
+/* Las dos caras se apilan en la misma celda: la visible y, oculta, la del rótulo
+   más largo («Descargado»), que es la que da el ancho. La visible va pegada a
+   la derecha, donde termina el pie. */
 .od-csv__button {
-  display: inline-flex;
+  display: inline-grid;
   align-items: center;
-  gap: var(--space-1);
+  justify-items: end;
   min-height: 28px;
   padding: 0 var(--space-2);
-  color: var(--ink-muted);
+  /* --ink-secondary y no --ink-muted: es texto, y tiene que llegar a 4,5:1 sobre el blanco. */
+  color: var(--ink-secondary);
   background: transparent;
   border: 0;
   border-radius: 6px;
@@ -111,9 +117,21 @@
   transition: color var(--dur-fast) ease;
 }
 
+.od-csv__face {
+  grid-area: 1 / 1;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  white-space: nowrap;
+}
+
+.od-csv__face--ghost {
+  visibility: hidden;
+}
+
 .od-csv__label {
   display: inline-block;
-  min-width: 3.4ch; /* «CSV», «…» y «Descargado» no mueven el pie al cambiar */
+  min-width: 3.4ch; /* «CSV» y «…» miden lo mismo: el icono no se mueve mientras se prepara */
 }
 
 /* El destello ámbar del volteo (csv-motion.ts) */
@@ -136,22 +154,18 @@
   }
 }
 
-/* Punteros gruesos: objetivo de 44 px sin engordar el pie (el área crece con un pseudo-elemento). */
+/* Punteros gruesos: 44 px de alto de verdad. Un pseudo-elemento que sobresalga
+   no sirve: .od-frame recorta lo que se sale (overflow: hidden). */
 @media (pointer: coarse) {
   .od-csv__button {
-    position: relative;
-  }
-
-  .od-csv__button::after {
-    content: "";
-    position: absolute;
-    inset: -8px -4px;
+    min-block-size: 44px;
+    min-inline-size: 44px;
   }
 }
 
 /* Estado: se lee en voz alta siempre; solo se ve cuando algo falló. */
 .od-csv__status {
-  color: var(--ink-muted);
+  color: var(--ink-secondary);
   font-size: var(--text-2xs);
 }
 
@@ -171,9 +185,11 @@
   margin-block-start: var(--space-2);
 }
 
-/* Al imprimir tampoco: un botón no dice nada en papel. */
+/* Al imprimir tampoco: un botón no dice nada en papel. Y el pie que solo lo
+   tenía a él (sin fuente) se va entero: si no, queda una franja vacía con su línea. */
 @media print {
   .od-csv { display: none; }
+  .od-frame__foot[data-export-ignore] { display: none; }
 }
 
 /* Sello de las filas del selector (csv-motion.ts · sellarFilas): un barrido ámbar

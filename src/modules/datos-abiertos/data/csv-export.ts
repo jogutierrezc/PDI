@@ -4,8 +4,9 @@
    Un escritor y muchos constructores. Cada conjunto que la ficha dibuja tiene
    aquí su `xToTable()`, que devuelve una tabla (`CsvTable`), y todas pasan por
    el mismo `toCsvText()`: BOM y punto y coma, que es lo que Excel en español
-   abre sin preguntar; coma decimal; comillas donde hacen falta, y un apóstrofo
-   delante de todo texto que una hoja de cálculo leería como fórmula.
+   abre sin preguntar; coma decimal sin ruido de coma flotante ni notación
+   científica; comillas donde hacen falta, y un apóstrofo delante de todo texto
+   que una hoja de cálculo leería como fórmula.
 
    La reserva estadística se decide aquí y en ningún otro sitio. El CSV no
    puede decir lo que la ficha calla, así que:
@@ -16,8 +17,12 @@
    · el corte «todo el periodo» (ALL_YEARS) no se exporta, porque es un
      promedio derivado; la excepción son los mapas de dato global, que guardan
      ahí su cifra real;
-   · el mapa por municipio no lleva filas de departamento: contienen a las
-     personas de los municipios reservados;
+   · el mapa por municipio no lleva filas de departamento, que contienen a las
+     personas de los municipios reservados, ni las del total institucional, que
+     la ficha no lee y que con un campus reservado lo despejarían por resta;
+   · una celda de cifra que trae texto ("< 5", como guardan su reserva el
+     Observatorio y los Tableros) sale con ese texto, y el total de su grupo se
+     calcula sin ella, como en la ficha: no hay resta que la despeje;
    · de Saber PRO y Saber TyT salen promedios y conteos por nivel, con la
      advertencia «Pocos evaluados»; los histogramas y las nubes por programa no
      salen: con un evaluado, señalan a una persona.
@@ -78,7 +83,7 @@ export interface CsvFile {
 
 /* --- El escritor ---------------------------------------------------------------- */
 
-const BOM = "﻿";
+const BOM = "\uFEFF";
 const SEPARATOR = ";";
 
 /** Lo que Excel, Calc y Sheets ejecutan como fórmula si abre una celda. */
@@ -87,16 +92,25 @@ const FORMULA_START = /^[=+\-@\t\r]/;
 const NEEDS_QUOTES = /[;"\r\n]|^\s|\s$/;
 
 /**
- * Texto de una celda. El apóstrofo desactiva la fórmula y la hoja de cálculo
- * no lo muestra. Solo mira el primer carácter: "< 5" no se toca.
+ * Texto de una celda. El apóstrofo desactiva la fórmula; la hoja de cálculo sí
+ * lo muestra al abrir el archivo, y el LEEME lo avisa. Solo mira el primer
+ * carácter: "< 5" no se toca.
  */
 function textCell(text: string): string {
   const safe = FORMULA_START.test(text) ? `'${text}` : text;
   return NEEDS_QUOTES.test(safe) ? `"${safe.replace(/"/g, '""')}"` : safe;
 }
 
+/** Seis decimales como mucho y sin agrupar: 0,1 + 0,2 sale "0,3" y 1e21 sale con todas sus cifras, nunca con "e+". */
+const plainNumber = new Intl.NumberFormat("en-US", { useGrouping: false, maximumFractionDigits: 6 });
+
 /** Un número nunca lleva apóstrofo ni comillas: -3 es una cifra, no una fórmula. */
-const numberCell = (value: number): string => (Number.isFinite(value) ? String(value).replace(".", ",") : "");
+function numberCell(value: number): string {
+  if (!Number.isFinite(value)) return "";
+  const text = plainNumber.format(value);
+  // Lo que se redondea a cero no conserva el signo.
+  return text === "-0" ? "0" : text.replace(".", ",");
+}
 
 function csvCell(cell: CsvCell): string {
   if (cell === null) return "";
@@ -126,10 +140,6 @@ const FILE_PREFIX = "udes-en-cifras";
 
 /** El zip de un informe: "udes-en-cifras-matricula.zip". */
 export const csvZipName = (report: string): string => `${FILE_PREFIX}-${slugify(report, "informe")}.zip`;
-
-/** Un archivo dentro del zip, numerado en el orden de la ficha: "03-desglose-genero.csv". */
-export const csvMemberName = (index: number, kind: string, key: string): string =>
-  `${String(index).padStart(2, "0")}-${slugify(kind, "conjunto")}-${slugify(key, "datos")}.csv`;
 
 /** Un conjunto que baja suelto: "udes-en-cifras-matricula-desglose-genero.csv". */
 export const csvFilename = (report: string, kind: string, key: string): string =>
@@ -326,12 +336,15 @@ function mapYears(map: MapDataset, municipio: boolean): number[] {
 
 function mapCells(map: MapDataset, campuses: CsvCampus[]): MapCell[] {
   const municipio = map.mode === "municipio";
+  // Por municipio la ficha solo lee los campus. El total institucional no sale:
+  // con un municipio reservado en un campus, total menos los demás lo despeja.
+  const exported = (campus: CampusId) => !(municipio && campus === ALL_CAMPUSES);
   const cells: MapCell[] = [];
   for (const year of mapYears(map, municipio)) {
     const values = map.values[year] ?? {};
     // Fuera del mapa por municipio la ficha no pinta las reservadas: aquí tampoco salen.
     const reserved: Partial<Record<CampusId, string[]>> = municipio ? map.reserved?.[year] ?? {} : {};
-    for (const campus of campusOrder([...Object.keys(values), ...Object.keys(reserved)], campuses)) {
+    for (const campus of campusOrder([...Object.keys(values), ...Object.keys(reserved)], campuses).filter(exported)) {
       const hidden = new Set((reserved[campus] ?? []).filter((code) => DIVIPOLA.test(code)));
       const reported = Object.keys(values[campus] ?? {});
       // Por municipio solo salen códigos DIVIPOLA: la fila de un departamento
@@ -355,7 +368,8 @@ function territoryOf(map: MapDataset, code: string): string {
  * Mapas en largo: una fila por corte, campus y territorio con dato. Admite
  * varios mapas (entrante y saliente van juntos en la ficha) y añade «Sentido»
  * si alguno es de movilidad. Con un mapa por municipio las columnas son las de
- * DIVIPOLA, con el departamento al lado y la columna «Reservado».
+ * DIVIPOLA, con el departamento al lado y la columna «Reservado», y solo
+ * salen sus campus, sin el total institucional.
  */
 export function mapToTable(maps: MapDataset | MapDataset[], { campuses }: MapExport): CsvTable {
   const list = Array.isArray(maps) ? maps : [maps];
@@ -805,9 +819,14 @@ export interface FreeTable {
 
 const ROW_KIND_LABEL: Record<FreeRow["kind"], string> = { dato: "Dato", grupo: "Grupo", total: "Total" };
 
-/** Una cifra escrita "1.234,5" sale como número; lo demás, como texto. */
+/**
+ * Una cifra escrita "1.234,5" sale como número; lo demás, como texto. Una
+ * columna de cifra puede traer texto: el Observatorio y los Tableros guardan
+ * ahí la reserva estadística ("< 5"). Ese texto sale tal cual (como en
+ * `tableCell`): vacía, la celda diría «sin reportar» de un dato que sí existe.
+ */
 function freeCell(column: FreeTable["columns"][number], cell: FreeCell | undefined): CsvCell {
-  if (column.kind === "cifra") return numberOf(cell);
+  if (column.kind === "cifra") return numberOf(cell) ?? textOrNull(textOf(cell));
   return textOrNull(textOf(cell));
 }
 
@@ -840,7 +859,8 @@ export function freeSetToTable(set: FreeTable): CsvTable {
       ...(mixed ? [ROW_KIND_LABEL[row.kind], textOrNull(row.label)] : []),
       ...set.columns.map((column): CsvCell => {
         if (row.kind === "grupo") return null;
-        // Un total solo tiene cifras: las calculadas, nunca una celda de texto de la fuente.
+        // Un total solo tiene cifras: las calculadas (`freeTotalAt` salta lo que no es
+        // número, así que una reserva no entra en la suma), nunca una celda de la fuente.
         if (totals) return column.kind === "cifra" ? numberOf(totals[column.key]) : null;
         return freeCell(column, row.cells[column.key]);
       }),

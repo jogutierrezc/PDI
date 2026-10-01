@@ -5,8 +5,9 @@
    el orden de la página y con el tipo de informe elegido (tablero, narrativo,
    comparativo o ficha técnica). Cada visor va en el marco de gráfica del
    portal —descarga de imagen y, además, el CSV de su tabla— con su fuente y
-   la reserva estadística a la vista. Se carga aparte: las gráficas pesan y el
-   índice del portal no las necesita.
+   la reserva estadística a la vista. Varios visores pueden leer la misma
+   tabla: el CSV es uno, y lo ofrece solo el primero de ellos. Se carga aparte:
+   las gráficas pesan y el índice del portal no las necesita.
    ========================================================================== */
 
 import { ChartFrame } from "../components/ChartFrame";
@@ -20,6 +21,11 @@ import type { LiveTopic } from "./live";
 export default function LiveTopicBody({ live, slug }: { live: LiveTopic; slug: string }) {
   const { config, views, datasets } = live;
   const sections = config.sections.filter((s) => views.some((v) => v.section === s));
+  // En el orden de la página, el primer visor de cada tabla: el que lleva su «CSV».
+  const firstOfDataset = new Map<string, string>();
+  for (const view of sections.flatMap((s) => views.filter((v) => v.section === s))) {
+    if (!firstOfDataset.has(view.datasetId)) firstOfDataset.set(view.datasetId, view.id);
+  }
   return (
     <section className="od-section obs-live" data-template={config.template} aria-label="Datos publicados">
       <div className="u-container obs-live__body">
@@ -30,7 +36,14 @@ export default function LiveTopicBody({ live, slug }: { live: LiveTopic; slug: s
               {views
                 .filter((v) => v.section === section)
                 .map((v) => (
-                  <LiveView key={v.id} view={v} dataset={datasets.get(v.datasetId)!} slug={slug} wide={config.template === "narrativo" || v.size === "completa" || v.type === "tabla"} />
+                  <LiveView
+                    key={v.id}
+                    view={v}
+                    dataset={datasets.get(v.datasetId)!}
+                    slug={slug}
+                    wide={config.template === "narrativo" || v.size === "completa" || v.type === "tabla"}
+                    withCsv={firstOfDataset.get(v.datasetId) === v.id}
+                  />
                 ))}
             </div>
           </div>
@@ -40,7 +53,7 @@ export default function LiveTopicBody({ live, slug }: { live: LiveTopic; slug: s
   );
 }
 
-function LiveView({ view, dataset, slug, wide }: { view: ObsView; dataset: ObsDataset; slug: string; wide: boolean }) {
+function LiveView({ view, dataset, slug, wide, withCsv }: { view: ObsView; dataset: ObsDataset; slug: string; wide: boolean; withCsv: boolean }) {
   const rows = dataset.rows.filter((r) => r.kind === "dato").length;
   const subtitle = [view.description || dataset.description, `${rows.toLocaleString("es-CO")} ${rows === 1 ? "fila" : "filas"}`].filter(Boolean).join(" · ");
   return (
@@ -51,7 +64,7 @@ function LiveView({ view, dataset, slug, wide }: { view: ObsView; dataset: ObsDa
       source={`${dataset.source || "Observatorio de Analítica Académica"}${dataset.anonymization ? ` · anonimizada, conteos menores que ${dataset.anonymization.threshold} en reserva` : ""}`}
       exportName={`observatorio-${slug}-${view.title}`}
       exportable={view.type !== "tabla"}
-      csv={{ files: [{ filename: `observatorio-${slug}-${slugify(dataset.title, "datos")}.csv`, build: () => freeSetToTable(dataset) }], name: dataset.title }}
+      csv={withCsv ? { files: [{ filename: `observatorio-${slug}-${slugify(dataset.title, "datos")}.csv`, build: () => freeSetToTable(dataset) }], name: dataset.title } : undefined}
     >
       <div className="obs-live__chart">
         <ObsChart dataset={dataset} view={view} />

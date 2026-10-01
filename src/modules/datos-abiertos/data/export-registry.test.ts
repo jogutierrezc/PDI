@@ -52,7 +52,8 @@ const map = (id: string, mode: MapDataset["mode"], extra: Partial<MapDataset> = 
   mode,
   unit: "personas",
   source: "Internacionalización",
-  values: { 2024: { todas: mode === "municipio" ? { "68001": 9 } : mode === "origen" ? { "68": 9 } : { USA: 4 } } },
+  // Por municipio la ficha lee los campus, no el total institucional.
+  values: mode === "municipio" ? { 2024: { bucaramanga: { "68001": 9 } } } : { 2024: { todas: mode === "origen" ? { "68": 9 } : { USA: 4 } } },
   ...extra,
 });
 
@@ -287,7 +288,7 @@ describe("reportExports", () => {
 
   it("con el tablero de la diversidad, el mapa por municipio sale una vez y como marco del tablero", () => {
     const grupo = indicator("grupo-especial");
-    const municipio = map("origen-municipio", "municipio", { reserved: { 2024: { todas: ["68276"] } } });
+    const municipio = map("origen-municipio", "municipio", { reserved: { 2024: { bucaramanga: ["68276"] } } });
     const mapBlock = block("mapa", { refKey: "origen-municipio" });
     const dei = block("diversidad");
     const r = report({
@@ -318,6 +319,28 @@ describe("reportExports", () => {
     expect(ids(reportExports({ ...r, blocks: [mapBlock] }, catalog))).toEqual(["mapa:origen-municipio"]);
     // Sin el indicador titular el tablero no se pinta: no hay marcos, y el mapa tampoco vuelve.
     expect(reportExports({ ...r, indicators: [indicator("otro")] }, catalog)).toEqual([]);
+  });
+
+  it("el mapa por municipio que otro mapa trae de pareja no sale dos veces con el tablero de la diversidad", () => {
+    const host = block("mapa", { refKey: "deptos", settings: { mapWith: "origen-municipio" } });
+    const dei = block("diversidad");
+    const r = report({
+      indicators: [indicator("grupo-especial")],
+      keyIndicators: [],
+      maps: [map("deptos", "origen"), map("origen-municipio", "municipio")],
+      blocks: [host, dei],
+    });
+    const entries = reportExports(r, catalog);
+    expect(ids(entries)).toEqual(["mapa:deptos", "dei:corte", "dei:mapa"]);
+    expect(entries.filter((e) => e.label === "Mapa origen-municipio")).toHaveLength(1);
+    expect(ids(exportsOfBlock(entries, host))).toEqual(["mapa:deptos"]);
+    // Da igual el orden de los bloques: el marco del tablero se queda con su mapa.
+    expect(ids(reportExports({ ...r, blocks: [{ ...dei, position: 0 }, host] }, catalog))).toEqual(["dei:corte", "dei:mapa", "mapa:deptos"]);
+    // Sin el tablero, la pareja sale en el bloque que la pide.
+    expect(ids(reportExports({ ...r, blocks: [host] }, catalog))).toEqual(["mapa:deptos", "mapa:origen-municipio"]);
+    // Un mapa en reserva solo en el total institucional no anuncia cifras en reserva: ese corte no se exporta.
+    const soloTotal = report({ maps: [map("m", "municipio", { reserved: { 2024: { todas: ["68276"] } } })], blocks: [block("mapa", { refKey: "m" })] });
+    expect(reportExports(soloTotal, catalog)[0].reserved).toBeUndefined();
   });
 
   it("un conjunto libre con una vista propia y un bloque de todas las vistas da una sola entrada, en el último", () => {
@@ -379,7 +402,7 @@ describe("reportExports", () => {
     // Sin tablero, una sola entrada con todos, en el primer bloque que los muestra.
     const none = report({ blocks: [block("evolucion"), block("tabla_dinamica")] });
     const single = reportExports(none, catalog);
-    expect(ids(single)).toEqual(["indicadores:todos"]);
+    expect(ids(single)).toEqual(["resto-indicadores:todos"]);
     expect(single[0].blockKey).toBe(blockKeyOf(none.blocks![0]));
 
     // Un tablero que elige solo algunos deja el resto a la evolución, sin repetir.
@@ -388,11 +411,25 @@ describe("reportExports", () => {
       blocks: [block("kpis", { settings: { indicators: ["a"] } }), block("tabla_dinamica")],
     });
     const split = reportExports(partial, catalog);
-    expect(ids(split)).toEqual(["indicadores:tablero", "indicadores:otros"]);
+    expect(ids(split)).toEqual(["indicadores:tablero", "resto-indicadores:otros"]);
     expect([...new Set(split[1].files[0].build().rows.map((row) => row[1]))]).toEqual(["b", "c"]);
 
     // Sin ningún bloque que los muestre, no se ofrecen.
     expect(reportExports(report({ blocks: [block("metodologia")] }), catalog)).toEqual([]);
+  });
+
+  it("un tablero cuyo slot se llama «otros» o «todos» no se queda con los indicadores que ningún tablero muestra", () => {
+    for (const slot of ["otros", "todos"]) {
+      const r = report({
+        indicators: [indicator("a"), indicator("b"), indicator("c")],
+        blocks: [block("kpis", { settings: { slot, indicators: ["a"] } }), block("evolucion"), block("tabla_dinamica")],
+      });
+      const entries = reportExports(r, catalog);
+      expect(ids(entries)).toEqual([`indicadores:${slot}`, "resto-indicadores:otros"]);
+      expect([...new Set(entries[0].files[0].build().rows.map((row) => row[1]))]).toEqual(["a"]);
+      expect([...new Set(entries[1].files[0].build().rows.map((row) => row[1]))]).toEqual(["b", "c"]);
+      expect(new Set(names(entries)).size).toBe(2);
+    }
   });
 
   it("un conjunto que dos bloques muestran sale una vez: gana el primero", () => {
@@ -445,6 +482,7 @@ describe("readmeText", () => {
     expect(text).toContain("coma decimal");
     expect(text).toContain("sin reportar");
     expect(text).toContain('"< n"');
+    expect(text).toContain("apóstrofo (')");
     for (const entry of chosen) for (const file of entry.files) expect(text).toContain(file.filename);
     expect(text).toContain("udes-en-cifras-matricula-desglose-edad.csv: Desglose edad. Fuente: Bienestar.");
     expect(text).not.toContain("tabla-t.csv");

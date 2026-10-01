@@ -4,7 +4,6 @@ import {
   breakdownToTable,
   countryName,
   csvFilename,
-  csvMemberName,
   csvZipName,
   departmentName,
   freeSetToTable,
@@ -35,7 +34,7 @@ import { slugify } from "./slug";
 import { ALL_YEARS } from "./terms";
 import type { Breakdown, HeatmapData, HistoryData, Indicator, MapDataset, ModelData, PipelineData, TableData } from "./types";
 
-const BOM = "﻿";
+const BOM = "\uFEFF";
 const campuses = [
   { id: "todas", name: "Total institucional" },
   { id: "bucaramanga", name: "Bucaramanga" },
@@ -60,6 +59,25 @@ describe("escritor de CSV", () => {
     expect(written(-0.25)).toBe("-0,25");
     expect(written(0)).toBe("0");
     expect(written(1234567)).toBe("1234567");
+  });
+
+  it("no escribe ruido de coma flotante: redondea a seis decimales", () => {
+    expect(written(0.1 + 0.2)).toBe("0,3");
+    expect(written(1.005 * 1000)).toBe("1005");
+    expect(written(1 / 3)).toBe("0,333333");
+    expect(written(2 / 3)).toBe("0,666667");
+    expect(written(123456789.125)).toBe("123456789,125");
+    expect(written(0.000025)).toBe("0,000025");
+  });
+
+  it("nunca usa notación científica, ni en lo muy grande ni en lo muy pequeño", () => {
+    expect(written(1e21)).toBe("1000000000000000000000");
+    expect(written(-1.5e22)).toBe("-15000000000000000000000");
+    expect(written(1.5e-7)).toBe("0");
+    expect(written(-1e-9)).toBe("0");
+    for (const value of [1e21, 1e-7, 6.02e23, -3e-10, Number.MAX_SAFE_INTEGER, Number.MIN_VALUE]) {
+      expect(written(value)).toMatch(/^-?\d+(,\d{1,6})?$/);
+    }
   });
 
   it("deja vacío lo nulo y lo que no es un número finito", () => {
@@ -139,11 +157,10 @@ describe("nombres de archivo", () => {
     expect(slugify("—", "datos")).toBe("datos");
   });
 
-  it("arma el nombre del zip, el de sus miembros y el del archivo suelto", () => {
+  it("arma el nombre del zip y el del archivo suelto", () => {
     expect(csvZipName("Población Estudiantil")).toBe("udes-en-cifras-poblacion-estudiantil.zip");
-    expect(csvMemberName(3, "Desglose", "Género")).toBe("03-desglose-genero.csv");
     expect(csvFilename("Población Estudiantil", "mapa", "origen")).toBe("udes-en-cifras-poblacion-estudiantil-mapa-origen.csv");
-    expect(csvMemberName(12, "", "")).toBe("12-conjunto-datos.csv");
+    expect(csvFilename("", "", "")).toBe("udes-en-cifras-informe-conjunto-datos.csv");
   });
 });
 
@@ -412,20 +429,20 @@ describe("mapa por municipio", () => {
     mode: "municipio",
     title: "Origen por municipio",
     values: {
-      [ALL_YEARS]: { todas: { "05001": 666 } },
-      2024: { todas: { "05": 90, "68": 300, "05001": 80, "05002": 7, "00999": 6 } },
+      [ALL_YEARS]: { bucaramanga: { "05001": 666 } },
+      2024: { bucaramanga: { "05": 90, "68": 300, "05001": 80, "05002": 7, "00999": 6 } },
     },
-    reserved: { 2024: { todas: ["05002", "05004", "05"] } },
+    reserved: { 2024: { bucaramanga: ["05002", "05004", "05"] } },
   });
   const table = mapToTable(municipios, { campuses });
 
   it("pone solo filas de municipio, con su departamento al lado", () => {
     expect(table.header).toEqual(["Mapa", "Año", "Campus", "DIVIPOLA", "Municipio", "Depto", "Valor", "Reservado", "Unidad", "Fuente"]);
     expect(table.rows).toEqual([
-      ["Origen por municipio", 2024, "Total institucional", "00999", null, null, 6, null, "estudiantes", "Registro"],
-      ["Origen por municipio", 2024, "Total institucional", "05001", "Medellín", "Antioquia", 80, null, "estudiantes", "Registro"],
-      ["Origen por municipio", 2024, "Total institucional", "05002", "Abejorral", "Antioquia", null, "< 5", "estudiantes", "Registro"],
-      ["Origen por municipio", 2024, "Total institucional", "05004", "Abriaquí", "Antioquia", null, "< 5", "estudiantes", "Registro"],
+      ["Origen por municipio", 2024, "Bucaramanga", "00999", null, null, 6, null, "estudiantes", "Registro"],
+      ["Origen por municipio", 2024, "Bucaramanga", "05001", "Medellín", "Antioquia", 80, null, "estudiantes", "Registro"],
+      ["Origen por municipio", 2024, "Bucaramanga", "05002", "Abejorral", "Antioquia", null, "< 5", "estudiantes", "Registro"],
+      ["Origen por municipio", 2024, "Bucaramanga", "05004", "Abriaquí", "Antioquia", null, "< 5", "estudiantes", "Registro"],
     ]);
   });
 
@@ -443,6 +460,29 @@ describe("mapa por municipio", () => {
   it("exporta un año que solo tiene municipios reservados", () => {
     const solo = mapToTable(map({ mode: "municipio", values: {}, reserved: { 2023: { cucuta: ["54001"] } } }), { campuses });
     expect(solo.rows.map((row) => row.slice(1, 8))).toEqual([[2023, "Cúcuta", "54001", municipioName("54001"), "Norte de Santander", null, "< 5"]]);
+  });
+
+  it("no escribe el total institucional: con un campus reservado, lo despejaría por resta", () => {
+    const conTotal = mapToTable(
+      map({
+        mode: "municipio",
+        values: { 2024: { todas: { "54001": 12, "54003": 40 }, bucaramanga: { "54001": 9 }, cucuta: { "54001": 3 } } },
+        reserved: { 2024: { cucuta: ["54001"], todas: ["54003"] } },
+      }),
+      { campuses },
+    );
+    expect(conTotal.rows.map((row) => row.slice(1, 8))).toEqual([
+      [2024, "Bucaramanga", "54001", municipioName("54001"), "Norte de Santander", 9, null],
+      [2024, "Cúcuta", "54001", municipioName("54001"), "Norte de Santander", null, "< 5"],
+    ]);
+    expect(column(conTotal, "Campus")).not.toContain("Total institucional");
+    // Ni el total (12), ni lo que daría la resta (3), ni nada de lo que solo tenía el total.
+    expect(cellsOf(conTotal)).not.toContain("12");
+    expect(cellsOf(conTotal)).not.toContain("3");
+    expect(cellsOf(conTotal)).not.toContain("40");
+    expect(cellsOf(conTotal)).not.toContain("54003");
+    // Un mapa que solo trae el total no deja filas.
+    expect(mapToTable(map({ mode: "municipio", values: { 2024: { todas: { "54001": 12 } } } }), { campuses }).rows).toEqual([]);
   });
 });
 
@@ -919,15 +959,39 @@ describe("conjunto libre", () => {
     expect(column(table, "Docentes")).toEqual([10, 10, 12, 12]);
   });
 
-  it("un total nunca expone una celda de texto reservada: la cifra que no es número no entra ni sale", () => {
+  it("escribe la reserva que viene como texto en una columna de cifra, no una celda vacía", () => {
     const table = freeSetToTable({
       temporality: "sin_tiempo",
       columns,
-      rows: [dato(null, "Cúcuta", "< 5", null), dato(null, "Bucaramanga", 30, null), { year: null, kind: "total", label: "Total", cells: { sede: "oculto" } }],
+      rows: [dato(null, "Cúcuta", "< 5", 12.5), dato(null, "Bogotá", " < 5 ", null), dato(null, "Valledupar", "", null), dato(null, "Bucaramanga", "1.234,5", null)],
     });
-    expect(column(table, "Docentes")).toEqual([null, 30, 30]);
+    expect(column(table, "Docentes")).toEqual(["< 5", "< 5", null, 1234.5]);
+    expect(toCsvText(table)).toContain("\nCúcuta;< 5;12,5\nBogotá;< 5;\nValledupar;;\nBucaramanga;1234,5;");
+  });
+
+  it("un total nunca expone una celda reservada: lo que no es número no entra en la suma, y el texto de la fila no sale", () => {
+    const table = freeSetToTable({
+      temporality: "sin_tiempo",
+      columns,
+      rows: [
+        dato(null, "Cúcuta", "< 5", null),
+        dato(null, "Bucaramanga", 30, null),
+        { year: null, kind: "total", label: "Total", cells: { sede: "oculto", n: 33, pct: "< 5" } },
+      ],
+    });
+    // El total es el de las celdas publicadas: restarle las demás da cero, no la reservada.
+    expect(column(table, "Docentes")).toEqual(["< 5", 30, 30]);
+    expect(column(table, "Docentes (2)")).toEqual([null, null, null]);
     expect(column(table, "Sede")).toEqual(["Cúcuta", "Bucaramanga", null]);
     expect(toCsvText(table)).not.toContain("oculto");
+    expect(cellsOf(table)).not.toContain("33");
+    // Con todo el grupo en reserva no hay total que escribir.
+    const todo = freeSetToTable({
+      temporality: "sin_tiempo",
+      columns,
+      rows: [dato(null, "Cúcuta", "< 5", null), dato(null, "Bucaramanga", "< 5", null), { year: null, kind: "total", label: "Total", cells: {} }],
+    });
+    expect(column(todo, "Docentes")).toEqual(["< 5", "< 5", null]);
   });
 });
 

@@ -5,8 +5,13 @@
    las filas se sellan una a una. GSAP, como el módulo de reportes
    (reportes/movimiento.ts). Solo transform y opacity (o una propiedad
    personalizada que alimenta un transform), nada en bucle, todo interrumpible:
-   cada función mata antes lo que corra sobre los mismos nodos. Con movimiento
-   reducido ninguna hace nada y el estado final ya está en el DOM.
+   cada función mata antes lo que corra sobre los mismos nodos, y quien se
+   desmonta llama a cancelarMovimiento. Con movimiento reducido ninguna hace
+   nada y el estado final ya está en el DOM.
+
+   El movimiento acompaña, no decide: el sello tiene un tope de 420 ms contando
+   la última fila y un reloj propio, porque en una pestaña en segundo plano
+   GSAP no avanza y la descarga no puede quedarse esperándolo.
 
    Estructura que esperan las tres últimas (las usa el selector de descarga):
 
@@ -21,6 +26,8 @@
      Pone data-sealing en cada fila y anima --od-pick-seal (0 a 1, barrido) y
      --od-pick-fade (0 a 1, desvanece el sello). El CSS que los consume está en
      chart-export.css, bajo .od-pick__row[data-sealing]::after.
+   - cancelarMovimiento(raíz…): corta lo que corra sobre esos nodos y sus
+     descendientes, incluido el sello. Para el desmontaje.
    - recorrerCasillas(filas): pulsa la casilla (input) de cada fila; si la fila
      no tiene input, la fila misma.
    ========================================================================== */
@@ -79,13 +86,24 @@ export function entrarGrupos(container: HTMLElement | null): void {
   );
 }
 
-let selloEnCurso: (() => void) | null = null;
+/** Tope del sello, de la primera fila a la última ya desvanecida. */
+const SELLO_TOPE = 0.42;
+const SELLO_BARRIDO = 0.16;
+const SELLO_FUNDIDO = 0.12;
+const SELLO_ESCALON = 0.035;
 
-/** Sella las filas una a una (barrido ámbar de izquierda a derecha). Escalón de 35 ms, tope de 420 ms. Resuelve al terminar. */
+let selloEnCurso: { rows: HTMLElement[]; cortar: () => void } | null = null;
+
+/**
+ * Sella las filas una a una (barrido ámbar de izquierda a derecha, que se
+ * desvanece). Escalón de 35 ms como mucho; con muchas filas se aprieta para
+ * que todo, la última incluida, quepa en 420 ms. Resuelve al terminar o al
+ * cumplirse el tope, lo que pase antes.
+ */
 export function sellarFilas(rows: HTMLElement[]): Promise<void> {
   if (rows.length === 0 || sinMovimiento()) return Promise.resolve();
   // Un sello en curso se corta (y su promesa se resuelve) antes de empezar otro.
-  selloEnCurso?.();
+  selloEnCurso?.cortar();
   gsap.killTweensOf(rows);
   const limpiar = () => {
     rows.forEach((row) => {
@@ -94,27 +112,40 @@ export function sellarFilas(rows: HTMLElement[]): Promise<void> {
       row.style.removeProperty("--od-pick-fade");
     });
   };
-  const paso = Math.min(0.035, 0.42 / Math.max(1, rows.length - 1));
+  const porFila = SELLO_BARRIDO + SELLO_FUNDIDO;
+  const paso = Math.min(SELLO_ESCALON, (SELLO_TOPE - porFila) / Math.max(1, rows.length - 1));
   return new Promise((resolver) => {
-    const tl = gsap.timeline({
-      onComplete: () => {
-        selloEnCurso = null;
-        limpiar();
-        resolver();
-      },
-    });
-    selloEnCurso = () => {
+    const terminar = () => {
+      if (selloEnCurso?.cortar !== terminar) return;
       selloEnCurso = null;
+      window.clearTimeout(reloj);
       tl.kill();
       limpiar();
       resolver();
     };
+    const tl = gsap.timeline({ onComplete: terminar });
+    // GSAP se detiene con la pestaña oculta; el reloj no. Lo que tarde de más no se espera.
+    const reloj = window.setTimeout(terminar, SELLO_TOPE * 1000 + 60);
+    selloEnCurso = { rows, cortar: terminar };
     rows.forEach((row, n) => {
       tl.call(() => { row.dataset.sealing = ""; }, undefined, n * paso);
-      tl.fromTo(row, { "--od-pick-seal": 0, "--od-pick-fade": 0 }, { "--od-pick-seal": 1, duration: 0.2, ease: "power2.out" }, n * paso);
-      tl.to(row, { "--od-pick-fade": 1, duration: 0.16, ease: "power1.out" }, n * paso + 0.2);
+      tl.fromTo(row, { "--od-pick-seal": 0, "--od-pick-fade": 0 }, { "--od-pick-seal": 1, duration: SELLO_BARRIDO, ease: "power2.out" }, n * paso);
+      tl.to(row, { "--od-pick-fade": 1, duration: SELLO_FUNDIDO, ease: "power1.out" }, n * paso + SELLO_BARRIDO);
     });
   });
+}
+
+/**
+ * Corta lo que corra sobre estos nodos y sus descendientes: volteos, cascadas,
+ * pulsos y el sello (cuya promesa se resuelve). Lo llama quien se desmonta,
+ * para no dejar nada animando un nodo que ya no está.
+ */
+export function cancelarMovimiento(...raices: (HTMLElement | null | undefined)[]): void {
+  for (const raiz of raices) {
+    if (!raiz) continue;
+    gsap.killTweensOf([raiz, ...Array.from(raiz.querySelectorAll<HTMLElement>("*"))]);
+    if (selloEnCurso?.rows.some((row) => raiz.contains(row))) selloEnCurso.cortar();
+  }
 }
 
 /** Pulso muy corto de las casillas al marcar o quitar todos. */

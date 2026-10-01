@@ -6,11 +6,22 @@
    que la lista corre dentro y el pie se queda pegado abajo, con el color de la
    superficie del modal y una línea arriba. El sello de las filas
    (.od-pick__row[data-sealing]) lo define chart-export.css.
+
+   Los textos secundarios (contadores, oficina que reporta, nota) van en
+   --ink-secondary: --ink-muted no llega a 4,5:1 sobre el blanco.
    ========================================================================== */
 
 .od-pick {
+  /* Alto del pie pegajoso: lo que un control enfocado deja libre debajo al desplazarse. */
+  --od-pick-foot: 5.5rem;
   display: flex;
   flex-direction: column;
+}
+
+/* El pie tapa el final de la lista: al enfocar con el teclado, la fila queda por encima de él. */
+.od-pick__link,
+.od-pick__row input {
+  scroll-margin-block: var(--space-3) var(--od-pick-foot);
 }
 
 .od-pick__tools {
@@ -18,7 +29,7 @@
   align-items: center;
   gap: var(--space-2);
   margin-bottom: var(--space-3);
-  color: var(--ink-muted);
+  color: var(--ink-secondary);
   font-size: var(--text-sm);
 }
 
@@ -74,7 +85,7 @@
 
 .od-pick__count {
   margin-left: auto;
-  color: var(--ink-muted);
+  color: var(--ink-secondary);
   font-size: var(--text-xs);
   font-weight: 500;
   letter-spacing: 0;
@@ -112,7 +123,7 @@
 .od-pick__row small {
   display: block;
   margin-top: 2px;
-  color: var(--ink-muted);
+  color: var(--ink-secondary);
   font-size: var(--text-xs);
 }
 
@@ -137,7 +148,7 @@
 
 .od-pick__note {
   margin: var(--space-5) 0 var(--space-4);
-  color: var(--ink-muted);
+  color: var(--ink-secondary);
   font-size: var(--text-xs);
   line-height: var(--leading-normal);
 }
@@ -178,12 +189,13 @@
   gap: var(--space-3);
 }
 
-.od-pick__buttons .od-button:disabled {
-  opacity: 0.55;
-  cursor: not-allowed;
-}
+/* El aspecto de un botón deshabilitado es el general del portal
+   (.od-button:disabled y [aria-disabled="true"], en datos-abiertos.css). */
 
 @media (max-width: 480px) {
+  /* El pie se apila: estado y dos botones a todo el ancho. */
+  .od-pick { --od-pick-foot: 11rem; }
+
   .od-pick__footer {
     flex-direction: column;
     align-items: stretch;

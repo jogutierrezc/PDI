@@ -13,6 +13,8 @@
    cada tipo. Un bloque sin datos no se pinta y aquí tampoco se ofrece.
 
    · Un conjunto que la ficha muestra dos veces sale una sola: gana el primero.
+     El mapa por municipio que dibuja el tablero de la diversidad es de su
+     marco, también cuando otro mapa lo trae de pareja.
    · Los indicadores no se repiten: cada tablero exporta los suyos y, si la
      gráfica de evolución o la tabla dinámica muestran otros que ningún tablero
      tiene, esos van en una entrada aparte.
@@ -66,7 +68,11 @@ export type ExportKind =
   | "modelo";
 
 export interface ExportEntry {
-  /** Único y estable: "indicadores:<slot>", "desglose:<clave>", "mapa:<clave>", "libre:<conjunto>", "dei:<marco>"… */
+  /**
+   * Único y estable: "indicadores:<slot>", "desglose:<clave>", "mapa:<clave>", "libre:<conjunto>", "dei:<marco>"…
+   * Los indicadores que ningún tablero muestra llevan otro prefijo ("resto-indicadores:"),
+   * que ningún slot puede reclamar.
+   */
   id: string;
   kind: ExportKind;
   /** Texto de la fila en el selector: el título del conjunto. */
@@ -114,6 +120,8 @@ export const DEI_BREAKDOWNS = {
 export const DEI_INES = "ines-grupos";
 /** La cifra del DE se captura en el segundo periodo del año. */
 export const DEI_TERM = "B" as const;
+/** Id del marco del mapa de origen en el tablero de la diversidad. */
+export const DEI_MAP = "dei:mapa";
 /** Marcos del tablero de la diversidad, en el orden en que se leen. */
 export const DEI_FRAMES = ["corte", "etnico", "mapa", "discapacidad", "estratos", "genero-zona", "ines"] as const;
 
@@ -128,6 +136,9 @@ const joined = (sources: (string | undefined)[]): string | undefined =>
   [...new Set(sources.filter((s): s is string => Boolean(s)))].join(" · ") || undefined;
 
 const anyReserved = (items: BreakdownItem[] | undefined): boolean => (items ?? []).some((item) => item.reserved);
+
+/** Ids de los indicadores que ningún tablero muestra. Sin "indicadores:" delante: un slot llamado «otros» o «todos» no choca. */
+export const REST_INDICATORS = { all: "resto-indicadores:todos", others: "resto-indicadores:otros" } as const;
 
 /** ¿El desglose tiene alguna celda reservada, en la cifra del año o en un periodo? */
 function breakdownReserved(breakdown: Breakdown): boolean {
@@ -146,10 +157,12 @@ function breakdownHasItems(breakdown: Breakdown | undefined): breakdown is Break
   );
 }
 
-/** Mapa por municipio con algún código en reserva. */
+/** Mapa por municipio con algún código en reserva en un campus (el total institucional no se exporta). */
 function mapReserved(map: MapDataset): boolean {
   if (map.mode !== "municipio") return false;
-  return Object.values(map.reserved ?? {}).some((byCampus) => Object.values(byCampus ?? {}).some((codes) => (codes ?? []).length > 0));
+  return Object.values(map.reserved ?? {}).some((byCampus) =>
+    Object.entries(byCampus ?? {}).some(([campus, codes]) => campus !== ALL_CAMPUSES && (codes ?? []).length > 0),
+  );
 }
 
 /** ¿El mapa trae algún corte capturado? */
@@ -220,7 +233,7 @@ export function reportExports(report: Report, catalog: Catalog): ExportEntry[] {
     add(
       block,
       {
-        id: all ? "indicadores:todos" : "indicadores:otros",
+        id: all ? REST_INDICATORS.all : REST_INDICATORS.others,
         kind: "indicadores",
         label: all ? "Indicadores del informe" : "Otros indicadores del informe",
         detail: joined(rest.map((i) => i.source)),
@@ -419,6 +432,10 @@ export function reportExports(report: Report, catalog: Catalog): ExportEntry[] {
         break;
     }
   }
+  // El mapa del tablero de la diversidad puede haber entrado también como pareja
+  // (`mapWith`) de otro mapa: se queda en su marco, que es donde el tablero lo dibuja.
+  const origin = report.maps?.find((m) => m.mode === "municipio");
+  if (origin && taken.has(DEI_MAP)) return entries.filter((entry) => entry.id !== `mapa:${origin.id}`);
   return entries;
 }
 
@@ -480,7 +497,7 @@ function diversityEntries(report: Report, catalog: Catalog, block: ReportBlock, 
       if (!origin || !mapHasData(origin)) return;
       add(
         block,
-        { id: "dei:mapa", kind: "mapa", label: origin.title, detail: origin.source || grupo.source || undefined, group, reserved: mapReserved(origin) },
+        { id: DEI_MAP, kind: "mapa", label: origin.title, detail: origin.source || grupo.source || undefined, group, reserved: mapReserved(origin) },
         () => [file("diversidad", `mapa-${origin.id}`, () => mapToTable(origin, { campuses: catalog.campuses }))],
       );
     },
@@ -557,6 +574,7 @@ export function readmeText(report: Report, catalog: Pick<OpenDataCatalog, "cutof
     "Formato",
     "- Archivos CSV en UTF-8, con punto y coma (;) como separador y coma decimal: Excel en español los abre sin configurar nada.",
     "- Una casilla vacía es un dato sin reportar, no un cero.",
+    "- Un texto que empieza por =, +, - o @ lleva un apóstrofo (') delante, para que la hoja de cálculo no lo ejecute como fórmula. El apóstrofo se ve en la celda y no es parte del dato; los números negativos no lo llevan.",
     `- "< n" (por ejemplo "< 5") es reserva estadística: la celda tiene dato, pero tan pocos registros que no se publica su número.${reserved ? " Estos archivos traen celdas así." : ""}`,
     "- Los códigos DANE y DIVIPOLA empiezan a veces por cero (05, 08001). Si la hoja de cálculo lo quita, la columna de nombre de al lado dice de qué territorio se trata.",
     "- Cada archivo trae el conjunto completo: todos sus cortes y campus, no solo lo que la ficha tenía en pantalla.",

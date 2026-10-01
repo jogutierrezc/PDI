@@ -16,10 +16,17 @@
    con overflow oculto. El cuerpo y el pie son del portal (clases od-pick*); no
    se usa ModalActions, cuyo botón es el de la intranet.
 
+   Mientras prepara la descarga, el botón pulsado no se deshabilita de verdad
+   (aria-disabled): conserva el foco y sigue siendo el último de la trampa del
+   Modal, que cuenta como enfocables las casillas de un fieldset deshabilitado.
+   El diálogo se puede cerrar a media descarga; lo que llegue después no toca
+   nada (`vivo`), y el cierre programado se cancela al desmontar.
+
    Movimiento (csv-motion.ts): los grupos entran en cascada al abrir, marcar o
    quitar todos recorre las casillas, y al descargar las filas marcadas se
-   sellan mientras se prepara el archivo. Con movimiento reducido no hay nada de
-   eso y el contenido ya está visible.
+   sellan mientras se prepara el archivo. El sello acompaña, no retiene: tiene
+   su tope y «Listo» no lo espera más que eso. Con movimiento reducido no hay
+   nada de eso y el contenido ya está visible.
    ========================================================================== */
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -29,7 +36,7 @@ import { Modal } from "../../../components/ui/Modal";
 import type { CsvFile } from "../data/csv-export";
 import { downloadCsvFiles } from "../data/download";
 import type { ExportEntry } from "../data/export-registry";
-import { entrarGrupos, recorrerCasillas, sellarFilas } from "./csv-motion";
+import { cancelarMovimiento, entrarGrupos, recorrerCasillas, sellarFilas } from "./csv-motion";
 import "./export-selector.css";
 
 /** Lo que tarda el diálogo en cerrarse solo después de «Listo». */
@@ -74,8 +81,11 @@ export function ExportSelector({ reportName, zipName, entries, readme, onClose }
   const [resultado, setResultado] = useState("");
   const listaRef = useRef<HTMLDivElement>(null);
   const cierreRef = useRef<number | null>(null);
+  const vivo = useRef(true);
   const onCloseRef = useRef(onClose);
   onCloseRef.current = onClose;
+  // Estable: el Modal vuelve a montar su trampa de foco cada vez que cambia onClose.
+  const cerrar = useCallback(() => onCloseRef.current(), []);
 
   const grupos = useMemo(() => agrupar(entries), [entries]);
   const elegidos = useMemo(() => entries.filter((e) => marcados.has(e.id)), [entries, marcados]);
@@ -83,18 +93,24 @@ export function ExportSelector({ reportName, zipName, entries, readme, onClose }
   const ocupado = fase === "preparando" || fase === "listo";
 
   // Entrada en cascada, una sola vez. El contenido ya es visible: si el script
-  // falla, nada queda oculto.
+  // falla, nada queda oculto. Al desmontar se corta lo que siga moviéndose.
   useEffect(() => {
-    entrarGrupos(listaRef.current);
+    const lista = listaRef.current;
+    entrarGrupos(lista);
+    return () => cancelarMovimiento(lista);
   }, []);
 
-  // Al desmontar se cancela el cierre programado.
-  useEffect(
-    () => () => {
-      if (cierreRef.current !== null) window.clearTimeout(cierreRef.current);
-    },
-    [],
-  );
+  // Al desmontar se cancela el cierre programado, y lo que resuelva después no hace nada.
+  useEffect(() => {
+    vivo.current = true;
+    return () => {
+      vivo.current = false;
+      if (cierreRef.current !== null) {
+        window.clearTimeout(cierreRef.current);
+        cierreRef.current = null;
+      }
+    };
+  }, []);
 
   const filas = useCallback(
     () => Array.from(listaRef.current?.querySelectorAll<HTMLElement>("label.od-pick__row") ?? []),
@@ -123,19 +139,25 @@ export function ExportSelector({ reportName, zipName, entries, readme, onClose }
     setFase("preparando");
     try {
       // Una sola pieza baja como .csv suelto: sin LEEME ni zip.
+      // El sello resuelve solo al cumplir su tope (420 ms), también con la pestaña oculta.
       await Promise.all([
         sellarFilas(filasMarcadas),
         downloadCsvFiles(archivos, zipName, unico ? undefined : [{ name: "LEEME.txt", text: readme(elegidos) }]),
       ]);
+      // Cerrado a media descarga: este diálogo ya no existe y no programa nada.
+      if (!vivo.current) return;
       setResultado(
         unico
           ? `Listo: descargado ${conNombreCsv(archivos[0].filename)}`
           : `Listo: ${archivos.length} archivos descargados`,
       );
       setFase("listo");
-      cierreRef.current = window.setTimeout(() => onCloseRef.current(), CIERRE_MS);
+      cierreRef.current = window.setTimeout(() => {
+        cierreRef.current = null;
+        if (vivo.current) cerrar();
+      }, CIERRE_MS);
     } catch {
-      setFase("error");
+      if (vivo.current) setFase("error");
     }
   };
 
@@ -149,9 +171,11 @@ export function ExportSelector({ reportName, zipName, entries, readme, onClose }
           : `${elegidos.length} de ${entries.length} conjuntos`;
 
   const accion =
-    fase === "preparando" || fase === "listo"
+    fase === "preparando"
       ? "Preparando la descarga…"
-      : totalArchivos === 1
+      : fase === "listo"
+        ? "Descarga lista"
+        : totalArchivos === 1
         ? "Descargar CSV"
         : `Descargar ${totalArchivos} archivos (.zip)`;
 
@@ -159,7 +183,7 @@ export function ExportSelector({ reportName, zipName, entries, readme, onClose }
     <Modal
       title="Descargar datos en CSV"
       description={`Elige qué conjuntos del informe ${reportName} quieres. Cada uno baja con todos sus cortes y campus, tal como lo reporta su oficina.`}
-      onClose={onClose}
+      onClose={cerrar}
       size="form"
     >
       <div className="od-pick">
@@ -215,14 +239,16 @@ export function ExportSelector({ reportName, zipName, entries, readme, onClose }
             )}
           </div>
           <div className="od-pick__buttons">
-            <button type="button" className="od-button od-button--ghost" onClick={onClose} disabled={ocupado}>
+            <button type="button" className="od-button od-button--ghost" onClick={cerrar} disabled={ocupado}>
               Cancelar
             </button>
+            {/* Ocupado, sigue enfocable (aria-disabled): el foco no se cae del diálogo. */}
             <button
               type="button"
               className="od-button od-button--signal"
               onClick={descargar}
-              disabled={elegidos.length === 0 || ocupado}
+              disabled={!ocupado && elegidos.length === 0}
+              aria-disabled={ocupado || undefined}
             >
               {accion}
             </button>

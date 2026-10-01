@@ -12,7 +12,6 @@ import { assembleCatalog, fetchOpenDataRows } from "./repository";
 import type { Breakdown, BreakdownItem, CampusId, Indicator, MapDataset, OpenDataCatalog, Report, Term, ValueFormat } from "./types";
 import { ALL_YEARS, annualBasis, setPeriodSpan, TERMS } from "./terms";
 import { isWorldMap } from "./types";
-import { indicatorsToTable, toCsvText } from "./csv-export";
 import { downloadText } from "./download";
 import { formatReserved, RESERVE_DEFAULT, valueOf } from "./reserve";
 
@@ -262,13 +261,8 @@ export function formatCutoff(iso: string): string {
 }
 
 /* --- Descarga en CSV -------------------------------------------------------
-   Datos abiertos que no se pueden bajar no son abiertos. Separador punto y
-   coma y BOM: es lo que Excel en español abre sin preguntar. */
-
-/** Los indicadores del informe en CSV: los arma y los escribe csv-export.ts, como a todos los demás conjuntos. */
-export function reportToCsv(report: Report, years: number[], campuses: { id: CampusId; name: string }[]): string {
-  return toCsvText(indicatorsToTable({ reportName: report.name, indicators: report.indicators, years, campuses }));
-}
+   Datos abiertos que no se pueden bajar no son abiertos. Los CSV de la ficha
+   los arma y los escribe csv-export.ts, desde el registro (export-registry.ts). */
 
 // La descarga vive en download.ts, que no arrastra Supabase. Aquí se sigue ofreciendo.
 export { downloadText };

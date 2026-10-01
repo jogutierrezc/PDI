@@ -705,6 +705,8 @@ function ReportContent({ data, report, year, term, campus, setYear, setTerm, set
               type="button"
               className="od-button od-button--ghost"
               aria-haspopup="dialog"
+              aria-label="Descargar datos en CSV"
+              aria-describedby={exports.length === 0 ? "od-csv-sin-datos" : undefined}
               disabled={exports.length === 0}
               title={exports.length === 0 ? "Este informe todavía no tiene datos para descargar" : "Elegir qué datos descargar"}
               onClick={() => {
@@ -716,6 +718,12 @@ function ReportContent({ data, report, year, term, campus, setYear, setTerm, set
             >
               <Icon name="download" size={16} /> CSV
             </button>
+            {/* El motivo no puede vivir solo en `title`: un lector de pantalla no lo anuncia. */}
+            {exports.length === 0 && (
+              <span id="od-csv-sin-datos" className="sr-only">
+                Este informe todavía no tiene datos para descargar.
+              </span>
+            )}
             <BulletinDownload catalog={data} report={report} />
           </span>
         </div>

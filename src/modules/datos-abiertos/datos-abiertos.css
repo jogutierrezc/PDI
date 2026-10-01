@@ -287,11 +287,22 @@
   border-color: var(--line-strong);
 }
 
-@media (hover: hover) and (pointer: fine) {
-  .od-button--signal:hover { background: var(--od-signal-strong); }
+/* Deshabilitado: se ve apagado y no responde ni a la pulsación ni al puntero.
+   aria-disabled es para el botón que debe conservar el foco mientras trabaja. */
+.od-button:disabled,
+.od-button[aria-disabled="true"] {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
 
-  .od-button--ghost:hover,
-  .od-button--line:hover {
+.od-button:disabled:active,
+.od-button[aria-disabled="true"]:active { transform: none; }
+
+@media (hover: hover) and (pointer: fine) {
+  .od-button--signal:not(:disabled, [aria-disabled="true"]):hover { background: var(--od-signal-strong); }
+
+  .od-button--ghost:not(:disabled, [aria-disabled="true"]):hover,
+  .od-button--line:not(:disabled, [aria-disabled="true"]):hover {
     color: var(--od-signal-text);
     border-color: var(--od-signal);
   }

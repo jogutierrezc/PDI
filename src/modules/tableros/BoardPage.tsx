@@ -67,6 +67,11 @@ export function BoardPage() {
 
   const current = page ?? board?.pages[0]?.slug ?? "panorama";
   const shown = views.filter((v) => v.page === current);
+  // Varias vistas pueden leer la misma tabla: su CSV es uno, y lo ofrece solo la primera de la página.
+  const firstOfDataset = new Map<string, string>();
+  for (const view of shown) {
+    if (!firstOfDataset.has(view.datasetId) && datasets.some((d) => d.id === view.datasetId)) firstOfDataset.set(view.datasetId, view.id);
+  }
   const pagesWithViews = (board?.pages ?? []).filter((p) => views.some((v) => v.page === p.slug));
 
   return (
@@ -138,10 +143,14 @@ export function BoardPage() {
                           source={dataset.source || undefined}
                           exportName={`${unit?.slug ?? "tablero"}-${title}`}
                           stamp={unit?.name ?? board.title}
-                          csv={{
-                            files: [{ filename: `${slugify(unit?.name ?? board.title)}-${slugify(dataset.title, "datos")}.csv`, build: () => freeSetToTable(dataset) }],
-                            name: dataset.title,
-                          }}
+                          csv={
+                            firstOfDataset.get(view.datasetId) === view.id
+                              ? {
+                                  files: [{ filename: `${slugify(unit?.name ?? board.title)}-${slugify(dataset.title, "datos")}.csv`, build: () => freeSetToTable(dataset) }],
+                                  name: dataset.title,
+                                }
+                              : undefined
+                          }
                         >
                           <ObsChart dataset={asObsDataset(dataset)} view={drawable} />
                         </ChartFrame>

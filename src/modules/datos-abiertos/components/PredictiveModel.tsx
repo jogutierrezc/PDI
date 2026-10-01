@@ -78,8 +78,9 @@ export function PredictiveModel({ model, anchor, title, csv }: { model: ModelDat
 
         <div className="od-model__grid">
           <Forest model={model} csv={csv} />
-          <Quality model={model} csv={csv} />
-          <Sample model={model} csv={csv} />
+          {/* El modelo es un solo archivo: la acción «CSV» va una vez, en el primer marco. */}
+          <Quality model={model} />
+          <Sample model={model} />
         </div>
 
         {model.note && <p className="od-model__note">{model.note}</p>}
@@ -327,7 +328,7 @@ function Forest({ model, csv }: { model: ModelData; csv?: CsvSource }) {
 
 /* --- Calidad ------------------------------------------------------------------------ */
 
-function Quality({ model, csv }: { model: ModelData; csv?: CsvSource }) {
+function Quality({ model }: { model: ModelData }) {
   const spec = model.spec;
   const q = classificationOf(spec);
   const c = spec.classification;
@@ -344,7 +345,6 @@ function Quality({ model, csv }: { model: ModelData; csv?: CsvSource }) {
       subtitle={`Tabla de clasificación · punto de corte ${fmtPctRound(spec.fit.cutoff * 100)}`}
       source={model.source}
       exportName="modelo-calidad"
-      csv={csv}
     >
       <div className="od-model__howto">
         <p>
@@ -427,7 +427,7 @@ function Quality({ model, csv }: { model: ModelData; csv?: CsvSource }) {
 /* --- Muestra ------------------------------------------------------------------------ */
 
 
-function Sample({ model, csv }: { model: ModelData; csv?: CsvSource }) {
+function Sample({ model }: { model: ModelData }) {
   const spec = model.spec;
   const ref = useRef<HTMLDivElement>(null);
   const seen = useInView(ref);
@@ -438,7 +438,6 @@ function Sample({ model, csv }: { model: ModelData; csv?: CsvSource }) {
       subtitle={`${count(spec.sample.n)} estudiantes · cohortes ${spec.sample.cohorts} · ${spec.sample.source}`}
       source={model.source}
       exportName="modelo-muestra"
-      csv={csv}
     >
       <p className="od-model__population">{spec.sample.population}</p>
       <div ref={ref} className="od-model__sample" data-seen={seen || undefined}>

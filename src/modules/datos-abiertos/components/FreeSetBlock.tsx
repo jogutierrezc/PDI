@@ -14,6 +14,10 @@
    Debajo de las gráficas, plegada, la tabla de origen: las filas tal como se
    cargaron. Sale una vez por conjunto (la ficha la pide en su último bloque)
    y no si el conjunto ya tiene su propia vista de tabla.
+
+   El conjunto es un solo archivo, así que la acción «CSV» va una vez por
+   bloque: junto a la tabla de origen cuando sale y, si no, en el pie de la
+   primera vista. Nunca en todas.
    ========================================================================== */
 
 import { useState } from "react";
@@ -65,6 +69,8 @@ export function FreeSetBlock({
   if (!views.length || !set.rows.length) return null;
   const usesYear = set.temporality === "anual" && views.some((v) => !USES_ALL_YEARS.includes(v.type));
   const showSource = withSource && !set.views.some((v) => v.type === "tabla" && viewProblems(set, v).length === 0);
+  // Una acción «CSV» por conjunto: en la tabla de origen si sale; si no, en la primera vista con marco.
+  const csvView = showSource ? undefined : views.find((v) => !hasOwnFrame(v));
 
   return (
     <section className="od-section od-free" aria-labelledby={anchor}>
@@ -94,7 +100,13 @@ export function FreeSetBlock({
 
         <div className="od-free__grid">
           {views.map((view) => (
-            <FreeViewPanel key={view.key} set={set} view={view} year={set.temporality === "anual" && !USES_ALL_YEARS.includes(view.type) ? year : null} csv={csv} />
+            <FreeViewPanel
+              key={view.key}
+              set={set}
+              view={view}
+              year={set.temporality === "anual" && !USES_ALL_YEARS.includes(view.type) ? year : null}
+              csv={view === csvView ? csv : undefined}
+            />
           ))}
         </div>
 

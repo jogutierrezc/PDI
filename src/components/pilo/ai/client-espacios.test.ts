@@ -9,6 +9,8 @@ describe("el pedido de «preguntar»: portal y rol (0113)", () => {
     const before = JSON.stringify({ action: "preguntar", portal: "pregunta", question: "¿Cuántos estudiantes hay?", history: HISTORY, stream: true });
     expect(JSON.stringify(askBody("¿Cuántos estudiantes hay?", HISTORY))).toBe(before);
     expect(JSON.stringify(askBody("¿Cuántos estudiantes hay?", HISTORY, {}))).toBe(before);
+    // Sin cuenta y sin preferencias de visitante (0120), tampoco cambia.
+    expect(JSON.stringify(askBody("¿Cuántos estudiantes hay?", HISTORY, { visitor: null }))).toBe(before);
   });
 
   it("en Enseñanza lleva su portal y el rol de quien pregunta", () => {

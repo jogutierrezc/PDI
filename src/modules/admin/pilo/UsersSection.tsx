@@ -32,7 +32,13 @@ const FILTERS: { id: PiloRol | ""; label: string }[] = [
   { id: "administrativo", label: "Administrativos" },
 ];
 
-const day = (iso: string | null) => (iso ? new Date(iso).toLocaleDateString("es-CO", { day: "numeric", month: "short", year: "numeric" }) : "—");
+const MONTHS = ["ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "sept", "oct", "nov", "dic"];
+
+/** «28 sept 2026»: corta, para que la tabla quepa. */
+const day = (iso: string | null) => {
+  const d = iso ? new Date(iso) : null;
+  return d && Number.isFinite(d.getTime()) ? `${d.getDate()} ${MONTHS[d.getMonth()]} ${d.getFullYear()}` : "—";
+};
 
 function usePiloUsers() {
   return useQuery({
@@ -82,7 +88,7 @@ export function UsersSection() {
 
   return (
     <Group
-      title="Usuarios de Pilo"
+      title="Cuentas registradas"
       aside={
         <small role="status">
           {missing ? (

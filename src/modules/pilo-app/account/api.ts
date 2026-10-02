@@ -46,7 +46,14 @@ async function call<T>(body: Record<string, unknown>, withSession = false): Prom
       body: JSON.stringify(body),
     });
   } catch {
-    throw new CuentaError(cuentaMessage("red"), "red");
+    // El navegador no deja leer la respuesta: o no hay red, o la función no está desplegada (la plataforma
+    // responde sin las cabeceras que el navegador pide). Una consulta sin leer la respuesta distingue las dos.
+    const reachable = await fetch(`${base}/functions/v1/pilo-cuentas`, { method: "GET", mode: "no-cors", cache: "no-store" }).then(
+      () => true,
+      () => false,
+    );
+    const code: CuentaCode = reachable ? "sin_funcion" : "red";
+    throw new CuentaError(cuentaMessage(code), code);
   }
   let parsed: unknown = null;
   try {

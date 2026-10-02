@@ -1,7 +1,8 @@
 import { describe, expect, it } from "vitest";
 import type { PiloAiConfig, SpaceConfig } from "../../components/pilo/ai/config";
 import { ASK_SPACES } from "../pregunta/space";
-import { spaceDoor } from "./access";
+import { extrasFor } from "../../components/pilo/ai/extras";
+import { extrasRole, spaceDoor } from "./access";
 
 const U = ASK_SPACES.planeacion;
 const E = ASK_SPACES.ensenanza;
@@ -59,6 +60,38 @@ describe("quién entra a cada Pilo en la app: lo mismo que en su página", () =>
     const r = rules({ pregunta: { on: true, aud: "sesion", welcome: true, ai: true } });
     expect(spaceDoor(r, U, null)).toMatchObject({ state: "sesion", message: U.gate.login });
     expect(spaceDoor(r, U, "consulta").state).toBe("abierto");
+  });
+
+  it("una cuenta de Pilo activa cuenta como sesión, sin rol de intranet (0120)", () => {
+    const r = rules({ pregunta: { on: true, aud: "sesion", welcome: true, ai: true }, spaces: { ensenanza: ficha({ aud: "sesion" }) } });
+    expect(spaceDoor(r, U, null, false).state).toBe("sesion");
+    expect(spaceDoor(r, U, null, true).state).toBe("abierto");
+    expect(spaceDoor(r, E, null, true).state).toBe("abierto");
+    // Y su voz: con sesión, la oficial.
+    expect(spaceDoor(r, U, null, true).voice.advanced).toBe(true);
+    expect(spaceDoor(r, U, null, false).voice.advanced).toBe(false);
+    // Lo público sigue abierto con cuenta o sin ella.
+    expect(spaceDoor(rules(), U, null, true).state).toBe("abierto");
+  });
+
+  it("una cuenta de Pilo nunca cuenta como administración", () => {
+    const r = rules({ pregunta: { on: true, aud: "admin", welcome: true, ai: true }, spaces: { ensenanza: ficha({ aud: "admin" }) } });
+    expect(spaceDoor(r, U, null, true).state).toBe("cerrado");
+    expect(spaceDoor(r, E, null, true).state).toBe("cerrado");
+    // Ni abre un Pilo apagado.
+    expect(spaceDoor(rules({ spaces: { ensenanza: ficha({ on: false }) } }), E, null, true).state).toBe("cerrado");
+  });
+
+  it("las funciones ampliadas: una cuenta de Pilo entra como «miembro»", () => {
+    expect(extrasRole(null, false)).toBeNull();
+    expect(extrasRole(null, true)).toBe("miembro");
+    // El rol de la intranet manda si lo hay.
+    expect(extrasRole("admin", true)).toBe("admin");
+    expect(extrasRole("consulta", false)).toBe("consulta");
+    const all = { planeacion: { filesAud: "sesion" as const, codeAud: "admin" as const, fileMaxMb: 10 } };
+    expect(extrasFor(all, "planeacion", extrasRole(null, true))).toMatchObject({ files: true, code: false });
+    expect(extrasFor(all, "planeacion", extrasRole(null, false))).toMatchObject({ files: false, code: false });
+    expect(extrasFor(all, "planeacion", extrasRole("admin", false))).toMatchObject({ files: true, code: true });
   });
 
   it("solo administración: los demás lo ven cerrado", () => {

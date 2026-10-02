@@ -51,7 +51,13 @@ describe("quién puede usar las funciones ampliadas", () => {
 
   it("lo que no se entiende queda apagado, y los topes dentro de sus límites", () => {
     expect(extraSettings(null)).toMatchObject({ filesAud: "nadie", codeAud: "nadie" });
-    expect(extraSettings({ files_aud: "todos", code_aud: "sesion", file_max_mb: 99, file_daily: -3, code_max_tokens: 100 })).toEqual({ filesAud: "nadie", codeAud: "sesion", fileMaxMb: 25, fileDaily: 0, codeMaxTokens: 400 });
+    // Sin los topes de las cuentas de Pilo (0120) en la fila, quedan los de partida.
+    expect(extraSettings({ files_aud: "todos", code_aud: "sesion", file_max_mb: 99, file_daily: -3, code_max_tokens: 100 })).toEqual({ filesAud: "nadie", codeAud: "sesion", fileMaxMb: 25, fileDaily: 0, codeMaxTokens: 400, memberFactor: 3, memberMaxTokens: 1200 });
+    expect(extraSettings({ member_factor: 99, member_max_tokens: 10 })).toMatchObject({ memberFactor: 20, memberMaxTokens: 400 });
+    // Una cuenta de Pilo entra como «miembro»: vale para «Con sesión», nunca para «Solo administración».
+    expect(extraAllowed("sesion", "miembro")).toBe(true);
+    expect(extraAllowed("admin", "miembro")).toBe(false);
+    expect(extraAllowed("nadie", "miembro")).toBe(false);
   });
 
   it("la página lee lo público por espacio; sin la migración, nada", () => {

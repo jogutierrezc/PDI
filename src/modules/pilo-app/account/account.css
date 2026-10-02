@@ -517,11 +517,9 @@
 .pc-terms ul {
   display: grid;
   gap: 6px;
-  max-height: 168px;
   margin: 0;
-  padding: 0 4px 0 18px;
-  overflow-y: auto;
-  overscroll-behavior: contain;
+  padding: 0 0 0 18px;
+  list-style: disc;
   font-size: 0.8125rem;
   color: var(--c-ink2);
 }

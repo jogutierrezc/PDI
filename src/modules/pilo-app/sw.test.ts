@@ -111,6 +111,7 @@ describe("el manifiesto", () => {
     start_url: string;
     scope: string;
     display: string;
+    display_override?: string[];
     theme_color: string;
     background_color: string;
     icons: { src: string; sizes: string; purpose?: string }[];
@@ -122,6 +123,9 @@ describe("el manifiesto", () => {
     expect(manifest.start_url).toBe(APP_BASE);
     expect(manifest.scope).toBe(APP_BASE);
     expect(manifest.display).toBe("standalone");
+    // En el computador se instala igual: su propia ventana, sin la barra del navegador; lo primero que se intenta es lo de siempre.
+    expect(manifest.display_override?.[0]).toBe("standalone");
+    expect(manifest.display_override).not.toContain("browser");
     expect(manifest.theme_color).toMatch(/^#[0-9a-f]{6}$/);
     expect(manifest.background_color).toMatch(/^#[0-9a-f]{6}$/);
   });

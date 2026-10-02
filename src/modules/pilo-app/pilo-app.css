@@ -1427,24 +1427,18 @@
   color: var(--c-link);
 }
 
+/* Con más filas de las que caben, el menú se desplaza: ninguna fila se encoge para hacerle sitio a otra. */
+.pa-menu-body {
+  grid-auto-rows: max-content;
+}
+
 .pa-mi--go {
   text-decoration: none;
   color: inherit;
 }
 
-.pa-mi--go strong {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.pa-mi--go strong .pa-i {
-  width: 18px;
-  height: 18px;
-}
-
 .pa-mi--go em {
-  margin-left: auto;
+  margin-left: 8px;
   padding: 1px 8px;
   border-radius: var(--radius-pill);
   background: var(--c-chip);
@@ -1455,7 +1449,7 @@
 }
 
 /* La persona: con cuenta, su nombre, su perfil y su usuario; sin ella, «Crear cuenta / Entrar». */
-.pa-me {
+.pa-who {
   display: grid;
   grid-template-columns: 40px minmax(0, 1fr);
   gap: 10px;
@@ -1470,24 +1464,24 @@
   transition: transform var(--dur-press) var(--ease-out), border-color var(--dur-fast) ease;
 }
 
-.pa-me b,
-.pa-me small {
+.pa-who b,
+.pa-who small {
   display: block;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.pa-me b {
+.pa-who b {
   font-size: 0.9rem;
 }
 
-.pa-me small {
+.pa-who small {
   font-size: 0.75rem;
   color: var(--c-ink2);
 }
 
-.pa-me[aria-current="page"] {
+.pa-who[aria-current="page"] {
   border-color: currentColor;
 }
 
@@ -1541,7 +1535,7 @@
   color: var(--c-link);
 }
 
-.pa-me:active,
+.pa-who:active,
 .pa-sl:active,
 .pa-side__two button:active {
   transform: scale(0.97);
@@ -1763,11 +1757,11 @@
     color: var(--c-bar-muted);
   }
 
-  .pa-side .pa-me {
+  .pa-side .pa-who {
     border-color: var(--pa-side-line);
   }
 
-  .pa-side .pa-me small,
+  .pa-side .pa-who small,
   .pa-side .pa-join p {
     color: var(--c-bar-muted);
   }
@@ -1792,9 +1786,12 @@
     text-underline-offset: 3px;
   }
 
-  .pa-side .pa-me[aria-current="page"],
-  .pa-side .pa-join__prefs[aria-current="page"] {
+  .pa-side .pa-who[aria-current="page"] {
     box-shadow: inset 3px 0 0 currentColor;
+  }
+
+  .pa-side .pa-join__prefs[aria-current="page"] {
+    text-decoration-thickness: 2px;
   }
 
   /* Las hojas (fuentes, la invitación) se abren sobre la conversación, no sobre la barra lateral. */
@@ -1811,7 +1808,7 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .pa-me:active,
+  .pa-who:active,
   .pa-sl:active,
   .pa-side__two button:active {
     transform: none;

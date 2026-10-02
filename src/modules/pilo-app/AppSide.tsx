@@ -51,7 +51,7 @@ export interface Person {
 export function PersonBlock({ person, current = false, onGo }: { person: Person; current?: boolean; onGo?: () => void }) {
   if (person.card) {
     return (
-      <Link className="pa-me" to={APP_PROFILE} aria-current={current ? "page" : undefined} onClick={onGo}>
+      <Link className="pa-who" to={APP_PROFILE} aria-current={current ? "page" : undefined} onClick={onGo}>
         <span className="pa-avatar" aria-hidden="true">
           {person.card.initial}
         </span>
@@ -64,7 +64,7 @@ export function PersonBlock({ person, current = false, onGo }: { person: Person;
   }
   if (person.intranet) {
     return (
-      <Link className="pa-me" to={APP_PROFILE} aria-current={current ? "page" : undefined} onClick={onGo}>
+      <Link className="pa-who" to={APP_PROFILE} aria-current={current ? "page" : undefined} onClick={onGo}>
         <span className="pa-avatar" aria-hidden="true">
           {person.intranet.trim().charAt(0).toUpperCase() || "P"}
         </span>

@@ -107,10 +107,20 @@ describe("los cinco temas", () => {
     }
   });
 
-  it("los colores de la app viven solo en la hoja de temas", () => {
-    const main = strip(readFileSync(resolve(DIR, "pilo-app.css"), "utf8"));
+  it.each(["pilo-app.css", "account/account.css"])("los colores de la app viven solo en la hoja de temas (%s)", (file) => {
+    const main = strip(readFileSync(resolve(DIR, file), "utf8"));
     // Ningún color escrito a mano: ni hexadecimal, ni rgb(), ni hsl(). (#000 solo como máscara: no es un color que se vea.)
     const loose = [...main.matchAll(/#[0-9a-fA-F]{3,8}\b|rgba?\(|hsla?\(/g)].map((m) => m[0]).filter((c) => c !== "#000");
     expect(loose).toEqual([]);
+  });
+
+  it("los campos de la cuenta van a 16 px (con menos, iOS acerca la página) y lo que se toca mide 44 px o más", () => {
+    const css = strip(readFileSync(resolve(DIR, "account/account.css"), "utf8"));
+    const rule = (selector: string) => css.split("}").find((block) => block.split("{")[0].split(",").some((s) => s.trim() === selector))?.split("{")[1] ?? "";
+    expect(rule(".pc-field input")).toMatch(/font:\s*500 16px/);
+    for (const selector of [".pc-field input", ".pc-seg button", ".pc-quiet", ".pc-chip", ".pc-check"]) {
+      const height = Number(rule(selector).match(/min-height:\s*(\d+)px/)?.[1] ?? 0);
+      expect(height, selector).toBeGreaterThanOrEqual(44);
+    }
   });
 });

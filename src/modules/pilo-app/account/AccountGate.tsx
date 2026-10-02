@@ -338,9 +338,9 @@ export function AccountGate({ voice, voiceOn, onVoice, theme, onTheme, account, 
     setNotice(
       expired
         ? { tone: "info", text: "Ese enlace venció o ya se usó. Si ya confirmó su correo, entre con su usuario; si no, escriba su usuario y pida otro correo con «Reenviar el correo»." }
-        : { tone: "ok", text: "Su correo quedó confirmado. Entre con su usuario y su contraseña." },
+        : { tone: "info", text: "Si ya abrió el enlace de su correo, su cuenta quedó confirmada: entre con su usuario y su contraseña." },
     );
-    say(expired ? "Ese enlace ya no sirve. Entre con su usuario, o pida otro correo." : "¡Su correo quedó confirmado! Entre con su usuario de Pilo.", expired ? "atento" : "feliz", expired ? "atento" : "emocionado");
+    say(expired ? "Ese enlace ya no sirve. Entre con su usuario, o pida otro correo." : "Ya casi. Entre con su usuario de Pilo para terminar.", expired ? "atento" : "feliz", expired ? "atento" : "emocionado");
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [mode, pending, account]);
 

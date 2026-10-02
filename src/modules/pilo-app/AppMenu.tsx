@@ -97,7 +97,6 @@ export function AppMenu({
 
         <Link className="pa-mi pa-mi--line pa-mi--go" to={APP_SAVED} onClick={() => onClose()}>
           <strong>
-            {Icon.mark}
             Respuestas guardadas
             {person.saved !== null && <em aria-label={`${person.saved} guardadas`}>{person.saved}</em>}
           </strong>

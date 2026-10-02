@@ -24,6 +24,7 @@
 
 import { useEffect, useState } from "react";
 import type { CSSProperties } from "react";
+import { cutTable, showsTotal, sumOfParts } from "../data/breakdown-total";
 import { formatReserved, formatValue, formatWithUnit } from "../data/open-data";
 import { ALL_YEARS, ANNUAL_RULE_LABEL, cutCode, cutCodeLabel, cutLabel, fromCutCode, termLabel, TERMS } from "../data/terms";
 import type { Breakdown, BreakdownItem, Term } from "../data/types";
@@ -80,10 +81,9 @@ export function BreakdownChart({ breakdown, year, term, years, setYear, setCut, 
   const labels = Array.from(new Set(available.flatMap(cutsOf).flatMap((cut) => itemsAt(cut).map((item) => item.label))));
   const valueAt = (label: string, cut: Cut) => itemsAt(cut).find((item) => item.label === label)?.value ?? null;
   const reservedAt = (label: string, cut: Cut) => Boolean(itemsAt(cut).find((item) => item.label === label)?.reserved);
-  const totalAt = (cut: Cut) => {
-    const parts = labels.map((label) => valueAt(label, cut)).filter((v): v is number => v !== null);
-    return parts.length ? parts.reduce((a, b) => a + b, 0) : null;
-  };
+  const totalAt = (cut: Cut) => sumOfParts(labels.map((label) => valueAt(label, cut)));
+  // El total se nombra solo si el desglose lo pide (intranet → «Mostrar total»).
+  const namesTotal = showsTotal(breakdown);
 
   // El corte que se lee: el elegido aquí; si no, el periodo de la ficha; si ese
   // año no lo tiene, su último corte con dato (un año solo anual lee el año).
@@ -131,6 +131,10 @@ export function BreakdownChart({ breakdown, year, term, years, setYear, setCut, 
     { value: "lineas" as const, label: "Líneas" },
     ...(hasPeriods ? [{ value: "combinada" as const, label: "Líneas y barras" }] : []),
   ];
+
+  // «Ver datos por corte»: el total solo sale en partes de un todo y si el desglose lo pide.
+  const withTotal = partsOfWhole && namesTotal;
+  const table = cutTable(labels, cuts.map((cut) => ({ label: cutLabel(cut.year, cut.term), values: labels.map((label) => valueAt(label, cut)) })), withTotal);
 
   const selectedItems = selected ? itemsAt(selected) : [];
   // Cuántas categorías del corte se callan por el umbral. Va en el subtítulo
@@ -234,7 +238,7 @@ export function BreakdownChart({ breakdown, year, term, years, setYear, setCut, 
             {cuts.map((cut, index) => {
               const total = totalAt(cut);
               const description = [
-                `${cutLabel(cut.year, cut.term)}: total ${formatWithUnit(total, breakdown.format, breakdown.unit)}`,
+                namesTotal ? `${cutLabel(cut.year, cut.term)}: total ${formatWithUnit(total, breakdown.format, breakdown.unit)}` : cutLabel(cut.year, cut.term),
                 ...labels.map((label) => {
                   const v = valueAt(label, cut);
                   return `${label} ${formatWithUnit(v, breakdown.format, breakdown.unit)}${v !== null && total ? ` (${oneDecimal.format((v / total) * 100)} %)` : ""}`;
@@ -258,7 +262,7 @@ export function BreakdownChart({ breakdown, year, term, years, setYear, setCut, 
                     setView(partsOfWhole ? "circular" : "barras");
                   }}
                 >
-                  <span className="od-stack100__total">{formatValue(total, breakdown.format)}</span>
+                  {namesTotal && <span className="od-stack100__total">{formatValue(total, breakdown.format)}</span>}
                   <span className="od-stack100__track">
                     {labels.map((label, i) => {
                       const v = valueAt(label, cut);
@@ -283,9 +287,11 @@ export function BreakdownChart({ breakdown, year, term, years, setYear, setCut, 
           {focusCut && (
             <div className="od-breakdown__detail" aria-live="polite">
               <strong>{cutLabel(focusCut.year, focusCut.term)}</strong>
-              <span>
-                Total <b>{formatWithUnit(totalAt(focusCut), breakdown.format, breakdown.unit)}</b>
-              </span>
+              {namesTotal && (
+                <span>
+                  Total <b>{formatWithUnit(totalAt(focusCut), breakdown.format, breakdown.unit)}</b>
+                </span>
+              )}
               {labels.map((label, i) => {
                 const v = valueAt(label, focusCut);
                 const total = totalAt(focusCut);
@@ -352,17 +358,15 @@ export function BreakdownChart({ breakdown, year, term, years, setYear, setCut, 
             </caption>
             <thead>
               <tr>
-                <th scope="col">Corte</th>
-                {labels.map((label) => (
-                  <th key={label} scope="col">
+                {table.header.map((label, index) => (
+                  <th key={`${index}-${label}`} scope="col">
                     {label}
                   </th>
                 ))}
-                {partsOfWhole && <th scope="col">Total</th>}
               </tr>
             </thead>
             <tbody>
-              {cuts.map((cut) => (
+              {cuts.map((cut, index) => (
                 <tr key={cutLabel(cut.year, cut.term)} data-selected={sameCut(cut, selected) || undefined}>
                   <th scope="row">{cutLabel(cut.year, cut.term)}</th>
                   {labels.map((label) => (
@@ -370,7 +374,7 @@ export function BreakdownChart({ breakdown, year, term, years, setYear, setCut, 
                       {formatValue(valueAt(label, cut), breakdown.format)}
                     </td>
                   ))}
-                  {partsOfWhole && <td>{formatValue(totalAt(cut), breakdown.format)}</td>}
+                  {withTotal && <td>{formatValue(table.rows[index].total ?? null, breakdown.format)}</td>}
                 </tr>
               ))}
             </tbody>

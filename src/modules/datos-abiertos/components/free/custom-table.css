@@ -1,0 +1,250 @@
+/* =============================================================================
+   Tabla personalizada (CustomTable.tsx).
+
+   Los tonos salen de los tokens del sistema: los de estado para bien, atención
+   y riesgo, la superficie elevada para el neutro y tres pasos de la escala azul
+   secuencial. Cada tono declara su fondo, su tinta y el color de su glifo; el
+   texto de la celda va siempre en la tinta del tono (≥ 4.5:1 en los dos temas,
+   medido en custom-table.test.ts). Ningún color, radio ni duración a mano.
+
+   El fondo de una celda con tono se pinta como imagen sobre la superficie: los
+   tonos suaves del tema oscuro son translúcidos, y la columna fija tiene que
+   tapar lo que pasa por debajo al desplazar.
+   ========================================================================== */
+
+.od-ctable {
+  display: grid;
+  gap: var(--space-4);
+  min-width: 0;
+}
+
+.od-ctable [data-tone="bien"] { --tone: var(--status-done-soft); --tone-ink: var(--ink); --tone-mark: var(--status-done); }
+.od-ctable [data-tone="atencion"] { --tone: var(--status-pending-soft); --tone-ink: var(--ink); --tone-mark: var(--status-pending); }
+.od-ctable [data-tone="riesgo"] { --tone: var(--status-risk-soft); --tone-ink: var(--ink); --tone-mark: var(--status-risk); }
+.od-ctable [data-tone="neutro"] { --tone: var(--od-board-raised); --tone-ink: var(--ink); --tone-mark: var(--ink-secondary); }
+.od-ctable [data-tone="seq-1"] { --tone: var(--od-seq-1); --tone-ink: var(--od-seq-ink-light); --tone-mark: var(--od-seq-ink-light); }
+.od-ctable [data-tone="seq-2"] { --tone: var(--od-seq-3); --tone-ink: var(--od-seq-ink-light); --tone-mark: var(--od-seq-ink-light); }
+.od-ctable [data-tone="seq-3"] { --tone: var(--od-seq-6); --tone-ink: var(--od-seq-ink-dark); --tone-mark: var(--od-seq-ink-dark); }
+
+/* --- La caja que se desplaza -------------------------------------------------- */
+
+.od-ctable__scroll {
+  max-width: 100%;
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  background: var(--od-surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-xs);
+  scrollbar-color: var(--line-strong) transparent;
+}
+
+.od-ctable__scroll:focus-visible { outline: 2px solid var(--brand-blue); outline-offset: 2px; }
+
+.od-ctable__table {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+  font-size: var(--text-sm);
+  font-variant-numeric: tabular-nums;
+}
+
+.od-ctable__table th,
+.od-ctable__table td {
+  padding: var(--space-3) var(--space-4);
+  text-align: left;
+  vertical-align: top;
+  border-bottom: 1px solid var(--line-faint);
+}
+
+.od-ctable__table tbody tr:last-child > * { border-bottom: 0; }
+
+.od-ctable__table thead th {
+  color: var(--ink-secondary);
+  font-family: var(--font-sign);
+  font-size: 0.95rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  vertical-align: bottom;
+  background: var(--od-board-raised);
+  border-bottom: 1px solid var(--line-strong);
+}
+
+.od-ctable__table thead th small {
+  display: block;
+  color: var(--ink-secondary);
+  font-family: var(--font-sans);
+  font-size: var(--text-2xs);
+  font-weight: 600;
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+.od-ctable__table tbody th,
+.od-ctable__table tbody td {
+  color: var(--tone-ink, var(--ink));
+  background-color: var(--od-surface);
+  background-image: linear-gradient(var(--tone, transparent), var(--tone, transparent));
+}
+
+.od-ctable__table tbody th { font-weight: 700; }
+
+/* Textos: parten línea limpia, con un ancho de lectura. */
+.od-ctable__table tbody > tr > :not([data-numeric]) {
+  min-width: 9rem;
+  max-width: 28rem;
+  overflow-wrap: break-word;
+  hyphens: auto;
+  text-wrap: pretty;
+}
+
+/* Números: a la derecha, en una sola línea. */
+.od-ctable__table [data-numeric] {
+  text-align: right;
+  white-space: nowrap;
+}
+
+.od-ctable__cell {
+  display: inline-flex;
+  align-items: baseline;
+  gap: var(--space-2);
+  max-width: 100%;
+}
+
+.od-ctable__glyph {
+  flex: none;
+  color: var(--tone-mark, currentColor);
+  font-size: 0.9em;
+  font-weight: 800;
+  line-height: 1;
+}
+
+.od-ctable__value { min-width: 0; }
+
+/* Un vacío no es un cero: se dice, en letra más callada pero legible. */
+.od-ctable__table [data-empty] .od-ctable__value {
+  color: var(--tone-ink, var(--ink-secondary));
+  font-style: italic;
+  font-weight: 500;
+}
+
+/* La primera columna se queda al desplazar. */
+.od-ctable__table tr > :first-child {
+  position: sticky;
+  left: 0;
+  z-index: 1;
+  box-shadow: 1px 0 0 var(--line);
+}
+
+.od-ctable__table thead th:first-child { z-index: 2; }
+
+/* Un título de grupo abre su tramo; la fila de totales lo cierra en tinta. */
+.od-ctable__table tr[data-kind="grupo"] th {
+  max-width: none;
+  padding: var(--space-4) var(--space-4) var(--space-2);
+  color: var(--ink);
+  font-family: var(--font-sign);
+  font-size: 1rem;
+  font-weight: 700;
+  letter-spacing: var(--tracking-wide);
+  text-transform: uppercase;
+  background: var(--od-surface);
+  border-bottom: 1px solid var(--line-strong);
+  box-shadow: none;
+}
+
+/* El título no se va con el desplazamiento: se queda a la vista del lado izquierdo. */
+.od-ctable__table tr[data-kind="grupo"] th > span {
+  position: sticky;
+  left: var(--space-4);
+}
+
+.od-ctable__table tr[data-kind="total"] > * {
+  font-weight: 800;
+  border-top: 1px solid var(--line-strong);
+}
+
+.od-ctable__table tr[data-kind="total"] > :not([data-tone]) {
+  background-image: linear-gradient(var(--od-board-raised), var(--od-board-raised));
+}
+
+/* --- Leyenda ------------------------------------------------------------------ */
+
+.od-ctable__legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3) var(--space-6);
+  margin: 0;
+  padding: 0;
+  color: var(--ink-secondary);
+  font-size: var(--text-sm);
+  list-style: none;
+}
+
+.od-ctable__legend li {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-2);
+  max-width: 34rem;
+}
+
+.od-ctable__legend strong { color: var(--ink); font-weight: 700; }
+
+.od-ctable__meaning::before { content: " — "; }
+
+.od-ctable__swatch {
+  flex: none;
+  display: inline-grid;
+  place-items: center;
+  width: 1.5rem;
+  height: 1.5rem;
+  color: var(--tone-mark);
+  font-size: 0.8rem;
+  font-weight: 800;
+  line-height: 1;
+  background-color: var(--od-surface);
+  background-image: linear-gradient(var(--tone), var(--tone));
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-xs);
+}
+
+/* --- Pie: nota, fuente y corte ---------------------------------------------------- */
+
+.od-ctable__foot {
+  display: grid;
+  gap: var(--space-2);
+  color: var(--ink-secondary);
+  font-size: var(--text-sm);
+}
+
+.od-ctable__foot p { margin: 0; }
+.od-ctable__note { max-width: 75ch; }
+
+.od-ctable__origin {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1) var(--space-5);
+  font-size: var(--text-xs);
+}
+
+.od-ctable__origin small { font-size: inherit; }
+
+/* --- Pantallas angostas ------------------------------------------------------------ */
+
+@media (max-width: 640px) {
+  .od-ctable__table th,
+  .od-ctable__table td { padding: var(--space-2) var(--space-3); }
+
+  /* La columna fija no se come la pantalla: deja ver al menos otra columna. */
+  .od-ctable__table tr:not([data-kind="grupo"]) > :first-child {
+    min-width: 6.5rem;
+    max-width: 42vw;
+  }
+
+  .od-ctable__table tbody > tr > :not([data-numeric]):not(:first-child) { min-width: 11rem; }
+}
+
+@media print {
+  .od-ctable__scroll { overflow: visible; }
+  .od-ctable__table tr > :first-child { position: static; }
+}

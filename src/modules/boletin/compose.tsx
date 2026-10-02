@@ -1528,7 +1528,8 @@ function datasetHighlights(report: Report, entry: BulletinSettings["reports"][nu
       const items = at !== undefined ? itemsAt(b, at) : lastTerm ? termItemsAt(b, lastTerm.year, lastTerm.term) : [];
       if (!items.length) continue;
       const top = items.slice().sort((a, c) => (c.value ?? 0) - (a.value ?? 0))[0];
-      const parts = b.unit !== "%" && b.format !== "porcentaje";
+      // Con «Mostrar total» apagado en la intranet, el resumen no suma las categorías: lee la más alta.
+      const parts = b.unit !== "%" && b.format !== "porcentaje" && b.showTotal !== false;
       const total = items.reduce((sum, i) => sum + (i.value ?? 0), 0);
       const when = at === ALL_YEARS ? cutLabel(ALL_YEARS, null) : at !== undefined ? String(at) : lastTerm!.label;
       list.push({

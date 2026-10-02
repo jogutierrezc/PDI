@@ -1,5 +1,0 @@
-<!doctype html><html><body><script>
-const f=document.createElement("iframe");f.width=1280;f.height=2000;f.src="./tabla.html?vista=editor";document.body.appendChild(f);
-f.addEventListener("load",()=>setTimeout(()=>{const d=f.contentDocument;const tr=d.querySelectorAll(".oda-ct__grid tbody tr")[1];
-document.title=[...tr.children].map(c=>c.tagName+":"+Math.round(c.getBoundingClientRect().height)+"/"+[...c.children].map(x=>x.tagName+Math.round(x.getBoundingClientRect().height)).join(",")).join(" | ");},2500));
-</script></body></html>

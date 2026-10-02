@@ -41,6 +41,10 @@ import { AppTurn } from "./AppTurn";
 import type { Live, TurnVoice } from "./AppTurn";
 import { AccountSheet, AppMenu, IphoneSheet, SourcesSheet } from "./AppMenu";
 import { Icon } from "./icons";
+import { useAuth } from "../../lib/auth";
+import { extrasFor, usePiloExtras } from "../../components/pilo/ai/extras";
+import { pickPassages, turnFile } from "../pregunta/attach";
+import { AttachButton, AttachTray, useAttachment } from "../pregunta/Extras";
 
 type Over = null | "menu" | "fuentes" | "cuenta" | "iphone";
 
@@ -90,6 +94,10 @@ export function AppShell({ space, door, waking, online, signedAs, theme, onTheme
   const who = askRol ? rol : null;
   const view = useMemo(() => roleView(space, door.cfg, who), [space, door.cfg, who]);
   const sent = wireRol(who);
+  // Las funciones ampliadas (0119): si esta persona puede adjuntar un archivo en este Pilo. Lo decide la administración.
+  const { profile: person } = useAuth();
+  const extras = extrasFor(usePiloExtras().data, space.id, person?.is_active ? person.role : null);
+  const attach = useAttachment(extras.fileMaxMb);
   // Lo que viaja a la función además de la pregunta. En el Pilo de la Universidad, nada: el pedido es el de siempre.
   const wire: AskOptions | undefined = useMemo(() => (usual ? undefined : { portal: space.portal, rol: sent }), [usual, space.portal, sent]);
   const voice: TurnVoice = useMemo(() => (usual ? door.voice : { ...door.voice, rol: sent, mood: view.mood }), [usual, door.voice, sent, view.mood]);
@@ -180,7 +188,10 @@ export function AppShell({ space, door, waking, online, signedAs, theme, onTheme
     }
     const patched = (turns: Turn[]) => (cut && cutPatch ? turns.map((t) => (t.id === cut.turnId ? { ...t, ...cutPatch } : t)) : turns);
     const conv: Conversation = current ?? { id: newId(), title: q.slice(0, 80), at: Date.now(), turns: [] };
-    const turn: Turn = { id: newId(), q };
+    const attached = attach.attachment;
+    const picked = attached ? pickPassages(attached.passages, q) : [];
+    const doc = attached ? { name: attached.name, passages: picked } : null;
+    const turn: Turn = { id: newId(), q, ...(attached ? { file: turnFile(attached, picked.length) } : {}) };
     born.current.add(turn.id);
     const before = patched(conv.turns.filter((t) => t.id !== replaceTurn));
     // Lo que la persona escribió y el texto final de cada respuesta: el servidor arma el contexto.
@@ -214,7 +225,8 @@ export function AppShell({ space, door, waking, online, signedAs, theme, onTheme
           show();
         },
       };
-      const answer = wire ? await askQuestionStream(q, history, handlers, wire) : await askQuestionStream(q, history, handlers);
+      // Con un archivo adjunto viajan, además, los pasajes que tienen que ver con esta pregunta: el archivo no se sube.
+      const answer = wire || doc ? await askQuestionStream(q, history, handlers, { ...(wire ?? {}), ...(doc ? { doc } : {}) }) : await askQuestionStream(q, history, handlers);
       if (run.current !== mine) return;
       setFresh((f) => new Map(f).set(turn.id, mine.text.trim() ? "en vivo" : "entera"));
       // Los pasos y los segundos del flujo no se guardan con la respuesta.
@@ -269,6 +281,7 @@ export function AppShell({ space, door, waking, online, signedAs, theme, onTheme
   const startNew = () => {
     stopOfficial();
     cancelRun();
+    attach.clear();
     setCurrentId(null);
     setNote("");
     setOver(null);
@@ -279,6 +292,7 @@ export function AppShell({ space, door, waking, online, signedAs, theme, onTheme
     setOver(null);
     if (entry.space !== space.id) return onSwitch(entry.space, entry.id);
     cancelRun();
+    attach.clear();
     setCurrentId(entry.id);
     toBottom();
   };
@@ -292,7 +306,8 @@ export function AppShell({ space, door, waking, online, signedAs, theme, onTheme
     setConvs((list) => list.filter((c) => c.id !== entry.id));
     if (entry.id === currentId) {
       stopOfficial();
-      setCurrentId(null);
+      attach.clear();
+    setCurrentId(null);
     }
   };
 
@@ -470,7 +485,9 @@ export function AppShell({ space, door, waking, online, signedAs, theme, onTheme
             </div>
           )}
 
-          <form className="pa-compose" onSubmit={submit}>
+          <AttachTray state={attach} />
+          <form className="pa-compose" data-clip={extras.files && can ? "" : undefined} onSubmit={submit}>
+            {extras.files && can && <AttachButton onPick={attach.pick} disabled={Boolean(attach.reading)} />}
             <label htmlFor="pa-q" className="pa-sr">
               Su pregunta para Pilo
             </label>

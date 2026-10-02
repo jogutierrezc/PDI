@@ -20,6 +20,8 @@ export interface AskOptions {
   portal?: AskPortal;
   /** «estudiante» o «profesor»; cualquier otra cosa no se manda (el servidor entiende «general»). Solo cuenta en `ensenanza`. */
   rol?: string | null;
+  /** El archivo adjunto (0119): su nombre y los pasajes elegidos en este dispositivo. El archivo no se sube. */
+  doc?: { name: string; passages: string[] } | null;
 }
 
 const rolOf = (rol: string | null | undefined): "estudiante" | "profesor" | undefined => (rol === "estudiante" || rol === "profesor" ? rol : undefined);
@@ -91,6 +93,8 @@ export interface AskStep {
 export interface AskResult {
   kind: AskKind;
   text: string;
+  /** La respuesta analizó un archivo adjunto (0119): su nombre, cuántos pasajes leyó y cuántos datos personales se taparon. */
+  file?: { name: string; passages: number; omitted: number };
   sources: AskSource[];
   trail: AskStep[];
   answerId?: number | null;
@@ -427,7 +431,7 @@ export function buildHistory(turns: { q: string; a?: string | null }[]): { q: st
 /** El cuerpo de `preguntar` con flujo. Sin opciones es, byte a byte, el de siempre. */
 export function askBody(question: string, history: { q: string; a: string }[], opts: AskOptions = {}) {
   const rol = rolOf(opts.rol);
-  return { action: "preguntar" as const, portal: opts.portal ?? "pregunta", question, history, stream: true as const, ...(rol ? { rol } : {}) };
+  return { action: "preguntar" as const, portal: opts.portal ?? "pregunta", question, history, stream: true as const, ...(rol ? { rol } : {}), ...(opts.doc && opts.doc.passages.length ? { doc: opts.doc } : {}) };
 }
 
 /**

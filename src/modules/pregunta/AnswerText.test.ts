@@ -41,7 +41,10 @@ describe("cómo se pinta una respuesta", () => {
     expect(html).toContain("<strong>tres</strong>");
     expect(html).toContain('<ol class="ap-list"><li value="1">');
     expect(html).toContain("<code>x</code>");
-    expect(html).toContain('<pre class="ap-pre" tabindex="0"><code>a &lt; b</code></pre>');
+    // El bloque de código lleva su barra (lenguaje y «Copiar») y su texto, línea por línea.
+    expect(html).toContain('<pre class="px-pre" tabindex="0">');
+    expect(html).toContain("a &lt; b");
+    expect(html).toContain("Copiar");
     expect(html).not.toMatch(/\*\*|##|```/);
   });
 

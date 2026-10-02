@@ -21,6 +21,7 @@
    ========================================================================== */
 
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { CodeBlock } from "./Extras";
 import type { ReactNode } from "react";
 import gsap from "gsap";
 import type { AskSource } from "../../components/pilo/ai/client";
@@ -121,7 +122,7 @@ export function AnswerText({
   const settle = (units?: HTMLElement[]) => {
     for (const t of tweens.current) t.progress(1).kill();
     tweens.current = [];
-    const all = units ?? Array.from(root.current?.querySelectorAll<HTMLElement>(".ap-sent, .ap-pre") ?? []);
+    const all = units ?? Array.from(root.current?.querySelectorAll<HTMLElement>(".ap-sent, .px-block") ?? []);
     if (!all.length) return;
     gsap.killTweensOf(all, "opacity,filter");
     gsap.set(all, { clearProps: "opacity,filter" });
@@ -129,7 +130,7 @@ export function AnswerText({
   useLayoutEffect(() => {
     const el = root.current;
     if (!el) return;
-    const units = Array.from(el.querySelectorAll<HTMLElement>(".ap-sent, .ap-pre"));
+    const units = Array.from(el.querySelectorAll<HTMLElement>(".ap-sent, .px-block"));
     if (!streaming) {
       // La respuesta ya no se escribe (terminó, se cortó o viene del historial): nada puede quedar a medio fundir.
       seen.current = units.length;
@@ -229,11 +230,7 @@ export function AnswerText({
   const block = (b: Block, bi: number) => {
     if (b.kind === "code") {
       if (b.order >= shown) return null;
-      return (
-        <pre key={bi} className="ap-pre" tabIndex={0}>
-          <code>{b.text}</code>
-        </pre>
-      );
+      return <CodeBlock key={bi} text={b.text} lang={b.lang} />;
     }
     if (b.kind === "list") {
       const items = b.items.filter((item) => seenGroup(item.sentences));

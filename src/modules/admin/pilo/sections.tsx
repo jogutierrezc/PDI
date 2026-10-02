@@ -27,6 +27,7 @@ import { Group, KeyField, NumField, StatusMark, Switch } from "./ui";
 import type { Tone } from "./ui";
 import { VoiceStyles } from "./VoiceStyles";
 import { WidgetGroup } from "./WidgetGroup";
+import { ExtrasGroup } from "./ExtrasGroup";
 import { VoiceExpressionsEditor } from "./VoiceExpressionsEditor";
 
 export interface EditorApi {
@@ -461,6 +462,7 @@ export function PortalsSection({ ed }: { ed: EditorApi }) {
       </Group>
 
       <WidgetGroup ed={ed} />
+      <ExtrasGroup />
 
       <ReportsGroup ed={ed} />
     </>

@@ -16,6 +16,7 @@
    ========================================================================== */
 
 import { useCallback, useEffect, useState } from "react";
+import type { TurnFile } from "./attach";
 import { useTheme } from "../../lib/theme";
 import type { AskResult } from "../../components/pilo/ai/client";
 import type { Think } from "./answer-state";
@@ -102,6 +103,8 @@ export interface Turn {
   incomplete?: boolean;
   /** «Pensando…» en compacto: los pasos que reportó el servidor y cuánto tardó. */
   think?: Think;
+  /** La pregunta llevó un archivo adjunto (0119): su nombre y cuánto se leyó. Nunca su contenido. */
+  file?: TurnFile;
 }
 
 export interface Conversation {

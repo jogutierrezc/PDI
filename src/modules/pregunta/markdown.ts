@@ -49,7 +49,7 @@ export type Block =
   | { kind: "p"; sentences: Sentence[] }
   | { kind: "h"; level: number; sentences: Sentence[] }
   | { kind: "list"; ordered: boolean; start: number; items: ListItem[] }
-  | { kind: "code"; text: string; order: number };
+  | { kind: "code"; text: string; order: number; lang?: string };
 
 export interface Parsed {
   blocks: Block[];
@@ -372,7 +372,9 @@ export function parseMarkdown(text: string, options: ParseOptions = {}): Parsed 
         k += 1;
       }
       const code = body.join("\n").replace(/\s+$/, "");
-      if (code.trim()) blocks.push({ kind: "code", text: code, order: order++ });
+      // El lenguaje, si la marca lo dice («```python»): es el rótulo del bloque.
+      const lang = info && !/\s/.test(info) && /^[\w+#.-]{1,20}$/.test(info) ? info.toLowerCase() : "";
+      if (code.trim()) blocks.push({ kind: "code", text: code, order: order++, ...(lang ? { lang } : {}) });
       continue;
     }
 

@@ -23,7 +23,7 @@ function view(text: string, streaming: boolean) {
   return createElement(AnswerText, { parsed, shown: parsed.count, typing: false, streaming, reading: null, sources: [], active: null, onSource: noop, onFinish: noop });
 }
 
-const units = (host: HTMLElement) => Array.from(host.querySelectorAll<HTMLElement>(".ap-sent, .ap-pre"));
+const units = (host: HTMLElement) => Array.from(host.querySelectorAll<HTMLElement>(".ap-sent, .px-block"));
 /** Las unidades con opacidad en línea distinta de 1: las que no se verían (del todo). */
 const hidden = (host: HTMLElement) => units(host).filter((u) => u.style.opacity !== "" && u.style.opacity !== "1");
 /** Pasa el tiempo: todo fundido vivo llega a su final. Uno muerto a medias no lo hace nunca. */

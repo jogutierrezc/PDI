@@ -26,6 +26,7 @@ import type { AppVoice } from "./access";
 import { prefetchOfficial, sayOfficial, stopOfficial } from "./official-voice";
 import { reducedMotion } from "./pwa";
 import { Icon } from "./icons";
+import { FileChip, FileFoot, FileLog } from "../pregunta/Extras";
 
 /** Lo que se ve de una respuesta mientras el servidor la escribe. No se guarda. */
 export interface Live {
@@ -223,6 +224,11 @@ export function AppTurn({
     <>
       <div className="pa-me" ref={question}>
         <span className="pa-sr">Usted: </span>
+        {turn.file && (
+          <span className="px-asked">
+            <FileChip name={turn.file.name} detail={`${turn.file.total} ${turn.file.total === 1 ? "pasaje" : "pasajes"} · leído aquí`} />
+          </span>
+        )}
         {turn.q}
       </div>
 
@@ -242,6 +248,8 @@ export function AppTurn({
               </span>
             </div>
           )}
+
+          {turn.file && <FileLog file={turn.file} />}
 
           {text && (
             <div className="pa-bubble" aria-busy={pending}>
@@ -279,6 +287,7 @@ export function AppTurn({
 
           {a && !typing && (
             <>
+              {turn.file && !incomplete && <FileFoot text={() => a.text} />}
               {notes.map((note) => (
                 <p key={note} className="pa-note">
                   {note}

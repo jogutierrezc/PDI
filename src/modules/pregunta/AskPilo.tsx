@@ -41,6 +41,9 @@ import { RoleMenu, RolePicker } from "./RolePicker";
 import { Welcome } from "./Welcome";
 import { MeshAnswer } from "./MeshAnswer";
 import { AnswerText, parseAnswer, useTypewriter } from "./AnswerText";
+import { extrasFor, usePiloExtras } from "../../components/pilo/ai/extras";
+import { pickPassages, turnFile } from "./attach";
+import { AttachButton, AttachTray, FileChip, FileFoot, FileLog, useAttachment } from "./Extras";
 import { toPlain } from "./markdown";
 import { badgeOf, compactThink, interruptedTurn, notesOf, reduceSteps, secondsText, showsSources, waitingLine } from "./answer-state";
 import type { ThinkStep } from "./answer-state";
@@ -259,6 +262,10 @@ function Chat({ space, cfg, tema, setTema, role, audience, welcome, voice: baseV
   };
   const view = useMemo(() => roleView(space, cfg, rol), [space, cfg, rol]);
   const sent = wireRol(rol);
+  // Las funciones ampliadas (0119): si esta persona puede adjuntar un archivo en este Pilo. Lo decide la administración.
+  const { profile: person } = useAuth();
+  const extras = extrasFor(usePiloExtras().data, space.id, person?.is_active ? person.role : null);
+  const attach = useAttachment(extras.fileMaxMb);
   // Lo que viaja a la función además de la pregunta. En el Pilo de siempre, nada: el pedido es el de siempre.
   const wire: AskOptions | undefined = useMemo(() => (usual ? undefined : { portal: space.portal, rol: sent }), [usual, space.portal, sent]);
   const voice = useMemo(() => (usual ? baseVoice : { ...baseVoice, rol: sent, mood: view.mood }), [usual, baseVoice, sent, view.mood]);
@@ -364,7 +371,10 @@ function Chat({ space, cfg, tema, setTema, role, audience, welcome, voice: baseV
     }
     const patched = (turns: Turn[]) => (cut && cutPatch ? turns.map((t) => (t.id === cut.turnId ? { ...t, ...cutPatch } : t)) : turns);
     const conv: Conversation = current ?? { id: newId(), title: q.slice(0, 80), at: Date.now(), turns: [] };
-    const turn: Turn = { id: newId(), q };
+    const attached = attach.attachment;
+    const picked = attached ? pickPassages(attached.passages, q) : [];
+    const doc = attached ? { name: attached.name, passages: picked } : null;
+    const turn: Turn = { id: newId(), q, ...(attached ? { file: turnFile(attached, picked.length) } : {}) };
     const before = patched(conv.turns.filter((t) => t.id !== replaceTurn));
     // Lo que la persona escribió y el texto final de cada respuesta: el servidor arma el contexto.
     const history = buildHistory(before.map((t) => ({ q: t.q, a: t.answer?.text })));
@@ -403,7 +413,8 @@ function Chat({ space, cfg, tema, setTema, role, audience, welcome, voice: baseV
           show();
         },
       };
-      const answer = wire ? await askQuestionStream(q, history, handlers, wire) : await askQuestionStream(q, history, handlers);
+      // Con un archivo adjunto viajan, además, los pasajes que tienen que ver con esta pregunta: el archivo no se sube.
+      const answer = wire || doc ? await askQuestionStream(q, history, handlers, { ...(wire ?? {}), ...(doc ? { doc } : {}) }) : await askQuestionStream(q, history, handlers);
       if (run.current !== mine) return;
       setFresh((f) => new Map(f).set(turn.id, mine.text.trim() ? "en vivo" : "entera"));
       // Los pasos que guarda el turno son los que trae `done`; sin ellos (función anterior), los vistos en vivo.
@@ -438,6 +449,7 @@ function Chat({ space, cfg, tema, setTema, role, audience, welcome, voice: baseV
 
   const startNew = () => {
     stopPilo();
+    attach.clear();
     setCurrentId(null);
     setSource(null);
     setSideOpen(false);
@@ -528,6 +540,7 @@ function Chat({ space, cfg, tema, setTema, role, audience, welcome, voice: baseV
               <button
                 type="button"
                 onClick={() => {
+                  attach.clear();
                   setCurrentId(c.id);
                   setSource(null);
                   setSideOpen(false);
@@ -644,7 +657,9 @@ function Chat({ space, cfg, tema, setTema, role, audience, welcome, voice: baseV
         </div>
 
         <div className="ap-dock">
+          <AttachTray state={attach} />
           <form className="ap-composer" onSubmit={submit}>
+            {extras.files && <AttachButton onPick={attach.pick} disabled={Boolean(attach.reading)} />}
             <label htmlFor="ap-q" className="ap-sr">
               Su pregunta para Pilo
             </label>
@@ -1079,7 +1094,14 @@ function TurnView({
 
   return (
     <>
-      <div className="ap-q">{turn.q}</div>
+      <div className="ap-q">
+        {turn.file && (
+          <span className="px-asked">
+            <FileChip name={turn.file.name} detail={`${turn.file.total} ${turn.file.total === 1 ? "pasaje" : "pasajes"} · leído en su dispositivo`} />
+          </span>
+        )}
+        {turn.q}
+      </div>
       <div className="ap-a">
         <div className="ap-a__face">
           <PiloMoji ref={face} size="100%" mood={pending ? "piensa" : a ? (incomplete ? "duda" : MOOD_OF[a.kind]) : "cuidado"} emotion={pending ? undefined : a?.expression || a?.mood} />
@@ -1123,7 +1145,9 @@ function TurnView({
                 )}
               </div>
               {hasHow && <ThinkBody id={howId} open={how} steps={steps} thinking={thinking} trail={shownTrail} working={working} />}
+              {turn.file && <FileLog file={turn.file} seconds={turn.think?.seconds} />}
               {text && <AnswerText parsed={parsed} shown={shown} typing={typing} streaming={streaming} reading={reading} sources={sources} active={active} onSource={openSource} onFinish={finish} />}
+              {turn.file && a && !typing && !incomplete && <FileFoot text={() => a.text} />}
               {notes.map((note) => (
                 <p key={note} className="ap-quiet">
                   {I.dash}

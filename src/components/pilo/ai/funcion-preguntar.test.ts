@@ -46,6 +46,8 @@ interface World {
   spaces: Record<string, Row>;
   /** Sin la migración 0113: la tabla pilo_spaces no existe. */
   noSpaces: boolean;
+  /** Funciones ampliadas (0119): las filas de pilo_extras por espacio. Sin fila, la tabla no existe. */
+  extras: Record<string, Row>;
   /** Pedidos de «preguntar» ya gastados hoy en cada espacio nuevo. */
   spaceUsed: Record<string, number>;
   /** Las respuestas guardadas que devuelve pilo_answer_candidates y que se leen por id. */
@@ -102,6 +104,7 @@ const world = (): World => ({
   visitors: [],
   spaces: {},
   noSpaces: false,
+  extras: {},
   spaceUsed: {},
   answers: [],
   calls: [],
@@ -133,6 +136,10 @@ function fakeClient(w: World) {
       if (table === "pilo_spaces") {
         if (w.noSpaces) return { data: null, error: { message: "Could not find the table 'public.pilo_spaces' in the schema cache" } };
         return { data: w.spaces[String(eq("id"))] ?? null, error: null };
+      }
+      if (table === "pilo_extras") {
+        const found = w.extras[String(eq("space"))];
+        return found ? { data: found, error: null } : { data: null, error: { message: "Could not find the table public.pilo_extras in the schema cache" } };
       }
       if (table === "pilo_ai_settings") return { data: w.settings, error: null };
       if (table === "pilo_ai_secret") return { data: { id: 1, nvidia_key: "clave-de-prueba" }, error: null };
@@ -1076,7 +1083,8 @@ describe("el portal de siempre no cambia con los espacios", () => {
     expect(all[all.length - 1].data).toMatchObject({ kind: "ia", grounding: "oficial", answerId: 77 });
     for (const c of w.calls) for (const k of SPACE_KEYS) expect(c.args).not.toHaveProperty(k);
     // Ninguna consulta directa nombra el espacio: ni el cupo, ni la bitácora, ni lo guardado.
-    for (const q of w.queries.filter((x) => x.table !== "pilo_spaces")) {
+    // (`pilo_extras`, 0119, es una tabla nueva cuya llave es el espacio: sin ella, la consulta falla y todo queda apagado.)
+    for (const q of w.queries.filter((x) => x.table !== "pilo_spaces" && x.table !== "pilo_extras")) {
       expect(q.filters.some(([, column]) => column === "space" || column === "vis" || column === "rol")).toBe(false);
       expect(q.row).not.toHaveProperty("space");
       expect(q.row).not.toHaveProperty("rol");
@@ -1933,5 +1941,77 @@ describe("moodle (leer cursos por la API)", () => {
     expect(JSON.stringify([denied.courses, denied.logs])).not.toContain(TOKEN);
     expect(denied.rpcs).not.toContain("pilo_doc_save");
     expect((await moodle(await boot(moodleWorld()), { step: "curso", course: "42; drop" })).status).toBe(400);
+  });
+});
+
+describe("funciones ampliadas (0119): analizar un archivo y generar código", () => {
+  const DOC = { name: "notas_ejemplo.csv", passages: ["Grupo: A; Nota: 4,1; Correo: ana@ejemplo.edu.co", "Grupo: B; Nota: 3,6"] };
+  const last = (all: Ev[]) => all[all.length - 1].data as Row;
+
+  it("sin la migración, o con la función apagada, el archivo se rechaza sin llamar al modelo ni a la memoria", async () => {
+    for (const extras of [{}, { planeacion: { files_aud: "nadie", code_aud: "nadie" } }, { planeacion: { files_aud: "sesion", code_aud: "nadie" } }]) {
+      const w = world();
+      w.extras = extras as Record<string, Row>;
+      const calls = provider(stream("Nada. "));
+      const response = await ask(await boot(w), { question: "¿Cómo les fue a mis grupos?", stream: true, doc: DOC });
+      expect(response.status).toBe(403);
+      expect(await response.json()).toMatchObject({ code: "archivo" });
+      expect(calls).toHaveLength(0);
+      expect(w.rpcs).not.toContain("pilo_memory_search");
+    }
+  });
+
+  it("con permiso, los pasajes van al modelo entre sus delimitadores, sin datos personales, y nada del archivo se guarda", async () => {
+    const w = world();
+    w.extras = { planeacion: { files_aud: "publico", code_aud: "nadie", file_daily: 5 } };
+    const calls = provider(stream("Según su archivo, el grupo A tiene 4,1 y el B 3,6; el promedio es 3,85. "));
+    const all = await events(await ask(await boot(w), { question: "¿Cómo les fue a mis grupos?", stream: true, doc: DOC }));
+    const system = systemOf(calls[0]);
+    expect(system).toContain("<<<ARCHIVO notas_ejemplo.csv");
+    expect(system).toContain("Grupo: B; Nota: 3,6");
+    expect(system).not.toContain("ana@ejemplo.edu.co");
+    expect(system).toContain("[dato omitido]");
+    // 3,85 es un cálculo sobre el archivo: no se marca como cifra de la UDES sin fuente.
+    expect(last(all)).toMatchObject({ kind: "ia", verified: true, answerId: null, file: { name: "notas_ejemplo.csv", passages: 2, omitted: 1 } });
+    expect(w.saved).toHaveLength(0);
+    expect(w.inbox).toHaveLength(0);
+    for (const text of [JSON.stringify(w.logs), JSON.stringify(w.saved), JSON.stringify(w.inbox)]) expect(text).not.toContain("Nota: 3,6");
+  });
+
+  it("el tope diario de archivos corta antes de llamar al modelo", async () => {
+    const w = world();
+    w.extras = { planeacion: { files_aud: "publico", code_aud: "nadie", file_daily: 1 } };
+    const calls = provider(stream("Listo. "), stream("Listo. "));
+    const handler = await boot(w);
+    expect((await ask(handler, { question: "¿Cómo les fue a mis grupos?", stream: true, doc: DOC })).status).toBe(200);
+    const again = await ask(handler, { question: "¿Y cuál va mejor?", stream: true, doc: DOC });
+    expect(again.status).toBe(429);
+    expect(await again.json()).toMatchObject({ code: "archivo_limite" });
+    expect(calls).toHaveLength(1);
+  });
+
+  it("pedir código: con permiso puede extenderse y usar bloques; sin permiso, el modelo recibe la orden de no escribirlo", async () => {
+    const yes = world();
+    yes.extras = { planeacion: { files_aud: "nadie", code_aud: "publico", code_max_tokens: 1800 } };
+    const allowed = provider(stream("Así se hace. "));
+    await events(await ask(await boot(yes), { question: "Deme un script de Python que promedie una columna", stream: true }));
+    expect(systemOf(allowed[0])).toContain("bloque de código de Markdown");
+    expect(allowed[0].body.max_tokens).toBe(1800);
+
+    const no = world();
+    const denied = provider(stream("Se haría así, en palabras. "));
+    await events(await ask(await boot(no), { question: "Deme un script de Python que promedie una columna", stream: true }));
+    expect(systemOf(denied[0])).toContain("No escribas código");
+    expect(denied[0].body.max_tokens).toBeLessThan(1800);
+  });
+
+  it("una pregunta de siempre no cambia: ni regla de código ni bloque de archivo", async () => {
+    const w = world();
+    w.extras = { planeacion: { files_aud: "publico", code_aud: "publico" } };
+    const calls = provider(stream("En 2024 hubo 20.500 estudiantes [1]. "));
+    await events(await ask(await boot(w), { question: "¿Cuántos estudiantes matriculados hay?", stream: true }));
+    const system = systemOf(calls[0]);
+    expect(system).not.toContain("ARCHIVO");
+    expect(system).not.toContain("código");
   });
 });

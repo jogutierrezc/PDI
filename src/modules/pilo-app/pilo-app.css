@@ -1386,3 +1386,17 @@
     transform: none;
   }
 }
+
+/* Funciones ampliadas (0119): con permiso para adjuntar, el clip va a la izquierda del campo. */
+.pa-compose[data-clip] {
+  grid-template-columns: 44px minmax(0, 1fr) 48px;
+}
+
+.pa .px-tray {
+  padding: 0 var(--pa-side-r) 6px var(--pa-side);
+}
+
+.pa-bubble {
+  min-width: 0;
+  max-width: 100%;
+}

@@ -910,3 +910,43 @@
   .pis-extras [role="rowheader"] { grid-column: 1 / -1; }
   .pis-extras__head > :first-child { display: none; }
 }
+
+/* --- Usuarios de Pilo (0120) --------------------------------------------------------------------------- */
+
+.pis-users__bar { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--space-3) var(--space-4); }
+.pis-users__search { flex: 1 1 18rem; max-width: 26rem; }
+
+.pis-users__search input,
+.pis-users select,
+.pis-users__confirm input {
+  width: 100%;
+  min-width: 0;
+  min-height: 40px;
+  box-sizing: border-box;
+  padding: 0 var(--space-3);
+  color: var(--ink);
+  background: var(--surface-2);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  font: inherit;
+  font-size: var(--text-sm);
+}
+
+.pis-users__search input { min-height: 44px; padding: 0 var(--space-4); }
+.pis-users__search input:focus-visible, .pis-users select:focus-visible, .pis-users__confirm input:focus-visible { border-color: var(--brand-blue); outline: none; box-shadow: var(--ring); }
+.pis-users__search input:disabled, .pis-users select:disabled { opacity: 0.6; cursor: not-allowed; }
+
+.pis-users { min-width: 980px; font-size: var(--text-sm); }
+.pis-users td { white-space: nowrap; font-variant-numeric: tabular-nums; }
+.pis-users select { width: auto; min-width: 8.5rem; }
+.pis-users__mail { color: var(--ink-secondary); }
+.pis-users__acts { text-align: right; }
+.pis-users__acts .pis-link { min-height: 40px; padding: 0 var(--space-2); }
+.pis-users__acts .pis-link:disabled { opacity: 0.5; cursor: not-allowed; }
+
+/* Eliminar se confirma en la misma fila, escribiendo el usuario: sin ventanas. */
+.pis-users__confirm > * { background: var(--status-pending-soft); }
+.pis-users__confirm td { white-space: normal; }
+.pis-users__confirm form { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2) var(--space-3); }
+.pis-users__confirm label { flex: 1 1 22rem; color: var(--ink); font-weight: 700; }
+.pis-users__confirm input { flex: 0 1 12rem; background: var(--surface); }

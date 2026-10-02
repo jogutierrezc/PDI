@@ -8,6 +8,10 @@
 
    Cada cambio se aplica al momento: no espera a «Guardar cambios». Sin la
    migración 0119 el grupo lo dice y queda apagado.
+
+   Con las cuentas de Pilo (0120) hay dos topes más por cada Pilo: por cuánto
+   se multiplica el cupo de quien tiene cuenta y hasta dónde pueden extenderse
+   sus respuestas. Sin la migración 0120 esos dos quedan apagados.
    ========================================================================== */
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -31,17 +35,26 @@ const AUDIENCES: { id: ExtraAudience; label: string }[] = [
 const KEY = ["pilo-ia", "extras-admin"];
 
 type Rows = Record<string, ExtraSettings>;
-type Patch = Partial<{ files_aud: ExtraAudience; code_aud: ExtraAudience; file_max_mb: number; file_daily: number; code_max_tokens: number }>;
+type Patch = Partial<{ files_aud: ExtraAudience; code_aud: ExtraAudience; file_max_mb: number; file_daily: number; code_max_tokens: number; member_factor: number; member_max_tokens: number }>;
+type LimitField = "file_max_mb" | "file_daily" | "code_max_tokens" | "member_factor" | "member_max_tokens";
+
+/** Las filas, y si la tabla ya tiene los topes de las cuentas de Pilo (0120). */
+interface Extras {
+  rows: Rows;
+  members: boolean;
+}
 
 function useExtrasAdmin() {
   return useQuery({
     queryKey: KEY,
     retry: false,
-    queryFn: async (): Promise<Rows | null> => {
+    queryFn: async (): Promise<Extras | null> => {
       const { data, error } = await supabase.from("pilo_extras").select("*");
       // Sin la migración 0119 la tabla no existe.
       if (error) return null;
-      return Object.fromEntries(((data ?? []) as { space: string }[]).map((row) => [row.space, extraSettings(row)]));
+      const list = (data ?? []) as { space: string; member_factor?: unknown }[];
+      // Sin la migración 0120 las filas no traen los topes de las cuentas.
+      return { rows: Object.fromEntries(list.map((row) => [row.space, extraSettings(row)])), members: list.length > 0 && list.every((row) => row.member_factor !== undefined) };
     },
   });
 }
@@ -69,7 +82,8 @@ export function ExtrasGroup() {
   const rows = useExtrasAdmin();
   const save = useSaveExtras();
   const missing = rows.data === null;
-  const of = (space: string) => rows.data?.[space] ?? extraSettings(null);
+  const noMembers = !missing && !rows.isPending && rows.data?.members === false;
+  const of = (space: string) => rows.data?.rows[space] ?? extraSettings(null);
   const change = (space: string, patch: Patch) => save.mutate({ space, patch });
 
   const audience = (space: (typeof SPACES)[number], field: "files_aud" | "code_aud", what: string) => {
@@ -85,14 +99,14 @@ export function ExtrasGroup() {
     );
   };
 
-  const limit = (space: (typeof SPACES)[number], field: "file_max_mb" | "file_daily" | "code_max_tokens", label: string, min: number, max: number) => {
+  const limit = (space: (typeof SPACES)[number], field: LimitField, label: string, min: number, max: number, off = false) => {
     const current = of(space.id);
-    const value = field === "file_max_mb" ? current.fileMaxMb : field === "file_daily" ? current.fileDaily : current.codeMaxTokens;
+    const value = { file_max_mb: current.fileMaxMb, file_daily: current.fileDaily, code_max_tokens: current.codeMaxTokens, member_factor: current.memberFactor, member_max_tokens: current.memberMaxTokens }[field];
     return (
       <label>
         {label}
         {/* Se guarda al salir del campo: escribir un número no dispara un guardado por cada tecla. */}
-        <input key={`${space.id}-${field}-${value}`} type="number" min={min} max={max} defaultValue={value} disabled={missing || rows.isPending} onBlur={(e) => {
+        <input key={`${space.id}-${field}-${value}`} type="number" min={min} max={max} defaultValue={value} disabled={missing || rows.isPending || off} onBlur={(e) => {
           const next = clamp(e.target.value, min, max, value);
           e.target.value = String(next);
           if (next !== value) change(space.id, { [field]: next });
@@ -158,9 +172,29 @@ export function ExtrasGroup() {
       ))}
 
       <p className="pis-small">
-        «Con sesión» es, por ahora, el personal con cuenta en la intranet. A quien no tiene permiso el clip no le aparece; si pide código, Pilo se lo explica en palabras. La
-        administración no tiene tope diario.
+        «Con sesión» incluye al personal con cuenta en la intranet y a quien tiene una cuenta de Pilo activa. A quien no tiene permiso el clip no le aparece; si pide código, Pilo se
+        lo explica en palabras. La administración no tiene tope diario.
       </p>
+
+      <header className="pis-group__head">
+        <h3>Quien tiene cuenta de Pilo</h3>
+        {noMembers && (
+          <small role="status">
+            <StatusMark tone="warn">Falta la migración 0120</StatusMark>
+          </small>
+        )}
+      </header>
+      <p className="pis-lead">
+        Quien se registra en Pilo puede preguntar más seguido que un visitante y recibir respuestas más extensas. El cupo de un visitante se fija en «Pregúntele a Pilo»; aquí, por
+        cuánto se multiplica para quien tiene cuenta.
+      </p>
+      {noMembers && <p className="pis-warn">Falta aplicar la migración 0120 en la base: hasta entonces estos dos topes no se pueden cambiar.</p>}
+      {SPACES.map((s) => (
+        <div key={s.id} className="pis-grid pis-grid--3" role="group" aria-label={`Cuentas de Pilo en ${s.name}`}>
+          {limit(s, "member_factor", `${s.name}: cupo de quien tiene cuenta (× el de un visitante)`, 1, 20, noMembers)}
+          {limit(s, "member_max_tokens", "Extensión de sus respuestas", 400, 4000, noMembers)}
+        </div>
+      ))}
       {save.isError && (
         <p className="pis-error" role="alert">
           No se guardó: {(save.error as Error).message}

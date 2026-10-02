@@ -299,7 +299,8 @@ export function cuentaFailure(status: number, body: unknown): CuentaFailure {
     const retryAfter = Number.isFinite(n) && n > 0 ? Math.ceil(n) : undefined;
     return { code, message: `${said || FALLBACK.limite}${retryAfter ? ` Podrá intentarlo de nuevo en ${waitText(retryAfter)}.` : ""}`, retryAfter };
   }
-  if (code === "desconocido") return { code, message: FALLBACK.desconocido };
+  // Sin código conocido: lo que dijo la función (siempre en palabras de la persona), o un texto de la página.
+  if (code === "desconocido") return { code, message: said || FALLBACK.desconocido };
   return { code, message: said || FALLBACK[code] };
 }
 

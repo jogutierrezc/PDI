@@ -38,6 +38,7 @@ import { ConnectionSection, PortalsSection, PORTALS, UsageSection, VoiceSection 
 import type { EditorApi, TestState } from "./sections";
 import { MemorySection, PreguntaSection } from "./PreguntaCard";
 import { CatalogSection } from "./CatalogCard";
+import { UsersSection } from "./UsersSection";
 import { StatusMark, Switch, plural, when } from "./ui";
 import type { Tone } from "./ui";
 import { revealSection } from "./motion";
@@ -242,6 +243,7 @@ function Editor({ initial }: { initial: PiloSettings }) {
     pregunta: () => <PreguntaSection ed={ed} />,
     memoria: () => <MemorySection ed={ed} indexedAt={indexedAt} onIndexed={setIndexedAt} />,
     catalogo: () => <CatalogSection />,
+    usuarios: () => <UsersSection />,
     uso: () => <UsageSection ed={ed} />,
   };
 

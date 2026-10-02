@@ -241,6 +241,8 @@ export interface DraftOutput {
   errors: string[];
   /** Celdas que no se pudieron leer: «<id de fila>|<id de columna>» → motivo. */
   cellErrors: Map<string, string>;
+  /** La fila guardada de cada fila del borrador (las que están en blanco no tienen). */
+  rowOf: Map<string, DraftOutput["rows"][number]>;
 }
 
 /**
@@ -302,6 +304,7 @@ export function buildOutput(draft: Draft, viewKey = "tabla"): DraftOutput {
     return { year: row.year, kind: row.kind, label, cells };
   });
 
+  const rowOf = new Map(kept.map((row, index) => [row.id, rows[index]]));
   const labels = Object.fromEntries(Object.entries(meta.labels).filter(([tone, text]) => isTone(tone) && text?.trim()).map(([tone, text]) => [tone, text!.trim()]));
   const table: CustomTable = {
     cut: meta.cut.trim(),
@@ -312,7 +315,7 @@ export function buildOutput(draft: Draft, viewKey = "tabla"): DraftOutput {
     ...(Object.keys(labels).length ? { labels } : {}),
   };
   const view: FreeView = { key: viewKey, title: meta.title.trim(), type: "tabla", table };
-  return { columns, view, rows, errors, cellErrors };
+  return { columns, view, rows, errors, cellErrors, rowOf };
 }
 
 /* --- Pegar desde Excel sobre el borrador ----------------------------------------------- */
@@ -369,11 +372,10 @@ export function applyPaste(draft: Draft, request: PasteRequest): Draft {
   const columns = request.replace ? [] : [...draft.columns];
   let rows = request.replace ? [] : [...draft.rows];
 
-  plan.newColumns.forEach((guess, index) => {
+  plan.newColumns.forEach((guess) => {
     const position = columns.length;
     const offset = plan.targets.indexOf(position);
     const name = plan.headers?.[offset]?.trim() || `Columna ${position + 1}`;
-    void index;
     columns.push({
       ...emptyColumn(guess.kind === "cifra" ? "numero" : "texto", name),
       decimals: guess.decimals ?? 0,

@@ -24,6 +24,7 @@ const PlaneacionHome = lazy(() => import("./modules/planeacion/PlaneacionHome").
 const TeamPage = lazy(() => import("./modules/planeacion/TeamPage").then((m) => ({ default: m.TeamPage })));
 const AskPilo = lazy(() => import("./modules/pregunta/AskPilo").then((m) => ({ default: m.AskPilo })));
 const PiloEmbed = lazy(() => import("./modules/pilo-embed/PiloEmbed").then((m) => ({ default: m.PiloEmbed })));
+const PiloApp = lazy(() => import("./modules/pilo-app/PiloApp").then((m) => ({ default: m.PiloApp })));
 
 const Dashboard = lazy(() => import("./routes/Dashboard").then((m) => ({ default: m.Dashboard })));
 const NotFound = lazy(() => import("./routes/NotFound").then((m) => ({ default: m.NotFound })));
@@ -255,6 +256,9 @@ export default function App() {
           {/* Mr. Pilo en Enseñanza (0113): la misma página y el mismo chat emergente, en su propio espacio. */}
           <Route path="/pilo-ensenanza" element={<AskPilo key="ensenanza" space="ensenanza" />} />
           <Route path="/pilo-ensenanza-embed" element={<PiloEmbed key="ensenanza" space="ensenanza" />} />
+          {/* La app móvil de Mr. Pilo (PWA): /app, /app/universidad y /app/ensenanza. Una sola ruta, para que
+              cambiar de Pilo no desmonte la app ni corte el vuelo de la bienvenida. */}
+          <Route path="/app/*" element={<PiloApp />} />
           <Route path="/tablero" element={<Dashboard />} />
           <Route path="/tablero/pilar/:slug" element={<PillarScorecard />} />
           <Route path="/implementacion" element={<ImplementationPortal />} />

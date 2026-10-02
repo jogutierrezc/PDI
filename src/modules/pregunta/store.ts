@@ -48,14 +48,20 @@ function read(key: string): string | null {
   }
 }
 
-function write(key: string, value: string | null) {
+/** Escribe y dice si quedó guardado: sin almacenamiento, o con el almacenamiento lleno, no se recuerda. */
+function write(key: string, value: string | null): boolean {
   try {
     if (value === null) window.localStorage.removeItem(key);
     else window.localStorage.setItem(key, value);
+    return true;
   } catch {
-    /* sin almacenamiento: no se recuerda */
+    return false;
   }
 }
+
+/** Lo mismo, para lo que otra superficie de Pilo recuerda en el dispositivo (la app móvil: su tema, su última conversación). */
+export const readStored = read;
+export const writeStored = write;
 
 export function useTema(): [Tema, (t: Tema) => void] {
   const { resolved } = useTheme();
@@ -114,7 +120,7 @@ export function loadConversations(prefix: string = DEFAULT_PREFIX): Conversation
     // Lo guardado antes de «IA siempre» no trae grounding, pasos ni marcas: se lee igual.
     return parsed
       .filter((c) => c && Array.isArray(c.turns))
-      .slice(0, 20)
+      .slice(0, SAVED_LIMIT)
       .map((c) => ({
         ...c,
         turns: c.turns
@@ -130,16 +136,39 @@ export function loadConversations(prefix: string = DEFAULT_PREFIX): Conversation
   }
 }
 
+/** Cuántas conversaciones se recuerdan por espacio. */
+export const SAVED_LIMIT = 20;
+
+/**
+ * Lo que se guarda de una lista: solo los turnos terminados (o marcados como
+ * incompletos) y las últimas conversaciones. Lo que aún se está escribiendo
+ * vive fuera de esta lista y no se recuerda.
+ */
+export function storableConversations(list: Conversation[]): Conversation[] {
+  return list
+    .map((c) => ({ ...c, turns: c.turns.filter((t) => t.answer || t.error) }))
+    .filter((c) => c.turns.length)
+    .slice(0, SAVED_LIMIT);
+}
+
+/**
+ * Guarda las conversaciones de un espacio. Si no caben (el almacenamiento del
+ * navegador está lleno), se quedan las más recientes: se reintenta con la
+ * mitad hasta que quepan. Dice si algo quedó guardado.
+ */
+export function saveConversations(prefix: string, list: Conversation[]): boolean {
+  let keep = storableConversations(list);
+  for (;;) {
+    if (write(storageKey(prefix, "conversaciones"), JSON.stringify(keep))) return true;
+    if (keep.length <= 1) return false;
+    keep = keep.slice(0, Math.ceil(keep.length / 2));
+  }
+}
+
 export function useConversations(prefix: string = DEFAULT_PREFIX) {
   const [list, setList] = useState<Conversation[]>(() => loadConversations(prefix));
   useEffect(() => {
-    // Solo se guardan los turnos terminados (o marcados como incompletos): lo que
-    // aún se está escribiendo vive fuera de esta lista y no se recuerda.
-    const done = list
-      .map((c) => ({ ...c, turns: c.turns.filter((t) => t.answer || t.error) }))
-      .filter((c) => c.turns.length)
-      .slice(0, 20);
-    write(storageKey(prefix, "conversaciones"), JSON.stringify(done));
+    saveConversations(prefix, list);
     // El prefijo no cambia mientras la página vive: cada espacio monta la suya.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [list]);

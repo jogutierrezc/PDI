@@ -1,0 +1,202 @@
+/* =============================================================================
+   Mr. Pilo · la app móvil · los cinco temas.
+
+   Esta es la única hoja de la app que escribe colores: es la excepción
+   acordada a «ningún color a mano». Todo lo demás (pilo-app.css) usa estas
+   variables. Cada tema redefine las mismas:
+
+     --s-*   la escena de la bienvenida (fondo en tres pasos, tinta, luz)
+     --acc   el acento de la escena y su tinta
+     --c-*   la conversación, el menú y las hojas
+     --w-*   las tarjetas de muestra de la bienvenida (papel claro en todos)
+
+   El contraste del texto se mide en themes.test.ts contra el fondo real de
+   cada uno: 4.5:1 como mínimo en los cinco. Un valor nuevo que no llegue,
+   rompe la prueba.
+
+   La muestra de cada tema en el menú (.pa-swatch) lleva su propio data-tema:
+   así se pinta con los colores de ese tema y no con los del que está puesto.
+   ========================================================================== */
+
+/* Mi UDES (por defecto): marino institucional y cian. */
+.pa,
+.pa-swatch[data-tema="udes"] {
+  --s1: #1c4f9f;
+  --s2: #0a2d63;
+  --s3: #061e46;
+  --s-ink: #ffffff;
+  --s-muted: #c3d5f2;
+  --s-line: rgba(255, 255, 255, 0.17);
+  --s-chip: rgba(255, 255, 255, 0.1);
+  --s-glow: rgba(127, 231, 240, 0.2);
+  --acc: #7fe7f0;
+  --acc-ink: #0a2d63;
+  --c-bg: #f4f7fb;
+  --c-bubble: #ffffff;
+  --c-ink: #0d1c31;
+  --c-ink2: #45566d;
+  --c-line: rgba(13, 40, 84, 0.14);
+  --c-mine: #0a2d63;
+  --c-mine-ink: #ffffff;
+  --c-bar: #0a2d63;
+  --c-bar-ink: #ffffff;
+  --c-bar-muted: #c3d5f2;
+  --c-link: #1b52ad;
+  --c-sheet: #ffffff;
+  --c-chip: #e6eefb;
+  --c-mark: #fff0b8;
+  --c-warn: #8a5700;
+  --c-warn-bg: #fbf2e0;
+  --c-scrim: rgba(2, 8, 20, 0.55);
+  --c-shadow: rgba(6, 30, 70, 0.26);
+  --w-card: #ffffff;
+  --w-card-ink: #0d1c31;
+  --w-card-ok: #0d6a2d;
+  color-scheme: light;
+}
+
+.pa[data-tema="blanco"],
+.pa-swatch[data-tema="blanco"] {
+  --s1: #ffffff;
+  --s2: #f4f7fb;
+  --s3: #e4ecf7;
+  --s-ink: #0d1c31;
+  --s-muted: #45566d;
+  --s-line: rgba(13, 40, 84, 0.16);
+  --s-chip: rgba(13, 40, 84, 0.06);
+  --s-glow: rgba(33, 102, 214, 0.12);
+  --acc: #2166d6;
+  --acc-ink: #ffffff;
+  --c-bg: #ffffff;
+  --c-bubble: #f1f5fb;
+  --c-ink: #0d1c31;
+  --c-ink2: #45566d;
+  --c-line: rgba(13, 40, 84, 0.14);
+  --c-mine: #2166d6;
+  --c-mine-ink: #ffffff;
+  --c-bar: #ffffff;
+  --c-bar-ink: #0d1c31;
+  --c-bar-muted: #45566d;
+  --c-link: #1b52ad;
+  --c-sheet: #ffffff;
+  --c-chip: #dfe9fa;
+  --c-mark: #fff0b8;
+  --c-warn: #8a5700;
+  --c-warn-bg: #fbf2e0;
+  --c-scrim: rgba(2, 8, 20, 0.5);
+  --c-shadow: rgba(6, 30, 70, 0.2);
+  --w-card: #ffffff;
+  --w-card-ink: #0d1c31;
+  --w-card-ok: #0d6a2d;
+  color-scheme: light;
+}
+
+/* Negro de verdad, no azul. */
+.pa[data-tema="negro"],
+.pa-swatch[data-tema="negro"] {
+  --s1: #151b25;
+  --s2: #07090d;
+  --s3: #000000;
+  --s-ink: #f2f5fa;
+  --s-muted: #a9b4c6;
+  --s-line: rgba(255, 255, 255, 0.15);
+  --s-chip: rgba(255, 255, 255, 0.08);
+  --s-glow: rgba(127, 231, 240, 0.16);
+  --acc: #7fe7f0;
+  --acc-ink: #00181c;
+  --c-bg: #000000;
+  --c-bubble: #12161d;
+  --c-ink: #eef2f8;
+  --c-ink2: #a9b4c6;
+  --c-line: rgba(255, 255, 255, 0.15);
+  --c-mine: #233044;
+  --c-mine-ink: #ffffff;
+  --c-bar: #07090d;
+  --c-bar-ink: #f2f5fa;
+  --c-bar-muted: #a9b4c6;
+  --c-link: #7fe7f0;
+  --c-sheet: #12161d;
+  --c-chip: #17262d;
+  --c-mark: #3a3115;
+  --c-warn: #f0c46a;
+  --c-warn-bg: #2a2110;
+  --c-scrim: rgba(0, 0, 0, 0.66);
+  --c-shadow: rgba(0, 0, 0, 0.7);
+  --w-card: #ffffff;
+  --w-card-ink: #0d1c31;
+  --w-card-ok: #0d6a2d;
+  color-scheme: dark;
+}
+
+.pa[data-tema="futurista"],
+.pa-swatch[data-tema="futurista"] {
+  --s1: #2f1d7a;
+  --s2: #120a3a;
+  --s3: #05031a;
+  --s-ink: #f4f1ff;
+  --s-muted: #bdb4ea;
+  --s-line: rgba(160, 140, 255, 0.32);
+  --s-chip: rgba(140, 120, 255, 0.16);
+  --s-glow: rgba(92, 242, 255, 0.22);
+  --acc: #5cf2ff;
+  --acc-ink: #05031a;
+  --c-bg: #080520;
+  --c-bubble: #17113f;
+  --c-ink: #f1eeff;
+  --c-ink2: #b8afe4;
+  --c-line: rgba(160, 140, 255, 0.26);
+  --c-mine: #6a3df0;
+  --c-mine-ink: #ffffff;
+  --c-bar: #0c0730;
+  --c-bar-ink: #f4f1ff;
+  --c-bar-muted: #bdb4ea;
+  --c-link: #5cf2ff;
+  --c-sheet: #130d38;
+  --c-chip: #231a5c;
+  --c-mark: #3b2c8a;
+  --c-warn: #ffd27a;
+  --c-warn-bg: #2b2140;
+  --c-scrim: rgba(3, 2, 14, 0.66);
+  --c-shadow: rgba(2, 1, 12, 0.7);
+  --w-card: #ffffff;
+  --w-card-ink: #0d1c31;
+  --w-card-ok: #0d6a2d;
+  color-scheme: dark;
+}
+
+/* Estilo Pilo: el marrón de su copete, el crema de su cuello y el naranja de sus gafas. */
+.pa[data-tema="pilo"],
+.pa-swatch[data-tema="pilo"] {
+  --s1: #954921;
+  --s2: #7c3b18;
+  --s3: #44200c;
+  --s-ink: #f6f3ea;
+  --s-muted: #f6e4d4;
+  --s-line: rgba(246, 243, 234, 0.22);
+  --s-chip: rgba(246, 243, 234, 0.13);
+  --s-glow: rgba(255, 106, 26, 0.26);
+  --acc: #ff7a2e;
+  --acc-ink: #1d1d1b;
+  --c-bg: #f1f0e8;
+  --c-bubble: #ffffff;
+  --c-ink: #1d1d1b;
+  --c-ink2: #5a4636;
+  --c-line: rgba(29, 29, 27, 0.17);
+  --c-mine: #954921;
+  --c-mine-ink: #ffffff;
+  --c-bar: #7c3b18;
+  --c-bar-ink: #f6f3ea;
+  --c-bar-muted: #f6e4d4;
+  --c-link: #8a3f17;
+  --c-sheet: #fbfaf5;
+  --c-chip: #f6e2d2;
+  --c-mark: #ffe2c2;
+  --c-warn: #7a4a00;
+  --c-warn-bg: #fbefd6;
+  --c-scrim: rgba(24, 12, 4, 0.55);
+  --c-shadow: rgba(40, 20, 6, 0.28);
+  --w-card: #ffffff;
+  --w-card-ink: #0d1c31;
+  --w-card-ok: #0d6a2d;
+  color-scheme: light;
+}

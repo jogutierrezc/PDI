@@ -1,0 +1,1388 @@
+/* =============================================================================
+   Mr. Pilo · la app móvil (/app).
+
+   Una pantalla de teléfono: cabecera, conversación y caja de escribir. Ocupa
+   el alto que de verdad se ve (100dvh, y el de visualViewport cuando sale el
+   teclado), respeta los márgenes seguros y nunca se desplaza hacia los lados.
+   Todo lo que se toca mide 44 px o más.
+
+   Los colores son los del tema (pilo-app-themes.css): aquí no hay ninguno
+   escrito a mano. El texto de las respuestas lo pinta AnswerText con las
+   reglas de ask-pilo.css, que leen --ap-*: más abajo se enlazan al tema.
+
+   Movimiento: solo transform y opacidad (más clip-path al cerrar la escena de
+   bienvenida, que lo pone GSAP). Lo de la interfaz dura menos de 300 ms y sale
+   más rápido de lo que entra; todo botón cede a 0.97 al pulsarlo. Lo que se
+   abre con el teclado no se anima ([data-quick]). Con movimiento reducido
+   quedan los fundidos. Ningún texto nace oculto en esta hoja: los estados
+   ocultos los pone y los quita GSAP, que al interrumpirse deja el final.
+   ========================================================================== */
+
+.pa {
+  /* Medidas propias de la app. */
+  --pa-gap: 12px;
+  --pa-side: max(12px, env(safe-area-inset-left, 0px));
+  --pa-side-r: max(12px, env(safe-area-inset-right, 0px));
+  --pa-col: 720px;
+  --pa-r-bubble: 18px 18px 18px 6px;
+  --pa-r-mine: 18px 18px 6px 18px;
+  --pa-r-sheet: 24px 24px 0 0;
+  --pa-enter: 280ms;
+  --pa-leave: 200ms;
+
+  /* Las reglas de AnswerText y RolePicker (ask-pilo.css), con los colores del tema. */
+  --ap-page: var(--c-bg);
+  --ap-surface: var(--c-bubble);
+  --ap-soft: var(--c-bg);
+  --ap-soft-2: var(--c-chip);
+  --ap-ink: var(--c-ink);
+  --ap-ink-2: var(--c-ink2);
+  --ap-ink-3: var(--c-ink2);
+  --ap-line: var(--c-line);
+  --ap-line-2: var(--c-line);
+  --ap-primary: var(--c-link);
+  --ap-primary-ink: var(--c-bg);
+  --ap-primary-soft: var(--c-chip);
+  --ap-primary-text: var(--c-link);
+  --ap-accent: var(--acc);
+  --ap-accent-ink: var(--acc-ink);
+  --ap-mark: var(--c-mark);
+  --ap-warn: var(--c-warn);
+  --ap-warn-soft: var(--c-warn-bg);
+  --ap-mem: var(--c-link);
+  --ap-mem-soft: var(--c-chip);
+  --ap-ease: var(--ease-out);
+  --ap-sans: var(--font-sans);
+  --ap-serif: var(--font-display);
+
+  position: fixed;
+  left: 0;
+  right: 0;
+  top: var(--pa-top, 0px);
+  z-index: 10;
+  height: 100vh;
+  height: var(--pa-h, 100dvh);
+  overflow: hidden;
+  overscroll-behavior: none;
+  isolation: isolate;
+  background: var(--c-bg);
+  color: var(--c-ink);
+  font: 500 0.9375rem/1.5 var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  -webkit-text-size-adjust: 100%;
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+}
+
+/* La conversación: cabecera, mensajes y caja de escribir. La bienvenida va encima, en su propia capa. */
+.pa-frame {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  min-width: 0;
+}
+
+.pa *,
+.pa *::before,
+.pa *::after {
+  box-sizing: border-box;
+}
+
+/* Los puntos de partida no pesan nada (:where): no le ganan a las reglas del texto de las respuestas. */
+:where(.pa) :where(h1, h2, h3, p, ul, ol) {
+  margin: 0;
+}
+
+.pa :where(h1, h2, h3) {
+  color: inherit;
+}
+
+:where(.pa) :where(button) {
+  font: inherit;
+  color: inherit;
+  background: none;
+  border: 0;
+  padding: 0;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+:where(.pa) :where(button:disabled) {
+  cursor: default;
+}
+
+.pa :focus-visible {
+  outline: 2px solid var(--c-link);
+  outline-offset: 2px;
+  border-radius: var(--radius-xs);
+}
+
+.pa ::selection {
+  background: var(--acc);
+  color: var(--acc-ink);
+}
+
+.pa-sr {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+.pa-i {
+  width: 20px;
+  height: 20px;
+  flex: none;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+/* Todo botón cede un poco al pulsarlo. */
+.pa-icon,
+.pa-btn,
+.pa-sbtn,
+.pa-sug,
+.pa-mi,
+.pa-tema,
+.pa-two button,
+.pa-act,
+.pa-src,
+.pa-choose button,
+.pa-w-next,
+.pa .ap-rolp__b {
+  transition: transform var(--dur-press) var(--ease-out), background-color var(--dur-fast) ease, border-color var(--dur-fast) ease;
+}
+
+.pa-icon:active,
+.pa-btn:active,
+.pa-sbtn:active,
+.pa-sug:active,
+.pa-mi:active,
+.pa-tema:active,
+.pa-two button:active,
+.pa-act:active,
+.pa-src:active,
+.pa-choose button:active,
+.pa-w-next:active,
+.pa-send:active,
+.pa .ap-rolp__b:active {
+  transform: scale(0.97);
+}
+
+/* --- Cabecera ---------------------------------------------------------------------------- */
+
+.pa-bar {
+  background: var(--c-bar);
+  color: var(--c-bar-ink);
+  border-bottom: 1px solid var(--c-line);
+  padding: calc(8px + env(safe-area-inset-top, 0px)) calc(var(--pa-side-r) - 4px) 8px calc(var(--pa-side) - 4px);
+}
+
+.pa-bar__in {
+  display: grid;
+  grid-template-columns: 44px 56px minmax(0, 1fr) 44px;
+  gap: 6px;
+  align-items: center;
+  max-width: var(--pa-col);
+  margin-inline: auto;
+  min-height: 56px;
+}
+
+.pa-bar-face {
+  width: 56px;
+  height: 56px;
+}
+
+.pa-bar-id {
+  min-width: 0;
+}
+
+.pa-bar-id strong {
+  display: block;
+  font: 700 1.02rem/1.15 var(--font-display);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.pa-bar-id span {
+  display: block;
+  font-size: 0.75rem;
+  color: var(--c-bar-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.pa-icon {
+  width: 44px;
+  height: 44px;
+  flex: none;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+}
+
+.pa-bar .pa-icon:focus-visible {
+  outline-color: var(--c-bar-ink);
+  border-radius: 50%;
+}
+
+/* --- Conversación ------------------------------------------------------------------------ */
+
+.pa-msgs {
+  min-height: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+  padding: 16px var(--pa-side-r) 12px var(--pa-side);
+}
+
+.pa-msgs::-webkit-scrollbar {
+  display: none;
+}
+
+.pa-col {
+  display: flex;
+  flex-direction: column;
+  gap: var(--pa-gap);
+  max-width: var(--pa-col);
+  margin-inline: auto;
+}
+
+/* Pilo junto a cada respuesta: su cara entera, a su proporción, y la burbuja al lado. */
+.pa-msg {
+  display: grid;
+  grid-template-columns: 48px minmax(0, 1fr);
+  gap: 6px;
+  align-items: start;
+  max-width: 100%;
+}
+
+/* En una respuesta larga, la cara se queda a la vista mientras se lee. */
+.pa-msg__face {
+  width: 48px;
+  height: 48px;
+  position: sticky;
+  top: 0;
+}
+
+.pa-msg__body {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+  justify-items: start;
+}
+
+.pa-bubble {
+  max-width: 100%;
+  min-width: 0;
+  padding: 10px 14px;
+  border-radius: var(--pa-r-bubble);
+  background: var(--c-bubble);
+  border: 1px solid var(--c-line);
+  overflow-wrap: anywhere;
+}
+
+.pa-bubble > p {
+  font-weight: 600;
+}
+
+.pa-me {
+  align-self: flex-end;
+  max-width: 84%;
+  padding: 10px 14px;
+  border-radius: var(--pa-r-mine);
+  background: var(--c-mine);
+  color: var(--c-mine-ink);
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+.pa-hint {
+  font-size: 0.75rem;
+  color: var(--c-ink2);
+}
+
+/* El paso actual del pensamiento, en palabras. */
+.pa-steps {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 24px;
+  font-size: 0.8125rem;
+  font-weight: 700;
+  color: var(--c-ink2);
+}
+
+.pa-steps > span:first-of-type {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.pa-after {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 0;
+  max-width: 100%;
+}
+
+.pa-src {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 44px;
+  margin-right: 4px;
+  padding: 0 12px;
+  border: 1px solid var(--c-line);
+  border-radius: var(--radius-pill);
+  font-size: 0.78rem;
+  font-weight: 800;
+  color: var(--c-link);
+}
+
+.pa-act {
+  display: inline-grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  color: var(--c-ink2);
+}
+
+.pa-act[aria-pressed="true"] {
+  background: var(--c-chip);
+  color: var(--c-link);
+}
+
+.pa-note {
+  font-size: 0.78rem;
+  color: var(--c-ink2);
+}
+
+.pa-warn {
+  display: grid;
+  gap: 8px;
+  justify-items: start;
+  max-width: 100%;
+  padding: 10px 14px;
+  border-radius: var(--radius-sm);
+  background: var(--c-warn-bg);
+  color: var(--c-warn);
+  font-size: 0.84rem;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+.pa-warn button {
+  min-height: 44px;
+  padding: 0 16px;
+  border: 1px solid currentColor;
+  border-radius: var(--radius-pill);
+  font-size: 0.8125rem;
+  font-weight: 800;
+}
+
+/* Las citas [n] del texto: el dibujo es pequeño, la zona que se toca no. */
+.pa .ap-cite {
+  position: relative;
+}
+
+.pa .ap-cite::after {
+  content: "";
+  position: absolute;
+  inset: -13px -10px;
+}
+
+.pa .ap-a__text {
+  max-width: none;
+  font-size: 0.9375rem;
+  line-height: 1.6;
+}
+
+/* Un aviso de Pilo (sin conexión, cerrado, pide sesión): su cara y el texto. */
+.pa-card {
+  display: grid;
+  justify-items: center;
+  gap: 10px;
+  margin-block: 8px;
+  padding: 20px 16px;
+  border: 1px solid var(--c-line);
+  border-radius: var(--radius-lg);
+  background: var(--c-bubble);
+  text-align: center;
+}
+
+.pa-card__face {
+  width: 112px;
+  height: 112px;
+}
+
+.pa-card h2 {
+  font: 700 1.2rem/1.2 var(--font-display);
+  text-wrap: balance;
+}
+
+.pa-card p {
+  max-width: 34ch;
+  font-size: 0.875rem;
+  color: var(--c-ink2);
+}
+
+/* --- Sugerencias y caja de escribir ------------------------------------------------------ */
+
+.pa-dock {
+  min-width: 0;
+  background: var(--c-bg);
+}
+
+.pa-dock__in {
+  max-width: var(--pa-col);
+  margin-inline: auto;
+}
+
+/* La fila se desplaza dentro de sí misma; la página, nunca. */
+.pa-sugs {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  scrollbar-width: none;
+  padding: 2px var(--pa-side-r) 10px var(--pa-side);
+}
+
+.pa-sugs::-webkit-scrollbar {
+  display: none;
+}
+
+.pa-sug {
+  flex: none;
+  max-width: 78vw;
+  min-height: 44px;
+  padding: 8px 14px;
+  border: 1px solid var(--c-line);
+  border-radius: var(--radius-lg);
+  background: var(--c-bubble);
+  color: var(--c-ink);
+  font-size: 0.8125rem;
+  font-weight: 700;
+  line-height: 1.3;
+  text-align: left;
+}
+
+.pa-compose {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 48px;
+  gap: 8px;
+  align-items: end;
+  padding: 8px var(--pa-side-r) calc(10px + env(safe-area-inset-bottom, 0px)) var(--pa-side);
+  border-top: 1px solid var(--c-line);
+}
+
+/* 16 px: con menos, iOS acerca la página al enfocar el campo. */
+.pa-compose textarea {
+  display: block;
+  width: 100%;
+  min-width: 0;
+  min-height: 48px;
+  max-height: 132px;
+  margin: 0;
+  padding: 12px 16px;
+  border: 1px solid var(--c-line);
+  border-radius: var(--radius-xl);
+  background: var(--c-bubble);
+  color: var(--c-ink);
+  font: 500 16px/1.4 var(--font-sans);
+  caret-color: var(--c-link);
+  resize: none;
+  -webkit-appearance: none;
+  appearance: none;
+}
+
+.pa-compose textarea::placeholder {
+  color: var(--c-ink2);
+  opacity: 1;
+}
+
+.pa-compose textarea:focus-visible {
+  outline: 2px solid var(--c-link);
+  outline-offset: 1px;
+  border-radius: var(--radius-xl);
+}
+
+.pa-compose textarea:disabled {
+  opacity: 1;
+  color: var(--c-ink2);
+}
+
+.pa-send {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  background: var(--c-mine);
+  color: var(--c-mine-ink);
+  transition: transform var(--dur-press) var(--ease-out), opacity var(--dur-fast) ease;
+}
+
+.pa-send:disabled {
+  opacity: 0.4;
+}
+
+.pa-send:focus-visible {
+  border-radius: 50%;
+}
+
+/* --- Botones ----------------------------------------------------------------------------- */
+
+.pa-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 48px;
+  padding: 10px 16px;
+  border-radius: var(--radius-sm);
+  font-weight: 800;
+  text-align: center;
+  text-decoration: none;
+}
+
+.pa-btn--main {
+  background: var(--c-mine);
+  color: var(--c-mine-ink);
+}
+
+.pa-btn--line {
+  border: 1px solid var(--c-line);
+  color: var(--c-ink);
+}
+
+/* --- Menú y hojas ------------------------------------------------------------------------ */
+
+.pa-scrim {
+  position: absolute;
+  inset: 0;
+  z-index: 7;
+  background: var(--c-scrim);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity var(--pa-leave) ease;
+}
+
+.pa-scrim[data-open] {
+  opacity: 1;
+  pointer-events: auto;
+  transition-duration: var(--dur-base);
+}
+
+.pa-menu,
+.pa-sheet {
+  position: absolute;
+  z-index: 8;
+  background: var(--c-sheet);
+  color: var(--c-ink);
+  /* Cerrado: fuera de la pantalla, sin foco ni lectura. Sale más rápido de lo que entra. */
+  visibility: hidden;
+  transition: transform var(--pa-leave) var(--ease-out), visibility 0s linear var(--pa-leave);
+}
+
+.pa-menu[data-open],
+.pa-sheet[data-open] {
+  transform: none;
+  visibility: visible;
+  transition: transform var(--pa-enter) var(--ease-drawer);
+}
+
+.pa-menu {
+  top: 0;
+  bottom: 0;
+  left: 0;
+  width: min(86%, 340px);
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  overflow: hidden;
+  transform: translateX(-102%);
+  box-shadow: 0 0 40px var(--c-shadow);
+}
+
+.pa-menu-head {
+  display: grid;
+  gap: 12px;
+  padding: calc(18px + env(safe-area-inset-top, 0px)) 18px 12px max(18px, env(safe-area-inset-left, 0px));
+}
+
+.pa-menu-head__top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.pa-menu h2,
+.pa-sheet h2 {
+  font: 700 1.2rem/1.2 var(--font-display);
+}
+
+.pa-menu-body {
+  display: grid;
+  align-content: start;
+  gap: 18px;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: none;
+  padding: 0 18px 12px max(18px, env(safe-area-inset-left, 0px));
+}
+
+.pa-label {
+  margin-bottom: 6px;
+  font-size: 0.75rem;
+  font-weight: 800;
+  color: var(--c-ink2);
+}
+
+.pa-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 44px;
+  align-items: center;
+  border-top: 1px solid var(--c-line);
+}
+
+.pa-row[aria-current="true"] .pa-mi strong {
+  color: var(--c-link);
+}
+
+.pa-mi {
+  display: grid;
+  gap: 1px;
+  width: 100%;
+  min-width: 0;
+  min-height: 48px;
+  padding: 8px 0;
+  text-align: left;
+}
+
+.pa-mi strong {
+  font-size: 0.9rem;
+  font-weight: 700;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.pa-mi small {
+  font-size: 0.75rem;
+  color: var(--c-ink2);
+}
+
+.pa-mi--line {
+  border-top: 1px solid var(--c-line);
+}
+
+.pa-empty {
+  padding: 10px 0;
+  border-top: 1px solid var(--c-line);
+  font-size: 0.8125rem;
+  color: var(--c-ink2);
+}
+
+.pa-two {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+  padding: 4px;
+  border: 1px solid var(--c-line);
+  border-radius: var(--radius-sm);
+  background: var(--c-bubble);
+}
+
+.pa-two button {
+  min-height: 44px;
+  border-radius: var(--radius-xs);
+  font-size: 0.82rem;
+  font-weight: 800;
+  color: var(--c-ink2);
+}
+
+.pa-two button[aria-pressed="true"] {
+  background: var(--c-mine);
+  color: var(--c-mine-ink);
+}
+
+.pa-temas {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 4px;
+}
+
+.pa-tema {
+  display: grid;
+  justify-items: center;
+  align-content: start;
+  gap: 4px;
+  min-height: 64px;
+  padding: 4px 0;
+  font-size: 0.6875rem;
+  font-weight: 800;
+  line-height: 1.15;
+  text-align: center;
+  color: var(--c-ink2);
+}
+
+.pa-swatch {
+  display: block;
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  border: 2px solid var(--c-line);
+  background: linear-gradient(135deg, var(--c-bar) 50%, var(--acc) 50%);
+}
+
+.pa-tema[aria-pressed="true"] {
+  color: var(--c-ink);
+}
+
+/* El elegido no se marca solo con color: lleva un anillo, que es del tema puesto y no del de la muestra. */
+.pa-tema__ring {
+  display: block;
+  border-radius: 50%;
+  outline: 2px solid transparent;
+  outline-offset: 2px;
+}
+
+.pa-tema[aria-pressed="true"] .pa-tema__ring {
+  outline-color: var(--c-link);
+}
+
+.pa-account {
+  display: grid;
+  gap: 8px;
+  padding: 14px 18px calc(18px + env(safe-area-inset-bottom, 0px)) max(18px, env(safe-area-inset-left, 0px));
+  border-top: 1px solid var(--c-line);
+  background: var(--c-bubble);
+}
+
+.pa-account p {
+  font-size: 0.8125rem;
+  color: var(--c-ink2);
+}
+
+.pa-sheet {
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 9;
+  display: grid;
+  gap: 12px;
+  max-height: 86%;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  border-radius: var(--pa-r-sheet);
+  padding: 10px max(20px, env(safe-area-inset-right, 0px)) calc(22px + env(safe-area-inset-bottom, 0px)) max(20px, env(safe-area-inset-left, 0px));
+  transform: translateY(102%);
+  box-shadow: 0 -12px 40px var(--c-shadow);
+}
+
+.pa-sheet__in {
+  display: grid;
+  gap: 12px;
+  width: 100%;
+  max-width: var(--pa-col);
+  margin-inline: auto;
+}
+
+.pa-sheet__grip {
+  justify-self: center;
+  width: 40px;
+  height: 4px;
+  border-radius: var(--radius-pill);
+  background: var(--c-line);
+}
+
+.pa-sheet__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.pa-sheet ul {
+  list-style: none;
+  padding: 0;
+}
+
+.pa-sheet li {
+  padding: 11px 0;
+  border-top: 1px solid var(--c-line);
+  font-size: 0.875rem;
+  overflow-wrap: anywhere;
+}
+
+.pa-sheet li small {
+  display: block;
+  color: var(--c-ink2);
+}
+
+.pa-sheet li a {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  font-weight: 800;
+  color: var(--c-link);
+}
+
+.pa-sheet p {
+  font-size: 0.875rem;
+  color: var(--c-ink2);
+}
+
+.pa-excerpt {
+  margin-top: 6px;
+  display: -webkit-box;
+  -webkit-line-clamp: 4;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.pa-src-li[data-on] strong {
+  color: var(--c-link);
+}
+
+/* Abierto con el teclado: aparece en su sitio, sin recorrido. */
+.pa-menu[data-quick],
+.pa-sheet[data-quick],
+.pa-scrim[data-quick] {
+  transition-duration: 0s;
+  transition-delay: 0s;
+}
+
+/* --- «Instalar a Pilo» ------------------------------------------------------------------- */
+
+.pa-install {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto 44px;
+  align-items: center;
+  gap: 8px;
+  margin: 0 var(--pa-side-r) 8px var(--pa-side);
+  padding: 6px 4px 6px 14px;
+  border: 1px solid var(--c-line);
+  border-radius: var(--radius-md);
+  background: var(--c-bubble);
+  font-size: 0.8125rem;
+  font-weight: 700;
+}
+
+.pa-install .pa-btn {
+  min-height: 44px;
+  padding-block: 6px;
+  font-size: 0.8125rem;
+}
+
+.pa-steps-list {
+  counter-reset: paso;
+}
+
+.pa-steps-list li {
+  counter-increment: paso;
+  display: grid;
+  grid-template-columns: 28px minmax(0, 1fr);
+  gap: 10px;
+  align-items: start;
+}
+
+.pa-steps-list li::before {
+  content: counter(paso);
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: var(--c-chip);
+  color: var(--c-link);
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+}
+
+/* --- Quién pregunta (RolePicker), con los colores del tema -------------------------------- */
+
+.pa .ap-rolp__q {
+  color: var(--c-ink2);
+}
+
+.pa .ap-rolp__b {
+  display: inline-flex;
+  align-items: center;
+  min-height: 46px;
+  padding: 0 16px;
+  border: 1px solid var(--c-line);
+  border-radius: var(--radius-pill);
+  background: var(--c-bubble);
+  color: var(--c-ink);
+  font-size: 0.875rem;
+  font-weight: 800;
+}
+
+.pa .ap-rolp__b[data-quiet] {
+  background: none;
+  color: var(--c-ink2);
+}
+
+.pa .ap-rolp__b[aria-pressed="true"] {
+  border-color: var(--c-link);
+  background: var(--c-chip);
+  color: var(--c-link);
+}
+
+.pa .pa-w .ap-rolp__opts {
+  justify-content: center;
+}
+
+.pa .pa-w .ap-rolp__b {
+  min-height: 50px;
+  padding: 0 22px;
+  border-color: transparent;
+  background: var(--acc);
+  color: var(--acc-ink);
+}
+
+.pa .pa-w .ap-rolp__b[data-quiet] {
+  border-color: var(--s-line);
+  background: none;
+  color: var(--s-ink);
+}
+
+.pa .pa-w .ap-rolp__b:focus-visible,
+.pa-w :focus-visible {
+  outline-color: var(--s-ink);
+}
+
+/* --- Bienvenida -------------------------------------------------------------------------- */
+
+.pa-w {
+  position: absolute;
+  inset: 0;
+  z-index: 20;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  color: var(--s-ink);
+}
+
+/* El fondo va en su propia capa: se cierra en círculo sin recortar a Pilo mientras vuela. */
+.pa-w-bg {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  overflow: hidden;
+  background: radial-gradient(120% 90% at 50% 34%, var(--s1) 0%, var(--s2) 46%, var(--s3) 100%);
+}
+
+.pa[data-tema="futurista"] .pa-w-bg::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background:
+    linear-gradient(var(--s-line) 1px, transparent 1px) 0 0 / 100% 34px,
+    linear-gradient(90deg, var(--s-line) 1px, transparent 1px) 0 0 / 34px 100%;
+  opacity: 0.35;
+  -webkit-mask: linear-gradient(transparent 35%, #000);
+  mask: linear-gradient(transparent 35%, #000);
+}
+
+.pa-w-glow {
+  position: absolute;
+  left: 50%;
+  top: 30%;
+  width: 520px;
+  aspect-ratio: 1;
+  translate: -50% -50%;
+  border-radius: 50%;
+  background: radial-gradient(closest-side, var(--s-glow), transparent);
+  pointer-events: none;
+}
+
+.pa-w-rings i {
+  position: absolute;
+  left: 50%;
+  top: 30%;
+  translate: -50% -50%;
+  border-radius: 50%;
+  border: 1px solid var(--s-line);
+  pointer-events: none;
+}
+
+.pa-w-top {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: calc(14px + env(safe-area-inset-top, 0px)) max(16px, env(safe-area-inset-right, 0px)) 6px max(16px, env(safe-area-inset-left, 0px));
+}
+
+.pa-w-brand {
+  min-width: 0;
+  margin-right: auto;
+  font-size: 0.75rem;
+  font-weight: 700;
+  line-height: 1.25;
+  color: var(--s-muted);
+}
+
+.pa-w-brand b {
+  display: block;
+  font-size: 0.8125rem;
+  font-weight: 800;
+  color: var(--s-ink);
+}
+
+.pa-sbtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  flex: none;
+  min-width: 44px;
+  min-height: 44px;
+  padding: 8px 14px;
+  border: 1px solid var(--s-line);
+  border-radius: var(--radius-pill);
+  color: var(--s-ink);
+  font-size: 0.8125rem;
+  font-weight: 700;
+}
+
+.pa-sbtn--icon {
+  width: 44px;
+  padding: 0;
+}
+
+.pa-sbtn[aria-pressed="true"] {
+  background: var(--s-chip);
+  border-color: var(--acc);
+}
+
+.pa-sbtn:focus-visible {
+  border-radius: var(--radius-pill);
+}
+
+/* `safe center`: si en una pantalla baja no cabe, sobra hacia abajo y no tapa a Pilo. */
+.pa-w-center {
+  display: grid;
+  justify-items: center;
+  align-content: center;
+  align-content: safe center;
+  gap: 12px;
+  min-height: 0;
+  min-width: 0;
+  padding: 0 18px;
+  text-align: center;
+  overflow: hidden;
+}
+
+.pa-w-slot,
+.pa-w-fly {
+  width: 176px;
+  height: 176px;
+}
+
+.pa-w-title {
+  font: 700 1.9rem/1.05 var(--font-display);
+  letter-spacing: -0.03em;
+  text-wrap: balance;
+}
+
+.pa-w-word {
+  display: inline-block;
+  white-space: nowrap;
+  margin: 0 0.1em;
+}
+
+.pa-w-title .ch {
+  display: inline-block;
+}
+
+.pa-w-mood {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 24px;
+  max-width: 100%;
+  padding: 2px 10px;
+  border-radius: var(--radius-pill);
+  background: var(--s-chip);
+  font-size: 0.75rem;
+  font-weight: 800;
+  color: var(--s-muted);
+}
+
+.pa-w-mood i {
+  flex: none;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--acc);
+}
+
+.pa-w-bubble {
+  max-width: min(30ch, 100%);
+  min-height: 4.4em;
+  font-size: 1.05rem;
+  font-weight: 600;
+  line-height: 1.42;
+}
+
+.pa-w-bubble .wd {
+  display: inline-block;
+  white-space: pre;
+}
+
+.pa-w-exhibit {
+  display: grid;
+  width: 100%;
+  max-width: 420px;
+  min-height: 108px;
+  align-items: center;
+}
+
+.pa-w-demo {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: center;
+  align-content: center;
+  min-width: 0;
+}
+
+.pa-know {
+  padding: 6px 12px;
+  border: 1px solid var(--s-line);
+  border-radius: var(--radius-sm);
+  background: var(--s-chip);
+  font-size: 0.78rem;
+  font-weight: 700;
+}
+
+.pa-qchip,
+.pa-ticket {
+  background: var(--w-card);
+  color: var(--w-card-ink);
+  font-size: 0.8rem;
+  font-weight: 700;
+  box-shadow: 0 10px 22px -8px var(--c-shadow);
+}
+
+.pa-qchip {
+  padding: 8px 13px;
+  border-radius: 16px 16px 16px 4px;
+}
+
+.pa-ticket {
+  display: grid;
+  gap: 2px;
+  padding: 10px 16px;
+  border-radius: var(--radius-sm);
+}
+
+.pa-ticket em {
+  font-style: normal;
+  font-size: 0.6875rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  color: var(--w-card-ok);
+}
+
+.pa-choose {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 10px;
+  width: 100%;
+}
+
+.pa-choose button {
+  min-height: 76px;
+  padding: 12px 8px;
+  border: 1px solid var(--s-line);
+  border-radius: var(--radius-lg);
+  background: var(--s-chip);
+  color: var(--s-ink);
+  font-size: 0.9rem;
+  font-weight: 800;
+  line-height: 1.2;
+}
+
+.pa-choose button small {
+  display: block;
+  margin-top: 3px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--s-muted);
+}
+
+.pa-choose button:focus-visible {
+  border-radius: var(--radius-lg);
+}
+
+.pa-w-foot {
+  display: grid;
+  gap: 12px;
+  width: 100%;
+  max-width: 456px;
+  margin-inline: auto;
+  padding: 6px 18px calc(20px + env(safe-area-inset-bottom, 0px));
+}
+
+.pa-segs {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.pa-segs span {
+  flex: 1;
+  height: 4px;
+  overflow: hidden;
+  border-radius: var(--radius-pill);
+  background: var(--s-line);
+}
+
+.pa-segs span i {
+  display: block;
+  height: 100%;
+  background: var(--acc);
+  transform: scaleX(0);
+  transform-origin: left;
+}
+
+.pa-segs small {
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: var(--s-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.pa-w-actions {
+  display: flex;
+  justify-content: flex-end;
+  min-height: 46px;
+}
+
+.pa-w-next {
+  min-height: 46px;
+  padding: 10px 22px;
+  border-radius: var(--radius-pill);
+  background: var(--acc);
+  color: var(--acc-ink);
+  font-weight: 800;
+}
+
+.pa-w-next:focus-visible {
+  border-radius: var(--radius-pill);
+}
+
+/* --- Pantallas bajas y anchas -------------------------------------------------------------- */
+
+@media (max-height: 700px) {
+  .pa-w-slot,
+  .pa-w-fly {
+    width: 132px;
+    height: 132px;
+  }
+  .pa-w-exhibit {
+    min-height: 92px;
+  }
+  .pa-w-title {
+    font-size: 1.6rem;
+  }
+  .pa-w-bubble {
+    font-size: 1rem;
+  }
+}
+
+@media (max-height: 610px) {
+  .pa-w-slot,
+  .pa-w-fly {
+    width: 100px;
+    height: 100px;
+  }
+  .pa-w-center {
+    gap: 8px;
+  }
+  .pa-w-bubble {
+    min-height: 0;
+  }
+}
+
+/* Teléfono acostado: Pilo se achica (entero, a su proporción) para caber con el texto. */
+@media (max-height: 520px) {
+  .pa-w-slot,
+  .pa-w-fly {
+    width: 84px;
+    height: 84px;
+  }
+  .pa-w-mood {
+    display: none;
+  }
+  .pa-w-bubble {
+    min-height: 0;
+  }
+  .pa-w-exhibit {
+    min-height: 0;
+  }
+  .pa-w-center {
+    gap: 6px;
+  }
+}
+
+@media (max-width: 340px) {
+  .pa-choose {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .pa-choose button {
+    min-height: 56px;
+  }
+}
+
+@media (min-width: 760px) {
+  .pa-sheet {
+    left: 50%;
+    right: auto;
+    width: min(560px, 100%);
+    translate: -50% 0;
+  }
+}
+
+/* --- Movimiento reducido -------------------------------------------------------------------- */
+
+@media (prefers-reduced-motion: reduce) {
+  .pa-menu,
+  .pa-sheet,
+  .pa-scrim {
+    transition-duration: 1ms;
+    transition-delay: 0s;
+  }
+
+  .pa-icon:active,
+  .pa-btn:active,
+  .pa-sbtn:active,
+  .pa-sug:active,
+  .pa-mi:active,
+  .pa-tema:active,
+  .pa-two button:active,
+  .pa-act:active,
+  .pa-src:active,
+  .pa-choose button:active,
+  .pa-w-next:active,
+  .pa-send:active,
+  .pa .ap-rolp__b:active {
+    transform: none;
+  }
+}

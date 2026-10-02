@@ -630,6 +630,17 @@ export function prefetchPilo(texts: string[], options: { portal: AskPortal | nul
   for (const text of texts) if (text.trim()) void audioFor(text, options.portal, options.style, options.rol);
 }
 
+/**
+ * El audio de la voz oficial de un texto, sin reproducirlo: el mismo pedido y
+ * la misma caché que usan prefetchPilo y sayWithPilo. null si la voz no está
+ * disponible. Lo usa quien no admite otra voz que la oficial (la app móvil):
+ * si no hay audio, se queda con el texto.
+ */
+export function piloAudio(text: string, options: { portal: AskPortal | null; advanced: boolean; style?: string; rol?: string | null }): Promise<Blob | null> {
+  if (!options.advanced || !options.portal || !text.trim()) return Promise.resolve(null);
+  return audioFor(text, options.portal, options.style, options.rol);
+}
+
 export async function sayWithPilo(
   text: string,
   options: { portal: AskPortal | null; advanced: boolean; rate?: number; pitch?: number; style?: string; rol?: string | null },

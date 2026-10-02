@@ -264,7 +264,7 @@ export function DocumentsPanel({ space, disabled }: MemoryPartProps) {
           const left = await indexPending(space, (pending) =>
             reading.set({ owner: OWNER, title: `${STEP_TEXT.vectores.doing}: «${ctx.title}»`, line: pending ? `Faltan ${pending.toLocaleString("es-CO")} vectores en este espacio.` : "Índice al día." }),
           );
-          if (left > 0) throw new StepError({ ...faultFrom(502, { error: `Quedaron ${left.toLocaleString("es-CO")} sin vector.` }), title: "El índice no quedó completo", hint: "El documento ya responde por palabras. Reintente, o use «Indexar por significado» más abajo.", retry: true });
+          if (left > 0) throw new StepError({ ...faultFrom(502, { error: `Quedaron ${left.toLocaleString("es-CO")} sin vector.` }), title: "El índice no quedó completo", hint: "El documento ya responde por palabras. Reintente, o use «Indexar por significado», en el momento «Comprender».", retry: true });
         },
       },
       say,

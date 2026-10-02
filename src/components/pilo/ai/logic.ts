@@ -3050,16 +3050,54 @@ export interface ComprehendPassage {
   body: string;
 }
 
-/** Cuántos pasajes entran en un lote, cuántos en cada pedido al modelo y cuánto se guarda de cada uno. */
-export const COMPREHEND_BATCH = 18;
+/** Cuántos pasajes entran en un lote, cuántos en cada pedido al modelo y cuánto se guarda de cada uno.
+    La base acepta hasta 60 pasajes por lote (0115) y, desde 0118, 6 temas y 5 referencias por pasaje;
+    sin 0118 guarda los 4 y 3 primeros y descarta el resto, sin fallar. */
+export const COMPREHEND_BATCH = 36;
 export const COMPREHEND_CALL = 6;
-export const COMPREHEND_TOPICS = 4;
-export const COMPREHEND_REFS = 3;
-/** Cuántos temas ya existentes se le ofrecen para que los reutilice. */
-export const COMPREHEND_KNOWN = 80;
-/** Lo más que dura un lote, con todos sus pedidos. */
-export const COMPREHEND_MS = 60_000;
-const COMPREHEND_BODY_CHARS = 1500;
+export const COMPREHEND_TOPICS = 6;
+export const COMPREHEND_REFS = 5;
+/** Cuántos temas ya existentes se le ofrecen para que los reutilice (la base da hasta 300). */
+export const COMPREHEND_KNOWN = 200;
+/** Lo más que dura un lote, con todos sus pedidos, bajo el tope de partida de la plataforma (150 s). */
+export const COMPREHEND_MS = 120_000;
+/** Cuánto se lee de cada pasaje. */
+export const COMPREHEND_BODY_CHARS = 2400;
+/** Lo que puede escribir el modelo en un pedido: caben 6 pasajes con sus temas y, si razona aparte, su razonamiento. */
+export const COMPREHEND_MAX_TOKENS = 3000;
+/** Lo que se aparta del tope de la plataforma para leer los pendientes, guardar, contar y anotar. */
+export const COMPREHEND_RESERVE_MS = 30_000;
+/** «Comprender» responde de una vez (JSON): un pedido sin actividad se corta a los 150 s aunque el plan deje más. */
+export const COMPREHEND_IDLE_MS = 150_000;
+/** Lo que se guarda al final de cada pedido para guardar lo comprendido antes de que se acabe el lote. */
+export const COMPREHEND_SAVE_MS = 8_000;
+/** Con menos de esto no se empieza otro pedido: no alcanzaría a responder. */
+export const COMPREHEND_MIN_CALL_MS = 12_000;
+/** Cuántos temas caben en la línea de una fuente del pedido de «preguntar». */
+const WHERE_TOPICS = 4;
+
+/**
+ * El presupuesto de un lote según el tope real de la plataforma: todo lo que
+ * deja, menos la reserva, y nunca más que el corte por inactividad. Con el
+ * tope de partida (150 s) son 120 s; con uno menor, lo que quede (30 s o más).
+ */
+export function comprehendBudget(capMs: number): number {
+  const cap = Number.isFinite(capMs) && capMs > 0 ? capMs : COMPREHEND_IDLE_MS;
+  return Math.max(30_000, Math.min(cap, COMPREHEND_IDLE_MS) - COMPREHEND_RESERVE_MS);
+}
+
+/**
+ * Cuánto puede tardar el siguiente pedido de un lote, o 0 si ya no conviene
+ * empezarlo: con poco tiempo, o con menos del que tardó el pedido más lento de
+ * este lote (más un cuarto), el modelo no alcanzaría a responder y se perdería
+ * su trabajo. Lo que no se empieza sigue pendiente para el lote siguiente.
+ */
+export function comprehendCallMs(leftMs: number, slowestMs = 0): number {
+  const room = Math.floor(leftMs) - COMPREHEND_SAVE_MS;
+  if (!(room >= COMPREHEND_MIN_CALL_MS)) return 0;
+  if (slowestMs > 0 && room < slowestMs * 1.25) return 0;
+  return room;
+}
 
 const COMPREHEND_RULES = [
   "Eres el bibliotecario de Mr. Pilo, en la Universidad de Santander (UDES). Lees pasajes de documentos y dices de qué trata cada uno, para armar un mapa de conexiones entre ellos.",
@@ -3314,7 +3352,7 @@ export function docOutline(
 export function passageWhere(collection: string, title: string, section: string, topics: string[] = []): string {
   const tidy = (v: string) => String(v ?? "").replace(/\s+/g, " ").trim();
   const path = [tidy(collection), tidy(title), tidy(section)].filter(Boolean).join(" › ");
-  const names = topics.map(tidy).filter(Boolean).slice(0, COMPREHEND_TOPICS);
+  const names = topics.map(tidy).filter(Boolean).slice(0, WHERE_TOPICS);
   return `${path}${names.length ? ` · temas: ${names.join(", ")}` : ""}`;
 }
 

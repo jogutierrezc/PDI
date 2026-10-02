@@ -18,13 +18,15 @@
      pasaje que Pilo tiene de él (tabla pilo_memory, mismo ref), su ruta, lo
      que contiene, de qué más cuelga y el enlace a su página pública.
    - El nodo elegido va en la dirección (?nodo=…): se puede compartir.
+   - «Mapa global de los dos Pilos» (?vista=global) cambia esta malla por el
+     mapa que la une con la de Pilo en Enseñanza (mapa-global/GlobalMap).
 
    Teclado: en el mapa, las flechas recorren la columna (arriba y abajo) y la
    cadena (izquierda al padre, derecha al primer hijo); Intro elige; Escape
    suelta. Lo que se hace con el teclado no se anima.
    ========================================================================== */
 
-import { useCallback, useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { Suspense, lazy, useCallback, useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from "react";
 import type { KeyboardEvent as ReactKeyboardEvent, MutableRefObject } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
@@ -79,7 +81,54 @@ export function usePassage(ref: string | null, space: PiloSpace = DEFAULT_SPACE)
 
 /* --- La vista ---------------------------------------------------------------------------------- */
 
+// El mapa global usa piezas de este archivo: se carga aparte, solo cuando se pide.
+const GlobalMap = lazy(() => import("./mapa-global/GlobalMap"));
+
+/** La malla de Pregúntele a Pilo o, a un clic, el mapa global de los dos Pilos. */
 export function MeshView({ onAskRefresh }: { onAskRefresh: () => void }) {
+  const [params, setParams] = useSearchParams();
+  const global = params.get("vista") === "global";
+  const show = (next: boolean) =>
+    setParams(
+      (prev) => {
+        const out = new URLSearchParams(prev);
+        if (next) out.set("vista", "global");
+        else out.delete("vista");
+        out.delete("nodo");
+        return out;
+      },
+      { replace: true },
+    );
+
+  return (
+    <div className="msh">
+      <div className="pis-seg pis-seg--sm" role="radiogroup" aria-label="Qué mapa se ve">
+        <button type="button" role="radio" aria-checked={!global} onClick={() => show(false)}>
+          Malla de Pregúntele a Pilo
+        </button>
+        <button type="button" role="radio" aria-checked={global} onClick={() => show(true)}>
+          Mapa global de los dos Pilos
+        </button>
+      </div>
+      {global ? (
+        <Suspense
+          fallback={
+            <div className="msh-state" aria-busy="true">
+              <span className="msh-skeleton" />
+              <p>Abriendo el mapa global…</p>
+            </div>
+          }
+        >
+          <GlobalMap focus="todo" />
+        </Suspense>
+      ) : (
+        <OwnMesh onAskRefresh={onAskRefresh} />
+      )}
+    </div>
+  );
+}
+
+function OwnMesh({ onAskRefresh }: { onAskRefresh: () => void }) {
   const overview = useMeshOverview();
   const [params, setParams] = useSearchParams();
   const selected = params.get("nodo");

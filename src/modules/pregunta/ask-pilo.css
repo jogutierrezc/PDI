@@ -623,10 +623,22 @@
 }
 
 .ap-a {
+  --ap-face: 52px;
   display: grid;
-  grid-template-columns: 42px minmax(0, 1fr);
+  grid-template-columns: var(--ap-face) minmax(0, 1fr);
   gap: 14px;
   align-items: start;
+}
+
+/* La cara de quien responde. El dibujo es más alto que ancho (450 × 631) y se
+   encaja entero en un cuadro: en 42 px quedaba de 30 px de ancho y se perdía.
+   Acompaña a la respuesta mientras se lee: en una larga se queda a la vista,
+   arriba, en vez de irse con el primer renglón. Nunca se recorta ni se estira. */
+.ap-a__face {
+  position: sticky;
+  top: 10px;
+  width: var(--ap-face);
+  height: var(--ap-face);
 }
 
 .ap-a__body {
@@ -1294,6 +1306,11 @@
   .ap-hello__slot {
     width: 88px;
     height: 88px;
+  }
+  /* En el teléfono la cara cede ancho al texto, sin bajar de un tamaño en que se reconoce. */
+  .ap-a {
+    --ap-face: 44px;
+    gap: 10px;
   }
 }
 

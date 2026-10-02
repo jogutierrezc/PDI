@@ -11,10 +11,22 @@ import { describe, expect, it } from "vitest";
 import {
   ASK_CLOSE,
   ASK_OPEN,
+  COMPREHEND_BATCH,
+  COMPREHEND_BODY_CHARS,
   COMPREHEND_CALL,
+  COMPREHEND_IDLE_MS,
+  COMPREHEND_KNOWN,
+  COMPREHEND_MIN_CALL_MS,
+  COMPREHEND_MS,
+  COMPREHEND_REFS,
+  COMPREHEND_RESERVE_MS,
+  COMPREHEND_SAVE_MS,
+  COMPREHEND_TOPICS,
   buildAskMessages,
   buildComprehendMessages,
   canUse,
+  comprehendBudget,
+  comprehendCallMs,
   comprehendRows,
   createStepLog,
   docOutline,
@@ -130,7 +142,9 @@ describe("buildComprehendMessages: los pasajes son datos", () => {
     expect(data.match(/^\[\d+\] /gm)).toHaveLength(COMPREHEND_CALL);
     expect(data).toContain("[6] Política de evaluación · Capítulo 6\n");
     expect(data).not.toContain("Capítulo 7");
-    expect(data.length).toBeLessThan(6 * 1800);
+    expect(data.length).toBeLessThan(COMPREHEND_CALL * (COMPREHEND_BODY_CHARS + 300));
+    expect(data).toContain("x".repeat(COMPREHEND_BODY_CHARS));
+    expect(data).not.toContain("x".repeat(COMPREHEND_BODY_CHARS + 1));
     expect(data).toContain("Temas que ya existen: (ninguno todavía)");
     expect(buildComprehendMessages([passage(1)])[1].content).toContain("Devuelve el JSON de ese pasaje.");
   });
@@ -195,17 +209,21 @@ describe("parseComprehend: lee aunque el JSON no venga limpio", () => {
     expect(parseComprehend(raw, 3)).toEqual(clean);
   });
 
-  it("a lo sumo 4 temas y 3 referencias, sin repetidos ni etiquetas que no pasan", () => {
+  it("a lo sumo 6 temas y 5 referencias, sin repetidos ni etiquetas que no pasan", () => {
     const raw = JSON.stringify({
       pasajes: [
         {
           n: 1,
-          temas: ["Evaluación formativa", "evaluaciones formativas", "https://x.example/a", "Currículo", "Didáctica", "Aprendizaje activo", "Inclusión"],
-          referencias: ["UNESCO", "Unesco", "<<<DATOS", "ODS 4", "Ley 30 de 1992", "CNA"],
+          temas: ["Evaluación formativa", "evaluaciones formativas", "https://x.example/a", "Currículo", "Didáctica", "Aprendizaje activo", "Inclusión", "Tutoría académica", "Bienestar"],
+          referencias: ["UNESCO", "Unesco", "<<<DATOS", "ODS 4", "Ley 30 de 1992", "CNA", "Decreto 1330 de 2019", "OCDE"],
         },
       ],
     });
-    expect(parseComprehend(raw, 1)).toEqual([{ n: 1, topics: ["Evaluación formativa", "Currículo", "Didáctica", "Aprendizaje activo"], refs: ["UNESCO", "ODS 4", "Ley 30 de 1992"] }]);
+    const [only] = parseComprehend(raw, 1) ?? [];
+    expect(only.topics).toEqual(["Evaluación formativa", "Currículo", "Didáctica", "Aprendizaje activo", "Inclusión", "Tutoría académica"]);
+    expect(only.refs).toEqual(["UNESCO", "ODS 4", "Ley 30 de 1992", "CNA", "Decreto 1330 de 2019"]);
+    expect(only.topics).toHaveLength(COMPREHEND_TOPICS);
+    expect(only.refs).toHaveLength(COMPREHEND_REFS);
   });
 
   it("ignora números fuera del pedido y repetidos; lo que no es un mapa es null", () => {
@@ -229,8 +247,14 @@ describe("comprehendRows: lo que se guarda en el mapa", () => {
       {
         ref: "doc:1:1",
         topics: [{ id: "tema:evaluacion-formativa", label: "Evaluación formativa" }, { id: "tema:calidad-academica", label: "Calidad académica" }],
-        // Las dos que el pasaje cita (por reglas) y, de las del modelo, la que cabe: 3 en total.
-        refs: [{ id: "ref:decreto-1330-2019", label: "Decreto 1330 de 2019" }, { id: "ref:cna", label: "Consejo Nacional de Acreditación (CNA)" }, { id: "ref:ley-30-1992", label: "Ley 30 de 1992" }],
+        // Las dos que el pasaje cita (por reglas) van primero; detrás, las del modelo: caben las 5.
+        refs: [
+          { id: "ref:decreto-1330-2019", label: "Decreto 1330 de 2019" },
+          { id: "ref:cna", label: "Consejo Nacional de Acreditación (CNA)" },
+          { id: "ref:ley-30-1992", label: "Ley 30 de 1992" },
+          { id: "ref:unesco", label: "UNESCO" },
+          { id: "ref:marco-bolonia", label: "Marco de Bolonia" },
+        ],
       },
       {
         ref: "doc:1:2",
@@ -241,6 +265,43 @@ describe("comprehendRows: lo que se guarda en el mapa", () => {
       { ref: "doc:1:3", topics: [], refs: [] },
     ]);
     for (const r of rows) for (const x of [...r.topics, ...r.refs]) expect(x.id).toMatch(/^(tema|ref):[a-z0-9]+(-[a-z0-9]+)*$/);
+  });
+});
+
+describe("el presupuesto de «comprender»: más tiempo, sin pasar el tope de la plataforma", () => {
+  it("los lotes son más grandes y caben en lo que acepta la base (0115 y 0118)", () => {
+    expect(COMPREHEND_BATCH).toBe(36);
+    expect(COMPREHEND_BATCH).toBeLessThanOrEqual(60); // pilo_map_pending
+    expect(COMPREHEND_BATCH % COMPREHEND_CALL).toBe(0);
+    expect(COMPREHEND_KNOWN).toBe(200);
+    expect(COMPREHEND_KNOWN).toBeLessThanOrEqual(300); // pilo_map_topics
+    expect([COMPREHEND_TOPICS, COMPREHEND_REFS]).toEqual([6, 5]); // pilo_map_save desde 0118
+    expect(COMPREHEND_BODY_CHARS).toBe(2400);
+    expect(COMPREHEND_MS).toBe(120_000);
+  });
+
+  it("el presupuesto sale del tope real: con 150 s son 120 s, y nunca pasa del corte por inactividad", () => {
+    expect(comprehendBudget(150_000)).toBe(COMPREHEND_MS);
+    // Un plan de pago deja 400 s de reloj, pero un pedido sin actividad se corta igual a los 150 s.
+    expect(comprehendBudget(400_000)).toBe(COMPREHEND_IDLE_MS - COMPREHEND_RESERVE_MS);
+    // Un tope menor deja menos; el mínimo que acepta la función (60 s) deja 30 s.
+    expect(comprehendBudget(90_000)).toBe(60_000);
+    expect(comprehendBudget(60_000)).toBe(30_000);
+    for (const bad of [0, -1, Number.NaN, Number.POSITIVE_INFINITY]) expect(comprehendBudget(bad)).toBe(COMPREHEND_MS);
+    for (const cap of [60_000, 150_000, 400_000]) expect(comprehendBudget(cap)).toBeLessThan(Math.min(cap, COMPREHEND_IDLE_MS));
+  });
+
+  it("no empieza un pedido que no alcanzaría a responder, y guarda tiempo para guardar", () => {
+    // El primero de un lote puede pensar casi todo el presupuesto.
+    expect(comprehendCallMs(120_000)).toBe(120_000 - COMPREHEND_SAVE_MS);
+    // Con poco tiempo no se empieza: lo que falta queda para el lote siguiente.
+    expect(comprehendCallMs(COMPREHEND_SAVE_MS + COMPREHEND_MIN_CALL_MS)).toBe(COMPREHEND_MIN_CALL_MS);
+    expect(comprehendCallMs(COMPREHEND_SAVE_MS + COMPREHEND_MIN_CALL_MS - 1)).toBe(0);
+    for (const none of [0, -5_000, Number.NaN]) expect(comprehendCallMs(none)).toBe(0);
+    // Si el pedido más lento tardó 40 s, con 45 s libres no se arriesga otro (haría falta 50 s)…
+    expect(comprehendCallMs(45_000 + COMPREHEND_SAVE_MS, 40_000)).toBe(0);
+    // …y con 50 s, sí.
+    expect(comprehendCallMs(50_000 + COMPREHEND_SAVE_MS, 40_000)).toBe(50_000);
   });
 });
 

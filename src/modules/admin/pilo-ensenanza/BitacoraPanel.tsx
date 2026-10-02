@@ -8,6 +8,10 @@
    Pedidos          pilo_ai_log con space = 'ensenanza', por día (created_at) y
                     por rol (columna rol). Nada identifica al visitante.
 
+   Primero lo que pide atención: si el cupo de preguntas o el de voz está por
+   agotarse, se dice arriba, antes de los medidores. El uso de hoy y quién
+   preguntó comparten una hoja; los pedidos van en la suya.
+
    Solo lectura: aquí no hay nada que guardar. Los cupos se cambian en
    «Pregúntele a Pilo».
    ========================================================================== */
@@ -19,7 +23,7 @@ import type { SpaceEditor } from "./PreguntaPanel";
 import { LOG_PAGE, ROL_FILTERS, useSpaceLog, useSpaceUsage } from "./store";
 import type { RolFilter, SpaceUsage } from "./store";
 import { fillBar } from "./motion";
-import { Meter, RolTag, Skeleton, useEnter } from "./ui";
+import { Meter, RolTag, Sheet, Skeleton, useEnter } from "./ui";
 
 const LOG_TONE = (status: string, cached: boolean) =>
   cached || status === "listo" ? ("ok" as const) : status === "revisar" || status === "limite" ? ("warn" as const) : ("fail" as const);
@@ -46,8 +50,19 @@ export function BitacoraPanel({ ed, onQuotas }: { ed: SpaceEditor; onQuotas: () 
 
   const refresh = () => client.invalidateQueries({ queryKey: ["pilo-ia", "espacio", s.id] });
 
+  // Lo que pide atención: un cupo en el tope o a punto de llegar.
+  const voiceLimit = shared?.voice_daily_limit ?? 0;
+  const near = (used: number, limit: number) => (limit > 0 ? used / limit >= 0.9 : used > 0);
+  const alerts = !u || missing ? [] : [near(u.today, saved.daily_limit) ? "preguntas con IA" : "", near(u.todayVoice, voiceLimit) ? "lecturas con voz" : ""].filter(Boolean);
+
   return (
     <>
+      <Sheet off={missing}>
+      {alerts.length > 0 && (
+        <p className="pis-warn" role="status">
+          <strong>El cupo de {alerts.join(" y de ")} de hoy está en el tope o por llegar.</strong> Al agotarse, Pilo sigue respondiendo, pero sin IA o con la voz del navegador, y lo dice.
+        </p>
+      )}
       <Group
         title="Uso de hoy"
         aside={
@@ -75,7 +90,7 @@ export function BitacoraPanel({ ed, onQuotas }: { ed: SpaceEditor; onQuotas: () 
             <Meter
               label="Lecturas con voz de hoy"
               used={u.todayVoice}
-              limit={shared?.voice_daily_limit ?? 0}
+              limit={voiceLimit}
               unit="lecturas con voz"
               full="Sin cupo, lee con la voz del navegador y lo dice."
             />
@@ -91,7 +106,9 @@ export function BitacoraPanel({ ed, onQuotas }: { ed: SpaceEditor; onQuotas: () 
       </Group>
 
       {u && !missing && <ByRol usage={u} />}
+      </Sheet>
 
+      <Sheet off={missing}>
       <Group title="Pedidos" aside={<small>Los {LOG_PAGE} más recientes del filtro</small>}>
         <div className="pen-filters">
           <label>
@@ -136,6 +153,7 @@ export function BitacoraPanel({ ed, onQuotas }: { ed: SpaceEditor; onQuotas: () 
           </ul>
         )}
       </Group>
+      </Sheet>
     </>
   );
 }

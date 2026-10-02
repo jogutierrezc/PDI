@@ -35,6 +35,8 @@ interface World {
   noVisitorTable: boolean;
   /** La búsqueda en la memoria falla (la base no responde). */
   memoryFails?: boolean;
+  /** Cuántos pasajes tienen vector (0108): con alguno, la búsqueda también va por significado. */
+  embedded?: number;
   logs: Row[];
   inbox: Row[];
   saved: Row[];
@@ -200,7 +202,7 @@ function fakeClient(w: World) {
         case "pilo_facts_campuses":
           return { data: ["Bucaramanga", "Cúcuta"], error: null };
         case "pilo_embed_status":
-          return { data: { memory_done: 0, facts_done: 0 }, error: null };
+          return { data: { memory_done: w.embedded ?? 0, facts_done: 0 }, error: null };
         case "pilo_memory_search":
           return w.memoryFails
             ? { data: null, error: { message: "tiempo agotado en la base" } }
@@ -1299,6 +1301,91 @@ describe("el espacio «ensenanza»", () => {
   });
 });
 
+/* =============================================================================
+   Un solo camino para los dos Pilos, y más ágil: lo que no depende entre sí se
+   lee a la vez. La búsqueda por palabras no espera al vector de la pregunta (un
+   pedido al proveedor), y el límite por visitante se cuenta a la par de lo que
+   se lee antes de buscar. Nada de eso cambia qué se busca ni con qué filtros.
+   ========================================================================== */
+
+describe("preguntar, el mismo camino en los dos espacios", () => {
+  /** Un proveedor que da vectores y redacta; anota qué se le había pedido ya a la base cuando le llegó el vector. */
+  const withVectors = (w: World, text: string) => {
+    const seen: string[][] = [];
+    const chats: Record<string, unknown>[] = [];
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (url: string, init: RequestInit) => {
+        if (String(url).includes("embeddings")) {
+          seen.push([...w.rpcs]);
+          return new Response(JSON.stringify({ data: [{ index: 0, embedding: Array.from({ length: 1024 }, () => 0.03) }] }), { headers: { "Content-Type": "application/json" } });
+        }
+        chats.push(JSON.parse(String(init.body)) as Record<string, unknown>);
+        return stream(text)();
+      }),
+    );
+    return { seen, chats };
+  };
+
+  it("la búsqueda por palabras sale sin esperar al vector, en Planeación y en Enseñanza", async () => {
+    const plan = world();
+    plan.embedded = 3;
+    const a = withVectors(plan, "En 2024 hubo 20.500 estudiantes matriculados [1]. ");
+    const first = await allEvents(await ask(await boot(plan), { question: "¿Cuántos estudiantes matriculados hay?", stream: true }));
+    expect(first[first.length - 1]).toMatchObject({ event: "done", data: { kind: "ia" } });
+    // Un solo vector por pregunta, aunque lo usen el catálogo, la memoria y las cifras.
+    expect(a.seen).toHaveLength(1);
+    // Cuando el proveedor recibió el pedido del vector, la memoria y las cifras ya se estaban buscando por palabras.
+    expect(a.seen[0]).toEqual(expect.arrayContaining(["pilo_memory_search", "pilo_facts_search", "pilo_answer_candidates"]));
+    // Y el vector se usó: también se buscó por significado.
+    expect(plan.rpcs).toEqual(expect.arrayContaining(["pilo_memory_semantic", "pilo_facts_semantic"]));
+    expect(a.chats).toHaveLength(1);
+
+    const teachW = teachWorld();
+    teachW.embedded = 3;
+    const b = withVectors(teachW, "La evaluación formativa tiene 3 momentos [1]. ");
+    const second = await allEvents(await teach(await boot(teachW), { question: "¿Qué dice la política de evaluación?", stream: true }));
+    expect(second[second.length - 1]).toMatchObject({ event: "done", data: { kind: "ia" } });
+    expect(b.seen).toHaveLength(1);
+    expect(b.seen[0]).toEqual(expect.arrayContaining(["pilo_memory_search", "pilo_answer_candidates"]));
+    expect(teachW.rpcs).toContain("pilo_memory_semantic");
+    // La separación sigue igual: la búsqueda por significado lleva su espacio, y Enseñanza no mira las cifras.
+    for (const args of argsOf(teachW, "pilo_memory_semantic")) expect(args).toMatchObject({ p_space: "ensenanza", p_public_only: true });
+    for (const args of argsOf(plan, "pilo_memory_semantic")) expect(args).not.toHaveProperty("p_space");
+    expect(teachW.rpcs).not.toContain("pilo_facts_search");
+    expect(teachW.rpcs).not.toContain("pilo_facts_semantic");
+  });
+
+  it("los pasos que se ven son los mismos y en el mismo orden; solo cambian las capas de cada espacio", async () => {
+    const plan = world();
+    provider(stream("En 2024 hubo 20.500 estudiantes matriculados [1]. "));
+    const p = stepsOf(await allEvents(await ask(await boot(plan), { question: "¿Cuántos estudiantes matriculados hay?", stream: true })));
+    const teachW = teachWorld();
+    provider(stream("La evaluación formativa tiene 3 momentos [1]. "));
+    const t = stepsOf(await allEvents(await teach(await boot(teachW), { question: "¿Qué dice la política de evaluación?", stream: true })));
+    expectClosed(p);
+    expectClosed(t);
+    const order = (steps: StepData[]) => [...new Set(steps.map((x) => x.id))];
+    // Planeación consulta además las cifras en vivo; lo demás es idéntico.
+    expect(order(p)).toEqual(["entender", "catalogo", "guardadas", "cifras", "memoria", "redactar", "verificar"]);
+    expect(order(t)).toEqual(order(p).filter((id) => id !== "cifras"));
+  });
+
+  it("pasado el límite por visitante no se busca ni se llama al modelo, aunque se cuente a la par", async () => {
+    for (const [w, send] of [[world(), ask], [teachWorld(), teach]] as const) {
+      w.hits = 20;
+      w.embedded = 3;
+      const calls = provider(stream("no debería llamarse"));
+      const response = await send(await boot(w), { question: "¿Cuántos estudiantes matriculados hay?", stream: true });
+      expect(response.status).toBe(429);
+      expect(calls).toHaveLength(0);
+      for (const name of ["pilo_memory_search", "pilo_memory_semantic", "pilo_facts_search", "pilo_answer_candidates", "pilo_catalog_semantic", "pilo_graph_around", "pilo_graph_neighbors", "pilo_inbox_add"]) expect(w.rpcs, name).not.toContain(name);
+      expect(w.logs).toEqual([]);
+      expect(w.saved).toEqual([]);
+    }
+  });
+});
+
 /* --- El mapa de conexiones (0115) y Moodle (0116) -----------------------------------------
    Solo en el espacio nuevo. Al preguntar, tras los pasajes hallados se siguen las
    conexiones del mapa y se suman hasta 3 vecinos, detrás de los directos. «comprender»
@@ -1481,8 +1568,14 @@ describe("comprender (el mapa con IA)", () => {
     expect(userOf(calls[1]).match(/^\[\d+\] /gm)).toHaveLength(2);
     expect(userOf(calls[0])).toContain("Temas que ya existen: Evaluación formativa\n");
     expect(userOf(calls[1])).toContain("Temas que ya existen: Evaluación formativa; Comunidad académica\n");
-    expect(argsOf(w, "pilo_map_pending")).toEqual([{ p_space: "ensenanza", p_doc: null, p_limit: 18 }]);
-    expect(argsOf(w, "pilo_map_topics")).toEqual([{ p_space: "ensenanza", p_limit: 80 }]);
+    expect(argsOf(w, "pilo_map_pending")).toEqual([{ p_space: "ensenanza", p_doc: null, p_limit: 36 }]);
+    expect(argsOf(w, "pilo_map_topics")).toEqual([{ p_space: "ensenanza", p_limit: 200 }]);
+    // El modelo tiene más sitio para responder (y para razonar, si razona aparte).
+    expect(calls[0].body).toMatchObject({ max_tokens: 3000 });
+    // Lo nuevo de la respuesta, todo opcional: nada quedó sin pedir y el presupuesto es el del tope de partida.
+    expect(out).toMatchObject({ skipped: 0, budget_ms: 120_000 });
+    expect(typeof out.ms).toBe("number");
+    expect(out).not.toHaveProperty("cut");
     for (const a of argsOf(w, "pilo_map_save")) expect(a).toMatchObject({ p_space: "ensenanza" });
     // El tema repetido conserva su nombre; la dirección, la marca del pedido y el correo no entran.
     expect(w.mapSaved).toHaveLength(8);
@@ -1548,6 +1641,48 @@ describe("comprender (el mapa con IA)", () => {
     expect(calls).toHaveLength(3);
     expect(w.mapSaved).toHaveLength(6);
     expect(w.logs.at(-1)).toMatchObject({ action: "comprender", status: "parcial · comprender · limite_proveedor" });
+  });
+
+  it("un lote que se queda sin tiempo devuelve lo que alcanzó: no se detiene y lo demás sigue pendiente", async () => {
+    const w = mapWorld();
+    w.pending = pendingRows(18);
+    const handler = await boot(w);
+    // Un proveedor lento: cada pedido tarda 50 s del reloj de la función.
+    const real = Date.now.bind(Date);
+    let skew = 0;
+    const clock = vi.spyOn(Date, "now").mockImplementation(() => real() + skew);
+    const slow = () => {
+      skew += 50_000;
+      return chatJson(JSON.stringify({ pasajes: Array.from({ length: 6 }, (_, i) => ({ n: i + 1, temas: ["Evaluación formativa"], referencias: [] })) }))();
+    };
+    const calls = provider(slow);
+    try {
+      const out = (await (await comprehend(handler)).json()) as Row;
+      // Tras el primer pedido quedan 70 s: no alcanzan para otro de 50 s con su margen. No se empieza y no se pierde nada.
+      expect(calls).toHaveLength(1);
+      expect(out).toMatchObject({ ok: true, asked: 18, saved: 6, failed: 0, calls: 1, done: false, cut: "tiempo", skipped: 12, budget_ms: 120_000, status: { pending: 12, mapped: 6 } });
+      // Sin `stopped`: la página sigue sola con el lote siguiente.
+      expect(out).not.toHaveProperty("stopped");
+      expect(String(out.note)).toContain("quedó guardado");
+      expect(w.mapSaved).toHaveLength(6);
+      expect(w.pending).toHaveLength(12);
+      expect(w.logs.at(-1)).toMatchObject({ action: "comprender", status: "parcial · comprender · tiempo" });
+    } finally {
+      clock.mockRestore();
+    }
+  });
+
+  it("si el tiempo se acaba sin guardar nada, el lote sí se detiene (la página no insiste sola)", async () => {
+    const w = mapWorld();
+    w.pending = pendingRows(8);
+    const calls = provider(() => {
+      throw new DOMException("The operation timed out.", "TimeoutError");
+    });
+    const out = (await (await comprehend(await boot(w))).json()) as Row;
+    expect(calls).toHaveLength(1);
+    expect(out).toMatchObject({ ok: true, asked: 8, saved: 0, calls: 1, done: false, stopped: "tiempo", skipped: 2, status: { pending: 8 } });
+    expect(out).not.toHaveProperty("cut");
+    expect(w.mapSaved).toEqual([]);
   });
 
   it("sin IA dice que el mapa básico es lo que hay, y sin 0115 lo dice claro", async () => {

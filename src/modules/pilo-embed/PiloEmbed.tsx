@@ -768,7 +768,6 @@ function TurnView({
 
       {working && (
         <div className="pe-think" ref={think}>
-          <PiloMoji size={34} mood="piensa" />
           <span ref={stepText}>{step}</span>
           <span className="ap-dots" aria-hidden="true">
             <i />

@@ -1,8 +1,10 @@
 /* =============================================================================
    Mr. Pilo en Enseñanza · las piezas que se repiten en sus paneles.
 
-   Thinking     Pilo pensando: su cara aprobada («pensar»), tres puntos y qué
-                está haciendo; con avance conocido, una barra que lo sigue.
+   Thinking     Pilo pensando, en una línea y sin cara (Pilo vive en su panel):
+                tres puntos, qué hace y, con avance conocido, su barra.
+   Sheet        una hoja de trabajo que se apaga entera sin la migración 0113.
+   FoldRow      una fila plegable: cerrada dice su valor; abierta, sus controles.
    Meter        un contador de hoy contra su tope, con la barra que crece.
    Skeleton     filas de espera con la forma de lo que va a llegar.
    TextArea     un texto con tope y su contador.
@@ -13,13 +15,16 @@
 
 import { useEffect, useLayoutEffect, useRef } from "react";
 import type { ReactNode, RefObject } from "react";
-import { PiloFace } from "../../../components/pilo/PiloFace";
 import { Icon } from "../../../components/ui/Icon";
 import type { IconName } from "../../../components/ui/Icon";
 import { Group, StatusMark } from "../pilo/ui";
-import { enterList, fillBar, thinkingDots } from "./motion";
+import { enterBlock, enterList, fillBar, thinkingDots } from "./motion";
 
-/** Pilo pensando. `progress` (0 a 1) solo cuando el avance se conoce de verdad. */
+/**
+ * Pilo pensando, dicho en el sitio donde se pidió el trabajo. Sin cara: Pilo
+ * vive en su panel, y allí están su pose y el avance. `progress` (0 a 1) solo
+ * cuando se conoce de verdad. Lo anuncia el panel (role="status"), no esta línea.
+ */
 export function Thinking({ children, progress, detail }: { children: ReactNode; progress?: number; detail?: ReactNode }) {
   const dots = useRef<HTMLSpanElement>(null);
   const bar = useRef<HTMLSpanElement>(null);
@@ -34,10 +39,7 @@ export function Thinking({ children, progress, detail }: { children: ReactNode; 
   }, [progress]);
 
   return (
-    <div className="pen-think" role="status" aria-live="polite">
-      <span className="pen-think__face">
-        <PiloFace size={44} expression="pensar" alive />
-      </span>
+    <div className="pen-think">
       <span className="pen-think__text">
         <strong>
           {children}
@@ -49,12 +51,93 @@ export function Thinking({ children, progress, detail }: { children: ReactNode; 
         </strong>
         {detail && <small>{detail}</small>}
         {progress !== undefined && (
-          <i className="pen-think__bar" role="progressbar" aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(progress * 100)}>
+          <i className="pen-think__bar" role="progressbar" aria-label="Avance" aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(progress * 100)}>
             <span ref={bar} />
           </i>
         )}
       </span>
     </div>
+  );
+}
+
+/**
+ * Una hoja de trabajo. Sin la migración 0113 nada se puede guardar: `off`
+ * apaga de una vez todos sus controles (un fieldset), y lo de fuera —pestañas,
+ * momentos, cabeceras de fila— sigue respondiendo.
+ */
+export function Sheet({ off = false, children }: { off?: boolean; children: ReactNode }) {
+  return (
+    <fieldset className="pen-sheet" disabled={off}>
+      <div className="pis-sheet">{children}</div>
+    </fieldset>
+  );
+}
+
+/**
+ * Una fila plegable. Cerrada dice su valor (`summary`); abierta muestra sus
+ * controles. El contenido sigue montado al cerrarse (no se pierde lo que se
+ * estaba escribiendo); solo se oculta. Abrirla con el puntero se ve; con el
+ * teclado, no.
+ */
+export function FoldRow({
+  id,
+  title,
+  summary,
+  open,
+  dirty = false,
+  off = false,
+  onToggle,
+  children,
+}: {
+  id: string;
+  title: string;
+  summary: ReactNode;
+  open: boolean;
+  dirty?: boolean;
+  off?: boolean;
+  onToggle: (via: "pointer" | "keyboard") => void;
+  children: ReactNode;
+}) {
+  const body = useRef<HTMLDivElement>(null);
+  const via = useRef<"pointer" | "keyboard" | null>(null);
+
+  useLayoutEffect(() => {
+    if (open && via.current === "pointer") enterBlock(body.current);
+    via.current = null;
+  }, [open]);
+
+  return (
+    <section className="pen-row" data-open={open || undefined} aria-labelledby={`pen-row-${id}-t`}>
+      <h3 className="pen-row__h">
+        <button
+          type="button"
+          className="pen-row__head"
+          aria-expanded={open}
+          aria-controls={`pen-row-${id}`}
+          // Un clic sin puntero (Intro o espacio) llega con detail 0.
+          onClick={(e) => {
+            via.current = e.detail === 0 ? "keyboard" : "pointer";
+            onToggle(via.current);
+          }}
+        >
+          <span className="pen-row__title" id={`pen-row-${id}-t`}>
+            {title}
+            {dirty && (
+              <span className="pis-tabs__dot" title="Cambios sin guardar">
+                <span className="sr-only">(cambios sin guardar)</span>
+              </span>
+            )}
+          </span>
+          <span className="pen-row__sum">{summary}</span>
+          <Icon name="chevron-down" size={16} className="pen-row__chev" />
+        </button>
+      </h3>
+      <div className="pen-row__body" id={`pen-row-${id}`} hidden={!open} ref={body}>
+        <fieldset className="pen-sheet" disabled={off}>
+          <div className="pen-row__inner">{children}</div>
+        </fieldset>
+      </div>
+    </section>
   );
 }
 

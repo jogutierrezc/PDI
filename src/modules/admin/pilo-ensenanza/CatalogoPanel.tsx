@@ -14,6 +14,10 @@
      pregunta al catálogo de este Pilo, con el rol de quien la hizo, y la
      cierra con pilo_inbox_close.
 
+   Primero lo que pide atención: la bandeja va arriba, en su propia hoja, y
+   dice de entrada cuántas preguntas esperan respuesta; el catálogo completo
+   queda debajo, con los mismos datos de siempre.
+
    Se aplica al momento: no espera a «Guardar cambios».
    ========================================================================== */
 
@@ -29,14 +33,18 @@ import { SPACE_COPY } from "../pilo/space";
 import { Group, StatusMark, plural, when } from "../pilo/ui";
 import type { SpaceEditor } from "./PreguntaPanel";
 import { CATALOG_EXAMPLES, CATALOG_LEAD } from "./store";
-import { RolTag, Skeleton, useEnter } from "./ui";
+import { RolTag, Sheet, Skeleton, useEnter } from "./ui";
 
 export function CatalogoPanel({ ed }: { ed: SpaceEditor }) {
   const space = ed.s.id;
   return (
     <>
-      <CatalogSection space={space} examples={CATALOG_EXAMPLES} lead={CATALOG_LEAD} />
-      <InboxGroup ed={ed} />
+      <Sheet off={ed.missing}>
+        <InboxGroup ed={ed} />
+      </Sheet>
+      <Sheet off={ed.missing}>
+        <CatalogSection space={space} examples={CATALOG_EXAMPLES} lead={CATALOG_LEAD} />
+      </Sheet>
     </>
   );
 }
@@ -65,20 +73,23 @@ function InboxGroup({ ed }: { ed: SpaceEditor }) {
   };
 
   return (
-    <Group title="Lo que Pilo no supo" aside={inbox.data ? <small>{plural(inbox.data.total, "pendiente", "pendientes")}</small> : null}>
+    <Group
+      title="Lo que Pilo no supo"
+      aside={inbox.data ? inbox.data.total > 0 ? <StatusMark tone="warn">{plural(inbox.data.total, "pregunta espera respuesta", "preguntas esperan respuesta")}</StatusMark> : <StatusMark tone="ok">Nada pendiente</StatusMark> : null}
+    >
       {ed.missing || inbox.data === null ? (
         <p className="pis-small">Falta aplicar la migración 0113 para que este Pilo anote lo que no supo responder.</p>
       ) : inbox.isPending ? (
         <Skeleton rows={3} label="Leyendo la bandeja" />
       ) : !inbox.data || inbox.data.rows.length === 0 ? (
         <p className="pis-small">
-          Nada pendiente. Aquí llegan las preguntas que este Pilo no pudo responder, las que alguien marcó «No me sirvió», las que la IA redactó con un dato sin fuente y las
+          Aquí llegan las preguntas que este Pilo no pudo responder, las que alguien marcó «No me sirvió», las que la IA redactó con un dato sin fuente y las
           que contestó de conocimiento general. Las del otro Pilo no entran.
         </p>
       ) : (
         <>
           <p className="pis-small">
-            Responda las más preguntadas: la respuesta entra al catálogo de este Pilo, para el rol de quien preguntó, y desde ese momento es la base de lo que redacta.
+            Las más preguntadas van primero. La respuesta entra al catálogo de este Pilo, para el rol de quien preguntó, y desde ese momento es la base de lo que redacta.
           </p>
           {inbox.data.rows.some((r) => r.reason === "general") && (
             <p className="pis-small">

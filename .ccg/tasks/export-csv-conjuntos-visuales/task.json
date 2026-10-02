@@ -4,7 +4,7 @@
   "status": "in_progress",
   "strategy": "full-collaborate",
   "currentPhase": "5-optimization",
-  "nextAction": "Pilo Enseñanza: hechas 0113-0116, función, lectores, intranet. En curso: página+emergente (E, con el arreglo de texto oculto). Luego UN agente: Memoria (documentos, Moodle, mapa) + voz de la presentación",
+  "nextAction": "Pilo Enseñanza construido (0113-0116, función, página, emergente, intranet, Memoria). Pendiente: voz de la presentación (edición denegada al agente: requiere autorización del usuario); aplicar migraciones y desplegar",
   "gate": null,
   "branch": "main",
   "scope": "export-csv-conjuntos-visuales",

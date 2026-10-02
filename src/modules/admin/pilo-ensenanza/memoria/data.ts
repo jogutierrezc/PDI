@@ -21,8 +21,9 @@ import { indexStep, pendingOf } from "../../pilo/memory";
 import type { EmbedStatus } from "../../pilo/memory";
 import { spaceKeys } from "../store";
 import type { SpaceSource } from "../store";
-import { StepError, currentReading, faultFrom, missingMigration, readingReducer } from "./flow";
-import type { ComprehendResult, DbError, DocStatus, ReadingJob, ReadingState } from "./flow";
+import { activity, useCurrentJob } from "../actividad";
+import { StepError, faultFrom, missingMigration } from "./flow";
+import type { ComprehendResult, DbError, DocStatus, ReadingJob } from "./flow";
 import type { RawEdge, RawNode } from "./map";
 
 export const BUCKET = "pilo-docs";
@@ -217,6 +218,23 @@ export async function indexPending(space: PiloSpace, onProgress?: (pending: numb
   return left;
 }
 
+/**
+ * Lo mismo, contando el estado entero y pudiendo detenerse: `stopped` se
+ * consulta entre lote y lote, así lo indexado nunca queda a medias.
+ */
+export async function indexRun(space: PiloSpace, opts: { onStatus?: (status: EmbedStatus) => void; stopped?: () => boolean } = {}): Promise<{ left: number; halted: boolean }> {
+  let left = 0;
+  for (let round = 0; round < 200; round++) {
+    if (opts.stopped?.()) return { left, halted: true };
+    const r = await indexStep<{ saved?: number; status?: EmbedStatus }>({ step: "lote" }, space);
+    const s = (r.status ?? null) as EmbedStatus | null;
+    left = pendingOf(s);
+    if (s) opts.onStatus?.(s);
+    if (!left || !r.saved) break;
+  }
+  return { left, halted: false };
+}
+
 /* --- La función pilo-ia ---------------------------------------------------------------- */
 
 /** Un paso de «comprender» o de «moodle». El espacio va siempre en el cuerpo. */
@@ -367,20 +385,16 @@ export async function mapNeighbors(space: PiloSpace, refs: string[]): Promise<{ 
   return (data ?? []) as { ref: string; source: string; title: string; section: string; shared: number }[];
 }
 
-/* --- La franja «Pilo leyendo» y el camino de la prueba --------------------------------- */
+/* --- La actividad de Pilo y el camino de la prueba -------------------------------------
+   Lo que Pilo está haciendo ya no vive en una franja de la Memoria: se reporta
+   al almacén de actividad (../actividad) y lo cuenta el panel de Pilo. `reading`
+   conserva su forma para los paneles que ya lo usaban. */
 
-interface Shared {
-  reading: ReadingState;
-  /** El camino de la última prueba de la memoria: lo que halló la búsqueda y lo que llegó por el mapa. */
-  probe: { direct: string[]; viaMap: string[]; at: number } | null;
-}
+/** El camino de la última prueba de la memoria: lo que halló la búsqueda y lo que llegó por el mapa. */
+export type ProbePath = { direct: string[]; viaMap: string[]; at: number };
 
-let shared: Shared = { reading: { jobs: [] }, probe: null };
+let probePath: ProbePath | null = null;
 const listeners = new Set<() => void>();
-const emit = (next: Shared) => {
-  shared = next;
-  for (const l of listeners) l();
-};
 const subscribe = (l: () => void) => {
   listeners.add(l);
   return () => {
@@ -388,12 +402,15 @@ const subscribe = (l: () => void) => {
   };
 };
 
-/** Un panel dice qué está leyendo Pilo; al terminar, lo quita. */
+/** Un panel dice qué está haciendo Pilo; al terminar, lo quita. */
 export const reading = {
-  set: (job: ReadingJob) => emit({ ...shared, reading: readingReducer(shared.reading, { type: "set", job }) }),
-  end: (owner: string) => emit({ ...shared, reading: readingReducer(shared.reading, { type: "end", owner }) }),
-  probe: (probe: Shared["probe"]) => emit({ ...shared, probe }),
+  set: (job: ReadingJob) => activity.set(job),
+  end: (owner: string) => activity.end(owner),
+  probe: (probe: ProbePath | null) => {
+    probePath = probe;
+    for (const l of listeners) l();
+  },
 };
 
-export const useReading = (): ReadingJob | null => useSyncExternalStore(subscribe, () => currentReading(shared.reading));
-export const useProbePath = () => useSyncExternalStore(subscribe, () => shared.probe);
+export const useReading = (): ReadingJob | null => useCurrentJob();
+export const useProbePath = () => useSyncExternalStore(subscribe, () => probePath);

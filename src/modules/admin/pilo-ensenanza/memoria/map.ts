@@ -341,3 +341,194 @@ export function buildOutline(doc: OutlineInput, collection: string, rows: { seq:
     trimmed: nodes.length < full.nodes.length || edges.length < full.edges.length,
   };
 }
+
+/* --- Pensar el mapa: el bucle de «comprender» ------------------------------------------- */
+
+/*
+   «Comprender» va por lotes (función pilo-ia). Esta máquina decide, tras cada
+   lote, qué sigue —otro lote, una espera, o parar— para que la corrida dure lo
+   que haga falta sin que nadie la relance:
+
+     pensando     se pide un lote
+     esperando    un lote falló o el proveedor limitó: se reintenta tras `waitMs`
+     deteniendo   se pidió detener: el lote en curso termina y se guarda
+     pausado      detenido a pedido o por cumplir el tiempo; se puede retomar
+     detenido     no pudo seguir (muchos fallos seguidos o algo que no se arregla solo)
+     listo        no queda nada pendiente
+
+   Lo comprendido se guarda en la base lote por lote: detener, fallar o cerrar
+   la página no pierde nada, y retomar sigue desde lo pendiente. La respuesta de
+   la función se lee con cuidado: cualquier campo puede faltar.
+*/
+
+export interface ThinkStatus {
+  total: number;
+  mapped: number;
+  pending: number;
+  topics: number;
+  refs: number;
+}
+
+/** El estado del mapa como venga (de la base o de la función); sin números, null. */
+export function readThinkStatus(raw: unknown): ThinkStatus | null {
+  if (!raw || typeof raw !== "object") return null;
+  const r = raw as Record<string, unknown>;
+  const n = (v: unknown) => (Number.isFinite(Number(v)) && Number(v) > 0 ? Math.floor(Number(v)) : 0);
+  if (r.total === undefined && r.mapped === undefined && r.pending === undefined) return null;
+  const total = n(r.total);
+  const mapped = n(r.mapped);
+  return { total, mapped, pending: r.pending === undefined ? Math.max(0, total - mapped) : n(r.pending), topics: n(r.topics), refs: n(r.refs) };
+}
+
+/** Lo que responde un lote, hasta donde se usa aquí. Todo es opcional. */
+export interface ThinkBatch {
+  ai?: unknown;
+  saved?: unknown;
+  done?: unknown;
+  stopped?: unknown;
+  note?: unknown;
+  status?: unknown;
+}
+
+export interface ThinkLimits {
+  /** Cuánto puede durar la corrida. */
+  maxMs: number;
+  /** Tope de lotes, por si el reloj no avanza. */
+  maxRounds: number;
+  /** Fallos seguidos que se toleran antes de parar. */
+  maxStrikes: number;
+  /** Cuánto se espera tras cada fallo seguido. */
+  waits: number[];
+  /** Cuánto se espera cuando el proveedor limita los pedidos. */
+  limitWaits: number[];
+}
+
+export const THINK_LIMITS: ThinkLimits = { maxMs: 60 * 60_000, maxRounds: 1500, maxStrikes: 4, waits: [5_000, 15_000, 40_000, 90_000], limitWaits: [45_000, 90_000, 180_000, 300_000] };
+
+/** Cuánto tiempo se le da a Pilo para pensar el mapa de una sola vez. */
+export const THINK_BUDGETS: { id: string; label: string; ms: number }[] = [
+  { id: "15", label: "15 minutos", ms: 15 * 60_000 },
+  { id: "60", label: "1 hora", ms: 60 * 60_000 },
+  { id: "180", label: "Hasta terminar (máximo 3 horas)", ms: 180 * 60_000 },
+];
+
+export type ThinkPhase = "pensando" | "esperando" | "deteniendo" | "pausado" | "detenido" | "listo";
+
+export interface ThinkRun {
+  phase: ThinkPhase;
+  startedAt: number;
+  /** Lotes pedidos en esta corrida (los que fallaron también). */
+  rounds: number;
+  /** Lotes que fallaron o no guardaron nada. */
+  failed: number;
+  /** Fallos seguidos ahora mismo. */
+  strikes: number;
+  /** El estado al empezar: contra él se mide lo ganado. */
+  base: ThinkStatus | null;
+  status: ThinkStatus | null;
+  /** En «esperando»: cuánto falta para reintentar. */
+  waitMs: number;
+  /** Por qué espera o por qué paró, en palabras. */
+  why: string;
+  /** Tras parar: ¿sirve retomar sin cambiar nada? */
+  again: boolean;
+}
+
+export type ThinkEvent =
+  | { type: "lote"; result: ThinkBatch; now: number }
+  /** El pedido falló entero (red, tiempo, error del servidor). `retry`: si vale la pena insistir. */
+  | { type: "fallo"; retry: boolean; why: string; now: number }
+  | { type: "esperado"; now: number }
+  | { type: "detener" };
+
+const SAVED = "Lo comprendido queda guardado.";
+const THINK_STOP: Record<string, string> = {
+  limite_proveedor: "El proveedor de IA limitó los pedidos.",
+  proveedor: "El proveedor de IA respondió con un error.",
+  tiempo: "El lote se quedó sin tiempo.",
+  red: "No hubo conexión con el proveedor de IA.",
+  formato: "El modelo no devolvió nada que se pudiera leer y no se guardó nada. No conviene insistir: revise el modelo en «Mr. Pilo con IA».",
+};
+
+export const thinkStart = (status: unknown, now: number): ThinkRun => {
+  const s = readThinkStatus(status);
+  return { phase: "pensando", startedAt: now, rounds: 0, failed: 0, strikes: 0, base: s, status: s, waitMs: 0, why: "", again: false };
+};
+
+/** Retomar una corrida que paró: reloj y tropiezos nuevos, pero lo ganado y los lotes se siguen sumando. */
+export const thinkResume = (prev: ThinkRun, status: unknown, now: number): ThinkRun => {
+  const next = thinkStart(status ?? prev.status, now);
+  return { ...next, status: next.status ?? prev.status, base: prev.base ?? next.base, rounds: prev.rounds, failed: prev.failed };
+};
+
+/** ¿La corrida sigue viva (pide lotes o espera)? */
+export const thinkActive = (run: ThinkRun | null | undefined): boolean => Boolean(run) && (run!.phase === "pensando" || run!.phase === "esperando" || run!.phase === "deteniendo");
+
+const span = (ms: number) => (ms >= 60_000 ? `${Math.round(ms / 60_000)} min` : `${Math.round(ms / 1000)} s`);
+
+export function thinkReduce(run: ThinkRun, event: ThinkEvent, limits: ThinkLimits = THINK_LIMITS): ThinkRun {
+  if (!thinkActive(run)) return run;
+
+  if (event.type === "detener") {
+    // En una espera no hay nada en curso: se detiene ya.
+    if (run.phase === "esperando") return { ...run, phase: "pausado", waitMs: 0, again: true, why: `Se detuvo a pedido. ${SAVED}` };
+    return { ...run, phase: "deteniendo" };
+  }
+
+  const spent = event.now - run.startedAt >= limits.maxMs;
+  const outOfTime = (r: ThinkRun): ThinkRun => ({ ...r, phase: "pausado", waitMs: 0, again: true, why: `Se cumplió el tiempo de pensamiento de esta corrida. ${SAVED} Puede continuar cuando quiera.` });
+
+  if (event.type === "esperado") {
+    if (run.phase !== "esperando") return run;
+    return spent ? outOfTime(run) : { ...run, phase: "pensando", waitMs: 0 };
+  }
+
+  const asked = run.phase === "deteniendo";
+  const rounds = run.rounds + 1;
+  /** Un tropiezo: se espera y se reintenta, hasta `maxStrikes` seguidos. */
+  const strike = (r: ThinkRun, why: string, waits: number[]): ThinkRun => {
+    const strikes = r.strikes + 1;
+    const next = { ...r, strikes, failed: r.failed + 1 };
+    if (asked) return { ...next, phase: "pausado", waitMs: 0, again: true, why: `Se detuvo a pedido. ${SAVED}` };
+    if (strikes > limits.maxStrikes) return { ...next, phase: "detenido", waitMs: 0, again: true, why: `${why} Falló ${strikes} veces seguidas y se detuvo. ${SAVED}` };
+    if (spent || rounds >= limits.maxRounds) return outOfTime(next);
+    const waitMs = waits[Math.min(strikes, waits.length) - 1] ?? 0;
+    return { ...next, phase: "esperando", waitMs, why: `${why} ${SAVED} Reintenta en ${span(waitMs)} (intento ${strikes} de ${limits.maxStrikes}).` };
+  };
+
+  if (event.type === "fallo") {
+    const r = { ...run, rounds };
+    if (!event.retry) return { ...r, phase: "detenido", waitMs: 0, failed: r.failed + 1, again: false, why: event.why || "No se pudo completar." };
+    return strike(r, event.why || "Un lote falló.", limits.waits);
+  }
+
+  const result = event.result ?? {};
+  const status = readThinkStatus(result.status) ?? run.status;
+  const r: ThinkRun = { ...run, rounds, status };
+  const stopped = typeof result.stopped === "string" ? result.stopped : "";
+  const note = typeof result.note === "string" ? result.note : "";
+  const progressed = Number(result.saved) > 0 || (status !== null && run.status !== null && status.mapped > run.status.mapped);
+
+  if (result.ai === false) return { ...r, phase: "listo", waitMs: 0, again: false, why: note || "Sin IA, el mapa es el básico: estructura y normas citadas." };
+  if (result.done === true || (status !== null && status.pending === 0)) return { ...r, phase: "listo", waitMs: 0, again: false, why: "" };
+  if (stopped === "formato") return { ...r, phase: "detenido", waitMs: 0, failed: r.failed + 1, again: false, why: THINK_STOP.formato };
+  if (!progressed) return strike(r, stopped ? THINK_STOP[stopped] ?? (note || "El lote se detuvo antes de terminar.") : "El lote no guardó ningún pasaje.", stopped === "limite_proveedor" ? limits.limitWaits : limits.waits);
+
+  // Hubo avance: los tropiezos seguidos se olvidan.
+  const ok: ThinkRun = { ...r, strikes: 0, why: "", waitMs: 0 };
+  if (asked) return { ...ok, phase: "pausado", again: true, why: `Se detuvo a pedido. ${SAVED}` };
+  if (spent || rounds >= limits.maxRounds) return outOfTime(ok);
+  if (stopped === "limite_proveedor") return { ...ok, phase: "esperando", waitMs: limits.limitWaits[0] ?? 0, why: `${THINK_STOP.limite_proveedor} ${SAVED} Sigue en ${span(limits.limitWaits[0] ?? 0)}.` };
+  return { ...ok, phase: "pensando" };
+}
+
+/** Lo ganado en la corrida: pasajes comprendidos, temas y referencias nuevas. */
+export function thinkGain(run: ThinkRun | null | undefined): { mapped: number; topics: number; refs: number } {
+  const a = run?.base;
+  const b = run?.status;
+  if (!a || !b) return { mapped: 0, topics: 0, refs: 0 };
+  return { mapped: Math.max(0, b.mapped - a.mapped), topics: Math.max(0, b.topics - a.topics), refs: Math.max(0, b.refs - a.refs) };
+}
+
+/** El avance real: de los pasajes con documento, cuántos ya están comprendidos (0 a 1). */
+export const thinkShare = (s: ThinkStatus | null | undefined): number => (s && s.total > 0 ? Math.min(1, Math.max(0, s.mapped / s.total)) : 0);

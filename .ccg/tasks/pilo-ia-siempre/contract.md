@@ -461,3 +461,59 @@ Cómo se llama a Moodle: `POST {moodle_url}/webservice/rest/server.php` (ruta fi
 - Que el modelo configurado devuelva JSON de forma fiable en `comprender` (solo Mistral recibe `response_format`); si no, el lote termina con `stopped: "formato"`.
 - Los topes de tiempo contra la plataforma real (60 s por lote, 90 s por curso, frente al corte de 150 s).
 - `Deno.resolveDns` en el entorno de Supabase: si no está disponible, la revisión de que el nombre no resuelva a una red interna se omite (queda la revisión del nombre y `redirect: "error"`).
+
+---
+
+## Anexo C · Un solo camino más ágil y un mapa que comprende más (2026-10-02)
+
+Nada de lo anterior cambia de forma: mismos pedidos, mismos eventos, mismos campos. Lo que sigue **reemplaza** las cifras de B.2, B.5 y B.6 donde se indica.
+
+### C.1 `preguntar`: el mismo camino para los dos espacios, con menos esperas en serie
+
+Los dos Pilos ya pasaban por la misma función (`answerWork`) y la misma página; lo que cambia de un espacio a otro es configuración (fuentes, catálogo, persona, rol, mapa, cupo). Lo que hacía esperar de más —y pesaba más en `planeacion`, que tiene vectores y cifras en vivo— eran lecturas en fila que no dependían unas de otras. Ahora van a la vez, en los dos espacios:
+
+| Antes (en serie) | Ahora |
+|---|---|
+| sesión (`auth.getUser` + `profiles`) → `pilo_ai_settings` + `pilo_ai_secret` | las tres lecturas a la vez |
+| `pilo_visitor_hit` → sedes + catálogo + cupo | todo a la vez, junto con `pilo_embed_status` (queda en memoria un minuto). Pasado el límite se responde el mismo `429`, sin buscar ni llamar al modelo |
+| vector de la pregunta (pedido al proveedor de embeddings, hasta 6 s) → búsqueda por palabras + por significado | la búsqueda por palabras (`pilo_memory_search`, `pilo_facts_search`) sale de inmediato; solo la de significado espera al vector |
+| pasajes de la respuesta guardada → vecinos del mapa → malla | las tres a la vez |
+
+No cambia: qué se busca, con qué filtros (`p_space`, `p_sources`, `p_public_only`, rol), el orden de prioridad de los bloques, el veto de dinero y de datos personales, los cupos, ni el orden de los pasos (`step`) ni del rastro (`trail`). En `trail`, los `ms` de «Respuestas guardadas», «Mapa» y «Malla» ya no se pueden leer por separado: esas tres lecturas corren juntas y su tiempo queda en el primer paso que se anota después.
+
+### C.2 `comprender`: más tiempo, más pasajes, más temas (reemplaza las cifras de B.2)
+
+| | Antes | Ahora |
+|---|---|---|
+| Presupuesto de un lote | 60 s fijos | `comprehendBudget(tope)`: el tope de la plataforma (`PILO_PLATFORM_CAP_MS`, 150 s de partida) menos 30 s de reserva, y nunca más que el corte por inactividad (150 s) → **120 s**; con un tope menor, lo que quede (30 s o más) |
+| Pasajes por lote (`p_limit` de `pilo_map_pending`) | 18 | **36** (la base acepta hasta 60) |
+| Pasajes por pedido al modelo | 6 | 6 (hasta 6 pedidos por lote, en serie: cada uno recibe los temas de los anteriores) |
+| Temas por pasaje | 4 | **6** |
+| Referencias por pasaje | 3 | **5** |
+| Temas conocidos que se le ofrecen (`p_limit` de `pilo_map_topics`) | 80 | **200** (la base da hasta 300) |
+| Texto leído de cada pasaje | 1.500 caracteres | **2.400** |
+| `max_tokens` de cada pedido | 1.200 | **3.000** |
+| Espera de un pedido | lo que quedara del lote | lo que quede del lote menos 8 s para guardar; no se empieza un pedido con menos de 12 s, ni con menos de 1,25 × lo que tardó el más lento del lote |
+
+**Un lote que se queda sin tiempo ya no se detiene si guardó algo.** Cada pedido se guarda en cuanto vuelve. Si el tiempo no alcanza para otro pedido (o el que estaba en curso se corta) y el lote ya guardó pasajes, la respuesta llega **sin** `stopped` y con `cut: "tiempo"`: la página sigue sola con el lote siguiente (`saved > 0`, `done: false`). Solo cuando se acaba el tiempo **sin haber guardado nada** viene `stopped: "tiempo"`, como antes.
+
+Campos nuevos de la respuesta de `lote` con IA, todos opcionales (quien no los lea no nota nada):
+
+| Campo | Significado |
+|---|---|
+| `cut` | `"tiempo"`: el lote quedó corto por tiempo pero guardó; no es una detención. Viene con su `note` |
+| `skipped` | pasajes del lote que no se alcanzaron a pedir al modelo: siguen pendientes |
+| `ms` | lo que duró el lote |
+| `budget_ms` | el presupuesto con que corrió |
+
+En la bitácora, ese lote queda como `parcial · comprender · tiempo`.
+
+**Migración 0118** (`0118_pilo_mapa_mas_temas.sql`): `pilo_map_save` guarda hasta 6 temas y 5 referencias por pasaje (0115 recortaba a 4 y 3). Es la misma función, con esos dos topes. Sin aplicarla nada falla: la base sigue guardando 4 y 3.
+
+En B.5: `pilo_map_pending { …, p_limit: 36 }` y `pilo_map_topics { …, p_limit: 200 }`.
+
+### C.3 Sin verificar
+
+- Cuánto baja de verdad la espera en `preguntar`: la mejora es estructural (menos idas y vueltas en serie); no se midió contra la base ni contra el proveedor reales.
+- Que el proveedor aguante 6 pedidos seguidos por lote sin `429`, y que un pedido de 6 pasajes con 2.400 caracteres cada uno quepa en el contexto del modelo configurado.
+- El corte de 150 s por inactividad frente a un lote de 120 s más lo que tarde en guardar y contar.

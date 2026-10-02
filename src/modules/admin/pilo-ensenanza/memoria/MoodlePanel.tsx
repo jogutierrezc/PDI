@@ -70,7 +70,11 @@ export function MoodlePanel({ space, disabled }: MemoryPartProps) {
   const [rowBusy, setRowBusy] = useState<number | null>(null);
   const [syncing, setSyncing] = useState<number | null>(null);
   const [results, setResults] = useState<Record<number, { tone: "ok" | "warn"; text: string } | { fault: Fault }>>({});
+  // Cuántos cursos quedaron sin leer la última vez que se detuvo la sincronización.
+  const [stopped, setStopped] = useState(0);
   const alive = useRef(true);
+  // «Detener» (en el panel de Pilo) corta la fila de cursos al terminar el que se está leyendo.
+  const halt = useRef(false);
 
   const data = setup.data?.data;
   const missing = setup.data?.missing ?? null;
@@ -96,6 +100,7 @@ export function MoodlePanel({ space, disabled }: MemoryPartProps) {
     if (busy) return;
     setBusy(what);
     setFault(null);
+    setStopped(0);
     try {
       await fn();
     } catch (error) {
@@ -137,8 +142,18 @@ export function MoodlePanel({ space, disabled }: MemoryPartProps) {
   /** Un curso: lo lee la función (un pedido), y luego se indexa lo nuevo. Devuelve si salió bien. */
   const syncOne = async (c: CourseRow, index = 0, total = 1): Promise<Fault | null> => {
     const counter = total > 1 ? `${index + 1} de ${total}` : undefined;
+    const progress = total > 1 ? index / total : undefined;
+    const line = "Pide a Moodle sus secciones y actividades, las parte en pasajes y las ubica en el mapa.";
+    // Solo con más cursos por delante hay algo que detener.
+    const stop =
+      index < total - 1 && !halt.current
+        ? () => {
+            halt.current = true;
+            reading.set({ owner: OWNER, title: `Pilo termina «${c.fullname}» y se detiene`, line: "Los cursos que faltan quedan sin leer; lo leído queda guardado.", progress, counter });
+          }
+        : undefined;
     setSyncing(c.course_id);
-    reading.set({ owner: OWNER, title: `Pilo está leyendo «${c.fullname}»`, line: "Pide a Moodle sus secciones y actividades, las parte en pasajes y las ubica en el mapa.", progress: total > 1 ? index / total : undefined, counter });
+    reading.set({ owner: OWNER, title: `Pilo está leyendo «${c.fullname}»`, line, progress, counter, stop });
     try {
       const r = await moodleCourse(space, c.course_id);
       const notes = [
@@ -151,13 +166,13 @@ export function MoodlePanel({ space, disabled }: MemoryPartProps) {
       ].filter(Boolean);
       let warn = Boolean(r.empty || r.dropped || r.skipped?.length || r.mapped === false);
       if (!r.empty && !r.unchanged) {
-        reading.set({ owner: OWNER, title: `Indexando por significado: «${c.fullname}»`, line: "Para que Pilo lo encuentre aunque le pregunten con otras palabras.", counter });
+        if (!halt.current) reading.set({ owner: OWNER, title: `Indexando por significado: «${c.fullname}»`, line: "Para que Pilo lo encuentre aunque le pregunten con otras palabras.", progress, counter, stop });
         try {
           const left = await indexPending(space);
           if (left > 0) throw new Error("incompleto");
         } catch {
           warn = true;
-          notes.push("El índice por significado no quedó completo: el curso ya responde por palabras; use «Indexar por significado» más abajo.");
+          notes.push("El índice por significado no quedó completo: el curso ya responde por palabras; use «Indexar por significado», en el momento «Comprender».");
         }
       }
       if (alive.current) setResults((prev) => ({ ...prev, [c.course_id]: { tone: warn ? "warn" : "ok", text: notes.join(" ") } }));
@@ -173,10 +188,15 @@ export function MoodlePanel({ space, disabled }: MemoryPartProps) {
 
   const sync = (list: CourseRow[]) =>
     act("sync", "La sincronización se detuvo", async () => {
+      halt.current = false;
       for (let i = 0; i < list.length; i++) {
         const failed = await syncOne(list[i], i, list.length);
         refresh();
         if (!alive.current) return;
+        if (halt.current && i < list.length - 1) {
+          setStopped(list.length - i - 1);
+          return;
+        }
         // Un token rechazado o una conexión mal puesta fallarían igual en los demás: se para ahí.
         if (failed && ["token", "config", "apagado", "permiso", "migracion"].includes(failed.code) && i < list.length - 1) {
           throw new StepError({ ...failed, detail: `${failed.detail} Quedaron ${list.length - i - 1} sin leer.`.trim() });
@@ -321,6 +341,7 @@ export function MoodlePanel({ space, disabled }: MemoryPartProps) {
             {!ready && <span className="pis-small">Guarde la dirección y el token para probar.</span>}
           </div>
 
+          {stopped > 0 && !busy && <p className="pis-small">Se detuvo: {plural(stopped, "curso quedó", "cursos quedaron")} sin leer. Lo leído queda guardado; vuelva a sincronizar cuando quiera.</p>}
           {fault && <FaultNote fault={fault.fault} lead={fault.where} onRetry={fault.fault.retry ? fault.retry : undefined} busy={Boolean(busy)} />}
 
           {site && functions && (

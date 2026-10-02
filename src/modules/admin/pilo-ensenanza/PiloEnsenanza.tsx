@@ -2,16 +2,19 @@
    Intranet · Mr. Pilo en Enseñanza (solo administración).
 
    El segundo Pilo: innovación educativa, políticas institucionales y mirada
-   global. Es un espacio aparte del Pilo de Planeación, con cuatro pestañas en
-   el riel de la cabecera, enlazables por la dirección (?seccion=memoria):
+   global. Una mesa de trabajo en dos partes:
 
-     Pregúntele a Pilo   su página, cómo se presenta, cómo le habla a cada rol,
-                         sus cupos y el chat emergente en otros portales.
-     Memoria             sus fuentes, su índice por significado, la prueba y sus
-                         respuestas guardadas (documentos, mapa y Moodle llegan
-                         en la próxima entrega).
-     Catálogo            sus respuestas oficiales y capciosas, y su bandeja.
-     Bitácora de uso     su uso de hoy, por rol, y sus pedidos.
+     El panel de Pilo    a la izquierda (arriba en el móvil): su cara, entera y
+     (PiloDock)          a buen tamaño, el estado en palabras, el interruptor,
+                         tres datos y toda la actividad larga. Es el único
+                         lugar donde aparece Pilo.
+     La hoja de trabajo  una sección a la vez, por las pestañas del riel de la
+                         cabecera, enlazables por la dirección:
+
+       Pregúntele a Pilo  ?seccion=pregunta&fila=cupos   filas plegables.
+       Memoria            ?seccion=memoria&momento=mapa  cuatro momentos.
+       Catálogo           lo que Pilo no supo, primero; luego el catálogo.
+       Bitácora de uso    el uso de hoy y los pedidos.
 
    No hay pestañas de Conexión ni de Voz: el servicio, la clave, el modelo y la
    voz son los de «Mr. Pilo con IA», y se dice con un enlace.
@@ -26,24 +29,24 @@
 
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import type { KeyboardEvent as ReactKeyboardEvent, ReactNode } from "react";
-import { Link, useSearchParams } from "react-router-dom";
+import { useSearchParams } from "react-router-dom";
 import { AdminShell } from "../components/AdminShell";
 import { ErrorBlock, LoadingBlock } from "../../../components/ui/QueryState";
-import { Icon } from "../../../components/ui/Icon";
-import { PiloFace } from "../../../components/pilo/PiloFace";
-import type { PiloFaceHandle } from "../../../components/pilo/PiloFace";
 import { usePiloSettings } from "../pilo/store";
 import { joinNames } from "../pilo/mesh-view";
-import { StatusMark, Switch, plural } from "../pilo/ui";
+import { StatusMark, plural } from "../pilo/ui";
 import "../pilo/pilo-settings.css";
 import { PreguntaPanel } from "./PreguntaPanel";
 import type { SpaceEditor } from "./PreguntaPanel";
 import { MemoriaPanel } from "./MemoriaPanel";
 import { CatalogoPanel } from "./CatalogoPanel";
 import { BitacoraPanel } from "./BitacoraPanel";
+import { PiloDock } from "./PiloDock";
+import type { DockFact } from "./PiloDock";
+import { AUD_TEXT } from "./resumen";
 import { SPACE, TABS, dirtyTabs, parseTab, useSaveSpace, useSpace, useSpaceMemoryCounts, useSpaceUsage } from "./store";
 import type { RolId, RoleSettings, SpaceLoad, SpaceSettings, TabId } from "./store";
-import { confirmSave, fillBar, revealSection } from "./motion";
+import { confirmSave, revealSection } from "./motion";
 import "./pilo-ensenanza.css";
 
 const SHELL = {
@@ -52,8 +55,6 @@ const SHELL = {
   title: "Mr. Pilo en Enseñanza",
   description: "El segundo Mr. Pilo: innovación educativa, políticas institucionales y mirada global. Con su propia memoria, catálogo y bitácora.",
 };
-
-const AUD_TEXT = { admin: "solo la administración", sesion: "quien tiene sesión", publico: "el público" } as const;
 
 export function PiloEnsenanzaSettings() {
   const space = useSpace(SPACE);
@@ -113,34 +114,6 @@ function Tabs({ current, dirty, onPick }: { current: TabId; dirty: TabId[]; onPi
   );
 }
 
-/* --- La franja de estado ------------------------------------------------------------------------ */
-
-function Fact({ label, children, detail, onClick }: { label: string; children: ReactNode; detail?: ReactNode; onClick: () => void }) {
-  return (
-    <li>
-      <button type="button" className="pis-fact" onClick={onClick}>
-        <span className="pis-fact__label">{label}</span>
-        {children}
-        {detail && <small>{detail}</small>}
-      </button>
-    </li>
-  );
-}
-
-function UsageBar({ share }: { share: number }) {
-  const bar = useRef<HTMLSpanElement>(null);
-  const started = useRef(false);
-  useLayoutEffect(() => {
-    fillBar(bar.current, share, started.current ? undefined : 0);
-    started.current = true;
-  }, [share]);
-  return (
-    <i className="pis-fact__meter" aria-hidden="true">
-      <span ref={bar} />
-    </i>
-  );
-}
-
 /* --- El editor ------------------------------------------------------------------------------------ */
 
 function Editor({ load }: { load: SpaceLoad }) {
@@ -156,7 +129,6 @@ function Editor({ load }: { load: SpaceLoad }) {
   const [visited, setVisited] = useState<Set<TabId>>(() => new Set([tab]));
   const via = useRef<"pointer" | "keyboard" | null>(null);
   const panels = useRef<Record<string, HTMLDivElement | null>>({});
-  const face = useRef<PiloFaceHandle>(null);
   const mark = useRef<HTMLSpanElement>(null);
   const [justSaved, setJustSaved] = useState(0);
 
@@ -175,20 +147,20 @@ function Editor({ load }: { load: SpaceLoad }) {
     via.current = null;
   }, [tab]);
 
-  // El guardado se confirma una vez: la marca del pie y un asentimiento de Pilo.
+  // El guardado se confirma una vez: la marca del pie y, en su panel, un asentimiento de Pilo.
   useLayoutEffect(() => {
-    if (!justSaved) return;
-    confirmSave(mark.current);
-    face.current?.nod();
+    if (justSaved) confirmSave(mark.current);
   }, [justSaved]);
 
-  const go = (id: TabId, how: "pointer" | "keyboard" = "pointer") => {
-    if (id === tab) return;
-    via.current = how;
+  /** Cambia de pestaña; `extra` lleva además a una fila o a un momento (fila=cupos, momento=mapa). */
+  const go = (id: TabId, how: "pointer" | "keyboard" = "pointer", extra?: Record<string, string>) => {
+    if (id === tab && !extra) return;
+    if (id !== tab) via.current = how;
     setParams(
       (prev) => {
         const next = new URLSearchParams(prev);
         next.set("seccion", id);
+        for (const [k, v] of Object.entries(extra ?? {})) next.set(k, v);
         return next;
       },
       { replace: true },
@@ -251,11 +223,41 @@ function Editor({ load }: { load: SpaceLoad }) {
   );
 
   const body: Record<TabId, () => ReactNode> = {
-    pregunta: () => <PreguntaPanel ed={ed} />,
+    pregunta: () => <PreguntaPanel ed={ed} active={tab === "pregunta"} />,
     memoria: () => <MemoriaPanel ed={ed} />,
     catalogo: () => <CatalogoPanel ed={ed} />,
-    bitacora: () => <BitacoraPanel ed={ed} onQuotas={() => go("pregunta")} />,
+    bitacora: () => <BitacoraPanel ed={ed} onQuotas={() => go("pregunta", "pointer", { fila: "cupos" })} />,
   };
+
+  // Los tres datos del panel de Pilo; cada uno lleva a donde se cambia o se mira.
+  const facts: DockFact[] = [
+    {
+      id: "ia",
+      label: "Redacta con IA",
+      value: <StatusMark tone={!shared.data ? "off" : aiReady && s.ai ? "ok" : "warn"}>{!shared.data ? "Revisando" : aiReady && s.ai ? "Sí" : "No"}</StatusMark>,
+      detail: !shared.data ? undefined : aiReady ? (s.ai ? undefined : "Apagado en este Pilo: responde con lo publicado") : "Mr. Pilo con IA está apagado: responde con lo publicado",
+      onClick: () => go("pregunta", "pointer", { fila: "pagina" }),
+    },
+    {
+      id: "uso",
+      label: "Uso de hoy",
+      value: (
+        <StatusMark tone={missing || !usage.data ? "off" : share >= 0.9 ? "warn" : "ok"}>
+          {missing || !usage.data ? "Sin contar" : `${today.toLocaleString("es-CO")} de ${saved.daily_limit.toLocaleString("es-CO")}`}
+        </StatusMark>
+      ),
+      share: missing || !usage.data ? undefined : share,
+      detail: !missing && usage.data && share >= 0.9 ? "Casi en el tope" : undefined,
+      onClick: () => go("bitacora"),
+    },
+    {
+      id: "memoria",
+      label: "Memoria",
+      value: <StatusMark tone={passages === null ? "off" : passages === 0 ? "warn" : "ok"}>{passages === null ? "Sin contar" : plural(passages, "pasaje", "pasajes")}</StatusMark>,
+      detail: passages === 0 ? "Se llena con documentos y Moodle" : undefined,
+      onClick: () => go("memoria"),
+    },
+  ];
 
   return (
     <AdminShell {...SHELL} rail={<Tabs current={tab} dirty={changed} onPick={go} />} footer={footer}>
@@ -267,54 +269,24 @@ function Editor({ load }: { load: SpaceLoad }) {
           </p>
         )}
 
-        <section className="pis-status pen-status" aria-label="Estado de Mr. Pilo en Enseñanza">
-          <div className="pis-status__main">
-            <span className="pen-status__face">
-              <PiloFace ref={face} size={56} expression="graduado" alive label="Mr. Pilo en Enseñanza" />
-            </span>
-            <p>
-              <strong>{status}</strong>
-              <span>
-                Comparte la conexión y la voz con{" "}
-                <Link className="pis-link" to="/admin/mr-pilo">
-                  Mr. Pilo con IA <Icon name="arrow-right" size={13} />
-                </Link>
-              </span>
-            </p>
-            <label className="pis-status__switch">
-              <span>{s.on ? "Abierto" : "Cerrado"}</span>
-              <Switch big on={s.on} disabled={missing} onChange={(v) => set("on", v)} label="Mr. Pilo en Enseñanza abierto" />
-            </label>
-          </div>
-          <ul className="pis-facts pen-facts">
-            <Fact label="Redacta con IA" detail={aiReady ? (s.ai ? "Con el servicio de Mr. Pilo con IA" : "Apagado en este Pilo") : "Mr. Pilo con IA está apagado"} onClick={() => go("pregunta")}>
-              <StatusMark tone={!shared.data ? "off" : aiReady && s.ai ? "ok" : "warn"}>{!shared.data ? "Revisando" : aiReady && s.ai ? "Sí" : "No: responde con lo publicado"}</StatusMark>
-            </Fact>
-            <Fact label="Uso de hoy" detail={<UsageBar share={share} />} onClick={() => go("bitacora")}>
-              <StatusMark tone={missing || !usage.data ? "off" : share >= 0.9 ? "warn" : "ok"}>
-                {missing || !usage.data ? "Sin contar" : `${today.toLocaleString("es-CO")} de ${saved.daily_limit.toLocaleString("es-CO")}`}
-              </StatusMark>
-            </Fact>
-            <Fact label="Memoria" detail={passages === 0 ? "Se llena con documentos y Moodle" : "Solo de este Pilo"} onClick={() => go("memoria")}>
-              <StatusMark tone={passages === null ? "off" : passages === 0 ? "warn" : "ok"}>{passages === null ? "Sin contar" : plural(passages, "pasaje", "pasajes")}</StatusMark>
-            </Fact>
-          </ul>
-        </section>
+        <div className="pen-app">
+          <PiloDock status={status} on={s.on} disabled={missing} onToggle={(v) => set("on", v)} facts={facts} nod={justSaved} />
 
-        {TABS.map((t) =>
-          visited.has(t.id) || t.id === tab ? (
-            <div key={t.id} id={`pen-panel-${t.id}`} role="tabpanel" aria-labelledby={`pen-tab-${t.id}`} hidden={t.id !== tab} className="pis-panel" ref={(el) => (panels.current[t.id] = el)}>
-              <header className="pis-panel__head">
-                <h2>{t.title}</h2>
-                <p>{t.lead}</p>
-              </header>
-              {/* Sin 0113 nada se puede guardar: un solo interruptor apaga todos los controles de la hoja. */}
-              <fieldset className="pen-sheet" disabled={missing}>
-                <div className="pis-sheet">{body[t.id]()}</div>
-              </fieldset>
-            </div>
-          ) : null,
-        )}
+          <div className="pen-work">
+            {TABS.map((t) =>
+              visited.has(t.id) || t.id === tab ? (
+                <div key={t.id} id={`pen-panel-${t.id}`} role="tabpanel" aria-labelledby={`pen-tab-${t.id}`} hidden={t.id !== tab} className="pis-panel" ref={(el) => (panels.current[t.id] = el)}>
+                  <header className="pis-panel__head">
+                    <h2>{t.title}</h2>
+                    <p>{t.lead}</p>
+                  </header>
+                  {/* Cada panel arma sus hojas (ui › Sheet, FoldRow): sin 0113 se apagan sus controles, no la navegación. */}
+                  {body[t.id]()}
+                </div>
+              ) : null,
+            )}
+          </div>
+        </div>
       </div>
     </AdminShell>
   );

@@ -18,8 +18,12 @@
                   ola (bucle que vive solo mientras dura la espera) y, si se
                   conoce el avance, una barra que lo sigue. Es el único bucle
                   del módulo y se mata al terminar.
-     Tarjeta      la tarjeta del rol cambia de cara con el pulso propio de
-                  PiloFace; aquí no se anima nada más.
+     Panel        el panel de Pilo entra una vez, por partes (enterList); su
+                  cara cambia de pose con el fundido propio de PiloFace, su
+                  frase con un fundido de 180 ms y su barra sigue el avance.
+     Fila         una fila plegable que se abre con el puntero muestra su
+                  contenido con un fundido de 180 ms (enterBlock); con el
+                  teclado se abre en seco. Igual los momentos de la Memoria.
 
    Solo transform y opacity. Con movimiento reducido quedan fundidos cortos,
    las barras aparecen en su valor y los puntos se quedan quietos. Cada llamada
@@ -95,9 +99,8 @@ export function thinkingDots(dots: Element[]): () => void {
   };
 }
 
-/* --- Memoria: la franja «Pilo leyendo», el recorrido y el mapa ---------------------------
-     Franja      mientras Pilo lee, dos anillos salen de su cara (bucle que vive solo
-                 mientras dura el trabajo) y la frase cambia con un fundido de 180 ms.
+/* --- Memoria: la frase del panel de Pilo, el recorrido y el mapa -------------------------
+     Frase       al cambiar de paso, la frase del panel entra con un fundido de 180 ms.
      Recorrido   la etapa que se acaba de cumplir llena su barra una vez (280 ms).
      Mapa        al llegar, las relaciones se trazan una vez; al elegir un punto con
                  el puntero, se traza su camino (drawChain, de «Mr. Pilo con IA»).
@@ -115,21 +118,7 @@ export function settle(targets: Element[] | Element | null) {
   gsap.killTweensOf(list);
 }
 
-/** Los anillos de la franja mientras Pilo lee. Devuelve cómo apagarlos. */
-export function readingRings(rings: Element[]): () => void {
-  if (!rings.length || reducedMotion()) return () => {};
-  const tween = gsap.fromTo(
-    rings,
-    { scale: 0.7, opacity: 0.7 },
-    { scale: 1.35, opacity: 0, duration: 1.8, ease: "power1.out", stagger: { each: 0.6, repeat: -1 } },
-  );
-  return () => {
-    tween.kill();
-    gsap.set(rings, { clearProps: "transform,opacity" });
-  };
-}
-
-/** La frase de la franja cambió: entra con un fundido corto, partiendo siempre de un estado limpio. */
+/** La frase del panel cambió: entra con un fundido corto, partiendo siempre de un estado limpio. */
 export function swapLine(node: Element | null) {
   if (!node) return;
   settle(node);

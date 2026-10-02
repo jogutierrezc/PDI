@@ -346,6 +346,8 @@ export interface ReadingJob {
   progress?: number;
   /** «2 de 5», «37 pasajes»… */
   counter?: string;
+  /** Cómo detenerlo, solo si de verdad se puede: el panel de Pilo ofrece «Detener». */
+  stop?: () => void;
 }
 
 export interface ReadingState {

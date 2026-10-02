@@ -3128,16 +3128,54 @@ export interface ComprehendPassage {
   body: string;
 }
 
-/** Cuántos pasajes entran en un lote, cuántos en cada pedido al modelo y cuánto se guarda de cada uno. */
-export const COMPREHEND_BATCH = 18;
+/** Cuántos pasajes entran en un lote, cuántos en cada pedido al modelo y cuánto se guarda de cada uno.
+    La base acepta hasta 60 pasajes por lote (0115) y, desde 0118, 6 temas y 5 referencias por pasaje;
+    sin 0118 guarda los 4 y 3 primeros y descarta el resto, sin fallar. */
+export const COMPREHEND_BATCH = 36;
 export const COMPREHEND_CALL = 6;
-export const COMPREHEND_TOPICS = 4;
-export const COMPREHEND_REFS = 3;
-/** Cuántos temas ya existentes se le ofrecen para que los reutilice. */
-export const COMPREHEND_KNOWN = 80;
-/** Lo más que dura un lote, con todos sus pedidos. */
-export const COMPREHEND_MS = 60_000;
-const COMPREHEND_BODY_CHARS = 1500;
+export const COMPREHEND_TOPICS = 6;
+export const COMPREHEND_REFS = 5;
+/** Cuántos temas ya existentes se le ofrecen para que los reutilice (la base da hasta 300). */
+export const COMPREHEND_KNOWN = 200;
+/** Lo más que dura un lote, con todos sus pedidos, bajo el tope de partida de la plataforma (150 s). */
+export const COMPREHEND_MS = 120_000;
+/** Cuánto se lee de cada pasaje. */
+export const COMPREHEND_BODY_CHARS = 2400;
+/** Lo que puede escribir el modelo en un pedido: caben 6 pasajes con sus temas y, si razona aparte, su razonamiento. */
+export const COMPREHEND_MAX_TOKENS = 3000;
+/** Lo que se aparta del tope de la plataforma para leer los pendientes, guardar, contar y anotar. */
+export const COMPREHEND_RESERVE_MS = 30_000;
+/** «Comprender» responde de una vez (JSON): un pedido sin actividad se corta a los 150 s aunque el plan deje más. */
+export const COMPREHEND_IDLE_MS = 150_000;
+/** Lo que se guarda al final de cada pedido para guardar lo comprendido antes de que se acabe el lote. */
+export const COMPREHEND_SAVE_MS = 8_000;
+/** Con menos de esto no se empieza otro pedido: no alcanzaría a responder. */
+export const COMPREHEND_MIN_CALL_MS = 12_000;
+/** Cuántos temas caben en la línea de una fuente del pedido de «preguntar». */
+const WHERE_TOPICS = 4;
+
+/**
+ * El presupuesto de un lote según el tope real de la plataforma: todo lo que
+ * deja, menos la reserva, y nunca más que el corte por inactividad. Con el
+ * tope de partida (150 s) son 120 s; con uno menor, lo que quede (30 s o más).
+ */
+export function comprehendBudget(capMs: number): number {
+  const cap = Number.isFinite(capMs) && capMs > 0 ? capMs : COMPREHEND_IDLE_MS;
+  return Math.max(30_000, Math.min(cap, COMPREHEND_IDLE_MS) - COMPREHEND_RESERVE_MS);
+}
+
+/**
+ * Cuánto puede tardar el siguiente pedido de un lote, o 0 si ya no conviene
+ * empezarlo: con poco tiempo, o con menos del que tardó el pedido más lento de
+ * este lote (más un cuarto), el modelo no alcanzaría a responder y se perdería
+ * su trabajo. Lo que no se empieza sigue pendiente para el lote siguiente.
+ */
+export function comprehendCallMs(leftMs: number, slowestMs = 0): number {
+  const room = Math.floor(leftMs) - COMPREHEND_SAVE_MS;
+  if (!(room >= COMPREHEND_MIN_CALL_MS)) return 0;
+  if (slowestMs > 0 && room < slowestMs * 1.25) return 0;
+  return room;
+}
 
 const COMPREHEND_RULES = [
   "Eres el bibliotecario de Mr. Pilo, en la Universidad de Santander (UDES). Lees pasajes de documentos y dices de qué trata cada uno, para armar un mapa de conexiones entre ellos.",
@@ -3392,7 +3430,7 @@ export function docOutline(
 export function passageWhere(collection: string, title: string, section: string, topics: string[] = []): string {
   const tidy = (v: string) => String(v ?? "").replace(/\s+/g, " ").trim();
   const path = [tidy(collection), tidy(title), tidy(section)].filter(Boolean).join(" › ");
-  const names = topics.map(tidy).filter(Boolean).slice(0, COMPREHEND_TOPICS);
+  const names = topics.map(tidy).filter(Boolean).slice(0, WHERE_TOPICS);
   return `${path}${names.length ? ` · temas: ${names.join(", ")}` : ""}`;
 }
 
@@ -4022,21 +4060,18 @@ async function handle(request: Request): Promise<Response> {
   const upkeep = action === "comprender" || action === "moodle";
 
   // Quién pregunta: sin sesión, o una persona con su rol (si su perfil está activo).
-  let profileId: string | null = null;
-  let role: Role | null = null;
   const token = request.headers.get("Authorization")?.replace(/^Bearer\s+/i, "") ?? "";
-  if (token) {
+  const whoAsks = async (): Promise<{ profileId: string | null; role: Role | null }> => {
+    if (!token) return { profileId: null, role: null };
     const { data } = await admin.auth.getUser(token);
-    if (data?.user) {
-      const { data: profile } = await admin.from("profiles").select("id, role, is_active").eq("id", data.user.id).maybeSingle();
-      if (profile?.is_active) {
-        profileId = profile.id;
-        role = profile.role as Role;
-      }
-    }
-  }
+    if (!data?.user) return { profileId: null, role: null };
+    const { data: profile } = await admin.from("profiles").select("id, role, is_active").eq("id", data.user.id).maybeSingle();
+    return profile?.is_active ? { profileId: profile.id as string, role: profile.role as Role } : { profileId: null, role: null };
+  };
 
-  const [{ data: settings }, { data: secret }] = await Promise.all([
+  // La sesión y la configuración no dependen una de otra: se leen a la vez (antes, una tras otra).
+  const [{ profileId, role }, { data: settings }, { data: secret }] = await Promise.all([
+    whoAsks(),
     admin.from("pilo_ai_settings").select("*").eq("id", 1).maybeSingle(),
     // «*»: si la base aún no tiene 0090, speech_key no existe y no debe fallar.
     admin.from("pilo_ai_secret").select("*").eq("id", 1).maybeSingle(),
@@ -4545,11 +4580,20 @@ async function handle(request: Request): Promise<Response> {
 
   /**
    * «Comprender» (solo administración): de qué trata cada pasaje, para el mapa.
-   * «estado»: cuántos pasajes hay y cuántos faltan. «lote»: los siguientes 18
-   * pendientes, en hasta 3 pedidos de 6 al modelo y con 60 s de presupuesto; la
+   * «estado»: cuántos pasajes hay y cuántos faltan. «lote»: los siguientes 36
+   * pendientes, en hasta 6 pedidos de 6 al modelo, uno tras otro (cada uno
+   * recibe los temas que dejaron los anteriores). El presupuesto sale del tope
+   * real de la plataforma (`comprehendBudget`: 120 s con el de partida); la
    * página repite hasta terminar. Los pasajes viajan como datos, entre los
    * delimitadores, y lo que el modelo devuelve se valida antes de guardarlo.
-   * Un 429 del proveedor detiene el lote y se devuelve lo que alcanzó a guardarse.
+   *
+   * Cada pedido se guarda en cuanto vuelve: un lote que se queda sin tiempo no
+   * pierde nada. No se empieza un pedido que ya no alcanzaría a responder
+   * (`comprehendCallMs`); lo que no se empezó sigue pendiente y, si el lote
+   * guardó algo, termina sin `stopped` (con `cut: "tiempo"`) para que la página
+   * siga sola con el siguiente. Solo un lote que no guardó nada por falta de
+   * tiempo se detiene con `stopped: "tiempo"`. Un 429 del proveedor detiene el
+   * lote y se devuelve lo que alcanzó a guardarse.
    * Sin IA, dice que el mapa básico (estructura y normas citadas) es lo que hay.
    */
   async function comprehendMap(): Promise<Response> {
@@ -4576,7 +4620,9 @@ async function handle(request: Request): Promise<Response> {
       if (what !== "lote") return json({ error: "Paso desconocido." }, 400);
       if (!aiOn) return json({ ok: true, ai: false, basic: true, note: BASIC, asked: 0, saved: 0, failed: 0, calls: 0, done: true, status: await status() });
 
-      const deadline = Date.now() + COMPREHEND_MS;
+      const since = Date.now();
+      const budget = comprehendBudget(PLATFORM_CAP_MS);
+      const deadline = since + budget;
       const [pending, topics] = await Promise.all([
         admin.rpc("pilo_map_pending", { ...inSpace({ p_space: space }), p_doc: doc, p_limit: COMPREHEND_BATCH }),
         admin.rpc("pilo_map_topics", { ...inSpace({ p_space: space }), p_limit: COMPREHEND_KNOWN }),
@@ -4592,18 +4638,24 @@ async function handle(request: Request): Promise<Response> {
       let calls = 0;
       let stopped = "";
       let detail = "";
+      /** Cuántos pasajes del lote se le dieron al modelo, y lo que tardó su pedido más lento. */
+      let tried = 0;
+      let slowest = 0;
       for (let i = 0; i < rows.length; i += COMPREHEND_CALL) {
-        const left = deadline - Date.now();
-        if (left < 5_000) {
+        // ¿Alcanza el tiempo para otro pedido? Si no, lo que falta queda para el lote siguiente.
+        const room = comprehendCallMs(deadline - Date.now(), slowest);
+        if (!room) {
           stopped = "tiempo";
           break;
         }
         const chunk = rows.slice(i, i + COMPREHEND_CALL);
         const names = known.filter((k) => k.id.startsWith("tema:")).map((k) => k.label);
         calls += 1;
+        tried += chunk.length;
+        const sent = Date.now();
         let raw = "";
         try {
-          const { response } = await chat(buildComprehendMessages(chunk, names), { temperature: 0.1, max_tokens: 1200, json: true, signal: AbortSignal.timeout(left) });
+          const { response } = await chat(buildComprehendMessages(chunk, names), { temperature: 0.1, max_tokens: COMPREHEND_MAX_TOKENS, json: true, signal: AbortSignal.timeout(room) });
           if (!response.ok) {
             detail = `${response.status} ${await providerDetail(response)}`.trim();
             stopped = response.status === 429 ? "limite_proveedor" : "proveedor";
@@ -4611,6 +4663,7 @@ async function handle(request: Request): Promise<Response> {
           }
           const data = await response.json().catch(() => null);
           raw = String(data?.choices?.[0]?.message?.content ?? "");
+          slowest = Math.max(slowest, Date.now() - sent);
         } catch (error) {
           stopped = timedOut(error) ? "tiempo" : "red";
           detail = String(error).slice(0, 200);
@@ -4630,9 +4683,17 @@ async function handle(request: Request): Promise<Response> {
       }
       const after = await status();
       const left = Number(after.pending ?? 0);
+      // Se acabó el tiempo con algo ya guardado: no es una detención. Lo guardado queda y la página sigue sola.
+      const cut = stopped === "tiempo" && saved > 0 ? "tiempo" : "";
+      if (cut) stopped = "";
       // Nada guardado y nada que lo explique: el modelo no devolvió algo que se pueda leer. Que la página no insista sola.
-      if (!stopped && left > 0 && saved === 0 && rows.length > 0) stopped = "formato";
-      if (calls > 0) await log(stopped ? `parcial · comprender · ${stopped}` : "listo · comprender", `${saved} de ${rows.length} pasajes en ${calls} ${calls === 1 ? "pedido" : "pedidos"}${detail ? ` · ${detail}` : ""}`);
+      if (!stopped && !cut && left > 0 && saved === 0 && rows.length > 0) stopped = "formato";
+      if (calls > 0) {
+        await log(
+          stopped ? `parcial · comprender · ${stopped}` : cut ? `parcial · comprender · ${cut}` : "listo · comprender",
+          `${saved} de ${rows.length} pasajes en ${calls} ${calls === 1 ? "pedido" : "pedidos"}${detail ? ` · ${detail}` : ""}`,
+        );
+      }
       const note =
         stopped === "limite_proveedor"
           ? LIMIT_429
@@ -4645,7 +4706,22 @@ async function handle(request: Request): Promise<Response> {
                 : stopped === "formato"
                   ? "El modelo no devolvió una respuesta que se pueda leer. Intente de nuevo o pruebe con otro modelo."
                   : "";
-      return json({ ok: true, ai: true, asked: rows.length, saved, failed, calls, done: left === 0, ...(stopped ? { stopped, note } : {}), status: after });
+      return json({
+        ok: true,
+        ai: true,
+        asked: rows.length,
+        saved,
+        failed,
+        calls,
+        done: left === 0,
+        ...(stopped ? { stopped, note } : {}),
+        // Lo nuevo, todo opcional: por qué el lote quedó corto sin detenerse, cuántos pasajes no se alcanzaron a pedir, y los tiempos.
+        ...(cut ? { cut, note: "Se acabó el tiempo de este lote: lo comprendido quedó guardado y lo demás sigue en el siguiente." } : {}),
+        skipped: rows.length - tried,
+        ms: Date.now() - since,
+        budget_ms: budget,
+        status: after,
+      });
     } catch (error) {
       if (error instanceof Missing) return json({ error: error.message, advice: "La administración debe aplicar la migración 0115 antes de armar el mapa.", code: "migracion" }, 500);
       await log("error · comprender", String(error).slice(0, 180)).then(
@@ -4988,14 +5064,20 @@ async function handle(request: Request): Promise<Response> {
   async function answerWork(session: AskSession, abort: AbortController): Promise<Response> {
     const question = String(body.question ?? "").replace(/\s+/g, " ").trim().slice(0, ASK_QUESTION_CHARS);
     if (question.length < 2) return json({ error: "Escriba su pregunta." }, 400);
-    const turnstile = await visitorCheck("p");
-    if (!turnstile.ok) {
+    // El límite por visitante se cuenta a la par de lo que se lee antes de buscar (más abajo):
+    // nada de eso escribe ni llama a un proveedor, y así el flujo se abre una ida y vuelta antes.
+    const checking = visitorCheck("p");
+    // Si algo de lo que sigue falla antes de esperarla, que no quede una promesa suelta.
+    checking.catch(() => undefined);
+    const turnstileBlocked = async (): Promise<Response | null> => {
+      const turnstile = await checking;
+      if (turnstile.ok) return null;
       return json(
         { error: "Va muy rápido: espere un momento antes de volver a preguntar.", advice: `Podrá preguntar de nuevo en ${turnstile.retry} s.`, code: "visitante", retry_after: turnstile.retry },
         429,
         { "Retry-After": String(turnstile.retry) },
       );
-    }
+    };
     const history = cleanHistory(body.history);
     const wantStream = body.stream === true && ask.stream;
     type Step = { step: string; status: "ok" | "skip" | "ai"; detail: string; ms: number };
@@ -5031,12 +5113,14 @@ async function handle(request: Request): Promise<Response> {
     const search = async (q: string): Promise<Hit[]> => {
       // Un espacio con todas sus fuentes apagadas no busca (una lista vacía no debe leerse como «todas»).
       if (spaced && !sources.length) return [];
-      const v = await queryVector(q);
+      // La búsqueda por palabras sale ya; no espera al vector de la pregunta (un pedido al proveedor).
       const [lex, sem] = await Promise.all([
         admin.rpc("pilo_memory_search", { p_q: q, p_sources: sources, p_limit: 8, ...scope }), // p_space
-        v
-          ? admin.rpc("pilo_memory_semantic", { p_embedding: v, p_model: model, p_sources: sources, p_limit: 8, p_min: SEMANTIC_MIN, ...scope }) // p_space
-          : Promise.resolve({ data: [], error: null }),
+        queryVector(q).then((v) =>
+          v
+            ? admin.rpc("pilo_memory_semantic", { p_embedding: v, p_model: model, p_sources: sources, p_limit: 8, p_min: SEMANTIC_MIN, ...scope }) // p_space
+            : { data: [], error: null },
+        ),
       ]);
       if (lex.error) throw new Error(`memoria: ${lex.error.message}`);
       return fuseHits((lex.data ?? []) as (Row & { rank: number })[], (sem.error ? [] : sem.data ?? []) as (Row & { sim: number })[]);
@@ -5045,10 +5129,9 @@ async function handle(request: Request): Promise<Response> {
     type FactHit = Fact & { rank: number; via?: "palabras" | "significado" | "ambas"; sim?: number };
     const searchFacts = async (q: string): Promise<FactHit[]> => {
       if (!sources.includes("cifras")) return [];
-      const v = await queryVector(q);
       const [lex, sem] = await Promise.all([
         admin.rpc("pilo_facts_search", { p_q: q, p_limit: 3 }),
-        v ? admin.rpc("pilo_facts_semantic", { p_embedding: v, p_model: model, p_limit: 3, p_min: SEMANTIC_MIN }) : Promise.resolve({ data: [], error: null }),
+        queryVector(q).then((v) => (v ? admin.rpc("pilo_facts_semantic", { p_embedding: v, p_model: model, p_limit: 3, p_min: SEMANTIC_MIN }) : { data: [], error: null })),
       ]);
       return fuseHits((lex.error ? [] : lex.data ?? []) as (Fact & { rank: number })[], (sem.error ? [] : sem.data ?? []) as (Fact & { sim: number })[]);
     };
@@ -5072,7 +5155,15 @@ async function handle(request: Request): Promise<Response> {
     // El cupo se mira de una vez, a la par de las sedes y el catálogo: así se sabe
     // antes de buscar si va a escribir el modelo, y el flujo se puede abrir ya.
     // En otro espacio, el catálogo es el de ese espacio y solo lo que le sirve al rol (lo de todos y lo suyo).
-    const [campuses, catalog, aiOff] = await Promise.all([loadCampuses(), loadCatalog().then((rows) => (spaced ? catalogForRol(rows, rol) : rows)), noAiReason()]);
+    // Y, de paso, se averigua si hay vectores (queda en memoria un minuto): la búsqueda no espera por eso.
+    const [blocked, campuses, catalog, aiOff] = await Promise.all([
+      turnstileBlocked(),
+      loadCampuses(),
+      loadCatalog().then((rows) => (spaced ? catalogForRol(rows, rol) : rows)),
+      noAiReason(),
+      semanticReady().catch(() => false),
+    ]);
+    if (blocked) return blocked;
     /** Fuera del espacio de partida, la respuesta dice para qué rol se redactó y, si no trae cara propia, la del rol. */
     const face = roleFace(profile, rol);
     const dress = <T extends Record<string, unknown>>(payload: T): T => (spaced ? withRole(payload, rol, face) : payload);
@@ -5225,22 +5316,65 @@ async function handle(request: Request): Promise<Response> {
       step("Catálogo", "ok", `Respuesta oficial de Planeación (${officialEntries.map((e) => e.key).join(", ")}), reconocida ${how}: es la base de la respuesta.`);
     } else if (!chatty) step("Catálogo", "skip", loose ? "Pregunta de seguimiento: el catálogo no se consulta sin su contexto." : catalog.length ? "Nada del catálogo coincide." : "El catálogo está vacío.");
 
+    // 2b–2f. Lo que sigue a la búsqueda no depende entre sí y va a la vez (antes, uno tras otro):
+    //        los pasajes de la respuesta guardada, los vecinos del mapa y la malla.
+    // 2d. Las cifras en vivo: la cifra exacta de ese corte, del mismo cálculo del portal.
+    const { passages: dataPassages, lead } = pickData(facts);
+    // 2e. La memoria: los pasajes más cercanos de lo publicado.
+    const memory = nearOf(found)
+      .filter((p) => !dataPassages.some((d) => d.ref === `dato:${p.ref}`))
+      .slice(0, dataPassages.length ? 3 : 5);
+    const names: Record<string, string> = SPACES[space].names;
+
     // 2b. Respuestas guardadas: casi la misma pregunta, con sus fuentes sin cambios
     //     y el mismo corte (una respuesta de 2024 no sirve para 2023).
-    let saved = savedOf(candidates);
-    let savedPassages: Passage[] = [];
-    if (saved) {
-      const wanted = admin.from("pilo_memory").select("ref, source, title, section, body, path, cut, office").in("ref", saved.refs);
+    const loadSaved = async (): Promise<{ saved: Saved | null; savedPassages: Passage[] }> => {
+      const hit = savedOf(candidates);
+      if (!hit) return { saved: null, savedPassages: [] };
+      const wanted = admin.from("pilo_memory").select("ref, source, title, section, body, path, cut, office").in("ref", hit.refs);
       // En otro espacio, solo sus pasajes y solo los que esta persona puede ver ("space", vis).
       const { data: rows } = await (!spaced ? wanted : publicOnly ? wanted.eq("space", space).eq("vis", "publico") : wanted.eq("space", space).neq("vis", "oculto"));
       const byRef = new Map(((rows ?? []) as Passage[]).map((r) => [r.ref, r]));
-      savedPassages = saved.refs.map((r) => byRef.get(r)).filter(Boolean) as Passage[];
+      const passages = hit.refs.map((r) => byRef.get(r)).filter(Boolean) as Passage[];
       // Si alguna de sus fuentes no es de este espacio o no se puede ver, la guardada no se usa.
-      if (spaced && savedPassages.length < saved.refs.length) {
-        saved = null;
-        savedPassages = [];
-      }
-    }
+      if (spaced && passages.length < hit.refs.length) return { saved: null, savedPassages: [] };
+      return { saved: hit, savedPassages: passages };
+    };
+
+    // 2e'. El mapa de conexiones (0115): solo en otro espacio y solo si va a escribir el modelo.
+    //      Con los 3 primeros pasajes se buscan sus vecinos (comparten tema o referencia) y se
+    //      suman hasta 3, DESPUÉS de los directos y marcados `via: "mapa"`. La base aplica los
+    //      mismos filtros que la búsqueda: el espacio, las fuentes y, sin sesión, solo lo público.
+    //      Sin 0115 o sin vecinos, todo queda como siempre: ni pasajes, ni paso, ni cambio en el pedido.
+    type Related = Passage & { via: "mapa"; link: string };
+    const followMap = async (): Promise<{ related: Related[]; pool: Passage[]; joined: string[] }> => {
+      const mapKnown = mapCache.get(space);
+      if (!spaced || aiOff || !memory.length || (mapKnown && !mapKnown.ready && Date.now() - mapKnown.at < 60_000)) return { related: [], pool: memory, joined: [] };
+      const since = Date.now();
+      const top = memory.slice(0, 3).map((p) => p.ref);
+      const near = await admin.rpc("pilo_graph_neighbors", { p_refs: top, ...inSpace({ p_space: space }), p_sources: sources, p_public_only: publicOnly, p_limit: 3 });
+      mapCache.set(space, { at: Date.now(), ready: !near.error });
+      const related: Related[] = near.error ? [] : mapNeighbors(near.data, memory.map((p) => p.ref), sources, 3);
+      if (!related.length) return { related, pool: memory, joined: [] };
+      // De qué trata cada pasaje, para la línea de su fuente. Solo temas y referencias de este espacio.
+      const all = [...memory, ...related];
+      const links = await admin.from("pilo_edges").select("from_id, to_id").eq("space", space).in("rel", ["trata", "cita"]).in("from_id", all.map((p) => p.ref));
+      const edges = (links.error ? [] : links.data ?? []) as { from_id: string; to_id: string }[];
+      const ids = [...new Set(edges.map((e) => e.to_id))].slice(0, 80);
+      const hubs = ids.length ? await admin.from("pilo_nodes").select("id, label").eq("space", space).in("id", ids) : { data: [], error: null };
+      const labels = new Map(((hubs.error ? [] : hubs.data ?? []) as { id: string; label: string }[]).map((n) => [n.id, mapLabel(n.label)]));
+      const topicsOf = (ref: string) => [...new Set(edges.filter((e) => e.from_id === ref).map((e) => labels.get(e.to_id) ?? "").filter(Boolean))];
+      const locate = <T extends Passage>(p: T): T => ({ ...p, where: passageWhere(names[p.source] ?? p.source, p.title, p.section, topicsOf(p.ref)) });
+      const joined = [...new Set(related.map((p) => p.link).filter(Boolean))];
+      emitStep(steps.start("mapa", "", since));
+      stepDone("mapa", stepDetail({ id: "mapa", count: related.length, topics: joined }));
+      return { related, pool: [...memory.map(locate), ...related.map(locate)], joined };
+    };
+
+    // `pool`: los pasajes para el modelo, los directos y, detrás, los vecinos; con mapa, cada uno dice dónde queda.
+    // 2f. La malla (0097): dónde queda cada pasaje y qué contiene. Sin 0097, vacía.
+    const [{ saved, savedPassages }, { related, pool, joined }, mesh] = await Promise.all([loadSaved(), followMap(), meshAround(memory.map((p) => p.ref), sources)]);
+
     if (saved) {
       step("Respuestas guardadas", "ok", `Ya se había respondido «${saved.question}», y sus fuentes no han cambiado.`);
     } else if (!chatty && !loose) step("Respuestas guardadas", "skip", candidates.length ? "Había preguntas parecidas, pero no iguales o sus fuentes cambiaron." : "No había una pregunta igual guardada.");
@@ -5254,8 +5388,6 @@ async function handle(request: Request): Promise<Response> {
     const understood = [loose ? `Sigue a «${chain.follow.join(CHAIN_SEP).slice(0, 120)}».` : "", cutParts.length ? `Pide: ${cutParts.join(" · ")}.` : ""].filter(Boolean);
     if (!chatty) step("Entender", understood.length ? "ok" : "skip", understood.length ? understood.join(" ") : "Pregunta directa, sin sede, año ni periodo.");
 
-    // 2d. Las cifras en vivo: la cifra exacta de ese corte, del mismo cálculo del portal.
-    const { passages: dataPassages, lead } = pickData(facts);
     if (dataPassages.length) {
       const d = dataPassages[0];
       step("Cifras", "ok", `«${d.title}»${d.cut ? ` en ${d.cut}` : ""}${lead?.missing.length ? `; sin cifra para ${lead.missing.join(", ")}` : ""}.`);
@@ -5263,52 +5395,16 @@ async function handle(request: Request): Promise<Response> {
       step("Cifras", "skip", facts.length ? "Ningún indicador tiene cifras para ese corte." : "Ningún indicador de UDES en Cifras coincide.");
     }
 
-    // 2e. La memoria: los pasajes más cercanos de lo publicado.
-    const memory = nearOf(found)
-      .filter((p) => !dataPassages.some((d) => d.ref === `dato:${p.ref}`))
-      .slice(0, dataPassages.length ? 3 : 5);
-    const names: Record<string, string> = SPACES[space].names;
     if (memory.length) {
       const where = [...new Set(memory.map((p) => names[p.source] ?? p.source))].join(", ");
       const bySenseOnly = memory.filter((p) => p.via === "significado").length;
       step("Fuentes", "ok", `${memory.length} ${memory.length === 1 ? "pasaje" : "pasajes"} en ${where}${bySenseOnly ? ` (${bySenseOnly} ${bySenseOnly === 1 ? "hallado" : "hallados"} solo por significado)` : ""}.`);
     } else if (!chatty) step("Fuentes", "skip", dataPassages.length ? "La memoria no suma nada a la cifra." : "Ningún pasaje de lo publicado coincide con la pregunta.");
 
-    // 2e'. El mapa de conexiones (0115): solo en otro espacio y solo si va a escribir el modelo.
-    //      Con los 3 primeros pasajes se buscan sus vecinos (comparten tema o referencia) y se
-    //      suman hasta 3, DESPUÉS de los directos y marcados `via: "mapa"`. La base aplica los
-    //      mismos filtros que la búsqueda: el espacio, las fuentes y, sin sesión, solo lo público.
-    //      Sin 0115 o sin vecinos, todo queda como siempre: ni pasajes, ni paso, ni cambio en el pedido.
-    let related: (Passage & { via: "mapa"; link: string })[] = [];
-    /** Los pasajes para el modelo: los directos y, detrás, los vecinos; con mapa, cada uno dice dónde queda. */
-    let pool: Passage[] = memory;
-    const mapKnown = mapCache.get(space);
-    if (spaced && !aiOff && memory.length && !(mapKnown && !mapKnown.ready && Date.now() - mapKnown.at < 60_000)) {
-      const since = Date.now();
-      const top = memory.slice(0, 3).map((p) => p.ref);
-      const near = await admin.rpc("pilo_graph_neighbors", { p_refs: top, ...inSpace({ p_space: space }), p_sources: sources, p_public_only: publicOnly, p_limit: 3 });
-      mapCache.set(space, { at: Date.now(), ready: !near.error });
-      related = near.error ? [] : mapNeighbors(near.data, memory.map((p) => p.ref), sources, 3);
-      if (related.length) {
-        // De qué trata cada pasaje, para la línea de su fuente. Solo temas y referencias de este espacio.
-        const all = [...memory, ...related];
-        const links = await admin.from("pilo_edges").select("from_id, to_id").eq("space", space).in("rel", ["trata", "cita"]).in("from_id", all.map((p) => p.ref));
-        const edges = (links.error ? [] : links.data ?? []) as { from_id: string; to_id: string }[];
-        const ids = [...new Set(edges.map((e) => e.to_id))].slice(0, 80);
-        const hubs = ids.length ? await admin.from("pilo_nodes").select("id, label").eq("space", space).in("id", ids) : { data: [], error: null };
-        const labels = new Map(((hubs.error ? [] : hubs.data ?? []) as { id: string; label: string }[]).map((n) => [n.id, mapLabel(n.label)]));
-        const topicsOf = (ref: string) => [...new Set(edges.filter((e) => e.from_id === ref).map((e) => labels.get(e.to_id) ?? "").filter(Boolean))];
-        const locate = <T extends Passage>(p: T): T => ({ ...p, where: passageWhere(names[p.source] ?? p.source, p.title, p.section, topicsOf(p.ref)) });
-        pool = [...memory.map(locate), ...related.map(locate)];
-        const joined = [...new Set(related.map((p) => p.link).filter(Boolean))];
-        emitStep(steps.start("mapa", "", since));
-        stepDone("mapa", stepDetail({ id: "mapa", count: related.length, topics: joined }));
-        step("Mapa", "ok", `Seguí las conexiones del mapa: ${related.length} ${related.length === 1 ? "pasaje relacionado" : "pasajes relacionados"}${joined.length ? ` por ${joined.slice(0, 3).join(", ")}` : ""}.`);
-      }
+    if (related.length) {
+      step("Mapa", "ok", `Seguí las conexiones del mapa: ${related.length} ${related.length === 1 ? "pasaje relacionado" : "pasajes relacionados"}${joined.length ? ` por ${joined.slice(0, 3).join(", ")}` : ""}.`);
     }
 
-    // 2f. La malla (0097): dónde queda cada pasaje y qué contiene. Sin 0097, vacía.
-    const mesh = await meshAround(memory.map((p) => p.ref), sources);
     const inMesh = memory.filter((p) => mesh.nodes.some((n) => n.id === p.ref));
     const drawFor = (ref: string | undefined) => (ref && mesh.nodes.some((n) => n.id === ref) ? { graph: focusMesh(mesh, ref) } : {});
     if (mesh.nodes.length) step("Malla", "ok", `Ubiqué ${inMesh.length} de los pasajes en la malla.`);

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { MAP_COLUMNS, OUTLINE_MAX, buildOutline, columnOf, docOf, edgeId, focusOf, isPassageRef, layoutColumns, neighborsOf, pathOfPassages, teachGraph } from "./map";
-import type { RawEdge, RawNode } from "./map";
+import { MAP_COLUMNS, OUTLINE_MAX, THINK_BUDGETS, THINK_LIMITS, buildOutline, columnOf, docOf, edgeId, focusOf, isPassageRef, layoutColumns, neighborsOf, pathOfPassages, readThinkStatus, teachGraph, thinkActive, thinkGain, thinkReduce, thinkResume, thinkShare, thinkStart } from "./map";
+import type { RawEdge, RawNode, ThinkLimits, ThinkRun } from "./map";
 
 const A = "11111111-1111-4111-8111-111111111111";
 const B = "22222222-2222-4222-8222-222222222222";
@@ -225,5 +225,132 @@ describe("la estructura de un documento, sin IA (lo que va a pilo_doc_outline)",
     expect(o.trimmed).toBe(true);
     const kept = new Set(o.nodes.map((n) => n.id));
     expect(o.edges.every((e) => (kept.has(e.from) || e.from.startsWith(`doc:${A}:`)) && (kept.has(e.to) || e.to.startsWith(`doc:${A}:`)))).toBe(true);
+  });
+});
+
+describe("pensar el mapa: el bucle de comprender", () => {
+  const limits: ThinkLimits = { maxMs: 60_000, maxRounds: 50, maxStrikes: 3, waits: [1_000, 2_000, 4_000], limitWaits: [10_000, 20_000, 30_000] };
+  const st = (mapped: number, topics = 0, refs = 0) => ({ total: 100, mapped, pending: 100 - mapped, topics, refs });
+  const lote = (run: ThinkRun, result: object, now = 1_000) => thinkReduce(run, { type: "lote", result, now }, limits);
+
+  it("lee el estado con cuidado: números como texto, campos que faltan, basura", () => {
+    expect(readThinkStatus({ total: "10", mapped: 4, pending: 6, topics: 2, refs: 1 })).toEqual({ total: 10, mapped: 4, pending: 6, topics: 2, refs: 1 });
+    expect(readThinkStatus({ total: 10, mapped: 4 })).toEqual({ total: 10, mapped: 4, pending: 6, topics: 0, refs: 0 });
+    expect(readThinkStatus({ total: -3, mapped: "x", pending: null })).toEqual({ total: 0, mapped: 0, pending: 0, topics: 0, refs: 0 });
+    expect(readThinkStatus(null)).toBeNull();
+    expect(readThinkStatus("18")).toBeNull();
+    expect(readThinkStatus({ otro: 1 })).toBeNull();
+  });
+
+  it("sigue lote tras lote mientras haya avance, sin tope de 80 lotes", () => {
+    let run = thinkStart(st(0), 0);
+    for (let i = 1; i <= 40; i++) run = lote(run, { saved: 2, status: st(i * 2, i, i) }, i * 100);
+    expect(run).toMatchObject({ phase: "pensando", rounds: 40, strikes: 0, failed: 0 });
+    expect(thinkGain(run)).toEqual({ mapped: 80, topics: 40, refs: 40 });
+    expect(thinkShare(run.status)).toBeCloseTo(0.8);
+    expect(thinkActive(run)).toBe(true);
+  });
+
+  it("termina cuando no queda nada pendiente o la función dice «done»", () => {
+    expect(lote(thinkStart(st(90), 0), { saved: 10, status: st(100) })).toMatchObject({ phase: "listo", why: "", again: false });
+    expect(lote(thinkStart(st(90), 0), { done: true })).toMatchObject({ phase: "listo" });
+    expect(lote(thinkStart(st(0), 0), { ai: false, note: "Este Pilo no tiene IA." })).toMatchObject({ phase: "listo", why: "Este Pilo no tiene IA." });
+  });
+
+  it("un lote que falla espera y reintenta sin perder lo hecho; al avanzar olvida los tropiezos", () => {
+    let run = lote(thinkStart(st(0), 0), { saved: 18, status: st(18, 5, 2) });
+    run = thinkReduce(run, { type: "fallo", retry: true, why: "Tardó demasiado.", now: 2_000 }, limits);
+    expect(run).toMatchObject({ phase: "esperando", waitMs: 1_000, strikes: 1, failed: 1, rounds: 2 });
+    expect(run.why).toContain("Tardó demasiado.");
+    expect(run.why).toContain("intento 1 de 3");
+    expect(thinkGain(run)).toEqual({ mapped: 18, topics: 5, refs: 2 });
+    run = thinkReduce(run, { type: "esperado", now: 3_000 }, limits);
+    expect(run).toMatchObject({ phase: "pensando", waitMs: 0, strikes: 1 });
+    run = thinkReduce(run, { type: "fallo", retry: true, why: "No hubo conexión.", now: 4_000 }, limits);
+    expect(run).toMatchObject({ phase: "esperando", waitMs: 2_000, strikes: 2 });
+    run = lote(thinkReduce(run, { type: "esperado", now: 6_000 }, limits), { saved: 18, status: st(36, 9, 3) }, 7_000);
+    expect(run).toMatchObject({ phase: "pensando", strikes: 0, failed: 2, rounds: 4, why: "" });
+  });
+
+  it("tras muchos fallos seguidos se detiene, y se puede retomar", () => {
+    let run = thinkStart(st(10), 0);
+    for (let i = 0; i < 3; i++) {
+      run = thinkReduce(run, { type: "fallo", retry: true, why: "Falló la base.", now: 100 * i }, limits);
+      expect(run.phase).toBe("esperando");
+      run = thinkReduce(run, { type: "esperado", now: 100 * i + 50 }, limits);
+    }
+    run = thinkReduce(run, { type: "fallo", retry: true, why: "Falló la base.", now: 900 }, limits);
+    expect(run).toMatchObject({ phase: "detenido", again: true, strikes: 4 });
+    expect(run.why).toContain("4 veces seguidas");
+    expect(thinkActive(run)).toBe(false);
+    // Ya detenida no reacciona a nada.
+    expect(lote(run, { saved: 5 })).toBe(run);
+  });
+
+  it("un error que no se arregla solo (permiso, migración) no se reintenta", () => {
+    const run = thinkReduce(thinkStart(st(0), 0), { type: "fallo", retry: false, why: "Falta la migración 0115.", now: 10 }, limits);
+    expect(run).toMatchObject({ phase: "detenido", again: false, why: "Falta la migración 0115." });
+  });
+
+  it("«formato» no se insiste; un lote sin nada guardado cuenta como tropiezo", () => {
+    expect(lote(thinkStart(st(0), 0), { stopped: "formato", saved: 0, status: st(0) })).toMatchObject({ phase: "detenido", again: false });
+    const empty = lote(thinkStart(st(0), 0), { saved: 0, status: st(0) });
+    expect(empty).toMatchObject({ phase: "esperando", strikes: 1, waitMs: 1_000 });
+    expect(empty.why).toContain("no guardó ningún pasaje");
+  });
+
+  it("si el proveedor limita, espera más; si el lote se quedó sin tiempo pero guardó, sigue de una vez", () => {
+    const limited = lote(thinkStart(st(0), 0), { stopped: "limite_proveedor", saved: 0, status: st(0) });
+    expect(limited).toMatchObject({ phase: "esperando", waitMs: 10_000, strikes: 1 });
+    const partial = lote(thinkStart(st(0), 0), { stopped: "limite_proveedor", saved: 6, status: st(6) });
+    expect(partial).toMatchObject({ phase: "esperando", waitMs: 10_000, strikes: 0, failed: 0 });
+    expect(lote(thinkStart(st(0), 0), { stopped: "tiempo", saved: 9, status: st(9) })).toMatchObject({ phase: "pensando", strikes: 0 });
+    expect(lote(thinkStart(st(0), 0), { stopped: "tiempo", saved: 0, status: st(0) })).toMatchObject({ phase: "esperando" });
+    // Sin «saved» pero con más pasajes comprendidos en el estado: hubo avance.
+    expect(lote(thinkStart(st(0), 0), { status: st(12) })).toMatchObject({ phase: "pensando", strikes: 0 });
+  });
+
+  it("detener: el lote en curso termina y se guarda; en una espera se corta ya", () => {
+    let run = thinkReduce(thinkStart(st(0), 0), { type: "detener" }, limits);
+    expect(run.phase).toBe("deteniendo");
+    expect(thinkActive(run)).toBe(true);
+    run = lote(run, { saved: 18, status: st(18, 4, 1) });
+    expect(run).toMatchObject({ phase: "pausado", again: true });
+    expect(thinkGain(run)).toEqual({ mapped: 18, topics: 4, refs: 1 });
+
+    const waiting = thinkReduce(thinkStart(st(0), 0), { type: "fallo", retry: true, why: "x", now: 1 }, limits);
+    expect(thinkReduce(waiting, { type: "detener" }, limits)).toMatchObject({ phase: "pausado", waitMs: 0, again: true });
+    // Detener y que el lote falle: pausa, no una espera.
+    const failing = thinkReduce(thinkReduce(thinkStart(st(0), 0), { type: "detener" }, limits), { type: "fallo", retry: true, why: "x", now: 1 }, limits);
+    expect(failing.phase).toBe("pausado");
+  });
+
+  it("al cumplirse el tiempo de pensamiento se pausa y ofrece continuar", () => {
+    const late = lote(thinkStart(st(0), 0), { saved: 18, status: st(18) }, 60_000);
+    expect(late).toMatchObject({ phase: "pausado", again: true });
+    expect(late.why).toContain("tiempo de pensamiento");
+    const waited = thinkReduce(thinkReduce(thinkStart(st(0), 0), { type: "fallo", retry: true, why: "x", now: 59_000 }, limits), { type: "esperado", now: 61_000 }, limits);
+    expect(waited.phase).toBe("pausado");
+    let many = thinkStart(st(0), 0);
+    for (let i = 1; i <= 50; i++) many = lote(many, { saved: 1, status: st(i) }, i);
+    expect(many).toMatchObject({ phase: "pausado", rounds: 50 });
+  });
+
+  it("retomar suma a lo ya ganado y estrena reloj y tropiezos", () => {
+    const paused = lote(thinkReduce(thinkStart(st(0), 0), { type: "detener" }, limits), { saved: 18, status: st(18, 4, 1) }, 500);
+    const again = thinkResume(paused, st(18, 4, 1), 90_000);
+    expect(again).toMatchObject({ phase: "pensando", startedAt: 90_000, rounds: 1, strikes: 0, why: "" });
+    const more = lote(again, { saved: 18, status: st(36, 7, 2) }, 91_000);
+    expect(more).toMatchObject({ phase: "pensando", rounds: 2 });
+    expect(thinkGain(more)).toEqual({ mapped: 36, topics: 7, refs: 2 });
+    expect(thinkResume(paused, null, 5).status).toEqual(paused.status);
+  });
+
+  it("los tiempos de pensamiento van de menos a más y el de partida da una hora", () => {
+    expect(THINK_BUDGETS.map((b) => b.ms)).toEqual([...THINK_BUDGETS.map((b) => b.ms)].sort((a, b) => a - b));
+    expect(THINK_LIMITS.maxMs).toBe(60 * 60_000);
+    expect(THINK_LIMITS.waits).toHaveLength(THINK_LIMITS.maxStrikes);
+    expect(thinkGain(null)).toEqual({ mapped: 0, topics: 0, refs: 0 });
+    expect(thinkShare(null)).toBe(0);
   });
 });

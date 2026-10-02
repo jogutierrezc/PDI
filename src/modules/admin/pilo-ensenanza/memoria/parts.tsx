@@ -1,9 +1,8 @@
 /* =============================================================================
    Mr. Pilo en Enseñanza · Memoria · las piezas que comparten sus paneles.
 
-   ReadingStrip   la franja «Pilo leyendo»: su cara aprobada (pensar mientras
-                  trabaja), el paso en curso en palabras, una barra de avance
-                  y un contador. Sin trabajo, dice el estado de la memoria.
+   (La franja «Pilo leyendo» ya no está: lo que Pilo hace se cuenta en su
+   panel, PiloDock, a partir del almacén de actividad.)
    Stages         el recorrido de un documento o un curso: leído → en pasajes
                   → entendido → en el mapa, con glifo y palabra.
    FaultNote      un error dicho entero: qué pasó, qué hacer y, si sirve,
@@ -12,81 +11,12 @@
    VisSeg         quién lo ve: con sesión o público.
    ========================================================================== */
 
-import { useEffect, useLayoutEffect, useRef } from "react";
+import { useLayoutEffect, useRef } from "react";
 import type { ReactNode } from "react";
-import { PiloFace } from "../../../../components/pilo/PiloFace";
 import { Icon } from "../../../../components/ui/Icon";
-import { fillBar, fillStages, readingRings, swapLine } from "../motion";
-import { useReading } from "./data";
+import { fillStages } from "../motion";
 import { faultLine } from "./flow";
 import type { Fault, Stage } from "./flow";
-
-export function ReadingStrip({ total, idleLine }: { total: number | null; idleLine: string }) {
-  const job = useReading();
-  const rings = useRef<HTMLSpanElement>(null);
-  const bar = useRef<HTMLSpanElement>(null);
-  const say = useRef<HTMLDivElement>(null);
-  const busy = Boolean(job);
-  const title = job ? job.title : total === null ? "La memoria de este Pilo" : total === 0 ? "La memoria está vacía" : "La memoria está lista para leer";
-  const line = job ? job.line : idleLine;
-
-  useEffect(() => (busy ? readingRings(rings.current ? [...rings.current.children] : []) : undefined), [busy]);
-
-  useLayoutEffect(() => {
-    if (job?.progress !== undefined) fillBar(bar.current, job.progress);
-  }, [job?.progress]);
-
-  // La frase cambia de paso: entra con un fundido. El primer pintado no se anima.
-  const first = useRef(true);
-  useLayoutEffect(() => {
-    if (first.current) {
-      first.current = false;
-      return;
-    }
-    swapLine(say.current);
-  }, [title]);
-
-  return (
-    <div className="pen-rd" role="status" aria-live="polite" data-busy={busy || undefined}>
-      <span className="pen-rd__face">
-        <span className="pen-rd__rings" ref={rings} aria-hidden="true">
-          <i />
-          <i />
-        </span>
-        <PiloFace size={60} expression={busy ? "pensar" : "graduado"} alive />
-      </span>
-      <div className="pen-rd__say">
-        <div ref={say}>
-          <strong>{title}</strong>
-          <span>{line}</span>
-        </div>
-        {busy && (
-          <i
-            className="pen-rd__bar"
-            data-loose={job?.progress === undefined || undefined}
-            role="progressbar"
-            aria-label="Avance"
-            aria-valuemin={0}
-            aria-valuemax={100}
-            aria-valuenow={job?.progress === undefined ? undefined : Math.round(job.progress * 100)}
-          >
-            <span ref={bar} />
-          </i>
-        )}
-      </div>
-      <div className="pen-rd__count">
-        {job?.counter ? (
-          <b>{job.counter}</b>
-        ) : (
-          <>
-            <b>{total === null ? "—" : total.toLocaleString("es-CO")}</b>
-            {total === 1 ? "pasaje en la memoria" : "pasajes en la memoria"}
-          </>
-        )}
-      </div>
-    </div>
-  );
-}
 
 const STATE_WORD: Record<Stage["state"], string> = { done: "hecho", run: "en curso", fail: "falló", todo: "pendiente" };
 

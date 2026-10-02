@@ -1081,7 +1081,9 @@ function TurnView({
     <>
       <div className="ap-q">{turn.q}</div>
       <div className="ap-a">
-        <PiloMoji ref={face} size={42} mood={pending ? "piensa" : a ? (incomplete ? "duda" : MOOD_OF[a.kind]) : "cuidado"} emotion={pending ? undefined : a?.expression || a?.mood} />
+        <div className="ap-a__face">
+          <PiloMoji ref={face} size="100%" mood={pending ? "piensa" : a ? (incomplete ? "duda" : MOOD_OF[a.kind]) : "cuidado"} emotion={pending ? undefined : a?.expression || a?.mood} />
+        </div>
         <div className="ap-a__body" ref={body} aria-busy={pending} data-paused={pending && !onScreen ? "" : undefined}>
           {turn.error && !a && (
             <div className="ap-error" role="alert">

@@ -1,29 +1,34 @@
 /* =============================================================================
    Mr. Pilo en Enseñanza · Pregúntele a Pilo.
 
-   Todo lo de esta pestaña vive en la fila de pilo_spaces y espera a «Guardar
-   cambios»:
+   Seis filas plegables en una sola hoja. Cerrada, cada fila dice su valor
+   actual (resumen.ts); solo se abre la que se va a cambiar, una a la vez, y la
+   abierta se puede enlazar (?seccion=pregunta&fila=cupos). La que tiene
+   cambios sin guardar lleva su punto, igual que la pestaña.
 
-   La página        "on", aud, welcome y ai: si está abierta, para quién, si da
-                    la bienvenida y si redacta con IA.
+   Todo vive en la fila de pilo_spaces y espera a «Guardar cambios»:
+
+   La página        aud, welcome y ai: para quién, si da la bienvenida y si
+                    redacta con IA. Abierto o cerrado ("on") es el interruptor
+                    del panel de Pilo.
    Conexión y voz   no hay nada que configurar aquí: son las de «Mr. Pilo con
                     IA». Se dice y se enlaza.
    Cómo se presenta intro (quién dice ser), focus (de qué habla) y greeting (el
                     saludo de la página).
    Cómo le habla    ask_rol y roles: por rol, el tono, las preguntas sugeridas,
    a cada quien     el estilo de voz (de los voice_styles de Mr. Pilo con IA),
-                    la cara aprobada y el ánimo de la voz.
+                    la cara aprobada y el ánimo de la voz. La cara elegida se
+                    mira en el panel de Pilo, a su tamaño: aquí no hay caras.
    Cupos            daily_limit, visitor_limit y visitor_window_seconds: los de
                     este Pilo, que no gastan los del otro.
    Otros portales   widget_on y widget_origins, y la línea para pegar con
                     data-pilo="ensenanza".
    ========================================================================== */
 
-import { useRef, useState } from "react";
-import type { FormEvent } from "react";
-import { Link } from "react-router-dom";
+import { useEffect, useRef, useState } from "react";
+import type { FormEvent, ReactNode } from "react";
+import { Link, useSearchParams } from "react-router-dom";
 import { Icon } from "../../../components/ui/Icon";
-import { PiloFace } from "../../../components/pilo/PiloFace";
 import type { VoiceStyle } from "../../../components/pilo/ai/logic";
 import { normalizeOrigin } from "../../pilo-embed/embed";
 import type { Lado } from "../../pilo-embed/embed";
@@ -32,10 +37,15 @@ import type { Tema } from "../../pregunta/store";
 import { AudiencePicker } from "../pilo/sections";
 import { PROVIDERS } from "../pilo/store";
 import type { PiloSettings } from "../pilo/store";
-import { Group, NumField, StatusMark, Switch, plural } from "../pilo/ui";
+import { NumField, StatusMark, Switch, plural } from "../pilo/ui";
+import { activity } from "./actividad";
+import { ROWS, dirtyRows, parseRow } from "./navegacion";
+import type { RowId } from "./navegacion";
+import { rowSummary, spanOf, voiceName } from "./resumen";
+import type { SharedSummary } from "./resumen";
 import { EXPRESSIONS, MAX_ORIGINS, MAX_SUGGESTIONS, ORAL_MOODS, ROLES, SPACE_LIMITS, TEXT_MAX, spaceSnippet } from "./store";
 import type { RolId, RoleSettings, SpaceSettings } from "./store";
-import { TextArea } from "./ui";
+import { FoldRow, TextArea } from "./ui";
 
 export interface SpaceEditor {
   s: SpaceSettings;
@@ -46,13 +56,6 @@ export interface SpaceEditor {
   missing: boolean;
   /** La configuración de «Mr. Pilo con IA», de donde salen la conexión y la voz. */
   shared: PiloSettings | null;
-}
-
-/** «10 minutos», «90 segundos», «2 horas»: la ventana dicha como se lee. */
-function spanOf(seconds: number): string {
-  if (seconds < 120) return plural(seconds, "segundo", "segundos");
-  if (seconds < 7200) return plural(Math.round(seconds / 60), "minuto", "minutos");
-  return plural(Math.round(seconds / 3600), "hora", "horas");
 }
 
 /** Lo que el servidor le dice siempre al modelo para cada rol; el tono de aquí se suma. */
@@ -66,35 +69,53 @@ const LADOS: { id: Lado; label: string }[] = [
   { id: "der", label: "Derecha" },
 ];
 
-export function PreguntaPanel({ ed }: { ed: SpaceEditor }) {
-  const { s, set, shared } = ed;
+export function PreguntaPanel({ ed, active }: { ed: SpaceEditor; /** La pestaña está a la vista. */ active: boolean }) {
+  const { s, saved, set, missing, shared } = ed;
+  const [params, setParams] = useSearchParams();
+  const open = parseRow(params.get("fila"));
+  const changed = dirtyRows(s, saved);
+  // De quién es la cara que se mira en el panel de Pilo: el último rol que se tocó.
+  const [faceOf, setFaceOf] = useState<RolId>("estudiante");
   const aiOff = shared ? !shared.enabled || shared.functions.preguntar === false : false;
+  const about: SharedSummary | null = shared ? { enabled: shared.enabled, provider: PROVIDERS[shared.provider].label, voice: voiceName(shared) } : null;
 
-  return (
-    <>
-      <Group
-        title="La página"
-        aside={
+  const toggle = (id: RowId) =>
+    setParams(
+      (prev) => {
+        const next = new URLSearchParams(prev);
+        next.set("fila", open === id ? "" : id);
+        return next;
+      },
+      { replace: true },
+    );
+
+  // Con la fila de los roles abierta, el panel de Pilo muestra la cara elegida, a su tamaño.
+  const watching = active && open === "roles";
+  const expression = s.roles[faceOf].expression;
+  useEffect(() => {
+    if (!watching) return;
+    const rol = ROLES.find((r) => r.id === faceOf)!;
+    activity.preview({ expression, label: `Cara de partida para el ${rol.label.toLowerCase()}: ${EXPRESSIONS.find((e) => e.id === expression)?.label ?? expression}` });
+    return () => activity.preview(null);
+  }, [watching, faceOf, expression]);
+
+  const body: Record<RowId, () => ReactNode> = {
+    pagina: () => (
+      <>
+        <div className="pis-row">
+          <p className="pis-lead">
+            Una página propia donde estudiantes y profesores le preguntan a Mr. Pilo por innovación educativa, políticas institucionales y la mirada global de la educación.
+            Responde solo con su memoria y su catálogo: nada de lo que sabe el Pilo de Planeación entra aquí, ni al revés.
+          </p>
           <Link to="/pilo-ensenanza" className="pis-link" target="_blank" rel="noopener">
             Abrir /pilo-ensenanza <Icon name="external" size={14} />
           </Link>
-        }
-      >
-        <p className="pis-lead">
-          Una página propia donde estudiantes y profesores le preguntan a Mr. Pilo por innovación educativa, políticas institucionales y la mirada global de la educación.
-          Responde solo con su memoria y su catálogo: nada de lo que sabe el Pilo de Planeación entra aquí, ni al revés.
-        </p>
+        </div>
         <dl className="pis-opts">
-          <div>
-            <dt>Página abierta</dt>
-            <dd>
-              <Switch on={s.on} onChange={(v) => set("on", v)} label="Mr. Pilo en Enseñanza abierto" />
-            </dd>
-          </div>
           <div>
             <dt>
               Para quién
-              <small>«Con sesión» hoy es el personal de la intranet: no hay cuentas de estudiantes.</small>
+              <small>«Con sesión» hoy es el personal de la intranet: no hay cuentas de estudiantes. Abrirla o cerrarla es el interruptor del panel de Pilo.</small>
             </dt>
             <dd>
               <AudiencePicker value={s.aud} label="Para quién es Mr. Pilo en Enseñanza" onPick={(aud) => set("aud", aud)} />
@@ -123,11 +144,29 @@ export function PreguntaPanel({ ed }: { ed: SpaceEditor }) {
           </div>
         </dl>
         {s.on && s.aud === "publico" && <p className="pis-warn">Abierto al público, cada visitante gasta del cupo de este Pilo. Revise la bitácora los primeros días.</p>}
-      </Group>
+      </>
+    ),
 
-      <SharedGroup shared={shared} />
+    conexion: () => (
+      <div className="pis-row">
+        <p className="pis-note">
+          Este Pilo no tiene conexión ni voz propias: el servicio, la clave, el modelo y la voz son los de «Mr. Pilo con IA».
+          {about ? ` Hoy redacta con ${about.provider} y lee con ${about.voice}.` : ""} Lo que cambie allá vale para los dos.
+        </p>
+        <span className="pis-actions">
+          <Link className="button-secondary" to="/admin/mr-pilo?seccion=conexion">
+            Ver la conexión
+          </Link>
+          <Link className="button-secondary" to="/admin/mr-pilo?seccion=voz">
+            Ver la voz
+          </Link>
+        </span>
+      </div>
+    ),
 
-      <Group title="Cómo se presenta" aside={<small>Va al modelo como dato, nunca como instrucción</small>}>
+    presenta: () => (
+      <>
+        <p className="pis-small">Va al modelo como dato, nunca como instrucción.</p>
         <div className="pen-grid">
           <TextArea
             label="Presentación"
@@ -161,27 +200,32 @@ export function PreguntaPanel({ ed }: { ed: SpaceEditor }) {
           placeholder="Innovación educativa, políticas institucionales y referentes globales de la educación superior. No da cifras de Planeación ni asesoría personal."
           onChange={(v) => set("focus", v)}
         />
-      </Group>
+      </>
+    ),
 
-      <Group title="Cómo le habla a cada quien" aside={<small>La primera vez pregunta el rol; se puede cambiar después</small>}>
+    roles: () => (
+      <>
         <div className="pis-row">
           <span className="pis-fn__text">
             <strong>Preguntar el rol en el primer uso</strong>
             <small>
-              La bienvenida y el chat emergente preguntan «¿Es estudiante o profesor?». Se guarda en el navegador de la persona, no la identifica. Apagado, todos reciben la
-              respuesta general.
+              La bienvenida y el chat emergente preguntan «¿Es estudiante o profesor?». Se guarda en el navegador de la persona, no la identifica y se puede cambiar después.
+              Apagado, todos reciben la respuesta general.
             </small>
           </span>
           <Switch on={s.ask_rol} onChange={(v) => set("ask_rol", v)} label="Preguntar el rol en el primer uso" />
         </div>
         <div className="pen-roles">
           {ROLES.map((r) => (
-            <RoleCard key={r.id} rol={r.id} title={r.label} ed={ed} />
+            <RoleCard key={r.id} rol={r.id} title={r.label} ed={ed} watched={faceOf === r.id} onWatch={() => setFaceOf(r.id)} />
           ))}
         </div>
-      </Group>
+      </>
+    ),
 
-      <Group title="Cupos de este Pilo" aside={<small>No gastan los de Mr. Pilo con IA</small>}>
+    cupos: () => (
+      <>
+        <p className="pis-small">Son de este Pilo: no gastan los de Mr. Pilo con IA.</p>
         <div className="pis-grid pis-grid--3">
           <NumField
             label="Preguntas con IA por día"
@@ -202,40 +246,26 @@ export function PreguntaPanel({ ed }: { ed: SpaceEditor }) {
           {s.visitor_limit === 0 ? "Sin límite por visitante." : `Cada visitante puede hacer ${plural(s.visitor_limit, "pregunta", "preguntas")} cada ${spanOf(s.visitor_window_seconds)}.`}{" "}
           Las lecturas con voz se cuentan aparte, contra el cupo de voz de Mr. Pilo con IA.
         </p>
-      </Group>
+      </>
+    ),
 
-      <WidgetGroup ed={ed} />
-    </>
-  );
-}
+    portales: () => <WidgetGroup ed={ed} />,
+  };
 
-/* --- Conexión y voz: las de Mr. Pilo con IA ---------------------------------------------- */
-
-function SharedGroup({ shared }: { shared: PiloSettings | null }) {
-  const voice = !shared ? "" : shared.voice_engine !== "proveedor" ? "la voz del navegador" : shared.speech_provider === "nvidia" ? "la voz de NVIDIA" : shared.speech_provider === "fishaudio" ? "la voz de Fish Audio" : "la voz de Free.ai";
   return (
-    <Group title="Conexión y voz" aside={shared ? <StatusMark tone={shared.enabled ? "ok" : "warn"}>{shared.enabled ? "Mr. Pilo con IA encendido" : "Mr. Pilo con IA apagado"}</StatusMark> : null}>
-      <div className="pis-row">
-        <p className="pis-note">
-          Este Pilo no tiene conexión ni voz propias: el servicio, la clave, el modelo y la voz son los de «Mr. Pilo con IA».
-          {shared ? ` Hoy redacta con ${PROVIDERS[shared.provider].label} y lee con ${voice}.` : ""} Lo que cambie allá vale para los dos.
-        </p>
-        <span className="pis-actions">
-          <Link className="button-secondary" to="/admin/mr-pilo?seccion=conexion">
-            Ver la conexión
-          </Link>
-          <Link className="button-secondary" to="/admin/mr-pilo?seccion=voz">
-            Ver la voz
-          </Link>
-        </span>
-      </div>
-    </Group>
+    <div className="pis-sheet pen-rows">
+      {ROWS.map((r) => (
+        <FoldRow key={r.id} id={r.id} title={r.title} summary={rowSummary(r.id, s, about)} open={open === r.id} dirty={changed.includes(r.id)} off={missing} onToggle={() => toggle(r.id)}>
+          {body[r.id]()}
+        </FoldRow>
+      ))}
+    </div>
   );
 }
 
 /* --- Un rol --------------------------------------------------------------------------------- */
 
-function RoleCard({ rol, title, ed }: { rol: RolId; title: string; ed: SpaceEditor }) {
+function RoleCard({ rol, title, ed, watched, onWatch }: { rol: RolId; title: string; ed: SpaceEditor; /** Su cara es la que se mira en el panel de Pilo. */ watched: boolean; onWatch: () => void }) {
   const { s, setRole, shared } = ed;
   const r = s.roles[rol];
   const styles: VoiceStyle[] = shared?.voice_styles ?? [];
@@ -253,15 +283,10 @@ function RoleCard({ rol, title, ed }: { rol: RolId; title: string; ed: SpaceEdit
   };
 
   return (
-    <section className="pen-role" aria-label={`Cómo le habla al ${title.toLowerCase()}`}>
+    <section className="pen-role" aria-label={`Cómo le habla al ${title.toLowerCase()}`} onFocusCapture={onWatch} onPointerDownCapture={onWatch}>
       <header className="pen-role__head">
-        <span className="pen-role__face">
-          <PiloFace size={64} expression={r.expression} alive />
-        </span>
-        <span>
-          <h4>{title}</h4>
-          <small>{ROLE_BASE[rol]}</small>
-        </span>
+        <h4>{title}</h4>
+        <small>{ROLE_BASE[rol]}</small>
       </header>
 
       <TextArea
@@ -352,7 +377,10 @@ function RoleCard({ rol, title, ed }: { rol: RolId; title: string; ed: SpaceEdit
             </button>
           ))}
         </span>
-        <small>Las caras son las aprobadas por la universidad. La del catálogo, cuando una entrada trae su emoción, manda sobre esta.</small>
+        <small>
+          {watched ? "Se ve ahora en el panel de Pilo, a su tamaño. " : "Tóquela para verla en el panel de Pilo. "}
+          Las caras son las aprobadas por la universidad. La del catálogo, cuando una entrada trae su emoción, manda sobre esta.
+        </small>
       </div>
     </section>
   );
@@ -398,16 +426,8 @@ function WidgetGroup({ ed }: { ed: SpaceEditor }) {
     window.setTimeout(() => setCopied(null), 2500);
   };
 
-  const aside = !s.widget_on ? (
-    <StatusMark tone="off">Solo en este portal</StatusMark>
-  ) : origins.length ? (
-    <StatusMark tone="ok">Abierto a {plural(origins.length, "portal", "portales")}</StatusMark>
-  ) : (
-    <StatusMark tone="warn">Encendido, sin portales en la lista</StatusMark>
-  );
-
   return (
-    <Group title="Este Pilo en otros portales" aside={aside}>
+    <>
       <p className="pis-small">
         El mismo chat emergente de siempre, pero con este Pilo: un botón con su cara en la esquina de otra página (el aula virtual, por ejemplo). Quien administra ese portal solo
         pega una línea. Cada pregunta gasta del cupo de este Pilo.
@@ -502,8 +522,8 @@ function WidgetGroup({ ed }: { ed: SpaceEditor }) {
       </div>
 
       {s.widget_on && !openToAll && (
-        <p className="pis-warn">Este Pilo no está abierto al público, y en otro portal nadie tiene sesión: el botón no aparecerá hasta abrirlo arriba, en «La página».</p>
+        <p className="pis-warn">Este Pilo no está abierto al público, y en otro portal nadie tiene sesión: el botón no aparecerá hasta abrirlo con el interruptor del panel de Pilo y elegir «el público» en «La página».</p>
       )}
-    </Group>
+    </>
   );
 }

@@ -98,10 +98,13 @@
   margin-left: auto;
 }
 
+/* `safe center`: si en una pantalla baja el contenido no cabe, sobra hacia abajo y
+   no hacia arriba; así Pilo, que va primero, no queda tapado por la barra de arriba. */
 .apw-center {
   display: grid;
   justify-items: center;
   align-content: center;
+  align-content: safe center;
   gap: clamp(12px, 2.4vh, 22px);
   min-height: 0;
   padding: 0 16px;
@@ -381,6 +384,18 @@
   .apw-fly {
     width: 150px;
     height: 150px;
+  }
+}
+
+/* Teléfono acostado: Pilo se achica (entero, a su proporción) para caber con el título. */
+@media (max-height: 480px) {
+  .apw-exhibit {
+    height: 104px;
+  }
+  .apw-fly-slot,
+  .apw-fly {
+    width: 104px;
+    height: 104px;
   }
 }
 

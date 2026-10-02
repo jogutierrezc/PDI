@@ -327,6 +327,14 @@ button.msh-tree__caret[aria-expanded="true"] svg { transform: none; }
 .msh-lines span:nth-child(2) { width: 86%; }
 .msh-lines span:nth-child(3) { width: 62%; }
 
+/* --- Tiempo de pensamiento (mapa de Enseñanza): cuánto corre «comprender» de una vez --- */
+
+.msh-think { display: inline-flex; flex-wrap: wrap; align-items: center; gap: var(--space-3); }
+.msh-think label { display: inline-flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); color: var(--ink-secondary); font-size: var(--text-sm); font-weight: 700; }
+.msh-think select { min-height: 40px; padding: 0 var(--space-3); color: var(--ink); background: var(--surface-2); border: 1px solid var(--line); border-radius: var(--radius-sm); font: inherit; font-size: var(--text-sm); font-weight: 600; }
+.msh-think select:focus { border-color: var(--brand-blue); outline: none; box-shadow: var(--ring); }
+.msh-think select:disabled { opacity: 0.6; cursor: not-allowed; }
+
 /* --- Estados ------------------------------------------------------------------------------ */
 
 .msh-state {

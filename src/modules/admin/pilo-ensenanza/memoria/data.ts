@@ -20,7 +20,6 @@ import type { PiloSpace } from "../../pilo/space";
 import { indexStep, pendingOf } from "../../pilo/memory";
 import type { EmbedStatus } from "../../pilo/memory";
 import { spaceKeys } from "../store";
-import type { SpaceSource } from "../store";
 import { activity, useCurrentJob } from "../actividad";
 import { StepError, faultFrom, missingMigration } from "./flow";
 import type { ComprehendResult, DbError, DocStatus, ReadingJob } from "./flow";
@@ -35,7 +34,8 @@ export interface DocRow {
   space: string;
   origin: "archivo" | "moodle";
   kind: "docx" | "xlsx" | "csv" | "pdf" | "curso";
-  source: SpaceSource;
+  /** La colección: una de las de su Pilo (las de Enseñanza o, desde 0121, las del general). */
+  source: string;
   title: string;
   file_path: string;
   file_name: string;

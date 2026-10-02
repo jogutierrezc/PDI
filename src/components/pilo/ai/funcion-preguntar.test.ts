@@ -73,7 +73,39 @@ interface World {
   /** Moodle (0116): el token guardado y los cursos anotados. */
   moodleToken: string;
   courses: Row[];
+  /** Los portales como vistas (0121): la matriz de cada portal. Sin esto, la base no tiene la migración. */
+  portals?: Record<string, { scope: string; matrix: Record<string, string> }>;
+  /** La base tiene 0121, pero pilo_scope falla esta vez. */
+  scopeFails?: boolean;
 }
+
+/** El catálogo de fuentes de 0121 (pilo_sources), en su orden. */
+const SOURCES: { id: string; scope: string; name: string; staff?: boolean; home?: boolean }[] = [
+  { id: "cifras", scope: "planeacion", name: "UDES en Cifras" },
+  { id: "boletines", scope: "planeacion", name: "Boletines" },
+  { id: "pdi", scope: "planeacion", name: "Plan de Desarrollo" },
+  { id: "observatorio", scope: "planeacion", name: "Observatorio" },
+  { id: "impacto", scope: "planeacion", name: "Portal de Impacto", staff: true },
+  { id: "institucional", scope: "planeacion", name: "Documentos institucionales" },
+  { id: "normativa", scope: "planeacion", name: "Normativa" },
+  { id: "lineamientos", scope: "planeacion", name: "Lineamientos y guías" },
+  { id: "innovacion", scope: "ensenanza", name: "Innovación educativa" },
+  { id: "politicas", scope: "ensenanza", name: "Políticas institucionales" },
+  { id: "global", scope: "ensenanza", name: "Mirada global" },
+  { id: "moodle", scope: "ensenanza", name: "Cursos de Moodle", home: true },
+];
+
+/** Como pilo_scope (0121): las fuentes que un portal lee para una persona. */
+const scopeRows = (w: World, portal: string, session: boolean, member: boolean): Row[] => {
+  const p = w.portals?.[portal];
+  if (!p) return [];
+  const staff = session && !member;
+  return SOURCES.flatMap((s) => {
+    const cell = p.matrix[s.id] ?? "no";
+    const ok = (cell === "casa" && s.scope === p.scope) || (cell === "visita" && s.scope !== p.scope && !s.home);
+    return ok && (!s.staff || staff) ? [{ source: s.id, space: s.scope, mode: cell, vis: staff ? ["publico", "sesion"] : ["publico"], name: s.name }] : [];
+  });
+};
 
 const passage = { ref: "cifras:matriculados", source: "cifras", title: "Estudiantes matriculados", section: "Población", body: "En 2024 hubo 20.500 estudiantes matriculados en toda la UDES.", path: "/cifras/poblacion", cut: "2024", office: "Registro", updated_at: "2026-09-01", rank: 0.9 };
 
@@ -130,6 +162,13 @@ const world = (): World => ({
 const spaceOf = (row: Row) => String(row.space ?? "planeacion");
 const visOf = (row: Row) => String(row.vis ?? "publico");
 
+/** Como las búsquedas de 0121: ¿ese portal y esa persona pueden leer el pasaje? (`p_space` es el portal.) */
+const canSee = (w: World, m: Row, args: Row): boolean => {
+  const rows = scopeRows(w, String(args.p_space ?? "planeacion"), args.p_public_only !== true, args.p_member === true);
+  const row = rows.find((r) => r.mode === "casa" && r.source === m.source && r.space === spaceOf(m));
+  return Boolean(row) && (row!.vis as string[]).includes(visOf(m));
+};
+
 /** Lo mínimo de supabase-js que usa la función: consultas encadenadas que se resuelven al esperarlas. */
 function fakeClient(w: World) {
   const from = (table: string) => {
@@ -175,7 +214,8 @@ function fakeClient(w: World) {
       // El mapa (0115) y Moodle (0116). Como la base: sin el filtro de espacio no sale nada.
       const within = (column: string) => (filters.find(([kind, c]) => kind === "in" && c === column)?.[2] as unknown[] | undefined) ?? [];
       if (table === "pilo_edges") return { data: w.edges.filter((e) => spaceOf(e) === eq("space") && within("from_id").includes(e.from_id) && within("rel").includes(e.rel ?? "trata")), error: null };
-      if (table === "pilo_nodes") return { data: w.nodes.filter((n) => spaceOf(n) === eq("space") && within("id").includes(n.id)), error: null };
+      // Los temas: sin 0121, solo los del espacio; con la vista (0121) son comunes y se piden por su id, del mapa.
+      if (table === "pilo_nodes") return { data: w.nodes.filter((n) => (eq("space") === undefined ? eq("source") === "mapa" : spaceOf(n) === eq("space")) && within("id").includes(n.id)), error: null };
       if (table === "pilo_space_secret") return { data: { space: eq("space"), moodle_token: w.moodleToken }, error: null };
       if (table === "pilo_moodle_courses") return { data: w.courses.find((c) => c.space === eq("space") && c.course_id === eq("course_id")) ?? null, error: null };
       if (table === "pilo_answers") {
@@ -210,6 +250,8 @@ function fakeClient(w: World) {
     w.calls.push({ name, args });
     // Como las funciones de 0113: sin p_space, el espacio de partida; con p_public_only, solo lo público.
     const space = String(args.p_space ?? "planeacion");
+    // Con 0121 la base filtra con la vista del portal; sin ella, con el espacio y la visibilidad.
+    const sees = (m: Row) => (w.portals ? canSee(w, m, args) : spaceOf(m) === space && visOf(m) !== "oculto" && (args.p_public_only !== true || visOf(m) === "publico"));
     const data = (): Row => {
       switch (name) {
         case "pilo_catalog_active":
@@ -222,15 +264,26 @@ function fakeClient(w: World) {
           return w.memoryFails
             ? { data: null, error: { message: "tiempo agotado en la base" } }
             : {
-                data: w.memory.filter(
-                  (m) => spaceOf(m) === space && visOf(m) !== "oculto" && (args.p_public_only !== true || visOf(m) === "publico") && (!Array.isArray(args.p_sources) || (args.p_sources as unknown[]).includes(m.source)),
-                ),
+                data: w.memory.filter((m) => sees(m) && (!Array.isArray(args.p_sources) || (args.p_sources as unknown[]).includes(m.source))),
                 error: null,
               };
+        // Los portales como vistas (0121).
+        case "pilo_scope":
+          if (!w.portals || w.scopeFails) return { data: null, error: { message: "Could not find the function public.pilo_scope(p_member, p_portal, p_session) in the schema cache" } };
+          return { data: scopeRows(w, String(args.p_portal), args.p_session === true, args.p_member === true), error: null };
+        case "pilo_memory_readable":
+          if (!w.portals) return { data: null, error: { message: "Could not find the function public.pilo_memory_readable in the schema cache" } };
+          return { data: w.memory.filter((m) => (args.p_refs as unknown[]).includes(m.ref) && sees(m)).map((m) => ({ ...m, vis: visOf(m) })), error: null };
         case "pilo_facts_search":
           return { data: w.facts, error: null };
         case "pilo_answer_candidates":
-          return { data: w.answers.filter((a) => spaceOf(a) === space && String(a.rol ?? "") === String(args.p_rol ?? "")), error: null };
+          return {
+            data: w.answers
+              .filter((a) => spaceOf(a) === space && String(a.rol ?? "") === String(args.p_rol ?? ""))
+              // Con 0121, una guardada no está fresca si cita algo que ese portal o esa persona no pueden leer.
+              .map((a) => (w.portals ? { ...a, fresh: a.fresh === true && (a.refs as string[]).every((r) => w.memory.some((m) => m.ref === r && sees(m))) } : a)),
+            error: null,
+          };
         case "pilo_graph_around":
           return { data: { nodes: [], edges: [] }, error: null };
         case "pilo_visitor_hit":
@@ -246,11 +299,7 @@ function fakeClient(w: World) {
           if (w.noMap) return { data: null, error: { message: "Could not find the function public.pilo_graph_neighbors in the schema cache" } };
           return {
             data: w.neighbors
-              .filter(
-                (m) =>
-                  spaceOf(m) === space && visOf(m) !== "oculto" && (args.p_public_only !== true || visOf(m) === "publico") &&
-                  (!Array.isArray(args.p_sources) || (args.p_sources as unknown[]).includes(m.source)) && !(args.p_refs as unknown[]).includes(m.ref),
-              )
+              .filter((m) => sees(m) && (!Array.isArray(args.p_sources) || (args.p_sources as unknown[]).includes(m.source)) && !(args.p_refs as unknown[]).includes(m.ref))
               .slice(0, Number(args.p_limit ?? 3)),
             error: null,
           };
@@ -1542,7 +1591,7 @@ const comprehend = (handler: Handler, body: Row = {}, headers: Record<string, st
 const userOf = (call: { body: Record<string, unknown> }) => (call.body.messages as { role: string; content: string }[]).filter((m) => m.role === "user").at(-1)!.content;
 
 describe("comprender (el mapa con IA)", () => {
-  it("solo la administración, solo un espacio que exista y nunca el de partida; igual que moodle", async () => {
+  it("solo la administración y solo un espacio que exista; Moodle, nunca en el de partida", async () => {
     const w = mapWorld({ moodle_on: true, moodle_url: "https://campus.udes.edu.co" });
     w.pending = pendingRows(3);
     w.moodleToken = "a1b2c3d4e5f60718293a4b5c6d7e8f90";
@@ -1555,12 +1604,18 @@ describe("comprender (el mapa con IA)", () => {
       expect((await ask(handler, { action, space: "otro", step })).status).toBe(403);
       expect((await ask(handler, { action, space: "otro", step }, adminAuth)).status).toBe(400);
       expect((await ask(handler, { action, step }, adminAuth)).status).toBe(400);
-      expect((await ask(handler, { action, space: "planeacion", step }, adminAuth)).status).toBe(400);
+      // Desde 0121 el Pilo de siempre tiene documentos y mapa: «comprender» lo acepta (su «estado» no llama a nadie);
+      // los cursos de Moodle no salen de su portal.
+      const general = await ask(handler, { action, space: "planeacion", step: action === "moodle" ? step : "estado" }, adminAuth);
+      expect(general.status).toBe(action === "moodle" ? 400 : 200);
+      if (action === "moodle") expect(await general.json()).toMatchObject({ error: expect.stringContaining("no tiene cursos de Moodle") });
       // El portal no elige el espacio de estas acciones.
       expect((await ask(handler, { action, portal: "ensenanza", step }, adminAuth)).status).toBe(400);
     }
     expect(calls).toHaveLength(0);
-    expect(w.rpcs.filter((n) => /pilo_map|pilo_doc|pilo_moodle/.test(n))).toEqual([]);
+    // Lo único que llegó a la base: el estado del mapa del Pilo de siempre, con su espacio dicho.
+    expect(w.rpcs.filter((n) => /pilo_map|pilo_doc|pilo_moodle/.test(n))).toEqual(["pilo_map_status"]);
+    expect(argsOf(w, "pilo_map_status")).toEqual([{ p_space: "planeacion", p_doc: null }]);
     expect(w.queries.some((q) => q.table === "pilo_space_secret")).toBe(false);
     expect(w.mapSaved).toEqual([]);
   });
@@ -2219,5 +2274,227 @@ describe("las cifras por periodo y su resumen", () => {
     const all = await events(await ask(await boot(w), { question: "¿Cuántos estudiantes matriculados hay?", stream: true }));
     expect(all[all.length - 1].data).toMatchObject({ kind: "ia", verified: false, unknown: ["1.95"] });
     expect(w.inbox).toEqual([expect.objectContaining({ p_reason: "revisar" })]);
+  });
+});
+
+/* --- Los portales como vistas (0121) ---------------------------------------------------
+   Con 0121 la base dice qué lee cada portal (pilo_scope) y aplica el filtro en
+   cada lectura. La función solo manda quién lee. La base de mentira hace lo
+   mismo que la de verdad: `portals` es la matriz, y sin ella no hay migración. */
+
+/** La matriz de partida: lo de hoy (las mismas fuentes que `teachRow` tiene encendidas). */
+const startPortals = (): NonNullable<World["portals"]> => ({
+  planeacion: { scope: "planeacion", matrix: { cifras: "casa", boletines: "casa", pdi: "casa", observatorio: "casa", impacto: "casa", institucional: "no", normativa: "no", lineamientos: "no", innovacion: "no", politicas: "no", global: "no", moodle: "no" } },
+  ensenanza: { scope: "ensenanza", matrix: { innovacion: "casa", politicas: "casa", global: "no", moodle: "casa", cifras: "no", boletines: "no", pdi: "no", observatorio: "no", impacto: "no" } },
+});
+const viewed = (w: World, change: (p: NonNullable<World["portals"]>) => void = () => undefined): World => {
+  w.portals = startPortals();
+  change(w.portals);
+  return w;
+};
+const READER_KEYS = ["p_space", "p_public_only", "p_member"];
+
+describe("los portales como vistas (0121)", () => {
+  const shape = (all: Ev[]) =>
+    all.map((e) => (e.event === "step" ? [e.event, e.data.id, e.data.state, e.data.detail] : e.event === "done" ? [e.event, e.data.kind, e.data.text, e.data.sources, e.data.grounding, (e.data.trail as Row[]).map((s) => [s.step, s.detail])] : e.event === "meta" ? [e.event, e.data.sources, e.data.intent, e.data.rol] : [e.event, e.data]));
+
+  it("con la matriz de partida, el pedido al modelo y lo que vuelve son byte a byte los de antes, en los dos portales", async () => {
+    const cases: { name: string; make: () => World; run: (h: Handler) => Promise<Response>; reply: string }[] = [
+      { name: "Planeación · visitante", make: () => teachWorld(), run: (h) => ask(h, { question: "¿Cuántos estudiantes matriculados hay?", stream: true }), reply: "En 2024 hubo 20.500 estudiantes matriculados [1]. " },
+      { name: "Planeación · personal de la intranet", make: () => teachWorld(), run: (h) => ask(h, { question: "¿Cuántos estudiantes matriculados hay?", stream: true }, adminAuth), reply: "En 2024 hubo 20.500 estudiantes matriculados [1]. " },
+      { name: "Planeación · con historia", make: () => teachWorld(), run: (h) => ask(h, { question: "¿y en Cúcuta?", history: [{ q: "¿Cuántos estudiantes matriculados hay?", a: "20.500 [1]" }], stream: true }), reply: "En Cúcuta no tengo la cifra publicada. " },
+      { name: "Enseñanza · estudiante", make: () => teachWorld(), run: (h) => teach(h, { question: "¿Qué dice la política de evaluación?", stream: true, rol: "estudiante" }), reply: "La evaluación formativa tiene 3 momentos [1]. " },
+      { name: "Enseñanza · profesor con sesión", make: () => teachWorld(), run: (h) => teach(h, { question: "¿Cuánto dura el taller del curso?", stream: true, rol: "profesor" }, adminAuth), reply: "El taller dura 40 horas [1]. " },
+      { name: "Enseñanza · con vecinos del mapa", make: () => mapWorld(), run: (h) => teach(h, { question: "¿Qué dice la política de evaluación?", stream: true }), reply: "La evaluación formativa tiene 3 momentos [1] y la retroalimentación oportuna es parte de ella [2]. " },
+    ];
+    for (const c of cases) {
+      const calls = provider(stream(c.reply));
+      const before = c.make();
+      const old = await allEvents(await c.run(await boot(before)));
+      const after = viewed(c.make());
+      const now = await allEvents(await c.run(await boot(after)));
+      // De verdad son los dos caminos: uno sin la vista y otro con ella.
+      expect(argsOf(before, "pilo_memory_search")[0], c.name).not.toHaveProperty("p_member");
+      expect(argsOf(after, "pilo_memory_search")[0], c.name).toHaveProperty("p_member");
+      // El pedido al modelo: idéntico, byte a byte.
+      expect(calls, c.name).toHaveLength(2);
+      expect(JSON.stringify(calls[1].body), c.name).toBe(JSON.stringify(calls[0].body));
+      // Y lo que vuelve a la página: los mismos eventos, con las mismas fuentes y los mismos pasos.
+      expect(shape(now), c.name).toEqual(shape(old));
+      // Las mismas fuentes pedidas a la base, en el mismo orden.
+      expect(argsOf(after, "pilo_memory_search")[0].p_sources, c.name).toEqual(argsOf(before, "pilo_memory_search")[0].p_sources);
+      // Lo que se guarda y lo que se anota es lo mismo.
+      expect(after.saved, c.name).toEqual(before.saved);
+      expect(after.logs.map((l) => ({ ...l, ms: 0 })), c.name).toEqual(before.logs.map((l) => ({ ...l, ms: 0 })));
+      vi.unstubAllGlobals();
+    }
+  });
+
+  it("la vista se pide con el portal y la sesión que el servidor comprobó, y cada lectura lleva quién lee", async () => {
+    const w = viewed(mapWorld());
+    provider(stream("En 2024 hubo 20.500 estudiantes [1]. "), stream("La evaluación formativa tiene 3 momentos [1]. "), stream("La evaluación formativa tiene 3 momentos [1]. "));
+    const handler = await boot(w);
+    // El portal de siempre, sin sesión: aunque la página mande otra cosa.
+    await events(await ask(handler, { question: "¿Cuántos estudiantes matriculados hay?", stream: true, space: "ensenanza", session: true, member: false, sources: ["moodle"] }));
+    expect(argsOf(w, "pilo_scope")).toEqual([{ p_portal: "planeacion", p_session: false, p_member: false }]);
+    const visitor = { p_space: "planeacion", p_public_only: true, p_member: false };
+    expect(argsOf(w, "pilo_memory_search")).toEqual([{ p_q: expect.any(String), p_sources: ["cifras", "boletines", "pdi", "observatorio"], p_limit: 8, ...visitor }]);
+    expect(argsOf(w, "pilo_answer_candidates")).toEqual([{ p_qnorm: "cuantos estudiantes matriculados hay", p_rol: "", ...visitor }]);
+    expect(argsOf(w, "pilo_graph_around")[0]).toEqual({ p_ids: ["cifras:matriculados"], p_sources: ["cifras", "boletines", "pdi", "observatorio"], p_up: 6, p_down: 1, p_limit: 160, ...visitor });
+    expect(argsOf(w, "pilo_graph_neighbors")).toEqual([{ p_refs: ["cifras:matriculados"], p_space: "planeacion", p_member: false, p_sources: ["cifras", "boletines", "pdi", "observatorio"], p_public_only: true, p_limit: 3 }]);
+    // Lo que no es lectura de la memoria sigue como siempre: el catálogo, la bandeja y la bitácora del portal de partida no llevan nada nuevo.
+    expect(argsOf(w, "pilo_catalog_active")).toEqual([{}]);
+    for (const l of w.logs) expect(l).not.toHaveProperty("space");
+    expect(w.saved[0]).not.toHaveProperty("space");
+
+    // Enseñanza, con sesión de la intranet.
+    w.calls.length = 0;
+    await events(await teach(handler, { question: "¿Qué dice la política de evaluación?", stream: true }, adminAuth));
+    expect(argsOf(w, "pilo_scope")).toEqual([{ p_portal: "ensenanza", p_session: true, p_member: false }]);
+    const staff = { p_space: "ensenanza", p_public_only: false, p_member: false };
+    expect(argsOf(w, "pilo_memory_search")[0]).toEqual({ p_q: expect.any(String), p_sources: ["innovacion", "politicas", "moodle"], p_limit: 8, ...staff });
+    expect(argsOf(w, "pilo_answer_candidates")[0]).toEqual({ p_qnorm: "que dice la politica de evaluacion", p_rol: "", ...staff });
+    expect(argsOf(w, "pilo_graph_neighbors")[0]).toMatchObject({ p_space: "ensenanza", p_public_only: false, p_member: false });
+    // El catálogo sigue siendo el del portal, como antes.
+    expect(argsOf(w, "pilo_catalog_active")).toEqual([{ p_space: "ensenanza" }]);
+
+    // Una cuenta de Pilo: no es personal. La base lo sabe por los dos datos.
+    w.members = { "pilo-1": { status: "activa", rol: "estudiante", campus: "bucaramanga", nick: "", tone: "cercano", length: "normal", about: "", program: "" } };
+    w.calls.length = 0;
+    await events(await teach(handler, { question: "¿Qué dice la política de evaluación?", stream: true }, { Authorization: "Bearer sesion-pilo" }));
+    expect(argsOf(w, "pilo_scope")).toEqual([{ p_portal: "ensenanza", p_session: false, p_member: true }]);
+    for (const name of ["pilo_memory_search", "pilo_answer_candidates"]) expect(argsOf(w, name)[0], name).toMatchObject({ p_space: "ensenanza", p_public_only: true, p_member: true });
+    // Ninguna lectura directa de la tabla de pasajes: con la vista, todo pasa por las funciones de la base.
+    expect(w.queries.filter((q) => q.table === "pilo_memory")).toEqual([]);
+  });
+
+  it("las fuentes salen de la matriz: una celda en «no» deja de buscarse y una colección nueva entra con su nombre", async () => {
+    const statute = { ref: "doc:9:1", space: "planeacion", vis: "publico", source: "normativa", title: "Estatuto profesoral", section: "Capítulo 1", body: "El escalafón docente tiene 4 categorías.", path: "", cut: "", office: "", updated_at: "2026-09-01", rank: 0.9 };
+    const w = viewed(teachWorld(), (p) => Object.assign(p.planeacion.matrix, { pdi: "no", cifras: "no", normativa: "casa" }));
+    w.memory = [passage, policy, statute];
+    w.facts = [{ ref: "cifra:matriculados", label: "Matriculados", series: [] }];
+    const calls = provider(stream("El escalafón docente tiene 4 categorías [1]. "));
+    const all = await allEvents(await ask(await boot(w), { question: "¿Cuántas categorías tiene el escalafón docente?", stream: true }));
+    expect(argsOf(w, "pilo_memory_search")[0].p_sources).toEqual(["boletines", "observatorio", "normativa"]);
+    // Sin «cifras» en la vista no se piden las cifras en vivo.
+    expect(w.rpcs).not.toContain("pilo_facts_search");
+    const done = all[all.length - 1].data;
+    expect((done.sources as Row[]).map((s) => s.ref)).toEqual(["doc:9:1"]);
+    // El pasaje de UDES en Cifras ya no entra, aunque esté en la memoria; ni el de Enseñanza.
+    expect(JSON.stringify(calls[0].body)).not.toContain("20.500");
+    expect(JSON.stringify(calls[0].body)).not.toContain("Política de evaluación");
+    // La colección nueva se nombra como en la base.
+    expect((done.trail as Row[]).find((s) => s.step === "Fuentes")?.detail).toContain("Normativa");
+  });
+
+  it("con todas las celdas en «no», el portal no busca nada en la memoria", async () => {
+    const w = viewed(teachWorld(), (p) => (p.planeacion.matrix = {}));
+    provider(stream("No tengo eso publicado. "));
+    await events(await ask(await boot(w), { question: "¿Cuántos estudiantes matriculados hay?", stream: true }));
+    expect(w.rpcs).not.toContain("pilo_memory_search");
+    expect(w.rpcs).not.toContain("pilo_memory_semantic");
+    expect(w.rpcs).not.toContain("pilo_facts_search");
+  });
+
+  it("«de visita» todavía no se busca: la celda existe, pero el portal sigue sin leer lo ajeno", async () => {
+    const w = viewed(teachWorld(), (p) => Object.assign(p.planeacion.matrix, { politicas: "visita", moodle: "visita", innovacion: "casa" }));
+    const calls = provider(stream("No tengo eso publicado. "));
+    const all = await allEvents(await ask(await boot(w), { question: "¿Qué dice la política de evaluación?", stream: true }, adminAuth));
+    // Ni «visita» ni un «casa» indebido sobre una fuente ajena llegan a la lista de fuentes.
+    expect(argsOf(w, "pilo_memory_search")[0].p_sources).toEqual(["cifras", "boletines", "pdi", "observatorio", "impacto"]);
+    expect(JSON.stringify(all)).not.toContain("Política de evaluación");
+    expect(JSON.stringify(calls[0].body)).not.toContain("3 momentos");
+    expect(JSON.stringify(calls[0].body)).not.toContain("taller reservado");
+  });
+
+  it("Impacto sigue pidiendo sesión de la intranet: ni un visitante ni una cuenta de Pilo lo buscan", async () => {
+    const w = viewed(world());
+    w.members = { "pilo-1": { status: "activa", rol: "administrativo", campus: "", nick: "", tone: "cercano", length: "normal", about: "", program: "" } };
+    provider(stream("Hola. "), stream("Hola. "), stream("Hola. "));
+    const handler = await boot(w);
+    await events(await ask(handler, { question: "¿Cuántos estudiantes matriculados hay?", stream: true }));
+    await events(await ask(handler, { question: "¿Cuántos estudiantes matriculados hay en total?", stream: true }, { Authorization: "Bearer sesion-pilo" }));
+    await events(await ask(handler, { question: "¿Cuántos estudiantes matriculados hubo?", stream: true }, adminAuth));
+    const asked = argsOf(w, "pilo_memory_search").map((a) => (a.p_sources as string[]).includes("impacto"));
+    expect(asked).toEqual([false, false, true]);
+  });
+
+  it("una guardada se sirve solo si la base dice que este portal y esta persona leen todo lo que cita", async () => {
+    const saved = { id: 9, space: "ensenanza", rol: "", question: "¿Cuánto dura el taller del curso?", qnorm: "cuanto dura el taller del curso", kind: "ia", answer: "El taller dura 40 horas [1].", refs: ["doc:2:1"], fresh: true };
+    // Un visitante: el pasaje es «con sesión». La base ya no la da por fresca y la función no la usa.
+    const w = viewed(teachWorld());
+    w.answers = [saved];
+    w.settings.enabled = false;
+    provider(stream("no debería llamarse"));
+    const handler = await boot(w);
+    expect(JSON.stringify(await (await teach(handler, { question: "¿Cuánto dura el taller del curso?" })).json())).not.toContain("40 horas");
+    // El personal con sesión sí la recibe, con sus pasajes leídos por la función de la base.
+    const staff = (await (await teach(handler, { question: "¿Cuánto dura el taller del curso?" }, adminAuth)).json()) as Row;
+    expect(staff).toMatchObject({ kind: "memoria", answerId: 9, text: expect.stringContaining("40 horas") });
+    expect(argsOf(w, "pilo_memory_readable").at(-1)).toEqual({ p_refs: ["doc:2:1"], p_space: "ensenanza", p_public_only: false, p_member: false });
+    expect(w.queries.filter((q) => q.table === "pilo_memory")).toEqual([]);
+    // Si la administración apaga esa fuente, deja de servirse también al personal.
+    w.portals!.ensenanza.matrix.moodle = "no";
+    expect(JSON.stringify(await (await teach(handler, { question: "¿Cuánto dura el taller del curso?" }, adminAuth)).json())).not.toContain("40 horas");
+    // Y aunque la base la diera por fresca, sin poder leer el pasaje la función no la usa.
+    const trusting = viewed(teachWorld());
+    trusting.answers = [saved];
+    trusting.settings.enabled = false;
+    trusting.memory = [passage, policy];
+    const h2 = await boot(trusting);
+    const original = trusting.answers;
+    Object.defineProperty(trusting, "answers", { get: () => original.map((a) => ({ ...a, refs: ["doc:2:1"], fresh: true })) });
+    expect(JSON.stringify(await (await teach(h2, { question: "¿Cuánto dura el taller del curso?" }, adminAuth)).json())).not.toContain("40 horas");
+  });
+
+  it("lo que cita un pasaje «con sesión» no se guarda para todos, tampoco en el portal de siempre", async () => {
+    const reservedDoc = { ref: "doc:8:1", space: "planeacion", vis: "sesion", source: "institucional", title: "Acta del consejo", section: "Decisiones", body: "El consejo aprobó 12 proyectos reservados.", path: "", cut: "", office: "", updated_at: "2026-09-01", rank: 0.95 };
+    const w = viewed(world(), (p) => (p.planeacion.matrix.institucional = "casa"));
+    w.memory = [reservedDoc];
+    const calls = provider(stream("El consejo aprobó 12 proyectos reservados [1]. "), stream("No tengo eso publicado. "));
+    const handler = await boot(w);
+    const staff = await events(await ask(handler, { question: "¿Cuántos proyectos aprobó el consejo?", stream: true }, adminAuth));
+    expect(staff[staff.length - 1].data).toMatchObject({ kind: "ia", grounding: "oficial", answerId: null });
+    expect((staff[staff.length - 1].data.sources as Row[]).map((s) => s.ref)).toEqual(["doc:8:1"]);
+    expect(w.saved).toEqual([]);
+    expect(argsOf(w, "pilo_memory_readable").at(-1)).toMatchObject({ p_space: "planeacion", p_public_only: false });
+    // Y un visitante no recibe ese pasaje: ni en el pedido al modelo ni en lo que vuelve.
+    const anon = await allEvents(await ask(handler, { question: "¿Cuántos proyectos aprobó el consejo?", stream: true }));
+    expect(JSON.stringify(anon)).not.toContain("12 proyectos");
+    expect(JSON.stringify(calls[1].body)).not.toContain("12 proyectos");
+  });
+
+  it("el Pilo de siempre sigue el mapa de sus documentos; sin vecinos no cambia nada", async () => {
+    const one = { ref: "doc:9:1", space: "planeacion", vis: "publico", source: "normativa", title: "Estatuto profesoral", section: "Capítulo 1", body: "El escalafón docente tiene 4 categorías.", path: "", cut: "", office: "", updated_at: "2026-09-01", rank: 0.9 };
+    const two = { ...one, ref: "doc:9:2", section: "Capítulo 2", body: "El ascenso en el escalafón exige 3 años de servicio.", via: "Escalafón docente", shared: 1 };
+    const w = viewed(world(), (p) => (p.planeacion.matrix.normativa = "casa"));
+    w.memory = [one];
+    w.neighbors = [two, { ...linked }];
+    w.edges = [{ space: "planeacion", from_id: "doc:9:1", to_id: "tema:escalafon", rel: "trata" }, { space: "planeacion", from_id: "doc:9:2", to_id: "tema:escalafon", rel: "trata" }];
+    // El tema lo creó el otro ámbito: es un nodo común.
+    w.nodes = [{ space: "ensenanza", source: "mapa", id: "tema:escalafon", label: "Escalafón docente" }];
+    const calls = provider(stream("El escalafón tiene 4 categorías [1] y el ascenso exige 3 años [2]. "));
+    const all = await allEvents(await ask(await boot(w), { question: "¿Cuántas categorías tiene el escalafón docente?", stream: true }));
+    const done = all[all.length - 1].data;
+    // El vecino de Planeación llega; el de Enseñanza, que la base de mentira también ofrece, no pasa el filtro.
+    expect((done.sources as Row[]).map((s) => [s.ref, s.via])).toEqual([["doc:9:1", undefined], ["doc:9:2", "mapa"]]);
+    expect(systemOf(calls[0])).toContain("[1] Normativa › Estatuto profesoral › Capítulo 1 · temas: Escalafón docente\n");
+    expect(JSON.stringify(calls[0].body)).not.toContain("retroalimentación oportuna");
+    // Las relaciones se leen del ámbito del portal; el tema, por su id.
+    expect(w.queries.find((q) => q.table === "pilo_edges")!.filters).toContainEqual(["eq", "space", "planeacion"]);
+    expect(w.queries.find((q) => q.table === "pilo_nodes")!.filters).toContainEqual(["eq", "source", "mapa"]);
+  });
+
+  it("si pilo_scope falla, la función sigue con lo de siempre y no insiste durante un minuto", async () => {
+    const w = viewed(teachWorld());
+    w.scopeFails = true;
+    provider(stream("En 2024 hubo 20.500 estudiantes [1]. "), stream("En 2024 hubo 20.500 estudiantes [1]. "));
+    const handler = await boot(w);
+    await events(await ask(handler, { question: "¿Cuántos estudiantes matriculados hay?", stream: true }));
+    await events(await ask(handler, { question: "¿Cuántos estudiantes matriculados hubo?", stream: true }));
+    expect(w.rpcs.filter((n) => n === "pilo_scope")).toHaveLength(1);
+    // Las llamadas de antes: sin quién lee. La base nueva las atiende igual (el portal de partida, con sus fuentes).
+    for (const a of argsOf(w, "pilo_memory_search")) for (const k of READER_KEYS) expect(a).not.toHaveProperty(k);
+    expect(argsOf(w, "pilo_memory_search")[0].p_sources).toEqual(["cifras", "boletines", "pdi", "observatorio"]);
   });
 });

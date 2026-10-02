@@ -24,7 +24,7 @@ import type { NetworkColumn } from "../../implementation/network";
 import type { AreaWithLines, PillarWithProgress } from "../../../data/queries";
 import type { ProjectWithLinks } from "../../../types/database";
 import type { Mesh, MeshEdge, MeshNode } from "../../../components/pilo/ai/logic";
-import { clean, finalize } from "./memory";
+import { MEMORY_SOURCES, clean, finalize } from "./memory";
 import type { MemoryRow, MemorySource } from "./memory";
 
 export type { Mesh, MeshEdge, MeshNode };
@@ -222,12 +222,16 @@ const toMesh = (raw: unknown): Mesh & { nodes: (MeshNode & { props?: Record<stri
   return { nodes: Array.isArray(r.nodes) ? r.nodes : [], edges: Array.isArray(r.edges) ? r.edges : [] };
 };
 
-/** Toda la malla (o la de unas fuentes). Sin 0097: null. */
+/**
+ * Toda la malla de los portales (o la de unas fuentes). Sin 0097: null. Se piden las fuentes por su
+ * nombre: desde 0121 el ámbito tiene además el mapa de sus documentos (fuente «mapa»), que no es
+ * parte de esta malla.
+ */
 export function useMeshOverview(sources?: MemorySource[]) {
   return useQuery({
     queryKey: ["pilo-ia", "memoria", "malla", sources ?? "todas"],
     queryFn: async () => {
-      const { data, error } = await supabase.rpc("pilo_graph_overview", { p_sources: (sources ?? null) as never });
+      const { data, error } = await supabase.rpc("pilo_graph_overview", { p_sources: (sources ?? MEMORY_SOURCES.map((s) => s.id)) as never });
       if (error) return null;
       return toMesh(data);
     },

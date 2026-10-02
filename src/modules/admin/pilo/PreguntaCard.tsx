@@ -21,6 +21,10 @@
      la memoria», que la rehace con lo publicado ahora (se aplica al momento,
      como las claves). Cada fuente va por su lado: la que falla o llega vacía
      se queda como estaba y la lista de resultados dice por qué.
+   - Qué lee cada portal (0121, PortalsMatrix): la matriz portal × fuente de
+     los dos Pilos, el único lugar que lo dice. Se aplica al momento.
+   - Los documentos del Pilo general (0121, GeneralDocs): los paneles de
+     Enseñanza montados con el espacio «planeacion».
    - Búsqueda por significado (0108): cuántos pasajes tienen su vector y el
      botón que los calcula (también corre solo después de actualizar).
    - Probar la memoria: qué pasajes encontraría Pilo para una pregunta, y si
@@ -42,6 +46,8 @@ import type { SystemRole } from "./store";
 import { MeshView } from "./MeshView";
 import { revealList } from "./motion";
 import { CatalogModal } from "./CatalogModal";
+import { GeneralDocs } from "./GeneralDocs";
+import { PortalsMatrix } from "./PortalsMatrix";
 import { reasonHint, reasonLabel, useCloseInbox, useInbox } from "./inbox";
 import type { InboxItem } from "./inbox";
 import type { CatalogRow } from "./catalog-sheet";
@@ -386,7 +392,18 @@ export function PreguntaSection({ ed }: { ed: EditorApi }) {
 
 /* --- La memoria ------------------------------------------------------------------------------ */
 
-export function MemorySection({ ed, indexedAt, onIndexed }: { ed: EditorApi; indexedAt: string | null; onIndexed: (iso: string) => void }) {
+export function MemorySection({
+  ed,
+  indexedAt,
+  onIndexed,
+  onSourceApplied,
+}: {
+  ed: EditorApi;
+  indexedAt: string | null;
+  onIndexed: (iso: string) => void;
+  /** Una celda de casa cambió en la matriz (ya aplicada en la base): el interruptor de «Fuentes» se pone al día, en lo editado y en lo guardado. */
+  onSourceApplied?: (source: string, on: boolean) => void;
+}) {
   const { s, set } = ed;
   const counts = useMemoryCounts();
   const inputs = useMemoryInputs();
@@ -511,6 +528,10 @@ export function MemorySection({ ed, indexedAt, onIndexed }: { ed: EditorApi; ind
           </ul>
         )}
       </Group>
+
+      <PortalsMatrix onHomeSource={onSourceApplied} />
+
+      <GeneralDocs disabled={s.needs0094} />
 
       <SemanticGroup
         model={s.embed_model}

@@ -86,6 +86,13 @@
    la plataforma. La clave del proveedor se guarda desde la intranet.)
    ========================================================================== */
 
+/* Los portales como vistas (0121). Con esa migración hay una sola memoria y cada
+   portal es una vista: `pilo_scope` dice qué fuentes lee cada portal para cada
+   persona y todas las lecturas de la memoria (`pilo_memory_search`, `_semantic`,
+   `pilo_graph_neighbors`, `pilo_graph_around`, `pilo_answer_candidates`,
+   `pilo_memory_readable`) llevan quién lee —también en el portal de siempre— para
+   que el filtro lo aplique la base. Sin 0121 todo sigue como antes: las fuentes
+   de partida (`SPACES`) y los filtros de 0113. */
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.58.0";
 
 // --- lógica: copia exacta de src/components/pilo/ai/logic.ts (la prueba logic-sync lo vigila)
@@ -3442,6 +3449,49 @@ export function spaceSources(space: SpaceId, on: Record<string, unknown> | null 
   return SPACES[space].sources.filter((s) => flags[s] === true);
 }
 
+/* --- Los portales como vistas (0121) -----------------------------------------------------
+   Desde 0121 hay una sola memoria y cada portal es una vista sobre ella: qué
+   lee cada portal lo dice la base (`pilo_scope`), no esta lista. `SPACES` y
+   `spaceSources` quedan como los valores de partida: lo que se usa mientras la
+   migración 0121 no esté aplicada, y es exactamente lo que la matriz trae al nacer. */
+
+/** Lo que un portal lee para una persona, según la base. */
+export interface PortalView {
+  /** Las fuentes «de casa», en el orden de la base: las únicas que se buscan. */
+  sources: string[];
+  /** Las «de visita» (de otro ámbito). Existen en la matriz, pero todavía no se buscan. */
+  visiting: string[];
+  /** Cómo se llama cada fuente al citarla. */
+  names: Record<string, string>;
+}
+
+const SOURCE_ID = /^[a-z]{3,30}$/;
+
+/**
+ * La vista de un portal, de lo que devuelve `pilo_scope`. `null` si no llega
+ * una lista (la base aún no tiene 0121): quien llama sigue con `spaceSources`.
+ * Los nombres de las fuentes de siempre son los de `SPACES` (el pedido no cambia
+ * ni una letra); los de las fuentes nuevas, los de la base.
+ */
+export function portalView(space: SpaceId, rows: unknown): PortalView | null {
+  if (!Array.isArray(rows)) return null;
+  const sources: string[] = [];
+  const visiting: string[] = [];
+  const names: Record<string, string> = {};
+  for (const row of rows) {
+    if (!row || typeof row !== "object") continue;
+    const r = row as Record<string, unknown>;
+    const id = typeof r.source === "string" ? r.source : "";
+    if (!SOURCE_ID.test(id) || sources.includes(id) || visiting.includes(id)) continue;
+    if (r.mode === "casa") sources.push(id);
+    else if (r.mode === "visita") visiting.push(id);
+    else continue;
+    const name = typeof r.name === "string" ? r.name.replace(/\s+/g, " ").trim().slice(0, 80) : "";
+    if (name) names[id] = name;
+  }
+  return { sources, visiting, names: { ...names, ...SPACES[space].names } };
+}
+
 /** Para quién se redacta. No es el rol de la intranet (`Role`): lo elige el visitante y no lo identifica. */
 export type Rol = "estudiante" | "profesor" | "general";
 export const ROLES: Exclude<Rol, "general">[] = ["estudiante", "profesor"];
@@ -4508,6 +4558,8 @@ const embedCache = new Map<SpaceId, { at: number; model: string; ready: boolean 
 const mapCache = new Map<SpaceId, { at: number; ready: boolean }>();
 /** ¿Está la migración 0113 (los espacios)? Se pregunta a lo sumo una vez por minuto. */
 let spacesCache: { at: number; ready: boolean } | null = null;
+/** ¿Está la migración 0121 (los portales como vistas)? Si la base no la tiene, no se vuelve a preguntar por un minuto. */
+let scopeCache: { at: number; ready: boolean } | null = null;
 /**
  * Si el modelo acepta el rol `system`. Se aprende con el primer 400 que lo
  * rechaza y se recuerda mientras viva la instancia: no se paga un pedido
@@ -4662,17 +4714,21 @@ async function handle(request: Request): Promise<Response> {
     if (!isSpace(body.space)) return json({ error: "Espacio desconocido." }, 400);
     space = body.space;
   }
-  // El mapa y Moodle nombran su espacio igual, siempre: solo la administración, solo uno que exista
-  // y nunca el de partida (el Pilo de siempre no tiene documentos propios, ni mapa, ni cursos).
+  // El mapa y Moodle nombran su espacio igual, siempre: solo la administración y solo uno que exista.
+  // Desde 0121 el Pilo de siempre también tiene documentos propios y, con ellos, su mapa
+  // («comprender»). Los cursos de Moodle no salen de su portal: el de partida no los tiene.
   if (upkeep) {
     if (role !== "admin") return json({ error: action === "moodle" ? "Solo la administración conecta a Pilo con Moodle." : "Solo la administración arma el mapa de conexiones de Pilo." }, 403);
     if (!isSpace(body.space)) return json({ error: "Espacio desconocido." }, 400);
     space = body.space;
-    if (space === DEFAULT_SPACE) return json({ error: "Ese espacio no tiene documentos propios: ni mapa de conexiones ni cursos de Moodle." }, 400);
+    if (space === DEFAULT_SPACE && action === "moodle") return json({ error: "Ese Pilo no tiene cursos de Moodle: los cursos no salen de su portal." }, 400);
   }
   const spaced = space !== DEFAULT_SPACE;
-  /** Los parámetros y columnas de espacio: solo fuera del de partida. Para `planeacion` no viaja nada nuevo. */
-  const inSpace = <T extends Record<string, unknown>>(extra: T): T | Record<string, never> => (spaced ? extra : {});
+  /**
+   * Los parámetros y columnas de espacio: fuera del de partida y, en el mapa, siempre (la
+   * administración nombró el espacio). Al preguntar en `planeacion` no viaja nada nuevo.
+   */
+  const inSpace = <T extends Record<string, unknown>>(extra: T): T | Record<string, never> => (spaced || upkeep ? extra : {});
   /** ¿Está 0113? Sin ella, el Pilo de siempre usa las consultas de siempre. */
   const spacesReady = async (): Promise<boolean> => {
     if (spacesCache && Date.now() - spacesCache.at < 60_000) return spacesCache.ready;
@@ -4684,6 +4740,19 @@ async function handle(request: Request): Promise<Response> {
   const loadExtras = async (): Promise<ExtraSettings> => {
     const { data, error } = await admin.from("pilo_extras").select("*").eq("space", space).maybeSingle();
     return error ? EXTRA_DEFAULTS : extraSettings(data);
+  };
+  /**
+   * La vista del portal (0121): qué fuentes lee este portal para esta persona. Lo dice la
+   * base (`pilo_scope`: la matriz, la visibilidad, quién pregunta y lo que no sale de casa)
+   * y se lee en cada pedido: un cambio en la matriz vale de inmediato. `null` sin esa
+   * migración: se sigue con las fuentes de partida y los filtros de siempre.
+   */
+  const loadView = async (): Promise<PortalView | null> => {
+    if (scopeCache && !scopeCache.ready && Date.now() - scopeCache.at < 60_000) return null;
+    const { data, error } = await admin.rpc("pilo_scope", { p_portal: space, p_session: Boolean(role), p_member: Boolean(member) });
+    const view = error ? null : portalView(space, data);
+    scopeCache = { at: Date.now(), ready: view !== null };
+    return view;
   };
   // La fila del espacio se lee en cada pedido: apagarlo o cerrarlo vale de inmediato.
   let profile: SpaceProfile | null = null;
@@ -5535,9 +5604,9 @@ async function handle(request: Request): Promise<Response> {
   }
 
   /** La malla alrededor de unos pasajes: su ruta hacia arriba y lo que contienen. Sin 0097, vacía. */
-  async function meshAround(ids: string[], sources: string[]): Promise<Mesh> {
+  async function meshAround(ids: string[], sources: string[], reader: Record<string, unknown> | null = null): Promise<Mesh> {
     if (!ids.length) return { nodes: [], edges: [] };
-    const { data, error } = await admin.rpc("pilo_graph_around", { p_ids: ids, p_sources: sources, p_up: 6, p_down: 1, p_limit: 160, ...inSpace({ p_space: space }) });
+    const { data, error } = await admin.rpc("pilo_graph_around", { p_ids: ids, p_sources: sources, p_up: 6, p_down: 1, p_limit: 160, ...(reader ?? inSpace({ p_space: space })) });
     if (error || !data) return { nodes: [], edges: [] };
     const raw = data as { nodes?: MeshNode[] | null; edges?: MeshEdge[] | null };
     return { nodes: raw.nodes ?? [], edges: raw.edges ?? [] };
@@ -5639,6 +5708,9 @@ async function handle(request: Request): Promise<Response> {
     const doc = cleanDoc(body.doc);
     const extrasLoading = loadExtras();
     extrasLoading.catch(() => undefined);
+    // La vista del portal (0121) se pide ya, a la par: cuando haga falta estará lista.
+    const viewing = loadView();
+    viewing.catch(() => undefined);
     if (doc) {
       const extras = await extrasLoading;
       if (!extraAllowed(extras.filesAud, sessionRole)) {
@@ -5679,11 +5751,19 @@ async function handle(request: Request): Promise<Response> {
       trail.push({ step: name, status, detail, ms: Date.now() - t0 });
       t0 = Date.now();
     };
-    // Qué memorias se usan: las del espacio que estén encendidas (las fija el servidor,
-    // nunca la página); en Planeación, Impacto pide sesión, como su portal.
-    const sources = spaceSources(space, (profile ? profile.sources : (settings.memory_sources ?? {})) as Record<string, unknown>, Boolean(role));
-    /** Lo que suma cada búsqueda fuera del espacio de partida: el espacio y, sin sesión, solo lo público. */
-    const scope = inSpace({ p_space: space, p_public_only: publicOnly });
+    // Qué memorias se usan (las fija el servidor, nunca la página). Con 0121 lo dice la base:
+    // las fuentes que este portal lee «de casa» para esta persona. Sin 0121, como siempre: las
+    // del espacio que estén encendidas; en Planeación, Impacto pide sesión, como su portal.
+    const view = await viewing.catch(() => null);
+    const sources = view ? view.sources : spaceSources(space, (profile ? profile.sources : (settings.memory_sources ?? {})) as Record<string, unknown>, Boolean(role));
+    /**
+     * Quién lee, para la base (0121): el portal, si es personal con sesión y si es una cuenta de
+     * Pilo. Con esto el filtro lo aplica la base en cada lectura de la memoria, también en el
+     * portal de siempre. `null` sin 0121: cada llamada lleva lo de antes.
+     */
+    const reader = view ? { p_space: space, p_public_only: publicOnly, p_member: Boolean(member) } : null;
+    /** Lo que suma cada búsqueda: quién lee o, sin 0121 y fuera del espacio de partida, el espacio y «solo lo público». */
+    const scope = reader ?? inSpace({ p_space: space, p_public_only: publicOnly });
     type Row = Passage & { updated_at: string };
     type Hit = Row & { rank: number; via?: "palabras" | "significado" | "ambas"; sim?: number };
     // El vector de cada texto buscado, una sola vez aunque lo pidan el catálogo, la memoria y las cifras a la par.
@@ -5703,8 +5783,8 @@ async function handle(request: Request): Promise<Response> {
     const model = embedder?.model ?? "";
     // Por palabras y, si hay vectores, por significado; las dos listas se funden.
     const search = async (q: string): Promise<Hit[]> => {
-      // Un espacio con todas sus fuentes apagadas no busca (una lista vacía no debe leerse como «todas»).
-      if (spaced && !sources.length) return [];
+      // Un portal con todas sus fuentes apagadas no busca (una lista vacía no debe leerse como «todas»).
+      if ((spaced || reader) && !sources.length) return [];
       // La búsqueda por palabras sale ya; no espera al vector de la pregunta (un pedido al proveedor).
       const [lex, sem] = await Promise.all([
         admin.rpc("pilo_memory_search", { p_q: q, p_sources: sources, p_limit: 8, ...scope }), // p_space
@@ -5858,7 +5938,8 @@ async function handle(request: Request): Promise<Response> {
     const savedCandidates = async (): Promise<Saved[]> => {
       if (chatty || loose) return [];
       // En otro espacio, solo las guardadas de ese espacio y de ese rol; sin sesión, solo las que citan lo público.
-      const { data } = await admin.rpc("pilo_answer_candidates", { p_qnorm: qnorm, ...inSpace({ p_space: space, p_rol: rolColumn(rol), p_public_only: publicOnly }) });
+      // Con 0121 la base revisa además que este portal y esta persona puedan leer todo lo que la guardada cita.
+      const { data } = await admin.rpc("pilo_answer_candidates", { p_qnorm: qnorm, ...(reader ? { ...reader, p_rol: rolColumn(rol) } : inSpace({ p_space: space, p_rol: rolColumn(rol), p_public_only: publicOnly })) });
       return (data ?? []) as Saved[];
     };
     const byWords = chatty || loose ? null : matchCatalog(question, responses);
@@ -5929,7 +6010,7 @@ async function handle(request: Request): Promise<Response> {
     const memory = nearOf(found)
       .filter((p) => !dataPassages.some((d) => d.ref === `dato:${p.ref}`))
       .slice(0, dataPassages.length ? 3 : 5);
-    const names: Record<string, string> = SPACES[space].names;
+    const names: Record<string, string> = view ? view.names : SPACES[space].names;
 
     // 2b. Respuestas guardadas: casi la misma pregunta, con sus fuentes sin cambios
     //     y el mismo corte (una respuesta de 2024 no sirve para 2023).
@@ -5939,6 +6020,14 @@ async function handle(request: Request): Promise<Response> {
       // Una guardada hecha con el pasaje de un indicador (su cifra del año) no tapa la lectura por
       // periodo de ese mismo indicador: mandan las cifras en vivo.
       if (lead?.points.some((p) => p.t !== null) && hit.refs.some((r) => dataPassages.some((d) => d.ref === `dato:${r}`))) return { saved: null, savedPassages: [] };
+      if (reader) {
+        // Con 0121 la base dice cuáles de esos pasajes puede leer este portal para esta persona.
+        // Si falta alguno (o la consulta falla), la guardada no se usa.
+        const { data: readable, error } = await admin.rpc("pilo_memory_readable", { p_refs: hit.refs, ...reader });
+        const found = new Map(((error ? [] : readable ?? []) as Passage[]).map((r) => [r.ref, { ref: r.ref, source: r.source, title: r.title, section: r.section, body: r.body, path: r.path, cut: r.cut, office: r.office } as Passage]));
+        const all = hit.refs.map((r) => found.get(r)).filter(Boolean) as Passage[];
+        return all.length < hit.refs.length ? { saved: null, savedPassages: [] } : { saved: hit, savedPassages: all };
+      }
       const wanted = admin.from("pilo_memory").select("ref, source, title, section, body, path, cut, office").in("ref", hit.refs);
       // En otro espacio, solo sus pasajes y solo los que esta persona puede ver ("space", vis).
       const { data: rows } = await (!spaced ? wanted : publicOnly ? wanted.eq("space", space).eq("vis", "publico") : wanted.eq("space", space).neq("vis", "oculto"));
@@ -5949,7 +6038,9 @@ async function handle(request: Request): Promise<Response> {
       return { saved: hit, savedPassages: passages };
     };
 
-    // 2e'. El mapa de conexiones (0115): solo en otro espacio y solo si va a escribir el modelo.
+    // 2e'. El mapa de conexiones (0115): solo si va a escribir el modelo. Sin 0121, solo en otro
+    //      espacio; con 0121, también en el de siempre (sus documentos tienen mapa). Los vecinos
+    //      no cruzan de ámbito: la base recorre las relaciones del ámbito de casa del portal.
     //      Con los 3 primeros pasajes se buscan sus vecinos (comparten tema o referencia) y se
     //      suman hasta 3, DESPUÉS de los directos y marcados `via: "mapa"`. La base aplica los
     //      mismos filtros que la búsqueda: el espacio, las fuentes y, sin sesión, solo lo público.
@@ -5957,10 +6048,10 @@ async function handle(request: Request): Promise<Response> {
     type Related = Passage & { via: "mapa"; link: string };
     const followMap = async (): Promise<{ related: Related[]; pool: Passage[]; joined: string[] }> => {
       const mapKnown = mapCache.get(space);
-      if (!spaced || aiOff || !memory.length || (mapKnown && !mapKnown.ready && Date.now() - mapKnown.at < 60_000)) return { related: [], pool: memory, joined: [] };
+      if (!(spaced || reader) || aiOff || !memory.length || (mapKnown && !mapKnown.ready && Date.now() - mapKnown.at < 60_000)) return { related: [], pool: memory, joined: [] };
       const since = Date.now();
       const top = memory.slice(0, 3).map((p) => p.ref);
-      const near = await admin.rpc("pilo_graph_neighbors", { p_refs: top, ...inSpace({ p_space: space }), p_sources: sources, p_public_only: publicOnly, p_limit: 3 });
+      const near = await admin.rpc("pilo_graph_neighbors", { p_refs: top, ...(reader ? { p_space: space, p_member: reader.p_member } : inSpace({ p_space: space })), p_sources: sources, p_public_only: publicOnly, p_limit: 3 });
       mapCache.set(space, { at: Date.now(), ready: !near.error });
       const related: Related[] = near.error ? [] : mapNeighbors(near.data, memory.map((p) => p.ref), sources, 3);
       if (!related.length) return { related, pool: memory, joined: [] };
@@ -5969,7 +6060,10 @@ async function handle(request: Request): Promise<Response> {
       const links = await admin.from("pilo_edges").select("from_id, to_id").eq("space", space).in("rel", ["trata", "cita"]).in("from_id", all.map((p) => p.ref));
       const edges = (links.error ? [] : links.data ?? []) as { from_id: string; to_id: string }[];
       const ids = [...new Set(edges.map((e) => e.to_id))].slice(0, 80);
-      const hubs = ids.length ? await admin.from("pilo_nodes").select("id, label").eq("space", space).in("id", ids) : { data: [], error: null };
+      // Desde 0121 los temas y las referencias son nodos comunes (el ámbito que los nombró primero
+      // los creó): con la vista se leen por su id; sin ella, solo los de este espacio ("space").
+      const hubsWanted = admin.from("pilo_nodes").select("id, label").in("id", ids);
+      const hubs = ids.length ? await (reader ? hubsWanted.eq("source", "mapa") : hubsWanted.eq("space", space)) : { data: [], error: null };
       const labels = new Map(((hubs.error ? [] : hubs.data ?? []) as { id: string; label: string }[]).map((n) => [n.id, mapLabel(n.label)]));
       const topicsOf = (ref: string) => [...new Set(edges.filter((e) => e.from_id === ref).map((e) => labels.get(e.to_id) ?? "").filter(Boolean))];
       const locate = <T extends Passage>(p: T): T => ({ ...p, where: passageWhere(names[p.source] ?? p.source, p.title, p.section, topicsOf(p.ref)) });
@@ -5981,7 +6075,7 @@ async function handle(request: Request): Promise<Response> {
 
     // `pool`: los pasajes para el modelo, los directos y, detrás, los vecinos; con mapa, cada uno dice dónde queda.
     // 2f. La malla (0097): dónde queda cada pasaje y qué contiene. Sin 0097, vacía.
-    const [{ saved, savedPassages }, { related, pool, joined }, mesh] = await Promise.all([loadSaved(), followMap(), meshAround(memory.map((p) => p.ref), sources)]);
+    const [{ saved, savedPassages }, { related, pool, joined }, mesh] = await Promise.all([loadSaved(), followMap(), meshAround(memory.map((p) => p.ref), sources, reader)]);
 
     if (saved) {
       step("Respuestas guardadas", "ok", `Ya se había respondido «${saved.question}», y sus fuentes no han cambiado.`);
@@ -6024,7 +6118,16 @@ async function handle(request: Request): Promise<Response> {
     };
     /** ¿Todo lo citado es público? Una respuesta que cita un pasaje con sesión no se guarda (la vería cualquiera). */
     const citesOnlyPublic = async (refs: string[]): Promise<boolean> => {
-      if (!spaced || publicOnly) return true;
+      // Quien no es personal con sesión solo recibió pasajes públicos.
+      if (publicOnly) return true;
+      if (reader) {
+        // Con 0121, en cualquier portal: lo citado tiene que ser legible aquí y, además, público.
+        const { data, error } = await admin.rpc("pilo_memory_readable", { p_refs: refs, ...reader });
+        if (error) return false;
+        const open = new Set(((data ?? []) as { ref: string; vis: string }[]).filter((r) => r.vis === "publico").map((r) => r.ref));
+        return refs.every((r) => open.has(r));
+      }
+      if (!spaced) return true;
       const { data } = await admin.from("pilo_memory").select("ref").in("ref", refs).eq("space", space).eq("vis", "publico");
       return new Set(((data ?? []) as { ref: string }[]).map((r) => r.ref)).size >= new Set(refs).size;
     };

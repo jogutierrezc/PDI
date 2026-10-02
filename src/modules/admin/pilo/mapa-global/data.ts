@@ -58,7 +58,8 @@ const list = <T,>(v: unknown): T[] => (Array.isArray(v) ? (v as T[]) : []);
 const num = (v: unknown) => (Number.isFinite(Number(v)) ? Number(v) : 0);
 
 async function readPlaneacion(): Promise<GlobalData["planeacion"]> {
-  const { data, error } = await supabase.rpc("pilo_graph_overview" as never, { p_sources: null } as never);
+  // Las cinco fuentes de portal, por su nombre: el mapa de los documentos del Pilo general (0121) aún no se dibuja aquí.
+  const { data, error } = await supabase.rpc("pilo_graph_overview" as never, { p_sources: ["cifras", "boletines", "pdi", "observatorio", "impacto"] } as never);
   if (error) return fail(error, "0097");
   const m = (data ?? {}) as { nodes?: unknown; edges?: unknown };
   return { data: { nodes: list<ViewNode>(m.nodes), edges: list<MeshEdge>(m.edges) }, missing: null, error: null };

@@ -138,9 +138,12 @@ describe("guardar la ficha", () => {
 
   it("no acepta un espacio, una clase, una colección ni una ruta que no sean suyas", async () => {
     const doc = { kind: "pdf", source: "politicas", title: "Otro" };
-    expect(await errorOf(save(doc, "planeacion"))).toMatch(/Espacio desconocido/);
+    // Desde 0121 Planeación también tiene documentos, pero en SUS colecciones: una de Enseñanza no cabe allí.
+    expect(await errorOf(save(doc, "planeacion"))).toMatch(/no recibe documentos/);
     expect(await errorOf(save(doc, "otro"))).toMatch(/Espacio desconocido/);
-    expect(await errorOf(save({ ...doc, source: "cifras" }))).toMatch(/pilo_docs_source/);
+    // Ni una fuente que llenan los portales, sea del ámbito que sea.
+    expect(await errorOf(save({ ...doc, source: "cifras" }))).toMatch(/no recibe documentos/);
+    expect(await errorOf(save({ ...doc, source: "pdi" }, "planeacion"))).toMatch(/no recibe documentos/);
     expect(await errorOf(save({ ...doc, source: "moodle" }))).toMatch(/pilo_docs_moodle/);
     expect(await errorOf(save({ ...doc, kind: "exe" }))).toMatch(/pilo_docs_kind/);
     expect(await errorOf(save({ ...doc, title: "" }))).toMatch(/pilo_docs_len/);
@@ -247,7 +250,7 @@ describe("un documento no escribe en otro espacio", () => {
     expect(await errorOf(cross)).toMatch(/pilo_memory_doc/);
     expect(await errorOf(t.q("update pilo_memory set doc_id = $1 where ref = 'pdi:pilar:p1'", [DOC]))).toMatch(/pilo_memory_doc/);
     expect(await errorOf(t.q("update pilo_memory set space = 'planeacion', source = 'pdi' where doc_id = $1", [DOC]))).toMatch(/pilo_memory_doc/);
-    expect(await errorOf(t.q("update pilo_docs set space = 'planeacion' where id = $1", [DOC]))).toMatch(/pilo_docs_(path|space_fkey)|pilo_memory_doc/);
+    expect(await errorOf(t.q("update pilo_docs set space = 'planeacion' where id = $1", [DOC]))).toMatch(/pilo_docs_(path|space_fkey)|pilo_memory_doc|no recibe documentos/);
   });
 
   it("pilo_memory_replace de Planeación no puede quedarse con un pasaje de un documento", async () => {
@@ -259,15 +262,16 @@ describe("un documento no escribe en otro espacio", () => {
   });
 
   it("guardar con el id de un documento de otro espacio se rechaza", async () => {
-    await t.q("insert into pilo_spaces (id, name) values ('otro', 'Otro espacio')");
-    expect(await errorOf(save({ id: DOC, kind: "pdf", source: "politicas", title: "Ajeno" }, "otro"))).toMatch(/otro espacio/);
-    // El mismo archivo en otro espacio es otro documento, y sus pasajes no caben en la memoria de nadie más.
-    const other = await save({ kind: "pdf", source: "politicas", title: "El mismo archivo", file_hash: "hash-a" }, "otro");
+    // El otro espacio es ahora Planeación, que desde 0121 tiene sus propias colecciones.
+    expect(await errorOf(save({ id: DOC, kind: "pdf", source: "institucional", title: "Ajeno" }, "planeacion"))).toMatch(/otro espacio/);
+    // El mismo archivo en otro espacio es otro documento, y sus pasajes quedan con SU procedencia.
+    const other = await save({ kind: "pdf", source: "institucional", title: "El mismo archivo", file_hash: "hash-a" }, "planeacion");
     expect(other).not.toBe(DOC);
-    expect(await errorOf(replace(other, [P(1, "Un pasaje de un espacio que la memoria no conoce.")]))).toMatch(/pilo_memory_(space|source)/);
+    await replace(other, [P(1, "Un pasaje de un documento del Pilo general.")]);
+    expect((await passages(other)).map((x) => [x.space, x.source, x.vis])).toEqual([["planeacion", "institucional", "sesion"]]);
+    expect(await passages(DOC)).toHaveLength(3);
+    await asAdmin((q) => q("select pilo_doc_delete($1)", [other]), true);
     expect(await passages(other)).toEqual([]);
-    await t.q("delete from pilo_docs where id = $1", [other]);
-    await t.q("delete from pilo_spaces where id = 'otro'");
   });
 });
 
@@ -323,7 +327,8 @@ describe("cambiar la ficha", () => {
     expect(after[1].updated_at.getTime()).toBe(before[1].updated_at.getTime());
     // La colección de un archivo no puede ser Moodle, ni una de Planeación.
     expect(await errorOf(update(DOC, { source: "moodle" }))).toMatch(/pilo_docs_moodle/);
-    expect(await errorOf(update(DOC, { source: "pdi" }))).toMatch(/pilo_docs_source/);
+    expect(await errorOf(update(DOC, { source: "pdi" }))).toMatch(/pilo_docs_source|no recibe documentos/);
+    expect(await errorOf(update(DOC, { source: "institucional" }))).toMatch(/pilo_docs_source|no recibe documentos/);
     expect(await errorOf(update(DOC, { status: "inventado" }))).toMatch(/pilo_docs_status/);
     expect(await errorOf(update("99999999-9999-4999-8999-999999999999", { vis: "publico" }))).toMatch(/no existe/);
   });
@@ -471,10 +476,13 @@ describe("la migración es idempotente", () => {
         (select count(*)::int from pg_indexes where schemaname = 'public' and indexname like 'pilo\\_%') as indexes`);
     const before = await snapshot();
     expect((before[0] as { policies: number }).policies).toBe(5);
-    const sql = readFileSync(MIGRATION, "utf8");
+    // 0114 y, encima, 0121: aplicar 0114 sola después de 0121 devolvería sus funciones a como eran
+    // (solo Enseñanza con documentos); 0121 las vuelve a dejar para cualquier ámbito.
+    const sql = readFileSync(MIGRATION, "utf8") + ";\n" + readFileSync(resolve(__dirname, "../../supabase/migrations/0121_pilo_portales.sql"), "utf8");
     await t.db.exec(sql);
     await t.db.exec(sql);
     expect(await snapshot()).toEqual(before);
+    expect(await asAdmin((q) => q<{ n: number }>("select pilo_map_save('planeacion', '[]'::jsonb) as n"))).toEqual([{ n: 0 }]);
     expect(await errorOf(t.asUser(null, (q) => q("select pilo_doc_replace('11111111-1111-4111-8111-111111111111', '[]'::jsonb)")))).toMatch(/permission denied/);
     expect(await errorOf(asAdmin((q) => q("update pilo_docs set vis = 'publico'")))).toMatch(/permission denied/);
   });

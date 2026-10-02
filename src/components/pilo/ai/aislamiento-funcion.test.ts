@@ -7,6 +7,11 @@
    lista de abajo con su razón. Quien agregue una consulta nueva y olvide el
    espacio, rompe esta prueba: así no se mezclan la memoria, el catálogo, las
    respuestas guardadas, la bandeja ni la bitácora de dos Pilos.
+
+   Desde 0121 hay una sola memoria y cada portal es una vista: el filtro lo
+   aplica la base (`pilo_scope`). Por eso cada LECTURA de la memoria lleva
+   además quién lee (`reader`: el portal, si es personal con sesión y si es una
+   cuenta de Pilo) cuando la base tiene 0121, también en el portal de siempre.
    ========================================================================== */
 
 import { readFileSync } from "node:fs";
@@ -22,7 +27,7 @@ const lines = code.split("\n");
 const TABLES = ["pilo_memory", "pilo_answers", "pilo_catalog", "pilo_inbox", "pilo_nodes", "pilo_edges", "pilo_ai_log"];
 
 /** Cómo se ve que una consulta atiende el espacio. */
-const HANDLES = /\bp_space\b|"space"|\binSpace\(|\bspace,/;
+const HANDLES = /\bp_space\b|"space"|\binSpace\(|\bspace,|\.\.\.reader\b/;
 /** Cuántas líneas abarca una consulta, contando la suya. */
 const WINDOW = 4;
 
@@ -94,11 +99,33 @@ describe("ninguna consulta de la función olvida el espacio", () => {
     expect(missing).toEqual([]);
   });
 
-  it("el espacio nunca se manda al de partida: va siempre dentro de inSpace(…)", () => {
-    // `p_space: space` suelto, fuera de inSpace, le llegaría también al Pilo de siempre.
-    const bare = lines.filter((l) => /p_space:/.test(l) && !/inSpace\(\{[^}]*p_space:/.test(l)).map((l) => l.trim().slice(0, 120));
+  it("sin 0121 el espacio nunca se manda al de partida: va dentro de inSpace(…) o de la vista del portal", () => {
+    // `p_space: space` suelto le llegaría al Pilo de siempre aunque la base no tenga 0121 (y una base
+    // sin 0113 no conoce ese parámetro). Solo puede ir dentro de inSpace(…) o donde ya hay vista (`reader`).
+    const bare = lines.filter((l) => /p_space:/.test(l) && !/inSpace\(\{[^}]*p_space:/.test(l) && !/\breader = view \? \{ p_space: space,/.test(l)).map((l) => l.trim().slice(0, 120));
     expect(bare).toEqual([]);
-    expect(code).toMatch(/const inSpace = .*\(spaced \? extra : \{\}\)/);
+    // inSpace solo se abre fuera del espacio de partida, o cuando la administración lo nombró (el mapa).
+    expect(code).toMatch(/const inSpace = .*\(spaced \|\| upkeep \? extra : \{\}\)/);
+    // Y la vista solo existe si la base respondió pilo_scope: sin 0121, `reader` es null.
+    expect(code).toMatch(/const reader = view \? \{ p_space: space, p_public_only: publicOnly, p_member: Boolean\(member\) \} : null;/);
+    expect(code).toMatch(/const view = error \? null : portalView\(space, data\);/);
+  });
+
+  it("con 0121, cada lectura de la memoria al preguntar lleva quién lee, para que filtre la base", () => {
+    const READS = ["pilo_memory_search", "pilo_memory_semantic", "pilo_answer_candidates", "pilo_graph_neighbors", "pilo_graph_around", "pilo_memory_readable"];
+    for (const name of READS) expect(calls.some((c) => c.name === name), name).toBe(true);
+    // Fuera de «preguntar»: la prueba de la memoria de la administración (su espacio, con sesión) y el análisis de los boletines.
+    const elsewhere = (c: (typeof calls)[number]) => /p_public_only: false \}\)/.test(c.text) || c.text.includes('p_sources: ["pdi"]');
+    // `scope` es la vista o, sin ella, lo de antes: las dos búsquedas lo llevan entero.
+    expect(code).toMatch(/const scope = reader \?\? inSpace\(\{ p_space: space, p_public_only: publicOnly \}\);/);
+    const blind = calls.filter((c) => READS.includes(c.name) && !/\breader\b|\.\.\.scope\b/.test(c.window) && !elsewhere(c)).map((c) => `${c.name} · ${c.text.trim().slice(0, 120)}`);
+    expect(blind).toEqual([]);
+    // La vista sale del portal y de la sesión que el servidor comprobó, nunca de un campo de la página.
+    expect(code).toMatch(/admin\.rpc\("pilo_scope", \{ p_portal: space, p_session: Boolean\(role\), p_member: Boolean\(member\) \}\)/);
+    // La tabla de pasajes solo se lee directo sin 0121: con la vista, esas dos lecturas van por pilo_memory_readable.
+    expect(calls.filter((c) => c.kind === "tabla" && c.name === "pilo_memory")).toHaveLength(2);
+    expect(calls.filter((c) => c.name === "pilo_memory_readable")).toHaveLength(2);
+    expect(code).not.toMatch(/p_session: (true|body|Boolean\(member)/);
   });
 
   it("el espacio sale del portal, nunca de un campo de la página (salvo «indexar», de la administración)", () => {

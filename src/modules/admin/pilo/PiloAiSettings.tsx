@@ -184,6 +184,14 @@ function Editor({ initial }: { initial: PiloSettings }) {
   const setPortal: EditorApi["setPortal"] = (id, patch) =>
     setS((prev) => ({ ...prev, portals: { ...prev.portals, [id]: { ...prev.portals[id], ...patch } } }));
   const ed: EditorApi = { s, saved, setS, set, setPortal, dirty, keys: keys.data };
+  // «Qué lee cada portal» se aplica al momento en la base, y la base mueve el interruptor de «Fuentes»
+  // (su espejo). Aquí se pone al día lo editado y lo guardado a la vez: no queda como cambio sin
+  // guardar, y un «Guardar cambios» posterior no devuelve la celda a como estaba.
+  const sourceApplied = (source: string, on: boolean) => {
+    const patch = (prev: PiloSettings): PiloSettings => ({ ...prev, memory_sources: { ...prev.memory_sources, [source]: on } });
+    setS(patch);
+    setSaved(patch);
+  };
 
   const runTest = async () => {
     if (dirty) {
@@ -241,7 +249,7 @@ function Editor({ initial }: { initial: PiloSettings }) {
     voz: () => <VoiceSection ed={ed} />,
     portales: () => <PortalsSection ed={ed} />,
     pregunta: () => <PreguntaSection ed={ed} />,
-    memoria: () => <MemorySection ed={ed} indexedAt={indexedAt} onIndexed={setIndexedAt} />,
+    memoria: () => <MemorySection ed={ed} indexedAt={indexedAt} onIndexed={setIndexedAt} onSourceApplied={sourceApplied} />,
     catalogo: () => <CatalogSection />,
     usuarios: () => <UsersSection />,
     uso: () => <UsageSection ed={ed} />,

@@ -1,0 +1,224 @@
+/* =============================================================================
+   Intranet · Mr. Pilo con IA · Memoria › «Qué lee cada portal» (0121).
+
+   Un solo cerebro, varios portales: la memoria es una y cada portal es una
+   vista. Esta matriz es el único lugar que dice qué lee cada portal de cada
+   fuente:
+
+     De casa     la fuente es del ámbito del portal: se busca siempre.
+     De visita   la fuente es de otro ámbito. Se ve, pero todavía no se puede
+                 marcar: llega con la lectura entre ámbitos.
+     No          el portal no la lee.
+
+   Cada cambio se aplica al momento (como las claves y las funciones
+   ampliadas), pero antes se confirma en el mismo sitio, nombrando la
+   consecuencia; después se dice el efecto con los números que contó la base.
+   Los interruptores de «Fuentes» son el espejo de las celdas de casa: al
+   cambiar una celda del portal de siempre, el editor se pone al día.
+
+   Sin la migración 0121 el grupo lo dice y queda apagado: Pilo sigue leyendo
+   como siempre.
+   ========================================================================== */
+
+import { useLayoutEffect, useRef, useState } from "react";
+import { Icon } from "../../../components/ui/Icon";
+import { revealList } from "./motion";
+import { CELL_LABEL, atHome, cellChoices, cellOf, confirmText, effectText, effectiveCell, usePortals, useSetCell } from "./portals";
+import type { Cell, PiloPortal, PiloSource } from "./portals";
+import { Group, StatusMark } from "./ui";
+
+const KIND_NOTE: Record<PiloSource["kind"], string> = {
+  portal: "La llenan los portales públicos",
+  documentos: "Documentos que sube la administración",
+  moodle: "Cursos leídos de Moodle",
+};
+
+const SCOPE_NAME: Record<string, string> = { planeacion: "Planeación", ensenanza: "Enseñanza" };
+const scopeName = (scope: string) => SCOPE_NAME[scope] ?? scope;
+
+interface Pending {
+  portal: PiloPortal;
+  source: PiloSource;
+  to: Cell;
+}
+
+export function PortalsMatrix({ onHomeSource }: { /** Una celda de casa del portal de siempre cambió: el editor pone al día su interruptor. */ onHomeSource?: (source: string, on: boolean) => void }) {
+  const query = usePortals();
+  const setCell = useSetCell();
+  const [pending, setPending] = useState<Pending | null>(null);
+  const [said, setSaid] = useState<{ tone: "ok" | "off"; text: string } | null>(null);
+  const confirmRef = useRef<HTMLDivElement>(null);
+  const missing = query.data === null;
+  const data = query.data ?? null;
+
+  // La confirmación entra una vez, en su sitio.
+  useLayoutEffect(() => {
+    if (pending && confirmRef.current) revealList([confirmRef.current]);
+  }, [pending?.portal.id, pending?.source.id, pending?.to]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const ask = (portal: PiloPortal, source: PiloSource, to: Cell) => {
+    if (setCell.isPending || cellOf(portal, source) === to) return;
+    setSaid(null);
+    setCell.reset();
+    setPending({ portal, source, to });
+  };
+
+  const apply = () => {
+    if (!pending) return;
+    const { portal, source, to } = pending;
+    setCell.mutate(pending, {
+      onSuccess: (r) => {
+        const effect = r.effects.find((e) => e.source === source.id);
+        setSaid(effect ? { tone: "ok", text: effectText(portal, effect) } : { tone: "off", text: `«${portal.name}» ya estaba así: no cambió nada.` });
+        if (portal.id === "planeacion" && atHome(portal, source)) onHomeSource?.(source.id, to === "casa");
+        setPending(null);
+      },
+    });
+  };
+
+  const groups = data ? [...new Set(data.sources.map((s) => s.scope))].map((scope) => ({ scope, sources: data.sources.filter((s) => s.scope === scope) })) : [];
+
+  return (
+    <Group
+      title="Qué lee cada portal"
+      aside={
+        <small role="status">
+          {missing ? <StatusMark tone="warn">Falta la migración 0121</StatusMark> : setCell.isPending ? "Aplicando…" : "Cada cambio se aplica al momento"}
+        </small>
+      }
+      id="pis-portales-memoria"
+    >
+      <p className="pis-lead">
+        Pilo tiene una sola memoria y cada portal es una vista sobre ella. Aquí se decide qué lee cada portal de cada fuente. Hoy cada uno lee solo lo de su casa: nada cambia
+        para quien pregunta hasta que usted cambie una celda.
+      </p>
+
+      <dl className="pis-legend">
+        <div>
+          <dt>De casa</dt>
+          <dd>La fuente es del ámbito del portal: se busca siempre y se cita sin aclaración.</dd>
+        </div>
+        <div>
+          <dt>
+            De visita <span className="pis-soon">Próximamente</span>
+          </dt>
+          <dd>La fuente es de otro ámbito: entraría solo cuando lo propio no alcanza, diciendo de dónde viene. Llega en la siguiente entrega; por ahora no se puede marcar.</dd>
+        </div>
+        <div>
+          <dt>No</dt>
+          <dd>El portal no la lee: ni al buscar, ni por el mapa, ni en una respuesta guardada.</dd>
+        </div>
+      </dl>
+
+      {missing ? (
+        <p className="pis-warn">
+          Falta aplicar la migración 0121 en la base. Hasta entonces Pilo lee como siempre —cada portal, sus fuentes encendidas— y esta matriz no se puede cambiar.
+        </p>
+      ) : query.isError ? (
+        <p className="pis-error" role="alert">
+          No se pudo leer la matriz: {(query.error as Error).message}{" "}
+          <button type="button" className="pis-link" onClick={() => void query.refetch()}>
+            Reintentar
+          </button>
+        </p>
+      ) : !data ? (
+        <p className="pis-small" role="status">
+          Leyendo qué lee cada portal…
+        </p>
+      ) : (
+        <div className="pis-extras pis-matrix" role="table" aria-label="Qué lee cada portal de cada fuente">
+          <div role="row" className="pis-extras__head">
+            <span role="columnheader">Fuente</span>
+            {data.portals.map((p) => (
+              <span key={p.id} role="columnheader">
+                {p.name}
+                {p.written_for && <small>Lo suyo fue preparado para {p.written_for}</small>}
+              </span>
+            ))}
+          </div>
+
+          {groups.map((g) => (
+            <div key={g.scope} role="rowgroup" aria-label={`Fuentes del ámbito de ${scopeName(g.scope)}`}>
+              <p className="pis-matrix__scope">Del ámbito de {scopeName(g.scope)}</p>
+              {g.sources.map((source) => {
+                const asking = pending?.source.id === source.id ? pending : null;
+                return (
+                  <div key={source.id} role="row" className="pis-matrix__row">
+                    <span role="rowheader">
+                      <strong>{source.name}</strong>
+                      <small>
+                        {KIND_NOTE[source.kind]}
+                        {source.staff_only ? " · pide sesión de la intranet en cualquier portal" : ""}
+                        {source.stays_home ? " · no sale de su portal" : ""}
+                      </small>
+                    </span>
+                    {data.portals.map((portal) => {
+                      const now = cellOf(portal, source);
+                      const choices = cellChoices(portal, source);
+                      // Una celda escrita a mano con un valor que aquí no se ofrece: se dice, y se dice qué lee de verdad.
+                      const odd = !choices.some((c) => c.value === now);
+                      return (
+                        <span key={portal.id} role="cell">
+                          <div className="pis-seg pis-seg--sm" role="radiogroup" aria-label={`${source.name} en ${portal.name}`}>
+                            {choices.map((c) => (
+                              <button
+                                key={c.value}
+                                type="button"
+                                role="radio"
+                                aria-checked={now === c.value}
+                                disabled={!c.enabled || setCell.isPending}
+                                title={c.note}
+                                onClick={() => ask(portal, source, c.value)}
+                              >
+                                {now === c.value && <Icon name="check" size={12} />}
+                                {c.label}
+                                {!c.enabled && <span className="sr-only"> (todavía no disponible: {c.note})</span>}
+                              </button>
+                            ))}
+                          </div>
+                          {odd && (
+                            <small className="pis-matrix__odd">
+                              <Icon name="alert" size={12} /> La celda dice «{CELL_LABEL[now]}», pero este portal {effectiveCell(portal, source) === "casa" ? "la lee" : "no la lee"}.
+                            </small>
+                          )}
+                        </span>
+                      );
+                    })}
+                    {asking && (
+                      <div className="pis-key__saved pis-key__saved--confirm pis-matrix__confirm" role="alert" ref={confirmRef}>
+                        <span>{confirmText(asking.portal, asking.source, asking.to)}</span>
+                        <button type="button" className="button-secondary" onClick={() => setPending(null)} disabled={setCell.isPending}>
+                          No, dejarlo como está
+                        </button>
+                        <button type="button" className="button-primary" onClick={apply} disabled={setCell.isPending}>
+                          {setCell.isPending ? "Aplicando…" : asking.to === "casa" ? "Sí, que la lea" : "Sí, que deje de leerla"}
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          ))}
+        </div>
+      )}
+
+      {said && (
+        <p className="pis-small pis-matrix__said" role="status">
+          <StatusMark tone={said.tone}>{said.tone === "ok" ? "Aplicado" : "Sin cambios"}</StatusMark> {said.text}
+        </p>
+      )}
+      {setCell.isError && (
+        <p className="pis-error" role="alert">
+          No se aplicó: {(setCell.error as Error).message}
+        </p>
+      )}
+      {data && (
+        <p className="pis-small">
+          Las celdas de casa son los mismos interruptores de «Fuentes» (aquí y en Mr. Pilo en Enseñanza): cambiar uno cambia el otro. El catálogo, las respuestas guardadas, la
+          bandeja y la bitácora siguen siendo de cada portal, y lo que Pilo nunca dice —dinero y datos personales— no depende de esta matriz.
+        </p>
+      )}
+    </Group>
+  );
+}

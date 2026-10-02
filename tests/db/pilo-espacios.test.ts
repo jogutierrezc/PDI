@@ -156,8 +156,10 @@ describe("los valores de partida", () => {
   });
 });
 
-describe("la fuente va atada al espacio", () => {
-  it("rechaza los cruces en la memoria, los nodos y las relaciones", async () => {
+describe("la procedencia de un pasaje es la de su fuente", () => {
+  // Desde 0121 ya no hay un CHECK fuente ↔ espacio: lo garantiza la llave a pilo_sources
+  // (pilo_memory_source_fk). La malla (nodos y relaciones) queda sin atadura.
+  it("rechaza los cruces en la memoria; la malla ya no ata la fuente al espacio", async () => {
     const mem = (space: string, source: string) =>
       t.q("insert into pilo_memory (ref, source, title, body, space) values ('cruce:1', $2, 'Cruce', 'Un pasaje cruzado de prueba.', $1)", [space, source]);
     expect(await errorOf(mem("planeacion", "politicas"))).toMatch(/pilo_memory_source/);
@@ -166,16 +168,19 @@ describe("la fuente va atada al espacio", () => {
     expect(await errorOf(t.q("update pilo_memory set space = 'ensenanza' where ref = 'cifras:evaluacion'"))).toMatch(/pilo_memory_source/);
     expect(await errorOf(t.q("update pilo_memory set source = 'pdi' where ref = 'doc:pol:1'"))).toMatch(/pilo_memory_source/);
 
-    const node = (space: string, source: string) =>
-      t.q("insert into pilo_nodes (id, source, type, label, space) values ('cruce:nodo', $2, 'nodo', 'Cruce', $1)", [space, source]);
-    expect(await errorOf(node("planeacion", "mapa"))).toMatch(/pilo_nodes_source/);
-    expect(await errorOf(node("planeacion", "moodle"))).toMatch(/pilo_nodes_source/);
-    expect(await errorOf(node("ensenanza", "pdi"))).toMatch(/pilo_nodes_source/);
-
-    const edge = (space: string, source: string) =>
-      t.q("insert into pilo_edges (from_id, to_id, rel, source, space) values ('cruce:a', 'cruce:b', 'contiene', $2, $1)", [space, source]);
-    expect(await errorOf(edge("planeacion", "global"))).toMatch(/pilo_edges_source/);
-    expect(await errorOf(edge("ensenanza", "impacto"))).toMatch(/pilo_edges_source/);
+    const gone = await t.q<{ conname: string }>("select conname from pg_constraint where conname in ('pilo_memory_source', 'pilo_nodes_source', 'pilo_edges_source')");
+    expect(gone).toEqual([]);
+    const kept = await t.q<{ conname: string }>("select conname from pg_constraint where conname in ('pilo_memory_source_fk', 'pilo_nodes_space', 'pilo_edges_space') order by conname");
+    expect(kept.map((c) => c.conname)).toEqual(["pilo_edges_space", "pilo_memory_source_fk", "pilo_nodes_space"]);
+    // Un nodo del mapa de documentos cabe ahora en Planeación (se revierte: no ensucia las demás pruebas).
+    await t.db.exec("begin");
+    try {
+      await t.q("insert into pilo_nodes (id, source, type, label, space) values ('cruce:nodo', 'mapa', 'nodo', 'Cruce', 'planeacion')");
+      await t.q("insert into pilo_edges (from_id, to_id, rel, source, space) values ('cruce:a', 'cruce:b', 'contiene', 'mapa', 'planeacion')");
+    } finally {
+      await t.db.exec("rollback");
+    }
+    expect(await errorOf(t.q("insert into pilo_nodes (id, source, type, label, space) values ('cruce:nodo', 'mapa', 'nodo', 'Cruce', 'otro')"))).toMatch(/pilo_nodes_space/);
   });
 
   it("no acepta espacios, visibilidades ni roles desconocidos", async () => {
@@ -573,7 +578,9 @@ describe("la migración es idempotente", () => {
         (select count(*)::int from pg_constraint where conname like 'pilo\\_%') as constraints,
         (select count(*)::int from pg_indexes where schemaname = 'public' and indexname like 'pilo\\_%') as indexes`);
     const before = await snapshot();
-    const sql = readFileSync(MIGRATION, "utf8");
+    // 0113 y, encima, 0121: aplicar 0113 sola después de 0121 devolvería los CHECK y las firmas viejas;
+    // 0121 los vuelve a quitar. La cadena, dos veces, deja todo como estaba.
+    const sql = readFileSync(MIGRATION, "utf8") + ";\n" + readFileSync(resolve(__dirname, "../../supabase/migrations/0121_pilo_portales.sql"), "utf8");
     await t.db.exec(sql);
     await t.db.exec(sql);
     expect(await snapshot()).toEqual(before);

@@ -1,7 +1,7 @@
 /* Los espacios de Pilo (0113), sin red ni base: de dónde sale el espacio, qué
    fuentes le tocan, cómo se lee su fila y qué regla le da a `canUse`. */
 import { describe, expect, it } from "vitest";
-import { DEFAULT_SPACE, PORTALS, SPACES, SPACE_INTRO, SPACE_PORTALS, canUse, isSpace, nothingText, ruleText, spaceOfPortal, spaceProfile, spaceRule, spaceSources, visitorSeed, NOTHING_TEXT, RULE_TEXT, type Rules } from "./logic";
+import { DEFAULT_SPACE, PORTALS, SPACES, SPACE_INTRO, SPACE_PORTALS, canUse, isSpace, nothingText, portalView, ruleText, spaceOfPortal, spaceProfile, spaceRule, spaceSources, visitorSeed, NOTHING_TEXT, RULE_TEXT, type Rules } from "./logic";
 
 describe("de dónde sale el espacio", () => {
   it("solo el portal propio de otro espacio lo cambia; lo demás es el Pilo de siempre", () => {
@@ -39,6 +39,40 @@ describe("las fuentes las fija el servidor", () => {
     expect(spaceSources("ensenanza", { cifras: true, impacto: true, politicas: true }, true)).toEqual(["politicas"]);
     expect(spaceSources("ensenanza", null, true)).toEqual([]);
     expect(spaceSources("ensenanza", { innovacion: "true", politicas: 1 }, true)).toEqual([]);
+  });
+});
+
+describe("la vista de un portal (0121)", () => {
+  const row = (source: string, mode: string, name = "") => ({ source, space: "planeacion", mode, vis: ["publico"], name });
+
+  it("sin lista no hay vista: quien llama sigue con las fuentes de partida", () => {
+    for (const v of [null, undefined, {}, "cifras", 3]) expect(portalView("planeacion", v)).toBeNull();
+    // Una lista vacía sí es una vista: el portal no lee nada.
+    expect(portalView("planeacion", [])).toEqual({ sources: [], visiting: [], names: SPACES.planeacion.names });
+  });
+
+  it("con la matriz de partida da las mismas fuentes, en el mismo orden y con los mismos nombres", () => {
+    const start = SPACES.planeacion.sources.map((s) => row(s, "casa", "Otro nombre en la base"));
+    const view = portalView("planeacion", start)!;
+    expect(view.sources).toEqual(spaceSources("planeacion", {}, true));
+    expect(view.sources).toEqual(SPACES.planeacion.sources);
+    // Los nombres de las fuentes de siempre son los del código: el pedido no cambia ni una letra.
+    expect(view.names).toEqual(SPACES.planeacion.names);
+    const teach = portalView("ensenanza", SPACES.ensenanza.sources.map((s) => row(s, "casa")))!;
+    expect(teach.sources).toEqual(spaceSources("ensenanza", { innovacion: true, politicas: true, global: true, moodle: true }, false));
+    expect(teach.names).toEqual(SPACES.ensenanza.names);
+  });
+
+  it("solo «casa» se busca; «visita» queda aparte; lo demás y lo raro no entra", () => {
+    const view = portalView("planeacion", [
+      row("cifras", "casa"), row("normativa", "casa", "  Normativa\n institucional "), row("politicas", "visita", "Políticas institucionales"),
+      row("global", "no"), row("cifras", "casa"), row("politicas", "casa"), row("Mala Fuente", "casa"), row("__proto__", "casa"), { mode: "casa" }, null, "pdi", row("pdi", "siempre"),
+    ])!;
+    expect(view.sources).toEqual(["cifras", "normativa"]);
+    expect(view.visiting).toEqual(["politicas"]);
+    expect(view.names.normativa).toBe("Normativa institucional");
+    expect(view.names.cifras).toBe("UDES en Cifras");
+    expect(Object.keys(view.names)).not.toContain("global");
   });
 });
 

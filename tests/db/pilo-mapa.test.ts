@@ -225,7 +225,8 @@ describe("comprender: lo pendiente y lo guardado", () => {
         "ref:ley-30-de-1992", "ref:unesco", "tema:aula-invertida", "tema:competencias", "tema:evaluacion-formativa", "tema:rubricas",
       ]);
       expect(await q("select id from pilo_map_topics('ensenanza', 2)")).toHaveLength(2);
-      expect(await q("select id from pilo_map_topics('planeacion')")).toEqual([]);
+      // Desde 0121 los temas son comunes: Planeación ve el que SU relación ya usa (la de la siembra), y ninguno más.
+      expect(await q("select id, uses from pilo_map_topics('planeacion')")).toEqual([{ id: "tema:evaluacion-formativa", uses: 1 }]);
     });
   });
 
@@ -262,7 +263,9 @@ describe("comprender: lo pendiente y lo guardado", () => {
   });
 
   it("no acepta un espacio desconocido ni filas que no sean una lista", async () => {
-    expect(await errorOf(mapSave([], "planeacion"))).toMatch(/Espacio desconocido/);
+    // Desde 0121 Planeación también tiene mapa de documentos: lo desconocido es lo que no es de ningún portal.
+    expect(await errorOf(mapSave([], "otro"))).toMatch(/Espacio desconocido/);
+    expect(await mapSave([], "planeacion")).toBe(0);
     expect(await errorOf(rpc("pilo_map_save('ensenanza', '{}'::jsonb)"))).toMatch(/lista/);
   });
 });
@@ -380,7 +383,8 @@ describe("la migración es idempotente", () => {
         (select count(*)::int from pg_indexes where schemaname = 'public' and indexname like 'pilo\\_%') as indexes`);
     const before = await snapshot();
     // 0115 y, encima, 0118 (que solo sube el tope de temas y referencias de pilo_map_save).
-    const sql = readFileSync(MIGRATION, "utf8") + ";\n" + readFileSync(resolve(__dirname, "../../supabase/migrations/0118_pilo_mapa_mas_temas.sql"), "utf8");
+    // Y 0121, que vuelve a dejar las funciones del mapa como las dejó (una sola firma de cada una).
+    const sql = ["0118_pilo_mapa_mas_temas.sql", "0121_pilo_portales.sql"].reduce((all, f) => all + ";\n" + readFileSync(resolve(__dirname, "../../supabase/migrations", f), "utf8"), readFileSync(MIGRATION, "utf8"));
     await t.db.exec(sql);
     await t.db.exec(sql);
     expect(await snapshot()).toEqual(before);

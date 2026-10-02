@@ -911,6 +911,41 @@
   .pis-extras__head > :first-child { display: none; }
 }
 
+/* --- Qué lee cada portal (0121) ------------------------------------------------------------------------
+   La matriz portal × fuente usa la rejilla de «Funciones ampliadas». Cada celda es un segmento con
+   su palabra y su glifo (nunca solo color); la confirmación ocupa el ancho de su fila. */
+
+.pis-legend { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--space-3) var(--space-5); margin: 0; }
+.pis-legend > div { display: grid; gap: 2px; align-content: start; min-width: 0; }
+.pis-legend dt { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); color: var(--ink); font-size: var(--text-sm); font-weight: 800; }
+.pis-legend dd { margin: 0; color: var(--ink-secondary); font-size: var(--text-sm); line-height: var(--leading-normal); }
+.pis-soon { padding: 1px var(--space-2); color: var(--ink-secondary); background: var(--surface-3); border-radius: var(--radius-pill); font-size: var(--text-2xs); font-weight: 800; }
+
+.pis-matrix [role="columnheader"] { display: grid; gap: 2px; min-width: 0; }
+.pis-matrix [role="columnheader"] small { color: var(--ink-muted); font-size: var(--text-xs); font-weight: 600; }
+.pis-matrix [role="rowgroup"] { display: grid; }
+.pis-matrix__scope { margin: 0; padding: var(--space-4) 0 var(--space-1); color: var(--ink-muted); font-size: var(--text-xs); font-weight: 800; }
+.pis-matrix__row { display: grid; grid-template-columns: minmax(0, 1.3fr) repeat(2, minmax(0, 1fr)); gap: var(--space-3); align-items: center; padding: var(--space-3) 0; border-bottom: 1px solid var(--line); }
+.pis-matrix [role="cell"] { display: grid; gap: 4px; justify-items: start; min-width: 0; }
+.pis-matrix .pis-seg button svg { flex: none; }
+.pis-matrix__odd { display: inline-flex; gap: 4px; align-items: baseline; color: var(--ink-secondary); font-size: var(--text-xs); line-height: var(--leading-normal); }
+.pis-matrix__confirm { grid-column: 1 / -1; }
+.pis-matrix__said { display: flex; flex-wrap: wrap; align-items: baseline; gap: var(--space-1) var(--space-2); color: var(--ink-secondary); }
+
+@media (max-width: 720px) {
+  .pis-legend { grid-template-columns: minmax(0, 1fr); }
+}
+
+@media (max-width: 620px) {
+  .pis-matrix__row { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+  .pis-matrix__row > [role="rowheader"] { grid-column: 1 / -1; }
+}
+
+/* Las colecciones de documentos del Pilo general (0121), con la misma etiqueta de dos letras. */
+.pis-code[data-s="institucional"] { background: var(--od-line-7); }
+.pis-code[data-s="normativa"] { background: var(--od-line-5); }
+.pis-code[data-s="lineamientos"] { background: var(--od-line-10); }
+
 /* --- Usuarios de Pilo (0120) --------------------------------------------------------------------------- */
 
 .pis-users__bar { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--space-3) var(--space-4); }

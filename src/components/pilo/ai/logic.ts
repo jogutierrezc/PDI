@@ -3364,6 +3364,49 @@ export function spaceSources(space: SpaceId, on: Record<string, unknown> | null 
   return SPACES[space].sources.filter((s) => flags[s] === true);
 }
 
+/* --- Los portales como vistas (0121) -----------------------------------------------------
+   Desde 0121 hay una sola memoria y cada portal es una vista sobre ella: qué
+   lee cada portal lo dice la base (`pilo_scope`), no esta lista. `SPACES` y
+   `spaceSources` quedan como los valores de partida: lo que se usa mientras la
+   migración 0121 no esté aplicada, y es exactamente lo que la matriz trae al nacer. */
+
+/** Lo que un portal lee para una persona, según la base. */
+export interface PortalView {
+  /** Las fuentes «de casa», en el orden de la base: las únicas que se buscan. */
+  sources: string[];
+  /** Las «de visita» (de otro ámbito). Existen en la matriz, pero todavía no se buscan. */
+  visiting: string[];
+  /** Cómo se llama cada fuente al citarla. */
+  names: Record<string, string>;
+}
+
+const SOURCE_ID = /^[a-z]{3,30}$/;
+
+/**
+ * La vista de un portal, de lo que devuelve `pilo_scope`. `null` si no llega
+ * una lista (la base aún no tiene 0121): quien llama sigue con `spaceSources`.
+ * Los nombres de las fuentes de siempre son los de `SPACES` (el pedido no cambia
+ * ni una letra); los de las fuentes nuevas, los de la base.
+ */
+export function portalView(space: SpaceId, rows: unknown): PortalView | null {
+  if (!Array.isArray(rows)) return null;
+  const sources: string[] = [];
+  const visiting: string[] = [];
+  const names: Record<string, string> = {};
+  for (const row of rows) {
+    if (!row || typeof row !== "object") continue;
+    const r = row as Record<string, unknown>;
+    const id = typeof r.source === "string" ? r.source : "";
+    if (!SOURCE_ID.test(id) || sources.includes(id) || visiting.includes(id)) continue;
+    if (r.mode === "casa") sources.push(id);
+    else if (r.mode === "visita") visiting.push(id);
+    else continue;
+    const name = typeof r.name === "string" ? r.name.replace(/\s+/g, " ").trim().slice(0, 80) : "";
+    if (name) names[id] = name;
+  }
+  return { sources, visiting, names: { ...names, ...SPACES[space].names } };
+}
+
 /** Para quién se redacta. No es el rol de la intranet (`Role`): lo elige el visitante y no lo identifica. */
 export type Rol = "estudiante" | "profesor" | "general";
 export const ROLES: Exclude<Rol, "general">[] = ["estudiante", "profesor"];

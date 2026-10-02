@@ -551,3 +551,88 @@ Cuando el corte trae varias cifras de una misma serie, `factSummary` arma de 2 a
 - Que el modelo real (Gemma por NVIDIA) cierre con el resumen y no recalcule: es una instrucción del pedido; lo que sí está garantizado es que un número que no esté en el pasaje se marca.
 - Cómo pinta la página la lista del resumen en la respuesta `dato` y cómo la lee la voz.
 - La frontera de «este periodo» (1 de julio) contra el calendario académico real de la universidad.
+
+
+## Anexo E · Un solo cerebro, varios portales (0121, pasos 1 a 3) (2026-10-02)
+
+Servidor: `supabase/functions/pilo-ia/index.ts` (`loadView`, `reader`, y los cambios de `answerWork`, `meshAround`, `comprehendMap`) · lógica pura: `logic.ts` (`portalView`, `PortalView`) · migración: `0121_pilo_portales.sql` · diseño: `.ccg/tasks/pilo-un-cerebro/propuesta.md` · avance: `.ccg/tasks/pilo-un-cerebro/avance.md`.
+
+**La forma del pedido y de la respuesta de `preguntar` no cambia** (`kind`, `text`, `sources`, eventos, errores). Con la matriz de partida, el pedido al modelo es byte a byte el de antes en los dos portales. Lo que cambia es de dónde salen las fuentes y quién aplica el filtro.
+
+### E.1 De dónde salen las fuentes
+
+| Base | Fuentes de un pedido | Filtro de cada lectura |
+|---|---|---|
+| Sin 0121 | `SPACES` + los interruptores (`memory_sources`), como en el Anexo A | el de 0113: `p_space` y `p_public_only`, solo fuera de `planeacion` |
+| Con 0121 | lo que devuelve `pilo_scope(portal, sesión, cuenta)`: las filas `mode = "casa"`, en el orden de la base | el de la base: cada lectura lleva **quién lee**, también en `planeacion` |
+
+La función pregunta por la vista en cada `preguntar` (`pilo_scope`); un cambio en la matriz vale de inmediato. Si `pilo_scope` no existe o falla, sigue como «Sin 0121» y no vuelve a preguntar durante un minuto en esa instancia.
+
+`pilo_scope` → filas `{ source, space, mode, vis, name }`:
+
+- `mode`: `"casa"` (se busca) o `"visita"` (de otro ámbito; **todavía no se busca**: la función la guarda en `PortalView.visiting` y no la usa).
+- `vis`: las visibilidades de pasaje que esa persona puede recibir (`["publico"]`, o `["publico","sesion"]` para el personal de la intranet).
+- `name`: el nombre de la fuente para citarla. Para las fuentes de siempre manda el de `SPACES` (así el pedido no cambia); para las nuevas, el de la base.
+
+Quién pregunta, para la base: `p_session = Boolean(rol de la intranet)`, `p_member = tiene cuenta de Pilo`. Los dos salen de la sesión que el servidor comprobó, nunca de un campo de la página. Una cuenta de Pilo nunca cuenta como personal.
+
+### E.2 Lo que la función le manda a la base (con 0121)
+
+`reader = { p_space: <portal>, p_public_only: <no es personal con sesión>, p_member: <cuenta de Pilo> }` va en **todas** las lecturas de la memoria de `preguntar`, en los dos portales:
+
+| Función | Parámetros |
+|---|---|
+| `pilo_scope` | `{ p_portal, p_session, p_member }` |
+| `pilo_memory_search` | `{ p_q, p_sources, p_limit: 8, ...reader }` |
+| `pilo_memory_semantic` | `{ p_embedding, p_model, p_sources, p_limit: 8, p_min, ...reader }` |
+| `pilo_answer_candidates` | `{ p_qnorm, ...reader, p_rol }` |
+| `pilo_graph_neighbors` | `{ p_refs, p_space, p_member, p_sources, p_public_only, p_limit: 3 }` |
+| `pilo_graph_around` | `{ p_ids, p_sources, p_up: 6, p_down: 1, p_limit: 160, ...reader }` |
+| `pilo_memory_readable` (nueva) | `{ p_refs, ...reader }` → los pasajes de una guardada que ese portal y esa persona pueden leer, con su `vis` |
+
+Con 0121 la función ya **no lee la tabla `pilo_memory` directo**: los pasajes de una respuesta guardada y la revisión «¿todo lo citado es público?» pasan por `pilo_memory_readable`. Una guardada se usa solo si la base devuelve **todos** los pasajes que cita.
+
+Lo que no es lectura de la memoria sigue igual que en el Anexo A: el catálogo (`pilo_catalog_active`, `_semantic`), la bandeja, la bitácora, el cupo y las guardadas son por portal y por rol; en `planeacion` no viaja ningún parámetro nuevo. Las cifras en vivo (`pilo_facts_*`) se piden solo si la vista trae `cifras`.
+
+`p_space` es ahora **el portal que pregunta** (los ids son los de siempre). Todos los parámetros nuevos de la base tienen valor de partida: la función desplegada antes de 0121 sigue llamando igual y recibe lo mismo (probado comparando una base sin 0121 y otra con ella).
+
+### E.3 Lo que cambia para quien pregunta
+
+- **Con la matriz de partida, nada.** Cada portal lee lo mismo que antes.
+- Una respuesta guardada deja de servirse si cita algo que ese portal o esa persona ya no pueden leer (antes solo se miraba el espacio y, fuera de `planeacion`, la visibilidad). En `planeacion` esto incluye ahora a Impacto: una guardada que lo cita no se le repite a un visitante ni a una cuenta de Pilo.
+- En `planeacion`, una respuesta que cita un pasaje «con sesión» (un documento del Pilo general) no se guarda para servirla después, igual que ya pasaba en Enseñanza.
+- El mapa (`pilo_graph_neighbors`, paso `mapa`, `via: "mapa"`; Anexo B.3) también puede aparecer en `portal: "pregunta"` cuando sus documentos tengan temas. Sin vecinos no hay paso ni campo nuevo, como antes.
+
+### E.4 `comprender` acepta `space: "planeacion"`
+
+El Pilo de siempre tiene desde 0121 documentos propios (colecciones `institucional`, `normativa`, `lineamientos`) y, con ellos, su mapa. Reemplaza la fila de B.1:
+
+| Caso | Respuesta |
+|---|---|
+| `comprender` con `space: "planeacion"` | como con cualquier otro espacio (`estado`, `lote`) |
+| `moodle` con `space: "planeacion"` | `400` `{ "error": "Ese Pilo no tiene cursos de Moodle: los cursos no salen de su portal." }` |
+
+En `comprender` y `moodle` el espacio viaja siempre a la base (`p_space`), también para `planeacion`. Sin 0121, `comprender` en `planeacion` responde su `estado` con cero pasajes (no hay documentos que comprender).
+
+`indexar` no cambia: los pasajes de los documentos del Pilo general son de `planeacion` y entran en su índice de siempre.
+
+### E.5 La matriz, para la intranet
+
+- `pilo_portals` (`id`, `scope`, `name`, `written_for`, `matrix`) y `pilo_sources` (`id`, `scope`, `name`, `kind`, `staff_only`, `stays_home`): la administración las lee; nadie las escribe directo.
+- `pilo_portal_update(p_portal, p_patch)` con `p_patch = { "matrix": { "<fuente>": "casa" | "no" }, "written_for"?: "…" }` → `{ portal, scope, matrix, written_for, name, effects: [{ source, name, from, to, passages, answers }] }`. Rechaza (`22023`) una fuente desconocida, un valor que no sea `casa`/`visita`/`no`, `casa` sobre una fuente de otro ámbito y, por ahora, **cualquier `visita`** («La lectura «de visita» todavía no está disponible…»).
+- `memory_sources` (en `pilo_ai_settings` y en `pilo_spaces`) es el espejo de las celdas de casa: cambiar uno cambia el otro (disparadores en los dos sentidos).
+
+### E.6 Orden de despliegue
+
+Cualquiera de los dos órdenes sirve:
+
+- **Función nueva, base sin 0121:** `pilo_scope` no existe → todo como antes.
+- **Base con 0121, función de antes:** las llamadas de siempre siguen valiendo; el filtro de la base se aplica igual (la función vieja manda sus fuentes y la base las cruza con la matriz).
+
+No volver a aplicar 0113, 0114, 0115 ni 0118 después de 0121: devuelven sus funciones (y, en 0113, las restricciones) a como eran. Si pasa, volver a aplicar 0121, que es idempotente y las deja de nuevo con una sola firma.
+
+### E.7 Sin verificar
+
+- La función en Deno contra la base real: las pruebas corren el archivo de la función con una base de mentira, y las funciones SQL en PGlite (sin pgvector: `pilo_memory_semantic` se prueba con un doble del operador `<=>`).
+- Que PostgREST resuelva bien las funciones con sus parámetros nuevos tras `notify pgrst, 'reload schema'` (cada una queda con una sola firma, que es lo que evita la ambigüedad).
+- La pantalla «Qué lee cada portal» y la carga de documentos del Pilo general en un navegador con la base real.

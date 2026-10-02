@@ -1,5 +1,10 @@
 /* =============================================================================
-   Mr. Pilo en Enseñanza · Memoria › Documentos.
+   Mr. Pilo · Memoria › Documentos (el de Enseñanza y, desde 0121, el general).
+
+   El mismo panel sirve a los dos Pilos: recibe de quién es la memoria (`space`)
+   y a qué colecciones puede ir un archivo (`collections`; de partida, las de
+   Enseñanza). «Mr. Pilo con IA» lo monta con `space="planeacion"` y sus
+   colecciones propias.
 
    La oficina sube DOCX, PDF, XLSX o CSV. El archivo se lee en el navegador
    (carpeta ingest/), se ve lo que va a quedar —pasajes, recortes, datos
@@ -18,18 +23,18 @@
    documento a medias ofrece «Continuar» (vuelve a leer el original guardado).
 
    Por documento: quién lo ve (nace «con sesión»), activo, reemplazar y borrar.
-   Sin la migración 0114 el panel lo dice y se apaga.
+   Sin la migración 0114 el panel lo dice y se apaga. Los sube solo la
+   administración (la base rechaza a cualquier otro).
    ========================================================================== */
 
 import { useEffect, useRef, useState } from "react";
-import type { DragEvent } from "react";
+import type { DragEvent, ReactNode } from "react";
 import { Icon } from "../../../../components/ui/Icon";
 import type { PiloSpace } from "../../pilo/space";
 import { Group, Switch, plural, when } from "../../pilo/ui";
 import { LIMITS, SCANNED_MESSAGE, kindOf, readDocument, toPassagesReport } from "../ingest";
 import type { DocKind, ParsedDocument, PassageReport } from "../ingest";
 import { SPACE_SOURCES } from "../store";
-import type { SpaceSource } from "../store";
 import { enterBlock } from "../motion";
 import { Skeleton, useEnter } from "../ui";
 import {
@@ -57,13 +62,28 @@ import { FaultNote, MissingNote, Stages, VisSeg } from "./parts";
 export interface MemoryPartProps {
   /** De qué Pilo es la memoria. */
   space: PiloSpace;
-  /** Falta la migración 0113: nada se puede guardar. */
+  /** Falta la migración que le da memoria a este Pilo: nada se puede guardar. */
   disabled: boolean;
 }
 
-/** Las colecciones a las que puede ir un archivo (la de Moodle la llena Moodle). */
-const COLLECTIONS = SPACE_SOURCES.filter((s) => s.id !== "moodle");
-const collectionName = (id: string) => SPACE_SOURCES.find((s) => s.id === id)?.name ?? id;
+/** Una colección a la que puede ir un archivo: su id en la base, su etiqueta de dos letras y su nombre. */
+export interface DocCollection {
+  id: string;
+  code: string;
+  name: string;
+}
+
+export interface DocumentsPanelProps extends MemoryPartProps {
+  /** Las colecciones de este Pilo. De partida, las de Enseñanza. */
+  collections?: DocCollection[];
+  /** Lo que se dice cuando está apagado. De partida, que falta la migración 0113. */
+  disabledNote?: string;
+  /** Un aviso propio de quien lo monta, bajo la presentación. */
+  note?: ReactNode;
+}
+
+/** Las colecciones de Enseñanza a las que puede ir un archivo (la de Moodle la llena Moodle). */
+const TEACH_COLLECTIONS: DocCollection[] = SPACE_SOURCES.filter((s) => s.id !== "moodle").map((s) => ({ id: s.id, code: s.code, name: s.name }));
 const KIND_NAME: Record<string, string> = { docx: "Word", pdf: "PDF", xlsx: "Excel", csv: "CSV" };
 const OWNER = "documentos";
 
@@ -75,7 +95,7 @@ interface Draft {
   parsed: ParsedDocument;
   report: PassageReport;
   title: string;
-  source: SpaceSource;
+  source: string;
   /** Si reemplaza a un documento que ya está. */
   replace: DocRow | null;
 }
@@ -84,7 +104,7 @@ interface Draft {
 interface Ctx {
   id: string;
   title: string;
-  source: SpaceSource;
+  source: string;
   kind: DocKind;
   path: string;
   file: File | null;
@@ -106,7 +126,9 @@ interface Job {
 
 class Duplicate extends Error {}
 
-export function DocumentsPanel({ space, disabled }: MemoryPartProps) {
+export function DocumentsPanel({ space, disabled, collections = TEACH_COLLECTIONS, disabledNote = "Sin la migración 0113 este Pilo no tiene memoria propia.", note }: DocumentsPanelProps) {
+  const collectionOf = (id: string) => collections.find((c) => c.id === id) ?? SPACE_SOURCES.find((s) => s.id === id);
+  const collectionName = (id: string) => collectionOf(id)?.name ?? id;
   const docs = useDocs(space, !disabled);
   const refresh = useRefreshMemory(space);
   const [draft, setDraft] = useState<Draft | null>(null);
@@ -164,7 +186,7 @@ export function DocumentsPanel({ space, disabled }: MemoryPartProps) {
       const parsed = await readDocument(file);
       const title = replace?.title ?? titleFromFile(file.name);
       const report = toPassagesReport(parsed, { title });
-      if (alive.current) setDraft({ file, kind, parsed, report, title, source: replace?.source ?? "innovacion", replace });
+      if (alive.current) setDraft({ file, kind, parsed, report, title, source: replace?.source ?? collections[0]?.id ?? "", replace });
     } catch (error) {
       if (alive.current) setOpenFault(error instanceof Error ? error.message : "No se pudo leer el archivo.");
     } finally {
@@ -264,7 +286,7 @@ export function DocumentsPanel({ space, disabled }: MemoryPartProps) {
           const left = await indexPending(space, (pending) =>
             reading.set({ owner: OWNER, title: `${STEP_TEXT.vectores.doing}: «${ctx.title}»`, line: pending ? `Faltan ${pending.toLocaleString("es-CO")} vectores en este espacio.` : "Índice al día." }),
           );
-          if (left > 0) throw new StepError({ ...faultFrom(502, { error: `Quedaron ${left.toLocaleString("es-CO")} sin vector.` }), title: "El índice no quedó completo", hint: "El documento ya responde por palabras. Reintente, o use «Indexar por significado», en el momento «Comprender».", retry: true });
+          if (left > 0) throw new StepError({ ...faultFrom(502, { error: `Quedaron ${left.toLocaleString("es-CO")} sin vector.` }), title: "El índice no quedó completo", hint: "El documento ya responde por palabras. Reintente, o use «Indexar por significado», en «Búsqueda por significado».", retry: true });
         },
       },
       say,
@@ -387,9 +409,10 @@ export function DocumentsPanel({ space, disabled }: MemoryPartProps) {
         Súbalos tal como están. Pilo los lee aquí mismo, los parte en pasajes, omite correos, teléfonos y documentos de identidad, y los ubica en el mapa. Cada documento nace
         visible solo con sesión iniciada.
       </p>
+      {note}
 
       {disabled ? (
-        <p className="pis-small">Sin la migración 0113 este Pilo no tiene memoria propia.</p>
+        <p className="pis-small">{disabledNote}</p>
       ) : missing ? (
         <MissingNote migration={missing} what="Sin ella no existen la ficha de los documentos ni el almacenamiento de los originales." />
       ) : docs.isError ? (
@@ -427,8 +450,8 @@ export function DocumentsPanel({ space, disabled }: MemoryPartProps) {
                 </label>
                 <label className="pen-field">
                   <span className="pen-field__label">Colección</span>
-                  <select value={draft.source} disabled={Boolean(draft.replace)} onChange={(e) => setDraft({ ...draft, source: e.target.value as SpaceSource })}>
-                    {COLLECTIONS.map((c) => (
+                  <select value={draft.source} disabled={Boolean(draft.replace)} onChange={(e) => setDraft({ ...draft, source: e.target.value })}>
+                    {collections.map((c) => (
                       <option key={c.id} value={c.id}>
                         {c.name}
                       </option>
@@ -526,7 +549,7 @@ export function DocumentsPanel({ space, disabled }: MemoryPartProps) {
                   <li key={d.id} className="pen-doc" data-off={!d.active || undefined}>
                     <header>
                       <span className="pis-code pen-code" data-s={d.source} title={collectionName(d.source)}>
-                        {SPACE_SOURCES.find((s) => s.id === d.source)?.code ?? "··"}
+                        {collectionOf(d.source)?.code ?? "··"}
                       </span>
                       <b>{d.title}</b>
                       <small>

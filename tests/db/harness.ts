@@ -48,11 +48,16 @@ export interface TestDb {
   close: () => Promise<void>;
 }
 
-export async function createTestDb({ seed = true } = {}): Promise<TestDb> {
+/**
+ * `before`: aplica solo las migraciones anteriores a ese número («0121» deja la
+ * base como estaba antes de 0121). Sirve para comparar una función antes y
+ * después de una migración, o para sembrar algo y aplicarla después.
+ */
+export async function createTestDb({ seed = true, before = "" }: { seed?: boolean; before?: string } = {}): Promise<TestDb> {
   const db = new PGlite({ extensions: { pgcrypto } });
   await db.exec(readFileSync(join(ROOT, "tests/db/supabase-stub.sql"), "utf8"));
 
-  for (const file of readdirSync(MIGRATIONS).filter((f) => f.endsWith(".sql")).sort()) {
+  for (const file of readdirSync(MIGRATIONS).filter((f) => f.endsWith(".sql") && (!before || f.slice(0, before.length) < before)).sort()) {
     try {
       await db.exec(readFileSync(join(MIGRATIONS, file), "utf8"));
     } catch (error) {

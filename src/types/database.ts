@@ -1168,6 +1168,8 @@ export interface OdBreakdownRow {
   years: number[] | null;
   /** Umbral de reserva estadística. null = el desglose no reserva nada. */
   reserve_threshold?: number | null;
+  /** Columna Total en «Ver datos por corte» (0124). Sin la columna, con total. */
+  show_total?: boolean;
   position: number;
 }
 

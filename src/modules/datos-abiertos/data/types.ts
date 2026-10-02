@@ -131,6 +131,11 @@ export interface Breakdown {
    * celda se publica como "< n". Sin umbral, el desglose no reserva nada.
    */
   reserveThreshold?: number;
+  /**
+   * «Ver datos por corte» lleva la columna Total (suma de categorías). Solo
+   * `false` la quita; sin la opción, el desglose queda con total.
+   */
+  showTotal?: boolean;
   /** Años con dato. Sin lista, todos los del periodo. */
   years?: number[];
   /** Se publica para el total institucional; por campus no se desagrega. */

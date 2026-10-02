@@ -489,6 +489,8 @@ export function assembleCatalog(rows: OpenDataRows): OpenDataCatalog {
           id: b.key, uuid: b.id, title: b.title, unit: b.unit, format: b.format,
           source: source(b.office_id), officeId: b.office_id, defaultChart: b.default_chart, years: yearsOf(b.years), values,
           reserveThreshold: b.reserve_threshold ?? undefined,
+          // Solo se anota cuando se apagó: sin la opción, el desglose va con total.
+          showTotal: b.show_total === false ? false : undefined,
           reporting: byYear ? "anual" : "periodo", annualRule: rule, terms: byYear ? undefined : terms,
         };
       });

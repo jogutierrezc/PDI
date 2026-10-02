@@ -194,7 +194,7 @@ export const EMPTY_REG: RegData = { email: "", rol: "", campus: "", fullName: ""
 export const TERMS_VERSION = "2026-10";
 export const ACCOUNT_TERMS: string[] = [
   "La cuenta es solo para Mr. Pilo: no da acceso a la intranet ni a otros sistemas de la universidad.",
-  "Se crea con su correo de la UDES, que se confirma con un mensaje. Su perfil y su sede salen de ese correo.",
+  "Se crea con su correo de la UDES. Su perfil y su sede salen de ese correo.",
   "Pilo usa su nombre, su perfil, su sede y lo que usted escriba en su perfil para responderle a su medida. Lo que guarde queda en su cuenta y solo usted lo ve.",
   "Pilo es una inteligencia artificial y puede equivocarse: revise la fuente de cada respuesta. Con estudiantes actúa como tutor: explica y guía, no resuelve evaluaciones.",
   "La administración de Pilo puede suspender o eliminar una cuenta.",

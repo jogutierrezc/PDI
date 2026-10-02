@@ -74,9 +74,21 @@ export async function checkUsername(username: string): Promise<{ free: boolean; 
   return { free: out?.free === true, reason: typeof out?.reason === "string" ? out.reason : "" };
 }
 
-/** Crea la cuenta. Se envía un correo de confirmación: hasta confirmarlo no se puede entrar. */
-export async function registerAccount(data: RegData): Promise<void> {
-  await call({ action: "registrar", ...registerBody(data) });
+/**
+ * Crea la cuenta y dice cómo se sigue:
+ *   «entro»       la cuenta quedó lista y la sesión, abierta (la confirmación por correo está apagada);
+ *   «ingresar»    quedó lista, pero hay que entrar con el usuario;
+ *   «confirmar»   se envió un correo y hasta confirmarlo no se puede entrar.
+ */
+export async function registerAccount(data: RegData): Promise<"entro" | "ingresar" | "confirmar"> {
+  const out = await call<{ confirm?: boolean; session?: { access_token?: string; refresh_token?: string } }>({ action: "registrar", ...registerBody(data) });
+  // Una función anterior no dice `confirm`: entonces sí se confirma por correo.
+  if (out?.confirm !== false) return "confirmar";
+  const access_token = out.session?.access_token;
+  const refresh_token = out.session?.refresh_token;
+  if (!access_token || !refresh_token) return "ingresar";
+  const { error } = await supabase.auth.setSession({ access_token, refresh_token });
+  return error ? "ingresar" : "entro";
 }
 
 /** Entra con usuario y contraseña: la función devuelve la sesión y aquí se instala. */

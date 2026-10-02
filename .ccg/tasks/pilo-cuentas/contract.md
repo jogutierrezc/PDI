@@ -33,7 +33,7 @@ POST JSON a `functions/v1/pilo-cuentas` (con la clave anónima; no hace falta se
 | Acción | Cuerpo | Respuesta |
 |---|---|---|
 | `usuario` | `{ username }` | `{ free: true }` o `{ free: false, reason }` |
-| `registrar` | `{ email, rol, campus?, full_name, username, password, nick?, tone? }` | `{ ok: true }` — se envía un correo de confirmación; hasta confirmarlo no se puede entrar |
+| `registrar` | `{ email, rol, campus?, full_name, username, password, nick?, tone? }` | `{ ok: true, confirm: false, session? }`: la cuenta nace confirmada y, con `session`, la persona entra de una vez. Con el secreto `PILO_CONFIRMAR_CORREO=si`: `{ ok: true, confirm: true }`, se envía un correo y no se entra hasta confirmarlo |
 | `ingresar` | `{ username, password }` | `{ session: { access_token, refresh_token } }` → `supabase.auth.setSession(...)` |
 | `reenviar` | `{ username }` | `{ ok: true }` siempre |
 | `recuperar` | `{ username }` | `{ ok: true }` siempre; el correo lleva a `/app/cuenta?clave=1` |

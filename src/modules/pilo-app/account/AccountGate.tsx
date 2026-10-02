@@ -131,7 +131,7 @@ export function AccountGate({ voice, voiceOn, onVoice, theme, onTheme, account, 
   const [reveal, setReveal] = useState(false);
   const [userEdited, setUserEdited] = useState(false);
   const [userCheck, setUserCheck] = useState<{ state: "idle" | "checking" | "free" | "taken" | "unknown"; reason?: string }>({ state: "idle" });
-  const [done, setDone] = useState<{ username: string; rol: string; campus: string; nick: string } | null>(null);
+  const [done, setDone] = useState<{ username: string; rol: string; campus: string; nick: string; after: "entro" | "ingresar" | "confirmar" } | null>(null);
   // Ingreso, olvido y contraseña nueva.
   const [login, setLogin] = useState({ username: "", password: "" });
   const [loginError, setLoginError] = useState<{ code: CuentaCode; message: string } | null>(null);
@@ -423,16 +423,16 @@ export function AccountGate({ voice, voiceOn, onVoice, theme, onTheme, account, 
   const create = async () => {
     setBusy(true);
     try {
-      await registerAccount(data);
+      const after = await registerAccount(data);
       const nick = data.nick.trim() || firstName(data.fullName);
-      // Mientras confirma su correo conversa sin cuenta: Pilo ya le dice como pidió.
+      // Si aún no entra (falta confirmar o abrir sesión), conversa sin cuenta: Pilo ya le dice como pidió.
       writeVisitor({ nick: visitorNick(nick), tone: data.tone });
-      setDone({ username, rol: rolLabel(data.rol), campus: campusLabel(rule?.campus || data.campus), nick });
+      setDone({ username, rol: rolLabel(data.rol), campus: campusLabel(rule?.campus || data.campus), nick, after });
       // La contraseña no se queda en la memoria de la página.
       setData((d) => ({ ...d, password: "" }));
       setReveal(false);
       setStep("listo");
-      say(`¡Listo, ${nick}! Ya tiene cuenta en Pilo. Revise su correo para confirmarla.`, "sorpresa", "emocionado");
+      say(after === "confirmar" ? `¡Listo, ${nick}! Ya tiene cuenta en Pilo. Revise su correo para confirmarla.` : `¡Listo, ${nick}! Ya tiene cuenta en Pilo. Conversemos.`, "sorpresa", "emocionado");
     } catch (e) {
       const err = asCuentaError(e);
       const target = registerErrorStep(err.code, steps);
@@ -616,7 +616,13 @@ export function AccountGate({ voice, voiceOn, onVoice, theme, onTheme, account, 
         {step === "listo" ? (
           <div className="pc-step" ref={setBody}>
             <h2 tabIndex={-1}>Cuenta creada</h2>
-            <p>Le enviamos un mensaje a su correo para confirmar que es suyo. Hasta que lo confirme puede conversar con Pilo sin cuenta; entrar, guardar respuestas y las respuestas a su medida se activan al confirmar.</p>
+            <p>
+              {done?.after === "confirmar"
+                ? "Le enviamos un mensaje a su correo para confirmar que es suyo. Hasta que lo confirme puede conversar con Pilo sin cuenta; entrar, guardar respuestas y las respuestas a su medida se activan al confirmar."
+                : done?.after === "ingresar"
+                  ? "Su cuenta quedó lista. Entre con su usuario y su contraseña para guardar respuestas y recibir respuestas a su medida."
+                  : "Su cuenta quedó lista y ya entró con ella: puede guardar respuestas y Pilo le responde a su medida."}
+            </p>
             <dl className="pc-rows">
               <div>
                 <dt>Usuario</dt>
@@ -635,9 +641,11 @@ export function AccountGate({ voice, voiceOn, onVoice, theme, onTheme, account, 
             </dl>
             {notice && <Msg tone={notice.tone}>{notice.text}</Msg>}
             <div className="pc-actions">
-              <button type="button" className="pc-quiet" disabled={busy} onClick={() => done && void resend(done.username)}>
-                {busy ? "Enviando…" : "Reenviar el correo"}
-              </button>
+              {done?.after === "confirmar" && (
+                <button type="button" className="pc-quiet" disabled={busy} onClick={() => done && void resend(done.username)}>
+                  {busy ? "Enviando…" : "Reenviar el correo"}
+                </button>
+              )}
               <Link className="pa-btn pa-btn--main" to={home} replace>
                 Conversar con Pilo
               </Link>

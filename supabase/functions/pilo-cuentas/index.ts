@@ -13,10 +13,15 @@
        dejaría a cualquiera averiguar el correo de un usuario;
      · los intentos se limitan por dirección y por cuenta.
 
-   El alta no depende de que el proyecto permita registros abiertos: el usuario
-   se crea con una invitación (la plataforma envía el correo de confirmación) y
-   su contraseña se fija en el mismo momento. Hasta que confirme el correo, no
-   puede entrar: así se comprueba que el correo es suyo.
+   El alta no depende de que el proyecto permita registros abiertos: la crea
+   esta función con la clave de servicio.
+
+   La confirmación del correo está APAGADA por ahora (el envío de correos del
+   proyecto aún no funciona): la cuenta nace confirmada y la persona entra de
+   inmediato. Mientras esté apagada no se comprueba que el correo sea de quien
+   se registra. Para encenderla, ponga el secreto PILO_CONFIRMAR_CORREO=si: el
+   usuario se crea entonces con una invitación (la plataforma envía el correo)
+   y no puede entrar hasta confirmarlo.
 
    Acciones (POST, JSON):
      { action: "usuario",   username }                          → { free, reason? }
@@ -175,7 +180,12 @@ Deno.serve(async (request) => {
       if (byUser.data) return json({ error: "Ese usuario ya está tomado. Pruebe con otro.", code: "usuario" }, 409);
 
       // El usuario de auth nace con la marca de Pilo: así no recibe perfil de intranet (0120).
-      const invited = await admin.auth.admin.inviteUserByEmail(email, { data: { pilo: true, full_name: fullName }, redirectTo: redirectTo("/app/cuenta?confirmada=1") });
+      // Con la confirmación apagada nace confirmado y con su contraseña; encendida, con una invitación.
+      const confirm = Deno.env.get("PILO_CONFIRMAR_CORREO") === "si";
+      const marks = { pilo: true, full_name: fullName };
+      const invited = confirm
+        ? await admin.auth.admin.inviteUserByEmail(email, { data: marks, redirectTo: redirectTo("/app/cuenta?confirmada=1") })
+        : await admin.auth.admin.createUser({ email, password, email_confirm: true, user_metadata: marks });
       if (invited.error || !invited.data?.user) {
         const detail = invited.error?.message ?? "";
         // El correo ya es de alguien con cuenta en la intranet: esa cuenta ya le sirve en Pilo.
@@ -188,7 +198,7 @@ Deno.serve(async (request) => {
       const id = invited.data.user.id;
       const undo = () => admin.auth.admin.deleteUser(id).catch(() => undefined);
 
-      const withPassword = await admin.auth.admin.updateUserById(id, { password });
+      const withPassword = confirm ? await admin.auth.admin.updateUserById(id, { password }) : { error: null };
       if (withPassword.error) {
         await undo();
         return json({ error: "No pude guardar la contraseña. Intente de nuevo.", code: "clave" }, 502);
@@ -199,7 +209,12 @@ Deno.serve(async (request) => {
         const clash = /duplicate|unique/i.test(saved.error.message);
         return json({ error: clash ? "Ese usuario ya está tomado. Pruebe con otro." : "No pude guardar la cuenta. Intente de nuevo.", code: clash ? "usuario" : "alta" }, clash ? 409 : 500);
       }
-      return json({ ok: true });
+      if (confirm) return json({ ok: true, confirm: true });
+      // Sin confirmación, la persona entra de una vez: se le devuelve su sesión. Si no se pudo abrir, entra con su usuario.
+      const signed = await visitor().auth.signInWithPassword({ email, password });
+      const session = signed.data?.session;
+      if (session) await admin.from("pilo_users").update({ last_seen_at: new Date().toISOString() }).eq("id", id);
+      return json({ ok: true, confirm: false, ...(session ? { session: { access_token: session.access_token, refresh_token: session.refresh_token } } : {}) });
     }
 
     /* --- Ingresar con nombre de usuario ----------------------------------------------------- */

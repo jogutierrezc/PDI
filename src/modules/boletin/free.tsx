@@ -145,7 +145,7 @@ export function freeUnits(set: FreeSet, view: FreeView, cut: number, Sheet: Shee
           const written = columns.map((c, i) => {
             const shown = cellView(c, r.cells[c.key]);
             const tone = cellTone(custom, c, r);
-            return `${tone && (tone.by !== "fila" || i === 0) ? `${tone.glyph} ` : ""}${shown.empty ? EMPTY_TEXT : shown.text}`;
+            return `${tone && (tone.by !== "fila" || i === 0) ? `${tone.glyph} ` : ""}${shown.empty ? (r.kind === "total" ? "" : EMPTY_TEXT) : shown.text}`;
           });
           return { label: written[0], cells: written.slice(1), strong: r.kind === "total" };
         }

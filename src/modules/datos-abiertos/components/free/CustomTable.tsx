@@ -92,7 +92,8 @@ export function CustomTableView({
                               {tone.glyph}
                             </span>
                           )}
-                          <span className="od-ctable__value">{view.empty ? EMPTY_TEXT : view.text}</span>
+                          {/* En la fila de totales, una celda sin escribir es un hueco de la fila, no un dato que falte. */}
+                          <span className="od-ctable__value">{view.empty ? (row.kind === "total" ? "" : EMPTY_TEXT) : view.text}</span>
                           {says && <span className="sr-only"> ({tone.label})</span>}
                         </span>
                       </Tag>

@@ -81,7 +81,27 @@
 .oda-ct__grid tr[data-row-kind="total"] td input { font-weight: 800; }
 .oda-ct__grid tr[data-row-kind="total"] > * { border-top: 1px solid var(--line-strong); }
 
-.oda-ct__grid td.oda-ct__tools { min-width: 17rem; }
+/* Las herramientas de la fila se quedan a la vista aunque la rejilla se desplace. */
+.oda-ct__grid td.oda-ct__tools,
+.oda-ct__grid thead th:last-child {
+  position: sticky;
+  right: 0;
+  z-index: 2;
+  min-width: 0;
+  background: var(--surface);
+  box-shadow: -1px 0 0 var(--line);
+}
+
+.oda-ct__grid thead th:last-child { z-index: 3; background: var(--surface-2); }
+
+.oda-ct__tools-row {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  white-space: nowrap;
+}
+
+.oda-ct .oda-form-grid { align-items: start; }
 
 .oda-ct__tools .oda-free-grid__kind {
   flex: none;

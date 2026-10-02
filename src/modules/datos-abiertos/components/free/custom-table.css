@@ -30,6 +30,9 @@
 /* --- La caja que se desplaza -------------------------------------------------- */
 
 .od-ctable__scroll {
+  /* Contiene los textos para lectores de pantalla (posición absoluta) de las
+     celdas: sin esto escapan de la caja y ensanchan la página entera. */
+  position: relative;
   max-width: 100%;
   overflow-x: auto;
   overscroll-behavior-x: contain;

@@ -739,6 +739,7 @@ function CustomTableEditor({ set, rows, offices, periodId, published, canEdit }:
                         })
                       )}
                       <td className="oda-free-grid__tools oda-ct__tools">
+                        <span className="oda-ct__tools-row">
                         {row.kind !== "grupo" && (
                           <select
                             className="oda-free-grid__kind"
@@ -779,6 +780,7 @@ function CustomTableEditor({ set, rows, offices, periodId, published, canEdit }:
                         >
                           <Icon name="close" size={14} />
                         </button>
+                        </span>
                       </td>
                     </tr>
                   );

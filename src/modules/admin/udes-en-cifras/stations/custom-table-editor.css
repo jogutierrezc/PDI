@@ -1,0 +1,251 @@
+/* =============================================================================
+   Tablas personalizadas en la intranet (CustomTableCapture.tsx).
+
+   La rejilla es la de los conjuntos libres (`.oda-grid.oda-free-grid`); aquí
+   solo va lo propio: el nombre de la columna editable en la cabecera, el tono
+   de cada casilla (los mismos tokens del portal, vía `.od-tones`), la barra de
+   la celda enfocada, los ajustes de columna y la vista previa del pegado.
+   Ningún color, radio ni duración a mano.
+   ========================================================================== */
+
+.oda-ct {
+  display: grid;
+  gap: var(--space-4);
+  min-width: 0;
+}
+
+.oda-ct__new {
+  padding: var(--space-4);
+  background: var(--surface-2);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-xs);
+}
+
+/* --- Rejilla --------------------------------------------------------------------- */
+
+.oda-ct__grid thead th { vertical-align: top; white-space: normal; }
+
+.oda-ct__colname {
+  display: block;
+  width: 100%;
+  min-width: 7rem;
+  padding: var(--space-1) var(--space-2);
+  color: var(--ink);
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-xs);
+  font: inherit;
+  font-weight: 800;
+  text-align: inherit;
+}
+
+.oda-ct__colname:focus-visible { outline: 2px solid var(--brand-blue); outline-offset: 1px; }
+.oda-ct__colname[aria-invalid="true"] { border-color: var(--status-risk); }
+
+.oda-ct__grid thead th .oda-link-button {
+  margin-top: var(--space-1);
+  font-size: var(--text-2xs);
+  font-weight: 600;
+}
+
+.oda-ct__grid thead th[data-adjusting] { box-shadow: inset 0 -3px 0 var(--brand-blue); }
+
+.oda-ct__grid td { position: relative; }
+
+/* El tono de la casilla, igual que en el portal. */
+.oda-ct__grid td[data-tone] {
+  background-color: var(--surface);
+  background-image: linear-gradient(var(--tone), var(--tone));
+}
+
+.oda-ct__grid td[data-tone] input { color: var(--tone-ink); font-weight: 700; }
+.oda-ct__grid td[data-tone] input:focus { color: var(--ink); }
+
+.oda-ct__glyph {
+  position: absolute;
+  top: 50%;
+  left: var(--space-2);
+  z-index: 2;
+  color: var(--tone-mark);
+  font-size: var(--text-xs);
+  font-weight: 800;
+  line-height: 1;
+  transform: translateY(-50%);
+  pointer-events: none;
+}
+
+.oda-ct__grid td[data-tone][data-kind="texto"] input { padding-left: calc(var(--space-2) + 1.25rem); }
+
+.oda-ct__grid td[data-active] { box-shadow: inset 0 0 0 2px var(--brand-blue); }
+
+.oda-ct__grid tr[data-row-kind="total"] td input { font-weight: 800; }
+.oda-ct__grid tr[data-row-kind="total"] > * { border-top: 1px solid var(--line-strong); }
+
+.oda-ct__grid td.oda-ct__tools { min-width: 17rem; }
+
+.oda-ct__tools .oda-free-grid__kind {
+  flex: none;
+  width: 8.5rem;
+  margin-right: var(--space-1);
+  vertical-align: middle;
+}
+
+/* --- Barra de la celda enfocada ------------------------------------------------------ */
+
+.oda-ct__bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2) var(--space-4);
+  min-height: 3rem;
+  padding: var(--space-2) var(--space-3);
+  font-size: var(--text-sm);
+  background: var(--surface-2);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-xs);
+}
+
+.oda-ct__bar select {
+  min-height: 36px;
+  padding: var(--space-1) var(--space-3);
+  color: var(--ink);
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-xs);
+  font: inherit;
+}
+
+.oda-ct__options { display: inline-flex; flex-wrap: wrap; gap: var(--space-2); }
+
+.oda-ct__option {
+  padding: var(--space-1) var(--space-3);
+  color: var(--ink);
+  background: var(--surface);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-pill);
+  font: inherit;
+  font-size: var(--text-xs);
+  font-weight: 700;
+  cursor: pointer;
+  transition: transform var(--dur-press) var(--ease-out);
+}
+
+.oda-ct__option:active { transform: scale(0.97); }
+.oda-ct__option:focus-visible { outline: 2px solid var(--brand-blue); outline-offset: 2px; }
+
+/* --- Ajustes de una columna ---------------------------------------------------------- */
+
+.oda-ct__column,
+.oda-ct__paste {
+  display: grid;
+  gap: var(--space-3);
+  padding: var(--space-4);
+  background: var(--surface-2);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-xs);
+  animation: oda-ct-in var(--dur-fast) var(--ease-out);
+}
+
+@keyframes oda-ct-in {
+  from { opacity: 0; transform: translateY(-4px); }
+}
+
+.oda-ct__column > header,
+.oda-ct__paste > header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2) var(--space-4);
+}
+
+.oda-ct__column-tools { display: inline-flex; flex-wrap: wrap; align-items: center; gap: var(--space-1) var(--space-3); }
+
+.oda-ct__column-fields { display: flex; flex-wrap: wrap; gap: var(--space-3) var(--space-4); align-items: flex-start; }
+
+.oda-ct__column-fields textarea {
+  width: 100%;
+  padding: var(--space-2) var(--space-3);
+  color: var(--ink);
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-xs);
+  font: inherit;
+  font-size: var(--text-sm);
+  resize: vertical;
+}
+
+.oda-ct__rules ol,
+.oda-ct__tone-list {
+  display: grid;
+  gap: var(--space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.oda-ct__rules li,
+.oda-ct__tone-list li {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: var(--space-2) var(--space-3);
+}
+
+.oda-ct__tone-list { grid-template-columns: repeat(auto-fill, minmax(14rem, 1fr)); }
+.oda-ct__tone-list li { align-items: center; flex-wrap: nowrap; }
+.oda-ct__tone-list .oda-inline-field { flex: 1 1 auto; }
+
+.oda-ct__swatch {
+  flex: none;
+  display: inline-grid;
+  place-items: center;
+  width: 2rem;
+  height: 2rem;
+  color: var(--tone-mark);
+  font-size: var(--text-sm);
+  font-weight: 800;
+  line-height: 1;
+  background-color: var(--surface);
+  background-image: linear-gradient(var(--tone), var(--tone));
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-xs);
+}
+
+/* --- Vista previa del pegado ---------------------------------------------------------- */
+
+.oda-ct__paste { border-color: var(--brand-blue); }
+
+.oda-ct__paste-table th,
+.oda-ct__paste-table td {
+  padding: var(--space-2) var(--space-3);
+  text-align: left;
+  white-space: nowrap;
+}
+
+.oda-ct__paste-table tbody th { min-width: 0; max-width: none; }
+.oda-ct__paste-table thead th { text-align: left; }
+.oda-ct__paste-table thead th small { display: block; color: var(--ink-muted); font-size: var(--text-2xs); font-weight: 500; }
+.oda-ct__paste-table td[data-blank] { color: var(--ink-secondary); font-style: italic; }
+.oda-ct__paste-table td[data-error] { color: var(--ink); font-weight: 700; }
+
+.oda-ct__paste-notes {
+  display: grid;
+  gap: var(--space-1);
+  margin: 0;
+  padding-left: calc(var(--space-3) + 1rem);
+  color: var(--ink-secondary);
+  font-size: var(--text-sm);
+}
+
+.oda-ct__paste-notes li[data-tone="error"] { color: var(--ink); font-weight: 700; }
+
+/* --- Vista previa de la tabla ---------------------------------------------------------- */
+
+.oda-ct__preview { min-width: 0; }
+
+@media (prefers-reduced-motion: reduce) {
+  .oda-ct__column,
+  .oda-ct__paste { animation: none; }
+  .oda-ct__option { transition: none; }
+}

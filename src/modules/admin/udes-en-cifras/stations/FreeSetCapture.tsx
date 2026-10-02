@@ -51,6 +51,7 @@ import { ConfirmButton, Panel, SaveState, StageEmpty, slugify } from "../ui";
 import { editableText, parseClipboardGrid, parseCsv, parseNumber } from "../sheet";
 import { PasteMessages } from "../PasteTable";
 import { formatValue } from "../../../datos-abiertos/data/open-data";
+import { customViewOf } from "../../../datos-abiertos/data/custom-table";
 
 const FORMAT_LABEL: Record<OdValueFormat, string> = { entero: "Entero", decimal: "Decimal", porcentaje: "Porcentaje" };
 const TERRITORY_LABEL: Record<FreeTerritory, string> = { departamento: "Departamento de Colombia", pais: "País" };
@@ -92,12 +93,15 @@ let draftCounter = 0;
 const newDraftId = () => `columna-${(draftCounter += 1)}`;
 
 /** Solo los campos que usa el tipo de columna. */
-const cleanColumn = ({ key, label, kind, format, unit, territory }: FreeColumn): FreeColumn => ({
+const cleanColumn = ({ key, label, kind, format, unit, territory, decimals, options }: FreeColumn): FreeColumn => ({
   key,
   label: label.trim(),
   kind,
   ...(kind === "cifra" ? { format: format ?? "entero", ...(unit?.trim() ? { unit: unit.trim() } : {}) } : {}),
   ...(kind === "territorio" ? { territory: territory ?? "departamento" } : {}),
+  // Lo que escribe una tabla personalizada (decimales de una cifra, lista de una categoría) se conserva.
+  ...(kind === "cifra" && typeof decimals === "number" ? { decimals } : {}),
+  ...(kind === "texto" && Array.isArray(options) ? { options } : {}),
 });
 
 export function FreeSetForm({
@@ -326,7 +330,8 @@ const signature = (text: string) => {
 };
 
 export function FreeSetCapture({ data, report, periodId, canEdit }: StationProps) {
-  const sets = (data.rows.freeSets ?? []).filter((fs) => fs.report_id === report!.uuid).sort((a, b) => a.position - b.position);
+  // Las tablas personalizadas se editan en su pestaña: aquí el total se calcula, y allá se escribe a mano.
+  const sets = (data.rows.freeSets ?? []).filter((fs) => fs.report_id === report!.uuid && !customViewOf(fs)).sort((a, b) => a.position - b.position);
   const [chosen, setChosen] = useState(sets[0]?.id ?? "");
   const set = sets.find((s) => s.id === chosen) ?? sets[0];
   if (!set) return <StageEmpty title="Este informe no tiene conjuntos libres">Créalos en Estructura, en Conjuntos visuales.</StageEmpty>;

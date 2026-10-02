@@ -55,6 +55,7 @@ import { SaberProForm } from "./SaberProCapture";
 import { SaberTytForm } from "./SaberTytCapture";
 import { FreeSetForm } from "./FreeSetCapture";
 import { TEMPORALITY_LABEL } from "../../../datos-abiertos/data/free-sets";
+import { customViewOf } from "../../../datos-abiertos/data/custom-table";
 import { RANKING_SYSTEMS, RANKING_VIEWS } from "../../../datos-abiertos/data/rankings";
 import { MEDAL_SORT, orderedTiers } from "../../../datos-abiertos/data/medals";
 
@@ -609,7 +610,7 @@ function DatasetsEditor({ data, reportId, years, canEdit }: { data: StationProps
     <Panel
       id="oda-conjuntos"
       title="Conjuntos visuales"
-      description="Desgloses, mapas de calor, mapas, tuberías, evoluciones históricas y conjuntos libres: los que quieras de cada tipo. Al crearlos entran a la ficha como bloque visible; sus cifras se cargan en Captura y su lugar se ajusta en Diseño visual."
+      description="Desgloses, mapas de calor, mapas, tuberías, evoluciones históricas y conjuntos libres: los que quieras de cada tipo. Al crearlos entran a la ficha como bloque visible; sus cifras se cargan en Captura y su lugar se ajusta en Diseño visual. Las tablas personalizadas (textos y cifras con color) se crean y se escriben en Captura, en «Tablas personalizadas»."
       actions={
         <>
           <SaveState pending={pending} error={error} success={success} />
@@ -837,8 +838,8 @@ function DatasetsEditor({ data, reportId, years, canEdit }: { data: StationProps
           const rowCount = freeRows(fs.id).length;
           const filled = freeFilled(fs.id);
           return (
-            <DatasetItem key={fs.id} kind="Conjunto libre" title={fs.title}
-              detail={`${fs.columns.length} columnas · ${rowCount} filas · ${fs.views.length} gráficas · ${TEMPORALITY_LABEL[fs.temporality].split(":")[0].toLowerCase()}${fs.temporality === "periodo" && fs.period_label ? ` ${fs.period_label}` : ""}`}
+            <DatasetItem key={fs.id} kind={customViewOf(fs) ? "Tabla personalizada" : "Conjunto libre"} title={fs.title}
+              detail={customViewOf(fs) ? `${fs.columns.length} columnas · ${rowCount} filas · se escribe en Captura › Tablas personalizadas` : `${fs.columns.length} columnas · ${rowCount} filas · ${fs.views.length} gráficas · ${TEMPORALITY_LABEL[fs.temporality].split(":")[0].toLowerCase()}${fs.temporality === "periodo" && fs.period_label ? ` ${fs.period_label}` : ""}`}
               canEdit={canEdit} editing={editing === fs.id} onEdit={() => setEditing(fs.id)} onDelete={() => remove.mutate({ table: "od_free_sets", id: fs.id })}>
               <FreeSetForm
                 offices={offices}

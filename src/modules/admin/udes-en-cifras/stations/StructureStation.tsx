@@ -29,6 +29,7 @@ import type {
 } from "../../../../types/database";
 import { ANNUAL_RULE_HINT, ANNUAL_RULE_LABEL, REPORTING_HINT, REPORTING_LABEL } from "../../../datos-abiertos/data/terms";
 import type { Reporting } from "../../../datos-abiertos/data/terms";
+import { totalAdvice } from "../../../datos-abiertos/data/breakdown-total";
 import type { StationProps } from "../OdAdmin";
 import {
   useDeleteDataset,
@@ -597,7 +598,7 @@ function DatasetsEditor({ data, reportId, years, canEdit }: { data: StationProps
 
   const create = (kind: DatasetKind, f: DatasetFields) => {
     const base = { report_id: reportId, office_id: f.office_id || null };
-    if (kind === "desglose") saveBreakdown.mutate({ ...base, key: uniqueKey(f.title, breakdowns.map((b) => b.key)), title: f.title, unit: f.unit, format: f.format, default_chart: f.chart, years: f.years, position: breakdowns.length + 1 }, done);
+    if (kind === "desglose") saveBreakdown.mutate({ ...base, key: uniqueKey(f.title, breakdowns.map((b) => b.key)), title: f.title, unit: f.unit, format: f.format, default_chart: f.chart, years: f.years, position: breakdowns.length + 1, ...(f.showTotal ? {} : { show_total: false }) }, done);
     if (kind === "calor") saveHeatmap.mutate({ ...base, key: uniqueKey(f.title, heatmaps.map((h) => h.key)), title: f.title, description: f.description, unit: f.unit, format: f.format, row_label: f.rowLabel, column_label: f.columnLabel, rows: lines(f.rows), columns: lines(f.columns), position: heatmaps.length + 1 }, done);
     if (kind === "mapa") saveMap.mutate({ ...base, key: uniqueKey(f.title, maps.map((m) => m.key)), title: f.title, description: f.description, unit: f.unit, mode: f.mode, reporting: reportingFor(f), years: reportingFor(f) === "global" ? null : f.years, position: maps.length + 1 }, done);
     if (kind === "tuberia") savePipeline.mutate({ ...base, key: uniqueKey(f.title, pipelines.map((p) => p.key)), title: f.title, description: f.description, measure: f.measure, stages: lines(f.rows), position: pipelines.length + 1 }, done);
@@ -736,10 +737,11 @@ function DatasetsEditor({ data, reportId, years, canEdit }: { data: StationProps
 
       <ul className="oda-datasets">
         {breakdowns.map((b) => (
-          <DatasetItem key={b.id} kind="Desglose" title={b.title} detail={`${b.unit} · ${b.default_chart === "barras" ? "barras" : b.default_chart === "composicion" ? "composición" : "circular"} · ${yearsDetail(b.years)}`} canEdit={canEdit}
+          <DatasetItem key={b.id} kind="Desglose" title={b.title} detail={`${b.unit} · ${b.default_chart === "barras" ? "barras" : b.default_chart === "composicion" ? "composición" : "circular"} · ${yearsDetail(b.years)}${b.show_total === false ? " · sin total" : ""}`} canEdit={canEdit}
             editing={editing === b.id} onEdit={() => setEditing(b.id)} onDelete={() => remove.mutate({ table: "od_breakdowns", id: b.id })}>
-            <DatasetForm kind="desglose" offices={offices} years={years} initial={{ title: b.title, unit: b.unit, format: b.format, chart: b.default_chart, years: b.years, office_id: b.office_id ?? "" }}
-              onCancel={() => setEditing(null)} onSubmit={(f) => saveBreakdown.mutate({ id: b.id, report_id: reportId, title: f.title, unit: f.unit, format: f.format, default_chart: f.chart, years: f.years, office_id: f.office_id || null }, done)} />
+            <DatasetForm kind="desglose" offices={offices} years={years} initial={{ title: b.title, unit: b.unit, format: b.format, chart: b.default_chart, years: b.years, office_id: b.office_id ?? "", showTotal: b.show_total ?? true }}
+              annualRule={b.reporting === "anual" ? "reportado" : b.annual_rule}
+              onCancel={() => setEditing(null)} onSubmit={(f) => saveBreakdown.mutate({ id: b.id, report_id: reportId, title: f.title, unit: f.unit, format: f.format, default_chart: f.chart, years: f.years, office_id: f.office_id || null, ...(f.showTotal !== (b.show_total ?? true) ? { show_total: f.showTotal } : {}) }, done)} />
           </DatasetItem>
         ))}
         {histories.map((h) => (
@@ -909,10 +911,14 @@ interface DatasetFields {
   title: string; description: string; unit: string; format: OdValueFormat; chart: OdChartKind; mode: OdMapMode; reporting: OdMapReporting;
   rowLabel: string; columnLabel: string; rows: string; columns: string; office_id: string;
   measure: OdPipelineMeasure; totalLabel: string; years: number[] | null;
+  /** Desgloses: columna Total en «Ver datos por corte». Solo viaja al guardar si cambió (0124). */
+  showTotal: boolean;
 }
 
-function DatasetForm({ kind, offices, years, initial, onSubmit, onCancel }: {
+function DatasetForm({ kind, offices, years, initial, annualRule, onSubmit, onCancel }: {
   kind: DatasetKind;
+  /** Desgloses: cómo sale su cifra del año; solo para sugerir si conviene el total. */
+  annualRule?: OdAnnualRule;
   offices: StationProps["data"]["rows"]["offices"];
   years: number[];
   initial?: Partial<DatasetFields>;
@@ -922,10 +928,11 @@ function DatasetForm({ kind, offices, years, initial, onSubmit, onCancel }: {
   const [f, setF] = useState<DatasetFields>({
     title: "", description: "", unit: kind === "historico" ? "estudiantes" : "", format: "entero", chart: "circular", mode: "origen", reporting: "anual",
     rowLabel: "", columnLabel: "", rows: kind === "tuberia" ? "Ingreso\n2.º semestre\n4.º semestre\n6.º semestre\n8.º semestre\n10.º semestre\nGrado" : "", columns: "", office_id: "",
-    measure: "estudiantes", totalLabel: kind === "historico" ? "Total" : "", years: null,
+    measure: "estudiantes", totalLabel: kind === "historico" ? "Total" : "", years: null, showTotal: true,
     ...initial,
   });
   const set = (patch: Partial<DatasetFields>) => setF({ ...f, ...patch });
+  const advice = kind === "desglose" && f.showTotal ? totalAdvice({ unit: f.unit, format: f.format, annualRule }) : null;
 
   return (
     <form className="oda-inline-form" onSubmit={(e) => { e.preventDefault(); if (f.title.trim()) onSubmit(f); }}>
@@ -969,6 +976,19 @@ function DatasetForm({ kind, offices, years, initial, onSubmit, onCancel }: {
               <option value="composicion">Composición (varios cortes)</option>
             </select>
           </label>
+        )}
+        {kind === "desglose" && (
+          <div className="admin-field--wide">
+            <label className="oda-switch">
+              <input type="checkbox" checked={f.showTotal} onChange={(e) => set({ showTotal: e.target.checked })} />
+              <span>Mostrar total</span>
+            </label>
+            <div className="oda-field-hint">
+              Suma las categorías de cada corte en «Ver datos por corte». Apáguelo cuando sumar las categorías no tenga sentido:
+              porcentajes, promedios, tasas o categorías que se solapan.
+            </div>
+            {advice && <div className="oda-field-warning">{advice}</div>}
+          </div>
         )}
         {kind === "mapa" && (
           <label className="admin-field">

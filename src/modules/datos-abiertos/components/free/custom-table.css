@@ -12,19 +12,20 @@
    tapar lo que pasa por debajo al desplazar.
    ========================================================================== */
 
+/* `.od-tones` declara los tonos; la rejilla de la intranet lo usa para pintar igual. */
 .od-ctable {
   display: grid;
   gap: var(--space-4);
   min-width: 0;
 }
 
-.od-ctable [data-tone="bien"] { --tone: var(--status-done-soft); --tone-ink: var(--ink); --tone-mark: var(--status-done); }
-.od-ctable [data-tone="atencion"] { --tone: var(--status-pending-soft); --tone-ink: var(--ink); --tone-mark: var(--status-pending); }
-.od-ctable [data-tone="riesgo"] { --tone: var(--status-risk-soft); --tone-ink: var(--ink); --tone-mark: var(--status-risk); }
-.od-ctable [data-tone="neutro"] { --tone: var(--od-board-raised); --tone-ink: var(--ink); --tone-mark: var(--ink-secondary); }
-.od-ctable [data-tone="seq-1"] { --tone: var(--od-seq-1); --tone-ink: var(--od-seq-ink-light); --tone-mark: var(--od-seq-ink-light); }
-.od-ctable [data-tone="seq-2"] { --tone: var(--od-seq-3); --tone-ink: var(--od-seq-ink-light); --tone-mark: var(--od-seq-ink-light); }
-.od-ctable [data-tone="seq-3"] { --tone: var(--od-seq-6); --tone-ink: var(--od-seq-ink-dark); --tone-mark: var(--od-seq-ink-dark); }
+.od-tones [data-tone="bien"] { --tone: var(--status-done-soft); --tone-ink: var(--ink); --tone-mark: var(--status-done); }
+.od-tones [data-tone="atencion"] { --tone: var(--status-pending-soft); --tone-ink: var(--ink); --tone-mark: var(--status-pending); }
+.od-tones [data-tone="riesgo"] { --tone: var(--status-risk-soft); --tone-ink: var(--ink); --tone-mark: var(--status-risk); }
+.od-tones [data-tone="neutro"] { --tone: var(--od-board-raised); --tone-ink: var(--ink); --tone-mark: var(--ink-secondary); }
+.od-tones [data-tone="seq-1"] { --tone: var(--od-seq-1); --tone-ink: var(--od-seq-ink-light); --tone-mark: var(--od-seq-ink-light); }
+.od-tones [data-tone="seq-2"] { --tone: var(--od-seq-3); --tone-ink: var(--od-seq-ink-light); --tone-mark: var(--od-seq-ink-light); }
+.od-tones [data-tone="seq-3"] { --tone: var(--od-seq-6); --tone-ink: var(--od-seq-ink-dark); --tone-mark: var(--od-seq-ink-dark); }
 
 /* --- La caja que se desplaza -------------------------------------------------- */
 

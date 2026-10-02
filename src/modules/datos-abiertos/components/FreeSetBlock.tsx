@@ -23,6 +23,7 @@
 import { useState } from "react";
 import { CHART_TYPES, freeYears, viewProblems } from "../data/free-sets";
 import type { FreeChartType, FreeSet, FreeView } from "../data/free-sets";
+import { isCustomView } from "../data/custom-table";
 import { ChartFrame } from "./ChartFrame";
 import { CsvAction } from "./CsvAction";
 import type { CsvSource } from "./CsvAction";
@@ -70,6 +71,9 @@ export function FreeSetBlock({
   const views = set.views.filter((v) => (viewKey ? v.key === viewKey : !exclude.includes(v.key)) && viewProblems(set, v).length === 0);
   if (!views.length || !set.rows.length) return null;
   const usesYear = set.temporality === "anual" && views.some((v) => !USES_ALL_YEARS.includes(v.type));
+  // Un bloque que solo trae tablas personalizadas rotula con el corte que ellas escriben.
+  const cuts = Array.from(new Set(views.map((v) => (isCustomView(v) ? v.table.cut.trim() : ""))));
+  const ownCut = !usesYear && cuts.length === 1 && cuts[0] ? `Corte ${cuts[0]}` : null;
   const showSource = withSource && !set.views.some((v) => v.type === "tabla" && viewProblems(set, v).length === 0);
   // Una acción «CSV» por conjunto: en la tabla de origen si sale; si no, en la primera vista con marco.
   const csvView = showSource ? undefined : views.find((v) => !hasOwnFrame(v));
@@ -95,7 +99,7 @@ export function FreeSetBlock({
                 </select>
               </label>
             ) : (
-              <span className="od-free__stamp">{temporalityText(set, null)}</span>
+              <span className="od-free__stamp">{ownCut ?? temporalityText(set, null)}</span>
             )}
           </div>
         </header>
@@ -137,12 +141,18 @@ function FreeViewPanel({ set, view, year, csv }: { set: FreeSet; view: FreeView;
       </div>
     );
   }
-  const when = set.temporality === "anual" && USES_ALL_YEARS.includes(view.type) ? "Todos los años" : temporalityText(set, year);
+  // La tabla personalizada lleva su propio corte, escrito por quien la publica.
+  const custom = isCustomView(view);
+  const when = custom
+    ? `Corte ${view.table.cut.trim()}`
+    : set.temporality === "anual" && USES_ALL_YEARS.includes(view.type)
+      ? "Todos los años"
+      : temporalityText(set, year);
   return (
     <div className="od-free__cell" data-span={span}>
       <ChartFrame
         title={view.title}
-        subtitle={[CHART_TYPES[view.type].label, when, view.description].filter(Boolean).join(" · ")}
+        subtitle={[custom ? "Tabla" : CHART_TYPES[view.type].label, when, view.description].filter(Boolean).join(" · ")}
         source={set.source}
         exportName={`${set.title}-${view.title}`}
         csv={csv}

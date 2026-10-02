@@ -14,6 +14,7 @@
    la fuente ya tenga una vista de tabla (ver freeSourceUnits).
    ========================================================================== */
 
+import { cellTone, cellView, EMPTY_TEXT, isCustomView, legendOf, legendText } from "../datos-abiertos/data/custom-table";
 import type { ReactNode } from "react";
 import { ALL_YEARS } from "../datos-abiertos/data/terms";
 import {
@@ -105,13 +106,17 @@ export function freeUnits(set: FreeSet, view: FreeView, cut: number, Sheet: Shee
   if (!rows.length) return [];
   const title = `${set.title} · ${view.title}`;
   const compared = view.type === "barras_comparadas" ? compareSource(set, view) : null;
+  const custom = isCustomView(view) ? view.table : null;
   const notes: [string, ReactNode][] = [
     ["Gráfica", CHART_TYPES[view.type].label],
-    ["Lectura", CHART_TYPES[view.type].hint],
+    // Tabla personalizada: en papel el tono viaja como glifo, y la lectura es su leyenda.
+    ["Lectura", custom ? legendText(legendOf(set.columns, custom, freeAllRowsAt(set, year))) || "Tabla escrita por quien publica: textos y cifras." : CHART_TYPES[view.type].hint],
     // Una gráfica comparada no se entiende sin saber qué se está comparando:
     // en papel no hay leyenda que se pueda señalar con el cursor.
     ...(compared ? ([["Compara", compared.label]] as [string, ReactNode][]) : []),
-    ["Corte", cutText(set, view, year, cut)],
+    ["Corte", custom ? custom.cut : cutText(set, view, year, cut)],
+    ...(custom?.note?.trim() ? ([["Nota", custom.note.trim()]] as [string, ReactNode][]) : []),
+    ...(custom?.source?.trim() ? ([["Fuente", custom.source.trim()]] as [string, ReactNode][]) : []),
   ];
   const sheet = (children: ReactNode, extra: [string, ReactNode][] = []) => (
     <Sheet title={title} description={view.description || set.description} source={set.source} notes={[...notes, ...extra]} wide>
@@ -135,6 +140,15 @@ export function freeUnits(set: FreeSet, view: FreeView, cut: number, Sheet: Shee
     const toRows = (list: typeof rows) =>
       list.map((r) => {
         if (r.kind === "grupo") return { label: r.label || "Sin título", cells: head.slice(1).map(() => ""), strong: true };
+        if (custom) {
+          // Como está escrita: el total es el de quien publica, un vacío dice «sin dato» y el tono va con su glifo.
+          const written = columns.map((c, i) => {
+            const shown = cellView(c, r.cells[c.key]);
+            const tone = cellTone(custom, c, r);
+            return `${tone && (tone.by !== "fila" || i === 0) ? `${tone.glyph} ` : ""}${shown.empty ? EMPTY_TEXT : shown.text}`;
+          });
+          return { label: written[0], cells: written.slice(1), strong: r.kind === "total" };
+        }
         const total = r.kind === "total" ? freeTotalAt(all, all.indexOf(r), columns) : null;
         const cells = [
           ...(set.temporality === "anual" ? [r.year === null ? "—" : String(r.year)] : []),

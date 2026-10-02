@@ -39,7 +39,7 @@ export function CustomTableView({
   const source = table.source?.trim() || fallbackSource;
 
   return (
-    <div className="od-ctable">
+    <div className="od-ctable od-tones">
       <div className="od-ctable__scroll" tabIndex={0} role="region" aria-label={`${title}, tabla desplazable`}>
         <table className="od-ctable__table">
           <caption className="sr-only">

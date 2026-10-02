@@ -50,6 +50,7 @@ import { usePrefersReducedMotion, useWidth } from "../motion";
 import type React from "react";
 import { MAX_CATEGORICAL, inkOn, nivoTheme, useChartTokens } from "./chart-tokens";
 import type { ChartTokens } from "./chart-tokens";
+import { CustomTableView } from "./CustomTable";
 
 const HEIGHT = 340;
 
@@ -182,7 +183,12 @@ export function FreeChart({ set, view, year }: { set: FreeSet; view: FreeView; y
     case "cifras":
       return <Figures {...common} />;
     case "tabla":
-      return <FreeTable set={set} view={view} rows={freeAllRowsAt(set, year)} />;
+      // Con `view.table`, la tabla es la que escribió quien publica: textos, cifras y tonos.
+      return view.table ? (
+        <CustomTableView title={view.title} columns={set.columns} rows={freeAllRowsAt(set, year)} table={view.table} fallbackSource={set.source} />
+      ) : (
+        <FreeTable set={set} view={view} rows={freeAllRowsAt(set, year)} />
+      );
   }
 }
 

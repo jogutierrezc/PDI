@@ -41,7 +41,8 @@ import {
   textOf,
 } from "../../data/free-sets";
 import type { FreeColumn, FreeRow, FreeSet, FreeView } from "../../data/free-sets";
-import { formatValue } from "../../data/open-data";
+import { formatCompact, formatValue } from "../../data/open-data";
+import { isBig, splitBig } from "../../data/big-numbers";
 import { DEPARTMENTS, MAP_HEIGHT, MAP_WIDTH } from "../../data/colombia-map";
 import { COUNTRIES, WORLD_HEIGHT, WORLD_WIDTH } from "../../data/world-map";
 import { ChartTooltip, niceCeil } from "../ChartFrame";
@@ -77,7 +78,15 @@ function useCanvasWidth(ref: React.RefObject<HTMLDivElement>, min: number) {
 const fmt = (column: FreeColumn | undefined, value: number | null) =>
   value === null ? "Sin dato" : `${formatValue(value, column?.format ?? "decimal")}${column?.unit ? (column.unit === "%" ? " %" : ` ${column.unit}`) : ""}`;
 
-const shortFmt = (column: FreeColumn | undefined, value: number) => formatValue(value, column?.format ?? "decimal");
+/** La cifra exacta, sin unidad: tablas y textos donde cabe entera. */
+const fullFmt = (column: FreeColumn | undefined, value: number) => formatValue(value, column?.format ?? "decimal");
+
+/**
+ * La cifra donde no hay sitio (ejes, rótulos sobre barras, rankings): de un
+ * millón en adelante va abreviada («12,3 mil M»). La exacta sigue en el
+ * tooltip (`fmt`), en la tabla y en el CSV.
+ */
+const shortFmt = (column: FreeColumn | undefined, value: number) => formatCompact(value, column?.format ?? "decimal");
 
 function Legend({ items }: { items: { label: string; color: string; dashed?: boolean }[] }) {
   if (items.length < 2) return null;
@@ -262,7 +271,7 @@ function CompareBars({ t, animate, set, view, rows }: ChartProps) {
   });
 
   const longest = Math.max(...groups.map((g) => g.label.length));
-  const leftMargin = horizontal ? Math.min(220, 12 + longest * 6.4) : 64;
+  const leftMargin = horizontal ? Math.min(220, 12 + longest * 6.4) : 76;
   const height = horizontal ? Math.max(240, groups.length * (shown.length * 16 + 16) + 70) : HEIGHT;
   const rotate = !horizontal && groups.length > 5;
   // Un grupo solo: las barras se juntan para no quedar como dos muros.
@@ -414,7 +423,7 @@ function Bars({ t, animate, set, view, rows }: ChartProps) {
   });
   if (!data.length) return <Note>La fuente no tiene filas para esta gráfica.</Note>;
   const longest = Math.max(...totals.map((d) => d.label.length));
-  const leftMargin = horizontal ? Math.min(220, 12 + longest * 6.4) : 64;
+  const leftMargin = horizontal ? Math.min(220, 12 + longest * 6.4) : 76;
   const height = horizontal ? Math.max(220, data.length * (series.length > 1 && view.type === "barras" ? 34 : 26) + 70) : HEIGHT;
   const rotate = !horizontal && data.length > 6;
 
@@ -473,7 +482,7 @@ function Bars({ t, animate, set, view, rows }: ChartProps) {
    promedia si es una tasa: sumar porcentajes no da nada. */
 
 const compact = new Intl.NumberFormat("es-CO", { notation: "compact", maximumFractionDigits: 1 });
-const axisFmt = (column: FreeColumn, value: number) => (Math.abs(value) >= 10000 ? compact.format(value) : shortFmt(column, value));
+const axisFmt = (column: FreeColumn, value: number) => (isBig(value) ? shortFmt(column, value) : Math.abs(value) >= 10000 ? compact.format(value) : shortFmt(column, value));
 const additive = (column: FreeColumn) => column.unit !== "%" && column.format !== "porcentaje";
 
 function BarsLine({ t, animate, set, view, rows }: ChartProps) {
@@ -860,7 +869,7 @@ function LineChart({ t, animate, set, view }: ChartProps) {
             width={width}
             height={HEIGHT}
             data={lines}
-            margin={{ top: 16, right: 24, bottom: 48, left: 64 }}
+            margin={{ top: 16, right: 24, bottom: 48, left: 76 }}
             xScale={{ type: "point" }}
             yScale={{ type: "linear", min: stacked || min >= 0 ? 0 : "auto", max: "auto", stacked }}
             curve="monotoneX"
@@ -1298,6 +1307,11 @@ function FreeMap({ set, view, rows }: ChartProps) {
 
 /* --- Cifras clave ------------------------------------------------------------------------------ */
 
+/** En una paleta solo cabe el número: la escala («miles de millones») baja al rótulo, junto a la unidad. */
+const figureText = (column: FreeColumn, value: number) => splitBig(value)?.text ?? fullFmt(column, value);
+const figureScale = (value: number | null, unit: string | undefined) =>
+  [splitBig(value)?.long ?? "", unit ?? ""].filter(Boolean).join(" de ");
+
 function Figures({ set, view, rows }: ChartProps) {
   const series = seriesOf(set, view);
   const category = columnOf(set, view.category);
@@ -1310,9 +1324,9 @@ function Figures({ set, view, rows }: ChartProps) {
           const value = numberOf(row.cells[s.key]);
           return (
             <div className="od-free__figure" key={i}>
-              <SplitFlap value={value === null ? "—" : shortFmt(s, value)} size="lg" numeric delay={i * 90} label={fmt(s, value)} />
+              <SplitFlap value={value === null ? "—" : figureText(s, value)} size="lg" numeric delay={i * 90} label={fmt(s, value)} />
               <strong>{textOf(row.cells[category.key]) || "Sin nombre"}</strong>
-              <small>{s.label}{s.unit ? ` · ${s.unit}` : ""}</small>
+              <small>{[s.label, figureScale(value, s.unit)].filter(Boolean).join(" · ")}</small>
             </div>
           );
         })}
@@ -1328,9 +1342,9 @@ function Figures({ set, view, rows }: ChartProps) {
         const basis = values.length > 1 ? (additive ? `suma de ${values.length} filas` : `promedio de ${values.length} filas`) : "";
         return (
           <div className="od-free__figure" key={s.key}>
-            <SplitFlap value={value === null ? "—" : shortFmt(s, value)} size="lg" numeric delay={i * 90} label={fmt(s, value)} />
+            <SplitFlap value={value === null ? "—" : figureText(s, value)} size="lg" numeric delay={i * 90} label={fmt(s, value)} />
             <strong>{s.label}</strong>
-            <small>{[s.unit, basis].filter(Boolean).join(" · ") || " "}</small>
+            <small>{[figureScale(value, s.unit), basis].filter(Boolean).join(" · ") || " "}</small>
           </div>
         );
       })}
@@ -1352,7 +1366,7 @@ function FreeTable({ set, view, rows }: { set: FreeSet; view: FreeView; rows: Fr
   const cell = (row: FreeRow, column: FreeColumn) => {
     const value = column.kind === "cifra" ? numberOf(row.cells[column.key]) : textOf(row.cells[column.key]);
     if (value === null || value === "") return null;
-    return typeof value === "number" ? shortFmt(column, value) : value;
+    return typeof value === "number" ? fullFmt(column, value) : value;
   };
   return (
     <div className="od-free__table" tabIndex={0} role="region" aria-label={`${view.title}, desplazable`}>
@@ -1403,7 +1417,7 @@ function FreeTable({ set, view, rows }: { set: FreeSet; view: FreeView; rows: Fr
                         ) : value === null || value === undefined ? (
                           "—"
                         ) : (
-                          shortFmt(c, value as number)
+                          fullFmt(c, value as number)
                         )}
                       </td>
                     );

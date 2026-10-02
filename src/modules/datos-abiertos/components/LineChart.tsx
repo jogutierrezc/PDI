@@ -10,7 +10,7 @@
 
 import { useMemo, useRef, useState } from "react";
 import type { KeyboardEvent, MouseEvent } from "react";
-import { formatValue, formatWithUnit } from "../data/open-data";
+import { formatCompact, formatValue, formatWithUnit } from "../data/open-data";
 import type { ValueFormat } from "../data/types";
 import { ChartTooltip, niceCeil, niceFloor } from "./ChartFrame";
 import { useInView, useWidth } from "./motion";
@@ -197,7 +197,7 @@ export function LineChart({
             <g key={tick}>
               <line className="od-lines__grid" x1={M.left} x2={M.left + innerW} y1={y(tick)} y2={y(tick)} />
               <text className="od-lines__tick" x={M.left - 10} y={y(tick)} dy="0.32em" textAnchor="end">
-                {formatValue(tick, format === "entero" ? "entero" : "decimal")}
+                {formatCompact(tick, format === "entero" ? "entero" : "decimal")}
               </text>
             </g>
           ))}
@@ -251,7 +251,7 @@ export function LineChart({
 
           {endLabels.map((item) => (
             <text key={item.s.id} className="od-lines__end" x={M.left + innerW + 12} y={item.y} dy="0.32em">
-              <tspan className="od-lines__end-value">{formatValue(item.value, format)}</tspan>
+              <tspan className="od-lines__end-value">{formatCompact(item.value, format)}</tspan>
               <tspan dx={6}>{item.s.label}</tspan>
             </text>
           ))}

@@ -11,7 +11,7 @@
 
 import { useMemo, useRef, useState } from "react";
 import type { CSSProperties } from "react";
-import { formatValue, formatWithUnit } from "../data/open-data";
+import { formatCompact, formatValue, formatWithUnit } from "../data/open-data";
 import type { ValueFormat } from "../data/types";
 import { useInView } from "./motion";
 
@@ -99,7 +99,7 @@ export function Donut({ label, items, format, unit }: DonutProps) {
             </>
           ) : (
             <>
-              <strong>{formatValue(total, format)}</strong>
+              <strong title={formatWithUnit(total, format, unit)}>{formatCompact(total, format)}</strong>
               <span>{unit === "%" ? "suma" : unit}</span>
               <small>en total</small>
             </>

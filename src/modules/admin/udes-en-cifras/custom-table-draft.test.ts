@@ -41,11 +41,11 @@ const view: FreeView = {
   },
 };
 
-const stored = [
-  { year: null, kind: "grupo" as const, label: "Salud", cells: {} },
-  { year: null, kind: "dato" as const, label: "", cells: { programa: "Medicina", avance: 85.5, estado: "Cumple", [cellToneKey("programa")]: "seq-1" } },
-  { year: null, kind: "dato" as const, label: "", cells: { programa: "Enfermería", avance: null, estado: "No cumple", [ROW_TONE_KEY]: "neutro" } },
-  { year: null, kind: "total" as const, label: "Total", cells: { programa: "Total", avance: 70.25, estado: null } },
+const stored: { year: number | null; kind: "dato" | "grupo" | "total"; label: string; cells: Record<string, string | number | null> }[] = [
+  { year: null, kind: "grupo", label: "Salud", cells: {} },
+  { year: null, kind: "dato", label: "", cells: { programa: "Medicina", avance: 85.5, estado: "Cumple", [cellToneKey("programa")]: "seq-1" } },
+  { year: null, kind: "dato", label: "", cells: { programa: "Enfermería", avance: null, estado: "No cumple", [ROW_TONE_KEY]: "neutro" } },
+  { year: null, kind: "total", label: "Total", cells: { programa: "Total", avance: 70.25, estado: null } },
 ];
 
 const set = { title: "Compromisos", description: "Avance por programa", office_id: "of-1", columns };

@@ -17,7 +17,7 @@
 
 import { useRef, useState } from "react";
 import type { CSSProperties } from "react";
-import { formatCellWithUnit, formatReserved, formatValue, formatWithUnit, RESERVE_DEFAULT } from "../data/open-data";
+import { formatCellWithUnit, formatCompact, formatReserved, formatValue, formatWithUnit, RESERVE_DEFAULT } from "../data/open-data";
 import type { ValueFormat } from "../data/types";
 import { useInView } from "./motion";
 
@@ -60,7 +60,7 @@ export function YearBars({ title, points, selectedYear, format, unit, onSelectYe
             .reverse()
             .map((tick) => (
               <span key={tick}>
-                <em>{formatValue(tick, format === "entero" ? "entero" : "decimal")}</em>
+                <em>{formatCompact(tick, format === "entero" ? "entero" : "decimal")}</em>
               </span>
             ))}
         </div>
@@ -88,7 +88,7 @@ export function YearBars({ title, points, selectedYear, format, unit, onSelectYe
                 >
                   {(selected || index === points.length - 1) && point.value !== null && (
                     <span className="od-yearbars__value" aria-hidden="true">
-                      {formatValue(point.value, format)}
+                      {formatCompact(point.value, format)}
                     </span>
                   )}
                   {point.value === null && (

@@ -1,5 +1,5 @@
 import { useRef, useState } from "react";
-import { formatValue, formatWithUnit } from "../data/open-data";
+import { formatCompact, formatWithUnit } from "../data/open-data";
 import type { ValueFormat } from "../data/types";
 import { niceCeil } from "./ChartFrame";
 import { useWidth } from "./motion";
@@ -75,7 +75,7 @@ export function AnnualTermChart({ label, points, selectedYear, format, unit, ann
             {ticks.map((tick) => (
               <g key={tick}>
                 <line className="od-lines__grid" x1={margin.left} x2={width - margin.right} y1={y(tick)} y2={y(tick)} />
-                <text className="od-lines__tick" x={margin.left - 8} y={y(tick)} dy="0.32em" textAnchor="end">{formatValue(tick, Number.isInteger(tick) ? "entero" : "decimal")}</text>
+                <text className="od-lines__tick" x={margin.left - 8} y={y(tick)} dy="0.32em" textAnchor="end">{formatCompact(tick, Number.isInteger(tick) ? "entero" : "decimal")}</text>
               </g>
             ))}
             <line className="od-combo__axis" x1={margin.left} x2={width - margin.right} y1={y(0)} y2={y(0)} />

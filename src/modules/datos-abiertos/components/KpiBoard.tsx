@@ -10,6 +10,7 @@
    y el corte elegido va marcado.
    ========================================================================== */
 
+import { splitBig } from "../data/big-numbers";
 import type { CSSProperties } from "react";
 import { basisOf, changeBetween, cutsOf, formatValue, formatWithUnit, valueOf } from "../data/open-data";
 import { comparisonText, periodReading, readingCutText } from "../data/period-reading";
@@ -64,14 +65,15 @@ export function KpiBoard({ indicators, years, year, term = null, campus, campusN
 
             <span className="od-kpi__figure">
               <SplitFlap
-                value={formatValue(value, indicator.format)}
+                value={splitBig(value)?.text ?? formatValue(value, indicator.format)}
                 size="md"
                 align="end"
                 numeric
                 delay={160 + index * 120}
                 label={`${formatWithUnit(value, indicator.format, indicator.unit)}, ${readingCutText(reading)}`}
               />
-              <span className="od-kpi__unit">{value === null ? "sin reportar" : indicator.unit}</span>
+              {/* Trece dígitos no caben en la paleta: va el número y la escala baja a la unidad («miles de millones de pesos»). */}
+              <span className="od-kpi__unit">{value === null ? "sin reportar" : [splitBig(value)?.long, indicator.unit].filter(Boolean).join(" de ")}</span>
             </span>
 
             <span className="od-kpi__change" data-reading={lead?.change?.reading ?? "neutro"}>

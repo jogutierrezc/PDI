@@ -7,6 +7,7 @@
    intranet ve también los borradores, tal como quedarán al publicar.
    ========================================================================== */
 
+import { formatBig } from "./big-numbers";
 import { useQuery } from "@tanstack/react-query";
 import { assembleCatalog, fetchOpenDataRows } from "./repository";
 import type { Breakdown, BreakdownItem, CampusId, Indicator, MapDataset, OpenDataCatalog, Report, Term, ValueFormat } from "./types";
@@ -186,6 +187,16 @@ export function formatCount(value: number | null): string {
 }
 
 /** Cifra con su unidad, para lectores de pantalla y tooltips. */
+/**
+ * La cifra donde no hay sitio (ejes, rótulos sobre barras, paletas): de un
+ * millón en adelante se abrevia («12,3 mil M»); la exacta sigue en el tooltip,
+ * la tabla y el texto para lectores de pantalla. Ver big-numbers.ts.
+ */
+export function formatCompact(value: number | null, format: ValueFormat): string {
+  if (value === null) return "—";
+  return formatBig(value, (v) => formatValue(v, format));
+}
+
 export function formatWithUnit(value: number | null, format: ValueFormat, unit: string): string {
   if (value === null) return "Sin reportar";
   const figure = formatValue(value, format);

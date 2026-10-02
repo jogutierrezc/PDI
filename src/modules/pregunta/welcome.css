@@ -402,3 +402,84 @@
 .apw-cta[hidden] {
   display: none;
 }
+
+/* --- En el teléfono ---------------------------------------------------------------------
+   Con las medidas de escritorio, Pilo, el título, la frase y la muestra no cabían en el
+   alto de un teléfono: la muestra (de alto fijo y contenido apilado) se montaba sobre la
+   frase y sobre los botones, y la barra de arriba partía sus rótulos. Aquí todo se
+   aprieta lo justo; Pilo se achica entero, a su proporción. Si aun así no cabe (letra
+   grande, teléfono acostado), el centro se desplaza en vez de montarse sobre el pie.
+   Va al final de la hoja para ganarle a las reglas por alto de arriba. */
+@media (max-width: 560px) {
+  .apw-top {
+    gap: 8px;
+  }
+  .apw-brand {
+    min-width: 0;
+  }
+  .apw-sbtn {
+    flex: none;
+    padding: 9px 11px;
+    white-space: nowrap;
+  }
+  .apw-center {
+    gap: 10px;
+    overflow-x: hidden;
+    overflow-y: auto;
+    scrollbar-width: none;
+  }
+  .apw-fly-slot,
+  .apw-fly {
+    width: clamp(96px, 17vh, 160px);
+    height: clamp(96px, 17vh, 160px);
+  }
+  .apw-title {
+    font-size: clamp(1.6rem, 7.4vw, 2rem);
+  }
+  .apw-bubble {
+    min-height: 0;
+    font-size: 1rem;
+    line-height: 1.4;
+  }
+  .apw-exhibit {
+    flex: none;
+    height: 168px;
+  }
+  .apw-knows,
+  .apw-qs {
+    gap: 6px;
+  }
+  .apw-know {
+    padding: 4px 10px 4px 4px;
+    font-size: 0.75rem;
+  }
+  .apw-qchip {
+    padding: 6px 11px;
+    font-size: 0.76rem;
+  }
+  .apw-mini {
+    gap: 8px;
+    padding: 10px 12px;
+  }
+  .apw-mini p {
+    font-size: 0.8rem;
+    line-height: 1.4;
+  }
+  .apw-foot {
+    gap: 8px;
+    padding-top: 8px;
+    padding-bottom: calc(14px + env(safe-area-inset-bottom, 0px));
+  }
+  .apw-actions {
+    min-height: 48px;
+  }
+  .apw-cta {
+    padding: 13px 22px;
+  }
+}
+
+@media (max-width: 560px) and (max-height: 700px) {
+  .apw-hint {
+    display: none;
+  }
+}

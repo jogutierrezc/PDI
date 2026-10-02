@@ -88,7 +88,8 @@ export function PiloApp() {
     const before = metas.map((m) => m.content);
     if (color) metas.forEach((m) => (m.content = color));
     return () => metas.forEach((m, i) => (m.content = before[i]));
-  }, [theme, welcoming]);
+    // También al cambiar de ruta: en /app a secas aún no hay pantalla que medir.
+  }, [theme, welcoming, location.pathname]);
 
   const rules = config.data ?? null;
   const waking = online && (config.isPending || loading);

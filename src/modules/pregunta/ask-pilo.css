@@ -643,6 +643,9 @@
 
 .ap-a__body {
   display: grid;
+  /* Una columna que no crece con su contenido: sin esto, el título largo de una fuente
+     (que no parte línea) ensanchaba la respuesta entera y el texto se salía de la pantalla. */
+  grid-template-columns: minmax(0, 1fr);
   gap: 12px;
   min-width: 0;
 }

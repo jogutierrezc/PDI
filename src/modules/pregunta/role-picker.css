@@ -224,8 +224,15 @@
     padding: 0 10px;
   }
 
+  /* En el teléfono el botón queda a media barra: un panel colgado de su borde derecho se
+     salía por la izquierda. Aquí se ancla a la pantalla, bajo la barra, de margen a margen. */
   .ap-rol__panel {
-    width: min(236px, calc(100vw - 32px));
+    position: fixed;
+    top: calc(64px + env(safe-area-inset-top, 0px));
+    left: 16px;
+    right: 16px;
+    width: auto;
+    transform-origin: 50% 0;
   }
 }
 

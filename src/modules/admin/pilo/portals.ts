@@ -10,9 +10,12 @@
    Lo puro va arriba (qué opciones tiene una celda, qué dice su estado y cómo se
    cuenta el efecto de un cambio); lo que habla con la base, abajo.
 
-   Hoy cada portal lee solo lo de su casa. «De visita» existe en la matriz y en
-   el filtro de la base, pero todavía no se busca ni se puede marcar: llega con
-   la lectura entre ámbitos.
+   La matriz nace con cada portal leyendo solo lo de su casa. Desde 0122 una
+   celda de otro ámbito se puede marcar «De visita»: entra solo cuando lo de
+   casa no alcanza o por un puente aprobado, después de lo de casa y diciendo
+   de dónde viene. Antes de confirmar, `pilo_portal_preview` cuenta qué podrá
+   leer ese portal y quién lo verá. Cada cambio lleva lo que esta pantalla veía
+   en la celda (`expect`): si otra pestaña la movió, la base no escribe.
    ========================================================================== */
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -58,6 +61,13 @@ export interface CellEffect {
   to: Cell;
   passages: number;
   answers: number;
+  /** Desde 0122: cuántos de esos pasajes son públicos y cuántos «con sesión», cuántos puentes aprobados hay entre los dos ámbitos, y de quién es la fuente. */
+  public?: number;
+  session?: number;
+  bridges?: number;
+  staff_only?: boolean;
+  home?: string;
+  written_for?: string;
 }
 
 /* --- Lo puro ------------------------------------------------------------------------------ */
@@ -107,11 +117,15 @@ export const atHome = (portal: PiloPortal, source: PiloSource) => source.scope =
 
 /**
  * Lo que ese portal lee DE VERDAD de esa fuente: la celda, pasada por las reglas
- * que la base aplica siempre. «casa» solo vale en lo propio; «visita» todavía
- * no se busca. Así la pantalla no promete lo que el filtro no hace.
+ * que la base aplica siempre. «casa» solo vale en lo propio; «visita», solo en
+ * lo de otro ámbito que puede salir de su casa. Así la pantalla no promete lo
+ * que el filtro no hace.
  */
-export function effectiveCell(portal: PiloPortal, source: PiloSource): "casa" | "no" {
-  return cellOf(portal, source) === "casa" && atHome(portal, source) ? "casa" : "no";
+export function effectiveCell(portal: PiloPortal, source: PiloSource): Cell {
+  const cell = cellOf(portal, source);
+  if (cell === "casa") return atHome(portal, source) ? "casa" : "no";
+  if (cell === "visita") return !atHome(portal, source) && !source.stays_home ? "visita" : "no";
+  return "no";
 }
 
 export interface CellChoice {
@@ -126,8 +140,8 @@ export const CELL_LABEL: Record<Cell, string> = { casa: "De casa", visita: "De v
 
 /**
  * Las opciones de una celda. En lo propio: «De casa» o «No». En lo ajeno: «No»
- * y «De visita», que se ve pero aún no se puede marcar (y nunca en lo que no
- * sale de su portal).
+ * y «De visita», salvo en lo que no sale de su portal (los cursos de Moodle),
+ * donde se ve pero no se puede marcar.
  */
 export function cellChoices(portal: PiloPortal, source: PiloSource): CellChoice[] {
   if (atHome(portal, source)) {
@@ -140,8 +154,10 @@ export function cellChoices(portal: PiloPortal, source: PiloSource): CellChoice[
     {
       value: "visita",
       label: CELL_LABEL.visita,
-      enabled: false,
-      note: source.stays_home ? `${source.name} no sale de su portal.` : "Llega en la siguiente entrega: leer lo de otro ámbito, diciendo de dónde viene.",
+      enabled: !source.stays_home,
+      note: source.stays_home
+        ? `${source.name} no sale de su portal.`
+        : `Es de otro ámbito: entra solo si lo de casa no alcanza o por un puente aprobado, después de lo de casa y diciendo de dónde viene${source.staff_only ? "; solo para el personal con sesión de la intranet" : ""}.`,
     },
     { value: "no", label: CELL_LABEL.no, enabled: true, note: "Este portal no la lee: es de otro ámbito." },
   ];
@@ -150,16 +166,53 @@ export function cellChoices(portal: PiloPortal, source: PiloSource): CellChoice[
 const count = (n: number, one: string, many: string) => `${n.toLocaleString("es-CO")} ${n === 1 ? one : many}`;
 
 /** Lo que se pregunta antes de cambiar una celda: nombra la consecuencia. */
-export function confirmText(portal: PiloPortal, source: PiloSource, to: Cell): string {
+export function confirmText(portal: PiloPortal, source: PiloSource, to: Cell, effect: CellEffect | null = null): string {
+  if (to === "visita") return visitConfirmText(portal, source, effect);
+  if (!atHome(portal, source)) {
+    return `¿«${portal.name}» deja de leer ${source.name} de visita? Sus pasajes siguen en su portal; aquí ya no entran en ninguna respuesta, ni por un puente aprobado.`;
+  }
   if (to === "casa") {
     return `¿«${portal.name}» vuelve a leer ${source.name}? Sus pasajes entran de nuevo en las respuestas${source.staff_only ? ", solo para el personal con sesión de la intranet" : ""}.`;
   }
   return `¿«${portal.name}» deja de leer ${source.name}? Sus pasajes siguen guardados, pero no entran en ninguna respuesta de este portal, y las respuestas guardadas que los citan dejan de servirse.`;
 }
 
+/** Quién recibirá los pasajes de una fuente leída de visita, según su visibilidad: nunca más de lo que ya ve en su portal. */
+function visitReaders(source: PiloSource, effect: CellEffect): string {
+  const pub = effect.public ?? 0;
+  const ses = effect.session ?? 0;
+  if (source.staff_only) return `Solo los verá el personal con sesión de la intranet (${count(pub + ses, "pasaje", "pasajes")}): esa fuente pide sesión en cualquier portal.`;
+  const parts = [
+    pub ? `${count(pub, "es público y lo verá", "son públicos y los verá")} cualquiera que pregunte en este portal` : "",
+    ses ? `${count(ses, "es «con sesión» y solo lo verá", "son «con sesión» y solo los verá")} el personal con sesión de la intranet (una cuenta de Pilo no)` : "",
+  ].filter(Boolean);
+  return parts.length ? `${parts.join("; ")}.` : "Esa fuente todavía no tiene pasajes: entrarán en cuanto se carguen.";
+}
+
+/**
+ * Lo que se pregunta antes de marcar «De visita», con lo que contó la base: cuántos
+ * pasajes de qué fuente podrá leer ese portal, quién los verá y cómo entran.
+ * Mientras llega la cuenta (`effect` null), dice lo que no depende de ella.
+ */
+export function visitConfirmText(portal: PiloPortal, source: PiloSource, effect: CellEffect | null): string {
+  const head = `¿«${portal.name}» podrá leer ${source.name} de visita?`;
+  const how = "Entran solo cuando lo de casa no alcanza o cuando los trae un puente aprobado, después de lo de casa y a lo sumo 2 por respuesta.";
+  if (!effect) return `${head} ${how} Contando qué podrá leer…`;
+  const home = effect.home ? `«${effect.home}»` : "otro portal";
+  const who = effect.written_for ? ` y, a quien no sea de ese público, que fue preparado para ${effect.written_for}` : "";
+  const bridges = effect.bridges ? ` Hay ${count(effect.bridges, "puente aprobado", "puentes aprobados")} entre los dos ámbitos.` : " Todavía no hay puentes aprobados entre los dos ámbitos.";
+  return `${head} ${visitReaders(source, effect)} ${how}${bridges} Pilo dirá que vienen de ${home}${who}. Lo que cite algo de visita no se guarda como respuesta.`;
+}
+
 /** Lo que pasó al cambiar una celda, con los números que devolvió la base. */
 export function effectText(portal: PiloPortal, effect: CellEffect): string {
   const passages = count(effect.passages, "pasaje", "pasajes");
+  if (effect.to === "visita") {
+    return effect.passages
+      ? `«${portal.name}» ya puede leer ${effect.name} de visita: ${passages}, cada uno con su visibilidad. ${effect.passages === 1 ? "Entra" : "Entran"} solo si lo de casa no alcanza o por un puente aprobado.`
+      : `«${portal.name}» ya puede leer ${effect.name} de visita, que todavía no tiene pasajes.`;
+  }
+  if (effect.from === "visita") return `«${portal.name}» ya no lee ${effect.name} de visita: sus pasajes siguen en su portal y aquí no entran por ningún camino.`;
   if (effect.to === "casa") {
     return effect.passages
       ? `«${portal.name}» ya lee ${effect.name}: ${passages} ${effect.passages === 1 ? "entra" : "entran"} en sus respuestas desde ahora.`
@@ -172,6 +225,28 @@ export function effectText(portal: PiloPortal, effect: CellEffect): string {
 /** Los interruptores de siempre (`memory_sources`) que corresponden a la matriz de un portal: sus celdas de casa. */
 export function homeFlags(portal: PiloPortal, sources: PiloSource[]): Record<string, boolean> {
   return Object.fromEntries(sources.filter((s) => atHome(portal, s)).map((s) => [s.id, effectiveCell(portal, s) === "casa"]));
+}
+
+/**
+ * Los interruptores de «Fuentes» que una pestaña debe guardar de verdad.
+ *
+ * «Guardar cambios» manda la ficha entera, y los interruptores son el espejo de
+ * las celdas de casa de la matriz: una pestaña abierta desde antes devolvería a
+ * su valor viejo una celda que otra pestaña acaba de cambiar. Por eso solo se
+ * guardan los interruptores que ESTA pestaña movió, sobre lo que la base tiene
+ * ahora:
+ *   `edited`   lo que tiene el editor;
+ *   `loaded`   lo que esta pestaña leyó de la base al abrir;
+ *   `current`  lo que la base tiene en este momento.
+ * `null`: esta pestaña no tocó ninguno; no se manda nada.
+ */
+export function mergeSourceFlags(edited: Record<string, boolean>, loaded: Record<string, boolean> | null | undefined, current: unknown): Record<string, boolean> | null {
+  // Sin saber qué había al abrir, no hay cómo distinguir: se guarda lo del editor, como siempre.
+  if (!loaded) return edited;
+  const changed = Object.keys(edited).filter((k) => edited[k] !== loaded[k]);
+  if (!changed.length) return null;
+  const now = current && typeof current === "object" && !Array.isArray(current) ? Object.fromEntries(Object.entries(current as Record<string, unknown>).filter(([, v]) => typeof v === "boolean")) : loaded;
+  return { ...(now as Record<string, boolean>), ...Object.fromEntries(changed.map((k) => [k, edited[k]])) };
 }
 
 /** Las colecciones a las que puede ir un documento en un ámbito, con un código de dos letras para su etiqueta. */
@@ -228,19 +303,59 @@ export interface CellChange {
   to: Cell;
 }
 
-/** Cambia una celda. Se aplica al momento; devuelve el efecto que contó la base. */
+/** El efecto de una celda, como lo cuenta la base (al cambiarla o antes, con `pilo_portal_preview`). null si no se reconoce. */
+export function parseEffect(e: unknown): CellEffect | null {
+  if (!e || typeof e !== "object") return null;
+  const r = e as Record<string, unknown>;
+  if (!isCell(r.from) || !isCell(r.to) || typeof r.source !== "string") return null;
+  return {
+    source: r.source,
+    name: text(r.name, 80) || r.source,
+    from: r.from,
+    to: r.to,
+    passages: whole(r.passages),
+    answers: whole(r.answers),
+    // Lo que la base cuenta desde 0122; con una base anterior no viene y no se inventa.
+    ...("public" in r ? { public: whole(r.public), session: whole(r.session), bridges: whole(r.bridges), staff_only: r.staff_only === true, home: text(r.home, 120), written_for: text(r.written_for, 200) } : {}),
+  };
+}
+
+/** ¿El error dice que la base aún no deja leer de visita? (0121 sin 0122) */
+export const missing0122 = (error: DbError | null | undefined): boolean =>
+  Boolean(error) && (missing0121(error) || /todavía no está disponible/i.test(error!.message ?? ""));
+
+/**
+ * Lo que pasaría al cambiar una celda, sin cambiarla: lo cuenta la base. Se pide
+ * antes de confirmar «De visita», para decir cuántos pasajes de qué fuente podrá
+ * leer ese portal y quién los verá.
+ */
+export async function previewCell({ portal, source, to }: CellChange): Promise<CellEffect> {
+  const { data, error } = await supabase.rpc("pilo_portal_preview" as never, { p_portal: portal.id, p_source: source.id, p_value: to } as never);
+  if (error) throw new Error(missing0122(error) ? "Falta aplicar la migración 0122 en la base: hasta entonces no se puede leer de visita." : error.message);
+  const effect = parseEffect(data);
+  if (!effect) throw new Error("La base no devolvió el efecto de ese cambio.");
+  return effect;
+}
+
+/**
+ * Cambia una celda. Se aplica al momento; devuelve el efecto que contó la base.
+ * Manda lo que esta pantalla veía en la celda (`expect`): si otra pestaña ya la
+ * movió, la base no escribe y lo dice, en vez de devolverla a un valor viejo.
+ */
 export function useSetCell() {
   const client = useQueryClient();
   return useMutation({
     mutationFn: async ({ portal, source, to }: CellChange): Promise<{ matrix: Record<string, Cell>; effects: CellEffect[] }> => {
-      const { data, error } = await supabase.rpc("pilo_portal_update" as never, { p_portal: portal.id, p_patch: { matrix: { [source.id]: to } } } as never);
-      if (error) throw new Error(missing0121(error) ? "Falta aplicar la migración 0121 en la base." : error.message);
+      const patch = { matrix: { [source.id]: to }, expect: { [source.id]: cellOf(portal, source) } };
+      const { data, error } = await supabase.rpc("pilo_portal_update" as never, { p_portal: portal.id, p_patch: patch } as never);
+      if (error) {
+        if (missing0121(error)) throw new Error("Falta aplicar la migración 0121 en la base.");
+        if (to === "visita" && missing0122(error)) throw new Error("Falta aplicar la migración 0122 en la base: hasta entonces no se puede leer de visita.");
+        throw new Error(error.message);
+      }
       const r = (data ?? {}) as { matrix?: unknown; effects?: unknown };
       const matrix = r.matrix && typeof r.matrix === "object" ? (Object.fromEntries(Object.entries(r.matrix as Record<string, unknown>).filter(([, v]) => isCell(v))) as Record<string, Cell>) : {};
-      const effects = (Array.isArray(r.effects) ? r.effects : [])
-        .filter((e): e is Record<string, unknown> => Boolean(e) && typeof e === "object")
-        .filter((e) => isCell(e.from) && isCell(e.to) && typeof e.source === "string")
-        .map((e) => ({ source: e.source as string, name: text(e.name, 80) || (e.source as string), from: e.from as Cell, to: e.to as Cell, passages: whole(e.passages), answers: whole(e.answers) }));
+      const effects = (Array.isArray(r.effects) ? r.effects : []).map(parseEffect).filter((e): e is CellEffect => e !== null);
       return { matrix, effects };
     },
     onSettled: (_data, _error, change) => {

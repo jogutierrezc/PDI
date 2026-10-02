@@ -16,10 +16,11 @@ import { useEffect, useState } from "react";
 import type { ReactNode } from "react";
 import { Link } from "react-router-dom";
 import type { SpaceId } from "../pregunta/space";
-import { APP_ACCOUNT, APP_LOGIN, APP_PILOS, APP_PROFILE, APP_SAVED, APP_SPACES } from "./routes";
+import { APP_ACCOUNT, APP_CLASSES, APP_LOGIN, APP_PILOS, APP_PROFILE, APP_SAVED, APP_SPACES } from "./routes";
 import { dayLabel } from "./saved";
 import type { SavedEntry } from "./saved";
 import { Icon } from "./icons";
+import { PolicyLink } from "./terms/PolicyLink";
 
 /** Desde este ancho la app usa la disposición de escritorio. */
 export const WIDE_QUERY = "(min-width: 960px)";
@@ -45,6 +46,8 @@ export interface Person {
   intranet: string | null;
   /** Cuántas respuestas tiene guardadas; null si no tiene cuenta o aún no se sabe. */
   saved: number | null;
+  /** Puede usar Mis clases (beta): estudiante o profesor con cuenta de Pilo activa. A los demás no se les muestra. */
+  clases?: boolean;
 }
 
 /** El bloque de la persona: con cuenta lleva a su perfil; sin ella, a crearla o a entrar. */
@@ -111,7 +114,7 @@ export function AppSide({
   saved: SavedEntry[];
   currentId: string | null;
   /** La pantalla que se está viendo. */
-  active: "chat" | "guardadas" | "perfil";
+  active: "chat" | "guardadas" | "perfil" | "clases";
   person: Person;
   onOpen: (entry: SavedEntry) => void;
   onDelete: (entry: SavedEntry) => void;
@@ -170,6 +173,24 @@ export function AppSide({
           <span>Guardadas</span>
           {person.saved !== null && <em aria-label={`${person.saved} guardadas`}>{person.saved}</em>}
         </Link>
+        {/* Mis clases (clases/): solo para estudiantes y profesores con cuenta. */}
+        {person.clases && (
+          <Link className="pa-sl" to={APP_CLASSES} aria-current={active === "clases" ? "page" : undefined}>
+            <svg className="pa-i" viewBox="0 0 20 20" aria-hidden="true">
+              <path d="M10 5.5C8.5 4.3 6.5 4 3.5 4v11c3 0 5 .3 6.5 1.5 1.5-1.2 3.5-1.5 6.5-1.5V4c-3 0-5 .3-6.5 1.5zM10 5.5v11" />
+            </svg>
+            <span>Mis clases</span>
+            <em>beta</em>
+          </Link>
+        )}
+        {/* La política de uso completa (terms/): página pública, fuera de la app. */}
+        <PolicyLink className="pa-sl">
+          <svg className="pa-i" viewBox="0 0 20 20" aria-hidden="true">
+            <rect x="4.5" y="9" width="11" height="7.5" rx="1.5" />
+            <path d="M7 9V6.5a3 3 0 016 0V9" />
+          </svg>
+          <span>Política de uso</span>
+        </PolicyLink>
       </nav>
 
       <div className="pa-side__me">
@@ -180,7 +201,7 @@ export function AppSide({
 }
 
 /** El marco de una pantalla que no es la conversación. */
-export function AppPage({ title, lead, home, side, children }: { title: string; lead: string; home: string; side: ReactNode; children: ReactNode }) {
+export function AppPage({ title, tag, lead, home, side, children }: { title: string; /** Una etiqueta junto al título («Beta»). */ tag?: string; lead: string; home: string; side: ReactNode; children: ReactNode }) {
   return (
     <div className="pa-frame pa-frame--page">
       {side}
@@ -198,7 +219,10 @@ export function AppPage({ title, lead, home, side, children }: { title: string; 
       <main className="pa-msgs pc-page">
         <div className="pc-pane">
           <header className="pc-pane__head">
-            <h1>{title}</h1>
+            <h1>
+              {title}
+              {tag && <span className="pcl-beta">{tag}</span>}
+            </h1>
             <p>{lead}</p>
           </header>
           {children}

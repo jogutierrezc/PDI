@@ -174,7 +174,8 @@ describe("comprender: lo pendiente y lo guardado", () => {
       expect(all.map((p) => p.ref)).toEqual([`doc:${A}:2`, `doc:${A}:3`, `doc:${B}:1`, `doc:${B}:2`]);
       expect((await q<{ ref: string }>("select ref from pilo_map_pending('ensenanza', $1)", [B])).map((p) => p.ref)).toEqual([`doc:${B}:1`, `doc:${B}:2`]);
       expect(await q("select ref from pilo_map_pending('ensenanza', null, 1)")).toHaveLength(1);
-      expect(await q("select ref from pilo_map_pending('planeacion')")).toEqual([]);
+      // Desde 0122 «comprender» corre también sobre los pasajes de portal: en Planeación, el suyo está pendiente.
+      expect(await q("select ref from pilo_map_pending('planeacion')")).toEqual([{ ref: "cifras:evaluacion" }]);
       const [s] = await q<{ s: Record<string, number> }>("select pilo_map_status('ensenanza') as s");
       expect(s.s).toMatchObject({ total: 5, mapped: 1, pending: 4, topics: 1, refs: 1 });
       const [sb] = await q<{ s: Record<string, number> }>("select pilo_map_status('ensenanza', $1) as s", [B]);
@@ -384,7 +385,7 @@ describe("la migración es idempotente", () => {
     const before = await snapshot();
     // 0115 y, encima, 0118 (que solo sube el tope de temas y referencias de pilo_map_save).
     // Y 0121, que vuelve a dejar las funciones del mapa como las dejó (una sola firma de cada una).
-    const sql = ["0118_pilo_mapa_mas_temas.sql", "0121_pilo_portales.sql"].reduce((all, f) => all + ";\n" + readFileSync(resolve(__dirname, "../../supabase/migrations", f), "utf8"), readFileSync(MIGRATION, "utf8"));
+    const sql = ["0118_pilo_mapa_mas_temas.sql", "0121_pilo_portales.sql", "0122_pilo_puentes.sql"].reduce((all, f) => all + ";\n" + readFileSync(resolve(__dirname, "../../supabase/migrations", f), "utf8"), readFileSync(MIGRATION, "utf8"));
     await t.db.exec(sql);
     await t.db.exec(sql);
     expect(await snapshot()).toEqual(before);

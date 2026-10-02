@@ -12,10 +12,13 @@
    Los ids llevan el espacio delante («p|…», «e|…»): aunque dos nodos se llamen
    igual en la base, en el mapa son dos puntos.
 
-   Los PUENTES entre los dos Pilos no existen en la base: se calculan al
-   dibujar, por etiqueta normalizada. Dos puntos de espacios distintos se unen
-   si nombran la misma referencia (un ODS, una ley, un decreto…) o si se llaman
-   igual (un pilar del Plan, un tema).
+   Los PUENTES entre los dos Pilos se LEEN de la base desde 0122 (`pilo_bridges`):
+   cada uno con su origen (reglas, IA o administración) y su estado (propuesto,
+   aprobado o rechazado). Los de reglas —la misma referencia (un ODS, una ley,
+   un decreto…) o el mismo nombre de un punto del Plan— los calcula y guarda la
+   base (`pilo_bridges_sync`); los que propone la IA se aprueban uno por uno.
+   Los rechazados no se dibujan. Sin 0122, los puentes se calculan aquí al
+   dibujar, por etiqueta normalizada, como antes: son solo un dibujo.
 
    Con cientos de nodos el mapa se pliega: de entrada se ven las fuentes y las
    colecciones (abiertas solo las pequeñas), y los temas y referencias más
@@ -73,15 +76,78 @@ export interface GEdge {
   docs: string[];
 }
 
+export type BridgeOrigin = "reglas" | "ia" | "admin";
+export type BridgeStatus = "propuesta" | "aprobada" | "rechazada";
+export type BridgeKind = "referencia" | "nombre" | "tema" | "relacion";
+
 export interface Bridge {
   /** El punto de Planeación. */
   a: string;
   /** El punto de Enseñanza. */
   b: string;
-  kind: "referencia" | "nombre";
+  kind: BridgeKind;
   /** Por qué se unen, en palabras. */
   why: string;
+  /** Solo los que se leen de la base (0122): su id, quién lo puso y en qué estado está. Un puente calculado al dibujar no los trae. */
+  id?: number;
+  origin?: BridgeOrigin;
+  status?: BridgeStatus;
 }
+
+/** Un puente como lo guarda la base (`pilo_bridges_list`): el par va con el ámbito menor primero. */
+export interface StoredBridge {
+  id: number;
+  a_scope: string;
+  a_id: string;
+  a_label: string;
+  b_scope: string;
+  b_id: string;
+  b_label: string;
+  kind: BridgeKind;
+  key: string;
+  why: string;
+  origin: BridgeOrigin;
+  status: BridgeStatus;
+}
+
+const KINDS: BridgeKind[] = ["referencia", "nombre", "tema", "relacion"];
+const ORIGINS: BridgeOrigin[] = ["reglas", "ia", "admin"];
+const STATUSES: BridgeStatus[] = ["propuesta", "aprobada", "rechazada"];
+
+/** Las filas de la base, leídas con cuidado: lo que no se reconoce no entra. */
+export function parseBridges(rows: unknown): StoredBridge[] {
+  const text = (v: unknown, max: number) => (typeof v === "string" ? v.replace(/\s+/g, " ").trim().slice(0, max) : "");
+  return (Array.isArray(rows) ? rows : [])
+    .filter((r): r is Record<string, unknown> => Boolean(r) && typeof r === "object")
+    .filter((r) => Number.isInteger(Number(r.id)) && typeof r.a_id === "string" && typeof r.b_id === "string" && typeof r.a_scope === "string" && typeof r.b_scope === "string" && r.a_scope !== r.b_scope)
+    .filter((r) => STATUSES.includes(r.status as BridgeStatus) && ORIGINS.includes(r.origin as BridgeOrigin))
+    .map((r) => ({
+      id: Number(r.id),
+      a_scope: r.a_scope as string,
+      a_id: r.a_id as string,
+      a_label: text(r.a_label, 300),
+      b_scope: r.b_scope as string,
+      b_id: r.b_id as string,
+      b_label: text(r.b_label, 300),
+      kind: KINDS.includes(r.kind as BridgeKind) ? (r.kind as BridgeKind) : "relacion",
+      key: text(r.key, 200),
+      why: text(r.why, 300),
+      origin: r.origin as BridgeOrigin,
+      status: r.status as BridgeStatus,
+    }));
+}
+
+export const ORIGIN_TEXT: Record<BridgeOrigin, string> = { reglas: "Por reglas", ia: "Lo propuso la IA", admin: "Lo puso la administración" };
+export const STATUS_TEXT: Record<BridgeStatus, string> = { propuesta: "Por revisar", aprobada: "Aprobado", rechazada: "Rechazado" };
+
+const lowerFirst = (text: string) => text.charAt(0).toLowerCase() + text.slice(1);
+
+/** Qué dice un puente de sí mismo: su estado y su origen, en palabras. Uno calculado al dibujar no está guardado. */
+export const bridgeState = (b: Pick<Bridge, "origin" | "status">): string =>
+  b.status && b.origin ? `${STATUS_TEXT[b.status]} · ${lowerFirst(ORIGIN_TEXT[b.origin])}` : "Calculado al dibujar · sin guardar";
+
+/** ¿La búsqueda de Pilo puede seguir este puente? Solo los aprobados (y solo hacia lo que la matriz deja leer de visita). */
+export const bridgeLive = (b: Pick<Bridge, "status">): boolean => b.status === "aprobada";
 
 export interface GlobalGraph {
   nodes: GNode[];
@@ -93,6 +159,37 @@ export interface GlobalGraph {
   hubs: string[];
   bridges: Bridge[];
   bridgesOf: Map<string, Bridge[]>;
+  /** Los puentes se leyeron de la base (0122). Si no, se calcularon al dibujar. */
+  stored: boolean;
+  /** Puentes guardados (sin los rechazados) que no se pueden dibujar: alguno de sus extremos no está en este mapa. */
+  offMap: number;
+}
+
+/**
+ * Los puentes guardados, puestos sobre el mapa: cada extremo es el punto de su
+ * ámbito con ese id. Los rechazados no se dibujan; los que apuntan a un punto
+ * que este mapa no tiene, tampoco (se cuentan aparte y se ven en la bandeja).
+ */
+export function placeBridges(rows: StoredBridge[], byId: Map<string, GNode>): { bridges: Bridge[]; offMap: number } {
+  const out: Bridge[] = [];
+  let offMap = 0;
+  for (const r of rows) {
+    if (r.status === "rechazada") continue;
+    const ends = [
+      { scope: r.a_scope, id: r.a_id },
+      { scope: r.b_scope, id: r.b_id },
+    ];
+    const plan = ends.find((e) => e.scope === "planeacion");
+    const teach = ends.find((e) => e.scope === "ensenanza");
+    const a = plan ? byId.get(gid("planeacion", plan.id)) : undefined;
+    const b = teach ? byId.get(gid("ensenanza", teach.id)) : undefined;
+    if (!a || !b) {
+      offMap += 1;
+      continue;
+    }
+    out.push({ a: a.id, b: b.id, kind: r.kind, why: r.why, id: r.id, origin: r.origin, status: r.status });
+  }
+  return { bridges: out, offMap };
 }
 
 /* --- Puentes ---------------------------------------------------------------------------- */
@@ -194,6 +291,8 @@ export interface GlobalInput {
   ensenanza: TeachGraph | null;
   /** El orden de las fuentes y de las colecciones. */
   order?: Partial<Record<PiloSpace, string[]>>;
+  /** Los puentes guardados en la base (0122). Sin ellos (null o ausente), se calculan al dibujar. */
+  bridges?: StoredBridge[] | null;
 }
 
 const natural = (a: GNode, b: GNode) => a.code.localeCompare(b.code, "es", { numeric: true }) || a.label.localeCompare(b.label, "es", { numeric: true }) || a.id.localeCompare(b.id);
@@ -308,7 +407,9 @@ export function buildGlobal(input: GlobalInput): GlobalGraph {
   const count = (n: GNode): number => (n.inside = n.kids.reduce((sum, k) => sum + 1 + count(byId.get(k)!), 0));
   for (const space of SPACES) for (const r of roots[space]) count(byId.get(r)!);
 
-  const bridges = computeBridges(nodes);
+  const stored = Array.isArray(input.bridges);
+  const placed = stored ? placeBridges(input.bridges!, byId) : { bridges: computeBridges(nodes), offMap: 0 };
+  const bridges = placed.bridges;
   const bridgesOf = new Map<string, Bridge[]>();
   for (const b of bridges) for (const end of [b.a, b.b]) bridgesOf.set(end, [...(bridgesOf.get(end) ?? []), b]);
 
@@ -321,7 +422,7 @@ export function buildGlobal(input: GlobalInput): GlobalGraph {
     .sort((a, b) => weight(b) - weight(a) || natural(a, b))
     .map((n) => n.id);
 
-  return { nodes, byId, edges, roots, hubs, bridges, bridgesOf };
+  return { nodes, byId, edges, roots, hubs, bridges, bridgesOf, stored, offMap: placed.offMap };
 }
 
 /* --- Lo que se ve: filtros y pliegues ----------------------------------------------------- */
@@ -595,8 +696,8 @@ export interface NodeDetail {
   kids: GNode[];
   /** Con qué se conecta dentro de su Pilo, por grupos. */
   links: { title: string; nodes: GNode[] }[];
-  /** Con qué se corresponde en el otro Pilo, y por qué. */
-  bridges: { other: GNode; why: string; kind: Bridge["kind"] }[];
+  /** Con qué se corresponde en el otro Pilo, por qué, y —si el puente está guardado— su estado y su origen. */
+  bridges: { other: GNode; why: string; kind: Bridge["kind"]; id?: number; origin?: BridgeOrigin; status?: BridgeStatus }[];
 }
 
 const LINK_TITLE: Record<string, string> = { coleccion: "Colección", documento: "Documentos y cursos", curso: "Documentos y cursos", tema: "Temas", referencia: "Referencias" };
@@ -631,9 +732,9 @@ export function detailOf(g: GlobalGraph, id: string): NodeDetail | null {
     .map(([title, list]) => ({ title, nodes: [...list.values()].sort(natural) }))
     .sort((a, b) => LINK_ORDER.indexOf(a.title) - LINK_ORDER.indexOf(b.title));
   const bridges = (g.bridgesOf.get(id) ?? [])
-    .map((b) => ({ other: g.byId.get(b.a === id ? b.b : b.a)!, why: b.why, kind: b.kind }))
+    .map((b) => ({ other: g.byId.get(b.a === id ? b.b : b.a)!, why: b.why, kind: b.kind, ...(b.status && b.origin ? { id: b.id, origin: b.origin, status: b.status } : {}) }))
     .filter((b) => b.other)
-    .sort((a, b) => (a.kind === b.kind ? natural(a.other, b.other) : a.kind === "referencia" ? -1 : 1));
+    .sort((a, b) => (a.kind === b.kind ? natural(a.other, b.other) : a.kind === "referencia" ? -1 : b.kind === "referencia" ? 1 : a.kind.localeCompare(b.kind)));
   return { node, route, kids, links, bridges };
 }
 
@@ -653,3 +754,39 @@ export function countsOf(g: GlobalGraph): Record<PiloSpace, number> & { puentes:
   for (const n of g.nodes) if (n.kind !== "fuente" && n.kind !== "coleccion") out[n.space] += 1;
   return out;
 }
+
+/** De los puentes dibujados: cuántos sigue la búsqueda (aprobados) y cuántos esperan revisión. */
+export function bridgeCounts(g: GlobalGraph): { aprobados: number; propuestos: number } {
+  const aprobados = g.bridges.filter((b) => b.status === "aprobada").length;
+  return { aprobados, propuestos: g.bridges.filter((b) => b.status === "propuesta").length };
+}
+
+/* --- La bandeja de puentes por revisar ------------------------------------------------------ */
+
+export interface InboxItem {
+  bridge: StoredBridge;
+  /** El extremo de cada Pilo, con su nombre y, si está en el mapa, el punto para saltar a él. */
+  ends: { space: PiloSpace; label: string; node: string | null }[];
+  /** De dónde sale la propuesta, en palabras. */
+  origin: string;
+}
+
+const KIND_TEXT: Record<BridgeKind, string> = { referencia: "Citan la misma referencia", nombre: "Se llaman igual", tema: "Tratan el mismo tema", relacion: "Relación propuesta" };
+
+/** Un puente guardado, listo para la bandeja: sus dos extremos (Planeación primero) y de dónde sale. */
+export function inboxItem(b: StoredBridge, byId: Map<string, GNode>): InboxItem {
+  const ends = [
+    { scope: b.a_scope, id: b.a_id, label: b.a_label },
+    { scope: b.b_scope, id: b.b_id, label: b.b_label },
+  ]
+    .filter((e): e is { scope: PiloSpace; id: string; label: string } => e.scope === "planeacion" || e.scope === "ensenanza")
+    .sort((x, y) => SPACES.indexOf(x.scope) - SPACES.indexOf(y.scope))
+    .map((e) => {
+      const node = byId.get(gid(e.scope, e.id));
+      return { space: e.scope, label: e.label || node?.label || e.id, node: node?.id ?? null };
+    });
+  return { bridge: b, ends, origin: `${ORIGIN_TEXT[b.origin]} · ${lowerFirst(KIND_TEXT[b.kind])}` };
+}
+
+/** Los que faltan por revisar, los más recientes primero (el orden de la base). */
+export const inboxOf = (rows: StoredBridge[], byId: Map<string, GNode>): InboxItem[] => rows.filter((b) => b.status === "propuesta").map((b) => inboxItem(b, byId));

@@ -478,7 +478,7 @@ describe("la migración es idempotente", () => {
     expect((before[0] as { policies: number }).policies).toBe(5);
     // 0114 y, encima, 0121: aplicar 0114 sola después de 0121 devolvería sus funciones a como eran
     // (solo Enseñanza con documentos); 0121 las vuelve a dejar para cualquier ámbito.
-    const sql = readFileSync(MIGRATION, "utf8") + ";\n" + readFileSync(resolve(__dirname, "../../supabase/migrations/0121_pilo_portales.sql"), "utf8");
+    const sql = readFileSync(MIGRATION, "utf8") + ";\n" + readFileSync(resolve(__dirname, "../../supabase/migrations/0121_pilo_portales.sql"), "utf8") + ";\n" + readFileSync(resolve(__dirname, "../../supabase/migrations/0122_pilo_puentes.sql"), "utf8");
     await t.db.exec(sql);
     await t.db.exec(sql);
     expect(await snapshot()).toEqual(before);

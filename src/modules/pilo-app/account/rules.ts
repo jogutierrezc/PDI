@@ -180,25 +180,18 @@ export interface RegData {
   password: string;
   nick: string;
   tone: Tone;
-  /** Leyó y aceptó los términos de la cuenta: sin esto no se crea. */
+  /** Leyó y aceptó los términos y la política de uso de Mr. Pilo (terms/policy.ts): sin esto no se crea. */
   terms: boolean;
 }
 
 export const EMPTY_REG: RegData = { email: "", rol: "", campus: "", fullName: "", username: "", password: "", nick: "", tone: "cercano", terms: false };
 
-/**
- * Los términos que se aceptan al crear la cuenta. Dicen solo lo que la cuenta
- * hace de verdad (el contrato de 0120); el texto definitivo lo aprueba la
- * universidad: al cambiarlo, suba la versión.
+/*
+ * Los términos que se aceptan al crear la cuenta son los de Mr. Pilo, y viven
+ * en un solo sitio: terms/policy.ts (las cuatro reglas de oro, la política
+ * completa y su versión). El registro los muestra desde ahí; aquí solo se
+ * exige que la casilla esté marcada.
  */
-export const TERMS_VERSION = "2026-10";
-export const ACCOUNT_TERMS: string[] = [
-  "La cuenta es solo para Mr. Pilo: no da acceso a la intranet ni a otros sistemas de la universidad.",
-  "Se crea con su correo de la UDES. Su perfil y su sede salen de ese correo.",
-  "Pilo usa su nombre, su perfil, su sede y lo que usted escriba en su perfil para responderle a su medida. Lo que guarde queda en su cuenta y solo usted lo ve.",
-  "Pilo es una inteligencia artificial y puede equivocarse: revise la fuente de cada respuesta. Con estudiantes actúa como tutor: explica y guía, no resuelve evaluaciones.",
-  "La administración de Pilo puede suspender o eliminar una cuenta.",
-];
 
 export interface StepProblem {
   field: "email" | "rol" | "campus" | "fullName" | "username" | "password" | "nick" | "terms";

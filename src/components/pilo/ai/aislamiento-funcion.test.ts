@@ -49,9 +49,16 @@ const ALLOWED: Allowed[] = [
   { name: "pilo_embed_save", near: "p_rows: payload", why: "guarda por (tipo, ref): las filas salen de pilo_embed_pending, que sí lleva p_space" },
   { name: "pilo_catalog_hit", near: "p_key: key", why: "la clave del catálogo es global (prefijos ER-/EC-) y sale del catálogo ya filtrado por espacio" },
   { name: "pilo_answer_vote", near: "p_id: id", why: "vota por id; antes se comprueba que la respuesta es de este espacio (eq space)" },
-  // Las cifras en vivo (0107) son solo de Planeación: un espacio sin la fuente «cifras» nunca las busca.
-  { name: "pilo_facts_search", near: "p_q: q, p_limit: 3", why: "solo corre si las fuentes incluyen «cifras», que es de planeacion" },
-  { name: "pilo_facts_semantic", near: "p_limit: 3", why: "igual que pilo_facts_search" },
+  // Las cifras en vivo (0107) son una fuente más de la matriz. Con 0122 llevan quién lee (`...who`, que es `reader`)
+  // y la base revisa la celda «cifras»; sin 0122 solo corren si la vista del portal trae «cifras» de casa.
+  { name: "pilo_facts_search", near: "p_q: q, p_limit: 3, ...who", why: "lleva quién lee cuando la base tiene 0122 (who = reader); sin ella, solo corre si las fuentes de casa incluyen «cifras»" },
+  { name: "pilo_facts_semantic", near: "p_limit: 3, p_min: SEMANTIC_MIN, ...who", why: "igual que pilo_facts_search" },
+  // Los puentes (0122) van de un ámbito a otro: no son de un espacio. Solo la administración los calcula y los propone.
+  { name: "pilo_bridges_sync", near: "// de un ámbito a otro: sin espacio", why: "calcula los puentes por reglas entre todos los ámbitos, sin parámetros: quien llama no decide qué se une" },
+  { name: "pilo_bridges_status", near: '"pilo_bridges_status", from', why: "cuenta los puentes y lo que falta por revisar del ámbito de partida (p_scope)" },
+  { name: "pilo_bridge_targets", near: "...from, p_limit: BRIDGE_TARGETS", why: "los puntos de los OTROS ámbitos, que es justo lo que un puente une; solo administración" },
+  { name: "pilo_bridge_candidates", near: "...from, p_limit: BRIDGE_CALL", why: "los puntos del ámbito de partida sin revisar (p_scope); solo administración" },
+  { name: "pilo_bridges_propose", near: "// cada fila dice sus dos ámbitos", why: "cada propuesta nombra sus dos ámbitos y la base comprueba que cada extremo exista en el suyo" },
   { name: "pilo_facts_campuses", near: 'admin.from("campuses")', why: "los nombres de las sedes, para entender la pregunta: no es contenido de ningún espacio" },
   // El análisis de los boletines es del Pilo de siempre: su acción nunca sale del espacio de partida.
   { name: "pilo_memory_search", near: 'p_sources: ["pdi"]', why: "«analizar» (boletines e Impacto): siempre planeacion, que es el valor de partida de p_space" },
@@ -112,7 +119,8 @@ describe("ninguna consulta de la función olvida el espacio", () => {
   });
 
   it("con 0121, cada lectura de la memoria al preguntar lleva quién lee, para que filtre la base", () => {
-    const READS = ["pilo_memory_search", "pilo_memory_semantic", "pilo_answer_candidates", "pilo_graph_neighbors", "pilo_graph_around", "pilo_memory_readable"];
+    // Las dos lecturas de visita (0122) son las únicas que traen algo de otro ámbito: también llevan quién lee.
+    const READS = ["pilo_memory_search", "pilo_memory_semantic", "pilo_answer_candidates", "pilo_graph_neighbors", "pilo_graph_around", "pilo_memory_readable", "pilo_memory_visit", "pilo_bridge_neighbors"];
     for (const name of READS) expect(calls.some((c) => c.name === name), name).toBe(true);
     // Fuera de «preguntar»: la prueba de la memoria de la administración (su espacio, con sesión) y el análisis de los boletines.
     const elsewhere = (c: (typeof calls)[number]) => /p_public_only: false \}\)/.test(c.text) || c.text.includes('p_sources: ["pdi"]');
@@ -126,6 +134,21 @@ describe("ninguna consulta de la función olvida el espacio", () => {
     expect(calls.filter((c) => c.kind === "tabla" && c.name === "pilo_memory")).toHaveLength(2);
     expect(calls.filter((c) => c.name === "pilo_memory_readable")).toHaveLength(2);
     expect(code).not.toMatch(/p_session: (true|body|Boolean\(member)/);
+  });
+
+  it("lo de otro ámbito se lee solo por los dos caminos de visita, una vez cada uno, y siempre con quién lee", () => {
+    for (const name of ["pilo_memory_visit", "pilo_bridge_neighbors"]) {
+      const found = calls.filter((c) => c.name === name);
+      expect(found, name).toHaveLength(1);
+      expect(found[0].text, name).toMatch(/\.\.\.reader\b/);
+    }
+    // El camino «alcance» solo corre si lo de casa no alcanza; el de los puentes, solo desde pasajes de casa.
+    expect(code).toMatch(/short \? admin\.rpc\("pilo_memory_visit"/);
+    expect(code).toMatch(/admin\.rpc\("pilo_bridge_neighbors", \{ p_refs: memory\.slice\(0, 3\)/);
+    // Sin celdas «De visita» en la vista no se llama a nada.
+    expect(code).toMatch(/if \(!view \|\| !reader \|\| !view\.visiting\.length \|\| chatty\) return NO_VISIT;/);
+    // Lo que cita algo de otro ámbito no se guarda.
+    expect(code).toMatch(/!fin\.passages\.some\(\(p\) => p\.visit\)/);
   });
 
   it("el espacio sale del portal, nunca de un campo de la página (salvo «indexar», de la administración)", () => {

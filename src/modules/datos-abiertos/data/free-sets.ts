@@ -24,6 +24,7 @@
 import type { ValueFormat } from "./types";
 import { DEPARTMENTS } from "./colombia-map";
 import { COUNTRIES } from "./world-map";
+import type { CustomTable } from "./custom-table";
 
 export type FreeTemporality = "sin_tiempo" | "anual" | "periodo";
 export type FreeColumnKind = "texto" | "cifra" | "fecha" | "territorio";
@@ -39,6 +40,14 @@ export interface FreeColumn {
   unit?: string;
   /** Territorio: qué tipo. */
   territory?: FreeTerritory;
+  /** Cifras de una tabla personalizada: cuántos decimales se escriben (0 a 4). */
+  decimals?: number;
+  /**
+   * Texto con lista cerrada: la columna es una categoría o un estado
+   * («Cumple», «En proceso»…) y solo admite estos valores. Para las gráficas
+   * sigue siendo una columna de texto.
+   */
+  options?: string[];
 }
 
 export type FreeCell = string | number | null;
@@ -109,6 +118,12 @@ export interface FreeView {
   end?: string;
   /** Cascada: añade la barra del total al final. */
   total?: boolean;
+  /**
+   * Tabla personalizada (solo en vistas de tipo «tabla»): corte, nota, fuente y
+   * reglas de color. Con esto la vista deja de ser «la fuente tal cual» y pasa
+   * a ser una tabla escrita por quien publica. Ver custom-table.ts.
+   */
+  table?: CustomTable;
 }
 
 export interface FreeSet {
@@ -490,5 +505,8 @@ export function viewProblems(set: FreeSet, view: FreeView): string[] {
     problems.push("Elige dos cifras distintas: una para las barras y otra para la línea.");
   }
   if (view.type === "barras_linea" && set.temporality !== "anual" && !category) problems.push("Sin años, elige la columna de categorías: cada una es una barra.");
+  // Tabla personalizada: la escribe quien publica, así que su corte no sale de
+  // ninguna parte si no lo escribe. Sin corte no se publica (custom-table.ts).
+  if (view.type === "tabla" && view.table && !view.table.cut?.trim()) problems.push("Escribe el corte o periodo de la tabla.");
   return problems;
 }

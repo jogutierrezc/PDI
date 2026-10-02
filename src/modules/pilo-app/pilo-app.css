@@ -1814,3 +1814,9 @@
     transform: none;
   }
 }
+
+/* Una fuente de otro ámbito de Pilo (0122): su procedencia, con texto y glifo. */
+.pa-sheet li small.pa-from {
+  font-weight: 700;
+  color: var(--c-ink);
+}

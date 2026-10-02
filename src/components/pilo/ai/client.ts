@@ -91,6 +91,12 @@ export interface AskSource {
   cut: string;
   office: string;
   excerpt: string;
+  /** Cómo llegó, si no fue por la búsqueda de siempre: «mapa» (0115) o, de otro ámbito (0122), «visita» (lo de casa no alcanzó) o «puente» (lo trajo un puente aprobado). */
+  via?: string;
+  /** De otro ámbito (0122): su procedencia, como la escribió el servidor («De Pilo en Enseñanza · Políticas institucionales»). */
+  from?: string;
+  /** De otro ámbito: para quién fue preparado, cuando quien pregunta no es ese público. */
+  written_for?: string;
 }
 
 export interface AskStep {

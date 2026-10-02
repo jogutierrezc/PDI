@@ -22,6 +22,7 @@ import type { PiloExpression } from "../../../components/pilo/PiloFace";
 import type { ExpressionMood } from "../../../components/pilo/ai/voice-expressions";
 import type { EXAMPLES } from "../pilo/catalog-sheet";
 import type { CatalogKind } from "../pilo/catalog-sheet";
+import { mergeSourceFlags } from "../pilo/portals";
 import type { LogRow } from "../pilo/store";
 import type { PiloSpace } from "../pilo/space";
 
@@ -265,10 +266,23 @@ export function useSaveSpace(space: PiloSpace = SPACE) {
   const client = useQueryClient();
   return useMutation({
     mutationFn: async (settings: SpaceSettings) => {
+      const patch = spacePatch(settings);
+      // Los interruptores de «Fuentes» son el espejo de la matriz (0121): solo se guardan los que esta
+      // pestaña movió, sobre lo que la base tiene ahora. Así una pestaña vieja no devuelve una celda
+      // que otra acaba de cambiar en «Qué lee cada portal».
+      const loaded = client.getQueryData<SpaceLoad>(spaceKeys.row(space))?.settings.memory_sources as Record<string, boolean> | undefined;
+      const edited = patch.memory_sources as Record<string, boolean> | undefined;
+      if (edited && loaded) {
+        if (!Object.keys(edited).some((k) => edited[k] !== loaded[k])) delete patch.memory_sources;
+        else {
+          const { data: now } = await supabase.from("pilo_spaces").select("memory_sources").eq("id", space).maybeSingle();
+          patch.memory_sources = mergeSourceFlags(edited, loaded, (now as { memory_sources?: unknown } | null)?.memory_sources) ?? edited;
+        }
+      }
       const { data: user } = await supabase.auth.getUser();
       const { error } = await supabase
         .from("pilo_spaces")
-        .update({ ...spacePatch(settings), updated_by: user.user?.id ?? null, updated_at: new Date().toISOString() } as never)
+        .update({ ...patch, updated_by: user.user?.id ?? null, updated_at: new Date().toISOString() } as never)
         .eq("id", space);
       if (error) throw describeDatabaseError(error);
     },

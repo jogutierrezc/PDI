@@ -636,3 +636,136 @@ No volver a aplicar 0113, 0114, 0115 ni 0118 después de 0121: devuelven sus fun
 - La función en Deno contra la base real: las pruebas corren el archivo de la función con una base de mentira, y las funciones SQL en PGlite (sin pgvector: `pilo_memory_semantic` se prueba con un doble del operador `<=>`).
 - Que PostgREST resuelva bien las funciones con sus parámetros nuevos tras `notify pgrst, 'reload schema'` (cada una queda con una sola firma, que es lo que evita la ambigüedad).
 - La pantalla «Qué lee cada portal» y la carga de documentos del Pilo general en un navegador con la base real.
+
+
+## Anexo F · Puentes entre ámbitos y lectura de visita (0122, pasos 4 a 6) (2026-10-02)
+
+Servidor: `supabase/functions/pilo-ia/index.ts` (`visitOf` y `searchFacts` en `answerWork`, `proposeBridges`, y una línea en `comprehendMap`) · lógica pura: `logic.ts` (`homeFallsShort`, `coversQuestion`, `visitPassages`, `visitLabel`, `visitRule`, `visitLead`, `visitAnswer`, `askerKind`, `buildBridgeMessages`, `parseBridges`, `bridgeWhy`) · migración: `0122_pilo_puentes.sql` · avance: `.ccg/tasks/pilo-un-cerebro/avance.md`.
+
+**Con la matriz de partida nada cambia**: sin ninguna celda «De visita», `preguntar` no llama a ninguna función nueva de lectura y el pedido al modelo es byte a byte el de antes (`rol.esperado.json` no cambió; regresión en `funcion-preguntar.test.ts`). Lo único que viaja distinto es que las cifras en vivo llevan ahora quién lee (F.4).
+
+### F.1 Cuándo entra algo de otro ámbito
+
+Solo si la vista del portal (`pilo_scope`) trae alguna fuente con `mode = "visita"`, y solo por dos caminos:
+
+| Camino | Cuándo | Llamada |
+|---|---|---|
+| `alcance` | lo de casa no alcanza (`homeFallsShort`) | `pilo_memory_visit { p_q, p_limit: 4, ...reader }` |
+| `puente` | un puente **aprobado** une uno de los 3 primeros pasajes de casa con un pasaje de otro ámbito; solo cuando va a escribir el modelo | `pilo_bridge_neighbors { p_refs, ...reader, p_limit: 2 }` |
+
+**«Lo de casa no alcanza»**, entera: la pregunta no es un saludo ni conversación, deja al menos una palabra clave (`extractKeywords`) y, tras buscar en casa, **no hay** respuesta oficial del catálogo, **ni** respuesta guardada que sirva, **ni** cifra en vivo de casa, **ni** un pasaje de casa que traiga al menos la mitad de las palabras clave de la pregunta (`coversQuestion`, `VISIT_COVERAGE = 0.5`). Con cualquiera de las cuatro, lo de casa alcanza y `pilo_memory_visit` no se llama.
+
+Lo que entra de visita:
+
+- va **después** de lo de casa en su bloque (`[CIFRAS]` o `[PASAJES]`) y es lo primero que se queda fuera si no cabe;
+- a lo sumo **2** por respuesta (`VISIT_MAX`), sumando los dos caminos y la cifra;
+- por `alcance`, además, tiene que traer la mitad de las palabras clave (el mismo criterio que a lo de casa);
+- se revisa otra vez en la función (`visitPassages`): fuente que la vista trae «de visita», ámbito distinto del de casa, no repetido;
+- **no se guarda**: una respuesta que cita un pasaje de visita no va a `pilo_answers` (y aunque fuera, las búsquedas de guardadas solo leen lo de casa: nunca estaría fresca).
+
+Leer de visita no eleva permisos: la base aplica el mismo filtro con la otra celda. Lo `oculto` nunca; lo `sesion` solo al personal de la intranet (una cuenta de Pilo no lo es); Impacto solo al personal; Moodle no sale de su portal aunque la celda o un puente lo digan.
+
+### F.2 Lo que cambia en la respuesta (todo opcional: quien no lo lea no nota nada)
+
+Cada fuente de otro ámbito, en `sources` (de `meta` y de `done`, y del JSON sin stream), lleva:
+
+```json
+{ "n": 2, "ref": "doc:…:1", "source": "politicas", "title": "Política de evaluación", "…": "…",
+  "via": "visita", "from": "De Pilo en Enseñanza · Políticas institucionales", "scope": "ensenanza",
+  "written_for": "profesores y estudiantes" }
+```
+
+| Campo | Significado |
+|---|---|
+| `via` | `"visita"` (lo de casa no alcanzó) o `"puente"` (lo trajo un puente aprobado). Las de casa no lo llevan (salvo `"mapa"`, como antes) |
+| `from` | la procedencia, escrita por el servidor: «De <portal de ese ámbito> · <fuente>». La página la muestra junto a la cita |
+| `scope` | el ámbito del pasaje |
+| `written_for` | solo si quien pregunta **no** es el público de ese ámbito (`pilo_portals.audience`): para quién fue preparado |
+
+Evento `step` nuevo, solo cuando entró algo de visita, después de la búsqueda y antes de `meta`:
+
+```
+event: step
+data: {"id":"visita","label":"Consultando otros ámbitos","detail":"1 pasaje de otro ámbito: Pilo en Enseñanza · Políticas institucionales","state":"done"}
+```
+
+y una entrada `{ "step": "Otros ámbitos", … }` en `trail`.
+
+**En el pedido al modelo**, solo si hay algo de visita:
+
+- la línea de la fuente empieza con su procedencia, como dato: `[2] (De Pilo en Enseñanza · Políticas institucionales) Política de evaluación · Capítulo 2`;
+- va la regla fija `VISIT_RULE`, fuera del bloque de datos: presentarla como «esto viene de…» con ese nombre y, si contradice a una fuente de casa, responder con la de casa y decir que hay otra fuente que dice algo distinto;
+- por cada ámbito cuyo público no es quien pregunta: «Lo de «Pilo en Enseñanza» fue preparado para profesores y estudiantes: dilo en una frase al usarlo.»
+
+Quién pregunta, para esto (`askerKind`): `personal` (sesión de la intranet), el rol de la cuenta de Pilo, el rol que eligió un visitante (`estudiante`/`profesor`) o `visitante`. No es un permiso.
+
+**Sin IA** (apagada, sin cupo, o si el proveedor falla): si lo de casa no alcanzó y otro ámbito sí lo tiene, la respuesta es `kind: "extracto"` con la plantilla del servidor:
+
+> No encontré eso en lo de este portal, pero sí en otro ámbito de Pilo. Esto viene de Pilo en Enseñanza · Políticas institucionales, y fue preparado para profesores y estudiantes. Política de evaluación: La evaluación formativa tiene 3 momentos en cada curso. [1]
+
+Sin IA no se siguen puentes (como el mapa).
+
+### F.3 Los puentes (`pilo_bridges`)
+
+Tabla propia —no columnas en `pilo_edges`—: las búsquedas recorren `pilo_edges`, y una relación entre ámbitos no debe poder seguirse por accidente. Un puente: `a_scope`/`a_id` ↔ `b_scope`/`b_id` (siempre con el ámbito menor primero, nunca dentro de un mismo ámbito), `kind` (`referencia`, `nombre`, `tema`, `relacion`), `why`, `origin` (`reglas` | `ia` | `admin`) y `status` (`propuesta` | `aprobada` | `rechazada`). Un extremo es un punto de la malla de su ámbito: un nodo (en Planeación, el ref de su pasaje), un documento (`doc:<uuid>`) o un tema o referencia que ese ámbito usa.
+
+| Función | Quién | Qué hace |
+|---|---|---|
+| `pilo_bridges_sync()` | servicio o administración | calcula y guarda los de reglas. Se aprueban solos: la misma norma u ODS nombrados en los dos ámbitos, y un punto del Plan de Desarrollo y un punto de otro ámbito que se llaman igual. Quedan como `propuesta` (origen `ia`): un tema compartido y una referencia compartida que no es norma ni ODS. Lo que ya existe no se toca; lo que las reglas ya no dan se quita si nadie lo decidió a mano |
+| `pilo_bridges_list(p_status?, p_limit?)` | servicio o administración | los puentes, los propuestos primero |
+| `pilo_bridge_set(p_id, p_status)` | **solo administración** (ni el servicio) | aprueba o rechaza **uno** |
+| `pilo_bridges_status(p_scope?)` | servicio o administración | cuentas, y cuántos puntos faltan por revisar |
+| `pilo_bridge_candidates`, `pilo_bridge_targets`, `pilo_bridges_propose` | servicio o administración | lo que usa la acción `puentes` (F.5) |
+
+La función llama a `pilo_bridges_sync()` al final de un lote de `comprender` que guardó algo (sin 0122, la llamada falla y se ignora).
+
+### F.4 Las cifras en vivo pasan por la matriz
+
+`pilo_facts_search` y `pilo_facts_semantic` ganan `p_space`, `p_public_only`, `p_member` (con valor de partida): la base las da solo si la celda `cifras` de ese portal las deja leer a esa persona, de casa o de visita. La función manda `reader` en las dos. Un portal con `cifras` en «visita» las recibe solo por el camino `alcance`, como una fuente más (`ref: "dato:…"`, `via: "visita"`, `from: "De Pilo de la Universidad · UDES en Cifras"`); el verificador de números sigue valiendo.
+
+### F.5 `puentes` — la IA propone, la administración revisa
+
+```json
+{ "action": "puentes", "step": "estado" | "reglas" | "lote" }
+```
+
+Solo administración (`403` `{ "error": "Solo la administración propone puentes entre los ámbitos de Pilo." }`). No gasta cupo; queda en `pilo_ai_log` con `action = 'puentes'`.
+
+| Paso | Respuesta `200` |
+|---|---|
+| `estado` | `{ "ok": true, "ai": true, "status": { "total", "aprobadas", "propuestas", "rechazadas", "reglas", "ia", "pending", "scanned", "targets" } }`. Sin IA: `"ai": false, "note": "Sin IA no se proponen puentes nuevos. Los puentes por reglas … siguen funcionando. …"` |
+| `reglas` | `{ "ok": true, "ai": …, "rules": { "found", "added", "removed", "total", "aprobadas", "propuestas", "rechazadas" }, "status": {…} }`. Funciona sin IA |
+| `lote` | `{ "ok": true, "ai": true, "asked": 24, "proposed": 3, "discarded": 0, "calls": 2, "done": false, "ms", "budget_ms", "status": {…} }`, y `stopped` (`limite_proveedor`, `proveedor`, `red`, `tiempo`, `formato`) con su `note` o `cut: "tiempo"`, como `comprender` |
+
+`lote`: hasta 4 pedidos en serie de 12 puntos sin revisar de Planeación (`pilo_bridge_candidates`) contra los 60 documentos, temas y referencias más usados de los otros ámbitos (`pilo_bridge_targets`), con el presupuesto de `comprehendBudget`. Al modelo le llegan **solo nombres**, como datos entre `<<<DATOS … DATOS>>>`; responde `{"puentes":[{"a":1,"b":3,"porque":"…"}]}` con **números** de las dos listas, así que no puede inventar un id. Se descarta (`parseBridges`, `bridgeWhy`) lo que no señala un punto de cada lista, lo que une dos puntos del mismo ámbito, lo repetido, más de 2 por punto y lo que no trae un porqué de 12 a 180 caracteres sin direcciones web, órdenes, marcas del pedido, datos de personas ni dinero. La base (`pilo_bridges_propose`) revisa otra vez que cada extremo exista en su ámbito y guarda `status = 'propuesta'`, `origin = 'ia'`; lo que ya existe —también lo rechazado— no se toca: no se vuelve a proponer. Una respuesta ilegible detiene el lote (`stopped: "formato"`) sin anotar nada como revisado.
+
+Errores: `400` `{ "error": "Paso desconocido." }`; sin 0122, `500` `{ "error": "Falta la migración 0122 de los puentes de Mr. Pilo.", "advice": "…", "code": "migracion" }`.
+
+### F.6 La matriz: «De visita»
+
+- `pilo_portal_update(p_portal, { "matrix": { "<fuente>": "casa" | "visita" | "no" }, "expect"?: { "<fuente>": "<valor que veía>" } })`. «visita» solo en fuentes de otro ámbito que puedan salir de su casa; rechaza `visita` sobre lo propio y sobre Moodle. Con `expect`, si la celda ya no está así (otra pestaña la cambió) no escribe nada (`40001`, «Esa celda cambió mientras tanto…»).
+- `effects[]` gana `public`, `session` (pasajes públicos y «con sesión»), `bridges` (puentes aprobados entre los dos ámbitos), `staff_only`, `home` (el portal de esa fuente) y `written_for`.
+- `pilo_portal_preview(p_portal, p_source, p_value)` devuelve ese mismo efecto **sin cambiar nada**: la pantalla lo pide antes de confirmar «De visita».
+- `pilo_portals.audience` (`text[]`): el público de cada ámbito. De partida: Enseñanza `{estudiante, profesor}`, Planeación `{personal}`.
+- `memory_sources` sigue siendo el espejo de las celdas **de casa**: nunca lleva una fuente de otro ámbito ni el valor «visita», y guardar los interruptores no toca una celda de visita.
+
+### F.7 `comprender` también sobre los pasajes de portal
+
+`pilo_map_pending`, `pilo_map_status` y `pilo_map_save` dejan de exigir que el pasaje sea de un documento. En Enseñanza nada cambia (todos lo son). En Planeación entran además los pasajes de sus portales (los de documentos van primero), que reutilizan los temas que ya existen; la relación queda en su ámbito y los vecinos no cruzan. `status.total` de `comprender` en `planeacion` cuenta ahora esos pasajes. `pilo_map_prune` quita además las relaciones de un pasaje de portal que «Actualizar la memoria» borró.
+
+### F.8 Orden de despliegue
+
+`0122` requiere `0121`. Los dos órdenes sirven:
+
+- **Función nueva, base con 0121 y sin 0122:** las cifras se piden primero con quién lee; la base no conoce esos parámetros, la función las pide como antes y no insiste por un minuto. Las lecturas de visita no existen: si alguien dejó a mano una celda «visita», la función no lee nada de ella. `puentes` responde `500` con `code: "migracion"`.
+- **Base con 0122, función de antes:** todas sus llamadas siguen valiendo (parámetros nuevos con valor de partida). No lee nada de visita, diga lo que diga la matriz.
+
+No volver a aplicar 0121 después de 0122 (devolvería `pilo_portal_update` y las funciones del mapa a como eran); si pasa, aplicar 0122 otra vez.
+
+### F.9 Sin verificar
+
+- Nada corrió contra la base real ni en Deno: la función se probó con una base de mentira; el SQL, en PGlite.
+- Que el modelo real presente lo de visita con «esto viene de…» y respete «manda lo de casa»: son instrucciones del pedido. Lo garantizado es lo que hace el servidor: la procedencia en la fuente, el orden, el tope y que no se guarde.
+- Que el modelo real devuelva JSON legible en `puentes` y que sus propuestas sean buenas: por eso entran como propuesta.
+- El costo de `pilo_bridges_sync()` y de `pilo_bridge_neighbors` con la malla real (miles de nodos).
+- La pantalla de la matriz, la bandeja de puentes y la procedencia en la página pública, en un navegador.

@@ -37,6 +37,8 @@ import { DEPARTMENTS } from "./colombia-map";
 import { MUNICIPIOS } from "./colombia-municipios";
 import { freeTotalAt, numberOf, textOf } from "./free-sets";
 import type { FreeCell, FreeColumn, FreeRow, FreeTemporality } from "./free-sets";
+import { cellTone, manualTone, rowTone, toneLabel, unitOf } from "./custom-table";
+import type { CustomTable } from "./custom-table";
 import { orderedTiers } from "./medals";
 import type { MedalBoard, MedalEntry } from "./medals";
 import { parseRank, RANKING_SYSTEMS, SDGS } from "./rankings";
@@ -864,6 +866,50 @@ export function freeSetToTable(set: FreeTable): CsvTable {
         if (totals) return column.kind === "cifra" ? numberOf(totals[column.key]) : null;
         return freeCell(column, row.cells[column.key]);
       }),
+    ];
+  });
+  return { header, rows };
+}
+
+/**
+ * Una tabla personalizada (custom-table.ts), con sus textos y sus cifras como
+ * están escritas: aquí el total es el que escribió quien publica, no se calcula.
+ * El color no viaja, pero sí lo que dice: cada columna con reglas o con celdas
+ * marcadas a mano trae al lado su «Tono», con el nombre del tono, y una fila
+ * coloreada entera lo dice en «Tono de la fila». El corte va en cada fila, para
+ * que ninguna cifra salga del archivo sin él.
+ */
+export function customTableToTable(set: { columns: FreeColumn[]; rows: FreeRow[] }, table: CustomTable): CsvTable {
+  const mixed = set.rows.some((row) => row.kind !== "dato");
+  const wholeRows = set.rows.some((row) => rowTone(row) !== null);
+  const toned = new Set(
+    set.columns
+      .filter((column) => (table.rules?.[column.key] ?? []).length > 0 || set.rows.some((row) => manualTone(row, column.key) !== null))
+      .map((column) => column.key),
+  );
+  const cut = table.cut?.trim() ?? "";
+  const header = uniqueLabels([
+    ...(mixed ? ["Tipo de fila"] : []),
+    ...set.columns.flatMap((column) => {
+      const name = column.label || column.key;
+      const unit = unitOf(column);
+      return [unit ? `${name} (${unit})` : name, ...(toned.has(column.key) ? [`Tono · ${name}`] : [])];
+    }),
+    ...(wholeRows ? ["Tono de la fila"] : []),
+    ...(cut ? ["Corte"] : []),
+  ]);
+  const rows: CsvCell[][] = set.rows.map((row) => {
+    const whole = rowTone(row);
+    return [
+      ...(mixed ? [ROW_KIND_LABEL[row.kind]] : []),
+      ...set.columns.flatMap((column, index): CsvCell[] => {
+        // Un título de grupo no tiene casillas: su texto va en la primera columna.
+        const value: CsvCell = row.kind === "grupo" ? (index === 0 ? textOrNull(row.label) : null) : freeCell(column, row.cells[column.key]);
+        if (!toned.has(column.key)) return [value];
+        return [value, row.kind === "grupo" ? null : cellTone(table, column, row)?.label ?? null];
+      }),
+      ...(wholeRows ? [whole ? toneLabel(table, whole) : null] : []),
+      ...(cut ? [cut] : []),
     ];
   });
   return { header, rows };

@@ -23,3 +23,8 @@ verify_jwt = false
 # Registro e ingreso de los Usuarios de Pilo: quien llama aún no tiene sesión.
 # La función valida por su cuenta cada acción y limita los intentos.
 verify_jwt = false
+
+[functions.pilo-clases]
+# «Mis clases» (beta): la función comprueba por su cuenta que quien llama tenga
+# una cuenta de Pilo activa de estudiante o de profesor. No guarda nada de Moodle.
+verify_jwt = false

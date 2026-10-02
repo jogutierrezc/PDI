@@ -6,13 +6,18 @@
    fuente:
 
      De casa     la fuente es del ámbito del portal: se busca siempre.
-     De visita   la fuente es de otro ámbito. Se ve, pero todavía no se puede
-                 marcar: llega con la lectura entre ámbitos.
+     De visita   la fuente es de otro ámbito (0122): entra solo cuando lo de
+                 casa no alcanza o por un puente aprobado, después de lo de
+                 casa y diciendo de dónde viene. Nace apagada: se enciende
+                 celda por celda.
      No          el portal no la lee.
 
    Cada cambio se aplica al momento (como las claves y las funciones
    ampliadas), pero antes se confirma en el mismo sitio, nombrando la
    consecuencia; después se dice el efecto con los números que contó la base.
+   Antes de marcar «De visita» la base cuenta qué podrá leer ese portal y quién
+   lo verá (pilo_portal_preview), y hasta que no llega esa cuenta no se puede
+   confirmar. Si otra pestaña movió la celda mientras tanto, la base no escribe.
    Los interruptores de «Fuentes» son el espejo de las celdas de casa: al
    cambiar una celda del portal de siempre, el editor se pone al día.
 
@@ -20,11 +25,11 @@
    como siempre.
    ========================================================================== */
 
-import { useLayoutEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { Icon } from "../../../components/ui/Icon";
 import { revealList } from "./motion";
-import { CELL_LABEL, atHome, cellChoices, cellOf, confirmText, effectText, effectiveCell, usePortals, useSetCell } from "./portals";
-import type { Cell, PiloPortal, PiloSource } from "./portals";
+import { CELL_LABEL, atHome, cellChoices, cellOf, confirmText, effectText, effectiveCell, previewCell, usePortals, useSetCell } from "./portals";
+import type { Cell, CellEffect, PiloPortal, PiloSource } from "./portals";
 import { Group, StatusMark } from "./ui";
 
 const KIND_NOTE: Record<PiloSource["kind"], string> = {
@@ -47,6 +52,8 @@ export function PortalsMatrix({ onHomeSource }: { /** Una celda de casa del port
   const setCell = useSetCell();
   const [pending, setPending] = useState<Pending | null>(null);
   const [said, setSaid] = useState<{ tone: "ok" | "off"; text: string } | null>(null);
+  // Lo que la base cuenta ANTES de marcar «De visita»: sin esa cuenta no se confirma.
+  const [preview, setPreview] = useState<{ effect: CellEffect | null; error: string | null }>({ effect: null, error: null });
   const confirmRef = useRef<HTMLDivElement>(null);
   const missing = query.data === null;
   const data = query.data ?? null;
@@ -60,8 +67,24 @@ export function PortalsMatrix({ onHomeSource }: { /** Una celda de casa del port
     if (setCell.isPending || cellOf(portal, source) === to) return;
     setSaid(null);
     setCell.reset();
+    setPreview({ effect: null, error: null });
     setPending({ portal, source, to });
   };
+
+  // Al pedir «De visita», la base cuenta qué podrá leer ese portal. Si la pregunta cambia antes de que llegue, se descarta.
+  useEffect(() => {
+    if (!pending || pending.to !== "visita") return;
+    let current = true;
+    previewCell(pending).then(
+      (effect) => current && setPreview({ effect, error: null }),
+      (error: unknown) => current && setPreview({ effect: null, error: error instanceof Error ? error.message : "No se pudo contar." }),
+    );
+    return () => {
+      current = false;
+    };
+  }, [pending]);
+
+  const counting = pending?.to === "visita" && !preview.effect && !preview.error;
 
   const apply = () => {
     if (!pending) return;
@@ -73,6 +96,8 @@ export function PortalsMatrix({ onHomeSource }: { /** Una celda de casa del port
         if (portal.id === "planeacion" && atHome(portal, source)) onHomeSource?.(source.id, to === "casa");
         setPending(null);
       },
+      // Si no se aplicó (la celda cambió en otra pestaña, falta una migración), la matriz se vuelve a leer y la pregunta se cierra.
+      onError: () => setPending(null),
     });
   };
 
@@ -89,8 +114,8 @@ export function PortalsMatrix({ onHomeSource }: { /** Una celda de casa del port
       id="pis-portales-memoria"
     >
       <p className="pis-lead">
-        Pilo tiene una sola memoria y cada portal es una vista sobre ella. Aquí se decide qué lee cada portal de cada fuente. Hoy cada uno lee solo lo de su casa: nada cambia
-        para quien pregunta hasta que usted cambie una celda.
+        Pilo tiene una sola memoria y cada portal es una vista sobre ella. Aquí se decide qué lee cada portal de cada fuente. De partida cada uno lee solo lo de su casa: nada
+        cambia para quien pregunta hasta que usted cambie una celda.
       </p>
 
       <dl className="pis-legend">
@@ -99,10 +124,11 @@ export function PortalsMatrix({ onHomeSource }: { /** Una celda de casa del port
           <dd>La fuente es del ámbito del portal: se busca siempre y se cita sin aclaración.</dd>
         </div>
         <div>
-          <dt>
-            De visita <span className="pis-soon">Próximamente</span>
-          </dt>
-          <dd>La fuente es de otro ámbito: entraría solo cuando lo propio no alcanza, diciendo de dónde viene. Llega en la siguiente entrega; por ahora no se puede marcar.</dd>
+          <dt>De visita</dt>
+          <dd>
+            La fuente es de otro ámbito: entra solo cuando lo de casa no alcanza o cuando la trae un puente aprobado, después de lo de casa, y Pilo dice de dónde viene. Cada pasaje
+            conserva su visibilidad.
+          </dd>
         </div>
         <div>
           <dt>No</dt>
@@ -155,8 +181,8 @@ export function PortalsMatrix({ onHomeSource }: { /** Una celda de casa del port
                     {data.portals.map((portal) => {
                       const now = cellOf(portal, source);
                       const choices = cellChoices(portal, source);
-                      // Una celda escrita a mano con un valor que aquí no se ofrece: se dice, y se dice qué lee de verdad.
-                      const odd = !choices.some((c) => c.value === now);
+                      // Una celda escrita a mano con un valor que la base no aplica («casa» sobre lo ajeno, «visita» sobre lo que no sale): se dice, y se dice qué lee de verdad.
+                      const odd = effectiveCell(portal, source) !== now;
                       return (
                         <span key={portal.id} role="cell">
                           <div className="pis-seg pis-seg--sm" role="radiogroup" aria-label={`${source.name} en ${portal.name}`}>
@@ -172,13 +198,13 @@ export function PortalsMatrix({ onHomeSource }: { /** Una celda de casa del port
                               >
                                 {now === c.value && <Icon name="check" size={12} />}
                                 {c.label}
-                                {!c.enabled && <span className="sr-only"> (todavía no disponible: {c.note})</span>}
+                                {!c.enabled && <span className="sr-only"> (no disponible: {c.note})</span>}
                               </button>
                             ))}
                           </div>
                           {odd && (
                             <small className="pis-matrix__odd">
-                              <Icon name="alert" size={12} /> La celda dice «{CELL_LABEL[now]}», pero este portal {effectiveCell(portal, source) === "casa" ? "la lee" : "no la lee"}.
+                              <Icon name="alert" size={12} /> La celda dice «{CELL_LABEL[now]}», pero este portal {effectiveCell(portal, source) === "no" ? "no la lee" : "la lee"}.
                             </small>
                           )}
                         </span>
@@ -186,12 +212,15 @@ export function PortalsMatrix({ onHomeSource }: { /** Una celda de casa del port
                     })}
                     {asking && (
                       <div className="pis-key__saved pis-key__saved--confirm pis-matrix__confirm" role="alert" ref={confirmRef}>
-                        <span>{confirmText(asking.portal, asking.source, asking.to)}</span>
+                        <span aria-busy={counting || undefined}>
+                          {preview.error && asking.to === "visita" ? `No se pudo contar qué leería este portal: ${preview.error}` : confirmText(asking.portal, asking.source, asking.to, preview.effect)}
+                        </span>
                         <button type="button" className="button-secondary" onClick={() => setPending(null)} disabled={setCell.isPending}>
                           No, dejarlo como está
                         </button>
-                        <button type="button" className="button-primary" onClick={apply} disabled={setCell.isPending}>
-                          {setCell.isPending ? "Aplicando…" : asking.to === "casa" ? "Sí, que la lea" : "Sí, que deje de leerla"}
+                        {/* «De visita» no se confirma a ciegas: hasta que la base no cuenta el efecto, el botón espera. */}
+                        <button type="button" className="button-primary" onClick={apply} disabled={setCell.isPending || counting || (asking.to === "visita" && !preview.effect)}>
+                          {setCell.isPending ? "Aplicando…" : counting ? "Contando…" : asking.to === "casa" ? "Sí, que la lea" : asking.to === "visita" ? "Sí, que la lea de visita" : "Sí, que deje de leerla"}
                         </button>
                       </div>
                     )}
@@ -215,8 +244,9 @@ export function PortalsMatrix({ onHomeSource }: { /** Una celda de casa del port
       )}
       {data && (
         <p className="pis-small">
-          Las celdas de casa son los mismos interruptores de «Fuentes» (aquí y en Mr. Pilo en Enseñanza): cambiar uno cambia el otro. El catálogo, las respuestas guardadas, la
-          bandeja y la bitácora siguen siendo de cada portal, y lo que Pilo nunca dice —dinero y datos personales— no depende de esta matriz.
+          Las celdas de casa son los mismos interruptores de «Fuentes» (aquí y en Mr. Pilo en Enseñanza): cambiar uno cambia el otro; las «De visita» solo se cambian aquí. El
+          catálogo, las respuestas guardadas, la bandeja y la bitácora siguen siendo de cada portal, lo que cita algo de visita no se guarda, y lo que Pilo nunca dice —dinero y datos
+          personales— no depende de esta matriz. Los puentes se revisan en el mapa global.
         </p>
       )}
     </Group>

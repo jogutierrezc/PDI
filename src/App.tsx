@@ -25,6 +25,7 @@ const TeamPage = lazy(() => import("./modules/planeacion/TeamPage").then((m) => 
 const AskPilo = lazy(() => import("./modules/pregunta/AskPilo").then((m) => ({ default: m.AskPilo })));
 const PiloEmbed = lazy(() => import("./modules/pilo-embed/PiloEmbed").then((m) => ({ default: m.PiloEmbed })));
 const PiloApp = lazy(() => import("./modules/pilo-app/PiloApp").then((m) => ({ default: m.PiloApp })));
+const PiloPolicy = lazy(() => import("./modules/pilo-app/terms/PolicyPage").then((m) => ({ default: m.PolicyPage })));
 
 const Dashboard = lazy(() => import("./routes/Dashboard").then((m) => ({ default: m.Dashboard })));
 const NotFound = lazy(() => import("./routes/NotFound").then((m) => ({ default: m.NotFound })));
@@ -259,6 +260,8 @@ export default function App() {
           {/* La app móvil de Mr. Pilo (PWA): /app, /app/universidad y /app/ensenanza. Una sola ruta, para que
               cambiar de Pilo no desmonte la app ni corte el vuelo de la bienvenida. */}
           <Route path="/app/*" element={<PiloApp />} />
+          {/* La política de uso de Mr. Pilo: un documento público, enlazable por sección (#p1…#p6). */}
+          <Route path="/pilo-politica" element={<PiloPolicy />} />
           <Route path="/tablero" element={<Dashboard />} />
           <Route path="/tablero/pilar/:slug" element={<PillarScorecard />} />
           <Route path="/implementacion" element={<ImplementationPortal />} />

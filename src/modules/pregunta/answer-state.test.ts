@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { activeStep, badgeOf, compactThink, interruptedTurn, notesOf, reduceSteps, secondsText, showsSources, THINKING_KEEP, waitingLine } from "./answer-state";
+import { activeStep, badgeOf, compactThink, interruptedTurn, notesOf, originNote, originOf, reduceSteps, secondsText, showsSources, THINKING_KEEP, waitingLine } from "./answer-state";
 import type { ThinkStep } from "./answer-state";
 import type { AskMeta, AskResult, AskSource, AskThinkStep } from "../../components/pilo/ai/client";
 
@@ -62,6 +62,34 @@ describe("las notas discretas", () => {
     expect(notesOf(answer({ kind: "curada", fallback: "tiempo" }))).toEqual(["La IA no respondió: esta es la respuesta oficial, tal cual."]);
     expect(notesOf(answer({ kind: "extracto", fallback: "proveedor" }))[0]).toMatch(/le muestro lo publicado, tal cual/);
     expect(notesOf(answer({ grounding: "oficial" }))).toEqual([]);
+  });
+});
+
+describe("la procedencia de lo que viene de otro ámbito de Pilo (0122)", () => {
+  const FROM = "De Pilo en Enseñanza · Políticas institucionales";
+  const visit = (n: number, over: Partial<AskSource> = {}): AskSource => ({ ...src(n), via: "visita", from: FROM, ...over });
+
+  it("solo la dice si el servidor la mandó: una fuente de casa no tiene procedencia", () => {
+    expect(originOf(src(1))).toBeNull();
+    expect(originOf({ via: "mapa" })).toBeNull();
+    // La página no la deduce: sin la marca del servidor, no hay procedencia aunque venga un texto.
+    expect(originOf({ from: FROM })).toBeNull();
+    expect(originOf({ via: "visita" })).toBeNull();
+    expect(originOf(visit(2))).toBe(FROM);
+    expect(originOf(visit(2, { via: "puente" }))).toBe(FROM);
+    expect(originOf(visit(2, { from: `  De   Pilo\n en Enseñanza ` }))).toBe("De Pilo en Enseñanza");
+  });
+
+  it("la nota la nombra en palabras, una vez por procedencia, y dice para quién fue preparado si el servidor lo dijo", () => {
+    expect(originNote([src(1)])).toBe("");
+    expect(originNote([src(1), visit(2), visit(3)])).toBe(`Parte de esta respuesta viene de otro ámbito de Pilo: ${FROM}.`);
+    expect(originNote([visit(1, { written_for: "profesores y estudiantes" }), visit(2, { from: "De Pilo de la Universidad · UDES en Cifras", via: "puente" })])).toBe(
+      `Parte de esta respuesta viene de otro ámbito de Pilo: ${FROM} (preparado para profesores y estudiantes); De Pilo de la Universidad · UDES en Cifras.`,
+    );
+    // Va con las demás notas de la respuesta, primero; y no aparece si la respuesta no muestra fuentes.
+    expect(notesOf(answer({ grounding: "oficial", truncated: true, sources: [src(1), visit(2)] }))).toEqual([`Parte de esta respuesta viene de otro ámbito de Pilo: ${FROM}.`, "La respuesta quedó corta: llegó al tope de extensión."]);
+    expect(notesOf(answer({ kind: "extracto", sources: [visit(1)] }))).toEqual([`Parte de esta respuesta viene de otro ámbito de Pilo: ${FROM}.`]);
+    expect(notesOf(answer({ grounding: "general", sources: [visit(1)] }))).toEqual([]);
   });
 });
 

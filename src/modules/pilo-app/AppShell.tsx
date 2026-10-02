@@ -133,7 +133,11 @@ export function AppShell({ space, door, waking, online, person, member, wide, th
   /* --- Estado de la conversación -------------------------------------------------------------- */
 
   const [busy, setBusy] = useState(false);
-  const [draft, setDraft] = useState("");
+  // Una pregunta que llega ya escrita (Mis clases › «Preguntarle a Pilo»): queda en la caja para que la persona la lea y la envíe.
+  const [draft, setDraft] = useState(() => {
+    const asked = (location.state as { pregunta?: unknown } | null)?.pregunta;
+    return typeof asked === "string" ? asked.slice(0, 500) : "";
+  });
   const [live, setLive] = useState<Live | null>(null);
   const [fresh, setFresh] = useState<Map<string, "entera" | "en vivo">>(() => new Map());
   const [status, setStatus] = useState("");

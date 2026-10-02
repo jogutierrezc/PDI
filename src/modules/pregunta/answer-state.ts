@@ -10,7 +10,7 @@
      · en qué queda un turno cuya respuesta se interrumpió.
    ========================================================================== */
 
-import type { AskMeta, AskResult, AskThinkStep } from "../../components/pilo/ai/client";
+import type { AskMeta, AskResult, AskSource, AskThinkStep } from "../../components/pilo/ai/client";
 
 /* --- Etiquetas ---------------------------------------------------------------------------- */
 
@@ -54,9 +54,35 @@ export function badgeOf(a: AskResult, incomplete = false): Badge | null {
 /** ¿Se muestra la lista de fuentes? Con conocimiento general no hay fuentes que mostrar. */
 export const showsSources = (a: AskResult) => a.sources.length > 0 && groundingOf(a) !== "general";
 
+/**
+ * La procedencia de una fuente que es de OTRO ámbito de Pilo (0122), tal como
+ * la escribió el servidor: «De Pilo en Enseñanza · Políticas institucionales».
+ * null si la fuente es de este portal. Nunca se deduce aquí: si el servidor no
+ * la manda, no hay procedencia que mostrar.
+ */
+export function originOf(s: Pick<AskSource, "via" | "from">): string | null {
+  if (s.via !== "visita" && s.via !== "puente") return null;
+  const from = typeof s.from === "string" ? s.from.replace(/\s+/g, " ").trim().slice(0, 200) : "";
+  return from || null;
+}
+
+/** La frase de procedencia de las fuentes de otro ámbito de una respuesta; vacía si todas son de casa. */
+export function originNote(sources: AskSource[]): string {
+  const seen = new Map<string, string>();
+  for (const s of sources) {
+    const from = originOf(s);
+    if (!from || seen.has(from)) continue;
+    const who = typeof s.written_for === "string" ? s.written_for.replace(/\s+/g, " ").trim().slice(0, 200) : "";
+    seen.set(from, who ? `${from} (preparado para ${who})` : from);
+  }
+  return seen.size ? `Parte de esta respuesta viene de otro ámbito de Pilo: ${[...seen.values()].join("; ")}.` : "";
+}
+
 /** Las notas discretas que acompañan a la respuesta. */
 export function notesOf(a: AskResult): string[] {
   const notes: string[] = [];
+  const origin = showsSources(a) ? originNote(a.sources) : "";
+  if (origin) notes.push(origin);
   if (a.partial) notes.push(a.notice?.trim() || "La redacción se cortó: esta respuesta quedó incompleta.");
   if (a.truncated && !a.partial) notes.push("La respuesta quedó corta: llegó al tope de extensión.");
   if (a.fallback) notes.push(a.kind === "curada" ? "La IA no respondió: esta es la respuesta oficial, tal cual." : "La IA no respondió esta vez: le muestro lo publicado, tal cual.");

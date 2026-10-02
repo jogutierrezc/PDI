@@ -38,8 +38,11 @@ import { sayOfficial, stopOfficial } from "../official-voice";
 import { reducedMotion } from "../pwa";
 import { Icon } from "../icons";
 import { asCuentaError, checkUsername, loginAccount, recoverPassword, registerAccount, resendConfirmation } from "./api";
+import { acceptPolicy } from "../terms/acceptance";
+import { CONSENT_LABEL, POLICY_LINK_LABEL, RULES_TITLE } from "../terms/policy";
+import { GoldenRules } from "../terms/GoldenRules";
+import { PolicyLink } from "../terms/PolicyLink";
 import {
-  ACCOUNT_TERMS,
   CAMPUSES,
   DOMAINS,
   EMPTY_REG,
@@ -424,6 +427,8 @@ export function AccountGate({ voice, voiceOn, onVoice, theme, onTheme, account, 
     setBusy(true);
     try {
       const after = await registerAccount(data);
+      // Aceptó la política al crear la cuenta: la app no se la vuelve a pedir en este dispositivo.
+      acceptPolicy();
       const nick = data.nick.trim() || firstName(data.fullName);
       // Si aún no entra (falta confirmar o abrir sesión), conversa sin cuenta: Pilo ya le dice como pidió.
       writeVisitor({ nick: visitorNick(nick), tone: data.tone });
@@ -844,14 +849,15 @@ export function AccountGate({ voice, voiceOn, onVoice, theme, onTheme, account, 
                   />
                 </div>
                 <div className="pc-terms">
+                  {/* Los mismos términos de la app (terms/policy.ts): las cuatro reglas de oro y la política completa. */}
                   <p className="pc-label" id="pc-terminos-titulo">
-                    Términos de la cuenta
+                    {RULES_TITLE}
                   </p>
-                  <ul aria-labelledby="pc-terminos-titulo" id="pc-terminos-texto">
-                    {ACCOUNT_TERMS.map((t) => (
-                      <li key={t}>{t}</li>
-                    ))}
-                  </ul>
+                  <GoldenRules id="pc-terminos-texto" labelledBy="pc-terminos-titulo" />
+                  {/* En otra pestaña: lo ya escrito en el registro no se pierde. */}
+                  <PolicyLink className="pc-quiet" newTab>
+                    {POLICY_LINK_LABEL}
+                  </PolicyLink>
                   <label className="pc-check" htmlFor={FIELD_ID.terms}>
                     <input
                       id={FIELD_ID.terms}
@@ -864,7 +870,7 @@ export function AccountGate({ voice, voiceOn, onVoice, theme, onTheme, account, 
                         if (error) setError(null);
                       }}
                     />
-                    <span>Leí y acepto los términos de la cuenta de Pilo.</span>
+                    <span>{CONSENT_LABEL}</span>
                   </label>
                   {errorOf("terms") && (
                     <Msg tone="bad" id="pc-terminos-error" alert>

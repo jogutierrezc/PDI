@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { teachGraph } from "../../pilo-ensenanza/memoria/map";
 import type { ViewNode } from "../mesh-view";
-import { bridgeKey, bridgeKeys, buildGlobal, computeBridges, countsOf, defaultOpen, detailOf, gid, layoutGlobal, litOf, normLabel, pairKey, revealOf, searchGlobal, visibleOf } from "./global";
-import type { GNode, ViewState } from "./global";
+import { bridgeCounts, bridgeKey, bridgeKeys, bridgeLive, bridgeState, buildGlobal, computeBridges, countsOf, defaultOpen, detailOf, gid, inboxItem, inboxOf, layoutGlobal, litOf, normLabel, pairKey, parseBridges, revealOf, searchGlobal, visibleOf } from "./global";
+import type { GNode, StoredBridge, ViewState } from "./global";
 
 const A = "11111111-1111-4111-8111-111111111111";
 const B = "22222222-2222-4222-8222-222222222222";
@@ -347,5 +347,112 @@ describe("lo que se enciende y el detalle", () => {
     expect(searchGlobal(g, "ods 4", "ensenanza").map((n) => n.id)).toEqual([E("ref:ods-4")]);
     expect(searchGlobal(g, "politicas institucionales")).toEqual([]);
     expect(searchGlobal(g, "   ")).toEqual([]);
+  });
+});
+
+/* --- Los puentes guardados (0122) ------------------------------------------------------------
+   Desde 0122 los puentes se leen de la base, con su origen y su estado. El mapa
+   deja de calcularlos: solo los pone sobre sus puntos. */
+
+describe("puentes guardados", () => {
+  const row = (over: Partial<StoredBridge>): StoredBridge => ({
+    id: 1,
+    a_scope: "ensenanza",
+    a_id: "ref:ods-4",
+    a_label: "ODS 4",
+    b_scope: "planeacion",
+    b_id: "impacto:indicador:i1",
+    b_label: "ODS 4 · Educación de calidad: cobertura",
+    kind: "referencia",
+    key: "ods:4",
+    why: "Los dos nombran ODS 4",
+    origin: "reglas",
+    status: "aprobada",
+    ...over,
+  });
+  const stored = [
+    row({}),
+    row({ id: 2, a_id: `doc:${A}`, a_label: "Política de evaluación", b_id: "pdi:proyecto:x", b_label: "Banco de rúbricas", kind: "relacion", key: "", why: "Este proyecto del Plan desarrolla lo que la política pide.", origin: "ia", status: "propuesta" }),
+    row({ id: 3, a_id: "ref:ley-30", a_label: "Ley 30", b_id: "impacto:indicador:i2", b_label: "Cumplimiento de la Ley 30 de 1992", why: "Los dos nombran Ley 30 de 1992", status: "rechazada" }),
+    // Un puente entre dos puntos que este mapa no dibuja (un tema que también usa Planeación).
+    row({ id: 4, a_id: "tema:evaluacion-formativa", a_label: "Evaluación formativa", b_id: "tema:evaluacion-formativa", b_label: "Evaluación formativa", kind: "tema", why: "Los dos ámbitos tratan «Evaluación formativa»", origin: "ia", status: "propuesta" }),
+  ];
+  const withStored = (bridges: StoredBridge[] | null) => buildGlobal({ planeacion: planeacion(), ensenanza: ensenanza(), order: { planeacion: ["cifras", "pdi", "impacto"], ensenanza: ["politicas"] }, bridges });
+
+  it("el mapa los lee en vez de calcularlos: cada uno con su estado y su origen", () => {
+    const g = withStored(stored);
+    expect(g.stored).toBe(true);
+    // El rechazado no se dibuja; el que une puntos que este mapa no tiene se cuenta aparte.
+    expect(g.bridges).toEqual([
+      { a: P("impacto:indicador:i1"), b: E("ref:ods-4"), kind: "referencia", why: "Los dos nombran ODS 4", id: 1, origin: "reglas", status: "aprobada" },
+      { a: P("pdi:proyecto:x"), b: E(`doc:${A}`), kind: "relacion", why: "Este proyecto del Plan desarrolla lo que la política pide.", id: 2, origin: "ia", status: "propuesta" },
+    ]);
+    expect(g.offMap).toBe(1);
+    expect(countsOf(g).puentes).toBe(2);
+    expect(bridgeCounts(g)).toEqual({ aprobados: 1, propuestos: 1 });
+    // Ya no calcula nada: los cuatro puentes por etiqueta de antes no aparecen si la base no los tiene.
+    expect(g.bridges.some((b) => b.b === E("tema:personalizacion"))).toBe(false);
+    // Con la base sin puentes guardados, el mapa no inventa ninguno.
+    expect(withStored([]).bridges).toEqual([]);
+    expect(withStored([]).stored).toBe(true);
+  });
+
+  it("sin 0122 (no llegan filas) los calcula al dibujar, como antes, y dice que no están guardados", () => {
+    const g = withStored(null);
+    expect(g.stored).toBe(false);
+    expect(g.bridges).toHaveLength(4);
+    expect(g.bridges.every((b) => b.status === undefined && b.origin === undefined && b.id === undefined)).toBe(true);
+    expect(g.offMap).toBe(0);
+    expect(bridgeCounts(g)).toEqual({ aprobados: 0, propuestos: 0 });
+    expect(bridgeState(g.bridges[0])).toBe("Calculado al dibujar · sin guardar");
+    expect(bridgeLive(g.bridges[0])).toBe(false);
+    expect(build().bridges).toEqual(g.bridges);
+  });
+
+  it("el estado se dice en palabras, y solo lo aprobado lo sigue Pilo", () => {
+    expect(bridgeState({ origin: "reglas", status: "aprobada" })).toBe("Aprobado · por reglas");
+    expect(bridgeState({ origin: "ia", status: "propuesta" })).toBe("Por revisar · lo propuso la IA");
+    expect(bridgeState({ origin: "admin", status: "rechazada" })).toBe("Rechazado · lo puso la administración");
+    expect(bridgeLive({ status: "aprobada" })).toBe(true);
+    expect(bridgeLive({ status: "propuesta" })).toBe(false);
+    expect(bridgeLive({ status: "rechazada" })).toBe(false);
+    const g = withStored(stored);
+    const detail = detailOf(g, P("pdi:proyecto:x"))!;
+    expect(detail.bridges.map((b) => [b.other.id, b.status, b.origin, b.id])).toEqual([[E(`doc:${A}`), "propuesta", "ia", 2]]);
+    // El punto del puente rechazado ya no tiene puente.
+    expect(detailOf(g, P("impacto:indicador:i2"))!.bridges).toEqual([]);
+  });
+
+  it("lo plegado pasa sus puentes a quien lo contiene, con su estado", () => {
+    const g = withStored(stored);
+    const v = visibleOf(g, view());
+    const folded = v.bridges.find((b) => b.a === P("fuente:pdi"))!;
+    expect(folded.b).toBe(E("fuente:politicas"));
+    expect(folded.items.map((i) => i.status)).toEqual(["propuesta"]);
+    expect(v.bridges.find((b) => b.b === E("ref:ods-4"))!.items[0].status).toBe("aprobada");
+  });
+
+  it("lee las filas de la base con cuidado: lo que no reconoce no entra", () => {
+    expect(parseBridges(null)).toEqual([]);
+    expect(parseBridges([row({}), null, "x", { id: "abc" }, { ...row({ id: 9 }), status: "activa" }, { ...row({ id: 10 }), origin: "modelo" }, { ...row({ id: 11 }), b_scope: "ensenanza" }])).toEqual([row({})]);
+    expect(parseBridges([{ ...row({ id: 12 }), kind: "otra", why: "  con   espacios  ", a_label: 7 }])).toEqual([row({ id: 12, kind: "relacion", why: "con espacios", a_label: "" })]);
+  });
+
+  it("la bandeja: solo los propuestos, con sus dos extremos (Planeación primero) y de dónde salen", () => {
+    const g = withStored(stored);
+    const inbox = inboxOf(stored, g.byId);
+    expect(inbox.map((i) => i.bridge.id)).toEqual([2, 4]);
+    expect(inbox[0].ends).toEqual([
+      { space: "planeacion", label: "Banco de rúbricas", node: P("pdi:proyecto:x") },
+      { space: "ensenanza", label: "Política de evaluación", node: E(`doc:${A}`) },
+    ]);
+    expect(inbox[0].origin).toBe("Lo propuso la IA · relación propuesta");
+    // Un extremo que el mapa no dibuja se nombra igual, sin punto al que saltar.
+    expect(inbox[1].ends[0]).toEqual({ space: "planeacion", label: "Evaluación formativa", node: null });
+    expect(inbox[1].ends[1]).toEqual({ space: "ensenanza", label: "Evaluación formativa", node: E("tema:evaluacion-formativa") });
+    expect(inbox[1].origin).toBe("Lo propuso la IA · tratan el mismo tema");
+    // Sin etiqueta guardada, vale el nombre del punto o, si no está en el mapa, su id.
+    expect(inboxItem(row({ a_label: "", b_label: "" }), g.byId).ends.map((e) => e.label)).toEqual(["ODS 4 · Educación de calidad: cobertura", "ODS 4"]);
+    expect(inboxItem(row({ a_id: "ref:nada", a_label: "" }), g.byId).ends[1]).toEqual({ space: "ensenanza", label: "ref:nada", node: null });
   });
 });

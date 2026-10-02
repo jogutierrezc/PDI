@@ -22,6 +22,17 @@
    puestas a mano («casa» sobre fuentes ajenas, Moodle hacia fuera, «visita» en
    todo lo ajeno) y una con celdas en «no».
 
+   Desde 0122 lo de otro ámbito SÍ se puede leer, y solo por dos caminos más:
+
+     visita       pilo_memory_visit (cuando lo de casa no alcanza)
+     puente       pilo_bridge_neighbors (un puente aprobado, desde un pasaje de casa)
+
+   Cada caso lleva su puente aprobado hacia el «gemelo» del otro ámbito, así que
+   el barrido comprueba, por cada portal × fuente × visibilidad × quién pregunta,
+   que un pasaje de visita llega solo por esos dos caminos, solo si la celda dice
+   «visita», con su visibilidad, y nunca por los seis de casa. Y lo repite con
+   los puentes en «propuesta» y en «rechazada»: no traen nada.
+
    Además: la matriz de partida da EXACTAMENTE lo de antes de la migración (se
    comparan dos bases, una sin 0121 y otra con ella, llamadas como llama la
    función desplegada hoy); el catálogo y las guardadas de un portal no se
@@ -38,6 +49,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { createTestDb, errorOf, PEOPLE, type Query, type TestDb } from "./harness";
 
 const MIGRATION = resolve(__dirname, "../../supabase/migrations/0121_pilo_portales.sql");
+const BRIDGES = resolve(__dirname, "../../supabase/migrations/0122_pilo_puentes.sql");
 
 type Vis = "publico" | "sesion" | "oculto";
 type Cell = "casa" | "visita" | "no";
@@ -65,9 +77,9 @@ const LEGACY: { id: string; scope: string }[] = [
 /**
  * EL ORÁCULO: la regla, dicha otra vez y en el orden de la propuesta.
  *   1. Visibilidad del pasaje: «oculto» nunca; «sesion» solo el personal de la intranet.
- *   2. La matriz del portal: solo «casa», y «de casa» es lo del propio ámbito. «visita» hoy es «no».
+ *   2. La matriz del portal: solo «casa», y «de casa» es lo del propio ámbito. Por los caminos de casa, «visita» es «no».
  *   3. Quién pregunta: una fuente que pide sesión (Impacto) solo con personal.
- *   4. Lo que no sale de casa (Moodle) solo importaría para «visita», que aún no se lee.
+ *   4. Lo que no sale de casa (Moodle) solo importa para «visita»: ver `canVisit`.
  */
 function canRead(portal: Portal, source: Source, vis: Vis, who: Who): boolean {
   const staff = !who.publicOnly && !who.member;
@@ -78,6 +90,27 @@ function canRead(portal: Portal, source: Source, vis: Vis, who: Who): boolean {
   if (source.staff_only && !staff) return false;
   return true;
 }
+
+/**
+ * EL ORÁCULO DE LA VISITA (0122): lo mismo, con la otra celda. Leer de visita no eleva permisos.
+ *   1. Visibilidad del pasaje: «oculto» nunca; «sesion» solo el personal de la intranet (una cuenta de Pilo no lo es).
+ *   2. La matriz del portal: la celda dice «visita» y la fuente es de OTRO ámbito.
+ *   3. Quién pregunta: una fuente que pide sesión (Impacto) solo con personal.
+ *   4. Lo que no sale de casa (Moodle) no se lee de visita, diga lo que diga la celda.
+ */
+function canVisit(portal: Portal, source: Source, vis: Vis, who: Who): boolean {
+  const staff = !who.publicOnly && !who.member;
+  if (vis === "oculto") return false;
+  if (vis === "sesion" && !staff) return false;
+  if ((portal.matrix[source.id] ?? "no") !== "visita") return false;
+  if (source.scope === portal.scope) return false;
+  if (source.staff_only && !staff) return false;
+  if (source.stays_home) return false;
+  return true;
+}
+
+/** La fuente del «gemelo» de cada ámbito: el pasaje de casa desde el que se piden los vecinos y los puentes. */
+const TWIN_SOURCE: Record<string, string> = { planeacion: "cifras", ensenanza: "politicas" };
 
 const other = (scope: string) => (scope === "planeacion" ? "ensenanza" : "planeacion");
 const ref = (source: string, vis: Vis) => `fuga:${source}:${vis}`;
@@ -102,8 +135,11 @@ async function vectorDouble(t: TestDb) {
  * relación INDEBIDA hacia su tema con el espacio del otro ámbito: si los
  * vecinos se fiaran solo de las relaciones, por ahí cruzaría. Y por cada pasaje
  * una respuesta guardada en cada portal que solo lo cita a él.
+ * Con 0122, además, un PUENTE APROBADO entre cada pasaje y el gemelo del otro
+ * ámbito: si la lectura de visita se fiara solo del puente, por ahí saldría todo.
  */
 async function seed(t: TestDb, sources: { id: string; scope: string }[]) {
+  const [{ bridges }] = await t.q<{ bridges: boolean }>("select to_regclass('public.pilo_bridges') is not null as bridges");
   await t.db.exec("create table public.fuga_cases (ref text primary key, token text, source text, space text, vis text, twin_planeacion text, twin_ensenanza text); grant select on public.fuga_cases to service_role, authenticated;");
   let n = 0;
   for (const s of sources) {
@@ -140,6 +176,13 @@ async function seed(t: TestDb, sources: { id: string; scope: string }[]) {
         [token, `Respuesta que cita ${id}.`, id],
       );
       await t.q("insert into fuga_cases (ref, token, source, space, vis, twin_planeacion, twin_ensenanza) values ($1, $2, $3, $4, $5, $6, $7)", [id, token, s.id, s.scope, vis, twin.planeacion, twin.ensenanza]);
+      // El par se guarda con el ámbito menor primero («ensenanza» < «planeacion»).
+      if (bridges) {
+        await t.q(
+          "insert into pilo_bridges (a_scope, a_id, b_scope, b_id, kind, why, origin, status) values ('ensenanza', $1, 'planeacion', $2, 'referencia', 'Puente de la prueba de fuga', 'reglas', 'aprobada')",
+          s.scope === "planeacion" ? [twin.ensenanza, id] : [id, twin.planeacion],
+        );
+      }
     }
     // Su lugar en la malla: un nodo de esa fuente, colgado de la raíz de su ámbito.
     await t.q("insert into pilo_nodes (id, source, type, label, space) values ($1, $2, 'nodo', $3, $4)", [`malla:${s.id}`, s.id, `Nodo de ${s.id}`, s.scope]);
@@ -169,9 +212,12 @@ interface Seen {
   readable: string[];
   fresh: boolean;
   saved_n: number;
+  /** Los dos caminos de visita (0122). */
+  visit: string[];
+  bridge: string[];
 }
 
-/** Los cuatro caminos de pasajes y las guardadas, para todos los casos, como ese portal y esa persona. */
+/** Los caminos de pasajes (los cuatro de casa y los dos de visita) y las guardadas, para todos los casos, como ese portal y esa persona. */
 const look = (t: TestDb, portal: string, who: Who) =>
   asService(t, (q) =>
     q<Seen>(
@@ -181,7 +227,20 @@ const look = (t: TestDb, portal: string, who: Who) =>
          (select coalesce(array_agg(r.ref order by r.ref), '{}') from pilo_graph_neighbors(array[case when $1 = 'planeacion' then c.twin_planeacion else c.twin_ensenanza end], $1, null, $2, 10, $3) r) as neighbors,
          (select coalesce(array_agg(r.ref order by r.ref), '{}') from pilo_memory_readable(array[c.ref], $1, $2, $3) r) as readable,
          (select coalesce(bool_or(a.fresh), false) from pilo_answer_candidates(c.token, $1, '', $2, $3) a) as fresh,
-         (select count(*)::int from pilo_answer_candidates(c.token, $1, '', $2, $3) a) as saved_n
+         (select count(*)::int from pilo_answer_candidates(c.token, $1, '', $2, $3) a) as saved_n,
+         (select coalesce(array_agg(r.ref order by r.ref), '{}') from pilo_memory_visit(c.token, 8, $1, $2, $3) r) as visit,
+         (select coalesce(array_agg(r.ref order by r.ref), '{}') from pilo_bridge_neighbors(array[case when $1 = 'planeacion' then c.twin_planeacion else c.twin_ensenanza end], $1, $2, $3, 4) r) as bridge
+       from fuga_cases c order by c.ref`,
+      [portal, who.publicOnly, who.member],
+    ),
+  );
+
+/** Solo el camino de los puentes, para todos los casos: lo que un puente trae desde el gemelo de casa. */
+const lookBridges = (t: TestDb, portal: string, who: Who) =>
+  asService(t, (q) =>
+    q<{ ref: string; bridge: string[] }>(
+      `select c.ref,
+         (select coalesce(array_agg(r.ref order by r.ref), '{}') from pilo_bridge_neighbors(array[case when $1 = 'planeacion' then c.twin_planeacion else c.twin_ensenanza end], $1, $2, $3, 4) r) as bridge
        from fuga_cases c order by c.ref`,
       [portal, who.publicOnly, who.member],
     ),
@@ -218,13 +277,18 @@ beforeAll(async () => {
 
 afterAll(() => t?.close());
 
-/** Corre todos los casos con la matriz que haya y devuelve cuántos comprobó y cuántos debían verse. */
-async function sweep(): Promise<{ cases: number; checks: number; visible: number }> {
+/**
+ * Corre todos los casos con la matriz que haya y devuelve cuántos comprobó, cuántos debían verse de
+ * casa, cuántos de visita (lo de casa no alcanza) y cuántos por su puente aprobado.
+ */
+async function sweep(): Promise<{ cases: number; checks: number; visible: number; visiting: number; bridged: number }> {
   const { sources, portals } = await loadMatrix(t);
   const byId = new Map(sources.map((s) => [s.id, s]));
   let cases = 0;
   let checks = 0;
   let visible = 0;
+  let visiting = 0;
+  let bridged = 0;
   for (const portal of portals) {
     for (const who of WHO) {
       const seen = await look(t, portal.id, who);
@@ -241,9 +305,19 @@ async function sweep(): Promise<{ cases: number; checks: number; visible: number
         expect(c.fresh, `guardadas · ${label}`).toBe(want);
         // La guardada del OTRO portal, con la misma pregunta, nunca es candidata aquí.
         expect(c.saved_n, `guardadas de otro portal · ${label}`).toBe(1);
+        // De visita: solo por sus dos caminos. Por el puente, además, solo si el pasaje de casa del que
+        // sale (el gemelo) se lee de casa en ese portal para esa persona.
+        const visit = canVisit(portal, byId.get(c.source)!, c.vis, who);
+        const fromHome = canRead(portal, byId.get(TWIN_SOURCE[portal.scope])!, "publico", who);
+        expect(c.visit, `visita · ${label}`).toEqual(visit ? [c.ref] : []);
+        expect(c.bridge, `puente · ${label}`).toEqual(visit && fromHome ? [c.ref] : []);
+        // Nunca las dos cosas: lo que se lee de casa no es de visita.
+        expect(want && visit, `casa y visita a la vez · ${label}`).toBe(false);
         cases += 1;
-        checks += 6;
+        checks += 8;
         if (want) visible += 1;
+        if (visit) visiting += 1;
+        if (visit && fromHome) bridged += 1;
       }
       // La malla: los nodos de las fuentes que ese portal lee de casa para esa persona, y nada más.
       const staff = !who.publicOnly && !who.member;
@@ -255,7 +329,26 @@ async function sweep(): Promise<{ cases: number; checks: number; visible: number
       checks += sources.length;
     }
   }
-  return { cases, checks, visible };
+  return { cases, checks, visible, visiting, bridged };
+}
+
+/** Con los puentes en un estado que no es «aprobada», ninguno trae nada: todos los casos, todos los portales, todos los que preguntan. */
+async function sweepBridges(status: "propuesta" | "rechazada"): Promise<number> {
+  await t.q("update pilo_bridges set status = $1 where why = 'Puente de la prueba de fuga'", [status]);
+  let checks = 0;
+  try {
+    for (const portal of (await loadMatrix(t)).portals) {
+      for (const who of WHO) {
+        for (const c of await lookBridges(t, portal.id, who)) {
+          expect(c.bridge, `puente ${status} · ${portal.id} · ${c.ref} · ${who.id}`).toEqual([]);
+          checks += 1;
+        }
+      }
+    }
+  } finally {
+    await t.q("update pilo_bridges set status = 'aprobada' where why = 'Puente de la prueba de fuga'");
+  }
+  return checks;
 }
 
 describe("la matriz de partida", () => {
@@ -280,11 +373,14 @@ describe("la matriz de partida", () => {
     expect(w.b).toBe("profesores y estudiantes");
   });
 
-  it("todos los casos, por los seis caminos", async () => {
+  it("todos los casos, por los seis caminos de casa y los dos de visita: nada sale de su ámbito", async () => {
     const r = await sweep();
     // 2 portales × 12 fuentes × 3 visibilidades × 4 quién pregunta.
     expect(r.cases).toBe(2 * 12 * 3 * 4);
-    expect(r.checks).toBe(r.cases * 6 + 2 * 4 * 12);
+    expect(r.checks).toBe(r.cases * 8 + 2 * 4 * 12);
+    // La lectura entre ámbitos nace apagada: con cada pasaje unido por un puente aprobado, no sale ninguno.
+    expect(r.visiting).toBe(0);
+    expect(r.bridged).toBe(0);
     // Con la matriz de partida: visitante y cuentas ven lo público de sus fuentes sin Impacto (4 + 4, tres veces);
     // el personal, lo público y lo de sesión de sus fuentes (5 × 2 + 4 × 2).
     expect(r.visible).toBe(3 * (4 + 4) + (10 + 8));
@@ -292,26 +388,37 @@ describe("la matriz de partida", () => {
 });
 
 describe("con todo abierto y celdas indebidas puestas a mano", () => {
-  it("«visita» se comporta como «no», «casa» sobre lo ajeno no vale y Moodle no sale de su portal", async () => {
+  it("«visita» se lee solo por sus dos caminos, «casa» sobre lo ajeno no vale y Moodle no sale de su portal", async () => {
     const { sources } = await loadMatrix(t);
     const open = (portal: string): Record<string, Cell> => {
       const scope = portal;
       return Object.fromEntries(sources.map((s) => [s.id, s.scope === scope ? "casa" : "visita"])) as Record<string, Cell>;
     };
-    // Planeación: «casa» sobre Moodle y sobre Innovación (indebidas); lo demás ajeno, «visita».
-    await forceMatrix(t, "planeacion", { ...open("planeacion"), moodle: "casa", innovacion: "casa" });
-    // Enseñanza: «casa» sobre las cifras y «visita» sobre Impacto y sobre su propio Moodle (sin sentido).
+    // Planeación: «casa» sobre Innovación (indebida); lo demás ajeno, «visita», también Moodle (que no sale de su casa).
+    // Y «visita» sobre una fuente propia (Boletines), que no tiene sentido: no se lee ni de casa ni de visita.
+    await forceMatrix(t, "planeacion", { ...open("planeacion"), innovacion: "casa", boletines: "visita" });
+    // Enseñanza: «casa» sobre las cifras (indebida) y «visita» sobre todo lo demás ajeno, con Impacto.
     await forceMatrix(t, "ensenanza", { ...open("ensenanza"), cifras: "casa", impacto: "visita" });
 
     const r = await sweep();
     expect(r.cases).toBe(288);
-    // Solo crece lo de casa: Planeación gana sus tres colecciones de documentos. Nada ajeno.
-    expect(r.visible).toBe(3 * (7 + 4) + (16 + 8));
+    // De casa solo crece lo propio: Planeación gana sus tres colecciones de documentos y pierde Boletines. Nada ajeno por esos caminos.
+    expect(r.visible).toBe(3 * (6 + 4) + (14 + 8));
+    // De visita. Planeación: Políticas y Mirada global (ni Moodle, ni la «casa» indebida): lo público a quien no es
+    // personal (2 × 3) y lo público y lo «con sesión» al personal (4). Enseñanza: seis fuentes de Planeación a quien
+    // no es personal (6 × 3) y, con Impacto, siete al personal (14). Las cifras, con «casa» indebida, a nadie.
+    expect(r.visiting).toBe(2 * 3 + 4 + (6 * 3 + 14));
+    // Y cada uno llega también por su puente aprobado, porque el gemelo de casa se lee.
+    expect(r.bridged).toBe(r.visiting);
+
+    // Un puente que no está aprobado no trae nada, con la matriz abierta: los 288 casos, dos veces.
+    expect(await sweepBridges("propuesta")).toBe(288);
+    expect(await sweepBridges("rechazada")).toBe(288);
 
     // El valor existe en el filtro: pilo_scope devuelve aparte lo que estaría «de visita»…
     const visiting = (portal: string, session: boolean, member = false) =>
       asService(t, (q) => q<{ source: string; mode: string }>("select source, mode from pilo_scope($1, $2, $3) where mode <> 'casa' order by source", [portal, session, member]));
-    // …sin Moodle (no sale de casa), sin lo marcado «casa» siendo ajeno, y con Impacto solo para el personal.
+    // …sin Moodle (no sale de casa, aunque su celda dice «visita»), sin lo marcado «casa» siendo ajeno, y con Impacto solo para el personal.
     expect(await visiting("planeacion", true)).toEqual([{ source: "global", mode: "visita" }, { source: "politicas", mode: "visita" }]);
     expect((await visiting("ensenanza", true)).map((x) => x.source)).toEqual(["boletines", "impacto", "institucional", "lineamientos", "normativa", "observatorio", "pdi"]);
     expect((await visiting("ensenanza", false)).map((x) => x.source)).not.toContain("impacto");
@@ -324,13 +431,18 @@ describe("con todo abierto y celdas indebidas puestas a mano", () => {
 });
 
 describe("con celdas en «no»", () => {
-  it("una celda en «no» no deja pasar nada por ningún camino; lo demás sigue igual", async () => {
-    await forceMatrix(t, "planeacion", { ...start.planeacion, pdi: "no", impacto: "no", institucional: "casa" });
-    await forceMatrix(t, "ensenanza", { ...start.ensenanza, politicas: "no", moodle: "no" });
+  it("una celda en «no» no deja pasar nada por ningún camino, ni con un puente aprobado; lo demás sigue igual", async () => {
+    // Cada portal, además, con UNA celda «de visita»: lo demás ajeno sigue en «no» aunque tenga su puente aprobado.
+    await forceMatrix(t, "planeacion", { ...start.planeacion, pdi: "no", impacto: "no", institucional: "casa", politicas: "visita" });
+    await forceMatrix(t, "ensenanza", { ...start.ensenanza, politicas: "no", moodle: "no", cifras: "visita" });
     const r = await sweep();
     expect(r.cases).toBe(288);
     // Planeación: cifras, boletines, observatorio e institucional; Enseñanza: innovación y global.
     expect(r.visible).toBe(3 * (4 + 2) + (8 + 4));
+    // De visita, una fuente por portal: lo público a tres y lo público y lo «con sesión» al personal.
+    expect(r.visiting).toBe(5 + 5);
+    // Por el puente solo en Planeación: en Enseñanza el pasaje de casa del que sale (Políticas) está en «no».
+    expect(r.bridged).toBe(5);
     // Un portal que no existe no lee nada.
     const nobody = await asService(t, (q) => q("select * from pilo_memory_search('q1000k', null, 20, 'otro', false, false)"));
     expect(nobody).toEqual([]);
@@ -338,8 +450,11 @@ describe("con celdas en «no»", () => {
     // Y se vuelve a la de partida para lo que sigue.
     await forceMatrix(t, "planeacion", start.planeacion);
     await forceMatrix(t, "ensenanza", start.ensenanza);
-    expect((await sweep()).visible).toBe(3 * (4 + 4) + (10 + 8));
-  }, 180_000);
+    const back = await sweep();
+    expect(back.visible).toBe(3 * (4 + 4) + (10 + 8));
+    expect(back.visiting).toBe(0);
+    expect(back.bridged).toBe(0);
+  }, 240_000);
 });
 
 describe("el catálogo y las guardadas son de cada portal", () => {
@@ -411,10 +526,13 @@ describe("quién lee y quién cambia la matriz", () => {
     expect(await errorOf(t.q("update pilo_portals set matrix = '[]'::jsonb where id = 'planeacion'"))).toMatch(/pilo_portals_matrix/);
   });
 
-  it("cada celda se revisa: «casa» solo en lo propio, «visita» todavía no, y dice su efecto", async () => {
-    const set = (portal: string, patch: unknown) => asAdmin((q) => q<{ r: { matrix: Record<string, Cell>; effects: { source: string; from: string; to: string; passages: number; answers: number }[]; written_for: string } }>("select pilo_portal_update($1, $2::jsonb) as r", [portal, JSON.stringify(patch)]), true).then((r) => r[0].r);
-    expect(await errorOf(set("planeacion", { matrix: { politicas: "visita" } }))).toMatch(/todavía no está disponible/);
-    expect(await errorOf(set("ensenanza", { matrix: { cifras: "visita" } }))).toMatch(/todavía no está disponible/);
+  it("cada celda se revisa: «casa» solo en lo propio, «visita» solo en lo ajeno que puede salir, y dice su efecto", async () => {
+    const set = (portal: string, patch: unknown) => asAdmin((q) => q<{ r: { matrix: Record<string, Cell>; effects: Record<string, unknown>[]; written_for: string } }>("select pilo_portal_update($1, $2::jsonb) as r", [portal, JSON.stringify(patch)]), true).then((r) => r[0].r);
+    // «De visita» es solo para lo de otro ámbito, y nunca para lo que no sale de su casa.
+    expect(await errorOf(set("planeacion", { matrix: { cifras: "visita" } }))).toMatch(/solo para las fuentes de otro ámbito/);
+    expect(await errorOf(set("ensenanza", { matrix: { politicas: "visita" } }))).toMatch(/solo para las fuentes de otro ámbito/);
+    expect(await errorOf(set("planeacion", { matrix: { moodle: "visita" } }))).toMatch(/no sale de su portal/);
+    expect(await errorOf(set("ensenanza", { matrix: { moodle: "visita" } }))).toMatch(/solo para las fuentes de otro ámbito/);
     expect(await errorOf(set("planeacion", { matrix: { politicas: "casa" } }))).toMatch(/solo para las fuentes del propio portal/);
     expect(await errorOf(set("planeacion", { matrix: { moodle: "casa" } }))).toMatch(/solo para las fuentes del propio portal/);
     expect(await errorOf(set("ensenanza", { matrix: { cifras: "casa" } }))).toMatch(/solo para las fuentes del propio portal/);
@@ -428,7 +546,7 @@ describe("quién lee y quién cambia la matriz", () => {
     // Apagar una fuente: dice cuántos pasajes deja de leer y cuántas guardadas dejan de servirse.
     const off = await set("planeacion", { matrix: { pdi: "no", cifras: "casa" } });
     expect(off.matrix.pdi).toBe("no");
-    expect(off.effects).toEqual([{ source: "pdi", name: "Plan de Desarrollo", from: "casa", to: "no", passages: 2, answers: 3 }]);
+    expect(off.effects).toEqual([{ source: "pdi", name: "Plan de Desarrollo", from: "casa", to: "no", passages: 2, public: 1, session: 1, answers: 3, bridges: 0, staff_only: false, home: "Pilo de la Universidad", written_for: "la dirección de la universidad y la Oficina de Planeación" }]);
     // Encender una colección de documentos de casa.
     const on = await set("planeacion", { matrix: { normativa: "casa" }, written_for: "  la   dirección de la universidad " });
     expect(on.effects.map((e) => [e.source, e.from, e.to])).toEqual([["normativa", "no", "casa"]]);
@@ -437,6 +555,67 @@ describe("quién lee y quién cambia la matriz", () => {
     expect((await set("planeacion", { matrix: { politicas: "no" } })).effects).toEqual([]);
     await set("planeacion", { matrix: { pdi: "casa", normativa: "no" }, written_for: "la dirección de la universidad y la Oficina de Planeación" });
     expect((await loadMatrix(t)).portals[0].matrix).toEqual(start.planeacion);
+  });
+
+  it("«De visita» se marca celda por celda: antes dice qué efecto tendrá, y no escribe si la celda cambió en otra pestaña", async () => {
+    const set = (portal: string, patch: unknown) => asAdmin((q) => q<{ r: { matrix: Record<string, Cell>; effects: Record<string, unknown>[] } }>("select pilo_portal_update($1, $2::jsonb) as r", [portal, JSON.stringify(patch)]), true).then((r) => r[0].r);
+    const preview = (portal: string, source: string, value: string) => asAdmin((q) => q<{ r: Record<string, unknown> }>("select pilo_portal_preview($1, $2, $3) as r", [portal, source, value])).then((r) => r[0].r);
+    // Antes de confirmar: cuántos pasajes de esa fuente podrá leer el portal (públicos y «con sesión»),
+    // de qué portal es, para quién fue escrita y cuántos puentes aprobados hay entre los dos ámbitos.
+    // (Políticas tiene los dos pasajes del caso y, públicos, los 36 «gemelos» de Enseñanza.)
+    const before = await preview("planeacion", "politicas", "visita");
+    expect(before).toMatchObject({ source: "politicas", name: "Políticas institucionales", from: "no", to: "visita", passages: 38, public: 37, session: 1, staff_only: false, home: "Pilo en Enseñanza", written_for: "profesores y estudiantes" });
+    expect(Number(before.bridges)).toBe(36);
+    // Ver el efecto no cambia nada, y solo la administración lo pide.
+    expect((await loadMatrix(t)).portals[0].matrix).toEqual(start.planeacion);
+    expect(await errorOf(t.asUser(PEOPLE.vx, (q) => q("select pilo_portal_preview('planeacion', 'politicas', 'visita')")))).toMatch(/Solo la administración/);
+    expect(await errorOf(t.asUser(null, (q) => q("select pilo_portal_preview('planeacion', 'politicas', 'visita')")))).toMatch(/permission denied/);
+    expect(await errorOf(preview("planeacion", "moodle", "visita"))).toMatch(/no sale de su portal/);
+
+    // Otra pestaña ya movió la celda: quien la veía en «no» y quiere «visita» no escribe nada.
+    await forceMatrix(t, "planeacion", { ...start.planeacion, politicas: "visita" });
+    expect(await errorOf(set("planeacion", { matrix: { politicas: "no" }, expect: { politicas: "no" } }))).toMatch(/cambió mientras tanto \(ahora dice «visita»\)/);
+    expect((await loadMatrix(t)).portals[0].matrix.politicas).toBe("visita");
+    await forceMatrix(t, "planeacion", start.planeacion);
+    // Con lo esperado al día, se aplica, y devuelve el mismo efecto que anunció.
+    const on = await set("planeacion", { matrix: { politicas: "visita" }, expect: { politicas: "no" } });
+    expect(on.matrix.politicas).toBe("visita");
+    expect(on.effects).toEqual([before]);
+    // Una celda que no está escrita se espera como «no».
+    expect(await errorOf(set("ensenanza", { matrix: { cifras: "visita" }, expect: { cifras: "casa" } }))).toMatch(/cambió mientras tanto/);
+    expect(await errorOf(set("planeacion", { matrix: {}, expect: [] }))).toMatch(/objeto/);
+
+    // Y ahora sí se lee, solo por los caminos de visita y con su procedencia.
+    const [policy] = await t.q<{ token: string; twin_planeacion: string }>("select token, twin_planeacion from fuga_cases where ref = 'fuga:politicas:publico'");
+    const visit = await asService(t, (q) => q<Record<string, unknown>>("select ref, space, source_name, home_name, written_for, audience from pilo_memory_visit($1, 4, 'planeacion', true, false)", [policy.token]));
+    expect(visit).toEqual([{ ref: "fuga:politicas:publico", space: "ensenanza", source_name: "Políticas institucionales", home_name: "Pilo en Enseñanza", written_for: "profesores y estudiantes", audience: ["estudiante", "profesor"] }]);
+    const bridge = await asService(t, (q) => q<Record<string, unknown>>("select ref, space, home_name, why, origin, kind from pilo_bridge_neighbors($1::text[], 'planeacion', true, false, 2)", [[policy.twin_planeacion]]));
+    expect(bridge).toEqual([{ ref: "fuga:politicas:publico", space: "ensenanza", home_name: "Pilo en Enseñanza", why: "Puente de la prueba de fuga", origin: "reglas", kind: "referencia" }]);
+    expect(await asService(t, (q) => q("select ref from pilo_memory_search($1, null, 20, 'planeacion', true, false)", [policy.token]))).toEqual([]);
+    // Sin decir quién lee, la visita es la de un visitante: nunca lo «con sesión».
+    const [reserved] = await t.q<{ token: string }>("select token from fuga_cases where ref = 'fuga:politicas:sesion'");
+    expect(await asService(t, (q) => q("select ref from pilo_memory_visit($1, 4, 'planeacion')", [reserved.token]))).toEqual([]);
+    expect(await asService(t, (q) => q("select ref from pilo_memory_visit($1, 4, 'planeacion', false, false)", [reserved.token]))).toEqual([{ ref: "fuga:politicas:sesion" }]);
+    // El público no llama a ninguna de las dos, y quien no es administración tampoco.
+    for (const sql of ["select * from pilo_memory_visit('x')", "select * from pilo_bridge_neighbors(array['x'], 'planeacion')"]) {
+      expect(await errorOf(t.asUser(null, (q) => q(sql))), sql).toMatch(/permission denied/);
+      expect(await errorOf(t.asUser(PEOPLE.vx, (q) => q(sql))), sql).toMatch(/Solo la función de Pilo/);
+    }
+
+    // El espejo no aprende «visita»: los interruptores de siempre solo conocen lo de casa.
+    const [flags] = await t.q<{ p: Record<string, unknown>; e: Record<string, unknown> }>("select (select memory_sources from pilo_ai_settings where id = 1) as p, (select memory_sources from pilo_spaces where id = 'ensenanza') as e");
+    expect(Object.keys(flags.p)).not.toContain("politicas");
+    expect(JSON.stringify(flags)).not.toContain("visita");
+    // Y una pestaña vieja que guarda sus interruptores (aunque nombre la fuente ajena) no toca la celda de visita.
+    await t.q(`update pilo_ai_settings set memory_sources = memory_sources || '{"politicas": false, "pdi": true}'::jsonb where id = 1`);
+    expect((await loadMatrix(t)).portals[0].matrix.politicas).toBe("visita");
+    await t.q("update pilo_ai_settings set memory_sources = memory_sources - 'politicas' where id = 1");
+
+    // Apagarla dice cuántos pasajes deja de leer.
+    const off = await set("planeacion", { matrix: { politicas: "no" }, expect: { politicas: "visita" } });
+    expect(off.effects).toEqual([{ ...before, from: "visita", to: "no" }]);
+    expect((await loadMatrix(t)).portals[0].matrix).toEqual(start.planeacion);
+    expect(await asService(t, (q) => q("select ref from pilo_memory_visit($1, 4, 'planeacion', true, false)", [policy.token]))).toEqual([]);
   });
 });
 
@@ -543,9 +722,14 @@ describe("los documentos del Pilo general", () => {
       { ref: `doc:${TEACH}:2`, topics: [{ id: "tema:evaluacion-formativa", label: "Evaluación formativa" }] },
     ])])).toBe(2);
 
-    // «Comprender» en Planeación: lo pendiente son sus pasajes, y el tema que ya existe se reutiliza.
+    // «Comprender» en Planeación: lo pendiente son sus pasajes, los de documentos primero, y el tema que ya existe se reutiliza.
     const pending = await asService(t, (q) => q<{ ref: string }>("select ref from pilo_map_pending('planeacion', null, 60)"));
-    expect(pending.map((p) => p.ref)).toEqual([`doc:${DOC}:1`, `doc:${DOC}:2`]);
+    expect(pending.slice(0, 2).map((p) => p.ref)).toEqual([`doc:${DOC}:1`, `doc:${DOC}:2`]);
+    // Desde 0122 siguen los pasajes de portal (los de la siembra), nunca uno oculto ni uno de Enseñanza.
+    expect(pending.length).toBeGreaterThan(2);
+    expect(pending.slice(2).every((p) => /^(fuga|gemelo):/.test(p.ref) && !p.ref.endsWith(":oculto") && !p.ref.startsWith("gemelo:ensenanza"))).toBe(true);
+    const mine = await asService(t, (q) => q<{ ref: string }>("select ref from pilo_map_pending('planeacion', $1, 60)", [DOC]));
+    expect(mine.map((p) => p.ref)).toEqual([`doc:${DOC}:1`, `doc:${DOC}:2`]);
     expect(await rpc("pilo_map_save('planeacion', $1::jsonb)", [JSON.stringify([
       { ref: `doc:${DOC}:1`, topics: [{ id: "tema:escalafon", label: "Escalafón docente" }] },
       { ref: `doc:${DOC}:2`, topics: [{ id: "tema:escalafon", label: "Escalafón docente" }, { id: "tema:evaluacion-formativa", label: "OTRA ETIQUETA" }] },
@@ -560,7 +744,7 @@ describe("los documentos del Pilo general", () => {
       { to_id: "tema:evaluacion-formativa", space: "planeacion" },
     ]);
     expect((await t.q<{ status: string }>("select status from pilo_docs where id = $1", [DOC]))[0].status).toBe("entendido");
-    const status = await asService(t, (q) => q<{ s: { total: number; pending: number; topics: number; refs: number } }>("select pilo_map_status('planeacion') as s"));
+    const status = await asService(t, (q) => q<{ s: { total: number; pending: number; topics: number; refs: number } }>("select pilo_map_status('planeacion', $1) as s", [DOC]));
     expect(status[0].s).toMatchObject({ total: 2, pending: 0, refs: 1 });
     const topics = await asService(t, (q) => q<{ id: string }>("select id from pilo_map_topics('planeacion', 300) where id not like 'tema:fuga-%' order by id"));
     expect(topics.map((x) => x.id)).toEqual(["ref:ley-30-de-1992", "tema:escalafon", "tema:evaluacion-formativa"]);
@@ -601,15 +785,39 @@ describe("la migración", () => {
         (select memory_sources from pilo_spaces where id = 'ensenanza') as flags_e,
         (select count(*)::int from pilo_memory) as memory,
         (select count(*)::int from pilo_edges) as edges,
+        (select jsonb_agg(to_jsonb(b) - 'created_at' - 'decided_at' order by b.id) from pilo_bridges b) as bridges,
         (select count(*)::int from pg_proc p join pg_namespace n on n.oid = p.pronamespace where n.nspname = 'public' and p.proname like 'pilo\\_%') as functions,
         (select count(*)::int from pg_constraint where conname like 'pilo\\_%') as constraints,
         (select count(*)::int from pg_trigger where tgname like 'pilo\\_%' and not tgisinternal) as triggers,
         (select count(*)::int from pg_policies where policyname like 'pilo\\_%') as policies`);
     const before = await snapshot();
-    const sql = readFileSync(MIGRATION, "utf8");
+    // 0121 y, encima, 0122: aplicar 0121 sola después de 0122 devolvería sus funciones a como eran
+    // (sin lectura de visita); 0122 las vuelve a dejar. La cadena, dos veces, deja todo como estaba.
+    const sql = readFileSync(MIGRATION, "utf8") + ";\n" + readFileSync(BRIDGES, "utf8");
     await t.db.exec(sql);
     await t.db.exec(sql);
     expect(await snapshot()).toEqual(before);
+    // 0122 tampoco cambia ninguna celda: la lectura entre ámbitos nace apagada.
+    for (const p of (await loadMatrix(t)).portals) expect(Object.values(p.matrix)).not.toContain("visita");
+    const visits = await t.q<{ proname: string; n: number; prosecdef: boolean; anon: boolean; pub: boolean }>(
+      `select p.proname, count(*) over (partition by p.proname)::int as n, p.prosecdef, has_function_privilege('anon', p.oid, 'execute') as anon,
+              exists (select 1 from aclexplode(p.proacl) a where a.grantee = 0 and a.privilege_type = 'EXECUTE') as pub
+       from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+       where n.nspname = 'public' and p.proname in ('pilo_memory_visit', 'pilo_bridge_neighbors', 'pilo_bridges_sync', 'pilo_bridges_list', 'pilo_bridge_set', 'pilo_bridges_propose',
+         'pilo_bridge_candidates', 'pilo_bridge_targets', 'pilo_bridges_status', 'pilo_portal_preview', 'pilo_cell_effect', 'pilo_bridge_end_ok', 'pilo_facts_search', 'pilo_facts_semantic',
+         'pilo_map_pending', 'pilo_map_status', 'pilo_map_save', 'pilo_map_prune')
+       order by p.proname`,
+    );
+    expect(visits).toHaveLength(18);
+    for (const f of visits) {
+      expect(f.n, f.proname).toBe(1);
+      expect(f.prosecdef, f.proname).toBe(true);
+      expect(f.anon, f.proname).toBe(false);
+      expect(f.pub, f.proname).toBe(false);
+    }
+    // Quien llame a las cifras como antes (sin decir quién lee) sigue llamando: los parámetros nuevos tienen valor de partida.
+    const facts = await t.q<{ args: string }>("select pg_get_function_arguments(p.oid) as args from pg_proc p join pg_namespace n on n.oid = p.pronamespace where n.nspname = 'public' and p.proname = 'pilo_facts_search'");
+    expect(facts[0].args).toBe("p_q text, p_limit integer DEFAULT 3, p_space text DEFAULT 'planeacion'::text, p_public_only boolean DEFAULT false, p_member boolean DEFAULT false");
     const fns = await t.q<{ proname: string; n: number }>(
       `select p.proname, count(*)::int as n from pg_proc p join pg_namespace n on n.oid = p.pronamespace
        where n.nspname = 'public' and p.proname in ('pilo_memory_search', 'pilo_memory_semantic', 'pilo_answer_candidates', 'pilo_graph_neighbors', 'pilo_graph_around', 'pilo_memory_readable', 'pilo_scope', 'pilo_portal_update')

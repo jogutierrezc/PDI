@@ -37,7 +37,7 @@ import type { Rol, SpaceId, SpaceProfile } from "../pregunta/space";
 import { RolePicker } from "../pregunta/RolePicker";
 import { AnswerText, parseAnswer, useTypewriter } from "../pregunta/AnswerText";
 import { toPlain } from "../pregunta/markdown";
-import { interruptedTurn, notesOf, reduceSteps, showsSources, waitingLine } from "../pregunta/answer-state";
+import { interruptedTurn, notesOf, originOf, reduceSteps, showsSources, waitingLine } from "../pregunta/answer-state";
 import type { ThinkStep } from "../pregunta/answer-state";
 import { frameMessage, hostOrigin, readHostMessage, readParams, sourceUrl, spaceWidget, widgetAllowed } from "./embed";
 import type { FrameState } from "./embed";
@@ -802,7 +802,7 @@ function TurnView({
           {a.unknown && a.unknown.length > 0 && <p className="pe-note pe-note--warn">Revise estos números antes de citarlos: no los encontré en las fuentes ({a.unknown.join(", ")}).</p>}
           <div className="pe-meta">
             {links.map((s) => (
-              <a key={s.n} href={sourceUrl(s.path, window.location.origin, new URL(home).pathname)} target="_blank" rel="noopener" title={s.title}>
+              <a key={s.n} href={sourceUrl(s.path, window.location.origin, new URL(home).pathname)} target="_blank" rel="noopener" title={originOf(s) ? `${s.title} · ${originOf(s)}` : s.title}>
                 {I.doc}
                 <span>{s.title}</span>
               </a>

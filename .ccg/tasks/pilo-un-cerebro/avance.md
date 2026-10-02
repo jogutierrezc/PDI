@@ -2,7 +2,7 @@
 
 Diseño: `propuesta.md` (sección 6). Contrato de la función: `.ccg/tasks/pilo-ia-siempre/contract.md`, Anexo E.
 
-Estado al 2026-10-02: **pasos 1, 2 y 3 construidos**. Sin commit, sin migrar, sin desplegar. Pasos 4 a 6 pendientes.
+Estado al 2026-10-02: **los seis pasos construidos** (1 a 3 en `0121`; 4 a 6 en `0122`, más abajo). Sin commit, sin migrar, sin desplegar. La lectura entre ámbitos nace apagada: ninguna migración cambia una celda.
 
 ## Qué quedó hecho
 
@@ -72,14 +72,82 @@ El orden entre 1 y 2 no importa. **No volver a aplicar 0113, 0114, 0115 ni 0118 
 - Las pantallas nuevas no se abrieron en un navegador: pasan `tsc` y el build, nada más.
 - Que el bucket `pilo-docs` acepte la ruta `planeacion/<id>/<nombre>` (sus políticas solo miran el bucket y el rol, así que debería).
 
-## Lo que necesita el encargo siguiente (pasos 4 a 6)
+---
 
-- **Paso 4.** Los temas ya son comunes; falta correr «comprender» sobre los pasajes de portal de Planeación (`pilo_map_pending` solo toma pasajes con `doc_id`) y guardar los puentes por referencia que hoy calcula `mapa-global/global.ts`. `pilo_edges.origin` solo admite `reglas`/`ia`: hay que sumar `admin` y el estado (`propuesta`/`aprobada`/`rechazada`). El mapa global pide hoy las cinco fuentes de portal por nombre; el mapa de documentos de Planeación (fuente `mapa`) aún no se dibuja ahí.
-- **Paso 5.** Encender «visita»: quitar el rechazo en `pilo_portal_update`, habilitar el botón en `portals.ts` (`cellChoices`), y que las búsquedas usen las filas `mode = 'visita'` de `pilo_scope` (hoy filtran `sc.mode = 'casa'`). `pilo_graph_neighbors` y `pilo_graph_around` recorren solo el ámbito de casa (`e.space = v_scope`): cruzar por puentes aprobados es ahí. `PortalView.visiting` ya llega a la función. `written_for` está guardado y sin usar.
-- **Riesgos antes de encender «visita»:**
-  - Las cifras en vivo (`pilo_facts_*`) no pasan por `pilo_scope`: la función las pide si la vista trae `cifras`. Si `cifras` puede ir de visita, ese permiso debe bajar a la base.
-  - El catálogo y las guardadas son por portal, pero una guardada puede citar pasajes de visita: la frescura ya lo revisa, falta decidir si se guardan.
-  - Los nombres de las fuentes ajenas llegarán al modelo y a la página: la procedencia la debe poner el servidor.
-  - El espejo `memory_sources` solo conoce «sí/no» de casa; no debe aprender «visita».
-  - La pantalla de administración abierta en dos pestañas puede guardar interruptores viejos sobre una celda recién cambiada (solo celdas de casa).
-- **Paso 6.** Bandeja de puentes propuestos por IA en el mapa global.
+# Pasos 4, 5 y 6 · puentes y lectura de visita (`0122_pilo_puentes.sql`)
+
+Contrato: `.ccg/tasks/pilo-ia-siempre/contract.md`, Anexo F. Sin commit, sin migrar, sin desplegar.
+
+## Qué quedó hecho
+
+### Paso 4 · Temas comunes y puentes por reglas
+
+- **«Comprender» sobre Planeación.** `pilo_map_pending`, `pilo_map_status` y `pilo_map_save` ya no exigen que el pasaje sea de un documento: en Planeación entran también los pasajes de sus portales (los de documentos van primero) y reutilizan los temas que ya existen. La relación queda en el ámbito del pasaje; los vecinos de casa no cruzan. `pilo_map_prune` limpia las relaciones de un pasaje de portal que «Actualizar la memoria» borró. El panel es el mismo `ComprehendGroup` de «Mr. Pilo con IA» › Memoria: ahora cuenta esos pasajes.
+- **Los puentes se guardan.** Tabla nueva `pilo_bridges` (más `pilo_bridge_scan` para lo que la IA ya revisó). `pilo_bridges_sync()` calcula y guarda los de reglas; `pilo_bridges_list()`, `pilo_bridges_status()` y `pilo_bridge_set(id, estado)` los leen, cuentan y deciden. La función llama a `pilo_bridges_sync()` al final de un lote de «comprender» que guardó algo.
+- **El mapa global los lee** (`mapa-global/data.ts`, `global.ts`, `GlobalMap.tsx`): con 0122 ya no calcula nada; pone cada puente guardado sobre sus puntos, con su estado y su origen (trazo de rayas si está aprobado, de puntos si espera revisión; los rechazados no se dibujan; en el detalle, con glifo y texto). Sin 0122 los calcula al dibujar, como antes, y lo dice.
+
+### Paso 5 · Lectura de visita
+
+- **La matriz.** `pilo_portal_update` deja marcar «De visita» (solo en fuentes de otro ámbito que puedan salir de su casa: nunca Moodle, nunca lo propio) y acepta `expect`. `pilo_portal_preview` cuenta el efecto sin cambiar nada. En la intranet (`portals.ts`, `PortalsMatrix.tsx`): el botón «De visita» ya se puede pulsar; antes de confirmar dice cuántos pasajes de qué fuente podrá leer el portal, cuántos son públicos y cuántos «con sesión», quién los verá, cuántos puentes aprobados hay y cómo se presentarán; el botón de confirmar espera a que la base cuente.
+- **La base.** Dos funciones nuevas y ninguna más leen lo de otro ámbito: `pilo_memory_visit` (por palabras) y `pilo_bridge_neighbors` (por un puente aprobado, desde pasajes que el portal lee de casa). Las dos pasan por `pilo_scope` y devuelven cada pasaje con su procedencia. Las búsquedas de siempre no cambian: siguen leyendo solo «de casa».
+- **Las cifras en vivo** pasan por el filtro: `pilo_facts_search` y `pilo_facts_semantic` reciben quién lee y revisan la celda `cifras`.
+- **La función** (`answerWork` › `visitOf`): decide cuándo (`homeFallsShort`), arma la procedencia (`visitPassages`, `visitLabel`), pone lo de visita al final de su bloque con tope 2, añade la regla fija al pedido (`visitRule`), no guarda lo que cita algo de visita y, sin IA, responde con una plantilla (`visitAnswer`).
+- **La página pública**: `AskSource` gana `via`, `from`, `written_for`. La procedencia va junto a la cita con texto y glifo (↗) y borde de rayas en `/pregunta` (`AskPilo.tsx`); en la app (`AppMenu.tsx`), en la lista «De dónde sale»; y en las tres (también el chat emergente) como nota escrita bajo la respuesta (`notesOf` › `originNote`).
+
+### Paso 6 · Puentes por IA con revisión
+
+- Acción nueva de la función: `puentes` (`estado`, `reglas`, `lote`), solo administración, por lotes y con el presupuesto de tiempo de «comprender». Al modelo le llegan nombres; responde con números de las dos listas (no puede inventar un id) y un porqué que se valida. Entran como `propuesta`.
+- En el mapa global, la bandeja **«Puentes por revisar»** (`mapa-global/BridgeInbox.tsx`): cada propuesta con sus dos extremos (se puede saltar al punto en el mapa), su porqué, de dónde sale y Aprobar / Rechazar, uno por uno. Lo ya decidido se puede revisar y cambiar. Sin IA lo dice, y «Recalcular los de reglas» sigue funcionando.
+
+## Decisiones
+
+1. **Tabla propia para los puentes, no columnas en `pilo_edges`.** Las búsquedas (`pilo_graph_neighbors`, `pilo_graph_around`) recorren `pilo_edges`; una relación entre ámbitos guardada ahí podría seguirse por accidente con solo olvidar una condición. En `pilo_bridges` una relación entre ámbitos solo existe como puente con estado, y solo la lee una función. El par se guarda con el ámbito menor primero y nunca dentro de un mismo ámbito (un `CHECK`).
+2. **Un puente une puntos, no pasajes.** Un extremo puede ser un nodo, un documento o un tema; «toca» un pasaje si es ese pasaje, si es su documento o si el pasaje trata o cita ese tema en su ámbito. Así un puente por «Ley 30» vale para todos los pasajes que la citan, de los dos lados.
+3. **Qué se aprueba solo.** Solo lo que sale de una regla sin IA: la misma norma u ODS (por su clave normalizada) y un punto del Plan de Desarrollo que se llama igual que un punto de otro ámbito. Un tema compartido y una referencia compartida que no es norma ni ODS los puso la IA al comprender: entran como propuesta. Es más estricto que lo que dibujaba el mapa (que unía cualquier par con el mismo nombre).
+4. **«Lo de casa no alcanza»**: ni respuesta oficial, ni guardada, ni cifra de casa, ni un pasaje de casa con la mitad de las palabras clave de la pregunta. Se mide por palabras y no por significado a propósito: con vectores casi siempre hay algún pasaje «parecido», y la regla no dispararía nunca. Lo de visita, por este camino, tiene que pasar la misma vara.
+5. **La visita por palabras, no por significado.** `pilo_memory_visit` no usa vectores: es más conservador y evita un pedido más al proveedor de embeddings.
+6. **Las cifras de visita solo por «alcance».** Un portal con `cifras` en «visita» las recibe cuando lo suyo no alcanza y la pregunta pide una cifra; cuentan dentro del tope de 2.
+7. **El público de cada ámbito es un dato** (`pilo_portals.audience`), para decidir cuándo decir «fue preparado para…». El aviso que ya recibía un administrativo en Enseñanza (sobre lo de casa) queda como estaba: el pedido de hoy no cambia.
+8. **Sin IA, si lo de casa no alcanzó y otro ámbito lo tiene, responde ese ámbito** con la plantilla del servidor, antes que un extracto de casa que no trae lo que se pregunta.
+9. **Solo la administración aprueba**, ni siquiera la función del servidor: `pilo_bridge_set` no está concedida al rol de servicio.
+
+## Los riesgos que dejó anotados el encargo anterior
+
+- **Las cifras en vivo no pasaban por `pilo_scope`**: ahora sí (`pilo_facts_search`, `pilo_facts_semantic`), y la función manda quién lee.
+- **El espejo `memory_sources` no aprende «visita»**: el disparador solo copia las celdas de casa y solo de fuentes del propio ámbito. Probado: marcar «visita» no añade la fuente a los interruptores, y guardar los interruptores (aunque nombren la fuente ajena) no toca la celda.
+- **Dos pestañas abiertas**: (a) la matriz manda `expect` y la base no escribe si la celda cambió; (b) «Guardar cambios» de las dos fichas ya no manda los interruptores de «Fuentes» si esa pestaña no los tocó y, si tocó alguno, lo aplica sobre lo que la base tiene en ese momento (`mergeSourceFlags`).
+- **Una guardada que cita pasajes de visita**: no se guardan.
+- **Los nombres de las fuentes ajenas**: la procedencia la arma el servidor (`visitLabel`), limpia de marcas del pedido.
+
+## Pruebas
+
+- `tests/db/pilo-portales.test.ts` (20 pruebas). El barrido sale de la matriz: 2 portales × 12 fuentes × 3 visibilidades × 4 «quién pregunta» = **288 casos**, cada uno ahora por **8 caminos** (los seis de casa, más `pilo_memory_visit` y `pilo_bridge_neighbors`, con un puente aprobado sembrado por caso) y 96 comprobaciones de la malla: **2.400 comprobaciones por barrido**, 4 barridos (partida, todo abierto con celdas indebidas, celdas en «no» con una de visita por portal, vuelta a la partida) = 9.600; más **576** con todos los puentes en «propuesta» y en «rechazada» (no traen nada). **10.176 comprobaciones generadas.**
+- `tests/db/pilo-puentes.test.ts` (15 pruebas, nuevo): las reglas, quién calcula y quién decide, extremos por tema y por documento, los dos sentidos, propuesta/rechazada, Moodle, lo que propone la IA, las cifras por la matriz, «comprender» en portal.
+- Mutaciones: 18 condiciones del filtro quitadas una por una (14 de 0122 y 4 de `pilo_scope`). 15 hicieron fallar la suite. Las 3 que no: dos son redundantes por construcción (en `pilo_bridge_neighbors`, «mode = visita» y «el pasaje de entrada se lee de casa» ya los garantizan el `CHECK` de ámbitos distintos y la unión con `pilo_scope`); la tercera («visita» sobre una fuente propia en `pilo_scope`) era un hueco de la prueba: el barrido «todo abierto» lleva ahora una celda así. Esa mutación no se volvió a correr después del arreglo.
+- `funcion-preguntar.test.ts`: 17 pruebas nuevas (visita de punta a punta, cifras, base sin 0122, vetos, la acción `puentes`). `visita.test.ts` (19, nuevo): lo puro. `aislamiento-funcion.test.ts`: las dos lecturas de visita llevan quién lee y aparecen una sola vez.
+- Pruebas existentes que hubo que cambiar porque afirmaban la regla vieja: «visita todavía no» (`pilo-portales`, `funcion-preguntar`, `portals.test`), «lo pendiente en Planeación está vacío» (`pilo-mapa`, `pilo-portales`), y las de idempotencia, que ahora aplican también 0122.
+
+## Para desplegar
+
+1. Aplicar `0121_pilo_portales.sql` (si no está) y después `0122_pilo_puentes.sql`. En ese orden.
+2. Desplegar `pilo-ia`.
+
+El orden entre 2 y las migraciones no importa (Anexo F.8). **No volver a aplicar 0121 después de 0122**; si pasa, aplicar 0122 otra vez.
+
+Nada cambia para quien pregunta hasta que la administración marque una celda «De visita».
+
+## Sin verificar
+
+- Nada corrió contra la base real ni en Deno. El SQL se probó en PGlite.
+- Ninguna pantalla se abrió en un navegador: pasan `tsc` y el build.
+- El modelo real: que presente lo de visita como se le pide, que devuelva JSON en `puentes`.
+- El costo de `pilo_bridges_sync()` y `pilo_bridge_neighbors` con la malla real.
+- El mapa global no dibuja el mapa de los documentos de Planeación ni los temas que Planeación usa: un puente con un extremo ahí se ve en la bandeja y se cuenta («une puntos que este mapa no dibuja»), pero no se traza.
+
+## Antes de encender la primera celda «De visita»
+
+1. Abrir la matriz y leer el efecto que anuncia: cuántos pasajes son «con sesión».
+2. Revisar la visibilidad de los documentos de esa fuente (cada pasaje conserva la suya).
+3. Recalcular los puentes por reglas en el mapa global y mirar los aprobados que tocan esa fuente.
+4. Revisar `written_for` y `audience` del portal de esa fuente (`pilo_portals`): es lo que Pilo dirá.
+5. Probar con una pregunta que solo el otro ámbito responde, como visitante, como cuenta de Pilo y como personal.

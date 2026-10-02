@@ -3,7 +3,6 @@ import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 import {
   ACCOUNT_BENEFITS,
-  ACCOUNT_TERMS,
   DOMAINS,
   EMPTY_REG,
   campusFixed,
@@ -183,7 +182,8 @@ describe("los pasos del registro", () => {
   });
 
   it("sin aceptar los términos no se crea la cuenta", () => {
-    expect(ACCOUNT_TERMS.length).toBeGreaterThan(2);
+    // El texto que se acepta es el de terms/policy.ts (ver terms/terms.test.ts): aquí ya no hay otro.
+    expect(readFileSync(resolve(process.cwd(), "src/modules/pilo-app/account/rules.ts"), "utf8")).not.toMatch(/ACCOUNT_TERMS|TERMS_VERSION/);
     expect(stepProblem("trato", reg({ nick: "Laura" }))).toMatchObject({ field: "terms" });
     expect(stepProblem("trato", reg({ nick: "x".repeat(41), terms: true }))).toMatchObject({ field: "nick" });
     expect(stepProblem("trato", reg({ nick: "Laura", terms: true }))).toBeNull();

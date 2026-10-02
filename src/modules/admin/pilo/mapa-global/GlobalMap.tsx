@@ -5,9 +5,14 @@
    Pregúntele a Pilo (Planeación) arriba y Pilo en Enseñanza abajo. De izquierda
    a derecha, de la fuente o colección al documento, informe o pilar, y de ahí a
    los temas, indicadores y referencias. Los PUENTES —el mismo ODS, la misma
-   ley, el mismo nombre en los dos Pilos— se calculan al dibujar (global.ts) y
-   van con trazo de rayas y un rombo: nada se escribe en la base y cada Pilo
-   sigue buscando solo en lo suyo. Es una vista de lectura, solo administración.
+   ley, el mismo nombre en los dos Pilos, o una relación que propuso la IA— se
+   LEEN de la base desde 0122, cada uno con su origen y su estado: los
+   aprobados van con trazo de rayas y un rombo; los que esperan revisión, con
+   trazo de puntos; los rechazados no se dibujan. Arriba del mapa, la bandeja
+   «Puentes por revisar» los aprueba o rechaza uno por uno. Aprobar un puente no
+   abre nada por sí solo: Pilo lo sigue solo hacia una fuente que el portal
+   tenga «De visita». Sin 0122 los puentes se calculan al dibujar, como antes.
+   Solo administración.
 
    - Ver: Todo, solo Planeación o solo Enseñanza.
    - Buscar por código o nombre salta al punto, abriendo lo que lo contiene.
@@ -35,9 +40,10 @@ import { clipLabel } from "../mesh-view";
 import { drawChain, swapPanel } from "../motion";
 import type { PiloSpace } from "../space";
 import { plural } from "../ui";
+import { BridgeInbox } from "./BridgeInbox";
 import { useDocRefs, useGlobalMap } from "./data";
 import type { GlobalData } from "./data";
-import { buildGlobal, countsOf, defaultOpen, detailOf, layoutGlobal, litOf, revealOf, searchGlobal, visibleOf } from "./global";
+import { bridgeCounts, bridgeLive, bridgeState, buildGlobal, countsOf, defaultOpen, detailOf, layoutGlobal, litOf, revealOf, searchGlobal, visibleOf } from "./global";
 import type { GNode, GlobalFilter, GlobalGraph, GlobalLayout, GlobalLit, Visible } from "./global";
 import { lightNeighbors, showBridges } from "./motion";
 import "../pilo-settings.css";
@@ -106,7 +112,8 @@ export function GlobalMap({ focus = "todo", face = true }: GlobalMapProps) {
     const d = query.data;
     if (!d) return null;
     const teach = d.ensenanza.data ? teachGraph(d.ensenanza.data, COLLECTIONS, new Set(d.ensenanza.data.courses)) : null;
-    return buildGlobal({ planeacion: d.planeacion.data, ensenanza: teach, order: ORDER });
+    // Con 0122 los puentes se leen de la base; sin ella (data: null) se calculan al dibujar.
+    return buildGlobal({ planeacion: d.planeacion.data, ensenanza: teach, order: ORDER, bridges: d.bridges.data });
   }, [query.data]);
 
   // Al llegar el mapa se abren solo las fuentes y colecciones pequeñas.
@@ -202,6 +209,13 @@ export function GlobalMap({ focus = "todo", face = true }: GlobalMapProps) {
   }
 
   const status = ensenanza.data?.status ?? null;
+  const stored = query.data.bridges.data;
+  const drawn = bridgeCounts(graph);
+  const bridgeNote = query.data.bridges.missing
+    ? "Falta aplicar la migración 0122: los puentes se calculan al dibujar y no se guardan, así que Pilo todavía no puede seguir ninguno. Con ella aparece aquí la bandeja para aprobarlos."
+    : query.data.bridges.error
+      ? `No se pudieron leer los puentes guardados: ${query.data.bridges.error} El mapa los calcula al dibujar.`
+      : null;
   const emptySide = (["planeacion", "ensenanza"] as PiloSpace[]).filter((s) => query.data[s].data && counts[s] === 0 && graph.roots[s].length === 0);
 
   return (
@@ -231,6 +245,8 @@ export function GlobalMap({ focus = "todo", face = true }: GlobalMapProps) {
       <p className="msh-meta" role="status">
         {plural(counts.planeacion, "punto", "puntos")} de Planeación · {plural(counts.ensenanza, "punto", "puntos")} de Enseñanza ·{" "}
         {counts.puentes ? plural(counts.puentes, "puente entre los dos", "puentes entre los dos") : "todavía ningún puente entre los dos"}
+        {graph.stored && counts.puentes ? ` (${plural(drawn.aprobados, "aprobado", "aprobados")}, ${plural(drawn.propuestos, "por revisar", "por revisar")})` : ""}
+        {graph.offMap ? ` · ${plural(graph.offMap, "puente más une puntos que este mapa no dibuja", "puentes más unen puntos que este mapa no dibuja")}` : ""}
         {status ? ` · Enseñanza ha comprendido ${status.mapped.toLocaleString("es-CO")} de ${status.total.toLocaleString("es-CO")} pasajes` : ""}.
       </p>
 
@@ -264,8 +280,17 @@ export function GlobalMap({ focus = "todo", face = true }: GlobalMapProps) {
             <path d="M0 6H34" style={{ stroke: "var(--brand-navy)", strokeWidth: 1.2, strokeDasharray: "5 4", fill: "none" }} />
             <path d={diamond(17, 6, 4.5)} style={{ fill: "var(--surface)", stroke: "var(--brand-navy)", strokeWidth: 1.5 }} />
           </svg>
-          Puente entre los dos Pilos (rayas y rombo)
+          {graph.stored ? "Puente aprobado (rayas y rombo)" : "Puente entre los dos Pilos (rayas y rombo)"}
         </li>
+        {graph.stored && (
+          <li>
+            <svg width="34" height="12" aria-hidden="true">
+              <path d="M0 6H34" style={{ stroke: "var(--ink-muted)", strokeWidth: 1.4, strokeDasharray: "1 4", strokeLinecap: "round", fill: "none" }} />
+              <path d={diamond(17, 6, 4.5)} style={{ fill: "var(--surface)", stroke: "var(--ink-muted)", strokeWidth: 1.5, strokeDasharray: "2 2" }} />
+            </svg>
+            Puente por revisar (puntos): Pilo aún no lo sigue
+          </li>
+        )}
         <li>
           <svg width="24" height="14" aria-hidden="true">
             <rect x="0.5" y="0.5" width="23" height="13" rx="6.5" style={{ fill: "var(--surface-3)", stroke: "var(--line-strong)" }} />
@@ -277,13 +302,14 @@ export function GlobalMap({ focus = "todo", face = true }: GlobalMapProps) {
         </li>
       </ul>
 
-      {(notes.length > 0 || emptySide.length > 0 || (counts.puentes === 0 && counts.planeacion > 0 && counts.ensenanza > 0)) && (
+      {(notes.length > 0 || bridgeNote || emptySide.length > 0 || (counts.puentes === 0 && counts.planeacion > 0 && counts.ensenanza > 0)) && (
         <div className="gmap-notes">
           {notes.map((n) => (
             <p key={n} className="pis-warn">
               {n}
             </p>
           ))}
+          {bridgeNote && <p className="pis-warn">{bridgeNote}</p>}
           {emptySide.map((s) => (
             <p key={s} className="pis-small">
               {s === "planeacion"
@@ -293,11 +319,15 @@ export function GlobalMap({ focus = "todo", face = true }: GlobalMapProps) {
           ))}
           {counts.puentes === 0 && counts.planeacion > 0 && counts.ensenanza > 0 && (
             <p className="pis-small">
-              Todavía no hay puentes: ningún tema o referencia de Enseñanza nombra lo mismo que un punto de Planeación (un ODS, una ley, un pilar). Aparecen solos cuando Enseñanza comprende más pasajes.
+              {graph.stored
+                ? "Todavía no hay puentes guardados entre estos puntos: «Recalcular los de reglas», abajo, los busca (la misma norma, el mismo ODS, el mismo nombre de un punto del Plan)."
+                : "Todavía no hay puentes: ningún tema o referencia de Enseñanza nombra lo mismo que un punto de Planeación (un ODS, una ley, un pilar). Aparecen solos cuando Enseñanza comprende más pasajes."}
             </p>
           )}
         </div>
       )}
+
+      {stored && <BridgeInbox rows={stored} byId={graph.byId} onShow={(id) => select(id, "pointer")} />}
 
       <div className="msh-body">
         <div className="msh-stage">
@@ -318,8 +348,8 @@ export function GlobalMap({ focus = "todo", face = true }: GlobalMapProps) {
             <div className="gmap-hint">
               {face && <PiloFace size={84} expression="pensar" label="Mr. Pilo, pensando" />}
               <p>
-                <strong>Un solo mapa, dos memorias.</strong> Arriba, lo que sabe Pregúntele a Pilo; abajo, lo que sabe Pilo en Enseñanza. Cada uno busca solo en lo suyo: los puentes de rayas muestran dónde
-                hablan de lo mismo.
+                <strong>Un solo cerebro, dos portales.</strong> Arriba, lo que sabe Pregúntele a Pilo; abajo, lo que sabe Pilo en Enseñanza. Cada uno busca en lo suyo; los puentes muestran dónde hablan de lo
+                mismo. Pilo solo sigue un puente aprobado, y solo hacia una fuente que el portal tenga «De visita».
               </p>
               <p>Toque un punto para ver de qué Pilo es, su fuente, sus pasajes y con qué se conecta.</p>
             </div>
@@ -571,9 +601,11 @@ function GlobalCanvas({
             if (!layout.y.has(b.a) || !layout.y.has(b.b)) return null;
             const a = xy(b.a);
             const z = xy(b.b);
+            // Guardados (0122): si alguno de los que resume está aprobado, va de rayas; si todos esperan revisión, de puntos.
+            const state = b.items.some((i) => !i.status) ? undefined : b.items.some(bridgeLive) ? "aprobada" : "propuesta";
             return (
-              <g key={b.key} className="gmap-bridge" data-on={lit?.bridges.has(b.key) || undefined}>
-                <title>{b.items.length === 1 ? `Puente: ${b.items[0].why}` : `${b.items.length} puentes entre estos dos puntos`}</title>
+              <g key={b.key} className="gmap-bridge" data-status={state} data-on={lit?.bridges.has(b.key) || undefined}>
+                <title>{b.items.length === 1 ? `Puente: ${b.items[0].why} (${bridgeState(b.items[0])})` : `${b.items.length} puentes entre estos dos puntos`}</title>
                 <path d={`M${a.x} ${a.y}C${LANE} ${a.y} ${LANE} ${z.y} ${z.x} ${z.y}`} />
                 <path className="gmap-mark" d={diamond((a.x + 6 * LANE + z.x) / 8, (a.y + z.y) / 2, 4.5)} style={{ strokeDasharray: "none" }} />
               </g>
@@ -753,17 +785,26 @@ function GlobalDetail({
           Puentes con {isPlan ? "Pilo en Enseñanza" : "Pregúntele a Pilo"} <small>{detail.bridges.length ? plural(detail.bridges.length, "puente", "puentes") : "ninguno"}</small>
         </h5>
         {detail.bridges.length === 0 ? (
-          <p className="pis-small">Nada del otro Pilo nombra lo mismo. Los puentes se calculan por nombre o por la referencia que se cita; no se guardan en la base.</p>
+          <p className="pis-small">
+            {graph.stored
+              ? "Ningún puente guardado une este punto con el otro Pilo. Los de reglas salen de la misma referencia o del mismo nombre; los demás los propone la IA y se revisan en «Puentes por revisar»."
+              : "Nada del otro Pilo nombra lo mismo. Sin la migración 0122 los puentes se calculan por nombre o por la referencia que se cita; no se guardan en la base."}
+          </p>
         ) : (
           <>
             <ul className="gmap-bridges">
               {(more.puentes ? detail.bridges : detail.bridges.slice(0, 6)).map((b) => (
-                <li key={b.other.id}>
+                <li key={b.id ?? b.other.id} data-status={b.status}>
                   <button type="button" onClick={() => onSelect(b.other.id)}>
                     {fullName(b.other)}
                   </button>
                   <small>
                     {kindName(b.other)} de {SPACE_SHORT[b.other.space]} · {b.why}
+                  </small>
+                  {/* El estado y el origen, con glifo y texto: nunca solo con el trazo. */}
+                  <small className="gmap-bridge-state">
+                    <Icon name={b.status === "aprobada" ? "check" : "alert"} size={12} /> {bridgeState(b)}
+                    {b.status === "propuesta" ? ": Pilo aún no lo sigue" : ""}
                   </small>
                 </li>
               ))}

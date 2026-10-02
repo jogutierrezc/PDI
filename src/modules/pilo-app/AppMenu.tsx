@@ -14,8 +14,9 @@
 import type { MouseEvent } from "react";
 import { Link } from "react-router-dom";
 import type { AskSource } from "../../components/pilo/ai/client";
+import { originOf } from "../pregunta/answer-state";
 import type { SpaceId, SpaceProfile } from "../pregunta/space";
-import { APP_ACCOUNT, APP_LOGIN, APP_PILOS, APP_SAVED, APP_SPACES } from "./routes";
+import { APP_ACCOUNT, APP_CLASSES, APP_LOGIN, APP_PILOS, APP_SAVED, APP_SPACES } from "./routes";
 import { APP_THEMES } from "./themes";
 import type { AppTheme } from "./themes";
 import { dayLabel } from "./saved";
@@ -25,6 +26,7 @@ import { Icon } from "./icons";
 import { PersonBlock } from "./AppSide";
 import type { Person } from "./AppSide";
 import { ACCOUNT_BENEFITS } from "./account/rules";
+import { PolicyLink } from "./terms/PolicyLink";
 
 export function AppMenu({
   open,
@@ -103,6 +105,17 @@ export function AppMenu({
           <small>{person.card ? "Lo que guardó de Pilo, en su cuenta" : "Con cuenta, las encuentra en cualquier dispositivo"}</small>
         </Link>
 
+        {/* Mis clases (clases/): solo para estudiantes y profesores con cuenta. */}
+        {person.clases && (
+          <Link className="pa-mi pa-mi--line pa-mi--go" to={APP_CLASSES} onClick={() => onClose()}>
+            <strong>
+              Mis clases
+              <em>beta</em>
+            </strong>
+            <small>Sus cursos de Moodle y sus fechas de entrega</small>
+          </Link>
+        )}
+
         <section aria-labelledby="pa-m-pilo">
           <p className="pa-label" id="pa-m-pilo">
             Con cuál Pilo
@@ -136,6 +149,12 @@ export function AppMenu({
           <strong>Ver la bienvenida</strong>
           <small>Pilo se presenta otra vez</small>
         </button>
+
+        {/* La política de uso completa (terms/): página pública, fuera de la app. */}
+        <PolicyLink className="pa-mi pa-mi--line pa-mi--go" onClick={() => onClose()}>
+          <strong>Política de uso</strong>
+          <small>Los términos de Mr. Pilo y cómo trata sus datos</small>
+        </PolicyLink>
       </div>
 
       <div className="pa-account">
@@ -177,12 +196,20 @@ export function SourcesSheet({
         <ul>
           {sources.map((s) => {
             const external = /^https?:/i.test(s.path);
+            // De otro ámbito de Pilo: se dice de dónde viene, y no se enlaza como si fuera de este portal.
+            const origin = originOf(s);
             return (
               <li key={s.n} className="pa-src-li" data-on={focus === s.n || undefined}>
                 <strong>
                   {s.n}. {s.title}
                 </strong>
-                <small>{[nameOf(s.source), s.section, s.cut ? `Corte ${s.cut}` : "", s.office].filter(Boolean).join(" · ")}</small>
+                <small>{[origin ? "" : nameOf(s.source), s.section, s.cut ? `Corte ${s.cut}` : "", s.office].filter(Boolean).join(" · ")}</small>
+                {origin && (
+                  <small className="pa-from">
+                    <span aria-hidden="true">↗</span> {origin}
+                    {s.written_for ? ` · preparado para ${s.written_for}` : ""}
+                  </small>
+                )}
                 {s.excerpt && <small className="pa-excerpt">{s.excerpt}</small>}
                 {s.path &&
                   (external ? (
@@ -190,7 +217,7 @@ export function SourcesSheet({
                       Abrir el documento
                     </a>
                   ) : (
-                    <Link to={s.path}>Abrir en {nameOf(s.source)}</Link>
+                    <Link to={s.path}>{origin ? "Abrir la fuente" : `Abrir en ${nameOf(s.source)}`}</Link>
                   ))}
               </li>
             );

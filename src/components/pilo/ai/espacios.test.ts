@@ -48,7 +48,7 @@ describe("la vista de un portal (0121)", () => {
   it("sin lista no hay vista: quien llama sigue con las fuentes de partida", () => {
     for (const v of [null, undefined, {}, "cifras", 3]) expect(portalView("planeacion", v)).toBeNull();
     // Una lista vacía sí es una vista: el portal no lee nada.
-    expect(portalView("planeacion", [])).toEqual({ sources: [], visiting: [], names: SPACES.planeacion.names });
+    expect(portalView("planeacion", [])).toEqual({ sources: [], visiting: [], names: SPACES.planeacion.names, scopes: {} });
   });
 
   it("con la matriz de partida da las mismas fuentes, en el mismo orden y con los mismos nombres", () => {

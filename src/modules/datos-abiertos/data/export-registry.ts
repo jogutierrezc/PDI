@@ -29,6 +29,7 @@
 import {
   breakdownToTable,
   csvFilename,
+  customTableToTable,
   freeSetToTable,
   heatmapToTable,
   historyToTable,
@@ -46,6 +47,7 @@ import {
 } from "./csv-export";
 import type { CsvFile, CsvTable } from "./csv-export";
 import { viewProblems } from "./free-sets";
+import { customViewOf } from "./custom-table";
 import type { FreeSet } from "./free-sets";
 import { blockPicks, orderedBlocks, ownFreeViews, pageBlocks, pairedMaps, saberProOf, saberTytOf } from "./groups";
 import { valueOf } from "./reserve";
@@ -380,7 +382,8 @@ export function reportExports(report: Report, catalog: Catalog): ExportEntry[] {
         add(
           block,
           { id: `libre:${set.id}`, kind: "libre", label: set.title, detail: set.source || undefined, group: EXPORT_GROUPS.tablas },
-          () => [file("conjunto", set.id, () => freeSetToTable(set))],
+          // Una tabla personalizada sale como está escrita, con el nombre de cada tono.
+          () => [file("conjunto", set.id, () => { const custom = customViewOf(set); return custom?.table ? customTableToTable(set, custom.table) : freeSetToTable(set); })],
         );
         break;
       }

@@ -45,7 +45,7 @@ import { extrasFor, usePiloExtras } from "../../components/pilo/ai/extras";
 import { pickPassages, turnFile } from "./attach";
 import { AttachButton, AttachTray, FileChip, FileFoot, FileLog, useAttachment } from "./Extras";
 import { toPlain } from "./markdown";
-import { badgeOf, compactThink, interruptedTurn, notesOf, reduceSteps, secondsText, showsSources, waitingLine } from "./answer-state";
+import { badgeOf, compactThink, interruptedTurn, notesOf, originOf, reduceSteps, secondsText, showsSources, waitingLine } from "./answer-state";
 import type { ThinkStep } from "./answer-state";
 import { CatalogModal } from "../admin/pilo/CatalogModal";
 import type { CatalogMood } from "../admin/pilo/catalog-sheet";
@@ -1168,17 +1168,26 @@ function TurnView({
                   {a.unknown && a.unknown.length > 0 && <p className="ap-warn">Revise estos números antes de citarlos: no los encontré en las fuentes ({a.unknown.join(", ")}).</p>}
                   {showsSources(a) && (
                     <div className="ap-srcs" aria-label="Fuentes">
-                      {a.sources.map((s) => (
-                        <button key={s.n} type="button" className="ap-src" aria-pressed={active === s.n} onClick={(e) => onSource(s, e.currentTarget)}>
-                          <span className="ap-src__n">{s.n}</span>
-                          <span className="ap-code" data-s={s.source}>
-                            {codeOf(space, s.source)}
-                          </span>
-                          <span>
-                            {s.title} {s.cut && <small>· {s.cut}</small>}
-                          </span>
-                        </button>
-                      ))}
+                      {a.sources.map((s) => {
+                        // Lo que viene de otro ámbito lo dice junto a la cita, con texto y glifo (no solo con color).
+                        const origin = originOf(s);
+                        return (
+                          <button key={s.n} type="button" className="ap-src" data-from={origin ? "" : undefined} aria-pressed={active === s.n} onClick={(e) => onSource(s, e.currentTarget)}>
+                            <span className="ap-src__n">{s.n}</span>
+                            <span className="ap-code" data-s={s.source}>
+                              {codeOf(space, s.source)}
+                            </span>
+                            <span>
+                              {s.title} {s.cut && <small>· {s.cut}</small>}
+                              {origin && (
+                                <small className="ap-from">
+                                  <span aria-hidden="true">↗</span> {origin}
+                                </small>
+                              )}
+                            </span>
+                          </button>
+                        );
+                      })}
                     </div>
                   )}
                   <div className="ap-acts">

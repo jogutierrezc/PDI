@@ -1832,3 +1832,19 @@ ol.ap-list {
   max-width: 760px;
   margin: 0 auto;
 }
+
+/* Una fuente de otro ámbito de Pilo (0122): su procedencia va junto a la cita, con texto y glifo. */
+.ap-src[data-from] {
+  align-items: flex-start;
+  border-style: dashed;
+}
+
+.ap-src[data-from] > span:last-child {
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
+.ap-from {
+  display: block;
+  margin-top: 2px;
+}

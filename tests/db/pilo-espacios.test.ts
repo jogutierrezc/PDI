@@ -580,7 +580,7 @@ describe("la migración es idempotente", () => {
     const before = await snapshot();
     // 0113 y, encima, 0121: aplicar 0113 sola después de 0121 devolvería los CHECK y las firmas viejas;
     // 0121 los vuelve a quitar. La cadena, dos veces, deja todo como estaba.
-    const sql = readFileSync(MIGRATION, "utf8") + ";\n" + readFileSync(resolve(__dirname, "../../supabase/migrations/0121_pilo_portales.sql"), "utf8");
+    const sql = readFileSync(MIGRATION, "utf8") + ";\n" + readFileSync(resolve(__dirname, "../../supabase/migrations/0121_pilo_portales.sql"), "utf8") + ";\n" + readFileSync(resolve(__dirname, "../../supabase/migrations/0122_pilo_puentes.sql"), "utf8");
     await t.db.exec(sql);
     await t.db.exec(sql);
     expect(await snapshot()).toEqual(before);

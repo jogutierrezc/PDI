@@ -14,6 +14,7 @@ import type { Fn, Portal, PortalRule } from "../../../components/pilo/ai/config"
 import type { ReportKind, VoiceStyle } from "../../../components/pilo/ai/logic";
 import type { MemorySource } from "./memory";
 import { DEFAULT_VOICE_PATTERNS } from "../../../components/pilo/ai/voice-expressions";
+import { mergeSourceFlags } from "./portals";
 import { DEFAULT_SPACE, readInSpace, spaceKey } from "./space";
 import type { PiloSpace } from "./space";
 
@@ -345,6 +346,19 @@ export function useSavePiloSettings() {
         delete rest.voice_expressions;
         delete rest.voice_modulation;
         delete rest.voice_patterns;
+      }
+      // Los interruptores de «Fuentes» son el espejo de la matriz (0121): solo se guardan los que esta
+      // pestaña movió, sobre lo que la base tiene ahora. Así una pestaña vieja no devuelve una celda
+      // que otra acaba de cambiar en «Qué lee cada portal».
+      if (rest.memory_sources) {
+        const loaded = client.getQueryData<PiloSettings | null>(pilokeys.settings)?.memory_sources as Record<string, boolean> | undefined;
+        const edited = rest.memory_sources as Record<string, boolean>;
+        const touched = !loaded || Object.keys(edited).some((k) => edited[k] !== loaded[k]);
+        if (!touched) delete rest.memory_sources;
+        else if (loaded) {
+          const { data: now } = await supabase.from("pilo_ai_settings").select("memory_sources").eq("id", 1).maybeSingle();
+          rest.memory_sources = mergeSourceFlags(edited, loaded, (now as { memory_sources?: unknown } | null)?.memory_sources) ?? edited;
+        }
       }
       const { data: user } = await supabase.auth.getUser();
       const { error } = await supabase

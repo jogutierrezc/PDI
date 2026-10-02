@@ -13,6 +13,10 @@
      /app/cuenta       crear la cuenta de Pilo, entrar, o seguir sin cuenta (0120)
      /app/perfil       los datos de la cuenta y cómo le habla Pilo
      /app/guardadas    las respuestas guardadas en la cuenta
+     /app/clases       Mis clases (beta): Moodle con la cuenta de la persona, solo lectura (clases/)
+
+   Antes de conversar se acepta la política de uso (terms/): una vez por
+   dispositivo y por versión, después de la bienvenida.
 
    Aquí se decide qué se ve: la bienvenida, cuál Pilo, con qué tema, quién usa
    la app y si hay conexión. La conversación es AppShell; la bienvenida,
@@ -43,12 +47,16 @@ import { memberAskRol, personCard } from "./account/rules";
 import { AccountGate } from "./account/AccountGate";
 import { ProfilePane } from "./account/ProfilePane";
 import { SavedPane } from "./account/SavedPane";
+import { ClasesPane } from "./clases/ClasesPane";
+import { canUseClases, clearLink } from "./clases/logic";
 import { APP_PREFIX, readTheme, writeTheme } from "./themes";
 import type { AppTheme } from "./themes";
 import { welcomeVoice } from "./welcome-script";
 import { registerAppWorker, useInstall, useKeyboardViewport, useOnline } from "./pwa";
 import { AppShell } from "./AppShell";
 import { AppWelcome } from "./AppWelcome";
+import { TermsGate } from "./terms/TermsGate";
+import { readAcceptanceState } from "./terms/acceptance";
 import "../pregunta/ask-pilo.css";
 import "./pilo-app-themes.css";
 import "./pilo-app.css";
@@ -86,6 +94,14 @@ export function PiloApp() {
   const [welcoming, setWelcoming] = useState(() => place.kind === "inicio" && !seenWelcome(APP_PREFIX));
   // El Pilo que queda debajo de la bienvenida mientras se elige.
   const [home] = useState<SpaceId>(() => startTarget({ seen: true, last: readLast().space }) as SpaceId);
+  // La política de uso (terms/): sin aceptarla en este dispositivo no se conversa. Se vuelve a mirar al
+  // cambiar de pantalla, porque crear la cuenta también la acepta.
+  const [acceptedNow, setAcceptedNow] = useState(false);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const terms = useMemo(() => (acceptedNow ? "vigente" : readAcceptanceState()), [acceptedNow, location.pathname]);
+  const gating = terms !== "vigente" && (place.kind === "pilo" || place.kind === "inicio");
+  // Con la aceptación pendiente, la bienvenida no vuela a la cabecera (queda tapada): se funde sobre ella.
+  const noSlot = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     registerAppWorker();
@@ -106,23 +122,41 @@ export function PiloApp() {
   useLayoutEffect(() => {
     const el = root.current;
     if (!el) return;
-    const color = getComputedStyle(el).getPropertyValue(welcoming ? "--s2" : "--c-bar").trim();
+    const color = getComputedStyle(el).getPropertyValue(welcoming || gating ? "--s2" : "--c-bar").trim();
     const metas = Array.from(document.querySelectorAll<HTMLMetaElement>('meta[name="theme-color"]'));
     const before = metas.map((m) => m.content);
     if (color) metas.forEach((m) => (m.content = color));
     return () => metas.forEach((m, i) => (m.content = before[i]));
     // También al cambiar de ruta: en /app a secas aún no hay pantalla que medir.
-  }, [theme, welcoming, location.pathname]);
+  }, [theme, welcoming, gating, location.pathname]);
+
+  /* Al aceptar la política, el foco pasa a la conversación: a la caja de escribir en el escritorio; en el
+     teléfono a los mensajes, para no abrir el teclado sin que se pida. */
+  const wasGating = useRef(gating);
+  useEffect(() => {
+    if (wasGating.current && !gating) {
+      const el = root.current?.querySelector<HTMLElement>(wide ? ".pa-compose textarea" : ".pa-msgs");
+      if (el && !wide && !el.hasAttribute("tabindex")) el.setAttribute("tabindex", "-1");
+      el?.focus({ preventScroll: true });
+    }
+    wasGating.current = gating;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [gating]);
 
   const rules = config.data ?? null;
   // También mientras se lee la cuenta: así un Pilo «con sesión» no parpadea como cerrado.
   const waking = online && (config.isPending || loading || cuenta.pending);
   const doors = useMemo(() => ({ planeacion: spaceDoor(rules, ASK_SPACES.planeacion, role, member), ensenanza: spaceDoor(rules, ENSENANZA, role, member) }), [rules, role, member]);
   const person: Person = useMemo(
-    () => ({ card: account ? personCard(account) : null, intranet: role ? profile?.full_name || profile?.email || "Su cuenta" : null, saved: null }),
+    () => ({ card: account ? personCard(account) : null, intranet: role ? profile?.full_name || profile?.email || "Su cuenta" : null, saved: null, clases: canUseClases(account) }),
     [account, role, profile?.full_name, profile?.email],
   );
   const greeting = useMemo(() => (online ? welcomeVoice(doors) : null), [doors, online]);
+
+  // Al salir de la cuenta, el permiso de Moodle de Mis clases se borra de este dispositivo.
+  useEffect(() => {
+    if (!loading && !session) clearLink();
+  }, [loading, session]);
 
   const pickTheme = (next: AppTheme) => {
     setTheme(next);
@@ -199,14 +233,32 @@ export function PiloApp() {
     );
   }
 
+  /* --- Mis clases (beta): solo estudiantes y profesores con cuenta ----------------------------- */
+
+  if (place.kind === "clases") {
+    return (
+      <div className="pa" ref={root} data-tema={theme}>
+        <AppPage
+          title="Mis clases"
+          tag="Beta"
+          lead="Pilo entra a Moodle con su cuenta para ver sus cursos y ayudarle con ellos: qué hay para esta semana, qué pide una actividad y cuándo se entrega."
+          home={APP_PATHS[home]}
+          side={wide ? <PageSide home={home} active="clases" person={person} userId={session?.user.id} member={member} /> : null}
+        >
+          <ClasesPane state={cuenta} online={online} />
+        </AppPage>
+      </div>
+    );
+  }
+
   const spaceId: SpaceId = place.kind === "pilo" ? place.space : home;
   const space = ASK_SPACES[spaceId];
   const door = doors[spaceId];
 
   return (
     <div className="pa" ref={root} data-tema={theme}>
-      {/* Mientras la bienvenida está encima, lo de debajo no se enfoca ni se lee. */}
-      <ShellFrame inert={welcoming}>
+      {/* Mientras la bienvenida o la aceptación están encima, lo de debajo no se enfoca ni se lee. */}
+      <ShellFrame inert={welcoming || gating}>
         <AppShell
           // Cada Pilo monta su propia conversación: nada de uno queda en la memoria del otro.
           key={space.id}
@@ -239,9 +291,12 @@ export function PiloApp() {
         />
       </ShellFrame>
 
+      {/* «Antes de empezar»: debajo de la bienvenida mientras dura, y activa cuando esta termina. */}
+      {gating && <TermsGate active={!welcoming} changed={terms === "cambio"} onAccept={() => setAcceptedNow(true)} />}
+
       {welcoming && (
         <AppWelcome
-          target={faceSlot}
+          target={gating ? noSlot : faceSlot}
           voice={greeting}
           voiceOn={voiceOn}
           onVoice={pickVoice}
@@ -262,7 +317,7 @@ export function PiloApp() {
 }
 
 /** La barra lateral del escritorio en las pantallas que no son la conversación: lleva a ella. */
-function PageSide({ home, active, person, userId, member }: { home: SpaceId; active: "perfil" | "guardadas"; person: Person; userId: string | undefined; member: boolean }) {
+function PageSide({ home, active, person, userId, member }: { home: SpaceId; active: "perfil" | "guardadas" | "clases"; person: Person; userId: string | undefined; member: boolean }) {
   const navigate = useNavigate();
   const [convs, setConvs] = useState(() => ({ planeacion: loadSaved("planeacion"), ensenanza: loadSaved("ensenanza") }));
   const entries = useMemo(() => savedEntries(convs), [convs]);

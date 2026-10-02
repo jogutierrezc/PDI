@@ -22,9 +22,19 @@ export interface AskOptions {
   rol?: string | null;
   /** El archivo adjunto (0119): su nombre y los pasajes elegidos en este dispositivo. El archivo no se sube. */
   doc?: { name: string; passages: string[] } | null;
+  /** Sin cuenta de Pilo (0120): cómo pidió que la llame y en qué tono. Con cuenta no se manda: el servidor la reconoce por la sesión. */
+  visitor?: { nick?: string | null; tone?: string | null } | null;
 }
 
 const rolOf = (rol: string | null | undefined): "estudiante" | "profesor" | undefined => (rol === "estudiante" || rol === "profesor" ? rol : undefined);
+
+/** Lo que viaja de un visitante: un nombre de hasta 30 caracteres y un tono conocido; sin ninguno de los dos, nada. */
+function visitorOf(visitor: AskOptions["visitor"]): { nick: string; tone: "cercano" | "formal" | "directo" } | undefined {
+  if (!visitor) return undefined;
+  const nick = (typeof visitor.nick === "string" ? visitor.nick : "").replace(/\s+/g, " ").trim().slice(0, 30);
+  const tone = visitor.tone === "cercano" || visitor.tone === "formal" || visitor.tone === "directo" ? visitor.tone : null;
+  return nick || tone ? { nick, tone: tone ?? "cercano" } : undefined;
+}
 
 export type { Answer };
 
@@ -431,7 +441,17 @@ export function buildHistory(turns: { q: string; a?: string | null }[]): { q: st
 /** El cuerpo de `preguntar` con flujo. Sin opciones es, byte a byte, el de siempre. */
 export function askBody(question: string, history: { q: string; a: string }[], opts: AskOptions = {}) {
   const rol = rolOf(opts.rol);
-  return { action: "preguntar" as const, portal: opts.portal ?? "pregunta", question, history, stream: true as const, ...(rol ? { rol } : {}), ...(opts.doc && opts.doc.passages.length ? { doc: opts.doc } : {}) };
+  const visitor = visitorOf(opts.visitor);
+  return {
+    action: "preguntar" as const,
+    portal: opts.portal ?? "pregunta",
+    question,
+    history,
+    stream: true as const,
+    ...(rol ? { rol } : {}),
+    ...(opts.doc && opts.doc.passages.length ? { doc: opts.doc } : {}),
+    ...(visitor ? { visitor } : {}),
+  };
 }
 
 /**

@@ -18,3 +18,8 @@ verify_jwt = false
 # x-sync-token de un cron— y las comprueba por su cuenta. Validar antes un JWT
 # que en el segundo caso nunca llega haría fallar la sincronización automática.
 verify_jwt = false
+
+[functions.pilo-cuentas]
+# Registro e ingreso de los Usuarios de Pilo: quien llama aún no tiene sesión.
+# La función valida por su cuenta cada acción y limita los intentos.
+verify_jwt = false

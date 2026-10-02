@@ -1400,3 +1400,420 @@
   min-width: 0;
   max-width: 100%;
 }
+
+/* --- Cuentas de Pilo (0120): «Guardar», la persona y las páginas ------------------------------ */
+
+/* «Guardar» junto a la respuesta: guardada lleva otro glifo y otra palabra, no solo otro color. */
+.pa-keep[aria-pressed="true"] {
+  border-color: var(--c-ok);
+  color: var(--c-ok);
+}
+
+.pa-keep:disabled {
+  opacity: 0.6;
+}
+
+.pa-keep .pa-i {
+  width: 16px;
+  height: 16px;
+}
+
+.pa-card__alt {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  font-size: 0.8125rem;
+  font-weight: 800;
+  color: var(--c-link);
+}
+
+.pa-mi--go {
+  text-decoration: none;
+  color: inherit;
+}
+
+.pa-mi--go strong {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.pa-mi--go strong .pa-i {
+  width: 18px;
+  height: 18px;
+}
+
+.pa-mi--go em {
+  margin-left: auto;
+  padding: 1px 8px;
+  border-radius: var(--radius-pill);
+  background: var(--c-chip);
+  font-style: normal;
+  font-size: 0.75rem;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+}
+
+/* La persona: con cuenta, su nombre, su perfil y su usuario; sin ella, «Crear cuenta / Entrar». */
+.pa-me {
+  display: grid;
+  grid-template-columns: 40px minmax(0, 1fr);
+  gap: 10px;
+  align-items: center;
+  min-height: 56px;
+  padding: 8px 10px;
+  border: 1px solid var(--c-line);
+  border-radius: var(--radius-sm);
+  color: inherit;
+  text-align: left;
+  text-decoration: none;
+  transition: transform var(--dur-press) var(--ease-out), border-color var(--dur-fast) ease;
+}
+
+.pa-me b,
+.pa-me small {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.pa-me b {
+  font-size: 0.9rem;
+}
+
+.pa-me small {
+  font-size: 0.75rem;
+  color: var(--c-ink2);
+}
+
+.pa-me[aria-current="page"] {
+  border-color: currentColor;
+}
+
+.pa-avatar {
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: var(--acc);
+  color: var(--acc-ink);
+  font-weight: 800;
+}
+
+.pa-join {
+  display: grid;
+  gap: 8px;
+}
+
+.pa-join p {
+  font-size: 0.8125rem;
+  color: var(--c-ink2);
+}
+
+.pa-join p b {
+  color: var(--c-ink);
+}
+
+.pa-join__go {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 8px;
+}
+
+.pa-join__main {
+  background: var(--c-mine);
+  color: var(--c-mine-ink);
+}
+
+.pa-join__line {
+  border: 1px solid var(--c-line);
+  color: var(--c-ink);
+}
+
+.pa-join__prefs {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  font-size: 0.8125rem;
+  font-weight: 800;
+  color: var(--c-link);
+}
+
+.pa-me:active,
+.pa-sl:active,
+.pa-side__two button:active {
+  transform: scale(0.97);
+}
+
+/* Una página que no es la conversación (perfil, guardadas): cabecera con «volver» y el contenido. */
+.pa-bar--page .pa-bar__in {
+  grid-template-columns: 44px minmax(0, 1fr);
+}
+
+.pa-bar--page .pa-icon {
+  color: inherit;
+}
+
+/* --- Escritorio: la barra lateral fija y la conversación al centro ----------------------------- */
+
+.pa-side {
+  display: none;
+}
+
+@media (min-width: 960px) {
+  .pa {
+    --pa-col: 820px;
+  }
+
+  .pa-frame {
+    grid-template-columns: 292px minmax(0, 1fr);
+  }
+
+  .pa-frame > .pa-bar {
+    grid-column: 2;
+    grid-row: 1;
+  }
+
+  .pa-frame > .pa-msgs {
+    grid-column: 2;
+    grid-row: 2;
+  }
+
+  .pa-frame > .pa-dock {
+    grid-column: 2;
+    grid-row: 3;
+  }
+
+  /* En el escritorio, la página ocupa todo el alto: su cabecera de «volver» sobra, la barra lateral ya lleva. */
+  .pa-frame--page > .pa-bar--page {
+    display: none;
+  }
+
+  .pa-frame--page > .pa-msgs {
+    grid-row: 1 / -1;
+  }
+
+  .pa-bar__in[data-wide] {
+    grid-template-columns: 56px minmax(0, 1fr) 44px;
+  }
+
+  .pa-msgs {
+    scrollbar-width: thin;
+  }
+
+  .pa-side {
+    --pa-side-line: color-mix(in srgb, var(--c-bar-ink) 22%, transparent);
+    --pa-side-chip: color-mix(in srgb, var(--c-bar-ink) 12%, transparent);
+    grid-column: 1;
+    grid-row: 1 / -1;
+    display: grid;
+    grid-template-rows: auto minmax(0, 1fr) auto;
+    gap: 12px;
+    min-width: 0;
+    min-height: 0;
+    padding: 18px 12px 14px;
+    border-right: 1px solid var(--c-line);
+    background: var(--c-bar);
+    color: var(--c-bar-ink);
+  }
+
+  .pa-side :focus-visible {
+    outline-color: var(--c-bar-ink);
+  }
+
+  .pa-side__top {
+    display: grid;
+    gap: 12px;
+  }
+
+  .pa-side__brand {
+    padding: 0 10px;
+    font: 700 1.2rem/1.15 var(--font-display);
+  }
+
+  .pa-side__brand small {
+    display: block;
+    font: 600 0.75rem/1.4 var(--font-sans);
+    color: var(--c-bar-muted);
+  }
+
+  .pa-sl {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    width: 100%;
+    min-width: 0;
+    min-height: 44px;
+    padding: 6px 10px;
+    border-radius: var(--radius-sm);
+    color: inherit;
+    font-size: 0.875rem;
+    font-weight: 700;
+    text-align: left;
+    text-decoration: none;
+    transition: transform var(--dur-press) var(--ease-out), background-color var(--dur-fast) ease;
+  }
+
+  .pa-sl .pa-i {
+    width: 18px;
+    height: 18px;
+  }
+
+  .pa-sl > span {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .pa-sl > span small {
+    display: block;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    font-size: 0.72rem;
+    font-weight: 600;
+    color: var(--c-bar-muted);
+  }
+
+  .pa-sl em {
+    padding: 1px 8px;
+    border-radius: var(--radius-pill);
+    background: var(--pa-side-chip);
+    font-style: normal;
+    font-size: 0.75rem;
+    font-weight: 800;
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* La actual no se marca solo con el fondo: lleva un filete a la izquierda. */
+  .pa-sl[aria-current] {
+    background: var(--pa-side-chip);
+    box-shadow: inset 3px 0 0 currentColor;
+  }
+
+  .pa-sl--new {
+    border: 1px solid var(--pa-side-line);
+  }
+
+  .pa-side__two {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    gap: 4px;
+    padding: 4px;
+    border: 1px solid var(--pa-side-line);
+    border-radius: var(--radius-sm);
+  }
+
+  .pa-side__two button {
+    min-height: 44px;
+    border-radius: var(--radius-xs);
+    font-size: 0.8125rem;
+    font-weight: 800;
+    color: var(--c-bar-muted);
+    transition: transform var(--dur-press) var(--ease-out), background-color var(--dur-fast) ease;
+  }
+
+  .pa-side__two button[aria-pressed="true"] {
+    background: var(--pa-side-chip);
+    box-shadow: inset 0 0 0 1px var(--pa-side-line);
+    color: var(--c-bar-ink);
+  }
+
+  .pa-side__nav {
+    display: grid;
+    align-content: start;
+    gap: 2px;
+    min-height: 0;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    scrollbar-width: thin;
+  }
+
+  .pa-side__nav ul {
+    display: grid;
+    gap: 2px;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .pa-side__label {
+    padding: 12px 10px 4px;
+    font-size: 0.72rem;
+    font-weight: 800;
+    color: var(--c-bar-muted);
+  }
+
+  .pa-side__empty {
+    padding: 4px 10px;
+    font-size: 0.8125rem;
+    color: var(--c-bar-muted);
+  }
+
+  .pa-side__row {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 44px;
+    align-items: center;
+  }
+
+  .pa-side__row .pa-icon {
+    color: var(--c-bar-muted);
+  }
+
+  .pa-side .pa-me {
+    border-color: var(--pa-side-line);
+  }
+
+  .pa-side .pa-me small,
+  .pa-side .pa-join p {
+    color: var(--c-bar-muted);
+  }
+
+  .pa-side .pa-join p b {
+    color: var(--c-bar-ink);
+  }
+
+  .pa-side .pa-join__main {
+    background: var(--acc);
+    color: var(--acc-ink);
+  }
+
+  .pa-side .pa-join__line {
+    border-color: var(--pa-side-line);
+    color: var(--c-bar-ink);
+  }
+
+  .pa-side .pa-join__prefs {
+    color: var(--c-bar-ink);
+    text-decoration: underline;
+    text-underline-offset: 3px;
+  }
+
+  .pa-side .pa-me[aria-current="page"],
+  .pa-side .pa-join__prefs[aria-current="page"] {
+    box-shadow: inset 3px 0 0 currentColor;
+  }
+
+  /* Las hojas (fuentes, la invitación) se abren sobre la conversación, no sobre la barra lateral. */
+  .pa-sheet {
+    left: calc(292px + (100% - 292px) / 2);
+  }
+}
+
+@media (min-width: 960px) and (hover: hover) and (pointer: fine) {
+  .pa-sl:hover,
+  .pa-side__two button[aria-pressed="false"]:hover {
+    background: var(--pa-side-chip);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pa-me:active,
+  .pa-sl:active,
+  .pa-side__two button:active {
+    transform: none;
+  }
+}

@@ -4,7 +4,8 @@
    La cara de Pilo va junto a cada respuesta. Mientras piensa, se lee el paso
    en el que va, en palabras (los que reporta el servidor, nunca inventados);
    la respuesta se escribe a medida que llega; al terminar aparecen sus
-   fuentes, «Escuchar», «Copiar» y los votos, como en la página.
+   fuentes, «Escuchar», «Copiar» y los votos, como en la página, y «Guardar»
+   (0120): la respuesta completa queda en la cuenta de la persona.
 
    La lectura es con la voz oficial o no es (official-voice.ts): frase por
    frase, con la que suena resaltada. Si la voz no está disponible, avisa una
@@ -82,6 +83,9 @@ export function AppTurn({
   onSources,
   onSound,
   onVoiceLost,
+  saved = false,
+  saving = false,
+  onSave,
 }: {
   turn: Turn;
   /** Lo que el servidor va mandando de este turno, mientras lo escribe. */
@@ -100,6 +104,12 @@ export function AppTurn({
   /** Pilo suena o calla: la cara de la cabecera mueve el pico con el audio. */
   onSound: (on: boolean) => void;
   onVoiceLost: () => void;
+  /** Esta respuesta está entre las guardadas de la cuenta. */
+  saved?: boolean;
+  /** Se está guardando o quitando. */
+  saving?: boolean;
+  /** Guardar o quitar de las guardadas. Sin cuenta, quien lo recibe invita a registrarse. */
+  onSave?: (trigger: HTMLElement, viaKeyboard: boolean) => void;
 }) {
   const a = turn.answer;
   const pending = !a && !turn.error;
@@ -298,6 +308,12 @@ export function AppTurn({
                 {listed.length > 0 && (
                   <button type="button" className="pa-src" onClick={(e) => onSources(listed, null, e.currentTarget)}>
                     Fuentes ({listed.length})
+                  </button>
+                )}
+                {onSave && !incomplete && !turn.error && text.trim() && (
+                  <button type="button" className="pa-src pa-keep" aria-pressed={saved} aria-busy={saving || undefined} disabled={saving} onClick={(e) => onSave(e.currentTarget, e.detail === 0)}>
+                    {saved ? Icon.check : Icon.mark}
+                    {saved ? "Guardada" : "Guardar"}
                   </button>
                 )}
                 {voice.advanced && text.trim() && (

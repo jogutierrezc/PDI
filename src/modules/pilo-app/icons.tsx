@@ -22,4 +22,11 @@ export const Icon = {
   up: <Svg><path d="M6 9v7.5H3.5V9zM6 9l3.2-6.5c1.4 0 2.1.9 1.8 2.3L10.6 7.5h4.9a1.6 1.6 0 011.6 1.9l-1 5.7a1.6 1.6 0 01-1.6 1.4H6" /></Svg>,
   down: <Svg><path d="M6 11V3.5H3.5V11zM6 11l3.2 6.5c1.4 0 2.1-.9 1.8-2.3l-.4-2.7h4.9a1.6 1.6 0 001.6-1.9l-1-5.7a1.6 1.6 0 00-1.6-1.4H6" /></Svg>,
   trash: <Svg><path d="M4.5 6h11M8.5 9.5v4.5M11.5 9.5v4.5M5.5 6l.8 10.5h7.4L14.5 6M7.5 6V3.5h5V6" /></Svg>,
+  // Las pantallas de la cuenta (0120).
+  mark: <Svg><path d="M5.5 3.5h9v13l-4.5-3.4-4.5 3.4v-13z" /></Svg>,
+  user: <Svg><circle cx="10" cy="7" r="3" /><path d="M4 16.5c.8-2.9 3.2-4.3 6-4.3s5.2 1.4 6 4.3" /></Svg>,
+  back: <Svg><path d="M16 10H4M9 5l-5 5 5 5" /></Svg>,
+  chat: <Svg><path d="M3.5 4.5h13v9H9l-3.5 3v-3h-2v-9z" /></Svg>,
+  dot: <Svg><circle cx="10" cy="10" r="2.5" /></Svg>,
+  search: <Svg><circle cx="9" cy="9" r="5" /><path d="M13 13l3.5 3.5" /></Svg>,
 };

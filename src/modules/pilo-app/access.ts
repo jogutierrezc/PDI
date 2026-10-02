@@ -41,15 +41,19 @@ export interface Door {
 
 const SILENT = { rate: 1, pitch: 1, expressions: true, modulation: true } as const;
 
-/** La puerta de un Pilo para esta persona, con la misma regla que su página (AskPilo). */
-export function spaceDoor(rules: PiloAiConfig | null | undefined, space: SpaceProfile, role: Role | null): Door {
+/**
+ * La puerta de un Pilo para esta persona, con la misma regla que su página (AskPilo).
+ * `member`: tiene una cuenta de Pilo activa (0120). Cuenta como sesión para
+ * preguntar y para la voz; nunca como rol de la intranet.
+ */
+export function spaceDoor(rules: PiloAiConfig | null | undefined, space: SpaceProfile, role: Role | null, member = false): Door {
   const usual = space.id === "planeacion";
   const cfg: SpaceConfig | null = usual ? null : (rules?.spaces[space.id] ?? null);
   const door = !rules ? null : usual ? rules.pregunta : cfg;
   const injected = rules && door ? { ...rules, portals: { ...rules.portals, [space.portal]: { on: door.on, aud: door.aud, fns: space.fns } } } : null;
   const voice: AppVoice = {
     portal: space.portal,
-    advanced: Boolean(rules && injected && rules.speechReady && canUse(usual ? rules : injected, space.portal, "voz", role).ok),
+    advanced: Boolean(rules && injected && rules.speechReady && canUse(usual ? rules : injected, space.portal, "voz", role, member).ok),
     rate: rules?.voiceRate ?? SILENT.rate,
     pitch: rules?.voicePitch ?? SILENT.pitch,
     expressions: rules?.voiceExpressions ?? SILENT.expressions,
@@ -61,8 +65,15 @@ export function spaceDoor(rules: PiloAiConfig | null | undefined, space: SpacePr
     const message = rules && !rules.spacesReady && !usual ? space.gate.missing : space.gate.closed;
     return { state: "cerrado", message, cfg, audience, voice: { ...voice, advanced: false } };
   }
-  const allowed = canUse(injected, space.portal, "preguntar", role);
+  const allowed = canUse(injected, space.portal, "preguntar", role, member);
   if (allowed.ok) return { state: "abierto", message: "", cfg, audience, voice };
-  if (door.on && door.aud === "sesion" && !role) return { state: "sesion", message: space.gate.login, cfg, audience, voice: { ...voice, advanced: false } };
+  if (door.on && door.aud === "sesion" && !role && !member) return { state: "sesion", message: space.gate.login, cfg, audience, voice: { ...voice, advanced: false } };
   return { state: "cerrado", message: !usual && !door.on ? space.gate.closed : allowed.reason, cfg, audience, voice: { ...voice, advanced: false } };
 }
+
+/**
+ * Con qué «rol» se piden las funciones ampliadas (0119): el de la intranet si
+ * lo hay; una cuenta de Pilo activa entra como «miembro» (vale para «Con
+ * sesión», nunca para «Solo administración»); sin nada, null.
+ */
+export const extrasRole = (role: Role | null, member: boolean): string | null => role ?? (member ? "miembro" : null);

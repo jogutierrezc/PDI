@@ -28,14 +28,42 @@ export const APP_PILOS: Record<SpaceId, { label: string; short: string; hint: st
 
 export const APP_SPACES: SpaceId[] = ["planeacion", "ensenanza"];
 
-export type AppPlace = { kind: "inicio" } | { kind: "pilo"; space: SpaceId } | { kind: "otra" };
+/** Las pantallas de la cuenta (0120): registro e ingreso, el perfil y las respuestas guardadas. */
+export const APP_ACCOUNT = "/app/cuenta";
+export const APP_PROFILE = "/app/perfil";
+export const APP_SAVED = "/app/guardadas";
+/** Directo al ingreso, o a usar Pilo sin cuenta. Nunca viaja un correo ni un usuario en la dirección. */
+export const APP_LOGIN = `${APP_ACCOUNT}?entrar=1`;
+export const APP_GUEST = `${APP_ACCOUNT}?visita=1`;
+
+export type AppPlace = { kind: "inicio" } | { kind: "pilo"; space: SpaceId } | { kind: "cuenta" } | { kind: "perfil" } | { kind: "guardadas" } | { kind: "otra" };
 
 /** Qué pantalla de la app pide una dirección. «otra» = no es de la app, o no existe dentro de ella. */
 export function readAppPath(pathname: string): AppPlace {
   const p = (pathname.split(/[?#]/)[0] || "/").replace(/\/+$/, "").toLowerCase() || "/";
   if (p === APP_BASE) return { kind: "inicio" };
   for (const space of APP_SPACES) if (p === APP_PATHS[space]) return { kind: "pilo", space };
+  if (p === APP_ACCOUNT) return { kind: "cuenta" };
+  if (p === APP_PROFILE) return { kind: "perfil" };
+  if (p === APP_SAVED) return { kind: "guardadas" };
   return { kind: "otra" };
+}
+
+export type GateMode = "registro" | "visita" | "ingreso" | "clave" | "confirmada";
+
+/** Con qué pantalla abre /app/cuenta, según lo que traiga la dirección (los enlaces del correo traen `clave` o `confirmada`). */
+export function gateMode(search: string): GateMode {
+  const q = new URLSearchParams(search);
+  if (q.get("clave") === "1") return "clave";
+  if (q.get("confirmada") === "1") return "confirmada";
+  if (q.get("entrar") === "1") return "ingreso";
+  if (q.get("visita") === "1") return "visita";
+  return "registro";
+}
+
+/** El enlace del correo llegó vencido o ya usado: la plataforma lo dice en la dirección. */
+export function linkExpired(hash: string, search = ""): boolean {
+  return /error(_code|_description)?=/.test(hash) || /[?&]error(_code)?=/.test(search);
 }
 
 /** ¿Esta dirección es de la app? (para registrar el service worker solo ahí). */

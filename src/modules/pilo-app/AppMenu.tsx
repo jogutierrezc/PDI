@@ -2,26 +2,29 @@
    Mr. Pilo · la app móvil · el menú (cajón lateral) y sus hojas.
 
    Nueva conversación · Conversaciones guardadas (en el teléfono, las de los
-   dos Pilos, con su fecha; se reabren y se borran) · Con cuál Pilo · Tema ·
-   Ver la bienvenida · la cuenta.
+   dos Pilos, con su fecha; se reabren y se borran) · Respuestas guardadas ·
+   Con cuál Pilo · Tema · Ver la bienvenida · la persona.
 
-   La cuenta: hoy solo existen las cuentas de la intranet. «Ya tengo cuenta»
-   lleva al inicio de sesión que ya existe; «Registrarme» es una hoja
-   informativa, sin nada detrás.
+   La persona (0120): con cuenta de Pilo, su nombre, su perfil y su usuario,
+   que llevan a su perfil; sin cuenta, «Crear cuenta / Entrar». En el
+   escritorio este cajón no se usa: lo mismo vive en la barra lateral fija
+   (AppSide).
    ========================================================================== */
 
-import { useState } from "react";
 import type { MouseEvent } from "react";
 import { Link } from "react-router-dom";
 import type { AskSource } from "../../components/pilo/ai/client";
 import type { SpaceId, SpaceProfile } from "../pregunta/space";
-import { APP_PILOS, APP_SPACES } from "./routes";
+import { APP_ACCOUNT, APP_LOGIN, APP_PILOS, APP_SAVED, APP_SPACES } from "./routes";
 import { APP_THEMES } from "./themes";
 import type { AppTheme } from "./themes";
 import { dayLabel } from "./saved";
 import type { SavedEntry } from "./saved";
 import { Layer } from "./Layer";
 import { Icon } from "./icons";
+import { PersonBlock } from "./AppSide";
+import type { Person } from "./AppSide";
+import { ACCOUNT_BENEFITS } from "./account/rules";
 
 export function AppMenu({
   open,
@@ -37,8 +40,7 @@ export function AppMenu({
   theme,
   onTheme,
   onWelcome,
-  onAccount,
-  signedAs,
+  person,
 }: {
   open: boolean;
   quick: boolean;
@@ -54,9 +56,8 @@ export function AppMenu({
   theme: AppTheme;
   onTheme: (theme: AppTheme, event: MouseEvent) => void;
   onWelcome: () => void;
-  onAccount: (event: MouseEvent) => void;
-  /** El nombre de quien tiene sesión; null sin sesión. */
-  signedAs: string | null;
+  /** Quién usa la app: su cuenta de Pilo, la de la intranet, o nadie. */
+  person: Person;
 }) {
   return (
     <Layer kind="menu" open={open} quick={quick} label="Menú de Mr. Pilo" onClose={onClose}>
@@ -94,6 +95,15 @@ export function AppMenu({
           ))}
         </section>
 
+        <Link className="pa-mi pa-mi--line pa-mi--go" to={APP_SAVED} onClick={() => onClose()}>
+          <strong>
+            {Icon.mark}
+            Respuestas guardadas
+            {person.saved !== null && <em aria-label={`${person.saved} guardadas`}>{person.saved}</em>}
+          </strong>
+          <small>{person.card ? "Lo que guardó de Pilo, en su cuenta" : "Con cuenta, las encuentra en cualquier dispositivo"}</small>
+        </Link>
+
         <section aria-labelledby="pa-m-pilo">
           <p className="pa-label" id="pa-m-pilo">
             Con cuál Pilo
@@ -130,20 +140,7 @@ export function AppMenu({
       </div>
 
       <div className="pa-account">
-        {signedAs ? (
-          <>
-            <strong>Sesión iniciada</strong>
-            <p>{signedAs}. Sus conversaciones se guardan en este teléfono.</p>
-          </>
-        ) : (
-          <>
-            <strong>Regístrese para más de Pilo</strong>
-            <p>Sin cuenta, sus conversaciones se guardan solo en este teléfono.</p>
-            <button type="button" className="pa-btn pa-btn--line" onClick={onAccount}>
-              Registrarme o entrar
-            </button>
-          </>
-        )}
+        <PersonBlock person={person} onGo={() => onClose()} />
       </div>
     </Layer>
   );
@@ -205,48 +202,33 @@ export function SourcesSheet({
   );
 }
 
-/* --- La hoja de la cuenta -------------------------------------------------------------------- */
+/* --- La invitación a tener cuenta --------------------------------------------------------------- */
 
-export function AccountSheet({ open, quick, onClose, from }: { open: boolean; quick: boolean; onClose: (event?: MouseEvent) => void; from: string }) {
-  const [info, setInfo] = useState(false);
-  const close = (event?: MouseEvent) => {
-    setInfo(false);
-    onClose(event);
-  };
+/** Lo que se abre al tocar «Guardar» sin cuenta: qué gana quien se registra, y los dos caminos. */
+export function AccountSheet({ open, quick, onClose }: { open: boolean; quick: boolean; onClose: (event?: MouseEvent) => void }) {
   return (
-    <Layer kind="sheet" open={open} quick={quick} label="Su cuenta de Pilo" onClose={close}>
+    <Layer kind="sheet" open={open} quick={quick} label="Su cuenta de Pilo" onClose={onClose}>
       <div className="pa-sheet__in">
         <span className="pa-sheet__grip" aria-hidden="true" />
         <div className="pa-sheet__head">
-          <h2>Su cuenta de Pilo</h2>
-          <button type="button" className="pa-icon" onClick={close} aria-label="Cerrar">
+          <h2>Guardar es de quienes tienen cuenta</h2>
+          <button type="button" className="pa-icon" onClick={onClose} aria-label="Cerrar">
             {Icon.close}
           </button>
         </div>
+        <p>Con una cuenta de Pilo, sus respuestas guardadas quedan en su cuenta y las encuentra en cualquier dispositivo. Además:</p>
         <ul>
-          <li>
-            <strong>Contenidos reservados</strong>
-            <small>Con sesión, Pilo también responde con lo reservado a quienes tienen cuenta, como el Portal de Impacto y los cursos.</small>
-          </li>
-          <li>
-            <strong>Conversaciones en todos sus dispositivos</strong>
-            <small>Próximamente: guardarlas y retomarlas donde las dejó. Hoy viven solo en este teléfono.</small>
-          </li>
-          <li>
-            <strong>Pilo lo conoce</strong>
-            <small>Próximamente: recordar si es estudiante o profesor y su tema preferido en cualquier dispositivo.</small>
-          </li>
+          {ACCOUNT_BENEFITS.filter((b) => b.title !== "Guardar respuestas").map((b) => (
+            <li key={b.title}>
+              <strong>{b.title}</strong>
+              <small>{b.text}</small>
+            </li>
+          ))}
         </ul>
-        {info ? (
-          // PENDIENTE: registro de estudiantes y profesores (decisión del dueño).
-          // Hoy solo existen las cuentas de la intranet: aquí no hay formulario ni nada detrás.
-          <p role="status">El registro de estudiantes y profesores todavía no está abierto. Por ahora las cuentas son las de la intranet de la universidad; si ya tiene una, entre con ella.</p>
-        ) : (
-          <button type="button" className="pa-btn pa-btn--main" onClick={() => setInfo(true)}>
-            Registrarme con mi correo
-          </button>
-        )}
-        <Link className="pa-btn pa-btn--line" to="/acceso-intranet" state={{ from }}>
+        <Link className="pa-btn pa-btn--main" to={APP_ACCOUNT}>
+          Crear una cuenta
+        </Link>
+        <Link className="pa-btn pa-btn--line" to={APP_LOGIN}>
           Ya tengo cuenta
         </Link>
       </div>

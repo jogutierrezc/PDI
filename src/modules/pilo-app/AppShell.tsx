@@ -10,6 +10,12 @@
    La cara de la cabecera piensa mientras Pilo piensa y mueve el pico mientras
    lee. Sin conexión, Pilo aparece en su pose «en obra» y avisa; lo guardado se
    puede leer. Si el espacio está cerrado o pide sesión, se dice aquí mismo.
+
+   Cuentas de Pilo (0120): con cuenta, la persona guarda las respuestas
+   completas en su cuenta («Guardar») y el servidor la reconoce por su sesión;
+   sin cuenta, con cada pregunta viaja cómo pidió que Pilo le diga y en qué
+   tono, y «Guardar» invita a registrarse. Desde 960 px de ancho, el menú deja
+   de ser un cajón y queda fijo a la izquierda (AppSide).
    ========================================================================== */
 
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
@@ -29,8 +35,11 @@ import { parseAnswer } from "../pregunta/AnswerText";
 import { toPlain } from "../pregunta/markdown";
 import { interruptedTurn, reduceSteps } from "../pregunta/answer-state";
 import type { ThinkStep } from "../pregunta/answer-state";
+import { useQueryClient } from "@tanstack/react-query";
+import { extrasRole } from "./access";
 import type { Door } from "./access";
-import { APP_PILOS, APP_SPACES } from "./routes";
+import type { Role } from "../../components/pilo/ai/logic";
+import { APP_LOGIN, APP_PILOS, APP_SPACES } from "./routes";
 import type { AppTheme } from "./themes";
 import { loadSaved, nextLast, openingId, readLast, removeSaved, savedEntries, writeLast } from "./saved";
 import type { SavedEntry } from "./saved";
@@ -41,6 +50,11 @@ import { AppTurn } from "./AppTurn";
 import type { Live, TurnVoice } from "./AppTurn";
 import { AccountSheet, AppMenu, IphoneSheet, SourcesSheet } from "./AppMenu";
 import { Icon } from "./icons";
+import { AppSide } from "./AppSide";
+import type { Person } from "./AppSide";
+import { removeSavedAnswer, saveAnswer, savedDraft, savedKey, useSavedAnswers } from "./account/answers";
+import type { SavedAnswer } from "./account/answers";
+import { readVisitor, visitorWire } from "./account/visitor";
 import { useAuth } from "../../lib/auth";
 import { extrasFor, usePiloExtras } from "../../components/pilo/ai/extras";
 import { pickPassages, turnFile } from "../pregunta/attach";
@@ -54,7 +68,12 @@ export interface ShellProps {
   /** La configuración o la sesión aún se están leyendo. */
   waking: boolean;
   online: boolean;
-  signedAs: string | null;
+  /** Quién usa la app: su cuenta de Pilo, la de la intranet, o nadie. */
+  person: Person;
+  /** Tiene una cuenta de Pilo activa (0120): cuenta como sesión y puede guardar respuestas. */
+  member: boolean;
+  /** Disposición de escritorio: el menú es una barra lateral fija. */
+  wide: boolean;
   theme: AppTheme;
   onTheme: (theme: AppTheme) => void;
   voiceOn: boolean;
@@ -70,15 +89,18 @@ export interface ShellProps {
   install: { way: InstallWay; dismissed: boolean; run: () => void; dismiss: () => void };
 }
 
-export function AppShell({ space, door, waking, online, signedAs, theme, onTheme, voiceOn, onVoice, rol, onRol, faceSlot, welcoming, onWelcome, onSwitch, install }: ShellProps) {
+export function AppShell({ space, door, waking, online, person, member, wide, theme, onTheme, voiceOn, onVoice, rol, onRol, faceSlot, welcoming, onWelcome, onSwitch, install }: ShellProps) {
   const prefix = space.storagePrefix;
   const usual = space.id === "planeacion";
   const location = useLocation();
   const [convs, setConvs] = useConversations(prefix);
   const [currentId, setCurrentId] = useState<string | null>(() => {
     // La que se pidió desde el menú del otro Pilo; si no, la última de este.
-    const asked = (location.state as { open?: unknown } | null)?.open;
+    const state = location.state as { open?: unknown; nueva?: unknown } | null;
+    const asked = state?.open;
     if (typeof asked === "string" && convs.some((c) => c.id === asked)) return asked;
+    // «Nueva conversación», pedida desde el perfil o las guardadas.
+    if (state?.nueva === true) return null;
     return openingId(readLast(), space.id, convs);
   });
   const current = convs.find((c) => c.id === currentId) ?? null;
@@ -95,8 +117,10 @@ export function AppShell({ space, door, waking, online, signedAs, theme, onTheme
   const view = useMemo(() => roleView(space, door.cfg, who), [space, door.cfg, who]);
   const sent = wireRol(who);
   // Las funciones ampliadas (0119): si esta persona puede adjuntar un archivo en este Pilo. Lo decide la administración.
-  const { profile: person } = useAuth();
-  const extras = extrasFor(usePiloExtras().data, space.id, person?.is_active ? person.role : null);
+  // Una cuenta de Pilo activa entra como «miembro»: vale para «Con sesión», nunca para «Solo administración».
+  const { profile, session } = useAuth();
+  const userId = session?.user.id;
+  const extras = extrasFor(usePiloExtras().data, space.id, extrasRole((profile?.is_active ? profile.role : null) as Role | null, member));
   const attach = useAttachment(extras.fileMaxMb);
   // Lo que viaja a la función además de la pregunta. En el Pilo de la Universidad, nada: el pedido es el de siempre.
   const wire: AskOptions | undefined = useMemo(() => (usual ? undefined : { portal: space.portal, rol: sent }), [usual, space.portal, sent]);
@@ -126,6 +150,13 @@ export function AppShell({ space, door, waking, online, signedAs, theme, onTheme
   const pinned = useRef(true);
   // Los turnos que nacieron en esta visita entran animados; los guardados, no.
   const born = useRef(new Set<string>());
+
+  /* --- Las respuestas guardadas en la cuenta (0120) -------------------------------------------- */
+
+  const client = useQueryClient();
+  const keptList = useSavedAnswers(userId, member);
+  const kept = useMemo(() => new Set((keptList.data ?? []).map((s) => s.id)), [keptList.data]);
+  const [keeping, setKeeping] = useState<string | null>(null);
 
   const toBottom = useCallback(() => {
     pinned.current = true;
@@ -226,7 +257,12 @@ export function AppShell({ space, door, waking, online, signedAs, theme, onTheme
         },
       };
       // Con un archivo adjunto viajan, además, los pasajes que tienen que ver con esta pregunta: el archivo no se sube.
-      const answer = wire || doc ? await askQuestionStream(q, history, handlers, { ...(wire ?? {}), ...(doc ? { doc } : {}) }) : await askQuestionStream(q, history, handlers);
+      // Sin cuenta viaja, además, cómo pidió que Pilo le diga y en qué tono. Con cuenta, nada: el servidor la reconoce por su sesión.
+      const visitor = visitorWire(readVisitor(), member);
+      const answer =
+        wire || doc || visitor
+          ? await askQuestionStream(q, history, handlers, { ...(wire ?? {}), ...(doc ? { doc } : {}), ...(visitor ? { visitor } : {}) })
+          : await askQuestionStream(q, history, handlers);
       if (run.current !== mine) return;
       setFresh((f) => new Map(f).set(turn.id, mine.text.trim() ? "en vivo" : "entera"));
       // Los pasos y los segundos del flujo no se guardan con la respuesta.
@@ -265,7 +301,45 @@ export function AppShell({ space, door, waking, online, signedAs, theme, onTheme
     setBusy(false);
   };
 
+  /** «Guardar» junto a una respuesta completa: la guarda en la cuenta, o la quita. Sin cuenta, invita a registrarse. */
+  const keep = async (t: Turn, viaKeyboard: boolean) => {
+    if (!member) {
+      setQuick(viaKeyboard);
+      setOver("cuenta");
+      return;
+    }
+    if (!current || !t.answer || keeping) return;
+    setKeeping(t.id);
+    setNote("");
+    try {
+      if (t.savedId && kept.has(t.savedId)) {
+        const id = t.savedId;
+        await removeSavedAnswer(id);
+        client.setQueryData<SavedAnswer[]>(savedKey(userId), (list) => (list ?? []).filter((s) => s.id !== id));
+        patchTurn(current.id, t.id, { savedId: undefined });
+        setStatus("Se quitó de sus guardadas.");
+      } else {
+        const draft = savedDraft(space.id, t.q, t.answer);
+        if (!draft) return;
+        const row = await saveAnswer(draft);
+        client.setQueryData<SavedAnswer[]>(savedKey(userId), (list) => [row, ...(list ?? [])]);
+        patchTurn(current.id, t.id, { savedId: row.id });
+        setStatus("Guardada en su cuenta.");
+        if (!viaKeyboard) face.current?.nod();
+      }
+    } catch (e) {
+      setNote((e as Error).message || "No se pudo guardar la respuesta.");
+    } finally {
+      setKeeping(null);
+    }
+  };
+
   /* --- Menú y hojas --------------------------------------------------------------------------- */
+
+  // En el escritorio el menú está siempre a la vista: las conversaciones del otro Pilo se leen al entrar.
+  useEffect(() => {
+    if (wide) setOthers(Object.fromEntries(APP_SPACES.filter((s) => s !== space.id).map((s) => [s, loadSaved(s)])));
+  }, [wide, space.id]);
 
   const show = (which: Exclude<Over, null>, event?: MouseEvent | null) => {
     setQuick(fromKeyboard(event));
@@ -349,13 +423,30 @@ export function AppShell({ space, door, waking, online, signedAs, theme, onTheme
   const needsRol = askRol && rol === null && !welcoming && open;
   const placeholder = !online ? "Sin conexión" : waking ? "Despertando a Pilo…" : !open ? "Pilo no está disponible aquí" : "Escriba su pregunta";
 
+  const shown = { ...person, saved: member ? (keptList.data?.length ?? null) : null };
+
   return (
     <>
+      {wide && (
+        <AppSide
+          space={space.id}
+          saved={saved}
+          currentId={currentId}
+          active="chat"
+          person={shown}
+          onOpen={openSaved}
+          onDelete={deleteSaved}
+          onNew={startNew}
+          onSwitch={(id) => id !== space.id && onSwitch(id)}
+        />
+      )}
       <header className="pa-bar">
-        <div className="pa-bar__in">
-          <button type="button" className="pa-icon" onClick={(e) => show("menu", e)} aria-label="Abrir el menú" aria-haspopup="dialog" aria-expanded={over === "menu"}>
-            {Icon.menu}
-          </button>
+        <div className="pa-bar__in" data-wide={wide || undefined}>
+          {!wide && (
+            <button type="button" className="pa-icon" onClick={(e) => show("menu", e)} aria-label="Abrir el menú" aria-haspopup="dialog" aria-expanded={over === "menu"}>
+              {Icon.menu}
+            </button>
+          )}
           <div className="pa-bar-face" ref={faceSlot} style={{ visibility: welcoming ? "hidden" : undefined }}>
             <Pilo ref={face} size="100%" mood={working ? "piensa" : "feliz"} emotion={working ? undefined : !online ? "obra" : view.expression} talking={sounding || writing} alive label="Mr. Pilo" />
           </div>
@@ -396,9 +487,14 @@ export function AppShell({ space, door, waking, online, signedAs, theme, onTheme
               <h2>{door.state === "sesion" ? "Pilo lo espera adentro" : "Pilo está descansando"}</h2>
               <p>{door.message}</p>
               {door.state === "sesion" && (
-                <Link className="pa-btn pa-btn--main" to="/acceso-intranet" state={{ from: location.pathname }}>
-                  Iniciar sesión
-                </Link>
+                <>
+                  <Link className="pa-btn pa-btn--main" to={APP_LOGIN}>
+                    Entrar con mi cuenta de Pilo
+                  </Link>
+                  <Link className="pa-card__alt" to="/acceso-intranet" state={{ from: location.pathname }}>
+                    Soy personal con cuenta en la intranet
+                  </Link>
+                </>
               )}
             </section>
           )}
@@ -449,6 +545,9 @@ export function AppShell({ space, door, waking, online, signedAs, theme, onTheme
                 }}
                 onSound={setSounding}
                 onVoiceLost={() => setNote("La voz de Pilo no está disponible ahora: queda el texto.")}
+                saved={Boolean(t.savedId && kept.has(t.savedId))}
+                saving={keeping === t.id}
+                onSave={(_trigger, viaKeyboard) => void keep(t, viaKeyboard)}
               />
             ))
           )}
@@ -475,7 +574,7 @@ export function AppShell({ space, door, waking, online, signedAs, theme, onTheme
 
           {!current && install.way && !install.dismissed && !welcoming && (
             <div className="pa-install">
-              <span>Lleve a Pilo en su teléfono.</span>
+              <span>{wide ? "Instale a Pilo en su computador." : "Lleve a Pilo en su teléfono."}</span>
               <button type="button" className="pa-btn pa-btn--main" onClick={(e) => (install.way === "iphone" ? show("iphone", e) : install.run())}>
                 Instalar a Pilo
               </button>
@@ -519,38 +618,40 @@ export function AppShell({ space, door, waking, online, signedAs, theme, onTheme
         </div>
       </div>
 
-      <div className="pa-scrim" data-open={over !== null || undefined} data-quick={quick || undefined} onClick={(e) => hide(e)} aria-hidden="true" />
+      <div className="pa-scrim" data-open={(over !== null && !(wide && over === "menu")) || undefined} data-quick={quick || undefined} onClick={(e) => hide(e)} aria-hidden="true" />
 
-      <AppMenu
-        open={over === "menu"}
-        quick={quick}
-        onClose={hide}
-        space={space.id}
-        saved={saved}
-        currentId={currentId}
-        onOpen={openSaved}
-        onDelete={deleteSaved}
-        onNew={startNew}
-        onSwitch={(id) => {
-          setOver(null);
-          if (id !== space.id) onSwitch(id);
-        }}
-        theme={theme}
-        onTheme={(id, e) => {
-          onTheme(id);
-          pulse(e);
-        }}
-        onWelcome={() => {
-          stopOfficial();
-          cancelRun();
-          setOver(null);
-          onWelcome();
-        }}
-        onAccount={(e) => show("cuenta", e)}
-        signedAs={signedAs}
-      />
+      {/* En el escritorio el menú es la barra lateral: el cajón no se monta. */}
+      {!wide && (
+        <AppMenu
+          open={over === "menu"}
+          quick={quick}
+          onClose={hide}
+          space={space.id}
+          saved={saved}
+          currentId={currentId}
+          onOpen={openSaved}
+          onDelete={deleteSaved}
+          onNew={startNew}
+          onSwitch={(id) => {
+            setOver(null);
+            if (id !== space.id) onSwitch(id);
+          }}
+          theme={theme}
+          onTheme={(id, e) => {
+            onTheme(id);
+            pulse(e);
+          }}
+          onWelcome={() => {
+            stopOfficial();
+            cancelRun();
+            setOver(null);
+            onWelcome();
+          }}
+          person={shown}
+        />
+      )}
       <SourcesSheet open={over === "fuentes"} quick={quick} onClose={hide} sources={shownSources.sources} focus={shownSources.focus} space={space} />
-      <AccountSheet open={over === "cuenta"} quick={quick} onClose={hide} from={location.pathname} />
+      <AccountSheet open={over === "cuenta"} quick={quick} onClose={hide} />
       <IphoneSheet open={over === "iphone"} quick={quick} onClose={hide} />
     </>
   );

@@ -76,6 +76,11 @@ const PAIRS: [string, string[]][] = [
   // La cita encendida: el fondo de la página como tinta sobre el color de enlace.
   ["--c-bg", ["--c-link"]],
   ["--c-warn", ["--c-warn-bg"]],
+  // Las pantallas de la cuenta: lo que sirve y lo que falta en un campo, sobre la página, la hoja y el campo.
+  ["--c-ok", ["--c-bg", "--c-bubble", "--c-sheet"]],
+  ["--c-bad", ["--c-bg", "--c-bubble", "--c-sheet"]],
+  // El campo elegido y la barra lateral del escritorio.
+  ["--c-ink2", ["--c-chip"]],
   ["--w-card-ink", ["--w-card"]],
   ["--w-card-ok", ["--w-card"]],
 ];

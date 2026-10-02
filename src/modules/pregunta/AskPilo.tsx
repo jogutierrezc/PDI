@@ -701,7 +701,7 @@ function Chat({ space, cfg, tema, setTema, role, audience, welcome, voice: baseV
                   question: catalogTurn.q,
                   answer: catalogTurn.answer ? toPlain(parseAnswer(catalogTurn.answer.text)) : "",
                   mood: (catalogTurn.answer?.mood as CatalogMood) || "emocionado",
-                  source_title: catalogTurn.answer?.sources?.[0]?.title ?? "Planeación Institucional · Pregúntele a Pilo",
+                  source_title: catalogTurn.answer?.sources?.[0]?.title ?? "Universidad de Santander · Pregúntele a Pilo",
                   source_path: catalogTurn.answer?.sources?.[0]?.path ?? "/pregunta",
                   cut: catalogTurn.answer?.sources?.[0]?.cut ?? "",
                 }

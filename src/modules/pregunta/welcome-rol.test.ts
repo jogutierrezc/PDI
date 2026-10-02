@@ -42,7 +42,7 @@ describe("la bienvenida", () => {
     act(() => root.render(createElement(StrictMode, null, createElement(Welcome, { tema: "blanco", target: createRef<HTMLElement>(), onDone }))));
     letTimePass();
     expect(host.querySelector("#apw-title")?.getAttribute("aria-label")).toBe("Pregúntele a Mr. Pilo");
-    expect(host.querySelector(".apw-brand")?.textContent).toBe("Planeación InstitucionalUniversidad de Santander");
+    expect(host.querySelector(".apw-brand")?.textContent).toBe("Pregúntele a PiloUniversidad de Santander");
     expect(host.querySelectorAll(".apw-seg")).toHaveLength(3);
     expect(host.querySelector(".apw-segs small")?.textContent).toMatch(/de 3$/);
     expect(host.querySelectorAll(".apw-know")).toHaveLength(5);

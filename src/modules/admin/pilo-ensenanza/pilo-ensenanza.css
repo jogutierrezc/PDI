@@ -217,6 +217,8 @@
 
 .pen-moment { display: grid; gap: var(--space-4); min-width: 0; }
 .pen-moment[hidden] { display: none; }
+/* El mapa de este Pilo y el global, tras su conmutador: el plano ancho se desplaza dentro, no ensancha la hoja. */
+.pen-moment > div { min-width: 0; }
 
 /* Una barra de avance dentro de la hoja (lo comprendido). La mueve GSAP. */
 .pen-bar { display: block; height: 8px; overflow: hidden; background: var(--surface-3); border-radius: var(--radius-pill); }

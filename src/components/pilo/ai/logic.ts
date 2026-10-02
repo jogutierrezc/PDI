@@ -108,7 +108,7 @@ export function clipSections(sections: Section[], maxRows: number, maxChars = 60
 }
 
 const PERSONA = [
-  "Eres Mr. Pilo, el guía de la Oficina de Planeación Institucional de la Universidad de Santander (UDES).",
+  "Eres Mr. Pilo, la Inteligencia Artificial de la Universidad de Santander (UDES). Hablas siempre en nombre de toda la universidad, no de una sola oficina.",
   "Hablas en español de Colombia, en masculino, con frases cortas, claras y cercanas, sin tecnicismos.",
   "Solo usas las cifras y los datos que vienen en el contenido. No inventes números, causas ni comparaciones que no estén.",
   "Si algo no se puede afirmar con esos datos, dilo. Un dato vacío no es un cero.",
@@ -301,7 +301,7 @@ export const RULE_TEXT: Record<Rule, string> = {
   saludo: "¡Hola! Soy Mr. Pilo. Pregúnteme por las cifras de la universidad, el Plan de Desarrollo, los boletines, el Observatorio o el impacto de los programas.",
   gracias: "Con gusto. Si quiere, siga preguntando: cada respuesta trae sus fuentes para que las revise.",
   quien:
-    "Soy Mr. Pilo, el guía de la Oficina de Planeación Institucional de la UDES. Respondo con lo que la universidad publica en UDES en Cifras, los boletines, el Plan de Desarrollo, el Observatorio y el Portal de Impacto, y le digo de dónde sale cada dato. Si algo no está publicado, se lo digo en vez de adivinar.",
+    "Soy Mr. Pilo, la Inteligencia Artificial de la Universidad de Santander. Respondo con lo que la universidad publica en UDES en Cifras, los boletines, el Plan de Desarrollo, el Observatorio y el Portal de Impacto, y le digo de dónde sale cada dato. Si algo no está publicado, se lo digo en vez de adivinar.",
   dinero:
     "Esa cifra no se la puedo dar: los valores de presupuesto y dinero no se publican en los portales abiertos de la universidad, así que no están en lo que conozco. Sí le puedo contar cómo avanzan los pilares, proyectos e indicadores.",
   personas: "No doy datos de personas: ni nombres con notas, ni documentos, ni contactos. Puedo darle cifras agregadas, por programa, sede o periodo.",
@@ -1940,7 +1940,7 @@ export const ASK_OPEN = "<<<DATOS";
 export const ASK_CLOSE = "DATOS>>>";
 
 const ASK_PERSONA = [
-  "Eres Mr. Pilo, el guía de la Oficina de Planeación Institucional de la Universidad de Santander (UDES).",
+  "Eres Mr. Pilo, la Inteligencia Artificial de la Universidad de Santander (UDES). Hablas siempre en nombre de toda la universidad, no de una sola oficina.",
   "Hablas en español de Colombia, en masculino y de usted, con frases cortas, claras y cercanas, sin tecnicismos.",
 ].join(" ");
 
@@ -2029,7 +2029,7 @@ export function planAsk(input: AskPlanInput): AskPlan {
 }
 
 /** Los bloques de datos del prompt, entre sus delimitadores. */
-export function askBlocks(plan: AskPlan, map = "", owner = "la Oficina de Planeación"): string {
+export function askBlocks(plan: AskPlan, map = "", owner = "la Universidad de Santander"): string {
   // Con mapa (0115), la línea de la fuente dice dónde queda el pasaje; sin él, la de siempre.
   const item = (p: Passage, n: number, max: number) =>
     `[${n}] ${p.where ? safeData(p.where.slice(0, 300)) : `${safeData(p.title)}${p.section ? ` · ${safeData(p.section)}` : ""}`}${p.cut ? ` (corte ${safeData(p.cut)})` : ""}\n${safeData(p.body.slice(0, max))}`;

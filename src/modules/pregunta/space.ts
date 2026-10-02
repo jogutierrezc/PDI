@@ -107,18 +107,18 @@ export const ASK_SPACES: Record<SpaceId, SpaceProfile> = {
     route: "/pregunta",
     embedRoute: "/pilo-embed",
     title: "Pregúntele a Mr. Pilo",
-    docTitle: "Pregúntele a Pilo · Planeación UDES",
+    docTitle: "Pregúntele a Pilo · Universidad de Santander",
     name: "Pregúntele a Pilo",
-    sub: "Planeación Institucional · UDES",
-    brand: { strong: "Planeación Institucional", text: "Universidad de Santander" },
+    sub: "Universidad de Santander · UDES",
+    brand: { strong: "Pregúntele a Pilo", text: "Universidad de Santander" },
     crumb: { to: "/", label: "Planeación Institucional" },
     beats: [
-      { say: "¡Hola! Soy Mr. Pilo, el guía de la Oficina de Planeación Institucional de la UDES.", mood: "feliz", look: [0, -0.1] },
+      { say: "¡Hola! Soy Mr. Pilo, la Inteligencia Artificial de la Universidad de Santander.", mood: "feliz", look: [0, -0.1] },
       { say: "Pregúnteme como le preguntaría a una persona: por cifras, el Plan de Desarrollo, los boletines o el Observatorio.", mood: "atento", look: [0, 0.7] },
       { say: "Le respondo sobre lo que necesite: las cifras de la UDES llevan su fuente para que la revise, y le aviso cuando algo es conocimiento general.", mood: "sorpresa", look: [0.2, 0.8] },
     ],
     hello: {
-      h1: "¿Qué quiere saber de la Planeación de la UDES?",
+      h1: "¿Qué quiere saber de la Universidad de Santander?",
       p: "Pregunte en sus palabras, sobre la UDES o sobre lo que necesite. Redacto con IA: las cifras de la universidad salen de lo publicado y llevan su fuente, y le aviso cuando algo es conocimiento general.",
     },
     suggestions: [
@@ -135,10 +135,10 @@ export const ASK_SPACES: Record<SpaceId, SpaceProfile> = {
       { id: "pdi", code: "PD", name: "Plan de Desarrollo" },
       { id: "observatorio", code: "OB", name: "Observatorio" },
       { id: "impacto", code: "IM", name: "Portal de Impacto", session: true },
-      // Las respuestas oficiales del catálogo: no es una memoria que se lista, es Planeación hablando.
-      { id: "catalogo", code: "PL", name: "Planeación Institucional", hidden: true },
+      // Las respuestas oficiales del catálogo: no es una memoria que se lista, es la universidad hablando.
+      { id: "catalogo", code: "UD", name: "Universidad de Santander", hidden: true },
     ],
-    office: "Oficina de Planeación Institucional",
+    office: "Universidad de Santander",
     accent: null,
     storagePrefix: "pilo-pregunta",
     embedPrefix: "pilo-embed",
@@ -167,8 +167,8 @@ export const ASK_SPACES: Record<SpaceId, SpaceProfile> = {
       },
     },
     widget: {
-      frameTitle: "Chat con Pilo, de Planeación UDES",
-      greeting: "Hola, soy Pilo. Pregúnteme por las cifras de la UDES y le digo de dónde sale cada una.",
+      frameTitle: "Chat con Pilo, la Inteligencia Artificial de la Universidad de Santander",
+      greeting: "Hola, soy Pilo, la Inteligencia Artificial de la Universidad de Santander. Pregúnteme por las cifras de la UDES y le digo de dónde sale cada una.",
       hello: "¿Busca una cifra de la UDES? Pregúnteme.",
       idle: "Cifras de la UDES",
       suggestions: ["¿Qué es UDES en Cifras?", "¿Cómo va el Plan de Desarrollo?", "¿Qué programas ofrece la UDES?"],

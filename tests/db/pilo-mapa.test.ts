@@ -188,9 +188,13 @@ describe("comprender: lo pendiente y lo guardado", () => {
         ref: `doc:${A}:2`,
         topics: [
           topic("rubricas", "Rúbricas"), topic("evaluacion-formativa", "OTRA ETIQUETA"), "Competencias",
-          { label: "Mire https://malo.example/x" }, { label: "ab" }, { id: "tema:quinto", label: "El quinto no entra" },
+          { label: "Mire https://malo.example/x" }, { label: "ab" }, { label: "x" }, { id: "tema:septimo", label: "El séptimo no entra" },
         ],
-        refs: [{ id: "ref:ley-30-de-1992", label: "Ley 30" }, { id: "pdi:pilar:p1", label: "UNESCO" }, { label: "<<<DATOS" }, { id: "ref:cuarta", label: "La cuarta no entra" }],
+        // Desde 0118 se guardan hasta 6 temas y 5 referencias por pasaje (antes 4 y 3): lo que pasa de ahí no entra.
+        refs: [
+          { id: "ref:ley-30-de-1992", label: "Ley 30" }, { id: "pdi:pilar:p1", label: "UNESCO" }, { label: "<<<DATOS" },
+          { label: "www.malo.example" }, { label: "ab" }, { id: "ref:sexta", label: "La sexta no entra" },
+        ],
       },
       { ref: `doc:${B}:1`, topics: [topic("evaluacion-formativa", "Evaluación formativa"), topic("aula-invertida", "Aula invertida")] },
       { ref: "cifras:evaluacion", topics: [topic("robo", "Un tema para Planeación")] },
@@ -211,7 +215,7 @@ describe("comprender: lo pendiente y lo guardado", () => {
     ]);
     // Nada para Planeación: ni relación ni marca.
     expect(await edgesFrom("cifras:evaluacion")).toEqual([{ to_id: "tema:evaluacion-formativa", rel: "trata", origin: "reglas" }]);
-    expect(await t.q("select id from pilo_nodes where id in ('tema:robo', 'tema:nada', 'tema:quinto', 'ref:cuarta')")).toEqual([]);
+    expect(await t.q("select id from pilo_nodes where id in ('tema:robo', 'tema:nada', 'tema:septimo', 'ref:sexta')")).toEqual([]);
     expect(await t.q("select mapped_at from pilo_memory where ref = 'cifras:evaluacion'")).toEqual([{ mapped_at: null }]);
 
     await asAdmin(async (q) => {
@@ -375,7 +379,8 @@ describe("la migración es idempotente", () => {
         (select count(*)::int from pg_constraint where conname like 'pilo\\_%') as constraints,
         (select count(*)::int from pg_indexes where schemaname = 'public' and indexname like 'pilo\\_%') as indexes`);
     const before = await snapshot();
-    const sql = readFileSync(MIGRATION, "utf8");
+    // 0115 y, encima, 0118 (que solo sube el tope de temas y referencias de pilo_map_save).
+    const sql = readFileSync(MIGRATION, "utf8") + ";\n" + readFileSync(resolve(__dirname, "../../supabase/migrations/0118_pilo_mapa_mas_temas.sql"), "utf8");
     await t.db.exec(sql);
     await t.db.exec(sql);
     expect(await snapshot()).toEqual(before);

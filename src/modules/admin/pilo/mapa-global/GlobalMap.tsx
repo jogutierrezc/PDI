@@ -47,6 +47,8 @@ import "./global-map.css";
 export interface GlobalMapProps {
   /** Con qué Pilo se abre la vista: los dos («todo», por defecto) o uno solo. Se puede cambiar dentro. */
   focus?: GlobalFilter;
+  /** La cara de Pilo junto a la ayuda. En la intranet de Enseñanza va apagada: allí Pilo vive solo en su panel. */
+  face?: boolean;
 }
 
 type Via = "pointer" | "keyboard";
@@ -91,7 +93,7 @@ function sideNote(space: PiloSpace, side: GlobalData[PiloSpace]): string | null 
   return `${SPACE_NAME[space]} no se pudo leer: ${side.error ?? "error desconocido"}`;
 }
 
-export function GlobalMap({ focus = "todo" }: GlobalMapProps) {
+export function GlobalMap({ focus = "todo", face = true }: GlobalMapProps) {
   const query = useGlobalMap();
   const [filter, setFilter] = useState<GlobalFilter>(focus);
   const [open, setOpen] = useState<Set<string>>(() => new Set());
@@ -314,7 +316,7 @@ export function GlobalMap({ focus = "todo" }: GlobalMapProps) {
             <GlobalDetail graph={graph} node={node} open={open} animate={via.current === "pointer"} onSelect={select} onToggle={toggle} />
           ) : (
             <div className="gmap-hint">
-              <PiloFace size={84} expression="pensar" label="Mr. Pilo, pensando" />
+              {face && <PiloFace size={84} expression="pensar" label="Mr. Pilo, pensando" />}
               <p>
                 <strong>Un solo mapa, dos memorias.</strong> Arriba, lo que sabe Pregúntele a Pilo; abajo, lo que sabe Pilo en Enseñanza. Cada uno busca solo en lo suyo: los puentes de rayas muestran dónde
                 hablan de lo mismo.

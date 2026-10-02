@@ -12,10 +12,12 @@
    Comprender   lo que Pilo entiende. Búsqueda por significado: el índice de
                 vectores de ESTE espacio (pilo-ia «indexar» con space).
                 Comprensión con IA: de qué trata cada pasaje y qué normas cita
-                (pilo-ia «comprender», 0115), en lotes que siguen solos; se
-                puede detener y retomar, lo comprendido no se pierde.
+                (pilo-ia «comprender», 0115), el tiempo de pensamiento que se
+                le dé: los lotes siguen solos, un fallo espera y reintenta; se
+                puede detener y retomar, lo comprendido no se pierde. Es el
+                único «Comprender»: el mapa no repite el control.
    Mapa         memoria/TeachMap: colección → documento → tema → referencia.
-                Aquí se monta también el mapa global de los dos Pilos.
+                Un conmutador lo cambia por el mapa global de los dos Pilos.
    Probar       memoria/TeachMap › MemoryProbe: los pasajes que este Pilo
                 encontraría y su camino; y las respuestas guardadas
                 (pilo_answers de este espacio), que se ocultan o se pasan al
@@ -37,16 +39,18 @@ import type { EmbedStatus } from "../pilo/memory";
 import { CatalogModal } from "../pilo/CatalogModal";
 import type { CatalogRow, CatalogRol } from "../pilo/catalog-sheet";
 import { SPACE_COPY } from "../pilo/space";
-// MONTAJE GlobalMap: el import; el montaje está en el momento «mapa», más abajo.
+// El mapa global se monta en el momento «mapa» (MapMoment), tras el conmutador «Los dos Pilos».
 import { GlobalMap } from "../pilo/mapa-global/GlobalMap";
 import { Group, StatusMark, Switch, plural, when } from "../pilo/ui";
-import { activity, isWorking, useActivity } from "./actividad";
+import { activity } from "./actividad";
 import { DocumentsPanel } from "./memoria/DocumentsPanel";
 import { MoodlePanel } from "./memoria/MoodlePanel";
 import { MemoryProbe, TeachMap } from "./memoria/TeachMap";
 import { comprehend, indexRun, useComprehendStatus, useProbePath, useRefreshMemory, useTeachMap } from "./memoria/data";
-import { MAX_ROUNDS, comprehendNext, comprehendShare, faultOf } from "./memoria/flow";
-import type { ComprehendResult, Fault } from "./memoria/flow";
+import { faultOf } from "./memoria/flow";
+import type { Fault } from "./memoria/flow";
+import { THINK_BUDGETS, THINK_LIMITS, readThinkStatus, thinkActive, thinkGain, thinkReduce, thinkResume, thinkShare, thinkStart } from "./memoria/map";
+import type { ThinkEvent, ThinkRun } from "./memoria/map";
 import { FaultNote, MissingNote } from "./memoria/parts";
 import { enterBlock, fillBar as fillBarTo } from "./motion";
 import { MOMENTS, parseMoment } from "./navegacion";
@@ -117,21 +121,7 @@ export function MemoriaPanel({ ed }: { ed: SpaceEditor }) {
         <ComprehendGroup ed={ed} onMap={() => go("mapa")} />
       </Sheet>
     ),
-    mapa: () => (
-      <>
-        <Sheet off={missing}>
-          <TeachMap space={space} disabled={missing} />
-        </Sheet>
-        {/* MONTAJE GlobalMap: el único punto donde se monta el mapa global de los dos Pilos
-            (src/modules/admin/pilo/mapa-global). Va en su propia hoja, debajo del mapa de este Pilo,
-            y abre mostrando los dos («todo»). Este momento se monta al visitarlo y sigue montado después. */}
-        <Sheet off={missing}>
-          <Group title="Mapa global de los dos Pilos" aside={<small>Solo se dibuja: cada Pilo sigue buscando en lo suyo</small>}>
-            {missing ? <p className="pis-small">Sin la migración 0113 este Pilo no existe todavía: no hay qué unir con el de Planeación.</p> : <GlobalMap focus="todo" />}
-          </Group>
-        </Sheet>
-      </>
-    ),
+    mapa: () => <MapMoment space={space} missing={missing} onComprehend={() => go("comprender")} />,
     probar: () => (
       <Sheet off={missing}>
         <MemoryProbe space={space} disabled={missing} />
@@ -172,6 +162,50 @@ export function MemoriaPanel({ ed }: { ed: SpaceEditor }) {
             {body[m.id]()}
           </div>
         ) : null,
+      )}
+    </>
+  );
+}
+
+/* --- Mapa · el de este Pilo o el de los dos ------------------------------------------------ */
+
+/**
+ * Un solo mapa a la vista: el de este Pilo o, a un clic, el global de los dos
+ * (src/modules/admin/pilo/mapa-global), que solo se dibuja: cada Pilo sigue
+ * buscando en lo suyo. El global se lee al pedirlo; después los dos siguen
+ * montados, para no perder el punto elegido al ir y volver.
+ */
+function MapMoment({ space, missing, onComprehend }: { space: SpaceEditor["s"]["id"]; missing: boolean; onComprehend: () => void }) {
+  const [both, setBoth] = useState(false);
+  const [seen, setSeen] = useState(false);
+  const show = (next: boolean) => {
+    setBoth(next);
+    if (next) setSeen(true);
+  };
+  return (
+    <>
+      <div className="pis-seg pis-seg--sm" role="radiogroup" aria-label="Qué mapa se ve">
+        <button type="button" role="radio" aria-checked={!both} onClick={() => show(false)}>
+          Este Pilo
+        </button>
+        <button type="button" role="radio" aria-checked={both} onClick={() => show(true)}>
+          Los dos Pilos
+        </button>
+      </div>
+      <div hidden={both}>
+        <Sheet off={missing}>
+          <TeachMap space={space} disabled={missing} onComprehend={onComprehend} />
+        </Sheet>
+      </div>
+      {seen && (
+        <div hidden={!both}>
+          <Sheet off={missing}>
+            <Group title="Mapa global de los dos Pilos" aside={<small>Solo se dibuja: cada Pilo sigue buscando en lo suyo</small>}>
+              {/* Sin cara: en esta intranet Pilo vive solo en su panel. */}
+              {missing ? <p className="pis-small">Sin la migración 0113 este Pilo no existe todavía: no hay qué unir con el de Planeación.</p> : <GlobalMap focus="todo" face={false} />}
+            </Group>
+          </Sheet>
+        </div>
       )}
     </>
   );
@@ -325,11 +359,14 @@ function SemanticGroup({ ed }: { ed: SpaceEditor }) {
   );
 }
 
-/* --- Comprender · Comprensión con IA ------------------------------------------------------ */
+/* --- Comprender · Comprensión con IA ------------------------------------------------------
+   El único «Comprender» de este Pilo. La corrida dura el tiempo de pensamiento
+   que se le dé sin que nadie la relance: la máquina de memoria/map.ts
+   (thinkReduce) decide tras cada lote si sigue, si espera y reintenta —un lote
+   que falla no detiene la corrida ni pierde lo hecho— o si para. El avance y
+   «Detener» van al panel de Pilo; el mapa solo muestra el resultado. */
 
 const UNDERSTAND_OWNER = "comprender";
-/** El dueño con que el mapa (TeachMap) reporta su propio «Comprender»: no se corren dos a la vez. */
-const MAP_OWNER = "mapa";
 
 function ComprehendGroup({ ed, onMap }: { ed: SpaceEditor; onMap: () => void }) {
   const { s, missing: off } = ed;
@@ -338,81 +375,116 @@ function ComprehendGroup({ ed, onMap }: { ed: SpaceEditor; onMap: () => void }) 
   const missing = map.data?.missing ?? null;
   const ai = useComprehendStatus(space, !off && map.data !== undefined && !missing);
   const refresh = useRefreshMemory(space);
-  const elsewhere = isWorking(useActivity(), MAP_OWNER);
-  const [run, setRun] = useState<{ status: ComprehendResult["status"]; round: number } | null>(null);
-  const [stop, setStop] = useState<{ why: string; again: boolean; calm?: boolean } | null>(null);
+  // La corrida: en un ref para el bucle (que sobrevive a los pintados) y en estado para verla.
+  const [think, setThink] = useState<ThinkRun | null>(null);
+  const thinkRef = useRef<ThinkRun | null>(null);
+  const [budget, setBudget] = useState("60");
   const [fault, setFault] = useState<Fault | null>(null);
-  const halt = useRef(false);
+  const wake = useRef<(() => void) | null>(null);
   const alive = useRef(true);
 
   useEffect(() => {
     alive.current = true;
     return () => {
       alive.current = false;
-      halt.current = true;
+      wake.current?.();
       activity.end(UNDERSTAND_OWNER);
     };
   }, []);
 
-  const status = run?.status ?? ai.data?.status ?? map.data?.data.status ?? null;
+  const running = thinkActive(think);
+  // Mientras corre (y hasta que la base responde de nuevo) manda lo que dijo el último lote.
+  const status = (think && (running || ai.isFetching || map.isFetching) ? think.status : null) ?? readThinkStatus(ai.data?.status) ?? readThinkStatus(map.data?.data.status);
   const hasAi = ai.data ? ai.data.ai !== false : null;
-  const pending = Number(status?.pending) || 0;
-  const mapped = Number(status?.mapped) || 0;
-  const total = Number(status?.total) || 0;
-  const running = run !== null;
+  const pending = status?.pending ?? 0;
 
-  /** Lote tras lote, hasta que no quede nada, un lote se detenga o alguien lo pare. */
+  const put = (next: ThinkRun) => {
+    thinkRef.current = next;
+    if (alive.current) setThink(next);
+  };
+
+  /** Lo que Pilo cuenta de la corrida en su panel. Mientras se detiene ya no ofrece «Detener». */
+  const tell = (run: ThinkRun) => {
+    const g = thinkGain(run);
+    const st = run.status;
+    activity.set({
+      owner: UNDERSTAND_OWNER,
+      title: run.phase === "esperando" ? "Pilo espera para reintentar" : run.phase === "deteniendo" ? "Pilo termina el lote y se detiene" : "Pilo está comprendiendo sus pasajes",
+      line:
+        run.phase === "esperando"
+          ? run.why
+          : st
+            ? `${st.mapped.toLocaleString("es-CO")} de ${st.total.toLocaleString("es-CO")} pasajes comprendidos · ${plural(g.topics, "tema nuevo", "temas nuevos")} · ${plural(g.refs, "referencia nueva", "referencias nuevas")}.`
+            : "Pregunta a la IA de qué trata cada pasaje y qué normas cita.",
+      progress: thinkShare(st),
+      counter: `Lote ${run.rounds + 1}`,
+      stop: run.phase === "deteniendo" ? undefined : halt,
+    });
+  };
+
+  /** Detener: el lote en curso termina y se guarda; una espera se corta ya. */
+  function halt() {
+    if (!thinkRef.current || !thinkActive(thinkRef.current)) return;
+    const next = thinkReduce(thinkRef.current, { type: "detener" });
+    put(next);
+    if (thinkActive(next)) tell(next);
+    wake.current?.();
+  }
+
+  /** Lote tras lote, el tiempo que se le dio: sigue, espera y reintenta, o para (thinkReduce). */
   const understand = async () => {
-    if (running || elsewhere) return;
-    halt.current = false;
-    setStop(null);
+    if (thinkActive(thinkRef.current)) return;
+    const limits = { ...THINK_LIMITS, maxMs: THINK_BUDGETS.find((b) => b.id === budget)?.ms ?? THINK_LIMITS.maxMs };
+    const prev = thinkRef.current;
+    const apply = (event: ThinkEvent) => {
+      const next = thinkReduce(thinkRef.current!, event, limits);
+      put(next);
+      return next;
+    };
     setFault(null);
-    setRun({ status: status ?? undefined, round: 0 });
-    const say = (st: ComprehendResult["status"] | null | undefined, round: number, stopping = false) =>
-      activity.set({
-        owner: UNDERSTAND_OWNER,
-        title: stopping ? "Pilo termina el lote y se detiene" : "Pilo está comprendiendo sus pasajes",
-        line: `${(Number(st?.mapped) || 0).toLocaleString("es-CO")} de ${(Number(st?.total) || 0).toLocaleString("es-CO")} pasajes · busca temas y referencias.`,
-        progress: comprehendShare(st),
-        counter: `Lote ${round + 1}`,
-        stop: stopping
-          ? undefined
-          : () => {
-              halt.current = true;
-              say(st, round, true);
-            },
-      });
-    let last: ComprehendResult["status"] | null | undefined = status;
+    put(prev && prev.again && prev.phase !== "listo" ? thinkResume(prev, status, Date.now()) : thinkStart(status, Date.now()));
     try {
-      for (let round = 0; round < MAX_ROUNDS; round++) {
-        if (halt.current) {
-          if (alive.current) setStop({ why: "Se detuvo. Lo comprendido queda guardado: puede retomarlo cuando quiera.", again: true, calm: true });
-          break;
+      while (alive.current && thinkActive(thinkRef.current)) {
+        const now = thinkRef.current!;
+        tell(now);
+        if (now.phase === "esperando") {
+          await new Promise<void>((resolve) => {
+            const timer = window.setTimeout(resolve, now.waitMs);
+            wake.current = () => {
+              window.clearTimeout(timer);
+              resolve();
+            };
+          });
+          wake.current = null;
+          apply({ type: "esperado", now: Date.now() });
+          continue;
         }
-        say(last, round);
-        const r = await comprehend(space, "lote");
-        last = r.status;
-        if (!alive.current) return;
-        setRun({ status: r.status, round });
-        const next = comprehendNext(r, round);
-        if (next.next === "seguir") continue;
-        if (next.why) setStop({ why: next.why, again: next.again });
-        break;
+        try {
+          const result = await comprehend(space, "lote");
+          const after = apply({ type: "lote", result, now: Date.now() });
+          // Cada pocos lotes el mapa se vuelve a leer: los temas nuevos se ven llegar.
+          if (alive.current && thinkActive(after) && after.rounds % 4 === 0) void map.refetch();
+        } catch (error) {
+          const f = faultOf(error);
+          const after = apply({ type: "fallo", retry: f.retry, why: `${f.title}.${f.detail && f.detail !== f.title ? ` ${f.detail}` : ""}`, now: Date.now() });
+          if (after.phase === "detenido" && alive.current) setFault(f);
+        }
       }
-    } catch (error) {
-      if (alive.current) setFault(faultOf(error));
     } finally {
       activity.end(UNDERSTAND_OWNER);
       refresh();
-      if (alive.current) setRun(null);
     }
   };
 
+  const gain = thinkGain(think);
+  const runLine = think
+    ? `${plural(gain.mapped, "pasaje comprendido", "pasajes comprendidos")}, ${plural(gain.topics, "tema nuevo", "temas nuevos")} y ${plural(gain.refs, "referencia nueva", "referencias nuevas")} en ${plural(think.rounds, "lote", "lotes")}${think.failed ? ` (${plural(think.failed, "falló y se reintentó", "fallaron y se reintentaron")})` : ""}`
+    : "";
   const bar = useRef<HTMLSpanElement>(null);
-  const share = comprehendShare(status);
+  const share = thinkShare(status);
 
   return (
-    <Group title="Comprensión con IA" aside={<small>{status ? `${plural(Number(status.topics) || 0, "tema", "temas")} · ${plural(Number(status.refs) || 0, "referencia", "referencias")}` : "De qué trata cada pasaje"}</small>}>
+    <Group title="Comprensión con IA" aside={<small>{status ? `${plural(status.topics, "tema", "temas")} · ${plural(status.refs, "referencia", "referencias")}` : "De qué trata cada pasaje"}</small>}>
       {off ? (
         <p className="pis-small">Sin la migración 0113 este Pilo no tiene nada que comprender.</p>
       ) : missing ? (
@@ -426,26 +498,57 @@ function ComprehendGroup({ ed, onMap }: { ed: SpaceEditor; onMap: () => void }) 
           <div className="pis-row">
             <p className="pis-note">
               Pilo le pregunta a la IA de qué trata cada pasaje y qué normas o referentes cita; con eso arma los temas y las referencias del mapa. Trabaja en lotes largos y sigue
-              solo hasta terminar. Puede detenerlo y retomarlo: lo ya comprendido no se pierde.
+              solo durante el tiempo de pensamiento que le dé; si un lote falla, espera y reintenta. Puede detenerlo y retomarlo: lo ya comprendido no se pierde.
               {hasAi === false ? " Sin IA, el mapa es el básico: estructura y normas citadas." : ""}
             </p>
-            <button type="button" className="button-primary" onClick={() => void understand()} disabled={running || elsewhere || hasAi !== true || pending === 0}>
-              {running || elsewhere ? "Comprendiendo…" : hasAi === false ? "Comprender necesita la IA" : pending === 0 && status ? "Todo comprendido" : stop?.again ? "Retomar" : "Comprender lo que falta"}
-            </button>
+            <span className="msh-think">
+              <label>
+                Tiempo de pensamiento
+                <select value={budget} onChange={(e) => setBudget(e.target.value)} disabled={running}>
+                  {THINK_BUDGETS.map((b) => (
+                    <option key={b.id} value={b.id}>
+                      {b.label}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              {/* El mismo botón inicia y detiene: en el móvil el panel de Pilo queda arriba, fuera de la vista. */}
+              <button
+                type="button"
+                className={running ? "button-secondary" : "button-primary"}
+                onClick={() => (running ? halt() : void understand())}
+                disabled={running ? think?.phase === "deteniendo" : hasAi !== true || pending === 0}
+              >
+                {running
+                  ? think?.phase === "deteniendo"
+                    ? "Deteniendo…"
+                    : "Detener"
+                  : hasAi === false
+                    ? "Comprender necesita la IA"
+                    : pending === 0 && status
+                      ? "Todo comprendido"
+                      : think?.again
+                        ? "Retomar"
+                        : status && status.mapped > 0
+                          ? "Continuar comprendiendo"
+                          : "Comprender lo que falta"}
+              </button>
+            </span>
           </div>
 
           {status && (
             <>
               <p className="pis-small">
-                <StatusMark tone={hasAi === false ? "off" : running || elsewhere ? "off" : pending ? "warn" : "ok"}>
-                  {hasAi === false ? "Mapa básico" : running || elsewhere ? "Comprendiendo" : pending ? `Faltan ${plural(pending, "pasaje", "pasajes")}` : "Todo comprendido"}
+                <StatusMark tone={hasAi === false ? "off" : running ? "off" : pending ? "warn" : "ok"}>
+                  {hasAi === false ? "Mapa básico" : running ? "Comprendiendo" : pending ? `Faltan ${plural(pending, "pasaje", "pasajes")}` : "Todo comprendido"}
                 </StatusMark>{" "}
-                {mapped.toLocaleString("es-CO")} de {plural(total, "pasaje comprendido", "pasajes comprendidos")}.{running || elsewhere ? " El avance y «Detener» están en el panel de Pilo." : ""}
+                {status.mapped.toLocaleString("es-CO")} de {plural(status.total, "pasaje comprendido", "pasajes comprendidos")}.{running ? " El avance se ve en el panel de Pilo; puede seguir trabajando en otra sección." : ""}
               </p>
               <ShareBar bar={bar} share={share} label="Pasajes comprendidos" />
             </>
           )}
-          {stop && !running && <p className={stop.calm ? "pis-small" : "pis-warn"}>{stop.why}</p>}
+          {think && !running && think.rounds > 0 && <p className="pis-small">Última corrida: {runLine}.</p>}
+          {think && !running && think.why && !fault && <p className={think.phase === "pausado" ? "pis-small" : "pis-warn"}>{think.why}</p>}
           {fault && !running && <FaultNote fault={fault} lead="Comprender se detuvo" onRetry={fault.retry ? () => void understand() : undefined} />}
           {ai.isError && !running && <FaultNote fault={faultOf(ai.error)} lead="No se pudo saber si este Pilo tiene IA para comprender" onRetry={() => void ai.refetch()} />}
           <p className="pis-small">

@@ -7,13 +7,9 @@
    conecta y los pasajes que lo sostienen (usePassage, el mismo de «Mr. Pilo
    con IA»). El buscador salta a un punto por su nombre.
 
-   «Comprender» pide a la IA de qué trata cada pasaje, por lotes (función
-   pilo-ia, acción «comprender»). La corrida dura lo que se le dé de tiempo de
-   pensamiento (15 minutos, 1 hora o hasta terminar) sin que nadie la relance:
-   la máquina de map.ts (thinkReduce) decide tras cada lote si sigue, si espera
-   y reintenta —un lote que falla no detiene la corrida ni pierde lo hecho— o
-   si para. Se puede detener y retomar: lo comprendido se guarda lote por lote.
-   Con `stopped: "formato"` no se insiste. Sin IA el mapa es el básico:
+   «Comprender» (pedir a la IA de qué trata cada pasaje) no se lanza aquí: vive
+   en el momento «Comprender» de la Memoria y reporta al panel de Pilo. El mapa
+   muestra lo comprendido y enlaza allá. Sin IA el mapa es el básico:
    estructura y normas citadas.
 
    MemoryProbe es «Probar la memoria» de este espacio: además de los pasajes
@@ -37,16 +33,14 @@ import type { PiloSpace } from "../../pilo/space";
 import { Group, StatusMark, plural } from "../../pilo/ui";
 import { SPACE_SOURCES } from "../store";
 import { Skeleton, Thinking, useEnter } from "../ui";
-import { comprehend, mapNeighbors, reading, useComprehendStatus, useDocPassages, useDocs, useProbePath, useRefreshMemory, useTeachMap } from "./data";
+import { mapNeighbors, reading, useComprehendStatus, useDocPassages, useDocs, useProbePath, useTeachMap } from "./data";
 import type { MemoryPartProps } from "./DocumentsPanel";
 import { faultOf } from "./flow";
-import type { Fault } from "./flow";
-import { MAP_COLUMNS, THINK_BUDGETS, THINK_LIMITS, docOf, edgeId, focusOf, layoutColumns, neighborsOf, pathOfPassages, readThinkStatus, teachGraph, thinkActive, thinkGain, thinkReduce, thinkResume, thinkShare, thinkStart } from "./map";
-import type { ColumnLayout, Lit, MapColumn, MapNode, TeachGraph, ThinkEvent, ThinkRun } from "./map";
+import { MAP_COLUMNS, docOf, edgeId, focusOf, layoutColumns, neighborsOf, pathOfPassages, readThinkStatus, teachGraph } from "./map";
+import type { ColumnLayout, Lit, MapColumn, MapNode, TeachGraph } from "./map";
 import { FaultNote, MissingNote } from "./parts";
 import "../../pilo/mesh-view.css";
 
-const OWNER = "mapa";
 const COLLECTIONS = Object.fromEntries(SPACE_SOURCES.map((s) => [s.id, s.name]));
 const ORDER = SPACE_SOURCES.map((s) => s.id);
 
@@ -66,31 +60,14 @@ const curve = (x1: number, y1: number, x2: number, y2: number) => {
 
 const kindName = (n: MapNode) => (n.column === "documento" && n.kind === "curso" ? "Curso de Moodle" : COL[n.column].one);
 
-export function TeachMap({ space, disabled }: MemoryPartProps) {
+export function TeachMap({ space, disabled, onComprehend }: MemoryPartProps & { /** Lleva al momento «Comprender». */ onComprehend?: () => void }) {
   const map = useTeachMap(space, !disabled);
   const docs = useDocs(space, !disabled);
   const missing = map.data?.missing ?? null;
   const ai = useComprehendStatus(space, !disabled && map.data !== undefined && !missing);
-  const refresh = useRefreshMemory(space);
   const probe = useProbePath();
   const [selected, setSelected] = useState<string | null>(null);
   const via = useRef<"pointer" | "keyboard">("pointer");
-  // La corrida de «comprender»: en un ref para el bucle (que sobrevive a los pintados) y en estado para verla.
-  const [think, setThink] = useState<ThinkRun | null>(null);
-  const thinkRef = useRef<ThinkRun | null>(null);
-  const [budget, setBudget] = useState("60");
-  const [fault, setFault] = useState<Fault | null>(null);
-  const wake = useRef<(() => void) | null>(null);
-  const alive = useRef(true);
-
-  useEffect(() => {
-    alive.current = true;
-    return () => {
-      alive.current = false;
-      wake.current?.();
-      reading.end(OWNER);
-    };
-  }, []);
 
   const courses = useMemo(() => new Set((docs.data?.data ?? []).filter((d) => d.origin === "moodle").map((d) => `doc:${d.id}`)), [docs.data]);
   const graph = useMemo(() => teachGraph(map.data?.data ?? { nodes: [], edges: [] }, COLLECTIONS, courses), [map.data, courses]);
@@ -111,93 +88,9 @@ export function TeachMap({ space, disabled }: MemoryPartProps) {
     }
   }, [probe?.at]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const running = thinkActive(think);
-  // Mientras corre (y hasta que la base responde de nuevo) manda lo que dijo el último lote.
-  const status = (think && (running || ai.isFetching || map.isFetching) ? think.status : null) ?? readThinkStatus(ai.data?.status) ?? readThinkStatus(map.data?.data.status);
+  const status = readThinkStatus(ai.data?.status) ?? readThinkStatus(map.data?.data.status);
   const hasAi = ai.data ? ai.data.ai !== false : null;
   const pending = status?.pending ?? 0;
-  const gain = thinkGain(think);
-
-  const put = (next: ThinkRun) => {
-    thinkRef.current = next;
-    if (alive.current) setThink(next);
-  };
-
-  /** Detener: el lote en curso termina y se guarda; una espera se corta ya. */
-  const halt = () => {
-    if (!thinkRef.current || !thinkActive(thinkRef.current)) return;
-    put(thinkReduce(thinkRef.current, { type: "detener" }));
-    wake.current?.();
-  };
-
-  /** Lo que Pilo cuenta de la corrida en su panel de actividad. */
-  const tell = (run: ThinkRun) => {
-    const g = thinkGain(run);
-    const s = run.status;
-    reading.set({
-      owner: OWNER,
-      title: run.phase === "esperando" ? "Pilo espera para reintentar" : run.phase === "deteniendo" ? "Pilo termina el lote y se detiene" : "Pilo está comprendiendo sus pasajes",
-      line:
-        run.phase === "esperando"
-          ? run.why
-          : s
-            ? `${s.mapped.toLocaleString("es-CO")} de ${s.total.toLocaleString("es-CO")} pasajes comprendidos · ${plural(g.topics, "tema nuevo", "temas nuevos")} · ${plural(g.refs, "referencia nueva", "referencias nuevas")}.`
-            : "Pregunta a la IA de qué trata cada pasaje y qué normas cita.",
-      progress: thinkShare(s),
-      counter: `Lote ${run.rounds + 1}`,
-      stop: halt,
-    });
-  };
-
-  /** Lote tras lote, el tiempo que se le dio: sigue, espera y reintenta, o para (thinkReduce). */
-  const understand = async () => {
-    if (thinkActive(thinkRef.current)) return;
-    const limits = { ...THINK_LIMITS, maxMs: THINK_BUDGETS.find((b) => b.id === budget)?.ms ?? THINK_LIMITS.maxMs };
-    const prev = thinkRef.current;
-    const apply = (event: ThinkEvent) => {
-      const next = thinkReduce(thinkRef.current!, event, limits);
-      put(next);
-      return next;
-    };
-    setFault(null);
-    put(prev && prev.again && prev.phase !== "listo" ? thinkResume(prev, status, Date.now()) : thinkStart(status, Date.now()));
-    try {
-      while (alive.current && thinkActive(thinkRef.current)) {
-        const now = thinkRef.current!;
-        tell(now);
-        if (now.phase === "esperando") {
-          await new Promise<void>((resolve) => {
-            const timer = window.setTimeout(resolve, now.waitMs);
-            wake.current = () => {
-              window.clearTimeout(timer);
-              resolve();
-            };
-          });
-          wake.current = null;
-          apply({ type: "esperado", now: Date.now() });
-          continue;
-        }
-        try {
-          const result = await comprehend(space, "lote");
-          const after = apply({ type: "lote", result, now: Date.now() });
-          // Cada pocos lotes el mapa se vuelve a leer: los temas nuevos se ven llegar.
-          if (alive.current && thinkActive(after) && after.rounds % 4 === 0) void map.refetch();
-        } catch (error) {
-          const f = faultOf(error);
-          const after = apply({ type: "fallo", retry: f.retry, why: `${f.title}.${f.detail && f.detail !== f.title ? ` ${f.detail}` : ""}`, now: Date.now() });
-          if (after.phase === "detenido" && alive.current) setFault(f);
-        }
-      }
-    } finally {
-      reading.end(OWNER);
-      refresh();
-    }
-  };
-
-  const elapsed = think ? Math.max(0, Math.round((Date.now() - think.startedAt) / 60_000)) : 0;
-  const runLine = think
-    ? `${plural(gain.mapped, "pasaje comprendido", "pasajes comprendidos")}, ${plural(gain.topics, "tema nuevo", "temas nuevos")} y ${plural(gain.refs, "referencia nueva", "referencias nuevas")} en ${plural(think.rounds, "lote", "lotes")}${think.failed ? ` (${plural(think.failed, "falló y se reintentó", "fallaron y se reintentaron")})` : ""}`
-    : "";
 
   const select = (id: string | null, how: "pointer" | "keyboard" = "pointer") => {
     via.current = how;
@@ -243,59 +136,25 @@ export function TeachMap({ space, disabled }: MemoryPartProps) {
               pasajes vecinos a los que encontró.
               {hasAi === false ? " Sin IA, el mapa es el básico: estructura y normas citadas." : ""}
             </p>
-            <span className="msh-think">
-              <label>
-                Tiempo de pensamiento
-                <select value={budget} onChange={(e) => setBudget(e.target.value)} disabled={running}>
-                  {THINK_BUDGETS.map((b) => (
-                    <option key={b.id} value={b.id}>
-                      {b.label}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              {running ? (
-                <button type="button" className="button-secondary" onClick={halt} disabled={think?.phase === "deteniendo"}>
-                  {think?.phase === "deteniendo" ? "Deteniendo…" : "Detener"}
-                </button>
-              ) : (
-                <button type="button" className="button-secondary" onClick={() => void understand()} disabled={hasAi !== true || pending === 0}>
-                  {hasAi === false ? "Comprender necesita la IA" : pending === 0 && status ? "Todo comprendido" : think?.again || (status && status.mapped > 0) ? "Continuar comprendiendo" : "Comprender con IA"}
-                </button>
-              )}
-            </span>
           </div>
 
-          {running && think ? (
-            <Thinking
-              progress={thinkShare(think.status)}
-              detail={
-                <>
-                  {(think.status?.mapped ?? 0).toLocaleString("es-CO")} de {(think.status?.total ?? 0).toLocaleString("es-CO")} pasajes · lote {think.rounds + 1} · lleva {elapsed} min. En esta corrida: {runLine}.{" "}
-                  {think.phase === "esperando" ? think.why : think.phase === "deteniendo" ? "Termina el lote en curso y se detiene." : "Lo comprendido se guarda lote por lote: puede detener y retomar cuando quiera."}
-                </>
-              }
-            >
-              {think.phase === "esperando" ? "Pilo espera para reintentar" : think.phase === "deteniendo" ? "Pilo se está deteniendo" : "Pilo está comprendiendo sus pasajes"}
-            </Thinking>
-          ) : (
-            status && (
-              <p className="pis-small" role="status">
-                <StatusMark tone={hasAi === false ? "off" : pending ? "warn" : "ok"}>{hasAi === false ? "Mapa básico" : pending ? "Falta comprender" : "Comprendido"}</StatusMark>{" "}
-                {plural(status.mapped, "pasaje comprendido", "pasajes comprendidos")} de {status.total.toLocaleString("es-CO")} · {plural(status.topics, "tema", "temas")} ·{" "}
-                {plural(status.refs, "referencia", "referencias")}
-                {pending ? ` · faltan ${pending.toLocaleString("es-CO")}` : ""}.
-              </p>
-            )
-          )}
-          {think && !running && think.rounds > 0 && (
+          {status && (
             <p className="pis-small" role="status">
-              Última corrida: {runLine}.
+              <StatusMark tone={hasAi === false ? "off" : pending ? "warn" : "ok"}>{hasAi === false ? "Mapa básico" : pending ? "Falta comprender" : "Comprendido"}</StatusMark>{" "}
+              {plural(status.mapped, "pasaje comprendido", "pasajes comprendidos")} de {status.total.toLocaleString("es-CO")} · {plural(status.topics, "tema", "temas")} ·{" "}
+              {plural(status.refs, "referencia", "referencias")}
+              {pending ? ` · faltan ${pending.toLocaleString("es-CO")}` : ""}.
+              {pending > 0 && hasAi !== false && onComprehend && (
+                <>
+                  {" "}
+                  <button type="button" className="pis-link" onClick={onComprehend}>
+                    Comprender lo que falta
+                  </button>
+                </>
+              )}
             </p>
           )}
-          {think && !running && think.why && !fault && <p className="pis-warn">{think.why}</p>}
-          {fault && !running && <FaultNote fault={fault} lead="Comprender se detuvo" onRetry={fault.retry ? () => void understand() : undefined} />}
-          {ai.isError && !running && <FaultNote fault={faultOf(ai.error)} lead="No se pudo saber si este Pilo tiene IA para comprender" onRetry={() => void ai.refetch()} />}
+          {ai.isError && <FaultNote fault={faultOf(ai.error)} lead="No se pudo saber cuánto se ha comprendido" onRetry={() => void ai.refetch()} />}
 
           {empty ? (
             <div className="pen-soon" role="note">
@@ -753,7 +612,7 @@ export function MemoryProbe({ space, disabled }: MemoryPartProps) {
             ))}
           </ol>
         ))}
-      {!busy && state && state.hits.length > 0 && <p className="pis-small">El camino de estos pasajes quedó encendido en el mapa de conexiones, arriba.</p>}
+      {!busy && state && state.hits.length > 0 && <p className="pis-small">El camino de estos pasajes quedó encendido en el momento «Mapa de conexiones».</p>}
     </Group>
   );
 }

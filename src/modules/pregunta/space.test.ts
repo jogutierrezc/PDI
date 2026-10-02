@@ -17,17 +17,17 @@ describe("el perfil «planeacion» es Pregúntele a Pilo tal como era", () => {
   });
 
   it("conserva los textos de la página", () => {
-    expect(p.docTitle).toBe("Pregúntele a Pilo · Planeación UDES");
+    expect(p.docTitle).toBe("Pregúntele a Pilo · Universidad de Santander");
     expect(p.name).toBe("Pregúntele a Pilo");
-    expect(p.sub).toBe("Planeación Institucional · UDES");
+    expect(p.sub).toBe("Universidad de Santander · UDES");
     expect(p.crumb).toEqual({ to: "/", label: "Planeación Institucional" });
-    expect(p.hello.h1).toBe("¿Qué quiere saber de la Planeación de la UDES?");
+    expect(p.hello.h1).toBe("¿Qué quiere saber de la Universidad de Santander?");
     expect(p.hello.p).toBe(
       "Pregunte en sus palabras, sobre la UDES o sobre lo que necesite. Redacto con IA: las cifras de la universidad salen de lo publicado y llevan su fuente, y le aviso cuando algo es conocimiento general.",
     );
     expect(p.placeholder).toBe("Pregunte por una cifra, un pilar, un boletín…");
     expect(p.note).toBe("Pilo redacta con IA. Las cifras de la UDES llevan su fuente; lo demás va marcado como conocimiento general.");
-    expect(p.office).toBe("Oficina de Planeación Institucional");
+    expect(p.office).toBe("Universidad de Santander");
     expect(p.gate.login).toBe("Por ahora, Pregúntele a Pilo es para quienes tienen cuenta en la intranet de Planeación. Inicie sesión y vuelva.");
     expect(p.gate.closed).toBe("Pregúntele a Pilo no está abierto por ahora. Mientras tanto, las cifras oficiales están en UDES en Cifras.");
     expect(p.gateFallback).toEqual({ to: "/datos-abiertos", label: "Ir a UDES en Cifras" });
@@ -46,15 +46,15 @@ describe("el perfil «planeacion» es Pregúntele a Pilo tal como era", () => {
       { id: "pdi", code: "PD", name: "Plan de Desarrollo" },
       { id: "observatorio", code: "OB", name: "Observatorio" },
       { id: "impacto", code: "IM", name: "Portal de Impacto", session: true },
-      { id: "catalogo", code: "PL", name: "Planeación Institucional", hidden: true },
+      { id: "catalogo", code: "UD", name: "Universidad de Santander", hidden: true },
     ]);
   });
 
   it("conserva la bienvenida: título, marca, las tres frases y sus muestras", () => {
     expect(p.title).toBe("Pregúntele a Mr. Pilo");
-    expect(p.brand).toEqual({ strong: "Planeación Institucional", text: "Universidad de Santander" });
+    expect(p.brand).toEqual({ strong: "Pregúntele a Pilo", text: "Universidad de Santander" });
     expect(p.beats).toEqual([
-      { say: "¡Hola! Soy Mr. Pilo, el guía de la Oficina de Planeación Institucional de la UDES.", mood: "feliz", look: [0, -0.1] },
+      { say: "¡Hola! Soy Mr. Pilo, la Inteligencia Artificial de la Universidad de Santander.", mood: "feliz", look: [0, -0.1] },
       { say: "Pregúnteme como le preguntaría a una persona: por cifras, el Plan de Desarrollo, los boletines o el Observatorio.", mood: "atento", look: [0, 0.7] },
       { say: "Le respondo sobre lo que necesite: las cifras de la UDES llevan su fuente para que la revise, y le aviso cuando algo es conocimiento general.", mood: "sorpresa", look: [0.2, 0.8] },
     ]);
@@ -74,8 +74,8 @@ describe("el perfil «planeacion» es Pregúntele a Pilo tal como era", () => {
 
   it("conserva los textos del chat emergente", () => {
     expect(p.widget).toEqual({
-      frameTitle: "Chat con Pilo, de Planeación UDES",
-      greeting: "Hola, soy Pilo. Pregúnteme por las cifras de la UDES y le digo de dónde sale cada una.",
+      frameTitle: "Chat con Pilo, la Inteligencia Artificial de la Universidad de Santander",
+      greeting: "Hola, soy Pilo, la Inteligencia Artificial de la Universidad de Santander. Pregúnteme por las cifras de la UDES y le digo de dónde sale cada una.",
       hello: "¿Busca una cifra de la UDES? Pregúnteme.",
       idle: "Cifras de la UDES",
       suggestions: ["¿Qué es UDES en Cifras?", "¿Cómo va el Plan de Desarrollo?", "¿Qué programas ofrece la UDES?"],

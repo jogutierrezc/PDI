@@ -1053,7 +1053,7 @@ describe("el portal de siempre no cambia con los espacios", () => {
     expect([...new Set(stepsOf(all).map((s) => s.id))]).toEqual(["entender", "catalogo", "guardadas", "cifras", "memoria", "redactar", "verificar"]);
     // El pedido al modelo es el de siempre: la persona de Planeación, sin instrucción de rol.
     const system = systemOf(calls[0]);
-    expect(system).toContain("Oficina de Planeación Institucional");
+    expect(system).toContain("Inteligencia Artificial de la Universidad de Santander");
     expect(system).not.toContain("Quien pregunta es");
     expect(system).not.toContain("Política de evaluación");
     // Con 0113, el cupo del Pilo de siempre cuenta solo sus propias filas.

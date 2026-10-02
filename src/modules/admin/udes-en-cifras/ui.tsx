@@ -5,7 +5,7 @@
    indicador pide confirmar en el mismo sitio, y el foco no salta a otra capa.
    ========================================================================== */
 
-import { useEffect, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import { Icon } from "../../../components/ui/Icon";
 
@@ -73,43 +73,96 @@ export function SaveState({ pending, error, success, idle }: { pending: boolean;
   return idle ? <span className="oda-save">{idle}</span> : null;
 }
 
-/** Botón que pide confirmar en el mismo sitio antes de una acción destructiva. */
+/**
+ * Botón que pide confirmar en el mismo sitio antes de una acción destructiva.
+ *
+ * La confirmación dice qué se borra (`subject`) y qué se pierde con ello
+ * (`confirmLabel`). Las dos salidas no se parecen: «Cancelar» es un botón de
+ * contorno y recibe el foco al abrir; la destructiva va rellena, con su verbo.
+ * Escape cancela y el foco vuelve al botón que la abrió. Dentro de una celda de
+ * tabla se despliega sobre la fila, anclada a la derecha, en vez de desbordar
+ * la columna de acciones (ver `.oda-confirm` en od-admin.css).
+ */
 export function ConfirmButton({
   label,
+  subject,
   confirmLabel,
+  confirmAction,
   onConfirm,
   disabled,
 }: {
+  /** El botón en reposo: "Borrar", "Quitar", "Borrar 2024". Su primera palabra es el verbo. */
   label: string;
+  /** Qué se borra, con artículo: "el indicador «Matrícula»". */
+  subject?: string;
+  /** Qué se pierde al hacerlo. */
   confirmLabel: string;
+  /** El botón destructivo; por defecto "Sí, borrar" / "Sí, quitar". */
+  confirmAction?: string;
   onConfirm: () => void;
   disabled?: boolean;
 }) {
   const [asking, setAsking] = useState(false);
+  const trigger = useRef<HTMLButtonElement>(null);
+  const cancel = useRef<HTMLButtonElement>(null);
+  const restore = useRef(false);
+  const id = useId();
+
+  useEffect(() => {
+    if (asking) cancel.current?.focus();
+    else if (restore.current) {
+      restore.current = false;
+      trigger.current?.focus();
+    }
+  }, [asking]);
+
+  const close = () => {
+    restore.current = true;
+    setAsking(false);
+  };
+
   if (!asking) {
     return (
-      <button type="button" className="oda-link-button" data-tone="danger" onClick={() => setAsking(true)} disabled={disabled}>
+      <button ref={trigger} type="button" className="oda-link-button" data-tone="danger" onClick={() => setAsking(true)} disabled={disabled}>
         {label}
       </button>
     );
   }
+
+  const verb = label.trim().split(/\s+/)[0] || "Borrar";
   return (
-    <span className="oda-confirm" role="group" aria-label={confirmLabel}>
-      <span>{confirmLabel}</span>
-      <button
-        type="button"
-        className="oda-link-button"
-        data-tone="danger"
-        onClick={() => {
-          setAsking(false);
-          onConfirm();
-        }}
-      >
-        Sí, borrar
-      </button>
-      <button type="button" className="oda-link-button" onClick={() => setAsking(false)}>
-        Cancelar
-      </button>
+    <span
+      className="oda-confirm"
+      role="alertdialog"
+      aria-labelledby={`${id}-titulo`}
+      aria-describedby={`${id}-texto`}
+      onKeyDown={(event) => {
+        if (event.key !== "Escape") return;
+        event.stopPropagation();
+        close();
+      }}
+    >
+      <span className="oda-confirm__text">
+        <strong id={`${id}-titulo`}>
+          <Icon name="alert" size={14} /> {subject ? `¿${verb} ${subject}?` : `¿${label}?`}
+        </strong>
+        <span id={`${id}-texto`}>{confirmLabel}</span>
+      </span>
+      <span className="oda-confirm__actions">
+        <button ref={cancel} type="button" className="oda-confirm__cancel" onClick={close}>
+          Cancelar
+        </button>
+        <button
+          type="button"
+          className="oda-confirm__danger"
+          onClick={() => {
+            close();
+            onConfirm();
+          }}
+        >
+          {confirmAction ?? `Sí, ${verb.toLowerCase()}`}
+        </button>
+      </span>
     </span>
   );
 }

@@ -12,7 +12,8 @@
 
 import type { CSSProperties } from "react";
 import { basisOf, changeBetween, cutsOf, formatValue, formatWithUnit, valueOf } from "../data/open-data";
-import { ALL_YEARS, cutLabel } from "../data/terms";
+import { comparisonText, periodReading, readingCutText } from "../data/period-reading";
+import { cutLabel } from "../data/terms";
 import type { CampusId, Indicator, Term } from "../data/types";
 import { SplitFlap } from "./SplitFlap";
 
@@ -20,7 +21,7 @@ interface KpiBoardProps {
   indicators: Indicator[];
   years: number[];
   year: number;
-  /** Periodo académico. Con él, el rastro recorre los periodos A y B. */
+  /** Periodo académico. Con él, cada cifra es la de ese periodo y el rastro recorre los periodos 1 y 2. */
   term?: Term | null;
   campus: CampusId;
   campusName: string;
@@ -30,22 +31,24 @@ interface KpiBoardProps {
 }
 
 export function KpiBoard({ indicators, years, year, term = null, campus, campusName, illustrative, selectedId, onSelect }: KpiBoardProps) {
-  const cuts = cutsOf(years, term !== null);
-  const cut = cutLabel(year, term);
-  const previousCut = cutLabel(year - 1, term);
-  const grouped = year === ALL_YEARS;
   return (
     <div className="od-kpis">
       {indicators.map((indicator, index) => {
-        const value = valueOf(indicator, year, campus, term);
-        const previous = valueOf(indicator, year - 1, campus, term);
-        const change = changeBetween(indicator, value, previous);
-        // El rastro recorre solo los años con dato del indicador.
+        // La lectura del corte: un indicador que solo se reporta por año lee su
+        // cifra anual aunque el tablero esté en un periodo, y lo dice.
+        const reading = periodReading(indicator, year, term, campus);
+        const { value, cut } = reading;
+        const grouped = reading.kind === "todo";
+        const changes = reading.comparisons.map((comparison) => ({ comparison, change: changeBetween(indicator, value, comparison.value) }));
+        const lead = changes.length ? changes[0] : undefined;
+        // El rastro recorre solo los años con dato del indicador, en su propia unidad de corte.
+        const cuts = cutsOf(years, reading.kind === "periodo");
         const own = indicator.years ? cuts.filter((c) => indicator.years!.includes(c.year)) : cuts;
         const trail = own.map((c) => valueOf(indicator, c.year, campus, c.term));
-        const basis = basisOf(indicator, year, campus, term);
+        const basis = basisOf(indicator, cut.year, campus, cut.term);
         const trailMax = Math.max(0, ...trail.map((v) => v ?? 0)) || 1;
         const selected = indicator.id === selectedId;
+        const previous = lead?.comparison.value ?? null;
         const rising = value !== null && previous !== null && value > previous;
         const falling = value !== null && previous !== null && value < previous;
 
@@ -66,26 +69,34 @@ export function KpiBoard({ indicators, years, year, term = null, campus, campusN
                 align="end"
                 numeric
                 delay={160 + index * 120}
-                label={formatWithUnit(value, indicator.format, indicator.unit)}
+                label={`${formatWithUnit(value, indicator.format, indicator.unit)}, ${readingCutText(reading)}`}
               />
               <span className="od-kpi__unit">{value === null ? "sin reportar" : indicator.unit}</span>
             </span>
 
-            <span className="od-kpi__change" data-reading={change?.reading ?? "neutro"}>
+            <span className="od-kpi__change" data-reading={lead?.change?.reading ?? "neutro"}>
               {grouped ? (
-                <>Periodo {cut} · {basis ?? "sin cifras"}</>
-              ) : change ? (
+                <>Periodo {reading.label} · {basis ?? "sin cifras"}</>
+              ) : lead?.change ? (
                 <>
                   <svg viewBox="0 0 16 16" aria-hidden="true" data-dir={rising ? "up" : falling ? "down" : "flat"}>
                     <path d={rising ? "M8 3l5 6H3z" : falling ? "M8 13l5-6H3z" : "M3 7h10v2H3z"} />
                   </svg>
-                  {change.label} frente a {previousCut}
-                  {change.reading === "mejora" ? " · mejora" : change.reading === "empeora" ? " · retrocede" : ""}
+                  {lead.change.label} frente a {lead.comparison.label}
+                  {lead.change.reading === "mejora" ? " · mejora" : lead.change.reading === "empeora" ? " · retrocede" : ""}
                 </>
+              ) : lead ? (
+                <>Sin comparación con {lead.comparison.label}</>
               ) : (
-                <>Sin comparación con {previousCut}</>
+                <>Primer corte publicado</>
               )}
             </span>
+            {/* El mismo periodo del año anterior: la comparación que no depende de la época del año. */}
+            {changes.slice(1).map(({ comparison, change }) => (
+              <span key={comparison.kind} className="od-kpi__change od-kpi__change--second" data-reading={change?.reading ?? "neutro"}>
+                {change ? `${change.label} frente a ${comparisonText(comparison)}` : `Sin comparación con ${comparisonText(comparison)}`}
+              </span>
+            ))}
 
             <span className="od-kpi__trail" aria-hidden="true" data-cuts={own.length}>
               {trail.map((v, i) => {
@@ -93,8 +104,8 @@ export function KpiBoard({ indicators, years, year, term = null, campus, campusN
                 return (
                   <span
                     key={cutLabel(c.year, c.term)}
-                    data-selected={(c.year === year && c.term === term) || undefined}
-                    data-previous={(c.year === year - 1 && c.term === term) || undefined}
+                    data-selected={(c.year === cut.year && c.term === cut.term) || undefined}
+                    data-previous={(lead !== undefined && cutLabel(c.year, c.term) === lead.comparison.label) || undefined}
                     data-empty={v === null || undefined}
                     style={{ "--h": `${v === null ? 12 : Math.max(8, (v / trailMax) * 100)}%` } as CSSProperties}
                     title={`${cutLabel(c.year, c.term)}: ${formatWithUnit(v, indicator.format, indicator.unit)}`}
@@ -106,7 +117,8 @@ export function KpiBoard({ indicators, years, year, term = null, campus, campusN
             <span className="od-stub">
               <span className="od-stub__source">{indicator.source}</span>
               <span className="od-stub__meta">
-                {campusName} · {cut}
+                {campusName} · {grouped ? reading.label : readingCutText(reading)}
+                {reading.annualOnly ? " · dato anual, no se reporta por periodo" : ""}
                 {basis && !grouped ? ` · ${basis}` : ""}
                 {illustrative ? " · ilustrativo" : ""}
               </span>

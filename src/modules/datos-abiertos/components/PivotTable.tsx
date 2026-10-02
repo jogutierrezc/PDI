@@ -26,14 +26,14 @@ const DIM_LABEL: Record<Dim, string> = { indicador: "Indicador", campus: "Campus
 
 const PERIOD_KEY = "periodo";
 
-/** Clave de un corte en la tabla: "2024", "2024-A" o "periodo" (todo el periodo). */
-const cutKey = (year: number, term: Term | null) => (year === ALL_YEARS ? PERIOD_KEY : cutLabel(year, term));
+/** Clave de un corte en la tabla: "2024", "2024-1" o "periodo" (todo el periodo). */
+export const cutKey = (year: number, term: Term | null) => (year === ALL_YEARS ? PERIOD_KEY : cutLabel(year, term));
 
-/** "2024" → año; "2024-A" → periodo A de 2024; "periodo" → todo el periodo. */
-const parseCut = (key: string): { year: number; term: Term | null } => {
+/** "2024" → año; "2024-1" → periodo 1 de 2024 (también "2024-A"); "periodo" → todo el periodo. */
+export const parseCut = (key: string): { year: number; term: Term | null } => {
   if (key === PERIOD_KEY) return { year: ALL_YEARS, term: null };
   const [year, term] = key.split("-");
-  return { year: Number(year), term: term === "A" || term === "B" ? term : null };
+  return { year: Number(year), term: term === "A" || term === "1" ? "A" : term === "B" || term === "2" ? "B" : null };
 };
 
 interface PivotTableProps {
@@ -203,8 +203,8 @@ export function PivotTable({ report, years, campuses, year, term = null, campus 
           <ViewSwitch
             label="Detalle del corte"
             options={[
-              { value: "anual", label: "Año" },
               { value: "periodos", label: "Periodos 1 y 2" },
+              { value: "anual", label: "Año" },
             ]}
             value={detail}
             onChange={(next) => {

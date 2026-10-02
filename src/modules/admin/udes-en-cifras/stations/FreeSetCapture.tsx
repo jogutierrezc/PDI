@@ -270,6 +270,7 @@ export function FreeSetForm({
                     {data > 0 ? (
                       <ConfirmButton
                         label="Quitar"
+                        subject={`la columna «${c.label || index + 1}»`}
                         confirmLabel={`Sus ${plural(data, "casilla con dato deja", "casillas con dato dejan")} de verse${using.length ? ` y ${using.map((v) => `«${v.title}»`).join(", ")} ${using.length === 1 ? "queda incompleta" : "quedan incompletas"}` : ""}.`}
                         onConfirm={() => setColumns(columns.filter((x) => x.draftId !== c.draftId))}
                       />
@@ -941,9 +942,10 @@ function FreeViewsEditor({ set, blocks, published, canEdit }: {
                   {canEdit && (
                     <ConfirmButton
                       label="Borrar"
+                      subject={`la gráfica «${view.title}»`}
                       confirmLabel={
                         !used
-                          ? "¿Borrar la gráfica?"
+                          ? "No está en ningún bloque de la ficha: sus datos de origen se conservan."
                           : used === blocks.length
                             ? `«${view.title}» sale de ${published ? "la ficha publicada" : "la ficha"}: ${used === 1 ? "su bloque pasa" : "uno de sus bloques pasa"} a mostrar todas las gráficas del conjunto${used > 1 ? " y los demás se quitan" : ""}.`
                             : `«${view.title}» sale de ${published ? "la ficha publicada" : "la ficha"}: ${used === 1 ? "su bloque se quita" : `sus ${used} bloques se quitan`}.`

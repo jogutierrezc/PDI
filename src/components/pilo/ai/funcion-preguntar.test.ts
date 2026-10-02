@@ -2125,3 +2125,99 @@ describe("usuarios de Pilo (0120): cuentas que no son de la intranet", () => {
     expect(systemOf(calls[1])).not.toContain("la llame");
   });
 });
+
+describe("las cifras por periodo y su resumen", () => {
+  /** Un indicador que se reporta por periodo; su cifra del año es la del último periodo. */
+  const matriculados = {
+    ref: "cifras:matriculados",
+    report: "Población",
+    label: "Estudiantes matriculados",
+    unit: "estudiantes",
+    format: "entero",
+    definition: "",
+    office: "Registro",
+    path: "/datos-abiertos/poblacion",
+    period: "2020–2025",
+    illustrative: false,
+    rank: 0.9,
+    series: [
+      { y: 2024, t: null, c: "", v: 20500, k: "p2" },
+      { y: 2024, t: "A", c: "", v: 20100 },
+      { y: 2024, t: "B", c: "", v: 20500 },
+      { y: 2025, t: null, c: "", v: 20900, k: "p1" },
+      { y: 2025, t: "A", c: "", v: 20900 },
+    ],
+  };
+  const off = () => {
+    const w = world();
+    w.settings.enabled = false;
+    w.facts = [matriculados];
+    return w;
+  };
+
+  it("sin IA responde por periodo, no con la cifra del año, y cierra con el resumen calculado", async () => {
+    const out = (await (await ask(await boot(off()), { question: "¿Cuántos estudiantes matriculados hay?" })).json()) as Row;
+    expect(out).toMatchObject({ kind: "dato", grounding: "oficial" });
+    expect(out.text).toBe(
+      [
+        "Según UDES en Cifras, «Estudiantes matriculados», por periodo académico: toda la UDES, 2025-1: 20.900 estudiantes; toda la UDES, 2024-2: 20.500 estudiantes; toda la UDES, 2024-1: 20.100 estudiantes [1].",
+        "",
+        "**En resumen**",
+        "- Dato más reciente, 2025-1: 20.900 estudiantes.",
+        "- Frente a 2024-2, el periodo anterior: subió 400 estudiantes (+2,0 %).",
+        "- Frente a 2024-1, el mismo periodo del año anterior: subió 800 estudiantes (+4,0 %).",
+      ].join("\n"),
+    );
+    expect((out.sources as Row[])[0]).toMatchObject({ ref: "dato:cifras:matriculados", cut: "2025-1, 2024-2, 2024-1" });
+  });
+
+  it("la cifra del año solo si se pide, diciendo qué es; y un periodo sin cifra se dice y se ofrece el más cercano", async () => {
+    const handler = await boot(off());
+    const year = (await (await ask(handler, { question: "¿Cuántos estudiantes matriculados hubo en todo 2024?" })).json()) as Row;
+    expect(year.text).toBe("Según UDES en Cifras, «Estudiantes matriculados» en toda la UDES fue 20.500 estudiantes en el año 2024 (la del periodo 2, el último reportado) [1].");
+    const gap = (await (await ask(handler, { question: "¿Cuántos estudiantes matriculados hubo en 2025-II?" })).json()) as Row;
+    expect(gap.text).toBe("«Estudiantes matriculados» no tiene cifra publicada para 2025-2: un dato sin reportar no es un cero. El corte más cercano con cifra es toda la UDES, 2025-1: 20.900 estudiantes [1].");
+    // «Este periodo» se cuenta desde hoy: aún no tiene cifra publicada, y se dice cuál es.
+    const now = (await (await ask(handler, { question: "¿Cuántos estudiantes matriculados hay este periodo?" })).json()) as Row;
+    expect(now.text).toMatch(/^El periodo en curso es (20\d\d-[12])\. «Estudiantes matriculados» no tiene cifra publicada para \1: un dato sin reportar no es un cero\. El corte más cercano con cifra es toda la UDES, 2025-1: 20\.900 estudiantes \[1\]\.$/);
+  });
+
+  it("el seguimiento «¿y en el segundo?» cambia solo el periodo", async () => {
+    const out = (await (await ask(await boot(off()), { question: "¿y en el segundo?", history: [{ q: "¿Cuántos estudiantes matriculados hubo en 2024-1?", a: "20.100 [1]." }] })).json()) as Row;
+    expect(out.text).toBe("Según UDES en Cifras, «Estudiantes matriculados» en toda la UDES fue 20.500 estudiantes en 2024-2 [1].");
+  });
+
+  it("una respuesta guardada con la cifra del año no tapa la lectura por periodo del mismo indicador", async () => {
+    const w = off();
+    w.answers = [{ id: 5, question: "¿Cuántos estudiantes matriculados hay?", qnorm: "cuantos estudiantes matriculados hay", kind: "ia", answer: "En 2024 hubo 20.500 estudiantes [1].", refs: ["cifras:matriculados"], fresh: true }];
+    expect(await (await ask(await boot(w), { question: "¿Cuántos estudiantes matriculados hay?" })).json()).toMatchObject({ kind: "dato" });
+    // Si el indicador solo tiene cifra del año, la guardada sigue valiendo.
+    w.facts = [{ ...matriculados, series: matriculados.series.filter((p) => p.t === null) }];
+    expect(await (await ask(await boot(w), { question: "¿Cuántos estudiantes matriculados hay?" })).json()).toMatchObject({ kind: "memoria" });
+  });
+
+  it("con IA: el modelo recibe la lectura por periodo y el resumen ya calculado, y sus números se verifican", async () => {
+    const w = world();
+    w.facts = [matriculados];
+    const calls = provider(stream("En 2025-1 hubo 20.900 estudiantes matriculados [1]. ", "Frente a 2024-2 subió 400 estudiantes, un 2,0 % [1]. ", "Frente a 2024-1 subió 800 estudiantes (+4,0 %) [1]."));
+    const all = await events(await ask(await boot(w), { question: "¿Cuántos estudiantes matriculados hay?", stream: true }));
+    const system = (calls[0].body.messages as { content: string }[])[0].content;
+    expect(system).toContain("Cómo das las cifras");
+    expect(system).toContain("[CIFRAS]");
+    expect(system).toContain("Lectura por periodo académico, el más reciente primero: toda la UDES, 2025-1: 20.900 estudiantes; toda la UDES, 2024-2: 20.500 estudiantes; toda la UDES, 2024-1: 20.100 estudiantes.");
+    expect(system).toContain("Resumen calculado con estas cifras (sus números ya están calculados; no los recalcules): Dato más reciente, 2025-1: 20.900 estudiantes. Frente a 2024-2, el periodo anterior: subió 400 estudiantes (+2,0 %).");
+    // La cifra del año no va: no se pidió.
+    expect(system).not.toContain("año 2024");
+    expect(all[all.length - 1].data).toMatchObject({ kind: "ia", verified: true, unknown: [], grounding: "oficial" });
+    expect(w.inbox).toEqual([]);
+  });
+
+  it("con IA: un porcentaje que el modelo calculó por su cuenta sí se marca para revisar", async () => {
+    const w = world();
+    w.facts = [matriculados];
+    provider(stream("En 2025-1 hubo 20.900 estudiantes, un 1,95 % más que en 2024-2 [1]."));
+    const all = await events(await ask(await boot(w), { question: "¿Cuántos estudiantes matriculados hay?", stream: true }));
+    expect(all[all.length - 1].data).toMatchObject({ kind: "ia", verified: false, unknown: ["1.95"] });
+    expect(w.inbox).toEqual([expect.objectContaining({ p_reason: "revisar" })]);
+  });
+});

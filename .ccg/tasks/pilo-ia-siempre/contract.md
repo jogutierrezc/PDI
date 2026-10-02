@@ -517,3 +517,37 @@ En B.5: `pilo_map_pending { …, p_limit: 36 }` y `pilo_map_topics { …, p_limi
 - Cuánto baja de verdad la espera en `preguntar`: la mejora es estructural (menos idas y vueltas en serie); no se midió contra la base ni contra el proveedor reales.
 - Que el proveedor aguante 6 pedidos seguidos por lote sin `429`, y que un pedido de 6 pasajes con 2.400 caracteres cada uno quepa en el contexto del modelo configurado.
 - El corte de 150 s por inactividad frente a un lote de 120 s más lo que tarde en guardar y contar.
+
+## Anexo D · Las cifras por periodo y su resumen (2026-10-02)
+
+Sin migración. La forma de la respuesta (`kind`, `text`, `sources`, eventos) no cambia: cambia qué cifras elige Pilo y cómo las dice.
+
+### D.1 Lectura por periodo
+
+- **De partida, por periodo académico.** Sin año ni periodo en la pregunta, `pickCuts` da el periodo más reciente con dato y, para compararlo, el periodo anterior y el mismo periodo del año anterior (los que existan). Con varias sedes, el periodo más reciente de cada una. Con un año («en 2024»), los periodos de ese año, cada uno por separado.
+- **La cifra del año** solo si se pide («anual», «en el año 2024», «en todo 2024», «por año») o si el indicador solo se publica por año; en ese caso el pasaje y la plantilla dicen «Este indicador se publica por año: no tiene cifras por periodo.». Siempre se escribe como «año 2024», nunca como un «2024» suelto.
+- **Nunca se suma ni se promedia.** La cifra del año es la que calculó el portal. Si se pide la del año y no está publicada, van los periodos por separado y se dice.
+- **Periodo sin cifra:** va en `missing` («Sin cifra publicada para 2025-2: un dato sin reportar no es un cero») y se ofrece el corte más cercano que sí la tiene («El corte más cercano con cifra: …»).
+- **Formas de periodo que se entienden** (`parseSlots`): `2025-1`, `2025-01`, `2025 I`, `2025-II`, `2024A`/`2024B`, «primer/segundo periodo o semestre», «1er periodo», «periodo 2», «periodo académico 2», «II semestre», «¿y en el segundo?», «este periodo» / «semestre actual» (el que está en curso según la fecha de Bogotá: enero–junio es el 1, julio–diciembre el 2), «el periodo pasado/anterior» (el anterior al que está en curso o, en un seguimiento, al que se venía hablando) y «el último periodo» (el más reciente con dato). Los dos periodos a la vez («2024-1 y 2024-2») no eligen uno: se dan los dos.
+- `Slots` gana dos campos opcionales: `annual` (`true` pide la del año, `false` la pide por periodo) y `rel` (`"ultimo" | "actual" | "anterior"`). El paso «entender» los anota: «periodo en curso», «cifra del año»…
+- Una respuesta guardada que cita el pasaje de memoria de un indicador (su cifra del año) ya no tapa la lectura por periodo de ese mismo indicador: mandan las cifras en vivo.
+
+### D.2 El resumen
+
+Cuando el corte trae varias cifras de una misma serie, `factSummary` arma de 2 a 4 líneas: el dato más reciente y su cambio frente al periodo anterior y al mismo periodo del año anterior, o la sede más alta y la más baja de un mismo corte.
+
+- Los números los calcula el servidor (`figureChange`, `changeText`) con las cifras de `pilo_facts`. Un conteo cambia en valor y en porcentaje (un decimal); **un porcentaje cambia en puntos porcentuales**, sin «% de cambio»; sin base (cero) no hay porcentaje; sin uno de los dos datos no hay cálculo; un año no se compara con un periodo.
+- Sin IA (`kind: "dato"`), el texto termina con `\n\n**En resumen**\n- …\n- …` (Markdown básico: una negrita y una lista).
+- Con IA, el resumen va escrito dentro del pasaje `[CIFRAS]` («Resumen calculado con estas cifras…») y el pedido lleva la regla «Cómo das las cifras» (solo cuando hay bloque `[CIFRAS]`; sin cifras el pedido es el de siempre, byte a byte). Como el resumen está en el pasaje, `finishAnswer`/`verifyNumbers` conoce sus números; un cálculo que el modelo haga por su cuenta sigue saliendo en `unknown` y va a la bandeja como «revisar».
+
+### D.3 La memoria
+
+`factRows()` añade a la cifra del año de cada indicador que se reporta por periodo un campo `k` dentro de `series`: `"suma"`, `"promedio"`, `"p1"` o `"p2"` (la regla anual del portal y, con «último», el periodo del que salió). Con él Pilo dice «año 2024 (la del periodo 2, el último reportado)». Va dentro del `jsonb` de la serie: no hace falta migración. El pasaje de memoria de cada indicador (`cifrasRows`) también pasa a contarse por periodo.
+
+**Hay que pulsar «Actualizar la memoria» una vez** para que lleguen `k` y los pasajes nuevos (y para que las respuestas guardadas con la cifra del año dejen de servirse). Con la memoria de antes la función responde igual por periodo (la serie ya traía los periodos); solo no dice de qué regla sale la cifra del año.
+
+### D.4 Sin verificar
+
+- Que el modelo real (Gemma por NVIDIA) cierre con el resumen y no recalcule: es una instrucción del pedido; lo que sí está garantizado es que un número que no esté en el pasaje se marca.
+- Cómo pinta la página la lista del resumen en la respuesta `dato` y cómo la lee la voz.
+- La frontera de «este periodo» (1 de julio) contra el calendario académico real de la universidad.

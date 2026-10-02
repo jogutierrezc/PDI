@@ -37,7 +37,9 @@ const USES_ALL_YEARS: FreeChartType[] = ["lineas", "area", "gantt", "barras_comp
 export function temporalityText(set: FreeSet, year: number | null) {
   if (set.temporality === "periodo") return set.periodLabel ? `Periodo ${set.periodLabel}` : "Dato del periodo";
   if (set.temporality === "sin_tiempo") return "Dato sin fecha";
-  return year === null ? "Todos los años" : `Año ${year}`;
+  // Un conjunto libre anual no trae periodos 1 y 2 (0033): se dice, para que
+  // nadie lea su cifra como la de un periodo académico.
+  return year === null ? "Todos los años · dato anual" : `Año ${year} · dato anual`;
 }
 
 /** La tabla de origen: una vista de tabla que no se guarda, armada al vuelo. */

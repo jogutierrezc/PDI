@@ -1,6 +1,9 @@
 /* Los pedidos con que se compara `buildAskMessages` (rol.test.ts). Lo esperado
    (rol.esperado.json) se armó con la función ANTES de que conociera espacios y
-   roles: sin `space` ni `rol`, el pedido debe seguir saliendo igual, byte a byte. */
+   roles: sin `space` ni `rol`, el pedido debe seguir saliendo igual, byte a byte.
+   Único cambio deliberado desde entonces (2026-10-02): el caso que trae el bloque
+   [CIFRAS] lleva además la regla «Cómo das las cifras» (lectura por periodo).
+   Los pedidos sin cifras siguen idénticos. */
 import type { AskPlanInput, AskPrompt, Passage } from "./logic";
 
 const p = (ref: string, source: string, title: string, body: string, extra: Partial<Passage> = {}): Passage => ({ ref, source, title, section: "", body, path: "", cut: "", office: "", ...extra });

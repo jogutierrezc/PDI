@@ -5,6 +5,12 @@
    oficinas salen sus cifras y a qué corte corresponden. Corte y campus viajan en
    la URL, igual que en el tablero, así que la ficha se comparte tal como se ve.
 
+   La ficha se lee primero por periodo académico: abre en el periodo más
+   reciente con dato del informe, compara con el periodo anterior y con el
+   mismo periodo del año anterior, y sus gráficas recorren los periodos. La
+   cifra del año («Año») y todo el periodo agrupado («Todos») siguen en la
+   barra, como lecturas secundarias. Lo que solo se reporta por año lo dice.
+
    Orden de lectura, de lo general a lo detallado:
      tablero de KPI → evolución por campus → evolución histórica → mapa (si
      el informe lo tiene) → tubería (permanencia) → mapa de calor → desgloses →
@@ -55,6 +61,7 @@ import {
 } from "./data/open-data";
 import { imagesOf, reportImageUrl } from "./data/images";
 import { ALL_YEARS, ANNUAL_RULE_LABEL, cutCode, cutCodeLabel, cutLabel, fromCutCode } from "./data/terms";
+import { periodReading } from "./data/period-reading";
 import type { Breakdown, CampusId, Indicator, MapDataset, OpenDataCatalog, Report, ReportBlock, Term } from "./data/types";
 import { blockPicks, inSectionOf, lastFreeBlock as lastFreeBlockOf, orderedBlocks, ownFreeViews as ownFreeViewsOf, pairedMaps as pairedMapsOf, saberProOf, saberTytOf } from "./data/groups";
 import { csvZipName } from "./data/csv-export";
@@ -76,8 +83,8 @@ import "./datos-abiertos.css";
 export function OpenDataReport() {
   const { slug } = useParams();
   const catalog = useOpenDataCatalog();
-  const filters = useBoardFilters(catalog.data ?? undefined);
   const report = catalog.data ? findReport(catalog.data, slug) : undefined;
+  const filters = useBoardFilters(catalog.data ?? undefined, report);
 
   return (
     <OpenDataLayout
@@ -117,7 +124,7 @@ interface ContentProps extends ReturnType<typeof useBoardFilters> {
   report: Report;
 }
 
-function ReportContent({ data, report, year, term, campus, setYear, setTerm, setCampus, search }: ContentProps) {
+function ReportContent({ data, report, year, term, campus, setYear, setTerm, setCut, setCampus, search }: ContentProps) {
   const query = search ? `?${search}` : "";
   const campusName = data.campuses.find((c) => c.id === campus)?.name ?? "Todos los campus";
   const keys = keyIndicators(report);
@@ -135,7 +142,7 @@ function ReportContent({ data, report, year, term, campus, setYear, setTerm, set
     return () => window.removeEventListener("scroll", onScroll);
   }, []);
   const barOpen = barManual ?? !scrolled;
-  const cutSummary = year === ALL_YEARS ? `Todos · ${cutLabel(ALL_YEARS, null)}` : cutLabel(year, term);
+  const cutSummary = year === ALL_YEARS ? `Todos · ${cutLabel(ALL_YEARS, null)}` : term ? `Periodo ${cutLabel(year, term)}` : `Año ${cutLabel(year, null)}`;
   const selected = report.indicators.find((i) => i.id === pickedId) ?? keys[0] ?? report.indicators[0];
   const sources = useMemo(
     () => Array.from(new Set([...report.indicators.map((i) => i.source), ...report.breakdowns.map((b) => b.source)])),
@@ -245,10 +252,15 @@ function ReportContent({ data, report, year, term, campus, setYear, setTerm, set
                       {campusName} · todo el periodo {cutLabel(year, term)}: promedio anual de cada indicador (las existencias, como la matrícula,
                       muestran su último dato). Elige un año arriba para ver ese corte.
                     </>
+                  ) : term ? (
+                    <>
+                      {campusName} · periodo {cutLabel(year, term)}. Cada cifra se compara con el periodo anterior y con el mismo
+                      periodo del año anterior. Lo que solo se reporta por año muestra su cifra de {year} y lo dice en su boleto.
+                    </>
                   ) : (
                     <>
-                      {campusName} · corte {cutLabel(year, term)}
-                      {term ? "" : ", cifra del año calculada con los periodos 1 y 2"}.
+                      {campusName} · año {cutLabel(year, null)}: cifra del año, calculada con los periodos 1 y 2 según la regla de cada
+                      indicador (la dice su boleto). Elige el periodo 1 o 2 arriba para leerlo por periodo.
                     </>
                   )}{" "}
                   Elige un indicador para verlo en la gráfica de evolución.
@@ -273,7 +285,7 @@ function ReportContent({ data, report, year, term, campus, setYear, setTerm, set
             campus={campus}
             campusName={campusName}
             setYear={setYear}
-            setTerm={setTerm}
+            setCut={setCut}
             defaultView={block.settings.chart === "barras" ? "barras" : "lineas"}
             csv={indicatorsCsv}
           />
@@ -303,7 +315,7 @@ function ReportContent({ data, report, year, term, campus, setYear, setTerm, set
         const mapCut = (d: MapDataset) =>
           d.reporting === "global"
             ? "Dato global"
-            : year === ALL_YEARS ? `Periodo ${cutLabel(year, null)} · ${isWorldMap(d.mode) ? "total" : "promedio anual"}` : `Corte ${year}`;
+            : year === ALL_YEARS ? `Periodo ${cutLabel(year, null)} · ${isWorldMap(d.mode) ? "total" : "promedio anual"}` : `Año ${year} · el mapa se reporta por año`;
         const frameTitle = (d: MapDataset) => (isWorldMap(d.mode) || d.mode === "municipio" ? MAP_MODE_TITLE[d.mode] : "Mapa por departamento");
 
         if (combined && partner) {
@@ -436,13 +448,13 @@ function ReportContent({ data, report, year, term, campus, setYear, setTerm, set
           return (
             <div className="od-point__block od-breakdowns" key={key}>
               {only.map((breakdown) => (
-                <BreakdownChart key={breakdown.id} breakdown={breakdown} year={year} term={term} years={data.years} setYear={setYear} csv={csvById(`desglose:${breakdown.id}`)} />
+                <BreakdownChart key={breakdown.id} breakdown={breakdown} year={year} term={term} years={data.years} setYear={setYear} setCut={setCut} csv={csvById(`desglose:${breakdown.id}`)} />
               ))}
             </div>
           );
         }
         return (
-          <Breakdowns key={key} anchor={block.settings.slot ? `od-desgloses-${block.settings.slot}` : "od-desgloses"} breakdowns={only} year={year} campus={campus} setYear={setYear} title={block.settings.title} term={term} years={data.years} csvOf={(id) => csvById(`desglose:${id}`)} />
+          <Breakdowns key={key} anchor={block.settings.slot ? `od-desgloses-${block.settings.slot}` : "od-desgloses"} breakdowns={only} year={year} campus={campus} setYear={setYear} setCut={setCut} title={block.settings.title} term={term} years={data.years} csvOf={(id) => csvById(`desglose:${id}`)} />
         );
       }
       case "tabla_dinamica":
@@ -836,7 +848,7 @@ function Evolution({
   campus,
   campusName,
   setYear,
-  setTerm,
+  setCut,
   defaultView = "lineas",
   csv,
 }: {
@@ -849,30 +861,30 @@ function Evolution({
   campus: CampusId;
   campusName: string;
   setYear: (year: number) => void;
-  setTerm: (term: Term | null) => void;
+  /** Año y periodo en una sola escritura: dos seguidas se pisarían en la URL. */
+  setCut: (cut: { year: number; term: Term | null }) => void;
   defaultView?: "lineas" | "barras";
   /** Los indicadores del informe en CSV. */
   csv?: ExportSource;
 }) {
   const [view, setView] = useState<"lineas" | "barras" | "combinada">(defaultView);
   const [siteView, setSiteView] = useState<"barras" | "circular">("barras");
-  // Por año (la cifra del año) o por periodos A y B. Elegir un periodo arriba
-  // abre la gráfica por periodos.
-  const [detail, setDetail] = useState<"anual" | "periodos">(term ? "periodos" : "anual");
+  // Por periodos 1 y 2 (la lectura de partida) o por año. La serie por año
+  // solo abre de entrada cuando la barra pide la cifra del año.
+  const annualAsked = year !== ALL_YEARS && term === null;
+  const [detail, setDetail] = useState<"anual" | "periodos">(annualAsked ? "anual" : "periodos");
   useEffect(() => {
-    if (term) setDetail("periodos");
-  }, [term]);
+    setDetail(annualAsked ? "anual" : "periodos");
+  }, [annualAsked]);
   const bySemester = detail === "periodos" && hasTerms(indicator);
+  // Lo que se lee en el corte de la barra: un indicador solo anual lee su año.
+  const reading = periodReading(indicator, year, term, campus);
   const indicatorYears = indicator.years ?? data.years;
   const visible = useVisibleYears(indicatorYears, indicator.id);
   const cuts = cutsOf(visible.years, bySemester);
   const codes = cuts.map((c) => cutCode(c.year, c.term));
   const selectedCode = bySemester ? (term ? cutCode(year, term) : -1) : year;
-  const selectCut = (code: number) => {
-    const picked = fromCutCode(code);
-    setYear(picked.year);
-    setTerm(picked.term);
-  };
+  const selectCut = (code: number) => setCut(fromCutCode(code));
 
   // Tres colores validados para daltonismo: desde el cuarto campus el color se
   // repite, y la leyenda y la etiqueta final cargan la identidad.
@@ -899,17 +911,17 @@ function Evolution({
   const hiddenByDefault = indicator.format === "entero" && hasSites ? ["todas"] : [];
 
   const points = cuts.map((c) => ({ year: cutCode(c.year, c.term), value: valueOf(indicator, c.year, campus, c.term) }));
-  const cut = cutLabel(year, term);
+  const cut = reading.label;
   const campusItems = data.campuses
     .filter((c) => c.id !== "todas")
-    .map((c) => ({ label: c.name, value: valueOf(indicator, year, c.id, term), highlight: c.id === campus }));
+    .map((c) => ({ label: c.name, value: valueOf(indicator, reading.cut.year, c.id, reading.cut.term), highlight: c.id === campus }));
   const hasCampusData = campusItems.some((item) => item.value !== null);
   const campusEverReported = data.years.some((y) =>
     data.campuses.some(
       (c) => c.id !== "todas" && [null, "A", "B"].some((t2) => valueOf(indicator, y, c.id, t2 as Term | null) !== null),
     ),
   );
-  const total = valueOf(indicator, year, "todas", term);
+  const total = valueOf(indicator, reading.cut.year, "todas", reading.cut.term);
   const summable =
     indicator.format === "entero" &&
     total !== null &&
@@ -941,8 +953,8 @@ function Evolution({
         <YearFilter available={indicatorYears} selected={visible.selected} onChange={visible.select} />
         <div className="od-evolution">
           <ChartFrame
-            title="Evolución por corte"
-            subtitle={`${view === "lineas" ? "Por campus" : campusName} · ${view === "combinada" ? "global anual y periodos A y B" : bySemester ? "periodos A y B" : "por año"} · ${indicator.unit}`}
+            title={bySemester || view === "combinada" ? "Evolución por periodo" : "Evolución por año"}
+            subtitle={`${view === "lineas" ? "Por campus" : campusName} · ${view === "combinada" ? "periodos 1 y 2 en barras, cifra del año en línea" : bySemester ? "periodos 1 y 2" : hasTerms(indicator) ? "cifra del año" : "dato anual: no se reporta por periodo"} · ${indicator.unit}`}
             source={indicator.source}
             csv={csv}
             actions={
@@ -951,8 +963,8 @@ function Evolution({
                   <ViewSwitch
                     label="Detalle de la serie"
                     options={[
+                      { value: "periodos", label: "Periodos" },
                       { value: "anual", label: "Año" },
-                      { value: "periodos", label: "A y B" },
                     ]}
                     value={detail}
                     onChange={setDetail}
@@ -974,7 +986,7 @@ function Evolution({
             {view === "combinada" ? (
               <AnnualTermChart
                 key={`${indicator.id}-${campus}`}
-                label={`${indicator.label}, ${campusName}: global anual en línea y periodos A y B en barras`}
+                label={`${indicator.label}, ${campusName}: periodos 1 y 2 en barras y cifra del año en línea`}
                 points={visible.years.map((y) => ({
                   year: y,
                   annual: valueOf(indicator, y, campus),
@@ -1015,7 +1027,7 @@ function Evolution({
 
           <ChartFrame
             title="Por campus"
-            subtitle={`${year === ALL_YEARS ? `Periodo ${cut} · ${indicator.annualRule === "ultimo" ? "último dato" : "promedio anual"}` : `Corte ${cut}`} · ${indicator.unit}`}
+            subtitle={`${reading.kind === "todo" ? `Periodo ${cut} · ${indicator.annualRule === "ultimo" ? "último dato" : "promedio anual"}` : reading.kind === "periodo" ? `Periodo ${cut}` : `Año ${cut}${reading.annualOnly ? " · dato anual, no se reporta por periodo" : ""}`} · ${indicator.unit}`}
             actions={
               summable ? (
                 <ViewSwitch
@@ -1062,6 +1074,7 @@ function Breakdowns({
   year,
   campus,
   setYear,
+  setCut,
   title,
   term,
   years,
@@ -1073,6 +1086,7 @@ function Breakdowns({
   year: number;
   campus: CampusId;
   setYear: (year: number) => void;
+  setCut: (cut: { year: number; term: Term | null }) => void;
   title?: string;
   term: Term | null;
   years: number[];
@@ -1092,7 +1106,7 @@ function Breakdowns({
         </header>
 
         <div className="od-breakdowns">
-          {breakdowns.map((breakdown) => <BreakdownChart key={breakdown.id} breakdown={breakdown} year={year} term={term} years={years} setYear={setYear} csv={csvOf(breakdown.id)} />)}
+          {breakdowns.map((breakdown) => <BreakdownChart key={breakdown.id} breakdown={breakdown} year={year} term={term} years={years} setYear={setYear} setCut={setCut} csv={csvOf(breakdown.id)} />)}
         </div>
       </div>
     </section>

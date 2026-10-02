@@ -6,8 +6,9 @@
    corte y su fuente no se publica, así que el componente no admite omitirlos.
    ========================================================================== */
 
-import { basisOf, changeBetween, formatValue, formatWithUnit, valueOf } from "../data/open-data";
-import { ALL_YEARS, cutLabel } from "../data/terms";
+import { basisOf, changeBetween, formatValue, formatWithUnit } from "../data/open-data";
+import { periodReading } from "../data/period-reading";
+import { ALL_YEARS } from "../data/terms";
 import type { CampusId, Indicator, Term } from "../data/types";
 import { SplitFlap } from "./SplitFlap";
 import type { FlapSize } from "./SplitFlap";
@@ -15,7 +16,7 @@ import type { FlapSize } from "./SplitFlap";
 interface FigureTicketProps {
   indicator: Indicator;
   year: number;
-  /** Periodo académico. Sin él, la cifra es la del año. */
+  /** Periodo académico. Sin él, la cifra es la del año; un indicador solo anual lee su año y lo dice. */
   term?: Term | null;
   campus: CampusId;
   campusName: string;
@@ -51,14 +52,16 @@ export function FigureTicket({
   variant = "board",
   annotate,
 }: FigureTicketProps) {
-  const value = valueOf(indicator, year, campus, term);
-  const previous = valueOf(indicator, year - 1, campus, term);
+  const reading = periodReading(indicator, year, term, campus);
+  const { value } = reading;
+  // La primera comparación: el periodo anterior (o el año anterior en la lectura anual).
+  const before = reading.comparisons.length ? reading.comparisons[0] : undefined;
+  const previous = before?.value ?? null;
   const change = changeBetween(indicator, value, previous);
   const figure = formatValue(value, indicator.format);
-  const hasPrevious = year - 1 in indicator.values;
-  const cut = cutLabel(year, term);
-  const previousCut = cutLabel(year - 1, term);
-  const basis = basisOf(indicator, year, campus, term);
+  const cut = reading.label;
+  const basis = basisOf(indicator, reading.cut.year, campus, reading.cut.term);
+  const cutName = reading.kind === "anual" ? "Año" : "Periodo";
 
   return (
     <span className={`od-figure od-figure--${variant}`} data-empty={value === null || undefined}>
@@ -84,13 +87,13 @@ export function FigureTicket({
         <Pin letter={annotate?.[1]} />
         {year === ALL_YEARS ? (
           <>Periodo {cut}{basis ? ` · ${basis}` : ""}</>
-        ) : !hasPrevious ? (
+        ) : !before ? (
           <>Primer corte publicado</>
         ) : previous === null ? (
-          <>{previousCut}: sin reportar</>
+          <>{before.label}: sin reportar</>
         ) : (
           <>
-            {previousCut}: {formatValue(previous, indicator.format)}
+            {before.label}: {formatValue(previous, indicator.format)}
             {change && (
               <span className="od-figure__change" data-reading={change.reading}>
                 {" · "}
@@ -108,7 +111,8 @@ export function FigureTicket({
         <span className="od-ticket">
           <span className="od-ticket__source">{indicator.source}</span>
           <span className="od-ticket__meta">
-            <span className="od-ticket__campus">{campusName} · </span>{year === ALL_YEARS ? "Periodo" : "Corte"} {cut}
+            <span className="od-ticket__campus">{campusName} · </span>{cutName} {cut}
+            {reading.annualOnly && <span className="od-ticket__basis"> · dato anual</span>}
             {basis && year !== ALL_YEARS && <span className="od-ticket__basis"> · {basis}</span>}
           </span>
           {illustrative && <span className="od-ticket__stamp">Dato ilustrativo</span>}

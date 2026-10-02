@@ -39,7 +39,8 @@ import { readFunctionError, supabase } from "../../../lib/supabase";
 import { usePillars, useProjects, useStructure } from "../../../data/queries";
 import { formatValue, useOpenDataCatalog, valueOf } from "../../datos-abiertos/data/open-data";
 import { ALL_CAMPUSES } from "../../datos-abiertos/data/types";
-import { ALL_YEARS } from "../../datos-abiertos/data/terms";
+import { ALL_YEARS, ANNUAL_RULE_LABEL } from "../../datos-abiertos/data/terms";
+import type { Term } from "../../datos-abiertos/data/terms";
 import type { Indicator, OpenDataCatalog, ValueFormat } from "../../datos-abiertos/data/types";
 import { OBS_TOPICS } from "../../datos-abiertos/observatorio/data";
 import { summarize, useObservatoryLive } from "../../datos-abiertos/observatorio/live";
@@ -180,9 +181,9 @@ export function finalize(rows: Partial<Record<keyof MemoryRow, unknown>>[]): Mem
 /* --- UDES en Cifras ------------------------------------------------------------------ */
 
 /** Cifra del corte, o null si no la hay o no es un número (la base puede traer cualquier cosa). */
-function figureOf(indicator: Indicator, year: number, campus: string): number | null {
+function figureOf(indicator: Indicator, year: number, campus: string, term?: Term): number | null {
   try {
-    return numberOrNull(valueOf(indicator, year, campus));
+    return numberOrNull(valueOf(indicator, year, campus, term));
   } catch {
     return null;
   }
@@ -194,21 +195,50 @@ function figure(indicator: Indicator, value: number) {
   return indicator.format === "porcentaje" || unit === "%" ? `${f} %` : `${f} ${unit}`.trim();
 }
 
+/**
+ * Lo que la memoria dice de un indicador. Si se reporta por periodo, manda el
+ * periodo más reciente con cifra, comparado con el anterior y con el mismo del
+ * año anterior; la cifra del año va después y diciendo cómo la calcula el
+ * portal. Si solo se reporta por año, va su cifra del año, como siempre.
+ */
 function indicatorBody(indicator: Indicator, catalog: OpenDataCatalog, label: string): { body: string; cut: string } {
   const years = arrayOf<unknown>(catalog.years)
     .filter((y): y is number => typeof y === "number" && Number.isFinite(y) && y !== ALL_YEARS)
     .sort((a, b) => b - a);
+  const campuses = arrayOf<{ id?: unknown; name?: unknown }>(catalog.campuses).filter((c) => typeof c.id === "string" && c.id !== ALL_CAMPUSES && clean(c.name));
+  const byCampus = (year: number, term?: Term) =>
+    campuses
+      .map((c) => [clean(c.name), figureOf(indicator, year, c.id as string, term)] as const)
+      .filter(([, v]) => v !== null)
+      .map(([name, v]) => `${name} ${figure(indicator, v!)}`);
   const year = years.find((y) => figureOf(indicator, y, ALL_CAMPUSES) !== null);
   const parts: string[] = [];
   let cut = "";
-  if (year !== undefined) {
+  // Los periodos, del más reciente al más antiguo: 2025-2, 2025-1, 2024-2…
+  const terms = indicator.terms && typeof indicator.terms === "object" ? years.flatMap((y) => (["B", "A"] as const).map((t) => ({ y, t }))) : [];
+  const termCut = (c: { y: number; t: Term }) => `${c.y}-${c.t === "A" ? 1 : 2}`;
+  const head = terms.findIndex((c) => figureOf(indicator, c.y, ALL_CAMPUSES, c.t) !== null);
+  if (head >= 0) {
+    const now = terms[head];
+    cut = termCut(now);
+    parts.push(`${label}: ${figure(indicator, figureOf(indicator, now.y, ALL_CAMPUSES, now.t)!)} en ${cut}, el periodo más reciente con cifra, en toda la UDES.`);
+    const campus = byCampus(now.y, now.t);
+    if (campus.length) parts.push(`Por campus en ${cut}: ${campus.join("; ")}.`);
+    const back = (steps: number, what: string) => {
+      const before = terms[head + steps];
+      const v = before ? figureOf(indicator, before.y, ALL_CAMPUSES, before.t) : null;
+      if (before && v !== null) parts.push(`En ${termCut(before)}, ${what}, fue ${figure(indicator, v)}.`);
+    };
+    back(1, "el periodo anterior");
+    back(2, "el mismo periodo del año anterior");
+    if (year !== undefined) {
+      const rule = indicator.annualRule ? ANNUAL_RULE_LABEL[indicator.annualRule] : "";
+      parts.push(`Cifra del año ${year}${rule ? ` (${rule.charAt(0).toLowerCase()}${rule.slice(1)})` : ""}: ${figure(indicator, figureOf(indicator, year, ALL_CAMPUSES)!)}.`);
+    }
+  } else if (year !== undefined) {
     cut = String(year);
     parts.push(`${label}: ${figure(indicator, figureOf(indicator, year, ALL_CAMPUSES)!)} en ${year}, en toda la UDES.`);
-    const campus = arrayOf<{ id?: unknown; name?: unknown }>(catalog.campuses)
-      .filter((c) => typeof c.id === "string" && c.id !== ALL_CAMPUSES && clean(c.name))
-      .map((c) => [clean(c.name), figureOf(indicator, year, c.id as string)] as const)
-      .filter(([, v]) => v !== null)
-      .map(([name, v]) => `${name} ${figure(indicator, v!)}`);
+    const campus = byCampus(year);
     if (campus.length) parts.push(`Por campus en ${year}: ${campus.join("; ")}.`);
     const prev = years.find((y) => y < year && figureOf(indicator, y, ALL_CAMPUSES) !== null);
     if (prev !== undefined) parts.push(`En ${prev} fue ${figure(indicator, figureOf(indicator, prev, ALL_CAMPUSES)!)}.`);
@@ -223,6 +253,9 @@ function indicatorBody(indicator: Indicator, catalog: OpenDataCatalog, label: st
   return { body: parts.join(" "), cut: catalog.illustrative && cut ? `${cut} · ilustrativo` : cut };
 }
 
+/** Cómo sale la cifra del año de los periodos (la regla anual del portal), para decirlo al darla. */
+export type AnnualBasis = "suma" | "promedio" | "p1" | "p2";
+
 /** La serie completa de un indicador, para `pilo_facts_replace` (0107). */
 export interface FactRow {
   ref: string;
@@ -235,13 +268,18 @@ export interface FactRow {
   path: string;
   period: string;
   illustrative: boolean;
-  series: { y: number; t: "A" | "B" | null; c: string; v: number }[];
+  /** `k` solo va en la cifra del año de un indicador que se reporta por periodo: dice de dónde salió. */
+  series: { y: number; t: "A" | "B" | null; c: string; v: number; k?: AnnualBasis }[];
 }
 
 /**
  * Las cifras en vivo de Pilo: cada indicador publicado con todas sus cifras
  * (año, periodo 1 y 2, cada sede y toda la UDES), tal como las calcula el
  * portal. El total de la UDES va con sede "". Sin dinero, como la memoria.
+ *
+ * La cifra del año no se calcula aquí ni en la función: es la del portal, y
+ * lleva en `k` su regla (suma, promedio o el periodo del que salió) para que
+ * Pilo diga qué es. Un indicador que se reporta por año no lleva periodos ni `k`.
  */
 export function factRows(catalog: OpenDataCatalog | null | undefined): FactRow[] {
   if (!catalog) return [];
@@ -261,11 +299,20 @@ export function factRows(catalog: OpenDataCatalog | null | undefined): FactRow[]
       const id = clean(indicator.id);
       if (!label || !id || isMoney(indicator.unit) || isMoney(label)) continue;
       const series: FactRow["series"] = [];
+      const basis = (y: number, key: string): AnnualBasis | undefined => {
+        if (!indicator.terms) return undefined;
+        if (indicator.annualRule === "suma" || indicator.annualRule === "promedio") return indicator.annualRule;
+        if (indicator.annualRule !== "ultimo") return undefined;
+        const from = indicator.annualFrom?.[y]?.[key];
+        return from === "A" ? "p1" : from === "B" ? "p2" : undefined;
+      };
       const add = (y: number, t: "A" | "B" | null, cells: Partial<Record<string, number | null>> | undefined) => {
         for (const [key, raw] of Object.entries(cells ?? {})) {
           const v = numberOrNull(raw);
           const c = campusName.get(key);
-          if (v !== null && c !== undefined) series.push({ y, t, c, v });
+          if (v === null || c === undefined) continue;
+          const k = t === null ? basis(y, key) : undefined;
+          series.push(k ? { y, t, c, v, k } : { y, t, c, v });
         }
       };
       for (const y of years) {

@@ -45,6 +45,7 @@ const matriculados: Fact = {
     point(2024, "A", "Cúcuta", 3350),
     point(2024, "B", "Cúcuta", 3400),
     point(2024, null, "Bucaramanga", 12000),
+    point(2024, "B", "Bucaramanga", 12000),
     point(2023, null, "", 19800),
     point(2023, "B", "Cúcuta", 3210),
     point(2023, null, "Cúcuta", 3210),
@@ -99,11 +100,19 @@ describe("Pilo entiende el corte que se pide", () => {
 });
 
 describe("Pilo elige y dice las cifras", () => {
-  it("sin sede ni año: toda la UDES, los dos últimos años", () => {
-    const { points, missing } = pickCuts(matriculados, parseSlots("¿cuántos matriculados hay?", CAMPUSES));
-    expect(points.map(cutText)).toEqual(["2024", "2023"]);
+  it("sin sede ni año: toda la UDES, el periodo más reciente y el que lo compara (no la cifra del año)", () => {
+    const { points, missing, reading } = pickCuts(matriculados, parseSlots("¿cuántos matriculados hay?", CAMPUSES));
+    expect(points.map(cutText)).toEqual(["2024-2", "2024-1"]);
     expect(points.every((p) => p.c === "")).toBe(true);
     expect(missing).toEqual([]);
+    expect(reading).toBe("periodo");
+  });
+
+  it("la cifra del año solo si se pide, y son los dos últimos años", () => {
+    const { points, reading } = pickCuts(matriculados, parseSlots("¿cuántos matriculados hay, cifra anual?", CAMPUSES));
+    expect(points.map(cutText)).toEqual(["2024", "2023"]);
+    expect(points.every((p) => p.c === "" && p.t === null)).toBe(true);
+    expect(reading).toBe("anual");
   });
 
   it("con sede y periodo: esa cifra exacta", () => {
@@ -111,10 +120,13 @@ describe("Pilo elige y dice las cifras", () => {
     expect(points).toEqual([point(2023, "B", "Cúcuta", 3210)]);
   });
 
-  it("por sede: un año, cada sede", () => {
+  it("por sede: el periodo más reciente, cada sede", () => {
     const { points } = pickCuts(matriculados, parseSlots("matriculados por sede", CAMPUSES));
     expect(points.map((p) => p.c)).toEqual(["Cúcuta", "Bucaramanga"]);
-    expect(points.every((p) => p.y === 2024 && p.t === null)).toBe(true);
+    expect(points.every((p) => p.y === 2024 && p.t === "B")).toBe(true);
+    // Y si se pide la del año, la del año de cada sede.
+    const year = pickCuts(matriculados, parseSlots("matriculados por sede, anual", CAMPUSES)).points;
+    expect(year.map((p) => [p.c, cutText(p)])).toEqual([["Cúcuta", "2024"], ["Bucaramanga", "2024"]]);
   });
 
   it("lo pedido que no está no es un cero", () => {
@@ -131,13 +143,15 @@ describe("Pilo elige y dice las cifras", () => {
   });
 
   it("el pasaje trae cada número que dirá la respuesta, y se verifica", () => {
-    const { points, missing } = pickCuts(matriculados, parseSlots("matriculados en Cúcuta en 2024", CAMPUSES));
-    const passage = factPassage(matriculados, points, missing);
+    const cuts = pickCuts(matriculados, parseSlots("matriculados en Cúcuta en todo 2024", CAMPUSES));
+    const { points, missing } = cuts;
+    const passage = factPassage(matriculados, points, missing, cuts);
     expect(passage.ref).toBe("dato:cifras:poblacion:matriculados");
-    expect(passage.body).toContain("Cúcuta, 2024: 3.400 estudiantes");
+    // La cifra del año se dice como lo que es.
+    expect(passage.body).toContain("Lectura anual (cifra del año): Cúcuta, año 2024: 3.400 estudiantes");
     expect(passage.cut).toBe("2024");
-    const answer = dataAnswer(matriculados, points, missing);
-    expect(answer).toBe("Según UDES en Cifras, «Matriculados» en Cúcuta fue 3.400 estudiantes en 2024 [1].");
+    const answer = dataAnswer(matriculados, points, missing, cuts);
+    expect(answer).toBe("Según UDES en Cifras, «Matriculados» en Cúcuta fue 3.400 estudiantes en el año 2024 [1].");
     expect(verifyNumbers(answer, passage.body).verified).toBe(true);
     // El modelo puede escribirlo sin punto de miles: es el mismo número.
     expect(verifyNumbers("En Cúcuta hubo 3400 estudiantes.", passage.body).verified).toBe(true);
@@ -179,7 +193,7 @@ describe("sedes con otro nombre y sin cifras", () => {
 
   it("la sede de la pregunta encuentra la de la serie aunque se escriba distinto", () => {
     const { points } = pickCuts(matriculados, parseSlots("matriculados en el campus de cucuta 2024", ["Campus Cúcuta"]));
-    expect(points).toEqual([point(2024, null, "Cúcuta", 3400)]);
+    expect(points).toEqual([point(2024, "B", "Cúcuta", 3400), point(2024, "A", "Cúcuta", 3350)]);
   });
 });
 

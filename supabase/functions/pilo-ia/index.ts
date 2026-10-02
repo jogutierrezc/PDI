@@ -499,12 +499,21 @@ export function renumber<T>(text: string, passages: T[]): { text: string; passag
 
 export type FactTerm = "A" | "B";
 
+/**
+ * De dónde sale la cifra del año cuando el indicador se reporta por periodo:
+ * la regla anual del portal. La trae la memoria desde que guarda `k`; sin ella
+ * (memoria de antes, o un indicador que se reporta por año) no se dice.
+ */
+export type AnnualBasis = "suma" | "promedio" | "p1" | "p2";
+
 /** Una cifra de la serie: año, periodo (null = el año), sede ("" = toda la UDES) y valor. */
 export interface FactPoint {
   y: number;
   t: FactTerm | null;
   c: string;
   v: number;
+  /** Solo en la cifra del año: cómo la calculó el portal a partir de los periodos. */
+  k?: AnnualBasis;
 }
 
 /** Un indicador de UDES en Cifras con su serie completa. */
@@ -529,7 +538,13 @@ export interface Slots {
   campus: string[];
   /** «por sede», «cada campus»: todas las sedes. */
   byCampus: boolean;
+  /** true: pide la cifra del año («anual», «en todo 2024»); false: la pide por periodo («por periodo»). Sin valor, no dijo. */
+  annual?: boolean;
+  /** Un periodo dicho sin número: el más reciente con dato, el que está en curso o el anterior a ese. */
+  rel?: PeriodRel;
 }
+
+export type PeriodRel = "ultimo" | "actual" | "anterior";
 
 const CAMPUS_GENERIC = new Set(["campus", "sede", "seccional", "udes", "ciudad", "extension"]);
 
@@ -559,20 +574,74 @@ export function knownCampuses(series: string[], others: string[]): string[] {
   return out;
 }
 
-/** Sede, año y periodo que pide la pregunta. Sin nada de eso, los campos quedan vacíos. */
+/* Las formas en que la gente escribe un periodo académico. La pregunta llega
+   sin tildes ni signos: «2025-1» es «2025 1»; «2025-I», «2025 i»; «2024B», «2024b». */
+const TERM_NOUN = "(?:semestre|periodo)(?: academico)?";
+const TERM_A = new RegExp(
+  [
+    `\\b(?:primer|primero|1er|1ro|1|i) ${TERM_NOUN}\\b`,
+    // «El primer y el segundo semestre»: nombra los dos.
+    `\\b(?:primer|primero|1er|1ro|1|i) (?:y|e|o) (?:el )?(?:segundo|2do|2|ii) ${TERM_NOUN}\\b`,
+    // «periodo a» sí; «periodo a periodo» o «del periodo a la fecha», no.
+    `\\b${TERM_NOUN} (?:1|01|uno|i|a)\\b(?! (?:periodo|semestre|la|el|los|las|otro)\\b)`,
+    // «2025-1», «2025-01», «2025 I», «2024A». «De 2023 a 2025» no es un periodo.
+    "\\b20\\d\\d (?:1|01|i)\\b",
+    "\\b20\\d\\da\\b",
+    // «¿y en el primero?»
+    "\\b(?:el|al|del) primero\\b(?! (?:de (?:enero|febrero|marzo|abril|mayo|junio|julio|agosto|septiembre|octubre|noviembre|diciembre)|lugar|puesto|ano|pilar|eje|proyecto|nivel)\\b)",
+  ].join("|"),
+);
+const TERM_B = new RegExp(
+  [
+    `\\b(?:segundo|2do|2|ii) ${TERM_NOUN}\\b`,
+    `\\b${TERM_NOUN} (?:2|02|dos|ii|b)\\b`,
+    "\\b20\\d\\d (?:2|02|ii)\\b",
+    "\\b20\\d\\d ?b\\b",
+    "\\b(?:el|al|del) segundo\\b(?! (?:lugar|puesto|ano|pilar|eje|proyecto|nivel)\\b)",
+  ].join("|"),
+);
+/** «Anual», «en el año», «en todo 2024», «por año»: pide la cifra del año. */
+const ANNUAL_ASKED = /\b(anual(es|mente)?|(en|del|por|para) el ano|por anos?|ano a ano|cada ano|ano completo|ano entero|(en )?todo (el )?(ano|20\d\d)|(cifra|dato|total|lectura|valor) del ano)\b/;
+/** «Por periodo», «cada semestre», «los dos periodos»: la pide por periodo. */
+const BY_TERM_ASKED = /\b(por|cada|los|ambos|dos|entre) (periodos?|semestres?)\b|\b(periodo a periodo|semestre a semestre)\b/;
+const REL_LATEST = /\b(ultimo|mas reciente) (periodo|semestre)\b|\b(periodo|semestre) mas reciente\b/;
+const REL_CURRENT = /\b(este|presente|actual) (periodo|semestre)\b|\b(periodo|semestre) (actual|en curso|vigente|presente)\b/;
+const REL_PREVIOUS = /\b(periodo|semestre) (pasado|anterior)\b|\b(anterior|pasado) (periodo|semestre)\b/;
+
+/**
+ * Sede, año y periodo que pide la pregunta. Sin nada de eso, los campos quedan
+ * vacíos. El periodo se entiende como se escribe: «2025-1», «2025-01»,
+ * «2025 I», «2024B», «primer semestre», «periodo 2», «¿y en el segundo?», y
+ * también sin número: «este periodo», «el periodo pasado», «el último periodo».
+ */
 export function parseSlots(question: string, campuses: string[]): Slots {
   const t = normalizeQuestion(question);
-  const years = [...new Set((t.match(/\b20\d\d\b/g) ?? []).map(Number))].sort((a, b) => a - b);
-  let term: FactTerm | null = null;
-  // «2023-2» llega como «2023 2»; «de 2023 a 2025» no es un periodo A.
-  if (/\b(primer|1er|1)( semestre| periodo)\b|\b(semestre|periodo) (1|uno|a)\b|\b20\d\d 1\b/.test(t)) term = "A";
-  else if (/\b(segundo|2do|2)( semestre| periodo)\b|\b(semestre|periodo) (2|dos|b)\b|\b20\d\d 2\b/.test(t)) term = "B";
+  // «2024b» también es el año 2024.
+  const years = [...new Set((t.match(/\b20\d\d(?=[ab]?\b)/g) ?? []).map(Number))].sort((a, b) => a - b);
+  const a = TERM_A.test(t);
+  const b = TERM_B.test(t);
+  // Los dos periodos a la vez («2024-1 y 2024-2») no eligen uno: se dan los dos.
+  const term: FactTerm | null = a && b ? null : a ? "A" : b ? "B" : null;
   const campus = campuses.filter((name) => campusWords(name).some((w) => new RegExp(`\\b${w}\\b`).test(t)));
   const byCampus = /\bpor (sede|campus|seccional)|\b(cada|todas las|todos los|las|los) (sedes|campus|seccionales)\b|\bsedes\b/.test(t);
-  return { years, term, campus, byCampus };
+  const slots: Slots = { years, term, campus, byCampus };
+  // Un periodo con número manda sobre «el periodo pasado» y sobre «anual».
+  if (term === null) {
+    const rel: PeriodRel | null = a && b ? null : REL_LATEST.test(t) ? "ultimo" : REL_CURRENT.test(t) ? "actual" : REL_PREVIOUS.test(t) ? "anterior" : null;
+    if (rel) slots.rel = rel;
+    else if ((a && b) || BY_TERM_ASKED.test(t)) slots.annual = false;
+    else if (ANNUAL_ASKED.test(t)) slots.annual = true;
+  }
+  return slots;
 }
 
-export const hasSlots = (s: Slots) => s.years.length > 0 || s.term !== null || s.campus.length > 0 || s.byCampus;
+export const hasSlots = (s: Slots) => s.years.length > 0 || s.term !== null || s.campus.length > 0 || s.byCampus || s.annual !== undefined || s.rel !== undefined;
+
+/** El periodo anterior a uno: antes del 1 de un año va el 2 del año anterior. */
+export const previousTerm = (p: { y: number; t: FactTerm }): { y: number; t: FactTerm } => (p.t === "B" ? { y: p.y, t: "A" } : { y: p.y - 1, t: "B" });
+
+/** El periodo académico en curso en una fecha: de enero a junio, el 1; de julio a diciembre, el 2. */
+export const termOn = (today: Date): { y: number; t: FactTerm } => ({ y: today.getFullYear(), t: today.getMonth() < 6 ? "A" : "B" });
 
 /**
  * ¿La pregunta sigue la anterior? «¿Y en Cúcuta?», «¿y en 2023?», «¿eso cómo
@@ -590,12 +659,27 @@ export function isFollowUp(question: string, campuses: string[]): boolean {
 /** El corte de una pregunta de seguimiento: lo que dice ahora manda; lo que calla, lo pone la anterior. */
 export function mergeSlots(before: Slots, now: Slots): Slots {
   const place = now.campus.length > 0 || now.byCampus;
-  return {
+  const out: Slots = {
     years: now.years.length ? now.years : before.years,
     term: now.term ?? (now.years.length ? null : before.term),
     campus: place ? now.campus : before.campus,
     byCampus: place ? now.byCampus : before.byCampus,
   };
+  if (now.rel) {
+    // «¿Y el periodo anterior?» tras «2024-2» es 2024-1: se cuenta desde lo que se venía hablando.
+    if (now.rel === "anterior" && !now.years.length && before.years.length === 1 && before.term) {
+      const prev = previousTerm({ y: before.years[0], t: before.term });
+      return { ...out, years: [prev.y], term: prev.t };
+    }
+    // Si no, el periodo sin número se cuenta desde hoy (o desde el último dato): el año de antes no aplica.
+    return { ...out, years: now.years, term: null, rel: now.rel };
+  }
+  if (now.term !== null) return out;
+  // La lectura (del año o por periodo) se conserva mientras no se pida otra; un año nuevo no arrastra «el último periodo».
+  const annual = now.annual ?? before.annual;
+  if (annual !== undefined) out.annual = annual;
+  if (before.rel && !now.years.length) out.rel = before.rel;
+  return out;
 }
 
 /** Las palabras de la pregunta más las que usan los informes: «alumnos» también busca «estudiantes». */
@@ -631,7 +715,7 @@ export function sameCut(a: string, b: string, campuses: string[]): boolean {
   const x = parseSlots(a, campuses);
   const y = parseSlots(b, campuses);
   const places = (s: Slots) => s.campus.map((c) => campusWords(c).join(" ") || normalizeQuestion(c)).sort().join("|");
-  return x.years.join() === y.years.join() && x.term === y.term && places(x) === places(y) && x.byCampus === y.byCampus;
+  return x.years.join() === y.years.join() && x.term === y.term && places(x) === places(y) && x.byCampus === y.byCampus && x.annual === y.annual && x.rel === y.rel;
 }
 
 const termText = (t: FactTerm) => (t === "A" ? "1" : "2");
@@ -646,13 +730,41 @@ export function figureText(value: number, format: string, unit: string): string 
   return format === "porcentaje" || unit.trim() === "%" ? `${f} %` : `${f} ${unit.trim()}`.trim();
 }
 
+/** Cómo se lee una respuesta con cifras: por periodo académico o con la cifra del año. */
+export type Reading = "periodo" | "anual";
+
+/** Las cifras elegidas para un corte y lo que hay que decir de ellas. */
+export interface Cuts {
+  points: FactPoint[];
+  /** Lo pedido que no tiene cifra publicada. */
+  missing: string[];
+  reading: Reading;
+  /** Cuando lo pedido no está: el corte más cercano que sí tiene cifra. */
+  near: FactPoint[];
+  /** Aclaraciones ciertas sobre la lectura: «este indicador se publica por año», «el periodo en curso es 2026-2». */
+  notes: string[];
+}
+
+export const NOTE_ANNUAL_ONLY = "Este indicador se publica por año: no tiene cifras por periodo.";
+export const NOTE_NO_ANNUAL = "No hay cifra del año publicada: van los periodos por separado, sin sumarlos ni promediarlos.";
+
+/** El orden de un periodo en el tiempo: 2024-1, 2024-2, 2025-1… van seguidos (la cifra del año cuenta como su periodo 1). */
+const termIndex = (p: Pick<FactPoint, "y" | "t">) => p.y * 2 + (p.t === "B" ? 1 : 0);
+/** Para ordenar cifras de la más reciente a la más antigua: dentro de un año, el periodo 2, el 1 y la del año. */
+const timeRank = (p: Pick<FactPoint, "y" | "t">) => p.y * 3 + (p.t === "B" ? 2 : p.t === "A" ? 1 : 0);
+
 /**
- * Las cifras del indicador para ese corte. Sin sede, toda la UDES; sin año,
- * los dos últimos con dato (uno solo si se comparan sedes); sin periodo, la
- * cifra del año. Lo pedido que no está se devuelve en `missing`: un dato sin
- * reportar no es un cero.
+ * Las cifras del indicador para ese corte. Sin sede, toda la UDES. La lectura
+ * es por periodo académico: sin año ni periodo, el periodo más reciente con
+ * dato y, para compararlo, el anterior y el mismo del año anterior (con varias
+ * sedes, solo el más reciente de cada una); con un año, sus periodos, cada uno
+ * por separado. La cifra del año solo sale si se pide («anual», «en todo
+ * 2024») o si el indicador no tiene periodos, y aquí nunca se suma ni se
+ * promedia: es la que calculó el portal. Lo pedido que no está se devuelve en
+ * `missing` (un dato sin reportar no es un cero) y en `near` va el corte más
+ * cercano que sí tiene cifra.
  */
-export function pickCuts(fact: Fact, slots: Slots, max = 8): { points: FactPoint[]; missing: string[] } {
+export function pickCuts(fact: Fact, slots: Slots, max = 8, today = new Date()): Cuts {
   // El total de la UDES va con sede "": solo es igual a otro "".
   const same = (a: string, b: string) => (a && b ? sameCampus(a, b) : a === b);
   const sedes = [...new Set(fact.series.map((p) => p.c).filter(Boolean))];
@@ -663,41 +775,228 @@ export function pickCuts(fact: Fact, slots: Slots, max = 8): { points: FactPoint
     places = sedes;
     pool = fact.series.filter((p) => p.c);
   }
+  const multi = places.length > 1;
+  const terms = pool.filter((p) => p.t !== null);
   const annual = pool.filter((p) => p.t === null);
-  let chosen = slots.term ? pool.filter((p) => p.t === slots.term) : annual.length ? annual : pool.filter((p) => p.t !== null);
   const missing: string[] = [];
-  if (slots.years.length) {
-    chosen = chosen.filter((p) => slots.years.includes(p.y));
-    // Un año falta si no está en las sedes que sí tienen cifras; si ninguna sede
-    // pedida tiene cifras, lo que falta es la sede, no el año.
-    const withData = pool.length > 0;
-    for (const y of slots.years) {
-      const absent = withData ? !chosen.some((p) => p.y === y) : !fact.series.some((p) => p.y === y);
-      if (absent) missing.push(slots.term ? `${y}-${termText(slots.term)}` : String(y));
+  const near: FactPoint[] = [];
+  const notes: string[] = [];
+
+  // «Este periodo» y «el periodo pasado» se cuentan desde hoy, y se dice cuál es.
+  const counted = slots.term === null && (slots.rel === "actual" || slots.rel === "anterior") ? (slots.rel === "actual" ? termOn(today) : previousTerm(termOn(today))) : null;
+  if (counted) notes.push(slots.rel === "actual" ? `El periodo en curso es ${cutText(counted)}.` : `El periodo anterior al que está en curso es ${cutText(counted)}.`);
+  const years = counted ? [counted.y] : slots.years;
+  const term = counted ? counted.t : slots.term;
+  const cutName = (y: number) => (term ? `${y}-${termText(term)}` : String(y));
+
+  const latest = (list: FactPoint[]) => list.reduce<FactPoint | null>((best, p) => (!best || termIndex(p) > termIndex(best) ? p : best), null);
+  /** La cifra de cada sede en el corte más reciente de la lista; la sede que no lo tiene da su último dato. */
+  const perPlace = (list: FactPoint[]) => {
+    const top = latest(list);
+    if (!top) return [];
+    return places.flatMap((c) => {
+      const mine = list.filter((p) => same(p.c, c));
+      const at = mine.find((p) => termIndex(p) === termIndex(top)) ?? latest(mine);
+      return at ? [at] : [];
+    });
+  };
+  const offer = (p: FactPoint | null) => {
+    if (p && !multi && !near.includes(p)) near.push(p);
+  };
+  /** El corte con cifra más cercano al que falta; si dos quedan igual de cerca, el anterior. */
+  const closest = (list: FactPoint[], target: number) =>
+    list.reduce<FactPoint | null>((best, p) => {
+      if (!best) return p;
+      const d = Math.abs(termIndex(p) - target) - Math.abs(termIndex(best) - target);
+      return d < 0 || (d === 0 && termIndex(p) < termIndex(best)) ? p : best;
+    }, null);
+  const lastYears = (list: FactPoint[]) => {
+    const recent = [...new Set(list.map((p) => p.y))].sort((a, b) => b - a).slice(0, multi ? 1 : 2);
+    return list.filter((p) => recent.includes(p.y));
+  };
+
+  let reading: Reading = term !== null || slots.rel === "ultimo" ? "periodo" : slots.annual ? "anual" : terms.length ? "periodo" : "anual";
+  if (reading === "anual" && !annual.length && terms.length) {
+    reading = "periodo";
+    notes.push(NOTE_NO_ANNUAL);
+  }
+  let chosen: FactPoint[] = [];
+  if (!pool.length) {
+    // Ninguna sede pedida tiene cifras: lo que falta es la sede, no el año (salvo que el año no esté en la serie).
+    for (const y of years) if (!fact.series.some((p) => p.y === y)) missing.push(cutName(y));
+  } else if (reading === "anual") {
+    if (!slots.annual && !fact.series.some((p) => p.t !== null)) notes.push(NOTE_ANNUAL_ONLY);
+    if (years.length) {
+      chosen = annual.filter((p) => years.includes(p.y));
+      for (const y of years) {
+        if (chosen.some((p) => p.y === y)) continue;
+        missing.push(String(y));
+        offer(closest(annual, y * 2));
+      }
+    } else chosen = lastYears(annual);
+  } else if (!terms.length) {
+    // Se pidió un periodo y el indicador solo tiene la cifra del año: se dice, y se ofrece esa.
+    notes.push(NOTE_ANNUAL_ONLY);
+    if (years.length) {
+      for (const y of years) {
+        missing.push(cutName(y));
+        offer(closest(annual, y * 2));
+      }
+    } else {
+      missing.push(term ? `el periodo ${termText(term)}` : "el último periodo");
+      offer(latest(annual));
     }
+  } else if (term) {
+    const ofTerm = terms.filter((p) => p.t === term);
+    if (years.length) {
+      chosen = ofTerm.filter((p) => years.includes(p.y));
+      for (const y of years) {
+        if (chosen.some((p) => p.y === y)) continue;
+        missing.push(cutName(y));
+        offer(closest(terms, termIndex({ y, t: term })));
+      }
+    } else {
+      // «El segundo semestre», sin año: el más reciente y el mismo periodo del año anterior.
+      chosen = lastYears(ofTerm);
+      if (!chosen.length) {
+        missing.push(`el periodo ${termText(term)}`);
+        offer(latest(terms));
+      }
+    }
+  } else if (years.length) {
+    // Un año sin periodo: sus periodos, cada uno por separado. La cifra del año solo si es lo único que hay.
+    for (const y of years) {
+      const inYear = terms.filter((p) => p.y === y);
+      const ofYear = annual.filter((p) => p.y === y);
+      if (inYear.length) chosen.push(...(multi || slots.rel === "ultimo" ? perPlace(inYear) : inYear));
+      else if (ofYear.length) chosen.push(...ofYear);
+      else {
+        missing.push(String(y));
+        offer(closest(terms, y * 2));
+      }
+    }
+  } else if (multi) {
+    chosen = perPlace(terms);
   } else {
-    const keep = places.length > 1 ? 1 : 2;
-    const recent = [...new Set(chosen.map((p) => p.y))].sort((a, b) => b - a).slice(0, keep);
-    chosen = chosen.filter((p) => recent.includes(p.y));
+    // Sin año ni periodo: el periodo más reciente con dato, el anterior y el mismo del año anterior.
+    const top = latest(terms);
+    if (top) chosen = [top, ...[1, 2].flatMap((back) => terms.filter((p) => termIndex(p) === termIndex(top) - back).slice(0, 1))];
   }
   for (const c of slots.campus) if (!chosen.some((p) => same(p.c, c)) && !missing.includes(c)) missing.push(c);
   const order = (p: FactPoint) => places.findIndex((c) => same(p.c, c));
-  chosen.sort((a, b) => order(a) - order(b) || b.y - a.y || (a.t ?? "").localeCompare(b.t ?? ""));
-  return { points: chosen.slice(0, max), missing };
+  chosen.sort((a, b) => order(a) - order(b) || timeRank(b) - timeRank(a));
+  return { points: chosen.slice(0, max), missing, reading, near: near.filter((p) => !chosen.includes(p)).slice(0, 2), notes };
 }
 
-const pointLine = (fact: Fact, p: FactPoint) => `${placeText(p.c)}, ${cutText(p)}: ${figureText(p.v, fact.format, fact.unit)}`;
+/** Cómo calculó el portal la cifra del año, dicho en palabras. */
+const BASIS_TEXT: Record<AnnualBasis, string> = {
+  suma: "suma de los periodos 1 y 2",
+  promedio: "promedio de los periodos 1 y 2",
+  p1: "la del periodo 1, el último reportado",
+  p2: "la del periodo 2, el último reportado",
+};
+
+/** El corte con todas sus letras: «2024-2» es un periodo; «año 2024», la cifra del año, con su regla si la memoria la trae. */
+export const whenText = (p: Pick<FactPoint, "y" | "t" | "k">) => (p.t ? cutText(p) : `año ${p.y}${p.k && BASIS_TEXT[p.k] ? ` (${BASIS_TEXT[p.k]})` : ""}`);
+const pointLine = (fact: Fact, p: FactPoint) => `${placeText(p.c)}, ${whenText(p)}: ${figureText(p.v, fact.format, fact.unit)}`;
 const asSentence = (s: string) => {
   const t = s.replace(/\s+/g, " ").trim().replace(/[.\s]+$/, "");
   return t ? `${t}.` : "";
 };
 
+/* --- El resumen de cifras ---------------------------------------------------------------
+   Cuando la respuesta trae varias cifras de una misma serie, cierra con un
+   resumen corto. Sus números se calculan aquí, con las cifras de la base: el
+   modelo redacta alrededor, pero no calcula. Como el resumen va escrito en el
+   pasaje de las cifras, el verificador de números lo reconoce como conocido. */
+
+const round6 = (n: number) => Math.round(n * 1e6) / 1e6;
+
+export interface FigureChange {
+  /** La diferencia, en la unidad de la cifra (o en puntos porcentuales si la cifra es un porcentaje). */
+  diff: number;
+  /** El cambio en porcentaje. null si la cifra ya es un porcentaje o si la base es cero: ahí no tiene sentido. */
+  pct: number | null;
+  /** La cifra es un porcentaje: la diferencia se dice en puntos porcentuales. */
+  share: boolean;
+}
+
+/** El cambio entre dos cifras de una misma serie. Un porcentaje no cambia «en porcentaje»: cambia en puntos. */
+export function figureChange(now: number, before: number, format: string, unit: string): FigureChange {
+  const share = format === "porcentaje" || unit.trim() === "%";
+  const diff = round6(now - before);
+  return { diff, pct: share || before === 0 ? null : round6((diff / Math.abs(before)) * 100), share };
+}
+
+/** El cambio dicho en palabras: «subió 400 estudiantes (+2,0 %)», «bajó 1,2 puntos porcentuales», «sin cambio». */
+export function changeText(now: number, before: number, format: string, unit: string): string {
+  const { diff, pct, share } = figureChange(now, before, format, unit);
+  const size = Math.abs(diff);
+  // Lo que no se ve con los decimales con que se escribe la cifra no se anuncia como cambio.
+  const shown = format === "entero" ? Math.round(size) : Math.round(size * 10) / 10;
+  if (shown === 0) return "sin cambio";
+  const amount = share ? `${DECIMAL.format(size)} ${shown === 1 ? "punto porcentual" : "puntos porcentuales"}` : figureText(size, format, unit);
+  const rate = pct !== null && Math.round(Math.abs(pct) * 10) > 0 ? ` (${diff > 0 ? "+" : "-"}${DECIMAL.format(Math.abs(pct))} %)` : "";
+  return `${diff > 0 ? "subió" : "bajó"} ${amount}${rate}`;
+}
+
+/**
+ * El resumen de las cifras elegidas, de 2 a 4 líneas, o ninguna si no hay qué
+ * resumir. Una sede (o toda la UDES) en varios cortes: el dato más reciente y
+ * su cambio frente al periodo anterior y al mismo periodo del año anterior.
+ * Varias sedes en un mismo corte: la más alta y la más baja. Solo compara
+ * periodos con periodos y años con años, y nunca calcula si falta un dato.
+ */
+export function factSummary(fact: Fact, points: FactPoint[]): string[] {
+  if (points.length < 2) return [];
+  const fig = (p: FactPoint) => figureText(p.v, fact.format, fact.unit);
+  const when = (p: FactPoint) => (p.t ? cutText(p) : `año ${p.y}`);
+  const newest = (list: FactPoint[]) => list.reduce((a, b) => (timeRank(b) > timeRank(a) ? b : a));
+  const lines: string[] = [];
+  if (new Set(points.map((p) => p.c)).size === 1) {
+    const head = newest(points);
+    const kin = points.filter((p) => p !== head && (p.t === null) === (head.t === null));
+    if (!kin.length) return [];
+    const back = (steps: number) => kin.find((p) => termIndex(p) === termIndex(head) - steps);
+    // Antes de un periodo va el anterior; antes de un año, el año anterior.
+    const previous = back(head.t === null ? 2 : 1);
+    const yearAgo = head.t === null ? undefined : back(2);
+    lines.push(`Dato más reciente, ${when(head)}${head.c ? ` en ${head.c}` : ""}: ${fig(head)}.`);
+    const change = (p: FactPoint) => changeText(head.v, p.v, fact.format, fact.unit);
+    if (previous) lines.push(`Frente a ${when(previous)}, ${head.t === null ? "el año anterior" : "el periodo anterior"}: ${change(previous)}.`);
+    if (yearAgo) lines.push(`Frente a ${when(yearAgo)}, el mismo periodo del año anterior: ${change(yearAgo)}.`);
+    if (!previous && !yearAgo) {
+      const other = newest(kin);
+      lines.push(`Frente a ${when(other)}: ${change(other)}.`);
+    }
+  } else {
+    const sedes = points.filter((p) => p.c);
+    if (!sedes.length) return [];
+    const top = newest(sedes);
+    const level = sedes.filter((p) => timeRank(p) === timeRank(top));
+    if (new Set(level.map((p) => p.c)).size < 2) return [];
+    const high = level.reduce((a, b) => (b.v > a.v ? b : a));
+    const low = level.reduce((a, b) => (b.v < a.v ? b : a));
+    if (high.v === low.v) return [];
+    lines.push(`Sede con la cifra más alta en ${when(high)}: ${high.c}, ${fig(high)}.`, `Sede con la cifra más baja en ${when(low)}: ${low.c}, ${fig(low)}.`);
+  }
+  return lines.length >= 2 ? lines.slice(0, 4) : [];
+}
+
+/** Lo que `pickCuts` dice de la lectura, para escribirlo en el pasaje y en la plantilla. */
+export type CutsMore = Partial<Pick<Cuts, "reading" | "near" | "notes">>;
+
 /** Las cifras elegidas como un pasaje más, para citarlo igual que la memoria. */
-export function factPassage(fact: Fact, points: FactPoint[], missing: string[]): Passage {
+export function factPassage(fact: Fact, points: FactPoint[], missing: string[], more: CutsMore = {}): Passage {
+  const lead = more.reading === "periodo" ? "Lectura por periodo académico, el más reciente primero: " : more.reading === "anual" ? "Lectura anual (cifra del año): " : "";
+  const summary = factSummary(fact, points);
   const body = [
     `${fact.label}${fact.report ? ` (informe ${fact.report})` : ""}.`,
-    points.length ? `${points.map((p) => pointLine(fact, p)).join("; ")}.` : "",
+    points.length ? `${lead}${points.map((p) => pointLine(fact, p)).join("; ")}.` : "",
     missing.length ? `Sin cifra publicada para ${missing.join(", ")}: un dato sin reportar no es un cero.` : "",
+    more.near?.length ? `El corte más cercano con cifra: ${more.near.map((p) => pointLine(fact, p)).join("; ")}.` : "",
+    ...(more.notes ?? []),
+    summary.length ? `Resumen calculado con estas cifras (sus números ya están calculados; no los recalcules): ${summary.join(" ")}` : "",
     fact.definition ? `Qué mide: ${asSentence(fact.definition)}` : "",
     fact.office ? `Lo reporta ${asSentence(fact.office)}` : "",
     fact.illustrative ? "Cifras marcadas como dato ilustrativo en el portal." : "",
@@ -716,18 +1015,24 @@ export function factPassage(fact: Fact, points: FactPoint[], missing: string[]):
   };
 }
 
-/** Sin IA: la cifra dicha con una plantilla, con su cita. Nada inventado. */
-export function dataAnswer(fact: Fact, points: FactPoint[], missing: string[]): string {
+/** Sin IA: la cifra dicha con una plantilla, con su cita y, si hay varias, su resumen. Nada inventado. */
+export function dataAnswer(fact: Fact, points: FactPoint[], missing: string[], more: CutsMore = {}): string {
   const parts: string[] = [];
   if (points.length === 1) {
     const p = points[0];
-    parts.push(`Según UDES en Cifras, «${fact.label}» en ${placeText(p.c)} fue ${figureText(p.v, fact.format, fact.unit)} en ${cutText(p)} [1].`);
+    parts.push(`Según UDES en Cifras, «${fact.label}» en ${placeText(p.c)} fue ${figureText(p.v, fact.format, fact.unit)} en ${p.t ? cutText(p) : `el ${whenText(p)}`} [1].`);
   } else if (points.length) {
-    parts.push(`Según UDES en Cifras, «${fact.label}»: ${points.map((p) => pointLine(fact, p)).join("; ")} [1].`);
+    const lead = more.reading === "periodo" ? ", por periodo académico" : more.reading === "anual" ? ", cifra del año" : "";
+    parts.push(`Según UDES en Cifras, «${fact.label}»${lead}: ${points.map((p) => pointLine(fact, p)).join("; ")} [1].`);
   }
-  if (missing.length) parts.push(`${points.length ? "No hay" : `«${fact.label}» no tiene`} cifra publicada para ${missing.join(", ")}: un dato sin reportar no es un cero.${points.length ? "" : " [1]"}`);
+  parts.push(...(more.notes ?? []));
+  const near = more.near ?? [];
+  // Sin cifras elegidas, la cita va en la última frase que habla del indicador.
+  if (missing.length) parts.push(`${points.length ? "No hay" : `«${fact.label}» no tiene`} cifra publicada para ${missing.join(", ")}: un dato sin reportar no es un cero.${points.length || near.length ? "" : " [1]"}`);
+  if (near.length) parts.push(`El corte más cercano con cifra es ${near.map((p) => pointLine(fact, p)).join("; ")}${points.length ? "" : " [1]"}.`);
   if (fact.illustrative) parts.push("Ojo: el portal marca estas cifras como dato ilustrativo.");
-  return parts.join(" ");
+  const summary = factSummary(fact, points);
+  return `${parts.join(" ")}${summary.length ? `\n\n**En resumen**\n${summary.map((line) => `- ${line}`).join("\n")}` : ""}`;
 }
 
 /**
@@ -2040,6 +2345,10 @@ const askRules = (official: string) => [
 ].join("\n");
 const ASK_RULES = askRules("de Planeación");
 
+/** Cómo se dicen las cifras. Solo va cuando el pedido trae el bloque [CIFRAS]: sin cifras, el pedido es el de siempre. */
+export const ASK_FIGURES_RULE =
+  "Cómo das las cifras: las cifras se leen por periodo académico (2025-1, 2025-2): da primero la del periodo más reciente que traiga [CIFRAS] y, si el bloque los trae, compárala con el periodo anterior y con el mismo periodo del año anterior. La cifra del año solo si la piden o si el bloque dice que el indicador se publica por año, y di que es la del año. Nunca sumes ni promedies periodos, ni calcules diferencias o porcentajes por tu cuenta: si el bloque trae un «Resumen calculado», cierra con él como una lista corta de 2 a 4 líneas, con sus números tal cual; si no lo trae, no calcules. Si el periodo pedido no tiene cifra publicada, dilo y ofrece el corte más cercano que el bloque sí traiga.";
+
 const HINT_TEXT: Record<Hint, string> = {
   dinero: "La pregunta toca dinero: no des valores en pesos de la universidad que no estén escritos en los bloques; si no están, dilo y sugiere consultar a la oficina que corresponda.",
   futuro: "La pregunta menciona un periodo que aún no llega: no hagas proyecciones; di lo último publicado y aclara que ese periodo no ha llegado.",
@@ -2401,6 +2710,7 @@ export function buildAskMessages(plan: AskPlan, prompt: AskPrompt): ChatMessage[
   const system = [
     prompt.space ? spacePersona(prompt.space) : ASK_PERSONA,
     prompt.space ? askRules("de la universidad") : ASK_RULES,
+    plan.facts ? ASK_FIGURES_RULE : "",
     roleInstruction(prompt.rol ?? "general", prompt.tone),
     prompt.member ? memberInstruction(prompt.member, Boolean(prompt.space)) : prompt.visitor ? visitorInstruction(prompt.visitor) : "",
     ...(prompt.hints ?? []).map((h) => HINT_TEXT[h]).filter(Boolean),
@@ -2885,7 +3195,7 @@ function stepName(text: string, max = 60): string {
 }
 
 export type StepInfo =
-  | { id: "entender"; intent: Intent; follow: boolean; campus: string[]; byCampus: boolean; years: number[]; term: FactTerm | null }
+  | { id: "entender"; intent: Intent; follow: boolean; campus: string[]; byCampus: boolean; years: number[]; term: FactTerm | null; annual?: boolean; rel?: PeriodRel }
   | { id: "catalogo" | "guardadas" | "memoria"; count: number }
   /** `count`: cuántas cifras (puntos) se hallaron; `title`: el indicador; `cut`: su corte. */
   | { id: "cifras"; count: number; title?: string; cut?: string }
@@ -2893,6 +3203,9 @@ export type StepInfo =
   | { id: "mapa"; count: number; topics?: string[] }
   | { id: "redactar"; intent: Intent; official: number; saved: boolean; facts: number; passages: number; failed?: boolean }
   | { id: "verificar"; grounding: Grounding; verified: boolean; unknown: number };
+
+/** El periodo dicho sin número, como se anota en los pasos. */
+export const REL_TEXT: Record<PeriodRel, string> = { ultimo: "último periodo con dato", actual: "periodo en curso", anterior: "periodo anterior" };
 
 const INTENT_TEXT: Partial<Record<Intent, string>> = { saludo: "es un saludo", charla: "es conversación", institucional: "pregunta sobre la UDES", general: "tema general" };
 
@@ -2910,7 +3223,7 @@ export function stepDetail(info: StepInfo): string {
         info.follow ? "sigue la conversación" : (INTENT_TEXT[info.intent] ?? ""),
         campus.length ? `${campus.length === 1 ? "sede" : "sedes"} ${listText(campus)}` : info.byCampus ? "todas las sedes" : "",
         years.length ? `${years.length === 1 ? "año" : "años"} ${listText(years)}` : "",
-        info.term ? `periodo ${info.term === "A" ? 1 : 2}` : "",
+        info.term ? `periodo ${info.term === "A" ? 1 : 2}` : info.rel ? REL_TEXT[info.rel] : info.annual ? "cifra del año" : "",
       ]
         .filter(Boolean)
         .join(" · ");
@@ -5524,7 +5837,7 @@ async function handle(request: Request): Promise<Response> {
       );
     };
     stepStart("entender");
-    stepDone("entender", stepDetail({ id: "entender", intent, follow: loose, campus: slots.campus, byCampus: slots.byCampus, years: slots.years, term: slots.term }));
+    stepDone("entender", stepDetail({ id: "entender", intent, follow: loose, campus: slots.campus, byCampus: slots.byCampus, years: slots.years, term: slots.term, annual: slots.annual, rel: slots.rel }));
 
     // 2. La búsqueda, toda a la vez: el catálogo por significado, las respuestas
     //    guardadas, las cifras en vivo y la memoria. Un saludo no busca.
@@ -5556,20 +5869,25 @@ async function handle(request: Request): Promise<Response> {
         qnorm,
         list.filter((c) => sameCut(question, c.question, campuses)),
       );
+    /** La fecha de hoy en Bogotá (la función corre en UTC): de ella sale el periodo en curso. */
+    const bogotaNow = () => new Date(Date.now() - 5 * 3_600_000);
     /** La cifra exacta del corte pedido, de los indicadores que más se acercan. */
     const pickData = (list: FactHit[]) => {
       const top = list[0]?.rank ?? 0;
       const passages: Passage[] = [];
-      let first: { fact: Fact; points: FactPoint[]; missing: string[] } | null = null;
+      type Lead = { fact: Fact; points: FactPoint[]; missing: string[]; cuts: Cuts };
+      let first: Lead | null = null;
       let count = 0;
       for (const f of list.filter((x) => x.rank >= top * 0.6).slice(0, 2)) {
-        const { points, missing } = pickCuts(f, slots);
+        // La lectura es por periodo; «este periodo» se cuenta con la fecha de Bogotá.
+        const cuts = pickCuts(f, slots, 8, bogotaNow());
+        const { points, missing } = cuts;
         if (!points.length && !missing.length) continue;
-        passages.push(factPassage(f, points, missing));
+        passages.push(factPassage(f, points, missing, cuts));
         count += points.length;
-        first ??= { fact: f, points, missing };
+        first ??= { fact: f, points, missing, cuts };
       }
-      return { passages, lead: first as { fact: Fact; points: FactPoint[]; missing: string[] } | null, count };
+      return { passages, lead: first as Lead | null, count };
     };
     const nearOf = (list: Hit[]) => list.filter((p) => p.rank >= (list[0]?.rank ?? 0) * 0.3);
     // Cada capa avisa que empieza antes de lanzarlas todas, y que terminó cuando la suya vuelve.
@@ -5618,6 +5936,9 @@ async function handle(request: Request): Promise<Response> {
     const loadSaved = async (): Promise<{ saved: Saved | null; savedPassages: Passage[] }> => {
       const hit = savedOf(candidates);
       if (!hit) return { saved: null, savedPassages: [] };
+      // Una guardada hecha con el pasaje de un indicador (su cifra del año) no tapa la lectura por
+      // periodo de ese mismo indicador: mandan las cifras en vivo.
+      if (lead?.points.some((p) => p.t !== null) && hit.refs.some((r) => dataPassages.some((d) => d.ref === `dato:${r}`))) return { saved: null, savedPassages: [] };
       const wanted = admin.from("pilo_memory").select("ref, source, title, section, body, path, cut, office").in("ref", hit.refs);
       // En otro espacio, solo sus pasajes y solo los que esta persona puede ver ("space", vis).
       const { data: rows } = await (!spaced ? wanted : publicOnly ? wanted.eq("space", space).eq("vis", "publico") : wanted.eq("space", space).neq("vis", "oculto"));
@@ -5670,7 +5991,7 @@ async function handle(request: Request): Promise<Response> {
     const cutParts = [
       slots.campus.length ? `sede ${slots.campus.join(", ")}` : slots.byCampus ? "todas las sedes" : "",
       slots.years.length ? `año ${slots.years.join(", ")}` : "",
-      slots.term ? `periodo ${slots.term === "A" ? 1 : 2}` : "",
+      slots.term ? `periodo ${slots.term === "A" ? 1 : 2}` : slots.rel ? REL_TEXT[slots.rel] : slots.annual ? "cifra del año" : "",
     ].filter(Boolean);
     const understood = [loose ? `Sigue a «${chain.follow.join(CHAIN_SEP).slice(0, 120)}».` : "", cutParts.length ? `Pide: ${cutParts.join(" · ")}.` : ""].filter(Boolean);
     if (!chatty) step("Entender", understood.length ? "ok" : "skip", understood.length ? understood.join(" ") : "Pregunta directa, sin sede, año ni periodo.");
@@ -5728,7 +6049,7 @@ async function handle(request: Request): Promise<Response> {
         const text = describeNode(mesh, focus.ref);
         if (text) return settle("malla", text, [focus], { ...drawFor(focus.ref), ...extra }, "oficial");
       }
-      if (lead) return settle("dato", dataAnswer(lead.fact, lead.points, lead.missing), [dataPassages[0]], extra, "oficial");
+      if (lead) return settle("dato", dataAnswer(lead.fact, lead.points, lead.missing, lead.cuts), [dataPassages[0]], extra, "oficial");
       if (memory.length) return settle("extracto", extractAnswer(memory), memory.slice(0, 2), { ...drawFor(memory[0]?.ref), ...extra }, "oficial");
       if (chatty && route.rule) return settle("regla", ruleText(route.rule, space), [], extra);
       return null;

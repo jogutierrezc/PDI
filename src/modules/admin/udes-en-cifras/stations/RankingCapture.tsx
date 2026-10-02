@@ -298,7 +298,12 @@ function RankingEditor({
             </span>
           )}
           {canEdit && stored.some((e) => e.year === year) && (
-            <ConfirmButton label={`Borrar ${year}`} confirmLabel={`¿Borrar la edición ${year}?`} onConfirm={() => remove.mutate({ rankingId: ranking.id, year })} />
+            <ConfirmButton
+              label={`Borrar ${year}`}
+              subject={`la edición ${year} de este ranking`}
+              confirmLabel="Se pierden sus posiciones, puntajes, estrellas y áreas, y el año sale de la evolución. No se puede deshacer."
+              onConfirm={() => remove.mutate({ rankingId: ranking.id, year })}
+            />
           )}
         </div>
 

@@ -21,11 +21,13 @@ interface AnnualTermChartProps {
   onSelectYear: (year: number) => void;
 }
 
+// Los periodos primero: son la lectura de partida; la cifra del año los acompaña.
 const SERIES = [
-  { key: "annual", label: "Global anual", color: "var(--od-series-total)" },
   { key: "a", label: "Periodo 1", color: "var(--od-series-1)" },
   { key: "b", label: "Periodo 2", color: "var(--od-series-2)" },
+  { key: "annual", label: "Cifra del año", color: "var(--od-series-total)" },
 ] as const;
+const BARS = SERIES.filter((series) => series.key !== "annual");
 
 /** Una misma escala, desde cero; los huecos interrumpen la línea anual. */
 export function AnnualTermChart({ label, points, selectedYear, format, unit, annualRule, onSelectYear }: AnnualTermChartProps) {
@@ -80,7 +82,7 @@ export function AnnualTermChart({ label, points, selectedYear, format, unit, ann
             {points.map((point, index) => (
               <g key={point.year}>
                 {point.year === selectedYear && <rect className="od-lines__selected" x={x(index) - slot / 2 + 2} y={margin.top} width={slot - 4} height={innerH} rx="4" />}
-                {SERIES.slice(1).map((series, barIndex) => {
+                {BARS.map((series, barIndex) => {
                   const value = point[series.key];
                   const left = x(index) + (barIndex === 0 ? -barW - 2 : 2);
                   return (
@@ -114,7 +116,7 @@ export function AnnualTermChart({ label, points, selectedYear, format, unit, ann
         <strong>{current.year}</strong>
         {SERIES.map((series) => <span key={series.key}>{series.label}: <b>{formatWithUnit(current[series.key], format, unit)}</b></span>)}
       </div>}
-      <p className="od-combo__note">Cifra anual: {annualRule.toLowerCase()}. — = sin reportar. Pasa por un año o enfócalo para consultar sus valores.</p>
+      <p className="od-combo__note">Barras: periodos 1 y 2, como se reportaron. Línea, cifra del año: {annualRule.toLowerCase()}. — = sin reportar. Pasa por un año o enfócalo para consultar sus valores.</p>
     </div>
   );
 }

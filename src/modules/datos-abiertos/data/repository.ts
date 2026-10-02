@@ -183,14 +183,31 @@ async function fetchAll<T>(page: (after: string | null) => PromiseLike<Result<T 
   }
 }
 
+/**
+ * Las familias de tablas que cuelgan de un informe: la cabecera del conjunto y
+ * sus filas (od_indicators + od_values, od_maps + od_map_values…).
+ */
+export type RowFamily =
+  | "indicators" | "breakdowns" | "heatmaps" | "maps" | "pipelines" | "histories" | "sections" | "tables"
+  | "rankings" | "saberPro" | "freeSets" | "saberTyt" | "models" | "medalBoards" | "blocks";
+
 interface FetchOptions {
   /** Periodo concreto (intranet). Sin él, el vigente. */
   periodId?: string;
   /** Incluir borradores. El portal público solo lo hace en vista previa. */
   includeDrafts?: boolean;
+  /**
+   * Relectura parcial (intranet): solo se vuelven a pedir las familias de
+   * `only`; el resto se toma de `rows`, la lectura anterior del mismo periodo.
+   * El periodo, sus campus, las oficinas y los informes se piden siempre: son
+   * cuatro consultas pequeñas y de ellos depende qué filas siguen vivas.
+   * Guardar una rejilla de cifras releía antes las treinta y tantas consultas
+   * del periodo; así relee las de su familia.
+   */
+  reuse?: { rows: OpenDataRows; only: ReadonlySet<RowFamily> };
 }
 
-export async function fetchOpenDataRows({ periodId, includeDrafts = false }: FetchOptions = {}): Promise<OpenDataRows | null> {
+export async function fetchOpenDataRows({ periodId, includeDrafts = false, reuse }: FetchOptions = {}): Promise<OpenDataRows | null> {
   let periodQuery = supabase.from("od_periods").select("*");
   periodQuery = periodId ? periodQuery.eq("id", periodId) : periodQuery.eq("is_current", true);
   if (!includeDrafts) periodQuery = periodQuery.eq("status", "publicado");
@@ -216,92 +233,110 @@ export async function fetchOpenDataRows({ periodId, includeDrafts = false }: Fet
   };
   if (reportIds.length === 0) return empty;
 
+  // Relectura parcial: una familia que no se pide sale de la lectura anterior,
+  // recortada a los informes (y a las cabeceras) que siguen existiendo.
+  const wanted = (family: RowFamily) => !reuse || reuse.only.has(family);
+  const liveReports = new Set(reportIds);
+  const head = <T extends { report_id: string }>(family: RowFamily, key: keyof OpenDataRows, load: () => PromiseLike<T[]>): PromiseLike<T[]> =>
+    wanted(family) ? load() : Promise.resolve((reuse!.rows[key] as unknown as T[]).filter((row) => liveReports.has(row.report_id)));
+  const tail = <T>(
+    family: RowFamily,
+    key: keyof OpenDataRows,
+    parentOf: (row: T) => string,
+    parents: { id: string }[],
+    load: () => PromiseLike<T[]>,
+  ): PromiseLike<T[]> => {
+    if (!parents.length) return Promise.resolve([] as T[]);
+    if (wanted(family)) return load();
+    const live = new Set(parents.map((parent) => parent.id));
+    return Promise.resolve((reuse!.rows[key] as unknown as T[]).filter((row) => live.has(parentOf(row))));
+  };
+
   const [indicators, breakdowns, heatmaps, maps, pipelines, histories, sections, tables, rankings, saberPro, freeSets, saberTyt, models, medalBoards, blocks] = await Promise.all([
-    supabase.from("od_indicators").select("*").in("report_id", reportIds).order("position").then(unwrap<OdIndicatorRow>),
-    supabase.from("od_breakdowns").select("*").in("report_id", reportIds).order("position").then(unwrap<OdBreakdownRow>),
-    supabase.from("od_heatmaps").select("*").in("report_id", reportIds).order("position").then(unwrap<OdHeatmapRow>),
-    supabase.from("od_maps").select("*").in("report_id", reportIds).order("position").then(unwrap<OdMapRow>),
-    supabase.from("od_pipelines").select("*").in("report_id", reportIds).order("position").then(unwrap<OdPipelineRow>),
-    supabase.from("od_histories").select("*").in("report_id", reportIds).order("position").then(unwrap<OdHistoryRow>),
-    supabase.from("od_sections").select("*").in("report_id", reportIds).order("position").then(unwrapOptional<OdSectionRow>),
-    supabase.from("od_tables").select("*").in("report_id", reportIds).order("position").then(unwrapOptional<OdTableRow>),
-    supabase.from("od_rankings").select("*").in("report_id", reportIds).order("position").then(unwrapOptional<OdRankingRow>),
-    supabase.from("od_saber_pro").select("*").in("report_id", reportIds).order("position").then(unwrapOptional<OdSaberProRow>),
-    supabase.from("od_free_sets").select("*").in("report_id", reportIds).order("position").then(unwrapOptional<OdFreeSetRow>),
-    supabase.from("od_saber_tyt").select("*").in("report_id", reportIds).order("position").then(unwrapOptional<OdSaberTytRow>),
-    supabase.from("od_models").select("*").in("report_id", reportIds).order("position").then(unwrapOptional<OdModelRow>),
-    supabase.from("od_medal_boards").select("*").in("report_id", reportIds).order("position").then(unwrapOptional<OdMedalBoardRow>),
-    supabase.from("od_report_blocks").select("*").in("report_id", reportIds).order("position").then(unwrap<OdReportBlockRow>),
+    head<OdIndicatorRow>("indicators", "indicators", () => supabase.from("od_indicators").select("*").in("report_id", reportIds).order("position").then(unwrap<OdIndicatorRow>)),
+    head<OdBreakdownRow>("breakdowns", "breakdowns", () => supabase.from("od_breakdowns").select("*").in("report_id", reportIds).order("position").then(unwrap<OdBreakdownRow>)),
+    head<OdHeatmapRow>("heatmaps", "heatmaps", () => supabase.from("od_heatmaps").select("*").in("report_id", reportIds).order("position").then(unwrap<OdHeatmapRow>)),
+    head<OdMapRow>("maps", "maps", () => supabase.from("od_maps").select("*").in("report_id", reportIds).order("position").then(unwrap<OdMapRow>)),
+    head<OdPipelineRow>("pipelines", "pipelines", () => supabase.from("od_pipelines").select("*").in("report_id", reportIds).order("position").then(unwrap<OdPipelineRow>)),
+    head<OdHistoryRow>("histories", "histories", () => supabase.from("od_histories").select("*").in("report_id", reportIds).order("position").then(unwrap<OdHistoryRow>)),
+    head<OdSectionRow>("sections", "sections", () => supabase.from("od_sections").select("*").in("report_id", reportIds).order("position").then(unwrapOptional<OdSectionRow>)),
+    head<OdTableRow>("tables", "tables", () => supabase.from("od_tables").select("*").in("report_id", reportIds).order("position").then(unwrapOptional<OdTableRow>)),
+    head<OdRankingRow>("rankings", "rankings", () => supabase.from("od_rankings").select("*").in("report_id", reportIds).order("position").then(unwrapOptional<OdRankingRow>)),
+    head<OdSaberProRow>("saberPro", "saberPro", () => supabase.from("od_saber_pro").select("*").in("report_id", reportIds).order("position").then(unwrapOptional<OdSaberProRow>)),
+    head<OdFreeSetRow>("freeSets", "freeSets", () => supabase.from("od_free_sets").select("*").in("report_id", reportIds).order("position").then(unwrapOptional<OdFreeSetRow>)),
+    head<OdSaberTytRow>("saberTyt", "saberTyt", () => supabase.from("od_saber_tyt").select("*").in("report_id", reportIds).order("position").then(unwrapOptional<OdSaberTytRow>)),
+    head<OdModelRow>("models", "models", () => supabase.from("od_models").select("*").in("report_id", reportIds).order("position").then(unwrapOptional<OdModelRow>)),
+    head<OdMedalBoardRow>("medalBoards", "medalBoards", () => supabase.from("od_medal_boards").select("*").in("report_id", reportIds).order("position").then(unwrapOptional<OdMedalBoardRow>)),
+    head<OdReportBlockRow>("blocks", "blocks", () => supabase.from("od_report_blocks").select("*").in("report_id", reportIds).order("position").then(unwrap<OdReportBlockRow>)),
   ]);
 
   const ids = (rows: { id: string }[]) => rows.map((r) => r.id);
-  const none = Promise.resolve([] as never[]);
 
   const [values, breakdownValues, heatmapCells, mapValues, pipelineValues, historyValues, tableRows, rankingEditions, saberProResults, freeSetRows, saberTytResults, medalEntries] = await Promise.all([
-    indicators.length
-      ? fetchAll<OdValueRow>((after) =>
+    tail<OdValueRow>("indicators", "values", (row) => row.indicator_id, indicators, () =>
+      fetchAll<OdValueRow>((after) =>
           (after === null ? supabase.from("od_values").select("id,indicator_id,year,term,campus_id,value,updated_at")
               .in("indicator_id", ids(indicators)) : (supabase.from("od_values").select("id,indicator_id,year,term,campus_id,value,updated_at")
               .in("indicator_id", ids(indicators))).gt("id", after)).order("id").limit(PAGE),
-        )
-      : none,
-    breakdowns.length
-      ? fetchAll<OdBreakdownValueRow>((after) =>
+        ),
+    ),
+    tail<OdBreakdownValueRow>("breakdowns", "breakdownValues", (row) => row.breakdown_id, breakdowns, () =>
+      fetchAll<OdBreakdownValueRow>((after) =>
           (after === null ? supabase.from("od_breakdown_values").select("*").in("breakdown_id", ids(breakdowns)) : (supabase.from("od_breakdown_values").select("*").in("breakdown_id", ids(breakdowns))).gt("id", after)).order("id").limit(PAGE),
-        )
-      : none,
-    heatmaps.length
-      ? fetchAllByOffset<OdHeatmapCellRow>((from, to) =>
+        ),
+    ),
+    tail<OdHeatmapCellRow>("heatmaps", "heatmapCells", (row) => row.heatmap_id, heatmaps, () =>
+      fetchAllByOffset<OdHeatmapCellRow>((from, to) =>
           supabase.from("od_heatmap_cells").select("*").in("heatmap_id", ids(heatmaps))
             .order("heatmap_id").order("row_index").order("column_index").range(from, to),
-        )
-      : none,
-    maps.length
-      ? fetchAllByOffset<OdMapValueRow>((from, to) =>
+        ),
+    ),
+    tail<OdMapValueRow>("maps", "mapValues", (row) => row.map_id, maps, () =>
+      fetchAllByOffset<OdMapValueRow>((from, to) =>
           supabase.from("od_map_values").select("*").in("map_id", ids(maps))
             .order("map_id").order("year").order("campus_id").order("department_code").range(from, to),
-        )
-      : none,
-    pipelines.length
-      ? fetchAll<OdPipelineValueRow>((after) =>
+        ),
+    ),
+    tail<OdPipelineValueRow>("pipelines", "pipelineValues", (row) => row.pipeline_id, pipelines, () =>
+      fetchAll<OdPipelineValueRow>((after) =>
           (after === null ? supabase.from("od_pipeline_values").select("*").in("pipeline_id", ids(pipelines)) : (supabase.from("od_pipeline_values").select("*").in("pipeline_id", ids(pipelines))).gt("id", after)).order("id").limit(PAGE),
-        )
-      : none,
-    histories.length
-      ? fetchAll<OdHistoryValueRow>((after) =>
+        ),
+    ),
+    tail<OdHistoryValueRow>("histories", "historyValues", (row) => row.history_id, histories, () =>
+      fetchAll<OdHistoryValueRow>((after) =>
           (after === null ? supabase.from("od_history_values").select("*").in("history_id", ids(histories)) : (supabase.from("od_history_values").select("*").in("history_id", ids(histories))).gt("id", after)).order("id").limit(PAGE),
-        )
-      : none,
-    tables.length
-      ? fetchAll<OdTableRecordRow>((after) =>
+        ),
+    ),
+    tail<OdTableRecordRow>("tables", "tableRows", (row) => row.table_id, tables, () =>
+      fetchAll<OdTableRecordRow>((after) =>
           (after === null ? supabase.from("od_table_rows").select("*").in("table_id", ids(tables)) : (supabase.from("od_table_rows").select("*").in("table_id", ids(tables))).gt("id", after)).order("id").limit(PAGE),
-        )
-      : none,
-    rankings.length
-      ? supabase.from("od_ranking_editions").select("*").in("ranking_id", ids(rankings)).order("year").then(unwrapOptional<OdRankingEditionRow>)
-      : none,
-    saberPro.length
-      ? fetchAll<OdSaberProResultRow>((after) =>
+        ),
+    ),
+    tail<OdRankingEditionRow>("rankings", "rankingEditions", (row) => row.ranking_id, rankings, () =>
+      supabase.from("od_ranking_editions").select("*").in("ranking_id", ids(rankings)).order("year").then(unwrapOptional<OdRankingEditionRow>),
+    ),
+    tail<OdSaberProResultRow>("saberPro", "saberProResults", (row) => row.saber_id, saberPro, () =>
+      fetchAll<OdSaberProResultRow>((after) =>
           (after === null ? supabase.from("od_saber_pro_results")
               .select("id,saber_id,year,scope,campus,faculty,program,competency,evaluated,mean,levels,histogram")
               .in("saber_id", ids(saberPro)) : (supabase.from("od_saber_pro_results")
               .select("id,saber_id,year,scope,campus,faculty,program,competency,evaluated,mean,levels,histogram")
               .in("saber_id", ids(saberPro))).gt("id", after)).order("id").limit(PAGE),
-        )
-      : none,
-    freeSets.length
-      ? fetchAll<OdFreeSetRecordRow>((after) =>
+        ),
+    ),
+    tail<OdFreeSetRecordRow>("freeSets", "freeSetRows", (row) => row.set_id, freeSets, () =>
+      fetchAll<OdFreeSetRecordRow>((after) =>
           (after === null ? supabase.from("od_free_set_rows").select("id,set_id,position,year,kind,label,cells").in("set_id", ids(freeSets)) : (supabase.from("od_free_set_rows").select("id,set_id,position,year,kind,label,cells").in("set_id", ids(freeSets))).gt("id", after)).order("id").limit(PAGE),
-        )
-      : none,
-    saberTyt.length
-      ? fetchAll<OdSaberTytResultRow>((after) =>
+        ),
+    ),
+    tail<OdSaberTytResultRow>("saberTyt", "saberTytResults", (row) => row.tyt_id, saberTyt, () =>
+      fetchAll<OdSaberTytResultRow>((after) =>
           (after === null ? supabase.from("od_saber_tyt_results").select("*").in("tyt_id", ids(saberTyt)) : (supabase.from("od_saber_tyt_results").select("*").in("tyt_id", ids(saberTyt))).gt("id", after)).order("id").limit(PAGE),
-        )
-      : none,
-    medalBoards.length
-      ? supabase.from("od_medal_entries").select("*").in("board_id", ids(medalBoards)).order("position").then(unwrapOptional<OdMedalEntryRow>)
-      : none,
+        ),
+    ),
+    tail<OdMedalEntryRow>("medalBoards", "medalEntries", (row) => row.board_id, medalBoards, () =>
+      supabase.from("od_medal_entries").select("*").in("board_id", ids(medalBoards)).order("position").then(unwrapOptional<OdMedalEntryRow>),
+    ),
   ]);
 
   return {

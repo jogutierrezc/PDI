@@ -154,6 +154,23 @@ describe("cifrasRows", () => {
     expect(rows.find((r) => r.ref === "cifras:poblacional:tasa")!.body).toContain("9,5 %");
   });
 
+  it("un indicador que se reporta por periodo se cuenta por periodo: el más reciente, sus comparaciones y, después, la cifra del año con su regla", () => {
+    const byTerm = indicator({
+      annualRule: "ultimo",
+      values: { 2024: { todas: 1000 }, 2025: { todas: 1100, bucaramanga: 700 } },
+      terms: { 2024: { A: { todas: 900 }, B: { todas: 1000 } }, 2025: { A: { todas: 1100, bucaramanga: 700 } } },
+    });
+    const rows = cifrasRows(catalog({ reports: [any({ slug: "p", name: "P", indicators: [byTerm] })] }));
+    expectClean(rows);
+    const m = rows.find((r) => r.ref === "cifras:p:matricula")!;
+    expect(m.cut).toBe("2025-1");
+    expect(m.body).toContain("Matrícula total: 1.100 estudiantes en 2025-1, el periodo más reciente con cifra, en toda la UDES.");
+    expect(m.body).toContain("Por campus en 2025-1: Bucaramanga 700 estudiantes.");
+    expect(m.body).toContain("En 2024-2, el periodo anterior, fue 1.000 estudiantes.");
+    expect(m.body).toContain("En 2024-1, el mismo periodo del año anterior, fue 900 estudiantes.");
+    expect(m.body).toContain("Cifra del año 2025 (último periodo reportado): 1.100 estudiantes.");
+  });
+
   it("marca el catálogo ilustrativo", () => {
     const rows = cifrasRows(catalog({ illustrative: true }));
     expectClean(rows);
@@ -209,6 +226,24 @@ describe("factRows (cifras en vivo, 0107)", () => {
       { y: 2025, t: "A", c: "Bucaramanga", v: 4 },
       { y: 2025, t: "B", c: "", v: 20 },
     ]);
+  });
+
+  it("la cifra del año lleva su regla (la del portal), para que Pilo diga qué es; los periodos no", () => {
+    const terms = { 2024: { A: { todas: 900 }, B: { todas: 1000 } }, 2025: { A: { todas: 1100, bucaramanga: 700 } } };
+    const values = { 2024: { todas: 1000 }, 2025: { todas: 1100, bucaramanga: 700 } };
+    const rows = (patch: Partial<Record<keyof Indicator, unknown>>) => factRows(catalog({ reports: [any({ slug: "p", name: "P", indicators: [indicator({ values, terms, ...patch })] })] }))[0].series;
+    const last = rows({ annualRule: "ultimo", annualFrom: { 2024: { todas: "B" }, 2025: { todas: "A", bucaramanga: "A" } } });
+    expect(last.filter((p) => p.t === null)).toEqual([
+      { y: 2024, t: null, c: "", v: 1000, k: "p2" },
+      { y: 2025, t: null, c: "", v: 1100, k: "p1" },
+      { y: 2025, t: null, c: "Bucaramanga", v: 700, k: "p1" },
+    ]);
+    expect(last.filter((p) => p.t !== null).every((p) => !("k" in p))).toBe(true);
+    expect(rows({ annualRule: "suma" }).find((p) => p.t === null)).toMatchObject({ k: "suma" });
+    expect(rows({ annualRule: "promedio" }).find((p) => p.t === null)).toMatchObject({ k: "promedio" });
+    // Lo que se captura aparte, o un indicador sin regla, no dice de dónde sale: no se inventa.
+    expect(rows({ annualRule: "reportado" }).some((p) => "k" in p)).toBe(false);
+    expect(rows({}).some((p) => "k" in p)).toBe(false);
   });
 
   it("sin catálogo o con catálogo deforme no se cae", () => {

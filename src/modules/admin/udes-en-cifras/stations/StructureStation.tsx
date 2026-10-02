@@ -376,7 +376,12 @@ function IndicatorsEditor({
                     Editar
                   </button>
                   {canEdit && (
-                    <ConfirmButton label="Borrar" confirmLabel="¿Borrar con sus cifras?" onConfirm={() => remove.mutate(indicator.id)} />
+                    <ConfirmButton
+                      label="Borrar"
+                      subject={`el indicador «${indicator.label}»`}
+                      confirmLabel="Se pierden todas sus cifras cargadas y sale del tablero y de las gráficas de la ficha. No se puede deshacer."
+                      onConfirm={() => remove.mutate(indicator.id)}
+                    />
                   )}
                 </td>
               </tr>
@@ -870,7 +875,14 @@ function DatasetItem({ kind, title, detail, canEdit, editing, onEdit, onDelete, 
         <small>{detail}</small>
         <span className="oda-table__actions">
           <button type="button" className="oda-link-button" disabled={!canEdit} onClick={onEdit}>Editar</button>
-          {canEdit && <ConfirmButton label="Borrar" confirmLabel="¿Borrar con sus cifras?" onConfirm={onDelete} />}
+          {canEdit && (
+            <ConfirmButton
+              label="Borrar"
+              subject={`«${title}» (${kind.toLowerCase()})`}
+              confirmLabel="Se pierden sus cifras cargadas y los bloques que lo muestran salen de la ficha. No se puede deshacer."
+              onConfirm={onDelete}
+            />
+          )}
         </span>
       </div>
       {editing && children}

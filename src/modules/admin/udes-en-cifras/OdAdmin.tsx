@@ -13,7 +13,7 @@
      /admin/udes-en-cifras/captura/poblacional?periodo=<id>
    ========================================================================== */
 
-import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { Suspense, lazy, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import type { CSSProperties } from "react";
 import { Link, NavLink, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { Icon } from "../../../components/ui/Icon";
@@ -29,11 +29,6 @@ import type { AdminData } from "./od-data";
 import { periodProgress, reportProgress, STATIONS, statusLabels } from "./progress";
 import type { MarkState, ReportProgress, StationId } from "./progress";
 import { PeriodStation, FirstPeriod } from "./stations/PeriodStation";
-import { StructureStation } from "./stations/StructureStation";
-import { CaptureStation } from "./stations/CaptureStation";
-import { DesignStation } from "./stations/DesignStation";
-import { PublishStation } from "./stations/PublishStation";
-import { BulletinStation } from "./stations/BulletinStation";
 import { useBulletins } from "../../boletin/data";
 import "./od-admin.css";
 
@@ -43,6 +38,28 @@ export interface StationProps {
   periodId: string;
   canEdit: boolean;
   progress: Map<string, ReportProgress>;
+}
+
+/* Cada estación baja cuando se abre. Antes las seis viajaban con la pantalla:
+   entrar a Captura traía también el documento del Boletín y sus gráficas
+   (más de medio megabyte que esa estación no usa). «Periodo y campus» es
+   pequeña y trae la pantalla del primer periodo: se queda en el trozo común. */
+const stationLoaders = {
+  estructura: () => import("./stations/StructureStation"),
+  captura: () => import("./stations/CaptureStation"),
+  diseno: () => import("./stations/DesignStation"),
+  publicacion: () => import("./stations/PublishStation"),
+  boletin: () => import("./stations/BulletinStation"),
+};
+const StructureStation = lazy(() => stationLoaders.estructura().then((m) => ({ default: m.StructureStation })));
+const CaptureStation = lazy(() => stationLoaders.captura().then((m) => ({ default: m.CaptureStation })));
+const DesignStation = lazy(() => stationLoaders.diseno().then((m) => ({ default: m.DesignStation })));
+const PublishStation = lazy(() => stationLoaders.publicacion().then((m) => ({ default: m.PublishStation })));
+const BulletinStation = lazy(() => stationLoaders.boletin().then((m) => ({ default: m.BulletinStation })));
+
+/** Al apuntar o enfocar una estación se adelanta su descarga: el clic la encuentra lista. */
+function preloadStation(id: StationId) {
+  if (id !== "periodo") void stationLoaders[id]().catch(() => undefined);
 }
 
 const MARK_LABEL: Record<MarkState, string> = { ok: "Completo", pendiente: "Pendiente", vacio: "Sin empezar" };
@@ -204,6 +221,7 @@ export function OdAdmin() {
             />
 
             <section className="oda-stage" aria-label={currentStation.label}>
+              <Suspense fallback={<LoadingBlock rows={6} label={`Cargando ${currentStation.label}`} />}>
               {station === "periodo" && (
                 <PeriodStation data={data} report={report} periodId={periodId} canEdit={canManagePeriod} progress={progress} />
               )}
@@ -222,6 +240,7 @@ export function OdAdmin() {
               {station === "boletin" && (
                 <BulletinStation data={data} report={report} periodId={periodId} canEdit={canEdit} progress={progress} />
               )}
+              </Suspense>
             </section>
 
             {/* Columna fija en Estructura y Publicación cuando la pantalla da;
@@ -311,6 +330,8 @@ function StationBar({
               <NavLink
                 to={hrefFor(s.id)}
                 className="oda-station"
+                onMouseEnter={() => preloadStation(s.id)}
+                onFocus={() => preloadStation(s.id)}
                 aria-current={s.id === station ? "step" : undefined}
                 data-state={info.state}
               >

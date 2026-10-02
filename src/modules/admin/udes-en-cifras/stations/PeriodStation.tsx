@@ -250,7 +250,12 @@ function OfficeRow({ office, canEdit, onSave, onDelete }: { office: OdOffice; ca
           Guardar
         </button>
       )}
-      {canEdit && <ConfirmButton label="Borrar" confirmLabel="¿Borrar la oficina?" onConfirm={onDelete} />}
+      {canEdit && <ConfirmButton
+          label="Borrar"
+          subject={`la oficina «${office.name}»`}
+          confirmLabel="Los indicadores y conjuntos que reporta quedan sin oficina: sus cifras se conservan, pero dejan de decir quién las reporta."
+          onConfirm={onDelete}
+        />}
     </li>
   );
 }

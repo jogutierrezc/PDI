@@ -1819,6 +1819,11 @@
   fill: var(--od-board-ink);
 }
 
+/* Segunda comparación (el mismo periodo del año anterior): más callada que la primera. */
+.od-kpi__change--second {
+  font-weight: 500;
+}
+
 .od-kpi__trail {
   display: flex;
   align-items: flex-end;

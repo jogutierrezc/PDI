@@ -692,13 +692,141 @@
 
 .oda-confirm {
   display: inline-flex;
+  flex-wrap: wrap;
   align-items: center;
-  gap: var(--space-1);
+  gap: var(--space-1) var(--space-2);
+  max-width: 100%;
   padding: 2px var(--space-1) 2px var(--space-2);
   background: var(--status-risk-soft);
-  border-radius: 6px;
+  border-radius: var(--radius-xs);
   font-size: var(--text-xs);
   font-weight: 600;
+  white-space: normal;
+  text-align: left;
+}
+
+/* --- Confirmación de borrado (ConfirmButton) ---------------------------------------
+   Dice qué se borra y qué se pierde. Las dos salidas se distinguen por forma,
+   no solo por color: «Cancelar» es de contorno; la destructiva va rellena y
+   nombra su verbo. El fondo es opaco (surface bajo el tinte) para que el texto
+   mantenga su contraste también cuando se despliega sobre una fila. */
+
+.oda-confirm[role="alertdialog"] {
+  gap: var(--space-2) var(--space-3);
+  max-width: min(100%, 34rem);
+  padding: var(--space-2) var(--space-3);
+  color: var(--ink);
+  background: linear-gradient(var(--status-risk-soft), var(--status-risk-soft)), var(--surface);
+  border: 1px solid color-mix(in srgb, var(--status-risk) 45%, transparent);
+  border-radius: var(--radius-sm);
+  box-shadow: var(--shadow-md);
+  vertical-align: middle;
+  animation: oda-confirm-in var(--dur-fast) var(--ease-out);
+}
+
+.oda-confirm__text {
+  display: grid;
+  flex: 1 1 14rem;
+  gap: 2px;
+  min-width: 0;
+  font-weight: 500;
+  line-height: var(--leading-snug);
+  overflow-wrap: anywhere;
+}
+
+.oda-confirm__text strong {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-1);
+  font-weight: 800;
+}
+
+.oda-confirm__text strong svg {
+  flex: none;
+  margin-top: 1px;
+  color: var(--status-risk);
+}
+
+.oda-confirm__text > span { color: var(--ink-secondary); }
+
+.oda-confirm__actions {
+  display: inline-flex;
+  flex: none;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin-left: auto;
+}
+
+.oda-confirm__cancel,
+.oda-confirm__danger {
+  min-height: 32px;
+  padding: var(--space-1) var(--space-3);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-pill);
+  font: inherit;
+  font-size: var(--text-xs);
+  font-weight: 700;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: transform var(--dur-press) var(--ease-out);
+}
+
+.oda-confirm__cancel {
+  color: var(--ink);
+  background: var(--surface);
+}
+
+.oda-confirm__danger {
+  color: var(--surface);
+  background: var(--status-risk);
+  border-color: var(--status-risk);
+  font-weight: 800;
+}
+
+.oda-confirm__cancel:active,
+.oda-confirm__danger:active { transform: scale(0.97); }
+
+/* El foco se ve sobre el tinte rojo: contorno en tinta, separado del botón. */
+.oda-confirm__cancel:focus-visible,
+.oda-confirm__danger:focus-visible {
+  outline: 2px solid var(--ink);
+  outline-offset: 2px;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .oda-confirm__cancel:hover { background: var(--surface-3); }
+  .oda-confirm__danger:hover { background: color-mix(in srgb, var(--status-risk) 86%, var(--ink)); }
+}
+
+/* En una celda de tabla la columna de acciones es angosta: la confirmación se
+   despliega sobre la fila, anclada a la derecha de su celda, sin ensanchar la
+   tabla ni salirse del panel. */
+td:has(> .oda-confirm[role="alertdialog"]) { position: relative; }
+
+td > .oda-confirm[role="alertdialog"] {
+  position: absolute;
+  top: var(--space-1);
+  right: var(--space-2);
+  z-index: 3;
+  width: max-content;
+  max-width: min(34rem, 78vw);
+}
+
+@keyframes oda-confirm-in {
+  from { opacity: 0; transform: translateY(-4px); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .oda-confirm[role="alertdialog"] { animation: none; }
+  .oda-confirm__cancel,
+  .oda-confirm__danger { transition: none; }
+}
+
+/* El detalle de la regla va bajo su nombre, no pegado a él. */
+.oda-table--indicators td small {
+  display: block;
+  color: var(--ink-muted);
+  font-size: var(--text-2xs);
 }
 
 .oda-badge {

@@ -1,57 +1,96 @@
 /* =============================================================================
    Controles del tablero: corte, periodo académico y campus.
 
-   Viven en la URL (?corte=2024&periodo=B&campus=cucuta), así que un enlace compartido
-   abre el tablero exactamente como lo vio quien lo envió. Cambiar cualquiera
-   de ellos re-voltea todas las cifras a la vez: un control, todo el tablero.
-   Sin ?corte, el tablero abre en "Todos": todo el periodo agrupado (promedio
-   anual, o el último dato en las existencias). Sin ?periodo, las cifras son del
-   año completo (calculadas de los periodos 1 y 2).
+   Viven en la URL (?corte=2024&periodo=B&campus=cucuta), así que un enlace
+   compartido abre el tablero exactamente como lo vio quien lo envió. Cambiar
+   cualquiera de ellos re-voltea todas las cifras a la vez: un control, todo el
+   tablero.
+
+   La lectura es primero por periodo: sin ?corte, el tablero abre en el periodo
+   más reciente con dato (ver `startingCut` en data/period-reading.ts). Un año
+   sin ?periodo abre en su periodo más reciente; ?periodo=anual pide la cifra
+   del año y ?corte=todos, todo el periodo agrupado. Las dos siguen ahí, como
+   lecturas secundarias.
+
+   Elegir un corte no es navegar: la URL se reemplaza sin mover la página
+   (ScrollManager solo reposiciona cuando cambia la ruta o el ancla) y el ancla
+   que hubiera se conserva.
    ========================================================================== */
 
-import { useCallback, useRef } from "react";
+import { useCallback, useMemo, useRef } from "react";
 import type { KeyboardEvent } from "react";
-import { useSearchParams } from "react-router-dom";
-import type { CampusId, OpenDataCatalog, Term } from "../data/types";
-import { ALL_YEARS } from "../data/terms";
+import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
+import type { CampusId, OpenDataCatalog, Report, Term } from "../data/types";
+import { ALL_YEARS, termLabel } from "../data/terms";
+import { cutForYear, cutFromParams, cutToParams, startingCut } from "../data/period-reading";
+import type { Cut, CutScope } from "../data/period-reading";
 
-export function useBoardFilters(data: OpenDataCatalog | undefined) {
-  const [params, setParams] = useSearchParams();
+const EMPTY_SCOPE: CutScope = { indicators: [], breakdowns: [] };
 
-  // Sin ?corte= se ve todo el periodo agrupado; ?corte=2024 abre ese año.
-  const rawYear = Number(params.get("corte"));
-  const year = data?.years.includes(rawYear) ? rawYear : ALL_YEARS;
+/**
+ * `report`: la ficha de un informe abre en el periodo más reciente de *sus*
+ * cifras; sin informe (la portada), en el del catálogo entero.
+ */
+export function useBoardFilters(data: OpenDataCatalog | undefined, report?: Report) {
+  const [params] = useSearchParams();
+  const { hash } = useLocation();
+  const navigate = useNavigate();
+
+  const scope = useMemo<CutScope>(() => {
+    if (report) return report;
+    if (!data) return EMPTY_SCOPE;
+    return { indicators: data.reports.flatMap((r) => r.indicators), breakdowns: data.reports.flatMap((r) => r.breakdowns) };
+  }, [data, report]);
+  const years = data?.years;
+  const start = useMemo<Cut>(() => (years ? startingCut(scope, years) : { year: ALL_YEARS, term: null }), [scope, years]);
+
+  const rawCorte = params.get("corte");
+  const rawPeriodo = params.get("periodo");
+  const cut = useMemo<Cut>(
+    () => (years ? cutFromParams({ corte: rawCorte, periodo: rawPeriodo }, scope, years) : { year: ALL_YEARS, term: null }),
+    [rawCorte, rawPeriodo, scope, years],
+  );
+  const { year, term } = cut;
   // ?sede= era el nombre anterior del parámetro: los enlaces viejos siguen abriendo.
   const rawCampus = (params.get("campus") ?? params.get("sede")) as CampusId | null;
   const campus: CampusId = data?.campuses.some((c) => c.id === rawCampus) && rawCampus ? rawCampus : "todas";
-  const rawTerm = params.get("periodo")?.toUpperCase();
-  // Los periodos 1 y 2 son de un año: con todo el periodo no aplican.
-  const term: Term | null = year !== ALL_YEARS && (rawTerm === "A" || rawTerm === "B") ? rawTerm : null;
 
-  const update = useCallback(
-    (key: "corte" | "campus" | "periodo", value: string, fallback: string) => {
-      setParams(
-        (prev) => {
-          const next = new URLSearchParams(prev);
-          next.delete("sede");
-          if (value === fallback) next.delete(key);
-          else next.set(key, value);
-          return next;
-        },
-        { replace: true, preventScrollReset: true },
-      );
+  /** Una sola escritura por cambio: dos seguidas se pisarían (la segunda no ve la primera). */
+  const write = useCallback(
+    (change: (next: URLSearchParams) => void) => {
+      const next = new URLSearchParams(params);
+      next.delete("sede");
+      change(next);
+      const search = next.toString();
+      // Reemplaza la entrada (no apila historial) y conserva el ancla de la URL.
+      navigate({ search: search ? `?${search}` : "", hash }, { replace: true, preventScrollReset: true });
     },
-    [setParams],
+    [params, navigate, hash],
   );
 
-  const setYear = useCallback(
-    (value: number) => update("corte", String(value), String(ALL_YEARS)),
-    [update],
+  const setCut = useCallback(
+    (nextCut: Cut) =>
+      write((next) => {
+        const { corte, periodo } = cutToParams(nextCut, start);
+        if (corte === null) next.delete("corte");
+        else next.set("corte", corte);
+        if (periodo === null) next.delete("periodo");
+        else next.set("periodo", periodo);
+      }),
+    [write, start],
   );
-  const setCampus = useCallback((value: CampusId) => update("campus", value, "todas"), [update]);
-  const setTerm = useCallback((value: Term | null) => update("periodo", value ?? "", ""), [update]);
+  const setYear = useCallback((value: number) => setCut(cutForYear(scope, value, cut)), [setCut, scope, cut]);
+  const setTerm = useCallback((value: Term | null) => setCut({ year: cut.year, term: cut.year === ALL_YEARS ? null : value }), [setCut, cut]);
+  const setCampus = useCallback(
+    (value: CampusId) =>
+      write((next) => {
+        if (value === "todas") next.delete("campus");
+        else next.set("campus", value);
+      }),
+    [write],
+  );
 
-  return { year, term, campus, setYear, setTerm, setCampus, search: params.toString() };
+  return { year, term, campus, setYear, setTerm, setCut, setCampus, search: params.toString() };
 }
 
 interface Option<T extends string | number> {
@@ -129,25 +168,23 @@ export function BoardControls({
 }) {
   return (
     <div className="od-controls">
+      {/* Los años primero y «Todos» al final: la lectura agrupada es la secundaria. */}
       <Segmented
         label="Corte"
         options={[
-          { value: ALL_YEARS, label: "Todos" },
           ...data.years.map((y) => ({ value: y, label: String(y) })),
+          { value: ALL_YEARS, label: "Todos" },
         ]}
         value={year}
-        onChange={(value) => {
-          if (value === ALL_YEARS) setTerm(null);
-          setYear(value);
-        }}
+        onChange={setYear}
       />
       {year !== ALL_YEARS && (
         <Segmented
           label="Periodo"
           options={[
+            { value: "A", label: termLabel("A") },
+            { value: "B", label: termLabel("B") },
             { value: "anual", label: "Año" },
-            { value: "A", label: "1" },
-            { value: "B", label: "2" },
           ]}
           value={term ?? "anual"}
           onChange={(value) => setTerm(value === "anual" ? null : (value as Term))}

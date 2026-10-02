@@ -527,7 +527,13 @@ function BoardEntries({
                     <input value={row.note} disabled={!canEdit} onChange={(e) => patch(row.uid, { note: e.target.value })} aria-label="Nota" />
                   </td>
                   <td>
-                    <ConfirmButton label="Quitar" confirmLabel="Quitar la fila" disabled={!canEdit} onConfirm={() => dropRow(row.uid)} />
+                    <ConfirmButton
+                      label="Quitar"
+                      subject={row.label ? `la fila «${row.label}»` : "la fila"}
+                      confirmLabel="Sus medallas y su nota salen del medallero al guardar."
+                      disabled={!canEdit}
+                      onConfirm={() => dropRow(row.uid)}
+                    />
                   </td>
                 </tr>
               ))}

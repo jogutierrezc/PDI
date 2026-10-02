@@ -1071,7 +1071,7 @@ function PublishTab({
                     </button>
                   )}
                   {canEdit && (
-                    <ConfirmButton label="Borrar" confirmLabel="Se borra el PDF y deja de estar disponible." onConfirm={() => deleteEdition.mutate(edition)} />
+                    <ConfirmButton label="Borrar" subject="esta edición" confirmLabel="Se borra su PDF y deja de estar disponible en el portal. No se puede deshacer." onConfirm={() => deleteEdition.mutate(edition)} />
                   )}
                 </span>
               </li>
@@ -1089,7 +1089,8 @@ function PublishTab({
           <p className="oda-muted">Se borran la plantilla y todas sus ediciones en PDF. Las cifras de los informes no se tocan.</p>
           <ConfirmButton
             label="Borrar boletín"
-            confirmLabel={`Se borran la plantilla y ${editions.length} ${editions.length === 1 ? "edición" : "ediciones"}.`}
+            subject="este boletín"
+            confirmLabel={`Se borran la plantilla y ${editions.length} ${editions.length === 1 ? "edición en PDF" : "ediciones en PDF"}. Las cifras de los informes no se tocan. No se puede deshacer.`}
             onConfirm={() => deleteBulletin.mutate({ id: row.id, files: editions.map((e) => e.file_path) }, { onSuccess: onDeleted })}
           />
           <SaveState pending={deleteBulletin.isPending} error={deleteBulletin.error} success={false} />

@@ -24,7 +24,8 @@ import { FigureTicket } from "./components/FigureTicket";
 import { ImageFlap } from "./components/ImageFlap";
 import { EmptyPeriod, OpenDataLayout } from "./components/OpenDataLayout";
 import { SplitFlap } from "./components/SplitFlap";
-import { changeBetween, formatValue, keyIndicators, useOpenDataCatalog, valueOf } from "./data/open-data";
+import { changeBetween, formatValue, keyIndicators, useOpenDataCatalog } from "./data/open-data";
+import { periodReading } from "./data/period-reading";
 import { ALL_YEARS, cutLabel } from "./data/terms";
 import { BulletinDownload } from "../boletin/BulletinDownload";
 import type { CampusId, Indicator, OpenDataCatalog, Report, Term } from "./data/types";
@@ -45,7 +46,7 @@ function findIndicator(data: OpenDataCatalog, slug: string, id: string): Indicat
 
 /** Celdas para alinear una columna de cifras a la derecha. */
 function cellsFor(indicators: Indicator[], year: number, campus: CampusId, term: Term | null): number {
-  return Math.max(1, ...indicators.map((i) => formatValue(valueOf(i, year, campus, term), i.format).length));
+  return Math.max(1, ...indicators.map((i) => formatValue(periodReading(i, year, term, campus).value, i.format).length));
 }
 
 export function OpenDataPortal() {
@@ -118,7 +119,7 @@ function PortalContent({ data, year, term, campus, setYear, setTerm, setCampus, 
           <div className="u-container od-arrivals__inner">
             <p className="od-arrivals__head">
               <span>
-                {year === ALL_YEARS ? "Periodo" : "Corte"} {cutLabel(year, term)} · {campusName}
+                {year === ALL_YEARS ? "Todo el periodo" : term ? "Periodo" : "Año"} {cutLabel(year, term)} · {campusName}
               </span>
               {data.illustrative && <span className="od-stamp">Cifras ilustrativas</span>}
             </p>
@@ -237,7 +238,7 @@ function DepartureBoard({ data, year, term, campus, campusName, setYear, setTerm
             <div className="od-departures__columns" aria-hidden="true">
               <span>Informe</span>
               <span>Cifra titular · {cutLabel(year, term)}</span>
-              <span>{year === ALL_YEARS ? "Cómo se calcula" : "Corte anterior"}</span>
+              <span>{year === ALL_YEARS ? "Cómo se calcula" : term ? "Periodo anterior" : "Año anterior"}</span>
             </div>
 
             <ol className="od-departures__list">
@@ -337,8 +338,11 @@ interface RowProps {
 }
 
 function DepartureRow({ report, indicator, index, year, term, campus, cells, active, onActivate, query }: RowProps) {
-  const value = indicator ? valueOf(indicator, year, campus, term) : null;
-  const previous = indicator ? valueOf(indicator, year - 1, campus, term) : null;
+  // La cifra titular en la lectura del corte: un titular solo anual lee su año y lo dice.
+  const reading = indicator ? periodReading(indicator, year, term, campus) : null;
+  const value = reading?.value ?? null;
+  const before = reading?.comparisons.length ? reading.comparisons[0] : undefined;
+  const previous = before?.value ?? null;
   const change = indicator ? changeBetween(indicator, value, previous) : null;
   const figure = indicator ? formatValue(value, indicator.format) : "—";
   const wave = index * 85;
@@ -380,16 +384,20 @@ function DepartureRow({ report, indicator, index, year, term, campus, cells, act
                 {value === null ? "s. r." : indicator.unit === "%" ? "%" : ""}
               </span>
             </span>
-            <span className="od-row__indicator">{indicator.label}</span>
+            <span className="od-row__indicator">
+              {indicator.label}
+              {reading?.annualOnly ? ` · dato anual ${reading.label}` : ""}
+            </span>
           </span>
         )}
 
         <span className="od-row__previous">
           {indicator && year === ALL_YEARS && <span>{indicator.periodBasis?.[campus] ?? "sin cifras en el periodo"}</span>}
-          {indicator && year !== ALL_YEARS && (
+          {indicator && year !== ALL_YEARS && !before && <span>Primer corte publicado</span>}
+          {indicator && year !== ALL_YEARS && before && (
             <>
               <span>
-                {cutLabel(year - 1, term)}: {previous === null ? "sin reportar" : formatValue(previous, indicator.format)}
+                {before.label}: {previous === null ? "sin reportar" : formatValue(previous, indicator.format)}
               </span>
               {change && (
                 <span className="od-row__change" data-reading={change.reading}>
@@ -444,7 +452,7 @@ function OriginAtlas({
         </div>
         <ChartFrame
           title={dataset.title}
-          subtitle={`${year === ALL_YEARS ? `Periodo ${cutLabel(year, null)} · promedio anual` : `Corte ${year}`} · ${dataset.unit}`}
+          subtitle={`${year === ALL_YEARS ? `Periodo ${cutLabel(year, null)} · promedio anual` : `Año ${year} · el mapa se reporta por año`} · ${dataset.unit}`}
           source={dataset.source}
         >
           <ColombiaMap
@@ -482,14 +490,14 @@ function ReadingGuide({ data }: { data: OpenDataCatalog }) {
               <span className="od-pin" aria-hidden="true">A</span>
               <div>
                 <strong>La cifra del corte</strong>
-                <p>El valor del año y el campus elegidos. Cuando llega un dato nuevo, voltea hasta asentarse.</p>
+                <p>El valor del periodo académico (1 o 2) y el campus elegidos; la cifra del año queda a un clic. Una cifra que solo se reporta por año lo dice en su boleto.</p>
               </div>
             </li>
             <li>
               <span className="od-pin" aria-hidden="true">B</span>
               <div>
                 <strong>El corte anterior</strong>
-                <p>El año previo y su variación. Las tasas cambian en puntos porcentuales; los conteos, en porcentaje.</p>
+                <p>El periodo previo y su variación. Las tasas cambian en puntos porcentuales; los conteos, en porcentaje.</p>
               </div>
             </li>
             <li>

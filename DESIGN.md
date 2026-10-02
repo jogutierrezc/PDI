@@ -370,11 +370,15 @@ Rejilla tipo hoja de cálculo: columna de rótulos pegajosa a la izquierda (12.5
 ### Inline Confirmation
 Borrar y cambiar lo que ve el público nunca abre un modal: la confirmación aparece en el mismo sitio, con fondo ámbar suave, y la pregunta nombra la consecuencia ("Poblacional deja de verse en el portal").
 
+**Confirmación de borrado** (`ConfirmButton`, `.oda-confirm[role="alertdialog"]`): tinte de riesgo sobre superficie opaca, borde y sombra de reposo. El título dice qué se borra («¿Borrar el indicador «Matrícula»?», con el glifo de alerta) y la línea de debajo qué se pierde. Las dos salidas se distinguen por forma, no solo por color: «Cancelar» es de contorno sobre superficie y recibe el foco al abrir; la destructiva va rellena en `status-risk`, en negrita, y nombra su verbo («Sí, borrar»). Escape cancela y el foco vuelve al botón que la abrió; el foco se dibuja con contorno de tinta de 2px, que sí se ve sobre el tinte. En una celda de tabla se despliega sobre la fila, anclada a la derecha de su celda, en vez de desbordar la columna de acciones. Entra con 180ms de opacidad y 4px de desplazamiento; con movimiento reducido aparece de una vez.
+
 ### Split-Flap Cell (UDES en Cifras)
 Celda de 0.7em × 1.24em partida en mitad superior (od-flap) e inferior (od-flap-low). Al cambiar, la hoja superior cae con aceleración y la inferior se asienta con rebote; la duración depende de cuántos caracteres recorre. Al llegar, destello ámbar breve. Con movimiento reducido, el valor aparece sin voltear. La insignia de informe es la misma paleta en el color de su línea con tinta blanca.
 
 ### Origin Ticket (UDES en Cifras)
 Boleto de papel claro bajo cada cifra: oficina que reporta en negrita, campus y sello de corte en mayúsculas, muesca perforada a la izquierda. Debajo, el corte anterior en cian con su variación (puntos porcentuales para tasas, porcentaje para conteos).
+
+**The Period First Rule.** UDES en Cifras se lee primero por periodo académico (1 o 2) y después por año. Sin `?corte`, el tablero y la ficha abren en el periodo más reciente con dato; la cifra se compara con el periodo anterior y, en una segunda línea más callada, con el mismo periodo del año anterior; las series recorren los periodos como eje. La cifra del año («Año») y todo el periodo agrupado («Todos») cierran sus controles, como lecturas secundarias, y la del año sigue saliendo de la regla anual de cada indicador (`annualRule`): nada se suma ni se promedia por fuera de ella. Un indicador, desglose, mapa o conjunto libre que solo se reporta por año muestra su cifra anual y lo dice en su boleto o subtítulo («dato anual, no se reporta por periodo»); un periodo sin dato es «sin reportar», nunca cero. Elegir un corte reemplaza la URL sin mover la página. La lectura vive en `data/period-reading.ts`.
 
 ### Descarga en CSV (UDES en Cifras)
 Dos piezas que leen el mismo registro (`data/export-registry.ts`), así que lo que se ofrece para bajar es lo que la ficha dibuja, y siempre el conjunto completo: todos sus cortes y campus.

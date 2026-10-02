@@ -776,7 +776,8 @@ function TytYears({ tyt, results, canEdit }: SectionProps) {
                   {canEdit && (
                     <ConfirmButton
                       label="Borrar año"
-                      confirmLabel={`¿Borrar ${year} de ${tyt.title}?`}
+                      subject={`el año ${year} de «${tyt.title}»`}
+                      confirmLabel="Se quitan sus programas; las curvas de percentil se quedan como están hasta la próxima importación. No se puede deshacer."
                       disabled={remove.isPending}
                       onConfirm={() => remove.mutate({ tytId: tyt.id, year })}
                     />

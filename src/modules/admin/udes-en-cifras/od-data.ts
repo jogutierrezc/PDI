@@ -6,9 +6,14 @@ import { FriendlyError } from "../../../data/errors";
    incluidos) y escribe tabla por tabla. Cada mutación invalida a la vez la
    caché de la intranet y la del portal: lo que se guarda aquí es lo que el
    público ve al publicar, sin un paso de sincronización intermedio.
+
+   Cada escritura declara qué familias de tablas toca (`touches`) y la
+   relectura del periodo pide solo esas (reload-plan.ts): guardar una rejilla
+   ya no relee Saber PRO, los mapas y los desgloses. La que no declara nada
+   relee todo, como antes.
    ========================================================================== */
 
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { hashKey, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { REPORT_BUCKET } from "../../datos-abiertos/data/images";
 import { supabase } from "../../../lib/supabase";
 import { describeDatabaseError } from "../../../data/errors";
@@ -47,7 +52,8 @@ import type {
   PublicationStatus,
 } from "../../../types/database";
 import { assembleCatalog, fetchOpenDataRows } from "../../datos-abiertos/data/repository";
-import type { OpenDataRows } from "../../datos-abiertos/data/repository";
+import type { OpenDataRows, RowFamily } from "../../datos-abiertos/data/repository";
+import { ReloadPlan } from "./reload-plan";
 import { openDataKeys } from "../../datos-abiertos/data/open-data";
 import type { TytBenchmarks } from "../../datos-abiertos/data/saber-tyt";
 import type { AlphaData } from "../../datos-abiertos/data/saber-alpha";
@@ -83,12 +89,24 @@ export interface AdminData {
   catalog: OpenDataCatalog;
 }
 
+/** Qué familias quedan por releer en cada lectura de periodo. */
+const reloadPlan = new ReloadPlan();
+const PERIOD_DATA = [...odAdminKeys.all, "period"] as const;
+
 export function useOdAdminData(periodId: string | undefined) {
+  const client = useQueryClient();
   return useQuery({
     queryKey: odAdminKeys.period(periodId ?? "none"),
     enabled: Boolean(periodId),
     queryFn: async (): Promise<AdminData | null> => {
-      const rows = await fetchOpenDataRows({ periodId, includeDrafts: true });
+      const key = odAdminKeys.period(periodId ?? "none");
+      const hash = hashKey(key);
+      const previous = client.getQueryData<AdminData | null>(key);
+      const take = reloadPlan.take(hash, Date.now());
+      // Tras guardar, solo las familias tocadas; el resto sale de la lectura anterior.
+      const reuse = take.only && previous ? { rows: previous.rows, only: take.only } : undefined;
+      const rows = await fetchOpenDataRows({ periodId, includeDrafts: true, reuse });
+      reloadPlan.settle(hash, reuse ? take : { ...take, only: null }, Date.now());
       return rows ? { rows, catalog: assembleCatalog(rows) } : null;
     },
   });
@@ -116,15 +134,41 @@ export function useOdPublications(periodId: string | undefined) {
 
 /* --- Escritura -------------------------------------------------------------- */
 
-/** Envuelve una escritura: invalida intranet y portal al terminar. */
-function useOdMutation<TInput>(fn: (input: TInput) => Promise<unknown>) {
+/**
+ * Qué toca una escritura. `families`: las familias de tablas del periodo que
+ * hay que releer (vacío: solo el periodo, sus campus, oficinas e informes, que
+ * se releen siempre). `also`: las otras lecturas de la intranet que cambian.
+ */
+interface Touches {
+  families: readonly RowFamily[];
+  also?: readonly ("periods" | "publications")[];
+}
+
+/**
+ * Envuelve una escritura: invalida intranet y portal al terminar. Sin
+ * `touches` relee todo; con él, solo lo que la escritura pudo cambiar.
+ */
+function useOdMutation<TInput>(fn: (input: TInput) => Promise<unknown>, touches?: Touches) {
   const client = useQueryClient();
   return useMutation({
     mutationFn: fn,
     onSuccess: async () => {
+      // Se apunta antes de invalidar: la relectura que dispara la invalidación ya lo lee.
+      for (const query of client.getQueryCache().findAll({ queryKey: PERIOD_DATA })) {
+        const fresh = !query.state.isInvalidated && query.state.data != null;
+        reloadPlan.mark(query.queryHash, touches ? touches.families : "all", fresh);
+      }
+      if (!touches) {
+        await Promise.all([
+          client.invalidateQueries({ queryKey: odAdminKeys.all }),
+          client.invalidateQueries({ queryKey: openDataKeys.all }),
+        ]);
+        return;
+      }
       await Promise.all([
-        client.invalidateQueries({ queryKey: odAdminKeys.all }),
+        client.invalidateQueries({ queryKey: PERIOD_DATA }),
         client.invalidateQueries({ queryKey: openDataKeys.all }),
+        ...(touches.also ?? []).map((name) => client.invalidateQueries({ queryKey: [...odAdminKeys.all, name] })),
       ]);
     },
   });
@@ -135,7 +179,7 @@ const run = async <T>(query: PromiseLike<Result<T>>) => unwrap(await query);
 export function useSavePeriod() {
   return useOdMutation(async ({ id, patch }: { id: string; patch: Partial<OdPeriod> }) => {
     await run(supabase.from("od_periods").update(patch).eq("id", id));
-  });
+  }, { families: [], also: ["periods", "publications"] });
 }
 
 /** Solo un periodo vigente: primero se apaga el anterior, después se enciende este. */
@@ -177,7 +221,7 @@ export function useSaveOffice() {
   return useOdMutation(async (office: Partial<OdOffice> & { name: string }) => {
     if (office.id) await run(supabase.from("od_offices").update({ name: office.name, contact_email: office.contact_email ?? "" }).eq("id", office.id));
     else await run(supabase.from("od_offices").insert({ name: office.name, contact_email: office.contact_email ?? "", position: office.position ?? 99 }));
-  });
+  }, { families: [] });
 }
 
 export function useDeleteOffice() {
@@ -189,7 +233,7 @@ export function useDeleteOffice() {
 export function useSaveReport() {
   return useOdMutation(async ({ id, patch }: { id: string; patch: Partial<OdReportRow> }) => {
     await run(supabase.from("od_reports").update(patch).eq("id", id));
-  });
+  }, { families: [] });
 }
 
 /**
@@ -197,16 +241,15 @@ export function useSaveReport() {
  *
  * Renumera de uno en adelante todas las filas en vez de tocar solo las que se
  * movieron: `position` es un entero libre y arrastrar sobre una numeración con
- * huecos deja empates que ordenan distinto en cada carga. Once escrituras y
- * una sola invalidación al final, que es lo que evita que la lista dé saltos
- * mientras se guarda.
+ * huecos deja empates que ordenan distinto en cada carga. Once escrituras a
+ * la vez y una sola invalidación al final, que es lo que evita que la lista dé
+ * saltos mientras se guarda.
  */
 export function useReorderReports() {
   return useOdMutation(async (rows: { id: string; position: number }[]) => {
-    for (const row of rows) {
-      await run(supabase.from("od_reports").update({ position: row.position }).eq("id", row.id));
-    }
-  });
+    // Cada fila escribe su propia posición: van a la vez, no una detrás de otra.
+    await Promise.all(rows.map((row) => run(supabase.from("od_reports").update({ position: row.position }).eq("id", row.id))));
+  }, { families: [] });
 }
 
 /* --- Imágenes de un informe (0053) ------------------------------------------ */
@@ -266,13 +309,13 @@ export function useSaveIndicator() {
     const { id, ...fields } = row;
     if (id) await run(supabase.from("od_indicators").update(fields).eq("id", id));
     else await run(supabase.from("od_indicators").insert(fields));
-  });
+  }, { families: ["indicators"] });
 }
 
 export function useDeleteIndicator() {
   return useOdMutation(async (id: string) => {
     await run(supabase.from("od_indicators").delete().eq("id", id));
-  });
+  }, { families: ["indicators"] });
 }
 
 /**
@@ -284,15 +327,19 @@ export function useSaveKpis() {
   return useOdMutation(
     async ({ reportId, kpis }: { reportId: string; kpis: { id: string; is_kpi: boolean; kpi_position: number | null; is_headline: boolean }[] }) => {
       await run(supabase.from("od_indicators").update({ is_headline: false }).eq("report_id", reportId));
-      for (const kpi of kpis) {
-        await run(
-          supabase
-            .from("od_indicators")
-            .update({ is_kpi: kpi.is_kpi, kpi_position: kpi.kpi_position, is_headline: kpi.is_headline })
-            .eq("id", kpi.id),
-        );
-      }
+      // Con todos los titulares ya apagados, cada fila se escribe sin esperar a la anterior.
+      await Promise.all(
+        kpis.map((kpi) =>
+          run(
+            supabase
+              .from("od_indicators")
+              .update({ is_kpi: kpi.is_kpi, kpi_position: kpi.kpi_position, is_headline: kpi.is_headline })
+              .eq("id", kpi.id),
+          ),
+        ),
+      );
     },
+    { families: ["indicators"] },
   );
 }
 
@@ -317,7 +364,7 @@ export function useSaveValues() {
       await run(supabase.from("od_values").upsert(values.slice(i, i + 500), { onConflict: "indicator_id,year,term,campus_id" }));
     }
     await logImport(periodId, reportId, kind, values.length, fileName, { tabla: "od_values" });
-  });
+  }, { families: ["indicators"] });
 }
 
 /**
@@ -355,7 +402,7 @@ async function saveDataset(
 }
 
 export function useSaveBreakdown() {
-  return useOdMutation(async (row: Partial<OdBreakdownRow> & { report_id: string }) => saveDataset("od_breakdowns", "desgloses", row));
+  return useOdMutation(async (row: Partial<OdBreakdownRow> & { report_id: string }) => saveDataset("od_breakdowns", "desgloses", row), { families: ["breakdowns", "blocks"] });
 }
 
 export function useSaveBreakdownValues() {
@@ -371,11 +418,12 @@ export function useSaveBreakdownValues() {
       }
       await logImport(periodId, reportId, kind, values.length, "", { tabla: "od_breakdown_values" });
     },
+    { families: ["breakdowns"] },
   );
 }
 
 export function useSaveHeatmap() {
-  return useOdMutation(async (row: Partial<OdHeatmapRow> & { report_id: string }) => saveDataset("od_heatmaps", "mapa_calor", row));
+  return useOdMutation(async (row: Partial<OdHeatmapRow> & { report_id: string }) => saveDataset("od_heatmaps", "mapa_calor", row), { families: ["heatmaps", "blocks"] });
 }
 
 export function useSaveHeatmapCells() {
@@ -394,11 +442,12 @@ export function useSaveHeatmapCells() {
       }
       await logImport(periodId, reportId, kind, cells.length, "", { tabla: "od_heatmap_cells" });
     },
+    { families: ["heatmaps"] },
   );
 }
 
 export function useSaveMap() {
-  return useOdMutation(async (row: Partial<OdMapRow> & { report_id: string }) => saveDataset("od_maps", "mapa", row));
+  return useOdMutation(async (row: Partial<OdMapRow> & { report_id: string }) => saveDataset("od_maps", "mapa", row), { families: ["maps", "blocks"] });
 }
 
 export function useSaveMapValues() {
@@ -417,6 +466,7 @@ export function useSaveMapValues() {
       }
       await logImport(periodId, reportId, kind, values.length + remove.length, "", { tabla: "od_map_values" });
     },
+    { families: ["maps"] },
   );
 }
 
@@ -440,15 +490,16 @@ export function useReplaceMapValues() {
       }
       await logImport(periodId, reportId, kind, rows.length, fileName, { tabla: "od_map_values", anios: years });
     },
+    { families: ["maps"] },
   );
 }
 
 export function useSavePipeline() {
-  return useOdMutation(async (row: Partial<OdPipelineRow> & { report_id: string }) => saveDataset("od_pipelines", "tuberia", row));
+  return useOdMutation(async (row: Partial<OdPipelineRow> & { report_id: string }) => saveDataset("od_pipelines", "tuberia", row), { families: ["pipelines", "blocks"] });
 }
 
 export function useSaveHistory() {
-  return useOdMutation(async (row: Partial<OdHistoryRow> & { report_id: string }) => saveDataset("od_histories", "historico", row));
+  return useOdMutation(async (row: Partial<OdHistoryRow> & { report_id: string }) => saveDataset("od_histories", "historico", row), { families: ["histories", "blocks"] });
 }
 
 /** Cifras de una evolución histórica: periodos × categorías. Quitar un periodo o una categoría borra sus cifras. */
@@ -469,6 +520,7 @@ export function useSaveHistoryValues() {
       }
       await logImport(periodId, reportId, kind, values.length, "", { tabla: "od_history_values" });
     },
+    { families: ["histories"] },
   );
 }
 
@@ -485,13 +537,14 @@ export function useSavePipelineValues() {
       }
       await logImport(periodId, reportId, kind, values.length, "", { tabla: "od_pipeline_values" });
     },
+    { families: ["pipelines"] },
   );
 }
 
 /* --- Rankings (0030) ---------------------------------------------------------- */
 
 export function useSaveRanking() {
-  return useOdMutation(async (row: Partial<OdRankingRow> & { report_id: string }) => saveDataset("od_rankings", "rankings", row));
+  return useOdMutation(async (row: Partial<OdRankingRow> & { report_id: string }) => saveDataset("od_rankings", "rankings", row), { families: ["rankings", "blocks"] });
 }
 
 /** Guarda una edición completa (posiciones y listas); sin fila previa, la crea. */
@@ -503,19 +556,20 @@ export function useSaveRankingEdition() {
       await run(supabase.from("od_ranking_editions").upsert(fields, { onConflict: "ranking_id,year" }));
       await logImport(periodId, reportId, "rejilla", 1, "", { tabla: "od_ranking_editions", anio: edition.year });
     },
+    { families: ["rankings"] },
   );
 }
 
 export function useDeleteRankingEdition() {
   return useOdMutation(async ({ rankingId, year }: { rankingId: string; year: number }) => {
     await run(supabase.from("od_ranking_editions").delete().eq("ranking_id", rankingId).eq("year", year));
-  });
+  }, { families: ["rankings"] });
 }
 
 /* --- Medallero (0056) --------------------------------------------------------- */
 
 export function useSaveMedalBoard() {
-  return useOdMutation(async (row: Partial<OdMedalBoardRow> & { report_id: string }) => saveDataset("od_medal_boards", "medallero", row));
+  return useOdMutation(async (row: Partial<OdMedalBoardRow> & { report_id: string }) => saveDataset("od_medal_boards", "medallero", row), { families: ["medalBoards", "blocks"] });
 }
 
 export function useDeleteMedalBoard() {
@@ -565,6 +619,7 @@ export function useSaveMedalEntries() {
       }
       await logImport(periodId, reportId, "rejilla", entries.length, "", { tabla: "od_medal_entries", anio: year });
     },
+    { families: ["medalBoards"] },
   );
 }
 
@@ -573,7 +628,7 @@ export function useSaveMedalEntries() {
 const SABER_UNIQUE = "saber_id,year,scope,campus,faculty,program,competency";
 
 export function useSaveSaberPro() {
-  return useOdMutation(async (row: Partial<OdSaberProRow> & { report_id: string }) => saveDataset("od_saber_pro", "saber_pro", row));
+  return useOdMutation(async (row: Partial<OdSaberProRow> & { report_id: string }) => saveDataset("od_saber_pro", "saber_pro", row), { families: ["saberPro", "blocks"] });
 }
 
 /**
@@ -594,6 +649,7 @@ export function useReplaceSaberProResults() {
       }
       await logImport(periodId, reportId, "plantilla", rows.length, fileName, { tabla: "od_saber_pro_results", anios: years });
     },
+    { families: ["saberPro"] },
   );
 }
 
@@ -613,6 +669,7 @@ export function useSaveSaberProReference() {
       if (rows.length) await run(supabase.from("od_saber_pro_results").upsert(rows, { onConflict: SABER_UNIQUE }));
       await logImport(periodId, reportId, "rejilla", rows.length + remove.length, "", { tabla: "od_saber_pro_results" });
     },
+    { families: ["saberPro"] },
   );
 }
 
@@ -620,13 +677,13 @@ export function useSaveSaberProReference() {
 export function useDeleteSaberProYear() {
   return useOdMutation(async ({ saberId, year }: { saberId: string; year: number }) => {
     await run(supabase.from("od_saber_pro_results").delete().eq("saber_id", saberId).eq("year", year));
-  });
+  }, { families: ["saberPro"] });
 }
 
 /* --- Motor Beta · Saber TyT (0035) ------------------------------------------------- */
 
 export function useSaveSaberTyt() {
-  return useOdMutation(async (row: Partial<OdSaberTytRow> & { report_id: string }) => saveDataset("od_saber_tyt", "saber_tyt", row));
+  return useOdMutation(async (row: Partial<OdSaberTytRow> & { report_id: string }) => saveDataset("od_saber_tyt", "saber_tyt", row), { families: ["saberTyt", "blocks"] });
 }
 
 /**
@@ -652,6 +709,7 @@ export function useReplaceSaberTytResults() {
       await run(supabase.from("od_saber_tyt").update(alpha ? { benchmarks, alpha } : { benchmarks }).eq("id", tytId));
       await logImport(periodId, reportId, "plantilla", rows.length, fileName, { tabla: "od_saber_tyt_results", anios: years });
     },
+    { families: ["saberTyt"] },
   );
 }
 
@@ -659,7 +717,7 @@ export function useReplaceSaberTytResults() {
 export function useDeleteSaberTytYear() {
   return useOdMutation(async ({ tytId, year }: { tytId: string; year: number }) => {
     await run(supabase.from("od_saber_tyt_results").delete().eq("tyt_id", tytId).eq("year", year));
-  });
+  }, { families: ["saberTyt"] });
 }
 
 /* --- Conjuntos libres (0033) ------------------------------------------------------ */
@@ -690,7 +748,7 @@ export function useSaveFreeSet() {
       drop = others;
     }
     if (drop.length) await run(supabase.from("od_report_blocks").delete().in("id", drop.map((b) => b.id)));
-  });
+  }, { families: ["freeSets", "blocks"] });
 }
 
 /**
@@ -713,6 +771,7 @@ export function useReplaceFreeSetRows() {
       }
       await logImport(periodId, reportId, kind, records.length, "", { tabla: "od_free_set_rows" });
     },
+    { families: ["freeSets"] },
   );
 }
 
@@ -732,13 +791,14 @@ export function useSaveBlocks() {
         else await run(supabase.from("od_report_blocks").insert({ ...fields, report_id: reportId }));
       }
     },
+    { families: ["blocks"] },
   );
 }
 
 export function useSetReportStatus() {
   return useOdMutation(async ({ id, status }: { id: string; status: PublicationStatus }) => {
     await run(supabase.from("od_reports").update({ status }).eq("id", id));
-  });
+  }, { families: [], also: ["publications"] });
 }
 
 /** Informe nuevo: nace en borrador con los bloques básicos de la ficha. */

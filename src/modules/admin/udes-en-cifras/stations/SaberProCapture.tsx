@@ -529,7 +529,8 @@ function SaberYears({ saber, results, canEdit }: SectionProps) {
                   {canEdit && (
                     <ConfirmButton
                       label="Borrar año"
-                      confirmLabel={`¿Borrar ${year} de ${saber.title}?`}
+                      subject={`el año ${year} de «${saber.title}»`}
+                      confirmLabel="Se quitan sus programas y sus promedios oficial y nacional. No se puede deshacer."
                       disabled={remove.isPending}
                       onConfirm={() => remove.mutate({ saberId: saber.id, year })}
                     />

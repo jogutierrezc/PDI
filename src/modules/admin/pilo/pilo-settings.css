@@ -931,6 +931,7 @@
 .pis-matrix .pis-seg button svg { flex: none; }
 .pis-matrix__odd { display: inline-flex; gap: 4px; align-items: baseline; color: var(--ink-secondary); font-size: var(--text-xs); line-height: var(--leading-normal); }
 .pis-matrix__confirm { grid-column: 1 / -1; }
+.pis-unify { display: grid; gap: var(--space-3); padding: var(--space-4); background: var(--surface-2); border: 1px solid var(--line); border-radius: var(--radius-sm); }
 .pis-matrix__said { display: flex; flex-wrap: wrap; align-items: baseline; gap: var(--space-1) var(--space-2); color: var(--ink-secondary); }
 
 @media (max-width: 720px) {

@@ -373,3 +373,59 @@ export function useSetCell() {
     },
   });
 }
+
+/* --- Una sola memoria: todos los portales leen lo de los demás, de visita ------------------- */
+
+export interface UnifyChange {
+  portal: PiloPortal;
+  /** Las celdas que cambian y a qué valor. */
+  cells: Record<string, Cell>;
+}
+
+/**
+ * Qué celdas habría que mover para que cada portal lea de visita todo lo que puede
+ * salir de su casa (`to: "visita"`), o para volver a separarlos (`to: "no"`: solo
+ * las que hoy dicen «visita»). Lo que no sale de su portal (Moodle) y lo propio de
+ * cada portal no se toca.
+ */
+export function unifyChanges(data: PortalsData, to: "visita" | "no" = "visita"): UnifyChange[] {
+  return data.portals
+    .map((portal) => {
+      const cells: Record<string, Cell> = {};
+      for (const source of data.sources) {
+        if (atHome(portal, source) || source.stays_home) continue;
+        const now = cellOf(portal, source);
+        if (to === "visita" ? now !== "visita" : now === "visita") cells[source.id] = to;
+      }
+      return { portal, cells };
+    })
+    .filter((c) => Object.keys(c.cells).length > 0);
+}
+
+/**
+ * Aplica `unifyChanges`, un portal a la vez y cada uno con lo que esta pantalla veía
+ * (`expect`). Devuelve cuántas celdas cambió.
+ */
+export function useUnifyMemory() {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ data, to }: { data: PortalsData; to: "visita" | "no" }): Promise<number> => {
+      let changed = 0;
+      for (const { portal, cells } of unifyChanges(data, to)) {
+        const expect = Object.fromEntries(Object.keys(cells).map((id) => [id, portal.matrix[id] ?? "no"]));
+        const { error } = await supabase.rpc("pilo_portal_update" as never, { p_portal: portal.id, p_patch: { matrix: cells, expect } } as never);
+        if (error) {
+          if (missing0121(error)) throw new Error("Falta aplicar la migración 0121 en la base.");
+          if (to === "visita" && missing0122(error)) throw new Error("Falta aplicar la migración 0122 en la base: hasta entonces no se puede leer de visita.");
+          throw new Error(changed ? `${error.message} (ya se cambiaron ${changed} celdas de los portales anteriores)` : error.message);
+        }
+        changed += Object.keys(cells).length;
+      }
+      return changed;
+    },
+    onSettled: () => {
+      void client.invalidateQueries({ queryKey: portalKeys.all });
+      void client.invalidateQueries({ queryKey: ["pilo-ia", "espacio"] });
+    },
+  });
+}

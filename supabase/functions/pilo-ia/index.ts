@@ -5457,8 +5457,8 @@ async function handle(request: Request): Promise<Response> {
           ? "Fish Audio no aceptó la clave"
           : response.status === 402
             ? `Fish Audio pide pago para el modelo «${model}» (el gratuito es s2.1-pro-free)`
-            : response.status === 404
-              ? `Fish Audio no encontró la voz «${voiceId}»: créela de nuevo`
+            : response.status === 404 || (response.status === 400 && /reference|model not found/i.test(detail))
+              ? `Fish Audio no encontró la voz «${voiceId}» (se borró o es de otra cuenta): en Voz, pulse «Crear de nuevo» en ese estilo`
               : response.status === 503
                 ? "Fish Audio está saturado ahora"
                 : `Fish Audio respondió ${response.status}`;

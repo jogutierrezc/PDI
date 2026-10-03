@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { cleanName, collectionFault, collectionId, collectionsReady, customOf, deleteBlock, nameProblem } from "./collections";
-import { docCollections, parsePortals } from "./portals";
+import { docCollections, parsePortals, unifyChanges } from "./portals";
 import type { PiloSource } from "./portals";
 
 const src = (over: Partial<PiloSource> & { id: string }): PiloSource => ({ scope: "ensenanza", name: over.id, kind: "documentos", staff_only: false, stays_home: false, sort: 1, ...over });
@@ -91,5 +91,47 @@ describe("borrar y fallar", () => {
     expect(collectionFault({ code: "42501", message: "Solo la administración crea colecciones de Pilo." })).toMatch(/Solo la administración/);
     expect(collectionFault({ code: "23505", message: "Ya existe una colección con ese nombre." })).toBe("Ya existe una colección con ese nombre.");
     expect(collectionFault(null)).toBe("No se pudo.");
+  });
+});
+
+describe("una sola memoria", () => {
+  const data = parsePortals(
+    [
+      { id: "planeacion", scope: "planeacion", name: "Pilo de la Universidad", matrix: { cifras: "casa", politicas: "no" } },
+      { id: "ensenanza", scope: "ensenanza", name: "Pilo en Enseñanza", matrix: { politicas: "casa", cifras: "visita" } },
+    ],
+    [
+      { id: "cifras", scope: "planeacion", name: "UDES en Cifras", kind: "portal", sort: 1 },
+      { id: "impacto", scope: "planeacion", name: "Impacto", kind: "portal", staff_only: true, sort: 2 },
+      { id: "politicas", scope: "ensenanza", name: "Políticas", kind: "documentos", sort: 3 },
+      { id: "moodle", scope: "ensenanza", name: "Moodle", kind: "moodle", stays_home: true, sort: 4 },
+    ],
+  );
+
+  it("pasa a «visita» lo ajeno que puede salir de su casa, y no toca lo propio ni Moodle", () => {
+    const changes = unifyChanges(data, "visita");
+    expect(changes.map((c) => [c.portal.id, c.cells])).toEqual([
+      ["ensenanza", { impacto: "visita" }],
+      ["planeacion", { politicas: "visita" }],
+    ]);
+  });
+
+  it("separarlas devuelve a «no» solo lo que hoy dice «visita»", () => {
+    expect(unifyChanges(data, "no").map((c) => [c.portal.id, c.cells])).toEqual([["ensenanza", { cifras: "no" }]]);
+  });
+
+  it("si ya está todo unido, no hay nada que cambiar", () => {
+    const joined = parsePortals(
+      [
+        { id: "planeacion", scope: "planeacion", matrix: { politicas: "visita" } },
+        { id: "ensenanza", scope: "ensenanza", matrix: { cifras: "visita", impacto: "visita" } },
+      ],
+      [
+        { id: "cifras", scope: "planeacion", name: "C", kind: "portal", sort: 1 },
+        { id: "impacto", scope: "planeacion", name: "I", kind: "portal", sort: 2 },
+        { id: "politicas", scope: "ensenanza", name: "P", kind: "documentos", sort: 3 },
+      ],
+    );
+    expect(unifyChanges(joined, "visita")).toEqual([]);
   });
 });

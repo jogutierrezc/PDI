@@ -35,6 +35,7 @@ import {
   TEACH_SOURCE_ORDER,
 } from "./engine";
 import type { PresentationData, SourceKey, StageHandle } from "./engine";
+import { PiloWelcomeSpeaker } from "./PiloWelcomeSpeaker";
 import "./presentation.css";
 
 const reduced = () => typeof window !== "undefined" && window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
@@ -108,6 +109,7 @@ export function Presentation() {
   const { data, loading, error } = usePresentationData();
   const model = useMemo(() => (data ? buildModel(data) : null), [data]);
   const [step, setStep] = useState(0);
+  const [fase0Mode, setFase0Mode] = useState<"speaker" | "technical">("speaker");
 
   const initialOn = useMemo(() => {
     const map = {} as Record<SourceKey, boolean>;
@@ -578,17 +580,114 @@ export function Presentation() {
           </p>
         ) : current ? (
           <>
-            <div style={{ display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap" }}>
-              <span className="cpp-research-tag">{current.phaseCode}</span>
-              {current.layer ? (
-                <div className="cpp-layer">
-                  <i>{current.layer}</i>Capa cognitiva {current.layer} de 5
+            {step === 0 ? (
+              <div className="cpp-fase0-container">
+                <div className="cpp-fase0-switcher" role="tablist" aria-label="Modo de visualización de la Fase 0">
+                  <button
+                    type="button"
+                    className="cpp-fase0-btn"
+                    aria-pressed={fase0Mode === "speaker"}
+                    onClick={() => setFase0Mode("speaker")}
+                  >
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                      <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z" />
+                      <path d="M19 10v2a7 7 0 0 1-14 0v-2" />
+                      <line x1="12" y1="19" x2="12" y2="23" />
+                      <line x1="8" y1="23" x2="16" y2="23" />
+                    </svg>
+                    Pensamiento y Voz de Pilo
+                  </button>
+
+                  <button
+                    type="button"
+                    className="cpp-fase0-btn"
+                    aria-pressed={fase0Mode === "technical"}
+                    onClick={() => setFase0Mode("technical")}
+                  >
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                      <circle cx="12" cy="12" r="3" />
+                      <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z" />
+                    </svg>
+                    Ficha Técnica de Arquitectura
+                  </button>
                 </div>
-              ) : null}
-            </div>
-            <h1>{current.title}</h1>
-            <p>{current.body}</p>
-            {current.extra}
+
+                {fase0Mode === "speaker" ? (
+                  <>
+                    <PiloWelcomeSpeaker
+                      onFaceChange={(f) => stage.current?.setFace?.(f)}
+                      onFinishWelcome={() => setStep(1)}
+                      onOpenTechnical={() => setFase0Mode("technical")}
+                    />
+                    <div className="cpp-fase0-summary">
+                      <div className="cpp-fase0-sum-item">
+                        <span>Hemisferio Estratégico</span>
+                        <b>{model.counts.nodes} nodos</b>
+                      </div>
+                      <div className="cpp-fase0-sum-item">
+                        <span>Hemisferio Curricular</span>
+                        <b>{model.counts.teachNodes} nodos</b>
+                      </div>
+                      <div className="cpp-fase0-sum-item">
+                        <span>Sinapsis Inter-dominio</span>
+                        <b>{model.counts.bridges} puentes</b>
+                      </div>
+                      <div className="cpp-fase0-sum-item">
+                        <span>Topología Total</span>
+                        <b>{model.counts.totalNodes} neuronas</b>
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      className="cpp-fase0-more-btn"
+                      onClick={() => setFase0Mode("technical")}
+                    >
+                      <span>Ver desglose técnico detallado y fuentes ontológicas</span>
+                      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                        <polyline points="9 18 15 12 9 6" />
+                      </svg>
+                    </button>
+                  </>
+                ) : (
+                  <>
+                    <div className="cpp-fase0-mini-speaker">
+                      <div className="cpp-fase0-mini-info">
+                        <span className="pws-pulse-dot" aria-hidden="true" />
+                        <span>Mr. Pilo disponible para presentar con voz y emociones</span>
+                      </div>
+                      <button
+                        type="button"
+                        className="cpp-fase0-mini-btn"
+                        onClick={() => setFase0Mode("speaker")}
+                      >
+                        Escuchar a Mr. Pilo
+                      </button>
+                    </div>
+
+                    <div style={{ display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap", marginTop: "4px" }}>
+                      <span className="cpp-research-tag">{current.phaseCode}</span>
+                    </div>
+                    <h1>{current.title}</h1>
+                    <p>{current.body}</p>
+                    {current.extra}
+                  </>
+                )}
+              </div>
+            ) : (
+              <>
+                <div style={{ display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap" }}>
+                  <span className="cpp-research-tag">{current.phaseCode}</span>
+                  {current.layer ? (
+                    <div className="cpp-layer">
+                      <i>{current.layer}</i>Capa cognitiva {current.layer} de 5
+                    </div>
+                  ) : null}
+                </div>
+                <h1>{current.title}</h1>
+                <p>{current.body}</p>
+                {current.extra}
+              </>
+            )}
           </>
         ) : null}
       </section>

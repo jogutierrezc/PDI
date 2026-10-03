@@ -517,6 +517,7 @@ export type Face = "feliz" | "piensa" | "idea" | "bien";
 
 export interface StageHandle {
   step: (i: number) => void;
+  setFace?: (f: Face) => void;
   toggleSource: (k: SourceKey, on: boolean) => void;
   toggleBridges: (on: boolean) => void;
   setExplore: (on: boolean) => void;
@@ -617,7 +618,7 @@ export function createStage(
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     CX = W / 2;
     CY = H / 2;
-    RAD = Math.min(W, H) * 0.44;
+    RAD = Math.min(W, H) * 0.38;
   };
 
   const ro = new ResizeObserver(resize);
@@ -1238,6 +1239,9 @@ export function createStage(
       tl = gsap.timeline();
       STEPS[Math.max(0, Math.min(STEPS.length - 1, i))](tl);
       if (reduce) tl.progress(1);
+    },
+    setFace(f) {
+      S.face = f;
     },
     toggleSource(k, on) {
       nodes.forEach((n) => {

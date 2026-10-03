@@ -355,7 +355,7 @@ describe("el índice de vectores va por espacio", () => {
   it("el estado cuenta lo de cada espacio; las cifras en vivo son solo de Planeación", async () => {
     await asAdmin(async (q) => {
       const [p] = await q<{ s: Record<string, number> }>("select pilo_embed_status('m') as s");
-      expect(p.s).toMatchObject({ memory_total: 1, memory_done: 1, facts_total: 1, facts_done: 0, catalog_total: 1, catalog_done: 1 });
+      expect(p.s).toMatchObject({ memory_total: 2, memory_done: 1, facts_total: 1, facts_done: 0, catalog_total: 1, catalog_done: 1 });
       const [e] = await q<{ s: Record<string, number> }>("select pilo_embed_status('m', 'ensenanza') as s");
       expect(e.s).toMatchObject({ memory_total: 3, memory_done: 3, facts_total: 0, facts_done: 0, catalog_total: 3, catalog_done: 1 });
     });
@@ -364,7 +364,8 @@ describe("el índice de vectores va por espacio", () => {
   it("lo pendiente también", async () => {
     await asAdmin(async (q) => {
       const p = await q<{ kind: string; ref: string }>("select kind, ref from pilo_embed_pending('otro-modelo')");
-      expect(p.map((r) => `${r.kind}:${r.ref}`).sort()).toEqual(["catalogo:R-001", "cifra:cifra:matriculados", "memoria:cifras:evaluacion"]);
+      // Desde 0126 la respuesta R-001 también es un pasaje de la memoria (y espera su vector).
+      expect(p.map((r) => `${r.kind}:${r.ref}`).sort()).toEqual(["catalogo:R-001", "cifra:cifra:matriculados", "memoria:catalogo:R-001", "memoria:cifras:evaluacion"]);
       const e = await q<{ kind: string; ref: string }>("select kind, ref from pilo_embed_pending('otro-modelo', 64, 'ensenanza')");
       expect(e.map((r) => `${r.kind}:${r.ref}`).sort()).toEqual([
         "catalogo:EC-001", "catalogo:ER-001", "catalogo:ER-002",
@@ -400,7 +401,8 @@ describe("la malla no se cruza", () => {
   it("la malla completa, por espacio", async () => {
     await asAdmin(async (q) => {
       const [p] = await q<{ g: Graph }>("select pilo_graph_overview() as g");
-      expect(ids(p.g)).toEqual(["fuente:pdi", "pdi:pilar:p1"]);
+      // La respuesta oficial R-001 es un punto de la malla de Planeación (0126), sin relaciones.
+      expect(ids(p.g)).toEqual(["catalogo:R-001", "fuente:pdi", "pdi:pilar:p1"]);
       expect(p.g.edges).toHaveLength(1);
       const [e] = await q<{ g: Graph }>("select pilo_graph_overview(null, 'ensenanza') as g");
       expect(ids(e.g)).toEqual(["doc:pol:1", "fuente:politicas"]);
@@ -580,9 +582,15 @@ describe("la migración es idempotente", () => {
     const before = await snapshot();
     // 0113 y, encima, 0121: aplicar 0113 sola después de 0121 devolvería los CHECK y las firmas viejas;
     // 0121 los vuelve a quitar. La cadena, dos veces, deja todo como estaba.
-    const sql = readFileSync(MIGRATION, "utf8") + ";\n" + readFileSync(resolve(__dirname, "../../supabase/migrations/0121_pilo_portales.sql"), "utf8") + ";\n" + readFileSync(resolve(__dirname, "../../supabase/migrations/0122_pilo_puentes.sql"), "utf8");
-    await t.db.exec(sql);
-    await t.db.exec(sql);
+    // 0126 va al final: sus pasajes del catálogo no caben en el CHECK de 0113, así que se quitan antes
+    // de cada pasada y su propia puesta al día los devuelve.
+    const read = (file: string) => readFileSync(resolve(__dirname, "../../supabase/migrations", file), "utf8");
+    const sql = readFileSync(MIGRATION, "utf8") + ";\n" + read("0121_pilo_portales.sql") + ";\n" + read("0122_pilo_puentes.sql") + ";\n" + read("0126_pilo_catalogo_compartido.sql");
+    for (let pass = 0; pass < 2; pass++) {
+      await t.q("delete from pilo_memory where ref like 'catalogo:%'");
+      await t.q("delete from pilo_nodes where id like 'catalogo:%'");
+      await t.db.exec(sql);
+    }
     expect(await snapshot()).toEqual(before);
 
     await asAdmin(async (q) => {

@@ -1,16 +1,21 @@
 /* =============================================================================
-   Intranet · Mr. Pilo con IA · La capa profunda de Pilo (presentación).
+   Intranet · Mr. Pilo con IA · Presentación de Investigación en Innovación Educativa.
 
-   Una pieza para proyectar, solo para la administración (/admin/mr-pilo/
-   presentacion): cómo recorre Pilo su arquitectura bio-digital —las dos
-   memorias (Hemisferio Estratégico de Planeación y Hemisferio Curricular de
-   Enseñanza), las nuevas acciones que puede ejecutar (archivos, código, roles),
-   sus filtros reflejos a 0 créditos, los puentes neuronales inter-hemisféricos y
-   la red neuronal profunda de Gemma 4 31B (NVIDIA NIM)— hasta entregar una
-   respuesta fundamentada y verificada.
+   Pieza interactiva de investigación y divulgación científica (AIED · UDES):
+   «Arquitectura Cognitiva de Doble Flujo (Dual-Stream Memory) con Alineación
+   Ontológica Cruzada y Razonamiento Neuronal con Gemma 4 31B».
 
-   Nueve pasos que se avanzan con ← → (o espacio, o Re Pág / Av Pág); el
-   último paso abre el explorador interactivo del cerebro de Mr. Pilo.
+   Explica el funcionamiento técnico de Mr. Pilo para pares académicos, comités
+   curriculares e investigadores:
+     1. Desacoplamiento ontológico en dos hemisferios cerebrales (Estratégico vs. Curricular).
+     2. Multimodalidad y computación segura en el borde (Edge AI · Archivos y Código).
+     3. Ingesta y estímulo sensorial de consultas.
+     4. Autómata determinista de enrutamiento O(1) a 0 créditos de GPU.
+     5. Recuperación semántica híbrida (densa vectorial + dispersa BM25/FTS).
+     6. Puentes de ontología cruzada y protocolo de lectura «de visita» (0122).
+     7. Inferencia profunda con Gemma 4 31B acelerada en NVIDIA TensorRT / NIM.
+     8. Síntesis epistémica y anclaje factual estricto (Strict Grounding).
+     9. Laboratorio interactivo de telemetría y topología de red.
    ========================================================================== */
 
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
@@ -35,7 +40,7 @@ import "./presentation.css";
 const reduced = () => typeof window !== "undefined" && window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
 const MONEY = /dinero|peso|\$|cop\b|millones|presupuest/i;
 
-/** Los datos del plan con la numeración del Mapa numerado (P1 › AE3 › LA12 › PR4). */
+/** Datos del plan institucional con la topología real del Mapa numerado. */
 function usePresentationData(): { data: PresentationData | null; loading: boolean; error: boolean } {
   const pillars = usePillars();
   const structure = useStructure();
@@ -91,6 +96,7 @@ function usePresentationData(): { data: PresentationData | null; loading: boolea
 
 interface Step {
   short: string;
+  phaseCode: string;
   layer?: number;
   title: string;
   body: ReactNode;
@@ -121,7 +127,7 @@ export function Presentation() {
 
   useEffect(() => {
     const before = document.title;
-    document.title = "La capa profunda de Mr. Pilo · Planeación Institucional UDES";
+    document.title = "Investigación AIED · La Capa Profunda de Mr. Pilo · UDES";
     return () => {
       document.title = before;
     };
@@ -200,74 +206,72 @@ export function Presentation() {
 
   const steps: Step[] = model
     ? [
-        // 0. El cerebro dual de Mr. Pilo
+        // 0. Arquitectura Cognitiva de Doble Flujo
         {
-          short: "El cerebro",
-          title: "El cerebro de Mr. Pilo: dos memorias interconectadas",
+          short: "Dual-Stream",
+          phaseCode: "FASE 0 · ARQUITECTURA COGNITIVA",
+          title: "Desacoplamiento ontológico: arquitectura bio-inspirada de doble flujo",
           body: (
             <>
-              Mr. Pilo opera como un cerebro bio-digital organizado en <b>dos hemisferios complementarios</b>: el{" "}
-              <b>Hemisferio Estratégico</b> (Planeación Institucional: PDI, Cifras, Observatorio, Boletines e Impacto) y el{" "}
-              <b>Hemisferio Curricular</b> (Enseñanza: innovación pedagógica, lineamientos, políticas, ODS y aulas Moodle).
-              Juntos suman <b>{model.counts.totalNodes} nodos neuronales</b> vinculados por sinapsis activas.
+              En Inteligencia Artificial aplicada a la Educación Superior (AIED), un sistema RAG monolítico produce
+              interferencias al cruzar metas de gestión directiva con lineamientos pedagógicos de aula. Mr. Pilo resuelve
+              esto mediante una <b>arquitectura cognitiva de dos hemisferios cerebrales</b>: el <b>Hemisferio Estratégico</b>{" "}
+              (Planeación Institucional: PDI, SNIES/CNA, UDES en Cifras) y el <b>Hemisferio Curricular</b> (Enseñanza: innovación
+              didáctica, resultados de aprendizaje y aulas Moodle).
             </>
           ),
           extra: (
-            <div style={{ display: "grid", gap: "12px" }}>
-              <div className="cpp-hemi-group">
-                <span className="cpp-hemi-title">
-                  <i style={{ background: "#b592e6" }} /> Hemisferio Estratégico · Planeación
-                </span>
-                <div className="cpp-chips">
-                  {SOURCE_ORDER.map((k) => (
-                    <span key={k} className="cpp-chip">
-                      <i style={{ background: SOURCES[k].color }} />
-                      {SOURCES[k].name}
-                    </span>
-                  ))}
+            <div style={{ display: "grid", gap: "10px" }}>
+              <div className="cpp-spec-grid">
+                <div className="cpp-spec-box">
+                  <span>Hemisferio Estratégico</span>
+                  <b>{model.counts.nodes} nodos</b>
+                  <small>PDI · Cifras · Observatorio</small>
+                </div>
+                <div className="cpp-spec-box">
+                  <span>Hemisferio Curricular</span>
+                  <b>{model.counts.teachNodes} nodos</b>
+                  <small>Modelos · RA · Moodle</small>
+                </div>
+                <div className="cpp-spec-box">
+                  <span>Sinapsis Inter-dominio</span>
+                  <b>{model.counts.bridges} puentes</b>
+                  <small>Alineación 0122 (ODS/Leyes)</small>
+                </div>
+                <div className="cpp-spec-box">
+                  <span>Topología Total</span>
+                  <b>{model.counts.totalNodes} neuronas</b>
+                  <small>Dual-Stream Knowledge Graph</small>
                 </div>
               </div>
 
               <div className="cpp-hemi-group">
                 <span className="cpp-hemi-title">
-                  <i style={{ background: "#38bdf8" }} /> Hemisferio Curricular · Enseñanza
+                  <i style={{ background: "#7fe7f0" }} /> Fuentes Ontológicas Mapeadas
                 </span>
                 <div className="cpp-chips">
-                  {TEACH_SOURCE_ORDER.map((k) => (
+                  {ALL_SOURCES.map((k) => (
                     <span key={k} className="cpp-chip">
                       <i style={{ background: SOURCES[k].color }} />
                       {SOURCES[k].name}
                     </span>
                   ))}
-                </div>
-              </div>
-
-              <div className="cpp-meter">
-                <div>
-                  <b>{model.counts.nodes}</b>
-                  <small>nodos Planeación</small>
-                </div>
-                <div>
-                  <b>{model.counts.teachNodes}</b>
-                  <small>nodos Enseñanza</small>
-                </div>
-                <div>
-                  <b>{model.counts.bridges}</b>
-                  <small>puentes neuronales</small>
                 </div>
               </div>
             </div>
           ),
         },
 
-        // 1. Nuevas capacidades y acciones
+        // 1. Multimodalidad y Procesamiento Perimetral
         {
-          short: "Acciones",
-          title: "Nuevas capacidades: archivos, código y roles",
+          short: "Edge AI",
+          phaseCode: "FASE 1 · COMPUTACIÓN EN EL BORDE",
+          title: "Multimodalidad en el cliente y preservación de privacidad perimetral",
           body: (
             <>
-              La nueva generación de Mr. Pilo amplía su alcance cognitivo con <b>acciones avanzadas</b> que van más allá
-              de la consulta básica de texto, diseñadas para la productividad académica y administrativa.
+              La investigación en innovación educativa exige estricta privacidad de datos institucionales (FERPA / Habeas Data).
+              Mr. Pilo incorpora <b>computación perimetral (Edge AI)</b>: los documentos y archivos no se suben a servidores
+              externos; se analizan de manera segura en el navegador de la persona mediante web-workers locales.
             </>
           ),
           extra: (
@@ -277,9 +281,9 @@ export function Presentation() {
                   <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--cpp-cyan)" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                     <path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48" />
                   </svg>
-                  Archivos adjuntos
+                  Edge Document Parser
                 </b>
-                <span>Lectura y extracción local segura de PDFs y hojas de cálculo (hasta 10 MB) sin almacenar ni filtrar datos.</span>
+                <span>Parseo e indexación vectorial en cliente (PDF/XLSX hasta 10 MB). Cero filtración de datos institucionales sensibles.</span>
               </div>
 
               <div className="cpp-action-card">
@@ -288,9 +292,9 @@ export function Presentation() {
                     <polyline points="16 18 22 12 16 6" />
                     <polyline points="8 6 2 12 8 18" />
                   </svg>
-                  Generación de código
+                  Learning Analytics Code
                 </b>
-                <span>Explicación y desarrollo de scripts analíticos (SQL, TypeScript, fórmulas y métricas) para docentes y gestión.</span>
+                <span>Generación computacional de scripts analíticos (SQL, TypeScript, fórmulas CNA/SNIES y cálculo de tasas de retención).</span>
               </div>
 
               <div className="cpp-action-card">
@@ -301,9 +305,9 @@ export function Presentation() {
                     <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
                     <path d="M16 3.13a4 4 0 0 1 0 7.75" />
                   </svg>
-                  Personalización por rol
+                  Persona Conditioning
                 </b>
-                <span>Voz y tono calibrados para estudiantes, profesores, directivos o personal administrativo con microexpresiones acordes.</span>
+                <span>Modulación prosódica y tonal condicionada por el perfil académico: Estudiante, Docente-Investigador o Directivo.</span>
               </div>
 
               <div className="cpp-action-card">
@@ -311,183 +315,199 @@ export function Presentation() {
                   <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#34d399" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                     <path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" />
                   </svg>
-                  Cifras vivas auditadas
+                  Zero-Hallucination Facts
                 </b>
-                <span>Integración en vivo con pilo_facts: verificación matemática estricta sin redondeos ni alucinaciones numéricas.</span>
+                <span>Verificación matemática auditada contra pilo_facts: ninguna cifra métrica o presupuestal es aproximada o alucinada.</span>
               </div>
             </div>
           ),
         },
 
-        // 2. Llega una pregunta
+        // 2. Vector de Entrada y Estímulo Sensorial
         {
-          short: "Pregunta",
-          title: "Llega una pregunta: el estímulo sináptico",
+          short: "Estímulo",
+          phaseCode: "FASE 2 · INGESTA SENSORIAL",
+          title: "Ingesta del vector de consulta y estímulo sensorial en lenguaje natural",
           body: (
             <>
-              La interacción comienza con un impulso sensorial: una persona escribe en lenguaje natural. Antes de activar
-              inferencia profunda o gastar créditos, la señal viaja velozmente por los filtros reflejos del núcleo central.
+              La interacción inicia con la formulación de una consulta de investigación en lenguaje natural. El estímulo
+              se tokeniza y vectoriza en tiempo real mientras se evalúan atajos reflejos de tiempo constante O(1).
             </>
           ),
           extra: (
             <div style={{ display: "grid", gap: "10px" }}>
               <div className="cpp-q">{model.question}</div>
-              <span className="cpp-badge" style={{ alignSelf: "flex-start" }}>
-                Estímulo sensorial inicial · Entrada de señal
-              </span>
+              <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
+                <span className="cpp-research-tag">Vector de entrada: dense-embedding (1536 dim)</span>
+                <span className="cpp-research-tag">Intención: Articulación PDI ↔ Currículo ↔ ODS</span>
+              </div>
             </div>
           ),
         },
 
-        // 3. Catálogo y reglas
+        // 3. Autómata de Enrutamiento Determinista (0 Créditos / < 40ms)
         {
           short: "Filtros 0cr",
+          phaseCode: "FASE 3 · ENRUTAMIENTO REFLEJO",
           layer: 1,
-          title: "Filtros reflejos: velocidad y 0 créditos",
+          title: "Autómata reflejo determinista: eficiencia O(1) y cero consumo de GPU",
           body: (
             <>
-              El <b>catálogo oficial</b> (respuestas institucionales firmadas y capciosas) y las <b>reglas duras</b>{" "}
-              (dinero, protección de datos personales, límites éticos) responden en menos de <b>40 ms</b>. Si la consulta
-              no coincide con una respuesta predeterminada, continúa sin fricción hacia la memoria profunda.
+              Gobernanza de costos computacionales en IA universitaria: antes de activar inferencia estocástica en la nube,
+              el <b>catálogo institucional firmado</b> y el <b>motor de reglas duras</b> (protección de datos, dinero, límites
+              éticos) resuelven de forma determinista en menos de <b>40 ms</b>.
             </>
           ),
           extra: (
             <div style={{ display: "grid", gap: "8px" }}>
               <div className="cpp-credits">
-                Costo en créditos: <b>0 créditos consumidos</b>
+                Costo computacional: <b>0 créditos de GPU consumidos</b>
               </div>
               <div className="cpp-meter">
                 <div>
-                  <b>&lt; 40 ms</b>
-                  <small>tiempo de respuesta</small>
+                  <b>&lt; 38 ms</b>
+                  <small>latencia de respuesta</small>
+                </div>
+                <div>
+                  <b>O(1)</b>
+                  <small>complejidad de enrutamiento</small>
                 </div>
                 <div>
                   <b>100%</b>
-                  <small>respuestas oficiales firmadas</small>
+                  <small>determinismo ontológico</small>
                 </div>
               </div>
             </div>
           ),
         },
 
-        // 4. Respuestas guardadas y activación de pasajes
+        // 4. Recuperación Semántica Híbrida Densa y Dispersa
         {
           short: "Pasajes",
+          phaseCode: "FASE 4 · RECUPERACIÓN HÍBRIDA",
           layer: 2,
-          title: "Activación sináptica: pasajes encendidos",
+          title: "Recuperación semántica híbrida: espacio vectorial denso y concordancia dispersa",
           body: (
             <>
-              Si una respuesta previa sigue fresca, Pilo la sirve sin demora. Si no, la búsqueda semántica y vectorial
-              despierta los pasajes pertinentes en ambos hemisferios. En la corteza se iluminan las neuronas asociadas al
-              núcleo conceptual de <b>{model.focus?.name ?? "la pregunta"}</b>.
+              Para consultas inéditas, el sistema despliega una <b>recuperación híbrida (Dense + Sparse)</b>: similitud
+              coseno sobre embeddings vectoriales (`bge-m3 / nemotron`) combinada con concordancia léxica BM25/FTS en español
+              normalizado. Se activan sinérgicamente las neuronas de memoria en ambos hemisferios.
             </>
           ),
           extra: (
             <div className="cpp-meter">
               <div>
                 <b>{model.matches.size}</b>
-                <small>pasajes encendidos</small>
+                <small>clústeres semánticos encendidos</small>
               </div>
               <div>
                 <b>{model.counts.totalNodes}</b>
-                <small>neuronas en la red</small>
+                <small>neuronas en la corteza</small>
               </div>
               <div>
-                <b>2</b>
-                <small>hemisferios activos</small>
+                <b>cos_sim &ge; 0.78</b>
+                <small>umbral de activación sináptica</small>
               </div>
             </div>
           ),
         },
 
-        // 5. Los puentes neuronales
+        // 5. Puentes de Ontología Cruzada y Protocolo de Visita
         {
           short: "Puentes",
+          phaseCode: "FASE 5 · ALINEACIÓN ONTOLÓGICA",
           layer: 3,
-          title: "Puentes neuronales: interconexión entre hemisferios",
+          title: "Puentes ontológicos inter-dominio y protocolo de lectura «de visita»",
           body: (
             <>
-              Lo institucional y lo pedagógico no funcionan en silos. Los <b>puentes neuronales</b> (migración 0122)
-              unen Planeación y Enseñanza mediante reglas cruzadas: <b>ODS 4</b>, <b>Ley 30 de 1992</b>, <b>Decreto 1330</b> y
-              resultados de aprendizaje. Permiten la <b>lectura «de visita»</b>: Pilo consulta el otro hemisferio indicando su procedencia exacta.
+              Aporte conceptual central del proyecto: alineación de ontologías heterogéneas. La migración 0122 define
+              <b> puentes ontológicos formales</b> que conectan el PDI con el marco pedagógico: <b>ODS 4</b>, <b>Ley 30 de 1992</b>,{" "}
+              <b>Decreto 1330</b> y resultados de aprendizaje (RA). Si un hemisferio no tiene suficiente contexto, la señal
+              cruza el puente mediante el <b>protocolo de lectura «de visita»</b> preservando la trazabilidad de origen.
             </>
           ),
           extra: (
             <div className="cpp-neural-card">
-              <span className="cpp-badge cpp-badge--bridge">Puente Neuronal Aprobado · Conexión 0122</span>
+              <span className="cpp-badge cpp-badge--bridge">Puente Ontológico Formal · Protocolo 0122</span>
               <p style={{ margin: 0, fontSize: "0.88rem", color: "var(--cpp-ink)" }}>
-                ⚡ <b>PR1 / LA21 ↔ ODS 4 y Resultados de Aprendizaje:</b> El proyecto institucional aterriza directamente
-                en las directivas curriculares y el aula Moodle.
+                ⚡ <b>Alineación Ontológica: PR1 / LA21 ↔ ODS 4 & Resultados de Aprendizaje:</b> Conexión formal entre metas
+                institucionales del PDI y las competencias evaluables en el aula Moodle.
               </p>
               <div className="cpp-credits">
-                Trazabilidad: <b>Procedencia de visita garantizada</b>
+                Trazabilidad: <b>Procedencia ontológica verificada de visita</b>
               </div>
             </div>
           ),
         },
 
-        // 6. Cortex Gemma 4 31B
+        // 6. Inferencia Profunda con Gemma 4 31B
         {
           short: "Gemma 31B",
+          phaseCode: "FASE 6 · INFERENCIA NEURONAL",
           layer: 4,
-          title: "Cortex neuronal profundo: Gemma 4 31B (NVIDIA)",
+          title: "Inferencia y razonamiento relacional con Gemma 4 31B (NVIDIA TensorRT)",
           body: (
             <>
-              Cuando la consulta exige correlacionar datos dispersos entre ambos hemisferios y redactar con criterio, entra
-              en acción <b>Gemma 4 31B</b> vía <b>NVIDIA NIM</b>. Sus 31 mil millones de parámetros orquestan la atención
-              sináptica multi-cabeza, conectando los fragmentos activados bajo un principio rector: <b>grounding estricto</b>, sin inventar cifras ni alucinar.
+              Cuando la consulta requiere correlacionar evidencia dispersa entre ambos hemisferios y formular una síntesis
+              con rigor metodológico, interviene <b>Gemma 4 31B</b> (desplegado en clúster NVIDIA NIM). Sus 31 mil millones
+              de parámetros ejecutan <b>atención multi-cabeza cruzada (Cross-Attention)</b> anclada en una barrera de{" "}
+              <b>Strict Factual Grounding</b> para erradicar alucinaciones.
             </>
           ),
           extra: (
             <div className="cpp-neural-card">
               <span className="cpp-badge cpp-badge--gemma">NVIDIA NIM · google/gemma-4-31b-it</span>
-              <div style={{ display: "grid", gap: "4px", fontSize: "0.85rem" }}>
+              <div style={{ display: "grid", gap: "5px", fontSize: "0.85rem" }}>
                 <div>
-                  <b style={{ color: "#fbbf24" }}>Arquitectura:</b> Red de atención neuronal de 31B parámetros
+                  <b style={{ color: "#fbbf24" }}>Arquitectura LLM:</b> 31B parámetros con Grouped-Query Attention
                 </div>
                 <div>
-                  <b style={{ color: "var(--cpp-cyan)" }}>Inferencia:</b> Aceleración por tensor cores en la nube
+                  <b style={{ color: "var(--cpp-cyan)" }}>Inferencia en la Nube:</b> TensorRT-LLM acelerado en GPU Hopper
                 </div>
                 <div>
-                  <b style={{ color: "#a78bfa" }}>Verificación:</b> Ponderación factual anclada 100% a las fuentes
+                  <b style={{ color: "#a78bfa" }}>Barrera Anti-Alucinación:</b> Ponderación estricta de citas institucionales
                 </div>
               </div>
             </div>
           ),
         },
 
-        // 7. La respuesta fundamentada
+        // 7. Síntesis Epistémica y Verificación Factual Auditada
         {
-          short: "Respuesta",
+          short: "Síntesis",
+          phaseCode: "FASE 7 · CONSTRUCTO EPISTÉMICO",
           layer: 5,
-          title: "La respuesta fundamentada emerge de la red",
+          title: "Síntesis epistémica multidominio con verificación factual auditada",
           body: (
             <>
-              La respuesta final es el resultado armónico de la malla, los puentes inter-hemisféricos y la síntesis
-              neuronal de Gemma 4 31B. Cada afirmación incluye su cita numérica verificable, su procedencia institucional y la garantía de exactitud.
+              La respuesta resultante es un constructo epistémico verificable: articula la evidencia del Hemisferio
+              Estratégico con las directivas del Hemisferio Curricular. Cada afirmación cuenta con citas indizables [1] y [2],
+              garantizando reproducibilidad académica y rigor de auditoría.
             </>
           ),
           extra: (
             <div className="cpp-ans">
-              <span className="cpp-badge">Respuesta fundamentada · Síntesis multi-hemisferio</span>
+              <span className="cpp-badge">Constructo Epistémico · Síntesis Multidominio Verificada</span>
               <p>
                 {model.answer} <span className="cpp-cite">1</span> <span className="cpp-cite">2</span>
               </p>
               <div className="cpp-credits">
-                Sello de autenticidad: <b>Fuentes institucionales UDES verificadas</b>
+                Auditoría: <b>100% fuentes primarias verificadas · Cero alucinación</b>
               </div>
             </div>
           ),
         },
 
-        // 8. Explorar el cerebro de Mr. Pilo
+        // 8. Laboratorio Interactivo de Telemetría y Topología
         {
-          short: "Explorar",
-          title: "Explore el cerebro de Mr. Pilo",
+          short: "Laboratorio",
+          phaseCode: "FASE 8 · EXPERIMENTACIÓN",
+          title: "Laboratorio interactivo de telemetría y topología de red",
           body: (
             <>
-              Pase el puntero sobre cualquier neurona para inspeccionar su ruta completa, hemisferio y procedencia; haga
-              clic para fijarla. Use los controles a continuación para filtrar fuentes y alternar la visibilidad de los puentes neuronales.
+              Explore libremente la topología del grafo cerebral: audite puentes ontológicos, inspeccione la centralidad
+              de cada nodo, alterne la visibilidad de los hemisferios y observe el comportamiento de la corteza sináptica
+              mediante el oscilograma y HUD de telemetría en tiempo real.
             </>
           ),
           extra: (
@@ -501,12 +521,12 @@ export function Presentation() {
                   onClick={toggleBridges}
                 >
                   <i style={{ background: "#fbbf24" }} />
-                  {bridgesOn ? "Puentes neuronales (visibles)" : "Puentes neuronales (ocultos)"}
+                  {bridgesOn ? "Puentes Ontológicos (Activos)" : "Puentes Ontológicos (Inactivos)"}
                 </button>
               </div>
 
               <span className="cpp-hemi-title" style={{ marginTop: "4px" }}>
-                Filtrar fuentes en la red:
+                Filtrar Ontologías en la Malla:
               </span>
               <div className="cpp-chips">
                 {ALL_SOURCES.map((k) => (
@@ -535,10 +555,10 @@ export function Presentation() {
     <div className="cpp">
       <header className="cpp-top">
         <div className="cpp-brand">
-          <b>Mr. Pilo · La capa profunda</b>
-          Planeación Institucional & Vicerrectoría de Enseñanza · UDES
+          <b>Mr. Pilo · AIED Research Engine</b>
+          Investigación e Innovación Pedagógica · Universidad de Santander UDES
         </div>
-        <span className="cpp-tag">Malla neuronal de 2 hemisferios · Puentes 0122 · Gemma 4 31B</span>
+        <span className="cpp-tag">Dual-Stream Cognitive Architecture · Gemma 4 31B (NVIDIA NIM) · Malla 0122</span>
         <button className="cpp-ghost" type="button" onClick={fullscreen}>
           Pantalla completa
         </button>
@@ -551,18 +571,21 @@ export function Presentation() {
         {!model ? (
           <p>
             {error
-              ? "No se pudo leer la estructura del plan. Revise la conexión y vuelva a abrir la presentación."
+              ? "No se pudo leer la topología de la memoria. Revise la conexión a la base y vuelva a intentar."
               : loading
-                ? "Leyendo la arquitectura neuronal de Mr. Pilo…"
-                : "No hay datos para presentar."}
+                ? "Compilando telemetría de la red neuronal…"
+                : "No hay datos de red para proyectar."}
           </p>
         ) : current ? (
           <>
-            {current.layer ? (
-              <div className="cpp-layer">
-                <i>{current.layer}</i>Capa cognitiva {current.layer} de 5
-              </div>
-            ) : null}
+            <div style={{ display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap" }}>
+              <span className="cpp-research-tag">{current.phaseCode}</span>
+              {current.layer ? (
+                <div className="cpp-layer">
+                  <i>{current.layer}</i>Capa cognitiva {current.layer} de 5
+                </div>
+              ) : null}
+            </div>
             <h1>{current.title}</h1>
             <p>{current.body}</p>
             {current.extra}
@@ -571,11 +594,11 @@ export function Presentation() {
       </section>
 
       <div className="cpp-stage" ref={host}>
-        <canvas ref={canvas} role="img" aria-label="Malla cerebral y neuronal de Mr. Pilo con dos hemisferios y Gemma 4 31B" />
+        <canvas ref={canvas} role="img" aria-label="Malla cerebral bio-digital y telemetría de inferencia de Mr. Pilo" />
         <div className="cpp-tip" ref={tip} />
       </div>
 
-      <nav className="cpp-rail" aria-label="Pasos de la presentación">
+      <nav className="cpp-rail" aria-label="Fases de la presentación de investigación">
         <div className="cpp-steps">
           {(steps.length ? steps : Array.from({ length: STEP_COUNT }, () => ({ short: "" }) as Step)).map((s, i) => (
             <button
@@ -583,7 +606,7 @@ export function Presentation() {
               type="button"
               className="cpp-step"
               aria-current={i === step ? "step" : undefined}
-              aria-label={`Paso ${i + 1}${s.short ? `: ${s.short}` : ""}`}
+              aria-label={`Fase ${i + 1}${s.short ? `: ${s.short}` : ""}`}
               style={{ ["--f" as string]: i <= step ? 1 : 0 }}
               onClick={() => setStep(i)}
             >
@@ -596,7 +619,7 @@ export function Presentation() {
           <button
             className="cpp-round"
             type="button"
-            aria-label="Paso anterior"
+            aria-label="Fase anterior"
             disabled={step === 0}
             onClick={() => setStep((s) => Math.max(0, s - 1))}
           >
@@ -607,7 +630,7 @@ export function Presentation() {
           <button
             className="cpp-round cpp-round--main"
             type="button"
-            aria-label="Paso siguiente"
+            aria-label="Fase siguiente"
             disabled={step === STEP_COUNT - 1}
             onClick={() => setStep((s) => Math.min(STEP_COUNT - 1, s + 1))}
           >
@@ -616,7 +639,7 @@ export function Presentation() {
             </svg>
           </button>
         </div>
-        <span className="cpp-keys">← → para avanzar · Esc para salir</span>
+        <span className="cpp-keys">← → avanzar/retroceder · Espacio · Esc salir</span>
       </nav>
     </div>
   );

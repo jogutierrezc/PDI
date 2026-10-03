@@ -23,7 +23,7 @@ import { supabase } from "../../../lib/supabase";
 import type { PiloSpace } from "./space";
 
 export type Cell = "casa" | "visita" | "no";
-export type SourceKind = "portal" | "documentos" | "moodle";
+export type SourceKind = "portal" | "documentos" | "moodle" | "catalogo";
 
 export interface PiloSource {
   id: string;
@@ -87,7 +87,7 @@ export function parsePortals(portalRows: unknown, sourceRows: unknown): PortalsD
       id: r.id as string,
       scope: r.scope as string,
       name: text(r.name, 80) || (r.id as string),
-      kind: (r.kind === "documentos" || r.kind === "moodle" ? r.kind : "portal") as SourceKind,
+      kind: (r.kind === "documentos" || r.kind === "moodle" || r.kind === "catalogo" ? r.kind : "portal") as SourceKind,
       staff_only: r.staff_only === true,
       stays_home: r.stays_home === true,
       sort: whole(r.sort),

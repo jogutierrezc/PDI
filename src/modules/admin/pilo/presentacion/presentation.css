@@ -385,33 +385,100 @@ button.cpp-chip:active {
 .cpp-tip {
   position: absolute;
   display: grid;
-  max-width: 280px;
-  padding: 9px 12px;
-  border-radius: 10px;
-  border: 1px solid var(--cpp-line);
-  background: rgba(4, 13, 31, 0.94);
-  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.5);
+  gap: 4px;
+  max-width: 320px;
+  padding: 10px 14px;
+  border-radius: 12px;
+  border: 1px solid rgba(127, 231, 240, 0.25);
+  background: rgba(4, 13, 31, 0.96);
+  box-shadow: 0 16px 36px rgba(0, 0, 0, 0.6);
   font-size: 0.78rem;
   line-height: 1.45;
   pointer-events: none;
   opacity: 0;
-  transform: translateY(4px);
+  transform: translateY(4px) scale(0.97);
   transition: opacity 140ms ease, transform 140ms var(--cpp-ease);
 }
 
 .cpp-tip[data-on] {
   opacity: 1;
-  transform: none;
+  transform: translateY(0) scale(1);
 }
 
 .cpp-tip b {
-  font-size: 0.84rem;
+  font-size: 0.85rem;
   color: var(--cpp-ink);
 }
 
 .cpp-tip span {
   color: var(--cpp-ink-3);
 }
+
+.cpp-tip-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 2px 0;
+}
+
+.cpp-tip-chip {
+  padding: 2px 6px;
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.06);
+  font: 700 0.65rem/1.2 "Fira Code", ui-monospace, SFMono-Regular, monospace;
+  color: var(--cpp-cyan);
+  border: 1px solid rgba(127, 231, 240, 0.2);
+}
+
+/* --- Elementos de Investigación Científica (AIED) ------------------------------ */
+
+.cpp-research-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 8px;
+  border-radius: 6px;
+  background: rgba(99, 102, 241, 0.15);
+  border: 1px solid rgba(99, 102, 241, 0.35);
+  font: 700 0.68rem/1 "Fira Code", ui-monospace, SFMono-Regular, monospace;
+  color: #a5b4fc;
+}
+
+.cpp-spec-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  max-width: 46ch;
+}
+
+.cpp-spec-box {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.025);
+  border: 1px solid var(--cpp-line);
+}
+
+.cpp-spec-box span {
+  font-size: 0.68rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--cpp-ink-3);
+}
+
+.cpp-spec-box b {
+  font: 700 0.95rem/1.2 "Fira Code", ui-monospace, monospace;
+  color: var(--cpp-ink);
+}
+
+.cpp-spec-box small {
+  font-size: 0.68rem;
+  color: var(--cpp-cyan);
+}
+
 
 /* --- El riel de pasos --------------------------------------------------------------------- */
 

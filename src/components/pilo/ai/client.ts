@@ -626,6 +626,26 @@ export function voiceBody(text: string, portal: string, style?: string, rol?: st
   return { action: "voz" as const, portal, text, style, ...(r ? { rol: r } : {}) };
 }
 
+/**
+ * Por qué no sonó la voz de IA. La página sigue con la voz del navegador y no lo
+ * dice; el motivo (clave, voz, cupo…) llega en el cuerpo del error y se deja en
+ * la consola para quien lo busque.
+ */
+async function reportVoiceFault(error: unknown): Promise<void> {
+  if (typeof console === "undefined") return;
+  let detail = "";
+  const response = (error as { context?: Response } | null)?.context;
+  if (response && typeof response.clone === "function") {
+    try {
+      const body = (await response.clone().json()) as { error?: unknown; code?: unknown };
+      detail = [body.code, body.error].filter((v) => typeof v === "string" && v).join(" · ");
+    } catch {
+      detail = "";
+    }
+  }
+  console.warn(`[Pilo] La voz de IA no sonó (${response?.status ?? "sin respuesta"}). ${detail || (error instanceof Error ? error.message : "")}`.trim());
+}
+
 function audioFor(text: string, portal: AskPortal, style?: string, rol?: string | null): Promise<Blob | null> {
   const key = audioKey(text, portal, style, rol);
   const known = audios.get(key);
@@ -633,7 +653,11 @@ function audioFor(text: string, portal: AskPortal, style?: string, rol?: string 
   const usual = () =>
     supabase.functions
       .invoke<Blob>("pilo-ia", { body: voiceBody(text, portal, style, rol) })
-      .then(({ data, error }) => (!error && data instanceof Blob && data.size > 0 ? data : null))
+      .then(async ({ data, error }) => {
+        if (!error && data instanceof Blob && data.size > 0) return data;
+        if (error) await reportVoiceFault(error);
+        return null;
+      })
       .catch(() => null);
   // Primero la vía directa (Vercel), que responde antes; si no está o tropieza, la de siempre.
   // Un estilo pedido a propósito (la prueba de la configuración) solo lo sabe dar la de siempre.

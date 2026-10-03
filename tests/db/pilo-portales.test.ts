@@ -476,6 +476,9 @@ describe("el catálogo y las guardadas son de cada portal", () => {
     expect(await mine("ensenanza")).toBe("ensenanza");
     // Y por rol: la de «general» no es candidata para un estudiante.
     expect(await asService(t, (q) => q("select id from pilo_answer_candidates('q1000k', 'ensenanza', 'estudiante', false, false)"))).toEqual([]);
+    // Estas dos entradas dejan de ser pasajes y fuentes (0126): el resto de las pruebas parte del catálogo de siempre.
+    await t.q("delete from pilo_catalog where key in ('R-900', 'ER-900')");
+    await t.q("delete from pilo_sources where kind = 'catalogo'");
   });
 
   it("una guardada deja de servirse en cuanto su portal o esa persona ya no pueden leer lo que cita", async () => {

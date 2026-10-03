@@ -36,6 +36,7 @@ const KIND_NOTE: Record<PiloSource["kind"], string> = {
   portal: "La llenan los portales públicos",
   documentos: "Documentos que sube la administración",
   moodle: "Cursos leídos de Moodle",
+  catalogo: "Respuestas oficiales del catálogo · para leer de visita",
 };
 
 const SCOPE_NAME: Record<string, string> = { planeacion: "Planeación", ensenanza: "Enseñanza" };

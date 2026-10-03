@@ -32,6 +32,8 @@ interface Entry extends CatalogRow {
   kind: CatalogKind;
   hits: number;
   updated_at: string;
+  /** Sirve además a los demás Pilos (0126). `undefined`: la base aún no tiene esa migración. */
+  shared?: boolean;
 }
 
 const KEY = ["pilo-ia", "catalogo"] as const;
@@ -131,6 +133,15 @@ export function CatalogSection({
     mutationFn: async ({ key, active }: { key: string; active: boolean }) => {
       const { error } = await supabase.from("pilo_catalog").update({ active }).eq("key", key);
       if (error) throw error;
+    },
+    onSuccess: () => client.invalidateQueries({ queryKey: KEY }),
+  });
+
+  /** Compartir una entrada con los demás Pilos (0126): se aplica al momento y la base revisa que sea para todos los roles. */
+  const share = useMutation({
+    mutationFn: async ({ key, shared }: { key: string; shared: boolean }) => {
+      const { error } = await supabase.rpc("pilo_catalog_share" as never, { p_key: key, p_shared: shared } as never);
+      if (error) throw new Error(/could not find the function|schema cache/i.test(error.message) ? "Falta aplicar la migración 0126 en la base." : error.message);
     },
     onSuccess: () => client.invalidateQueries({ queryKey: KEY }),
   });
@@ -288,9 +299,9 @@ export function CatalogSection({
         title={kind === "respuesta" ? "Respuestas guardadas" : "Capciosas guardadas"}
         aside={rows.length ? <small>{rows.filter((e) => e.active).length} en uso de {rows.length}</small> : null}
       >
-        {toggle.isError && (
+        {(toggle.isError || share.isError) && (
           <p className="pis-error" role="alert">
-            No se cambió: {(toggle.error as Error).message}
+            No se cambió: {((toggle.error ?? share.error) as Error).message}
           </p>
         )}
         {rows.length === 0 ? (
@@ -316,8 +327,15 @@ export function CatalogSection({
                 <em>
                   {own ? `${ROL_LABEL[(e.rol ?? "") as CatalogRol] ?? "Todos"} · ` : ""}
                   {e.mood} · {e.hits} {e.hits === 1 ? "uso" : "usos"}
+                  {e.shared ? " · en todos los Pilos" : ""}
                 </em>
                 <div className="pis-cat__actions">
+                  {typeof e.shared === "boolean" && (e.rol ?? "") === "" && (
+                    <label className="pis-cat__share" title="La entrada sirve también en los demás Pilos">
+                      <Switch on={e.shared} disabled={share.isPending} onChange={(shared) => share.mutate({ key: e.key, shared })} label={`Compartir ${e.key} con los demás Pilos`} />
+                      <span>Todos los Pilos</span>
+                    </label>
+                  )}
                   <button
                     type="button"
                     className="button-secondary"

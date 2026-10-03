@@ -59,6 +59,15 @@ describe("el catálogo", () => {
     ]);
   });
 
+  it("reconoce las fuentes del catálogo y no las ofrece como colecciones de documentos", () => {
+    const data = parsePortals([], [
+      { id: "respuestasplan", scope: "planeacion", name: "Respuestas oficiales de Planeación", kind: "catalogo", sort: 9, custom: false },
+      { id: "normativa", scope: "planeacion", name: "Normativa", kind: "documentos", sort: 7, custom: false },
+    ]);
+    expect(data.sources.find((s) => s.id === "respuestasplan")?.kind).toBe("catalogo");
+    expect(docCollections(data.sources, "planeacion").map((c) => c.id)).toEqual(["normativa"]);
+  });
+
   it("sin la columna custom (base sin 0125) no hay gestión de colecciones", () => {
     const old = parsePortals([], [{ id: "politicas", scope: "ensenanza", name: "P", kind: "documentos", sort: 1 }]);
     expect(old.sources[0].custom).toBeUndefined();

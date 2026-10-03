@@ -794,7 +794,7 @@ export function createStage(
         const [x1, y1] = pos(br.a);
         const [x2, y2] = pos(br.b);
         const lit = Boolean(chainB?.has(br)) || S.bridges > 0.5;
-        let a = (lit ? 0.85 : 0.25) * Math.max(S.bridges, S.chain);
+        let a = (lit ? 0.9 : 0.25) * Math.max(S.bridges, S.chain);
         if (!lit) a *= 1 - 0.75 * dimAmount;
         if (a < 0.01) continue;
 
@@ -802,23 +802,82 @@ export function createStage(
         const curveOffset = (x1 > x2 ? -1 : 1) * 35;
         ctx.beginPath();
         ctx.moveTo(x1, y1);
-        ctx.bezierCurveTo(x1 + curveOffset, y1 - 30, x2 - curveOffset, y2 - 30, x2, y2);
+        ctx.bezierCurveTo(x1 + curveOffset, y1 - 32, x2 - curveOffset, y2 - 32, x2, y2);
         ctx.strokeStyle = lit ? rgba(GOLD, a) : rgba(CYAN, a * 0.6);
-        ctx.lineWidth = lit ? 2.2 : 1;
+        ctx.lineWidth = lit ? 2.4 : 1;
         ctx.setLineDash(br.kind === "visita" ? [3, 4] : []);
         ctx.stroke();
         ctx.setLineDash([]);
 
+        // Impulso eléctrico bio-digital cruzando el puente inter-hemisférico
+        if (!reduce && (lit || S.bridges > 0.4)) {
+          const pt = (time * 0.95 + (br.id.charCodeAt(3) || 1) * 0.17) % 1;
+          const cp1x = x1 + curveOffset;
+          const cp1y = y1 - 32;
+          const cp2x = x2 - curveOffset;
+          const cp2y = y2 - 32;
+          const u = 1 - pt;
+          const px = u * u * u * x1 + 3 * u * u * pt * cp1x + 3 * u * pt * pt * cp2x + pt * pt * pt * x2;
+          const py = u * u * u * y1 + 3 * u * u * pt * cp1y + 3 * u * pt * pt * cp2y + pt * pt * pt * y2;
+
+          ctx.beginPath();
+          ctx.arc(px, py, 2.6, 0, Math.PI * 2);
+          ctx.fillStyle = rgba("#ffffff", Math.min(1, a * 1.2));
+          ctx.shadowColor = GOLD;
+          ctx.shadowBlur = 8;
+          ctx.fill();
+          ctx.shadowBlur = 0;
+        }
+
         // Rótulo del puente cuando está encendido
         if (lit && S.labels > 0.3 && br.refCode) {
           const midX = (x1 + x2) / 2;
-          const midY = (y1 + y2) / 2 - 25;
+          const midY = (y1 + y2) / 2 - 28;
           ctx.font = "800 10px Manrope, sans-serif";
           ctx.fillStyle = rgba(GOLD, a);
           ctx.textAlign = "center";
-          ctx.fillText(br.refCode, midX, midY);
+          ctx.fillText(`⚡ ${br.refCode}`, midX, midY);
         }
       }
+    }
+
+    // 5.b. Monitor de Telemetría Científica e Inferencia Neuronal (HUD)
+    if (W > 500) {
+      ctx.save();
+      const hudY = H - 24;
+      const attentionPct = Math.round(S.gemma * 94.6 + (reduce ? 0 : Math.sin(time * 3) * 2.2));
+      const entropyVal = (0.08 * (1 - S.chain * 0.7) + (reduce ? 0 : Math.sin(time * 2) * 0.015)).toFixed(3);
+
+      // Onda sinusoidal / Oscilograma de actividad sináptica
+      ctx.beginPath();
+      const waveWidth = Math.min(220, W * 0.28);
+      const startX = W - waveWidth - 28;
+      for (let wx = 0; wx < waveWidth; wx += 4) {
+        const freq = S.gemma > 0.3 ? 0.12 : 0.05;
+        const amp = S.gemma > 0.3 ? 5.5 : S.chain > 0.3 ? 3.5 : 1.8;
+        const wy = hudY + (reduce ? 0 : Math.sin(wx * freq + time * 5) * amp);
+        if (wx === 0) ctx.moveTo(startX + wx, wy);
+        else ctx.lineTo(startX + wx, wy);
+      }
+      ctx.strokeStyle = rgba(S.gemma > 0.3 ? GOLD : CYAN, 0.45);
+      ctx.lineWidth = 1.2;
+      ctx.stroke();
+
+      // Indicadores científicos en tipografía monoespaciada
+      ctx.font = "700 9.5px 'Fira Code', ui-monospace, SFMono-Regular, monospace";
+      ctx.fillStyle = rgba("#8196ba", 0.7);
+      ctx.textAlign = "left";
+      ctx.fillText(`SYNAPSE FLUX · ${S.gemma > 0.3 ? "31B TENSORS ACTIVE" : "DUAL-STREAM DENSE"}`, startX, hudY - 10);
+
+      const statusBadge = S.gemma > 0.4
+        ? `GEMMA 4 31B: ATTENTION ${attentionPct}% · H(X): ${entropyVal}`
+        : S.bridges > 0.3
+        ? "ONTOLOGY BRIDGES: SYNCHRONIZED · CROSS-DOMAIN"
+        : "COGNITIVE MESH: DUAL-STREAM AIED STANDBY";
+
+      ctx.fillStyle = rgba(S.gemma > 0.4 ? GOLD : S.bridges > 0.3 ? CYAN : "#b9c9e6", 0.85);
+      ctx.fillText(statusBadge, 28, hudY);
+      ctx.restore();
     }
 
     // 6. Nodos somáticos (Neuronas y pasajes)
@@ -977,25 +1036,30 @@ export function createStage(
     const title = document.createElement("b");
     title.textContent = n.code ? `${n.code} · ${n.name}` : n.name;
 
+    const metaRow = document.createElement("div");
+    metaRow.className = "cpp-tip-meta";
+    metaRow.innerHTML = `<span class="cpp-tip-chip">${n.hemi === "planeacion" ? "ESTRATÉGICO · PLANEACIÓN" : "CURRICULAR · ENSEÑANZA"}</span><span class="cpp-tip-chip">k=${(k + pr) || 1}</span>`;
+
     const kind = document.createElement("span");
-    kind.textContent = `${n.type} · ${SOURCES[n.src]?.name ?? n.src} [${n.hemi === "planeacion" ? "Planeación" : "Enseñanza"}]`;
+    kind.textContent = `Ontología: ${n.type} · Fuente: ${SOURCES[n.src]?.name ?? n.src}`;
 
     const path = document.createElement("span");
-    path.textContent = route.join(" › ");
+    path.textContent = `Jerarquía ontológica: ${route.join(" › ")}`;
 
-    tip.append(title, kind, path);
-    if (k) tip.append(Object.assign(document.createElement("span"), { textContent: `Contiene ${k} elementos` }));
-    if (pr > 1) tip.append(Object.assign(document.createElement("span"), { textContent: `Vinculado en ${pr} lugares` }));
+    tip.append(title, metaRow, kind, path);
+    if (k) tip.append(Object.assign(document.createElement("span"), { textContent: `Sub-arborescencia: ${k} nodos descendentes` }));
+    if (pr > 1) tip.append(Object.assign(document.createElement("span"), { textContent: `Co-dependencias: ${pr} nodos ascendentes` }));
 
     if (nodeBridges.length) {
       const brSpan = document.createElement("span");
       brSpan.style.color = GOLD;
-      brSpan.textContent = `⚡ ${nodeBridges.length} puente neuronal: ${nodeBridges[0].why}`;
+      brSpan.style.fontWeight = "700";
+      brSpan.textContent = `⚡ Puente Ontológico Inter-dominio: ${nodeBridges[0].why}`;
       tip.append(brSpan);
     }
 
-    tip.style.left = `${Math.min(W - 300, mx + 14)}px`;
-    tip.style.top = `${Math.min(H - 140, my + 14)}px`;
+    tip.style.left = `${Math.min(W - 320, mx + 14)}px`;
+    tip.style.top = `${Math.min(H - 160, my + 14)}px`;
     tip.dataset.on = "";
   };
 

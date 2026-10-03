@@ -552,6 +552,32 @@
 .pen-doc__controls { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2) var(--space-4); }
 .pen-doc__switch { display: inline-flex; align-items: center; gap: var(--space-2); color: var(--ink-secondary); font-size: var(--text-xs); font-weight: 800; }
 .pen-doc__controls .pis-link:disabled, .pen-doc__controls .pis-file[aria-disabled] { opacity: 0.5; cursor: default; }
+.pen-doc__move { display: inline-flex; align-items: center; gap: var(--space-2); color: var(--ink-secondary); font-size: var(--text-xs); font-weight: 800; }
+.pen-doc__move select { min-height: 32px; max-width: 14rem; padding: 0 var(--space-2); color: var(--ink); background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius-sm); font: inherit; font-size: var(--text-xs); font-weight: 600; }
+.pen-doc__move select:focus-visible { outline: 2px solid var(--brand-blue); outline-offset: 1px; }
+.pen-doc__move select:disabled { opacity: 0.5; }
+
+/* Colecciones propias (0125). */
+.pen-colls { border: 1px solid var(--line); border-radius: var(--radius-sm); background: var(--surface); }
+.pen-colls > summary { display: flex; flex-wrap: wrap; align-items: baseline; gap: var(--space-1) var(--space-3); padding: var(--space-3) var(--space-4); cursor: pointer; color: var(--ink); font-size: var(--text-sm); }
+.pen-colls > summary small { color: var(--ink-muted); font-size: var(--text-xs); font-weight: 600; }
+.pen-colls > summary:focus-visible { outline: 2px solid var(--brand-blue); outline-offset: -2px; border-radius: var(--radius-sm); }
+.pen-colls__body { display: grid; gap: var(--space-4); padding: var(--space-1) var(--space-4) var(--space-4); }
+.pen-colls__list { display: grid; margin: 0; padding: 0; list-style: none; }
+.pen-colls__item { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2) var(--space-3); padding: var(--space-3) 0; border-bottom: 1px solid var(--line-faint); }
+.pen-colls__item:last-child { border-bottom: 0; }
+.pen-colls__name { display: grid; flex: 1 1 12rem; min-width: 0; }
+.pen-colls__name b { color: var(--ink); font-size: var(--text-sm); overflow-wrap: anywhere; }
+.pen-colls__name small, .pen-colls__block { color: var(--ink-muted); font-size: var(--text-xs); font-variant-numeric: tabular-nums; }
+.pen-colls__block { flex-basis: 100%; }
+.pen-colls__actions { display: inline-flex; gap: var(--space-4); }
+.pen-colls__confirm { display: inline-flex; flex-wrap: wrap; align-items: center; gap: var(--space-2) var(--space-3); color: var(--ink); font-size: var(--text-sm); }
+.pen-colls__edit { display: grid; flex: 1 1 100%; gap: var(--space-3); }
+.pen-colls__new { display: grid; gap: var(--space-3); max-width: 36rem; }
+.pen-colls__read { display: inline-flex; align-items: center; gap: var(--space-2); min-height: 44px; color: var(--ink-secondary); font-size: var(--text-sm); font-weight: 700; cursor: pointer; }
+.pen-colls__read input { width: 18px; height: 18px; accent-color: var(--brand-blue); }
+.pen-colls__list .pis-code { background: var(--od-line-5, var(--brand-navy)); }
+.pen-colls .pis-link:disabled { opacity: 0.5; cursor: default; }
 
 .pen-cat { display: grid; gap: var(--space-1); padding-top: var(--space-4); }
 .pen-cat h5 { margin: 0; color: var(--ink-muted); font-size: var(--text-xs); font-weight: 800; letter-spacing: 0.04em; text-transform: uppercase; }

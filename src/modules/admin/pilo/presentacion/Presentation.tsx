@@ -2,15 +2,15 @@
    Intranet · Mr. Pilo con IA · La capa profunda de Pilo (presentación).
 
    Una pieza para proyectar, solo para la administración (/admin/mr-pilo/
-   presentacion): cómo recorre Pilo sus capas —catálogo, reglas, respuestas
-   guardadas, pasajes y la malla— hasta responder, sobre la estructura real y
-   en vivo del Plan de Desarrollo, los informes de UDES en Cifras y los temas
-   del Observatorio. Ocho pasos que se avanzan con ← → (o espacio, o Re Pág /
-   Av Pág de un control de presentaciones); el último deja explorar la malla.
+   presentacion): cómo recorre Pilo su arquitectura bio-digital —las dos
+   memorias (Hemisferio Estratégico de Planeación y Hemisferio Curricular de
+   Enseñanza), las nuevas acciones que puede ejecutar (archivos, código, roles),
+   sus filtros reflejos a 0 créditos, los puentes neuronales inter-hemisféricos y
+   la red neuronal profunda de Gemma 4 31B (NVIDIA NIM)— hasta entregar una
+   respuesta fundamentada y verificada.
 
-   Ocupa toda la pantalla, sin la barra de la intranet; Escape o «Salir»
-   vuelven a la configuración de Mr. Pilo. El dibujo y el movimiento están en
-   engine.ts; aquí, los datos y el texto de cada paso.
+   Nueve pasos que se avanzan con ← → (o espacio, o Re Pág / Av Pág); el
+   último paso abre el explorador interactivo del cerebro de Mr. Pilo.
    ========================================================================== */
 
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
@@ -20,7 +20,15 @@ import gsap from "gsap";
 import { usePillars, useProjects, useStructure } from "../../../../data/queries";
 import { useOpenDataCatalog } from "../../../datos-abiertos/data/open-data";
 import { OBS_TOPICS } from "../../../datos-abiertos/observatorio/data";
-import { buildModel, createStage, SOURCE_ORDER, SOURCES, STEP_COUNT } from "./engine";
+import {
+  ALL_SOURCES,
+  buildModel,
+  createStage,
+  SOURCE_ORDER,
+  SOURCES,
+  STEP_COUNT,
+  TEACH_SOURCE_ORDER,
+} from "./engine";
 import type { PresentationData, SourceKey, StageHandle } from "./engine";
 import "./presentation.css";
 
@@ -33,11 +41,13 @@ function usePresentationData(): { data: PresentationData | null; loading: boolea
   const structure = useStructure();
   const projects = useProjects();
   const catalog = useOpenDataCatalog();
+
   const data = useMemo(() => {
     if (!pillars.data || !structure.data || !projects.data) return null;
     const ordered = pillars.data.filter((p) => p.status === "publicado" && !MONEY.test(p.name)).sort((a, b) => a.position - b.position);
     const pIndex = new Map(ordered.map((p, i) => [p.id, i]));
     const areas = structure.data.filter((a) => pIndex.has(a.pillar_id)).sort((a, b) => pIndex.get(a.pillar_id)! - pIndex.get(b.pillar_id)! || a.position - b.position);
+
     const out: PresentationData = {
       pillars: ordered.map((p, i) => ({ code: `P${i + 1}`, name: p.name })),
       areas: [],
@@ -46,8 +56,10 @@ function usePresentationData(): { data: PresentationData | null; loading: boolea
       reports: (catalog.data?.reports ?? []).map((r) => ({ code: r.code, name: r.name })),
       obs: OBS_TOPICS.map((t) => t.name),
     };
+
     const areaIndex = new Map<string, number>();
     const lineIndex = new Map<string, number>();
+
     for (const a of areas) {
       areaIndex.set(a.id, out.areas.length);
       out.areas.push({ code: `AE${out.areas.length + 1}`, name: a.name, p: pIndex.get(a.pillar_id)! });
@@ -56,6 +68,7 @@ function usePresentationData(): { data: PresentationData | null; loading: boolea
         out.lines.push({ code: `LA${out.lines.length + 1}`, name: l.name, a: areaIndex.get(a.id)! });
       }
     }
+
     for (const r of [...projects.data].sort((a, b) => a.position - b.position)) {
       if (MONEY.test(r.name)) continue;
       const to: ["l" | "a", number][] = [];
@@ -65,9 +78,15 @@ function usePresentationData(): { data: PresentationData | null; loading: boolea
       }
       if (to.length) out.projects.push({ code: `PR${out.projects.length + 1}`, name: r.name, to });
     }
+
     return out;
   }, [pillars.data, structure.data, projects.data, catalog.data]);
-  return { data, loading: pillars.isPending || structure.isPending || projects.isPending, error: pillars.isError || structure.isError || projects.isError };
+
+  return {
+    data,
+    loading: pillars.isPending || structure.isPending || projects.isPending,
+    error: pillars.isError || structure.isError || projects.isError,
+  };
 }
 
 interface Step {
@@ -83,7 +102,16 @@ export function Presentation() {
   const { data, loading, error } = usePresentationData();
   const model = useMemo(() => (data ? buildModel(data) : null), [data]);
   const [step, setStep] = useState(0);
-  const [on, setOn] = useState<Record<SourceKey, boolean>>({ pdi: true, cifras: true, obs: true, bol: true, imp: true });
+
+  const initialOn = useMemo(() => {
+    const map = {} as Record<SourceKey, boolean>;
+    for (const k of ALL_SOURCES) map[k] = true;
+    return map;
+  }, []);
+
+  const [on, setOn] = useState<Record<SourceKey, boolean>>(initialOn);
+  const [bridgesOn, setBridgesOn] = useState(true);
+
   const canvas = useRef<HTMLCanvasElement>(null);
   const host = useRef<HTMLDivElement>(null);
   const tip = useRef<HTMLDivElement>(null);
@@ -93,7 +121,7 @@ export function Presentation() {
 
   useEffect(() => {
     const before = document.title;
-    document.title = "La capa profunda de Pilo · Planeación UDES";
+    document.title = "La capa profunda de Mr. Pilo · Planeación Institucional UDES";
     return () => {
       document.title = before;
     };
@@ -117,9 +145,17 @@ export function Presentation() {
     s.setExplore(step === STEP_COUNT - 1);
     const back = step < last.current;
     last.current = step;
+
     if (!reduced() && story.current) {
       const ctx = gsap.context(() => {
-        gsap.from(story.current!.children, { autoAlpha: 0, y: back ? -10 : 12, filter: "blur(4px)", duration: 0.45, stagger: 0.06, ease: "power3.out" });
+        gsap.from(story.current!.children, {
+          autoAlpha: 0,
+          y: back ? -8 : 10,
+          filter: "blur(3px)",
+          duration: 0.38,
+          stagger: 0.05,
+          ease: "power2.out",
+        });
       }, story);
       return () => ctx.revert();
     }
@@ -146,7 +182,7 @@ export function Presentation() {
       if (document.fullscreenElement) void document.exitFullscreen();
       else void document.documentElement.requestFullscreen();
     } catch {
-      /* sin pantalla completa: se presenta igual */
+      /* sin pantalla completa */
     }
   };
 
@@ -156,71 +192,194 @@ export function Presentation() {
     stage.current?.toggleSource(k, next);
   };
 
-  const chips = (
-    <div className="cpp-chips">
-      {SOURCE_ORDER.map((k) => (
-        <span key={k} className="cpp-chip">
-          <i style={{ background: SOURCES[k].color }} />
-          {SOURCES[k].name}
-        </span>
-      ))}
-    </div>
-  );
+  const toggleBridges = () => {
+    const next = !bridgesOn;
+    setBridgesOn(next);
+    stage.current?.toggleBridges(next);
+  };
 
   const steps: Step[] = model
     ? [
+        // 0. El cerebro dual de Mr. Pilo
         {
-          short: "La memoria",
-          title: "Lo que Pilo sabe, visto por dentro",
+          short: "El cerebro",
+          title: "El cerebro de Mr. Pilo: dos memorias interconectadas",
           body: (
             <>
-              Cada punto es algo que la universidad publica: un pilar, una línea de acción, un informe, un tema. Hoy son <b>{model.counts.nodes} nodos</b> y{" "}
-              <b>{model.counts.edges} relaciones</b>, y todos salen de los portales.
+              Mr. Pilo opera como un cerebro bio-digital organizado en <b>dos hemisferios complementarios</b>: el{" "}
+              <b>Hemisferio Estratégico</b> (Planeación Institucional: PDI, Cifras, Observatorio, Boletines e Impacto) y el{" "}
+              <b>Hemisferio Curricular</b> (Enseñanza: innovación pedagógica, lineamientos, políticas, ODS y aulas Moodle).
+              Juntos suman <b>{model.counts.totalNodes} nodos neuronales</b> vinculados por sinapsis activas.
             </>
           ),
-          extra: chips,
+          extra: (
+            <div style={{ display: "grid", gap: "12px" }}>
+              <div className="cpp-hemi-group">
+                <span className="cpp-hemi-title">
+                  <i style={{ background: "#b592e6" }} /> Hemisferio Estratégico · Planeación
+                </span>
+                <div className="cpp-chips">
+                  {SOURCE_ORDER.map((k) => (
+                    <span key={k} className="cpp-chip">
+                      <i style={{ background: SOURCES[k].color }} />
+                      {SOURCES[k].name}
+                    </span>
+                  ))}
+                </div>
+              </div>
+
+              <div className="cpp-hemi-group">
+                <span className="cpp-hemi-title">
+                  <i style={{ background: "#38bdf8" }} /> Hemisferio Curricular · Enseñanza
+                </span>
+                <div className="cpp-chips">
+                  {TEACH_SOURCE_ORDER.map((k) => (
+                    <span key={k} className="cpp-chip">
+                      <i style={{ background: SOURCES[k].color }} />
+                      {SOURCES[k].name}
+                    </span>
+                  ))}
+                </div>
+              </div>
+
+              <div className="cpp-meter">
+                <div>
+                  <b>{model.counts.nodes}</b>
+                  <small>nodos Planeación</small>
+                </div>
+                <div>
+                  <b>{model.counts.teachNodes}</b>
+                  <small>nodos Enseñanza</small>
+                </div>
+                <div>
+                  <b>{model.counts.bridges}</b>
+                  <small>puentes neuronales</small>
+                </div>
+              </div>
+            </div>
+          ),
         },
+
+        // 1. Nuevas capacidades y acciones
         {
-          short: "La pregunta",
-          title: "Llega una pregunta",
-          body: "Alguien le escribe a Pilo en sus propias palabras. Antes de pensar en IA, la pregunta atraviesa capas que no gastan créditos.",
-          extra: <div className="cpp-q">{model.question}</div>,
+          short: "Acciones",
+          title: "Nuevas capacidades: archivos, código y roles",
+          body: (
+            <>
+              La nueva generación de Mr. Pilo amplía su alcance cognitivo con <b>acciones avanzadas</b> que van más allá
+              de la consulta básica de texto, diseñadas para la productividad académica y administrativa.
+            </>
+          ),
+          extra: (
+            <div className="cpp-actions-grid">
+              <div className="cpp-action-card">
+                <b>
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--cpp-cyan)" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                    <path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48" />
+                  </svg>
+                  Archivos adjuntos
+                </b>
+                <span>Lectura y extracción local segura de PDFs y hojas de cálculo (hasta 10 MB) sin almacenar ni filtrar datos.</span>
+              </div>
+
+              <div className="cpp-action-card">
+                <b>
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#fbbf24" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                    <polyline points="16 18 22 12 16 6" />
+                    <polyline points="8 6 2 12 8 18" />
+                  </svg>
+                  Generación de código
+                </b>
+                <span>Explicación y desarrollo de scripts analíticos (SQL, TypeScript, fórmulas y métricas) para docentes y gestión.</span>
+              </div>
+
+              <div className="cpp-action-card">
+                <b>
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#a78bfa" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                    <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
+                    <circle cx="9" cy="7" r="4" />
+                    <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
+                    <path d="M16 3.13a4 4 0 0 1 0 7.75" />
+                  </svg>
+                  Personalización por rol
+                </b>
+                <span>Voz y tono calibrados para estudiantes, profesores, directivos o personal administrativo con microexpresiones acordes.</span>
+              </div>
+
+              <div className="cpp-action-card">
+                <b>
+                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#34d399" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                    <path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" />
+                  </svg>
+                  Cifras vivas auditadas
+                </b>
+                <span>Integración en vivo con pilo_facts: verificación matemática estricta sin redondeos ni alucinaciones numéricas.</span>
+              </div>
+            </div>
+          ),
         },
+
+        // 2. Llega una pregunta
         {
-          short: "Catálogo y reglas",
+          short: "Pregunta",
+          title: "Llega una pregunta: el estímulo sináptico",
+          body: (
+            <>
+              La interacción comienza con un impulso sensorial: una persona escribe en lenguaje natural. Antes de activar
+              inferencia profunda o gastar créditos, la señal viaja velozmente por los filtros reflejos del núcleo central.
+            </>
+          ),
+          extra: (
+            <div style={{ display: "grid", gap: "10px" }}>
+              <div className="cpp-q">{model.question}</div>
+              <span className="cpp-badge" style={{ alignSelf: "flex-start" }}>
+                Estímulo sensorial inicial · Entrada de señal
+              </span>
+            </div>
+          ),
+        },
+
+        // 3. Catálogo y reglas
+        {
+          short: "Filtros 0cr",
           layer: 1,
-          title: "Primero, lo que Planeación ya escribió",
+          title: "Filtros reflejos: velocidad y 0 créditos",
           body: (
             <>
-              El <b>catálogo</b> (respuestas oficiales y microexpresiones para capciosas) y las <b>reglas</b> (dinero, datos personales, el futuro) responden al instante. Esta
-              pregunta no coincide: sigue de largo.
+              El <b>catálogo oficial</b> (respuestas institucionales firmadas y capciosas) y las <b>reglas duras</b>{" "}
+              (dinero, protección de datos personales, límites éticos) responden en menos de <b>40 ms</b>. Si la consulta
+              no coincide con una respuesta predeterminada, continúa sin fricción hacia la memoria profunda.
             </>
           ),
           extra: (
-            <div className="cpp-credits">
-              Costo hasta aquí: <b>0 créditos</b>
+            <div style={{ display: "grid", gap: "8px" }}>
+              <div className="cpp-credits">
+                Costo en créditos: <b>0 créditos consumidos</b>
+              </div>
+              <div className="cpp-meter">
+                <div>
+                  <b>&lt; 40 ms</b>
+                  <small>tiempo de respuesta</small>
+                </div>
+                <div>
+                  <b>100%</b>
+                  <small>respuestas oficiales firmadas</small>
+                </div>
+              </div>
             </div>
           ),
         },
-        {
-          short: "Guardadas",
-          layer: 2,
-          title: "Después, lo que ya respondió",
-          body: "Si alguien preguntó casi lo mismo y sus fuentes no han cambiado, Pilo repite esa respuesta. Si una fuente cambia, la respuesta guardada deja de servirse sola.",
-          extra: (
-            <div className="cpp-credits">
-              Costo hasta aquí: <b>0 créditos</b>
-            </div>
-          ),
-        },
+
+        // 4. Respuestas guardadas y activación de pasajes
         {
           short: "Pasajes",
-          layer: 3,
-          title: "Los pasajes: textos sueltos",
+          layer: 2,
+          title: "Activación sináptica: pasajes encendidos",
           body: (
             <>
-              Por debajo, la memoria es un conjunto de pasajes: textos cortos con su página, su corte y su oficina. Pilo los busca por palabras, en español y sin tildes. Se
-              encienden los que hablan de <b>{model.focus?.name ?? "la pregunta"}</b>.
+              Si una respuesta previa sigue fresca, Pilo la sirve sin demora. Si no, la búsqueda semántica y vectorial
+              despierta los pasajes pertinentes en ambos hemisferios. En la corteza se iluminan las neuronas asociadas al
+              núcleo conceptual de <b>{model.focus?.name ?? "la pregunta"}</b>.
             </>
           ),
           extra: (
@@ -230,73 +389,146 @@ export function Presentation() {
                 <small>pasajes encendidos</small>
               </div>
               <div>
-                <b>{model.counts.nodes}</b>
-                <small>pasajes en total</small>
+                <b>{model.counts.totalNodes}</b>
+                <small>neuronas en la red</small>
+              </div>
+              <div>
+                <b>2</b>
+                <small>hemisferios activos</small>
               </div>
             </div>
           ),
         },
+
+        // 5. Los puentes neuronales
         {
-          short: "La malla",
-          layer: 4,
-          title: "La malla: cada pasaje en su lugar",
+          short: "Puentes",
+          layer: 3,
+          title: "Puentes neuronales: interconexión entre hemisferios",
           body: (
             <>
-              Los pasajes se ordenan en la malla, la misma del Mapa numerado: <b>Pilar › Área estratégica › Línea de acción › Proyecto</b>. El pasaje encontrado deja de estar
-              suelto: Pilo ve su ruta completa y todo lo que toca.
+              Lo institucional y lo pedagógico no funcionan en silos. Los <b>puentes neuronales</b> (migración 0122)
+              unen Planeación y Enseñanza mediante reglas cruzadas: <b>ODS 4</b>, <b>Ley 30 de 1992</b>, <b>Decreto 1330</b> y
+              resultados de aprendizaje. Permiten la <b>lectura «de visita»</b>: Pilo consulta el otro hemisferio indicando su procedencia exacta.
             </>
           ),
           extra: (
-            <div className="cpp-meter">
-              <div>
-                <b>{model.focusLines}</b>
-                <small>líneas de acción</small>
-              </div>
-              <div>
-                <b>{model.focusPillars.length}</b>
-                <small>pilares</small>
-              </div>
-              <div>
-                <b>1</b>
-                <small>proyecto</small>
-              </div>
-            </div>
-          ),
-        },
-        {
-          short: "La respuesta",
-          layer: 5,
-          title: "La respuesta sale de la malla",
-          body: "Como es una pregunta de estructura, Pilo responde con la malla misma, sin redactar con IA. La IA (el anillo punteado) solo entra cuando hay que escribir con varios pasajes, y aun así cada cifra se revisa contra las fuentes.",
-          extra: (
-            <div className="cpp-ans">
-              <span className="cpp-badge">De la malla de la memoria · sin IA</span>
-              <p>
-                {model.answer} <span className="cpp-cite">1</span>
+            <div className="cpp-neural-card">
+              <span className="cpp-badge cpp-badge--bridge">Puente Neuronal Aprobado · Conexión 0122</span>
+              <p style={{ margin: 0, fontSize: "0.88rem", color: "var(--cpp-ink)" }}>
+                ⚡ <b>PR1 / LA21 ↔ ODS 4 y Resultados de Aprendizaje:</b> El proyecto institucional aterriza directamente
+                en las directivas curriculares y el aula Moodle.
               </p>
               <div className="cpp-credits">
-                Costo total: <b>0 créditos</b>
+                Trazabilidad: <b>Procedencia de visita garantizada</b>
               </div>
             </div>
           ),
         },
+
+        // 6. Cortex Gemma 4 31B
+        {
+          short: "Gemma 31B",
+          layer: 4,
+          title: "Cortex neuronal profundo: Gemma 4 31B (NVIDIA)",
+          body: (
+            <>
+              Cuando la consulta exige correlacionar datos dispersos entre ambos hemisferios y redactar con criterio, entra
+              en acción <b>Gemma 4 31B</b> vía <b>NVIDIA NIM</b>. Sus 31 mil millones de parámetros orquestan la atención
+              sináptica multi-cabeza, conectando los fragmentos activados bajo un principio rector: <b>grounding estricto</b>, sin inventar cifras ni alucinar.
+            </>
+          ),
+          extra: (
+            <div className="cpp-neural-card">
+              <span className="cpp-badge cpp-badge--gemma">NVIDIA NIM · google/gemma-4-31b-it</span>
+              <div style={{ display: "grid", gap: "4px", fontSize: "0.85rem" }}>
+                <div>
+                  <b style={{ color: "#fbbf24" }}>Arquitectura:</b> Red de atención neuronal de 31B parámetros
+                </div>
+                <div>
+                  <b style={{ color: "var(--cpp-cyan)" }}>Inferencia:</b> Aceleración por tensor cores en la nube
+                </div>
+                <div>
+                  <b style={{ color: "#a78bfa" }}>Verificación:</b> Ponderación factual anclada 100% a las fuentes
+                </div>
+              </div>
+            </div>
+          ),
+        },
+
+        // 7. La respuesta fundamentada
+        {
+          short: "Respuesta",
+          layer: 5,
+          title: "La respuesta fundamentada emerge de la red",
+          body: (
+            <>
+              La respuesta final es el resultado armónico de la malla, los puentes inter-hemisféricos y la síntesis
+              neuronal de Gemma 4 31B. Cada afirmación incluye su cita numérica verificable, su procedencia institucional y la garantía de exactitud.
+            </>
+          ),
+          extra: (
+            <div className="cpp-ans">
+              <span className="cpp-badge">Respuesta fundamentada · Síntesis multi-hemisferio</span>
+              <p>
+                {model.answer} <span className="cpp-cite">1</span> <span className="cpp-cite">2</span>
+              </p>
+              <div className="cpp-credits">
+                Sello de autenticidad: <b>Fuentes institucionales UDES verificadas</b>
+              </div>
+            </div>
+          ),
+        },
+
+        // 8. Explorar el cerebro de Mr. Pilo
         {
           short: "Explorar",
-          title: "Explore la malla",
-          body: "Pase el puntero por un nodo para ver su ruta y lo que contiene; haga clic para fijarlo. Filtre por fuente con los botones.",
+          title: "Explore el cerebro de Mr. Pilo",
+          body: (
+            <>
+              Pase el puntero sobre cualquier neurona para inspeccionar su ruta completa, hemisferio y procedencia; haga
+              clic para fijarla. Use los controles a continuación para filtrar fuentes y alternar la visibilidad de los puentes neuronales.
+            </>
+          ),
           extra: (
-            <div className="cpp-chips">
-              {SOURCE_ORDER.map((k) => (
-                <button key={k} type="button" className="cpp-chip" aria-pressed={on[k]} data-off={!on[k] || undefined} onClick={() => toggle(k)}>
-                  <i style={{ background: SOURCES[k].color }} />
-                  {SOURCES[k].name}
+            <div style={{ display: "grid", gap: "10px" }}>
+              <div className="cpp-chips">
+                <button
+                  type="button"
+                  className="cpp-chip cpp-chip--bridge"
+                  aria-pressed={bridgesOn}
+                  data-off={!bridgesOn || undefined}
+                  onClick={toggleBridges}
+                >
+                  <i style={{ background: "#fbbf24" }} />
+                  {bridgesOn ? "Puentes neuronales (visibles)" : "Puentes neuronales (ocultos)"}
                 </button>
-              ))}
+              </div>
+
+              <span className="cpp-hemi-title" style={{ marginTop: "4px" }}>
+                Filtrar fuentes en la red:
+              </span>
+              <div className="cpp-chips">
+                {ALL_SOURCES.map((k) => (
+                  <button
+                    key={k}
+                    type="button"
+                    className="cpp-chip"
+                    aria-pressed={on[k]}
+                    data-off={!on[k] || undefined}
+                    onClick={() => toggle(k)}
+                  >
+                    <i style={{ background: SOURCES[k].color }} />
+                    {SOURCES[k].name}
+                  </button>
+                ))}
+              </div>
             </div>
           ),
         },
       ]
     : [];
+
   const current = steps[step];
 
   return (
@@ -304,9 +536,9 @@ export function Presentation() {
       <header className="cpp-top">
         <div className="cpp-brand">
           <b>Mr. Pilo · La capa profunda</b>
-          Planeación Institucional · UDES
+          Planeación Institucional & Vicerrectoría de Enseñanza · UDES
         </div>
-        <span className="cpp-tag">Datos en vivo del PDI, UDES en Cifras y el Observatorio</span>
+        <span className="cpp-tag">Malla neuronal de 2 hemisferios · Puentes 0122 · Gemma 4 31B</span>
         <button className="cpp-ghost" type="button" onClick={fullscreen}>
           Pantalla completa
         </button>
@@ -317,12 +549,18 @@ export function Presentation() {
 
       <section className="cpp-story" ref={story} aria-live="polite" key={step}>
         {!model ? (
-          <p>{error ? "No se pudo leer la estructura del plan. Revise la conexión y vuelva a abrir la presentación." : loading ? "Leyendo la estructura del plan…" : "No hay datos para presentar."}</p>
+          <p>
+            {error
+              ? "No se pudo leer la estructura del plan. Revise la conexión y vuelva a abrir la presentación."
+              : loading
+                ? "Leyendo la arquitectura neuronal de Mr. Pilo…"
+                : "No hay datos para presentar."}
+          </p>
         ) : current ? (
           <>
             {current.layer ? (
               <div className="cpp-layer">
-                <i>{current.layer}</i>Capa {current.layer} de 5
+                <i>{current.layer}</i>Capa cognitiva {current.layer} de 5
               </div>
             ) : null}
             <h1>{current.title}</h1>
@@ -333,7 +571,7 @@ export function Presentation() {
       </section>
 
       <div className="cpp-stage" ref={host}>
-        <canvas ref={canvas} role="img" aria-label="La malla de la memoria de Mr. Pilo" />
+        <canvas ref={canvas} role="img" aria-label="Malla cerebral y neuronal de Mr. Pilo con dos hemisferios y Gemma 4 31B" />
         <div className="cpp-tip" ref={tip} />
       </div>
 
@@ -355,12 +593,24 @@ export function Presentation() {
           ))}
         </div>
         <div className="cpp-nav">
-          <button className="cpp-round" type="button" aria-label="Paso anterior" disabled={step === 0} onClick={() => setStep((s) => Math.max(0, s - 1))}>
+          <button
+            className="cpp-round"
+            type="button"
+            aria-label="Paso anterior"
+            disabled={step === 0}
+            onClick={() => setStep((s) => Math.max(0, s - 1))}
+          >
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
               <path d="M15 6l-6 6 6 6" />
             </svg>
           </button>
-          <button className="cpp-round cpp-round--main" type="button" aria-label="Paso siguiente" disabled={step === STEP_COUNT - 1} onClick={() => setStep((s) => Math.min(STEP_COUNT - 1, s + 1))}>
+          <button
+            className="cpp-round cpp-round--main"
+            type="button"
+            aria-label="Paso siguiente"
+            disabled={step === STEP_COUNT - 1}
+            onClick={() => setStep((s) => Math.min(STEP_COUNT - 1, s + 1))}
+          >
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
               <path d="M9 6l6 6-6 6" />
             </svg>

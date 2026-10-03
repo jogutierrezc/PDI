@@ -35,9 +35,11 @@ import { Icon } from "../../../../components/ui/Icon";
 import { teachGraph } from "../../pilo-ensenanza/memoria/map";
 import { SPACE_SOURCES } from "../../pilo-ensenanza/store";
 import { usePassage } from "../MeshView";
+import { customOf } from "../collections";
 import { MEMORY_SOURCES } from "../memory";
 import { clipLabel } from "../mesh-view";
 import { drawChain, swapPanel } from "../motion";
+import { usePortals } from "../portals";
 import type { PiloSpace } from "../space";
 import { plural } from "../ui";
 import { BridgeInbox } from "./BridgeInbox";
@@ -101,6 +103,8 @@ function sideNote(space: PiloSpace, side: GlobalData[PiloSpace]): string | null 
 
 export function GlobalMap({ focus = "todo", face = true }: GlobalMapProps) {
   const query = useGlobalMap();
+  const portals = usePortals();
+  const own = useMemo(() => customOf(portals.data?.sources ?? [], "ensenanza"), [portals.data]);
   const [filter, setFilter] = useState<GlobalFilter>(focus);
   const [open, setOpen] = useState<Set<string>>(() => new Set());
   const [pinned, setPinned] = useState<Set<string>>(() => new Set());
@@ -111,10 +115,10 @@ export function GlobalMap({ focus = "todo", face = true }: GlobalMapProps) {
   const graph = useMemo(() => {
     const d = query.data;
     if (!d) return null;
-    const teach = d.ensenanza.data ? teachGraph(d.ensenanza.data, COLLECTIONS, new Set(d.ensenanza.data.courses)) : null;
+    const teach = d.ensenanza.data ? teachGraph(d.ensenanza.data, { ...COLLECTIONS, ...Object.fromEntries(own.map((c) => [c.id, c.name])) }, new Set(d.ensenanza.data.courses)) : null;
     // Con 0122 los puentes se leen de la base; sin ella (data: null) se calculan al dibujar.
-    return buildGlobal({ planeacion: d.planeacion.data, ensenanza: teach, order: ORDER, bridges: d.bridges.data });
-  }, [query.data]);
+    return buildGlobal({ planeacion: d.planeacion.data, ensenanza: teach, order: { ...ORDER, ensenanza: [...ORDER.ensenanza, ...own.map((c) => c.id)] }, bridges: d.bridges.data });
+  }, [query.data, own]);
 
   // Al llegar el mapa se abren solo las fuentes y colecciones pequeñas.
   const seeded = useRef<GlobalGraph | null>(null);

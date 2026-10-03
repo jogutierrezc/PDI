@@ -37,6 +37,8 @@ import { Icon } from "../../../components/ui/Icon";
 import { pendingOf, useEmbedStatus, useHideAnswer, useIndexMemory, useSavedAnswers } from "../pilo/memory";
 import type { EmbedStatus } from "../pilo/memory";
 import { CatalogModal } from "../pilo/CatalogModal";
+import { customOf, useSourceCounts } from "../pilo/collections";
+import { effectiveCell, usePortals, useSetCell } from "../pilo/portals";
 import type { CatalogRow, CatalogRol } from "../pilo/catalog-sheet";
 import { SPACE_COPY } from "../pilo/space";
 // El mapa global se monta en el momento «mapa» (MapMoment), tras el conmutador «Los dos Pilos».
@@ -209,6 +211,49 @@ function MapMoment({ space, missing, onComprehend }: { space: SpaceEditor["s"]["
 
 /* --- Alimentar · Fuentes ------------------------------------------------------------------ */
 
+/**
+ * Las colecciones que creó la administración (0125). A diferencia de las cuatro de
+ * partida, su interruptor no espera a «Guardar cambios»: es la celda de este Pilo
+ * en «Qué lee cada portal» y se aplica al momento.
+ */
+function CustomSources({ space, enabled }: { space: SpaceEditor["s"]["id"]; enabled: boolean }) {
+  const portals = usePortals(enabled);
+  const setCell = useSetCell();
+  const portal = portals.data?.portals.find((p) => p.id === space) ?? null;
+  const own = portals.data ? customOf(portals.data.sources, space) : [];
+  const counts = useSourceCounts(
+    space,
+    own.map((c) => c.id),
+    enabled,
+  );
+  if (!portal || own.length === 0) return null;
+  return (
+    <>
+      {own.map((c) => {
+        const on = effectiveCell(portal, c) === "casa";
+        return (
+          <li key={c.id} data-off={!on || undefined}>
+            <span className="pis-code pen-code" aria-hidden="true">
+              {c.name.slice(0, 2).toUpperCase()}
+            </span>
+            <span>
+              <strong>{c.name}</strong>
+              <small>Colección propia · se aplica al momento</small>
+            </span>
+            <em>{counts.data ? plural(counts.data[c.id] ?? 0, "pasaje", "pasajes") : "—"}</em>
+            <Switch on={on} disabled={setCell.isPending} onChange={(v) => setCell.mutate({ portal, source: c, to: v ? "casa" : "no" })} label={`Usar ${c.name}`} />
+          </li>
+        );
+      })}
+      {setCell.isError && (
+        <li className="pis-error" role="alert">
+          {(setCell.error as Error).message}
+        </li>
+      )}
+    </>
+  );
+}
+
 function SourcesGroup({ ed }: { ed: SpaceEditor }) {
   const { s, set, missing } = ed;
   const counts = useSpaceMemoryCounts(s.id, !missing);
@@ -217,7 +262,7 @@ function SourcesGroup({ ed }: { ed: SpaceEditor }) {
   return (
     <Group title="Fuentes" aside={<small>{missing ? "Sin la migración 0113" : counts.data ? `${plural(total, "pasaje", "pasajes")} · actualizada ${when(s.memory_indexed_at)}` : "Contando pasajes…"}</small>}>
       <p className="pis-lead">
-        La memoria de este Pilo es solo suya: cuatro colecciones que no se cruzan con las de Planeación. Apagar una la deja guardada, pero Pilo deja de buscar en ella.
+        La memoria de este Pilo es solo suya: cuatro colecciones de partida y las que usted cree en «Documentos». Apagar una la deja guardada, pero Pilo deja de buscar en ella.
       </p>
       <ul className="pis-sources">
         {SPACE_SOURCES.map((m) => (
@@ -233,6 +278,7 @@ function SourcesGroup({ ed }: { ed: SpaceEditor }) {
             <Switch on={s.memory_sources[m.id]} onChange={(v) => set("memory_sources", { ...s.memory_sources, [m.id]: v } as Record<SpaceSource, boolean>)} label={`Usar ${m.name}`} />
           </li>
         ))}
+        <CustomSources space={s.id} enabled={!missing} />
       </ul>
       {missing ? (
         <p className="pis-small">Sin la migración 0113 este Pilo no tiene memoria propia.</p>

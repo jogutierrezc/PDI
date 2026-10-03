@@ -30,6 +30,8 @@
 import { useEffect, useRef, useState } from "react";
 import type { DragEvent, ReactNode } from "react";
 import { Icon } from "../../../../components/ui/Icon";
+import { collectionsReady } from "../../pilo/collections";
+import { docCollections, usePortals } from "../../pilo/portals";
 import type { PiloSpace } from "../../pilo/space";
 import { Group, Switch, plural, when } from "../../pilo/ui";
 import { LIMITS, SCANNED_MESSAGE, kindOf, readDocument, toPassagesReport } from "../ingest";
@@ -58,6 +60,7 @@ import { MIME_OF, STEP_TEXT, StepError, docPath, faultFrom, faultOf, resumePoint
 import type { Fault, StepId } from "./flow";
 import { buildOutline } from "./map";
 import { FaultNote, MissingNote, Stages, VisSeg } from "./parts";
+import { CollectionsEditor } from "./CollectionsEditor";
 
 export interface MemoryPartProps {
   /** De qué Pilo es la memoria. */
@@ -71,10 +74,12 @@ export interface DocCollection {
   id: string;
   code: string;
   name: string;
+  /** La creó la administración (0125). */
+  custom?: boolean;
 }
 
 export interface DocumentsPanelProps extends MemoryPartProps {
-  /** Las colecciones de este Pilo. De partida, las de Enseñanza. */
+  /** Las colecciones de este Pilo. De partida, las que dice la base (con las propias, 0125) o, sin ellas, las de Enseñanza. */
   collections?: DocCollection[];
   /** Lo que se dice cuando está apagado. De partida, que falta la migración 0113. */
   disabledNote?: string;
@@ -126,7 +131,12 @@ interface Job {
 
 class Duplicate extends Error {}
 
-export function DocumentsPanel({ space, disabled, collections = TEACH_COLLECTIONS, disabledNote = "Sin la migración 0113 este Pilo no tiene memoria propia.", note }: DocumentsPanelProps) {
+export function DocumentsPanel({ space, disabled, collections: given, disabledNote = "Sin la migración 0113 este Pilo no tiene memoria propia.", note }: DocumentsPanelProps) {
+  const portals = usePortals(!disabled);
+  const catalog = portals.data?.sources ?? [];
+  const fromCatalog = docCollections(catalog, space);
+  const collections: DocCollection[] = given ?? (fromCatalog.length ? fromCatalog : TEACH_COLLECTIONS);
+  const owner = portals.data?.portals.find((p) => p.id === space)?.name || (space === "ensenanza" ? "Pilo en Enseñanza" : "Pilo de la Universidad");
   const collectionOf = (id: string) => collections.find((c) => c.id === id) ?? SPACE_SOURCES.find((s) => s.id === id);
   const collectionName = (id: string) => collectionOf(id)?.name ?? id;
   const docs = useDocs(space, !disabled);
@@ -148,6 +158,8 @@ export function DocumentsPanel({ space, disabled, collections = TEACH_COLLECTION
   const missing = docs.data?.missing ?? null;
   const rows = (docs.data?.data ?? []).filter((d) => d.origin === "archivo");
   const off = disabled || Boolean(missing) || docs.isError;
+  const docCounts = rows.reduce<Record<string, number>>((acc, d) => ((acc[d.source] = (acc[d.source] ?? 0) + 1), acc), {});
+  const canManage = portals.data ? collectionsReady(catalog) : null;
   const busy = job?.state === "run" || Boolean(opening);
   const list = useEnter<HTMLUListElement>(docs.data ? rows.map((d) => d.id).join() : null);
 
@@ -354,17 +366,24 @@ export function DocumentsPanel({ space, disabled, collections = TEACH_COLLECTION
 
   /* --- Cambios de un documento ---------------------------------------------------------- */
 
-  const patch = async (d: DocRow, change: Record<string, unknown>) => {
+  const patch = async (d: DocRow, change: Record<string, unknown>): Promise<boolean> => {
     setPendingRow(d.id);
     setRowFault(null);
     try {
       await docUpdate(d.id, change);
       refresh();
+      return true;
     } catch (error) {
       if (alive.current) setRowFault({ id: d.id, fault: faultOf(error) });
+      return false;
     } finally {
       if (alive.current) setPendingRow(null);
     }
+  };
+
+  const move = async (d: DocRow, source: string) => {
+    if (source === d.source || !(await patch(d, { source })) || !alive.current) return;
+    setNotice({ tone: "ok", text: `«${d.title}» pasó a «${collectionName(source)}». Pilo lo lee según lo que ese portal tenga encendido para esa colección.` });
   };
 
   const remove = async (d: DocRow) => {
@@ -419,6 +438,11 @@ export function DocumentsPanel({ space, disabled, collections = TEACH_COLLECTION
         <FaultNote fault={faultOf(docs.error)} lead="No se pudieron leer los documentos" onRetry={() => void docs.refetch()} />
       ) : (
         <>
+          {canManage ? (
+            <CollectionsEditor space={space} sources={catalog} docCounts={docCounts} owner={owner} />
+          ) : (
+            canManage === false && <p className="pis-small">Para crear colecciones propias falta aplicar la migración 0125 en la base.</p>
+          )}
           <label className="pen-drop" data-over={over || undefined} aria-disabled={busy || undefined} onDragOver={(e) => (e.preventDefault(), setOver(true))} onDragLeave={() => setOver(false)} onDrop={onDrop}>
             <Icon name="upload" size={20} />
             <span>
@@ -600,6 +624,19 @@ export function DocumentsPanel({ space, disabled, collections = TEACH_COLLECTION
                     ) : (
                       <div className="pen-doc__controls">
                         <VisSeg value={d.vis} label={d.title} disabled={rowBusy} onChange={(vis) => void patch(d, { vis })} />
+                        {collections.length > 1 && (
+                          <label className="pen-doc__move">
+                            Colección
+                            <select value={d.source} disabled={rowBusy || busy} aria-label={`Colección de «${d.title}»`} onChange={(e) => void move(d, e.target.value)}>
+                              {!collections.some((c) => c.id === d.source) && <option value={d.source}>{collectionName(d.source)}</option>}
+                              {collections.map((c) => (
+                                <option key={c.id} value={c.id}>
+                                  {c.name}
+                                </option>
+                              ))}
+                            </select>
+                          </label>
+                        )}
                         <span className="pen-doc__switch">
                           <Switch on={d.active} disabled={rowBusy} onChange={(active) => void patch(d, { active })} label={`Usar «${d.title}»`} />
                           {d.active ? "Activo" : "Inactivo"}

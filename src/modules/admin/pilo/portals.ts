@@ -36,6 +36,8 @@ export interface PiloSource {
   /** No sale de su portal (los cursos de Moodle). */
   stays_home: boolean;
   sort: number;
+  /** La creó la administración (0125). `undefined`: la base aún no tiene esa migración. */
+  custom?: boolean;
 }
 
 export interface PiloPortal {
@@ -89,6 +91,7 @@ export function parsePortals(portalRows: unknown, sourceRows: unknown): PortalsD
       staff_only: r.staff_only === true,
       stays_home: r.stays_home === true,
       sort: whole(r.sort),
+      ...("custom" in r ? { custom: r.custom === true } : {}),
     }))
     .sort((a, b) => a.sort - b.sort || a.id.localeCompare(b.id));
   const portals: PiloPortal[] = (Array.isArray(portalRows) ? portalRows : [])
@@ -249,11 +252,11 @@ export function mergeSourceFlags(edited: Record<string, boolean>, loaded: Record
   return { ...(now as Record<string, boolean>), ...Object.fromEntries(changed.map((k) => [k, edited[k]])) };
 }
 
-/** Las colecciones a las que puede ir un documento en un ámbito, con un código de dos letras para su etiqueta. */
-export function docCollections(sources: PiloSource[], scope: string): { id: string; code: string; name: string }[] {
+/** Las colecciones a las que puede ir un documento en un ámbito, con un código de dos letras para su etiqueta. `custom`: la creó la administración (0125). */
+export function docCollections(sources: PiloSource[], scope: string): { id: string; code: string; name: string; custom: boolean }[] {
   return sources
     .filter((s) => s.scope === scope && s.kind === "documentos")
-    .map((s) => ({ id: s.id, code: DOC_CODE[s.id] ?? s.id.slice(0, 2).toUpperCase(), name: s.name }));
+    .map((s) => ({ id: s.id, code: DOC_CODE[s.id] ?? s.id.slice(0, 2).toUpperCase(), name: s.name, custom: s.custom === true }));
 }
 
 const DOC_CODE: Record<string, string> = { institucional: "DI", normativa: "NO", lineamientos: "LG", innovacion: "IE", politicas: "PO", global: "GL" };
@@ -281,10 +284,14 @@ export const missing0121 = (error: DbError | null | undefined): boolean =>
 
 /** La matriz y el catálogo de fuentes. Sin la migración 0121: null. */
 export async function fetchPortals(): Promise<PortalsData | null> {
-  const [portals, sources] = await Promise.all([
-    supabase.from("pilo_portals" as never).select("id, scope, name, written_for, matrix, sort"),
-    supabase.from("pilo_sources" as never).select("id, scope, name, kind, staff_only, stays_home, sort"),
-  ]);
+  const columns = "id, scope, name, kind, staff_only, stays_home, sort";
+  const readSources = async () => {
+    const withCustom = await supabase.from("pilo_sources" as never).select(`${columns}, custom`);
+    // Sin 0125 la columna no existe: se lee el catálogo de antes, sin colecciones propias.
+    if (withCustom.error && /custom/i.test(withCustom.error.message ?? "")) return supabase.from("pilo_sources" as never).select(columns);
+    return withCustom;
+  };
+  const [portals, sources] = await Promise.all([supabase.from("pilo_portals" as never).select("id, scope, name, written_for, matrix, sort"), readSources()]);
   const error = portals.error ?? sources.error;
   if (error) {
     if (missing0121(error)) return null;

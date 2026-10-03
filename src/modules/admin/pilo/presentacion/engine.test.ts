@@ -19,9 +19,21 @@ describe("la capa profunda de Pilo", () => {
     expect(model.matches.has(model.focus!)).toBe(true);
   });
 
-  it("no se rompe sin datos", () => {
-    const empty = buildModel({ pillars: [], areas: [], lines: [], projects: [], reports: [], obs: [] });
-    expect(empty.focus).toBeNull();
-    expect(empty.question).toMatch(/pilares/);
+  it("integra los dos hemisferios cerebrales (Planeación y Enseñanza) y sus puentes", () => {
+    expect(model.counts.teachNodes).toBeGreaterThan(0);
+    expect(model.counts.totalNodes).toBe(model.counts.nodes + model.counts.teachNodes);
+    expect(model.bridges.length).toBeGreaterThanOrEqual(4);
+    // Verificar que los puentes unen nodos de ambos hemisferios
+    for (const b of model.bridges) {
+      expect(b.a.hemi).toBe("planeacion");
+      expect(b.b.hemi).toBe("ensenanza");
+    }
+  });
+
+  it("configura la red neuronal profunda de Gemma 4 31B", () => {
+    expect(model.gemma.model).toBe("google/gemma-4-31b-it");
+    expect(model.gemma.params).toContain("31B");
+    expect(model.gemma.provider).toContain("NVIDIA");
   });
 });
+

@@ -159,9 +159,9 @@ describe("lo que se deriva de la matriz", () => {
   });
 
   it("las colecciones de documentos de un ámbito: sin las fuentes de portal ni Moodle", () => {
-    expect(docCollections(data.sources, "planeacion")).toEqual([{ id: "normativa", code: "NO", name: "Normativa" }]);
-    expect(docCollections(data.sources, "ensenanza")).toEqual([{ id: "politicas", code: "PO", name: "Políticas institucionales" }]);
-    expect(docCollections([{ ...src("normativa"), id: "actas", name: "Actas" }], "planeacion")).toEqual([{ id: "actas", code: "AC", name: "Actas" }]);
+    expect(docCollections(data.sources, "planeacion")).toEqual([{ id: "normativa", code: "NO", name: "Normativa", custom: false }]);
+    expect(docCollections(data.sources, "ensenanza")).toEqual([{ id: "politicas", code: "PO", name: "Políticas institucionales", custom: false }]);
+    expect(docCollections([{ ...src("normativa"), id: "actas", name: "Actas", custom: true }], "planeacion")).toEqual([{ id: "actas", code: "AC", name: "Actas", custom: true }]);
   });
 
   it("reconoce que falta la migración", () => {

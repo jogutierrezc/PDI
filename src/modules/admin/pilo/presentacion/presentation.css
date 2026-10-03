@@ -269,6 +269,103 @@ button.cpp-chip:active {
   color: var(--cpp-cyan);
 }
 
+/* --- Grupos por hemisferio cerebral --------------------------------------------- */
+
+.cpp-hemi-group {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-width: 46ch;
+}
+
+.cpp-hemi-title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.7rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--cpp-ink-3);
+}
+
+.cpp-hemi-title i {
+  display: inline-block;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+}
+
+/* --- Nuevas acciones de Mr. Pilo ----------------------------------------------- */
+
+.cpp-actions-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  max-width: 46ch;
+}
+
+.cpp-action-card {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  border: 1px solid var(--cpp-line);
+  background: rgba(255, 255, 255, 0.03);
+  transition: transform 160ms var(--cpp-ease), background-color 160ms ease, border-color 160ms ease;
+}
+
+.cpp-action-card:hover {
+  background: rgba(255, 255, 255, 0.06);
+  border-color: rgba(127, 231, 240, 0.35);
+  transform: translateY(-1px);
+}
+
+.cpp-action-card b {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.79rem;
+  font-weight: 800;
+  color: var(--cpp-ink);
+}
+
+.cpp-action-card span {
+  font-size: 0.72rem;
+  line-height: 1.35;
+  color: var(--cpp-ink-3);
+}
+
+/* --- Cortex Gemma 4 31B y Puentes Neuronales ---------------------------------- */
+
+.cpp-neural-card {
+  display: grid;
+  gap: 8px;
+  max-width: 44ch;
+  padding: 14px 16px;
+  border-radius: 14px;
+  border: 1px solid rgba(251, 191, 36, 0.25);
+  background: linear-gradient(135deg, rgba(251, 191, 36, 0.06) 0%, rgba(99, 102, 241, 0.08) 100%);
+}
+
+.cpp-badge--gemma {
+  background: rgba(251, 191, 36, 0.15);
+  color: #fbbf24;
+  border: 1px solid rgba(251, 191, 36, 0.35);
+}
+
+.cpp-badge--bridge {
+  background: rgba(127, 231, 240, 0.15);
+  color: var(--cpp-cyan);
+  border: 1px solid rgba(127, 231, 240, 0.35);
+}
+
+.cpp-chip--bridge {
+  border-color: rgba(251, 191, 36, 0.4);
+  color: #fef3c7;
+}
+
 /* --- El lienzo ------------------------------------------------------------------------ */
 
 .cpp-stage {

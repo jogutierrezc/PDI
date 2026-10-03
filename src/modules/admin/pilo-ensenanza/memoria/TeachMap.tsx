@@ -26,6 +26,8 @@ import type { KeyboardEvent as ReactKeyboardEvent } from "react";
 import { Icon } from "../../../../components/ui/Icon";
 import { usePassage } from "../../pilo/MeshView";
 import { useTryMemory } from "../../pilo/memory";
+import { customOf } from "../../pilo/collections";
+import { usePortals } from "../../pilo/portals";
 import { clipLabel, searchNodes } from "../../pilo/mesh-view";
 import type { ViewNode } from "../../pilo/mesh-view";
 import { drawChain } from "../../pilo/motion";
@@ -63,6 +65,10 @@ const kindName = (n: MapNode) => (n.column === "documento" && n.kind === "curso"
 export function TeachMap({ space, disabled, onComprehend }: MemoryPartProps & { /** Lleva al momento «Comprender». */ onComprehend?: () => void }) {
   const map = useTeachMap(space, !disabled);
   const docs = useDocs(space, !disabled);
+  const portals = usePortals(!disabled);
+  const own = useMemo(() => customOf(portals.data?.sources ?? [], space), [portals.data, space]);
+  const names = useMemo(() => ({ ...COLLECTIONS, ...Object.fromEntries(own.map((c) => [c.id, c.name])) }), [own]);
+  const order = useMemo(() => [...ORDER, ...own.map((c) => c.id)], [own]);
   const missing = map.data?.missing ?? null;
   const ai = useComprehendStatus(space, !disabled && map.data !== undefined && !missing);
   const probe = useProbePath();
@@ -70,8 +76,8 @@ export function TeachMap({ space, disabled, onComprehend }: MemoryPartProps & { 
   const via = useRef<"pointer" | "keyboard">("pointer");
 
   const courses = useMemo(() => new Set((docs.data?.data ?? []).filter((d) => d.origin === "moodle").map((d) => `doc:${d.id}`)), [docs.data]);
-  const graph = useMemo(() => teachGraph(map.data?.data ?? { nodes: [], edges: [] }, COLLECTIONS, courses), [map.data, courses]);
-  const layout = useMemo(() => layoutColumns(graph, ORDER), [graph]);
+  const graph = useMemo(() => teachGraph(map.data?.data ?? { nodes: [], edges: [] }, names, courses), [map.data, names, courses]);
+  const layout = useMemo(() => layoutColumns(graph, order), [graph, order]);
   const node = selected ? graph.byId.get(selected) ?? null : null;
   const lit: Lit | null = useMemo(() => {
     if (node) return focusOf(graph, node.id);

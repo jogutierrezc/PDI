@@ -2294,6 +2294,12 @@ export interface AskPlanInput {
   passages: Passage[];
   /** El tope de contexto, en tokens aproximados. */
   budgetTokens?: number;
+  /**
+   * Pasajes que van al final pero con su sitio apartado: lo de otro ámbito cuando lo de
+   * casa no alcanzó (0122). Sin esto, los pasajes de casa que no responden llenaban el
+   * contexto y dejaban fuera lo único que sí trae lo que se pregunta.
+   */
+  reserved?: Passage[];
 }
 
 /** Lo que se le pasa al modelo, ya numerado: una sola numeración para todos los bloques. */
@@ -2316,11 +2322,14 @@ export function planAsk(input: AskPlanInput): AskPlan {
   const cap = Math.max(800, input.budgetTokens ?? ASK_CONTEXT_TOKENS) * CHARS_PER_TOKEN;
   let used = 0;
   const seen = new Set<string>();
-  const take = (list: Passage[], max: number) =>
+  const reserved = input.reserved ?? [];
+  // A lo sumo la mitad del contexto queda apartada: lo de casa nunca se queda sin sitio.
+  const held = Math.min(reserved.reduce((n, p) => n + Math.min(p.body.length, ASK_PASSAGE_CHARS) + 120, 0), Math.floor(cap / 2));
+  const take = (list: Passage[], max: number, limit = cap) =>
     list.filter((p) => {
       if (seen.has(p.ref)) return false;
       const cost = Math.min(p.body.length, max) + 120;
-      if (used > 0 && used + cost > cap) return false;
+      if (used > 0 && used + cost > limit) return false;
       used += cost;
       seen.add(p.ref);
       return true;
@@ -2330,7 +2339,7 @@ export function planAsk(input: AskPlanInput): AskPlan {
   if (saved) used += saved.answer.length;
   const facts = take(input.facts, ASK_PASSAGE_CHARS);
   // Los pasajes de la guardada van primero: son los que ella cita.
-  const passages = take([...(saved?.passages ?? []), ...input.passages], ASK_PASSAGE_CHARS);
+  const passages = [...take([...(saved?.passages ?? []), ...input.passages], ASK_PASSAGE_CHARS, cap - held), ...take(reserved, ASK_PASSAGE_CHARS)];
   const sources = [...official, ...facts, ...passages];
   const savedText = saved
     ? saved.answer
@@ -3476,10 +3485,25 @@ export function askerKind(input: { staff: boolean; member?: MemberRol | null; ro
   return input.rol === "estudiante" || input.rol === "profesor" ? input.rol : "visitante";
 }
 
-/** ¿Ese pasaje trae al menos la mitad de las palabras clave de la pregunta? Sin palabras clave, no. */
+/**
+ * Las palabras que nombran a la universidad. Están en casi todo lo publicado: que un
+ * pasaje diga «UDES» no quiere decir que responda «¿quién es el rector de la UDES?».
+ */
+const VISIT_GENERIC = new Set("udes universidad universidades santander institucion".split(" "));
+
+/** Lo propio de la pregunta: sus palabras clave sin el nombre de la universidad (si solo trae ese nombre, todas). */
+function ownKeywords(question: string): string[] {
+  const all = extractKeywords(question);
+  const own = all.filter((k) => !VISIT_GENERIC.has(k));
+  return own.length ? own : all;
+}
+
+/** ¿Ese pasaje trae al menos la mitad de las palabras clave propias de la pregunta? Sin palabras clave, no. */
 export function coversQuestion(question: string, p: { title: string; section: string; body: string }): boolean {
-  if (!extractKeywords(question).length) return false;
-  return coverage(question, contentWords(`${p.title} ${p.section} ${p.body}`)) >= VISIT_COVERAGE;
+  const asked = ownKeywords(question);
+  if (!asked.length) return false;
+  const words = contentWords(`${p.title} ${p.section} ${p.body}`);
+  return asked.filter((k) => triggerWordIn(k, words)).length / asked.length >= VISIT_COVERAGE;
 }
 
 /**
@@ -3488,7 +3512,8 @@ export function coversQuestion(question: string, p: { title: string; section: st
  *   · no hay respuesta oficial del catálogo,
  *   · no hay respuesta guardada que sirva,
  *   · no hay cifra en vivo de casa, y
- *   · ningún pasaje de casa trae al menos la mitad de sus palabras clave.
+ *   · ningún pasaje de casa trae al menos la mitad de sus palabras clave (sin
+ *     contar el nombre de la universidad, que está en casi todo).
  * Con cualquiera de esas cuatro cosas, lo de casa alcanza y no se consulta
  * ningún otro ámbito por este camino.
  */

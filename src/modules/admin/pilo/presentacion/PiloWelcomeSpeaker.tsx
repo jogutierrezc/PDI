@@ -1,47 +1,35 @@
 /* =============================================================================
-   Mr. Pilo · Presentación de Investigación · Orador de Bienvenida (Fase 0).
+   Mr. Pilo · Presentación de investigación · la bienvenida.
 
-   Inspirado en la experiencia de bienvenida de creación de cuenta (AppWelcome /
-   AccountGate) pero diseñado específicamente para la presentación de investigación
-   de innovación educativa y digital de la Universidad de Santander (UDES).
+   La de la app al abrirla por primera vez (AppWelcome), a la medida de la sala:
+   luz y anillos crecen, Pilo salta a escena, se sorprende y mira a los lados;
+   el título llega letra por letra y cada frase palabra por palabra mientras
+   habla, con su muestra debajo. La salida: el escenario se cierra en círculo
+   sobre la cabecera mientras Pilo vuela hasta ella.
 
-   Voz programada oficial de Mr. Pilo:
-     · Utiliza estrictamente la voz oficial programada de Pilo (sayOfficial /
-       piloAudio vía NVIDIA NIM Riva / Fish Audio clonado en /api/pilo-voz).
-     · NUNCA cae a la síntesis del navegador ni a la «voz de equipo» (speechSynthesis).
-     · Si no hay audio disponible (red apagada, sin cuota), continúa limpiamente
-       con la animación de texto y subtítulos sincronizados, sin emitir voces
-       genéricas del sistema operativo.
-     · El pico de Mr. Pilo se anima mediante onSound en sincronía exacta con el
-       audio real reproducido.
+   La voz es la oficial o ninguna (official-voice.ts): nunca la del navegador.
+   Se pide por adelantado; suena solo después de un toque o una tecla, que es
+   cuando el navegador deja; el pico se mueve mientras suena el audio de verdad.
+   Sin voz, el pico acompaña a las palabras mientras aparecen.
 
-   Contenido obligatorio del discurso de Mr. Pilo:
-     1. Presentación como la Inteligencia Artificial oficial de la UDES.
-     2. Creado por y desde la Oficina de Planeación Institucional.
-     3. Capacitado para apoyar la toma de decisiones institucionales y para
-        enseñar y ayudar a profesores y estudiantes.
-     4. Integración profunda a los sistemas universitarios (PDI, Moodle, Cifras).
-     5. Emociones orales en la voz (moduladas según el ánimo de cada frase).
-     6. Humor cariñoso sobre sus plumas cibernéticas.
-     7. Estado actual: pequeño pero con capacidades cognitivas inimaginables.
-     8. Agradecimiento a NVIDIA por permitir el uso de sus entornos de supercómputo
-        (NVIDIA NIM / TensorRT / Hopper) para que Pilo esté presente hoy.
-     9. Orgullo de ser el piloto pionero de innovación educativa y transformación
-        digital de su alma mater la UDES.
+   Lo que dice Pilo (PRESENTATION_BEATS) lo fija speaker.test.ts: quién es y de
+   dónde viene, el chiste de las plumas, su doble misión, el apoyo de NVIDIA y
+   el cierre como piloto de innovación educativa de la UDES.
 
-   Seguridad y aislamiento:
-     · Solo se ejecuta e interactúa en la primera diapositiva (step === 0).
-     · Al cambiar de fase (step > 0) o desmontar, se silencia y detiene en seco.
-     · Respeta prefers-reduced-motion y la política de audio del navegador.
+   Movimiento: transform y opacidad, y clip-path solo para el cierre. Cada
+   animación se monta en un contexto de GSAP que, al interrumpirse (otra frase,
+   Saltar, desmontaje), devuelve todo a su estado visible. Con movimiento
+   reducido, solo fundidos.
    ========================================================================== */
 
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import type { RefObject } from "react";
 import gsap from "gsap";
 import { Pilo } from "../../../pregunta/Pilo";
 import type { MojiMood, PiloMojiHandle } from "../../../pregunta/Pilo";
 import { modulateVoice } from "../../../../components/pilo/ai/voice-expressions";
 import { prefetchOfficial, sayOfficial, stopOfficial } from "../../../pilo-app/official-voice";
-import { unlockPiloAudio } from "../../../../components/pilo/ai/voice-player";
+import { useFocusTrap } from "../../../pilo-app/Layer";
 import type { Face } from "./engine";
 
 export interface PresentationBeat {
@@ -119,540 +107,337 @@ export const PRESENTATION_BEATS: PresentationBeat[] = [
   },
 ];
 
+export const WELCOME_TITLE = "Hola, soy Mr. Pilo";
+
+const VOICE = { portal: "pregunta", advanced: true, keep: true } as const;
 const stillMotion = () => typeof window !== "undefined" && window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
+/** Ya hubo un toque o una tecla en esta página: el navegador deja sonar. */
+const touched = () => typeof navigator !== "undefined" && Boolean((navigator as Navigator & { userActivation?: { hasBeenActive: boolean } }).userActivation?.hasBeenActive);
+
+const VoiceIcon = ({ on }: { on: boolean }) => (
+  <svg width="16" height="16" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    <path d="M3 8v4h3l4 3V5L6 8H3z" />
+    {on ? <path d="M13 7.5a3.5 3.5 0 010 5M15.5 5a7 7 0 010 10" /> : <path d="M13.5 8l4 4M17.5 8l-4 4" />}
+  </svg>
+);
 
 export function PiloWelcomeSpeaker({
+  target,
   onFaceChange,
-  onFinishWelcome,
-  onOpenTechnical,
+  onDone,
 }: {
-  /** Sincroniza la expresión de Pilo con el avatar central del lienzo del cerebro */
+  /** El lugar de Pilo en la cabecera de la presentación: hasta ahí vuela al salir. */
+  target: RefObject<HTMLElement>;
+  /** La cara de Pilo en el núcleo de la malla acompaña a la de la bienvenida. */
   onFaceChange?: (face: Face) => void;
-  /** Acción al finalizar o cerrar la bienvenida */
-  onFinishWelcome?: () => void;
-  /** Alterna a la vista de ficha técnica detallada */
-  onOpenTechnical?: () => void;
+  onDone: () => void;
 }) {
-  const [beatIndex, setBeatIndex] = useState(0);
-  const [isPlaying, setIsPlaying] = useState(true);
-  const [isMuted, setIsMuted] = useState(false);
-  const [minimized, setMinimized] = useState(false);
+  const stage = useRef<HTMLDivElement>(null);
+  const holder = useRef<HTMLDivElement>(null);
+  const pilo = useRef<PiloMojiHandle>(null);
+  const hold = useRef<gsap.core.Tween | null>(null);
+  const intro = useRef<gsap.core.Timeline | null>(null);
+  const leaving = useRef(false);
+  const [beat, setBeat] = useState(-1);
+  const [voiceOn, setVoiceOn] = useState(true);
+  const [armed, setArmed] = useState(touched);
+  const [silent, setSilent] = useState(false);
 
-  const containerRef = useRef<HTMLDivElement>(null);
-  const bubbleRef = useRef<HTMLParagraphElement>(null);
-  const piloRef = useRef<PiloMojiHandle>(null);
-  const segmentHoldRef = useRef<gsap.core.Tween | null>(null);
-  const textTimelineRef = useRef<gsap.core.Timeline | null>(null);
-  const activeTokenRef = useRef(0);
+  const current = beat >= 0 ? PRESENTATION_BEATS[beat] : null;
+  const last = beat >= PRESENTATION_BEATS.length - 1;
+  // Habla si la voz está encendida, ya hubo un toque y el servicio no ha fallado.
+  const speaks = voiceOn && armed && !silent;
 
-  const beat = PRESENTATION_BEATS[beatIndex];
-
-  // Pre-cargar por adelantado los audios oficiales en la caché local
+  /* El audio de la presentación se pide por adelantado. */
   useEffect(() => {
-    prefetchOfficial(
-      PRESENTATION_BEATS.map((b) => b.say),
-      { portal: "pregunta", advanced: true, keep: true },
-    );
+    prefetchOfficial(PRESENTATION_BEATS.map((b) => b.say), VOICE);
   }, []);
 
-  // Desbloqueo proactivo del reproductor compartido con el primer toque o tecla
+  /* El primer toque (o tecla) estrena el audio: desde ahí Pilo puede sonar. */
   useEffect(() => {
-    const unlock = () => {
-      unlockPiloAudio();
-    };
-    if (
-      typeof navigator !== "undefined" &&
-      Boolean((navigator as Navigator & { userActivation?: { hasBeenActive: boolean } }).userActivation?.hasBeenActive)
-    ) {
-      unlockPiloAudio();
-    }
-    window.addEventListener("pointerup", unlock, { once: true });
-    window.addEventListener("keyup", unlock, { once: true });
+    if (armed) return;
+    const arm = () => setArmed(true);
+    // Al soltar, no al tocar: si el toque fue en «Siguiente», la frase que suena es ya la nueva.
+    window.addEventListener("pointerup", arm, { once: true });
+    window.addEventListener("keyup", arm, { once: true });
     return () => {
-      window.removeEventListener("pointerup", unlock);
-      window.removeEventListener("keyup", unlock);
+      window.removeEventListener("pointerup", arm);
+      window.removeEventListener("keyup", arm);
     };
-  }, []);
+  }, [armed]);
 
-  // Silenciar de inmediato si se desmonta el componente
-  useEffect(() => {
-    return () => {
-      activeTokenRef.current += 1;
-      segmentHoldRef.current?.kill();
-      textTimelineRef.current?.kill();
-      stopOfficial();
-      piloRef.current?.talk(false);
-    };
-  }, []);
-
-  // Animación de entrada inicial de la tarjeta estilo account.css
+  /* La entrada. */
   useLayoutEffect(() => {
-    if (minimized || stillMotion()) return;
-    const root = containerRef.current;
-    if (!root) return;
-
+    const root = stage.current!;
     const ctx = gsap.context(() => {
-      gsap.from(".pws-rings i", {
-        scale: 0.65,
-        autoAlpha: 0,
-        stagger: 0.12,
-        duration: 1.1,
-        ease: "power3.out",
-      });
-      gsap.from(".pws-face-box", {
-        y: 28,
-        scale: 0.88,
-        autoAlpha: 0,
-        duration: 0.8,
-        ease: "back.out(1.5)",
-      });
-      gsap.from([".pws-brand", ".pws-mood-badge", ".pws-controls"], {
-        y: -10,
-        autoAlpha: 0,
-        stagger: 0.08,
-        duration: 0.5,
-        ease: "power2.out",
-      });
-    }, root);
-
-    return () => ctx.revert();
-  }, [minimized]);
-
-  // Manejo de cada Beat (texto, voz oficial de Pilo, gestos y avance)
-  useEffect(() => {
-    if (minimized) return;
-
-    const token = ++activeTokenRef.current;
-    segmentHoldRef.current?.kill();
-    textTimelineRef.current?.kill();
-    stopOfficial();
-    piloRef.current?.talk(false);
-
-    if (!beat) return;
-
-    // 1. Sincronizar rostro y mirada
-    piloRef.current?.mood(beat.face);
-    piloRef.current?.look(...beat.look);
-    piloRef.current?.blink();
-    if (beatIndex % 2 === 0) piloRef.current?.nod();
-    onFaceChange?.(beat.canvasFace);
-
-    // 2. Modulación vocal (velocidad y prosodia según emoción de Pilo)
-    const voiceMod = modulateVoice(beat.voiceMood, 1.02, 1.0);
-
-    const root = containerRef.current;
-    const words = root?.querySelectorAll(".pws-bubble .wd");
-    const still = stillMotion();
-    const wordStep = still ? 0 : isMuted ? 0.08 : 0.22;
-
-    let textDone = false;
-    let audioDone = isMuted || !isPlaying;
-
-    const checkAdvance = () => {
-      if (token !== activeTokenRef.current) return;
-      if (!textDone || !audioDone) return;
-
-      piloRef.current?.talk(false);
-
-      if (!isPlaying) return;
-
-      // Si es el último beat, concluye la bienvenida tras una pausa
-      if (beatIndex >= PRESENTATION_BEATS.length - 1) {
-        segmentHoldRef.current = gsap.delayedCall(2.2, () => {
-          if (token === activeTokenRef.current) {
-            onFinishWelcome?.();
-          }
-        });
+      if (stillMotion()) {
+        gsap.from(root, { autoAlpha: 0, duration: 0.3 });
+        gsap.delayedCall(0.4, () => setBeat((b) => (b < 0 ? 0 : b)));
         return;
       }
+      intro.current = gsap
+        .timeline()
+        .from(".pw-glow", { scale: 0.4, autoAlpha: 0, duration: 1.2, ease: "power2.out" }, 0)
+        .from(".pw-rings i", { scale: 0.6, autoAlpha: 0, duration: 1.1, stagger: 0.12, ease: "power3.out" }, 0.1)
+        .from(holder.current, { y: 160, scale: 0.82, rotation: -10, autoAlpha: 0, duration: 0.95, ease: "back.out(1.5)" }, 0.3)
+        .add(() => {
+          pilo.current?.mood("sorpresa");
+          pilo.current?.blink();
+        }, 0.95)
+        .add(() => pilo.current?.look(-0.9, -0.1), 1.2)
+        .add(() => pilo.current?.look(0.9, -0.1), 1.6)
+        .add(() => {
+          pilo.current?.look(0, 0);
+          pilo.current?.mood("feliz");
+        }, 1.95)
+        // Letra por letra. Sin desenfoque: al texto solo se le anima posición y opacidad.
+        .from(".pw-title .ch", { y: 24, autoAlpha: 0, duration: 0.7, stagger: 0.028, ease: "power3.out" }, 1.1)
+        .from(".pw-top > *", { autoAlpha: 0, y: -8, duration: 0.5, stagger: 0.06, ease: "power3.out" }, 1.3)
+        .from([".pw-mood", ".pw-foot"], { autoAlpha: 0, y: 14, duration: 0.6, ease: "power3.out" }, 1.6)
+        .add(() => setBeat((b) => (b < 0 ? 0 : b)), 2.1);
+    }, root);
+    return () => {
+      // Interrumpida (o desmontada), todo vuelve a verse.
+      ctx.revert();
+      hold.current?.kill();
+      stopOfficial();
+    };
+  }, []);
 
-      // Animación de la barra de segmento antes de avanzar
-      const segs = root?.querySelectorAll(".pws-segs span i");
-      const currentBar = segs ? segs[beatIndex] : null;
-      if (currentBar) {
-        segmentHoldRef.current = gsap.to(currentBar, {
-          scaleX: 1,
-          duration: 1.6,
-          ease: "none",
-          onComplete: () => {
-            if (token === activeTokenRef.current && isPlaying) {
-              setBeatIndex((prev) => prev + 1);
-            }
-          },
-        });
-      } else {
-        segmentHoldRef.current = gsap.delayedCall(1.6, () => {
-          if (token === activeTokenRef.current && isPlaying) {
-            setBeatIndex((prev) => prev + 1);
-          }
-        });
-      }
+  /* Cada frase: palabra por palabra mientras Pilo habla, con su cara, su mirada y su muestra. */
+  useLayoutEffect(() => {
+    if (!current || leaving.current) return;
+    const root = stage.current!;
+    const b = current;
+    const i = beat;
+    const still = stillMotion();
+    const words = root.querySelectorAll(".pw-bubble .wd");
+    // Con voz las palabras llegan al paso del habla; sin ella, al de la lectura.
+    const perWord = still ? 0 : speaks ? 0.22 : 0.075;
+    let typed = false;
+    let spoken = !speaks;
+    let cancelled = false;
+    const next = () => {
+      if (cancelled || !typed || !spoken) return;
+      pilo.current?.talk(false);
+      // La última frase espera a quien presenta: «Conocer la capa profunda».
+      if (i >= PRESENTATION_BEATS.length - 1) return;
+      const seg = root.querySelectorAll(".pw-segs span i")[i];
+      // La barra del segmento marca la pausa antes de la frase siguiente.
+      hold.current = gsap.to(seg, { scaleX: 1, duration: 2.4, ease: "none", onComplete: () => setBeat(i + 1) });
     };
 
-    // 3. Ejecutar audio con la voz programada oficial de Mr. Pilo (sin caer a voz de equipo)
-    if (!isMuted && isPlaying) {
-      void sayOfficial(beat.say, {
-        portal: "pregunta",
-        advanced: true,
-        rate: voiceMod.rate,
-        keep: true,
-        // El pico se mueve estrictamente con el audio real de Pilo
-        onSound: (on) => {
-          if (token === activeTokenRef.current) {
-            piloRef.current?.talk(on);
-          }
-        },
+    pilo.current?.mood(b.face);
+    pilo.current?.look(...b.look);
+    pilo.current?.blink();
+    if (i % 2 === 0) pilo.current?.nod();
+    onFaceChange?.(b.canvasFace);
+    if (speaks) {
+      void sayOfficial(b.say, {
+        ...VOICE,
+        rate: modulateVoice(b.voiceMood, 1.02, 1.0).rate,
+        // El pico se mueve con el audio de verdad: cuando empieza y hasta que calla.
+        onSound: (on) => !cancelled && pilo.current?.talk(on),
       }).then((result) => {
-        if (token !== activeTokenRef.current || result === "cancelado") return;
-        audioDone = true;
-        piloRef.current?.talk(false);
-        checkAdvance();
+        if (cancelled || result === "cancelado") return;
+        // Sin audio no hay otra voz: la bienvenida sigue en texto.
+        if (result === "sin voz") setSilent(true);
+        spoken = true;
+        next();
       });
     } else {
-      // Modo silenciado: acompasa las palabras visualmente
-      piloRef.current?.talk(true);
+      pilo.current?.talk(true);
     }
 
-    // 4. Animación del texto palabra por palabra
-    if (root && words && words.length) {
-      const segs = root.querySelectorAll(".pws-segs span i");
-      gsap.set(segs, { scaleX: (k: number) => (k < beatIndex ? 1 : 0) });
-
+    const ctx = gsap.context(() => {
+      const segs = root.querySelectorAll(".pw-segs span i");
+      gsap.set(segs, { scaleX: (k: number) => (k < i ? 1 : 0) });
       const tl = gsap.timeline();
-      textTimelineRef.current = tl;
-
-      if (still) {
-        tl.set(words, { autoAlpha: 1, y: 0 });
-      } else {
-        tl.fromTo(
-          words,
-          { autoAlpha: 0, y: 8 },
-          {
-            autoAlpha: 1,
-            y: 0,
-            duration: 0.35,
-            stagger: wordStep,
-            ease: "power2.out",
-          },
-        );
-      }
-
+      if (words.length) tl.fromTo(words, { autoAlpha: 0, y: still ? 0 : 8 }, { autoAlpha: 1, y: 0, duration: still ? 0.2 : 0.35, stagger: perWord, ease: "power3.out" }, 0);
       tl.add(() => {
-        if (token !== activeTokenRef.current) return;
-        textDone = true;
-        if (isMuted) {
-          piloRef.current?.talk(false);
-        }
-        checkAdvance();
-      }, words.length * wordStep + 0.3);
-    } else {
-      textDone = true;
-      checkAdvance();
-    }
+        typed = true;
+        if (!speaks) pilo.current?.talk(false);
+        next();
+      }, words.length * perWord + 0.3);
+      const items = root.querySelectorAll(".pw-exhibit > *");
+      if (items.length) {
+        if (still) tl.fromTo(items, { autoAlpha: 0 }, { autoAlpha: 1, duration: 0.2 }, 0);
+        else tl.fromTo(items, { autoAlpha: 0, y: 16, scale: 0.94 }, { autoAlpha: 1, y: 0, scale: 1, duration: 0.5, stagger: 0.08, ease: "back.out(1.6)" }, 0.2);
+      }
+    }, root);
 
     return () => {
-      segmentHoldRef.current?.kill();
-      textTimelineRef.current?.kill();
+      cancelled = true;
+      hold.current?.kill();
+      hold.current = null;
+      ctx.revert();
       stopOfficial();
-      piloRef.current?.talk(false);
+      pilo.current?.talk(false);
     };
-  }, [beatIndex, isPlaying, isMuted, minimized, onFaceChange, onFinishWelcome]);
+    // La cara del lienzo no cambia a media frase: mandan la frase y si suena.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [beat, speaks]);
 
-  const togglePlay = () => {
-    unlockPiloAudio();
-    if (isPlaying) {
-      setIsPlaying(false);
-      stopOfficial();
-      piloRef.current?.talk(false);
-      segmentHoldRef.current?.pause();
-      textTimelineRef.current?.pause();
-    } else {
-      setIsPlaying(true);
-      segmentHoldRef.current?.resume();
-      textTimelineRef.current?.resume();
-    }
-  };
-
-  const toggleMute = () => {
-    unlockPiloAudio();
-    const next = !isMuted;
-    setIsMuted(next);
-    if (next) {
-      stopOfficial();
-      piloRef.current?.talk(false);
-    }
-  };
-
-  const replay = () => {
-    unlockPiloAudio();
-    setIsPlaying(true);
-    // Forzar re-trigger reiniciando el token
-    setBeatIndex((i) => i);
-    activeTokenRef.current += 1;
+  /* La salida: Pilo vuela a la cabecera y el escenario se cierra sobre él. */
+  const finish = () => {
+    if (leaving.current) return;
+    leaving.current = true;
+    hold.current?.kill();
     stopOfficial();
-    piloRef.current?.talk(false);
-    // Disparo inmediato
-    const current = beatIndex;
-    setBeatIndex(-1);
-    setTimeout(() => setBeatIndex(current), 40);
-  };
-
-  const nextBeat = () => {
-    unlockPiloAudio();
-    stopOfficial();
-    if (beatIndex < PRESENTATION_BEATS.length - 1) {
-      setBeatIndex((i) => i + 1);
-    } else {
-      onFinishWelcome?.();
+    pilo.current?.talk(false);
+    const root = stage.current;
+    const slot = target.current;
+    const fly = holder.current;
+    if (!root || !fly) return onDone();
+    // Si la entrada no había terminado, termina ya: Pilo vuela desde su sitio, entero y visible.
+    intro.current?.progress(1);
+    if (stillMotion() || !slot) {
+      gsap.to(root, { autoAlpha: 0, duration: 0.3, onComplete: onDone });
+      return;
     }
+    const frame = root.getBoundingClientRect();
+    const from = fly.getBoundingClientRect();
+    const to = slot.getBoundingClientRect();
+    const cx = to.left + to.width / 2 - frame.left;
+    const cy = to.top + to.height / 2 - frame.top;
+    const R = Math.hypot(frame.width, frame.height);
+    gsap.killTweensOf([fly, root.querySelectorAll(".pw-center > *, .pw-top, .pw-foot, .pw-bubble .wd, .pw-segs span i")]);
+    gsap.set(fly, { transformOrigin: "0 0" });
+    gsap
+      .timeline({ onComplete: onDone })
+      .to(root.querySelectorAll(".pw-center > :not(.pw-slot), .pw-top, .pw-foot, .pw-rings"), { autoAlpha: 0, y: -8, duration: 0.25, ease: "power2.out" }, 0)
+      .fromTo(root.querySelector(".pw-bg"), { clipPath: `circle(${R}px at ${cx}px ${cy}px)` }, { clipPath: `circle(0px at ${cx}px ${cy}px)`, duration: 0.75, ease: "power3.inOut" }, 0.12)
+      .to(fly, { x: to.left - from.left, y: to.top - from.top, scale: to.width / from.width, rotation: 0, duration: 0.85, ease: "power3.inOut" }, 0.08);
   };
 
-  const prevBeat = () => {
-    unlockPiloAudio();
-    stopOfficial();
-    if (beatIndex > 0) {
-      setBeatIndex((i) => i - 1);
-    }
+  const advance = () => {
+    if (beat < 0) setBeat(0);
+    else if (last) finish();
+    else setBeat(beat + 1);
   };
 
-  // Estado minimizado: píldora flotante compacta
-  if (minimized) {
-    return (
-      <div className="pws-minimized" role="region" aria-label="Mr. Pilo orador">
-        <button
-          type="button"
-          className="pws-min-pill"
-          onClick={() => {
-            unlockPiloAudio();
-            setMinimized(false);
-            setIsPlaying(true);
-          }}
-          title="Abrir la presentación hablada de Mr. Pilo"
-        >
-          <span className="pws-min-avatar">
-            <Pilo size={28} alive label="Pilo" mood={beat.face} />
-          </span>
-          <span className="pws-min-text">
-            <b>Mr. Pilo en vivo:</b> {beat.tag} ({beatIndex + 1}/{PRESENTATION_BEATS.length})
-          </span>
-          <span className="pws-min-action">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-              <polygon points="5 3 19 12 5 21 5 3" />
-            </svg>
-            Escuchar
-          </span>
-        </button>
-      </div>
-    );
-  }
+  // Escape salta la bienvenida; el foco no sale de ella mientras está.
+  useFocusTrap(stage, true, finish);
+
+  /* Las flechas pasan de frase, como después pasan de fase. */
+  const keys = useRef({ advance, back: () => {} });
+  keys.current = {
+    advance,
+    back: () => {
+      if (beat > 0) setBeat(beat - 1);
+    },
+  };
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === " " && e.target instanceof HTMLElement && e.target.closest("button")) return;
+      if (["ArrowRight", "PageDown", " "].includes(e.key)) {
+        e.preventDefault();
+        keys.current.advance();
+      } else if (["ArrowLeft", "PageUp"].includes(e.key)) {
+        e.preventDefault();
+        keys.current.back();
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
+
+  const shown = Math.min(beat < 0 ? 0 : beat, PRESENTATION_BEATS.length - 1) + 1;
+  const moodLine = silent ? "La voz de Pilo no está disponible: lea a Pilo" : !voiceOn ? "Voz apagada" : !armed ? "Toque la pantalla para oír a Pilo" : (current?.moodLabel ?? "Voz oficial de Pilo");
+  const voiceLabel = silent ? "La voz de Pilo no está disponible ahora" : voiceOn ? "Voz de Pilo activada. Apagar" : "Voz de Pilo apagada. Activar";
 
   return (
-    <section className="pws-card" ref={containerRef} aria-label="Presentación y saludo de Mr. Pilo">
-      {/* Fondo ceremonial con anillos concéntricos y resplandor cian */}
-      <div className="pws-bg" aria-hidden="true">
-        <div className="pws-glow" />
-        <div className="pws-rings">
-          <i style={{ width: 180, height: 180 }} />
-          <i style={{ width: 310, height: 310 }} />
-          <i style={{ width: 440, height: 440 }} />
+    <div className="pw" ref={stage} role="dialog" aria-modal="true" aria-label="Bienvenida de Mr. Pilo" tabIndex={-1}>
+      <div className="pw-bg">
+        <div className="pw-glow" />
+        <div className="pw-rings" aria-hidden="true">
+          <i style={{ width: 250, height: 250 }} />
+          <i style={{ width: 400, height: 400 }} />
+          <i style={{ width: 570, height: 570 }} />
         </div>
       </div>
 
-      {/* Cabecera del orador */}
-      <header className="pws-top">
-        <div className="pws-brand">
+      <header className="pw-top">
+        <div className="cpp-brand">
           <b>Mr. Pilo</b>
           <span>Universidad de Santander · Planeación Institucional</span>
         </div>
-
-        <div className="pws-controls">
-          {/* Botón de Silencio / Audio */}
-          <button
-            type="button"
-            className="pws-btn pws-btn--icon"
-            onClick={toggleMute}
-            aria-label={isMuted ? "Activar voz de Mr. Pilo" : "Silenciar voz"}
-            title={isMuted ? "Activar voz oficial de Mr. Pilo" : "Silenciar voz"}
-          >
-            {isMuted ? (
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                <line x1="1" y1="1" x2="23" y2="23" />
-                <path d="M9 9v3a3 3 0 0 0 5.12 2.12M15 9.34V4a3 3 0 0 0-5.94-.6" />
-                <path d="M17 16.95A7 7 0 0 1 5 12v-2m14 0v2a7 7 0 0 1-.11 1.23" />
-                <line x1="12" y1="19" x2="12" y2="23" />
-                <line x1="8" y1="23" x2="16" y2="23" />
-              </svg>
-            ) : (
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z" />
-                <path d="M19 10v2a7 7 0 0 1-14 0v-2" />
-                <line x1="12" y1="19" x2="12" y2="23" />
-                <line x1="8" y1="23" x2="16" y2="23" />
-              </svg>
-            )}
-          </button>
-
-          {/* Ficha técnica */}
-          <button
-            type="button"
-            className="pws-btn pws-btn--text"
-            onClick={() => {
-              if (onOpenTechnical) onOpenTechnical();
-              else setMinimized(true);
-            }}
-            title="Ver arquitectura técnica detallada"
-          >
-            Ficha técnica
-          </button>
-        </div>
+        <button
+          type="button"
+          className="cpp-ghost"
+          aria-pressed={!silent && voiceOn}
+          aria-disabled={silent || undefined}
+          aria-label={voiceLabel}
+          title={voiceLabel}
+          onClick={() => {
+            if (silent) return;
+            if (voiceOn) stopOfficial();
+            setVoiceOn(!voiceOn);
+          }}
+        >
+          <VoiceIcon on={!silent && voiceOn} />
+        </button>
+        <button type="button" className="cpp-ghost" onClick={finish}>
+          Saltar
+        </button>
       </header>
 
-      {/* Avatar interactivo de Mr. Pilo con microexpresiones oficiales */}
-      <div className="pws-stage-center">
-        <div className="pws-face-box">
-          <Pilo ref={piloRef} size="100%" alive label="Mr. Pilo hablando" mood={beat.face} />
-        </div>
-
-        {/* Indicador prosódico del estado emocional */}
-        <div className="pws-mood-badge">
-          <i className={`pws-pulse-dot ${isMuted ? "pws-pulse-dot--muted" : ""}`} aria-hidden="true" />
-          <span>{isMuted ? `Modo lectura (silenciado) · ${beat.tag}` : beat.moodLabel}</span>
-        </div>
-
-        {/* Subtítulo dinámico con lectura sincronizada */}
-        <p className="pws-sr" aria-live="polite">
-          {beat.say}
-        </p>
-
-        <div className="pws-bubble-card">
-          <div className="pws-bubble-eyebrow">
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-              <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
-            </svg>
-            <span>Pensamiento en vivo de Mr. Pilo · {beat.tag}</span>
+      <div className="pw-center">
+        <div className="pw-slot">
+          <div className="pw-fly" ref={holder}>
+            <Pilo ref={pilo} size="100%" alive label="Mr. Pilo" />
           </div>
-
-          <p className="pws-bubble" ref={bubbleRef} aria-hidden="true">
-            {beat.say.split(" ").map((w, i) => (
-              <span key={`${beat.id}:${i}`} className="wd">
-                {w}{" "}
-              </span>
-            ))}
-          </p>
         </div>
-
-        {/* Chips de contexto semántico del beat */}
-        <div className="pws-chips-row">
-          {beat.chips.map((chip) => (
-            <span key={chip} className="pws-tag-chip">
+        <h1 className="pw-title" aria-label={WELCOME_TITLE}>
+          {WELCOME_TITLE.split(" ").map((word, i) => (
+            <span key={i} className="w" aria-hidden="true">
+              {[...word].map((c, j) => (
+                <span key={j} className="ch">
+                  {c}
+                </span>
+              ))}
+            </span>
+          ))}
+        </h1>
+        <span className="pw-mood">
+          <i aria-hidden="true" />
+          <span>{moodLine}</span>
+        </span>
+        {/* Lo que se ve aparece palabra por palabra; lo que se anuncia, la frase entera de una vez. */}
+        <p className="pw-sr" aria-live="polite">
+          {current?.say}
+        </p>
+        <p className="pw-bubble" aria-hidden="true">
+          {current?.say.split(" ").map((w, i) => (
+            <span key={`${current.id}:${i}`} className="wd">
+              {w}{" "}
+            </span>
+          ))}
+        </p>
+        <div className="pw-exhibit">
+          {current?.chips.map((chip) => (
+            <span key={`${current.id}:${chip}`} className="pw-know">
               {chip}
             </span>
           ))}
         </div>
       </div>
 
-      {/* Barra de progreso de segmentos (Estilo AccountGate / AppWelcome) */}
-      <footer className="pws-foot">
-        <div className="pws-segs" role="tablist" aria-label="Progreso de la presentación de Pilo">
-          {PRESENTATION_BEATS.map((b, i) => (
-            <button
-              key={b.id}
-              type="button"
-              className="pws-seg-btn"
-              onClick={() => {
-                unlockPiloAudio();
-                setBeatIndex(i);
-              }}
-              title={`Parte ${i + 1}: ${b.tag}`}
-              aria-label={`Ir a parte ${i + 1}: ${b.tag}`}
-              aria-selected={i === beatIndex}
-            >
-              <span>
-                <i style={{ transform: i < beatIndex ? "scaleX(1)" : i === beatIndex ? undefined : "scaleX(0)" }} />
-              </span>
-            </button>
-          ))}
-        </div>
-
-        <div className="pws-actions">
-          <div className="pws-player-actions">
-            {/* Retroceder */}
-            <button
-              type="button"
-              className="pws-btn pws-btn--nav"
-              onClick={prevBeat}
-              disabled={beatIndex === 0}
-              aria-label="Frase anterior"
-              title="Frase anterior"
-            >
-              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                <polyline points="15 18 9 12 15 6" />
-              </svg>
-            </button>
-
-            {/* Pausar / Reproducir */}
-            <button
-              type="button"
-              className="pws-btn pws-btn--nav pws-btn--primary"
-              onClick={togglePlay}
-              aria-label={isPlaying ? "Pausar orador" : "Reanudar orador"}
-              title={isPlaying ? "Pausar" : "Reanudar"}
-            >
-              {isPlaying ? (
-                <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-                  <rect x="6" y="4" width="4" height="16" />
-                  <rect x="14" y="4" width="4" height="16" />
-                </svg>
-              ) : (
-                <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-                  <polygon points="5 3 19 12 5 21 5 3" />
-                </svg>
-              )}
-            </button>
-
-            {/* Repetir frase */}
-            <button
-              type="button"
-              className="pws-btn pws-btn--nav"
-              onClick={replay}
-              aria-label="Repetir frase de Pilo"
-              title="Repetir frase"
-            >
-              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                <polyline points="1 4 1 10 7 10" />
-                <path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10" />
-              </svg>
-            </button>
-          </div>
-
-          <div className="pws-forward-actions">
-            <span className="pws-count">
-              Parte {beatIndex + 1} de {PRESENTATION_BEATS.length}
+      <footer className="pw-foot">
+        <div className="pw-segs">
+          {PRESENTATION_BEATS.map((b) => (
+            <span key={b.id} aria-hidden="true">
+              <i />
             </span>
-
-            {beatIndex < PRESENTATION_BEATS.length - 1 ? (
-              <button type="button" className="pws-btn pws-btn--cta" onClick={nextBeat}>
-                Siguiente frase
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                  <polyline points="9 18 15 12 9 6" />
-                </svg>
-              </button>
-            ) : (
-              <button
-                type="button"
-                className="pws-btn pws-btn--cta pws-btn--glow"
-                onClick={onFinishWelcome}
-              >
-                Conocer la Capa Profunda
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                  <line x1="5" y1="12" x2="19" y2="12" />
-                  <polyline points="12 5 19 12 12 19" />
-                </svg>
-              </button>
-            )}
-          </div>
+          ))}
+          <small aria-label={`Parte ${shown} de ${PRESENTATION_BEATS.length}`}>
+            {shown} de {PRESENTATION_BEATS.length}
+          </small>
         </div>
+        <button type="button" className="pw-next" onClick={advance}>
+          {last ? "Conocer la capa profunda" : "Siguiente"}
+        </button>
       </footer>
-    </section>
+    </div>
   );
 }

@@ -29,12 +29,13 @@ import {
   ALL_SOURCES,
   buildModel,
   createStage,
-  SOURCE_ORDER,
   SOURCES,
   STEP_COUNT,
-  TEACH_SOURCE_ORDER,
+  stageTheme,
 } from "./engine";
 import type { PresentationData, SourceKey, StageHandle } from "./engine";
+import { Pilo } from "../../../pregunta/Pilo";
+import type { MojiMood } from "../../../pregunta/Pilo";
 import { PiloWelcomeSpeaker } from "./PiloWelcomeSpeaker";
 import "./presentation.css";
 
@@ -99,17 +100,24 @@ interface Step {
   short: string;
   phaseCode: string;
   layer?: number;
+  /** La cara de Pilo en la cabecera durante la fase. */
+  face: MojiMood;
   title: string;
   body: ReactNode;
   extra?: ReactNode;
 }
+
+const ICON = { width: 15, height: 15, viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: 2.2, strokeLinecap: "round", strokeLinejoin: "round", "aria-hidden": true } as const;
 
 export function Presentation() {
   const navigate = useNavigate();
   const { data, loading, error } = usePresentationData();
   const model = useMemo(() => (data ? buildModel(data) : null), [data]);
   const [step, setStep] = useState(0);
-  const [fase0Mode, setFase0Mode] = useState<"speaker" | "technical">("speaker");
+  /** La bienvenida de Pilo abre la presentación; se vuelve a ver tocando a Pilo en la cabecera. */
+  const [welcome, setWelcome] = useState(true);
+  /** Sobre blanco de partida; «noche» es la escena con que nació la presentación. */
+  const [night, setNight] = useState(false);
 
   const initialOn = useMemo(() => {
     const map = {} as Record<SourceKey, boolean>;
@@ -124,8 +132,11 @@ export function Presentation() {
   const host = useRef<HTMLDivElement>(null);
   const tip = useRef<HTMLDivElement>(null);
   const story = useRef<HTMLElement>(null);
+  const slot = useRef<HTMLButtonElement>(null);
   const stage = useRef<StageHandle | null>(null);
   const last = useRef(-1);
+  const welcomeOpen = useRef(welcome);
+  welcomeOpen.current = welcome;
 
   useEffect(() => {
     const before = document.title;
@@ -134,6 +145,11 @@ export function Presentation() {
       document.title = before;
     };
   }, []);
+
+  // La malla sigue al fondo: desde el cuadro siguiente pinta con los colores de ese fondo.
+  useLayoutEffect(() => {
+    stageTheme.light = !night;
+  }, [night]);
 
   useEffect(() => {
     if (!model || !canvas.current || !host.current || !tip.current) return;
@@ -159,7 +175,6 @@ export function Presentation() {
         gsap.from(story.current!.children, {
           autoAlpha: 0,
           y: back ? -8 : 10,
-          filter: "blur(3px)",
           duration: 0.38,
           stagger: 0.05,
           ease: "power2.out",
@@ -171,7 +186,10 @@ export function Presentation() {
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
+      // Mientras Pilo da la bienvenida, las teclas son suyas.
+      if (welcomeOpen.current) return;
       if (["ArrowRight", "PageDown", " "].includes(e.key)) {
+        if (e.key === " " && e.target instanceof HTMLElement && e.target.closest("button, a")) return;
         e.preventDefault();
         setStep((s) => Math.min(STEP_COUNT - 1, s + 1));
       } else if (["ArrowLeft", "PageUp"].includes(e.key)) {
@@ -206,24 +224,33 @@ export function Presentation() {
     stage.current?.toggleBridges(next);
   };
 
+  const dot = (k: SourceKey) => <i style={{ background: `var(--cpp-s-${k})` }} />;
+
   const steps: Step[] = model
     ? [
         // 0. Arquitectura Cognitiva de Doble Flujo
         {
           short: "Dual-Stream",
           phaseCode: "FASE 0 · ARQUITECTURA COGNITIVA",
+          face: "feliz",
           title: "Desacoplamiento ontológico: arquitectura bio-inspirada de doble flujo",
           body: (
             <>
               En Inteligencia Artificial aplicada a la Educación Superior (AIED), un sistema RAG monolítico produce
               interferencias al cruzar metas de gestión directiva con lineamientos pedagógicos de aula. Mr. Pilo resuelve
-              esto mediante una <b>arquitectura cognitiva de dos hemisferios cerebrales</b>: el <b>Hemisferio Estratégico</b>{" "}
-              (Planeación Institucional: PDI, SNIES/CNA, UDES en Cifras) y el <b>Hemisferio Curricular</b> (Enseñanza: innovación
-              didáctica, resultados de aprendizaje y aulas Moodle).
+              esto con una <b>arquitectura cognitiva de dos hemisferios</b>: el <b>Hemisferio Estratégico</b> (Planeación:
+              PDI, SNIES/CNA, UDES en Cifras) y el <b>Hemisferio Curricular</b> (Enseñanza: innovación didáctica,
+              resultados de aprendizaje y aulas Moodle).
             </>
           ),
           extra: (
-            <div style={{ display: "grid", gap: "10px" }}>
+            <>
+              <div className="cpp-mini">
+                <span>Mr. Pilo presenta esta investigación con su propia voz</span>
+                <button type="button" onClick={() => setWelcome(true)}>
+                  Escuchar a Mr. Pilo
+                </button>
+              </div>
               <div className="cpp-spec-grid">
                 <div className="cpp-spec-box">
                   <span>Hemisferio Estratégico</span>
@@ -236,72 +263,66 @@ export function Presentation() {
                   <small>Modelos · RA · Moodle</small>
                 </div>
                 <div className="cpp-spec-box">
-                  <span>Sinapsis Inter-dominio</span>
+                  <span>Sinapsis inter-dominio</span>
                   <b>{model.counts.bridges} puentes</b>
-                  <small>Alineación 0122 (ODS/Leyes)</small>
+                  <small>Alineación 0122 (ODS y leyes)</small>
                 </div>
                 <div className="cpp-spec-box">
-                  <span>Topología Total</span>
+                  <span>Topología total</span>
                   <b>{model.counts.totalNodes} neuronas</b>
                   <small>Dual-Stream Knowledge Graph</small>
                 </div>
               </div>
-
-              <div className="cpp-hemi-group">
-                <span className="cpp-hemi-title">
-                  <i style={{ background: "#7fe7f0" }} /> Fuentes Ontológicas Mapeadas
-                </span>
-                <div className="cpp-chips">
-                  {ALL_SOURCES.map((k) => (
-                    <span key={k} className="cpp-chip">
-                      <i style={{ background: SOURCES[k].color }} />
-                      {SOURCES[k].name}
-                    </span>
-                  ))}
-                </div>
+              <span className="cpp-hemi-title">Fuentes ontológicas mapeadas</span>
+              <div className="cpp-chips">
+                {ALL_SOURCES.map((k) => (
+                  <span key={k} className="cpp-chip">
+                    {dot(k)}
+                    {SOURCES[k].name}
+                  </span>
+                ))}
               </div>
-            </div>
+            </>
           ),
         },
 
-        // 1. Multimodalidad y Procesamiento Perimetral
+        // 1. Multimodalidad, privacidad en el dispositivo y las capacidades nuevas
         {
           short: "Edge AI",
           phaseCode: "FASE 1 · COMPUTACIÓN EN EL BORDE",
+          face: "sorpresa",
           title: "Multimodalidad en el cliente y preservación de privacidad perimetral",
           body: (
             <>
-              La investigación en innovación educativa exige estricta privacidad de datos institucionales (FERPA / Habeas Data).
-              Mr. Pilo incorpora <b>computación perimetral (Edge AI)</b>: los documentos y archivos no se suben a servidores
-              externos; se analizan de manera segura en el navegador de la persona mediante web-workers locales.
+              La investigación en innovación educativa exige estricta privacidad de los datos institucionales. Mr. Pilo
+              incorpora <b>computación perimetral (Edge AI)</b>: los archivos no se suben a servidores externos; se
+              analizan en el navegador de la persona.
             </>
           ),
           extra: (
             <div className="cpp-actions-grid">
               <div className="cpp-action-card">
                 <b>
-                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--cpp-cyan)" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                  <svg {...ICON}>
                     <path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48" />
                   </svg>
                   Edge Document Parser
                 </b>
-                <span>Parseo e indexación vectorial en cliente (PDF/XLSX hasta 10 MB). Cero filtración de datos institucionales sensibles.</span>
+                <span>Lectura del archivo en el dispositivo (PDF o XLSX): no se guarda en el servidor.</span>
               </div>
-
               <div className="cpp-action-card">
                 <b>
-                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#fbbf24" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                  <svg {...ICON}>
                     <polyline points="16 18 22 12 16 6" />
                     <polyline points="8 6 2 12 8 18" />
                   </svg>
                   Learning Analytics Code
                 </b>
-                <span>Generación computacional de scripts analíticos (SQL, TypeScript, fórmulas CNA/SNIES y cálculo de tasas de retención).</span>
+                <span>Scripts analíticos (SQL, TypeScript, fórmulas CNA/SNIES y tasas de retención).</span>
               </div>
-
               <div className="cpp-action-card">
                 <b>
-                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#a78bfa" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                  <svg {...ICON}>
                     <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
                     <circle cx="9" cy="7" r="4" />
                     <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
@@ -309,91 +330,112 @@ export function Presentation() {
                   </svg>
                   Persona Conditioning
                 </b>
-                <span>Modulación prosódica y tonal condicionada por el perfil académico: Estudiante, Docente-Investigador o Directivo.</span>
+                <span>El tono cambia con el perfil: estudiante, profesor o administrativo.</span>
               </div>
-
               <div className="cpp-action-card">
                 <b>
-                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#34d399" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                  <svg {...ICON}>
                     <path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" />
                   </svg>
-                  Zero-Hallucination Facts
+                  Facts verificados
                 </b>
-                <span>Verificación matemática auditada contra pilo_facts: ninguna cifra métrica o presupuestal es aproximada o alucinada.</span>
+                <span>Cada cifra se verifica contra pilo_facts, con su corte y su fuente.</span>
+              </div>
+              <div className="cpp-action-card">
+                <b>
+                  <svg {...ICON}>
+                    <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20" />
+                    <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z" />
+                  </svg>
+                  Catálogo compartido
+                </b>
+                <span>Nuevo: una respuesta oficial puede servir a todos los Pilos y entra a la memoria.</span>
+              </div>
+              <div className="cpp-action-card">
+                <b>
+                  <svg {...ICON}>
+                    <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z" />
+                  </svg>
+                  Colecciones propias
+                </b>
+                <span>Nuevo: cada oficina crea sus colecciones de documentos y decide cuándo se leen.</span>
               </div>
             </div>
           ),
         },
 
-        // 2. Vector de Entrada y Estímulo Sensorial
+        // 2. Vector de entrada y estímulo sensorial
         {
           short: "Estímulo",
           phaseCode: "FASE 2 · INGESTA SENSORIAL",
+          face: "piensa",
           title: "Ingesta del vector de consulta y estímulo sensorial en lenguaje natural",
           body: (
             <>
-              La interacción inicia con la formulación de una consulta de investigación en lenguaje natural. El estímulo
-              se tokeniza y vectoriza en tiempo real mientras se evalúan atajos reflejos de tiempo constante O(1).
+              La interacción inicia con una consulta en lenguaje natural. El estímulo se vectoriza en tiempo real
+              mientras se evalúan los atajos reflejos.
             </>
           ),
           extra: (
-            <div style={{ display: "grid", gap: "10px" }}>
+            <>
               <div className="cpp-q">{model.question}</div>
-              <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
-                <span className="cpp-research-tag">Vector de entrada: dense-embedding (1536 dim)</span>
-                <span className="cpp-research-tag">Intención: Articulación PDI ↔ Currículo ↔ ODS</span>
+              <div className="cpp-row">
+                <span className="cpp-research-tag">Vector de entrada: 1.024 dimensiones</span>
+                <span className="cpp-research-tag">Intención: PDI ↔ Currículo ↔ ODS</span>
               </div>
-            </div>
+            </>
           ),
         },
 
-        // 3. Autómata de Enrutamiento Determinista (0 Créditos / < 40ms)
+        // 3. Autómata de enrutamiento determinista
         {
           short: "Filtros 0cr",
           phaseCode: "FASE 3 · ENRUTAMIENTO REFLEJO",
           layer: 1,
-          title: "Autómata reflejo determinista: eficiencia O(1) y cero consumo de GPU",
+          face: "feliz",
+          title: "Autómata reflejo determinista: cero consumo de GPU",
           body: (
             <>
-              Gobernanza de costos computacionales en IA universitaria: antes de activar inferencia estocástica en la nube,
-              el <b>catálogo institucional firmado</b> y el <b>motor de reglas duras</b> (protección de datos, dinero, límites
-              éticos) resuelven de forma determinista en menos de <b>40 ms</b>.
+              Gobernanza de costos en IA universitaria: antes de activar la inferencia en la nube, el{" "}
+              <b>catálogo institucional</b> y el <b>motor de reglas duras</b> (protección de datos, dinero, límites
+              éticos) resuelven de forma determinista.
             </>
           ),
           extra: (
-            <div style={{ display: "grid", gap: "8px" }}>
+            <>
               <div className="cpp-credits">
                 Costo computacional: <b>0 créditos de GPU consumidos</b>
               </div>
               <div className="cpp-meter">
                 <div>
-                  <b>&lt; 38 ms</b>
-                  <small>latencia de respuesta</small>
+                  <b>0</b>
+                  <small>pedidos al modelo</small>
                 </div>
                 <div>
-                  <b>O(1)</b>
-                  <small>complejidad de enrutamiento</small>
+                  <b>2</b>
+                  <small>vetos: dinero y datos personales</small>
                 </div>
                 <div>
-                  <b>100%</b>
-                  <small>determinismo ontológico</small>
+                  <b>0,80</b>
+                  <small>parecido mínimo con el catálogo</small>
                 </div>
               </div>
-            </div>
+            </>
           ),
         },
 
-        // 4. Recuperación Semántica Híbrida Densa y Dispersa
+        // 4. Recuperación semántica híbrida
         {
           short: "Pasajes",
           phaseCode: "FASE 4 · RECUPERACIÓN HÍBRIDA",
           layer: 2,
+          face: "piensa",
           title: "Recuperación semántica híbrida: espacio vectorial denso y concordancia dispersa",
           body: (
             <>
               Para consultas inéditas, el sistema despliega una <b>recuperación híbrida (Dense + Sparse)</b>: similitud
-              coseno sobre embeddings vectoriales (`bge-m3 / nemotron`) combinada con concordancia léxica BM25/FTS en español
-              normalizado. Se activan sinérgicamente las neuronas de memoria en ambos hemisferios.
+              coseno sobre embeddings combinada con concordancia léxica en español normalizado. Se activan las neuronas
+              de memoria del hemisferio de casa.
             </>
           ),
           extra: (
@@ -407,145 +449,131 @@ export function Presentation() {
                 <small>neuronas en la corteza</small>
               </div>
               <div>
-                <b>cos_sim &ge; 0.78</b>
-                <small>umbral de activación sináptica</small>
+                <b>0,30</b>
+                <small>parecido mínimo por significado</small>
               </div>
             </div>
           ),
         },
 
-        // 5. Puentes de Ontología Cruzada y Protocolo de Visita
+        // 5. Puentes de ontología cruzada y lectura de visita
         {
           short: "Puentes",
           phaseCode: "FASE 5 · ALINEACIÓN ONTOLÓGICA",
           layer: 3,
+          face: "sorpresa",
           title: "Puentes ontológicos inter-dominio y protocolo de lectura «de visita»",
           body: (
             <>
-              Aporte conceptual central del proyecto: alineación de ontologías heterogéneas. La migración 0122 define
-              <b> puentes ontológicos formales</b> que conectan el PDI con el marco pedagógico: <b>ODS 4</b>, <b>Ley 30 de 1992</b>,{" "}
-              <b>Decreto 1330</b> y resultados de aprendizaje (RA). Si un hemisferio no tiene suficiente contexto, la señal
-              cruza el puente mediante el <b>protocolo de lectura «de visita»</b> preservando la trazabilidad de origen.
+              Aporte conceptual central del proyecto: la migración 0122 define <b>puentes ontológicos formales</b> que
+              conectan el PDI con el marco pedagógico: <b>ODS 4</b>, <b>Ley 30 de 1992</b> y <b>Decreto 1330</b>. Si un
+              hemisferio no tiene suficiente contexto, la señal cruza el puente con el{" "}
+              <b>protocolo de lectura «de visita»</b>, preservando la procedencia.
             </>
           ),
           extra: (
-            <div className="cpp-neural-card">
-              <span className="cpp-badge cpp-badge--bridge">Puente Ontológico Formal · Protocolo 0122</span>
-              <p style={{ margin: 0, fontSize: "0.88rem", color: "var(--cpp-ink)" }}>
-                ⚡ <b>Alineación Ontológica: PR1 / LA21 ↔ ODS 4 & Resultados de Aprendizaje:</b> Conexión formal entre metas
-                institucionales del PDI y las competencias evaluables en el aula Moodle.
+            <div className="cpp-card cpp-card--amber">
+              <span className="cpp-badge cpp-badge--amber">Puente ontológico formal · Protocolo 0122</span>
+              <p>
+                <b>PDI ↔ ODS 4 y resultados de aprendizaje.</b> Conexión formal entre las metas del Plan y las
+                competencias evaluables en el aula. Los puentes que propone la IA entran como propuesta y la
+                administración los aprueba uno por uno.
               </p>
               <div className="cpp-credits">
-                Trazabilidad: <b>Procedencia ontológica verificada de visita</b>
+                Trazabilidad: <b>a lo sumo 2 pasajes de visita, con su procedencia</b>
               </div>
             </div>
           ),
         },
 
-        // 6. Inferencia Profunda con Gemma 4 31B
+        // 6. Inferencia con Gemma 4 31B
         {
           short: "Gemma 31B",
           phaseCode: "FASE 6 · INFERENCIA NEURONAL",
           layer: 4,
-          title: "Inferencia y razonamiento relacional con Gemma 4 31B (NVIDIA TensorRT)",
+          face: "piensa",
+          title: "Inferencia y razonamiento relacional con Gemma 4 31B (NVIDIA NIM)",
           body: (
             <>
-              Cuando la consulta requiere correlacionar evidencia dispersa entre ambos hemisferios y formular una síntesis
-              con rigor metodológico, interviene <b>Gemma 4 31B</b> (desplegado en clúster NVIDIA NIM). Sus 31 mil millones
-              de parámetros ejecutan <b>atención multi-cabeza cruzada (Cross-Attention)</b> anclada en una barrera de{" "}
-              <b>Strict Factual Grounding</b> para erradicar alucinaciones.
+              Cuando la consulta requiere correlacionar evidencia dispersa entre ambos hemisferios, interviene{" "}
+              <b>Gemma 4 31B</b>. Redacta con lo que Pilo encontró por delante, anclado en una barrera de{" "}
+              <b>Strict Factual Grounding</b>: toda cifra o hecho de la UDES sale de los bloques y lleva su cita.
             </>
           ),
           extra: (
-            <div className="cpp-neural-card">
-              <span className="cpp-badge cpp-badge--gemma">NVIDIA NIM · google/gemma-4-31b-it</span>
-              <div style={{ display: "grid", gap: "5px", fontSize: "0.85rem" }}>
+            <div className="cpp-card">
+              <span className="cpp-badge">NVIDIA NIM · google/gemma-4-31b-it</span>
+              <div className="cpp-lines">
                 <div>
-                  <b style={{ color: "#fbbf24" }}>Arquitectura LLM:</b> 31B parámetros con Grouped-Query Attention
+                  <b>Un solo pedido:</b> oficial, guardada, cifras y pasajes, numerados
                 </div>
                 <div>
-                  <b style={{ color: "var(--cpp-cyan)" }}>Inferencia en la Nube:</b> TensorRT-LLM acelerado en GPU Hopper
+                  <b>Contexto:</b> 3.500 tokens, lo de visita con su sitio apartado
                 </div>
                 <div>
-                  <b style={{ color: "#a78bfa" }}>Barrera Anti-Alucinación:</b> Ponderación estricta de citas institucionales
+                  <b>Barrera:</b> sin fuente no hay cifra institucional
                 </div>
               </div>
             </div>
           ),
         },
 
-        // 7. Síntesis Epistémica y Verificación Factual Auditada
+        // 7. Síntesis y verificación
         {
           short: "Síntesis",
           phaseCode: "FASE 7 · CONSTRUCTO EPISTÉMICO",
           layer: 5,
+          face: "feliz",
           title: "Síntesis epistémica multidominio con verificación factual auditada",
           body: (
             <>
-              La respuesta resultante es un constructo epistémico verificable: articula la evidencia del Hemisferio
-              Estratégico con las directivas del Hemisferio Curricular. Cada afirmación cuenta con citas indizables [1] y [2],
-              garantizando reproducibilidad académica y rigor de auditoría.
+              La respuesta es un constructo verificable: articula la evidencia del Hemisferio Estratégico con las
+              directivas del Hemisferio Curricular. Cada afirmación lleva su cita, para que se pueda auditar.
             </>
           ),
           extra: (
-            <div className="cpp-ans">
-              <span className="cpp-badge">Constructo Epistémico · Síntesis Multidominio Verificada</span>
+            <div className="cpp-card">
+              <span className="cpp-badge">Constructo epistémico · Síntesis multidominio verificada</span>
               <p>
                 {model.answer} <span className="cpp-cite">1</span> <span className="cpp-cite">2</span>
               </p>
               <div className="cpp-credits">
-                Auditoría: <b>100% fuentes primarias verificadas · Cero alucinación</b>
+                Auditoría: <b>citas, números y dinero se revisan antes de mostrar</b>
               </div>
             </div>
           ),
         },
 
-        // 8. Laboratorio Interactivo de Telemetría y Topología
+        // 8. Laboratorio interactivo
         {
           short: "Laboratorio",
           phaseCode: "FASE 8 · EXPERIMENTACIÓN",
+          face: "feliz",
           title: "Laboratorio interactivo de telemetría y topología de red",
           body: (
             <>
-              Explore libremente la topología del grafo cerebral: audite puentes ontológicos, inspeccione la centralidad
-              de cada nodo, alterne la visibilidad de los hemisferios y observe el comportamiento de la corteza sináptica
-              mediante el oscilograma y HUD de telemetría en tiempo real.
+              Explore la topología del grafo cerebral: audite los puentes ontológicos, inspeccione cada nodo con el
+              cursor y alterne la visibilidad de cada fuente en la malla.
             </>
           ),
           extra: (
-            <div style={{ display: "grid", gap: "10px" }}>
+            <>
               <div className="cpp-chips">
-                <button
-                  type="button"
-                  className="cpp-chip cpp-chip--bridge"
-                  aria-pressed={bridgesOn}
-                  data-off={!bridgesOn || undefined}
-                  onClick={toggleBridges}
-                >
-                  <i style={{ background: "#fbbf24" }} />
-                  {bridgesOn ? "Puentes Ontológicos (Activos)" : "Puentes Ontológicos (Inactivos)"}
+                <button type="button" className="cpp-chip" aria-pressed={bridgesOn} onClick={toggleBridges}>
+                  <i style={{ background: "var(--cpp-amber)" }} />
+                  Puentes ontológicos
                 </button>
               </div>
-
-              <span className="cpp-hemi-title" style={{ marginTop: "4px" }}>
-                Filtrar Ontologías en la Malla:
-              </span>
+              <span className="cpp-hemi-title">Filtrar ontologías en la malla</span>
               <div className="cpp-chips">
                 {ALL_SOURCES.map((k) => (
-                  <button
-                    key={k}
-                    type="button"
-                    className="cpp-chip"
-                    aria-pressed={on[k]}
-                    data-off={!on[k] || undefined}
-                    onClick={() => toggle(k)}
-                  >
-                    <i style={{ background: SOURCES[k].color }} />
+                  <button key={k} type="button" className="cpp-chip" aria-pressed={on[k]} onClick={() => toggle(k)}>
+                    {dot(k)}
                     {SOURCES[k].name}
                   </button>
                 ))}
               </div>
-            </div>
+            </>
           ),
         },
       ]
@@ -554,13 +582,26 @@ export function Presentation() {
   const current = steps[step];
 
   return (
-    <div className="cpp">
+    <div className="cpp" data-fondo={night ? "noche" : undefined}>
       <header className="cpp-top">
+        <button
+          ref={slot}
+          className="cpp-pilo"
+          type="button"
+          aria-label="Volver a ver la bienvenida de Mr. Pilo"
+          title="Volver a ver la bienvenida"
+          onClick={() => setWelcome(true)}
+        >
+          <Pilo size={40} label="" mood={current?.face ?? "feliz"} />
+        </button>
         <div className="cpp-brand">
           <b>Mr. Pilo · AIED Research Engine</b>
-          Investigación e Innovación Pedagógica · Universidad de Santander UDES
+          <span>Investigación e Innovación Pedagógica · Universidad de Santander UDES</span>
         </div>
-        <span className="cpp-tag">Dual-Stream Cognitive Architecture · Gemma 4 31B (NVIDIA NIM) · Malla 0122</span>
+        <span className="cpp-tag">Dual-Stream Cognitive Architecture · Malla 0122</span>
+        <button className="cpp-ghost" type="button" aria-pressed={night} onClick={() => setNight((n) => !n)}>
+          {night ? "Fondo: noche" : "Fondo: blanco"}
+        </button>
         <button className="cpp-ghost" type="button" onClick={fullscreen}>
           Pantalla completa
         </button>
@@ -580,120 +621,23 @@ export function Presentation() {
           </p>
         ) : current ? (
           <>
-            {step === 0 ? (
-              <div className="cpp-fase0-container">
-                <div className="cpp-fase0-switcher" role="tablist" aria-label="Modo de visualización de la Fase 0">
-                  <button
-                    type="button"
-                    className="cpp-fase0-btn"
-                    aria-pressed={fase0Mode === "speaker"}
-                    onClick={() => setFase0Mode("speaker")}
-                  >
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                      <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z" />
-                      <path d="M19 10v2a7 7 0 0 1-14 0v-2" />
-                      <line x1="12" y1="19" x2="12" y2="23" />
-                      <line x1="8" y1="23" x2="16" y2="23" />
-                    </svg>
-                    Pensamiento y Voz de Pilo
-                  </button>
-
-                  <button
-                    type="button"
-                    className="cpp-fase0-btn"
-                    aria-pressed={fase0Mode === "technical"}
-                    onClick={() => setFase0Mode("technical")}
-                  >
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                      <circle cx="12" cy="12" r="3" />
-                      <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z" />
-                    </svg>
-                    Ficha Técnica de Arquitectura
-                  </button>
+            <div className="cpp-row">
+              <span className="cpp-research-tag">{current.phaseCode}</span>
+              {current.layer ? (
+                <div className="cpp-layer">
+                  <i>{current.layer}</i>Capa cognitiva {current.layer} de 5
                 </div>
-
-                {fase0Mode === "speaker" ? (
-                  <>
-                    <PiloWelcomeSpeaker
-                      onFaceChange={(f) => stage.current?.setFace?.(f)}
-                      onFinishWelcome={() => setStep(1)}
-                      onOpenTechnical={() => setFase0Mode("technical")}
-                    />
-                    <div className="cpp-fase0-summary">
-                      <div className="cpp-fase0-sum-item">
-                        <span>Hemisferio Estratégico</span>
-                        <b>{model.counts.nodes} nodos</b>
-                      </div>
-                      <div className="cpp-fase0-sum-item">
-                        <span>Hemisferio Curricular</span>
-                        <b>{model.counts.teachNodes} nodos</b>
-                      </div>
-                      <div className="cpp-fase0-sum-item">
-                        <span>Sinapsis Inter-dominio</span>
-                        <b>{model.counts.bridges} puentes</b>
-                      </div>
-                      <div className="cpp-fase0-sum-item">
-                        <span>Topología Total</span>
-                        <b>{model.counts.totalNodes} neuronas</b>
-                      </div>
-                    </div>
-                    <button
-                      type="button"
-                      className="cpp-fase0-more-btn"
-                      onClick={() => setFase0Mode("technical")}
-                    >
-                      <span>Ver desglose técnico detallado y fuentes ontológicas</span>
-                      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                        <polyline points="9 18 15 12 9 6" />
-                      </svg>
-                    </button>
-                  </>
-                ) : (
-                  <>
-                    <div className="cpp-fase0-mini-speaker">
-                      <div className="cpp-fase0-mini-info">
-                        <span className="pws-pulse-dot" aria-hidden="true" />
-                        <span>Mr. Pilo disponible para presentar con voz y emociones</span>
-                      </div>
-                      <button
-                        type="button"
-                        className="cpp-fase0-mini-btn"
-                        onClick={() => setFase0Mode("speaker")}
-                      >
-                        Escuchar a Mr. Pilo
-                      </button>
-                    </div>
-
-                    <div style={{ display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap", marginTop: "4px" }}>
-                      <span className="cpp-research-tag">{current.phaseCode}</span>
-                    </div>
-                    <h1>{current.title}</h1>
-                    <p>{current.body}</p>
-                    {current.extra}
-                  </>
-                )}
-              </div>
-            ) : (
-              <>
-                <div style={{ display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap" }}>
-                  <span className="cpp-research-tag">{current.phaseCode}</span>
-                  {current.layer ? (
-                    <div className="cpp-layer">
-                      <i>{current.layer}</i>Capa cognitiva {current.layer} de 5
-                    </div>
-                  ) : null}
-                </div>
-                <h1>{current.title}</h1>
-                <p>{current.body}</p>
-                {current.extra}
-              </>
-            )}
+              ) : null}
+            </div>
+            <h1>{current.title}</h1>
+            <p>{current.body}</p>
+            {current.extra ? <div className="cpp-extra">{current.extra}</div> : null}
           </>
         ) : null}
       </section>
 
       <div className="cpp-stage" ref={host}>
-        <canvas ref={canvas} role="img" aria-label="Malla cerebral bio-digital y telemetría de inferencia de Mr. Pilo" />
+        <canvas ref={canvas} role="img" aria-label="Malla cerebral de Mr. Pilo: dos hemisferios de memoria, sus capas y los puentes que los unen" />
         <div className="cpp-tip" ref={tip} />
       </div>
 
@@ -715,13 +659,7 @@ export function Presentation() {
           ))}
         </div>
         <div className="cpp-nav">
-          <button
-            className="cpp-round"
-            type="button"
-            aria-label="Fase anterior"
-            disabled={step === 0}
-            onClick={() => setStep((s) => Math.max(0, s - 1))}
-          >
+          <button className="cpp-round" type="button" aria-label="Fase anterior" disabled={step === 0} onClick={() => setStep((s) => Math.max(0, s - 1))}>
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
               <path d="M15 6l-6 6 6 6" />
             </svg>
@@ -740,6 +678,8 @@ export function Presentation() {
         </div>
         <span className="cpp-keys">← → avanzar/retroceder · Espacio · Esc salir</span>
       </nav>
+
+      {welcome ? <PiloWelcomeSpeaker target={slot} onFaceChange={(f) => stage.current?.setFace?.(f)} onDone={() => setWelcome(false)} /> : null}
     </div>
   );
 }

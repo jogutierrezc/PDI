@@ -508,7 +508,27 @@ export const LAYERS = [
 const CYAN = "#7fe7f0";
 const GOLD = "#fbbf24";
 
+/**
+ * El fondo de la escena. La malla nació pintada para la noche de Pilo; sobre
+ * blanco, cada color pasa por esta tabla a su versión para fondo claro. Lo
+ * cambia la presentación (el botón «Fondo») y vale desde el cuadro siguiente.
+ */
+export const stageTheme = { light: true };
+
+const LIGHT: Record<string, string> = {
+  "#7fe7f0": "#0a7d8c", "#fbbf24": "#a56f00", "#b9c9e6": "#5b6d86", "#8196ba": "#62748c", "#7a52c7": "#6b3fa0",
+  "#38bdf8": "#0b6aa8", "#9f84db": "#6b3fa0", "#6366f1": "#3d4bb8", "#ffffff": "#0a2d63", "#040d1f": "#ffffff",
+  "#eef4ff": "#0d1c31", "#b592e6": "#6b3fa0", "#6fa4f5": "#1f5fbf", "#4fc2cf": "#0b7481", "#e58a5c": "#a4471f",
+  "#7cc27d": "#2e6b2f", "#a78bfa": "#8a3b8f", "#f87171": "#ad2f58", "#34d399": "#1a6b5a", "#c3a4ee": "#7a4fb5",
+  "#a88be0": "#5f3a99", "#d0b6f2": "#8d63c4", "#9b7ad6": "#553090", "#b99ae8": "#6f45ab", "#e0cdf7": "#9a74cc",
+};
+
 function rgba(hex: string, a: number) {
+  if (stageTheme.light) {
+    hex = LIGHT[hex.toLowerCase()] ?? hex;
+    // Sobre blanco, los trazos tenues necesitan más peso que sobre la noche.
+    if (a < 0.5) a = Math.min(0.5, a * 1.7);
+  }
   const v = parseInt(hex.replace("#", ""), 16);
   return `rgba(${(v >> 16) & 255},${(v >> 8) & 255},${v & 255},${Math.max(0, Math.min(1, a))})`;
 }
@@ -1053,7 +1073,7 @@ export function createStage(
 
     if (nodeBridges.length) {
       const brSpan = document.createElement("span");
-      brSpan.style.color = GOLD;
+      brSpan.style.color = "var(--cpp-amber)";
       brSpan.style.fontWeight = "700";
       brSpan.textContent = `⚡ Puente Ontológico Inter-dominio: ${nodeBridges[0].why}`;
       tip.append(brSpan);

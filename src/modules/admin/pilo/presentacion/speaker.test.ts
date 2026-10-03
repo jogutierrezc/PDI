@@ -53,6 +53,7 @@ describe("Orador de bienvenida de Mr. Pilo (Fase 0)", () => {
       expect(["feliz", "piensa", "idea", "bien"]).toContain(b.canvasFace);
       expect(b.chips.length).toBeGreaterThanOrEqual(3);
       expect(b.look.length).toBe(2);
+      expect(b.moodLabel).toContain("Voz oficial de Pilo");
     }
   });
 });

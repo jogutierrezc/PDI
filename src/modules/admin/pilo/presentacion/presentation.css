@@ -975,6 +975,12 @@ button.cpp-chip:active {
   }
 }
 
+.pws-pulse-dot--muted {
+  background: var(--cpp-ink-3);
+  box-shadow: none;
+  animation: none;
+}
+
 .pws-sr {
   position: absolute;
   width: 1px;

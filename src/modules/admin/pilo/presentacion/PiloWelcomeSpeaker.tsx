@@ -5,6 +5,16 @@
    AccountGate) pero diseñado específicamente para la presentación de investigación
    de innovación educativa y digital de la Universidad de Santander (UDES).
 
+   Voz programada oficial de Mr. Pilo:
+     · Utiliza estrictamente la voz oficial programada de Pilo (sayOfficial /
+       piloAudio vía NVIDIA NIM Riva / Fish Audio clonado en /api/pilo-voz).
+     · NUNCA cae a la síntesis del navegador ni a la «voz de equipo» (speechSynthesis).
+     · Si no hay audio disponible (red apagada, sin cuota), continúa limpiamente
+       con la animación de texto y subtítulos sincronizados, sin emitir voces
+       genéricas del sistema operativo.
+     · El pico de Mr. Pilo se anima mediante onSound en sincronía exacta con el
+       audio real reproducido.
+
    Contenido obligatorio del discurso de Mr. Pilo:
      1. Presentación como la Inteligencia Artificial oficial de la UDES.
      2. Creado por y desde la Oficina de Planeación Institucional.
@@ -25,13 +35,13 @@
      · Respeta prefers-reduced-motion y la política de audio del navegador.
    ========================================================================== */
 
-import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import gsap from "gsap";
 import { Pilo } from "../../../pregunta/Pilo";
 import type { MojiMood, PiloMojiHandle } from "../../../pregunta/Pilo";
-import { speak, stopSpeaking } from "../../../../components/pilo/voice";
 import { modulateVoice } from "../../../../components/pilo/ai/voice-expressions";
-import { sayWithPilo, stopPilo } from "../../../../components/pilo/ai/client";
+import { prefetchOfficial, sayOfficial, stopOfficial } from "../../../pilo-app/official-voice";
+import { unlockPiloAudio } from "../../../../components/pilo/ai/voice-player";
 import type { Face } from "./engine";
 
 export interface PresentationBeat {
@@ -54,7 +64,7 @@ export const PRESENTATION_BEATS: PresentationBeat[] = [
     face: "feliz",
     canvasFace: "feliz",
     voiceMood: "emocionado",
-    moodLabel: "Voz de Pilo · Entusiasta / Identidad Institucional",
+    moodLabel: "Voz oficial de Pilo · Entusiasta / Identidad Institucional",
     look: [0, -0.1],
     chips: ["Universidad de Santander", "Planeación Institucional", "IA Oficial UDES"],
     tag: "Identidad & Origen",
@@ -66,7 +76,7 @@ export const PRESENTATION_BEATS: PresentationBeat[] = [
     face: "cuidado", // Se traduce a 'atrevido' (guiño pícaro)
     canvasFace: "idea",
     voiceMood: "atrevido",
-    moodLabel: "Voz de Pilo · Pícaro / Sacudiendo las plumas",
+    moodLabel: "Voz oficial de Pilo · Pícaro / Sacudiendo las plumas",
     look: [0.35, 0.15],
     chips: ["Plumaje Cibernético", "Pequeño pero Poderoso", "Capacidades Inimaginables"],
     tag: "Humor & Potencial",
@@ -78,7 +88,7 @@ export const PRESENTATION_BEATS: PresentationBeat[] = [
     face: "piensa",
     canvasFace: "piensa",
     voiceMood: "atento",
-    moodLabel: "Voz de Pilo · Atento / Conexión Sistémica",
+    moodLabel: "Voz oficial de Pilo · Atento / Conexión Sistémica",
     look: [-0.25, 0.35],
     chips: ["Toma de Decisiones", "Profesores & Estudiantes", "Integración Moodle & PDI", "Cero Alucinación"],
     tag: "Misión Dual",
@@ -90,7 +100,7 @@ export const PRESENTATION_BEATS: PresentationBeat[] = [
     face: "sorpresa", // Se traduce a 'emocionado'
     canvasFace: "bien",
     voiceMood: "emocionado",
-    moodLabel: "Voz de Pilo · Orgullo Tecnológico / NVIDIA NIM",
+    moodLabel: "Voz oficial de Pilo · Orgullo Tecnológico / NVIDIA NIM",
     look: [0, -0.2],
     chips: ["NVIDIA NIM", "TensorRT-LLM", "Supercómputo Hopper", "Gemma 4 31B"],
     tag: "Alianza NVIDIA",
@@ -102,7 +112,7 @@ export const PRESENTATION_BEATS: PresentationBeat[] = [
     face: "feliz",
     canvasFace: "feliz",
     voiceMood: "emocionado",
-    moodLabel: "Voz de Pilo · Emocionado / Alma Mater UDES",
+    moodLabel: "Voz oficial de Pilo · Emocionado / Alma Mater UDES",
     look: [0, 0],
     chips: ["Piloto de Innovación Educativa", "Transformación Digital", "Alma Mater UDES", "Capa Profunda"],
     tag: "Innovación Educativa",
@@ -127,7 +137,6 @@ export function PiloWelcomeSpeaker({
   const [isPlaying, setIsPlaying] = useState(true);
   const [isMuted, setIsMuted] = useState(false);
   const [minimized, setMinimized] = useState(false);
-  const [hasUserStarted, setHasUserStarted] = useState(false);
 
   const containerRef = useRef<HTMLDivElement>(null);
   const bubbleRef = useRef<HTMLParagraphElement>(null);
@@ -138,14 +147,40 @@ export function PiloWelcomeSpeaker({
 
   const beat = PRESENTATION_BEATS[beatIndex];
 
+  // Pre-cargar por adelantado los audios oficiales en la caché local
+  useEffect(() => {
+    prefetchOfficial(
+      PRESENTATION_BEATS.map((b) => b.say),
+      { portal: "pregunta", advanced: true, keep: true },
+    );
+  }, []);
+
+  // Desbloqueo proactivo del reproductor compartido con el primer toque o tecla
+  useEffect(() => {
+    const unlock = () => {
+      unlockPiloAudio();
+    };
+    if (
+      typeof navigator !== "undefined" &&
+      Boolean((navigator as Navigator & { userActivation?: { hasBeenActive: boolean } }).userActivation?.hasBeenActive)
+    ) {
+      unlockPiloAudio();
+    }
+    window.addEventListener("pointerup", unlock, { once: true });
+    window.addEventListener("keyup", unlock, { once: true });
+    return () => {
+      window.removeEventListener("pointerup", unlock);
+      window.removeEventListener("keyup", unlock);
+    };
+  }, []);
+
   // Silenciar de inmediato si se desmonta el componente
   useEffect(() => {
     return () => {
       activeTokenRef.current += 1;
       segmentHoldRef.current?.kill();
       textTimelineRef.current?.kill();
-      stopPilo();
-      stopSpeaking();
+      stopOfficial();
       piloRef.current?.talk(false);
     };
   }, []);
@@ -183,15 +218,14 @@ export function PiloWelcomeSpeaker({
     return () => ctx.revert();
   }, [minimized]);
 
-  // Manejo de cada Beat (texto, voz modulada, gestos y avance)
+  // Manejo de cada Beat (texto, voz oficial de Pilo, gestos y avance)
   useEffect(() => {
     if (minimized) return;
 
     const token = ++activeTokenRef.current;
     segmentHoldRef.current?.kill();
     textTimelineRef.current?.kill();
-    stopPilo();
-    stopSpeaking();
+    stopOfficial();
     piloRef.current?.talk(false);
 
     if (!beat) return;
@@ -203,7 +237,7 @@ export function PiloWelcomeSpeaker({
     if (beatIndex % 2 === 0) piloRef.current?.nod();
     onFaceChange?.(beat.canvasFace);
 
-    // 2. Modulación vocal (velocidad y tono según emoción)
+    // 2. Modulación vocal (velocidad y prosodia según emoción de Pilo)
     const voiceMod = modulateVoice(beat.voiceMood, 1.02, 1.0);
 
     const root = containerRef.current;
@@ -255,37 +289,28 @@ export function PiloWelcomeSpeaker({
       }
     };
 
-    // 3. Ejecutar audio (si no está silenciado y está en reproducción)
+    // 3. Ejecutar audio con la voz programada oficial de Mr. Pilo (sin caer a voz de equipo)
     if (!isMuted && isPlaying) {
-      piloRef.current?.talk(true);
-
-      // sayWithPilo intenta el proveedor de voz oficial de Planeación UDES y cae limpiamente a Web Speech
-      void sayWithPilo(beat.say, {
-        portal: "pdi",
+      void sayOfficial(beat.say, {
+        portal: "pregunta",
         advanced: true,
         rate: voiceMod.rate,
-        pitch: voiceMod.pitch,
-      })
-        .then((res) => {
-          if (token !== activeTokenRef.current) return;
-          audioDone = true;
-          piloRef.current?.talk(false);
-          checkAdvance();
-        })
-        .catch(() => {
-          if (token !== activeTokenRef.current) return;
-          // Fallback directo a síntesis del navegador en español
-          void speak(beat.say, {
-            force: true,
-            rate: voiceMod.rate,
-            pitch: voiceMod.pitch,
-          }).finally(() => {
-            if (token !== activeTokenRef.current) return;
-            audioDone = true;
-            piloRef.current?.talk(false);
-            checkAdvance();
-          });
-        });
+        keep: true,
+        // El pico se mueve estrictamente con el audio real de Pilo
+        onSound: (on) => {
+          if (token === activeTokenRef.current) {
+            piloRef.current?.talk(on);
+          }
+        },
+      }).then((result) => {
+        if (token !== activeTokenRef.current || result === "cancelado") return;
+        audioDone = true;
+        piloRef.current?.talk(false);
+        checkAdvance();
+      });
+    } else {
+      // Modo silenciado: acompasa las palabras visualmente
+      piloRef.current?.talk(true);
     }
 
     // 4. Animación del texto palabra por palabra
@@ -328,18 +353,16 @@ export function PiloWelcomeSpeaker({
     return () => {
       segmentHoldRef.current?.kill();
       textTimelineRef.current?.kill();
-      stopPilo();
-      stopSpeaking();
+      stopOfficial();
       piloRef.current?.talk(false);
     };
   }, [beatIndex, isPlaying, isMuted, minimized, onFaceChange, onFinishWelcome]);
 
   const togglePlay = () => {
-    setHasUserStarted(true);
+    unlockPiloAudio();
     if (isPlaying) {
       setIsPlaying(false);
-      stopPilo();
-      stopSpeaking();
+      stopOfficial();
       piloRef.current?.talk(false);
       segmentHoldRef.current?.pause();
       textTimelineRef.current?.pause();
@@ -351,24 +374,22 @@ export function PiloWelcomeSpeaker({
   };
 
   const toggleMute = () => {
-    setHasUserStarted(true);
+    unlockPiloAudio();
     const next = !isMuted;
     setIsMuted(next);
     if (next) {
-      stopPilo();
-      stopSpeaking();
+      stopOfficial();
       piloRef.current?.talk(false);
     }
   };
 
   const replay = () => {
-    setHasUserStarted(true);
+    unlockPiloAudio();
     setIsPlaying(true);
     // Forzar re-trigger reiniciando el token
     setBeatIndex((i) => i);
     activeTokenRef.current += 1;
-    stopPilo();
-    stopSpeaking();
+    stopOfficial();
     piloRef.current?.talk(false);
     // Disparo inmediato
     const current = beatIndex;
@@ -377,7 +398,8 @@ export function PiloWelcomeSpeaker({
   };
 
   const nextBeat = () => {
-    setHasUserStarted(true);
+    unlockPiloAudio();
+    stopOfficial();
     if (beatIndex < PRESENTATION_BEATS.length - 1) {
       setBeatIndex((i) => i + 1);
     } else {
@@ -386,7 +408,8 @@ export function PiloWelcomeSpeaker({
   };
 
   const prevBeat = () => {
-    setHasUserStarted(true);
+    unlockPiloAudio();
+    stopOfficial();
     if (beatIndex > 0) {
       setBeatIndex((i) => i - 1);
     }
@@ -400,6 +423,7 @@ export function PiloWelcomeSpeaker({
           type="button"
           className="pws-min-pill"
           onClick={() => {
+            unlockPiloAudio();
             setMinimized(false);
             setIsPlaying(true);
           }}
@@ -448,7 +472,7 @@ export function PiloWelcomeSpeaker({
             className="pws-btn pws-btn--icon"
             onClick={toggleMute}
             aria-label={isMuted ? "Activar voz de Mr. Pilo" : "Silenciar voz"}
-            title={isMuted ? "Activar voz de Mr. Pilo" : "Silenciar voz"}
+            title={isMuted ? "Activar voz oficial de Mr. Pilo" : "Silenciar voz"}
           >
             {isMuted ? (
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
@@ -491,8 +515,8 @@ export function PiloWelcomeSpeaker({
 
         {/* Indicador prosódico del estado emocional */}
         <div className="pws-mood-badge">
-          <i className="pws-pulse-dot" aria-hidden="true" />
-          <span>{beat.moodLabel}</span>
+          <i className={`pws-pulse-dot ${isMuted ? "pws-pulse-dot--muted" : ""}`} aria-hidden="true" />
+          <span>{isMuted ? `Modo lectura (silenciado) · ${beat.tag}` : beat.moodLabel}</span>
         </div>
 
         {/* Subtítulo dinámico con lectura sincronizada */}
@@ -536,7 +560,7 @@ export function PiloWelcomeSpeaker({
               type="button"
               className="pws-seg-btn"
               onClick={() => {
-                setHasUserStarted(true);
+                unlockPiloAudio();
                 setBeatIndex(i);
               }}
               title={`Parte ${i + 1}: ${b.tag}`}

@@ -19,11 +19,14 @@
       <p>Esta página no usa los estilos del portal de Planeación, a propósito: sirve para ver a Pilo alojado en un sitio ajeno. Aquí están los dos: el Pilo de Planeación en la esquina inferior derecha y Mr. Pilo en Enseñanza, la Inteligencia Artificial de la Universidad de Santander, en la inferior izquierda.</p>
       <p>Cada uno se pega con su propia línea. El de Enseñanza lleva <code>data-pilo="ensenanza"</code>; sin ese atributo, la línea trae al Pilo de Planeación. Un Pilo que no esté abierto para quien mira la página sencillamente no aparece.</p>
       <p>Para probar otras variantes, cambie los atributos de los <code>&lt;script&gt;</code> al final de este archivo: <code>data-tema</code> acepta blanco, soleado o negro; <code>data-esquina</code> acepta derecha o izquierda. Si van los dos en la misma página, póngalos en esquinas distintas.</p>
+      <h2>Leer la página</h2>
+      <p>El Pilo de la derecha lleva <code>data-leer="si"</code>: al preguntarle, lee el texto visible de esta página para responder sobre lo que usted está viendo. Solo se acepta desde un portal autorizado en la intranet; la lectura llega a «Lo que leyó en otros portales», en la memoria de ese Pilo, y la administración decide si la guarda.</p>
+      <p data-pilo-ignorar>Este párrafo lleva <code>data-pilo-ignorar</code>: Pilo no lo lee. Tampoco lee campos de formulario ni lo que esté oculto.</p>
       <p>Baje por la página para comprobar que los botones se quedan en su esquina.</p>
       <p style="height: 900px"></p>
       <p>Fin de la página de prueba.</p>
     </main>
-    <script src="/pilo.js" data-tema="blanco" data-esquina="derecha" defer></script>
+    <script src="/pilo.js" data-tema="blanco" data-esquina="derecha" data-leer="si" defer></script>
     <script src="/pilo.js" data-pilo="ensenanza" data-tema="blanco" data-esquina="izquierda" defer></script>
   </body>
 </html>

@@ -206,6 +206,7 @@ export interface DbError {
 }
 
 const MIGRATION_OF: [RegExp, string][] = [
+  [/pilo_readings?\b|pilo_reading_/i, "0127"],
   [/pilo_portals?\b|pilo_sources\b|pilo_scope|pilo_portal_update|pilo_memory_readable/i, "0121"],
   [/pilo_moodle|pilo_space_secret|pilo_space_set_secret|moodle_(on|url|site|checked_at)/i, "0116"],
   [/pilo_doc_outline|pilo_map_|pilo_graph_neighbors|mapped_at/i, "0115"],

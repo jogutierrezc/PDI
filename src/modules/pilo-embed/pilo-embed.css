@@ -584,3 +584,142 @@ html.pilo-embed-doc .route-fallback {
     filter: none;
   }
 }
+
+/* --- Leer la página (0127) ------------------------------------------------------
+   Mientras lee: una tarjeta con los títulos de la página, que la marca recorre
+   uno tras otro. Con la respuesta: el recibo, que es el boleto de origen del
+   portal (.ap-ticket). Los colores son los tokens --ap-* del tema. */
+
+.pe-read {
+  align-self: flex-start;
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  max-width: 92%;
+  padding: 10px 14px 10px 10px;
+  border: 1px solid var(--ap-line);
+  border-radius: 14px;
+  background: var(--ap-surface);
+}
+
+.pe-read__icon {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 9px;
+  background: var(--ap-primary-soft);
+  color: var(--ap-primary-text);
+}
+
+.pe-read__body {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.pe-read__body strong {
+  font-size: 0.86rem;
+  font-weight: 700;
+  line-height: 1.3;
+  color: var(--ap-ink);
+}
+
+.pe-read__where {
+  overflow: hidden;
+  font-size: 0.76rem;
+  color: var(--ap-ink-3);
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.pe-read__lines {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  margin: 7px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.pe-read__line {
+  position: relative;
+  align-self: flex-start;
+  max-width: 100%;
+  padding: 1px 5px;
+  margin-left: -5px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  line-height: 1.4;
+  color: var(--ap-ink-2);
+}
+
+/* La marca del renglón que se está leyendo: parte oculta y la descubre la animación. */
+.pe-read__mark {
+  position: absolute;
+  inset: 0;
+  border-radius: 4px;
+  background: var(--ap-mark);
+  clip-path: inset(0 100% 0 0);
+}
+
+.pe-read__text {
+  position: relative;
+  display: block;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.pe-read[data-done] .pe-read__icon {
+  background: var(--ap-mem-soft);
+  color: var(--ap-mem);
+}
+
+.pe-read__icon {
+  transition: background-color 220ms ease, color 220ms ease;
+}
+
+.pe-ticket {
+  align-self: flex-start;
+  max-width: 92%;
+  gap: 3px;
+  padding-top: 9px;
+  padding-bottom: 9px;
+}
+
+.pe-ticket .ap-ticket__row {
+  gap: 2px 12px;
+}
+
+.pe-ticket__where {
+  max-width: 100%;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.pe-ticket__sent {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  margin-top: 2px;
+  font-weight: 700;
+  color: var(--ap-ticket-ink);
+}
+
+.pe-ticket__sent svg {
+  flex: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pe-read__mark {
+    display: none;
+  }
+
+  .pe-read__icon {
+    transition: none;
+  }
+}

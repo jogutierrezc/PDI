@@ -17,6 +17,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import type { TurnFile } from "./attach";
+import type { TurnPage } from "../pilo-embed/embed";
 import { useTheme } from "../../lib/theme";
 import type { AskResult } from "../../components/pilo/ai/client";
 import type { Think } from "./answer-state";
@@ -105,6 +106,8 @@ export interface Turn {
   think?: Think;
   /** La pregunta llevó un archivo adjunto (0119): su nombre y cuánto se leyó. Nunca su contenido. */
   file?: TurnFile;
+  /** En otro portal, Pilo leyó la página que lo aloja (0127): cuál y cuánto. Nunca su contenido. */
+  page?: TurnPage;
   /** La respuesta se guardó en la cuenta de Pilo de la persona (0120, solo la app): el id de lo guardado. */
   savedId?: number;
 }

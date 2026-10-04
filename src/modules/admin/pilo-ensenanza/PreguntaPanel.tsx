@@ -398,7 +398,8 @@ function WidgetGroup({ ed }: { ed: SpaceEditor }) {
   const code = useRef<HTMLElement>(null);
 
   const origins = s.widget_origins;
-  const snippet = spaceSnippet(window.location.origin, s.id, tema, lado);
+  const [leer, setLeer] = useState(false);
+  const snippet = spaceSnippet(window.location.origin, s.id, tema, lado, leer);
   const openToAll = s.on && s.aud === "publico";
 
   const add = (e: FormEvent) => {
@@ -505,6 +506,17 @@ function WidgetGroup({ ed }: { ed: SpaceEditor }) {
               </button>
             ))}
           </span>
+        </div>
+        <div className="pis-row">
+          <span className="pis-fn__text">
+            <strong>Que Pilo lea la página donde está</strong>
+            <small>
+              Agrega <code>data-leer="si"</code> a la línea. Al preguntar, Pilo lee el texto visible de esa página para responder sobre lo que la persona ve, y la
+              manda a «Lo que leyó en otros portales», en la memoria, para que usted decida si la guarda. No lee formularios ni lo que lleve{" "}
+              <code>data-pilo-ignorar</code>.
+            </small>
+          </span>
+          <Switch on={leer} onChange={setLeer} label="Que Pilo lea la página donde está" />
         </div>
         <pre tabIndex={0}>
           <code ref={code}>{snippet}</code>

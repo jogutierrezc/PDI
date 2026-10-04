@@ -47,6 +47,7 @@ import { Group, StatusMark, Switch, plural, when } from "../pilo/ui";
 import { activity } from "./actividad";
 import { ComprehendGroup } from "./memoria/ComprehendGroup";
 import { DocumentsPanel } from "./memoria/DocumentsPanel";
+import { ReadingsPanel } from "./memoria/ReadingsPanel";
 import { MoodlePanel } from "./memoria/MoodlePanel";
 import { MemoryProbe, TeachMap } from "./memoria/TeachMap";
 import { indexRun, useProbePath, useRefreshMemory } from "./memoria/data";
@@ -110,6 +111,7 @@ export function MemoriaPanel({ ed }: { ed: SpaceEditor }) {
       <Sheet off={missing}>
         <SourcesGroup ed={ed} />
         <DocumentsPanel space={space} disabled={missing} />
+        <ReadingsPanel space={space} disabled={missing} />
         <MoodlePanel space={space} disabled={missing} />
       </Sheet>
     ),

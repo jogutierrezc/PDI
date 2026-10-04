@@ -22,6 +22,8 @@ export interface AskOptions {
   rol?: string | null;
   /** El archivo adjunto (0119): su nombre y los pasajes elegidos en este dispositivo. El archivo no se sube. */
   doc?: { name: string; passages: string[] } | null;
+  /** La página que la persona ve en otro portal (0127): su dirección, su título y los pasajes elegidos en su navegador. */
+  page?: { url: string; title: string; passages: string[] } | null;
   /** Sin cuenta de Pilo (0120): cómo pidió que la llame y en qué tono. Con cuenta no se manda: el servidor la reconoce por la sesión. */
   visitor?: { nick?: string | null; tone?: string | null } | null;
 }
@@ -111,6 +113,8 @@ export interface AskResult {
   text: string;
   /** La respuesta analizó un archivo adjunto (0119): su nombre, cuántos pasajes leyó y cuántos datos personales se taparon. */
   file?: { name: string; passages: number; omitted: number };
+  /** La respuesta leyó la página que la persona ve (0127): cuál, cuántos pasajes y cuántos datos personales se taparon. */
+  page?: { url: string; title: string; passages: number; omitted: number };
   sources: AskSource[];
   trail: AskStep[];
   answerId?: number | null;
@@ -456,6 +460,7 @@ export function askBody(question: string, history: { q: string; a: string }[], o
     stream: true as const,
     ...(rol ? { rol } : {}),
     ...(opts.doc && opts.doc.passages.length ? { doc: opts.doc } : {}),
+    ...(opts.page && opts.page.passages.length ? { page: opts.page } : {}),
     ...(visitor ? { visitor } : {}),
   };
 }
@@ -489,6 +494,21 @@ export async function askQuestionStream(question: string, history: { q: string; 
     throw new PiloError("No pude conectarme con Pilo. Revise su conexión a internet e intente de nuevo.", "red");
   }
   return readAskResponse(response, handlers);
+}
+
+/**
+ * La lectura de una página anfitriona, para la bandeja de la administración
+ * (0127). Va aparte de la pregunta y una sola vez por página: la administración
+ * decide si entra a la memoria. Nunca falla hacia fuera: si algo sale mal, o
+ * la página no es de un portal autorizado, responde «no» y la conversación sigue.
+ */
+export async function capturePage(page: { url: string; title: string; blocks: { h: boolean; t: string }[] }, portal: AskPortal = "pregunta"): Promise<string> {
+  try {
+    const { data, error } = await supabase.functions.invoke<{ status?: string }>("pilo-ia", { body: { action: "captura", portal, page } });
+    return error ? "no" : String(data?.status ?? "no");
+  } catch {
+    return "no";
+  }
 }
 
 /**

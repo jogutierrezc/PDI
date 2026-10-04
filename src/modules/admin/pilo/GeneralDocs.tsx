@@ -21,6 +21,7 @@
 
 import { ComprehendGroup } from "../pilo-ensenanza/memoria/ComprehendGroup";
 import { DocumentsPanel } from "../pilo-ensenanza/memoria/DocumentsPanel";
+import { ReadingsPanel } from "../pilo-ensenanza/memoria/ReadingsPanel";
 import { GENERAL_COLLECTIONS, docCollections, effectiveCell, usePortals } from "./portals";
 import { DEFAULT_SPACE } from "./space";
 // Los paneles de documentos traen su propia hoja (prefijo pen-), que no toca nada de esta pantalla.
@@ -56,6 +57,7 @@ export function GeneralDocs({ disabled = false }: { /** Falta la base de la memo
         disabledNote={loading ? "Revisando si la base ya acepta documentos para este Pilo…" : OFF_NOTE}
         note={note}
       />
+      <ReadingsPanel space={DEFAULT_SPACE} disabled={missing || loading} collections={collections} />
       <ComprehendGroup space={DEFAULT_SPACE} off={missing || loading} offNote={loading ? "Revisando el mapa de este Pilo…" : OFF_NOTE} dock={false} />
     </>
   );

@@ -227,8 +227,9 @@ export function dirtyTabs(now: SpaceSettings, saved: SpaceSettings): TabId[] {
 /* --- El chat emergente de este espacio --------------------------------------------- */
 
 /** La línea que se pega en otro portal: la misma de siempre, con `data-pilo` diciendo qué Pilo es. */
-export function spaceSnippet(origin: string, space: PiloSpace, tema: string, lado: "der" | "izq"): string {
-  return `<script src="${origin.replace(/\/+$/, "")}/pilo.js" data-pilo="${space}" data-tema="${tema}" data-esquina="${lado === "izq" ? "izquierda" : "derecha"}" defer></script>`;
+/** Con `read`, la línea pide además que Pilo lea la página que lo aloja (0127). */
+export function spaceSnippet(origin: string, space: PiloSpace, tema: string, lado: "der" | "izq", read = false): string {
+  return `<script src="${origin.replace(/\/+$/, "")}/pilo.js" data-pilo="${space}" data-tema="${tema}" data-esquina="${lado === "izq" ? "izquierda" : "derecha"}"${read ? ' data-leer="si"' : ""} defer></script>`;
 }
 
 /* --- Leer y guardar la ficha ---------------------------------------------------------- */

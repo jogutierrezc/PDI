@@ -5,7 +5,9 @@
    (public/pilo.js). Aquí se decide si otros portales pueden mostrarlo y
    cuáles, y se arma esa línea lista para copiar, con el tema y la esquina.
    El interruptor y la lista se guardan con «Guardar cambios»; el tema y la
-   esquina no se guardan: van escritos en la línea que se copia.
+   esquina no se guardan: van escritos en la línea que se copia. Igual «Leer la
+   página» (0127): es un atributo de la línea, así quien administra el otro
+   portal lo ve y lo decide.
    ========================================================================== */
 
 import { useRef, useState } from "react";
@@ -31,11 +33,12 @@ export function WidgetGroup({ ed }: { ed: EditorApi }) {
   const [error, setError] = useState("");
   const [tema, setTema] = useState<Tema>("blanco");
   const [lado, setLado] = useState<Lado>("der");
+  const [leer, setLeer] = useState(false);
   const [copied, setCopied] = useState<"si" | "no" | null>(null);
   const code = useRef<HTMLElement>(null);
 
   const origins = s.widget_origins;
-  const snippet = widgetSnippet(window.location.origin, tema, lado);
+  const snippet = widgetSnippet(window.location.origin, tema, lado, "planeacion", leer);
   const askPublic = Boolean(s.portals.pregunta?.on) && s.portals.pregunta?.aud === "publico";
 
   const add = (e: FormEvent) => {
@@ -150,6 +153,17 @@ export function WidgetGroup({ ed }: { ed: EditorApi }) {
               </button>
             ))}
           </span>
+        </div>
+        <div className="pis-row">
+          <span className="pis-fn__text">
+            <strong>Que Pilo lea la página donde está</strong>
+            <small>
+              Agrega <code>data-leer="si"</code> a la línea. Al preguntar, Pilo lee el texto visible de esa página para responder sobre lo que la persona ve, y la
+              manda a «Lo que leyó en otros portales», en la memoria, para que usted decida si la guarda. No lee formularios ni lo que lleve{" "}
+              <code>data-pilo-ignorar</code>.
+            </small>
+          </span>
+          <Switch on={leer} onChange={setLeer} label="Que Pilo lea la página donde está" />
         </div>
         <pre tabIndex={0}>
           <code ref={code}>{snippet}</code>

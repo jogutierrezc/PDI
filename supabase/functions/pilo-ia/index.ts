@@ -21,6 +21,11 @@
                                                  con stream: true y si escribe el modelo → text/event-stream
                                                  (meta → delta… → done | error). El contrato completo está en
                                                  .ccg/tasks/pilo-ia-siempre/contract.md
+                                                 con espera: "<uuid>" (0128), Pilo sigue redactando aunque el
+                                                 pedido se cierre y deja la respuesta para «recoger»
+     { action: "recoger", portal, espera: "<uuid>", wait? }                                  (0128)
+                                                 → { status: "lista", kind, text, asked, sources } · { status: "pendiente" }
+                                                 · { status: "error", message } · 404 { status: "desconocida" }
      { action: "calificar", portal: "pregunta", answerId?, vote: "up" | "down", question?, text?, kind? }
                                                  «No me sirvió» anota la pregunta en la bandeja (0109)
      { action: "indexar", step: "estado" | "lote" | "probar" | "catalogo" | "modelos", q? }   (solo administración, 0108)
@@ -4906,6 +4911,38 @@ const ASK_BODY_MAX = 48_000;
 const CAPTURE_BODY_MAX = 96_000;
 /** Cuántas páginas puede mandar un mismo visitante a la bandeja de lecturas por hora. */
 const CAPTURE_HOURLY = 20;
+/** «Recoger» (0128): lo más que se espera con el pedido abierto, y cada cuánto se mira. */
+const WAIT_POLL_MAX_MS = 7_000;
+const WAIT_POLL_STEP_MS = 500;
+
+/** El tiquete de una espera (0128): un uuid que inventa quien pregunta. Vacío si no lo es. */
+export const ticketOf = (value: unknown): string =>
+  typeof value === "string" && /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value) ? value.toLowerCase() : "";
+
+/** Lo que se deja para recoger: la respuesta y de dónde salió, sin lo que solo le sirve a la página. */
+export function waitPayload(data: unknown): Record<string, unknown> {
+  const d = (data && typeof data === "object" ? data : {}) as Record<string, unknown>;
+  const sources = (Array.isArray(d.sources) ? d.sources : []).map((s) => {
+    const x = (s && typeof s === "object" ? s : {}) as Record<string, unknown>;
+    return { n: x.n, title: String(x.title ?? ""), path: String(x.path ?? "") };
+  });
+  return {
+    kind: String(d.kind ?? ""),
+    text: String(d.text ?? ""),
+    asked: typeof d.asked === "string" ? d.asked : "",
+    sources,
+    ...(d.partial === true ? { partial: true } : {}),
+  };
+}
+
+/** Deja que la plataforma mantenga viva la función hasta que termine un trabajo, aunque el pedido ya se haya cerrado. */
+function keepAlive(work: Promise<unknown>) {
+  try {
+    (globalThis as { EdgeRuntime?: { waitUntil?: (p: Promise<unknown>) => void } }).EdgeRuntime?.waitUntil?.(work);
+  } catch {
+    /* fuera de la plataforma no hace falta */
+  }
+}
 
 type SseEventName = "step" | "meta" | "thinking" | "delta" | "done" | "error";
 
@@ -5067,8 +5104,12 @@ async function handle(request: Request): Promise<Response> {
   const admin = createClient(url, serviceKey, { auth: { persistSession: false } });
 
   let body: {
-    action?: Action | "calificar" | "captura";
+    action?: Action | "calificar" | "captura" | "recoger";
     portal?: string;
+    /** El tiquete de una espera (0128): al preguntar, para recoger después; al recoger, cuál. */
+    espera?: unknown;
+    /** Recoger: cuántos milisegundos se espera con el pedido abierto si aún no está lista. */
+    wait?: unknown;
     page?: string;
     sections?: Section[];
     text?: string;
@@ -5128,11 +5169,11 @@ async function handle(request: Request): Promise<Response> {
   // La lectura de una página (0127) trae su texto entero: tiene su propio tope.
   if (body.action === "captura" && bodySize > CAPTURE_BODY_MAX) return json({ status: "no" });
   const requested = body.action;
-  if (!requested || !["resumir", "sintetizar", "explicar", "voz", "probar", "preguntar", "calificar", "captura", "entender", "analizar", "indexar", "comprender", "moodle", "puentes"].includes(requested)) {
+  if (!requested || !["resumir", "sintetizar", "explicar", "voz", "probar", "preguntar", "calificar", "captura", "recoger", "entender", "analizar", "indexar", "comprender", "moodle", "puentes"].includes(requested)) {
     return json({ error: "Acción desconocida." }, 400);
   }
-  // Calificar una respuesta y mandar la lectura de una página (0127) piden los mismos permisos que preguntar.
-  const action: Action = requested === "calificar" || requested === "captura" ? "preguntar" : requested;
+  // Calificar una respuesta, mandar la lectura de una página (0127) y recoger una respuesta (0128) piden los mismos permisos que preguntar.
+  const action: Action = requested === "calificar" || requested === "captura" || requested === "recoger" ? "preguntar" : requested;
   const asking = action === "preguntar";
   /** El mapa y Moodle (0115, 0116): mantenimiento de un espacio. Sirven con o sin IA y no gastan cupo. */
   const upkeep = action === "comprender" || action === "moodle";
@@ -6286,34 +6327,101 @@ async function handle(request: Request): Promise<Response> {
    * cuanto `work` abre el flujo (o cuando termina, si responde con JSON); lo
    * que falle después de abrirlo llega como evento `error` y el flujo se
    * cierra siempre. Si quien lee se va, se suelta al proveedor.
+   *
+   * Con un tiquete de espera (0128) es al revés: quien lee puede irse, Pilo
+   * sigue redactando y lo que habría dicho queda guardado para «recoger». Sin
+   * esa migración (o con un tiquete ya usado) se responde como siempre.
    */
-  function answerQuestion(): Promise<Response> {
+  async function answerQuestion(): Promise<Response> {
+    const ticket = ticketOf(body.espera);
+    const held = ticket ? (await admin.rpc("pilo_wait_open", { p_ticket: ticket, p_portal: portal })).data === true : false;
     const abort = new AbortController();
+    const leave = () => {
+      if (!held) abort.abort();
+    };
     let opened: SseChannel | null = null;
+    let stored: Promise<void> = Promise.resolve();
+    const store = (status: "lista" | "error", payload: Record<string, unknown>) => {
+      if (!held) return;
+      stored = (async () => {
+        try {
+          await admin.rpc("pilo_wait_close", { p_ticket: ticket, p_status: status, p_payload: payload });
+        } catch {
+          /* si no se pudo guardar, quien recoge verá que sigue pendiente y se rendirá */
+        }
+      })();
+    };
     return new Promise<Response>((resolve, reject) => {
       const session: AskSession = { open, closeSteps: () => undefined };
       function open() {
-        const channel = sseChannel(() => abort.abort());
-        opened = channel;
+        const channel = sseChannel(leave);
+        // Lo último que sale por el flujo es lo que se deja para recoger.
+        const kept: SseChannel = held
+          ? {
+              ...channel,
+              send(event, data) {
+                if (event === "done") store("lista", waitPayload(data));
+                else if (event === "error") store("error", { message: String((data as { message?: unknown })?.message ?? "") });
+                channel.send(event, data);
+              },
+            }
+          : channel;
+        opened = kept;
         // La plataforma avisa por la señal del pedido cuando el navegador se desconecta.
-        request.signal?.addEventListener("abort", () => abort.abort(), { once: true });
+        request.signal?.addEventListener("abort", leave, { once: true });
         resolve(channel.response);
-        return channel;
+        return kept;
       }
-      answerWork(session, abort).then(resolve, async (error: unknown) => {
-        const channel = opened as SseChannel | null;
-        if (!channel) return reject(error);
-        // Los pasos que quedaron abiertos se cierran antes del error.
-        session.closeSteps();
-        const failure = askFailure(error);
-        await log(failure.logStatus, `${String(body.question ?? "").slice(0, 120)} · ${failure.detail}`).then(
-          () => undefined,
-          () => undefined,
-        );
-        channel.send("error", { message: failure.message, code: failure.code, detail: failure.detail });
-        channel.close();
-      });
+      const finished = answerWork(session, abort).then(
+        async (response) => {
+          // Sin flujo, la respuesta es un JSON: también se deja.
+          if (held && !opened) {
+            const said = (await response.clone().json().catch(() => null)) as Record<string, unknown> | null;
+            if (response.ok && said) store("lista", waitPayload(said));
+            else store("error", { message: String(said?.error ?? "") });
+          }
+          resolve(response);
+        },
+        async (error: unknown) => {
+          const channel = opened as SseChannel | null;
+          if (!channel) {
+            store("error", { message: askFailure(error).message });
+            return reject(error);
+          }
+          // Los pasos que quedaron abiertos se cierran antes del error.
+          session.closeSteps();
+          const failure = askFailure(error);
+          await log(failure.logStatus, `${String(body.question ?? "").slice(0, 120)} · ${failure.detail}`).then(
+            () => undefined,
+            () => undefined,
+          );
+          channel.send("error", { message: failure.message, code: failure.code, detail: failure.detail });
+          channel.close();
+        },
+      );
+      if (held) keepAlive(finished.then(() => stored));
     });
+  }
+
+  /**
+   * Recoger una respuesta que se dejó esperando (0128). Si aún no está, se
+   * espera con el pedido abierto hasta `wait` milisegundos. No gasta cupo ni
+   * cuenta para el límite por visitante: la pregunta ya se contó.
+   */
+  async function collectAnswer(): Promise<Response> {
+    const ticket = ticketOf(body.espera);
+    if (!ticket) return json({ error: "Falta el tiquete de la espera." }, 400);
+    const asked = Number(body.wait);
+    const until = Date.now() + Math.min(Math.max(Number.isFinite(asked) ? asked : 0, 0), WAIT_POLL_MAX_MS);
+    for (;;) {
+      const { data, error } = await admin.rpc("pilo_wait_read", { p_ticket: ticket });
+      if (error) return json({ error: "Pilo aún no puede dejar respuestas para recoger (falta la migración 0128).", code: "migracion" }, 500);
+      const row = data as { status?: string; payload?: Record<string, unknown> | null } | null;
+      if (!row) return json({ status: "desconocida" }, 404);
+      if (row.status !== "pendiente") return json({ ...(row.payload ?? {}), status: row.status });
+      if (Date.now() + WAIT_POLL_STEP_MS > until) return json({ status: "pendiente" });
+      await new Promise((r) => setTimeout(r, WAIT_POLL_STEP_MS));
+    }
   }
 
   /**
@@ -7215,6 +7323,7 @@ async function handle(request: Request): Promise<Response> {
       // Sin la migración 0127 la función no existe: se sigue leyendo, solo que no se guarda.
       return json({ status: error ? "no" : String(data ?? "no") });
     }
+    if (requested === "recoger") return await collectAnswer();
     if (asking) return await answerQuestion();
     if (action === "indexar") return await indexMemory();
     if (action === "comprender") return await comprehendMap();

@@ -1,0 +1,15 @@
+{
+  "name": "pilo-alexa-skill",
+  "private": true,
+  "version": "1.0.0",
+  "description": "Mr. Pilo, la IA de la Universidad de Santander, en Amazon Alexa.",
+  "type": "module",
+  "main": "index.js",
+  "engines": {
+    "node": ">=20"
+  },
+  "dependencies": {
+    "ask-sdk-core": "^2.14.0",
+    "ask-sdk-model": "^1.86.0"
+  }
+}

@@ -1,0 +1,43 @@
+{
+  "manifest": {
+    "manifestVersion": "1.0",
+    "publishingInformation": {
+      "locales": {
+        "es-MX": {
+          "name": "Mister Pilo",
+          "summary": "Pregúntele a Pilo, la inteligencia artificial de la Universidad de Santander.",
+          "description": "Mister Pilo responde preguntas sobre la Universidad de Santander con lo que la universidad publica: sus cifras, su Plan de Desarrollo y sus documentos. Dice de dónde sale lo que responde y avisa cuando algo no lo sabe.",
+          "examplePhrases": ["Alexa, abre mister pilo", "Alexa, pregúntale a mister pilo cuántos programas tiene la universidad", "dime qué es el plan de desarrollo"],
+          "keywords": ["universidad", "UDES", "Santander", "educación", "cifras"]
+        },
+        "es-US": {
+          "name": "Mister Pilo",
+          "summary": "Pregúntele a Pilo, la inteligencia artificial de la Universidad de Santander.",
+          "description": "Mister Pilo responde preguntas sobre la Universidad de Santander con lo que la universidad publica: sus cifras, su Plan de Desarrollo y sus documentos. Dice de dónde sale lo que responde y avisa cuando algo no lo sabe.",
+          "examplePhrases": ["Alexa, abre mister pilo", "Alexa, pregúntale a mister pilo cuántos programas tiene la universidad", "dime qué es el plan de desarrollo"],
+          "keywords": ["universidad", "UDES", "Santander", "educación", "cifras"]
+        },
+        "es-ES": {
+          "name": "Mister Pilo",
+          "summary": "Pregúntele a Pilo, la inteligencia artificial de la Universidad de Santander.",
+          "description": "Mister Pilo responde preguntas sobre la Universidad de Santander con lo que la universidad publica: sus cifras, su Plan de Desarrollo y sus documentos. Dice de dónde sale lo que responde y avisa cuando algo no lo sabe.",
+          "examplePhrases": ["Alexa, abre mister pilo", "Alexa, pregúntale a mister pilo cuántos programas tiene la universidad", "dime qué es el plan de desarrollo"],
+          "keywords": ["universidad", "UDES", "Santander", "educación", "cifras"]
+        }
+      },
+      "isAvailableWorldwide": true,
+      "category": "EDUCATION_AND_REFERENCE",
+      "distributionCountries": []
+    },
+    "apis": {
+      "custom": {}
+    },
+    "privacyAndCompliance": {
+      "allowsPurchases": false,
+      "usesPersonalInfo": false,
+      "isChildDirected": false,
+      "isExportCompliant": true,
+      "containsAds": false
+    }
+  }
+}

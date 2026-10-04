@@ -35,6 +35,8 @@ interface World {
   seen: Record<string, number>;
   /** Sin la migración 0110: la función del límite no existe. */
   noVisitorTable: boolean;
+  /** Las respuestas que se dejan para recoger (0128), por tiquete. Sin esto, esa migración no está. */
+  waits?: Record<string, { status: string; payload: Row | null }>;
   /** La búsqueda en la memoria falla (la base no responde). */
   memoryFails?: boolean;
   /** Cuántos pasajes tienen vector (0108): con alguno, la búsqueda también va por significado. */
@@ -357,6 +359,22 @@ function fakeClient(w: World) {
           w.visitors.push(String(args.p_visitor));
           w.seen[String(args.p_visitor)] = (w.seen[String(args.p_visitor)] ?? 0) + 1;
           return { data: w.hits + w.seen[String(args.p_visitor)], error: null };
+        case "pilo_wait_open": {
+          if (!w.waits) return missing(name);
+          const ticket = String(args.p_ticket);
+          if (w.waits[ticket]) return { data: false, error: null };
+          w.waits[ticket] = { status: "pendiente", payload: null };
+          return { data: true, error: null };
+        }
+        case "pilo_wait_close": {
+          if (!w.waits) return missing(name);
+          const wait = w.waits[String(args.p_ticket)];
+          if (wait?.status === "pendiente") w.waits[String(args.p_ticket)] = { status: String(args.p_status), payload: args.p_payload as Row };
+          return { data: null, error: null };
+        }
+        case "pilo_wait_read":
+          if (!w.waits) return missing(name);
+          return { data: w.waits[String(args.p_ticket)] ?? null, error: null };
         case "pilo_inbox_add":
           w.inbox.push(args);
           return { data: null, error: null };
@@ -1120,6 +1138,95 @@ describe("el flujo se mantiene vivo y se suelta", () => {
     expect(seen.signal?.aborted).toBe(true);
     await vi.waitFor(() => expect(w.logs.some((l) => l.status === "cancelado")).toBe(true));
     expect(w.saved).toEqual([]);
+  });
+});
+
+/* --- La respuesta que se recoge después (0128) --------------------------------------------
+   Quien no puede esperar con el pedido abierto (la skill de Alexa) deja un
+   tiquete y se va: Pilo sigue redactando y la respuesta se recoge con «recoger». */
+
+describe("la respuesta que se recoge después (espera)", () => {
+  const TICKET = "3f2b8c1e-5a47-4d09-9b61-0c7e2a1d4f58";
+  const QUESTION = "¿Cuántos estudiantes matriculados hay?";
+
+  it("con tiquete, si quien pregunta se va, Pilo sigue y deja la respuesta", async () => {
+    const w = world();
+    w.waits = {};
+    const seen: { signal: AbortSignal | null } = { signal: null };
+    let release: (r: Response) => void = () => undefined;
+    vi.stubGlobal(
+      "fetch",
+      vi.fn((_url: string, init: RequestInit) => {
+        seen.signal = init.signal ?? null;
+        return new Promise<Response>((ok) => (release = ok));
+      }),
+    );
+    const handler = await boot(w);
+    const response = await ask(handler, { question: QUESTION, stream: true, espera: TICKET });
+    const reader = response.body!.getReader();
+    await reader.read();
+    await vi.waitFor(() => expect(seen.signal).not.toBeNull());
+    expect(w.waits[TICKET]).toEqual({ status: "pendiente", payload: null });
+    expect(await (await ask(handler, { action: "recoger", espera: TICKET })).json()).toEqual({ status: "pendiente" });
+
+    await reader.cancel();
+    expect(seen.signal?.aborted).toBe(false);
+    release(stream("En 2024 hubo 20.500 estudiantes [1]. ")());
+    await vi.waitFor(() => expect(w.waits?.[TICKET].status).toBe("lista"));
+    expect(w.logs.some((l) => l.status === "cancelado")).toBe(false);
+
+    const got = await ask(handler, { action: "recoger", espera: TICKET });
+    expect(got.status).toBe(200);
+    const body = await got.json();
+    expect(body).toMatchObject({ status: "lista", kind: "ia", text: "En 2024 hubo 20.500 estudiantes [1]." });
+    expect(body.sources[0]).toEqual({ n: 1, title: "Estudiantes matriculados", path: "/cifras/poblacion" });
+    // Lo que solo le sirve a la página no se guarda.
+    expect(body).not.toHaveProperty("trail");
+  });
+
+  it("recoger espera con el pedido abierto hasta que la respuesta esté", async () => {
+    const w = world();
+    w.waits = { [TICKET]: { status: "pendiente", payload: null } };
+    const handler = await boot(w);
+    vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout", "Date"] });
+    const waiting = ask(handler, { action: "recoger", espera: TICKET, wait: 5000 }).then((r) => r.json());
+    await vi.advanceTimersByTimeAsync(1200);
+    w.waits[TICKET] = { status: "lista", payload: { kind: "ia", text: "Listo.", asked: "", sources: [] } };
+    await vi.advanceTimersByTimeAsync(600);
+    expect(await waiting).toEqual({ status: "lista", kind: "ia", text: "Listo.", asked: "", sources: [] });
+  });
+
+  it("un error de la redacción también se recoge, y un tiquete que no existe se dice", async () => {
+    const w = world();
+    w.waits = { [TICKET]: { status: "error", payload: { message: "El proveedor falló." } } };
+    const handler = await boot(w);
+    expect(await (await ask(handler, { action: "recoger", espera: TICKET })).json()).toEqual({ status: "error", message: "El proveedor falló." });
+    const unknown = await ask(handler, { action: "recoger", espera: "9a1b2c3d-4e5f-4a6b-8c7d-0e1f2a3b4c5d" });
+    expect(unknown.status).toBe(404);
+    expect(await unknown.json()).toEqual({ status: "desconocida" });
+    expect((await ask(handler, { action: "recoger", espera: "no-es-un-tiquete" })).status).toBe(400);
+  });
+
+  it("sin la migración 0128 se responde como siempre: si la página se va, se suelta al proveedor", async () => {
+    const w = world();
+    const seen: { signal: AbortSignal | null } = { signal: null };
+    vi.stubGlobal(
+      "fetch",
+      vi.fn((_url: string, init: RequestInit) => {
+        seen.signal = init.signal ?? null;
+        return new Promise<Response>((_ok, fail) => init.signal?.addEventListener("abort", () => fail(new DOMException("cancelado", "AbortError"))));
+      }),
+    );
+    const handler = await boot(w);
+    const response = await ask(handler, { question: QUESTION, stream: true, espera: TICKET });
+    const reader = response.body!.getReader();
+    await reader.read();
+    await vi.waitFor(() => expect(seen.signal).not.toBeNull());
+    await reader.cancel();
+    expect(seen.signal?.aborted).toBe(true);
+    const got = await ask(handler, { action: "recoger", espera: TICKET });
+    expect(got.status).toBe(500);
+    expect(await got.json()).toMatchObject({ code: "migracion" });
   });
 });
 

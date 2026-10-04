@@ -12,8 +12,7 @@
 
 const CONFIG = {
   SUPABASE_URL: "https://dogbfifebeyopcowuzbs.supabase.co",
-  SUPABASE_ANON_KEY: "",
-  // «pregunta» (el Pilo de Planeación) o «ensenanza» (con PILO_ROL «estudiante» o «profesor»).
+  SUPABASE_ANON_KEY: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRvZ2JmaWZlYmV5b3Bjb3d1emJzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODgzNjIyODcsImV4cCI6MjEwMzkzODI4N30.2sJM4HiogRcnqkWcbZgRf1OtmcdECtqxgx0D6sc0V9w",  // «pregunta» (el Pilo de Planeación) o «ensenanza» (con PILO_ROL «estudiante» o «profesor»).
   PILO_PORTAL: "pregunta",
   PILO_ROL: "",
   // Cuántos segundos llena Alexa mientras Pilo redacta (ver lambda/index.js).

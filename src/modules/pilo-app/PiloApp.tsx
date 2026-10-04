@@ -198,6 +198,12 @@ export function PiloApp() {
     );
   }
 
+  /** Desde una página que no es la conversación: Pilo se presenta otra vez, sobre ella. */
+  const welcomeAgain = () => {
+    setWelcoming(true);
+    navigate(APP_PATHS[home]);
+  };
+
   if (place.kind === "perfil" || place.kind === "guardadas") {
     const profilePage = place.kind === "perfil";
     return (
@@ -212,7 +218,7 @@ export function PiloApp() {
               : "Lo que guarda queda en su cuenta y lo encuentra en cualquier dispositivo."
           }
           home={APP_PATHS[home]}
-          side={wide ? <PageSide home={home} active={profilePage ? "perfil" : "guardadas"} person={person} userId={session?.user.id} member={member} /> : null}
+          side={wide ? <PageSide home={home} active={profilePage ? "perfil" : "guardadas"} person={person} userId={session?.user.id} member={member} theme={theme} onTheme={pickTheme} onWelcome={welcomeAgain} /> : null}
         >
           {profilePage ? (
             <ProfilePane
@@ -220,10 +226,7 @@ export function PiloApp() {
               theme={theme}
               onTheme={pickTheme}
               intranetName={person.intranet}
-              onWelcome={() => {
-                setWelcoming(true);
-                navigate(APP_PATHS[home]);
-              }}
+              onWelcome={welcomeAgain}
             />
           ) : (
             <SavedPane userId={session?.user.id} member={member} pending={cuenta.pending} />
@@ -243,7 +246,7 @@ export function PiloApp() {
           tag="Beta"
           lead="Pilo entra a Moodle con su cuenta para ver sus cursos y ayudarle con ellos: qué hay para esta semana, qué pide una actividad y cuándo se entrega."
           home={APP_PATHS[home]}
-          side={wide ? <PageSide home={home} active="clases" person={person} userId={session?.user.id} member={member} /> : null}
+          side={wide ? <PageSide home={home} active="clases" person={person} userId={session?.user.id} member={member} theme={theme} onTheme={pickTheme} onWelcome={welcomeAgain} /> : null}
         >
           <ClasesPane state={cuenta} online={online} />
         </AppPage>
@@ -317,7 +320,25 @@ export function PiloApp() {
 }
 
 /** La barra lateral del escritorio en las pantallas que no son la conversación: lleva a ella. */
-function PageSide({ home, active, person, userId, member }: { home: SpaceId; active: "perfil" | "guardadas" | "clases"; person: Person; userId: string | undefined; member: boolean }) {
+function PageSide({
+  home,
+  active,
+  person,
+  userId,
+  member,
+  theme,
+  onTheme,
+  onWelcome,
+}: {
+  home: SpaceId;
+  active: "perfil" | "guardadas" | "clases";
+  person: Person;
+  userId: string | undefined;
+  member: boolean;
+  theme: AppTheme;
+  onTheme: (theme: AppTheme) => void;
+  onWelcome: () => void;
+}) {
   const navigate = useNavigate();
   const [convs, setConvs] = useState(() => ({ planeacion: loadSaved("planeacion"), ensenanza: loadSaved("ensenanza") }));
   const entries = useMemo(() => savedEntries(convs), [convs]);
@@ -333,6 +354,9 @@ function PageSide({ home, active, person, userId, member }: { home: SpaceId; act
       onDelete={(entry: SavedEntry) => setConvs((c) => ({ ...c, [entry.space]: removeSaved(entry.space, entry.id) }))}
       onNew={() => navigate(APP_PATHS[home], { state: { nueva: true } })}
       onSwitch={(space) => navigate(APP_PATHS[space])}
+      theme={theme}
+      onTheme={onTheme}
+      onWelcome={onWelcome}
     />
   );
 }

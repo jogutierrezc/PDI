@@ -83,3 +83,9 @@ export function startTarget(input: { seen: boolean; last: SpaceId | null | undef
   if (!input.seen) return "bienvenida";
   return input.last === "ensenanza" ? "ensenanza" : "planeacion";
 }
+
+/**
+ * Gemini, para estudiantes y profesores con cuenta: un acceso que se abre aparte, con la cuenta de
+ * Google de la universidad. Pilo no le pasa nada ni lee lo que allí se conversa.
+ */
+export const APP_GEMINI = "https://gemini.google.com/app";

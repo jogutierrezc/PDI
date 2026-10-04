@@ -1,29 +1,32 @@
 /* =============================================================================
    Mr. Pilo · la app móvil · el menú (cajón lateral) y sus hojas.
 
-   Nueva conversación · Conversaciones guardadas (en el teléfono, las de los
-   dos Pilos, con su fecha; se reabren y se borran) · Respuestas guardadas ·
-   Con cuál Pilo · Tema · Ver la bienvenida · la persona.
+   De arriba abajo, por lo que más se usa: la persona (su nombre lleva a su
+   perfil) · con cuál Pilo · Nueva conversación · «Para estudiar» (Mis clases en
+   Moodle, Gemini y las respuestas guardadas) · las conversaciones de este
+   teléfono (las cuatro más recientes; «Ver todas» las abre, y ahí se borran) ·
+   Ajustes (el tema, la bienvenida y la política de uso), que es una hoja
+   aparte: se usa poco y ya no ocupa el menú.
 
-   La persona (0120): con cuenta de Pilo, su nombre, su perfil y su usuario,
-   que llevan a su perfil; sin cuenta, «Crear cuenta / Entrar». En el
-   escritorio este cajón no se usa: lo mismo vive en la barra lateral fija
-   (AppSide).
+   La persona (0120): con cuenta de Pilo o de la intranet, encabeza el cajón;
+   sin cuenta, «Crear cuenta / Entrar» queda al pie. En el escritorio este
+   cajón no se usa: lo mismo vive en la barra lateral fija (AppSide).
    ========================================================================== */
 
+import { useState } from "react";
 import type { MouseEvent } from "react";
 import { Link } from "react-router-dom";
 import type { AskSource } from "../../components/pilo/ai/client";
 import { originOf } from "../pregunta/answer-state";
 import type { SpaceId, SpaceProfile } from "../pregunta/space";
-import { APP_ACCOUNT, APP_CLASSES, APP_LOGIN, APP_PILOS, APP_SAVED, APP_SPACES } from "./routes";
+import { APP_ACCOUNT, APP_CLASSES, APP_GEMINI, APP_LOGIN, APP_PILOS, APP_SAVED, APP_SPACES } from "./routes";
 import { APP_THEMES } from "./themes";
 import type { AppTheme } from "./themes";
 import { dayLabel } from "./saved";
 import type { SavedEntry } from "./saved";
 import { Layer } from "./Layer";
 import { Icon } from "./icons";
-import { PersonBlock } from "./AppSide";
+import { PersonBlock, RECENT_CONVERSATIONS, StudyIcon } from "./AppSide";
 import type { Person } from "./AppSide";
 import { ACCOUNT_BENEFITS } from "./account/rules";
 import { PolicyLink } from "./terms/PolicyLink";
@@ -39,9 +42,7 @@ export function AppMenu({
   onDelete,
   onNew,
   onSwitch,
-  theme,
-  onTheme,
-  onWelcome,
+  onSettings,
   person,
 }: {
   open: boolean;
@@ -55,20 +56,32 @@ export function AppMenu({
   onDelete: (entry: SavedEntry) => void;
   onNew: () => void;
   onSwitch: (space: SpaceId) => void;
-  theme: AppTheme;
-  onTheme: (theme: AppTheme, event: MouseEvent) => void;
-  onWelcome: () => void;
+  /** Abre la hoja de ajustes (el tema, la bienvenida y la política). */
+  onSettings: () => void;
   /** Quién usa la app: su cuenta de Pilo, la de la intranet, o nadie. */
   person: Person;
 }) {
+  /** Todas las conversaciones a la vista: ahí, además, se borran. */
+  const [all, setAll] = useState(false);
+  const known = Boolean(person.card || person.intranet);
+  const few = saved.length <= RECENT_CONVERSATIONS;
+  const shown = all || few ? saved : saved.slice(0, RECENT_CONVERSATIONS);
+
   return (
     <Layer kind="menu" open={open} quick={quick} label="Menú de Mr. Pilo" onClose={onClose}>
       <div className="pa-menu-head">
         <div className="pa-menu-head__top">
-          <h2>Mr. Pilo</h2>
+          {known ? <PersonBlock person={person} onGo={() => onClose()} /> : <h2>Mr. Pilo</h2>}
           <button type="button" className="pa-icon" onClick={onClose} aria-label="Cerrar el menú">
             {Icon.close}
           </button>
+        </div>
+        <div className="pa-two" role="group" aria-label="Con cuál Pilo">
+          {APP_SPACES.map((id) => (
+            <button key={id} type="button" aria-pressed={id === space} onClick={() => onSwitch(id)}>
+              {APP_PILOS[id].short}
+            </button>
+          ))}
         </div>
         <button type="button" className="pa-btn pa-btn--main" onClick={onNew}>
           {Icon.plus}
@@ -77,58 +90,117 @@ export function AppMenu({
       </div>
 
       <div className="pa-menu-body">
+        <section aria-labelledby="pa-m-study">
+          <p className="pa-label" id="pa-m-study">
+            {person.clases ? "Para estudiar" : "Mi Pilo"}
+          </p>
+          <div className="pa-tiles">
+            {/* Mis clases (clases/) y Gemini: solo para estudiantes y profesores con cuenta. */}
+            {person.clases && (
+              <Link className="pa-tile" to={APP_CLASSES} onClick={() => onClose()}>
+                <span className="pa-tile__top">
+                  <span className="pa-tile__ico">{StudyIcon.classes}</span>
+                  <em>beta</em>
+                </span>
+                <span>
+                  <strong>Mis clases</strong>
+                  <small>Sus cursos de Moodle y sus fechas de entrega</small>
+                </span>
+              </Link>
+            )}
+            {person.clases && (
+              <a className="pa-tile" href={APP_GEMINI} target="_blank" rel="noopener noreferrer" onClick={() => onClose()}>
+                <span className="pa-tile__top">
+                  <span className="pa-tile__ico">{StudyIcon.gemini}</span>
+                  <em data-new>Nuevo</em>
+                </span>
+                <span>
+                  <strong>Gemini</strong>
+                  <small>Se abre aparte, con su cuenta de la universidad</small>
+                </span>
+              </a>
+            )}
+            <Link className="pa-tile pa-tile--wide" to={APP_SAVED} onClick={() => onClose()}>
+              <span className="pa-tile__ico">{Icon.mark}</span>
+              <span>
+                <strong>Respuestas guardadas</strong>
+                <small>{person.card ? "Lo que guardó de Pilo, en su cuenta" : "Con cuenta, las encuentra en cualquier dispositivo"}</small>
+              </span>
+              {person.saved !== null && <b aria-label={`${person.saved} guardadas`}>{person.saved}</b>}
+            </Link>
+          </div>
+        </section>
+
         <section aria-labelledby="pa-m-saved">
           <p className="pa-label" id="pa-m-saved">
-            Conversaciones guardadas
+            Conversaciones
           </p>
           {saved.length === 0 && <p className="pa-empty">Sus conversaciones quedan aquí, solo en este teléfono.</p>}
-          {saved.map((entry) => (
-            <div key={`${entry.space}:${entry.id}`} className="pa-row" aria-current={entry.space === space && entry.id === currentId}>
+          {shown.map((entry) => (
+            <div key={`${entry.space}:${entry.id}`} className="pa-row" data-plain={!(all || few) || undefined} aria-current={entry.space === space && entry.id === currentId}>
               <button type="button" className="pa-mi" onClick={() => onOpen(entry)}>
                 <strong>{entry.title}</strong>
                 <small>
                   {APP_PILOS[entry.space].short} · {dayLabel(entry.at)}
                 </small>
               </button>
-              <button type="button" className="pa-icon" onClick={() => onDelete(entry)} aria-label={`Borrar la conversación «${entry.title}»`}>
-                {Icon.trash}
-              </button>
+              {(all || few) && (
+                <button type="button" className="pa-icon" onClick={() => onDelete(entry)} aria-label={`Borrar la conversación «${entry.title}»`}>
+                  {Icon.trash}
+                </button>
+              )}
             </div>
           ))}
+          {!few && (
+            <button type="button" className="pa-mi pa-mi--more" aria-expanded={all} onClick={() => setAll(!all)}>
+              <strong>{all ? "Ver solo las recientes" : `Ver las ${saved.length} conversaciones`}</strong>
+            </button>
+          )}
         </section>
+      </div>
 
-        <Link className="pa-mi pa-mi--line pa-mi--go" to={APP_SAVED} onClick={() => onClose()}>
-          <strong>
-            Respuestas guardadas
-            {person.saved !== null && <em aria-label={`${person.saved} guardadas`}>{person.saved}</em>}
-          </strong>
-          <small>{person.card ? "Lo que guardó de Pilo, en su cuenta" : "Con cuenta, las encuentra en cualquier dispositivo"}</small>
-        </Link>
+      <div className="pa-account">
+        {!known && <PersonBlock person={person} onGo={() => onClose()} />}
+        <button type="button" className="pa-mi pa-mi--set" onClick={onSettings}>
+          {StudyIcon.settings}
+          <span>
+            <strong>Ajustes</strong>
+            <small>Tema, bienvenida y política de uso</small>
+          </span>
+        </button>
+      </div>
+    </Layer>
+  );
+}
 
-        {/* Mis clases (clases/): solo para estudiantes y profesores con cuenta. */}
-        {person.clases && (
-          <Link className="pa-mi pa-mi--line pa-mi--go" to={APP_CLASSES} onClick={() => onClose()}>
-            <strong>
-              Mis clases
-              <em>beta</em>
-            </strong>
-            <small>Sus cursos de Moodle y sus fechas de entrega</small>
-          </Link>
-        )}
+/* --- La hoja de ajustes ---------------------------------------------------------------------- */
 
-        <section aria-labelledby="pa-m-pilo">
-          <p className="pa-label" id="pa-m-pilo">
-            Con cuál Pilo
-          </p>
-          <div className="pa-two" role="group" aria-labelledby="pa-m-pilo">
-            {APP_SPACES.map((id) => (
-              <button key={id} type="button" aria-pressed={id === space} onClick={() => onSwitch(id)}>
-                {APP_PILOS[id].short}
-              </button>
-            ))}
-          </div>
-        </section>
-
+/** Lo que se usa poco: el tema, ver la bienvenida otra vez y la política de uso. */
+export function SettingsSheet({
+  open,
+  quick,
+  onClose,
+  theme,
+  onTheme,
+  onWelcome,
+}: {
+  open: boolean;
+  quick: boolean;
+  onClose: (event?: MouseEvent) => void;
+  theme: AppTheme;
+  onTheme: (theme: AppTheme, event: MouseEvent) => void;
+  onWelcome: () => void;
+}) {
+  return (
+    <Layer kind="sheet" open={open} quick={quick} label="Ajustes de Mr. Pilo" onClose={onClose}>
+      <div className="pa-sheet__in">
+        <span className="pa-sheet__grip" aria-hidden="true" />
+        <div className="pa-sheet__head">
+          <h2>Ajustes</h2>
+          <button type="button" className="pa-icon" onClick={onClose} aria-label="Cerrar los ajustes">
+            {Icon.close}
+          </button>
+        </div>
         <section aria-labelledby="pa-m-tema">
           <p className="pa-label" id="pa-m-tema">
             Tema
@@ -144,21 +216,17 @@ export function AppMenu({
             ))}
           </div>
         </section>
-
-        <button type="button" className="pa-mi pa-mi--line" onClick={onWelcome}>
-          <strong>Ver la bienvenida</strong>
-          <small>Pilo se presenta otra vez</small>
-        </button>
-
-        {/* La política de uso completa (terms/): página pública, fuera de la app. */}
-        <PolicyLink className="pa-mi pa-mi--line pa-mi--go" onClick={() => onClose()}>
-          <strong>Política de uso</strong>
-          <small>Los términos de Mr. Pilo y cómo trata sus datos</small>
-        </PolicyLink>
-      </div>
-
-      <div className="pa-account">
-        <PersonBlock person={person} onGo={() => onClose()} />
+        <div>
+          <button type="button" className="pa-mi pa-mi--line" onClick={onWelcome}>
+            <strong>Ver la bienvenida</strong>
+            <small>Pilo se presenta otra vez</small>
+          </button>
+          {/* La política de uso completa (terms/): página pública, fuera de la app. */}
+          <PolicyLink className="pa-mi pa-mi--line pa-mi--go" onClick={() => onClose()}>
+            <strong>Política de uso</strong>
+            <small>Los términos de Mr. Pilo y cómo trata sus datos</small>
+          </PolicyLink>
+        </div>
       </div>
     </Layer>
   );

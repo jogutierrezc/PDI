@@ -926,3 +926,215 @@
     transform: none;
   }
 }
+
+/* --- El perfil de quien tiene cuenta --------------------------------------------------------------
+   Arriba, quién es. Después lo que se edita, con la muestra de cómo responde Pilo a la vista: justo
+   encima en el teléfono, fija al lado en el escritorio. La cuenta (lo que no se cambia aquí) y la
+   salida van al final y aparte. «Guardar» aparece cuando hay algo que guardar. */
+
+.pc-pane:has(.pc-profile--v2) {
+  max-width: 920px;
+}
+
+.pc-me {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  min-width: 0;
+}
+
+.pc-me__avatar {
+  flex: none;
+  width: 64px;
+  height: 64px;
+  background: var(--c-mine);
+  color: var(--c-mine-ink);
+  font: 700 1.6rem/1 var(--font-display);
+}
+
+.pc-me h2 {
+  font: 700 1.35rem/1.15 var(--font-display);
+  letter-spacing: -0.015em;
+  overflow-wrap: anywhere;
+}
+
+.pc-me p {
+  font-size: 0.8125rem;
+  color: var(--c-ink2);
+  overflow-wrap: anywhere;
+}
+
+.pc-me__tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.pc-h {
+  font: 700 1.08rem/1.2 var(--font-display);
+}
+
+/* En el teléfono: la muestra, lo que se edita y la cuenta, en ese orden. */
+.pc-cols {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  min-width: 0;
+}
+
+.pc-aside {
+  display: contents;
+}
+
+.pc-sample {
+  order: 1;
+}
+
+.pc-edit {
+  order: 2;
+  display: grid;
+  gap: 12px;
+  min-width: 0;
+}
+
+.pc-account {
+  order: 3;
+}
+
+.pc-sample__turn {
+  display: grid;
+  grid-template-columns: 48px minmax(0, 1fr);
+  gap: 8px;
+  align-items: start;
+}
+
+.pc-sample__bubble {
+  min-height: 5.2em;
+  padding: 10px 14px;
+  border: 1px solid var(--c-line);
+  border-radius: var(--pa-r-bubble);
+  background: var(--c-bubble);
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+/* La respuesta cambia de una a otra: un desenfoque corto une las dos. */
+.pc-sample__bubble span {
+  display: block;
+  animation: pc-swap 320ms var(--ease-out);
+}
+
+@keyframes pc-swap {
+  from {
+    opacity: 0.35;
+    filter: blur(3px);
+  }
+}
+
+.pc-facts {
+  display: grid;
+  margin: 0;
+}
+
+.pc-facts > div {
+  display: grid;
+  grid-template-columns: 72px minmax(0, 1fr);
+  gap: 10px;
+  padding: 11px 0;
+  border-top: 1px solid var(--c-line);
+}
+
+.pc-facts > div:first-child {
+  padding-top: 0;
+  border-top: 0;
+}
+
+.pc-facts dt {
+  font-size: 0.8125rem;
+  font-weight: 800;
+  color: var(--c-ink2);
+}
+
+.pc-facts dd {
+  margin: 0;
+  min-width: 0;
+  font-weight: 700;
+  overflow-wrap: anywhere;
+}
+
+.pc-facts small {
+  display: block;
+  font-size: 0.8125rem;
+  font-weight: 500;
+  color: var(--c-ink2);
+}
+
+.pc-out {
+  justify-self: start;
+}
+
+/* En el teléfono, la barra de guardar sube con el primer cambio y baja cuando no queda nada pendiente. */
+.pc-profile--v2 .pc-save {
+  position: sticky;
+  bottom: 0;
+  z-index: 2;
+  padding: 10px 0;
+  border-top: 1px solid var(--c-line);
+  background: var(--c-bg);
+  transition: transform 280ms var(--ease-out), opacity 200ms ease;
+}
+
+.pc-profile--v2 .pc-save:not([data-on]) {
+  transform: translateY(100%);
+  opacity: 0;
+  visibility: hidden;
+  transition: transform 200ms ease, opacity 160ms ease, visibility 0s linear 200ms;
+}
+
+@media (min-width: 960px) {
+  .pc-cols {
+    display: grid;
+    grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr);
+    gap: 20px;
+    align-items: start;
+  }
+
+  .pc-edit {
+    grid-column: 1;
+    grid-row: 1;
+  }
+
+  .pc-aside {
+    grid-column: 2;
+    grid-row: 1;
+    position: sticky;
+    top: 0;
+    display: grid;
+    gap: 16px;
+    min-width: 0;
+  }
+
+  .pc-profile--v2 .pc-save,
+  .pc-profile--v2 .pc-save:not([data-on]) {
+    position: static;
+    padding: 0;
+    border: 0;
+    background: none;
+    transform: none;
+    opacity: 1;
+    visibility: visible;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pc-sample__bubble span {
+    animation: none;
+  }
+
+  .pc-profile--v2 .pc-save,
+  .pc-profile--v2 .pc-save:not([data-on]) {
+    transition: none;
+    transform: none;
+  }
+}

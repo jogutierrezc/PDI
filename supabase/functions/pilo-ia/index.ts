@@ -2719,6 +2719,20 @@ export function pageAllowed(url: string, origins: unknown): boolean {
   });
 }
 
+/**
+ * ¿Esa página es de este mismo portal? El chat siempre puede mostrarse en su
+ * propio portal, sin estar en la lista (widgetAllowed, en la página), así que
+ * lo que se ve ahí también se lee. `origin` es el del pedido: el del marco del
+ * chat, que siempre es de este portal.
+ */
+export function pageOwn(url: string, origin: string | null): boolean {
+  try {
+    return Boolean(origin) && new URL(url).origin === new URL(String(origin)).origin;
+  } catch {
+    return false;
+  }
+}
+
 /** La página que viaja con una pregunta: su dirección, su título y los pasajes que el navegador eligió. No se guarda con la pregunta. */
 export interface AskPage {
   url: string;
@@ -6449,10 +6463,11 @@ async function handle(request: Request): Promise<Response> {
     // Las funciones ampliadas (0119). El archivo llega ya leído por el navegador de la
     // persona, como pasajes de texto: aquí no se guarda, ni en la base ni en la bitácora.
     const doc = cleanDoc(body.doc);
-    // La página que la persona ve en otro portal (0127): solo si es de un portal autorizado.
-    // Con la pregunta viaja a la IA y no se guarda; a la bandeja de lecturas va aparte («captura»).
+    // La página que la persona ve (0127): solo si es de este portal o de uno autorizado.
+    // Con la pregunta viaja a la IA y no se guarda; a la bandeja de lecturas va aparte («captura»),
+    // y ahí solo llegan las de otros portales.
     const seen = cleanPage(body.page);
-    const page = seen && pageAllowed(seen.url, hostOrigins) ? seen : null;
+    const page = seen && (pageOwn(seen.url, request.headers.get("Origin")) || pageAllowed(seen.url, hostOrigins)) ? seen : null;
     const extrasLoading = loadExtras();
     extrasLoading.catch(() => undefined);
     // La vista del portal (0121) se pide ya, a la par: cuando haga falta estará lista.

@@ -1230,6 +1230,37 @@ describe("la respuesta que se recoge después (espera)", () => {
   });
 });
 
+/* --- La página que se ve con la pregunta (0127) --------------------------------------------
+   Con la pregunta puede viajar el texto de la página donde está el chat. Se usa
+   si la página es de este mismo portal o de uno autorizado; de otra, se ignora. */
+
+describe("la página que se ve con la pregunta", () => {
+  const sentPage = (call: { body: Record<string, unknown> }) => JSON.stringify(call.body.messages).includes("<<<PAGINA");
+  const pageAt = (url: string) => ({ url, title: "Admisiones", passages: ["Las inscripciones cierran el 30 de noviembre."] });
+  const askWith = async (w: World, url: string) => {
+    const calls = provider(stream("Según esta página, cierran el 30 de noviembre. "));
+    const all = await events(await ask(await boot(w), { question: "¿Cuándo cierran las inscripciones de esta página?", stream: true, page: pageAt(url) }));
+    return { used: sentPage(calls[calls.length - 1]), done: all[all.length - 1].data };
+  };
+
+  it("la de este mismo portal se lee sin estar en la lista de portales autorizados", async () => {
+    const own = await askWith(world(), "http://localhost:5173/pilo-widget-demo.html");
+    expect(own.used).toBe(true);
+    expect(own.done.page).toMatchObject({ url: "http://localhost:5173/pilo-widget-demo.html" });
+  });
+
+  it("la de otro portal, solo si está autorizado y con el interruptor encendido", async () => {
+    const other = "https://www.udes.edu.co/admisiones";
+    expect((await askWith(world(), other)).used).toBe(false);
+    const listed = world();
+    listed.settings = { ...listed.settings, widget_on: true, widget_origins: ["https://www.udes.edu.co"] };
+    expect((await askWith(listed, other)).used).toBe(true);
+    const off = world();
+    off.settings = { ...off.settings, widget_on: false, widget_origins: ["https://www.udes.edu.co"] };
+    expect((await askWith(off, other)).used).toBe(false);
+  });
+});
+
 /* --- Espacios y rol (0113) ----------------------------------------------------------------
    Otro Pilo («ensenanza») vive en su propio espacio: sus fuentes, su catálogo,
    su cupo, su bandeja y su bitácora. Para el portal de siempre no cambia nada:

@@ -25,6 +25,7 @@
 import "./config.js";
 import { randomUUID } from "node:crypto";
 import Alexa from "ask-sdk-core";
+import { netFetch, timeoutSignal } from "./http.js";
 import { askPilo, collectPilo } from "./pilo.js";
 import { cardText, escapeSsml, toPlain, toSpeech, waitSpeech } from "./speech.js";
 
@@ -83,11 +84,11 @@ async function sayWhileWorking(envelope) {
   const { apiEndpoint, apiAccessToken } = envelope.context?.System ?? {};
   if (!apiEndpoint || !apiAccessToken) return;
   try {
-    await fetch(`${apiEndpoint}/v1/directives`, {
+    await netFetch(`${apiEndpoint}/v1/directives`, {
       method: "POST",
       headers: { "Content-Type": "application/json", Authorization: `Bearer ${apiAccessToken}` },
       body: JSON.stringify({ header: { requestId: envelope.request.requestId }, directive: { type: "VoicePlayer.Speak", speech: "Déjeme revisar." } }),
-      signal: AbortSignal.timeout(1500),
+      signal: timeoutSignal(1500),
     });
   } catch {
     /* si no se pudo avisar, la respuesta llega igual */

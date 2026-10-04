@@ -21,6 +21,7 @@
      PILO_ROL            solo en «ensenanza»: «estudiante» o «profesor»
    ========================================================================== */
 
+import { netFetch, timeoutSignal } from "./http.js";
 import { completeSentences } from "./speech.js";
 
 /** Lo que se espera a Pilo: Alexa corta a los 8 s y hay que dejar tiempo para responderle. */
@@ -96,7 +97,7 @@ const done = (payload) => ({
  *   { status: "slow" }                                sin tiquete: no alcanzó a escribir nada
  *   { status: "error", message }                      lo que dijo el servidor, o que no hubo conexión
  */
-export async function askPilo({ question, history = [], ticket = "", deadlineMs = DEADLINE_MS, env = process.env, fetchImpl = fetch }) {
+export async function askPilo({ question, history = [], ticket = "", deadlineMs = DEADLINE_MS, env = process.env, fetchImpl = netFetch }) {
   const base = String(env.SUPABASE_URL ?? "").replace(/\/+$/, "");
   const key = String(env.SUPABASE_ANON_KEY ?? "");
   if (!base || !key) return { status: "error", message: "A esta skill le falta la dirección o la clave de Pilo. La administración debe configurarla." };
@@ -159,16 +160,17 @@ export const COLLECT_MS = 5500;
  *   { status: "gone" }                                el servidor no guardó esa espera (falta 0128, o venció)
  *   { status: "error", message }                      falló la redacción, o no hubo conexión
  */
-export async function collectPilo({ ticket, waitMs = COLLECT_MS, env = process.env, fetchImpl = fetch }) {
+export async function collectPilo({ ticket, waitMs = COLLECT_MS, env = process.env, fetchImpl = netFetch }) {
   const base = String(env.SUPABASE_URL ?? "").replace(/\/+$/, "");
   const key = String(env.SUPABASE_ANON_KEY ?? "");
   if (!base || !key) return { status: "error", message: "A esta skill le falta la dirección o la clave de Pilo. La administración debe configurarla." };
+  const signal = timeoutSignal(waitMs + 1200);
   try {
     const response = await fetchImpl(`${base}/functions/v1/pilo-ia`, {
       method: "POST",
       headers: { "Content-Type": "application/json", apikey: key, Authorization: `Bearer ${key}` },
       body: JSON.stringify({ action: "recoger", portal: portalOf(env), espera: ticket, wait: waitMs }),
-      signal: AbortSignal.timeout(waitMs + 1200),
+      signal,
     });
     const body = await response.json().catch(() => null);
     if (body?.status === "lista") return done(body);
@@ -178,7 +180,7 @@ export async function collectPilo({ ticket, waitMs = COLLECT_MS, env = process.e
     return { status: "error", message: said(body, "No pude responder ahora. Intente de nuevo en un momento.") };
   } catch (error) {
     // Si el plazo se cumplió esperando, Pilo sigue: se vuelve a recoger en el siguiente turno.
-    if (error?.name === "TimeoutError" || error?.name === "AbortError") return { status: "waiting" };
+    if (signal.aborted || error?.name === "TimeoutError" || error?.name === "AbortError") return { status: "waiting" };
     console.error("pilo-ia recoger", error);
     return { status: "error", message: "No pude conectarme con Pilo. Intente de nuevo en un momento." };
   }

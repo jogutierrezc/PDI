@@ -41,7 +41,7 @@ module.exports = __toCommonJS(lambda_exports);
 // lambda/config.js
 var CONFIG = {
   SUPABASE_URL: "https://dogbfifebeyopcowuzbs.supabase.co",
-  SUPABASE_ANON_KEY: "",
+  SUPABASE_ANON_KEY: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRvZ2JmaWZlYmV5b3Bjb3d1emJzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODgzNjIyODcsImV4cCI6MjEwMzkzODI4N30.2sJM4HiogRcnqkWcbZgRf1OtmcdECtqxgx0D6sc0V9w",
   // «pregunta» (el Pilo de Planeación) o «ensenanza» (con PILO_ROL «estudiante» o «profesor»).
   PILO_PORTAL: "pregunta",
   PILO_ROL: "",
@@ -57,6 +57,55 @@ for (const [name, value] of Object.entries(CONFIG)) {
 // lambda/index.js
 var import_node_crypto = require("node:crypto");
 var import_ask_sdk_core = __toESM(require("ask-sdk-core"), 1);
+
+// lambda/http.js
+var import_node_https = __toESM(require("node:https"), 1);
+var abortError = () => Object.assign(new Error("El pedido se canceló."), { name: "AbortError" });
+function nodeFetch(url, { method = "GET", headers = {}, body, signal } = {}) {
+  return new Promise((resolve, reject) => {
+    if (signal == null ? void 0 : signal.aborted) return reject(abortError());
+    const request = import_node_https.default.request(url, { method, headers: { ...headers, ...body ? { "Content-Length": Buffer.byteLength(body) } : {} } }, (res) => {
+      const chunks = res[Symbol.asyncIterator]();
+      const status = res.statusCode ?? 0;
+      resolve({
+        status,
+        ok: status >= 200 && status < 300,
+        headers: {
+          get(name) {
+            const value = res.headers[String(name).toLowerCase()];
+            return Array.isArray(value) ? value.join(", ") : value ?? null;
+          }
+        },
+        body: {
+          getReader: () => ({
+            async read() {
+              const { done: done2, value } = await chunks.next();
+              return { done: Boolean(done2), value };
+            }
+          })
+        },
+        async json() {
+          const parts = [];
+          for await (const part of res) parts.push(part);
+          return JSON.parse(Buffer.concat(parts).toString("utf8"));
+        }
+      });
+    });
+    const onAbort = () => request.destroy(abortError());
+    signal == null ? void 0 : signal.addEventListener("abort", onAbort, { once: true });
+    request.on("close", () => signal == null ? void 0 : signal.removeEventListener("abort", onAbort));
+    request.on("error", reject);
+    request.end(body);
+  });
+}
+var netFetch = (url, init) => typeof globalThis.fetch === "function" ? globalThis.fetch(url, init) : nodeFetch(url, init);
+function timeoutSignal(ms) {
+  var _a;
+  const ctl = new AbortController();
+  const timer = setTimeout(() => ctl.abort(), ms);
+  (_a = timer.unref) == null ? void 0 : _a.call(timer);
+  return ctl.signal;
+}
 
 // lambda/speech.js
 var SPEECH_MAX = 900;
@@ -153,7 +202,7 @@ var done = (payload) => ({
   asked: typeof (payload == null ? void 0 : payload.asked) === "string" ? payload.asked : "",
   sources: Array.isArray(payload == null ? void 0 : payload.sources) ? payload.sources : []
 });
-async function askPilo({ question, history = [], ticket = "", deadlineMs = DEADLINE_MS, env = process.env, fetchImpl = fetch }) {
+async function askPilo({ question, history = [], ticket = "", deadlineMs = DEADLINE_MS, env = process.env, fetchImpl = netFetch }) {
   const base = String(env.SUPABASE_URL ?? "").replace(/\/+$/, "");
   const key = String(env.SUPABASE_ANON_KEY ?? "");
   if (!base || !key) return { status: "error", message: "A esta skill le falta la dirección o la clave de Pilo. La administración debe configurarla." };
@@ -202,16 +251,17 @@ async function askPilo({ question, history = [], ticket = "", deadlineMs = DEADL
   }
 }
 var COLLECT_MS = 5500;
-async function collectPilo({ ticket, waitMs = COLLECT_MS, env = process.env, fetchImpl = fetch }) {
+async function collectPilo({ ticket, waitMs = COLLECT_MS, env = process.env, fetchImpl = netFetch }) {
   const base = String(env.SUPABASE_URL ?? "").replace(/\/+$/, "");
   const key = String(env.SUPABASE_ANON_KEY ?? "");
   if (!base || !key) return { status: "error", message: "A esta skill le falta la dirección o la clave de Pilo. La administración debe configurarla." };
+  const signal = timeoutSignal(waitMs + 1200);
   try {
     const response = await fetchImpl(`${base}/functions/v1/pilo-ia`, {
       method: "POST",
       headers: { "Content-Type": "application/json", apikey: key, Authorization: `Bearer ${key}` },
       body: JSON.stringify({ action: "recoger", portal: portalOf(env), espera: ticket, wait: waitMs }),
-      signal: AbortSignal.timeout(waitMs + 1200)
+      signal
     });
     const body = await response.json().catch(() => null);
     if ((body == null ? void 0 : body.status) === "lista") return done(body);
@@ -220,7 +270,7 @@ async function collectPilo({ ticket, waitMs = COLLECT_MS, env = process.env, fet
     if ((body == null ? void 0 : body.status) === "error") return { status: "error", message: typeof body.message === "string" && body.message ? body.message : "No pude terminar la respuesta." };
     return { status: "error", message: said(body, "No pude responder ahora. Intente de nuevo en un momento.") };
   } catch (error) {
-    if ((error == null ? void 0 : error.name) === "TimeoutError" || (error == null ? void 0 : error.name) === "AbortError") return { status: "waiting" };
+    if (signal.aborted || (error == null ? void 0 : error.name) === "TimeoutError" || (error == null ? void 0 : error.name) === "AbortError") return { status: "waiting" };
     console.error("pilo-ia recoger", error);
     return { status: "error", message: "No pude conectarme con Pilo. Intente de nuevo en un momento." };
   }
@@ -268,11 +318,11 @@ async function sayWhileWorking(envelope) {
   const { apiEndpoint, apiAccessToken } = ((_a = envelope.context) == null ? void 0 : _a.System) ?? {};
   if (!apiEndpoint || !apiAccessToken) return;
   try {
-    await fetch(`${apiEndpoint}/v1/directives`, {
+    await netFetch(`${apiEndpoint}/v1/directives`, {
       method: "POST",
       headers: { "Content-Type": "application/json", Authorization: `Bearer ${apiAccessToken}` },
       body: JSON.stringify({ header: { requestId: envelope.request.requestId }, directive: { type: "VoicePlayer.Speak", speech: "Déjeme revisar." } }),
-      signal: AbortSignal.timeout(1500)
+      signal: timeoutSignal(1500)
     });
   } catch {
   }

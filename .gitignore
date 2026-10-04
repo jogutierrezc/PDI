@@ -25,3 +25,6 @@ bi/
 # Microdatos del modelo predictivo (caracterización): nunca al repositorio.
 Modelo/*.xlsx
 supabase/.temp/
+
+# Capturas de red (HAR): traen contraseñas, permisos y datos personales.
+*.har

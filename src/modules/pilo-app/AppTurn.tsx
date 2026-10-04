@@ -21,7 +21,7 @@ import type { MojiMood } from "../pregunta/Pilo";
 import type { Turn } from "../pregunta/store";
 import { AnswerText, parseAnswer, useTypewriter } from "../pregunta/AnswerText";
 import { toPlain } from "../pregunta/markdown";
-import { notesOf, showsSources, waitingLine } from "../pregunta/answer-state";
+import { notesOf, seedOf, showsSources, waitingFace, waitingLine, waitingTip } from "../pregunta/answer-state";
 import type { ThinkStep } from "../pregunta/answer-state";
 import type { AppVoice } from "./access";
 import { prefetchOfficial, sayOfficial, stopOfficial } from "./official-voice";
@@ -121,6 +121,7 @@ export function AppTurn({
   const parsed = useMemo(() => parseAnswer(text, { streaming }), [text, streaming]);
   const elapsed = useElapsed(stream?.startedAt, working);
   const step = working ? waitingLine({ steps: stream?.steps ?? [], meta: stream?.meta ?? null, seconds: elapsed }) : "";
+  const tip = working ? waitingTip(elapsed, seedOf(turn.id)) : null;
 
   const question = useRef<HTMLDivElement>(null);
   const answer = useRef<HTMLDivElement>(null);
@@ -244,7 +245,7 @@ export function AppTurn({
 
       <div className="pa-msg" ref={answer}>
         <div className="pa-msg__face">
-          <Pilo size="100%" mood={mood} emotion={pending ? undefined : a?.expression || a?.mood || expression} talking={reading !== null} />
+          <Pilo size="100%" mood={mood} emotion={pending ? (working ? waitingFace(elapsed) : undefined) : a?.expression || a?.mood || expression} talking={reading !== null} />
         </div>
         <div className="pa-msg__body">
           <span className="pa-sr">Mr. Pilo: </span>
@@ -257,6 +258,11 @@ export function AppTurn({
                 <i />
               </span>
             </div>
+          )}
+          {tip && (
+            <p className="ap-tip" key={tip}>
+              {tip}
+            </p>
           )}
 
           {turn.file && <FileLog file={turn.file} />}

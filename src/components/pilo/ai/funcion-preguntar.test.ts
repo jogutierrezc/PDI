@@ -37,6 +37,9 @@ interface World {
   noVisitorTable: boolean;
   /** Las respuestas que se dejan para recoger (0128), por tiquete. Sin esto, esa migración no está. */
   waits?: Record<string, { status: string; payload: Row | null }>;
+  /** Las colecciones de documentos (0121) y los documentos «web» ya guardados (0127), para leer páginas web (0129). */
+  sources?: Row[];
+  webDocs?: Row[];
   /** La búsqueda en la memoria falla (la base no responde). */
   memoryFails?: boolean;
   /** Cuántos pasajes tienen vector (0108): con alguno, la búsqueda también va por significado. */
@@ -88,6 +91,12 @@ interface World {
   bridgeTargets?: Row[];
   proposed?: Row[];
   scanned?: Row[];
+  /** Relaciones, premisas y análisis (0130): lo que devolvería pilo_catalog_near y las premisas de las capciosas. Sin `premises`, la base no tiene esa migración. */
+  near?: Row[];
+  premises?: Row[];
+  /** Proponer premisas (0130): las capciosas sin revisar y lo que la IA dejó propuesto. */
+  premisePending?: Row[];
+  premiseProposed?: Row[];
 }
 
 /** El portal de casa de cada ámbito (pilo_portals): su nombre, para quién fue escrito lo suyo y su público. */
@@ -260,6 +269,8 @@ function fakeClient(w: World) {
         }
         return { data: null, error: null };
       }
+      if (table === "pilo_sources") return { data: (w.sources ?? []).find((x) => x.id === eq("id") && x.scope === eq("scope")) ?? null, error: null };
+      if (table === "pilo_docs") return { data: (w.webDocs ?? []).find((x) => x.external_id === eq("external_id") && x.space === eq("space")) ?? null, error: null };
       return { data: null, error: null };
     };
     const api = {
@@ -343,6 +354,24 @@ function fakeClient(w: World) {
           w.scanned = [...(w.scanned ?? []), ...seen];
           w.bridgePending = (w.bridgePending ?? []).filter((p) => !seen.some((s) => s.id === p.id));
           return { data: { given: rows.length, added: rows.length, scanned: seen.length }, error: null };
+        }
+        // Las capciosas (0130). Como la base: lo aprobado, y solo de ese Pilo; proponer no pisa nada.
+        case "pilo_catalog_near":
+          return { data: w.near ?? null, error: null };
+        case "pilo_premises_active":
+          if (!w.premises) return missing(name);
+          return { data: w.premises.filter((p) => p.status === "aprobada" && spaceOf(p) === space), error: null };
+        case "pilo_premises_status":
+          if (!w.premises) return missing(name);
+          return { data: { total: w.catalog.filter((c) => c.kind === "capciosa" && spaceOf(c) === space).length, pending: (w.premisePending ?? []).filter((p) => spaceOf(p) === space).length, proposed: (w.premiseProposed ?? []).length, approved: w.premises.filter((p) => p.status === "aprobada" && spaceOf(p) === space).length }, error: null };
+        case "pilo_premises_pending":
+          if (!w.premises) return missing(name);
+          return { data: (w.premisePending ?? []).filter((p) => spaceOf(p) === space).slice(0, Number(args.p_limit ?? 8)), error: null };
+        case "pilo_premises_propose": {
+          const rows = args.p_rows as Row[];
+          w.premiseProposed = [...(w.premiseProposed ?? []), ...rows.map((r) => ({ ...r, space }))];
+          w.premisePending = (w.premisePending ?? []).filter((p) => !rows.some((r) => r.key === p.key));
+          return { data: rows.length, error: null };
         }
         case "pilo_answer_candidates":
           return {
@@ -3094,5 +3123,503 @@ describe("puentes: la IA propone y la administración revisa (0122)", () => {
     const out = (await (await comprehend(await boot(w))).json()) as Row;
     expect(out).toMatchObject({ ok: true, saved: 2, done: true });
     expect(w.rpcs.filter((n) => n === "pilo_bridges_sync")).toHaveLength(1);
+  });
+});
+
+/* --- Páginas web (0129) -------------------------------------------------------------------
+   La administración le da a Pilo la dirección de una página: la función la
+   lee, la deja como documento «web» de la memoria y le da su lugar en el mapa. */
+
+describe("páginas web (leer una página por su dirección)", () => {
+  const ADMIN = { Authorization: "Bearer sesion-admin" };
+  const PAGE = "https://www.udes.edu.co/admisiones";
+  const HTML = `<html><head><title>Admisiones | UDES</title></head><body><nav>Menú del sitio con muchos enlaces que no son contenido</nav><main>
+    <h1>Admisiones de pregrado</h1><p>La inscripción se hace en línea, desde el formulario de aspirantes de la universidad.</p>
+    <h2>Documentos</h2><p>Se pide el documento de identidad y el diploma de bachiller, según el Acuerdo 012 de 2021.</p>
+    <h2>Calendario</h2><p>Las inscripciones abren al comienzo de cada periodo académico y cierran una semana antes.</p></main></body></html>`;
+  const webWorld = () => {
+    const w = world();
+    w.sources = [
+      { id: "paginasweb", scope: "planeacion", name: "Páginas web", kind: "documentos" },
+      { id: "cifras", scope: "planeacion", name: "UDES en Cifras", kind: "portal" },
+    ];
+    return w;
+  };
+  const web = (handler: Handler, body: Row, headers: Record<string, string> = ADMIN) => ask(handler, { action: "web", space: "planeacion", step: "leer", collection: "paginasweb", ...body }, headers);
+  const net = (reply: (url: string) => Response) => {
+    const seen: { url: string; init: RequestInit }[] = [];
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (url: string, init: RequestInit) => {
+        seen.push({ url, init });
+        return reply(url);
+      }),
+    );
+    return seen;
+  };
+  const html = (text = HTML) => new Response(text, { headers: { "Content-Type": "text/html; charset=utf-8" } });
+
+  it("la lee, la guarda como documento web con sus pasajes y la pone en el mapa", async () => {
+    const w = webWorld();
+    const seen = net(() => html());
+    const response = await web(await boot(w), { url: `${PAGE}?utm_source=x#fechas` });
+    expect(response.status).toBe(200);
+    const out = (await response.json()) as Row;
+    expect(out).toMatchObject({ ok: true, url: PAGE, title: "Admisiones de pregrado", sections: ["Presentación", "Documentos", "Calendario"], total: 3, unchanged: false, mapped: true, collection: { id: "paginasweb", name: "Páginas web" } });
+    expect((out.passages as Row[]).map((p) => [p.seq, p.section])).toEqual([
+      [1, "Presentación"],
+      [2, "Documentos"],
+      [3, "Calendario"],
+    ]);
+    expect(JSON.stringify(out.passages)).not.toContain("Menú del sitio");
+    // Un solo pedido, a la dirección ya limpia, sin seguir redirecciones por su cuenta.
+    expect(seen).toHaveLength(1);
+    expect(seen[0].url).toBe(PAGE);
+    expect(seen[0].init).toMatchObject({ redirect: "manual" });
+    const saved = w.calls.find((c) => c.name === "pilo_doc_save")!.args as { p_space: string; p_doc: Row };
+    expect(saved.p_space).toBe("planeacion");
+    expect(saved.p_doc).toMatchObject({ origin: "web", kind: "web", source: "paginasweb", title: "Admisiones de pregrado", file_name: PAGE, external_id: await sha(PAGE), vis: "publico" });
+    const rows = (w.calls.find((c) => c.name === "pilo_doc_replace")!.args as { p_rows: Row[] }).p_rows;
+    expect(rows).toHaveLength(3);
+    expect(rows.every((r) => r.path === PAGE && r.title === "Admisiones de pregrado")).toBe(true);
+    const outline = w.calls.find((c) => c.name === "pilo_doc_outline")!.args as { p_nodes: Row[]; p_edges: Row[] };
+    expect(outline.p_nodes.map((n) => n.label)).toEqual(expect.arrayContaining(["Páginas web", "Admisiones de pregrado", "Documentos", "Calendario"]));
+    expect(w.logs.some((l) => l.status === "listo · web leer")).toBe(true);
+  });
+
+  it("leerla de nuevo sin cambios no reescribe nada; con cambios, actualiza el mismo documento", async () => {
+    const w = webWorld();
+    net(() => html());
+    const handler = await boot(w);
+    const first = (await (await web(handler, { url: PAGE })).json()) as Row;
+    const doc = (w.calls.find((c) => c.name === "pilo_doc_save")!.args as { p_doc: Row }).p_doc;
+    w.webDocs = [{ id: doc.id, space: "planeacion", external_id: doc.external_id, content_hash: doc.content_hash }];
+    w.calls.length = 0;
+    const again = (await (await web(handler, { url: PAGE })).json()) as Row;
+    expect(again).toMatchObject({ unchanged: true, doc: first.doc, total: 3, added: 0 });
+    expect(w.calls.some((c) => c.name === "pilo_doc_save" || c.name === "pilo_doc_replace")).toBe(false);
+    net(() => html(HTML.replace("una semana antes", "dos semanas antes")));
+    const changed = (await (await web(handler, { url: PAGE })).json()) as Row;
+    expect(changed).toMatchObject({ unchanged: false, doc: first.doc });
+    expect((w.calls.find((c) => c.name === "pilo_doc_save")!.args as { p_doc: Row }).p_doc.id).toBe(first.doc);
+  });
+
+  it("sigue una redirección revisándola, y no sale hacia una red interna ni hacia algo que no sea https", async () => {
+    const seen = net((url) => (url === PAGE ? new Response(null, { status: 301, headers: { Location: "/admisiones/pregrado" } }) : html()));
+    const out = (await (await web(await boot(webWorld()), { url: PAGE })).json()) as Row;
+    expect(out.url).toBe(`${PAGE}/pregrado`);
+    expect(seen.map((s) => s.url)).toEqual([PAGE, `${PAGE}/pregrado`]);
+    for (const target of ["http://www.udes.edu.co/admisiones", "https://192.168.0.5/panel", "https://localhost/x"]) {
+      const calls = net(() => new Response(null, { status: 302, headers: { Location: target } }));
+      const response = await web(await boot(webWorld()), { url: PAGE });
+      expect(response.status, target).toBe(400);
+      expect(calls).toHaveLength(1);
+    }
+  });
+
+  it("dice qué pasó cuando la dirección no sirve, la página falla, no es HTML o no tiene texto", async () => {
+    const calls = net(() => html());
+    const handler = await boot(webWorld());
+    for (const bad of ["", "http://www.udes.edu.co/", "https://10.0.0.1/", "https://intranet/"]) {
+      const response = await web(handler, { url: bad });
+      expect(response.status, bad).toBe(400);
+      expect(await response.json()).toMatchObject({ code: "direccion" });
+    }
+    expect((await web(handler, { url: PAGE, collection: "cifras" })).status).toBe(400);
+    expect((await web(handler, { url: PAGE, collection: "noexiste" })).status).toBe(400);
+    expect(calls).toHaveLength(0);
+    net(() => new Response("no", { status: 404 }));
+    expect(await (await web(handler, { url: PAGE })).json()).toMatchObject({ code: "pagina", error: "La página respondió 404." });
+    net(() => new Response("%PDF-1.7", { headers: { "Content-Type": "application/pdf" } }));
+    expect((await web(handler, { url: PAGE })).status).toBe(415);
+    net(() => html('<html><body><div id="root"></div><script>render()</script></body></html>'));
+    const empty = await web(handler, { url: PAGE });
+    expect(empty.status).toBe(422);
+    expect(await empty.json()).toMatchObject({ code: "vacia" });
+  });
+
+  it("solo la administración le da páginas a Pilo", async () => {
+    const calls = net(() => html());
+    const handler = await boot(webWorld());
+    expect((await web(handler, { url: PAGE }, {})).status).toBe(403);
+    expect((await web(handler, { url: PAGE }, { Authorization: "Bearer sesion-pilo" })).status).toBe(403);
+    expect(calls).toHaveLength(0);
+  });
+});
+
+/* --- Relaciones, premisas de las capciosas y análisis (0130) ------------------------------
+   Tres piezas con su interruptor, apagadas de partida. Encendidas: el pedido lleva
+   [RELACIONES] con lo que ya está en la base; una pregunta que se parece a una
+   capciosa sin dispararla va al modelo con esa capciosa como regla; y, si no hay
+   una relación aprobada pero sí señales, el modelo analiza antes de responder sin
+   que ese análisis llegue a quien pregunta. */
+
+describe("relaciones, premisas de las capciosas y análisis (0130)", () => {
+  const ON = { ask_relations: true, tricky_near: true, ask_analysis: true };
+  const C1 = { key: "C-001", kind: "capciosa", question: "Vida personal de Pilo", variants: [], triggers: ["tienes novia"], answer: "¡Solo tengo ojos para los datos!", mood: "atrevido", source_title: "", source_path: "", cut: "", office: "" };
+  const APPROVED = { key: "C-001", status: "aprobada", premise: "Da por hecho que Pilo es una persona y tiene pareja", truth: "Pilo es una inteligencia artificial y no tiene vida sentimental" };
+  const ANALYSIS = "La pregunta da por hecho que Pilo tiene pareja. Manda el catálogo.";
+  const RULE = "Antes de responder, analiza";
+  const NEAR = "¿Pilo sale con alguien?";
+
+  /** Un proveedor que da vectores y, a cada pedido de chat, la respuesta que sigue. */
+  const withVectors = (...replies: (() => Response)[]) => {
+    let n = 0;
+    const chats: { body: Record<string, unknown> }[] = [];
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (url: string, init: RequestInit) => {
+        if (String(url).includes("embeddings")) return new Response(JSON.stringify({ data: [{ index: 0, embedding: Array.from({ length: 1024 }, () => 0.03) }] }), { headers: { "Content-Type": "application/json" } });
+        chats.push({ body: JSON.parse(String(init.body)) as Record<string, unknown> });
+        return replies[Math.min(n++, replies.length - 1)]();
+      }),
+    );
+    return chats;
+  };
+  /** El Pilo de siempre con una capciosa, vectores y una pregunta que se le parece sin dispararla. */
+  const nearWorld = (premises: Row[] | undefined, switches: Row = ON): World => {
+    const w = world();
+    w.settings = { ...w.settings, ...switches };
+    w.catalog = [C1];
+    w.memory = [];
+    w.embedded = 3;
+    w.near = [{ key: "C-001", sim: 0.74 }];
+    w.premises = premises;
+    return w;
+  };
+  const tagged = stream("<anal", "isis>La pregunta da por hecho que Pilo tiene pareja. ", "Manda el catálogo.</anali", "sis>\n<resp", "uesta>No tengo pareja: ", "soy una inteligencia artificial. ", "Pregúnteme por la UDES.</respuesta>");
+  const ANSWER = "No tengo pareja: soy una inteligencia artificial. Pregúnteme por la UDES.";
+  const stepsOf = (data: Record<string, unknown>) => (data.trail as Row[]).map((s) => s.step);
+
+  it("encendidas, pero sin nada que relacionar: el pedido al modelo es byte a byte el de siempre", async () => {
+    const question = "¿Cuántos estudiantes matriculados hay?";
+    const before = provider(stream("En 2024 hubo 20.500 estudiantes matriculados [1]. "));
+    await events(await ask(await boot(world()), { question, stream: true }));
+    const w = world();
+    w.settings = { ...w.settings, ...ON };
+    const after = provider(stream("En 2024 hubo 20.500 estudiantes matriculados [1]. "));
+    const all = await events(await ask(await boot(w), { question, stream: true }));
+    expect(after).toHaveLength(1);
+    expect(after[0].body).toEqual(before[0].body);
+    expect(stepsOf(all[all.length - 1].data)).toEqual(["Enrutador", "Catálogo", "Respuestas guardadas", "Entender", "Cifras", "Fuentes", "IA"]);
+    // Sin capciosas en el catálogo no se pregunta por ninguna, ni por sus premisas.
+    expect(w.rpcs).not.toContain("pilo_catalog_near");
+    expect(w.rpcs).not.toContain("pilo_premises_active");
+  });
+
+  it("apagadas, nada de esto corre aunque haya capciosa, premisa aprobada y vectores", async () => {
+    const w = nearWorld([APPROVED], {});
+    const calls = withVectors(tagged);
+    const all = await allEvents(await ask(await boot(w), { question: NEAR, stream: true }));
+    expect(systemOf(calls[0])).not.toContain("[RELACIONES]");
+    expect(systemOf(calls[0])).not.toContain(RULE);
+    expect(calls[0].body.max_tokens).toBe(800);
+    for (const name of ["pilo_catalog_near", "pilo_premises_active"]) expect(w.rpcs, name).not.toContain(name);
+    // Sin pedir análisis, lo que el modelo escriba se trata como siempre: aquí nadie le pidió etiquetas.
+    expect(all[all.length - 1].event).toBe("done");
+  });
+
+  it("[RELACIONES] dice las conexiones del mapa que ya existen para las fuentes, solo las de casa y a la vista", async () => {
+    const w = mapWorld({ ask_relations: true });
+    const calls = provider(stream("La evaluación formativa tiene 3 momentos [1] y la retroalimentación oportuna es parte de ella [2]. "));
+    const all = await events(await teach(await boot(w), { question: "¿Qué dice la política de evaluación?", stream: true }));
+    const prompt = systemOf(calls[0]);
+    expect(prompt).toContain("[RELACIONES] Cómo se conecta lo que sabes para esta pregunta:");
+    expect(prompt).toContain("- [1] Política de evaluación —trata de→ Evaluación formativa [PUBLICADO]");
+    expect(prompt).toContain("- [2] Guía de aprendizaje activo —trata de→ Evaluación formativa [PUBLICADO]");
+    expect(prompt).toContain("- [2] Guía de aprendizaje activo —cita→ UNESCO [PUBLICADO]");
+    expect(prompt).toContain("Cómo lees [RELACIONES]");
+    // El pasaje reservado no entró al pedido: de él no se dice ninguna relación.
+    expect(prompt).not.toContain("Curso de Didáctica");
+    // Las relaciones se leyeron solo de este espacio.
+    const edges = w.queries.filter((q) => q.table === "pilo_edges");
+    expect(edges.length).toBeGreaterThan(0);
+    for (const q of edges) expect(q.filters).toContainEqual(["eq", "space", "ensenanza"]);
+    const done = all[all.length - 1].data;
+    expect(stepsOf(done)).toContain("Relaciones");
+    expect((done.trail as Row[]).find((s) => s.step === "Relaciones")!.detail).toBe("3 conexiones que ya estaban en la base van en el pedido (3 de lo publicado).");
+    // Las citas, las cifras y si es oficial se deciden como siempre.
+    expect(done).toMatchObject({ kind: "ia", grounding: "oficial", verified: true });
+  });
+
+  it("A · casi capciosa con premisa aprobada: va como regla del catálogo y no se pide análisis", async () => {
+    const w = nearWorld([APPROVED]);
+    const calls = withVectors(stream("No tengo pareja: soy una inteligencia artificial. "));
+    const all = await events(await ask(await boot(w), { question: NEAR, stream: true }, adminAuth));
+    expect(calls).toHaveLength(1);
+    const prompt = systemOf(calls[0]);
+    expect(prompt).toContain("- (Pregunta) —se parece a→ (Capciosa «Vida personal de Pilo») [REGLA DEL CATÁLOGO]");
+    expect(prompt).toContain("- (Capciosa «Vida personal de Pilo») —premisa que da por cierta→ Da por hecho que Pilo es una persona y tiene pareja [REGLA DEL CATÁLOGO]");
+    expect(prompt).toContain("- (Capciosa «Vida personal de Pilo») —lo cierto→ Pilo es una inteligencia artificial y no tiene vida sentimental [REGLA DEL CATÁLOGO]");
+    // No disparó la capciosa: su microexpresión no es la base, y no la respondió el catálogo.
+    expect(prompt).not.toContain("[OFICIAL] Respuestas oficiales");
+    expect(prompt).not.toContain("¡Solo tengo ojos para los datos!");
+    expect(prompt).not.toContain(RULE);
+    expect(calls[0].body.max_tokens).toBe(800);
+    const done = all[all.length - 1].data;
+    expect(done).toMatchObject({ kind: "ia", text: "No tengo pareja: soy una inteligencia artificial." });
+    expect(stepsOf(done)).toEqual(expect.arrayContaining(["Capciosa cercana", "Relaciones", "Análisis"]));
+    expect((done.trail as Row[]).find((s) => s.step === "Análisis")).toMatchObject({ status: "skip" });
+    // El catálogo de este Pilo, con su umbral propio; y solo sus premisas.
+    expect(argsOf(w, "pilo_catalog_near")).toEqual([{ p_embedding: expect.any(String), p_model: expect.any(String), p_limit: 5 }]);
+    expect(argsOf(w, "pilo_premises_active")).toEqual([{}]);
+    // No se sirvió la capciosa: no cuenta como uso.
+    expect(w.rpcs).not.toContain("pilo_catalog_hit");
+  });
+
+  it("por debajo del umbral no es casi capciosa; y el umbral es el de la administración", async () => {
+    const low = nearWorld([APPROVED]);
+    low.near = [{ key: "C-001", sim: 0.69 }];
+    let calls = withVectors(stream("Hablemos de la UDES. "));
+    await events(await ask(await boot(low), { question: NEAR, stream: true }));
+    expect(systemOf(calls[0])).not.toContain("[RELACIONES]");
+    const strict = nearWorld([APPROVED], { ...ON, tricky_near_min: 0.9 });
+    calls = withVectors(stream("Hablemos de la UDES. "));
+    await events(await ask(await boot(strict), { question: NEAR, stream: true }));
+    expect(systemOf(calls[0])).not.toContain("[RELACIONES]");
+  });
+
+  it("B · casi capciosa sin premisa aprobada: se pide análisis, y el análisis nunca llega a quien pregunta", async () => {
+    // Lo propuesto por la IA y sin aprobar no se usa.
+    const w = nearWorld([{ ...APPROVED, status: "propuesta" }]);
+    const calls = withVectors(tagged);
+    const all = await allEvents(await ask(await boot(w), { question: NEAR, stream: true }));
+    const prompt = systemOf(calls[0]);
+    expect(prompt).toContain("—se parece a→ (Capciosa «Vida personal de Pilo») [REGLA DEL CATÁLOGO]");
+    expect(prompt).not.toContain("premisa que da por cierta→");
+    expect(prompt).toContain(RULE);
+    expect(calls[0].body.max_tokens).toBe(960);
+    // Lo que salió por el flujo: solo la respuesta, en frases completas.
+    expect(all.filter((e) => e.event === "delta").map((e) => e.data.text).join("")).toBe(ANSWER);
+    expect(all.filter((e) => e.event === "thinking")).toEqual([]);
+    const done = all[all.length - 1];
+    expect(done).toMatchObject({ event: "done", data: { kind: "ia", text: ANSWER } });
+    // Ni el análisis ni una etiqueta, en ningún evento: tampoco en el rastro de un visitante.
+    const wire = JSON.stringify(all);
+    expect(wire).not.toContain("da por hecho que Pilo tiene pareja");
+    expect(wire).not.toContain("Manda el catálogo");
+    expect(wire).not.toMatch(/<\/?(analisis|respuesta)/);
+    expect(stepsOf(done.data)).not.toContain("Análisis de la IA");
+    expect(stepsOf(done.data)).not.toContain("Análisis");
+    // Tampoco en la bandeja ni en lo guardado.
+    expect(JSON.stringify([w.inbox, w.saved, w.logs])).not.toContain("da por hecho que Pilo tiene pareja");
+  });
+
+  it("B · la administración sí ve el análisis, recortado, en «Cómo respondí»; y sin streaming es igual", async () => {
+    const w = nearWorld([]);
+    const calls = withVectors(tagged);
+    const all = await allEvents(await ask(await boot(w), { question: NEAR, stream: true }, adminAuth));
+    expect(all.filter((e) => e.event === "delta").map((e) => e.data.text).join("")).toBe(ANSWER);
+    const done = all[all.length - 1].data;
+    expect(done.text).toBe(ANSWER);
+    const trail = done.trail as Row[];
+    expect(trail.find((s) => s.step === "Análisis de la IA")).toMatchObject({ status: "ai", detail: ANALYSIS });
+    expect(trail.find((s) => s.step === "Análisis")!.detail).toContain("capciosa cercana sin análisis aprobado");
+    // Solo en el objeto final: ni en `meta`, ni en los trozos, ni como razonamiento.
+    expect(JSON.stringify(all.slice(0, -1))).not.toContain("da por hecho que Pilo tiene pareja");
+    expect(calls).toHaveLength(1);
+    // Sin streaming: el mismo texto, sin análisis.
+    const plain = nearWorld([]);
+    withVectors(() => new Response(JSON.stringify({ choices: [{ message: { content: `<analisis>${ANALYSIS}</analisis><respuesta>${ANSWER}</respuesta>` }, finish_reason: "stop" }] }), { headers: { "Content-Type": "application/json" } }));
+    const whole = (await (await ask(await boot(plain), { question: NEAR })).json()) as Record<string, unknown>;
+    expect(whole.text).toBe(ANSWER);
+    expect(JSON.stringify(whole)).not.toContain("da por hecho");
+  });
+
+  it("si el modelo no cierra el análisis ni escribe la respuesta, se le pide de nuevo sin análisis y nada se filtra", async () => {
+    const w = nearWorld([]);
+    const calls = withVectors(stream("<analisis>La pregunta da por hecho que Pilo tiene pareja. ", "Y sigo pensando sin cerrar la etiqueta. "), stream("No tengo pareja: soy una inteligencia artificial. "));
+    const all = await allEvents(await ask(await boot(w), { question: NEAR, stream: true }));
+    expect(calls).toHaveLength(2);
+    expect(systemOf(calls[0])).toContain(RULE);
+    // El segundo pedido es el de siempre para esa pregunta: con sus relaciones y sin la regla del análisis.
+    expect(systemOf(calls[1])).not.toContain(RULE);
+    expect(systemOf(calls[1])).toContain("[RELACIONES]");
+    expect(calls[1].body.max_tokens).toBe(800);
+    expect(all.filter((e) => e.event === "delta").map((e) => e.data.text).join("")).toBe("No tengo pareja: soy una inteligencia artificial. ");
+    expect(all[all.length - 1]).toMatchObject({ event: "done", data: { kind: "ia", text: "No tengo pareja: soy una inteligencia artificial." } });
+    expect(JSON.stringify(all)).not.toMatch(/da por hecho|sigo pensando|analisis>/);
+  });
+
+  it("si el modelo no usa las etiquetas, responde igual: sale entero al final, sin etiquetas", async () => {
+    const w = nearWorld([]);
+    const calls = withVectors(stream("No tengo pareja. ", "Soy una inteligencia artificial.</respuesta>"));
+    const all = await allEvents(await ask(await boot(w), { question: NEAR, stream: true }));
+    expect(calls).toHaveLength(1);
+    expect(all.filter((e) => e.event === "delta").map((e) => e.data.text).join("")).toBe("No tengo pareja. Soy una inteligencia artificial.");
+    expect(all[all.length - 1].data.text).toBe("No tengo pareja. Soy una inteligencia artificial.");
+    expect(JSON.stringify(all)).not.toMatch(/<\/?(analisis|respuesta)/);
+  });
+
+  it("C · a un saludo no se le pide análisis ni se le suman relaciones: el pedido de siempre", async () => {
+    const hello = nearWorld([]);
+    const calls = withVectors(stream("¡Hola! ¿En qué le ayudo? "));
+    await events(await ask(await boot(hello), { question: "hola", stream: true }));
+    expect(systemOf(calls[0])).not.toContain(RULE);
+    expect(systemOf(calls[0])).not.toContain("[RELACIONES]");
+  });
+
+  it("B · una pregunta de seguimiento con contexto pide análisis, y su relación es «dicho por la persona»", async () => {
+    const w = world();
+    w.settings = { ...w.settings, ...ON };
+    const calls = provider(stream("<analisis>Sigue la pregunta anterior, ahora por Cúcuta.</analisis><respuesta>En Cúcuta no tengo la cifra publicada.</respuesta>"));
+    const history = [{ q: "¿Cuántos estudiantes matriculados hay?", a: "En 2024 hubo 20.500 [1]." }];
+    const all = await events(await ask(await boot(w), { question: "¿y en Cúcuta?", history, stream: true }));
+    const prompt = systemOf(calls[0]);
+    expect(prompt).toContain("- (Pregunta) —sigue a→ ¿Cuántos estudiantes matriculados hay? [DICHO POR LA PERSONA]");
+    expect(prompt).toContain(RULE);
+    expect(all[all.length - 1].data.text).toBe("En Cúcuta no tengo la cifra publicada.");
+    // Sin historia que mandar no hay contexto que analizar.
+    const none = world();
+    none.settings = { ...none.settings, ...ON, ask_history_turns: 0 };
+    const alone = provider(stream("En Cúcuta no tengo la cifra publicada. "));
+    await events(await ask(await boot(none), { question: "¿y en Cúcuta?", history, stream: true }));
+    expect(systemOf(alone[0])).not.toContain(RULE);
+  });
+
+  it("B · una fuente de otro ámbito pide análisis y lleva su procedencia en [RELACIONES], sin leer nada más de ese ámbito", async () => {
+    const w = teachWorld(ON);
+    w.portals = {
+      ensenanza: { scope: "ensenanza", matrix: { innovacion: "casa", politicas: "casa", moodle: "casa", pdi: "visita" } },
+      pregunta: { scope: "planeacion", matrix: { cifras: "casa", pdi: "casa" } },
+    };
+    const far = { ref: "pdi:P1", space: "planeacion", vis: "publico", source: "pdi", title: "Pilar I · Personalización", section: "", body: "El pilar I del Plan de Desarrollo agrupa los proyectos de personalización del aprendizaje.", path: "/pdi", cut: "", office: "", updated_at: "2026-09-01", rank: 0.9 };
+    w.memory = [far];
+    w.edges = [{ space: "planeacion", from_id: "pdi:P1", to_id: "tema:personalizacion", rel: "trata" }];
+    w.nodes = [{ space: "planeacion", id: "tema:personalizacion", label: "Personalización", source: "mapa" }];
+    const calls = provider(stream("<analisis>Lo de casa no trae el pilar; la fuente es de otro ámbito.</analisis><respuesta>Esto viene de Pilo de la Universidad: el pilar I agrupa los proyectos de personalización [1].</respuesta>"));
+    const all = await events(await teach(await boot(w), { question: "¿Qué agrupa el pilar I de personalización?", stream: true }));
+    const prompt = systemOf(calls[0]);
+    expect(prompt).toContain("- [1] Pilar I · Personalización —de visita desde→ Pilo de la Universidad · Plan de Desarrollo [DE OTRO ÁMBITO]");
+    // De lo de otro ámbito no se dice ninguna relación de su malla: no se leyó.
+    expect(prompt).not.toContain("—trata de→");
+    expect(w.queries.filter((q) => q.table === "pilo_edges" && q.filters.some(([, c, v]) => c === "space" && v !== "ensenanza"))).toEqual([]);
+    expect(prompt).toContain(RULE);
+    const done = all[all.length - 1].data;
+    expect(done.text).toBe("Esto viene de Pilo de la Universidad: el pilar I agrupa los proyectos de personalización [1].");
+    // Lo que cita algo de otro ámbito sigue sin guardarse.
+    expect(w.saved).toEqual([]);
+  });
+
+  it("la capciosa que sí se dispara sigue su camino de siempre; encendida, suma su premisa aprobada", async () => {
+    const off = nearWorld([APPROVED], {});
+    let calls = withVectors(stream("Mi corazón es de los datos. "));
+    await events(await ask(await boot(off), { question: "Pilo, ¿tienes novia?", stream: true }));
+    const today = systemOf(calls[0]);
+    expect(today).toContain("[OFICIAL] Respuestas oficiales");
+    expect(today).not.toContain("[RELACIONES]");
+    const on = nearWorld([APPROVED], { tricky_near: true });
+    calls = withVectors(stream("Mi corazón es de los datos. "));
+    await events(await ask(await boot(on), { question: "Pilo, ¿tienes novia?", stream: true }));
+    const prompt = systemOf(calls[0]);
+    expect(prompt).toContain("¡Solo tengo ojos para los datos!");
+    expect(prompt).toContain("- (Pregunta) —dispara→ [1] (Capciosa «Vida personal de Pilo») [REGLA DEL CATÁLOGO]");
+    expect(prompt).toContain("—lo cierto→ Pilo es una inteligencia artificial y no tiene vida sentimental [REGLA DEL CATÁLOGO]");
+    // Quitando el bloque y su regla, queda el pedido de siempre.
+    const block = prompt.slice(prompt.indexOf("\n\n[RELACIONES]"), prompt.lastIndexOf("\nDATOS>>>"));
+    const rule = prompt.slice(prompt.indexOf("Cómo lees [RELACIONES]"), prompt.indexOf("\n\n<<<DATOS\n") + 2);
+    expect(prompt.replace(block, "").replace(rule, "")).toBe(today);
+    // Sin IA, la capciosa sale tal cual y sin modelo, como siempre.
+    const noAi = nearWorld([APPROVED]);
+    noAi.settings = { ...noAi.settings, enabled: false };
+    calls = withVectors(stream("no debería llamarse"));
+    const said = (await (await ask(await boot(noAi), { question: "Pilo, ¿tienes novia?", stream: true })).json()) as Record<string, unknown>;
+    expect(said).toMatchObject({ kind: "capciosa", text: "¡Solo tengo ojos para los datos!" });
+    expect(calls).toHaveLength(0);
+    expect(noAi.rpcs).not.toContain("pilo_premises_active");
+  });
+
+  it("una base sin la migración: la casi capciosa va sin premisa, y todo lo demás responde", async () => {
+    const w = nearWorld(undefined);
+    const calls = withVectors(tagged);
+    const all = await events(await ask(await boot(w), { question: NEAR, stream: true }));
+    expect(systemOf(calls[0])).toContain("—se parece a→ (Capciosa «Vida personal de Pilo») [REGLA DEL CATÁLOGO]");
+    expect(systemOf(calls[0])).not.toContain("premisa que da por cierta→");
+    expect(all[all.length - 1].data.text).toBe(ANSWER);
+  });
+
+  it("cada Pilo usa solo las capciosas y las premisas de su catálogo", async () => {
+    const w = teachWorld(ON);
+    const EC1 = { ...C1, key: "EC-001", space: "ensenanza", question: "Hacer la tarea", triggers: ["hazme la tarea"] };
+    w.catalog = [C1, EC1];
+    w.memory = [];
+    w.embedded = 3;
+    // La base devolvería solo lo de este Pilo; aunque trajera la del otro, no está en su catálogo y no cuenta.
+    w.near = [{ key: "C-001", sim: 0.95 }, { key: "EC-001", sim: 0.72 }];
+    w.premises = [APPROVED, { key: "EC-001", space: "ensenanza", status: "aprobada", premise: "Da por hecho que Pilo resuelve las tareas por el estudiante", truth: "Pilo es un tutor: explica y guía, no entrega la tarea hecha" }];
+    const calls = withVectors(stream("La tarea es suya; la ruta la armamos juntos. "));
+    await events(await teach(await boot(w), { question: "¿Me escribe el ensayo de mañana?", stream: true }));
+    const prompt = systemOf(calls[0]);
+    expect(prompt).toContain("—se parece a→ (Capciosa «Hacer la tarea») [REGLA DEL CATÁLOGO]");
+    expect(prompt).toContain("—lo cierto→ Pilo es un tutor: explica y guía, no entrega la tarea hecha [REGLA DEL CATÁLOGO]");
+    expect(prompt).not.toContain("Vida personal de Pilo");
+    expect(prompt).not.toContain("vida sentimental");
+    expect(argsOf(w, "pilo_catalog_near")[0]).toMatchObject({ p_space: "ensenanza" });
+    expect(argsOf(w, "pilo_premises_active")).toEqual([{ p_space: "ensenanza" }]);
+  });
+
+  describe("proponer las premisas con la IA (solo administración)", () => {
+    const premisas = (handler: Handler, body: Row = {}, headers: Record<string, string> = adminAuth) => ask(handler, { action: "premisas", portal: "", space: "planeacion", step: "lote", ...body }, headers);
+    const reply = (content: string) => () => new Response(JSON.stringify({ choices: [{ message: { content }, finish_reason: "stop" }] }), { headers: { "Content-Type": "application/json" } });
+    const pendingWorld = (): World => {
+      const w = teachWorld();
+      w.premises = [];
+      w.premisePending = [
+        { key: "C-001", question: "Vida personal de Pilo", triggers: ["tienes novia"], answer: "¡Solo tengo ojos para los datos!" },
+        { key: "C-002", question: "", triggers: ["eres humano"], answer: "Soy Mr. Pilo, la Inteligencia Artificial de la UDES." },
+        { key: "EC-001", space: "ensenanza", question: "Hacer la tarea", triggers: ["hazme la tarea"], answer: "La tarea es suya." },
+      ];
+      return w;
+    };
+
+    it("propone por lotes, con JSON estricto, y deja anotadas también las que no tienen premisa", async () => {
+      const w = pendingWorld();
+      const calls = provider(reply('{"capciosas":[{"n":1,"premisa":"Da por hecho que Pilo es una persona y tiene pareja.","cierto":"Pilo es una inteligencia artificial: no tiene vida sentimental."},{"n":2,"premisa":"","cierto":""}]}'));
+      const out = (await (await premisas(await boot(w))).json()) as Record<string, unknown>;
+      expect(out).toMatchObject({ ok: true, ai: true, asked: 2, proposed: 1, empty: 1, done: true });
+      expect(calls).toHaveLength(1);
+      expect(calls[0].body).toMatchObject({ temperature: 0.1 });
+      const user = (calls[0].body.messages as { content: string }[])[1].content;
+      expect(user).toContain("1. Tema: Vida personal de Pilo");
+      // Solo las de ese Pilo viajan al modelo.
+      expect(user).not.toContain("Hacer la tarea");
+      expect(w.premiseProposed).toEqual([
+        { key: "C-001", premise: "Da por hecho que Pilo es una persona y tiene pareja.", truth: "Pilo es una inteligencia artificial: no tiene vida sentimental.", space: "planeacion" },
+        { key: "C-002", premise: "", truth: "", space: "planeacion" },
+      ]);
+      expect(argsOf(w, "pilo_premises_pending")).toEqual([{ p_space: "planeacion", p_limit: 8 }]);
+      expect(w.logs.at(-1)).toMatchObject({ action: "premisas", status: "listo · premisas" });
+      // El otro Pilo, lo suyo.
+      provider(reply('{"capciosas":[{"n":1,"premisa":"Da por hecho que Pilo resuelve las tareas por el estudiante.","cierto":"Pilo es un tutor: explica y guía, no entrega la tarea hecha."}]}'));
+      expect(await (await premisas(await boot(w), { space: "ensenanza" })).json()).toMatchObject({ asked: 1, proposed: 1 });
+      expect(w.premiseProposed!.at(-1)).toMatchObject({ key: "EC-001", space: "ensenanza" });
+    });
+
+    it("una respuesta que no se puede leer no anota nada; y sin IA no propone", async () => {
+      const w = pendingWorld();
+      provider(reply("No pude hacerlo."));
+      expect(await (await premisas(await boot(w))).json()).toMatchObject({ asked: 0, proposed: 0, stopped: "formato", done: false });
+      expect(w.premiseProposed).toBeUndefined();
+      const off = pendingWorld();
+      off.settings = { ...off.settings, enabled: false };
+      const calls = provider(reply("{}"));
+      expect(await (await premisas(await boot(off))).json()).toMatchObject({ ai: false, proposed: 0, note: expect.stringContaining("Sin IA") });
+      expect(calls).toHaveLength(0);
+    });
+
+    it("solo la administración; y sin la migración lo dice", async () => {
+      const w = pendingWorld();
+      const calls = provider(reply("{}"));
+      const handler = await boot(w);
+      expect((await premisas(handler, {}, {})).status).toBe(403);
+      expect((await premisas(handler, {}, { Authorization: "Bearer sesion-pilo" })).status).toBe(403);
+      expect((await premisas(handler, { space: "otro" })).status).toBe(400);
+      expect(calls).toHaveLength(0);
+      const old = pendingWorld();
+      old.premises = undefined;
+      const missingDb = await premisas(await boot(old), { step: "estado" });
+      expect(missingDb.status).toBe(500);
+      expect(await missingDb.json()).toMatchObject({ code: "migracion", error: expect.stringContaining("0130") });
+    });
   });
 });

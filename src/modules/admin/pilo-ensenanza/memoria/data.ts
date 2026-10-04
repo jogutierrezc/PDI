@@ -268,8 +268,8 @@ export async function indexRun(space: PiloSpace, opts: { onStatus?: (status: Emb
 
 /* --- La función pilo-ia ---------------------------------------------------------------- */
 
-/** Un paso de «comprender» o de «moodle». El espacio va siempre en el cuerpo. */
-export async function piloStep<T>(action: "comprender" | "moodle", space: PiloSpace, body: Record<string, unknown>): Promise<T> {
+/** Un paso de «comprender», de «moodle» o de «web». El espacio va siempre en el cuerpo. */
+export async function piloStep<T>(action: "comprender" | "moodle" | "web", space: PiloSpace, body: Record<string, unknown>): Promise<T> {
   const { data, error } = await supabase.functions.invoke<T>("pilo-ia", { body: { action, space, ...body } });
   if (!error) return data as T;
   const response = (error as { context?: Response }).context;
@@ -287,6 +287,9 @@ export async function piloStep<T>(action: "comprender" | "moodle", space: PiloSp
 }
 
 export const comprehend = (space: PiloSpace, step: "estado" | "lote") => piloStep<ComprehendResult>("comprender", space, { step });
+
+/** Comprender solo los pasajes de un documento (una página web recién leída, por ejemplo). */
+export const comprehendDoc = (space: PiloSpace, doc: string) => piloStep<ComprehendResult>("comprender", space, { step: "lote", doc });
 
 export interface MoodleProbe {
   site?: { name?: string; release?: string; url?: string };

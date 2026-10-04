@@ -21,6 +21,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "../../../lib/supabase";
 import { Modal } from "../../../components/ui/Modal";
 import { Switch } from "./ui";
+import { PremiseEditor } from "./Razonamiento";
 import { CATALOG_ROLES, MOODS, ROL_LABEL } from "./catalog-sheet";
 import type { CatalogKind, CatalogMood, CatalogRol, CatalogRow } from "./catalog-sheet";
 import { CATALOG_PREFIX, DEFAULT_SPACE, SPACE_COPY, isDefaultSpace, keyFitsSpace, nextCatalogKey, spaceArgs } from "./space";
@@ -449,6 +450,9 @@ export function CatalogModal({
             <small>«Todos» sirve a cualquiera. Con un rol, Pilo solo la usa cuando quien pregunta eligió ese rol.</small>
           </div>
         )}
+
+        {/* La premisa de la capciosa (0130): solo en una que ya existe, porque se guarda por su clave. */}
+        {isEditing && kind === "capciosa" && initialEntry?.key && <PremiseEditor entryKey={initialEntry.key} />}
 
         <div className="pis-modal-field">
           <label>Estado en el catálogo</label>

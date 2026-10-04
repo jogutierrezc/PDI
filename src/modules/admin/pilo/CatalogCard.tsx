@@ -23,6 +23,8 @@ import type { CatalogKind, CatalogRol, CatalogRow, ParseResult, SheetOptions } f
 import { Icon } from "../../../components/ui/Icon";
 import { Group, StatusMark, Switch } from "./ui";
 import { CatalogModal } from "./CatalogModal";
+import { usePremises } from "./premises";
+import { PremiseMark, PremisesGroup } from "./Razonamiento";
 import { useEmbedStatus, useIndexMemory, useTryCatalog } from "./memory";
 import type { EmbedStatus } from "./memory";
 import { CATALOG_PREFIX, DEFAULT_SPACE, SPACE_COPY, isDefaultSpace, readInSpace, spaceArgs, spaceKey } from "./space";
@@ -111,6 +113,9 @@ export function CatalogSection({
   const [modalOpen, setModalOpen] = useState(false);
   const [editingEntry, setEditingEntry] = useState<Entry | null>(null);
 
+  // Las premisas de las capciosas (0130): en qué va cada una. Sin esa migración, null y no se pinta nada.
+  const premises = usePremises();
+  const trickyInUse = useMemo(() => (catalog.data ?? []).filter((e) => e.kind === "capciosa" && e.active).map((e) => e.key), [catalog.data]);
   const rows = useMemo(() => (catalog.data ?? []).filter((e) => e.kind === kind), [catalog.data, kind]);
   const count = (k: CatalogKind) => (catalog.data ?? []).filter((e) => e.kind === k).length;
 
@@ -213,6 +218,8 @@ export function CatalogSection({
       </Group>
 
       <CatalogMemory space={space} />
+
+      {kind === "capciosa" && <PremisesGroup space={space} active={trickyInUse} />}
 
       <Group title="Agregar o importar">
         <div className="pis-actions">
@@ -317,6 +324,7 @@ export function CatalogSection({
                   {e.triggers && e.triggers.length > 0 && (
                     <small>Disparadores: {e.triggers.join(" · ")}</small>
                   )}
+                  {kind === "capciosa" && <PremiseMark row={premises.data?.[e.key]} known={Boolean(premises.data)} />}
                   {kind === "respuesta" && e.variants && e.variants.length > 0 && (
                     <small>Variantes: {e.variants.join(" · ")}</small>
                   )}

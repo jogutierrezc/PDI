@@ -215,3 +215,43 @@ describe("una respuesta interrumpida", () => {
     expect(interruptedTurn("", null).error).toMatch(/Detuvo la pregunta/);
   });
 });
+
+describe("mientras espera: consejos y gestos", () => {
+  it("el primer consejo tarda unos segundos y luego cambia cada tanto, sin repetirse de inmediato", async () => {
+    const { TIP_AFTER, TIP_EVERY, WAIT_TIPS, waitingTip } = await import("./answer-state");
+    expect(waitingTip(0)).toBeNull();
+    expect(waitingTip(TIP_AFTER - 0.1)).toBeNull();
+    expect(waitingTip(Number.NaN)).toBeNull();
+    const first = waitingTip(TIP_AFTER);
+    expect(first).toBe(WAIT_TIPS[0]);
+    expect(waitingTip(TIP_AFTER + TIP_EVERY - 0.1)).toBe(first);
+    expect(waitingTip(TIP_AFTER + TIP_EVERY)).toBe(WAIT_TIPS[1]);
+    // La semilla del turno cambia por dónde empieza; al acabar la lista, vuelve al comienzo.
+    expect(waitingTip(TIP_AFTER, 3)).toBe(WAIT_TIPS[3]);
+    expect(waitingTip(TIP_AFTER, -3)).toBe(WAIT_TIPS[3]);
+    expect(waitingTip(TIP_AFTER + TIP_EVERY * WAIT_TIPS.length)).toBe(WAIT_TIPS[0]);
+  });
+
+  it("los consejos hablan de cómo preguntarle a Pilo, no dan cifras ni prometen tiempos", async () => {
+    const { WAIT_TIPS } = await import("./answer-state");
+    expect(WAIT_TIPS.length).toBeGreaterThanOrEqual(8);
+    expect(new Set(WAIT_TIPS).size).toBe(WAIT_TIPS.length);
+    for (const tip of WAIT_TIPS) {
+      expect(tip.length, tip).toBeLessThanOrEqual(110);
+      expect(tip, tip).not.toMatch(/\d{2,}|segundos|minutos/);
+    }
+  });
+
+  it("la cara vuelve siempre a pensar y entre una y otra cambia de gesto; al escribir, se emociona", async () => {
+    const { FACE_EVERY, seedOf, waitingFace } = await import("./answer-state");
+    expect(waitingFace(0)).toBe("pensar");
+    expect(waitingFace(-5)).toBe("pensar");
+    const faces = Array.from({ length: 6 }, (_, i) => waitingFace(i * FACE_EVERY));
+    expect(faces).toEqual(["pensar", "neutral", "pensar", "atrevido", "pensar", "emocionado"]);
+    expect(waitingFace(6 * FACE_EVERY)).toBe("pensar");
+    expect(waitingFace(3, true)).toBe("emocionado");
+    expect(seedOf("turno-1")).toBe(seedOf("turno-1"));
+    expect(seedOf("turno-1")).not.toBe(seedOf("turno-2"));
+    expect(Number.isInteger(seedOf(""))).toBe(true);
+  });
+});

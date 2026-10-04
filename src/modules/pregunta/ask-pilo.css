@@ -1848,3 +1848,28 @@ ol.ap-list {
   display: block;
   margin-top: 2px;
 }
+
+/* --- El consejo mientras espera -------------------------------------------------------
+   Aparte del titular (que dice en qué va Pilo de verdad): un consejo o una
+   ocurrencia que cambia cada tanto. Más callado que el titular, y entra con un
+   fundido corto cada vez que cambia. */
+
+.ap-tip {
+  max-width: 46ch;
+  margin: 6px 0 0;
+  color: var(--ap-ink-2, var(--c-ink2, inherit));
+  font-size: 0.8125rem;
+  font-weight: 500;
+  line-height: 1.45;
+  animation: ap-tip-in 0.32s var(--ap-ease, cubic-bezier(0.23, 1, 0.32, 1)) both;
+}
+
+.pe-tip { align-self: flex-start; margin: 0; padding-left: 4px; }
+
+@keyframes ap-tip-in {
+  from { opacity: 0; transform: translateY(4px); filter: blur(2px); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ap-tip { animation: none; }
+}

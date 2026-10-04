@@ -45,7 +45,8 @@ import { rowSummary, spanOf, voiceName } from "./resumen";
 import type { SharedSummary } from "./resumen";
 import { EXPRESSIONS, MAX_ORIGINS, MAX_SUGGESTIONS, ORAL_MOODS, ROLES, SPACE_LIMITS, TEXT_MAX, spaceSnippet } from "./store";
 import type { RolId, RoleSettings, SpaceSettings } from "./store";
-import { FoldRow, TextArea } from "./ui";
+import { ReasoningGroup } from "../pilo/Razonamiento";
+import { FoldRow, Sheet, TextArea } from "./ui";
 
 export interface SpaceEditor {
   s: SpaceSettings;
@@ -253,13 +254,19 @@ export function PreguntaPanel({ ed, active }: { ed: SpaceEditor; /** La pestaña
   };
 
   return (
-    <div className="pis-sheet pen-rows">
-      {ROWS.map((r) => (
-        <FoldRow key={r.id} id={r.id} title={r.title} summary={rowSummary(r.id, s, about)} open={open === r.id} dirty={changed.includes(r.id)} off={missing} onToggle={() => toggle(r.id)}>
-          {body[r.id]()}
-        </FoldRow>
-      ))}
-    </div>
+    <>
+      <div className="pis-sheet pen-rows">
+        {ROWS.map((r) => (
+          <FoldRow key={r.id} id={r.id} title={r.title} summary={rowSummary(r.id, s, about)} open={open === r.id} dirty={changed.includes(r.id)} off={missing} onToggle={() => toggle(r.id)}>
+            {body[r.id]()}
+          </FoldRow>
+        ))}
+      </div>
+      {/* Cómo razona este Pilo (0130): sus interruptores son suyos y se aplican al momento, aparte de «Guardar cambios». */}
+      <Sheet off={missing}>
+        <ReasoningGroup space={s.id} />
+      </Sheet>
+    </>
   );
 }
 

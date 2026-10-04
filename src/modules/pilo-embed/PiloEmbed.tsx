@@ -43,7 +43,7 @@ import type { Rol, SpaceId, SpaceProfile } from "../pregunta/space";
 import { RolePicker } from "../pregunta/RolePicker";
 import { AnswerText, parseAnswer, useTypewriter } from "../pregunta/AnswerText";
 import { toPlain } from "../pregunta/markdown";
-import { interruptedTurn, notesOf, originOf, reduceSteps, showsSources, waitingLine } from "../pregunta/answer-state";
+import { interruptedTurn, notesOf, originOf, reduceSteps, seedOf, showsSources, waitingFace, waitingLine, waitingTip } from "../pregunta/answer-state";
 import type { ThinkStep } from "../pregunta/answer-state";
 import { captureLine, captureStatus, frameMessage, hostLabel, hostOrigin, pageForQuestion, pageRequest, pageStamp, readHostMessage, readHostPage, readParams, sourceUrl, spaceWidget, widgetAllowed } from "./embed";
 import type { CaptureStatus, FrameState, HostPage, TurnPage } from "./embed";
@@ -568,6 +568,8 @@ function Widget({ space, cfg, tema, lado, host, voice: baseVoice }: { space: Spa
     });
 
   const working = busy && !live?.text;
+  // Mientras piensa, la cara de la cabecera cambia de gesto con los segundos.
+  const waited = useElapsed(live?.startedAt, working);
   const headline = reading ? "Hablando" : working ? (live?.page && !live.steps.length ? "Leyendo la página" : "Pensando") : busy ? "Escribiendo" : space.widget.idle;
   // La primera vez (o al pedir cambiarlo), el saludo pregunta quién habla.
   const picking = askRol && (rol === null || asking);
@@ -580,7 +582,7 @@ function Widget({ space, cfg, tema, lado, host, voice: baseVoice }: { space: Spa
         <div className="pe-panel" ref={panel} role="dialog" aria-label="Chat con Pilo">
           <header className="pe-head">
             <div className="pe-face">
-              <PiloMoji size={64} mood={working ? "piensa" : "feliz"} emotion={working ? undefined : view.expression} talking={reading || (busy && !working)} alive />
+              <PiloMoji size={64} mood={working ? "piensa" : "feliz"} emotion={working ? waitingFace(waited) : view.expression} talking={reading || (busy && !working)} alive />
             </div>
             <div className="pe-id">
               <strong>Pilo</strong>
@@ -738,6 +740,7 @@ function TurnView({
   const parsed = useMemo(() => parseAnswer(text, { streaming }), [text, streaming]);
   const elapsed = useElapsed(stream?.startedAt, working);
   const step = working ? waitingLine({ steps: stream?.steps ?? [], meta: stream?.meta ?? null, seconds: elapsed }) : "";
+  const tip = working ? waitingTip(elapsed, seedOf(turn.id)) : null;
 
   const question = useRef<HTMLDivElement>(null);
   const think = useRef<HTMLDivElement>(null);
@@ -877,6 +880,11 @@ function TurnView({
             <i />
           </span>
         </div>
+      )}
+      {tip && (
+        <p className="ap-tip pe-tip" key={tip}>
+          {tip}
+        </p>
       )}
 
       {text && (

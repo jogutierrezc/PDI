@@ -223,7 +223,7 @@ export interface Fault {
 
 /** Los textos son de esta función: lo que diga Génesis no viaja a la página (podría nombrar a la persona). */
 export const FAULTS = {
-  credenciales: { code: "credenciales", message: "Génesis no aceptó ese código y esa contraseña. Revíselos e intente de nuevo.", status: 401 },
+  credenciales: { code: "credenciales", message: "Génesis no aceptó ese usuario y esa contraseña. Revíselos e intente de nuevo.", status: 401 },
   permiso: { code: "permiso", message: "Su permiso de Génesis venció o fue retirado. Conecte de nuevo sus notas.", status: 401 },
   no_estudiante: { code: "no_estudiante", message: "Mis notas es para estudiantes: esa cuenta de Génesis no es de estudiante.", status: 403 },
   genesis: { code: "genesis", message: "Génesis no respondió como se esperaba. Intente de nuevo en un momento.", status: 502 },

@@ -261,7 +261,7 @@ export interface Fault {
 
 /** Los textos son de esta función: lo que diga Génesis no viaja a la página (podría nombrar a la persona). */
 export const FAULTS = {
-  credenciales: { code: "credenciales", message: "Génesis no aceptó ese código y esa contraseña. Revíselos e intente de nuevo.", status: 401 },
+  credenciales: { code: "credenciales", message: "Génesis no aceptó ese usuario y esa contraseña. Revíselos e intente de nuevo.", status: 401 },
   permiso: { code: "permiso", message: "Su permiso de Génesis venció o fue retirado. Conecte de nuevo sus notas.", status: 401 },
   no_estudiante: { code: "no_estudiante", message: "Mis notas es para estudiantes: esa cuenta de Génesis no es de estudiante.", status: 403 },
   genesis: { code: "genesis", message: "Génesis no respondió como se esperaba. Intente de nuevo en un momento.", status: 502 },
@@ -764,7 +764,7 @@ Deno.serve(async (request) => {
     /* --- Conectar: la contraseña se usa una vez para entrar y no se guarda ----------------------- */
     if (action === "conectar") {
       const creds = credentials(body);
-      if (!creds) return json({ error: "Escriba su código de estudiante (solo números) y su contraseña de Génesis.", code: "datos" }, 400);
+      if (!creds) return json({ error: "Escriba su usuario de Génesis (solo números) y su contraseña.", code: "datos" }, 400);
       const entered = await ask("ingreso", undefined, loginBody(creds.code, creds.password));
       if (!entered.ok) return fail(entered.fault);
       // De lo que responde Génesis solo queda el acceso y el encabezado: lo personal se descarta.

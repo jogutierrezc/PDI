@@ -8,6 +8,7 @@ import {
   askRecommendations,
   canUseNotas,
   chartOf,
+  checkPortalRows,
   clearLink,
   courseName,
   courseState,
@@ -16,19 +17,24 @@ import {
   failureOf,
   findings,
   inProgress,
+  matchPortal,
   nearestIndex,
   nota,
   notasFailure,
   notasMessage,
   parseHead,
   parseHistory,
+  parsePortals,
   periodLine,
+  pickPortal,
+  plainName,
+  portalSlug,
   readLink,
   saveLink,
   settled,
   totals,
 } from "./logic";
-import type { LinkStore, NotaCourse, NotaPeriod } from "./logic";
+import type { LinkStore, NotaCourse, NotaPeriod, PortalInfo } from "./logic";
 
 /* Todos los datos de estas pruebas son inventados. */
 
@@ -51,6 +57,7 @@ function fakeStore(): LinkStore & { data: Map<string, string> } {
 
 const PERMIT = `v1.${"a".repeat(80)}.${"b".repeat(43)}`;
 const HEAD = { program: "INGENIERÍA DE PRUEBAS", period: "2025B", creditsPercent: 40 };
+const SEDE: PortalInfo = { id: "cucuta", name: "Cúcuta" };
 const NOW = 1_800_000_000_000;
 const LATER = NOW / 1000 + 3600;
 
@@ -66,25 +73,41 @@ describe("el permiso, en el dispositivo", () => {
 
   it("con «mantener», queda en el dispositivo; sin ella, solo en memoria", () => {
     const store = fakeStore();
-    expect(saveLink("u1", { permit: PERMIT, expires: LATER, head: HEAD }, true, store).kept).toBe(true);
-    expect(JSON.parse(store.data.get(LINK_KEY)!)).toEqual({ v: 1, owner: "u1", permit: PERMIT, expires: LATER, head: HEAD });
-    expect(readLink("u1", NOW, store)).toEqual({ permit: PERMIT, expires: LATER, head: HEAD, kept: true });
+    expect(saveLink("u1", { permit: PERMIT, expires: LATER, head: HEAD, portal: SEDE }, true, store).kept).toBe(true);
+    expect(JSON.parse(store.data.get(LINK_KEY)!)).toEqual({ v: 1, owner: "u1", permit: PERMIT, expires: LATER, head: HEAD, portal: SEDE });
+    expect(readLink("u1", NOW, store)).toEqual({ permit: PERMIT, expires: LATER, head: HEAD, portal: SEDE, kept: true });
 
-    expect(saveLink("u1", { permit: PERMIT, expires: LATER, head: HEAD }, false, store).kept).toBe(false);
+    expect(saveLink("u1", { permit: PERMIT, expires: LATER, head: HEAD, portal: SEDE }, false, store).kept).toBe(false);
     expect(store.data.has(LINK_KEY)).toBe(false);
     expect(readLink("u1", NOW, store)).toMatchObject({ permit: PERMIT, kept: false });
   });
 
+  it("la sede se recuerda con el permiso y se borra con él; un permiso sin sede no se entiende", () => {
+    const store = fakeStore();
+    saveLink("u1", { permit: PERMIT, expires: LATER, head: HEAD, portal: SEDE }, true, store);
+    expect(readLink("u1", NOW, store)?.portal).toEqual({ id: "cucuta", name: "Cúcuta" });
+    // De la sede se guardan el id y el nombre: nunca la dirección del portal.
+    expect(store.data.get(LINK_KEY)).not.toMatch(/https|:81/);
+    clearLink(store);
+    expect(store.data.has(LINK_KEY)).toBe(false);
+    expect(readLink("u1", NOW, store)).toBeNull();
+    for (const portal of [undefined, null, { id: "Malo Id", name: "X" }, { id: "cucuta", name: "" }, "cucuta"]) {
+      store.data.set(LINK_KEY, JSON.stringify({ v: 1, owner: "u1", permit: PERMIT, expires: LATER, head: HEAD, portal }));
+      expect(readLink("u1", NOW, store), JSON.stringify(portal)).toBeNull();
+      expect(store.data.has(LINK_KEY)).toBe(false);
+    }
+  });
+
   it("lo guardado no trae notas, ni el código, ni la contraseña", () => {
     const store = fakeStore();
-    saveLink("u1", { permit: PERMIT, expires: LATER, head: HEAD }, true, store);
-    expect(Object.keys(JSON.parse(store.data.get(LINK_KEY)!)).sort()).toEqual(["expires", "head", "owner", "permit", "v"]);
+    saveLink("u1", { permit: PERMIT, expires: LATER, head: HEAD, portal: SEDE }, true, store);
+    expect(Object.keys(JSON.parse(store.data.get(LINK_KEY)!)).sort()).toEqual(["expires", "head", "owner", "permit", "portal", "v"]);
     expect([...store.data.keys()]).toEqual(["pilo-app:notas"]);
   });
 
   it("el de otra cuenta no se entrega: se borra", () => {
     const store = fakeStore();
-    saveLink("u1", { permit: PERMIT, expires: LATER, head: HEAD }, true, store);
+    saveLink("u1", { permit: PERMIT, expires: LATER, head: HEAD, portal: SEDE }, true, store);
     expect(readLink("u2", NOW, store)).toBeNull();
     expect(store.data.has(LINK_KEY)).toBe(false);
     expect(readLink("u1", NOW, store)).toBeNull();
@@ -92,14 +115,14 @@ describe("el permiso, en el dispositivo", () => {
 
   it("vencido, se borra de los dos sitios", () => {
     const store = fakeStore();
-    saveLink("u1", { permit: PERMIT, expires: LATER, head: HEAD }, true, store);
+    saveLink("u1", { permit: PERMIT, expires: LATER, head: HEAD, portal: SEDE }, true, store);
     expect(readLink("u1", LATER * 1000 + 1, store)).toBeNull();
     expect(store.data.has(LINK_KEY)).toBe(false);
   });
 
   it("«Desconectar» lo borra de inmediato, y lo que no se entiende también se va", () => {
     const store = fakeStore();
-    saveLink("u1", { permit: PERMIT, expires: LATER, head: HEAD }, true, store);
+    saveLink("u1", { permit: PERMIT, expires: LATER, head: HEAD, portal: SEDE }, true, store);
     clearLink(store);
     expect(readLink("u1", NOW, store)).toBeNull();
     for (const junk of ["{", "null", '{"v":2}', JSON.stringify({ v: 1, owner: "u1", permit: "sin-forma", expires: LATER })]) {
@@ -110,10 +133,125 @@ describe("el permiso, en el dispositivo", () => {
   });
 
   it("sin almacenamiento, o con él lleno, queda en memoria y no falla", () => {
-    expect(saveLink("u1", { permit: PERMIT, expires: LATER, head: HEAD }, true, null).kept).toBe(false);
+    expect(saveLink("u1", { permit: PERMIT, expires: LATER, head: HEAD, portal: SEDE }, true, null).kept).toBe(false);
     expect(readLink("u1", NOW, null)).toMatchObject({ kept: false });
     const full: LinkStore = { getItem: () => null, setItem: () => { throw new Error("QuotaExceeded"); }, removeItem: () => undefined };
-    expect(saveLink("u1", { permit: PERMIT, expires: LATER, head: HEAD }, true, full).kept).toBe(false);
+    expect(saveLink("u1", { permit: PERMIT, expires: LATER, head: HEAD, portal: SEDE }, true, full).kept).toBe(false);
+  });
+});
+
+describe("la sede: a cuál portal de Génesis se entra", () => {
+  const SEDES: PortalInfo[] = [
+    { id: "bucaramanga", name: "Bucaramanga" },
+    { id: "cucuta", name: "Cúcuta" },
+    { id: "valledupar", name: "Valledupar" },
+    { id: "bogota", name: "Bogotá" },
+    { id: "tec", name: "TEC" },
+  ];
+
+  it("la lista que responde la función: solo id y nombre, y lo que no se entiende se descarta", () => {
+    expect(parsePortals({ on: true, portals: [...SEDES.slice(0, 2), { id: "cucuta", name: "Repetida" }, { id: "Malo", name: "X" }, { id: "sin", name: " " }, null, { id: "tec", name: "TEC", url: "https://se-cuela.example.org" }] })).toEqual({
+      on: true,
+      portals: [SEDES[0], SEDES[1], { id: "tec", name: "TEC" }],
+    });
+    // Encendida pero sin portales, o cualquier otra cosa: no está disponible.
+    expect(parsePortals({ on: true, portals: [] })).toEqual({ on: false, portals: [] });
+    expect(parsePortals({ on: false, portals: SEDES })).toMatchObject({ on: false });
+    for (const junk of [null, "x", [], { portals: "x" }]) expect(parsePortals(junk)).toEqual({ on: false, portals: [] });
+  });
+
+  it("la sede de la cuenta casa con el nombre del portal sin distinguir tildes ni mayúsculas", () => {
+    // pilo_users.campus guarda «cucuta», «bogota»…; la administración escribe «Cúcuta», «Bogotá».
+    expect(matchPortal(SEDES, "cucuta")).toEqual({ id: "cucuta", name: "Cúcuta" });
+    expect(matchPortal(SEDES, "bogota")?.name).toBe("Bogotá");
+    expect(matchPortal(SEDES, "BUCARAMANGA")?.id).toBe("bucaramanga");
+    expect(matchPortal(SEDES, " Cúcuta ")?.id).toBe("cucuta");
+    expect(plainName("  Cúcuta — SEDE  ")).toBe("cucuta sede");
+    // También por el id, si la administración le puso otro nombre.
+    expect(matchPortal([{ id: "valledupar", name: "Campus del Cesar" }], "valledupar")?.name).toBe("Campus del Cesar");
+  });
+
+  it("si ninguno es igual, vale el único que la trae como palabra; con dos, no se adivina", () => {
+    const named: PortalInfo[] = [{ id: "sede-bga", name: "Sede Bucaramanga" }, { id: "sede-cuc", name: "UDES Cúcuta" }];
+    expect(matchPortal(named, "bucaramanga")?.id).toBe("sede-bga");
+    expect(matchPortal(named, "cucuta")?.id).toBe("sede-cuc");
+    expect(matchPortal([...named, { id: "posg", name: "Posgrados Bucaramanga" }], "bucaramanga")).toBeNull();
+    // Un trozo de palabra no cuenta.
+    expect(matchPortal([{ id: "x", name: "Bucaramanguesa" }], "bucaramanga")).toBeNull();
+  });
+
+  it("sin sede en la cuenta, o con una que no tiene portal, no se preselecciona nada", () => {
+    for (const campus of ["", null, undefined, "medellin", "   "]) expect(matchPortal(SEDES, campus), String(campus)).toBeNull();
+    expect(pickPortal(SEDES, "")).toBeNull();
+    expect(pickPortal(SEDES, "medellin")).toBeNull();
+    expect(pickPortal(SEDES, "valledupar")).toBe("valledupar");
+  });
+
+  it("con un solo portal no se pregunta: es ese, sea cual sea la sede de la cuenta", () => {
+    expect(pickPortal([SEDES[4]], "cucuta")).toBe("tec");
+    expect(pickPortal([SEDES[4]], "")).toBe("tec");
+    expect(pickPortal([], "cucuta")).toBeNull();
+  });
+});
+
+describe("los portales, como los escribe la administración", () => {
+  it("el id de un portal nuevo sale de su nombre, sin tildes, y no se repite", () => {
+    expect(portalSlug("Cúcuta", [])).toBe("cucuta");
+    expect(portalSlug("Bogotá D. C.", [])).toBe("bogota-d-c");
+    expect(portalSlug("TEC", ["tec"])).toBe("tec-2");
+    expect(portalSlug("TEC", ["tec", "tec-2"])).toBe("tec-3");
+    expect(portalSlug("2 de Mayo", [])).toBe("sede-2-de-mayo");
+    expect(portalSlug("¡!", [])).toBe("sede");
+    for (const name of ["Cúcuta", "Un nombre de sede larguísimo que no cabe en ningún lado", "X", "9", ""]) expect(portalSlug(name, []), name).toMatch(/^[a-z][a-z0-9-]{1,23}$/);
+  });
+
+  it("una lista bien escrita queda lista para guardar, en su orden; lo ya guardado conserva su id", () => {
+    const r = checkPortalRows([
+      { id: "", name: "  Bucaramanga ", url: "https://Genesis-BGA.udes.edu.co:81/" },
+      { id: "cuc", name: "Cúcuta (nuevo nombre)", url: "https://genesis-cuc.udes.edu.co:81" },
+      { id: "", name: "TEC", url: "https://genesis-tec.udes.edu.co/genesis" },
+    ]);
+    expect(r).toEqual({
+      ok: true,
+      portals: [
+        { id: "bucaramanga", name: "Bucaramanga", url: "https://genesis-bga.udes.edu.co:81" },
+        { id: "cuc", name: "Cúcuta (nuevo nombre)", url: "https://genesis-cuc.udes.edu.co:81" },
+        { id: "tec", name: "TEC", url: "https://genesis-tec.udes.edu.co" },
+      ],
+    });
+    expect(checkPortalRows([])).toEqual({ ok: true, portals: [] });
+  });
+
+  it("un portal nuevo no toma el id de uno ya guardado", () => {
+    const r = checkPortalRows([{ id: "", name: "Cúcuta", url: "https://nuevo.udes.edu.co" }, { id: "cucuta", name: "Cúcuta centro", url: "https://viejo.udes.edu.co" }]);
+    expect(r.ok && r.portals.map((p) => p.id)).toEqual(["cucuta-2", "cucuta"]);
+  });
+
+  it("los errores se dicen en la fila que los tiene", () => {
+    const r = checkPortalRows([
+      { id: "", name: "Bucaramanga", url: "https://genesis-bga.udes.edu.co:81" },
+      { id: "", name: "", url: "http://genesis.udes.edu.co" },
+      { id: "", name: "BUCARAMANGÁ", url: "https://otro.udes.edu.co" },
+      { id: "", name: "Cúcuta", url: "https://genesis-bga.udes.edu.co:81" },
+      { id: "", name: "Interna", url: "https://10.0.0.5:81" },
+      { id: "", name: "Con ruta", url: "https://genesis.udes.edu.co/portal" },
+    ]);
+    expect(r).toEqual({
+      ok: false,
+      errors: {
+        1: { name: "Escriba el nombre de la sede.", url: "La dirección de Génesis debe empezar por https://." },
+        2: { name: "Ya hay un portal con ese nombre." },
+        3: { url: "Esa dirección ya está en otro portal." },
+        4: { url: expect.stringMatching(/dominio público/) },
+        5: { url: expect.stringMatching(/sin ruta/) },
+      },
+    });
+  });
+
+  it("no deja pasar del tope", () => {
+    const many = Array.from({ length: 13 }, (_, i) => ({ id: "", name: `Sede ${i}`, url: `https://genesis-${i}.udes.edu.co` }));
+    expect(checkPortalRows(many)).toEqual({ ok: false, errors: {}, why: "Son máximo 12 portales." });
+    expect(checkPortalRows(many.slice(0, 12)).ok).toBe(true);
   });
 });
 
@@ -124,6 +262,8 @@ describe("lo que responde la función", () => {
     expect(notasFailure(401, { code: "credenciales" })).toEqual({ code: "credenciales", message: notasMessage("credenciales"), view: "campo" });
     expect(notasFailure(403, { code: "no_estudiante" }).view).toBe("campo");
     expect(notasFailure(403, { code: "perfil" }).view).toBe("cuenta");
+    // La sede elegida ya no está entre los portales: se dice junto a la sede.
+    expect(notasFailure(400, { code: "portal" })).toEqual({ code: "portal", message: notasMessage("portal"), view: "sede" });
     expect(notasFailure(502, { code: "genesis" }).view).toBe("aviso");
     expect(notasFailure(502, { code: "pdf" }).view).toBe("aviso");
     expect(failureOf("sin_red").view).toBe("sin_conexion");
@@ -372,6 +512,21 @@ describe("la pantalla", () => {
     expect(pane).toContain('<DataConsent\n              platform="genesis"');
     expect(pane.indexOf("<DataConsent")).toBeLessThan(pane.indexOf('id="pnt-pass"'));
     expect(pane).toMatch(/if \(connecting \|\| !granted\) return;/);
+  });
+
+  it("la sede se elige antes del código y la contraseña; con un solo portal no se pregunta", () => {
+    expect(pane.indexOf('id="pnt-sede"')).toBeGreaterThan(pane.indexOf("<DataConsent"));
+    expect(pane.indexOf('id="pnt-sede"')).toBeLessThan(pane.indexOf('id="pnt-code"'));
+    expect(pane).toMatch(/\{sedes && sedes\.portals\.length > 1 \? \(/);
+    // La que viene elegida es la de la cuenta de Pilo, si casa con un portal.
+    expect(pane).toContain("<Notas key={account.id} owner={account.id} campus={account.campus} online={online} />");
+    expect(pane).toMatch(/pickPortal\(list\.portals, campus\)/);
+    // A la función viaja el id de la sede, y en la barra se dice a cuál está conectado.
+    expect(pane).toContain("await connectGenesis(portalId, typed, pass);");
+    expect(pane).toContain("`Génesis ${link.portal.name}`");
+    expect(source("notas/api.ts")).toContain('call({ action: "conectar", portal, code: code.trim(), password })');
+    // La app nunca arma ni conoce una dirección de Génesis.
+    for (const file of ["notas/NotasPane.tsx", "notas/api.ts"]) expect(source(file), file).not.toMatch(/genesis_url|genesis_portals|genesisSite|\/genesis\//);
   });
 
   it("no guarda las notas ni la contraseña: del almacenamiento solo sabe logic.ts, y solo del permiso", () => {

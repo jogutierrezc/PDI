@@ -1,8 +1,9 @@
 /* =============================================================================
    Mis notas (beta) · la lógica pura de la función `pilo-genesis`.
 
-   Todo lo que la función decide sin tocar la red ni la base: qué dirección de
-   Génesis se acepta, qué rutas de Génesis se pueden llamar (lista cerrada),
+   Todo lo que la función decide sin tocar la red ni la base: qué portales de
+   Génesis hay (uno por sede) y qué dirección se le acepta a cada uno, qué
+   rutas de Génesis se pueden llamar (lista cerrada),
    cómo se arma cada pedido, qué significa cada respuesta, qué queda de ellas
    antes de devolverlas al navegador (lo personal se descarta aquí) y cómo se
    firma y se comprueba el permiso que guarda el dispositivo.
@@ -52,6 +53,8 @@ export const MAX_BYTES = 3_000_000;
 export const MAX_PDF_BYTES = 8_000_000;
 export const MAX_PERIODS = 60;
 export const MAX_COURSES = 40;
+/** Cuántos portales de Génesis (uno por sede) puede configurar la administración. */
+export const MAX_PORTALS = 12;
 /** Cuánto vale el permiso que guarda el dispositivo. */
 export const PERMIT_SECONDS = 12 * 3600;
 
@@ -116,6 +119,46 @@ export function genesisSite(raw0: unknown): GenesisSite {
   return { ok: true, site: `https://${host}${port ? `:${port}` : ""}`, host, port: port || 443 };
 }
 
+/* --- Los portales: uno por sede --------------------------------------------------------------- */
+
+/** El id de un portal: corto y estable. Es lo único que manda el navegador; la dirección, nunca. */
+export const portalIdShape = (v: unknown): v is string => typeof v === "string" && /^[a-z][a-z0-9-]{1,23}$/.test(v);
+
+export interface GenesisPortal {
+  id: string;
+  /** El nombre que ve el estudiante («Bucaramanga», «Cúcuta», «TEC»…): lo escribe la administración. */
+  name: string;
+  /** La dirección de entrada, ya revisada. No sale de la función. */
+  site: string;
+  host: string;
+}
+
+/**
+ * Los portales que configuró la administración (`[{ id, name, url }]`), ya
+ * revisados: el que no tenga un id con buena forma, un nombre o una dirección
+ * que pase genesisSite, no cuenta; tampoco un id repetido. Hasta MAX_PORTALS,
+ * en el orden en que se guardaron.
+ */
+export function genesisPortals(raw: unknown): GenesisPortal[] {
+  const out: GenesisPortal[] = [];
+  for (const item of Array.isArray(raw) ? raw : []) {
+    if (out.length >= MAX_PORTALS) break;
+    const p = item && typeof item === "object" && !Array.isArray(item) ? (item as Record<string, unknown>) : {};
+    // deno-lint-ignore no-control-regex
+    const name = typeof p.name === "string" ? p.name.replace(/[\u0000-\u001f\u007f]/g, " ").replace(/\s+/g, " ").trim().slice(0, 60) : "";
+    const site = genesisSite(p.url);
+    if (!portalIdShape(p.id) || !name || !site.ok || out.some((x) => x.id === p.id)) continue;
+    out.push({ id: p.id, name, site: site.site, host: site.host });
+  }
+  return out;
+}
+
+/** Lo que la app puede saber de los portales: su id y su nombre. La dirección no viaja. */
+export const publicPortals = (portals: GenesisPortal[]): { id: string; name: string }[] => portals.map((p) => ({ id: p.id, name: p.name }));
+
+/** El portal con ese id; `null` si no es un id o no está configurado. */
+export const findPortal = (portals: GenesisPortal[], id: unknown): GenesisPortal | null => (portalIdShape(id) ? (portals.find((p) => p.id === id) ?? null) : null);
+
 /* --- Los pedidos ----------------------------------------------------------------------------- */
 
 /** El código del estudiante: solo dígitos (once, en la UDES; se admite algo más por si cambia). */
@@ -169,7 +212,7 @@ export function credentials(body: Record<string, unknown>): { code: string; pass
 /** Los códigos con que esta función responde un fallo. La página los traduce a un estado. */
 export type GenesisCode =
   | "sesion" | "cuenta" | "perfil" | "suspendida" | "limite" | "no_disponible" | "datos"
-  | "credenciales" | "no_estudiante" | "permiso" | "pdf"
+  | "credenciales" | "no_estudiante" | "permiso" | "pdf" | "portal"
   | "tiempo" | "red" | "tamano" | "genesis" | "interno";
 
 export interface Fault {
@@ -188,6 +231,7 @@ export const FAULTS = {
   red: { code: "red", message: "No pude conectarme con Génesis. Intente de nuevo en un momento.", status: 502 },
   tamano: { code: "tamano", message: "Génesis devolvió más de lo que Pilo puede leer de una vez.", status: 502 },
   pdf: { code: "pdf", message: "Génesis no entregó el polígrafo en PDF. Intente de nuevo en un momento.", status: 502 },
+  portal: { code: "portal", message: "Elija su sede: esa no está entre los portales de Génesis que Pilo puede leer.", status: 400 },
 } as const satisfies Record<string, Fault>;
 
 const obj = (v: unknown): Record<string, unknown> => (v && typeof v === "object" && !Array.isArray(v) ? (v as Record<string, unknown>) : {});
@@ -396,8 +440,12 @@ export function pdfBase64(msg: unknown): string | null {
 
 /* --- El permiso firmado ---------------------------------------------------------------------- */
 
-/** Lo que amarra el permiso: el acceso a Génesis, el periodo vigente, la cuenta de Pilo que lo pidió y cuándo vence. */
+/** Lo que amarra el permiso: el acceso a Génesis, el portal en que se entró, el periodo vigente, la cuenta de Pilo que lo pidió y cuándo vence. */
 export interface PermitData extends GenesisAccess {
+  /** El id del portal (la sede) en que se entró: las consultas van a ese y a ningún otro. */
+  portal: string;
+  /** La marca de la dirección que tenía ese portal al entrar (portalMark): si la cambian, el permiso deja de valer. */
+  mark: string;
   period: string;
   /** La cuenta de Pilo que conectó: otra cuenta no puede usar este permiso. */
   owner: string;
@@ -439,13 +487,22 @@ async function permitKey(secret: string): Promise<CryptoKey> {
 }
 
 /**
+ * La marca de la dirección de un portal: una huella corta, para amarrarla al
+ * permiso sin que la dirección viaje al dispositivo.
+ */
+export async function portalMark(site: string): Promise<string> {
+  const digest = new Uint8Array(await crypto.subtle.digest("SHA-256", bytesOf(`pilo-genesis:portal:v1|${site}`) as unknown as ArrayBuffer));
+  return toBase64Url(digest.slice(0, 12));
+}
+
+/**
  * El permiso que guarda el dispositivo: el acceso a Génesis, el código del
- * estudiante, la cuenta de Pilo y el vencimiento, firmados con HMAC-SHA-256 y
+ * estudiante, el portal, la cuenta de Pilo y el vencimiento, firmados con HMAC-SHA-256 y
  * un secreto que solo tiene el servidor. Quien lo tenga puede leerlo, pero no
  * cambiarle el código ni alargarle la vida: la firma dejaría de cuadrar.
  */
 export async function signPermit(data: PermitData, secret: string): Promise<string> {
-  const body = toBase64Url(bytesOf(JSON.stringify({ t: data.token, k: data.apiKey, c: data.code, p: data.period, o: data.owner, e: data.exp })));
+  const body = toBase64Url(bytesOf(JSON.stringify({ t: data.token, k: data.apiKey, c: data.code, s: data.portal, m: data.mark, p: data.period, o: data.owner, e: data.exp })));
   const mac = new Uint8Array(await crypto.subtle.sign("HMAC", await permitKey(secret), bytesOf(`v1.${body}`) as unknown as ArrayBuffer));
   return `v1.${body}.${toBase64Url(mac)}`;
 }
@@ -471,10 +528,22 @@ export async function openPermit(permit: unknown, secret: string, owner: string,
     return { ok: false, why: "forma" };
   }
   const exp = Number(d.e);
-  if (!keyShape(d.t) || !keyShape(d.k) || !codeShape(d.c) || typeof d.o !== "string" || !d.o || !Number.isInteger(exp)) return { ok: false, why: "forma" };
+  if (!keyShape(d.t) || !keyShape(d.k) || !codeShape(d.c) || !portalIdShape(d.s) || typeof d.m !== "string" || !/^[A-Za-z0-9_-]{16}$/.test(d.m) || typeof d.o !== "string" || !d.o || !Number.isInteger(exp)) return { ok: false, why: "forma" };
   if (exp <= nowSec) return { ok: false, why: "vencido" };
   if (d.o !== owner) return { ok: false, why: "cuenta" };
-  return { ok: true, data: { token: d.t, apiKey: d.k, code: d.c, period: periodShape(d.p) ? d.p : "", owner: d.o, exp } };
+  return { ok: true, data: { token: d.t, apiKey: d.k, code: d.c, portal: d.s, mark: d.m, period: periodShape(d.p) ? d.p : "", owner: d.o, exp } };
+}
+
+/**
+ * El portal al que van las consultas de un permiso ya abierto: el que dice el
+ * permiso, y solo si sigue configurado con la misma dirección que tenía al
+ * entrar. Si lo quitaron o le cambiaron la dirección, `null`: el permiso ya
+ * no vale y hay que entrar de nuevo. Nunca se usa otro portal en su lugar.
+ */
+export async function permitPortal(portals: GenesisPortal[], data: Pick<PermitData, "portal" | "mark">): Promise<GenesisPortal | null> {
+  const portal = findPortal(portals, data.portal);
+  if (!portal) return null;
+  return (await portalMark(portal.site)) === data.mark ? portal : null;
 }
 
 /* --- La red ---------------------------------------------------------------------------------- */

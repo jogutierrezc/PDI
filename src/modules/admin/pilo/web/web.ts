@@ -8,10 +8,12 @@
      temas), con las hojas en su fila, como la malla de la memoria;
    - los temas y normas de la página que salen del mapa, y con cuántos otros
      documentos de la memoria los comparte (ahí se ve que quedó conectada);
-   - qué pasajes de la página encontró una consulta.
+   - qué pasajes de la página encontró una consulta;
+   - con navegador (0132): qué se dice de una lectura hecha (o no) con él.
    ========================================================================== */
 
 import { webAddress } from "../../../../components/pilo/ai/logic";
+import type { BrowserNote } from "../../../../components/pilo/ai/logic";
 
 /** Lo que devuelve la función al leer una página. */
 export interface WebRead {
@@ -31,6 +33,8 @@ export interface WebRead {
   unchanged: boolean;
   mapped?: boolean;
   collection?: { id: string; name: string };
+  /** Si se pidió abrirla con navegador, y qué pasó (0132). */
+  browser?: BrowserNote;
 }
 
 /** Una página en pantalla: recién leída, o una ya guardada con sus pasajes de la memoria. */
@@ -55,6 +59,18 @@ export function webWhere(url: string): string {
 }
 
 export const kilobytes = (bytes: number) => `${Math.max(1, Math.round(bytes / 1024)).toLocaleString("es-CO")} KB`;
+
+/**
+ * Lo que se dice del navegador en una lectura: cuántos despliegues hizo, o que
+ * se leyó sin ejecutar JavaScript y por qué. Vacío si no se pidió navegador.
+ */
+export function browserLine(note: BrowserNote | null | undefined): string {
+  if (!note?.asked) return "";
+  if (!note.used) return `se leyó sin ejecutar JavaScript${note.why ? `: ${note.why}` : ""}`;
+  if (!note.tried) return "con navegador, sin nada que desplegar";
+  const failed = note.tried - note.clicks;
+  return `con navegador: ${note.clicks} ${note.clicks === 1 ? "despliegue" : "despliegues"}${failed > 0 ? ` (${failed} no ${failed === 1 ? "abrió" : "abrieron"})` : ""}`;
+}
 
 /* --- La preparación ---------------------------------------------------------------------- */
 
@@ -85,7 +101,8 @@ export function prepSet(steps: PrepStep[], id: PrepId, state: StepState, detail?
 /** Lo que dicen los tres primeros pasos cuando la función ya leyó la página. */
 export function prepRead(steps: PrepStep[], r: WebRead): PrepStep[] {
   const tops = new Set(r.passages.map((p) => topSection(p.section))).size;
-  let out = prepSet(steps, "traer", "done", `${kilobytes(r.bytes)}${r.cut ? " (se leyó hasta el tope)" : ""}`);
+  const browser = browserLine(r.browser);
+  let out = prepSet(steps, "traer", "done", `${kilobytes(r.bytes)}${r.cut ? " (se leyó hasta el tope)" : ""}${browser ? ` · ${browser}` : ""}`);
   out = prepSet(out, "limpiar", "done", `Sin menús, formularios ni pie${r.redacted ? ` · ${r.redacted} ${r.redacted === 1 ? "dato personal omitido" : "datos personales omitidos"}` : ""}`);
   const moved = r.unchanged ? "sin cambios desde la última lectura" : [r.added ? `${r.added} nuevos` : "", r.changed ? `${r.changed} cambiaron` : "", r.removed ? `${r.removed} se quitaron` : ""].filter(Boolean).join(", ");
   return prepSet(out, "partir", "done", `${r.total} ${r.total === 1 ? "pasaje" : "pasajes"} en ${tops} ${tops === 1 ? "sección" : "secciones"}${moved ? ` · ${moved}` : ""}${r.dropped ? ` · ${r.dropped} quedaron por fuera del tope` : ""}`);

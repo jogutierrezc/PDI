@@ -1,0 +1,17 @@
+{
+  "name": "pilo-navegador",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Navegador de Mr. Pilo: abre páginas públicas, ejecuta su JavaScript, despliega lo plegado y devuelve su texto como HTML sencillo.",
+  "type": "module",
+  "engines": {
+    "node": ">=20"
+  },
+  "main": "src/servidor.js",
+  "scripts": {
+    "start": "node src/servidor.js"
+  },
+  "dependencies": {
+    "playwright": "1.63.0"
+  }
+}

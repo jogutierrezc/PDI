@@ -42,7 +42,7 @@ export const CONSENT_TEXTS: Record<DataPlatform, ConsentTexts> = {
     lead: LEAD,
     promises: [
       { title: "Solo leo", text: "Miro sus notas del periodo y su récord académico por periodo. No puedo cambiar nada." },
-      { title: "No me las llevo", text: "Sus notas se quedan en Génesis. No las guardo en ningún servidor." },
+      { title: "No me las llevo", text: "Sus notas se quedan en Génesis. No las guardo en ningún servidor. Si me pide recomendaciones, envío a la IA un resumen de sus notas sin su nombre ni su código. No se guarda." },
       YOURS,
       YOU_RULE,
     ],

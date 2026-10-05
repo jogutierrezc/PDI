@@ -15,6 +15,12 @@
    No hay tubería nueva: «web» lee y guarda; indexar y comprender son los de
    Memoria. Lo que aquí se guarda se ve también en Memoria › Páginas en la
    memoria, y desde allá se quita.
+
+   Con navegador (0132): si la administración conectó el servicio de navegador
+   (abajo, en «Navegador»), cada lectura puede pedir que la página se abra con
+   él: ejecuta su JavaScript y despliega pestañas y acordeones. La casilla solo
+   aparece con el servicio encendido; el resultado dice cuántos despliegues
+   hizo, o que se leyó sin ejecutar JavaScript y por qué.
    ========================================================================== */
 
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
@@ -34,8 +40,10 @@ import { useTryMemory } from "../memory";
 import { GENERAL_COLLECTIONS, docCollections, effectiveCell, usePortals } from "../portals";
 import { DEFAULT_SPACE } from "../space";
 import { Group, plural, when } from "../ui";
+import { BrowserService } from "./BrowserService";
+import { useBrowser } from "./browser";
 import { buildMesh, buildTopics, pulse, scan } from "./motion";
-import { MESH_PASSAGES, checkWebUrl, curve, hitsOf, prepRead, prepSet, prepStart, simText, topSection, topicsOf, webMesh, webWhere } from "./web";
+import { MESH_PASSAGES, browserLine, checkWebUrl, curve, hitsOf, prepRead, prepSet, prepStart, simText, topSection, topicsOf, webMesh, webWhere } from "./web";
 import type { PrepId, PrepStep, WebHit, WebPageView, WebRead, WebTopic } from "./web";
 import "../../pilo-ensenanza/pilo-ensenanza.css";
 import "./web.css";
@@ -266,6 +274,10 @@ export function WebSection() {
   const refresh = useRefreshMemory(SPACE);
   const create = useCreateCollection(SPACE);
   const tryIt = useTryMemory(SPACE);
+  // El servicio de navegador (0132): la casilla solo se ofrece si está encendido y completo.
+  const browser = useBrowser(!off);
+  const browserReady = browser.data?.ready === true;
+  const [withBrowser, setWithBrowser] = useState(false);
 
   const pages = useMemo(() => (docs.data?.data ?? []).filter((d) => d.origin === "web"), [docs.data]);
   const hasWebCollection = collections.some((c) => c.name.toLowerCase() === NEW_NAME.toLowerCase());
@@ -368,7 +380,7 @@ export function WebSection() {
         into = made.id;
         setCollection(made.id);
       }
-      const r = await piloStep<WebRead>("web", SPACE, { step: "leer", url: address.url, collection: into });
+      const r = await piloStep<WebRead>("web", SPACE, { step: "leer", url: address.url, collection: into, ...(withBrowser && browserReady ? { browser: true } : {}) });
       setSteps((s) => prepRead(s, r));
       setUrl(r.url);
       setFresh({ doc: r.doc, url: r.url, title: r.title, passages: r.passages });
@@ -418,7 +430,7 @@ export function WebSection() {
       say("conectar", closing.state, closing.detail);
       const reads = general && data?.sources.find((s) => s.id === into) ? effectiveCell(general, data.sources.find((s) => s.id === into)!) === "casa" : true;
       setNotice(
-        `«${r.title}» quedó en la memoria de Pilo${r.unchanged ? " (no había cambiado)" : ""}.${reads ? " Ya entra en sus respuestas." : " Pilo todavía no lee esa colección: enciéndala en Memoria › Qué lee cada portal."}`,
+        `«${r.title}» quedó en la memoria de Pilo${r.unchanged ? " (no había cambiado)" : ""}.${reads ? " Ya entra en sus respuestas." : " Pilo todavía no lee esa colección: enciéndala en Memoria › Qué lee cada portal."}${r.browser?.asked && !r.browser.used ? ` Ojo: ${browserLine(r.browser)}.` : ""}`,
       );
     } catch (error) {
       setFault(faultOf(error));
@@ -552,6 +564,15 @@ export function WebSection() {
                 ))}
               </select>
             </label>
+            {browserReady && (
+              <label className="pwb-check">
+                <input type="checkbox" checked={withBrowser} disabled={busy} onChange={(e) => setWithBrowser(e.target.checked)} />
+                <span>
+                  Abrir con navegador (ejecuta JavaScript y despliega pestañas)
+                  <small>Tarda más. Úselo si la página llega vacía o le falta lo que está en pestañas, acordeones o «ver más».</small>
+                </span>
+              </label>
+            )}
             <div className="pis-actions">
               <button type="submit" className="button-primary" disabled={busy || off || !url.trim()}>
                 <Icon name="document" size={16} />
@@ -630,6 +651,8 @@ export function WebSection() {
           )}
           <p className="pis-small">Para quitar una página o cambiar quién la ve: Memoria › Páginas en la memoria.</p>
         </Group>
+
+        <BrowserService enabled={!off} />
       </div>
 
       <div className="pwb-work">

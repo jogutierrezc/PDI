@@ -5,10 +5,13 @@ import {
   FAULTS,
   GENESIS_ROUTES,
   MAX_COURSES,
+  MAX_PORTALS,
   PERMIT_SECONDS,
   codeShape,
   credentials,
+  findPortal,
   genesisAddress,
+  genesisPortals,
   genesisReply,
   genesisSite,
   grade,
@@ -20,8 +23,12 @@ import {
   pdfBase64,
   pdfBody,
   periodShape,
+  permitPortal,
   permitShape,
+  portalIdShape,
+  portalMark,
   privateAddress,
+  publicPortals,
   readCapped,
   recordBody,
   shapeLogin,
@@ -142,6 +149,61 @@ describe("la dirección de Génesis", () => {
   it("reconoce las direcciones de red privada, para el nombre que resuelve hacia adentro", () => {
     for (const ip of ["10.1.2.3", "127.0.0.1", "172.16.0.1", "192.168.0.1", "169.254.169.254", "100.64.0.1", "0.0.0.0", "::1", "fd12::1", "fe80::1", "::ffff:10.0.0.1", "no-es-ip", ""]) expect(privateAddress(ip), ip).toBe(true);
     for (const ip of ["190.0.0.1", "8.8.8.8", "2800:480::1"]) expect(privateAddress(ip), ip).toBe(false);
+  });
+});
+
+/* --- Los portales ---------------------------------------------------------------------------- */
+
+/** Lo que guarda la administración: un portal por sede. Las direcciones son inventadas. */
+const CONFIG = [
+  { id: "bucaramanga", name: "Bucaramanga", url: "https://genesis-bga.udes.edu.co:81" },
+  { id: "cucuta", name: "Cúcuta", url: "https://genesis-cuc.udes.edu.co:81" },
+  { id: "tec", name: "TEC", url: "https://genesis-tec.udes.edu.co" },
+];
+
+describe("los portales de Génesis, uno por sede", () => {
+  it("salen en el orden guardado, cada uno con su dirección revisada", () => {
+    expect(genesisPortals(CONFIG)).toEqual([
+      { id: "bucaramanga", name: "Bucaramanga", site: "https://genesis-bga.udes.edu.co:81", host: "genesis-bga.udes.edu.co" },
+      { id: "cucuta", name: "Cúcuta", site: "https://genesis-cuc.udes.edu.co:81", host: "genesis-cuc.udes.edu.co" },
+      { id: "tec", name: "TEC", site: "https://genesis-tec.udes.edu.co", host: "genesis-tec.udes.edu.co" },
+    ]);
+  });
+
+  it("el que no tiene id, nombre o una dirección que pase la revisión no cuenta; un id repetido, tampoco", () => {
+    const messy = [
+      CONFIG[0],
+      { id: "bucaramanga", name: "Otra vez", url: "https://otro.udes.edu.co" },
+      { id: "Malo Id", name: "X", url: "https://x.udes.edu.co" },
+      { id: "sin-nombre", name: "  ", url: "https://x.udes.edu.co" },
+      { id: "interna", name: "Interna", url: "https://10.0.0.5:81" },
+      { id: "http", name: "Sin https", url: "http://genesis.udes.edu.co" },
+      { id: "ruta", name: "Con ruta", url: "https://genesis.udes.edu.co/otra" },
+      null, "texto", 5,
+      CONFIG[2],
+    ];
+    expect(genesisPortals(messy).map((p) => p.id)).toEqual(["bucaramanga", "tec"]);
+    for (const junk of [null, undefined, "x", {}, 5]) expect(genesisPortals(junk)).toEqual([]);
+  });
+
+  it("hay un tope", () => {
+    const many = Array.from({ length: MAX_PORTALS + 5 }, (_, i) => ({ id: `sede-${i}`, name: `Sede ${i}`, url: `https://genesis-${i}.udes.edu.co` }));
+    expect(MAX_PORTALS).toBe(12);
+    expect(genesisPortals(many)).toHaveLength(MAX_PORTALS);
+  });
+
+  it("a la app solo le llegan el id y el nombre: la dirección no viaja", () => {
+    const shown = publicPortals(genesisPortals(CONFIG));
+    expect(shown).toEqual([{ id: "bucaramanga", name: "Bucaramanga" }, { id: "cucuta", name: "Cúcuta" }, { id: "tec", name: "TEC" }]);
+    expect(JSON.stringify(shown)).not.toMatch(/https|udes\.edu|:81/);
+  });
+
+  it("el navegador manda un id; uno desconocido, o algo que no es un id, no encuentra portal", () => {
+    const portals = genesisPortals(CONFIG);
+    expect(findPortal(portals, "cucuta")?.site).toBe("https://genesis-cuc.udes.edu.co:81");
+    for (const no of ["valledupar", "Cúcuta", "CUCUTA", "https://genesis-cuc.udes.edu.co:81", "https://malo.example.org", "", null, undefined, 1, { id: "cucuta" }, "constructor", "__proto__"]) expect(findPortal(portals, no), String(no)).toBeNull();
+    expect(portalIdShape("cucuta")).toBe(true);
+    for (const no of ["c", "1sede", "con espacio", "MAYUS", "a".repeat(25), "sede/../x"]) expect(portalIdShape(no), no).toBe(false);
   });
 });
 
@@ -314,7 +376,11 @@ describe("el polígrafo y el récord", () => {
 /* --- El permiso firmado ---------------------------------------------------------------------- */
 
 describe("el permiso firmado", () => {
-  const data: PermitData = { ...ACCESS, period: "2026B", owner: OWNER, exp: NOW + PERMIT_SECONDS };
+  const PORTALS = genesisPortals(CONFIG);
+  const MARK = "AAAAAAAAAAAAAAAA";
+  const data: PermitData = { ...ACCESS, portal: "cucuta", mark: MARK, period: "2026B", owner: OWNER, exp: NOW + PERMIT_SECONDS };
+  /** Un permiso como el que firma la función al entrar por una sede. */
+  const forSede = async (id: string, portals = PORTALS): Promise<PermitData> => ({ ...data, portal: id, mark: await portalMark(findPortal(portals, id)!.site) });
 
   /** Cambia los datos de un permiso sin rehacer la firma. */
   const forge = (permit: string, change: (d: Record<string, unknown>) => void) => {
@@ -337,6 +403,9 @@ describe("el permiso firmado", () => {
     expect(await openPermit(forge(permit, (d) => (d.c = "00000000099")), SECRET, OWNER, NOW)).toEqual({ ok: false, why: "firma" });
     expect(await openPermit(forge(permit, (d) => (d.e = NOW + 10 * PERMIT_SECONDS)), SECRET, OWNER, NOW)).toEqual({ ok: false, why: "firma" });
     expect(await openPermit(forge(permit, (d) => (d.o = "otra-cuenta")), SECRET, "otra-cuenta", NOW)).toEqual({ ok: false, why: "firma" });
+    // Tampoco la sede: un permiso de Cúcuta no se convierte en uno de Bucaramanga.
+    expect(await openPermit(forge(permit, (d) => (d.s = "bucaramanga")), SECRET, OWNER, NOW)).toEqual({ ok: false, why: "firma" });
+    expect(await openPermit(forge(permit, (d) => (d.m = "BBBBBBBBBBBBBBBB")), SECRET, OWNER, NOW)).toEqual({ ok: false, why: "firma" });
     // La firma de otro permiso tampoco sirve.
     const other = await signPermit({ ...data, code: "00000000099" }, SECRET);
     expect(await openPermit(`${permit.split(".").slice(0, 2).join(".")}.${other.split(".")[2]}`, SECRET, OWNER, NOW)).toEqual({ ok: false, why: "firma" });
@@ -356,6 +425,49 @@ describe("el permiso firmado", () => {
     expect(await openPermit(permit, SECRET, "99999999-2222-4333-8444-555555555555", NOW)).toEqual({ ok: false, why: "cuenta" });
   });
 
+  it("va a su portal y a ningún otro: el de la sede en que se entró", async () => {
+    const cucuta = await forSede("cucuta");
+    const opened = await openPermit(await signPermit(cucuta, SECRET), SECRET, OWNER, NOW);
+    expect(opened).toMatchObject({ ok: true, data: { portal: "cucuta" } });
+    expect((await permitPortal(PORTALS, cucuta))?.site).toBe("https://genesis-cuc.udes.edu.co:81");
+    // La marca es de la dirección de ESE portal: la de otro no es la misma, y la dirección no va dentro.
+    expect(cucuta.mark).toMatch(/^[A-Za-z0-9_-]{16}$/);
+    expect(cucuta.mark).not.toBe((await forSede("bucaramanga")).mark);
+    expect(await signPermit(cucuta, SECRET)).not.toContain(Buffer.from("genesis-cuc").toString("base64url").slice(0, 10));
+    expect(Buffer.from((await signPermit(cucuta, SECRET)).split(".")[1], "base64url").toString("utf8")).not.toMatch(/https|udes\.edu/);
+  });
+
+  it("un permiso de una sede usado contra otra no encuentra portal", async () => {
+    const cucuta = await forSede("cucuta");
+    // Con la sede cambiada a mano (y aunque la firma se rehiciera), la marca es de otra dirección.
+    expect(await permitPortal(PORTALS, { portal: "bucaramanga", mark: cucuta.mark })).toBeNull();
+    expect(await permitPortal(PORTALS, { portal: "tec", mark: cucuta.mark })).toBeNull();
+  });
+
+  it("si quitan el portal o le cambian la dirección, el permiso deja de valer", async () => {
+    const cucuta = await forSede("cucuta");
+    const without = genesisPortals(CONFIG.filter((p) => p.id !== "cucuta"));
+    expect(await permitPortal(without, cucuta)).toBeNull();
+    const moved = genesisPortals(CONFIG.map((p) => (p.id === "cucuta" ? { ...p, url: "https://otro-genesis.udes.edu.co:81" } : p)));
+    expect(await permitPortal(moved, cucuta)).toBeNull();
+    // Cambiarle solo el nombre no lo afecta: el id y la dirección son los mismos.
+    const renamed = genesisPortals(CONFIG.map((p) => (p.id === "cucuta" ? { ...p, name: "Campus Cúcuta" } : p)));
+    expect((await permitPortal(renamed, cucuta))?.name).toBe("Campus Cúcuta");
+    expect(await permitPortal([], cucuta)).toBeNull();
+  });
+
+  it("un permiso sin sede, o con una que no tiene forma de id, no se abre", async () => {
+    const permit = await signPermit(data, SECRET);
+    const [v, , mac] = permit.split(".");
+    const body = JSON.parse(Buffer.from(permit.split(".")[1], "base64url").toString("utf8"));
+    delete body.s;
+    // Aunque estuviera bien firmado: sin sede no se sabría a qué portal va.
+    const bare = await signPermit({ ...data, portal: "" }, SECRET);
+    expect(await openPermit(bare, SECRET, OWNER, NOW)).toEqual({ ok: false, why: "forma" });
+    expect(await openPermit(await signPermit({ ...data, portal: "https://malo.example.org" }, SECRET), SECRET, OWNER, NOW)).toEqual({ ok: false, why: "forma" });
+    expect(await openPermit(`${v}.${Buffer.from(JSON.stringify(body)).toString("base64url")}.${mac}`, SECRET, OWNER, NOW)).toEqual({ ok: false, why: "firma" });
+  });
+
   it("lo que no tiene forma de permiso ni se intenta abrir", async () => {
     for (const junk of ["", "v1.a.b", TOKEN, null, undefined, 5, { permit: "x" }, `v2.${"a".repeat(60)}.${"b".repeat(43)}`]) expect(await openPermit(junk, SECRET, OWNER, NOW), String(junk)).toEqual({ ok: false, why: "forma" });
   });
@@ -364,7 +476,7 @@ describe("el permiso firmado", () => {
     await expect(signPermit(data, "")).rejects.toThrow();
     await expect(signPermit(data, "corto")).rejects.toThrow();
     const permit = await signPermit(data, SECRET);
-    expect(Object.keys(JSON.parse(Buffer.from(permit.split(".")[1], "base64url").toString("utf8"))).sort()).toEqual(["c", "e", "k", "o", "p", "t"]);
+    expect(Object.keys(JSON.parse(Buffer.from(permit.split(".")[1], "base64url").toString("utf8"))).sort()).toEqual(["c", "e", "k", "m", "o", "p", "s", "t"]);
     expect(permit).not.toContain(SECRET);
   });
 
@@ -399,7 +511,10 @@ describe("la función no guarda nada", () => {
     // Las únicas tablas que lee: la cuenta de quien llama y la configuración de Génesis.
     expect([...code.matchAll(/\.from\(\s*"([^"]+)"/g)].map((m) => m[1]).sort()).toEqual(["pilo_spaces", "pilo_users"]);
     expect(code).toMatch(/\.from\("pilo_users"\)\.select\("rol, status"\)/);
-    expect(code).toMatch(/\.from\("pilo_spaces"\)\.select\("genesis_on, genesis_url"\)/);
+    expect(code).toMatch(/\.from\("pilo_spaces"\)\.select\("genesis_on, genesis_portals, genesis_advice"\)/);
+    // A la app solo le dice si las recomendaciones con IA están encendidas: esta función no llama a ninguna IA.
+    expect(handler).toMatch(/return json\(\{ periods, record: record\.ok, advice: row\?\.genesis_advice === true \}\);/);
+    expect(code).not.toMatch(/pilo-ia|chat\/completions|max_tokens/);
   });
 
   it("la única función de la base que llama es el contador del límite, y con una huella", () => {
@@ -407,7 +522,7 @@ describe("la función no guarda nada", () => {
     // La huella sale de la cuenta de Pilo o de la dirección de red: nunca del permiso, del código del estudiante ni de sus notas.
     const hash = code.slice(code.indexOf("const visitorId"), code.indexOf("pilo_visitor_hit"));
     expect(hash).toMatch(/sha256\(/);
-    expect(hash).not.toMatch(/token|permit|password|creds|access|code\b|body\./);
+    expect(hash).not.toMatch(/token|permit|password|creds|access|portal|code\b|body\./);
     expect(code).toMatch(/limited\(`\$\{action\}:u`, perUser, 600, userId\)/);
     expect(code).toMatch(/limited\(`\$\{action\}:i`, perIp, 600, ip\)/);
   });
@@ -432,7 +547,7 @@ describe("la función no guarda nada", () => {
     expect(code).toMatch(/AbortSignal\.timeout\(/);
     expect(code).toMatch(/readCapped\(response, max\)/);
     // A dónde: solo lo que arma genesisAddress con la dirección revisada y una ruta de la lista.
-    expect(handler).toMatch(/const address = genesisAddress\(site\.site, route, access\);/);
+    expect(handler).toMatch(/const address = genesisAddress\(target\.site, route, access\);/);
     expect(handler).toMatch(/fetch\(address,/);
     const called = [...new Set([...handler.matchAll(/\bask\("([^"]+)"/g)].map((m) => m[1]))].sort();
     expect(called).toEqual(["ingreso", "poligrafo", "poligrafo_pdf", "record"]);
@@ -443,35 +558,46 @@ describe("la función no guarda nada", () => {
     expect(code).toMatch(/resolveDns/);
   });
 
-  it("la dirección de Génesis sale de la configuración, no del navegador", () => {
-    expect(code).toMatch(/genesisSite\(row\.genesis_url\)/);
-    expect(code).toMatch(/row\.genesis_on !== true/);
+  it("la dirección de Génesis sale de la configuración, no del navegador: del navegador solo llega el id de la sede", () => {
+    expect(handler).toMatch(/row\.genesis_on !== true \? \[\] : genesisPortals\(row\.genesis_portals\)/);
+    // Al conectar, el portal se busca por el id; después, es el del permiso. No hay otro camino a una dirección.
+    expect(handler).toMatch(/site = findPortal\(portals, body\.portal\);\s*if \(!site\) return fail\(FAULTS\.portal\);/);
+    expect(handler).toMatch(/site = await permitPortal\(portals, opened\);\s*if \(!site\) return fail\(FAULTS\.permiso\);/);
+    expect([...handler.matchAll(/\bsite = /g)]).toHaveLength(2);
+    expect(handler).toMatch(/const target = site;/);
+    expect(handler).toMatch(/dns\(target\.host, type\)/);
+    // La lista que ve la app: solo lo público, y nunca una dirección.
+    expect(handler).toMatch(/if \(action === "portales"\) return json\(\{ on: portals\.length > 0, portals: publicPortals\(portals\) \}\);/);
+    expect(handler).not.toMatch(/json\([^)]*\.(site|host|url)\b/);
     expect(LOGIC_FROM).toBeGreaterThan(-1);
     expect(LOGIC_TO).toBeGreaterThan(LOGIC_FROM);
     // Del pedido solo se leen estas claves; el código y la contraseña, solo dentro de `credentials` (la lógica) y solo al conectar.
-    expect([...new Set([...handler.matchAll(/\bbody\.([a-zA-Z_]+)/g)].map((m) => m[1]))].sort()).toEqual(["action", "permit"]);
-    expect([...new Set([...code.matchAll(/\bbody\.([a-zA-Z_]+)/g)].map((m) => m[1]))].sort()).toEqual(["action", "code", "password", "permit"]);
+    expect([...new Set([...handler.matchAll(/\bbody\.([a-zA-Z_]+)/g)].map((m) => m[1]))].sort()).toEqual(["action", "permit", "portal"]);
+    expect([...new Set([...code.matchAll(/\bbody\.([a-zA-Z_]+)/g)].map((m) => m[1]))].sort()).toEqual(["action", "code", "password", "permit", "portal"]);
     expect([...handler.matchAll(/credentials\(body\)/g)]).toHaveLength(1);
     expect(code).not.toMatch(/body\.(url|site|genesis|host|route|path|period|student|login)/);
   });
 
-  it("el código del estudiante de cada consulta sale del permiso firmado", () => {
-    expect(handler).toMatch(/const opened = await openPermit\(body\.permit, secret, userId, Math\.floor\(Date\.now\(\) \/ 1000\)\);/);
-    expect(handler).toMatch(/if \(!opened\.ok\) return fail\(FAULTS\.permiso\);/);
-    expect(handler).toMatch(/const access: GenesisAccess = \{ token: opened\.data\.token, apiKey: opened\.data\.apiKey, code: opened\.data\.code \};/);
+  it("el código del estudiante y el portal de cada consulta salen del permiso firmado", () => {
+    expect(handler).toMatch(/const read = await openPermit\(body\.permit, secret, userId, Math\.floor\(Date\.now\(\) \/ 1000\)\);/);
+    expect(handler).toMatch(/if \(!read\.ok\) return fail\(FAULTS\.permiso\);/);
+    expect(handler).toMatch(/const access: GenesisAccess = \{ token: opened\.token, apiKey: opened\.apiKey, code: opened\.code \};/);
+    // El permiso se abre (firma, vencimiento, cuenta) antes de buscar su portal.
+    expect(handler.indexOf("await openPermit(")).toBeLessThan(handler.indexOf("await permitPortal("));
     // Después del ingreso, toda consulta usa ese acceso.
-    const after = handler.slice(handler.indexOf("const opened"));
+    const after = handler.slice(handler.indexOf("if (!opened) return fail(FAULTS.permiso);"));
+    expect(after.length).toBeGreaterThan(200);
     for (const m of after.matchAll(/\bask\("[a-z_]+",\s*([^,]+),/g)) expect(m[1].trim()).toBe("access");
     expect(after).toMatch(/recordBody\(access\.code\)/);
-    expect(after).toMatch(/pdfBody\(access\.code, opened\.data\.period\)/);
-    // El permiso se firma con lo que dijo Génesis (shapeLogin), la cuenta de Pilo y el vencimiento.
-    expect(handler).toMatch(/signPermit\(\{ \.\.\.login\.access, period: login\.head\.period, owner: userId, exp: expires \}, secret\)/);
+    expect(after).toMatch(/pdfBody\(access\.code, opened\.period\)/);
+    // El permiso se firma con lo que dijo Génesis (shapeLogin), la sede en que se entró, la cuenta de Pilo y el vencimiento.
+    expect(handler).toMatch(/signPermit\(\{ \.\.\.login\.access, portal: target\.id, mark: await portalMark\(target\.site\), period: login\.head\.period, owner: userId, exp: expires \}, secret\)/);
     expect(handler).toMatch(/Deno\.env\.get\("PILO_GENESIS_SECRET"\) \|\| serviceKey/);
   });
 
   it("del ingreso solo sale lo que deja shapeLogin: el permiso firmado y el encabezado", () => {
     expect(handler).toMatch(/const login = shapeLogin\(entered\.msg, creds\.code\);/);
-    expect(handler).toMatch(/return json\(\{ permit, expires, head: login\.head \}\);/);
+    expect(handler).toMatch(/return json\(\{ permit, expires, head: login\.head, portal: \{ id: target\.id, name: target\.name \} \}\);/);
     // Lo crudo de Génesis no se devuelve nunca: solo lo que pasó por la lógica.
     expect(handler).not.toMatch(/json\(\s*(entered|polygraph|record|file)\.msg/);
     expect(handler).not.toMatch(/json\(\{[^}]*\.msg\b/);

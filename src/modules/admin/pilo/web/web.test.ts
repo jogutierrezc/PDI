@@ -4,7 +4,7 @@
    ========================================================================== */
 
 import { describe, expect, it } from "vitest";
-import { MESH_PASSAGES, checkWebUrl, hitsOf, kilobytes, prepRead, prepSet, prepStart, simText, topSection, topicsOf, webMesh, webWhere } from "./web";
+import { MESH_PASSAGES, browserLine, checkWebUrl, hitsOf, kilobytes, prepRead, prepSet, prepStart, simText, topSection, topicsOf, webMesh, webWhere } from "./web";
 import type { WebPageView, WebRead } from "./web";
 
 const DOC = "3f2b8c1e-5a47-4d09-9b61-0c7e2a1d4f58";
@@ -59,6 +59,34 @@ describe("los pasos de la preparación", () => {
     expect(steps[0].detail).toBe("184 KB (se leyó hasta el tope)");
     expect(steps[1].detail).toBe("Sin menús, formularios ni pie");
     expect(steps[2].detail).toBe("6 pasajes en 3 secciones · sin cambios desde la última lectura · 3 quedaron por fuera del tope");
+  });
+});
+
+describe("con navegador (0132)", () => {
+  const read: WebRead = { doc: DOC, url: "https://x.co/a", title: "A", bytes: 20_480, sections: ["Presentación"], passages: page(2).passages, total: 2, added: 2, changed: 0, removed: 0, redacted: 0, dropped: 0, unchanged: false };
+  const note = { asked: true, used: true, clicks: 0, tried: 0, why: "" };
+
+  it("sin pedirlo, no se dice nada: el paso queda como siempre", () => {
+    expect(browserLine(undefined)).toBe("");
+    expect(browserLine(null)).toBe("");
+    expect(browserLine({ ...note, asked: false })).toBe("");
+    expect(prepRead(prepStart(), read)[0].detail).toBe("20 KB");
+    expect(prepRead(prepStart(), { ...read, browser: { ...note, asked: false, used: false } })[0].detail).toBe("20 KB");
+  });
+
+  it("dice cuántos despliegues hizo, y cuántos no abrieron", () => {
+    expect(browserLine(note)).toBe("con navegador, sin nada que desplegar");
+    expect(browserLine({ ...note, clicks: 1, tried: 1 })).toBe("con navegador: 1 despliegue");
+    expect(browserLine({ ...note, clicks: 5, tried: 5 })).toBe("con navegador: 5 despliegues");
+    expect(browserLine({ ...note, clicks: 5, tried: 7 })).toBe("con navegador: 5 despliegues (2 no abrieron)");
+    expect(browserLine({ ...note, clicks: 0, tried: 1 })).toBe("con navegador: 0 despliegues (1 no abrió)");
+    expect(prepRead(prepStart(), { ...read, cut: true, browser: { ...note, clicks: 3, tried: 3 } })[0].detail).toBe("20 KB (se leyó hasta el tope) · con navegador: 3 despliegues");
+  });
+
+  it("si se pidió y no se pudo, dice que se leyó sin ejecutar JavaScript y por qué", () => {
+    expect(browserLine({ ...note, used: false, why: "el navegador está apagado" })).toBe("se leyó sin ejecutar JavaScript: el navegador está apagado");
+    expect(browserLine({ ...note, used: false })).toBe("se leyó sin ejecutar JavaScript");
+    expect(prepRead(prepStart(), { ...read, browser: { ...note, used: false, why: "el navegador tardó demasiado" } })[0].detail).toBe("20 KB · se leyó sin ejecutar JavaScript: el navegador tardó demasiado");
   });
 });
 

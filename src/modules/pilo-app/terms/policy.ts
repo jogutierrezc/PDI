@@ -194,7 +194,7 @@ export const POLICY_SECTIONS: PolicySection[] = [
         items: [
           "**Siempre con su autorización.** Ninguna consulta se hace sin que el estudiante o el profesor la autorice de forma expresa, y puede retirarla cuando quiera.",
           "**Solo lectura.** Pilo consulta; no escribe, no entrega tareas, no presenta exámenes ni cambia nada en esas plataformas.",
-          "**Nada se aloja en Pilo.** Sus notas, su récord académico y los contenidos de sus cursos permanecen en la plataforma institucional. Pilo los consulta en el momento y no los guarda en sus servidores.",
+          "**Nada se aloja en Pilo.** Sus notas, su récord académico y los contenidos de sus cursos permanecen en la plataforma institucional. Pilo los consulta en el momento y no los guarda en sus servidores. Si usted le pide recomendaciones sobre sus notas, y solo al pedirlas, Pilo envía a la IA un resumen de ellas sin su nombre ni su código; ese resumen no se guarda.",
           "**Solo para usted.** Ni la universidad ni otra persona usa o ve esa información a través de Pilo.",
           "**La conexión es suya.** Si decide mantenerla, queda guardada en su dispositivo. Al desconectar, se borra.",
         ],

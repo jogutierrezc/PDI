@@ -16,16 +16,20 @@
        abajo): el ingreso y tres lecturas. No matricula ni cambia datos.
      · No devuelve datos personales: el ingreso de Génesis trae nombre,
        apellidos, documento, teléfonos y correo; se descartan aquí (shapeLogin).
-     · No acepta una dirección del navegador: la de Génesis sale de lo que
-       configuró la administración (`pilo_spaces`, fila «ensenanza»,
-       `genesis_url`, y solo si `genesis_on`), se revisa (solo https, dominio
-       público, sin IP ni red interna, DNS comprobado, rutas fijas; puede
-       llevar puerto) y no se siguen redirecciones.
+     · No acepta una dirección del navegador. Génesis tiene un portal por
+       sede: la lista sale de lo que configuró la administración
+       (`pilo_spaces`, fila «ensenanza», `genesis_portals`, y solo si
+       `genesis_on`). El navegador manda el id de la sede y nada más; la
+       dirección de ese portal se revisa (solo https, dominio público, sin IP
+       ni red interna, DNS comprobado, rutas fijas; puede llevar puerto) y no
+       se siguen redirecciones. A la app solo le llegan el id y el nombre.
      · No acepta un código de estudiante del navegador: el ingreso devuelve un
        permiso firmado (HMAC-SHA-256, con un secreto que solo tiene esta
        función) que amarra el acceso a Génesis, el código que Génesis dijo que
-       es el de quien entró, la cuenta de Pilo y un vencimiento. Cada consulta
-       usa el código de ese permiso; si la firma no cuadra, se rechaza.
+       es el de quien entró, el portal en que entró, la cuenta de Pilo y un
+       vencimiento. Cada consulta usa el código y el portal de ese permiso; si
+       la firma no cuadra, o ese portal ya no está o cambió de dirección, se
+       rechaza y hay que entrar de nuevo.
 
    Quién puede llamar: solo una cuenta de Pilo activa (0120) con perfil de
    estudiante, y solo si Génesis dice que quien entró es estudiante. La sesión
@@ -36,8 +40,11 @@
    Sin él se usa la llave de servicio del proyecto, que tampoco sale de aquí.
 
    Acciones (POST, JSON, con la sesión de la cuenta de Pilo):
-     { action: "conectar", code, password } → { permit, expires, head }
-     { action: "historico", permit }        → { periods, record }
+     { action: "portales" }                 → { on, portals: [{ id, name }] }
+     { action: "conectar", portal, code, password }
+                                            → { permit, expires, head, portal: { id, name } }
+     { action: "historico", permit }        → { periods, record, advice }
+                                              (advice: la administración encendió las recomendaciones con IA)
      { action: "poligrafo_pdf", permit }    → { pdf, name }
 
    Los errores llevan `error` (para la persona) y `code` (para la página).
@@ -84,6 +91,8 @@ export const MAX_BYTES = 3_000_000;
 export const MAX_PDF_BYTES = 8_000_000;
 export const MAX_PERIODS = 60;
 export const MAX_COURSES = 40;
+/** Cuántos portales de Génesis (uno por sede) puede configurar la administración. */
+export const MAX_PORTALS = 12;
 /** Cuánto vale el permiso que guarda el dispositivo. */
 export const PERMIT_SECONDS = 12 * 3600;
 
@@ -148,6 +157,46 @@ export function genesisSite(raw0: unknown): GenesisSite {
   return { ok: true, site: `https://${host}${port ? `:${port}` : ""}`, host, port: port || 443 };
 }
 
+/* --- Los portales: uno por sede --------------------------------------------------------------- */
+
+/** El id de un portal: corto y estable. Es lo único que manda el navegador; la dirección, nunca. */
+export const portalIdShape = (v: unknown): v is string => typeof v === "string" && /^[a-z][a-z0-9-]{1,23}$/.test(v);
+
+export interface GenesisPortal {
+  id: string;
+  /** El nombre que ve el estudiante («Bucaramanga», «Cúcuta», «TEC»…): lo escribe la administración. */
+  name: string;
+  /** La dirección de entrada, ya revisada. No sale de la función. */
+  site: string;
+  host: string;
+}
+
+/**
+ * Los portales que configuró la administración (`[{ id, name, url }]`), ya
+ * revisados: el que no tenga un id con buena forma, un nombre o una dirección
+ * que pase genesisSite, no cuenta; tampoco un id repetido. Hasta MAX_PORTALS,
+ * en el orden en que se guardaron.
+ */
+export function genesisPortals(raw: unknown): GenesisPortal[] {
+  const out: GenesisPortal[] = [];
+  for (const item of Array.isArray(raw) ? raw : []) {
+    if (out.length >= MAX_PORTALS) break;
+    const p = item && typeof item === "object" && !Array.isArray(item) ? (item as Record<string, unknown>) : {};
+    // deno-lint-ignore no-control-regex
+    const name = typeof p.name === "string" ? p.name.replace(/[\u0000-\u001f\u007f]/g, " ").replace(/\s+/g, " ").trim().slice(0, 60) : "";
+    const site = genesisSite(p.url);
+    if (!portalIdShape(p.id) || !name || !site.ok || out.some((x) => x.id === p.id)) continue;
+    out.push({ id: p.id, name, site: site.site, host: site.host });
+  }
+  return out;
+}
+
+/** Lo que la app puede saber de los portales: su id y su nombre. La dirección no viaja. */
+export const publicPortals = (portals: GenesisPortal[]): { id: string; name: string }[] => portals.map((p) => ({ id: p.id, name: p.name }));
+
+/** El portal con ese id; `null` si no es un id o no está configurado. */
+export const findPortal = (portals: GenesisPortal[], id: unknown): GenesisPortal | null => (portalIdShape(id) ? (portals.find((p) => p.id === id) ?? null) : null);
+
 /* --- Los pedidos ----------------------------------------------------------------------------- */
 
 /** El código del estudiante: solo dígitos (once, en la UDES; se admite algo más por si cambia). */
@@ -201,7 +250,7 @@ export function credentials(body: Record<string, unknown>): { code: string; pass
 /** Los códigos con que esta función responde un fallo. La página los traduce a un estado. */
 export type GenesisCode =
   | "sesion" | "cuenta" | "perfil" | "suspendida" | "limite" | "no_disponible" | "datos"
-  | "credenciales" | "no_estudiante" | "permiso" | "pdf"
+  | "credenciales" | "no_estudiante" | "permiso" | "pdf" | "portal"
   | "tiempo" | "red" | "tamano" | "genesis" | "interno";
 
 export interface Fault {
@@ -220,6 +269,7 @@ export const FAULTS = {
   red: { code: "red", message: "No pude conectarme con Génesis. Intente de nuevo en un momento.", status: 502 },
   tamano: { code: "tamano", message: "Génesis devolvió más de lo que Pilo puede leer de una vez.", status: 502 },
   pdf: { code: "pdf", message: "Génesis no entregó el polígrafo en PDF. Intente de nuevo en un momento.", status: 502 },
+  portal: { code: "portal", message: "Elija su sede: esa no está entre los portales de Génesis que Pilo puede leer.", status: 400 },
 } as const satisfies Record<string, Fault>;
 
 const obj = (v: unknown): Record<string, unknown> => (v && typeof v === "object" && !Array.isArray(v) ? (v as Record<string, unknown>) : {});
@@ -428,8 +478,12 @@ export function pdfBase64(msg: unknown): string | null {
 
 /* --- El permiso firmado ---------------------------------------------------------------------- */
 
-/** Lo que amarra el permiso: el acceso a Génesis, el periodo vigente, la cuenta de Pilo que lo pidió y cuándo vence. */
+/** Lo que amarra el permiso: el acceso a Génesis, el portal en que se entró, el periodo vigente, la cuenta de Pilo que lo pidió y cuándo vence. */
 export interface PermitData extends GenesisAccess {
+  /** El id del portal (la sede) en que se entró: las consultas van a ese y a ningún otro. */
+  portal: string;
+  /** La marca de la dirección que tenía ese portal al entrar (portalMark): si la cambian, el permiso deja de valer. */
+  mark: string;
   period: string;
   /** La cuenta de Pilo que conectó: otra cuenta no puede usar este permiso. */
   owner: string;
@@ -471,13 +525,22 @@ async function permitKey(secret: string): Promise<CryptoKey> {
 }
 
 /**
+ * La marca de la dirección de un portal: una huella corta, para amarrarla al
+ * permiso sin que la dirección viaje al dispositivo.
+ */
+export async function portalMark(site: string): Promise<string> {
+  const digest = new Uint8Array(await crypto.subtle.digest("SHA-256", bytesOf(`pilo-genesis:portal:v1|${site}`) as unknown as ArrayBuffer));
+  return toBase64Url(digest.slice(0, 12));
+}
+
+/**
  * El permiso que guarda el dispositivo: el acceso a Génesis, el código del
- * estudiante, la cuenta de Pilo y el vencimiento, firmados con HMAC-SHA-256 y
+ * estudiante, el portal, la cuenta de Pilo y el vencimiento, firmados con HMAC-SHA-256 y
  * un secreto que solo tiene el servidor. Quien lo tenga puede leerlo, pero no
  * cambiarle el código ni alargarle la vida: la firma dejaría de cuadrar.
  */
 export async function signPermit(data: PermitData, secret: string): Promise<string> {
-  const body = toBase64Url(bytesOf(JSON.stringify({ t: data.token, k: data.apiKey, c: data.code, p: data.period, o: data.owner, e: data.exp })));
+  const body = toBase64Url(bytesOf(JSON.stringify({ t: data.token, k: data.apiKey, c: data.code, s: data.portal, m: data.mark, p: data.period, o: data.owner, e: data.exp })));
   const mac = new Uint8Array(await crypto.subtle.sign("HMAC", await permitKey(secret), bytesOf(`v1.${body}`) as unknown as ArrayBuffer));
   return `v1.${body}.${toBase64Url(mac)}`;
 }
@@ -503,10 +566,22 @@ export async function openPermit(permit: unknown, secret: string, owner: string,
     return { ok: false, why: "forma" };
   }
   const exp = Number(d.e);
-  if (!keyShape(d.t) || !keyShape(d.k) || !codeShape(d.c) || typeof d.o !== "string" || !d.o || !Number.isInteger(exp)) return { ok: false, why: "forma" };
+  if (!keyShape(d.t) || !keyShape(d.k) || !codeShape(d.c) || !portalIdShape(d.s) || typeof d.m !== "string" || !/^[A-Za-z0-9_-]{16}$/.test(d.m) || typeof d.o !== "string" || !d.o || !Number.isInteger(exp)) return { ok: false, why: "forma" };
   if (exp <= nowSec) return { ok: false, why: "vencido" };
   if (d.o !== owner) return { ok: false, why: "cuenta" };
-  return { ok: true, data: { token: d.t, apiKey: d.k, code: d.c, period: periodShape(d.p) ? d.p : "", owner: d.o, exp } };
+  return { ok: true, data: { token: d.t, apiKey: d.k, code: d.c, portal: d.s, mark: d.m, period: periodShape(d.p) ? d.p : "", owner: d.o, exp } };
+}
+
+/**
+ * El portal al que van las consultas de un permiso ya abierto: el que dice el
+ * permiso, y solo si sigue configurado con la misma dirección que tenía al
+ * entrar. Si lo quitaron o le cambiaron la dirección, `null`: el permiso ya
+ * no vale y hay que entrar de nuevo. Nunca se usa otro portal en su lugar.
+ */
+export async function permitPortal(portals: GenesisPortal[], data: Pick<PermitData, "portal" | "mark">): Promise<GenesisPortal | null> {
+  const portal = findPortal(portals, data.portal);
+  if (!portal) return null;
+  return (await portalMark(portal.site)) === data.mark ? portal : null;
 }
 
 /* --- La red ---------------------------------------------------------------------------------- */
@@ -578,7 +653,7 @@ Deno.serve(async (request) => {
   }
   if (!body || typeof body !== "object" || Array.isArray(body)) return json({ error: "El pedido no es JSON.", code: "datos" }, 400);
   const action = String(body.action ?? "");
-  if (!["conectar", "historico", "poligrafo_pdf"].includes(action)) return json({ error: "Acción desconocida.", code: "datos" }, 400);
+  if (!["portales", "conectar", "historico", "poligrafo_pdf"].includes(action)) return json({ error: "Acción desconocida.", code: "datos" }, 400);
 
   try {
     /* --- Quién llama: solo una cuenta de Pilo activa, de estudiante ---------------------------- */
@@ -611,21 +686,42 @@ Deno.serve(async (request) => {
       return Number(data ?? 0) > limit ? Math.max(1, Math.ceil((start + windowSeconds * 1000 - now) / 1000)) : null;
     };
     // «conectar» prueba una contraseña de Génesis: pocos intentos, para que esto no sirva para adivinarla.
-    const [perUser, perIp] = action === "conectar" ? [6, 20] : action === "historico" ? [30, 90] : [10, 30];
+    const [perUser, perIp] = action === "conectar" ? [6, 20] : action === "historico" ? [30, 90] : action === "portales" ? [60, 180] : [10, 30];
     const retry = (await limited(`${action}:u`, perUser, 600, userId)) ?? (await limited(`${action}:i`, perIp, 600, ip));
     if (retry) return json({ error: "Va muy rápido: espere un momento antes de volver a intentarlo.", code: "limite", retry_after: retry }, 429, { "Retry-After": String(retry) });
 
-    /* --- La dirección de Génesis: la de la administración, nunca la del navegador --------------- */
-    const space = await admin.from("pilo_spaces").select("genesis_on, genesis_url").eq("id", "ensenanza").maybeSingle();
-    const row = (space.data ?? null) as { genesis_on?: unknown; genesis_url?: unknown } | null;
-    // Sin la migración 0131, sin dirección o con Génesis apagado: aún no hay Mis notas.
-    if (space.error || !row || row.genesis_on !== true) return fail(OFF);
-    const site = genesisSite(row.genesis_url);
-    if (!site.ok) return fail(OFF);
+    /* --- Los portales de Génesis: los de la administración, nunca una dirección del navegador --- */
+    const space = await admin.from("pilo_spaces").select("genesis_on, genesis_portals, genesis_advice").eq("id", "ensenanza").maybeSingle();
+    const row = (space.data ?? null) as { genesis_on?: unknown; genesis_portals?: unknown; genesis_advice?: unknown } | null;
+    // Sin la migración 0131, sin ningún portal que pase la revisión o con Génesis apagado: aún no hay Mis notas.
+    const portals = space.error || !row || row.genesis_on !== true ? [] : genesisPortals(row.genesis_portals);
+
+    /* --- Las sedes: lo que la app puede saber (id y nombre; la dirección no viaja) -------------- */
+    if (action === "portales") return json({ on: portals.length > 0, portals: publicPortals(portals) });
+    if (!portals.length) return fail(OFF);
+
+    // El secreto de la firma del permiso: solo vive aquí.
+    const secret = Deno.env.get("PILO_GENESIS_SECRET") || serviceKey;
+
+    /* --- A cuál portal: al conectar, el de la sede elegida; después, el del permiso firmado ----- */
+    let site: GenesisPortal | null = null;
+    let opened: PermitData | null = null;
+    if (action === "conectar") {
+      site = findPortal(portals, body.portal);
+      if (!site) return fail(FAULTS.portal);
+    } else {
+      const read = await openPermit(body.permit, secret, userId, Math.floor(Date.now() / 1000));
+      if (!read.ok) return fail(FAULTS.permiso);
+      opened = read.data;
+      // El portal es el del permiso, con la dirección que tenía al entrar: si ya no está o cambió, hay que entrar de nuevo.
+      site = await permitPortal(portals, opened);
+      if (!site) return fail(FAULTS.permiso);
+    }
+    const target = site;
     // Un nombre público que resuelve a una red interna tampoco pasa (donde la plataforma deja preguntar).
     const dns = (Deno as unknown as { resolveDns?: (host: string, type: string) => Promise<unknown[]> }).resolveDns;
     if (typeof dns === "function") {
-      const answers = await Promise.all(["A", "AAAA"].map((type) => dns(site.host, type).then((list) => (Array.isArray(list) ? list.map(String) : []), () => [] as string[])));
+      const answers = await Promise.all(["A", "AAAA"].map((type) => dns(target.host, type).then((list) => (Array.isArray(list) ? list.map(String) : []), () => [] as string[])));
       if (answers.flat().some(privateAddress)) return fail(OFF);
     }
 
@@ -635,7 +731,7 @@ Deno.serve(async (request) => {
     type Result = { ok: true; msg: unknown } | { ok: false; fault: Fault };
     const ask = async (route: GenesisRoute, access: GenesisAccess | undefined, payload: string | null, max = MAX_BYTES): Promise<Result> => {
       // Fuera de la lista cerrada no se llama nada.
-      const address = genesisAddress(site.site, route, access);
+      const address = genesisAddress(target.site, route, access);
       if (!address) return { ok: false, fault: FAULTS.permiso };
       const left = Math.min(CALL_MS, deadline - Date.now());
       if (calls >= MAX_CALLS || left < 1_000) return { ok: false, fault: FAULTS.tiempo };
@@ -665,9 +761,6 @@ Deno.serve(async (request) => {
       }
     };
 
-    // El secreto de la firma del permiso: solo vive aquí.
-    const secret = Deno.env.get("PILO_GENESIS_SECRET") || serviceKey;
-
     /* --- Conectar: la contraseña se usa una vez para entrar y no se guarda ----------------------- */
     if (action === "conectar") {
       const creds = credentials(body);
@@ -678,15 +771,14 @@ Deno.serve(async (request) => {
       const login = shapeLogin(entered.msg, creds.code);
       if (!login.ok) return fail(login.fault);
       const expires = Math.floor(Date.now() / 1000) + PERMIT_SECONDS;
-      const permit = await signPermit({ ...login.access, period: login.head.period, owner: userId, exp: expires }, secret);
-      return json({ permit, expires, head: login.head });
+      const permit = await signPermit({ ...login.access, portal: target.id, mark: await portalMark(target.site), period: login.head.period, owner: userId, exp: expires }, secret);
+      return json({ permit, expires, head: login.head, portal: { id: target.id, name: target.name } });
     }
 
     /* --- Lo demás lleva el permiso firmado que guarda el navegador ------------------------------- */
-    const opened = await openPermit(body.permit, secret, userId, Math.floor(Date.now() / 1000));
-    if (!opened.ok) return fail(FAULTS.permiso);
+    if (!opened) return fail(FAULTS.permiso);
     // El código del estudiante es el del permiso: del pedido no se lee ninguno.
-    const access: GenesisAccess = { token: opened.data.token, apiKey: opened.data.apiKey, code: opened.data.code };
+    const access: GenesisAccess = { token: opened.token, apiKey: opened.apiKey, code: opened.code };
 
     /* --- Histórico: el polígrafo, completado con el récord de notas ----------------------------- */
     if (action === "historico") {
@@ -695,12 +787,12 @@ Deno.serve(async (request) => {
       // Si el permiso venció a mitad de camino, se dice; si el récord no se deja leer, queda el polígrafo.
       if (!record.ok && record.fault.code === "permiso") return fail(record.fault);
       const periods = mergeHistory(shapePolygraph(polygraph.msg), record.ok ? shapeRecord(record.msg) : new Map());
-      return json({ periods, record: record.ok });
+      return json({ periods, record: record.ok, advice: row?.genesis_advice === true });
     }
 
     /* --- El polígrafo oficial, en PDF, tal como lo entrega Génesis ------------------------------- */
-    if (!opened.data.period) return fail(FAULTS.pdf);
-    const file = await ask("poligrafo_pdf", access, pdfBody(access.code, opened.data.period), MAX_PDF_BYTES);
+    if (!opened.period) return fail(FAULTS.pdf);
+    const file = await ask("poligrafo_pdf", access, pdfBody(access.code, opened.period), MAX_PDF_BYTES);
     if (!file.ok) return fail(file.fault);
     const pdf = pdfBase64(file.msg);
     if (!pdf) return fail(FAULTS.pdf);

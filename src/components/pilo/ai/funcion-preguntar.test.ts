@@ -3623,3 +3623,178 @@ describe("relaciones, premisas de las capciosas y análisis (0130)", () => {
     });
   });
 });
+
+/* --- Mis notas: las recomendaciones de «Mi evolución» (acción «evolucion», 0131) ---------------
+   Los datos son inventados. No se llama a ninguna IA de verdad. */
+describe("evolucion: las recomendaciones de Mis notas (0131)", () => {
+  const pilo = { Authorization: "Bearer sesion-pilo" };
+  const camila = { status: "activa", rol: "estudiante", campus: "cucuta", nick: "Cami", tone: "cercano", length: "normal", about: "Trabajo en las tardes.", program: "Ingeniería de Pruebas" };
+  const summary = {
+    program: "Ingeniería de Pruebas",
+    goals: { accumulated: 4.2, semester: 4.5 },
+    periods: [
+      { id: "2025A", average: 2.9, accumulated: 3.3, courses: [{ name: "Física II", credits: 3, def: 2.6, state: "reprobada" }, { name: "Álgebra lineal", credits: 3, def: 3.2, state: "aprobada" }] },
+      { id: "2025B", average: 3.8, accumulated: 3.5, courses: [{ name: "Física II", credits: 3, def: 3.5, state: "aprobada" }, { name: "Programación", credits: 3, def: 4.1, state: "aprobada" }] },
+    ],
+  };
+  const good = {
+    areas: [{ nombre: "Ciencias básicas", materias: [1, 3] }, { nombre: "Matemáticas", materias: [2, 2, 9] }, { nombre: "Área profesional", materias: [4, 1] }],
+    recomendaciones: [
+      { titulo: "Refuerce Física II", porque: "Fue su definitiva más baja, 2,6, y la repitió.", accion: "Revise los 3 momentos de la evaluación formativa de su curso.", fuentes: [1, 7] },
+      { titulo: "Apóyese en lo que le funciona", porque: "En Programación sacó 4,1.", accion: "Mantenga su rutina de estudio.", fuentes: [] },
+      { titulo: "Una cifra inventada", porque: "El 87 % de los estudiantes mejora con tutorías.", accion: "Pida una tutoría.", fuentes: [] },
+    ],
+  };
+  const reply = (content: unknown) => () => new Response(JSON.stringify({ choices: [{ message: { content: typeof content === "string" ? content : JSON.stringify(content) }, finish_reason: "stop" }] }), { headers: { "Content-Type": "application/json" } });
+  const onWorld = (over: Row = {}) => {
+    const w = teachWorld({ genesis_on: true, genesis_advice: true, ...over });
+    w.members = { "pilo-1": camila };
+    return w;
+  };
+  const evolucion = (handler: Handler, body: Row = {}, headers: Record<string, string> = pilo) => ask(handler, { action: "evolucion", portal: "ensenanza", summary, ...body }, headers);
+
+  it("escribe áreas y recomendaciones con sus fuentes, y descarta lo que no se sostiene", async () => {
+    const w = onWorld();
+    const calls = provider(reply(good));
+    const response = await evolucion(await boot(w));
+    expect(response.status).toBe(200);
+    expect(response.headers.get("Cache-Control")).toBe("no-store");
+    const out = (await response.json()) as { courses: number; areas: Row[]; recs: Row[]; sources: Row[] };
+    expect(out.courses).toBe(4);
+    // Cada materia en una sola área; los números que no existen se descartan.
+    expect(out.areas).toEqual([{ name: "Ciencias básicas", courses: [0, 2] }, { name: "Matemáticas", courses: [1] }, { name: "Área profesional", courses: [3] }]);
+    // La de la cifra inventada no sale; la que cita un documento es «con documento» y la otra, general.
+    expect(out.recs.map((r) => [r.title, r.grounded, r.sources])).toEqual([["Refuerce Física II", true, [1]], ["Apóyese en lo que le funciona", false, []]]);
+    expect(out.sources).toEqual([{ n: 1, title: "Política de evaluación", section: "Capítulo 2", path: "" }]);
+    expect(calls).toHaveLength(1);
+  });
+
+  it("a la IA va el resumen y lo que el servidor sabe de la cuenta: nunca el nombre ni el apodo", async () => {
+    const w = onWorld();
+    const calls = provider(reply(good));
+    await evolucion(await boot(w), { summary: { ...summary, name: "Camila Inventada", code: "00000000042", email: "camila@ejemplo.test" } });
+    const sent = JSON.stringify(calls[0].body.messages);
+    expect(sent).toContain("Ingeniería de Pruebas");
+    expect(sent).toContain("Sede: Cúcuta");
+    expect(sent).toContain("Trabajo en las tardes.");
+    expect(sent).toContain("Meta de promedio acumulado: 4,2");
+    expect(sent).toContain("Física II · 3 créditos · definitiva 2,6 · reprobada");
+    for (const personal of ["Cami", "Camila", "00000000042", "ejemplo.test", "pilo-1"]) expect(sent, personal).not.toContain(personal);
+  });
+
+  it("busca solo en la memoria de Enseñanza, con el lector de siempre", async () => {
+    const w = onWorld();
+    provider(reply(good));
+    await evolucion(await boot(w));
+    const searches = argsOf(w, "pilo_memory_search");
+    expect(searches.length).toBeGreaterThan(0);
+    for (const args of searches) {
+      expect(args).toMatchObject({ p_space: "ensenanza", p_public_only: true });
+      expect(args.p_sources).toEqual(expect.arrayContaining(["politicas"]));
+      expect(args.p_sources).not.toContain("cifras");
+    }
+  });
+
+  it("no guarda nada: en la bitácora quedan la acción y el estado, sin el resumen", async () => {
+    const w = onWorld();
+    provider(reply(good));
+    await evolucion(await boot(w));
+    expect(w.logs).toHaveLength(1);
+    expect(w.logs[0]).toMatchObject({ action: "evolucion", status: "listo", subject: "", profile_id: null, space: "ensenanza" });
+    expect(JSON.stringify(w.logs)).not.toMatch(/Física|2\.6|2,6|Ingeniería/);
+    expect(w.saved).toEqual([]);
+    expect(w.inbox).toEqual([]);
+    expect(w.answers).toEqual([]);
+    for (const name of w.calls.map((c) => c.name)) expect(["pilo_scope", "pilo_visitor_hit", "pilo_memory_search", "pilo_memory_semantic", "pilo_embed_status"], name).toContain(name);
+  });
+
+  it("solo un estudiante con cuenta de Pilo activa", async () => {
+    const calls = provider(reply(good));
+    const handler = await boot(onWorld());
+    expect((await evolucion(handler, {}, {})).status).toBe(403);
+    expect((await evolucion(handler, {}, { Authorization: "Bearer sesion-admin" })).status).toBe(403);
+    for (const account of [{ ...camila, rol: "profesor" }, { ...camila, rol: "administrativo" }, { ...camila, status: "suspendida" }]) {
+      const w = onWorld();
+      w.members = { "pilo-1": account };
+      const response = await evolucion(await boot(w));
+      expect(response.status, account.rol + account.status).toBe(403);
+    }
+    expect(calls).toHaveLength(0);
+  });
+
+  it("apagada de partida: sin el interruptor, sin Mis notas o con la IA apagada, no se llama a nadie", async () => {
+    const calls = provider(reply(good));
+    for (const w of [onWorld({ genesis_advice: false }), onWorld({ genesis_on: false }), onWorld({ genesis_advice: undefined, genesis_on: undefined })]) {
+      const response = await evolucion(await boot(w));
+      expect(response.status).toBe(403);
+      expect(await response.json()).toMatchObject({ code: "apagado" });
+      expect(w.logs).toEqual([]);
+    }
+    const off = onWorld();
+    off.settings = { ...off.settings, enabled: false };
+    expect(await (await evolucion(await boot(off))).json()).toMatchObject({ code: "apagado" });
+    expect(calls).toHaveLength(0);
+  });
+
+  it("solo en Enseñanza: desde otro portal no se atiende", async () => {
+    const calls = provider(reply(good));
+    const response = await evolucion(await boot(onWorld()), { portal: "pregunta" });
+    expect(response.status).toBe(400);
+    expect(calls).toHaveLength(0);
+  });
+
+  it("tiene tope del día por cuenta, y la huella no lleva nada del resumen", async () => {
+    const w = onWorld();
+    w.hits = 5;
+    const calls = provider(reply(good));
+    const response = await evolucion(await boot(w));
+    expect(response.status).toBe(429);
+    expect(await response.json()).toMatchObject({ code: "tope" });
+    expect(calls).toHaveLength(0);
+    expect(w.logs.map((l) => [l.action, l.status, l.subject])).toEqual([["evolucion", "tope", ""]]);
+    const fine = onWorld();
+    fine.hits = 4;
+    provider(reply(good));
+    expect((await evolucion(await boot(fine))).status).toBe(200);
+    expect(fine.visitors).toHaveLength(1);
+    expect(fine.visitors[0]).toMatch(/^[0-9a-f]{40}$/);
+  });
+
+  it("sin notas que leer, o con un pedido enorme, no llama a la IA", async () => {
+    const calls = provider(reply(good));
+    const handler = await boot(onWorld());
+    for (const bad of [null, "texto", {}, { periods: [] }, { periods: [{ id: "malo", courses: [{ name: "X y Z", credits: 3, def: 3, state: "aprobada" }] }] }]) {
+      const response = await evolucion(handler, { summary: bad });
+      expect(response.status, JSON.stringify(bad)).toBe(400);
+      expect(await response.json()).toMatchObject({ code: "datos" });
+    }
+    expect((await evolucion(handler, { relleno: "x".repeat(41_000) })).status).toBe(413);
+    expect(calls).toHaveLength(0);
+  });
+
+  it("si la IA no escribe nada que pase la revisión, o falla, lo dice sin detalle", async () => {
+    const w = onWorld();
+    provider(reply("No puedo ayudar con eso."));
+    const empty = await evolucion(await boot(w));
+    expect(empty.status).toBe(502);
+    expect(await empty.json()).toEqual({ error: expect.any(String), code: "vacio" });
+    const down = onWorld();
+    provider(() => new Response("clave vencida de la cuenta 123", { status: 500 }));
+    const failed = await evolucion(await boot(down));
+    expect(failed.status).toBe(502);
+    expect(JSON.stringify(await failed.json())).not.toContain("clave vencida");
+    expect(down.logs.map((l) => [l.status, l.subject])).toEqual([["error 500", ""]]);
+  });
+
+  it("sin documentos en la memoria, todas las recomendaciones salen generales", async () => {
+    const w = onWorld();
+    w.memory = [];
+    const calls = provider(reply(good));
+    const out = (await (await evolucion(await boot(w))).json()) as { recs: Row[]; sources: Row[] };
+    expect(out.sources).toEqual([]);
+    // La que citaba un documento de la universidad traía «3 momentos», que no está en el resumen: aquí
+    // 3 es un número pequeño y pasa, pero ya no tiene fuente que citar.
+    expect(out.recs.every((r) => r.grounded === false && (r.sources as unknown[]).length === 0)).toBe(true);
+    expect(JSON.stringify(calls[0].body.messages)).toContain("Ninguno: todas las recomendaciones son generales.");
+  });
+});

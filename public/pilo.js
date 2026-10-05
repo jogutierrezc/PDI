@@ -93,9 +93,10 @@
   // Lo que no es contenido, lo que la persona escribe y lo que la página pide no leer.
   var SKIP = "script,style,noscript,template,svg,canvas,iframe,object,embed,video,audio,nav,footer,form,input,textarea,select,option,button,[contenteditable],[aria-hidden='true'],[hidden],[data-pilo-ignorar]";
   // Leyendo todo, lo oculto no se descarta de entrada (lo deciden las reglas) y el botón que abre un
-  // acordeón se lee como su título. A cambio se suman los diálogos, los menús y las copias de los carruseles.
+  // acordeón se lee como su título. Las pestañas no se leen sueltas: cada panel entra con el nombre de la
+  // suya. A cambio se suman los diálogos, los menús y las copias de los carruseles.
   var NEVER =
-    "script,style,noscript,template,svg,canvas,iframe,object,embed,video,audio,nav,footer,form,input,textarea,select,option,datalist,button:not([aria-controls]),[contenteditable],[data-pilo-ignorar]," +
+    "script,style,noscript,template,svg,canvas,iframe,object,embed,video,audio,nav,footer,form,input,textarea,select,option,datalist,button:not([aria-controls]),[role='tab'],[contenteditable],[data-pilo-ignorar]," +
     "dialog,[role='dialog'],[role='alertdialog'],[aria-modal='true'],menu,[role='menu'],[role='menubar'],[role='listbox'],[role='tooltip'],.slick-cloned,.swiper-slide-duplicate,.owl-item.cloned";
 
   /* --- Las reglas de lectura (sin DOM; se prueban en src/modules/pilo-embed/pilo-leer.test.ts) --- */
@@ -245,12 +246,12 @@
       if (owner !== last) {
         last = owner;
         var hidden = all ? folded(node) : 0;
-        // Un panel de pestaña plegado entra con el nombre de su pestaña por título: sin él no se sabe de qué habla.
-        var panel = hidden && owner.closest ? owner.closest("[role='tabpanel']") : null;
+        // Un panel de pestaña entra con el nombre de su pestaña por título: sin él no se sabe de qué habla.
+        var panel = all && owner.closest ? owner.closest("[role='tabpanel']") : null;
         if (panel && panel !== lastPanel && root.contains(panel)) {
           lastPanel = panel;
           var label = panelLabel(panel);
-          if (label.length > 1) blocks.push({ h: 1, t: label, o: 1 });
+          if (label.length > 1) blocks.push(hidden ? { h: 1, t: label, o: 1 } : { h: 1, t: label });
         }
         // Leyendo todo, el <summary> y el botón que abre un acordeón son el título de lo que despliegan.
         var heading = owner.closest ? owner.closest(all ? "h1,h2,h3,h4,h5,h6,[role='heading'],summary,button[aria-controls]" : "h1,h2,h3,h4,h5,h6,[role='heading']") : null;

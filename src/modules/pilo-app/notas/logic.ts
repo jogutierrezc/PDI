@@ -1,10 +1,13 @@
 /* =============================================================================
    Mr. Pilo · Mis notas (beta) · las reglas de la página, en un solo sitio.
 
-   Quién ve Mis notas, dónde vive el permiso de Génesis, qué quiere decir cada
-   error de la función `pilo-genesis`, cómo se lee el histórico, y todo lo de
+   Quién ve Mis notas, a cuál portal de Génesis entra (hay uno por sede),
+   dónde vive el permiso, qué quiere decir cada error de la función
+   `pilo-genesis`, cómo se lee el histórico, y todo lo de
    «Mi evolución»: la tabla de promedios, la geometría de la gráfica, lo que
-   Pilo ve en el récord y la pregunta con que se le piden recomendaciones.
+   Pilo ve en el récord, la cuenta de la meta y las recomendaciones: el
+   resumen sin datos personales que se envía a la IA cuando la persona las
+   pide, y cómo se lee lo que vuelve.
 
    El permiso de Génesis (firmado por la función, de solo lectura):
      · nunca está en el servidor: la función lo devuelve y aquí se queda;
@@ -14,17 +17,23 @@
      · va atado a la cuenta de Pilo que lo pidió: otra cuenta en el mismo
        dispositivo no lo recibe, y encontrarlo lo borra;
      · vence solo (la función dice cuándo): vencido, se borra;
-     · «Desconectar» lo borra de los dos sitios de inmediato.
+     · lleva la sede en que se entró (su id y su nombre, nunca la dirección
+       del portal), para decirla en la pantalla;
+     · «Desconectar» lo borra de los dos sitios de inmediato, con su sede.
    La contraseña de Génesis no pasa por aquí: va del formulario a la función y
    no se guarda en ningún lado. Las notas tampoco se guardan: viven en la
    memoria de la pantalla mientras está abierta.
 
-   Los hallazgos de «Mi evolución» se CALCULAN aquí, en el dispositivo, con
-   las notas que llegaron: nada de eso lo redacta una IA ni sale a ningún lado.
+   Los hallazgos de «Mi evolución», la meta y TODOS los números de las
+   gráficas se CALCULAN aquí, en el dispositivo, con las notas que llegaron.
+   La IA propone cómo agrupar las materias en áreas y redacta las
+   recomendaciones; nunca pone una cifra. Las recomendaciones no se guardan:
+   viven en la memoria de la pantalla.
 
    Puro: se prueba en node.
    ========================================================================== */
 
+import { MAX_PORTALS, genesisSite } from "./servidor-logica";
 import type { NotaCourse, NotaPeriod, NotasHead } from "./servidor-logica";
 
 export type { NotaCourse, NotaPeriod, NotasHead };
@@ -34,6 +43,130 @@ export type { NotaCourse, NotaPeriod, NotasHead };
 /** Mis notas es de estudiantes con cuenta de Pilo activa: Génesis es el portal del estudiante. */
 export const canUseNotas = (account: { rol: string; status: string } | null | undefined): boolean => Boolean(account) && account!.status === "activa" && account!.rol === "estudiante";
 
+/* --- La sede: a cuál portal de Génesis se entra ---------------------------------------------- */
+
+/** Lo que la app sabe de un portal de Génesis: su id y el nombre de la sede. La dirección no llega aquí. */
+export interface PortalInfo {
+  id: string;
+  name: string;
+}
+
+export interface PortalList {
+  /** La administración encendió Mis notas y hay al menos un portal. */
+  on: boolean;
+  portals: PortalInfo[];
+}
+
+const portalIdShape = (v: unknown): v is string => typeof v === "string" && /^[a-z][a-z0-9-]{1,23}$/.test(v);
+
+/** Un portal tal como se usa aquí; `null` si no se entiende. */
+export function parsePortal(raw: unknown): PortalInfo | null {
+  const p = (raw && typeof raw === "object" ? raw : {}) as Record<string, unknown>;
+  const name = typeof p.name === "string" ? p.name.trim().slice(0, 60) : "";
+  return portalIdShape(p.id) && name ? { id: p.id, name } : null;
+}
+
+/** La lista de sedes que responde la función; lo que no se entiende se descarta. */
+export function parsePortals(body: unknown): PortalList {
+  const b = (body && typeof body === "object" ? body : {}) as Record<string, unknown>;
+  const portals: PortalInfo[] = [];
+  for (const raw of Array.isArray(b.portals) ? b.portals : []) {
+    const p = parsePortal(raw);
+    if (p && !portals.some((x) => x.id === p.id)) portals.push(p);
+  }
+  return { on: b.on === true && portals.length > 0, portals };
+}
+
+/** Un nombre para comparar: sin tildes, sin mayúsculas y sin signos. */
+export const plainName = (text: string): string =>
+  String(text ?? "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, " ")
+    .trim();
+
+/**
+ * El portal de la sede de la cuenta de Pilo (`pilo_users.campus`:
+ * «bucaramanga», «cucuta»…). Casa si el nombre del portal (o su id) es esa
+ * sede, sin distinguir tildes ni mayúsculas: «Cúcuta» casa con «cucuta». Si
+ * ninguno es igual, vale el único portal cuyo nombre la trae como palabra
+ * («Sede Bucaramanga»); con dos que la traigan, no se adivina.
+ */
+export function matchPortal(portals: PortalInfo[], campus: string | null | undefined): PortalInfo | null {
+  const wanted = plainName(campus ?? "");
+  if (!wanted) return null;
+  const exact = portals.find((p) => plainName(p.name) === wanted || plainName(p.id) === wanted);
+  if (exact) return exact;
+  const loose = portals.filter((p) => ` ${plainName(p.name)} `.includes(` ${wanted} `));
+  return loose.length === 1 ? loose[0] : null;
+}
+
+/**
+ * La sede con que abre el ingreso: con un solo portal, ese (no se pregunta);
+ * con varios, el de la sede de la cuenta si casa con alguno; si no, ninguna:
+ * la persona elige.
+ */
+export function pickPortal(portals: PortalInfo[], campus: string | null | undefined): string | null {
+  if (portals.length === 1) return portals[0].id;
+  return matchPortal(portals, campus)?.id ?? null;
+}
+
+/* --- La sede, en la intranet: la lista que escribe la administración --------------------------- */
+
+/** Un portal como lo escribe la administración. `id` vacío: es nuevo y aún no tiene. */
+export interface PortalRow {
+  id: string;
+  name: string;
+  url: string;
+}
+
+/**
+ * El id de un portal nuevo, sacado de su nombre: corto, en minúsculas y sin
+ * tildes («Cúcuta» → «cucuta»). Si ya está tomado, lleva un número. Una vez
+ * guardado no cambia aunque cambie el nombre: los permisos lo llevan dentro.
+ */
+export function portalSlug(name: string, taken: string[]): string {
+  let base = plainName(name).replace(/ /g, "-").slice(0, 20).replace(/-+$/, "");
+  if (!/^[a-z]/.test(base)) base = `sede${base ? `-${base}` : ""}`.slice(0, 20).replace(/-+$/, "");
+  if (base.length < 2) base = "sede";
+  let id = base;
+  for (let n = 2; taken.includes(id); n++) id = `${base}-${n}`;
+  return id;
+}
+
+export type PortalRowsCheck =
+  | { ok: true; portals: { id: string; name: string; url: string }[] }
+  | { ok: false; errors: Record<number, { name?: string; url?: string }>; why?: string };
+
+/**
+ * La lista de portales antes de guardarla: cada fila con su nombre y su
+ * dirección (la misma regla de la función: https, dominio público, sin ruta;
+ * puede llevar puerto), sin nombres ni direcciones repetidos y sin pasar del
+ * tope. Devuelve la lista lista para guardar, en el orden en que está escrita,
+ * o qué le falta a cada fila.
+ */
+export function checkPortalRows(rows: PortalRow[]): PortalRowsCheck {
+  const errors: Record<number, { name?: string; url?: string }> = {};
+  if (rows.length > MAX_PORTALS) return { ok: false, errors, why: `Son máximo ${MAX_PORTALS} portales.` };
+  const out: { id: string; name: string; url: string }[] = [];
+  const taken = rows.map((r) => r.id).filter(portalIdShape);
+  rows.forEach((row, i) => {
+    const name = row.name.replace(/\s+/g, " ").trim();
+    const site = genesisSite(row.url);
+    const problem: { name?: string; url?: string } = {};
+    if (!name) problem.name = "Escriba el nombre de la sede.";
+    else if (name.length > 60) problem.name = "El nombre es demasiado largo (máximo 60 caracteres).";
+    else if (out.some((p) => plainName(p.name) === plainName(name))) problem.name = "Ya hay un portal con ese nombre.";
+    if (!site.ok) problem.url = site.reason;
+    else if (out.some((p) => p.url === site.site)) problem.url = "Esa dirección ya está en otro portal.";
+    if (problem.name || problem.url || !site.ok) return void (errors[i] = problem);
+    const id = portalIdShape(row.id) && !out.some((p) => p.id === row.id) ? row.id : portalSlug(name, [...taken, ...out.map((p) => p.id)]);
+    out.push({ id, name, url: site.site });
+  });
+  return Object.keys(errors).length ? { ok: false, errors } : { ok: true, portals: out };
+}
+
 /* --- El permiso, en el dispositivo ---------------------------------------------------------- */
 
 export interface Link {
@@ -42,6 +175,8 @@ export interface Link {
   /** Cuándo vence, en segundos desde 1970 (UTC). */
   expires: number;
   head: NotasHead;
+  /** La sede en que se entró: su id y su nombre, para decirla en la pantalla. */
+  portal: PortalInfo;
   /** Quedó guardado en este dispositivo (si no, solo en la memoria de la pestaña). */
   kept: boolean;
 }
@@ -59,6 +194,7 @@ interface Held {
   permit: string;
   expires: number;
   head: NotasHead;
+  portal: PortalInfo;
 }
 
 /** Lo que vive solo mientras la pestaña está abierta. */
@@ -91,9 +227,11 @@ export function parseHead(raw: unknown): NotasHead {
 function parseHeld(raw: string | null): Held | null {
   if (!raw) return null;
   try {
-    const d = JSON.parse(raw) as { v?: unknown; owner?: unknown; permit?: unknown; expires?: unknown; head?: unknown };
-    if (d?.v !== 1 || typeof d.owner !== "string" || !d.owner || !permitShape(d.permit) || !whole(d.expires)) return null;
-    return { owner: d.owner, permit: d.permit, expires: whole(d.expires), head: parseHead(d.head) };
+    const d = JSON.parse(raw) as { v?: unknown; owner?: unknown; permit?: unknown; expires?: unknown; head?: unknown; portal?: unknown };
+    const portal = parsePortal(d?.portal);
+    // Un permiso sin su sede no se entiende: no se sabría a qué portal pertenece.
+    if (d?.v !== 1 || typeof d.owner !== "string" || !d.owner || !permitShape(d.permit) || !whole(d.expires) || !portal) return null;
+    return { owner: d.owner, permit: d.permit, expires: whole(d.expires), head: parseHead(d.head), portal };
   } catch {
     return null;
   }
@@ -112,12 +250,12 @@ const drop = (store: LinkStore | null) => {
  * él, solo en memoria (y borra el que hubiera guardado). Dice si quedó en el
  * dispositivo: con el almacenamiento lleno o bloqueado, queda en memoria.
  */
-export function saveLink(owner: string, link: { permit: string; expires: number; head: NotasHead }, keep: boolean, store: LinkStore | null = deviceStore()): Link {
-  memory = { owner, permit: link.permit, expires: link.expires, head: link.head };
+export function saveLink(owner: string, link: { permit: string; expires: number; head: NotasHead; portal: PortalInfo }, keep: boolean, store: LinkStore | null = deviceStore()): Link {
+  memory = { owner, permit: link.permit, expires: link.expires, head: link.head, portal: link.portal };
   let kept = false;
   if (keep && store) {
     try {
-      store.setItem(LINK_KEY, JSON.stringify({ v: 1, owner, permit: link.permit, expires: link.expires, head: link.head }));
+      store.setItem(LINK_KEY, JSON.stringify({ v: 1, owner, permit: link.permit, expires: link.expires, head: link.head, portal: link.portal }));
       kept = true;
     } catch {
       kept = false;
@@ -144,12 +282,12 @@ export function readLink(owner: string, now: number = Date.now(), store: LinkSto
     stored = null;
   }
   if (memory && !live(memory)) memory = null;
-  if (stored) return { permit: stored.permit, expires: stored.expires, head: stored.head, kept: true };
-  if (memory) return { permit: memory.permit, expires: memory.expires, head: memory.head, kept: false };
+  if (stored) return { permit: stored.permit, expires: stored.expires, head: stored.head, portal: stored.portal, kept: true };
+  if (memory) return { permit: memory.permit, expires: memory.expires, head: memory.head, portal: memory.portal, kept: false };
   return null;
 }
 
-/** «Desconectar»: el permiso se borra de la memoria y del dispositivo, de inmediato. */
+/** «Desconectar»: el permiso, con su sede, se borra de la memoria y del dispositivo, de inmediato. */
 export function clearLink(store: LinkStore | null = deviceStore()): void {
   memory = null;
   drop(store);
@@ -159,12 +297,12 @@ export function clearLink(store: LinkStore | null = deviceStore()): void {
 
 export type NotasCode =
   | "sesion" | "cuenta" | "perfil" | "suspendida" | "limite" | "no_disponible" | "datos"
-  | "credenciales" | "no_estudiante" | "permiso" | "pdf"
+  | "credenciales" | "no_estudiante" | "permiso" | "pdf" | "portal"
   | "tiempo" | "red" | "tamano" | "genesis" | "interno"
   /** Los que pone la página: sin red, la función no está desplegada, o respondió algo que no se entiende. */
   | "sin_red" | "sin_funcion" | "desconocido";
 
-const SERVER: string[] = ["sesion", "cuenta", "perfil", "suspendida", "limite", "no_disponible", "datos", "credenciales", "no_estudiante", "permiso", "pdf", "tiempo", "red", "tamano", "genesis", "interno"];
+const SERVER: string[] = ["sesion", "cuenta", "perfil", "suspendida", "limite", "no_disponible", "datos", "credenciales", "no_estudiante", "permiso", "pdf", "portal", "tiempo", "red", "tamano", "genesis", "interno"];
 
 const FALLBACK: Record<NotasCode, string> = {
   sesion: "Para ver sus notas, entre con su cuenta de Pilo.",
@@ -178,6 +316,7 @@ const FALLBACK: Record<NotasCode, string> = {
   no_estudiante: "Mis notas es para estudiantes: esa cuenta de Génesis no es de estudiante.",
   permiso: "Su permiso de Génesis venció o fue retirado. Conecte de nuevo sus notas.",
   pdf: "Génesis no entregó el polígrafo en PDF. Intente de nuevo en un momento.",
+  portal: "Elija su sede: esa no está entre los portales de Génesis que Pilo puede leer.",
   tiempo: "Génesis tardó demasiado en responder. Intente de nuevo en un momento.",
   red: "No pude conectarme con Génesis. Intente de nuevo en un momento.",
   tamano: "Génesis devolvió más de lo que Pilo puede leer de una vez.",
@@ -201,6 +340,8 @@ export type FailureView =
   | "cuenta"
   /** Se dice junto al campo de la contraseña de Génesis. */
   | "campo"
+  /** La sede elegida ya no está: se dice junto a la sede y se vuelve a leer la lista. */
+  | "sede"
   /** Se dice en la pantalla en que esté la persona, y puede reintentar. */
   | "aviso";
 
@@ -216,6 +357,7 @@ const VIEW: Partial<Record<NotasCode, FailureView>> = {
   credenciales: "campo",
   no_estudiante: "campo",
   datos: "campo",
+  portal: "sede",
 };
 
 export interface NotasFailure {
@@ -259,6 +401,8 @@ export interface History {
   periods: NotaPeriod[];
   /** El récord de notas se dejó leer (si no, faltan el grupo y la nota mínima). */
   record: boolean;
+  /** La administración encendió las recomendaciones con IA. */
+  advice: boolean;
 }
 
 const rows = (v: unknown): Record<string, unknown>[] => (Array.isArray(v) ? v.filter((x) => x && typeof x === "object") : []);
@@ -291,7 +435,7 @@ export function parseHistory(body: unknown): History {
     }))
     .filter((p) => p.id)
     .sort((a, b2) => (a.id < b2.id ? -1 : a.id > b2.id ? 1 : 0));
-  return { periods, record: b.record === true };
+  return { periods, record: b.record === true, advice: b.advice === true };
 }
 
 /* --- Los números y los nombres, dichos ------------------------------------------------------- */
@@ -559,30 +703,282 @@ export function nearestIndex(px: number, n: number): number {
   return Math.max(0, Math.min(n - 1, Math.round(((px - L) / (W - L - R)) * (n - 1))));
 }
 
-/* --- Lo que le recomiendo: la pregunta para Pilo ---------------------------------------------- */
+/* --- Qué necesita para llegar a su meta -------------------------------------------------------- */
 
-/** Lo más que cabe en la caja de la conversación cuando la pregunta llega escrita. */
-export const ASK_MAX = 500;
+/** La meta que puede elegir la persona: un promedio acumulado entre 3,0 y 5,0, de décima en décima. */
+export const GOAL = { min: 3, max: 5, step: 0.1 } as const;
+/** La nota más alta que se puede sacar. */
+export const TOP_MARK = 5;
+
+/** Los créditos que ya pesan en el promedio: los de las materias con definitiva, sin las homologadas ni las que van en curso. */
+export function gradedCredits(periods: NotaPeriod[], current = ""): number {
+  return periods.reduce((total, p) => total + p.courses.filter((c) => !c.homologated && c.def !== null && c.credits > 0 && !inProgress(p, c, current)).reduce((sum, c) => sum + c.credits, 0), 0);
+}
+
+export interface GoalInput {
+  /** El promedio acumulado de hoy. */
+  accumulated: number | null;
+  /** Los créditos que pesan en ese promedio (gradedCredits). */
+  graded: number;
+  /** Los créditos aprobados hasta hoy. */
+  approved: number;
+  /** Cuánto lleva del plan de estudios, en porcentaje de créditos (el encabezado de Génesis). */
+  percent: number | null;
+  /** La meta elegida. */
+  goal: number;
+}
+
+export type GoalPlan =
+  /** No hay con qué calcular: falta el promedio, los créditos o el avance. */
+  | { status: "sin_datos" }
+  /** Ya no le quedan créditos por cursar: el promedio no se mueve. */
+  | { status: "terminado"; accumulated: number }
+  /**
+   * `needed`: lo que debe promediar en los `remaining` créditos que faltan.
+   * «cumplida»: ya va en la meta o por encima (y `needed` es lo que la
+   * mantiene); «inalcanzable»: pediría más de 5,0, y `best` es a lo más que
+   * llega sacando 5,0 en todo lo que falta.
+   */
+  | { status: "posible" | "cumplida" | "inalcanzable"; needed: number; remaining: number; best: number; accumulated: number };
 
 /**
- * La pregunta que queda escrita en la conversación para pedirle
- * recomendaciones a Pilo. Lleva solo lo calculado aquí (promedios, periodos y
- * nombres de materias reprobadas): nunca el nombre de la persona, su código,
- * su documento ni su programa. La persona la lee, la cambia si quiere y la
- * envía; nada viaja antes de eso.
+ * Cuánto hay que promediar en lo que falta para cerrar con la meta. Aritmética
+ * pura: los créditos que faltan salen del avance (si lleva `approved` y eso
+ * es el `percent` % del plan, faltan approved × (100 − percent) / percent), y
+ * el promedio final es el de hoy y el de lo que falta, cada uno con sus
+ * créditos. Es una cuenta aproximada y así se le dice a la persona.
  */
-export function askRecommendations(periods: NotaPeriod[], current = ""): string {
+export function goalPlan(input: GoalInput): GoalPlan {
+  const { accumulated, graded, approved, percent } = input;
+  if (accumulated === null || !Number.isFinite(accumulated) || !(graded > 0) || !(approved > 0) || percent === null || !Number.isFinite(percent) || percent <= 0) return { status: "sin_datos" };
+  const goal = Math.min(GOAL.max, Math.max(GOAL.min, input.goal));
+  const remaining = Math.round((approved * (100 - Math.min(100, percent))) / percent);
+  if (remaining < 1) return { status: "terminado", accumulated };
+  const raw = (goal * (graded + remaining) - accumulated * graded) / remaining;
+  // Hacia arriba, a la centésima: con lo que se muestra, alcanza.
+  const needed = Math.max(0, Math.ceil(raw * 100 - 1e-7) / 100);
+  const best = Math.floor(((accumulated * graded + TOP_MARK * remaining) / (graded + remaining)) * 100 + 1e-7) / 100;
+  const status = accumulated >= goal ? "cumplida" : raw > TOP_MARK + 1e-9 ? "inalcanzable" : "posible";
+  return { status, needed, remaining, best, accumulated };
+}
+
+const creditsText = (n: number) => `${n} ${n === 1 ? "crédito" : "créditos"}`;
+
+/** El plan, dicho. Cada estado con sus palabras: nunca solo con un color. */
+export function goalText(plan: GoalPlan, goal: number): { title: string; detail: string } {
+  if (plan.status === "sin_datos") return { title: "Aún no puedo calcularlo", detail: "Me falta su promedio acumulado o su avance en el plan de estudios: Génesis no los trae todavía." };
+  if (plan.status === "terminado") return { title: "Ya no le quedan créditos por cursar", detail: `Según su avance en Génesis, su promedio acumulado queda en ${nota(plan.accumulated)}.` };
+  const left = `los ${creditsText(plan.remaining)} que le faltan`;
+  if (plan.status === "cumplida")
+    return {
+      title: `Ya va en ${nota(goal)} o más`,
+      detail: plan.needed <= PASS_MARK ? `Lleva ${nota(plan.accumulated)}. Con aprobar ${left}, la mantiene.` : `Lleva ${nota(plan.accumulated)}. Para mantenerla, promedie ${nota(plan.needed)} o más en ${left}.`,
+    };
+  if (plan.status === "inalcanzable")
+    return {
+      title: `${nota(goal)} ya no se alcanza`,
+      detail: `Pediría más de ${nota(TOP_MARK)} en ${left}. Sacando ${nota(TOP_MARK)} en todo, llegaría a ${nota(plan.best)}.`,
+    };
+  return { title: `Necesita promediar ${nota(plan.needed)}`, detail: `En ${left}, para cerrar con ${nota(goal)}. Hoy lleva ${nota(plan.accumulated)}.` };
+}
+
+/* --- Lo que le recomiendo: el resumen que se envía y lo que vuelve ------------------------------ */
+
+/** Los topes del resumen: los mismos que aplica la función (que además lo limpia por su cuenta). */
+export const ADVICE_PERIODS = 24;
+export const ADVICE_PERIOD_COURSES = 12;
+export const ADVICE_COURSES = 120;
+export const ADVICE_NAME = 80;
+
+export interface AdviceCourse {
+  name: string;
+  credits: number;
+  def: number | null;
+  state: CourseState;
+}
+
+/**
+ * El resumen que se envía a la IA cuando la persona pide recomendaciones, y
+ * solo entonces. No lleva nada que la identifique: ni nombre, ni código de
+ * estudiante, ni documento, ni los códigos de las materias. Lleva el programa
+ * y, por periodo, los promedios y las materias con sus créditos, su definitiva
+ * y su estado.
+ */
+export interface AdviceSummary {
+  program: string;
+  periods: { id: string; average: number | null; accumulated: number | null; courses: AdviceCourse[] }[];
+}
+
+const fiveOrNull = (v: number | null): number | null => (v !== null && v >= 0 && v <= TOP_MARK ? v : null);
+
+/** Arma el resumen, de los periodos más recientes hacia atrás hasta los topes, y lo deja en orden. */
+export function adviceSummary(periods: NotaPeriod[], head?: Partial<Pick<NotasHead, "program" | "period">> | null): AdviceSummary {
+  const current = head?.period ?? "";
   const evo = evolution(periods);
-  if (!evo.length) return "";
-  const said = findings(periods, { period: current })
-    .filter((f) => f.id !== "creditos")
-    .map((f) => f.text.replace(/^Su /, "Mi ").replace(/^Reprobó/, "Reprobé").replace(/^No ha reprobado/, "No he reprobado").replace(/^En (\S+) su promedio/, "En $1 mi promedio").replace(/La repitió y la aprobó/, "La repetí y la aprobé").replace(/Las repitió y las aprobó/, "Las repetí y las aprobé").replace(/en su récord/g, "en mi récord"));
-  const lead = `Este es el resumen de mi récord académico (${evo.length} ${evo.length === 1 ? "periodo" : "periodos"}).`;
-  const close = "¿Qué me recomienda para mejorar y en qué debería concentrarme?";
-  let text = lead;
-  for (const line of said) {
-    if (`${text} ${line} ${close}`.length > ASK_MAX) break;
-    text = `${text} ${line}`;
+  const out: AdviceSummary["periods"] = [];
+  let room = ADVICE_COURSES;
+  for (let i = periods.length - 1; i >= 0 && out.length < ADVICE_PERIODS && room > 0; i--) {
+    const p = periods[i];
+    const courses = p.courses.slice(0, Math.min(ADVICE_PERIOD_COURSES, room)).map((c): AdviceCourse => {
+      const pending = inProgress(p, c, current);
+      return { name: (courseName(c.name) || "Materia").slice(0, ADVICE_NAME), credits: c.credits, def: pending ? null : fiveOrNull(c.def), state: courseState(c, pending) };
+    });
+    if (!courses.length) continue;
+    room -= courses.length;
+    out.unshift({ id: p.id, average: fiveOrNull(evo[i].avg), accumulated: fiveOrNull(evo[i].acc), courses });
   }
-  return `${text} ${close}`.slice(0, ASK_MAX);
+  return { program: courseName(head?.program ?? "").slice(0, 120), periods: out };
+}
+
+/** Las materias del resumen en fila, en su orden: la IA las nombra por su número en esta fila. */
+export const summaryCourses = (summary: AdviceSummary): (AdviceCourse & { period: string })[] => summary.periods.flatMap((p) => p.courses.map((c) => ({ ...c, period: p.id })));
+
+export interface AdviceArea {
+  name: string;
+  /** Las materias del área, por su posición en summaryCourses. */
+  courses: number[];
+}
+
+export interface AdviceRec {
+  title: string;
+  /** Por qué, referido a sus notas. */
+  why: string;
+  /** Qué hacer, en concreto. */
+  action: string;
+  /** Los números de las fuentes en que se apoya. */
+  sources: number[];
+  /** Se apoya en un documento de la universidad; si no, es una recomendación general. */
+  grounded: boolean;
+}
+
+export interface AdviceSource {
+  n: number;
+  title: string;
+  section: string;
+  /** A dónde lleva: una ruta del portal o una dirección https. Vacía si no hay a dónde enlazar. */
+  path: string;
+}
+
+export interface Advice {
+  areas: AdviceArea[];
+  recs: AdviceRec[];
+  sources: AdviceSource[];
+}
+
+const said = (v: unknown, max: number): string => (typeof v === "string" ? v.replace(/\s+/g, " ").trim().slice(0, max) : "");
+const linkOf = (v: unknown): string => (typeof v === "string" && (/^\/[^\s/][^\s]*$/.test(v) || /^https:\/\/[^\s]+$/.test(v)) ? v.slice(0, 400) : "");
+
+/**
+ * Lo que responde la función, leído con cuidado. Las áreas solo valen si la
+ * función contó las mismas materias que se enviaron (`total`): cada número es
+ * una posición de esa fila, y cada materia queda en una sola área. Una
+ * recomendación solo cita fuentes que vinieron en la respuesta.
+ */
+export function parseAdvice(body: unknown, total: number): Advice {
+  const b = (body && typeof body === "object" ? body : {}) as Record<string, unknown>;
+  const sources: AdviceSource[] = [];
+  for (const r of rows(b.sources)) {
+    const n = Number(r.n);
+    const title = said(r.title, 200);
+    if (!Number.isInteger(n) || n < 1 || !title || sources.some((x) => x.n === n)) continue;
+    sources.push({ n, title, section: said(r.section, 160), path: linkOf(r.path) });
+  }
+  const recs: AdviceRec[] = [];
+  for (const r of rows(b.recs).slice(0, 5)) {
+    const title = said(r.title, 120);
+    const why = said(r.why, 500);
+    const action = said(r.action, 500);
+    if (!title || (!why && !action)) continue;
+    const cited = [...new Set((Array.isArray(r.sources) ? r.sources : []).filter((n): n is number => Number.isInteger(n) && sources.some((x) => x.n === n)))];
+    recs.push({ title, why, action, sources: cited, grounded: r.grounded === true && cited.length > 0 });
+  }
+  const areas: AdviceArea[] = [];
+  if (Number(b.courses) === total && total > 0) {
+    const taken = new Set<number>();
+    for (const r of rows(b.areas).slice(0, 8)) {
+      const name = said(r.name, 40);
+      const mine = (Array.isArray(r.courses) ? r.courses : []).filter((n): n is number => Number.isInteger(n) && n >= 0 && n < total && !taken.has(n));
+      const unique = [...new Set(mine)];
+      if (!name || !unique.length || areas.some((a) => plainName(a.name) === plainName(name))) continue;
+      unique.forEach((n) => taken.add(n));
+      areas.push({ name, courses: unique });
+    }
+  }
+  return { areas, recs, sources };
+}
+
+export interface AreaBar {
+  name: string;
+  /** El promedio del área, ponderado por créditos. */
+  avg: number;
+  credits: number;
+  /** Cuántas materias con definitiva entraron en la cuenta. */
+  count: number;
+  /** Va en el promedio acumulado o por encima: una fortaleza. Por debajo: un área por reforzar. */
+  strong: boolean;
+}
+
+/**
+ * Las barras de «Fortalezas y áreas por reforzar». Las áreas las propone la
+ * IA; los números NO: el promedio de cada una se calcula aquí, con las
+ * definitivas reales, ponderado por créditos (sin las homologadas ni lo que va
+ * en curso). De mayor a menor. Con menos de dos áreas con notas no hay nada
+ * que comparar, y no hay gráfica.
+ */
+export function areaBars(summary: AdviceSummary, areas: AdviceArea[], reference: number | null): AreaBar[] {
+  const flat = summaryCourses(summary);
+  const bars: Omit<AreaBar, "strong">[] = [];
+  for (const area of areas) {
+    const graded = area.courses.map((i) => flat[i]).filter((c) => c && c.def !== null && c.state !== "homologada" && c.state !== "en_curso");
+    const weight = (c: AdviceCourse) => Math.max(1, c.credits);
+    const credits = graded.reduce((total, c) => total + weight(c), 0);
+    if (!credits) continue;
+    bars.push({ name: area.name, avg: round2(graded.reduce((total, c) => total + weight(c) * (c.def as number), 0) / credits), credits, count: graded.length });
+  }
+  if (bars.length < 2) return [];
+  const line = reference ?? bars.reduce((total, b) => total + b.avg * b.credits, 0) / bars.reduce((total, b) => total + b.credits, 0);
+  return bars.sort((a, b) => b.avg - a.avg || a.name.localeCompare(b.name, "es")).map((b) => ({ ...b, strong: b.avg >= line - 1e-9 }));
+}
+
+/** Cómo va el pedido de recomendaciones, para la pantalla. */
+export type AdviceCode = "apagado" | "tope" | "limite" | "sesion" | "perfil" | "datos" | "vacio" | "proveedor" | "tiempo" | "red" | "sin_red" | "desconocido";
+
+export interface AdviceFailure {
+  code: AdviceCode;
+  message: string;
+  /** Se puede volver a intentar ya. */
+  retry: boolean;
+}
+
+const ADVICE_TEXT: Record<AdviceCode, string> = {
+  apagado: "La universidad aún no ha habilitado las recomendaciones con IA en Mis notas.",
+  tope: "Ya pidió las recomendaciones que se pueden pedir por hoy. Mañana puede pedirlas otra vez.",
+  limite: "Pilo llegó a su límite de pedidos de hoy. Mañana vuelve.",
+  sesion: "Para pedir recomendaciones, entre con su cuenta de Pilo.",
+  perfil: "Las recomendaciones de Mis notas son para estudiantes con cuenta de Pilo.",
+  datos: "No hay notas suficientes para recomendarle algo todavía.",
+  vacio: "Pilo no logró escribir recomendaciones que pasaran la revisión. Intente de nuevo.",
+  proveedor: "La IA no respondió como se esperaba. Intente de nuevo en un momento.",
+  tiempo: "La IA tardó demasiado. Intente de nuevo en un momento.",
+  red: "No pude hablar con la IA. Intente de nuevo en un momento.",
+  sin_red: "No hay conexión a internet. Revísela e intente de nuevo.",
+  desconocido: "Algo falló al pedir las recomendaciones. Intente de nuevo en un momento.",
+};
+
+const ADVICE_FINAL: AdviceCode[] = ["apagado", "tope", "limite", "sesion", "perfil", "datos"];
+
+export const adviceFailureOf = (code: AdviceCode): AdviceFailure => ({ code, message: ADVICE_TEXT[code], retry: !ADVICE_FINAL.includes(code) });
+
+/** Un error de la acción de recomendaciones, en palabras de la app: el texto del servidor no se muestra. */
+export function adviceFailure(status: number, body: unknown): AdviceFailure {
+  const raw = (body && typeof body === "object" ? (body as { code?: unknown }).code : "") as unknown;
+  const known = typeof raw === "string" && raw in ADVICE_TEXT ? (raw as AdviceCode) : null;
+  if (known && known !== "sin_red" && known !== "desconocido") return adviceFailureOf(known);
+  if (raw === "limite_proveedor") return adviceFailureOf("proveedor");
+  if (status === 401) return adviceFailureOf("sesion");
+  if (status === 403) return adviceFailureOf("perfil");
+  if (status === 429) return adviceFailureOf("tope");
+  if (status === 504) return adviceFailureOf("tiempo");
+  if (status === 502 || status === 503) return adviceFailureOf("proveedor");
+  return adviceFailureOf("desconocido");
 }

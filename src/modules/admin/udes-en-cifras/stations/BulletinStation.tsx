@@ -21,6 +21,7 @@ import { useAuth } from "../../../../lib/auth";
 import { formatBytes } from "../../../../data/storage";
 import type { OdBulletinEditionRow, OdBulletinRow } from "../../../../types/database";
 import { withPeriodView } from "../../../datos-abiertos/data/open-data";
+import { isCustomView } from "../../../datos-abiertos/data/custom-table";
 import { ALL_YEARS, cutLabel } from "../../../datos-abiertos/data/terms";
 import type { OpenDataCatalog, Report } from "../../../datos-abiertos/data/types";
 import { useWidth } from "../../../datos-abiertos/components/motion";
@@ -785,6 +786,15 @@ function ContentTab({ catalog, draft, setDraft }: { catalog: OpenDataCatalog; dr
           if (!report) return null;
           const expanded = open === entry.slug;
           const titles = new Map(datasetRefs(report).map((d) => [d.ref, d.title]));
+          const datasetKind = (ref: string) => {
+            if (!ref.startsWith("libre:")) return DATASET_KIND[ref.split(":")[0]] ?? "Conjunto";
+            const end = ref.lastIndexOf(":");
+            const setId = ref.slice("libre:".length, end);
+            const viewKey = ref.slice(end + 1);
+            const set = report.freeSets?.find((item) => item.id === setId);
+            const view = set?.views.find((item) => item.key === viewKey);
+            return view && isCustomView(view) ? "Tabla personalizada" : "Conjunto visual";
+          };
           const included = entry.indicators.filter((i) => i.include).length;
           return (
             <li key={entry.slug} data-off={!entry.include || undefined}>
@@ -887,7 +897,7 @@ function ContentTab({ catalog, draft, setDraft }: { catalog: OpenDataCatalog; dr
                               />
                               <span>
                                 {titles.get(item.ref) ?? item.ref}
-                                <small>{DATASET_KIND[item.ref.split(":")[0]] ?? "Conjunto"}</small>
+                                <small>{datasetKind(item.ref)}</small>
                               </span>
                             </label>
                             <span className="oda-bulletin-order">

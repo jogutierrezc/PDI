@@ -82,7 +82,10 @@ export function parseFreeKey(report: Report, key: string): { set: FreeSet; view:
   if (at < 0) return null;
   const set = report.freeSets?.find((s) => s.id === key.slice(0, at));
   const view = set?.views.find((v) => v.key === key.slice(at + 1));
-  return set && view && viewProblems(set, view).length === 0 ? { set, view } : null;
+  // Las tablas personalizadas no dependen de las dimensiones de una gráfica;
+  // conservarlas disponibles en el boletín aunque otras validaciones del
+  // conjunto libre no sean aplicables a esta vista.
+  return set && view && (isCustomView(view) || viewProblems(set, view).length === 0) ? { set, view } : null;
 }
 
 /** El año que dibuja una vista anual con el corte del boletín: el del corte o el último anterior. */
@@ -103,7 +106,7 @@ export function freeUnits(set: FreeSet, view: FreeView, cut: number, Sheet: Shee
   const year = yearFor(set, view, cut);
   if (set.temporality === "anual" && !USES_ALL_YEARS.includes(view.type) && year === null) return [];
   const rows = freeRowsAt(set, year);
-  if (!rows.length) return [];
+  if (view.type === "tabla" ? freeAllRowsAt(set, year).length === 0 : rows.length === 0) return [];
   const title = `${set.title} · ${view.title}`;
   const compared = view.type === "barras_comparadas" ? compareSource(set, view) : null;
   const custom = isCustomView(view) ? view.table : null;

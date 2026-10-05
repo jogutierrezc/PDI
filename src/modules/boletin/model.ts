@@ -20,7 +20,8 @@
 
 import { SABER_COMPETENCIES } from "../datos-abiertos/data/saber-pro";
 import { saberRef } from "../datos-abiertos/data/groups";
-import { freeRefs } from "../datos-abiertos/data/free-sets";
+import { freeRef, freeRefs } from "../datos-abiertos/data/free-sets";
+import { isCustomView } from "../datos-abiertos/data/custom-table";
 import { tytRefs } from "./tyt";
 import { deiRefs } from "./dei";
 import { modelRefs } from "./model-sheets";
@@ -290,6 +291,15 @@ export function datasetRefs(report: Report): { ref: string; title: string }[] {
   tytRefs(report).forEach(({ ref, title }) => add(ref, title));
   // Conjuntos libres: una hoja por vista publicable.
   freeRefs(report.freeSets).forEach(({ ref, title }) => add(ref, title));
+  // La tabla personalizada se selecciona como contenido propio del boletín.
+  // Mantenerla disponible por sus filas capturadas, incluso si otra regla de
+  // validez de gráficas del conjunto no aplica a una tabla.
+  for (const set of report.freeSets ?? []) {
+    if (!set.rows.length) continue;
+    for (const view of set.views) {
+      if (isCustomView(view)) add(freeRef(set, view), `${set.title} · ${view.title}`);
+    }
+  }
   report.breakdowns.forEach((b) => add(`desglose:${b.id}`, b.title));
   // Un mapa por municipio ya tiene su hoja en las del tablero de la diversidad
   // (dei:origen); como mapa departamental sumaría códigos de municipio.

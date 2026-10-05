@@ -311,8 +311,8 @@ const FALLBACK: Record<NotasCode, string> = {
   suspendida: "Su cuenta de Pilo está suspendida. Escriba a la administración.",
   limite: "Va muy rápido: espere un momento antes de volver a intentarlo.",
   no_disponible: "Mis notas aún no está disponible: la universidad todavía no ha conectado a Pilo con Génesis.",
-  datos: "Escriba su código de estudiante (solo números) y su contraseña de Génesis.",
-  credenciales: "Génesis no aceptó ese código y esa contraseña. Revíselos e intente de nuevo.",
+  datos: "Escriba su usuario de Génesis (solo números) y su contraseña.",
+  credenciales: "Génesis no aceptó ese usuario y esa contraseña. Revíselos e intente de nuevo.",
   no_estudiante: "Mis notas es para estudiantes: esa cuenta de Génesis no es de estudiante.",
   permiso: "Su permiso de Génesis venció o fue retirado. Conecte de nuevo sus notas.",
   pdf: "Génesis no entregó el polígrafo en PDF. Intente de nuevo en un momento.",
@@ -525,6 +525,9 @@ export function evolution(periods: NotaPeriod[]): EvoRow[] {
   });
 }
 
+/** El promedio del último semestre que ya tiene definitivas; null si no hay ninguno. */
+export const lastAverage = (periods: NotaPeriod[]): number | null => [...evolution(periods)].reverse().find((r) => r.avg !== null)?.avg ?? null;
+
 export interface Totals {
   /** El promedio acumulado más reciente. */
   accumulated: number | null;
@@ -630,7 +633,8 @@ export function failedCourses(periods: NotaPeriod[], current = ""): FailedCourse
     for (const c of p.courses) {
       if (c.approved || c.homologated || inProgress(p, c, current)) continue;
       const recovered = periods.slice(i + 1).some((later) => later.courses.some((x) => key(x) === key(c) && (x.approved || x.homologated)));
-      out.push({ period: p.id, name: c.name || c.code, recovered });
+      // Sin nombre no se muestra su código: en ninguna pantalla se ve un identificador.
+      out.push({ period: p.id, name: c.name || "una materia", recovered });
     }
   });
   return out;
@@ -657,12 +661,14 @@ export interface ChartShape {
   grid: { value: number; y: number }[];
   /** Los periodos que se nombran en el eje (no todos caben). */
   ticks: { index: number; x: number; label: string; anchor: "start" | "middle" | "end" }[];
+  /** A qué altura va la línea de la meta de acumulado; null si no hay meta. */
+  goal: number | null;
 }
 
 const fixed = (n: number) => Number(n.toFixed(1));
 
 /** La geometría de la gráfica de líneas: pura, para pintarla y para probarla. */
-export function chartOf(rowsIn: EvoRow[]): ChartShape {
+export function chartOf(rowsIn: EvoRow[], goal: number | null = null): ChartShape {
   const { W, H, L, R, T, B } = CHART;
   const n = rowsIn.length;
   const values = rowsIn.flatMap((r) => [r.avg, r.acc]).filter((v): v is number => v !== null);
@@ -693,7 +699,8 @@ export function chartOf(rowsIn: EvoRow[]): ChartShape {
     if (!lastOne && (i % step !== 0 || n - 1 - i < step)) return;
     ticks.push({ index: i, x: x(i), label: r.id, anchor: n > 1 && lastOne ? "end" : n > 1 && i === 0 ? "start" : "middle" });
   });
-  return { y0, y1, xs: rowsIn.map((_, i) => x(i)), avg: rowsIn.map((r) => (r.avg === null ? null : y(r.avg))), acc: rowsIn.map((r) => (r.acc === null ? null : y(r.acc))), pathAvg: path((r) => r.avg), pathAcc: path((r) => r.acc), grid, ticks };
+  const goalAt = goal !== null && Number.isFinite(goal) && goal >= y0 && goal <= y1 ? y(goal) : null;
+  return { goal: goalAt, y0, y1, xs: rowsIn.map((_, i) => x(i)), avg: rowsIn.map((r) => (r.avg === null ? null : y(r.avg))), acc: rowsIn.map((r) => (r.acc === null ? null : y(r.acc))), pathAvg: path((r) => r.avg), pathAcc: path((r) => r.acc), grid, ticks };
 }
 
 /** El periodo más cercano a un punto de la gráfica (en unidades del viewBox). */
@@ -762,26 +769,6 @@ export function goalPlan(input: GoalInput): GoalPlan {
   return { status, needed, remaining, best, accumulated };
 }
 
-const creditsText = (n: number) => `${n} ${n === 1 ? "crédito" : "créditos"}`;
-
-/** El plan, dicho. Cada estado con sus palabras: nunca solo con un color. */
-export function goalText(plan: GoalPlan, goal: number): { title: string; detail: string } {
-  if (plan.status === "sin_datos") return { title: "Aún no puedo calcularlo", detail: "Me falta su promedio acumulado o su avance en el plan de estudios: Génesis no los trae todavía." };
-  if (plan.status === "terminado") return { title: "Ya no le quedan créditos por cursar", detail: `Según su avance en Génesis, su promedio acumulado queda en ${nota(plan.accumulated)}.` };
-  const left = `los ${creditsText(plan.remaining)} que le faltan`;
-  if (plan.status === "cumplida")
-    return {
-      title: `Ya va en ${nota(goal)} o más`,
-      detail: plan.needed <= PASS_MARK ? `Lleva ${nota(plan.accumulated)}. Con aprobar ${left}, la mantiene.` : `Lleva ${nota(plan.accumulated)}. Para mantenerla, promedie ${nota(plan.needed)} o más en ${left}.`,
-    };
-  if (plan.status === "inalcanzable")
-    return {
-      title: `${nota(goal)} ya no se alcanza`,
-      detail: `Pediría más de ${nota(TOP_MARK)} en ${left}. Sacando ${nota(TOP_MARK)} en todo, llegaría a ${nota(plan.best)}.`,
-    };
-  return { title: `Necesita promediar ${nota(plan.needed)}`, detail: `En ${left}, para cerrar con ${nota(goal)}. Hoy lleva ${nota(plan.accumulated)}.` };
-}
-
 /* --- Lo que le recomiendo: el resumen que se envía y lo que vuelve ------------------------------ */
 
 /** Los topes del resumen: los mismos que aplica la función (que además lo limpia por su cuenta). */
@@ -800,19 +787,21 @@ export interface AdviceCourse {
 /**
  * El resumen que se envía a la IA cuando la persona pide recomendaciones, y
  * solo entonces. No lleva nada que la identifique: ni nombre, ni código de
- * estudiante, ni documento, ni los códigos de las materias. Lleva el programa
- * y, por periodo, los promedios y las materias con sus créditos, su definitiva
- * y su estado.
+ * estudiante, ni documento, ni los códigos de las materias. Lleva el programa,
+ * las dos metas que se puso la persona y, por periodo, los promedios y las
+ * materias con sus créditos, su definitiva y su estado.
  */
 export interface AdviceSummary {
   program: string;
+  /** Las metas de la persona: su promedio acumulado y el de este semestre. null si no las ha dicho. */
+  goals: { accumulated: number | null; semester: number | null };
   periods: { id: string; average: number | null; accumulated: number | null; courses: AdviceCourse[] }[];
 }
 
 const fiveOrNull = (v: number | null): number | null => (v !== null && v >= 0 && v <= TOP_MARK ? v : null);
 
 /** Arma el resumen, de los periodos más recientes hacia atrás hasta los topes, y lo deja en orden. */
-export function adviceSummary(periods: NotaPeriod[], head?: Partial<Pick<NotasHead, "program" | "period">> | null): AdviceSummary {
+export function adviceSummary(periods: NotaPeriod[], head?: Partial<Pick<NotasHead, "program" | "period">> | null, goals?: { accumulated: number; semester: number } | null): AdviceSummary {
   const current = head?.period ?? "";
   const evo = evolution(periods);
   const out: AdviceSummary["periods"] = [];
@@ -827,7 +816,7 @@ export function adviceSummary(periods: NotaPeriod[], head?: Partial<Pick<NotasHe
     room -= courses.length;
     out.unshift({ id: p.id, average: fiveOrNull(evo[i].avg), accumulated: fiveOrNull(evo[i].acc), courses });
   }
-  return { program: courseName(head?.program ?? "").slice(0, 120), periods: out };
+  return { program: courseName(head?.program ?? "").slice(0, 120), goals: { accumulated: fiveOrNull(goals?.accumulated ?? null), semester: fiveOrNull(goals?.semester ?? null) }, periods: out };
 }
 
 /** Las materias del resumen en fila, en su orden: la IA las nombra por su número en esta fila. */

@@ -14,6 +14,7 @@
      /app/perfil       los datos de la cuenta y cómo le habla Pilo
      /app/guardadas    las respuestas guardadas en la cuenta
      /app/clases       Mis clases (beta): Moodle con la cuenta de la persona, solo lectura (clases/)
+     /app/notas        Mis notas (beta): Génesis con la cuenta del estudiante, solo lectura (notas/)
 
    Antes de conversar se acepta la política de uso (terms/): una vez por
    dispositivo y por versión, después de la bienvenida.
@@ -49,6 +50,9 @@ import { ProfilePane } from "./account/ProfilePane";
 import { SavedPane } from "./account/SavedPane";
 import { ClasesPane } from "./clases/ClasesPane";
 import { canUseClases, clearLink } from "./clases/logic";
+import { NotasPane } from "./notas/NotasPane";
+import { canUseNotas, clearLink as clearNotasLink } from "./notas/logic";
+import { clearGoals as clearNotasGoals } from "./notas/guia";
 import { APP_PREFIX, readTheme, writeTheme } from "./themes";
 import type { AppTheme } from "./themes";
 import { welcomeVoice } from "./welcome-script";
@@ -148,14 +152,18 @@ export function PiloApp() {
   const waking = online && (config.isPending || loading || cuenta.pending);
   const doors = useMemo(() => ({ planeacion: spaceDoor(rules, ASK_SPACES.planeacion, role, member), ensenanza: spaceDoor(rules, ENSENANZA, role, member) }), [rules, role, member]);
   const person: Person = useMemo(
-    () => ({ card: account ? personCard(account) : null, intranet: role ? profile?.full_name || profile?.email || "Su cuenta" : null, saved: null, clases: canUseClases(account) }),
+    () => ({ card: account ? personCard(account) : null, intranet: role ? profile?.full_name || profile?.email || "Su cuenta" : null, saved: null, clases: canUseClases(account), notas: canUseNotas(account) }),
     [account, role, profile?.full_name, profile?.email],
   );
   const greeting = useMemo(() => (online ? welcomeVoice(doors) : null), [doors, online]);
 
-  // Al salir de la cuenta, el permiso de Moodle de Mis clases se borra de este dispositivo.
+  // Al salir de la cuenta, el permiso de Moodle de Mis clases, el de Génesis de Mis notas y las metas se borran de este dispositivo.
   useEffect(() => {
-    if (!loading && !session) clearLink();
+    if (!loading && !session) {
+      clearLink();
+      clearNotasLink();
+      clearNotasGoals();
+    }
   }, [loading, session]);
 
   const pickTheme = (next: AppTheme) => {
@@ -198,6 +206,12 @@ export function PiloApp() {
     );
   }
 
+  /** Desde una página que no es la conversación: Pilo se presenta otra vez, sobre ella. */
+  const welcomeAgain = () => {
+    setWelcoming(true);
+    navigate(APP_PATHS[home]);
+  };
+
   if (place.kind === "perfil" || place.kind === "guardadas") {
     const profilePage = place.kind === "perfil";
     return (
@@ -212,7 +226,7 @@ export function PiloApp() {
               : "Lo que guarda queda en su cuenta y lo encuentra en cualquier dispositivo."
           }
           home={APP_PATHS[home]}
-          side={wide ? <PageSide home={home} active={profilePage ? "perfil" : "guardadas"} person={person} userId={session?.user.id} member={member} /> : null}
+          side={wide ? <PageSide home={home} active={profilePage ? "perfil" : "guardadas"} person={person} userId={session?.user.id} member={member} theme={theme} onTheme={pickTheme} onWelcome={welcomeAgain} /> : null}
         >
           {profilePage ? (
             <ProfilePane
@@ -220,10 +234,7 @@ export function PiloApp() {
               theme={theme}
               onTheme={pickTheme}
               intranetName={person.intranet}
-              onWelcome={() => {
-                setWelcoming(true);
-                navigate(APP_PATHS[home]);
-              }}
+              onWelcome={welcomeAgain}
             />
           ) : (
             <SavedPane userId={session?.user.id} member={member} pending={cuenta.pending} />
@@ -243,9 +254,28 @@ export function PiloApp() {
           tag="Beta"
           lead="Pilo entra a Moodle con su cuenta para ver sus cursos y ayudarle con ellos: qué hay para esta semana, qué pide una actividad y cuándo se entrega."
           home={APP_PATHS[home]}
-          side={wide ? <PageSide home={home} active="clases" person={person} userId={session?.user.id} member={member} /> : null}
+          side={wide ? <PageSide home={home} active="clases" person={person} userId={session?.user.id} member={member} theme={theme} onTheme={pickTheme} onWelcome={welcomeAgain} /> : null}
         >
           <ClasesPane state={cuenta} online={online} />
+        </AppPage>
+      </div>
+    );
+  }
+
+  /* --- Mis notas (beta): solo estudiantes con cuenta -------------------------------------------- */
+
+  if (place.kind === "notas") {
+    return (
+      <div className="pa" ref={root} data-tema={theme}>
+        <AppPage
+          title="Mis notas"
+          tag="Beta"
+          lead="Pilo lo guía para leer sus notas de Génesis, las compara con sus metas y le recomienda cómo mejorar."
+          home={APP_PATHS[home]}
+          side={wide ? <PageSide home={home} active="notas" person={person} userId={session?.user.id} member={member} theme={theme} onTheme={pickTheme} onWelcome={welcomeAgain} /> : null}
+        >
+          {/* La voz de la guía es la de la bienvenida, con el mismo interruptor de sonido de la app. */}
+          <NotasPane state={cuenta} online={online} voice={greeting} voiceOn={voiceOn} onVoice={pickVoice} />
         </AppPage>
       </div>
     );
@@ -317,7 +347,25 @@ export function PiloApp() {
 }
 
 /** La barra lateral del escritorio en las pantallas que no son la conversación: lleva a ella. */
-function PageSide({ home, active, person, userId, member }: { home: SpaceId; active: "perfil" | "guardadas" | "clases"; person: Person; userId: string | undefined; member: boolean }) {
+function PageSide({
+  home,
+  active,
+  person,
+  userId,
+  member,
+  theme,
+  onTheme,
+  onWelcome,
+}: {
+  home: SpaceId;
+  active: "perfil" | "guardadas" | "clases" | "notas";
+  person: Person;
+  userId: string | undefined;
+  member: boolean;
+  theme: AppTheme;
+  onTheme: (theme: AppTheme) => void;
+  onWelcome: () => void;
+}) {
   const navigate = useNavigate();
   const [convs, setConvs] = useState(() => ({ planeacion: loadSaved("planeacion"), ensenanza: loadSaved("ensenanza") }));
   const entries = useMemo(() => savedEntries(convs), [convs]);
@@ -333,6 +381,9 @@ function PageSide({ home, active, person, userId, member }: { home: SpaceId; act
       onDelete={(entry: SavedEntry) => setConvs((c) => ({ ...c, [entry.space]: removeSaved(entry.space, entry.id) }))}
       onNew={() => navigate(APP_PATHS[home], { state: { nueva: true } })}
       onSwitch={(space) => navigate(APP_PATHS[space])}
+      theme={theme}
+      onTheme={onTheme}
+      onWelcome={onWelcome}
     />
   );
 }

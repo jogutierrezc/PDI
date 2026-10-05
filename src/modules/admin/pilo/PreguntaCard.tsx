@@ -48,6 +48,7 @@ import { revealList } from "./motion";
 import { CatalogModal } from "./CatalogModal";
 import { GeneralDocs } from "./GeneralDocs";
 import { PortalsMatrix } from "./PortalsMatrix";
+import { ReasoningGroup } from "./Razonamiento";
 import { reasonHint, reasonLabel, useCloseInbox, useInbox } from "./inbox";
 import type { InboxItem } from "./inbox";
 import type { CatalogRow } from "./catalog-sheet";
@@ -246,6 +247,8 @@ export function PreguntaSection({ ed }: { ed: EditorApi }) {
           </div>
         </details>
       </Group>
+
+      <ReasoningGroup />
 
       <Group title="Límite por visitante" aside={<small>Solo la página pública</small>}>
         <p className="pis-small">

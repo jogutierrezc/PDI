@@ -158,6 +158,54 @@ export function waitingLine(input: { steps: ThinkStep[]; meta: AskMeta | null; s
   return "Buscando en lo que conozco…";
 }
 
+/* --- Mientras espera ------------------------------------------------------------------------
+   El titular dice en qué va Pilo de verdad. Aparte, para que la espera no
+   desespere, Pilo suelta de vez en cuando un consejo o una ocurrencia, y su
+   cara cambia de gesto. Nada de esto es un estado: los consejos hablan de cómo
+   preguntarle y de cómo responde, nunca de la universidad ni de la respuesta. */
+
+export const WAIT_TIPS: string[] = [
+  "Consejo: si me dice el año o la sede, le respondo más exacto.",
+  "Dato capcioso: yo no adivino cifras. Si no está publicada, se lo digo sin pena.",
+  "Después puede preguntarme «¿y el año pasado?»: me acuerdo de lo que veníamos hablando.",
+  "Cada cifra que digo trae su fuente. Al final puede ver de dónde salió.",
+  "Pregunta capciosa: ¿qué es más largo, un semestre o esta espera? Tranquilo, ya voy.",
+  "Consejo: una pregunta a la vez me sale mejor que tres juntas.",
+  "Si la respuesta le queda corta, pídame «explíquemelo con un ejemplo».",
+  "No me sé chismes, pero sí lo que publica la universidad.",
+  "Si me equivoco, dígamelo con «No me sirvió»: así aprendo.",
+  "Cuando termine, puedo leerle la respuesta en voz alta.",
+  "Dato capcioso: prefiero demorarme a inventar. Por eso reviso las fuentes dos veces.",
+  "Consejo: las siglas me confunden menos si las escribe completas la primera vez.",
+];
+
+/** Cuándo aparece el primer consejo y cada cuánto cambia, en segundos. */
+export const TIP_AFTER = 6;
+export const TIP_EVERY = 9;
+
+/**
+ * El consejo de este momento de la espera, o null si aún es pronto. `seed`
+ * (cualquier entero del turno) hace que no todas las esperas empiecen igual.
+ */
+export function waitingTip(seconds: number, seed = 0): string | null {
+  if (!(seconds >= TIP_AFTER)) return null;
+  const turn = Math.floor((seconds - TIP_AFTER) / TIP_EVERY);
+  return WAIT_TIPS[(Math.abs(Math.trunc(seed)) + turn) % WAIT_TIPS.length];
+}
+
+/** Los gestos de Pilo mientras piensa: vuelve siempre a «pensar», y entre uno y otro se le escapa otro. */
+const WAIT_FACES = ["pensar", "neutral", "pensar", "atrevido", "pensar", "emocionado"] as const;
+export const FACE_EVERY = 6;
+
+/** La cara de Pilo según cuánto lleva esperando. Con las primeras palabras ya escritas, se emociona. */
+export function waitingFace(seconds: number, writing = false): (typeof WAIT_FACES)[number] {
+  if (writing) return "emocionado";
+  return WAIT_FACES[Math.floor(Math.max(0, seconds) / FACE_EVERY) % WAIT_FACES.length];
+}
+
+/** Un entero estable de un texto (el id del turno), para sembrar los consejos. */
+export const seedOf = (text: string): number => [...String(text)].reduce((n, c) => (n * 31 + c.charCodeAt(0)) % 9973, 7);
+
 /** «12 s», «1 min 5 s». */
 export function secondsText(seconds: number): string {
   const s = Math.max(1, Math.round(seconds));

@@ -31,7 +31,7 @@ import { Link, useSearchParams } from "react-router-dom";
 import { Icon } from "../../../components/ui/Icon";
 import type { VoiceStyle } from "../../../components/pilo/ai/logic";
 import { normalizeOrigin } from "../../pilo-embed/embed";
-import type { Lado } from "../../pilo-embed/embed";
+import type { Lado, LeerModo } from "../../pilo-embed/embed";
 import { TEMAS } from "../../pregunta/store";
 import type { Tema } from "../../pregunta/store";
 import { AudiencePicker } from "../pilo/sections";
@@ -45,7 +45,9 @@ import { rowSummary, spanOf, voiceName } from "./resumen";
 import type { SharedSummary } from "./resumen";
 import { EXPRESSIONS, MAX_ORIGINS, MAX_SUGGESTIONS, ORAL_MOODS, ROLES, SPACE_LIMITS, TEXT_MAX, spaceSnippet } from "./store";
 import type { RolId, RoleSettings, SpaceSettings } from "./store";
-import { FoldRow, TextArea } from "./ui";
+import { ReasoningGroup } from "../pilo/Razonamiento";
+import { LeerPicker } from "../pilo/WidgetGroup";
+import { FoldRow, Sheet, TextArea } from "./ui";
 
 export interface SpaceEditor {
   s: SpaceSettings;
@@ -253,13 +255,19 @@ export function PreguntaPanel({ ed, active }: { ed: SpaceEditor; /** La pestaña
   };
 
   return (
-    <div className="pis-sheet pen-rows">
-      {ROWS.map((r) => (
-        <FoldRow key={r.id} id={r.id} title={r.title} summary={rowSummary(r.id, s, about)} open={open === r.id} dirty={changed.includes(r.id)} off={missing} onToggle={() => toggle(r.id)}>
-          {body[r.id]()}
-        </FoldRow>
-      ))}
-    </div>
+    <>
+      <div className="pis-sheet pen-rows">
+        {ROWS.map((r) => (
+          <FoldRow key={r.id} id={r.id} title={r.title} summary={rowSummary(r.id, s, about)} open={open === r.id} dirty={changed.includes(r.id)} off={missing} onToggle={() => toggle(r.id)}>
+            {body[r.id]()}
+          </FoldRow>
+        ))}
+      </div>
+      {/* Cómo razona este Pilo (0130): sus interruptores son suyos y se aplican al momento, aparte de «Guardar cambios». */}
+      <Sheet off={missing}>
+        <ReasoningGroup space={s.id} />
+      </Sheet>
+    </>
   );
 }
 
@@ -398,7 +406,8 @@ function WidgetGroup({ ed }: { ed: SpaceEditor }) {
   const code = useRef<HTMLElement>(null);
 
   const origins = s.widget_origins;
-  const snippet = spaceSnippet(window.location.origin, s.id, tema, lado);
+  const [leer, setLeer] = useState<LeerModo>("no");
+  const snippet = spaceSnippet(window.location.origin, s.id, tema, lado, leer);
   const openToAll = s.on && s.aud === "publico";
 
   const add = (e: FormEvent) => {
@@ -506,6 +515,7 @@ function WidgetGroup({ ed }: { ed: SpaceEditor }) {
             ))}
           </span>
         </div>
+        <LeerPicker value={leer} onChange={setLeer} />
         <pre tabIndex={0}>
           <code ref={code}>{snippet}</code>
         </pre>

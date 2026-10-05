@@ -162,6 +162,9 @@ describe("las cuatro reglas de oro y las seis secciones", () => {
     expect(all).toContain("El texto de su pregunta se envía a un proveedor de inteligencia artificial");
     expect(all).toContain("Se conservan, sin su nombre, preguntas que Pilo no supo responder");
     expect(all).toContain("Siempre con su autorización.");
+    // La sección 4 dice lo mismo que la autorización de Génesis: las notas del periodo y el récord por periodo.
+    expect(all).toContain("en Génesis, sus notas del periodo y su récord académico por periodo");
+    expect(all).toContain("Si usted le pide recomendaciones sobre sus notas, y solo al pedirlas, Pilo envía a la IA un resumen de ellas sin su nombre ni su código; ese resumen no se guarda.");
     expect(all).toContain("Si la política cambia, Pilo lo avisa y pide aceptarla de nuevo antes de continuar.");
     // Las promesas que se retiraron del borrador porque Pilo no las cumple no vuelven a colarse.
     expect(all).not.toMatch(/efímero|anonimiza|no rastre|ningún servidor de terceros/i);
@@ -229,8 +232,11 @@ describe("la autorización de Génesis y Moodle", () => {
       expect(`${t.question} ${t.authorize} ${t.promises.map((x) => x.text).join(" ")}`, p).not.toContain(other);
       expect(t.promises[1].text, p).toContain(`se quedan en ${t.name}`);
     }
-    expect(CONSENT_TEXTS.genesis.promises[0].text).toMatch(/P1, P2, P3 y su acumulado/);
+    expect(CONSENT_TEXTS.genesis.promises[0].text).toBe("Miro sus notas del periodo y su récord académico por periodo. No puedo cambiar nada.");
     expect(CONSENT_TEXTS.moodle.promises[0].text).toMatch(/cursos, actividades, materiales y fechas de entrega/);
+    // Lo único de las notas que sale hacia la IA, dicho expresamente: el resumen de las recomendaciones.
+    expect(CONSENT_TEXTS.genesis.promises[1].text).toBe("Sus notas se quedan en Génesis. No las guardo en ningún servidor. Si me pide recomendaciones, envío a la IA un resumen de sus notas sin su nombre ni su código. No se guarda.");
+    expect(CONSENT_TEXTS.moodle.promises[1].text).not.toMatch(/recomendaciones|IA/);
     expect(CONSENT_TEXTS.genesis.authorize).toMatch(/plan de mejoramiento/);
     expect(CONSENT_TEXTS.moodle.authorize).toMatch(/recordarme entregas/);
   });

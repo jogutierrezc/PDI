@@ -85,6 +85,32 @@ describe("«lo de casa no alcanza»", () => {
     expect(coversQuestion("estudiantes matriculados", passage())).toBe(true);
     expect(coversQuestion("presupuesto del laboratorio", passage())).toBe(false);
   });
+
+  it("el nombre de la universidad no cuenta: que un pasaje diga «UDES» no responde «¿quién es el rector de la UDES?»", () => {
+    const rector = "quien es el rector de la udes";
+    // Antes alcanzaba con «UDES» (una de dos palabras clave) y no se consultaba el otro ámbito.
+    expect(homeFallsShort({ ...base, question: rector, passages: [passage({ title: "Plan de Desarrollo", body: "El Plan de Desarrollo de la UDES tiene seis pilares." })] })).toBe(true);
+    expect(homeFallsShort({ ...base, question: "¿Cuál es la política de evaluación de la universidad?", passages: [passage({ title: "Plan de Desarrollo", body: "La Universidad de Santander publica su Plan cada cinco años." })] })).toBe(true);
+    // Un pasaje que sí habla de lo que se pregunta sigue alcanzando, y uno de visita pasa la misma vara.
+    expect(homeFallsShort({ ...base, question: rector, passages: [passage({ title: "Gobierno", body: "El rector es la primera autoridad ejecutiva." })] })).toBe(false);
+    expect(coversQuestion(rector, passage({ title: "Estatuto general", body: "El rector de la UDES es la primera autoridad ejecutiva." }))).toBe(true);
+    // Si la pregunta solo nombra a la universidad, esa es su palabra clave.
+    expect(coversQuestion("¿Qué es la UDES?", passage())).toBe(true);
+  });
+
+  it("si lo de casa no alcanzó, lo de otro ámbito tiene su sitio apartado en el pedido", () => {
+    const home = Array.from({ length: 8 }, (_, i) => passage({ ref: `pdi:${i}`, body: "x".repeat(1600) }));
+    const visit = [passage({ ref: "doc:1:1", body: "y".repeat(1600) }), passage({ ref: "doc:1:2", body: "y".repeat(1600) })];
+    // Como antes (al final y sin sitio apartado), los pasajes de casa lo dejan fuera.
+    expect(planAsk({ official: [], saved: null, facts: [], passages: [...home, ...visit] }).sources.map((p) => p.ref)).not.toContain("doc:1:1");
+    // Con su sitio apartado entra todo lo de visita, después de lo de casa, y salen los últimos de casa.
+    const refs = planAsk({ official: [], saved: null, facts: [], passages: home, reserved: visit }).sources.map((p) => p.ref);
+    expect(refs.slice(-2)).toEqual(["doc:1:1", "doc:1:2"]);
+    expect(refs.slice(0, 3)).toEqual(["pdi:0", "pdi:1", "pdi:2"]);
+    expect(refs).not.toContain("pdi:7");
+    // Sin nada apartado, el plan es el de siempre.
+    expect(planAsk({ official: [], saved: null, facts: [], passages: home, reserved: [] })).toEqual(planAsk({ official: [], saved: null, facts: [], passages: home }));
+  });
 });
 
 describe("los pasajes de visita y su procedencia", () => {

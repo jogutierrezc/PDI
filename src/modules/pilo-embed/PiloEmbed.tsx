@@ -16,6 +16,12 @@
    siempre y /pilo-ensenanza-embed es Mr. Pilo en Enseñanza, con sus textos,
    su acceso y su lista de portales (0113). Ese, la primera vez, pregunta en
    su saludo quién habla (estudiante o profesor).
+
+   Leer la página (0127): si la línea que lo carga lleva data-leer="si", al
+   preguntar Pilo lee la página que lo aloja. Se ve en tres momentos: mientras
+   lee (los títulos de la página, uno tras otro), mientras piensa (los pasos
+   del servidor, como siempre) y, con la respuesta, el recibo: qué página leyó,
+   cuánto de ella y si quedó enviada a Planeación para guardarla en la memoria.
    ========================================================================== */
 
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
@@ -26,7 +32,7 @@ import { usePiloAiConfig } from "../../components/pilo/ai/config";
 import type { SpaceConfig } from "../../components/pilo/ai/config";
 import { canUse } from "../../components/pilo/ai/logic";
 import type { Role } from "../../components/pilo/ai/logic";
-import { askQuestionStream, buildHistory, PiloError, prefetchPilo, sayWithPilo, stopPilo } from "../../components/pilo/ai/client";
+import { askQuestionStream, buildHistory, capturePage, PiloError, prefetchPilo, sayWithPilo, stopPilo } from "../../components/pilo/ai/client";
 import type { AskHandlers, AskMeta, AskOptions, AskPortal } from "../../components/pilo/ai/client";
 import { enrichSpokenSentences } from "../../components/pilo/ai/voice-expressions";
 import { Pilo as PiloMoji } from "../pregunta/Pilo";
@@ -37,10 +43,10 @@ import type { Rol, SpaceId, SpaceProfile } from "../pregunta/space";
 import { RolePicker } from "../pregunta/RolePicker";
 import { AnswerText, parseAnswer, useTypewriter } from "../pregunta/AnswerText";
 import { toPlain } from "../pregunta/markdown";
-import { interruptedTurn, notesOf, originOf, reduceSteps, showsSources, waitingLine } from "../pregunta/answer-state";
+import { interruptedTurn, notesOf, originOf, reduceSteps, seedOf, showsSources, waitingFace, waitingLine, waitingTip } from "../pregunta/answer-state";
 import type { ThinkStep } from "../pregunta/answer-state";
-import { frameMessage, hostOrigin, readHostMessage, readParams, sourceUrl, spaceWidget, widgetAllowed } from "./embed";
-import type { FrameState } from "./embed";
+import { captureLine, captureStatus, frameMessage, hostLabel, hostOrigin, pageForQuestion, pageRequest, pageStamp, readHostMessage, readHostPage, readParams, sourceUrl, spaceWidget, widgetAllowed } from "./embed";
+import type { CaptureStatus, FrameState, HostPage, TurnPage } from "./embed";
 import "../pregunta/ask-pilo.css";
 import "./pilo-embed.css";
 
@@ -103,6 +109,8 @@ const I = {
   doc: <Svg size={13} sw={2}><path d="M7 3.5h7l4 4v13H7z" /><path d="M14 3.5v4h4" /></Svg>,
   out: <Svg size={13} sw={2}><path d="M14 4h6v6M20 4l-9 9M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5" /></Svg>,
   fresh: <Svg><path d="M12 5v14M5 12h14" /></Svg>,
+  page: <Svg size={16} sw={1.9}><rect x="3.5" y="4.5" width="17" height="15" rx="2.5" /><path d="M3.5 9h17M7 13h6M7 16h9" /></Svg>,
+  check: <Svg size={13} sw={2.4}><path className="pe-check" pathLength={1} d="m5 12.5 4.5 4.5L19 7.5" /></Svg>,
 };
 
 interface Voice {
@@ -124,7 +132,12 @@ interface Live {
   meta: AskMeta | null;
   steps: ThinkStep[];
   startedAt: number;
+  /** La página que Pilo leyó para esta pregunta, si leyó alguna. */
+  page: TurnPage | null;
 }
+
+/** Cuánto se espera a que la página anfitriona entregue su texto: si no llega, se pregunta sin ella. */
+const PAGE_WAIT_MS = 700;
 
 /* --- Quién entra ----------------------------------------------------------------------------- */
 
@@ -168,6 +181,8 @@ export function PiloEmbed({ space = "planeacion" }: { space?: SpaceId }) {
       cfg={cfg}
       tema={params.tema}
       lado={params.lado}
+      // Solo otro portal se lee: lo de este ya está en la memoria de Pilo.
+      host={hosted && hosted !== window.location.origin ? hosted : null}
       voice={{
         portal: here.portal,
         advanced: rules.speechReady && canUse(usual ? rules : injected, here.portal, "voz", role).ok,
@@ -193,11 +208,12 @@ function loadTurns(key: string): Turn[] {
   }
 }
 
-function Widget({ space, cfg, tema, lado, voice: baseVoice }: { space: SpaceProfile; cfg: SpaceConfig | null; tema: string; lado: string; voice: Voice }) {
+function Widget({ space, cfg, tema, lado, host, voice: baseVoice }: { space: SpaceProfile; cfg: SpaceConfig | null; tema: string; lado: string; host: string | null; voice: Voice }) {
   // Lo de esta visita (sessionStorage), bajo el prefijo del chat de este espacio: el de siempre conserva «pilo-embed:*».
   const KEY_TURNS = storageKey(space.embedPrefix, "turnos");
   const KEY_HELLO = storageKey(space.embedPrefix, "saludo");
   const KEY_READ = storageKey(space.embedPrefix, "leer");
+  const KEY_PAGES = storageKey(space.embedPrefix, "paginas");
   const usual = space.id === "planeacion";
   // Quién pregunta: solo en los espacios que lo piden. Se recuerda por navegador y por espacio, igual que en la página.
   const askRol = asksRol(space, cfg);
@@ -221,6 +237,18 @@ function Widget({ space, cfg, tema, lado, voice: baseVoice }: { space: SpaceProf
   const [open, setOpen] = useState(false);
   const [hello, setHello] = useState(false);
   const [full, setFull] = useState(false);
+  // La página anfitriona dice si se deja leer (data-leer="si" en su línea).
+  const [canRead, setCanRead] = useState(false);
+  // Qué pasó con cada lectura de esta visita en la bandeja de la administración, por su huella.
+  const [captures, setCaptures] = useState<Record<string, CaptureStatus>>(() => {
+    try {
+      const saved = JSON.parse(session.get(KEY_PAGES) ?? "{}") as Record<string, unknown>;
+      return Object.fromEntries(Object.entries(saved && typeof saved === "object" ? saved : {}).map(([k, v]) => [k, captureStatus(v)]));
+    } catch {
+      return {};
+    }
+  });
+  const sending = useRef(new Set<string>());
   const [turns, setTurns] = useState<Turn[]>(() => loadTurns(KEY_TURNS));
   const [live, setLive] = useState<Live | null>(null);
   const [busy, setBusy] = useState(false);
@@ -231,7 +259,7 @@ function Widget({ space, cfg, tema, lado, voice: baseVoice }: { space: SpaceProf
   // Las respuestas que acaban de llegar: «entera» se escribe palabra por palabra; «en vivo» ya se vio escribir.
   const [fresh, setFresh] = useState<Map<string, "entera" | "en vivo">>(() => new Map());
   const [autoRead, setAutoRead] = useState(() => session.get(KEY_READ) === "1");
-  const run = useRef<{ ctl: AbortController; turnId: string; text: string; meta: AskMeta | null; steps: ThinkStep[]; startedAt: number } | null>(null);
+  const run = useRef<{ ctl: AbortController; turnId: string; text: string; meta: AskMeta | null; steps: ThinkStep[]; startedAt: number; page: TurnPage | null } | null>(null);
   const panel = useRef<HTMLDivElement>(null);
   const log = useRef<HTMLDivElement>(null);
   const input = useRef<HTMLInputElement>(null);
@@ -251,11 +279,60 @@ function Widget({ space, cfg, tema, lado, voice: baseVoice }: { space: SpaceProf
     const onMessage = (e: MessageEvent) => {
       if (e.source !== window.parent) return;
       const m = readHostMessage(e.data);
-      if (m) setFull(m.full);
+      if (!m) return;
+      setFull(m.full);
+      setCanRead(m.read === true && host !== null && e.origin === host);
     };
     window.addEventListener("message", onMessage);
     return () => window.removeEventListener("message", onMessage);
-  }, []);
+  }, [host]);
+
+  /* --- leer la página que aloja el chat (0127) --- */
+
+  /** Le pide a la página su texto de ahora. null si no se deja leer, no responde a tiempo o no tiene texto. */
+  const requestPage = (signal: AbortSignal): Promise<HostPage | null> =>
+    new Promise((resolve) => {
+      if (!canRead || !host) return resolve(null);
+      const id = newId();
+      let timer = 0;
+      const finish = (page: HostPage | null) => {
+        window.clearTimeout(timer);
+        window.removeEventListener("message", onReply);
+        signal.removeEventListener("abort", onAbort);
+        resolve(page);
+      };
+      const onReply = (e: MessageEvent) => {
+        if (e.source !== window.parent || e.origin !== host) return;
+        const reply = readHostPage(e.data, id);
+        if (reply) finish(reply.page);
+      };
+      const onAbort = () => finish(null);
+      window.addEventListener("message", onReply);
+      signal.addEventListener("abort", onAbort);
+      timer = window.setTimeout(() => finish(null), PAGE_WAIT_MS);
+      try {
+        window.parent.postMessage(pageRequest(id), host);
+      } catch {
+        finish(null);
+      }
+    });
+
+  /** La lectura va a la bandeja de la administración una sola vez por página y contenido en la visita. */
+  const sendCapture = (page: HostPage) => {
+    const stamp = pageStamp(page);
+    if (captures[stamp] || sending.current.has(stamp)) return;
+    sending.current.add(stamp);
+    void capturePage(page, space.portal).then((raw) => {
+      sending.current.delete(stamp);
+      setCaptures((all) => ({ ...all, [stamp]: captureStatus(raw) }));
+    });
+  };
+
+  useEffect(() => {
+    session.set(KEY_PAGES, JSON.stringify(captures));
+    // La llave no cambia mientras el chat vive.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [captures]);
 
   /* El saludo: una vez por visita, a los pocos segundos, y se retira solo. */
   useEffect(() => {
@@ -396,9 +473,9 @@ function Widget({ space, cfg, tema, lado, voice: baseVoice }: { space: SpaceProf
     born.current.add(turn.id);
     setTurns([...before, turn].slice(-MAX_TURNS));
     const ctl = new AbortController();
-    const mine = { ctl, turnId: turn.id, text: "", meta: null as AskMeta | null, steps: [] as ThinkStep[], startedAt: Date.now() };
+    const mine = { ctl, turnId: turn.id, text: "", meta: null as AskMeta | null, steps: [] as ThinkStep[], startedAt: Date.now(), page: null as TurnPage | null };
     run.current = mine;
-    const show = () => setLive({ turnId: mine.turnId, text: mine.text, meta: mine.meta, steps: mine.steps, startedAt: mine.startedAt });
+    const show = () => setLive({ turnId: mine.turnId, text: mine.text, meta: mine.meta, steps: mine.steps, startedAt: mine.startedAt, page: mine.page });
     show();
     setBusy(true);
     setStatus("Pilo está pensando.");
@@ -422,10 +499,24 @@ function Widget({ space, cfg, tema, lado, voice: baseVoice }: { space: SpaceProf
           show();
         },
       };
-      const answer = wire ? await askQuestionStream(q, history, handlers, wire) : await askQuestionStream(q, history, handlers);
+      // La página se lee ahora, no al cargar: así vale también si cambió sin recargar.
+      const hostPage = await requestPage(ctl.signal);
+      if (run.current !== mine) return;
+      const read = hostPage ? pageForQuestion(hostPage, q) : null;
+      if (hostPage && read) {
+        mine.page = read.turn;
+        show();
+        sendCapture(hostPage);
+      }
+      const answer = read
+        ? await askQuestionStream(q, history, handlers, { ...wire, page: read.wire })
+        : wire
+          ? await askQuestionStream(q, history, handlers, wire)
+          : await askQuestionStream(q, history, handlers);
       if (run.current !== mine) return;
       setFresh((f) => new Map(f).set(turn.id, mine.text.trim() ? "en vivo" : "entera"));
-      patchTurn(turn.id, { answer });
+      // El recibo solo aparece si el servidor confirma que usó la página.
+      patchTurn(turn.id, { answer, ...(answer.page && mine.page ? { page: mine.page } : {}) });
       setStatus(`Pilo respondió: ${toPlain(parseAnswer(answer.text))}`);
     } catch (e) {
       // Cortado por «Detener» o por otra pregunta: ya quedó resuelto.
@@ -477,7 +568,9 @@ function Widget({ space, cfg, tema, lado, voice: baseVoice }: { space: SpaceProf
     });
 
   const working = busy && !live?.text;
-  const headline = reading ? "Hablando" : working ? "Pensando" : busy ? "Escribiendo" : space.widget.idle;
+  // Mientras piensa, la cara de la cabecera cambia de gesto con los segundos.
+  const waited = useElapsed(live?.startedAt, working);
+  const headline = reading ? "Hablando" : working ? (live?.page && !live.steps.length ? "Leyendo la página" : "Pensando") : busy ? "Escribiendo" : space.widget.idle;
   // La primera vez (o al pedir cambiarlo), el saludo pregunta quién habla.
   const picking = askRol && (rol === null || asking);
   const who = ROLE_OPTIONS.find((o) => o.id === rol)?.short;
@@ -489,7 +582,7 @@ function Widget({ space, cfg, tema, lado, voice: baseVoice }: { space: SpaceProf
         <div className="pe-panel" ref={panel} role="dialog" aria-label="Chat con Pilo">
           <header className="pe-head">
             <div className="pe-face">
-              <PiloMoji size={64} mood={working ? "piensa" : "feliz"} emotion={working ? undefined : view.expression} talking={reading || (busy && !working)} alive />
+              <PiloMoji size={64} mood={working ? "piensa" : "feliz"} emotion={working ? waitingFace(waited) : view.expression} talking={reading || (busy && !working)} alive />
             </div>
             <div className="pe-id">
               <strong>Pilo</strong>
@@ -536,6 +629,9 @@ function Widget({ space, cfg, tema, lado, voice: baseVoice }: { space: SpaceProf
                 onTyped={() => typed(t.id)}
                 onRetry={() => void ask(t.q, t.id)}
                 home={home}
+                capture={captureLine(captures[(t.page ?? (live && live.turnId === t.id ? live.page : null))?.stamp ?? ""] ?? "no")}
+                // La primera lectura de una página se cuenta entera; las siguientes, en una línea.
+                firstRead={turns.findIndex((x) => x.page?.url === (live?.page?.url ?? "")) === -1}
                 onReading={(on) => setReadingId((cur) => (on ? t.id : cur === t.id ? null : cur))}
               />
             ))}
@@ -614,9 +710,15 @@ function TurnView({
   onRetry,
   onReading,
   home,
+  capture,
+  firstRead,
 }: {
   /** La página de este Pilo: a donde lleva una fuente que no tiene la suya. */
   home: string;
+  /** Qué pasó con la lectura en la bandeja de la administración, ya en palabras; vacío si no hay nada que decir. */
+  capture: string;
+  /** Es la primera vez que Pilo lee esta página en la conversación. */
+  firstRead: boolean;
   turn: Turn;
   stream: Live | null;
   fresh: "entera" | "en vivo" | undefined;
@@ -638,6 +740,7 @@ function TurnView({
   const parsed = useMemo(() => parseAnswer(text, { streaming }), [text, streaming]);
   const elapsed = useElapsed(stream?.startedAt, working);
   const step = working ? waitingLine({ steps: stream?.steps ?? [], meta: stream?.meta ?? null, seconds: elapsed }) : "";
+  const tip = working ? waitingTip(elapsed, seedOf(turn.id)) : null;
 
   const question = useRef<HTMLDivElement>(null);
   const think = useRef<HTMLDivElement>(null);
@@ -766,6 +869,8 @@ function TurnView({
         {turn.q}
       </div>
 
+      {working && stream?.page && <ReadCard page={stream.page} full={firstRead} />}
+
       {working && (
         <div className="pe-think" ref={think}>
           <span ref={stepText}>{step}</span>
@@ -775,6 +880,11 @@ function TurnView({
             <i />
           </span>
         </div>
+      )}
+      {tip && (
+        <p className="ap-tip pe-tip" key={tip}>
+          {tip}
+        </p>
       )}
 
       {text && (
@@ -799,6 +909,7 @@ function TurnView({
               {note}
             </p>
           ))}
+          {a.page && turn.page && <ReadTicket page={turn.page} capture={capture} />}
           {a.unknown && a.unknown.length > 0 && <p className="pe-note pe-note--warn">Revise estos números antes de citarlos: no los encontré en las fuentes ({a.unknown.join(", ")}).</p>}
           <div className="pe-meta">
             {links.map((s) => (
@@ -817,5 +928,99 @@ function TurnView({
         </div>
       )}
     </>
+  );
+}
+
+/* --- Leer la página: mientras lee y el recibo ---------------------------------------------- */
+
+/**
+ * Pilo leyendo la página que lo aloja. La primera vez muestra sus títulos y los
+ * recorre uno tras otro, como quien pasa el dedo por el renglón; las siguientes
+ * preguntas sobre la misma página, una sola línea. La lectura ya ocurrió cuando
+ * esto se pinta: la animación la cuenta, no hace esperar a nadie (el pedido al
+ * servidor sale a la vez).
+ */
+function ReadCard({ page, full }: { page: TurnPage; full: boolean }) {
+  const root = useRef<HTMLDivElement>(null);
+  const lines = full ? page.headings.slice(0, 3) : [];
+  const [done, setDone] = useState(lines.length === 0 || reduced());
+
+  useLayoutEffect(() => {
+    const el = root.current;
+    if (!el || reduced()) return;
+    const ctx = gsap.context(() => {
+      const tl = gsap.timeline({ defaults: { ease: EASE }, onComplete: () => setDone(true) });
+      tl.fromTo(el, { opacity: 0, y: 10, filter: "blur(4px)" }, { opacity: 1, y: 0, filter: "blur(0px)", duration: 0.28, clearProps: "opacity,filter,transform" });
+      // Cada título: la marca lo recorre de izquierda a derecha y, al pasar, queda leído.
+      gsap.utils.toArray<HTMLElement>(".pe-read__line", el).forEach((line, i) => {
+        const at = 0.16 + i * 0.26;
+        tl.fromTo(line.querySelector(".pe-read__mark"), { clipPath: "inset(0 100% 0 0)" }, { clipPath: "inset(0 0% 0 0)", duration: 0.34, ease: "power2.out" }, at)
+          .fromTo(line.querySelector(".pe-read__text"), { opacity: 0.5 }, { opacity: 1, duration: 0.2, ease: "none", clearProps: "opacity" }, at + 0.14)
+          .to(line.querySelector(".pe-read__mark"), { opacity: 0, duration: 0.3, ease: "power1.out" }, at + 0.4);
+      });
+    }, el);
+    return () => ctx.revert();
+    // Una vez por tarjeta: la página leída no cambia mientras se pinta.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  return (
+    <div className="pe-read" ref={root} data-done={done || undefined}>
+      <span className="pe-read__icon">{I.page}</span>
+      <div className="pe-read__body">
+        <strong>{done ? "Leí esta página" : "Leyendo esta página"}</strong>
+        <span className="pe-read__where">{hostLabel(page.url)}</span>
+        {lines.length > 0 && (
+          <ul className="pe-read__lines">
+            {lines.map((text) => (
+              <li key={text} className="pe-read__line">
+                <span className="pe-read__mark" aria-hidden="true" />
+                <span className="pe-read__text">{text}</span>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+    </div>
+  );
+}
+
+/**
+ * El recibo de la lectura, con la respuesta: qué página leyó, cuánto de ella
+ * viajó con la pregunta y, cuando el servidor lo confirma, que la mandó a
+ * Planeación para guardarla en la memoria. Es el boleto de origen del portal.
+ */
+function ReadTicket({ page, capture }: { page: TurnPage; capture: string }) {
+  const sent = useRef<HTMLSpanElement>(null);
+
+  /* La confirmación llega después que el recibo: entra de izquierda a derecha y su visto se dibuja. */
+  useLayoutEffect(() => {
+    const el = sent.current;
+    if (!capture || !el || reduced()) return;
+    const ctx = gsap.context(() => {
+      gsap
+        .timeline({ defaults: { ease: EASE } })
+        .fromTo(el, { clipPath: "inset(0 100% 0 0)", opacity: 0 }, { clipPath: "inset(0 0% 0 0)", opacity: 1, duration: 0.36, clearProps: "clipPath,opacity" })
+        .fromTo(".pe-check", { strokeDasharray: 1, strokeDashoffset: 1 }, { strokeDashoffset: 0, duration: 0.26, ease: "power2.out" }, 0.14);
+    }, el);
+    return () => ctx.revert();
+  }, [capture]);
+
+  return (
+    <div className="ap-ticket pe-ticket">
+      <b>Leí esta página</b>
+      <span className="ap-ticket__row">
+        <span className="pe-ticket__where">{hostLabel(page.url)}</span>
+        <span>
+          {page.sent} de {page.total} {page.total === 1 ? "pasaje" : "pasajes"}
+        </span>
+      </span>
+      {capture && (
+        <span className="pe-ticket__sent" ref={sent}>
+          {I.check}
+          {capture}
+        </span>
+      )}
+    </div>
   );
 }

@@ -28,7 +28,7 @@
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { Icon } from "../../../components/ui/Icon";
 import { revealList } from "./motion";
-import { CELL_LABEL, atHome, cellChoices, cellOf, confirmText, effectText, effectiveCell, previewCell, usePortals, useSetCell } from "./portals";
+import { CELL_LABEL, atHome, cellChoices, cellOf, confirmText, effectText, effectiveCell, previewCell, unifyChanges, usePortals, useSetCell, useUnifyMemory } from "./portals";
 import type { Cell, CellEffect, PiloPortal, PiloSource } from "./portals";
 import { Group, StatusMark } from "./ui";
 
@@ -36,6 +36,7 @@ const KIND_NOTE: Record<PiloSource["kind"], string> = {
   portal: "La llenan los portales públicos",
   documentos: "Documentos que sube la administración",
   moodle: "Cursos leídos de Moodle",
+  catalogo: "Respuestas oficiales del catálogo · para leer de visita",
 };
 
 const SCOPE_NAME: Record<string, string> = { planeacion: "Planeación", ensenanza: "Enseñanza" };
@@ -50,6 +51,8 @@ interface Pending {
 export function PortalsMatrix({ onHomeSource }: { /** Una celda de casa del portal de siempre cambió: el editor pone al día su interruptor. */ onHomeSource?: (source: string, on: boolean) => void }) {
   const query = usePortals();
   const setCell = useSetCell();
+  const unify = useUnifyMemory();
+  const [unifying, setUnifying] = useState<"visita" | "no" | null>(null);
   const [pending, setPending] = useState<Pending | null>(null);
   const [said, setSaid] = useState<{ tone: "ok" | "off"; text: string } | null>(null);
   // Lo que la base cuenta ANTES de marcar «De visita»: sin esa cuenta no se confirma.
@@ -102,6 +105,31 @@ export function PortalsMatrix({ onHomeSource }: { /** Una celda de casa del port
   };
 
   const groups = data ? [...new Set(data.sources.map((s) => s.scope))].map((scope) => ({ scope, sources: data.sources.filter((s) => s.scope === scope) })) : [];
+  const toJoin = data ? unifyChanges(data, "visita") : [];
+  const toSplit = data ? unifyChanges(data, "no") : [];
+  const cellsOf = (list: typeof toJoin) => list.reduce((n, c) => n + Object.keys(c.cells).length, 0);
+
+  const applyUnify = (to: "visita" | "no") => {
+    if (!data) return;
+    setSaid(null);
+    unify.mutate(
+      { data, to },
+      {
+        onSuccess: (n) => {
+          setUnifying(null);
+          setSaid({
+            tone: n ? "ok" : "off",
+            text: n
+              ? to === "visita"
+                ? `Una sola memoria: ${n === 1 ? "1 celda pasó" : `${n} celdas pasaron`} a «De visita». Cada portal busca primero en lo suyo y, si no alcanza, lee lo del otro diciendo de dónde viene.`
+                : `Memorias separadas: ${n === 1 ? "1 celda volvió" : `${n} celdas volvieron`} a «No».`
+              : "No había nada que cambiar.",
+          });
+        },
+        onError: () => setUnifying(null),
+      },
+    );
+  };
 
   return (
     <Group
@@ -152,6 +180,48 @@ export function PortalsMatrix({ onHomeSource }: { /** Una celda de casa del port
           Leyendo qué lee cada portal…
         </p>
       ) : (
+        <>
+          <div className="pis-unify" role="group" aria-label="Una sola memoria">
+            <p className="pis-small">
+              <strong>Una sola memoria.</strong>{" "}
+              {toJoin.length
+                ? "Que cada portal lea también lo de los demás, de visita, de un solo paso. Sigue buscando primero en lo suyo; solo si no alcanza (o si un puente aprobado lo trae) lee lo del otro, y dice de dónde viene."
+                : "Todos los portales ya leen de visita lo que puede salir de su casa."}
+            </p>
+            {unifying ? (
+              <div className="pis-key__saved pis-key__saved--confirm" role="alert">
+                <span>
+                  {unifying === "visita"
+                    ? `¿Pasar ${cellsOf(toJoin)} ${cellsOf(toJoin) === 1 ? "celda" : "celdas"} a «De visita»? Respeta quién puede ver cada pasaje: lo «con sesión» no llega a visitantes ni a cuentas de Pilo, Impacto sigue solo para el personal y Moodle no sale de su portal. Se puede deshacer.`
+                    : `¿Volver ${cellsOf(toSplit)} ${cellsOf(toSplit) === 1 ? "celda" : "celdas"} de «De visita» a «No»? Cada portal vuelve a leer solo lo suyo.`}
+                </span>
+                <button type="button" className="button-secondary" onClick={() => setUnifying(null)} disabled={unify.isPending}>
+                  No, dejarlo como está
+                </button>
+                <button type="button" className="button-primary" onClick={() => applyUnify(unifying)} disabled={unify.isPending}>
+                  {unify.isPending ? "Aplicando…" : unifying === "visita" ? "Sí, unir las memorias" : "Sí, separarlas"}
+                </button>
+              </div>
+            ) : (
+              <span className="pis-actions">
+                {toJoin.length > 0 && (
+                  <button type="button" className="button-primary" onClick={() => (setSaid(null), unify.reset(), setUnifying("visita"))} disabled={setCell.isPending}>
+                    Unir las memorias
+                  </button>
+                )}
+                {toSplit.length > 0 && (
+                  <button type="button" className="pis-link" onClick={() => (setSaid(null), unify.reset(), setUnifying("no"))} disabled={setCell.isPending}>
+                    Separarlas otra vez
+                  </button>
+                )}
+              </span>
+            )}
+            {unify.isError && (
+              <p className="pis-error" role="alert">
+                No se aplicó: {(unify.error as Error).message}
+              </p>
+            )}
+          </div>
         <div className="pis-extras pis-matrix" role="table" aria-label="Qué lee cada portal de cada fuente">
           <div role="row" className="pis-extras__head">
             <span role="columnheader">Fuente</span>
@@ -230,6 +300,7 @@ export function PortalsMatrix({ onHomeSource }: { /** Una celda de casa del port
             </div>
           ))}
         </div>
+        </>
       )}
 
       {said && (

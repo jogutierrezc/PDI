@@ -45,7 +45,7 @@ import { extrasFor, usePiloExtras } from "../../components/pilo/ai/extras";
 import { pickPassages, turnFile } from "./attach";
 import { AttachButton, AttachTray, FileChip, FileFoot, FileLog, useAttachment } from "./Extras";
 import { toPlain } from "./markdown";
-import { badgeOf, compactThink, interruptedTurn, notesOf, originOf, reduceSteps, secondsText, showsSources, waitingLine } from "./answer-state";
+import { badgeOf, compactThink, interruptedTurn, notesOf, originOf, reduceSteps, secondsText, seedOf, showsSources, waitingFace, waitingLine, waitingTip } from "./answer-state";
 import type { ThinkStep } from "./answer-state";
 import { CatalogModal } from "../admin/pilo/CatalogModal";
 import type { CatalogMood } from "../admin/pilo/catalog-sheet";
@@ -1078,6 +1078,8 @@ function TurnView({
   const badge = a ? badgeOf(a, incomplete) : null;
   const notes = a && !incomplete ? notesOf(a) : [];
   const headline = working ? waitingLine({ steps, meta: stream?.meta ?? null, seconds: elapsed }) : thought !== null ? `Pensó durante ${secondsText(thought)}` : "Cómo respondí";
+  // Aparte del titular: un consejo que va cambiando, para que la espera no desespere.
+  const tip = working ? waitingTip(elapsed, seedOf(turn.id)) : null;
   const head = (
     <>
       {working && (
@@ -1104,7 +1106,7 @@ function TurnView({
       </div>
       <div className="ap-a">
         <div className="ap-a__face">
-          <PiloMoji ref={face} size="100%" mood={pending ? "piensa" : a ? (incomplete ? "duda" : MOOD_OF[a.kind]) : "cuidado"} emotion={pending ? undefined : a?.expression || a?.mood} />
+          <PiloMoji ref={face} size="100%" mood={pending ? "piensa" : a ? (incomplete ? "duda" : MOOD_OF[a.kind]) : "cuidado"} emotion={pending ? (working ? waitingFace(elapsed) : undefined) : a?.expression || a?.mood} />
         </div>
         <div className="ap-a__body" ref={body} aria-busy={pending} data-paused={pending && !onScreen ? "" : undefined}>
           {turn.error && !a && (
@@ -1144,6 +1146,11 @@ function TurnView({
                   </button>
                 )}
               </div>
+              {tip && (
+                <p className="ap-tip" key={tip}>
+                  {tip}
+                </p>
+              )}
               {hasHow && <ThinkBody id={howId} open={how} steps={steps} thinking={thinking} trail={shownTrail} working={working} />}
               {turn.file && <FileLog file={turn.file} seconds={turn.think?.seconds} />}
               {text && <AnswerText parsed={parsed} shown={shown} typing={typing} streaming={streaming} reading={reading} sources={sources} active={active} onSource={openSource} onFinish={finish} />}

@@ -48,7 +48,7 @@ import { fromKeyboard, reducedMotion } from "./pwa";
 import type { InstallWay } from "./pwa";
 import { AppTurn } from "./AppTurn";
 import type { Live, TurnVoice } from "./AppTurn";
-import { AccountSheet, AppMenu, IphoneSheet, SourcesSheet } from "./AppMenu";
+import { AccountSheet, AppMenu, IphoneSheet, SettingsSheet, SourcesSheet } from "./AppMenu";
 import { Icon } from "./icons";
 import { AppSide } from "./AppSide";
 import type { Person } from "./AppSide";
@@ -60,7 +60,7 @@ import { extrasFor, usePiloExtras } from "../../components/pilo/ai/extras";
 import { pickPassages, turnFile } from "../pregunta/attach";
 import { AttachButton, AttachTray, useAttachment } from "../pregunta/Extras";
 
-type Over = null | "menu" | "fuentes" | "cuenta" | "iphone";
+type Over = null | "menu" | "ajustes" | "fuentes" | "cuenta" | "iphone";
 
 export interface ShellProps {
   space: SpaceProfile;
@@ -428,6 +428,13 @@ export function AppShell({ space, door, waking, online, person, member, wide, th
   const placeholder = !online ? "Sin conexión" : waking ? "Despertando a Pilo…" : !open ? "Pilo no está disponible aquí" : "Escriba su pregunta";
 
   const shown = { ...person, saved: member ? (keptList.data?.length ?? null) : null };
+  /** Pilo se presenta otra vez: calla lo que suene, corta la respuesta en curso y cierra lo que esté encima. */
+  const showWelcome = () => {
+    stopOfficial();
+    cancelRun();
+    setOver(null);
+    onWelcome();
+  };
 
   return (
     <>
@@ -442,6 +449,9 @@ export function AppShell({ space, door, waking, online, person, member, wide, th
           onDelete={deleteSaved}
           onNew={startNew}
           onSwitch={(id) => id !== space.id && onSwitch(id)}
+          theme={theme}
+          onTheme={onTheme}
+          onWelcome={showWelcome}
         />
       )}
       <header className="pa-bar">
@@ -640,20 +650,21 @@ export function AppShell({ space, door, waking, online, person, member, wide, th
             setOver(null);
             if (id !== space.id) onSwitch(id);
           }}
-          theme={theme}
-          onTheme={(id, e) => {
-            onTheme(id);
-            pulse(e);
-          }}
-          onWelcome={() => {
-            stopOfficial();
-            cancelRun();
-            setOver(null);
-            onWelcome();
-          }}
+          onSettings={() => setOver("ajustes")}
           person={shown}
         />
       )}
+      <SettingsSheet
+        open={over === "ajustes"}
+        quick={quick}
+        onClose={hide}
+        theme={theme}
+        onTheme={(id, e) => {
+          onTheme(id);
+          pulse(e);
+        }}
+        onWelcome={showWelcome}
+      />
       <SourcesSheet open={over === "fuentes"} quick={quick} onClose={hide} sources={shownSources.sources} focus={shownSources.focus} space={space} />
       <AccountSheet open={over === "cuenta"} quick={quick} onClose={hide} />
       <IphoneSheet open={over === "iphone"} quick={quick} onClose={hide} />

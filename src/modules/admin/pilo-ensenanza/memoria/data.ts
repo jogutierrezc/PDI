@@ -24,6 +24,7 @@ import { activity, useCurrentJob } from "../actividad";
 import { StepError, faultFrom, missingMigration } from "./flow";
 import type { ComprehendResult, DbError, DocStatus, ReadingJob } from "./flow";
 import type { RawEdge, RawNode } from "./map";
+import type { ReadingRow } from "./readings";
 
 export const BUCKET = "pilo-docs";
 
@@ -32,8 +33,9 @@ export const BUCKET = "pilo-docs";
 export interface DocRow {
   id: string;
   space: string;
-  origin: "archivo" | "moodle";
-  kind: "docx" | "xlsx" | "csv" | "pdf" | "curso";
+  /** «web» (0127): una página que Pilo leyó en otro portal y la administración guardó. */
+  origin: "archivo" | "moodle" | "web";
+  kind: "docx" | "xlsx" | "csv" | "pdf" | "curso" | "web";
   /** La colección: una de las de su Pilo (las de Enseñanza o, desde 0121, las del general). */
   source: string;
   title: string;
@@ -108,6 +110,7 @@ function dbFail(error: DbError): never {
 
 export const memoKeys = {
   docs: (space: PiloSpace) => ["pilo-ia", "memoria", "documentos", space] as const,
+  readings: (space: PiloSpace) => ["pilo-ia", "memoria", "lecturas", space] as const,
   moodle: (space: PiloSpace) => ["pilo-ia", "memoria", "moodle", space] as const,
   map: (space: PiloSpace) => ["pilo-ia", "memoria", "mapa", space] as const,
   mapStatus: (space: PiloSpace) => ["pilo-ia", "memoria", "mapa-estado", space] as const,
@@ -118,6 +121,7 @@ export function useRefreshMemory(space: PiloSpace) {
   const client = useQueryClient();
   return () => {
     void client.invalidateQueries({ queryKey: memoKeys.docs(space) });
+    void client.invalidateQueries({ queryKey: memoKeys.readings(space) });
     void client.invalidateQueries({ queryKey: memoKeys.moodle(space) });
     void client.invalidateQueries({ queryKey: memoKeys.map(space) });
     void client.invalidateQueries({ queryKey: memoKeys.mapStatus(space) });
@@ -189,6 +193,33 @@ export const docDelete = (doc: string) =>
 export const docOutlineSave = (doc: string, nodes: unknown[], edges: unknown[]) =>
   rpc<{ nodes: number; edges: number; removed: number; rejected: number }>("pilo_doc_outline", { p_doc: doc, p_nodes: nodes, p_edges: edges });
 
+/* --- Lo que leyó en otros portales (0127) ----------------------------------------------- */
+
+/** Las lecturas pendientes de un Pilo, la más reciente primero. Solo las de su ámbito. */
+export async function fetchReadings(space: PiloSpace): Promise<Loaded<ReadingRow[]>> {
+  const { data, error } = await supabase.from("pilo_readings").select("*").eq("space", space).eq("status", "pendiente").order("last_seen", { ascending: false }).limit(200);
+  if (error) {
+    const missing = missingMigration(error) ?? (/pilo_readings/i.test(error.message ?? "") ? "0127" : null);
+    if (missing) return { missing, data: [] };
+    dbFail(error);
+  }
+  return { missing: null, data: (data ?? []) as unknown as ReadingRow[] };
+}
+
+export function useReadings(space: PiloSpace, enabled = true) {
+  return useQuery({ queryKey: memoKeys.readings(space), enabled, queryFn: () => fetchReadings(space) });
+}
+
+/** El documento «web» de una página en este Pilo, si ya se guardó antes: se actualiza en vez de duplicarse. */
+export async function findWebDoc(space: PiloSpace, urlHash: string): Promise<string | null> {
+  const { data, error } = await supabase.from("pilo_docs").select("id").eq("space", space).eq("origin", "web").eq("external_id", urlHash).maybeSingle();
+  if (error) dbFail(error);
+  return (data as { id?: string } | null)?.id ?? null;
+}
+
+export const readingDecide = (id: string, status: "guardada" | "descartada", doc: string | null = null) =>
+  rpc<unknown>("pilo_reading_decide", { p_id: id, p_status: status, p_doc: doc });
+
 /** Los pasajes de un documento, para rehacer su estructura o listarlos. */
 export async function fetchDocPassages(space: PiloSpace, doc: string): Promise<{ ref: string; seq: number; section: string; body: string }[]> {
   const { data, error } = await supabase.from("pilo_memory").select("ref, section, body").eq("space", space).eq("doc_id", doc).limit(450);
@@ -237,8 +268,8 @@ export async function indexRun(space: PiloSpace, opts: { onStatus?: (status: Emb
 
 /* --- La función pilo-ia ---------------------------------------------------------------- */
 
-/** Un paso de «comprender» o de «moodle». El espacio va siempre en el cuerpo. */
-export async function piloStep<T>(action: "comprender" | "moodle", space: PiloSpace, body: Record<string, unknown>): Promise<T> {
+/** Un paso de «comprender», de «moodle» o de «web». El espacio va siempre en el cuerpo. */
+export async function piloStep<T>(action: "comprender" | "moodle" | "web", space: PiloSpace, body: Record<string, unknown>): Promise<T> {
   const { data, error } = await supabase.functions.invoke<T>("pilo-ia", { body: { action, space, ...body } });
   if (!error) return data as T;
   const response = (error as { context?: Response }).context;
@@ -256,6 +287,9 @@ export async function piloStep<T>(action: "comprender" | "moodle", space: PiloSp
 }
 
 export const comprehend = (space: PiloSpace, step: "estado" | "lote") => piloStep<ComprehendResult>("comprender", space, { step });
+
+/** Comprender solo los pasajes de un documento (una página web recién leída, por ejemplo). */
+export const comprehendDoc = (space: PiloSpace, doc: string) => piloStep<ComprehendResult>("comprender", space, { step: "lote", doc });
 
 export interface MoodleProbe {
   site?: { name?: string; release?: string; url?: string };

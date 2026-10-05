@@ -16,7 +16,7 @@
    ========================================================================== */
 
 /** La versión de la política. Al cambiar el texto, súbala: la app vuelve a pedir la aceptación. */
-export const POLICY_VERSION = "1";
+export const POLICY_VERSION = "2";
 
 /** La fecha de esta versión, como se le muestra a la persona («1 de noviembre de 2026»). */
 // POR DEFINIR por el dueño
@@ -187,14 +187,14 @@ export const POLICY_SECTIONS: PolicySection[] = [
     blocks: [
       {
         kind: "p",
-        text: "Algunas funciones leen información suya en plataformas de la universidad: sus notas en Génesis y sus cursos en Moodle. Para eso rigen estas reglas:",
+        text: "Algunas funciones leen información suya en plataformas de la universidad: en Génesis, sus notas del periodo y su récord académico por periodo (promedios, créditos y la definitiva de cada materia); en Moodle, sus cursos. Para eso rigen estas reglas:",
       },
       {
         kind: "list",
         items: [
           "**Siempre con su autorización.** Ninguna consulta se hace sin que el estudiante o el profesor la autorice de forma expresa, y puede retirarla cuando quiera.",
           "**Solo lectura.** Pilo consulta; no escribe, no entrega tareas, no presenta exámenes ni cambia nada en esas plataformas.",
-          "**Nada se aloja en Pilo.** Sus notas y los contenidos de sus cursos permanecen en la plataforma institucional. Pilo los consulta en el momento y no los guarda en sus servidores.",
+          "**Nada se aloja en Pilo.** Sus notas, su récord académico y los contenidos de sus cursos permanecen en la plataforma institucional. Pilo los consulta en el momento y no los guarda en sus servidores. Si usted le pide recomendaciones sobre sus notas, y solo al pedirlas, Pilo envía a la IA un resumen de ellas sin su nombre ni su código; ese resumen no se guarda.",
           "**Solo para usted.** Ni la universidad ni otra persona usa o ve esa información a través de Pilo.",
           "**La conexión es suya.** Si decide mantenerla, queda guardada en su dispositivo. Al desconectar, se borra.",
         ],

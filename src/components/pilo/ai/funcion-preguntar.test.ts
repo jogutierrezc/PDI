@@ -35,6 +35,11 @@ interface World {
   seen: Record<string, number>;
   /** Sin la migración 0110: la función del límite no existe. */
   noVisitorTable: boolean;
+  /** Las respuestas que se dejan para recoger (0128), por tiquete. Sin esto, esa migración no está. */
+  waits?: Record<string, { status: string; payload: Row | null }>;
+  /** Las colecciones de documentos (0121) y los documentos «web» ya guardados (0127), para leer páginas web (0129). */
+  sources?: Row[];
+  webDocs?: Row[];
   /** La búsqueda en la memoria falla (la base no responde). */
   memoryFails?: boolean;
   /** Cuántos pasajes tienen vector (0108): con alguno, la búsqueda también va por significado. */
@@ -86,6 +91,12 @@ interface World {
   bridgeTargets?: Row[];
   proposed?: Row[];
   scanned?: Row[];
+  /** Relaciones, premisas y análisis (0130): lo que devolvería pilo_catalog_near y las premisas de las capciosas. Sin `premises`, la base no tiene esa migración. */
+  near?: Row[];
+  premises?: Row[];
+  /** Proponer premisas (0130): las capciosas sin revisar y lo que la IA dejó propuesto. */
+  premisePending?: Row[];
+  premiseProposed?: Row[];
 }
 
 /** El portal de casa de cada ámbito (pilo_portals): su nombre, para quién fue escrito lo suyo y su público. */
@@ -258,6 +269,8 @@ function fakeClient(w: World) {
         }
         return { data: null, error: null };
       }
+      if (table === "pilo_sources") return { data: (w.sources ?? []).find((x) => x.id === eq("id") && x.scope === eq("scope")) ?? null, error: null };
+      if (table === "pilo_docs") return { data: (w.webDocs ?? []).find((x) => x.external_id === eq("external_id") && x.space === eq("space")) ?? null, error: null };
       return { data: null, error: null };
     };
     const api = {
@@ -342,6 +355,24 @@ function fakeClient(w: World) {
           w.bridgePending = (w.bridgePending ?? []).filter((p) => !seen.some((s) => s.id === p.id));
           return { data: { given: rows.length, added: rows.length, scanned: seen.length }, error: null };
         }
+        // Las capciosas (0130). Como la base: lo aprobado, y solo de ese Pilo; proponer no pisa nada.
+        case "pilo_catalog_near":
+          return { data: w.near ?? null, error: null };
+        case "pilo_premises_active":
+          if (!w.premises) return missing(name);
+          return { data: w.premises.filter((p) => p.status === "aprobada" && spaceOf(p) === space), error: null };
+        case "pilo_premises_status":
+          if (!w.premises) return missing(name);
+          return { data: { total: w.catalog.filter((c) => c.kind === "capciosa" && spaceOf(c) === space).length, pending: (w.premisePending ?? []).filter((p) => spaceOf(p) === space).length, proposed: (w.premiseProposed ?? []).length, approved: w.premises.filter((p) => p.status === "aprobada" && spaceOf(p) === space).length }, error: null };
+        case "pilo_premises_pending":
+          if (!w.premises) return missing(name);
+          return { data: (w.premisePending ?? []).filter((p) => spaceOf(p) === space).slice(0, Number(args.p_limit ?? 8)), error: null };
+        case "pilo_premises_propose": {
+          const rows = args.p_rows as Row[];
+          w.premiseProposed = [...(w.premiseProposed ?? []), ...rows.map((r) => ({ ...r, space }))];
+          w.premisePending = (w.premisePending ?? []).filter((p) => !rows.some((r) => r.key === p.key));
+          return { data: rows.length, error: null };
+        }
         case "pilo_answer_candidates":
           return {
             data: w.answers
@@ -357,6 +388,22 @@ function fakeClient(w: World) {
           w.visitors.push(String(args.p_visitor));
           w.seen[String(args.p_visitor)] = (w.seen[String(args.p_visitor)] ?? 0) + 1;
           return { data: w.hits + w.seen[String(args.p_visitor)], error: null };
+        case "pilo_wait_open": {
+          if (!w.waits) return missing(name);
+          const ticket = String(args.p_ticket);
+          if (w.waits[ticket]) return { data: false, error: null };
+          w.waits[ticket] = { status: "pendiente", payload: null };
+          return { data: true, error: null };
+        }
+        case "pilo_wait_close": {
+          if (!w.waits) return missing(name);
+          const wait = w.waits[String(args.p_ticket)];
+          if (wait?.status === "pendiente") w.waits[String(args.p_ticket)] = { status: String(args.p_status), payload: args.p_payload as Row };
+          return { data: null, error: null };
+        }
+        case "pilo_wait_read":
+          if (!w.waits) return missing(name);
+          return { data: w.waits[String(args.p_ticket)] ?? null, error: null };
         case "pilo_inbox_add":
           w.inbox.push(args);
           return { data: null, error: null };
@@ -1120,6 +1167,126 @@ describe("el flujo se mantiene vivo y se suelta", () => {
     expect(seen.signal?.aborted).toBe(true);
     await vi.waitFor(() => expect(w.logs.some((l) => l.status === "cancelado")).toBe(true));
     expect(w.saved).toEqual([]);
+  });
+});
+
+/* --- La respuesta que se recoge después (0128) --------------------------------------------
+   Quien no puede esperar con el pedido abierto (la skill de Alexa) deja un
+   tiquete y se va: Pilo sigue redactando y la respuesta se recoge con «recoger». */
+
+describe("la respuesta que se recoge después (espera)", () => {
+  const TICKET = "3f2b8c1e-5a47-4d09-9b61-0c7e2a1d4f58";
+  const QUESTION = "¿Cuántos estudiantes matriculados hay?";
+
+  it("con tiquete, si quien pregunta se va, Pilo sigue y deja la respuesta", async () => {
+    const w = world();
+    w.waits = {};
+    const seen: { signal: AbortSignal | null } = { signal: null };
+    let release: (r: Response) => void = () => undefined;
+    vi.stubGlobal(
+      "fetch",
+      vi.fn((_url: string, init: RequestInit) => {
+        seen.signal = init.signal ?? null;
+        return new Promise<Response>((ok) => (release = ok));
+      }),
+    );
+    const handler = await boot(w);
+    const response = await ask(handler, { question: QUESTION, stream: true, espera: TICKET });
+    const reader = response.body!.getReader();
+    await reader.read();
+    await vi.waitFor(() => expect(seen.signal).not.toBeNull());
+    expect(w.waits[TICKET]).toEqual({ status: "pendiente", payload: null });
+    expect(await (await ask(handler, { action: "recoger", espera: TICKET })).json()).toEqual({ status: "pendiente" });
+
+    await reader.cancel();
+    expect(seen.signal?.aborted).toBe(false);
+    release(stream("En 2024 hubo 20.500 estudiantes [1]. ")());
+    await vi.waitFor(() => expect(w.waits?.[TICKET].status).toBe("lista"));
+    expect(w.logs.some((l) => l.status === "cancelado")).toBe(false);
+
+    const got = await ask(handler, { action: "recoger", espera: TICKET });
+    expect(got.status).toBe(200);
+    const body = await got.json();
+    expect(body).toMatchObject({ status: "lista", kind: "ia", text: "En 2024 hubo 20.500 estudiantes [1]." });
+    expect(body.sources[0]).toEqual({ n: 1, title: "Estudiantes matriculados", path: "/cifras/poblacion" });
+    // Lo que solo le sirve a la página no se guarda.
+    expect(body).not.toHaveProperty("trail");
+  });
+
+  it("recoger espera con el pedido abierto hasta que la respuesta esté", async () => {
+    const w = world();
+    w.waits = { [TICKET]: { status: "pendiente", payload: null } };
+    const handler = await boot(w);
+    vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout", "Date"] });
+    const waiting = ask(handler, { action: "recoger", espera: TICKET, wait: 5000 }).then((r) => r.json());
+    await vi.advanceTimersByTimeAsync(1200);
+    w.waits[TICKET] = { status: "lista", payload: { kind: "ia", text: "Listo.", asked: "", sources: [] } };
+    await vi.advanceTimersByTimeAsync(600);
+    expect(await waiting).toEqual({ status: "lista", kind: "ia", text: "Listo.", asked: "", sources: [] });
+  });
+
+  it("un error de la redacción también se recoge, y un tiquete que no existe se dice", async () => {
+    const w = world();
+    w.waits = { [TICKET]: { status: "error", payload: { message: "El proveedor falló." } } };
+    const handler = await boot(w);
+    expect(await (await ask(handler, { action: "recoger", espera: TICKET })).json()).toEqual({ status: "error", message: "El proveedor falló." });
+    const unknown = await ask(handler, { action: "recoger", espera: "9a1b2c3d-4e5f-4a6b-8c7d-0e1f2a3b4c5d" });
+    expect(unknown.status).toBe(404);
+    expect(await unknown.json()).toEqual({ status: "desconocida" });
+    expect((await ask(handler, { action: "recoger", espera: "no-es-un-tiquete" })).status).toBe(400);
+  });
+
+  it("sin la migración 0128 se responde como siempre: si la página se va, se suelta al proveedor", async () => {
+    const w = world();
+    const seen: { signal: AbortSignal | null } = { signal: null };
+    vi.stubGlobal(
+      "fetch",
+      vi.fn((_url: string, init: RequestInit) => {
+        seen.signal = init.signal ?? null;
+        return new Promise<Response>((_ok, fail) => init.signal?.addEventListener("abort", () => fail(new DOMException("cancelado", "AbortError"))));
+      }),
+    );
+    const handler = await boot(w);
+    const response = await ask(handler, { question: QUESTION, stream: true, espera: TICKET });
+    const reader = response.body!.getReader();
+    await reader.read();
+    await vi.waitFor(() => expect(seen.signal).not.toBeNull());
+    await reader.cancel();
+    expect(seen.signal?.aborted).toBe(true);
+    const got = await ask(handler, { action: "recoger", espera: TICKET });
+    expect(got.status).toBe(500);
+    expect(await got.json()).toMatchObject({ code: "migracion" });
+  });
+});
+
+/* --- La página que se ve con la pregunta (0127) --------------------------------------------
+   Con la pregunta puede viajar el texto de la página donde está el chat. Se usa
+   si la página es de este mismo portal o de uno autorizado; de otra, se ignora. */
+
+describe("la página que se ve con la pregunta", () => {
+  const sentPage = (call: { body: Record<string, unknown> }) => JSON.stringify(call.body.messages).includes("<<<PAGINA");
+  const pageAt = (url: string) => ({ url, title: "Admisiones", passages: ["Las inscripciones cierran el 30 de noviembre."] });
+  const askWith = async (w: World, url: string) => {
+    const calls = provider(stream("Según esta página, cierran el 30 de noviembre. "));
+    const all = await events(await ask(await boot(w), { question: "¿Cuándo cierran las inscripciones de esta página?", stream: true, page: pageAt(url) }));
+    return { used: sentPage(calls[calls.length - 1]), done: all[all.length - 1].data };
+  };
+
+  it("la de este mismo portal se lee sin estar en la lista de portales autorizados", async () => {
+    const own = await askWith(world(), "http://localhost:5173/pilo-widget-demo.html");
+    expect(own.used).toBe(true);
+    expect(own.done.page).toMatchObject({ url: "http://localhost:5173/pilo-widget-demo.html" });
+  });
+
+  it("la de otro portal, solo si está autorizado y con el interruptor encendido", async () => {
+    const other = "https://www.udes.edu.co/admisiones";
+    expect((await askWith(world(), other)).used).toBe(false);
+    const listed = world();
+    listed.settings = { ...listed.settings, widget_on: true, widget_origins: ["https://www.udes.edu.co"] };
+    expect((await askWith(listed, other)).used).toBe(true);
+    const off = world();
+    off.settings = { ...off.settings, widget_on: false, widget_origins: ["https://www.udes.edu.co"] };
+    expect((await askWith(off, other)).used).toBe(false);
   });
 });
 
@@ -2956,5 +3123,678 @@ describe("puentes: la IA propone y la administración revisa (0122)", () => {
     const out = (await (await comprehend(await boot(w))).json()) as Row;
     expect(out).toMatchObject({ ok: true, saved: 2, done: true });
     expect(w.rpcs.filter((n) => n === "pilo_bridges_sync")).toHaveLength(1);
+  });
+});
+
+/* --- Páginas web (0129) -------------------------------------------------------------------
+   La administración le da a Pilo la dirección de una página: la función la
+   lee, la deja como documento «web» de la memoria y le da su lugar en el mapa. */
+
+describe("páginas web (leer una página por su dirección)", () => {
+  const ADMIN = { Authorization: "Bearer sesion-admin" };
+  const PAGE = "https://www.udes.edu.co/admisiones";
+  const HTML = `<html><head><title>Admisiones | UDES</title></head><body><nav>Menú del sitio con muchos enlaces que no son contenido</nav><main>
+    <h1>Admisiones de pregrado</h1><p>La inscripción se hace en línea, desde el formulario de aspirantes de la universidad.</p>
+    <h2>Documentos</h2><p>Se pide el documento de identidad y el diploma de bachiller, según el Acuerdo 012 de 2021.</p>
+    <h2>Calendario</h2><p>Las inscripciones abren al comienzo de cada periodo académico y cierran una semana antes.</p></main></body></html>`;
+  const webWorld = () => {
+    const w = world();
+    w.sources = [
+      { id: "paginasweb", scope: "planeacion", name: "Páginas web", kind: "documentos" },
+      { id: "cifras", scope: "planeacion", name: "UDES en Cifras", kind: "portal" },
+    ];
+    return w;
+  };
+  const web = (handler: Handler, body: Row, headers: Record<string, string> = ADMIN) => ask(handler, { action: "web", space: "planeacion", step: "leer", collection: "paginasweb", ...body }, headers);
+  const net = (reply: (url: string) => Response) => {
+    const seen: { url: string; init: RequestInit }[] = [];
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (url: string, init: RequestInit) => {
+        seen.push({ url, init });
+        return reply(url);
+      }),
+    );
+    return seen;
+  };
+  const html = (text = HTML) => new Response(text, { headers: { "Content-Type": "text/html; charset=utf-8" } });
+
+  it("la lee, la guarda como documento web con sus pasajes y la pone en el mapa", async () => {
+    const w = webWorld();
+    const seen = net(() => html());
+    const response = await web(await boot(w), { url: `${PAGE}?utm_source=x#fechas` });
+    expect(response.status).toBe(200);
+    const out = (await response.json()) as Row;
+    expect(out).toMatchObject({ ok: true, url: PAGE, title: "Admisiones de pregrado", sections: ["Presentación", "Documentos", "Calendario"], total: 3, unchanged: false, mapped: true, collection: { id: "paginasweb", name: "Páginas web" } });
+    expect((out.passages as Row[]).map((p) => [p.seq, p.section])).toEqual([
+      [1, "Presentación"],
+      [2, "Documentos"],
+      [3, "Calendario"],
+    ]);
+    expect(JSON.stringify(out.passages)).not.toContain("Menú del sitio");
+    // Un solo pedido, a la dirección ya limpia, sin seguir redirecciones por su cuenta.
+    expect(seen).toHaveLength(1);
+    expect(seen[0].url).toBe(PAGE);
+    expect(seen[0].init).toMatchObject({ redirect: "manual" });
+    const saved = w.calls.find((c) => c.name === "pilo_doc_save")!.args as { p_space: string; p_doc: Row };
+    expect(saved.p_space).toBe("planeacion");
+    expect(saved.p_doc).toMatchObject({ origin: "web", kind: "web", source: "paginasweb", title: "Admisiones de pregrado", file_name: PAGE, external_id: await sha(PAGE), vis: "publico" });
+    const rows = (w.calls.find((c) => c.name === "pilo_doc_replace")!.args as { p_rows: Row[] }).p_rows;
+    expect(rows).toHaveLength(3);
+    expect(rows.every((r) => r.path === PAGE && r.title === "Admisiones de pregrado")).toBe(true);
+    const outline = w.calls.find((c) => c.name === "pilo_doc_outline")!.args as { p_nodes: Row[]; p_edges: Row[] };
+    expect(outline.p_nodes.map((n) => n.label)).toEqual(expect.arrayContaining(["Páginas web", "Admisiones de pregrado", "Documentos", "Calendario"]));
+    expect(w.logs.some((l) => l.status === "listo · web leer")).toBe(true);
+  });
+
+  it("leerla de nuevo sin cambios no reescribe nada; con cambios, actualiza el mismo documento", async () => {
+    const w = webWorld();
+    net(() => html());
+    const handler = await boot(w);
+    const first = (await (await web(handler, { url: PAGE })).json()) as Row;
+    const doc = (w.calls.find((c) => c.name === "pilo_doc_save")!.args as { p_doc: Row }).p_doc;
+    w.webDocs = [{ id: doc.id, space: "planeacion", external_id: doc.external_id, content_hash: doc.content_hash }];
+    w.calls.length = 0;
+    const again = (await (await web(handler, { url: PAGE })).json()) as Row;
+    expect(again).toMatchObject({ unchanged: true, doc: first.doc, total: 3, added: 0 });
+    expect(w.calls.some((c) => c.name === "pilo_doc_save" || c.name === "pilo_doc_replace")).toBe(false);
+    net(() => html(HTML.replace("una semana antes", "dos semanas antes")));
+    const changed = (await (await web(handler, { url: PAGE })).json()) as Row;
+    expect(changed).toMatchObject({ unchanged: false, doc: first.doc });
+    expect((w.calls.find((c) => c.name === "pilo_doc_save")!.args as { p_doc: Row }).p_doc.id).toBe(first.doc);
+  });
+
+  it("sigue una redirección revisándola, y no sale hacia una red interna ni hacia algo que no sea https", async () => {
+    const seen = net((url) => (url === PAGE ? new Response(null, { status: 301, headers: { Location: "/admisiones/pregrado" } }) : html()));
+    const out = (await (await web(await boot(webWorld()), { url: PAGE })).json()) as Row;
+    expect(out.url).toBe(`${PAGE}/pregrado`);
+    expect(seen.map((s) => s.url)).toEqual([PAGE, `${PAGE}/pregrado`]);
+    for (const target of ["http://www.udes.edu.co/admisiones", "https://192.168.0.5/panel", "https://localhost/x"]) {
+      const calls = net(() => new Response(null, { status: 302, headers: { Location: target } }));
+      const response = await web(await boot(webWorld()), { url: PAGE });
+      expect(response.status, target).toBe(400);
+      expect(calls).toHaveLength(1);
+    }
+  });
+
+  it("dice qué pasó cuando la dirección no sirve, la página falla, no es HTML o no tiene texto", async () => {
+    const calls = net(() => html());
+    const handler = await boot(webWorld());
+    for (const bad of ["", "http://www.udes.edu.co/", "https://10.0.0.1/", "https://intranet/"]) {
+      const response = await web(handler, { url: bad });
+      expect(response.status, bad).toBe(400);
+      expect(await response.json()).toMatchObject({ code: "direccion" });
+    }
+    expect((await web(handler, { url: PAGE, collection: "cifras" })).status).toBe(400);
+    expect((await web(handler, { url: PAGE, collection: "noexiste" })).status).toBe(400);
+    expect(calls).toHaveLength(0);
+    net(() => new Response("no", { status: 404 }));
+    expect(await (await web(handler, { url: PAGE })).json()).toMatchObject({ code: "pagina", error: "La página respondió 404." });
+    net(() => new Response("%PDF-1.7", { headers: { "Content-Type": "application/pdf" } }));
+    expect((await web(handler, { url: PAGE })).status).toBe(415);
+    net(() => html('<html><body><div id="root"></div><script>render()</script></body></html>'));
+    const empty = await web(handler, { url: PAGE });
+    expect(empty.status).toBe(422);
+    expect(await empty.json()).toMatchObject({ code: "vacia" });
+  });
+
+  it("solo la administración le da páginas a Pilo", async () => {
+    const calls = net(() => html());
+    const handler = await boot(webWorld());
+    expect((await web(handler, { url: PAGE }, {})).status).toBe(403);
+    expect((await web(handler, { url: PAGE }, { Authorization: "Bearer sesion-pilo" })).status).toBe(403);
+    expect(calls).toHaveLength(0);
+  });
+});
+
+/* --- Relaciones, premisas de las capciosas y análisis (0130) ------------------------------
+   Tres piezas con su interruptor, apagadas de partida. Encendidas: el pedido lleva
+   [RELACIONES] con lo que ya está en la base; una pregunta que se parece a una
+   capciosa sin dispararla va al modelo con esa capciosa como regla; y, si no hay
+   una relación aprobada pero sí señales, el modelo analiza antes de responder sin
+   que ese análisis llegue a quien pregunta. */
+
+describe("relaciones, premisas de las capciosas y análisis (0130)", () => {
+  const ON = { ask_relations: true, tricky_near: true, ask_analysis: true };
+  const C1 = { key: "C-001", kind: "capciosa", question: "Vida personal de Pilo", variants: [], triggers: ["tienes novia"], answer: "¡Solo tengo ojos para los datos!", mood: "atrevido", source_title: "", source_path: "", cut: "", office: "" };
+  const APPROVED = { key: "C-001", status: "aprobada", premise: "Da por hecho que Pilo es una persona y tiene pareja", truth: "Pilo es una inteligencia artificial y no tiene vida sentimental" };
+  const ANALYSIS = "La pregunta da por hecho que Pilo tiene pareja. Manda el catálogo.";
+  const RULE = "Antes de responder, analiza";
+  const NEAR = "¿Pilo sale con alguien?";
+
+  /** Un proveedor que da vectores y, a cada pedido de chat, la respuesta que sigue. */
+  const withVectors = (...replies: (() => Response)[]) => {
+    let n = 0;
+    const chats: { body: Record<string, unknown> }[] = [];
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (url: string, init: RequestInit) => {
+        if (String(url).includes("embeddings")) return new Response(JSON.stringify({ data: [{ index: 0, embedding: Array.from({ length: 1024 }, () => 0.03) }] }), { headers: { "Content-Type": "application/json" } });
+        chats.push({ body: JSON.parse(String(init.body)) as Record<string, unknown> });
+        return replies[Math.min(n++, replies.length - 1)]();
+      }),
+    );
+    return chats;
+  };
+  /** El Pilo de siempre con una capciosa, vectores y una pregunta que se le parece sin dispararla. */
+  const nearWorld = (premises: Row[] | undefined, switches: Row = ON): World => {
+    const w = world();
+    w.settings = { ...w.settings, ...switches };
+    w.catalog = [C1];
+    w.memory = [];
+    w.embedded = 3;
+    w.near = [{ key: "C-001", sim: 0.74 }];
+    w.premises = premises;
+    return w;
+  };
+  const tagged = stream("<anal", "isis>La pregunta da por hecho que Pilo tiene pareja. ", "Manda el catálogo.</anali", "sis>\n<resp", "uesta>No tengo pareja: ", "soy una inteligencia artificial. ", "Pregúnteme por la UDES.</respuesta>");
+  const ANSWER = "No tengo pareja: soy una inteligencia artificial. Pregúnteme por la UDES.";
+  const stepsOf = (data: Record<string, unknown>) => (data.trail as Row[]).map((s) => s.step);
+
+  it("encendidas, pero sin nada que relacionar: el pedido al modelo es byte a byte el de siempre", async () => {
+    const question = "¿Cuántos estudiantes matriculados hay?";
+    const before = provider(stream("En 2024 hubo 20.500 estudiantes matriculados [1]. "));
+    await events(await ask(await boot(world()), { question, stream: true }));
+    const w = world();
+    w.settings = { ...w.settings, ...ON };
+    const after = provider(stream("En 2024 hubo 20.500 estudiantes matriculados [1]. "));
+    const all = await events(await ask(await boot(w), { question, stream: true }));
+    expect(after).toHaveLength(1);
+    expect(after[0].body).toEqual(before[0].body);
+    expect(stepsOf(all[all.length - 1].data)).toEqual(["Enrutador", "Catálogo", "Respuestas guardadas", "Entender", "Cifras", "Fuentes", "IA"]);
+    // Sin capciosas en el catálogo no se pregunta por ninguna, ni por sus premisas.
+    expect(w.rpcs).not.toContain("pilo_catalog_near");
+    expect(w.rpcs).not.toContain("pilo_premises_active");
+  });
+
+  it("apagadas, nada de esto corre aunque haya capciosa, premisa aprobada y vectores", async () => {
+    const w = nearWorld([APPROVED], {});
+    const calls = withVectors(tagged);
+    const all = await allEvents(await ask(await boot(w), { question: NEAR, stream: true }));
+    expect(systemOf(calls[0])).not.toContain("[RELACIONES]");
+    expect(systemOf(calls[0])).not.toContain(RULE);
+    expect(calls[0].body.max_tokens).toBe(800);
+    for (const name of ["pilo_catalog_near", "pilo_premises_active"]) expect(w.rpcs, name).not.toContain(name);
+    // Sin pedir análisis, lo que el modelo escriba se trata como siempre: aquí nadie le pidió etiquetas.
+    expect(all[all.length - 1].event).toBe("done");
+  });
+
+  it("[RELACIONES] dice las conexiones del mapa que ya existen para las fuentes, solo las de casa y a la vista", async () => {
+    const w = mapWorld({ ask_relations: true });
+    const calls = provider(stream("La evaluación formativa tiene 3 momentos [1] y la retroalimentación oportuna es parte de ella [2]. "));
+    const all = await events(await teach(await boot(w), { question: "¿Qué dice la política de evaluación?", stream: true }));
+    const prompt = systemOf(calls[0]);
+    expect(prompt).toContain("[RELACIONES] Cómo se conecta lo que sabes para esta pregunta:");
+    expect(prompt).toContain("- [1] Política de evaluación —trata de→ Evaluación formativa [PUBLICADO]");
+    expect(prompt).toContain("- [2] Guía de aprendizaje activo —trata de→ Evaluación formativa [PUBLICADO]");
+    expect(prompt).toContain("- [2] Guía de aprendizaje activo —cita→ UNESCO [PUBLICADO]");
+    expect(prompt).toContain("Cómo lees [RELACIONES]");
+    // El pasaje reservado no entró al pedido: de él no se dice ninguna relación.
+    expect(prompt).not.toContain("Curso de Didáctica");
+    // Las relaciones se leyeron solo de este espacio.
+    const edges = w.queries.filter((q) => q.table === "pilo_edges");
+    expect(edges.length).toBeGreaterThan(0);
+    for (const q of edges) expect(q.filters).toContainEqual(["eq", "space", "ensenanza"]);
+    const done = all[all.length - 1].data;
+    expect(stepsOf(done)).toContain("Relaciones");
+    expect((done.trail as Row[]).find((s) => s.step === "Relaciones")!.detail).toBe("3 conexiones que ya estaban en la base van en el pedido (3 de lo publicado).");
+    // Las citas, las cifras y si es oficial se deciden como siempre.
+    expect(done).toMatchObject({ kind: "ia", grounding: "oficial", verified: true });
+  });
+
+  it("A · casi capciosa con premisa aprobada: va como regla del catálogo y no se pide análisis", async () => {
+    const w = nearWorld([APPROVED]);
+    const calls = withVectors(stream("No tengo pareja: soy una inteligencia artificial. "));
+    const all = await events(await ask(await boot(w), { question: NEAR, stream: true }, adminAuth));
+    expect(calls).toHaveLength(1);
+    const prompt = systemOf(calls[0]);
+    expect(prompt).toContain("- (Pregunta) —se parece a→ (Capciosa «Vida personal de Pilo») [REGLA DEL CATÁLOGO]");
+    expect(prompt).toContain("- (Capciosa «Vida personal de Pilo») —premisa que da por cierta→ Da por hecho que Pilo es una persona y tiene pareja [REGLA DEL CATÁLOGO]");
+    expect(prompt).toContain("- (Capciosa «Vida personal de Pilo») —lo cierto→ Pilo es una inteligencia artificial y no tiene vida sentimental [REGLA DEL CATÁLOGO]");
+    // No disparó la capciosa: su microexpresión no es la base, y no la respondió el catálogo.
+    expect(prompt).not.toContain("[OFICIAL] Respuestas oficiales");
+    expect(prompt).not.toContain("¡Solo tengo ojos para los datos!");
+    expect(prompt).not.toContain(RULE);
+    expect(calls[0].body.max_tokens).toBe(800);
+    const done = all[all.length - 1].data;
+    expect(done).toMatchObject({ kind: "ia", text: "No tengo pareja: soy una inteligencia artificial." });
+    expect(stepsOf(done)).toEqual(expect.arrayContaining(["Capciosa cercana", "Relaciones", "Análisis"]));
+    expect((done.trail as Row[]).find((s) => s.step === "Análisis")).toMatchObject({ status: "skip" });
+    // El catálogo de este Pilo, con su umbral propio; y solo sus premisas.
+    expect(argsOf(w, "pilo_catalog_near")).toEqual([{ p_embedding: expect.any(String), p_model: expect.any(String), p_limit: 5 }]);
+    expect(argsOf(w, "pilo_premises_active")).toEqual([{}]);
+    // No se sirvió la capciosa: no cuenta como uso.
+    expect(w.rpcs).not.toContain("pilo_catalog_hit");
+  });
+
+  it("por debajo del umbral no es casi capciosa; y el umbral es el de la administración", async () => {
+    const low = nearWorld([APPROVED]);
+    low.near = [{ key: "C-001", sim: 0.69 }];
+    let calls = withVectors(stream("Hablemos de la UDES. "));
+    await events(await ask(await boot(low), { question: NEAR, stream: true }));
+    expect(systemOf(calls[0])).not.toContain("[RELACIONES]");
+    const strict = nearWorld([APPROVED], { ...ON, tricky_near_min: 0.9 });
+    calls = withVectors(stream("Hablemos de la UDES. "));
+    await events(await ask(await boot(strict), { question: NEAR, stream: true }));
+    expect(systemOf(calls[0])).not.toContain("[RELACIONES]");
+  });
+
+  it("B · casi capciosa sin premisa aprobada: se pide análisis, y el análisis nunca llega a quien pregunta", async () => {
+    // Lo propuesto por la IA y sin aprobar no se usa.
+    const w = nearWorld([{ ...APPROVED, status: "propuesta" }]);
+    const calls = withVectors(tagged);
+    const all = await allEvents(await ask(await boot(w), { question: NEAR, stream: true }));
+    const prompt = systemOf(calls[0]);
+    expect(prompt).toContain("—se parece a→ (Capciosa «Vida personal de Pilo») [REGLA DEL CATÁLOGO]");
+    expect(prompt).not.toContain("premisa que da por cierta→");
+    expect(prompt).toContain(RULE);
+    expect(calls[0].body.max_tokens).toBe(960);
+    // Lo que salió por el flujo: solo la respuesta, en frases completas.
+    expect(all.filter((e) => e.event === "delta").map((e) => e.data.text).join("")).toBe(ANSWER);
+    expect(all.filter((e) => e.event === "thinking")).toEqual([]);
+    const done = all[all.length - 1];
+    expect(done).toMatchObject({ event: "done", data: { kind: "ia", text: ANSWER } });
+    // Ni el análisis ni una etiqueta, en ningún evento: tampoco en el rastro de un visitante.
+    const wire = JSON.stringify(all);
+    expect(wire).not.toContain("da por hecho que Pilo tiene pareja");
+    expect(wire).not.toContain("Manda el catálogo");
+    expect(wire).not.toMatch(/<\/?(analisis|respuesta)/);
+    expect(stepsOf(done.data)).not.toContain("Análisis de la IA");
+    expect(stepsOf(done.data)).not.toContain("Análisis");
+    // Tampoco en la bandeja ni en lo guardado.
+    expect(JSON.stringify([w.inbox, w.saved, w.logs])).not.toContain("da por hecho que Pilo tiene pareja");
+  });
+
+  it("B · la administración sí ve el análisis, recortado, en «Cómo respondí»; y sin streaming es igual", async () => {
+    const w = nearWorld([]);
+    const calls = withVectors(tagged);
+    const all = await allEvents(await ask(await boot(w), { question: NEAR, stream: true }, adminAuth));
+    expect(all.filter((e) => e.event === "delta").map((e) => e.data.text).join("")).toBe(ANSWER);
+    const done = all[all.length - 1].data;
+    expect(done.text).toBe(ANSWER);
+    const trail = done.trail as Row[];
+    expect(trail.find((s) => s.step === "Análisis de la IA")).toMatchObject({ status: "ai", detail: ANALYSIS });
+    expect(trail.find((s) => s.step === "Análisis")!.detail).toContain("capciosa cercana sin análisis aprobado");
+    // Solo en el objeto final: ni en `meta`, ni en los trozos, ni como razonamiento.
+    expect(JSON.stringify(all.slice(0, -1))).not.toContain("da por hecho que Pilo tiene pareja");
+    expect(calls).toHaveLength(1);
+    // Sin streaming: el mismo texto, sin análisis.
+    const plain = nearWorld([]);
+    withVectors(() => new Response(JSON.stringify({ choices: [{ message: { content: `<analisis>${ANALYSIS}</analisis><respuesta>${ANSWER}</respuesta>` }, finish_reason: "stop" }] }), { headers: { "Content-Type": "application/json" } }));
+    const whole = (await (await ask(await boot(plain), { question: NEAR })).json()) as Record<string, unknown>;
+    expect(whole.text).toBe(ANSWER);
+    expect(JSON.stringify(whole)).not.toContain("da por hecho");
+  });
+
+  it("si el modelo no cierra el análisis ni escribe la respuesta, se le pide de nuevo sin análisis y nada se filtra", async () => {
+    const w = nearWorld([]);
+    const calls = withVectors(stream("<analisis>La pregunta da por hecho que Pilo tiene pareja. ", "Y sigo pensando sin cerrar la etiqueta. "), stream("No tengo pareja: soy una inteligencia artificial. "));
+    const all = await allEvents(await ask(await boot(w), { question: NEAR, stream: true }));
+    expect(calls).toHaveLength(2);
+    expect(systemOf(calls[0])).toContain(RULE);
+    // El segundo pedido es el de siempre para esa pregunta: con sus relaciones y sin la regla del análisis.
+    expect(systemOf(calls[1])).not.toContain(RULE);
+    expect(systemOf(calls[1])).toContain("[RELACIONES]");
+    expect(calls[1].body.max_tokens).toBe(800);
+    expect(all.filter((e) => e.event === "delta").map((e) => e.data.text).join("")).toBe("No tengo pareja: soy una inteligencia artificial. ");
+    expect(all[all.length - 1]).toMatchObject({ event: "done", data: { kind: "ia", text: "No tengo pareja: soy una inteligencia artificial." } });
+    expect(JSON.stringify(all)).not.toMatch(/da por hecho|sigo pensando|analisis>/);
+  });
+
+  it("si el modelo no usa las etiquetas, responde igual: sale entero al final, sin etiquetas", async () => {
+    const w = nearWorld([]);
+    const calls = withVectors(stream("No tengo pareja. ", "Soy una inteligencia artificial.</respuesta>"));
+    const all = await allEvents(await ask(await boot(w), { question: NEAR, stream: true }));
+    expect(calls).toHaveLength(1);
+    expect(all.filter((e) => e.event === "delta").map((e) => e.data.text).join("")).toBe("No tengo pareja. Soy una inteligencia artificial.");
+    expect(all[all.length - 1].data.text).toBe("No tengo pareja. Soy una inteligencia artificial.");
+    expect(JSON.stringify(all)).not.toMatch(/<\/?(analisis|respuesta)/);
+  });
+
+  it("C · a un saludo no se le pide análisis ni se le suman relaciones: el pedido de siempre", async () => {
+    const hello = nearWorld([]);
+    const calls = withVectors(stream("¡Hola! ¿En qué le ayudo? "));
+    await events(await ask(await boot(hello), { question: "hola", stream: true }));
+    expect(systemOf(calls[0])).not.toContain(RULE);
+    expect(systemOf(calls[0])).not.toContain("[RELACIONES]");
+  });
+
+  it("B · una pregunta de seguimiento con contexto pide análisis, y su relación es «dicho por la persona»", async () => {
+    const w = world();
+    w.settings = { ...w.settings, ...ON };
+    const calls = provider(stream("<analisis>Sigue la pregunta anterior, ahora por Cúcuta.</analisis><respuesta>En Cúcuta no tengo la cifra publicada.</respuesta>"));
+    const history = [{ q: "¿Cuántos estudiantes matriculados hay?", a: "En 2024 hubo 20.500 [1]." }];
+    const all = await events(await ask(await boot(w), { question: "¿y en Cúcuta?", history, stream: true }));
+    const prompt = systemOf(calls[0]);
+    expect(prompt).toContain("- (Pregunta) —sigue a→ ¿Cuántos estudiantes matriculados hay? [DICHO POR LA PERSONA]");
+    expect(prompt).toContain(RULE);
+    expect(all[all.length - 1].data.text).toBe("En Cúcuta no tengo la cifra publicada.");
+    // Sin historia que mandar no hay contexto que analizar.
+    const none = world();
+    none.settings = { ...none.settings, ...ON, ask_history_turns: 0 };
+    const alone = provider(stream("En Cúcuta no tengo la cifra publicada. "));
+    await events(await ask(await boot(none), { question: "¿y en Cúcuta?", history, stream: true }));
+    expect(systemOf(alone[0])).not.toContain(RULE);
+  });
+
+  it("B · una fuente de otro ámbito pide análisis y lleva su procedencia en [RELACIONES], sin leer nada más de ese ámbito", async () => {
+    const w = teachWorld(ON);
+    w.portals = {
+      ensenanza: { scope: "ensenanza", matrix: { innovacion: "casa", politicas: "casa", moodle: "casa", pdi: "visita" } },
+      pregunta: { scope: "planeacion", matrix: { cifras: "casa", pdi: "casa" } },
+    };
+    const far = { ref: "pdi:P1", space: "planeacion", vis: "publico", source: "pdi", title: "Pilar I · Personalización", section: "", body: "El pilar I del Plan de Desarrollo agrupa los proyectos de personalización del aprendizaje.", path: "/pdi", cut: "", office: "", updated_at: "2026-09-01", rank: 0.9 };
+    w.memory = [far];
+    w.edges = [{ space: "planeacion", from_id: "pdi:P1", to_id: "tema:personalizacion", rel: "trata" }];
+    w.nodes = [{ space: "planeacion", id: "tema:personalizacion", label: "Personalización", source: "mapa" }];
+    const calls = provider(stream("<analisis>Lo de casa no trae el pilar; la fuente es de otro ámbito.</analisis><respuesta>Esto viene de Pilo de la Universidad: el pilar I agrupa los proyectos de personalización [1].</respuesta>"));
+    const all = await events(await teach(await boot(w), { question: "¿Qué agrupa el pilar I de personalización?", stream: true }));
+    const prompt = systemOf(calls[0]);
+    expect(prompt).toContain("- [1] Pilar I · Personalización —de visita desde→ Pilo de la Universidad · Plan de Desarrollo [DE OTRO ÁMBITO]");
+    // De lo de otro ámbito no se dice ninguna relación de su malla: no se leyó.
+    expect(prompt).not.toContain("—trata de→");
+    expect(w.queries.filter((q) => q.table === "pilo_edges" && q.filters.some(([, c, v]) => c === "space" && v !== "ensenanza"))).toEqual([]);
+    expect(prompt).toContain(RULE);
+    const done = all[all.length - 1].data;
+    expect(done.text).toBe("Esto viene de Pilo de la Universidad: el pilar I agrupa los proyectos de personalización [1].");
+    // Lo que cita algo de otro ámbito sigue sin guardarse.
+    expect(w.saved).toEqual([]);
+  });
+
+  it("la capciosa que sí se dispara sigue su camino de siempre; encendida, suma su premisa aprobada", async () => {
+    const off = nearWorld([APPROVED], {});
+    let calls = withVectors(stream("Mi corazón es de los datos. "));
+    await events(await ask(await boot(off), { question: "Pilo, ¿tienes novia?", stream: true }));
+    const today = systemOf(calls[0]);
+    expect(today).toContain("[OFICIAL] Respuestas oficiales");
+    expect(today).not.toContain("[RELACIONES]");
+    const on = nearWorld([APPROVED], { tricky_near: true });
+    calls = withVectors(stream("Mi corazón es de los datos. "));
+    await events(await ask(await boot(on), { question: "Pilo, ¿tienes novia?", stream: true }));
+    const prompt = systemOf(calls[0]);
+    expect(prompt).toContain("¡Solo tengo ojos para los datos!");
+    expect(prompt).toContain("- (Pregunta) —dispara→ [1] (Capciosa «Vida personal de Pilo») [REGLA DEL CATÁLOGO]");
+    expect(prompt).toContain("—lo cierto→ Pilo es una inteligencia artificial y no tiene vida sentimental [REGLA DEL CATÁLOGO]");
+    // Quitando el bloque y su regla, queda el pedido de siempre.
+    const block = prompt.slice(prompt.indexOf("\n\n[RELACIONES]"), prompt.lastIndexOf("\nDATOS>>>"));
+    const rule = prompt.slice(prompt.indexOf("Cómo lees [RELACIONES]"), prompt.indexOf("\n\n<<<DATOS\n") + 2);
+    expect(prompt.replace(block, "").replace(rule, "")).toBe(today);
+    // Sin IA, la capciosa sale tal cual y sin modelo, como siempre.
+    const noAi = nearWorld([APPROVED]);
+    noAi.settings = { ...noAi.settings, enabled: false };
+    calls = withVectors(stream("no debería llamarse"));
+    const said = (await (await ask(await boot(noAi), { question: "Pilo, ¿tienes novia?", stream: true })).json()) as Record<string, unknown>;
+    expect(said).toMatchObject({ kind: "capciosa", text: "¡Solo tengo ojos para los datos!" });
+    expect(calls).toHaveLength(0);
+    expect(noAi.rpcs).not.toContain("pilo_premises_active");
+  });
+
+  it("una base sin la migración: la casi capciosa va sin premisa, y todo lo demás responde", async () => {
+    const w = nearWorld(undefined);
+    const calls = withVectors(tagged);
+    const all = await events(await ask(await boot(w), { question: NEAR, stream: true }));
+    expect(systemOf(calls[0])).toContain("—se parece a→ (Capciosa «Vida personal de Pilo») [REGLA DEL CATÁLOGO]");
+    expect(systemOf(calls[0])).not.toContain("premisa que da por cierta→");
+    expect(all[all.length - 1].data.text).toBe(ANSWER);
+  });
+
+  it("cada Pilo usa solo las capciosas y las premisas de su catálogo", async () => {
+    const w = teachWorld(ON);
+    const EC1 = { ...C1, key: "EC-001", space: "ensenanza", question: "Hacer la tarea", triggers: ["hazme la tarea"] };
+    w.catalog = [C1, EC1];
+    w.memory = [];
+    w.embedded = 3;
+    // La base devolvería solo lo de este Pilo; aunque trajera la del otro, no está en su catálogo y no cuenta.
+    w.near = [{ key: "C-001", sim: 0.95 }, { key: "EC-001", sim: 0.72 }];
+    w.premises = [APPROVED, { key: "EC-001", space: "ensenanza", status: "aprobada", premise: "Da por hecho que Pilo resuelve las tareas por el estudiante", truth: "Pilo es un tutor: explica y guía, no entrega la tarea hecha" }];
+    const calls = withVectors(stream("La tarea es suya; la ruta la armamos juntos. "));
+    await events(await teach(await boot(w), { question: "¿Me escribe el ensayo de mañana?", stream: true }));
+    const prompt = systemOf(calls[0]);
+    expect(prompt).toContain("—se parece a→ (Capciosa «Hacer la tarea») [REGLA DEL CATÁLOGO]");
+    expect(prompt).toContain("—lo cierto→ Pilo es un tutor: explica y guía, no entrega la tarea hecha [REGLA DEL CATÁLOGO]");
+    expect(prompt).not.toContain("Vida personal de Pilo");
+    expect(prompt).not.toContain("vida sentimental");
+    expect(argsOf(w, "pilo_catalog_near")[0]).toMatchObject({ p_space: "ensenanza" });
+    expect(argsOf(w, "pilo_premises_active")).toEqual([{ p_space: "ensenanza" }]);
+  });
+
+  describe("proponer las premisas con la IA (solo administración)", () => {
+    const premisas = (handler: Handler, body: Row = {}, headers: Record<string, string> = adminAuth) => ask(handler, { action: "premisas", portal: "", space: "planeacion", step: "lote", ...body }, headers);
+    const reply = (content: string) => () => new Response(JSON.stringify({ choices: [{ message: { content }, finish_reason: "stop" }] }), { headers: { "Content-Type": "application/json" } });
+    const pendingWorld = (): World => {
+      const w = teachWorld();
+      w.premises = [];
+      w.premisePending = [
+        { key: "C-001", question: "Vida personal de Pilo", triggers: ["tienes novia"], answer: "¡Solo tengo ojos para los datos!" },
+        { key: "C-002", question: "", triggers: ["eres humano"], answer: "Soy Mr. Pilo, la Inteligencia Artificial de la UDES." },
+        { key: "EC-001", space: "ensenanza", question: "Hacer la tarea", triggers: ["hazme la tarea"], answer: "La tarea es suya." },
+      ];
+      return w;
+    };
+
+    it("propone por lotes, con JSON estricto, y deja anotadas también las que no tienen premisa", async () => {
+      const w = pendingWorld();
+      const calls = provider(reply('{"capciosas":[{"n":1,"premisa":"Da por hecho que Pilo es una persona y tiene pareja.","cierto":"Pilo es una inteligencia artificial: no tiene vida sentimental."},{"n":2,"premisa":"","cierto":""}]}'));
+      const out = (await (await premisas(await boot(w))).json()) as Record<string, unknown>;
+      expect(out).toMatchObject({ ok: true, ai: true, asked: 2, proposed: 1, empty: 1, done: true });
+      expect(calls).toHaveLength(1);
+      expect(calls[0].body).toMatchObject({ temperature: 0.1 });
+      const user = (calls[0].body.messages as { content: string }[])[1].content;
+      expect(user).toContain("1. Tema: Vida personal de Pilo");
+      // Solo las de ese Pilo viajan al modelo.
+      expect(user).not.toContain("Hacer la tarea");
+      expect(w.premiseProposed).toEqual([
+        { key: "C-001", premise: "Da por hecho que Pilo es una persona y tiene pareja.", truth: "Pilo es una inteligencia artificial: no tiene vida sentimental.", space: "planeacion" },
+        { key: "C-002", premise: "", truth: "", space: "planeacion" },
+      ]);
+      expect(argsOf(w, "pilo_premises_pending")).toEqual([{ p_space: "planeacion", p_limit: 8 }]);
+      expect(w.logs.at(-1)).toMatchObject({ action: "premisas", status: "listo · premisas" });
+      // El otro Pilo, lo suyo.
+      provider(reply('{"capciosas":[{"n":1,"premisa":"Da por hecho que Pilo resuelve las tareas por el estudiante.","cierto":"Pilo es un tutor: explica y guía, no entrega la tarea hecha."}]}'));
+      expect(await (await premisas(await boot(w), { space: "ensenanza" })).json()).toMatchObject({ asked: 1, proposed: 1 });
+      expect(w.premiseProposed!.at(-1)).toMatchObject({ key: "EC-001", space: "ensenanza" });
+    });
+
+    it("una respuesta que no se puede leer no anota nada; y sin IA no propone", async () => {
+      const w = pendingWorld();
+      provider(reply("No pude hacerlo."));
+      expect(await (await premisas(await boot(w))).json()).toMatchObject({ asked: 0, proposed: 0, stopped: "formato", done: false });
+      expect(w.premiseProposed).toBeUndefined();
+      const off = pendingWorld();
+      off.settings = { ...off.settings, enabled: false };
+      const calls = provider(reply("{}"));
+      expect(await (await premisas(await boot(off))).json()).toMatchObject({ ai: false, proposed: 0, note: expect.stringContaining("Sin IA") });
+      expect(calls).toHaveLength(0);
+    });
+
+    it("solo la administración; y sin la migración lo dice", async () => {
+      const w = pendingWorld();
+      const calls = provider(reply("{}"));
+      const handler = await boot(w);
+      expect((await premisas(handler, {}, {})).status).toBe(403);
+      expect((await premisas(handler, {}, { Authorization: "Bearer sesion-pilo" })).status).toBe(403);
+      expect((await premisas(handler, { space: "otro" })).status).toBe(400);
+      expect(calls).toHaveLength(0);
+      const old = pendingWorld();
+      old.premises = undefined;
+      const missingDb = await premisas(await boot(old), { step: "estado" });
+      expect(missingDb.status).toBe(500);
+      expect(await missingDb.json()).toMatchObject({ code: "migracion", error: expect.stringContaining("0130") });
+    });
+  });
+});
+
+/* --- Mis notas: las recomendaciones de «Mi evolución» (acción «evolucion», 0131) ---------------
+   Los datos son inventados. No se llama a ninguna IA de verdad. */
+describe("evolucion: las recomendaciones de Mis notas (0131)", () => {
+  const pilo = { Authorization: "Bearer sesion-pilo" };
+  const camila = { status: "activa", rol: "estudiante", campus: "cucuta", nick: "Cami", tone: "cercano", length: "normal", about: "Trabajo en las tardes.", program: "Ingeniería de Pruebas" };
+  const summary = {
+    program: "Ingeniería de Pruebas",
+    goals: { accumulated: 4.2, semester: 4.5 },
+    periods: [
+      { id: "2025A", average: 2.9, accumulated: 3.3, courses: [{ name: "Física II", credits: 3, def: 2.6, state: "reprobada" }, { name: "Álgebra lineal", credits: 3, def: 3.2, state: "aprobada" }] },
+      { id: "2025B", average: 3.8, accumulated: 3.5, courses: [{ name: "Física II", credits: 3, def: 3.5, state: "aprobada" }, { name: "Programación", credits: 3, def: 4.1, state: "aprobada" }] },
+    ],
+  };
+  const good = {
+    areas: [{ nombre: "Ciencias básicas", materias: [1, 3] }, { nombre: "Matemáticas", materias: [2, 2, 9] }, { nombre: "Área profesional", materias: [4, 1] }],
+    recomendaciones: [
+      { titulo: "Refuerce Física II", porque: "Fue su definitiva más baja, 2,6, y la repitió.", accion: "Revise los 3 momentos de la evaluación formativa de su curso.", fuentes: [1, 7] },
+      { titulo: "Apóyese en lo que le funciona", porque: "En Programación sacó 4,1.", accion: "Mantenga su rutina de estudio.", fuentes: [] },
+      { titulo: "Una cifra inventada", porque: "El 87 % de los estudiantes mejora con tutorías.", accion: "Pida una tutoría.", fuentes: [] },
+    ],
+  };
+  const reply = (content: unknown) => () => new Response(JSON.stringify({ choices: [{ message: { content: typeof content === "string" ? content : JSON.stringify(content) }, finish_reason: "stop" }] }), { headers: { "Content-Type": "application/json" } });
+  const onWorld = (over: Row = {}) => {
+    const w = teachWorld({ genesis_on: true, genesis_advice: true, ...over });
+    w.members = { "pilo-1": camila };
+    return w;
+  };
+  const evolucion = (handler: Handler, body: Row = {}, headers: Record<string, string> = pilo) => ask(handler, { action: "evolucion", portal: "ensenanza", summary, ...body }, headers);
+
+  it("escribe áreas y recomendaciones con sus fuentes, y descarta lo que no se sostiene", async () => {
+    const w = onWorld();
+    const calls = provider(reply(good));
+    const response = await evolucion(await boot(w));
+    expect(response.status).toBe(200);
+    expect(response.headers.get("Cache-Control")).toBe("no-store");
+    const out = (await response.json()) as { courses: number; areas: Row[]; recs: Row[]; sources: Row[] };
+    expect(out.courses).toBe(4);
+    // Cada materia en una sola área; los números que no existen se descartan.
+    expect(out.areas).toEqual([{ name: "Ciencias básicas", courses: [0, 2] }, { name: "Matemáticas", courses: [1] }, { name: "Área profesional", courses: [3] }]);
+    // La de la cifra inventada no sale; la que cita un documento es «con documento» y la otra, general.
+    expect(out.recs.map((r) => [r.title, r.grounded, r.sources])).toEqual([["Refuerce Física II", true, [1]], ["Apóyese en lo que le funciona", false, []]]);
+    expect(out.sources).toEqual([{ n: 1, title: "Política de evaluación", section: "Capítulo 2", path: "" }]);
+    expect(calls).toHaveLength(1);
+  });
+
+  it("a la IA va el resumen y lo que el servidor sabe de la cuenta: nunca el nombre ni el apodo", async () => {
+    const w = onWorld();
+    const calls = provider(reply(good));
+    await evolucion(await boot(w), { summary: { ...summary, name: "Camila Inventada", code: "00000000042", email: "camila@ejemplo.test" } });
+    const sent = JSON.stringify(calls[0].body.messages);
+    expect(sent).toContain("Ingeniería de Pruebas");
+    expect(sent).toContain("Sede: Cúcuta");
+    expect(sent).toContain("Trabajo en las tardes.");
+    expect(sent).toContain("Meta de promedio acumulado: 4,2");
+    expect(sent).toContain("Física II · 3 créditos · definitiva 2,6 · reprobada");
+    for (const personal of ["Cami", "Camila", "00000000042", "ejemplo.test", "pilo-1"]) expect(sent, personal).not.toContain(personal);
+  });
+
+  it("busca solo en la memoria de Enseñanza, con el lector de siempre", async () => {
+    const w = onWorld();
+    provider(reply(good));
+    await evolucion(await boot(w));
+    const searches = argsOf(w, "pilo_memory_search");
+    expect(searches.length).toBeGreaterThan(0);
+    for (const args of searches) {
+      expect(args).toMatchObject({ p_space: "ensenanza", p_public_only: true });
+      expect(args.p_sources).toEqual(expect.arrayContaining(["politicas"]));
+      expect(args.p_sources).not.toContain("cifras");
+    }
+  });
+
+  it("no guarda nada: en la bitácora quedan la acción y el estado, sin el resumen", async () => {
+    const w = onWorld();
+    provider(reply(good));
+    await evolucion(await boot(w));
+    expect(w.logs).toHaveLength(1);
+    expect(w.logs[0]).toMatchObject({ action: "evolucion", status: "listo", subject: "", profile_id: null, space: "ensenanza" });
+    expect(JSON.stringify(w.logs)).not.toMatch(/Física|2\.6|2,6|Ingeniería/);
+    expect(w.saved).toEqual([]);
+    expect(w.inbox).toEqual([]);
+    expect(w.answers).toEqual([]);
+    for (const name of w.calls.map((c) => c.name)) expect(["pilo_scope", "pilo_visitor_hit", "pilo_memory_search", "pilo_memory_semantic", "pilo_embed_status"], name).toContain(name);
+  });
+
+  it("solo un estudiante con cuenta de Pilo activa", async () => {
+    const calls = provider(reply(good));
+    const handler = await boot(onWorld());
+    expect((await evolucion(handler, {}, {})).status).toBe(403);
+    expect((await evolucion(handler, {}, { Authorization: "Bearer sesion-admin" })).status).toBe(403);
+    for (const account of [{ ...camila, rol: "profesor" }, { ...camila, rol: "administrativo" }, { ...camila, status: "suspendida" }]) {
+      const w = onWorld();
+      w.members = { "pilo-1": account };
+      const response = await evolucion(await boot(w));
+      expect(response.status, account.rol + account.status).toBe(403);
+    }
+    expect(calls).toHaveLength(0);
+  });
+
+  it("apagada de partida: sin el interruptor, sin Mis notas o con la IA apagada, no se llama a nadie", async () => {
+    const calls = provider(reply(good));
+    for (const w of [onWorld({ genesis_advice: false }), onWorld({ genesis_on: false }), onWorld({ genesis_advice: undefined, genesis_on: undefined })]) {
+      const response = await evolucion(await boot(w));
+      expect(response.status).toBe(403);
+      expect(await response.json()).toMatchObject({ code: "apagado" });
+      expect(w.logs).toEqual([]);
+    }
+    const off = onWorld();
+    off.settings = { ...off.settings, enabled: false };
+    expect(await (await evolucion(await boot(off))).json()).toMatchObject({ code: "apagado" });
+    expect(calls).toHaveLength(0);
+  });
+
+  it("solo en Enseñanza: desde otro portal no se atiende", async () => {
+    const calls = provider(reply(good));
+    const response = await evolucion(await boot(onWorld()), { portal: "pregunta" });
+    expect(response.status).toBe(400);
+    expect(calls).toHaveLength(0);
+  });
+
+  it("tiene tope del día por cuenta, y la huella no lleva nada del resumen", async () => {
+    const w = onWorld();
+    w.hits = 5;
+    const calls = provider(reply(good));
+    const response = await evolucion(await boot(w));
+    expect(response.status).toBe(429);
+    expect(await response.json()).toMatchObject({ code: "tope" });
+    expect(calls).toHaveLength(0);
+    expect(w.logs.map((l) => [l.action, l.status, l.subject])).toEqual([["evolucion", "tope", ""]]);
+    const fine = onWorld();
+    fine.hits = 4;
+    provider(reply(good));
+    expect((await evolucion(await boot(fine))).status).toBe(200);
+    expect(fine.visitors).toHaveLength(1);
+    expect(fine.visitors[0]).toMatch(/^[0-9a-f]{40}$/);
+  });
+
+  it("sin notas que leer, o con un pedido enorme, no llama a la IA", async () => {
+    const calls = provider(reply(good));
+    const handler = await boot(onWorld());
+    for (const bad of [null, "texto", {}, { periods: [] }, { periods: [{ id: "malo", courses: [{ name: "X y Z", credits: 3, def: 3, state: "aprobada" }] }] }]) {
+      const response = await evolucion(handler, { summary: bad });
+      expect(response.status, JSON.stringify(bad)).toBe(400);
+      expect(await response.json()).toMatchObject({ code: "datos" });
+    }
+    expect((await evolucion(handler, { relleno: "x".repeat(41_000) })).status).toBe(413);
+    expect(calls).toHaveLength(0);
+  });
+
+  it("si la IA no escribe nada que pase la revisión, o falla, lo dice sin detalle", async () => {
+    const w = onWorld();
+    provider(reply("No puedo ayudar con eso."));
+    const empty = await evolucion(await boot(w));
+    expect(empty.status).toBe(502);
+    expect(await empty.json()).toEqual({ error: expect.any(String), code: "vacio" });
+    const down = onWorld();
+    provider(() => new Response("clave vencida de la cuenta 123", { status: 500 }));
+    const failed = await evolucion(await boot(down));
+    expect(failed.status).toBe(502);
+    expect(JSON.stringify(await failed.json())).not.toContain("clave vencida");
+    expect(down.logs.map((l) => [l.status, l.subject])).toEqual([["error 500", ""]]);
+  });
+
+  it("sin documentos en la memoria, todas las recomendaciones salen generales", async () => {
+    const w = onWorld();
+    w.memory = [];
+    const calls = provider(reply(good));
+    const out = (await (await evolucion(await boot(w))).json()) as { recs: Row[]; sources: Row[] };
+    expect(out.sources).toEqual([]);
+    // La que citaba un documento de la universidad traía «3 momentos», que no está en el resumen: aquí
+    // 3 es un número pequeño y pasa, pero ya no tiene fuente que citar.
+    expect(out.recs.every((r) => r.grounded === false && (r.sources as unknown[]).length === 0)).toBe(true);
+    expect(JSON.stringify(calls[0].body.messages)).toContain("Ninguno: todas las recomendaciones son generales.");
   });
 });

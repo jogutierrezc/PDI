@@ -23,7 +23,7 @@ import { supabase } from "../../../lib/supabase";
 import type { PiloSpace } from "./space";
 
 export type Cell = "casa" | "visita" | "no";
-export type SourceKind = "portal" | "documentos" | "moodle";
+export type SourceKind = "portal" | "documentos" | "moodle" | "catalogo";
 
 export interface PiloSource {
   id: string;
@@ -36,6 +36,8 @@ export interface PiloSource {
   /** No sale de su portal (los cursos de Moodle). */
   stays_home: boolean;
   sort: number;
+  /** La creó la administración (0125). `undefined`: la base aún no tiene esa migración. */
+  custom?: boolean;
 }
 
 export interface PiloPortal {
@@ -85,10 +87,11 @@ export function parsePortals(portalRows: unknown, sourceRows: unknown): PortalsD
       id: r.id as string,
       scope: r.scope as string,
       name: text(r.name, 80) || (r.id as string),
-      kind: (r.kind === "documentos" || r.kind === "moodle" ? r.kind : "portal") as SourceKind,
+      kind: (r.kind === "documentos" || r.kind === "moodle" || r.kind === "catalogo" ? r.kind : "portal") as SourceKind,
       staff_only: r.staff_only === true,
       stays_home: r.stays_home === true,
       sort: whole(r.sort),
+      ...("custom" in r ? { custom: r.custom === true } : {}),
     }))
     .sort((a, b) => a.sort - b.sort || a.id.localeCompare(b.id));
   const portals: PiloPortal[] = (Array.isArray(portalRows) ? portalRows : [])
@@ -249,11 +252,11 @@ export function mergeSourceFlags(edited: Record<string, boolean>, loaded: Record
   return { ...(now as Record<string, boolean>), ...Object.fromEntries(changed.map((k) => [k, edited[k]])) };
 }
 
-/** Las colecciones a las que puede ir un documento en un ámbito, con un código de dos letras para su etiqueta. */
-export function docCollections(sources: PiloSource[], scope: string): { id: string; code: string; name: string }[] {
+/** Las colecciones a las que puede ir un documento en un ámbito, con un código de dos letras para su etiqueta. `custom`: la creó la administración (0125). */
+export function docCollections(sources: PiloSource[], scope: string): { id: string; code: string; name: string; custom: boolean }[] {
   return sources
     .filter((s) => s.scope === scope && s.kind === "documentos")
-    .map((s) => ({ id: s.id, code: DOC_CODE[s.id] ?? s.id.slice(0, 2).toUpperCase(), name: s.name }));
+    .map((s) => ({ id: s.id, code: DOC_CODE[s.id] ?? s.id.slice(0, 2).toUpperCase(), name: s.name, custom: s.custom === true }));
 }
 
 const DOC_CODE: Record<string, string> = { institucional: "DI", normativa: "NO", lineamientos: "LG", innovacion: "IE", politicas: "PO", global: "GL" };
@@ -281,10 +284,14 @@ export const missing0121 = (error: DbError | null | undefined): boolean =>
 
 /** La matriz y el catálogo de fuentes. Sin la migración 0121: null. */
 export async function fetchPortals(): Promise<PortalsData | null> {
-  const [portals, sources] = await Promise.all([
-    supabase.from("pilo_portals" as never).select("id, scope, name, written_for, matrix, sort"),
-    supabase.from("pilo_sources" as never).select("id, scope, name, kind, staff_only, stays_home, sort"),
-  ]);
+  const columns = "id, scope, name, kind, staff_only, stays_home, sort";
+  const readSources = async () => {
+    const withCustom = await supabase.from("pilo_sources" as never).select(`${columns}, custom`);
+    // Sin 0125 la columna no existe: se lee el catálogo de antes, sin colecciones propias.
+    if (withCustom.error && /custom/i.test(withCustom.error.message ?? "")) return supabase.from("pilo_sources" as never).select(columns);
+    return withCustom;
+  };
+  const [portals, sources] = await Promise.all([supabase.from("pilo_portals" as never).select("id, scope, name, written_for, matrix, sort"), readSources()]);
   const error = portals.error ?? sources.error;
   if (error) {
     if (missing0121(error)) return null;
@@ -363,6 +370,62 @@ export function useSetCell() {
       // La ficha del otro Pilo refleja la matriz en sus interruptores: se vuelve a leer.
       // (La de «Mr. Pilo con IA» no se invalida: su editor se pone al día sin perder lo que está a medio escribir.)
       if (change.portal.id !== "planeacion") void client.invalidateQueries({ queryKey: ["pilo-ia", "espacio", change.portal.id as PiloSpace, "ficha"] });
+    },
+  });
+}
+
+/* --- Una sola memoria: todos los portales leen lo de los demás, de visita ------------------- */
+
+export interface UnifyChange {
+  portal: PiloPortal;
+  /** Las celdas que cambian y a qué valor. */
+  cells: Record<string, Cell>;
+}
+
+/**
+ * Qué celdas habría que mover para que cada portal lea de visita todo lo que puede
+ * salir de su casa (`to: "visita"`), o para volver a separarlos (`to: "no"`: solo
+ * las que hoy dicen «visita»). Lo que no sale de su portal (Moodle) y lo propio de
+ * cada portal no se toca.
+ */
+export function unifyChanges(data: PortalsData, to: "visita" | "no" = "visita"): UnifyChange[] {
+  return data.portals
+    .map((portal) => {
+      const cells: Record<string, Cell> = {};
+      for (const source of data.sources) {
+        if (atHome(portal, source) || source.stays_home) continue;
+        const now = cellOf(portal, source);
+        if (to === "visita" ? now !== "visita" : now === "visita") cells[source.id] = to;
+      }
+      return { portal, cells };
+    })
+    .filter((c) => Object.keys(c.cells).length > 0);
+}
+
+/**
+ * Aplica `unifyChanges`, un portal a la vez y cada uno con lo que esta pantalla veía
+ * (`expect`). Devuelve cuántas celdas cambió.
+ */
+export function useUnifyMemory() {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ data, to }: { data: PortalsData; to: "visita" | "no" }): Promise<number> => {
+      let changed = 0;
+      for (const { portal, cells } of unifyChanges(data, to)) {
+        const expect = Object.fromEntries(Object.keys(cells).map((id) => [id, portal.matrix[id] ?? "no"]));
+        const { error } = await supabase.rpc("pilo_portal_update" as never, { p_portal: portal.id, p_patch: { matrix: cells, expect } } as never);
+        if (error) {
+          if (missing0121(error)) throw new Error("Falta aplicar la migración 0121 en la base.");
+          if (to === "visita" && missing0122(error)) throw new Error("Falta aplicar la migración 0122 en la base: hasta entonces no se puede leer de visita.");
+          throw new Error(changed ? `${error.message} (ya se cambiaron ${changed} celdas de los portales anteriores)` : error.message);
+        }
+        changed += Object.keys(cells).length;
+      }
+      return changed;
+    },
+    onSettled: () => {
+      void client.invalidateQueries({ queryKey: portalKeys.all });
+      void client.invalidateQueries({ queryKey: ["pilo-ia", "espacio"] });
     },
   });
 }

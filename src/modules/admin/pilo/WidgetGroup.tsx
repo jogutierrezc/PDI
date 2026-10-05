@@ -5,20 +5,55 @@
    (public/pilo.js). Aquí se decide si otros portales pueden mostrarlo y
    cuáles, y se arma esa línea lista para copiar, con el tema y la esquina.
    El interruptor y la lista se guardan con «Guardar cambios»; el tema y la
-   esquina no se guardan: van escritos en la línea que se copia.
+   esquina no se guardan: van escritos en la línea que se copia. Igual «Leer la
+   página» (0127): es un atributo de la línea, así quien administra el otro
+   portal lo ve y lo decide. Tiene tres opciones: no leer, leer lo visible o
+   leer todo, también lo que está plegado en pestañas y acordeones.
    ========================================================================== */
 
 import { useRef, useState } from "react";
 import type { FormEvent } from "react";
 import { Icon } from "../../../components/ui/Icon";
-import { normalizeOrigin, widgetSnippet } from "../../pilo-embed/embed";
-import type { Lado } from "../../pilo-embed/embed";
+import { LEER_MODOS, normalizeOrigin, widgetSnippet } from "../../pilo-embed/embed";
+import type { Lado, LeerModo } from "../../pilo-embed/embed";
 import { TEMAS } from "../../pregunta/store";
 import type { Tema } from "../../pregunta/store";
 import type { EditorApi } from "./sections";
 import { Group, StatusMark, Switch, plural } from "./ui";
 
 const MAX_ORIGINS = 50;
+
+/**
+ * Cuánto lee Pilo de la página donde está: no leer, lo visible o todo. Lo usan
+ * las dos líneas para pegar (la de este Pilo y la de Mr. Pilo en Enseñanza).
+ */
+export function LeerPicker({ value, onChange }: { value: LeerModo; onChange: (modo: LeerModo) => void }) {
+  const chosen = LEER_MODOS.find((m) => m.id === value) ?? LEER_MODOS[0];
+  return (
+    <div className="pis-row">
+      <span className="pis-fn__text">
+        <strong>Que Pilo lea la página donde está</strong>
+        <small>
+          {chosen.hint}{" "}
+          {value !== "no" && (
+            <>
+              Agrega <code>data-leer="{value}"</code> a la línea. Al preguntar, Pilo lee esa página para responder sobre lo que la persona ve, y la manda a «Lo
+              que leyó en otros portales», en la memoria, para que usted decida si la guarda. Nunca lee formularios, menús, diálogos ni lo que lleve{" "}
+              <code>data-pilo-ignorar</code>.
+            </>
+          )}
+        </small>
+      </span>
+      <span className="pis-seg pis-seg--sm" role="radiogroup" aria-label="Que Pilo lea la página donde está">
+        {LEER_MODOS.map((m) => (
+          <button key={m.id} type="button" role="radio" aria-checked={value === m.id} onClick={() => onChange(m.id)}>
+            {m.label}
+          </button>
+        ))}
+      </span>
+    </div>
+  );
+}
 
 const LADOS: { id: Lado; label: string }[] = [
   { id: "izq", label: "Izquierda" },
@@ -31,11 +66,12 @@ export function WidgetGroup({ ed }: { ed: EditorApi }) {
   const [error, setError] = useState("");
   const [tema, setTema] = useState<Tema>("blanco");
   const [lado, setLado] = useState<Lado>("der");
+  const [leer, setLeer] = useState<LeerModo>("no");
   const [copied, setCopied] = useState<"si" | "no" | null>(null);
   const code = useRef<HTMLElement>(null);
 
   const origins = s.widget_origins;
-  const snippet = widgetSnippet(window.location.origin, tema, lado);
+  const snippet = widgetSnippet(window.location.origin, tema, lado, "planeacion", leer);
   const askPublic = Boolean(s.portals.pregunta?.on) && s.portals.pregunta?.aud === "publico";
 
   const add = (e: FormEvent) => {
@@ -151,6 +187,7 @@ export function WidgetGroup({ ed }: { ed: EditorApi }) {
             ))}
           </span>
         </div>
+        <LeerPicker value={leer} onChange={setLeer} />
         <pre tabIndex={0}>
           <code ref={code}>{snippet}</code>
         </pre>

@@ -1,0 +1,225 @@
+{
+  "interactionModel": {
+    "languageModel": {
+      "invocationName": "mister pilo",
+      "intents": [
+        {
+          "name": "AMAZON.CancelIntent",
+          "samples": []
+        },
+        {
+          "name": "AMAZON.HelpIntent",
+          "samples": []
+        },
+        {
+          "name": "AMAZON.StopIntent",
+          "samples": []
+        },
+        {
+          "name": "AMAZON.NavigateHomeIntent",
+          "samples": []
+        },
+        {
+          "name": "AMAZON.FallbackIntent",
+          "samples": []
+        },
+        {
+          "name": "AMAZON.RepeatIntent",
+          "samples": []
+        },
+        {
+          "name": "AMAZON.YesIntent",
+          "samples": []
+        },
+        {
+          "name": "AMAZON.NoIntent",
+          "samples": []
+        },
+        {
+          "name": "PreguntarIntent",
+          "slots": [
+            {
+              "name": "consulta",
+              "type": "AMAZON.SearchQuery"
+            }
+          ],
+          "samples": [
+            "dime {consulta}",
+            "dígame {consulta}",
+            "cuéntame {consulta}",
+            "quiero saber {consulta}",
+            "quisiera saber {consulta}",
+            "necesito saber {consulta}",
+            "me puedes decir {consulta}",
+            "pregunta {consulta}",
+            "pregúntale {consulta}",
+            "busca {consulta}",
+            "responde {consulta}",
+            "explícame {consulta}",
+            "háblame de {consulta}",
+            "qué sabes de {consulta}",
+            "información sobre {consulta}"
+          ]
+        },
+        {
+          "name": "PreguntaQueIntent",
+          "slots": [
+            {
+              "name": "consulta",
+              "type": "AMAZON.SearchQuery"
+            }
+          ],
+          "samples": [
+            "qué {consulta}"
+          ]
+        },
+        {
+          "name": "PreguntaCualIntent",
+          "slots": [
+            {
+              "name": "consulta",
+              "type": "AMAZON.SearchQuery"
+            }
+          ],
+          "samples": [
+            "cuál {consulta}"
+          ]
+        },
+        {
+          "name": "PreguntaCualesIntent",
+          "slots": [
+            {
+              "name": "consulta",
+              "type": "AMAZON.SearchQuery"
+            }
+          ],
+          "samples": [
+            "cuáles {consulta}"
+          ]
+        },
+        {
+          "name": "PreguntaCuantoIntent",
+          "slots": [
+            {
+              "name": "consulta",
+              "type": "AMAZON.SearchQuery"
+            }
+          ],
+          "samples": [
+            "cuánto {consulta}"
+          ]
+        },
+        {
+          "name": "PreguntaCuantaIntent",
+          "slots": [
+            {
+              "name": "consulta",
+              "type": "AMAZON.SearchQuery"
+            }
+          ],
+          "samples": [
+            "cuánta {consulta}"
+          ]
+        },
+        {
+          "name": "PreguntaCuantosIntent",
+          "slots": [
+            {
+              "name": "consulta",
+              "type": "AMAZON.SearchQuery"
+            }
+          ],
+          "samples": [
+            "cuántos {consulta}"
+          ]
+        },
+        {
+          "name": "PreguntaCuantasIntent",
+          "slots": [
+            {
+              "name": "consulta",
+              "type": "AMAZON.SearchQuery"
+            }
+          ],
+          "samples": [
+            "cuántas {consulta}"
+          ]
+        },
+        {
+          "name": "PreguntaComoIntent",
+          "slots": [
+            {
+              "name": "consulta",
+              "type": "AMAZON.SearchQuery"
+            }
+          ],
+          "samples": [
+            "cómo {consulta}"
+          ]
+        },
+        {
+          "name": "PreguntaDondeIntent",
+          "slots": [
+            {
+              "name": "consulta",
+              "type": "AMAZON.SearchQuery"
+            }
+          ],
+          "samples": [
+            "dónde {consulta}",
+            "en dónde {consulta}"
+          ]
+        },
+        {
+          "name": "PreguntaCuandoIntent",
+          "slots": [
+            {
+              "name": "consulta",
+              "type": "AMAZON.SearchQuery"
+            }
+          ],
+          "samples": [
+            "cuándo {consulta}"
+          ]
+        },
+        {
+          "name": "PreguntaQuienIntent",
+          "slots": [
+            {
+              "name": "consulta",
+              "type": "AMAZON.SearchQuery"
+            }
+          ],
+          "samples": [
+            "quién {consulta}"
+          ]
+        },
+        {
+          "name": "PreguntaQuienesIntent",
+          "slots": [
+            {
+              "name": "consulta",
+              "type": "AMAZON.SearchQuery"
+            }
+          ],
+          "samples": [
+            "quiénes {consulta}"
+          ]
+        },
+        {
+          "name": "PreguntaPorQueIntent",
+          "slots": [
+            {
+              "name": "consulta",
+              "type": "AMAZON.SearchQuery"
+            }
+          ],
+          "samples": [
+            "por qué {consulta}"
+          ]
+        }
+      ],
+      "types": []
+    }
+  }
+}

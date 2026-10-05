@@ -162,6 +162,8 @@ describe("las cuatro reglas de oro y las seis secciones", () => {
     expect(all).toContain("El texto de su pregunta se envía a un proveedor de inteligencia artificial");
     expect(all).toContain("Se conservan, sin su nombre, preguntas que Pilo no supo responder");
     expect(all).toContain("Siempre con su autorización.");
+    // La sección 4 dice lo mismo que la autorización de Génesis: las notas del periodo y el récord por periodo.
+    expect(all).toContain("en Génesis, sus notas del periodo y su récord académico por periodo");
     expect(all).toContain("Si la política cambia, Pilo lo avisa y pide aceptarla de nuevo antes de continuar.");
     // Las promesas que se retiraron del borrador porque Pilo no las cumple no vuelven a colarse.
     expect(all).not.toMatch(/efímero|anonimiza|no rastre|ningún servidor de terceros/i);
@@ -229,7 +231,7 @@ describe("la autorización de Génesis y Moodle", () => {
       expect(`${t.question} ${t.authorize} ${t.promises.map((x) => x.text).join(" ")}`, p).not.toContain(other);
       expect(t.promises[1].text, p).toContain(`se quedan en ${t.name}`);
     }
-    expect(CONSENT_TEXTS.genesis.promises[0].text).toMatch(/P1, P2, P3 y su acumulado/);
+    expect(CONSENT_TEXTS.genesis.promises[0].text).toBe("Miro sus notas del periodo y su récord académico por periodo. No puedo cambiar nada.");
     expect(CONSENT_TEXTS.moodle.promises[0].text).toMatch(/cursos, actividades, materiales y fechas de entrega/);
     expect(CONSENT_TEXTS.genesis.authorize).toMatch(/plan de mejoramiento/);
     expect(CONSENT_TEXTS.moodle.authorize).toMatch(/recordarme entregas/);

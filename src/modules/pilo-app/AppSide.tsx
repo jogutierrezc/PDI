@@ -3,7 +3,7 @@
 
    Desde 960 px de ancho la app deja de ser una pantalla de teléfono: la barra
    lateral queda fija con cuál Pilo, «Nueva conversación», «Para estudiar»
-   (Mis clases, Gemini y las guardadas), las conversaciones más recientes de
+   (Mis clases, Mis notas, Gemini y las guardadas), las conversaciones más recientes de
    este dispositivo, la persona (o «Crear cuenta / Entrar») y Ajustes (el
    tema, la bienvenida y la política), que se abren junto a ella. Por debajo de ese ancho, lo mismo vive en el
    cajón del menú (AppMenu).
@@ -17,7 +17,7 @@ import { useEffect, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import { Link } from "react-router-dom";
 import type { SpaceId } from "../pregunta/space";
-import { APP_ACCOUNT, APP_CLASSES, APP_GEMINI, APP_LOGIN, APP_PILOS, APP_PROFILE, APP_SAVED, APP_SPACES } from "./routes";
+import { APP_ACCOUNT, APP_CLASSES, APP_GEMINI, APP_GRADES, APP_LOGIN, APP_PILOS, APP_PROFILE, APP_SAVED, APP_SPACES } from "./routes";
 import { APP_THEMES } from "./themes";
 import type { AppTheme } from "./themes";
 import { dayLabel } from "./saved";
@@ -51,6 +51,8 @@ export interface Person {
   saved: number | null;
   /** Puede usar Mis clases (beta): estudiante o profesor con cuenta de Pilo activa. A los demás no se les muestra. */
   clases?: boolean;
+  /** Puede usar Mis notas (beta): estudiante con cuenta de Pilo activa. A los demás no se les muestra. */
+  notas?: boolean;
 }
 
 /** El bloque de la persona: con cuenta lleva a su perfil; sin ella, a crearla o a entrar. */
@@ -111,6 +113,11 @@ export const StudyIcon = {
       <path d="M10 5.5C8.5 4.3 6.5 4 3.5 4v11c3 0 5 .3 6.5 1.5 1.5-1.2 3.5-1.5 6.5-1.5V4c-3 0-5 .3-6.5 1.5zM10 5.5v11" />
     </svg>
   ),
+  grades: (
+    <svg className="pa-i" viewBox="0 0 20 20" aria-hidden="true">
+      <path d="M3.5 16.5h13M4 13l3.5-4 3 2.5L16 5M12.5 5H16v3.5" />
+    </svg>
+  ),
   gemini: (
     <svg className="pa-i" viewBox="0 0 20 20" aria-hidden="true">
       <path d="M10 3c.6 3.6 2.4 5.4 6 6-3.6.6-5.4 2.4-6 6-.6-3.6-2.4-5.4-6-6 3.6-.6 5.4-2.4 6-6z" />
@@ -149,7 +156,7 @@ export function AppSide({
   saved: SavedEntry[];
   currentId: string | null;
   /** La pantalla que se está viendo. */
-  active: "chat" | "guardadas" | "perfil" | "clases";
+  active: "chat" | "guardadas" | "perfil" | "clases" | "notas";
   person: Person;
   onOpen: (entry: SavedEntry) => void;
   onDelete: (entry: SavedEntry) => void;
@@ -214,6 +221,14 @@ export function AppSide({
           <Link className="pa-sl" to={APP_CLASSES} aria-current={active === "clases" ? "page" : undefined}>
             {StudyIcon.classes}
             <span>Mis clases</span>
+            <em>beta</em>
+          </Link>
+        )}
+        {/* Mis notas (notas/): Génesis, solo para estudiantes con cuenta. */}
+        {person.notas && (
+          <Link className="pa-sl" to={APP_GRADES} aria-current={active === "notas" ? "page" : undefined}>
+            {StudyIcon.grades}
+            <span>Mis notas</span>
             <em>beta</em>
           </Link>
         )}

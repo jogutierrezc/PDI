@@ -28,3 +28,8 @@ verify_jwt = false
 # «Mis clases» (beta): la función comprueba por su cuenta que quien llama tenga
 # una cuenta de Pilo activa de estudiante o de profesor. No guarda nada de Moodle.
 verify_jwt = false
+
+[functions.pilo-genesis]
+# «Mis notas» (beta): la función comprueba por su cuenta que quien llama tenga
+# una cuenta de Pilo activa de estudiante. No guarda nada de Génesis.
+verify_jwt = false

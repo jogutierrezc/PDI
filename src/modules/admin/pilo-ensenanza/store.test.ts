@@ -177,6 +177,13 @@ describe("el chat emergente de este espacio", () => {
       '<script src="https://pdi.udes.edu.co/pilo.js" data-pilo="ensenanza" data-tema="blanco" data-esquina="izquierda" defer></script>',
     );
     expect(spaceSnippet("https://pdi.udes.edu.co", "ensenanza", "negro", "der")).toContain('data-esquina="derecha"');
+    // Leer la página: nada, lo visible («si», o true como antes) o todo, también lo plegado.
+    expect(spaceSnippet("https://pdi.udes.edu.co", "ensenanza", "blanco", "izq", "no")).toBe(spaceSnippet("https://pdi.udes.edu.co", "ensenanza", "blanco", "izq"));
+    expect(spaceSnippet("https://pdi.udes.edu.co", "ensenanza", "blanco", "izq", true)).toBe(spaceSnippet("https://pdi.udes.edu.co", "ensenanza", "blanco", "izq", "si"));
+    expect(spaceSnippet("https://pdi.udes.edu.co", "ensenanza", "blanco", "izq", "si")).toContain(' data-esquina="izquierda" data-leer="si" defer>');
+    expect(spaceSnippet("https://pdi.udes.edu.co", "ensenanza", "blanco", "izq", "todo")).toBe(
+      '<script src="https://pdi.udes.edu.co/pilo.js" data-pilo="ensenanza" data-tema="blanco" data-esquina="izquierda" data-leer="todo" defer></script>',
+    );
   });
 });
 

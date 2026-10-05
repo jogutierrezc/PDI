@@ -3,7 +3,7 @@
 
    De arriba abajo, por lo que más se usa: la persona (su nombre lleva a su
    perfil) · con cuál Pilo · Nueva conversación · «Para estudiar» (Mis clases en
-   Moodle, Gemini y las respuestas guardadas) · las conversaciones de este
+   Moodle, Mis notas en Génesis, Gemini y las respuestas guardadas) · las conversaciones de este
    teléfono (las cuatro más recientes; «Ver todas» las abre, y ahí se borran) ·
    Ajustes (el tema, la bienvenida y la política de uso), que es una hoja
    aparte: se usa poco y ya no ocupa el menú.
@@ -19,7 +19,7 @@ import { Link } from "react-router-dom";
 import type { AskSource } from "../../components/pilo/ai/client";
 import { originOf } from "../pregunta/answer-state";
 import type { SpaceId, SpaceProfile } from "../pregunta/space";
-import { APP_ACCOUNT, APP_CLASSES, APP_GEMINI, APP_LOGIN, APP_PILOS, APP_SAVED, APP_SPACES } from "./routes";
+import { APP_ACCOUNT, APP_CLASSES, APP_GEMINI, APP_GRADES, APP_LOGIN, APP_PILOS, APP_SAVED, APP_SPACES } from "./routes";
 import { APP_THEMES } from "./themes";
 import type { AppTheme } from "./themes";
 import { dayLabel } from "./saved";
@@ -105,6 +105,19 @@ export function AppMenu({
                 <span>
                   <strong>Mis clases</strong>
                   <small>Sus cursos de Moodle y sus fechas de entrega</small>
+                </span>
+              </Link>
+            )}
+            {/* Mis notas (notas/): Génesis, solo para estudiantes con cuenta. */}
+            {person.notas && (
+              <Link className="pa-tile" to={APP_GRADES} onClick={() => onClose()}>
+                <span className="pa-tile__top">
+                  <span className="pa-tile__ico">{StudyIcon.grades}</span>
+                  <em>beta</em>
+                </span>
+                <span>
+                  <strong>Mis notas</strong>
+                  <small>Su histórico de Génesis y cómo va su promedio</small>
                 </span>
               </Link>
             )}

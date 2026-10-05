@@ -25,6 +25,8 @@ import type { CatalogKind } from "../pilo/catalog-sheet";
 import { mergeSourceFlags } from "../pilo/portals";
 import type { LogRow } from "../pilo/store";
 import type { PiloSpace } from "../pilo/space";
+import { leerAttr } from "../../pilo-embed/embed";
+import type { LeerModo } from "../../pilo-embed/embed";
 
 /** El espacio de esta pantalla. */
 export const SPACE: PiloSpace = "ensenanza";
@@ -227,9 +229,9 @@ export function dirtyTabs(now: SpaceSettings, saved: SpaceSettings): TabId[] {
 /* --- El chat emergente de este espacio --------------------------------------------- */
 
 /** La línea que se pega en otro portal: la misma de siempre, con `data-pilo` diciendo qué Pilo es. */
-/** Con `read`, la línea pide además que Pilo lea la página que lo aloja (0127). */
-export function spaceSnippet(origin: string, space: PiloSpace, tema: string, lado: "der" | "izq", read = false): string {
-  return `<script src="${origin.replace(/\/+$/, "")}/pilo.js" data-pilo="${space}" data-tema="${tema}" data-esquina="${lado === "izq" ? "izquierda" : "derecha"}"${read ? ' data-leer="si"' : ""} defer></script>`;
+/** Con `read`, la línea pide además que Pilo lea la página que lo aloja (0127): lo visible («si») o todo, también lo plegado («todo»). */
+export function spaceSnippet(origin: string, space: PiloSpace, tema: string, lado: "der" | "izq", read: boolean | LeerModo = false): string {
+  return `<script src="${origin.replace(/\/+$/, "")}/pilo.js" data-pilo="${space}" data-tema="${tema}" data-esquina="${lado === "izq" ? "izquierda" : "derecha"}"${leerAttr(read)} defer></script>`;
 }
 
 /* --- Leer y guardar la ficha ---------------------------------------------------------- */

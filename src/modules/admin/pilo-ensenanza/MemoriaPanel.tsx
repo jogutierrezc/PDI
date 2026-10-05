@@ -49,6 +49,7 @@ import { ComprehendGroup } from "./memoria/ComprehendGroup";
 import { DocumentsPanel } from "./memoria/DocumentsPanel";
 import { ReadingsPanel } from "./memoria/ReadingsPanel";
 import { MoodlePanel } from "./memoria/MoodlePanel";
+import { GenesisPanel } from "./memoria/GenesisPanel";
 import { MemoryProbe, TeachMap } from "./memoria/TeachMap";
 import { indexRun, useProbePath, useRefreshMemory } from "./memoria/data";
 import { enterBlock } from "./motion";
@@ -113,6 +114,7 @@ export function MemoriaPanel({ ed }: { ed: SpaceEditor }) {
         <DocumentsPanel space={space} disabled={missing} />
         <ReadingsPanel space={space} disabled={missing} />
         <MoodlePanel space={space} disabled={missing} />
+        <GenesisPanel space={space} disabled={missing} />
       </Sheet>
     ),
     comprender: () => (

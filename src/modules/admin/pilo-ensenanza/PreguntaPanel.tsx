@@ -31,7 +31,7 @@ import { Link, useSearchParams } from "react-router-dom";
 import { Icon } from "../../../components/ui/Icon";
 import type { VoiceStyle } from "../../../components/pilo/ai/logic";
 import { normalizeOrigin } from "../../pilo-embed/embed";
-import type { Lado } from "../../pilo-embed/embed";
+import type { Lado, LeerModo } from "../../pilo-embed/embed";
 import { TEMAS } from "../../pregunta/store";
 import type { Tema } from "../../pregunta/store";
 import { AudiencePicker } from "../pilo/sections";
@@ -46,6 +46,7 @@ import type { SharedSummary } from "./resumen";
 import { EXPRESSIONS, MAX_ORIGINS, MAX_SUGGESTIONS, ORAL_MOODS, ROLES, SPACE_LIMITS, TEXT_MAX, spaceSnippet } from "./store";
 import type { RolId, RoleSettings, SpaceSettings } from "./store";
 import { ReasoningGroup } from "../pilo/Razonamiento";
+import { LeerPicker } from "../pilo/WidgetGroup";
 import { FoldRow, Sheet, TextArea } from "./ui";
 
 export interface SpaceEditor {
@@ -405,7 +406,7 @@ function WidgetGroup({ ed }: { ed: SpaceEditor }) {
   const code = useRef<HTMLElement>(null);
 
   const origins = s.widget_origins;
-  const [leer, setLeer] = useState(false);
+  const [leer, setLeer] = useState<LeerModo>("no");
   const snippet = spaceSnippet(window.location.origin, s.id, tema, lado, leer);
   const openToAll = s.on && s.aud === "publico";
 
@@ -514,17 +515,7 @@ function WidgetGroup({ ed }: { ed: SpaceEditor }) {
             ))}
           </span>
         </div>
-        <div className="pis-row">
-          <span className="pis-fn__text">
-            <strong>Que Pilo lea la página donde está</strong>
-            <small>
-              Agrega <code>data-leer="si"</code> a la línea. Al preguntar, Pilo lee el texto visible de esa página para responder sobre lo que la persona ve, y la
-              manda a «Lo que leyó en otros portales», en la memoria, para que usted decida si la guarda. No lee formularios ni lo que lleve{" "}
-              <code>data-pilo-ignorar</code>.
-            </small>
-          </span>
-          <Switch on={leer} onChange={setLeer} label="Que Pilo lea la página donde está" />
-        </div>
+        <LeerPicker value={leer} onChange={setLeer} />
         <pre tabIndex={0}>
           <code ref={code}>{snippet}</code>
         </pre>

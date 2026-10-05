@@ -28,6 +28,14 @@ describe("las rutas de la app y su Pilo", () => {
     expect(readAppPath("/app/cuenta/otra")).toEqual({ kind: "otra" });
   });
 
+  it("Mis clases y Mis notas son pantallas de la app", () => {
+    expect(readAppPath("/app/clases")).toEqual({ kind: "clases" });
+    expect(readAppPath("/app/notas")).toEqual({ kind: "notas" });
+    expect(readAppPath("/app/notas/")).toEqual({ kind: "notas" });
+    expect(readAppPath("/app/notas/2024B")).toEqual({ kind: "otra" });
+    expect(isAppPath("/app/notas")).toBe(true);
+  });
+
   it("/app/cuenta abre según lo que traiga la dirección; los enlaces del correo mandan", () => {
     expect(gateMode("")).toBe("registro");
     expect(gateMode("?entrar=1")).toBe("ingreso");

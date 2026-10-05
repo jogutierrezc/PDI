@@ -16,6 +16,10 @@
    la página anfitriona su texto visible cuando alguien pregunta. Con la
    pregunta viajan solo los pasajes que más tienen que ver con ella; la página
    entera va aparte, una vez, a la bandeja de lecturas de la administración.
+
+   Leer todo: con data-leer="todo" la página manda además lo que tiene plegado
+   (pestañas, acordeones, <details> cerrados). Qué cuenta como plegado lo
+   decide public/pilo.js; aquí solo se quita lo plegado que repite lo visible.
    ========================================================================== */
 
 import type { Tema } from "../pregunta/store";
@@ -85,6 +89,23 @@ export interface PageBlock {
   t: string;
 }
 
+/** Cuánto lee Pilo de la página que lo aloja: nada, lo visible, o todo (también lo plegado). */
+export type LeerModo = "no" | "si" | "todo";
+
+/** Lo que dice `data-leer` en la línea. La misma lectura que hace public/pilo.js. */
+export function leerModo(raw: unknown): LeerModo {
+  const v = (typeof raw === "string" ? raw : "").trim().toLowerCase();
+  if (/^todo/.test(v)) return "todo";
+  return /^s[ií]/.test(v) ? "si" : "no";
+}
+
+/** Las tres opciones, como se le ofrecen a quien arma la línea en la intranet. */
+export const LEER_MODOS: { id: LeerModo; label: string; hint: string }[] = [
+  { id: "no", label: "No leer", hint: "Pilo responde solo con lo que ya sabe: la línea no lleva data-leer." },
+  { id: "si", label: "Leer lo visible", hint: "Lo que la persona tiene a la vista en ese momento. Lo que esté en una pestaña o un acordeón sin abrir no se lee." },
+  { id: "todo", label: "Leer todo", hint: "También lo que está en la página pero plegado: las demás pestañas, los acordeones y los «ver más» sin abrir. Pilo no pulsa nada: solo lo lee." },
+];
+
 /** La página tal como la leyó public/pilo.js, ya revisada aquí. */
 export interface HostPage {
   url: string;
@@ -108,9 +129,20 @@ export function readHostPage(data: unknown, id: string): { page: HostPage | null
   if (!url) return { page: null };
   let size = 0;
   const blocks: PageBlock[] = [];
-  for (const b of Array.isArray(p.blocks) ? p.blocks.slice(0, BLOCKS_MAX) : []) {
-    const t = typeof (b as { t?: unknown })?.t === "string" ? (b as { t: string }).t.replace(/\s+/g, " ").trim() : "";
+  const raw = Array.isArray(p.blocks) ? p.blocks.slice(0, BLOCKS_MAX) : [];
+  const textOf = (b: unknown) => (typeof (b as { t?: unknown })?.t === "string" ? (b as { t: string }).t.replace(/\s+/g, " ").trim() : "");
+  // Lo plegado (o) que repite un párrafo ya leído sobra: la copia oculta de lo visible (la versión
+  // de móvil, la diapositiva repetida de un carrusel) o dos veces el mismo panel. Los títulos no se tocan.
+  const folded = (b: unknown) => Boolean((b as { o?: unknown } | null)?.o) && !(b as { h?: unknown }).h;
+  const said = new Set(raw.filter((b) => !folded(b)).map((b) => textOf(b).toLowerCase()));
+  for (const b of raw) {
+    const t = textOf(b);
     if (t.length < 2) continue;
+    if (folded(b)) {
+      const key = t.toLowerCase();
+      if (said.has(key)) continue;
+      said.add(key);
+    }
     if (size + t.length > PAGE_CAPTURE_CHARS) break;
     size += t.length;
     blocks.push({ h: Boolean((b as { h?: unknown }).h), t });
@@ -253,11 +285,17 @@ export function widgetAllowed(widget: { on: boolean; origins: string[] } | null 
 }
 
 /** La línea que se pega en el otro portal. Otro espacio de Pilo se pide con `data-pilo`. */
-export function widgetSnippet(origin: string, tema: Tema, lado: Lado, space: SpaceId = "planeacion", read = false): string {
+export function widgetSnippet(origin: string, tema: Tema, lado: Lado, space: SpaceId = "planeacion", read: boolean | LeerModo = false): string {
   const pilo = isAskSpace(space) && space !== "planeacion" ? ` data-pilo="${space}"` : "";
   // Leer la página (0127) se pide en la línea: quien administra ese portal lo ve y lo decide.
-  const leer = read ? ' data-leer="si"' : "";
+  const leer = leerAttr(read);
   return `<script src="${origin.replace(/\/+$/, "")}/pilo.js"${pilo} data-tema="${tema}" data-esquina="${lado === "izq" ? "izquierda" : "derecha"}"${leer} defer></script>`;
+}
+
+/** El atributo de la línea: nada, data-leer="si" o data-leer="todo". `true` es «si», como antes. */
+export function leerAttr(read: boolean | LeerModo): string {
+  const modo = read === true ? "si" : read === false ? "no" : leerModo(read);
+  return modo === "no" ? "" : ` data-leer="${modo}"`;
 }
 
 /** La ruta del marco de un espacio (la misma que arma public/pilo.js). */

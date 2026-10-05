@@ -81,6 +81,9 @@ const PAIRS: [string, string[]][] = [
   ["--c-bad", ["--c-bg", "--c-bubble", "--c-sheet"]],
   // El campo elegido y la barra lateral del escritorio.
   ["--c-ink2", ["--c-chip"]],
+  // La gráfica de Mis notas: sus dos series, sobre la tarjeta en que se dibujan.
+  ["--c-s1", ["--c-sheet"]],
+  ["--c-s2", ["--c-sheet"]],
   ["--w-card-ink", ["--w-card"]],
   ["--w-card-ok", ["--w-card"]],
 ];
@@ -107,7 +110,7 @@ describe("los cinco temas", () => {
     }
   });
 
-  it.each(["pilo-app.css", "account/account.css"])("los colores de la app viven solo en la hoja de temas (%s)", (file) => {
+  it.each(["pilo-app.css", "account/account.css", "notas/notas.css"])("los colores de la app viven solo en la hoja de temas (%s)", (file) => {
     const main = strip(readFileSync(resolve(DIR, file), "utf8"));
     // Ningún color escrito a mano: ni hexadecimal, ni rgb(), ni hsl(). (#000 solo como máscara: no es un color que se vea.)
     const loose = [...main.matchAll(/#[0-9a-fA-F]{3,8}\b|rgba?\(|hsla?\(/g)].map((m) => m[0]).filter((c) => c !== "#000");

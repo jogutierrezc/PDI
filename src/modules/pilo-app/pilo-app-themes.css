@@ -9,7 +9,9 @@
      --acc   el acento de la escena y su tinta
      --c-*   la conversación, el menú, las hojas y las pantallas de la cuenta
              (--c-ok y --c-bad: lo que sirve y lo que falta en un campo,
-             siempre con su glifo y su palabra)
+             siempre con su glifo y su palabra; --c-s1 y --c-s2: las dos
+             series de la gráfica de Mis notas, que además se distinguen
+             por el trazo)
      --w-*   las tarjetas de muestra de la bienvenida (papel claro en todos)
 
    El contraste del texto se mide en themes.test.ts contra el fondo real de
@@ -51,6 +53,8 @@
   --c-warn-bg: #fbf2e0;
   --c-ok: #0d6a2d;
   --c-bad: #b3261e;
+  --c-s1: #1f5fbf;
+  --c-s2: #bd5318;
   --c-scrim: rgba(2, 8, 20, 0.55);
   --c-shadow: rgba(6, 30, 70, 0.26);
   --w-card: #ffffff;
@@ -89,6 +93,8 @@
   --c-warn-bg: #fbf2e0;
   --c-ok: #0d6a2d;
   --c-bad: #b3261e;
+  --c-s1: #1f5fbf;
+  --c-s2: #bd5318;
   --c-scrim: rgba(2, 8, 20, 0.5);
   --c-shadow: rgba(6, 30, 70, 0.2);
   --w-card: #ffffff;
@@ -128,6 +134,8 @@
   --c-warn-bg: #2a2110;
   --c-ok: #5fd38a;
   --c-bad: #ff9a92;
+  --c-s1: #7fb2ff;
+  --c-s2: #ffab6b;
   --c-scrim: rgba(0, 0, 0, 0.66);
   --c-shadow: rgba(0, 0, 0, 0.7);
   --w-card: #ffffff;
@@ -166,6 +174,8 @@
   --c-warn-bg: #2b2140;
   --c-ok: #6fe3a0;
   --c-bad: #ffa59e;
+  --c-s1: #8fc1ff;
+  --c-s2: #ffb37a;
   --c-scrim: rgba(3, 2, 14, 0.66);
   --c-shadow: rgba(2, 1, 12, 0.7);
   --w-card: #ffffff;
@@ -205,6 +215,8 @@
   --c-warn-bg: #fbefd6;
   --c-ok: #0d6a2d;
   --c-bad: #a3241c;
+  --c-s1: #1f5fbf;
+  --c-s2: #b34d12;
   --c-scrim: rgba(24, 12, 4, 0.55);
   --c-shadow: rgba(40, 20, 6, 0.28);
   --w-card: #ffffff;

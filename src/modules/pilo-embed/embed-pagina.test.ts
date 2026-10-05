@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { captureLine, captureStatus, hostLabel, pageForQuestion, pageHeadings, pagePassages, pageRequest, pageStamp, readHostMessage, readHostPage, widgetSnippet } from "./embed";
+import { LEER_MODOS, captureLine, captureStatus, hostLabel, leerAttr, pageForQuestion, pageHeadings, pagePassages, pageRequest, pageStamp, readHostMessage, readHostPage, widgetSnippet } from "./embed";
 import type { HostPage } from "./embed";
 
 /* Leer la página anfitriona (0127): lo que el marco le pide a la página, lo que
@@ -74,5 +74,40 @@ describe("leer la página anfitriona", () => {
   it("la línea para pegar pide leer solo si se marca", () => {
     expect(widgetSnippet("https://portal.example", "blanco", "der", "planeacion", true)).toBe('<script src="https://portal.example/pilo.js" data-tema="blanco" data-esquina="derecha" data-leer="si" defer></script>');
     expect(readHostMessage({ source: "pilo-host", full: false, read: true })).toEqual({ full: false, read: true });
+  });
+
+  it("la línea para pegar tiene tres opciones: no leer, leer lo visible y leer todo", () => {
+    const line = (read: Parameters<typeof widgetSnippet>[4]) => widgetSnippet("https://portal.example", "blanco", "der", "planeacion", read);
+    expect(line("no")).toBe(line(false));
+    expect(line("no")).not.toContain("data-leer");
+    expect(line("si")).toBe(line(true));
+    expect(line("todo")).toBe('<script src="https://portal.example/pilo.js" data-tema="blanco" data-esquina="derecha" data-leer="todo" defer></script>');
+    expect(widgetSnippet("https://portal.example", "blanco", "der", "ensenanza", "todo")).toContain('data-pilo="ensenanza" data-tema="blanco" data-esquina="derecha" data-leer="todo"');
+    expect(leerAttr("otra" as never)).toBe("");
+    expect(LEER_MODOS.map((m) => m.id)).toEqual(["no", "si", "todo"]);
+    expect(LEER_MODOS.every((m) => m.label.length > 3 && m.hint.length > 20)).toBe(true);
+  });
+
+  it("lo plegado que repite un párrafo ya leído se quita; los títulos y lo plegado nuevo se quedan", () => {
+    const blocks = [
+      { h: 1, t: "Pregrado" },
+      { h: 0, t: "La inscripción abre en octubre." },
+      { h: 1, t: "Pregrado", o: 1 },
+      { h: 0, t: "la  inscripción abre en OCTUBRE.", o: 1 },
+      { h: 1, t: "Posgrado", o: 1 },
+      { h: 0, t: "La inscripción abre en enero.", o: 1 },
+      { h: 0, t: "La inscripción abre en enero.", o: 1 },
+      { h: 0, t: "La inscripción abre en octubre." },
+    ];
+    const seen = readHostPage({ source: "pilo-host", type: "pagina", id: "a", page: { url: "https://a.co/", title: "A", blocks } }, "a");
+    expect(seen?.page?.blocks).toEqual([
+      { h: true, t: "Pregrado" },
+      { h: false, t: "La inscripción abre en octubre." },
+      { h: true, t: "Pregrado" },
+      { h: true, t: "Posgrado" },
+      { h: false, t: "La inscripción abre en enero." },
+      // Lo visible repetido no es cosa de esta regla: queda como antes.
+      { h: false, t: "La inscripción abre en octubre." },
+    ]);
   });
 });

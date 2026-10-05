@@ -34,11 +34,13 @@ export const APP_PROFILE = "/app/perfil";
 export const APP_SAVED = "/app/guardadas";
 /** Mis clases (beta): Moodle con la cuenta de la persona, solo lectura. Solo para estudiantes y profesores con cuenta. */
 export const APP_CLASSES = "/app/clases";
+/** Mis notas (beta): Génesis con la cuenta de la persona, solo lectura. Solo para estudiantes con cuenta. */
+export const APP_GRADES = "/app/notas";
 /** Directo al ingreso, o a usar Pilo sin cuenta. Nunca viaja un correo ni un usuario en la dirección. */
 export const APP_LOGIN = `${APP_ACCOUNT}?entrar=1`;
 export const APP_GUEST = `${APP_ACCOUNT}?visita=1`;
 
-export type AppPlace = { kind: "inicio" } | { kind: "pilo"; space: SpaceId } | { kind: "cuenta" } | { kind: "perfil" } | { kind: "guardadas" } | { kind: "clases" } | { kind: "otra" };
+export type AppPlace = { kind: "inicio" } | { kind: "pilo"; space: SpaceId } | { kind: "cuenta" } | { kind: "perfil" } | { kind: "guardadas" } | { kind: "clases" } | { kind: "notas" } | { kind: "otra" };
 
 /** Qué pantalla de la app pide una dirección. «otra» = no es de la app, o no existe dentro de ella. */
 export function readAppPath(pathname: string): AppPlace {
@@ -49,6 +51,7 @@ export function readAppPath(pathname: string): AppPlace {
   if (p === APP_PROFILE) return { kind: "perfil" };
   if (p === APP_SAVED) return { kind: "guardadas" };
   if (p === APP_CLASSES) return { kind: "clases" };
+  if (p === APP_GRADES) return { kind: "notas" };
   return { kind: "otra" };
 }
 

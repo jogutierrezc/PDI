@@ -14,6 +14,7 @@
      /app/perfil       los datos de la cuenta y cómo le habla Pilo
      /app/guardadas    las respuestas guardadas en la cuenta
      /app/clases       Mis clases (beta): Moodle con la cuenta de la persona, solo lectura (clases/)
+     /app/notas        Mis notas (beta): Génesis con la cuenta del estudiante, solo lectura (notas/)
 
    Antes de conversar se acepta la política de uso (terms/): una vez por
    dispositivo y por versión, después de la bienvenida.
@@ -49,6 +50,8 @@ import { ProfilePane } from "./account/ProfilePane";
 import { SavedPane } from "./account/SavedPane";
 import { ClasesPane } from "./clases/ClasesPane";
 import { canUseClases, clearLink } from "./clases/logic";
+import { NotasPane } from "./notas/NotasPane";
+import { canUseNotas, clearLink as clearNotasLink } from "./notas/logic";
 import { APP_PREFIX, readTheme, writeTheme } from "./themes";
 import type { AppTheme } from "./themes";
 import { welcomeVoice } from "./welcome-script";
@@ -148,14 +151,17 @@ export function PiloApp() {
   const waking = online && (config.isPending || loading || cuenta.pending);
   const doors = useMemo(() => ({ planeacion: spaceDoor(rules, ASK_SPACES.planeacion, role, member), ensenanza: spaceDoor(rules, ENSENANZA, role, member) }), [rules, role, member]);
   const person: Person = useMemo(
-    () => ({ card: account ? personCard(account) : null, intranet: role ? profile?.full_name || profile?.email || "Su cuenta" : null, saved: null, clases: canUseClases(account) }),
+    () => ({ card: account ? personCard(account) : null, intranet: role ? profile?.full_name || profile?.email || "Su cuenta" : null, saved: null, clases: canUseClases(account), notas: canUseNotas(account) }),
     [account, role, profile?.full_name, profile?.email],
   );
   const greeting = useMemo(() => (online ? welcomeVoice(doors) : null), [doors, online]);
 
-  // Al salir de la cuenta, el permiso de Moodle de Mis clases se borra de este dispositivo.
+  // Al salir de la cuenta, el permiso de Moodle de Mis clases y el de Génesis de Mis notas se borran de este dispositivo.
   useEffect(() => {
-    if (!loading && !session) clearLink();
+    if (!loading && !session) {
+      clearLink();
+      clearNotasLink();
+    }
   }, [loading, session]);
 
   const pickTheme = (next: AppTheme) => {
@@ -254,6 +260,24 @@ export function PiloApp() {
     );
   }
 
+  /* --- Mis notas (beta): solo estudiantes con cuenta -------------------------------------------- */
+
+  if (place.kind === "notas") {
+    return (
+      <div className="pa" ref={root} data-tema={theme}>
+        <AppPage
+          title="Mis notas"
+          tag="Beta"
+          lead="Pilo entra a Génesis con su cuenta para mostrarle su histórico de notas, periodo a periodo, y cómo ha evolucionado su promedio."
+          home={APP_PATHS[home]}
+          side={wide ? <PageSide home={home} active="notas" person={person} userId={session?.user.id} member={member} theme={theme} onTheme={pickTheme} onWelcome={welcomeAgain} /> : null}
+        >
+          <NotasPane state={cuenta} online={online} />
+        </AppPage>
+      </div>
+    );
+  }
+
   const spaceId: SpaceId = place.kind === "pilo" ? place.space : home;
   const space = ASK_SPACES[spaceId];
   const door = doors[spaceId];
@@ -331,7 +355,7 @@ function PageSide({
   onWelcome,
 }: {
   home: SpaceId;
-  active: "perfil" | "guardadas" | "clases";
+  active: "perfil" | "guardadas" | "clases" | "notas";
   person: Person;
   userId: string | undefined;
   member: boolean;

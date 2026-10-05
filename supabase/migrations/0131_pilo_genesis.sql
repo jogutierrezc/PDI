@@ -51,7 +51,9 @@
 -- eso se deja dicho aquí en vez de fiarse de los permisos de partida del
 -- proyecto. No la cambia.
 --
--- Sin UPDATE ni DELETE. Requiere 0113. Idempotente. No toca ninguna fila.
+-- Requiere 0113. Idempotente. Sin DELETE. Solo toca una fila si antes se aplicó el
+-- borrador de una sola dirección: la pasa a portal o, si no sirve, apaga la conexión
+-- (los dos UPDATE llevan WHERE).
 -- =============================================================================
 
 -- Lo que debe cumplir la lista de portales. Inmutable: la usa una restricción.
@@ -115,7 +117,32 @@ alter table public.pilo_spaces add column if not exists genesis_advice boolean n
 -- Un borrador de esta migración guardaba una sola dirección: si llegó a aplicarse en algún sitio, se retira.
 alter table public.pilo_spaces drop constraint if exists pilo_spaces_genesis_url;
 alter table public.pilo_spaces drop constraint if exists pilo_spaces_genesis_on;
+
+-- Antes de retirarla, la dirección que alguien ya había guardado pasa a ser el primer
+-- portal («Principal»), si es válida: así no se pierde y Mis notas sigue encendida.
+do $$
+begin
+  if exists (
+    select 1 from information_schema.columns
+    where table_schema = 'public' and table_name = 'pilo_spaces' and column_name = 'genesis_url'
+  ) then
+    execute $sql$
+      update public.pilo_spaces s
+      set genesis_portals = jsonb_build_array(jsonb_build_object('id', 'principal', 'name', 'Principal', 'url', btrim(s.genesis_url)))
+      where coalesce(btrim(s.genesis_url), '') <> ''
+        and jsonb_array_length(s.genesis_portals) = 0
+        and public.pilo_genesis_portals_ok(jsonb_build_array(jsonb_build_object('id', 'principal', 'name', 'Principal', 'url', btrim(s.genesis_url))))
+    $sql$;
+  end if;
+end $$;
+
 alter table public.pilo_spaces drop column if exists genesis_url;
+
+-- Encendida y sin ningún portal (el borrador se encendió con una dirección que ya no está, o
+-- que no era válida): se apaga. La administración la enciende de nuevo al escribir los portales.
+update public.pilo_spaces s
+set genesis_on = false
+where s.genesis_on and jsonb_array_length(s.genesis_portals) = 0;
 
 alter table public.pilo_spaces drop constraint if exists pilo_spaces_genesis_portals;
 alter table public.pilo_spaces add constraint pilo_spaces_genesis_portals check (public.pilo_genesis_portals_ok(genesis_portals));

@@ -14,7 +14,9 @@
      · solo la administración la lee y la cambia; la función del servidor la
        lee y no la cambia;
      · no sale en la configuración pública;
-     · la migración se puede aplicar dos veces y no toca ninguna fila.
+     · la migración se puede aplicar dos veces y no toca ninguna fila, salvo
+       donde ya se había aplicado el borrador de una sola dirección: ahí la
+       pasa a portal o apaga la conexión.
 
    Las direcciones de estas pruebas son inventadas.
    ========================================================================== */
@@ -186,10 +188,12 @@ describe("la migración", () => {
     const cols = await t.q<{ column_name: string }>("select column_name from information_schema.columns where table_schema = 'public' and column_name like 'genesis%' order by 1");
     expect(cols.map((c) => c.column_name)).toEqual(["genesis_advice", "genesis_on", "genesis_portals"]);
     expect(await t.q("select table_name from information_schema.tables where table_schema = 'public' and table_name like '%genesis%'")).toEqual([]);
-    // Sin UPDATE ni DELETE: no toca ninguna fila. No crea políticas, y los únicos permisos que nombra son la
-    // lectura del rol de servicio y poder usar la función de la restricción.
+    // Sin DELETE ni INSERT, y sin políticas. Solo dos UPDATE, los dos sobre la ficha del espacio: pasar la
+    // dirección del borrador a portal y apagar una conexión que quedó encendida sin portales. Los únicos
+    // permisos que nombra son la lectura del rol de servicio y poder usar la función de la restricción.
     const code = sql.replace(/--.*$/gm, "");
-    expect(code).not.toMatch(/\b(update|delete|insert|create\s+policy)\b/i);
+    expect(code).not.toMatch(/\b(delete|insert|create\s+policy)\b/i);
+    expect([...code.matchAll(/\bupdate\s+(\S+)/gi)].map((m) => m[1])).toEqual(["public.pilo_spaces", "public.pilo_spaces"]);
     expect([...code.matchAll(/\bgrant\b[^;]*;/gi)].map((m) => m[0])).toEqual([
       "grant execute on function public.pilo_genesis_portals_ok(jsonb) to authenticated, service_role;",
       "grant select on public.pilo_spaces to service_role;",
@@ -207,4 +211,40 @@ describe("la migración", () => {
     const [f] = await t.q<{ v: string }>("select provolatile as v from pg_proc where proname = 'pilo_genesis_portals_ok'");
     expect(f.v).toBe("i");
   });
+});
+
+describe("sobre una base donde ya se aplicó el borrador de una sola dirección", () => {
+  // El borrador (una columna genesis_url) llegó a aplicarse y alguien encendió la conexión: la versión
+  // con portales fallaba con «check constraint pilo_spaces_genesis_on is violated by some row».
+  const draft = async (url: string) => {
+    const old = await createTestDb({ before: "0131" });
+    await old.db.exec("alter table public.pilo_spaces add column genesis_on boolean not null default false; alter table public.pilo_spaces add column genesis_url text not null default '';");
+    await old.q("update pilo_spaces set genesis_on = true, genesis_url = $1 where id = 'ensenanza'", [url]);
+    return old;
+  };
+  const row = async (db: TestDb) => (await db.q<{ genesis_on: boolean; genesis_portals: unknown }>("select genesis_on, genesis_portals from pilo_spaces where id = 'ensenanza'"))[0];
+
+  it("la dirección guardada pasa a ser el primer portal y la conexión sigue encendida", async () => {
+    const old = await draft("https://genesis.ejemplo.edu.co:81");
+    try {
+      await old.db.exec(readFileSync(MIGRATION, "utf8"));
+      expect(await row(old)).toEqual({ genesis_on: true, genesis_portals: [{ id: "principal", name: "Principal", url: "https://genesis.ejemplo.edu.co:81" }] });
+      expect(await old.q("select 1 from information_schema.columns where table_name = 'pilo_spaces' and column_name = 'genesis_url'")).toEqual([]);
+    } finally {
+      await old.close();
+    }
+  }, 120_000);
+
+  it("encendida y sin dirección que sirva, se apaga en vez de fallar", async () => {
+    const old = await draft("");
+    try {
+      await old.db.exec(readFileSync(MIGRATION, "utf8"));
+      expect(await row(old)).toEqual({ genesis_on: false, genesis_portals: [] });
+      // Y se puede aplicar otra vez sin cambiar nada.
+      await old.db.exec(readFileSync(MIGRATION, "utf8"));
+      expect(await row(old)).toEqual({ genesis_on: false, genesis_portals: [] });
+    } finally {
+      await old.close();
+    }
+  }, 120_000);
 });

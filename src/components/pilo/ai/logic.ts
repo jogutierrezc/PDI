@@ -2658,6 +2658,22 @@ export function pageOwn(url: string, origin: string | null): boolean {
   }
 }
 
+/** La página de prueba de este portal (public/pilo-widget-demo.html). */
+export const PAGE_TRIAL_PATH = "/pilo-widget-demo.html";
+
+/**
+ * ¿Es la página de prueba de este mismo portal? Es la única página propia cuya
+ * lectura va a la bandeja: así se prueba la lectura de punta a punta sin un
+ * portal ajeno. Las demás páginas del portal se leen para responder y nada más.
+ */
+export function pageTrial(url: string, origin: string | null): boolean {
+  try {
+    return pageOwn(url, origin) && new URL(url).pathname === PAGE_TRIAL_PATH;
+  } catch {
+    return false;
+  }
+}
+
 /** La página que viaja con una pregunta: su dirección, su título y los pasajes que el navegador eligió. No se guarda con la pregunta. */
 export interface AskPage {
   url: string;

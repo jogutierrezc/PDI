@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { cleanCapture, cleanPage, DOC_OMITTED, PAGE_CAPTURE_CHARS, PAGE_PASSAGES, pageAllowed, pageBlock, pageUrl, unknownBeyondPage } from "./logic";
+import { cleanCapture, cleanPage, DOC_OMITTED, PAGE_CAPTURE_CHARS, PAGE_PASSAGES, pageAllowed, pageBlock, pageTrial, pageUrl, unknownBeyondPage } from "./logic";
 
 /* La página que la persona ve en otro portal (0127): lo que se acepta, cómo
    entra al pedido y qué va a la bandeja de lecturas. */
@@ -20,6 +20,15 @@ describe("la dirección de la página", () => {
     expect(pageAllowed("http://www.udes.edu.co/admisiones", origins)).toBe(false);
     expect(pageAllowed("https://www.udes.edu.co/", [])).toBe(false);
     expect(pageAllowed("https://www.udes.edu.co/", null)).toBe(false);
+  });
+
+  it("de este portal, a la bandeja solo va su página de prueba", () => {
+    const portal = "https://pdi.udes.edu.co";
+    expect(pageTrial(`${portal}/pilo-widget-demo.html`, portal)).toBe(true);
+    expect(pageTrial(`${portal}/pilo-widget-demo.html?tema=negro`, portal)).toBe(true);
+    expect(pageTrial(`${portal}/pregunta`, portal)).toBe(false);
+    expect(pageTrial("https://otro.example/pilo-widget-demo.html", portal)).toBe(false);
+    expect(pageTrial(`${portal}/pilo-widget-demo.html`, null)).toBe(false);
   });
 });
 

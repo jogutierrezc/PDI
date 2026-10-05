@@ -2754,6 +2754,22 @@ export function pageOwn(url: string, origin: string | null): boolean {
   }
 }
 
+/** La página de prueba de este portal (public/pilo-widget-demo.html). */
+export const PAGE_TRIAL_PATH = "/pilo-widget-demo.html";
+
+/**
+ * ¿Es la página de prueba de este mismo portal? Es la única página propia cuya
+ * lectura va a la bandeja: así se prueba la lectura de punta a punta sin un
+ * portal ajeno. Las demás páginas del portal se leen para responder y nada más.
+ */
+export function pageTrial(url: string, origin: string | null): boolean {
+  try {
+    return pageOwn(url, origin) && new URL(url).pathname === PAGE_TRIAL_PATH;
+  } catch {
+    return false;
+  }
+}
+
 /** La página que viaja con una pregunta: su dirección, su título y los pasajes que el navegador eligió. No se guarda con la pregunta. */
 export interface AskPage {
   url: string;
@@ -8828,7 +8844,8 @@ async function handle(request: Request): Promise<Response> {
     // responde con un error: la página que aloja a Pilo no debe notar nada.
     if (requested === "captura") {
       const capture = cleanCapture(body.page);
-      if (!capture || !pageAllowed(capture.url, hostOrigins)) return json({ status: "no" });
+      // De este portal solo entra su página de prueba; de los demás, las de los portales autorizados.
+      if (!capture || !(pageAllowed(capture.url, hostOrigins) || pageTrial(capture.url, request.headers.get("Origin")))) return json({ status: "no" });
       if (!(await visitorCheck("l", CAPTURE_HOURLY, 3600)).ok) return json({ status: "no" });
       const { data, error } = await admin.rpc("pilo_reading_capture", {
         p_scope: space,

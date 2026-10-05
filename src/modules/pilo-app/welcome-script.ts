@@ -23,7 +23,7 @@ import type { AppVoice, Door } from "./access";
 import type { SpaceId } from "../pregunta/space";
 
 export interface AppBeat {
-  id: "hola" | "preguntar" | "fuente" | "elegir" | "rol";
+  id: "hola" | "preguntar" | "fuente" | "elegir" | "rol" | "cuenta";
   say: string;
   /** La cara de Pilo mientras lo dice. */
   face: MojiMood;
@@ -46,6 +46,39 @@ export const APP_BEATS: AppBeat[] = [
 
 /** Solo si se elige Pilo en Enseñanza y ese espacio pregunta el rol. */
 export const ROLE_BEAT: AppBeat = { id: "rol", say: "¿Quién pregunta? Así le hablo a su medida.", face: "cuidado", mood: "atento", label: "Atento", look: [0, 0.6], pick: true };
+
+/* --- En el computador (desktop.ts) ---------------------------------------------------------
+   La misma presentación, dicha para el escritorio. Quien aún no ha entrado no
+   elige Pilo al final: Pilo le pide la cuenta, que en el computador es obligatoria. */
+
+export const DESK_HELLO: AppBeat = {
+  id: "hola",
+  say: "¡Hola! Soy Mr. Pilo, la Inteligencia Artificial de la Universidad de Santander. Ahora también estoy en su computador.",
+  face: "feliz",
+  mood: "emocionado",
+  label: "Emocionado",
+  look: [0, -0.1],
+};
+
+export const ACCOUNT_BEAT: AppBeat = {
+  id: "cuenta",
+  say: "En el computador trabajo con su cuenta de Pilo. ¿La creamos, o ya tiene una?",
+  face: "feliz",
+  mood: "atento",
+  label: "Atento",
+  look: [0, 0.6],
+  pick: true,
+};
+
+/**
+ * Las partes de la bienvenida: las de siempre en el teléfono y en el navegador;
+ * en la app de escritorio, el saludo de escritorio y, si falta entrar, la cuenta
+ * en vez de la elección de Pilo.
+ */
+export function welcomeBeats(options: { desktop?: boolean; account?: boolean } = {}): AppBeat[] {
+  if (!options.desktop) return APP_BEATS;
+  return [DESK_HELLO, APP_BEATS[1], APP_BEATS[2], options.account ? ACCOUNT_BEAT : APP_BEATS[3]];
+}
 
 /** Lo que conoce Pilo, para la primera muestra: lo de sus dos versiones. */
 export const APP_KNOWS = ["UDES en Cifras", "Plan de Desarrollo", "Impacto", "Innovación educativa", "Políticas"];
@@ -86,8 +119,9 @@ export function voiceRequest(beat: AppBeat, voice: AppVoice): VoiceRequest {
  * Todo lo que la bienvenida pide por adelantado. Sin voz oficial, nada. La
  * pregunta del rol solo se pide si Pilo en Enseñanza la va a hacer.
  */
-export function welcomeVoicePlan(voice: AppVoice | null, options: { askRol?: boolean } = {}): VoiceRequest[] {
+export function welcomeVoicePlan(voice: AppVoice | null, options: { askRol?: boolean; beats?: AppBeat[] } = {}): VoiceRequest[] {
   if (!voice || !voice.advanced) return [];
-  const beats = options.askRol ? [...APP_BEATS, ROLE_BEAT] : APP_BEATS;
+  const base = options.beats ?? APP_BEATS;
+  const beats = options.askRol ? [...base, ROLE_BEAT] : base;
   return beats.map((b) => voiceRequest(b, voice));
 }

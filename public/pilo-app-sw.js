@@ -22,7 +22,7 @@
    (src/modules/pilo-app/sw.test.ts), que carga este mismo archivo.
    ========================================================================== */
 
-const VERSION = "v1";
+const VERSION = "v2";
 const PREFIX = "pilo-app-";
 const SHELL = `${PREFIX}esqueleto-${VERSION}`;
 const ASSETS = `${PREFIX}archivos-${VERSION}`;

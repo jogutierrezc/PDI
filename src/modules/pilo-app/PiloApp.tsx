@@ -37,7 +37,8 @@ import { markWelcome, readRol, readStored, seenWelcome, storageKey, writeRol, wr
 import { ASK_SPACES, asksRol } from "../pregunta/space";
 import type { Rol, SpaceId } from "../pregunta/space";
 import { spaceDoor } from "./access";
-import { APP_BASE, APP_PATHS, readAppPath, startTarget } from "./routes";
+import { APP_ACCOUNT, APP_BASE, APP_LOGIN, APP_PATHS, readAppPath, startTarget } from "./routes";
+import { desktopGate, isDesktopApp } from "./desktop";
 import { AppPage, AppSide, useWide } from "./AppSide";
 import type { Person } from "./AppSide";
 import { loadSaved, readLast, removeSaved, savedEntries } from "./saved";
@@ -80,6 +81,10 @@ export function PiloApp() {
   // La cuenta de Pilo de esta sesión (0120): activa, cuenta como sesión en los dos Pilos.
   const cuenta = usePiloAccount();
   const { account, member } = cuenta;
+  // La app instalada en un computador (desktop.ts): ahí Pilo pide cuenta siempre.
+  const [desktop] = useState(isDesktopApp);
+  // Lo que se eligió al final de la bienvenida de escritorio: crear la cuenta o entrar.
+  const accountWay = useRef<"registro" | "ingreso" | null>(null);
   const wide = useWide();
   const online = useOnline();
   const install = useInstall();
@@ -103,9 +108,17 @@ export function PiloApp() {
   const [acceptedNow, setAcceptedNow] = useState(false);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const terms = useMemo(() => (acceptedNow ? "vigente" : readAcceptanceState()), [acceptedNow, location.pathname]);
-  const gating = terms !== "vigente" && (place.kind === "pilo" || place.kind === "inicio");
+  // En el escritorio, sin cuenta no hay conversación: la bienvenida y las pantallas de la cuenta, nada más.
+  // Vale la cuenta de Pilo o la sesión de la intranet.
+  const desk = desktopGate({ desktop, pending: loading || cuenta.pending, signedIn: member || Boolean(role) });
+  // La política se acepta al crear la cuenta o, ya dentro, antes de conversar: sin cuenta en el escritorio no se pide aún.
+  const gating = desk === "libre" && terms !== "vigente" && (place.kind === "pilo" || place.kind === "inicio");
   // Con la aceptación pendiente, la bienvenida no vuela a la cabecera (queda tapada): se funde sobre ella.
   const noSlot = useRef<HTMLDivElement>(null);
+  // Ya dentro, la elección de la bienvenida se olvida: si después sale de la cuenta, vuelve al ingreso.
+  useEffect(() => {
+    if (desk === "libre") accountWay.current = null;
+  }, [desk]);
 
   useEffect(() => {
     registerAppWorker();
@@ -183,7 +196,24 @@ export function PiloApp() {
 
   if (place.kind === "otra") return <Navigate to={APP_BASE} replace />;
   // /app, ya vista la bienvenida: al Pilo de la última conversación.
-  if (place.kind === "inicio" && !welcoming) return <Navigate to={APP_PATHS[home]} replace />;
+  if (place.kind === "inicio" && !welcoming && desk === "libre") return <Navigate to={APP_PATHS[home]} replace />;
+
+  /* --- La app de escritorio pide cuenta ------------------------------------------------------- */
+
+  if (desk !== "libre" && place.kind !== "cuenta" && !welcoming) {
+    if (desk === "espera") {
+      return (
+        <div className="pa" ref={root} data-tema={theme} aria-busy="true">
+          <p className="pa-wait" role="status">
+            Abriendo a Pilo…
+          </p>
+        </div>
+      );
+    }
+    // Lo que eligió en la bienvenida; si no viene de ella, quien ya la vio vuelve a entrar y quien no, se registra.
+    const way = accountWay.current ?? (seenWelcome(APP_PREFIX) ? "ingreso" : "registro");
+    return <Navigate to={way === "ingreso" ? APP_LOGIN : APP_ACCOUNT} replace />;
+  }
 
   /* --- La cuenta: registro e ingreso, perfil y guardadas ------------------------------------- */
 
@@ -201,6 +231,7 @@ export function PiloApp() {
           hasSession={Boolean(session)}
           intranetName={person.intranet}
           home={APP_PATHS[home]}
+          required={desktop}
         />
       </div>
     );
@@ -340,6 +371,9 @@ export function PiloApp() {
             markWelcome(true, APP_PREFIX);
             setWelcoming(false);
           }}
+          desktop={desktop}
+          needsAccount={desk !== "libre"}
+          onAccount={(way) => (accountWay.current = way)}
         />
       )}
     </div>

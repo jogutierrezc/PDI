@@ -181,8 +181,9 @@ export function PiloEmbed({ space = "planeacion" }: { space?: SpaceId }) {
       cfg={cfg}
       tema={params.tema}
       lado={params.lado}
-      // Solo otro portal se lee: lo de este ya está en la memoria de Pilo.
-      host={hosted && hosted !== window.location.origin ? hosted : null}
+      // Se lee la página que lo pide en su línea (data-leer), sea de otro portal o de este:
+      // la página de prueba es de este portal y sin esto nunca se leía.
+      host={hosted}
       voice={{
         portal: here.portal,
         advanced: rules.speechReady && canUse(usual ? rules : injected, here.portal, "voz", role).ok,

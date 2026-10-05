@@ -52,6 +52,7 @@ import { ClasesPane } from "./clases/ClasesPane";
 import { canUseClases, clearLink } from "./clases/logic";
 import { NotasPane } from "./notas/NotasPane";
 import { canUseNotas, clearLink as clearNotasLink } from "./notas/logic";
+import { clearGoals as clearNotasGoals } from "./notas/guia";
 import { APP_PREFIX, readTheme, writeTheme } from "./themes";
 import type { AppTheme } from "./themes";
 import { welcomeVoice } from "./welcome-script";
@@ -156,11 +157,12 @@ export function PiloApp() {
   );
   const greeting = useMemo(() => (online ? welcomeVoice(doors) : null), [doors, online]);
 
-  // Al salir de la cuenta, el permiso de Moodle de Mis clases y el de Génesis de Mis notas se borran de este dispositivo.
+  // Al salir de la cuenta, el permiso de Moodle de Mis clases, el de Génesis de Mis notas y las metas se borran de este dispositivo.
   useEffect(() => {
     if (!loading && !session) {
       clearLink();
       clearNotasLink();
+      clearNotasGoals();
     }
   }, [loading, session]);
 
@@ -268,11 +270,12 @@ export function PiloApp() {
         <AppPage
           title="Mis notas"
           tag="Beta"
-          lead="Pilo entra a Génesis con su cuenta para mostrarle su histórico de notas, periodo a periodo, y cómo ha evolucionado su promedio."
+          lead="Pilo lo guía para leer sus notas de Génesis, las compara con sus metas y le recomienda cómo mejorar."
           home={APP_PATHS[home]}
           side={wide ? <PageSide home={home} active="notas" person={person} userId={session?.user.id} member={member} theme={theme} onTheme={pickTheme} onWelcome={welcomeAgain} /> : null}
         >
-          <NotasPane state={cuenta} online={online} />
+          {/* La voz de la guía es la de la bienvenida, con el mismo interruptor de sonido de la app. */}
+          <NotasPane state={cuenta} online={online} voice={greeting} voiceOn={voiceOn} onVoice={pickVoice} />
         </AppPage>
       </div>
     );

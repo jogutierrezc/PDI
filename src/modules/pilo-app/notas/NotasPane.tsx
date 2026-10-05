@@ -2,44 +2,55 @@
    Mr. Pilo · Mis notas (beta) · /app/notas.
 
    Un estudiante con cuenta de Pilo conecta Génesis (el portal del estudiante)
-   y Pilo le muestra su histórico de notas y cómo ha evolucionado. Solo
-   lectura: Pilo no cambia nada en Génesis.
+   y Pilo le muestra su histórico de notas y cómo ha evolucionado, leído
+   contra las metas que él mismo se pone. Solo lectura: Pilo no cambia nada en
+   Génesis.
 
-   Los pasos:
-     1. La autorización amistosa (DataConsent, de terms/): sin la casilla, no
-        se consulta nada. La segunda casilla decide si el permiso queda en
+   La entrada es una guía narrada por Pilo (guia.ts), con Pilo y su texto a un
+   lado y la tarea al otro, y el avance a la vista:
+     1. Bienvenida: qué va a pasar, en cuatro pasos. Se puede saltar.
+     2. Permiso: la autorización amistosa (DataConsent, de terms/). Sin la
+        casilla no se consulta nada; la segunda decide si el permiso queda en
         este dispositivo o solo mientras la pestaña esté abierta.
-     2. La sede (Génesis tiene un portal por sede), el código de estudiante
-        y la contraseña: se usan una vez para entrar y no se guardan. La sede
-        de la cuenta de Pilo viene elegida si casa con un portal; con un solo
-        portal no se pregunta.
-     3. Pilo leyendo: entra a Génesis y lee el polígrafo.
-     4. Conectado, tres pestañas:
-          Mi histórico   abre en el último periodo y deja recorrer los
-                         anteriores; el polígrafo oficial se descarga en PDF.
-          Mi evolución   la gráfica de promedios, lo que Pilo ve en el récord
-                         y qué necesita para llegar a su meta (todo calculado
-                         aquí, en logic.ts), y «Lo que le recomiendo»: al
-                         pulsar el botón, y solo entonces, se envía a la IA un
-                         resumen sin datos personales, y las recomendaciones
-                         se escriben ahí mismo, con sus fuentes y con la
-                         gráfica de fortalezas y áreas por reforzar. La IA
-                         agrupa las materias y redacta; los números de las
-                         gráficas son siempre los de las notas.
-          Mi semestre    en construcción: sin datos.
+     3. Cuenta: la sede (Génesis tiene un portal por sede), el usuario y la
+        contraseña de Génesis. Se usan una vez para entrar y no se guardan.
+     4. Metas: qué promedio acumulado quiere alcanzar y cuál este semestre. Al
+        mover cada control se le dice cuánto tendría que promediar.
+     5. Despegue: Pilo lo saluda por su nombre (el de su cuenta de Pilo, nunca
+        el de Génesis) y vuela de la guía a la barra de las notas.
+   Quien ya está conectado y vuelve a entrar no repite la guía: va directo a
+   sus notas.
 
-   Otros estados: el permiso venció (se borra y se pide conectar de nuevo),
-   Mis notas aún no está disponible, y sin conexión.
+   Las notas, con las metas siempre a la vista (a la izquierda en computador,
+   arriba en teléfono) y tres pestañas:
+     Mi histórico   un selector de periodo fijo arriba —anterior, lista y
+                    siguiente; en computador, además, todos los periodos en
+                    varias filas— y las materias del periodo. El polígrafo
+                    oficial se descarga en PDF.
+     Mi evolución   la gráfica de promedios con la meta de acumulado dibujada,
+                    lo que Pilo ve en el récord (calculado aquí) y «Lo que le
+                    recomiendo»: al pulsar el botón, y solo entonces, se envía
+                    a la IA un resumen sin datos personales, con las metas, y
+                    las recomendaciones se escriben ahí mismo con sus fuentes
+                    y la gráfica de fortalezas y áreas por reforzar.
+     Mi semestre    en construcción: sin datos.
 
-   Las notas y las recomendaciones viven en la memoria de esta pantalla: no
-   se guardan en el dispositivo ni en el servidor. El permiso, donde diga
-   logic.ts.
+   En ninguna pantalla se muestra un código ni un identificador: ni el del
+   estudiante, ni el de las materias, ni ids internos.
 
-   Movimiento: lo que entra, entra una vez y solo con el dedo o el ratón
-   (nunca con el teclado, ni con movimiento reducido), con transform y
-   opacidad; la línea de la gráfica se dibuja una vez por conexión, no cada
-   vez que se abre la pestaña. GSAP pone y quita el estado oculto, así que si
-   se interrumpe no queda nada escondido.
+   La voz es la de Pilo, como en la bienvenida de la app (official-voice.ts):
+   respeta el interruptor de voz de la app y, si no llega, todo funciona
+   igual: el texto nunca espera al audio. El aleteo (alas.ts) suena solo tras
+   un gesto y con el mismo interruptor.
+
+   Nada de las notas se guarda: viven en la memoria de esta pantalla, igual
+   que las recomendaciones. En el dispositivo quedan el permiso (logic.ts) y
+   las metas (guia.ts), y «Desconectar» borra los dos.
+
+   Movimiento: GSAP con contexto y revert. El paso que entra, entra una vez
+   con un desenfoque leve; lo que sale no se anima. Solo con el dedo o el
+   ratón, nunca con el teclado, y con movimiento reducido todo aparece en su
+   sitio. La línea de la gráfica se dibuja una vez por conexión.
    ========================================================================== */
 
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
@@ -48,17 +59,49 @@ import { Link } from "react-router-dom";
 import gsap from "gsap";
 import { Pilo } from "../../pregunta/Pilo";
 import type { PiloMojiHandle } from "../../pregunta/Pilo";
+import type { AppVoice } from "../access";
 import { APP_ACCOUNT, APP_LOGIN } from "../routes";
 import { Icon } from "../icons";
+import { prefetchOfficial, sayOfficial, stopOfficial } from "../official-voice";
 import { fromKeyboard, reducedMotion } from "../pwa";
 import type { AccountState } from "../account/useAccount";
 import { Field, Msg } from "../account/parts";
 import { DataConsent } from "../terms/DataConsent";
+import { glide, setWingsOn, wings } from "./alas";
 import { asAdviceFailure, asFailure, connectGenesis, loadAdvice, loadHistory, loadPolygraphPdf, loadPortals } from "./api";
-import { GOAL, TOP_MARK, adviceFailureOf, adviceSummary, areaBars, goalPlan, goalText, gradedCredits, summaryCourses } from "./logic";
-import type { Advice, AdviceFailure, AdviceSummary, AreaBar, NotasHead } from "./logic";
-import { CHART, PASS_MARK, STATE_LABEL, canUseNotas, chartOf, clearLink, courseName, courseState, evolution, findings, inProgress, nearestIndex, nota, notasMessage, periodLine, pickPortal, readLink, saveLink, settled, totals } from "./logic";
-import type { CourseState, EvoRow, Finding, History, Link as GenesisLink, NotaPeriod, NotasFailure, PortalList } from "./logic";
+import { GUIDE_STEPS, accumulatedLine, captionWords, clearGoals, defaultGoals, goalHint, guideName, guideProgress, guideScript, meterPct, readGoals, saveGoals, semesterHint, semesterLine, spoken, voiceAhead } from "./guia";
+import type { Goals, Moment } from "./guia";
+import {
+  CHART,
+  GOAL,
+  PASS_MARK,
+  STATE_LABEL,
+  adviceFailureOf,
+  adviceSummary,
+  areaBars,
+  canUseNotas,
+  chartOf,
+  clearLink,
+  courseName,
+  courseState,
+  evolution,
+  findings,
+  goalPlan,
+  gradedCredits,
+  inProgress,
+  lastAverage,
+  nearestIndex,
+  nota,
+  notasMessage,
+  periodLine,
+  pickPortal,
+  readLink,
+  saveLink,
+  settled,
+  summaryCourses,
+  totals,
+} from "./logic";
+import type { Advice, AdviceFailure, AdviceSummary, AreaBar, CourseState, EvoRow, Finding, History, Link as GenesisLink, NotaPeriod, NotasFailure, PortalList } from "./logic";
 import "../clases/clases.css";
 import "./notas.css";
 
@@ -70,9 +113,6 @@ type AdviceState = { status: "reposo" } | { status: "pensando"; step: 0 | 1 } | 
 /** Los pasos reales de un pedido de recomendaciones: lo que hace el dispositivo y lo que hace Pilo. */
 const ADVICE_STEPS = ["Armando el resumen, sin su nombre ni su código", "Pilo lee los documentos de Enseñanza y escribe"];
 
-/** Lo que Pilo está haciendo mientras lee; null si no está leyendo. */
-type Phase = "entrando" | "leyendo" | "ordenando" | null;
-
 const TABS: { id: TabId; label: string }[] = [
   { id: "historico", label: "Mi histórico" },
   { id: "evolucion", label: "Mi evolución" },
@@ -81,17 +121,11 @@ const TABS: { id: TabId; label: string }[] = [
 
 const NO_PERIODS: NotaPeriod[] = [];
 
-const PHASE_TEXT: Record<Exclude<Phase, null>, string> = {
-  entrando: "Entrando a Génesis",
-  leyendo: "Leyendo su polígrafo",
-  ordenando: "Ordenando sus periodos",
-};
-
 /** Lo que Pilo promete, dicho otra vez al pie (el diseño aprobado). */
 const PROMISES = [
   "Pilo solo lee: no matricula, no cambia notas ni datos, ni toca nada en Génesis.",
   "Sus notas son solo para usted: no entran a la memoria de Pilo ni las ve otra persona.",
-  "Puede desconectarlo cuando quiera; al hacerlo se borra el permiso de este dispositivo.",
+  "Puede desconectarlo cuando quiera; al hacerlo se borran de este dispositivo el permiso y sus metas.",
 ];
 
 /** El glifo de cada estado: el mismo trazo, distinta forma. */
@@ -102,7 +136,15 @@ const STATE_GLYPH: Record<CourseState, JSX.Element> = {
   en_curso: <path d="M12 7v5l3 2M12 3.5a8.5 8.5 0 100 17 8.5 8.5 0 000-17z" />,
 };
 
-export function NotasPane({ state, online }: { state: AccountState; online: boolean }) {
+export interface NotasVoice {
+  /** La voz oficial de Pilo para esta persona; null si no hay: la guía es solo texto. */
+  voice: AppVoice | null;
+  /** El interruptor de sonido de la app: vale para la voz y para el aleteo. */
+  voiceOn: boolean;
+  onVoice: (on: boolean) => void;
+}
+
+export function NotasPane({ state, online, voice, voiceOn, onVoice }: { state: AccountState; online: boolean } & NotasVoice) {
   const { account, pending } = state;
 
   if (pending) {
@@ -139,16 +181,22 @@ export function NotasPane({ state, online }: { state: AccountState; online: bool
     );
   }
 
-  // Otra cuenta en el mismo dispositivo empieza de cero.
-  return <Notas key={account.id} owner={account.id} campus={account.campus} online={online} />;
+  // Otra cuenta en el mismo dispositivo empieza de cero. El nombre del saludo es el de la cuenta de Pilo.
+  return <Notas key={account.id} owner={account.id} campus={account.campus} name={guideName(account)} online={online} voice={voice} voiceOn={voiceOn} onVoice={onVoice} />;
 }
 
-function Notas({ owner, campus, online }: { owner: string; /** La sede de la cuenta de Pilo, para proponer su portal. */ campus: string; online: boolean }) {
+function Notas({
+  owner,
+  campus,
+  name,
+  online,
+  voice,
+  voiceOn,
+  onVoice,
+}: { owner: string; /** La sede de la cuenta de Pilo, para proponer su portal. */ campus: string; /** A quién saluda Pilo. */ name: string; online: boolean } & NotasVoice) {
   const [link, setLink] = useState<GenesisLink | null>(() => readLink(owner));
   const [history, setHistory] = useState<History | null>(null);
   const [loading, setLoading] = useState(false);
-  /** Acaba de llegar el histórico y Pilo lo está acomodando: un instante, solo al conectar. */
-  const [settling, setSettling] = useState(false);
   /** Mis notas no se puede usar todavía: el porqué. */
   const [off, setOff] = useState<string | null>(null);
   /** Un fallo que se dice donde esté la persona, con «Reintentar». */
@@ -156,15 +204,21 @@ function Notas({ owner, campus, online }: { owner: string; /** La sede de la cue
   const [expired, setExpired] = useState(false);
   const [note, setNote] = useState<Note | null>(null);
 
-  // El paso 1 (autorizar) y el paso 2 (la sede, el código y la contraseña de Génesis).
+  // Quien ya está conectado no repite la guía: va directo a sus notas.
+  const [stage, setStage] = useState<"guia" | "notas">(() => (readLink(owner) ? "notas" : "guia"));
+  const [moment, setMoment] = useState<Moment>(0);
+  const [goals, setGoals] = useState<Goals | null>(() => readGoals(owner));
+  /** Las metas mientras se mueven los controles; quedan al confirmar. */
+  const [draft, setDraft] = useState<Goals | null>(null);
+
   const [granted, setGranted] = useState<{ keep: boolean } | null>(null);
   /** Las sedes en que se puede entrar; null mientras no se han leído. */
   const [sedes, setSedes] = useState<PortalList | null>(null);
   const [sedesTry, setSedesTry] = useState(0);
   const [portalId, setPortalId] = useState("");
-  const [code, setCode] = useState("");
+  const [user, setUser] = useState("");
   const [pass, setPass] = useState("");
-  const [errors, setErrors] = useState<{ sede?: string; code?: string; pass?: string }>({});
+  const [errors, setErrors] = useState<{ sede?: string; user?: string; pass?: string }>({});
   const [connecting, setConnecting] = useState(false);
 
   const [tab, setTab] = useState<TabId>("historico");
@@ -174,31 +228,47 @@ function Notas({ owner, campus, online }: { owner: string; /** La sede de la cue
   const [advice, setAdvice] = useState<AdviceState>({ status: "reposo" });
 
   const root = useRef<HTMLDivElement>(null);
-  const face = useRef<PiloMojiHandle>(null);
-  const focusTo = useRef<"paso" | "pestanas" | "inicio" | "clave" | "sede" | null>(null);
-  const stepHead = useRef<HTMLHeadingElement>(null);
+  const guideFace = useRef<PiloMojiHandle>(null);
+  const guideHolder = useRef<HTMLDivElement>(null);
+  const barHolder = useRef<HTMLDivElement>(null);
+  const focusTo = useRef<"momento" | "pestanas" | "inicio" | "clave" | "sede" | null>(null);
   const tabList = useRef<HTMLDivElement>(null);
   const startHead = useRef<HTMLDivElement>(null);
-  /** Lo que llega entra animado solo si se pidió con el dedo o el ratón. */
-  const animateNext = useRef(false);
+  /** El último cambio de momento vino de un toque o un clic: se anima y suena. */
+  const byHand = useRef(false);
   /** Qué acaba de cambiar con el dedo o el ratón, para animar solo eso. */
   const moved = useRef<"pestana" | "periodo" | null>(null);
   /** La línea de la gráfica ya se dibujó en esta conexión. */
   const drawn = useRef(false);
+  /** De dónde despega Pilo: el sitio que ocupaba en la guía. */
+  const flightFrom = useRef<DOMRect | null>(null);
   const request = useRef<AbortController | null>(null);
   const adviceRequest = useRef<AbortController | null>(null);
   /** Las recomendaciones entran animadas solo si se pidieron con el dedo o el ratón. */
   const adviceIn = useRef(false);
-  const settleTimer = useRef(0);
+  const flightTimer = useRef(0);
+
+  const script = useMemo(() => guideScript(name), [name]);
+  const beat = script[moment];
+  /** La voz de Pilo suena si existe para esta persona y el interruptor de la app está encendido. */
+  const speaks = Boolean(voice?.advanced) && voiceOn;
+  const voiceOptions = useMemo(() => (voice ? { portal: voice.portal, advanced: voice.advanced, rate: voice.rate, keep: true } : null), [voice]);
 
   useEffect(
     () => () => {
       request.current?.abort();
       adviceRequest.current?.abort();
-      window.clearTimeout(settleTimer.current);
+      window.clearTimeout(flightTimer.current);
+      stopOfficial();
     },
     [],
   );
+
+  // El interruptor de sonido de la app manda también sobre el aleteo.
+  useEffect(() => {
+    setWingsOn(voiceOn);
+    if (!voiceOn) stopOfficial();
+  }, [voiceOn]);
 
   /** Lo que se borra con la conexión: el pedido en curso y las recomendaciones que hubiera. */
   const dropAdvice = useCallback(() => {
@@ -207,43 +277,58 @@ function Notas({ owner, campus, online }: { owner: string; /** La sede de la cue
     setAdvice({ status: "reposo" });
   }, []);
 
+  /** Pasa a un momento de la guía. `hand`: vino de un toque o un clic (suena el aleteo y se anima). */
+  const go = useCallback((next: Moment, hand: boolean) => {
+    byHand.current = hand;
+    if (hand && next > 0) wings(2);
+    focusTo.current = "momento";
+    setStage("guia");
+    setMoment(next);
+  }, []);
+
   /** Un fallo de la función, llevado al estado que le toca. */
-  const fail = useCallback((failure: NotasFailure, where: "conectar" | "leer") => {
-    // No hubo pestañas que enfocar.
-    if (focusTo.current === "pestanas") focusTo.current = null;
-    if (failure.view === "vencido") {
-      clearLink();
-      setLink(null);
-      setHistory(null);
-      setGranted(null);
-      setExpired(true);
-      setNote(null);
-      drawn.current = false;
-      dropAdvice();
-      focusTo.current = "inicio";
-      return;
-    }
-    if (failure.view === "no_disponible") {
-      setOff(failure.message);
-      focusTo.current = "inicio";
-      return;
-    }
-    if (failure.view === "sede") {
-      // La sede elegida ya no está entre los portales: se lee la lista otra vez y se pide elegir.
-      setPortalId("");
-      setSedesTry((n) => n + 1);
-      setErrors({ sede: failure.message });
-      focusTo.current = "sede";
-      return;
-    }
-    if (failure.view === "campo" && where === "conectar") {
-      setErrors({ pass: failure.message });
-      // El campo aún está deshabilitado: el foco llega cuando vuelva a estar disponible.
-      focusTo.current = "clave";
-      return;
-    }
-    setTrouble(failure);
-  }, [dropAdvice]);
+  const fail = useCallback(
+    (failure: NotasFailure, where: "conectar" | "leer") => {
+      if (focusTo.current === "pestanas") focusTo.current = null;
+      if (failure.view === "vencido") {
+        clearLink();
+        setLink(null);
+        setHistory(null);
+        setGranted(null);
+        setExpired(true);
+        setNote(null);
+        drawn.current = false;
+        dropAdvice();
+        // Las metas siguen: son suyas, no del permiso. Vuelve al paso del permiso.
+        byHand.current = false;
+        setStage("guia");
+        setMoment(1);
+        focusTo.current = "inicio";
+        return;
+      }
+      if (failure.view === "no_disponible") {
+        setOff(failure.message);
+        focusTo.current = "inicio";
+        return;
+      }
+      if (failure.view === "sede") {
+        // La sede elegida ya no está entre los portales: se lee la lista otra vez y se pide elegir.
+        setPortalId("");
+        setSedesTry((n) => n + 1);
+        setErrors({ sede: failure.message });
+        focusTo.current = "sede";
+        return;
+      }
+      if (failure.view === "campo" && where === "conectar") {
+        setErrors({ pass: failure.message });
+        // El campo aún está deshabilitado: el foco llega cuando vuelva a estar disponible.
+        focusTo.current = "clave";
+        return;
+      }
+      setTrouble(failure);
+    },
+    [dropAdvice],
+  );
 
   const fetchHistory = useCallback(
     async (permit: string) => {
@@ -255,21 +340,12 @@ function Notas({ owner, campus, online }: { owner: string; /** La sede de la cue
       try {
         const next = await loadHistory(permit, ctl.signal);
         if (ctl.signal.aborted) return;
-        const show = () => {
-          setHistory(next);
-          setPeriodId((current) => (current && next.periods.some((p) => p.id === current) ? current : (next.periods[next.periods.length - 1]?.id ?? null)));
-          setOff(null);
-          setSettling(false);
-          setLoading(false);
-        };
-        // Al conectar con el dedo o el ratón, Pilo dice un instante que está ordenando. Nunca al actualizar.
-        if (animateNext.current && !reducedMotion()) {
-          setSettling(true);
-          settleTimer.current = window.setTimeout(show, 320);
-        } else show();
+        setHistory(next);
+        setPeriodId((current) => (current && next.periods.some((p) => p.id === current) ? current : (next.periods[next.periods.length - 1]?.id ?? null)));
+        setOff(null);
+        setLoading(false);
       } catch (error) {
         if (ctl.signal.aborted) return;
-        animateNext.current = false;
         setLoading(false);
         fail(asFailure(error), "leer");
       }
@@ -279,6 +355,9 @@ function Notas({ owner, campus, online }: { owner: string; /** La sede de la cue
 
   // Con un permiso ya en el dispositivo (o en la memoria de la pestaña), se leen las notas al entrar.
   const permit = link?.permit;
+  useEffect(() => {
+    if (permit && online) void fetchHistory(permit);
+  }, [permit, online, fetchHistory]);
 
   // Sin conectar, se leen las sedes: si Mis notas está apagada se dice de una vez, antes de pedir nada.
   useEffect(() => {
@@ -298,42 +377,100 @@ function Notas({ owner, campus, online }: { owner: string; /** La sede de la cue
     );
     return () => ctl.abort();
   }, [permit, online, sedesTry, campus, fail]);
-  useEffect(() => {
-    if (permit && online) void fetchHistory(permit);
-  }, [permit, online, fetchHistory]);
 
-  // El foco sigue al estado: al paso nuevo, a las pestañas recién leídas, o al comienzo si hubo que volver.
+  const periods = history?.periods ?? NO_PERIODS;
+  const current = link?.head.period ?? "";
+  const sums = useMemo(() => totals(periods), [periods]);
+  const evo = useMemo(() => evolution(periods), [periods]);
+  const lastAvg = useMemo(() => lastAverage(periods), [periods]);
+  const graded = useMemo(() => gradedCredits(periods, current), [periods, current]);
+  const seen = useMemo(() => findings(periods, link?.head), [periods, link?.head]);
+  /** La cuenta de la meta de acumulado: aritmética del dispositivo. */
+  const planFor = useCallback((goal: number) => goalPlan({ accumulated: sums.accumulated, graded, approved: sums.approved, percent: link?.head.creditsPercent ?? null, goal }), [sums.accumulated, sums.approved, graded, link?.head.creditsPercent]);
+
+  // Ya llegaron sus datos: la guía pasa sola del paso de la cuenta al de las metas.
+  const ready = Boolean(history);
+  useEffect(() => {
+    if (stage === "guia" && moment === 2 && ready && link) {
+      setDraft((d) => d ?? goals ?? defaultGoals(sums.accumulated, lastAvg));
+      setMoment(3);
+      focusTo.current = "momento";
+    }
+  }, [stage, moment, ready, link, goals, sums.accumulated, lastAvg]);
+
+  /* --- La voz de Pilo: el texto nunca la espera ------------------------------------------------ */
+
+  // Al entrar a la guía y en cada momento: se pide por adelantado lo que viene y el saludo con el nombre.
+  useEffect(() => {
+    if (stage !== "guia" || !speaks || !voiceOptions) return;
+    prefetchOfficial(voiceAhead(script, moment), voiceOptions);
+  }, [stage, moment, speaks, voiceOptions, script]);
+
+  // Cada momento se dice con la voz de Pilo, si la hay y está encendida. Si no llega, queda el texto.
+  useEffect(() => {
+    if (stage !== "guia") return;
+    if (!speaks || !voiceOptions) return void stopOfficial();
+    void sayOfficial(spoken(script[moment]), { ...voiceOptions, onSound: (on) => guideFace.current?.talk(on) }).catch(() => undefined);
+    // El saludo del despegue sigue sonando mientras Pilo vuela a las notas: no se corta al cambiar de pantalla.
+  }, [stage, moment, speaks, voiceOptions, script]);
+
+  /* --- El foco sigue al estado ------------------------------------------------------------------ */
+
   useEffect(() => {
     const where = focusTo.current;
     if (!where) return;
-    const el = where === "paso" ? stepHead.current : where === "pestanas" ? tabList.current?.querySelector<HTMLElement>('[aria-selected="true"]') : where === "clave" ? document.getElementById("pnt-pass") : where === "sede" ? document.getElementById("pnt-sede") : startHead.current;
+    const el =
+      where === "momento"
+        ? root.current?.querySelector<HTMLElement>(".pnt-say strong")
+        : where === "pestanas"
+          ? tabList.current?.querySelector<HTMLElement>('[aria-selected="true"]')
+          : where === "clave"
+            ? document.getElementById("pnt-pass")
+            : where === "sede"
+              ? document.getElementById("pnt-sede")
+              : startHead.current;
     if (!el || (el as HTMLInputElement).disabled) return;
     focusTo.current = null;
     el.focus({ preventScroll: false });
   });
 
-  const phase: Phase = connecting ? "entrando" : settling ? "ordenando" : loading && !history ? "leyendo" : null;
+  /* --- Movimiento ------------------------------------------------------------------------------- */
 
-  // Cada paso de la lectura entra en su sitio; el que sale no se anima: ya no importa.
+  // El momento que entra: la tarea sube con un desenfoque leve, Pilo hace un gesto y pasan las estelas.
   useLayoutEffect(() => {
-    if (!phase || reducedMotion() || !root.current) return;
+    if (stage !== "guia" || !root.current) return;
+    const hand = byHand.current;
+    byHand.current = false;
+    if (reducedMotion()) return;
     const ctx = gsap.context(() => {
-      gsap.fromTo(".pnt-reading__step", { opacity: 0, y: 6 }, { opacity: 1, y: 0, duration: 0.22, ease: "expo.out", clearProps: "opacity,transform" });
+      // El texto se ilumina al ritmo de la voz, unas tres palabras por segundo; aparece de inmediato.
+      gsap.fromTo(".pnt-caption span", { opacity: 0.45 }, { opacity: 1, duration: 0.2, ease: "none", stagger: 0.3, clearProps: "opacity" });
+      if (!hand) return;
+      gsap.fromTo(".pnt-step", { opacity: 0, y: 14, filter: "blur(5px)" }, { opacity: 1, y: 0, filter: "blur(0px)", duration: 0.34, ease: "expo.out", clearProps: "opacity,transform,filter" });
+      gsap.fromTo(guideHolder.current, { y: 0, rotate: 0 }, { keyframes: [{ y: -9, rotate: -5, duration: 0.18 }, { y: 0, rotate: 0, duration: 0.4, ease: "bounce.out" }], clearProps: "transform" });
+      if (moment > 0) gsap.fromTo(".pnt-streaks i", { xPercent: 0, opacity: 0 }, { xPercent: 460, opacity: 0.9, duration: 0.7, ease: "power2.in", stagger: 0.09, clearProps: "opacity,transform" });
     }, root);
     return () => ctx.revert();
-  }, [phase]);
+  }, [stage, moment]);
 
-  // Las pestañas entran una vez, al conectar. GSAP pone y quita el estado oculto: interrumpido, queda todo a la vista.
+  // El despegue: Pilo vuela, en arco, de donde estaba en la guía a la barra de las notas, y las notas suben a su encuentro.
   useLayoutEffect(() => {
-    if (!history || !animateNext.current) return;
-    animateNext.current = false;
-    if (reducedMotion() || !root.current) return;
+    const from = flightFrom.current;
+    if (stage !== "notas" || !from || !root.current) return;
+    flightFrom.current = null;
+    const to = barHolder.current?.getBoundingClientRect();
+    if (reducedMotion() || !to || !to.width) return;
     const ctx = gsap.context(() => {
-      const rows = gsap.utils.toArray<HTMLElement>("[data-in]").slice(0, 8);
-      if (rows.length) gsap.fromTo(rows, { opacity: 0, y: 10 }, { opacity: 1, y: 0, duration: 0.24, stagger: 0.035, ease: "expo.out", clearProps: "opacity,transform" });
+      const tl = gsap.timeline({ defaults: { ease: "expo.out" } });
+      // En x frena pronto y en y tarda en subir: el recorrido queda en arco, como un planeo.
+      tl.fromTo(barHolder.current, { x: from.left - to.left, transformOrigin: "0 0" }, { x: 0, duration: 0.9, ease: "power3.out" }, 0);
+      tl.fromTo(barHolder.current, { y: from.top - to.top, scale: from.width / to.width }, { y: 0, scale: 1, duration: 0.9, ease: "power2.inOut" }, 0);
+      tl.fromTo(barHolder.current, { rotate: -14 }, { rotate: 0, duration: 0.9, ease: "power2.out", clearProps: "transform" }, 0);
+      tl.fromTo("[data-in]", { opacity: 0, y: 22 }, { opacity: 1, y: 0, duration: 0.46, stagger: 0.07, clearProps: "opacity,transform" }, 0.3);
+      tl.fromTo(".pnt-meter__fill", { scaleX: 0, transformOrigin: "0% 50%" }, { scaleX: 1, duration: 0.7, clearProps: "transform" }, 0.5);
     }, root);
     return () => ctx.revert();
-  }, [history]);
+  }, [stage]);
 
   // Al cambiar de pestaña o de periodo con el dedo o el ratón, lo nuevo entra; con el teclado aparece en su sitio.
   useLayoutEffect(() => {
@@ -348,25 +485,24 @@ function Notas({ owner, campus, online }: { owner: string; /** La sede de la cue
   }, [tab, periodId]);
 
   // La gráfica se dibuja una sola vez por conexión: la primera vez que se abre «Mi evolución».
-  const ready = Boolean(history);
   useLayoutEffect(() => {
-    if (tab !== "evolucion" || !ready || drawn.current || !root.current) return;
+    if (stage !== "notas" || tab !== "evolucion" || !ready || drawn.current || !root.current) return;
     drawn.current = true;
     if (reducedMotion()) return;
     const ctx = gsap.context(() => {
       const line = root.current?.querySelector<SVGPathElement>(".pnt-line--avg");
       const length = line?.getTotalLength?.() ?? 0;
       const tl = gsap.timeline({ defaults: { ease: "power2.out" } });
-      // El acumulado aparece primero, quieto: es el fondo contra el que se lee cada semestre.
-      tl.fromTo(".pnt-line--acc", { opacity: 0 }, { opacity: 1, duration: 0.3, clearProps: "opacity" }, 0);
+      // El acumulado y la meta aparecen primero, quietos: son el fondo contra el que se lee cada semestre.
+      tl.fromTo(".pnt-line--acc, .pnt-goal-line", { opacity: 0 }, { opacity: 1, duration: 0.3, clearProps: "opacity" }, 0);
       if (line && length > 0) tl.fromTo(line, { strokeDasharray: length, strokeDashoffset: length }, { strokeDashoffset: 0, duration: 0.8, ease: "power1.inOut", clearProps: "strokeDasharray,strokeDashoffset" }, 0.1);
       tl.fromTo(".pnt-dot", { scale: 0.5, opacity: 0, transformOrigin: "50% 50%" }, { scale: 1, opacity: 1, duration: 0.22, stagger: 0.06, ease: "back.out(2)", clearProps: "opacity,transform" }, 0.14);
       tl.fromTo(".pnt-finds li", { opacity: 0, y: 8 }, { opacity: 1, y: 0, duration: 0.24, stagger: 0.05, ease: "expo.out", clearProps: "opacity,transform" }, 0.45);
     }, root);
     return () => ctx.revert();
-  }, [tab, ready]);
+  }, [stage, tab, ready]);
 
-  // Las recomendaciones recién escritas entran una vez: las barras crecen desde su base y las filas suben.
+  // Las recomendaciones recién escritas entran una vez: suben con un desenfoque leve y las barras crecen desde su base.
   const adviceReady = advice.status === "listo";
   useLayoutEffect(() => {
     if (!adviceReady || !adviceIn.current) return;
@@ -374,37 +510,41 @@ function Notas({ owner, campus, online }: { owner: string; /** La sede de la cue
     if (reducedMotion() || !root.current) return;
     const ctx = gsap.context(() => {
       const tl = gsap.timeline({ defaults: { ease: "expo.out" } });
-      tl.fromTo(".pnt-area__fill", { scaleX: 0, transformOrigin: "0% 50%" }, { scaleX: 1, duration: 0.5, stagger: 0.05, ease: "power2.out", clearProps: "transform" }, 0);
-      tl.fromTo(".pnt-recs > li", { opacity: 0, y: 8 }, { opacity: 1, y: 0, duration: 0.24, stagger: 0.05, clearProps: "opacity,transform" }, 0.1);
+      tl.fromTo(".pnt-recs > li", { opacity: 0, y: 10, filter: "blur(4px)" }, { opacity: 1, y: 0, filter: "blur(0px)", duration: 0.32, stagger: 0.1, clearProps: "opacity,transform,filter" }, 0);
+      tl.fromTo(".pnt-area__fill", { scaleX: 0, transformOrigin: "0% 50%" }, { scaleX: 1, duration: 0.6, stagger: 0.06, clearProps: "transform" }, 0.3);
     }, root);
     return () => ctx.revert();
   }, [adviceReady]);
 
+  /* --- Lo que hace la persona -------------------------------------------------------------------- */
+
   const connect = async (event: FormEvent) => {
     event.preventDefault();
-    if (connecting || !granted) return;
-    const typed = code.trim();
+    if (connecting || loading || !granted) return;
+    const typed = user.trim();
     const problems = {
       sede: sedes?.portals.some((p) => p.id === portalId) ? undefined : sedes ? "Elija su sede." : "Aún no pude leer las sedes de Génesis. Intente de nuevo en un momento.",
-      code: !typed ? "Escriba su código de estudiante." : /^\d{6,15}$/.test(typed) ? undefined : "El código de estudiante lleva solo números.",
+      user: !typed ? "Escriba su usuario de Génesis." : /^\d{6,15}$/.test(typed) ? undefined : "El usuario de Génesis lleva solo números.",
       pass: pass ? undefined : "Escriba su contraseña de Génesis.",
     };
     setErrors(problems);
-    if (problems.sede || problems.code || problems.pass) {
-      animateNext.current = false;
+    if (problems.sede || problems.user || problems.pass) {
       if (problems.sede && !sedes) setSedesTry((n) => n + 1);
-      document.getElementById(problems.sede ? "pnt-sede" : problems.code ? "pnt-code" : "pnt-pass")?.focus();
+      document.getElementById(problems.sede ? "pnt-sede" : problems.user ? "pnt-user" : "pnt-pass")?.focus();
       return;
     }
+    // Pilo lee Génesis: un aleteo y el planeo mientras tanto (el envío del formulario es un gesto).
+    wings(2);
+    glide(3);
     setConnecting(true);
     setTrouble(null);
     setNote(null);
     try {
       const out = await connectGenesis(portalId, typed, pass);
       const saved = saveLink(owner, out, granted.keep);
-      // La contraseña y el código ya cumplieron: no quedan ni en el formulario.
+      // La contraseña y el usuario ya cumplieron: no quedan ni en el formulario.
       setPass("");
-      setCode("");
+      setUser("");
       setExpired(false);
       setTab("historico");
       drawn.current = false;
@@ -417,10 +557,7 @@ function Notas({ owner, campus, online }: { owner: string; /** La sede de la cue
             ? "Conectado. No se pudo guardar en este dispositivo: la conexión dura mientras esta pestaña esté abierta."
             : "Conectado solo por esta vez: al cerrar la pestaña, no queda nada guardado.",
       });
-      focusTo.current = "pestanas";
-      if (animateNext.current) face.current?.nod();
     } catch (error) {
-      animateNext.current = false;
       fail(asFailure(error), "conectar");
     } finally {
       setConnecting(false);
@@ -429,25 +566,62 @@ function Notas({ owner, campus, online }: { owner: string; /** La sede de la cue
 
   const disconnect = () => {
     request.current?.abort();
-    window.clearTimeout(settleTimer.current);
+    window.clearTimeout(flightTimer.current);
+    stopOfficial();
+    // Con el permiso se van las metas: las dos cosas que este dispositivo guardaba.
     clearLink();
+    clearGoals();
     setLink(null);
     setHistory(null);
+    setGoals(null);
+    setDraft(null);
     setGranted(null);
     setLoading(false);
-    setSettling(false);
     setTrouble(null);
     setOff(null);
     setExpired(false);
-    setCode("");
+    setUser("");
     setPass("");
     setTab("historico");
     setPeriodId(null);
     setAsTable(false);
     drawn.current = false;
     dropAdvice();
-    setNote({ tone: "ok", text: "Se desconectó y se borró el permiso de este dispositivo." });
+    byHand.current = false;
+    setStage("guia");
+    setMoment(0);
+    setNote({ tone: "ok", text: "Se desconectó. Se borraron de este dispositivo el permiso y sus metas." });
     focusTo.current = "inicio";
+  };
+
+  /** «Estas son mis metas»: se guardan en el dispositivo y Pilo despega hacia las notas. */
+  const takeOff = (event: MouseEvent, chosen: Goals) => {
+    saveGoals(owner, chosen);
+    setGoals(chosen);
+    setDraft(chosen);
+    const hand = !fromKeyboard(event);
+    go(4, hand);
+    if (hand) {
+      wings(3);
+      glide(2.4);
+    }
+    window.clearTimeout(flightTimer.current);
+    // Un momento para leer el saludo; después, a las notas. La voz sigue sonando en el vuelo.
+    flightTimer.current = window.setTimeout(
+      () => {
+        flightFrom.current = hand ? (guideHolder.current?.getBoundingClientRect() ?? null) : null;
+        setTab("historico");
+        setStage("notas");
+        focusTo.current = "pestanas";
+      },
+      reducedMotion() || !hand ? 1200 : 2200,
+    );
+  };
+
+  /** «Cambiar»: vuelve al paso de las metas, con las de hoy puestas. */
+  const editGoals = (event: MouseEvent) => {
+    setDraft(goals ?? defaultGoals(sums.accumulated, lastAvg));
+    go(3, !fromKeyboard(event));
   };
 
   /** El polígrafo oficial: llega de Génesis y se descarga aquí mismo; no se guarda en ningún otro lado. */
@@ -477,16 +651,21 @@ function Notas({ owner, campus, online }: { owner: string; /** La sede de la cue
 
   /**
    * Pide las recomendaciones: es el único momento en que algo de las notas va a la IA, y va sin nombre, código
-   * ni documento. Lo que vuelve se queda en la memoria de esta pantalla.
+   * ni documento, con las dos metas. Lo que vuelve se queda en la memoria de esta pantalla.
    */
   const askAdvice = async (event: MouseEvent) => {
     if (!history || !link || advice.status === "pensando") return;
-    const summary = adviceSummary(history.periods, link.head);
+    const summary = adviceSummary(history.periods, link.head, goals);
     if (!summaryCourses(summary).length) return setAdvice({ status: "fallo", failure: adviceFailureOf("datos") });
     adviceRequest.current?.abort();
     const ctl = new AbortController();
     adviceRequest.current = ctl;
     adviceIn.current = !fromKeyboard(event);
+    if (adviceIn.current) {
+      // Pilo piensa: un aleteo y el planeo mientras tanto.
+      wings(2);
+      glide(4);
+    }
     setAdvice({ status: "pensando", step: 0 });
     try {
       // El resumen ya está armado: lo que sigue es la espera de verdad.
@@ -518,13 +697,14 @@ function Notas({ owner, campus, online }: { owner: string; /** La sede de la cue
     tabList.current?.querySelectorAll<HTMLButtonElement>('[role="tab"]')[to]?.focus();
   };
 
-  /* --- Lo que se ve --------------------------------------------------------------------------- */
+  const pickPeriod = (id: string, pointer: boolean) => {
+    if (id === periodId) return;
+    moved.current = pointer ? "periodo" : null;
+    setPeriodId(id);
+  };
 
-  const periods = history?.periods ?? NO_PERIODS;
-  const current = link?.head.period ?? "";
-  const sums = useMemo(() => totals(periods), [periods]);
-  const evo = useMemo(() => evolution(periods), [periods]);
-  const seen = useMemo(() => findings(periods, link?.head), [periods, link?.head]);
+  /* --- Piezas comunes ----------------------------------------------------------------------------- */
+
   const busy = connecting || loading;
 
   const live = (
@@ -534,15 +714,9 @@ function Notas({ owner, campus, online }: { owner: string; /** La sede de la cue
   );
 
   const offline = !online && (
-    <section className="pcl-card pcl-card--note" role="status">
-      <div className="pcl-face">
-        <Pilo size="100%" emotion="obra" alive label="Mr. Pilo, en obra" />
-      </div>
-      <div>
-        <h2>Estoy sin conexión</h2>
-        <p>Necesito internet para leer sus notas en Génesis. {history ? "Lo que ve aquí es lo último que leí." : "Cuando vuelva la conexión, seguimos."}</p>
-      </div>
-    </section>
+    <div className="pc-confirm" role="status">
+      <span>Estoy sin conexión. Necesito internet para leer sus notas en Génesis. {history ? "Lo que ve aquí es lo último que leí." : "Cuando vuelva la conexión, seguimos."}</span>
+    </div>
   );
 
   const retry = trouble && (
@@ -552,30 +726,48 @@ function Notas({ owner, campus, online }: { owner: string; /** La sede de la cue
         <Link className="pc-chip" data-strong to={APP_LOGIN}>
           Entrar con mi cuenta de Pilo
         </Link>
+      ) : link ? (
+        <button type="button" className="pc-chip" data-strong disabled={!online || loading} onClick={() => void fetchHistory(link.permit)}>
+          Reintentar
+        </button>
       ) : (
-        link && (
-          <button type="button" className="pc-chip" data-strong disabled={!online || loading} onClick={() => void fetchHistory(link.permit)}>
-            Reintentar
-          </button>
-        )
+        <button
+          type="button"
+          className="pc-chip"
+          data-strong
+          disabled={!online}
+          onClick={() => {
+            setTrouble(null);
+            setSedesTry((n) => n + 1);
+          }}
+        >
+          Reintentar
+        </button>
       )}
     </div>
   );
 
-  const reading = phase && (
-    <div className="pnt-reading">
-      <div className="pcl-face">
-        <Pilo size="100%" mood="piensa" alive label="Mr. Pilo, leyendo" />
-      </div>
-      <p className="pnt-reading__step" role="status" key={phase}>
-        {PHASE_TEXT[phase]}
-      </p>
-      <span className="pnt-dots" aria-hidden="true">
-        <i />
-        <i />
-        <i />
-      </span>
-    </div>
+  /** El interruptor de sonido de la app, a la mano: la voz de Pilo y el aleteo. */
+  const sound = (
+    <button
+      type="button"
+      className="pnt-chipbtn"
+      aria-pressed={voiceOn}
+      onClick={() => {
+        const next = !voiceOn;
+        setWingsOn(next);
+        onVoice(next);
+        // Al encenderlo, un aleteo: así se oye que quedó encendido.
+        if (next) wings(1);
+        else stopOfficial();
+      }}
+    >
+      <svg viewBox="0 0 24 24" aria-hidden="true">
+        <path d="M4 9.5v5h3.5L12 18.5v-13L7.5 9.5H4z" />
+        {voiceOn ? <path d="M15.5 9a4.2 4.2 0 0 1 0 6" /> : <path d="M16 9.5l5 5M21 9.5l-5 5" />}
+      </svg>
+      {voiceOn ? "Con sonido" : "Sin sonido"}
+    </button>
   );
 
   /* Mis notas aún no está disponible. */
@@ -609,8 +801,12 @@ function Notas({ owner, campus, online }: { owner: string; /** La sede de la cue
     );
   }
 
-  /* Sin conectar: autorizar y, después, el código y la contraseña de Génesis. */
-  if (!link) {
+  /* --- La guía ------------------------------------------------------------------------------------ */
+
+  if (stage === "guia") {
+    const reading = connecting || (moment === 2 && Boolean(link) && !history);
+    const goalsNow = draft ?? goals ?? defaultGoals(sums.accumulated, lastAvg);
+    const lit = guideProgress(moment);
     return (
       <div className="pcl pnt" ref={root}>
         <div ref={startHead} tabIndex={-1} className="pcl-start">
@@ -620,134 +816,207 @@ function Notas({ owner, campus, online }: { owner: string; /** La sede de la cue
             </div>
           )}
           {offline}
-          {connecting ? (
-            reading
-          ) : !granted ? (
-            <DataConsent
-              platform="genesis"
-              className="pcl-consent"
-              onAuthorize={({ keep }) => {
-                setGranted({ keep });
-                setNote(null);
-                focusTo.current = "paso";
-              }}
-            />
-          ) : (
-            <section className="pcl-card" aria-labelledby="pnt-paso-h">
-              <header className="pcl-card__head">
-                <div className="pcl-face">
-                  <Pilo ref={face} size="100%" mood="feliz" alive label="Mr. Pilo" />
-                </div>
-                <div>
-                  <h2 id="pnt-paso-h" ref={stepHead} tabIndex={-1}>
-                    Entre con su cuenta de Génesis
-                  </h2>
-                  <p>
-                    {sedes?.portals.length === 1 ? `La misma del portal del estudiante de ${sedes.portals[0].name}.` : "La misma del portal del estudiante de su sede."} Pilo la usa una vez para entrar y
-                    leer.
-                  </p>
-                </div>
-              </header>
-              <form className="pcl-card__body" onSubmit={(e) => void connect(e)} noValidate>
-                <p className="pcl-granted">
-                  {Icon.check}
-                  <span>Autorizó a Pilo a consultar sus notas. {granted.keep ? "La conexión quedará guardada solo en este dispositivo." : "Solo por esta vez: al cerrar la pestaña, no queda nada guardado."}</span>
+        </div>
+
+        <div className="pnt-guide">
+          {/* Pilo y lo que dice: arriba en teléfono, a la izquierda en computador. */}
+          <div className="pnt-scene">
+            <div className="pnt-streaks" aria-hidden="true">
+              <i />
+              <i />
+              <i />
+            </div>
+            <div className="pnt-scene__row">
+              <div className="pnt-pilo" ref={guideHolder}>
+                <Pilo ref={guideFace} size="100%" mood={reading ? "piensa" : beat.mood} alive label="Mr. Pilo" />
+              </div>
+              <div className="pnt-say">
+                <strong tabIndex={-1}>{beat.title}</strong>
+                {/* El texto está entero desde el primer instante; la voz lo alcanza. */}
+                <p className="pnt-caption" aria-live="polite" key={moment}>
+                  {captionWords(beat).map((word, i) => (
+                    <span key={i}>{word} </span>
+                  ))}
                 </p>
-                {/* La sede: Génesis tiene un portal por sede. Con uno solo no se pregunta. */}
-                {sedes && sedes.portals.length > 1 ? (
-                  <Field id="pnt-sede" label="Su sede" hint="Cada sede tiene su propio Génesis: entre al de la suya." error={errors.sede}>
-                    {(aria) => (
-                      <select
-                        {...aria}
-                        name="genesis-sede"
-                        value={portalId}
-                        onChange={(e) => {
-                          setPortalId(e.target.value);
-                          if (errors.sede) setErrors((x) => ({ ...x, sede: undefined }));
+              </div>
+            </div>
+            <div className="pnt-scene__foot">
+              <span className="pnt-progress" role="img" aria-label={moment === 0 ? "Cuatro pasos por delante" : moment === 4 ? "Los cuatro pasos, listos" : `Paso ${moment} de 4`}>
+                {lit.map((on, i) => (
+                  <i key={i} data-on={on || moment === i + 1 || undefined} data-now={moment === i + 1 || undefined} />
+                ))}
+              </span>
+              {sound}
+            </div>
+          </div>
+
+          {/* La tarea del momento. */}
+          <div className="pnt-task">
+            {moment === 0 && (
+              <div className="pnt-step">
+                <h2>Así lo vamos a hacer</h2>
+                <ol className="pnt-list">
+                  {GUIDE_STEPS.map((text) => (
+                    <li key={text}>{text}</li>
+                  ))}
+                </ol>
+                <button type="button" className="pa-btn pa-btn--main" onClick={(e) => go(1, !fromKeyboard(e))}>
+                  Empezar
+                </button>
+                <button type="button" className="pnt-link pnt-link--mid" onClick={(e) => go(1, !fromKeyboard(e))}>
+                  Saltar la explicación
+                </button>
+              </div>
+            )}
+
+            {moment === 1 && (
+              <div className="pnt-step">
+                <DataConsent
+                  platform="genesis"
+                  className="pcl-consent"
+                  onAuthorize={({ keep }) => {
+                    setGranted({ keep });
+                    setNote(null);
+                    go(2, true);
+                  }}
+                />
+                <button type="button" className="pnt-link pnt-link--mid" onClick={(e) => go(0, !fromKeyboard(e))}>
+                  Volver a los cuatro pasos
+                </button>
+              </div>
+            )}
+
+            {moment === 2 && (
+              <form className="pnt-step" onSubmit={(e) => void connect(e)} noValidate>
+                <h2>Su cuenta de Génesis</h2>
+                {!granted ? (
+                  <>
+                    <p className="pnt-muted">Primero necesito su permiso.</p>
+                    <button type="button" className="pa-btn pa-btn--main" onClick={(e) => go(1, !fromKeyboard(e))}>
+                      Ir al permiso
+                    </button>
+                  </>
+                ) : (
+                  <>
+                    {/* La sede: Génesis tiene un portal por sede. Con uno solo no se pregunta. */}
+                    {sedes && sedes.portals.length > 1 ? (
+                      <Field id="pnt-sede" label="Sede" hint="Cada sede tiene su propio Génesis: entre al de la suya." error={errors.sede}>
+                        {(aria) => (
+                          <select
+                            {...aria}
+                            name="genesis-sede"
+                            value={portalId}
+                            disabled={reading}
+                            onChange={(e) => {
+                              setPortalId(e.target.value);
+                              if (errors.sede) setErrors((x) => ({ ...x, sede: undefined }));
+                            }}
+                          >
+                            {!portalId && <option value="">Elija su sede</option>}
+                            {sedes.portals.map((p) => (
+                              <option key={p.id} value={p.id}>
+                                {p.name}
+                              </option>
+                            ))}
+                          </select>
+                        )}
+                      </Field>
+                    ) : sedes && sedes.portals.length === 1 ? (
+                      <p className="pnt-muted">Entra al Génesis de {sedes.portals[0].name}.</p>
+                    ) : null}
+                    {errors.sede && !(sedes && sedes.portals.length > 1) && (
+                      <Msg tone="bad" alert>
+                        {errors.sede}
+                      </Msg>
+                    )}
+                    <Field id="pnt-user" label="Usuario de Génesis" error={errors.user}>
+                      {(aria) => (
+                        <input
+                          {...aria}
+                          type="text"
+                          name="genesis-usuario"
+                          inputMode="numeric"
+                          autoComplete="off"
+                          autoCorrect="off"
+                          spellCheck={false}
+                          maxLength={15}
+                          value={user}
+                          disabled={reading}
+                          onChange={(e) => {
+                            setUser(e.target.value);
+                            if (errors.user) setErrors((x) => ({ ...x, user: undefined }));
+                          }}
+                        />
+                      )}
+                    </Field>
+                    <Field id="pnt-pass" label="Contraseña" error={errors.pass}>
+                      {(aria) => (
+                        <input
+                          {...aria}
+                          type="password"
+                          name="genesis-clave"
+                          autoComplete="off"
+                          maxLength={200}
+                          value={pass}
+                          disabled={reading}
+                          onChange={(e) => {
+                            setPass(e.target.value);
+                            if (errors.pass) setErrors((x) => ({ ...x, pass: undefined }));
+                          }}
+                        />
+                      )}
+                    </Field>
+                    <p className="pnt-muted">Uso su contraseña una sola vez, para entrar. No la guardo: ni aquí ni en el servidor.</p>
+                    {retry}
+                    <button type="submit" className="pa-btn pa-btn--main" disabled={!online || reading}>
+                      {reading ? "Leyendo su récord en Génesis…" : "Entrar"}
+                    </button>
+                    <div className="pa-sr" role="status">
+                      {reading ? "Pilo está leyendo su récord en Génesis." : ""}
+                    </div>
+                    {!reading && (
+                      <button
+                        type="button"
+                        className="pnt-link pnt-link--mid"
+                        onClick={(e) => {
+                          setGranted(null);
+                          setPass("");
+                          setErrors({});
+                          go(1, !fromKeyboard(e));
                         }}
                       >
-                        {!portalId && <option value="">Elija su sede</option>}
-                        {sedes.portals.map((p) => (
-                          <option key={p.id} value={p.id}>
-                            {p.name}
-                          </option>
-                        ))}
-                      </select>
+                        Volver al permiso
+                      </button>
                     )}
-                  </Field>
-                ) : (
-                  errors.sede && (
-                    <Msg tone="bad" alert>
-                      {errors.sede}
-                    </Msg>
-                  )
+                  </>
                 )}
-                <Field id="pnt-code" label="Código de estudiante" error={errors.code}>
-                  {(aria) => (
-                    <input
-                      {...aria}
-                      type="text"
-                      name="genesis-codigo"
-                      inputMode="numeric"
-                      autoComplete="off"
-                      autoCorrect="off"
-                      spellCheck={false}
-                      maxLength={15}
-                      value={code}
-                      onChange={(e) => {
-                        setCode(e.target.value);
-                        if (errors.code) setErrors((x) => ({ ...x, code: undefined }));
-                      }}
-                    />
-                  )}
-                </Field>
-                <Field id="pnt-pass" label="Contraseña de Génesis" hint="Se usa una sola vez para entrar a Génesis y no se guarda: ni aquí ni en el servidor." error={errors.pass}>
-                  {(aria) => (
-                    <input
-                      {...aria}
-                      type="password"
-                      name="genesis-clave"
-                      autoComplete="off"
-                      maxLength={200}
-                      value={pass}
-                      onChange={(e) => {
-                        setPass(e.target.value);
-                        if (errors.pass) setErrors((x) => ({ ...x, pass: undefined }));
-                      }}
-                    />
-                  )}
-                </Field>
-                {retry}
-                <div className="pcl-row">
-                  <button
-                    type="submit"
-                    className="pa-btn pa-btn--main"
-                    disabled={!online}
-                    onClick={(e) => {
-                      // Con Enter o con el teclado, todo aparece en su sitio, sin recorrido.
-                      animateNext.current = !fromKeyboard(e);
-                    }}
-                  >
-                    Conectar con Génesis
-                  </button>
-                  <button
-                    type="button"
-                    className="pc-quiet"
-                    onClick={() => {
-                      setGranted(null);
-                      setPass("");
-                      setErrors({});
-                      focusTo.current = "inicio";
-                    }}
-                  >
-                    Volver a la autorización
-                  </button>
-                </div>
               </form>
-            </section>
-          )}
+            )}
+
+            {moment === 3 && (
+              <div className="pnt-step">
+                <h2>Sus metas</h2>
+                <GoalPick id="pnt-meta-acc" label="Promedio acumulado" value={goalsNow.accumulated} hint={goalHint(planFor(goalsNow.accumulated))} onChange={(v) => setDraft({ ...goalsNow, accumulated: v })} />
+                <GoalPick id="pnt-meta-sem" label="Promedio de este semestre" value={goalsNow.semester} hint={semesterHint(lastAvg)} onChange={(v) => setDraft({ ...goalsNow, semester: v })} />
+                <p className="pnt-origin">Sus metas se guardan solo en este dispositivo y se borran al desconectar. La cuenta es aproximada: lo que le falta sale de su avance en Génesis.</p>
+                <button type="button" className="pa-btn pa-btn--main" onClick={(e) => takeOff(e, goalsNow)}>
+                  Estas son mis metas
+                </button>
+              </div>
+            )}
+
+            {moment === 4 && (
+              <div className="pnt-step">
+                <p className="pnt-muted pnt-center" role="status">
+                  Preparando sus notas…
+                </p>
+              </div>
+            )}
+          </div>
         </div>
+
         {live}
+        {moment !== 2 && retry}
         <ul className="pc-hint pcl-notes">
           {PROMISES.map((p) => (
             <li key={p}>{p}</li>
@@ -757,215 +1026,269 @@ function Notas({ owner, campus, online }: { owner: string; /** La sede de la cue
     );
   }
 
-  /* Conectado. */
+  /* --- Las notas ---------------------------------------------------------------------------------- */
+
+  if (!link) return null;
   const period = periods.find((p) => p.id === periodId) ?? periods[periods.length - 1] ?? null;
   const newestFirst = [...periods].reverse();
+  const at = period ? periods.findIndex((p) => p.id === period.id) : -1;
+  const accPlan = goals ? planFor(goals.accumulated) : null;
 
   return (
     <div className="pcl pnt" ref={root}>
       <div ref={startHead} tabIndex={-1} className="pcl-start">
         {offline}
-        <section className="pcl-state" aria-label={`Estado de la conexión con Génesis, sede ${link.portal.name}`}>
-          <div className="pcl-state__who">
-            <div className="pcl-face pcl-face--sm">
-              <Pilo ref={face} size="100%" mood={loading ? "piensa" : "feliz"} alive label="Mr. Pilo" />
-            </div>
-            <p>
-              <span className="pc-tag" data-t="ok">
-                {Icon.check}
-                Conectado
-              </span>
-              <b>{[`Génesis ${link.portal.name}`, "solo lectura", link.head.program ? courseName(link.head.program) : ""].filter(Boolean).join(" · ")}</b>
-              <small>{link.kept ? "La conexión está guardada solo en este dispositivo." : "La conexión dura mientras esta pestaña esté abierta."}</small>
-            </p>
+        <header className="pnt-bar" aria-label={`Conectado a Génesis, sede ${link.portal.name}, solo lectura`}>
+          <div className="pnt-bar__pilo" ref={barHolder}>
+            <Pilo size="100%" mood={loading ? "piensa" : "feliz"} alive label="Mr. Pilo" />
           </div>
-          <div className="pcl-tools">
-            <button type="button" className="pc-chip" disabled={busy || !online} onClick={() => void fetchHistory(link.permit)}>
+          <div className="pnt-bar__who">
+            <strong>{name ? `Hola, ${name}` : "Sus notas"}</strong>
+            <span>
+              Génesis · {link.portal.name} · solo lectura{link.head.program ? ` · ${courseName(link.head.program)}` : ""}
+            </span>
+          </div>
+          <div className="pnt-bar__tools">
+            {sound}
+            <button type="button" className="pnt-chipbtn" disabled={busy || !online} onClick={() => void fetchHistory(link.permit)}>
               {loading && history ? "Actualizando…" : "Actualizar"}
             </button>
-            <button type="button" className="pc-chip" onClick={disconnect}>
+            <button type="button" className="pnt-chipbtn" onClick={disconnect}>
               Desconectar
             </button>
           </div>
-        </section>
+        </header>
       </div>
 
       {live}
       {retry}
 
       {!history ? (
-        reading
-      ) : (
-        <>
-          <div className="pnt-tabs" role="tablist" aria-label="Mis notas" ref={tabList} onKeyDown={onTabKey} data-in>
-            {TABS.map((t) => (
-              <button key={t.id} type="button" role="tab" id={`pnt-tab-${t.id}`} aria-selected={t.id === tab} aria-controls={`pnt-panel-${t.id}`} tabIndex={t.id === tab ? 0 : -1} onClick={(e) => pickTab(t.id, !fromKeyboard(e))}>
-                {t.label}
-              </button>
-            ))}
+        loading && (
+          <div className="pnt-reading" role="status">
+            <span>Pilo está leyendo su récord en Génesis</span>
+            <span className="pnt-dots" aria-hidden="true">
+              <i />
+              <i />
+              <i />
+            </span>
           </div>
-
-          {tab === "historico" && (
-            <div className="pnt-panel" role="tabpanel" id="pnt-panel-historico" aria-labelledby="pnt-tab-historico" tabIndex={0}>
-              {periods.length === 0 || !period ? (
-                <p className="pcl-empty">Génesis no muestra periodos en su polígrafo todavía. Cuando tenga notas definitivas, aparecerán aquí.</p>
-              ) : (
+        )
+      ) : (
+        <div className="pnt-body">
+          {/* Las metas, siempre a la vista: a la izquierda en computador, arriba en teléfono. */}
+          <aside className="pnt-rail" aria-label="Sus metas y sus totales">
+            <section className="pnt-card pnt-metas" aria-labelledby="pnt-metas-h" data-in>
+              <div className="pnt-metas__head">
+                <h2 id="pnt-metas-h">Sus metas</h2>
+                <button type="button" className="pnt-link" onClick={editGoals}>
+                  {goals ? "Cambiar" : "Decir mis metas"}
+                </button>
+              </div>
+              {goals && accPlan ? (
                 <>
-                  <dl className="pnt-totals" data-in>
-                    <div>
-                      <dt>Promedio acumulado</dt>
-                      <dd>{nota(sums.accumulated)}</dd>
+                  <Meter label="Acumulado" value={sums.accumulated} goal={goals.accumulated} line={accumulatedLine(accPlan, goals.accumulated)} />
+                  <Meter label="Último semestre" value={lastAvg} goal={goals.semester} line={semesterLine(lastAvg, goals.semester)} />
+                </>
+              ) : (
+                <p className="pnt-muted">Aún no me ha dicho sus metas. Con ellas le digo cuánto necesita promediar.</p>
+              )}
+            </section>
+            <dl className="pnt-totals" data-in>
+              <div>
+                <dt>Créditos aprobados</dt>
+                <dd>{sums.approved}</dd>
+              </div>
+              <div>
+                <dt>Avance del plan</dt>
+                <dd>{link.head.creditsPercent === null ? "—" : `${nota(link.head.creditsPercent).replace(/,0$/, "")} %`}</dd>
+              </div>
+              <div>
+                <dt>{sums.periods === 1 ? "Periodo cursado" : "Periodos cursados"}</dt>
+                <dd>{sums.periods}</dd>
+              </div>
+            </dl>
+          </aside>
+
+          <div className="pnt-main">
+            <div className="pnt-tabs" role="tablist" aria-label="Mis notas" ref={tabList} onKeyDown={onTabKey} data-in>
+              {TABS.map((t) => (
+                <button key={t.id} type="button" role="tab" id={`pnt-tab-${t.id}`} aria-selected={t.id === tab} aria-controls={`pnt-panel-${t.id}`} tabIndex={t.id === tab ? 0 : -1} onClick={(e) => pickTab(t.id, !fromKeyboard(e))}>
+                  {t.label}
+                </button>
+              ))}
+            </div>
+
+            {tab === "historico" && (
+              <div className="pnt-panel" role="tabpanel" id="pnt-panel-historico" aria-labelledby="pnt-tab-historico" tabIndex={0}>
+                {periods.length === 0 || !period ? (
+                  <p className="pcl-empty">Génesis no muestra periodos en su polígrafo todavía. Cuando tenga notas definitivas, aparecerán aquí.</p>
+                ) : (
+                  <>
+                    {/* El selector de periodo: fijo arriba, siempre alcanzable. Nunca una fila que se desplace a lo ancho. */}
+                    <div className="pnt-picker" data-in>
+                      <div className="pnt-stepper">
+                        <button type="button" aria-label="Periodo anterior" disabled={at <= 0} onClick={(e) => at > 0 && pickPeriod(periods[at - 1].id, !fromKeyboard(e))}>
+                          <svg viewBox="0 0 24 24" aria-hidden="true">
+                            <path d="m14.5 6-6 6 6 6" />
+                          </svg>
+                        </button>
+                        <select aria-label="Periodo" value={period.id} onChange={(e) => pickPeriod(e.target.value, false)}>
+                          {newestFirst.map((p, i) => (
+                            <option key={p.id} value={p.id}>
+                              {i === 0 ? `${p.id} · último` : p.id}
+                            </option>
+                          ))}
+                        </select>
+                        <button type="button" aria-label="Periodo siguiente" disabled={at < 0 || at >= periods.length - 1} onClick={(e) => at < periods.length - 1 && pickPeriod(periods[at + 1].id, !fromKeyboard(e))}>
+                          <svg viewBox="0 0 24 24" aria-hidden="true">
+                            <path d="m9.5 6 6 6-6 6" />
+                          </svg>
+                        </button>
+                      </div>
+                      {/* En computador, además, todos los periodos a la vista, en las filas que hagan falta. */}
+                      <div className="pnt-periods" role="group" aria-label="Todos los periodos">
+                        {newestFirst.map((p, i) => (
+                          <button key={p.id} type="button" aria-pressed={p.id === period.id} onClick={(e) => pickPeriod(p.id, !fromKeyboard(e))}>
+                            {i === 0 ? `${p.id} · último` : p.id}
+                          </button>
+                        ))}
+                      </div>
                     </div>
-                    <div>
-                      <dt>Créditos aprobados</dt>
-                      <dd>{sums.approved}</dd>
-                    </div>
-                    <div>
-                      <dt>{sums.periods === 1 ? "Periodo" : "Periodos"}</dt>
-                      <dd>{sums.periods}</dd>
-                    </div>
-                  </dl>
-                  <div className="pnt-periods" role="group" aria-label="Periodo" data-in>
-                    {newestFirst.map((p, i) => (
-                      <button
-                        key={p.id}
-                        type="button"
-                        aria-pressed={p.id === period.id}
-                        onClick={(e) => {
-                          if (p.id === period.id) return;
-                          moved.current = fromKeyboard(e) ? null : "periodo";
-                          setPeriodId(p.id);
-                        }}
-                      >
-                        {i === 0 ? `${p.id} · último` : p.id}
+                    <section className="pnt-card" aria-labelledby="pnt-periodo-h" data-in>
+                      <div className="pnt-period-head">
+                        <h2 id="pnt-periodo-h">{period.id}</h2>
+                        <span className="pnt-muted">{periodLine(period)}</span>
+                      </div>
+                      {period.courses.length === 0 ? (
+                        <p className="pnt-muted">Génesis no trae materias en este periodo.</p>
+                      ) : (
+                        <ul className="pnt-courses">
+                          {period.courses.map((c, i) => {
+                            const pending = inProgress(period, c, current);
+                            const state = courseState(c, pending);
+                            return (
+                              // Sin códigos: de la materia se muestra su nombre y nada que la identifique por dentro.
+                              <li key={i}>
+                                <span className="pnt-course__name">{courseName(c.name) || "Materia sin nombre"}</span>
+                                <span className="pnt-course__def">{pending ? "—" : nota(c.def)}</span>
+                                <span className="pnt-course__meta">
+                                  {c.credits > 0 && (
+                                    <span>
+                                      {c.credits} {c.credits === 1 ? "crédito" : "créditos"}
+                                    </span>
+                                  )}
+                                  {c.min !== null && !pending && <span>Se aprueba con {nota(c.min)}</span>}
+                                  <span className="pnt-state" data-s={state}>
+                                    <svg viewBox="0 0 24 24" aria-hidden="true">
+                                      {STATE_GLYPH[state]}
+                                    </svg>
+                                    {STATE_LABEL[state]}
+                                  </span>
+                                </span>
+                              </li>
+                            );
+                          })}
+                        </ul>
+                      )}
+                      {!settled(period) && period.courses.length > 0 && <p className="pnt-muted">Este periodo aún no tiene definitivas en Génesis.</p>}
+                    </section>
+                    {!history.record && <p className="pc-hint">Génesis no dejó leer el récord de notas: se muestra el polígrafo, sin la nota mínima de cada materia.</p>}
+                    <div className="pnt-pdf" data-in>
+                      <button type="button" className="pc-chip" data-strong disabled={downloading || !online} onClick={() => void downloadPdf()}>
+                        <svg viewBox="0 0 24 24" aria-hidden="true">
+                          <path d="M7 3.5h7l4 4v13H7z" />
+                          <path d="M14 3.5v4h4M12 11v6M9.5 14.5 12 17l2.5-2.5" />
+                        </svg>
+                        {downloading ? "Pidiendo el polígrafo…" : "Descargar mi polígrafo (PDF)"}
                       </button>
+                      <span className="pnt-muted">El oficial, tal como lo entrega Génesis.</span>
+                    </div>
+                  </>
+                )}
+              </div>
+            )}
+
+            {tab === "evolucion" && (
+              <div className="pnt-panel pnt-panel--two" role="tabpanel" id="pnt-panel-evolucion" aria-labelledby="pnt-tab-evolucion" tabIndex={0}>
+                {evo.filter((r) => r.avg !== null || r.acc !== null).length === 0 ? (
+                  <p className="pcl-empty pnt-span">Todavía no hay promedios que mostrar: aparecerán cuando Génesis tenga su primer periodo con definitivas.</p>
+                ) : (
+                  <>
+                    <section className="pnt-card pnt-span" aria-labelledby="pnt-evo-h">
+                      <h2 id="pnt-evo-h">Su promedio, periodo a periodo</h2>
+                      <ul className="pnt-legend" aria-label="Series de la gráfica">
+                        <li>
+                          <svg width="26" height="10" aria-hidden="true">
+                            <path className="pnt-line pnt-key--avg" d="M1 5h24" strokeWidth="2.5" />
+                            <circle className="pnt-key-dot" cx="13" cy="5" r="3.5" />
+                          </svg>
+                          Promedio del semestre
+                        </li>
+                        <li>
+                          <svg width="26" height="10" aria-hidden="true">
+                            <path className="pnt-line pnt-key--acc" d="M1 5h24" strokeWidth="2.5" />
+                          </svg>
+                          Promedio acumulado
+                        </li>
+                        {goals && (
+                          <li>
+                            <svg width="26" height="10" aria-hidden="true">
+                              <path className="pnt-goal-key" d="M1 5h24" />
+                            </svg>
+                            Su meta de acumulado
+                          </li>
+                        )}
+                      </ul>
+                      <EvoChart rows={evo} goal={goals?.accumulated ?? null} />
+                      <button type="button" className="pnt-link" aria-expanded={asTable} aria-controls="pnt-evo-tabla" onClick={() => setAsTable((v) => !v)}>
+                        {asTable ? "Ocultar la tabla" : "Ver como tabla"}
+                      </button>
+                      <div className="pnt-scroll" id="pnt-evo-tabla" hidden={!asTable}>
+                        {asTable && <EvoTable rows={evo} goal={goals?.accumulated ?? null} />}
+                      </div>
+                    </section>
+
+                    <section className="pnt-card" aria-labelledby="pnt-veo-h">
+                      <h2 id="pnt-veo-h">Lo que veo en su récord</h2>
+                      <FindingList items={seen} />
+                      <p className="pnt-origin">Calculado en su dispositivo con las notas de su polígrafo.</p>
+                    </section>
+
+                    <AdviceCard state={advice} enabled={history.advice} online={online} hasGoals={Boolean(goals)} onAsk={(e) => void askAdvice(e)} />
+
+                    {advice.status === "listo" && <AreasCard summary={advice.summary} advice={advice.advice} accumulated={sums.accumulated} />}
+                  </>
+                )}
+              </div>
+            )}
+
+            {tab === "semestre" && (
+              <div className="pnt-panel" role="tabpanel" id="pnt-panel-semestre" aria-labelledby="pnt-tab-semestre" tabIndex={0}>
+                <section className="pnt-card pnt-soon" aria-labelledby="pnt-sem-h">
+                  <span className="pnt-badge">
+                    <svg viewBox="0 0 24 24" aria-hidden="true">
+                      <path d="M12 7v6M12 17h.01M10.3 3.9 2.6 17.5A2 2 0 0 0 4.3 20.5h15.4a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z" />
+                    </svg>
+                    En construcción
+                  </span>
+                  <h2 id="pnt-sem-h">Mi semestre con Pilo</h2>
+                  <p className="pnt-muted">Aquí verá sus notas de P1, P2 y P3 y cuánto necesita en cada corte para llegar a su meta del semestre. Todavía no está disponible.</p>
+                  <div className="pnt-cuts" aria-hidden="true">
+                    {["P1", "P2", "P3"].map((cut) => (
+                      <div key={cut}>
+                        <b>{cut}</b>
+                        <i />
+                        <i />
+                      </div>
                     ))}
                   </div>
-                  <section className="pnt-card" aria-labelledby="pnt-periodo-h" data-in>
-                    <div className="pnt-period-head">
-                      <h2 id="pnt-periodo-h">{period.id}</h2>
-                      <span className="pnt-muted">{periodLine(period)}</span>
-                    </div>
-                    {period.courses.length === 0 ? (
-                      <p className="pnt-muted">Génesis no trae materias en este periodo.</p>
-                    ) : (
-                      <ul className="pnt-courses">
-                        {period.courses.map((c, i) => {
-                          const pending = inProgress(period, c, current);
-                          const state = courseState(c, pending);
-                          return (
-                            <li key={`${c.code}-${i}`}>
-                              <span className="pnt-course__name">{courseName(c.name) || c.code}</span>
-                              <span className="pnt-course__def">{pending ? "—" : nota(c.def)}</span>
-                              <span className="pnt-course__meta">
-                                {c.credits > 0 && (
-                                  <span>
-                                    {c.credits} {c.credits === 1 ? "crédito" : "créditos"}
-                                  </span>
-                                )}
-                                {c.group && <span>{courseName(c.group)}</span>}
-                                {c.min !== null && !pending && <span>Se aprueba con {nota(c.min)}</span>}
-                                <span className="pnt-state" data-s={state}>
-                                  <svg viewBox="0 0 24 24" aria-hidden="true">
-                                    {STATE_GLYPH[state]}
-                                  </svg>
-                                  {STATE_LABEL[state]}
-                                </span>
-                              </span>
-                            </li>
-                          );
-                        })}
-                      </ul>
-                    )}
-                    {!settled(period) && period.courses.length > 0 && <p className="pnt-muted">Este periodo aún no tiene definitivas en Génesis.</p>}
-                  </section>
-                  {!history.record && <p className="pc-hint">Génesis no dejó leer el récord de notas: se muestra el polígrafo, sin la nota mínima de cada materia.</p>}
-                  <div className="pnt-pdf" data-in>
-                    <button type="button" className="pc-chip" data-strong disabled={downloading || !online} onClick={() => void downloadPdf()}>
-                      <svg viewBox="0 0 24 24" aria-hidden="true">
-                        <path d="M7 3.5h7l4 4v13H7z" />
-                        <path d="M14 3.5v4h4M12 11v6M9.5 14.5 12 17l2.5-2.5" />
-                      </svg>
-                      {downloading ? "Pidiendo el polígrafo…" : "Descargar mi polígrafo (PDF)"}
-                    </button>
-                    <span className="pnt-muted">El oficial, tal como lo entrega Génesis.</span>
-                  </div>
-                </>
-              )}
-            </div>
-          )}
-
-          {tab === "evolucion" && (
-            <div className="pnt-panel" role="tabpanel" id="pnt-panel-evolucion" aria-labelledby="pnt-tab-evolucion" tabIndex={0}>
-              {evo.filter((r) => r.avg !== null || r.acc !== null).length === 0 ? (
-                <p className="pcl-empty">Todavía no hay promedios que mostrar: aparecerán cuando Génesis tenga su primer periodo con definitivas.</p>
-              ) : (
-                <>
-                  <section className="pnt-card" aria-labelledby="pnt-evo-h">
-                    <h2 id="pnt-evo-h">Su promedio, periodo a periodo</h2>
-                    <ul className="pnt-legend" aria-label="Series de la gráfica">
-                      <li>
-                        <svg width="26" height="10" aria-hidden="true">
-                          <path className="pnt-line pnt-key--avg" d="M1 5h24" strokeWidth="2.5" />
-                          <circle className="pnt-key-dot" cx="13" cy="5" r="3.5" />
-                        </svg>
-                        Promedio del semestre
-                      </li>
-                      <li>
-                        <svg width="26" height="10" aria-hidden="true">
-                          <path className="pnt-line pnt-key--acc" d="M1 5h24" strokeWidth="2.5" />
-                        </svg>
-                        Promedio acumulado
-                      </li>
-                    </ul>
-                    <EvoChart rows={evo} />
-                    <button type="button" className="pnt-link" aria-expanded={asTable} aria-controls="pnt-evo-tabla" onClick={() => setAsTable((v) => !v)}>
-                      {asTable ? "Ocultar la tabla" : "Ver como tabla"}
-                    </button>
-                    <div className="pnt-scroll" id="pnt-evo-tabla" hidden={!asTable}>
-                      {asTable && <EvoTable rows={evo} />}
-                    </div>
-                  </section>
-
-                  <section className="pnt-card" aria-labelledby="pnt-veo-h">
-                    <h2 id="pnt-veo-h">Lo que veo en su récord</h2>
-                    <FindingList items={seen} />
-                    <p className="pnt-origin">Calculado en su dispositivo con las notas de su polígrafo.</p>
-                  </section>
-
-                  <GoalCard periods={periods} head={link.head} accumulated={sums.accumulated} approved={sums.approved} />
-
-                  <AdviceCard state={advice} enabled={history.advice} online={online} accumulated={sums.accumulated} onAsk={(e) => void askAdvice(e)} />
-                </>
-              )}
-            </div>
-          )}
-
-          {tab === "semestre" && (
-            <div className="pnt-panel" role="tabpanel" id="pnt-panel-semestre" aria-labelledby="pnt-tab-semestre" tabIndex={0}>
-              <section className="pnt-card pnt-soon" aria-labelledby="pnt-sem-h">
-                <span className="pnt-badge">
-                  <svg viewBox="0 0 24 24" aria-hidden="true">
-                    <path d="M12 7v6M12 17h.01M10.3 3.9 2.6 17.5A2 2 0 0 0 4.3 20.5h15.4a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z" />
-                  </svg>
-                  En construcción
-                </span>
-                <h2 id="pnt-sem-h">Mi semestre con Pilo</h2>
-                <p className="pnt-muted">Aquí verá sus notas de P1, P2 y P3 del periodo en curso, y cuánto necesita en cada corte para llegar a donde quiere. Todavía no está disponible.</p>
-                <div className="pnt-cuts" aria-hidden="true">
-                  {["P1", "P2", "P3"].map((cut) => (
-                    <div key={cut}>
-                      <b>{cut}</b>
-                      <i />
-                      <i />
-                    </div>
-                  ))}
-                </div>
-                <p className="pnt-muted">Vista previa, sin datos.</p>
-              </section>
-            </div>
-          )}
-        </>
+                  <p className="pnt-muted">Vista previa, sin datos.</p>
+                </section>
+              </div>
+            )}
+          </div>
+        </div>
       )}
 
       <ul className="pc-hint pcl-notes">
@@ -977,17 +1300,55 @@ function Notas({ owner, campus, online }: { owner: string; /** La sede de la cue
   );
 }
 
+/* --- Las metas ------------------------------------------------------------------------------------ */
+
+/** Un control de meta: un promedio de 3,0 a 5,0, de décima en décima, que dice al moverlo qué significa. */
+function GoalPick({ id, label, value, hint, onChange }: { id: string; label: string; value: number; hint: string; onChange: (value: number) => void }) {
+  return (
+    <div className="pnt-goal">
+      <div className="pnt-goal__top">
+        <label htmlFor={id}>{label}</label>
+        <output htmlFor={id}>{nota(value)}</output>
+      </div>
+      <input id={id} type="range" min={GOAL.min} max={GOAL.max} step={GOAL.step} value={value} aria-valuetext={nota(value)} aria-describedby={`${id}-d`} onChange={(e) => onChange(Math.round(Number(e.target.value) * 10) / 10)} />
+      <p className="pnt-muted" id={`${id}-d`} role="status">
+        {hint}
+      </p>
+    </div>
+  );
+}
+
+/**
+ * Una meta a la vista: dónde va (la barra y su valor escrito), la meta marcada con una raya y su palabra, y la
+ * frase de lo que necesita. El eje va de 3,0 a 5,0. Nada se dice solo con color.
+ */
+function Meter({ label, value, goal, line }: { label: string; value: number | null; goal: number; line: string }) {
+  return (
+    <div className="pnt-meter">
+      <div className="pnt-meter__top">
+        <span>{label}</span>
+        <b>{nota(value)}</b>
+      </div>
+      <div className="pnt-meter__track" aria-hidden="true">
+        <i className="pnt-meter__fill" style={{ width: `${meterPct(value)}%` }} />
+        <u style={{ left: `${meterPct(goal)}%` }} />
+      </div>
+      <p>{line}</p>
+    </div>
+  );
+}
+
 /* --- La gráfica ---------------------------------------------------------------------------------- */
 
 /**
- * Dos series en un solo eje: el promedio del semestre (continua, con puntos) y
- * el acumulado (punteada). La guía de 3,0 dice con cuánto se aprueba. Al pasar
- * o tocar, una cruz y una etiqueta con los dos valores del periodo. La tabla
- * («Ver como tabla») es la misma información para quien no ve la gráfica.
+ * Dos series en un solo eje: el promedio del semestre (continua, con puntos) y el acumulado (punteada), y la
+ * meta de acumulado como una raya fina con su nombre. La guía de 3,0 dice con cuánto se aprueba. Al pasar o
+ * tocar, una cruz y una etiqueta con los dos valores del periodo. La tabla («Ver como tabla») es la misma
+ * información para quien no ve la gráfica.
  */
-function EvoChart({ rows }: { rows: EvoRow[] }) {
+function EvoChart({ rows, goal }: { rows: EvoRow[]; goal: number | null }) {
   const { W, H, L, R, T, B } = CHART;
-  const shape = useMemo(() => chartOf(rows), [rows]);
+  const shape = useMemo(() => chartOf(rows, goal), [rows, goal]);
   const [at, setAt] = useState<number | null>(null);
   const svg = useRef<SVGSVGElement>(null);
 
@@ -999,10 +1360,11 @@ function EvoChart({ rows }: { rows: EvoRow[] }) {
 
   const passAt = shape.grid.find((g) => g.value === PASS_MARK)?.y;
   const row = at === null ? null : rows[at];
+  const count = `${rows.length} ${rows.length === 1 ? "periodo" : "periodos"}`;
 
   return (
     <div className="pnt-chart">
-      <svg ref={svg} viewBox={`0 0 ${W} ${H}`} role="img" aria-label={`Promedio del semestre y promedio acumulado en ${rows.length} ${rows.length === 1 ? "periodo" : "periodos"}. La tabla trae los valores.`}>
+      <svg ref={svg} viewBox={`0 0 ${W} ${H}`} role="img" aria-label={`Promedio del semestre y promedio acumulado en ${count}${goal !== null ? `, con su meta de acumulado en ${nota(goal)}` : ""}. La tabla trae los valores.`}>
         {shape.grid.map((g) => (
           <g key={g.value}>
             <line className="pnt-grid" data-pass={g.value === PASS_MARK || undefined} x1={L} x2={W - R} y1={g.y} y2={g.y} />
@@ -1015,6 +1377,14 @@ function EvoChart({ rows }: { rows: EvoRow[] }) {
           <text x={W - R} y={passAt - 5} textAnchor="end">
             se aprueba con {nota(PASS_MARK)}
           </text>
+        )}
+        {shape.goal !== null && goal !== null && (
+          <g className="pnt-goal-line">
+            <line x1={L} x2={W - R} y1={shape.goal} y2={shape.goal} />
+            <text x={L + 4} y={shape.goal - 5}>
+              su meta: {nota(goal)}
+            </text>
+          </g>
         )}
         {shape.ticks.map((t) => (
           <text key={t.index} x={t.x} y={H - 6} textAnchor={t.anchor}>
@@ -1039,10 +1409,10 @@ function EvoChart({ rows }: { rows: EvoRow[] }) {
   );
 }
 
-function EvoTable({ rows }: { rows: EvoRow[] }) {
+function EvoTable({ rows, goal }: { rows: EvoRow[]; goal: number | null }) {
   return (
     <table className="pnt-table">
-      <caption className="pa-sr">Promedio del semestre y promedio acumulado por periodo</caption>
+      <caption className={goal === null ? "pa-sr" : undefined}>{goal === null ? "Promedio del semestre y promedio acumulado por periodo" : `Su meta de acumulado: ${nota(goal)}`}</caption>
       <thead>
         <tr>
           <th scope="col">Periodo</th>
@@ -1082,95 +1452,14 @@ function FindingList({ items }: { items: Finding[] }) {
   );
 }
 
-/* --- Qué necesita para llegar a su meta ---------------------------------------------------------- */
-
-const pct = (v: number) => `${Math.max(0, Math.min(100, (v / TOP_MARK) * 100))}%`;
-
-/**
- * La persona elige un promedio acumulado meta y se le dice cuánto debe promediar en los créditos que le faltan.
- * Es aritmética del dispositivo (goalPlan): no pasa por la IA ni sale de aquí. En el eje, tres marcas de forma
- * distinta —lo que lleva, la meta y lo que necesita—, cada una con su valor escrito al lado.
- */
-function GoalCard({ periods, head, accumulated, approved }: { periods: NotaPeriod[]; head: NotasHead; accumulated: number | null; approved: number }) {
-  const [goal, setGoal] = useState(() => Math.min(GOAL.max, Math.max(GOAL.min, Math.round(((accumulated ?? 3.8) + 0.2) * 10) / 10)));
-  const graded = useMemo(() => gradedCredits(periods, head.period), [periods, head.period]);
-  const plan = goalPlan({ accumulated, graded, approved, percent: head.creditsPercent, goal });
-  const said = goalText(plan, goal);
-  const scaled = plan.status === "posible" || plan.status === "cumplida" || plan.status === "inalcanzable";
-
-  return (
-    <section className="pnt-card" aria-labelledby="pnt-meta-h">
-      <h2 id="pnt-meta-h">Qué necesita para llegar a su meta</h2>
-      {plan.status === "sin_datos" || plan.status === "terminado" ? (
-        <p className="pnt-goal__say">
-          <b>{said.title}</b>
-          <span>{said.detail}</span>
-        </p>
-      ) : (
-        <>
-          <div className="pnt-goal__pick">
-            <label htmlFor="pnt-meta">Su meta de promedio acumulado</label>
-            <output htmlFor="pnt-meta">{nota(goal)}</output>
-            <input
-              id="pnt-meta"
-              type="range"
-              min={GOAL.min}
-              max={GOAL.max}
-              step={GOAL.step}
-              value={goal}
-              aria-valuetext={`${nota(goal)} de promedio acumulado`}
-              onChange={(e) => setGoal(Math.round(Number(e.target.value) * 10) / 10)}
-            />
-          </div>
-          {scaled && (
-            <>
-              <div className="pnt-goal__axis" aria-hidden="true">
-                <i className="pnt-goal__pass" style={{ left: pct(PASS_MARK) }} />
-                <i className="pnt-mark pnt-mark--has" style={{ left: pct(plan.accumulated) }} />
-                <i className="pnt-mark pnt-mark--goal" style={{ left: pct(goal) }} />
-                <i className="pnt-mark pnt-mark--need" style={{ left: pct(Math.min(TOP_MARK, plan.needed)) }} />
-              </div>
-              <ul className="pnt-goal__key">
-                <li>
-                  <i className="pnt-mark pnt-mark--has" aria-hidden="true" />
-                  Lleva <b>{nota(plan.accumulated)}</b>
-                </li>
-                <li>
-                  <i className="pnt-mark pnt-mark--goal" aria-hidden="true" />
-                  Meta <b>{nota(goal)}</b>
-                </li>
-                <li>
-                  <i className="pnt-mark pnt-mark--need" aria-hidden="true" />
-                  Necesita <b>{plan.status === "inalcanzable" ? `más de ${nota(TOP_MARK)}` : nota(plan.needed)}</b>
-                </li>
-              </ul>
-            </>
-          )}
-          <p className="pnt-goal__say" role="status">
-            <b>{said.title}</b>
-            <span>{said.detail}</span>
-          </p>
-          <p className="pnt-origin">
-            Calculado en su dispositivo. Es una cuenta aproximada: los créditos que le faltan salen de su avance en Génesis ({nota(head.creditsPercent).replace(/,0$/, "")} % del plan). La línea
-            del eje marca {nota(PASS_MARK)}.
-          </p>
-        </>
-      )}
-    </section>
-  );
-}
-
 /* --- Lo que le recomiendo -------------------------------------------------------------------------- */
 
 /**
  * Las recomendaciones, escritas aquí mismo. En reposo, el botón y qué se envía; pensando, los pasos reales;
- * con resultado, la gráfica de áreas (si la IA las propuso), cada recomendación con su porqué, su acción y
- * sus fuentes —o dicho con palabras que es general, sin documento de la universidad—; y el error, con
- * reintento, o el tope del día.
+ * con resultado, cada recomendación con su porqué, su acción y sus fuentes —o dicho con palabras que es
+ * general, sin documento de la universidad—; y el error, con reintento, o el tope del día.
  */
-function AdviceCard({ state, enabled, online, accumulated, onAsk }: { state: AdviceState; enabled: boolean; online: boolean; accumulated: number | null; onAsk: (event: MouseEvent) => void }) {
-  const bars = useMemo(() => (state.status === "listo" ? areaBars(state.summary, state.advice.areas, accumulated) : []), [state, accumulated]);
-
+function AdviceCard({ state, enabled, online, hasGoals, onAsk }: { state: AdviceState; enabled: boolean; online: boolean; hasGoals: boolean; onAsk: (event: MouseEvent) => void }) {
   return (
     <section className="pnt-card" aria-labelledby="pnt-rec-h">
       <h2 id="pnt-rec-h">Lo que le recomiendo</h2>
@@ -1178,18 +1467,18 @@ function AdviceCard({ state, enabled, online, accumulated, onAsk }: { state: Adv
       {state.status === "reposo" &&
         (enabled ? (
           <>
-            <p className="pnt-muted">Pilo interpreta sus notas, tiene en cuenta su programa y busca en los documentos de la universidad qué le puede servir.</p>
+            <p className="pnt-muted">
+              Le envío a la IA un resumen de sus notas{hasGoals ? " y sus metas" : ""}, sin su nombre ni su código, y busco en los documentos de la universidad. No se guarda.
+            </p>
             <div className="pcl-tools">
-              <button type="button" className="pc-chip" data-strong disabled={!online} onClick={onAsk}>
+              <button type="button" className="pa-btn pa-btn--main" disabled={!online} onClick={onAsk}>
                 Pedirle recomendaciones a Pilo
               </button>
             </div>
-            <p className="pnt-origin">
-              Al pulsar, envío a la IA un resumen de sus notas: programa, periodos, materias, créditos y definitivas. Sin su nombre, su código ni su documento. No se guarda.
-            </p>
+            <p className="pnt-origin">Viajan su programa, sus periodos, sus materias con créditos y definitivas{hasGoals ? ", y sus dos metas" : ""}. Solo al pulsar el botón.</p>
           </>
         ) : (
-          <p className="pnt-muted">La universidad aún no ha habilitado las recomendaciones con IA en Mis notas. Lo de arriba sí es suyo desde ya: se calcula en su dispositivo.</p>
+          <p className="pnt-muted">La universidad aún no ha habilitado las recomendaciones con IA en Mis notas. Lo demás sí es suyo desde ya: se calcula en su dispositivo.</p>
         ))}
 
       {state.status === "pensando" && (
@@ -1226,7 +1515,6 @@ function AdviceCard({ state, enabled, online, accumulated, onAsk }: { state: Adv
 
       {state.status === "listo" && (
         <>
-          {bars.length > 0 && <AreaChart bars={bars} />}
           <ol className="pnt-recs" aria-label="Recomendaciones de Pilo">
             {state.advice.recs.map((rec, i) => (
               <li key={`${i}-${rec.title}`}>
@@ -1271,8 +1559,8 @@ function AdviceCard({ state, enabled, online, accumulated, onAsk }: { state: Adv
             ))}
           </ol>
           <p className="pnt-origin">
-            Redactado por Pilo con IA, con un resumen de sus notas sin su nombre ni su código. Los números de las gráficas se calculan en su dispositivo. Verifique lo que le diga: puede
-            equivocarse. No se guarda: al salir de esta pantalla, se borra.
+            Redactado por Pilo con IA, con documentos de Pilo en Enseñanza y un resumen de sus notas sin su nombre ni su código. Verifique lo que le diga: puede equivocarse. No se guarda: al
+            salir de esta pantalla, se borra.
           </p>
           <div className="pcl-tools">
             <button type="button" className="pc-chip" disabled={!online} onClick={onAsk}>
@@ -1288,20 +1576,23 @@ function AdviceCard({ state, enabled, online, accumulated, onAsk }: { state: Adv
 /**
  * Fortalezas y áreas por reforzar: una barra por área con su promedio ponderado por créditos, de mayor a menor,
  * en un solo eje de 0 a 5 con la guía en 3,0. El valor va escrito junto a cada barra y el estado se dice con
- * glifo y palabra. Las áreas las agrupó la IA; los promedios son de las notas (areaBars).
+ * glifo y palabra. Las áreas las agrupó la IA; los promedios son de las notas (areaBars). Sin áreas, no hay
+ * tarjeta: no se inventan.
  */
-function AreaChart({ bars }: { bars: AreaBar[] }) {
+function AreasCard({ summary, advice, accumulated }: { summary: AdviceSummary; advice: Advice; accumulated: number | null }) {
+  const bars: AreaBar[] = useMemo(() => areaBars(summary, advice.areas, accumulated), [summary, advice, accumulated]);
   const [asTable, setAsTable] = useState(false);
+  if (!bars.length) return null;
   return (
-    <div className="pnt-areas">
-      <h3>Fortalezas y áreas por reforzar</h3>
+    <section className="pnt-card pnt-areas" aria-labelledby="pnt-areas-h">
+      <h2 id="pnt-areas-h">Fortalezas y áreas por reforzar</h2>
       <ul aria-label="Promedio por área, de mayor a menor">
         {bars.map((b) => (
           <li key={b.name}>
             <span className="pnt-area__name">{b.name}</span>
             <span className="pnt-area__val">{nota(b.avg)}</span>
             <span className="pnt-area__track" aria-hidden="true">
-              <i className="pnt-area__fill" data-strong={b.strong || undefined} style={{ width: pct(b.avg) }} />
+              <i className="pnt-area__fill" data-strong={b.strong || undefined} style={{ width: `${Math.max(0, Math.min(100, (b.avg / 5) * 100))}%` }} />
             </span>
             <span className="pnt-area__state">
               <svg viewBox="0 0 24 24" aria-hidden="true">
@@ -1313,8 +1604,8 @@ function AreaChart({ bars }: { bars: AreaBar[] }) {
         ))}
       </ul>
       <p className="pnt-origin">
-        Pilo agrupó sus materias en áreas; el promedio de cada una se calcula en su dispositivo con sus definitivas, ponderado por créditos. La línea marca {nota(PASS_MARK)}: con eso se
-        aprueba. «Fortaleza» es ir en su promedio acumulado o por encima.
+        Pilo agrupa las materias; el promedio de cada área sale de sus notas, ponderado por créditos y calculado en su dispositivo. La raya marca {nota(PASS_MARK)}: con eso se aprueba.
+        «Fortaleza» es ir en su promedio acumulado o por encima.
       </p>
       <button type="button" className="pnt-link" aria-expanded={asTable} aria-controls="pnt-areas-tabla" onClick={() => setAsTable((v) => !v)}>
         {asTable ? "Ocultar la tabla" : "Ver como tabla"}
@@ -1346,6 +1637,6 @@ function AreaChart({ bars }: { bars: AreaBar[] }) {
           </table>
         )}
       </div>
-    </div>
+    </section>
   );
 }

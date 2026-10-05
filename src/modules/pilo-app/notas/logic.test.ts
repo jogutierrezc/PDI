@@ -2,10 +2,20 @@ import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import {
-  ASK_MAX,
+  ADVICE_COURSES,
+  ADVICE_PERIODS,
+  ADVICE_PERIOD_COURSES,
   CHART,
   LINK_KEY,
-  askRecommendations,
+  GOAL,
+  adviceFailure,
+  adviceSummary,
+  areaBars,
+  goalPlan,
+  gradedCredits,
+  lastAverage,
+  parseAdvice,
+  summaryCourses,
   canUseNotas,
   chartOf,
   checkPortalRows,
@@ -285,7 +295,9 @@ describe("lo que responde la función", () => {
     expect(h.periods.map((p) => p.id)).toEqual(["2024A", "2024B", "2026A"]);
     expect(h.periods[2]).toEqual({ id: "2026A", average: null, accumulated: null, credits: 0, creditsApproved: 0, totalApproved: 0, courses: [{ code: "", name: "X", credits: 0, def: null, approved: false, homologated: false, group: "", min: null }] });
     expect(h.record).toBe(true);
-    expect(parseHistory(null)).toEqual({ periods: [], record: false });
+    expect(h.advice).toBe(false);
+    expect(parseHistory({ periods: [], advice: true }).advice).toBe(true);
+    expect(parseHistory(null)).toEqual({ periods: [], record: false, advice: false });
   });
 });
 
@@ -480,24 +492,146 @@ describe("Mi evolución: la gráfica", () => {
   });
 });
 
-describe("lo que le recomiendo: la pregunta para Pilo", () => {
-  it("lleva el resumen calculado, en primera persona, y cabe en la caja de la conversación", () => {
-    const q = askRecommendations(RECORD, "2025B");
-    expect(q).toBe(
-      "Este es el resumen de mi récord académico (4 periodos). Mi promedio acumulado va en 3,67: prácticamente igual que hace 3 periodos. Mi mejor periodo fue 2025B (4,24) y el más difícil, 2024B (2,9). En 2025B mi promedio (4,24) estuvo 0,78 por encima de lo que traía en los periodos anteriores. Reprobé una vez: Física II en 2024B. La repetí y la aprobé. ¿Qué me recomienda para mejorar y en qué debería concentrarme?",
-    );
-    expect(q.length).toBeLessThanOrEqual(ASK_MAX);
-    expect(askRecommendations([])).toBe("");
+describe("qué necesita para llegar a su meta", () => {
+  // Va en 3,5 con 60 créditos que pesan; lleva 60 aprobados y eso es el 60 % del plan: le faltan 40.
+  const base = { accumulated: 3.5, graded: 60, approved: 60, percent: 60 };
+
+  it("dice cuánto debe promediar en los créditos que le faltan", () => {
+    // (4,0 × 100 − 3,5 × 60) / 40 = 4,75.
+    expect(goalPlan({ ...base, goal: 4 })).toEqual({ status: "posible", needed: 4.75, remaining: 40, best: 4.1, accumulated: 3.5 });
+    // Hacia arriba, a la centésima: con lo que se muestra, alcanza.
+    expect(goalPlan({ accumulated: 3.5, graded: 61, approved: 61, percent: 61, goal: 3.8 })).toMatchObject({ status: "posible", remaining: 39, needed: 4.27 });
   });
 
-  it("no lleva nada que identifique a la persona, y nunca se pasa del tope", () => {
-    const long = Array.from({ length: 14 }, (_, i) => period(`${2015 + Math.floor(i / 2)}${i % 2 ? "B" : "A"}`, [course(`MATERIA DE NOMBRE MUY LARGO NÚMERO ${i} CON MUCHAS PALABRAS`, 3, 2)], { average: 2, accumulated: 2 }));
-    const q = askRecommendations(long);
-    expect(q.length).toBeLessThanOrEqual(ASK_MAX);
-    expect(q).toMatch(/¿Qué me recomienda para mejorar y en qué debería concentrarme\?$/);
-    // Ni el programa, ni un código, ni un documento, ni un correo: solo promedios, periodos y materias.
-    const withHead = askRecommendations(RECORD, "2025B");
-    expect(withHead).not.toMatch(/INGENIERÍA|\b\d{6,}\b|@/);
+  it("meta cumplida: ya va ahí o por encima, y dice con qué la mantiene", () => {
+    expect(goalPlan({ ...base, goal: 3.4 })).toMatchObject({ status: "cumplida", needed: 3.25, remaining: 40 });
+    expect(goalPlan({ ...base, goal: 3.5 })).toMatchObject({ status: "cumplida", needed: 3.5 });
+  });
+
+  it("meta inalcanzable: pediría más de 5,0, y dice a lo más que llega", () => {
+    // (4,2 × 100 − 210) / 40 = 5,25; sacando 5,0 en todo llega a (210 + 200) / 100 = 4,1.
+    expect(goalPlan({ ...base, goal: 4.2 })).toMatchObject({ status: "inalcanzable", best: 4.1, remaining: 40 });
+    // Justo en 5,0 todavía se puede.
+    expect(goalPlan({ ...base, goal: 4.1 })).toMatchObject({ status: "posible", needed: 5 });
+  });
+
+  it("sin con qué calcular, lo dice; y sin créditos por cursar, también", () => {
+    for (const missing of [{ accumulated: null }, { percent: null }, { percent: 0 }, { approved: 0 }, { graded: 0 }]) expect(goalPlan({ ...base, goal: 4, ...missing }), JSON.stringify(missing)).toEqual({ status: "sin_datos" });
+    expect(goalPlan({ ...base, percent: 100, goal: 4 })).toEqual({ status: "terminado", accumulated: 3.5 });
+    expect(goalPlan({ ...base, percent: 99.9, goal: 4 })).toEqual({ status: "terminado", accumulated: 3.5 });
+  });
+
+  it("la meta se acota entre 3,0 y 5,0", () => {
+    expect(goalPlan({ ...base, goal: 9 })).toEqual(goalPlan({ ...base, goal: 5 }));
+    expect(goalPlan({ ...base, goal: 1 })).toEqual(goalPlan({ ...base, goal: 3 }));
+    expect(GOAL).toEqual({ min: 3, max: 5, step: 0.1 });
+  });
+
+  it("los créditos que pesan en el promedio: con definitiva, sin homologadas ni lo que va en curso", () => {
+    // 2024A: 3 + 2 (la homologada no); 2024B: 3 + 3; 2025A: 3 + 3; 2025B: 3 + 2.
+    expect(gradedCredits(RECORD, "2025B")).toBe(22);
+    const open = period("2026A", [course("SIMULACIÓN", 3, 0)], { average: 0 });
+    expect(gradedCredits([...RECORD, open], "2026A")).toBe(22);
+    expect(lastAverage([...RECORD, open])).toBe(4.24);
+    expect(lastAverage([])).toBeNull();
+  });
+});
+
+describe("lo que le recomiendo: el resumen que se envía", () => {
+  const head = { program: "INGENIERÍA DE PRUEBAS", period: "2025B" };
+  const goals = { accumulated: 4.2, semester: 4.5 };
+
+  it("lleva el programa, las dos metas y, por periodo, promedios y materias: nada que identifique a la persona", () => {
+    const s = adviceSummary(RECORD, head, goals);
+    expect(s.program).toBe("Ingeniería de pruebas");
+    expect(s.goals).toEqual({ accumulated: 4.2, semester: 4.5 });
+    expect(s.periods.map((p) => p.id)).toEqual(["2024A", "2024B", "2025A", "2025B"]);
+    expect(s.periods[1]).toEqual({ id: "2024B", average: 2.9, accumulated: 3.33, courses: [{ name: "Física II", credits: 3, def: 2.6, state: "reprobada" }, { name: "Álgebra lineal", credits: 3, def: 3.2, state: "aprobada" }] });
+    expect(s.periods[0].courses[2]).toEqual({ name: "Inglés I", credits: 2, def: 4, state: "homologada" });
+    // Solo estas llaves: ni el código de las materias ni ningún otro identificador.
+    expect(Object.keys(s).sort()).toEqual(["goals", "periods", "program"]);
+    expect(Object.keys(s.periods[0].courses[0]).sort()).toEqual(["credits", "def", "name", "state"]);
+    expect(JSON.stringify(s)).not.toMatch(/"code"|"group"|"min"|fisica-ii/);
+    expect(summaryCourses(s)).toHaveLength(9);
+    expect(summaryCourses(s)[3]).toMatchObject({ name: "Física II", period: "2024B" });
+  });
+
+  it("sin metas, van vacías; y lo que va en curso viaja sin definitiva", () => {
+    const open = period("2026A", [course("SIMULACIÓN", 3, 0)], { average: 0, accumulated: 3.67 });
+    const s = adviceSummary([...RECORD, open], { period: "2026A" });
+    expect(s.goals).toEqual({ accumulated: null, semester: null });
+    expect(s.periods.at(-1)).toEqual({ id: "2026A", average: null, accumulated: 3.67, courses: [{ name: "Simulación", credits: 3, def: null, state: "en_curso" }] });
+  });
+
+  it("tiene topes, y se quedan los periodos más recientes", () => {
+    const many = Array.from({ length: 40 }, (_, i) => period(`${2000 + i}A`, Array.from({ length: 20 }, (_, k) => course(`MATERIA ${k}`, 3, 3.5)), { average: 3.5, accumulated: 3.5 }));
+    const s = adviceSummary(many, head, goals);
+    expect(summaryCourses(s).length).toBeLessThanOrEqual(ADVICE_COURSES);
+    expect(s.periods.length).toBeLessThanOrEqual(ADVICE_PERIODS);
+    for (const p of s.periods) expect(p.courses.length).toBeLessThanOrEqual(ADVICE_PERIOD_COURSES);
+    expect(s.periods.at(-1)!.id).toBe("2039A");
+    expect(adviceSummary([], head, goals).periods).toEqual([]);
+  });
+});
+
+describe("lo que le recomiendo: lo que vuelve", () => {
+  const summary = adviceSummary(RECORD, { program: "X", period: "2025B" }, null);
+  const body = {
+    courses: 9,
+    areas: [{ name: "Ciencias", courses: [3, 5] }, { name: "Matemáticas", courses: [0, 4, 3] }, { name: "Profesional", courses: [6, 7, 99, -1] }, { name: "Idiomas", courses: [2] }, { name: "ciencias", courses: [8] }],
+    recs: [
+      { title: "Refuerce Física II", why: "Fue su nota más baja.", action: "Pida una monitoría.", sources: [1, 9], grounded: true },
+      { title: "Siga así", why: "Va subiendo.", action: "", sources: [], grounded: true },
+      { title: "", why: "sin título", action: "x" },
+    ],
+    sources: [{ n: 1, title: "Guía de monitorías", section: "Cómo pedir una", path: "/pilo-ensenanza" }, { n: 2, title: "Otra", path: "javascript:alert(1)" }, { n: 1, title: "Repetida" }],
+  };
+
+  it("cada materia queda en una sola área y las recomendaciones solo citan fuentes que vinieron", () => {
+    const a = parseAdvice(body, 9);
+    expect(a.areas).toEqual([{ name: "Ciencias", courses: [3, 5] }, { name: "Matemáticas", courses: [0, 4] }, { name: "Profesional", courses: [6, 7] }, { name: "Idiomas", courses: [2] }]);
+    expect(a.recs).toEqual([
+      { title: "Refuerce Física II", why: "Fue su nota más baja.", action: "Pida una monitoría.", sources: [1], grounded: true },
+      // Dice «con documento» pero no cita ninguno: es general.
+      { title: "Siga así", why: "Va subiendo.", action: "", sources: [], grounded: false },
+    ]);
+    // Un enlace que no es una ruta del portal ni https no se enlaza.
+    expect(a.sources).toEqual([{ n: 1, title: "Guía de monitorías", section: "Cómo pedir una", path: "/pilo-ensenanza" }, { n: 2, title: "Otra", section: "", path: "" }]);
+  });
+
+  it("si la función contó otras materias, las áreas no valen: no se dibuja una gráfica con números corridos", () => {
+    expect(parseAdvice({ ...body, courses: 8 }, 9).areas).toEqual([]);
+    expect(parseAdvice({ ...body, courses: 8 }, 9).recs).toHaveLength(2);
+    expect(parseAdvice(null, 9)).toEqual({ areas: [], recs: [], sources: [] });
+  });
+
+  it("las barras por área: el promedio lo ponen las notas, ponderado por créditos, de mayor a menor", () => {
+    const bars = areaBars(summary, parseAdvice(body, 9).areas, 3.67);
+    expect(bars).toEqual([
+      // Programación 4,1 y Bases de datos 4,4, tres créditos cada una.
+      { name: "Profesional", avg: 4.25, credits: 6, count: 2, strong: true },
+      { name: "Matemáticas", avg: 3.3, credits: 6, count: 2, strong: false },
+      // Física II dos veces: 2,6 y 3,5.
+      { name: "Ciencias", avg: 3.05, credits: 6, count: 2, strong: false },
+    ]);
+    // «Idiomas» solo tenía una homologada: no tiene promedio y no sale.
+    expect(bars.map((b) => b.name)).not.toContain("Idiomas");
+  });
+
+  it("sin áreas de la IA, o con una sola, no hay gráfica: no se inventan", () => {
+    expect(areaBars(summary, [], 3.67)).toEqual([]);
+    expect(areaBars(summary, [{ name: "Todo", courses: [0, 1, 3] }], 3.67)).toEqual([]);
+  });
+
+  it("cada fallo se dice en palabras de la app, y se sabe si vale reintentar", () => {
+    expect(adviceFailure(403, { code: "apagado", error: "texto del servidor" })).toEqual({ code: "apagado", message: "La universidad aún no ha habilitado las recomendaciones con IA en Mis notas.", retry: false });
+    expect(adviceFailure(429, { code: "tope" })).toMatchObject({ code: "tope", retry: false });
+    expect(adviceFailure(429, { code: "limite" })).toMatchObject({ code: "limite", retry: false });
+    expect(adviceFailure(502, { code: "vacio" })).toMatchObject({ code: "vacio", retry: true });
+    expect(adviceFailure(504, { code: "tiempo" })).toMatchObject({ code: "tiempo", retry: true });
+    expect(adviceFailure(403, { error: "sin código" })).toMatchObject({ code: "perfil", retry: false });
+    expect(adviceFailure(503, null)).toMatchObject({ code: "proveedor", retry: true });
+    expect(adviceFailure(500, { code: "raro", error: "Traceback…" })).toEqual({ code: "desconocido", message: expect.not.stringContaining("Traceback"), retry: true });
   });
 });
 
@@ -506,39 +640,120 @@ describe("la pantalla", () => {
   const source = (file: string) => readFileSync(resolve(DIR, file), "utf8").replace(/\r\n/g, "\n");
   const strip = (css: string) => css.replace(/\/\*[\s\S]*?\*\//g, "");
   const pane = source("notas/NotasPane.tsx");
+  /** Lo que se pinta: sin los comentarios, que sí nombran lo que no se muestra. */
+  const shown = pane.replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$/gm, "");
   const css = strip(source("notas/notas.css"));
+  const rule = (selector: string) => css.split("}").find((block) => block.split("{")[0].split(",").some((s) => s.trim() === selector))?.split("{")[1] ?? "";
 
-  it("pide la autorización de Génesis antes de pedir la contraseña", () => {
-    expect(pane).toContain('<DataConsent\n              platform="genesis"');
-    expect(pane.indexOf("<DataConsent")).toBeLessThan(pane.indexOf('id="pnt-pass"'));
-    expect(pane).toMatch(/if \(connecting \|\| !granted\) return;/);
+  it("es una guía de Pilo en cinco momentos, y quien ya está conectado no la repite", () => {
+    expect(pane).toContain("const script = useMemo(() => guideScript(name), [name]);");
+    for (const m of [0, 1, 2, 3, 4]) expect(pane, `momento ${m}`).toContain(`{moment === ${m} && (`);
+    expect(pane).toContain('useState<"guia" | "notas">(() => (readLink(owner) ? "notas" : "guia"))');
+    // Se puede saltar la explicación.
+    expect(pane).toContain("Saltar la explicación");
+    // El nombre del saludo es el de la cuenta de Pilo: nunca sale de Génesis.
+    expect(pane).toContain("name={guideName(account)}");
+    expect(shown).not.toMatch(/head\.(name|user|nombre)/);
   });
 
-  it("la sede se elige antes del código y la contraseña; con un solo portal no se pregunta", () => {
-    expect(pane.indexOf('id="pnt-sede"')).toBeGreaterThan(pane.indexOf("<DataConsent"));
-    expect(pane.indexOf('id="pnt-sede"')).toBeLessThan(pane.indexOf('id="pnt-code"'));
+  it("pide la autorización de Génesis antes de la cuenta, y la sede antes del usuario y la contraseña", () => {
+    expect(pane).toContain('<DataConsent\n                  platform="genesis"');
+    expect(pane.indexOf("<DataConsent")).toBeLessThan(pane.indexOf('id="pnt-sede"'));
+    expect(pane.indexOf('id="pnt-sede"')).toBeLessThan(pane.indexOf('id="pnt-user"'));
+    expect(pane.indexOf('id="pnt-user"')).toBeLessThan(pane.indexOf('id="pnt-pass"'));
+    expect(pane).toMatch(/if \(connecting \|\| loading \|\| !granted\) return;/);
     expect(pane).toMatch(/\{sedes && sedes\.portals\.length > 1 \? \(/);
     // La que viene elegida es la de la cuenta de Pilo, si casa con un portal.
-    expect(pane).toContain("<Notas key={account.id} owner={account.id} campus={account.campus} online={online} />");
     expect(pane).toMatch(/pickPortal\(list\.portals, campus\)/);
-    // A la función viaja el id de la sede, y en la barra se dice a cuál está conectado.
     expect(pane).toContain("await connectGenesis(portalId, typed, pass);");
-    expect(pane).toContain("`Génesis ${link.portal.name}`");
     expect(source("notas/api.ts")).toContain('call({ action: "conectar", portal, code: code.trim(), password })');
     // La app nunca arma ni conoce una dirección de Génesis.
-    for (const file of ["notas/NotasPane.tsx", "notas/api.ts"]) expect(source(file), file).not.toMatch(/genesis_url|genesis_portals|genesisSite|\/genesis\//);
+    for (const file of ["notas/NotasPane.tsx", "notas/api.ts", "notas/guia.ts"]) expect(source(file), file).not.toMatch(/genesis_url|genesis_portals|genesisSite|\/genesis\//);
   });
 
-  it("no guarda las notas ni la contraseña: del almacenamiento solo sabe logic.ts, y solo del permiso", () => {
-    for (const file of ["notas/NotasPane.tsx", "notas/api.ts"]) expect(source(file), file).not.toMatch(/localStorage|sessionStorage|indexedDB|document\.cookie/);
+  it("no muestra ningún código ni identificador: ni el del estudiante, ni el de las materias", () => {
+    expect(shown).not.toMatch(/\.code\b|\bcode\}/);
+    expect(shown).not.toMatch(/\.group\b|portal\.id\}|\{owner\}|link\.permit\}/);
+    expect(shown).not.toMatch(/C[oó]digo de estudiante|su c[oó]digo de/i);
+    // Para entrar se pide el usuario de Génesis.
+    expect(pane).toContain('<Field id="pnt-user" label="Usuario de Génesis"');
+    expect(pane).toContain('"Materia sin nombre"');
+    // En la barra se dice la sede por su nombre.
+    expect(pane).toContain("Génesis · {link.portal.name} · solo lectura");
+    // Tampoco en los textos de los fallos.
+    for (const code of ["datos", "credenciales"] as const) expect(notasMessage(code)).not.toMatch(/c[oó]digo/i);
+  });
+
+  it("las metas mandan: quedan a la vista, se dibujan en la gráfica y viajan en el resumen", () => {
+    expect(pane).toContain('<Meter label="Acumulado" value={sums.accumulated} goal={goals.accumulated} line={accumulatedLine(accPlan, goals.accumulated)} />');
+    expect(pane).toContain('<Meter label="Último semestre" value={lastAvg} goal={goals.semester} line={semesterLine(lastAvg, goals.semester)} />');
+    expect(pane).toContain('{goals ? "Cambiar" : "Decir mis metas"}');
+    expect(pane).toMatch(/const editGoals = [\s\S]{0,140}go\(3, !fromKeyboard\(event\)\);/);
+    expect(pane).toContain("<EvoChart rows={evo} goal={goals?.accumulated ?? null} />");
+    expect(pane).toContain("const summary = adviceSummary(history.periods, link.head, goals);");
+    // No hay un control de meta aparte dentro de «Mi evolución».
+    const evolucion = pane.slice(pane.indexOf('{tab === "evolucion"'), pane.indexOf('{tab === "semestre"'));
+    expect(evolucion).not.toMatch(/type="range"|GoalPick/);
+  });
+
+  it("no guarda las notas ni la contraseña: en el dispositivo quedan el permiso y las metas, y «Desconectar» borra los dos", () => {
+    for (const file of ["notas/NotasPane.tsx", "notas/api.ts", "notas/alas.ts"]) expect(source(file), file).not.toMatch(/localStorage|sessionStorage|indexedDB|document\.cookie/);
     expect(source("notas/logic.ts").match(/\.setItem\(/g)).toHaveLength(1);
-    expect(pane).toMatch(/setPass\(""\);\s*setCode\(""\);/);
+    expect(source("notas/guia.ts").match(/\.setItem\(/g)).toHaveLength(1);
+    expect(pane).toMatch(/setPass\(""\);\s*setUser\(""\);/);
     expect(pane).not.toMatch(/console\./);
+    expect(pane).toMatch(/const disconnect = \(\) => \{[\s\S]*?clearLink\(\);\s*clearGoals\(\);/);
+    expect(source("PiloApp.tsx")).toMatch(/if \(!loading && !session\) \{\s*clearLink\(\);\s*clearNotasLink\(\);\s*clearNotasGoals\(\);/);
   });
 
-  it("«Desconectar» borra el permiso, y salir de la cuenta también", () => {
-    expect(pane).toMatch(/const disconnect = \(\) => \{[\s\S]*?clearLink\(\);/);
-    expect(source("PiloApp.tsx")).toMatch(/if \(!loading && !session\) \{\s*clearLink\(\);\s*clearNotasLink\(\);/);
+  it("el selector de periodo no se puede ocultar: fijo arriba, con anterior, lista y siguiente, y nunca a lo ancho", () => {
+    expect(pane).toContain('aria-label="Periodo anterior"');
+    expect(pane).toContain('<select aria-label="Periodo" value={period.id}');
+    expect(pane).toContain('aria-label="Periodo siguiente"');
+    expect(rule(".pnt-picker")).toMatch(/position:\s*sticky/);
+    expect(rule(".pnt-periods")).toMatch(/flex-wrap:\s*wrap/);
+    expect(rule(".pnt-periods")).not.toMatch(/overflow/);
+    // Fuera de las tablas («Ver como tabla»), nada se desplaza a lo ancho.
+    expect([...css.matchAll(/([^{}]+)\{[^}]*overflow-x:\s*auto/g)].map((m) => m[1].trim())).toEqual([".pnt-scroll"]);
+  });
+
+  it("sirve en teléfono y en computador: la disposición sale del ancho de la pantalla, no del de un teléfono", () => {
+    expect(rule(".pnt")).toMatch(/container-type:\s*inline-size/);
+    expect(css).toMatch(/@container pnt \(min-width: 760px\)/);
+    const wide = css.slice(css.indexOf("@container pnt (min-width: 760px)"));
+    expect(wide).toMatch(/\.pnt-guide \{[^}]*grid-template-columns/);
+    expect(wide).toMatch(/\.pnt-body \{[^}]*grid-template-columns:\s*300px/);
+    expect(wide).toMatch(/\.pnt-rail \{[^}]*position:\s*sticky/);
+    expect(wide).toMatch(/\.pnt-periods \{[^}]*display:\s*flex/);
+    expect(css).toMatch(/\.pnt-panel--two \{[^}]*grid-template-columns:\s*repeat\(2/);
+    // Ninguna regla pregunta por el ancho de la ventana: todas, por el de esta pantalla.
+    expect(css).not.toMatch(/@media[^{]*(max|min)-width/);
+  });
+
+  it("la voz es la de Pilo, con el interruptor de la app, y el texto nunca la espera", () => {
+    expect(pane).toMatch(/import \{ prefetchOfficial, sayOfficial, stopOfficial \} from "\.\.\/official-voice";/);
+    expect(pane).toContain("const speaks = Boolean(voice?.advanced) && voiceOn;");
+    expect(pane).toContain("prefetchOfficial(voiceAhead(script, moment), voiceOptions);");
+    expect(pane).toMatch(/void sayOfficial\(spoken\(script\[moment\]\), \{ \.\.\.voiceOptions,/);
+    // El audio de la guía se guarda en el dispositivo por su texto, como el de la bienvenida.
+    expect(pane).toMatch(/keep: true \}/);
+    // Ni la voz del navegador ni un caché propio.
+    for (const file of ["notas/NotasPane.tsx", "notas/guia.ts", "notas/alas.ts"]) expect(source(file), file).not.toMatch(/speechSynthesis|caches\.open/);
+    // El texto está entero en el JSX: no depende de que el audio llegue.
+    expect(pane).toContain("{captionWords(beat).map((word, i) => (");
+    expect(source("PiloApp.tsx")).toContain("<NotasPane state={cuenta} online={online} voice={greeting} voiceOn={voiceOn} onVoice={pickVoice} />");
+  });
+
+  it("el aleteo es un módulo aparte, obedece al interruptor de sonido y solo suena desde un gesto", () => {
+    const alas = source("notas/alas.ts");
+    expect(alas).not.toMatch(/^import /m);
+    expect(alas).not.toMatch(/fetch\(|prefers-reduced-motion/);
+    expect(alas).toMatch(/if \(!on \|\| typeof window === "undefined"\) return null;/);
+    expect(pane).toMatch(/useEffect\(\(\) => \{\s*setWingsOn\(voiceOn\);/);
+    // Nunca dentro de un efecto: solo en lo que responde a un toque, un clic o el envío de un formulario.
+    for (const m of pane.matchAll(/use(Layout)?Effect\(\(\) => \{[\s\S]*?\n  \}, \[[^\]]*\]\);/g)) expect(m[0]).not.toMatch(/\b(wings|glide)\(/);
+    expect(pane.match(/\bwings\(/g)!.length).toBeGreaterThanOrEqual(4);
+    expect(pane.match(/\bglide\(/g)!.length).toBeGreaterThanOrEqual(3);
   });
 
   it("«Mi semestre» no trae datos ni llama a nada: solo su aviso", () => {
@@ -548,24 +763,34 @@ describe("la pantalla", () => {
     expect(panel).not.toMatch(/periods|history|fetch|load[A-Z]|nota\(/);
   });
 
-  it("las recomendaciones no fuerzan el adjunto: dejan la pregunta escrita en la conversación", () => {
-    expect(pane).toMatch(/navigate\(APP_PATHS\.ensenanza, \{ state: \{ nueva: true, pregunta: askRecommendations\(/);
-    for (const file of ["notas/NotasPane.tsx", "notas/api.ts", "notas/logic.ts"]) expect(source(file), file).not.toMatch(/askQuestionStream|pilo-ia|passages/);
+  it("las recomendaciones se escriben ahí mismo: no mandan al chat, y solo se piden al pulsar", () => {
+    expect(pane).not.toMatch(/useNavigate|navigate\(|APP_PATHS/);
+    expect(pane).toContain("const got = await loadAdvice(summary, ctl.signal);");
+    // El único que llama a loadAdvice es el botón.
+    expect(pane.match(/loadAdvice\(/g)).toHaveLength(1);
+    expect(pane).toContain("onAsk={(e) => void askAdvice(e)}");
+    expect(source("notas/api.ts")).toContain('body: JSON.stringify({ action: "evolucion", portal: "ensenanza", summary }),');
+    expect(pane).toContain("Recomendación general, sin documento de la universidad");
+    // La gráfica de áreas no se muestra sin áreas de la IA.
+    expect(pane).toContain("if (!bars.length) return null;");
   });
 
   it("el estado de una materia lleva glifo y palabra; las series, además del color, distinto trazo", () => {
     expect(pane).toMatch(/\{STATE_GLYPH\[state\]\}\s*<\/svg>\s*\{STATE_LABEL\[state\]\}/);
     expect(css).toMatch(/\.pnt-line--acc,\s*\.pnt-key--acc \{[^}]*stroke-dasharray/);
     expect(pane).toContain('className="pnt-dot"');
-    expect(pane).toContain("Ver como tabla");
+    expect(shown.match(/Ver como tabla/g)!.length).toBe(2);
+    expect(pane).toContain('{b.strong ? "Fortaleza" : "Por reforzar"}');
+    // Los textos de las gráficas van en tinta, nunca del color de la serie.
+    for (const m of css.matchAll(/([^{}]+)\{([^}]*)\}/g)) if (/text|__val|__top b|caption/.test(m[1])) expect(m[2], m[1]).not.toMatch(/var\(--c-s[12]\)/);
   });
 
   it("los colores son los del tema, lo que se toca mide 44 px y solo se anima transform y opacidad", () => {
     expect([...css.matchAll(/#[0-9a-fA-F]{3,8}\b|rgba?\(|hsla?\(/g)].map((m) => m[0])).toEqual([]);
     expect(css).toMatch(/var\(--c-s1\)/);
     expect(css).toMatch(/var\(--c-s2\)/);
-    const rule = (selector: string) => css.split("}").find((block) => block.split("{")[0].split(",").some((s) => s.trim() === selector))?.split("{")[1] ?? "";
-    for (const selector of [".pnt-tabs button", ".pnt-periods button", ".pnt-link"]) expect(Number(rule(selector).match(/min-height:\s*(\d+)px/)?.[1] ?? 0), selector).toBeGreaterThanOrEqual(44);
+    for (const selector of [".pnt-tabs button", ".pnt-periods button", ".pnt-link", ".pnt-chipbtn", ".pnt-goal input"]) expect(Number(rule(selector).match(/min-height:\s*(\d+)px/)?.[1] ?? 0), selector).toBeGreaterThanOrEqual(44);
+    for (const selector of [".pnt-stepper button", ".pnt-stepper select"]) expect(Number(rule(selector).match(/[^-]height:\s*(\d+)px/)?.[1] ?? 0), selector).toBeGreaterThanOrEqual(44);
     for (const [, value] of css.matchAll(/transition:\s*([^;]+);/g)) expect(value).not.toMatch(/\b(all|width|height|top|left|margin|padding)\b/);
     expect(css).toMatch(/prefers-reduced-motion: reduce/);
     expect(css).toMatch(/scale\(0\.97\)/);
@@ -573,11 +798,15 @@ describe("la pantalla", () => {
 
   it("el movimiento se revierte, respeta el movimiento reducido y la línea se dibuja una vez por conexión", () => {
     expect(pane.match(/gsap\.context\(/g)!.length).toBe(pane.match(/ctx\.revert\(\)/g)!.length);
-    expect(pane.match(/reducedMotion\(\)/g)!.length).toBeGreaterThanOrEqual(5);
-    expect(pane).toMatch(/if \(tab !== "evolucion" \|\| !ready \|\| drawn\.current \|\| !root\.current\) return;\s*drawn\.current = true;/);
+    expect(pane.match(/gsap\.context\(/g)!.length).toBe(5);
+    expect(pane.match(/reducedMotion\(\)/g)!.length).toBeGreaterThanOrEqual(6);
+    expect(pane).toMatch(/if \(stage !== "notas" \|\| tab !== "evolucion" \|\| !ready \|\| drawn\.current \|\| !root\.current\) return;\s*drawn\.current = true;/);
     // Solo una conexión nueva (o desconectar, o que el permiso venza) deja dibujarla otra vez.
     expect(pane.match(/drawn\.current = false;/g)).toHaveLength(3);
-    // Nada dura más de lo que dura una interfaz, salvo la línea, que se ve una vez.
-    for (const [, d] of pane.matchAll(/duration: (\d\.\d+)/g)) expect(Number(d)).toBeLessThanOrEqual(0.8);
+    // Entradas cortas; lo más largo es el vuelo del despegue, que se ve una vez.
+    for (const [, d] of pane.matchAll(/duration: (\d\.\d+)/g)) expect(Number(d)).toBeLessThanOrEqual(0.9);
+    // El despegue: Pilo vuela de su sitio en la guía a la barra, en arco (x y y con curvas distintas).
+    expect(pane).toMatch(/x: from\.left - to\.left[\s\S]{0,120}ease: "power3\.out"/);
+    expect(pane).toMatch(/y: from\.top - to\.top[\s\S]{0,140}ease: "power2\.inOut"/);
   });
 });

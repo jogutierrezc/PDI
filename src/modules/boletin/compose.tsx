@@ -102,7 +102,7 @@ const NAMES: Record<string, string> = {
 
 const sites = (catalog: OpenDataCatalog): Campus[] => catalog.campuses.filter((c) => c.id !== "todas");
 const yearsOf = (catalog: OpenDataCatalog, own?: number[]) => (own?.length ? catalog.years.filter((y) => own.includes(y)) : catalog.years);
-const periodColumn = (settings: BulletinSettings) => settings.cut === ALL_YEARS;
+const periodColumn = (settings: BulletinSettings) => settings.annualFigures && settings.cut === ALL_YEARS;
 const cutText = (cut: number) => (cut === ALL_YEARS ? `Periodo ${cutLabel(ALL_YEARS, null)}` : `Corte ${cut}`);
 
 /* --- Periodos académicos -------------------------------------------------------- */
@@ -228,9 +228,10 @@ function mapKey(map: MapDataset, cut: number, catalog: OpenDataCatalog): number 
 }
 
 /**
- * Tablas por periodo: cada año con sus periodos 1 y 2 y la cifra del año al
- * lado, en tramos de tres años para que las cifras se lean a tamaño de papel.
- * Con todo el periodo, la última tabla cierra con la cifra agrupada.
+ * Tablas por periodo: cada año con sus periodos 1 y 2, en tramos de años para
+ * que las cifras se lean a tamaño de papel. Con las cifras anuales activas,
+ * cada año lleva además su cifra al lado y, con todo el periodo, la última
+ * tabla cierra con la cifra agrupada.
  */
 function PeriodTables({
   head,
@@ -238,6 +239,7 @@ function PeriodTables({
   rows,
   format,
   highlightYear,
+  annual,
   grouped,
   caption,
 }: {
@@ -246,20 +248,23 @@ function PeriodTables({
   rows: { label: string; strong?: boolean; at: (year: number, term: Term | null) => number | null; grouped?: number | null }[];
   format: ValueFormat;
   highlightYear?: number;
+  /** Junto a los periodos va la cifra del año. */
+  annual: boolean;
   /** Rótulo de la columna agrupada ("2020–2025"), si va. */
   grouped?: string;
   caption?: ReactNode;
 }) {
-  const groups = chunk(years, YEARS_PER_TABLE);
+  // Sin la columna del año caben cuatro años (ocho columnas) por tabla.
+  const groups = chunk(years, annual ? YEARS_PER_TABLE : YEARS_PER_TABLE + 1);
   return (
     <div className="bol-period-tables">
       {groups.map((group, g) => {
         const last = g === groups.length - 1;
         const columns = group.flatMap((year) => [
           ...TERMS.map((term) => ({ label: cutLabel(year, term), year, term: term as Term | null })),
-          { label: String(year), year, term: null as Term | null },
+          ...(annual ? [{ label: String(year), year, term: null as Term | null }] : []),
         ]);
-        const withGrouped = last && grouped !== undefined;
+        const withGrouped = annual && last && grouped !== undefined;
         const yearCols = columns.map((c, i) => (c.term === null ? i : -1)).filter((i) => i >= 0);
         const highlightCol = highlightYear === undefined ? (withGrouped ? columns.length : undefined) : columns.findIndex((c) => c.year === highlightYear && c.term === null);
         return (
@@ -439,7 +444,7 @@ function IndicatorSheet({
     { id: "todas", label: "Total institucional", strong: withData.length > 0 },
   ];
   const columns = [...years.map((y) => (only ? cutLabel(y, only) : String(y))), ...(grouped ? [grouped] : [])];
-  const highlightCol = cut === ALL_YEARS ? columns.length - 1 : years.indexOf(cut);
+  const highlightCol = grouped ? columns.length - 1 : years.indexOf(cut);
   const calculation = [
     byTerm
       ? "Se reporta por periodo académico (1 y 2)."
@@ -551,8 +556,9 @@ function IndicatorSheet({
               years={years}
               format={indicator.format}
               highlightYear={cut === ALL_YEARS ? undefined : cut}
+              annual={settings.annualFigures}
               grouped={grouped}
-              caption={rule ? `Periodos 1 y 2 como se reportaron; en negrita, la cifra del año (${RULE_SHORT[rule]}).` : undefined}
+              caption={rule && settings.annualFigures ? `Periodos 1 y 2 como se reportaron; en negrita, la cifra del año (${RULE_SHORT[rule]}).` : "Periodos 1 y 2 como se reportaron."}
               rows={tableRows.map((row) => ({
                 label: row.label,
                 strong: row.strong,
@@ -774,15 +780,17 @@ function breakdownUnit(b: Breakdown, catalog: OpenDataCatalog, settings: Bulleti
       : []),
   ];
 
+  // La columna de todo el periodo solo va con las cifras anuales activas.
+  const groupedCol = withPeriod && settings.annualFigures;
   const tableRows = labels.map((label) => ({
     label,
     cells: [
       ...years.map((y) => cellOf(yearItem(label, y))),
-      ...(withPeriod ? [cellOf((b.values[ALL_YEARS] ?? []).find((i) => i.label === label))] : []),
+      ...(groupedCol ? [cellOf((b.values[ALL_YEARS] ?? []).find((i) => i.label === label))] : []),
     ],
   }));
-  const tableHead = ["Categoría", ...years.map((y) => (only ? cutLabel(y, only) : String(y))), ...(withPeriod ? [cutLabel(ALL_YEARS, null)] : [])];
-  const tableHighlight = withPeriod ? years.length : years.indexOf(key);
+  const tableHead = ["Categoría", ...years.map((y) => (only ? cutLabel(y, only) : String(y))), ...(groupedCol ? [cutLabel(ALL_YEARS, null)] : [])];
+  const tableHighlight = groupedCol ? years.length : years.indexOf(key);
   // Tabla larga: la hoja lleva las primeras filas y el resto sigue en continuación.
   const firstRows = long && tableRows.length > BREAKDOWN_ROWS - 10 ? BREAKDOWN_ROWS - 14 : tableRows.length;
   const rest: { from: number; rows: typeof tableRows }[] = [];
@@ -796,8 +804,9 @@ function breakdownUnit(b: Breakdown, catalog: OpenDataCatalog, settings: Bulleti
       years={years}
       format={b.format}
       highlightYear={key === ALL_YEARS ? undefined : key}
-      grouped={withPeriod ? cutLabel(ALL_YEARS, null) : undefined}
-      caption={rule ? `Periodos 1 y 2 como se reportaron; en negrita, la cifra del año (${RULE_SHORT[rule]}).` : undefined}
+      annual={settings.annualFigures}
+      grouped={groupedCol ? cutLabel(ALL_YEARS, null) : undefined}
+      caption={rule && settings.annualFigures ? `Periodos 1 y 2 como se reportaron; en negrita, la cifra del año (${RULE_SHORT[rule]}).` : "Periodos 1 y 2 como se reportaron."}
       rows={labels.map((label) => ({
         label,
         at: (year, term) => (term ? termValue(label, year, term) : yearValue(label, year)),

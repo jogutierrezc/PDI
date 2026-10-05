@@ -761,6 +761,12 @@ function ContentTab({ catalog, draft, setDraft }: { catalog: OpenDataCatalog; dr
             Omitir lo que no tiene cifras <small>indicadores y conjuntos vacíos, e informes que se quedan sin hojas</small>
           </span>
         </label>
+        <label className="oda-inline-check admin-field--wide">
+          <input type="checkbox" checked={draft.annualFigures} onChange={(e) => setDraft({ ...draft, annualFigures: e.target.checked })} />
+          <span>
+            Cifras anuales en las tablas <small>junto a los periodos 1 y 2, la cifra del año (suma, promedio o último periodo) y la de todo el periodo</small>
+          </span>
+        </label>
       </div>
 
       <div className="oda-bulletin-show" role="group" aria-label="Lo que muestra la hoja de cada indicador, para todos">

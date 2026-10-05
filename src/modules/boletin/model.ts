@@ -172,6 +172,8 @@ export interface BulletinSettings {
   campus: CampusId;
   /** Omite indicadores y conjuntos sin cifras, e informes que se quedan vacíos. */
   skipEmpty: boolean;
+  /** Las tablas suman a los periodos la cifra del año (suma, promedio…) y la de todo el periodo. */
+  annualFigures: boolean;
   /** Diversidad, Equidad e Inclusión: capítulo propio o sección de Bienestar. */
   deiPlacement: DeiPlacement;
   reports: BulletinReport[];
@@ -392,6 +394,8 @@ export function normalizeSettings(
     cut,
     campus,
     skipEmpty: saved.skipEmpty ?? true,
+    // Las tablas llevan los periodos como se reportaron; la cifra anual se pide a mano.
+    annualFigures: saved.annualFigures ?? false,
     deiPlacement: saved.deiPlacement === "bienestar" ? "bienestar" : "capitulo",
     reports,
     ...(format === "analisis" ? { analysis: normalizeAnalysis(saved.analysis) } : {}),

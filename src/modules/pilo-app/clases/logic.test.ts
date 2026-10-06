@@ -4,12 +4,15 @@ import { beforeEach, describe, expect, it } from "vitest";
 import { readAppPath } from "../routes";
 import {
   LINK_KEY, askAbout, canUseClases, clasesFailure, clearLink, courseDeliveries, courseLine, datesText, dueIn, failureOf, groupDeliveries, groupOf, kindLabel, parseAgenda, parseCourse,
-  readLink, saveLink, sortDeliveries,
+  parseSites, readLink, saveLink, siteIdShape, sortDeliveries,
 } from "./logic";
 import type { Delivery, LinkStore } from "./logic";
 
 const TOKEN = "0123456789abcdef0123456789abcdef";
 const SITE = { name: "Moodle UDES", user: "Laura Gómez" };
+/** El Moodle elegido entre varios, y el único que había. */
+const MOODLE = { id: "bucaramanga", name: "Bucaramanga", chosen: true };
+const ONLY = { id: "principal", name: "Principal", chosen: false };
 
 /** Un almacenamiento de prueba; `broken` falla al escribir (lleno o bloqueado). */
 function fakeStore(broken = false): LinkStore & { data: Map<string, string> } {
@@ -135,12 +138,79 @@ describe("el permiso de Moodle en el dispositivo", () => {
     const store = fakeStore();
     saveLink("u1", { token: TOKEN, site: SITE, ...({ password: "secreta", courses: [1] } as object) }, true, store);
     expect(Object.keys(JSON.parse(store.data.get(LINK_KEY)!)).sort()).toEqual(["owner", "site", "token", "v"]);
+    // Con su Moodle: el identificador y el nombre, y nunca una dirección.
+    saveLink("u1", { token: TOKEN, site: SITE, moodle: { ...MOODLE, ...({ url: "https://moodle.udes.edu.co" } as object) } }, true, store);
+    const kept = JSON.parse(store.data.get(LINK_KEY)!);
+    expect(Object.keys(kept).sort()).toEqual(["moodle", "owner", "site", "token", "v"]);
+    expect(kept.moodle).toEqual(MOODLE);
+    expect(store.data.get(LINK_KEY)).not.toContain("https://");
+  });
+});
+
+describe("el Moodle del permiso", () => {
+  beforeEach(() => clearLink(null));
+
+  it("se guarda con el permiso y vuelve al leerlo, en el dispositivo y en memoria", () => {
+    const store = fakeStore();
+    const saved = saveLink("u1", { token: TOKEN, site: SITE, moodle: MOODLE }, true, store);
+    expect(saved).toEqual({ token: TOKEN, site: SITE, moodle: MOODLE, kept: true });
+    expect(JSON.parse(store.data.get(LINK_KEY)!)).toEqual({ v: 1, owner: "u1", token: TOKEN, site: SITE, moodle: MOODLE });
+    clearLink(null);
+    expect(readLink("u1", store)).toEqual({ token: TOKEN, site: SITE, moodle: MOODLE, kept: true });
+    // Solo en memoria.
+    clearLink(store);
+    saveLink("u1", { token: TOKEN, site: SITE, moodle: ONLY }, false, store);
+    expect(readLink("u1", store)).toEqual({ token: TOKEN, site: SITE, moodle: ONLY, kept: false });
+  });
+
+  it("un permiso guardado antes de que hubiera varios sigue leyéndose, sin sitio", () => {
+    const store = fakeStore();
+    store.data.set(LINK_KEY, JSON.stringify({ v: 1, owner: "u1", token: TOKEN, site: SITE }));
+    const link = readLink("u1", store);
+    expect(link).toEqual({ token: TOKEN, site: SITE, kept: true });
+    expect(link && "moodle" in link).toBe(false);
+    // Y no se borra por no traerlo.
+    expect(store.data.has(LINK_KEY)).toBe(true);
+  });
+
+  it("un sitio que no se entiende no tumba el permiso: queda como los de antes", () => {
+    for (const moodle of [null, "bucaramanga", {}, { id: "Con Mayúsculas", name: "x" }, { id: "a", name: "muy corto" }, { id: "https://moodle.udes.edu.co", name: "x" }, { id: 7, name: "x" }]) {
+      const store = fakeStore();
+      store.data.set(LINK_KEY, JSON.stringify({ v: 1, owner: "u1", token: TOKEN, site: SITE, moodle }));
+      expect(readLink("u1", store)).toEqual({ token: TOKEN, site: SITE, kept: true });
+    }
+    // Ni al guardarlo.
+    const store = fakeStore();
+    const saved = saveLink("u1", { token: TOKEN, site: SITE, moodle: { id: "NO", name: "x", chosen: true } }, true, store);
+    expect("moodle" in saved).toBe(false);
+    expect(Object.keys(JSON.parse(store.data.get(LINK_KEY)!)).sort()).toEqual(["owner", "site", "token", "v"]);
+  });
+
+  it("el nombre se recorta y «elegido» solo vale si es verdadero", () => {
+    const store = fakeStore();
+    store.data.set(LINK_KEY, JSON.stringify({ v: 1, owner: "u1", token: TOKEN, site: SITE, moodle: { id: "cucuta", name: "N".repeat(200), chosen: "sí" } }));
+    expect(readLink("u1", store)?.moodle).toEqual({ id: "cucuta", name: "N".repeat(60), chosen: false });
+  });
+
+  it("el de otra cuenta no se entrega, con sitio o sin él", () => {
+    const store = fakeStore();
+    saveLink("u1", { token: TOKEN, site: SITE, moodle: MOODLE }, true, store);
+    expect(readLink("u2", store)).toBeNull();
+    expect(store.data.has(LINK_KEY)).toBe(false);
+  });
+
+  it("un identificador de sitio tiene la forma de la tabla", () => {
+    for (const ok of ["principal", "bucaramanga", "sede-2", "ab", `a${"b".repeat(23)}`]) expect(siteIdShape(ok), ok).toBe(true);
+    for (const bad of ["", "a", "1sede", "-sede", "Sede", "sede_2", "sede 2", `a${"b".repeat(24)}`, "sede/..", 5, null, undefined, ["principal"]]) expect(siteIdShape(bad), String(bad)).toBe(false);
   });
 });
 
 describe("clasesFailure", () => {
   it("lleva cada código a su estado de pantalla", () => {
     expect(clasesFailure(401, { code: "permiso", error: "Su permiso venció." })).toMatchObject({ code: "permiso", view: "vencido", message: "Su permiso venció." });
+    // Su Moodle ya no se ofrece: como el permiso vencido, se borra y se conecta de nuevo.
+    expect(clasesFailure(409, { code: "sitio", error: "Ese Moodle ya no está disponible en Pilo." })).toMatchObject({ code: "sitio", view: "vencido", message: "Ese Moodle ya no está disponible en Pilo." });
+    expect(clasesFailure(409, { code: "sitio" }).message).toContain("Conecte de nuevo");
     expect(clasesFailure(503, { code: "no_disponible" }).view).toBe("no_disponible");
     expect(clasesFailure(503, { code: "movil" }).view).toBe("no_disponible");
     expect(clasesFailure(401, { code: "credenciales" }).view).toBe("campo");
@@ -259,6 +329,27 @@ describe("las entregas", () => {
 });
 
 describe("lo que llega de la función", () => {
+  it("parseSites deja el identificador y el nombre de cada Moodle, en su orden", () => {
+    const sites = parseSites({
+      sites: [
+        { id: "bucaramanga", name: "Bucaramanga", url: "https://moodle.udes.edu.co", enabled: true },
+        { id: "cucuta", name: "  Cúcuta  " },
+        { id: "bucaramanga", name: "Repetido" },
+        { id: "Mal Id", name: "x" },
+        { id: "valledupar", name: "" },
+        { id: "bogota", name: "N".repeat(200) },
+        "basura",
+        null,
+      ],
+    });
+    expect(sites).toEqual([{ id: "bucaramanga", name: "Bucaramanga" }, { id: "cucuta", name: "Cúcuta" }, { id: "valledupar", name: "Moodle" }, { id: "bogota", name: "N".repeat(60) }]);
+    // De un sitio no pasa nada más: ni su dirección.
+    expect(JSON.stringify(sites)).not.toContain("https://");
+    expect(parseSites(null)).toEqual([]);
+    expect(parseSites({ sites: "no es una lista" })).toEqual([]);
+    expect(parseSites({ sites: Array.from({ length: 30 }, (_, i) => ({ id: `sede-${i}`, name: `Sede ${i}` })) })).toHaveLength(12);
+  });
+
   it("parseAgenda descarta lo que no se entiende y ordena las entregas", () => {
     const agenda = parseAgenda({
       site: { name: "Moodle UDES", user: "Laura" },

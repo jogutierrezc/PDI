@@ -15,11 +15,14 @@
      · No escribe en Moodle: solo llama las funciones de CLASES_ALLOWED
        (más abajo), todas de lectura. No entrega tareas, no escribe en foros,
        no presenta exámenes ni lee sus preguntas.
-     · No acepta una dirección del navegador: la del Moodle sale de lo que
-       configuró la administración (`pilo_spaces`, fila «ensenanza»,
-       `moodle_url`, y solo si `moodle_on`), se revisa (solo https, dominio
-       público, sin IP ni red interna, DNS comprobado, rutas fijas) y no se
-       siguen redirecciones.
+     · No acepta una dirección del navegador: la universidad tiene varios
+       Moodle, y los que se ofrecen son los que configuró la administración
+       (`pilo_moodle_sites`, espacio «ensenanza», solo los encendidos; 0133).
+       Del navegador llega, a lo sumo, el identificador de uno de ellos; su
+       dirección sale de esa lista, se revisa (solo https, dominio público,
+       sin IP ni red interna, DNS comprobado, rutas fijas) y no se siguen
+       redirecciones. De un sitio solo viajan al navegador su identificador
+       y su nombre: nunca su dirección.
 
    Quién puede llamar: solo una cuenta de Pilo activa (0120) con perfil de
    estudiante o de profesor. La sesión se comprueba aquí (verify_jwt = false).
@@ -28,9 +31,14 @@
    dispositivo de la persona (o solo en la memoria de la pestaña), no aquí.
 
    Acciones (POST, JSON, con la sesión de la cuenta de Pilo):
-     { action: "conectar", username, password } → { token, site: { name, user } }
-     { action: "agenda",   token }              → { site, courses, deliveries, from }
-     { action: "curso",    token, course }      → { course, sections, cut }
+     { action: "sitios" }                             → { sites: [{ id, name }] }
+     { action: "conectar", site, username, password } → { token, site_id, site: { name, user } }
+     { action: "agenda",   site, token }              → { site, courses, deliveries, from }
+     { action: "curso",    site, token, course }      → { course, sections, cut }
+
+   `site` es el identificador del Moodle. Un permiso guardado antes de que
+   hubiera varios no lo trae: vale mientras haya un solo sitio encendido. Si
+   el sitio ya no está (o falta y hay varios), el fallo es `sitio`.
 
    Los errores llevan `error` (para la persona) y `code` (para la página).
 
@@ -195,7 +203,7 @@ export function credentials(body: Record<string, unknown>): { username: string; 
 /** Los códigos con que esta función responde un fallo. La página los traduce a un estado. */
 export type ClasesCode =
   | "sesion" | "cuenta" | "perfil" | "suspendida" | "limite" | "no_disponible" | "datos"
-  | "credenciales" | "movil" | "permiso" | "mantenimiento" | "clave_moodle" | "curso"
+  | "credenciales" | "movil" | "permiso" | "mantenimiento" | "clave_moodle" | "curso" | "sitio"
   | "funcion" | "tiempo" | "red" | "tamano" | "moodle" | "interno";
 
 export interface Fault {
@@ -252,6 +260,60 @@ export function loginResult(data: unknown): { ok: true; token: string } | { ok: 
   const token = obj(data).token;
   if (!tokenShape(token)) return { ok: false, fault: { code: "moodle", message: "Moodle no entregó el permiso. Intente de nuevo en un momento.", status: 502 } };
   return { ok: true, token };
+}
+
+/* --- Los sitios de Moodle -------------------------------------------------------------------- */
+
+/** Lo más que se ofrece: los que la administración puede tener en un espacio (0133). */
+export const MAX_SITES = 12;
+
+/** El identificador de un sitio, con la forma que exige su tabla (0133). */
+export const siteIdShape = (v: unknown): v is string => typeof v === "string" && /^[a-z][a-z0-9-]{1,23}$/.test(v);
+
+export interface OpenSite {
+  id: string;
+  /** El nombre que le puso la administración. Con el identificador, es lo único del sitio que viaja al navegador. */
+  name: string;
+  /** Su dirección, ya revisada. No sale de la función. */
+  at: Extract<MoodleSite, { ok: true }>;
+}
+
+/**
+ * Los sitios que «Mis clases» ofrece, en el orden en que llegan: los
+ * encendidos, con un identificador bien formado y una dirección que pasa
+ * `moodleSite`. Lo demás no existe para quien llama.
+ */
+export function openSites(rows: unknown): OpenSite[] {
+  const out: OpenSite[] = [];
+  for (const raw of list(rows)) {
+    const r = obj(raw);
+    const id = r.id;
+    if (r.enabled !== true || !siteIdShape(id) || out.some((s) => s.id === id)) continue;
+    const at = moodleSite(r.url);
+    if (!at.ok) continue;
+    const name = typeof r.name === "string" ? r.name.replace(/\s+/g, " ").trim().slice(0, 60) : "";
+    out.push({ id, name: name || "Moodle", at });
+    if (out.length >= MAX_SITES) break;
+  }
+  return out;
+}
+
+/** Aún no hay ningún Moodle conectado a Pilo. */
+export const OFF: Fault = { code: "no_disponible", message: "Mis clases aún no está disponible: la universidad todavía no ha conectado a Pilo con Moodle.", status: 503 };
+/** El sitio que se pide no está (lo quitaron o lo apagaron), o no se dijo cuál y hay varios. */
+export const SITE_GONE: Fault = { code: "sitio", message: "Ese Moodle ya no está disponible en Pilo. Conecte de nuevo sus clases.", status: 409 };
+
+/**
+ * El sitio de un pedido: el que nombra su identificador, si sigue entre los
+ * que se ofrecen. Un permiso guardado antes de que hubiera varios no dice
+ * cuál: vale si hay exactamente uno. La dirección sale siempre de la lista de
+ * la administración; del navegador solo llega el identificador.
+ */
+export function pickSite(sites: OpenSite[], asked: unknown): { ok: true; site: OpenSite } | { ok: false; fault: Fault } {
+  if (sites.length === 0) return { ok: false, fault: OFF };
+  if (asked === undefined || asked === null || asked === "") return sites.length === 1 ? { ok: true, site: sites[0] } : { ok: false, fault: SITE_GONE };
+  const site = siteIdShape(asked) ? sites.find((s) => s.id === asked) : undefined;
+  return site ? { ok: true, site } : { ok: false, fault: SITE_GONE };
 }
 
 /* --- El texto -------------------------------------------------------------------------------- */
@@ -562,8 +624,6 @@ async function sha256(value: string): Promise<string> {
 
 const timedOut = (error: unknown) => error instanceof DOMException && (error.name === "TimeoutError" || error.name === "AbortError");
 
-const OFF: Fault = { code: "no_disponible", message: "Mis clases aún no está disponible: la universidad todavía no ha conectado a Pilo con Moodle.", status: 503 };
-
 Deno.serve(async (request) => {
   if (request.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
   if (request.method !== "POST") return json({ error: "Método no permitido." }, 405);
@@ -581,7 +641,7 @@ Deno.serve(async (request) => {
   }
   if (!body || typeof body !== "object" || Array.isArray(body)) return json({ error: "El pedido no es JSON.", code: "datos" }, 400);
   const action = String(body.action ?? "");
-  if (!["conectar", "agenda", "curso"].includes(action)) return json({ error: "Acción desconocida.", code: "datos" }, 400);
+  if (!["sitios", "conectar", "agenda", "curso"].includes(action)) return json({ error: "Acción desconocida.", code: "datos" }, 400);
 
   try {
     /* --- Quién llama: solo una cuenta de Pilo activa, de estudiante o de profesor -------------- */
@@ -614,17 +674,25 @@ Deno.serve(async (request) => {
       return Number(data ?? 0) > limit ? Math.max(1, Math.ceil((start + windowSeconds * 1000 - now) / 1000)) : null;
     };
     // «conectar» prueba una contraseña de Moodle: pocos intentos, para que esto no sirva para adivinarla.
-    const [perUser, perIp] = action === "conectar" ? [8, 20] : action === "agenda" ? [40, 120] : [80, 240];
+    const [perUser, perIp] = action === "conectar" ? [8, 20] : action === "agenda" || action === "sitios" ? [40, 120] : [80, 240];
     const retry = (await limited(`${action}:u`, perUser, 600, userId)) ?? (await limited(`${action}:i`, perIp, 600, ip));
     if (retry) return json({ error: "Va muy rápido: espere un momento antes de volver a intentarlo.", code: "limite", retry_after: retry }, 429, { "Retry-After": String(retry) });
 
-    /* --- La dirección de Moodle: la de la administración, nunca la del navegador ---------------- */
-    const space = await admin.from("pilo_spaces").select("moodle_on, moodle_url").eq("id", "ensenanza").maybeSingle();
-    const row = (space.data ?? null) as { moodle_on?: unknown; moodle_url?: unknown } | null;
-    // Sin la migración 0116, sin dirección o con Moodle apagado: aún no hay Mis clases.
-    if (space.error || !row || row.moodle_on !== true) return fail(OFF);
-    const site = moodleSite(row.moodle_url);
-    if (!site.ok) return fail(OFF);
+    /* --- Los sitios de Moodle: los de la administración, nunca una dirección del navegador ------ */
+    const listed = await admin.from("pilo_moodle_sites").select("id, name, url, enabled").eq("space", "ensenanza").eq("enabled", true).order("created_at", { ascending: true }).limit(MAX_SITES);
+    // Sin la migración 0133 o sin ningún sitio encendido con una dirección válida: aún no hay Mis clases.
+    if (listed.error) return fail(OFF);
+    const sites = openSites(listed.data);
+    if (sites.length === 0) return fail(OFF);
+
+    /* --- Sitios: entre cuáles se elige. Solo el identificador y el nombre ------------------------ */
+    if (action === "sitios") return json({ sites: sites.map((s) => ({ id: s.id, name: s.name })) });
+
+    // El pedido dice cuál por su identificador; la dirección es la de la lista.
+    const picked = pickSite(sites, body.site);
+    if (!picked.ok) return fail(picked.fault);
+    const siteId = picked.site.id;
+    const site = picked.site.at;
     // Un nombre público que resuelve a una red interna tampoco pasa (donde la plataforma deja preguntar).
     const dns = (Deno as unknown as { resolveDns?: (host: string, type: string) => Promise<unknown[]> }).resolveDns;
     if (typeof dns === "function") {
@@ -686,7 +754,7 @@ Deno.serve(async (request) => {
       if (!login.ok) return fail(login.fault);
       const info = await call(login.token, "core_webservice_get_site_info");
       if (!info.ok) return fail(info.fault);
-      return json({ token: login.token, site: shapeSite(info.data).info });
+      return json({ token: login.token, site_id: siteId, site: shapeSite(info.data).info });
     }
 
     /* --- Lo demás lleva el permiso que guarda el navegador --------------------------------------- */

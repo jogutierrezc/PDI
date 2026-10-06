@@ -2,12 +2,15 @@
    Mr. Pilo en Enseñanza · Memoria › Moodle.
 
    Pilo lee cursos de Moodle por su API de servicios web (función pilo-ia,
-   acción «moodle»; migración 0116). Aquí:
+   acción «moodle»; migraciones 0116 y 0133). La universidad tiene varios
+   Moodle: cada uno es un sitio, con su conexión y sus cursos. Aquí:
 
-     Conexión    la dirección del sitio (pilo_spaces.moodle_url) y el token, que
-                 se escribe y no vuelve: pilo_space_set_secret devuelve solo sus
-                 cuatro últimos caracteres. Ninguno de los dos viaja en los
-                 pedidos de esta página a la función.
+     Sitios      la lista (pilo_moodle_sites): elegir uno, agregar otro o
+                 quitarlo. De un sitio a la función solo viaja su id.
+     Conexión    la dirección del sitio y el token, que se escribe y no vuelve:
+                 pilo_moodle_site_set_token devuelve solo sus cuatro últimos
+                 caracteres. Ninguno de los dos viaja en los pedidos de esta
+                 página a la función.
      Probar      paso «probar»: qué sitio respondió y cuáles funciones de
                  lectura puede usar de verdad el token.
      Elegir      paso «categorias» y «cursos» (anota los cursos de una
@@ -19,7 +22,7 @@
 
    Los nombres de las funciones y las rutas de menú no están comprobados contra
    el Moodle de la universidad: la guía lo dice y «Probar conexión» es quien
-   responde. Sin la migración 0116 el panel lo dice y se apaga.
+   responde. Sin la migración 0133 el panel lo dice y se apaga.
    ========================================================================== */
 
 import { useEffect, useRef, useState } from "react";
@@ -27,10 +30,10 @@ import { MOODLE_ALLOWED } from "../../../../components/pilo/ai/logic";
 import { Icon } from "../../../../components/ui/Icon";
 import { Group, StatusMark, Switch, plural, when } from "../../pilo/ui";
 import { Skeleton, useEnter } from "../ui";
-import { courseSet, indexPending, moodleCategories, moodleCourse, moodleCourses, moodleProbe, reading, saveMoodleSpace, saveMoodleToken, useDocs, useMoodle, useRefreshMemory } from "./data";
-import type { CourseRow, MoodleCategory, MoodleProbe } from "./data";
+import { courseSet, deleteMoodleSite, indexPending, moodleCategories, moodleCourse, moodleCourses, moodleProbe, reading, saveMoodleSite, saveMoodleToken, useDocs, useMoodle, useRefreshMemory } from "./data";
+import type { CourseRow, DocRow, MoodleCategory, MoodleProbe, MoodleSiteRow } from "./data";
 import type { MemoryPartProps } from "./DocumentsPanel";
-import { StepError, checkMoodleUrl, faultOf, stagesOf } from "./flow";
+import { MAX_MOODLE_SITES, StepError, checkMoodleUrl, faultOf, moodleSiteId, stagesOf } from "./flow";
 import type { Fault } from "./flow";
 import { FaultNote, MissingNote, Stages, VisSeg } from "./parts";
 
@@ -53,13 +56,194 @@ const CORE = new Set(["core_webservice_get_site_info", "core_course_get_categori
 
 const COURSE_STATUS: Record<string, string> = { leido: "Leído", sin_cambios: "Sin cambios desde la última lectura", vacio: "Sin contenido legible", error: "La última lectura falló" };
 
-type Busy = null | "url" | "token" | "probe" | "cats" | `cat:${number}` | "sync";
+type Busy = null | "url" | "token" | "probe" | "cats" | `cat:${number}` | "sync" | "del";
 
 export function MoodlePanel({ space, disabled }: MemoryPartProps) {
   const setup = useMoodle(space, !disabled);
   const docs = useDocs(space, !disabled);
   const refresh = useRefreshMemory(space);
+  const [current, setCurrent] = useState<string | null>(null);
+  // Mientras un sitio lee o guarda, no se cambia de sitio: la lectura seguiría sin nadie mirándola.
+  const [locked, setLocked] = useState(false);
+  const [adding, setAdding] = useState(false);
+  const [name, setName] = useState("");
+  const [newUrl, setNewUrl] = useState("");
+  const [addBad, setAddBad] = useState<string | null>(null);
+  const [addFault, setAddFault] = useState<Fault | null>(null);
+  const [saving, setSaving] = useState(false);
+
+  const data = setup.data?.data;
+  const missing = setup.data?.missing ?? null;
+  const sites = data?.sites ?? [];
+  const site = sites.find((s) => s.id === current) ?? sites[0] ?? null;
+  const lit = sites.filter((s) => s.on).length;
+  const docById = new Map((docs.data?.data ?? []).map((d) => [d.id, d]));
+  const showAdd = adding || (Boolean(data) && sites.length === 0);
+
+  const add = async () => {
+    const clean = name.trim().replace(/\s+/g, " ");
+    if (!clean) return setAddBad("Escriba un nombre para el sitio.");
+    if (clean.length > 60) return setAddBad("El nombre es demasiado largo: hasta 60 caracteres.");
+    if (sites.some((s) => s.name.toLowerCase() === clean.toLowerCase())) return setAddBad("Ya hay un sitio con ese nombre.");
+    const checked = checkMoodleUrl(newUrl);
+    if (!checked.ok) return setAddBad(checked.why);
+    setAddBad(null);
+    setAddFault(null);
+    setSaving(true);
+    const id = moodleSiteId(clean, sites.map((s) => s.id));
+    try {
+      await saveMoodleSite(space, id, { name: clean, url: checked.url });
+      setCurrent(id);
+      setAdding(false);
+      setName("");
+      setNewUrl("");
+      refresh();
+    } catch (error) {
+      setAddFault(faultOf(error));
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const state = !data ? null : sites.length === 0 ? (
+    <StatusMark tone="off">Sin sitios</StatusMark>
+  ) : (
+    <StatusMark tone={lit ? "ok" : "warn"}>{`${plural(sites.length, "sitio", "sitios")} · ${lit === 0 ? "ninguno encendido" : plural(lit, "encendido", "encendidos")}`}</StatusMark>
+  );
+
+  return (
+    <Group title="Moodle" aside={<small>{state}</small>}>
+      <p className="pis-lead">
+        Pilo entra por la API de servicios web con un usuario de solo lectura y lee la estructura y el contenido de los cursos que usted elija. Nunca estudiantes, notas, entregas,
+        mensajes ni foros. Cada Moodle de la universidad es un sitio aparte, con su conexión y sus cursos.
+      </p>
+
+      {disabled ? (
+        <p className="pis-small">Sin la migración 0113 este Pilo no tiene memoria propia.</p>
+      ) : missing ? (
+        <MissingNote migration={missing} what="Sin ella no hay dónde guardar los sitios de Moodle, sus tokens ni sus cursos." />
+      ) : setup.isError ? (
+        <FaultNote fault={faultOf(setup.error)} lead="No se pudo leer la conexión con Moodle" onRetry={() => void setup.refetch()} />
+      ) : setup.isPending || !data ? (
+        <Skeleton rows={2} label="Leyendo la conexión con Moodle" />
+      ) : (
+        <>
+          {/* --- Los sitios ---------------------------------------------------------------- */}
+          <div className="pen-moodle__sites">
+            {sites.length > 0 && (
+              <div className="pis-seg" role="radiogroup" aria-label="Sitio de Moodle">
+                {sites.map((s) => (
+                  <button key={s.id} type="button" role="radio" aria-checked={s.id === site?.id} disabled={locked && s.id !== site?.id} onClick={() => setCurrent(s.id)}>
+                    {s.name}
+                    {s.on ? "" : <span className="pis-seg__n"> · apagado</span>}
+                  </button>
+                ))}
+              </div>
+            )}
+            {!showAdd && sites.length < MAX_MOODLE_SITES && (
+              <button type="button" className="button-secondary pen-refresh" disabled={locked} onClick={() => setAdding(true)}>
+                <Icon name="plus" size={14} /> Agregar sitio
+              </button>
+            )}
+          </div>
+
+          {showAdd && (
+            <form
+              className="pen-moodle__new"
+              onSubmit={(e) => {
+                e.preventDefault();
+                void add();
+              }}
+            >
+              {sites.length === 0 && <p className="pis-small">Todavía no hay ningún sitio de Moodle. Agregue el primero: después podrá sumar los demás, hasta {MAX_MOODLE_SITES}.</p>}
+              <div className="pen-moodle__conn">
+                <label className="pen-field">
+                  <span className="pen-field__label">Nombre del sitio</span>
+                  <input
+                    className="pen-input"
+                    type="text"
+                    value={name}
+                    maxLength={60}
+                    placeholder="Por ejemplo, Pregrado Bucaramanga"
+                    aria-invalid={Boolean(addBad) || undefined}
+                    onChange={(e) => {
+                      setName(e.target.value);
+                      setAddBad(null);
+                    }}
+                  />
+                  <small>Como lo verá la gente al elegir su Moodle en «Mis clases».</small>
+                </label>
+                <label className="pen-field">
+                  <span className="pen-field__label">Dirección de Moodle</span>
+                  <input
+                    className="pen-input"
+                    type="url"
+                    inputMode="url"
+                    value={newUrl}
+                    placeholder="https://…"
+                    aria-invalid={Boolean(addBad) || undefined}
+                    onChange={(e) => {
+                      setNewUrl(e.target.value);
+                      setAddBad(null);
+                    }}
+                  />
+                  <small>La de entrada al sitio, con https. Puede dejarla para después.</small>
+                </label>
+              </div>
+              {addBad && (
+                <p className="pis-small" role="alert">
+                  <b className="pen-bad">{addBad}</b>
+                </p>
+              )}
+              {addFault && <FaultNote fault={addFault} lead="No se agregó el sitio" />}
+              <div className="pis-actions">
+                <button type="submit" className="button-primary" disabled={saving}>
+                  {saving ? "Agregando…" : "Agregar sitio"}
+                </button>
+                {sites.length > 0 && (
+                  <button type="button" className="button-secondary" disabled={saving} onClick={() => (setAdding(false), setAddBad(null), setAddFault(null))}>
+                    Cancelar
+                  </button>
+                )}
+              </div>
+            </form>
+          )}
+
+          {site && (
+            <MoodleSite
+              key={site.id}
+              space={space}
+              data={site}
+              courses={data.courses.filter((c) => c.site === site.id)}
+              docById={docById}
+              several={sites.length > 1}
+              onBusy={setLocked}
+            />
+          )}
+        </>
+      )}
+
+      <MoodleGuide />
+    </Group>
+  );
+}
+
+/* --- Un sitio: su conexión y sus cursos ------------------------------------------------------- */
+
+interface MoodleSiteProps {
+  space: MemoryPartProps["space"];
+  data: MoodleSiteRow;
+  courses: CourseRow[];
+  docById: Map<string, DocRow>;
+  /** Hay más sitios: los textos nombran este. */
+  several: boolean;
+  onBusy: (busy: boolean) => void;
+}
+
+function MoodleSite({ space, data, courses, docById, several, onBusy }: MoodleSiteProps) {
+  const refresh = useRefreshMemory(space);
   const [url, setUrl] = useState("");
+  const [confirmDel, setConfirmDel] = useState(false);
   const [token, setToken] = useState("");
   const [editToken, setEditToken] = useState(false);
   const [busy, setBusy] = useState<Busy>(null);
@@ -76,24 +260,25 @@ export function MoodlePanel({ space, disabled }: MemoryPartProps) {
   // «Detener» (en el panel de Pilo) corta la fila de cursos al terminar el que se está leyendo.
   const halt = useRef(false);
 
-  const data = setup.data?.data;
-  const missing = setup.data?.missing ?? null;
-  const courses = data?.courses ?? [];
   const chosen = courses.filter((c) => c.selected);
-  const list = useEnter<HTMLUListElement>(setup.data ? courses.map((c) => c.course_id).join() : null);
-  const docById = new Map((docs.data?.data ?? []).map((d) => [d.id, d]));
+  const list = useEnter<HTMLUListElement>(courses.map((c) => c.course_id).join());
 
   useEffect(() => {
     alive.current = true;
     return () => {
       alive.current = false;
       reading.end(OWNER);
+      onBusy(false);
     };
-  }, []);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
-    if (data) setUrl(data.url);
-  }, [data?.url]); // eslint-disable-line react-hooks/exhaustive-deps
+    onBusy(Boolean(busy));
+  }, [busy]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
+    setUrl(data.url);
+  }, [data.url]);
 
   /** Corre algo que habla con la base o la función: marca qué está ocupado y deja el error donde pasó. */
   const act = async (what: Busy, where: string, fn: () => Promise<void>) => {
@@ -116,27 +301,36 @@ export function MoodlePanel({ space, disabled }: MemoryPartProps) {
     const checked = checkMoodleUrl(url);
     if (!checked.ok) return setUrlBad(checked.why);
     setUrlBad(null);
-    void act("url", "No se guardó la dirección", () => saveMoodleSpace(space, { moodle_url: checked.url }));
+    void act("url", "No se guardó la dirección", async () => {
+      await saveMoodleSite(space, data.id, { url: checked.url });
+      // Otra dirección es otro sitio: lo que respondió el anterior ya no vale.
+      if (alive.current) setProbe(null);
+    });
   };
+
+  const remove = () =>
+    act("del", "No se quitó el sitio", async () => {
+      await deleteMoodleSite(space, data.id);
+    });
 
   const test = () =>
     act("probe", "La prueba de conexión falló", async () => {
       reading.set({ owner: OWNER, title: "Pilo está llamando a Moodle", line: "Pide los datos del sitio y revisa qué funciones de lectura puede usar el token." });
-      const r = await moodleProbe(space);
+      const r = await moodleProbe(space, data.id);
       if (alive.current) setProbe(r);
     });
 
   const loadCats = () =>
     act("cats", "No se pudieron leer las categorías", async () => {
       reading.set({ owner: OWNER, title: "Pilo está leyendo las categorías de Moodle", line: "Solo las visibles." });
-      const r = await moodleCategories(space);
+      const r = await moodleCategories(space, data.id);
       if (alive.current) setCats(r.categories ?? []);
     });
 
   const loadCourses = (c: MoodleCategory) =>
     act(`cat:${c.id}`, `No se pudieron leer los cursos de «${c.name}»`, async () => {
       reading.set({ owner: OWNER, title: `Pilo está leyendo los cursos de «${c.name}»`, line: "Los anota para que usted elija; no lee su contenido todavía." });
-      await moodleCourses(space, c.id);
+      await moodleCourses(space, data.id, c.id);
     });
 
   /** Un curso: lo lee la función (un pedido), y luego se indexa lo nuevo. Devuelve si salió bien. */
@@ -155,7 +349,7 @@ export function MoodlePanel({ space, disabled }: MemoryPartProps) {
     setSyncing(c.course_id);
     reading.set({ owner: OWNER, title: `Pilo está leyendo «${c.fullname}»`, line, progress, counter, stop });
     try {
-      const r = await moodleCourse(space, c.course_id);
+      const r = await moodleCourse(space, data.id, c.course_id);
       const notes = [
         r.empty ? r.note || "El curso no tiene contenido legible." : r.unchanged ? "Sin cambios desde la última lectura." : `${plural(r.passages ?? 0, "pasaje", "pasajes")}: ${r.added ?? 0} nuevos, ${r.changed ?? 0} cambiados, ${r.removed ?? 0} quitados.`,
         r.redacted ? `${plural(r.redacted, "dato personal omitido", "datos personales omitidos")}.` : "",
@@ -207,7 +401,7 @@ export function MoodlePanel({ space, disabled }: MemoryPartProps) {
   const setCourse = async (c: CourseRow, patch: { selected?: boolean; vis?: "publico" | "sesion" }) => {
     setRowBusy(c.course_id);
     try {
-      await courseSet(space, c.course_id, patch);
+      await courseSet(space, data.id, c.course_id, patch);
       refresh();
     } catch (error) {
       if (alive.current) setResults((prev) => ({ ...prev, [c.course_id]: { fault: faultOf(error) } }));
@@ -218,15 +412,15 @@ export function MoodlePanel({ space, disabled }: MemoryPartProps) {
 
   /* --- Pintar ---------------------------------------------------------------------------------- */
 
-  const site = probe?.site ?? (data?.site.name ? { name: data.site.name, release: data.site.release } : null);
-  const functions = probe?.functions ?? data?.site.functions ?? null;
-  const ready = Boolean(data?.url) && Boolean(data?.token.has);
-  const connected = ready && Boolean(data?.checkedAt);
+  const site = probe?.site ?? (data.site.name ? { name: data.site.name, release: data.site.release } : null);
+  const functions = probe?.functions ?? data.site.functions ?? null;
+  const ready = Boolean(data.url) && data.token.has;
+  const connected = ready && Boolean(data.checkedAt);
   const lastSync = courses.reduce<string | null>((latest, c) => (c.synced_at && (!latest || c.synced_at > latest) ? c.synced_at : latest), null);
   const byCategory = new Map<string, CourseRow[]>();
   for (const c of courses) byCategory.set(c.category_name || "Sin categoría", [...(byCategory.get(c.category_name || "Sin categoría") ?? []), c]);
 
-  const state = !data ? null : !ready ? (
+  const state = !ready ? (
     <StatusMark tone="off">Sin conectar</StatusMark>
   ) : !connected ? (
     <StatusMark tone="warn">Sin probar</StatusMark>
@@ -237,22 +431,11 @@ export function MoodlePanel({ space, disabled }: MemoryPartProps) {
   );
 
   return (
-    <Group title="Moodle" aside={<small>{state}</small>}>
-      <p className="pis-lead">
-        Pilo entra por la API de servicios web con un usuario de solo lectura y lee la estructura y el contenido de los cursos que usted elija. Nunca estudiantes, notas, entregas,
-        mensajes ni foros.
-      </p>
-
-      {disabled ? (
-        <p className="pis-small">Sin la migración 0113 este Pilo no tiene memoria propia.</p>
-      ) : missing ? (
-        <MissingNote migration={missing} what="Sin ella no hay dónde guardar la conexión, el token ni los cursos de Moodle." />
-      ) : setup.isError ? (
-        <FaultNote fault={faultOf(setup.error)} lead="No se pudo leer la conexión con Moodle" onRetry={() => void setup.refetch()} />
-      ) : setup.isPending || !data ? (
-        <Skeleton rows={2} label="Leyendo la conexión con Moodle" />
-      ) : (
-        <>
+    <section className="pen-moodle__site" aria-label={`Sitio de Moodle: ${data.name}`}>
+      <header className="pis-row">
+        <h4 className="pen-moodle__name">{data.name}</h4>
+        <small>{state}</small>
+      </header>
           {/* --- Conexión ------------------------------------------------------------- */}
           <div className="pen-moodle__conn">
             <form
@@ -295,7 +478,7 @@ export function MoodlePanel({ space, disabled }: MemoryPartProps) {
                     e.preventDefault();
                     if (!token.trim()) return;
                     void act("token", "No se guardó el token", async () => {
-                      await saveMoodleToken(space, token);
+                      await saveMoodleToken(space, data.id, token);
                       if (alive.current) {
                         setToken("");
                         setEditToken(false);
@@ -322,7 +505,7 @@ export function MoodlePanel({ space, disabled }: MemoryPartProps) {
                   <button type="button" className="button-secondary" onClick={() => setEditToken(true)}>
                     Cambiar token
                   </button>
-                  <button type="button" className="pis-link pis-link--danger" disabled={Boolean(busy)} onClick={() => void act("token", "No se quitó el token", async () => void (await saveMoodleToken(space, "")))}>
+                  <button type="button" className="pis-link pis-link--danger" disabled={Boolean(busy)} onClick={() => void act("token", "No se quitó el token", async () => void (await saveMoodleToken(space, data.id, "")))}>
                     Quitar
                   </button>
                 </div>
@@ -335,11 +518,17 @@ export function MoodlePanel({ space, disabled }: MemoryPartProps) {
               {busy === "probe" ? "Probando…" : "Probar conexión"}
             </button>
             <span className="pen-doc__switch">
-              <Switch on={data.on} disabled={Boolean(busy)} onChange={(on) => void act("url", "No se cambió la lectura de Moodle", () => saveMoodleSpace(space, { moodle_on: on }))} label="Leer cursos de Moodle" />
+              <Switch
+                on={data.on}
+                disabled={Boolean(busy) || (!data.on && !data.url)}
+                onChange={(on) => void act("url", "No se cambió la lectura de Moodle", async () => void (await saveMoodleSite(space, data.id, { enabled: on })))}
+                label={`Leer cursos de ${data.name}`}
+              />
               {data.on ? "Lectura encendida" : "Lectura apagada"}
             </span>
             {!ready && <span className="pis-small">Guarde la dirección y el token para probar.</span>}
           </div>
+          <p className="pis-small">Encendido, este sitio también es uno de los que la app ofrece en «Mis clases», donde cada persona entra con su propia cuenta de Moodle.</p>
 
           {stopped > 0 && !busy && <p className="pis-small">Se detuvo: {plural(stopped, "curso quedó", "cursos quedaron")} sin leer. Lo leído queda guardado; vuelva a sincronizar cuando quiera.</p>}
           {fault && <FaultNote fault={fault.fault} lead={fault.where} onRetry={fault.fault.retry ? fault.retry : undefined} busy={Boolean(busy)} />}
@@ -469,11 +658,28 @@ export function MoodlePanel({ space, disabled }: MemoryPartProps) {
               </ul>
             </>
           )}
-        </>
-      )}
 
-      <MoodleGuide />
-    </Group>
+          {/* --- Quitar el sitio ------------------------------------------------------------ */}
+          <div className="pis-row pen-moodle__remove">
+            <p className="pis-small">
+              Quitar {several ? `«${data.name}»` : "este sitio"} borra su token, sus cursos anotados y lo que Pilo leyó de ellos. Quien lo tenga conectado en «Mis clases» tendrá que conectar de nuevo.
+            </p>
+            {confirmDel ? (
+              <span className="pis-actions">
+                <button type="button" className="button-secondary pen-refresh" disabled={Boolean(busy)} onClick={() => setConfirmDel(false)}>
+                  Cancelar
+                </button>
+                <button type="button" className="pis-link pis-link--danger" disabled={Boolean(busy)} onClick={() => void remove()}>
+                  {busy === "del" ? "Quitando…" : `Sí, quitar «${data.name}»`}
+                </button>
+              </span>
+            ) : (
+              <button type="button" className="pis-link pis-link--danger" disabled={Boolean(busy)} onClick={() => setConfirmDel(true)}>
+                Quitar este sitio
+              </button>
+            )}
+          </div>
+    </section>
   );
 }
 
@@ -564,8 +770,8 @@ function MoodleGuide() {
       <h5 className="pen-guide__title">En la intranet</h5>
       <ol className="pen-mg" style={{ counterReset: "mg 4" }}>
         <li>
-          <h6>Guarde la dirección y el token, y pruebe la conexión</h6>
-          <p>La dirección es la de entrada al sitio, con https. «Probar conexión» funciona con la lectura apagada y muestra qué funciones puede usar el token.</p>
+          <h6>Agregue el sitio, guarde su dirección y su token, y pruebe la conexión</h6>
+          <p>Cada Moodle de la universidad es un sitio aparte, con su propio token: repita los pasos de arriba en cada uno. La dirección es la de entrada al sitio, con https. «Probar conexión» funciona con la lectura apagada y muestra qué funciones puede usar el token.</p>
         </li>
         <li>
           <h6>Encienda la lectura, elija los cursos y sincronice</h6>

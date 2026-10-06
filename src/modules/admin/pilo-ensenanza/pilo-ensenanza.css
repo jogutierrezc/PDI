@@ -606,6 +606,15 @@
 
 .pen-moodle__conn { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-5); align-items: start; }
 .pen-moodle__probe, .pen-moodle__pick { display: grid; gap: var(--space-3); }
+/* Varios sitios (0133): la barra para elegir uno y, debajo, lo de ese sitio. */
+.pen-moodle__sites { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-3); }
+.pen-moodle__sites .pis-seg { flex-wrap: wrap; max-width: 100%; }
+.pen-moodle__sites .pen-refresh { display: inline-flex; align-items: center; gap: var(--space-2); }
+.pen-moodle__new, .pen-moodle__site { display: grid; gap: var(--space-4); }
+.pen-moodle__new { padding-bottom: var(--space-4); border-bottom: 1px solid var(--line-faint); }
+.pen-moodle__name { margin: 0; color: var(--brand-navy); font-size: var(--text-base); font-weight: 800; }
+.pen-moodle__remove { padding-top: var(--space-3); border-top: 1px solid var(--line-faint); }
+.pen-moodle__remove .pis-small { flex: 1 1 20rem; margin: 0; }
 .pen-moodle__probe code, .pen-fnlist code { padding: 1px 6px; background: var(--surface-3); border-radius: 5px; font-size: var(--text-xs); font-weight: 600; overflow-wrap: anywhere; }
 
 .pen-cats { display: grid; margin: 0; padding: 0; list-style: none; }

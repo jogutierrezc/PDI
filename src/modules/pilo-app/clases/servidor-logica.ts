@@ -2,9 +2,11 @@
    Mis clases (beta) · la lógica pura de la función `pilo-clases`.
 
    Todo lo que la función decide sin tocar la red ni la base: qué dirección de
-   Moodle se acepta, qué funciones de Moodle se pueden llamar (lista cerrada,
-   todas de lectura), cómo se arma cada pedido, qué significa cada error de
-   Moodle y qué queda de sus respuestas antes de devolverlas al navegador.
+   Moodle se acepta, cuáles de los sitios de la administración se ofrecen y
+   cuál atiende cada pedido, qué funciones de Moodle se pueden llamar (lista
+   cerrada, todas de lectura), cómo se arma cada pedido, qué significa cada
+   error de Moodle y qué queda de sus respuestas antes de devolverlas al
+   navegador.
 
    La función del servidor (supabase/functions/pilo-clases/index.ts) es un solo
    archivo, porque el editor del panel de Supabase solo acepta uno, y lleva
@@ -169,7 +171,7 @@ export function credentials(body: Record<string, unknown>): { username: string; 
 /** Los códigos con que esta función responde un fallo. La página los traduce a un estado. */
 export type ClasesCode =
   | "sesion" | "cuenta" | "perfil" | "suspendida" | "limite" | "no_disponible" | "datos"
-  | "credenciales" | "movil" | "permiso" | "mantenimiento" | "clave_moodle" | "curso"
+  | "credenciales" | "movil" | "permiso" | "mantenimiento" | "clave_moodle" | "curso" | "sitio"
   | "funcion" | "tiempo" | "red" | "tamano" | "moodle" | "interno";
 
 export interface Fault {
@@ -226,6 +228,60 @@ export function loginResult(data: unknown): { ok: true; token: string } | { ok: 
   const token = obj(data).token;
   if (!tokenShape(token)) return { ok: false, fault: { code: "moodle", message: "Moodle no entregó el permiso. Intente de nuevo en un momento.", status: 502 } };
   return { ok: true, token };
+}
+
+/* --- Los sitios de Moodle -------------------------------------------------------------------- */
+
+/** Lo más que se ofrece: los que la administración puede tener en un espacio (0133). */
+export const MAX_SITES = 12;
+
+/** El identificador de un sitio, con la forma que exige su tabla (0133). */
+export const siteIdShape = (v: unknown): v is string => typeof v === "string" && /^[a-z][a-z0-9-]{1,23}$/.test(v);
+
+export interface OpenSite {
+  id: string;
+  /** El nombre que le puso la administración. Con el identificador, es lo único del sitio que viaja al navegador. */
+  name: string;
+  /** Su dirección, ya revisada. No sale de la función. */
+  at: Extract<MoodleSite, { ok: true }>;
+}
+
+/**
+ * Los sitios que «Mis clases» ofrece, en el orden en que llegan: los
+ * encendidos, con un identificador bien formado y una dirección que pasa
+ * `moodleSite`. Lo demás no existe para quien llama.
+ */
+export function openSites(rows: unknown): OpenSite[] {
+  const out: OpenSite[] = [];
+  for (const raw of list(rows)) {
+    const r = obj(raw);
+    const id = r.id;
+    if (r.enabled !== true || !siteIdShape(id) || out.some((s) => s.id === id)) continue;
+    const at = moodleSite(r.url);
+    if (!at.ok) continue;
+    const name = typeof r.name === "string" ? r.name.replace(/\s+/g, " ").trim().slice(0, 60) : "";
+    out.push({ id, name: name || "Moodle", at });
+    if (out.length >= MAX_SITES) break;
+  }
+  return out;
+}
+
+/** Aún no hay ningún Moodle conectado a Pilo. */
+export const OFF: Fault = { code: "no_disponible", message: "Mis clases aún no está disponible: la universidad todavía no ha conectado a Pilo con Moodle.", status: 503 };
+/** El sitio que se pide no está (lo quitaron o lo apagaron), o no se dijo cuál y hay varios. */
+export const SITE_GONE: Fault = { code: "sitio", message: "Ese Moodle ya no está disponible en Pilo. Conecte de nuevo sus clases.", status: 409 };
+
+/**
+ * El sitio de un pedido: el que nombra su identificador, si sigue entre los
+ * que se ofrecen. Un permiso guardado antes de que hubiera varios no dice
+ * cuál: vale si hay exactamente uno. La dirección sale siempre de la lista de
+ * la administración; del navegador solo llega el identificador.
+ */
+export function pickSite(sites: OpenSite[], asked: unknown): { ok: true; site: OpenSite } | { ok: false; fault: Fault } {
+  if (sites.length === 0) return { ok: false, fault: OFF };
+  if (asked === undefined || asked === null || asked === "") return sites.length === 1 ? { ok: true, site: sites[0] } : { ok: false, fault: SITE_GONE };
+  const site = siteIdShape(asked) ? sites.find((s) => s.id === asked) : undefined;
+  return site ? { ok: true, site } : { ok: false, fault: SITE_GONE };
 }
 
 /* --- El texto -------------------------------------------------------------------------------- */

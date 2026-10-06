@@ -11,15 +11,20 @@
         se consulta nada. La segunda casilla decide si el permiso queda en
         este dispositivo o solo mientras la pestaña esté abierta.
      2. El usuario y la contraseña de Moodle: se usan una vez para pedir el
-        permiso de lectura y no se guardan.
+        permiso de lectura y no se guardan. La universidad tiene varios
+        Moodle: si la administración ofrece más de uno, aquí se elige cuál
+        (sin elegir no se conecta); con uno solo, no se pregunta nada. La
+        conexión es a un Moodle a la vez: para pasar a otro, se desconecta y
+        se conecta de nuevo.
      3. Conectado: las próximas entregas por fecha, con su curso, y los
         cursos. De cada entrega (y de todas las de un curso) sale un archivo
         de calendario armado aquí mismo, o la lista de fechas para copiar.
         «Preguntarle a Pilo» deja escrita una pregunta con los títulos (nunca
         con contenidos de Moodle) en la conversación de Enseñanza.
 
-   Otros estados: el permiso venció (se borra y se pide conectar de nuevo),
-   Mis clases aún no está disponible, y sin conexión.
+   Otros estados: el permiso venció o su Moodle ya no se ofrece (se borra y
+   se pide conectar de nuevo), Mis clases aún no está disponible, y sin
+   conexión.
 
    Los cursos y las fechas viven en la memoria de esta pantalla: no se guardan
    en el dispositivo ni en el servidor. El permiso, donde diga logic.ts.
@@ -42,10 +47,10 @@ import { fromKeyboard, reducedMotion } from "../pwa";
 import type { AccountState } from "../account/useAccount";
 import { Field, Msg } from "../account/parts";
 import { DataConsent } from "../terms/DataConsent";
-import { asFailure, connectMoodle, loadAgenda, loadCourse } from "./api";
+import { asFailure, connectMoodle, loadAgenda, loadCourse, loadSites } from "./api";
 import { buildIcs, icsFileName } from "./ics";
-import { askAbout, canUseClases, clearLink, courseDeliveries, courseLine, datesText, dueIn, dueLabel, groupDeliveries, groupOf, kindLabel, readLink, saveLink } from "./logic";
-import type { Agenda, ClasesFailure, Course, CourseDetail, Delivery, Link as MoodleLink } from "./logic";
+import { askAbout, canUseClases, clearLink, courseDeliveries, courseLine, datesText, dueIn, dueLabel, failureOf, groupDeliveries, groupOf, kindLabel, readLink, saveLink } from "./logic";
+import type { Agenda, ClasesFailure, Course, CourseDetail, Delivery, Link as MoodleLink, SiteRef } from "./logic";
 import "./clases.css";
 
 type Note = { tone: "ok" | "bad" | "info"; text: string };
@@ -108,14 +113,18 @@ function Clases({ owner, online }: { owner: string; online: boolean }) {
   const [off, setOff] = useState<string | null>(null);
   /** Un fallo que se dice donde esté la persona, con «Reintentar». */
   const [trouble, setTrouble] = useState<ClasesFailure | null>(null);
-  const [expired, setExpired] = useState(false);
+  /** El permiso se borró y hay que conectar de nuevo: el porqué. */
+  const [expired, setExpired] = useState<string | null>(null);
   const [note, setNote] = useState<Note | null>(null);
 
-  // El paso 1 (autorizar) y el paso 2 (usuario y contraseña de Moodle).
+  // El paso 1 (autorizar) y el paso 2 (cuál Moodle, si hay varios, y su usuario y contraseña).
   const [granted, setGranted] = useState<{ keep: boolean } | null>(null);
+  /** Los Moodle entre los que se elige; null mientras no se han leído. */
+  const [sites, setSites] = useState<SiteRef[] | null>(null);
+  const [siteId, setSiteId] = useState("");
   const [user, setUser] = useState("");
   const [pass, setPass] = useState("");
-  const [errors, setErrors] = useState<{ user?: string; pass?: string }>({});
+  const [errors, setErrors] = useState<{ site?: string; user?: string; pass?: string }>({});
   const [connecting, setConnecting] = useState(false);
 
   const [openCourse, setOpenCourse] = useState<number | null>(null);
@@ -143,7 +152,15 @@ function Clases({ owner, online }: { owner: string; online: boolean }) {
       setLink(null);
       setAgenda(null);
       setGranted(null);
-      setExpired(true);
+      setSites(null);
+      setSiteId("");
+      setExpired(
+        failure.code !== "sitio"
+          ? "Su permiso de Moodle venció o fue retirado, y ya se borró de este dispositivo. Para seguir, autorice y conecte de nuevo."
+          : where === "conectar"
+            ? "Ese Moodle ya no está disponible en Pilo. Autorice de nuevo y elija su Moodle."
+            : "Su conexión con Moodle ya no sirve: ese Moodle ya no está disponible en Pilo, o ahora hay que elegir entre varios. El permiso ya se borró de este dispositivo. Para seguir, autorice y conecte de nuevo.",
+      );
       setNote(null);
       focusTo.current = "inicio";
       return;
@@ -162,15 +179,36 @@ function Clases({ owner, online }: { owner: string; online: boolean }) {
     setTrouble(failure);
   }, []);
 
+  /** Los Moodle que ofrece la administración: se leen al autorizar, antes de pedir el usuario y la contraseña. */
+  const fetchSites = useCallback(async () => {
+    request.current?.abort();
+    const ctl = new AbortController();
+    request.current = ctl;
+    setSites(null);
+    setSiteId("");
+    setTrouble(null);
+    try {
+      const next = await loadSites(ctl.signal);
+      if (ctl.signal.aborted) return;
+      if (next.length === 0) return fail(failureOf("no_disponible"), "leer");
+      setSites(next);
+      // Con uno solo no hay nada que elegir.
+      setSiteId(next.length === 1 ? next[0].id : "");
+    } catch (error) {
+      if (ctl.signal.aborted) return;
+      fail(asFailure(error), "leer");
+    }
+  }, [fail]);
+
   const fetchAgenda = useCallback(
-    async (token: string) => {
+    async (token: string, site: string | undefined) => {
       request.current?.abort();
       const ctl = new AbortController();
       request.current = ctl;
       setLoading(true);
       setTrouble(null);
       try {
-        const next = await loadAgenda(token, ctl.signal);
+        const next = await loadAgenda(token, site, ctl.signal);
         if (ctl.signal.aborted) return;
         setNow(Date.now());
         setAgenda(next);
@@ -187,9 +225,11 @@ function Clases({ owner, online }: { owner: string; online: boolean }) {
 
   // Con un permiso ya en el dispositivo (o en la memoria de la pestaña), se leen las clases al entrar.
   const token = link?.token;
+  /** El Moodle del permiso; uno guardado antes de que hubiera varios no lo dice. */
+  const linkSite = link?.moodle?.id;
   useEffect(() => {
-    if (token && online) void fetchAgenda(token);
-  }, [token, online, fetchAgenda]);
+    if (token && online) void fetchAgenda(token, linkSite);
+  }, [token, linkSite, online, fetchAgenda]);
 
   // El foco sigue al estado: al paso nuevo, a las entregas recién leídas, o al comienzo si hubo que volver.
   useEffect(() => {
@@ -215,23 +255,25 @@ function Clases({ owner, online }: { owner: string; online: boolean }) {
 
   const connect = async (event: FormEvent) => {
     event.preventDefault();
-    if (connecting || !granted) return;
-    const problems = { user: user.trim() ? undefined : "Escriba su usuario de Moodle.", pass: pass ? undefined : "Escriba su contraseña de Moodle." };
+    if (connecting || !granted || !sites) return;
+    const chosen = sites.find((s) => s.id === siteId);
+    const problems = { site: chosen ? undefined : "Elija su Moodle.", user: user.trim() ? undefined : "Escriba su usuario de Moodle.", pass: pass ? undefined : "Escriba su contraseña de Moodle." };
     setErrors(problems);
-    if (problems.user || problems.pass) {
+    if (!chosen || problems.user || problems.pass) {
       animateNext.current = false;
-      document.getElementById(problems.user ? "pcl-user" : "pcl-pass")?.focus();
+      document.getElementById(problems.site ? "pcl-site" : problems.user ? "pcl-user" : "pcl-pass")?.focus();
       return;
     }
     setConnecting(true);
     setTrouble(null);
     setNote(null);
     try {
-      const out = await connectMoodle(user, pass);
-      const saved = saveLink(owner, out, granted.keep);
+      const out = await connectMoodle(chosen.id, user, pass);
+      const name = sites.find((s) => s.id === out.siteId)?.name ?? chosen.name;
+      const saved = saveLink(owner, { token: out.token, site: out.site, moodle: { id: out.siteId, name, chosen: sites.length > 1 } }, granted.keep);
       // La contraseña ya cumplió: no queda ni en el formulario.
       setPass("");
-      setExpired(false);
+      setExpired(null);
       setLink(saved);
       setNote({
         tone: "ok",
@@ -262,7 +304,10 @@ function Clases({ owner, online }: { owner: string; online: boolean }) {
     setLoading(false);
     setTrouble(null);
     setOff(null);
-    setExpired(false);
+    setExpired(null);
+    setSites(null);
+    setSiteId("");
+    setErrors({});
     setUser("");
     setPass("");
     setNote({ tone: "ok", text: "Se desconectó y se borró el permiso de este dispositivo." });
@@ -315,7 +360,7 @@ function Clases({ owner, online }: { owner: string; online: boolean }) {
     const have = details[course.id];
     if (!link || (have && have !== "cargando" && "sections" in have)) return;
     setDetails((d) => ({ ...d, [course.id]: "cargando" }));
-    loadCourse(link.token, course.id).then(
+    loadCourse(link.token, link.moodle?.id, course.id).then(
       (detail) => setDetails((d) => ({ ...d, [course.id]: detail })),
       (error) => {
         const failure = asFailure(error);
@@ -358,15 +403,28 @@ function Clases({ owner, online }: { owner: string; online: boolean }) {
         <Link className="pc-chip" data-strong to={APP_LOGIN}>
           Entrar con mi cuenta de Pilo
         </Link>
+      ) : link ? (
+        <button type="button" className="pc-chip" data-strong disabled={!online || loading} onClick={() => void fetchAgenda(link.token, link.moodle?.id)}>
+          Reintentar
+        </button>
       ) : (
-        link && (
-          <button type="button" className="pc-chip" data-strong disabled={!online || loading} onClick={() => void fetchAgenda(link.token)}>
+        // Sin la lista de los Moodle no se puede conectar: se vuelve a pedir.
+        granted &&
+        !sites && (
+          <button type="button" className="pc-chip" data-strong disabled={!online} onClick={() => void fetchSites()}>
             Reintentar
           </button>
         )
       )}
     </div>
   );
+
+  /** «Intentar de nuevo» cuando Mis clases no está disponible: las clases, o la lista de los Moodle. */
+  const retryOff = () => {
+    setOff(null);
+    if (link) void fetchAgenda(link.token, link.moodle?.id);
+    else if (granted) void fetchSites();
+  };
 
   /* Mis clases aún no está disponible. */
   if (off) {
@@ -382,7 +440,7 @@ function Clases({ owner, online }: { owner: string; online: boolean }) {
               <p>{off}</p>
               <p className="pc-hint">No es algo que usted deba arreglar: depende de la administración de Moodle y de Pilo.</p>
               <div className="pcl-tools">
-                <button type="button" className="pc-chip" data-strong disabled={!online} onClick={() => (link ? (setOff(null), void fetchAgenda(link.token)) : setOff(null))}>
+                <button type="button" className="pc-chip" data-strong disabled={!online} onClick={retryOff}>
                   Intentar de nuevo
                 </button>
                 {link && (
@@ -406,7 +464,7 @@ function Clases({ owner, online }: { owner: string; online: boolean }) {
         <div ref={startHead} tabIndex={-1} className="pcl-start">
           {expired && (
             <div className="pc-confirm" role="alert">
-              <span>Su permiso de Moodle venció o fue retirado, y ya se borró de este dispositivo. Para seguir, autorice y conecte de nuevo.</span>
+              <span>{expired}</span>
             </div>
           )}
           {offline}
@@ -417,7 +475,9 @@ function Clases({ owner, online }: { owner: string; online: boolean }) {
               onAuthorize={({ keep }) => {
                 setGranted({ keep });
                 setNote(null);
+                setErrors({});
                 focusTo.current = "paso";
+                void fetchSites();
               }}
             />
           ) : (
@@ -440,6 +500,30 @@ function Clases({ owner, online }: { owner: string; online: boolean }) {
                     Autorizó a Pilo a consultar sus cursos. {granted.keep ? "La conexión quedará guardada solo en este dispositivo." : "Solo por esta vez: al cerrar la pestaña, no queda nada guardado."}
                   </span>
                 </p>
+                {sites && sites.length > 1 && (
+                  <Field id="pcl-site" label="Su Moodle" hint="La universidad tiene varios Moodle: elija el de sus clases. Pilo se conecta a uno a la vez; para pasar a otro, desconecte y conecte de nuevo." error={errors.site}>
+                    {(aria) => (
+                      <select
+                        {...aria}
+                        name="moodle-sitio"
+                        required
+                        value={siteId}
+                        disabled={connecting}
+                        onChange={(e) => {
+                          setSiteId(e.target.value);
+                          if (errors.site) setErrors((x) => ({ ...x, site: undefined }));
+                        }}
+                      >
+                        {!siteId && <option value="">Elija su Moodle</option>}
+                        {sites.map((m) => (
+                          <option key={m.id} value={m.id}>
+                            {m.name}
+                          </option>
+                        ))}
+                      </select>
+                    )}
+                  </Field>
+                )}
                 <Field id="pcl-user" label="Usuario de Moodle" error={errors.user}>
                   {(aria) => (
                     <input
@@ -482,7 +566,7 @@ function Clases({ owner, online }: { owner: string; online: boolean }) {
                   <button
                     type="submit"
                     className="pa-btn pa-btn--main"
-                    disabled={connecting || !online}
+                    disabled={connecting || !online || !sites}
                     onClick={(e) => {
                       // Con Enter o con el teclado, la lista aparece en su sitio, sin recorrido.
                       animateNext.current = !fromKeyboard(e);
@@ -505,7 +589,7 @@ function Clases({ owner, online }: { owner: string; online: boolean }) {
                   </button>
                 </div>
                 <div className="pa-sr" role="status">
-                  {connecting ? "Pilo está pidiendo el permiso a Moodle." : ""}
+                  {connecting ? "Pilo está pidiendo el permiso a Moodle." : !sites && !trouble ? "Pilo está preparando la conexión con Moodle." : ""}
                 </div>
               </form>
             </section>
@@ -603,11 +687,12 @@ function Clases({ owner, online }: { owner: string; online: boolean }) {
                 Conectado
               </span>
               <b>{[link.site.name || "Moodle", link.site.user].filter(Boolean).join(" · ")}</b>
+              {link.moodle?.chosen && link.moodle.name && <small>Está conectado a «{link.moodle.name}». Para cambiar de Moodle, desconecte y conecte al otro.</small>}
               <small>{link.kept ? "La conexión está guardada solo en este dispositivo." : "La conexión dura mientras esta pestaña esté abierta."}</small>
             </p>
           </div>
           <div className="pcl-tools">
-            <button type="button" className="pc-chip" disabled={busy || !online} onClick={() => void fetchAgenda(link.token)}>
+            <button type="button" className="pc-chip" disabled={busy || !online} onClick={() => void fetchAgenda(link.token, link.moodle?.id)}>
               {loading && agenda ? "Actualizando…" : "Actualizar"}
             </button>
             <button type="button" className="pc-chip" onClick={disconnect}>

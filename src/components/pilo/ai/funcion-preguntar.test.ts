@@ -256,8 +256,16 @@ function fakeClient(w: World) {
       if (table === "pilo_edges") return { data: w.edges.filter((e) => spaceOf(e) === eq("space") && within("from_id").includes(e.from_id) && within("rel").includes(e.rel ?? "trata")), error: null };
       // Los temas: sin 0121, solo los del espacio; con la vista (0121) son comunes y se piden por su id, del mapa.
       if (table === "pilo_nodes") return { data: w.nodes.filter((n) => (eq("space") === undefined ? eq("source") === "mapa" : spaceOf(n) === eq("space")) && within("id").includes(n.id)), error: null };
-      if (table === "pilo_space_secret") return { data: { space: eq("space"), moodle_token: w.moodleToken }, error: null };
-      if (table === "pilo_moodle_courses") return { data: w.courses.find((c) => c.space === eq("space") && c.course_id === eq("course_id")) ?? null, error: null };
+      // Los sitios de Moodle (0133). El de estas pruebas es «principal» y sale de la ficha de prueba del espacio
+      // (moodle_on, moodle_url, moodle_site); sin esas llaves, la tabla no existe: falta la migración.
+      if (table === "pilo_moodle_sites") {
+        const home = w.spaces[String(eq("space"))];
+        if (!home || !("moodle_url" in home)) return { data: null, error: { message: "Could not find the table 'public.pilo_moodle_sites' in the schema cache" } };
+        if (eq("id") !== "principal") return { data: null, error: null };
+        return { data: { space: eq("space"), id: "principal", name: "Principal", url: home.moodle_url, enabled: home.moodle_on === true, site: home.moodle_site ?? {} }, error: null };
+      }
+      if (table === "pilo_moodle_site_secret") return { data: { space: eq("space"), site: eq("site"), token: w.moodleToken }, error: null };
+      if (table === "pilo_moodle_courses") return { data: w.courses.find((c) => c.space === eq("space") && c.site === eq("site") && c.course_id === eq("course_id")) ?? null, error: null };
       if (table === "pilo_answers") {
         if (op === "insert") {
           w.saved.push(row);
@@ -438,14 +446,14 @@ function fakeClient(w: World) {
           return w.noMap ? { data: null, error: { message: "Could not find the function public.pilo_doc_outline in the schema cache" } } : { data: { doc: args.p_doc, nodes: (args.p_nodes as Row[]).length, edges: (args.p_edges as Row[]).length, removed: 0, rejected: 0 }, error: null };
         case "pilo_moodle_courses_save":
           for (const r of args.p_rows as Row[]) {
-            const at = w.courses.find((c) => c.space === space && c.course_id === r.id);
+            const at = w.courses.find((c) => c.space === space && c.site === args.p_site && c.course_id === r.id);
             if (at) Object.assign(at, { fullname: r.fullname, shortname: r.shortname });
-            else w.courses.push({ space, course_id: r.id, fullname: r.fullname, shortname: r.shortname, selected: false, vis: "sesion", doc_id: null, content_hash: "", status: "", error: "" });
+            else w.courses.push({ space, site: args.p_site, course_id: r.id, fullname: r.fullname, shortname: r.shortname, selected: false, vis: "sesion", doc_id: null, content_hash: "", status: "", error: "" });
           }
           return { data: (args.p_rows as Row[]).length, error: null };
         case "pilo_moodle_course_set": {
-          const at = w.courses.find((c) => c.space === space && c.course_id === args.p_course);
-          if (!at) return { data: null, error: { message: "Ese curso no está anotado en este espacio." } };
+          const at = w.courses.find((c) => c.space === space && c.site === args.p_site && c.course_id === args.p_course);
+          if (!at) return { data: null, error: { message: "Ese curso no está anotado en este sitio." } };
           const { synced: _synced, ...patch } = args.p_patch as Row;
           Object.assign(at, patch);
           return { data: at, error: null };
@@ -1849,7 +1857,7 @@ describe("comprender (el mapa con IA)", () => {
     // Lo único que llegó a la base: el estado del mapa del Pilo de siempre, con su espacio dicho.
     expect(w.rpcs.filter((n) => /pilo_map|pilo_doc|pilo_moodle/.test(n))).toEqual(["pilo_map_status"]);
     expect(argsOf(w, "pilo_map_status")).toEqual([{ p_space: "planeacion", p_doc: null }]);
-    expect(w.queries.some((q) => q.table === "pilo_space_secret")).toBe(false);
+    expect(w.queries.some((q) => /pilo_space_secret|pilo_moodle_site/.test(q.table))).toBe(false);
     expect(w.mapSaved).toEqual([]);
   });
 
@@ -2038,7 +2046,8 @@ const moodleNet = (reply: (fn: string, form: URLSearchParams) => unknown) => {
   );
   return seen;
 };
-const moodle = (handler: Handler, body: Row, headers: Record<string, string> = adminAuth) => ask(handler, { action: "moodle", space: "ensenanza", ...body }, headers);
+/** De cuál sitio (0133): «principal», salvo que la prueba diga otro. */
+const moodle = (handler: Handler, body: Row, headers: Record<string, string> = adminAuth) => ask(handler, { action: "moodle", space: "ensenanza", site: "principal", ...body }, headers);
 const courseContents = [
   {
     id: 1,
@@ -2084,8 +2093,11 @@ describe("moodle (leer cursos por la API)", () => {
     expect((seen[0].init.headers as Record<string, string>)["Content-Type"]).toBe("application/x-www-form-urlencoded");
     expect(Object.fromEntries(seen[0].form)).toEqual({ wstoken: TOKEN, wsfunction: "core_webservice_get_site_info", moodlewsrestformat: "json" });
     // Ni el token ni el usuario técnico salen de la función: ni en la respuesta, ni en la bitácora, ni en la ficha.
-    const kept = w.queries.find((q) => q.table === "pilo_spaces" && q.op === "update")!;
-    expect(kept.row).toMatchObject({ moodle_site: { name: "Campus UDES", functions: { core_course_get_contents: true } }, moodle_checked_at: expect.any(String) });
+    const kept = w.queries.find((q) => q.table === "pilo_moodle_sites" && q.op === "update")!;
+    expect(kept.row).toMatchObject({ site: { name: "Campus UDES", functions: { core_course_get_contents: true } }, checked_at: expect.any(String) });
+    // Lo anota en la ficha de ESE sitio, no en la de otro.
+    expect(kept.filters).toEqual(expect.arrayContaining([["eq", "space", "ensenanza"], ["eq", "id", "principal"]]));
+    expect(w.queries.some((q) => q.table === "pilo_spaces" && q.op === "update")).toBe(false);
     for (const text of [JSON.stringify(out), JSON.stringify(w.logs), JSON.stringify(kept.row)]) {
       expect(text).not.toContain(TOKEN);
       expect(text).not.toContain("pilo_ws");
@@ -2133,9 +2145,19 @@ describe("moodle (leer cursos por la API)", () => {
     const noToken = moodleWorld();
     noToken.moodleToken = "";
     expect(await (await moodle(await boot(noToken), { step: "probar" })).json()).toMatchObject({ code: "config", error: expect.stringContaining("token") });
-    // Sin 0116 (la ficha del espacio no tiene las columnas de Moodle), lo dice.
+    // Sin 0133 (no existe la tabla de los sitios), lo dice.
     const old = teachWorld();
-    expect(await (await moodle(await boot(old), { step: "probar" })).json()).toMatchObject({ code: "migracion" });
+    expect(await (await moodle(await boot(old), { step: "probar" })).json()).toMatchObject({ code: "migracion", error: expect.stringContaining("0133") });
+    // Sin decir de cuál sitio, con un id que no tiene forma de id, o con uno que no existe: tampoco.
+    const some = await boot(moodleWorld());
+    for (const site of [undefined, "", "Principal", "https://campus.udes.edu.co", "a", 7]) {
+      const response = await ask(some, { action: "moodle", space: "ensenanza", step: "probar", ...(site === undefined ? {} : { site }) }, adminAuth);
+      expect(response.status, String(site)).toBe(400);
+      expect(await response.json(), String(site)).toMatchObject({ code: "config", error: expect.stringContaining("sitio") });
+    }
+    const gone = await moodle(some, { step: "probar", site: "otro-campus" });
+    expect(gone.status).toBe(404);
+    expect(await gone.json()).toMatchObject({ code: "config" });
     expect(seen).toHaveLength(0);
     // Apagado, se puede probar la conexión pero no leer.
     const off = await boot(moodleWorld({ moodle_on: false }));
@@ -2162,8 +2184,8 @@ describe("moodle (leer cursos por la API)", () => {
     expect(out).toEqual({ ok: true, category: 3, saved: 1, courses: [{ id: 42, shortname: "DID-01", fullname: "Didáctica general", category_id: 3, category_name: "Educación", time_modified: 1790000000, visible: true }] });
     expect(seen.map((s) => s.fn)).toEqual(["core_course_get_categories", "core_course_get_courses_by_field"]);
     expect(Object.fromEntries(seen[1].form)).toMatchObject({ field: "category", value: "3" });
-    expect(argsOf(w, "pilo_moodle_courses_save")).toEqual([{ p_space: "ensenanza", p_rows: out.courses }]);
-    expect(w.courses).toEqual([expect.objectContaining({ course_id: 42, selected: false, vis: "sesion" })]);
+    expect(argsOf(w, "pilo_moodle_courses_save")).toEqual([{ p_space: "ensenanza", p_site: "principal", p_rows: out.courses }]);
+    expect(w.courses).toEqual([expect.objectContaining({ site: "principal", course_id: 42, selected: false, vis: "sesion" })]);
   });
 
   it("lee un curso: solo estructura y contenido, como documento de la memoria con su lugar en el mapa", async () => {
@@ -2186,7 +2208,9 @@ describe("moodle (leer cursos por la API)", () => {
     expect(seen[2].form.get("courseids[0]")).toBe("42");
     // El documento: origen «moodle», con sesión de partida, en su espacio.
     const [saved] = argsOf(w, "pilo_doc_save");
-    expect(saved).toMatchObject({ p_space: "ensenanza", p_doc: { origin: "moodle", kind: "curso", source: "moodle", title: "Didáctica general", external_id: "42", vis: "sesion" } });
+    expect(saved).toMatchObject({ p_space: "ensenanza", p_doc: { origin: "moodle", kind: "curso", source: "moodle", title: "Didáctica general", external_id: "principal:42", vis: "sesion" } });
+    // El curso se anota y se marca en su sitio.
+    expect(argsOf(w, "pilo_moodle_course_set").every((a) => a.p_site === "principal" && a.p_course === 42)).toBe(true);
     expect(String((saved.p_doc as Row).id)).toMatch(/^[0-9a-f-]{36}$/);
     expect(out.doc).toBe((saved.p_doc as Row).id);
     // Los pasajes: título = curso, sección = sección › actividad, ruta = la dirección de la actividad.

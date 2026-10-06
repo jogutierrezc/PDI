@@ -2,17 +2,22 @@
    Mr. Pilo · Mis clases (beta) · los pedidos a la función `pilo-clases`.
 
    Cada pedido lleva la sesión de la cuenta de Pilo (la función comprueba que
-   sea de estudiante o de profesor) y, salvo «conectar», el permiso de Moodle
-   que guarda este dispositivo. La contraseña de Moodle pasa por aquí hacia la
-   función una sola vez y no se guarda en ningún sitio.
+   sea de estudiante o de profesor) y, salvo «sitios» y «conectar», el permiso
+   de Moodle que guarda este dispositivo. La contraseña de Moodle pasa por
+   aquí hacia la función una sola vez y no se guarda en ningún sitio.
+
+   La universidad tiene varios Moodle: de cada uno aquí solo se conoce su
+   identificador y su nombre, y eso es lo que se envía (`site`). La dirección
+   la pone la función. Un permiso guardado antes de que hubiera varios va sin
+   `site`.
 
    Nada de lo que llega se escribe en el almacenamiento: los cursos y las
    fechas viven en la memoria de la pantalla mientras está abierta.
    ========================================================================== */
 
 import { supabase } from "../../../lib/supabase";
-import { clasesFailure, failureOf, parseAgenda, parseCourse } from "./logic";
-import type { Agenda, ClasesFailure, CourseDetail, SiteInfo } from "./logic";
+import { clasesFailure, failureOf, parseAgenda, parseCourse, parseSites, siteIdShape } from "./logic";
+import type { Agenda, ClasesFailure, CourseDetail, SiteInfo, SiteRef } from "./logic";
 
 export class ClasesError extends Error {
   constructor(readonly failure: ClasesFailure) {
@@ -62,20 +67,26 @@ async function call(body: Record<string, unknown>, signal?: AbortSignal): Promis
   return parsed;
 }
 
-/** Pide a Moodle un permiso de lectura con el usuario y la contraseña de la persona. La contraseña no se guarda. */
-export async function connectMoodle(username: string, password: string): Promise<{ token: string; site: SiteInfo }> {
-  const out = (await call({ action: "conectar", username: username.trim(), password })) as { token?: unknown; site?: { name?: unknown; user?: unknown } } | null;
-  if (typeof out?.token !== "string" || !out.token) throw new ClasesError(failureOf("desconocido"));
-  const text = (v: unknown) => (typeof v === "string" ? v.slice(0, 120) : "");
-  return { token: out.token, site: { name: text(out.site?.name), user: text(out.site?.user) } };
+/** Los Moodle que ofrece la administración: de cada uno, su identificador y su nombre. */
+export async function loadSites(signal?: AbortSignal): Promise<SiteRef[]> {
+  return parseSites(await call({ action: "sitios" }, signal));
 }
 
-/** Los cursos de la persona y sus próximas entregas. */
-export async function loadAgenda(token: string, signal?: AbortSignal): Promise<Agenda> {
-  return parseAgenda(await call({ action: "agenda", token }, signal));
+/** Pide al Moodle `site` un permiso de lectura con el usuario y la contraseña de la persona. La contraseña no se guarda. */
+export async function connectMoodle(site: string, username: string, password: string): Promise<{ token: string; siteId: string; site: SiteInfo }> {
+  const out = (await call({ action: "conectar", site, username: username.trim(), password })) as { token?: unknown; site_id?: unknown; site?: { name?: unknown; user?: unknown } } | null;
+  if (typeof out?.token !== "string" || !out.token) throw new ClasesError(failureOf("desconocido"));
+  const text = (v: unknown) => (typeof v === "string" ? v.slice(0, 120) : "");
+  // El sitio es el que dice la función; si no lo dice, el del pedido.
+  return { token: out.token, siteId: siteIdShape(out.site_id) ? out.site_id : site, site: { name: text(out.site?.name), user: text(out.site?.user) } };
+}
+
+/** Los cursos de la persona y sus próximas entregas. `site` falta en un permiso de antes. */
+export async function loadAgenda(token: string, site: string | undefined, signal?: AbortSignal): Promise<Agenda> {
+  return parseAgenda(await call({ action: "agenda", site, token }, signal));
 }
 
 /** Las secciones, actividades y materiales de un curso. */
-export async function loadCourse(token: string, course: number, signal?: AbortSignal): Promise<CourseDetail> {
-  return parseCourse(await call({ action: "curso", token, course }, signal));
+export async function loadCourse(token: string, site: string | undefined, course: number, signal?: AbortSignal): Promise<CourseDetail> {
+  return parseCourse(await call({ action: "curso", site, token, course }, signal));
 }

@@ -34,7 +34,7 @@
                                                  → { summary, paragraphs, alerts, recommendations, unknown, verified }
      { action: "comprender", space, doc?, step: "estado" | "lote" }                            (solo administración, 0115)
                                                  → { ai, status } · { asked, saved, failed, calls, done, stopped?, status }
-     { action: "moodle", space, step: "probar" | "categorias" | "cursos" | "curso", category?, course? }   (solo administración, 0116)
+     { action: "moodle", space, site, step: "probar" | "categorias" | "cursos" | "curso", category?, course? }   (solo administración, 0116 y 0133)
                                                  → { site, functions, usable, missing } · { categories } · { courses } · { doc, passages, … }
      { action: "evolucion", portal: "ensenanza", summary: {program, goals, periods} }          (solo un estudiante con cuenta de Pilo, 0131)
                                                  → { courses, areas, recs, sources } · no se guarda ni se anota el resumen
@@ -5147,6 +5147,9 @@ export function privateAddress(ip: string): boolean {
 const MOODLE_BLOCKED_HOST = /(^|\.)(localhost|local|localdomain|internal|intranet|lan|home|corp|test|invalid|example|onion|arpa|nip\.io|sslip\.io|xip\.io|localtest\.me|lvh\.me)$/;
 const MOODLE_HOST_REASON = "La dirección de Moodle debe ser un nombre de dominio público, no una dirección IP ni un nombre de red interna.";
 
+/** El id de un sitio de Moodle (0133): corto y estable. Es lo único del sitio que manda la página. */
+export const moodleSiteId = (v: unknown): string => (typeof v === "string" && /^[a-z][a-z0-9-]{1,23}$/.test(v) ? v : "");
+
 /**
  * La dirección del servicio de un sitio de Moodle, revisada: solo https, con
  * nombre de dominio público (ni IP escrita de ninguna forma, ni localhost, ni
@@ -6181,7 +6184,8 @@ async function handle(request: Request): Promise<Response> {
     space?: unknown;
     /** Comprender (0115): solo los pasajes de este documento. */
     doc?: unknown;
-    /** Moodle (0116): la categoría cuyos cursos se listan y el curso que se lee. */
+    /** Moodle (0116): la categoría cuyos cursos se listan y el curso que se lee. Desde 0133, de cuál sitio (su id). */
+    site?: unknown;
     category?: unknown;
     course?: unknown;
     analysis?: {
@@ -7214,16 +7218,21 @@ async function handle(request: Request): Promise<Response> {
   async function moodleSync(): Promise<Response> {
     const what = String(body.step ?? "probar");
     if (!["probar", "categorias", "cursos", "curso"].includes(what)) return json({ error: "Paso desconocido." }, 400);
-    const row = spaceRow ?? {};
-    const MISSING = { error: "Falta la migración 0116 de Moodle.", advice: "La administración debe aplicar la migración 0116 antes de conectar a Pilo con Moodle.", code: "migracion" };
-    if (!("moodle_url" in row)) return json(MISSING, 500);
-    const endpoint = moodleEndpoint(row.moodle_url);
+    const MISSING = { error: "Falta la migración 0133 de los sitios de Moodle.", advice: "La administración debe aplicar la migración 0133 antes de conectar a Pilo con Moodle.", code: "migracion" };
+    // De cuál sitio (0133): su id, nunca su dirección. La dirección y el token salen de la base.
+    const siteId = moodleSiteId(body.site);
+    if (!siteId) return json({ error: "Falta el sitio de Moodle.", advice: "Elija el sitio en Mr. Pilo en Enseñanza › Memoria › Moodle.", code: "config" }, 400);
+    const { data: siteData, error: siteError } = await admin.from("pilo_moodle_sites").select("*").eq("space", space).eq("id", siteId).maybeSingle();
+    if (siteError) return json(missingInDb(siteError.message) ? MISSING : { error: "No pude leer la conexión con Moodle.", code: "interno" }, 500);
+    if (!siteData) return json({ error: "Ese sitio de Moodle no existe en este espacio.", advice: "Recargue la página: puede que alguien lo haya quitado.", code: "config" }, 404);
+    const row = siteData as Record<string, unknown>;
+    const endpoint = moodleEndpoint(row.url);
     if (!endpoint.ok) return json({ error: endpoint.reason, code: "config" }, 400);
-    const { data: kept, error: keptError } = await admin.from("pilo_space_secret").select("moodle_token").eq("space", space).maybeSingle();
+    const { data: kept, error: keptError } = await admin.from("pilo_moodle_site_secret").select("token").eq("space", space).eq("site", siteId).maybeSingle();
     if (keptError) return json(missingInDb(keptError.message) ? MISSING : { error: "No pude leer la conexión con Moodle.", code: "interno" }, 500);
-    const token = String((kept as { moodle_token?: unknown } | null)?.moodle_token ?? "").trim();
-    if (!token) return json({ error: "Falta el token de Moodle.", advice: "Guárdelo en Mr. Pilo en Enseñanza › Memoria › Moodle.", code: "config" }, 400);
-    if (what !== "probar" && row.moodle_on !== true) return json({ error: "Moodle está apagado en este espacio.", advice: "Enciéndalo en Mr. Pilo en Enseñanza › Memoria › Moodle.", code: "apagado" }, 400);
+    const token = String((kept as { token?: unknown } | null)?.token ?? "").trim();
+    if (!token) return json({ error: "Falta el token de este sitio de Moodle.", advice: "Guárdelo en Mr. Pilo en Enseñanza › Memoria › Moodle.", code: "config" }, 400);
+    if (what !== "probar" && row.enabled !== true) return json({ error: "Este sitio de Moodle está apagado.", advice: "Enciéndalo en Mr. Pilo en Enseñanza › Memoria › Moodle.", code: "apagado" }, 400);
     // Un nombre público que resuelve a una red interna tampoco pasa (donde la plataforma deja preguntar).
     const dns = (Deno as unknown as { resolveDns?: (host: string, type: string) => Promise<unknown[]> }).resolveDns;
     if (typeof dns === "function") {
@@ -7298,12 +7307,13 @@ async function handle(request: Request): Promise<Response> {
         const r = await call("core_webservice_get_site_info");
         if (!r.ok) return await fail(r);
         const site = moodleSite(r.data);
-        // Lo que respondió el sitio queda en la ficha del espacio: sin usuario y sin token.
+        // Lo que respondió el sitio queda en su ficha: sin usuario y sin token.
         await admin
-          .from("pilo_spaces")
-          .update({ moodle_site: { name: site.name, release: site.release, functions: site.functions }, moodle_checked_at: new Date().toISOString() })
-          .eq("id", space);
-        await log("listo · moodle probar", clean(`${site.name} · ${site.usable.length} de ${MOODLE_ALLOWED.length} funciones`));
+          .from("pilo_moodle_sites")
+          .update({ site: { name: site.name, release: site.release, functions: site.functions }, checked_at: new Date().toISOString() })
+          .eq("space", space)
+          .eq("id", siteId);
+        await log("listo · moodle probar", clean(`${siteId} · ${site.name} · ${site.usable.length} de ${MOODLE_ALLOWED.length} funciones`));
         return json({ ok: true, site: { name: site.name, release: site.release, url: endpoint.site }, functions: site.functions, usable: site.usable, missing: site.missing, ms: Date.now() - started });
       }
 
@@ -7325,7 +7335,7 @@ async function handle(request: Request): Promise<Response> {
         if (!r.ok) return await fail(r);
         const list = obj(r.data).courses;
         const courses = (Array.isArray(list) ? list : []).map(obj).map(courseRow).filter((c) => c.id > 0).slice(0, 2000);
-        const { data: saved, error } = await admin.rpc("pilo_moodle_courses_save", { ...inSpace({ p_space: space }), p_rows: courses });
+        const { data: saved, error } = await admin.rpc("pilo_moodle_courses_save", { ...inSpace({ p_space: space }), p_site: siteId, p_rows: courses });
         if (error) return json(missingInDb(error.message) ? MISSING : { error: "No pude anotar los cursos.", detail: clean(error.message), code: "interno" }, 500);
         return json({ ok: true, category, courses, saved: Number(saved ?? 0) });
       }
@@ -7335,7 +7345,7 @@ async function handle(request: Request): Promise<Response> {
       if (!id) return json({ error: "Falta el curso." }, 400);
       /** Anota en el curso cómo terminó su lectura; si no se puede, la respuesta lo dice igual. */
       const mark = (patch: Record<string, unknown>) =>
-        admin.rpc("pilo_moodle_course_set", { ...inSpace({ p_space: space }), p_course: id, p_patch: patch }).then(
+        admin.rpc("pilo_moodle_course_set", { ...inSpace({ p_space: space }), p_site: siteId, p_course: id, p_patch: patch }).then(
           (r: { data: unknown; error: unknown }) => r,
           () => ({ data: null, error: true }),
         );
@@ -7346,10 +7356,10 @@ async function handle(request: Request): Promise<Response> {
       const course = courseRow(found);
       const title = course.fullname || `Curso ${id}`;
       {
-        const { error } = await admin.rpc("pilo_moodle_courses_save", { ...inSpace({ p_space: space }), p_rows: [course] });
+        const { error } = await admin.rpc("pilo_moodle_courses_save", { ...inSpace({ p_space: space }), p_site: siteId, p_rows: [course] });
         if (error) return json(missingInDb(error.message) ? MISSING : { error: "No pude anotar el curso.", detail: clean(error.message), code: "interno" }, 500);
       }
-      const { data: before } = await admin.from("pilo_moodle_courses").select("doc_id, content_hash, vis, selected").eq("space", space).eq("course_id", id).maybeSingle();
+      const { data: before } = await admin.from("pilo_moodle_courses").select("doc_id, content_hash, vis, selected").eq("space", space).eq("site", siteId).eq("course_id", id).maybeSingle();
       const known = (before ?? {}) as { doc_id?: string | null; content_hash?: string; vis?: string; selected?: boolean };
 
       const contents = await call("core_course_get_contents", { courseid: id });
@@ -7359,7 +7369,7 @@ async function handle(request: Request): Promise<Response> {
       }
       // El contenido de páginas y demás: solo de los tipos que el curso tiene y con las funciones
       // que el token puede usar (lo dice «probar»). Sin esa prueba, solo las páginas.
-      const granted = obj(obj(row.moodle_site).functions);
+      const granted = obj(obj(row.site).functions);
       const tested = Object.keys(granted).length > 0;
       const mods = moodleModnames(contents.data);
       const wanted = MOODLE_EXTRA.filter(([mod, fn]) => mods.includes(mod) && (tested ? granted[fn] === true : fn === "mod_page_get_pages_by_courses")).map(([, fn]) => fn);
@@ -7387,7 +7397,8 @@ async function handle(request: Request): Promise<Response> {
       // El curso es un documento de la memoria: origen «moodle», y sus pasajes heredan su visibilidad («sesion» de partida).
       const { data: docId, error: saveError } = await admin.rpc("pilo_doc_save", {
         ...inSpace({ p_space: space }),
-        p_doc: { id: known.doc_id || crypto.randomUUID(), origin: "moodle", kind: "curso", source: "moodle", title, external_id: String(id), vis: known.vis === "publico" ? "publico" : "sesion" },
+        // El mismo número de curso puede existir en dos sitios: el documento se reconoce por «sitio:curso».
+        p_doc: { id: known.doc_id || crypto.randomUUID(), origin: "moodle", kind: "curso", source: "moodle", title, external_id: `${siteId}:${id}`, vis: known.vis === "publico" ? "publico" : "sesion" },
       });
       if (saveError || !docId) {
         const said = clean(saveError?.message ?? "sin id");

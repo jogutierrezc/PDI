@@ -46,7 +46,8 @@ const passagesVis = async (doc: string) =>
   (await t.q<{ vis: string }>("select vis from pilo_memory where doc_id = $1 order by ref", [doc])).map((p) => p.vis);
 
 beforeAll(async () => {
-  t = await createTestDb();
+  // Como quedó con 0116: la conexión única. Los varios sitios (0133) tienen su prueba en pilo-moodle-sitios.test.ts.
+  t = await createTestDb({ before: "0133" });
   await t.q("update profiles set access_role_id = (select id from access_roles where key = 'admin') where id = $1", [PEOPLE.admin]);
   await t.q("update profiles set access_role_id = (select id from access_roles where key = 'consulta'), role = 'consulta' where id = $1", [PEOPLE.vx]);
 }, 120_000);

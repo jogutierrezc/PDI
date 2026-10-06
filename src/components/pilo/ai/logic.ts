@@ -5051,6 +5051,9 @@ export function privateAddress(ip: string): boolean {
 const MOODLE_BLOCKED_HOST = /(^|\.)(localhost|local|localdomain|internal|intranet|lan|home|corp|test|invalid|example|onion|arpa|nip\.io|sslip\.io|xip\.io|localtest\.me|lvh\.me)$/;
 const MOODLE_HOST_REASON = "La dirección de Moodle debe ser un nombre de dominio público, no una dirección IP ni un nombre de red interna.";
 
+/** El id de un sitio de Moodle (0133): corto y estable. Es lo único del sitio que manda la página. */
+export const moodleSiteId = (v: unknown): string => (typeof v === "string" && /^[a-z][a-z0-9-]{1,23}$/.test(v) ? v : "");
+
 /**
  * La dirección del servicio de un sitio de Moodle, revisada: solo https, con
  * nombre de dominio público (ni IP escrita de ninguna forma, ni localhost, ni

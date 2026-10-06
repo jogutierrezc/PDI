@@ -27,7 +27,7 @@ import type { CellKey } from "../sheet";
 /* --- Forma ------------------------------------------------------------------ */
 
 /** Lo que el taller deja cambiar de un indicador. La clave no está: no cambia tras crear. */
-export const INDICATOR_FIELDS = ["label", "unit", "format", "direction", "aggregation", "reporting", "annual_rule", "office_id", "definition"] as const;
+export const INDICATOR_FIELDS = ["label", "unit", "format", "direction", "aggregation", "reporting", "annual_rule", "office_id", "definition", "years"] as const;
 export type IndicatorField = (typeof INDICATOR_FIELDS)[number];
 export type IndicatorPatch = Partial<Pick<OdIndicatorRow, IndicatorField>>;
 
@@ -142,7 +142,9 @@ export function patchIndicator(draft: TallerDraft, stored: OdIndicatorRow, patch
   for (const field of INDICATOR_FIELDS) {
     if (!(field in merged)) continue;
     const base = field === "reporting" ? stored.reporting ?? "periodo" : stored[field];
-    if (merged[field] !== base) kept[field] = merged[field];
+    // Los años con dato son una lista (o null: todos): se comparan por contenido.
+    const same = field === "years" ? JSON.stringify(merged[field] ?? null) === JSON.stringify(base ?? null) : merged[field] === base;
+    if (!same) kept[field] = merged[field];
   }
   const indicators = { ...draft.indicators };
   if (Object.keys(kept).length) indicators[stored.id] = kept as IndicatorPatch;
@@ -210,8 +212,20 @@ export function setBlocks(draft: TallerDraft, next: BlocksDraft, stored: DraftBl
   return { ...draft, blocks: same ? null : { list, removed: next.removed } };
 }
 
-/** La lista con que se trabaja: la pendiente o, si no hay, la guardada. */
-export const workingBlocks = (draft: TallerDraft, stored: DraftBlock[]): BlocksDraft => draft.blocks ?? { list: stored, removed: [] };
+/**
+ * La lista con que se trabaja: la pendiente o, si no hay, la guardada. Con una
+ * lista pendiente, un bloque guardado que ella no conoce (lo creó hace un
+ * momento otro editor: un conjunto nuevo entra a la ficha con su bloque) se
+ * añade al final, salvo que se haya quitado a propósito.
+ */
+export function workingBlocks(draft: TallerDraft, stored: DraftBlock[]): BlocksDraft {
+  if (!draft.blocks) return { list: stored, removed: [] };
+  const known = new Set<string>([...draft.blocks.list.flatMap((b) => [b.tempId, ...(b.id ? [b.id] : [])]), ...draft.blocks.removed]);
+  // Un bloque nuevo ya guardado y todavía sin id en el borrador se reconoce por su tipo y su clave corta.
+  const slots = new Set(draft.blocks.list.filter((b) => !b.id && b.settings.slot).map((b) => `${b.kind}:${b.settings.slot}`));
+  const fresh = stored.filter((b) => !known.has(b.tempId) && !(b.settings.slot && slots.has(`${b.kind}:${b.settings.slot}`)));
+  return fresh.length ? { list: renumber([...draft.blocks.list, ...fresh]), removed: draft.blocks.removed } : draft.blocks;
+}
 
 export function moveBlock(blocks: BlocksDraft, tempId: string, delta: -1 | 1): BlocksDraft {
   const from = blocks.list.findIndex((b) => b.tempId === tempId);
@@ -230,14 +244,20 @@ export function patchBlock(blocks: BlocksDraft, tempId: string, change: Partial<
 /** Clave corta para distinguir varios bloques del mismo tipo (ver 0029). */
 export const newSlot = () => Math.random().toString(36).slice(2, 10);
 
-export function addBlock(blocks: BlocksDraft, kind: OdBlockKind, slot: string = newSlot()): { blocks: BlocksDraft; tempId: string } {
+export function addBlock(
+  blocks: BlocksDraft,
+  kind: OdBlockKind,
+  slot: string = newSlot(),
+  /** Un conjunto que ya existe y la ficha no muestra: el bloque apunta a él. */
+  refId: string | null = null,
+): { blocks: BlocksDraft; tempId: string } {
   const tempId = `nuevo-${kind}-${slot}`;
   const block: DraftBlock = {
     kind,
-    ref_id: null,
+    ref_id: refId,
     visible: true,
     position: blocks.list.length + 1,
-    settings: kind === "separador" ? { title: "", slot } : { slot },
+    settings: kind === "separador" ? { title: "", slot } : kind === "imagenes" ? { images: [], columns: 2, slot } : kind === "evolucion" ? { chart: "lineas", slot } : { slot },
     tempId,
   };
   return { blocks: { ...blocks, list: renumber([...blocks.list, block]) }, tempId };
@@ -388,7 +408,7 @@ export function overlayRows(rows: OpenDataRows, reportId: string, draft: TallerD
   }
 
   const blocks: OdReportBlockRow[] = draft.blocks
-    ? draft.blocks.list.map(({ tempId, id, ...b }, index) => ({ ...b, id: id ?? tempId, report_id: reportId, position: index + 1 }))
+    ? workingBlocks(draft, blocksFromRows(rows.blocks, reportId)).list.map(({ tempId, id, ...b }, index) => ({ ...b, id: id ?? tempId, report_id: reportId, position: index + 1 }))
     : rows.blocks.filter((b) => b.report_id === reportId);
 
   return {

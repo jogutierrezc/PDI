@@ -235,13 +235,13 @@ export const TOURS: Tour[] = [
       {
         target: "[data-tour='odt-bloque']",
         title: "La ficha, bloque por bloque",
-        body: "Esta es la ficha tal como la verá el público. Toque un bloque para elegirlo y pulse «Editar»: en el tablero de indicadores llena todos los años a la vez, escribiendo o pegando desde Excel. «Subir», «Bajar», «Ocultar» y «Quitar» ordenan la ficha; quitar no borra cifras y se puede deshacer.",
+        body: "Esta es la ficha tal como la verá el público. Toque un bloque para elegirlo y pulse «Editar»: se abre su editor ahí mismo, uno a la vez. En el tablero de indicadores llena todos los años de una vez, escribiendo o pegando desde Excel. «Subir», «Bajar», «Ocultar» y «Quitar» ordenan la ficha; quitar no borra cifras y se puede deshacer.",
         mood: "idea",
       },
       {
         target: "[data-tour='odt-anadir']",
         title: "Añadir algo a la ficha",
-        body: "Aquí añade un separador u otro tablero de indicadores, y ve los veinte tipos de bloque con su explicación. Los demás se crean, por ahora, en la vista clásica.",
+        body: "Aquí están los veinte tipos de bloque, cada uno con su explicación. Elija uno y créelo aquí mismo: un desglose, un mapa, una tabla, un separador. Queda al final de la ficha, listo para llenar.",
         mood: "bien",
       },
       {

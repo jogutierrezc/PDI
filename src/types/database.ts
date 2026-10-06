@@ -1313,6 +1313,8 @@ export interface OdReportBlockRow {
     chart?: OdChartKind;
     title?: string;
     indicators?: string[];
+    /** Evolución por campus: clave del indicador con que abre. Sin ella, la cifra titular. */
+    indicator?: string;
     /** Mapas: clave (no id) del otro mapa que se muestra con este. La clave sobrevive a la copia de periodo. */
     mapWith?: string;
     /** "combinado": entrante y saliente en un solo mapa; "lado_a_lado": dos mapas en una fila. */

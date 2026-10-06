@@ -17,11 +17,11 @@
    ========================================================================== */
 
 import { useMemo, useState } from "react";
-import { Link } from "react-router-dom";
 import { Icon } from "../../../../components/ui/Icon";
 import type { OdAggregation, OdAnnualRule, OdDirection, OdIndicatorRow, OdOffice, OdPeriodCampus, OdValueFormat } from "../../../../types/database";
 import { ANNUAL_RULE_HINT, ANNUAL_RULE_LABEL, REPORTING_HINT, REPORTING_LABEL } from "../../../datos-abiertos/data/terms";
 import type { Reporting } from "../../../datos-abiertos/data/terms";
+import { ConfirmButton, SaveState, YearPicker } from "../ui";
 import { DataGrid } from "../DataGrid";
 import type { GridColumn, GridRow } from "../DataGrid";
 import { TOTAL, byYear, indicatorColumns, indicatorGridModel, rowKeyOf } from "../indicator-grid";
@@ -33,7 +33,7 @@ import type { IndicatorPatch, TallerMode } from "./draft";
 
 /** Los motivos de bloqueo, dichos a quien llena (de usted, y sin mandar a otra pantalla si se cambia aquí). */
 const LOCK_TEXTS: LockTexts = {
-  noYear: (_indicator, year) => `Este dato no se reporta en ${year}. Los años con dato se cambian en la vista clásica, en Captura.`,
+  noYear: (_indicator, year) => `Este dato no se reporta en ${year}. Se cambia abajo, en «Años con dato».`,
   byYear: () => "Este dato se reporta por año: no tiene periodos 1 y 2.",
   annualRule: (indicator) => `Se calcula con la regla del año: ${ANNUAL_RULE_LABEL[indicator.annual_rule].toLowerCase()}.`,
   summed: "Se suma de los campus. Queda vacío si falta alguno.",
@@ -43,7 +43,7 @@ const LOCK_LEGEND: Record<LockKind, (indicator: OdIndicatorRow) => string> = {
   suma: () => "Total institucional: se suma de los campus y queda vacío si falta alguno. Usted escribe la cifra de cada campus.",
   regla: (indicator) => `Columna «Año»: se calcula con la regla de este dato (${ANNUAL_RULE_LABEL[indicator.annual_rule].toLowerCase()}). Se cambia arriba, en «Cifra del año».`,
   "por-ano": () => "Este dato se reporta por año: no tiene periodos 1 y 2.",
-  "sin-ano": () => "Años sin dato: este indicador no se reporta en esos años. Se cambian en la vista clásica, en Captura › «Años con dato por indicador».",
+  "sin-ano": () => "Años sin dato: este indicador no se reporta en esos años. Se cambian aquí abajo, en «Años con dato».",
 };
 
 const TERM_LABELS = { A: "Periodo 1", B: "Periodo 2", anual: "Año" } as const;
@@ -61,11 +61,15 @@ export interface KpiEditorProps {
   onValues: (next: Record<CellKey, number | null>) => void;
   onPasted: (count: number) => void;
   onPatch: (indicatorId: string, patch: IndicatorPatch) => void;
-  /** Enlace a Estructura y KPI de la vista clásica: crear o borrar indicadores. */
-  structureHref: string;
+  /** Borra el indicador con todas sus cifras (ya confirmado en su sitio). */
+  onDelete: (indicatorId: string) => void;
+  deleting?: boolean;
+  deleteError?: unknown;
+  /** Informe publicado: borrar se ve en el portal de inmediato, y la confirmación lo dice. */
+  live?: boolean;
 }
 
-export function KpiEditor({ indicators, campuses, offices, years, stored, values, mode, canEdit, onValues, onPasted, onPatch, structureHref }: KpiEditorProps) {
+export function KpiEditor({ indicators, campuses, offices, years, stored, values, mode, canEdit, onValues, onPasted, onPatch, onDelete, deleting = false, deleteError = null, live = false }: KpiEditorProps) {
   const campusIds = useMemo(() => campuses.map((c) => c.campus_id), [campuses]);
   const period = years.length ? (years.length === 1 ? String(years[0]) : `${years[0]}–${years[years.length - 1]}`) : "";
 
@@ -73,8 +77,8 @@ export function KpiEditor({ indicators, campuses, offices, years, stored, values
     return (
       <div className="odt-editor">
         <p className="odt-empty">
-          Este tablero todavía no tiene indicadores. Elija cuáles muestra en «Indicadores de este tablero», más abajo, o{" "}
-          <Link to={structureHref}>cree un indicador en la vista clásica (Estructura y KPI)</Link>.
+          Este tablero todavía no tiene indicadores. Elija cuáles muestra en «Indicadores de este tablero», más abajo, o cree uno
+          con «Nuevo indicador».
         </p>
       </div>
     );
@@ -102,12 +106,12 @@ export function KpiEditor({ indicators, campuses, offices, years, stored, values
           onValues={onValues}
           onPasted={onPasted}
           onPatch={(patch) => onPatch(indicator.id, patch)}
+          onDelete={() => onDelete(indicator.id)}
+          deleting={deleting}
+          live={live}
         />
       ))}
-      <p className="odt-note">
-        Para crear un indicador nuevo, borrar uno o cambiar sus años con dato, use la{" "}
-        <Link to={structureHref}>vista clásica (Estructura y KPI)</Link>.
-      </p>
+      <SaveState pending={deleting} error={deleteError} success={false} />
     </div>
   );
 }
@@ -125,6 +129,9 @@ function IndicatorEditor({
   onValues,
   onPasted,
   onPatch,
+  onDelete,
+  deleting,
+  live,
 }: {
   indicator: OdIndicatorRow;
   campuses: OdPeriodCampus[];
@@ -138,6 +145,9 @@ function IndicatorEditor({
   onValues: (next: Record<CellKey, number | null>) => void;
   onPasted: (count: number) => void;
   onPatch: (patch: IndicatorPatch) => void;
+  onDelete: () => void;
+  deleting: boolean;
+  live: boolean;
 }) {
   const annual = byYear(indicator);
   /** Cambio de «cómo se reporta» que espera confirmación porque esconde cifras ya cargadas. */
@@ -277,6 +287,28 @@ function IndicatorEditor({
             </li>
           ))}
         </ul>
+      )}
+
+      <details className="odt-picker">
+        <summary>
+          Años con dato: {indicator.years && indicator.years.length ? indicator.years.join(", ") : "todos los del periodo"}
+        </summary>
+        <div className="odt-picker__body">
+          <YearPicker years={years} value={indicator.years} disabled={!canEdit} label={`Años con dato de ${indicator.label}`} onChange={(next) => onPatch({ years: next })} />
+          <p className="odt-note">Un año sin marcar queda bloqueado en la rejilla y no se pide en el portal. Sus cifras, si las tenía, no se borran.</p>
+        </div>
+      </details>
+
+      {canEdit && (
+        <div className="odt-indicator__danger">
+          <ConfirmButton
+            label="Borrar este indicador"
+            subject={`el indicador «${indicator.label}»`}
+            confirmLabel={`Se pierden todas sus cifras cargadas y sale del tablero y de las gráficas de la ficha. No se puede deshacer.${live ? " El informe está publicado: deja de verse en el portal de inmediato." : ""}`}
+            disabled={deleting}
+            onConfirm={onDelete}
+          />
+        </div>
       )}
 
       {mode === "completo" && (

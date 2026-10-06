@@ -265,10 +265,10 @@ interface DraftRow {
 
 const newUid = () => Math.random().toString(36).slice(2, 9);
 
-export function MedalCapture({ data, report, periodId, canEdit }: StationProps) {
+export function MedalCapture({ data, report, periodId, canEdit, only }: StationProps) {
   const reportId = report?.uuid;
   if (!report || !reportId) return <StageEmpty title="Elige un informe">Los medalleros se cargan informe por informe.</StageEmpty>;
-  return <MedalBoards data={data} reportId={reportId} reportName={report.name} periodId={periodId} canEdit={canEdit} />;
+  return <MedalBoards data={data} reportId={reportId} reportName={report.name} periodId={periodId} canEdit={canEdit} only={only} />;
 }
 
 function MedalBoards({
@@ -277,15 +277,17 @@ function MedalBoards({
   reportName,
   periodId,
   canEdit,
+  only,
 }: {
   data: StationProps["data"];
   reportId: string;
   reportName: string;
   periodId: string;
   canEdit: boolean;
+  only?: string;
 }) {
   const boards = (data.rows.medalBoards ?? [])
-    .filter((b) => b.report_id === reportId)
+    .filter((b) => b.report_id === reportId && (!only || b.id === only))
     .sort((a, b) => a.position - b.position);
   const [activeId, setActiveId] = useState<string | undefined>(boards[0]?.id);
   const board = boards.find((b) => b.id === activeId) ?? boards[0];

@@ -159,8 +159,8 @@ const emptyEdition = (year: number): RankingEdition => ({
   stars: [], sdgs: [], subjects: [], custom: [], note: "",
 });
 
-export function RankingCapture({ data, report, periodId, canEdit }: StationProps) {
-  const rankings = (data.rows.rankings ?? []).filter((r) => r.report_id === report!.uuid).sort((a, b) => a.position - b.position);
+export function RankingCapture({ data, report, periodId, canEdit, only }: StationProps) {
+  const rankings = (data.rows.rankings ?? []).filter((r) => r.report_id === report!.uuid && (!only || r.id === only)).sort((a, b) => a.position - b.position);
   const [active, setActive] = useState(rankings[0]?.id);
   const ranking = rankings.find((r) => r.id === active) ?? rankings[0];
   if (!ranking) {

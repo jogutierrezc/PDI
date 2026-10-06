@@ -678,17 +678,115 @@
   accent-color: var(--brand-blue);
 }
 
+/* --- Editores de Captura montados en el bloque ------------------------------------
+   Son los componentes de la vista clásica (clases `oda-`), sin tocar. Aquí solo
+   se les da el tamaño de toque del taller: 44 px en todo lo que se pulsa. */
+
+.odt-editor--mounted :where(.button-primary, .button-secondary, .button-ghost, .oda-link-button, .oda-chip, .oda-tab, .icon-button, .oda-year-chip) {
+  min-height: 44px;
+}
+
+.odt-editor--mounted :where(.icon-button) { min-width: 44px; }
+.odt-editor--mounted :where(.oda-link-button) { padding-inline: var(--space-3); font-size: var(--text-sm); }
+.odt-editor--mounted :where(select, input:not([type="checkbox"]):not([type="radio"]):not([type="file"]), textarea) { min-height: 44px; }
+.odt-editor--mounted .oda-grid td input { height: 44px; }
+.odt-editor--mounted .oda-grid td[data-locked] { height: 44px; }
+.odt-editor--mounted :where(.oda-check, .oda-switch, .oda-inline-check) { min-height: 44px; }
+
+/* Varios conjuntos en un bloque, y la definición de cada uno: se abre uno a la vez. */
+.odt-sections {
+  display: grid;
+  gap: var(--space-3);
+}
+
+.odt-section {
+  min-width: 0;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+}
+
+.odt-section[data-open] { border-color: var(--line-strong); }
+
+.odt-section__head {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--space-3);
+  width: 100%;
+  min-height: 48px;
+  padding: var(--space-2) var(--space-4);
+  color: var(--ink);
+  background: transparent;
+  border: 0;
+  border-radius: var(--radius-sm);
+  font: inherit;
+  font-size: var(--text-sm);
+  text-align: left;
+  cursor: pointer;
+  transition: transform var(--dur-press) var(--ease-out);
+}
+
+.odt-section__head:active { transform: scale(0.99); }
+.odt-section__head strong { font-weight: 800; overflow-wrap: anywhere; }
+
+.odt-section__head span {
+  color: var(--brand-blue-strong);
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.odt-section__head svg {
+  color: var(--ink-muted);
+  transform: rotate(-90deg);
+  transition: transform var(--dur-fast) var(--ease-out);
+}
+
+.odt-section[data-open] > .odt-section__head svg { transform: rotate(0deg); }
+
+.odt-section__body {
+  display: grid;
+  gap: var(--space-4);
+  min-width: 0;
+  padding: var(--space-3) var(--space-4) var(--space-4);
+  border-top: 1px solid var(--line);
+}
+
+.odt-origin {
+  padding: var(--space-3) var(--space-4);
+  color: var(--ink-secondary);
+  background: var(--surface-3);
+  border-radius: var(--radius-sm);
+}
+
+.odt-indicator__danger {
+  display: flex;
+  justify-content: flex-start;
+}
+
+.odt-indicator__danger .oda-link-button {
+  min-height: 44px;
+  padding-inline: var(--space-3);
+  font-size: var(--text-sm);
+}
+
+.odt-editor-wrap > .oda-banner { font-size: var(--text-base); }
+
+@media (hover: hover) and (pointer: fine) {
+  .odt-section__head:hover { background: var(--surface-2); }
+}
+
 /* Modo completo: la rejilla a la izquierda y, a la derecha y pegajosa, la ficha viva.
    Se mide el ancho del taller, no el de la pantalla: con la barra lateral y la
    lista de informes puestas, 640 px de taller son unos 900 px de pantalla. */
 @container odt (min-width: 640px) {
-  .odt[data-mode="completo"] .odt-block[data-editing][data-kind="kpis"] .odt-block__body {
+  .odt[data-mode="completo"] .odt-block[data-editing]:is([data-kind="kpis"], [data-kind="desgloses"]) .odt-block__body {
     grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr);
     align-items: start;
     column-gap: var(--space-5);
   }
 
-  .odt[data-mode="completo"] .odt-block[data-editing][data-kind="kpis"] .odt-block__view {
+  .odt[data-mode="completo"] .odt-block[data-editing]:is([data-kind="kpis"], [data-kind="desgloses"]) .odt-block__view {
     position: sticky;
     top: calc(var(--admin-topbar-h, 96px) + var(--space-4));
     max-height: calc(100vh - var(--admin-topbar-h, 96px) - var(--space-8));
@@ -926,6 +1024,8 @@
 
 @media (prefers-reduced-motion: reduce) {
   .odt-block,
+  .odt-section__head,
+  .odt-section__head svg,
   .odt-seg button,
   .odt-call,
   .odt-pilo__button {

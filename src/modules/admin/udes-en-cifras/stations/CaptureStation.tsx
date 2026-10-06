@@ -150,7 +150,7 @@ export function CaptureStation(props: StationProps) {
 
 /* --- Indicadores ---------------------------------------------------------------- */
 
-function IndicatorCapture({ data, report, periodId, canEdit }: StationProps) {
+export function IndicatorCapture({ data, report, periodId, canEdit }: StationProps) {
   const save = useSaveValues();
   const [draft, setDraft] = useState<Record<CellKey, number | null>>({});
   const [via, setVia] = useState<OdImportKind>("rejilla");
@@ -498,8 +498,8 @@ function UploadReview({ preview, onApply, onCancel }: { preview: UploadPreview; 
 
 /* --- Desgloses -------------------------------------------------------------------- */
 
-function BreakdownCapture({ data, report, periodId, canEdit }: StationProps) {
-  const breakdowns = data.rows.breakdowns.filter((b) => b.report_id === report!.uuid);
+export function BreakdownCapture({ data, report, periodId, canEdit, only }: StationProps) {
+  const breakdowns = data.rows.breakdowns.filter((b) => b.report_id === report!.uuid && (!only || b.id === only));
   const [active, setActive] = useState(breakdowns[0]?.id);
   const breakdown = breakdowns.find((b) => b.id === active) ?? breakdowns[0];
   const save = useSaveBreakdownValues();
@@ -718,8 +718,8 @@ function BreakdownCapture({ data, report, periodId, canEdit }: StationProps) {
 
 /* --- Mapas de calor ------------------------------------------------------------------- */
 
-function HeatmapCapture({ data, report, periodId, canEdit }: StationProps) {
-  const heatmaps = data.rows.heatmaps.filter((h) => h.report_id === report!.uuid);
+export function HeatmapCapture({ data, report, periodId, canEdit, only }: StationProps) {
+  const heatmaps = data.rows.heatmaps.filter((h) => h.report_id === report!.uuid && (!only || h.id === only));
   const [active, setActive] = useState(heatmaps[0]?.id);
   const heatmap = heatmaps.find((h) => h.id === active) ?? heatmaps[0];
   const save = useSaveHeatmapCells();
@@ -863,9 +863,9 @@ function HeatmapCapture({ data, report, periodId, canEdit }: StationProps) {
 
 /* --- Mapas ------------------------------------------------------------------------------ */
 
-function MapCapture(props: StationProps) {
-  const { data, report, periodId, canEdit } = props;
-  const maps = data.rows.maps.filter((m) => m.report_id === report!.uuid);
+export function MapCapture(props: StationProps) {
+  const { data, report, periodId, canEdit, only } = props;
+  const maps = data.rows.maps.filter((m) => m.report_id === report!.uuid && (!only || m.id === only));
   const [active, setActive] = useState(maps[0]?.id);
   const map = maps.find((m) => m.id === active) ?? maps[0];
   const years = map?.years && map.years.length ? data.catalog.years.filter((y) => map.years!.includes(y)) : data.catalog.years;
@@ -991,8 +991,8 @@ const flowLabel = (from: PeriodValue, to: PeriodValue) => {
  * Si una base antigua trae varias cohortes, se trabaja la que tiene más etapas
  * con dato y las demás se pueden quitar.
  */
-function PipelineCapture({ data, report, periodId, canEdit }: StationProps) {
-  const pipelines = data.rows.pipelines.filter((p) => p.report_id === report!.uuid).sort((a, b) => a.position - b.position);
+export function PipelineCapture({ data, report, periodId, canEdit, only }: StationProps) {
+  const pipelines = data.rows.pipelines.filter((p) => p.report_id === report!.uuid && (!only || p.id === only)).sort((a, b) => a.position - b.position);
   const [active, setActive] = useState(pipelines[0]?.id);
   const pipeline = pipelines.find((p) => p.id === active) ?? pipelines[0];
   const values = data.rows.pipelineValues.filter((v) => v.pipeline_id === pipeline?.id);
@@ -1164,8 +1164,8 @@ function PipelineCapture({ data, report, periodId, canEdit }: StationProps) {
 
 const HISTORY_TOTAL = "__total";
 
-function HistoryCapture({ data, report, periodId, canEdit }: StationProps) {
-  const histories = data.rows.histories.filter((h) => h.report_id === report!.uuid).sort((a, b) => a.position - b.position);
+export function HistoryCapture({ data, report, periodId, canEdit, only }: StationProps) {
+  const histories = data.rows.histories.filter((h) => h.report_id === report!.uuid && (!only || h.id === only)).sort((a, b) => a.position - b.position);
   const [active, setActive] = useState(histories[0]?.id);
   const history = histories.find((h) => h.id === active) ?? histories[0];
   const save = useSaveHistoryValues();

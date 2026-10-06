@@ -48,15 +48,24 @@ const signature = (text: string) => {
   return `${text.length}-${(hash >>> 0).toString(36)}`;
 };
 
-export function FreeSetCapture({ data, report, periodId, canEdit }: StationProps) {
+export function FreeSetCapture({ data, report, periodId, canEdit, only, startCreating, onCreated, onCancelCreate }: StationProps & {
+  /** El taller: abre directamente la creación de un conjunto nuevo, sin lista ni conjunto abierto. */
+  startCreating?: boolean;
+  onCreated?: (key: string) => void;
+  onCancelCreate?: () => void;
+}) {
   const all = (data.rows.freeSets ?? []).filter((fs) => fs.report_id === report!.uuid).sort((a, b) => a.position - b.position);
   // Las tablas personalizadas se editan en su pestaña: allá el total se escribe entero y hay color.
-  const sets = all.filter((fs) => !customViewOf(fs));
+  const sets = all.filter((fs) => !customViewOf(fs) && (!only || fs.id === only));
   const [chosen, setChosen] = useState("");
   /** La clave del conjunto recién creado: se abre solo cuando llega de la base. */
   const [createdKey, setCreatedKey] = useState<string | null>(null);
   /** Conjunto nuevo: primero se elige cómo arrancar, después se abre el editor. */
-  const [creating, setCreating] = useState<"elegir" | "pegar" | "blanco" | null>(null);
+  const [creating, setCreatingState] = useState<"elegir" | "pegar" | "blanco" | null>(startCreating ? "elegir" : null);
+  const setCreating = (next: "elegir" | "pegar" | "blanco" | null) => {
+    setCreatingState(next);
+    if (next === null && startCreating) onCancelCreate?.();
+  };
 
   const set = sets.find((s) => s.key === createdKey) ?? sets.find((s) => s.id === chosen) ?? sets[0];
   const published = report!.status === "publicado";
@@ -79,7 +88,7 @@ export function FreeSetCapture({ data, report, periodId, canEdit }: StationProps
             </select>
           </label>
         )}
-        {!creating && (
+        {!creating && !only && !startCreating && (
           <button type="button" className="button-secondary" disabled={!canEdit} onClick={() => setCreating("elegir")}>
             <Icon name="plus" size={15} /> Nuevo conjunto libre
           </button>
@@ -123,10 +132,11 @@ export function FreeSetCapture({ data, report, periodId, canEdit }: StationProps
           onCancel={() => setCreating(null)}
           onCreated={(key) => {
             setCreatedKey(key);
-            setCreating(null);
+            setCreatingState(null);
+            onCreated?.(key);
           }}
         />
-      ) : !set ? (
+      ) : startCreating ? null : !set ? (
         !creating && (
           <StageEmpty title="Este informe no tiene conjuntos libres">
             Un conjunto libre es una fuente con las columnas que tú definas y las gráficas que quieras armar sobre ella.

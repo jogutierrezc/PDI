@@ -143,7 +143,10 @@ function ReportContent({ data, report, year, term, campus, setYear, setTerm, set
   }, []);
   const barOpen = barManual ?? !scrolled;
   const cutSummary = year === ALL_YEARS ? `Todos · ${cutLabel(ALL_YEARS, null)}` : term ? `Periodo ${cutLabel(year, term)}` : `Año ${cutLabel(year, null)}`;
-  const selected = report.indicators.find((i) => i.id === pickedId) ?? keys[0] ?? report.indicators[0];
+  // La evolución abre en el indicador que la intranet eligió para su bloque; sin elección, en la cifra titular.
+  const openingId = (report.blocks ?? []).find((b) => b.kind === "evolucion" && b.visible && b.settings.indicator)?.settings.indicator;
+  const selected =
+    report.indicators.find((i) => i.id === pickedId) ?? report.indicators.find((i) => i.id === openingId) ?? keys[0] ?? report.indicators[0];
   const sources = useMemo(
     () => Array.from(new Set([...report.indicators.map((i) => i.source), ...report.breakdowns.map((b) => b.source)])),
     [report],

@@ -8,12 +8,22 @@
    «Quitar». Une lo que en la vista clásica hacen Estructura, Captura y Diseño;
    la vista clásica sigue ahí, sin tocar, y las dos leen y escriben lo mismo.
 
+   Todas las fuentes de datos se diligencian aquí: «Editar» abre, dentro del
+   bloque, el editor de su familia (BlockEditors.tsx monta el de Captura,
+   acotado al conjunto del bloque) y «Añadir algo a la ficha» crea el conjunto
+   con el formulario de Estructura. Hay un solo editor abierto a la vez; cerrar
+   uno que puede tener cambios sin guardar lo avisa antes.
+
    Guardado (ver draft.ts):
    · Informe sin publicar: lo escrito se guarda solo, un segundo después de la
      última tecla, y lo dice («Guardando…», «Guardado»).
    · Informe publicado: guardar se vería en el portal al instante, así que los
      cambios quedan pendientes en este navegador hasta «Publicar cambios (n)».
      «Descartar cambios» los borra. Se dice a la vista que están solo aquí.
+   · Eso vale para el tablero de indicadores, el separador, las imágenes, la
+     evolución y los ajustes de cada bloque. Los editores montados desde
+     Captura conservan su propio «Guardar», con el aviso de siempre cuando el
+     informe está publicado: lo guardado se ve de inmediato en el portal.
 
    Arriba, «Así lo ve el público»: el corte y el campus del portal. Cambian lo
    que se mira, nunca lo que se puede llenar: al editar están todos los años.
@@ -22,7 +32,7 @@
    OdAdmin, el mismo de la vista clásica).
    ========================================================================== */
 
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { Suspense, lazy, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { Icon } from "../../../../components/ui/Icon";
 import { useTour } from "../../../../components/tour/TourProvider";
@@ -33,12 +43,13 @@ import { cutForYear, startingCut } from "../../../datos-abiertos/data/period-rea
 import type { Cut } from "../../../datos-abiertos/data/period-reading";
 import { assembleCatalog } from "../../../datos-abiertos/data/repository";
 import { ALL_YEARS, cutLabel } from "../../../datos-abiertos/data/terms";
+import { customViewOf } from "../../../datos-abiertos/data/custom-table";
 import { ALL_CAMPUSES, BLOCK_LABELS } from "../../../datos-abiertos/data/types";
 import type { CampusId, ReportBlock, Term } from "../../../datos-abiertos/data/types";
 import type { StationProps } from "../OdAdmin";
-import { BLOCK_CLASSIC, BLOCK_CREATE, BLOCK_FILL, BLOCK_GROUPS, blockHelp, blockHelpText } from "../block-help";
+import { BLOCK_CLASSIC, BLOCK_FILL, BLOCK_GROUPS, blockHelp, blockHelpText } from "../block-help";
 import { indexValues } from "../indicator-grid";
-import { useSaveBlocks, useSaveIndicator, useSaveValues } from "../od-data";
+import { useDeleteIndicator, useSaveBlocks, useSaveIndicator, useSaveValues } from "../od-data";
 import type { StationId } from "../progress";
 import type { CellKey } from "../sheet";
 import { ConfirmButton, StageEmpty } from "../ui";
@@ -85,11 +96,32 @@ import "./taller.css";
 
 export const TALLER_TOUR = "intranet-taller-cifras";
 
-/** Tipos que se editan dentro del taller en este incremento. */
-const EDITABLE: OdBlockKind[] = ["kpis", "separador"];
-/** Tipos que «Añadir algo a la ficha» crea aquí mismo; los demás, en la vista clásica. */
-const ADDABLE: OdBlockKind[] = ["separador", "kpis"];
-const ADD_LABEL: Partial<Record<OdBlockKind, string>> = { kpis: "Otro tablero de indicadores" };
+// Los editores montados desde Captura y Estructura bajan al pulsar «Editar» o «Añadir».
+const loadEditors = () => import("./BlockEditors");
+const BlockEditor = lazy(() => loadEditors().then((m) => ({ default: m.BlockEditor })));
+const AddDataset = lazy(() => loadEditors().then((m) => ({ default: m.AddDataset })));
+const NewIndicator = lazy(() => loadEditors().then((m) => ({ default: m.NewIndicator })));
+
+/** Tipos sin captura: sus datos salen de otra parte, y el bloque lo explica. */
+const NO_CAPTURE: OdBlockKind[] = ["tabla", "tabla_dinamica", "metodologia", "diversidad", "modelo"];
+/** Tipos cuyo editor es el de Captura, con su propio «Guardar» dentro del bloque. */
+const OWN_SAVE: OdBlockKind[] = ["desgloses", "historico", "mapa_calor", "tuberia", "mapa", "rankings", "medallero", "saber_pro", "saber_tyt", "libre", "tablas_personalizadas"];
+const isEditable = (kind: OdBlockKind) => !NO_CAPTURE.includes(kind);
+/** Bloques que «Añadir» pone en la ficha sin crear ningún conjunto. */
+const PLAIN_BLOCKS: OdBlockKind[] = ["separador", "kpis", "imagenes", "evolucion", "tabla_dinamica", "metodologia"];
+/** De esos, los que la ficha admite una sola vez. */
+const ONCE: OdBlockKind[] = ["evolucion", "tabla_dinamica", "metodologia"];
+/** Familias cuyo conjunto se crea aquí con su formulario de definición. */
+const CREATABLE: OdBlockKind[] = ["desgloses", "historico", "mapa_calor", "mapa", "tuberia", "rankings", "medallero", "saber_pro", "saber_tyt", "libre", "tablas_personalizadas"];
+const ADD_LABEL: Partial<Record<OdBlockKind, string>> = { kpis: "Otro tablero de indicadores", desgloses: "Desglose", tablas_personalizadas: "Tabla personalizada" };
+/** De dónde salen los datos de los tipos sin captura. */
+const NO_CAPTURE_WHY: Partial<Record<OdBlockKind, string>> = {
+  tabla_dinamica: "No se llena: se arma sola con las cifras de los indicadores del informe. Si le falta una cifra, se llena en el tablero de indicadores.",
+  metodologia: "No se llena aquí: toma de cada indicador lo escrito en «Qué mide y cómo» y su oficina. Se cambian en el tablero de indicadores, en modo completo.",
+  diversidad: "No se llena aquí: lee indicadores y desgloses del informe por su clave. Si una cifra falta, se llena en su indicador (tablero) o en su desglose.",
+  modelo: "No tiene formulario: el modelo lo carga Planeación con su especificación.",
+  tabla: "Esta tabla llegó con «Importar informe» y no tiene editor propio. Se vuelve a cargar desde la vista clásica.",
+};
 
 /** Cuánto dura a la vista un aviso con «Deshacer». */
 const TOAST_MS = 8000;
@@ -126,7 +158,7 @@ interface Toast {
 /** La copia de la ficha no recibe el foco ni el tabulador (The Inert Preview Rule). */
 const makeInert = (node: HTMLElement | null) => node?.setAttribute("inert", "");
 
-function TallerReport({ data, report, reportId, periodId, canEdit, classicHref }: TallerProps & { reportId: string }) {
+function TallerReport({ data, report, reportId, periodId, canEdit, progress, classicHref }: TallerProps & { reportId: string }) {
   const storage = useMemo(browserStorage, []);
   const storageKey = draftKey(periodId, reportId);
   const live = report!.status === "publicado";
@@ -135,6 +167,7 @@ function TallerReport({ data, report, reportId, periodId, canEdit, classicHref }
   const saveBlocks = useSaveBlocks();
   const saveIndicator = useSaveIndicator();
   const saveValues = useSaveValues();
+  const deleteIndicator = useDeleteIndicator();
 
   /* --- Lo guardado ---------------------------------------------------------- */
 
@@ -268,9 +301,40 @@ function TallerReport({ data, report, reportId, periodId, canEdit, classicHref }
     }
   }, [pick, picked, pickedIndex]);
 
+  /* --- Un solo editor abierto, y aviso si se deja algo sin guardar ------------------- */
+
+  /** Se tocó algo en un editor con su propio «Guardar» desde la última vez que la base cambió. */
+  const dirty = useRef(false);
+  const [leave, setLeave] = useState<{ run: () => void } | null>(null);
+  useEffect(() => {
+    dirty.current = false;
+  }, [data.rows]);
+  const touch = (event: { target: EventTarget }) => {
+    // Lo que va al borrador del taller (título propio, qué conjuntos muestra) ya queda guardado o pendiente.
+    if (event.target instanceof Element && event.target.closest("[data-odt-draft]")) return;
+    dirty.current = true;
+  };
+  /** Hace `run`; si el editor abierto puede tener cambios sin guardar, pregunta antes. */
+  const guard = (run: () => void) => {
+    if (dirty.current) setLeave({ run });
+    else run();
+  };
+  const openEditor = pick?.editing ? picked : undefined;
+
   const select = (block: DraftBlock, index: number) => {
     if (picked?.tempId === block.tempId) return;
-    setPick({ id: block.tempId, index, editing: false });
+    // Elegir otro bloque cierra el editor abierto: solo hay uno a la vez.
+    guard(() => {
+      dirty.current = false;
+      setPick({ id: block.tempId, index, editing: false });
+    });
+  };
+  const toggleEdit = (block: DraftBlock, index: number, editing: boolean) => {
+    if (!editing) void loadEditors().catch(() => undefined);
+    guard(() => {
+      dirty.current = false;
+      setPick({ id: block.tempId, index, editing: !editing });
+    });
   };
 
   /* --- Avisos y Pilo ---------------------------------------------------------------- */
@@ -291,6 +355,13 @@ function TallerReport({ data, report, reportId, periodId, canEdit, classicHref }
   const speak = (title: string, text: string, mood: PiloSay["mood"] = "idea") => setSay({ id: (saySeq.current += 1), title, text, mood });
 
   const [adding, setAdding] = useState(false);
+  /** Familia cuyo formulario de alta está abierto dentro de «Añadir». */
+  const [creating, setCreating] = useState<OdBlockKind | null>(null);
+  const [newIndicator, setNewIndicator] = useState(false);
+  /** Tras crear un conjunto: en cuanto llegue su bloque, se elige y se abre para llenarlo. */
+  const [awaiting, setAwaiting] = useState<{ kind: OdBlockKind; known: string[] } | null>(null);
+  /** Los conjuntos de la familia que ya existían al abrir el formulario: el que no esté aquí es el nuevo. */
+  const knownSets = useRef<string[]>([]);
   const addPanel = useRef<HTMLDivElement>(null);
 
   /* --- Bloques ------------------------------------------------------------------------ */
@@ -335,17 +406,74 @@ function TallerReport({ data, report, reportId, periodId, canEdit, classicHref }
     });
   };
 
-  const add = (kind: OdBlockKind) => {
-    const { blocks, tempId } = addBlock(currentBlocks(), kind);
+  const add = (kind: OdBlockKind, refId: string | null = null, label = BLOCK_LABELS[kind]) => {
+    const { blocks, tempId } = addBlock(currentBlocks(), kind, undefined, refId);
     changeBlocks(blocks);
     setAdding(false);
-    setPick({ id: tempId, index: blocks.list.length - 1, editing: true });
+    setCreating(null);
+    void loadEditors().catch(() => undefined);
+    setPick({ id: tempId, index: blocks.list.length - 1, editing: isEditable(kind) && !refId });
     notify(
       kind === "kpis"
         ? "Añadí otro tablero de indicadores al final de la ficha. Elija abajo qué indicadores muestra."
-        : `Añadí «${BLOCK_LABELS[kind]}» al final de la ficha. Use «Subir» para llevarlo a su sitio.`,
+        : `Añadí «${label}» al final de la ficha. Use «Subir» para llevarlo a su sitio.`,
     );
   };
+
+  /** Los conjuntos del informe de la familia de un tipo de bloque. */
+  const familyRows = (kind: OdBlockKind): { id: string; key: string }[] => {
+    const own = <T extends { id: string; key: string; report_id: string }>(rows: T[] | undefined) => (rows ?? []).filter((x) => x.report_id === reportId);
+    if (kind === "desgloses") return own(data.rows.breakdowns);
+    if (kind === "mapa_calor") return own(data.rows.heatmaps);
+    if (kind === "mapa") return own(data.rows.maps);
+    if (kind === "tuberia") return own(data.rows.pipelines);
+    if (kind === "historico") return own(data.rows.histories);
+    if (kind === "rankings") return own(data.rows.rankings);
+    if (kind === "medallero") return own(data.rows.medalBoards);
+    if (kind === "saber_pro") return own(data.rows.saberPro);
+    if (kind === "saber_tyt") return own(data.rows.saberTyt);
+    if (kind === "libre" || kind === "tablas_personalizadas") return own(data.rows.freeSets);
+    return [];
+  };
+  const beginCreate = (kind: OdBlockKind) => {
+    knownSets.current = familyRows(kind).map((x) => x.id);
+    setCreating(kind);
+  };
+
+  /** Un conjunto recién creado trae su bloque (lo pone la base): se espera, se elige y se abre. */
+  const created = (kind: OdBlockKind) => {
+    setCreating(null);
+    setAdding(false);
+    setAwaiting({ kind, known: knownSets.current });
+    notify(`Se creó «${ADD_LABEL[kind] ?? BLOCK_LABELS[kind]}». Su bloque queda en la ficha, listo para llenar.`);
+  };
+  useEffect(() => {
+    if (!awaiting) return;
+    // Si en unos segundos no llegó, se deja de esperar: no se abre nada por sorpresa más tarde.
+    const giveUp = window.setTimeout(() => setAwaiting(null), 8000);
+    const fresh = familyRows(awaiting.kind).find((x) => !awaiting.known.includes(x.id));
+    if (fresh) {
+      const blocks = workingBlocks(draftRef.current, storedBlocks);
+      // Su bloque propio; o, si la familia comparte bloque (desgloses, rankings, tablas…), el primero de ese tipo.
+      const own = blocks.list.findIndex((b) => b.ref_id === fresh.id);
+      const at = own >= 0 ? own : blocks.list.findIndex((b) => b.kind === awaiting.kind);
+      if (at >= 0) {
+        window.clearTimeout(giveUp);
+        setAwaiting(null);
+        const target = blocks.list[at];
+        // Un bloque compartido que eligió los suyos no mostraría el nuevo: se le suma.
+        const field = ({ desgloses: "breakdowns", rankings: "rankings", medallero: "medalleros", tablas_personalizadas: "tablas" } as const)[target.kind as "desgloses"];
+        const chosen = field ? target.settings[field] : undefined;
+        if (own < 0 && field && chosen?.length && !chosen.includes(fresh.key)) {
+          changeBlocks(patchBlock(blocks, target.tempId, { settings: { ...target.settings, [field]: [...chosen, fresh.key] } }));
+        }
+        void loadEditors().catch(() => undefined);
+        setPick({ id: target.tempId, index: at, editing: true });
+      }
+    }
+    return () => window.clearTimeout(giveUp);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [awaiting, storedBlocks, data.rows]);
 
   /* --- Cifras e indicadores ------------------------------------------------------------- */
 
@@ -366,6 +494,18 @@ function TallerReport({ data, report, reportId, periodId, canEdit, classicHref }
   const onPatchIndicator = (indicatorId: string, patch: IndicatorPatch) => {
     const row = indicatorRows.find((i) => i.id === indicatorId);
     if (row) update((d) => patchIndicator(d, row, patch));
+  };
+  /** Borrar un indicador es de inmediato (con su confirmación): lo pendiente de ese indicador se va con él. */
+  const onDeleteIndicator = (indicatorId: string) => {
+    deleteIndicator.mutate(indicatorId, {
+      onSuccess: () =>
+        update((d) => {
+          const indicators = { ...d.indicators };
+          delete indicators[indicatorId];
+          const values = Object.fromEntries(Object.entries(d.values).filter(([key]) => !key.startsWith(`${indicatorId}::`))) as typeof d.values;
+          return { ...d, indicators, values, pasted: d.pasted && Object.keys(values).length > 0 };
+        }),
+    });
   };
 
   if (!view.report) {
@@ -390,6 +530,23 @@ function TallerReport({ data, report, reportId, periodId, canEdit, classicHref }
     const ids = new Set(boardIndicators(viewReport, block).map((i) => i.uuid));
     return Object.keys(draft.indicators).some((id) => ids.has(id)) || Object.keys(draft.values).some((key) => ids.has(key.split("::")[0]));
   };
+
+  /** Conjuntos que el informe tiene y ningún bloque de la ficha muestra. */
+  const orphans: { kind: OdBlockKind; id: string; title: string }[] = (() => {
+    const refs = new Set(working.list.map((b) => b.ref_id).filter(Boolean));
+    const own = <T extends { id: string; report_id: string; title: string }>(list: T[] | undefined, kind: OdBlockKind) =>
+      (list ?? []).filter((x) => x.report_id === reportId && !refs.has(x.id)).map((x) => ({ kind, id: x.id, title: x.title }));
+    const tables = working.list.some((b) => b.kind === "tablas_personalizadas");
+    return [
+      ...own(data.rows.heatmaps, "mapa_calor"),
+      ...own(data.rows.maps, "mapa").filter((m) => !working.list.some((b) => b.kind === "mapa" && b.settings.mapWith === data.rows.maps.find((x) => x.id === m.id)?.key)),
+      ...own(data.rows.pipelines, "tuberia"),
+      ...own(data.rows.histories, "historico"),
+      ...own((data.rows.freeSets ?? []).filter((fs) => !(tables && customViewOf(fs))), "libre"),
+    ];
+  })();
+  const has = (kind: OdBlockKind) => working.list.some((b) => b.kind === kind);
+  const station = { data, report, periodId, canEdit, progress };
 
   const helpBlock = (block: DraftBlock) => speak(`Sobre «${nameOf(block)}»`, blockHelpText(block.kind), "idea");
 
@@ -492,7 +649,8 @@ function TallerReport({ data, report, reportId, periodId, canEdit, classicHref }
           {working.list.map((block, index) => {
             const shown = catalogBlocks.get(block.id ?? block.tempId);
             const selected = picked?.tempId === block.tempId;
-            const editing = selected && Boolean(pick?.editing) && canEdit && EDITABLE.includes(block.kind);
+            const editing = selected && Boolean(pick?.editing) && canEdit && isEditable(block.kind);
+            const ownSave = OWN_SAVE.includes(block.kind);
             const name = nameOf(block);
             const classic = BLOCK_CLASSIC[block.kind];
             const rendered = shown && block.visible ? renderBlock(shown, context) : { embedded: true, node: null };
@@ -541,8 +699,15 @@ function TallerReport({ data, report, reportId, periodId, canEdit, classicHref }
 
                 {selected && (
                   <div className="odt-tools" role="toolbar" aria-label={`Acciones de «${name}»`}>
-                    {canEdit && EDITABLE.includes(block.kind) && (
-                      <button type="button" className="button-primary" data-act="editar" onClick={() => setPick({ id: block.tempId, index, editing: !editing })}>
+                    {canEdit && isEditable(block.kind) && (
+                      <button
+                        type="button"
+                        className="button-primary"
+                        data-act="editar"
+                        onMouseEnter={() => void loadEditors().catch(() => undefined)}
+                        onFocus={() => void loadEditors().catch(() => undefined)}
+                        onClick={() => toggleEdit(block, index, editing)}
+                      >
                         {editing ? "Listo" : "Editar"}
                       </button>
                     )}
@@ -568,20 +733,89 @@ function TallerReport({ data, report, reportId, periodId, canEdit, classicHref }
                     <button type="button" className="button-ghost" data-act="ayuda" onClick={() => helpBlock(block)}>
                       Ayúdeme con esto
                     </button>
-                    {!EDITABLE.includes(block.kind) && (
+                    {block.kind === "tabla" && (
                       <Link className="button-ghost" to={classicHref(classic.station, classic.hash)}>
-                        Editar en la vista clásica <small>({classic.where})</small>
+                        Volver a cargarla en la vista clásica <small>({classic.where})</small>
                       </Link>
                     )}
                     {canEdit && (
-                      <button type="button" className="button-ghost odt-danger" data-act="quitar" disabled={saving} onClick={() => remove(block, index)}>
+                      <button type="button" className="button-ghost odt-danger" data-act="quitar" disabled={saving} onClick={() => guard(() => { dirty.current = false; remove(block, index); })}>
                         Quitar
                       </button>
                     )}
                   </div>
                 )}
 
+                {leave && openEditor?.tempId === block.tempId && (
+                  <div className="odt-ask" role="alertdialog" aria-labelledby="odt-salir-titulo" aria-describedby="odt-salir-texto">
+                    <p>
+                      <strong id="odt-salir-titulo">
+                        <Icon name="alert" size={15} /> ¿Cerrar «{name}» sin guardar?
+                      </strong>
+                      <span id="odt-salir-texto">
+                        Puede haber cambios sin guardar en este bloque. Si lo cierra ahora, se pierden. Para conservarlos, pulse
+                        «Seguir editando» y después «Guardar» dentro del bloque.
+                      </span>
+                    </p>
+                    <div className="odt-ask__actions">
+                      <button type="button" className="button-primary" autoFocus onClick={() => setLeave(null)}>
+                        Seguir editando
+                      </button>
+                      <button
+                        type="button"
+                        className="button-ghost"
+                        onClick={() => {
+                          const run = leave.run;
+                          dirty.current = false;
+                          setLeave(null);
+                          run();
+                        }}
+                      >
+                        Cerrar sin guardar
+                      </button>
+                    </div>
+                  </div>
+                )}
+
                 <div className="odt-block__body">
+                  {editing && block.kind !== "separador" && block.kind !== "kpis" && (
+                    <div
+                      className="odt-editor-wrap"
+                      // Cualquier cosa escrita, elegida o pegada en un editor con su propio «Guardar» cuenta como «puede haber cambios».
+                      onInputCapture={ownSave ? touch : undefined}
+                      onChangeCapture={ownSave ? touch : undefined}
+                      onPasteCapture={ownSave ? touch : undefined}
+                    >
+                      {ownSave && (
+                        <p className={live ? "oda-banner" : "odt-tip"} role="note">
+                          {live && <Icon name="alert" size={16} />}
+                          {live ? (
+                            <span>
+                              <strong>Este informe está publicado: lo que guarde en este bloque se ve en el portal de inmediato.</strong> Este
+                              editor no usa los cambios pendientes: guarda con su propio botón «Guardar».
+                            </span>
+                          ) : (
+                            <span>
+                              Este bloque se guarda con su propio botón <strong>«Guardar»</strong>, aquí dentro. Al guardar, la ficha de abajo se
+                              actualiza.
+                            </span>
+                          )}
+                        </p>
+                      )}
+                      <Suspense fallback={<p className="odt-empty">Abriendo el editor…</p>}>
+                        <BlockEditor
+                          block={block}
+                          shown={shown}
+                          station={station}
+                          viewReport={viewReport}
+                          mode={mode}
+                          onSettings={(settings) => changeBlocks(patchBlock(currentBlocks(), block.tempId, { settings }))}
+                          guard={guard}
+                        />
+                      </Suspense>
+                    </div>
+                  )}
+
                   {editing && block.kind === "separador" && (
                     <div className="odt-editor">
                       <label className="admin-field admin-field--wide">
@@ -621,8 +855,47 @@ function TallerReport({ data, report, reportId, periodId, canEdit, classicHref }
                         onValues={onValues}
                         onPasted={onPasted}
                         onPatch={onPatchIndicator}
-                        structureHref={classicHref("estructura")}
+                        onDelete={onDeleteIndicator}
+                        deleting={deleteIndicator.isPending}
+                        deleteError={deleteIndicator.error}
+                        live={live}
                       />
+                      {newIndicator ? (
+                        <Suspense fallback={<p className="odt-empty">Abriendo el formulario…</p>}>
+                          {live && (
+                            <p className="oda-banner" role="note">
+                              <Icon name="alert" size={16} />
+                              Este informe está publicado: el indicador nuevo se guarda de inmediato y sale en el portal como «sin reportar» hasta que tenga cifras.
+                            </p>
+                          )}
+                          <NewIndicator
+                            station={station}
+                            onCancel={() => setNewIndicator(false)}
+                            onCreated={(key) => {
+                              setNewIndicator(false);
+                              // Un tablero con indicadores elegidos suma el nuevo a los suyos; uno sin elección ya lo recoge.
+                              if (block.settings.indicators?.length) {
+                                changeBlocks(patchBlock(currentBlocks(), block.tempId, { settings: { ...block.settings, indicators: [...block.settings.indicators, key] } }));
+                              }
+                              notify("Se creó el indicador. Ya puede llenar sus cifras en la rejilla.");
+                            }}
+                          />
+                        </Suspense>
+                      ) : (
+                        <div>
+                          <button
+                            type="button"
+                            className="button-secondary"
+                            disabled={!canEdit}
+                            onClick={() => {
+                              void loadEditors().catch(() => undefined);
+                              setNewIndicator(true);
+                            }}
+                          >
+                            <Icon name="plus" size={15} /> Nuevo indicador
+                          </button>
+                        </div>
+                      )}
                       <BoardPicker
                         indicators={indicatorRows}
                         chosen={block.settings.indicators ?? []}
@@ -646,9 +919,6 @@ function TallerReport({ data, report, reportId, periodId, canEdit, classicHref }
                           <p>
                             <strong>Cómo se llena.</strong> {BLOCK_FILL[block.kind]}
                           </p>
-                          <p className="odt-note">
-                            Este tipo de bloque todavía no se dibuja ni se edita en el taller: se maneja en la vista clásica ({classic.where}).
-                          </p>
                         </div>
                       ) : rendered.node ? (
                         <div className="odt-copy" ref={makeInert} aria-hidden="true">
@@ -658,9 +928,12 @@ function TallerReport({ data, report, reportId, periodId, canEdit, classicHref }
                         <p className="odt-empty">
                           {block.kind === "kpis"
                             ? "Este tablero no tiene indicadores que mostrar. Pulse «Editar» y elija cuáles muestra."
-                            : "Este bloque todavía no tiene datos: el público no lo ve hasta que los tenga."}
+                            : isEditable(block.kind)
+                              ? "Este bloque todavía no tiene datos: el público no lo ve hasta que los tenga. Pulse «Editar» para llenarlo."
+                              : "Este bloque todavía no tiene datos: el público no lo ve hasta que los tenga."}
                         </p>
                       )}
+                      {selected && NO_CAPTURE_WHY[block.kind] && <p className="odt-note odt-origin">{NO_CAPTURE_WHY[block.kind]}</p>}
                       {/* Modo completo: la evolución por campus, viva, con las cifras que se están escribiendo. */}
                       {editing && mode === "completo" && block.kind === "kpis" && shown && (
                         <div className="odt-copy odt-evolution" ref={makeInert} aria-hidden="true">
@@ -687,9 +960,34 @@ function TallerReport({ data, report, reportId, periodId, canEdit, classicHref }
       {/* --- Añadir -------------------------------------------------------------------- */}
       <div className="odt-add" data-tour="odt-anadir" data-open={adding || undefined} ref={addPanel}>
         {!adding ? (
-          <button type="button" className="button-secondary" disabled={!canEdit} onClick={() => setAdding(true)}>
+          <button
+            type="button"
+            className="button-secondary"
+            disabled={!canEdit}
+            onMouseEnter={() => void loadEditors().catch(() => undefined)}
+            onFocus={() => void loadEditors().catch(() => undefined)}
+            onClick={() => guard(() => { dirty.current = false; setPick((current) => (current ? { ...current, editing: false } : current)); setAdding(true); })}
+          >
             <Icon name="plus" size={15} /> Añadir algo a la ficha
           </button>
+        ) : creating ? (
+          <>
+            <div className="odt-add__head">
+              <strong>Crear: {ADD_LABEL[creating] ?? BLOCK_LABELS[creating]}</strong>
+              <button type="button" className="button-ghost" onClick={() => setCreating(null)}>
+                Volver a la lista
+              </button>
+            </div>
+            <p className={live ? "oda-banner" : "odt-note"} role="note">
+              {live && <Icon name="alert" size={16} />}
+              {live
+                ? "Este informe está publicado: lo que cree aquí se guarda de inmediato. El portal no lo dibuja hasta que tenga cifras."
+                : "Al crearlo queda su bloque en la ficha, al final, listo para llenar."}
+            </p>
+            <Suspense fallback={<p className="odt-empty">Abriendo el formulario…</p>}>
+              <AddDataset kind={creating} station={station} onDone={() => created(creating)} onCancel={() => setCreating(null)} />
+            </Suspense>
+          </>
         ) : (
           <>
             <div className="odt-add__head">
@@ -698,31 +996,74 @@ function TallerReport({ data, report, reportId, periodId, canEdit, classicHref }
                 Cancelar
               </button>
             </div>
-            <p className="odt-note">
-              En el taller se añaden, por ahora, el separador y otro tablero de indicadores. Los demás se crean en la vista
-              clásica y aparecen aquí en cuanto existen.
-            </p>
+            {orphans.length > 0 && (
+              <section className="odt-add__group" aria-label="Lo que el informe tiene y la ficha no muestra">
+                <h4>El informe tiene esto y la ficha no lo muestra</h4>
+                <ul>
+                  {orphans.map((orphan) => (
+                    <li key={`${orphan.kind}-${orphan.id}`} className="odt-option" data-live>
+                      <strong>{orphan.title}</strong>
+                      <span>{BLOCK_LABELS[orphan.kind]}</span>
+                      <div className="odt-option__actions">
+                        <button type="button" className="button-secondary" onClick={() => add(orphan.kind, orphan.id, orphan.title)}>
+                          Poner en la ficha
+                        </button>
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+              </section>
+            )}
             {BLOCK_GROUPS.map((group) => (
               <section key={group.title} className="odt-add__group" aria-label={group.title}>
                 <h4>{group.title}</h4>
                 <ul>
                   {group.kinds.map((kind) => {
-                    const here = ADDABLE.includes(kind);
-                    const create = BLOCK_CREATE[kind];
+                    const plain = PLAIN_BLOCKS.includes(kind);
+                    const repeated = ONCE.includes(kind) && has(kind);
+                    const single = (kind === "saber_pro" && (data.rows.saberPro ?? []).some((x) => x.report_id === reportId)) || (kind === "saber_tyt" && (data.rows.saberTyt ?? []).some((x) => x.report_id === reportId));
+                    const creatable = CREATABLE.includes(kind) && !single;
+                    // Un bloque que lee lo que el informe ya tiene: se pone si falta.
+                    const reads =
+                      !has(kind) &&
+                      ((kind === "diversidad" && indicatorRows.some((i) => i.key === "grupo-especial")) ||
+                        (kind === "modelo" && (data.rows.models ?? []).some((m) => m.report_id === reportId)) ||
+                        (kind === "desgloses" && data.rows.breakdowns.some((b) => b.report_id === reportId)) ||
+                        (kind === "rankings" && (data.rows.rankings ?? []).some((r) => r.report_id === reportId)) ||
+                        (kind === "medallero" && (data.rows.medalBoards ?? []).some((m) => m.report_id === reportId)) ||
+                        (kind === "tablas_personalizadas" && (data.rows.freeSets ?? []).some((fs) => fs.report_id === reportId && customViewOf(fs))) ||
+                        single);
+                    const why =
+                      repeated || (single && has(kind))
+                        ? "Ya está en la ficha."
+                        : kind === "tabla"
+                          ? "Solo llega con «Importar informe», en la vista clásica."
+                          : kind === "diversidad" && !reads
+                            ? has(kind) ? "Ya está en la ficha." : "Lee indicadores con claves propias del informe de Diversidad: este informe no los tiene."
+                            : kind === "modelo" && !reads
+                              ? has(kind) ? "Ya está en la ficha." : "El modelo lo carga Planeación; este informe no tiene uno."
+                              : null;
                     return (
-                      <li key={kind} className="odt-option" data-live={here || undefined}>
+                      <li key={kind} className="odt-option" data-live={((plain && !repeated) || creatable || reads) || undefined}>
                         <strong>{ADD_LABEL[kind] ?? BLOCK_LABELS[kind]}</strong>
                         <span>{blockHelp(kind)}</span>
                         <div className="odt-option__actions">
-                          {here ? (
+                          {plain && !repeated && (
                             <button type="button" className="button-secondary" onClick={() => add(kind)}>
                               Añadir
                             </button>
-                          ) : (
-                            <Link className="odt-link" to={classicHref(create.station, create.hash)}>
-                              Disponible en la vista clásica <small>({create.where})</small>
-                            </Link>
                           )}
+                          {creatable && (
+                            <button type="button" className="button-secondary" onClick={() => beginCreate(kind)}>
+                              Crear uno nuevo
+                            </button>
+                          )}
+                          {reads && (
+                            <button type="button" className="button-secondary" onClick={() => add(kind)}>
+                              Poner el bloque en la ficha
+                            </button>
+                          )}
+                          {why && <small className="odt-note">{why}</small>}
                           <button type="button" className="odt-link" onClick={() => speak(BLOCK_LABELS[kind], blockHelpText(kind), "idea")}>
                             ¿Cómo funciona?
                           </button>

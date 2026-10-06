@@ -15,9 +15,15 @@ import type { OpenDataRows } from "../../../datos-abiertos/data/repository";
 import { draftKey } from "./draft";
 
 const memory = new Map<string, string>();
-const saveValues = vi.fn(async (_input: unknown) => undefined);
-const saveIndicator = vi.fn(async (_input: unknown) => undefined);
-const saveBlocks = vi.fn(async (_input: unknown) => undefined);
+/** Un espía por cada escritura de od-data, con su nombre de gancho: aquí no hay base. */
+const { spy, spies } = vi.hoisted(() => {
+  const spies: Record<string, ReturnType<typeof vi.fn>> = {};
+  const spy = (name: string) => (spies[name] ??= vi.fn(async (_input: unknown) => undefined as unknown));
+  return { spy, spies };
+});
+const saveValues = spy("useSaveValues");
+const saveIndicator = spy("useSaveIndicator");
+const saveBlocks = spy("useSaveBlocks");
 const startTour = vi.fn();
 
 vi.mock("./draft", async (original) => {
@@ -40,9 +46,22 @@ vi.mock("./pilo-motion", () => ({
   enterToast: () => undefined,
   settleBlock: () => undefined,
 }));
-vi.mock("../od-data", () => {
-  const mutation = (mutateAsync: unknown) => () => ({ mutateAsync, mutate: () => undefined, isPending: false, error: null, isSuccess: false });
-  return { useSaveBlocks: mutation(saveBlocks), useSaveIndicator: mutation(saveIndicator), useSaveValues: mutation(saveValues) };
+vi.mock("../od-data", async (original) => {
+  const real = await original<Record<string, unknown>>();
+  const out: Record<string, unknown> = { ...real };
+  for (const name of Object.keys(real)) {
+    if (!/^use(Save|Delete|Replace|Import|Reorder|SetReport|Create|Copy|Make)/.test(name)) continue;
+    out[name] = () => ({
+      mutateAsync: (input: unknown) => spy(name)(input),
+      mutate: (input: unknown, options?: { onSuccess?: () => void; onError?: (error: unknown) => void }) => {
+        void Promise.resolve(spy(name)(input)).then(() => options?.onSuccess?.(), (error) => options?.onError?.(error));
+      },
+      isPending: false,
+      error: null,
+      isSuccess: false,
+    });
+  }
+  return out;
 });
 
 const { Taller } = await import("./Taller");
@@ -95,32 +114,61 @@ const rows = (status: "publicado" | "borrador"): OpenDataRows =>
     ],
   }) as unknown as OpenDataRows;
 
+/** El mismo informe con un desglose cargado y su bloque en la ficha. */
+const rowsWithBreakdown = (status: "publicado" | "borrador"): OpenDataRows => {
+  const base = rows(status) as unknown as Record<string, unknown[]>;
+  return {
+    ...base,
+    breakdowns: [
+      { id: "bd1", report_id: "r1", key: "nivel", title: "Matrícula por nivel", unit: "estudiantes", format: "entero", default_chart: "circular", years: null, office_id: "o1", position: 1, reporting: "periodo", annual_rule: "ultimo", reserve_threshold: null, show_total: true },
+    ],
+    breakdownValues: [
+      { breakdown_id: "bd1", year: 2025, term: "B", label: "Pregrado", position: 1, value: 9000, reserved: false },
+      { breakdown_id: "bd1", year: 2025, term: "B", label: "Posgrado", position: 2, value: 1500, reserved: false },
+    ],
+    blocks: [...base.blocks, { id: "b4", report_id: "r1", kind: "desgloses", ref_id: null, position: 4, visible: true, settings: {} }],
+  } as unknown as OpenDataRows;
+};
+
 let root: Root | null = null;
 let host: HTMLDivElement;
+let canEditNow = true;
 
-async function open(status: "publicado" | "borrador", canEdit = true) {
-  const data = rows(status);
+const tree = (data: OpenDataRows) => {
   const catalog = assembleCatalog(data);
+  return createElement(
+    MemoryRouter,
+    null,
+    createElement(Taller, {
+      data: { rows: data, catalog },
+      report: catalog.reports[0],
+      periodId: "p1",
+      canEdit: canEditNow,
+      progress: new Map(),
+      classicHref: (station, hash) => `/admin/udes-en-cifras/${station}/poblacional${hash ? `#${hash}` : ""}`,
+    }),
+  );
+};
+
+async function open(status: "publicado" | "borrador", canEdit = true, build: (status: "publicado" | "borrador") => OpenDataRows = rows) {
+  canEditNow = canEdit;
   host = document.createElement("div");
   document.body.appendChild(host);
   root = createRoot(host);
   await act(async () => {
-    root!.render(
-      createElement(
-        MemoryRouter,
-        null,
-        createElement(Taller, {
-          data: { rows: data, catalog },
-          report: catalog.reports[0],
-          periodId: "p1",
-          canEdit,
-          progress: new Map(),
-          classicHref: (station, hash) => `/admin/udes-en-cifras/${station}/poblacional${hash ? `#${hash}` : ""}`,
-        }),
-      ),
-    );
+    root!.render(tree(build(status)));
   });
 }
+
+/** Como cuando la base responde tras guardar: la pantalla recibe las filas nuevas. */
+const refresh = (data: OpenDataRows) => act(async () => root!.render(tree(data)));
+/** Los editores de Captura bajan aparte: se espera a que lleguen. */
+const editors = async () => {
+  await act(async () => {
+    await vi.dynamicImportSettled();
+  });
+  await act(async () => undefined);
+};
 
 const all = <T extends Element = HTMLElement>(selector: string) => Array.from(host.querySelectorAll<T>(selector));
 const button = (label: string, within: ParentNode = host) =>
@@ -158,9 +206,7 @@ const pick = (index: number) => click(block(index).querySelector(".odt-block__he
 beforeEach(() => {
   vi.useFakeTimers();
   memory.clear();
-  saveValues.mockClear();
-  saveIndicator.mockClear();
-  saveBlocks.mockClear();
+  Object.values(spies).forEach((s) => s.mockClear());
   startTour.mockClear();
 });
 
@@ -180,12 +226,10 @@ describe("elegir un bloque", () => {
     const tools = all(".odt-tools button").map((b) => b.textContent?.trim());
     expect(tools).toEqual(["Editar", "Subir", "Bajar", "Ocultar", "Ayúdeme con esto", "Quitar"]);
     expect(block(1).querySelector(".odt-block__head")?.getAttribute("aria-pressed")).toBe("true");
-    // Un tipo sin editor aquí no ofrece «Editar»: lleva a la vista clásica.
+    // Todos los tipos con captura se editan aquí: ya no mandan a la vista clásica.
     await pick(2);
-    expect(button("Editar")).toBeUndefined();
-    const link = host.querySelector<HTMLAnchorElement>(".odt-tools a");
-    expect(link?.textContent).toContain("Editar en la vista clásica");
-    expect(link?.getAttribute("href")).toBe("/admin/udes-en-cifras/diseno/poblacional");
+    expect(button("Editar")).toBeTruthy();
+    expect(host.querySelector(".odt-tools a")).toBeNull();
   });
 
   it("la copia de la ficha es inerte: no recibe el foco", async () => {
@@ -388,18 +432,32 @@ describe("orden de la ficha", () => {
     expect(toast()).toBeNull();
   });
 
-  it("«Añadir algo a la ficha» lista los veinte tipos y añade aquí separador y tablero", async () => {
+  it("«Añadir algo a la ficha» lista los veinte tipos; cada familia se crea aquí", async () => {
     await open("borrador");
     await click(button("Añadir algo a la ficha"));
     expect(all(".odt-option")).toHaveLength(20);
-    expect(all(".odt-option[data-live]").map((o) => o.querySelector("strong")?.textContent)).toEqual(["Otro tablero de indicadores", "Separador"]);
-    const classic = all<HTMLAnchorElement>(".odt-option a");
-    expect(classic).toHaveLength(18);
-    expect(classic.every((a) => a.textContent?.includes("Disponible en la vista clásica"))).toBe(true);
+    const name = (o: Element) => o.querySelector("strong")?.textContent;
+    const offers = (label: string) => all(".odt-option").filter((o) => button(label, o)).map(name);
+    expect(offers("Añadir")).toEqual(["Otro tablero de indicadores", "Tabla dinámica", "Separador", "Grid de imágenes", "Qué mide cada cifra"]);
+    expect(offers("Crear uno nuevo")).toEqual([
+      "Evolución histórica", "Desglose", "Conjunto libre", "Tabla personalizada", "Mapa por departamento", "Mapa de calor",
+      "Tubería de permanencia", "Rankings", "Medallero", "Resultados Saber PRO", "Saber TyT · Motor Beta",
+    ]);
+    // Lo que la ficha admite una sola vez y ya tiene, lo dice; lo que falta, se ofrece.
+    const option = (label: string) => all(".odt-option").find((o) => name(o) === label)!;
+    expect(option("Evolución por campus").textContent).toContain("Ya está en la ficha.");
+    expect(button("Añadir", option("Tabla dinámica"))).toBeTruthy();
+    expect(option("Tabla").textContent).toContain("Solo llega con «Importar informe»");
+    // Ya no manda a la vista clásica.
+    expect(all(".odt-option a")).toHaveLength(0);
+  });
+
+  it("añade un separador, que entra elegido y en edición", async () => {
+    await open("borrador");
+    await click(button("Añadir algo a la ficha"));
     const divider = all(".odt-option").find((o) => o.querySelector("strong")?.textContent === "Separador")!;
     await click(button("Añadir", divider));
     expect(blocks()).toEqual(["separador", "kpis", "evolucion", "separador"]);
-    // Entra elegido y en edición: se le escribe el título.
     const title = block(3).querySelector<HTMLInputElement>(".odt-editor input")!;
     await type(title, "Graduados");
     await wait(1100);
@@ -408,6 +466,165 @@ describe("orden de la ficha", () => {
     expect(added.id).toBeUndefined();
     expect(added).toMatchObject({ kind: "separador", position: 4, settings: { title: "Graduados" } });
     expect(added.settings.slot).toBeTruthy();
+  });
+});
+
+describe("diligenciar dentro del bloque", () => {
+  const blur = async (input: HTMLInputElement | null | undefined) =>
+    act(async () => {
+      input!.dispatchEvent(new FocusEvent("focusout", { bubbles: true }));
+    });
+
+  it("un desglose se edita en su bloque, con el editor de Captura y su propio «Guardar»", async () => {
+    await open("borrador", true, rowsWithBreakdown);
+    await pick(3);
+    await click(button("Editar"));
+    await editors();
+    const editor = block(3).querySelector(".odt-editor--mounted")!;
+    expect(editor).toBeTruthy();
+    expect(block(3).textContent).toContain("Este bloque se guarda con su propio botón «Guardar»");
+    // La rejilla de siempre: categorías por fila y todos los cortes del periodo por columna.
+    expect(editor.querySelectorAll('input[aria-label^="Pregrado, 20"]').length).toBe(4);
+    const input = cell("Pregrado, 2025, periodo 2");
+    expect(input?.value).toBe("9.000");
+    await type(input, "9100");
+    await blur(input);
+    await click(button("Guardar 1", editor));
+    const save = spies.useSaveBreakdownValues;
+    expect(save).toHaveBeenCalledTimes(1);
+    const sent = save.mock.calls[0][0] as { breakdownId: string; kind: string; values: { label: string; year: number; term: string; value: number | null }[] };
+    expect(sent.breakdownId).toBe("bd1");
+    expect(sent.kind).toBe("rejilla");
+    expect(sent.values.find((v) => v.label === "Pregrado" && v.year === 2025 && v.term === "B")?.value).toBe(9100);
+    // No pasa por el guardado automático del taller.
+    await wait(3000);
+    expect(saveValues).not.toHaveBeenCalled();
+    expect(saveBlocks).not.toHaveBeenCalled();
+  });
+
+  it("junto al desglose: cómo se reporta, la cifra del año, categorías nuevas y su definición", async () => {
+    await open("borrador", true, rowsWithBreakdown);
+    await pick(3);
+    await click(button("Editar"));
+    await editors();
+    const read = block(3).textContent ?? "";
+    expect(read).toContain("Se reporta");
+    expect(read).toContain("Definición y cómo se ve");
+    expect(read).toContain("Título propio del bloque");
+    expect(read).toContain("Desgloses de este bloque");
+  });
+
+  it("al guardar, la ficha del bloque se refresca con la cifra nueva", async () => {
+    await open("borrador", true, rowsWithBreakdown);
+    const next = rowsWithBreakdown("borrador");
+    (next.breakdownValues as unknown as { label: string; value: number }[])[0].value = 9100;
+    await refresh(next);
+    expect(block(3).querySelector(".odt-copy")?.textContent).toContain("9.100");
+  });
+
+  it("un solo editor abierto a la vez: abrir otro cierra el anterior", async () => {
+    await open("borrador", true, rowsWithBreakdown);
+    await pick(3);
+    await click(button("Editar"));
+    await editors();
+    expect(all(".odt-block[data-editing]")).toHaveLength(1);
+    await pick(1);
+    expect(all(".odt-block[data-editing]")).toHaveLength(0);
+    await click(button("Editar"));
+    expect(all(".odt-block[data-editing]").map((b) => b.getAttribute("data-kind"))).toEqual(["kpis"]);
+  });
+
+  it("con cambios sin guardar, avisa antes de cerrar el editor y deja seguir", async () => {
+    await open("borrador", true, rowsWithBreakdown);
+    await pick(3);
+    await click(button("Editar"));
+    await editors();
+    await type(cell("Pregrado, 2025, periodo 2"), "9100");
+    await pick(1);
+    const ask = host.querySelector(".odt-ask");
+    expect(ask?.getAttribute("role")).toBe("alertdialog");
+    expect(ask?.textContent).toContain("¿Cerrar «Desgloses» sin guardar?");
+    // Sigue abierto el mismo editor.
+    expect(all(".odt-block[data-editing]").map((b) => b.getAttribute("data-kind"))).toEqual(["desgloses"]);
+    await click(button("Seguir editando"));
+    expect(host.querySelector(".odt-ask")).toBeNull();
+    expect(cell("Pregrado, 2025, periodo 2")?.value).toBe("9100");
+    // «Listo» también avisa; «Cerrar sin guardar» cierra.
+    await click(button("Listo"));
+    await click(button("Cerrar sin guardar"));
+    expect(all(".odt-block[data-editing]")).toHaveLength(0);
+    expect(spies.useSaveBreakdownValues ?? vi.fn()).not.toHaveBeenCalled();
+  });
+
+  it("informe publicado: el editor montado avisa que su «Guardar» se ve en el portal de inmediato", async () => {
+    await open("publicado", true, rowsWithBreakdown);
+    await pick(3);
+    await click(button("Editar"));
+    await editors();
+    expect(block(3).querySelector(".oda-banner")?.textContent).toContain("lo que guarde en este bloque se ve en el portal de inmediato");
+    // Y no entra a los cambios pendientes del taller.
+    await type(cell("Pregrado, 2025, periodo 2"), "9100");
+    expect(button("Publicar cambios (1)")).toBeUndefined();
+  });
+
+  it("crear un desglose desde «Añadir»: el formulario de Estructura, y su bloque queda abierto para llenar", async () => {
+    await open("borrador", true, rowsWithBreakdown);
+    await click(button("Añadir algo a la ficha"));
+    const option = all(".odt-option").find((o) => o.querySelector("strong")?.textContent === "Desglose")!;
+    await click(button("Crear uno nuevo", option));
+    await editors();
+    const panel = host.querySelector(".odt-add")!;
+    expect(panel.textContent).toContain("Crear: Desglose");
+    await type(panel.querySelector<HTMLInputElement>("form input"), "Matrícula por sexo");
+    await click(panel.querySelector('form button[type="submit"]'));
+    const save = spies.useSaveBreakdown;
+    expect(save).toHaveBeenCalledTimes(1);
+    expect(save.mock.calls[0][0]).toMatchObject({ report_id: "r1", key: "matricula-por-sexo", title: "Matrícula por sexo", position: 2 });
+    await act(async () => undefined);
+    expect(toast()?.textContent).toContain("Se creó «Desglose»");
+    // La base responde con el desglose nuevo: el bloque de desgloses se elige y se abre, con los dos.
+    const next = rowsWithBreakdown("borrador") as unknown as { breakdowns: Record<string, unknown>[] };
+    next.breakdowns.push({ ...next.breakdowns[0], id: "bd2", key: "matricula-por-sexo", title: "Matrícula por sexo", position: 2 });
+    await refresh(next as unknown as OpenDataRows);
+    await editors();
+    expect(all(".odt-block[data-editing]").map((b) => b.getAttribute("data-kind"))).toEqual(["desgloses"]);
+    const sections = all(".odt-section__head", ).map((s) => s.querySelector("strong")?.textContent);
+    expect(sections).toContain("Matrícula por nivel");
+    expect(sections).toContain("Matrícula por sexo");
+  });
+
+  it("crear y borrar indicadores desde el tablero", async () => {
+    await open("borrador");
+    await pick(1);
+    await click(button("Editar"));
+    await click(button("Nuevo indicador"));
+    await editors();
+    const form = block(1).querySelector("form")!;
+    await type(form.querySelector<HTMLInputElement>("input"), "Estudiantes nuevos");
+    await click(form.querySelector('button[type="submit"]'));
+    expect(saveIndicator).toHaveBeenCalledWith(expect.objectContaining({ report_id: "r1", key: "estudiantes-nuevos", label: "Estudiantes nuevos", position: 3 }));
+    // Borrar conserva la confirmación en su sitio, que nombra lo que se pierde.
+    await click(button("Borrar este indicador", block(1).querySelector(".odt-indicator")!));
+    const confirm = block(1).querySelector('[role="alertdialog"]');
+    expect(confirm?.textContent).toContain("Se pierden todas sus cifras cargadas");
+    await click(button("Sí, borrar", confirm!));
+    expect(spies.useDeleteIndicator).toHaveBeenCalledWith("mat");
+  });
+
+  it("la evolución por campus elige su indicador y cómo abre, y se guarda con los bloques", async () => {
+    await open("borrador");
+    await pick(2);
+    await click(button("Editar"));
+    await editors();
+    await click(button("Barras por año"));
+    const select = block(2).querySelector<HTMLSelectElement>(".odt-editor select")!;
+    await act(async () => {
+      Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, "value")!.set!.call(select, "docentes");
+      select.dispatchEvent(new Event("change", { bubbles: true }));
+    });
+    await wait(1100);
+    const sent = saveBlocks.mock.calls[0][0] as { blocks: { id?: string; settings: Record<string, unknown> }[] };
+    expect(sent.blocks.find((b) => b.id === "b3")?.settings).toMatchObject({ chart: "barras", indicator: "docentes" });
   });
 });
 
@@ -507,6 +724,6 @@ describe("Pilo en espera", () => {
     await click(button("¿Cómo funciona?", heat));
     const said = host.querySelector(".odt-pilo__say")?.textContent ?? "";
     expect(said).toContain("Mapa de calor. Matriz de dos dimensiones en escala azul.");
-    expect(said).toContain("Se pega la tabla completa desde Excel");
+    expect(said).toContain("pegue la tabla completa desde Excel");
   });
 });

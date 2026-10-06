@@ -29,7 +29,7 @@ vi.mock("./draft", async (original) => {
 vi.mock("../../../../components/tour/TourProvider", () => ({ useTour: () => ({ start: () => undefined, isDone: () => true, active: null }) }));
 vi.mock("../od-data", () => {
   const mutation = () => ({ mutateAsync: async () => undefined, mutate: () => undefined, isPending: false, error: null, isSuccess: false });
-  return { useSaveBlocks: mutation, useSaveIndicator: mutation, useSaveValues: mutation };
+  return { useSaveBlocks: mutation, useSaveIndicator: mutation, useSaveValues: mutation, useDeleteIndicator: mutation };
 });
 
 // React avisa de que los efectos de maquetación no corren en el servidor: aquí es justo lo esperado.
@@ -115,9 +115,9 @@ describe("el taller, dibujado", () => {
     // El tablero se dibuja con el componente del portal y sus cifras.
     expect(html).toContain("od-kpi");
     expect(read).toContain("Estudiantes matriculados");
-    // Un tipo que no se incrusta: su ayuda y cómo se llena.
-    expect(read).toContain("Posiciones en QS, THE y otros rankings");
-    expect(read).toContain("se maneja en la vista clásica (Captura › Rankings)");
+    // Un bloque con captura y todavía sin datos invita a llenarlo aquí, sin mandar a otra pantalla.
+    expect(read).toContain("Este bloque todavía no tiene datos: el público no lo ve hasta que los tenga. Pulse «Editar» para llenarlo.");
+    expect(read).not.toContain("vista clásica (Captura");
     // Un bloque oculto lo dice.
     expect(read).toContain("Oculto: el público no lo ve");
     expect(read).toContain("Llamar a Pilo");
@@ -187,7 +187,7 @@ describe("el editor del tablero, dibujado", () => {
     onValues: () => undefined,
     onPasted: () => undefined,
     onPatch: () => undefined,
-    structureHref: "/admin/udes-en-cifras/estructura/poblacional",
+    onDelete: () => undefined,
   };
   const editor = (mode: "sencillo" | "completo", indicators = data.indicators) =>
     renderToString(createElement(MemoryRouter, null, createElement(KpiEditor, { ...base, mode, indicators })));

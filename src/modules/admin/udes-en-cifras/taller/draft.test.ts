@@ -321,6 +321,58 @@ describe("un bloque nuevo que se guarda mientras se sigue editando", () => {
   });
 });
 
+describe("lo que otro editor crea mientras hay cambios de bloques pendientes", () => {
+  const base = () => blocksFromRows(BLOCK_ROWS, REPORT);
+
+  it("un bloque que la base acaba de recibir (un conjunto nuevo) se suma al final de la lista pendiente", () => {
+    const draft = setBlocks(emptyDraft(), moveBlock({ list: base(), removed: [] }, "b3", -1), base());
+    const stored = [...base(), { ...base()[2], id: "b7", tempId: "b7", kind: "mapa_calor" as const, ref_id: "h1", position: 4 }];
+    const working = workingBlocks(draft, stored);
+    expect(working.list.map((b) => [b.tempId, b.position])).toEqual([["b1", 1], ["b3", 2], ["b2", 3], ["b7", 4]]);
+    // Y la ficha lo dibuja en ese orden.
+    const withBlock = { ...rows(), blocks: [...BLOCK_ROWS, blockRow("b7", "metodologia", 4)] } as OpenDataRows;
+    const report = assembleCatalog(overlayRows(withBlock, REPORT, draft)).reports[0];
+    expect([...(report.blocks ?? [])].sort((a, b) => a.position - b.position).map((b) => b.uuid)).toEqual(["b1", "b3", "b2", "b7"]);
+  });
+
+  it("no devuelve un bloque quitado a propósito ni duplica uno nuevo que ya se guardó", () => {
+    const removed = removeBlock({ list: base(), removed: [] }, "b2").blocks;
+    expect(workingBlocks({ ...emptyDraft(), blocks: removed }, base()).list.map((b) => b.tempId)).toEqual(["b1", "b3"]);
+    const added = addBlock({ list: base(), removed: [] }, "separador", "abc");
+    const saved = [...base(), { ...added.blocks.list[3], id: "b9", tempId: "b9" }];
+    expect(workingBlocks({ ...emptyDraft(), blocks: added.blocks }, saved).list.map((b) => b.tempId)).toEqual(["b1", "b2", "b3", "nuevo-separador-abc"]);
+  });
+
+  it("sin cambios pendientes, la lista es la guardada", () => {
+    expect(workingBlocks(emptyDraft(), base())).toEqual({ list: base(), removed: [] });
+  });
+
+  it("un bloque para un conjunto que ya existe apunta a él; imágenes y evolución nacen con sus ajustes", () => {
+    const heat = addBlock({ list: base(), removed: [] }, "mapa_calor", "abc", "h1").blocks.list[3];
+    expect(heat).toMatchObject({ kind: "mapa_calor", ref_id: "h1", visible: true });
+    expect(addBlock({ list: [], removed: [] }, "imagenes", "x").blocks.list[0].settings).toEqual({ images: [], columns: 2, slot: "x" });
+    expect(addBlock({ list: [], removed: [] }, "evolucion", "x").blocks.list[0].settings).toEqual({ chart: "lineas", slot: "x" });
+  });
+});
+
+describe("años con dato de un indicador", () => {
+  it("se guardan como ajuste y se comparan por contenido", () => {
+    let draft = patchIndicator(emptyDraft(), indicatorRow(), { years: [2024] });
+    expect(draft.indicators).toEqual({ mat: { years: [2024] } });
+    expect(indicatorPayloads(draft, REPORT)).toEqual([{ id: "mat", report_id: REPORT, years: [2024] }]);
+    // Volver a «todos» (null) es volver a lo guardado: deja de ser un cambio.
+    draft = patchIndicator(draft, indicatorRow(), { years: null });
+    expect(draft.indicators).toEqual({});
+    // La misma lista que ya estaba guardada tampoco es un cambio.
+    expect(patchIndicator(emptyDraft(), indicatorRow({ years: [2024, 2025] }), { years: [2024, 2025] }).indicators).toEqual({});
+  });
+
+  it("la ficha deja de leer un año sin marcar", () => {
+    const draft = patchIndicator(emptyDraft(), indicatorRow(), { years: [2024] });
+    expect(assembleCatalog(overlayRows(rows(), REPORT, draft)).reports[0].indicators[0].years).toEqual([2024]);
+  });
+});
+
 describe("descartar y sobrevivir a una recarga", () => {
   const filled = (): TallerDraft => {
     let draft = mergeValues(emptyDraft(), { [key("cuc", "2025-B")]: 45, [key("buc", "2025-A")]: null }, stored(), true);

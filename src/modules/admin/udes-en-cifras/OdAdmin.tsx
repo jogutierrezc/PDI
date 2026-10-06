@@ -51,6 +51,12 @@ export interface StationProps {
   periodId: string;
   canEdit: boolean;
   progress: Map<string, ReportProgress>;
+  /**
+   * El taller monta un editor de Captura dentro de un bloque de la ficha: con
+   * el id de un conjunto, el editor se acota a ese conjunto y no ofrece elegir
+   * otro ni crear uno nuevo. Las estaciones clásicas no lo pasan.
+   */
+  only?: string;
 }
 
 /* Cada estación baja cuando se abre. Antes las seis viajaban con la pantalla:

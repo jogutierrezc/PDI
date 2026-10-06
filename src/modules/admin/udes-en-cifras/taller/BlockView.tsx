@@ -8,12 +8,12 @@
    «The Inert Preview Rule»). El bloque se elige y se edita con los controles
    del taller, que están fuera de la copia.
 
-   Los tipos que piden un montaje propio (mapas, rankings, medalleros, Saber
-   PRO y TyT, modelo, diversidad, tabla dinámica) no se incrustan en este
-   incremento: `embedded` sale en falso y el taller los muestra con su
-   etiqueta, su ayuda y el enlace a la vista clásica.
+   Los tipos de montaje pesado (mapas, rankings, medalleros, Saber PRO y TyT,
+   modelo, diversidad, tabla dinámica) se dibujan con su componente del portal
+   desde HeavyViews.tsx, que baja aparte solo cuando la ficha tiene alguno.
    ========================================================================== */
 
+import { Suspense, lazy } from "react";
 import type { CSSProperties, ReactNode } from "react";
 import { BreakdownChart } from "../../../datos-abiertos/components/BreakdownChart";
 import { ChartFrame } from "../../../datos-abiertos/components/ChartFrame";
@@ -32,8 +32,11 @@ import type { Cut } from "../../../datos-abiertos/data/period-reading";
 import { ALL_YEARS, cutCode, cutCodeLabel } from "../../../datos-abiertos/data/terms";
 import { ALL_CAMPUSES } from "../../../datos-abiertos/data/types";
 import type { Breakdown, CampusId, Indicator, OpenDataCatalog, Report, ReportBlock } from "../../../datos-abiertos/data/types";
+import { saberProOf, saberTytOf } from "../../../datos-abiertos/data/groups";
 import "../../../datos-abiertos/datos-abiertos.css";
 import "../../../datos-abiertos/components/report-sections.css";
+
+const HeavyBlock = lazy(() => import("./HeavyViews"));
 
 export interface BlockViewContext {
   catalog: OpenDataCatalog;
@@ -173,7 +176,7 @@ export function renderBlock(block: ReportBlock, { catalog, report, cut, campus, 
       };
     }
     case "evolucion": {
-      const indicator = keyIndicators(report)[0] ?? report.indicators[0];
+      const indicator = report.indicators.find((i) => i.id === block.settings.indicator) ?? keyIndicators(report)[0] ?? report.indicators[0];
       if (!indicator) return { embedded: true, node: null };
       return {
         embedded: true,
@@ -335,6 +338,39 @@ export function renderBlock(block: ReportBlock, { catalog, report, cut, campus, 
               ))}
             </dl>
           </div>
+        ),
+      };
+    }
+    case "mapa":
+    case "rankings":
+    case "medallero":
+    case "saber_pro":
+    case "saber_tyt":
+    case "diversidad":
+    case "modelo":
+    case "tabla_dinamica": {
+      // ¿Hay algo que dibujar? Lo mismo que mira la ficha pública antes de pintar el bloque.
+      const has = (() => {
+        if (!block.visible) return false;
+        if (block.kind === "mapa") {
+          const dataset = report.maps?.find((m) => m.id === block.refKey) ?? (block.refKey ? undefined : report.maps?.[0]);
+          return Boolean(dataset && Object.values(dataset.values).some((byCampus) => Object.values(byCampus ?? {}).some((codes) => codes && Object.keys(codes).length > 0)));
+        }
+        if (block.kind === "rankings") return blockPicks(report).rankings(block).some((key) => (report.rankings?.find((r) => r.id === key)?.editions.length ?? 0) > 0);
+        if (block.kind === "medallero") return blockPicks(report).medals(block).some((key) => (report.medals?.find((m) => m.id === key)?.entries.length ?? 0) > 0);
+        if (block.kind === "saber_pro") return (saberProOf(report, block)?.results.length ?? 0) > 0;
+        if (block.kind === "saber_tyt") return (saberTytOf(report, block)?.results.length ?? 0) > 0;
+        if (block.kind === "diversidad") return report.indicators.some((i) => i.id === "grupo-especial");
+        if (block.kind === "modelo") return Boolean(report.models?.length);
+        return report.indicators.length > 0;
+      })();
+      if (!has) return { embedded: true, node: null };
+      return {
+        embedded: true,
+        node: (
+          <Suspense fallback={<p className="odt-empty">Dibujando este bloque…</p>}>
+            <HeavyBlock block={block} context={{ catalog, report, cut, campus, noop }} />
+          </Suspense>
         ),
       };
     }

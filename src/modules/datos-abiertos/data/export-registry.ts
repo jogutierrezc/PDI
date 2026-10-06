@@ -258,7 +258,8 @@ export function reportExports(report: Report, catalog: Catalog): ExportEntry[] {
   const freeSetFile = (set: FreeSet) =>
     file("conjunto", set.id, () => {
       const custom = customViewOf(set);
-      return custom?.table ? customTableToTable(set, custom.table) : freeSetToTable(set);
+      // Conjunto libre de la ficha: el total que quien reporta escribió manda sobre el calculado.
+      return custom?.table ? customTableToTable(set, custom.table) : freeSetToTable(set, { writtenTotals: true });
     });
 
   for (const { block, inSection } of page) {

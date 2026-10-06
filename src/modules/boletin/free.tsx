@@ -23,7 +23,7 @@ import {
   compareSource,
   freeAllRowsAt,
   freeRowsAt,
-  freeTotalAt,
+  freeTotalShown,
   freeYears,
   numberOf,
   territoryCode,
@@ -135,7 +135,8 @@ export function freeUnits(set: FreeSet, view: FreeView, cut: number, Sheet: Shee
       if (value === null || value === undefined || value === "") return "—";
       if (kind === "cifra") {
         const n = numberOf(value as string | number);
-        return n === null ? "—" : formatValue(n, (format as "entero" | "decimal" | "porcentaje") ?? "decimal");
+        // Un texto en una columna de cifra («N/D», «< 5») se imprime como está escrito.
+        return n === null ? String(value) : formatValue(n, (format as "entero" | "decimal" | "porcentaje") ?? "decimal");
       }
       return String(value);
     };
@@ -152,11 +153,16 @@ export function freeUnits(set: FreeSet, view: FreeView, cut: number, Sheet: Shee
           });
           return { label: written[0], cells: written.slice(1), strong: r.kind === "total" };
         }
-        const total = r.kind === "total" ? freeTotalAt(all, all.indexOf(r), columns) : null;
+        // El total, casilla por casilla: la escrita por quien reporta o, vacía, la calculada.
+        const total = r.kind === "total" ? freeTotalShown(all, all.indexOf(r), columns) : null;
         const cells = [
           ...(set.temporality === "anual" ? [r.year === null ? "—" : String(r.year)] : []),
           ...columns.map((c, i) =>
-            total ? (i === 0 && c.kind !== "cifra" ? r.label || "Total" : cell(total.cells[c.key], c.kind, c.format)) : cell(r.cells[c.key], c.kind, c.format),
+            total
+              ? i === 0 && c.kind !== "cifra" && !total.written.includes(c.key)
+                ? r.label || "Total"
+                : cell(total.cells[c.key], c.kind, c.format)
+              : cell(r.cells[c.key], c.kind, c.format),
           ),
         ];
         return { label: cells[0], cells: cells.slice(1), strong: Boolean(total) };

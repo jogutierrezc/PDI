@@ -14,6 +14,7 @@
    ========================================================================== */
 
 import { useEffect, useState } from "react";
+import { Link, useLocation } from "react-router-dom";
 import type { CSSProperties } from "react";
 import { Icon } from "../../../../components/ui/Icon";
 import type {
@@ -35,7 +36,6 @@ import {
   useDeleteDataset,
   useDeleteIndicator,
   useSaveBreakdown,
-  useSaveFreeSet,
   useSaveHeatmap,
   useSaveHistory,
   useSaveIndicator,
@@ -53,7 +53,6 @@ import { RankingForm } from "./RankingCapture";
 import { MedalBoardForm } from "./MedalCapture";
 import { SaberProForm } from "./SaberProCapture";
 import { SaberTytForm } from "./SaberTytCapture";
-import { FreeSetForm } from "./FreeSetCapture";
 import { TEMPORALITY_LABEL } from "../../../datos-abiertos/data/free-sets";
 import { customViewOf } from "../../../datos-abiertos/data/custom-table";
 import { RANKING_SYSTEMS, RANKING_VIEWS } from "../../../datos-abiertos/data/rankings";
@@ -529,7 +528,7 @@ function IndicatorForm({
 
 /* --- Conjuntos visuales --------------------------------------------------------------------- */
 
-type DatasetKind = "desglose" | "calor" | "mapa" | "tuberia" | "historico" | "ranking" | "medallero" | "saber" | "tyt" | "libre";
+type DatasetKind = "desglose" | "calor" | "mapa" | "tuberia" | "historico" | "ranking" | "medallero" | "saber" | "tyt";
 
 const MEASURE_LABEL: Record<OdPipelineMeasure, string> = {
   estudiantes: "Estudiantes que siguen en cada etapa (el portal lo muestra en %)",
@@ -555,8 +554,8 @@ function DatasetsEditor({ data, reportId, years, canEdit }: { data: StationProps
   const saveMedalBoard = useSaveMedalBoard();
   const saveSaberPro = useSaveSaberPro();
   const saveSaberTyt = useSaveSaberTyt();
-  const saveFreeSet = useSaveFreeSet();
   const remove = useDeleteDataset();
+  const location = useLocation();
   const [adding, setAdding] = useState<DatasetKind | null>(null);
   // Mapas: por departamento o de movilidad internacional, según la opción elegida.
   const [addingMode, setAddingMode] = useState<OdMapMode>("origen");
@@ -576,18 +575,8 @@ function DatasetsEditor({ data, reportId, years, canEdit }: { data: StationProps
   const freeSets = (data.rows.freeSets ?? []).filter((fs) => fs.report_id === reportId).sort((a, b) => a.position - b.position);
   // Las filas de datos; los títulos de grupo y los totales de 0034 no cuentan como cifras cargadas.
   const freeRows = (id: string) => (data.rows.freeSetRows ?? []).filter((r) => r.set_id === id && (r.kind ?? "dato") === "dato");
-  /** Casillas con dato por columna, y todas las claves presentes en las filas (también de columnas quitadas). */
-  const freeFilled = (id: string) => {
-    const filled: Record<string, number> = {};
-    for (const row of freeRows(id)) {
-      for (const [key, value] of Object.entries(row.cells ?? {})) {
-        filled[key] = (filled[key] ?? 0) + (value === null || value === "" ? 0 : 1);
-      }
-    }
-    return filled;
-  };
   const offices = data.rows.offices;
-  const mutations = [saveBreakdown, saveHeatmap, saveMap, savePipeline, saveHistory, saveRanking, saveMedalBoard, saveSaberPro, saveSaberTyt, saveFreeSet, remove];
+  const mutations = [saveBreakdown, saveHeatmap, saveMap, savePipeline, saveHistory, saveRanking, saveMedalBoard, saveSaberPro, saveSaberTyt, remove];
   const pending = mutations.some((m) => m.isPending);
   const error = mutations.find((m) => m.error)?.error ?? null;
   const success = mutations.some((m) => m.isSuccess);
@@ -610,7 +599,7 @@ function DatasetsEditor({ data, reportId, years, canEdit }: { data: StationProps
     <Panel
       id="oda-conjuntos"
       title="Conjuntos visuales"
-      description="Desgloses, mapas de calor, mapas, tuberías, evoluciones históricas y conjuntos libres: los que quieras de cada tipo. Al crearlos entran a la ficha como bloque visible; sus cifras se cargan en Captura y su lugar se ajusta en Diseño visual. Las tablas personalizadas (textos y cifras con color) se crean y se escriben en Captura, en «Tablas personalizadas»."
+      description="Desgloses, mapas de calor, mapas, tuberías y evoluciones históricas: los que quieras de cada tipo. Al crearlos entran a la ficha como bloque visible; sus cifras se cargan en Captura y su lugar se ajusta en Diseño visual. Los conjuntos libres y las tablas personalizadas no se definen aquí: quien los reporta los crea y arma sus columnas en Captura, en «Conjuntos libres» y «Tablas personalizadas»; aquí solo se listan y se pueden borrar."
       actions={
         <>
           <SaveState pending={pending} error={error} success={success} />
@@ -640,7 +629,6 @@ function DatasetsEditor({ data, reportId, years, canEdit }: { data: StationProps
               {saberPro.length === 0 && <option value="saber">Resultados Saber PRO (ICFES)</option>}
               {/* El Motor Beta cruza dos pruebas de la misma persona: también uno por informe. */}
               {saberTyt.length === 0 && <option value="tyt">Saber TyT · Motor Beta (Saber 11 → Saber TyT)</option>}
-              <option value="libre">Conjunto libre (columnas propias y sus gráficas)</option>
             </select>
           </label>
         </>
@@ -702,23 +690,7 @@ function DatasetsEditor({ data, reportId, years, canEdit }: { data: StationProps
           }
         />
       )}
-      {adding === "libre" && (
-        <FreeSetForm
-          offices={offices}
-          onCancel={() => setAdding(null)}
-          onSubmit={(f) =>
-            saveFreeSet.mutate(
-              {
-                report_id: reportId, key: uniqueKey(f.title, freeSets.map((fs) => fs.key)), title: f.title, description: f.description,
-                temporality: f.temporality, period_label: f.period_label, columns: f.columns, views: [], office_id: f.office_id || null,
-                position: freeSets.length + 1,
-              },
-              done,
-            )
-          }
-        />
-      )}
-      {adding && adding !== "ranking" && adding !== "saber" && adding !== "tyt" && adding !== "libre" && (
+      {adding && adding !== "ranking" && adding !== "saber" && adding !== "tyt" && (
         <DatasetForm
           key={`${adding}-${addingMode}`}
           kind={adding}
@@ -834,29 +806,37 @@ function DatasetsEditor({ data, reportId, years, canEdit }: { data: StationProps
               onSubmit={(f) => saveSaberTyt.mutate({ id: t.id, report_id: reportId, title: f.title, description: f.description, note: f.note, office_id: f.office_id || null }, done)} />
           </DatasetItem>
         ))}
+        {/* Los conjuntos libres se crean y se editan en Captura: aquí solo se listan y se borran. */}
         {freeSets.map((fs) => {
           const rowCount = freeRows(fs.id).length;
-          const filled = freeFilled(fs.id);
+          const custom = Boolean(customViewOf(fs));
+          const where = custom ? "Captura › Tablas personalizadas" : "Captura › Conjuntos libres";
           return (
-            <DatasetItem key={fs.id} kind={customViewOf(fs) ? "Tabla personalizada" : "Conjunto libre"} title={fs.title}
-              detail={customViewOf(fs) ? `${fs.columns.length} columnas · ${rowCount} filas · se escribe en Captura › Tablas personalizadas` : `${fs.columns.length} columnas · ${rowCount} filas · ${fs.views.length} gráficas · ${TEMPORALITY_LABEL[fs.temporality].split(":")[0].toLowerCase()}${fs.temporality === "periodo" && fs.period_label ? ` ${fs.period_label}` : ""}`}
-              canEdit={canEdit} editing={editing === fs.id} onEdit={() => setEditing(fs.id)} onDelete={() => remove.mutate({ table: "od_free_sets", id: fs.id })}>
-              <FreeSetForm
-                offices={offices}
-                initial={{ title: fs.title, description: fs.description, office_id: fs.office_id ?? "", temporality: fs.temporality, period_label: fs.period_label, columns: fs.columns }}
-                rowCount={rowCount}
-                filled={filled}
-                views={fs.views}
-                takenKeys={Object.keys(filled)}
-                onCancel={() => setEditing(null)}
-                onSubmit={(f) =>
-                  saveFreeSet.mutate(
-                    { id: fs.id, report_id: reportId, title: f.title, description: f.description, temporality: f.temporality, period_label: f.period_label, columns: f.columns, office_id: f.office_id || null },
-                    done,
-                  )
-                }
-              />
-            </DatasetItem>
+            <li key={fs.id} className="oda-dataset">
+              <div className="oda-dataset__row">
+                <span className="oda-badge">{custom ? "Tabla personalizada" : "Conjunto libre"}</span>
+                <strong>{fs.title}</strong>
+                <small>
+                  {custom
+                    ? `${fs.columns.length} columnas · ${rowCount} filas`
+                    : `${fs.columns.length} columnas · ${rowCount} filas · ${fs.views.length} gráficas · ${TEMPORALITY_LABEL[fs.temporality].split(":")[0].toLowerCase()}${fs.temporality === "periodo" && fs.period_label ? ` ${fs.period_label}` : ""}`}
+                  {" · "}se edita en {where}
+                </small>
+                <span className="oda-table__actions">
+                  <Link className="oda-link-button" to={{ pathname: location.pathname.replace("/estructura", "/captura"), search: location.search, hash: custom ? "personalizadas" : "libres" }}>
+                    Editar en Captura
+                  </Link>
+                  {canEdit && (
+                    <ConfirmButton
+                      label="Borrar"
+                      subject={`«${fs.title}» (${custom ? "tabla personalizada" : "conjunto libre"})`}
+                      confirmLabel="Se pierden sus cifras cargadas y los bloques que lo muestran salen de la ficha. No se puede deshacer."
+                      onConfirm={() => remove.mutate({ table: "od_free_sets", id: fs.id })}
+                    />
+                  )}
+                </span>
+              </div>
+            </li>
           );
         })}
         {total === 0 && !adding && (

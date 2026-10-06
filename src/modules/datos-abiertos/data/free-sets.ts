@@ -18,6 +18,10 @@
    · territorio  departamento (código DANE o nombre) o país (ISO alfa-3 o
                  nombre), para los mapas.
 
+   El tipo orienta, no bloquea: una casilla que no encaja con su columna (un
+   texto en una cifra) se guarda tal cual. Las gráficas la saltan; las tablas y
+   el CSV la muestran como está escrita (`cellShown`).
+
    Un vacío no es un cero: una casilla sin dato es `null` y se dibuja aparte.
    ========================================================================== */
 
@@ -54,9 +58,10 @@ export type FreeCell = string | number | null;
 
 /**
  * Qué es una fila: un dato, un título que agrupa las siguientes hasta el
- * próximo título, o un total calculado sobre las filas de datos de su grupo.
- * Las gráficas solo leen las de datos: un total junto a sus partes contaría
- * dos veces lo mismo.
+ * próximo título, o un total de las filas de datos de su grupo. Cada casilla
+ * del total puede venir escrita por quien reporta; la que queda vacía se
+ * calcula (ver `freeTotalShown`). Las gráficas solo leen las de datos: un
+ * total junto a sus partes contaría dos veces lo mismo.
  */
 export type FreeRowKind = "dato" | "grupo" | "total";
 
@@ -242,6 +247,54 @@ export function freeTotalAt(rows: FreeRow[], index: number, columns: FreeColumn[
     cells[column.key] = add ? values.reduce((a, b) => a + b, 0) : values.reduce((a, b) => a + b, 0) / values.length;
   }
   return { cells, basis, count: part.length };
+}
+
+/**
+ * Lo que se lee en una casilla, sea cual sea el tipo de su columna: el número
+ * si la columna es de cifra y la casilla lo es; si no, el texto tal como se
+ * escribió («N/D», «< 5», «en trámite»). El tipo de la columna orienta, no
+ * bloquea: las gráficas saltan lo que no es número (`numberOf`), pero la tabla,
+ * el boletín y el CSV lo muestran en vez de dejar un hueco.
+ */
+export function cellShown(column: Pick<FreeColumn, "kind">, cell: FreeCell | undefined): number | string | null {
+  const text = textOf(cell);
+  // Antes que nada: unos espacios sueltos no son un cero.
+  if (text === "") return null;
+  if (column.kind === "cifra") {
+    const n = numberOf(cell);
+    if (n !== null) return n;
+  }
+  return text;
+}
+
+/**
+ * La fila de total como se muestra: escrita o calculada, casilla por casilla.
+ *
+ * · casilla escrita en la fila de total → se muestra esa, tal cual;
+ * · casilla vacía → la calculada de `freeTotalAt` (solo en columnas de cifra).
+ *
+ * Los totales guardados antes de esta regla no traen casillas, así que siguen
+ * saliendo calculados sin migrar nada. `written` dice qué columnas vienen
+ * escritas; `basis` solo conserva las calculadas, para rotular «suma de 4».
+ *
+ * Es la regla de la ficha, el boletín y el CSV de UDES en Cifras. El
+ * Observatorio y los Tableros siguen con `freeTotalAt`: allí un total escrito
+ * dejaría deducir una celda en reserva.
+ */
+export function freeTotalShown(rows: FreeRow[], index: number, columns: FreeColumn[]) {
+  const total = freeTotalAt(rows, index, columns);
+  const own = rows[index]?.cells ?? {};
+  const cells: Record<string, FreeCell> = { ...total.cells };
+  const basis = { ...total.basis };
+  const written: string[] = [];
+  for (const column of columns) {
+    const shown = cellShown(column, own[column.key]);
+    if (shown === null) continue;
+    cells[column.key] = shown;
+    delete basis[column.key];
+    written.push(column.key);
+  }
+  return { cells, basis, count: total.count, written };
 }
 
 export const columnOf = (set: FreeSet, key: string | undefined) => (key ? set.columns.find((c) => c.key === key) : undefined);
@@ -484,6 +537,19 @@ export function freeRefs(sets: FreeSet[] | undefined): { ref: string; title: str
     set.rows.length ? set.views.filter((v) => viewProblems(set, v).length === 0).map((v) => ({ ref: freeRef(set, v), title: `${set.title} · ${v.title}` })) : [],
   );
 }
+
+/** Las columnas que una vista nombra: categorías, comparación, fechas y cifras. */
+export const viewColumnKeys = (view: FreeView): string[] =>
+  Array.from(new Set([view.category, view.compare, view.start, view.end, ...(view.series ?? [])].filter((key): key is string => Boolean(key))));
+
+/**
+ * Columnas que la vista nombra y el conjunto ya no tiene. No es lo mismo que
+ * `viewProblems`: una gráfica de tres cifras a la que le quitan una se sigue
+ * dibujando con dos, y por eso no deja de publicarse; pero quien edita tiene
+ * que saber que le falta una.
+ */
+export const viewLostColumns = (set: Pick<FreeSet, "columns">, view: FreeView): string[] =>
+  viewColumnKeys(view).filter((key) => !set.columns.some((c) => c.key === key));
 
 /** Qué le falta a una vista para dibujarse, en palabras; vacío si está completa. */
 export function viewProblems(set: FreeSet, view: FreeView): string[] {

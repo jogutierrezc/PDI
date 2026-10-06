@@ -16,6 +16,7 @@
    ========================================================================== */
 
 import { useMemo, useRef, useState } from "react";
+import { useLocation } from "react-router-dom";
 import { Icon } from "../../../../components/ui/Icon";
 import { downloadText, formatValue } from "../../../datos-abiertos/data/open-data";
 import { DEPARTMENTS } from "../../../datos-abiertos/data/colombia-map";
@@ -56,7 +57,9 @@ const TOTAL = "total";
 
 export function CaptureStation(props: StationProps) {
   const { data, report } = props;
-  const [tab, setTab] = useState<Tab>("indicadores");
+  // Estructura enlaza a los conjuntos libres y a las tablas personalizadas con «#libres» y «#personalizadas».
+  const { hash } = useLocation();
+  const [tab, setTab] = useState<Tab>(hash === "#libres" ? "libres" : hash === "#personalizadas" ? "personalizadas" : "indicadores");
   if (!report?.uuid) return <StageEmpty title="Elige un informe">Las cifras se cargan informe por informe.</StageEmpty>;
 
   const importable = Boolean(profileFor(report.slug));
@@ -90,7 +93,8 @@ export function CaptureStation(props: StationProps) {
     { id: "libres" as Tab, label: "Conjuntos libres" },
     { id: "personalizadas" as Tab, label: "Tablas personalizadas" },
     { id: "medalleros" as Tab, label: "Medalleros" },
-  ].filter((t) => t.id === "indicadores" || t.id === "importar" || t.id === "personalizadas" || counts[t.id] > 0);
+    // Los conjuntos libres y las tablas personalizadas se crean aquí mismo: su pestaña está siempre.
+  ].filter((t) => t.id === "indicadores" || t.id === "importar" || t.id === "libres" || t.id === "personalizadas" || counts[t.id] > 0);
 
   return (
     <div className="oda-stack">

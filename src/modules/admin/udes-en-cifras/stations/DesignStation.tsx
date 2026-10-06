@@ -16,6 +16,7 @@
 import { useState } from "react";
 import { Icon } from "../../../../components/ui/Icon";
 import type { OdBlockKind, OdReportBlockRow } from "../../../../types/database";
+import { customViewOf } from "../../../datos-abiertos/data/custom-table";
 import { BLOCK_LABELS } from "../../../datos-abiertos/data/types";
 import type { StationProps } from "../OdAdmin";
 import { useSaveBlocks } from "../od-data";
@@ -74,6 +75,11 @@ function DesignEditor({ data, reportId, reportSlug, blocks, canEdit }: { data: S
   const saberPro = (data.rows.saberPro ?? []).filter((sp) => sp.report_id === reportId).sort((a, b) => a.position - b.position);
   const saberTyt = (data.rows.saberTyt ?? []).filter((t) => t.report_id === reportId).sort((a, b) => a.position - b.position);
   const freeSets = (data.rows.freeSets ?? []).filter((fs) => fs.report_id === reportId).sort((a, b) => a.position - b.position);
+  /** Las tablas personalizadas del informe (un conjunto libre con su vista de tabla escrita a mano). */
+  const customTables = freeSets.flatMap((set) => {
+    const view = customViewOf(set);
+    return view ? [{ set, view }] : [];
+  });
   const sections = data.rows.sections.filter((s) => s.report_id === reportId);
   const indicators = data.rows.indicators.filter((i) => i.report_id === reportId).sort((a, b) => a.position - b.position);
   /** Separador bajo el que queda un bloque (el anterior más cercano). */
@@ -501,6 +507,18 @@ function DesignEditor({ data, reportId, reportSlug, blocks, canEdit }: { data: S
                   <Icon name="plus" size={15} /> Otra gráfica de «{fs.title}»
                 </button>
               ))}
+            {/* Las tablas personalizadas: cada una se puede poner donde haga falta, también más de una vez. */}
+            {customTables.map(({ set, view }) => (
+              <button
+                key={`tabla-${set.id}`}
+                type="button"
+                className="button-secondary"
+                onClick={() => add({ kind: "libre", ref_id: set.id, visible: true, settings: { view: view.key, slot: newSlot() } })}
+              >
+                <Icon name="plus" size={15} /> Añadir tabla «{set.title}»
+              </button>
+            ))}
+            {customTables.length === 0 && <small>Este informe aún no tiene tablas personalizadas: se crean en Captura › Tablas personalizadas y después se colocan aquí.</small>}
             <small>
               Un separador agrupa los bloques que le siguen, hasta el próximo. Para que una sección muestre sus indicadores y desgloses, ponle debajo un tablero y un bloque de desgloses con los suyos elegidos: así no se repiten en cada sección.
             </small>

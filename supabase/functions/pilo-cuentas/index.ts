@@ -182,7 +182,9 @@ Deno.serve(async (request) => {
       // El usuario de auth nace con la marca de Pilo: así no recibe perfil de intranet (0120).
       // Con la confirmación apagada nace confirmado y con su contraseña; encendida, con una invitación.
       const confirm = Deno.env.get("PILO_CONFIRMAR_CORREO") === "si";
-      const marks = { pilo: true, full_name: fullName };
+      // El perfil y la sede viajan con la cuenta: la bienvenida se envía antes de guardar pilo_users,
+      // y la función `correos` los necesita para escoger el mensaje de ese perfil.
+      const marks = { pilo: true, full_name: fullName, rol, campus };
       const invited = confirm
         ? await admin.auth.admin.inviteUserByEmail(email, { data: marks, redirectTo: redirectTo("/app/cuenta?confirmada=1") })
         : await admin.auth.admin.createUser({ email, password, email_confirm: true, user_metadata: marks });

@@ -184,6 +184,9 @@ const InstitutionView = lazy(() =>
 const DataTransfer = lazy(() =>
   import("./modules/admin/traslado/DataTransfer").then((m) => ({ default: m.DataTransfer })),
 );
+const Correos = lazy(() =>
+  import("./modules/admin/correos/Correos").then((m) => ({ default: m.Correos })),
+);
 const ReportesInstitucionales = lazy(() =>
   import("./modules/reportes/ReportesInstitucionales").then((m) => ({ default: m.ReportesInstitucionales })),
 );
@@ -575,6 +578,15 @@ export default function App() {
             element={
               <RequireRole minimum="admin" screen="transfer">
                 <DataTransfer />
+              </RequireRole>
+            }
+          />
+
+          <Route
+            path="/admin/correos"
+            element={
+              <RequireRole minimum="planeacion" screen="correos">
+                <Correos />
               </RequireRole>
             }
           />

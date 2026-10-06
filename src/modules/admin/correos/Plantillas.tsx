@@ -1,0 +1,420 @@
+/* =============================================================================
+   Correos · Plantillas.
+
+   Tres columnas: las plantillas de la identidad, los campos y el correo. Lo
+   que se escribe se ve al momento a la derecha, armado con la MISMA función
+   que usa el servidor (`armarCorreo`): lo que se ve es lo que llega. El diseño
+   alrededor de los textos es fijo; aquí solo se escriben frases.
+
+   Nada se guarda hasta pulsar «Guardar». Cambiar de plantilla o de identidad
+   no pierde lo escrito: cada borrador se queda en su plantilla, marcado como
+   «sin guardar». «Enviar una prueba» envía el borrador tal como está.
+   ========================================================================== */
+
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
+import {
+  armarCorreo,
+  CAMPOS,
+  correoValido,
+  DATOS,
+  DATO_NOMBRE,
+  enlaceDeVerificacion,
+  IDENTIDADES,
+  marcadoresDesconocidos,
+  MARCAS,
+  PERSONAS_DE_EJEMPLO,
+  plantillaOriginal,
+  ROLES,
+  ROL_NOMBRE,
+  type Campo,
+  type Identidad,
+  type Plantilla,
+  type Rol,
+} from "./servidor-logica";
+import { claves, enviarPrueba, guardarPlantilla, type Configuracion, type Leido } from "./datos";
+import { Estado, Seg, type Aviso } from "./partes";
+
+const igual = (a: Plantilla, b: Plantilla) => CAMPOS.every((c) => a[c] === b[c]) && JSON.stringify(a.roles) === JSON.stringify(b.roles);
+
+/** Como queda guardada: sin espacios sobrantes en las líneas cortas. */
+const limpia = (p: Plantilla): Plantilla => ({ ...p, asunto: p.asunto.trim(), previa: p.previa.trim(), titulo: p.titulo.trim(), saludo: p.saludo.trim(), boton: p.boton.trim() });
+
+const IDENTIDAD_OPCIONES = IDENTIDADES.map((i) => [i, MARCAS[i].nombre] as const);
+const ROL_OPCIONES = ROLES.map((r) => [r, ROL_NOMBRE[r]] as const);
+const DISPOSITIVOS = [["pc", "Computador"], ["cel", "Celular"]] as const;
+type Dispositivo = (typeof DISPOSITIVOS)[number][0];
+
+const LINEAS: { campo: Exclude<Campo, "mensaje">; rotulo: string; ayuda?: string }[] = [
+  { campo: "asunto", rotulo: "Asunto" },
+  { campo: "previa", rotulo: "Línea previa", ayuda: "La que algunos programas muestran junto al asunto." },
+  { campo: "titulo", rotulo: "Título" },
+  { campo: "saludo", rotulo: "Saludo" },
+];
+
+export function Plantillas({ config }: { config: Configuracion }) {
+  const queryClient = useQueryClient();
+  const [identidad, setIdentidad] = useState<Identidad>("plan");
+  const [clave, setClave] = useState(config.plantillas.find((p) => p.identidad === "plan")?.clave ?? config.plantillas[0]?.clave ?? "");
+  const [borradores, setBorradores] = useState<Record<string, Plantilla>>({});
+  const [rol, setRol] = useState<Rol>("estudiante");
+  const [dispositivo, setDispositivo] = useState<Dispositivo>("pc");
+  const [aviso, setAviso] = useState<Aviso | null>(null);
+  const [prueba, setPrueba] = useState<Aviso | null>(null);
+  const [para, setPara] = useState("");
+  const [ocupado, setOcupado] = useState<"guardar" | "prueba" | null>(null);
+
+  const ultimo = useRef<Campo>("mensaje");
+  const campos = useRef<Partial<Record<Campo, HTMLInputElement | HTMLTextAreaElement | null>>>({});
+  const cursor = useRef<{ campo: Campo; pos: number } | null>(null);
+
+  const guardada = config.plantillas.find((p) => p.clave === clave) ?? config.plantillas[0];
+  const actual = borradores[clave] ?? guardada;
+  const original = plantillaOriginal(clave);
+  const sinGuardar = !igual(limpia(actual), guardada);
+  const persona = PERSONAS_DE_EJEMPLO[rol];
+  const mensaje = actual.roles ? actual.roles[rol] : actual.mensaje;
+  const desconocidos = useMemo(() => marcadoresDesconocidos(actual), [actual]);
+  const remitente = config.remitentes[actual.identidad];
+
+  const correo = useMemo(() => {
+    const sitio = window.location.origin;
+    return armarCorreo({
+      plantilla: actual,
+      persona,
+      rol,
+      enlace: enlaceDeVerificacion(sitio, "enlace-personal-de-ejemplo", "invite", sitio),
+      sitio,
+      respondible: remitente.responder !== "",
+      resaltar: true,
+    });
+  }, [actual, persona, rol, remitente.responder]);
+
+  // Tras insertar un dato, el cursor queda justo después de él.
+  useLayoutEffect(() => {
+    const c = cursor.current;
+    if (!c) return;
+    cursor.current = null;
+    const el = campos.current[c.campo];
+    el?.focus();
+    el?.setSelectionRange(c.pos, c.pos);
+  });
+
+  const cambiar = (campo: Campo, valor: string) => {
+    setAviso(null);
+    setBorradores((b) => {
+      const base = b[clave] ?? guardada;
+      const nueva = campo === "mensaje" && base.roles ? { ...base, roles: { ...base.roles, [rol]: valor } } : { ...base, [campo]: valor };
+      return { ...b, [clave]: nueva };
+    });
+  };
+
+  const elegir = (k: string) => {
+    setClave(k);
+    setAviso(null);
+    setPrueba(null);
+  };
+
+  const insertar = (dato: string) => {
+    const campo = ultimo.current;
+    const el = campos.current[campo];
+    const valor = campo === "mensaje" ? mensaje : actual[campo];
+    const inicio = el?.selectionStart ?? valor.length;
+    const fin = el?.selectionEnd ?? inicio;
+    const marcador = `{{${dato}}}`;
+    cursor.current = { campo, pos: inicio + marcador.length };
+    cambiar(campo, valor.slice(0, inicio) + marcador + valor.slice(fin));
+  };
+
+  const guardar = async () => {
+    setOcupado("guardar");
+    setAviso(null);
+    try {
+      const lista = limpia(actual);
+      await guardarPlantilla(lista);
+      queryClient.setQueryData<Leido<Configuracion>>(claves.configuracion, (viejo) =>
+        viejo && !viejo.falta ? { falta: false, datos: { ...viejo.datos, plantillas: viejo.datos.plantillas.map((p) => (p.clave === lista.clave ? lista : p)) } } : viejo,
+      );
+      setBorradores(({ [clave]: _, ...resto }) => resto);
+      setAviso(desconocidos.length ? { tono: "aviso", texto: "Guardada, con un aviso por revisar." } : { tono: "ok", texto: "Guardada. Vale desde el próximo correo." });
+    } catch (error) {
+      setAviso({ tono: "mal", texto: error instanceof Error ? error.message : "No se guardó la plantilla." });
+    } finally {
+      setOcupado(null);
+    }
+  };
+
+  const volver = () => {
+    if (!original) return;
+    setBorradores((b) => ({ ...b, [clave]: original }));
+    setAviso({ tono: "aviso", texto: igual(original, guardada) ? "Volvió al texto original." : "Volvió al texto original. Pulse «Guardar» para que valga." });
+  };
+
+  const probar = async () => {
+    const destino = para.trim();
+    if (!correoValido(destino)) {
+      setPrueba({ tono: "mal", texto: "Escriba un correo completo para la prueba." });
+      return;
+    }
+    setOcupado("prueba");
+    setPrueba({ tono: "espera", texto: "Enviando la prueba…" });
+    const r = await enviarPrueba(destino, limpia(actual), rol);
+    setPrueba({ tono: r.ok ? "ok" : "mal", texto: r.mensaje });
+    setOcupado(null);
+  };
+
+  const deLaIdentidad = config.plantillas.filter((p) => p.identidad === identidad);
+  const grupos = [...new Set(deLaIdentidad.map((p) => p.grupo))];
+  const enfocar = (campo: Campo) => () => {
+    ultimo.current = campo;
+  };
+
+  return (
+    <div className="cor-taller">
+      <div className="cor-taller__barra">
+        <Seg
+          label="Identidad"
+          value={identidad}
+          options={IDENTIDAD_OPCIONES}
+          onChange={(v) => {
+            setIdentidad(v);
+            elegir(config.plantillas.find((p) => p.identidad === v)?.clave ?? clave);
+          }}
+        />
+        <p className="cor-chica">El diseño del correo es fijo y está probado en Outlook y Gmail: aquí solo se escriben las frases.</p>
+      </div>
+
+      <div className="cor-taller__cuerpo">
+        <nav className="cor-lista" aria-label={`Plantillas de ${MARCAS[identidad].nombre}`}>
+          {grupos.map((grupo) => (
+            <div key={grupo} className="cor-lista__grupo">
+              <h3>{grupo}</h3>
+              {deLaIdentidad
+                .filter((p) => p.grupo === grupo)
+                .map((p) => {
+                  const b = borradores[p.clave];
+                  const o = plantillaOriginal(p.clave);
+                  const marcas = [p.cuando, o && !igual(p, o) ? "cambiada" : "", b && !igual(limpia(b), p) ? "sin guardar" : ""].filter(Boolean);
+                  return (
+                    <button key={p.clave} type="button" aria-current={p.clave === clave ? "true" : undefined} onClick={() => elegir(p.clave)}>
+                      {p.nombre}
+                      <small>{marcas.join(" · ")}</small>
+                    </button>
+                  );
+                })}
+            </div>
+          ))}
+        </nav>
+
+        <form
+          className="cor-editor"
+          onSubmit={(e) => {
+            e.preventDefault();
+            if (sinGuardar && !ocupado) void guardar();
+          }}
+        >
+          <header>
+            <h2>{actual.nombre}</h2>
+            <p className="cor-chica">
+              {actual.cuando} · identidad: {MARCAS[actual.identidad].nombre}
+            </p>
+          </header>
+
+          {LINEAS.map(({ campo, rotulo, ayuda }) => (
+            <label key={campo} className="admin-field">
+              <span>
+                {rotulo}
+                {ayuda && <small>{ayuda}</small>}
+              </span>
+              <input
+                ref={(el) => {
+                  campos.current[campo] = el;
+                }}
+                value={actual[campo]}
+                maxLength={200}
+                onFocus={enfocar(campo)}
+                onChange={(e) => cambiar(campo, e.target.value)}
+              />
+            </label>
+          ))}
+
+          {actual.roles && (
+            <div className="admin-field">
+              <span>Este mensaje cambia según quién crea la cuenta</span>
+              <Seg label="Rol del mensaje" value={rol} options={ROL_OPCIONES} onChange={setRol} />
+            </div>
+          )}
+          <label className="admin-field">
+            <span>{actual.roles ? `Mensaje para ${ROL_NOMBRE[rol].toLowerCase()}` : "Mensaje"}</span>
+            <textarea
+              ref={(el) => {
+                campos.current.mensaje = el;
+              }}
+              rows={5}
+              value={mensaje}
+              maxLength={4000}
+              onFocus={enfocar("mensaje")}
+              onChange={(e) => cambiar("mensaje", e.target.value)}
+            />
+          </label>
+
+          <div className="cor-datos">
+            <span className="cor-chica">Insertar un dato de la persona:</span>
+            {DATOS.map((d) => (
+              // No roba el foco del campo donde se está escribiendo.
+              <button key={d} type="button" onMouseDown={(e) => e.preventDefault()} onClick={() => insertar(d)}>
+                {DATO_NOMBRE[d]}
+              </button>
+            ))}
+          </div>
+
+          <label className="admin-field">
+            <span>
+              Texto del botón
+              <small>El enlace personal lo pone el sistema: no se escribe.</small>
+            </span>
+            <input
+              ref={(el) => {
+                campos.current.boton = el;
+              }}
+              value={actual.boton}
+              maxLength={80}
+              onFocus={enfocar("boton")}
+              onChange={(e) => cambiar("boton", e.target.value)}
+            />
+          </label>
+          <label className="admin-field">
+            <span>Nota final</span>
+            <input
+              ref={(el) => {
+                campos.current.nota = el;
+              }}
+              value={actual.nota}
+              maxLength={600}
+              onFocus={enfocar("nota")}
+              onChange={(e) => cambiar("nota", e.target.value)}
+            />
+          </label>
+
+          {desconocidos.length > 0 && (
+            <p className="cor-aviso" role="alert">
+              {desconocidos.join(", ")} {desconocidos.length === 1 ? "no es un dato" : "no son datos"} que el sistema conozca: {desconocidos.length === 1 ? "llegaría" : "llegarían"} tal cual. Use los
+              botones de «Insertar un dato».
+            </p>
+          )}
+
+          <div className="cor-acciones">
+            <button type="submit" className="button-primary" disabled={!sinGuardar || ocupado !== null}>
+              {ocupado === "guardar" ? "Guardando…" : "Guardar"}
+            </button>
+            <button type="button" className="button-ghost" disabled={!original || igual(actual, original) || ocupado !== null} onClick={volver}>
+              Volver al texto original
+            </button>
+            <Estado aviso={aviso ?? (sinGuardar ? { tono: "aviso", texto: "Hay cambios sin guardar." } : null)} />
+          </div>
+
+          <div className="cor-prueba">
+            <label className="admin-field">
+              <span>
+                Enviar una prueba a
+                <small>Sale lo que está escrito ahora, guardado o no.</small>
+              </span>
+              <input
+                type="email"
+                inputMode="email"
+                autoComplete="email"
+                placeholder="su.correo@udes.edu.co"
+                value={para}
+                onChange={(e) => setPara(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    e.preventDefault();
+                    if (!ocupado) void probar();
+                  }
+                }}
+              />
+            </label>
+            <button type="button" className="button-secondary" disabled={ocupado !== null} onClick={() => void probar()}>
+              Enviar una prueba
+            </button>
+            <Estado aviso={prueba} />
+          </div>
+        </form>
+
+        <aside className="cor-vista" aria-label="Vista previa">
+          <div className="cor-vista__barra">
+            <label className="cor-como">
+              Verlo como
+              <select value={rol} onChange={(e) => setRol(e.target.value as Rol)}>
+                {ROLES.map((r) => (
+                  <option key={r} value={r}>
+                    {PERSONAS_DE_EJEMPLO[r].rotulo}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <Seg label="Tamaño de la vista previa" value={dispositivo} options={DISPOSITIVOS} onChange={setDispositivo} />
+          </div>
+          <div className="cor-bandeja">
+            <b>{correo.asunto || "(sin asunto)"}</b>
+            <span>
+              De: {remitente.nombre || MARCAS[actual.identidad].nombre} &lt;{remitente.direccion || config.ajustes.usuario || "el usuario de la conexión"}&gt;
+              {remitente.responder ? ` · responder a ${remitente.responder}` : ""}
+            </span>
+            {correo.previa && <span>{correo.previa}</span>}
+          </div>
+          <Marco html={correo.html} dispositivo={dispositivo} cambio={`${clave}|${rol}`} />
+          <p className="cor-chica">Los datos resaltados son de una persona de ejemplo. En el correo de verdad no llevan resalte, y el enlace es el personal de cada quien.</p>
+        </aside>
+      </div>
+    </div>
+  );
+}
+
+/**
+ * El correo, dentro de un marco. Es el HTML que arma el servidor, en un
+ * documento aparte: sus colores son los del correo, no los de la intranet, y
+ * por eso no cambian con el tema. Es una imagen de lo que llega, no una
+ * página: va inerte, sin foco ni tabulador (DESIGN.md, «Inert Preview Rule»).
+ */
+function Marco({ html, dispositivo, cambio }: { html: string; dispositivo: Dispositivo; cambio: string }) {
+  const marco = useRef<HTMLIFrameElement>(null);
+  const caja = useRef<HTMLDivElement>(null);
+  const [alto, setAlto] = useState(560);
+
+  useEffect(() => {
+    caja.current?.setAttribute("inert", "");
+  }, []);
+
+  useEffect(() => {
+    const doc = marco.current?.contentDocument;
+    if (!doc) return;
+    doc.open();
+    doc.write(html);
+    doc.close();
+    const medir = () => setAlto(Math.max(240, doc.documentElement.scrollHeight));
+    medir();
+    // La cara de Pilo llega después y no cambia el alto (tiene tamaño fijo), pero por si el portal tarda.
+    const imagenes = [...doc.images];
+    imagenes.forEach((img) => img.addEventListener("load", medir));
+    // El ancho cambia al pasar a celular, al estrechar la ventana o al volver de otra vista: el alto se mide otra vez.
+    const observador = new ResizeObserver(medir);
+    if (caja.current) observador.observe(caja.current);
+    return () => {
+      observador.disconnect();
+      imagenes.forEach((img) => img.removeEventListener("load", medir));
+    };
+  }, [html, dispositivo]);
+
+  // Al cambiar de plantilla o de persona, el correo se asienta: un solo gesto, corto.
+  useEffect(() => {
+    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+    marco.current?.animate([{ opacity: 0.35, filter: "blur(3px)" }, { opacity: 1, filter: "blur(0px)" }], { duration: 220, easing: "cubic-bezier(0.23, 1, 0.32, 1)" });
+  }, [cambio]);
+
+  return (
+    <div ref={caja} className="cor-marco" data-dispositivo={dispositivo} aria-hidden="true">
+      <iframe ref={marco} title="Vista previa del correo" sandbox="allow-same-origin" tabIndex={-1} style={{ height: alto }} />
+    </div>
+  );
+}

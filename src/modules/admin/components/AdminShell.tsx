@@ -48,7 +48,8 @@ export type AdminSection =
   | "institution"
   | "pilo"
   | "pilo_ensenanza"
-  | "reportes";
+  | "reportes"
+  | "correos";
 
 export interface NavItem {
   id: AdminSection;
@@ -175,6 +176,9 @@ export const navigation: NavGroup[] = [
       { id: "pilo", label: "Mr. Pilo con IA", icon: "spark", to: "/admin/mr-pilo", minimum: "admin" },
       // El segundo Pilo: su página, su memoria, su catálogo y su bitácora. Comparte la conexión y la voz con el de arriba.
       { id: "pilo_ensenanza", label: "Mr. Pilo en Enseñanza", icon: "compass", to: "/admin/mr-pilo-ensenanza", minimum: "admin" },
+      // Los correos de cuenta de Planeación y de Pilo: plantillas, conexión y bitácora.
+      // Planeación entra a leer la bitácora; lo demás es de la administración.
+      { id: "correos", label: "Correos", icon: "mail", to: "/admin/correos", minimum: "planeacion" },
       // Copia otro servidor de Supabase en este. Reemplaza datos: solo administración.
       { id: "transfer", label: "Traslado de datos", icon: "upload", to: "/admin/traslado", minimum: "admin" },
     ],

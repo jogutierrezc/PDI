@@ -58,12 +58,7 @@ import { customViewOf } from "../../../datos-abiertos/data/custom-table";
 import { RANKING_SYSTEMS, RANKING_VIEWS } from "../../../datos-abiertos/data/rankings";
 import { MEDAL_SORT, orderedTiers } from "../../../datos-abiertos/data/medals";
 
-const FORMAT_LABEL: Record<OdValueFormat, string> = { entero: "Entero", porcentaje: "Porcentaje", decimal: "Decimal" };
-const DIRECTION_LABEL: Record<OdDirection, string> = { sube: "Subir es mejor", baja: "Bajar es mejor", neutro: "Neutro" };
-const AGGREGATION_LABEL: Record<OdAggregation, string> = {
-  suma: "Suma de campus",
-  reportado: "Total reportado aparte",
-};
+import { AGGREGATION_LABEL, DIRECTION_LABEL, FORMAT_LABEL } from "../indicator-labels";
 
 export function StructureStation({ data, report, canEdit }: StationProps) {
   if (!report?.uuid) return <StageEmpty title="Elige un informe">La estructura se configura informe por informe.</StageEmpty>;

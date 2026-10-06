@@ -22,31 +22,9 @@ import type { StationProps } from "../OdAdmin";
 import { useSaveBlocks } from "../od-data";
 import { Panel, SaveState, StageEmpty } from "../ui";
 import { ImageGrid } from "./ImageGrid";
+import { BLOCK_HELP } from "../block-help";
 
 type DraftBlock = Omit<OdReportBlockRow, "id" | "report_id"> & { id?: string; tempId: string };
-
-const BLOCK_HELP: Record<OdBlockKind, string> = {
-  kpis: "Las cifras clave del informe, con variación y rastro de cortes.",
-  evolucion: "El indicador elegido año a año, por campus.",
-  mapa: "Colombia por departamento, movilidad por país con rutas animadas o convenios por país como mapa de calor.",
-  tuberia: "La deserción de una cohorte, tramo a tramo, en estudiantes o en %.",
-  historico: "La cifra de un periodo frente a otro, con sus categorías y su peso en el total.",
-  mapa_calor: "Matriz de dos dimensiones en escala azul.",
-  desgloses: "Cómo se reparte la cifra: circular o barras.",
-  tabla_dinamica: "Todas las cifras, para armar la tabla propia y descargarla.",
-  metodologia: "Qué mide cada indicador y quién lo reporta.",
-  tabla: "Una tabla del informe: listado, ranking, fichas o cifras de un periodo.",
-  separador: "Agrupa los bloques que siguen, hasta el próximo separador. En el Boletín abre página.",
-  rankings: "Posiciones en QS, THE y otros rankings, con medallas, tabla, evolución y rueda de ODS.",
-  saber_pro: "Resultados Saber PRO por competencia: niveles de desempeño, brecha con el país y evolución, filtrables por sede, facultad y programa.",
-  saber_tyt: "Motor Beta: de Saber 11 a Saber TyT en rango percentil, con el valor agregado por programa.",
-  libre: "Un conjunto libre con sus gráficas: elige una vista o muéstralas todas.",
-  modelo: "Modelo estadístico del informe: factores asociados con su intervalo, simulador de perfiles, calidad de la clasificación y la muestra.",
-  imagenes: "Fotografías en dos columnas, dentro de la ficha y en el boletín.",
-  diversidad: "Tablero propio de Diversidad, Equidad e Inclusión: grupos de protección constitucional por corte y campus, mosaico étnico, discapacidad, estratos, género, zona e INES.",
-  medallero: "Lo que gana la universidad cuando compite: juegos, festivales y concursos, con su podio y su tabla de medallas.",
-  tablas_personalizadas: "Varias tablas personalizadas, una tras otra: elige cuáles muestra este bloque.",
-};
 
 /** Clave corta para distinguir varios bloques del mismo tipo (ver 0029). */
 const newSlot = () => Math.random().toString(36).slice(2, 10);

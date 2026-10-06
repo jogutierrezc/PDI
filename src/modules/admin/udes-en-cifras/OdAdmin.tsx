@@ -11,6 +11,17 @@
    la cabecera. Periodo, estación e informe viven en la URL:
 
      /admin/udes-en-cifras/captura/poblacional?periodo=<id>
+
+   Vista «Taller»: convive con las estaciones («vista clásica»), que no se
+   tocan. Es una sola pantalla donde se edita la ficha como la ve el público
+   (ver taller/Taller.tsx). Se elige con el interruptor de la cabecera, que
+   recuerda la elección en el navegador, y vive en la URL en el sitio de la
+   estación:
+
+     /admin/udes-en-cifras/taller/poblacional?periodo=<id>
+
+   Un enlace a una estación abre siempre esa estación; la vista recordada solo
+   decide cuando la dirección no nombra ninguna.
    ========================================================================== */
 
 import { Suspense, lazy, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
@@ -30,6 +41,8 @@ import { periodProgress, reportProgress, STATIONS, statusLabels } from "./progre
 import type { MarkState, ReportProgress, StationId } from "./progress";
 import { PeriodStation, FirstPeriod } from "./stations/PeriodStation";
 import { useBulletins } from "../../boletin/data";
+import { browserStorage, readView, writeView } from "./taller/draft";
+import type { TallerView } from "./taller/draft";
 import "./od-admin.css";
 
 export interface StationProps {
@@ -56,6 +69,13 @@ const CaptureStation = lazy(() => stationLoaders.captura().then((m) => ({ defaul
 const DesignStation = lazy(() => stationLoaders.diseno().then((m) => ({ default: m.DesignStation })));
 const PublishStation = lazy(() => stationLoaders.publicacion().then((m) => ({ default: m.PublishStation })));
 const BulletinStation = lazy(() => stationLoaders.boletin().then((m) => ({ default: m.BulletinStation })));
+// El taller también baja solo cuando se abre: trae los componentes del portal.
+const loadTaller = () => import("./taller/Taller");
+const Taller = lazy(() => loadTaller().then((m) => ({ default: m.Taller })));
+const preloadTaller = () => void loadTaller().catch(() => undefined);
+
+/** Segmento de la URL que abre el taller, en el sitio de la estación. */
+const TALLER_SEGMENT = "taller";
 
 /** Al apuntar o enfocar una estación se adelanta su descarga: el clic la encuentra lista. */
 function preloadStation(id: StationId) {
@@ -93,6 +113,10 @@ export function OdAdmin() {
   const canManagePeriod = canEditPeriod();
 
   const station = (STATIONS.find((s) => s.id === stationParam)?.id ?? "captura") as StationId;
+  const isTaller = stationParam === TALLER_SEGMENT;
+  /** La última estación clásica visitada: a ella se vuelve desde el taller. */
+  const lastClassic = useRef<StationId>("captura");
+  if (!isTaller && stationParam) lastClassic.current = station;
   const periods = useOdPeriods();
   const periodId = params.get("periodo") ?? periods.data?.find((p) => p.is_current)?.id ?? periods.data?.[0]?.id;
   const admin = useOdAdminData(periodId);
@@ -114,7 +138,7 @@ export function OdAdmin() {
   const currentStation = STATIONS.find((s) => s.id === station)!;
   const [previewOpen, setPreviewOpen] = useState(false);
   const previewToggle = useRef<HTMLButtonElement>(null);
-  const hasPreview = Boolean(report) && PREVIEW_STATIONS.includes(station);
+  const hasPreview = !isTaller && Boolean(report) && PREVIEW_STATIONS.includes(station);
 
   // Cambiar de estación o de informe cierra el cajón.
   useEffect(() => setPreviewOpen(false), [station, report?.slug]);
@@ -128,6 +152,32 @@ export function OdAdmin() {
 
   const query = periodId && params.get("periodo") ? `?periodo=${periodId}` : "";
   const hrefFor = (s: StationId, slug = report?.slug) => `/admin/udes-en-cifras/${s}${slug ? `/${slug}` : ""}${query}`;
+  const tallerHref = (slug = report?.slug) => `/admin/udes-en-cifras/${TALLER_SEGMENT}${slug ? `/${slug}` : ""}${query}`;
+
+  // Sin estación en la dirección decide la vista recordada: quien eligió el
+  // taller vuelve a él. Un enlace a una estación abre siempre esa estación.
+  const bare = !stationParam;
+  useEffect(() => {
+    if (bare && readView(browserStorage()) === "taller") navigate(`/admin/udes-en-cifras/${TALLER_SEGMENT}${query}`, { replace: true });
+  }, [bare, navigate, query]);
+
+  const chooseView = (view: TallerView) => {
+    writeView(browserStorage(), view);
+    if (view === "taller" && !isTaller) navigate(tallerHref());
+    if (view === "clasica" && isTaller) navigate(hrefFor(lastClassic.current));
+  };
+
+  const viewSwitch = (
+    <div className="odt-view" role="group" aria-label="Vista de UDES en Cifras" data-tour="odt-vista">
+      <span className="odt-view__label" aria-hidden="true">Vista</span>
+      <button type="button" aria-pressed={isTaller} onMouseEnter={preloadTaller} onFocus={preloadTaller} onClick={() => chooseView("taller")}>
+        Taller
+      </button>
+      <button type="button" aria-pressed={!isTaller} onClick={() => chooseView("clasica")}>
+        Clásica
+      </button>
+    </div>
+  );
 
   const periodSelect = periods.data && periods.data.length > 0 && (
     <label className="oda-period-select">
@@ -154,10 +204,11 @@ export function OdAdmin() {
     <AdminShell
       section="cifras"
       kicker="UDES en Cifras"
-      title={currentStation.label}
-      description={currentStation.hint}
+      title={isTaller ? "El taller" : currentStation.label}
+      description={isTaller ? "La ficha del informe, editada como la ve el público" : currentStation.hint}
       actions={
         <>
+          {viewSwitch}
           {hasPreview && data && (
             <button
               ref={previewToggle}
@@ -184,7 +235,7 @@ export function OdAdmin() {
             : "Tu rol no tiene asignado este informe: lo consultas, no lo modificas."}
         </ReadOnlyNotice>
       )}
-      {canEdit && !canManagePeriod && station === "periodo" && (
+      {canEdit && !canManagePeriod && !isTaller && station === "periodo" && (
         <p className="oda-banner" role="note">
           <Icon name="alert" size={16} />
           El periodo, sus campus y la creación de informes los administra Planeación. Aquí se consultan.
@@ -199,6 +250,31 @@ export function OdAdmin() {
         <ErrorBlock error={admin.error} onRetry={() => void admin.refetch()} />
       ) : !periodId || !data ? (
         <FirstPeriod canEdit={canEdit} />
+      ) : isTaller ? (
+        // El taller: la lista de informes de siempre y, en vez de las estaciones, la ficha que se edita.
+        <div className="oda-workspace" data-station="taller">
+          <ReportRail
+            data={data}
+            active={report?.slug}
+            progress={progress}
+            onPick={(slug) => navigate(tallerHref(slug))}
+            station="captura"
+            canEdit={canManagePeriod}
+            onCreated={(slug) => navigate(tallerHref(slug))}
+          />
+          <section className="oda-stage" aria-label="El taller">
+            <Suspense fallback={<LoadingBlock rows={6} label="Cargando el taller" />}>
+              <Taller
+                data={data}
+                report={report}
+                periodId={periodId}
+                canEdit={canEdit}
+                progress={progress}
+                classicHref={(s, hash) => `${hrefFor(s)}${hash ? `#${hash}` : ""}`}
+              />
+            </Suspense>
+          </section>
+        </div>
       ) : (
         <>
           <StationBar

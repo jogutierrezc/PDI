@@ -1,0 +1,934 @@
+/* =============================================================================
+   UDES en Cifras · el taller.
+
+   La ficha que se edita. Todo lo que se toca mide al menos 44 px, cada botón
+   dice lo que hace con palabras y nada depende de arrastrar ni de pasar el
+   puntero. Los bloques se dibujan con los componentes y la hoja del portal
+   (clases `od-`); lo propio del taller lleva el prefijo `odt-`.
+
+   Todos los valores salen de tokens.css: ningún color, radio ni duración se
+   escribe a mano. Los dos temas son los del sistema; el panel de Mr. Pilo usa
+   los tokens de su guía (`--pilo-stage…`), que no cambian con el tema.
+   ========================================================================== */
+
+.odt {
+  position: relative;
+  display: grid;
+  gap: var(--space-5);
+  min-width: 0;
+  /* El modo completo parte el bloque en dos según el ancho del taller, no de la pantalla. */
+  container: odt / inline-size;
+}
+
+/* Todo lo que se toca: 44 px como mínimo. */
+.odt :where(.button-primary, .button-secondary, .button-ghost) {
+  min-height: 44px;
+}
+
+.odt :where(button, a, select, input, textarea, summary):focus-visible {
+  outline: 2px solid var(--brand-blue);
+  outline-offset: 2px;
+}
+
+.odt-note {
+  margin: 0;
+  color: var(--ink-muted);
+  font-size: var(--text-sm);
+  line-height: var(--leading-normal);
+}
+
+.odt-empty {
+  margin: 0;
+  padding: var(--space-4);
+  color: var(--ink-secondary);
+  background: repeating-linear-gradient(135deg, transparent 0 6px, var(--line-faint) 6px 7px);
+  border: 1px dashed var(--line-strong);
+  border-radius: var(--radius-sm);
+  font-size: var(--text-sm);
+  line-height: var(--leading-normal);
+}
+
+.odt-link {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: 44px;
+  padding: 0 var(--space-2);
+  color: var(--brand-blue-strong);
+  background: transparent;
+  border: 0;
+  border-radius: var(--radius-xs);
+  font: inherit;
+  font-size: var(--text-sm);
+  font-weight: 700;
+  text-align: left;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+
+.odt-link small {
+  color: var(--ink-muted);
+  font-weight: 600;
+}
+
+/* --- Estado y modo ---------------------------------------------------------- */
+
+.odt-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3) var(--space-5);
+  padding: var(--space-3) var(--space-4);
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-xs);
+}
+
+.odt-status {
+  min-width: 0;
+}
+
+.odt-save {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: 44px;
+  color: var(--ink-secondary);
+  font-size: var(--text-base);
+  font-weight: 700;
+}
+
+.odt-save[data-state="ok"] { color: var(--status-done); }
+.odt-save[data-state="error"] { color: var(--status-risk); }
+.odt-save[data-state="waiting"] { color: var(--ink); }
+.odt-save[data-state="waiting"] svg { color: var(--status-pending); }
+
+.odt-field {
+  display: grid;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+.odt-field--inline {
+  grid-auto-flow: column;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.odt-field__label {
+  color: var(--ink-secondary);
+  font-size: var(--text-sm);
+  font-weight: 700;
+}
+
+.odt-field__hint {
+  color: var(--ink-muted);
+  font-size: var(--text-xs);
+  line-height: var(--leading-normal);
+}
+
+.odt-field__hint[data-tone="risk"] { color: var(--status-risk); }
+
+.odt-field select {
+  min-height: 44px;
+  padding: var(--space-2) var(--space-4);
+  color: var(--ink);
+  background: var(--surface-2);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  font: inherit;
+  font-size: var(--text-base);
+}
+
+.odt-field select:focus {
+  border-color: var(--brand-blue);
+  box-shadow: var(--ring);
+}
+
+/* Dos o tres opciones a la vista: se elige con un toque. */
+.odt-seg {
+  display: inline-flex;
+  flex-wrap: wrap;
+  justify-self: start;
+  gap: var(--space-1);
+  padding: var(--space-1);
+  background: var(--surface);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-lg);
+}
+
+.odt-seg button {
+  min-height: 44px;
+  padding: 0 var(--space-4);
+  color: var(--ink-secondary);
+  background: transparent;
+  border: 0;
+  border-radius: var(--radius-pill);
+  font: inherit;
+  font-size: var(--text-sm);
+  font-weight: 700;
+  cursor: pointer;
+  transition:
+    background-color var(--dur-fast) ease,
+    color var(--dur-fast) ease,
+    transform var(--dur-press) var(--ease-out);
+}
+
+.odt-seg button[aria-pressed="true"] {
+  color: var(--surface);
+  background: var(--brand-navy);
+}
+
+.odt-seg button:active:not(:disabled) { transform: scale(0.97); }
+.odt-seg button:disabled { opacity: 0.55; cursor: default; }
+
+@media (hover: hover) and (pointer: fine) {
+  .odt-seg button:not([aria-pressed="true"]):not(:disabled):hover { background: var(--surface-3); }
+}
+
+/* --- Informe publicado: cambios pendientes ----------------------------------- */
+
+.odt-live {
+  display: grid;
+  gap: var(--space-3);
+  padding: var(--space-4);
+  color: var(--ink);
+  background: var(--status-pending-soft);
+  border: 1px solid color-mix(in srgb, var(--status-pending) 35%, transparent);
+  border-radius: var(--radius-md);
+  font-size: var(--text-base);
+  line-height: var(--leading-normal);
+}
+
+.odt-live p {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-3);
+  margin: 0;
+}
+
+.odt-live svg {
+  flex: none;
+  margin-top: 3px;
+  color: var(--status-pending);
+}
+
+.odt-live__actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.odt-live__count {
+  flex: 1 1 14rem;
+  font-weight: 700;
+}
+
+.odt-live__actions .oda-link-button {
+  min-height: 44px;
+  padding-inline: var(--space-3);
+  font-size: var(--text-sm);
+}
+
+.odt-live__warn {
+  color: var(--status-risk);
+  font-weight: 700;
+}
+
+.odt-live__warn svg { color: var(--status-risk); }
+
+/* --- Así lo ve el público ------------------------------------------------------- */
+
+.odt-public {
+  display: grid;
+  gap: var(--space-3);
+  padding: var(--space-4);
+  background: var(--od-board-raised);
+  border: 1px solid var(--od-board-line-strong);
+  border-radius: var(--radius-md);
+}
+
+.odt-public__head h3 {
+  margin: 0;
+  color: var(--brand-navy);
+  font-size: var(--text-md);
+  font-weight: 800;
+}
+
+.odt-public__head p {
+  margin: var(--space-1) 0 0;
+  color: var(--ink-secondary);
+  font-size: var(--text-sm);
+}
+
+.odt-public .od-segmented__option { min-height: 44px; }
+.odt-public .odt-link { justify-self: start; }
+
+/* --- La ficha -------------------------------------------------------------------- */
+
+.odt-ficha {
+  display: grid;
+  gap: var(--space-4);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.odt-block {
+  display: grid;
+  gap: var(--space-3);
+  min-width: 0;
+  padding: var(--space-3);
+  background: var(--surface);
+  border: 2px solid var(--line);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-xs);
+  cursor: pointer;
+  transition: border-color var(--dur-fast) ease, background-color var(--dur-fast) ease;
+}
+
+.odt-block[data-selected] {
+  background: var(--surface-2);
+  border-color: var(--brand-blue);
+  cursor: default;
+}
+
+.odt-block[data-hidden] { border-style: dashed; }
+
+.odt-block__head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-3);
+  width: 100%;
+  min-height: 44px;
+  padding: var(--space-1) var(--space-2);
+  color: var(--ink);
+  background: transparent;
+  border: 0;
+  border-radius: var(--radius-xs);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.odt-block__pos {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 2rem;
+  height: 2rem;
+  color: var(--ink-secondary);
+  background: var(--surface-3);
+  border-radius: var(--radius-xs);
+  font-size: var(--text-sm);
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+}
+
+.odt-block[data-selected] .odt-block__pos {
+  color: var(--ink-on-accent);
+  background: var(--brand-blue);
+}
+
+.odt-block__title {
+  display: grid;
+  flex: 1 1 12rem;
+  gap: 2px;
+  min-width: 0;
+}
+
+.odt-block__kind {
+  color: var(--ink-muted);
+  font-size: var(--text-xs);
+  font-weight: 700;
+}
+
+.odt-block__title strong {
+  font-size: var(--text-md);
+  font-weight: 800;
+  overflow-wrap: anywhere;
+}
+
+.odt-block__marks {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.odt-block__hint {
+  color: var(--ink-muted);
+  font-size: var(--text-xs);
+  font-weight: 700;
+}
+
+.odt-block[data-selected] .odt-block__hint { color: var(--brand-blue-strong); }
+
+.odt-mark {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  padding: var(--space-1) var(--space-2);
+  border-radius: var(--radius-pill);
+  font-size: var(--text-xs);
+  font-weight: 700;
+}
+
+.odt-mark[data-tone="muted"] {
+  color: var(--ink-secondary);
+  background: var(--surface-3);
+}
+
+.odt-mark[data-tone="pending"] {
+  color: var(--ink);
+  background: var(--status-pending-soft);
+}
+
+.odt-mark[data-tone="pending"] svg { color: var(--status-pending); }
+
+.odt-tools {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  padding: var(--space-1) var(--space-2);
+}
+
+.odt-tools a small {
+  color: var(--ink-muted);
+  font-weight: 600;
+}
+
+.odt-danger:not(:disabled) { color: var(--ink-secondary); }
+.odt-danger:not(:disabled):focus-visible { color: var(--status-risk); }
+
+@media (hover: hover) and (pointer: fine) {
+  .odt-block:not([data-selected]):hover { border-color: var(--line-strong); }
+  .odt-danger:not(:disabled):hover { color: var(--status-risk); border-color: var(--status-risk); }
+}
+
+.odt-block__body {
+  display: grid;
+  gap: var(--space-4);
+  min-width: 0;
+}
+
+.odt-block__view {
+  display: grid;
+  gap: var(--space-3);
+  min-width: 0;
+}
+
+.odt-block__viewlabel {
+  color: var(--ink-muted);
+  font-size: var(--text-xs);
+  font-weight: 700;
+}
+
+/* La copia de la ficha: los componentes del portal, sobre el fondo del portal. */
+.odt-copy {
+  min-width: 0;
+  padding: var(--space-3);
+  overflow-x: auto;
+  color: var(--ink);
+  background: var(--od-page);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+}
+
+.odt-copy .od-kpis { margin-block: 0; }
+.odt-copy .od-section { padding-block: var(--space-4); }
+.odt-copy .od-divider { padding-block: var(--space-5) var(--space-3); border-top: 0; border-radius: var(--radius-xs); }
+.odt-copy .od-divider__inner { padding-inline: var(--space-4); }
+
+.odt-evolution {
+  display: grid;
+  gap: var(--space-5);
+}
+
+.odt-evolution figure {
+  display: grid;
+  gap: var(--space-2);
+  min-width: 0;
+  margin: 0;
+}
+
+.odt-evolution figcaption {
+  display: grid;
+  gap: 2px;
+  color: var(--ink);
+  font-size: var(--text-sm);
+  font-weight: 800;
+}
+
+.odt-evolution figcaption small {
+  color: var(--ink-muted);
+  font-weight: 600;
+}
+
+/* Tipos que todavía no se dibujan aquí: etiqueta, ayuda y dónde se editan. */
+.odt-card {
+  display: grid;
+  gap: var(--space-2);
+  padding: var(--space-4);
+  background: var(--surface-3);
+  border-radius: var(--radius-sm);
+  font-size: var(--text-base);
+  line-height: var(--leading-normal);
+}
+
+.odt-card p { margin: 0; }
+
+/* --- Editor ---------------------------------------------------------------------- */
+
+.odt-editor-wrap,
+.odt-editor {
+  display: grid;
+  gap: var(--space-4);
+  min-width: 0;
+}
+
+.odt-editor {
+  padding: var(--space-4);
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+}
+
+.odt-tip {
+  margin: 0;
+  padding: var(--space-3) var(--space-4);
+  color: var(--ink);
+  background: var(--brand-blue-soft);
+  border-radius: var(--radius-sm);
+  font-size: var(--text-sm);
+  line-height: var(--leading-normal);
+}
+
+.odt-indicator {
+  display: grid;
+  gap: var(--space-3);
+  min-width: 0;
+  padding-top: var(--space-4);
+  border-top: 1px solid var(--line);
+}
+
+.odt-indicator__head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: var(--space-3) var(--space-6);
+}
+
+.odt-indicator__head h4 {
+  display: grid;
+  flex: 1 1 14rem;
+  gap: 2px;
+  margin: 0;
+  color: var(--brand-navy);
+  font-size: var(--text-md);
+  font-weight: 800;
+}
+
+.odt-indicator__head h4 small {
+  color: var(--ink-muted);
+  font-size: var(--text-xs);
+  font-weight: 600;
+}
+
+.odt-indicator__head .odt-field { max-width: 24rem; }
+
+/* La confirmación aparece en su sitio y nombra la consecuencia. */
+.odt-ask {
+  display: grid;
+  gap: var(--space-3);
+  padding: var(--space-4);
+  background: var(--status-pending-soft);
+  border: 1px solid color-mix(in srgb, var(--status-pending) 35%, transparent);
+  border-radius: var(--radius-sm);
+  font-size: var(--text-sm);
+  line-height: var(--leading-normal);
+}
+
+.odt-ask p {
+  display: grid;
+  gap: var(--space-2);
+  margin: 0;
+}
+
+.odt-ask strong {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: var(--text-base);
+}
+
+.odt-ask strong svg { flex: none; color: var(--status-pending); }
+
+.odt-ask__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+/* La rejilla de Captura, con casillas de 44 px. Se desplaza dentro de su marco. */
+.odt-grid {
+  min-width: 0;
+  overflow-x: auto;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+}
+
+.odt-grid .oda-grid td input { height: 44px; }
+.odt-grid .oda-grid td[data-locked] { height: 44px; }
+.odt-grid .oda-grid tbody th { min-height: 44px; }
+
+.odt-locks {
+  display: grid;
+  gap: var(--space-2);
+  margin: 0;
+  padding: 0;
+  color: var(--ink-secondary);
+  font-size: var(--text-sm);
+  line-height: var(--leading-normal);
+  list-style: none;
+}
+
+.odt-locks li {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: start;
+  gap: var(--space-2);
+}
+
+.odt-locks__swatch {
+  width: 1.5rem;
+  height: 1.1rem;
+  margin-top: 2px;
+  background: var(--surface-2);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-xs);
+}
+
+.odt-definition {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 14rem), 1fr));
+  gap: var(--space-4);
+  min-width: 0;
+  margin: 0;
+  padding: var(--space-4);
+  background: var(--surface-3);
+  border: 0;
+  border-radius: var(--radius-sm);
+}
+
+.odt-definition legend {
+  float: left;
+  width: 100%;
+  grid-column: 1 / -1;
+  padding: 0;
+  color: var(--ink);
+  font-size: var(--text-sm);
+  font-weight: 800;
+}
+
+.odt-definition :where(input, select) { min-height: 44px; }
+.odt-editor :where(.admin-field input) { min-height: 44px; }
+
+.odt-picker {
+  padding: var(--space-2) var(--space-4);
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+}
+
+.odt-picker summary {
+  display: flex;
+  align-items: center;
+  min-height: 44px;
+  color: var(--ink);
+  font-size: var(--text-sm);
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.odt-picker__body {
+  display: grid;
+  gap: var(--space-1);
+  padding-block: var(--space-2) var(--space-3);
+}
+
+.odt-check {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  min-height: 44px;
+  font-size: var(--text-base);
+  cursor: pointer;
+}
+
+.odt-check input {
+  width: 1.25rem;
+  height: 1.25rem;
+  accent-color: var(--brand-blue);
+}
+
+/* Modo completo: la rejilla a la izquierda y, a la derecha y pegajosa, la ficha viva.
+   Se mide el ancho del taller, no el de la pantalla: con la barra lateral y la
+   lista de informes puestas, 640 px de taller son unos 900 px de pantalla. */
+@container odt (min-width: 640px) {
+  .odt[data-mode="completo"] .odt-block[data-editing][data-kind="kpis"] .odt-block__body {
+    grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr);
+    align-items: start;
+    column-gap: var(--space-5);
+  }
+
+  .odt[data-mode="completo"] .odt-block[data-editing][data-kind="kpis"] .odt-block__view {
+    position: sticky;
+    top: calc(var(--admin-topbar-h, 96px) + var(--space-4));
+    max-height: calc(100vh - var(--admin-topbar-h, 96px) - var(--space-8));
+    overflow-y: auto;
+  }
+}
+
+/* --- Añadir algo a la ficha ---------------------------------------------------------- */
+
+.odt-add {
+  display: grid;
+  justify-items: start;
+  gap: var(--space-3);
+}
+
+.odt-add[data-open] {
+  justify-items: stretch;
+  padding: var(--space-4);
+  border: 2px dashed var(--line-strong);
+  border-radius: var(--radius-md);
+}
+
+.odt-add__head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  font-size: var(--text-base);
+}
+
+.odt-add__group h4 {
+  margin: var(--space-2) 0;
+  color: var(--ink-muted);
+  font-size: var(--text-sm);
+  font-weight: 800;
+}
+
+.odt-add__group ul {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 15rem), 1fr));
+  gap: var(--space-3);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.odt-option {
+  display: grid;
+  align-content: start;
+  gap: var(--space-2);
+  padding: var(--space-3) var(--space-4);
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  font-size: var(--text-sm);
+  line-height: var(--leading-normal);
+}
+
+.odt-option[data-live] { border-color: var(--brand-blue); }
+
+.odt-option strong {
+  color: var(--brand-navy);
+  font-size: var(--text-base);
+}
+
+.odt-option > span { color: var(--ink-secondary); }
+
+.odt-option__actions {
+  display: grid;
+  justify-items: start;
+  gap: var(--space-1);
+}
+
+/* --- Esquina: avisos y Mr. Pilo ------------------------------------------------------- */
+
+/* Pegada al borde bajo de la ventana y sin alto propio: no empuja la ficha. */
+.odt-corner {
+  position: sticky;
+  bottom: var(--space-4);
+  z-index: var(--z-sticky);
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: var(--space-3);
+  height: 0;
+  pointer-events: none;
+}
+
+.odt-corner > * { pointer-events: auto; }
+
+.odt-toasts {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.odt-toast {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2) var(--space-3);
+  max-width: 100%;
+  padding: var(--space-2) var(--space-2) var(--space-2) var(--space-5);
+  color: var(--pilo-stage-ink);
+  background: var(--pilo-stage);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-lg);
+  font-size: var(--text-sm);
+  font-weight: 700;
+}
+
+.odt-toast button {
+  min-height: 44px;
+  padding: 0 var(--space-4);
+  color: var(--pilo-stage-ink);
+  background: transparent;
+  border: 1px solid var(--pilo-stage-line);
+  border-radius: var(--radius-pill);
+  font: inherit;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.odt-toast button:first-of-type:not(:only-of-type) {
+  color: var(--pilo-accent-ink);
+  background: var(--pilo-accent);
+  border-color: transparent;
+}
+
+.odt-dock {
+  display: flex;
+  flex: none;
+  justify-content: flex-end;
+  margin-left: auto;
+}
+
+.odt-call {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-3);
+  min-height: 52px;
+  padding: var(--space-1) var(--space-5) var(--space-1) var(--space-2);
+  color: var(--pilo-stage-ink);
+  background: var(--pilo-stage);
+  border: 0;
+  border-radius: var(--radius-pill);
+  box-shadow: var(--shadow-lg);
+  font: inherit;
+  font-size: var(--text-base);
+  font-weight: 800;
+  cursor: pointer;
+  transition: transform var(--dur-press) var(--ease-out);
+}
+
+.odt-call:active { transform: scale(0.97); }
+
+.odt-pilo {
+  display: grid;
+  gap: var(--space-3);
+  width: min(24rem, calc(100vw - var(--space-7)));
+  padding: var(--space-4);
+  color: var(--pilo-stage-ink);
+  background: var(--pilo-stage);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-xl);
+}
+
+.odt-pilo ::selection {
+  color: var(--pilo-accent-ink);
+  background: var(--pilo-accent);
+}
+
+.odt-pilo__head {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.odt-pilo__head strong { display: block; font-size: var(--text-md); }
+
+.odt-pilo__head small {
+  display: block;
+  color: var(--pilo-stage-muted);
+  font-size: var(--text-sm);
+}
+
+.odt-pilo__say {
+  margin: 0;
+  font-size: var(--text-md);
+  line-height: var(--leading-normal);
+}
+
+.odt-pilo__nav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.odt-pilo__button {
+  min-height: 44px;
+  padding: 0 var(--space-4);
+  color: var(--pilo-stage-ink);
+  background: transparent;
+  border: 1px solid var(--pilo-stage-line);
+  border-radius: var(--radius-pill);
+  font: inherit;
+  font-size: var(--text-sm);
+  font-weight: 800;
+  text-align: left;
+  cursor: pointer;
+  transition: transform var(--dur-press) var(--ease-out);
+}
+
+.odt-pilo__button[data-tone="go"] {
+  color: var(--pilo-accent-ink);
+  background: var(--pilo-accent);
+  border-color: transparent;
+}
+
+.odt-pilo__button:active { transform: scale(0.97); }
+
+.odt .odt-call:focus-visible,
+.odt .odt-pilo :where(button):focus-visible,
+.odt .odt-toast button:focus-visible {
+  outline: 3px solid var(--pilo-accent);
+  outline-offset: 2px;
+}
+
+@media (max-width: 640px) {
+  .odt-bar { align-items: flex-start; }
+  .odt-field--inline { grid-auto-flow: row; }
+  .odt-tools > * { flex: 1 1 8rem; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .odt-block,
+  .odt-seg button,
+  .odt-call,
+  .odt-pilo__button {
+    transition: none;
+  }
+}

@@ -45,6 +45,7 @@ const BLOCK_HELP: Record<OdBlockKind, string> = {
   imagenes: "Fotografías en dos columnas, dentro de la ficha y en el boletín.",
   diversidad: "Tablero propio de Diversidad, Equidad e Inclusión: grupos de protección constitucional por corte y campus, mosaico étnico, discapacidad, estratos, género, zona e INES.",
   medallero: "Lo que gana la universidad cuando compite: juegos, festivales y concursos, con su podio y su tabla de medallas.",
+  tablas_personalizadas: "Varias tablas personalizadas, una tras otra: elige cuáles muestra este bloque.",
 };
 
 /** Clave corta para distinguir varios bloques del mismo tipo (ver 0029). */
@@ -80,6 +81,23 @@ function DesignEditor({ data, reportId, reportSlug, blocks, canEdit }: { data: S
     const view = customViewOf(set);
     return view ? [{ set, view }] : [];
   });
+  /**
+   * Bloque de tablas que eligió la tabla personalizada de este bloque «libre»:
+   * la ficha la pinta allí y aquí no la repite (groups.ts). `whole` dice si con
+   * eso el bloque queda sin nada que mostrar.
+   */
+  const tableHost = (b: DraftBlock) => {
+    if (b.kind !== "libre") return null;
+    const table = customTables.find(({ set }) => set.id === b.ref_id);
+    if (!table || (b.settings.view && b.settings.view !== table.view.key)) return null;
+    const host = draft.find((x) => x.kind === "tablas_personalizadas" && x.visible && x.settings.tablas?.includes(table.set.key));
+    return host ? { host, whole: Boolean(b.settings.view) || table.set.views.length === 1 } : null;
+  };
+  /** ¿Algún bloque de tablas muestra esta tabla? La eligió, o hay uno sin elección que recoge el resto. */
+  const inTableBlock = (key: string) => {
+    const own = draft.filter((b) => b.kind === "tablas_personalizadas");
+    return own.some((b) => b.settings.tablas?.includes(key)) || own.some((b) => !b.settings.tablas?.length);
+  };
   const sections = data.rows.sections.filter((s) => s.report_id === reportId);
   const indicators = data.rows.indicators.filter((i) => i.report_id === reportId).sort((a, b) => a.position - b.position);
   /** Separador bajo el que queda un bloque (el anterior más cercano). */
@@ -128,6 +146,7 @@ function DesignEditor({ data, reportId, reportSlug, blocks, canEdit }: { data: S
     ...(breakdowns.length && !draft.some((b) => b.kind === "desgloses") ? [{ kind: "desgloses" as OdBlockKind, ref_id: null, label: BLOCK_LABELS.desgloses }] : []),
     ...(rankings.length && !draft.some((b) => b.kind === "rankings") ? [{ kind: "rankings" as OdBlockKind, ref_id: null, label: BLOCK_LABELS.rankings }] : []),
     ...(medalBoards.length && !draft.some((b) => b.kind === "medallero") ? [{ kind: "medallero" as OdBlockKind, ref_id: null, label: BLOCK_LABELS.medallero }] : []),
+    ...(customTables.length && !draft.some((b) => b.kind === "tablas_personalizadas") ? [{ kind: "tablas_personalizadas" as OdBlockKind, ref_id: null, label: BLOCK_LABELS.tablas_personalizadas }] : []),
     ...(saberPro.length && !draft.some((b) => b.kind === "saber_pro") ? [{ kind: "saber_pro" as OdBlockKind, ref_id: null, label: BLOCK_LABELS.saber_pro }] : []),
     ...(saberTyt.length && !draft.some((b) => b.kind === "saber_tyt") ? [{ kind: "saber_tyt" as OdBlockKind, ref_id: null, label: BLOCK_LABELS.saber_tyt }] : []),
     // El tablero de la diversidad lee los indicadores del informe DE por su clave.
@@ -138,7 +157,8 @@ function DesignEditor({ data, reportId, reportSlug, blocks, canEdit }: { data: S
     ...pipelines.filter((p) => !draft.some((b) => b.ref_id === p.id)).map((p) => ({ kind: "tuberia" as OdBlockKind, ref_id: p.id, label: p.title })),
     ...histories.filter((h) => !draft.some((b) => b.ref_id === h.id)).map((h) => ({ kind: "historico" as OdBlockKind, ref_id: h.id, label: h.title })),
     ...tables.filter((x) => !draft.some((b) => b.ref_id === x.id)).map((x) => ({ kind: "tabla" as OdBlockKind, ref_id: x.id, label: x.title })),
-    ...freeSets.filter((fs) => !draft.some((b) => b.ref_id === fs.id)).map((fs) => ({ kind: "libre" as OdBlockKind, ref_id: fs.id, label: fs.title })),
+    // Una tabla personalizada que ya sale en un bloque de tablas no está sin mostrar.
+    ...freeSets.filter((fs) => !draft.some((b) => b.ref_id === fs.id) && !(customViewOf(fs) && inTableBlock(fs.key))).map((fs) => ({ kind: "libre" as OdBlockKind, ref_id: fs.id, label: fs.title })),
   ];
 
   const mapOf = (b: DraftBlock) => (b.kind === "mapa" ? maps.find((m) => m.id === b.ref_id) : undefined);
@@ -290,6 +310,17 @@ function DesignEditor({ data, reportId, reportSlug, blocks, canEdit }: { data: S
                       onChange={(list) => patch(block.tempId, { settings: { ...block.settings, medalleros: list.length ? list : undefined } })}
                     />
                   )}
+                  {block.kind === "tablas_personalizadas" && customTables.length > 0 && (
+                    <Picker
+                      noun={{ one: "tabla", many: "tablas", block: "bloque de tablas", feminine: true }}
+                      options={customTables.map(({ set }) => ({ key: set.key, label: set.title }))}
+                      chosen={block.settings.tablas ?? []}
+                      restState={restState(block, (b) => Boolean(b.settings.tablas?.length))}
+                      disabled={!canEdit}
+                      note="Una tabla que ya tiene su bloque propio a la vista no entra en ese resto; si la eliges aquí, sale en este bloque y el suyo no la repite."
+                      onChange={(list) => patch(block.tempId, { settings: { ...block.settings, tablas: list.length ? list : undefined } })}
+                    />
+                  )}
                   {block.kind === "saber_pro" && saberPro.length > 1 && (
                     <label className="oda-inline-field">
                       <span>Resultados que muestra</span>
@@ -385,18 +416,28 @@ function DesignEditor({ data, reportId, reportSlug, blocks, canEdit }: { data: S
                     // Las vistas con bloque propio no se repiten en el de «todas»: la ficha las salta.
                     const own = new Set(draft.filter((b) => b.kind === "libre" && b.ref_id === set.id && b.settings.view).map((b) => b.settings.view));
                     const rest = set.views.filter((v) => !own.has(v.key)).length;
+                    const grouped = tableHost(block);
                     return (
-                      <label className="oda-inline-field">
-                        <span>Gráfica</span>
-                        <select
-                          value={block.settings.view ?? ""}
-                          disabled={!canEdit}
-                          onChange={(e) => patch(block.tempId, { settings: { ...block.settings, view: e.target.value || undefined } })}
-                        >
-                          <option value="">{own.size ? `Las demás vistas (${rest})` : `Todas las vistas (${set.views.length})`}</option>
-                          {set.views.map((v) => <option key={v.key} value={v.key}>{v.title}</option>)}
-                        </select>
-                      </label>
+                      <>
+                        <label className="oda-inline-field">
+                          <span>Gráfica</span>
+                          <select
+                            value={block.settings.view ?? ""}
+                            disabled={!canEdit}
+                            onChange={(e) => patch(block.tempId, { settings: { ...block.settings, view: e.target.value || undefined } })}
+                          >
+                            <option value="">{own.size ? `Las demás vistas (${rest})` : `Todas las vistas (${set.views.length})`}</option>
+                            {set.views.map((v) => <option key={v.key} value={v.key}>{v.title}</option>)}
+                          </select>
+                        </label>
+                        {grouped && (
+                          <small className="oda-block__note">
+                            {grouped.whole
+                              ? `Se muestra dentro de «${grouped.host.settings.title || nameOf(grouped.host)}»: este bloque no se repite.`
+                              : `La tabla se muestra dentro de «${grouped.host.settings.title || nameOf(grouped.host)}»: aquí salen las demás vistas.`}
+                          </small>
+                        )}
+                      </>
                     );
                   })()}
                   {block.kind === "evolucion" && (
@@ -507,20 +548,18 @@ function DesignEditor({ data, reportId, reportSlug, blocks, canEdit }: { data: S
                   <Icon name="plus" size={15} /> Otra gráfica de «{fs.title}»
                 </button>
               ))}
-            {/* Las tablas personalizadas: cada una se puede poner donde haga falta, también más de una vez. */}
-            {customTables.map(({ set, view }) => (
+            {customTables.length > 0 && draft.some((b) => b.kind === "tablas_personalizadas") && (
               <button
-                key={`tabla-${set.id}`}
                 type="button"
-                className="button-secondary"
-                onClick={() => add({ kind: "libre", ref_id: set.id, visible: true, settings: { view: view.key, slot: newSlot() } })}
+                className="button-ghost"
+                onClick={() => add({ kind: "tablas_personalizadas", ref_id: null, visible: true, settings: { slot: newSlot() } })}
               >
-                <Icon name="plus" size={15} /> Añadir tabla «{set.title}»
+                <Icon name="plus" size={15} /> Otro bloque de tablas
               </button>
-            ))}
-            {customTables.length === 0 && <small>Este informe aún no tiene tablas personalizadas: se crean en Captura › Tablas personalizadas y después se colocan aquí.</small>}
+            )}
+            {customTables.length === 0 && <small>Este informe aún no tiene tablas personalizadas: se crean en Captura › Tablas personalizadas y después se colocan aquí, en un bloque de tablas.</small>}
             <small>
-              Un separador agrupa los bloques que le siguen, hasta el próximo. Para que una sección muestre sus indicadores y desgloses, ponle debajo un tablero y un bloque de desgloses con los suyos elegidos: así no se repiten en cada sección.
+              Un separador agrupa los bloques que le siguen, hasta el próximo. Para que una sección muestre sus indicadores y desgloses, ponle debajo un tablero y un bloque de desgloses con los suyos elegidos: así no se repiten en cada sección. Lo mismo con las tablas personalizadas: un bloque de tablas por sección, cada uno con las suyas.
             </small>
           </div>
         )}
@@ -550,7 +589,7 @@ function DesignEditor({ data, reportId, reportSlug, blocks, canEdit }: { data: S
         <div className="oda-schematic__page">
           <div className="oda-schematic__head" aria-hidden="true" />
           <div className="oda-schematic__bar" aria-hidden="true" />
-          {draft.filter((b) => b.visible && !shownWith(b)).map((b) => (
+          {draft.filter((b) => b.visible && !shownWith(b) && !tableHost(b)?.whole).map((b) => (
             <div key={b.tempId} className={b.kind === "separador" ? "oda-schematic__divider" : "oda-schematic__block"} data-kind={b.kind}>
               <span>
                 {b.settings.title || nameOf(b)}
@@ -564,28 +603,33 @@ function DesignEditor({ data, reportId, reportSlug, blocks, canEdit }: { data: S
   );
 }
 
-/** Qué muestra un tablero de indicadores o un bloque de desgloses. */
+/** Qué muestra un tablero de indicadores o un bloque de desgloses, rankings, medalleros o tablas. */
 function Picker({
   noun,
   options,
   chosen,
   restState,
   disabled,
+  note,
   onChange,
 }: {
-  noun: { one: string; many: string; block: string };
+  /** `feminine`: el nombre es femenino («tabla»), para que el texto concuerde. */
+  noun: { one: string; many: string; block: string; feminine?: boolean };
   options: { key: string; label: string }[];
   chosen: string[];
   restState: "elige" | "resto" | "vacio";
   disabled: boolean;
+  /** Una frase más bajo la lista, propia del tipo de bloque. */
+  note?: string;
   onChange: (list: string[]) => void;
 }) {
+  const f = Boolean(noun.feminine);
   const summary =
     restState === "elige"
-      ? `${chosen.length} ${chosen.length === 1 ? `${noun.one} elegido` : `${noun.many} elegidos`}`
+      ? `${chosen.length} ${chosen.length === 1 ? `${noun.one} elegid${f ? "a" : "o"}` : `${noun.many} elegid${f ? "as" : "os"}`}`
       : restState === "resto"
-        ? `los ${noun.many} que ningún otro ${noun.block} eligió`
-        : `ninguno: otro ${noun.block} sin elección ya muestra el resto`;
+        ? `l${f ? "as" : "os"} ${noun.many} que ningún otro ${noun.block} eligió`
+        : `ningun${f ? "a" : "o"}: otro ${noun.block} sin elección ya muestra el resto`;
   return (
     <details className="oda-block__picker" data-empty={restState === "vacio" || undefined}>
       <summary>
@@ -610,7 +654,8 @@ function Picker({
           </label>
         ))}
         <small className="oda-block__note">
-          Sin elegir ninguno, el primer {noun.block} sin elección muestra los {noun.many} que ningún otro eligió; los demás quedan vacíos.
+          Sin elegir {f ? "ninguna" : "ninguno"}, el primer {noun.block} sin elección muestra {f ? "las" : "los"} {noun.many} que ningún otro eligió; los demás quedan vacíos.
+          {note ? ` ${note}` : ""}
         </small>
       </div>
     </details>

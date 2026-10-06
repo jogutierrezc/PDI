@@ -59,7 +59,8 @@ export type BlockKind =
   | "diversidad"
   | "imagenes"
   | "modelo"
-  | "medallero";
+  | "medallero"
+  | "tablas_personalizadas";
 
 export interface Campus {
   id: CampusId;
@@ -292,6 +293,8 @@ export interface ReportBlock {
     rankings?: string[];
     /** Medalleros que enseña este bloque; vacío, los que no reclamó otro. */
     medalleros?: string[];
+    /** Bloque de tablas: claves de las tablas personalizadas (su conjunto libre) que muestra. Sin ellas, las que ningún otro bloque eligió. */
+    tablas?: string[];
     /** Bloque Saber PRO: clave del conjunto. Sin ella, el primero del informe. */
     saberPro?: string;
     /** Bloque de conjunto libre: clave de la vista. Sin ella, todas las de la fuente. */
@@ -502,4 +505,5 @@ export const BLOCK_LABELS: Record<BlockKind, string> = {
   imagenes: "Grid de imágenes",
   modelo: "Modelo predictivo",
   medallero: "Medallero",
+  tablas_personalizadas: "Tablas personalizadas",
 };

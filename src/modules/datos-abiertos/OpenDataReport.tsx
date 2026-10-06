@@ -63,7 +63,7 @@ import { imagesOf, reportImageUrl } from "./data/images";
 import { ALL_YEARS, ANNUAL_RULE_LABEL, cutCode, cutCodeLabel, cutLabel, fromCutCode } from "./data/terms";
 import { periodReading } from "./data/period-reading";
 import type { Breakdown, CampusId, Indicator, MapDataset, OpenDataCatalog, Report, ReportBlock, Term } from "./data/types";
-import { blockPicks, inSectionOf, lastFreeBlock as lastFreeBlockOf, orderedBlocks, ownFreeViews as ownFreeViewsOf, pairedMaps as pairedMapsOf, saberProOf, saberTytOf } from "./data/groups";
+import { blockPicks, groupedTableViews, inSectionOf, lastFreeBlock as lastFreeBlockOf, orderedBlocks, ownFreeViews as ownFreeViewsOf, pairedMaps as pairedMapsOf, saberProOf, saberTytOf } from "./data/groups";
 import { csvZipName } from "./data/csv-export";
 import { EXPORT_GROUPS, exportsOfBlock, readmeText, reportExports, sourceOf } from "./data/export-registry";
 import type { ExportEntry, ExportSource } from "./data/export-registry";
@@ -76,7 +76,7 @@ import { SaberTytBlock } from "./components/SaberTytBlock";
 import { DiversityBoard } from "./components/DiversityBoard";
 import { OriginMap } from "./components/OriginMap";
 import { PredictiveModel } from "./components/PredictiveModel";
-import { FreeSetBlock } from "./components/FreeSetBlock";
+import { CustomTablesBlock, FreeSetBlock } from "./components/FreeSetBlock";
 import { ALL_CAMPUSES, MAP_MODE_TITLE, isMobilityMap, isWorldMap } from "./data/types";
 import "./datos-abiertos.css";
 
@@ -190,6 +190,9 @@ function ReportContent({ data, report, year, term, campus, setYear, setTerm, set
   // debajo del último bloque que dibuja algo de ese conjunto.
   const ownFreeViews = ownFreeViewsOf(blocks);
   const lastFreeBlock = lastFreeBlockOf(report, blocks);
+  // Una tabla personalizada que un bloque de tablas eligió sale en ese bloque:
+  // su bloque «libre» suelto no la repite.
+  const groupedTables = groupedTableViews(report, blocks);
 
   /** Un bloque suelto es una sección de la ficha; dentro de un punto, el punto ya pone el título. */
   const shell = (key: string, id: string, title: string, description: string | undefined, inSection: boolean, children: ReactNode) =>
@@ -507,16 +510,32 @@ function ReportContent({ data, report, year, term, campus, setYear, setTerm, set
         const set = report.freeSets?.find((f) => f.id === block.refKey);
         if (!set) return null;
         const view = block.settings.view;
+        if (view && groupedTables.has(`${set.id}:${view}`)) return null;
+        const elsewhere = (v: { key: string }) => ownFreeViews.has(`${set.id}:${v.key}`) || groupedTables.has(`${set.id}:${v.key}`);
         return (
           <FreeSetBlock
             key={key}
             set={set}
             viewKey={view}
-            exclude={view ? undefined : set.views.filter((v) => ownFreeViews.has(`${set.id}:${v.key}`)).map((v) => v.key)}
+            exclude={view ? undefined : set.views.filter(elsewhere).map((v) => v.key)}
             withSource={lastFreeBlock.get(set.id) === block}
             title={block.settings.title}
             anchor={`od-libre-${set.id}${view ? `-${view}` : ""}`}
             csv={csvById(`libre:${set.id}`)}
+          />
+        );
+      }
+      case "tablas_personalizadas": {
+        if (inSection) return null;
+        const shown = picks.tables(block).map((id) => report.freeSets?.find((f) => f.id === id)).filter((f): f is NonNullable<typeof f> => Boolean(f));
+        if (!shown.length) return null;
+        return (
+          <CustomTablesBlock
+            key={key}
+            sets={shown}
+            title={block.settings.title}
+            anchor={block.settings.slot ? `od-tablas-${block.settings.slot}` : "od-tablas"}
+            csvOf={(id) => csvById(`libre:${id}`)}
           />
         );
       }

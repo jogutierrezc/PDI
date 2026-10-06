@@ -18,8 +18,13 @@
      Lo mismo con los bloques de desgloses sin elección.
    · Un mapa, tubería, histórico, mapa de calor o tabla es del grupo donde
      aparece su bloque por primera vez.
+   · Una tabla personalizada elegida en un bloque de tablas es de ese bloque y
+     de su grupo, y su bloque «libre» suelto deja de pintarla. El primer bloque
+     de tablas sin elección muestra las que nadie eligió y que no tienen ya su
+     bloque «libre» a la vista.
    ========================================================================== */
 
+import { customViewOf } from "./custom-table";
 import { DEFAULT_BLOCK_ORDER } from "./types";
 import type { Report, ReportBlock } from "./types";
 import { SABER_COMPETENCIES } from "./saber-pro";
@@ -77,11 +82,17 @@ const sameBlock = (a: ReportBlock, b: ReportBlock) => a === b || (Boolean(a.uuid
  */
 export function blockPicks(report: Report) {
   const blocks = visibleBlocks(report);
-  const pick = (kind: "kpis" | "desgloses" | "rankings" | "medallero", all: string[], explicit: (b: ReportBlock) => string[] | null) => {
+  const pick = (
+    kind: "kpis" | "desgloses" | "rankings" | "medallero" | "tablas_personalizadas",
+    all: string[],
+    explicit: (b: ReportBlock) => string[] | null,
+    /** Lo que ya se ve en otra parte de la ficha: no entra en «lo que nadie eligió». */
+    elsewhere?: Set<string>,
+  ) => {
     const own = blocks.filter((b) => b.kind === kind);
     const claimed = new Set(own.flatMap((b) => explicit(b) ?? []));
     const restOwner = own.find((b) => explicit(b) === null);
-    const rest = all.filter((key) => !claimed.has(key));
+    const rest = all.filter((key) => !claimed.has(key) && !elsewhere?.has(key));
     return (block: ReportBlock): string[] => {
       if (!own.some((b) => sameBlock(b, block))) return all;
       const chosen = explicit(block);
@@ -110,12 +121,55 @@ export function blockPicks(report: Report) {
       (report.medals ?? []).map((m) => m.id),
       (b) => (b.settings.medalleros?.length ? b.settings.medalleros : null),
     ),
+    // Tablas personalizadas, por la clave de su conjunto libre. Un bloque de
+    // tablas dentro de un punto no se pinta: ni muestra ni reclama.
+    tables: pick(
+      "tablas_personalizadas",
+      (report.freeSets ?? []).filter((set) => customViewOf(set)).map((set) => set.id),
+      (b) => (inSectionOf(report, b) ? [] : b.settings.tablas?.length ? b.settings.tablas : null),
+      looseTables(report, blocks),
+    ),
   };
+}
+
+/**
+ * Tablas personalizadas y sus bloques «libre»: para que ninguna salga dos veces.
+ * · La que un bloque de tablas elige sale en ese bloque; su bloque «libre»
+ *   suelto no la pinta (`groupedTableViews`).
+ * · La que nadie eligió y tiene su bloque «libre» a la vista se queda en él: el
+ *   bloque de tablas sin elección no la repite (`looseTables`).
+ */
+
+/** Vistas ("<conjunto>:<vista>") de las tablas personalizadas que un bloque de tablas eligió. */
+export function groupedTableViews(report: Report, blocks: ReportBlock[]): Set<string> {
+  const grouped = new Set<string>();
+  for (const b of blocks) {
+    if (b.kind !== "tablas_personalizadas" || !b.visible || inSectionOf(report, b)) continue;
+    for (const key of b.settings.tablas ?? []) {
+      const set = report.freeSets?.find((f) => f.id === key);
+      const view = set && customViewOf(set);
+      if (set && view) grouped.add(`${set.id}:${view.key}`);
+    }
+  }
+  return grouped;
+}
+
+/** Conjuntos cuya tabla personalizada ya pinta un bloque «libre» de la ficha: el suyo propio o el de «todas las vistas». */
+function looseTables(report: Report, blocks: ReportBlock[]): Set<string> {
+  const loose = new Set<string>();
+  for (const b of blocks) {
+    if (b.kind !== "libre" || !b.visible || inSectionOf(report, b)) continue;
+    const set = report.freeSets?.find((f) => f.id === b.refKey);
+    const view = set && customViewOf(set);
+    if (set && view && (!b.settings.view || b.settings.view === view.key)) loose.add(set.id);
+  }
+  return loose;
 }
 
 export function reportGroups(report: Report): ReportGrouping {
   const blocks = visibleBlocks(report);
   const picks = blockPicks(report);
+  const grouped = groupedTableViews(report, blocks);
   const groups: ReportGroup[] = [];
   const owner = new Map<string, ReportGroup | null>();
   const claim = (ref: string, group: ReportGroup | null) => {
@@ -148,6 +202,15 @@ export function reportGroups(report: Report): ReportGrouping {
       picks.rankings(block).forEach((key) => claim(`ranking:${key}`, current));
       return;
     }
+    if (block.kind === "tablas_personalizadas") {
+      // En el boletín cada tabla es la hoja de su vista ("libre:<fuente>:<vista>").
+      picks.tables(block).forEach((key) => {
+        const set = report.freeSets?.find((f) => f.id === key);
+        const view = set && customViewOf(set);
+        if (set && view) claim(`libre:${set.id}:${view.key}`, current);
+      });
+      return;
+    }
     if (block.kind === "saber_tyt") {
       // Como en Saber PRO: una hoja por competencia con las dos pruebas.
       const shown = saberTytOf(report, block);
@@ -166,7 +229,10 @@ export function reportGroups(report: Report): ReportGrouping {
       // Conjunto libre: en el boletín cada vista es su hoja ("libre:<fuente>:<vista>").
       if (block.kind === "libre") {
         const set = report.freeSets?.find((f) => f.id === block.refKey);
-        set?.views.filter((v) => !block.settings.view || v.key === block.settings.view).forEach((v) => claim(`libre:${set.id}:${v.key}`, current));
+        // La tabla que un bloque de tablas eligió es del grupo de ese bloque, no de este.
+        set?.views
+          .filter((v) => (!block.settings.view || v.key === block.settings.view) && !grouped.has(`${set.id}:${v.key}`))
+          .forEach((v) => claim(`libre:${set.id}:${v.key}`, current));
       }
       // Un mapa que se muestra junto a otro arrastra a su pareja.
       if (block.kind === "mapa" && block.settings.mapWith) claim(`mapa:${block.settings.mapWith}`, current);
@@ -241,11 +307,13 @@ export function ownFreeViews(blocks: ReportBlock[]): Set<string> {
  */
 export function lastFreeBlock(report: Report, blocks: ReportBlock[]): Map<string, ReportBlock> {
   const own = ownFreeViews(blocks);
+  const grouped = groupedTableViews(report, blocks);
   const last = new Map<string, ReportBlock>();
   for (const b of blocks) {
     const set = b.kind === "libre" ? report.freeSets?.find((f) => f.id === b.refKey) : undefined;
     if (!set) continue;
-    const draws = b.settings.view ? set.views.some((v) => v.key === b.settings.view) : set.views.some((v) => !own.has(`${set.id}:${v.key}`));
+    const mine = (key: string) => !grouped.has(`${set.id}:${key}`);
+    const draws = b.settings.view ? mine(b.settings.view) && set.views.some((v) => v.key === b.settings.view) : set.views.some((v) => !own.has(`${set.id}:${v.key}`) && mine(v.key));
     if (draws) last.set(set.id, b);
   }
   return last;

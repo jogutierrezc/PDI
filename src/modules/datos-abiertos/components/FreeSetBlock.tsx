@@ -18,12 +18,16 @@
    El conjunto es un solo archivo, así que la acción «CSV» va una vez por
    bloque: junto a la tabla de origen cuando sale y, si no, en el pie de la
    primera vista. Nunca en todas.
+
+   Bloque de tablas (`CustomTablesBlock`): varias tablas personalizadas, cada
+   una de su conjunto, una tras otra bajo un mismo título. Usa el mismo panel
+   que aquí dibuja una vista; cada tabla lleva su fuente y su «CSV».
    ========================================================================== */
 
 import { useState } from "react";
 import { CHART_TYPES, freeYears, viewProblems } from "../data/free-sets";
 import type { FreeChartType, FreeSet, FreeView } from "../data/free-sets";
-import { isCustomView } from "../data/custom-table";
+import { customViewOf, isCustomView } from "../data/custom-table";
 import { ChartFrame } from "./ChartFrame";
 import { CsvAction } from "./CsvAction";
 import type { CsvSource } from "./CsvAction";
@@ -127,6 +131,48 @@ export function FreeSetBlock({
             {csv && <CsvAction {...csv} />}
           </details>
         )}
+      </div>
+    </section>
+  );
+}
+
+/**
+ * Bloque de tablas: las tablas personalizadas que el bloque muestra, en su
+ * orden. Una tabla sin filas o incompleta no se publica, como en su bloque
+ * suelto; sin ninguna, el bloque no sale.
+ */
+export function CustomTablesBlock({
+  sets,
+  title,
+  anchor,
+  csvOf,
+}: {
+  /** Los conjuntos de las tablas, ya repartidos por la ficha (`blockPicks`). */
+  sets: FreeSet[];
+  title?: string;
+  anchor: string;
+  /** Archivo de cada tabla para su botón «CSV», por la clave del conjunto. */
+  csvOf?: (setId: string) => CsvSource | undefined;
+}) {
+  const tables = sets.flatMap((set) => {
+    const view = customViewOf(set);
+    return view && set.rows.length > 0 && viewProblems(set, view).length === 0 ? [{ set, view }] : [];
+  });
+  if (!tables.length) return null;
+  return (
+    <section className="od-section od-free" aria-labelledby={anchor}>
+      <div className="u-container">
+        <header className="od-section__head">
+          <h2 id={anchor}>{title || (tables.length === 1 ? tables[0].set.title : "Tablas")}</h2>
+          {tables.length === 1 && tables[0].set.description && <p>{tables[0].set.description}</p>}
+        </header>
+        <div className="od-free__grid">
+          {tables.map(({ set, view }) => {
+            // Una tabla de un conjunto anual abre en su último año, como en su bloque suelto.
+            const years = set.temporality === "anual" ? freeYears(set) : [];
+            return <FreeViewPanel key={set.id} set={set} view={view} year={years.length ? years[years.length - 1] : null} csv={csvOf?.(set.id)} />;
+          })}
+        </div>
       </div>
     </section>
   );

@@ -1029,6 +1029,8 @@ export type OdBlockKind =
   | "diversidad"
   /** Medallero: lo que gana la universidad cuando compite (0056). */
   | "medallero"
+  /** Bloque de tablas personalizadas: las que elige (settings.tablas) o las que nadie eligió (0134). */
+  | "tablas_personalizadas"
   /** Modelo estadístico del informe (0046). */
   | "modelo"
   /** Grid de fotografías a dos columnas, en la ficha y en el boletín (0053). */
@@ -1325,6 +1327,8 @@ export interface OdReportBlockRow {
     rankings?: string[];
     /** Medalleros que enseña este bloque; vacío, los que no reclamó otro. */
     medalleros?: string[];
+    /** Bloque de tablas: claves de las tablas personalizadas (su conjunto libre) que muestra. Sin ellas, las que ningún otro bloque eligió (0134). */
+    tablas?: string[];
     /** Bloque Saber PRO: clave del conjunto que muestra (0031). */
     saberPro?: string;
     /** Bloque de conjunto libre: clave de la vista que muestra; sin ella, todas (0033). */

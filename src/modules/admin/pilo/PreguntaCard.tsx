@@ -245,6 +245,9 @@ export function PreguntaSection({ ed }: { ed: EditorApi }) {
               onCommit={(v) => set("ask_history_turns", v)}
             />
           </div>
+          <p className="pis-small" style={{ marginTop: "0.5rem" }}>
+            💡 <strong>Consejo de velocidad:</strong> Bajar el contexto a 1800–2200 tokens y el largo a 400–500 tokens reduce el tiempo de procesamiento del proveedor.
+          </p>
         </details>
       </Group>
 

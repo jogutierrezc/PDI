@@ -186,8 +186,8 @@ export function ConnectionSection({ ed, test, onTest }: { ed: EditorApi; test: T
             </label>
           </div>
         ) : (
-          <details className="pis-adv">
-            <summary>Opciones avanzadas</summary>
+          <details className="pis-adv" open={Boolean(s.text_model && s.text_model !== PROVIDERS[s.provider].model)}>
+            <summary>Opciones avanzadas y velocidad del modelo</summary>
             <div className="pis-grid">
               <label>
                 Modelo (vacío: {PROVIDERS[s.provider].model})
@@ -198,6 +198,64 @@ export function ConnectionSection({ ed, test, onTest }: { ed: EditorApi; test: T
                 />
               </label>
             </div>
+            {s.provider === "nvidia" && (
+              <div style={{ marginTop: "0.5rem" }}>
+                <p className="pis-small" style={{ marginBottom: "0.4rem" }}>
+                  <strong>Acelerar respuesta (NVIDIA NIM):</strong>
+                </p>
+                <div style={{ display: "flex", flexWrap: "wrap", gap: "0.4rem" }}>
+                  <button
+                    type="button"
+                    className="button-subtle"
+                    style={{ fontSize: "0.78rem", padding: "0.25rem 0.55rem" }}
+                    onClick={() => set("text_model", "meta/llama-3.1-8b-instruct")}
+                  >
+                    ⚡ meta/llama-3.1-8b-instruct (~1-3 s)
+                  </button>
+                  <button
+                    type="button"
+                    className="button-subtle"
+                    style={{ fontSize: "0.78rem", padding: "0.25rem 0.55rem" }}
+                    onClick={() => set("text_model", "mistralai/mistral-7b-instruct-v0.3")}
+                  >
+                    ⚡ mistralai/mistral-7b-instruct-v0.3 (~2-4 s)
+                  </button>
+                  <button
+                    type="button"
+                    className="button-subtle"
+                    style={{ fontSize: "0.78rem", padding: "0.25rem 0.55rem" }}
+                    onClick={() => set("text_model", "google/gemma-4-31b-it")}
+                  >
+                    🐢 google/gemma-4-31b-it (Lento ~40-60 s)
+                  </button>
+                </div>
+              </div>
+            )}
+            {s.provider === "mistral" && (
+              <div style={{ marginTop: "0.5rem" }}>
+                <p className="pis-small" style={{ marginBottom: "0.4rem" }}>
+                  <strong>Modelos en Mistral:</strong>
+                </p>
+                <div style={{ display: "flex", flexWrap: "wrap", gap: "0.4rem" }}>
+                  <button
+                    type="button"
+                    className="button-subtle"
+                    style={{ fontSize: "0.78rem", padding: "0.25rem 0.55rem" }}
+                    onClick={() => set("text_model", "mistral-small-latest")}
+                  >
+                    ⚡ mistral-small-latest (Recomendado)
+                  </button>
+                  <button
+                    type="button"
+                    className="button-subtle"
+                    style={{ fontSize: "0.78rem", padding: "0.25rem 0.55rem" }}
+                    onClick={() => set("text_model", "ministral-8b-latest")}
+                  >
+                    ⚡ ministral-8b-latest (Ultra-rápido)
+                  </button>
+                </div>
+              </div>
+            )}
           </details>
         )}
       </Group>

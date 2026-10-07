@@ -44,7 +44,7 @@ import type { AppTheme } from "./themes";
 import { loadSaved, nextLast, openingId, readLast, removeSaved, savedEntries, writeLast } from "./saved";
 import type { SavedEntry } from "./saved";
 import { stopOfficial } from "./official-voice";
-import { fromKeyboard, reducedMotion } from "./pwa";
+import { APP_APK, fromKeyboard, isAndroidDevice, isStandalone, reducedMotion } from "./pwa";
 import type { InstallWay } from "./pwa";
 import { SuperContext, SuperDefs } from "../pregunta/super/Gear";
 import { SuperEntrance } from "../pregunta/super/SuperEntrance";
@@ -53,7 +53,7 @@ import type { SuperLine, SuperMode } from "../pregunta/super/modes";
 import { superSfx } from "../pregunta/super/sfx";
 import { AppTurn } from "./AppTurn";
 import type { Live, TurnVoice } from "./AppTurn";
-import { AccountSheet, AppMenu, IphoneSheet, SettingsSheet, SourcesSheet } from "./AppMenu";
+import { AccountSheet, AndroidSheet, AppMenu, IphoneSheet, SettingsSheet, SourcesSheet } from "./AppMenu";
 import { Icon } from "./icons";
 import { AppSide } from "./AppSide";
 import type { Person } from "./AppSide";
@@ -65,7 +65,7 @@ import { extrasFor, usePiloExtras } from "../../components/pilo/ai/extras";
 import { pickPassages, turnFile } from "../pregunta/attach";
 import { AttachButton, AttachTray, useAttachment } from "../pregunta/Extras";
 
-type Over = null | "menu" | "ajustes" | "fuentes" | "cuenta" | "iphone";
+type Over = null | "menu" | "ajustes" | "fuentes" | "cuenta" | "iphone" | "android";
 
 export interface ShellProps {
   space: SpaceProfile;
@@ -426,6 +426,9 @@ export function AppShell({ space, door, waking, online, person, member, wide, th
     if (wide) setOthers(Object.fromEntries(APP_SPACES.filter((s) => s !== space.id).map((s) => [s, loadSaved(s)])));
   }, [wide, space.id]);
 
+  /** En un Android que aún no corre como app instalada: el APK de la universidad es también una opción. */
+  const androidOffer = !wide && !isStandalone() && isAndroidDevice(navigator.userAgent);
+
   const show = (which: Exclude<Over, null>, event?: MouseEvent | null) => {
     setQuick(fromKeyboard(event));
     if (which === "menu") setOthers(Object.fromEntries(APP_SPACES.filter((s) => s !== space.id).map((s) => [s, loadSaved(s)])));
@@ -668,11 +671,15 @@ export function AppShell({ space, door, waking, online, person, member, wide, th
             </div>
           )}
 
-          {!current && install.way && !install.dismissed && !welcoming && (
+          {!current && !welcoming && !install.dismissed && (install.way || androidOffer) && (
             <div className="pa-install">
-              <span>{wide ? "Instale a Pilo en su computador." : "Lleve a Pilo en su teléfono."}</span>
-              <button type="button" className="pa-btn pa-btn--main" onClick={(e) => (install.way === "iphone" ? show("iphone", e) : install.run())}>
-                Instalar a Pilo
+              <span>{wide ? "Instale a Pilo en su computador." : androidOffer ? "Pilo también vive como app en su Android." : "Lleve a Pilo en su teléfono."}</span>
+              <button
+                type="button"
+                className="pa-btn pa-btn--main"
+                onClick={(e) => (androidOffer ? show("android", e) : install.way === "iphone" ? show("iphone", e) : install.run())}
+              >
+                {androidOffer ? "Conseguir la app" : "Instalar a Pilo"}
               </button>
               <button type="button" className="pa-icon" onClick={install.dismiss} aria-label="Ahora no">
                 {Icon.close}
@@ -733,6 +740,13 @@ export function AppShell({ space, door, waking, online, person, member, wide, th
             if (id !== space.id) onSwitch(id);
           }}
           onSettings={() => setOver("ajustes")}
+          getApp={
+            androidOffer
+              ? { label: "Descargar para Android", hint: `Tabletas y celulares · versión ${APP_APK.version} · ${APP_APK.size}`, onOpen: () => setOver("android") }
+              : install.way === "iphone"
+                ? { label: "Instalar en el iPhone", hint: "Desde Safari, «Añadir a pantalla de inicio»", onOpen: () => setOver("iphone") }
+                : null
+          }
           person={shown}
         />
       )}
@@ -750,6 +764,10 @@ export function AppShell({ space, door, waking, online, person, member, wide, th
       <SourcesSheet open={over === "fuentes"} quick={quick} onClose={hide} sources={shownSources.sources} focus={shownSources.focus} space={space} />
       <AccountSheet open={over === "cuenta"} quick={quick} onClose={hide} />
       <IphoneSheet open={over === "iphone"} quick={quick} onClose={hide} />
+      <AndroidSheet open={over === "android"} quick={quick} onClose={hide} canPrompt={install.way === "aviso"} onPrompt={() => {
+        setOver(null);
+        install.run();
+      }} />
       {entrance && <SuperEntrance key={entrance.turnId} mode={entrance.mode} short={entrance.short} sound={autoRead} target={() => faceSlot.current} onDone={landSuper} />}
     </SuperContext.Provider>
   );

@@ -29,4 +29,5 @@ export const Icon = {
   chat: <Svg><path d="M3.5 4.5h13v9H9l-3.5 3v-3h-2v-9z" /></Svg>,
   dot: <Svg><circle cx="10" cy="10" r="2.5" /></Svg>,
   search: <Svg><circle cx="9" cy="9" r="5" /><path d="M13 13l3.5 3.5" /></Svg>,
+  download: <Svg><path d="M10 3.5v8.5M6.5 8.5L10 12l3.5-3.5M4 15.5h12" /></Svg>,
 };

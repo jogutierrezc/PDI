@@ -1,0 +1,321 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Propuesta · Descargar a Pilo desde el chat</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600;9..144,700&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+<style>
+  :root {
+    --brand-navy: #0a2d63;
+    --brand-blue: #2166d6;
+    --brand-blue-soft: #eaf1fd;
+    --page: #f4f7fb;
+    --surface: #ffffff;
+    --surface-3: #eef3fa;
+    --ink: #0d1c31;
+    --ink-2: #45566d;
+    --ink-muted: #6b7c93;
+    --line: rgba(13, 40, 84, 0.11);
+    --line-strong: rgba(13, 40, 84, 0.2);
+    --done: #12833a;
+    --radius-md: 16px;
+    --radius-sm: 12px;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: Manrope, system-ui, sans-serif;
+    background: var(--page);
+    color: var(--ink);
+    padding: 40px 24px 64px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 36px;
+  }
+  header.propuesta { max-width: 980px; text-align: center; }
+  header.propuesta .kicker {
+    font-size: 0.75rem; font-weight: 800; letter-spacing: 0.14em;
+    text-transform: uppercase; color: var(--ink-muted);
+  }
+  header.propuesta h1 {
+    font-family: Fraunces, Georgia, serif;
+    font-size: clamp(1.8rem, 3vw, 2.6rem);
+    font-weight: 700; letter-spacing: -0.028em; line-height: 1.08;
+    margin-top: 10px;
+  }
+  header.propuesta p { margin-top: 12px; color: var(--ink-2); font-size: 0.95rem; line-height: 1.55; max-width: 720px; margin-inline: auto; }
+
+  .escenarios { display: flex; gap: 28px; flex-wrap: wrap; justify-content: center; }
+
+  /* --- Teléfono de muestra ------------------------------------------------------------------ */
+  .phone {
+    width: 318px; border-radius: 30px; background: var(--surface);
+    border: 1px solid var(--line-strong); overflow: hidden;
+    box-shadow: 0 18px 50px rgba(13, 40, 84, 0.14);
+    display: flex; flex-direction: column;
+  }
+  .phone .barra {
+    padding: 14px 16px 10px; display: flex; align-items: center; gap: 10px;
+    border-bottom: 1px solid var(--line);
+  }
+  .phone .barra .nombre { font-weight: 800; font-size: 0.95rem; }
+  .phone .barra .sub { font-size: 0.72rem; color: var(--ink-muted); font-weight: 600; }
+  .phone .cuerpo { padding: 16px; flex: 1; display: flex; flex-direction: column; gap: 12px; min-height: 210px; }
+  .phone figcaption {
+    padding: 10px 16px; font-size: 0.75rem; font-weight: 700; color: var(--ink-muted);
+    border-top: 1px solid var(--line); background: var(--surface-3);
+  }
+  .burbuja {
+    max-width: 85%; padding: 10px 13px; border-radius: 14px;
+    font-size: 0.82rem; line-height: 1.45; font-weight: 500;
+  }
+  .burbuja.pilo { background: var(--brand-blue-soft); border: 1px solid var(--line); border-bottom-left-radius: 4px; }
+  .burbuja.yo { background: var(--brand-navy); color: #fff; align-self: flex-end; border-bottom-right-radius: 4px; }
+
+  /* --- El dock: banner y caja de escribir --------------------------------------------------- */
+  .dock { padding: 0 12px 14px; display: flex; flex-direction: column; gap: 10px; }
+  .banner {
+    display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px; align-items: center;
+    border: 1px solid var(--line); border-radius: var(--radius-sm);
+    background: var(--surface-3); padding: 8px 8px 8px 13px;
+    font-size: 0.78rem; font-weight: 700; color: var(--ink);
+  }
+  .btn {
+    border: none; border-radius: 10px; min-height: 44px; padding: 8px 14px;
+    font-family: inherit; font-size: 0.8rem; font-weight: 800;
+    cursor: pointer; transition: transform 160ms ease-out, background-color 160ms ease-out;
+  }
+  .btn:active { transform: scale(0.97); }
+  .btn-main { background: var(--brand-navy); color: #fff; }
+  .btn-main:hover { background: #0d3a7d; }
+  .compose {
+    display: flex; align-items: center; gap: 8px;
+    border: 1px solid var(--line-strong); border-radius: 14px;
+    padding: 6px 6px 6px 14px; background: var(--surface);
+    color: var(--ink-muted); font-size: 0.8rem; font-weight: 600;
+  }
+  .compose .send {
+    width: 38px; height: 38px; border-radius: 10px; background: var(--brand-blue-soft);
+    display: grid; place-items: center; color: var(--brand-navy);
+  }
+
+  /* --- La hoja (sheet) ----------------------------------------------------------------------- */
+  .phone.sheet-phone { height: 560px; }
+  .hoja {
+    margin-top: auto; border-top: 1px solid var(--line);
+    border-radius: 18px 18px 0 0; background: var(--surface);
+    box-shadow: 0 -14px 40px rgba(13, 40, 84, 0.16);
+    padding: 10px 18px 18px;
+  }
+  .hoja .grip { display: block; width: 40px; height: 4px; border-radius: 99px; background: var(--line-strong); margin: 4px auto 12px; }
+  .hoja .head { display: flex; align-items: center; justify-content: space-between; }
+  .hoja h2 { font-family: Fraunces, Georgia, serif; font-size: 1.2rem; font-weight: 700; letter-spacing: -0.02em; }
+  .hoja .cerrar { border: none; background: none; color: var(--ink-muted); cursor: pointer; font-size: 1rem; padding: 8px; }
+  .hoja .fila-pilo { display: flex; gap: 12px; align-items: center; margin-top: 14px; }
+  .hoja .cara {
+    width: 46px; height: 46px; border-radius: 14px; background: var(--brand-navy);
+    display: grid; place-items: center; flex: none;
+  }
+  .hoja .fila-pilo p { font-size: 0.82rem; line-height: 1.5; color: var(--ink-2); font-weight: 500; }
+  .hoja .meta {
+    margin-top: 10px; font-size: 0.7rem; font-weight: 700; color: var(--ink-muted);
+    display: flex; gap: 6px; align-items: center; flex-wrap: wrap;
+  }
+  .hoja .meta .sep { color: var(--line-strong); }
+  .hoja .meta .firma { color: var(--done); display: inline-flex; align-items: center; gap: 4px; }
+  .hoja .descarga { margin-top: 14px; display: grid; gap: 8px; }
+  .hoja .descarga .btn { min-height: 48px; font-size: 0.85rem; display: inline-flex; align-items: center; justify-content: center; gap: 8px; text-decoration: none; }
+  .hoja .descarga .btn--sec { background: none; border: 1px solid var(--line-strong); color: var(--ink); }
+  .hoja .descarga .btn--sec:hover { background: var(--surface-3); }
+  .hoja ol { margin-top: 16px; counter-reset: paso; list-style: none; display: grid; gap: 9px; }
+  .hoja ol li {
+    counter-increment: paso; font-size: 0.78rem; line-height: 1.45; font-weight: 600; color: var(--ink-2);
+    display: grid; grid-template-columns: 22px 1fr; gap: 9px; align-items: start;
+  }
+  .hoja ol li::before {
+    content: counter(paso); width: 22px; height: 22px; border-radius: 99px;
+    background: var(--brand-blue-soft); color: var(--brand-navy);
+    display: grid; place-items: center; font-size: 0.7rem; font-weight: 800;
+  }
+  .hoja .nota { margin-top: 14px; font-size: 0.72rem; color: var(--ink-muted); font-weight: 500; line-height: 1.5; }
+
+  /* --- Menú ----------------------------------------------------------------------------------- */
+  .menu { padding: 14px 16px; display: grid; gap: 12px; }
+  .menu .pa-label { font-size: 0.7rem; font-weight: 800; letter-spacing: 0.1em; text-transform: uppercase; color: var(--ink-muted); }
+  .tile {
+    display: grid; grid-template-columns: 40px 1fr; gap: 12px; align-items: center;
+    border: 1px solid var(--line); border-radius: var(--radius-sm); padding: 11px 12px;
+    background: var(--surface); cursor: pointer;
+    transition: border-color 160ms ease-out, background-color 160ms ease-out;
+  }
+  .tile:hover { border-color: var(--brand-blue); background: var(--brand-blue-soft); }
+  .tile .ico {
+    width: 40px; height: 40px; border-radius: 12px; background: var(--brand-blue-soft);
+    display: grid; place-items: center; color: var(--brand-navy);
+  }
+  .tile strong { font-size: 0.85rem; font-weight: 800; display: block; }
+  .tile small { font-size: 0.72rem; color: var(--ink-muted); font-weight: 600; }
+
+  /* --- Matriz y notas ------------------------------------------------------------------------- */
+  .detalle { max-width: 980px; width: 100%; display: grid; gap: 22px; }
+  table { width: 100%; border-collapse: collapse; background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius-md); overflow: hidden; font-size: 0.82rem; }
+  th, td { text-align: left; padding: 11px 14px; border-bottom: 1px solid var(--line); }
+  th { background: var(--surface-3); font-size: 0.7rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--ink-muted); }
+  td:last-child, th:last-child { border-bottom: none; }
+  tr:last-child td { border-bottom: none; }
+  td.celda-b { font-weight: 700; }
+  ul.principios { list-style: none; display: grid; gap: 8px; font-size: 0.85rem; color: var(--ink-2); line-height: 1.5; }
+  ul.principios li::before { content: "—"; color: var(--brand-blue); font-weight: 800; margin-right: 8px; }
+  .detalle h3 { font-family: Fraunces, Georgia, serif; font-size: 1.15rem; font-weight: 700; }
+  svg { display: block; }
+</style>
+</head>
+<body>
+
+<header class="propuesta">
+  <p class="kicker">Propuesta · Mr. Pilo para Android desde el chat</p>
+  <h1>Llevar a Pilo en la tableta, sin salir de la conversación</h1>
+  <p>El APK firmado de la universidad queda publicado en el propio portal (<code>/pilo-app/apk/</code>) y el chat de Pilo lo ofrece donde ya vive el aviso de instalación: el mismo dock de la conversación, la misma hoja deslizante del iPhone y una entrada nueva en el menú. Nada de pantallas nuevas ni flujos ajenos al sistema de Pilo.</p>
+</header>
+
+<div class="escenarios">
+
+  <!-- Escenario 1: banner -->
+  <figure class="phone">
+    <div class="barra">
+      <div>
+        <div class="nombre">Mr. Pilo</div>
+        <div class="sub">Pilo de la Universidad · en línea</div>
+      </div>
+    </div>
+    <div class="cuerpo">
+      <div class="burbuja pilo">¡Hola! Ya lo tenía: la matrícula de nuevo se abre el 20 de enero. ¿Le muestro las fechas por programa?</div>
+      <div class="burbuja yo">¿Y puedo tenerte en mi tableta?</div>
+      <div class="burbuja pilo">¡Claro! Ahí abajo está el botón.</div>
+    </div>
+    <div class="dock">
+      <div class="banner">
+        <span>Pilo también vive como app en su Android.</span>
+        <button class="btn btn-main" type="button">Conseguir la app</button>
+      </div>
+      <div class="compose">Pregúntele a Pilo… <span class="send">↑</span></div>
+    </div>
+    <figcaption>1 · En Android, el aviso del dock ofrece la hoja de descarga (se puede cerrar con «Ahora no»).</figcaption>
+  </figure>
+
+  <!-- Escenario 2: la hoja -->
+  <figure class="phone sheet-phone">
+    <div class="barra">
+      <div>
+        <div class="nombre">Mr. Pilo</div>
+        <div class="sub">Pilo de la Universidad · en línea</div>
+      </div>
+    </div>
+    <div class="cuerpo"></div>
+    <div class="hoja">
+      <span class="grip" aria-hidden="true"></span>
+      <div class="head">
+        <h2>Lleve a Pilo en su Android</h2>
+        <button class="cerrar" type="button" aria-label="Cerrar">✕</button>
+      </div>
+      <div class="fila-pilo">
+        <span class="cara" aria-hidden="true">
+          <svg width="26" height="26" viewBox="0 0 20 20" fill="none" stroke="#fff" stroke-width="1.4" stroke-linecap="round">
+            <rect x="4" y="6.5" width="12" height="9" rx="3.5"/>
+            <circle cx="7.5" cy="11" r="1" fill="#fff" stroke="none"/>
+            <circle cx="12.5" cy="11" r="1" fill="#fff" stroke="none"/>
+            <path d="M7 3.5c-1.8.6-3 1.7-3.4 3M13 3.5c1.8.6 3 1.7 3.4 3"/>
+          </svg>
+        </span>
+        <p>Descargue la app de Mr. Pilo para tabletas y celulares Android. Es el mismo Pilo de siempre, con icono propio y sin barra del navegador.</p>
+      </div>
+      <p class="meta">
+        <span>Versión 1.0.0</span> <span class="sep">·</span>
+        <span>1,5 MB</span> <span class="sep">·</span>
+        <span class="firma">
+          <svg width="12" height="12" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4.5 10.5l3.5 3.5 7.5-8"/></svg>
+          Firmada por la Universidad de Santander
+        </span>
+      </p>
+      <div class="descarga">
+        <a class="btn btn-main" href="#">Descargar el archivo (APK)</a>
+        <button class="btn btn--sec" type="button">Instalar sin descargar (aviso del navegador)</button>
+      </div>
+      <ol>
+        <li>Toque «Descargar el archivo» y espere a que termine.</li>
+        <li>Abra el archivo <strong>Mr-Pilo-1.0.0.apk</strong> desde el aviso o desde Descargas.</li>
+        <li>Si el sistema lo pide, permita «Instalar apps desconocidas» solo para esta descarga.</li>
+        <li>Toque «Instalar» y abra Mr. Pilo: queda en su pantalla de inicio.</li>
+      </ol>
+      <p class="nota">La app se actualiza sola cada vez que la universidad publica el portal; el archivo solo vuelve a bajar cuando haya una versión nueva.</p>
+    </div>
+    <figcaption>2 · La hoja de descarga: APK directo y, si el navegador lo ofrece, instalación sin archivo.</figcaption>
+  </figure>
+
+  <!-- Escenario 3: el menú -->
+  <figure class="phone">
+    <div class="barra">
+      <div>
+        <div class="nombre">Menú de Mr. Pilo</div>
+        <div class="sub">Con cuál Pilo · conversaciones</div>
+      </div>
+    </div>
+    <div class="menu">
+      <p class="pa-label">Conseguir la app</p>
+      <div class="tile" role="button" tabindex="0">
+        <span class="ico">
+          <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+            <rect x="4.5" y="2.5" width="11" height="15" rx="2.5"/>
+            <path d="M10 6.5v5.5M7.5 9.5L10 12l2.5-2.5"/>
+          </svg>
+        </span>
+        <span>
+          <strong>Descargar para Android</strong>
+          <small>Tabletas y celulares · versión 1.0.0 · 1,5 MB</small>
+        </span>
+      </div>
+      <p class="pa-label" style="margin-top:6px">Para estudiar</p>
+      <div class="tile" role="button" tabindex="0">
+        <span class="ico">…</span>
+        <span><strong>Mis clases</strong><small>Sus cursos de Moodle y sus fechas de entrega</small></span>
+      </div>
+      <div class="tile" role="button" tabindex="0">
+        <span class="ico">…</span>
+        <span><strong>Mis notas</strong><small>Su histórico de Génesis y cómo va su promedio</small></span>
+      </div>
+    </div>
+    <figcaption>3 · «Conseguir la app» en el menú: el APK siempre a mano, aunque el aviso se haya cerrado.</figcaption>
+  </figure>
+
+</div>
+
+<div class="detalle">
+  <div>
+    <h3>Qué ve cada quien</h3>
+    <table>
+      <tr><th>Quién</th><th>En el dock del chat</th><th>Al tocar</th></tr>
+      <tr><td class="celda-b">Android (Chrome con aviso de instalación)</td><td>«Conseguir la app»</td><td>Hoja con las dos vías: instalar directo (aviso del navegador) o descargar el APK</td></tr>
+      <tr><td class="celda-b">Android (navegador sin aviso, p. ej. Firefox o tablets gestionadas)</td><td>«Descargar la app»</td><td>La misma hoja, con el APK como vía principal</td></tr>
+      <tr><td class="celda-b">iPhone o iPad</td><td>«Instalar a Pilo» (como hoy)</td><td>La guía de Safari, sin cambios</td></tr>
+      <tr><td class="celda-b">Computador</td><td>«Instale a Pilo en su computador» (como hoy)</td><td>Instalación del navegador, sin cambios</td></tr>
+      <tr><td class="celda-b">Ya instalada como app</td><td>Nada</td><td>Solo queda la entrada del menú (útil para actualizar el APK)</td></tr>
+    </table>
+  </div>
+  <div>
+    <h3>Decisiones de diseño</h3>
+    <ul class="principios">
+      <li><strong>Modo operar, no vendedor.</strong> La hoja no persuade: informa versión, tamaño y firma, porque en la UDES todo dato dice su procedencia.</li>
+      <li><strong>Seis toques, cero pantallas nuevas.</strong> La descarga vive en la hoja deslizante que el iPhone ya usa; el dock conserva su altura y la conversación no se mueve.</li>
+      <li><strong>Botones de 44–48 px</strong> con <code>:active { transform: scale(0.97) }</code> y transiciones en propiedades concretas (160 ms, ease-out); nada de <code>transition: all</code>.</li>
+      <li><strong>Animación solo donde es nueva la acción</strong> (la hoja sube como las demás); <code>prefers-reduced-motion</code> la omite igual que el resto de la app.</li>
+      <li><strong>El APK no se cachea</strong> en el service worker: 1,5 MB que cambian con cada versión y solo se descargan a propósito.</li>
+      <li><strong>Un solo lugar para la verdad del archivo</strong> (URL, versión, tamaño) en <code>pwa.ts</code>: la hoja, el menú y las pruebas leen de ahí.</li>
+    </ul>
+  </div>
+</div>
+
+</body>
+</html>

@@ -1,0 +1,66 @@
+{
+  "packageId": "co.edu.udes.mrpilo",
+  "host": "planeacion.udes.edu.co",
+  "name": "Mr. Pilo",
+  "launcherName": "Mr. Pilo",
+  "display": "standalone",
+  "themeColor": "#0A2D63",
+  "themeColorDark": "#000000",
+  "navigationColor": "#000000",
+  "navigationColorDark": "#000000",
+  "navigationDividerColor": "#000000",
+  "navigationDividerColorDark": "#000000",
+  "backgroundColor": "#0A2D63",
+  "enableNotifications": true,
+  "startUrl": "/app",
+  "iconUrl": "https://planeacion.udes.edu.co/pilo-app/icon-512.png",
+  "maskableIconUrl": "https://planeacion.udes.edu.co/pilo-app/icon-maskable-512.png",
+  "splashScreenFadeOutDuration": 300,
+  "signingKey": {
+    "path": "C:\\Users\\Admin\\Documents\\Planeación Desarrollos 2026\\PDI\\pilo-android\\keys\\mrpilo-release.keystore",
+    "alias": "mrpilo"
+  },
+  "appVersionName": "1.0.0",
+  "appVersionCode": 1,
+  "shortcuts": [
+    {
+      "name": "Pilo de la Universidad",
+      "shortName": "Universidad",
+      "url": "https://planeacion.udes.edu.co/app/universidad",
+      "chosenIconUrl": "https://planeacion.udes.edu.co/pilo-app/icon-192.png"
+    },
+    {
+      "name": "Pilo en Enseñanza",
+      "shortName": "Enseñanza",
+      "url": "https://planeacion.udes.edu.co/app/ensenanza",
+      "chosenIconUrl": "https://planeacion.udes.edu.co/pilo-app/icon-192.png"
+    }
+  ],
+  "generatorApp": "bubblewrap-cli",
+  "webManifestUrl": "https://planeacion.udes.edu.co/manifest.webmanifest",
+  "fallbackType": "customtabs",
+  "features": {},
+  "alphaDependencies": {
+    "enabled": false
+  },
+  "enableSiteSettingsShortcut": true,
+  "isChromeOSOnly": false,
+  "isMetaQuest": false,
+  "fullScopeUrl": "https://planeacion.udes.edu.co/app",
+  "minSdkVersion": 21,
+  "orientation": "natural",
+  "fingerprints": [],
+  "additionalTrustedOrigins": [],
+  "retainedBundles": [],
+  "protocolHandlers": [],
+  "fileHandlers": [],
+  "launchHandlerClientMode": [
+    "navigate-existing",
+    "auto"
+  ],
+  "displayOverride": [
+    "standalone",
+    "minimal-ui"
+  ],
+  "appVersion": "1.0.0"
+}

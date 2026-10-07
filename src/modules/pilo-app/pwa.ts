@@ -64,6 +64,28 @@ export function isIosDevice(userAgent: string, maxTouchPoints = 0): boolean {
 
 export type InstallWay = "aviso" | "iphone" | null;
 
+/* --- La app de Android (APK) ---------------------------------------------------------------
+
+   La Universidad firma y publica un APK de Mr. Pilo para tabletas y celulares
+   Android: sirve donde no hay Play Store o donde el navegador no ofrece el
+   aviso de instalación. La hoja de descarga, el menú y las pruebas leen la
+   ficha de aquí: un solo lugar para la versión y el tamaño. El archivo vive en
+   `public/pilo-app/apk/` y NO se cachea en el service worker: solo se baja a
+   propósito. */
+
+export const APP_APK = {
+  /** Ruta pública del archivo, tal como la sirve el portal. */
+  url: "/pilo-app/apk/Mr-Pilo-1.0.0.apk",
+  file: "Mr-Pilo-1.0.0.apk",
+  version: "1.0.0",
+  size: "1,5 MB",
+} as const;
+
+/** ¿Es un teléfono o tableta Android? (No las apps que ya corren instaladas: a esas no se les ofrece el APK.) */
+export function isAndroidDevice(userAgent: string): boolean {
+  return /Android/i.test(userAgent);
+}
+
 /** Cómo se puede instalar aquí: con el aviso del navegador, con la guía de iPhone, o no hace falta. */
 export function useInstall(): { way: InstallWay; install: () => Promise<boolean> } {
   const [event, setEvent] = useState<InstallEvent | null>(() => (typeof window === "undefined" ? null : (window.__piloInstall ?? null)));

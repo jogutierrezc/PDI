@@ -2084,3 +2084,34 @@
     animation: none;
   }
 }
+
+/* --- La app de Android: el APK de la universidad ------------------------------------------- */
+
+/* La ficha del archivo: versión, tamaño y firma. La firma la dice el texto; el verde solo la acompaña. */
+.pa-apk__meta {
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: var(--c-ink2);
+}
+
+.pa-apk__sign {
+  color: var(--c-ok);
+}
+
+/* Las dos vías: descargar el APK o, si el navegador lo ofrece, instalar sin archivo. */
+.pa-apk__actions {
+  display: grid;
+  gap: 8px;
+}
+
+.pa-apk__alt {
+  border: 1px solid var(--c-line);
+  background: none;
+  color: var(--c-ink);
+  transition: background-color var(--dur-fast) ease;
+}
+
+.pa-apk__note {
+  font-size: 0.75rem;
+  color: var(--c-ink2);
+}

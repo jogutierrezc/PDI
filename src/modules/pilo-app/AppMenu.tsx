@@ -30,6 +30,7 @@ import { PersonBlock, RECENT_CONVERSATIONS, StudyIcon } from "./AppSide";
 import type { Person } from "./AppSide";
 import { ACCOUNT_BENEFITS } from "./account/rules";
 import { PolicyLink } from "./terms/PolicyLink";
+import { APP_APK } from "./pwa";
 
 export function AppMenu({
   open,
@@ -44,6 +45,7 @@ export function AppMenu({
   onSwitch,
   onSettings,
   person,
+  getApp,
 }: {
   open: boolean;
   quick: boolean;
@@ -60,6 +62,8 @@ export function AppMenu({
   onSettings: () => void;
   /** Quién usa la app: su cuenta de Pilo, la de la intranet, o nadie. */
   person: Person;
+  /** «Conseguir la app»: el APK de Android o la guía del iPhone, según donde se abra. Nada si no aplica. */
+  getApp?: { label: string; hint: string; onOpen: () => void } | null;
 }) {
   /** Todas las conversaciones a la vista: ahí, además, se borran. */
   const [all, setAll] = useState(false);
@@ -170,6 +174,22 @@ export function AppMenu({
             </button>
           )}
         </section>
+
+
+        {getApp && (
+          <section aria-labelledby="pa-m-app">
+            <p className="pa-label" id="pa-m-app">
+              Conseguir la app
+            </p>
+            <button type="button" className="pa-tile pa-tile--wide" onClick={getApp.onOpen}>
+              <span className="pa-tile__ico">{Icon.download}</span>
+              <span>
+                <strong>{getApp.label}</strong>
+                <small>{getApp.hint}</small>
+              </span>
+            </button>
+          </section>
+        )}
       </div>
 
       <div className="pa-account">
@@ -362,6 +382,63 @@ export function IphoneSheet({ open, quick, onClose }: { open: boolean; quick: bo
           <li>Elija «Añadir a pantalla de inicio».</li>
           <li>Toque «Añadir». Pilo queda con su icono, como una app.</li>
         </ul>
+      </div>
+    </Layer>
+  );
+}
+
+/* --- La hoja de la app de Android --------------------------------------------------------------- */
+
+/** El APK firmado de la universidad y, si el navegador lo ofrece, instalar sin descargar archivo. */
+export function AndroidSheet({
+  open,
+  quick,
+  onClose,
+  canPrompt,
+  onPrompt,
+}: {
+  open: boolean;
+  quick: boolean;
+  onClose: (event?: MouseEvent) => void;
+  /** Si el navegador tiene listo su aviso de instalación. */
+  canPrompt: boolean;
+  /** Cierra la hoja y saca el aviso de instalación del navegador. */
+  onPrompt: () => void;
+}) {
+  return (
+    <Layer kind="sheet" open={open} quick={quick} label="Descargar a Pilo para Android" onClose={onClose}>
+      <div className="pa-sheet__in">
+        <span className="pa-sheet__grip" aria-hidden="true" />
+        <div className="pa-sheet__head">
+          <h2>Lleve a Pilo en su Android</h2>
+          <button type="button" className="pa-icon" onClick={onClose} aria-label="Cerrar">
+            {Icon.close}
+          </button>
+        </div>
+        <p>Descargue la app de Mr. Pilo para tabletas y celulares Android. Es el mismo Pilo de siempre, con icono propio y sin barra del navegador.</p>
+        <p className="pa-apk__meta">
+          Versión {APP_APK.version} · {APP_APK.size} · <span className="pa-apk__sign">Firmada por la Universidad de Santander</span>
+        </p>
+        <div className="pa-apk__actions">
+          <a className="pa-btn pa-btn--main" href={APP_APK.url} download={APP_APK.file}>
+            {Icon.download}
+            Descargar el archivo (APK)
+          </a>
+          {canPrompt && (
+            <button type="button" className="pa-btn pa-apk__alt" onClick={onPrompt}>
+              Instalar sin descargar (aviso del navegador)
+            </button>
+          )}
+        </div>
+        <ul className="pa-steps-list">
+          <li>Toque «Descargar el archivo» y espere a que la descarga termine.</li>
+          <li>
+            Abra el archivo <strong>{APP_APK.file}</strong>, desde el aviso o desde Descargas.
+          </li>
+          <li>Si el sistema lo pide, permita «Instalar apps desconocidas» solo para esta descarga.</li>
+          <li>Toque «Instalar» y abra Mr. Pilo: queda en su pantalla de inicio.</li>
+        </ul>
+        <p className="pa-apk__note">La app se actualiza sola cada vez que la universidad publica el portal. El archivo solo vuelve a bajar cuando haya una versión nueva.</p>
       </div>
     </Layer>
   );

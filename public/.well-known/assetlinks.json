@@ -1,0 +1,10 @@
+[{
+  "relation": ["delegate_permission/common.handle_all_urls"],
+  "target": {
+    "namespace": "android_app",
+    "package_name": "co.edu.udes.mrpilo",
+    "sha256_cert_fingerprints": [
+      "69:6B:6C:C7:D6:B9:C3:0A:EE:FD:21:23:2A:38:27:E0:EB:61:C9:A5:B4:65:9E:67:BB:E9:F4:84:82:CF:36:A7"
+    ]
+  }
+}]

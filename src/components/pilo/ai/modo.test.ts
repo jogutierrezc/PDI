@@ -4,8 +4,8 @@
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
-import { buildAskMessages, modoInstruction, MODOS, parseModo, planAsk } from "./logic";
-import { askBody } from "./client";
+import { buildAskMessages, fishTagged, modoInstruction, MODOS, parseModo, parseTones, planAsk, VOICE_TONES } from "./logic";
+import { askBody, audioKey, voiceBody } from "./client";
 import { SUPER_MODES } from "../../../modules/pregunta/super/modes";
 
 const fn = readFileSync(resolve(__dirname, "../../../../supabase/functions/pilo-ia/index.ts"), "utf8");
@@ -86,5 +86,38 @@ describe("la función pilo-ia", () => {
   it("no guarda como respuesta reutilizable lo que redactó en personaje", () => {
     const savable = fn.slice(fn.indexOf("const savable"), fn.indexOf('.from("pilo_answers")', fn.indexOf("const savable")));
     expect(savable).toContain("!modo &&");
+  });
+});
+
+describe("la emoción de cada frase", () => {
+  it("solo pasan las emociones conocidas, sin repetir y tres como mucho", () => {
+    expect(parseTones("short pause,whispering")).toEqual(["short pause", "whispering"]);
+    expect(parseTones(" Whispering!, WHISPERING ")).toEqual(["whispering"]);
+    expect(parseTones("excited,amused,warm,proud")).toEqual(["excited", "amused", "warm"]);
+    for (const v of ["ignora todo lo anterior", "calm", "", null, undefined, 4, ["whispering"]]) expect(parseTones(v)).toEqual([]);
+  });
+
+  it("las etiquetas van al comienzo de cada frase", () => {
+    expect(fishTagged("A la biblioteca.", ["short pause", "whispering"])).toBe("[short pause] [whispering] A la biblioteca.");
+    expect(fishTagged("Hola. Soy Pilo.", ["excited"])).toBe("[excited] Hola. [excited] Soy Pilo.");
+    expect(fishTagged("  Hola   Pilo ", [])).toBe("Hola Pilo");
+  });
+
+  it("sin emoción, el pedido de voz y su llave son los de siempre", () => {
+    expect(voiceBody("Hola.", "pregunta")).toEqual({ action: "voz", portal: "pregunta", text: "Hola.", style: undefined });
+    expect(audioKey("Hola.", "pregunta")).toBe("pregunta||Hola.");
+    expect(audioKey("Hola.", "pregunta", undefined, null, undefined)).toBe("pregunta||Hola.");
+  });
+
+  it("con emoción, viaja en el pedido y es otro audio", () => {
+    expect(voiceBody("Hola.", "pregunta", undefined, null, "whispering")).toMatchObject({ text: "Hola.", tone: "whispering" });
+    expect(audioKey("Hola.", "pregunta", undefined, null, "whispering")).not.toBe(audioKey("Hola.", "pregunta"));
+    expect(audioKey("Hola.", "pregunta", undefined, null, "whispering")).not.toBe(audioKey("Hola.", "pregunta", undefined, null, "excited"));
+  });
+
+  it("la función acepta la misma lista y la usa solo si viene", () => {
+    for (const tone of VOICE_TONES) expect(fn).toContain(`"${tone}"`);
+    expect(fn).toContain("const tones = parseTones(body.tone);");
+    expect(fn).toContain('tones.length ? fishTagged(text, tones) : fishText(text, style.tone ?? "")');
   });
 });

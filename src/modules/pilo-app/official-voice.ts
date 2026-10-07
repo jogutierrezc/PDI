@@ -66,6 +66,8 @@ export interface OfficialOptions {
   advanced: boolean;
   rate?: number;
   rol?: string | null;
+  /** La emoción de la frase (los modos secretos del chat): «short pause,whispering». */
+  tone?: string;
   /** Guardar el audio en el teléfono (solo la bienvenida). */
   keep?: boolean;
 }
@@ -73,12 +75,12 @@ export interface OfficialOptions {
 /** El audio oficial de un texto: el guardado en el teléfono, o el del servicio. null = no hay voz. */
 export async function officialAudio(text: string, options: OfficialOptions): Promise<Blob | null> {
   if (!options.advanced || !options.portal || !text.trim()) return null;
-  const key = audioKey(text, options.portal, undefined, options.rol);
+  const key = audioKey(text, options.portal, undefined, options.rol, options.tone);
   if (options.keep) {
     const saved = await kept(key);
     if (saved) return saved;
   }
-  const blob = await piloAudio(text, { portal: options.portal, advanced: true, rol: options.rol });
+  const blob = await piloAudio(text, { portal: options.portal, advanced: true, rol: options.rol, tone: options.tone });
   if (blob && options.keep) void keep(key, blob);
   return blob;
 }

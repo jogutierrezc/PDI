@@ -2050,6 +2050,33 @@ export function fishText(text: string, tone: string): string {
     .join(" ");
 }
 
+/**
+ * Las emociones que la página puede pedir para una frase (los modos secretos
+ * del chat: cada frase de su catálogo trae la suya). Es una lista cerrada: de
+ * la página solo llega cuál, nunca texto libre que termine en el pedido de voz.
+ */
+export const VOICE_TONES = ["robotic monotone", "deep serious voice", "cold calm voice", "whispering", "short pause", "excited", "shouting", "amused", "proud", "playful", "alarmed", "confident", "worried", "warm", "laughing", "helpful", "cheerful", "sighing", "sleepy", "singing"] as const;
+
+/** Las emociones pedidas para una frase («short pause,whispering»): solo las conocidas, sin repetir y tres como mucho. */
+export function parseTones(v: unknown): string[] {
+  if (typeof v !== "string") return [];
+  const known = v.split(",").map(cleanTone).filter((t) => (VOICE_TONES as readonly string[]).includes(t));
+  return [...new Set(known)].slice(0, 3);
+}
+
+/** El texto con varias emociones al comienzo de cada frase: «[short pause] [whispering] A la biblioteca.». */
+export function fishTagged(text: string, tones: string[]): string {
+  const clean = text.replace(/\s+/g, " ").trim();
+  const tags = tones.map((t) => `[${t}]`).join(" ");
+  if (!tags || !clean) return clean;
+  const sentences = clean.match(/[^.!?…]+(?:[.!?…]+["»)]*|$)/g) ?? [clean];
+  return sentences
+    .map((s) => s.trim())
+    .filter(Boolean)
+    .map((s) => `${tags} ${s}`)
+    .join(" ");
+}
+
 /* --- Pregúntele a Pilo con IA siempre (0110) --------------------------------------------
    La respuesta la escribe siempre el modelo, con lo que Pilo sabe por delante:
    un enrutador por reglas etiqueta la pregunta sin bloquearla (solo lo vetado

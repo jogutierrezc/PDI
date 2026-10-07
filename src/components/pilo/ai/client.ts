@@ -642,15 +642,17 @@ const audios = new Map<string, Promise<Blob | null>>();
 const SPACE_VOICE: readonly string[] = ["ensenanza"];
 
 /** La llave del audio guardado: el rol entra porque cambia el estilo de la voz. Sin rol, la de siempre. */
-export function audioKey(text: string, portal: string, style?: string, rol?: string | null): string {
+export function audioKey(text: string, portal: string, style?: string, rol?: string | null, tone?: string): string {
   const r = rolOf(rol);
-  return r ? `${portal}|${style ?? ""}|rol:${r}|${text}` : `${portal}|${style ?? ""}|${text}`;
+  // La misma frase dicha con otra emoción es otro audio.
+  const t = tone ? `tono:${tone}|` : "";
+  return r ? `${portal}|${style ?? ""}|rol:${r}|${t}${text}` : `${portal}|${style ?? ""}|${t}${text}`;
 }
 
-/** El cuerpo de `voz`. Sin rol es el de siempre. */
-export function voiceBody(text: string, portal: string, style?: string, rol?: string | null) {
+/** El cuerpo de `voz`. Sin rol ni emoción es el de siempre. `tone`: la emoción de la frase («short pause,whispering»), de la lista cerrada del servidor. */
+export function voiceBody(text: string, portal: string, style?: string, rol?: string | null, tone?: string) {
   const r = rolOf(rol);
-  return { action: "voz" as const, portal, text, style, ...(r ? { rol: r } : {}) };
+  return { action: "voz" as const, portal, text, style, ...(r ? { rol: r } : {}), ...(tone ? { tone } : {}) };
 }
 
 /**
@@ -673,13 +675,13 @@ async function reportVoiceFault(error: unknown): Promise<void> {
   console.warn(`[Pilo] La voz de IA no sonó (${response?.status ?? "sin respuesta"}). ${detail || (error instanceof Error ? error.message : "")}`.trim());
 }
 
-function audioFor(text: string, portal: AskPortal, style?: string, rol?: string | null): Promise<Blob | null> {
-  const key = audioKey(text, portal, style, rol);
+function audioFor(text: string, portal: AskPortal, style?: string, rol?: string | null, tone?: string): Promise<Blob | null> {
+  const key = audioKey(text, portal, style, rol, tone);
   const known = audios.get(key);
   if (known) return known;
   const usual = () =>
     supabase.functions
-      .invoke<Blob>("pilo-ia", { body: voiceBody(text, portal, style, rol) })
+      .invoke<Blob>("pilo-ia", { body: voiceBody(text, portal, style, rol, tone) })
       .then(async ({ data, error }) => {
         if (!error && data instanceof Blob && data.size > 0) return data;
         if (error) await reportVoiceFault(error);
@@ -690,7 +692,7 @@ function audioFor(text: string, portal: AskPortal, style?: string, rol?: string 
   // Un estilo pedido a propósito (la prueba de la configuración) solo lo sabe dar la de siempre.
   // Otro espacio de Pilo tampoco va por la directa: esa no sabe de su cupo, su bitácora ni la voz de cada rol.
   const viaFunction = Boolean(style) || SPACE_VOICE.includes(portal);
-  const asked = (viaFunction ? usual() : directVoice(text).then((blob) => blob ?? usual()))
+  const asked = (viaFunction ? usual() : directVoice(text, tone).then((blob) => blob ?? usual()))
     .then((blob) => {
       // Lo que falló se puede volver a pedir más tarde.
       if (!blob) audios.delete(key);
@@ -706,9 +708,9 @@ function audioFor(text: string, portal: AskPortal, style?: string, rol?: string 
  * Pide por adelantado el audio de las frases que vienen, para que suenen sin
  * pausas entre una y otra. Pocas a la vez: cada una gasta del cupo del servicio.
  */
-export function prefetchPilo(texts: string[], options: { portal: AskPortal | null; advanced: boolean; style?: string; rol?: string | null }) {
+export function prefetchPilo(texts: string[], options: { portal: AskPortal | null; advanced: boolean; style?: string; rol?: string | null; tone?: string }) {
   if (!options.advanced || !options.portal) return;
-  for (const text of texts) if (text.trim()) void audioFor(text, options.portal, options.style, options.rol);
+  for (const text of texts) if (text.trim()) void audioFor(text, options.portal, options.style, options.rol, options.tone);
 }
 
 /**
@@ -717,19 +719,19 @@ export function prefetchPilo(texts: string[], options: { portal: AskPortal | nul
  * disponible. Lo usa quien no admite otra voz que la oficial (la app móvil):
  * si no hay audio, se queda con el texto.
  */
-export function piloAudio(text: string, options: { portal: AskPortal | null; advanced: boolean; style?: string; rol?: string | null }): Promise<Blob | null> {
+export function piloAudio(text: string, options: { portal: AskPortal | null; advanced: boolean; style?: string; rol?: string | null; tone?: string }): Promise<Blob | null> {
   if (!options.advanced || !options.portal || !text.trim()) return Promise.resolve(null);
-  return audioFor(text, options.portal, options.style, options.rol);
+  return audioFor(text, options.portal, options.style, options.rol, options.tone);
 }
 
 export async function sayWithPilo(
   text: string,
-  options: { portal: AskPortal | null; advanced: boolean; rate?: number; pitch?: number; style?: string; rol?: string | null },
+  options: { portal: AskPortal | null; advanced: boolean; rate?: number; pitch?: number; style?: string; rol?: string | null; tone?: string },
 ): Promise<"proveedor" | "navegador" | "cancelado"> {
   stopPilo();
   const mine = ++token;
   if (options.advanced && options.portal) {
-    const data = await audioFor(text, options.portal, options.style, options.rol);
+    const data = await audioFor(text, options.portal, options.style, options.rol, options.tone);
     if (mine !== token) return "cancelado";
     if (data) {
       const done = await playPiloAudio(data, options.rate ?? 1);

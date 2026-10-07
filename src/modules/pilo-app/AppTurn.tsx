@@ -25,6 +25,7 @@ import { notesOf, seedOf, showsSources, waitingFace, waitingLine, waitingTip } f
 import type { ThinkStep } from "../pregunta/answer-state";
 import type { AppVoice } from "./access";
 import { prefetchOfficial, sayOfficial, stopOfficial } from "./official-voice";
+import { isSuperMode, sentenceTone, SUPER } from "../pregunta/super/modes";
 import { reducedMotion } from "./pwa";
 import { Icon } from "./icons";
 import { FileChip, FileFoot, FileLog } from "../pregunta/Extras";
@@ -147,16 +148,25 @@ export function AppTurn({
     () =>
       enrichSpokenSentences(
         parsed.sentences.map((x) => x.spoken),
-        { mood: a?.mood ?? voice.mood, expressionsEnabled: voice.expressions, patterns: voice.patterns, modulationEnabled: voice.modulation, baseRate: voice.rate, basePitch: voice.pitch },
+        // En un modo secreto, la voz no antepone muletillas: el personaje ya trae las suyas.
+        { mood: a?.mood ?? voice.mood, expressionsEnabled: voice.expressions && !isSuperMode(turn.modo), patterns: voice.patterns, modulationEnabled: voice.modulation, baseRate: voice.rate, basePitch: voice.pitch },
       ),
-    [parsed, a?.mood, voice.mood, voice.expressions, voice.patterns, voice.modulation, voice.rate, voice.pitch],
+    [parsed, a?.mood, turn.modo, voice.mood, voice.expressions, voice.patterns, voice.modulation, voice.rate, voice.pitch],
   );
   const spoken = enriched.sentences;
-  const said = { portal: voice.portal, advanced: voice.advanced, rol: voice.rol };
+  // En un modo secreto cada frase se dice con su emoción (pregunta/super/modes.ts) y la voz cambia de paso.
+  const superMode = isSuperMode(turn.modo) ? turn.modo : null;
+  const toneOf = (k: number) => (superMode && a ? sentenceTone(superMode, a.text, parsed.sentences[k]?.spoken ?? "") : undefined);
+  const saidAt = (k: number) => ({ portal: voice.portal, advanced: voice.advanced, rol: voice.rol, tone: toneOf(k) });
+  const prefetch = (from: number, to: number) => {
+    for (let k = from; k < to; k++) if (spoken[k]) prefetchOfficial([spoken[k]], saidAt(k));
+  };
 
   // Con la voz encendida, el audio de las primeras frases se pide en cuanto la respuesta está completa.
   useEffect(() => {
-    if (a && fresh && autoRead && !incomplete) prefetchOfficial(spoken.slice(0, 2), { portal: voice.portal, advanced: voice.advanced, rol: voice.rol });
+    if (a && fresh && autoRead && !incomplete) prefetch(0, 2);
+    // `prefetch` lee lo mismo que ya está en la lista.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [a, fresh, autoRead, incomplete, spoken, voice.advanced, voice.portal, voice.rol]);
 
   const read = async () => {
@@ -173,8 +183,8 @@ export function AppTurn({
       if (!spoken[k]?.trim()) continue;
       setReading(k);
       // Mientras suena esta frase, se piden las dos que siguen: así no hay pausas.
-      prefetchOfficial(spoken.slice(k + 1, k + 3), said);
-      const result = await sayOfficial(spoken[k], { ...said, rate: enriched.rate, onSound: (on) => mine === readRun.current && onSound(on) });
+      prefetch(k + 1, k + 3);
+      const result = await sayOfficial(spoken[k], { ...saidAt(k), rate: enriched.rate * (superMode ? SUPER[superMode].voice.rate : 1), onSound: (on) => mine === readRun.current && onSound(on) });
       if (result === "cancelado") break;
       if (result === "sin voz") {
         // Nunca otra voz: se avisa y queda el texto.

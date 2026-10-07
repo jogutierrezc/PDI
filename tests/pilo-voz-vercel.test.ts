@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 // @ts-expect-error La función de Vercel es JavaScript sin tipos.
-import handler, { fishText, fishVoiceId, originAllowed } from "../api/pilo-voz.js";
+import handler, { fishTagged, fishText, fishVoiceId, originAllowed, parseTones, VOICE_TONES as DIRECT_TONES } from "../api/pilo-voz.js";
+import { VOICE_TONES } from "../src/components/pilo/ai/logic";
 import { directVerdict, sniffAudioType } from "../src/components/pilo/ai/voice-player";
 
 const SELF = "https://portal.example";
@@ -84,6 +85,13 @@ describe("api/pilo-voz · la voz directa por Vercel", () => {
     expect(fishText("Hola.", "")).toBe("Hola.");
     expect(originAllowed("https://a.example", "https://b.example", "https://a.example")).toBe(true);
     expect(originAllowed("", "https://b.example", "")).toBe(false);
+  });
+
+  it("la emoción de una frase: la misma lista cerrada que en pilo-ia", () => {
+    expect([...DIRECT_TONES]).toEqual([...VOICE_TONES]);
+    expect(parseTones("short pause,whispering,nada")).toEqual(["short pause", "whispering"]);
+    expect(parseTones(undefined)).toEqual([]);
+    expect(fishTagged("A la biblioteca.", ["short pause", "whispering"])).toBe("[short pause] [whispering] A la biblioteca.");
   });
 });
 

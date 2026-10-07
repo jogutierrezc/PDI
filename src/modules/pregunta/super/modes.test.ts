@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { isSuperMode, line, plainText, SUPER, SUPER_INTENTS, SUPER_MODES, superAnswer, superCommand, superLine, superReply, superStep } from "./modes";
+import { isSuperMode, line, plainText, sentenceTone, SUPER, SUPER_INTENTS, SUPER_MODES, superAnswer, superCommand, superLine, superReply, superStep } from "./modes";
+import { parseTones, VOICE_TONES } from "../../../components/pilo/ai/logic";
 
 describe("los modos secretos de Pilo", () => {
   it("reconoce la orden de entrar, con número, con nombre o sin nada", () => {
@@ -63,7 +64,61 @@ describe("los modos secretos de Pilo", () => {
   });
 
   it("arma una línea frase por frase", () => {
-    expect(line("R|Hola.", "P,W|Adiós.")).toEqual({ text: "Hola. Adiós.", fish: "[robotic monotone] Hola. [short pause] [whispering] Adiós." });
+    expect(line("R|Hola.", "P,W|Adiós.")).toEqual({
+      text: "Hola. Adiós.",
+      fish: "[robotic monotone] Hola. [short pause] [whispering] Adiós.",
+      parts: [
+        { text: "Hola.", tags: ["robotic monotone"] },
+        { text: "Adiós.", tags: ["short pause", "whispering"] },
+      ],
+    });
+  });
+
+  it("el catálogo es amplio y no repite nombres ni líneas", () => {
+    expect(SUPER_INTENTS.length).toBeGreaterThanOrEqual(35);
+    expect(new Set(SUPER_INTENTS.map((i) => i.id)).size).toBe(SUPER_INTENTS.length);
+    for (const mode of SUPER_MODES) {
+      const texts = SUPER_INTENTS.map((i) => i.lines[mode].text);
+      expect(new Set(texts).size, mode).toBe(texts.length);
+    }
+  });
+
+  it("lo específico gana a lo general", () => {
+    expect(superReply("pilocop", "pasé el parcial")?.id).toBe("logro");
+    expect(superReply("pilocop", "otro chiste")?.id).toBe("otro-chiste");
+    expect(superReply("sayayin", "jajaja")?.id).toBe("risa");
+    expect(superReply("pilonator", "voy a la cafetería")?.id).toBe("hambre");
+    expect(superReply("pilonator", "quiero un café")?.id).toBe("tinto");
+    expect(superReply("pilocop", "hola, ¿cómo estás?")?.id).toBe("saludo");
+    expect(superReply("pilocop", "¿cómo estás?")?.id).toBe("como-estas");
+  });
+
+  it("toda emoción del catálogo y de los modos está en la lista que acepta el servidor", () => {
+    const used = new Set<string>(SUPER_MODES.map((m) => SUPER[m].tone));
+    for (const intent of SUPER_INTENTS) for (const mode of SUPER_MODES) for (const part of intent.lines[mode].parts) for (const tag of part.tags) used.add(tag);
+    for (const tag of used) expect(VOICE_TONES as readonly string[], tag).toContain(tag);
+    // Y ninguna frase pide más de las que el servidor deja pasar.
+    for (const intent of SUPER_INTENTS) for (const mode of SUPER_MODES) for (const part of intent.lines[mode].parts) expect(parseTones(part.tags.join(","))).toEqual(part.tags);
+  });
+
+  it("cada frase de una respuesta del catálogo se dice con su emoción", () => {
+    const said = superLine("pilocop", "activar");
+    expect(sentenceTone("pilocop", said.text, "Protocolo Pilocop activado.")).toBe("robotic monotone");
+    expect(sentenceTone("pilocop", said.text, "Vivo o reprobado, usted viene conmigo.")).toBe("deep serious voice");
+    expect(sentenceTone("pilocop", said.text, "A la biblioteca.")).toBe("short pause,whispering");
+    // Lo que el lector de frases haya partido distinto se reconoce igual.
+    expect(sentenceTone("pilocop", said.text, "a la biblioteca")).toBe("short pause,whispering");
+    // Al salir del modo, la despedida conserva sus emociones.
+    expect(sentenceTone("sayayin", superLine("sayayin", "desactivar").text, "¡Hola otra vez!")).toBe("cheerful");
+  });
+
+  it("lo que redactó la IA en un modo va entero con el tono del modo", () => {
+    expect(sentenceTone("pilocop", "Consulta recibida. La UDES tiene 3 sedes [1].", "La UDES tiene 3 sedes.")).toBe("robotic monotone");
+    expect(sentenceTone("sayayin", "¡Buena pregunta!", "")).toBe("excited");
+    for (const mode of SUPER_MODES) {
+      expect(SUPER[mode].voice.rate).toBeGreaterThan(0.8);
+      expect(SUPER[mode].voice.rate).toBeLessThan(1.2);
+    }
   });
 
   it("las líneas que dice la página existen en los tres modos", () => {

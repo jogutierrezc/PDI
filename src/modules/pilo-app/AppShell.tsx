@@ -305,7 +305,8 @@ export function AppShell({ space, door, waking, online, person, member, wide, th
     const attached = attach.attachment;
     const picked = attached ? pickPassages(attached.passages, q) : [];
     const doc = attached ? { name: attached.name, passages: picked } : null;
-    const turn: Turn = { id: newId(), q, ...(attached ? { file: turnFile(attached, picked.length) } : {}) };
+    // Con un modo secreto puesto, el turno lo recuerda: la voz lee la respuesta con el tono del modo.
+    const turn: Turn = { id: newId(), q, ...(modo ? { modo } : {}), ...(attached ? { file: turnFile(attached, picked.length) } : {}) };
     born.current.add(turn.id);
     const before = patched(conv.turns.filter((t) => t.id !== replaceTurn));
     // Lo que la persona escribió y el texto final de cada respuesta: el servidor arma el contexto.

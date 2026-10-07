@@ -47,6 +47,37 @@ export function fishText(text, tone) {
     .join(" ");
 }
 
+/** Las emociones que la página puede pedir para una frase (los modos secretos del chat). Lista cerrada, igual que en pilo-ia. */
+export const VOICE_TONES = ["robotic monotone", "deep serious voice", "cold calm voice", "whispering", "short pause", "excited", "shouting", "amused", "proud", "playful", "alarmed", "confident", "worried", "warm", "laughing", "helpful", "cheerful", "sighing", "sleepy", "singing"];
+
+const cleanTone = (tone) =>
+  String(tone ?? "")
+    .toLowerCase()
+    .replace(/[^a-z ]/g, "")
+    .replace(/\s+/g, " ")
+    .trim()
+    .slice(0, 30);
+
+/** Las emociones pedidas para una frase («short pause,whispering»): solo las conocidas, sin repetir y tres como mucho. */
+export function parseTones(v) {
+  if (typeof v !== "string") return [];
+  const known = v.split(",").map(cleanTone).filter((t) => VOICE_TONES.includes(t));
+  return [...new Set(known)].slice(0, 3);
+}
+
+/** El texto con varias emociones al comienzo de cada frase, igual que en pilo-ia. */
+export function fishTagged(text, tones) {
+  const clean = String(text ?? "").replace(/\s+/g, " ").trim();
+  const tags = tones.map((t) => `[${t}]`).join(" ");
+  if (!tags || !clean) return clean;
+  const sentences = clean.match(/[^.!?…]+(?:[.!?…]+["»)]*|$)/g) ?? [clean];
+  return sentences
+    .map((s) => s.trim())
+    .filter(Boolean)
+    .map((s) => `${tags} ${s}`)
+    .join(" ");
+}
+
 /** ¿Viene el pedido del propio portal o de un origen autorizado? */
 export function originAllowed(origin, self, extra) {
   if (!origin) return false;
@@ -84,6 +115,8 @@ export default async function handler(request) {
   }
   const text = typeof body?.text === "string" ? body.text.replace(/\s+/g, " ").trim() : "";
   if (!text) return json({ error: "Falta el texto.", code: "formato" }, 400, cors);
+  // Una frase de un modo secreto del chat trae su propia emoción: manda sobre el tono de siempre.
+  const tones = parseTones(body?.tone);
   if (text.length > MAX_TEXT) return json({ error: "El texto es demasiado largo para leerlo de una vez.", code: "tamano" }, 413, cors);
 
   let upstream;
@@ -91,7 +124,7 @@ export default async function handler(request) {
     upstream = await fetch(FISH_TTS_URL, {
       method: "POST",
       headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json", model: fishModel(env.FISH_MODEL) },
-      body: JSON.stringify({ text: fishText(text, env.FISH_TONE), reference_id: voiceId, format: "mp3", mp3_bitrate: 128, latency: "balanced", normalize: true }),
+      body: JSON.stringify({ text: tones.length ? fishTagged(text, tones) : fishText(text, env.FISH_TONE), reference_id: voiceId, format: "mp3", mp3_bitrate: 128, latency: "balanced", normalize: true }),
     });
   } catch {
     return json({ error: "No se pudo conectar con Fish Audio.", code: "red" }, 502, cors);

@@ -46,7 +46,7 @@ import { RoleMenu, RolePicker } from "./RolePicker";
 import { Welcome } from "./Welcome";
 import { SuperContext, SuperDefs } from "./super/Gear";
 import { SuperEntrance } from "./super/SuperEntrance";
-import { isSuperMode, SUPER, superAnswer, superStep } from "./super/modes";
+import { isSuperMode, sentenceTone, SUPER, superAnswer, superStep } from "./super/modes";
 import type { SuperLine, SuperMode } from "./super/modes";
 import { superSfx } from "./super/sfx";
 import { MeshAnswer } from "./MeshAnswer";
@@ -466,7 +466,8 @@ function Chat({ space, cfg, tema, setTema, role, audience, welcome, voice: baseV
     const attached = attach.attachment;
     const picked = attached ? pickPassages(attached.passages, q) : [];
     const doc = attached ? { name: attached.name, passages: picked } : null;
-    const turn: Turn = { id: newId(), q, ...(attached ? { file: turnFile(attached, picked.length) } : {}) };
+    // Con un modo secreto puesto, el turno lo recuerda: la voz lee la respuesta con el tono del modo.
+    const turn: Turn = { id: newId(), q, ...(modo ? { modo } : {}), ...(attached ? { file: turnFile(attached, picked.length) } : {}) };
     const before = patched(conv.turns.filter((t) => t.id !== replaceTurn));
     // Lo que la persona escribió y el texto final de cada respuesta: el servidor arma el contexto.
     // Lo que respondió la página (los modos secretos) no es contexto para el servidor.
@@ -1065,23 +1066,34 @@ function TurnView({
   const readRun = useRef(0);
   const after = useRef<HTMLDivElement>(null);
 
+  // En un modo secreto cada frase se dice con su emoción (super/modes.ts) y la voz cambia de paso y de tono.
+  const superMode = isSuperMode(turn.modo) ? turn.modo : null;
+  const superVoice = superMode ? SUPER[superMode].voice : null;
+  const toneOf = (k: number) => (superMode && a ? sentenceTone(superMode, a.text, parsed.sentences[k]?.spoken ?? "") : undefined);
+  const prefetch = (from: number, to: number) => {
+    for (let k = from; k < to; k++) if (spoken[k]) prefetchPilo([spoken[k]], { portal: voice.portal, advanced: voice.advanced, rol: voice.rol, tone: toneOf(k) });
+  };
+
   const enrichedVoice = useMemo(() => {
     const raw = parsed.sentences.map((x) => x.spoken);
     return enrichSpokenSentences(raw, {
       // El ánimo de la respuesta (el del catálogo manda); en otro espacio, si no trae, el de partida del rol.
       mood: a?.mood ?? voice.mood,
-      expressionsEnabled: voice.expressions !== false,
+      // En un modo, la voz no antepone muletillas: el personaje ya trae las suyas.
+      expressionsEnabled: voice.expressions !== false && !isSuperMode(turn.modo),
       patterns: voice.patterns,
       modulationEnabled: voice.modulation !== false,
       baseRate: voice.rate,
       basePitch: voice.pitch,
     });
-  }, [parsed, a?.mood, voice.mood, voice.expressions, voice.patterns, voice.modulation, voice.rate, voice.pitch]);
+  }, [parsed, a?.mood, turn.modo, voice.mood, voice.expressions, voice.patterns, voice.modulation, voice.rate, voice.pitch]);
 
   const spoken = enrichedVoice.sentences;
   // Con «Leer en voz alta», el audio de las primeras frases se pide en cuanto la respuesta está completa.
   useEffect(() => {
-    if (a && fresh && autoRead && !incomplete) prefetchPilo(spoken.slice(0, 2), { portal: voice.portal, advanced: voice.advanced, rol: voice.rol });
+    if (a && fresh && autoRead && !incomplete) prefetch(0, 2);
+    // `prefetch` lee lo mismo que ya está en la lista.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [a, fresh, autoRead, incomplete, spoken, voice.advanced, voice.portal, voice.rol]);
 
   /** Leer la respuesta frase por frase: la que suena se resalta y Pilo mueve el pico. */
@@ -1100,11 +1112,12 @@ function TurnView({
       if (!spoken[k]?.trim()) continue;
       setReading(k);
       // Mientras suena esta frase, se piden las dos que siguen: así no hay pausas.
-      prefetchPilo(spoken.slice(k + 1, k + 3), { portal: voice.portal, advanced: voice.advanced, rol: voice.rol });
+      prefetch(k + 1, k + 3);
       const used = await sayWithPilo(spoken[k], {
         ...voice,
-        rate: enrichedVoice.rate,
-        pitch: enrichedVoice.pitch,
+        rate: enrichedVoice.rate * (superVoice?.rate ?? 1),
+        pitch: enrichedVoice.pitch * (superVoice?.pitch ?? 1),
+        tone: toneOf(k),
       });
       if (used === "cancelado") break;
     }

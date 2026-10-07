@@ -172,12 +172,12 @@ export function directVerdict(status: number, contentType: string | null): "audi
 }
 
 /** El audio por la vía directa, o null si hay que pedirlo por la de siempre. */
-export async function directVoice(text: string): Promise<Blob | null> {
+export async function directVoice(text: string, tone?: string): Promise<Blob | null> {
   if (direct === "no hay" || typeof window === "undefined" || text.length > DIRECT_MAX_TEXT) return null;
   const ctl = new AbortController();
   const timer = window.setTimeout(() => ctl.abort(), DIRECT_TIMEOUT);
   try {
-    const response = await fetch(DIRECT_VOICE_PATH, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ text }), signal: ctl.signal });
+    const response = await fetch(DIRECT_VOICE_PATH, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(tone ? { text, tone } : { text }), signal: ctl.signal });
     const verdict = directVerdict(response.status, response.headers.get("content-type"));
     if (verdict === "no hay") direct = "no hay";
     if (verdict !== "audio") return null;

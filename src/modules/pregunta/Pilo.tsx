@@ -11,12 +11,19 @@
      piensa    →  pensar       (busca)
      cuidado   →  atrevido     (pregunta capciosa: dinero, futuro)
      duda      →  loco         (no encontró nada)
+
+   Con un modo secreto activo (super/), Pilo lleva puesto su equipo y no cambia
+   de cara: los robots esperan con el pico cerrado, el Sayayín sonriendo. Las
+   poses de una sola imagen no se usan, porque sobre ellas el equipo no cabe.
    ========================================================================== */
 
-import { forwardRef, useImperativeHandle, useRef } from "react";
+import { forwardRef, useContext, useImperativeHandle, useRef } from "react";
 import { PILO_EXPRESSIONS, PiloFace } from "../../components/pilo/PiloFace";
 import type { PiloExpression, PiloFaceHandle } from "../../components/pilo/PiloFace";
 import type { MojiMood, PiloMojiHandle } from "../../components/pilo/PiloMoji";
+
+import { Gear, SuperContext } from "./super/Gear";
+import { SUPER } from "./super/modes";
 
 export type { MojiMood, PiloMojiHandle };
 
@@ -45,14 +52,18 @@ export const Pilo = forwardRef<
   }
 >(function Pilo({ mood = "feliz", emotion, ...rest }, ref) {
   const inner = useRef<PiloFaceHandle>(null);
+  const modo = useContext(SuperContext);
   useImperativeHandle(ref, () => ({
     look: (nx, ny) => inner.current?.look(nx, ny),
     talk: (on) => inner.current?.talk(on),
-    mood: (m) => inner.current?.expression(EMOCION[m]),
+    // Con un modo secreto puesto la cara no cambia: la manda el modo.
+    mood: (m) => {
+      if (!modo) inner.current?.expression(EMOCION[m]);
+    },
     blink: () => inner.current?.blink(),
     nod: () => inner.current?.nod(),
     el: () => inner.current?.el() ?? null,
   }));
-  const chosen = PILO_EXPRESSIONS.find((e) => e === emotion) ?? EMOCION[mood];
-  return <PiloFace ref={inner} expression={chosen} {...rest} />;
+  const chosen = modo ? (SUPER[modo].robot ? "neutral" : "feliz") : (PILO_EXPRESSIONS.find((e) => e === emotion) ?? EMOCION[mood]);
+  return <PiloFace ref={inner} expression={chosen} gear={modo ? <Gear mode={modo} /> : undefined} {...rest} />;
 });

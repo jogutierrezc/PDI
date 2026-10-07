@@ -21,10 +21,15 @@
    Con movimiento reducido no hay respiración, mirada ni pulso: quedan los
    cambios de cuadro, que son estado y no adorno.
 
+   Quien la usa puede ponerle algo ENCIMA (`gear`): un dibujo aparte, en las
+   medidas de la cara (450 × 631), que se mueve con ella. El dibujo aprobado no
+   cambia; así se visten los modos secretos de Pregúntele a Pilo.
+
    PiloAvatar, PiloMoji y PiloSvgMoji son esta cara con los gestos de cada uno.
    ========================================================================== */
 
 import { forwardRef, useEffect, useImperativeHandle, useLayoutEffect, useRef } from "react";
+import type { ReactNode } from "react";
 import gsap from "gsap";
 import "./pilo-face.css";
 
@@ -99,8 +104,10 @@ export const PiloFace = forwardRef<
     idle?: boolean;
     label?: string;
     className?: string;
+    /** Algo que va encima de la cara y se mueve con ella (un SVG de 450 × 631). No se ve en las poses de una sola imagen. */
+    gear?: ReactNode;
   }
->(function PiloFace({ size = 96, expression = "feliz", talking = false, alive = false, track = false, idle = false, label, className }, ref) {
+>(function PiloFace({ size = 96, expression = "feliz", talking = false, alive = false, track = false, idle = false, label, className, gear }, ref) {
   const root = useRef<HTMLDivElement>(null);
   const api = useRef<(PiloFaceHandle & { breathe: (on: boolean) => void }) | null>(null);
   const props = useRef({ expression, talking, alive });
@@ -304,6 +311,7 @@ export const PiloFace = forwardRef<
         </div>
         {img("eyes")}
         {img("wink")}
+        {gear}
       </div>
       <img className="pilo-face__pose" data-part="pose" alt="" draggable={false} decoding="async" style={{ opacity: 0 }} />
     </div>

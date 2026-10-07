@@ -18,6 +18,11 @@
    Planeación, tal cual era, y /pilo-ensenanza es Mr. Pilo en Enseñanza, que
    además pregunta una vez quién habla (estudiante o profesor) y con eso
    cambia las preguntas sugeridas, la cara de partida y el ánimo de la voz.
+
+   Los modos secretos (super/): escribir «modo super pilo» disfraza a Pilo de
+   Pilocop, Pilonator o Súper Pilo Sayayín. La orden y la charla corta de cada
+   modo se responden aquí, sin ir al servidor; lo demás viaja como siempre, con
+   el modo, y la IA redacta en personaje. «Desactivar» vuelve al de siempre.
    ========================================================================== */
 
 import { createContext, useCallback, useContext, useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from "react";
@@ -30,7 +35,7 @@ import type { SpaceConfig } from "../../components/pilo/ai/config";
 import { canUse } from "../../components/pilo/ai/logic";
 import type { Role } from "../../components/pilo/ai/logic";
 import { askQuestionStream, buildHistory, PiloError, prefetchPilo, rateAnswer, sayWithPilo, stopPilo } from "../../components/pilo/ai/client";
-import type { AskHandlers, AskKind, AskMeta, AskOptions, AskPortal, AskSource, AskStep } from "../../components/pilo/ai/client";
+import type { AskHandlers, AskKind, AskMeta, AskOptions, AskPortal, AskResult, AskSource, AskStep } from "../../components/pilo/ai/client";
 import { Pilo as PiloMoji } from "./Pilo";
 import type { MojiMood, PiloMojiHandle } from "./Pilo";
 import { markWelcome, newId, readFlag, readRol, seenWelcome, TEMAS, useConversations, useTema, writeFlag, writeRol } from "./store";
@@ -39,6 +44,11 @@ import { ASK_SPACES, asksRol, ROLE_QUESTION, roleView, wireRol } from "./space";
 import type { Rol, SpaceId, SpaceProfile, Suggestion } from "./space";
 import { RoleMenu, RolePicker } from "./RolePicker";
 import { Welcome } from "./Welcome";
+import { SuperContext, SuperDefs } from "./super/Gear";
+import { SuperEntrance } from "./super/SuperEntrance";
+import { isSuperMode, SUPER, superCommand, superLine, superReply } from "./super/modes";
+import type { SuperLine, SuperMode } from "./super/modes";
+import { superSfx } from "./super/sfx";
 import { MeshAnswer } from "./MeshAnswer";
 import { AnswerText, parseAnswer, useTypewriter } from "./AnswerText";
 import { extrasFor, usePiloExtras } from "../../components/pilo/ai/extras";
@@ -46,7 +56,7 @@ import { pickPassages, turnFile } from "./attach";
 import { AttachButton, AttachTray, FileChip, FileFoot, FileLog, useAttachment } from "./Extras";
 import { toPlain } from "./markdown";
 import { badgeOf, compactThink, interruptedTurn, notesOf, originOf, reduceSteps, secondsText, seedOf, showsSources, waitingFace, waitingLine, waitingTip } from "./answer-state";
-import type { ThinkStep } from "./answer-state";
+import type { Badge, ThinkStep } from "./answer-state";
 import { CatalogModal } from "../admin/pilo/CatalogModal";
 import type { CatalogMood } from "../admin/pilo/catalog-sheet";
 import { enrichSpokenSentences } from "../../components/pilo/ai/voice-expressions";
@@ -87,6 +97,9 @@ interface OpenSource {
 const THINKING_LIVE = 8000;
 
 const MOOD_OF: Record<AskKind, MojiMood> = { memoria: "feliz", extracto: "atento", ia: "feliz", regla: "cuidado", nada: "duda", curada: "feliz", capciosa: "cuidado", malla: "feliz", dato: "feliz" };
+
+/** Lo que dice el catálogo de un modo secreto, con la forma de una respuesta: sin fuentes ni rastro, porque no salió del servidor. */
+const localAnswer = (said: SuperLine): AskResult => ({ kind: "curada", text: said.text, sources: [], trail: [] });
 
 /* --- Iconos (un solo trazo, 2.2) --------------------------------------------------------- */
 
@@ -267,8 +280,20 @@ function Chat({ space, cfg, tema, setTema, role, audience, welcome, voice: baseV
   const extras = extrasFor(usePiloExtras().data, space.id, person?.is_active ? person.role : null);
   const attach = useAttachment(extras.fileMaxMb);
   // Lo que viaja a la función además de la pregunta. En el Pilo de siempre, nada: el pedido es el de siempre.
-  const wire: AskOptions | undefined = useMemo(() => (usual ? undefined : { portal: space.portal, rol: sent }), [usual, space.portal, sent]);
-  const voice = useMemo(() => (usual ? baseVoice : { ...baseVoice, rol: sent, mood: view.mood }), [usual, baseVoice, sent, view.mood]);
+  // El modo secreto (super/): lo activa una orden escrita en el chat y dura lo que dure la visita.
+  const [modo, setModo] = useState<SuperMode | null>(null);
+  const lastModo = useRef<SuperMode>("pilocop");
+  /** La entrada en curso: a qué modo va y en qué turno aterriza Pilo. */
+  const [entrance, setEntrance] = useState<{ mode: SuperMode; short: boolean; convId: string; turnId: string } | null>(null);
+  const wire: AskOptions | undefined = useMemo(() => {
+    const base: AskOptions | null = usual ? null : { portal: space.portal, rol: sent };
+    return base || modo ? { ...(base ?? {}), ...(modo ? { modo } : {}) } : undefined;
+  }, [usual, space.portal, sent, modo]);
+  const voice = useMemo(() => {
+    const own = usual ? baseVoice : { ...baseVoice, rol: sent, mood: view.mood };
+    // En un modo, la voz no antepone muletillas: el personaje ya trae las suyas.
+    return modo ? { ...own, expressions: false } : own;
+  }, [usual, baseVoice, sent, view.mood, modo]);
   const [currentId, setCurrentId] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [draft, setDraft] = useState("");
@@ -357,9 +382,87 @@ function Chat({ space, cfg, tema, setTema, role, audience, welcome, voice: baseV
     input.current?.focus({ preventScroll: true });
   };
 
+  /* --- Los modos secretos ------------------------------------------------------------------- */
+
+  /** La cara de la última respuesta: ahí aterriza Pilo al terminar su entrada. */
+  const lastFace = () => {
+    const all = col.current?.querySelectorAll<HTMLElement>(".ap-a__face");
+    return all?.length ? all[all.length - 1] : null;
+  };
+
+  /** Un turno que responde la página (una orden o la charla de un modo). Corta lo que Pilo estuviera escribiendo. */
+  const pushLocal = (q: string, mode: SuperMode, said: SuperLine | null) => {
+    setSource(null);
+    stopPilo();
+    if (run.current) stop();
+    const turn: Turn = { id: newId(), q, modo: mode, local: true, ...(said ? { answer: localAnswer(said) } : {}) };
+    const convId = current?.id ?? newId();
+    setConvs((list) => {
+      const conv = list.find((c) => c.id === convId) ?? { id: convId, title: q.slice(0, 80), at: Date.now(), turns: [] };
+      return [{ ...conv, at: Date.now(), turns: [...conv.turns, turn] }, ...list.filter((c) => c.id !== convId)];
+    });
+    setCurrentId(convId);
+    if (said) setFresh((f) => new Map(f).set(turn.id, "entera"));
+    setStatus(said ? `Pilo respondió: ${said.text}` : `Pilo entra al modo ${SUPER[mode].name}.`);
+    toBottom();
+    return { convId, turnId: turn.id };
+  };
+
+  /** ¿El mensaje es cosa de los modos? Entrar, salir o la charla corta de su catálogo. Lo demás sigue al servidor. */
+  const handleSuper = (q: string): boolean => {
+    const cmd = superCommand(q, { active: modo, last: lastModo.current });
+    if (cmd?.type === "off" && modo) {
+      superSfx(autoRead).down();
+      setModo(null);
+      pushLocal(q, modo, superLine(modo, "desactivar"));
+      return true;
+    }
+    if (cmd?.type === "on") {
+      if (cmd.mode === modo) {
+        pushLocal(q, modo, superLine(modo, "activo"));
+        return true;
+      }
+      lastModo.current = cmd.mode;
+      if (reduced()) {
+        // Con movimiento reducido no hay escena: el modo cambia y Pilo lo dice.
+        setModo(cmd.mode);
+        pushLocal(q, cmd.mode, superLine(cmd.mode, "activar"));
+        return true;
+      }
+      // El turno espera sin respuesta mientras Pilo entra; al aterrizar, habla.
+      setEntrance({ mode: cmd.mode, short: Boolean(modo), ...pushLocal(q, cmd.mode, null) });
+      return true;
+    }
+    const said = modo ? superReply(modo, q) : null;
+    if (!modo || !said) return false;
+    pushLocal(q, modo, said);
+    return true;
+  };
+
+  /** Pilo llegó a la cara de la respuesta: el modo queda puesto y dice su frase de entrada. */
+  const landSuper = () => {
+    const e = entrance;
+    if (!e) return;
+    const said = superLine(e.mode, "activar");
+    setEntrance(null);
+    setModo(e.mode);
+    patchTurn(e.convId, e.turnId, { answer: localAnswer(said) });
+    setFresh((f) => new Map(f).set(e.turnId, "entera"));
+    setStatus(`Pilo respondió: ${said.text}`);
+    superSfx(autoRead).clank();
+    followUntil.current = performance.now() + 800;
+    // La cara llega con su equipo puesto y un rebote corto.
+    requestAnimationFrame(() => {
+      const face = lastFace();
+      if (face) gsap.fromTo(face, { scale: 0.7 }, { scale: 1, duration: 0.5, ease: "back.out(2.4)", clearProps: "transform" });
+    });
+  };
+
   const ask = async (raw: string, replaceTurn?: string) => {
     const q = raw.replace(/\s+/g, " ").trim();
     if (!q) return;
+    // Los modos secretos se atienden antes de llamar al servidor. Con un archivo adjunto, la pregunta es de verdad.
+    if (!replaceTurn && !attach.attachment && handleSuper(q)) return;
     setSource(null);
     stopPilo();
     // Otra pregunta mientras Pilo escribe: la anterior se corta y queda como incompleta.
@@ -377,7 +480,8 @@ function Chat({ space, cfg, tema, setTema, role, audience, welcome, voice: baseV
     const turn: Turn = { id: newId(), q, ...(attached ? { file: turnFile(attached, picked.length) } : {}) };
     const before = patched(conv.turns.filter((t) => t.id !== replaceTurn));
     // Lo que la persona escribió y el texto final de cada respuesta: el servidor arma el contexto.
-    const history = buildHistory(before.map((t) => ({ q: t.q, a: t.answer?.text })));
+    // Lo que respondió la página (los modos secretos) no es contexto para el servidor.
+    const history = buildHistory(before.filter((t) => !t.local).map((t) => ({ q: t.q, a: t.answer?.text })));
     setConvs((list) => [{ ...conv, at: Date.now(), turns: [...before, turn] }, ...list.filter((c) => c.id !== conv.id).map((c) => (cut && c.id === cut.convId ? { ...c, turns: patched(c.turns) } : c))]);
     setCurrentId(conv.id);
     const ctl = new AbortController();
@@ -518,7 +622,9 @@ function Chat({ space, cfg, tema, setTema, role, audience, welcome, voice: baseV
 
   return (
     <SpaceContext.Provider value={space}>
-    <div className="ap" data-tema={tema} data-espacio={space.accent ?? undefined}>
+    <SuperContext.Provider value={modo}>
+    <div className="ap" data-tema={tema} data-espacio={space.accent ?? undefined} data-modo={entrance?.mode ?? modo ?? undefined}>
+      <SuperDefs />
       <aside className="ap-side" data-open={sideOpen || undefined} aria-label={name}>
         <div className="ap-side__top">
           <div>
@@ -592,6 +698,7 @@ function Chat({ space, cfg, tema, setTema, role, audience, welcome, voice: baseV
             </span>
             <b>{current?.title ?? "Nueva conversación"}</b>
           </div>
+          {modo && <span className="ap-modo">Modo {SUPER[modo].name}</span>}
           <button type="button" className="ap-readall" aria-pressed={autoRead} onClick={toggleAutoRead} title="Leer en voz alta cada respuesta nueva">
             {I.speak}
             <span>Leer en voz alta</span>
@@ -704,6 +811,8 @@ function Chat({ space, cfg, tema, setTema, role, audience, welcome, voice: baseV
 
       {showWelcome && <Welcome tema={tema} target={slot} onDone={finishWelcome} space={space} askRol={askRol} rol={rol} onRol={pickRol} />}
 
+      {entrance && <SuperEntrance key={entrance.turnId} mode={entrance.mode} short={entrance.short} sound={autoRead} target={lastFace} onDone={landSuper} />}
+
       {role === "admin" && space.catalog && (
         <CatalogModal
           open={Boolean(catalogTurn)}
@@ -726,6 +835,7 @@ function Chat({ space, cfg, tema, setTema, role, audience, welcome, voice: baseV
         />
       )}
     </div>
+    </SuperContext.Provider>
     </SpaceContext.Provider>
   );
 }
@@ -1075,8 +1185,10 @@ function TurnView({
     }
   };
 
-  const badge = a ? badgeOf(a, incomplete) : null;
-  const notes = a && !incomplete ? notesOf(a) : [];
+  // Lo que respondió la página en un modo secreto lo dice con el nombre del modo: no es una respuesta oficial.
+  const modeBadge: Badge | null = turn.local && isSuperMode(turn.modo) ? { text: `Modo ${SUPER[turn.modo].name}`, tone: "general", icon: null } : null;
+  const badge = a ? (modeBadge ?? badgeOf(a, incomplete)) : null;
+  const notes = a && !incomplete && !turn.local ? notesOf(a) : [];
   const headline = working ? waitingLine({ steps, meta: stream?.meta ?? null, seconds: elapsed }) : thought !== null ? `Pensó durante ${secondsText(thought)}` : "Cómo respondí";
   // Aparte del titular: un consejo que va cambiando, para que la espera no desespere.
   const tip = working ? waitingTip(elapsed, seedOf(turn.id)) : null;
@@ -1206,13 +1318,13 @@ function TurnView({
                       {I.copy}
                       {copied && <span>Copiada</span>}
                     </button>
-                    {isAdmin && onCatalog && !incomplete && (
+                    {isAdmin && onCatalog && !incomplete && !turn.local && (
                       <button type="button" className="ap-ic" onClick={onCatalog} aria-label="Agregar al catálogo de respuestas oficiales de Pilo" title="Agregar al catálogo oficial de Pilo">
                         {I.catalog}
                         <span>Al catálogo</span>
                       </button>
                     )}
-                    {a.kind !== "regla" && !incomplete && (
+                    {a.kind !== "regla" && !incomplete && !turn.local && (
                       <>
                         <button type="button" className="ap-ic" aria-pressed={turn.vote === "up"} onClick={() => onVote("up")} aria-label="Me sirvió">
                           {I.up}

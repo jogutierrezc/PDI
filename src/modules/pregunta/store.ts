@@ -97,6 +97,10 @@ export const writeRol = (prefix: string, rol: Rol | null) => write(storageKey(pr
 export interface Turn {
   id: string;
   q: string;
+  /** El modo secreto que estaba puesto al responder (super/modes.ts): la respuesta lo dice en su insignia. */
+  modo?: string;
+  /** La respondió la página (una orden o el catálogo de un modo): no fue al servidor ni entra en la historia que se le manda. */
+  local?: boolean;
   answer?: AskResult;
   error?: string;
   vote?: "up" | "down";

@@ -34,6 +34,16 @@
   -webkit-user-drag: none;
 }
 
+/* Lo que se le pone encima (PiloFace `gear`): mismo encuadre, puede sobresalir. */
+.pilo-face__gear {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+  pointer-events: none;
+}
+
 /* Las pupilas se mueven dentro del blanco del ojo y no salen de él. */
 .pilo-face__white {
   -webkit-mask: url("/pilo-face/white.png") center / 100% 100% no-repeat;

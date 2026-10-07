@@ -26,7 +26,12 @@ export interface AskOptions {
   page?: { url: string; title: string; passages: string[] } | null;
   /** Sin cuenta de Pilo (0120): cómo pidió que la llame y en qué tono. Con cuenta no se manda: el servidor la reconoce por la sesión. */
   visitor?: { nick?: string | null; tone?: string | null } | null;
+  /** El modo secreto que la persona activó en el chat («pilocop», «pilonator» o «sayayin»): el servidor le pone el personaje a la redacción. Cualquier otra cosa no se manda. */
+  modo?: string | null;
 }
+
+/** Los modos secretos que entiende el servidor (logic.ts, `parseModo`). */
+const modoOf = (modo: string | null | undefined): "pilocop" | "pilonator" | "sayayin" | undefined => (modo === "pilocop" || modo === "pilonator" || modo === "sayayin" ? modo : undefined);
 
 const rolOf = (rol: string | null | undefined): "estudiante" | "profesor" | undefined => (rol === "estudiante" || rol === "profesor" ? rol : undefined);
 
@@ -452,6 +457,7 @@ export function buildHistory(turns: { q: string; a?: string | null }[]): { q: st
 export function askBody(question: string, history: { q: string; a: string }[], opts: AskOptions = {}) {
   const rol = rolOf(opts.rol);
   const visitor = visitorOf(opts.visitor);
+  const modo = modoOf(opts.modo);
   return {
     action: "preguntar" as const,
     portal: opts.portal ?? "pregunta",
@@ -462,6 +468,7 @@ export function askBody(question: string, history: { q: string; a: string }[], o
     ...(opts.doc && opts.doc.passages.length ? { doc: opts.doc } : {}),
     ...(opts.page && opts.page.passages.length ? { page: opts.page } : {}),
     ...(visitor ? { visitor } : {}),
+    ...(modo ? { modo } : {}),
   };
 }
 

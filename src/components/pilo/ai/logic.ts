@@ -2801,6 +2801,8 @@ export interface AskPrompt {
   rol?: Rol;
   /** El tono que la administración pide para ese rol: nunca texto de quien pregunta. */
   tone?: string;
+  /** El modo secreto que la persona activó en el chat. Sin él, el pedido es el de siempre. */
+  modo?: Modo;
   /** El archivo que la persona adjuntó (0119). Sin él, el pedido es el de siempre. */
   doc?: AskDoc;
   /** La página que la persona está viendo, en otro portal (0127). */
@@ -2833,6 +2835,7 @@ export function buildAskMessages(plan: AskPlan, prompt: AskPrompt): ChatMessage[
     // Solo si alguna fuente es de otro ámbito (0122): sin lectura de visita, el pedido es el de siempre.
     visitRule(plan.sources),
     roleInstruction(prompt.rol ?? "general", prompt.tone),
+    modoInstruction(prompt.modo),
     prompt.member ? memberInstruction(prompt.member, Boolean(prompt.space)) : prompt.visitor ? visitorInstruction(prompt.visitor) : "",
     ...(prompt.hints ?? []).map((h) => HINT_TEXT[h]).filter(Boolean),
     prompt.today ? `Hoy es ${prompt.today}.` : "",
@@ -4460,6 +4463,34 @@ export function roleInstruction(rol: Rol, tone = ""): string {
   const extra = safeData(String(tone ?? "")).replace(/\s+/g, " ").trim().slice(0, 300);
   return extra ? `${fixed} Tono que pide la universidad para este público: ${extra}` : fixed;
 }
+
+/* --- Los modos secretos del chat («modo super pilo») --------------------------------------
+   La persona escribe una orden en Pregúntele a Pilo y Pilo se disfraza. La orden
+   y la charla corta se responden en la página; una pregunta de verdad llega aquí
+   con el modo, y la redacción toma el personaje. El personaje es un texto fijo:
+   de la página solo viene cuál de los tres es. Sin modo, el pedido es el de siempre. */
+
+export type Modo = "pilocop" | "pilonator" | "sayayin";
+
+export const MODOS: Modo[] = ["pilocop", "pilonator", "sayayin"];
+
+/** El modo que manda la página: uno de los conocidos o ninguno. */
+export function parseModo(v: unknown): Modo | null {
+  const t = typeof v === "string" ? v.trim().toLowerCase() : "";
+  return (MODOS as string[]).includes(t) ? (t as Modo) : null;
+}
+
+const MODO_TEXT: Record<Modo, string> = {
+  pilocop: "Hoy respondes en personaje: eres Pilocop, un agente robot amable de la universidad. Frases cortas, en tono de reporte. Abre con «Consulta recibida» y cierra con una línea breve de servicio.",
+  pilonator: "Hoy respondes en personaje: eres Pilonator, un robot serio que llegó del futuro para proteger el semestre de quien pregunta. Frases secas y un remate de humor al final.",
+  sayayin: "Hoy respondes en personaje: eres Súper Pilo Sayayín, un guerrero entusiasta que ve el estudio como un entrenamiento. Enérgico y motivador, con una frase de ánimo al final.",
+};
+
+/** Lo que el personaje no puede tocar: el dato es el mismo, cambia cómo se dice. */
+const MODO_RULE = "El personaje solo cambia el tono: las cifras, las fuentes y las citas [n] van exactas y completas, no inventes datos para seguir la broma y sigue todas las reglas anteriores.";
+
+/** La instrucción de redacción de un modo secreto. Sin modo, nada. */
+export const modoInstruction = (modo?: Modo | null): string => (modo ? `${MODO_TEXT[modo]} ${MODO_RULE}` : "");
 
 /** Las entradas del catálogo que le sirven a ese rol: las de todos y las suyas. */
 export const catalogForRol = <T extends { rol?: string | null }>(entries: T[], rol: Rol): T[] => entries.filter((e) => !e.rol || e.rol === rolColumn(rol));

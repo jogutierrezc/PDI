@@ -53,14 +53,6 @@
   --ap-accent: var(--sp-accent);
   --ap-accent-ink: #000000;
   --ap-ring: 0 0 0 3px color-mix(in srgb, var(--sp-accent) 35%, transparent);
-  --ap-stage-1: var(--sp-stage-1);
-  --ap-stage-2: var(--sp-stage-2);
-  --ap-stage-3: #020202;
-  --ap-stage-glow: color-mix(in srgb, var(--sp-accent) 26%, transparent);
-  --ap-stage-ink: #ffffff;
-  --ap-stage-muted: #d6d6d6;
-  --ap-stage-line: rgba(255, 255, 255, 0.14);
-  --ap-stage-chip: rgba(255, 255, 255, 0.08);
 }
 /* En negro el acento tiene que ser claro para leerse. */
 .ap[data-modo][data-tema="negro"] {
@@ -125,8 +117,43 @@
 
 /* --- La entrada --------------------------------------------------------------------- */
 
+/* La escena trae sus propios colores: así es la misma en la página (.ap) y en la app (.pa),
+   sin depender de las variables de quien la aloja. */
+.aps[data-modo="pilocop"] {
+  --ap-accent: #ff6a00;
+  --ap-stage-1: #4a2208;
+  --ap-stage-2: #170b04;
+}
+.aps[data-modo="pilonator"] {
+  --ap-accent: #ff3b30;
+  --ap-stage-1: #450d0d;
+  --ap-stage-2: #140404;
+}
+.aps[data-modo="sayayin"] {
+  --ap-accent: #ffd21f;
+  --ap-stage-1: #4d3d05;
+  --ap-stage-2: #171200;
+}
 .aps {
   z-index: 110;
+  --ap-stage-3: #020202;
+  --ap-stage-glow: color-mix(in srgb, var(--ap-accent) 26%, transparent);
+  --ap-stage-ink: #ffffff;
+  --ap-stage-muted: #d6d6d6;
+  --ap-stage-line: rgba(255, 255, 255, 0.14);
+  --ap-stage-chip: rgba(255, 255, 255, 0.08);
+  color: var(--ap-stage-ink);
+  font-family: var(--ap-sans, inherit);
+}
+.aps .apw-title {
+  font: 700 clamp(2rem, 3.4vw + 1rem, 3.4rem) / 1.04 var(--ap-serif, var(--font-display, Georgia, serif));
+}
+.aps .apw-sbtn {
+  font: inherit;
+  font-size: 0.8125rem;
+  font-weight: 700;
+  background: none;
+  cursor: pointer;
 }
 .aps .apw-brand {
   margin-right: auto;

@@ -227,7 +227,8 @@ export function AppTurn({
     }
   };
 
-  const notes = a && !incomplete ? notesOf(a) : [];
+  // Lo que respondió la app en un modo secreto no es una respuesta oficial: sin notas, sin guardar y sin voto.
+  const notes = a && !incomplete && !turn.local ? notesOf(a) : [];
   const listed = a && showsSources(a) ? a.sources : [];
   const mood: MojiMood = pending ? "piensa" : a ? (incomplete ? "duda" : MOOD_OF[a.kind]) : "cuidado";
 
@@ -316,7 +317,7 @@ export function AppTurn({
                     Fuentes ({listed.length})
                   </button>
                 )}
-                {onSave && !incomplete && !turn.error && text.trim() && (
+                {onSave && !incomplete && !turn.error && !turn.local && text.trim() && (
                   <button type="button" className="pa-src pa-keep" aria-pressed={saved} aria-busy={saving || undefined} disabled={saving} onClick={(e) => onSave(e.currentTarget, e.detail === 0)}>
                     {saved ? Icon.check : Icon.mark}
                     {saved ? "Guardada" : "Guardar"}
@@ -330,7 +331,7 @@ export function AppTurn({
                 <button type="button" className="pa-act" aria-label={copied ? "Copiada" : "Copiar la respuesta con sus fuentes"} aria-pressed={copied} onClick={copy}>
                   {copied ? Icon.check : Icon.copy}
                 </button>
-                {a.kind !== "regla" && !incomplete && (
+                {a.kind !== "regla" && !incomplete && !turn.local && (
                   <>
                     <button type="button" className="pa-act" aria-pressed={turn.vote === "up"} aria-label="Me sirvió" onClick={() => onVote("up")}>
                       {Icon.up}

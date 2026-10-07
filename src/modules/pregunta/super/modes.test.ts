@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { isSuperMode, line, plainText, SUPER, SUPER_INTENTS, SUPER_MODES, superCommand, superLine, superReply } from "./modes";
+import { isSuperMode, line, plainText, SUPER, SUPER_INTENTS, SUPER_MODES, superAnswer, superCommand, superLine, superReply, superStep } from "./modes";
 
 describe("los modos secretos de Pilo", () => {
   it("reconoce la orden de entrar, con número, con nombre o sin nada", () => {
@@ -69,6 +69,24 @@ describe("los modos secretos de Pilo", () => {
   it("las líneas que dice la página existen en los tres modos", () => {
     for (const mode of SUPER_MODES) for (const id of ["activar", "activo", "desactivar"]) expect(superLine(mode, id).text).not.toBe("");
     expect(() => superLine("pilocop", "no-existe")).toThrow();
+  });
+
+  it("decide qué hace la conversación con cada mensaje", () => {
+    // Sin modo: solo la orden de entrar es cosa de los modos.
+    expect(superStep("tengo parcial", { active: null })).toBeNull();
+    expect(superStep("desactivar", { active: null })).toBeNull();
+    expect(superStep("modo super pilo", { active: null })).toEqual({ kind: "entrar", mode: "pilocop", short: false, said: superLine("pilocop", "activar") });
+    // Con un modo: cambiar a otro (entrada corta), repetirlo, charlar y salir.
+    expect(superStep("super pilo 3", { active: "pilocop" })).toMatchObject({ kind: "entrar", mode: "sayayin", short: true });
+    expect(superStep("pilocop", { active: "pilocop" })).toEqual({ kind: "activo", mode: "pilocop", said: superLine("pilocop", "activo") });
+    expect(superStep("tengo parcial", { active: "pilonator" })).toMatchObject({ kind: "charla", mode: "pilonator" });
+    expect(superStep("desactivar", { active: "sayayin" })).toEqual({ kind: "salir", mode: "sayayin", said: superLine("sayayin", "desactivar") });
+    // Una pregunta de verdad sigue al servidor, con el modo puesto.
+    expect(superStep("¿cuántos programas de pregrado tiene la UDES en Cúcuta?", { active: "pilocop" })).toBeNull();
+  });
+
+  it("lo que dice el catálogo tiene forma de respuesta, sin fuentes", () => {
+    expect(superAnswer(superLine("pilocop", "activo"))).toEqual({ kind: "curada", text: superLine("pilocop", "activo").text, sources: [], trail: [] });
   });
 
   it("cada modo tiene nombre, tono y las cuatro frases de su entrada", () => {

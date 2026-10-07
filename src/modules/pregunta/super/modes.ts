@@ -15,7 +15,13 @@
 
    Las órdenes son mensajes enteros y cortos: una pregunta de verdad que
    mencione «desactivar» o «parcial» no se desvía.
+
+   Lo usan las dos conversaciones de Pilo: la página (AskPilo) y la app
+   (pilo-app/AppShell). Las dos preguntan aquí qué hacer con cada mensaje
+   (`superStep`) y cada una lo pinta a su manera.
    ========================================================================== */
+
+import type { AskResult } from "../../../components/pilo/ai/client";
 
 export type SuperMode = "pilocop" | "pilonator" | "sayayin";
 
@@ -311,4 +317,35 @@ export function superReply(mode: SuperMode, text: string): (SuperLine & { id: st
   if (!q || q.split(" ").length > SUPER_REPLY_WORDS) return null;
   const hit = SUPER_INTENTS.find((i) => i.test?.test(q));
   return hit ? { id: hit.id, ...hit.lines[mode] } : null;
+}
+
+/* --- Qué hacer con un mensaje ----------------------------------------------------------- */
+
+/** Lo que dice el catálogo, con la forma de una respuesta: sin fuentes ni rastro, porque no salió del servidor. */
+export const superAnswer = (said: SuperLine): AskResult => ({ kind: "curada", text: said.text, sources: [], trail: [] });
+
+/**
+ * Lo que la conversación hace con un mensaje que es cosa de los modos:
+ *   «salir»    se quita el modo y Pilo se despide de él
+ *   «activo»   pidieron el modo que ya está puesto
+ *   «entrar»   se pone un modo (`short`: ya había otro, la entrada va sin el escaneo)
+ *   «charla»   el catálogo del modo responde
+ */
+export type SuperStep =
+  | { kind: "salir"; mode: SuperMode; said: SuperLine }
+  | { kind: "activo"; mode: SuperMode; said: SuperLine }
+  | { kind: "entrar"; mode: SuperMode; short: boolean; said: SuperLine }
+  | { kind: "charla"; mode: SuperMode; said: SuperLine };
+
+/** El paso que toca, o null si el mensaje es una pregunta como cualquiera y sigue al servidor. */
+export function superStep(text: string, state: { active: SuperMode | null; last?: SuperMode }): SuperStep | null {
+  const { active } = state;
+  const cmd = superCommand(text, state);
+  if (cmd?.type === "off" && active) return { kind: "salir", mode: active, said: superLine(active, "desactivar") };
+  if (cmd?.type === "on") {
+    if (cmd.mode === active) return { kind: "activo", mode: active, said: superLine(active, "activo") };
+    return { kind: "entrar", mode: cmd.mode, short: Boolean(active), said: superLine(cmd.mode, "activar") };
+  }
+  const said = active ? superReply(active, text) : null;
+  return active && said ? { kind: "charla", mode: active, said } : null;
 }

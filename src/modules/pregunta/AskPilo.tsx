@@ -35,7 +35,7 @@ import type { SpaceConfig } from "../../components/pilo/ai/config";
 import { canUse } from "../../components/pilo/ai/logic";
 import type { Role } from "../../components/pilo/ai/logic";
 import { askQuestionStream, buildHistory, PiloError, prefetchPilo, rateAnswer, sayWithPilo, stopPilo } from "../../components/pilo/ai/client";
-import type { AskHandlers, AskKind, AskMeta, AskOptions, AskPortal, AskResult, AskSource, AskStep } from "../../components/pilo/ai/client";
+import type { AskHandlers, AskKind, AskMeta, AskOptions, AskPortal, AskSource, AskStep } from "../../components/pilo/ai/client";
 import { Pilo as PiloMoji } from "./Pilo";
 import type { MojiMood, PiloMojiHandle } from "./Pilo";
 import { markWelcome, newId, readFlag, readRol, seenWelcome, TEMAS, useConversations, useTema, writeFlag, writeRol } from "./store";
@@ -46,7 +46,7 @@ import { RoleMenu, RolePicker } from "./RolePicker";
 import { Welcome } from "./Welcome";
 import { SuperContext, SuperDefs } from "./super/Gear";
 import { SuperEntrance } from "./super/SuperEntrance";
-import { isSuperMode, SUPER, superCommand, superLine, superReply } from "./super/modes";
+import { isSuperMode, SUPER, superAnswer, superStep } from "./super/modes";
 import type { SuperLine, SuperMode } from "./super/modes";
 import { superSfx } from "./super/sfx";
 import { MeshAnswer } from "./MeshAnswer";
@@ -97,9 +97,6 @@ interface OpenSource {
 const THINKING_LIVE = 8000;
 
 const MOOD_OF: Record<AskKind, MojiMood> = { memoria: "feliz", extracto: "atento", ia: "feliz", regla: "cuidado", nada: "duda", curada: "feliz", capciosa: "cuidado", malla: "feliz", dato: "feliz" };
-
-/** Lo que dice el catálogo de un modo secreto, con la forma de una respuesta: sin fuentes ni rastro, porque no salió del servidor. */
-const localAnswer = (said: SuperLine): AskResult => ({ kind: "curada", text: said.text, sources: [], trail: [] });
 
 /* --- Iconos (un solo trazo, 2.2) --------------------------------------------------------- */
 
@@ -284,7 +281,7 @@ function Chat({ space, cfg, tema, setTema, role, audience, welcome, voice: baseV
   const [modo, setModo] = useState<SuperMode | null>(null);
   const lastModo = useRef<SuperMode>("pilocop");
   /** La entrada en curso: a qué modo va y en qué turno aterriza Pilo. */
-  const [entrance, setEntrance] = useState<{ mode: SuperMode; short: boolean; convId: string; turnId: string } | null>(null);
+  const [entrance, setEntrance] = useState<{ mode: SuperMode; short: boolean; said: SuperLine; convId: string; turnId: string } | null>(null);
   const wire: AskOptions | undefined = useMemo(() => {
     const base: AskOptions | null = usual ? null : { portal: space.portal, rol: sent };
     return base || modo ? { ...(base ?? {}), ...(modo ? { modo } : {}) } : undefined;
@@ -395,7 +392,7 @@ function Chat({ space, cfg, tema, setTema, role, audience, welcome, voice: baseV
     setSource(null);
     stopPilo();
     if (run.current) stop();
-    const turn: Turn = { id: newId(), q, modo: mode, local: true, ...(said ? { answer: localAnswer(said) } : {}) };
+    const turn: Turn = { id: newId(), q, modo: mode, local: true, ...(said ? { answer: superAnswer(said) } : {}) };
     const convId = current?.id ?? newId();
     setConvs((list) => {
       const conv = list.find((c) => c.id === convId) ?? { id: convId, title: q.slice(0, 80), at: Date.now(), turns: [] };
@@ -410,32 +407,25 @@ function Chat({ space, cfg, tema, setTema, role, audience, welcome, voice: baseV
 
   /** ¿El mensaje es cosa de los modos? Entrar, salir o la charla corta de su catálogo. Lo demás sigue al servidor. */
   const handleSuper = (q: string): boolean => {
-    const cmd = superCommand(q, { active: modo, last: lastModo.current });
-    if (cmd?.type === "off" && modo) {
+    const step = superStep(q, { active: modo, last: lastModo.current });
+    if (!step) return false;
+    if (step.kind === "salir") {
       superSfx(autoRead).down();
       setModo(null);
-      pushLocal(q, modo, superLine(modo, "desactivar"));
+    }
+    if (step.kind !== "entrar") {
+      pushLocal(q, step.mode, step.said);
       return true;
     }
-    if (cmd?.type === "on") {
-      if (cmd.mode === modo) {
-        pushLocal(q, modo, superLine(modo, "activo"));
-        return true;
-      }
-      lastModo.current = cmd.mode;
-      if (reduced()) {
-        // Con movimiento reducido no hay escena: el modo cambia y Pilo lo dice.
-        setModo(cmd.mode);
-        pushLocal(q, cmd.mode, superLine(cmd.mode, "activar"));
-        return true;
-      }
-      // El turno espera sin respuesta mientras Pilo entra; al aterrizar, habla.
-      setEntrance({ mode: cmd.mode, short: Boolean(modo), ...pushLocal(q, cmd.mode, null) });
+    lastModo.current = step.mode;
+    if (reduced()) {
+      // Con movimiento reducido no hay escena: el modo cambia y Pilo lo dice.
+      setModo(step.mode);
+      pushLocal(q, step.mode, step.said);
       return true;
     }
-    const said = modo ? superReply(modo, q) : null;
-    if (!modo || !said) return false;
-    pushLocal(q, modo, said);
+    // El turno espera sin respuesta mientras Pilo entra; al aterrizar, habla.
+    setEntrance({ mode: step.mode, short: step.short, said: step.said, ...pushLocal(q, step.mode, null) });
     return true;
   };
 
@@ -443,12 +433,11 @@ function Chat({ space, cfg, tema, setTema, role, audience, welcome, voice: baseV
   const landSuper = () => {
     const e = entrance;
     if (!e) return;
-    const said = superLine(e.mode, "activar");
     setEntrance(null);
     setModo(e.mode);
-    patchTurn(e.convId, e.turnId, { answer: localAnswer(said) });
+    patchTurn(e.convId, e.turnId, { answer: superAnswer(e.said) });
     setFresh((f) => new Map(f).set(e.turnId, "entera"));
-    setStatus(`Pilo respondió: ${said.text}`);
+    setStatus(`Pilo respondió: ${e.said.text}`);
     superSfx(autoRead).clank();
     followUntil.current = performance.now() + 800;
     // La cara llega con su equipo puesto y un rebote corto.

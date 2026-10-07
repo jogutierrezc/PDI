@@ -260,7 +260,7 @@ export function SuperEntrance({
   }, []);
 
   return (
-    <div className="apw aps" ref={root} role="dialog" aria-modal="true" aria-label={title}>
+    <div className="apw aps" data-modo={mode} ref={root} role="dialog" aria-modal="true" aria-label={title}>
       <div className="apw-bg" data-p="bg">
         <div className="apw-glow" />
         <div className="apw-rings" aria-hidden="true">

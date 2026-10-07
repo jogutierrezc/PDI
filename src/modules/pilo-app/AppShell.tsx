@@ -46,6 +46,11 @@ import type { SavedEntry } from "./saved";
 import { stopOfficial } from "./official-voice";
 import { fromKeyboard, reducedMotion } from "./pwa";
 import type { InstallWay } from "./pwa";
+import { SuperContext, SuperDefs } from "../pregunta/super/Gear";
+import { SuperEntrance } from "../pregunta/super/SuperEntrance";
+import { SUPER, superAnswer, superStep } from "../pregunta/super/modes";
+import type { SuperLine, SuperMode } from "../pregunta/super/modes";
+import { superSfx } from "../pregunta/super/sfx";
 import { AppTurn } from "./AppTurn";
 import type { Live, TurnVoice } from "./AppTurn";
 import { AccountSheet, AppMenu, IphoneSheet, SettingsSheet, SourcesSheet } from "./AppMenu";
@@ -123,8 +128,20 @@ export function AppShell({ space, door, waking, online, person, member, wide, th
   const extras = extrasFor(usePiloExtras().data, space.id, extrasRole((profile?.is_active ? profile.role : null) as Role | null, member));
   const attach = useAttachment(extras.fileMaxMb);
   // Lo que viaja a la función además de la pregunta. En el Pilo de la Universidad, nada: el pedido es el de siempre.
-  const wire: AskOptions | undefined = useMemo(() => (usual ? undefined : { portal: space.portal, rol: sent }), [usual, space.portal, sent]);
-  const voice: TurnVoice = useMemo(() => (usual ? door.voice : { ...door.voice, rol: sent, mood: view.mood }), [usual, door.voice, sent, view.mood]);
+  // El modo secreto (pregunta/super): lo activa una orden escrita en el chat y dura lo que dure la visita.
+  const [modo, setModo] = useState<SuperMode | null>(null);
+  const lastModo = useRef<SuperMode>("pilocop");
+  /** La entrada en curso: a qué modo va, qué dirá Pilo al llegar y en qué turno. */
+  const [entrance, setEntrance] = useState<{ mode: SuperMode; short: boolean; said: SuperLine; convId: string; turnId: string } | null>(null);
+  const wire: AskOptions | undefined = useMemo(() => {
+    const base: AskOptions | null = usual ? null : { portal: space.portal, rol: sent };
+    return base || modo ? { ...(base ?? {}), ...(modo ? { modo } : {}) } : undefined;
+  }, [usual, space.portal, sent, modo]);
+  const voice: TurnVoice = useMemo(() => {
+    const own: TurnVoice = usual ? door.voice : { ...door.voice, rol: sent, mood: view.mood };
+    // En un modo, la voz no antepone muletillas: el personaje ya trae las suyas.
+    return modo ? { ...own, expressions: false } : own;
+  }, [usual, door.voice, sent, view.mood, modo]);
 
   const open = door.state === "abierto";
   const can = open && online && !waking;
@@ -209,9 +226,71 @@ export function AppShell({ space, door, waking, online, person, member, wide, th
     setStatus(r.text.trim() ? "Detuvo la respuesta: quedó incompleta." : "Detuvo la pregunta.");
   };
 
+  /* --- Los modos secretos ------------------------------------------------------------------- */
+
+  /** Un turno que responde la app (una orden o la charla de un modo). Corta lo que Pilo estuviera escribiendo. */
+  const pushLocal = (q: string, mode: SuperMode, said: SuperLine | null) => {
+    stopOfficial();
+    setNote("");
+    if (run.current) stop();
+    const turn: Turn = { id: newId(), q, modo: mode, local: true, ...(said ? { answer: superAnswer(said) } : {}) };
+    born.current.add(turn.id);
+    const convId = current?.id ?? newId();
+    setConvs((list) => {
+      const conv = list.find((c) => c.id === convId) ?? { id: convId, title: q.slice(0, 80), at: Date.now(), turns: [] };
+      return [{ ...conv, at: Date.now(), turns: [...conv.turns, turn] }, ...list.filter((c) => c.id !== convId)];
+    });
+    setCurrentId(convId);
+    if (said) setFresh((f) => new Map(f).set(turn.id, "entera"));
+    setStatus(said ? `Pilo respondió: ${said.text}` : `Pilo entra al modo ${SUPER[mode].name}.`);
+    toBottom();
+    return { convId, turnId: turn.id };
+  };
+
+  /** ¿El mensaje es cosa de los modos? Entrar, salir o la charla corta de su catálogo. Lo demás sigue al servidor. */
+  const handleSuper = (q: string): boolean => {
+    const step = superStep(q, { active: modo, last: lastModo.current });
+    if (!step) return false;
+    if (step.kind === "salir") {
+      superSfx(autoRead).down();
+      setModo(null);
+    }
+    if (step.kind !== "entrar") {
+      pushLocal(q, step.mode, step.said);
+      return true;
+    }
+    lastModo.current = step.mode;
+    if (reducedMotion()) {
+      // Con movimiento reducido no hay escena: el modo cambia y Pilo lo dice.
+      setModo(step.mode);
+      pushLocal(q, step.mode, step.said);
+      return true;
+    }
+    // El turno espera sin respuesta mientras Pilo entra; al aterrizar en la barra, habla.
+    setEntrance({ mode: step.mode, short: step.short, said: step.said, ...pushLocal(q, step.mode, null) });
+    return true;
+  };
+
+  /** Pilo llegó a su lugar en la barra: el modo queda puesto y dice su frase de entrada. */
+  const landSuper = () => {
+    const e = entrance;
+    if (!e) return;
+    setEntrance(null);
+    setModo(e.mode);
+    patchTurn(e.convId, e.turnId, { answer: superAnswer(e.said) });
+    setFresh((f) => new Map(f).set(e.turnId, "entera"));
+    setStatus(`Pilo respondió: ${e.said.text}`);
+    superSfx(autoRead).clank();
+    // La cara llega con su equipo puesto y un rebote corto.
+    const slot = faceSlot.current;
+    if (slot) gsap.fromTo(slot, { scale: 0.7 }, { scale: 1, duration: 0.5, ease: "back.out(2.4)", clearProps: "transform" });
+  };
+
   const ask = async (raw: string, replaceTurn?: string) => {
     const q = raw.replace(/\s+/g, " ").trim();
     if (!q || !can) return;
+    // Los modos secretos se atienden antes de llamar al servidor. Con un archivo adjunto, la pregunta es de verdad.
+    if (!replaceTurn && !attach.attachment && handleSuper(q)) return;
     stopOfficial();
     setNote("");
     // Otra pregunta mientras Pilo escribe: la anterior se corta y queda como incompleta.
@@ -230,7 +309,8 @@ export function AppShell({ space, door, waking, online, person, member, wide, th
     born.current.add(turn.id);
     const before = patched(conv.turns.filter((t) => t.id !== replaceTurn));
     // Lo que la persona escribió y el texto final de cada respuesta: el servidor arma el contexto.
-    const history = buildHistory(before.map((t) => ({ q: t.q, a: t.answer?.text })));
+    // Lo que respondió la app (los modos secretos) no es contexto para el servidor.
+    const history = buildHistory(before.filter((t) => !t.local).map((t) => ({ q: t.q, a: t.answer?.text })));
     setConvs((list) => [{ ...conv, at: Date.now(), turns: [...before, turn] }, ...list.filter((c) => c.id !== conv.id).map((c) => (cut && c.id === cut.convId ? { ...c, turns: patched(c.turns) } : c))]);
     setCurrentId(conv.id);
     const ctl = new AbortController();
@@ -437,7 +517,8 @@ export function AppShell({ space, door, waking, online, person, member, wide, th
   };
 
   return (
-    <>
+    <SuperContext.Provider value={modo}>
+      <SuperDefs />
       {wide && (
         <AppSide
           space={space.id}
@@ -466,7 +547,7 @@ export function AppShell({ space, door, waking, online, person, member, wide, th
           </div>
           <div className="pa-bar-id">
             <strong>Mr. Pilo</strong>
-            <span>{working ? "Pensando…" : sounding ? "Hablando" : writing ? "Escribiendo…" : under}</span>
+            <span>{working ? "Pensando…" : sounding ? "Hablando" : writing ? "Escribiendo…" : modo ? `Modo ${SUPER[modo].name}` : under}</span>
           </div>
           <button type="button" className="pa-icon" aria-pressed={autoRead} aria-disabled={!voice.advanced || undefined} aria-label={voiceLabel} title={voiceLabel} onClick={toggleVoice}>
             {autoRead ? Icon.voice : Icon.mute}
@@ -668,6 +749,7 @@ export function AppShell({ space, door, waking, online, person, member, wide, th
       <SourcesSheet open={over === "fuentes"} quick={quick} onClose={hide} sources={shownSources.sources} focus={shownSources.focus} space={space} />
       <AccountSheet open={over === "cuenta"} quick={quick} onClose={hide} />
       <IphoneSheet open={over === "iphone"} quick={quick} onClose={hide} />
-    </>
+      {entrance && <SuperEntrance key={entrance.turnId} mode={entrance.mode} short={entrance.short} sound={autoRead} target={() => faceSlot.current} onDone={landSuper} />}
+    </SuperContext.Provider>
   );
 }

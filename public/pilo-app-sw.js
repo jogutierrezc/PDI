@@ -75,7 +75,8 @@ function kindOf(request, origin) {
   if (request.mode === "navigate") return url.pathname === SHELL_URL || url.pathname.startsWith(`${SHELL_URL}/`) ? "pagina" : "pasar";
   if (url.search) return "pasar";
   if (PRECACHE.includes(url.pathname)) return "archivo";
-  if (/^\/(assets|pilo-face|pilo-app)\//.test(url.pathname)) return "archivo";
+  // /Pilo2: las vistas de cuerpo entero de la entrada a un modo secreto. No se precargan: se guardan al usarse.
+  if (/^\/(assets|pilo-face|pilo-app|Pilo2)\//.test(url.pathname)) return "archivo";
   return "pasar";
 }
 

@@ -39,6 +39,9 @@ export interface EditorApi {
   setPortal: (id: Portal, patch: Partial<PortalRule>) => void;
   dirty: boolean;
   keys: KeyStatus | null | undefined;
+  saveNow?: () => void;
+  isSaving?: boolean;
+  saveError?: string | null;
 }
 
 export type TestState = {
@@ -169,6 +172,49 @@ export function ConnectionSection({ ed, test, onTest }: { ed: EditorApi; test: T
           </>
         )}
         {otherKeys.length > 0 && <p className="pis-small">También hay clave guardada de {otherKeys.join(" y ")}.</p>}
+
+        {(s.provider !== ed.saved.provider || s.text_model !== ed.saved.text_model) && (
+          <div
+            style={{
+              margin: "1rem 0",
+              padding: "0.85rem 1.1rem",
+              background: "#eff6ff",
+              border: "1.5px solid #2563eb",
+              borderRadius: "8px",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+              flexWrap: "wrap",
+              gap: "0.75rem",
+            }}
+          >
+            <div>
+              <strong style={{ color: "#1d4ed8", display: "block", fontSize: "0.95rem" }}>
+                ⚠️ Cambios pendientes de guardar en este servicio:
+              </strong>
+              <div style={{ fontSize: "0.85rem", color: "#334155", marginTop: "0.3rem", lineHeight: 1.5 }}>
+                <div>Activo en el servidor: <strong>{PROVIDERS[ed.saved.provider]?.label}</strong> — modelo <code>{ed.saved.text_model || PROVIDERS[ed.saved.provider]?.model}</code></div>
+                <div>Seleccionado en pantalla: <strong>{PROVIDERS[s.provider]?.label}</strong> — modelo <code>{s.text_model || PROVIDERS[s.provider]?.model}</code></div>
+              </div>
+            </div>
+            {ed.saveNow && (
+              <button
+                type="button"
+                className="button-primary"
+                disabled={ed.isSaving}
+                onClick={ed.saveNow}
+                style={{ padding: "0.5rem 1rem", fontWeight: 600 }}
+              >
+                {ed.isSaving ? "Guardando en servidor…" : `💾 Guardar ${PROVIDERS[s.provider]?.label} ahora`}
+              </button>
+            )}
+          </div>
+        )}
+        {ed.saveError && (
+          <p className="pis-warn" style={{ marginTop: "0.5rem" }}>
+            No se pudo guardar: {ed.saveError}
+          </p>
+        )}
 
         {s.provider === "otro" ? (
           <div className="pis-grid pis-grid--3">

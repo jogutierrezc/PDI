@@ -184,7 +184,18 @@ function Editor({ initial }: { initial: PiloSettings }) {
   const set = <K extends keyof PiloSettings>(key: K, value: PiloSettings[K]) => setS((prev) => ({ ...prev, [key]: value }));
   const setPortal: EditorApi["setPortal"] = (id, patch) =>
     setS((prev) => ({ ...prev, portals: { ...prev.portals, [id]: { ...prev.portals[id], ...patch } } }));
-  const ed: EditorApi = { s, saved, setS, set, setPortal, dirty, keys: keys.data };
+  const ed: EditorApi = {
+    s,
+    saved,
+    setS,
+    set,
+    setPortal,
+    dirty,
+    keys: keys.data,
+    saveNow: () => save.mutate(s),
+    isSaving: save.isPending,
+    saveError: save.isError ? (save.error as Error).message : null,
+  };
   // «Qué lee cada portal» se aplica al momento en la base, y la base mueve el interruptor de «Fuentes»
   // (su espejo). Aquí se pone al día lo editado y lo guardado a la vez: no queda como cambio sin
   // guardar, y un «Guardar cambios» posterior no devuelve la celda a como estaba.

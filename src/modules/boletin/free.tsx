@@ -23,7 +23,7 @@ import {
   compareSource,
   freeAllRowsAt,
   freeRowsAt,
-  freeTotalAt,
+  freeTotalShown,
   freeYears,
   numberOf,
   territoryCode,
@@ -82,7 +82,10 @@ export function parseFreeKey(report: Report, key: string): { set: FreeSet; view:
   if (at < 0) return null;
   const set = report.freeSets?.find((s) => s.id === key.slice(0, at));
   const view = set?.views.find((v) => v.key === key.slice(at + 1));
-  return set && view && viewProblems(set, view).length === 0 ? { set, view } : null;
+  // Las tablas personalizadas no dependen de las dimensiones de una gráfica;
+  // conservarlas disponibles en el boletín aunque otras validaciones del
+  // conjunto libre no sean aplicables a esta vista.
+  return set && view && (isCustomView(view) || viewProblems(set, view).length === 0) ? { set, view } : null;
 }
 
 /** El año que dibuja una vista anual con el corte del boletín: el del corte o el último anterior. */
@@ -103,7 +106,7 @@ export function freeUnits(set: FreeSet, view: FreeView, cut: number, Sheet: Shee
   const year = yearFor(set, view, cut);
   if (set.temporality === "anual" && !USES_ALL_YEARS.includes(view.type) && year === null) return [];
   const rows = freeRowsAt(set, year);
-  if (!rows.length) return [];
+  if (view.type === "tabla" ? freeAllRowsAt(set, year).length === 0 : rows.length === 0) return [];
   const title = `${set.title} · ${view.title}`;
   const compared = view.type === "barras_comparadas" ? compareSource(set, view) : null;
   const custom = isCustomView(view) ? view.table : null;
@@ -132,7 +135,8 @@ export function freeUnits(set: FreeSet, view: FreeView, cut: number, Sheet: Shee
       if (value === null || value === undefined || value === "") return "—";
       if (kind === "cifra") {
         const n = numberOf(value as string | number);
-        return n === null ? "—" : formatValue(n, (format as "entero" | "decimal" | "porcentaje") ?? "decimal");
+        // Un texto en una columna de cifra («N/D», «< 5») se imprime como está escrito.
+        return n === null ? String(value) : formatValue(n, (format as "entero" | "decimal" | "porcentaje") ?? "decimal");
       }
       return String(value);
     };
@@ -149,11 +153,16 @@ export function freeUnits(set: FreeSet, view: FreeView, cut: number, Sheet: Shee
           });
           return { label: written[0], cells: written.slice(1), strong: r.kind === "total" };
         }
-        const total = r.kind === "total" ? freeTotalAt(all, all.indexOf(r), columns) : null;
+        // El total, casilla por casilla: la escrita por quien reporta o, vacía, la calculada.
+        const total = r.kind === "total" ? freeTotalShown(all, all.indexOf(r), columns) : null;
         const cells = [
           ...(set.temporality === "anual" ? [r.year === null ? "—" : String(r.year)] : []),
           ...columns.map((c, i) =>
-            total ? (i === 0 && c.kind !== "cifra" ? r.label || "Total" : cell(total.cells[c.key], c.kind, c.format)) : cell(r.cells[c.key], c.kind, c.format),
+            total
+              ? i === 0 && c.kind !== "cifra" && !total.written.includes(c.key)
+                ? r.label || "Total"
+                : cell(total.cells[c.key], c.kind, c.format)
+              : cell(r.cells[c.key], c.kind, c.format),
           ),
         ];
         return { label: cells[0], cells: cells.slice(1), strong: Boolean(total) };

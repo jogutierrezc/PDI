@@ -16,7 +16,8 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import type { ClipboardEvent, KeyboardEvent } from "react";
 import { formatValue } from "../../datos-abiertos/data/open-data";
 import type { ValueFormat } from "../../datos-abiertos/data/types";
-import { editableText, parseClipboardGrid, parseNumber } from "./sheet";
+import { cellKey, editableText, parseClipboardGrid, parseNumber, pasteIntoGrid } from "./sheet";
+import type { CellKey } from "./sheet";
 
 export interface GridRow {
   key: string;
@@ -36,8 +37,9 @@ export interface GridColumn {
   ariaLabel?: string;
 }
 
-export type CellKey = `${string}|${string}`;
-export const cellKey = (row: string, column: string): CellKey => `${row}|${column}`;
+// La clave de casilla vive en sheet.ts (sin React); aquí se sigue ofreciendo.
+export { cellKey };
+export type { CellKey };
 
 interface DataGridProps {
   label: string;
@@ -55,6 +57,14 @@ interface DataGridProps {
   readOnly?: boolean;
   onPasted?: (count: number) => void;
   rowHeader?: string;
+  /**
+   * El taller dibuja la gráfica mientras se escribe: con esto, cada tecla que
+   * deja un número entendible pasa al borrador sin esperar a salir de la
+   * casilla. Sin la opción (Captura), el cambio entra al salir o con Enter.
+   */
+  liveCommit?: boolean;
+  /** Escribe el motivo de cada casilla bloqueada para lectores de pantalla (no solo en `title`). */
+  describeLocked?: boolean;
 }
 
 export function DataGrid({
@@ -69,6 +79,8 @@ export function DataGrid({
   readOnly = false,
   onPasted,
   rowHeader = "Indicador",
+  liveCommit = false,
+  describeLocked = false,
 }: DataGridProps) {
   const [texts, setTexts] = useState<Record<string, string>>({});
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -168,32 +180,17 @@ export function DataGrid({
     const text = event.clipboardData.getData("text/plain");
     if (!/[\t\n]/.test(text)) return; // Un solo valor: pegado normal.
     event.preventDefault();
-    const grid = parseClipboardGrid(text);
-    const next = { ...draft };
-    const nextErrors = { ...errors };
-    let count = 0;
-    // Las columnas de destino son las editables de la fila donde empieza el
-    // pegado, desde la casilla enfocada: las calculadas no consumen valores.
-    const targets = columns.map((_, index) => index).filter((index) => index >= ci && editable[ri][index]);
-    grid.forEach((line, dr) => {
-      const row = rows[ri + dr];
-      if (!row) return;
-      line.forEach((raw, dc) => {
-        const columnIndex = targets[dc];
-        const column = columnIndex === undefined ? undefined : columns[columnIndex];
-        if (!column || !editable[ri + dr][columnIndex]) return;
-        const key = cellKey(row.key, column.key);
-        const parsed = parseNumber(raw);
-        if (!parsed.ok) {
-          nextErrors[key] = parsed.reason;
-          return;
-        }
-        delete nextErrors[key];
-        if (parsed.value === stored(row.key, column.key)) delete next[key];
-        else next[key] = parsed.value;
-        count += 1;
-      });
+    const result = pasteIntoGrid({
+      grid: parseClipboardGrid(text),
+      rows: rows.map((r) => r.key),
+      columns: columns.map((c) => c.key),
+      editable,
+      start: { row: ri, column: ci },
+      stored,
+      draft,
+      errors,
     });
+    const { draft: next, errors: nextErrors, count } = result;
     setErrors(nextErrors);
     setTexts({});
     onDraft(next);
@@ -249,6 +246,7 @@ export function DataGrid({
                   return (
                     <td key={column.key} data-locked data-group-start={groupStarts[ci] || undefined} title={locked}>
                       <span>{shown === null ? "—" : formatValue(shown, row.format ?? "entero")}</span>
+                      {describeLocked && <span className="sr-only"> · {locked}</span>}
                     </td>
                   );
                 }
@@ -275,7 +273,18 @@ export function DataGrid({
                       aria-label={`${row.label}, ${column.ariaLabel ?? column.label}`}
                       aria-invalid={error ? true : undefined}
                       placeholder="—"
-                      onChange={(event) => setTexts((t) => ({ ...t, [key]: event.target.value }))}
+                      onChange={(event) => {
+                        const text = event.target.value;
+                        setTexts((t) => ({ ...t, [key]: text }));
+                        if (!liveCommit) return;
+                        // En vivo: solo lo que ya es un número; el error se dice al salir.
+                        const parsed = parseNumber(text);
+                        if (!parsed.ok) return;
+                        const next = { ...draft };
+                        if (parsed.value === stored(row.key, column.key)) delete next[key];
+                        else next[key] = parsed.value;
+                        onDraft(next);
+                      }}
                       onBlur={(event) => {
                         setFocused(null);
                         if (key in texts) commit(row.key, column.key, event.target.value);

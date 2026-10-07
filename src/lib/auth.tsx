@@ -55,6 +55,7 @@ export const SCREEN_PATHS: Record<AdminScreen, string> = {
   pilo: "/admin/mr-pilo",
   pilo_ensenanza: "/admin/mr-pilo-ensenanza",
   reportes: "/admin/reportes-institucionales",
+  correos: "/admin/correos",
 };
 
 export interface AuthContextValue {
@@ -107,6 +108,9 @@ export function screenVisible(
   if ((screen === "users" || screen === "transfer" || screen === "institution" || screen === "pilo" || screen === "pilo_ensenanza") && RANK[profile.role] < RANK.admin) {
     return false;
   }
+  // Correos se decide solo por el rol, como en la base (0137): Planeación lee la
+  // bitácora y la administración lo cambia todo. No depende del rol de acceso.
+  if (screen === "correos") return RANK[profile.role] >= RANK.planeacion;
   // Mis Tableros se gana perteneciendo a una unidad, no marcándolo aparte.
   if (screen === "tableros" && inAnyUnit) return true;
   // Impacto, solo a quien tiene algo que hacer en él: un programa o una

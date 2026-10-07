@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Confirme su correo nuevo</title>
+</head>
+<body style="margin:0;padding:0;background:#f4f7fb;">
+<!-- Texto que algunos programas de correo muestran junto al asunto. -->
+<div style="display:none;max-height:0;overflow:hidden;opacity:0;">Hola. Pidió cambiar el correo de su cuenta a {{ .NewEmail }}.</div>
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f4f7fb;">
+  <tr>
+    <td align="center" style="padding:32px 16px;">
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:560px;background:#ffffff;border:1px solid #dfe6f0;border-radius:16px;">
+        <!-- CABECERA: el nombre de la universidad y de la oficina. -->
+        <tr>
+          <td style="padding:24px 32px;background:#0a2d63;border-radius:16px 16px 0 0;">
+            <div style="font-family:Georgia,'Times New Roman',serif;font-size:20px;font-weight:bold;color:#ffffff;">Universidad de Santander</div>
+            <div style="font-family:Arial,Helvetica,sans-serif;font-size:13px;color:#b9cdf0;padding-top:4px;">Dirección de Planeación Institucional</div>
+          </td>
+        </tr>
+        <!-- CUERPO: aquí está el texto que puede cambiar. -->
+        <tr>
+          <td style="padding:32px;font-family:Arial,Helvetica,sans-serif;font-size:16px;line-height:1.55;color:#0d1c31;">
+            <h1 style="margin:0 0 16px;font-family:Georgia,'Times New Roman',serif;font-size:24px;line-height:1.2;color:#0a2d63;">Confirme su correo nuevo</h1>
+            <p style="margin:0 0 16px;">Hola. Pidió cambiar el correo de su cuenta a {{ .NewEmail }}.</p>
+            <p style="margin:0 0 24px;">Para que el cambio quede hecho, confírmelo desde este enlace.</p>
+            <!-- BOTÓN: no cambie {{ .ConfirmationURL }}; es el enlace que pone el sistema. -->
+            <table role="presentation" cellpadding="0" cellspacing="0">
+              <tr>
+                <td style="background:#2166d6;border-radius:999px;">
+                  <a href="{{ .ConfirmationURL }}" style="display:inline-block;padding:14px 28px;font-family:Arial,Helvetica,sans-serif;font-size:16px;font-weight:bold;color:#ffffff;text-decoration:none;">Confirmar el cambio</a>
+                </td>
+              </tr>
+            </table>
+            <p style="margin:24px 0 8px;font-size:14px;color:#45566d;">Si el botón no abre, copie esta dirección y péguela en su navegador:</p>
+            <p style="margin:0 0 24px;font-size:13px;line-height:1.45;color:#1b52ad;word-break:break-all;">{{ .ConfirmationURL }}</p>
+            <p style="margin:0;font-size:14px;color:#45566d;">Si usted no lo pidió, ignore este mensaje: su cuenta sigue con el correo de antes ({{ .Email }}).</p>
+          </td>
+        </tr>
+        <!-- PIE -->
+        <tr>
+          <td style="padding:20px 32px;border-top:1px solid #dfe6f0;font-family:Arial,Helvetica,sans-serif;font-size:12px;line-height:1.5;color:#6b7c93;">
+            Este correo lo envía un sistema de la Dirección de Planeación Institucional de la Universidad de Santander. No responda a esta dirección.<br>
+            <a href="{{ .SiteURL }}" style="color:#1b52ad;">{{ .SiteURL }}</a>
+          </td>
+        </tr>
+      </table>
+    </td>
+  </tr>
+</table>
+</body>
+</html>

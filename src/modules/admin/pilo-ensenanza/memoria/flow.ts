@@ -208,6 +208,7 @@ export interface DbError {
 const MIGRATION_OF: [RegExp, string][] = [
   [/pilo_readings?\b|pilo_reading_/i, "0127"],
   [/pilo_portals?\b|pilo_sources\b|pilo_scope|pilo_portal_update|pilo_memory_readable/i, "0121"],
+  [/pilo_moodle_sites?(\b|_)|p_site\b/i, "0133"],
   [/pilo_moodle|pilo_space_secret|pilo_space_set_secret|moodle_(on|url|site|checked_at)/i, "0116"],
   [/pilo_doc_outline|pilo_map_|pilo_graph_neighbors|mapped_at/i, "0115"],
   [/pilo_docs?\b|pilo_doc_|pilo-docs|doc_id/i, "0114"],
@@ -335,6 +336,32 @@ export function checkMoodleUrl(value: string): { ok: true; url: string } | { ok:
   const url = `https://${host}${u.pathname.replace(/\/+$/, "")}`;
   if (url.length > 300) return { ok: false, why: "La dirección es demasiado larga." };
   return { ok: true, url };
+}
+
+/** Hasta cuántos sitios de Moodle tiene un espacio (lo mismo que revisa la base, 0133). */
+export const MAX_MOODLE_SITES = 12;
+
+/**
+ * El id de un sitio nuevo, a partir de su nombre: minúsculas, números y
+ * guiones, empieza por letra, hasta 24 caracteres y sin repetir uno que ya
+ * exista («Campus Cúcuta» → «campus-cucuta»; si ya está, «campus-cucuta-2»).
+ */
+export function moodleSiteId(name: string, taken: readonly string[] = []): string {
+  const plain = String(name ?? "")
+    .normalize("NFD")
+    .replace(/[̀-ͯ]/g, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^[^a-z]+/, "")
+    .replace(/-+$/, "");
+  const base = (plain.length >= 2 ? plain : "sitio").slice(0, 24).replace(/-+$/, "");
+  if (!taken.includes(base)) return base;
+  for (let n = 2; n < 100; n++) {
+    const tail = `-${n}`;
+    const id = `${base.slice(0, 24 - tail.length).replace(/-+$/, "")}${tail}`;
+    if (!taken.includes(id)) return id;
+  }
+  return base;
 }
 
 /* --- Quién está leyendo: la franja ------------------------------------------------------ */

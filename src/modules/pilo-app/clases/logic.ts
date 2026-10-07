@@ -12,7 +12,12 @@
        se va;
      · va atado a la cuenta de Pilo que lo pidió: otra cuenta en el mismo
        dispositivo no lo recibe, y encontrarlo lo borra;
-     · «Desconectar» lo borra de los dos sitios de inmediato.
+     · «Desconectar» lo borra de los dos sitios de inmediato;
+     · es de UN Moodle: la universidad tiene varios y con el permiso se
+       guarda cuál (su identificador y su nombre, nunca su dirección). Una
+       persona tiene una conexión a la vez. Un permiso guardado antes de que
+       hubiera varios no dice cuál: se envía sin sitio y la función lo
+       resuelve mientras haya uno solo.
    La contraseña de Moodle no pasa por aquí: va del formulario a la función y
    no se guarda en ningún lado.
 
@@ -31,9 +36,20 @@ export const canUseClases = (account: { rol: string; status: string } | null | u
 
 /* --- El permiso, en el dispositivo ---------------------------------------------------------- */
 
+/** Un Moodle de los que ofrece la administración: su identificador y su nombre. La dirección no llega aquí. */
+export interface SiteRef {
+  id: string;
+  name: string;
+}
+
 export interface Link {
   token: string;
   site: SiteInfo;
+  /** A cuál Moodle es la conexión. Falta en un permiso guardado antes de que hubiera varios. */
+  moodle?: SiteRef & {
+    /** La persona lo eligió entre varios: solo entonces se nombra en la pantalla. */
+    chosen: boolean;
+  };
   /** Quedó guardado en este dispositivo (si no, solo en la memoria de la pestaña). */
   kept: boolean;
 }
@@ -50,6 +66,7 @@ interface Held {
   owner: string;
   token: string;
   site: SiteInfo;
+  moodle?: Link["moodle"];
 }
 
 /** Lo que vive solo mientras la pestaña está abierta. */
@@ -66,13 +83,22 @@ export function deviceStore(): LinkStore | null {
 
 const tokenShape = (v: unknown): v is string => typeof v === "string" && /^[A-Za-z0-9]{20,128}$/.test(v);
 const short = (v: unknown, max = 120): string => (typeof v === "string" ? v.slice(0, max) : "");
+/** El identificador de un sitio de Moodle, con la forma que exige la función. */
+export const siteIdShape = (v: unknown): v is string => typeof v === "string" && /^[a-z][a-z0-9-]{1,23}$/.test(v);
+
+/** El Moodle de un permiso; si no se entiende, el permiso queda como los de antes: sin sitio. */
+function moodleOf(v: unknown): Link["moodle"] {
+  const m = (v && typeof v === "object" ? v : {}) as { id?: unknown; name?: unknown; chosen?: unknown };
+  return siteIdShape(m.id) ? { id: m.id, name: short(m.name, 60), chosen: m.chosen === true } : undefined;
+}
 
 function parseHeld(raw: string | null): Held | null {
   if (!raw) return null;
   try {
-    const d = JSON.parse(raw) as { v?: unknown; owner?: unknown; token?: unknown; site?: { name?: unknown; user?: unknown } };
+    const d = JSON.parse(raw) as { v?: unknown; owner?: unknown; token?: unknown; site?: { name?: unknown; user?: unknown }; moodle?: unknown };
     if (d?.v !== 1 || typeof d.owner !== "string" || !d.owner || !tokenShape(d.token)) return null;
-    return { owner: d.owner, token: d.token, site: { name: short(d.site?.name), user: short(d.site?.user) } };
+    const moodle = moodleOf(d.moodle);
+    return { owner: d.owner, token: d.token, site: { name: short(d.site?.name), user: short(d.site?.user) }, ...(moodle ? { moodle } : {}) };
   } catch {
     return null;
   }
@@ -91,19 +117,21 @@ const drop = (store: LinkStore | null) => {
  * él, solo en memoria (y borra el que hubiera guardado). Dice si quedó en el
  * dispositivo: con el almacenamiento lleno o bloqueado, queda en memoria.
  */
-export function saveLink(owner: string, link: { token: string; site: SiteInfo }, keep: boolean, store: LinkStore | null = deviceStore()): Link {
-  memory = { owner, token: link.token, site: link.site };
+export function saveLink(owner: string, link: { token: string; site: SiteInfo; moodle?: Link["moodle"] }, keep: boolean, store: LinkStore | null = deviceStore()): Link {
+  const moodle = moodleOf(link.moodle);
+  const held: Held = { owner, token: link.token, site: link.site, ...(moodle ? { moodle } : {}) };
+  memory = held;
   let kept = false;
   if (keep && store) {
     try {
-      store.setItem(LINK_KEY, JSON.stringify({ v: 1, owner, token: link.token, site: link.site }));
+      store.setItem(LINK_KEY, JSON.stringify({ v: 1, ...held }));
       kept = true;
     } catch {
       kept = false;
     }
   }
   if (!kept) drop(store);
-  return { ...link, kept };
+  return { token: held.token, site: held.site, ...(moodle ? { moodle } : {}), kept };
 }
 
 /** El permiso de la cuenta `owner`, si lo hay. El de otra cuenta no se entrega: se borra. */
@@ -122,9 +150,9 @@ export function readLink(owner: string, store: LinkStore | null = deviceStore())
     stored = null;
   }
   if (memory && memory.owner !== owner) memory = null;
-  if (stored) return { token: stored.token, site: stored.site, kept: true };
-  if (memory) return { token: memory.token, site: memory.site, kept: false };
-  return null;
+  const held = stored ?? memory;
+  if (!held) return null;
+  return { token: held.token, site: held.site, ...(held.moodle ? { moodle: held.moodle } : {}), kept: Boolean(stored) };
 }
 
 /** «Desconectar»: el permiso se borra de la memoria y del dispositivo, de inmediato. */
@@ -137,13 +165,13 @@ export function clearLink(store: LinkStore | null = deviceStore()): void {
 
 export type ClasesCode =
   | "sesion" | "cuenta" | "perfil" | "suspendida" | "limite" | "no_disponible" | "datos"
-  | "credenciales" | "movil" | "permiso" | "mantenimiento" | "clave_moodle" | "curso"
+  | "credenciales" | "movil" | "permiso" | "mantenimiento" | "clave_moodle" | "curso" | "sitio"
   | "funcion" | "tiempo" | "red" | "tamano" | "moodle" | "interno"
   /** Los que pone la página: sin red, la función no está desplegada, o respondió algo que no se entiende. */
   | "sin_red" | "sin_funcion" | "desconocido";
 
 const SERVER: string[] = [
-  "sesion", "cuenta", "perfil", "suspendida", "limite", "no_disponible", "datos", "credenciales", "movil", "permiso", "mantenimiento", "clave_moodle", "curso",
+  "sesion", "cuenta", "perfil", "suspendida", "limite", "no_disponible", "datos", "credenciales", "movil", "permiso", "mantenimiento", "clave_moodle", "curso", "sitio",
   "funcion", "tiempo", "red", "tamano", "moodle", "interno",
 ];
 
@@ -161,6 +189,7 @@ const FALLBACK: Record<ClasesCode, string> = {
   mantenimiento: "Moodle está en mantenimiento. Intente de nuevo más tarde.",
   clave_moodle: "Moodle le pide revisar su contraseña. Entre a Moodle y vuelva a conectar.",
   curso: "Moodle no encontró ese curso, o usted no está inscrito en él.",
+  sitio: "Ese Moodle ya no está disponible en Pilo. Conecte de nuevo sus clases.",
   funcion: "El Moodle de la universidad no deja leer esa parte desde una aplicación.",
   tiempo: "Moodle tardó demasiado en responder. Intente de nuevo en un momento.",
   red: "No pude conectarme con Moodle. Intente de nuevo en un momento.",
@@ -176,7 +205,7 @@ export const clasesMessage = (code: ClasesCode): string => FALLBACK[code];
 
 /** A qué estado de la pantalla lleva un fallo. */
 export type FailureView =
-  /** El permiso ya no sirve: se borra y se pide conectar de nuevo. */
+  /** El permiso ya no sirve, o su Moodle ya no se ofrece: se borra y se pide conectar de nuevo. */
   | "vencido"
   /** Mis clases no se puede usar todavía (falta configurar Moodle o desplegar la función). */
   | "no_disponible"
@@ -190,6 +219,7 @@ export type FailureView =
 
 const VIEW: Partial<Record<ClasesCode, FailureView>> = {
   permiso: "vencido",
+  sitio: "vencido",
   no_disponible: "no_disponible",
   movil: "no_disponible",
   sin_funcion: "no_disponible",
@@ -252,6 +282,18 @@ const whole = (v: unknown): number => (Number.isInteger(v) && (v as number) > 0 
 const rows = (v: unknown): Record<string, unknown>[] => (Array.isArray(v) ? v.filter((x) => x && typeof x === "object") : []);
 /** Un enlace que se puede abrir: solo https. */
 const link = (v: unknown): string => (typeof v === "string" && /^https:\/\/[^\s]+$/.test(v) ? v.slice(0, 400) : "");
+
+/** Los Moodle entre los que se elige, en el orden de la función; lo que no se entiende se descarta. */
+export function parseSites(body: unknown): SiteRef[] {
+  const b = (body && typeof body === "object" ? body : {}) as Record<string, unknown>;
+  const out: SiteRef[] = [];
+  for (const s of rows(b.sites)) {
+    const id = s.id;
+    if (!siteIdShape(id) || out.some((o) => o.id === id)) continue;
+    out.push({ id, name: text(s.name, 60).trim() || "Moodle" });
+  }
+  return out.slice(0, 12);
+}
 
 /** La agenda tal como se usa aquí; lo que no se entiende se descarta. */
 export function parseAgenda(body: unknown): Agenda {

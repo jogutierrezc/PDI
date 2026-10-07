@@ -8,8 +8,8 @@
 
    Sigue las reglas de `renderBlock` (OpenDataReport.tsx) con los mismos
    helpers de `groups.ts`: orden y visibilidad de los bloques, mapas
-   emparejados, reparto de indicadores, desgloses, rankings y medalleros entre
-   bloques, tipos que no salen dentro de un punto y las guardas de vacío de
+   emparejados, reparto de indicadores, desgloses, rankings, medalleros y
+   tablas personalizadas entre bloques, tipos que no salen dentro de un punto y las guardas de vacío de
    cada tipo. Un bloque sin datos no se pinta y aquí tampoco se ofrece.
 
    · Un conjunto que la ficha muestra dos veces sale una sola: gana el primero.
@@ -49,7 +49,7 @@ import type { CsvFile, CsvTable } from "./csv-export";
 import { viewProblems } from "./free-sets";
 import { customViewOf } from "./custom-table";
 import type { FreeSet } from "./free-sets";
-import { blockPicks, orderedBlocks, ownFreeViews, pageBlocks, pairedMaps, saberProOf, saberTytOf } from "./groups";
+import { blockPicks, groupedTableViews, orderedBlocks, ownFreeViews, pageBlocks, pairedMaps, saberProOf, saberTytOf } from "./groups";
 import { valueOf } from "./reserve";
 import { ALL_CAMPUSES } from "./types";
 import type { Breakdown, BreakdownItem, Indicator, MapDataset, OpenDataCatalog, Report, ReportBlock } from "./types";
@@ -180,7 +180,9 @@ export function reportExports(report: Report, catalog: Catalog): ExportEntry[] {
   const page = pageBlocks(report, blocks);
   const picks = blockPicks(report);
   const paired = pairedMaps(blocks);
-  const ownViews = ownFreeViews(blocks);
+  // Lo que un bloque «libre» no dibuja: las vistas con bloque propio y las
+  // tablas personalizadas que un bloque de tablas eligió.
+  const ownViews = new Set([...ownFreeViews(blocks), ...groupedTableViews(report, blocks)]);
   // Conjunto libre: una entrada por conjunto, en el último bloque que lo dibuja
   // (el mismo que lleva su tabla de origen, `lastFreeBlock`, cuando ese se pinta).
   const freeHome = new Map<string, ReportBlock>();
@@ -251,6 +253,14 @@ export function reportExports(report: Report, catalog: Catalog): ExportEntry[] {
       { id: `mapa:${map.id}`, kind: "mapa", label: map.title, detail: map.source || undefined, group: EXPORT_GROUPS.mapas, reserved: mapReserved(map) },
       () => [file("mapa", map.id, () => mapToTable(map, { campuses }))],
     );
+
+  /** El archivo de un conjunto libre. Una tabla personalizada sale como está escrita, con el nombre de cada tono. */
+  const freeSetFile = (set: FreeSet) =>
+    file("conjunto", set.id, () => {
+      const custom = customViewOf(set);
+      // Conjunto libre de la ficha: el total que quien reporta escribió manda sobre el calculado.
+      return custom?.table ? customTableToTable(set, custom.table) : freeSetToTable(set, { writtenTotals: true });
+    });
 
   for (const { block, inSection } of page) {
     switch (block.kind) {
@@ -382,9 +392,24 @@ export function reportExports(report: Report, catalog: Catalog): ExportEntry[] {
         add(
           block,
           { id: `libre:${set.id}`, kind: "libre", label: set.title, detail: set.source || undefined, group: EXPORT_GROUPS.tablas },
-          // Una tabla personalizada sale como está escrita, con el nombre de cada tono.
-          () => [file("conjunto", set.id, () => { const custom = customViewOf(set); return custom?.table ? customTableToTable(set, custom.table) : freeSetToTable(set); })],
+          () => [freeSetFile(set)],
         );
+        break;
+      }
+      case "tablas_personalizadas": {
+        if (inSection) break;
+        for (const key of picks.tables(block)) {
+          const set = report.freeSets?.find((f) => f.id === key);
+          const view = set && customViewOf(set);
+          // Las guardas de la ficha: que haya filas y que la tabla esté completa.
+          if (!set || !view || set.rows.length === 0 || viewProblems(set, view).length > 0) continue;
+          // El mismo id que en su bloque «libre»: el conjunto es un solo archivo y sale una vez.
+          add(
+            block,
+            { id: `libre:${set.id}`, kind: "libre", label: set.title, detail: set.source || undefined, group: EXPORT_GROUPS.tablas },
+            () => [freeSetFile(set)],
+          );
+        }
         break;
       }
       case "saber_tyt": {

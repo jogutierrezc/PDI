@@ -115,12 +115,24 @@ export interface GateProps {
   intranetName: string | null;
   /** A dónde se vuelve a conversar. */
   home: string;
+  /** La app de escritorio (desktop.ts): la cuenta es obligatoria, no se ofrece usar a Pilo sin ella. */
+  required?: boolean;
 }
 
-export function AccountGate({ voice, voiceOn, onVoice, theme, onTheme, account, pending, hasSession, intranetName, home }: GateProps) {
+/** Con la cuenta obligatoria, lo que Pilo dice al abrir el registro y el ingreso. */
+const OPENING_REQUIRED: Partial<Record<Mode, string>> = {
+  registro: "En el computador trabajo con su cuenta de Pilo. Para crearla, empecemos por su correo de la UDES.",
+  ingreso: "¡Qué bueno verle! Entre con su usuario de Pilo para usarme en este computador.",
+};
+
+export function AccountGate({ voice, voiceOn, onVoice, theme, onTheme, account, pending, hasSession, intranetName, home, required = false }: GateProps) {
   const location = useLocation();
   const navigate = useNavigate();
-  const asked = useMemo(() => gateMode(location.search), [location.search]);
+  const asked = useMemo(() => {
+    const mode = gateMode(location.search);
+    // Con la cuenta obligatoria no hay «sin cuenta»: quien llega ahí ve el registro.
+    return required && mode === "visita" ? "registro" : mode;
+  }, [location.search, required]);
   // Lo que la plataforma dejó en la dirección al volver de un enlace vencido: se mira una vez, al llegar.
   const [expired] = useState(() => (typeof window === "undefined" ? false : linkExpired(window.location.hash, window.location.search)));
 
@@ -165,7 +177,7 @@ export function AccountGate({ voice, voiceOn, onVoice, theme, onTheme, account, 
   const [silent, setSilent] = useState(false);
   const [line, setLine] = useState<Line>(() => {
     const [text, face, mood, label] = OPENING[asked];
-    return { key: 0, text, face, mood, label: label ?? MOOD_LABEL[mood] };
+    return { key: 0, text: (required && OPENING_REQUIRED[asked]) || text, face, mood, label: label ?? MOOD_LABEL[mood] };
   });
   const say = (text: string, face: MojiMood = "feliz", mood: Line["mood"] = "atento", label?: string) => setLine((l) => ({ key: l.key + 1, text, face, mood, label: label ?? MOOD_LABEL[mood] }));
   const speaks = Boolean(voice) && voiceOn && armed && !silent;
@@ -306,7 +318,7 @@ export function AccountGate({ voice, voiceOn, onVoice, theme, onTheme, account, 
       stepLine(at);
     } else {
       const [text, face, mood, label] = OPENING[next];
-      say(text, face, mood, label);
+      say((required && OPENING_REQUIRED[next]) || text, face, mood, label);
     }
   };
 
@@ -623,7 +635,9 @@ export function AccountGate({ voice, voiceOn, onVoice, theme, onTheme, account, 
             <h2 tabIndex={-1}>Cuenta creada</h2>
             <p>
               {done?.after === "confirmar"
-                ? "Le enviamos un mensaje a su correo para confirmar que es suyo. Hasta que lo confirme puede conversar con Pilo sin cuenta; entrar, guardar respuestas y las respuestas a su medida se activan al confirmar."
+                ? required
+                  ? "Le enviamos un mensaje a su correo para confirmar que es suyo. Abra el enlace de ese correo y entre con su usuario: en el computador Pilo trabaja con la cuenta confirmada."
+                  : "Le enviamos un mensaje a su correo para confirmar que es suyo. Hasta que lo confirme puede conversar con Pilo sin cuenta; entrar, guardar respuestas y las respuestas a su medida se activan al confirmar."
                 : done?.after === "ingresar"
                   ? "Su cuenta quedó lista. Entre con su usuario y su contraseña para guardar respuestas y recibir respuestas a su medida."
                   : "Su cuenta quedó lista y ya entró con ella: puede guardar respuestas y Pilo le responde a su medida."}
@@ -651,9 +665,15 @@ export function AccountGate({ voice, voiceOn, onVoice, theme, onTheme, account, 
                   {busy ? "Enviando…" : "Reenviar el correo"}
                 </button>
               )}
-              <Link className="pa-btn pa-btn--main" to={home} replace>
-                Conversar con Pilo
-              </Link>
+              {required && done?.after !== "entro" ? (
+                <button type="button" className="pa-btn pa-btn--main" onClick={() => goMode("ingreso")}>
+                  Entrar con mi usuario
+                </button>
+              ) : (
+                <Link className="pa-btn pa-btn--main" to={home} replace>
+                  Conversar con Pilo
+                </Link>
+              )}
             </div>
           </div>
         ) : (
@@ -900,7 +920,17 @@ export function AccountGate({ voice, voiceOn, onVoice, theme, onTheme, account, 
           </form>
         )}
 
-        {step !== "listo" && (
+        {step !== "listo" && required && (
+          <div className="pc-aside" data-strong={off || undefined}>
+            <p>{off ? "Las cuentas de Pilo no están disponibles ahora. Intente de nuevo en un momento." : "¿Ya tiene cuenta de Pilo?"}</p>
+            {!off && (
+              <button type="button" className="pc-quiet" onClick={() => goMode("ingreso")}>
+                Entrar con mi usuario
+              </button>
+            )}
+          </div>
+        )}
+        {step !== "listo" && !required && (
           <div className="pc-aside" data-strong={off || undefined}>
             <p>{off ? "Mientras tanto, Pilo le responde sin cuenta." : "¿Prefiere no registrarse? Pilo también responde sin cuenta."}</p>
             {guestDoor}
@@ -1028,10 +1058,18 @@ export function AccountGate({ voice, voiceOn, onVoice, theme, onTheme, account, 
             {busy ? "Entrando…" : "Entrar"}
           </button>
         </div>
-        <div className="pc-aside" data-strong={off || undefined}>
-          <p>{off ? "Mientras tanto, Pilo le responde sin cuenta." : "¿Sin cuenta? Pilo también responde."}</p>
-          {guestDoor}
-        </div>
+        {required ? (
+          off && (
+            <div className="pc-aside" data-strong>
+              <p>Las cuentas de Pilo no están disponibles ahora. Intente de nuevo en un momento.</p>
+            </div>
+          )
+        ) : (
+          <div className="pc-aside" data-strong={off || undefined}>
+            <p>{off ? "Mientras tanto, Pilo le responde sin cuenta." : "¿Sin cuenta? Pilo también responde."}</p>
+            {guestDoor}
+          </div>
+        )}
       </form>
     );
   } else if (mode === "olvide") {
@@ -1191,10 +1229,15 @@ export function AccountGate({ voice, voiceOn, onVoice, theme, onTheme, account, 
           </span>
         </div>
         <header className="pc-stage-top">
-          <Link className="pa-sbtn" to={home} replace aria-label="Volver a conversar con Pilo">
-            {Icon.back}
-            Volver
-          </Link>
+          {/* Con la cuenta obligatoria y sin entrar no hay conversación a la que volver. */}
+          {required && !account && !intranetName ? (
+            <span />
+          ) : (
+            <Link className="pa-sbtn" to={home} replace aria-label="Volver a conversar con Pilo">
+              {Icon.back}
+              Volver
+            </Link>
+          )}
           <div className="pa-w-brand">
             <b>Mr. Pilo</b>
             Universidad de Santander

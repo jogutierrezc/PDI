@@ -4,7 +4,7 @@ import { BD, IND, INES_KEY, TERM } from "./dei";
 import { blockKeyOf, DEI_BREAKDOWNS, DEI_INDICATORS, DEI_INES, DEI_TERM, exportsOfBlock, readmeText, reportExports, sourceOf } from "./export-registry";
 import type { ExportEntry } from "./export-registry";
 import type { FreeSet } from "./free-sets";
-import { inSectionOf, lastFreeBlock, orderedBlocks, ownFreeViews, pageBlocks, pairedMaps } from "./groups";
+import { blockPicks, groupedTableViews, inSectionOf, lastFreeBlock, orderedBlocks, ownFreeViews, pageBlocks, pairedMaps, reportGroups } from "./groups";
 import type { Breakdown, HeatmapData, HistoryData, Indicator, MapDataset, PipelineData, Report, ReportBlock, ReportSection, TableData } from "./types";
 
 const catalog = {
@@ -123,6 +123,13 @@ const freeSet = (id: string, rows = 1): FreeSet => ({
   ],
 });
 
+/** Una tabla personalizada: un conjunto libre con su vista de tabla escrita a mano. */
+const customTable = (id: string, rows = 1): FreeSet => ({
+  ...freeSet(id, rows),
+  title: `Tabla ${id}`,
+  views: [{ key: "tabla", title: `Tabla ${id}`, type: "tabla", table: { cut: "30 de junio de 2025" } }],
+});
+
 const report = (extra: Partial<Report> = {}): Report => ({
   slug: "matricula",
   code: "MA",
@@ -207,6 +214,63 @@ describe("reglas de la ficha (groups.ts)", () => {
     const blocks = orderedBlocks(r);
     expect([...ownFreeViews(blocks)]).toEqual(["f:torta"]);
     expect(lastFreeBlock(r, blocks).get("f")).toBe(own);
+  });
+
+  it("bloques de tablas: lo elegido es de su bloque, el primero sin elección muestra el resto y los demás quedan vacíos", () => {
+    const chosen = block("tablas_personalizadas", { settings: { slot: "uno", tablas: ["b", "no-existe"] } });
+    const rest = block("tablas_personalizadas", { settings: { slot: "dos" } });
+    const empty = block("tablas_personalizadas", { settings: { slot: "tres" } });
+    // Un conjunto libre sin tabla personalizada no es cosa de estos bloques.
+    const r = report({ freeSets: [customTable("a"), customTable("b"), customTable("c"), freeSet("f")], blocks: [chosen, rest, empty] });
+    const picks = blockPicks(r);
+    expect(picks.tables(chosen)).toEqual(["b"]);
+    expect(picks.tables(rest)).toEqual(["a", "c"]);
+    expect(picks.tables(empty)).toEqual([]);
+    // Oculto el que recogía el resto, lo recoge el siguiente sin elección.
+    const hidden = blockPicks({ ...r, blocks: [chosen, { ...rest, visible: false }, empty] });
+    expect(hidden.tables(empty)).toEqual(["a", "c"]);
+  });
+
+  it("una tabla con su bloque «libre» a la vista no se repite en el resto; la que un bloque de tablas elige deja su bloque «libre»", () => {
+    const looseA = block("libre", { refKey: "a" });
+    const looseB = block("libre", { refKey: "b", settings: { view: "tabla" } });
+    const hiddenC = block("libre", { refKey: "c", visible: false });
+    const chosen = block("tablas_personalizadas", { settings: { slot: "uno", tablas: ["a"] } });
+    const rest = block("tablas_personalizadas", { settings: { slot: "dos" } });
+    const r = report({ freeSets: [customTable("a"), customTable("b"), customTable("c"), customTable("d")], blocks: [looseA, looseB, hiddenC, chosen, rest] });
+    const picks = blockPicks(r);
+    expect(picks.tables(chosen)).toEqual(["a"]);
+    // «b» se queda en su bloque suelto; «c» tiene el suyo oculto y «d» no tiene: van al resto.
+    expect(picks.tables(rest)).toEqual(["c", "d"]);
+    expect([...groupedTableViews(r, orderedBlocks(r))]).toEqual(["a:tabla"]);
+    // El bloque suelto de «a» ya no dibuja nada: la tabla de origen no cuelga de él.
+    expect(lastFreeBlock(r, orderedBlocks(r)).get("a")).toBeUndefined();
+    expect(lastFreeBlock(r, orderedBlocks(r)).get("b")).toBe(looseB);
+  });
+
+  it("un bloque de tablas dentro de un punto no se pinta: ni muestra ni reclama", () => {
+    const inPoint = block("tablas_personalizadas", { sectionKey: "p1", settings: { tablas: ["a"] } });
+    const rest = block("tablas_personalizadas", { settings: { slot: "dos" } });
+    const r = report({ sections: [section("p1")], freeSets: [customTable("a")], blocks: [inPoint, rest] });
+    expect(blockPicks(r).tables(inPoint)).toEqual([]);
+    expect(blockPicks(r).tables(rest)).toEqual(["a"]);
+    expect(groupedTableViews(r, orderedBlocks(r)).size).toBe(0);
+  });
+
+  it("la tabla es del grupo del bloque de tablas que la eligió, no del de su bloque «libre»", () => {
+    const r = report({
+      freeSets: [customTable("a"), customTable("b")],
+      blocks: [
+        block("separador", { settings: { slot: "g1", title: "Uno" } }),
+        block("libre", { refKey: "a" }),
+        block("libre", { refKey: "b" }),
+        block("separador", { settings: { slot: "g2", title: "Dos" } }),
+        block("tablas_personalizadas", { settings: { tablas: ["a"] } }),
+      ],
+    });
+    const { groupOf } = reportGroups(r);
+    expect(groupOf("libre:a:tabla")?.key).toBe("g2");
+    expect(groupOf("libre:b:tabla")?.key).toBe("g1");
   });
 
   it("lee primero los bloques de cada punto y después los de toda la ficha", () => {
@@ -354,6 +418,28 @@ describe("reportExports", () => {
     expect(entries[0].files[0].build().header).toEqual(["Sede", "Cantidad"]);
   });
 
+  it("un bloque de tablas ofrece el CSV de las tablas que muestra, una vez cada una", () => {
+    const looseA = block("libre", { refKey: "a" });
+    const looseB = block("libre", { refKey: "b" });
+    const chosen = block("tablas_personalizadas", { settings: { slot: "uno", tablas: ["a", "vacia"] } });
+    const rest = block("tablas_personalizadas", { settings: { slot: "dos" } });
+    const r = report({ freeSets: [customTable("a"), customTable("b"), customTable("c"), customTable("vacia", 0)], blocks: [looseA, looseB, chosen, rest] });
+    const entries = reportExports(r, catalog);
+    // «a» baja en el bloque que la eligió y no en su bloque suelto; «b» sigue en el suyo; una tabla sin filas no se ofrece.
+    expect(ids(entries)).toEqual(["libre:b", "libre:a", "libre:c"]);
+    expect(exportsOfBlock(entries, looseA)).toEqual([]);
+    expect(ids(exportsOfBlock(entries, looseB))).toEqual(["libre:b"]);
+    expect(ids(exportsOfBlock(entries, chosen))).toEqual(["libre:a"]);
+    expect(ids(exportsOfBlock(entries, rest))).toEqual(["libre:c"]);
+    expect(entries.every((e) => e.group === "Tablas y series" && e.kind === "libre")).toBe(true);
+    expect(names(entries)).toContain("udes-en-cifras-matricula-conjunto-a.csv");
+    // La tabla sale como está escrita: sus columnas, no las de una gráfica.
+    expect(entries[1].files[0].build().header.slice(0, 2)).toEqual(["Sede", "Cantidad"]);
+    // Dos tablas en un bloque: una sola descarga con los dos archivos.
+    const both = report({ freeSets: [customTable("a"), customTable("c")], blocks: [rest] });
+    expect(sourceOf(exportsOfBlock(reportExports(both, catalog), rest), "Tablas", "tablas.zip")?.files).toHaveLength(2);
+  });
+
   it("dentro de un punto no salen los tipos que la ficha no pinta ahí", () => {
     const r = report({
       sections: [section("p1")],
@@ -368,6 +454,7 @@ describe("reportExports", () => {
         block("diversidad", { sectionKey: "p1" }),
         block("rankings", { sectionKey: "p1" }),
         block("medallero", { sectionKey: "p1" }),
+        block("tablas_personalizadas", { sectionKey: "p1" }),
         block("saber_pro", { sectionKey: "p1" }),
         block("saber_tyt", { sectionKey: "p1" }),
         block("modelo", { sectionKey: "p1" }),

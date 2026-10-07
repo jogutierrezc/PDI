@@ -26,10 +26,10 @@
       <p>Cada uno se pega con su propia línea. El de Enseñanza lleva <code>data-pilo="ensenanza"</code>; sin ese atributo, la línea trae al Pilo de Planeación. Un Pilo que no esté abierto para quien mira la página sencillamente no aparece.</p>
       <p>Para probar otras variantes, cambie los atributos de los <code>&lt;script&gt;</code> al final de este archivo: <code>data-tema</code> acepta blanco, soleado o negro; <code>data-esquina</code> acepta derecha o izquierda. Si van los dos en la misma página, póngalos en esquinas distintas.</p>
       <h2>Leer la página</h2>
-      <p>El Pilo de la derecha lleva <code>data-leer="todo"</code>: al preguntarle, lee esta página para responder sobre lo que usted está viendo, también lo que está plegado en la pestaña y en el desplegable de abajo. Con <code>data-leer="si"</code> leería solo lo visible. Solo se acepta desde un portal autorizado en la intranet; la lectura llega a «Lo que leyó en otros portales», en la memoria de ese Pilo, y la administración decide si la guarda.</p>
+      <p>Los dos Pilos llevan <code>data-leer="todo"</code>: al preguntarles, leen esta página para responder sobre lo que usted está viendo, también lo que está plegado en la pestaña y en el desplegable de abajo. Con <code>data-leer="si"</code> leerían solo lo visible. La lectura llega a «Lo que leyó en otros portales», en la memoria de ese Pilo, y la administración decide si la guarda. A esa bandeja llegan las páginas de los portales autorizados en la intranet y, del portal de Planeación, solo esta página de prueba.</p>
       <p data-pilo-ignorar>Este párrafo lleva <code>data-pilo-ignorar</code>: Pilo no lo lee. Tampoco lee campos de formulario, menús ni diálogos.</p>
       <h2>Para probar «leer todo»</h2>
-      <p>Sin abrir nada, pregúntele al Pilo de la derecha por el horario de la biblioteca de Cúcuta o por el código de préstamo: los dos están en la página, pero plegados. Pilo no pulsa las pestañas ni abre el desplegable: los lee como están.</p>
+      <p>Sin abrir nada, pregúntele a cualquiera de los dos por el horario de la biblioteca de Cúcuta o por el código de préstamo: los dos están en la página, pero plegados. Pilo no pulsa las pestañas ni abre el desplegable: los lee como están.</p>
       <div role="tablist" aria-label="Sedes">
         <button type="button" role="tab" id="demo-tab-1" aria-controls="demo-panel-1" aria-selected="true">Bucaramanga</button>
         <button type="button" role="tab" id="demo-tab-2" aria-controls="demo-panel-2" aria-selected="false">Cúcuta</button>
@@ -63,6 +63,6 @@
       });
     </script>
     <script src="/pilo.js" data-tema="blanco" data-esquina="derecha" data-leer="todo" defer></script>
-    <script src="/pilo.js" data-pilo="ensenanza" data-tema="blanco" data-esquina="izquierda" defer></script>
+    <script src="/pilo.js" data-pilo="ensenanza" data-tema="blanco" data-esquina="izquierda" data-leer="todo" defer></script>
   </body>
 </html>

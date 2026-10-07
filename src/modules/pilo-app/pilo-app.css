@@ -1360,6 +1360,54 @@
   }
 }
 
+/* --- La bienvenida en la app de escritorio (desktop.ts) --------------------------------------
+   La misma escena, a la medida de una ventana de computador: Pilo y el texto
+   más grandes, y la frase en una línea más larga. Solo si la ventana da para ello. */
+
+@media (min-width: 760px) and (min-height: 720px) {
+  .pa-w[data-escritorio] .pa-w-center {
+    gap: 16px;
+  }
+
+  .pa-w[data-escritorio] .pa-w-slot,
+  .pa-w[data-escritorio] .pa-w-fly {
+    width: 232px;
+    height: 232px;
+  }
+
+  .pa-w[data-escritorio] .pa-w-title {
+    font-size: 2.6rem;
+  }
+
+  .pa-w[data-escritorio] .pa-w-bubble {
+    max-width: min(44ch, 100%);
+    min-height: 3em;
+    font-size: 1.2rem;
+  }
+
+  .pa-w[data-escritorio] .pa-w-exhibit {
+    max-width: 520px;
+  }
+
+  .pa-w[data-escritorio] .pa-choose button {
+    min-height: 88px;
+    font-size: 1rem;
+  }
+
+  .pa-w[data-escritorio] .pa-choose button small {
+    font-size: 0.8125rem;
+  }
+}
+
+/* Mientras la app de escritorio lee la sesión: la ventana con su fondo, sin nada que usar. */
+.pa-wait {
+  grid-row: 1 / -1;
+  display: grid;
+  place-items: center;
+  min-height: 0;
+  font-weight: 600;
+}
+
 /* --- Movimiento reducido -------------------------------------------------------------------- */
 
 @media (prefers-reduced-motion: reduce) {

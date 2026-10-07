@@ -41,6 +41,71 @@ export function parseClipboardGrid(text: string): string[][] {
     .map((line) => line.split("\t"));
 }
 
+/* --- Casillas de una rejilla --------------------------------------------------
+   La clave de una casilla y el reparto de un rango pegado viven aquí, sin
+   React: la rejilla de Captura y la del taller pegan con la misma regla, y las
+   pruebas la ejercitan sin montar nada. */
+
+export type CellKey = `${string}|${string}`;
+export const cellKey = (row: string, column: string): CellKey => `${row}|${column}`;
+
+export interface PasteInput {
+  /** Lo pegado, ya partido en filas y columnas (parseClipboardGrid). */
+  grid: string[][];
+  /** Claves de fila y de columna de la rejilla, en su orden. */
+  rows: string[];
+  columns: string[];
+  /** editable[fila][columna]: falso en las casillas calculadas o que no aplican. */
+  editable: boolean[][];
+  /** Casilla enfocada: ahí empieza el pegado. */
+  start: { row: number; column: number };
+  stored: (row: string, column: string) => number | null;
+  draft: Record<CellKey, number | null>;
+  errors?: Record<string, string>;
+}
+
+export interface PasteResult {
+  draft: Record<CellKey, number | null>;
+  errors: Record<string, string>;
+  /** Casillas que recibieron un valor entendido. */
+  count: number;
+}
+
+/**
+ * Reparte un rango pegado desde la casilla enfocada, hacia la derecha y hacia
+ * abajo. Las columnas de destino son las editables de la fila donde empieza el
+ * pegado: las calculadas (la cifra del año que sale de los periodos 1 y 2) no
+ * consumen valores, así un rango con columnas 1 y 2 cae en 1 y 2 de cada año.
+ * Un valor igual al guardado no cuenta como cambio; uno que no es número se
+ * queda como error de su casilla y no se guarda.
+ */
+export function pasteIntoGrid({ grid, rows, columns, editable, start, stored, draft, errors = {} }: PasteInput): PasteResult {
+  const next = { ...draft };
+  const nextErrors = { ...errors };
+  let count = 0;
+  const targets = columns.map((_, index) => index).filter((index) => index >= start.column && editable[start.row]?.[index]);
+  grid.forEach((line, dr) => {
+    const row = rows[start.row + dr];
+    if (row === undefined) return;
+    line.forEach((raw, dc) => {
+      const columnIndex = targets[dc];
+      const column = columnIndex === undefined ? undefined : columns[columnIndex];
+      if (column === undefined || columnIndex === undefined || !editable[start.row + dr]?.[columnIndex]) return;
+      const key = cellKey(row, column);
+      const parsed = parseNumber(raw);
+      if (!parsed.ok) {
+        nextErrors[key] = parsed.reason;
+        return;
+      }
+      delete nextErrors[key];
+      if (parsed.value === stored(row, column)) delete next[key];
+      else next[key] = parsed.value;
+      count += 1;
+    });
+  });
+  return { draft: next, errors: nextErrors, count };
+}
+
 /* --- CSV ------------------------------------------------------------------- */
 
 export function detectSeparator(headerLine: string): string {

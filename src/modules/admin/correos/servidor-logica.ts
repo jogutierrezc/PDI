@@ -1,0 +1,880 @@
+/* =============================================================================
+   Correos · la lógica pura de la función `correos`.
+
+   Todo lo que el módulo decide sin tocar la red ni la base: si el pedido del
+   servidor de cuentas viene firmado de verdad, qué identidad y qué plantilla le
+   tocan, qué mensaje según el rol, cómo se arma el enlace personal, cómo se
+   ponen los datos de la persona (escapados) y cómo queda el correo en HTML y en
+   texto plano; además de los topes, los dominios, el enmascarado de la
+   bitácora y qué significa cada fallo del servidor de correo.
+
+   Aquí vive también el «texto original» de cada plantilla (PLANTILLAS): la
+   migración 0137 siembra esos mismos textos, y «Volver al texto original» los
+   toma de aquí. Una prueba de base de datos vigila que no se separen.
+
+   La función del servidor (supabase/functions/correos/index.ts) es un solo
+   archivo y lleva dentro una copia exacta de este. La prueba
+   servidor-sync.test.ts falla si las dos se separan: al cambiar algo aquí, hay
+   que copiarlo también en index.ts.
+
+   Por eso este archivo no importa nada y solo usa lo que existe igual en el
+   navegador, en Node y en Deno (`crypto.subtle`, `atob`, `btoa`, `TextEncoder`).
+   La vista previa de la intranet llama el mismo `armarCorreo` que el servidor:
+   lo que se ve es lo que llega.
+   ========================================================================== */
+
+/* --- Identidades, roles y datos -------------------------------------------------------------- */
+
+export type Identidad = "plan" | "pilo";
+export type Rol = "estudiante" | "profesor" | "administrativo";
+
+export const IDENTIDADES: readonly Identidad[] = ["plan", "pilo"];
+export const ROLES: readonly Rol[] = ["estudiante", "profesor", "administrativo"];
+export const ROL_NOMBRE: Record<Rol, string> = { estudiante: "Estudiante", profesor: "Profesor", administrativo: "Administrativo" };
+
+/** Los datos de la persona que una plantilla puede insertar: `{{nombre}}`, `{{correo}}`… */
+export const DATOS = ["nombre", "correo", "sede", "rol"] as const;
+export type Dato = (typeof DATOS)[number];
+export const DATO_NOMBRE: Record<Dato, string> = { nombre: "Nombre", correo: "Correo", sede: "Sede", rol: "Rol" };
+
+export interface Persona {
+  nombre: string;
+  correo: string;
+  sede: string;
+  rol: string;
+}
+
+/** El aspecto fijo de cada identidad. No se edita: es el diseño probado del correo. */
+export interface Marca {
+  nombre: string;
+  cabecera: string;
+  cabeceraTinta: string;
+  cabeceraTenue: string;
+  boton: string;
+  botonTinta: string;
+  titulo: string;
+  linea1: string;
+  linea2: string;
+  pie: string;
+  /** La cara de Pilo en la cabecera, como imagen publicada por el portal. */
+  cara: boolean;
+}
+
+export const MARCAS: Record<Identidad, Marca> = {
+  plan: {
+    nombre: "Portal de Planeación",
+    cabecera: "#0a2d63",
+    cabeceraTinta: "#ffffff",
+    cabeceraTenue: "#b9cdf0",
+    boton: "#2166d6",
+    botonTinta: "#ffffff",
+    titulo: "#0a2d63",
+    linea1: "Universidad de Santander",
+    linea2: "Dirección de Planeación Institucional",
+    pie: "Este correo lo envía un sistema de la Dirección de Planeación Institucional de la Universidad de Santander.",
+    cara: false,
+  },
+  pilo: {
+    nombre: "Mr. Pilo",
+    cabecera: "#06142b",
+    cabeceraTinta: "#ffffff",
+    cabeceraTenue: "#a9c0e2",
+    boton: "#4fd3e0",
+    botonTinta: "#04222a",
+    titulo: "#06142b",
+    linea1: "Mr. Pilo",
+    linea2: "La inteligencia artificial de la Universidad de Santander",
+    pie: "Mr. Pilo es la inteligencia artificial de la Universidad de Santander. Este correo se envió porque alguien creó una cuenta con esta dirección.",
+    cara: true,
+  },
+};
+
+/** Dónde publica el portal la cara de Pilo (public/pilo-face/closed.png). */
+export const CARA_DE_PILO = "/pilo-face/closed.png";
+
+/* --- Plantillas ------------------------------------------------------------------------------ */
+
+export interface Plantilla {
+  /** Estable: es la llave en la base y en la bitácora. */
+  clave: string;
+  identidad: Identidad;
+  grupo: string;
+  nombre: string;
+  /** Cuándo se envía, en palabras. */
+  cuando: string;
+  asunto: string;
+  /** La línea que algunos programas muestran junto al asunto. */
+  previa: string;
+  titulo: string;
+  saludo: string;
+  mensaje: string;
+  boton: string;
+  nota: string;
+  /** Un mensaje por rol, cuando la plantilla cambia según quién crea la cuenta. */
+  roles: Record<Rol, string> | null;
+}
+
+/** Los campos que la administración escribe. */
+export const CAMPOS = ["asunto", "previa", "titulo", "saludo", "mensaje", "boton", "nota"] as const;
+export type Campo = (typeof CAMPOS)[number];
+
+const P_CUENTA = "Cuentas de la intranet";
+const K_CUENTA = "Cuenta de Pilo";
+
+/** El texto original de cada plantilla. La migración 0137 siembra estos mismos textos. */
+export const PLANTILLAS: readonly Plantilla[] = [
+  {
+    clave: "plan-invite",
+    identidad: "plan",
+    grupo: P_CUENTA,
+    nombre: "Activar la cuenta",
+    cuando: "Al crear un usuario",
+    asunto: "Active su cuenta de Planeación UDES",
+    previa: "Su cuenta está lista: elija su contraseña.",
+    titulo: "Active su cuenta",
+    saludo: "Hola, {{nombre}}.",
+    mensaje: "La Dirección de Planeación le creó una cuenta en la intranet, con el correo {{correo}}.\nPara activarla y elegir su contraseña, abra este enlace.",
+    boton: "Activar mi cuenta",
+    nota: "El enlace sirve una sola vez. Si no esperaba este mensaje, puede ignorarlo.",
+    roles: null,
+  },
+  {
+    clave: "plan-recovery",
+    identidad: "plan",
+    grupo: P_CUENTA,
+    nombre: "Cambiar la contraseña",
+    cuando: "«Olvidé mi contraseña»",
+    asunto: "Cambie su contraseña",
+    previa: "Abra el enlace y escriba la nueva.",
+    titulo: "Cambie su contraseña",
+    saludo: "Hola, {{nombre}}.",
+    mensaje: "Recibimos una solicitud para cambiar la contraseña de la cuenta {{correo}}.\nAbra este enlace y escriba la contraseña nueva.",
+    boton: "Cambiar mi contraseña",
+    nota: "Si usted no lo pidió, ignore este mensaje: su contraseña sigue siendo la misma.",
+    roles: null,
+  },
+  {
+    clave: "plan-email_change",
+    identidad: "plan",
+    grupo: P_CUENTA,
+    nombre: "Confirmar el correo nuevo",
+    cuando: "Al cambiar el correo",
+    asunto: "Confirme su correo nuevo",
+    previa: "",
+    titulo: "Confirme su correo nuevo",
+    saludo: "Hola, {{nombre}}.",
+    mensaje: "Pidió cambiar el correo de su cuenta. Para que el cambio quede hecho, confírmelo desde este enlace.",
+    boton: "Confirmar el cambio",
+    nota: "Si usted no lo pidió, ignore este mensaje.",
+    roles: null,
+  },
+  {
+    clave: "plan-signup",
+    identidad: "plan",
+    grupo: P_CUENTA,
+    nombre: "Confirmar el correo",
+    cuando: "Si alguien se registra por su cuenta",
+    asunto: "Confirme su correo",
+    previa: "Un paso más para terminar el registro.",
+    titulo: "Confirme su correo",
+    saludo: "Hola, {{nombre}}.",
+    mensaje: "Alguien creó una cuenta con el correo {{correo}} en los portales de Planeación UDES.\nPara terminar el registro, confirme que este correo es suyo.",
+    boton: "Confirmar mi correo",
+    nota: "Si usted no creó esta cuenta, ignore este mensaje: sin confirmar, la cuenta no se activa.",
+    roles: null,
+  },
+  {
+    clave: "plan-magiclink",
+    identidad: "plan",
+    grupo: P_CUENTA,
+    nombre: "Enlace de acceso",
+    cuando: "Al pedir entrar con un enlace",
+    asunto: "Su enlace para entrar",
+    previa: "Entre sin escribir la contraseña.",
+    titulo: "Su enlace para entrar",
+    saludo: "Hola, {{nombre}}.",
+    mensaje: "Pidió entrar a los portales de Planeación UDES con el correo {{correo}}.\nAbra este enlace para entrar sin escribir la contraseña.",
+    boton: "Entrar",
+    nota: "El enlace sirve una sola vez y vence pronto. Si usted no lo pidió, ignore este mensaje.",
+    roles: null,
+  },
+  {
+    clave: "pilo-invite",
+    identidad: "pilo",
+    grupo: K_CUENTA,
+    nombre: "Bienvenida y confirmación",
+    cuando: "Al crear la cuenta de Pilo",
+    asunto: "{{nombre}}, confirme su cuenta de Mr. Pilo",
+    previa: "Un paso más y empezamos.",
+    titulo: "¡Qué bueno tenerlo por aquí!",
+    saludo: "Hola, {{nombre}}.",
+    mensaje: "",
+    boton: "Confirmar mi cuenta",
+    nota: "Si usted no creó esta cuenta, ignore este mensaje: sin confirmar, no se activa.",
+    roles: {
+      estudiante:
+        "Soy Mr. Pilo. Con su cuenta de {{sede}} puedo ayudarle a estudiar: explicarle un tema, recordarle sus entregas de Moodle y mostrarle sus notas.\nPara empezar, confirme que este correo es suyo.",
+      profesor:
+        "Soy Mr. Pilo. Con su cuenta de {{sede}} puedo apoyarle en su labor docente: políticas institucionales, innovación educativa y sus cursos de Moodle.\nPara empezar, confirme que este correo es suyo.",
+      administrativo:
+        "Soy Mr. Pilo. Con su cuenta de {{sede}} puedo responderle sobre las cifras, los planes y las políticas de la universidad.\nPara empezar, confirme que este correo es suyo.",
+    },
+  },
+  {
+    clave: "pilo-recovery",
+    identidad: "pilo",
+    grupo: K_CUENTA,
+    nombre: "Cambiar la contraseña",
+    cuando: "«Olvidé mi contraseña» en Pilo",
+    asunto: "Cambie su contraseña de Mr. Pilo",
+    previa: "",
+    titulo: "Cambiemos su contraseña",
+    saludo: "Hola, {{nombre}}.",
+    mensaje: "Me pidieron cambiar la contraseña de su cuenta. Abra este enlace y escriba la nueva.",
+    boton: "Cambiar mi contraseña",
+    nota: "Si usted no lo pidió, ignore este mensaje: su contraseña sigue siendo la misma.",
+    roles: null,
+  },
+];
+
+/** El texto original de una plantilla, o null si esa clave no es de las de fábrica. */
+export function plantillaOriginal(clave: string): Plantilla | null {
+  return PLANTILLAS.find((p) => p.clave === clave) ?? null;
+}
+
+/**
+ * El correo con código, sin enlace: lo pide el servidor de cuentas cuando alguien
+ * debe confirmar que es quien dice antes de un cambio delicado. No se edita.
+ */
+export const PLANTILLA_CODIGO: Plantilla = {
+  clave: "codigo",
+  identidad: "plan",
+  grupo: P_CUENTA,
+  nombre: "Código de verificación",
+  cuando: "Al confirmar un cambio delicado",
+  asunto: "Su código de verificación",
+  previa: "Escríbalo en la página que se lo pidió.",
+  titulo: "Su código de verificación",
+  saludo: "Hola, {{nombre}}.",
+  mensaje: "Escriba este código en la página que se lo pidió.",
+  boton: "",
+  nota: "Si usted no lo pidió, ignore este mensaje y cambie su contraseña.",
+  roles: null,
+};
+
+const texto = (v: unknown, max: number): string => (typeof v === "string" ? v.slice(0, max) : "");
+
+/**
+ * Una fila de `correo_templates` como plantilla. Lo que falte o venga mal se
+ * completa con el texto original, para que un correo de cuenta nunca salga
+ * vacío. Devuelve null si no hay ni fila útil ni original.
+ */
+export function plantillaDeFila(fila: unknown, clave: string): Plantilla | null {
+  const base = plantillaOriginal(clave);
+  const f = fila && typeof fila === "object" ? (fila as Record<string, unknown>) : null;
+  // Sin fila, o apagada: vale el texto original.
+  if (!f || f.active === false) return base;
+  const identidad: Identidad = f.identity === "pilo" || f.identity === "plan" ? f.identity : (base?.identidad ?? "plan");
+  const rb = f.role_bodies && typeof f.role_bodies === "object" ? (f.role_bodies as Record<string, unknown>) : null;
+  const roles = rb
+    ? ({ estudiante: texto(rb.estudiante, 4000), profesor: texto(rb.profesor, 4000), administrativo: texto(rb.administrativo, 4000) } as Record<Rol, string>)
+    : (base?.roles ?? null);
+  return {
+    clave,
+    identidad,
+    grupo: texto(f.grp, 80) || base?.grupo || "",
+    nombre: texto(f.name, 80) || base?.nombre || clave,
+    cuando: texto(f.sent_when, 120) || base?.cuando || "",
+    asunto: texto(f.subject, 200) || base?.asunto || "",
+    previa: texto(f.preheader, 200),
+    titulo: texto(f.title, 200) || base?.titulo || "",
+    saludo: texto(f.greeting, 200),
+    mensaje: texto(f.body, 4000),
+    boton: texto(f.button, 80) || base?.boton || "Abrir",
+    nota: texto(f.note, 600),
+    roles,
+  };
+}
+
+/**
+ * Un borrador que llega de la pantalla («Enviar una prueba» antes de guardar),
+ * recortado a lo que una plantilla admite. La identidad y la clave son las de
+ * la plantilla de fábrica: un borrador no puede hacerse pasar por otra.
+ */
+export function plantillaDeBorrador(borrador: unknown, clave: string): Plantilla | null {
+  const base = plantillaOriginal(clave);
+  if (!base) return null;
+  const b = borrador && typeof borrador === "object" ? (borrador as Record<string, unknown>) : null;
+  if (!b) return base;
+  const rb = b.roles && typeof b.roles === "object" ? (b.roles as Record<string, unknown>) : null;
+  return {
+    ...base,
+    asunto: texto(b.asunto, 200) || base.asunto,
+    previa: texto(b.previa, 200),
+    titulo: texto(b.titulo, 200) || base.titulo,
+    saludo: texto(b.saludo, 200),
+    mensaje: texto(b.mensaje, 4000),
+    boton: texto(b.boton, 80) || base.boton,
+    nota: texto(b.nota, 600),
+    roles: base.roles && rb ? { estudiante: texto(rb.estudiante, 4000), profesor: texto(rb.profesor, 4000), administrativo: texto(rb.administrativo, 4000) } : base.roles,
+  };
+}
+
+/* --- Qué pide el servidor de cuentas --------------------------------------------------------- */
+
+/** Los correos de cuenta que llevan un enlace personal. */
+export const ACCIONES_CON_ENLACE = ["signup", "invite", "magiclink", "recovery", "email_change"] as const;
+
+/** ¿La cuenta es de Mr. Pilo? La función pilo-cuentas la marca al crearla (0120). */
+export function identidadDe(user: unknown): Identidad {
+  const meta = user && typeof user === "object" ? (user as { user_metadata?: unknown }).user_metadata : null;
+  const pilo = meta && typeof meta === "object" ? (meta as Record<string, unknown>).pilo : null;
+  return pilo === true || pilo === "true" ? "pilo" : "plan";
+}
+
+/**
+ * Qué plantilla le toca a un pedido. Pilo tiene las suyas para la bienvenida
+ * (invitación o registro) y para la contraseña; lo demás —poco frecuente en una
+ * cuenta de Pilo— sale con la de Planeación. `reauthentication` es un código
+ * sin enlace. Los avisos «ya se cambió…» no se envían: devuelve null.
+ */
+export function clavePlantilla(identidad: Identidad, accion: string): string | null {
+  const a = accion === "email" ? "magiclink" : accion;
+  if (a === "reauthentication") return PLANTILLA_CODIGO.clave;
+  if (!(ACCIONES_CON_ENLACE as readonly string[]).includes(a)) return null;
+  if (identidad === "pilo") {
+    if (a === "invite" || a === "signup") return "pilo-invite";
+    if (a === "recovery") return "pilo-recovery";
+  }
+  return `plan-${a}`;
+}
+
+export const esRol = (v: unknown): v is Rol => typeof v === "string" && (ROLES as readonly string[]).includes(v);
+
+/** El primer rol conocido entre los candidatos; si ninguno lo es, estudiante. */
+export function rolDe(...candidatos: unknown[]): Rol {
+  for (const c of candidatos) {
+    const v = typeof c === "string" ? c.trim().toLowerCase() : c;
+    if (esRol(v)) return v;
+  }
+  return "estudiante";
+}
+
+/** El mensaje que le toca a ese rol. Si el suyo está vacío, el de estudiante; si tampoco, el común. */
+export function mensajeDe(plantilla: Plantilla, rol: Rol): string {
+  if (!plantilla.roles) return plantilla.mensaje;
+  const propio = plantilla.roles[rol] ?? "";
+  if (propio.trim()) return propio;
+  const respaldo = plantilla.roles.estudiante ?? "";
+  return respaldo.trim() ? respaldo : plantilla.mensaje;
+}
+
+const SEDES: Record<string, string> = { bucaramanga: "Bucaramanga", cucuta: "Cúcuta", valledupar: "Valledupar", bogota: "Bogotá" };
+
+/** La persona como la nombra el correo. Sin sede conocida, «la UDES»; sin rol, «usuario». */
+export function personaDe(datos: { correo?: unknown; nombre?: unknown; sede?: unknown; rol?: unknown }): Persona {
+  const limpio = (v: unknown, max: number) => (typeof v === "string" ? v.replace(/\s+/g, " ").trim().slice(0, max) : "");
+  const sede = limpio(datos.sede, 40);
+  const rol = limpio(datos.rol, 40).toLowerCase();
+  return {
+    nombre: limpio(datos.nombre, 120),
+    correo: limpio(datos.correo, 200),
+    sede: SEDES[sede.toLowerCase()] ?? (sede || "la UDES"),
+    rol: rol || "usuario",
+  };
+}
+
+/** Las personas de ejemplo de la vista previa y de «Enviar una prueba». */
+export const PERSONAS_DE_EJEMPLO: Record<Rol, Persona & { rotulo: string }> = {
+  estudiante: { rotulo: "Laura, estudiante", nombre: "Laura Gómez", correo: "laura.gomez@mail.udes.edu.co", sede: "Bucaramanga", rol: "estudiante" },
+  profesor: { rotulo: "Carlos, profesor", nombre: "Carlos Rueda", correo: "carlos.rueda@udes.edu.co", sede: "Cúcuta", rol: "profesor" },
+  administrativo: { rotulo: "Marta, administrativa", nombre: "Marta Peña", correo: "marta.pena@valledupar.udes.edu.co", sede: "Valledupar", rol: "administrativo" },
+};
+
+/**
+ * Los correos que hay que enviar por un pedido, cada uno con su enlace. Casi
+ * siempre es uno. El cambio de correo puede traer dos: con el «cambio seguro»
+ * encendido, el servidor de cuentas pide confirmar desde la dirección de antes
+ * y desde la nueva. Los nombres van cruzados (así lo documenta Supabase):
+ * `token_hash` es de la dirección NUEVA y `token_hash_new`, de la ACTUAL.
+ */
+export function enviosDe(user: unknown, data: unknown): { para: string; hash: string; codigo: string }[] {
+  const u = (user && typeof user === "object" ? user : {}) as Record<string, unknown>;
+  const d = (data && typeof data === "object" ? data : {}) as Record<string, unknown>;
+  const s = (v: unknown) => (typeof v === "string" ? v.trim() : "");
+  const actual = s(u.email);
+  if (s(d.email_action_type) === "email_change") {
+    const nuevo = s(u.new_email) || actual;
+    const dos = s(d.token_hash_new) !== "";
+    const lista = [{ para: nuevo, hash: s(d.token_hash), codigo: dos ? s(d.token_new) : s(d.token) || s(d.token_new) }];
+    if (dos) lista.push({ para: actual, hash: s(d.token_hash_new), codigo: s(d.token) });
+    return lista.filter((e) => e.para !== "" && e.hash !== "");
+  }
+  return actual ? [{ para: actual, hash: s(d.token_hash), codigo: s(d.token) }] : [];
+}
+
+/* --- El enlace personal ---------------------------------------------------------------------- */
+
+const origen = (v: unknown): string => {
+  const m = /^(https?:\/\/[^/?#\s]+)/i.exec(typeof v === "string" ? v.trim() : "");
+  return m ? m[1] : "";
+};
+
+/**
+ * La dirección pública del servidor de cuentas. Dentro de Docker, SUPABASE_URL
+ * suele ser interna (http://kong:8000) y no sirve para un enlace que abre una
+ * persona. Por eso: primero la que diga la variable de la función; si no, el
+ * dominio del portal (aquí portal y servidor comparten dominio); y solo al
+ * final SUPABASE_URL.
+ */
+export function basePublica(explicita: unknown, sitio: unknown, supabaseUrl: unknown): string {
+  return origen(explicita) || origen(sitio) || origen(supabaseUrl);
+}
+
+/** El enlace que la persona abre: el servidor de cuentas lo comprueba y la lleva a `redirect`. */
+export function enlaceDeVerificacion(base: string, hash: string, tipo: string, redirect: string): string {
+  return `${base.replace(/\/+$/, "")}/auth/v1/verify?token=${encodeURIComponent(hash)}&type=${encodeURIComponent(tipo)}&redirect_to=${encodeURIComponent(redirect)}`;
+}
+
+/* --- Los datos de la persona ----------------------------------------------------------------- */
+
+/** Escapa lo que se inserta en el HTML del correo (texto o atributo). */
+export function escapar(v: unknown): string {
+  return String(v ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c] as string);
+}
+
+const MARCADOR = /\{\{\s*([^{}]*?)\s*\}\}/g;
+const RESALTE = "background:#fff3c4;border-radius:3px;padding:0 2px;";
+
+/** Sin nombre, «Hola, {{nombre}}.» queda «Hola.» y «{{nombre}}, confirme…» queda «Confirme…». */
+function sinNombre(crudo: string): string {
+  const alInicio = crudo.replace(/^\s*\{\{\s*nombre\s*\}\}\s*[,:;]?\s*/, "");
+  const t = alInicio !== crudo ? alInicio.charAt(0).toUpperCase() + alInicio.slice(1) : crudo;
+  return t.replace(/,?[ \t]*\{\{\s*nombre\s*\}\}/g, "");
+}
+
+export type Modo = "texto" | "html" | "resaltado";
+
+/**
+ * Pone los datos de la persona en un texto. Cada dato se escapa al insertarse
+ * (en HTML); un marcador que no es un dato conocido se deja tal cual y se
+ * devuelve en `desconocidos`, para avisarlo antes de guardar.
+ */
+export function rellenar(crudo: string, persona: Persona, modo: Modo = "texto"): { salida: string; desconocidos: string[] } {
+  const desconocidos: string[] = [];
+  const fuente = persona.nombre.trim() ? String(crudo ?? "") : sinNombre(String(crudo ?? ""));
+  const literal = (t: string) => (modo === "texto" ? t : escapar(t));
+  let salida = "";
+  let desde = 0;
+  for (const m of fuente.matchAll(MARCADOR)) {
+    const i = m.index ?? 0;
+    salida += literal(fuente.slice(desde, i));
+    desde = i + m[0].length;
+    const k = m[1];
+    if ((DATOS as readonly string[]).includes(k)) {
+      const valor = literal(persona[k as Dato] ?? "");
+      salida += modo === "resaltado" ? `<span style="${RESALTE}">${valor}</span>` : valor;
+    } else {
+      desconocidos.push(m[0]);
+      salida += literal(m[0]);
+    }
+  }
+  salida += literal(fuente.slice(desde));
+  return { salida, desconocidos };
+}
+
+/** Los marcadores de una plantilla que el sistema no conoce, sin repetir. */
+export function marcadoresDesconocidos(plantilla: Plantilla): string[] {
+  const textos = [...CAMPOS.map((c) => plantilla[c]), ...(plantilla.roles ? ROLES.map((r) => plantilla.roles?.[r] ?? "") : [])];
+  const malos: string[] = [];
+  for (const t of textos) for (const m of String(t ?? "").matchAll(MARCADOR)) if (!(DATOS as readonly string[]).includes(m[1])) malos.push(m[0]);
+  return [...new Set(malos)];
+}
+
+/* --- El correo ------------------------------------------------------------------------------- */
+
+export interface Correo {
+  asunto: string;
+  previa: string;
+  html: string;
+  texto: string;
+  desconocidos: string[];
+}
+
+export interface PedidoDeCorreo {
+  plantilla: Plantilla;
+  persona: Persona;
+  /** El rol que decide el mensaje, si la plantilla lo cambia por rol. */
+  rol?: Rol;
+  /** El enlace personal. Vacío cuando el correo lleva un código. */
+  enlace: string;
+  /** La dirección del portal: para el pie y para la cara de Pilo. */
+  sitio: string;
+  /** Un código para escribir, en vez del botón. */
+  codigo?: string;
+  /** Si el remitente tiene «responder a», el pie no dice «No responda». */
+  respondible?: boolean;
+  /** Solo para la vista previa: marca en amarillo los datos insertados. */
+  resaltar?: boolean;
+}
+
+const FUENTE = "Arial,Helvetica,sans-serif";
+const SERIF = "Georgia,'Times New Roman',serif";
+
+/**
+ * Arma el correo: el diseño fijo y probado (tablas, estilos en línea, 560 px,
+ * el mismo de public/correos/*.html) con la cabecera y el color de la
+ * identidad, más su versión en texto plano. No usa hojas de estilo, ni
+ * JavaScript, ni SVG. La cara de Pilo es una imagen del portal con `alt` y
+ * tamaño fijo: si el programa de correo la oculta, el correo se entiende igual.
+ */
+export function armarCorreo(pedido: PedidoDeCorreo): Correo {
+  const { plantilla: p, persona } = pedido;
+  const marca = MARCAS[p.identidad] ?? MARCAS.plan;
+  const sitio = origen(pedido.sitio);
+  const desconocidos: string[] = [];
+  const modo: Modo = pedido.resaltar ? "resaltado" : "html";
+  const H = (t: string) => {
+    const r = rellenar(t, persona, modo);
+    desconocidos.push(...r.desconocidos);
+    return r.salida;
+  };
+  const T = (t: string) => rellenar(t, persona, "texto").salida.trim();
+  const unaLinea = (t: string) => T(t).replace(/\s+/g, " ").trim();
+  const parrafos = (t: string) => String(t ?? "").split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
+
+  const mensaje = mensajeDe(p, pedido.rol ?? "estudiante");
+  const asunto = unaLinea(p.asunto).slice(0, 200);
+  const previa = unaLinea(p.previa).slice(0, 200);
+  // Los marcadores del asunto y de la línea previa también se avisan.
+  desconocidos.push(...rellenar(p.asunto, persona).desconocidos, ...rellenar(p.previa, persona).desconocidos);
+
+  const enlace = pedido.codigo ? "" : pedido.enlace;
+  const pie = `${marca.pie}${pedido.respondible ? "" : " No responda a esta dirección."}`;
+
+  const cabecera = marca.cara && sitio
+    ? `<table role="presentation" cellpadding="0" cellspacing="0"><tr>
+              <td width="46" valign="middle" style="padding-right:14px;"><img src="${escapar(sitio + CARA_DE_PILO)}" width="46" height="64" alt="${escapar(marca.nombre)}" style="display:block;width:46px;height:64px;border:0;outline:none;font-family:${FUENTE};font-size:11px;color:${marca.cabeceraTenue};"></td>
+              <td valign="middle"><div style="font-family:${SERIF};font-size:20px;font-weight:bold;color:${marca.cabeceraTinta};">${escapar(marca.linea1)}</div>
+              <div style="font-family:${FUENTE};font-size:13px;color:${marca.cabeceraTenue};padding-top:4px;">${escapar(marca.linea2)}</div></td>
+            </tr></table>`
+    : `<div style="font-family:${SERIF};font-size:20px;font-weight:bold;color:${marca.cabeceraTinta};">${escapar(marca.linea1)}</div>
+            <div style="font-family:${FUENTE};font-size:13px;color:${marca.cabeceraTenue};padding-top:4px;">${escapar(marca.linea2)}</div>`;
+
+  const cuerpo = [p.saludo, ...parrafos(mensaje)].filter((l) => l.trim()).map((l, i, all) => `<p style="margin:0 0 ${i === all.length - 1 ? 24 : 16}px;">${H(l)}</p>`).join("\n            ");
+
+  const accion = pedido.codigo
+    ? `<p style="margin:0 0 24px;font-family:${SERIF};font-size:30px;font-weight:bold;letter-spacing:6px;color:${marca.titulo};">${escapar(pedido.codigo)}</p>`
+    : `<table role="presentation" cellpadding="0" cellspacing="0">
+              <tr>
+                <td style="background:${marca.boton};border-radius:999px;">
+                  <a href="${escapar(enlace)}" style="display:inline-block;padding:14px 28px;font-family:${FUENTE};font-size:16px;font-weight:bold;color:${marca.botonTinta};text-decoration:none;">${H(p.boton)}</a>
+                </td>
+              </tr>
+            </table>
+            <p style="margin:24px 0 8px;font-size:14px;color:#45566d;">Si el botón no abre, copie esta dirección y péguela en su navegador:</p>
+            <p style="margin:0 0 24px;font-size:13px;line-height:1.45;color:#1b52ad;word-break:break-all;">${escapar(enlace)}</p>`;
+
+  const nota = p.nota.trim() ? `<p style="margin:0;font-size:14px;color:#45566d;">${H(p.nota)}</p>` : "";
+  const previaHtml = previa ? `<div style="display:none;max-height:0;overflow:hidden;opacity:0;">${escapar(previa)}</div>\n` : "";
+  const pieSitio = sitio ? `<br>\n            <a href="${escapar(sitio)}" style="color:#1b52ad;">${escapar(sitio)}</a>` : "";
+
+  const html = `<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>${escapar(asunto)}</title>
+</head>
+<body style="margin:0;padding:0;background:#f4f7fb;">
+${previaHtml}<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f4f7fb;">
+  <tr>
+    <td align="center" style="padding:32px 16px;">
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:560px;background:#ffffff;border:1px solid #dfe6f0;border-radius:16px;">
+        <tr>
+          <td style="padding:24px 32px;background:${marca.cabecera};border-radius:16px 16px 0 0;">
+            ${cabecera}
+          </td>
+        </tr>
+        <tr>
+          <td style="padding:32px;font-family:${FUENTE};font-size:16px;line-height:1.55;color:#0d1c31;">
+            <h1 style="margin:0 0 16px;font-family:${SERIF};font-size:24px;line-height:1.2;color:${marca.titulo};">${H(p.titulo)}</h1>
+            ${cuerpo}
+            ${accion}
+            ${nota}
+          </td>
+        </tr>
+        <tr>
+          <td style="padding:20px 32px;border-top:1px solid #dfe6f0;font-family:${FUENTE};font-size:12px;line-height:1.5;color:#6b7c93;">
+            ${escapar(pie)}${pieSitio}
+          </td>
+        </tr>
+      </table>
+    </td>
+  </tr>
+</table>
+</body>
+</html>
+`;
+
+  const lineas = [
+    T(p.titulo),
+    T(p.saludo),
+    ...parrafos(mensaje).map(T),
+    pedido.codigo ? `Código: ${pedido.codigo}` : `${T(p.boton)}:\n${enlace}`,
+    T(p.nota),
+    `--\n${pie}${sitio ? `\n${sitio}` : ""}`,
+  ].filter((l) => l.trim());
+
+  return { asunto, previa, html, texto: `${lineas.join("\n\n")}\n`, desconocidos: [...new Set(desconocidos)] };
+}
+
+/* --- La firma del pedido (Standard Webhooks) ------------------------------------------------- */
+
+function deBase64(b64: string): Uint8Array | null {
+  try {
+    const bin = atob(b64.replace(/-/g, "+").replace(/_/g, "/"));
+    const out = new Uint8Array(bin.length);
+    for (let i = 0; i < bin.length; i += 1) out[i] = bin.charCodeAt(i);
+    return out;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Los secretos del gancho, listos para firmar. Admite `v1,whsec_<base64>` (como
+ * lo pide el servidor de cuentas), `whsec_<base64>` o el base64 solo, y varios
+ * separados por `|` (para cambiar de secreto sin cortar el servicio).
+ */
+export function secretosDelGancho(crudo: unknown): Uint8Array[] {
+  if (typeof crudo !== "string") return [];
+  return crudo
+    .split("|")
+    .map((s) => s.trim().replace(/^v1,/, "").replace(/^whsec_/, ""))
+    .filter(Boolean)
+    .map(deBase64)
+    .filter((b): b is Uint8Array => b !== null && b.length > 0);
+}
+
+/** Compara sin revelar por el tiempo en qué posición difieren. */
+export function igualesEnTiempoConstante(a: Uint8Array, b: Uint8Array): boolean {
+  let diferencia = a.length ^ b.length;
+  const n = Math.max(a.length, b.length);
+  for (let i = 0; i < n; i += 1) diferencia |= (a[i] ?? 0) ^ (b[i] ?? 0);
+  return diferencia === 0;
+}
+
+/** Cuánto puede adelantarse o atrasarse la hora del pedido, en segundos. */
+export const TOLERANCIA_FIRMA = 300;
+
+export type Firma = { ok: true } | { ok: false; motivo: "secreto" | "cabeceras" | "vencida" | "firma" };
+
+/**
+ * ¿El pedido lo firmó el servidor de cuentas? Se firma `id.hora.cuerpo` con
+ * HMAC-SHA256; la cabecera `webhook-signature` trae una o varias firmas
+ * (`v1,<base64>`, separadas por espacios). La hora no puede alejarse más de
+ * cinco minutos, para que un pedido copiado no sirva después.
+ */
+export async function firmaValida(pedido: { secreto: unknown; id: unknown; hora: unknown; cuerpo: string; firmas: unknown; ahora: number; tolerancia?: number }): Promise<Firma> {
+  const secretos = secretosDelGancho(pedido.secreto);
+  if (secretos.length === 0) return { ok: false, motivo: "secreto" };
+  const id = typeof pedido.id === "string" ? pedido.id : "";
+  const hora = typeof pedido.hora === "string" ? pedido.hora.trim() : "";
+  const firmas = typeof pedido.firmas === "string" ? pedido.firmas : "";
+  if (!id || !/^\d{1,12}$/.test(hora) || !firmas) return { ok: false, motivo: "cabeceras" };
+  if (Math.abs(pedido.ahora - Number(hora)) > (pedido.tolerancia ?? TOLERANCIA_FIRMA)) return { ok: false, motivo: "vencida" };
+
+  const recibidas = firmas
+    .split(/\s+/)
+    .filter((f) => f.startsWith("v1,"))
+    .map((f) => deBase64(f.slice(3)))
+    .filter((b): b is Uint8Array => b !== null);
+  if (recibidas.length === 0) return { ok: false, motivo: "firma" };
+
+  const contenido = new TextEncoder().encode(`${id}.${hora}.${pedido.cuerpo}`);
+  let ok = false;
+  for (const secreto of secretos) {
+    const llave = await crypto.subtle.importKey("raw", secreto as unknown as ArrayBuffer, { name: "HMAC", hash: "SHA-256" }, false, ["sign"]);
+    const esperada = new Uint8Array(await crypto.subtle.sign("HMAC", llave, contenido as unknown as ArrayBuffer));
+    // Sin salir antes: se comparan todas.
+    for (const r of recibidas) if (igualesEnTiempoConstante(esperada, r)) ok = true;
+  }
+  return ok ? { ok: true } : { ok: false, motivo: "firma" };
+}
+
+/** Firma un pedido como lo hace el servidor de cuentas. Sirve a las pruebas y a nada más. */
+export async function firmar(secreto: string, id: string, hora: string, cuerpo: string): Promise<string> {
+  const [llaveCruda] = secretosDelGancho(secreto);
+  const llave = await crypto.subtle.importKey("raw", llaveCruda as unknown as ArrayBuffer, { name: "HMAC", hash: "SHA-256" }, false, ["sign"]);
+  const bytes = new Uint8Array(await crypto.subtle.sign("HMAC", llave, new TextEncoder().encode(`${id}.${hora}.${cuerpo}`) as unknown as ArrayBuffer));
+  let bin = "";
+  for (const b of bytes) bin += String.fromCharCode(b);
+  return `v1,${btoa(bin)}`;
+}
+
+/* --- La bitácora: a quién, sin decir quién --------------------------------------------------- */
+
+export const CORREO_VALIDO = /^[^@\s<>"',;]+@[^@\s<>"',;]+\.[^@\s<>"',;.]+$/;
+export const correoValido = (v: unknown): v is string => typeof v === "string" && v.length <= 254 && CORREO_VALIDO.test(v.trim());
+
+/**
+ * El destinatario como queda en la bitácora: `laura.gomez@mail.udes.edu.co`
+ * pasa a `l•••a.gomez@mail.udes.edu.co`. Se tapa la primera parte del nombre
+ * (hasta el primer punto), que es la que más identifica.
+ */
+export function enmascarar(correo: unknown): string {
+  const limpio = typeof correo === "string" ? correo.trim().toLowerCase() : "";
+  const arroba = limpio.lastIndexOf("@");
+  if (arroba < 1) return "•••";
+  const local = limpio.slice(0, arroba);
+  const punto = local.indexOf(".");
+  const primera = punto > 0 ? local.slice(0, punto) : local;
+  const resto = punto > 0 ? local.slice(punto) : "";
+  const tapada = primera.length > 2 ? `${primera[0]}•••${primera[primera.length - 1]}` : `${primera[0]}•••`;
+  return `${tapada}${resto}${limpio.slice(arroba)}`;
+}
+
+/** La huella de un destinatario: sirve para contar su tope sin guardar su correo. */
+export async function huella(correo: string, sal: string): Promise<string> {
+  const bytes = new Uint8Array(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(`${sal}|correos|${correo.trim().toLowerCase()}`) as unknown as ArrayBuffer));
+  return [...bytes].map((b) => b.toString(16).padStart(2, "0")).join("").slice(0, 40);
+}
+
+/* --- Dominios y topes ------------------------------------------------------------------------ */
+
+/** «udes.edu.co, @mail.udes.edu.co» → ["udes.edu.co", "mail.udes.edu.co"]. Lo que no parece un dominio se descarta. */
+export function dominiosDe(crudo: unknown): string[] {
+  const partes = Array.isArray(crudo) ? crudo.map(String) : typeof crudo === "string" ? crudo.split(/[\s,;]+/) : [];
+  const limpios = partes.map((d) => d.trim().toLowerCase().replace(/^@/, "").replace(/^\*\./, "").replace(/\.$/, "")).filter((d) => /^[a-z0-9-]+(\.[a-z0-9-]+)+$/.test(d));
+  return [...new Set(limpios)].slice(0, 40);
+}
+
+/** Lista vacía: a cualquiera. Un dominio de la lista incluye sus subdominios. */
+export function dominioPermitido(correo: string, dominios: readonly string[]): boolean {
+  if (dominios.length === 0) return true;
+  const d = correo.trim().toLowerCase().split("@").pop() ?? "";
+  return dominios.some((p) => d === p || d.endsWith(`.${p}`));
+}
+
+export type Tipo = "cuenta" | "prueba" | "aviso";
+export type Resultado = "aceptado" | "rechazado" | "en_espera";
+export type Decision = { sale: true } | { sale: false; resultado: Resultado; motivo: string; http: number };
+
+/**
+ * ¿Sale este correo?
+ *
+ * Los correos de CUENTA (activar, cambiar contraseña…) no esperan: si se
+ * retuvieran por el tope por hora, alguien se quedaría sin poder entrar y sin
+ * saber por qué. Por eso el tope por hora no los frena; sí los cortan el
+ * interruptor general, los dominios permitidos y el tope por persona y día,
+ * que es el que impide usar «olvidé mi contraseña» para molestar a otro.
+ *
+ * Una PRUEBA no cuenta para el tope por persona, pero sí respeta el tope por
+ * hora y los dominios. Un AVISO (para después) espera su turno si se pasa el
+ * tope por hora. Un tope en 0 es «sin tope».
+ */
+export function decidirEnvio(caso: { tipo: Tipo; encendido: boolean; permitido: boolean; enHora: number; topeHora: number; dePersonaHoy: number; topePersona: number }): Decision {
+  const no = (resultado: Resultado, motivo: string, http: number): Decision => ({ sale: false, resultado, motivo, http });
+  if (caso.tipo !== "prueba" && !caso.encendido) return no("rechazado", "El envío de correos está apagado en la intranet.", 503);
+  if (!caso.permitido) return no("rechazado", "Esa dirección no es de un dominio permitido.", 403);
+  if (caso.tipo === "cuenta") {
+    if (caso.topePersona > 0 && caso.dePersonaHoy >= caso.topePersona) {
+      return no("rechazado", `Ya se enviaron ${caso.topePersona} correos de cuenta a esta dirección hoy. Revise su bandeja (y el correo no deseado) o intente mañana.`, 429);
+    }
+    return { sale: true };
+  }
+  if (caso.topeHora > 0 && caso.enHora >= caso.topeHora) {
+    return caso.tipo === "aviso" ? no("en_espera", "Se alcanzó el tope por hora: espera su turno.", 429) : no("rechazado", "Se alcanzó el tope de correos por hora. Intente más tarde.", 429);
+  }
+  return { sale: true };
+}
+
+/* --- El servidor de correo ------------------------------------------------------------------- */
+
+export type Seguridad = "starttls" | "ssl";
+
+export interface Conexion {
+  host: string;
+  port: number;
+  seguridad: Seguridad;
+  user: string;
+  pass: string;
+  /** De dónde salió: de la intranet, de las variables de la función o de ninguna parte. */
+  origen: "base" | "entorno" | "ninguno";
+}
+
+/**
+ * La conexión SMTP. Manda lo guardado en la intranet; si ahí no hay servidor,
+ * valen las variables de la función (SMTP_HOST, SMTP_PORT, SMTP_USER,
+ * SMTP_PASS, SMTP_SECURE), para poder arrancar solo con Coolify. Si en la
+ * intranet hay servidor pero aún no contraseña, se usa la de las variables.
+ */
+export function conexionDe(ajustes: unknown, clave: unknown, env: Record<string, string | undefined>): Conexion {
+  const a = (ajustes && typeof ajustes === "object" ? ajustes : {}) as Record<string, unknown>;
+  const s = (v: unknown) => (typeof v === "string" ? v.trim() : "");
+  const puerto = (v: unknown, def: number) => {
+    const n = Number(v);
+    return Number.isInteger(n) && n > 0 && n < 65536 ? n : def;
+  };
+  if (s(a.smtp_host)) {
+    const port = puerto(a.smtp_port, 587);
+    return { host: s(a.smtp_host), port, seguridad: a.smtp_security === "ssl" ? "ssl" : "starttls", user: s(a.smtp_user), pass: (typeof clave === "string" && clave) || env.SMTP_PASS || "", origen: "base" };
+  }
+  const host = s(env.SMTP_HOST);
+  if (!host) return { host: "", port: 587, seguridad: "starttls", user: "", pass: "", origen: "ninguno" };
+  const port = puerto(env.SMTP_PORT, 587);
+  const seguro = s(env.SMTP_SECURE).toLowerCase();
+  const ssl = seguro ? ["ssl", "tls", "ssl/tls", "true", "1", "si", "sí"].includes(seguro) : port === 465;
+  return { host, port, seguridad: ssl ? "ssl" : "starttls", user: s(env.SMTP_USER), pass: env.SMTP_PASS ?? "", origen: "entorno" };
+}
+
+/** Tiempos límite del servidor de correo, en milisegundos. Cortos: el servidor de cuentas espera pocos segundos. */
+export const SMTP_CONEXION_MS = 4_000;
+export const SMTP_SALUDO_MS = 4_000;
+export const SMTP_SILENCIO_MS = 8_000;
+/** Lo más que puede tardar un envío pedido por el servidor de cuentas, que solo espera cinco segundos. */
+export const SMTP_TOTAL_GANCHO_MS = 4_500;
+/** Lo más que puede tardar una prueba pedida desde la intranet. */
+export const SMTP_TOTAL_PANEL_MS = 15_000;
+
+export type FalloSmtp = { codigo: "dns" | "puerto" | "tiempo" | "tls" | "credenciales" | "remitente" | "buzon" | "config" | "otro"; mensaje: string };
+
+/**
+ * Qué pasó con el servidor de correo, dicho para quien no programa. De la
+ * respuesta del servidor solo se usa su número: el texto puede traer la
+ * dirección de la persona y no debe llegar a la bitácora.
+ */
+export function falloSmtp(error: unknown): FalloSmtp {
+  const e = (error && typeof error === "object" ? error : {}) as Record<string, unknown>;
+  const code = typeof e.code === "string" ? e.code.toUpperCase() : "";
+  const n = Number(e.responseCode) || 0;
+  const m = `${typeof e.message === "string" ? e.message : String(error ?? "")} ${typeof e.response === "string" ? e.response : ""}`.toLowerCase();
+  const con = (codigo: FalloSmtp["codigo"], mensaje: string): FalloSmtp => ({ codigo, mensaje });
+
+  if (code === "EAUTH" || [530, 534, 535].includes(n) || /authentication (failed|unsuccessful)|invalid login|username and password not accepted/.test(m)) {
+    return con("credenciales", "El servidor rechazó el usuario o la contraseña. Revise los dos; en Microsoft 365, el buzón debe tener permitido «SMTP autenticado».");
+  }
+  if (code === "EDNS" || code === "ENOTFOUND" || code === "EAI_AGAIN" || /getaddrinfo|enotfound|dns|name or service not known|failed to lookup/.test(m)) {
+    return con("dns", "No encontré ese servidor: revise que el nombre esté bien escrito.");
+  }
+  if (code === "ECONNREFUSED" || /econnrefused|connection refused/.test(m)) {
+    return con("puerto", "El servidor no acepta conexiones en ese puerto. Lo habitual es 587 (STARTTLS) o 465 (SSL/TLS).");
+  }
+  if (code === "ETLS" || /wrong version number|ssl routines|certificate|tls|handshake|starttls/.test(m)) {
+    return con("tls", "Falló el cifrado de la conexión. Con el puerto 587 elija STARTTLS; con el 465, SSL/TLS.");
+  }
+  if (code === "ETIMEDOUT" || code === "ETIME" || /timed? ?out|timeout|greeting never received/.test(m)) {
+    return con("tiempo", "El servidor no respondió a tiempo: lo más probable es que la salida por ese puerto esté cerrada desde este servidor. Pida que la abran (puerto 587).");
+  }
+  if (/sendasdenied|send as|not authorized to send|5\.7\.60|sender address rejected|5\.7\.1 .*sender/.test(m) || n === 553) {
+    return con("remitente", `Rechazado${n ? ` (${n})` : ""}: el servidor no deja enviar con esa dirección de remitente. Debe ser el buzón de la conexión o uno con permiso «Enviar como».`);
+  }
+  if (code === "EENVELOPE" || [550, 551, 552, 554].includes(n)) {
+    return con("buzon", `Rechazado${n ? ` (${n})` : ""}: el buzón no existe o el servidor no aceptó el destinatario.`);
+  }
+  if (code === "ECONNECTION" || code === "ESOCKET" || /econnreset|socket|connection closed/.test(m)) {
+    return con("puerto", "La conexión con el servidor se cortó. Revise el puerto y la seguridad, y que la salida no esté bloqueada.");
+  }
+  return con("otro", `El servidor de correo no aceptó el pedido${n ? ` (${n})` : ""}.`);
+}

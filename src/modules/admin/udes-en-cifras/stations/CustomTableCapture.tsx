@@ -104,14 +104,23 @@ function ToneOptions({ labels }: { labels: Draft["meta"]["labels"] }) {
 
 /* --- La pestaña ------------------------------------------------------------------------ */
 
-export function CustomTableCapture({ data, report, periodId, canEdit }: StationProps) {
+export function CustomTableCapture({ data, report, periodId, canEdit, only, startCreating, onCreated, onCancelCreate }: StationProps & {
+  /** El taller: abre directamente el alta de una tabla nueva, sin lista ni tabla abierta. */
+  startCreating?: boolean;
+  onCreated?: (key: string) => void;
+  onCancelCreate?: () => void;
+}) {
   const all = (data.rows.freeSets ?? []).filter((fs) => fs.report_id === report!.uuid).sort((a, b) => a.position - b.position);
-  const sets = all.filter((fs) => customViewOf(fs));
+  const sets = all.filter((fs) => customViewOf(fs) && (!only || fs.id === only));
   const create = useSaveCustomTable();
   const [chosen, setChosen] = useState("");
   /** La clave de la tabla recién creada: se abre sola cuando llega de la base. */
   const [createdKey, setCreatedKey] = useState<string | null>(null);
-  const [creating, setCreating] = useState(false);
+  const [creating, setCreatingState] = useState(Boolean(startCreating));
+  const setCreating = (next: boolean) => {
+    setCreatingState(next);
+    if (!next && startCreating) onCancelCreate?.();
+  };
   const [title, setTitle] = useState("");
 
   const set = sets.find((s) => s.key === createdKey) ?? sets.find((s) => s.id === chosen) ?? sets[0];
@@ -132,8 +141,9 @@ export function CustomTableCapture({ data, report, periodId, canEdit }: StationP
       {
         onSuccess: () => {
           setCreatedKey(key);
-          setCreating(false);
+          setCreatingState(false);
           setTitle("");
+          onCreated?.(key);
         },
       },
     );
@@ -160,7 +170,7 @@ export function CustomTableCapture({ data, report, periodId, canEdit }: StationP
             </select>
           </label>
         )}
-        {!creating && (
+        {!creating && !only && !startCreating && (
           <button type="button" className="button-secondary" disabled={!canEdit} onClick={() => setCreating(true)}>
             <Icon name="plus" size={15} /> Nueva tabla personalizada
           </button>
@@ -195,7 +205,7 @@ export function CustomTableCapture({ data, report, periodId, canEdit }: StationP
         </form>
       )}
 
-      {!set ? (
+      {startCreating ? null : !set ? (
         !creating && (
           <StageEmpty title="Este informe no tiene tablas personalizadas">
             Una tabla personalizada mezcla textos y cifras, con color por reglas o a mano. Créala con «Nueva tabla

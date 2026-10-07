@@ -367,8 +367,8 @@ const ALPHA_SOURCE = `${ALPHA_CITATION.authors} «${ALPHA_CITATION.title}». ${A
 
 /* --- Captura ------------------------------------------------------------------------ */
 
-export function SaberTytCapture({ data, report, periodId, canEdit }: StationProps) {
-  const sets = (data.rows.saberTyt ?? []).filter((t) => t.report_id === report!.uuid).sort((a, b) => a.position - b.position);
+export function SaberTytCapture({ data, report, periodId, canEdit, only }: StationProps) {
+  const sets = (data.rows.saberTyt ?? []).filter((t) => t.report_id === report!.uuid && (!only || t.id === only)).sort((a, b) => a.position - b.position);
   const [active, setActive] = useState(sets[0]?.id);
   const tyt = sets.find((t) => t.id === active) ?? sets[0];
   if (!tyt) {

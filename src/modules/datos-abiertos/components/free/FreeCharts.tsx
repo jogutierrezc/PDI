@@ -29,9 +29,10 @@ import {
   compareSource,
   compareTotals,
   dateOf,
+  cellShown,
   freeAllRowsAt,
   freeRowsAt,
-  freeTotalAt,
+  freeTotalShown,
   freeYears,
   histogramBins,
   numberOf,
@@ -1356,16 +1357,18 @@ function Figures({ set, view, rows }: ChartProps) {
 
 /**
  * La fuente tal como se capturó: los títulos de grupo abren su tramo y las
- * filas de total llevan la cifra calculada sobre las filas de datos de su
+ * filas de total llevan, casilla por casilla, la cifra escrita por quien
+ * reporta o, si la dejó vacía, la calculada sobre las filas de datos de su
  * grupo (suma en enteros, promedio en decimales y porcentajes), con la
- * operación dicha en el encabezado de la fila.
+ * operación dicha en el encabezado de la fila (`freeTotalShown`). Una casilla
+ * que no encaja con el tipo de su columna se lee como está escrita.
  */
 function FreeTable({ set, view, rows }: { set: FreeSet; view: FreeView; rows: FreeRow[] }) {
   const columns = set.columns;
   const yearColumn = set.temporality === "anual";
   const cell = (row: FreeRow, column: FreeColumn) => {
-    const value = column.kind === "cifra" ? numberOf(row.cells[column.key]) : textOf(row.cells[column.key]);
-    if (value === null || value === "") return null;
+    const value = cellShown(column, row.cells[column.key]);
+    if (value === null) return null;
     return typeof value === "number" ? fullFmt(column, value) : value;
   };
   return (
@@ -1394,7 +1397,7 @@ function FreeTable({ set, view, rows }: { set: FreeSet; view: FreeView; rows: Fr
                 </tr>
               );
             }
-            const total = row.kind === "total" ? freeTotalAt(rows, index, columns) : null;
+            const total = row.kind === "total" ? freeTotalShown(rows, index, columns) : null;
             const operations = total ? Array.from(new Set(Object.values(total.basis))) : [];
             return (
               <tr key={index} data-kind={row.kind}>
@@ -1404,7 +1407,7 @@ function FreeTable({ set, view, rows }: { set: FreeSet; view: FreeView; rows: Fr
                     const value = total.cells[c.key];
                     return (
                       <td key={c.key} data-numeric={c.kind === "cifra" || undefined}>
-                        {i === 0 && c.kind !== "cifra" ? (
+                        {i === 0 && c.kind !== "cifra" && !total.written.includes(c.key) ? (
                           <>
                             {row.label || "Total"}
                             {operations.length > 0 && (
@@ -1417,7 +1420,7 @@ function FreeTable({ set, view, rows }: { set: FreeSet; view: FreeView; rows: Fr
                         ) : value === null || value === undefined ? (
                           "—"
                         ) : (
-                          fullFmt(c, value as number)
+                          typeof value === "number" ? fullFmt(c, value) : value
                         )}
                       </td>
                     );

@@ -39,6 +39,7 @@ export type IconName =
   | "download"
   | "sidebar"
   | "upload"
+  | "mail"
   | "shield"
   | "eye"
   | "eye-off"
@@ -198,6 +199,12 @@ const paths: Record<IconName, JSX.Element> = {
     </>
   ),
   upload: <path d="M12 15V4M7.5 8.5 12 4l4.5 4.5M4.5 19.5h15" />,
+  mail: (
+    <>
+      <rect x="3.5" y="5.5" width="17" height="13" rx="2.2" />
+      <path d="m4.5 7.5 7.5 6 7.5-6" />
+    </>
+  ),
   shield: (
     <>
       <path d="M12 3.5 5 6v5.6c0 4.2 2.9 7.6 7 8.9 4.1-1.3 7-4.7 7-8.9V6z" />

@@ -42,6 +42,7 @@ const SCREENS: { screen: AdminScreen; label: string; icon: IconName }[] = [
   { screen: "users", label: "Usuarios y roles", icon: "user" },
   { screen: "pilo", label: "Mr. Pilo con IA", icon: "spark" },
   { screen: "pilo_ensenanza", label: "Mr. Pilo en Enseñanza", icon: "compass" },
+  { screen: "correos", label: "Correos", icon: "mail" },
   { screen: "transfer", label: "Traslado de datos", icon: "upload" },
 ];
 

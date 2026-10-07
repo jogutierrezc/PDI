@@ -249,6 +249,36 @@
 }
 
 @media print {
-  .od-ctable__scroll { overflow: visible; }
-  .od-ctable__table tr > :first-child { position: static; }
+  /* La tabla personalizada conserva el mismo contenido en el informe impreso:
+     se abre el contenedor desplazable, se libera la primera columna fija y se
+     mantienen los tonos de la matriz aunque el navegador suprima fondos. */
+  .od-ctable,
+  .od-ctable__scroll {
+    display: block;
+    overflow: visible !important;
+    max-width: none;
+    border-color: #aeb8c4;
+    break-inside: auto;
+  }
+
+  .od-ctable__table {
+    width: 100%;
+    font-size: 9pt;
+    border-collapse: collapse;
+    print-color-adjust: exact;
+    -webkit-print-color-adjust: exact;
+  }
+
+  .od-ctable__table tr > :first-child,
+  .od-ctable__table tr[data-kind="grupo"] th > span {
+    position: static;
+  }
+
+  .od-ctable__table thead { display: table-header-group; }
+  .od-ctable__table tr { break-inside: avoid; }
+  .od-ctable__table th,
+  .od-ctable__table td { padding: 4pt 6pt; }
+
+  .od-ctable__legend,
+  .od-ctable__foot { break-inside: avoid; }
 }

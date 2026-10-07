@@ -1,0 +1,793 @@
+<title>Taller de UDES en Cifras</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700&family=Fraunces:opsz,wght@9..144,600;9..144,700&family=Manrope:wght@500;700;800&display=swap">
+<style>
+/* Composición: columna de lectura de 68ch; el taller de prueba y las tablas de inventario la rompen a lo ancho. */
+:root{
+  --page:#f4f7fb;--surface:#ffffff;--surface-2:#f8fafd;--surface-3:#eef3fa;
+  --ink:#0d1c31;--ink-2:#45566d;--ink-3:#5f7088;
+  --navy:#0a2d63;--blue:#2166d6;--blue-strong:#1b52ad;--blue-soft:#eaf1fd;
+  --line:rgba(13,40,84,.13);--line-strong:rgba(13,40,84,.24);
+  --done:#12833a;--pending:#8a5700;--pending-soft:#fbf2e0;--risk:#c23434;
+  --signal:#f6b93f;--signal-ink:#1d1402;--previous:#0a6f7c;--flap:#f6f8fc;--flap-ink:#0a2d63;--ticket:#eef2f8;--ticket-ink:#0d1c31;
+  --stage:#06142b;--stage-ink:#eef4ff;--stage-muted:#a9bddb;--pilo:#4fd3e0;
+  --shadow:0 1px 2px rgba(10,34,73,.06),0 8px 24px rgba(10,34,73,.07);
+  --display:"Fraunces","Iowan Old Style",Georgia,serif;
+  --body:"Manrope",ui-sans-serif,system-ui,sans-serif;
+  --sign:"Barlow Condensed","Arial Narrow","Roboto Condensed",sans-serif;
+  --ease-out:cubic-bezier(.23,1,.32,1);
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --page:#081326;--surface:#0e1d36;--surface-2:#122441;--surface-3:#18305a;
+  --ink:#eaf1fc;--ink-2:#b4c4dc;--ink-3:#93a6c2;
+  --navy:#cfe0ff;--blue:#6ea4f5;--blue-strong:#8db8fa;--blue-soft:#17305c;
+  --line:rgba(190,212,255,.16);--line-strong:rgba(190,212,255,.3);
+  --done:#57c97f;--pending:#f0c060;--pending-soft:#3a2c0c;--risk:#ff8a8a;
+  --signal:#f6b93f;--signal-ink:#1d1402;--previous:#5fd0de;--flap:#06142b;--flap-ink:#eaf1fc;--ticket:#eef2f8;--ticket-ink:#0d1c31;
+  --stage:#030b1a;--stage-ink:#eef4ff;--stage-muted:#a9bddb;--pilo:#4fd3e0;
+  --shadow:0 1px 2px rgba(0,0,0,.4),0 8px 24px rgba(0,0,0,.35);color-scheme:dark}}
+:root[data-theme="dark"]{
+  --page:#081326;--surface:#0e1d36;--surface-2:#122441;--surface-3:#18305a;
+  --ink:#eaf1fc;--ink-2:#b4c4dc;--ink-3:#93a6c2;
+  --navy:#cfe0ff;--blue:#6ea4f5;--blue-strong:#8db8fa;--blue-soft:#17305c;
+  --line:rgba(190,212,255,.16);--line-strong:rgba(190,212,255,.3);
+  --done:#57c97f;--pending:#f0c060;--pending-soft:#3a2c0c;--risk:#ff8a8a;
+  --signal:#f6b93f;--signal-ink:#1d1402;--previous:#5fd0de;--flap:#06142b;--flap-ink:#eaf1fc;--ticket:#eef2f8;--ticket-ink:#0d1c31;
+  --stage:#030b1a;--stage-ink:#eef4ff;--stage-muted:#a9bddb;--pilo:#4fd3e0;
+  --shadow:0 1px 2px rgba(0,0,0,.4),0 8px 24px rgba(0,0,0,.35);color-scheme:dark}
+
+*{box-sizing:border-box}
+body{background:var(--page);color:var(--ink);font:500 17px/1.6 var(--body);margin:0}
+::selection{background:var(--blue);color:#fff}
+.wrap{max-width:1240px;margin:0 auto;padding-inline:clamp(16px,4vw,40px);padding-block:clamp(28px,5vw,64px)}
+.read{max-width:68ch}
+h1,h2{font-family:var(--display);color:var(--navy);letter-spacing:-.022em;line-height:1.1;text-wrap:balance;margin:0}
+h1{font-size:clamp(2.1rem,3vw + 1.2rem,3.3rem);font-weight:700}
+h2{font-size:clamp(1.5rem,1.2vw + 1.2rem,2rem);font-weight:700;margin-top:clamp(48px,7vw,88px);margin-bottom:14px}
+h3{font:800 1.06rem/1.3 var(--body);margin:0 0 4px;color:var(--ink)}
+p{margin:0 0 14px}
+.lede{font-size:1.2rem;color:var(--ink-2);margin-top:18px}
+:focus-visible{outline:3px solid var(--blue);outline-offset:2px;border-radius:6px}
+.note{font-size:.9rem;color:var(--ink-3)}
+
+.paths{display:grid;gap:18px;margin-top:28px}
+.path{display:grid;grid-template-columns:7.5rem minmax(0,1fr);gap:14px;align-items:center}
+.path>b{font-weight:800;color:var(--ink-2)}
+.path ol{display:flex;flex-wrap:wrap;gap:8px;list-style:none;margin:0;padding:0}
+.path li{padding:8px 14px;border:1px solid var(--line-strong);border-radius:999px;background:var(--surface);font-weight:700;font-size:.92rem}
+.path.new li{background:var(--navy);color:var(--page);border-color:transparent}
+@media (max-width:560px){.path{grid-template-columns:1fr}}
+
+/* --- El taller de prueba ---------------------------------------------------- */
+.bar{display:flex;flex-wrap:wrap;gap:12px 22px;align-items:center;margin:26px 0 12px}
+.seg{display:inline-flex;flex-wrap:wrap;border:1px solid var(--line-strong);border-radius:22px;background:var(--surface);padding:3px}
+.seg button{min-height:42px;padding:0 15px;border:0;border-radius:999px;background:transparent;color:var(--ink-2);font:700 .95em var(--body);cursor:pointer}
+.seg button[aria-pressed="true"]{background:var(--navy);color:var(--page)}
+.bar label,.ctl{font-weight:700;color:var(--ink-2);display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+
+.proto{--fs:16px;--ln:#1f5fbf;position:relative;font-size:var(--fs);background:var(--surface);border:1px solid var(--line-strong);border-radius:20px;box-shadow:var(--shadow);overflow:clip}
+.proto[data-size="grande"]{--fs:19px}
+.p-top{display:flex;flex-wrap:wrap;gap:10px 16px;align-items:center;padding:12px 18px;border-bottom:1px solid var(--line);background:var(--surface-2)}
+.p-top strong{font-family:var(--display);font-size:1.2em;color:var(--navy)}
+.p-top .sp{flex:1 1 auto}
+.chip{padding:5px 12px;border-radius:999px;background:var(--surface-3);font-weight:700;font-size:.82em;color:var(--ink-2)}
+.saved{display:inline-flex;align-items:center;gap:7px;font-weight:700;font-size:.86em;color:var(--done)}
+.btn{min-height:48px;padding:0 20px;border-radius:999px;border:1px solid var(--line-strong);background:var(--surface);color:var(--navy);font:800 .95em var(--body);cursor:pointer;display:inline-flex;align-items:center;gap:8px;transition:transform 140ms var(--ease-out),background-color 180ms ease}
+.btn:active{transform:scale(.97)}
+.btn.primary{background:var(--blue);border-color:transparent;color:#fff}
+:root[data-theme="dark"] .btn.primary{color:#04112a}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]) .btn.primary{color:#04112a}}
+.btn.quiet{border-color:transparent;background:transparent;color:var(--ink-2)}
+.btn.danger{color:var(--risk)}
+.btn[disabled]{opacity:.45;cursor:default}
+@media (hover:hover) and (pointer:fine){.btn:not(.primary):not([disabled]):hover{background:var(--surface-3)}}
+
+.p-body{display:grid;grid-template-columns:15em minmax(0,1fr);align-items:start}
+.p-list{display:grid;gap:2px;padding:12px 8px;border-right:1px solid var(--line)}
+.p-list h3{padding:0 10px 6px;font-size:.8em;color:var(--ink-3)}
+.p-list button{min-height:46px;text-align:left;padding:6px 10px;border:0;border-radius:12px;background:transparent;color:var(--ink);font:700 .88em/1.25 var(--body);cursor:pointer;display:flex;gap:10px;align-items:center}
+.p-list button[aria-current="true"]{background:var(--blue-soft);color:var(--blue-strong)}
+.p-list small{display:block;font-weight:600;color:var(--ink-3);font-size:.86em}
+.code{flex:none;width:2.2em;height:2.2em;border-radius:5px;display:grid;place-items:center;font:700 .95em var(--sign);letter-spacing:.04em;color:#fff}
+
+.p-ficha{padding:16px clamp(14px,2.2vw,28px) 28px;min-width:0;display:grid;gap:12px}
+.p-ctl{display:flex;flex-wrap:wrap;gap:10px 20px;align-items:center;padding-bottom:10px;border-bottom:1px solid var(--line)}
+.p-ctl .seg button{min-height:38px;font-family:var(--sign);letter-spacing:.06em;text-transform:uppercase;font-size:.95em}
+.p-ctl .seg button[aria-pressed="true"]{background:var(--signal);color:var(--signal-ink)}
+.ex{font-size:.8em;font-weight:700;color:var(--pending);background:var(--pending-soft);padding:6px 12px;border-radius:8px}
+.blk{border:2px solid transparent;border-radius:16px;padding:14px;margin:0 -14px;min-width:0}
+.blk[data-on]{border-color:var(--blue);background:var(--surface-2)}
+.blk-view{cursor:pointer;min-width:0}
+.kind{font:600 .82em var(--sign);letter-spacing:.08em;text-transform:uppercase;color:var(--ink-3)}
+.sign{font:700 1.25em/1.15 var(--sign);letter-spacing:.03em;text-transform:uppercase;color:var(--navy);margin:2px 0 10px}
+.empty{color:var(--ink-3);font-style:italic}
+
+/* Separador de sección, tablero de paletas y boleto de origen: el vocabulario del portal. */
+.f-sec{display:flex;gap:14px;align-items:center;padding:14px 16px;background:var(--surface-3);border-bottom:4px solid var(--ln);border-radius:6px 6px 0 0}
+.f-sec i{flex:none;font:700 1.3em var(--sign);font-style:normal;color:#fff;background:var(--ln);padding:2px 10px;border-radius:4px}
+.f-sec b{font:700 2em/1 var(--sign);text-transform:uppercase;letter-spacing:.02em;color:var(--navy)}
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(15em,1fr));gap:18px}
+.kpi{display:grid;gap:8px;align-content:start}
+.kpi>span:first-child{font:600 .9em var(--sign);letter-spacing:.08em;text-transform:uppercase;color:var(--ink-2)}
+.flaps{display:flex;gap:3px;flex-wrap:wrap;font:700 2.5em/1 var(--sign);perspective:300px}
+.flaps span{display:grid;place-items:center;width:.72em;height:1.24em;background:linear-gradient(var(--flap) 49%,var(--line) 49%,var(--line) 51%,var(--flap) 51%);color:var(--flap-ink);border-radius:.1em;box-shadow:0 1px 0 var(--line-strong);font-variant-numeric:tabular-nums}
+.flaps span.pt{width:.3em;background:none;box-shadow:none}
+.flaps.none{font-size:1.2em;font-family:var(--body);font-style:italic;color:var(--ink-3)}
+.ticket{position:relative;background:var(--ticket);color:var(--ticket-ink);border-radius:3px;padding:6px 12px 6px 20px;font-size:.78em;line-height:1.35;border-left:2px dashed rgba(13,40,84,.35)}
+.ticket b{display:block}
+.ticket span{font:600 1em var(--sign);letter-spacing:.08em;text-transform:uppercase}
+.prev{font-size:.84em;color:var(--previous);font-weight:700}
+.tbl-wrap{overflow-x:auto}
+table{border-collapse:collapse;width:100%;font-variant-numeric:tabular-nums}
+th,td{padding:8px 12px;border-bottom:1px solid var(--line);text-align:left;vertical-align:top}
+th{font-size:.82em;color:var(--ink-2);background:var(--surface-3)}
+td.n,th.n{text-align:right}
+.bars{display:grid;gap:9px}
+.bars div{display:grid;grid-template-columns:9em minmax(0,1fr) 5.4em;gap:10px;align-items:center}
+.bars i{display:block;height:1.35em;border-radius:4px;background:var(--ln);transition:width 260ms var(--ease-out)}
+.bars i.res{background:repeating-linear-gradient(135deg,var(--ln) 0 4px,transparent 4px 8px);border:1px solid var(--ln)}
+.bars span:last-child{text-align:right;font-weight:800;font-variant-numeric:tabular-nums}
+.pie{display:flex;flex-wrap:wrap;gap:18px;align-items:center}
+.pie svg{width:9.5em;height:9.5em;flex:none}
+.legend{display:grid;gap:5px;list-style:none;margin:0;padding:0;font-size:.92em}
+.legend li{display:grid;grid-template-columns:1em minmax(0,1fr) auto;gap:8px;align-items:center}
+.legend i{width:.9em;height:.9em;border-radius:3px}
+.legend b{font-variant-numeric:tabular-nums}
+.tone{font-weight:800;white-space:nowrap}
+.tone.t-bien{color:var(--done)}.tone.t-atencion{color:var(--pending)}.tone.t-riesgo{color:var(--risk)}
+.src{color:var(--ink-3);font-size:.8em;margin:8px 0 0;display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap}
+.src span:last-child{font:600 1em var(--sign);letter-spacing:.08em}
+.how{padding:12px 14px;border-radius:12px;background:var(--surface-3);margin:0}
+.tools{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px}
+/* Vista avanzada: los datos a la izquierda y la gráfica, viva, a la derecha. */
+@media (min-width:900px){.proto[data-mode="completo"] .blk[data-ed]{display:grid;grid-template-columns:minmax(0,1.25fr) minmax(0,1fr);column-gap:22px;align-items:start}
+  .proto[data-mode="completo"] .blk[data-ed]>.blk-view{grid-column:2;grid-row:1/span 3;position:sticky;top:12px;padding:14px;border-radius:14px;background:var(--surface);border:1px solid var(--line)}
+  .proto[data-mode="completo"] .blk[data-ed]>.tools{grid-column:1;margin-top:0}
+  .proto[data-mode="completo"] .blk[data-ed]>.ed{grid-column:1}}
+.evo{margin-top:16px;padding-top:12px;border-top:1px solid var(--line)}
+.evo svg{width:100%;height:auto;display:block}
+.evo text{font:600 9px var(--body);fill:var(--ink-3)}
+.keys{display:flex;flex-wrap:wrap;gap:6px 16px;list-style:none;margin:6px 0 0;padding:0;font-size:.84em;font-weight:700}
+.keys i{display:inline-block;width:1.4em;height:.3em;border-radius:2px;vertical-align:middle;margin-right:6px}
+.yr{font:700 1em var(--sign);letter-spacing:.06em;text-align:center!important;border-left:2px solid var(--line-strong)!important}
+.yr small{display:block;font:600 .72em var(--body);letter-spacing:0;color:var(--pending)}
+.grid .sub{text-align:center;font-size:.8em;color:var(--ink-3);font-weight:700}
+.ask-prior{display:flex;flex-wrap:wrap;gap:10px;align-items:center;padding:12px 14px;border-radius:12px;background:var(--pending-soft);color:var(--ink);font-weight:700}
+.fld select.inl{width:auto;min-height:42px}
+.ind-head{display:flex;flex-wrap:wrap;gap:10px 16px;align-items:end}
+.ind-head .fld{flex:1 1 16em}
+.ind-head .seg button{min-height:44px}
+.tip{display:flex;gap:10px;align-items:baseline;margin:0;font-size:.92em;color:var(--ink-2)}
+.tip b{color:var(--navy);white-space:nowrap}
+/* La vista clásica: la herramienta de hoy, tal cual. */
+.cl{padding:18px clamp(14px,2.4vw,28px) 26px;display:grid;gap:18px}
+.cl-st{display:grid;grid-template-columns:repeat(auto-fit,minmax(11em,1fr));gap:8px;list-style:none;margin:0;padding:0}
+.cl-st li{padding:10px 12px;border:1px solid var(--line);border-radius:12px;background:var(--surface-2);display:grid;gap:2px}
+.cl-st li[data-now]{background:var(--blue-soft);border-color:var(--blue);box-shadow:inset 0 -3px 0 var(--blue)}
+.cl-st b{font-weight:800}
+.cl-st small{color:var(--ink-3);font-size:.8em;line-height:1.3}
+.cl-st em{font-style:normal;font-weight:700;font-size:.8em}
+.cl-st em.ok{color:var(--done)}.cl-st em.pe{color:var(--pending)}
+.cl-tabs{display:flex;flex-wrap:wrap;gap:4px 6px;border-bottom:1px solid var(--line-strong);padding-bottom:0}
+.cl-tabs span{padding:8px 12px;font-weight:700;font-size:.88em;color:var(--ink-2);border-bottom:3px solid transparent}
+.cl-tabs span[data-now]{color:var(--blue-strong);border-color:var(--blue)}
+
+.ed{display:grid;gap:14px;margin-top:14px;padding-top:14px;border-top:1px dashed var(--line-strong)}
+.fld{display:grid;gap:6px;font-weight:700}
+.fld input,.fld select,.grid input,.paste{font:500 1em var(--body);color:var(--ink);background:var(--surface);border:1px solid var(--line-strong);border-radius:12px;padding:10px 12px;min-height:46px;width:100%}
+.fld input:focus,.fld select:focus,.grid input:focus,.paste:focus{outline:none;border-color:var(--blue);box-shadow:0 0 0 3px rgba(33,102,214,.3)}
+.grid{overflow-x:auto}
+.grid table{min-width:30em}
+.grid td,.grid th{padding:3px;border:0;background:transparent;font-size:1em}
+.grid th.lbl,.grid td.lbl{padding:8px 10px;font-weight:800;white-space:nowrap;text-align:left}
+.grid input{border-radius:8px;padding:8px 10px;min-height:44px;text-align:right}
+.grid input.txt{text-align:left}
+.grid input,.grid .lock{min-width:5.4em}
+.grid th input{font-weight:800;background:var(--surface-3);text-align:left}
+.lock{display:block;padding:10px;border-radius:8px;background:repeating-linear-gradient(135deg,var(--surface-3) 0 6px,transparent 6px 12px);text-align:right;font-weight:800;font-style:italic;color:var(--ink-2);min-height:44px}
+.paste{min-height:60px;resize:vertical}
+.adv{padding:12px 14px;border-radius:12px;background:var(--surface-3);display:grid;gap:6px;font-size:.92em}
+.proto[data-mode="sencillo"] .adv{display:none}
+.add{border:2px dashed var(--line-strong);border-radius:16px;padding:16px;display:grid;gap:14px}
+.add h4{font:600 .9em var(--sign);letter-spacing:.08em;text-transform:uppercase;color:var(--ink-3);margin:6px 0 0}
+.add-opts{display:grid;grid-template-columns:repeat(auto-fill,minmax(13em,1fr));gap:8px}
+.optc{display:grid;gap:2px;align-content:start}
+.why{justify-self:start;min-height:40px;padding:0 8px;border:0;background:transparent;color:var(--blue-strong);font:700 .84em var(--body);text-decoration:underline;text-underline-offset:3px;cursor:pointer}
+.opt{width:100%;min-height:70px;text-align:left;padding:10px 12px;border-radius:12px;border:1px solid var(--line-strong);background:var(--surface);color:var(--ink-2);font:500 .84em/1.35 var(--body);cursor:pointer;transition:transform 140ms var(--ease-out)}
+.opt b{display:block;font-weight:800;font-size:1.12em;color:var(--navy)}
+.opt:active{transform:scale(.97)}
+.opt[data-live]{border-color:var(--blue)}
+
+.dock{position:sticky;bottom:14px;height:0;z-index:7}
+.dock>*{position:absolute;bottom:0}
+.call{right:14px;min-height:52px;padding:4px 20px 4px 6px;border-radius:999px;border:0;background:var(--stage);color:var(--stage-ink);font:800 .95em var(--body);cursor:pointer;display:inline-flex;align-items:center;gap:10px;box-shadow:var(--shadow);transition:transform 140ms var(--ease-out)}
+.call:active{transform:scale(.97)}
+.call img{width:44px;height:44px;object-fit:contain}
+.p-pilo{right:14px;width:min(22em,calc(100% - 28px));transform-origin:100% 100%;box-shadow:var(--shadow);border-radius:18px;background:var(--stage);color:var(--stage-ink);padding:16px;display:grid;gap:12px}
+.pilo-head{display:flex;gap:12px;align-items:center}
+.pilo-head img{width:64px;height:64px;object-fit:contain;flex:none}
+.pilo-head small{display:block;color:var(--stage-muted);font-size:.82em}
+.pilo-say{font-size:1.02em;line-height:1.5;margin:0}
+.pilo-list{list-style:none;padding:0;margin:0;display:grid;gap:8px}
+.pilo-list li{display:grid;grid-template-columns:1.4em minmax(0,1fr);gap:8px}
+.pilo-nav{display:flex;flex-wrap:wrap;gap:8px}
+.p-pilo .btn{background:transparent;border-color:rgba(190,212,255,.35);color:var(--stage-ink)}
+.p-pilo .btn.go{background:var(--pilo);border-color:transparent;color:#04222a}
+.spot{position:absolute;left:0;top:0;border:3px solid var(--pilo);border-radius:16px;box-shadow:0 0 0 6px rgba(79,211,224,.25);pointer-events:none;z-index:5}
+.toast{left:14px;background:var(--stage);color:var(--stage-ink);padding:10px 12px 10px 18px;border-radius:999px;display:flex;gap:12px;align-items:center;font-weight:700;box-shadow:var(--shadow);max-width:calc(100% - 28px)}
+.toast .btn{min-height:40px;background:transparent;color:var(--pilo);border-color:transparent}
+
+@media (max-width:1100px){.p-body{grid-template-columns:minmax(0,1fr)}
+  .p-list{grid-auto-flow:column;grid-auto-columns:max-content;overflow-x:auto;border-right:0;border-bottom:1px solid var(--line)}
+  .p-list h3{display:none}
+}
+
+/* --- El resto de la propuesta ------------------------------------------------ */
+.inv{overflow-x:auto;margin-top:18px;border:1px solid var(--line);border-radius:16px;background:var(--surface)}
+.inv table{min-width:52rem;font-size:.92rem}
+.inv td:first-child{font-weight:800}
+.inv td small{display:block;font-weight:600;color:var(--ink-3)}
+.rules{display:grid;grid-template-columns:repeat(auto-fit,minmax(17rem,1fr));gap:22px 36px;margin-top:22px}
+.rules p{color:var(--ink-2);margin:0}
+.script{margin-top:18px;display:grid}
+.script div{display:grid;grid-template-columns:10rem minmax(0,1fr);gap:16px;padding:14px 0;border-bottom:1px solid var(--line)}
+.script b{color:var(--navy)}
+.script q{quotes:"«" "»";color:var(--ink-2)}
+@media (max-width:560px){.script div{grid-template-columns:1fr;gap:4px}}
+.phases{counter-reset:f;list-style:none;padding:0;margin:20px 0 0;display:grid;gap:18px}
+.phases li{counter-increment:f;display:grid;grid-template-columns:3rem minmax(0,1fr);gap:16px}
+.phases li::before{content:counter(f);font:700 2rem/1 var(--display);color:var(--blue)}
+.phases p{margin:0;color:var(--ink-2)}
+.ask{margin-top:18px;padding-left:1.2em}
+.ask li{margin-bottom:10px}
+@media (prefers-reduced-motion:reduce){*{transition-duration:.01ms!important}}
+</style>
+
+<div class="wrap">
+  <div class="read">
+    <h1>Un solo taller para UDES en Cifras</h1>
+    <p class="lede">Hoy, para publicar una cifra hay que pasar por seis estaciones y, dentro de Captura, por hasta trece pestañas. La propuesta es trabajar sobre la ficha misma: usted ve el informe como lo verá el público, toca lo que quiere cambiar y lo cambia ahí, con las mismas reglas y los mismos veinte tipos de bloque que el portal ya maneja.</p>
+  </div>
+
+  <div class="paths" aria-label="El recorrido de hoy y el propuesto">
+    <div class="path"><b>Hoy</b><ol><li>1 · Periodo y campus</li><li>2 · Estructura y KPI</li><li>3 · Captura</li><li>4 · Diseño visual</li><li>5 · Publicación</li><li>6 · Boletín</li></ol></div>
+    <div class="path new"><b>Propuesta</b><ol><li>El taller: la ficha que se edita</li><li>Publicar</li></ol></div>
+  </div>
+
+  <h2>Pruébelo con lo que el portal maneja de verdad</h2>
+  <div class="read"><p>El prototipo usa los once informes, los tres campus, los seis años del periodo 2020–2025 con sus periodos 1 y 2, y los bloques reales. Elija el tablero de indicadores y pulse «Editar»: llena los seis años a la vez, o pega el rango desde Excel. Cambie de «Sencillo» a «Completo» para ver la gráfica en vivo, y de «Taller nuevo» a «Clásica» para volver a la herramienta de hoy. Pilo está en espera, abajo a la derecha: aparece solo si usted lo llama. Las cifras son de ejemplo.</p></div>
+
+  <div class="bar">
+    <label>Vista
+      <span class="seg" id="vista"><button type="button" data-v="taller" aria-pressed="true">Taller nuevo</button><button type="button" data-v="clasica" aria-pressed="false">Clásica</button></span>
+    </label>
+    <label>Tamaño de letra
+      <span class="seg" id="size"><button type="button" data-v="normal" aria-pressed="true">Normal</button><button type="button" data-v="grande" aria-pressed="false">Grande</button></span>
+    </label>
+    <label>Modo
+      <span class="seg" id="mode"><button type="button" data-v="sencillo" aria-pressed="true">Sencillo</button><button type="button" data-v="completo" aria-pressed="false">Completo</button></span>
+    </label>
+    <button type="button" class="btn" id="tour">Que Pilo me muestre</button>
+  </div>
+
+  <div class="proto" id="proto" data-size="normal" data-mode="sencillo">
+    <div class="p-top">
+      <strong>UDES en Cifras</strong>
+      <span class="chip">Periodo 2020–2025 · vigente</span>
+      <span class="sp"></span>
+      <span class="saved" id="saved" role="status"></span>
+      <button type="button" class="btn primary" id="publish">Publicar</button>
+    </div>
+    <div class="p-body">
+      <nav class="p-list" id="plist" aria-label="Informes"></nav>
+      <div class="p-ficha">
+        <div class="p-ctl" id="pctl">
+          <span class="ctl fld" style="display:flex">Así lo ve el público · Corte <select id="year" class="inl" aria-label="Año del corte"></select><span class="seg" id="cut"><button type="button" data-v="0" aria-pressed="false">Periodo 1</button><button type="button" data-v="1" aria-pressed="true">Periodo 2</button><button type="button" data-v="a" aria-pressed="false">Año</button></span></span>
+          <span class="ctl">Campus <span class="seg" id="camp"><button type="button" data-v="todas" aria-pressed="true">Todos</button><button type="button" data-v="BUC" aria-pressed="false">Bucaramanga</button><button type="button" data-v="CUC" aria-pressed="false">Cúcuta</button><button type="button" data-v="VAL" aria-pressed="false">Valledupar</button></span></span>
+          <span class="ex">Cifras de ejemplo</span>
+        </div>
+        <div id="ficha" style="display:grid;gap:12px;min-width:0"></div>
+      </div>
+    </div>
+    <div class="cl" id="classic" hidden>
+      <ol class="cl-st" aria-label="Estaciones de hoy">
+        <li><b>1 · Periodo y campus</b><small>Años, corte, campus y oficinas</small><em class="ok">✓ Completo</em></li>
+        <li><b>2 · Estructura y KPI</b><small>Informes, indicadores y cifras clave</small><em class="ok">✓ Completo</em></li>
+        <li data-now><b>3 · Captura</b><small>Cifras por año y campus</small><em class="pe">▲ Pendiente</em></li>
+        <li><b>4 · Diseño visual</b><small>Orden y gráficas de cada ficha</small><em class="ok">✓ Completo</em></li>
+        <li><b>5 · Publicación</b><small>Revisar cambios y publicar</small><em class="pe">▲ Pendiente</em></li>
+        <li><b>6 · Boletín</b><small>Documento A4 en PDF con las cifras</small><em class="ok">✓ Completo</em></li>
+      </ol>
+      <div class="cl-tabs" aria-label="Pestañas de Captura"><span>Importar informe</span><span data-now>Indicadores</span><span>Desgloses</span><span>Evolución histórica</span><span>Mapas de calor</span><span>Mapas</span><span>Tuberías</span><span>Rankings</span><span>Saber PRO</span><span>Saber TyT</span><span>Conjuntos libres</span><span>Tablas personalizadas</span><span>Medalleros</span></div>
+      <p style="max-width:64ch;margin:0"><b>Esta es la herramienta de hoy, sin tocar.</b> Las seis estaciones y sus trece pestañas de Captura siguen exactamente como las conoce. El taller nuevo no la reemplaza todavía: las dos conviven, leen y escriben los mismos datos, y usted pasa de una a otra con este interruptor, que recuerda su elección.</p>
+      <p class="note" style="margin:0">Aquí no la redibujo entera: es la que ya usa. Vuelva a «Taller nuevo» para seguir probando.</p>
+    </div>
+    <div class="spot" id="spot" hidden></div>
+    <div class="dock" id="dock"><button type="button" class="call" id="call"><img src="__PILO_CLOSED__" alt="">Llamar a Pilo</button><aside class="p-pilo" id="pilo" aria-live="polite" hidden></aside></div>
+  </div>
+  <h2>Todo el periodo de una vez</h2>
+  <div class="rules">
+    <div><h3>Los seis años, juntos</h3><p>Al editar un dato se abren todos los años del periodo 2020–2025 en una sola rejilla. El corte de arriba solo cambia lo que usted mira; nunca recorta lo que puede llenar.</p></div>
+    <div><h3>Por periodo o por año, en cada dato</h3><p>La elección está junto al nombre del dato, no arriba. Uno puede reportarse por periodo 1 y 2, y el de al lado por año, en la misma ficha.</p></div>
+    <div><h3>Otros periodos, si los tiene</h3><p>«¿Tiene cifras de antes de 2020?» añade años hacia atrás a la misma rejilla, marcados como anteriores. Se quitan igual de fácil.</p></div>
+    <div><h3>Pegar desde Excel</h3><p>Se copia el rango en Excel, se toca la primera casilla y se pega: se llenan todas desde ahí, hacia la derecha y hacia abajo. «Deshacer» devuelve lo que había.</p></div>
+    <div><h3>Sencillo y completo</h3><p>Sencillo es la rejilla sola. Completo suma la gráfica a la derecha, que se redibuja con cada tecla, y los campos que hoy viven en Estructura.</p></div>
+    <div><h3>Taller nuevo y vista clásica</h3><p>Las dos conviven. La clásica es la de hoy, sin tocar; un interruptor arriba pasa de una a otra y los datos son los mismos.</p></div>
+  </div>
+
+  <h2>Cada tipo de dato, hoy y en el taller</h2>
+  <div class="read"><p>Este es el inventario de lo que la herramienta maneja hoy, familia por familia, y cómo se llenaría sin cambiar de pantalla. Ninguna se pierde.</p></div>
+  <div class="inv"><table>
+    <thead><tr><th>Familia</th><th>Cómo se llena hoy</th><th>En el taller</th></tr></thead>
+    <tbody>
+      <tr><td>Indicadores<small>y su tablero de cifras clave</small></td><td>Se definen en Estructura (unidad, formato, variación, total, regla del año, oficina). Se llenan en Captura: campus por fila, periodos 1 y 2 y año por columna.</td><td>Se toca la cifra en el tablero y se abre su rejilla ahí mismo. El total y el año se calculan a la vista, con su motivo.</td></tr>
+      <tr><td>Evolución por campus<small>y evolución histórica</small></td><td>La primera sale de los indicadores. La histórica tiene su rejilla: total y categorías por periodo.</td><td>Mismo bloque, dos pestañas: «Datos» y «Cómo se ve» (líneas por campus o barras por año).</td></tr>
+      <tr><td>Desgloses</td><td>Categorías por fila, cortes por columna. Gráfica circular, barras o composición.</td><td>Se escribe la lista junto a la gráfica. La reserva estadística (« &lt; 5 ») se ajusta en modo completo: hoy no tiene dónde.</td></tr>
+      <tr><td>Mapas de calor</td><td>Filas y columnas se escriben en Estructura, una por línea; las cifras, en Captura.</td><td>Se pega la tabla completa y el mapa aparece. Los rótulos se editan sobre él.</td></tr>
+      <tr><td>Mapas<small>origen, cobertura, municipio, entrante, saliente, convenios</small></td><td>Departamentos por campus; países con «Pegar lista»; municipio, desde un archivo de estudiantes que se cuenta en el navegador.</td><td>Pilo pregunta primero «¿De dónde vienen, a dónde van o con quién hay convenio?» y abre la captura que corresponde.</td></tr>
+      <tr><td>Tubería de permanencia</td><td>Etapas en Estructura; campus por fila y etapas por columna, en estudiantes o en porcentaje.</td><td>Se escribe sobre los tramos dibujados. Los porcentajes fuera de 0–100 se avisan al momento.</td></tr>
+      <tr><td>Rankings</td><td>Una edición por año: posiciones como texto (145, =145, 801-1000), puntaje, estrellas, ODS, áreas.</td><td>La placa del ranking es el formulario: se toca la posición y se escribe.</td></tr>
+      <tr><td>Medalleros</td><td>Categorías en Estructura; filas libres y medallas por corte en Captura.</td><td>La tabla de medallas se edita en su sitio. Vacío es «no compitió»; cero, «compitió y no ganó».</td></tr>
+      <tr><td>Saber PRO<small>y Saber TyT · Motor Beta</small></td><td>Se importa el Excel del ICFES; se agrega en el navegador y solo suben los resultados sumados.</td><td>Un solo paso guiado: «Suba el archivo». Pilo dice cuántas filas leyó y cuáles descartó antes de guardar.</td></tr>
+      <tr><td>Conjuntos libres<small>17 tipos de gráfica</small></td><td>Desde hoy se crean en Captura: pegar o empezar en blanco, columnas libres, totales escritos o calculados.</td><td>Igual, dentro de la ficha, con la gráfica al lado mientras se escribe.</td></tr>
+      <tr><td>Tablas personalizadas</td><td>Rejilla propia con columnas de texto, número y estado, y colores por regla o a mano.</td><td>Igual, en su bloque. Varias se agrupan en un bloque de tablas.</td></tr>
+      <tr><td>Tablas del informe<small>listado, ranking, fichas, cifras</small></td><td>Solo llegan por «Importar informe». No tienen editor.</td><td>Ganan editor: se abren como una tabla personalizada.</td></tr>
+      <tr><td>Modelo predictivo</td><td>Sin formulario en la intranet.</td><td>Queda en modo completo, para Planeación, con su especificación.</td></tr>
+      <tr><td>Tablero de la diversidad</td><td>No se captura: lee indicadores y desgloses con claves fijas.</td><td>Pilo muestra cuáles de esas cifras faltan y lleva a cada una.</td></tr>
+      <tr><td>Separador e imágenes</td><td>Se añaden en Diseño visual.</td><td>Son dos opciones más de «Añadir algo a la ficha».</td></tr>
+      <tr><td>Importar informe</td><td>Carpeta de archivos de la oficina; reemplaza todo el informe. Hoy solo existe para Investigación.</td><td>Se conserva como «Traer un informe completo», con el plan a la vista antes de aplicar.</td></tr>
+    </tbody>
+  </table></div>
+
+  <h2>Las reglas que el taller no toca</h2>
+  <div class="rules">
+    <div><h3>Un vacío no es un cero</h3><p>Una casilla sin dato sale como «sin reportar» y se dibuja rayada. Así es hoy y así sigue.</p></div>
+    <div><h3>Reserva estadística</h3><p>Una celda con menos registros que el umbral se publica como « &lt; 5 », también en el CSV. Los totales siguen exactos.</p></div>
+    <div><h3>La cifra del año sale de su regla</h3><p>Suma de los periodos, último periodo, promedio o «se reporta aparte». Nada se suma por fuera de ella.</p></div>
+    <div><h3>Primero el periodo</h3><p>La ficha abre en el periodo más reciente con dato; «Año» y «Todos» son lecturas secundarias.</p></div>
+    <div><h3>Toda cifra dice quién la reporta</h3><p>La oficina y el corte van en el boleto de origen de cada cifra. Sin oficina, Pilo lo avisa antes de publicar.</p></div>
+    <div><h3>Permisos por informe</h3><p>Cada persona ve y edita solo los informes de su rol. El periodo, los campus y las oficinas siguen siendo de Planeación.</p></div>
+    <div><h3>Los datos personales no salen del equipo</h3><p>Saber PRO, TyT y origen por municipio se cuentan en el navegador. Solo suben los resultados sumados.</p></div>
+    <div><h3>Publicar sigue siendo un acto</h3><p>Lo escrito se guarda solo, pero el público no lo ve hasta pulsar «Publicar». En un informe ya publicado se dice claro antes de empezar.</p></div>
+  </div>
+
+  <h2>Dónde queda cada estación</h2>
+  <div class="inv"><table>
+    <thead><tr><th>Hoy</th><th>En el taller</th><th>Qué deja de hacer falta</th></tr></thead>
+    <tbody>
+      <tr><td>1 · Periodo y campus</td><td>Un rótulo arriba, siempre a la vista. Años, campus, oficinas y «abrir periodo copiando» siguen en una pantalla de Planeación.</td><td>Una estación entera para algo que cambia dos veces al año.</td></tr>
+      <tr><td>2 · Estructura y KPI</td><td>«Añadir algo a la ficha» y el modo completo de cada bloque.</td><td>Definir todo antes de tener un solo dato.</td></tr>
+      <tr><td>3 · Captura</td><td>Escribir, pegar o subir el archivo dentro del bloque.</td><td>Trece pestañas por tipo de conjunto y guardar sin ver el resultado.</td></tr>
+      <tr><td>4 · Diseño visual</td><td>El orden de la pantalla es el orden de la ficha: «Subir», «Bajar», «Ocultar». Cada bloque trae «Cómo se ve».</td><td>Una lista de bloques que hay que imaginar, y el aviso «el informe tiene esto y la ficha no lo muestra».</td></tr>
+      <tr><td>5 · Publicación</td><td>Un botón. Pilo dice el porcentaje de casillas cargadas y cada pendiente, con un enlace a donde se arregla.</td><td>Recorrer estaciones buscando la marca ámbar.</td></tr>
+      <tr><td>6 · Boletín</td><td>Sale de la misma ficha: completo, ejecutivo o análisis con Pilo. Plantilla y ediciones en PDF siguen en su pantalla.</td><td>Volver a elegir uno por uno lo que ya está en la ficha.</td></tr>
+    </tbody>
+  </table></div>
+
+  <h2>Pensado para quien usa poco el computador</h2>
+  <div class="rules">
+    <div><h3>Se ve lo que se publica</h3><p>No hay que traducir una rejilla a una gráfica en la cabeza. Lo que está en pantalla es la ficha.</p></div>
+    <div><h3>Palabras, no símbolos</h3><p>Cada botón dice lo que hace: «Subir», «Quitar», «Listo». Ningún icono va solo.</p></div>
+    <div><h3>Botones y letra grandes</h3><p>Todo lo que se toca mide al menos 44 píxeles. El tamaño de letra se cambia con un botón y se recuerda.</p></div>
+    <div><h3>Deshacer en vez de confirmar</h3><p>Quitar un bloque de la ficha no pregunta: lo quita y ofrece «Deshacer». Borrar cifras guardadas sí conserva su confirmación.</p></div>
+    <div><h3>Lo bloqueado dice por qué</h3><p>Una casilla que no se escribe lo explica en su sitio: «se suma de los campus», «se calcula con la regla del año».</p></div>
+    <div><h3>Sin arrastrar, sin apuntar fino</h3><p>Nada depende de arrastrar ni de pasar el cursor por encima. Todo funciona con un toque o con el teclado.</p></div>
+  </div>
+
+  <h2>Pilo espera a que lo llamen</h2>
+  <div class="read"><p>Pilo no ocupa pantalla. Es un botón en una esquina, y aparece solo cuando alguien lo invoca: con «Llamar a Pilo», con «Ayúdeme con esto» en un bloque o con «¿Cómo funciona?» en la lista de tipos. Al cerrarlo vuelve a su botón.</p></div>
+  <div class="script">
+    <div><b>El recorrido</b><span>Señala cada parte de la pantalla, paso a paso. <q>Aquí están los once informes. Toque uno para abrir su ficha.</q> Se pide cuando se quiera.</span></div>
+    <div><b>Cada tipo de bloque</b><span>Los veinte tipos tienen su «¿Cómo funciona?». Pilo dice qué muestra ese bloque y cómo se llena: <q>Un desglose reparte una cifra en categorías. Escriba la lista y elija si se ve circular o en barras.</q></span></div>
+    <div><b>Mientras trabaja</b><span>Cada bloque tiene «Ayúdeme con esto». Pilo explica ese bloque y nada más: <q>El total institucional se suma solo. Usted escribe la cifra de cada campus.</q></span></div>
+    <div><b>Antes de publicar</b><span>Pilo revisa lo mismo que hoy revisa Publicación y lo dice en palabras: <q>Están cargadas 11 de 12 casillas. Falta Valledupar en 2025-2.</q></span></div>
+  </div>
+  <p class="note" style="margin-top:14px">La cara de Pilo es la aprobada por la universidad, con su pico que abre y cierra al hablar.</p>
+
+  <h2>Cómo se construiría</h2>
+  <div class="read"><p>La base de datos no cambia: las mismas tablas, los mismos permisos, los mismos datos. El taller se añade como una vista más, por partes; la vista clásica se queda como está y se elige con el interruptor.</p></div>
+  <ol class="phases">
+    <li><div><h3>Lo de todos los días</h3><p>Separador, tablero de indicadores, evolución, desgloses, conjuntos libres, tablas personalizadas e imágenes, con guardado automático, deshacer y el recorrido de Pilo. Con esto se arma y se publica un informe corriente.</p></div></li>
+    <li><div><h3>Los bloques con captura propia</h3><p>Mapas de calor, mapas, tubería, histórico, rankings y medalleros, cada uno editado sobre su dibujo. La revisión de Pilo antes de publicar llega aquí.</p></div></li>
+    <li><div><h3>Importadores, boletín y cierre</h3><p>Saber PRO, Saber TyT, «Traer un informe completo» y el boletín desde la ficha. La vista clásica se conserva; retirarla sería una decisión aparte, más adelante.</p></div></li>
+  </ol>
+
+  <h2>Lo que necesito que decida</h2>
+  <ol class="ask read">
+    <li><b>¿Dónde se guardan los años anteriores al periodo?</b> Hoy un indicador solo guarda años de su periodo; lo anterior vive en «Evolución histórica». Propongo que el taller los muestre en la misma rejilla y los guarde como histórico por debajo, sin que usted tenga que saberlo.</li>
+    <li><b>¿Sencillo por defecto para todos?</b> Propongo que sí, y que cada persona pueda dejar «Completo» fijo en su cuenta.</li>
+    <li><b>Guardado automático: aprobado.</b> Queda así: lo escrito se guarda solo, en borrador, y el público solo ve cambios al pulsar «Publicar». La vista clásica conserva su botón «Guardar». Falta definir una cosa: si dos personas editan el mismo informe a la vez, propongo que gane la última casilla escrita y que el taller avise.</li>
+    <li><b>¿Empezamos por la fase 1?</b> Es la que une crear, capturar y ordenar en un solo sitio para los tipos que más se usan.</li>
+  </ol>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
+<script>
+(function(){
+const FACE={closed:"__PILO_CLOSED__",open:"__PILO_OPEN__"};
+const $=(s,r=document)=>r.querySelector(s);
+const esc=s=>String(s??"").replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const calm=matchMedia("(prefers-reduced-motion: reduce)").matches;
+const G=window.gsap;
+const proto=$("#proto"),ficha=$("#ficha"),pilo=$("#pilo"),spot=$("#spot"),saved=$("#saved");
+const CHECK='<svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true"><circle cx="8" cy="8" r="8" fill="currentColor"/><path d="M4.5 8.2l2.3 2.3 4.7-5" stroke="var(--surface-2)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+const num=t=>{const c=String(t??"").replace(/\./g,"").replace(",",".").replace(/[^\d.-]/g,"");return c===""||isNaN(+c)?null:+c};
+const fmt=n=>n.toLocaleString("es-CO",{maximumFractionDigits:1});
+const NONE='<span class="empty">sin reportar</span>';
+
+/* Los once informes y sus líneas, como están sembrados. */
+const REPORTS=[["PO","Poblacional","#1f5fbf","Publicado"],["PE","Permanencia","#0b7481","Publicado"],["VI","Visibilidad","#a4471f","Borrador"],["EN","Enseñanza","#6b3fa0","Publicado"],["EX","Extensión y Proyección Social","#7f6200","En revisión"],["IN","Investigación","#ad2f58","Publicado"],["IF","Infraestructura Física y Tecnológica","#43536b","Borrador"],["SO","UDES Sostenible","#2e6b2f","Borrador"],["PD","Plan de Desarrollo Institucional","#8a3b8f","Publicado"],["DE","Diversidad, Equidad e Inclusión","#1a6b5a","Publicado"],["BI","Bienestar Institucional","#7a4a2b","En revisión"]];
+$("#plist").innerHTML='<h3>Sus informes</h3>'+REPORTS.map((r,i)=>`<button type="button" ${i?"":'aria-current="true"'}><span class="code" style="background:${r[2]}">${r[0]}</span><span>${r[1]}<small>${r[3]}</small></span></button>`).join("");
+const CAMPUS=[["BUC","Bucaramanga"],["CUC","Cúcuta"],["VAL","Valledupar"]];
+const PERIOD=[2020,2021,2022,2023,2024,2025];let prior=0;
+const years=()=>[...Array.from({length:prior},(_,i)=>2020-prior+i),...PERIOD];
+const SERIES=["#1f5fbf","#c2571a","#0f8a6e"];
+const cutName=(y,t)=>t==="a"?`Año ${y}`:`${y}-${+t+1}`;
+/* Cifras de ejemplo para los seis años del periodo, por campus y por periodo. */
+const gen=(base,g,second)=>Object.fromEntries(CAMPUS.map(([c],ci)=>[c,Object.fromEntries(PERIOD.map((y,yi)=>[y,[fmt(Math.round(base[ci]*Math.pow(1+g,yi*2))),fmt(Math.round(base[ci]*Math.pow(1+g,yi*2+1)*second))]]))]));
+const RULES={suma:"Suma de los periodos 1 y 2",ultimo:"Último periodo reportado",promedio:"Promedio de los periodos 1 y 2"};
+const CHARTS=[["barras","Barras"],["barras_comparadas","Barras comparadas"],["barras_apiladas","Barras apiladas"],["barras_100","Barras al 100 %"],["barras_linea","Barras y línea"],["circular","Circular"],["dona","Dona"],["radar","Radar"],["lineas","Líneas"],["area","Área"],["histograma","Histograma"],["caja","Diagrama de caja"],["cascada","Cascada"],["gantt","Gantt"],["mapa","Mapa"],["cifras","Cifras clave"],["tabla","Tabla"]];
+const DRAWN=["barras","dona","circular","lineas","tabla"];
+const CAT=["#1f5fbf","#c2571a","#0f8a6e","#6b3fa0","#7f6200","#ad2f58"];
+
+/* Los veinte tipos de bloque, con la etiqueta y la ayuda que hoy tiene Diseño visual. */
+const KINDS=[
+ ["Cifras",[
+  ["kpis","Tablero de indicadores","Las cifras clave del informe, con variación y rastro de cortes.","",1],
+  ["evolucion","Evolución por campus","El indicador elegido año a año, por campus.","Sale de los indicadores: no se captura aparte. Usted elige si abre en líneas por campus o en barras por año."],
+  ["historico","Evolución histórica","La cifra de un periodo frente a otro, con sus categorías y su peso en el total.","Una rejilla con el total y sus categorías por fila, y los periodos que usted elija por columna."],
+  ["desgloses","Desgloses","Cómo se reparte la cifra: circular o barras.","",1]]],
+ ["Tablas y gráficas propias",[
+  ["libre","Conjunto libre","Un conjunto libre con sus gráficas: usted define las columnas.","",1],
+  ["tablas_personalizadas","Tablas personalizadas","Tablas escritas a mano, con colores por regla.","",1],
+  ["tabla","Tabla del informe","Una tabla del informe: listado, ranking, fichas o cifras de un periodo.","Hoy solo llega por «Importar informe». En el taller se abre como una tabla personalizada."],
+  ["tabla_dinamica","Tabla dinámica","Todas las cifras, para armar la tabla propia y descargarla.","No se captura: se arma sola con las cifras del informe."]]],
+ ["Mapas y matrices",[
+  ["mapa","Mapa","Colombia por departamento, movilidad por país con rutas, o convenios por país.","Seis modos: origen, cobertura, municipio, entrante, saliente y convenios. Departamentos o países por fila, campus por columna; o «Pegar lista» País · Campus · Participantes."],
+  ["mapa_calor","Mapa de calor","Matriz de dos dimensiones en escala azul.","Se pega la tabla completa desde Excel: la primera fila y la primera columna son los rótulos."]]],
+ ["Recorridos y resultados",[
+  ["tuberia","Tubería de permanencia","La deserción de una cohorte, tramo a tramo, en estudiantes o en %.","Campus por fila y etapas por columna. Se captura en estudiantes, en permanencia o en deserción acumulada."],
+  ["rankings","Rankings","Posiciones en QS, THE y otros rankings, con medallas, tabla, evolución y rueda de ODS.","Una edición por año: posiciones (145, =145, 801-1000), puntaje, estrellas y ODS."],
+  ["medallero","Medallero","Lo que gana la universidad cuando compite, con su podio y su tabla de medallas.","Filas libres y una columna por categoría (Oro, Plata, Bronce…). Vacío es «no compitió»."],
+  ["saber_pro","Resultados Saber PRO","Resultados por competencia: niveles de desempeño, brecha con el país y evolución.","Se sube el Excel del ICFES. Se cuenta en este equipo: los datos de cada estudiante no salen de aquí."],
+  ["saber_tyt","Saber TyT · Motor Beta","De Saber 11 a Saber TyT en rango percentil, con el valor agregado por programa.","Se sube el Excel con una fila por evaluado y se elige la hoja y el nivel de formación."],
+  ["modelo","Modelo predictivo","Factores asociados, simulador de perfiles y calidad de la clasificación.","Para Planeación, en modo completo."],
+  ["diversidad","Tablero de la diversidad","Grupos de protección constitucional por corte y campus, mosaico étnico, discapacidad, estratos, género y zona.","No se captura: lee indicadores y desgloses del informe. Pilo le dice cuáles faltan."]]],
+ ["Para ordenar y explicar",[
+  ["separador","Separador","Agrupa los bloques que siguen, hasta el próximo separador. En el Boletín abre página.","",1],
+  ["imagenes","Grid de imágenes","Fotografías en una o dos columnas, dentro de la ficha y en el boletín.","Se eligen las fotos y se escribe qué muestra cada una. Esa descripción es obligatoria."],
+  ["metodologia","Qué mide cada cifra","Qué mide cada indicador y quién lo reporta.","Se arma sola con lo escrito en cada indicador."]]],
+];
+const KIND=Object.fromEntries(KINDS.flatMap(g=>g[1]).map(k=>[k[0],k]));
+
+let uid=0;const id=()=>"b"+(++uid);
+let blocks=[
+  {id:id(),type:"separador",title:"Matrícula"},
+  {id:id(),type:"kpis",inds:[
+    {name:"Estudiantes matriculados",rule:"ultimo",by:"periodo",v:gen([6200,2200,1500],.016,1.012)},
+    {name:"Estudiantes nuevos",rule:"suma",by:"periodo",v:gen([1250,520,370],.01,.74)}]},
+  {id:id(),type:"desgloses",title:"Matrícula por nivel de formación",look:"circular",reserve:5,rows:[["Pregrado","9.870"],["Especialización","1.420"],["Maestría","980"],["Doctorado","3"]]},
+  {id:id(),type:"libre",title:"Admitidos por modalidad",chart:"barras",cols:["Modalidad","Admitidos"],rows:[["Presencial","2.140"],["Virtual","620"],["Distancia","310"]]},
+  {id:id(),type:"tablas_personalizadas",title:"Metas de permanencia",cut:"Corte a 30 de junio de 2025",cols:["Meta","Avance","Responsable"],rows:[["Retención de primer año","86","Bienestar Universitario"],["Tutorías académicas","72","Vicerrectoría Académica"],["Alertas tempranas","48","Dirección TIC"]]},
+];
+blocks[1].inds[0].v.VAL[2025][1]="";
+let on=blocks[1].id,editing=null,adding=false,step=-1,cut="1",camp="todas",year=2025;
+
+/* La cifra de un indicador en un campus y un corte: el año sale de su regla; el total se suma y queda vacío si falta un campus. */
+function cell(ind,c,y,t){
+  if(c==="todas"){let s=0;for(const [k] of CAMPUS){const v=cell(ind,k,y,t);if(v==null)return null;s+=v}return s}
+  const p=ind.v[c][y]||["",""],a=num(p[0]),b=num(p[1]);
+  if(ind.by==="anio")return a;
+  if(t!=="a")return t==="0"?a:b;
+  if(ind.rule==="ultimo")return b??a;
+  if(a==null||b==null)return null;
+  return ind.rule==="suma"?a+b:(a+b)/2;
+}
+/* El corte anterior: el periodo 1 del mismo año, o el periodo 2 del año de antes. */
+function before(ind,y,t){const ys=years(),i=ys.indexOf(y);if(ind.by==="anio"||t==="a")return i>0?[ys[i-1],t]:null;return t==="1"?[y,"0"]:i>0?[ys[i-1],"1"]:null}
+/* La evolución por campus, dibujada con las mismas cifras de la rejilla: cambia mientras se escribe. */
+function evo(ind){
+  const ys=years(),an=ind.by==="anio",cuts=an?ys.map(y=>[y,"0"]):ys.flatMap(y=>[[y,"0"],[y,"1"]]);
+  const S=CAMPUS.map(([c])=>cuts.map(([y,t])=>cell(ind,c,y,t)));
+  const max=Math.max(1,...S.flat().map(v=>v??0)),n=Math.max(1,cuts.length-1),X=i=>34+i/n*276,Y=v=>96-v/max*84;
+  const lines=S.map((s,si)=>{let d="",pen=false;s.forEach((v,i)=>{if(v==null){pen=false;return}d+=`${pen?"L":"M"}${X(i).toFixed(1)} ${Y(v).toFixed(1)}`;pen=true});
+    return `<path d="${d}" fill="none" stroke="${SERIES[si]}" stroke-width="2" stroke-linejoin="round"/>`+s.map((v,i)=>v==null?"":`<circle cx="${X(i).toFixed(1)}" cy="${Y(v).toFixed(1)}" r="2.2" fill="${SERIES[si]}"/>`).join("")}).join("");
+  const ticks=ys.map((y,i)=>`<text x="${X(an?i:i*2+.5).toFixed(1)}" y="110" text-anchor="middle">${y}</text>`).join("");
+  return `<div class="evo"><div class="kind">Evolución por campus · ${esc(ind.name)||"indicador"}${an?" · por año":" · por periodo"}</div><svg viewBox="0 0 320 114" role="img" aria-label="Evolución de ${esc(ind.name)} por campus"><line x1="34" y1="96" x2="310" y2="96" stroke="var(--line-strong)"/><line x1="34" y1="12" x2="310" y2="12" stroke="var(--line)" stroke-dasharray="2 3"/><text x="30" y="15" text-anchor="end">${fmt(max)}</text><text x="30" y="99" text-anchor="end">0</text>${lines}${ticks}</svg><ul class="keys">${CAMPUS.map((c,i)=>`<li><i style="background:${SERIES[i]}"></i>${c[1]}</li>`).join("")}</ul><p class="note" style="margin:6px 0 0">Un hueco en la línea es un corte sin reportar.</p></div>`;
+}
+const flaps=v=>v==null?`<div class="flaps none">sin reportar</div>`:`<div class="flaps" aria-label="${fmt(v)}">${[...fmt(v)].map(ch=>`<span ${/\d/.test(ch)?"":'class="pt"'} aria-hidden="true">${ch}</span>`).join("")}</div>`;
+const src=(o,c)=>`<p class="src"><span>Reporta: ${o}</span><span>${c||"CSV"}</span></p>`;
+function tone(v){const n=num(v);return n==null?null:n<60?["riesgo","✕","Riesgo"]:n<80?["atencion","▲","Atención"]:["bien","✓","Bien"]}
+
+function view(b){
+  const K=KIND[b.type]||[];
+  if(b.type==="separador")return `<div class="f-sec"><i>1</i><b>${esc(b.title)||"Título del separador"}</b></div>`;
+  if(b.type==="kpis"){
+    const cname=camp==="todas"?"Todos los campus":CAMPUS.find(c=>c[0]===camp)[1];
+    let h=`<div class="kind">Tablero de indicadores</div><div class="kpis">`+b.inds.map(ind=>{
+      const an=ind.by==="anio",v=cell(ind,camp,year,cut),pc=before(ind,year,cut),p=pc?cell(ind,camp,pc[0],pc[1]):null,d=v!=null&&p?((v-p)/p*100):null;
+      return `<div class="kpi"><span>${esc(ind.name)||"Nombre del indicador"}</span>${flaps(v)}
+        <div class="ticket"><b>Admisiones y Registro Académico</b><span>${cname} · corte ${an?"Año "+year:cutName(year,cut)}</span></div>
+        <div class="prev">${p==null?"Sin corte anterior para comparar":`${an?"Año "+pc[0]:cutName(pc[0],pc[1])}: ${fmt(p)}${d==null?"":` · ${d>=0?"sube":"baja"} ${fmt(Math.abs(d))} %`}`}</div>
+        ${an?'<div class="note">Dato anual: no se reporta por periodo.</div>':cut==="a"?`<div class="note">Cifra del año: ${RULES[ind.rule].toLowerCase()}.</div>`:""}</div>`}).join("")+`</div>`;
+    if(b.id===editing&&proto.dataset.mode==="completo")h+=b.inds.map(evo).join("");
+    return h;
+  }
+  if(b.type==="desgloses"){
+    const vals=b.rows.map(r=>num(r[1])),tot=vals.reduce((a,v)=>a+(v??0),0)||1,max=Math.max(1,...vals.map(v=>v??0));
+    const shown=v=>v==null?NONE:v<b.reserve?`&lt; ${b.reserve}`:fmt(v);
+    let body;
+    if(b.look==="barras")body=`<div class="bars">`+b.rows.map((r,i)=>`<div><span>${esc(r[0])||"—"}</span><span><i class="${vals[i]!=null&&vals[i]<b.reserve?"res":""}" style="width:${vals[i]==null?0:vals[i]<b.reserve?Math.max(3,b.reserve/max*100):Math.max(2,vals[i]/max*100)}%"></i></span><span>${shown(vals[i])}</span></div>`).join("")+`</div>`;
+    else{let acc=0;const C=2*Math.PI*40;
+      body=`<div class="pie"><svg viewBox="0 0 100 100" role="img" aria-label="Circular de ${esc(b.title)}"><circle cx="50" cy="50" r="40" fill="none" stroke="var(--surface-3)" stroke-width="18"/>`+vals.map((v,i)=>{const f=(v??0)/tot,s=`<circle cx="50" cy="50" r="40" fill="none" stroke="${CAT[i%6]}" stroke-width="18" stroke-dasharray="${f*C} ${C}" stroke-dashoffset="${-acc*C}" transform="rotate(-90 50 50)"/>`;acc+=f;return s}).join("")+`</svg>
+      <ul class="legend">${b.rows.map((r,i)=>`<li><i style="background:${CAT[i%6]}"></i><span>${esc(r[0])||"—"}</span><b>${shown(vals[i])}${vals[i]!=null&&vals[i]>=b.reserve?` · ${fmt(vals[i]/tot*100)} %`:""}</b></li>`).join("")}</ul></div>`}
+    return `<div class="kind">Desglose</div><div class="sign">${esc(b.title)||"Título del desglose"}</div>${body}${src("Admisiones y Registro Académico")}`;
+  }
+  if(b.type==="libre"){
+    const last=b.cols.length-1,vals=b.rows.map(r=>num(r[last])),max=Math.max(1,...vals.map(v=>v??0)),tot=vals.reduce((a,v)=>a+(v??0),0)||1;
+    const ch=DRAWN.includes(b.chart)?b.chart:"barras";let body;
+    if(ch==="tabla")body=`<div class="tbl-wrap"><table><thead><tr>${b.cols.map((c,i)=>`<th class="${i?"n":""}">${esc(c)}</th>`).join("")}</tr></thead><tbody>${b.rows.map(r=>`<tr>${b.cols.map((_,i)=>`<td class="${i?"n":""}">${esc(r[i])||NONE}</td>`).join("")}</tr>`).join("")}</tbody></table></div>`;
+    else if(ch==="lineas"){const n=Math.max(1,b.rows.length-1);const pts=vals.map((v,i)=>v==null?null:[10+i/n*280,90-v/max*76]).filter(Boolean);
+      body=`<svg viewBox="0 0 300 100" style="width:100%;max-width:34em" role="img" aria-label="Líneas de ${esc(b.cols[last])}"><line x1="10" y1="90" x2="290" y2="90" stroke="var(--line-strong)"/><polyline fill="none" stroke="var(--ln)" stroke-width="2.5" stroke-linejoin="round" points="${pts.map(p=>p.join(",")).join(" ")}"/>${pts.map(p=>`<circle cx="${p[0]}" cy="${p[1]}" r="3.5" fill="var(--ln)"/>`).join("")}</svg><ul class="legend">${b.rows.map((r,i)=>`<li><i style="background:var(--ln)"></i><span>${esc(r[0])||"—"}</span><b>${vals[i]==null?NONE:fmt(vals[i])}</b></li>`).join("")}</ul>`}
+    else if(ch==="dona"||ch==="circular"){let acc=0;const C=2*Math.PI*40,w=ch==="dona"?14:40,rr=ch==="dona"?40:20,CC=2*Math.PI*rr;
+      body=`<div class="pie"><svg viewBox="0 0 100 100" role="img" aria-label="${esc(b.title)}">`+vals.map((v,i)=>{const f=(v??0)/tot,s=`<circle cx="50" cy="50" r="${rr}" fill="none" stroke="${CAT[i%6]}" stroke-width="${w}" stroke-dasharray="${f*CC} ${CC}" stroke-dashoffset="${-acc*CC}" transform="rotate(-90 50 50)"/>`;acc+=f;return s}).join("")+`</svg><ul class="legend">${b.rows.map((r,i)=>`<li><i style="background:${CAT[i%6]}"></i><span>${esc(r[0])||"—"}</span><b>${vals[i]==null?NONE:fmt(vals[i])}</b></li>`).join("")}</ul></div>`}
+    else body=`<div class="bars">`+b.rows.map((r,i)=>`<div><span>${esc(r[0])||"—"}</span><span><i style="width:${vals[i]==null?0:Math.max(2,vals[i]/max*100)}%"></i></span><span>${vals[i]==null?NONE:fmt(vals[i])}</span></div>`).join("")+`</div>`;
+    const lab=CHARTS.find(c=>c[0]===b.chart)[1];
+    return `<div class="kind">Conjunto libre · ${lab}</div><div class="sign">${esc(b.title)||"Título del conjunto"}</div>${body}${DRAWN.includes(b.chart)?"":`<p class="note">En esta demostración «${lab}» se dibuja como barras.</p>`}${src("Admisiones y Registro Académico")}`;
+  }
+  if(b.type==="tablas_personalizadas"){
+    return `<div class="kind">Tabla personalizada</div><div class="sign">${esc(b.title)||"Título de la tabla"}</div><div class="tbl-wrap"><table><thead><tr>${b.cols.map((c,i)=>`<th class="${i===1?"n":""}">${esc(c)}</th>`).join("")}</tr></thead><tbody>${b.rows.map(r=>{const t=tone(r[1]);return `<tr><td>${esc(r[0])||'<span class="empty">sin dato</span>'}</td><td class="n">${t?`<span class="tone t-${t[0]}">${t[1]} ${esc(r[1])} %</span>`:'<span class="empty">sin dato</span>'}</td><td>${esc(r[2])||'<span class="empty">sin dato</span>'}</td></tr>`}).join("")}</tbody></table></div>
+      <p class="note" style="margin:8px 0 0">✓ Bien (80 % o más) · ▲ Atención (de 60 a menos de 80 %) · ✕ Riesgo (menos de 60 %)</p>${src("Planeación Institucional",esc(b.cut))}`;
+  }
+  return `<div class="kind">${esc(K[1])}</div><p style="margin:4px 0 10px">${esc(K[2])}</p><p class="how"><b>Cómo se llena en el taller.</b> ${esc(K[3])}</p>`;
+}
+
+function editor(b){
+  const adv=t=>`<div class="adv"><b>Modo completo · lo que hoy está en Estructura</b>${t.map(x=>`<span>${x}</span>`).join("")}</div>`;
+  const I=(k,l,v,x="")=>`<label class="fld">${l}<input id="f-${b.id}-${k}" data-k="${k}" value="${esc(v)}" ${x}></label>`;
+  if(b.type==="separador")return `<div class="ed">${I("title","Título del separador",b.title)}</div>`;
+  if(b.type==="kpis"){
+    const ys=years();
+    const top=`<div class="ask-prior"><span>${prior?`Periodo 2020–2025, más ${years().slice(0,prior).join(", ")} (${prior===1?"anterior":"anteriores"} al periodo).`:"Está ingresando los seis años del periodo 2020–2025. ¿Tiene cifras de antes de 2020?"}</span><button type="button" class="btn" data-act="prior">${prior?"Añadir "+(2020-prior-1):"Sí, añadir 2019"}</button>${prior?`<button type="button" class="btn quiet" data-act="noprior">Quitar ${2020-prior}</button>`:""}</div>
+      <p class="tip"><b>Pegar desde Excel:</b><span>copie el rango en Excel, toque aquí la primera casilla y pegue (Ctrl+V). Se llenan todas desde ahí, campus por campus y año por año.</span></p>`;
+    return `<div class="ed">${top}`+b.inds.map((ind,ii)=>{const an=ind.by==="anio",ts=an?["0"]:["0","1","a"];
+      return `<div class="ind-head"><label class="fld">Nombre del indicador<input id="f-${b.id}-n${ii}" data-n="${ii}" value="${esc(ind.name)}"></label>
+        <div class="fld"><span>Este dato se reporta</span><span class="seg"><button type="button" data-byset="${ii}" data-v="periodo" aria-pressed="${!an}">Por periodo (1 y 2)</button><button type="button" data-byset="${ii}" data-v="anio" aria-pressed="${an}">Por año</button></span></div></div>
+      <div class="grid"><table><thead><tr><th class="lbl" rowspan="${an?1:2}">Campus</th>${ys.map(y=>`<th class="yr" colspan="${ts.length}">${y}${y<2020?"<small>anterior</small>":""}</th>`).join("")}</tr>${an?"":`<tr>${ys.map(()=>'<th class="sub">Periodo 1</th><th class="sub">Periodo 2</th><th class="sub">Año</th>').join("")}</tr>`}</thead><tbody>
+      <tr><td class="lbl">Total institucional</td>${ys.map(y=>ts.map(t=>`<td><span class="lock" id="t-${b.id}-${ii}-todas-${y}-${t}" title="Se suma de los campus"></span></td>`).join("")).join("")}</tr>
+      ${CAMPUS.map(c=>`<tr><td class="lbl">${c[1]}</td>${ys.map(y=>(an?[0]:[0,1]).map(t=>`<td><input id="f-${b.id}-${ii}${c[0]}${y}${t}" data-i="${ii}" data-c="${c[0]}" data-y="${y}" data-t="${t}" inputmode="decimal" aria-label="${c[1]}, ${an?y:y+"-"+(t+1)}" value="${esc((ind.v[c[0]][y]||["",""])[t])}"></td>`).join("")+(an?"":`<td><span class="lock" id="t-${b.id}-${ii}-${c[0]}-${y}-a" title="Se calcula con la regla del año"></span></td>`)).join("")}</tr>`).join("")}
+      </tbody></table></div>
+      ${an?'<p class="note" style="margin:0">Una casilla por año. La ficha lo dirá: «dato anual, no se reporta por periodo».</p>':`<label class="fld" style="justify-self:start">Cifra del año de este dato<select class="inl" id="f-${b.id}-r${ii}" data-rule="${ii}">${Object.entries(RULES).map(([k,l])=>`<option value="${k}" ${k===ind.rule?"selected":""}>${l}</option>`).join("")}</select></label>`}`}).join('<hr style="border:0;border-top:1px solid var(--line);width:100%">')
+      +`<p class="note" style="margin:0">El total se suma de los campus y queda vacío si falta uno. Deje vacía la casilla que no se ha reportado: no escriba cero.</p>`
+      +adv(["Unidad: estudiantes · Formato: Entero · Lectura de la variación: Subir es mejor","Total institucional: Suma de campus · Oficina que reporta: Admisiones y Registro Académico","Cifra titular del informe: Estudiantes matriculados"])+`</div>`;
+  }
+  if(b.type==="desgloses")return `<div class="ed">${I("title","Título",b.title)}
+    <div class="grid"><table><thead><tr><th class="lbl">Categoría</th><th class="lbl">2025-2</th></tr></thead><tbody>${b.rows.map((r,ri)=>`<tr>${[0,1].map(ci=>`<td><input class="${ci?"":"txt"}" id="f-${b.id}-r${ri}c${ci}" data-r="${ri}" data-c="${ci}" value="${esc(r[ci])}"></td>`).join("")}</tr>`).join("")}</tbody></table></div>
+    <div class="tools"><button type="button" class="btn" data-act="row">Añadir categoría</button></div>
+    <div class="fld"><span>Cómo se ve</span><span class="seg" style="justify-self:start"><button type="button" data-look="circular" aria-pressed="${b.look==="circular"}">Circular</button><button type="button" data-look="barras" aria-pressed="${b.look==="barras"}">Barras</button></span></div>
+    ${adv([`Reserva estadística: una categoría con menos de ${b.reserve} se publica como «&lt; ${b.reserve}», también en el CSV.`,"Unidad: estudiantes · Formato: Entero · Mostrar total: sí · Oficina: Admisiones y Registro Académico"])}</div>`;
+  const grid=`<div class="grid"><table><thead><tr>${b.cols.map((c,i)=>`<th><input id="f-${b.id}-c${i}" data-c="${i}" aria-label="Nombre de la columna ${i+1}" value="${esc(c)}"></th>`).join("")}</tr></thead><tbody>${b.rows.map((r,ri)=>`<tr>${b.cols.map((_,ci)=>`<td><input class="txt" id="f-${b.id}-r${ri}c${ci}" data-r="${ri}" data-c="${ci}" aria-label="Fila ${ri+1}, ${esc(b.cols[ci])}" value="${esc(r[ci]??"")}"></td>`).join("")}</tr>`).join("")}</tbody></table></div>`;
+  if(b.type==="libre")return `<div class="ed">${I("title","Título",b.title)}
+    <div class="fld"><span>Los datos <span class="note">(la primera fila son los nombres de las columnas; usted las define)</span></span>${grid}</div>
+    <div class="tools"><button type="button" class="btn" data-act="row">Añadir fila</button><button type="button" class="btn" data-act="col">Añadir columna</button></div>
+    <label class="fld">O pegue aquí lo copiado de Excel<textarea class="paste" id="f-${b.id}-p" rows="2" placeholder="Copie las celdas en Excel y péguelas aquí"></textarea></label>
+    <label class="fld">Cómo se ve<select id="f-${b.id}-ch" data-chart>${CHARTS.map(c=>`<option value="${c[0]}" ${c[0]===b.chart?"selected":""}>${c[1]}</option>`).join("")}</select></label>
+    ${adv(["Tiempo: Sin tiempo, Por año o Por periodo · Tipo de cada columna: Texto, Cifra, Fecha o Territorio","Filas de título y de total (escrito o calculado) · Oficina: Admisiones y Registro Académico"])}</div>`;
+  if(b.type==="tablas_personalizadas")return `<div class="ed">${I("title","Título",b.title)}${I("cut","Corte o periodo de la tabla",b.cut)}
+    <div class="fld"><span>La tabla</span>${grid}</div>
+    <div class="tools"><button type="button" class="btn" data-act="row">Añadir fila</button></div>
+    ${adv(["Colores por regla en «Avance»: menos de 60 Riesgo ✕ · de 60 a menos de 80 Atención ▲ · 80 o más Bien ✓","Columnas de Texto, Número o Categoría · color a mano por celda o por fila · hasta 24 columnas y 300 filas"])}</div>`;
+  return "";
+}
+
+function fillLocks(b){
+  if(b.type!=="kpis")return;
+  b.inds.forEach((ind,ii)=>document.querySelectorAll(`[id^="t-${b.id}-${ii}-"]`).forEach(el=>{
+    const p=el.id.split("-"),v=cell(ind,p[3],+p[4],p[5]);
+    el.textContent=v==null?(p[3]==="todas"?"falta un campus":"sin reportar"):fmt(v);
+  }));
+}
+function render(focus){
+  let h="";
+  blocks.forEach((b,i)=>{
+    const sel=b.id===on,ed=b.id===editing,live=KIND[b.type]&&KIND[b.type][4];
+    h+=`<section class="blk" data-id="${b.id}" ${sel?"data-on":""} ${ed?"data-ed":""}><div class="blk-view" tabindex="0" role="button" aria-label="Elegir este bloque">${view(b)}</div>`;
+    if(sel)h+=`<div class="tools">${live?`<button type="button" class="btn primary" data-act="edit">${ed?"Listo":"Editar"}</button>`:""}<button type="button" class="btn" data-act="up" ${i===0?"disabled":""}>Subir</button><button type="button" class="btn" data-act="down" ${i===blocks.length-1?"disabled":""}>Bajar</button><button type="button" class="btn quiet" data-act="help">Ayúdeme con esto</button><button type="button" class="btn quiet danger" data-act="del">Quitar</button></div>`;
+    if(ed)h+=editor(b);
+    h+=`</section>`;
+  });
+  h+=adding?`<div class="add" id="add"><b>¿Qué quiere añadir? Estos son los veinte tipos de bloque de la ficha.</b>${KINDS.map(g=>`<h4>${g[0]}</h4><div class="add-opts">${g[1].map(k=>`<div class="optc"><button type="button" class="opt" data-new="${k[0]}" ${k[4]?"data-live":""}><b>${k[1]}</b>${k[2]}</button><button type="button" class="why" data-why="${k[0]}">¿Cómo funciona?</button></div>`).join("")}</div>`).join("")}<p class="note" style="margin:0">Los de borde azul funcionan completos en esta demostración. «¿Cómo funciona?» llama a Pilo para que explique ese tipo.</p><div><button type="button" class="btn quiet" data-new="">Cancelar</button></div></div>`
+    :`<div><button type="button" class="btn" id="addBtn">Añadir algo a la ficha</button></div>`;
+  ficha.innerHTML=h;
+  const eb=blocks.find(b=>b.id===editing);if(eb)fillLocks(eb);
+  if(focus){const el=document.getElementById(focus);if(el){el.focus();if(el.select&&el.tagName==="INPUT")el.select()}}
+  if(step>=0)placeSpot(false);
+}
+const get=i=>blocks.find(b=>b.id===i);
+function refresh(b){const v=ficha.querySelector(`[data-id="${b.id}"] .blk-view`);if(v)v.innerHTML=view(b);fillLocks(b)}
+function flip(){if(G&&!calm)G.from(".flaps span:not(.pt)",{rotationX:-80,opacity:.4,duration:.24,stagger:.018,ease:"power2.out",transformOrigin:"50% 50%"})}
+
+let saveT;
+function touch(){saved.textContent="Guardando…";clearTimeout(saveT);saveT=setTimeout(()=>{saved.innerHTML=CHECK+" Guardado en borrador"},600)}
+saved.innerHTML=CHECK+" Guardado en borrador";
+
+function toast(text,restore){
+  const dock=$("#dock"),old=$(".toast",dock);if(old)old.remove();
+  const t=document.createElement("div");t.className="toast";t.setAttribute("role","status");
+  t.innerHTML=`<span>${esc(text)}</span>${restore?'<button type="button" class="btn">Deshacer</button>':""}`;
+  dock.appendChild(t);
+  const kill=()=>t.remove();const timer=setTimeout(kill,restore?8000:6000);
+  if(restore)$("button",t).onclick=()=>{clearTimeout(timer);kill();restore()};
+  if(G&&!calm)G.from(t,{y:16,opacity:0,duration:.22,ease:"power3.out"});
+}
+const NEW={
+  separador:()=>({title:""}),
+  kpis:()=>({inds:[{name:"",rule:"ultimo",by:"periodo",v:{BUC:{},CUC:{},VAL:{}}}]}),
+  desgloses:()=>({title:"",look:"barras",reserve:5,rows:[["",""],["",""]]}),
+  libre:()=>({title:"",chart:"barras",cols:["Nombre","Cifra"],rows:[["",""],["",""]]}),
+  tablas_personalizadas:()=>({title:"",cut:"",cols:["Meta","Avance","Responsable"],rows:[["","",""]]}),
+};
+const FIRST={kpis:"n0",separador:"title",desgloses:"title",libre:"title",tablas_personalizadas:"title"};
+
+ficha.addEventListener("click",e=>{
+  const sec=e.target.closest(".blk"),act=e.target.closest("[data-act]"),nw=e.target.closest("[data-new]"),look=e.target.closest("[data-look]");
+  if(e.target.closest("#addBtn")){adding=true;render();const a=$("#add");if(G&&!calm)G.from(a,{opacity:0,y:-8,duration:.24,ease:"power3.out"});$(".opt",a).focus();return}
+  if(nw){adding=false;const t=nw.dataset.new;if(!t){render();return}
+    const b={id:id(),type:t,...(NEW[t]?NEW[t]():{})};blocks.push(b);on=b.id;editing=NEW[t]?b.id:null;touch();render(NEW[t]?`f-${b.id}-${FIRST[t]}`:null);
+    const n=ficha.querySelector(`[data-id="${b.id}"]`);if(G&&!calm)G.from(n,{opacity:0,y:14,duration:.28,ease:"power3.out"});
+    if(!NEW[t]){n.scrollIntoView({block:"nearest"});toast(`Añadí «${KIND[t][1]}». Aquí se muestra cómo se llenaría.`)}return}
+  const by=e.target.closest("[data-byset]");if(by){const bb=get(by.closest(".blk").dataset.id);bb.inds[+by.dataset.byset].by=by.dataset.v;touch();render();return}
+  const why=e.target.closest("[data-why]");if(why){const K=KIND[why.dataset.why];say(`${K[1]}. ${K[2]} ${HELP[K[0]]||K[3]}`,true);return}
+  if(!sec)return;const b=get(sec.dataset.id),i=blocks.indexOf(b);
+  if(look){b.look=look.dataset.look;touch();render();return}
+  if(act){const a=act.dataset.act;
+    if(a==="edit"){editing=editing===b.id?null:b.id;render(editing?`f-${b.id}-${FIRST[b.type]}`:null)}
+    else if(a==="up"||a==="down"){const j=i+(a==="up"?-1:1);blocks.splice(i,1);blocks.splice(j,0,b);touch();render();const n=ficha.querySelector(`[data-id="${b.id}"]`);if(G&&!calm)G.from(n,{y:a==="up"?26:-26,duration:.26,ease:"power3.out"});const btn=n.querySelector(`[data-act="${a}"]`);(btn&&!btn.disabled?btn:n.querySelector("[data-act]")).focus()}
+    else if(a==="del"){blocks.splice(i,1);if(editing===b.id)editing=null;on=(blocks[Math.min(i,blocks.length-1)]||{}).id;touch();render();toast(`Se quitó «${KIND[b.type][1]}» de la ficha. Sus cifras siguen guardadas.`,()=>{blocks.splice(i,0,b);on=b.id;touch();render()})}
+    else if(a==="row"){b.rows.push((b.cols||[0,0]).map(()=>""));touch();render(`f-${b.id}-r${b.rows.length-1}c0`)}
+    else if(a==="col"){b.cols.push("Nueva columna");b.rows.forEach(r=>r.push(""));touch();render(`f-${b.id}-c${b.cols.length-1}`)}
+    else if(a==="prior"){prior++;buildYears();render()}
+    else if(a==="noprior"){prior--;if(!years().includes(year))year=years()[0];buildYears();render();flip()}
+    else if(a==="help")say(HELP[b.type]||`${KIND[b.type][2]} ${KIND[b.type][3]}`,true);
+    return}
+  if(on!==b.id){on=b.id;render()}
+});
+ficha.addEventListener("keydown",e=>{if((e.key==="Enter"||e.key===" ")&&e.target.classList.contains("blk-view")){e.preventDefault();e.target.click()}});
+function onEdit(e){
+  const sec=e.target.closest(".blk");if(!sec||e.target.classList.contains("paste"))return;const b=get(sec.dataset.id),d=e.target.dataset,v=e.target.value;
+  if(d.chart!==undefined)b.chart=v;
+  else if(d.rule!==undefined)b.inds[+d.rule].rule=v;
+  else if(d.n!==undefined)b.inds[+d.n].name=v;
+  else if(d.by!==undefined){b.inds[+d.by].by=v;touch();render();return}
+  else if(d.i!==undefined)(b.inds[+d.i].v[d.c][d.y]||(b.inds[+d.i].v[d.c][d.y]=["",""]))[+d.t]=v;
+  else if(d.k)b[d.k]=v;
+  else if(d.r!==undefined)b.rows[+d.r][+d.c]=v;
+  else if(d.c!==undefined)b.cols[+d.c]=v;
+  else return;
+  touch();refresh(b);
+}
+ficha.addEventListener("input",onEdit);
+ficha.addEventListener("change",e=>{if(e.target.tagName==="SELECT")onEdit(e)});
+const clip=e=>(e.clipboardData.getData("text")||"").replace(/\r/g,"").split("\n").filter(l=>l.trim()!=="").map(l=>l.split("\t").map(c=>c.trim()));
+/* Pega un rango en la rejilla de un indicador: desde su campus y su corte, hacia la derecha y hacia abajo. */
+function pasteInd(ind,d,g){
+  const k=ind.by==="anio"?1:2,ys=years(),c0=CAMPUS.findIndex(c=>c[0]===d.c),col0=ys.indexOf(+d.y)*k+ +d.t;let n=0;
+  g.forEach((row,r)=>{const cp=CAMPUS[c0+r];if(!cp)return;row.forEach((val,c)=>{const col=col0+c,y=ys[Math.floor(col/k)];if(y===undefined)return;(ind.v[cp[0]][y]||(ind.v[cp[0]][y]=["",""]))[col%k]=val;n++})});
+  return n;
+}
+/* Pega un rango en una tabla de filas: añade las filas que hagan falta. */
+function pasteRows(b,d,g){
+  const w=(b.cols||[0,0]).length;let n=0;
+  g.forEach((row,r)=>{const ri=+d.r+r;while(b.rows.length<=ri)b.rows.push(Array(w).fill(""));row.forEach((val,c)=>{const ci=+d.c+c;if(ci<w){b.rows[ri][ci]=val;n++}})});
+  return n;
+}
+ficha.addEventListener("paste",e=>{
+  const el=e.target,sec=el.closest(".blk");if(!sec)return;const b=get(sec.dataset.id),g=clip(e);
+  if(el.classList.contains("paste")){e.preventDefault();
+    if(g.length<2)return toast("Para pegar hacen falta al menos dos filas: los nombres de columna y una de datos.");
+    const before={cols:b.cols,rows:b.rows},w=Math.max(...g.map(r=>r.length)),pad=r=>[...r,...Array(w-r.length).fill("")];
+    b.cols=pad(g[0]);b.rows=g.slice(1).map(pad);touch();render();
+    return toast(`Pegué ${b.rows.length} filas y ${w} columnas.`,()=>{b.cols=before.cols;b.rows=before.rows;touch();render()})}
+  // Una sola casilla copiada se pega como texto corriente.
+  if(el.tagName!=="INPUT"||!g.length||(g.length===1&&g[0].length===1))return;
+  const d=el.dataset;let n,undo;
+  if(d.i!==undefined){const ind=b.inds[+d.i],snap=JSON.stringify(ind.v);undo=()=>{ind.v=JSON.parse(snap)};n=pasteInd(ind,d,g)}
+  else if(d.r!==undefined){const snap=JSON.stringify(b.rows);undo=()=>{b.rows=JSON.parse(snap)};n=pasteRows(b,d,g)}
+  else return;
+  e.preventDefault();touch();render();
+  toast(`Pegué ${n} ${n===1?"casilla":"casillas"} desde Excel.`,()=>{undo();touch();render()});
+});
+
+/* --- Pilo ---------------------------------------------------------------------- */
+const HELP={
+  kpis:"Este es el tablero de indicadores. Toque «Editar»: verá los seis años del periodo a la vez. Escriba la cifra de cada campus o pegue el rango desde Excel. En cada dato elige si se reporta por periodo o por año. El total institucional se suma solo.",
+  desgloses:"Un desglose reparte una cifra en categorías. Escriba la lista y elija si se ve circular o en barras. Una categoría con muy pocos casos sale como «menos de 5», para no señalar a nadie.",
+  libre:"En un conjunto libre usted define las columnas. Escriba sobre la tabla o pegue desde Excel, y elija entre diecisiete formas de verlo.",
+  tablas_personalizadas:"Esta tabla se escribe a mano. El color de «Avance» lo pone una regla, y siempre va con su símbolo para que no dependa solo del color.",
+  separador:"Un separador abre una sección. Todo lo que quede debajo, hasta el siguiente separador, pertenece a ella. En el boletín abre página.",
+};
+const STEPS=[
+  {t:"#plist",s:"Aquí están los once informes. Toque uno para abrir su ficha. Usted ve solo los que su rol puede editar."},
+  {t:"#pctl",s:"Estos controles solo cambian lo que usted está mirando, como en el portal. No limitan lo que puede llenar: al editar siempre tiene todos los años."},
+  {t:"#ficha",s:"Esta es la ficha, tal como la verá el público. Lo que usted cambie aquí es lo que se publica."},
+  {t:".blk[data-on]",s:"Toque cualquier bloque para elegirlo y pulse «Editar». Llena los seis años del periodo de una vez, escribiendo o pegando desde Excel. En modo completo tiene además la gráfica al lado mientras escribe."},
+  {t:"#addBtn,#add",s:"Con este botón añade cualquiera de los veinte tipos de bloque: cifras, mapas, tablas, rankings y los demás."},
+  {t:"#publish",s:"Nada sale al público hasta que usted pulse «Publicar». Antes, yo reviso las casillas y le digo qué falta."},
+];
+let talkT;
+function talk(){
+  const img=$("#face");clearInterval(talkT);if(!img||calm)return;
+  let n=0;talkT=setInterval(()=>{img.src=n%2?FACE.closed:FACE.open;if(++n>8){clearInterval(talkT);img.src=FACE.closed}},130);
+}
+const call=$("#call");
+function shell(body,nav){
+  pilo.innerHTML=`<div class="pilo-head"><img id="face" src="${FACE.closed}" alt="Mr. Pilo"><div style="flex:1"><b>Mr. Pilo</b><small>${step>=0?`Paso ${step+1} de ${STEPS.length}`:"Su guía en el taller"}</small></div><button type="button" class="btn" data-p="close" style="min-height:40px;padding:0 14px">Cerrar</button></div>${body}<div class="pilo-nav">${nav}</div>`;
+  if(pilo.hidden){pilo.hidden=false;call.hidden=true;if(G&&!calm)G.fromTo(pilo,{scale:.9,opacity:0},{scale:1,opacity:1,duration:.24,ease:"power3.out"})}
+  talk();
+}
+/* Pilo vuelve a su botón: no ocupa pantalla hasta que alguien lo llame. */
+function rest(){step=-1;spot.hidden=true;pilo.hidden=true;call.hidden=false;call.focus()}
+function say(text,again){
+  if(step>=0&&again){step=-1;spot.hidden=true}
+  shell(`<p class="pilo-say">${esc(text)}</p>`,'<button type="button" class="btn go" data-p="tour">Mostrarme el recorrido</button><button type="button" class="btn" data-p="tipos">Explicarme los tipos de bloque</button>');
+}
+function placeSpot(animate){
+  const t=proto.querySelector(STEPS[step].t);if(!t){spot.hidden=true;return}
+  const r=t.getBoundingClientRect(),p=proto.getBoundingClientRect();
+  const to={x:r.left-p.left-5,y:r.top-p.top-5,width:r.width+10,height:Math.min(r.height+10,p.height-(r.top-p.top)+2)};
+  const first=spot.hidden;spot.hidden=false;
+  if(G)G[animate&&!first&&!calm?"to":"set"](spot,{...to,duration:.32,ease:"power3.inOut"});
+  else Object.assign(spot.style,{transform:`translate(${to.x}px,${to.y}px)`,width:to.width+"px",height:to.height+"px"});
+  if(first&&G&&!calm)G.fromTo(spot,{opacity:0},{opacity:1,duration:.2});
+}
+function showStep(){
+  shell(`<p class="pilo-say">${esc(STEPS[step].s)}</p>`,
+    `<button type="button" class="btn" data-p="prev" ${step===0?"disabled":""}>Atrás</button>`+
+    (step<STEPS.length-1?`<button type="button" class="btn go" data-p="next">Siguiente</button>`:`<button type="button" class="btn go" data-p="end">Entendido</button>`)+
+    `<button type="button" class="btn" data-p="end">Salir</button>`);
+  const t=proto.querySelector(STEPS[step].t);if(t)t.scrollIntoView({block:"nearest",behavior:calm?"auto":"smooth"});
+  placeSpot(true);
+}
+function endTour(silent){step=-1;spot.hidden=true;if(!silent)say("Listo. Si quiere verlo otra vez, llámeme.")}
+function startTour(){step=0;showStep()}
+/* Lo mismo que hoy revisa Publicación: casillas cargadas y pendientes. */
+function review(){
+  if(step>=0)endTour(true);
+  const out=[];let total=0,filled=0;
+  blocks.forEach(b=>{
+    if(b.type==="kpis")b.inds.forEach(ind=>{if(!ind.name.trim())out.push("Un indicador no tiene nombre.");CAMPUS.forEach(c=>PERIOD.forEach(y=>(ind.by==="anio"?[0]:[0,1]).forEach(t=>{total++;if(num((ind.v[c[0]][y]||[])[t])!=null)filled++;else out.push(`«${ind.name||"Indicador"}»: falta ${c[1]} en ${ind.by==="anio"?y:y+"-"+(t+1)}. Saldrá como «sin reportar» y el total institucional quedará vacío.`)})))});
+    else if(b.type==="desgloses"){b.rows.forEach(r=>{const v=num(r[1]);if(v!=null&&v<b.reserve)out.push(`«${b.title||"El desglose"}»: «${r[0]}» tiene menos de ${b.reserve}. Se publicará como «< ${b.reserve}».`)})}
+    if(NEW[b.type]&&b.type!=="kpis"&&!b.title.trim())out.push(`«${KIND[b.type][1]}» no tiene título.`);
+    if(b.type==="tablas_personalizadas"&&!b.cut.trim())out.push(`«${b.title||"La tabla"}» no dice su corte: una cifra sin corte no se publica.`);
+  });
+  if(!blocks.some(b=>b.type==="kpis"))out.unshift("La ficha no tiene tablero de indicadores.");
+  const head=total?`<p class="pilo-say">Del periodo 2020–2025 están cargadas ${filled} de ${total} casillas de indicadores (${Math.round(filled/total*100)} %).</p>`:"";
+  const list=out.length?`<ul class="pilo-list">${out.slice(0,4).map(o=>`<li><span aria-hidden="true">▲</span><span>${esc(o)}</span></li>`).join("")}</ul>`:`<p class="pilo-say">No encontré pendientes. Puede publicar.</p>`;
+  shell(head+list,`<button type="button" class="btn go" data-p="pub">${out.length?"Publicar así":"Publicar ahora"}</button><button type="button" class="btn" data-p="back">Seguir editando</button>`);
+}
+pilo.addEventListener("click",e=>{
+  const p=(e.target.closest("[data-p]")||{dataset:{}}).dataset.p;if(!p)return;
+  if(p==="tour")startTour();
+  else if(p==="close")rest();
+  else if(p==="tipos"){adding=true;render();const a=$("#add");if(a)a.scrollIntoView({block:"start",behavior:calm?"auto":"smooth"});say("Abrí la lista de los veinte tipos de bloque. Debajo de cada uno hay un «¿Cómo funciona?»: tóquelo y se lo explico.",true)}
+  else if(p==="next"){step++;showStep()}
+  else if(p==="prev"){step--;showStep()}
+  else if(p==="end")endTour();
+  else if(p==="back")say("Siga con calma. Todo lo que escribe se guarda solo, en borrador.");
+  else if(p==="pub"){saved.innerHTML=CHECK+" Publicado hace un momento";say("Publicado. Esto es una demostración: nada salió al portal real.")}
+});
+$("#tour").onclick=startTour;
+call.onclick=()=>say("Aquí estoy. Puedo mostrarle el recorrido, explicarle cada tipo de bloque o ayudarle con el bloque que tenga elegido: use «Ayúdeme con esto».");
+$("#publish").onclick=review;
+function seg(sel,fn){$(sel).addEventListener("click",e=>{const b=e.target.closest("button");if(!b)return;[...b.parentNode.children].forEach(x=>x.setAttribute("aria-pressed",x===b));fn(b.dataset.v);if(step>=0)requestAnimationFrame(()=>placeSpot(false))})}
+seg("#vista",v=>{const c=v==="clasica";$("#classic").hidden=!c;$(".p-body",proto).hidden=c;$("#dock").hidden=c;if(c){step=-1;spot.hidden=true}});
+seg("#size",v=>proto.dataset.size=v);seg("#mode",v=>{proto.dataset.mode=v;render()});
+const ysel=$("#year");function buildYears(){ysel.innerHTML=years().map(y=>`<option ${y===year?"selected":""}>${y}</option>`).join("")}
+ysel.addEventListener("change",()=>{year=+ysel.value;render();flip()});buildYears();
+seg("#cut",v=>{cut=v;blocks.filter(b=>b.type==="kpis").forEach(refresh);flip()});
+seg("#camp",v=>{camp=v;blocks.filter(b=>b.type==="kpis").forEach(refresh);flip()});
+$("#plist").addEventListener("click",e=>{const b=e.target.closest("button");if(!b||b.getAttribute("aria-current"))return;toast("En esta demostración solo está armado el informe Poblacional.")});
+addEventListener("resize",()=>{if(step>=0)placeSpot(false)});
+
+render();
+})();
+</script>

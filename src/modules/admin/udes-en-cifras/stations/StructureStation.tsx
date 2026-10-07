@@ -14,6 +14,7 @@
    ========================================================================== */
 
 import { useEffect, useState } from "react";
+import { Link, useLocation } from "react-router-dom";
 import type { CSSProperties } from "react";
 import { Icon } from "../../../../components/ui/Icon";
 import type {
@@ -35,7 +36,6 @@ import {
   useDeleteDataset,
   useDeleteIndicator,
   useSaveBreakdown,
-  useSaveFreeSet,
   useSaveHeatmap,
   useSaveHistory,
   useSaveIndicator,
@@ -53,18 +53,12 @@ import { RankingForm } from "./RankingCapture";
 import { MedalBoardForm } from "./MedalCapture";
 import { SaberProForm } from "./SaberProCapture";
 import { SaberTytForm } from "./SaberTytCapture";
-import { FreeSetForm } from "./FreeSetCapture";
 import { TEMPORALITY_LABEL } from "../../../datos-abiertos/data/free-sets";
 import { customViewOf } from "../../../datos-abiertos/data/custom-table";
 import { RANKING_SYSTEMS, RANKING_VIEWS } from "../../../datos-abiertos/data/rankings";
 import { MEDAL_SORT, orderedTiers } from "../../../datos-abiertos/data/medals";
 
-const FORMAT_LABEL: Record<OdValueFormat, string> = { entero: "Entero", porcentaje: "Porcentaje", decimal: "Decimal" };
-const DIRECTION_LABEL: Record<OdDirection, string> = { sube: "Subir es mejor", baja: "Bajar es mejor", neutro: "Neutro" };
-const AGGREGATION_LABEL: Record<OdAggregation, string> = {
-  suma: "Suma de campus",
-  reportado: "Total reportado aparte",
-};
+import { AGGREGATION_LABEL, DIRECTION_LABEL, FORMAT_LABEL } from "../indicator-labels";
 
 export function StructureStation({ data, report, canEdit }: StationProps) {
   if (!report?.uuid) return <StageEmpty title="Elige un informe">La estructura se configura informe por informe.</StageEmpty>;
@@ -265,12 +259,12 @@ function KpiBoardEditor({ reportId, indicators, canEdit }: { reportId: string; i
 
 /* --- 2. Indicadores -------------------------------------------------------------------- */
 
-type IndicatorDraft = Pick<
+export type IndicatorDraft = Pick<
   OdIndicatorRow,
   "label" | "key" | "unit" | "format" | "direction" | "aggregation" | "reporting" | "annual_rule" | "years" | "definition" | "office_id"
 >;
 
-const emptyIndicator: IndicatorDraft = {
+export const emptyIndicator: IndicatorDraft = {
   label: "", key: "", unit: "", format: "entero", direction: "sube", aggregation: "suma", reporting: "periodo", annual_rule: "suma", years: null,
   definition: "", office_id: null,
 };
@@ -395,7 +389,7 @@ function IndicatorsEditor({
   );
 }
 
-function IndicatorForm({
+export function IndicatorForm({
   initial,
   offices,
   years,
@@ -529,7 +523,7 @@ function IndicatorForm({
 
 /* --- Conjuntos visuales --------------------------------------------------------------------- */
 
-type DatasetKind = "desglose" | "calor" | "mapa" | "tuberia" | "historico" | "ranking" | "medallero" | "saber" | "tyt" | "libre";
+export type DatasetKind = "desglose" | "calor" | "mapa" | "tuberia" | "historico" | "ranking" | "medallero" | "saber" | "tyt";
 
 const MEASURE_LABEL: Record<OdPipelineMeasure, string> = {
   estudiantes: "Estudiantes que siguen en cada etapa (el portal lo muestra en %)",
@@ -545,18 +539,285 @@ const uniqueKey = (title: string, taken: string[]) => {
   return key;
 };
 
+const lines = (text: string) => text.split("\n").map((s) => s.trim()).filter(Boolean);
+
+/** Los guardados de cada familia de conjuntos. Quien pinta el formulario de alta los crea y muestra su estado. */
+export function useDatasetSaves() {
+  return {
+    saveBreakdown: useSaveBreakdown(),
+    saveHeatmap: useSaveHeatmap(),
+    saveMap: useSaveMap(),
+    savePipeline: useSavePipeline(),
+    saveHistory: useSaveHistory(),
+    saveRanking: useSaveRanking(),
+    saveMedalBoard: useSaveMedalBoard(),
+    saveSaberPro: useSaveSaberPro(),
+    saveSaberTyt: useSaveSaberTyt(),
+  };
+}
+
+/**
+ * Alta de un conjunto visual: el formulario de definición de su familia y la
+ * fila que crea, con su clave única dentro del informe. Lo usan «Conjuntos
+ * visuales» (Estructura y KPI) y «Añadir algo a la ficha» (el taller): un
+ * conjunto nace igual desde las dos vistas, y al crearse entra a la ficha como
+ * bloque (ver `saveDataset` en od-data.ts).
+ */
+export function NewDatasetForm({
+  data,
+  reportId,
+  years,
+  kind,
+  mode = "origen",
+  saves,
+  onCancel,
+  onDone,
+}: {
+  data: StationProps["data"];
+  reportId: string;
+  years: number[];
+  kind: DatasetKind;
+  /** Mapas: por departamento o de movilidad internacional. */
+  mode?: OdMapMode;
+  saves: ReturnType<typeof useDatasetSaves>;
+  onCancel: () => void;
+  onDone: () => void;
+}) {
+  const { saveBreakdown, saveHeatmap, saveMap, savePipeline, saveHistory, saveRanking, saveMedalBoard, saveSaberPro, saveSaberTyt } = saves;
+  const breakdowns = data.rows.breakdowns.filter((b) => b.report_id === reportId);
+  const heatmaps = data.rows.heatmaps.filter((h) => h.report_id === reportId);
+  const maps = data.rows.maps.filter((m) => m.report_id === reportId);
+  const pipelines = data.rows.pipelines.filter((p) => p.report_id === reportId);
+  const histories = data.rows.histories.filter((h) => h.report_id === reportId);
+  const rankings = (data.rows.rankings ?? []).filter((r) => r.report_id === reportId);
+  const medalBoards = (data.rows.medalBoards ?? []).filter((m) => m.report_id === reportId);
+  const saberPro = (data.rows.saberPro ?? []).filter((sp) => sp.report_id === reportId);
+  const saberTyt = (data.rows.saberTyt ?? []).filter((x) => x.report_id === reportId);
+  const offices = data.rows.offices;
+  const done = { onSuccess: onDone };
+
+  const create = (f: DatasetFields) => {
+    const base = { report_id: reportId, office_id: f.office_id || null };
+    if (kind === "desglose") saveBreakdown.mutate({ ...base, key: uniqueKey(f.title, breakdowns.map((b) => b.key)), title: f.title, unit: f.unit, format: f.format, default_chart: f.chart, years: f.years, position: breakdowns.length + 1, ...(f.showTotal ? {} : { show_total: false }) }, done);
+    if (kind === "calor") saveHeatmap.mutate({ ...base, key: uniqueKey(f.title, heatmaps.map((h) => h.key)), title: f.title, description: f.description, unit: f.unit, format: f.format, row_label: f.rowLabel, column_label: f.columnLabel, rows: lines(f.rows), columns: lines(f.columns), position: heatmaps.length + 1 }, done);
+    if (kind === "mapa") saveMap.mutate({ ...base, key: uniqueKey(f.title, maps.map((m) => m.key)), title: f.title, description: f.description, unit: f.unit, mode: f.mode, reporting: reportingFor(f), years: reportingFor(f) === "global" ? null : f.years, position: maps.length + 1 }, done);
+    if (kind === "tuberia") savePipeline.mutate({ ...base, key: uniqueKey(f.title, pipelines.map((p) => p.key)), title: f.title, description: f.description, measure: f.measure, stages: lines(f.rows), position: pipelines.length + 1 }, done);
+    if (kind === "historico") saveHistory.mutate({ ...base, key: uniqueKey(f.title, histories.map((h) => h.key)), title: f.title, description: f.description, unit: f.unit, format: f.format, total_label: f.totalLabel || "Total", position: histories.length + 1 }, done);
+  };
+
+  if (kind === "ranking") {
+    return (
+      <RankingForm
+        offices={offices}
+        onCancel={onCancel}
+        onSubmit={(f) =>
+          saveRanking.mutate(
+            { report_id: reportId, key: uniqueKey(f.title, rankings.map((r) => r.key)), title: f.title, description: f.description, system: f.system, accent: f.accent, view: f.view, office_id: f.office_id || null, position: rankings.length + 1 },
+            done,
+          )
+        }
+      />
+    );
+  }
+  if (kind === "medallero") {
+    return (
+      <MedalBoardForm
+        offices={offices}
+        onCancel={onCancel}
+        onSubmit={(f) =>
+          saveMedalBoard.mutate(
+            {
+              report_id: reportId,
+              key: uniqueKey(f.title, medalBoards.map((m) => m.key)),
+              title: f.title, description: f.description, row_label: f.row_label,
+              reporting: f.reporting, scope: f.scope,
+              fixed_year: f.fixed_year ? Number(f.fixed_year) : null,
+              sort: f.sort, tiers: f.tiers, note: f.note,
+              office_id: f.office_id || null, position: medalBoards.length + 1,
+            },
+            done,
+          )
+        }
+      />
+    );
+  }
+  if (kind === "saber") {
+    return (
+      <SaberProForm
+        offices={offices}
+        onCancel={onCancel}
+        onSubmit={(f) =>
+          saveSaberPro.mutate(
+            { report_id: reportId, key: uniqueKey("saber pro", saberPro.map((sp) => sp.key)), title: f.title, description: f.description, note: f.note, office_id: f.office_id || null, position: saberPro.length + 1 },
+            done,
+          )
+        }
+      />
+    );
+  }
+  if (kind === "tyt") {
+    return (
+      <SaberTytForm
+        offices={offices}
+        onCancel={onCancel}
+        onSubmit={(f) =>
+          saveSaberTyt.mutate(
+            { report_id: reportId, key: uniqueKey("saber tyt", saberTyt.map((x) => x.key)), title: f.title, description: f.description, note: f.note, office_id: f.office_id || null, position: saberTyt.length + 1 },
+            done,
+          )
+        }
+      />
+    );
+  }
+  return (
+    <DatasetForm
+      kind={kind}
+      offices={offices}
+      years={years}
+      initial={
+        kind === "mapa"
+          ? mode === "convenios"
+            ? { mode, unit: "convenios", reporting: "global" }
+            : { mode, unit: mode === "origen" ? "" : "participantes" }
+          : undefined
+      }
+      onCancel={onCancel}
+      onSubmit={create}
+    />
+  );
+}
+
+/**
+ * Definición de un conjunto ya creado: el mismo formulario de su familia, con
+ * lo guardado, y la fila que actualiza. Lo usan «Conjuntos visuales»
+ * (Estructura y KPI) y el editor de cada bloque en el taller.
+ */
+export function EditDatasetForm({
+  data,
+  reportId,
+  years,
+  kind,
+  id,
+  saves,
+  onCancel,
+  onDone,
+}: {
+  data: StationProps["data"];
+  reportId: string;
+  years: number[];
+  kind: DatasetKind;
+  id: string;
+  saves: ReturnType<typeof useDatasetSaves>;
+  onCancel: () => void;
+  onDone: () => void;
+}) {
+  const { saveBreakdown, saveHeatmap, saveMap, savePipeline, saveHistory, saveRanking, saveMedalBoard, saveSaberPro, saveSaberTyt } = saves;
+  const offices = data.rows.offices;
+  const done = { onSuccess: onDone };
+
+  if (kind === "desglose") {
+    const b = data.rows.breakdowns.find((x) => x.id === id);
+    if (!b) return null;
+    return (
+      <DatasetForm kind="desglose" offices={offices} years={years} initial={{ title: b.title, unit: b.unit, format: b.format, chart: b.default_chart, years: b.years, office_id: b.office_id ?? "", showTotal: b.show_total ?? true }}
+        annualRule={b.reporting === "anual" ? "reportado" : b.annual_rule}
+        onCancel={onCancel} onSubmit={(f) => saveBreakdown.mutate({ id: b.id, report_id: reportId, title: f.title, unit: f.unit, format: f.format, default_chart: f.chart, years: f.years, office_id: f.office_id || null, ...(f.showTotal !== (b.show_total ?? true) ? { show_total: f.showTotal } : {}) }, done)} />
+    );
+  }
+  if (kind === "historico") {
+    const h = data.rows.histories.find((x) => x.id === id);
+    if (!h) return null;
+    return (
+      <DatasetForm kind="historico" offices={offices} years={years} initial={{ title: h.title, description: h.description, unit: h.unit, format: h.format, totalLabel: h.total_label, office_id: h.office_id ?? "" }}
+        onCancel={onCancel} onSubmit={(f) => saveHistory.mutate({ id: h.id, report_id: reportId, title: f.title, description: f.description, unit: f.unit, format: f.format, total_label: f.totalLabel || "Total", office_id: f.office_id || null }, done)} />
+    );
+  }
+  if (kind === "tuberia") {
+    const p = data.rows.pipelines.find((x) => x.id === id);
+    if (!p) return null;
+    return (
+      <DatasetForm kind="tuberia" offices={offices} years={years} initial={{ title: p.title, description: p.description, measure: p.measure, rows: p.stages.join("\n"), office_id: p.office_id ?? "" }}
+        onCancel={onCancel} onSubmit={(f) => savePipeline.mutate({ id: p.id, report_id: reportId, title: f.title, description: f.description, measure: f.measure, stages: lines(f.rows), office_id: f.office_id || null }, done)} />
+    );
+  }
+  if (kind === "calor") {
+    const h = data.rows.heatmaps.find((x) => x.id === id);
+    if (!h) return null;
+    return (
+      <DatasetForm kind="calor" offices={offices} years={years}
+        initial={{ title: h.title, description: h.description, unit: h.unit, format: h.format, rowLabel: h.row_label, columnLabel: h.column_label, rows: h.rows.join("\n"), columns: h.columns.join("\n"), office_id: h.office_id ?? "" }}
+        onCancel={onCancel}
+        onSubmit={(f) => saveHeatmap.mutate({ id: h.id, report_id: reportId, title: f.title, description: f.description, unit: f.unit, format: f.format, row_label: f.rowLabel, column_label: f.columnLabel, rows: lines(f.rows), columns: lines(f.columns), office_id: f.office_id || null }, done)} />
+    );
+  }
+  if (kind === "mapa") {
+    const m = data.rows.maps.find((x) => x.id === id);
+    if (!m) return null;
+    return (
+      <DatasetForm kind="mapa" offices={offices} years={years} initial={{ title: m.title, description: m.description, unit: m.unit, mode: m.mode, reporting: m.reporting ?? "anual", years: m.years, office_id: m.office_id ?? "" }}
+        onCancel={onCancel} onSubmit={(f) => saveMap.mutate({ id: m.id, report_id: reportId, title: f.title, description: f.description, unit: f.unit, mode: f.mode, reporting: reportingFor(f), years: reportingFor(f) === "global" ? null : f.years, office_id: f.office_id || null }, done)} />
+    );
+  }
+  if (kind === "medallero") {
+    const m = (data.rows.medalBoards ?? []).find((x) => x.id === id);
+    if (!m) return null;
+    return (
+      <MedalBoardForm
+        offices={offices}
+        initial={{
+          title: m.title, description: m.description, row_label: m.row_label,
+          reporting: m.reporting, scope: m.scope,
+          fixed_year: m.fixed_year ? String(m.fixed_year) : "",
+          sort: m.sort, tiers: orderedTiers(m), note: m.note, office_id: m.office_id ?? "",
+        }}
+        onCancel={onCancel}
+        onSubmit={(f) =>
+          saveMedalBoard.mutate(
+            {
+              id: m.id, report_id: reportId,
+              title: f.title, description: f.description, row_label: f.row_label,
+              reporting: f.reporting, scope: f.scope,
+              fixed_year: f.fixed_year ? Number(f.fixed_year) : null,
+              sort: f.sort, tiers: f.tiers, note: f.note, office_id: f.office_id || null,
+            },
+            done,
+          )
+        }
+      />
+    );
+  }
+  if (kind === "ranking") {
+    const r = (data.rows.rankings ?? []).find((x) => x.id === id);
+    if (!r) return null;
+    return (
+      <RankingForm offices={offices} initial={{ title: r.title, description: r.description, system: r.system, accent: r.accent, view: r.view, office_id: r.office_id ?? "" }}
+        onCancel={onCancel}
+        onSubmit={(f) => saveRanking.mutate({ id: r.id, report_id: reportId, title: f.title, description: f.description, system: f.system, accent: f.accent, view: f.view, office_id: f.office_id || null }, done)} />
+    );
+  }
+  if (kind === "saber") {
+    const sp = (data.rows.saberPro ?? []).find((x) => x.id === id);
+    if (!sp) return null;
+    return (
+      <SaberProForm offices={offices} initial={{ title: sp.title, description: sp.description, note: sp.note, office_id: sp.office_id ?? "" }}
+        onCancel={onCancel}
+        onSubmit={(f) => saveSaberPro.mutate({ id: sp.id, report_id: reportId, title: f.title, description: f.description, note: f.note, office_id: f.office_id || null }, done)} />
+    );
+  }
+  const tyt = (data.rows.saberTyt ?? []).find((x) => x.id === id);
+  if (!tyt) return null;
+  return (
+    <SaberTytForm offices={offices} initial={{ title: tyt.title, description: tyt.description, note: tyt.note, office_id: tyt.office_id ?? "" }}
+      onCancel={onCancel}
+      onSubmit={(f) => saveSaberTyt.mutate({ id: tyt.id, report_id: reportId, title: f.title, description: f.description, note: f.note, office_id: f.office_id || null }, done)} />
+  );
+}
+
 function DatasetsEditor({ data, reportId, years, canEdit }: { data: StationProps["data"]; reportId: string; years: number[]; canEdit: boolean }) {
-  const saveBreakdown = useSaveBreakdown();
-  const saveHeatmap = useSaveHeatmap();
-  const saveMap = useSaveMap();
-  const savePipeline = useSavePipeline();
-  const saveHistory = useSaveHistory();
-  const saveRanking = useSaveRanking();
-  const saveMedalBoard = useSaveMedalBoard();
-  const saveSaberPro = useSaveSaberPro();
-  const saveSaberTyt = useSaveSaberTyt();
-  const saveFreeSet = useSaveFreeSet();
+  const saves = useDatasetSaves();
+  const { saveBreakdown, saveHeatmap, saveMap, savePipeline, saveHistory, saveRanking, saveMedalBoard, saveSaberPro, saveSaberTyt } = saves;
   const remove = useDeleteDataset();
+  const location = useLocation();
   const [adding, setAdding] = useState<DatasetKind | null>(null);
   // Mapas: por departamento o de movilidad internacional, según la opción elegida.
   const [addingMode, setAddingMode] = useState<OdMapMode>("origen");
@@ -576,41 +837,21 @@ function DatasetsEditor({ data, reportId, years, canEdit }: { data: StationProps
   const freeSets = (data.rows.freeSets ?? []).filter((fs) => fs.report_id === reportId).sort((a, b) => a.position - b.position);
   // Las filas de datos; los títulos de grupo y los totales de 0034 no cuentan como cifras cargadas.
   const freeRows = (id: string) => (data.rows.freeSetRows ?? []).filter((r) => r.set_id === id && (r.kind ?? "dato") === "dato");
-  /** Casillas con dato por columna, y todas las claves presentes en las filas (también de columnas quitadas). */
-  const freeFilled = (id: string) => {
-    const filled: Record<string, number> = {};
-    for (const row of freeRows(id)) {
-      for (const [key, value] of Object.entries(row.cells ?? {})) {
-        filled[key] = (filled[key] ?? 0) + (value === null || value === "" ? 0 : 1);
-      }
-    }
-    return filled;
-  };
   const offices = data.rows.offices;
-  const mutations = [saveBreakdown, saveHeatmap, saveMap, savePipeline, saveHistory, saveRanking, saveMedalBoard, saveSaberPro, saveSaberTyt, saveFreeSet, remove];
+  const mutations = [saveBreakdown, saveHeatmap, saveMap, savePipeline, saveHistory, saveRanking, saveMedalBoard, saveSaberPro, saveSaberTyt, remove];
   const pending = mutations.some((m) => m.isPending);
   const error = mutations.find((m) => m.error)?.error ?? null;
   const success = mutations.some((m) => m.isSuccess);
   const done = { onSuccess: () => { setAdding(null); setEditing(null); } };
   const total = breakdowns.length + heatmaps.length + maps.length + pipelines.length + histories.length + rankings.length + medalBoards.length + saberPro.length + saberTyt.length + freeSets.length;
 
-  const lines = (text: string) => text.split("\n").map((s) => s.trim()).filter(Boolean);
   const yearsDetail = (list: number[] | null) => (list && list.length ? list.join(", ") : "todos los años");
-
-  const create = (kind: DatasetKind, f: DatasetFields) => {
-    const base = { report_id: reportId, office_id: f.office_id || null };
-    if (kind === "desglose") saveBreakdown.mutate({ ...base, key: uniqueKey(f.title, breakdowns.map((b) => b.key)), title: f.title, unit: f.unit, format: f.format, default_chart: f.chart, years: f.years, position: breakdowns.length + 1, ...(f.showTotal ? {} : { show_total: false }) }, done);
-    if (kind === "calor") saveHeatmap.mutate({ ...base, key: uniqueKey(f.title, heatmaps.map((h) => h.key)), title: f.title, description: f.description, unit: f.unit, format: f.format, row_label: f.rowLabel, column_label: f.columnLabel, rows: lines(f.rows), columns: lines(f.columns), position: heatmaps.length + 1 }, done);
-    if (kind === "mapa") saveMap.mutate({ ...base, key: uniqueKey(f.title, maps.map((m) => m.key)), title: f.title, description: f.description, unit: f.unit, mode: f.mode, reporting: reportingFor(f), years: reportingFor(f) === "global" ? null : f.years, position: maps.length + 1 }, done);
-    if (kind === "tuberia") savePipeline.mutate({ ...base, key: uniqueKey(f.title, pipelines.map((p) => p.key)), title: f.title, description: f.description, measure: f.measure, stages: lines(f.rows), position: pipelines.length + 1 }, done);
-    if (kind === "historico") saveHistory.mutate({ ...base, key: uniqueKey(f.title, histories.map((h) => h.key)), title: f.title, description: f.description, unit: f.unit, format: f.format, total_label: f.totalLabel || "Total", position: histories.length + 1 }, done);
-  };
 
   return (
     <Panel
       id="oda-conjuntos"
       title="Conjuntos visuales"
-      description="Desgloses, mapas de calor, mapas, tuberías, evoluciones históricas y conjuntos libres: los que quieras de cada tipo. Al crearlos entran a la ficha como bloque visible; sus cifras se cargan en Captura y su lugar se ajusta en Diseño visual. Las tablas personalizadas (textos y cifras con color) se crean y se escriben en Captura, en «Tablas personalizadas»."
+      description="Desgloses, mapas de calor, mapas, tuberías y evoluciones históricas: los que quieras de cada tipo. Al crearlos entran a la ficha como bloque visible; sus cifras se cargan en Captura y su lugar se ajusta en Diseño visual. Los conjuntos libres y las tablas personalizadas no se definen aquí: quien los reporta los crea y arma sus columnas en Captura, en «Conjuntos libres» y «Tablas personalizadas»; aquí solo se listan y se pueden borrar."
       actions={
         <>
           <SaveState pending={pending} error={error} success={success} />
@@ -640,99 +881,25 @@ function DatasetsEditor({ data, reportId, years, canEdit }: { data: StationProps
               {saberPro.length === 0 && <option value="saber">Resultados Saber PRO (ICFES)</option>}
               {/* El Motor Beta cruza dos pruebas de la misma persona: también uno por informe. */}
               {saberTyt.length === 0 && <option value="tyt">Saber TyT · Motor Beta (Saber 11 → Saber TyT)</option>}
-              <option value="libre">Conjunto libre (columnas propias y sus gráficas)</option>
             </select>
           </label>
         </>
       }
     >
-      {adding === "ranking" && (
-        <RankingForm
-          offices={offices}
-          onCancel={() => setAdding(null)}
-          onSubmit={(f) =>
-            saveRanking.mutate(
-              { report_id: reportId, key: uniqueKey(f.title, rankings.map((r) => r.key)), title: f.title, description: f.description, system: f.system, accent: f.accent, view: f.view, office_id: f.office_id || null, position: rankings.length + 1 },
-              done,
-            )
-          }
-        />
-      )}
-      {adding === "medallero" && (
-        <MedalBoardForm
-          offices={offices}
-          onCancel={() => setAdding(null)}
-          onSubmit={(f) =>
-            saveMedalBoard.mutate(
-              {
-                report_id: reportId,
-                key: uniqueKey(f.title, medalBoards.map((m) => m.key)),
-                title: f.title, description: f.description, row_label: f.row_label,
-                reporting: f.reporting, scope: f.scope,
-                fixed_year: f.fixed_year ? Number(f.fixed_year) : null,
-                sort: f.sort, tiers: f.tiers, note: f.note,
-                office_id: f.office_id || null, position: medalBoards.length + 1,
-              },
-              done,
-            )
-          }
-        />
-      )}
-      {adding === "saber" && (
-        <SaberProForm
-          offices={offices}
-          onCancel={() => setAdding(null)}
-          onSubmit={(f) =>
-            saveSaberPro.mutate(
-              { report_id: reportId, key: uniqueKey("saber pro", saberPro.map((sp) => sp.key)), title: f.title, description: f.description, note: f.note, office_id: f.office_id || null, position: saberPro.length + 1 },
-              done,
-            )
-          }
-        />
-      )}
-      {adding === "tyt" && (
-        <SaberTytForm
-          offices={offices}
-          onCancel={() => setAdding(null)}
-          onSubmit={(f) =>
-            saveSaberTyt.mutate(
-              { report_id: reportId, key: uniqueKey("saber tyt", saberTyt.map((t) => t.key)), title: f.title, description: f.description, note: f.note, office_id: f.office_id || null, position: saberTyt.length + 1 },
-              done,
-            )
-          }
-        />
-      )}
-      {adding === "libre" && (
-        <FreeSetForm
-          offices={offices}
-          onCancel={() => setAdding(null)}
-          onSubmit={(f) =>
-            saveFreeSet.mutate(
-              {
-                report_id: reportId, key: uniqueKey(f.title, freeSets.map((fs) => fs.key)), title: f.title, description: f.description,
-                temporality: f.temporality, period_label: f.period_label, columns: f.columns, views: [], office_id: f.office_id || null,
-                position: freeSets.length + 1,
-              },
-              done,
-            )
-          }
-        />
-      )}
-      {adding && adding !== "ranking" && adding !== "saber" && adding !== "tyt" && adding !== "libre" && (
-        <DatasetForm
+      {adding && (
+        <NewDatasetForm
           key={`${adding}-${addingMode}`}
-          kind={adding}
-          offices={offices}
+          data={data}
+          reportId={reportId}
           years={years}
-          initial={
-            adding === "mapa"
-              ? addingMode === "convenios"
-                ? { mode: addingMode, unit: "convenios", reporting: "global" }
-                : { mode: addingMode, unit: addingMode === "origen" ? "" : "participantes" }
-              : undefined
-          }
+          kind={adding}
+          mode={addingMode}
+          saves={saves}
           onCancel={() => setAdding(null)}
-          onSubmit={(f) => create(adding, f)}
+          onDone={() => {
+            setAdding(null);
+            setEditing(null);
+          }}
         />
       )}
 
@@ -740,39 +907,31 @@ function DatasetsEditor({ data, reportId, years, canEdit }: { data: StationProps
         {breakdowns.map((b) => (
           <DatasetItem key={b.id} kind="Desglose" title={b.title} detail={`${b.unit} · ${b.default_chart === "barras" ? "barras" : b.default_chart === "composicion" ? "composición" : "circular"} · ${yearsDetail(b.years)}${b.show_total === false ? " · sin total" : ""}`} canEdit={canEdit}
             editing={editing === b.id} onEdit={() => setEditing(b.id)} onDelete={() => remove.mutate({ table: "od_breakdowns", id: b.id })}>
-            <DatasetForm kind="desglose" offices={offices} years={years} initial={{ title: b.title, unit: b.unit, format: b.format, chart: b.default_chart, years: b.years, office_id: b.office_id ?? "", showTotal: b.show_total ?? true }}
-              annualRule={b.reporting === "anual" ? "reportado" : b.annual_rule}
-              onCancel={() => setEditing(null)} onSubmit={(f) => saveBreakdown.mutate({ id: b.id, report_id: reportId, title: f.title, unit: f.unit, format: f.format, default_chart: f.chart, years: f.years, office_id: f.office_id || null, ...(f.showTotal !== (b.show_total ?? true) ? { show_total: f.showTotal } : {}) }, done)} />
+            <EditDatasetForm data={data} reportId={reportId} years={years} kind="desglose" id={b.id} saves={saves} onCancel={() => setEditing(null)} onDone={done.onSuccess} />
           </DatasetItem>
         ))}
         {histories.map((h) => (
           <DatasetItem key={h.id} kind="Evolución histórica" title={h.title} detail={`${h.unit || "sin unidad"} · total: ${h.total_label}`} canEdit={canEdit}
             editing={editing === h.id} onEdit={() => setEditing(h.id)} onDelete={() => remove.mutate({ table: "od_histories", id: h.id })}>
-            <DatasetForm kind="historico" offices={offices} years={years} initial={{ title: h.title, description: h.description, unit: h.unit, format: h.format, totalLabel: h.total_label, office_id: h.office_id ?? "" }}
-              onCancel={() => setEditing(null)} onSubmit={(f) => saveHistory.mutate({ id: h.id, report_id: reportId, title: f.title, description: f.description, unit: f.unit, format: f.format, total_label: f.totalLabel || "Total", office_id: f.office_id || null }, done)} />
+            <EditDatasetForm data={data} reportId={reportId} years={years} kind="historico" id={h.id} saves={saves} onCancel={() => setEditing(null)} onDone={done.onSuccess} />
           </DatasetItem>
         ))}
         {pipelines.map((p) => (
           <DatasetItem key={p.id} kind="Tubería" title={p.title} detail={`${p.stages.length} etapas · ${MEASURE_LABEL[p.measure].split(":")[0].toLowerCase()}`} canEdit={canEdit}
             editing={editing === p.id} onEdit={() => setEditing(p.id)} onDelete={() => remove.mutate({ table: "od_pipelines", id: p.id })}>
-            <DatasetForm kind="tuberia" offices={offices} years={years} initial={{ title: p.title, description: p.description, measure: p.measure, rows: p.stages.join("\n"), office_id: p.office_id ?? "" }}
-              onCancel={() => setEditing(null)} onSubmit={(f) => savePipeline.mutate({ id: p.id, report_id: reportId, title: f.title, description: f.description, measure: f.measure, stages: lines(f.rows), office_id: f.office_id || null }, done)} />
+            <EditDatasetForm data={data} reportId={reportId} years={years} kind="tuberia" id={p.id} saves={saves} onCancel={() => setEditing(null)} onDone={done.onSuccess} />
           </DatasetItem>
         ))}
         {heatmaps.map((h) => (
           <DatasetItem key={h.id} kind="Mapa de calor" title={h.title} detail={`${h.rows.length} × ${h.columns.length} · ${h.unit}`} canEdit={canEdit}
             editing={editing === h.id} onEdit={() => setEditing(h.id)} onDelete={() => remove.mutate({ table: "od_heatmaps", id: h.id })}>
-            <DatasetForm kind="calor" offices={offices} years={years}
-              initial={{ title: h.title, description: h.description, unit: h.unit, format: h.format, rowLabel: h.row_label, columnLabel: h.column_label, rows: h.rows.join("\n"), columns: h.columns.join("\n"), office_id: h.office_id ?? "" }}
-              onCancel={() => setEditing(null)}
-              onSubmit={(f) => saveHeatmap.mutate({ id: h.id, report_id: reportId, title: f.title, description: f.description, unit: f.unit, format: f.format, row_label: f.rowLabel, column_label: f.columnLabel, rows: lines(f.rows), columns: lines(f.columns), office_id: f.office_id || null }, done)} />
+            <EditDatasetForm data={data} reportId={reportId} years={years} kind="calor" id={h.id} saves={saves} onCancel={() => setEditing(null)} onDone={done.onSuccess} />
           </DatasetItem>
         ))}
         {maps.map((m) => (
           <DatasetItem key={m.id} kind="Mapa" title={m.title} detail={`${MAP_MODE_DETAIL[m.mode]} · ${m.unit} · ${m.reporting === "global" ? "dato global, sin año" : yearsDetail(m.years)}`} canEdit={canEdit}
             editing={editing === m.id} onEdit={() => setEditing(m.id)} onDelete={() => remove.mutate({ table: "od_maps", id: m.id })}>
-            <DatasetForm kind="mapa" offices={offices} years={years} initial={{ title: m.title, description: m.description, unit: m.unit, mode: m.mode, reporting: m.reporting ?? "anual", years: m.years, office_id: m.office_id ?? "" }}
-              onCancel={() => setEditing(null)} onSubmit={(f) => saveMap.mutate({ id: m.id, report_id: reportId, title: f.title, description: f.description, unit: f.unit, mode: f.mode, reporting: reportingFor(f), years: reportingFor(f) === "global" ? null : f.years, office_id: f.office_id || null }, done)} />
+            <EditDatasetForm data={data} reportId={reportId} years={years} kind="mapa" id={m.id} saves={saves} onCancel={() => setEditing(null)} onDone={done.onSuccess} />
           </DatasetItem>
         ))}
         {medalBoards.map((m) => (
@@ -786,77 +945,58 @@ function DatasetsEditor({ data, reportId, years, canEdit }: { data: StationProps
             onEdit={() => setEditing(m.id)}
             onDelete={() => remove.mutate({ table: "od_medal_boards", id: m.id })}
           >
-            <MedalBoardForm
-              offices={offices}
-              initial={{
-                title: m.title, description: m.description, row_label: m.row_label,
-                reporting: m.reporting, scope: m.scope,
-                fixed_year: m.fixed_year ? String(m.fixed_year) : "",
-                sort: m.sort, tiers: orderedTiers(m), note: m.note, office_id: m.office_id ?? "",
-              }}
-              onCancel={() => setEditing(null)}
-              onSubmit={(f) =>
-                saveMedalBoard.mutate(
-                  {
-                    id: m.id, report_id: reportId,
-                    title: f.title, description: f.description, row_label: f.row_label,
-                    reporting: f.reporting, scope: f.scope,
-                    fixed_year: f.fixed_year ? Number(f.fixed_year) : null,
-                    sort: f.sort, tiers: f.tiers, note: f.note, office_id: f.office_id || null,
-                  },
-                  done,
-                )
-              }
-            />
+            <EditDatasetForm data={data} reportId={reportId} years={years} kind="medallero" id={m.id} saves={saves} onCancel={() => setEditing(null)} onDone={done.onSuccess} />
           </DatasetItem>
         ))}
         {rankings.map((r) => (
           <DatasetItem key={r.id} kind="Ranking" title={r.title} detail={`${RANKING_SYSTEMS[r.system].short} · abre en ${RANKING_VIEWS[r.view].toLowerCase()}`} canEdit={canEdit}
             editing={editing === r.id} onEdit={() => setEditing(r.id)} onDelete={() => remove.mutate({ table: "od_rankings", id: r.id })}>
-            <RankingForm offices={offices} initial={{ title: r.title, description: r.description, system: r.system, accent: r.accent, view: r.view, office_id: r.office_id ?? "" }}
-              onCancel={() => setEditing(null)}
-              onSubmit={(f) => saveRanking.mutate({ id: r.id, report_id: reportId, title: f.title, description: f.description, system: f.system, accent: f.accent, view: f.view, office_id: f.office_id || null }, done)} />
+            <EditDatasetForm data={data} reportId={reportId} years={years} kind="ranking" id={r.id} saves={saves} onCancel={() => setEditing(null)} onDone={done.onSuccess} />
           </DatasetItem>
         ))}
         {saberPro.map((sp) => (
           <DatasetItem key={sp.id} kind="Saber PRO" title={sp.title} detail={saberYears(sp.id) ? `${saberYears(sp.id)} años cargados` : "sin resultados: impórtalos en Captura"} canEdit={canEdit}
             editing={editing === sp.id} onEdit={() => setEditing(sp.id)} onDelete={() => remove.mutate({ table: "od_saber_pro", id: sp.id })}>
-            <SaberProForm offices={offices} initial={{ title: sp.title, description: sp.description, note: sp.note, office_id: sp.office_id ?? "" }}
-              onCancel={() => setEditing(null)}
-              onSubmit={(f) => saveSaberPro.mutate({ id: sp.id, report_id: reportId, title: f.title, description: f.description, note: f.note, office_id: f.office_id || null }, done)} />
+            <EditDatasetForm data={data} reportId={reportId} years={years} kind="saber" id={sp.id} saves={saves} onCancel={() => setEditing(null)} onDone={done.onSuccess} />
           </DatasetItem>
         ))}
         {saberTyt.map((t) => (
           <DatasetItem key={t.id} kind="Saber TyT (Motor Beta)" title={t.title} detail={tytYears(t.id) ? `${tytYears(t.id)} años cargados` : "sin resultados: impórtalos en Captura"} canEdit={canEdit}
             editing={editing === t.id} onEdit={() => setEditing(t.id)} onDelete={() => remove.mutate({ table: "od_saber_tyt", id: t.id })}>
-            <SaberTytForm offices={offices} initial={{ title: t.title, description: t.description, note: t.note, office_id: t.office_id ?? "" }}
-              onCancel={() => setEditing(null)}
-              onSubmit={(f) => saveSaberTyt.mutate({ id: t.id, report_id: reportId, title: f.title, description: f.description, note: f.note, office_id: f.office_id || null }, done)} />
+            <EditDatasetForm data={data} reportId={reportId} years={years} kind="tyt" id={t.id} saves={saves} onCancel={() => setEditing(null)} onDone={done.onSuccess} />
           </DatasetItem>
         ))}
+        {/* Los conjuntos libres se crean y se editan en Captura: aquí solo se listan y se borran. */}
         {freeSets.map((fs) => {
           const rowCount = freeRows(fs.id).length;
-          const filled = freeFilled(fs.id);
+          const custom = Boolean(customViewOf(fs));
+          const where = custom ? "Captura › Tablas personalizadas" : "Captura › Conjuntos libres";
           return (
-            <DatasetItem key={fs.id} kind={customViewOf(fs) ? "Tabla personalizada" : "Conjunto libre"} title={fs.title}
-              detail={customViewOf(fs) ? `${fs.columns.length} columnas · ${rowCount} filas · se escribe en Captura › Tablas personalizadas` : `${fs.columns.length} columnas · ${rowCount} filas · ${fs.views.length} gráficas · ${TEMPORALITY_LABEL[fs.temporality].split(":")[0].toLowerCase()}${fs.temporality === "periodo" && fs.period_label ? ` ${fs.period_label}` : ""}`}
-              canEdit={canEdit} editing={editing === fs.id} onEdit={() => setEditing(fs.id)} onDelete={() => remove.mutate({ table: "od_free_sets", id: fs.id })}>
-              <FreeSetForm
-                offices={offices}
-                initial={{ title: fs.title, description: fs.description, office_id: fs.office_id ?? "", temporality: fs.temporality, period_label: fs.period_label, columns: fs.columns }}
-                rowCount={rowCount}
-                filled={filled}
-                views={fs.views}
-                takenKeys={Object.keys(filled)}
-                onCancel={() => setEditing(null)}
-                onSubmit={(f) =>
-                  saveFreeSet.mutate(
-                    { id: fs.id, report_id: reportId, title: f.title, description: f.description, temporality: f.temporality, period_label: f.period_label, columns: f.columns, office_id: f.office_id || null },
-                    done,
-                  )
-                }
-              />
-            </DatasetItem>
+            <li key={fs.id} className="oda-dataset">
+              <div className="oda-dataset__row">
+                <span className="oda-badge">{custom ? "Tabla personalizada" : "Conjunto libre"}</span>
+                <strong>{fs.title}</strong>
+                <small>
+                  {custom
+                    ? `${fs.columns.length} columnas · ${rowCount} filas`
+                    : `${fs.columns.length} columnas · ${rowCount} filas · ${fs.views.length} gráficas · ${TEMPORALITY_LABEL[fs.temporality].split(":")[0].toLowerCase()}${fs.temporality === "periodo" && fs.period_label ? ` ${fs.period_label}` : ""}`}
+                  {" · "}se edita en {where}
+                </small>
+                <span className="oda-table__actions">
+                  <Link className="oda-link-button" to={{ pathname: location.pathname.replace("/estructura", "/captura"), search: location.search, hash: custom ? "personalizadas" : "libres" }}>
+                    Editar en Captura
+                  </Link>
+                  {canEdit && (
+                    <ConfirmButton
+                      label="Borrar"
+                      subject={`«${fs.title}» (${custom ? "tabla personalizada" : "conjunto libre"})`}
+                      confirmLabel="Se pierden sus cifras cargadas y los bloques que lo muestran salen de la ficha. No se puede deshacer."
+                      onConfirm={() => remove.mutate({ table: "od_free_sets", id: fs.id })}
+                    />
+                  )}
+                </span>
+              </div>
+            </li>
           );
         })}
         {total === 0 && !adding && (
@@ -908,7 +1048,7 @@ const MAP_MODE_DETAIL: Record<OdMapMode, string> = {
   municipio: "origen por municipio, con zoom",
 };
 
-interface DatasetFields {
+export interface DatasetFields {
   title: string; description: string; unit: string; format: OdValueFormat; chart: OdChartKind; mode: OdMapMode; reporting: OdMapReporting;
   rowLabel: string; columnLabel: string; rows: string; columns: string; office_id: string;
   measure: OdPipelineMeasure; totalLabel: string; years: number[] | null;
@@ -916,7 +1056,7 @@ interface DatasetFields {
   showTotal: boolean;
 }
 
-function DatasetForm({ kind, offices, years, initial, annualRule, onSubmit, onCancel }: {
+export function DatasetForm({ kind, offices, years, initial, annualRule, onSubmit, onCancel }: {
   kind: DatasetKind;
   /** Desgloses: cómo sale su cifra del año; solo para sugerir si conviene el total. */
   annualRule?: OdAnnualRule;

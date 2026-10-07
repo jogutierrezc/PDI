@@ -45,6 +45,44 @@
 -- 0057 (units, unit_chain), 0063/0077 (program_campuses). Idempotente.
 -- =============================================================================
 
+-- 0064 dejó dos tablas del diseño anterior con los mismos nombres. El rediseño
+-- las conserva fuera de los esquemas expuestos por PostgREST: así sus datos,
+-- índices y relaciones quedan archivados mientras este módulo crea las nuevas.
+create schema if not exists legacy_impact;
+
+do $$
+begin
+  if to_regclass('public.imp_indicators') is not null
+     and exists (
+       select 1 from information_schema.columns
+       where table_schema = 'public' and table_name = 'imp_indicators'
+         and column_name = 'version_id'
+     )
+     and not exists (
+       select 1 from information_schema.columns
+       where table_schema = 'public' and table_name = 'imp_indicators'
+         and column_name = 'fn'
+     ) then
+    alter table public.imp_indicators set schema legacy_impact;
+  end if;
+
+  if to_regclass('public.imp_alignments') is not null
+     and exists (
+       select 1 from information_schema.columns
+       where table_schema = 'public' and table_name = 'imp_alignments'
+         and column_name = 'kind'
+     )
+     and not exists (
+       select 1 from information_schema.columns
+       where table_schema = 'public' and table_name = 'imp_alignments'
+         and column_name = 'target'
+     ) then
+    alter table public.imp_alignments set schema legacy_impact;
+  end if;
+end $$;
+
+revoke all on schema legacy_impact from public, anon, authenticated;
+
 -- -----------------------------------------------------------------------------
 -- 0. Sede en la pertenencia
 -- -----------------------------------------------------------------------------

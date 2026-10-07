@@ -1,0 +1,347 @@
+<title>Correos de Planeación y Pilo</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600;9..144,700&family=Manrope:wght@500;700;800&display=swap">
+<style>
+/* Composición: lectura a 68ch; el módulo de prueba la rompe a lo ancho con tres columnas: plantillas · campos · correo. */
+:root{
+  --page:#f4f7fb;--surface:#ffffff;--surface-2:#f8fafd;--surface-3:#eef3fa;
+  --ink:#0d1c31;--ink-2:#45566d;--ink-3:#5f7088;
+  --navy:#0a2d63;--blue:#2166d6;--blue-strong:#1b52ad;--blue-soft:#eaf1fd;
+  --line:rgba(13,40,84,.13);--line-strong:rgba(13,40,84,.24);
+  --done:#12833a;--pending:#8a5700;--pending-soft:#fbf2e0;--risk:#c23434;
+  --desk:#dfe6f0;--stage:#06142b;--pilo:#4fd3e0;
+  --shadow:0 1px 2px rgba(10,34,73,.06),0 8px 24px rgba(10,34,73,.07);
+  --display:"Fraunces","Iowan Old Style",Georgia,serif;
+  --body:"Manrope",ui-sans-serif,system-ui,sans-serif;
+  --ease-out:cubic-bezier(.23,1,.32,1);
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --page:#081326;--surface:#0e1d36;--surface-2:#122441;--surface-3:#18305a;
+  --ink:#eaf1fc;--ink-2:#b4c4dc;--ink-3:#93a6c2;
+  --navy:#cfe0ff;--blue:#6ea4f5;--blue-strong:#8db8fa;--blue-soft:#17305c;
+  --line:rgba(190,212,255,.16);--line-strong:rgba(190,212,255,.3);
+  --done:#57c97f;--pending:#f0c060;--pending-soft:#3a2c0c;--risk:#ff8a8a;
+  --desk:#050d1c;--stage:#06142b;--pilo:#4fd3e0;
+  --shadow:0 1px 2px rgba(0,0,0,.4),0 8px 24px rgba(0,0,0,.35);color-scheme:dark}}
+:root[data-theme="dark"]{
+  --page:#081326;--surface:#0e1d36;--surface-2:#122441;--surface-3:#18305a;
+  --ink:#eaf1fc;--ink-2:#b4c4dc;--ink-3:#93a6c2;
+  --navy:#cfe0ff;--blue:#6ea4f5;--blue-strong:#8db8fa;--blue-soft:#17305c;
+  --line:rgba(190,212,255,.16);--line-strong:rgba(190,212,255,.3);
+  --done:#57c97f;--pending:#f0c060;--pending-soft:#3a2c0c;--risk:#ff8a8a;
+  --desk:#050d1c;--stage:#06142b;--pilo:#4fd3e0;
+  --shadow:0 1px 2px rgba(0,0,0,.4),0 8px 24px rgba(0,0,0,.35);color-scheme:dark}
+
+*{box-sizing:border-box}
+body{background:var(--page);color:var(--ink);font:500 16px/1.6 var(--body);margin:0}
+::selection{background:var(--blue);color:#fff}
+.wrap{max-width:1280px;margin:0 auto;padding-inline:clamp(16px,4vw,40px);padding-block:clamp(28px,5vw,60px)}
+.read{max-width:68ch}
+h1,h2{font-family:var(--display);color:var(--navy);letter-spacing:-.022em;line-height:1.1;text-wrap:balance;margin:0}
+h1{font-size:clamp(2rem,2.6vw + 1.2rem,3rem)}
+h2{font-size:clamp(1.4rem,1vw + 1.2rem,1.85rem);margin-top:clamp(44px,6vw,76px);margin-bottom:12px}
+h3{font:800 1.02rem/1.3 var(--body);margin:0 0 4px}
+p{margin:0 0 14px}
+.lede{font-size:1.15rem;color:var(--ink-2);margin-top:16px}
+.note{font-size:.88rem;color:var(--ink-3)}
+:focus-visible{outline:3px solid var(--blue);outline-offset:2px;border-radius:6px}
+
+/* --- El módulo --------------------------------------------------------------- */
+.mod{margin-top:26px;background:var(--surface);border:1px solid var(--line-strong);border-radius:20px;box-shadow:var(--shadow);overflow:clip}
+.m-top{display:flex;flex-wrap:wrap;gap:10px 18px;align-items:center;padding:12px 18px;border-bottom:1px solid var(--line);background:var(--surface-2)}
+.m-top strong{font-family:var(--display);font-size:1.2rem;color:var(--navy)}
+.m-top .sp{flex:1 1 auto}
+.rail{display:flex;flex-wrap:wrap;gap:2px}
+.rail button{min-height:44px;padding:0 14px;border:0;background:transparent;color:var(--ink-2);font:700 .95rem var(--body);cursor:pointer;border-bottom:3px solid transparent}
+.rail button[aria-selected="true"]{color:var(--blue-strong);border-color:var(--blue);font-weight:800}
+.seg{display:inline-flex;flex-wrap:wrap;border:1px solid var(--line-strong);border-radius:22px;background:var(--surface);padding:3px}
+.seg button{min-height:40px;padding:0 14px;border:0;border-radius:999px;background:transparent;color:var(--ink-2);font:700 .9rem var(--body);cursor:pointer}
+.seg button[aria-pressed="true"]{background:var(--navy);color:var(--page)}
+.btn{min-height:44px;padding:0 18px;border-radius:999px;border:1px solid var(--line-strong);background:var(--surface);color:var(--navy);font:800 .92rem var(--body);cursor:pointer;display:inline-flex;align-items:center;gap:8px;transition:transform 140ms var(--ease-out),background-color 180ms ease}
+.btn:active{transform:scale(.97)}
+.btn.primary{background:var(--blue);border-color:transparent;color:#fff}
+:root[data-theme="dark"] .btn.primary{color:#04112a}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]) .btn.primary{color:#04112a}}
+.btn.quiet{border-color:transparent;background:transparent;color:var(--ink-2)}
+@media (hover:hover) and (pointer:fine){.btn:not(.primary):hover{background:var(--surface-3)}}
+.status{font-weight:700;font-size:.86rem;display:inline-flex;gap:6px;align-items:center}
+.status.ok{color:var(--done)}.status.warn{color:var(--pending)}.status.bad{color:var(--risk)}
+
+.m-body{display:grid;grid-template-columns:16.5rem minmax(0,1fr) minmax(0,1.05fr);align-items:start}
+.m-list{padding:14px 10px;border-right:1px solid var(--line);display:grid;gap:4px}
+.m-list h3{font-size:.76rem;color:var(--ink-3);padding:10px 10px 4px;margin:0}
+.m-list button{min-height:52px;text-align:left;padding:8px 12px;border:0;border-radius:12px;background:transparent;color:var(--ink);font:700 .9rem/1.25 var(--body);cursor:pointer}
+.m-list button small{display:block;font-weight:600;color:var(--ink-3);font-size:.8rem}
+.m-list button[aria-current="true"]{background:var(--blue-soft);color:var(--blue-strong)}
+.m-edit{padding:20px clamp(14px,2vw,26px) 26px;display:grid;gap:14px;min-width:0}
+.fld{display:grid;gap:6px;font-weight:700;font-size:.92rem}
+.fld small{font-weight:600;color:var(--ink-3)}
+.fld input,.fld textarea,.fld select{font:500 1rem var(--body);color:var(--ink);background:var(--surface-2);border:1px solid var(--line-strong);border-radius:12px;padding:11px 14px;min-height:46px;width:100%}
+.fld textarea{resize:vertical;min-height:6.5rem;line-height:1.5}
+.fld input:focus,.fld textarea:focus,.fld select:focus{outline:none;border-color:var(--blue);box-shadow:0 0 0 3px rgba(33,102,214,.3)}
+.vars{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+.vars button{min-height:36px;padding:0 12px;border-radius:8px;border:1px dashed var(--line-strong);background:var(--surface);color:var(--blue-strong);font:700 .84rem var(--body);cursor:pointer}
+.warn{padding:10px 14px;border-radius:12px;background:var(--pending-soft);color:var(--ink);font-weight:700;font-size:.9rem}
+.acts{display:flex;flex-wrap:wrap;gap:8px;align-items:center;padding-top:6px;border-top:1px solid var(--line)}
+.test{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.test input{flex:1 1 14rem;font:500 1rem var(--body);color:var(--ink);background:var(--surface-2);border:1px solid var(--line-strong);border-radius:12px;padding:10px 14px;min-height:44px}
+
+/* El correo: sus colores son los del correo, no los de la página; por eso no cambian con el tema. */
+.m-prev{position:sticky;top:12px;padding:16px;background:var(--desk);min-width:0;display:grid;gap:12px;align-content:start;border-left:1px solid var(--line)}
+.p-bar{display:flex;flex-wrap:wrap;gap:8px 14px;align-items:center;justify-content:space-between}
+.inbox{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:10px 14px;font-size:.86rem;display:grid;gap:2px}
+.inbox b{font-size:.98rem}
+.inbox span{color:var(--ink-3);overflow-wrap:anywhere}
+.frame{margin:0 auto;width:100%;transition:max-width 260ms var(--ease-out)}
+.frame[data-dev="cel"]{max-width:340px}
+.mail{background:#f4f7fb;border-radius:14px;padding:18px 12px;color:#0d1c31;font-family:Arial,Helvetica,sans-serif}
+.mail-card{max-width:560px;margin:0 auto;background:#fff;border:1px solid #dfe6f0;border-radius:16px;overflow:hidden}
+.mail-head{padding:20px 26px;color:#fff;display:flex;gap:14px;align-items:center}
+.mail-head img{width:54px;height:54px;object-fit:contain;flex:none}
+.mail-head b{display:block;font-family:Georgia,serif;font-size:19px}
+.mail-head span{font-size:12.5px;opacity:.8}
+.mail-main{padding:26px;font-size:15.5px;line-height:1.55}
+.mail-main h4{margin:0 0 14px;font-family:Georgia,serif;font-size:22px;line-height:1.2}
+.mail-main p{margin:0 0 14px;white-space:pre-line;overflow-wrap:anywhere}
+.mail-btn{display:inline-block;padding:13px 26px;border-radius:999px;font-weight:bold;font-size:15.5px;text-decoration:none;margin:6px 0 16px}
+.mail-foot{padding:16px 26px;border-top:1px solid #dfe6f0;font-size:11.5px;line-height:1.5;color:#6b7c93}
+.var{background:#fff3c4;border-radius:3px;padding:0 2px}
+
+.m-pane{padding:22px clamp(14px,2.4vw,30px) 28px;display:grid;gap:20px}
+.cols{display:grid;grid-template-columns:repeat(auto-fit,minmax(15rem,1fr));gap:14px 22px}
+.box{border:1px solid var(--line);border-radius:16px;padding:18px;display:grid;gap:14px;background:var(--surface)}
+.saved{display:flex;flex-wrap:wrap;gap:10px;align-items:center;padding:10px 14px;border-radius:12px;background:var(--surface-3);font-weight:700}
+.tbl{overflow-x:auto;border:1px solid var(--line);border-radius:14px}
+table{border-collapse:collapse;width:100%;min-width:44rem;font-size:.92rem;font-variant-numeric:tabular-nums}
+th,td{padding:10px 14px;border-bottom:1px solid var(--line);text-align:left;vertical-align:top}
+th{font-size:.8rem;color:var(--ink-2);background:var(--surface-3)}
+tr:last-child td{border-bottom:0}
+.ex{font-size:.8rem;font-weight:700;color:var(--pending);background:var(--pending-soft);padding:5px 12px;border-radius:8px}
+
+@media (max-width:1080px){.m-body{grid-template-columns:minmax(0,1fr)}
+  .m-list{grid-auto-flow:column;grid-auto-columns:max-content;overflow-x:auto;border-right:0;border-bottom:1px solid var(--line)}
+  .m-list h3{display:none}
+  .m-prev{position:static;border-left:0;border-top:1px solid var(--line)}}
+
+.rules{display:grid;grid-template-columns:repeat(auto-fit,minmax(17rem,1fr));gap:20px 34px;margin-top:20px}
+.rules p{color:var(--ink-2);margin:0}
+.steps{counter-reset:s;list-style:none;padding:0;margin:18px 0 0;display:grid;gap:14px;max-width:68ch}
+.steps li{counter-increment:s;display:grid;grid-template-columns:2.6rem minmax(0,1fr);gap:14px}
+.steps li::before{content:counter(s);font:700 1.8rem/1 var(--display);color:var(--blue)}
+.ask{margin-top:16px;padding-left:1.2em;max-width:68ch}
+.ask li{margin-bottom:10px}
+@media (prefers-reduced-motion:reduce){*{transition-duration:.01ms!important}}
+</style>
+
+<div class="wrap">
+  <div class="read">
+    <h1>Un módulo de correos para Planeación y para Pilo</h1>
+    <p class="lede">Una pantalla de la intranet donde se escribe lo que dice cada correo, se ve cómo llega y se envía una prueba. Dos identidades, cada una con su remitente y su aspecto: el Portal de Planeación y Mr. Pilo. Cuando alguien crea su cuenta de Pilo, el correo lo saluda por su nombre y le habla según sea estudiante, profesor o administrativo.</p>
+  </div>
+
+  <h2>Pruébelo</h2>
+  <div class="read"><p>Cambie de identidad, elija una plantilla y escriba: el correo de la derecha cambia al momento. Los botones azules punteados insertan un dato de la persona. Las personas y los envíos son de ejemplo, y nada se envía de verdad.</p></div>
+
+  <div class="mod" id="mod">
+    <div class="m-top">
+      <strong>Correos</strong>
+      <div class="rail" role="tablist" id="rail">
+        <button type="button" role="tab" data-v="plantillas" aria-selected="true">Plantillas</button>
+        <button type="button" role="tab" data-v="conexion" aria-selected="false">Remitentes y conexión</button>
+        <button type="button" role="tab" data-v="bitacora" aria-selected="false">Bitácora</button>
+      </div>
+      <span class="sp"></span>
+      <span class="seg" id="brand" aria-label="Identidad"><button type="button" data-v="plan" aria-pressed="true">Portal de Planeación</button><button type="button" data-v="pilo" aria-pressed="false">Mr. Pilo</button></span>
+    </div>
+
+    <div class="m-body" id="v-plantillas">
+      <nav class="m-list" id="list" aria-label="Plantillas"></nav>
+      <div class="m-edit" id="edit"></div>
+      <aside class="m-prev" aria-label="Vista previa">
+        <div class="p-bar">
+          <label class="fld" style="grid-template-columns:auto auto;align-items:center;gap:10px">Verlo como <select id="who" style="min-height:40px;padding:6px 10px;width:auto"></select></label>
+          <span class="seg" id="dev"><button type="button" data-v="pc" aria-pressed="true">Computador</button><button type="button" data-v="cel" aria-pressed="false">Celular</button></span>
+        </div>
+        <div class="inbox" id="inbox"></div>
+        <div class="frame" id="frame" data-dev="pc"><div class="mail" id="mail"></div></div>
+      </aside>
+    </div>
+
+    <div class="m-pane" id="v-conexion" hidden>
+      <div class="cols">
+        <div class="box">
+          <h3>Conexión SMTP</h3>
+          <label class="fld" for="s-host">Servidor<input id="s-host" value="smtp.office365.com"></label>
+          <label class="fld" for="s-port">Puerto<input id="s-port" inputmode="numeric" value="587"></label>
+          <label class="fld" for="s-sec">Seguridad<select id="s-sec"><option>STARTTLS (recomendada con 587)</option><option>SSL/TLS (con 465)</option></select></label>
+          <label class="fld" for="s-user">Usuario<input id="s-user" value="planeacion-notificaciones@udes.edu.co"></label>
+          <div class="fld"><span>Contraseña <small>Se escribe una vez y no vuelve a mostrarse.</small></span><div class="saved" id="s-pass"></div></div>
+          <div class="acts" style="border:0;padding:0"><button type="button" class="btn primary" id="s-test">Probar conexión</button><span class="status" id="s-out" role="status"></span></div>
+        </div>
+        <div class="box">
+          <h3>Remitente del Portal de Planeación</h3>
+          <label class="fld" for="f-plan-n">Nombre que ve quien recibe<input id="f-plan-n" data-from="plan" data-k="from"></label>
+          <label class="fld" for="f-plan-a">Dirección<input id="f-plan-a" data-from="plan" data-k="addr"></label>
+          <label class="fld" for="f-plan-r">Responder a <small>Vacío: no se espera respuesta.</small><input id="f-plan-r" data-from="plan" data-k="reply"></label>
+          <h3 style="margin-top:8px">Remitente de Mr. Pilo</h3>
+          <label class="fld" for="f-pilo-n">Nombre que ve quien recibe<input id="f-pilo-n" data-from="pilo" data-k="from"></label>
+          <label class="fld" for="f-pilo-a">Dirección<input id="f-pilo-a" data-from="pilo" data-k="addr"></label>
+          <label class="fld" for="f-pilo-r">Responder a<input id="f-pilo-r" data-from="pilo" data-k="reply"></label>
+        </div>
+        <div class="box">
+          <h3>Límites y resguardo</h3>
+          <label class="fld" for="l-hora">Correos por hora, como máximo <small>Si se pasa, los demás esperan su turno.</small><input id="l-hora" inputmode="numeric" value="200"></label>
+          <label class="fld" for="l-dia">Correos de cuenta por persona al día <small>Evita que alguien use «olvidé mi contraseña» para molestar a otro.</small><input id="l-dia" inputmode="numeric" value="5"></label>
+          <label class="fld" for="l-dom">Solo se envía a estos dominios <small>Vacío: a cualquiera.</small><input id="l-dom" value="udes.edu.co, mail.udes.edu.co"></label>
+          <p class="note" style="margin:0">Con Microsoft 365, la dirección de cada remitente debe ser el buzón de la conexión o uno sobre el que tenga permiso «Enviar como».</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="m-pane" id="v-bitacora" hidden>
+      <div style="display:flex;flex-wrap:wrap;gap:10px;align-items:center;justify-content:space-between"><p style="margin:0;max-width:60ch">Cada correo que sale queda anotado: cuál plantilla, a quién, cuándo y si el servidor lo aceptó. El contenido no se guarda, y el enlace personal tampoco.</p><span class="ex">Envíos de ejemplo</span></div>
+      <div class="tbl"><table>
+        <thead><tr><th>Cuándo</th><th>Identidad</th><th>Plantilla</th><th>Para</th><th>Resultado</th></tr></thead>
+        <tbody id="log"></tbody>
+      </table></div>
+    </div>
+  </div>
+
+  <h2>Qué se puede configurar</h2>
+  <div class="rules">
+    <div><h3>Dos identidades</h3><p>Portal de Planeación y Mr. Pilo. Cada una con su nombre de remitente, su dirección, su «responder a», su cabecera y su color. Añadir una tercera sería una fila más.</p></div>
+    <div><h3>Plantillas por campos</h3><p>Asunto, línea previa, título, saludo, mensaje, botón y nota. El diseño alrededor es fijo y probado en Outlook y Gmail: no hay forma de dañarlo escribiendo.</p></div>
+    <div><h3>Datos de la persona</h3><p>Nombre, correo, sede y rol se insertan con un botón. Si alguien escribe mal un dato, el módulo lo avisa antes de guardar.</p></div>
+    <div><h3>Un mensaje por rol en Pilo</h3><p>La bienvenida tiene un texto para estudiantes, otro para profesores y otro para administrativos. Pilo ya sabe el rol por el correo con que se registran.</p></div>
+    <div><h3>Vista previa y prueba</h3><p>Se ve en computador y en celular, con una persona de ejemplo de cada rol. «Enviar una prueba» lo manda a su correo antes de guardar.</p></div>
+    <div><h3>Conexión y límites</h3><p>Servidor SMTP, usuario y contraseña (que no vuelve a mostrarse), tope por hora, tope por persona y dominios permitidos.</p></div>
+    <div><h3>Bitácora</h3><p>Qué salió, a quién y si falló, con el motivo que dio el servidor. Sin el contenido ni el enlace personal.</p></div>
+    <div><h3>Volver al original</h3><p>Cada plantilla conserva su texto de fábrica. Un botón lo recupera si un cambio no convence.</p></div>
+  </div>
+
+  <h2>Cómo funcionaría por debajo</h2>
+  <ol class="steps">
+    <li><div><h3>Supabase delega el envío</h3><p>Cuando alguien se registra o pide cambiar su contraseña, el servidor de cuentas le pasa el pedido a una función del proyecto, en vez de enviar su correo genérico.</p></div></li>
+    <li><div><h3>La función elige identidad y plantilla</h3><p>Si la cuenta es de Pilo, usa la identidad de Pilo y el mensaje de su rol. Si es de la intranet, la de Planeación.</p></div></li>
+    <li><div><h3>Arma el correo y lo envía por SMTP</h3><p>Pone el nombre, la sede y el enlace personal, y lo entrega al servidor de correo de la universidad. Anota el resultado en la bitácora.</p></div></li>
+  </ol>
+  <p class="note" style="margin-top:14px;max-width:68ch">Falta comprobar que el servidor de la universidad deje salir a las funciones por el puerto 587. Si no, el mismo módulo puede enviar por Amazon SES, que el dominio ya tiene autorizado.</p>
+
+  <h2>Lo que necesito que decida</h2>
+  <ol class="ask">
+    <li><b>¿Estas plantillas para empezar?</b> Planeación: activar cuenta, cambiar contraseña, confirmar correo nuevo. Pilo: bienvenida con confirmación, cambiar contraseña. Las de aviso («se publicó un informe», recordatorios de Moodle) quedarían para después.</li>
+    <li><b>¿Quién edita?</b> Propongo que solo la administración cambie plantillas y conexión, y que Planeación pueda ver la bitácora.</li>
+    <li><b>¿La cara de Pilo en la cabecera de sus correos?</b> En el prototipo va la aprobada. Algunos programas de correo ocultan las imágenes hasta que la persona lo permite; el correo se entiende igual sin ella.</li>
+  </ol>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
+<script>
+(function(){
+const FACE="__PILO_CLOSED__";
+const $=(s,r=document)=>r.querySelector(s);
+const esc=s=>String(s??"").replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const calm=matchMedia("(prefers-reduced-motion: reduce)").matches,G=window.gsap;
+
+const BRANDS={
+  plan:{name:"Portal de Planeación",from:"Planeación UDES",addr:"planeacion-notificaciones@udes.edu.co",reply:"",head:"#0a2d63",btn:"#2166d6",btnInk:"#ffffff",title:"#0a2d63",line1:"Universidad de Santander",line2:"Dirección de Planeación Institucional",foot:"Este correo lo envía un sistema de la Dirección de Planeación Institucional de la Universidad de Santander."},
+  pilo:{name:"Mr. Pilo",from:"Mr. Pilo · UDES",addr:"pilo@udes.edu.co",reply:"",head:"#06142b",btn:"#4fd3e0",btnInk:"#04222a",title:"#06142b",line1:"Mr. Pilo",line2:"La inteligencia artificial de la Universidad de Santander",foot:"Mr. Pilo es la inteligencia artificial de la Universidad de Santander. Este correo se envió porque alguien creó una cuenta con esta dirección."},
+};
+const PEOPLE=[
+  {id:"est",label:"Laura, estudiante",nombre:"Laura Gómez",correo:"laura.gomez@mail.udes.edu.co",sede:"Bucaramanga",rol:"estudiante"},
+  {id:"pro",label:"Carlos, profesor",nombre:"Carlos Rueda",correo:"carlos.rueda@udes.edu.co",sede:"Cúcuta",rol:"profesor"},
+  {id:"adm",label:"Marta, administrativa",nombre:"Marta Peña",correo:"marta.pena@valledupar.udes.edu.co",sede:"Valledupar",rol:"administrativo"},
+];
+const VARS=[["nombre","Nombre"],["correo","Correo"],["sede","Sede"],["rol","Rol"]];
+const ROLES=[["estudiante","Estudiante"],["profesor","Profesor"],["administrativo","Administrativo"]];
+const T=(o)=>{const m={pre:"",note:"",...o};return {...m,original:JSON.stringify(m)}};
+const TPL=[
+  T({id:"p-invita",brand:"plan",group:"Cuentas de la intranet",name:"Activar la cuenta",when:"Al crear un usuario",subject:"Active su cuenta de Planeación UDES",pre:"Su cuenta está lista: elija su contraseña.",title:"Active su cuenta",hello:"Hola, {{nombre}}.",body:"La Dirección de Planeación le creó una cuenta en la intranet, con el correo {{correo}}.\nPara activarla y elegir su contraseña, abra este enlace.",button:"Activar mi cuenta",note:"El enlace sirve una sola vez. Si no esperaba este mensaje, puede ignorarlo."}),
+  T({id:"p-clave",brand:"plan",group:"Cuentas de la intranet",name:"Cambiar la contraseña",when:"«Olvidé mi contraseña»",subject:"Cambie su contraseña",pre:"Abra el enlace y escriba la nueva.",title:"Cambie su contraseña",hello:"Hola, {{nombre}}.",body:"Recibimos una solicitud para cambiar la contraseña de la cuenta {{correo}}.\nAbra este enlace y escriba la contraseña nueva.",button:"Cambiar mi contraseña",note:"Si usted no lo pidió, ignore este mensaje: su contraseña sigue siendo la misma."}),
+  T({id:"p-correo",brand:"plan",group:"Cuentas de la intranet",name:"Confirmar el correo nuevo",when:"Al cambiar el correo",subject:"Confirme su correo nuevo",title:"Confirme su correo nuevo",hello:"Hola, {{nombre}}.",body:"Pidió cambiar el correo de su cuenta. Para que el cambio quede hecho, confírmelo desde este enlace.",button:"Confirmar el cambio",note:"Si usted no lo pidió, ignore este mensaje."}),
+  T({id:"p-informe",brand:"plan",group:"Avisos",name:"Se publicó un informe",when:"Para después: aún no se envía",subject:"Nuevo corte en UDES en Cifras",title:"Hay cifras nuevas",hello:"Hola, {{nombre}}.",body:"Se publicó un nuevo corte de UDES en Cifras con lo que reportó su oficina.",button:"Ver el informe",note:"Recibe este aviso porque su oficina reporta cifras a Planeación."}),
+  T({id:"k-bienvenida",brand:"pilo",group:"Cuenta de Pilo",name:"Bienvenida y confirmación",when:"Al crear la cuenta de Pilo",subject:"{{nombre}}, confirme su cuenta de Mr. Pilo",pre:"Un paso más y empezamos.",title:"¡Qué bueno tenerlo por aquí!",hello:"Hola, {{nombre}}.",button:"Confirmar mi cuenta",note:"Si usted no creó esta cuenta, ignore este mensaje: sin confirmar, no se activa.",
+    roles:{estudiante:"Soy Mr. Pilo. Con su cuenta de {{sede}} puedo ayudarle a estudiar: explicarle un tema, recordarle sus entregas de Moodle y mostrarle sus notas.\nPara empezar, confirme que este correo es suyo.",profesor:"Soy Mr. Pilo. Con su cuenta de {{sede}} puedo apoyarle en su labor docente: políticas institucionales, innovación educativa y sus cursos de Moodle.\nPara empezar, confirme que este correo es suyo.",administrativo:"Soy Mr. Pilo. Con su cuenta de {{sede}} puedo responderle sobre las cifras, los planes y las políticas de la universidad.\nPara empezar, confirme que este correo es suyo."}}),
+  T({id:"k-clave",brand:"pilo",group:"Cuenta de Pilo",name:"Cambiar la contraseña",when:"«Olvidé mi contraseña» en Pilo",subject:"Cambie su contraseña de Mr. Pilo",title:"Cambiemos su contraseña",hello:"Hola, {{nombre}}.",body:"Me pidieron cambiar la contraseña de su cuenta. Abra este enlace y escriba la nueva.",button:"Cambiar mi contraseña",note:"Si usted no lo pidió, ignore este mensaje: su contraseña sigue siendo la misma."}),
+  T({id:"k-entrega",brand:"pilo",group:"Avisos",name:"Recordatorio de entrega",when:"Para después: aún no se envía",subject:"{{nombre}}, tiene una entrega mañana",title:"Una entrega se acerca",hello:"Hola, {{nombre}}.",body:"Mañana vence una entrega en uno de sus cursos de Moodle. Entre a «Mis clases» para verla.",button:"Ver mis clases",note:"Puede apagar estos recordatorios en su cuenta de Pilo."}),
+];
+let brand="plan",cur="p-invita",role="estudiante",who="est",lastField="body";
+const tpl=()=>TPL.find(t=>t.id===cur);
+const person=()=>PEOPLE.find(p=>p.id===who);
+const bodyOf=t=>t.roles?t.roles[person().rol]:t.body;
+
+/* Pone los datos de la persona; lo que no es un dato conocido se devuelve para avisarlo. */
+function fill(text,p,mark){const bad=[];const out=esc(text).replace(/\{\{\s*([^}]*?)\s*\}\}/g,(m,k)=>{if(k in p&&VARS.some(v=>v[0]===k))return mark?`<span class="var">${esc(p[k])}</span>`:esc(p[k]);bad.push(m);return m});return {out,bad}}
+
+function list(){
+  let h="",g="";
+  TPL.filter(t=>t.brand===brand).forEach(t=>{if(t.group!==g){g=t.group;h+=`<h3>${g}</h3>`}
+    h+=`<button type="button" data-id="${t.id}" ${t.id===cur?'aria-current="true"':""}>${t.name}<small>${t.when}${JSON.stringify(strip(t))===t.original?"":" · cambiada"}</small></button>`});
+  $("#list").innerHTML=h;
+}
+const strip=t=>{const {original,...o}=t;return o};
+function editor(){
+  const t=tpl(),I=(k,l,hint="")=>`<label class="fld" for="e-${k}">${l}${hint?` <small>${hint}</small>`:""}<input id="e-${k}" data-k="${k}" value="${esc(t[k])}"></label>`;
+  $("#edit").innerHTML=`<div><h3 style="font-size:1.15rem">${t.name}</h3><p class="note" style="margin:0">${t.when} · identidad: ${BRANDS[t.brand].name}</p></div>
+    ${I("subject","Asunto")}${I("pre","Línea previa","La que algunos programas muestran junto al asunto.")}${I("title","Título")}${I("hello","Saludo")}
+    ${t.roles?`<div class="fld"><span>Este mensaje cambia según quién crea la cuenta</span><span class="seg" id="role" style="justify-self:start">${ROLES.map(r=>`<button type="button" data-v="${r[0]}" aria-pressed="${r[0]===role}">${r[1]}</button>`).join("")}</span></div>
+      <label class="fld" for="e-body">Mensaje para ${ROLES.find(r=>r[0]===role)[1].toLowerCase()}<textarea id="e-body" data-k="body" rows="5">${esc(t.roles[role])}</textarea></label>`
+     :`<label class="fld" for="e-body">Mensaje<textarea id="e-body" data-k="body" rows="5">${esc(t.body)}</textarea></label>`}
+    <div class="vars"><span class="note">Insertar un dato de la persona:</span>${VARS.map(v=>`<button type="button" data-var="${v[0]}">${v[1]}</button>`).join("")}</div>
+    ${I("button","Texto del botón","El enlace personal lo pone el sistema: no se escribe.")}${I("note","Nota final")}
+    <div class="warn" id="bad" hidden role="alert"></div>
+    <div class="acts"><button type="button" class="btn primary" id="save">Guardar</button><button type="button" class="btn quiet" id="reset">Volver al texto original</button><span class="status ok" id="out" role="status"></span></div>
+    <div class="test"><input id="e-test" type="email" placeholder="su.correo@udes.edu.co" aria-label="Correo para la prueba"><button type="button" class="btn" id="send">Enviar una prueba</button></div>`;
+}
+function preview(swap){
+  const t=tpl(),b=BRANDS[t.brand],p=person(),bad=[];
+  const F=(x,m=true)=>{const r=fill(x,p,m);bad.push(...r.bad);return r.out};
+  $("#inbox").innerHTML=`<b>${F(t.subject,false)}</b><span>De: ${esc(b.from)} &lt;${esc(b.addr)}&gt;${b.reply?` · responder a ${esc(b.reply)}`:""}</span><span>${F(t.pre,false)}</span>`;
+  $("#mail").innerHTML=`<div class="mail-card"><div class="mail-head" style="background:${b.head}">${t.brand==="pilo"?`<img src="${FACE}" alt="Mr. Pilo">`:""}<div><b>${b.line1}</b><span>${b.line2}</span></div></div>
+    <div class="mail-main"><h4 style="color:${b.title}">${F(t.title)}</h4><p>${F(t.hello)}</p><p>${F(bodyOf(t))}</p><span class="mail-btn" style="background:${b.btn};color:${b.btnInk}">${F(t.button)}</span><p style="font-size:13.5px;color:#45566d">${F(t.note)}</p></div>
+    <div class="mail-foot">${b.foot} No responda a esta dirección.</div></div>`;
+  const w=$("#bad");if(w){const u=[...new Set(bad)];w.hidden=!u.length;w.textContent=u.length?`${u.join(", ")} no es un dato que el sistema conozca: llegaría tal cual. Use los botones de «Insertar un dato».`:""}
+  if(swap&&G&&!calm)G.fromTo("#mail",{opacity:.35,filter:"blur(3px)"},{opacity:1,filter:"blur(0px)",duration:.22,ease:"power2.out"});
+}
+function all(swap){list();editor();preview(swap)}
+
+$("#list").addEventListener("click",e=>{const b=e.target.closest("[data-id]");if(!b)return;cur=b.dataset.id;all(true)});
+$("#edit").addEventListener("focusin",e=>{if(e.target.dataset.k)lastField=e.target.dataset.k});
+$("#edit").addEventListener("input",e=>{const k=e.target.dataset.k;if(!k)return;const t=tpl();if(k==="body"&&t.roles)t.roles[role]=e.target.value;else t[k]=e.target.value;$("#out").textContent="";preview()});
+$("#edit").addEventListener("click",e=>{
+  const t=tpl(),v=e.target.closest("[data-var]"),r=e.target.closest("#role button");
+  if(r){role=r.dataset.v;who=PEOPLE.find(p=>p.rol===role).id;$("#who").value=who;editor();preview(true);return}
+  if(v){const el=$(`#e-${lastField}`)||$("#e-body"),ins=`{{${v.dataset.var}}}`,s=el.selectionStart??el.value.length,en=el.selectionEnd??s;
+    el.value=el.value.slice(0,s)+ins+el.value.slice(en);el.focus();el.setSelectionRange(s+ins.length,s+ins.length);el.dispatchEvent(new Event("input",{bubbles:true}));return}
+  if(e.target.id==="save"){const bad=!$("#bad").hidden;$("#out").className="status "+(bad?"warn":"ok");$("#out").textContent=bad?"Guardada, con un aviso por revisar.":"Guardada. Vale desde el próximo correo.";list()}
+  if(e.target.id==="reset"){Object.assign(t,JSON.parse(t.original));all(true);$("#out").textContent="Volvió al texto original."}
+  if(e.target.id==="send"){const m=$("#e-test").value.trim(),ok=/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(m);$("#out").className="status "+(ok?"ok":"bad");$("#out").textContent=ok?`Prueba enviada a ${m}, como la vería ${person().nombre} (demostración).`:"Escriba un correo completo para la prueba."}
+});
+function seg(sel,fn){$(sel).addEventListener("click",e=>{const b=e.target.closest("button");if(!b)return;[...b.parentNode.children].forEach(x=>x.setAttribute("aria-pressed",x===b));fn(b.dataset.v)})}
+seg("#brand",v=>{brand=v;cur=TPL.find(t=>t.brand===v).id;all(true)});
+seg("#dev",v=>{$("#frame").dataset.dev=v});
+$("#who").innerHTML=PEOPLE.map(p=>`<option value="${p.id}">${p.label}</option>`).join("");
+$("#who").addEventListener("change",e=>{who=e.target.value;if(tpl().roles){role=person().rol;editor()}preview(true)});
+$("#rail").addEventListener("click",e=>{const b=e.target.closest("button");if(!b)return;[...b.parentNode.children].forEach(x=>x.setAttribute("aria-selected",x===b));["plantillas","conexion","bitacora"].forEach(v=>{$("#v-"+v).hidden=v!==b.dataset.v});$("#brand").hidden=b.dataset.v!=="plantillas"});
+
+/* --- Remitentes y conexión -------------------------------------------------------- */
+document.querySelectorAll("[data-from]").forEach(el=>{el.value=BRANDS[el.dataset.from][el.dataset.k];el.addEventListener("input",()=>{BRANDS[el.dataset.from][el.dataset.k]=el.value;preview()})});
+function pass(saved){$("#s-pass").innerHTML=saved?`<span>Guardada en el servidor · termina en <b>••••x7Qa</b></span><button type="button" class="btn" id="p-chg">Cambiar</button>`:`<input id="p-new" type="password" autocomplete="off" aria-label="Contraseña nueva" placeholder="Escriba la contraseña" style="flex:1 1 12rem;min-height:42px;border-radius:10px;border:1px solid var(--line-strong);padding:8px 12px;background:var(--surface);color:var(--ink);font:500 1rem var(--body)"><button type="button" class="btn primary" id="p-save">Guardar</button>`}
+$("#s-pass").addEventListener("click",e=>{if(e.target.id==="p-chg")pass(false);if(e.target.id==="p-save")pass(true)});
+$("#s-test").addEventListener("click",()=>{const host=$("#s-host").value.trim(),port=+$("#s-port").value,o=$("#s-out");
+  if(!/^[a-z0-9.-]+\.[a-z]{2,}$/i.test(host)){o.className="status bad";o.textContent="El servidor no parece una dirección válida.";return}
+  if(![25,465,587,2525].includes(port)){o.className="status warn";o.textContent="Ese puerto no es de los habituales (587 o 465).";return}
+  o.className="status";o.textContent="Probando…";setTimeout(()=>{o.className="status ok";o.textContent="El servidor aceptó el usuario y la contraseña (demostración)."},700)});
+pass(true);
+
+$("#log").innerHTML=[
+  ["Hoy, 9:42","Mr. Pilo","Bienvenida y confirmación · estudiante","l•••a.gomez@mail.udes.edu.co","ok","Aceptado por el servidor"],
+  ["Hoy, 9:15","Mr. Pilo","Bienvenida y confirmación · profesor","c•••s.rueda@udes.edu.co","ok","Aceptado por el servidor"],
+  ["Hoy, 8:03","Portal de Planeación","Cambiar la contraseña","m•••a.pena@valledupar.udes.edu.co","ok","Aceptado por el servidor"],
+  ["Ayer, 17:20","Mr. Pilo","Cambiar la contraseña","j•••n.diaz@mail.udes.edu.co","bad","Rechazado: el buzón no existe"],
+  ["Ayer, 11:05","Portal de Planeación","Activar la cuenta","a•••a.rios@udes.edu.co","ok","Aceptado por el servidor"],
+  ["Ayer, 10:58","Mr. Pilo","Bienvenida y confirmación · estudiante","s•••o.mora@mail.udes.edu.co","warn","En espera: se alcanzó el tope por hora"],
+].map(r=>`<tr><td>${r[0]}</td><td>${r[1]}</td><td>${r[2]}</td><td>${r[3]}</td><td><span class="status ${r[4]}">${r[4]==="ok"?"✓":r[4]==="bad"?"✕":"▲"} ${r[5]}</span></td></tr>`).join("");
+
+all();
+})();
+</script>

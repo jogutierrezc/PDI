@@ -3,23 +3,26 @@
 
    Su lógica pura (servidor-logica.ts, que la función lleva copiada dentro:
    servidor-sync.test.ts vigila que sean iguales): la dirección de Moodle que
-   se acepta, la lista cerrada de funciones, los pedidos, los errores y lo que
-   queda de las respuestas.
+   se acepta, cuáles sitios se ofrecen y cuál atiende cada pedido, la lista
+   cerrada de funciones, los pedidos, los errores y lo que queda de las
+   respuestas.
 
    Y una prueba ESTÁTICA del archivo de la función (uno solo, con la lógica
    dentro): no escribe en ninguna tabla, no usa la bitácora ni `console`, no
    sigue redirecciones y no toma la dirección de Moodle de lo que manda el
-   navegador. Quien agregue una de esas cosas, rompe esta prueba.
+   navegador (de él solo llega el identificador de un sitio, y la dirección
+   no viaja de vuelta). Quien agregue una de esas cosas, rompe esta prueba.
    ========================================================================== */
 
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 import {
-  CLASES_ALLOWED, MAX_EVENTS, MAX_ITEMS, MAX_TEXT, MOODLE_SERVICE,
-  credentials, hasPages, htmlToText, isClasesFn, loginForm, loginResult, moodleFault, moodleForm, moodleSite, privateAddress, readCapped, safeLink,
-  shapeAssignments, shapeContents, shapeCourses, shapeEvents, shapePages, shapeSite, tokenShape,
+  CLASES_ALLOWED, MAX_EVENTS, MAX_ITEMS, MAX_SITES, MAX_TEXT, MOODLE_SERVICE, OFF, SITE_GONE,
+  credentials, hasPages, htmlToText, isClasesFn, loginForm, loginResult, moodleFault, moodleForm, moodleSite, openSites, pickSite, privateAddress, readCapped, safeLink,
+  shapeAssignments, shapeContents, shapeCourses, shapeEvents, shapePages, shapeSite, siteIdShape, tokenShape,
 } from "./servidor-logica";
+import { siteIdShape as clientSiteIdShape } from "./logic";
 
 const SITE = "https://moodle.udes.edu.co";
 const TOKEN = "0123456789abcdef0123456789abcdef";
@@ -81,6 +84,79 @@ describe("la dirección de Moodle", () => {
     for (const ip of ["190.24.150.10", "8.8.8.8", "172.32.0.1", "2800:e2:1::10", "2606:4700:4700::1111"]) {
       expect(privateAddress(ip), ip).toBe(false);
     }
+  });
+});
+
+describe("los sitios de Moodle", () => {
+  const ROWS = [
+    { id: "bucaramanga", name: "Bucaramanga", url: "https://moodle.udes.edu.co", enabled: true },
+    { id: "cucuta", name: "  Cúcuta \n virtual ", url: "https://campus.udes.edu.co/moodle/", enabled: true },
+  ];
+
+  it("un identificador tiene la forma de la tabla (0133), aquí y en la página", () => {
+    for (const ok of ["principal", "bucaramanga", "sede-2", "ab", `a${"b".repeat(23)}`]) {
+      expect(siteIdShape(ok), ok).toBe(true);
+      expect(clientSiteIdShape(ok), ok).toBe(true);
+    }
+    for (const bad of ["", "a", "1sede", "-sede", "Sede", "sede_2", "sede 2", `a${"b".repeat(24)}`, "sede'--", "sede/..", "https://moodle.udes.edu.co", 5, null, undefined, ["principal"], { id: "principal" }]) {
+      expect(siteIdShape(bad), String(bad)).toBe(false);
+      expect(clientSiteIdShape(bad), String(bad)).toBe(false);
+    }
+  });
+
+  it("se ofrecen los encendidos con una dirección válida, en el orden en que llegan", () => {
+    const sites = openSites([
+      ...ROWS,
+      { id: "apagado", name: "Apagado", url: "https://otro.udes.edu.co", enabled: false },
+      { id: "sin-encender", name: "Sin decir", url: "https://otro.udes.edu.co" },
+      { id: "interno", name: "Interno", url: "https://10.0.0.1", enabled: true },
+      { id: "http", name: "Sin https", url: "http://moodle.udes.edu.co", enabled: true },
+      { id: "vacio", name: "Sin dirección", url: "", enabled: true },
+      { id: "Mal Id", name: "x", url: "https://otro.udes.edu.co", enabled: true },
+      { id: "bucaramanga", name: "Repetido", url: "https://otro.udes.edu.co", enabled: true },
+      "basura",
+      null,
+    ]);
+    expect(sites.map((s) => s.id)).toEqual(["bucaramanga", "cucuta"]);
+    expect(sites[0]).toEqual({ id: "bucaramanga", name: "Bucaramanga", at: moodleSite("https://moodle.udes.edu.co") });
+    expect(sites[1].name).toBe("Cúcuta virtual");
+    expect(sites[1].at).toMatchObject({ ok: true, site: "https://campus.udes.edu.co/moodle", host: "campus.udes.edu.co" });
+    expect(openSites([{ id: "sin-nombre", name: "", url: "https://moodle.udes.edu.co", enabled: true }])[0].name).toBe("Moodle");
+    expect(openSites(null)).toEqual([]);
+    expect(openSites("no es una lista")).toEqual([]);
+    expect(openSites(Array.from({ length: 30 }, (_, i) => ({ id: `sede-${i}`, name: `Sede ${i}`, url: "https://moodle.udes.edu.co", enabled: true })))).toHaveLength(MAX_SITES);
+  });
+
+  it("el pedido dice cuál por su identificador, y se usa la dirección de ese", () => {
+    const sites = openSites(ROWS);
+    const picked = pickSite(sites, "cucuta");
+    expect(picked).toMatchObject({ ok: true, site: { id: "cucuta", at: { rest: "https://campus.udes.edu.co/moodle/webservice/rest/server.php" } } });
+    expect(pickSite(sites, "bucaramanga")).toMatchObject({ ok: true, site: { id: "bucaramanga", at: { host: "moodle.udes.edu.co" } } });
+  });
+
+  it("un permiso de antes no trae sitio: vale si hay exactamente uno", () => {
+    const one = openSites(ROWS.slice(0, 1));
+    for (const none of [undefined, null, ""]) {
+      expect(pickSite(one, none)).toMatchObject({ ok: true, site: { id: "bucaramanga" } });
+      // Con varios, no se adivina.
+      expect(pickSite(openSites(ROWS), none)).toEqual({ ok: false, fault: SITE_GONE });
+    }
+  });
+
+  it("un sitio que no existe, que está apagado o que viene mal escrito es el fallo «sitio»", () => {
+    const sites = openSites([...ROWS, { id: "apagado", name: "Apagado", url: "https://otro.udes.edu.co", enabled: false }]);
+    expect(SITE_GONE).toMatchObject({ code: "sitio", status: 409 });
+    for (const bad of ["apagado", "valledupar", "Bucaramanga", " bucaramanga", "https://moodle.udes.edu.co", "https://10.0.0.1", 0, 7, true, ["bucaramanga"], { id: "bucaramanga" }, "__proto__", "constructor"]) {
+      expect(pickSite(sites, bad), String(bad)).toEqual({ ok: false, fault: SITE_GONE });
+    }
+    // Aunque haya uno solo: un identificador que no es el suyo no se cambia por él.
+    expect(pickSite(openSites(ROWS.slice(0, 1)), "cucuta")).toEqual({ ok: false, fault: SITE_GONE });
+  });
+
+  it("sin ningún sitio encendido, Mis clases aún no está disponible", () => {
+    expect(OFF).toMatchObject({ code: "no_disponible", status: 503 });
+    for (const asked of [undefined, "", "bucaramanga", "Mal Id"]) expect(pickSite([], asked)).toEqual({ ok: false, fault: OFF });
+    expect(pickSite(openSites([{ id: "apagado", name: "Apagado", url: "https://otro.udes.edu.co", enabled: false }]), "apagado")).toEqual({ ok: false, fault: OFF });
   });
 });
 
@@ -352,9 +428,11 @@ describe("la función no guarda nada", () => {
   it("no escribe en ninguna tabla", () => {
     expect(code).not.toMatch(/\.(insert|update|upsert|delete)\s*\(/);
     // Las únicas tablas que lee: la cuenta de quien llama y la configuración de Moodle.
-    expect([...code.matchAll(/\.from\(\s*"([^"]+)"/g)].map((m) => m[1]).sort()).toEqual(["pilo_spaces", "pilo_users"]);
+    expect([...code.matchAll(/\.from\(\s*"([^"]+)"/g)].map((m) => m[1]).sort()).toEqual(["pilo_moodle_sites", "pilo_users"]);
     expect(code).toMatch(/\.from\("pilo_users"\)\.select\("rol, status"\)/);
-    expect(code).toMatch(/\.from\("pilo_spaces"\)\.select\("moodle_on, moodle_url"\)/);
+    // De los sitios: los del espacio de Enseñanza, solo los encendidos y por orden de creación. Su token no se lee.
+    expect(code).toMatch(/\.from\("pilo_moodle_sites"\)\.select\("id, name, url, enabled"\)\.eq\("space", "ensenanza"\)\.eq\("enabled", true\)\.order\("created_at", \{ ascending: true \}\)\.limit\(MAX_SITES\)/);
+    expect(code).not.toMatch(/pilo_spaces|moodle_on|moodle_url/);
   });
 
   it("la única función de la base que llama es el contador del límite, y con una huella", () => {
@@ -369,7 +447,7 @@ describe("la función no guarda nada", () => {
 
   it("no usa console ni la bitácora, ni guarda secretos de Moodle", () => {
     expect(code).not.toMatch(/console\s*\./);
-    expect(code).not.toMatch(/pilo_ai_log|pilo_space_secret|pilo_memory|\blog\(/);
+    expect(code).not.toMatch(/pilo_ai_log|pilo_space_secret|pilo_moodle_site_secret|pilo_memory|\blog\(/);
     expect(code).not.toMatch(/Deno\.(writeTextFile|writeFile|openKv|open)\b/);
     expect(code).not.toMatch(/localStorage|sessionStorage|caches\./);
   });
@@ -391,15 +469,34 @@ describe("la función no guarda nada", () => {
   });
 
   it("la dirección de Moodle sale de la configuración, no del navegador", () => {
-    expect(code).toMatch(/moodleSite\(row\.moodle_url\)/);
-    expect(code).toMatch(/row\.moodle_on !== true/);
+    // Los sitios salen de la tabla; cada dirección pasa por moodleSite, y la única que se usa es la del sitio elegido.
+    expect(handler).toMatch(/const sites = openSites\(listed\.data\);/);
+    expect(handler).toMatch(/const site = picked\.site\.at;/);
+    expect(handler).not.toMatch(/moodleSite\(/);
+    expect(code).toMatch(/const at = moodleSite\(r\.url\);/);
     // Del pedido solo se leen estas claves; el usuario y la contraseña, solo dentro de `credentials` (la lógica).
     expect(LOGIC_FROM).toBeGreaterThan(-1);
     expect(LOGIC_TO).toBeGreaterThan(LOGIC_FROM);
-    expect([...new Set([...handler.matchAll(/\bbody\.([a-zA-Z_]+)/g)].map((m) => m[1]))].sort()).toEqual(["action", "course", "token"]);
-    expect([...new Set([...code.matchAll(/\bbody\.([a-zA-Z_]+)/g)].map((m) => m[1]))].sort()).toEqual(["action", "course", "password", "token", "username"]);
+    expect([...new Set([...handler.matchAll(/\bbody\.([a-zA-Z_]+)/g)].map((m) => m[1]))].sort()).toEqual(["action", "course", "site", "token"]);
+    expect([...new Set([...code.matchAll(/\bbody\.([a-zA-Z_]+)/g)].map((m) => m[1]))].sort()).toEqual(["action", "course", "password", "site", "token", "username"]);
     expect(handler).toMatch(/credentials\(body\)/);
-    expect(code).not.toMatch(/body\.(url|site|moodle|host|fn|wsfunction|function)/);
+    expect(code).not.toMatch(/body\.(url|moodle|host|address|fn|wsfunction|function)/);
+    // `site` es solo un identificador: se usa una vez, para buscarlo entre los de la administración. Nunca llega a una consulta ni a una dirección.
+    expect([...code.matchAll(/\bbody\.site\b/g)]).toHaveLength(1);
+    expect(handler).toMatch(/const picked = pickSite\(sites, body\.site\);/);
+  });
+
+  it("de un sitio solo viajan al navegador su identificador y su nombre", () => {
+    expect(handler).toMatch(/if \(action === "sitios"\) return json\(\{ sites: sites\.map\(\(s\) => \(\{ id: s\.id, name: s\.name \}\)\) \}\);/);
+    expect(handler).toMatch(/json\(\{ token: login\.token, site_id: siteId, site: shapeSite\(info\.data\)\.info \}\)/);
+    // Ninguna respuesta lleva la dirección revisada ni la fila de la tabla.
+    for (const m of handler.matchAll(/\bjson\(([^\n]*)/g)) expect(m[1], m[1]).not.toMatch(/\bat\b|\.url\b|\.rest\b|\.login\b|\.host\b|listed|picked/);
+    // Sin sitios no hay nada que listar: es el mismo «aún no disponible».
+    expect(handler).toMatch(/if \(sites\.length === 0\) return fail\(OFF\);/);
+    // «sitios» se atiende después de comprobar la cuenta y el límite, y antes de hablar con Moodle.
+    expect(code.indexOf('account.rol !== "estudiante"')).toBeLessThan(code.indexOf('action === "sitios") return'));
+    expect(code.indexOf("if (retry) return")).toBeLessThan(code.indexOf('action === "sitios") return'));
+    expect(code.indexOf('action === "sitios") return')).toBeLessThan(code.indexOf("fetch("));
   });
 
   it("solo atiende a una cuenta de Pilo activa de estudiante o de profesor", () => {
@@ -408,7 +505,7 @@ describe("la función no guarda nada", () => {
     expect(code).toMatch(/account\.rol !== "estudiante" && account\.rol !== "profesor"/);
     // La cuenta se comprueba antes de pedirle nada a Moodle.
     expect(code.indexOf('from("pilo_users")')).toBeLessThan(code.indexOf("fetch("));
-    expect(code.indexOf('account.status !== "activa"')).toBeLessThan(code.indexOf('from("pilo_spaces")'));
+    expect(code.indexOf('account.status !== "activa"')).toBeLessThan(code.indexOf('from("pilo_moodle_sites")'));
   });
 
   it("toda llamada al servicio de Moodle pasa por la lista cerrada", () => {

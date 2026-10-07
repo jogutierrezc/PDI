@@ -209,6 +209,50 @@ export const TOURS: Tour[] = [
     ],
   },
   {
+    // Se pide desde «Llamar a Pilo» en el taller de UDES en Cifras; no arranca solo.
+    id: "intranet-taller-cifras",
+    title: "Recorrido del taller de UDES en Cifras",
+    scope: "intranet",
+    steps: [
+      {
+        target: "[data-tour='odt-vista']",
+        title: "Taller y vista clásica",
+        body: "Con este interruptor pasa del taller a la vista clásica, la de las seis estaciones. Las dos conviven y guardan lo mismo; el navegador recuerda cuál eligió.",
+        mood: "feliz",
+      },
+      {
+        target: ".oda-rail",
+        title: "Sus informes",
+        body: "Aquí están los informes del periodo, con su código de dos letras y su estado. Toque uno para abrir su ficha.",
+        mood: "bien",
+      },
+      {
+        target: "[data-tour='odt-publico']",
+        title: "Así lo ve el público",
+        body: "Estos controles solo cambian lo que usted está mirando, como en el portal. No limitan lo que puede llenar: al editar siempre tiene todos los años del periodo.",
+        mood: "piensa",
+      },
+      {
+        target: "[data-tour='odt-bloque']",
+        title: "La ficha, bloque por bloque",
+        body: "Esta es la ficha tal como la verá el público. Toque un bloque para elegirlo y pulse «Editar»: se abre su editor ahí mismo, uno a la vez. En el tablero de indicadores llena todos los años de una vez, escribiendo o pegando desde Excel. «Subir», «Bajar», «Ocultar» y «Quitar» ordenan la ficha; quitar no borra cifras y se puede deshacer.",
+        mood: "idea",
+      },
+      {
+        target: "[data-tour='odt-anadir']",
+        title: "Añadir algo a la ficha",
+        body: "Aquí están los veinte tipos de bloque, cada uno con su explicación. Elija uno y créelo aquí mismo: un desglose, un mapa, una tabla, un separador. Queda al final de la ficha, listo para llenar.",
+        mood: "bien",
+      },
+      {
+        target: "[data-tour='odt-guardado']",
+        title: "Guardado",
+        body: "Si el informe no está publicado, lo que escribe se guarda solo. Si ya está publicado, los cambios quedan pendientes en este equipo hasta que usted pulse «Publicar cambios». Y si me necesita, estoy abajo, en «Llamar a Pilo».",
+        mood: "excelente",
+      },
+    ],
+  },
+  {
     id: "portal-planeacion",
     title: "Conozca el portal de Planeación",
     scope: "publico",

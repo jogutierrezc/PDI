@@ -2658,6 +2658,22 @@ export function pageOwn(url: string, origin: string | null): boolean {
   }
 }
 
+/** La página de prueba de este portal (public/pilo-widget-demo.html). */
+export const PAGE_TRIAL_PATH = "/pilo-widget-demo.html";
+
+/**
+ * ¿Es la página de prueba de este mismo portal? Es la única página propia cuya
+ * lectura va a la bandeja: así se prueba la lectura de punta a punta sin un
+ * portal ajeno. Las demás páginas del portal se leen para responder y nada más.
+ */
+export function pageTrial(url: string, origin: string | null): boolean {
+  try {
+    return pageOwn(url, origin) && new URL(url).pathname === PAGE_TRIAL_PATH;
+  } catch {
+    return false;
+  }
+}
+
 /** La página que viaja con una pregunta: su dirección, su título y los pasajes que el navegador eligió. No se guarda con la pregunta. */
 export interface AskPage {
   url: string;
@@ -5065,6 +5081,9 @@ export function privateAddress(ip: string): boolean {
 
 const MOODLE_BLOCKED_HOST = /(^|\.)(localhost|local|localdomain|internal|intranet|lan|home|corp|test|invalid|example|onion|arpa|nip\.io|sslip\.io|xip\.io|localtest\.me|lvh\.me)$/;
 const MOODLE_HOST_REASON = "La dirección de Moodle debe ser un nombre de dominio público, no una dirección IP ni un nombre de red interna.";
+
+/** El id de un sitio de Moodle (0133): corto y estable. Es lo único del sitio que manda la página. */
+export const moodleSiteId = (v: unknown): string => (typeof v === "string" && /^[a-z][a-z0-9-]{1,23}$/.test(v) ? v : "");
 
 /**
  * La dirección del servicio de un sitio de Moodle, revisada: solo https, con

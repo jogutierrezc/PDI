@@ -246,8 +246,8 @@ const count = (n: number) => n.toLocaleString("es-CO");
 
 /* --- Captura ------------------------------------------------------------------------ */
 
-export function SaberProCapture({ data, report, periodId, canEdit }: StationProps) {
-  const sets = (data.rows.saberPro ?? []).filter((sp) => sp.report_id === report!.uuid).sort((a, b) => a.position - b.position);
+export function SaberProCapture({ data, report, periodId, canEdit, only }: StationProps) {
+  const sets = (data.rows.saberPro ?? []).filter((sp) => sp.report_id === report!.uuid && (!only || sp.id === only)).sort((a, b) => a.position - b.position);
   const [active, setActive] = useState(sets[0]?.id);
   const saber = sets.find((sp) => sp.id === active) ?? sets[0];
   if (!saber) {

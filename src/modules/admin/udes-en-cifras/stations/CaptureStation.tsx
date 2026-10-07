@@ -16,6 +16,7 @@
    ========================================================================== */
 
 import { useMemo, useRef, useState } from "react";
+import { useLocation } from "react-router-dom";
 import { Icon } from "../../../../components/ui/Icon";
 import { downloadText, formatValue } from "../../../datos-abiertos/data/open-data";
 import { DEPARTMENTS } from "../../../datos-abiertos/data/colombia-map";
@@ -50,13 +51,22 @@ import { customViewOf } from "../../../datos-abiertos/data/custom-table";
 import { MedalCapture } from "./MedalCapture";
 import { PasteMessages, PasteTable, breakdownFromTable, heatmapFromTable } from "../PasteTable";
 import { IMPORT_PROFILES } from "../import/investigacion";
+import { TOTAL, byYear, draftToValues, indexValues, indicatorColumns, indicatorGridModel } from "../indicator-grid";
 
 type Tab = "importar" | "indicadores" | "desgloses" | "historico" | "calor" | "mapas" | "tuberia" | "rankings" | "saber" | "tyt" | "libres" | "personalizadas" | "medalleros";
-const TOTAL = "total";
+
+/** Pestañas que una dirección puede pedir con su ancla. */
+const HASH_TABS: Tab[] = ["importar", "indicadores", "desgloses", "historico", "calor", "mapas", "tuberia", "rankings", "saber", "tyt", "libres", "personalizadas", "medalleros"];
 
 export function CaptureStation(props: StationProps) {
   const { data, report } = props;
-  const [tab, setTab] = useState<Tab>("indicadores");
+  // Estructura enlaza a los conjuntos libres y a las tablas personalizadas con «#libres» y «#personalizadas»;
+  // el taller, a la pestaña de cada tipo de bloque («#desgloses», «#mapas»…). Sin ancla, Indicadores.
+  const { hash } = useLocation();
+  const [tab, setTab] = useState<Tab>(() => {
+    const asked = hash.replace(/^#/, "") as Tab;
+    return HASH_TABS.includes(asked) ? asked : "indicadores";
+  });
   if (!report?.uuid) return <StageEmpty title="Elige un informe">Las cifras se cargan informe por informe.</StageEmpty>;
 
   const importable = Boolean(profileFor(report.slug));
@@ -90,7 +100,8 @@ export function CaptureStation(props: StationProps) {
     { id: "libres" as Tab, label: "Conjuntos libres" },
     { id: "personalizadas" as Tab, label: "Tablas personalizadas" },
     { id: "medalleros" as Tab, label: "Medalleros" },
-  ].filter((t) => t.id === "indicadores" || t.id === "importar" || t.id === "personalizadas" || counts[t.id] > 0);
+    // Los conjuntos libres y las tablas personalizadas se crean aquí mismo: su pestaña está siempre.
+  ].filter((t) => t.id === "indicadores" || t.id === "importar" || t.id === "libres" || t.id === "personalizadas" || counts[t.id] > 0);
 
   return (
     <div className="oda-stack">
@@ -139,7 +150,7 @@ export function CaptureStation(props: StationProps) {
 
 /* --- Indicadores ---------------------------------------------------------------- */
 
-function IndicatorCapture({ data, report, periodId, canEdit }: StationProps) {
+export function IndicatorCapture({ data, report, periodId, canEdit }: StationProps) {
   const save = useSaveValues();
   const [draft, setDraft] = useState<Record<CellKey, number | null>>({});
   const [via, setVia] = useState<OdImportKind>("rejilla");
@@ -153,20 +164,13 @@ function IndicatorCapture({ data, report, periodId, canEdit }: StationProps) {
   const campuses = data.rows.campuses;
   const years = data.catalog.years;
   const shownYears = yearFilter === "todos" ? years : years.filter((y) => String(y) === yearFilter);
-  const byYear = (indicator: OdIndicatorRow) => indicator.reporting === "anual";
   const anyReported = indicators.some((i) => i.annual_rule === "reportado" || byYear(i));
   const anyByTerm = indicators.some((i) => !byYear(i));
   // Con indicadores por año, la columna del año se captura: no se oculta.
   const annualShown = showAnnual || indicators.some(byYear);
 
   // Índice de lo guardado: indicador|año|periodo|campus → valor.
-  const stored = useMemo(() => {
-    const map = new Map<string, number | null>();
-    for (const v of data.rows.values) {
-      map.set(`${v.indicator_id}|${v.year}|${v.term}|${v.campus_id ?? TOTAL}`, v.value === null ? null : Number(v.value));
-    }
-    return map;
-  }, [data.rows.values]);
+  const stored = useMemo(() => indexValues(data.rows.values), [data.rows.values]);
 
   // Una fila por indicador y campus; el total va primero.
   const rows: GridRow[] = indicators.flatMap((indicator) => {
@@ -185,79 +189,20 @@ function IndicatorCapture({ data, report, periodId, canEdit }: StationProps) {
 
   // Por año: periodo A, periodo B y la cifra del año (calculada, salvo en "reportado").
   // Si todos se reportan por año, la rejilla es una columna por año.
-  const columns: GridColumn[] = shownYears.flatMap((y) => [
-    ...(anyByTerm
-      ? [
-          { key: `${y}-A`, label: "1", group: String(y), ariaLabel: `${y}, periodo 1` },
-          { key: `${y}-B`, label: "2", group: String(y), ariaLabel: `${y}, periodo 2` },
-        ]
-      : []),
-    ...(annualShown ? [{ key: `${y}-anual`, label: "Año", group: String(y), ariaLabel: `${y}, cifra del año` }] : []),
-  ]);
+  const columns: GridColumn[] = indicatorColumns(shownYears, { byTerm: anyByTerm, annual: annualShown });
 
-  const split = (rowKey: string) => {
-    const [indicatorId, campus] = rowKey.split("::");
-    return { indicator: indicators.find((i) => i.id === indicatorId)!, campus };
-  };
-  const parseColumn = (column: string) => {
-    const [year, term] = column.split("-");
-    return { year, term: term as OdTerm };
-  };
-  const storedValue = (rowKey: string, column: string) => {
-    const { indicator, campus } = split(rowKey);
-    const { year, term } = parseColumn(column);
-    return stored.get(`${indicator.id}|${year}|${term}|${campus}`) ?? null;
-  };
-  /** Lo que se ve en la casilla: el cambio sin guardar o lo guardado. */
-  const currentValue = (indicatorId: string, campus: string, year: string, term: OdTerm) => {
-    const key = cellKey(`${indicatorId}::${campus}`, `${year}-${term}`);
-    return key in draft ? draft[key] : stored.get(`${indicatorId}|${year}|${term}|${campus}`) ?? null;
-  };
-  /** Total institucional de lo que se suma: la suma de los campus, o nada si falta uno. */
-  const sumFor = (indicator: OdIndicatorRow, year: string, term: OdTerm) => {
-    const parts = campuses.map((c) => currentValue(indicator.id, c.campus_id, year, term));
-    return parts.every((p) => p !== null && p !== undefined) ? parts.reduce<number>((a, b) => a + (b as number), 0) : null;
-  };
-  const cellValue = (indicator: OdIndicatorRow, campus: string, year: string, term: OdTerm) =>
-    campus === TOTAL && indicator.aggregation === "suma" ? sumFor(indicator, year, term) : currentValue(indicator.id, campus, year, term);
-
-  const lockedReason = (rowKey: string, column: string) => {
-    const { indicator, campus } = split(rowKey);
-    const { year, term } = parseColumn(column);
-    if (indicator.years && indicator.years.length && !indicator.years.includes(Number(year))) {
-      return `${indicator.label} no se reporta en ${year}. Cámbialo en "Años con dato".`;
-    }
-    if (byYear(indicator) && term !== "anual") {
-      return `${indicator.label} se reporta por año: sin periodos 1 y 2. Se cambia en Estructura y KPI.`;
-    }
-    if (term === "anual" && indicator.annual_rule !== "reportado" && !byYear(indicator)) {
-      return `Cifra del año: ${ANNUAL_RULE_LABEL[indicator.annual_rule].toLowerCase()}. Se cambia en Estructura y KPI.`;
-    }
-    return campus === TOTAL && indicator.aggregation === "suma" ? "Se calcula sumando los campus" : null;
-  };
-  const lockedValue = (rowKey: string, column: string) => {
-    const { indicator, campus } = split(rowKey);
-    const { year, term } = parseColumn(column);
-    if (indicator.years && indicator.years.length && !indicator.years.includes(Number(year))) return null;
-    if (byYear(indicator)) return term === "anual" ? cellValue(indicator, campus, year, "anual") : null;
-    if (term !== "anual") return cellValue(indicator, campus, year, term);
-    return annualFigure(
-      indicator.annual_rule,
-      cellValue(indicator, campus, year, "A"),
-      cellValue(indicator, campus, year, "B"),
-      cellValue(indicator, campus, year, "anual"),
-    ).value;
-  };
+  // Qué se escribe, qué se calcula y por qué: las reglas compartidas con el taller (indicator-grid.ts).
+  const { storedValue, lockedReason, lockedValue } = indicatorGridModel({
+    indicators,
+    campusIds: campuses.map((c) => c.campus_id),
+    stored,
+    draft,
+  });
 
   const changes = Object.keys(draft).length;
 
   const commitSave = () => {
-    const values = Object.entries(draft).map(([key, value]) => {
-      const [rowKey, column] = key.split("|");
-      const { indicator, campus } = split(rowKey);
-      const { year, term } = parseColumn(column);
-      return { indicator_id: indicator.id, year: Number(year), term, campus_id: campus === TOTAL ? null : campus, value };
-    });
+    const values = draftToValues(draft);
     save.mutate(
       { periodId, reportId: report!.uuid!, kind: via, fileName: upload?.fileName, values },
       { onSuccess: () => { setDraft({}); setVia("rejilla"); setPasted(null); setUpload(null); } },
@@ -553,8 +498,8 @@ function UploadReview({ preview, onApply, onCancel }: { preview: UploadPreview; 
 
 /* --- Desgloses -------------------------------------------------------------------- */
 
-function BreakdownCapture({ data, report, periodId, canEdit }: StationProps) {
-  const breakdowns = data.rows.breakdowns.filter((b) => b.report_id === report!.uuid);
+export function BreakdownCapture({ data, report, periodId, canEdit, only }: StationProps) {
+  const breakdowns = data.rows.breakdowns.filter((b) => b.report_id === report!.uuid && (!only || b.id === only));
   const [active, setActive] = useState(breakdowns[0]?.id);
   const breakdown = breakdowns.find((b) => b.id === active) ?? breakdowns[0];
   const save = useSaveBreakdownValues();
@@ -773,8 +718,8 @@ function BreakdownCapture({ data, report, periodId, canEdit }: StationProps) {
 
 /* --- Mapas de calor ------------------------------------------------------------------- */
 
-function HeatmapCapture({ data, report, periodId, canEdit }: StationProps) {
-  const heatmaps = data.rows.heatmaps.filter((h) => h.report_id === report!.uuid);
+export function HeatmapCapture({ data, report, periodId, canEdit, only }: StationProps) {
+  const heatmaps = data.rows.heatmaps.filter((h) => h.report_id === report!.uuid && (!only || h.id === only));
   const [active, setActive] = useState(heatmaps[0]?.id);
   const heatmap = heatmaps.find((h) => h.id === active) ?? heatmaps[0];
   const save = useSaveHeatmapCells();
@@ -918,9 +863,9 @@ function HeatmapCapture({ data, report, periodId, canEdit }: StationProps) {
 
 /* --- Mapas ------------------------------------------------------------------------------ */
 
-function MapCapture(props: StationProps) {
-  const { data, report, periodId, canEdit } = props;
-  const maps = data.rows.maps.filter((m) => m.report_id === report!.uuid);
+export function MapCapture(props: StationProps) {
+  const { data, report, periodId, canEdit, only } = props;
+  const maps = data.rows.maps.filter((m) => m.report_id === report!.uuid && (!only || m.id === only));
   const [active, setActive] = useState(maps[0]?.id);
   const map = maps.find((m) => m.id === active) ?? maps[0];
   const years = map?.years && map.years.length ? data.catalog.years.filter((y) => map.years!.includes(y)) : data.catalog.years;
@@ -1046,8 +991,8 @@ const flowLabel = (from: PeriodValue, to: PeriodValue) => {
  * Si una base antigua trae varias cohortes, se trabaja la que tiene más etapas
  * con dato y las demás se pueden quitar.
  */
-function PipelineCapture({ data, report, periodId, canEdit }: StationProps) {
-  const pipelines = data.rows.pipelines.filter((p) => p.report_id === report!.uuid).sort((a, b) => a.position - b.position);
+export function PipelineCapture({ data, report, periodId, canEdit, only }: StationProps) {
+  const pipelines = data.rows.pipelines.filter((p) => p.report_id === report!.uuid && (!only || p.id === only)).sort((a, b) => a.position - b.position);
   const [active, setActive] = useState(pipelines[0]?.id);
   const pipeline = pipelines.find((p) => p.id === active) ?? pipelines[0];
   const values = data.rows.pipelineValues.filter((v) => v.pipeline_id === pipeline?.id);
@@ -1219,8 +1164,8 @@ function PipelineCapture({ data, report, periodId, canEdit }: StationProps) {
 
 const HISTORY_TOTAL = "__total";
 
-function HistoryCapture({ data, report, periodId, canEdit }: StationProps) {
-  const histories = data.rows.histories.filter((h) => h.report_id === report!.uuid).sort((a, b) => a.position - b.position);
+export function HistoryCapture({ data, report, periodId, canEdit, only }: StationProps) {
+  const histories = data.rows.histories.filter((h) => h.report_id === report!.uuid && (!only || h.id === only)).sort((a, b) => a.position - b.position);
   const [active, setActive] = useState(histories[0]?.id);
   const history = histories.find((h) => h.id === active) ?? histories[0];
   const save = useSaveHistoryValues();

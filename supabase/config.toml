@@ -33,3 +33,9 @@ verify_jwt = false
 # «Mis notas» (beta): la función comprueba por su cuenta que quien llama tenga
 # una cuenta de Pilo activa de estudiante. No guarda nada de Génesis.
 verify_jwt = false
+
+[functions.correos]
+# La llama el servidor de cuentas (gancho «Send Email»), que no trae sesión sino
+# una firma: la función la comprueba por su cuenta. Las acciones de la intranet
+# («probar», «prueba») exigen la sesión de alguien de la administración.
+verify_jwt = false

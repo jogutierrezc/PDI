@@ -28,7 +28,7 @@ import { RolePicker } from "../pregunta/RolePicker";
 import type { Rol, SpaceId } from "../pregunta/space";
 import type { AppVoice } from "./access";
 import { APP_PILOS, APP_SPACES } from "./routes";
-import { APP_ASKS, APP_BEATS, APP_KNOWS, APP_TITLE, ROLE_BEAT, voiceRequest, welcomeVoicePlan } from "./welcome-script";
+import { APP_ASKS, APP_KNOWS, APP_TITLE, ROLE_BEAT, voiceRequest, welcomeBeats, welcomeVoicePlan } from "./welcome-script";
 import { keepOnlyVoices, prefetchOfficial, sayOfficial, stopOfficial } from "./official-voice";
 import { useFocusTrap } from "./Layer";
 import { reducedMotion } from "./pwa";
@@ -53,6 +53,9 @@ export function AppWelcome({
   onChoose,
   onRol,
   onDone,
+  desktop = false,
+  needsAccount = false,
+  onAccount,
 }: {
   /** El lugar de Pilo en la cabecera: hasta ahí vuela al salir. */
   target: RefObject<HTMLElement>;
@@ -67,6 +70,12 @@ export function AppWelcome({
   onChoose: (space: SpaceId) => void;
   onRol: (rol: Rol) => void;
   onDone: () => void;
+  /** La app de escritorio (desktop.ts): Pilo se presenta para el computador. */
+  desktop?: boolean;
+  /** En el escritorio y sin haber entrado: al final Pilo pide la cuenta en vez de elegir Pilo. */
+  needsAccount?: boolean;
+  /** Crear la cuenta o entrar con ella, desde la última parte. */
+  onAccount?: (way: "registro" | "ingreso") => void;
 }) {
   const stage = useRef<HTMLDivElement>(null);
   const holder = useRef<HTMLDivElement>(null);
@@ -79,12 +88,13 @@ export function AppWelcome({
   const [armed, setArmed] = useState(touched);
   const [silent, setSilent] = useState(false);
 
-  const current = asking ? ROLE_BEAT : beat >= 0 ? APP_BEATS[beat] : null;
+  const beats = useMemo(() => welcomeBeats({ desktop, account: needsAccount }), [desktop, needsAccount]);
+  const current = asking ? ROLE_BEAT : beat >= 0 ? beats[beat] : null;
   // Habla si hay voz oficial, está encendida, ya hubo un toque y el servicio no ha fallado.
   const speaks = Boolean(voice) && voiceOn && armed && !silent;
 
   /* El audio de la presentación se pide por adelantado y se guarda en el teléfono. */
-  const plan = useMemo(() => welcomeVoicePlan(voice, { askRol: APP_SPACES.some(asksRol) }), [voice, asksRol]);
+  const plan = useMemo(() => welcomeVoicePlan(voice, { askRol: !needsAccount && APP_SPACES.some(asksRol), beats }), [voice, asksRol, beats, needsAccount]);
   useEffect(() => {
     if (!voice || !voiceOn || !plan.length) return;
     prefetchOfficial(plan.map((r) => r.text), { portal: voice.portal, advanced: voice.advanced, keep: true });
@@ -158,7 +168,7 @@ export function AppWelcome({
       if (cancelled || !typed || !spoken) return;
       pilo.current?.talk(false);
       if (b.pick) return;
-      const i = APP_BEATS.indexOf(b);
+      const i = beats.indexOf(b);
       const seg = root.querySelectorAll(".pa-segs span i")[i];
       // La barra del segmento marca la pausa antes de la frase siguiente.
       hold.current = gsap.to(seg, { scaleX: 1, duration: 2.4, ease: "none", onComplete: () => setBeat(i + 1) });
@@ -188,7 +198,7 @@ export function AppWelcome({
 
     const ctx = gsap.context(() => {
       const segs = root.querySelectorAll(".pa-segs span i");
-      const at = asking ? APP_BEATS.length : beat;
+      const at = asking ? beats.length : beat;
       gsap.set(segs, { scaleX: (k: number) => (k < at ? 1 : 0) });
       const tl = gsap.timeline();
       if (words.length) tl.fromTo(words, { autoAlpha: 0, y: still ? 0 : 8 }, { autoAlpha: 1, y: 0, duration: still ? 0.2 : 0.35, stagger: perWord, ease: "power3.out" }, 0);
@@ -254,12 +264,14 @@ export function AppWelcome({
   useFocusTrap(stage, true, () => skip());
 
   const skip = () => {
+    // Sin cuenta en el escritorio, saltar lleva a la cuenta: no hay conversación a la que ir.
+    if (needsAccount) return toAccount("registro");
     onChoose(fallback);
     finish();
   };
 
   const advance = () => {
-    if (beat < 0 || beat >= APP_BEATS.length - 1) return;
+    if (beat < 0 || beat >= beats.length - 1) return;
     setBeat(beat + 1);
   };
 
@@ -274,12 +286,28 @@ export function AppWelcome({
     finish();
   };
 
-  const shown = Math.min(beat < 0 ? 0 : beat, APP_BEATS.length - 1) + 1;
+  /** A la cuenta: la bienvenida se funde (no hay cabecera a la que volar) y sigue la pantalla de la cuenta. */
+  const toAccount = (way: "registro" | "ingreso") => {
+    if (leaving.current) return;
+    leaving.current = true;
+    hold.current?.kill();
+    stopOfficial();
+    pilo.current?.talk(false);
+    const go = () => {
+      // Primero a dónde ir: al cerrarse la bienvenida, la app lleva ahí.
+      onAccount?.(way);
+      onDone();
+    };
+    if (!stage.current) return go();
+    gsap.to(stage.current, { autoAlpha: 0, duration: reducedMotion() ? 0.2 : 0.3, ease: "power2.out", onComplete: go });
+  };
+
+  const shown = Math.min(beat < 0 ? 0 : beat, beats.length - 1) + 1;
   const moodLine = !voice || silent ? "La voz de Pilo no está disponible: lea a Pilo" : !voiceOn ? "Voz apagada" : !armed ? "Toque la pantalla para oír a Pilo" : `Voz de Pilo · ${current?.label ?? "Emocionado"}`;
   const voiceLabel = !voice || silent ? "La voz de Pilo no está disponible ahora" : voiceOn ? "Voz de Pilo activada. Apagar" : "Voz de Pilo apagada. Activar";
 
   return (
-    <div className="pa-w" ref={stage} role="dialog" aria-modal="true" aria-label="Bienvenida de Mr. Pilo" tabIndex={-1}>
+    <div className="pa-w" ref={stage} data-escritorio={desktop || undefined} role="dialog" aria-modal="true" aria-label="Bienvenida de Mr. Pilo" tabIndex={-1}>
       <div className="pa-w-bg">
         <div className="pa-w-glow" />
         <div className="pa-w-rings" aria-hidden="true">
@@ -381,6 +409,20 @@ export function AppWelcome({
               </div>
             </div>
           )}
+          {current?.id === "cuenta" && (
+            <div className="pa-w-demo">
+              <div className="pa-choose" role="group" aria-label={current.say}>
+                <button type="button" onClick={() => toAccount("registro")}>
+                  Crear mi cuenta
+                  <small>Con su correo de la UDES</small>
+                </button>
+                <button type="button" onClick={() => toAccount("ingreso")}>
+                  Ya tengo cuenta
+                  <small>Entrar con mi usuario</small>
+                </button>
+              </div>
+            </div>
+          )}
           {current?.id === "rol" && (
             <div className="pa-w-demo">
               <RolePicker variant="stage" value={null} onPick={pickRol} />
@@ -391,13 +433,13 @@ export function AppWelcome({
 
       <footer className="pa-w-foot">
         <div className="pa-segs">
-          {APP_BEATS.map((b) => (
+          {beats.map((b) => (
             <span key={b.id} aria-hidden="true">
               <i />
             </span>
           ))}
-          <small aria-label={`Parte ${shown} de ${APP_BEATS.length}`}>
-            {shown} de {APP_BEATS.length}
+          <small aria-label={`Parte ${shown} de ${beats.length}`}>
+            {shown} de {beats.length}
           </small>
         </div>
         <div className="pa-w-actions">

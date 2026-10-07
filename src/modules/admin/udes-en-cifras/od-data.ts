@@ -752,66 +752,60 @@ export function useSaveFreeSet() {
 }
 
 /**
- * Filas de un conjunto libre: se reemplazan todas. Se borran las del conjunto
- * y se suben las nuevas en tandas de 500, con su posición en el orden dado.
- * Cada fila lleva su tipo (dato, título de grupo o total) y su texto; el total
- * se guarda sin casillas, que lo calcula el portal (0034).
+ * Definición y filas de un conjunto libre, de una vez: así la ficha no ve
+ * columnas nuevas con filas viejas más que un instante. Las filas se
+ * reemplazan todas, en tandas de 500, con su posición en el orden dado. Un
+ * título de grupo no lleva casillas; un total conserva las que traiga
+ * escritas. Al crearlo entra a la ficha con su bloque, como cualquier conjunto.
  */
-export function useReplaceFreeSetRows() {
-  return useOdMutation(
-    async ({ periodId, reportId, setId, rows, kind = "rejilla" }: {
-      periodId: string; reportId: string; setId: string; rows: Pick<OdFreeSetRecordRow, "year" | "kind" | "label" | "cells">[]; kind?: OdImportKind;
-    }) => {
-      await run(supabase.from("od_free_set_rows").delete().eq("set_id", setId));
-      const records: OdFreeSetRecordRow[] = rows.map((r, position) => ({
-        set_id: setId, position, year: r.year, kind: r.kind ?? "dato", label: r.label ?? "", cells: r.kind === "total" ? {} : r.cells,
-      }));
-      for (let i = 0; i < records.length; i += 500) {
-        await run(supabase.from("od_free_set_rows").insert(records.slice(i, i + 500)));
-      }
-      await logImport(periodId, reportId, kind, records.length, "", { tabla: "od_free_set_rows" });
-    },
-    { families: ["freeSets"] },
-  );
+async function saveFreeSetAndRows(
+  { periodId, set, rows, kind = "rejilla" }: {
+    periodId: string;
+    set: Partial<OdFreeSetRow> & { report_id: string };
+    /** Sin filas, solo se guarda la definición. */
+    rows?: Pick<OdFreeSetRecordRow, "year" | "kind" | "label" | "cells">[];
+    kind?: OdImportKind;
+  },
+  detail: Record<string, unknown>,
+) {
+  const { id, ...fields } = set;
+  let setId = id;
+  if (setId) {
+    await run(supabase.from("od_free_sets").update(fields).eq("id", setId));
+  } else {
+    setId = unwrap<{ id: string }>(await supabase.from("od_free_sets").insert(fields).select("id").single()).id;
+    await ensureBlock(set.report_id, "libre", setId);
+  }
+  if (!rows) return;
+  await run(supabase.from("od_free_set_rows").delete().eq("set_id", setId));
+  const records: OdFreeSetRecordRow[] = rows.map((r, position) => ({
+    set_id: setId!, position, year: r.year, kind: r.kind ?? "dato", label: r.label ?? "", cells: r.kind === "grupo" ? {} : r.cells,
+  }));
+  for (let i = 0; i < records.length; i += 500) {
+    await run(supabase.from("od_free_set_rows").insert(records.slice(i, i + 500)));
+  }
+  await logImport(periodId, set.report_id, kind, records.length, "", { tabla: "od_free_set_rows", ...detail });
+}
+
+/**
+ * Conjunto libre desde Captura: un solo guardado para el título, el tiempo, las
+ * columnas y las filas (FreeSetEditor). La fila de total guarda solo las
+ * casillas que quien reporta escribió; las vacías las calcula el portal
+ * (`freeTotalShown`), como los totales guardados antes de esta regla (0034).
+ * Las gráficas no viajan aquí: las guarda `useSaveFreeSet`.
+ */
+export function useSaveFreeSetWithRows() {
+  return useOdMutation((input: Parameters<typeof saveFreeSetAndRows>[0]) => saveFreeSetAndRows(input, {}), { families: ["freeSets", "blocks"] });
 }
 
 /**
  * Tabla personalizada: un conjunto libre con su vista de tabla escrita a mano
- * (datos-abiertos/data/custom-table.ts). Se guarda de una vez —definición y
- * filas— para que la ficha no vea columnas nuevas con filas viejas más que un
- * instante. A diferencia de `useReplaceFreeSetRows`, la fila de totales conserva
- * sus casillas: aquí el total lo escribe quien publica, no lo calcula el portal.
- * Al crearla entra a la ficha con su bloque, como cualquier conjunto.
+ * (datos-abiertos/data/custom-table.ts). Se guarda igual que un conjunto libre
+ * —definición y filas de una vez—; aquí el total lo escribe entero quien
+ * publica, el portal no calcula nada.
  */
 export function useSaveCustomTable() {
-  return useOdMutation(
-    async ({ periodId, set, rows, kind = "rejilla" }: {
-      periodId: string;
-      set: Partial<OdFreeSetRow> & { report_id: string };
-      /** Sin filas, solo se guarda la definición (al crear la tabla). */
-      rows?: Pick<OdFreeSetRecordRow, "year" | "kind" | "label" | "cells">[];
-      kind?: OdImportKind;
-    }) => {
-      const { id, ...fields } = set;
-      let setId = id;
-      if (setId) {
-        await run(supabase.from("od_free_sets").update(fields).eq("id", setId));
-      } else {
-        setId = unwrap<{ id: string }>(await supabase.from("od_free_sets").insert(fields).select("id").single()).id;
-        await ensureBlock(set.report_id, "libre", setId);
-      }
-      if (!rows) return;
-      await run(supabase.from("od_free_set_rows").delete().eq("set_id", setId));
-      const records: OdFreeSetRecordRow[] = rows.map((r, position) => ({
-        set_id: setId!, position, year: r.year, kind: r.kind ?? "dato", label: r.label ?? "", cells: r.kind === "grupo" ? {} : r.cells,
-      }));
-      for (let i = 0; i < records.length; i += 500) {
-        await run(supabase.from("od_free_set_rows").insert(records.slice(i, i + 500)));
-      }
-      await logImport(periodId, set.report_id, kind, records.length, "", { tabla: "od_free_set_rows", personalizada: true });
-    },
-    { families: ["freeSets", "blocks"] },
-  );
+  return useOdMutation((input: Parameters<typeof saveFreeSetAndRows>[0]) => saveFreeSetAndRows(input, { personalizada: true }), { families: ["freeSets", "blocks"] });
 }
 
 export function useDeleteDataset() {

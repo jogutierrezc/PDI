@@ -12,6 +12,7 @@ import {
   faultLine,
   faultOf,
   missingMigration,
+  moodleSiteId,
   readingReducer,
   resumePoint,
   runFrom,
@@ -159,6 +160,10 @@ describe("qué migración falta", () => {
     expect(missingMigration({ code: "PGRST205", message: "Could not find the table 'public.pilo_moodle_courses'" })).toBe("0116");
     expect(missingMigration({ code: "42703", message: "column pilo_spaces.moodle_on does not exist" })).toBe("0116");
     expect(missingMigration({ code: "PGRST202", message: "Could not find the function public.pilo_space_secret_status(p_space)" })).toBe("0116");
+    // Los varios sitios (0133) se reconocen antes que lo demás de Moodle.
+    expect(missingMigration({ code: "PGRST205", message: "Could not find the table 'public.pilo_moodle_sites' in the schema cache" })).toBe("0133");
+    expect(missingMigration({ code: "PGRST202", message: "Could not find the function public.pilo_moodle_sites_status(p_space)" })).toBe("0133");
+    expect(missingMigration({ code: "PGRST202", message: "Could not find the function public.pilo_moodle_course_set(p_course, p_patch, p_site, p_space)" })).toBe("0133");
     expect(missingMigration({ message: "Bucket not found pilo-docs" })).toBe("0114");
     expect(missingMigration({ code: "PGRST205", message: "Could not find the table 'public.pilo_spaces'" })).toBe("0113");
   });
@@ -231,6 +236,26 @@ describe("la dirección de Moodle", () => {
       expect(r.ok, bad).toBe(false);
       if (!r.ok) expect(r.why.length).toBeGreaterThan(10);
     }
+  });
+});
+
+describe("el id de un sitio de Moodle nuevo", () => {
+  const SHAPE = /^[a-z][a-z0-9-]{1,23}$/;
+  it("sale del nombre: minúsculas, sin tildes y con guiones", () => {
+    expect(moodleSiteId("Campus Cúcuta")).toBe("campus-cucuta");
+    expect(moodleSiteId("  Pregrado · Bucaramanga  ")).toBe("pregrado-bucaramanga");
+    expect(moodleSiteId("2026 Posgrados")).toBe("posgrados");
+  });
+  it("siempre cumple la forma que pide la base, también con nombres raros o largos", () => {
+    for (const name of ["", "¿?", "7", "A", "Educación continua y extensión de la sede Valledupar", "---", "Ñ"]) expect(moodleSiteId(name), name).toMatch(SHAPE);
+  });
+  it("no repite uno que ya existe", () => {
+    expect(moodleSiteId("Principal", ["principal"])).toBe("principal-2");
+    expect(moodleSiteId("Principal", ["principal", "principal-2"])).toBe("principal-3");
+    const long = moodleSiteId("Educación continua y extensión", []);
+    const next = moodleSiteId("Educación continua y extensión", [long]);
+    expect(next).not.toBe(long);
+    expect(next).toMatch(SHAPE);
   });
 });
 

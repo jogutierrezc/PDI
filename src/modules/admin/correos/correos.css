@@ -1,0 +1,616 @@
+/* =============================================================================
+   Intranet · Correos.
+
+   Sigue el lenguaje de la intranet: tokens de tokens.css, campos de admin.css
+   (.admin-field) y los botones de base.css. Aquí solo va lo propio de la
+   pantalla: el taller de tres columnas (plantillas · campos · correo), los
+   selectores de pocas opciones, las cajas de la conexión y la tabla de la
+   bitácora.
+
+   El correo de la vista previa vive en su propio documento (un iframe): sus
+   colores son los del correo y no cambian con el tema de la intranet.
+   ========================================================================== */
+
+/* --- Piezas comunes -------------------------------------------------------- */
+
+.cor-chica {
+  margin: 0;
+  color: var(--ink-muted);
+  font-size: var(--text-sm);
+  line-height: var(--leading-normal);
+  text-wrap: pretty;
+}
+
+.cor-seg {
+  display: inline-flex;
+  flex-wrap: wrap;
+  justify-self: start;
+  padding: 3px;
+  background: var(--surface);
+  border: 1px solid var(--line-strong);
+  border-radius: 22px;
+}
+
+.cor-seg button {
+  min-height: 36px;
+  padding: 0 var(--space-4);
+  color: var(--ink-secondary);
+  background: transparent;
+  border: 0;
+  border-radius: var(--radius-pill);
+  font: inherit;
+  font-size: var(--text-sm);
+  font-weight: 700;
+  cursor: pointer;
+  transition: background-color var(--dur-fast) ease, color var(--dur-fast) ease, transform var(--dur-press) var(--ease-out);
+}
+
+.cor-seg button[aria-pressed="true"] {
+  color: var(--page);
+  background: var(--brand-navy);
+}
+
+.cor-seg button:active { transform: scale(0.97); }
+.cor-seg button:focus-visible { outline: 2px solid var(--brand-blue); outline-offset: 2px; }
+
+@media (hover: hover) and (pointer: fine) {
+  .cor-seg button:not([aria-pressed="true"]):hover { color: var(--ink); background: var(--surface-3); }
+}
+
+/* Lo que respondió la última acción: glifo y frase, nunca solo color. */
+.cor-estado {
+  display: inline-flex;
+  align-items: flex-start;
+  gap: var(--space-2);
+  min-height: 1.4em;
+  margin: 0;
+  color: var(--ink-secondary);
+  font-size: var(--text-sm);
+  font-weight: 700;
+  line-height: 1.4;
+}
+
+.cor-estado:empty { display: none; }
+.cor-estado svg { flex: none; margin-top: 2px; }
+.cor-estado[data-tono="ok"] { color: var(--status-done); }
+/* El ámbar no alcanza contraste como tinta de texto: la frase va en tinta y el ámbar queda en el glifo. */
+.cor-estado[data-tono="aviso"] { color: var(--ink); }
+.cor-estado[data-tono="aviso"] svg { color: var(--status-pending); }
+.cor-estado[data-tono="mal"] { color: var(--status-risk); }
+
+.cor-nota {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-3);
+  max-width: 72ch;
+  padding: var(--space-4) var(--space-5);
+  color: var(--ink);
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  font-size: var(--text-base);
+  line-height: var(--leading-normal);
+}
+
+.cor-nota > div { flex: 1 1 18rem; }
+.cor-nota svg { flex: none; }
+.cor-nota code { font-size: 0.9em; overflow-wrap: anywhere; }
+.cor-nota--espera { color: var(--ink-muted); background: transparent; border-style: dashed; }
+.cor-nota--aviso { background: var(--status-pending-soft); border-color: color-mix(in srgb, var(--status-pending) 34%, transparent); }
+.cor-nota--aviso svg { color: var(--status-pending); }
+.cor-nota--mal { background: var(--status-risk-soft); border-color: color-mix(in srgb, var(--status-risk) 30%, transparent); }
+.cor-nota--mal svg { color: var(--status-risk); }
+
+/* Los rótulos de esta pantalla llevan ayuda al lado: que baje de línea en vez de apretarse. */
+.cor-editor .admin-field > span,
+.cor-conexion .admin-field > span,
+.cor-prueba .admin-field > span {
+  flex-wrap: wrap;
+  justify-content: flex-start;
+  column-gap: var(--space-3);
+  row-gap: 2px;
+}
+
+.cor-editor .admin-field > span small,
+.cor-conexion .admin-field > span small,
+.cor-prueba .admin-field > span small,
+.cor-conexion .admin-field > small:not(.admin-field-error) {
+  color: var(--ink-muted);
+  font-size: var(--text-sm);
+  font-weight: 500;
+}
+
+.cor-editor .admin-field input,
+.cor-conexion .admin-field input,
+.cor-conexion .admin-field select,
+.cor-prueba .admin-field input {
+  min-height: 44px;
+}
+
+.cor-conexion .admin-field [aria-invalid="true"] { border-color: var(--status-risk); }
+
+/* --- Plantillas: el taller -------------------------------------------------- */
+
+.cor-taller {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-sm);
+  overflow: clip;
+}
+
+.cor-taller__barra {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-3) var(--space-5);
+  padding: var(--space-3) var(--space-5);
+  background: var(--surface-2);
+  border-bottom: 1px solid var(--line);
+}
+
+.cor-taller__barra .cor-chica { flex: 1 1 20rem; }
+
+.cor-taller__cuerpo {
+  display: grid;
+  grid-template-columns: 16.5rem minmax(0, 1fr) minmax(0, 1.05fr);
+  align-items: start;
+}
+
+.cor-lista {
+  display: grid;
+  gap: var(--space-2);
+  padding: var(--space-4) var(--space-3);
+}
+
+.cor-lista__grupo { display: grid; gap: var(--space-1); }
+
+.cor-lista h3 {
+  margin: 0;
+  padding: var(--space-2) var(--space-3) var(--space-1);
+  color: var(--ink-muted);
+  font-family: var(--font-sans);
+  font-size: var(--text-xs);
+  font-weight: 800;
+}
+
+.cor-lista button {
+  display: grid;
+  gap: 2px;
+  min-height: 52px;
+  padding: var(--space-2) var(--space-3);
+  color: var(--ink);
+  background: transparent;
+  border: 0;
+  border-radius: var(--radius-sm);
+  font: inherit;
+  font-size: var(--text-base);
+  font-weight: 700;
+  line-height: 1.25;
+  text-align: left;
+  cursor: pointer;
+  transition: background-color var(--dur-fast) ease, color var(--dur-fast) ease;
+}
+
+.cor-lista button small {
+  color: var(--ink-muted);
+  font-size: var(--text-sm);
+  font-weight: 600;
+}
+
+.cor-lista button[aria-current="true"] { color: var(--brand-blue-strong); background: var(--brand-blue-soft); }
+.cor-lista button:focus-visible { outline: 2px solid var(--brand-blue); outline-offset: -2px; }
+
+@media (hover: hover) and (pointer: fine) {
+  .cor-lista button:not([aria-current="true"]):hover { background: var(--surface-2); }
+}
+
+.cor-editor {
+  display: grid;
+  gap: var(--space-4);
+  min-width: 0;
+  padding: var(--space-5) clamp(var(--space-4), 2vw, var(--space-6)) var(--space-6);
+  border-left: 1px solid var(--line);
+}
+
+.cor-editor header { display: grid; gap: 2px; }
+
+.cor-editor h2 {
+  margin: 0;
+  color: var(--brand-navy);
+  font-size: var(--text-lg);
+  text-wrap: balance;
+}
+
+.cor-editor textarea { min-height: 7.5rem; }
+
+.cor-datos {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+/* Punteado: no es una acción sobre la plantilla, es un hueco que el sistema llena. */
+.cor-datos button {
+  min-height: 36px;
+  padding: 0 var(--space-3);
+  color: var(--brand-blue-strong);
+  background: var(--surface);
+  border: 1px dashed var(--line-strong);
+  border-radius: var(--radius-xs);
+  font: inherit;
+  font-size: var(--text-sm);
+  font-weight: 700;
+  cursor: pointer;
+  transition: background-color var(--dur-fast) ease, border-color var(--dur-fast) ease, transform var(--dur-press) var(--ease-out);
+}
+
+.cor-datos button:active { transform: scale(0.97); }
+.cor-datos button:focus-visible { outline: 2px solid var(--brand-blue); outline-offset: 2px; }
+
+@media (hover: hover) and (pointer: fine) {
+  .cor-datos button:hover { background: var(--brand-blue-soft); border-color: var(--brand-blue); }
+}
+
+.cor-aviso {
+  margin: 0;
+  padding: var(--space-3) var(--space-4);
+  color: var(--ink);
+  background: var(--status-pending-soft);
+  border-radius: var(--radius-sm);
+  font-size: var(--text-sm);
+  font-weight: 700;
+  line-height: var(--leading-normal);
+  overflow-wrap: anywhere;
+}
+
+.cor-acciones {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.cor-editor .cor-acciones {
+  padding-top: var(--space-4);
+  border-top: 1px solid var(--line);
+}
+
+.cor-prueba {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: end;
+  gap: var(--space-3);
+}
+
+.cor-prueba .cor-estado { grid-column: 1 / -1; }
+
+/* El correo, sobre su mesa. */
+.cor-vista {
+  position: sticky;
+  top: calc(var(--admin-topbar-h, 96px) + var(--space-5));
+  display: grid;
+  gap: var(--space-3);
+  align-content: start;
+  min-width: 0;
+  padding: var(--space-4);
+  background: var(--surface-3);
+  border-left: 1px solid var(--line);
+}
+
+.cor-vista__barra {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2) var(--space-4);
+}
+
+.cor-como {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  color: var(--ink-secondary);
+  font-size: var(--text-sm);
+  font-weight: 700;
+}
+
+.cor-como select {
+  min-height: 40px;
+  padding: var(--space-1) var(--space-3);
+  color: var(--ink);
+  background: var(--surface);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-sm);
+  font: inherit;
+  font-weight: 600;
+}
+
+.cor-como select:focus-visible { outline: none; border-color: var(--brand-blue); box-shadow: var(--ring); }
+
+.cor-bandeja {
+  display: grid;
+  gap: 2px;
+  padding: var(--space-3) var(--space-4);
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  font-size: var(--text-sm);
+}
+
+.cor-bandeja b { color: var(--ink); font-size: var(--text-base); overflow-wrap: anywhere; }
+.cor-bandeja span { color: var(--ink-muted); overflow-wrap: anywhere; }
+
+/* Una ventana a otra cosa, no un panel más: el borde hacia dentro dice que lo de ahí no se toca. */
+.cor-marco {
+  width: 100%;
+  margin: 0 auto;
+  /* El gris del fondo del correo (el de su propio documento), no un color de la intranet. */
+  background: #f4f7fb;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-md);
+  box-shadow: inset 0 1px 3px var(--line-strong);
+  overflow: hidden;
+}
+
+.cor-marco[data-dispositivo="cel"] { max-width: 360px; }
+
+.cor-marco iframe {
+  display: block;
+  width: 100%;
+  border: 0;
+}
+
+/* --- Remitentes y conexión -------------------------------------------------- */
+
+.cor-conexion { display: grid; gap: var(--space-5); }
+
+.cor-general {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-4) var(--space-6);
+  padding: var(--space-4) var(--space-5);
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-xs);
+}
+
+.cor-general .cor-acciones { margin-left: auto; }
+
+.cor-interruptor {
+  display: flex;
+  flex: 1 1 24rem;
+  align-items: flex-start;
+  gap: var(--space-3);
+  max-width: 68ch;
+  cursor: pointer;
+}
+
+.cor-interruptor span { display: grid; gap: 2px; }
+.cor-interruptor strong { color: var(--ink); font-size: var(--text-base); }
+.cor-interruptor small { color: var(--ink-muted); font-size: var(--text-sm); line-height: var(--leading-normal); }
+
+.cor-interruptor input {
+  flex: none;
+  width: 44px;
+  height: 26px;
+  margin: 1px 0 0;
+  appearance: none;
+  background: var(--track);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-pill);
+  cursor: pointer;
+  transition: background-color var(--dur-fast) ease, border-color var(--dur-fast) ease;
+}
+
+.cor-interruptor input::before {
+  content: "";
+  display: block;
+  width: 20px;
+  height: 20px;
+  margin: 2px;
+  background: var(--surface);
+  border-radius: 50%;
+  box-shadow: var(--shadow-xs);
+  transition: transform var(--dur-fast) var(--ease-out);
+}
+
+.cor-interruptor input:checked { background: var(--brand-blue); border-color: var(--brand-blue); }
+.cor-interruptor input:checked::before { transform: translateX(18px); }
+.cor-interruptor input:focus-visible { outline: 2px solid var(--brand-blue); outline-offset: 2px; }
+
+.cor-columnas {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 19rem), 1fr));
+  align-items: start;
+  gap: var(--space-5);
+}
+
+.cor-caja {
+  display: grid;
+  gap: var(--space-4);
+  min-width: 0;
+  padding: var(--space-5);
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-xs);
+}
+
+.cor-caja h2 {
+  margin: 0;
+  color: var(--brand-navy);
+  font-family: var(--font-sans);
+  font-size: var(--text-md);
+  font-weight: 800;
+}
+
+.cor-par {
+  display: grid;
+  grid-template-columns: 6.5rem minmax(0, 1fr);
+  gap: var(--space-3);
+}
+
+.cor-clave {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.cor-clave input { flex: 1 1 12rem; width: auto; }
+
+.cor-clave--guardada {
+  justify-content: space-between;
+  padding: var(--space-2) var(--space-2) var(--space-2) var(--space-4);
+  background: var(--surface-3);
+  border-radius: var(--radius-sm);
+  font-size: var(--text-sm);
+  font-weight: 700;
+}
+
+.cor-clave--guardada span { display: inline-flex; align-items: center; gap: var(--space-2); color: var(--ink); }
+.cor-clave--guardada b { font-variant-numeric: tabular-nums; letter-spacing: 0.04em; }
+
+.cor-probar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-3);
+  padding-top: var(--space-4);
+  border-top: 1px solid var(--line);
+}
+
+.cor-probar .cor-estado { flex: 1 1 14rem; }
+
+.cor-remitente {
+  display: grid;
+  gap: var(--space-3);
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.cor-remitente + .cor-remitente {
+  padding-top: var(--space-4);
+  border-top: 1px solid var(--line);
+}
+
+.cor-remitente legend {
+  padding: 0;
+  margin-bottom: var(--space-3);
+  color: var(--ink);
+  font-size: var(--text-base);
+  font-weight: 800;
+}
+
+/* --- Bitácora ---------------------------------------------------------------- */
+
+.cor-bitacora { display: grid; gap: var(--space-4); }
+
+.cor-bitacora__cabeza {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3) var(--space-5);
+}
+
+.cor-bitacora__cabeza p {
+  max-width: 68ch;
+  margin: 0;
+  color: var(--ink-secondary);
+  line-height: var(--leading-normal);
+  text-wrap: pretty;
+}
+
+/* La tabla se desplaza dentro de su marco: la página nunca lo hace a lo ancho. */
+.cor-tabla {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  overflow-x: auto;
+}
+
+.cor-tabla:focus-visible { outline: 2px solid var(--brand-blue); outline-offset: 2px; }
+
+.cor-tabla table {
+  width: 100%;
+  min-width: 46rem;
+  border-collapse: collapse;
+  font-size: var(--text-base);
+  font-variant-numeric: tabular-nums;
+}
+
+.cor-tabla th,
+.cor-tabla td {
+  padding: var(--space-3) var(--space-4);
+  border-bottom: 1px solid var(--line);
+  text-align: left;
+  vertical-align: top;
+}
+
+.cor-tabla th {
+  color: var(--ink-secondary);
+  background: var(--surface-3);
+  font-size: var(--text-sm);
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.cor-tabla td:first-child { white-space: nowrap; }
+.cor-tabla tr:last-child td { border-bottom: 0; }
+.cor-tabla__para { overflow-wrap: anywhere; }
+
+.cor-resultado {
+  display: inline-flex;
+  align-items: flex-start;
+  gap: var(--space-2);
+  font-size: var(--text-sm);
+  font-weight: 700;
+  line-height: 1.4;
+}
+
+.cor-resultado svg { flex: none; margin-top: 2px; }
+.cor-resultado[data-tono="ok"] { color: var(--status-done); }
+.cor-resultado[data-tono="aviso"] { color: var(--ink); }
+.cor-resultado[data-tono="aviso"] svg { color: var(--status-pending); }
+.cor-resultado[data-tono="mal"] { color: var(--status-risk); }
+
+/* --- En pantallas estrechas: una columna, y las plantillas en una fila que se desliza ---- */
+
+@media (max-width: 1180px) {
+  .cor-taller__cuerpo { grid-template-columns: minmax(0, 1fr); }
+
+  .cor-lista {
+    grid-auto-flow: column;
+    grid-auto-columns: max-content;
+    padding: var(--space-3);
+    border-bottom: 1px solid var(--line);
+    overflow-x: auto;
+  }
+
+  .cor-lista__grupo { grid-auto-flow: column; grid-auto-columns: max-content; }
+  .cor-lista h3 { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+  .cor-editor { border-left: 0; }
+  .cor-vista { position: static; border-left: 0; border-top: 1px solid var(--line); }
+}
+
+@media (max-width: 560px) {
+  .cor-prueba { grid-template-columns: minmax(0, 1fr); }
+  .cor-prueba .button-secondary { justify-self: start; }
+  .cor-general .cor-acciones { margin-left: 0; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .cor-seg button,
+  .cor-datos button,
+  .cor-interruptor input,
+  .cor-interruptor input::before { transition-duration: 0.01ms; }
+}

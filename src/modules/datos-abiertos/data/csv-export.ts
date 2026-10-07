@@ -35,7 +35,7 @@
 
 import { DEPARTMENTS } from "./colombia-map";
 import { MUNICIPIOS } from "./colombia-municipios";
-import { freeTotalAt, numberOf, textOf } from "./free-sets";
+import { freeTotalAt, freeTotalShown, numberOf, textOf } from "./free-sets";
 import type { FreeCell, FreeColumn, FreeRow, FreeTemporality } from "./free-sets";
 import { cellTone, manualTone, rowTone, toneLabel, unitOf } from "./custom-table";
 import type { CustomTable } from "./custom-table";
@@ -836,17 +836,24 @@ function freeCell(column: FreeTable["columns"][number], cell: FreeCell | undefin
  * Las cifras de una fila de total, como las imprime la ficha (`freeTotalAt`):
  * sobre las filas de datos de su grupo y, en una fuente anual, de su año.
  */
-function freeTotalCells(set: FreeTable, row: FreeRow): Record<string, FreeCell> {
+function freeTotalCells(set: FreeTable, row: FreeRow, written: boolean): Record<string, FreeCell> {
   const scope = set.temporality === "anual" ? set.rows.filter((other) => other.year === row.year) : set.rows;
-  return freeTotalAt(scope, scope.indexOf(row), set.columns).cells;
+  return (written ? freeTotalShown : freeTotalAt)(scope, scope.indexOf(row), set.columns).cells;
 }
 
 /**
  * La fuente en ancho, con sus columnas. Añade «Año» si es anual y, si trae
  * títulos de grupo o totales, «Tipo de fila» y «Rótulo» para no confundirlos
  * con un dato. Los totales son los que la ficha ya imprime.
+ *
+ * `writtenTotals` es la regla de los conjuntos libres de UDES en Cifras
+ * (`freeTotalShown`): la casilla que quien reporta escribió en la fila de total
+ * sale tal cual, y la vacía se calcula. Sin la opción —Observatorio y
+ * Tableros— el total es siempre el calculado sobre lo publicado y ninguna
+ * celda de la fila de total sale del archivo: escrita, dejaría deducir una
+ * reserva.
  */
-export function freeSetToTable(set: FreeTable): CsvTable {
+export function freeSetToTable(set: FreeTable, { writtenTotals = false }: { writtenTotals?: boolean } = {}): CsvTable {
   const annual = set.temporality === "anual";
   const mixed = set.rows.some((row) => row.kind !== "dato");
   const header = uniqueLabels([
@@ -855,7 +862,7 @@ export function freeSetToTable(set: FreeTable): CsvTable {
     ...set.columns.map((column) => column.label || column.key),
   ]);
   const rows: CsvCell[][] = set.rows.map((row) => {
-    const totals = row.kind === "total" ? freeTotalCells(set, row) : null;
+    const totals = row.kind === "total" ? freeTotalCells(set, row, writtenTotals) : null;
     return [
       ...(annual ? [row.year] : []),
       ...(mixed ? [ROW_KIND_LABEL[row.kind], textOrNull(row.label)] : []),
@@ -863,6 +870,7 @@ export function freeSetToTable(set: FreeTable): CsvTable {
         if (row.kind === "grupo") return null;
         // Un total solo tiene cifras: las calculadas (`freeTotalAt` salta lo que no es
         // número, así que una reserva no entra en la suma), nunca una celda de la fuente.
+        if (totals && writtenTotals) return freeCell(column, totals[column.key]);
         if (totals) return column.kind === "cifra" ? numberOf(totals[column.key]) : null;
         return freeCell(column, row.cells[column.key]);
       }),

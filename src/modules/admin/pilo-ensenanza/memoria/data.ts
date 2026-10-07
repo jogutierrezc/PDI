@@ -1,9 +1,10 @@
 /* =============================================================================
    Mr. Pilo en Enseñanza · Memoria · lo que se lee y se escribe.
 
-   Base (0114–0116): pilo_docs y pilo_moodle_courses se leen; todo lo demás se
-   escribe por función (pilo_doc_save, _replace, _update, _delete, _outline,
-   pilo_moodle_course_set, pilo_space_set_secret). El original va al bucket
+   Base (0114–0116, 0133): pilo_docs, pilo_moodle_sites y pilo_moodle_courses se
+   leen; todo lo demás se escribe por función (pilo_doc_save, _replace, _update,
+   _delete, _outline, pilo_moodle_site_save, _set_token, _delete,
+   pilo_moodle_course_set). El original va al bucket
    privado pilo-docs, en <espacio>/<id>/<nombre>.
 
    Función pilo-ia: «comprender» y «moodle» (anexo B del contrato). Sus errores
@@ -58,6 +59,8 @@ export interface DocRow {
 
 export interface CourseRow {
   space: string;
+  /** De cuál sitio de Moodle es (0133): el mismo número de curso puede existir en dos. */
+  site: string;
   course_id: number;
   category_id: number | null;
   category_name: string;
@@ -77,12 +80,20 @@ export interface MoodleSite {
   functions?: Record<string, boolean>;
 }
 
-export interface MoodleSetup {
+/** Un sitio de Moodle del espacio (0133): su conexión y lo que respondió al probarlo. */
+export interface MoodleSiteRow {
+  id: string;
+  name: string;
   on: boolean;
   url: string;
   site: MoodleSite;
   checkedAt: string | null;
   token: { has: boolean; last4: string };
+}
+
+export interface MoodleSetup {
+  sites: MoodleSiteRow[];
+  /** Los cursos de todos los sitios; cada uno dice de cuál es. */
   courses: CourseRow[];
 }
 
@@ -325,39 +336,46 @@ export interface MoodleCourseRead {
   skipped?: string[];
 }
 
-export const moodleProbe = (space: PiloSpace) => piloStep<MoodleProbe>("moodle", space, { step: "probar" });
-export const moodleCategories = (space: PiloSpace) => piloStep<{ categories?: MoodleCategory[] }>("moodle", space, { step: "categorias" });
-export const moodleCourses = (space: PiloSpace, category: number) => piloStep<{ saved?: number; courses?: unknown[] }>("moodle", space, { step: "cursos", category });
-export const moodleCourse = (space: PiloSpace, course: number) => piloStep<MoodleCourseRead>("moodle", space, { step: "curso", course });
+// De cuál sitio (0133) viaja solo su id: la dirección y el token los pone la función.
+export const moodleProbe = (space: PiloSpace, site: string) => piloStep<MoodleProbe>("moodle", space, { site, step: "probar" });
+export const moodleCategories = (space: PiloSpace, site: string) => piloStep<{ categories?: MoodleCategory[] }>("moodle", space, { site, step: "categorias" });
+export const moodleCourses = (space: PiloSpace, site: string, category: number) => piloStep<{ saved?: number; courses?: unknown[] }>("moodle", space, { site, step: "cursos", category });
+export const moodleCourse = (space: PiloSpace, site: string, course: number) => piloStep<MoodleCourseRead>("moodle", space, { site, step: "curso", course });
 
 /* --- Moodle: la conexión y los cursos -------------------------------------------------- */
 
 export async function fetchMoodle(space: PiloSpace): Promise<Loaded<MoodleSetup>> {
-  const empty: MoodleSetup = { on: false, url: "", site: {}, checkedAt: null, token: { has: false, last4: "" }, courses: [] };
-  const row = await supabase.from("pilo_spaces").select("moodle_on, moodle_url, moodle_site, moodle_checked_at").eq("id", space).maybeSingle();
-  if (row.error) {
-    const missing = missingMigration(row.error) ?? (/moodle_/i.test(row.error.message ?? "") ? "0116" : null);
+  const empty: MoodleSetup = { sites: [], courses: [] };
+  const rows = await supabase.from("pilo_moodle_sites" as never).select("*").eq("space", space).order("created_at").order("id");
+  if (rows.error) {
+    const missing = missingMigration(rows.error);
     if (missing) return { missing, data: empty };
-    dbFail(row.error);
+    dbFail(rows.error);
   }
   const courses = await supabase.from("pilo_moodle_courses").select("*").eq("space", space).order("category_name").order("fullname").limit(2000);
   if (courses.error) {
     const missing = missingMigration(courses.error) ?? "0116";
     return { missing, data: empty };
   }
-  const secret = await supabase.rpc("pilo_space_secret_status" as never, { p_space: space } as never);
-  if (secret.error && missingMigration({ code: secret.error.code, message: `${secret.error.message} pilo_space_secret_status` })) return { missing: "0116", data: empty };
-  const r = (row.data ?? {}) as Record<string, unknown>;
-  const token = ((secret.data ?? {}) as { moodle?: { has?: boolean; last4?: string } }).moodle ?? {};
+  const secret = await supabase.rpc("pilo_moodle_sites_status" as never, { p_space: space } as never);
+  if (secret.error && missingMigration({ code: secret.error.code, message: `${secret.error.message} pilo_moodle_sites_status` })) return { missing: "0133", data: empty };
+  const tokens = (secret.data ?? {}) as Record<string, { has?: boolean; last4?: string } | undefined>;
   return {
     missing: null,
     data: {
-      on: r.moodle_on === true,
-      url: typeof r.moodle_url === "string" ? r.moodle_url : "",
-      site: r.moodle_site && typeof r.moodle_site === "object" ? (r.moodle_site as MoodleSite) : {},
-      checkedAt: typeof r.moodle_checked_at === "string" ? r.moodle_checked_at : null,
-      token: { has: token.has === true, last4: typeof token.last4 === "string" ? token.last4 : "" },
-      courses: ((courses.data ?? []) as unknown as CourseRow[]).map((c) => ({ ...c, course_id: num(c.course_id) })),
+      sites: ((rows.data ?? []) as unknown as Record<string, unknown>[]).map((r) => {
+        const id = String(r.id ?? "");
+        return {
+          id,
+          name: typeof r.name === "string" ? r.name : id,
+          on: r.enabled === true,
+          url: typeof r.url === "string" ? r.url : "",
+          site: r.site && typeof r.site === "object" ? (r.site as MoodleSite) : {},
+          checkedAt: typeof r.checked_at === "string" ? r.checked_at : null,
+          token: { has: tokens[id]?.has === true, last4: typeof tokens[id]?.last4 === "string" ? (tokens[id]?.last4 as string) : "" },
+        };
+      }),
+      courses: ((courses.data ?? []) as unknown as CourseRow[]).map((c) => ({ ...c, site: String(c.site ?? ""), course_id: num(c.course_id) })),
     },
   };
 }
@@ -366,17 +384,18 @@ export function useMoodle(space: PiloSpace, enabled = true) {
   return useQuery({ queryKey: memoKeys.moodle(space), enabled, queryFn: () => fetchMoodle(space) });
 }
 
-/** La dirección y el interruptor viven en la ficha del espacio; se guardan al momento. */
-export async function saveMoodleSpace(space: PiloSpace, patch: { moodle_on?: boolean; moodle_url?: string }): Promise<void> {
-  const { error } = await supabase.from("pilo_spaces").update({ ...patch, updated_at: new Date().toISOString() } as never).eq("id", space);
-  if (error) dbFail(error);
-}
+/** Crea un sitio (con `name`) o cambia su nombre, su dirección o su interruptor; se guarda al momento. */
+export const saveMoodleSite = (space: PiloSpace, site: string, patch: { name?: string; url?: string; enabled?: boolean }) =>
+  rpc<unknown>("pilo_moodle_site_save", { p_space: space, p_site: site, p_patch: patch });
 
-/** Guarda el token (o lo quita, con vacío). Devuelve solo sus cuatro últimos caracteres. */
-export const saveMoodleToken = (space: PiloSpace, value: string) => rpc<string>("pilo_space_set_secret", { p_space: space, p_which: "moodle", p_value: value });
+/** Quita un sitio con su token, sus cursos y lo que Pilo leyó de ellos. */
+export const deleteMoodleSite = (space: PiloSpace, site: string) => rpc<{ courses?: number; docs?: number }>("pilo_moodle_site_delete", { p_space: space, p_site: site });
 
-export const courseSet = (space: PiloSpace, course: number, patch: { selected?: boolean; vis?: "publico" | "sesion" }) =>
-  rpc<unknown>("pilo_moodle_course_set", { p_space: space, p_course: course, p_patch: patch });
+/** Guarda el token de un sitio (o lo quita, con vacío). Devuelve solo sus cuatro últimos caracteres. */
+export const saveMoodleToken = (space: PiloSpace, site: string, value: string) => rpc<string>("pilo_moodle_site_set_token", { p_space: space, p_site: site, p_value: value });
+
+export const courseSet = (space: PiloSpace, site: string, course: number, patch: { selected?: boolean; vis?: "publico" | "sesion" }) =>
+  rpc<unknown>("pilo_moodle_course_set", { p_space: space, p_site: site, p_course: course, p_patch: patch });
 
 /* --- El mapa ----------------------------------------------------------------------------- */
 

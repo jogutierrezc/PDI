@@ -39,6 +39,13 @@
    caracteres o más; al cambiarlo, los permisos ya entregados dejan de servir).
    Sin él se usa la llave de servicio del proyecto, que tampoco sale de aquí.
 
+   Red interna: PILO_GENESIS_RED_INTERNA («true» para encenderlo) deja llamar a
+   un portal de Génesis cuya dirección responde en una red privada. Para eso
+   está: cuando esta función corre dentro de la red de la universidad (un
+   Supabase propio, no la nube), el DNS de la universidad responde los portales
+   de Génesis con su dirección interna y, con la regla de siempre, ninguno pasa.
+   Apagado (lo normal), la regla sigue: solo direcciones públicas.
+
    Acciones (POST, JSON, con la sesión de la cuenta de Pilo):
      { action: "portales" }                 → { on, portals: [{ id, name }] }
      { action: "conectar", portal, code, password }
@@ -719,8 +726,11 @@ Deno.serve(async (request) => {
     }
     const target = site;
     // Un nombre público que resuelve a una red interna tampoco pasa (donde la plataforma deja preguntar).
+    // Con PILO_GENESIS_RED_INTERNA encendido se permite a propósito: los portales de Génesis los
+    // elige la administración y, en una instalación dentro de la red de la universidad, son internos.
+    const insideNetwork = ["true", "1", "si", "sí"].includes(String(Deno.env.get("PILO_GENESIS_RED_INTERNA") ?? "").trim().toLowerCase());
     const dns = (Deno as unknown as { resolveDns?: (host: string, type: string) => Promise<unknown[]> }).resolveDns;
-    if (typeof dns === "function") {
+    if (!insideNetwork && typeof dns === "function") {
       const answers = await Promise.all(["A", "AAAA"].map((type) => dns(target.host, type).then((list) => (Array.isArray(list) ? list.map(String) : []), () => [] as string[])));
       if (answers.flat().some(privateAddress)) return fail(OFF);
     }
@@ -802,3 +812,4 @@ Deno.serve(async (request) => {
     return json({ error: "Algo falló al leer sus notas. Intente de nuevo en un momento.", code: "interno" }, 500);
   }
 });
+33

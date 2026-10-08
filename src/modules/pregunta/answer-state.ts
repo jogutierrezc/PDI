@@ -11,7 +11,7 @@
    ========================================================================== */
 
 import type { AskMeta, AskResult, AskSource, AskThinkStep } from "../../components/pilo/ai/client";
-import { tr, trn } from "../../components/pilo/i18n";
+import { tr, trServer, trn } from "../../components/pilo/i18n";
 
 /* --- Etiquetas ---------------------------------------------------------------------------- */
 
@@ -24,7 +24,7 @@ export interface Badge {
 }
 
 const PLAIN: Record<Exclude<AskResult["kind"], "ia">, Badge> = {
-  curada: { text: "Respuesta oficial de Planeación", tone: "oficial", icon: "check" },
+  curada: { text: "Respuesta oficial de la UDES", tone: "oficial", icon: "check" },
   memoria: { text: "Respuesta guardada · con fuentes de la UDES", tone: "oficial", icon: "check" },
   extracto: { text: "De lo publicado, tal cual", tone: "oficial", icon: "check" },
   dato: { text: "Cifra de UDES en Cifras", tone: "oficial", icon: "check" },
@@ -87,7 +87,7 @@ export function notesOf(a: AskResult): string[] {
   const notes: string[] = [];
   const origin = showsSources(a) ? originNote(a.sources) : "";
   if (origin) notes.push(origin);
-  if (a.partial) notes.push(a.notice?.trim() || tr("La redacción se cortó: esta respuesta quedó incompleta."));
+  if (a.partial) notes.push(a.notice?.trim() ? trServer(a.notice.trim()) : tr("La redacción se cortó: esta respuesta quedó incompleta."));
   if (a.truncated && !a.partial) notes.push(tr("La respuesta quedó corta: llegó al tope de extensión."));
   if (a.fallback) notes.push(a.kind === "curada" ? tr("La IA no respondió: esta es la respuesta oficial, tal cual.") : tr("La IA no respondió esta vez: le muestro lo publicado, tal cual."));
   return notes;

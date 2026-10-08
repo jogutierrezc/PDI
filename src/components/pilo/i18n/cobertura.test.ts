@@ -14,6 +14,7 @@ import { resolve } from "node:path";
 import ts from "typescript";
 import { describe, expect, it } from "vitest";
 import { DICTIONARY } from "./dict";
+import { SERVIDOR_EN } from "./dict/servidor";
 
 const ROOT = resolve(__dirname, "../../../..");
 
@@ -50,16 +51,33 @@ const DATA = [
   "src/modules/pilo-app/account/visitor.ts",
   "src/modules/pilo-app/account/useAccount.ts",
   "src/modules/pilo-app/account/AccountGate.tsx",
+  "src/components/pilo/ai/client.ts",
 ];
 
 /** Nombres propios y marcas: no se traducen. */
 const NO_TRADUCIR = new Set(["Mr. Pilo", "Pilo", "Gemini", "beta", "Bucaramanga", "Cúcuta", "Valledupar", "Bogotá", "Universidad de Santander", "UDES", "Mr. Pilo:", "Pilo:"]);
 
 /** Cadenas de las constantes que no son texto para mostrar. */
-const NO_ES_TEXTO = new Set(["pc-terminos-texto pc-terminos-error", "id, username, full_name, email, rol, campus, status, nick, tone, length, about, program", "Universidad de Santander · Pregúntele a Pilo"]);
+const NO_ES_TEXTO = new Set(["sin respuesta", "pc-terminos-texto pc-terminos-error", "id, username, full_name, email, rol, campus, status, nick, tone, length, about, program", "Universidad de Santander · Pregúntele a Pilo"]);
 
 /** Los textos que llegan del servidor y la pantalla traduce al mostrarlos (pasos de «Cómo respondí»). */
 const DEL_SERVIDOR = [
+  "Enrutador",
+  "Página",
+  "Archivo",
+  "Catálogo",
+  "Respuestas guardadas",
+  "Entender",
+  "Cifras",
+  "Fuentes",
+  "Mapa",
+  "Malla",
+  "Otros ámbitos",
+  "IA",
+  "Capciosa cercana",
+  "Relaciones",
+  "Análisis",
+  "Análisis de la IA",
   "Entendiendo la pregunta",
   "Revisando las respuestas oficiales",
   "Recordando respuestas anteriores",
@@ -149,6 +167,7 @@ for (const s of data) {
   for (const l of s.loose) if (!NO_TRADUCIR.has(l.text) && !NO_ES_TEXTO.has(l.text)) required.set(l.text, `${s.file}:${l.line}`);
 }
 for (const k of DEL_SERVIDOR) required.set(k, "servidor");
+for (const k of Object.keys(SERVIDOR_EN)) required.set(k, "servidor");
 
 describe("las pantallas de Pilo en inglés y portugués", () => {
   it("ningún texto JSX se queda fuera de tr()", () => {
@@ -160,6 +179,7 @@ describe("las pantallas de Pilo en inglés y portugués", () => {
     if (process.env.PILO_I18N_DUMP) writeFileSync(process.env.PILO_I18N_DUMP, JSON.stringify([...required.entries()].map(([k, w]) => ({ k, w })), null, 1));
     const missingEn = [...required.keys()].filter((k) => !dictOk("en", k));
     const missingPt = [...required.keys()].filter((k) => !dictOk("pt", k));
+    if (process.env.PILO_I18N_MISSING) writeFileSync(process.env.PILO_I18N_MISSING, JSON.stringify(missingEn, null, 1));
     expect({ en: missingEn.length, pt: missingPt.length, ejemplo: missingEn.slice(0, 8) }).toEqual({ en: 0, pt: 0, ejemplo: [] });
   });
 

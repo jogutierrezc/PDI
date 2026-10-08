@@ -61,7 +61,7 @@ import { CatalogModal } from "../admin/pilo/CatalogModal";
 import type { CatalogMood } from "../admin/pilo/catalog-sheet";
 import { enrichSpokenSentences } from "../../components/pilo/ai/voice-expressions";
 import "./ask-pilo.css";
-import { tr, trn, useLang, localizeDeep, LangSwitch } from "../../components/pilo/i18n";
+import { tr, trn, useLang, localizeDeep, LangSwitch, effectiveLang } from "../../components/pilo/i18n";
 
 const reduced = () => typeof window !== "undefined" && window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
 
@@ -933,6 +933,9 @@ const ms = (n: number) => (n >= 1000 ? `${(n / 1000).toFixed(1).replace(".", ","
  * de la respuesta. Se abre y se cierra con una rejilla (0fr → 1fr), sin medir
  * alturas; los pasos nuevos entran con un escalón corto.
  */
+/** En inglés y portugués el servidor manda los pasos sin detalle (lo escribe en español): esas filas no dicen nada y no se pintan. */
+const spoken = (s: { detail?: string }) => effectiveLang() === "es" || Boolean(s.detail);
+
 function ThinkBody({ id, open, steps, thinking, trail, working }: { id: string; open: boolean; steps: ThinkStep[]; thinking: string; trail: AskStep[]; working: boolean }) {
   useLang();
   const root = useRef<HTMLDivElement>(null);
@@ -976,15 +979,15 @@ function ThinkBody({ id, open, steps, thinking, trail, working }: { id: string; 
           </ol>
         )}
         {thinking && <p className="ap-think__text">{thinking}</p>}
-        {trail.length > 0 && (
+        {trail.some(spoken) && (
           <ol className="ap-trail">
-            {trail.map((s, i) => (
+            {trail.filter(spoken).map((s, i) => (
               <li key={i}>
                 <span className="ap-st" data-s={s.status}>
                   {s.status === "ok" ? I.check : s.status === "ai" ? I.spark : I.dash}
                 </span>
                 <span>
-                  <b>{s.step}.</b> {s.detail}
+                  <b>{tr(s.step)}.</b> {s.detail}
                 </span>
                 <em className="ap-num">{ms(s.ms)}</em>
               </li>

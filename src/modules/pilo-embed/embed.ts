@@ -244,7 +244,7 @@ export const captureStatus = (raw: unknown): CaptureStatus =>
 
 /** La línea del recibo. Vacía cuando no hay nada cierto que decir (descartada, bandeja llena, sin 0127). */
 export function captureLine(status: CaptureStatus): string {
-  if (status === "nueva" || status === "vista") return tr("Enviada a Planeación para guardarla en mi memoria");
+  if (status === "nueva" || status === "vista") return tr("Enviada para guardarla en mi memoria");
   if (status === "guardada") return tr("Ya está en mi memoria");
   return "";
 }

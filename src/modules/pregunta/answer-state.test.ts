@@ -31,7 +31,7 @@ describe("la etiqueta de procedencia", () => {
       expect(badge?.text, kind).toBeTruthy();
       expect(badge?.text, kind).not.toMatch(/sin IA/i);
     }
-    expect(badgeOf(answer({ kind: "curada" }))?.text).toBe("Respuesta oficial de Planeación");
+    expect(badgeOf(answer({ kind: "curada" }))?.text).toBe("Respuesta oficial de la UDES");
   });
 
   it("las conversaciones guardadas antes (sin grounding) siguen teniendo etiqueta", () => {

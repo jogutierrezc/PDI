@@ -65,7 +65,7 @@ describe("leer la página anfitriona", () => {
     expect(hostLabel("https://www.udes.edu.co/admisiones/?a=1")).toBe("www.udes.edu.co/admisiones");
     expect(captureStatus("nueva")).toBe("nueva");
     expect(captureStatus("cualquier cosa")).toBe("no");
-    expect(captureLine("nueva")).toMatch(/Enviada a Planeación/);
+    expect(captureLine("nueva")).toMatch(/Enviada para guardarla/);
     expect(captureLine("guardada")).toMatch(/Ya está en mi memoria/);
     expect(captureLine("descartada")).toBe("");
     expect(captureLine("no")).toBe("");

@@ -3824,6 +3824,19 @@ describe("evolucion: las recomendaciones de Mis notas (0131)", () => {
 });
 
 describe("el idioma de la respuesta (inglés y portugués)", () => {
+  it("con la IA apagada, el saludo y el «no encontré» también salen en el idioma elegido", async () => {
+    const w = world();
+    w.settings = { ...w.settings, enabled: false };
+    provider(completion("nunca se usa"));
+    const handler = await boot(w);
+    const hi = (await (await ask(handler, { question: "hola", lang: "en" })).json()) as Row;
+    expect(hi.text).toMatch(/^Hello! I.m Mr. Pilo/);
+    const hola = (await (await ask(handler, { question: "hola", lang: "pt" })).json()) as Row;
+    expect(hola.text).toMatch(/^Olá! Sou o Mr. Pilo/);
+    const es = (await (await ask(handler, { question: "hola" })).json()) as Row;
+    expect(es.text).toMatch(/^¡Hola! Soy Mr. Pilo/);
+  });
+
   const completion = (text: string) => () => new Response(JSON.stringify({ choices: [{ message: { content: text }, finish_reason: "stop" }] }));
 
   it("sin idioma, o en español, el pedido es el de siempre: sin regla de idioma y sin traducir", async () => {
@@ -3850,10 +3863,17 @@ describe("el idioma de la respuesta (inglés y portugués)", () => {
     expect(calls[0].body.temperature).toBe(0);
     // 2. La respuesta: la pregunta original, la regla del idioma y los datos buscados con la traducción.
     const messages = calls[1].body.messages as { role: string; content: string }[];
-    expect(messages[messages.length - 1]).toEqual({ role: "user", content: "How many students are enrolled?" });
+    // La pregunta es la que la persona escribió; junto a ella, un recordatorio corto del idioma.
+    expect(messages[messages.length - 1].content).toBe("How many students are enrolled?\n\n(Answer in English.)");
     const system = messages.filter((m) => m.role === "system").map((m) => m.content).join("\n");
     expect(system).toContain("IDIOMA DE LA RESPUESTA");
     expect(system).toContain("inglés");
+    // El idioma es lo último de las instrucciones, para que mande sobre todo lo anterior.
+    expect(system.trimEnd().split("\n\n").pop()).toContain("IDIOMA DE LA RESPUESTA");
+    // Pilo habla por toda la UDES, no «según Planeación».
+    expect(system).not.toContain("respuesta oficial de Planeación");
+    expect(system).toContain("respuesta oficial de la UDES");
+    expect(system).toContain("nunca digas «según la Oficina de Planeación»");
     expect(system).toContain("[CIFRAS]");
     expect(data).toMatchObject({ kind: "ia", text: "In 2024 there were 20,500 enrolled students [1]." });
   });
@@ -3887,5 +3907,44 @@ describe("el idioma de la respuesta (inglés y portugués)", () => {
     // Dos traducciones (inglés y portugués) y ninguna respuesta; en español no se llama a nada.
     expect(calls).toHaveLength(2);
     for (const call of calls) expect((call.body.messages as unknown[]).length).toBe(2);
+  });
+});
+
+describe("si insultan a Pilo", () => {
+  const completion = (text: string) => () => new Response(JSON.stringify({ choices: [{ message: { content: text }, finish_reason: "stop" }] }));
+
+  it("lo contesta el modelo con humor: va con el aviso, sin buscar en lo publicado y sin devolver el insulto", async () => {
+    const w = world();
+    const calls = provider(completion("¡Uy, qué carácter! Soy una IA de circuitos curtidos. ¿Qué quiere saber de la UDES?"));
+    const data = (await (await ask(await boot(w), { question: "eres un idiota" })).json()) as Row;
+    expect(calls).toHaveLength(1);
+    const system = (calls[0].body.messages as { role: string; content: string }[]).filter((m) => m.role === "system").map((m) => m.content).join("\n");
+    expect(system).toContain("insulto o una grosería");
+    expect(system).toContain("sin devolver el insulto");
+    expect(data).toMatchObject({ kind: "ia", text: expect.stringContaining("circuitos curtidos") });
+  });
+
+  it("en inglés, el aviso y la respuesta van en el idioma elegido", async () => {
+    const w = world();
+    const calls = provider(completion("Ouch! My circuits are thick-skinned. What would you like to know about UDES?"), completion("Ouch! My circuits are thick-skinned. What would you like to know about UDES?"));
+    const data = (await (await ask(await boot(w), { question: "you are stupid", lang: "en" })).json()) as Row;
+    const used = calls[calls.length - 1];
+    const system = (used.body.messages as { role: string; content: string }[]).filter((m) => m.role === "system").map((m) => m.content).join("\n");
+    expect(system).toContain("insulto o una grosería");
+    expect(system.trimEnd().split("\n\n").pop()).toContain("IDIOMA DE LA RESPUESTA");
+    expect(data).toMatchObject({ kind: "ia", text: expect.stringContaining("Ouch!") });
+  });
+
+  it("sin IA, una broma amable fija, en el idioma de la persona", async () => {
+    const w = world();
+    w.settings = { ...w.settings, enabled: false };
+    provider(completion("nunca se usa"));
+    const handler = await boot(w);
+    const es = (await (await ask(handler, { question: "eres un idiota" })).json()) as Row;
+    expect(es).toMatchObject({ kind: "regla", text: expect.stringContaining("piel gruesa") });
+    const en = (await (await ask(handler, { question: "you are stupid", lang: "en" })).json()) as Row;
+    expect(en.text).toMatch(/^Ouch!/);
+    const pt = (await (await ask(handler, { question: "você é um lixo", lang: "pt" })).json()) as Row;
+    expect(pt.text).toMatch(/^Opa!/);
   });
 });

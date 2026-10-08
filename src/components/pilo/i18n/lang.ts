@@ -175,3 +175,30 @@ export function localizeDeep<T extends object>(value: T): T {
 
 /** El idioma que de verdad aplica ahora: el elegido en una pantalla de Pilo y español en cualquier otra. */
 export const effectiveLang = (): PiloLang => (inPiloScreen() ? current : "es");
+
+/* --- Lo que dice el servidor ------------------------------------------------------------------ */
+
+/** Las frases del servidor que llevan un número: se reconocen por su forma y se traducen con su plantilla. */
+const SERVER_PATTERNS: [RegExp, string][] = [[/^Podrá preguntar de nuevo en (\d+) s\.$/, "Podrá preguntar de nuevo en {n} s."]];
+
+/**
+ * Un mensaje del servidor (un error, un consejo, un aviso) en el idioma de ahora. Llegan en español y a
+ * veces dos frases juntas («error consejo»): cada frase se busca sola; la que no está queda como llegó.
+ */
+export function trServer(message: string): string {
+  const lang = inPiloScreen() ? current : "es";
+  if (lang === "es" || !message) return message;
+  const dict = DICTIONARY[lang];
+  return message
+    .split(/(?<=[.!?…])\s+/)
+    .map((sentence) => {
+      const hit = dict[sentence];
+      if (hit) return hit;
+      for (const [re, key] of SERVER_PATTERNS) {
+        const m = sentence.match(re);
+        if (m) return translate(lang, key, { n: m[1] });
+      }
+      return sentence;
+    })
+    .join(" ");
+}

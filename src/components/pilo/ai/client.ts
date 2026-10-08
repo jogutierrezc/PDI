@@ -11,7 +11,7 @@ import { speak, stopSpeaking } from "../voice";
 import { directVoice, playPiloAudio, stopPiloAudio } from "./voice-player";
 import type { AnalysisBrief, AnalysisPart, Answer, Mesh, NeedAnswer, NeedInput, ReportKind, Section, SpacePortal } from "./logic";
 import type { Portal } from "./config";
-import { effectiveLang } from "../i18n/lang";
+import { effectiveLang, tr, trServer } from "../i18n/lang";
 
 /** Un portal de siempre o el de otro espacio de Pilo (0113): de ahí saca el servidor el espacio. */
 export type AskPortal = Portal | SpacePortal;
@@ -76,7 +76,7 @@ async function failure(error: unknown): Promise<PiloError> {
     /* sin cuerpo */
   }
   const detail = await readFunctionError(error);
-  return new PiloError(detail ?? "No pude hablar con Mr. Pilo ahora.", code || "red");
+  return new PiloError(detail ? trServer(detail) : tr("No pude hablar con Mr. Pilo ahora."), code || "red");
 }
 
 export async function askPilo(action: "resumir" | "sintetizar" | "explicar", portal: Portal, page: string, sections: Section[]): Promise<PiloResult> {
@@ -312,7 +312,7 @@ export function toAskEvent(message: SseMessage): AskEvent | null {
     return result ? { type: "done", result } : null;
   }
   if (message.event === "error") {
-    return { type: "error", message: typeof body.message === "string" && body.message ? body.message : "Pilo no pudo terminar la respuesta.", code: typeof body.code === "string" ? body.code : "" };
+    return { type: "error", message: typeof body.message === "string" && body.message ? body.message : tr("Pilo no pudo terminar la respuesta."), code: typeof body.code === "string" ? body.code : "" };
   }
   return null;
 }
@@ -350,9 +350,9 @@ export async function consumeAskStream(chunks: AsyncIterable<string>, handlers: 
   } catch (e) {
     if (e instanceof PiloError) throw e;
     if (isAbort(e) || handlers.signal?.aborted) throw new PiloError("", "cancelado");
-    throw new PiloError("Se cortó la conexión mientras Pilo escribía.", "cortado");
+    throw new PiloError(tr("Se cortó la conexión mientras Pilo escribía."), "cortado");
   }
-  throw new PiloError("La respuesta se cortó antes de terminar.", "cortado");
+  throw new PiloError(tr("La respuesta se cortó antes de terminar."), "cortado");
 }
 
 const waitText = (seconds: number) => (seconds >= 90 ? `${Math.round(seconds / 60)} min` : `${Math.max(1, Math.round(seconds))} s`);
@@ -374,21 +374,21 @@ export function askHttpError(status: number, body: unknown, retryAfter?: string 
   const code = typeof b.code === "string" ? b.code : "";
   // Otro espacio de Pilo sin su migración (0113): no es un fallo de la pregunta ni algo que se arregle reintentando.
   if (code === "migracion") {
-    return new PiloError("Este Pilo todavía no está instalado: a la base de datos le falta la migración 0113 de los espacios. No es un problema de su pregunta; la administración debe aplicarla.", "migracion");
+    return new PiloError(tr("Este Pilo todavía no está instalado: a la base de datos le falta la migración 0113 de los espacios. No es un problema de su pregunta; la administración debe aplicarla."), "migracion");
   }
   if (status === 429) {
     const fromBody = Number(b.retry_after);
     const wait = Number.isFinite(fromBody) && fromBody > 0 ? Math.ceil(fromBody) : retryAfterSeconds(retryAfter);
-    const base = said || "Va muy rápido: espere un momento antes de volver a preguntar.";
-    const when = advice || (wait ? `Podrá preguntar de nuevo en ${waitText(wait)}.` : "");
+    const base = said ? trServer(said) : tr("Va muy rápido: espere un momento antes de volver a preguntar.");
+    const when = advice ? trServer(advice) : (wait ? tr("Podrá preguntar de nuevo en {v0}.", { v0: waitText(wait) }) : "");
     return new PiloError(when ? `${base} ${when}` : base, code || "limite", wait);
   }
   if (said) return new PiloError(advice ? `${said} ${advice}` : said, code || `http_${status}`);
-  if (status === 401 || status === 403) return new PiloError("Pregúntele a Pilo no está abierto para usted en este momento.", code || "acceso");
-  if (status === 413) return new PiloError("La conversación es demasiado larga para enviarla. Empiece una conversación nueva.", code || "tamano");
-  if (status === 504) return new PiloError("Pilo tardó demasiado en responder. Intente de nuevo en un momento.", code || "tiempo");
-  if (status >= 500) return new PiloError("Pilo tuvo un problema al responder. Intente de nuevo en un momento.", code || "interno");
-  return new PiloError("No pude hablar con Pilo ahora.", code || `http_${status}`);
+  if (status === 401 || status === 403) return new PiloError(tr("Pregúntele a Pilo no está abierto para usted en este momento."), code || "acceso");
+  if (status === 413) return new PiloError(tr("La conversación es demasiado larga para enviarla. Empiece una conversación nueva."), code || "tamano");
+  if (status === 504) return new PiloError(tr("Pilo tardó demasiado en responder. Intente de nuevo en un momento."), code || "tiempo");
+  if (status >= 500) return new PiloError(tr("Pilo tuvo un problema al responder. Intente de nuevo en un momento."), code || "interno");
+  return new PiloError(tr("No pude hablar con Pilo ahora."), code || `http_${status}`);
 }
 
 /** Lee la respuesta de `preguntar`: un flujo o un JSON, según lo que diga su `Content-Type`. */
@@ -427,12 +427,12 @@ export async function readAskResponse(response: Response, handlers: AskHandlers 
     body = await response.json();
   } catch (e) {
     if (isAbort(e) || handlers.signal?.aborted) throw new PiloError("", "cancelado");
-    throw new PiloError("Pilo respondió algo que no pude leer. Intente de nuevo.", "formato");
+    throw new PiloError(tr("Pilo respondió algo que no pude leer. Intente de nuevo."), "formato");
   }
   const result = toAskResult(body);
   if (result) return result;
   const said = (body as { error?: unknown } | null)?.error;
-  throw new PiloError(typeof said === "string" && said ? said : "Pilo respondió algo que no pude leer. Intente de nuevo.", "formato");
+  throw new PiloError(typeof said === "string" && said ? trServer(said) : tr("Pilo respondió algo que no pude leer. Intente de nuevo."), "formato");
 }
 
 /** Lo que el servidor acepta de historia (contrato §1). */
@@ -504,7 +504,7 @@ export async function askQuestionStream(question: string, history: { q: string; 
     });
   } catch (e) {
     if (isAbort(e) || handlers.signal?.aborted) throw new PiloError("", "cancelado");
-    throw new PiloError("No pude conectarme con Pilo. Revise su conexión a internet e intente de nuevo.", "red");
+    throw new PiloError(tr("No pude conectarme con Pilo. Revise su conexión a internet e intente de nuevo."), "red");
   }
   return readAskResponse(response, handlers);
 }
@@ -622,7 +622,7 @@ export async function probeVoice(text: string, style?: string): Promise<{ audio:
   const started = performance.now();
   const { data, error } = await supabase.functions.invoke<Blob>("pilo-ia", { body: { action: "voz", portal: "prueba", text, style } });
   if (error) return { error: (await failure(error)).message };
-  if (!(data instanceof Blob) || data.size === 0) return { error: "El servicio de voz no devolvió audio." };
+  if (!(data instanceof Blob) || data.size === 0) return { error: tr("El servicio de voz no devolvió audio.") };
   return { audio: data, ms: Math.round(performance.now() - started) };
 }
 

@@ -126,6 +126,11 @@ describe("estadoCapa", () => {
     expect(estadoCapa([cerrada], vacio, new Set(["a"]), ahora).modo).toBe("dormida");
     expect(estadoCapa([cerrada], vacio, vacio, ahora + DESPEJADO_MS + 120000).modo).toBe("dormida");
   });
+  it("un aviso que lleva días «activo» en Aluna no cubre la pantalla", () => {
+    const vieja = fila({ id: "v", kind: "general", emitted_at: "2026-09-09T19:55:00Z" });
+    expect(estadoCapa([vieja], vacio, vacio, ahora).modo).toBe("dormida");
+    expect(estadoCapa([vieja, fila({})], vacio, vacio, ahora)).toMatchObject({ modo: "completa", activas: 1 });
+  });
   it("con otra emergencia activa no se ofrece el despejado de la anterior", () => {
     const filas = [fila({ id: "x", state: "cerrada", closed_at: "2026-10-08T11:58:00Z" }), fila({ id: "y" })];
     expect(estadoCapa(filas, vacio, vacio, ahora).modo).toBe("completa");

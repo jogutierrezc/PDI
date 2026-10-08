@@ -35,7 +35,10 @@ export interface EstadoCapa {
 /** Cuánto tiempo se ofrece el «todo despejado» después de cerrarse. */
 export const DESPEJADO_MS = 15 * 60 * 1000;
 
-const COLUMNAS = "id, source, code, kind, title, body, state, emitted_at, closed_at, close_note";
+/** Cuánto puede llevar una alerta activa y seguir cubriendo la pantalla. */
+export const ACTIVA_MAX_MS = 12 * 60 * 60 * 1000;
+
+const COLUMNAS ="id, source, code, kind, title, body, state, emitted_at, closed_at, close_note";
 export { COLUMNAS as COLUMNAS_ALERTA };
 
 const KINDS: readonly string[] = ["sismo", "incendio", "seguridad", "general"];
@@ -70,7 +73,11 @@ const tiempo = (iso: string | null) => (iso ? Date.parse(iso) || 0 : 0);
  * @param vistoDespejado  los identificadores cuyo «todo despejado» ya cerró
  */
 export function estadoCapa(filas: readonly FilaAlerta[], leidas: ReadonlySet<string>, vistoDespejado: ReadonlySet<string>, ahora: number): EstadoCapa {
-  const activas = filas.filter((f) => f.state === "activa").sort((a, b) => tiempo(b.emitted_at) - tiempo(a.emitted_at));
+  // Una emergencia no dura días: un aviso que lleva más que eso «activo» es uno que Aluna dejó abierto
+  // (una capacitación, una prueba) y no se le grita a toda la universidad.
+  const activas = filas
+    .filter((f) => f.state === "activa" && ahora - tiempo(f.emitted_at) < ACTIVA_MAX_MS)
+    .sort((a, b) => tiempo(b.emitted_at) - tiempo(a.emitted_at));
   if (activas.length) {
     // Si alguna activa no se ha leído, manda la capa completa con la más reciente sin leer.
     const sinLeer = activas.find((a) => !leidas.has(a.id));

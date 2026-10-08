@@ -64,6 +64,7 @@ import { useAuth } from "../../lib/auth";
 import { extrasFor, usePiloExtras } from "../../components/pilo/ai/extras";
 import { pickPassages, turnFile } from "../pregunta/attach";
 import { AttachButton, AttachTray, useAttachment } from "../pregunta/Extras";
+import { tr, useLang } from "../../components/pilo/i18n";
 
 type Over = null | "menu" | "ajustes" | "fuentes" | "cuenta" | "iphone" | "android";
 
@@ -95,6 +96,7 @@ export interface ShellProps {
 }
 
 export function AppShell({ space, door, waking, online, person, member, wide, theme, onTheme, voiceOn, onVoice, rol, onRol, faceSlot, welcoming, onWelcome, onSwitch, install }: ShellProps) {
+  useLang();
   const prefix = space.storagePrefix;
   const usual = space.id === "planeacion";
   const location = useLocation();
@@ -223,7 +225,7 @@ export function AppShell({ space, door, waking, online, person, member, wide, th
     patchTurn(r.convId, r.turnId, interruptedTurn(r.text, r.meta));
     setLive(null);
     setBusy(false);
-    setStatus(r.text.trim() ? "Detuvo la respuesta: quedó incompleta." : "Detuvo la pregunta.");
+    setStatus(r.text.trim() ? tr("Detuvo la respuesta: quedó incompleta.") : tr("Detuvo la pregunta."));
   };
 
   /* --- Los modos secretos ------------------------------------------------------------------- */
@@ -242,7 +244,7 @@ export function AppShell({ space, door, waking, online, person, member, wide, th
     });
     setCurrentId(convId);
     if (said) setFresh((f) => new Map(f).set(turn.id, "entera"));
-    setStatus(said ? `Pilo respondió: ${said.text}` : `Pilo entra al modo ${SUPER[mode].name}.`);
+    setStatus(said ? tr("Pilo respondió: {text}", { text: said.text }) : tr("Pilo entra al modo {name}.", { name: SUPER[mode].name }));
     toBottom();
     return { convId, turnId: turn.id };
   };
@@ -279,7 +281,7 @@ export function AppShell({ space, door, waking, online, person, member, wide, th
     setModo(e.mode);
     patchTurn(e.convId, e.turnId, { answer: superAnswer(e.said) });
     setFresh((f) => new Map(f).set(e.turnId, "entera"));
-    setStatus(`Pilo respondió: ${e.said.text}`);
+    setStatus(tr("Pilo respondió: {text}", { text: e.said.text }));
     superSfx(autoRead).clank();
     // La cara llega con su equipo puesto y un rebote corto.
     const slot = faceSlot.current;
@@ -320,7 +322,7 @@ export function AppShell({ space, door, waking, online, person, member, wide, th
     const show = () => setLive({ turnId: mine.turnId, text: mine.text, meta: mine.meta, steps: mine.steps, startedAt: mine.startedAt });
     show();
     setBusy(true);
-    setStatus("Pilo está pensando.");
+    setStatus(tr("Pilo está pensando."));
     toBottom();
     try {
       const handlers: AskHandlers = {
@@ -355,13 +357,13 @@ export function AppShell({ space, door, waking, online, person, member, wide, th
       delete rest.steps;
       delete rest.seconds;
       patchTurn(conv.id, turn.id, { answer: rest });
-      setStatus(`Pilo respondió: ${toPlain(parseAnswer(answer.text))}`);
+      setStatus(tr("Pilo respondió: {v0}", { v0: toPlain(parseAnswer(answer.text)) }));
     } catch (e) {
       // Cortado por «Detener» o por otra pregunta: ya quedó resuelto.
       if (run.current !== mine) return;
-      const message = (e instanceof PiloError && e.code === "cancelado" ? "" : (e as Error).message) || "No pude hablar con Pilo ahora.";
+      const message = (e instanceof PiloError && e.code === "cancelado" ? "" : (e as Error).message) || tr("No pude hablar con Pilo ahora.");
       patchTurn(conv.id, turn.id, interruptedTurn(mine.text, mine.meta, message));
-      setStatus(mine.text.trim() ? "La respuesta quedó incompleta." : message);
+      setStatus(mine.text.trim() ? tr("La respuesta quedó incompleta.") : message);
     } finally {
       if (run.current === mine) {
         run.current = null;
@@ -402,18 +404,18 @@ export function AppShell({ space, door, waking, online, person, member, wide, th
         await removeSavedAnswer(id);
         client.setQueryData<SavedAnswer[]>(savedKey(userId), (list) => (list ?? []).filter((s) => s.id !== id));
         patchTurn(current.id, t.id, { savedId: undefined });
-        setStatus("Se quitó de sus guardadas.");
+        setStatus(tr("Se quitó de sus guardadas."));
       } else {
         const draft = savedDraft(space.id, t.q, t.answer);
         if (!draft) return;
         const row = await saveAnswer(draft);
         client.setQueryData<SavedAnswer[]>(savedKey(userId), (list) => [row, ...(list ?? [])]);
         patchTurn(current.id, t.id, { savedId: row.id });
-        setStatus("Guardada en su cuenta.");
+        setStatus(tr("Guardada en su cuenta."));
         if (!viaKeyboard) face.current?.nod();
       }
     } catch (e) {
-      setNote((e as Error).message || "No se pudo guardar la respuesta.");
+      setNote((e as Error).message || tr("No se pudo guardar la respuesta."));
     } finally {
       setKeeping(null);
     }
@@ -497,7 +499,7 @@ export function AppShell({ space, door, waking, online, person, member, wide, th
 
   const toggleVoice = () => {
     if (!voice.advanced) {
-      setNote("La voz de Pilo no está disponible ahora: queda el texto.");
+      setNote(tr("La voz de Pilo no está disponible ahora: queda el texto."));
       return;
     }
     if (voiceOn) stopOfficial();
@@ -505,11 +507,11 @@ export function AppShell({ space, door, waking, online, person, member, wide, th
     onVoice(!voiceOn);
   };
 
-  const roleName = ROLE_OPTIONS.find((o) => o.id === who && o.id !== "general")?.short;
+  const roleName = tr(ROLE_OPTIONS.find((o) => o.id === who && o.id !== "general")?.short ?? "") || undefined;
   const under = APP_PILOS[space.id].under + (roleName ? ` · ${roleName}` : "");
-  const voiceLabel = !voice.advanced ? "La voz de Pilo no está disponible ahora" : voiceOn ? "Pilo lee las respuestas con su voz. Apagar" : "Leer las respuestas con la voz de Pilo";
+  const voiceLabel = !voice.advanced ? tr("La voz de Pilo no está disponible ahora") : voiceOn ? tr("Pilo lee las respuestas con su voz. Apagar") : tr("Leer las respuestas con la voz de Pilo");
   const needsRol = askRol && rol === null && !welcoming && open;
-  const placeholder = !online ? "Sin conexión" : waking ? "Despertando a Pilo…" : !open ? "Pilo no está disponible aquí" : "Escriba su pregunta";
+  const placeholder = !online ? tr("Sin conexión") : waking ? tr("Despertando a Pilo…") : !open ? tr("Pilo no está disponible aquí") : tr("Escriba su pregunta");
 
   const shown = { ...person, saved: member ? (keptList.data?.length ?? null) : null };
   /** Pilo se presenta otra vez: calla lo que suene, corta la respuesta en curso y cierra lo que esté encima. */
@@ -542,7 +544,7 @@ export function AppShell({ space, door, waking, online, person, member, wide, th
       <header className="pa-bar">
         <div className="pa-bar__in" data-wide={wide || undefined}>
           {!wide && (
-            <button type="button" className="pa-icon" onClick={(e) => show("menu", e)} aria-label="Abrir el menú" aria-haspopup="dialog" aria-expanded={over === "menu"}>
+            <button type="button" className="pa-icon" onClick={(e) => show("menu", e)} aria-label={tr("Abrir el menú")} aria-haspopup="dialog" aria-expanded={over === "menu"}>
               {Icon.menu}
             </button>
           )}
@@ -551,7 +553,7 @@ export function AppShell({ space, door, waking, online, person, member, wide, th
           </div>
           <div className="pa-bar-id">
             <strong>Mr. Pilo</strong>
-            <span>{working ? "Pensando…" : sounding ? "Hablando" : writing ? "Escribiendo…" : modo ? `Modo ${SUPER[modo].name}` : under}</span>
+            <span>{working ? tr("Pensando…") : sounding ? tr("Hablando") : writing ? tr("Escribiendo…") : modo ? tr("Modo {name}", { name: SUPER[modo].name }) : under}</span>
           </div>
           <button type="button" className="pa-icon" aria-pressed={autoRead} aria-disabled={!voice.advanced || undefined} aria-label={voiceLabel} title={voiceLabel} onClick={toggleVoice}>
             {autoRead ? Icon.voice : Icon.mute}
@@ -571,10 +573,10 @@ export function AppShell({ space, door, waking, online, person, member, wide, th
           {!online && (
             <section className="pa-card" role="status">
               <div className="pa-card__face">
-                <Pilo size="100%" emotion="obra" alive label="Mr. Pilo, en obra" />
+                <Pilo size="100%" emotion="obra" alive label={tr("Mr. Pilo, en obra")} />
               </div>
-              <h2>Estoy sin conexión</h2>
-              <p>Necesito internet para responder. Mientras vuelve, sus conversaciones guardadas se pueden leer desde el menú.</p>
+              <h2>{tr("Estoy sin conexión")}</h2>
+              <p>{tr("Necesito internet para responder. Mientras vuelve, sus conversaciones guardadas se pueden leer desde el menú.")}</p>
             </section>
           )}
 
@@ -583,15 +585,15 @@ export function AppShell({ space, door, waking, online, person, member, wide, th
               <div className="pa-card__face">
                 <Pilo size="100%" mood={door.state === "sesion" ? "atento" : "duda"} alive label="Mr. Pilo" />
               </div>
-              <h2>{door.state === "sesion" ? "Pilo lo espera adentro" : "Pilo está descansando"}</h2>
-              <p>{door.message}</p>
+              <h2>{door.state === "sesion" ? tr("Pilo lo espera adentro") : tr("Pilo está descansando")}</h2>
+              <p>{tr(door.message)}</p>
               {door.state === "sesion" && (
                 <>
                   <Link className="pa-btn pa-btn--main" to={APP_LOGIN}>
-                    Entrar con mi cuenta de Pilo
+                    {tr("Entrar con mi cuenta de Pilo")}
                   </Link>
                   <Link className="pa-card__alt" to="/acceso-intranet" state={{ from: location.pathname }}>
-                    Soy personal con cuenta en la intranet
+                    {tr("Soy personal con cuenta en la intranet")}
                   </Link>
                 </>
               )}
@@ -609,7 +611,7 @@ export function AppShell({ space, door, waking, online, person, member, wide, th
                     <p>{space.hello.h1}</p>
                   </div>
                   <p className="pa-hint">{space.note}</p>
-                  {needsRol && <RolePicker variant="chat" value={rol} onPick={onRol} legend={ROLE_QUESTION} />}
+                  {needsRol && <RolePicker variant="chat" value={rol} onPick={onRol} legend={tr(ROLE_QUESTION)} />}
                 </div>
               </div>
             )
@@ -643,7 +645,7 @@ export function AppShell({ space, door, waking, online, person, member, wide, th
                   setOver("fuentes");
                 }}
                 onSound={setSounding}
-                onVoiceLost={() => setNote("La voz de Pilo no está disponible ahora: queda el texto.")}
+                onVoiceLost={() => setNote(tr("La voz de Pilo no está disponible ahora: queda el texto."))}
                 saved={Boolean(t.savedId && kept.has(t.savedId))}
                 saving={keeping === t.id}
                 onSave={(_trigger, viaKeyboard) => void keep(t, viaKeyboard)}
@@ -662,7 +664,7 @@ export function AppShell({ space, door, waking, online, person, member, wide, th
       <div className="pa-dock">
         <div className="pa-dock__in">
           {!current && can && (
-            <div className="pa-sugs" role="group" aria-label="Preguntas sugeridas">
+            <div className="pa-sugs" role="group" aria-label={tr("Preguntas sugeridas")}>
               {view.suggestions.map((s) => (
                 <button key={s.q} type="button" className="pa-sug" onClick={() => void ask(s.q)}>
                   {s.q}
@@ -673,15 +675,15 @@ export function AppShell({ space, door, waking, online, person, member, wide, th
 
           {!current && !welcoming && !install.dismissed && (install.way || androidOffer) && (
             <div className="pa-install">
-              <span>{wide ? "Instale a Pilo en su computador." : androidOffer ? "Pilo también vive como app en su Android." : "Lleve a Pilo en su teléfono."}</span>
+              <span>{wide ? tr("Instale a Pilo en su computador.") : androidOffer ? tr("Pilo también vive como app en su Android.") : tr("Lleve a Pilo en su teléfono.")}</span>
               <button
                 type="button"
                 className="pa-btn pa-btn--main"
                 onClick={(e) => (androidOffer ? show("android", e) : install.way === "iphone" ? show("iphone", e) : install.run())}
               >
-                {androidOffer ? "Conseguir la app" : "Instalar a Pilo"}
+                {androidOffer ? tr("Conseguir la app") : tr("Instalar a Pilo")}
               </button>
-              <button type="button" className="pa-icon" onClick={install.dismiss} aria-label="Ahora no">
+              <button type="button" className="pa-icon" onClick={install.dismiss} aria-label={tr("Ahora no")}>
                 {Icon.close}
               </button>
             </div>
@@ -691,7 +693,7 @@ export function AppShell({ space, door, waking, online, person, member, wide, th
           <form className="pa-compose" data-clip={extras.files && can ? "" : undefined} onSubmit={submit}>
             {extras.files && can && <AttachButton onPick={attach.pick} disabled={Boolean(attach.reading)} />}
             <label htmlFor="pa-q" className="pa-sr">
-              Su pregunta para Pilo
+              {tr("Su pregunta para Pilo")}
             </label>
             <textarea
               id="pa-q"
@@ -711,7 +713,7 @@ export function AppShell({ space, door, waking, online, person, member, wide, th
                 }
               }}
             />
-            <button type="submit" className="pa-send" disabled={!can || (!busy && !draft.trim())} aria-label={busy && !draft.trim() ? "Detener la respuesta" : busy ? "Detener y preguntar esto" : "Enviar la pregunta"}>
+            <button type="submit" className="pa-send" disabled={!can || (!busy && !draft.trim())} aria-label={busy && !draft.trim() ? tr("Detener la respuesta") : busy ? tr("Detener y preguntar esto") : tr("Enviar la pregunta")}>
               {busy && !draft.trim() ? Icon.stop : Icon.send}
             </button>
           </form>
@@ -742,9 +744,9 @@ export function AppShell({ space, door, waking, online, person, member, wide, th
           onSettings={() => setOver("ajustes")}
           getApp={
             androidOffer
-              ? { label: "Descargar para Android", hint: `Tabletas y celulares · versión ${APP_APK.version} · ${APP_APK.size}`, onOpen: () => setOver("android") }
+              ? { label: tr("Descargar para Android"), hint: tr("Tabletas y celulares · versión {version} · {size}", { version: APP_APK.version, size: APP_APK.size }), onOpen: () => setOver("android") }
               : install.way === "iphone"
-                ? { label: "Instalar en el iPhone", hint: "Desde Safari, «Añadir a pantalla de inicio»", onOpen: () => setOver("iphone") }
+                ? { label: tr("Instalar en el iPhone"), hint: tr("Desde Safari, «Añadir a pantalla de inicio»"), onOpen: () => setOver("iphone") }
                 : null
           }
           person={shown}

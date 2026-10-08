@@ -11,6 +11,7 @@ import { speak, stopSpeaking } from "../voice";
 import { directVoice, playPiloAudio, stopPiloAudio } from "./voice-player";
 import type { AnalysisBrief, AnalysisPart, Answer, Mesh, NeedAnswer, NeedInput, ReportKind, Section, SpacePortal } from "./logic";
 import type { Portal } from "./config";
+import { effectiveLang } from "../i18n/lang";
 
 /** Un portal de siempre o el de otro espacio de Pilo (0113): de ahí saca el servidor el espacio. */
 export type AskPortal = Portal | SpacePortal;
@@ -28,6 +29,8 @@ export interface AskOptions {
   visitor?: { nick?: string | null; tone?: string | null } | null;
   /** El modo secreto que la persona activó en el chat («pilocop», «pilonator» o «sayayin»): el servidor le pone el personaje a la redacción. Cualquier otra cosa no se manda. */
   modo?: string | null;
+  /** El idioma en que la persona usa a Pilo; sin él, el que eligió en la pantalla (español si no eligió). */
+  lang?: "es" | "en" | "pt";
 }
 
 /** Los modos secretos que entiende el servidor (logic.ts, `parseModo`). */
@@ -458,6 +461,7 @@ export function askBody(question: string, history: { q: string; a: string }[], o
   const rol = rolOf(opts.rol);
   const visitor = visitorOf(opts.visitor);
   const modo = modoOf(opts.modo);
+  const lang = opts.lang ?? effectiveLang();
   return {
     action: "preguntar" as const,
     portal: opts.portal ?? "pregunta",
@@ -469,6 +473,8 @@ export function askBody(question: string, history: { q: string; a: string }[], o
     ...(opts.page && opts.page.passages.length ? { page: opts.page } : {}),
     ...(visitor ? { visitor } : {}),
     ...(modo ? { modo } : {}),
+    // Solo si la persona eligió inglés o portugués: sin él, el cuerpo es el de siempre.
+    ...(lang !== "es" ? { lang } : {}),
   };
 }
 

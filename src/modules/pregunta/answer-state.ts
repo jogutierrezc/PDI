@@ -11,6 +11,7 @@
    ========================================================================== */
 
 import type { AskMeta, AskResult, AskSource, AskThinkStep } from "../../components/pilo/ai/client";
+import { tr, trn } from "../../components/pilo/i18n";
 
 /* --- Etiquetas ---------------------------------------------------------------------------- */
 
@@ -41,14 +42,17 @@ export function groundingOf(a: Pick<AskResult, "kind" | "grounding" | "sources">
 
 /** La etiqueta de procedencia; null cuando es conversación (un saludo no lleva fuentes). */
 export function badgeOf(a: AskResult, incomplete = false): Badge | null {
-  if (incomplete) return { text: "Respuesta incompleta", tone: "aviso", icon: "alert" };
-  if (a.kind !== "ia") return PLAIN[a.kind] ?? null;
+  if (incomplete) return { text: tr("Respuesta incompleta"), tone: "aviso", icon: "alert" };
+  if (a.kind !== "ia") {
+    const plain = PLAIN[a.kind];
+    return plain ? { ...plain, text: tr(plain.text) } : null;
+  }
   if (a.intent === "saludo" || a.intent === "charla") return null;
   const grounding = groundingOf(a);
-  if (grounding === "general") return { text: "Conocimiento general · no es información oficial de la UDES", tone: "general", icon: "globe" };
-  if (grounding === "mixta") return { text: "Redactada con IA · parte es conocimiento general", tone: "ia", icon: "spark" };
-  if (grounding === "oficial") return { text: "Redactada con IA · con fuentes de la UDES", tone: "ia", icon: "spark" };
-  return { text: "Redactada con IA", tone: "ia", icon: "spark" };
+  if (grounding === "general") return { text: tr("Conocimiento general · no es información oficial de la UDES"), tone: "general", icon: "globe" };
+  if (grounding === "mixta") return { text: tr("Redactada con IA · parte es conocimiento general"), tone: "ia", icon: "spark" };
+  if (grounding === "oficial") return { text: tr("Redactada con IA · con fuentes de la UDES"), tone: "ia", icon: "spark" };
+  return { text: tr("Redactada con IA"), tone: "ia", icon: "spark" };
 }
 
 /** ¿Se muestra la lista de fuentes? Con conocimiento general no hay fuentes que mostrar. */
@@ -73,9 +77,9 @@ export function originNote(sources: AskSource[]): string {
     const from = originOf(s);
     if (!from || seen.has(from)) continue;
     const who = typeof s.written_for === "string" ? s.written_for.replace(/\s+/g, " ").trim().slice(0, 200) : "";
-    seen.set(from, who ? `${from} (preparado para ${who})` : from);
+    seen.set(from, who ? tr("{from} (preparado para {who})", { from, who }) : from);
   }
-  return seen.size ? `Parte de esta respuesta viene de otro ámbito de Pilo: ${[...seen.values()].join("; ")}.` : "";
+  return seen.size ? tr("Parte de esta respuesta viene de otro ámbito de Pilo: {list}.", { list: [...seen.values()].join("; ") }) : "";
 }
 
 /** Las notas discretas que acompañan a la respuesta. */
@@ -83,9 +87,9 @@ export function notesOf(a: AskResult): string[] {
   const notes: string[] = [];
   const origin = showsSources(a) ? originNote(a.sources) : "";
   if (origin) notes.push(origin);
-  if (a.partial) notes.push(a.notice?.trim() || "La redacción se cortó: esta respuesta quedó incompleta.");
-  if (a.truncated && !a.partial) notes.push("La respuesta quedó corta: llegó al tope de extensión.");
-  if (a.fallback) notes.push(a.kind === "curada" ? "La IA no respondió: esta es la respuesta oficial, tal cual." : "La IA no respondió esta vez: le muestro lo publicado, tal cual.");
+  if (a.partial) notes.push(a.notice?.trim() || tr("La redacción se cortó: esta respuesta quedó incompleta."));
+  if (a.truncated && !a.partial) notes.push(tr("La respuesta quedó corta: llegó al tope de extensión."));
+  if (a.fallback) notes.push(a.kind === "curada" ? tr("La IA no respondió: esta es la respuesta oficial, tal cual.") : tr("La IA no respondió esta vez: le muestro lo publicado, tal cual."));
   return notes;
 }
 
@@ -133,7 +137,10 @@ const DRAFTING_LINES: [number, string][] = [
   [20, "Organizando las ideas…"],
 ];
 
-const draftingLine = (seconds: number): string | null => DRAFTING_LINES.find(([from]) => seconds >= from)?.[1] ?? null;
+const draftingLine = (seconds: number): string | null => {
+  const line = DRAFTING_LINES.find(([from]) => seconds >= from)?.[1];
+  return line ? tr(line) : null;
+};
 
 /**
  * El titular mientras Pilo trabaja. Con pasos del servidor, el que está en
@@ -146,16 +153,16 @@ export function waitingLine(input: { steps: ThinkStep[]; meta: AskMeta | null; s
     const current = activeStep(steps) ?? steps[steps.length - 1];
     // Redactar es el paso largo (el modelo puede tardar dos minutos): el titular
     // cuenta en qué anda esa redacción para que la espera no parezca un cuelgue.
-    return current.id === "redactar" && current.state === "start" ? draftingLine(seconds) ?? current.label : current.label;
+    return current.id === "redactar" && current.state === "start" ? draftingLine(seconds) ?? tr(current.label) : tr(current.label);
   }
-  if (seconds >= 25) return "Esto está tardando más de lo normal; sigo en ello.";
+  if (seconds >= 25) return tr("Esto está tardando más de lo normal; sigo en ello.");
   if (meta) {
     const n = meta.sources.length;
-    if (n > 0) return `Encontré ${n} ${n === 1 ? "fuente" : "fuentes"}. Redactando la respuesta…`;
-    return "Redactando la respuesta…";
+    if (n > 0) return trn(n, "Encontré {n} fuente. Redactando la respuesta…", "Encontré {n} fuentes. Redactando la respuesta…");
+    return tr("Redactando la respuesta…");
   }
-  if (seconds >= 8) return "Redactando la respuesta…";
-  return "Buscando en lo que conozco…";
+  if (seconds >= 8) return tr("Redactando la respuesta…");
+  return tr("Buscando en lo que conozco…");
 }
 
 /* --- Mientras espera ------------------------------------------------------------------------
@@ -190,7 +197,7 @@ export const TIP_EVERY = 9;
 export function waitingTip(seconds: number, seed = 0): string | null {
   if (!(seconds >= TIP_AFTER)) return null;
   const turn = Math.floor((seconds - TIP_AFTER) / TIP_EVERY);
-  return WAIT_TIPS[(Math.abs(Math.trunc(seed)) + turn) % WAIT_TIPS.length];
+  return tr(WAIT_TIPS[(Math.abs(Math.trunc(seed)) + turn) % WAIT_TIPS.length]);
 }
 
 /** Los gestos de Pilo mientras piensa: vuelve siempre a «pensar», y entre uno y otro se le escapa otro. */
@@ -248,7 +255,7 @@ export interface Interrupted {
  */
 export function interruptedTurn(text: string, meta: AskMeta | null, message?: string): Interrupted {
   const written = text.trim();
-  if (!written) return { error: message || "Detuvo la pregunta antes de que Pilo respondiera." };
+  if (!written) return { error: message || tr("Detuvo la pregunta antes de que Pilo respondiera.") };
   const cited = new Set([...written.matchAll(/\[(\d+)\]/g)].map((m) => Number(m[1])));
   return {
     incomplete: true,

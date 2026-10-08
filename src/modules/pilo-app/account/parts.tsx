@@ -12,6 +12,7 @@ import { APP_THEMES } from "../themes";
 import type { AppTheme } from "../themes";
 import { Icon } from "../icons";
 import { ACCOUNT_BENEFITS, passwordChecks } from "./rules";
+import { tr, useLang } from "../../../components/pilo/i18n";
 
 export function Msg({ tone, id, alert = false, children }: { tone: "ok" | "bad" | "info"; id?: string; alert?: boolean; children: ReactNode }) {
   return (
@@ -55,7 +56,7 @@ export function Seg<T extends string>({ label, value, options, onPick, disabled 
     <div className="pc-seg" role="group" aria-label={label}>
       {options.map((o) => (
         <button key={o.id} type="button" aria-pressed={o.id === value} disabled={disabled} onClick={() => onPick(o.id)}>
-          {o.label}
+          {tr(o.label)}
         </button>
       ))}
     </div>
@@ -71,7 +72,7 @@ export function ThemePicker({ value, onPick, labelledBy }: { value: AppTheme; on
           <span className="pa-tema__ring">
             <i className="pa-swatch" data-tema={t.id} aria-hidden="true" />
           </span>
-          {t.label}
+          {tr(t.label)}
         </button>
       ))}
     </div>
@@ -88,8 +89,8 @@ export function Benefits({ title }: { title: string }) {
           <li key={b.title}>
             {Icon.check}
             <span>
-              <strong>{b.title}</strong>
-              <small>{b.text}</small>
+              <strong>{tr(b.title)}</strong>
+              <small>{tr(b.text)}</small>
             </span>
           </li>
         ))}
@@ -100,14 +101,15 @@ export function Benefits({ title }: { title: string }) {
 
 /** Lo que pide la contraseña, con lo que ya cumple marcado (glifo y palabra). */
 export function PasswordChecklist({ password, id }: { password: string; id: string }) {
+  useLang();
   const c = passwordChecks(password);
   const items: [boolean, string][] = [
-    [c.len, "8 caracteres o más"],
-    [c.letter, "Una letra"],
-    [c.num, "Un número"],
+    [c.len, tr("8 caracteres o más")],
+    [c.letter, tr("Una letra")],
+    [c.num, tr("Un número")],
   ];
   return (
-    <ul className="pc-checks" id={id} aria-label="Lo que pide la contraseña">
+    <ul className="pc-checks" id={id} aria-label={tr("Lo que pide la contraseña")}>
       {items.map(([ok, text]) => (
         <li key={text} data-ok={ok || undefined}>
           {ok ? Icon.check : Icon.dot}

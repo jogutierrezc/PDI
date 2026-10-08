@@ -49,6 +49,7 @@ import { captureLine, captureStatus, frameMessage, hostLabel, hostOrigin, pageFo
 import type { CaptureStatus, FrameState, HostPage, TurnPage } from "./embed";
 import "../pregunta/ask-pilo.css";
 import "./pilo-embed.css";
+import { tr, trn, useLang, localizeDeep, LangSwitch } from "../../components/pilo/i18n";
 
 const reduced = () => typeof window !== "undefined" && window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
 
@@ -142,7 +143,7 @@ const PAGE_WAIT_MS = 700;
 /* --- Quién entra ----------------------------------------------------------------------------- */
 
 export function PiloEmbed({ space = "planeacion" }: { space?: SpaceId }) {
-  const here = ASK_SPACES[space] ?? ASK_SPACES.planeacion;
+  const here = localizeDeep(ASK_SPACES[space] ?? ASK_SPACES.planeacion);
   const usual = here.id === "planeacion";
   const config = usePiloAiConfig();
   const { profile, loading } = useAuth();
@@ -210,6 +211,7 @@ function loadTurns(key: string): Turn[] {
 }
 
 function Widget({ space, cfg, tema, lado, host, voice: baseVoice }: { space: SpaceProfile; cfg: SpaceConfig | null; tema: string; lado: string; host: string | null; voice: Voice }) {
+  useLang();
   // Lo de esta visita (sessionStorage), bajo el prefijo del chat de este espacio: el de siempre conserva «pilo-embed:*».
   const KEY_TURNS = storageKey(space.embedPrefix, "turnos");
   const KEY_HELLO = storageKey(space.embedPrefix, "saludo");
@@ -454,7 +456,7 @@ function Widget({ space, cfg, tema, lado, host, voice: baseVoice }: { space: Spa
     patchTurn(r.turnId, interruptedTurn(r.text, r.meta));
     setLive(null);
     setBusy(false);
-    setStatus(r.text.trim() ? "Detuvo la respuesta: quedó incompleta." : "Detuvo la pregunta.");
+    setStatus(r.text.trim() ? tr("Detuvo la respuesta: quedó incompleta.") : tr("Detuvo la pregunta."));
   };
 
   const ask = async (raw: string, replaceTurn?: string) => {
@@ -479,7 +481,7 @@ function Widget({ space, cfg, tema, lado, host, voice: baseVoice }: { space: Spa
     const show = () => setLive({ turnId: mine.turnId, text: mine.text, meta: mine.meta, steps: mine.steps, startedAt: mine.startedAt, page: mine.page });
     show();
     setBusy(true);
-    setStatus("Pilo está pensando.");
+    setStatus(tr("Pilo está pensando."));
     toBottom();
     try {
       const handlers: AskHandlers = {
@@ -518,13 +520,13 @@ function Widget({ space, cfg, tema, lado, host, voice: baseVoice }: { space: Spa
       setFresh((f) => new Map(f).set(turn.id, mine.text.trim() ? "en vivo" : "entera"));
       // El recibo solo aparece si el servidor confirma que usó la página.
       patchTurn(turn.id, { answer, ...(answer.page && mine.page ? { page: mine.page } : {}) });
-      setStatus(`Pilo respondió: ${toPlain(parseAnswer(answer.text))}`);
+      setStatus(tr("Pilo respondió: {v0}", { v0: toPlain(parseAnswer(answer.text)) }));
     } catch (e) {
       // Cortado por «Detener» o por otra pregunta: ya quedó resuelto.
       if (run.current !== mine) return;
-      const message = (e instanceof PiloError && e.code === "cancelado" ? "" : (e as Error).message) || "No pude hablar con Pilo ahora.";
+      const message = (e instanceof PiloError && e.code === "cancelado" ? "" : (e as Error).message) || tr("No pude hablar con Pilo ahora.");
       patchTurn(turn.id, interruptedTurn(mine.text, mine.meta, message));
-      setStatus(mine.text.trim() ? "La respuesta quedó incompleta." : "");
+      setStatus(mine.text.trim() ? tr("La respuesta quedó incompleta.") : "");
     } finally {
       if (run.current === mine) {
         run.current = null;
@@ -571,16 +573,16 @@ function Widget({ space, cfg, tema, lado, host, voice: baseVoice }: { space: Spa
   const working = busy && !live?.text;
   // Mientras piensa, la cara de la cabecera cambia de gesto con los segundos.
   const waited = useElapsed(live?.startedAt, working);
-  const headline = reading ? "Hablando" : working ? (live?.page && !live.steps.length ? "Leyendo la página" : "Pensando") : busy ? "Escribiendo" : space.widget.idle;
+  const headline = reading ? tr("Hablando") : working ? (live?.page && !live.steps.length ? tr("Leyendo la página") : tr("Pensando")) : busy ? tr("Escribiendo") : tr(space.widget.idle);
   // La primera vez (o al pedir cambiarlo), el saludo pregunta quién habla.
   const picking = askRol && (rol === null || asking);
-  const who = ROLE_OPTIONS.find((o) => o.id === rol)?.short;
+  const who = tr(ROLE_OPTIONS.find((o) => o.id === rol)?.short ?? "") || undefined;
   const shut = open && full;
 
   return (
     <div className="ap pe" data-tema={tema} data-espacio={space.accent ?? undefined} data-lado={lado} data-open={open || undefined} data-full={shut || undefined} data-reading={reading || undefined}>
       {open && (
-        <div className="pe-panel" ref={panel} role="dialog" aria-label="Chat con Pilo">
+        <div className="pe-panel" ref={panel} role="dialog" aria-label={tr("Chat con Pilo")}>
           <header className="pe-head">
             <div className="pe-face">
               <PiloMoji size={64} mood={working ? "piensa" : "feliz"} emotion={working ? waitingFace(waited) : view.expression} talking={reading || (busy && !working)} alive />
@@ -596,15 +598,16 @@ function Widget({ space, cfg, tema, lado, host, voice: baseVoice }: { space: Spa
               <i />
               <i />
             </div>
+            <LangSwitch className="pe-lang" />
             {turns.length > 0 && (
-              <button type="button" className="pe-ib" onClick={startNew} aria-label="Empezar una conversación nueva" title="Conversación nueva">
+              <button type="button" className="pe-ib" onClick={startNew} aria-label={tr("Empezar una conversación nueva")} title={tr("Conversación nueva")}>
                 {I.fresh}
               </button>
             )}
-            <button type="button" className="pe-ib" aria-pressed={autoRead} onClick={toggleAutoRead} aria-label="Leer las respuestas en voz alta" title="Leer las respuestas en voz alta">
+            <button type="button" className="pe-ib" aria-pressed={autoRead} onClick={toggleAutoRead} aria-label={tr("Leer las respuestas en voz alta")} title={tr("Leer las respuestas en voz alta")}>
               {autoRead ? I.sound : I.mute}
             </button>
-            <button type="button" className="pe-ib" onClick={closePanel} aria-label="Cerrar el chat">
+            <button type="button" className="pe-ib" onClick={closePanel} aria-label={tr("Cerrar el chat")}>
               {I.down}
             </button>
           </header>
@@ -636,7 +639,7 @@ function Widget({ space, cfg, tema, lado, host, voice: baseVoice }: { space: Spa
                 onReading={(on) => setReadingId((cur) => (on ? t.id : cur === t.id ? null : cur))}
               />
             ))}
-            {picking && <RolePicker variant="chat" value={rol} onPick={pickRol} legend={ROLE_QUESTION} />}
+            {picking && <RolePicker variant="chat" value={rol} onPick={pickRol} legend={tr(ROLE_QUESTION)} />}
           </div>
 
           {turns.length === 0 && (
@@ -650,8 +653,8 @@ function Widget({ space, cfg, tema, lado, host, voice: baseVoice }: { space: Spa
           )}
 
           <form className="pe-form" onSubmit={submit}>
-            <input ref={input} id="pe-pregunta" type="text" value={draft} maxLength={500} autoComplete="off" placeholder="Escriba su pregunta" aria-label="Su pregunta para Pilo" onChange={(e) => setDraft(e.target.value)} />
-            <button type="submit" className="pe-send" disabled={!busy && !draft.trim()} aria-label={busy ? "Detener la respuesta" : "Enviar la pregunta"}>
+            <input ref={input} id="pe-pregunta" type="text" value={draft} maxLength={500} autoComplete="off" placeholder={tr("Escriba su pregunta")} aria-label={tr("Su pregunta para Pilo")} onChange={(e) => setDraft(e.target.value)} />
+            <button type="submit" className="pe-send" disabled={!busy && !draft.trim()} aria-label={busy ? tr("Detener la respuesta") : tr("Enviar la pregunta")}>
               {busy ? I.stop : I.send}
             </button>
           </form>
@@ -660,8 +663,8 @@ function Widget({ space, cfg, tema, lado, host, voice: baseVoice }: { space: Spa
               {space.widget.open} {I.out}
             </a>
             {askRol && rol !== null && !asking && (
-              <button type="button" className="pe-rol" onClick={() => { setAsking(true); toBottom(); }} aria-label={`Quién pregunta: ${who}. Cambiar`}>
-                {who} · cambiar
+              <button type="button" className="pe-rol" onClick={() => { setAsking(true); toBottom(); }} aria-label={tr("Quién pregunta: {who}. Cambiar", { who: who ?? "" })}>
+                {who} {tr("· cambiar")}
               </button>
             )}
           </p>
@@ -677,7 +680,7 @@ function Widget({ space, cfg, tema, lado, host, voice: baseVoice }: { space: Spa
         </button>
       )}
 
-      <button type="button" className="pe-fab" ref={fab} hidden={shut} aria-expanded={open} aria-label={open ? "Cerrar el chat con Pilo" : "Abrir el chat con Pilo"} onClick={open ? closePanel : openPanel}>
+      <button type="button" className="pe-fab" ref={fab} hidden={shut} aria-expanded={open} aria-label={open ? tr("Cerrar el chat con Pilo") : tr("Abrir el chat con Pilo")} onClick={open ? closePanel : openPanel}>
         <span className="pe-fab__face">
           <PiloMoji size={70} mood="feliz" alive={!open} />
         </span>
@@ -730,6 +733,7 @@ function TurnView({
   onRetry: () => void;
   onReading: (on: boolean) => void;
 }) {
+  useLang();
   const a = turn.answer;
   const pending = !a && !turn.error;
   // Pilo ya escribe: llegó la primera frase y la respuesta aún no termina.
@@ -896,9 +900,9 @@ function TurnView({
 
       {turn.error && (
         <div className="pe-error" role="alert">
-          <span>{a ? `${turn.error} Lo que alcanzó a escribir quedó incompleto.` : turn.error}</span>
+          <span>{a ? tr("{error} Lo que alcanzó a escribir quedó incompleto.", { error: turn.error }) : turn.error}</span>
           <button type="button" onClick={onRetry}>
-            Preguntar de nuevo
+            {tr("Preguntar de nuevo")}
           </button>
         </div>
       )}
@@ -911,7 +915,7 @@ function TurnView({
             </p>
           ))}
           {a.page && turn.page && <ReadTicket page={turn.page} capture={capture} />}
-          {a.unknown && a.unknown.length > 0 && <p className="pe-note pe-note--warn">Revise estos números antes de citarlos: no los encontré en las fuentes ({a.unknown.join(", ")}).</p>}
+          {a.unknown && a.unknown.length > 0 && <p className="pe-note pe-note--warn">{tr("Revise estos números antes de citarlos: no los encontré en las fuentes ({numbers}).", { numbers: a.unknown.join(", ") })}</p>}
           <div className="pe-meta">
             {links.map((s) => (
               <a key={s.n} href={sourceUrl(s.path, window.location.origin, new URL(home).pathname)} target="_blank" rel="noopener" title={originOf(s) ? `${s.title} · ${originOf(s)}` : s.title}>
@@ -922,7 +926,7 @@ function TurnView({
             {text.trim() && (
               <button type="button" aria-pressed={reading !== null} onClick={() => void read()}>
                 {I.listen}
-                {reading !== null ? "Detener" : "Escuchar"}
+                {reading !== null ? tr("Detener") : tr("Escuchar")}
               </button>
             )}
           </div>
@@ -942,6 +946,7 @@ function TurnView({
  * servidor sale a la vez).
  */
 function ReadCard({ page, full }: { page: TurnPage; full: boolean }) {
+  useLang();
   const root = useRef<HTMLDivElement>(null);
   const lines = full ? page.headings.slice(0, 3) : [];
   const [done, setDone] = useState(lines.length === 0 || reduced());
@@ -969,7 +974,7 @@ function ReadCard({ page, full }: { page: TurnPage; full: boolean }) {
     <div className="pe-read" ref={root} data-done={done || undefined}>
       <span className="pe-read__icon">{I.page}</span>
       <div className="pe-read__body">
-        <strong>{done ? "Leí esta página" : "Leyendo esta página"}</strong>
+        <strong>{done ? tr("Leí esta página") : tr("Leyendo esta página")}</strong>
         <span className="pe-read__where">{hostLabel(page.url)}</span>
         {lines.length > 0 && (
           <ul className="pe-read__lines">
@@ -992,6 +997,7 @@ function ReadCard({ page, full }: { page: TurnPage; full: boolean }) {
  * Planeación para guardarla en la memoria. Es el boleto de origen del portal.
  */
 function ReadTicket({ page, capture }: { page: TurnPage; capture: string }) {
+  useLang();
   const sent = useRef<HTMLSpanElement>(null);
 
   /* La confirmación llega después que el recibo: entra de izquierda a derecha y su visto se dibuja. */
@@ -1009,11 +1015,11 @@ function ReadTicket({ page, capture }: { page: TurnPage; capture: string }) {
 
   return (
     <div className="ap-ticket pe-ticket">
-      <b>Leí esta página</b>
+      <b>{tr("Leí esta página")}</b>
       <span className="ap-ticket__row">
         <span className="pe-ticket__where">{hostLabel(page.url)}</span>
         <span>
-          {page.sent} de {page.total} {page.total === 1 ? "pasaje" : "pasajes"}
+          {trn(page.total, tr("{sent} de {total} pasaje"), tr("{sent} de {total} pasajes"), { sent: page.sent, total: page.total })}
         </span>
       </span>
       {capture && (

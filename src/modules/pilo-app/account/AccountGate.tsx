@@ -68,6 +68,7 @@ import {
 import type { Campus, CuentaCode, PiloAccount, PiloRol, RegData, RegStep, StepProblem, Tone } from "./rules";
 import { readVisitor, visitorNick, visitorNickProblem, writeVisitor } from "./visitor";
 import { Benefits, Field, Msg, PasswordChecklist, Seg, ThemePicker } from "./parts";
+import { tr, useLang, LangSwitch } from "../../../components/pilo/i18n";
 
 type Mode = "registro" | "visita" | "ingreso" | "olvide" | "clave" | "confirmada";
 type Step = RegStep | "listo";
@@ -126,6 +127,7 @@ const OPENING_REQUIRED: Partial<Record<Mode, string>> = {
 };
 
 export function AccountGate({ voice, voiceOn, onVoice, theme, onTheme, account, pending, hasSession, intranetName, home, required = false }: GateProps) {
+  useLang();
   const location = useLocation();
   const navigate = useNavigate();
   const asked = useMemo(() => {
@@ -179,7 +181,7 @@ export function AccountGate({ voice, voiceOn, onVoice, theme, onTheme, account, 
     const [text, face, mood, label] = OPENING[asked];
     return { key: 0, text: (required && OPENING_REQUIRED[asked]) || text, face, mood, label: label ?? MOOD_LABEL[mood] };
   });
-  const say = (text: string, face: MojiMood = "feliz", mood: Line["mood"] = "atento", label?: string) => setLine((l) => ({ key: l.key + 1, text, face, mood, label: label ?? MOOD_LABEL[mood] }));
+  const say = (text: string, face: MojiMood = "feliz", mood: Line["mood"] = "atento", label?: string) => setLine((l) => ({ key: l.key + 1, text: tr(text), face, mood, label: tr(label ?? MOOD_LABEL[mood]) }));
   const speaks = Boolean(voice) && voiceOn && armed && !silent;
 
   // El primer toque (o tecla) estrena el audio: desde ahí Pilo puede sonar.
@@ -286,12 +288,12 @@ export function AccountGate({ voice, voiceOn, onVoice, theme, onTheme, account, 
 
   const stepLine = (next: Step, d: RegData = data) => {
     const r = emailRule(d.email);
-    if (next === "correo") say(OPENING.registro[0], "feliz", "emocionado");
+    if (next === "correo") say(tr(OPENING.registro[0]), "feliz", "emocionado");
     else if (next === "perfil" && r) say(rolQuestion(r), "feliz", "atento");
-    else if (next === "sede") say("¿En cuál sede está? Así le respondo con lo de su sede.", "feliz", "atento");
-    else if (next === "identidad") say("Mucho gusto. ¿Cómo se llama? Le propongo un usuario para entrar; cámbielo si quiere.", "feliz", "atento");
-    else if (next === "clave") say("Ahora una contraseña solo para Pilo. No use la de su correo ni la de Moodle.", "cuidado", "atento", "De cuidado");
-    else if (next === "trato") say("Casi listo. Dígame cómo le digo y en qué tono prefiere que le hable.", "feliz", "emocionado");
+    else if (next === "sede") say(tr("¿En cuál sede está? Así le respondo con lo de su sede."), "feliz", "atento");
+    else if (next === "identidad") say(tr("Mucho gusto. ¿Cómo se llama? Le propongo un usuario para entrar; cámbielo si quiere."), "feliz", "atento");
+    else if (next === "clave") say(tr("Ahora una contraseña solo para Pilo. No use la de su correo ni la de Moodle."), "cuidado", "atento", tr("De cuidado"));
+    else if (next === "trato") say(tr("Casi listo. Dígame cómo le digo y en qué tono prefiere que le hable."), "feliz", "emocionado");
   };
 
   const goStep = (next: Step, d: RegData = data) => {
@@ -318,7 +320,7 @@ export function AccountGate({ voice, voiceOn, onVoice, theme, onTheme, account, 
       stepLine(at);
     } else {
       const [text, face, mood, label] = OPENING[next];
-      say((required && OPENING_REQUIRED[next]) || text, face, mood, label);
+      say(tr((required && OPENING_REQUIRED[next]) || text), face, mood, label ? tr(label) : label);
     }
   };
 
@@ -346,16 +348,16 @@ export function AccountGate({ voice, voiceOn, onVoice, theme, onTheme, account, 
     greeted.current = true;
     if (account) {
       const name = account.nick || firstName(account.full_name);
-      say(`${name ? `¡Listo, ${name}!` : "¡Listo!"} Su correo quedó confirmado. Ya puede guardar respuestas y recibir respuestas a su medida.`, "sorpresa", "emocionado");
+      say(name ? tr("¡Listo, {name}! Su correo quedó confirmado. Ya puede guardar respuestas y recibir respuestas a su medida.", { name }) : tr("¡Listo! Su correo quedó confirmado. Ya puede guardar respuestas y recibir respuestas a su medida."), "sorpresa", "emocionado");
       return;
     }
     setMode("ingreso");
     setNotice(
       expired
-        ? { tone: "info", text: "Ese enlace venció o ya se usó. Si ya confirmó su correo, entre con su usuario; si no, escriba su usuario y pida otro correo con «Reenviar el correo»." }
-        : { tone: "info", text: "Si ya abrió el enlace de su correo, su cuenta quedó confirmada: entre con su usuario y su contraseña." },
+        ? { tone: "info", text: tr("Ese enlace venció o ya se usó. Si ya confirmó su correo, entre con su usuario; si no, escriba su usuario y pida otro correo con «Reenviar el correo».") }
+        : { tone: "info", text: tr("Si ya abrió el enlace de su correo, su cuenta quedó confirmada: entre con su usuario y su contraseña.") },
     );
-    say(expired ? "Ese enlace ya no sirve. Entre con su usuario, o pida otro correo." : "Ya casi. Entre con su usuario de Pilo para terminar.", expired ? "atento" : "feliz", expired ? "atento" : "emocionado");
+    say(expired ? tr("Ese enlace ya no sirve. Entre con su usuario, o pida otro correo.") : tr("Ya casi. Entre con su usuario de Pilo para terminar."), expired ? "atento" : "feliz", expired ? "atento" : "emocionado");
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [mode, pending, account]);
 
@@ -371,7 +373,7 @@ export function AccountGate({ voice, voiceOn, onVoice, theme, onTheme, account, 
     let cancelled = false;
     const timer = window.setTimeout(() => {
       checkUsername(username)
-        .then((r) => !cancelled && setUserCheck(r.free ? { state: "free" } : { state: "taken", reason: r.reason || "Ese usuario no está disponible. Pruebe con otro." }))
+        .then((r) => !cancelled && setUserCheck(r.free ? { state: "free" } : { state: "taken", reason: r.reason || tr("Ese usuario no está disponible. Pruebe con otro.") }))
         .catch((e) => {
           if (cancelled) return;
           const err = asCuentaError(e);
@@ -393,7 +395,7 @@ export function AccountGate({ voice, voiceOn, onVoice, theme, onTheme, account, 
   const fail = (problem: StepProblem, said: string) => {
     setError(problem);
     focusField(problem.field);
-    say(said, "atento", "atento", "De cuidado");
+    say(said, "atento", "atento", tr("De cuidado"));
   };
 
   const advance = async () => {
@@ -402,7 +404,7 @@ export function AccountGate({ voice, voiceOn, onVoice, theme, onTheme, account, 
     const problem = stepProblem(step, data);
     if (problem) {
       const said =
-        step === "correo" ? "Ese correo no me sirve. Solo puedo crear cuentas con un correo de la UDES." : step === "identidad" ? (problem.field === "fullName" ? "Me falta su nombre." : "Ese usuario no sirve. Revise la nota de abajo.") : step === "clave" ? "A la contraseña le falta algo de la lista." : problem.field === "terms" ? "Antes de crear la cuenta, lea y acepte los términos." : "Elija una opción para seguir.";
+        step === "correo" ? tr("Ese correo no me sirve. Solo puedo crear cuentas con un correo de la UDES.") : step === "identidad" ? (problem.field === "fullName" ? tr("Me falta su nombre.") : tr("Ese usuario no sirve. Revise la nota de abajo.")) : step === "clave" ? tr("A la contraseña le falta algo de la lista.") : problem.field === "terms" ? tr("Antes de crear la cuenta, lea y acepte los términos.") : tr("Elija una opción para seguir.");
       return fail(problem, said);
     }
     if (step === "correo" && rule) {
@@ -426,7 +428,7 @@ export function AccountGate({ voice, voiceOn, onVoice, theme, onTheme, account, 
         }
         setUserCheck(check);
       }
-      if (check.state === "taken") return fail({ field: "username", message: check.reason || "Ese usuario no está disponible. Pruebe con otro." }, "Ese usuario no está disponible. Pruebe con otro.");
+      if (check.state === "taken") return fail({ field: "username", message: check.reason || tr("Ese usuario no está disponible. Pruebe con otro.") }, tr("Ese usuario no está disponible. Pruebe con otro."));
       const next = { ...data, nick: data.nick || firstName(data.fullName) };
       setData(next);
       return goStep("clave", next);
@@ -449,7 +451,7 @@ export function AccountGate({ voice, voiceOn, onVoice, theme, onTheme, account, 
       setData((d) => ({ ...d, password: "" }));
       setReveal(false);
       setStep("listo");
-      say(after === "confirmar" ? `¡Listo, ${nick}! Ya tiene cuenta en Pilo. Revise su correo para confirmarla.` : `¡Listo, ${nick}! Ya tiene cuenta en Pilo. Conversemos.`, "sorpresa", "emocionado");
+      say(after === "confirmar" ? tr("¡Listo, {nick}! Ya tiene cuenta en Pilo. Revise su correo para confirmarla.", { nick }) : tr("¡Listo, {nick}! Ya tiene cuenta en Pilo. Conversemos.", { nick }), "sorpresa", "emocionado");
     } catch (e) {
       const err = asCuentaError(e);
       const target = registerErrorStep(err.code, steps);
@@ -460,10 +462,10 @@ export function AccountGate({ voice, voiceOn, onVoice, theme, onTheme, account, 
         setError({ field, message: err.message });
         setNotice(null);
         focusField(field);
-        say(err.code === "existe" || err.code === "intranet" ? "Ese correo ya tiene cuenta." : "Hay algo por corregir antes de crear la cuenta.", "atento", "atento", "De cuidado");
+        say(err.code === "existe" || err.code === "intranet" ? tr("Ese correo ya tiene cuenta.") : tr("Hay algo por corregir antes de crear la cuenta."), "atento", "atento", tr("De cuidado"));
       } else {
         setNotice({ tone: "bad", text: err.message });
-        say("No pude crear la cuenta ahora.", "duda", "atento", "De cuidado");
+        say(tr("No pude crear la cuenta ahora."), "duda", "atento", tr("De cuidado"));
       }
     } finally {
       setBusy(false);
@@ -488,11 +490,11 @@ export function AccountGate({ voice, voiceOn, onVoice, theme, onTheme, account, 
   };
 
   const resend = async (who: string) => {
-    if (usernameProblem(who)) return setNotice({ tone: "bad", text: "Escriba su usuario para reenviarle el correo." });
+    if (usernameProblem(who)) return setNotice({ tone: "bad", text: tr("Escriba su usuario para reenviarle el correo.") });
     setBusy(true);
     try {
       await resendConfirmation(who);
-      setNotice({ tone: "ok", text: "Si esa cuenta está por confirmar, le enviamos el correo otra vez. Revise también el correo no deseado." });
+      setNotice({ tone: "ok", text: tr("Si esa cuenta está por confirmar, le enviamos el correo otra vez. Revise también el correo no deseado.") });
     } catch (e) {
       setNotice({ tone: "bad", text: asCuentaError(e).message });
     } finally {
@@ -507,7 +509,7 @@ export function AccountGate({ voice, voiceOn, onVoice, theme, onTheme, account, 
     if (busy) return;
     setNotice(null);
     if (!login.username.trim() || !login.password) {
-      setLoginError({ code: "credenciales", message: "Escriba su usuario y su contraseña." });
+      setLoginError({ code: "credenciales", message: tr("Escriba su usuario y su contraseña.") });
       return;
     }
     setBusy(true);
@@ -522,7 +524,7 @@ export function AccountGate({ voice, voiceOn, onVoice, theme, onTheme, account, 
       setLoginError({ code: failure.code, message: failure.message });
       // La contraseña errada no se queda escrita.
       setLogin((l) => ({ ...l, password: "" }));
-      say(failure.code === "credenciales" ? "No coinciden. Revise el usuario y la contraseña." : failure.code === "sin_confirmar" ? "Le falta confirmar su correo." : "Ahora no puedo dejarle entrar.", "atento", "atento", "De cuidado");
+      say(failure.code === "credenciales" ? tr("No coinciden. Revise el usuario y la contraseña.") : failure.code === "sin_confirmar" ? tr("Le falta confirmar su correo.") : tr("Ahora no puedo dejarle entrar."), "atento", "atento", tr("De cuidado"));
       window.requestAnimationFrame(() => document.getElementById(failure.code === "credenciales" ? "pc-entrar-clave" : "pc-entrar-usuario")?.focus());
     } finally {
       setBusy(false);
@@ -533,7 +535,7 @@ export function AccountGate({ voice, voiceOn, onVoice, theme, onTheme, account, 
     e.preventDefault();
     if (busy) return;
     if (usernameProblem(login.username)) {
-      setLoginError({ code: "usuario", message: "Escriba su nombre de usuario de Pilo." });
+      setLoginError({ code: "usuario", message: tr("Escriba su nombre de usuario de Pilo.") });
       return;
     }
     setBusy(true);
@@ -541,7 +543,7 @@ export function AccountGate({ voice, voiceOn, onVoice, theme, onTheme, account, 
     try {
       await recoverPassword(login.username);
       setSent(true);
-      say("Listo. Si ese usuario tiene cuenta, el correo va en camino.", "feliz", "atento");
+      say(tr("Listo. Si ese usuario tiene cuenta, el correo va en camino."), "feliz", "atento");
     } catch (err) {
       setLoginError({ code: asCuentaError(err).code, message: asCuentaError(err).message });
     } finally {
@@ -563,13 +565,13 @@ export function AccountGate({ voice, voiceOn, onVoice, theme, onTheme, account, 
     const { error: failed } = await supabase.auth.updateUser({ password: newPass });
     setBusy(false);
     if (failed) {
-      setPassError(/different|same/i.test(failed.message) ? "La contraseña nueva debe ser distinta de la anterior." : /session|expired|invalid/i.test(failed.message) ? "El enlace venció. Pida otro correo para cambiar la contraseña." : "No se pudo cambiar la contraseña. Intente de nuevo.");
+      setPassError(/different|same/i.test(failed.message) ? tr("La contraseña nueva debe ser distinta de la anterior.") : /session|expired|invalid/i.test(failed.message) ? tr("El enlace venció. Pida otro correo para cambiar la contraseña.") : tr("No se pudo cambiar la contraseña. Intente de nuevo."));
       return;
     }
     setNewPass("");
     setReveal(false);
     setChanged(true);
-    say("¡Hecho! Su contraseña nueva ya está guardada.", "sorpresa", "emocionado");
+    say(tr("¡Hecho! Su contraseña nueva ya está guardada."), "sorpresa", "emocionado");
   };
 
   const enterAsGuest = (e: FormEvent) => {
@@ -590,14 +592,14 @@ export function AccountGate({ voice, voiceOn, onVoice, theme, onTheme, account, 
   if (!pending && account && !leaving) return <Navigate to={APP_PROFILE} replace />;
 
   const at = step === "listo" ? steps.length : steps.indexOf(step);
-  const moodLine = !voice || silent ? "La voz de Pilo no está disponible: lea a Pilo" : !voiceOn ? "Voz apagada" : !armed ? "Toque la pantalla para oír a Pilo" : `Voz de Pilo · ${line.label}`;
-  const voiceLabel = !voice || silent ? "La voz de Pilo no está disponible ahora" : voiceOn ? "Voz de Pilo activada. Apagar" : "Voz de Pilo apagada. Activar";
+  const moodLine = !voice || silent ? tr("La voz de Pilo no está disponible: lea a Pilo") : !voiceOn ? tr("Voz apagada") : !armed ? tr("Toque la pantalla para oír a Pilo") : tr("Voz de Pilo · {label}", { label: line.label });
+  const voiceLabel = !voice || silent ? tr("La voz de Pilo no está disponible ahora") : voiceOn ? tr("Voz de Pilo activada. Apagar") : tr("Voz de Pilo apagada. Activar");
   const errorOf = (field: StepProblem["field"]) => (error?.field === field ? error.message : null);
   const liveUser = !errorOf("username") && data.username ? usernameProblem(username) : "";
 
   const guestDoor = (
     <button type="button" className="pc-quiet" onClick={() => goMode("visita")}>
-      Usar Pilo sin cuenta
+      {tr("Usar Pilo sin cuenta")}
     </button>
   );
 
@@ -606,14 +608,14 @@ export function AccountGate({ voice, voiceOn, onVoice, theme, onTheme, account, 
   if (intranetName) {
     form = (
       <div className="pc-step" ref={setBody}>
-        <h2 tabIndex={-1}>Ya tiene sesión</h2>
+        <h2 tabIndex={-1}>{tr("Ya tiene sesión")}</h2>
         <p>
-          Entró con su cuenta de la intranet ({intranetName}). Esa cuenta ya le sirve en Pilo: no necesita otra.
+          {tr("Entró con su cuenta de la intranet ({name}). Esa cuenta ya le sirve en Pilo: no necesita otra.", { name: intranetName })}
         </p>
         <div className="pc-actions">
           <span />
           <Link className="pa-btn pa-btn--main" to={home} replace>
-            Conversar con Pilo
+            {tr("Conversar con Pilo")}
           </Link>
         </div>
       </div>
@@ -621,40 +623,40 @@ export function AccountGate({ voice, voiceOn, onVoice, theme, onTheme, account, 
   } else if (mode === "registro") {
     form = (
       <>
-        <div className="pc-segs" aria-label={step === "listo" ? "Registro completo" : `Paso ${at + 1} de ${steps.length}`} role="img">
+        <div className="pc-segs" aria-label={step === "listo" ? tr("Registro completo") : tr("Paso {n} de {total}", { n: at + 1, total: steps.length })} role="img">
           {steps.map((s, i) => (
             <span key={s} data-on={i < at || (step !== "listo" && i === at) || undefined}>
               <i />
             </span>
           ))}
-          <small aria-hidden="true">{step === "listo" ? "Listo" : `${at + 1} de ${steps.length}`}</small>
+          <small aria-hidden="true">{step === "listo" ? tr("Listo") : tr("{n} de {total}", { n: at + 1, total: steps.length })}</small>
         </div>
 
         {step === "listo" ? (
           <div className="pc-step" ref={setBody}>
-            <h2 tabIndex={-1}>Cuenta creada</h2>
+            <h2 tabIndex={-1}>{tr("Cuenta creada")}</h2>
             <p>
               {done?.after === "confirmar"
                 ? required
-                  ? "Le enviamos un mensaje a su correo para confirmar que es suyo. Abra el enlace de ese correo y entre con su usuario: en el computador Pilo trabaja con la cuenta confirmada."
-                  : "Le enviamos un mensaje a su correo para confirmar que es suyo. Hasta que lo confirme puede conversar con Pilo sin cuenta; entrar, guardar respuestas y las respuestas a su medida se activan al confirmar."
+                  ? tr("Le enviamos un mensaje a su correo para confirmar que es suyo. Abra el enlace de ese correo y entre con su usuario: en el computador Pilo trabaja con la cuenta confirmada.")
+                  : tr("Le enviamos un mensaje a su correo para confirmar que es suyo. Hasta que lo confirme puede conversar con Pilo sin cuenta; entrar, guardar respuestas y las respuestas a su medida se activan al confirmar.")
                 : done?.after === "ingresar"
-                  ? "Su cuenta quedó lista. Entre con su usuario y su contraseña para guardar respuestas y recibir respuestas a su medida."
-                  : "Su cuenta quedó lista y ya entró con ella: puede guardar respuestas y Pilo le responde a su medida."}
+                  ? tr("Su cuenta quedó lista. Entre con su usuario y su contraseña para guardar respuestas y recibir respuestas a su medida.")
+                  : tr("Su cuenta quedó lista y ya entró con ella: puede guardar respuestas y Pilo le responde a su medida.")}
             </p>
             <dl className="pc-rows">
               <div>
-                <dt>Usuario</dt>
+                <dt>{tr("Usuario")}</dt>
                 <dd>
                   <code>{done?.username}</code>
                 </dd>
               </div>
               <div>
-                <dt>Perfil</dt>
+                <dt>{tr("Perfil")}</dt>
                 <dd>{done?.rol}</dd>
               </div>
               <div>
-                <dt>Sede</dt>
+                <dt>{tr("Sede")}</dt>
                 <dd>{done?.campus}</dd>
               </div>
             </dl>
@@ -662,16 +664,16 @@ export function AccountGate({ voice, voiceOn, onVoice, theme, onTheme, account, 
             <div className="pc-actions">
               {done?.after === "confirmar" && (
                 <button type="button" className="pc-quiet" disabled={busy} onClick={() => done && void resend(done.username)}>
-                  {busy ? "Enviando…" : "Reenviar el correo"}
+                  {busy ? tr("Enviando…") : tr("Reenviar el correo")}
                 </button>
               )}
               {required && done?.after !== "entro" ? (
                 <button type="button" className="pa-btn pa-btn--main" onClick={() => goMode("ingreso")}>
-                  Entrar con mi usuario
+                  {tr("Entrar con mi usuario")}
                 </button>
               ) : (
                 <Link className="pa-btn pa-btn--main" to={home} replace>
-                  Conversar con Pilo
+                  {tr("Conversar con Pilo")}
                 </Link>
               )}
             </div>
@@ -688,9 +690,9 @@ export function AccountGate({ voice, voiceOn, onVoice, theme, onTheme, account, 
           >
             {step === "correo" && (
               <>
-                <h2 tabIndex={-1}>Su correo de la UDES</h2>
-                <p>Con él Pilo sabe a qué parte de la universidad pertenece. Esta cuenta es solo para Pilo: no da acceso a la intranet.</p>
-                <Field id={FIELD_ID.email} label="Correo institucional" error={errorOf("email")}>
+                <h2 tabIndex={-1}>{tr("Su correo de la UDES")}</h2>
+                <p>{tr("Con él Pilo sabe a qué parte de la universidad pertenece. Esta cuenta es solo para Pilo: no da acceso a la intranet.")}</p>
+                <Field id={FIELD_ID.email} label={tr("Correo institucional")} error={errorOf("email")}>
                   {(aria) => (
                     <input
                       {...aria}
@@ -700,7 +702,7 @@ export function AccountGate({ voice, voiceOn, onVoice, theme, onTheme, account, 
                       autoComplete="email"
                       autoCapitalize="none"
                       spellCheck={false}
-                      placeholder="nombre@mail.udes.edu.co"
+                      placeholder={tr("nombre@mail.udes.edu.co")}
                       value={data.email}
                       maxLength={160}
                       onChange={(e) => {
@@ -711,7 +713,7 @@ export function AccountGate({ voice, voiceOn, onVoice, theme, onTheme, account, 
                   )}
                 </Field>
                 <div>
-                  <p className="pc-label">Correos que acepta Pilo</p>
+                  <p className="pc-label">{tr("Correos que acepta Pilo")}</p>
                   <ul className="pc-domains">
                     {DOMAINS.map((d) => (
                       <li key={d.domain}>@{d.domain}</li>
@@ -724,14 +726,14 @@ export function AccountGate({ voice, voiceOn, onVoice, theme, onTheme, account, 
             {step === "perfil" && rule && (
               <>
                 <h2 tabIndex={-1} id={FIELD_ID.rol}>
-                  ¿Quién es usted en la universidad?
+                  {tr("¿Quién es usted en la universidad?")}
                 </h2>
                 <p>{rolQuestion(rule)}</p>
                 <div className="pc-opts" role="group" aria-labelledby={FIELD_ID.rol}>
                   {rule.roles.map((r) => (
                     <button key={r} type="button" className="pc-opt" aria-pressed={data.rol === r} onClick={() => pickRol(r)}>
-                      {ROLES[r].label}
-                      <small>{ROLES[r].hint}</small>
+                      {tr(ROLES[r].label)}
+                      <small>{tr(ROLES[r].hint)}</small>
                     </button>
                   ))}
                 </div>
@@ -746,9 +748,9 @@ export function AccountGate({ voice, voiceOn, onVoice, theme, onTheme, account, 
             {step === "sede" && (
               <>
                 <h2 tabIndex={-1} id={FIELD_ID.campus}>
-                  ¿En cuál sede está?
+                  {tr("¿En cuál sede está?")}
                 </h2>
-                <p>Su correo no dice la sede. Pilo la usa para responderle con lo de su sede.</p>
+                <p>{tr("Su correo no dice la sede. Pilo la usa para responderle con lo de su sede.")}</p>
                 <div className="pc-opts" role="group" aria-labelledby={FIELD_ID.campus}>
                   {CAMPUSES.map((c) => (
                     <button key={c.id} type="button" className="pc-opt" aria-pressed={data.campus === c.id} onClick={() => pickCampus(c.id)}>
@@ -766,9 +768,9 @@ export function AccountGate({ voice, voiceOn, onVoice, theme, onTheme, account, 
 
             {step === "identidad" && (
               <>
-                <h2 tabIndex={-1}>Su nombre y su usuario</h2>
-                <p>Entrará a Pilo con su usuario, no con el correo.</p>
-                <Field id={FIELD_ID.fullName} label="Nombre completo" error={errorOf("fullName")}>
+                <h2 tabIndex={-1}>{tr("Su nombre y su usuario")}</h2>
+                <p>{tr("Entrará a Pilo con su usuario, no con el correo.")}</p>
+                <Field id={FIELD_ID.fullName} label={tr("Nombre completo")} error={errorOf("fullName")}>
                   {(aria) => (
                     <input
                       {...aria}
@@ -784,7 +786,7 @@ export function AccountGate({ voice, voiceOn, onVoice, theme, onTheme, account, 
                     />
                   )}
                 </Field>
-                <Field id={FIELD_ID.username} label="Nombre de usuario" hint={USERNAME_HINT} error={errorOf("username")}>
+                <Field id={FIELD_ID.username} label={tr("Nombre de usuario")} hint={tr(USERNAME_HINT)} error={errorOf("username")}>
                   {(aria) => (
                     <input
                       {...aria}
@@ -807,9 +809,9 @@ export function AccountGate({ voice, voiceOn, onVoice, theme, onTheme, account, 
                   {liveUser ? (
                     <Msg tone="info">{liveUser}</Msg>
                   ) : userCheck.state === "checking" ? (
-                    <Msg tone="info">Comprobando si está libre…</Msg>
+                    <Msg tone="info">{tr("Comprobando si está libre…")}</Msg>
                   ) : userCheck.state === "free" ? (
-                    <Msg tone="ok">Disponible</Msg>
+                    <Msg tone="ok">{tr("Disponible")}</Msg>
                   ) : userCheck.state === "taken" && !errorOf("username") ? (
                     <Msg tone="bad">{userCheck.reason}</Msg>
                   ) : null}
@@ -819,11 +821,11 @@ export function AccountGate({ voice, voiceOn, onVoice, theme, onTheme, account, 
 
             {step === "clave" && (
               <>
-                <h2 tabIndex={-1}>Una contraseña para Pilo</h2>
-                <p>Distinta de la de su correo y de la de Moodle.</p>
+                <h2 tabIndex={-1}>{tr("Una contraseña para Pilo")}</h2>
+                <p>{tr("Distinta de la de su correo y de la de Moodle.")}</p>
                 {/* Para que el navegador guarde la contraseña junto a su usuario. */}
                 <input className="pa-sr" type="text" autoComplete="username" value={username} readOnly tabIndex={-1} aria-hidden="true" />
-                <Field id={FIELD_ID.password} label="Contraseña" error={errorOf("password")}>
+                <Field id={FIELD_ID.password} label={tr("Contraseña")} error={errorOf("password")}>
                   {(aria) => (
                     <div className="pc-pass">
                       <input
@@ -840,7 +842,7 @@ export function AccountGate({ voice, voiceOn, onVoice, theme, onTheme, account, 
                         }}
                       />
                       <button type="button" className="pc-reveal" aria-pressed={reveal} onClick={() => setReveal(!reveal)}>
-                        {reveal ? "Ocultar" : "Mostrar"}
+                        {reveal ? tr("Ocultar") : tr("Mostrar")}
                       </button>
                     </div>
                   )}
@@ -851,15 +853,15 @@ export function AccountGate({ voice, voiceOn, onVoice, theme, onTheme, account, 
 
             {step === "trato" && (
               <>
-                <h2 tabIndex={-1}>¿Cómo quiere que le hable Pilo?</h2>
-                <p>Lo puede cambiar después en su perfil.</p>
-                <Field id={FIELD_ID.nick} label="¿Cómo le digo?" hint="Su nombre o uno abreviado." error={errorOf("nick")}>
+                <h2 tabIndex={-1}>{tr("¿Cómo quiere que le hable Pilo?")}</h2>
+                <p>{tr("Lo puede cambiar después en su perfil.")}</p>
+                <Field id={FIELD_ID.nick} label={tr("¿Cómo le digo?")} hint={tr("Su nombre o uno abreviado.")} error={errorOf("nick")}>
                   {(aria) => <input {...aria} data-first autoComplete="nickname" value={data.nick} maxLength={40} onChange={(e) => setData({ ...data, nick: e.target.value })} />}
                 </Field>
                 <div>
-                  <p className="pc-label">Tono</p>
+                  <p className="pc-label">{tr("Tono")}</p>
                   <Seg
-                    label="Tono"
+                    label={tr("Tono")}
                     value={data.tone}
                     options={TONE_OPTIONS}
                     onPick={(tone) => {
@@ -909,11 +911,11 @@ export function AccountGate({ voice, voiceOn, onVoice, theme, onTheme, account, 
 
             <div className="pc-actions">
               <button type="button" className="pc-quiet" onClick={back} disabled={busy}>
-                {step === "correo" ? "Ya tengo cuenta" : "Atrás"}
+                {step === "correo" ? tr("Ya tengo cuenta") : tr("Atrás")}
               </button>
               {step !== "perfil" && step !== "sede" && (
                 <button type="submit" className="pa-btn pa-btn--main" disabled={busy}>
-                  {step === "trato" ? (busy ? "Creando su cuenta…" : "Crear mi cuenta") : busy ? "Un momento…" : "Continuar"}
+                  {step === "trato" ? (busy ? tr("Creando su cuenta…") : tr("Crear mi cuenta")) : busy ? tr("Un momento…") : tr("Continuar")}
                 </button>
               )}
             </div>
@@ -922,17 +924,17 @@ export function AccountGate({ voice, voiceOn, onVoice, theme, onTheme, account, 
 
         {step !== "listo" && required && (
           <div className="pc-aside" data-strong={off || undefined}>
-            <p>{off ? "Las cuentas de Pilo no están disponibles ahora. Intente de nuevo en un momento." : "¿Ya tiene cuenta de Pilo?"}</p>
+            <p>{off ? tr("Las cuentas de Pilo no están disponibles ahora. Intente de nuevo en un momento.") : tr("¿Ya tiene cuenta de Pilo?")}</p>
             {!off && (
               <button type="button" className="pc-quiet" onClick={() => goMode("ingreso")}>
-                Entrar con mi usuario
+                {tr("Entrar con mi usuario")}
               </button>
             )}
           </div>
         )}
         {step !== "listo" && !required && (
           <div className="pc-aside" data-strong={off || undefined}>
-            <p>{off ? "Mientras tanto, Pilo le responde sin cuenta." : "¿Prefiere no registrarse? Pilo también responde sin cuenta."}</p>
+            <p>{off ? tr("Mientras tanto, Pilo le responde sin cuenta.") : tr("¿Prefiere no registrarse? Pilo también responde sin cuenta.")}</p>
             {guestDoor}
           </div>
         )}
@@ -941,9 +943,9 @@ export function AccountGate({ voice, voiceOn, onVoice, theme, onTheme, account, 
   } else if (mode === "visita") {
     form = (
       <form className="pc-step" noValidate ref={setBody} onSubmit={enterAsGuest}>
-        <h2 tabIndex={-1}>Usar Pilo sin cuenta</h2>
-        <p>Solo dos cosas, que quedan en este dispositivo y puede cambiar cuando quiera.</p>
-        <Field id="pc-visita-nombre" label="¿Cómo quiere que le diga Pilo?" hint="Su nombre o uno abreviado. Si lo deja vacío, Pilo no usa nombre." error={guestError || null}>
+        <h2 tabIndex={-1}>{tr("Usar Pilo sin cuenta")}</h2>
+        <p>{tr("Solo dos cosas, que quedan en este dispositivo y puede cambiar cuando quiera.")}</p>
+        <Field id="pc-visita-nombre" label={tr("¿Cómo quiere que le diga Pilo?")} hint={tr("Su nombre o uno abreviado. Si lo deja vacío, Pilo no usa nombre.")} error={guestError || null}>
           {(aria) => (
             <input
               {...aria}
@@ -959,9 +961,9 @@ export function AccountGate({ voice, voiceOn, onVoice, theme, onTheme, account, 
           )}
         </Field>
         <div>
-          <p className="pc-label">Tono</p>
+          <p className="pc-label">{tr("Tono")}</p>
           <Seg
-            label="Tono"
+            label={tr("Tono")}
             value={guest.tone}
             options={TONE_OPTIONS}
             onPick={(tone) => {
@@ -972,17 +974,17 @@ export function AccountGate({ voice, voiceOn, onVoice, theme, onTheme, account, 
         </div>
         <div>
           <p className="pc-label" id="pc-visita-tema">
-            Tema de la app
+            {tr("Tema de la app")}
           </p>
           <ThemePicker value={theme} onPick={onTheme} labelledBy="pc-visita-tema" />
         </div>
-        <Benefits title="Con una cuenta, además" />
+        <Benefits title={tr("Con una cuenta, además")} />
         <div className="pc-actions">
           <button type="button" className="pc-quiet" onClick={() => goMode("registro")}>
-            Crear una cuenta
+            {tr("Crear una cuenta")}
           </button>
           <button type="submit" className="pa-btn pa-btn--main">
-            Entrar a conversar
+            {tr("Entrar a conversar")}
           </button>
         </div>
       </form>
@@ -990,10 +992,10 @@ export function AccountGate({ voice, voiceOn, onVoice, theme, onTheme, account, 
   } else if (mode === "ingreso") {
     form = (
       <form className="pc-step" noValidate ref={setBody} onSubmit={enter}>
-        <h2 tabIndex={-1}>Entrar a Pilo</h2>
-        <p>Con su usuario de Pilo. Si es personal con cuenta en la intranet, esa cuenta es aparte.</p>
+        <h2 tabIndex={-1}>{tr("Entrar a Pilo")}</h2>
+        <p>{tr("Con su usuario de Pilo. Si es personal con cuenta en la intranet, esa cuenta es aparte.")}</p>
         {notice && <Msg tone={notice.tone}>{notice.text}</Msg>}
-        <Field id="pc-entrar-usuario" label="Nombre de usuario">
+        <Field id="pc-entrar-usuario" label={tr("Nombre de usuario")}>
           {(aria) => (
             <input
               {...aria}
@@ -1013,7 +1015,7 @@ export function AccountGate({ voice, voiceOn, onVoice, theme, onTheme, account, 
             />
           )}
         </Field>
-        <Field id="pc-entrar-clave" label="Contraseña">
+        <Field id="pc-entrar-clave" label={tr("Contraseña")}>
           {(aria) => (
             <div className="pc-pass">
               <input
@@ -1030,7 +1032,7 @@ export function AccountGate({ voice, voiceOn, onVoice, theme, onTheme, account, 
                 }}
               />
               <button type="button" className="pc-reveal" aria-pressed={reveal} onClick={() => setReveal(!reveal)}>
-                {reveal ? "Ocultar" : "Mostrar"}
+                {reveal ? tr("Ocultar") : tr("Mostrar")}
               </button>
             </div>
           )}
@@ -1042,31 +1044,31 @@ export function AccountGate({ voice, voiceOn, onVoice, theme, onTheme, account, 
         )}
         <div className="pc-links">
           <button type="button" className="pc-quiet" onClick={() => goMode("olvide")}>
-            Olvidé mi contraseña
+            {tr("Olvidé mi contraseña")}
           </button>
           {(loginError?.code === "sin_confirmar" || expired) && (
             <button type="button" className="pc-quiet" disabled={busy} onClick={() => void resend(login.username)}>
-              Reenviar el correo
+              {tr("Reenviar el correo")}
             </button>
           )}
         </div>
         <div className="pc-actions">
           <button type="button" className="pc-quiet" onClick={() => goMode("registro")}>
-            Crear una cuenta
+            {tr("Crear una cuenta")}
           </button>
           <button type="submit" className="pa-btn pa-btn--main" disabled={busy}>
-            {busy ? "Entrando…" : "Entrar"}
+            {busy ? tr("Entrando…") : tr("Entrar")}
           </button>
         </div>
         {required ? (
           off && (
             <div className="pc-aside" data-strong>
-              <p>Las cuentas de Pilo no están disponibles ahora. Intente de nuevo en un momento.</p>
+              <p>{tr("Las cuentas de Pilo no están disponibles ahora. Intente de nuevo en un momento.")}</p>
             </div>
           )
         ) : (
           <div className="pc-aside" data-strong={off || undefined}>
-            <p>{off ? "Mientras tanto, Pilo le responde sin cuenta." : "¿Sin cuenta? Pilo también responde."}</p>
+            <p>{off ? tr("Mientras tanto, Pilo le responde sin cuenta.") : tr("¿Sin cuenta? Pilo también responde.")}</p>
             {guestDoor}
           </div>
         )}
@@ -1075,12 +1077,12 @@ export function AccountGate({ voice, voiceOn, onVoice, theme, onTheme, account, 
   } else if (mode === "olvide") {
     form = (
       <form className="pc-step" noValidate ref={setBody} onSubmit={recover}>
-        <h2 tabIndex={-1}>Olvidé mi contraseña</h2>
-        <p>Escriba su usuario de Pilo. Le enviamos un correo con un enlace para poner una contraseña nueva.</p>
+        <h2 tabIndex={-1}>{tr("Olvidé mi contraseña")}</h2>
+        <p>{tr("Escriba su usuario de Pilo. Le enviamos un correo con un enlace para poner una contraseña nueva.")}</p>
         {sent ? (
-          <Msg tone="ok">Si ese usuario tiene una cuenta, le enviamos el correo. Revise también el correo no deseado; el enlace abre esta misma app.</Msg>
+          <Msg tone="ok">{tr("Si ese usuario tiene una cuenta, le enviamos el correo. Revise también el correo no deseado; el enlace abre esta misma app.")}</Msg>
         ) : (
-          <Field id="pc-olvide-usuario" label="Nombre de usuario" error={loginError?.message ?? null}>
+          <Field id="pc-olvide-usuario" label={tr("Nombre de usuario")} error={loginError?.message ?? null}>
             {(aria) => (
               <input
                 {...aria}
@@ -1101,11 +1103,11 @@ export function AccountGate({ voice, voiceOn, onVoice, theme, onTheme, account, 
         )}
         <div className="pc-actions">
           <button type="button" className="pc-quiet" onClick={() => goMode("ingreso")}>
-            Volver a entrar
+            {tr("Volver a entrar")}
           </button>
           {!sent && (
             <button type="submit" className="pa-btn pa-btn--main" disabled={busy}>
-              {busy ? "Enviando…" : "Enviar el correo"}
+              {busy ? tr("Enviando…") : tr("Enviar el correo")}
             </button>
           )}
         </div>
@@ -1114,39 +1116,39 @@ export function AccountGate({ voice, voiceOn, onVoice, theme, onTheme, account, 
   } else if (mode === "clave") {
     form = pending ? (
       <div className="pc-step" ref={setBody}>
-        <h2 tabIndex={-1}>Un momento…</h2>
-        <p role="status">Pilo está revisando el enlace de su correo.</p>
+        <h2 tabIndex={-1}>{tr("Un momento…")}</h2>
+        <p role="status">{tr("Pilo está revisando el enlace de su correo.")}</p>
       </div>
     ) : changed ? (
       <div className="pc-step" ref={setBody}>
-        <h2 tabIndex={-1}>Contraseña cambiada</h2>
-        <p>Desde ahora entra a Pilo con su usuario y esta contraseña nueva.</p>
+        <h2 tabIndex={-1}>{tr("Contraseña cambiada")}</h2>
+        <p>{tr("Desde ahora entra a Pilo con su usuario y esta contraseña nueva.")}</p>
         <div className="pc-actions">
           <span />
           <Link className="pa-btn pa-btn--main" to={home} replace>
-            Conversar con Pilo
+            {tr("Conversar con Pilo")}
           </Link>
         </div>
       </div>
     ) : !hasSession ? (
       <div className="pc-step" ref={setBody}>
-        <h2 tabIndex={-1}>El enlace venció</h2>
-        <p>El enlace para cambiar la contraseña sirve una sola vez y por poco tiempo. Pida otro correo y ábralo en este mismo dispositivo.</p>
+        <h2 tabIndex={-1}>{tr("El enlace venció")}</h2>
+        <p>{tr("El enlace para cambiar la contraseña sirve una sola vez y por poco tiempo. Pida otro correo y ábralo en este mismo dispositivo.")}</p>
         <div className="pc-actions">
           <button type="button" className="pc-quiet" onClick={() => goMode("ingreso")}>
-            Volver a entrar
+            {tr("Volver a entrar")}
           </button>
           <button type="button" className="pa-btn pa-btn--main" onClick={() => goMode("olvide")}>
-            Pedir otro correo
+            {tr("Pedir otro correo")}
           </button>
         </div>
       </div>
     ) : (
       <form className="pc-step" noValidate ref={setBody} onSubmit={changePassword}>
-        <h2 tabIndex={-1}>Su contraseña nueva</h2>
-        <p>Distinta de la de su correo y de la de Moodle.</p>
+        <h2 tabIndex={-1}>{tr("Su contraseña nueva")}</h2>
+        <p>{tr("Distinta de la de su correo y de la de Moodle.")}</p>
         <input className="pa-sr" type="text" autoComplete="username" value={account?.username ?? ""} readOnly tabIndex={-1} aria-hidden="true" />
-        <Field id="pc-nueva" label="Contraseña nueva" error={passError || null}>
+        <Field id="pc-nueva" label={tr("Contraseña nueva")} error={passError || null}>
           {(aria) => (
             <div className="pc-pass">
               <input
@@ -1163,7 +1165,7 @@ export function AccountGate({ voice, voiceOn, onVoice, theme, onTheme, account, 
                 }}
               />
               <button type="button" className="pc-reveal" aria-pressed={reveal} onClick={() => setReveal(!reveal)}>
-                {reveal ? "Ocultar" : "Mostrar"}
+                {reveal ? tr("Ocultar") : tr("Mostrar")}
               </button>
             </div>
           )}
@@ -1172,7 +1174,7 @@ export function AccountGate({ voice, voiceOn, onVoice, theme, onTheme, account, 
         <div className="pc-actions">
           <span />
           <button type="submit" className="pa-btn pa-btn--main" disabled={busy}>
-            {busy ? "Guardando…" : "Guardar la contraseña"}
+            {busy ? tr("Guardando…") : tr("Guardar la contraseña")}
           </button>
         </div>
       </form>
@@ -1181,37 +1183,37 @@ export function AccountGate({ voice, voiceOn, onVoice, theme, onTheme, account, 
     // «confirmada»: mientras se lee la cuenta, y cuando ya se sabe que entró.
     form = (
       <div className="pc-step" ref={setBody}>
-        <h2 tabIndex={-1}>{account ? "Cuenta confirmada" : "Un momento…"}</h2>
+        <h2 tabIndex={-1}>{account ? tr("Cuenta confirmada") : tr("Un momento…")}</h2>
         {account ? (
           <>
-            <p>Ya puede entrar con su usuario en cualquier dispositivo. Pilo le responde a su medida y guarda lo que usted le pida guardar.</p>
+            <p>{tr("Ya puede entrar con su usuario en cualquier dispositivo. Pilo le responde a su medida y guarda lo que usted le pida guardar.")}</p>
             <dl className="pc-rows">
               <div>
-                <dt>Usuario</dt>
+                <dt>{tr("Usuario")}</dt>
                 <dd>
                   <code>{account.username}</code>
                 </dd>
               </div>
               <div>
-                <dt>Perfil</dt>
+                <dt>{tr("Perfil")}</dt>
                 <dd>{rolLabel(account.rol)}</dd>
               </div>
               <div>
-                <dt>Sede</dt>
-                <dd>{campusLabel(account.campus) || "Sin sede"}</dd>
+                <dt>{tr("Sede")}</dt>
+                <dd>{campusLabel(account.campus) || tr("Sin sede")}</dd>
               </div>
             </dl>
             <div className="pc-actions">
               <Link className="pc-quiet" to={APP_PROFILE} replace>
-                Ver mi perfil
+                {tr("Ver mi perfil")}
               </Link>
               <Link className="pa-btn pa-btn--main" to={home} replace>
-                Conversar con Pilo
+                {tr("Conversar con Pilo")}
               </Link>
             </div>
           </>
         ) : (
-          <p role="status">Pilo está revisando su cuenta.</p>
+          <p role="status">{tr("Pilo está revisando su cuenta.")}</p>
         )}
       </div>
     );
@@ -1233,15 +1235,16 @@ export function AccountGate({ voice, voiceOn, onVoice, theme, onTheme, account, 
           {required && !account && !intranetName ? (
             <span />
           ) : (
-            <Link className="pa-sbtn" to={home} replace aria-label="Volver a conversar con Pilo">
+            <Link className="pa-sbtn" to={home} replace aria-label={tr("Volver a conversar con Pilo")}>
               {Icon.back}
-              Volver
+              {tr("Volver")}
             </Link>
           )}
           <div className="pa-w-brand">
             <b>Mr. Pilo</b>
-            Universidad de Santander
+            {tr("Universidad de Santander")}
           </div>
+          <LangSwitch className="pa-lang" />
           <button
             type="button"
             className="pa-sbtn pa-sbtn--icon"

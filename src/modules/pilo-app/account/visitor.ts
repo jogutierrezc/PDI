@@ -14,6 +14,7 @@ import { readStored, storageKey, writeStored } from "../../pregunta/store";
 import { APP_PREFIX } from "../themes";
 import { isTone } from "./rules";
 import type { Tone } from "./rules";
+import { tr } from "../../../components/pilo/i18n";
 
 export interface Visitor {
   nick: string;
@@ -26,8 +27,8 @@ const NICK = /^[\p{L}][\p{L} .'-]{0,29}$/u;
 export function visitorNickProblem(raw: string): string {
   const nick = raw.replace(/\s+/g, " ").trim();
   if (!nick) return "";
-  if (nick.length > 30) return "Hasta 30 letras: su nombre o uno abreviado.";
-  if (!NICK.test(nick)) return "Solo letras, espacios, punto, apóstrofo o guion.";
+  if (nick.length > 30) return tr("Hasta 30 letras: su nombre o uno abreviado.");
+  if (!NICK.test(nick)) return tr("Solo letras, espacios, punto, apóstrofo o guion.");
   return "";
 }
 

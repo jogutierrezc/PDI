@@ -19,6 +19,7 @@
 import type { Fn, Portal, Rol, SpaceId, SpacePortal } from "../../components/pilo/ai/logic";
 import type { SpaceConfig } from "../../components/pilo/ai/config";
 import type { MojiMood } from "../../components/pilo/PiloMoji";
+import { tr } from "../../components/pilo/i18n";
 
 export type { Rol, SpaceId };
 
@@ -318,7 +319,7 @@ export function roleView(
   const expression = set?.expression || fixed?.expression;
   const mood = set?.mood || fixed?.mood;
   return {
-    suggestions: own.length ? own.map((q) => ({ q, hint: HINT[asked] })) : (profile.roleSuggestions[asked] ?? profile.suggestions),
+    suggestions: own.length ? own.map((q) => ({ q, hint: tr(HINT[asked]) })) : (profile.roleSuggestions[asked] ?? profile.suggestions),
     ...(expression ? { expression } : {}),
     ...(mood ? { mood } : {}),
   };

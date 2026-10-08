@@ -14,6 +14,7 @@ import { supabase } from "../../../lib/supabase";
 import type { AskSource } from "../../../components/pilo/ai/client";
 import { isAskSpace } from "../../pregunta/space";
 import type { SpaceId } from "../../pregunta/space";
+import { tr } from "../../../components/pilo/i18n";
 
 export interface SavedSource {
   n: number;
@@ -103,13 +104,13 @@ export function savedWhen(iso: string, now: number = Date.now()): string {
     return new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
   };
   const days = Math.round((start(now) - start(at)) / DAY);
-  if (days <= 0) return "guardada hoy";
-  if (days === 1) return "guardada ayer";
-  if (days < 7) return `guardada hace ${days} días`;
+  if (days <= 0) return tr("guardada hoy");
+  if (days === 1) return tr("guardada ayer");
+  if (days < 7) return tr("guardada hace {days} días", { days });
   const d = new Date(at);
   const month = ["enero", "febrero", "marzo", "abril", "mayo", "junio", "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre"][d.getMonth()];
-  const year = d.getFullYear() === new Date(now).getFullYear() ? "" : ` de ${d.getFullYear()}`;
-  return `guardada el ${d.getDate()} de ${month}${year}`;
+  const year = d.getFullYear() === new Date(now).getFullYear() ? "" : tr(" de {v0}", { v0: d.getFullYear() });
+  return tr("guardada el {v0} de {month}{year}", { v0: d.getDate(), month, year });
 }
 
 /** La línea de debajo de cada guardada: «Enseñanza · guardada ayer · con 2 fuentes». */
@@ -127,9 +128,9 @@ export function savedCopyText(item: Pick<SavedAnswer, "question" | "sources">, p
 /** Lo que dice la base al fallar un guardado, en palabras de la persona. */
 export function saveProblem(message: string | null | undefined): string {
   const m = message ?? "";
-  if (/300 respuestas/i.test(m)) return "Ya tiene 300 respuestas guardadas: quite alguna para guardar otra.";
-  if (/pilo_user_saved|does not exist|schema cache/i.test(m)) return "Guardar respuestas todavía no está disponible.";
-  return "No se pudo guardar la respuesta. Intente de nuevo.";
+  if (/300 respuestas/i.test(m)) return tr("Ya tiene 300 respuestas guardadas: quite alguna para guardar otra.");
+  if (/pilo_user_saved|does not exist|schema cache/i.test(m)) return tr("Guardar respuestas todavía no está disponible.");
+  return tr("No se pudo guardar la respuesta. Intente de nuevo.");
 }
 
 /* --- La base ----------------------------------------------------------------------------------- */
@@ -151,7 +152,7 @@ export async function saveAnswer(draft: SavedDraft): Promise<SavedAnswer> {
 
 export async function removeSavedAnswer(id: number): Promise<void> {
   const { error } = await supabase.from("pilo_user_saved").delete().eq("id", id);
-  if (error) throw new Error("No se pudo quitar la respuesta. Intente de nuevo.");
+  if (error) throw new Error(tr("No se pudo quitar la respuesta. Intente de nuevo."));
 }
 
 /** Las guardadas de la cuenta; sin cuenta activa no se pide nada. */

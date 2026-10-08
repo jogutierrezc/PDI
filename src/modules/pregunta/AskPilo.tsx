@@ -61,6 +61,7 @@ import { CatalogModal } from "../admin/pilo/CatalogModal";
 import type { CatalogMood } from "../admin/pilo/catalog-sheet";
 import { enrichSpokenSentences } from "../../components/pilo/ai/voice-expressions";
 import "./ask-pilo.css";
+import { tr, trn, useLang, localizeDeep, LangSwitch } from "../../components/pilo/i18n";
 
 const reduced = () => typeof window !== "undefined" && window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
 
@@ -146,7 +147,8 @@ const I = {
 /* --- La página: quién entra --------------------------------------------------------------- */
 
 export function AskPilo({ space = "planeacion" }: { space?: SpaceId }) {
-  const here = ASK_SPACES[space] ?? ASK_SPACES.planeacion;
+  useLang();
+  const here = localizeDeep(ASK_SPACES[space] ?? ASK_SPACES.planeacion);
   const usual = here.id === "planeacion";
   const config = usePiloAiConfig();
   const { profile, loading } = useAuth();
@@ -167,7 +169,7 @@ export function AskPilo({ space = "planeacion" }: { space?: SpaceId }) {
       <div className="ap" data-tema={tema} data-espacio={here.accent ?? undefined}>
         <div className="ap-gate" role="status">
           <PiloMoji size={96} mood="atento" alive />
-          <p>Despertando a Pilo…</p>
+          <p>{tr("Despertando a Pilo…")}</p>
         </div>
       </div>
     );
@@ -185,7 +187,7 @@ export function AskPilo({ space = "planeacion" }: { space?: SpaceId }) {
       <div className="ap" data-tema={tema} data-espacio={here.accent ?? undefined}>
         <div className="ap-gate">
           <PiloMoji size={120} mood={needsLogin ? "atento" : "duda"} track alive />
-          <h1>{needsLogin ? "Pilo lo espera adentro" : "Pilo está descansando"}</h1>
+          <h1>{needsLogin ? tr("Pilo lo espera adentro") : tr("Pilo está descansando")}</h1>
           <p>
             {needsLogin
               ? here.gate.login
@@ -199,7 +201,7 @@ export function AskPilo({ space = "planeacion" }: { space?: SpaceId }) {
           </p>
           {needsLogin ? (
             <Link to="/acceso-intranet" state={{ from: location.pathname }}>
-              Iniciar sesión
+              {tr("Iniciar sesión")}
             </Link>
           ) : (
             <Link to={here.gateFallback.to}>{here.gateFallback.label}</Link>
@@ -260,6 +262,7 @@ interface ChatProps {
 }
 
 function Chat({ space, cfg, tema, setTema, role, audience, welcome, voice: baseVoice }: ChatProps) {
+  useLang();
   const prefix = space.storagePrefix;
   const usual = space.id === "planeacion";
   const [convs, setConvs] = useConversations(prefix);
@@ -374,7 +377,7 @@ function Chat({ space, cfg, tema, setTema, role, audience, welcome, voice: baseV
     patchTurn(r.convId, r.turnId, settle(r));
     setLive(null);
     setBusy(false);
-    setStatus(r.text.trim() ? "Detuvo la respuesta: quedó incompleta." : "Detuvo la pregunta.");
+    setStatus(r.text.trim() ? tr("Detuvo la respuesta: quedó incompleta.") : tr("Detuvo la pregunta."));
     followUntil.current = performance.now() + 800;
     input.current?.focus({ preventScroll: true });
   };
@@ -400,7 +403,7 @@ function Chat({ space, cfg, tema, setTema, role, audience, welcome, voice: baseV
     });
     setCurrentId(convId);
     if (said) setFresh((f) => new Map(f).set(turn.id, "entera"));
-    setStatus(said ? `Pilo respondió: ${said.text}` : `Pilo entra al modo ${SUPER[mode].name}.`);
+    setStatus(said ? tr("Pilo respondió: {text}", { text: said.text }) : tr("Pilo entra al modo {name}.", { name: SUPER[mode].name }));
     toBottom();
     return { convId, turnId: turn.id };
   };
@@ -437,7 +440,7 @@ function Chat({ space, cfg, tema, setTema, role, audience, welcome, voice: baseV
     setModo(e.mode);
     patchTurn(e.convId, e.turnId, { answer: superAnswer(e.said) });
     setFresh((f) => new Map(f).set(e.turnId, "entera"));
-    setStatus(`Pilo respondió: ${e.said.text}`);
+    setStatus(tr("Pilo respondió: {text}", { text: e.said.text }));
     superSfx(autoRead).clank();
     followUntil.current = performance.now() + 800;
     // La cara llega con su equipo puesto y un rebote corto.
@@ -480,7 +483,7 @@ function Chat({ space, cfg, tema, setTema, role, audience, welcome, voice: baseV
     const show = () => setLive({ turnId: mine.turnId, text: mine.text, meta: mine.meta, steps: mine.steps, thinking: mine.thinking, startedAt: mine.startedAt, thoughtMs: mine.thoughtMs });
     show();
     setBusy(true);
-    setStatus("Pilo está pensando.");
+    setStatus(tr("Pilo está pensando."));
     toBottom();
     try {
       const handlers: AskHandlers = {
@@ -517,13 +520,13 @@ function Chat({ space, cfg, tema, setTema, role, audience, welcome, voice: baseV
       // «Pensó durante»: hasta la primera frase; si llegó entera, el total que dice el servidor.
       const thoughtFor = mine.thoughtMs !== null || typeof total !== "number" ? seconds(mine) : total;
       patchTurn(conv.id, turn.id, { answer: rest, think: compactThink(kept, mine.thinking, thoughtFor) });
-      setStatus(`Pilo respondió: ${toPlain(parseAnswer(answer.text))}`);
+      setStatus(tr("Pilo respondió: {v0}", { v0: toPlain(parseAnswer(answer.text)) }));
     } catch (e) {
       // Cortado por «Detener» o por otra pregunta: ya quedó resuelto.
       if (run.current !== mine) return;
-      const message = (e instanceof PiloError && e.code === "cancelado" ? "" : (e as Error).message) || "No pude hablar con Pilo ahora.";
+      const message = (e instanceof PiloError && e.code === "cancelado" ? "" : (e as Error).message) || tr("No pude hablar con Pilo ahora.");
       patchTurn(conv.id, turn.id, settle(mine, message));
-      setStatus(mine.text.trim() ? "La respuesta quedó incompleta." : "");
+      setStatus(mine.text.trim() ? tr("La respuesta quedó incompleta.") : "");
     } finally {
       if (run.current === mine) {
         run.current = null;
@@ -621,16 +624,16 @@ function Chat({ space, cfg, tema, setTema, role, audience, welcome, voice: baseV
             <div className="ap-side__name">{name}</div>
             <div className="ap-side__sub">{space.sub}</div>
           </div>
-          <button type="button" className="ap-side__close" onClick={() => setSideOpen(false)} aria-label="Cerrar el menú">
+          <button type="button" className="ap-side__close" onClick={() => setSideOpen(false)} aria-label={tr("Cerrar el menú")}>
             {I.close}
           </button>
         </div>
         <button type="button" className="ap-new" onClick={startNew}>
-          {I.plus}Nueva conversación
+          {I.plus}{tr("Nueva conversación")}
         </button>
         <div className="ap-side__scroll">
-          <h2>Conversaciones</h2>
-          {convs.length === 0 && <p className="ap-empty-hist">Sus preguntas quedan aquí, solo en este navegador.</p>}
+          <h2>{tr("Conversaciones")}</h2>
+          {convs.length === 0 && <p className="ap-empty-hist">{tr("Sus preguntas quedan aquí, solo en este navegador.")}</p>}
           {convs.map((c) => (
             <div key={c.id} className="ap-hist" aria-current={c.id === currentId}>
               <button
@@ -644,12 +647,12 @@ function Chat({ space, cfg, tema, setTema, role, audience, welcome, voice: baseV
               >
                 {c.title}
               </button>
-              <button type="button" className="ap-hist__del" onClick={() => remove(c.id)} aria-label={`Borrar la conversación «${c.title}»`}>
+              <button type="button" className="ap-hist__del" onClick={() => remove(c.id)} aria-label={tr("Borrar la conversación «{title}»", { title: c.title })}>
                 {I.trash}
               </button>
             </div>
           ))}
-          <h2>Lo que conoce Pilo</h2>
+          <h2>{tr("Lo que conoce Pilo")}</h2>
           <ul className="ap-knows">
             {known.map((s) => (
               <li key={s.id}>
@@ -657,7 +660,7 @@ function Chat({ space, cfg, tema, setTema, role, audience, welcome, voice: baseV
                   {s.code}
                 </span>
                 {s.name}
-                {s.session && <small>con sesión</small>}
+                {s.session && <small>{tr("con sesión")}</small>}
               </li>
             ))}
           </ul>
@@ -666,12 +669,12 @@ function Chat({ space, cfg, tema, setTema, role, audience, welcome, voice: baseV
           <div className="ap-access">
             {I.globe}
             <span>
-              Acceso <b>{audience === "publico" ? "público" : audience === "sesion" ? "con sesión" : "de administración"}</b>
+              {tr("Acceso")} <b>{audience === "publico" ? tr("público") : audience === "sesion" ? tr("con sesión") : tr("de administración")}</b>
             </span>
           </div>
           {welcome && (
             <button type="button" className="ap-replay" onClick={replayWelcome}>
-              {I.replay}Ver la bienvenida otra vez
+              {I.replay}{tr("Ver la bienvenida otra vez")}
             </button>
           )}
         </div>
@@ -679,26 +682,27 @@ function Chat({ space, cfg, tema, setTema, role, audience, welcome, voice: baseV
 
       <main className="ap-main">
         <header className="ap-bar" data-scrolled={scrolled || undefined}>
-          <button type="button" className="ap-bar__menu" onClick={() => setSideOpen(true)} aria-label="Abrir el menú">
+          <button type="button" className="ap-bar__menu" onClick={() => setSideOpen(true)} aria-label={tr("Abrir el menú")}>
             {I.menu}
           </button>
           <div className="ap-crumb">
             <span>
               <Link to={space.crumb.to}>{space.crumb.label}</Link> ›{" "}
             </span>
-            <b>{current?.title ?? "Nueva conversación"}</b>
+            <b>{current?.title ?? tr("Nueva conversación")}</b>
           </div>
-          {modo && <span className="ap-modo">Modo {SUPER[modo].name}</span>}
-          <button type="button" className="ap-readall" aria-pressed={autoRead} onClick={toggleAutoRead} title="Leer en voz alta cada respuesta nueva">
+          {modo && <span className="ap-modo">{tr("Modo")} {SUPER[modo].name}</span>}
+          <button type="button" className="ap-readall" aria-pressed={autoRead} onClick={toggleAutoRead} title={tr("Leer en voz alta cada respuesta nueva")}>
             {I.speak}
-            <span>Leer en voz alta</span>
+            <span>{tr("Leer en voz alta")}</span>
           </button>
           {askRol && <RoleMenu value={rol} onPick={pickRol} />}
-          <div className="ap-temas" role="group" aria-label="Tema de color">
+          <LangSwitch className="ap-lang" />
+          <div className="ap-temas" role="group" aria-label={tr("Tema de color")}>
             {TEMAS.map((t) => (
-              <button key={t.id} type="button" aria-pressed={tema === t.id} onClick={() => setTema(t.id)} title={t.label}>
+              <button key={t.id} type="button" aria-pressed={tema === t.id} onClick={() => setTema(t.id)} title={tr(t.label)}>
                 {I[t.id]}
-                <span>{t.label}</span>
+                <span>{tr(t.label)}</span>
               </button>
             ))}
           </div>
@@ -758,7 +762,7 @@ function Chat({ space, cfg, tema, setTema, role, audience, welcome, voice: baseV
           <form className="ap-composer" onSubmit={submit}>
             {extras.files && <AttachButton onPick={attach.pick} disabled={Boolean(attach.reading)} />}
             <label htmlFor="ap-q" className="ap-sr">
-              Su pregunta para Pilo
+              {tr("Su pregunta para Pilo")}
             </label>
             <textarea
               id="ap-q"
@@ -777,11 +781,11 @@ function Chat({ space, cfg, tema, setTema, role, audience, welcome, voice: baseV
               }}
             />
             {busy && !draft.trim() ? (
-              <button key="stop" type="button" className="ap-send" data-stop="" onClick={stop} aria-label="Detener la respuesta" title="Detener la respuesta">
+              <button key="stop" type="button" className="ap-send" data-stop="" onClick={stop} aria-label={tr("Detener la respuesta")} title={tr("Detener la respuesta")}>
                 {I.stop}
               </button>
             ) : (
-              <button key="send" type="submit" className="ap-send" disabled={!draft.trim()} aria-label={busy ? "Detener y preguntar esto" : "Preguntar"}>
+              <button key="send" type="submit" className="ap-send" disabled={!draft.trim()} aria-label={busy ? tr("Detener y preguntar esto") : tr("Preguntar")}>
                 {I.send}
               </button>
             )}
@@ -877,7 +881,7 @@ function Hello({
         </div>
         <h1>{space.hello.h1}</h1>
         <p>{space.hello.p}</p>
-        {onRol && <RolePicker variant="page" value={rol} onPick={onRol} legend={ROLE_QUESTION} />}
+        {onRol && <RolePicker variant="page" value={rol} onPick={onRol} legend={tr(ROLE_QUESTION)} />}
       </section>
       <div className="ap-sugs" ref={sugs}>
         {suggestions.map((s) => (
@@ -930,6 +934,7 @@ const ms = (n: number) => (n >= 1000 ? `${(n / 1000).toFixed(1).replace(".", ","
  * alturas; los pasos nuevos entran con un escalón corto.
  */
 function ThinkBody({ id, open, steps, thinking, trail, working }: { id: string; open: boolean; steps: ThinkStep[]; thinking: string; trail: AskStep[]; working: boolean }) {
+  useLang();
   const root = useRef<HTMLDivElement>(null);
   const seen = useRef(0);
   const wasOpen = useRef(open);
@@ -961,9 +966,9 @@ function ThinkBody({ id, open, steps, thinking, trail, working }: { id: string; 
                     {active ? <i className="ap-pulse" /> : I.check}
                   </span>
                   <span>
-                    <b>{s.label}</b>
+                    <b>{tr(s.label)}</b>
                     {s.detail ? ` · ${s.detail}` : ""}
-                    <span className="ap-sr">{active ? " (en curso)" : " (listo)"}</span>
+                    <span className="ap-sr">{active ? tr(" (en curso)") : tr(" (listo)")}</span>
                   </span>
                 </li>
               );
@@ -1023,6 +1028,7 @@ function TurnView({
   isAdmin?: boolean;
   onCatalog?: () => void;
 }) {
+  useLang();
   const space = useContext(SpaceContext);
   const [how, setHow] = useState(false);
   const [map, setMap] = useState<boolean | null>(null);
@@ -1191,7 +1197,7 @@ function TurnView({
   const modeBadge: Badge | null = turn.local && isSuperMode(turn.modo) ? { text: `Modo ${SUPER[turn.modo].name}`, tone: "general", icon: null } : null;
   const badge = a ? (modeBadge ?? badgeOf(a, incomplete)) : null;
   const notes = a && !incomplete && !turn.local ? notesOf(a) : [];
-  const headline = working ? waitingLine({ steps, meta: stream?.meta ?? null, seconds: elapsed }) : thought !== null ? `Pensó durante ${secondsText(thought)}` : "Cómo respondí";
+  const headline = working ? waitingLine({ steps, meta: stream?.meta ?? null, seconds: elapsed }) : thought !== null ? tr("Pensó durante {v0}", { v0: secondsText(thought) }) : tr("Cómo respondí");
   // Aparte del titular: un consejo que va cambiando, para que la espera no desespere.
   const tip = working ? waitingTip(elapsed, seedOf(turn.id)) : null;
   const head = (
@@ -1213,7 +1219,7 @@ function TurnView({
       <div className="ap-q">
         {turn.file && (
           <span className="px-asked">
-            <FileChip name={turn.file.name} detail={`${turn.file.total} ${turn.file.total === 1 ? "pasaje" : "pasajes"} · leído en su dispositivo`} />
+            <FileChip name={turn.file.name} detail={trn(turn.file.total, tr("{n} pasaje · leído en su dispositivo"), tr("{n} pasajes · leído en su dispositivo"))} />
           </span>
         )}
         {turn.q}
@@ -1227,7 +1233,7 @@ function TurnView({
             <div className="ap-error" role="alert">
               <span>{turn.error}</span>
               <button type="button" onClick={onRetry}>
-                Preguntar de nuevo
+                {tr("Preguntar de nuevo")}
               </button>
             </div>
           )}
@@ -1243,7 +1249,7 @@ function TurnView({
                 {a && !incomplete && a.kind === "ia" && a.verified === false && (
                   <span className="ap-badge" data-tone="aviso">
                     {I.alert}
-                    Revise las cifras
+                    {tr("Revise las cifras")}
                   </span>
                 )}
                 {hasHow ? (
@@ -1256,7 +1262,7 @@ function TurnView({
                 ) : null}
                 {a?.graph && a.graph.nodes.length > 1 && (
                   <button type="button" className="ap-trail-btn" aria-expanded={map ?? a.kind === "malla"} onClick={() => setMap(!(map ?? a.kind === "malla"))}>
-                    Ver en el mapa {I.chev}
+                    {tr("Ver en el mapa")} {I.chev}
                   </button>
                 )}
               </div>
@@ -1277,18 +1283,18 @@ function TurnView({
               ))}
               {a && incomplete && (
                 <div className="ap-cut">
-                  <span>{turn.error ? `${turn.error} Lo que alcanzó a escribir quedó incompleto.` : "Detuvo la respuesta: lo escrito quedó incompleto."}</span>
+                  <span>{turn.error ? tr("{error} Lo que alcanzó a escribir quedó incompleto.", { error: turn.error }) : tr("Detuvo la respuesta: lo escrito quedó incompleto.")}</span>
                   <button type="button" onClick={onRetry}>
-                    Preguntar de nuevo
+                    {tr("Preguntar de nuevo")}
                   </button>
                 </div>
               )}
               {a && !typing && (
                 <div className="ap-after" ref={after}>
                   {a.graph && a.graph.nodes.length > 1 && (map ?? a.kind === "malla") && <MeshAnswer graph={a.graph} animate={live} />}
-                  {a.unknown && a.unknown.length > 0 && <p className="ap-warn">Revise estos números antes de citarlos: no los encontré en las fuentes ({a.unknown.join(", ")}).</p>}
+                  {a.unknown && a.unknown.length > 0 && <p className="ap-warn">{tr("Revise estos números antes de citarlos: no los encontré en las fuentes ({numbers}).", { numbers: a.unknown.join(", ") })}</p>}
                   {showsSources(a) && (
-                    <div className="ap-srcs" aria-label="Fuentes">
+                    <div className="ap-srcs" aria-label={tr("Fuentes")}>
                       {a.sources.map((s) => {
                         // Lo que viene de otro ámbito lo dice junto a la cita, con texto y glifo (no solo con color).
                         const origin = originOf(s);
@@ -1312,26 +1318,26 @@ function TurnView({
                     </div>
                   )}
                   <div className="ap-acts">
-                    <button type="button" className="ap-ic" onClick={() => void read()} aria-pressed={reading !== null} aria-label={reading !== null ? "Dejar de leer" : "Escuchar la respuesta"}>
+                    <button type="button" className="ap-ic" onClick={() => void read()} aria-pressed={reading !== null} aria-label={reading !== null ? tr("Dejar de leer") : tr("Escuchar la respuesta")}>
                       {reading !== null ? I.stop : I.speak}
-                      {reading !== null && <span>Leyendo</span>}
+                      {reading !== null && <span>{tr("Leyendo")}</span>}
                     </button>
-                    <button type="button" className="ap-ic" onClick={copy} aria-label={copied ? "Copiada" : "Copiar la respuesta con sus fuentes"}>
+                    <button type="button" className="ap-ic" onClick={copy} aria-label={copied ? tr("Copiada") : tr("Copiar la respuesta con sus fuentes")}>
                       {I.copy}
-                      {copied && <span>Copiada</span>}
+                      {copied && <span>{tr("Copiada")}</span>}
                     </button>
                     {isAdmin && onCatalog && !incomplete && !turn.local && (
-                      <button type="button" className="ap-ic" onClick={onCatalog} aria-label="Agregar al catálogo de respuestas oficiales de Pilo" title="Agregar al catálogo oficial de Pilo">
+                      <button type="button" className="ap-ic" onClick={onCatalog} aria-label={tr("Agregar al catálogo de respuestas oficiales de Pilo")} title={tr("Agregar al catálogo oficial de Pilo")}>
                         {I.catalog}
-                        <span>Al catálogo</span>
+                        <span>{tr("Al catálogo")}</span>
                       </button>
                     )}
                     {a.kind !== "regla" && !incomplete && !turn.local && (
                       <>
-                        <button type="button" className="ap-ic" aria-pressed={turn.vote === "up"} onClick={() => onVote("up")} aria-label="Me sirvió">
+                        <button type="button" className="ap-ic" aria-pressed={turn.vote === "up"} onClick={() => onVote("up")} aria-label={tr("Me sirvió")}>
                           {I.up}
                         </button>
-                        <button type="button" className="ap-ic" aria-pressed={turn.vote === "down"} onClick={() => onVote("down")} aria-label="No me sirvió">
+                        <button type="button" className="ap-ic" aria-pressed={turn.vote === "down"} onClick={() => onVote("down")} aria-label={tr("No me sirvió")}>
                           <span style={{ display: "inline-flex", transform: "scaleY(-1)" }}>{I.up}</span>
                         </button>
                       </>
@@ -1374,6 +1380,7 @@ function highlight(text: string, question: string): ReactNode[] {
 }
 
 function SourceDrawer({ source, onClose }: { source: OpenSource | null; onClose: () => void }) {
+  useLang();
   const space = useContext(SpaceContext);
   const closeBtn = useRef<HTMLButtonElement>(null);
   const [shown, setShown] = useState(source);
@@ -1397,11 +1404,11 @@ function SourceDrawer({ source, onClose }: { source: OpenSource | null; onClose:
   const external = s ? /^https?:/i.test(s.path) : false;
 
   return (
-    <aside className="ap-drawer" data-open={source ? "" : undefined} aria-hidden={!source} aria-label="Fuente">
+    <aside className="ap-drawer" data-open={source ? "" : undefined} aria-hidden={!source} aria-label={tr("Fuente")}>
       <div className="ap-drawer__head">
         {s && <span className="ap-src__n">{s.n}</span>}
-        <h2>Fuente</h2>
-        <button ref={closeBtn} type="button" className="ap-x" onClick={close} aria-label="Cerrar la fuente">
+        <h2>{tr("Fuente")}</h2>
+        <button ref={closeBtn} type="button" className="ap-x" onClick={close} aria-label={tr("Cerrar la fuente")}>
           {I.close}
         </button>
       </div>
@@ -1421,7 +1428,7 @@ function SourceDrawer({ source, onClose }: { source: OpenSource | null; onClose:
               <b>{s.office || space.office}</b>
               {s.cut && (
                 <div className="ap-ticket__row">
-                  <span className="ap-ticket__cut">CORTE {s.cut.toUpperCase()}</span>
+                  <span className="ap-ticket__cut">{tr("CORTE")} {s.cut.toUpperCase()}</span>
                 </div>
               )}
             </div>
@@ -1429,11 +1436,11 @@ function SourceDrawer({ source, onClose }: { source: OpenSource | null; onClose:
           {s.path &&
             (external ? (
               <a className="ap-open" href={s.path} target="_blank" rel="noopener noreferrer">
-                Abrir el documento {I.ext}
+                {tr("Abrir el documento")} {I.ext}
               </a>
             ) : (
               <Link className="ap-open" to={s.path}>
-                Abrir en {nameOf(space, s.source)} {I.ext}
+                {tr("Abrir en")} {nameOf(space, s.source)} {I.ext}
               </Link>
             ))}
         </div>

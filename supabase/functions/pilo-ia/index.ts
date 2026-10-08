@@ -2388,6 +2388,36 @@ const ASK_PERSONA = [
   "Hablas en español de Colombia, en masculino y de usted, con frases cortas, claras y cercanas, sin tecnicismos.",
 ].join(" ");
 
+/* --- El idioma de la respuesta ------------------------------------------------------------
+   Mr. Pilo piensa y guarda todo en español de Colombia. Quien lo prefiere en inglés o en
+   portugués lo pide desde la pantalla (`lang`): lo que cambia es el idioma en que se redacta
+   la respuesta y el de las negativas fijas. Las cifras, las citas [n] y los nombres propios
+   no cambian. Sin `lang`, o con «es», el pedido es el de siempre, letra por letra. */
+export type Lang = "es" | "en" | "pt";
+export const parseLang = (value: unknown): Lang => (value === "en" || value === "pt" ? value : "es");
+
+const LANG_RULE: Record<Exclude<Lang, "es">, string> = {
+  en: "IDIOMA DE LA RESPUESTA (manda sobre cualquier otra mención del idioma en estas instrucciones, incluidas «en español» y «de usted»): la persona usa Mr. Pilo en inglés. Responde SIEMPRE en inglés claro y cercano, sin tecnicismos, tratando a la persona de «you». Los bloques de datos están en español: tradúcelos al responder sin cambiar ninguna cifra, fecha, sigla ni número de fuente [n]. Deja en español, tal como se escriben en la universidad, los nombres propios (programas, sedes, oficinas, documentos oficiales y siglas como UDES, PDI, SNIES); la primera vez puedes añadir entre paréntesis una explicación breve en inglés. No presentes tu traducción como traducción oficial.",
+  pt: "IDIOMA DA RESPOSTA (manda sobre qualquer outra menção ao idioma nestas instruções, incluídas «em espanhol» e «de usted»): a pessoa usa o Mr. Pilo em português. Responde SEMPRE em português do Brasil claro e próximo, sem tecnicismos, tratando a pessoa por «você». Os blocos de dados estão em espanhol: traduza-os ao responder sem mudar nenhuma cifra, data, sigla nem número de fonte [n]. Deixa em espanhol, como se escrevem na universidade, os nomes próprios (programas, sedes, escritórios, documentos oficiais e siglas como UDES, PDI, SNIES); na primeira vez pode acrescentar entre parênteses uma explicação breve em português. Não apresentes a tua tradução como tradução oficial.",
+};
+
+/** La regla del idioma, o nada si es español. */
+export const languageRule = (lang?: Lang | null): string => (lang === "en" || lang === "pt" ? LANG_RULE[lang] : "");
+
+/** Las negativas fijas (dinero y datos de personas), en cada idioma. En español salen de RULE_TEXT. */
+const VETO_TEXT: Record<Exclude<Lang, "es">, Record<"dinero" | "personas", string>> = {
+  en: {
+    dinero: "I can't give you that figure: budget and money values are not published in the university's open portals, so they are not part of what I know. I can tell you how the pillars, projects and indicators are progressing.",
+    personas: "I don't share personal data: no names with grades, documents or contacts. I can give you aggregated figures by program, campus or period.",
+  },
+  pt: {
+    dinero: "Não posso lhe dar essa cifra: os valores de orçamento e dinheiro não são publicados nos portais abertos da universidade, então não fazem parte do que eu conheço. Posso contar como avançam os pilares, os projetos e os indicadores.",
+    personas: "Não compartilho dados de pessoas: nem nomes com notas, nem documentos, nem contatos. Posso lhe dar cifras agregadas, por programa, campus ou período.",
+  },
+};
+
+export const vetoText = (veto: "dinero" | "personas", lang: Lang, fallback: string): string => (lang === "es" ? fallback : VETO_TEXT[lang][veto]);
+
 const askRules = (official: string) => [
   "Cómo respondes:",
   "1. Responde siempre la pregunta concreta, en español: de 2 a 6 frases o una lista corta. Puedes usar Markdown básico (negritas y listas cortas); sin títulos, sin tablas y sin JSON.",
@@ -2943,6 +2973,8 @@ export interface AskPrompt {
   tone?: string;
   /** El modo secreto que la persona activó en el chat. Sin él, el pedido es el de siempre. */
   modo?: Modo;
+  /** El idioma en que la persona usa a Pilo. Sin él, o «es», el pedido es el de siempre. */
+  lang?: Lang;
   /** El archivo que la persona adjuntó (0119). Sin él, el pedido es el de siempre. */
   doc?: AskDoc;
   /** La página que la persona está viendo, en otro portal (0127). */
@@ -2972,6 +3004,7 @@ export function buildAskMessages(plan: AskPlan, prompt: AskPrompt): ChatMessage[
     prompt.space ? spacePersona(prompt.space) : ASK_PERSONA,
     prompt.space ? askRules("de la universidad") : ASK_RULES,
     plan.facts ? ASK_FIGURES_RULE : "",
+    languageRule(prompt.lang),
     // Solo si alguna fuente es de otro ámbito (0122): sin lectura de visita, el pedido es el de siempre.
     visitRule(plan.sources),
     roleInstruction(prompt.rol ?? "general", prompt.tone),
@@ -7913,8 +7946,11 @@ async function handle(request: Request): Promise<Response> {
    * cuenta para el cupo del día.
    */
   async function answerWork(session: AskSession, abort: AbortController): Promise<Response> {
-    const question = String(body.question ?? "").replace(/\s+/g, " ").trim().slice(0, ASK_QUESTION_CHARS);
-    if (question.length < 2) return json({ error: "Escriba su pregunta." }, 400);
+    /** Lo que la persona escribió, en su idioma. */
+    const questionAsked = String(body.question ?? "").replace(/\s+/g, " ").trim().slice(0, ASK_QUESTION_CHARS);
+    if (questionAsked.length < 2) return json({ error: "Escriba su pregunta." }, 400);
+    /** El idioma en que la persona usa a Pilo (inglés o portugués); sin él, español y todo como siempre. */
+    const lang = parseLang(body.lang);
     // Las funciones ampliadas (0119). El archivo llega ya leído por el navegador de la
     // persona, como pasajes de texto: aquí no se guarda, ni en la base ni en la bitácora.
     const doc = cleanDoc(body.doc);
@@ -8068,6 +8104,33 @@ async function handle(request: Request): Promise<Response> {
       extrasLoading.catch(() => EXTRA_DEFAULTS),
     ]);
     if (blocked) return blocked;
+    /**
+     * La búsqueda, el enrutador y las cifras trabajan en español. Si la persona escribió en
+     * otro idioma, se traduce solo la pregunta con la que se busca (con la IA encendida): es
+     * una línea corta. El modelo recibe siempre lo que la persona escribió. Si la traducción
+     * falla o tarda, se busca con la pregunta tal cual.
+     */
+    const translateForSearch = async (text: string): Promise<string> => {
+      try {
+        const { response } = await chat(
+          [
+            { role: "system", content: "Traduces preguntas al español de Colombia para buscarlas en los documentos de una universidad. Conserva los nombres propios, las siglas, los años y las cifras. Responde SOLO con la pregunta traducida, sin comillas ni explicaciones." },
+            { role: "user", content: text },
+          ],
+          { temperature: 0, max_tokens: 160, signal: AbortSignal.timeout(6000) },
+        );
+        if (!response.ok) {
+          await response.body?.cancel();
+          return text;
+        }
+        const data = (await response.json()) as { choices?: { message?: { content?: unknown } }[] };
+        const out = String(data?.choices?.[0]?.message?.content ?? "").replace(/<think>[\s\S]*?<\/think>/g, "").replace(/\s+/g, " ").trim().replace(/^["«]|["»]$/g, "").slice(0, ASK_QUESTION_CHARS);
+        return out.length >= 2 ? out : text;
+      } catch {
+        return text;
+      }
+    };
+    const question = lang !== "es" && !aiOff ? await translateForSearch(questionAsked) : questionAsked;
     if (doc && aiOff) return json({ error: "Para analizar un archivo, Pilo necesita la IA, y ahora no está disponible.", advice: aiOff, code: "archivo_ia" }, 503);
     // Pedir código: solo se le dice algo al modelo si la pregunta lo pide, y según el permiso.
     const codeAsked = wantsCode(question);
@@ -8112,7 +8175,7 @@ async function handle(request: Request): Promise<Response> {
     }
     if (route.intent === "vetado" && route.veto) {
       step("Enrutador", "ok", route.veto === "dinero" ? "Pide cifras de dinero de la universidad: no son públicas y no se dan." : "Pide datos de personas: no se dan.");
-      return json(await settle("regla", ruleText(route.veto, space), []));
+      return json(await settle("regla", vetoText(route.veto, lang, ruleText(route.veto, space)), []));
     }
     const label: Record<string, string> = { saludo: "Es un saludo", charla: "Es conversación", institucional: "Es sobre la universidad", general: "Es de tema general" };
     step("Enrutador", "ok", `${label[intent] ?? "Pregunta"}: la responde la IA, con lo que Pilo sabe por delante.`);
@@ -8574,9 +8637,10 @@ async function handle(request: Request): Promise<Response> {
     /** El pedido. `analysis`: con la regla del análisis; sin ella y sin relaciones es, tal cual, el de siempre. */
     const messagesFor = (analysis: boolean) =>
       buildAskMessages(plan, {
-        question,
+        question: questionAsked,
         history,
         map,
+        ...(lang !== "es" ? { lang } : {}),
         hints: route.hints,
         today,
         turns: ask.turns,

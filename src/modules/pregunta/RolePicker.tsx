@@ -20,6 +20,7 @@ import gsap from "gsap";
 import { ROLE_OPTIONS, ROLE_QUESTION } from "./space";
 import type { Rol } from "./space";
 import "./role-picker.css";
+import { tr, useLang } from "../../components/pilo/i18n";
 
 const reduced = () => typeof window !== "undefined" && window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
 
@@ -37,12 +38,12 @@ export function RolePicker({
   legend?: string;
 }) {
   return (
-    <div className="ap-rolp" data-variant={variant} role="group" aria-label={ROLE_QUESTION}>
+    <div className="ap-rolp" data-variant={variant} role="group" aria-label={tr(ROLE_QUESTION)}>
       {legend && <p className="ap-rolp__q">{legend}</p>}
       <div className="ap-rolp__opts">
         {ROLE_OPTIONS.map((o) => (
           <button key={o.id} type="button" className="ap-rolp__b" data-quiet={o.id === "general" || undefined} aria-pressed={value === o.id} onClick={() => onPick(o.id)}>
-            {o.label}
+            {tr(o.label)}
           </button>
         ))}
       </div>
@@ -52,6 +53,7 @@ export function RolePicker({
 
 /** El control de la barra: dice quién pregunta y deja cambiarlo. */
 export function RoleMenu({ value, onPick }: { value: Rol | null; onPick: (rol: Rol) => void }) {
+  useLang();
   const [open, setOpen] = useState(false);
   const root = useRef<HTMLDivElement>(null);
   const button = useRef<HTMLButtonElement>(null);
@@ -94,22 +96,22 @@ export function RoleMenu({ value, onPick }: { value: Rol | null; onPick: (rol: R
         className="ap-rol__btn"
         aria-haspopup="true"
         aria-expanded={open}
-        aria-label={current ? `Quién pregunta: ${current.short}. Cambiar` : "Decir quién pregunta"}
-        title="Quién pregunta"
+        aria-label={current ? tr("Quién pregunta: {short}. Cambiar", { short: tr(current.short) }) : tr("Decir quién pregunta")}
+        title={tr("Quién pregunta")}
         onClick={() => setOpen((v) => !v)}
       >
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
           <circle cx="12" cy="8" r="3.6" />
           <path d="M5 20a7 7 0 0 1 14 0" />
         </svg>
-        <span>{current?.short ?? "¿Quién pregunta?"}</span>
+        <span>{current ? tr(current.short) : tr("¿Quién pregunta?")}</span>
       </button>
       {open && (
         <div className="ap-rol__panel" ref={panel}>
           <RolePicker
             variant="menu"
             value={value}
-            legend="Pilo adapta la respuesta a quien pregunta."
+            legend={tr("Pilo adapta la respuesta a quien pregunta.")}
             onPick={(rol) => {
               onPick(rol);
               setOpen(false);

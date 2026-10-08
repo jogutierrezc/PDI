@@ -28,6 +28,7 @@ import type { Prefs, Tone } from "./rules";
 import type { AccountState } from "./useAccount";
 import { readVisitor, visitorNick, visitorNickProblem, writeVisitor } from "./visitor";
 import { Benefits, Field, Msg, Seg, ThemePicker } from "./parts";
+import { tr, useLang } from "../../../components/pilo/i18n";
 
 const TONE_OPTIONS = TONES.map((t) => ({ id: t.id, label: t.label }));
 
@@ -45,17 +46,18 @@ export function ProfilePane({
   intranetName: string | null;
   onWelcome: () => void;
 }) {
+  useLang();
   const { account, member, pending } = state;
 
   const look = (
     <section className="pc-sheet" aria-labelledby="pc-p-tema">
       <div className="pc-sheet__in">
         <p className="pc-label" id="pc-p-tema">
-          Tema de la app
+          {tr("Tema de la app")}
         </p>
         <ThemePicker value={theme} onPick={onTheme} labelledBy="pc-p-tema" />
         <button type="button" className="pc-quiet" onClick={onWelcome}>
-          Ver la bienvenida otra vez
+          {tr("Ver la bienvenida otra vez")}
         </button>
       </div>
     </section>
@@ -64,7 +66,7 @@ export function ProfilePane({
   if (pending) {
     return (
       <p className="pc-wait" role="status">
-        Pilo está buscando su cuenta…
+        {tr("Pilo está buscando su cuenta…")}
       </p>
     );
   }
@@ -75,8 +77,8 @@ export function ProfilePane({
         {intranetName ? (
           <section className="pc-sheet">
             <div className="pc-sheet__in">
-              <p className="pc-label">Sesión de la intranet</p>
-              <p>Entró con su cuenta de la intranet ({intranetName}). Esa cuenta ya le sirve en Pilo; sus conversaciones quedan en este dispositivo.</p>
+              <p className="pc-label">{tr("Sesión de la intranet")}</p>
+              <p>{tr("Entró con su cuenta de la intranet ({name}). Esa cuenta ya le sirve en Pilo; sus conversaciones quedan en este dispositivo.", { name: intranetName })}</p>
             </div>
           </section>
         ) : (
@@ -92,12 +94,12 @@ export function ProfilePane({
       <>
         <section className="pc-sheet">
           <div className="pc-sheet__in">
-            <Msg tone="bad">Su cuenta de Pilo está suspendida. Escriba a la administración para reactivarla.</Msg>
-            <p>Mientras tanto puede conversar con Pilo sin cuenta.</p>
+            <Msg tone="bad">{tr("Su cuenta de Pilo está suspendida. Escriba a la administración para reactivarla.")}</Msg>
+            <p>{tr("Mientras tanto puede conversar con Pilo sin cuenta.")}</p>
             <div className="pc-actions">
               <span />
               <button type="button" className="pa-btn pa-btn--line" onClick={() => void state.signOut()}>
-                Cerrar sesión
+                {tr("Cerrar sesión")}
               </button>
             </div>
           </div>
@@ -113,6 +115,7 @@ export function ProfilePane({
 /* --- Con cuenta ----------------------------------------------------------------------------- */
 
 function MemberPrefs({ state }: { state: AccountState }) {
+  useLang();
   const account = state.account!;
   const card = personCard(account);
   const [prefs, setPrefs] = useState<Prefs>(() => prefsOf(account));
@@ -144,9 +147,9 @@ function MemberPrefs({ state }: { state: AccountState }) {
     try {
       const row = await state.save(prefs);
       setPrefs(prefsOf(row));
-      setResult({ tone: "ok", text: "Guardado. Pilo ya le responde así." });
+      setResult({ tone: "ok", text: tr("Guardado. Pilo ya le responde así.") });
     } catch (err) {
-      setResult({ tone: "bad", text: (err as Error).message || "No se pudieron guardar sus preferencias." });
+      setResult({ tone: "bad", text: (err as Error).message || tr("No se pudieron guardar sus preferencias.") });
     } finally {
       setSaving(false);
     }
@@ -174,27 +177,27 @@ function MemberPrefs({ state }: { state: AccountState }) {
           <section className="pc-sheet" aria-labelledby="pc-p-habla">
             <div className="pc-sheet__in">
               <h2 className="pc-h" id="pc-p-habla">
-                Cómo le habla Pilo
+                {tr("Cómo le habla Pilo")}
               </h2>
-              <Field id="pc-p-trato" label="¿Cómo le dice Pilo?" hint="Su nombre o uno abreviado.">
+              <Field id="pc-p-trato" label={tr("¿Cómo le dice Pilo?")} hint={tr("Su nombre o uno abreviado.")}>
                 {(aria) => <input {...aria} autoComplete="nickname" value={prefs.nick} maxLength={40} onChange={(e) => change({ nick: e.target.value }, true)} />}
               </Field>
               <div>
-                <p className="pc-label">Tono</p>
-                <Seg label="Tono" value={prefs.tone} options={TONE_OPTIONS} onPick={(tone) => change({ tone }, true)} />
+                <p className="pc-label">{tr("Tono")}</p>
+                <Seg label={tr("Tono")} value={prefs.tone} options={TONE_OPTIONS} onPick={(tone) => change({ tone }, true)} />
               </div>
               <div>
-                <p className="pc-label">Extensión de las respuestas</p>
-                <Seg label="Extensión de las respuestas" value={prefs.length} options={LENGTHS} onPick={(length) => change({ length }, true)} />
+                <p className="pc-label">{tr("Extensión de las respuestas")}</p>
+                <Seg label={tr("Extensión de las respuestas")} value={prefs.length} options={LENGTHS} onPick={(length) => change({ length }, true)} />
               </div>
-              <Field id="pc-p-sobre" label="Lo que Pilo debe saber de usted" hint={`Opcional. Por ejemplo: «Estudio de noche y prefiero ejemplos de programación». ${prefs.about.length} de 400.`}>
+              <Field id="pc-p-sobre" label={tr("Lo que Pilo debe saber de usted")} hint={tr("Opcional. Por ejemplo: «Estudio de noche y prefiero ejemplos de programación». {length} de 400.", { length: prefs.about.length })}>
                 {(aria) => <textarea {...aria} rows={3} value={prefs.about} maxLength={400} onChange={(e) => change({ about: e.target.value })} />}
               </Field>
               {!fixed && (
-                <Field id="pc-p-sede" label="Sede">
+                <Field id="pc-p-sede" label={tr("Sede")}>
                   {(aria) => (
                     <select {...aria} value={prefs.campus} onChange={(e) => isCampus(e.target.value) && change({ campus: e.target.value })}>
-                      {!prefs.campus && <option value="">Elija su sede</option>}
+                      {!prefs.campus && <option value="">{tr("Elija su sede")}</option>}
                       {CAMPUSES.map((c) => (
                         <option key={c.id} value={c.id}>
                           {c.label}
@@ -204,7 +207,7 @@ function MemberPrefs({ state }: { state: AccountState }) {
                   )}
                 </Field>
               )}
-              <Field id="pc-p-programa" label="Programa o dependencia" hint="Por ejemplo: Ingeniería de Software, o Bienestar Universitario.">
+              <Field id="pc-p-programa" label={tr("Programa o dependencia")} hint={tr("Por ejemplo: Ingeniería de Software, o Bienestar Universitario.")}>
                 {(aria) => <input {...aria} autoComplete="organization-title" value={prefs.program} maxLength={120} onChange={(e) => change({ program: e.target.value })} />}
               </Field>
             </div>
@@ -218,11 +221,11 @@ function MemberPrefs({ state }: { state: AccountState }) {
                   {result.text}
                 </Msg>
               ) : dirty ? (
-                <p className="pc-hint">Hay cambios sin guardar.</p>
+                <p className="pc-hint">{tr("Hay cambios sin guardar.")}</p>
               ) : null}
             </div>
             <button type="submit" className="pa-btn pa-btn--main" disabled={saving || !dirty}>
-              {saving ? "Guardando…" : "Guardar"}
+              {saving ? tr("Guardando…") : tr("Guardar")}
             </button>
           </div>
         </div>
@@ -232,7 +235,7 @@ function MemberPrefs({ state }: { state: AccountState }) {
           <section className="pc-sheet pc-sample" aria-labelledby="pc-p-muestra">
             <div className="pc-sheet__in">
               <p className="pc-label" id="pc-p-muestra">
-                Así le respondería Pilo
+                {tr("Así le respondería Pilo")}
               </p>
               <div className="pc-sample__turn">
                 <div className="pc-preview__face">
@@ -242,7 +245,7 @@ function MemberPrefs({ state }: { state: AccountState }) {
                   <span key={sample}>{sample}</span>
                 </p>
               </div>
-              <p className="pc-hint">Es una muestra: cambia con el nombre, el tono y la extensión.</p>
+              <p className="pc-hint">{tr("Es una muestra: cambia con el nombre, el tono y la extensión.")}</p>
             </div>
           </section>
 
@@ -250,38 +253,38 @@ function MemberPrefs({ state }: { state: AccountState }) {
           <section className="pc-sheet pc-account" aria-labelledby="pc-p-cuenta">
             <div className="pc-sheet__in">
               <h2 className="pc-h" id="pc-p-cuenta">
-                Su cuenta
+                {tr("Su cuenta")}
               </h2>
               <dl className="pc-facts">
                 <div>
-                  <dt>Correo</dt>
+                  <dt>{tr("Correo")}</dt>
                   <dd>
                     <span className="pc-break">{account.email}</span>{" "}
                     <span className="pc-tag" data-t="ok">
                       {Icon.check}
-                      Confirmado
+                      {tr("Confirmado")}
                     </span>
                   </dd>
                 </div>
                 <div>
-                  <dt>Perfil</dt>
+                  <dt>{tr("Perfil")}</dt>
                   <dd>
                     {rolLabel(account.rol)}
-                    <small>Lo fija su correo; para cambiarlo, escriba a la administración.</small>
+                    <small>{tr("Lo fija su correo; para cambiarlo, escriba a la administración.")}</small>
                   </dd>
                 </div>
                 {fixed && (
                   <div>
-                    <dt>Sede</dt>
+                    <dt>{tr("Sede")}</dt>
                     <dd>
-                      {campusLabel(account.campus) || "Sin sede"}
-                      <small>La fija su correo.</small>
+                      {campusLabel(account.campus) || tr("Sin sede")}
+                      <small>{tr("La fija su correo.")}</small>
                     </dd>
                   </div>
                 )}
               </dl>
               <button type="button" className="pa-btn pa-btn--line pc-out" onClick={() => void state.signOut()}>
-                Cerrar sesión
+                {tr("Cerrar sesión")}
               </button>
             </div>
           </section>
@@ -294,6 +297,7 @@ function MemberPrefs({ state }: { state: AccountState }) {
 /* --- Sin cuenta ------------------------------------------------------------------------------ */
 
 function GuestPrefs() {
+  useLang();
   const [guest, setGuest] = useState(() => readVisitor() ?? { nick: "", tone: "cercano" as Tone });
   const [problem, setProblem] = useState("");
   const [saved, setSaved] = useState(false);
@@ -312,10 +316,10 @@ function GuestPrefs() {
 
   return (
     <>
-      <form className="pc-sheet" noValidate onSubmit={submit} aria-label="Cómo le habla Pilo">
+      <form className="pc-sheet" noValidate onSubmit={submit} aria-label={tr("Cómo le habla Pilo")}>
         <div className="pc-sheet__in">
-          <p>Usa a Pilo sin cuenta. Estas dos preferencias quedan en este dispositivo.</p>
-          <Field id="pc-v-nombre" label="¿Cómo quiere que le diga Pilo?" hint="Su nombre o uno abreviado. Si lo deja vacío, Pilo no usa nombre." error={problem || null}>
+          <p>{tr("Usa a Pilo sin cuenta. Estas dos preferencias quedan en este dispositivo.")}</p>
+          <Field id="pc-v-nombre" label={tr("¿Cómo quiere que le diga Pilo?")} hint={tr("Su nombre o uno abreviado. Si lo deja vacío, Pilo no usa nombre.")} error={problem || null}>
             {(aria) => (
               <input
                 {...aria}
@@ -331,9 +335,9 @@ function GuestPrefs() {
             )}
           </Field>
           <div>
-            <p className="pc-label">Tono</p>
+            <p className="pc-label">{tr("Tono")}</p>
             <Seg
-              label="Tono"
+              label={tr("Tono")}
               value={guest.tone}
               options={TONE_OPTIONS}
               onPick={(tone) => {
@@ -343,23 +347,23 @@ function GuestPrefs() {
             />
           </div>
           <div className="pc-save">
-            <div className="pc-save__msg">{saved && <Msg tone="ok">Guardado en este dispositivo.</Msg>}</div>
+            <div className="pc-save__msg">{saved && <Msg tone="ok">{tr("Guardado en este dispositivo.")}</Msg>}</div>
             <button type="submit" className="pa-btn pa-btn--main">
-              Guardar
+              {tr("Guardar")}
             </button>
           </div>
         </div>
       </form>
 
-      <section className="pc-sheet" aria-label="Crear una cuenta">
+      <section className="pc-sheet" aria-label={tr("Crear una cuenta")}>
         <div className="pc-sheet__in">
-          <Benefits title="Con una cuenta de Pilo" />
+          <Benefits title={tr("Con una cuenta de Pilo")} />
           <div className="pc-actions">
             <Link className="pa-btn pa-btn--line" to={APP_LOGIN}>
-              Entrar
+              {tr("Entrar")}
             </Link>
             <Link className="pa-btn pa-btn--main" to={APP_ACCOUNT}>
-              Crear una cuenta
+              {tr("Crear una cuenta")}
             </Link>
           </div>
         </div>

@@ -50,6 +50,9 @@
 
   var origin = new URL(script.src).origin;
   var tema = (script.getAttribute("data-tema") || "blanco").toLowerCase();
+  // El idioma del chat: con data-lang="en" o "pt" arranca en inglés o portugués; sin él, español (la persona puede cambiarlo dentro).
+  var lang = (script.getAttribute("data-lang") || "").toLowerCase().slice(0, 2);
+  lang = lang === "en" || lang === "pt" ? lang : "";
   var left = /^izq/i.test(script.getAttribute("data-esquina") || script.getAttribute("data-lado") || "");
   // Solo si la línea lo pide: quien administra la página decide si Pilo la lee, y cuánto.
   var mode = leerModo(script.getAttribute("data-leer"));
@@ -292,7 +295,7 @@
 
   function mount() {
     frame = document.createElement("iframe");
-    frame.src = origin + space.route + "?tema=" + encodeURIComponent(tema) + "&lado=" + (left ? "izq" : "der");
+    frame.src = origin + space.route + "?tema=" + encodeURIComponent(tema) + "&lado=" + (left ? "izq" : "der") + (lang ? "&lang=" + lang : "");
     frame.title = space.title;
     frame.setAttribute("allow", "autoplay");
     frame.setAttribute("allowtransparency", "true");

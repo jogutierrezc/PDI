@@ -17,6 +17,7 @@ import { useAuth } from "../../../lib/auth";
 import { supabase } from "../../../lib/supabase";
 import { isMember, parseAccount, prefsPatch } from "./rules";
 import type { PiloAccount, Prefs } from "./rules";
+import { tr } from "../../../components/pilo/i18n";
 
 const COLUMNS = "id, username, full_name, email, rol, campus, status, nick, tone, length, about, program";
 
@@ -54,12 +55,12 @@ export function usePiloAccount(): AccountState {
 
   const save = useCallback(
     async (next: Prefs): Promise<PiloAccount> => {
-      if (!account) throw new Error("No hay una cuenta de Pilo en esta sesión.");
+      if (!account) throw new Error(tr("No hay una cuenta de Pilo en esta sesión."));
       const patch = prefsPatch(account, next);
       if (!Object.keys(patch).length) return account;
       const { data, error } = await supabase.rpc("pilo_user_update_prefs", { p_patch: patch });
       const row = parseAccount(Array.isArray(data) ? data[0] : data);
-      if (error || !row) throw new Error("No se pudieron guardar sus preferencias. Intente de nuevo.");
+      if (error || !row) throw new Error(tr("No se pudieron guardar sus preferencias. Intente de nuevo."));
       client.setQueryData(accountKey(userId), row);
       return row;
     },

@@ -66,12 +66,14 @@ import "../pregunta/ask-pilo.css";
 import "./pilo-app-themes.css";
 import "./pilo-app.css";
 import "./account/account.css";
+import { tr, useLang, localizeDeep } from "../../components/pilo/i18n";
 
 const KEY_VOICE = storageKey(APP_PREFIX, "voz");
 const KEY_INSTALL = storageKey(APP_PREFIX, "instalar");
 const ENSENANZA = ASK_SPACES.ensenanza;
 
 export function PiloApp() {
+  useLang();
   const location = useLocation();
   const navigate = useNavigate();
   const place = readAppPath(location.pathname);
@@ -165,7 +167,7 @@ export function PiloApp() {
   const waking = online && (config.isPending || loading || cuenta.pending);
   const doors = useMemo(() => ({ planeacion: spaceDoor(rules, ASK_SPACES.planeacion, role, member), ensenanza: spaceDoor(rules, ENSENANZA, role, member) }), [rules, role, member]);
   const person: Person = useMemo(
-    () => ({ card: account ? personCard(account) : null, intranet: role ? profile?.full_name || profile?.email || "Su cuenta" : null, saved: null, clases: canUseClases(account), notas: canUseNotas(account) }),
+    () => ({ card: account ? personCard(account) : null, intranet: role ? profile?.full_name || profile?.email || tr("Su cuenta") : null, saved: null, clases: canUseClases(account), notas: canUseNotas(account) }),
     [account, role, profile?.full_name, profile?.email],
   );
   const greeting = useMemo(() => (online ? welcomeVoice(doors) : null), [doors, online]);
@@ -205,7 +207,7 @@ export function PiloApp() {
       return (
         <div className="pa" ref={root} data-tema={theme} aria-busy="true">
           <p className="pa-wait" role="status">
-            Abriendo a Pilo…
+            {tr("Abriendo a Pilo…")}
           </p>
         </div>
       );
@@ -248,13 +250,13 @@ export function PiloApp() {
     return (
       <div className="pa" ref={root} data-tema={theme}>
         <AppPage
-          title={profilePage ? (account ? "Mi perfil" : "Mis preferencias") : "Respuestas guardadas"}
+          title={profilePage ? (account ? tr("Mi perfil") : tr("Mis preferencias")) : tr("Respuestas guardadas")}
           lead={
             profilePage
               ? account
-                ? "Sus datos y la manera en que Pilo le habla y le responde."
-                : "Cómo le habla Pilo y con qué tema se ve la app."
-              : "Lo que guarda queda en su cuenta y lo encuentra en cualquier dispositivo."
+                ? tr("Sus datos y la manera en que Pilo le habla y le responde.")
+                : tr("Cómo le habla Pilo y con qué tema se ve la app.")
+              : tr("Lo que guarda queda en su cuenta y lo encuentra en cualquier dispositivo.")
           }
           home={APP_PATHS[home]}
           side={wide ? <PageSide home={home} active={profilePage ? "perfil" : "guardadas"} person={person} userId={session?.user.id} member={member} theme={theme} onTheme={pickTheme} onWelcome={welcomeAgain} /> : null}
@@ -281,9 +283,9 @@ export function PiloApp() {
     return (
       <div className="pa" ref={root} data-tema={theme}>
         <AppPage
-          title="Mis clases"
-          tag="Beta"
-          lead="Pilo entra a Moodle con su cuenta para ver sus cursos y ayudarle con ellos: qué hay para esta semana, qué pide una actividad y cuándo se entrega."
+          title={tr("Mis clases")}
+          tag={tr("Beta")}
+          lead={tr("Pilo entra a Moodle con su cuenta para ver sus cursos y ayudarle con ellos: qué hay para esta semana, qué pide una actividad y cuándo se entrega.")}
           home={APP_PATHS[home]}
           side={wide ? <PageSide home={home} active="clases" person={person} userId={session?.user.id} member={member} theme={theme} onTheme={pickTheme} onWelcome={welcomeAgain} /> : null}
         >
@@ -299,9 +301,9 @@ export function PiloApp() {
     return (
       <div className="pa" ref={root} data-tema={theme}>
         <AppPage
-          title="Mis notas"
-          tag="Beta"
-          lead="Pilo lo guía para leer sus notas de Génesis, las compara con sus metas y le recomienda cómo mejorar."
+          title={tr("Mis notas")}
+          tag={tr("Beta")}
+          lead={tr("Pilo lo guía para leer sus notas de Génesis, las compara con sus metas y le recomienda cómo mejorar.")}
           home={APP_PATHS[home]}
           side={wide ? <PageSide home={home} active="notas" person={person} userId={session?.user.id} member={member} theme={theme} onTheme={pickTheme} onWelcome={welcomeAgain} /> : null}
         >
@@ -313,7 +315,7 @@ export function PiloApp() {
   }
 
   const spaceId: SpaceId = place.kind === "pilo" ? place.space : home;
-  const space = ASK_SPACES[spaceId];
+  const space = localizeDeep(ASK_SPACES[spaceId]);
   const door = doors[spaceId];
 
   return (

@@ -19,8 +19,10 @@ import { Icon } from "../icons";
 import { removeSavedAnswer, savedCopyText, savedKey, savedMeta, searchSaved, useSavedAnswers } from "./answers";
 import type { SavedAnswer } from "./answers";
 import { Benefits, Msg } from "./parts";
+import { tr, useLang, trn } from "../../../components/pilo/i18n";
 
 export function SavedPane({ userId, member, pending }: { userId: string | undefined; member: boolean; pending: boolean }) {
+  useLang();
   const client = useQueryClient();
   const saved = useSavedAnswers(userId, member);
   const [query, setQuery] = useState("");
@@ -33,7 +35,7 @@ export function SavedPane({ userId, member, pending }: { userId: string | undefi
   if (pending || (member && saved.isPending)) {
     return (
       <p className="pc-wait" role="status">
-        Pilo está buscando sus respuestas guardadas…
+        {tr("Pilo está buscando sus respuestas guardadas…")}
       </p>
     );
   }
@@ -42,14 +44,14 @@ export function SavedPane({ userId, member, pending }: { userId: string | undefi
     return (
       <section className="pc-sheet">
         <div className="pc-sheet__in">
-          <p>Guardar respuestas es de quienes tienen cuenta de Pilo: quedan en su cuenta y las encuentra en cualquier dispositivo. Sin cuenta, sus conversaciones siguen en este dispositivo, en el menú.</p>
-          <Benefits title="Con una cuenta de Pilo" />
+          <p>{tr("Guardar respuestas es de quienes tienen cuenta de Pilo: quedan en su cuenta y las encuentra en cualquier dispositivo. Sin cuenta, sus conversaciones siguen en este dispositivo, en el menú.")}</p>
+          <Benefits title={tr("Con una cuenta de Pilo")} />
           <div className="pc-actions">
             <Link className="pa-btn pa-btn--line" to={APP_LOGIN}>
-              Entrar
+              {tr("Entrar")}
             </Link>
             <Link className="pa-btn pa-btn--main" to={APP_ACCOUNT}>
-              Crear una cuenta
+              {tr("Crear una cuenta")}
             </Link>
           </div>
         </div>
@@ -64,7 +66,7 @@ export function SavedPane({ userId, member, pending }: { userId: string | undefi
       await navigator.clipboard.writeText(savedCopyText(item, plain(item), window.location.origin));
       setStatus({ tone: "ok", text: "Copiada." });
     } catch {
-      setStatus({ tone: "bad", text: "No se pudo copiar: seleccione el texto para copiarlo." });
+      setStatus({ tone: "bad", text: tr("No se pudo copiar: seleccione el texto para copiarlo.") });
     }
   };
 
@@ -73,7 +75,7 @@ export function SavedPane({ userId, member, pending }: { userId: string | undefi
     try {
       await removeSavedAnswer(item.id);
       client.setQueryData<SavedAnswer[]>(savedKey(userId), (list) => (list ?? []).filter((s) => s.id !== item.id));
-      setStatus({ tone: "ok", text: "Se quitó de sus guardadas." });
+      setStatus({ tone: "ok", text: tr("Se quitó de sus guardadas.") });
     } catch (e) {
       setStatus({ tone: "bad", text: (e as Error).message });
     }
@@ -82,8 +84,8 @@ export function SavedPane({ userId, member, pending }: { userId: string | undefi
   return (
     <>
       <div className="pc-field pc-search">
-        <label htmlFor="pc-buscar">Buscar en lo guardado</label>
-        <input id="pc-buscar" type="search" enterKeyHint="search" autoComplete="off" placeholder="Rúbrica, PDI, evaluación…" value={query} onChange={(e) => setQuery(e.target.value)} />
+        <label htmlFor="pc-buscar">{tr("Buscar en lo guardado")}</label>
+        <input id="pc-buscar" type="search" enterKeyHint="search" autoComplete="off" placeholder={tr("Rúbrica, PDI, evaluación…")} value={query} onChange={(e) => setQuery(e.target.value)} />
       </div>
 
       <div className="pc-live" aria-live="polite">
@@ -93,15 +95,15 @@ export function SavedPane({ userId, member, pending }: { userId: string | undefi
       {all.length === 0 && !saved.isError ? (
         <section className="pc-sheet">
           <div className="pc-sheet__in">
-            <p>Aún no ha guardado nada. En la conversación, toque «Guardar» junto a una respuesta completa y la encontrará aquí.</p>
+            <p>{tr("Aún no ha guardado nada. En la conversación, toque «Guardar» junto a una respuesta completa y la encontrará aquí.")}</p>
           </div>
         </section>
       ) : shown.length === 0 && !saved.isError ? (
         <p className="pc-hint" role="status">
-          No hay nada guardado con esa búsqueda.
+          {tr("No hay nada guardado con esa búsqueda.")}
         </p>
       ) : (
-        <ul className="pc-saved" aria-label={`${shown.length} ${shown.length === 1 ? "respuesta guardada" : "respuestas guardadas"}`}>
+        <ul className="pc-saved" aria-label={trn(shown.length, "{n} respuesta guardada", "{n} respuestas guardadas")}>
           {shown.map((item) => {
             const isOpen = open === item.id;
             return (
@@ -114,17 +116,17 @@ export function SavedPane({ userId, member, pending }: { userId: string | undefi
                   {plain(item)}
                 </p>
                 {isOpen && item.sources.length > 0 && (
-                  <ol className="pc-saved__src" aria-label="Fuentes">
+                  <ol className="pc-saved__src" aria-label={tr("Fuentes")}>
                     {item.sources.map((s) => (
                       <li key={s.n}>
                         {s.n}. {s.title}
                         {s.path &&
                           (/^https?:/i.test(s.path) ? (
                             <a href={s.path} target="_blank" rel="noopener noreferrer">
-                              Abrir
+                              {tr("Abrir")}
                             </a>
                           ) : (
-                            <Link to={s.path}>Abrir</Link>
+                            <Link to={s.path}>{tr("Abrir")}</Link>
                           ))}
                       </li>
                     ))}
@@ -132,26 +134,26 @@ export function SavedPane({ userId, member, pending }: { userId: string | undefi
                 )}
                 {asking === item.id ? (
                   <div className="pc-confirm" role="alert">
-                    <span>¿Quitarla de sus guardadas? No se puede deshacer.</span>
+                    <span>{tr("¿Quitarla de sus guardadas? No se puede deshacer.")}</span>
                     <button type="button" className="pc-chip" onClick={() => setAsking(null)}>
-                      No, dejarla
+                      {tr("No, dejarla")}
                     </button>
                     <button type="button" className="pc-chip" data-strong onClick={() => void remove(item)}>
-                      Sí, quitar
+                      {tr("Sí, quitar")}
                     </button>
                   </div>
                 ) : (
                   <div className="pc-saved__tools">
                     <button type="button" className="pc-chip" aria-expanded={isOpen} aria-controls={`pc-g-${item.id}`} onClick={() => setOpen(isOpen ? null : item.id)}>
-                      {isOpen ? "Ver menos" : "Ver completa"}
+                      {isOpen ? tr("Ver menos") : tr("Ver completa")}
                     </button>
                     <button type="button" className="pc-chip" onClick={() => void copy(item)}>
                       {Icon.copy}
-                      Copiar
+                      {tr("Copiar")}
                     </button>
                     <button type="button" className="pc-chip" onClick={() => setAsking(item.id)}>
                       {Icon.trash}
-                      Quitar
+                      {tr("Quitar")}
                     </button>
                   </div>
                 )}

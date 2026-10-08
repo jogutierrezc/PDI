@@ -31,6 +31,7 @@ import type { Person } from "./AppSide";
 import { ACCOUNT_BENEFITS } from "./account/rules";
 import { PolicyLink } from "./terms/PolicyLink";
 import { APP_APK } from "./pwa";
+import { tr, useLang, LangSwitch } from "../../components/pilo/i18n";
 
 export function AppMenu({
   open,
@@ -65,6 +66,7 @@ export function AppMenu({
   /** «Conseguir la app»: el APK de Android o la guía del iPhone, según donde se abra. Nada si no aplica. */
   getApp?: { label: string; hint: string; onOpen: () => void } | null;
 }) {
+  useLang();
   /** Todas las conversaciones a la vista: ahí, además, se borran. */
   const [all, setAll] = useState(false);
   const known = Boolean(person.card || person.intranet);
@@ -72,15 +74,15 @@ export function AppMenu({
   const shown = all || few ? saved : saved.slice(0, RECENT_CONVERSATIONS);
 
   return (
-    <Layer kind="menu" open={open} quick={quick} label="Menú de Mr. Pilo" onClose={onClose}>
+    <Layer kind="menu" open={open} quick={quick} label={tr("Menú de Mr. Pilo")} onClose={onClose}>
       <div className="pa-menu-head">
         <div className="pa-menu-head__top">
           {known ? <PersonBlock person={person} onGo={() => onClose()} /> : <h2>Mr. Pilo</h2>}
-          <button type="button" className="pa-icon" onClick={onClose} aria-label="Cerrar el menú">
+          <button type="button" className="pa-icon" onClick={onClose} aria-label={tr("Cerrar el menú")}>
             {Icon.close}
           </button>
         </div>
-        <div className="pa-two" role="group" aria-label="Con cuál Pilo">
+        <div className="pa-two" role="group" aria-label={tr("Con cuál Pilo")}>
           {APP_SPACES.map((id) => (
             <button key={id} type="button" aria-pressed={id === space} onClick={() => onSwitch(id)}>
               {APP_PILOS[id].short}
@@ -89,14 +91,14 @@ export function AppMenu({
         </div>
         <button type="button" className="pa-btn pa-btn--main" onClick={onNew}>
           {Icon.plus}
-          Nueva conversación
+          {tr("Nueva conversación")}
         </button>
       </div>
 
       <div className="pa-menu-body">
         <section aria-labelledby="pa-m-study">
           <p className="pa-label" id="pa-m-study">
-            {person.clases ? "Para estudiar" : "Mi Pilo"}
+            {person.clases ? tr("Para estudiar") : tr("Mi Pilo")}
           </p>
           <div className="pa-tiles">
             {/* Mis clases (clases/) y Gemini: solo para estudiantes y profesores con cuenta. */}
@@ -107,8 +109,8 @@ export function AppMenu({
                   <em>beta</em>
                 </span>
                 <span>
-                  <strong>Mis clases</strong>
-                  <small>Sus cursos de Moodle y sus fechas de entrega</small>
+                  <strong>{tr("Mis clases")}</strong>
+                  <small>{tr("Sus cursos de Moodle y sus fechas de entrega")}</small>
                 </span>
               </Link>
             )}
@@ -120,8 +122,8 @@ export function AppMenu({
                   <em>beta</em>
                 </span>
                 <span>
-                  <strong>Mis notas</strong>
-                  <small>Su histórico de Génesis y cómo va su promedio</small>
+                  <strong>{tr("Mis notas")}</strong>
+                  <small>{tr("Su histórico de Génesis y cómo va su promedio")}</small>
                 </span>
               </Link>
             )}
@@ -129,19 +131,19 @@ export function AppMenu({
               <a className="pa-tile" href={APP_GEMINI} target="_blank" rel="noopener noreferrer" onClick={() => onClose()}>
                 <span className="pa-tile__top">
                   <span className="pa-tile__ico">{StudyIcon.gemini}</span>
-                  <em data-new>Nuevo</em>
+                  <em data-new>{tr("Nuevo")}</em>
                 </span>
                 <span>
                   <strong>Gemini</strong>
-                  <small>Se abre aparte, con su cuenta de la universidad</small>
+                  <small>{tr("Se abre aparte, con su cuenta de la universidad")}</small>
                 </span>
               </a>
             )}
             <Link className="pa-tile pa-tile--wide" to={APP_SAVED} onClick={() => onClose()}>
               <span className="pa-tile__ico">{Icon.mark}</span>
               <span>
-                <strong>Respuestas guardadas</strong>
-                <small>{person.card ? "Lo que guardó de Pilo, en su cuenta" : "Con cuenta, las encuentra en cualquier dispositivo"}</small>
+                <strong>{tr("Respuestas guardadas")}</strong>
+                <small>{person.card ? tr("Lo que guardó de Pilo, en su cuenta") : tr("Con cuenta, las encuentra en cualquier dispositivo")}</small>
               </span>
               {person.saved !== null && <b aria-label={`${person.saved} guardadas`}>{person.saved}</b>}
             </Link>
@@ -150,9 +152,9 @@ export function AppMenu({
 
         <section aria-labelledby="pa-m-saved">
           <p className="pa-label" id="pa-m-saved">
-            Conversaciones
+            {tr("Conversaciones")}
           </p>
-          {saved.length === 0 && <p className="pa-empty">Sus conversaciones quedan aquí, solo en este teléfono.</p>}
+          {saved.length === 0 && <p className="pa-empty">{tr("Sus conversaciones quedan aquí, solo en este teléfono.")}</p>}
           {shown.map((entry) => (
             <div key={`${entry.space}:${entry.id}`} className="pa-row" data-plain={!(all || few) || undefined} aria-current={entry.space === space && entry.id === currentId}>
               <button type="button" className="pa-mi" onClick={() => onOpen(entry)}>
@@ -162,7 +164,7 @@ export function AppMenu({
                 </small>
               </button>
               {(all || few) && (
-                <button type="button" className="pa-icon" onClick={() => onDelete(entry)} aria-label={`Borrar la conversación «${entry.title}»`}>
+                <button type="button" className="pa-icon" onClick={() => onDelete(entry)} aria-label={tr("Borrar la conversación «{title}»", { title: entry.title })}>
                   {Icon.trash}
                 </button>
               )}
@@ -170,7 +172,7 @@ export function AppMenu({
           ))}
           {!few && (
             <button type="button" className="pa-mi pa-mi--more" aria-expanded={all} onClick={() => setAll(!all)}>
-              <strong>{all ? "Ver solo las recientes" : `Ver las ${saved.length} conversaciones`}</strong>
+              <strong>{all ? tr("Ver solo las recientes") : tr("Ver las {length} conversaciones", { length: saved.length })}</strong>
             </button>
           )}
         </section>
@@ -179,7 +181,7 @@ export function AppMenu({
         {getApp && (
           <section aria-labelledby="pa-m-app">
             <p className="pa-label" id="pa-m-app">
-              Conseguir la app
+              {tr("Conseguir la app")}
             </p>
             <button type="button" className="pa-tile pa-tile--wide" onClick={getApp.onOpen}>
               <span className="pa-tile__ico">{Icon.download}</span>
@@ -197,8 +199,8 @@ export function AppMenu({
         <button type="button" className="pa-mi pa-mi--set" onClick={onSettings}>
           {StudyIcon.settings}
           <span>
-            <strong>Ajustes</strong>
-            <small>Tema, bienvenida y política de uso</small>
+            <strong>{tr("Ajustes")}</strong>
+            <small>{tr("Tema, bienvenida y política de uso")}</small>
           </span>
         </button>
       </div>
@@ -224,19 +226,26 @@ export function SettingsSheet({
   onTheme: (theme: AppTheme, event: MouseEvent) => void;
   onWelcome: () => void;
 }) {
+  useLang();
   return (
-    <Layer kind="sheet" open={open} quick={quick} label="Ajustes de Mr. Pilo" onClose={onClose}>
+    <Layer kind="sheet" open={open} quick={quick} label={tr("Ajustes de Mr. Pilo")} onClose={onClose}>
       <div className="pa-sheet__in">
         <span className="pa-sheet__grip" aria-hidden="true" />
         <div className="pa-sheet__head">
-          <h2>Ajustes</h2>
-          <button type="button" className="pa-icon" onClick={onClose} aria-label="Cerrar los ajustes">
+          <h2>{tr("Ajustes")}</h2>
+          <button type="button" className="pa-icon" onClick={onClose} aria-label={tr("Cerrar los ajustes")}>
             {Icon.close}
           </button>
         </div>
+        <section aria-labelledby="pa-m-idioma">
+          <p className="pa-label" id="pa-m-idioma">
+            {tr("Idioma")}
+          </p>
+          <LangSwitch />
+        </section>
         <section aria-labelledby="pa-m-tema">
           <p className="pa-label" id="pa-m-tema">
-            Tema
+            {tr("Tema")}
           </p>
           <div className="pa-temas" role="group" aria-labelledby="pa-m-tema">
             {APP_THEMES.map((t) => (
@@ -244,20 +253,20 @@ export function SettingsSheet({
                 <span className="pa-tema__ring">
                   <i className="pa-swatch" data-tema={t.id} aria-hidden="true" />
                 </span>
-                {t.label}
+                {tr(t.label)}
               </button>
             ))}
           </div>
         </section>
         <div>
           <button type="button" className="pa-mi pa-mi--line" onClick={onWelcome}>
-            <strong>Ver la bienvenida</strong>
-            <small>Pilo se presenta otra vez</small>
+            <strong>{tr("Ver la bienvenida")}</strong>
+            <small>{tr("Pilo se presenta otra vez")}</small>
           </button>
           {/* La política de uso completa (terms/): página pública, fuera de la app. */}
           <PolicyLink className="pa-mi pa-mi--line pa-mi--go" onClick={() => onClose()}>
-            <strong>Política de uso</strong>
-            <small>Los términos de Mr. Pilo y cómo trata sus datos</small>
+            <strong>{tr("Política de uso")}</strong>
+            <small>{tr("Los términos de Mr. Pilo y cómo trata sus datos")}</small>
           </PolicyLink>
         </div>
       </div>
@@ -283,14 +292,15 @@ export function SourcesSheet({
   focus: number | null;
   space: SpaceProfile;
 }) {
+  useLang();
   const nameOf = (id: string) => space.sources.find((x) => x.id === id)?.name ?? space.office;
   return (
-    <Layer kind="sheet" open={open} quick={quick} label="Fuentes de la respuesta" onClose={onClose}>
+    <Layer kind="sheet" open={open} quick={quick} label={tr("Fuentes de la respuesta")} onClose={onClose}>
       <div className="pa-sheet__in">
         <span className="pa-sheet__grip" aria-hidden="true" />
         <div className="pa-sheet__head">
-          <h2>De dónde sale</h2>
-          <button type="button" className="pa-icon" onClick={onClose} aria-label="Cerrar las fuentes">
+          <h2>{tr("De dónde sale")}</h2>
+          <button type="button" className="pa-icon" onClick={onClose} aria-label={tr("Cerrar las fuentes")}>
             {Icon.close}
           </button>
         </div>
@@ -308,17 +318,17 @@ export function SourcesSheet({
                 {origin && (
                   <small className="pa-from">
                     <span aria-hidden="true">↗</span> {origin}
-                    {s.written_for ? ` · preparado para ${s.written_for}` : ""}
+                    {s.written_for ? tr(" · preparado para {v0}", { v0: s.written_for }) : ""}
                   </small>
                 )}
                 {s.excerpt && <small className="pa-excerpt">{s.excerpt}</small>}
                 {s.path &&
                   (external ? (
                     <a href={s.path} target="_blank" rel="noopener noreferrer">
-                      Abrir el documento
+                      {tr("Abrir el documento")}
                     </a>
                   ) : (
-                    <Link to={s.path}>{origin ? "Abrir la fuente" : `Abrir en ${nameOf(s.source)}`}</Link>
+                    <Link to={s.path}>{origin ? tr("Abrir la fuente") : tr("Abrir en {v0}", { v0: nameOf(s.source) })}</Link>
                   ))}
               </li>
             );
@@ -333,17 +343,18 @@ export function SourcesSheet({
 
 /** Lo que se abre al tocar «Guardar» sin cuenta: qué gana quien se registra, y los dos caminos. */
 export function AccountSheet({ open, quick, onClose }: { open: boolean; quick: boolean; onClose: (event?: MouseEvent) => void }) {
+  useLang();
   return (
-    <Layer kind="sheet" open={open} quick={quick} label="Su cuenta de Pilo" onClose={onClose}>
+    <Layer kind="sheet" open={open} quick={quick} label={tr("Su cuenta de Pilo")} onClose={onClose}>
       <div className="pa-sheet__in">
         <span className="pa-sheet__grip" aria-hidden="true" />
         <div className="pa-sheet__head">
-          <h2>Guardar es de quienes tienen cuenta</h2>
-          <button type="button" className="pa-icon" onClick={onClose} aria-label="Cerrar">
+          <h2>{tr("Guardar es de quienes tienen cuenta")}</h2>
+          <button type="button" className="pa-icon" onClick={onClose} aria-label={tr("Cerrar")}>
             {Icon.close}
           </button>
         </div>
-        <p>Con una cuenta de Pilo, sus respuestas guardadas quedan en su cuenta y las encuentra en cualquier dispositivo. Además:</p>
+        <p>{tr("Con una cuenta de Pilo, sus respuestas guardadas quedan en su cuenta y las encuentra en cualquier dispositivo. Además:")}</p>
         <ul>
           {ACCOUNT_BENEFITS.filter((b) => b.title !== "Guardar respuestas").map((b) => (
             <li key={b.title}>
@@ -353,10 +364,10 @@ export function AccountSheet({ open, quick, onClose }: { open: boolean; quick: b
           ))}
         </ul>
         <Link className="pa-btn pa-btn--main" to={APP_ACCOUNT}>
-          Crear una cuenta
+          {tr("Crear una cuenta")}
         </Link>
         <Link className="pa-btn pa-btn--line" to={APP_LOGIN}>
-          Ya tengo cuenta
+          {tr("Ya tengo cuenta")}
         </Link>
       </div>
     </Layer>
@@ -366,21 +377,22 @@ export function AccountSheet({ open, quick, onClose }: { open: boolean; quick: b
 /* --- La guía para iPhone ---------------------------------------------------------------------- */
 
 export function IphoneSheet({ open, quick, onClose }: { open: boolean; quick: boolean; onClose: (event?: MouseEvent) => void }) {
+  useLang();
   return (
-    <Layer kind="sheet" open={open} quick={quick} label="Instalar a Pilo en el iPhone" onClose={onClose}>
+    <Layer kind="sheet" open={open} quick={quick} label={tr("Instalar a Pilo en el iPhone")} onClose={onClose}>
       <div className="pa-sheet__in">
         <span className="pa-sheet__grip" aria-hidden="true" />
         <div className="pa-sheet__head">
-          <h2>Instalar a Pilo</h2>
-          <button type="button" className="pa-icon" onClick={onClose} aria-label="Cerrar">
+          <h2>{tr("Instalar a Pilo")}</h2>
+          <button type="button" className="pa-icon" onClick={onClose} aria-label={tr("Cerrar")}>
             {Icon.close}
           </button>
         </div>
-        <p>En el iPhone se instala desde Safari, en tres pasos:</p>
+        <p>{tr("En el iPhone se instala desde Safari, en tres pasos:")}</p>
         <ul className="pa-steps-list">
-          <li>Toque «Compartir»: el cuadrado con la flecha hacia arriba.</li>
-          <li>Elija «Añadir a pantalla de inicio».</li>
-          <li>Toque «Añadir». Pilo queda con su icono, como una app.</li>
+          <li>{tr("Toque «Compartir»: el cuadrado con la flecha hacia arriba.")}</li>
+          <li>{tr("Elija «Añadir a pantalla de inicio».")}</li>
+          <li>{tr("Toque «Añadir». Pilo queda con su icono, como una app.")}</li>
         </ul>
       </div>
     </Layer>
@@ -405,40 +417,41 @@ export function AndroidSheet({
   /** Cierra la hoja y saca el aviso de instalación del navegador. */
   onPrompt: () => void;
 }) {
+  useLang();
   return (
-    <Layer kind="sheet" open={open} quick={quick} label="Descargar a Pilo para Android" onClose={onClose}>
+    <Layer kind="sheet" open={open} quick={quick} label={tr("Descargar a Pilo para Android")} onClose={onClose}>
       <div className="pa-sheet__in">
         <span className="pa-sheet__grip" aria-hidden="true" />
         <div className="pa-sheet__head">
-          <h2>Lleve a Pilo en su Android</h2>
-          <button type="button" className="pa-icon" onClick={onClose} aria-label="Cerrar">
+          <h2>{tr("Lleve a Pilo en su Android")}</h2>
+          <button type="button" className="pa-icon" onClick={onClose} aria-label={tr("Cerrar")}>
             {Icon.close}
           </button>
         </div>
-        <p>Descargue la app de Mr. Pilo para tabletas y celulares Android. Es el mismo Pilo de siempre, con icono propio y sin barra del navegador.</p>
+        <p>{tr("Descargue la app de Mr. Pilo para tabletas y celulares Android. Es el mismo Pilo de siempre, con icono propio y sin barra del navegador.")}</p>
         <p className="pa-apk__meta">
-          Versión {APP_APK.version} · {APP_APK.size} · <span className="pa-apk__sign">Firmada por la Universidad de Santander</span>
+          {tr("Versión")} {APP_APK.version} · {APP_APK.size} · <span className="pa-apk__sign">{tr("Firmada por la Universidad de Santander")}</span>
         </p>
         <div className="pa-apk__actions">
           <a className="pa-btn pa-btn--main" href={APP_APK.url} download={APP_APK.file}>
             {Icon.download}
-            Descargar el archivo (APK)
+            {tr("Descargar el archivo (APK)")}
           </a>
           {canPrompt && (
             <button type="button" className="pa-btn pa-apk__alt" onClick={onPrompt}>
-              Instalar sin descargar (aviso del navegador)
+              {tr("Instalar sin descargar (aviso del navegador)")}
             </button>
           )}
         </div>
         <ul className="pa-steps-list">
-          <li>Toque «Descargar el archivo» y espere a que la descarga termine.</li>
+          <li>{tr("Toque «Descargar el archivo» y espere a que la descarga termine.")}</li>
           <li>
-            Abra el archivo <strong>{APP_APK.file}</strong>, desde el aviso o desde Descargas.
+            {tr("Abra el archivo")} <strong>{APP_APK.file}</strong>{tr(", desde el aviso o desde Descargas.")}
           </li>
-          <li>Si el sistema lo pide, permita «Instalar apps desconocidas» solo para esta descarga.</li>
-          <li>Toque «Instalar» y abra Mr. Pilo: queda en su pantalla de inicio.</li>
+          <li>{tr("Si el sistema lo pide, permita «Instalar apps desconocidas» solo para esta descarga.")}</li>
+          <li>{tr("Toque «Instalar» y abra Mr. Pilo: queda en su pantalla de inicio.")}</li>
         </ul>
-        <p className="pa-apk__note">La app se actualiza sola cada vez que la universidad publica el portal. El archivo solo vuelve a bajar cuando haya una versión nueva.</p>
+        <p className="pa-apk__note">{tr("La app se actualiza sola cada vez que la universidad publica el portal. El archivo solo vuelve a bajar cuando haya una versión nueva.")}</p>
       </div>
     </Layer>
   );

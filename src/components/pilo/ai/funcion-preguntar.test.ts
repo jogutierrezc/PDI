@@ -3822,3 +3822,70 @@ describe("evolucion: las recomendaciones de Mis notas (0131)", () => {
     expect(JSON.stringify(calls[0].body.messages)).toContain("Ninguno: todas las recomendaciones son generales.");
   });
 });
+
+describe("el idioma de la respuesta (inglés y portugués)", () => {
+  const completion = (text: string) => () => new Response(JSON.stringify({ choices: [{ message: { content: text }, finish_reason: "stop" }] }));
+
+  it("sin idioma, o en español, el pedido es el de siempre: sin regla de idioma y sin traducir", async () => {
+    const w = world();
+    const calls = provider(completion("En 2024 hubo 20.500 estudiantes [1]."));
+    const handler = await boot(w);
+    await ask(handler, { question: "¿Cuántos estudiantes matriculados hay?" });
+    await ask(handler, { question: "¿Cuántos estudiantes matriculados hay?", lang: "es" });
+    await ask(handler, { question: "¿Cuántos estudiantes matriculados hay?", lang: "fr" });
+    expect(calls).toHaveLength(3);
+    for (const call of calls) expect(JSON.stringify(call.body.messages)).not.toContain("IDIOMA DE LA RESPUESTA");
+  });
+
+  it("en inglés: traduce solo la pregunta de la búsqueda y el modelo recibe lo que la persona escribió, con la regla del idioma", async () => {
+    const w = world();
+    const calls = provider(completion("¿Cuántos estudiantes matriculados hay?"), completion("In 2024 there were 20,500 enrolled students [1]."));
+    const response = await ask(await boot(w), { question: "How many students are enrolled?", lang: "en" });
+    const data = (await response.json()) as Row;
+    expect(calls).toHaveLength(2);
+    // 1. La traducción: una línea, sin la persona de Pilo ni los datos.
+    const translate = calls[0].body.messages as { role: string; content: string }[];
+    expect(translate.map((m) => m.role)).toEqual(["system", "user"]);
+    expect(translate[1].content).toBe("How many students are enrolled?");
+    expect(calls[0].body.temperature).toBe(0);
+    // 2. La respuesta: la pregunta original, la regla del idioma y los datos buscados con la traducción.
+    const messages = calls[1].body.messages as { role: string; content: string }[];
+    expect(messages[messages.length - 1]).toEqual({ role: "user", content: "How many students are enrolled?" });
+    const system = messages.filter((m) => m.role === "system").map((m) => m.content).join("\n");
+    expect(system).toContain("IDIOMA DE LA RESPUESTA");
+    expect(system).toContain("inglés");
+    expect(system).toContain("[CIFRAS]");
+    expect(data).toMatchObject({ kind: "ia", text: "In 2024 there were 20,500 enrolled students [1]." });
+  });
+
+  it("en portugués: pide português del Brasil", async () => {
+    const w = world();
+    const calls = provider(completion("¿Cuántos estudiantes matriculados hay?"), completion("Em 2024 havia 20.500 estudantes [1]."));
+    await ask(await boot(w), { question: "Quantos estudantes estão matriculados?", lang: "pt" });
+    const system = (calls[1].body.messages as { role: string; content: string }[]).filter((m) => m.role === "system").map((m) => m.content).join("\n");
+    expect(system).toContain("português do Brasil");
+  });
+
+  it("si la traducción falla, busca con la pregunta tal cual y responde igual", async () => {
+    const w = world();
+    const calls = provider(() => new Response("{}", { status: 500 }), completion("In 2024 there were 20,500 enrolled students [1]."));
+    const data = (await (await ask(await boot(w), { question: "How many students are enrolled?", lang: "en" })).json()) as Row;
+    expect(calls).toHaveLength(2);
+    expect(data).toMatchObject({ kind: "ia" });
+  });
+
+  it("lo vetado se niega en el idioma de la persona: solo se llama al modelo para traducir la pregunta, nunca para responder", async () => {
+    const w = world();
+    const calls = provider(completion("¿Cuánto presupuesto tiene el pilar II?"));
+    const handler = await boot(w);
+    const en = (await (await ask(handler, { question: "How much budget does pillar II have?", lang: "en" })).json()) as Row;
+    expect(en).toMatchObject({ kind: "regla", intent: "vetado", text: expect.stringContaining("I can't give you that figure") });
+    const pt = (await (await ask(handler, { question: "Quanto orçamento tem o pilar II?", lang: "pt" })).json()) as Row;
+    expect(pt).toMatchObject({ kind: "regla", text: expect.stringContaining("Não posso lhe dar essa cifra") });
+    const es = (await (await ask(handler, { question: "¿Cuánto presupuesto tiene el pilar II?" })).json()) as Row;
+    expect(es).toMatchObject({ kind: "regla", text: expect.stringContaining("Esa cifra no se la puedo dar") });
+    // Dos traducciones (inglés y portugués) y ninguna respuesta; en español no se llama a nada.
+    expect(calls).toHaveLength(2);
+    for (const call of calls) expect((call.body.messages as unknown[]).length).toBe(2);
+  });
+});

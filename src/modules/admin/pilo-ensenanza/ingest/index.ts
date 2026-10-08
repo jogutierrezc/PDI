@@ -6,6 +6,7 @@
    cuando hace falta.
    ========================================================================== */
 
+import { importFresh } from "../../../../lib/stale-chunk";
 import { readCsv } from "./csv";
 import { readDocxDocument } from "./docx";
 import { readPdfPages } from "./pdf";
@@ -36,10 +37,10 @@ export async function readDocument(file: File): Promise<ParsedDocument> {
   const kind = kindOf(file);
   if (!kind) throw new Error("Formato no admitido: use Word (.docx), Excel (.xlsx), CSV o PDF.");
   const buffer = await file.arrayBuffer();
-  if (kind === "xlsx") return (await import("./xlsx")).readXlsx(buffer);
+  if (kind === "xlsx") return (await importFresh(() => import("./xlsx"))).readXlsx(buffer);
   const bytes = new Uint8Array(buffer);
   if (kind === "docx") return readDocxDocument(bytes);
   if (kind === "csv") return readCsv(bytes, file.name.replace(/\.[^.]+$/, ""));
-  const { loadPdfPages } = await import("./pdf-load");
+  const { loadPdfPages } = await importFresh(() => import("./pdf-load"));
   return readPdfPages(await loadPdfPages(bytes));
 }

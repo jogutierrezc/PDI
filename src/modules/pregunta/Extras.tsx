@@ -19,6 +19,7 @@ import type { ReactNode } from "react";
 import { ATTACH_ACCEPT, fileSteps, readAttachment } from "./attach";
 import type { Attachment, TurnFile } from "./attach";
 import "./extras.css";
+import { tr, trn, useLang } from "../../components/pilo/i18n";
 
 const svg = (d: ReactNode) => (
   <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
@@ -48,6 +49,7 @@ const ICON = {
 /* --- Copiar ------------------------------------------------------------------------------- */
 
 export function CopyButton({ text, label = "Copiar", what }: { text: string | (() => string); label?: string; what: string }) {
+  useLang();
   const [state, setState] = useState<"idle" | "done" | "fail">("idle");
   const timer = useRef<ReturnType<typeof setTimeout>>();
   useEffect(() => () => clearTimeout(timer.current), []);
@@ -63,17 +65,17 @@ export function CopyButton({ text, label = "Copiar", what }: { text: string | ((
     timer.current = setTimeout(() => setState("idle"), 1600);
   };
   return (
-    <button type="button" className="px-copy" data-state={state === "idle" ? undefined : state} onClick={() => void copy()} aria-label={`${label} ${what}`}>
+    <button type="button" className="px-copy" data-state={state === "idle" ? undefined : state} onClick={() => void copy()} aria-label={`${tr(label)} ${tr(what)}`}>
       <span className="px-copy__idle">
         {ICON.copy}
-        {label}
+        {tr(label)}
       </span>
       <span className="px-copy__done" aria-hidden={state === "idle"}>
         {state === "fail" ? null : ICON.check}
-        {state === "fail" ? "No se pudo" : "Copiado"}
+        {state === "fail" ? tr("No se pudo") : tr("Copiado")}
       </span>
       <span className="px-sr" role="status">
-        {state === "done" ? "Copiado" : state === "fail" ? "No se pudo copiar: seleccione el texto y cópielo." : ""}
+        {state === "done" ? tr("Copiado") : state === "fail" ? tr("No se pudo copiar: seleccione el texto y cópielo.") : ""}
       </span>
     </button>
   );
@@ -114,12 +116,13 @@ export function codeTokens(line: string, lang = ""): CodeToken[] {
 }
 
 export function CodeBlock({ text, lang }: { text: string; lang?: string }) {
+  useLang();
   const name = langOf(lang);
   return (
     <div className="px-block px-code">
       <div className="px-block__head">
-        <span>{name || "código"}</span>
-        <CopyButton text={text} what="el código" />
+        <span>{name || tr("código")}</span>
+        <CopyButton text={text} what={tr("el código")} />
       </div>
       <pre className="px-pre" tabIndex={0}>
         <code>
@@ -165,7 +168,7 @@ export function useAttachment(maxMb: number): AttachState {
         },
         (e: unknown) => {
           if (mine !== turn.current) return;
-          setError((e as Error)?.message || "No pude leer ese archivo.");
+          setError((e as Error)?.message || tr("No pude leer ese archivo."));
           setReading(null);
         },
       );
@@ -182,6 +185,7 @@ export function useAttachment(maxMb: number): AttachState {
 }
 
 export function AttachButton({ onPick, disabled, className }: { onPick: (file: File | null | undefined) => void; disabled?: boolean; className?: string }) {
+  useLang();
   const input = useRef<HTMLInputElement>(null);
   return (
     <>
@@ -197,7 +201,7 @@ export function AttachButton({ onPick, disabled, className }: { onPick: (file: F
           e.target.value = "";
         }}
       />
-      <button type="button" className={className ? `px-clip ${className}` : "px-clip"} disabled={disabled} onClick={() => input.current?.click()} aria-label="Adjuntar un archivo para que Pilo lo analice" title="Adjuntar un archivo (Word, Excel, CSV o PDF)">
+      <button type="button" className={className ? `px-clip ${className}` : "px-clip"} disabled={disabled} onClick={() => input.current?.click()} aria-label={tr("Adjuntar un archivo para que Pilo lo analice")} title={tr("Adjuntar un archivo (Word, Excel, CSV o PDF)")}>
         {ICON.clip}
       </button>
     </>
@@ -222,12 +226,13 @@ export function FileChip({ name, detail, onRemove, busy }: { name: string; detai
 
 /** Lo que acompaña a la caja de escribir: el archivo listo, el que se está leyendo, o por qué no se pudo leer. */
 export function AttachTray({ state }: { state: AttachState }) {
+  useLang();
   const { attachment, reading, error, clear } = state;
   if (!attachment && !reading && !error) return null;
   return (
     <div className="px-tray" role="status">
-      {reading && <FileChip name={reading} detail="leyendo en este dispositivo…" busy />}
-      {attachment && !reading && <FileChip name={attachment.name} detail={`${attachment.passages.length} ${attachment.passages.length === 1 ? "pasaje" : "pasajes"} · no se sube`} onRemove={clear} />}
+      {reading && <FileChip name={reading} detail={tr("leyendo en este dispositivo…")} busy />}
+      {attachment && !reading && <FileChip name={attachment.name} detail={trn(attachment.passages.length, tr("{n} pasaje · no se sube"), tr("{n} pasajes · no se sube"))} onRemove={clear} />}
       {error && <span className="px-tray__error">{error}</span>}
       {attachment && !reading && attachment.warnings.length > 0 && <span className="px-tray__note">{attachment.warnings[0]}</span>}
     </div>
@@ -236,6 +241,7 @@ export function AttachTray({ state }: { state: AttachState }) {
 
 /** La bitácora de trabajo de una respuesta que analizó un archivo. En pantallas angostas llega plegada. */
 export function FileLog({ file, seconds }: { file: TurnFile; seconds?: number }) {
+  useLang();
   const id = useId();
   const [open, setOpen] = useState(() => (typeof window === "undefined" ? true : !window.matchMedia("(max-width: 640px)").matches));
   const steps = fileSteps(file);
@@ -244,7 +250,7 @@ export function FileLog({ file, seconds }: { file: TurnFile; seconds?: number })
       <button type="button" className="px-log__head" aria-expanded={open} aria-controls={id} onClick={() => setOpen((v) => !v)}>
         {ICON.chev}
         <span>
-          Pilo trabajó con su archivo{seconds && seconds >= 1 ? ` · ${Math.round(seconds)} s` : ""} · {steps.length} pasos
+          {tr("Pilo trabajó con su archivo")}{seconds && seconds >= 1 ? ` · ${Math.round(seconds)} s` : ""} · {steps.length} {tr("pasos")}
         </span>
       </button>
       <ol id={id} hidden={!open}>
@@ -264,14 +270,15 @@ export function FileLog({ file, seconds }: { file: TurnFile; seconds?: number })
 
 /** El pie de una respuesta con archivo: no se guardó, y copiar todo el análisis. */
 export function FileFoot({ text }: { text: () => string }) {
+  useLang();
   return (
     <div className="px-foot">
       <span className="px-foot__mark">
         {ICON.lock}
-        El archivo no se guardó
+        {tr("El archivo no se guardó")}
       </span>
-      <span>Los cálculos son de Pilo sobre su archivo: verifíquelos antes de usarlos.</span>
-      <CopyButton text={text} label="Copiar todo" what="el análisis" />
+      <span>{tr("Los cálculos son de Pilo sobre su archivo: verifíquelos antes de usarlos.")}</span>
+      <CopyButton text={text} label={tr("Copiar todo")} what={tr("el análisis")} />
     </div>
   );
 }

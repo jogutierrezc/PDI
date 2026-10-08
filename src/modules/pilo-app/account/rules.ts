@@ -1,4 +1,5 @@
-/* =============================================================================
+
+import { tr } from "../../../components/pilo/i18n";/* =============================================================================
    Mr. Pilo · cuentas (0120) · las reglas, en un solo sitio.
 
    Espejo de lo que deciden la base (`pilo_email_rule`, las restricciones de
@@ -86,17 +87,17 @@ export function emailRule(email: string | null | undefined): EmailRule | null {
 /** Qué le falta a un correo, o "" si sirve. */
 export function emailProblem(email: string): string {
   const e = cleanEmail(email);
-  if (!e) return "Escriba su correo de la UDES.";
-  if (!EMAIL.test(e)) return "Escriba su correo completo, con la arroba.";
+  if (!e) return tr("Escriba su correo de la UDES.");
+  if (!EMAIL.test(e)) return tr("Escriba su correo completo, con la arroba.");
   if (!emailRule(e)) return `«@${e.slice(e.indexOf("@") + 1)}» no es un correo de la UDES. Use su correo institucional.`;
   return "";
 }
 
 /** Lo que Pilo pregunta al ver el dominio. */
 export function rolQuestion(rule: EmailRule): string {
-  if (rule.domain === "mail.udes.edu.co") return "Su correo es de @mail.udes.edu.co, el de estudiantes y profesores. ¿Cuál de los dos es usted?";
-  if (rule.campus) return `Su correo es de la sede ${campusLabel(rule.campus)}. ¿Es administrativo o profesor?`;
-  return "Su correo es administrativo. ¿Es administrativo o profesor?";
+  if (rule.domain === "mail.udes.edu.co") return tr("Su correo es de @mail.udes.edu.co, el de estudiantes y profesores. ¿Cuál de los dos es usted?");
+  if (rule.campus) return tr("Su correo es de la sede {v0}. ¿Es administrativo o profesor?", { v0: campusLabel(rule.campus) });
+  return tr("Su correo es administrativo. ¿Es administrativo o profesor?");
 }
 
 /* --- El nombre, el usuario y la contraseña ---------------------------------------------------- */
@@ -112,10 +113,10 @@ export const cleanUsername = (username: string): string => username.trim().toLow
 /** Qué le falta a un nombre de usuario, o "" si sirve. */
 export function usernameProblem(username: string): string {
   const u = cleanUsername(username);
-  if (!u) return "Escriba un nombre de usuario.";
-  if (!USERNAME.test(u)) return "El usuario lleva de 4 a 20 caracteres: letras minúsculas, números, punto o guion bajo.";
-  if (/^[._]|[._]$|[._]{2}/.test(u)) return "El usuario no puede empezar ni terminar con punto o guion bajo, ni llevar dos seguidos.";
-  if (RESERVED.includes(u.replace(/[._]/g, "")) || RESERVED.includes(u)) return "Ese nombre de usuario está reservado. Elija otro.";
+  if (!u) return tr("Escriba un nombre de usuario.");
+  if (!USERNAME.test(u)) return tr("El usuario lleva de 4 a 20 caracteres: letras minúsculas, números, punto o guion bajo.");
+  if (/^[._]|[._]$|[._]{2}/.test(u)) return tr("El usuario no puede empezar ni terminar con punto o guion bajo, ni llevar dos seguidos.");
+  if (RESERVED.includes(u.replace(/[._]/g, "")) || RESERVED.includes(u)) return tr("Ese nombre de usuario está reservado. Elija otro.");
   return "";
 }
 
@@ -135,8 +136,8 @@ export const cleanName = (name: string): string => name.replace(/\s+/g, " ").tri
 
 export function nameProblem(fullName: string): string {
   const n = cleanName(fullName);
-  if (n.length < 3) return "Escriba su nombre completo.";
-  if (n.length > 120) return "El nombre es demasiado largo: hasta 120 caracteres.";
+  if (n.length < 3) return tr("Escriba su nombre completo.");
+  if (n.length > 120) return tr("El nombre es demasiado largo: hasta 120 caracteres.");
   return "";
 }
 
@@ -153,9 +154,9 @@ export const passwordChecks = (password: string): PasswordChecks => ({ len: pass
 
 /** Qué le falta a una contraseña, o "" si sirve. */
 export function passwordProblem(password: string): string {
-  if (password.length < 8) return "La contraseña lleva 8 caracteres o más.";
-  if (password.length > 72) return "La contraseña es demasiado larga: hasta 72 caracteres.";
-  if (!/[a-zA-Z]/.test(password) || !/\d/.test(password)) return "La contraseña lleva al menos una letra y un número.";
+  if (password.length < 8) return tr("La contraseña lleva 8 caracteres o más.");
+  if (password.length > 72) return tr("La contraseña es demasiado larga: hasta 72 caracteres.");
+  if (!/[a-zA-Z]/.test(password) || !/\d/.test(password)) return tr("La contraseña lleva al menos una letra y un número.");
   return "";
 }
 
@@ -203,11 +204,11 @@ export function stepProblem(step: RegStep, data: RegData): StepProblem | null {
   const rule = emailRule(data.email);
   const bad = (field: StepProblem["field"], message: string): StepProblem | null => (message ? { field, message } : null);
   if (step === "correo") return bad("email", emailProblem(data.email));
-  if (step === "perfil") return bad("rol", rule && data.rol && rule.roles.includes(data.rol) ? "" : "Elija su perfil en la universidad.");
-  if (step === "sede") return bad("campus", rule?.campus || isCampus(data.campus) ? "" : "Elija su sede: Bucaramanga, Cúcuta, Valledupar o Bogotá.");
+  if (step === "perfil") return bad("rol", rule && data.rol && rule.roles.includes(data.rol) ? "" : tr("Elija su perfil en la universidad."));
+  if (step === "sede") return bad("campus", rule?.campus || isCampus(data.campus) ? "" : tr("Elija su sede: Bucaramanga, Cúcuta, Valledupar o Bogotá."));
   if (step === "identidad") return bad("fullName", nameProblem(data.fullName)) ?? bad("username", usernameProblem(data.username));
   if (step === "clave") return bad("password", passwordProblem(data.password));
-  return bad("nick", data.nick.replace(/\s+/g, " ").trim().length > 40 ? "Hasta 40 caracteres." : "") ?? bad("terms", data.terms ? "" : "Para crear la cuenta, lea y acepte los términos.");
+  return bad("nick", data.nick.replace(/\s+/g, " ").trim().length > 40 ? tr("Hasta 40 caracteres.") : "") ?? bad("terms", data.terms ? "" : tr("Para crear la cuenta, lea y acepte los términos."));
 }
 
 /** El primer paso incompleto: hasta ahí puede llegar la persona. */
@@ -290,14 +291,14 @@ export function cuentaFailure(status: number, body: unknown): CuentaFailure {
   if (code === "limite") {
     const n = Number(b.retry_after);
     const retryAfter = Number.isFinite(n) && n > 0 ? Math.ceil(n) : undefined;
-    return { code, message: `${said || FALLBACK.limite}${retryAfter ? ` Podrá intentarlo de nuevo en ${waitText(retryAfter)}.` : ""}`, retryAfter };
+    return { code, message: `${said || FALLBACK.limite}${retryAfter ? tr(" Podrá intentarlo de nuevo en {v0}.", { v0: waitText(retryAfter) }) : ""}`, retryAfter };
   }
   // Sin código conocido: lo que dijo la función (siempre en palabras de la persona), o un texto de la página.
   if (code === "desconocido") return { code, message: said || FALLBACK.desconocido };
   return { code, message: said || FALLBACK[code] };
 }
 
-export const cuentaMessage = (code: CuentaCode): string => FALLBACK[code];
+export const cuentaMessage = (code: CuentaCode): string => tr(FALLBACK[code]);
 
 /** A qué paso del registro pertenece un error del servidor; null = no es de un campo (se dice donde esté la persona). */
 export function registerErrorStep(code: CuentaCode, steps: RegStep[]): RegStep | null {
@@ -403,12 +404,12 @@ export function personCard(account: PiloAccount): { name: string; under: string;
 /** Una muestra de cómo cambia la respuesta con el nombre, el tono y la extensión. Es un ejemplo: no la escribe la IA. */
 export function previewAnswer(nick: string, tone: Tone, length: Length): string {
   const name = cleanNick(nick);
-  const open = { cercano: name ? `¡Claro, ${name}!` : "¡Claro!", formal: name ? `Con gusto, ${name}.` : "Con gusto.", directo: name ? `${name}:` : "" }[tone];
+  const open = { cercano: name ? tr("¡Claro, {name}!", { name }) : tr("¡Claro!"), formal: name ? tr("Con gusto, {name}.", { name }) : tr("Con gusto."), directo: name ? `${name}:` : "" }[tone];
   const body = {
-    corta: "Una rúbrica dice qué se evalúa y con qué niveles.",
-    normal: "Una rúbrica dice qué se evalúa y con qué niveles. Así se sabe desde el inicio cómo se calificará un trabajo.",
+    corta: tr("Una rúbrica dice qué se evalúa y con qué niveles."),
+    normal: tr("Una rúbrica dice qué se evalúa y con qué niveles. Así se sabe desde el inicio cómo se calificará un trabajo."),
     detallada:
-      "Una rúbrica dice qué se evalúa y con qué niveles. Así se sabe desde el inicio cómo se calificará un trabajo. Por ejemplo, en un proyecto puede valorar el diseño, las pruebas y la documentación por separado.",
+      tr("Una rúbrica dice qué se evalúa y con qué niveles. Así se sabe desde el inicio cómo se calificará un trabajo. Por ejemplo, en un proyecto puede valorar el diseño, las pruebas y la documentación por separado."),
   }[length];
   return [open, body].filter(Boolean).join(" ");
 }

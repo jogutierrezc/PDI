@@ -27,6 +27,7 @@ import { ASK_SPACES, isAskSpace } from "../pregunta/space";
 import type { SpaceId } from "../pregunta/space";
 import { PAGE_CAPTURE_CHARS, PAGE_PASSAGE_CHARS, PAGE_PASSAGES, pageUrl } from "../../components/pilo/ai/logic";
 import { pickPassages } from "../pregunta/attach";
+import { tr } from "../../components/pilo/i18n";
 
 export type Lado = "der" | "izq";
 
@@ -243,8 +244,8 @@ export const captureStatus = (raw: unknown): CaptureStatus =>
 
 /** La línea del recibo. Vacía cuando no hay nada cierto que decir (descartada, bandeja llena, sin 0127). */
 export function captureLine(status: CaptureStatus): string {
-  if (status === "nueva" || status === "vista") return "Enviada a Planeación para guardarla en mi memoria";
-  if (status === "guardada") return "Ya está en mi memoria";
+  if (status === "nueva" || status === "vista") return tr("Enviada a Planeación para guardarla en mi memoria");
+  if (status === "guardada") return tr("Ya está en mi memoria");
   return "";
 }
 
@@ -285,11 +286,13 @@ export function widgetAllowed(widget: { on: boolean; origins: string[] } | null 
 }
 
 /** La línea que se pega en el otro portal. Otro espacio de Pilo se pide con `data-pilo`. */
-export function widgetSnippet(origin: string, tema: Tema, lado: Lado, space: SpaceId = "planeacion", read: boolean | LeerModo = false): string {
+export function widgetSnippet(origin: string, tema: Tema, lado: Lado, space: SpaceId = "planeacion", read: boolean | LeerModo = false, lang: "es" | "en" | "pt" = "es"): string {
   const pilo = isAskSpace(space) && space !== "planeacion" ? ` data-pilo="${space}"` : "";
   // Leer la página (0127) se pide en la línea: quien administra ese portal lo ve y lo decide.
   const leer = leerAttr(read);
-  return `<script src="${origin.replace(/\/+$/, "")}/pilo.js"${pilo} data-tema="${tema}" data-esquina="${lado === "izq" ? "izquierda" : "derecha"}"${leer} defer></script>`;
+  // El idioma con que arranca el chat (la persona puede cambiarlo dentro): sin atributo, español.
+  const idioma = lang === "en" || lang === "pt" ? " data-lang=\"" + lang + "\"" : "";
+  return `<script src="${origin.replace(/\/+$/, "")}/pilo.js"${pilo} data-tema="${tema}" data-esquina="${lado === "izq" ? "izquierda" : "derecha"}"${leer}${idioma} defer></script>`;
 }
 
 /** El atributo de la línea: nada, data-leer="si" o data-leer="todo". `true` es «si», como antes. */

@@ -2292,6 +2292,36 @@ const ASK_PERSONA = [
   "Hablas en español de Colombia, en masculino y de usted, con frases cortas, claras y cercanas, sin tecnicismos.",
 ].join(" ");
 
+/* --- El idioma de la respuesta ------------------------------------------------------------
+   Mr. Pilo piensa y guarda todo en español de Colombia. Quien lo prefiere en inglés o en
+   portugués lo pide desde la pantalla (`lang`): lo que cambia es el idioma en que se redacta
+   la respuesta y el de las negativas fijas. Las cifras, las citas [n] y los nombres propios
+   no cambian. Sin `lang`, o con «es», el pedido es el de siempre, letra por letra. */
+export type Lang = "es" | "en" | "pt";
+export const parseLang = (value: unknown): Lang => (value === "en" || value === "pt" ? value : "es");
+
+const LANG_RULE: Record<Exclude<Lang, "es">, string> = {
+  en: "IDIOMA DE LA RESPUESTA (manda sobre cualquier otra mención del idioma en estas instrucciones, incluidas «en español» y «de usted»): la persona usa Mr. Pilo en inglés. Responde SIEMPRE en inglés claro y cercano, sin tecnicismos, tratando a la persona de «you». Los bloques de datos están en español: tradúcelos al responder sin cambiar ninguna cifra, fecha, sigla ni número de fuente [n]. Deja en español, tal como se escriben en la universidad, los nombres propios (programas, sedes, oficinas, documentos oficiales y siglas como UDES, PDI, SNIES); la primera vez puedes añadir entre paréntesis una explicación breve en inglés. No presentes tu traducción como traducción oficial.",
+  pt: "IDIOMA DA RESPOSTA (manda sobre qualquer outra menção ao idioma nestas instruções, incluídas «em espanhol» e «de usted»): a pessoa usa o Mr. Pilo em português. Responde SEMPRE em português do Brasil claro e próximo, sem tecnicismos, tratando a pessoa por «você». Os blocos de dados estão em espanhol: traduza-os ao responder sem mudar nenhuma cifra, data, sigla nem número de fonte [n]. Deixa em espanhol, como se escrevem na universidade, os nomes próprios (programas, sedes, escritórios, documentos oficiais e siglas como UDES, PDI, SNIES); na primeira vez pode acrescentar entre parênteses uma explicação breve em português. Não apresentes a tua tradução como tradução oficial.",
+};
+
+/** La regla del idioma, o nada si es español. */
+export const languageRule = (lang?: Lang | null): string => (lang === "en" || lang === "pt" ? LANG_RULE[lang] : "");
+
+/** Las negativas fijas (dinero y datos de personas), en cada idioma. En español salen de RULE_TEXT. */
+const VETO_TEXT: Record<Exclude<Lang, "es">, Record<"dinero" | "personas", string>> = {
+  en: {
+    dinero: "I can't give you that figure: budget and money values are not published in the university's open portals, so they are not part of what I know. I can tell you how the pillars, projects and indicators are progressing.",
+    personas: "I don't share personal data: no names with grades, documents or contacts. I can give you aggregated figures by program, campus or period.",
+  },
+  pt: {
+    dinero: "Não posso lhe dar essa cifra: os valores de orçamento e dinheiro não são publicados nos portais abertos da universidade, então não fazem parte do que eu conheço. Posso contar como avançam os pilares, os projetos e os indicadores.",
+    personas: "Não compartilho dados de pessoas: nem nomes com notas, nem documentos, nem contatos. Posso lhe dar cifras agregadas, por programa, campus ou período.",
+  },
+};
+
+export const vetoText = (veto: "dinero" | "personas", lang: Lang, fallback: string): string => (lang === "es" ? fallback : VETO_TEXT[lang][veto]);
+
 const askRules = (official: string) => [
   "Cómo respondes:",
   "1. Responde siempre la pregunta concreta, en español: de 2 a 6 frases o una lista corta. Puedes usar Markdown básico (negritas y listas cortas); sin títulos, sin tablas y sin JSON.",
@@ -2847,6 +2877,8 @@ export interface AskPrompt {
   tone?: string;
   /** El modo secreto que la persona activó en el chat. Sin él, el pedido es el de siempre. */
   modo?: Modo;
+  /** El idioma en que la persona usa a Pilo. Sin él, o «es», el pedido es el de siempre. */
+  lang?: Lang;
   /** El archivo que la persona adjuntó (0119). Sin él, el pedido es el de siempre. */
   doc?: AskDoc;
   /** La página que la persona está viendo, en otro portal (0127). */
@@ -2876,6 +2908,7 @@ export function buildAskMessages(plan: AskPlan, prompt: AskPrompt): ChatMessage[
     prompt.space ? spacePersona(prompt.space) : ASK_PERSONA,
     prompt.space ? askRules("de la universidad") : ASK_RULES,
     plan.facts ? ASK_FIGURES_RULE : "",
+    languageRule(prompt.lang),
     // Solo si alguna fuente es de otro ámbito (0122): sin lectura de visita, el pedido es el de siempre.
     visitRule(plan.sources),
     roleInstruction(prompt.rol ?? "general", prompt.tone),

@@ -13,6 +13,7 @@
    ========================================================================== */
 
 import { useSyncExternalStore } from "react";
+import { effectiveLang } from "./i18n/lang";
 
 const KEY = "pilo:voz";
 
@@ -57,6 +58,32 @@ export function pickVoice<T extends Pick<SpeechSynthesisVoice, "name" | "lang" |
 
 /** Las voces cargan tarde en Chrome y Edge: se espera a voiceschanged, con tope. */
 let voicePromise: Promise<SpeechSynthesisVoice | null> | null = null;
+/** Las voces del navegador; cargan tarde, así que se espera a voiceschanged con tope. */
+function voicesReady(): Promise<SpeechSynthesisVoice[]> {
+  return new Promise((resolve) => {
+    if (!voiceSupported()) return resolve([]);
+    const synth = window.speechSynthesis;
+    const now = synth.getVoices();
+    if (now.length) return resolve(now);
+    const done = () => {
+      synth.removeEventListener("voiceschanged", done);
+      clearTimeout(timer);
+      resolve(synth.getVoices());
+    };
+    const timer = setTimeout(done, 1500);
+    synth.addEventListener("voiceschanged", done);
+  });
+}
+
+/** Una voz del navegador en el idioma pedido (la primera de ese idioma), o null si no hay. */
+async function voiceFor(lang: "en" | "pt"): Promise<SpeechSynthesisVoice | null> {
+  const all = await voicesReady();
+  const prefix = lang === "en" ? "en" : "pt";
+  const preferred = lang === "en" ? "en-us" : "pt-br";
+  const mine = all.filter((v) => v.lang.toLowerCase().startsWith(prefix));
+  return mine.find((v) => v.lang.toLowerCase() === preferred) ?? mine[0] ?? null;
+}
+
 function bestVoice(): Promise<SpeechSynthesisVoice | null> {
   if (!voiceSupported()) return Promise.resolve(null);
   if (voicePromise) return voicePromise;
@@ -125,9 +152,11 @@ export async function speak(text: string, options: { force?: boolean; rate?: num
   if (!clean) return;
   const synth = window.speechSynthesis;
   synth.cancel();
-  const voice = await bestVoice();
+  // En inglés o portugués, la voz del navegador es una de ese idioma (la oficial de Pilo lee por Fish Audio, no por aquí).
+  const lang = effectiveLang();
+  const voice = lang === "es" ? await bestVoice() : await voiceFor(lang);
   const utterance = new SpeechSynthesisUtterance(clean);
-  utterance.lang = voice?.lang ?? "es-CO";
+  utterance.lang = voice?.lang ?? (lang === "en" ? "en-US" : lang === "pt" ? "pt-BR" : "es-CO");
   if (voice) utterance.voice = voice;
   // Con voz masculina, su tono natural; si el equipo solo tiene voces femeninas, más grave.
   utterance.rate = options.rate ?? 1.02;

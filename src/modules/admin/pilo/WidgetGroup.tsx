@@ -67,11 +67,12 @@ export function WidgetGroup({ ed }: { ed: EditorApi }) {
   const [tema, setTema] = useState<Tema>("blanco");
   const [lado, setLado] = useState<Lado>("der");
   const [leer, setLeer] = useState<LeerModo>("no");
+  const [idioma, setIdioma] = useState<"es" | "en" | "pt">("es");
   const [copied, setCopied] = useState<"si" | "no" | null>(null);
   const code = useRef<HTMLElement>(null);
 
   const origins = s.widget_origins;
-  const snippet = widgetSnippet(window.location.origin, tema, lado, "planeacion", leer);
+  const snippet = widgetSnippet(window.location.origin, tema, lado, "planeacion", leer, idioma);
   const askPublic = Boolean(s.portals.pregunta?.on) && s.portals.pregunta?.aud === "publico";
 
   const add = (e: FormEvent) => {
@@ -187,6 +188,20 @@ export function WidgetGroup({ ed }: { ed: EditorApi }) {
             ))}
           </span>
         </div>
+        <span className="pis-seg pis-seg--sm" role="radiogroup" aria-label="Idioma con que abre el chat">
+          {(
+            [
+              ["es", "Español"],
+              ["en", "English"],
+              ["pt", "Português"],
+            ] as const
+          ).map(([id, label]) => (
+            <button key={id} type="button" role="radio" aria-checked={idioma === id} onClick={() => setIdioma(id)}>
+              {label}
+            </button>
+          ))}
+        </span>
+        <p className="pis-small">El chat abre en ese idioma; la persona puede cambiarlo desde el botón ES · EN · PT.</p>
         <LeerPicker value={leer} onChange={setLeer} />
         <pre tabIndex={0}>
           <code ref={code}>{snippet}</code>

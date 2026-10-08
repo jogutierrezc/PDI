@@ -29,6 +29,7 @@ import { isSuperMode, sentenceTone, SUPER } from "../pregunta/super/modes";
 import { reducedMotion } from "./pwa";
 import { Icon } from "./icons";
 import { FileChip, FileFoot, FileLog } from "../pregunta/Extras";
+import { tr, trn, useLang } from "../../components/pilo/i18n";
 
 /** Lo que se ve de una respuesta mientras el servidor la escribe. No se guarda. */
 export interface Live {
@@ -112,6 +113,7 @@ export function AppTurn({
   /** Guardar o quitar de las guardadas. Sin cuenta, quien lo recibe invita a registrarse. */
   onSave?: (trigger: HTMLElement, viaKeyboard: boolean) => void;
 }) {
+  useLang();
   const a = turn.answer;
   const pending = !a && !turn.error;
   const streaming = pending && Boolean(stream?.text);
@@ -245,10 +247,10 @@ export function AppTurn({
   return (
     <>
       <div className="pa-me" ref={question}>
-        <span className="pa-sr">Usted: </span>
+        <span className="pa-sr">{tr("Usted:")} </span>
         {turn.file && (
           <span className="px-asked">
-            <FileChip name={turn.file.name} detail={`${turn.file.total} ${turn.file.total === 1 ? "pasaje" : "pasajes"} · leído aquí`} />
+            <FileChip name={turn.file.name} detail={trn(turn.file.total, tr("{n} pasaje · leído aquí"), tr("{n} pasajes · leído aquí"))} />
           </span>
         )}
         {turn.q}
@@ -296,18 +298,18 @@ export function AppTurn({
 
           {turn.error && (
             <div className="pa-warn" role="alert">
-              <span>{a ? `${turn.error} Lo que alcanzó a escribir quedó incompleto.` : turn.error}</span>
+              <span>{a ? tr("{error} Lo que alcanzó a escribir quedó incompleto.", { error: turn.error }) : turn.error}</span>
               <button type="button" onClick={onRetry}>
-                Preguntar de nuevo
+                {tr("Preguntar de nuevo")}
               </button>
             </div>
           )}
 
           {a && incomplete && !turn.error && (
             <div className="pa-warn">
-              <span>Detuvo la respuesta: lo escrito quedó incompleto.</span>
+              <span>{tr("Detuvo la respuesta: lo escrito quedó incompleto.")}</span>
               <button type="button" onClick={onRetry}>
-                Preguntar de nuevo
+                {tr("Preguntar de nuevo")}
               </button>
             </div>
           )}
@@ -320,33 +322,33 @@ export function AppTurn({
                   {note}
                 </p>
               ))}
-              {a.unknown && a.unknown.length > 0 && <p className="pa-note">Revise estos números antes de citarlos: no los encontré en las fuentes ({a.unknown.join(", ")}).</p>}
+              {a.unknown && a.unknown.length > 0 && <p className="pa-note">{tr("Revise estos números antes de citarlos: no los encontré en las fuentes ({numbers}).", { numbers: a.unknown.join(", ") })}</p>}
               <div className="pa-after">
                 {listed.length > 0 && (
                   <button type="button" className="pa-src" onClick={(e) => onSources(listed, null, e.currentTarget)}>
-                    Fuentes ({listed.length})
+                    {tr("Fuentes")} ({listed.length})
                   </button>
                 )}
                 {onSave && !incomplete && !turn.error && !turn.local && text.trim() && (
                   <button type="button" className="pa-src pa-keep" aria-pressed={saved} aria-busy={saving || undefined} disabled={saving} onClick={(e) => onSave(e.currentTarget, e.detail === 0)}>
                     {saved ? Icon.check : Icon.mark}
-                    {saved ? "Guardada" : "Guardar"}
+                    {saved ? tr("Guardada") : tr("Guardar")}
                   </button>
                 )}
                 {voice.advanced && text.trim() && (
-                  <button type="button" className="pa-act" aria-pressed={reading !== null} aria-label={reading !== null ? "Dejar de leer" : "Escuchar la respuesta con la voz de Pilo"} onClick={() => void read()}>
+                  <button type="button" className="pa-act" aria-pressed={reading !== null} aria-label={reading !== null ? tr("Dejar de leer") : tr("Escuchar la respuesta con la voz de Pilo")} onClick={() => void read()}>
                     {reading !== null ? Icon.stop : Icon.listen}
                   </button>
                 )}
-                <button type="button" className="pa-act" aria-label={copied ? "Copiada" : "Copiar la respuesta con sus fuentes"} aria-pressed={copied} onClick={copy}>
+                <button type="button" className="pa-act" aria-label={copied ? tr("Copiada") : tr("Copiar la respuesta con sus fuentes")} aria-pressed={copied} onClick={copy}>
                   {copied ? Icon.check : Icon.copy}
                 </button>
                 {a.kind !== "regla" && !incomplete && !turn.local && (
                   <>
-                    <button type="button" className="pa-act" aria-pressed={turn.vote === "up"} aria-label="Me sirvió" onClick={() => onVote("up")}>
+                    <button type="button" className="pa-act" aria-pressed={turn.vote === "up"} aria-label={tr("Me sirvió")} onClick={() => onVote("up")}>
                       {Icon.up}
                     </button>
-                    <button type="button" className="pa-act" aria-pressed={turn.vote === "down"} aria-label="No me sirvió" onClick={() => onVote("down")}>
+                    <button type="button" className="pa-act" aria-pressed={turn.vote === "down"} aria-label={tr("No me sirvió")} onClick={() => onVote("down")}>
                       {Icon.down}
                     </button>
                   </>

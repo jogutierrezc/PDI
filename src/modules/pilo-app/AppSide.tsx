@@ -24,6 +24,7 @@ import { dayLabel } from "./saved";
 import type { SavedEntry } from "./saved";
 import { Icon } from "./icons";
 import { PolicyLink } from "./terms/PolicyLink";
+import { tr, useLang, LangSwitch } from "../../components/pilo/i18n";
 
 /** Desde este ancho la app usa la disposición de escritorio. */
 export const WIDE_QUERY = "(min-width: 960px)";
@@ -57,6 +58,7 @@ export interface Person {
 
 /** El bloque de la persona: con cuenta lleva a su perfil; sin ella, a crearla o a entrar. */
 export function PersonBlock({ person, current = false, onGo }: { person: Person; current?: boolean; onGo?: () => void }) {
+  useLang();
   if (person.card) {
     return (
       <Link className="pa-who" to={APP_PROFILE} aria-current={current ? "page" : undefined} onClick={onGo}>
@@ -78,7 +80,7 @@ export function PersonBlock({ person, current = false, onGo }: { person: Person;
         </span>
         <span>
           <b>{person.intranet}</b>
-          <small>Cuenta de la intranet</small>
+          <small>{tr("Cuenta de la intranet")}</small>
         </span>
       </Link>
     );
@@ -86,18 +88,18 @@ export function PersonBlock({ person, current = false, onGo }: { person: Person;
   return (
     <div className="pa-join">
       <p>
-        <b>Sin cuenta.</b> Con una, Pilo le responde a su medida, guarda respuestas y le da más cupo.
+        <b>{tr("Sin cuenta.")}</b> {tr("Con una, Pilo le responde a su medida, guarda respuestas y le da más cupo.")}
       </p>
       <div className="pa-join__go">
         <Link className="pa-btn pa-join__main" to={APP_ACCOUNT} onClick={onGo}>
-          Crear cuenta
+          {tr("Crear cuenta")}
         </Link>
         <Link className="pa-btn pa-join__line" to={APP_LOGIN} onClick={onGo}>
-          Entrar
+          {tr("Entrar")}
         </Link>
       </div>
       <Link className="pa-join__prefs" to={APP_PROFILE} aria-current={current ? "page" : undefined} onClick={onGo}>
-        Mis preferencias y el tema
+        {tr("Mis preferencias y el tema")}
       </Link>
     </div>
   );
@@ -167,6 +169,7 @@ export function AppSide({
   onTheme: (theme: AppTheme) => void;
   onWelcome: () => void;
 }) {
+  useLang();
   const [all, setAll] = useState(false);
   const [settings, setSettings] = useState(false);
   const pop = useRef<HTMLDivElement>(null);
@@ -199,9 +202,9 @@ export function AppSide({
       <div className="pa-side__top">
         <p className="pa-side__brand">
           Mr. Pilo
-          <small>Universidad de Santander</small>
+          <small>{tr("Universidad de Santander")}</small>
         </p>
-        <div className="pa-side__two" role="group" aria-label="Con cuál Pilo">
+        <div className="pa-side__two" role="group" aria-label={tr("Con cuál Pilo")}>
           {APP_SPACES.map((id) => (
             <button key={id} type="button" aria-pressed={active === "chat" && id === space} onClick={() => onSwitch(id)}>
               {APP_PILOS[id].short}
@@ -210,17 +213,17 @@ export function AppSide({
         </div>
         <button type="button" className="pa-sl pa-sl--new" onClick={onNew}>
           {Icon.plus}
-          <span>Nueva conversación</span>
+          <span>{tr("Nueva conversación")}</span>
         </button>
       </div>
 
-      <nav className="pa-side__nav" aria-label="Secciones de la app">
-        <p className="pa-side__label">{person.clases ? "Para estudiar" : "Mi Pilo"}</p>
+      <nav className="pa-side__nav" aria-label={tr("Secciones de la app")}>
+        <p className="pa-side__label">{person.clases ? tr("Para estudiar") : tr("Mi Pilo")}</p>
         {/* Mis clases (clases/) y Gemini: solo para estudiantes y profesores con cuenta. */}
         {person.clases && (
           <Link className="pa-sl" to={APP_CLASSES} aria-current={active === "clases" ? "page" : undefined}>
             {StudyIcon.classes}
-            <span>Mis clases</span>
+            <span>{tr("Mis clases")}</span>
             <em>beta</em>
           </Link>
         )}
@@ -228,27 +231,27 @@ export function AppSide({
         {person.notas && (
           <Link className="pa-sl" to={APP_GRADES} aria-current={active === "notas" ? "page" : undefined}>
             {StudyIcon.grades}
-            <span>Mis notas</span>
+            <span>{tr("Mis notas")}</span>
             <em>beta</em>
           </Link>
         )}
         {person.clases && (
-          <a className="pa-sl" href={APP_GEMINI} target="_blank" rel="noopener noreferrer" title="Se abre aparte, con su cuenta de la universidad">
+          <a className="pa-sl" href={APP_GEMINI} target="_blank" rel="noopener noreferrer" title={tr("Se abre aparte, con su cuenta de la universidad")}>
             {StudyIcon.gemini}
             <span>Gemini</span>
-            <em data-new>Nuevo</em>
+            <em data-new>{tr("Nuevo")}</em>
           </a>
         )}
         <Link className="pa-sl" to={APP_SAVED} aria-current={active === "guardadas" ? "page" : undefined}>
           {Icon.mark}
-          <span>Guardadas</span>
+          <span>{tr("Guardadas")}</span>
           {person.saved !== null && <em aria-label={`${person.saved} guardadas`}>{person.saved}</em>}
         </Link>
 
         <p className="pa-side__label" id="pa-s-convs">
-          Conversaciones
+          {tr("Conversaciones")}
         </p>
-        {saved.length === 0 && <p className="pa-side__empty">Sus conversaciones quedan aquí, solo en este dispositivo.</p>}
+        {saved.length === 0 && <p className="pa-side__empty">{tr("Sus conversaciones quedan aquí, solo en este dispositivo.")}</p>}
         <ul aria-labelledby="pa-s-convs">
           {shown.map((entry) => {
             const on = active === "chat" && entry.space === space && entry.id === currentId;
@@ -263,7 +266,7 @@ export function AppSide({
                     </small>
                   </span>
                 </button>
-                <button type="button" className="pa-icon" onClick={() => onDelete(entry)} aria-label={`Borrar la conversación «${entry.title}»`}>
+                <button type="button" className="pa-icon" onClick={() => onDelete(entry)} aria-label={tr("Borrar la conversación «{title}»", { title: entry.title })}>
                   {Icon.trash}
                 </button>
               </li>
@@ -272,7 +275,7 @@ export function AppSide({
         </ul>
         {!few && (
           <button type="button" className="pa-sl pa-sl--more" aria-expanded={all} onClick={() => setAll(!all)}>
-            <span>{all ? "Ver solo las recientes" : `Ver las ${saved.length} conversaciones`}</span>
+            <span>{all ? tr("Ver solo las recientes") : tr("Ver las {length} conversaciones", { length: saved.length })}</span>
           </button>
         )}
       </nav>
@@ -288,12 +291,16 @@ export function AppSide({
           onClick={() => setSettings(!settings)}
         >
           {StudyIcon.settings}
-          <span>Ajustes</span>
+          <span>{tr("Ajustes")}</span>
         </button>
         {settings && (
-          <div className="pa-side__pop" id="pa-s-ajustes" ref={pop} role="group" aria-label="Ajustes">
+          <div className="pa-side__pop" id="pa-s-ajustes" ref={pop} role="group" aria-label={tr("Ajustes")}>
+            <p className="pa-side__label" id="pa-s-idioma">
+              {tr("Idioma")}
+            </p>
+            <LangSwitch />
             <p className="pa-side__label" id="pa-s-tema">
-              Tema
+              {tr("Tema")}
             </p>
             <div className="pa-temas" role="group" aria-labelledby="pa-s-tema">
               {APP_THEMES.map((t) => (
@@ -301,7 +308,7 @@ export function AppSide({
                   <span className="pa-tema__ring">
                     <i className="pa-swatch" data-tema={t.id} aria-hidden="true" />
                   </span>
-                  {t.label}
+                  {tr(t.label)}
                 </button>
               ))}
             </div>
@@ -314,12 +321,12 @@ export function AppSide({
               }}
             >
               {Icon.listen}
-              <span>Ver la bienvenida</span>
+              <span>{tr("Ver la bienvenida")}</span>
             </button>
             {/* La política de uso completa (terms/): página pública, fuera de la app. */}
             <PolicyLink className="pa-sl">
               {StudyIcon.policy}
-              <span>Política de uso</span>
+              <span>{tr("Política de uso")}</span>
             </PolicyLink>
           </div>
         )}
@@ -330,12 +337,13 @@ export function AppSide({
 
 /** El marco de una pantalla que no es la conversación. */
 export function AppPage({ title, tag, lead, home, side, children }: { title: string; /** Una etiqueta junto al título («Beta»). */ tag?: string; lead: string; home: string; side: ReactNode; children: ReactNode }) {
+  useLang();
   return (
     <div className="pa-frame pa-frame--page">
       {side}
       <header className="pa-bar pa-bar--page">
         <div className="pa-bar__in">
-          <Link className="pa-icon" to={home} aria-label="Volver a conversar con Pilo">
+          <Link className="pa-icon" to={home} aria-label={tr("Volver a conversar con Pilo")}>
             {Icon.back}
           </Link>
           <div className="pa-bar-id">

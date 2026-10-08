@@ -18,6 +18,7 @@
 
 import { audioKey, voiceBody } from "../../components/pilo/ai/client";
 import { modulateVoice, normalizeMood } from "../../components/pilo/ai/voice-expressions";
+import { localizeDeep } from "../../components/pilo/i18n";
 import type { MojiMood } from "../../components/pilo/PiloMoji";
 import type { AppVoice, Door } from "./access";
 import type { SpaceId } from "../pregunta/space";
@@ -76,8 +77,8 @@ export const ACCOUNT_BEAT: AppBeat = {
  * en vez de la elección de Pilo.
  */
 export function welcomeBeats(options: { desktop?: boolean; account?: boolean } = {}): AppBeat[] {
-  if (!options.desktop) return APP_BEATS;
-  return [DESK_HELLO, APP_BEATS[1], APP_BEATS[2], options.account ? ACCOUNT_BEAT : APP_BEATS[3]];
+  if (!options.desktop) return localizeDeep(APP_BEATS);
+  return localizeDeep([DESK_HELLO, APP_BEATS[1], APP_BEATS[2], options.account ? ACCOUNT_BEAT : APP_BEATS[3]]);
 }
 
 /** Lo que conoce Pilo, para la primera muestra: lo de sus dos versiones. */
@@ -121,7 +122,7 @@ export function voiceRequest(beat: AppBeat, voice: AppVoice): VoiceRequest {
  */
 export function welcomeVoicePlan(voice: AppVoice | null, options: { askRol?: boolean; beats?: AppBeat[] } = {}): VoiceRequest[] {
   if (!voice || !voice.advanced) return [];
-  const base = options.beats ?? APP_BEATS;
-  const beats = options.askRol ? [...base, ROLE_BEAT] : base;
+  const base = options.beats ?? localizeDeep(APP_BEATS);
+  const beats = options.askRol ? [...base, localizeDeep(ROLE_BEAT)] : base;
   return beats.map((b) => voiceRequest(b, voice));
 }

@@ -32,6 +32,7 @@ import { APP_ASKS, APP_KNOWS, APP_TITLE, ROLE_BEAT, voiceRequest, welcomeBeats, 
 import { keepOnlyVoices, prefetchOfficial, sayOfficial, stopOfficial } from "./official-voice";
 import { useFocusTrap } from "./Layer";
 import { reducedMotion } from "./pwa";
+import { tr, useLang, localizeDeep, LangSwitch } from "../../components/pilo/i18n";
 
 /** Ya hubo un toque o una tecla en esta página: el teléfono deja sonar. */
 const touched = () => typeof navigator !== "undefined" && Boolean((navigator as Navigator & { userActivation?: { hasBeenActive: boolean } }).userActivation?.hasBeenActive);
@@ -77,6 +78,7 @@ export function AppWelcome({
   /** Crear la cuenta o entrar con ella, desde la última parte. */
   onAccount?: (way: "registro" | "ingreso") => void;
 }) {
+  useLang();
   const stage = useRef<HTMLDivElement>(null);
   const holder = useRef<HTMLDivElement>(null);
   const pilo = useRef<PiloMojiHandle>(null);
@@ -89,7 +91,7 @@ export function AppWelcome({
   const [silent, setSilent] = useState(false);
 
   const beats = useMemo(() => welcomeBeats({ desktop, account: needsAccount }), [desktop, needsAccount]);
-  const current = asking ? ROLE_BEAT : beat >= 0 ? beats[beat] : null;
+  const current = asking ? localizeDeep(ROLE_BEAT) : beat >= 0 ? beats[beat] : null;
   // Habla si hay voz oficial, está encendida, ya hubo un toque y el servicio no ha fallado.
   const speaks = Boolean(voice) && voiceOn && armed && !silent;
 
@@ -303,11 +305,11 @@ export function AppWelcome({
   };
 
   const shown = Math.min(beat < 0 ? 0 : beat, beats.length - 1) + 1;
-  const moodLine = !voice || silent ? "La voz de Pilo no está disponible: lea a Pilo" : !voiceOn ? "Voz apagada" : !armed ? "Toque la pantalla para oír a Pilo" : `Voz de Pilo · ${current?.label ?? "Emocionado"}`;
-  const voiceLabel = !voice || silent ? "La voz de Pilo no está disponible ahora" : voiceOn ? "Voz de Pilo activada. Apagar" : "Voz de Pilo apagada. Activar";
+  const moodLine = !voice || silent ? tr("La voz de Pilo no está disponible: lea a Pilo") : !voiceOn ? tr("Voz apagada") : !armed ? tr("Toque la pantalla para oír a Pilo") : tr("Voz de Pilo · {mood}", { mood: tr(current?.label ?? "Emocionado") });
+  const voiceLabel = !voice || silent ? tr("La voz de Pilo no está disponible ahora") : voiceOn ? tr("Voz de Pilo activada. Apagar") : tr("Voz de Pilo apagada. Activar");
 
   return (
-    <div className="pa-w" ref={stage} data-escritorio={desktop || undefined} role="dialog" aria-modal="true" aria-label="Bienvenida de Mr. Pilo" tabIndex={-1}>
+    <div className="pa-w" ref={stage} data-escritorio={desktop || undefined} role="dialog" aria-modal="true" aria-label={tr("Bienvenida de Mr. Pilo")} tabIndex={-1}>
       <div className="pa-w-bg">
         <div className="pa-w-glow" />
         <div className="pa-w-rings" aria-hidden="true">
@@ -320,8 +322,9 @@ export function AppWelcome({
       <header className="pa-w-top">
         <div className="pa-w-brand">
           <b>Mr. Pilo</b>
-          Universidad de Santander
+          {tr("Universidad de Santander")}
         </div>
+        <LangSwitch className="pa-lang" />
         <button
           type="button"
           className="pa-sbtn pa-sbtn--icon"
@@ -334,7 +337,7 @@ export function AppWelcome({
           <VoiceIcon on={Boolean(voice) && !silent && voiceOn} />
         </button>
         <button type="button" className="pa-sbtn" onClick={skip}>
-          Saltar
+          {tr("Saltar")}
         </button>
       </header>
 
@@ -344,8 +347,8 @@ export function AppWelcome({
             <Pilo ref={pilo} size="100%" alive label="Mr. Pilo" />
           </div>
         </div>
-        <h1 className="pa-w-title" aria-label={APP_TITLE}>
-          {APP_TITLE.split(" ").map((word, i) => (
+        <h1 className="pa-w-title" aria-label={tr(APP_TITLE)}>
+          {tr(APP_TITLE).split(" ").map((word, i) => (
             <span key={i} className="pa-w-word" aria-hidden="true">
               {[...word].map((c, j) => (
                 <span key={j} className="ch">
@@ -375,7 +378,7 @@ export function AppWelcome({
             <div className="pa-w-demo">
               {APP_KNOWS.map((k) => (
                 <span key={k} className="pa-know">
-                  {k}
+                  {tr(k)}
                 </span>
               ))}
             </div>
@@ -384,7 +387,7 @@ export function AppWelcome({
             <div className="pa-w-demo">
               {APP_ASKS.map((q) => (
                 <span key={q} className="pa-qchip">
-                  {q}
+                  {tr(q)}
                 </span>
               ))}
             </div>
@@ -392,8 +395,8 @@ export function AppWelcome({
           {current?.id === "fuente" && (
             <div className="pa-w-demo">
               <div className="pa-ticket">
-                Cada respuesta dice de dónde viene
-                <em>CON SU FUENTE</em>
+                {tr("Cada respuesta dice de dónde viene")}
+                <em>{tr("CON SU FUENTE")}</em>
               </div>
             </div>
           )}
@@ -413,12 +416,12 @@ export function AppWelcome({
             <div className="pa-w-demo">
               <div className="pa-choose" role="group" aria-label={current.say}>
                 <button type="button" onClick={() => toAccount("registro")}>
-                  Crear mi cuenta
-                  <small>Con su correo de la UDES</small>
+                  {tr("Crear mi cuenta")}
+                  <small>{tr("Con su correo de la UDES")}</small>
                 </button>
                 <button type="button" onClick={() => toAccount("ingreso")}>
-                  Ya tengo cuenta
-                  <small>Entrar con mi usuario</small>
+                  {tr("Ya tengo cuenta")}
+                  <small>{tr("Entrar con mi usuario")}</small>
                 </button>
               </div>
             </div>
@@ -438,14 +441,14 @@ export function AppWelcome({
               <i />
             </span>
           ))}
-          <small aria-label={`Parte ${shown} de ${beats.length}`}>
-            {shown} de {beats.length}
+          <small aria-label={tr("Parte {shown} de {length}", { shown, length: beats.length })}>
+            {tr("{shown} de {total}", { shown, total: beats.length })}
           </small>
         </div>
         <div className="pa-w-actions">
           {!current?.pick && (
             <button type="button" className="pa-w-next" onClick={advance} disabled={beat < 0}>
-              Siguiente
+              {tr("Siguiente")}
             </button>
           )}
         </div>

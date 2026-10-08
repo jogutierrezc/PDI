@@ -32,6 +32,7 @@ import { ASK_SPACES, ROLE_QUESTION } from "./space";
 import type { Rol, SpaceProfile } from "./space";
 import { RolePicker } from "./RolePicker";
 import "./welcome.css";
+import { tr, useLang, LangSwitch } from "../../components/pilo/i18n";
 
 const reduced = () => typeof window !== "undefined" && window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
 const finePointer = () => typeof window !== "undefined" && window.matchMedia?.("(hover: hover) and (pointer: fine)").matches;
@@ -55,6 +56,7 @@ export function Welcome({
   rol?: Rol | null;
   onRol?: (rol: Rol) => void;
 }) {
+  useLang();
   const BEATS = space.beats;
   const TITLE = space.title;
   const total = BEATS.length + (askRol ? 1 : 0);
@@ -189,7 +191,7 @@ export function Welcome({
       root.querySelector<HTMLElement>(".apw-role button")?.focus({ preventScroll: true });
       if (voiceOn) {
         pilo.current?.talk(true);
-        void speak(ROLE_QUESTION, { force: true }).finally(() => pilo.current?.talk(false));
+        void speak(tr(ROLE_QUESTION), { force: true }).finally(() => pilo.current?.talk(false));
       }
     } else cta.current?.focus({ preventScroll: true });
     return () => {
@@ -251,7 +253,7 @@ export function Welcome({
 
   const b = beat >= 0 ? BEATS[beat] : null;
   const asking = done && askRol;
-  const say = asking ? ROLE_QUESTION : b?.say;
+  const say = asking ? tr(ROLE_QUESTION) : b?.say;
 
   return (
     <div className="apw" ref={stage} data-tema={tema} data-espacio={space.accent ?? undefined} role="dialog" aria-modal="true" aria-labelledby="apw-title">
@@ -268,15 +270,16 @@ export function Welcome({
           <b>{space.brand.strong}</b>
           {space.brand.text}
         </div>
+        <LangSwitch className="apw-lang" />
         <button type="button" className="apw-sbtn apw-push" aria-pressed={voiceOn} onClick={() => setVoiceOn((v) => !v)}>
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
             <path d="M4 10v4h4l5 4V6L8 10z" />
             <path d="M16.5 9a4 4 0 0 1 0 6" />
           </svg>
-          {voiceOn ? "Voz activada" : "Con voz"}
+          {voiceOn ? tr("Voz activada") : tr("Con voz")}
         </button>
         <button type="button" className="apw-sbtn" onClick={finish}>
-          Saltar
+          {tr("Saltar")}
         </button>
       </header>
 
@@ -356,24 +359,24 @@ export function Welcome({
             </span>
           ))}
           <small className="ap-num">
-            {asking ? total : Math.max(1, beat + 1)} de {total}
+            {tr("{shown} de {total}", { shown: asking ? total : Math.max(1, beat + 1), total })}
           </small>
         </div>
         <div className="apw-actions">
           {!done && (
             <button type="button" className="apw-next" ref={next} onClick={advance}>
-              Siguiente
+              {tr("Siguiente")}
             </button>
           )}
           <button type="button" className="apw-cta" ref={cta} onClick={finish} hidden={!done || askRol}>
-            Hacer mi primera pregunta
+            {tr("Hacer mi primera pregunta")}
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
               <path d="M5 12h14M13 6l6 6-6 6" />
             </svg>
           </button>
         </div>
         <span className="apw-hint">
-          Solo aparece la primera vez.{finePointer() ? " Mueva el puntero: Pilo lo sigue con la mirada." : " Toque Siguiente para avanzar."}
+          {tr("Solo aparece la primera vez.")}{finePointer() ? tr(" Mueva el puntero: Pilo lo sigue con la mirada.") : tr(" Toque Siguiente para avanzar.")}
         </span>
       </footer>
     </div>

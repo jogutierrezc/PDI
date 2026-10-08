@@ -185,7 +185,7 @@ export function AlertasSection() {
   const filas = useFilas();
   const guardar = useGuardar();
   const [prueba, setPrueba] = useState<{ estado: "idle" | "busy" | "ok" | "fail"; texto: string }>({ estado: "idle", texto: "" });
-  const [previa, setPrevia] = useState<KindAlerta | null>(null);
+  const [previa, setPrevia] = useState<{ kind: KindAlerta; simulacro: boolean } | null>(null);
   const [kind, setKind] = useState<KindAlerta>("sismo");
   const [confirma, setConfirma] = useState(false);
   const [urlEscrita, setUrlEscrita] = useState<string | null>(null);
@@ -353,7 +353,7 @@ export function AlertasSection() {
 
       <Group title="Ensayar la alerta">
         <p className="pis-lead">
-          La <b>vista previa</b> muestra la capa solo en esta pantalla. El <b>simulacro</b> la muestra a todos los usuarios de Pilo, marcada como simulacro, hasta que se termine: úselo con
+          La <b>vista previa</b> muestra la capa solo en esta pantalla, con la voz de Mr. Pilo. El <b>simulacro</b> la muestra a todos los usuarios de Pilo, marcada como simulacro, hasta que se termine: úselo con
           aviso previo.
         </p>
         <div className="pis-row">
@@ -368,8 +368,11 @@ export function AlertasSection() {
             </select>
           </label>
           <span className="pis-save__actions">
-            <button type="button" className="button-secondary" onClick={() => setPrevia(kind)}>
-              Ver vista previa
+            <button type="button" className="button-secondary" onClick={() => setPrevia({ kind, simulacro: false })}>
+              Ver como emergencia
+            </button>
+            <button type="button" className="button-secondary" onClick={() => setPrevia({ kind, simulacro: true })}>
+              Ver como simulacro
             </button>
             {simulacroActivo ? (
               <button type="button" className="button-primary" disabled={simulacro.isPending} onClick={() => simulacro.mutate("terminar")}>
@@ -422,7 +425,7 @@ export function AlertasSection() {
         )}
       </Group>
 
-      {previa && <AlertaVistaPrevia kind={previa} onClose={() => setPrevia(null)} />}
+      {previa && <AlertaVistaPrevia kind={previa.kind} simulacro={previa.simulacro} onClose={() => setPrevia(null)} />}
     </>
   );
 }

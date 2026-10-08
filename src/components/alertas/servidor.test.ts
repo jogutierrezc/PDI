@@ -7,7 +7,7 @@ import { resolve } from "node:path";
 import { createHash } from "node:crypto";
 import { describe, expect, it } from "vitest";
 import { alertasDeLista, direccionAluna, firmaAlunaValida, igualesEnTiempoConstante, normalizarAviso, planificarSync, tipoDeAlerta } from "./servidor-logica";
-import { DESPEJADO_MS, estadoCapa, filasDe, haceCuanto, textoParaLeer } from "./logic";
+import { DESPEJADO_MS, estadoCapa, filasDe, frasesParaLeer, haceCuanto, mensajeDespejado, pasosDe, presentar, tituloLimpio } from "./logic";
 import type { FilaAlerta } from "./logic";
 
 describe("tipoDeAlerta", () => {
@@ -141,11 +141,64 @@ describe("filasDe", () => {
   });
 });
 
-describe("textos", () => {
-  it("el simulacro se dice como simulacro", () => {
-    expect(textoParaLeer({ kind: "sismo", title: "Simulacro de sismo", body: "No es real.", source: "simulacro" })).toMatch(/^Esto es un simulacro\./);
-    expect(textoParaLeer({ kind: "incendio", title: "Incendio", body: "Bloque B.", source: "aluna" })).toMatch(/^Atención\. Incendio\./);
+describe("presentar (el diseño de Aluna)", () => {
+  const base = { title: "Alerta de incendio", body: "", source: "aluna" as const };
+  it("usa los colores y el título de la clase", () => {
+    const p = presentar({ ...base, kind: "incendio" });
+    expect(p).toMatchObject({ c1: "#7a1408", c2: "#ff9a52", ambiente: "incendio", simulacro: false, lineas: ["Alerta de", "incendio"], subtitulo: null });
+    expect(presentar({ ...base, kind: "sismo" })).toMatchObject({ c1: "#2e1065", ambiente: "sismo", entendido: "Entendido, estoy protegido" });
   });
+  it("el título que escribió quien emitió va debajo si dice algo más", () => {
+    expect(presentar({ ...base, kind: "sismo", title: "Sismo de magnitud 5.1 en Bucaramanga" }).subtitulo).toBe("Sismo de magnitud 5.1 en Bucaramanga");
+  });
+  it("una emergencia sin clase conserva su título", () => {
+    expect(presentar({ ...base, kind: "general", title: "Simulacro: Corte de gas" })).toMatchObject({ lineas: ["Corte de gas"], ambiente: "otra", c1: "#6b0f14" });
+  });
+  it("un simulacro se ve distinto y usa los pasos de la clase, no su propio texto", () => {
+    const p = presentar({ kind: "sismo", title: "Simulacro de sismo", body: "Este es un simulacro. No hay una emergencia real.", source: "simulacro" });
+    expect(p).toMatchObject({ simulacro: true, ambiente: "simulacro", c1: "#4f3600", lineas: ["Simulacro de", "sismo"] });
+    expect(p.pasos.join(" ")).not.toMatch(/simulacro/i);
+    expect(p.pasos.length).toBeGreaterThanOrEqual(2);
+  });
+  it("las instrucciones de Aluna se vuelven pasos y el alcance va aparte", () => {
+    const p = presentar({ ...base, kind: "incendio", body: "Evacúa por la escalera. No uses el ascensor. Ve al punto de encuentro.\n\nBloques: A, B" });
+    expect(p.pasos).toEqual(["Evacúa por la escalera.", "No uses el ascensor.", "Ve al punto de encuentro."]);
+    expect(p.alcance).toBe("Bloques: A, B");
+  });
+  it("sin instrucciones, valen las de la clase", () => {
+    expect(presentar({ ...base, kind: "incendio", body: "" }).pasos.length).toBeGreaterThanOrEqual(2);
+  });
+});
+
+describe("pasosDe y tituloLimpio", () => {
+  it("junta los pasos de más de cinco", () => {
+    const r = pasosDe("Uno. Dos. Tres. Cuatro. Cinco. Seis. Siete.");
+    expect(r.pasos).toHaveLength(5);
+    expect(r.pasos[4]).toBe("Cinco. Seis. Siete.");
+  });
+  it("quita el «Simulacro: » del título", () => {
+    expect(tituloLimpio("Simulacro: Evacuación")).toBe("Evacuación");
+    expect(tituloLimpio("Incendio")).toBe("Incendio");
+  });
+});
+
+describe("la voz de Pilo", () => {
+  it("la alerta se lee en frases cortas, cada una apta para la voz directa", () => {
+    const frases = frasesParaLeer({ kind: "incendio", title: "Alerta de incendio", body: "Evacúa por la escalera. No uses el ascensor.", source: "aluna" });
+    expect(frases[0]).toBe("Atención. Alerta de incendio.");
+    expect(frases).toContain("No uses el ascensor.");
+    expect(frases.every((f) => f.length <= 500)).toBe(true);
+  });
+  it("el simulacro se dice como simulacro", () => {
+    expect(frasesParaLeer({ kind: "sismo", title: "x", body: "", source: "simulacro" })[0]).toMatch(/^Esto es un simulacro de sismo./);
+  });
+  it("el «todo está bien» distingue el simulacro", () => {
+    expect(mensajeDespejado({ source: "simulacro" })).toMatch(/simulacro/);
+    expect(mensajeDespejado({ source: "aluna" })).toMatch(/alerta terminó/);
+  });
+});
+
+describe("textos", () => {
   it("hace cuánto, en palabras", () => {
     expect(haceCuanto("2026-10-08T11:59:50Z", ahora)).toBe("ahora mismo");
     expect(haceCuanto("2026-10-08T11:45:00Z", ahora)).toBe("hace 15 min");

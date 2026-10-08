@@ -113,10 +113,108 @@ export const GUIA: Record<KindAlerta, string[]> = {
   general: ["Mantenga la calma y siga las instrucciones de las brigadas de su sede.", "Avise a quien esté cerca y espere nuevas indicaciones."],
 };
 
-/** El texto que Pilo dice en voz alta. */
-export function textoParaLeer(a: Pick<FilaAlerta, "kind" | "title" | "body" | "source">): string {
-  const guia = GUIA[a.kind].join(" ");
-  return `${a.source === "simulacro" ? "Esto es un simulacro. " : "Atención. "}${a.title}. ${a.body} ${guia}`.replace(/\s+/g, " ").trim();
+/* --- La presentación (la de Aluna) ----------------------------------------------------------
+   Cada clase es su propio mundo de color: `c1` es el fondo y `c2` el acento. Son los mismos
+   de Aluna (src/features/avisos/clases.ts): quien ve la alerta en Pilo reconoce la de Aluna. */
+
+export interface PresentacionKind {
+  nombre: string;
+  c1: string;
+  c2: string;
+  /** El título, partido en las dos líneas que entran una tras otra. */
+  titulo: [string, string];
+  /** Lo que dice el botón de «entendido». Cambia con lo que hay que HACER. */
+  entendido: string;
+  /** La palabra que completa «Simulacro de …». */
+  simulacroDe: string;
+}
+
+export const PRESENTACION: Record<KindAlerta, PresentacionKind> = {
+  incendio: { nombre: "Incendio", c1: "#7a1408", c2: "#ff9a52", titulo: ["Alerta de", "incendio"], entendido: "Entendido, voy al punto de encuentro", simulacroDe: "evacuación" },
+  sismo: { nombre: "Sismo", c1: "#2e1065", c2: "#c9b8ff", titulo: ["Alerta de", "sismo"], entendido: "Entendido, estoy protegido", simulacroDe: "sismo" },
+  seguridad: { nombre: "Seguridad", c1: "#06223f", c2: "#7cc4ff", titulo: ["Alerta de", "seguridad"], entendido: "Entendido, estoy resguardado", simulacroDe: "seguridad" },
+  general: { nombre: "Alerta", c1: "#6b0f14", c2: "#ffb4a8", titulo: ["Alerta de", "emergencia"], entendido: "Entendido, sigo las instrucciones", simulacroDe: "emergencia" },
+};
+
+/** El simulacro manda sobre la clase: se ve distinto de cualquier emergencia real. */
+export const SIMULACRO_COLORES = { c1: "#4f3600", c2: "#ffd23f" };
+
+export type Ambiente = "sismo" | "incendio" | "seguridad" | "simulacro" | "otra";
+
+/** El título sin el «Simulacro: » que algunos avisos traen: la pantalla ya lo dice. */
+export function tituloLimpio(titulo: string): string {
+  return titulo.replace(/^\s*simulacro\s*[:·-]\s*/i, "").trim() || titulo;
+}
+
+/**
+ * Las instrucciones, como pasos: una frase, un paso. El texto llega como un
+ * párrafo («Evacúa por la escalera. No uses el ascensor.») y a pantalla
+ * completa se lee mejor como lista. Aluna añade al final el alcance
+ * —«Bloques: …», «Oficinas: …»—, que no es una instrucción y va aparte.
+ */
+export function pasosDe(cuerpo: string): { pasos: string[]; alcance: string | null } {
+  const partes = cuerpo.split(/\n\s*\n(?=(?:Bloques|Oficinas):)/);
+  const principal = partes[0] ?? "";
+  const alcance = partes.slice(1).join(" ").replace(/\s+/g, " ").trim() || null;
+  const pasos = principal
+    .split(/\n+|(?<=[.!?…])\s+(?=[A-ZÁÉÍÓÚÑ¿¡0-9])/u)
+    .map((p) => p.trim())
+    .filter((p) => p.length > 0);
+  // Más de cinco pasos no se leen corriendo: los últimos se juntan en uno.
+  if (pasos.length > 5) return { pasos: [...pasos.slice(0, 4), pasos.slice(4).join(" ")], alcance };
+  return { pasos, alcance };
+}
+
+export interface Presentada {
+  c1: string;
+  c2: string;
+  ambiente: Ambiente;
+  simulacro: boolean;
+  /** El título en sus líneas. */
+  lineas: string[];
+  /** Si el título que escribió quien emitió dice algo más que la clase, va debajo. */
+  subtitulo: string | null;
+  pasos: string[];
+  alcance: string | null;
+  entendido: string;
+}
+
+/** Todo lo que la pantalla necesita saber de una alerta para pintarla. */
+export function presentar(a: Pick<FilaAlerta, "kind" | "title" | "body" | "source">): Presentada {
+  const k = PRESENTACION[a.kind];
+  const simulacro = a.source === "simulacro";
+  const limpio = tituloLimpio(a.title);
+  // La clase la deduce Pilo del texto: un aviso «general» conserva el título que escribió quien lo emitió.
+  const lineas = simulacro ? ["Simulacro de", k.simulacroDe] : a.kind === "general" ? [limpio] : k.titulo;
+  const mismo = (x: string) => x.toLowerCase().replace(/\s+/g, " ").trim();
+  const subtitulo = !simulacro && a.kind !== "general" && mismo(limpio) !== mismo(k.titulo.join(" ")) ? limpio : null;
+  // El texto de un simulacro habla del simulacro, no de qué hacer: ahí valen los pasos de la clase.
+  const leidos = simulacro ? { pasos: [], alcance: null } : pasosDe(a.body);
+  const pasos = leidos.pasos.length ? leidos.pasos : GUIA[a.kind];
+  const ambiente: Ambiente = simulacro ? "simulacro" : a.kind === "general" ? "otra" : a.kind;
+  return {
+    c1: simulacro ? SIMULACRO_COLORES.c1 : k.c1,
+    c2: simulacro ? SIMULACRO_COLORES.c2 : k.c2,
+    ambiente,
+    simulacro,
+    lineas,
+    subtitulo,
+    pasos,
+    alcance: leidos.alcance,
+    entendido: k.entendido,
+  };
+}
+
+/** Lo que Pilo dice en voz alta, en frases cortas: cada una es un audio (la voz directa admite hasta 600 caracteres). */
+export function frasesParaLeer(a: Pick<FilaAlerta, "kind" | "title" | "body" | "source">): string[] {
+  const p = presentar(a);
+  const intro = p.simulacro ? `Esto es un simulacro de ${PRESENTACION[a.kind].simulacroDe}. No es una emergencia real.` : `Atención. ${p.lineas.join(" ")}.`;
+  return [intro, ...p.pasos, "Siga siempre las instrucciones de las brigadas de su sede."].map((f) => f.replace(/\s+/g, " ").trim().slice(0, 500)).filter(Boolean);
+}
+
+/** El mensaje del «todo está bien». */
+export function mensajeDespejado(a: Pick<FilaAlerta, "source">): string {
+  return a.source === "simulacro" ? "El simulacro terminó. Gracias por participar; puede volver a su puesto." : "La alerta terminó. Puede regresar a su puesto con calma.";
 }
 
 /** Hace cuánto empezó, en palabras. */

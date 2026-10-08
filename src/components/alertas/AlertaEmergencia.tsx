@@ -53,19 +53,37 @@ export function useAlertas(): FilaAlerta[] {
       if (vivo && !error) setFilas(filasDe(data));
     };
     void cargar();
-    const canal = supabase
-      .channel("pilo-alerts")
-      .on("postgres_changes", { event: "*", schema: "public", table: "pilo_alerts" }, () => void cargar())
-      .subscribe();
+    const abrir = () =>
+      supabase
+        .channel("pilo-alerts")
+        .on("postgres_changes", { event: "*", schema: "public", table: "pilo_alerts" }, () => void cargar())
+        .subscribe();
+    let canal: ReturnType<typeof abrir> | null = abrir();
+    const cerrar = () => {
+      if (canal) void supabase.removeChannel(canal);
+      canal = null;
+    };
     // Si el canal en vivo se cae (red, móvil dormido), al volver a la pestaña se vuelve a preguntar.
     const alVolver = () => {
       if (document.visibilityState === "visible") void cargar();
     };
+    // Una conexión abierta saca la página de la caché de ida y vuelta del navegador (y ensucia la
+    // consola): se cierra al salir y se reabre, con una lectura fresca, si la página regresa de ella.
+    const alSalir = () => cerrar();
+    const alRegresar = (e: PageTransitionEvent) => {
+      if (!e.persisted || canal) return;
+      canal = abrir();
+      void cargar();
+    };
     document.addEventListener("visibilitychange", alVolver);
+    window.addEventListener("pagehide", alSalir);
+    window.addEventListener("pageshow", alRegresar);
     return () => {
       vivo = false;
       document.removeEventListener("visibilitychange", alVolver);
-      void supabase.removeChannel(canal);
+      window.removeEventListener("pagehide", alSalir);
+      window.removeEventListener("pageshow", alRegresar);
+      cerrar();
     };
   }, []);
 

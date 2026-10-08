@@ -39,6 +39,7 @@ import type { EditorApi, TestState } from "./sections";
 import { MemorySection, PreguntaSection } from "./PreguntaCard";
 import { CatalogSection } from "./CatalogCard";
 import { WebSection } from "./web/WebSection";
+import { AlertasSection } from "./AlertasSection";
 import { UsersSection } from "./UsersSection";
 import { StatusMark, Switch, plural, when } from "./ui";
 import type { Tone } from "./ui";
@@ -265,6 +266,7 @@ function Editor({ initial }: { initial: PiloSettings }) {
     web: () => <WebSection />,
     catalogo: () => <CatalogSection />,
     usuarios: () => <UsersSection />,
+    emergencias: () => <AlertasSection />,
     uso: () => <UsageSection ed={ed} />,
   };
 

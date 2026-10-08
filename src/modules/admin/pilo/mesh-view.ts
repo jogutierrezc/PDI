@@ -19,7 +19,7 @@ import type { PiloSettings } from "./store";
 
 /* --- Las secciones -------------------------------------------------------------------- */
 
-export type SectionId = "conexion" | "voz" | "portales" | "pregunta" | "memoria" | "web" | "catalogo" | "usuarios" | "uso";
+export type SectionId = "conexion" | "voz" | "portales" | "pregunta" | "memoria" | "web" | "catalogo" | "usuarios" | "emergencias" | "uso";
 
 export const SECTIONS: { id: SectionId; label: string; title: string; lead: string }[] = [
   { id: "conexion", label: "Conexión", title: "Conexión para resumir y sintetizar", lead: "El servicio que redacta, su clave y la prueba." },
@@ -30,6 +30,7 @@ export const SECTIONS: { id: SectionId; label: string; title: string; lead: stri
   { id: "web", label: "Páginas web", title: "Páginas web", lead: "Pilo lee una página por su dirección, la guarda en su memoria y la conecta con lo demás que sabe." },
   { id: "catalogo", label: "Catálogo", title: "Catálogo de Pilo", lead: "Respuestas oficiales y microexpresiones, escritas en Excel." },
   { id: "usuarios", label: "Usuarios de Pilo", title: "Usuarios de Pilo", lead: "Las cuentas que solo sirven para Pilo: quién se registró, con qué perfil y sede, y en qué estado está." },
+  { id: "emergencias", label: "Emergencias", title: "Alerta de emergencias", lead: "Sismos, incendios y emergencias que Aluna declara: Pilo los muestra a todos mientras duren." },
   { id: "uso", label: "Uso y bitácora", title: "Uso, límites y bitácora", lead: "Cuánto se ha usado hoy, los topes y los últimos pedidos." },
 ];
 

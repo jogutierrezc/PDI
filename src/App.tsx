@@ -14,6 +14,7 @@ import { ScrollManager } from "./components/layout/ScrollManager";
 import { TourProvider } from "./components/tour/TourProvider";
 import { TourFab } from "./components/tour/TourFab";
 import { PiloAi } from "./components/pilo/ai/PiloAi";
+import { AlertaEmergencia } from "./components/alertas/AlertaEmergencia";
 import { useAuth } from "./lib/auth";
 import type { AdminScreen, AppRole } from "./types/database";
 import type { ReactElement } from "react";
@@ -248,6 +249,8 @@ export default function App() {
   return (
     <TourProvider>
       <ScrollManager />
+      {/* La capa de emergencias (0138): dormida hasta que Aluna declare una, y entonces cubre cualquier página. */}
+      <AlertaEmergencia />
       <Suspense fallback={<RouteFallback />}>
         <Routes>
           {/* La portada es el portal de Planeación; el PDI vive en /pdi. */}

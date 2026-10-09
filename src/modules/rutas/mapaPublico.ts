@@ -31,6 +31,7 @@ import {
   salidas,
   segundosDelDia,
 } from "./horario";
+import { HORA_PRIMERA, HORA_ULTIMA, barrasPorHora, hayUso, lecturaDeHora, miles, paradasDeRuta, type UsoPublico } from "./uso";
 import type { ApiPublico, DatosPublicos, EstadoPublico, Modo, OpcionesPublico, PuntoHoja } from "./tiposPublico";
 
 const R2D = Math.PI / 180;
@@ -116,6 +117,7 @@ function esqueleto(op: OpcionesPublico, nombre: string): string {
     <div class="rpub-pestanas" role="tablist" aria-label="Contenido del panel">
       <button type="button" role="tab" id="rpub-t-paradas" aria-controls="rpub-p-paradas" aria-selected="true" data-pest="paradas">Paradas</button>
       <button type="button" role="tab" id="rpub-t-horario" aria-controls="rpub-p-horario" aria-selected="false" tabindex="-1" data-pest="horario">Horario</button>
+      <button type="button" role="tab" id="rpub-t-uso" aria-controls="rpub-p-uso" aria-selected="false" tabindex="-1" data-pest="uso">Uso</button>
     </div>
     <div class="rpub-cuerpo">
       <div role="tabpanel" id="rpub-p-paradas" aria-labelledby="rpub-t-paradas" class="rpub-panel">
@@ -137,6 +139,9 @@ function esqueleto(op: OpcionesPublico, nombre: string): string {
         </div>
         <p class="rpub-sub-t">Salidas desde la UDES</p>
         <ul class="rpub-salidas"></ul>
+      </div>
+      <div role="tabpanel" id="rpub-p-uso" aria-labelledby="rpub-t-uso" class="rpub-panel" hidden>
+        <div class="rpub-uso"></div>
       </div>
       <footer class="rpub-pie"></footer>
     </div>
@@ -264,7 +269,7 @@ export function montarPublico(root: HTMLElement, datos: DatosPublicos, op: Opcio
     reveal: 0,
     busAlpha: 0,
     hoja: "asomada" as PuntoHoja,
-    pestana: "paradas" as "paradas" | "horario",
+    pestana: "paradas" as "paradas" | "horario" | "uso",
     modo: "hoja" as Modo,
     modoForzado: null as Modo | null,
     tocoMapa: false,
@@ -820,6 +825,7 @@ export function montarPublico(root: HTMLElement, datos: DatosPublicos, op: Opcio
       setTxt(subEl, `${cuando} · ${extra}`);
     }
     quitarEl.hidden = ST.sel === null || esUdes;
+    pintarUsoHora(false);
     // Solo lo que cambia por minuto se toca una vez por minuto.
     if (!forzar && minuto === minutoPrevio) return;
     minutoPrevio = minuto;
@@ -835,6 +841,132 @@ export function montarPublico(root: HTMLElement, datos: DatosPublicos, op: Opcio
     if (doc.activeElement !== horaInput) horaInput.value = aCampoHora(t);
   }
 
+  /* ------------------------------------------------------------------- uso */
+  // Solo conteos reales ya agregados (uso.ts). undefined: cargando. null: aún no hay conteos suficientes.
+  let uso: UsoPublico | null | undefined = undefined;
+  const usoEl = q(".rpub-uso");
+  let usoAnimado = false;
+  let horaUsoPrevia = -1;
+  const hh = (h: number) => formatoHora(h * 3600);
+
+  function pintarUso() {
+    usoAnimado = false;
+    horaUsoPrevia = -1;
+    usoEl.removeAttribute("data-entra");
+    const sim = `<p class="rpub-uso-nota">Los buses del mapa siguen siendo una simulación según el horario, no su posición real.</p>`;
+    if (uso === undefined) {
+      usoEl.innerHTML = `<p class="rpub-uso-nota">Cargando los conteos…</p>`;
+      return;
+    }
+    if (!hayUso(uso)) {
+      usoEl.innerHTML = `<div class="rpub-uso-vacio">
+        <h2>Aún no hay conteos publicados</h2>
+        <p>Cuando la universidad registre cuántas personas suben al bus en cada parada, aquí verá a qué horas hay más gente y cuáles son las paradas y las rutas más usadas.</p>
+        <p>Por ahora no se muestra ninguna cifra: no se estima ni se inventa. Solo se publica lo que se cuenta.</p>
+      </div>${sim}`;
+      return;
+    }
+    const u = uso;
+    const { barras, pico } = barrasPorHora(u.horas);
+    const propias = paradasDeRuta(u.paradas, datos.ruta.id).filter((p) => PARADAS[p.seq]);
+    const maxP = propias[0]?.abordajes || 1;
+    const maxR = u.rutas[0]?.abordajes || 1;
+    const dec = (n: number) => n.toLocaleString("es-CO", { maximumFractionDigits: 1 });
+    const barrasHtml = barras
+      .map((b, i) => {
+        const eje = (b.hora - HORA_PRIMERA) % 3 === 0 ? `<span class="rpub-barra-e">${b.hora}</span>` : `<span class="rpub-barra-e"></span>`;
+        const v = b.promedio === null ? `<span class="rpub-barra-v rpub-barra-v--vacia"></span>` : `<span class="rpub-barra-v" style="--alto:${(b.alto * 100).toFixed(1)}%"></span>`;
+        return `<div class="rpub-barra" data-h="${b.hora}" style="--i:${i}">${v}${eje}<span class="rpub-barra-m" aria-hidden="true"></span></div>`;
+      })
+      .join("");
+    const filaRank = (p: (typeof propias)[number], n: number) => `<li${n >= 5 ? " data-extra hidden" : ""}>
+        <button type="button" class="rpub-rk" data-par="${p.seq}" data-rk="${p.seq}" aria-pressed="false">
+          <span class="rpub-rk-pos" aria-hidden="true">${n + 1}</span>
+          <span class="rpub-rk-cuerpo"><span class="rpub-rk-nombre">${esc(PARADAS[p.seq].terminal ? "Parqueadero UDES" : p.nombre)}</span><span class="rpub-rk-pista" aria-hidden="true"><span class="rpub-rk-barra" style="--ancho:${((p.abordajes / maxP) * 100).toFixed(1)}%"></span></span></span>
+          <span class="rpub-rk-cifra num"><strong>${miles(p.abordajes)}</strong><span>${dec(p.participacion)}${nb}%</span></span>
+        </button>
+      </li>`;
+    const tabH = u.horas.map((h) => `<tr><th scope="row">${hh(h.hora)}</th><td class="num">${dec(h.promedio)}</td><td class="num">${miles(h.abordajes)}</td></tr>`).join("");
+    const tabP = propias.map((p) => `<tr><th scope="row">${esc(p.nombre)}</th><td class="num">${miles(p.abordajes)}</td><td class="num">${dec(p.participacion)}${nb}%</td></tr>`).join("");
+    const rutasHtml =
+      u.rutas.length > 1
+        ? `<section class="rpub-uso-sec" aria-labelledby="rpub-ur"><h2 id="rpub-ur">Rutas más usadas</h2><ol class="rpub-rank">${u.rutas
+            .map(
+              (r, n) =>
+                `<li><div class="rpub-rk rpub-rk--fija"><span class="rpub-rk-pos" aria-hidden="true">${n + 1}</span><span class="rpub-rk-cuerpo"><span class="rpub-rk-nombre">${esc(r.codigo ? r.codigo + " · " : "")}${esc(r.nombre)}</span><span class="rpub-rk-pista" aria-hidden="true"><span class="rpub-rk-barra" style="--ancho:${((r.abordajes / maxR) * 100).toFixed(1)}%"></span></span></span><span class="rpub-rk-cifra num"><strong>${miles(r.abordajes)}</strong><span>${dec((r.abordajes / (u.total || 1)) * 100)}${nb}%</span></span></div></li>`,
+            )
+            .join("")}</ol></section>`
+        : "";
+    usoEl.innerHTML = `
+      ${u.ejemplo ? `<p class="rpub-uso-ejemplo" role="note"><strong>Datos de ejemplo.</strong> Estas cifras están inventadas para mostrar el diseño. No son conteos reales.</p>` : ""}
+      <p class="rpub-uso-fuente"><strong>Conteos registrados por la universidad</strong> · últimos ${u.dias}${nb}días · ${miles(u.total)}${nb}abordajes</p>
+      <section class="rpub-uso-sec" aria-labelledby="rpub-uh">
+        <h2 id="rpub-uh">¿Cuándo hay más gente?</h2>
+        <p class="rpub-lectura" aria-live="polite"></p>
+        <figure class="rpub-fig">
+          <div class="rpub-barras" role="img" aria-label="Promedio de abordajes por hora, de las 5 de la mañana a las 10 de la noche.${pico ? ` La hora con más gente es ${hh(pico.hora)}.` : ""} Las mismas cifras están en las tablas de abajo.">${barrasHtml}</div>
+          <figcaption>Hora del día, en formato de 24 horas. ${pico ? `La hora con más gente es ${hh(pico.hora)}, con un promedio de ${dec(pico.promedio)} abordajes por día de servicio.` : ""} Las horas con línea punteada no tienen conteos suficientes.</figcaption>
+        </figure>
+      </section>
+      <section class="rpub-uso-sec" aria-labelledby="rpub-up">
+        <h2 id="rpub-up">Paradas más usadas</h2>
+        ${
+          propias.length
+            ? `<ol class="rpub-rank">${propias.map(filaRank).join("")}</ol>${propias.length > 5 ? `<button type="button" class="rpub-chico rpub-ver" data-ac="verTodas" aria-expanded="false">Ver todas (${propias.length})</button>` : ""}`
+            : `<p class="rpub-uso-nota">Esta ruta aún no tiene paradas con conteos suficientes.</p>`
+        }
+      </section>
+      ${rutasHtml}
+      <details class="rpub-tablas"><summary>Ver las cifras en tablas</summary>
+        <table><caption>Promedio de abordajes por hora y día de servicio</caption><thead><tr><th scope="col">Hora</th><th scope="col">Por día</th><th scope="col">En el periodo</th></tr></thead><tbody>${tabH}</tbody></table>
+        ${propias.length ? `<table><caption>Abordajes por parada</caption><thead><tr><th scope="col">Parada</th><th scope="col">Abordajes</th><th scope="col">Del total</th></tr></thead><tbody>${tabP}</tbody></table>` : ""}
+      </details>
+      <p class="rpub-uso-nota">Lo que se ve es lo típico de esos días, no lo que pasa en este instante. Se omiten las horas y las paradas con menos de 10 abordajes. Los buses del mapa siguen siendo una simulación según el horario, no su posición real.</p>`;
+    marcarRank();
+    pintarUsoHora(true);
+    animarUso();
+  }
+  /** Marca la hora de la simulación en las barras y la dice en palabras, contra el pico de la propia ruta. */
+  function pintarUsoHora(forzar: boolean) {
+    if (!hayUso(uso)) return;
+    const hora = Math.floor(diaT(nowT()) / 3600);
+    if (!forzar && hora === horaUsoPrevia) return;
+    horaUsoPrevia = hora;
+    usoEl.querySelectorAll(".rpub-barra").forEach((b) => b.classList.toggle("es-ahora", Number((b as HTMLElement).dataset.h) === hora));
+    const l = lecturaDeHora(uso.horas, hora);
+    const cuando = reloj.vivo && reloj.juega ? `Ahora, a las ${hh(hora)},` : `A las ${hh(hora)}`;
+    const fuera = hora < HORA_PRIMERA || hora > HORA_ULTIMA;
+    const txt = fuera
+      ? `A las ${hh(hora)} no hay servicio.`
+      : l.nivel === null
+        ? `${cuando} no hay conteos suficientes para decir cómo suele estar.`
+        : `${cuando} suele estar ${l.nivel}. Es lo típico de los últimos ${uso.dias} días, no lo de este instante.`;
+    const el = usoEl.querySelector(".rpub-lectura");
+    if (el) setTxt(el, txt);
+  }
+  function marcarRank() {
+    usoEl.querySelectorAll<HTMLElement>("[data-rk]").forEach((b) => {
+      const on = Number(b.dataset.rk) === ST.sel || (ST.sel === 0 && Number(b.dataset.rk) === NPAR - 1);
+      b.setAttribute("aria-pressed", String(on));
+      b.parentElement?.classList.toggle("es-elegida", on);
+    });
+  }
+  /** Las barras crecen una sola vez, la primera vez que se ve la pestaña. Con movimiento reducido, nada. */
+  function animarUso() {
+    if (usoAnimado || !hayUso(uso) || ST.pestana !== "uso" || RM) return;
+    usoAnimado = true;
+    usoEl.setAttribute("data-entra", "");
+  }
+  usoEl.addEventListener("click", (e) => {
+    const b = (e.target as Element).closest<HTMLButtonElement>('[data-ac="verTodas"]');
+    if (!b) return;
+    const abrir = b.getAttribute("aria-expanded") !== "true";
+    b.setAttribute("aria-expanded", String(abrir));
+    b.textContent = abrir ? "Ver solo las primeras 5" : `Ver todas (${usoEl.querySelectorAll("[data-rk]").length})`;
+    usoEl.querySelectorAll("[data-extra]").forEach((li) => ((li as HTMLElement).hidden = !abrir));
+  });
+  pintarUso();
+
   /* ------------------------------------------------------------- selección */
   function elegir(i: number | null, volar: boolean, desdeMapa = false) {
     const mismo = ST.sel === i;
@@ -844,6 +976,7 @@ export function montarPublico(root: HTMLElement, datos: DatosPublicos, op: Opcio
       it.btn.setAttribute("aria-pressed", String(on));
       it.li.classList.toggle("es-elegida", on);
     });
+    marcarRank();
     refrescarTextos(true);
     pedir();
     if (ST.sel === null) return;
@@ -1132,7 +1265,7 @@ export function montarPublico(root: HTMLElement, datos: DatosPublicos, op: Opcio
     velBtn.setAttribute("aria-pressed", String(reloj.vel > 1));
     root.setAttribute("data-juega", String(j));
   }
-  function seleccionarPestana(p: "paradas" | "horario", enfocar = false) {
+  function seleccionarPestana(p: "paradas" | "horario" | "uso", enfocar = false) {
     ST.pestana = p;
     qa("[data-pest]").forEach((b) => {
       const on = b.getAttribute("data-pest") === p;
@@ -1140,8 +1273,8 @@ export function montarPublico(root: HTMLElement, datos: DatosPublicos, op: Opcio
       b.setAttribute("tabindex", on ? "0" : "-1");
       if (on && enfocar) (b as HTMLElement).focus();
     });
-    q("#rpub-p-paradas").hidden = p !== "paradas";
-    q("#rpub-p-horario").hidden = p !== "horario";
+    for (const id of ["paradas", "horario", "uso"]) q(`#rpub-p-${id}`).hidden = p !== id;
+    if (p === "uso") animarUso();
   }
 
   root.addEventListener("click", (e) => {
@@ -1160,7 +1293,7 @@ export function montarPublico(root: HTMLElement, datos: DatosPublicos, op: Opcio
     }
     const pest = el.closest<HTMLElement>("[data-pest]");
     if (pest) {
-      seleccionarPestana(pest.dataset.pest as "paradas" | "horario");
+      seleccionarPestana(pest.dataset.pest as "paradas" | "horario" | "uso");
       return;
     }
     const ac = el.closest<HTMLElement>("[data-ac]")?.dataset.ac;
@@ -1193,7 +1326,10 @@ export function montarPublico(root: HTMLElement, datos: DatosPublicos, op: Opcio
     const k = (e as KeyboardEvent).key;
     if (k === "ArrowRight" || k === "ArrowLeft" || k === "Home" || k === "End") {
       e.preventDefault();
-      seleccionarPestana(ST.pestana === "paradas" ? "horario" : "paradas", true);
+      const orden = ["paradas", "horario", "uso"] as const;
+      const i = orden.indexOf(ST.pestana);
+      const j = k === "Home" ? 0 : k === "End" ? orden.length - 1 : (i + (k === "ArrowRight" ? 1 : -1) + orden.length) % orden.length;
+      seleccionarPestana(orden[j], true);
     }
   });
 
@@ -1335,6 +1471,10 @@ export function montarPublico(root: HTMLElement, datos: DatosPublicos, op: Opcio
       };
     },
     saltarEntrada,
+    ponerUso(u) {
+      uso = u;
+      pintarUso();
+    },
     elegirParada(i) {
       elegir(i, true);
     },

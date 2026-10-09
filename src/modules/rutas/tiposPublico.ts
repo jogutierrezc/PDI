@@ -3,6 +3,7 @@
 
 import type { Horario } from "./horario";
 import type { ParadaRuta } from "./tipos";
+import type { UsoPublico } from "./uso";
 
 export interface RutaPublica {
   id: string;
@@ -60,7 +61,7 @@ export type PuntoHoja = "asomada" | "media" | "abierta";
 export interface EstadoPublico {
   parada: number | null;
   hoja: PuntoHoja;
-  pestana: "paradas" | "horario";
+  pestana: "paradas" | "horario" | "uso";
   /** Segundos del día de la simulación. */
   hora: number;
   jugando: boolean;
@@ -76,6 +77,8 @@ export interface ApiPublico {
   estado(): EstadoPublico;
   /** Salta la secuencia de entrada. */
   saltarEntrada(): void;
+  /** Entrega los conteos de uso: undefined mientras cargan, null si aún no hay conteos suficientes. */
+  ponerUso(u: UsoPublico | null | undefined): void;
   /** Elige una parada (índice del recorrido) o ninguna. */
   elegirParada(i: number | null): void;
 }

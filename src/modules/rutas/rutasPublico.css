@@ -420,7 +420,7 @@
 .rpub-pestanas {
   flex: none;
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: repeat(3, 1fr);
   border-bottom: 1px solid var(--linea);
   padding: 0 max(8px, var(--seguro-der)) 0 max(8px, var(--seguro-izq));
 }
@@ -804,4 +804,284 @@
 }
 .rpub-reintentar:active {
   transform: scale(0.97);
+}
+
+/* --- Uso: cuándo hay más gente y qué paradas se usan más (solo conteos reales) --- */
+.rpub-uso {
+  display: grid;
+  gap: 20px;
+  padding: 14px max(18px, var(--seguro-der)) 0 max(18px, var(--seguro-izq));
+}
+.rpub-uso h2 {
+  margin: 0;
+  font-size: 16px;
+  line-height: 1.25;
+  font-weight: 800;
+  text-wrap: balance;
+}
+.rpub-uso-sec {
+  display: grid;
+  gap: 10px;
+}
+.rpub-uso-fuente {
+  font-size: 13px;
+  line-height: 1.4;
+  color: var(--tinta2);
+}
+.rpub-uso-fuente strong {
+  color: var(--tinta);
+}
+.rpub-uso-ejemplo {
+  padding: 10px 12px;
+  border: 1.5px dashed var(--senal-tinta);
+  border-radius: 12px;
+  background: var(--senal-suave);
+  color: var(--senal-tinta);
+  font-size: 13px;
+  line-height: 1.4;
+}
+.rpub-uso-nota {
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: var(--tinta3);
+  max-width: 68ch;
+}
+.rpub-uso-vacio {
+  display: grid;
+  gap: 10px;
+  padding: 18px 16px;
+  border: 1.5px dashed var(--linea-fuerte);
+  border-radius: 16px;
+  background: var(--sup2);
+}
+.rpub-uso-vacio p {
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--tinta2);
+  max-width: 60ch;
+}
+.rpub-lectura {
+  font-size: 15px;
+  font-weight: 600;
+  line-height: 1.4;
+  color: var(--tinta);
+}
+.rpub-fig {
+  margin: 0;
+  display: grid;
+  gap: 8px;
+}
+.rpub-fig figcaption {
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: var(--tinta3);
+}
+.rpub-barras {
+  display: grid;
+  grid-template-columns: repeat(18, minmax(0, 1fr));
+  gap: 3px;
+  height: 150px;
+  padding-top: 4px;
+  border-bottom: 1.5px solid var(--linea-fuerte);
+}
+.rpub-barra {
+  position: relative;
+  display: grid;
+  grid-template-rows: minmax(0, 1fr);
+  align-items: end;
+  min-width: 0;
+}
+.rpub-barra-v {
+  display: block;
+  align-self: end;
+  height: max(3px, var(--alto, 0%));
+  border-radius: 4px 4px 0 0;
+  background: var(--azul);
+  transform-origin: 50% 100%;
+}
+.rpub-barra-v--vacia {
+  height: 8px;
+  background: none;
+  border: 1.5px dotted var(--tinta3);
+  border-bottom: 0;
+}
+.rpub-barra-e {
+  position: absolute;
+  top: 100%;
+  left: 50%;
+  margin-top: 4px;
+  transform: translateX(-50%);
+  font-size: 11.5px;
+  font-variant-numeric: tabular-nums;
+  color: var(--tinta2);
+}
+/* La hora marcada: contorno en la barra y un triángulo debajo del eje, además del texto de arriba. */
+.rpub-barra.es-ahora .rpub-barra-v {
+  background: var(--navy);
+  box-shadow: 0 0 0 2px var(--sup), 0 0 0 4px var(--navy);
+}
+.rpub-barra-m {
+  display: none;
+}
+.rpub-barra.es-ahora .rpub-barra-m {
+  display: block;
+  position: absolute;
+  top: calc(100% + 20px);
+  left: 50%;
+  width: 0;
+  height: 0;
+  margin-left: -6px;
+  border: 6px solid transparent;
+  border-bottom: 8px solid var(--navy);
+  border-top: 0;
+}
+.rpub-fig {
+  padding-bottom: 28px;
+}
+.rpub-rank {
+  display: grid;
+  gap: 2px;
+}
+.rpub-rk {
+  display: grid;
+  grid-template-columns: 28px minmax(0, 1fr) auto;
+  align-items: center;
+  column-gap: 10px;
+  width: 100%;
+  min-height: 56px;
+  padding: 8px 8px;
+  border: 0;
+  border-radius: 12px;
+  background: none;
+  text-align: left;
+  transition: transform 140ms var(--ease);
+}
+.rpub-rk--fija {
+  cursor: default;
+}
+.rpub-rank li.es-elegida .rpub-rk {
+  background: var(--azul-suave);
+  box-shadow: inset 0 0 0 2px var(--azul);
+}
+.rpub-rk-pos {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  border: 2px solid var(--navy);
+  font-size: 13px;
+  font-weight: 800;
+  color: var(--navy);
+  font-variant-numeric: tabular-nums;
+}
+.rpub-rk-cuerpo {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+}
+.rpub-rk-nombre {
+  font-size: 14.5px;
+  font-weight: 600;
+  line-height: 1.3;
+  overflow-wrap: anywhere;
+}
+.rpub-rk-pista {
+  display: block;
+  height: 8px;
+  border-radius: 4px;
+  background: var(--sup2);
+  box-shadow: inset 0 0 0 1px var(--linea);
+  overflow: hidden;
+}
+.rpub-rk-barra {
+  display: block;
+  width: var(--ancho, 0%);
+  height: 100%;
+  border-radius: 4px;
+  background: var(--azul);
+  transform-origin: 0 50%;
+}
+.rpub-rk-cifra {
+  display: grid;
+  justify-items: end;
+  font-size: 12.5px;
+  color: var(--tinta2);
+  white-space: nowrap;
+}
+.rpub-rk-cifra strong {
+  font-size: 15px;
+  color: var(--tinta);
+}
+.rpub-ver {
+  justify-self: start;
+}
+.rpub-tablas {
+  border-top: 1px solid var(--linea);
+  padding-top: 10px;
+}
+.rpub-tablas summary {
+  min-height: 48px;
+  display: flex;
+  align-items: center;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+}
+.rpub-tablas table {
+  width: 100%;
+  margin: 8px 0 14px;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+.rpub-tablas caption {
+  text-align: left;
+  font-weight: 700;
+  padding-bottom: 6px;
+}
+.rpub-tablas th,
+.rpub-tablas td {
+  padding: 6px 6px;
+  border-bottom: 1px solid var(--linea);
+  text-align: right;
+}
+.rpub-tablas th[scope="row"],
+.rpub-tablas thead th:first-child {
+  text-align: left;
+  font-weight: 600;
+}
+.rpub-tablas thead th {
+  font-size: 12px;
+  color: var(--tinta2);
+}
+@media (hover: hover) and (pointer: fine) {
+  .rpub-rk:not(.rpub-rk--fija):hover {
+    background: var(--sup2);
+  }
+}
+/* Las barras crecen una vez, al ver la pestaña por primera vez. Nada en lo que se repite. */
+@keyframes rpub-crece-v {
+  from {
+    transform: scaleY(0);
+  }
+}
+@keyframes rpub-crece-h {
+  from {
+    transform: scaleX(0);
+  }
+}
+.rpub-uso[data-entra] .rpub-barra-v:not(.rpub-barra-v--vacia) {
+  animation: rpub-crece-v 460ms var(--ease) backwards;
+  animation-delay: calc(var(--i, 0) * 14ms);
+}
+.rpub-uso[data-entra] .rpub-rk-barra {
+  animation: rpub-crece-h 520ms var(--ease) 120ms backwards;
+}
+@media (prefers-reduced-motion: reduce) {
+  .rpub-uso[data-entra] .rpub-barra-v,
+  .rpub-uso[data-entra] .rpub-rk-barra,
+  .rpub-rk {
+    animation: none;
+    transition: none;
+  }
 }

@@ -11,6 +11,7 @@
 import { supabase } from "../../lib/supabase";
 import { aMinutos, horarioSeguro } from "./horario";
 import type { DatosPublicos } from "./tiposPublico";
+import { rutasMasUsadas, type UsoHora, type UsoParada, type UsoPublico } from "./uso";
 
 /** Las únicas tablas que esta página consulta. */
 export const TABLAS_PUBLICAS = ["bus_routes", "bus_stops", "bus_route_geometry"] as const;
@@ -85,4 +86,61 @@ export async function cargarRutaPublica(): Promise<DatosPublicos> {
     },
     vias: (vias.default as unknown as [number, number[]][]) ?? [],
   };
+}
+
+/* --- Uso: solo agregados de conteos reales, por las funciones de la migración 0142 --- */
+
+/** Las únicas funciones que la página llama para el uso. bus_ridership nunca se consulta directo. */
+export const FUNCIONES_USO = ["bus_uso_paradas", "bus_uso_horas"] as const;
+export const DIAS_USO = 30;
+
+interface FilaUsoParada {
+  route_id: string;
+  stop_id: string;
+  seq: number;
+  nombre: string;
+  abordajes: number | string;
+  participacion: number | string;
+  total_periodo: number | string;
+}
+interface FilaUsoHora {
+  hora: number;
+  promedio: number | string;
+  abordajes: number | string;
+  dias_servicio: number;
+  total_periodo: number | string;
+}
+
+/**
+ * El uso de los últimos DIAS_USO días. Devuelve null si todavía no hay conteos suficientes
+ * (o si la migración 0142 aún no está aplicada): la página dice entonces «Aún no hay conteos publicados».
+ * No inventa ni estima nada.
+ */
+export async function cargarUsoPublico(dias = DIAS_USO): Promise<UsoPublico | null> {
+  const [pa, ho] = await Promise.all([
+    supabase.rpc("bus_uso_paradas" as never, { p_days: dias } as never),
+    supabase.rpc("bus_uso_horas" as never, { p_days: dias } as never),
+  ]);
+  if (pa.error || ho.error) return null;
+  const filasP = (pa.data as unknown as FilaUsoParada[] | null) ?? [];
+  const filasH = (ho.data as unknown as FilaUsoHora[] | null) ?? [];
+  if (!filasP.length && !filasH.length) return null;
+
+  const paradas: UsoParada[] = filasP.map((f) => ({
+    routeId: f.route_id,
+    stopId: f.stop_id,
+    seq: f.seq,
+    nombre: f.nombre,
+    abordajes: Number(f.abordajes),
+    participacion: Number(f.participacion),
+  }));
+  const horas: UsoHora[] = filasH.map((f) => ({ hora: f.hora, promedio: Number(f.promedio), abordajes: Number(f.abordajes) }));
+  const total = Number(filasP[0]?.total_periodo ?? filasH[0]?.total_periodo ?? 0);
+
+  // Los nombres de las rutas salen de la tabla pública de rutas.
+  const rutas = await supabase.from("bus_routes" as never).select("id, code, name").eq("active", true).eq("public", true);
+  const nombres = new Map<string, { codigo: string; nombre: string }>();
+  for (const r of (rutas.data as unknown as { id: string; code: string; name: string }[] | null) ?? []) nombres.set(r.id, { codigo: r.code, nombre: r.name });
+
+  return { dias, total, horas, paradas, rutas: rutasMasUsadas(paradas, nombres) };
 }

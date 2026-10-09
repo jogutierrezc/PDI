@@ -12,14 +12,27 @@ import { useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { gsap } from "gsap";
-import { cargarRutaPublica } from "./datosPublico";
+import { cargarRutaPublica, cargarUsoPublico } from "./datosPublico";
 import { montarPublico } from "./mapaPublico";
+import type { ApiPublico } from "./tiposPublico";
+import type { UsoPublico } from "./uso";
 import "./rutasPublico.css";
 
 export function RutasPublico() {
   const navegar = useNavigate();
   const host = useRef<HTMLDivElement>(null);
   const datos = useQuery({ queryKey: ["rutas", "publico"], queryFn: cargarRutaPublica, staleTime: 10 * 60_000, retry: 1 });
+
+  // Los conteos de uso llegan aparte: si fallan o aún no hay, la página lo dice y el mapa sigue igual.
+  const uso = useQuery({ queryKey: ["rutas", "uso"], queryFn: () => cargarUsoPublico(), staleTime: 10 * 60_000, retry: 0 });
+  const api = useRef<ApiPublico | null>(null);
+  const usoActual: UsoPublico | null | undefined = uso.isLoading ? undefined : (uso.data ?? null);
+  const usoRef = useRef(usoActual);
+  usoRef.current = usoActual;
+
+  useEffect(() => {
+    api.current?.ponerUso(usoActual);
+  }, [usoActual]);
 
   useEffect(() => {
     const previo = document.title;
@@ -33,7 +46,7 @@ export function RutasPublico() {
     const el = host.current;
     const d = datos.data;
     if (!el || !d) return;
-    const api = montarPublico(el, d, {
+    const motor = montarPublico(el, d, {
       teselas: true,
       logoSrc: "/logo-udes.svg",
       logoOscuroSrc: "/boletin/logo-udes-blanco.png",
@@ -41,7 +54,12 @@ export function RutasPublico() {
       alIr: () => navegar("/"),
       gsap,
     });
-    return () => api.destruir();
+    api.current = motor;
+    motor.ponerUso(usoRef.current);
+    return () => {
+      motor.destruir();
+      api.current = null;
+    };
     // El mapa se monta una vez por ruta: plegar o girar el equipo no lo reinicia.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [datos.data]);

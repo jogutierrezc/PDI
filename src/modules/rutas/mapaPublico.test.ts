@@ -6,6 +6,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { montarPublico } from "./mapaPublico";
 import type { ApiPublico, DatosPublicos, GsapLike } from "./tiposPublico";
+import type { UsoPublico } from "./uso";
 
 const win = document.defaultView as unknown as Record<string, unknown> & Window;
 
@@ -283,5 +284,119 @@ describe("la simulación", () => {
     api.destruir();
     expect(raiz.innerHTML).toBe("");
     expect(raiz.classList.contains("rpub")).toBe(false);
+  });
+});
+
+describe("la vista de uso (solo conteos reales)", () => {
+  const USO: UsoPublico = {
+    dias: 30,
+    total: 1200,
+    horas: [
+      { hora: 6, promedio: 30, abordajes: 300 },
+      { hora: 7, promedio: 60, abordajes: 600 },
+      { hora: 13, promedio: 12, abordajes: 120 },
+    ],
+    paradas: [1, 2, 3, 4, 5, 6, 7].map((seq) => ({ routeId: "r1", stopId: `s${seq}`, seq: seq <= 4 ? seq : 4, nombre: `Parada ${seq}`, abordajes: 400 - seq * 40, participacion: 10 })),
+    rutas: [],
+    ejemplo: true,
+  };
+  const abrirUso = () => q<HTMLButtonElement>('[data-pest="uso"]').click();
+
+  it("sin conteos dice con claridad que aún no hay, y no muestra ninguna cifra", () => {
+    api.ponerUso(null);
+    abrirUso();
+    expect(q("#rpub-p-uso").hidden).toBe(false);
+    expect(q(".rpub-uso").textContent).toContain("Aún no hay conteos publicados");
+    expect(q(".rpub-uso").textContent).toContain("no se estima ni se inventa");
+    expect(raiz.querySelectorAll(".rpub-barra")).toHaveLength(0);
+    expect(raiz.querySelectorAll(".rpub-rk")).toHaveLength(0);
+  });
+
+  it("mientras cargan lo dice, y sin llamar nada todavía no inventa barras", () => {
+    expect(q(".rpub-uso").textContent).toContain("Cargando");
+    expect(raiz.querySelectorAll(".rpub-barra")).toHaveLength(0);
+  });
+
+  it("con conteos muestra las barras de 5 a 22, el periodo, la fuente y que es lo típico", () => {
+    api.ponerUso(USO);
+    abrirUso();
+    expect(raiz.querySelectorAll(".rpub-barra")).toHaveLength(18);
+    expect(raiz.querySelectorAll(".rpub-barra-v--vacia").length).toBe(15); // 18 horas, 3 con dato: un vacío no es un cero
+    const t = q(".rpub-uso").textContent ?? "";
+    expect(t).toContain("Conteos registrados por la universidad");
+    expect(t).toContain("últimos 30");
+    expect(t).toContain("lo que pasa en este instante");
+    expect(t).toContain("simulación según el horario");
+    expect(t).toContain("Datos de ejemplo");
+  });
+
+  it("marca la hora de la simulación y la dice en palabras", () => {
+    api.ponerUso(USO);
+    abrirUso();
+    q<HTMLButtonElement>('[data-pest="horario"]').click();
+    const campo = q<HTMLInputElement>(".rpub-hora");
+    campo.value = "07:20";
+    campo.dispatchEvent(new Event("change"));
+    abrirUso();
+    expect(q(".rpub-barra.es-ahora").getAttribute("data-h")).toBe("7");
+    expect(q(".rpub-lectura").textContent).toContain("suele estar concurrido");
+    expect(q(".rpub-lectura").textContent).toContain("no lo de este instante");
+    campo.value = "13:05";
+    campo.dispatchEvent(new Event("change"));
+    expect(q(".rpub-lectura").textContent).toContain("suele estar tranquilo"); // 12 de un pico de 60
+    campo.value = "10:00";
+    campo.dispatchEvent(new Event("change"));
+    expect(q(".rpub-lectura").textContent).toContain("no hay conteos suficientes");
+    campo.value = "23:00";
+    campo.dispatchEvent(new Event("change"));
+    expect(q(".rpub-lectura").textContent).toContain("no hay servicio");
+  });
+
+  it("las paradas más usadas muestran las primeras 5 y se pueden ver todas", () => {
+    api.ponerUso(USO);
+    abrirUso();
+    const visibles = () => [...raiz.querySelectorAll<HTMLElement>(".rpub-rank li")].filter((li) => !li.hidden).length;
+    expect(raiz.querySelectorAll(".rpub-rk")).toHaveLength(7);
+    expect(visibles()).toBe(5);
+    const ver = q<HTMLButtonElement>('[data-ac="verTodas"]');
+    ver.click();
+    expect(ver.getAttribute("aria-expanded")).toBe("true");
+    expect(visibles()).toBe(7);
+  });
+
+  it("tocar una parada del ranking la selecciona en el mapa", () => {
+    api.ponerUso(USO);
+    abrirUso();
+    raiz.querySelectorAll<HTMLButtonElement>(".rpub-rk")[1].click();
+    expect(api.estado().parada).toBe(2);
+    expect(raiz.querySelector(".rpub-rank li.es-elegida")).not.toBeNull();
+    expect(raiz.querySelectorAll('.rpub-parada[aria-pressed="true"]')).toHaveLength(1);
+  });
+
+  it("las rutas más usadas solo aparecen si hay más de una", () => {
+    api.ponerUso(USO);
+    abrirUso();
+    expect(q(".rpub-uso").textContent).not.toContain("Rutas más usadas");
+    api.ponerUso({ ...USO, rutas: [{ routeId: "r1", codigo: "R1", nombre: "Campus", abordajes: 800 }, { routeId: "r2", codigo: "R2", nombre: "Piedecuesta", abordajes: 400 }] });
+    expect(q(".rpub-uso").textContent).toContain("Rutas más usadas");
+  });
+
+  it("hay una alternativa en tablas para los lectores de pantalla", () => {
+    api.ponerUso(USO);
+    expect(raiz.querySelectorAll(".rpub-tablas table")).toHaveLength(2);
+    expect(q(".rpub-barras").getAttribute("role")).toBe("img");
+  });
+
+  it("al plegar o desplegar la vista de uso conserva la pestaña y la selección", () => {
+    api.ponerUso(USO);
+    abrirUso();
+    raiz.querySelectorAll<HTMLButtonElement>(".rpub-rk")[0].click();
+    const antes = api.estado();
+    redimensionar(880, 1100);
+    redimensionar(344, 882);
+    const ahora = api.estado();
+    expect(ahora.pestana).toBe("uso");
+    expect(ahora.parada).toBe(antes.parada);
+    expect(raiz.querySelectorAll(".rpub-barra")).toHaveLength(18);
   });
 });

@@ -14,13 +14,15 @@
 
 import { useEffect, useState } from "react";
 import type { RefObject } from "react";
+import { isNative } from "./native";
 import { APP_BASE, isAppPath } from "./routes";
 
 export const SW_URL = "/pilo-app-sw.js";
 
 /** Registra el service worker de la app. En desarrollo no hace nada. */
 export function registerAppWorker() {
-  if (!import.meta.env.PROD || typeof navigator === "undefined" || !("serviceWorker" in navigator)) return;
+  // Dentro de la app de Android los archivos ya viajan en el APK: no hace falta (ni conviene) un service worker.
+  if (!import.meta.env.PROD || isNative() || typeof navigator === "undefined" || !("serviceWorker" in navigator)) return;
   if (!isAppPath(window.location.pathname)) return;
   navigator.serviceWorker
     .register(SW_URL, { scope: APP_BASE })

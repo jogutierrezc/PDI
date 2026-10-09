@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Mr. Pilo</string>
+    <string name="title_activity_main">Mr. Pilo</string>
+    <string name="package_name">co.edu.udes.mrpilo</string>
+    <string name="custom_url_scheme">co.edu.udes.mrpilo</string>
+</resources>

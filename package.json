@@ -10,9 +10,21 @@
     "optimize:assets": "node scripts/optimize-assets.mjs",
     "smoke": "node scripts/smoke.mjs",
     "check:sql": "node scripts/check-sql.mjs",
-    "test": "vitest run"
+    "test": "vitest run",
+    "android": "node scripts/android-build.cjs todo",
+    "android:web": "node scripts/android-build.cjs web",
+    "android:sync": "node scripts/android-build.cjs sync",
+    "android:debug": "node scripts/android-build.cjs debug",
+    "android:release": "node scripts/android-build.cjs release"
   },
   "dependencies": {
+    "@capacitor/android": "^8.5.3",
+    "@capacitor/app": "^8.1.2",
+    "@capacitor/core": "^8.5.3",
+    "@capacitor/haptics": "^8.0.2",
+    "@capacitor/keyboard": "^8.0.6",
+    "@capacitor/splash-screen": "^8.0.2",
+    "@capacitor/status-bar": "^8.0.4",
     "@gsap/react": "^2.1.2",
     "@nivo/bar": "^0.99.0",
     "@nivo/boxplot": "^0.99.0",
@@ -33,6 +45,7 @@
     "read-excel-file": "^9.3.10"
   },
   "devDependencies": {
+    "@capacitor/cli": "^8.5.3",
     "@electric-sql/pglite": "^0.5.8",
     "@types/node": "^22.10.2",
     "@types/react": "^18.3.8",

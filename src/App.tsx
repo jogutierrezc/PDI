@@ -189,6 +189,7 @@ const Correos = lazy(() =>
   import("./modules/admin/correos/Correos").then((m) => ({ default: m.Correos })),
 );
 const Rutas = lazy(() => import("./modules/rutas/Rutas").then((m) => ({ default: m.Rutas })));
+const RutasPublico = lazy(() => import("./modules/rutas/RutasPublico").then((m) => ({ default: m.RutasPublico })));
 const ReportesInstitucionales = lazy(() =>
   import("./modules/reportes/ReportesInstitucionales").then((m) => ({ default: m.ReportesInstitucionales })),
 );
@@ -259,6 +260,8 @@ export default function App() {
           <Route path="/pdi" element={<Home />} />
           <Route path="/equipo" element={<TeamPage />} />
           <Route path="/pregunta" element={<AskPilo />} />
+          {/* La ruta del bus UDES para el público (migración 0140): sin iniciar sesión, solo ruta, paradas y horario. */}
+          <Route path="/rutas" element={<RutasPublico />} />
           {/* El chat emergente de Pilo, para verse dentro de un marco en otros portales (public/pilo.js). */}
           <Route path="/pilo-embed" element={<PiloEmbed />} />
           {/* Mr. Pilo en Enseñanza (0113): la misma página y el mismo chat emergente, en su propio espacio. */}

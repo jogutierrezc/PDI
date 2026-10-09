@@ -1,0 +1,807 @@
+/* Ruta del bus UDES · hoja de la página pública.
+
+   Concepto: el mapa es la pantalla y el panel es una hoja que se arrastra con el pulgar.
+   La composición se decide por el tamaño y la forma del contenedor (data-modo, que pone
+   mapaPublico.ts), no por el modelo del equipo:
+     hoja     celulares y pantallas externas de plegables: mapa completo y hoja inferior de tres puntos.
+     panel    Galaxy Z Fold desplegado y tabletas: mapa y panel lateral, sin que nada tape el mapa.
+     partido  equipo a medio plegar (Flip): mapa arriba, panel abajo, con la bisagra libre.
+   Las API de plegables (segmentos de ventana, postura) solo afinan; el diseño base ya funciona sin ellas. */
+
+.rpub {
+  --fondo: #ffffff;
+  --sup: #ffffff;
+  --sup2: #f4f7fc;
+  --tinta: #0d1c31;
+  --tinta2: #45566d;
+  --tinta3: #566880;
+  --linea: rgba(13, 40, 84, 0.12);
+  --linea-fuerte: rgba(13, 40, 84, 0.26);
+  --navy: #0a2d63;
+  --azul: #1f5fc9;
+  --azul-suave: #e8f0fd;
+  --senal: #f6b93f;
+  --senal-tinta: #6f4300;
+  --senal-suave: #fbf1da;
+  --foco: #1f5fc9;
+  --sombra: 0 -10px 32px -12px rgba(10, 30, 70, 0.38), 0 -1px 0 rgba(10, 30, 70, 0.06);
+  --sombra-btn: 0 1px 2px rgba(10, 30, 70, 0.14), 0 6px 16px -6px rgba(10, 30, 70, 0.28);
+  /* El mapa (lo lee el lienzo) */
+  --m-suelo: #e9eef5;
+  --m-via: #ffffff;
+  --m-via-borde: #c3d0e1;
+  --m-menor: #f7f9fc;
+  --m-menor-borde: #d5deea;
+  --m-ruta: #1f5fc9;
+  --m-ruta-borde: #ffffff;
+  --m-bus: #0a2d63;
+  --m-bus-vidrio: #cfe0f7;
+  --m-parada: #ffffff;
+  --m-parada-borde: #0a2d63;
+  --m-tinta: #0d1c31;
+  --m-halo: rgba(255, 255, 255, 0.92);
+  --m-senal: #f6b93f;
+  --m-velo: rgba(255, 255, 255, 0.34);
+  --ease: cubic-bezier(0.23, 1, 0.32, 1);
+  --fuente: "Open Sans", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  --seguro-sup: env(safe-area-inset-top, 0px);
+  --seguro-inf: env(safe-area-inset-bottom, 0px);
+  --seguro-izq: env(safe-area-inset-left, 0px);
+  --seguro-der: env(safe-area-inset-right, 0px);
+}
+.rpub[data-tema="oscuro"] {
+  --fondo: #0e151f;
+  --sup: #151d28;
+  --sup2: #1a232f;
+  --tinta: #eef3f9;
+  --tinta2: #b3c1d2;
+  --tinta3: #94a5ba;
+  --linea: rgba(148, 176, 214, 0.18);
+  --linea-fuerte: rgba(148, 176, 214, 0.34);
+  --navy: #9cc2ff;
+  --azul: #7fb0ff;
+  --azul-suave: #1b2c47;
+  --senal-tinta: #f6c76a;
+  --senal-suave: #2a2210;
+  --foco: #9cc2ff;
+  --sombra: 0 -10px 32px -10px rgba(0, 0, 0, 0.7), 0 -1px 0 rgba(148, 176, 214, 0.12);
+  --sombra-btn: 0 1px 2px rgba(0, 0, 0, 0.5), 0 6px 16px -6px rgba(0, 0, 0, 0.6);
+  --m-suelo: #0f1722;
+  --m-via: #2b394b;
+  --m-via-borde: #0a111b;
+  --m-menor: #223044;
+  --m-menor-borde: #0c141f;
+  --m-ruta: #6fa8ff;
+  --m-ruta-borde: #0a1220;
+  --m-bus: #f6b93f;
+  --m-bus-vidrio: #0a2d63;
+  --m-parada: #151d28;
+  --m-parada-borde: #cfe0f7;
+  --m-tinta: #eef3f9;
+  --m-halo: rgba(14, 21, 31, 0.92);
+  --m-senal: #0a2d63;
+  --m-velo: rgba(8, 14, 24, 0.5);
+}
+
+.rpub,
+.rpub *,
+.rpub *::before,
+.rpub *::after {
+  box-sizing: border-box;
+}
+.rpub {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-rows: auto auto minmax(0, 1fr);
+  background: var(--fondo);
+  color: var(--tinta);
+  font: 400 15px/1.45 var(--fuente);
+  -webkit-font-smoothing: antialiased;
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+  color-scheme: light;
+}
+.rpub[data-tema="oscuro"] {
+  color-scheme: dark;
+}
+.rpub button,
+.rpub input {
+  font: inherit;
+  color: inherit;
+}
+.rpub button {
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+.rpub ::selection {
+  background: var(--senal);
+  color: #1d1402;
+}
+.rpub :focus-visible {
+  outline: 3px solid var(--foco);
+  outline-offset: 2px;
+  border-radius: 8px;
+}
+.rpub .sr {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+.rpub .num {
+  font-variant-numeric: tabular-nums;
+}
+.rpub ul,
+.rpub ol,
+.rpub dl,
+.rpub dd,
+.rpub p,
+.rpub h1 {
+  margin: 0;
+  padding: 0;
+}
+.rpub ul,
+.rpub ol {
+  list-style: none;
+}
+
+/* --- Cabecera y aviso --- */
+.rpub-cab {
+  grid-row: 1;
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: calc(54px + var(--seguro-sup));
+  padding: var(--seguro-sup) max(16px, var(--seguro-der)) 0 max(16px, var(--seguro-izq));
+  background: var(--sup);
+  border-bottom: 1px solid var(--linea);
+  position: relative;
+  z-index: 3;
+}
+.rpub-marca {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  min-height: 48px;
+  padding-right: 12px;
+  margin-right: 0;
+  border-right: 1px solid var(--linea-fuerte);
+  border-radius: 6px;
+}
+.rpub-logo {
+  display: block;
+  height: 34px;
+  width: auto;
+}
+.rpub-logo--oscuro {
+  display: none;
+}
+.rpub[data-tema="oscuro"] .rpub-logo--claro {
+  display: none;
+}
+.rpub[data-tema="oscuro"] .rpub-logo--oscuro {
+  display: block;
+}
+.rpub-titulo {
+  min-width: 0;
+  font-size: 17px;
+  line-height: 1.2;
+  font-weight: 800;
+  letter-spacing: -0.005em;
+  color: var(--navy);
+  text-wrap: balance;
+}
+.rpub-aviso {
+  grid-row: 2;
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 7px max(16px, var(--seguro-der)) 7px max(16px, var(--seguro-izq));
+  background: var(--senal-suave);
+  color: var(--senal-tinta);
+  font-size: 13px;
+  line-height: 1.35;
+  border-bottom: 1px solid var(--linea);
+  position: relative;
+  z-index: 3;
+}
+.rpub-aviso svg {
+  flex: none;
+  width: 18px;
+  height: 18px;
+  margin-top: 1px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+}
+
+/* --- El mapa --- */
+.rpub-mapa {
+  grid-row: 3;
+  grid-column: 1;
+  position: relative;
+  min-width: 0;
+  min-height: 0;
+  background: var(--m-suelo);
+  overflow: hidden;
+}
+.rpub-lienzo {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
+  touch-action: none;
+  cursor: grab;
+  user-select: none;
+  -webkit-user-select: none;
+}
+.rpub-lienzo:active {
+  cursor: grabbing;
+}
+.rpub-atrib {
+  position: absolute;
+  top: 10px;
+  left: max(10px, var(--seguro-izq));
+  z-index: 2;
+  max-width: calc(100% - 84px - var(--seguro-izq));
+  padding: 5px 9px;
+  border-radius: 8px;
+  background: var(--m-halo);
+  color: var(--tinta2);
+  font-size: 11.5px;
+  line-height: 1.3;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+.rpub-ctl {
+  position: absolute;
+  top: 10px;
+  right: max(10px, var(--seguro-der));
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.rpub-btn {
+  display: grid;
+  place-items: center;
+  width: 48px;
+  height: 48px;
+  padding: 0;
+  border: 1px solid var(--linea);
+  border-radius: 14px;
+  background: var(--sup);
+  color: var(--tinta);
+  box-shadow: var(--sombra-btn);
+  transition: transform 140ms var(--ease);
+}
+.rpub-btn svg {
+  width: 24px;
+  height: 24px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.rpub-btn[data-ac="jugar"] svg path {
+  fill: currentColor;
+}
+.rpub-btn[data-ac="jugar"][aria-pressed="false"] svg path {
+  fill: none;
+}
+.rpub-btn[data-ac="jugar"][aria-pressed="true"] svg path {
+  fill: currentColor;
+}
+.rpub-btn:active,
+.rpub-chico:active,
+.rpub-parada:active,
+.rpub-quitar:active {
+  transform: scale(0.97);
+}
+
+/* --- La hoja --- */
+.rpub-hoja {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  background: var(--sup);
+  color: var(--tinta);
+}
+.rpub[data-modo="hoja"] .rpub-hoja {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 4;
+  border-radius: 24px 24px 0 0;
+  box-shadow: var(--sombra);
+  will-change: transform;
+  transform: translate3d(0, 100%, 0);
+}
+.rpub-arrastre {
+  flex: none;
+  touch-action: none;
+  cursor: grab;
+  padding-bottom: var(--seguro-inf);
+  user-select: none;
+  -webkit-user-select: none;
+}
+.rpub:not([data-modo="hoja"]) .rpub-arrastre {
+  padding-bottom: 0;
+  cursor: default;
+  touch-action: auto;
+}
+.rpub[data-arrastra] .rpub-arrastre {
+  cursor: grabbing;
+}
+.rpub-asa {
+  display: grid;
+  place-items: center;
+  width: 100%;
+  height: 34px;
+  padding: 0;
+  border: 0;
+  background: none;
+  border-radius: 24px 24px 0 0;
+}
+.rpub-asa-barra {
+  width: 40px;
+  height: 5px;
+  border-radius: 3px;
+  background: var(--linea-fuerte);
+}
+.rpub:not([data-modo="hoja"]) .rpub-asa {
+  display: none;
+}
+.rpub:not([data-modo="hoja"]) .rpub-prox {
+  padding-top: 16px;
+}
+.rpub-prox {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 0 max(18px, var(--seguro-der)) 12px max(18px, var(--seguro-izq));
+}
+.rpub-prox-txt {
+  min-width: 0;
+}
+.rpub-prox-rotulo {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--tinta2);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.rpub-prox-hora {
+  font-size: 32px;
+  line-height: 1.15;
+  font-weight: 800;
+  letter-spacing: -0.015em;
+  color: var(--tinta);
+}
+.rpub-prox-sub {
+  font-size: 14px;
+  color: var(--tinta2);
+  line-height: 1.35;
+}
+.rpub-quitar {
+  flex: none;
+  min-height: 48px;
+  padding: 0 14px;
+  border: 1.5px solid var(--linea-fuerte);
+  border-radius: 24px;
+  background: var(--sup);
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--tinta);
+  transition: transform 140ms var(--ease);
+}
+.rpub-quitar[hidden] {
+  display: none;
+}
+.rpub-resto {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+.rpub-pestanas {
+  flex: none;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  border-bottom: 1px solid var(--linea);
+  padding: 0 max(8px, var(--seguro-der)) 0 max(8px, var(--seguro-izq));
+}
+.rpub-pestanas button {
+  position: relative;
+  min-height: 48px;
+  border: 0;
+  background: none;
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--tinta2);
+}
+.rpub-pestanas button[aria-selected="true"] {
+  font-weight: 800;
+  color: var(--tinta);
+}
+.rpub-pestanas button[aria-selected="true"]::after {
+  content: "";
+  position: absolute;
+  left: 18%;
+  right: 18%;
+  bottom: -1px;
+  height: 4px;
+  border-radius: 4px 4px 0 0;
+  background: var(--azul);
+}
+.rpub-cuerpo {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+  padding-bottom: calc(16px + var(--seguro-inf));
+  scrollbar-width: thin;
+  scrollbar-color: var(--linea-fuerte) transparent;
+}
+.rpub-panel[hidden] {
+  display: none;
+}
+.rpub-lista {
+  padding: 0 max(8px, var(--seguro-der)) 0 max(8px, var(--seguro-izq));
+}
+.rpub-lista li + li {
+  border-top: 1px solid var(--linea);
+}
+.rpub-parada {
+  display: grid;
+  grid-template-columns: 36px minmax(0, 1fr) auto;
+  grid-template-areas: "num nombre hora" "num nombre elegida";
+  align-items: center;
+  column-gap: 12px;
+  width: 100%;
+  min-height: 56px;
+  padding: 8px 10px;
+  border: 0;
+  border-radius: 14px;
+  background: none;
+  text-align: left;
+  transition: transform 140ms var(--ease);
+}
+.rpub-num {
+  grid-area: num;
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  border: 2.5px solid var(--navy);
+  font-size: 14px;
+  font-weight: 800;
+  color: var(--navy);
+  background: var(--sup);
+}
+.rpub-num--udes {
+  border-radius: 10px;
+  background: var(--navy);
+  color: var(--sup);
+}
+.rpub-par-nombre {
+  grid-area: nombre;
+  min-width: 0;
+  font-size: 15px;
+  font-weight: 600;
+  line-height: 1.3;
+  overflow-wrap: anywhere;
+}
+.rpub-par-nota {
+  display: block;
+  font-size: 12.5px;
+  font-weight: 400;
+  color: var(--tinta2);
+}
+.rpub-par-hora {
+  grid-area: hora;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--tinta);
+  text-align: right;
+  white-space: nowrap;
+}
+.rpub-elegida {
+  grid-area: elegida;
+  display: none;
+  justify-self: end;
+  font-size: 11.5px;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+  color: var(--azul);
+}
+.rpub-lista .es-elegida .rpub-parada {
+  background: var(--azul-suave);
+  box-shadow: inset 0 0 0 2px var(--azul);
+}
+.rpub-lista .es-elegida .rpub-num:not(.rpub-num--udes) {
+  background: var(--navy);
+  color: var(--sup);
+}
+.rpub-lista .es-elegida .rpub-par-nombre {
+  font-weight: 800;
+}
+.rpub-lista .es-elegida .rpub-elegida {
+  display: block;
+}
+.rpub-panel {
+  padding-top: 4px;
+}
+.rpub-datos {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(148px, 1fr));
+  gap: 10px 14px;
+  padding: 14px max(18px, var(--seguro-der)) 6px max(18px, var(--seguro-izq));
+}
+.rpub-datos dt {
+  font-size: 12.5px;
+  color: var(--tinta2);
+}
+.rpub-datos dd {
+  font-size: 17px;
+  font-weight: 800;
+}
+.rpub-sub-t {
+  padding: 14px max(18px, var(--seguro-der)) 6px max(18px, var(--seguro-izq));
+  font-size: 14px;
+  font-weight: 800;
+}
+.rpub-reloj {
+  border-top: 1px solid var(--linea);
+  margin-top: 10px;
+}
+.rpub-reloj-fila {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 0 max(18px, var(--seguro-der)) 0 max(18px, var(--seguro-izq));
+  align-items: center;
+}
+.rpub-reloj-fila--2 {
+  margin-top: 8px;
+}
+.rpub-chico {
+  min-height: 48px;
+  padding: 0 16px;
+  border: 1.5px solid var(--linea-fuerte);
+  border-radius: 24px;
+  background: var(--sup);
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--tinta);
+  transition: transform 140ms var(--ease);
+}
+.rpub-chico[aria-pressed="true"] {
+  background: var(--navy);
+  color: var(--sup);
+  border-color: var(--navy);
+}
+.rpub-chico--ahora {
+  border-color: var(--azul);
+  color: var(--azul);
+}
+.rpub-hora-campo {
+  flex: 1;
+  min-width: 112px;
+}
+.rpub-hora {
+  width: 100%;
+  min-height: 48px;
+  padding: 0 12px;
+  border: 1.5px solid var(--linea-fuerte);
+  border-radius: 14px;
+  background: var(--sup2);
+  font-size: 18px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  text-align: center;
+}
+.rpub-salidas {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(92px, 1fr));
+  gap: 8px;
+  padding: 0 max(18px, var(--seguro-der)) 0 max(18px, var(--seguro-izq));
+}
+.rpub-salidas li {
+  display: grid;
+  place-items: center;
+  min-height: 40px;
+  padding: 4px 6px;
+  border: 1px solid var(--linea);
+  border-radius: 10px;
+  background: var(--sup2);
+  font-size: 13.5px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.rpub-salidas .es-pasada {
+  color: var(--tinta3);
+  text-decoration: line-through;
+  background: none;
+}
+.rpub-salidas .es-proxima {
+  border: 2px solid var(--azul);
+  background: var(--azul-suave);
+  font-weight: 800;
+}
+.rpub-salidas .es-proxima::before {
+  content: "Próxima";
+  font-size: 10.5px;
+  font-weight: 800;
+  color: var(--azul);
+  line-height: 1;
+}
+.rpub-pie {
+  display: grid;
+  gap: 8px;
+  margin-top: 18px;
+  padding: 14px max(18px, var(--seguro-der)) 0 max(18px, var(--seguro-izq));
+  border-top: 1px solid var(--linea);
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: var(--tinta3);
+  max-width: 68ch;
+}
+.rpub-pie strong {
+  color: var(--tinta2);
+}
+.rpub-pie a {
+  color: var(--tinta2);
+  text-underline-offset: 2px;
+}
+
+/* --- Pantallas amplias: Galaxy Z Fold desplegado y tabletas --- */
+.rpub[data-modo="panel"] {
+  grid-template-columns: minmax(0, 1fr) clamp(344px, 40%, 460px);
+  grid-template-areas:
+    "cab cab"
+    "aviso hoja"
+    "mapa hoja";
+}
+.rpub[data-modo="panel"] .rpub-cab {
+  grid-area: cab;
+}
+.rpub[data-modo="panel"] .rpub-aviso {
+  grid-area: aviso;
+  grid-column: auto;
+}
+.rpub[data-modo="panel"] .rpub-mapa {
+  grid-area: mapa;
+}
+.rpub[data-modo="panel"] .rpub-hoja {
+  grid-area: hoja;
+  border-left: 1px solid var(--linea);
+  min-width: 0;
+}
+.rpub[data-modo="panel"] .rpub-prox-hora {
+  font-size: 36px;
+}
+/* Fold abierto como libro (bisagra vertical): el mapa en una mitad, el panel en la otra. */
+@media (horizontal-viewport-segments: 2) {
+  .rpub[data-modo="panel"] {
+    grid-template-columns: env(viewport-segment-width 0 0, 1fr) calc(env(viewport-segment-left 1 0, 0px) - env(viewport-segment-right 0 0, 0px)) env(viewport-segment-width 1 0, 40%);
+    grid-template-areas:
+      "cab cab cab"
+      "aviso . hoja"
+      "mapa . hoja";
+  }
+}
+
+/* --- A medio plegar (Flip en modo laptop, tabletop): mapa arriba, panel abajo, bisagra libre --- */
+.rpub[data-modo="partido"] {
+  --bisagra: calc(env(viewport-segment-top 0 1, 24px) - env(viewport-segment-bottom 0 0, 0px));
+  --seg-inf: env(viewport-segment-height 0 1, calc((100% - var(--bisagra)) / 2));
+  grid-template-rows: auto auto minmax(0, 1fr) var(--bisagra) var(--seg-inf);
+}
+.rpub[data-modo="partido"] .rpub-hoja {
+  grid-row: 5;
+  grid-column: 1;
+  border-top: 1px solid var(--linea);
+}
+.rpub[data-modo="partido"] .rpub-prox-hora {
+  font-size: 28px;
+}
+
+/* En alturas muy bajas (celular horizontal) se aprieta la cabecera, no los botones. */
+@media (max-height: 420px) {
+  .rpub-ctl {
+    gap: 6px;
+  }
+  .rpub-cab {
+    min-height: calc(48px + var(--seguro-sup));
+  }
+  .rpub-titulo {
+    font-size: 15px;
+  }
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .rpub-btn:hover,
+  .rpub-chico:hover {
+    border-color: var(--azul);
+  }
+  .rpub-parada:hover {
+    background: var(--sup2);
+  }
+  .rpub-lista .es-elegida .rpub-parada:hover {
+    background: var(--azul-suave);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .rpub-btn,
+  .rpub-chico,
+  .rpub-parada,
+  .rpub-quitar {
+    transition: none;
+  }
+}
+
+/* --- La página: ocupa toda la pantalla, sin 100vh, y deja los estados de carga y error --- */
+.rpub-pagina {
+  position: fixed;
+  inset: 0;
+  background: var(--surface, #fff);
+  color: var(--ink, #0d1c31);
+}
+.rpub-host {
+  position: absolute;
+  inset: 0;
+}
+.rpub-host[hidden] {
+  display: none;
+}
+.rpub-estado {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-content: center;
+  justify-items: center;
+  gap: 8px;
+  padding: 24px;
+  text-align: center;
+  font: 600 16px/1.4 var(--font-sans, "Open Sans", sans-serif);
+  text-wrap: balance;
+}
+.rpub-estado p {
+  margin: 0;
+}
+.rpub-estado-nota {
+  font-weight: 400;
+  font-size: 14px;
+  color: var(--ink-secondary, #45566d);
+}
+.rpub-reintentar {
+  min-height: 48px;
+  margin-top: 8px;
+  padding: 0 24px;
+  border: 1.5px solid var(--line-strong, rgba(13, 40, 84, 0.26));
+  border-radius: 24px;
+  background: var(--surface, #fff);
+  font: 700 15px var(--font-sans, "Open Sans", sans-serif);
+  color: inherit;
+  cursor: pointer;
+}
+.rpub-reintentar:active {
+  transform: scale(0.97);
+}

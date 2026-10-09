@@ -7,6 +7,7 @@ import { ThemeProvider } from "./lib/theme";
 import { AuthProvider } from "./lib/auth";
 import { isRetryable } from "./data/errors";
 import { reloadOnceOnStalePreload } from "./lib/stale-chunk";
+import { enterAppIfNative, startNative } from "./modules/pilo-app/native";
 
 import "./styles/tokens.css";
 import "./styles/base.css";
@@ -16,6 +17,9 @@ import "./styles/app.css";
 // los import de un módulo se evalúan antes que los de esta lista: desde Home
 // entraría antes que base.css y `.card` pisaría el relleno de sus bloques.
 import "./modules/landing/landing.css";
+
+// Dentro de la app de Android, «/» abre Pilo (/app) y no la portada del portal.
+enterAppIfNative();
 
 // Una pestaña que quedó abierta antes de publicar pide archivos que ya no existen: se recarga una vez.
 reloadOnceOnStalePreload();
@@ -47,3 +51,6 @@ ReactDOM.createRoot(document.getElementById("root") as HTMLElement).render(
     </QueryClientProvider>
   </React.StrictMode>,
 );
+
+// La envoltura nativa (botón atrás, barra de estado, pantalla de inicio); fuera de la app no hace nada.
+void startNative();

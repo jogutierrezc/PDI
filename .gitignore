@@ -28,3 +28,20 @@ supabase/.temp/
 
 # Capturas de red (HAR): traen contraseñas, permisos y datos personales.
 *.har
+
+# Web compilada para la app de Android (Capacitor) y su proyecto generado
+dist-android
+pilo-android/capacitor/**/build
+pilo-android/capacitor/.gradle
+pilo-android/capacitor/local.properties
+pilo-android/capacitor/app/src/main/assets/public
+pilo-android/capacitor/app/src/main/assets/capacitor.config.json
+pilo-android/capacitor/app/src/main/assets/capacitor.plugins.json
+pilo-android/capacitor/capacitor-cordova-android-plugins
+
+# Llaves de firma: nunca al repositorio (la de la universidad la custodia la institución; ver pilo-android/FIRMA.md)
+*.keystore
+*.jks
+*.p12
+pilo-android/keys/
+**/CLAVE-FIRMA*

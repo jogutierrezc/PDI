@@ -4,7 +4,7 @@
 
 import { describe, expect, it } from "vitest";
 import { freeSetToTable } from "./csv-export";
-import { cellShown, freeTotalAt, freeTotalShown, viewLostColumns, viewProblems } from "./free-sets";
+import { cellShown, freeTitle, freeTotalAt, freeTotalShown, viewLostColumns, viewProblems } from "./free-sets";
 import type { FreeColumn, FreeRow, FreeSet, FreeView } from "./free-sets";
 
 const columns: FreeColumn[] = [
@@ -128,5 +128,20 @@ describe("gráficas y columnas que ya no están", () => {
     const set = asSet(columns.filter((c) => c.key !== "sede"));
     expect(viewProblems(set, view)).toEqual(["Elige la columna de categorías."]);
     expect(viewLostColumns(set, view)).toEqual(["sede"]);
+  });
+});
+
+describe("el título de una vista no repite el nombre del conjunto", () => {
+  it("une los dos cuando dicen cosas distintas", () => {
+    expect(freeTitle({ title: "Docentes" }, { title: "Por sede" })).toBe("Docentes · Por sede");
+  });
+  it("deja uno solo cuando se llaman igual o uno contiene al otro", () => {
+    expect(freeTitle({ title: "Docentes por sede" }, { title: "Docentes por sede" })).toBe("Docentes por sede");
+    expect(freeTitle({ title: "Matrícula" }, { title: "matricula total por sede" })).toBe("matricula total por sede");
+    expect(freeTitle({ title: "Docentes por sede 2025" }, { title: "Por sede" })).toBe("Docentes por sede 2025");
+  });
+  it("no deja un título vacío", () => {
+    expect(freeTitle({ title: "" }, { title: "Vista" })).toBe("Vista");
+    expect(freeTitle({ title: "Conjunto" }, { title: " " })).toBe("Conjunto");
   });
 });

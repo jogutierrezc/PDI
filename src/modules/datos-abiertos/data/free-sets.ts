@@ -531,10 +531,29 @@ export function territoryCode(kind: FreeTerritory, cell: FreeCell | undefined): 
 /** Referencia de una vista en el boletín: "libre:<fuente>:<vista>". */
 export const freeRef = (set: FreeSet, view: FreeView) => `libre:${set.id}:${view.key}`;
 
+const plain = (text: string) => text.normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/[^a-z0-9]+/gi, " ").trim().toLowerCase();
+
+/**
+ * Título de una vista: «Conjunto · Vista». Cuando uno de los dos ya dice al
+ * otro (la vista se llama como el conjunto, o lo repite entero), se imprime
+ * una sola vez el más completo: nada de leer el mismo nombre dos veces.
+ */
+export function freeTitle(set: { title: string }, view: { title: string }): string {
+  const a = set.title.trim();
+  const b = view.title.trim();
+  if (!a) return b;
+  if (!b) return a;
+  const pa = plain(a);
+  const pb = plain(b);
+  if (pa === pb || pb.includes(pa)) return b.length >= a.length ? b : a;
+  if (pa.includes(pb)) return a;
+  return `${a} · ${b}`;
+}
+
 /** Vistas publicables de un informe, en el orden de sus fuentes (sin dibujar nada). */
 export function freeRefs(sets: FreeSet[] | undefined): { ref: string; title: string }[] {
   return (sets ?? []).flatMap((set) =>
-    set.rows.length ? set.views.filter((v) => viewProblems(set, v).length === 0).map((v) => ({ ref: freeRef(set, v), title: `${set.title} · ${v.title}` })) : [],
+    set.rows.length ? set.views.filter((v) => viewProblems(set, v).length === 0).map((v) => ({ ref: freeRef(set, v), title: freeTitle(set, v) })) : [],
   );
 }
 

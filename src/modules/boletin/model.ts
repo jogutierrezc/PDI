@@ -20,7 +20,7 @@
 
 import { SABER_COMPETENCIES } from "../datos-abiertos/data/saber-pro";
 import { saberRef } from "../datos-abiertos/data/groups";
-import { freeRef, freeRefs } from "../datos-abiertos/data/free-sets";
+import { freeRef, freeRefs, freeTitle } from "../datos-abiertos/data/free-sets";
 import { isCustomView } from "../datos-abiertos/data/custom-table";
 import { tytRefs } from "./tyt";
 import { deiRefs } from "./dei";
@@ -175,6 +175,8 @@ export interface BulletinSettings {
   skipEmpty: boolean;
   /** Las tablas suman a los periodos la cifra del año (suma, promedio…) y la de todo el periodo. */
   annualFigures: boolean;
+  /** La hoja que junta la evolución de todos los rankings. Apagada de origen: no se imprime si no se pide. */
+  rankingsEvolution: boolean;
   /** Diversidad, Equidad e Inclusión: capítulo propio o sección de Bienestar. */
   deiPlacement: DeiPlacement;
   reports: BulletinReport[];
@@ -297,7 +299,7 @@ export function datasetRefs(report: Report): { ref: string; title: string }[] {
   for (const set of report.freeSets ?? []) {
     if (!set.rows.length) continue;
     for (const view of set.views) {
-      if (isCustomView(view)) add(freeRef(set, view), `${set.title} · ${view.title}`);
+      if (isCustomView(view)) add(freeRef(set, view), freeTitle(set, view));
     }
   }
   report.breakdowns.forEach((b) => add(`desglose:${b.id}`, b.title));
@@ -406,6 +408,7 @@ export function normalizeSettings(
     skipEmpty: saved.skipEmpty ?? true,
     // Las tablas llevan los periodos como se reportaron; la cifra anual se pide a mano.
     annualFigures: saved.annualFigures ?? false,
+    rankingsEvolution: saved.rankingsEvolution ?? false,
     deiPlacement: saved.deiPlacement === "bienestar" ? "bienestar" : "capitulo",
     reports,
     ...(format === "analisis" ? { analysis: normalizeAnalysis(saved.analysis) } : {}),

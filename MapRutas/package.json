@@ -1,0 +1,12 @@
+{
+  "name": "visualizador-movilidad-urbana",
+  "version": "1.0.0",
+  "description": "Visualizador de movilidad urbana con tráfico Mapbox y flujos de estudiantes",
+  "scripts": {
+    "dev": "npx live-server --port=8000 --open=index.html --quiet"
+  },
+  "devDependencies": {
+    "live-server": "^1.2.2"
+  },
+  "license": "MIT"
+}

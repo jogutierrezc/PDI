@@ -768,6 +768,12 @@ function ContentTab({ catalog, draft, setDraft }: { catalog: OpenDataCatalog; dr
             Cifras anuales en las tablas <small>junto a los periodos 1 y 2, la cifra del año (suma, promedio o último periodo) y la de todo el periodo</small>
           </span>
         </label>
+        <label className="oda-inline-check admin-field--wide">
+          <input type="checkbox" checked={draft.rankingsEvolution} onChange={(e) => setDraft({ ...draft, rankingsEvolution: e.target.checked })} />
+          <span>
+            Hoja «Evolución de los rankings» <small>un lienzo con todos los rankings del informe, edición a edición; apagada, no se imprime</small>
+          </span>
+        </label>
       </div>
 
       <div className="oda-bulletin-show" role="group" aria-label="Lo que muestra la hoja de cada indicador, para todos">

@@ -30,6 +30,7 @@ import {
   textOf,
   viewProblems,
 } from "../datos-abiertos/data/free-sets";
+import { freeTitle } from "../datos-abiertos/data/free-sets";
 import type { FreeSet, FreeView } from "../datos-abiertos/data/free-sets";
 import { formatValue } from "../datos-abiertos/data/open-data";
 import type { Report } from "../datos-abiertos/data/types";
@@ -107,7 +108,7 @@ export function freeUnits(set: FreeSet, view: FreeView, cut: number, Sheet: Shee
   if (set.temporality === "anual" && !USES_ALL_YEARS.includes(view.type) && year === null) return [];
   const rows = freeRowsAt(set, year);
   if (view.type === "tabla" ? freeAllRowsAt(set, year).length === 0 : rows.length === 0) return [];
-  const title = `${set.title} · ${view.title}`;
+  const title = freeTitle(set, view);
   const compared = view.type === "barras_comparadas" ? compareSource(set, view) : null;
   const custom = isCustomView(view) ? view.table : null;
   const notes: [string, ReactNode][] = [

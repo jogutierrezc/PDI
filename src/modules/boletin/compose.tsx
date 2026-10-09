@@ -2000,7 +2000,7 @@ export function compose(catalog: OpenDataCatalog, settings: BulletinSettings): C
           );
         }
       } else if (kind === "rankings-evo") {
-        const node = rankingsEvolutionUnit(report, settings);
+        const node = settings.rankingsEvolution ? rankingsEvolutionUnit(report, settings) : null;
         const sources = Array.from(new Set((report.rankings ?? []).map((r) => r.source).filter(Boolean))).join(" · ");
         if (node) nodes.push({ node, source: sources, title: "Evolución de los rankings" });
       } else if (kind === "tyt") {

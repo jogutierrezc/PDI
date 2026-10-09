@@ -1,0 +1,268 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Visualizador de Movilidad Urbana</title>
+  <link href="styles.css" rel="stylesheet" />
+  <link href="https://cdn.jsdelivr.net/npm/mapbox-gl@2.17.0/dist/mapbox-gl.css" rel="stylesheet" />
+  <script>
+    const mapboxScriptUrls = [
+      'https://unpkg.com/mapbox-gl@latest/dist/mapbox-gl.js',
+      'https://cdn.jsdelivr.net/npm/mapbox-gl@latest/dist/mapbox-gl.js',
+      'https://api.mapbox.com/mapbox-gl-js/v2.17.0/mapbox-gl.js'
+    ];
+
+    window.mapboxReadyPromise = new Promise((resolve, reject) => {
+      function loadMapboxScript(urls) {
+        if (!urls.length) {
+          const errorDiv = document.getElementById('errorMessage');
+          if (errorDiv) {
+            errorDiv.textContent = 'No se pudo cargar Mapbox GL JS. Comprueba tu conexi\u00f3n a internet o el CDN.';
+            errorDiv.style.display = 'block';
+          }
+          reject(new Error('No se pudo cargar Mapbox GL JS'));
+          return;
+        }
+        const script = document.createElement('script');
+        script.src = urls[0];
+        script.crossOrigin = 'anonymous';
+        script.onload = () => {
+          console.log('Mapbox GL JS cargado desde', urls[0]);
+          resolve();
+        };
+        script.onerror = () => {
+          script.remove();
+          loadMapboxScript(urls.slice(1));
+        };
+        document.head.appendChild(script);
+      }
+      loadMapboxScript(mapboxScriptUrls);
+    });
+  </script>
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+</head>
+<body>
+  <header>
+    <h1>Visualizador de Movilidad Urbana</h1>
+    <p>Bucaramanga · Floridablanca · Girón · Puntos reales, tráfico, flujos y geocodificación.</p>
+  </header>
+
+  <div id="errorMessage" class="error-message" role="alert" aria-live="polite"></div>
+
+  <main>
+    <aside class="panel">
+
+      <!-- Geocodificación individual -->
+      <section>
+        <h2>Geocodificar dirección</h2>
+        <p class="hint">Escribe una dirección en Colombia para convertirla en coordenadas.</p>
+        <input type="text" id="geocodeInput" placeholder="Cra 27 #64-14, Bucaramanga" />
+        <button id="geocodeBtn">Buscar dirección</button>
+        <div id="geocodeResult" class="geocode-result hidden">
+          <span id="geocodeCoords"></span>
+          <button id="geocodeAddToMap" class="btn-sm">Agregar al mapa</button>
+        </div>
+      </section>
+
+      <!-- Geocodificación por lotes -->
+      <section>
+        <h2>Geocodificar archivo de direcciones</h2>
+        <p class="hint">Carga un XLSX/CSV con columnas de dirección (ej: departamento, ciudad, dirección) y conviértelo en coordenadas automáticamente.</p>
+        <input type="file" id="addressFileInput" accept=".xlsx,.csv" class="file-input" />
+        <button id="batchGeocodeBtn">Geocodificar archivo</button>
+        <button id="exportGeocodedBtn" class="hidden">📥 Exportar con coordenadas</button>
+        <div id="geocodeProgress" class="geocode-progress hidden">
+          <div class="progress-bar">
+            <div id="progressFill" class="progress-fill"></div>
+          </div>
+          <div id="progressText" class="progress-text">0 / 0 direcciones</div>
+        </div>
+        <div id="geocodeStatus" class="geocode-status hidden"></div>
+        <div id="exportButtons" class="export-buttons hidden">
+          <button id="exportXlsxBtn" class="btn-export">📥 Exportar XLSX con coordenadas</button>
+          <button id="exportCsvBtn" class="btn-export btn-export-secondary">📥 Exportar CSV con coordenadas</button>
+        </div>
+        <div id="detectedColumns" class="detected-columns hidden">
+          <strong>Columnas detectadas:</strong>
+          <span id="detectedColsList"></span>
+        </div>
+      </section>
+
+      <!-- Carga de datos -->
+      <section>
+        <h2>Carga de datos</h2>
+        <button id="loadDefaultXls">Cargar direcciones.xlsx</button>
+        <button id="loadCsv">Cargar direcciones.csv</button>
+        <input type="file" id="fileInput" accept=".xlsx,.csv" class="file-input" />
+        <button id="loadCustomFile">Cargar archivo personalizado</button>
+        <div id="validationStats" class="validation-stats hidden">
+          <div class="stat-row">
+            <span class="stat-label">Total puntos:</span>
+            <span id="statTotal" class="stat-value">0</span>
+          </div>
+          <div class="stat-row valid">
+            <span class="stat-label">✅ Dentro de Colombia:</span>
+            <span id="statValid" class="stat-value">0</span>
+          </div>
+          <div class="stat-row invalid">
+            <span class="stat-label">❌ Fuera de Colombia:</span>
+            <span id="statInvalid" class="stat-value">0</span>
+          </div>
+        </div>
+      </section>
+
+      <!-- Puntos reales -->
+      <section>
+        <h2>Puntos reales</h2>
+        <p class="hint">Muestra cada ubicación individual con clustering. Los puntos se agrupan al acercar.</p>
+        <button id="toggleRealPoints">Mostrar puntos reales</button>
+      </section>
+
+      <!-- Visualización de densidad -->
+      <section>
+        <h2>Visualización de densidad</h2>
+        <div class="viz-modes">
+          <button id="modeHexagons" class="viz-btn active" title="Grillas hexagonales">
+            <span class="viz-icon">⬡</span> Hexágonos
+          </button>
+          <button id="modeHeatmap" class="viz-btn" title="Mapa de calor tradicional">
+            <span class="viz-icon">🔥</span> Heatmap
+          </button>
+          <button id="modeNetwork" class="viz-btn" title="Demanda sobre red vial">
+            <span class="viz-icon">🛣️</span> Red Vial
+          </button>
+        </div>
+      </section>
+
+      <!-- Filtro horario -->
+      <section>
+        <h2>Horario de análisis</h2>
+        <div class="time-filter">
+          <button id="timeMorning" class="time-btn active">🌅 6:00 AM</button>
+          <button id="timeNoon" class="time-btn">☀️ 12:00 PM</button>
+          <button id="timeNight" class="time-btn">🌙 6:00 PM</button>
+        </div>
+      </section>
+
+      <!-- Paradas sugeridas -->
+      <section>
+        <label class="checkbox-row">
+          <input type="checkbox" id="showSuggestedStops" checked />
+          <span>📍 Sugerir paradas (alta densidad)</span>
+        </label>
+      </section>
+
+      <!-- Info panel -->
+      <section>
+        <div id="vizInfo" class="viz-info">
+          <span class="viz-info-icon">ℹ️</span>
+          <span id="vizInfoText">Los hexágonos dividen la ciudad uniformemente. Los más oscuros son candidatos ideales para ubicar paradas.</span>
+        </div>
+      </section>
+
+      <!-- Tráfico -->
+      <section>
+        <h2>Tráfico en tiempo real</h2>
+        <p class="hint">Capa de tráfico de Mapbox sobre el mapa base.</p>
+        <button id="toggleTraffic">Activar tráfico</button>
+      </section>
+
+      <!-- Flujos -->
+      <section>
+        <h2>Flujos de estudiantes</h2>
+        <p class="hint">Muestra movimiento de estudiantes hacia las paradas de bus.</p>
+        <button id="toggleFlow">Mostrar flujos a paradas</button>
+        <div id="flowStats" class="flow-stats hidden">
+          <span id="flowCount"></span>
+        </div>
+      </section>
+
+      <!-- Ruta de bus UDES -->
+      <section>
+        <h2>🚌 Ruta de Bus UDES</h2>
+        <p class="hint">20 paradas fijas de la ruta institucional con probabilidad de uso.</p>
+        <button id="toggleBusRoute">Mostrar ruta de bus</button>
+        <label class="checkbox-row" style="margin-top:8px">
+          <input type="checkbox" id="showStopProbability" checked />
+          <span>📊 Mostrar probabilidad de uso</span>
+        </label>
+        <div id="stopStats" class="flow-stats hidden">
+          <span id="stopStatsText"></span>
+        </div>
+      </section>
+
+    </aside>
+
+    <section class="map-container">
+      <div id="map"></div>
+      <div id="mapLegend" class="map-legend hidden">
+        <h3>Leyenda</h3>
+        <div class="legend-section">
+          <strong>Tráfico vial</strong>
+          <div class="legend-item">
+            <span class="legend-swatch" style="background: #00b300;"></span>
+            <span>Tráfico fluido</span>
+          </div>
+          <div class="legend-item">
+            <span class="legend-swatch" style="background: #ffc200;"></span>
+            <span>Tráfico moderado</span>
+          </div>
+          <div class="legend-item">
+            <span class="legend-swatch" style="background: #ff6600;"></span>
+            <span>Tráfico pesado</span>
+          </div>
+          <div class="legend-item">
+            <span class="legend-swatch" style="background: #ff0000;"></span>
+            <span>Tráfico severo</span>
+          </div>
+          <div class="legend-item">
+            <span class="legend-swatch" style="background: #990000;"></span>
+            <span>Vía cerrada</span>
+          </div>
+        </div>
+        <div class="legend-item">
+          <span class="legend-swatch" style="background: #10b981;"></span>
+          <span>Punto real (válido)</span>
+        </div>
+        <div class="legend-item">
+          <span class="legend-swatch" style="background: #ff6b35;"></span>
+          <span>Origen estudiante</span>
+        </div>
+        <div class="legend-item">
+          <span class="legend-swatch" style="background: #2563eb;"></span>
+          <span>Destino (universidad)</span>
+        </div>
+        <div class="legend-item">
+          <span class="legend-swatch legend-swatch-line" style="border-color: #ff6b35;"></span>
+          <span>Flujo de estudiantes</span>
+        </div>
+        <div class="legend-item">
+          <span class="legend-swatch" style="background: #ef4444;"></span>
+          <span>Punto fuera de Colombia</span>
+        </div>
+        <div class="legend-section">
+          <strong>Ruta de Bus UDES</strong>
+          <div class="legend-item">
+            <span class="legend-swatch" style="background: #f59e0b; border-radius: 2px;"></span>
+            <span>Trayectoria del bus</span>
+          </div>
+          <div class="legend-item">
+            <span class="legend-swatch" style="background: #16a34a; border-radius: 50%;"></span>
+            <span>Parada de bus (🟥-Alta 🟨-Media 🟩-Baja uso)</span>
+          </div>
+        </div>
+        <div class="legend-section">
+          <strong>Densidad estudiantil</strong>
+          <div class="legend-item">
+            <span class="legend-swatch" style="background: linear-gradient(to right, #fde047, #fb923c, #ef4444, #991b1b);"></span>
+            <span>Baja → Alta concentración</span>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <script src="app.js"></script>
+</body>
+</html>

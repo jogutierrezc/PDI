@@ -19,8 +19,11 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { FormEvent } from "react";
 import { Link } from "react-router-dom";
+import gsap from "gsap";
+import { useGSAP } from "@gsap/react";
 import { Pilo } from "../../pregunta/Pilo";
 import { APP_ACCOUNT, APP_LOGIN } from "../routes";
+import { reducedMotion } from "../pwa";
 import type { AppTheme } from "../themes";
 import { Icon } from "../icons";
 import { CAMPUSES, LENGTHS, TONES, campusFixed, campusLabel, isCampus, personCard, prefsOf, prefsPatch, previewAnswer, rolLabel } from "./rules";
@@ -29,6 +32,8 @@ import type { AccountState } from "./useAccount";
 import { readVisitor, visitorNick, visitorNickProblem, writeVisitor } from "./visitor";
 import { Benefits, Field, Msg, Seg, ThemePicker } from "./parts";
 import { tr, useLang } from "../../../components/pilo/i18n";
+
+gsap.registerPlugin(useGSAP);
 
 const TONE_OPTIONS = TONES.map((t) => ({ id: t.id, label: t.label }));
 
@@ -109,12 +114,15 @@ export function ProfilePane({
     );
   }
 
-  return <MemberPrefs state={state} />;
+  return <MemberPrefs state={state} theme={theme} onTheme={onTheme} />;
 }
 
 /* --- Con cuenta ----------------------------------------------------------------------------- */
 
-function MemberPrefs({ state }: { state: AccountState }) {
+/** La opacidad de reposo de cada anillo, de dentro hacia fuera. */
+const RING_OPACITY = [0.6, 0.44, 0.28];
+
+function MemberPrefs({ state, theme, onTheme }: { state: AccountState; theme: AppTheme; onTheme: (theme: AppTheme) => void }) {
   useLang();
   const account = state.account!;
   const card = personCard(account);
@@ -126,6 +134,24 @@ function MemberPrefs({ state }: { state: AccountState }) {
   const fixed = campusFixed(account);
   const dirty = useMemo(() => Object.keys(prefsPatch(account, prefs)).length > 0, [account, prefs]);
   const sample = previewAnswer(prefs.nick, prefs.tone, prefs.length);
+  const head = useRef<HTMLElement>(null);
+  const seenTheme = useRef(theme);
+
+  // Un solo movimiento: al cambiar de tema, los anillos salen de Pilo (no al entrar, solo al cambiar).
+  useGSAP(
+    () => {
+      if (seenTheme.current === theme) return;
+      seenTheme.current = theme;
+      if (reducedMotion()) return;
+      const rings = gsap.utils.toArray<SVGCircleElement>(".pc-me__rings circle");
+      gsap.fromTo(
+        rings,
+        { scale: 0.78, opacity: 0, transformOrigin: "50% 50%" },
+        { scale: 1, opacity: (i: number) => RING_OPACITY[i] ?? 0.3, duration: 0.9, ease: "power3.out", stagger: 0.1, overwrite: true, clearProps: "transform,opacity,transformOrigin" },
+      );
+    },
+    { dependencies: [theme], scope: head },
+  );
 
   useEffect(() => () => window.clearTimeout(timer.current), []);
 
@@ -157,12 +183,19 @@ function MemberPrefs({ state }: { state: AccountState }) {
 
   return (
     <form className="pc-profile pc-profile--v2" noValidate onSubmit={submit}>
-      {/* Quién es: lo que no cambia, dicho una vez y arriba. */}
-      <header className="pc-me">
-        <span className="pa-avatar pc-me__avatar" aria-hidden="true">
-          {card.initial}
-        </span>
-        <div>
+      {/* Quién es: lo que no cambia, dicho una vez y arriba, con la cara de Pilo y sus anillos. */}
+      <header className="pc-me" ref={head}>
+        <div className="pc-me__orb" aria-hidden="true">
+          <svg className="pc-me__rings" viewBox="0 0 240 240">
+            <circle cx="120" cy="120" r="64" />
+            <circle cx="120" cy="120" r="88" />
+            <circle cx="120" cy="120" r="112" />
+          </svg>
+          <span className="pc-me__face">
+            <Pilo size="100%" mood="feliz" talking={talking} />
+          </span>
+        </div>
+        <div className="pc-me__who">
           <h2>{card.name}</h2>
           <p>@{account.username}</p>
           <div className="pc-me__tags">
@@ -171,6 +204,14 @@ function MemberPrefs({ state }: { state: AccountState }) {
           </div>
         </div>
       </header>
+
+      <section className="pc-line" aria-labelledby="pc-p-tema">
+        <h2 className="pc-h" id="pc-p-tema">
+          {tr("Tema de la app")}
+        </h2>
+        <p className="pc-hint">{tr("Los colores salen de la paleta institucional. Se recuerda en este dispositivo.")}</p>
+        <ThemePicker value={theme} onPick={(id) => onTheme(id)} labelledBy="pc-p-tema" />
+      </section>
 
       <div className="pc-cols">
         <div className="pc-edit">

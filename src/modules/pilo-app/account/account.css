@@ -380,34 +380,50 @@
   color: var(--c-ok);
 }
 
+/* Una elección entre pocas: un selector que se desliza hasta la elegida (lo mueve Seg, en parts.tsx). */
 .pc-seg {
-  display: inline-flex;
-  flex-wrap: wrap;
-  gap: 4px;
+  position: relative;
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(0, 1fr);
   max-width: 100%;
   padding: 4px;
+  border: 1px solid var(--c-line);
   border-radius: var(--radius-sm);
-  background: var(--pc-soft);
+  background: var(--c-bubble);
+}
+
+.pc-seg__thumb {
+  position: absolute;
+  top: 4px;
+  bottom: 4px;
+  left: 0;
+  width: 0;
+  border-radius: var(--radius-xs);
+  background: var(--c-mine);
+  pointer-events: none;
 }
 
 .pc-seg button {
+  position: relative;
+  z-index: 1;
   min-height: 44px;
-  padding: 8px 16px;
-  border: 1px solid transparent;
+  padding: 8px 12px;
+  border: 0;
   border-radius: var(--radius-xs);
   font-size: 0.875rem;
   font-weight: 700;
   color: var(--c-ink2);
+  transition: transform var(--dur-press) var(--ease-out), color var(--dur-fast) ease;
 }
 
-.pc-seg button[aria-pressed="true"] {
-  border-color: var(--c-link);
-  background: var(--c-bubble);
-  color: var(--c-ink);
+.pc-seg button[aria-checked="true"] {
+  color: var(--c-mine-ink);
 }
 
-.pc-temas {
-  max-width: 420px;
+.pc-seg button:focus-visible {
+  outline: 2px solid var(--c-link);
+  outline-offset: 2px;
 }
 
 .pc-actions {
@@ -812,7 +828,6 @@
 
 /* Todo lo que se toca cede un poco al pulsarlo. */
 .pc-opt,
-.pc-seg button,
 .pc-quiet,
 .pc-reveal,
 .pc-chip {
@@ -936,39 +951,119 @@
   max-width: 920px;
 }
 
+/* El encabezado: la cara de Pilo con sus anillos, sobre la escena del tema. */
 .pc-me {
-  display: flex;
+  position: relative;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 22px;
   align-items: center;
-  gap: 14px;
+  padding: 20px clamp(16px, 4vw, 32px);
+  border-radius: var(--radius-md);
+  background: radial-gradient(120% 140% at 12% 20%, var(--s1), var(--s2) 55%, var(--s3));
+  color: var(--s-ink);
+  overflow: hidden;
+}
+
+.pc-me__orb {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 118px;
+  height: 118px;
+}
+
+.pc-me__rings {
+  position: absolute;
+  width: 150px;
+  max-width: none;
+  height: 150px;
+  fill: none;
+  stroke: var(--ring-1);
+  stroke-width: 1.4;
+  pointer-events: none;
+}
+
+.pc-me__rings circle:nth-child(1) {
+  opacity: 0.6;
+}
+
+.pc-me__rings circle:nth-child(2) {
+  stroke: var(--ring-2);
+  opacity: 0.44;
+}
+
+.pc-me__rings circle:nth-child(3) {
+  opacity: 0.28;
+}
+
+.pc-me__face {
+  position: relative;
+  display: block;
+  width: 100px;
+  height: 100px;
+  filter: drop-shadow(0 10px 16px var(--c-shadow));
+}
+
+.pc-me__who {
   min-width: 0;
 }
 
-.pc-me__avatar {
-  flex: none;
-  width: 64px;
-  height: 64px;
-  background: var(--c-mine);
-  color: var(--c-mine-ink);
-  font: 700 1.6rem/1 var(--font-display);
-}
-
 .pc-me h2 {
-  font: 700 1.35rem/1.15 var(--font-display);
+  font: 700 1.5rem/1.15 var(--font-display);
   letter-spacing: -0.015em;
   overflow-wrap: anywhere;
 }
 
 .pc-me p {
-  font-size: 0.8125rem;
-  color: var(--c-ink2);
+  margin-top: 4px;
+  font-size: 0.875rem;
+  color: var(--s-muted);
   overflow-wrap: anywhere;
 }
 
 .pc-me__tags {
   display: flex;
   flex-wrap: wrap;
-  gap: 6px;
-  margin-top: 8px;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.pc-me .pc-tag {
+  min-height: 28px;
+  padding: 0 12px;
+  background: var(--s-chip);
+  color: var(--s-ink);
+}
+
+@media (max-width: 560px) {
+  .pc-me {
+    grid-template-columns: minmax(0, 1fr);
+    justify-items: start;
+    gap: 12px;
+  }
+}
+
+/* Las secciones del perfil se separan con líneas finas, no con cajas. */
+.pc-line {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.pc-line > .pc-hint {
+  margin-bottom: 10px;
+}
+
+.pc-profile--v2 .pc-sheet {
+  border: 0;
+  border-top: 1px solid var(--c-line);
+  border-radius: 0;
+  background: none;
+}
+
+.pc-profile--v2 .pc-sheet__in {
+  padding: 18px 0 4px;
 }
 
 .pc-h {
@@ -1130,6 +1225,11 @@
 @media (prefers-reduced-motion: reduce) {
   .pc-sample__bubble span {
     animation: none;
+  }
+
+  .pc-seg button,
+  .pa-tile__ck {
+    transition-duration: 1ms;
   }
 
   .pc-profile--v2 .pc-save,

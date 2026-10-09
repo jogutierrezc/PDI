@@ -22,7 +22,6 @@ import type { SpaceId, SpaceProfile } from "../pregunta/space";
 import { activarAlertas, desactivarAlertas, estadoAlertas } from "./alertas";
 import type { EstadoAlertas } from "./alertas";
 import { APP_ACCOUNT, APP_CLASSES, APP_GEMINI, APP_GRADES, APP_LOGIN, APP_PILOS, APP_SAVED, APP_SPACES } from "./routes";
-import { APP_THEMES } from "./themes";
 import type { AppTheme } from "./themes";
 import { dayLabel } from "./saved";
 import type { SavedEntry } from "./saved";
@@ -31,6 +30,7 @@ import { Icon } from "./icons";
 import { PersonBlock, RECENT_CONVERSATIONS, StudyIcon } from "./AppSide";
 import type { Person } from "./AppSide";
 import { ACCOUNT_BENEFITS } from "./account/rules";
+import { ThemePicker } from "./account/parts";
 import { PolicyLink } from "./terms/PolicyLink";
 import { APP_APK } from "./pwa";
 import { tr, useLang, LangSwitch } from "../../components/pilo/i18n";
@@ -225,7 +225,7 @@ export function SettingsSheet({
   quick: boolean;
   onClose: (event?: MouseEvent) => void;
   theme: AppTheme;
-  onTheme: (theme: AppTheme, event: MouseEvent) => void;
+  onTheme: (theme: AppTheme, event: { detail: number }) => void;
   onWelcome: () => void;
 }) {
   useLang();
@@ -249,16 +249,7 @@ export function SettingsSheet({
           <p className="pa-label" id="pa-m-tema">
             {tr("Tema")}
           </p>
-          <div className="pa-temas" role="group" aria-labelledby="pa-m-tema">
-            {APP_THEMES.map((t) => (
-              <button key={t.id} type="button" className="pa-tema" aria-pressed={t.id === theme} onClick={(e) => onTheme(t.id, e)}>
-                <span className="pa-tema__ring">
-                  <i className="pa-swatch" data-tema={t.id} aria-hidden="true" />
-                </span>
-                {tr(t.label)}
-              </button>
-            ))}
-          </div>
+          <ThemePicker value={theme} onPick={onTheme} labelledBy="pa-m-tema" />
         </section>
         <AlertasEmergencia open={open} />
         <div>

@@ -570,7 +570,7 @@ export function AppShell({ space, door, waking, online, person, member, wide, th
   const writing = busy && !working;
 
   // Cambiar de tema: un pulso de la cara lo confirma (entera, sin deformarla).
-  const pulse = (event: MouseEvent) => {
+  const pulse = (event: { detail: number }) => {
     const el = faceSlot.current;
     if (!el || reducedMotion() || fromKeyboard(event)) return;
     gsap.fromTo(el, { scale: 0.96 }, { scale: 1, duration: 0.22, ease: "power3.out", overwrite: true, clearProps: "transform" });

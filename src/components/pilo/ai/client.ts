@@ -697,7 +697,8 @@ function audioFor(text: string, portal: AskPortal, style?: string, rol?: string 
   // Primero la vía directa (Vercel), que responde antes; si no está o tropieza, la de siempre.
   // Un estilo pedido a propósito (la prueba de la configuración) solo lo sabe dar la de siempre.
   // Otro espacio de Pilo tampoco va por la directa: esa no sabe de su cupo, su bitácora ni la voz de cada rol.
-  const viaFunction = Boolean(style) || SPACE_VOICE.includes(portal);
+  // Una frase de un modo secreto («modo:pilonator») también: solo la función sabe qué estilo del sistema se llama como el modo.
+  const viaFunction = Boolean(style) || SPACE_VOICE.includes(portal) || /(?:^|,)modo:/.test(tone ?? "");
   const asked = (viaFunction ? usual() : directVoice(text, tone).then((blob) => blob ?? usual()))
     .then((blob) => {
       // Lo que falló se puede volver a pedir más tarde.

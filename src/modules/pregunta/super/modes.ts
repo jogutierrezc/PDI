@@ -572,6 +572,12 @@ export function sentenceTone(mode: SuperMode, answer: string, sentence: string):
   return (part?.tags ?? [SUPER[mode].tone]).join(",");
 }
 
+/**
+ * Lo mismo, pero con el modo al final («short pause,whispering,modo:pilonator»): así el servidor
+ * sabe qué voz del sistema usar (un estilo que se llame como el modo) además de la emoción.
+ */
+export const voiceTone = (mode: SuperMode, answer: string, sentence: string): string => `${sentenceTone(mode, answer, sentence)},modo:${mode}`;
+
 /* --- Qué hacer con un mensaje ----------------------------------------------------------- */
 
 /** Lo que dice el catálogo, con la forma de una respuesta: sin fuentes ni rastro, porque no salió del servidor. */

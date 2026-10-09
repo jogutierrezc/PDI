@@ -25,7 +25,7 @@ import { notesOf, seedOf, showsSources, waitingFace, waitingLine, waitingTip } f
 import type { ThinkStep } from "../pregunta/answer-state";
 import type { AppVoice } from "./access";
 import { prefetchOfficial, sayOfficial, stopOfficial } from "./official-voice";
-import { isSuperMode, sentenceTone, SUPER } from "../pregunta/super/modes";
+import { isSuperMode, voiceTone, SUPER } from "../pregunta/super/modes";
 import { reducedMotion } from "./pwa";
 import { Icon } from "./icons";
 import { FileChip, FileFoot, FileLog } from "../pregunta/Extras";
@@ -158,7 +158,7 @@ export function AppTurn({
   const spoken = enriched.sentences;
   // En un modo secreto cada frase se dice con su emoción (pregunta/super/modes.ts) y la voz cambia de paso.
   const superMode = isSuperMode(turn.modo) ? turn.modo : null;
-  const toneOf = (k: number) => (superMode && a ? sentenceTone(superMode, a.text, parsed.sentences[k]?.spoken ?? "") : undefined);
+  const toneOf = (k: number) => (superMode && a ? voiceTone(superMode, a.text, parsed.sentences[k]?.spoken ?? "") : undefined);
   const saidAt = (k: number) => ({ portal: voice.portal, advanced: voice.advanced, rol: voice.rol, tone: toneOf(k) });
   const prefetch = (from: number, to: number) => {
     for (let k = from; k < to; k++) if (spoken[k]) prefetchOfficial([spoken[k]], saidAt(k));

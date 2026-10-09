@@ -46,7 +46,7 @@ import { RoleMenu, RolePicker } from "./RolePicker";
 import { Welcome } from "./Welcome";
 import { SuperContext, SuperDefs } from "./super/Gear";
 import { SuperEntrance } from "./super/SuperEntrance";
-import { isSuperMode, sentenceTone, SUPER, superAnswer, superStep } from "./super/modes";
+import { isSuperMode, voiceTone, SUPER, superAnswer, superStep } from "./super/modes";
 import type { SuperLine, SuperMode } from "./super/modes";
 import { superSfx } from "./super/sfx";
 import { MeshAnswer } from "./MeshAnswer";
@@ -1078,7 +1078,7 @@ function TurnView({
   // En un modo secreto cada frase se dice con su emoción (super/modes.ts) y la voz cambia de paso y de tono.
   const superMode = isSuperMode(turn.modo) ? turn.modo : null;
   const superVoice = superMode ? SUPER[superMode].voice : null;
-  const toneOf = (k: number) => (superMode && a ? sentenceTone(superMode, a.text, parsed.sentences[k]?.spoken ?? "") : undefined);
+  const toneOf = (k: number) => (superMode && a ? voiceTone(superMode, a.text, parsed.sentences[k]?.spoken ?? "") : undefined);
   const prefetch = (from: number, to: number) => {
     for (let k = from; k < to; k++) if (spoken[k]) prefetchPilo([spoken[k]], { portal: voice.portal, advanced: voice.advanced, rol: voice.rol, tone: toneOf(k) });
   };

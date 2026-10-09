@@ -24,7 +24,7 @@ import {
 } from "./policy";
 
 const DIR = resolve(process.cwd(), "src/modules/pilo-app");
-const source = (file: string) => readFileSync(resolve(DIR, file), "utf8");
+const source = (file: string) => readFileSync(resolve(DIR, file), "utf8").replace(/\r\n/g, "\n");
 const strip = (css: string) => css.replace(/\/\*[\s\S]*?\*\//g, "");
 
 /** Un almacenamiento de mentira, como el del navegador. */

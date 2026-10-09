@@ -67,6 +67,11 @@ const ALLOWED: Allowed[] = [
   // Moodle (0116): trabajan por id de documento, y ese id acaba de salir de pilo_doc_save, que sí lleva p_space y rechaza el documento de otro espacio.
   { name: "pilo_doc_replace", near: "p_doc: docId, p_rows: built.rows", why: "sin parámetro de espacio (0114): los pasajes heredan el espacio del documento, que pilo_doc_save creó o halló con p_space" },
   { name: "pilo_doc_outline", near: "p_doc: docId, p_nodes: outline.nodes", why: "sin parámetro de espacio (0115): el mapa se escribe en el espacio del documento, que pilo_doc_save creó o halló con p_space" },
+  { name: "pilo_doc_replace", near: "p_doc: docId, p_rows: page.rows", why: "igual: la página web se guardó con pilo_doc_save y p_space justo antes; el id es de ese documento" },
+  // La espera (0128): trabaja por tiquete, no por espacio; el portal solo sirve para saber de quién es la respuesta.
+  { name: "pilo_wait_open", near: "p_ticket: ticket, p_portal: portal", why: "abre el tiquete de una respuesta en curso: lleva el portal y la llave es el tiquete" },
+  { name: "pilo_wait_close", near: "p_ticket: ticket, p_status: status", why: "cierra el mismo tiquete con la respuesta ya calculada en su espacio" },
+  { name: "pilo_wait_read", near: "p_ticket: ticket", why: "lee por tiquete (llave única); no hay contenido de un espacio por consultar" },
 ];
 
 const calls = lines.flatMap((line, i) => {

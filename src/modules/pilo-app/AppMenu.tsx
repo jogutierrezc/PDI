@@ -271,12 +271,13 @@ export function SettingsSheet({
 /* --- Las alertas de emergencia ----------------------------------------------------------------- */
 
 /** Lo que se cuenta de cada estado, para nunca prometer de más. */
-const ALERTAS_TEXTO: Record<EstadoAlertas, string> = {
-  activas: "Sismo, incendio u otra emergencia del campus: suena también en este teléfono",
-  desactivadas: "Sismo, incendio u otra emergencia del campus, también aquí",
-  denegado: "El navegador tiene el permiso bloqueado; se habilita en la configuración de notificaciones del sitio",
-  no_disponible: "Este navegador no puede recibirlas; instálela desde Chrome o Safari a la pantalla de inicio",
-};
+// Función y no constante: tr() lee el idioma de cada momento.
+const alertasTexto = (): Record<EstadoAlertas, string> => ({
+  activas: tr("Sismo, incendio u otra emergencia del campus: suena también en este teléfono"),
+  desactivadas: tr("Sismo, incendio u otra emergencia del campus, también aquí"),
+  denegado: tr("El navegador tiene el permiso bloqueado; se habilita en la configuración de notificaciones del sitio"),
+  no_disponible: tr("Este navegador no puede recibirlas; instálela desde Chrome o Safari a la pantalla de inicio"),
+});
 
 function AlertasEmergencia({ open }: { open: boolean }) {
   const [estado, setEstado] = useState<EstadoAlertas>("desactivadas");
@@ -296,7 +297,7 @@ function AlertasEmergencia({ open }: { open: boolean }) {
       setEstado(estado === "activas" ? await desactivarAlertas() : await activarAlertas());
     } catch (error) {
       // Activar y no quedar es lo único que no puede pasar en silencio.
-      setFallo(error instanceof Error ? error.message : "No se pudo conectar con Aluna.");
+      setFallo(error instanceof Error ? error.message : tr("No se pudo conectar con Aluna."));
     } finally {
       setOcupado(false);
     }
@@ -305,7 +306,7 @@ function AlertasEmergencia({ open }: { open: boolean }) {
   return (
     <section aria-labelledby="pa-m-alertas">
       <p className="pa-label" id="pa-m-alertas">
-        Emergencias del campus
+        {tr("Emergencias del campus")}
       </p>
       <button
         type="button"
@@ -314,8 +315,8 @@ function AlertasEmergencia({ open }: { open: boolean }) {
         disabled={ocupado || estado === "denegado" || estado === "no_disponible"}
         aria-pressed={estado === "activas"}
       >
-        <strong>{estado === "activas" ? "Alertas activadas" : "Alertas de emergencia"}</strong>
-        <small>{ALERTAS_TEXTO[estado]}</small>
+        <strong>{estado === "activas" ? tr("Alertas activadas") : tr("Alertas de emergencia")}</strong>
+        <small>{alertasTexto()[estado]}</small>
       </button>
       {fallo && (
         <p className="pa-empty" role="alert">

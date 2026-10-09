@@ -30,4 +30,9 @@ export const Icon = {
   dot: <Svg><circle cx="10" cy="10" r="2.5" /></Svg>,
   search: <Svg><circle cx="9" cy="9" r="5" /><path d="M13 13l3.5 3.5" /></Svg>,
   download: <Svg><path d="M10 3.5v8.5M6.5 8.5L10 12l3.5-3.5M4 15.5h12" /></Svg>,
+  // La llamada con Pilo.
+  phone: <Svg><path d="M5.2 3.5h2.6l1.2 3.4-1.7 1.2a9 9 0 004.2 4.2l1.2-1.7 3.4 1.2v2.6a1.6 1.6 0 01-1.7 1.6A12.7 12.7 0 013.6 5.2a1.6 1.6 0 011.6-1.7z" /></Svg>,
+  hangup: <Svg><path transform="rotate(135 10 10)" d="M5.2 3.5h2.6l1.2 3.4-1.7 1.2a9 9 0 004.2 4.2l1.2-1.7 3.4 1.2v2.6a1.6 1.6 0 01-1.7 1.6A12.7 12.7 0 013.6 5.2a1.6 1.6 0 011.6-1.7z" /></Svg>,
+  mic: <Svg><rect x="7.5" y="2.5" width="5" height="9" rx="2.5" /><path d="M4.5 9.5a5.5 5.5 0 0011 0M10 15v2.5" /></Svg>,
+  micOff: <Svg><path d="M7.5 6V5a2.5 2.5 0 015 0v4.5M12.4 12a2.5 2.5 0 01-4.9-.7M4.5 9.5a5.5 5.5 0 009.2 4.1M15.5 9.5v.2M10 15v2.5M3.5 3.5l13 13" /></Svg>,
 };

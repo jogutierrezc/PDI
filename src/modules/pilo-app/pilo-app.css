@@ -186,7 +186,7 @@
 
 .pa-bar__in {
   display: grid;
-  grid-template-columns: 44px 56px minmax(0, 1fr) 44px;
+  grid-template-columns: 44px 56px minmax(0, 1fr) 44px 44px;
   gap: 6px;
   align-items: center;
   max-width: var(--pa-col);
@@ -1638,7 +1638,7 @@
   }
 
   .pa-bar__in[data-wide] {
-    grid-template-columns: 56px minmax(0, 1fr) 44px;
+    grid-template-columns: 56px minmax(0, 1fr) 44px 44px;
   }
 
   .pa-msgs {

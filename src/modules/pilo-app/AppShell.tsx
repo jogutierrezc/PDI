@@ -26,7 +26,8 @@ import { askQuestionStream, buildHistory, PiloError, rateAnswer } from "../../co
 import type { AskHandlers, AskMeta, AskOptions, AskSource } from "../../components/pilo/ai/client";
 import { Pilo } from "../pregunta/Pilo";
 import type { PiloMojiHandle } from "../pregunta/Pilo";
-import { newId, useConversations } from "../pregunta/store";
+import { newId, readStored, storageKey, useConversations, writeStored } from "../pregunta/store";
+import { APP_PREFIX } from "./themes";
 import type { Conversation, Turn } from "../pregunta/store";
 import { asksRol, ROLE_OPTIONS, ROLE_QUESTION, roleView, wireRol } from "../pregunta/space";
 import type { Rol, SpaceId, SpaceProfile } from "../pregunta/space";
@@ -43,7 +44,11 @@ import { APP_LOGIN, APP_PILOS, APP_SPACES } from "./routes";
 import type { AppTheme } from "./themes";
 import { loadSaved, nextLast, openingId, readLast, removeSaved, savedEntries, writeLast } from "./saved";
 import type { SavedEntry } from "./saved";
-import { stopOfficial } from "./official-voice";
+import { prefetchOfficial, sayOfficial, stopOfficial } from "./official-voice";
+import { CallPreview } from "./llamada/CallPreview";
+import { CallScreen } from "./llamada/CallScreen";
+import { parseCallLang } from "./llamada/logic";
+import type { CallLang } from "./llamada/logic";
 import { APP_APK, fromKeyboard, isAndroidDevice, isStandalone, reducedMotion } from "./pwa";
 import type { InstallWay } from "./pwa";
 import { SuperContext, SuperDefs } from "../pregunta/super/Gear";
@@ -66,7 +71,11 @@ import { pickPassages, turnFile } from "../pregunta/attach";
 import { AttachButton, AttachTray, useAttachment } from "../pregunta/Extras";
 import { tr, useLang } from "../../components/pilo/i18n";
 
-type Over = null | "menu" | "ajustes" | "fuentes" | "cuenta" | "iphone" | "android";
+type Over = null | "menu" | "ajustes" | "fuentes" | "cuenta" | "iphone" | "android" | "llamada";
+
+/** La llamada recuerda en el dispositivo que ya se activó (no se vuelve a mostrar el aviso) y el idioma elegido. */
+const KEY_CALL = storageKey(APP_PREFIX, "llamada");
+const KEY_CALL_LANG = storageKey(APP_PREFIX, "llamada-idioma");
 
 export interface ShellProps {
   space: SpaceProfile;
@@ -148,6 +157,40 @@ export function AppShell({ space, door, waking, online, person, member, wide, th
   const open = door.state === "abierto";
   const can = open && online && !waking;
   const autoRead = voiceOn && voice.advanced;
+
+  /* --- La llamada ------------------------------------------------------------------------------- */
+
+  // La primera vez, el aviso previo; después, directo a la llamada.
+  const [calling, setCalling] = useState(false);
+  const [callLang, setCallLang] = useState<CallLang>(() => parseCallLang(readStored(KEY_CALL_LANG)));
+  const pickCallLang = (next: CallLang) => {
+    setCallLang(next);
+    writeStored(KEY_CALL_LANG, next);
+  };
+  const startCall = (event: MouseEvent) => {
+    if (readStored(KEY_CALL) === "1") {
+      stopOfficial();
+      setCalling(true);
+      return;
+    }
+    show("llamada", event);
+  };
+  const activateCall = () => {
+    writeStored(KEY_CALL, "1");
+    stopOfficial();
+    setOver(null);
+    setCalling(true);
+  };
+  // La llamada pregunta lo mismo que el chat: el mismo Pilo, el mismo pedido, las mismas fuentes.
+  const callAsk = async (question: string, history: { q: string; a: string }[], onDelta: (text: string) => void, signal: AbortSignal) => {
+    const visitor = visitorWire(readVisitor(), member);
+    const options = { ...(wire ?? {}), ...(visitor ? { visitor } : {}) };
+    const result = await askQuestionStream(question, history, { signal, onDelta }, options);
+    return result.text;
+  };
+  const callVoice = { portal: voice.portal, advanced: voice.advanced, rol: voice.rol };
+  const callSpeak = (text: string, onSound: (on: boolean) => void) => sayOfficial(text, { ...callVoice, onSound });
+  const callPrefetch = (text: string) => prefetchOfficial([text], callVoice);
 
   /* --- Estado de la conversación -------------------------------------------------------------- */
 
@@ -555,6 +598,9 @@ export function AppShell({ space, door, waking, online, person, member, wide, th
             <strong>Mr. Pilo</strong>
             <span>{working ? tr("Pensando…") : sounding ? tr("Hablando") : writing ? tr("Escribiendo…") : modo ? tr("Modo {name}", { name: SUPER[modo].name }) : under}</span>
           </div>
+          <button type="button" className="pa-icon" disabled={!can || welcoming} aria-haspopup="dialog" aria-label={tr("Llamar a Pilo")} title={tr("Llamar a Pilo")} onClick={startCall}>
+            {Icon.phone}
+          </button>
           <button type="button" className="pa-icon" aria-pressed={autoRead} aria-disabled={!voice.advanced || undefined} aria-label={voiceLabel} title={voiceLabel} onClick={toggleVoice}>
             {autoRead ? Icon.voice : Icon.mute}
           </button>
@@ -770,6 +816,23 @@ export function AppShell({ space, door, waking, online, person, member, wide, th
         setOver(null);
         install.run();
       }} />
+      <CallPreview open={over === "llamada"} quick={quick} onClose={hide} lang={callLang} onLang={pickCallLang} onActivate={activateCall} available={voice.advanced} />
+      {calling && (
+        <CallScreen
+          lang={callLang}
+          onLang={pickCallLang}
+          ask={callAsk}
+          speak={callSpeak}
+          hush={stopOfficial}
+          prefetch={callPrefetch}
+          online={online}
+          onEnd={() => {
+            stopOfficial();
+            setSounding(false);
+            setCalling(false);
+          }}
+        />
+      )}
       {entrance && <SuperEntrance key={entrance.turnId} mode={entrance.mode} short={entrance.short} sound={autoRead} target={() => faceSlot.current} onDone={landSuper} />}
     </SuperContext.Provider>
   );

@@ -13,12 +13,14 @@
    cajón no se usa: lo mismo vive en la barra lateral fija (AppSide).
    ========================================================================== */
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import type { MouseEvent } from "react";
 import { Link } from "react-router-dom";
 import type { AskSource } from "../../components/pilo/ai/client";
 import { originOf } from "../pregunta/answer-state";
 import type { SpaceId, SpaceProfile } from "../pregunta/space";
+import { activarAlertas, desactivarAlertas, estadoAlertas } from "./alertas";
+import type { EstadoAlertas } from "./alertas";
 import { APP_ACCOUNT, APP_CLASSES, APP_GEMINI, APP_GRADES, APP_LOGIN, APP_PILOS, APP_SAVED, APP_SPACES } from "./routes";
 import { APP_THEMES } from "./themes";
 import type { AppTheme } from "./themes";
@@ -210,7 +212,7 @@ export function AppMenu({
 
 /* --- La hoja de ajustes ---------------------------------------------------------------------- */
 
-/** Lo que se usa poco: el tema, ver la bienvenida otra vez y la política de uso. */
+/** Lo que se usa poco: el tema, las alertas de emergencia, ver la bienvenida otra vez y la política de uso. */
 export function SettingsSheet({
   open,
   quick,
@@ -258,6 +260,7 @@ export function SettingsSheet({
             ))}
           </div>
         </section>
+        <AlertasEmergencia open={open} />
         <div>
           <button type="button" className="pa-mi pa-mi--line" onClick={onWelcome}>
             <strong>{tr("Ver la bienvenida")}</strong>
@@ -271,6 +274,64 @@ export function SettingsSheet({
         </div>
       </div>
     </Layer>
+  );
+}
+
+/* --- Las alertas de emergencia ----------------------------------------------------------------- */
+
+/** Lo que se cuenta de cada estado, para nunca prometer de más. */
+const ALERTAS_TEXTO: Record<EstadoAlertas, string> = {
+  activas: "Sismo, incendio u otra emergencia del campus: suena también en este teléfono",
+  desactivadas: "Sismo, incendio u otra emergencia del campus, también aquí",
+  denegado: "El navegador tiene el permiso bloqueado; se habilita en la configuración de notificaciones del sitio",
+  no_disponible: "Este navegador no puede recibirlas; instálela desde Chrome o Safari a la pantalla de inicio",
+};
+
+function AlertasEmergencia({ open }: { open: boolean }) {
+  const [estado, setEstado] = useState<EstadoAlertas>("desactivadas");
+  const [ocupado, setOcupado] = useState(false);
+  const [fallo, setFallo] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    void estadoAlertas().then(setEstado);
+  }, [open]);
+
+  const alternar = async () => {
+    if (ocupado || estado === "denegado" || estado === "no_disponible") return;
+    setOcupado(true);
+    setFallo(null);
+    try {
+      setEstado(estado === "activas" ? await desactivarAlertas() : await activarAlertas());
+    } catch (error) {
+      // Activar y no quedar es lo único que no puede pasar en silencio.
+      setFallo(error instanceof Error ? error.message : "No se pudo conectar con Aluna.");
+    } finally {
+      setOcupado(false);
+    }
+  };
+
+  return (
+    <section aria-labelledby="pa-m-alertas">
+      <p className="pa-label" id="pa-m-alertas">
+        Emergencias del campus
+      </p>
+      <button
+        type="button"
+        className="pa-mi pa-mi--line"
+        onClick={() => void alternar()}
+        disabled={ocupado || estado === "denegado" || estado === "no_disponible"}
+        aria-pressed={estado === "activas"}
+      >
+        <strong>{estado === "activas" ? "Alertas activadas" : "Alertas de emergencia"}</strong>
+        <small>{ALERTAS_TEXTO[estado]}</small>
+      </button>
+      {fallo && (
+        <p className="pa-empty" role="alert">
+          {fallo}
+        </p>
+      )}
+    </section>
   );
 }
 

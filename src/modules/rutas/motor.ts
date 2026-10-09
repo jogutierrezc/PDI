@@ -480,7 +480,7 @@ function drawStops(t, mp) {
       else { ctx.beginPath(); ctx.arc(x, y, r, 0, 6.2832); ctx.fill(); ctx.stroke(); if (s.terminal) { ctx.fillStyle = T.signal; ctx.beginPath(); ctx.arc(x, y, r * 0.45, 0, 6.2832); ctx.fill(); } }
       if (s.wait > 0 && view.z >= 14.6) {
         var txt = String(s.wait), tw = ctx.measureText(txt).width + 10;
-        ctx.font = '700 11px "Barlow Condensed", sans-serif'; tw = ctx.measureText(txt).width + 10;
+        ctx.font = '700 11px "Open Sans", sans-serif'; tw = ctx.measureText(txt).width + 10;
         rr(x - tw / 2, y - r - 21, tw, 15, 7.5); ctx.fillStyle = T.board; ctx.fill();
         ctx.fillStyle = '#f6b93f'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(txt, x, y - r - 13.5);
       }
@@ -490,7 +490,7 @@ function drawStops(t, mp) {
 }
 function drawPicks(t) {
   if (ST.tab !== 'nueva') return;
-  ctx.font = '700 11px "Barlow Condensed", sans-serif';
+  ctx.font = '700 11px "Open Sans", sans-serif';
   PICKS.forEach(function (p, i) {
     var x = SX(p.x), y = SY(p.y), on = ghost === p, pr = RM ? 0 : (t * 1.1 + i * 0.3) % 1, r = on ? 11 : 8;
     ctx.setLineDash([4, 3]); ctx.lineWidth = 2; ctx.strokeStyle = T.gap; ctx.beginPath(); ctx.arc(x, y, r + (on ? pr * 9 : 0), 0, 6.2832); ctx.stroke(); ctx.setLineDash([]);
@@ -499,7 +499,7 @@ function drawPicks(t) {
   });
 }
 function label(x, y, text, strong) {
-  ctx.font = '700 11.5px Manrope, sans-serif'; var w = ctx.measureText(text).width + 14;
+  ctx.font = '700 11.5px "Open Sans", sans-serif'; var w = ctx.measureText(text).width + 14;
   rr(x - w / 2, y, w, 20, 10); ctx.fillStyle = strong ? T.board : T.surface; ctx.globalAlpha = 0.96; ctx.fill(); ctx.globalAlpha = 1;
   ctx.fillStyle = strong ? '#f6f9ff' : T.ink; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(text, x, y + 10.5);
 }
@@ -539,7 +539,7 @@ function drawBus(b, t, mp) {
   ctx.restore();
   if (view.z >= 14.8) {
     var txt = 'Bus ' + b.id + (b.state === 'run' ? ' · ' + Math.round(b.occ) + '/' + b.cap : b.state === 'term' ? ' · descansa' : ' · espera');
-    ctx.font = '700 11px Manrope, sans-serif'; var w = ctx.measureText(txt).width + 14;
+    ctx.font = '700 11px "Open Sans", sans-serif'; var w = ctx.measureText(txt).width + 14;
     rr(x - w / 2, y - L * 0.5 - 28, w, 19, 9.5); ctx.fillStyle = T.board; ctx.fill();
     ctx.fillStyle = '#f6b93f'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(txt, x, y - L * 0.5 - 18);
   }
@@ -547,7 +547,7 @@ function drawBus(b, t, mp) {
 function drawCampus(mp) {
   var s = STOPS[0], x = SX(s.x), y = SY(s.y);
   if (view.z < 13) return;
-  ctx.font = '800 12px Manrope, sans-serif'; var w = ctx.measureText('UDES').width + 18;
+  ctx.font = '800 12px "Open Sans", sans-serif'; var w = ctx.measureText('UDES').width + 18;
   rr(x - w / 2, y - 40, w, 22, 11); ctx.fillStyle = T.board; ctx.fill();
   ctx.fillStyle = '#f6b93f'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText('UDES', x, y - 28.5);
 }
@@ -892,7 +892,7 @@ function drawChart() {
   var d = '', t = '', i;
   for (i = 0; i <= 170; i++) { var h = 5 + i * 0.1; d += (i ? 'L' : 'M') + (x(h * 60)).toFixed(1) + ' ' + yy(demandH(h) / H_MAX).toFixed(1); t += (i ? 'L' : 'M') + (x(h * 60)).toFixed(1) + ' ' + yy(trafficH(h) * 0.55).toFixed(1); }
   var ticks = '';
-  [6, 9, 12, 15, 18, 21].forEach(function (h) { ticks += '<text x="' + x(h * 60).toFixed(1) + '" y="' + (Hd - 1) + '" text-anchor="middle" font-size="10" font-weight="600" fill="var(--ink-3)" font-family="Manrope,sans-serif">' + h + ':00</text><line x1="' + x(h * 60).toFixed(1) + '" x2="' + x(h * 60).toFixed(1) + '" y1="' + (Hd - 13) + '" y2="' + (Hd - 10) + '" stroke="var(--line-2)"/>'; });
+  [6, 9, 12, 15, 18, 21].forEach(function (h) { ticks += '<text x="' + x(h * 60).toFixed(1) + '" y="' + (Hd - 1) + '" text-anchor="middle" font-size="10" font-weight="600" fill="var(--ink-3)" font-family="Open Sans,sans-serif">' + h + ':00</text><line x1="' + x(h * 60).toFixed(1) + '" x2="' + x(h * 60).toFixed(1) + '" y1="' + (Hd - 13) + '" y2="' + (Hd - 10) + '" stroke="var(--line-2)"/>'; });
   chart.innerHTML = '<defs><linearGradient id="gf" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="var(--flow)" stop-opacity=".42"/><stop offset="1" stop-color="var(--flow)" stop-opacity=".03"/></linearGradient></defs>' +
     '<line x1="0" x2="' + Wd + '" y1="' + (Hd - 14) + '" y2="' + (Hd - 14) + '" stroke="var(--line-2)"/>' +
     '<path d="' + d + 'L' + Wd + ' ' + (Hd - 14) + 'L0 ' + (Hd - 14) + 'Z" fill="url(#gf)"/><path d="' + d + '" fill="none" stroke="var(--flow)" stroke-width="2" vector-effect="non-scaling-stroke"/>' +

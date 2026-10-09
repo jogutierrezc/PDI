@@ -46,7 +46,7 @@ const FALLBACK: ChartTokens = {
   line: "rgba(13, 40, 84, 0.11)",
   lineStrong: "rgba(13, 40, 84, 0.2)",
   surface: "#ffffff",
-  font: "Manrope, ui-sans-serif, system-ui, sans-serif",
+  font: "Open Sans, ui-sans-serif, system-ui, sans-serif",
   cats: ["#2a78d6", "#eb6834", "#1baf7a", "#7a5bd0", "#e87ba4", "#008300"],
   total: "#0d1c31",
   pos: "#2a63b8",

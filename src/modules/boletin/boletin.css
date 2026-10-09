@@ -1932,7 +1932,7 @@
 .od-bulletins h2 {
   margin: var(--space-8) 0 var(--space-3);
   color: var(--ink-muted);
-  font-family: var(--font-sign);
+  font-family: var(--font-sign); font-stretch: var(--sign-stretch);
   font-size: 0.95rem;
   font-weight: 600;
   letter-spacing: var(--tracking-wide);

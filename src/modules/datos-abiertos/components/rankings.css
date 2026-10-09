@@ -85,7 +85,7 @@
   color: #ffffff;
   background: var(--rk-accent);
   border-radius: var(--radius-xs);
-  font-family: var(--font-sign);
+  font-family: var(--font-sign); font-stretch: var(--sign-stretch);
   font-size: 1.3rem;
   font-weight: 700;
   letter-spacing: 0.04em;
@@ -115,7 +115,7 @@
 .od-rank__scopes dt,
 .od-rank__section h4 {
   color: var(--od-board-muted);
-  font-family: var(--font-sign);
+  font-family: var(--font-sign); font-stretch: var(--sign-stretch);
   font-size: 0.85rem;
   font-weight: 600;
   letter-spacing: var(--tracking-wide);
@@ -150,7 +150,7 @@
 /* El signo no es cifra: se queda fuera de las paletas. */
 .od-rank__sigil {
   color: var(--od-board-muted);
-  font-family: var(--font-sign);
+  font-family: var(--font-sign); font-stretch: var(--sign-stretch);
   font-size: 1.7rem;
   font-weight: 700;
   line-height: 1;
@@ -226,7 +226,7 @@
 }
 
 .od-rank__scale-note > span {
-  font-family: var(--font-sign);
+  font-family: var(--font-sign); font-stretch: var(--sign-stretch);
   font-size: 0.85rem;
   font-weight: 600;
 }
@@ -267,7 +267,7 @@
 }
 
 .od-rank__scopes dd b {
-  font-family: var(--font-sign);
+  font-family: var(--font-sign); font-stretch: var(--sign-stretch);
   font-size: 1.75rem;
   font-weight: 700;
   line-height: 1;
@@ -359,7 +359,7 @@
   height: 1.85rem;
   color: #ffffff;
   background: var(--sdg);
-  font-family: var(--font-sign);
+  font-family: var(--font-sign); font-stretch: var(--sign-stretch);
   font-size: 1.05rem;
   font-weight: 700;
 }
@@ -419,7 +419,7 @@
 }
 
 .od-rank__subjects td {
-  font-family: var(--font-sign);
+  font-family: var(--font-sign); font-stretch: var(--sign-stretch);
   font-size: 1.05rem;
   text-align: right;
   font-variant-numeric: tabular-nums;
@@ -427,7 +427,7 @@
 
 .od-rank__subjects thead th {
   color: var(--od-board-muted);
-  font-family: var(--font-sign);
+  font-family: var(--font-sign); font-stretch: var(--sign-stretch);
   font-size: 0.8rem;
   font-weight: 600;
   letter-spacing: var(--tracking-wide);
@@ -531,7 +531,7 @@
 }
 
 .od-rank-table td b {
-  font-family: var(--font-sign);
+  font-family: var(--font-sign); font-stretch: var(--sign-stretch);
   font-size: 1.2rem;
   font-variant-numeric: tabular-nums;
 }
@@ -561,7 +561,7 @@
 .od-rank-evo__band { stroke: var(--rk-accent); stroke-width: 8; stroke-linecap: round; opacity: 0.22; }
 .od-rank-evo__dot { fill: var(--od-surface); stroke: var(--rk-accent); stroke-width: 2.5; }
 .od-rank-evo__label { fill: var(--ink-secondary); font-size: 12px; font-weight: 600; }
-.od-rank-evo__value { fill: var(--ink); font-family: var(--font-sign); font-size: 15px; font-weight: 700; }
+.od-rank-evo__value { fill: var(--ink); font-family: var(--font-sign); font-stretch: var(--sign-stretch); font-size: 15px; font-weight: 700; }
 
 /* El hilo del último punto a su rótulo: existe para que el ojo no tenga que
    adivinar de qué línea es cada nombre, así que se ve poco y no compite. */
@@ -606,7 +606,7 @@
   color: #ffffff;
   background: var(--rk-accent);
   border-radius: var(--radius-xs);
-  font-family: var(--font-sign);
+  font-family: var(--font-sign); font-stretch: var(--sign-stretch);
   font-size: 1rem;
   font-weight: 700;
   letter-spacing: 0.04em;
@@ -711,7 +711,7 @@
 
 .od-sdg__segment text {
   fill: color-mix(in srgb, var(--sdg) 45%, var(--ink-muted));
-  font-family: var(--font-sign);
+  font-family: var(--font-sign); font-stretch: var(--sign-stretch);
   font-size: 15px;
   font-weight: 700;
   pointer-events: none;
@@ -734,7 +734,7 @@
 
 .od-sdg__hub { fill: var(--od-board-raised); }
 .od-sdg__center-kicker { fill: var(--ink-muted); font-size: 13px; font-weight: 700; letter-spacing: 0.08em; }
-.od-sdg__center-rank { fill: var(--ink); font-family: var(--font-sign); font-size: 34px; font-weight: 700; }
+.od-sdg__center-rank { fill: var(--ink); font-family: var(--font-sign); font-stretch: var(--sign-stretch); font-size: 34px; font-weight: 700; }
 .od-sdg__center-scope { fill: var(--ink-muted); font-size: 12px; font-weight: 600; }
 
 .od-sdg__detail {
@@ -761,7 +761,7 @@
   color: #ffffff;
   background: var(--sdg);
   border-radius: 6px;
-  font-family: var(--font-sign);
+  font-family: var(--font-sign); font-stretch: var(--sign-stretch);
   font-size: 2.1rem;
   font-weight: 700;
 }
@@ -776,7 +776,7 @@
 }
 
 .od-sdg__focus dt { color: var(--ink-muted); font-size: var(--text-2xs); font-weight: 700; letter-spacing: var(--tracking-wide); text-transform: uppercase; }
-.od-sdg__focus dd { margin: 0; font-family: var(--font-sign); font-size: 1.7rem; font-weight: 700; }
+.od-sdg__focus dd { margin: 0; font-family: var(--font-sign); font-stretch: var(--sign-stretch); font-size: 1.7rem; font-weight: 700; }
 
 .od-sdg__list {
   display: grid;
@@ -813,7 +813,7 @@
   color: #ffffff;
   background: var(--sdg);
   border-radius: 4px;
-  font-family: var(--font-sign);
+  font-family: var(--font-sign); font-stretch: var(--sign-stretch);
   font-size: 1.1rem;
 }
 

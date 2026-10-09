@@ -64,7 +64,7 @@
 
 .od-ctable__table thead th {
   color: var(--ink-secondary);
-  font-family: var(--font-sign);
+  font-family: var(--font-sign); font-stretch: var(--sign-stretch);
   font-size: 0.95rem;
   font-weight: 600;
   letter-spacing: 0.04em;
@@ -147,7 +147,7 @@
   max-width: none;
   padding: var(--space-4) var(--space-4) var(--space-2);
   color: var(--ink);
-  font-family: var(--font-sign);
+  font-family: var(--font-sign); font-stretch: var(--sign-stretch);
   font-size: 1rem;
   font-weight: 700;
   letter-spacing: var(--tracking-wide);

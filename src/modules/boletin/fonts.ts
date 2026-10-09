@@ -11,6 +11,7 @@ import type { BulletinFont } from "./model";
 
 const SPEC: Record<BulletinFont, string> = {
   Montserrat: "Montserrat:ital,wght@0,400..900;1,400..900",
+  "Open Sans": "Open+Sans:ital,wght@0,400..800;1,400..800",
   Manrope: "Manrope:wght@400..800",
   "Source Sans 3": "Source+Sans+3:ital,wght@0,400..900;1,400..900",
   Roboto: "Roboto:ital,wght@0,400..900;1,400..900",

@@ -704,7 +704,7 @@ export function createStage(
 
       // Rótulos sutiles de cada hemisferio
       if (S.labels > 0.2) {
-        ctx.font = "800 10.5px Manrope, sans-serif";
+        ctx.font = "800 10.5px 'Open Sans', sans-serif";
         ctx.fillStyle = rgba("#9f84db", 0.45 * S.labels * S.leftHemi);
         ctx.textAlign = "center";
         ctx.fillText("HEMISFERIO ESTRATÉGICO · PLANEACIÓN", leftCenterX, CY - RAD * 0.79);
@@ -731,7 +731,7 @@ export function createStage(
         ctx.setLineDash([]);
 
         ctx.fillStyle = hot ? rgba(ringColor, S.rings) : rgba("#8196ba", 0.75 * S.rings);
-        ctx.font = `700 ${hot ? 11 : 9.5}px Manrope, sans-serif`;
+        ctx.font = `700 ${hot ? 11 : 9.5}px 'Open Sans', sans-serif`;
         ctx.textAlign = "center";
         ctx.textBaseline = "alphabetic";
         ctx.fillText(`${g.name.toUpperCase()} · ${g.cost}`, CX, CY - r - 6);
@@ -854,7 +854,7 @@ export function createStage(
         if (lit && S.labels > 0.3 && br.refCode) {
           const midX = (x1 + x2) / 2;
           const midY = (y1 + y2) / 2 - 28;
-          ctx.font = "800 10px Manrope, sans-serif";
+          ctx.font = "800 10px 'Open Sans', sans-serif";
           ctx.fillStyle = rgba(GOLD, a);
           ctx.textAlign = "center";
           ctx.fillText(`⚡ ${br.refCode}`, midX, midY);
@@ -971,7 +971,7 @@ export function createStage(
       const a = isChain ? 1 : S.labels * (actN || S.dim > 0.5 ? 0.35 : 0.9);
       if (a < 0.02) continue;
 
-      ctx.font = `${n.level <= 2 || n === focusNode ? 800 : 700} ${n.level === 1 ? 12 : 10.5}px Manrope, sans-serif`;
+      ctx.font = `${n.level <= 2 || n === focusNode ? 800 : 700} ${n.level === 1 ? 12 : 10.5}px 'Open Sans', sans-serif`;
       const full = n.code ? `${n.code} · ${n.name}` : n.name;
       const options = [full.length > 36 ? `${full.slice(0, 35)}…` : full];
       if (n.code && n !== focusNode) options.push(n.code);

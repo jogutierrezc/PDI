@@ -37,7 +37,7 @@
   --flap-size: 1.9rem;
   display: inline-flex;
   gap: 0.07em;
-  font-family: var(--font-sign);
+  font-family: var(--font-sign); font-stretch: var(--sign-stretch);
   font-size: var(--flap-size);
   font-weight: 600;
   line-height: 1;
@@ -315,7 +315,7 @@
   color: var(--od-board-ink);
   border: 1px dashed var(--od-board-line-strong);
   border-radius: 4px;
-  font-family: var(--font-sign);
+  font-family: var(--font-sign); font-stretch: var(--sign-stretch);
   font-size: 0.8rem;
   font-weight: 600;
   letter-spacing: var(--tracking-wide);
@@ -333,7 +333,7 @@
   color: var(--od-board);
   background: var(--od-board-ink);
   border-radius: 50%;
-  font-family: var(--font-sign);
+  font-family: var(--font-sign); font-stretch: var(--sign-stretch);
   font-size: 0.95rem;
   font-weight: 700;
   line-height: 1;
@@ -377,7 +377,7 @@
 }
 
 .od-frame__titles strong {
-  font-family: var(--font-sign);
+  font-family: var(--font-sign); font-stretch: var(--sign-stretch);
   font-size: 1.2rem;
   font-weight: 600;
   letter-spacing: 0.03em;
@@ -424,7 +424,7 @@
   background: transparent;
   border: 0;
   border-radius: 5px;
-  font-family: var(--font-sign);
+  font-family: var(--font-sign); font-stretch: var(--sign-stretch);
   font-size: 0.95rem;
   font-weight: 600;
   letter-spacing: 0.02em;
@@ -536,7 +536,7 @@
 }
 
 .od-brand__name {
-  font-family: var(--font-sign);
+  font-family: var(--font-sign); font-stretch: var(--sign-stretch);
   font-size: 1.35rem;
   font-weight: 500;
   letter-spacing: 0.03em;
@@ -610,7 +610,7 @@
 
 .od-footer__brand strong {
   color: var(--od-board-ink);
-  font-family: var(--font-sign);
+  font-family: var(--font-sign); font-stretch: var(--sign-stretch);
   font-size: 1.15rem;
   font-weight: 600;
   letter-spacing: 0.02em;
@@ -702,7 +702,7 @@
 
 .od-hero__name {
   max-width: 14ch;
-  font-family: var(--font-sign);
+  font-family: var(--font-sign); font-stretch: var(--sign-stretch);
   font-size: var(--text-sign-hero);
   font-weight: 700;
   letter-spacing: -0.005em;
@@ -758,7 +758,7 @@
   gap: var(--space-3);
   margin: 0;
   color: var(--od-board-muted);
-  font-family: var(--font-sign);
+  font-family: var(--font-sign); font-stretch: var(--sign-stretch);
   font-size: 0.95rem;
   font-weight: 600;
   letter-spacing: var(--tracking-wide);
@@ -813,7 +813,7 @@
 
 .od-figure__unit {
   color: var(--od-board-muted);
-  font-family: var(--font-sign);
+  font-family: var(--font-sign); font-stretch: var(--sign-stretch);
   font-size: 1rem;
   font-weight: 500;
   letter-spacing: 0.02em;
@@ -908,7 +908,7 @@
 .od-keyrow__head h2 {
   margin: 0;
   color: var(--od-board-ink);
-  font-family: var(--font-sign);
+  font-family: var(--font-sign); font-stretch: var(--sign-stretch);
   font-size: clamp(2.2rem, 3.8vw, 3.4rem);
   font-weight: 700;
   letter-spacing: 0;
@@ -938,7 +938,7 @@
 
 .od-segmented__label {
   color: var(--od-board-muted);
-  font-family: var(--font-sign);
+  font-family: var(--font-sign); font-stretch: var(--sign-stretch);
   font-size: 0.85rem;
   font-weight: 600;
   letter-spacing: var(--tracking-wide);
@@ -965,7 +965,7 @@
   background: transparent;
   border: 0;
   border-radius: 5px;
-  font-family: var(--font-sign);
+  font-family: var(--font-sign); font-stretch: var(--sign-stretch);
   font-size: 1.05rem;
   font-weight: 600;
   letter-spacing: 0.02em;
@@ -1008,7 +1008,7 @@
   padding: 0 var(--space-3) var(--space-3);
   color: var(--od-board-muted);
   border-bottom: 1px solid var(--od-board-line-strong);
-  font-family: var(--font-sign);
+  font-family: var(--font-sign); font-stretch: var(--sign-stretch);
   font-size: 0.85rem;
   font-weight: 600;
   letter-spacing: var(--tracking-wide);
@@ -1049,7 +1049,7 @@
 }
 
 .od-row__name strong {
-  font-family: var(--font-sign);
+  font-family: var(--font-sign); font-stretch: var(--sign-stretch);
   font-size: 1.35rem;
   font-weight: 600;
   letter-spacing: 0.015em;
@@ -1089,7 +1089,7 @@
 .od-row__unit {
   min-width: 1.4ch;
   color: var(--od-board-muted);
-  font-family: var(--font-sign);
+  font-family: var(--font-sign); font-stretch: var(--sign-stretch);
   font-size: 1rem;
   font-weight: 600;
 }
@@ -1162,7 +1162,7 @@
 .od-platform__title h3 {
   margin: 0;
   color: var(--od-board-ink);
-  font-family: var(--font-sign);
+  font-family: var(--font-sign); font-stretch: var(--sign-stretch);
   font-size: 1.8rem;
   font-weight: 700;
   line-height: 0.95;
@@ -1247,7 +1247,7 @@
 .od-missing h1 {
   margin: 0;
   color: var(--ink);
-  font-family: var(--font-sign);
+  font-family: var(--font-sign); font-stretch: var(--sign-stretch);
   font-size: clamp(2rem, 3.4vw, 3rem);
   font-weight: 700;
   letter-spacing: 0;
@@ -1378,7 +1378,7 @@
 .od-report-head h1 {
   margin: 0;
   color: var(--od-board-ink);
-  font-family: var(--font-sign);
+  font-family: var(--font-sign); font-stretch: var(--sign-stretch);
   font-size: clamp(2.5rem, 5vw, 4.5rem);
   font-weight: 700;
   letter-spacing: 0;
@@ -1411,7 +1411,7 @@
 
 .od-report-head__facts dt {
   color: var(--od-board-muted);
-  font-family: var(--font-sign);
+  font-family: var(--font-sign); font-stretch: var(--sign-stretch);
   font-size: 0.9rem;
   font-weight: 600;
   letter-spacing: var(--tracking-wide);
@@ -1480,7 +1480,7 @@
   place-items: center;
   overflow: hidden;
   color: var(--od-dei-tile-ink);
-  font-family: var(--font-sign);
+  font-family: var(--font-sign); font-stretch: var(--sign-stretch);
   font-size: 0.7rem;
   font-weight: 700;
   letter-spacing: 0.08em;
@@ -1553,14 +1553,14 @@
   color: var(--od-dei-tile-ink);
   background: var(--line);
   border-radius: 4px;
-  font-family: var(--font-sign);
+  font-family: var(--font-sign); font-stretch: var(--sign-stretch);
   font-size: 1.05rem;
   font-weight: 700;
   letter-spacing: 0.06em;
 }
 
 .od-report-bar__name {
-  font-family: var(--font-sign);
+  font-family: var(--font-sign); font-stretch: var(--sign-stretch);
   font-size: 1.1rem;
   font-weight: 600;
   letter-spacing: 0.03em;
@@ -1594,7 +1594,7 @@
   background: var(--od-flap-low);
   border: 1px solid var(--od-board-line-strong);
   border-radius: var(--radius-xs);
-  font-family: var(--font-sign);
+  font-family: var(--font-sign); font-stretch: var(--sign-stretch);
   font-size: 0.98rem;
   font-weight: 600;
   letter-spacing: 0.02em;
@@ -1666,7 +1666,7 @@
   color: var(--od-board-ink);
   background: color-mix(in srgb, var(--line) 16%, var(--od-flap-low));
   border-radius: 5px;
-  font-family: var(--font-sign);
+  font-family: var(--font-sign); font-stretch: var(--sign-stretch);
   font-size: 1.1rem;
   font-weight: 600;
   text-decoration: none;
@@ -1799,7 +1799,7 @@
 
 .od-kpi__unit {
   color: var(--od-board-muted);
-  font-family: var(--font-sign);
+  font-family: var(--font-sign); font-stretch: var(--sign-stretch);
   font-size: 1rem;
 }
 
@@ -1851,7 +1851,7 @@
 .od-kpi__pick {
   margin-top: var(--space-1);
   color: var(--od-board-muted);
-  font-family: var(--font-sign);
+  font-family: var(--font-sign); font-stretch: var(--sign-stretch);
   font-size: 0.95rem;
   font-weight: 600;
   letter-spacing: var(--tracking-wide);
@@ -1902,7 +1902,7 @@
 .od-select span,
 .od-pivot__control > span {
   color: var(--ink-muted);
-  font-family: var(--font-sign);
+  font-family: var(--font-sign); font-stretch: var(--sign-stretch);
   font-size: 0.85rem;
   font-weight: 600;
   letter-spacing: var(--tracking-wide);
@@ -2060,7 +2060,7 @@
 
 .od-lines__year {
   fill: var(--ink-muted);
-  font-family: var(--font-sign);
+  font-family: var(--font-sign); font-stretch: var(--sign-stretch);
   font-size: 14px;
   font-weight: 600;
 }
@@ -2227,7 +2227,7 @@
 .od-yearbars__year {
   align-self: center;
   color: var(--ink-muted);
-  font-family: var(--font-sign);
+  font-family: var(--font-sign); font-stretch: var(--sign-stretch);
   font-size: 1rem;
   font-weight: 600;
 }
@@ -2411,7 +2411,7 @@
 
 .od-donut__center strong {
   color: var(--ink);
-  font-family: var(--font-sign);
+  font-family: var(--font-sign); font-stretch: var(--sign-stretch);
   font-size: clamp(1.4rem, 2.2vw, 1.9rem);
   font-weight: 700;
   line-height: 1;
@@ -2544,7 +2544,7 @@
 
 .od-pipe__stage-name {
   fill: var(--ink-muted);
-  font-family: var(--font-sign);
+  font-family: var(--font-sign); font-stretch: var(--sign-stretch);
   font-size: 14px;
   font-weight: 600;
   letter-spacing: 0.03em;
@@ -2733,7 +2733,7 @@
 }
 
 .od-map__label strong {
-  font-family: var(--font-sign);
+  font-family: var(--font-sign); font-stretch: var(--sign-stretch);
   font-size: 0.95rem;
   font-weight: 700;
   letter-spacing: 0.02em;
@@ -2763,7 +2763,7 @@
 
 .od-map__total span {
   color: var(--ink-muted);
-  font-family: var(--font-sign);
+  font-family: var(--font-sign); font-stretch: var(--sign-stretch);
   font-size: 0.9rem;
   font-weight: 600;
   letter-spacing: var(--tracking-wide);
@@ -2772,7 +2772,7 @@
 
 .od-map__total strong {
   color: var(--ink);
-  font-family: var(--font-sign);
+  font-family: var(--font-sign); font-stretch: var(--sign-stretch);
   font-size: clamp(2.2rem, 3.2vw, 2.8rem);
   font-weight: 700;
   line-height: 1;
@@ -3110,7 +3110,7 @@
 }
 
 .od-world__hub-label strong {
-  font-family: var(--font-sign);
+  font-family: var(--font-sign); font-stretch: var(--sign-stretch);
   font-size: 0.95rem;
   font-weight: 700;
   letter-spacing: 0.02em;
@@ -3552,7 +3552,7 @@
 }
 
 .od-heat__grid thead th {
-  font-family: var(--font-sign);
+  font-family: var(--font-sign); font-stretch: var(--sign-stretch);
   font-size: 0.95rem;
   text-align: center;
 }
@@ -3746,7 +3746,7 @@
 .od-table thead th {
   color: var(--ink-muted);
   background: var(--od-board-raised);
-  font-family: var(--font-sign);
+  font-family: var(--font-sign); font-stretch: var(--sign-stretch);
   font-size: 0.95rem;
   font-weight: 600;
   letter-spacing: 0.04em;
@@ -3850,7 +3850,7 @@
   display: inline-flex;
   align-items: center;
   gap: var(--space-3);
-  font-family: var(--font-sign);
+  font-family: var(--font-sign); font-stretch: var(--sign-stretch);
   font-size: clamp(1.3rem, 2vw, 1.75rem);
   font-weight: 600;
   line-height: 1;
@@ -4146,7 +4146,7 @@
 
 .od-history__period {
   color: var(--od-board-muted);
-  font-family: var(--font-sign);
+  font-family: var(--font-sign); font-stretch: var(--sign-stretch);
   font-size: 1rem;
   font-weight: 700;
   letter-spacing: var(--tracking-wide);

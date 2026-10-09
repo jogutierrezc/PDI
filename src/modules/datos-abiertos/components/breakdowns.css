@@ -137,7 +137,7 @@
 
 .od-stack100__label b {
   color: var(--ink);
-  font-family: var(--font-sign);
+  font-family: var(--font-sign); font-stretch: var(--sign-stretch);
   font-size: 0.95rem;
   font-weight: 700;
 }
@@ -165,7 +165,7 @@
 
 .od-breakdown__detail strong {
   color: var(--ink);
-  font-family: var(--font-sign);
+  font-family: var(--font-sign); font-stretch: var(--sign-stretch);
   font-size: 1.05rem;
   letter-spacing: var(--tracking-wide);
 }

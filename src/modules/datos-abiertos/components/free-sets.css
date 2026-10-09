@@ -11,7 +11,7 @@
 .od-free__stamp {
   padding: var(--space-2) var(--space-3);
   color: var(--od-board-ink);
-  font-family: var(--font-sign);
+  font-family: var(--font-sign); font-stretch: var(--sign-stretch);
   font-size: 0.95rem;
   font-weight: 600;
   letter-spacing: var(--tracking-wide);
@@ -138,7 +138,7 @@
 
 .od-free__pie-total strong {
   color: var(--ink);
-  font-family: var(--font-sign);
+  font-family: var(--font-sign); font-stretch: var(--sign-stretch);
   font-size: 2rem;
   font-weight: 700;
   line-height: 1;
@@ -313,7 +313,7 @@
 .od-free__table tr[data-kind="grupo"] th {
   padding: var(--space-3) var(--space-3) var(--space-2);
   color: var(--ink);
-  font-family: var(--font-sign);
+  font-family: var(--font-sign); font-stretch: var(--sign-stretch);
   font-size: 1rem;
   font-weight: 700;
   letter-spacing: var(--tracking-wide);

@@ -86,7 +86,7 @@
 .ibol-cover__scope {
   margin: 0;
   color: color-mix(in srgb, var(--brand-teal) 75%, var(--ink));
-  font-family: var(--font-sign);
+  font-family: var(--font-sign); font-stretch: var(--sign-stretch);
   font-size: 16px;
   font-weight: 600;
   line-height: 1.35;
@@ -94,7 +94,7 @@
   text-transform: uppercase;
 }
 
-.ibol-kicker { color: var(--brand-navy); font-family: var(--font-sign); font-size: 15px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; }
+.ibol-kicker { color: var(--brand-navy); font-family: var(--font-sign); font-stretch: var(--sign-stretch); font-size: 15px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; }
 .ibol-kicker b { color: var(--tone, var(--brand-blue)); }
 
 .ibol-rule { display: flex; height: 5px; overflow: hidden; border-radius: 3px; }
@@ -107,7 +107,7 @@
   display: grid;
   justify-items: end;
   color: var(--brand-navy);
-  font-family: var(--font-sign);
+  font-family: var(--font-sign); font-stretch: var(--sign-stretch);
   font-size: 14px;
   font-weight: 600;
   letter-spacing: 0.08em;
@@ -136,7 +136,7 @@
 .ibol-footer > div > span:first-child { display: flex; align-items: center; gap: 10px; }
 .ibol-footer i { width: 10px; height: 10px; background: var(--od-signal); border-radius: 6px 3px 6px 3px; }
 .ibol-footer span span { opacity: 0.78; }
-.ibol-footer__sign { font-family: var(--font-sign); font-size: 14px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; opacity: 0.88; }
+.ibol-footer__sign { font-family: var(--font-sign); font-stretch: var(--sign-stretch); font-size: 14px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; opacity: 0.88; }
 
 /* --- Títulos y cifras ------------------------------------------------------------------ */
 

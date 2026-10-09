@@ -61,7 +61,7 @@
   width: 2.35rem;
   height: 2.35rem;
   color: var(--od-flap-ink);
-  font-family: var(--font-sign);
+  font-family: var(--font-sign); font-stretch: var(--sign-stretch);
   font-size: 1.15rem;
   font-weight: 700;
   letter-spacing: 0.04em;
@@ -165,7 +165,7 @@
 
 .od-saber__arrival dt {
   color: var(--od-board-muted);
-  font-family: var(--font-sign);
+  font-family: var(--font-sign); font-stretch: var(--sign-stretch);
   font-size: 0.85rem;
   font-weight: 600;
   letter-spacing: var(--tracking-wide);
@@ -184,7 +184,7 @@
 
 .od-saber__unit {
   color: var(--od-board-ink);
-  font-family: var(--font-sign);
+  font-family: var(--font-sign); font-stretch: var(--sign-stretch);
   font-size: 1.6rem;
   font-weight: 700;
 }
@@ -278,7 +278,7 @@
 
 .od-ladder__scale {
   color: var(--ink-muted);
-  font-family: var(--font-sign);
+  font-family: var(--font-sign); font-stretch: var(--sign-stretch);
   font-size: 0.8rem;
   font-weight: 600;
   letter-spacing: var(--tracking-wide);
@@ -312,7 +312,7 @@
 
 .od-ladder__year {
   color: var(--ink);
-  font-family: var(--font-sign);
+  font-family: var(--font-sign); font-stretch: var(--sign-stretch);
   font-size: 1.05rem;
   font-weight: 700;
   font-variant-numeric: tabular-nums;
@@ -403,7 +403,7 @@
 
 .od-ladder__share strong {
   color: var(--ink);
-  font-family: var(--font-sign);
+  font-family: var(--font-sign); font-stretch: var(--sign-stretch);
   font-size: 1.35rem;
   font-weight: 700;
 }
@@ -562,7 +562,7 @@
   z-index: 2;
   padding: var(--space-2) var(--space-1);
   color: var(--ink);
-  font-family: var(--font-sign);
+  font-family: var(--font-sign); font-stretch: var(--sign-stretch);
   font-size: 0.95rem;
   font-weight: 700;
   text-align: center;
@@ -604,7 +604,7 @@
 .od-gap__table tr[data-level="udes"] th[scope="row"],
 .od-gap__table tr[data-level="sede"] th[scope="row"] {
   color: var(--ink);
-  font-family: var(--font-sign);
+  font-family: var(--font-sign); font-stretch: var(--sign-stretch);
   font-size: 1rem;
   font-weight: 700;
   letter-spacing: var(--tracking-wide);

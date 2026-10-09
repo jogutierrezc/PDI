@@ -54,7 +54,7 @@
 .obs-platform .od-platform__body { padding-top: var(--space-6); }
 
 .obs-question {
-  font-family: var(--font-sign);
+  font-family: var(--font-sign); font-stretch: var(--sign-stretch);
   font-size: 1.25rem;
   font-weight: 600;
   line-height: 1.2;
@@ -65,7 +65,7 @@
 
 .obs-mini figcaption {
   color: var(--od-board-muted);
-  font-family: var(--font-sign);
+  font-family: var(--font-sign); font-stretch: var(--sign-stretch);
   font-size: 0.85rem;
   font-weight: 600;
   letter-spacing: 0.06em;
@@ -98,7 +98,7 @@
   gap: var(--space-2);
   margin: var(--space-5) 0 0;
   color: var(--ink);
-  font-family: var(--font-sign);
+  font-family: var(--font-sign); font-stretch: var(--sign-stretch);
   font-size: clamp(1.4rem, 2vw, 1.8rem);
   font-weight: 600;
   letter-spacing: 0.04em;
@@ -108,12 +108,12 @@
 .obs-head__lede { max-width: 70ch; margin: var(--space-4) 0 0; color: var(--ink-secondary); line-height: 1.6; }
 
 .obs-head__row { display: flex; align-items: center; gap: var(--space-4); margin-top: var(--space-5); }
-.obs-head__count { color: var(--ink-muted); font-family: var(--font-sign); font-size: 0.95rem; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; }
+.obs-head__count { color: var(--ink-muted); font-family: var(--font-sign); font-stretch: var(--sign-stretch); font-size: 0.95rem; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; }
 
 .obs-head h1 {
   margin: var(--space-3) 0 0;
   color: var(--ink);
-  font-family: var(--font-sign);
+  font-family: var(--font-sign); font-stretch: var(--sign-stretch);
   font-size: clamp(2.2rem, 4vw, 3.4rem);
   font-weight: 700;
   line-height: 0.95;
@@ -166,7 +166,7 @@
 .obs-series:not([data-seen]) .obs-series__bar { transform: scaleY(0); }
 .obs-series__col[data-on] .obs-series__bar { fill: var(--od-signal); }
 
-.obs-series__value { fill: var(--ink); font-family: var(--font-sign); font-size: 15px; font-weight: 700; }
+.obs-series__value { fill: var(--ink); font-family: var(--font-sign); font-stretch: var(--sign-stretch); font-size: 15px; font-weight: 700; }
 .obs-series__label { fill: var(--ink-muted); font-size: 12px; }
 .obs-series__col[data-on] .obs-series__label { fill: var(--od-signal-text); font-weight: 700; }
 
@@ -270,7 +270,7 @@
   background: var(--od-board);
   border: 1px solid var(--od-board-line);
   border-radius: var(--radius-xs);
-  font-family: var(--font-sign);
+  font-family: var(--font-sign); font-stretch: var(--sign-stretch);
   font-size: 1.15rem;
   font-weight: 600;
   text-decoration: none;
@@ -308,7 +308,7 @@
   padding-bottom: var(--space-2);
   color: var(--ink-secondary);
   border-bottom: 1px solid var(--line);
-  font-family: var(--font-sign);
+  font-family: var(--font-sign); font-stretch: var(--sign-stretch);
   font-size: 1rem;
   font-weight: 700;
   letter-spacing: 0.08em;

@@ -30,7 +30,7 @@ import type { BulletinAnalysis } from "./analysis";
 import { ALL_YEARS } from "../datos-abiertos/data/terms";
 import type { CampusId, OpenDataCatalog, Report } from "../datos-abiertos/data/types";
 
-export const BULLETIN_FONTS = ["Montserrat", "Manrope", "Source Sans 3", "Roboto", "Lato"] as const;
+export const BULLETIN_FONTS = ["Montserrat", "Open Sans", "Manrope", "Source Sans 3", "Roboto", "Lato"] as const;
 export type BulletinFont = (typeof BULLETIN_FONTS)[number];
 
 export interface BulletinTheme {

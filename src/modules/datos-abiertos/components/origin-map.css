@@ -146,7 +146,7 @@
 
 .od-omap__sites text {
   fill: var(--od-board-ink);
-  font-family: var(--font-sign);
+  font-family: var(--font-sign); font-stretch: var(--sign-stretch);
   font-size: 13px;
   font-weight: 700;
   letter-spacing: 0.04em;
@@ -285,7 +285,7 @@
 .od-omap__count b {
   display: block;
   color: var(--ink);
-  font-family: var(--font-sign);
+  font-family: var(--font-sign); font-stretch: var(--sign-stretch);
   font-size: 2rem;
   line-height: 1;
   font-variant-numeric: tabular-nums;
@@ -296,7 +296,7 @@
   justify-content: space-between;
   margin: 0;
   color: var(--ink);
-  font-family: var(--font-sign);
+  font-family: var(--font-sign); font-stretch: var(--sign-stretch);
   font-size: 1rem;
   font-weight: 600;
   letter-spacing: 0.04em;
@@ -375,7 +375,7 @@
 
 .od-omap__pending strong {
   color: var(--od-signal-text);
-  font-family: var(--font-sign);
+  font-family: var(--font-sign); font-stretch: var(--sign-stretch);
   font-size: 1.1rem;
   letter-spacing: 0.06em;
   text-transform: uppercase;

@@ -60,39 +60,39 @@ colors:
   bol-paper-2: "#eef3f9"
 typography:
   display:
-    fontFamily: "Fraunces, Iowan Old Style, Georgia, serif"
+    fontFamily: "Open Sans, ui-sans-serif, system-ui, sans-serif"
     fontSize: "clamp(2.1rem, 2.6vw + 1.5rem, 3.1rem)"
     fontWeight: 700
     lineHeight: 1.08
     letterSpacing: "-0.028em"
   headline:
-    fontFamily: "Fraunces, Iowan Old Style, Georgia, serif"
+    fontFamily: "Open Sans, ui-sans-serif, system-ui, sans-serif"
     fontSize: "clamp(1.35rem, 0.8vw + 1.15rem, 1.65rem)"
     fontWeight: 700
     lineHeight: 1.08
     letterSpacing: "-0.028em"
   title:
-    fontFamily: "Manrope, ui-sans-serif, system-ui, sans-serif"
+    fontFamily: "Open Sans, ui-sans-serif, system-ui, sans-serif"
     fontSize: "1.0625rem"
     fontWeight: 800
     lineHeight: 1.28
   body:
-    fontFamily: "Manrope, ui-sans-serif, system-ui, sans-serif"
+    fontFamily: "Open Sans, ui-sans-serif, system-ui, sans-serif"
     fontSize: "0.9375rem"
     fontWeight: 500
     lineHeight: 1.5
   label:
-    fontFamily: "Manrope, ui-sans-serif, system-ui, sans-serif"
+    fontFamily: "Open Sans, ui-sans-serif, system-ui, sans-serif"
     fontSize: "0.75rem"
     fontWeight: 700
     lineHeight: 1.5
   sign-hero:
-    fontFamily: "Barlow Condensed, Arial Narrow, Roboto Condensed, sans-serif"
+    fontFamily: "Open Sans, Arial Narrow, sans-serif"
     fontSize: "clamp(2.7rem, 7.2vw, 6rem)"
     fontWeight: 700
     lineHeight: 1
   sign-label:
-    fontFamily: "Barlow Condensed, Arial Narrow, Roboto Condensed, sans-serif"
+    fontFamily: "Open Sans, Arial Narrow, sans-serif"
     fontSize: "0.8rem"
     fontWeight: 600
     lineHeight: 1.3
@@ -215,7 +215,7 @@ components:
 
 **Creative North Star: "El tablero de llegadas de la universidad"**
 
-Un solo código atiende tres superficies con un mismo suelo: el portal del Plan de Desarrollo, la intranet de Planeación y el portal estadístico UDES en Cifras. El suelo común es institucional y sobrio: planos blancos y gris azulado, tinta azul marino, azul institucional reservado para la acción, Fraunces para los títulos y Manrope para todo lo demás. Sobre ese suelo, UDES en Cifras monta su propio mundo: un tablero de paletas partidas (Solari) donde cada cifra voltea hasta asentarse en el dato oficial, con boletos de origen de papel perforado que dicen quién la reporta, para qué campus y con qué corte.
+Un solo código atiende tres superficies con un mismo suelo: el portal del Plan de Desarrollo, la intranet de Planeación y el portal estadístico UDES en Cifras. El suelo común es institucional y sobrio: planos blancos y gris azulado, tinta azul marino, azul institucional reservado para la acción, Open Sans para todo, con el peso como única jerarquía de voz. Sobre ese suelo, UDES en Cifras monta su propio mundo: un tablero de paletas partidas (Solari) donde cada cifra voltea hasta asentarse en el dato oficial, con boletos de origen de papel perforado que dicen quién la reporta, para qué campus y con qué corte.
 
 La intranet es el otro extremo: densa, callada y orientada a la tarea. Estaciones fijas, rejillas tipo hoja de cálculo, estado siempre con glifo y texto. El color de estado solo aparece cuando algo está completo, pendiente o en riesgo. Los dos temas (claro y oscuro) son reales en todo el sistema: cada token de color se redefine por tema, no se invierte automáticamente.
 
@@ -232,7 +232,7 @@ Institucional y frío en su base, con dos acentos de señal (ámbar y cian) que 
 
 ### Primary
 - **Azul Institucional** (brand-blue): acción principal (botón primario), elemento seleccionado, anillo de foco, estación activa. Su versión suave (brand-blue-soft) rellena la selección en listas y el cajón activo.
-- **Azul Marino UDES** (brand-navy): títulos en Fraunces, botones secundarios, tinta de las paletas en tema claro.
+- **Azul Marino UDES** (brand-navy): títulos en Open Sans, botones secundarios, tinta de las paletas en tema claro.
 
 ### Secondary
 - **Ámbar de Señal** (od-signal): exclusivo del tablero. Destello de la paleta al asentarse, acción principal del portal estadístico, control activo y flujos del mapa. Como texto usa od-signal-text, que sí alcanza 4.5:1 sobre blanco.
@@ -273,33 +273,33 @@ Institucional y frío en su base, con dos acentos de señal (ámbar y cian) que 
 
 ## Typography
 
-**Display Font:** Fraunces (con Iowan Old Style, Georgia)
-**Body Font:** Manrope (con ui-sans-serif, system-ui)
-**Sign Font:** Barlow Condensed (con Arial Narrow, Roboto Condensed), solo en UDES en Cifras
+**Display Font:** Open Sans (con ui-sans-serif, system-ui)
+**Body Font:** Open Sans (con ui-sans-serif, system-ui)
+**Sign Font:** Open Sans condensada (eje de ancho `wdth` 75, `--sign-stretch`), solo en UDES en Cifras
 
-**Character:** Fraunces da a los títulos el peso de un documento institucional; Manrope mantiene la interfaz legible y densa. Barlow Condensed es la señalética del tablero: mayúsculas espaciadas y cifras en celdas.
+**Character:** Una sola familia, Open Sans, para todo el portal (decisión de 2026-10-09, antes Fraunces, Manrope y Barlow Condensed). Los títulos se distinguen por peso y tamaño, no por una segunda familia. La señalética del tablero usa la misma Open Sans en su ancho condensado: mayúsculas espaciadas y cifras en celdas.
 
 ### Hierarchy
 - **Display** (700, clamp 2.1–3.1rem, 1.08, tracking −0.028em): títulos de página en azul marino.
 - **Headline** (700, clamp 1.35–1.65rem, 1.08): títulos de sección y de pantalla en la intranet ("Captura", "Publicación").
-- **Title** (Manrope 800, 1.0625rem, 1.28): cabecera de panel, nombre de informe.
-- **Body** (Manrope 500, 0.9375rem, 1.5): texto corrido; descripciones de panel a 0.75rem con máximo 64ch.
-- **Label** (Manrope 700, 0.75rem): botones, rótulos de campo, cabeceras de rejilla.
-- **Sign Hero** (Barlow Condensed 700, clamp 2.7–6rem): "Universidad de Santander" en la portada del tablero.
-- **Sign Label** (Barlow Condensed 600, 0.8rem, tracking 0.08em, MAYÚSCULAS): rótulos del tablero, sellos y etiquetas de corte.
+- **Title** (Open Sans 800, 1.0625rem, 1.28): cabecera de panel, nombre de informe.
+- **Body** (Open Sans 500, 0.9375rem, 1.5): texto corrido; descripciones de panel a 0.75rem con máximo 64ch.
+- **Label** (Open Sans 700, 0.75rem): botones, rótulos de campo, cabeceras de rejilla.
+- **Sign Hero** (Open Sans condensada 700, clamp 2.7–6rem): "Universidad de Santander" en la portada del tablero.
+- **Sign Label** (Open Sans condensada 600, 0.8rem, tracking 0.08em, MAYÚSCULAS): rótulos del tablero, sellos y etiquetas de corte.
 
 ### Named Rules
 **The Tabular Figure Rule.** Toda cifra que se compara (rejillas, tablero, tablas, KPI) usa numerales tabulares. En el tablero, cada carácter ocupa su propia celda de paleta.
 
-**The Sign Belongs To The Board Rule.** Barlow Condensed y las mayúsculas espaciadas no salen del portal estadístico; la intranet y el PDI hablan en Manrope.
+**The Sign Belongs To The Board Rule.** La Open Sans condensada y las mayúsculas espaciadas no salen del portal estadístico; la intranet y el PDI hablan en Open Sans de ancho normal.
 
-**The Index Speaks Twice Rule.** Cuando un índice agrupa en dos niveles —la divisoria de un tomo y, dentro de ella, el año—, los dos se distinguen por voz antes que por tamaño: la divisoria en Fraunces (1.35–1.65rem, 600) y el año en Manrope 800 a 1.0625rem con numerales tabulares, cerrado por un filete que recorre lo que queda de ancho. Dos rótulos del mismo palo separados solo por dos puntos de tamaño se leen como una lista plana, y quien busca el acta de 2023 acaba contando sangrías para saber en qué nivel está.
+**The Index Speaks Twice Rule.** Cuando un índice agrupa en dos niveles —la divisoria de un tomo y, dentro de ella, el año—, los dos se distinguen por peso antes que por tamaño: la divisoria en Open Sans 600 (1.35–1.65rem) y el año en Open Sans 800 a 1.0625rem con numerales tabulares, cerrado por un filete que recorre lo que queda de ancho. Dos rótulos del mismo palo separados solo por dos puntos de tamaño se leen como una lista plana, y quien busca el acta de 2023 acaba contando sangrías para saber en qué nivel está.
 
 ## Layout
 
 Rejilla de espacio base 4px (space-1 = 4px … space-12 = 104px). Margen lateral fluido (gutter: clamp 16–40px) y ancho de lectura de 68ch; contenido público hasta 1220px.
 
-**Intranet.** Barra lateral fija de 250px, agrupada por portal (Plan de Desarrollo, UDES en Cifras, Sistema), que se desplaza entera; cabecera pegajosa compacta de una línea (56px): ruta › título (Fraunces a `text-lg`) · descripción en una línea que se recorta, y acciones a la derecha. Si la pantalla tiene vistas o estaciones simples, van en su riel (`rail` con `AdminRail`/`AdminRailTab`) en el borde bajo de la cabecera, con negrita y subrayado azul como la barra de menús; las barras de estaciones con estado (UDES en Cifras, Observatorio, Página de la oficina) siguen en el contenido. AdminShell publica su alto como `--admin-topbar-h` para que las cabeceras pegajosas de cada pantalla se coloquen debajo. UDES en Cifras organiza el trabajo en una barra de cinco estaciones, una lista de informes (16.5rem, 14rem por debajo de 1600px) y el área de trabajo; la vista previa es columna fija (14–15.5rem) en Estructura y Publicación desde 1280px, y cajón derecho en Captura y en pantallas medianas. Por debajo de 1100px todo va en una columna y las tiras de estaciones e informes se desplazan a lo ancho, dejando a la vista el elemento actual. Por debajo de 900px la barra lateral es un cajón con capa.
+**Intranet.** Barra lateral fija de 250px, agrupada por portal (Plan de Desarrollo, UDES en Cifras, Sistema), que se desplaza entera; cabecera pegajosa compacta de una línea (56px): ruta › título (Open Sans a `text-lg`) · descripción en una línea que se recorta, y acciones a la derecha. Si la pantalla tiene vistas o estaciones simples, van en su riel (`rail` con `AdminRail`/`AdminRailTab`) en el borde bajo de la cabecera, con negrita y subrayado azul como la barra de menús; las barras de estaciones con estado (UDES en Cifras, Observatorio, Página de la oficina) siguen en el contenido. AdminShell publica su alto como `--admin-topbar-h` para que las cabeceras pegajosas de cada pantalla se coloquen debajo. UDES en Cifras organiza el trabajo en una barra de cinco estaciones, una lista de informes (16.5rem, 14rem por debajo de 1600px) y el área de trabajo; la vista previa es columna fija (14–15.5rem) en Estructura y Publicación desde 1280px, y cajón derecho en Captura y en pantallas medianas. Por debajo de 1100px todo va en una columna y las tiras de estaciones e informes se desplazan a lo ancho, dejando a la vista el elemento actual. Por debajo de 900px la barra lateral es un cajón con capa.
 
 **UDES en Cifras público.** Portada con vídeo a sangre completa y rótulo abajo a la izquierda; tablero de once informes; fichas con bloques en el orden que decide la intranet. Tablas, mapas y rejillas anchas se desplazan dentro de su marco; la página nunca se desplaza en horizontal.
 
@@ -460,14 +460,14 @@ Los dos carruseles de la portada —las fotografías de la oficina y el equipo�
 
 ### Franja de la galería (Portal de Planeación)
 
-Banda propia entre el mosaico de portales y «Lo más reciente», con la cabecera cerrada por una regla de 2px en azul marino. Cada diapositiva es una fotografía a 16/9 (4/3 por debajo de 900px) de `min(100%, 880px)`, esquina `rounded.lg`, sobre el marino noche del portal mientras carga. El pie va **sobre** la fotografía con su velo —degradado vertical de transparente a rgba(6,20,43,.88) al 62 %—, con el título en Fraunces, el texto a 58ch en azul claro y un enlace opcional que pasa a blanco al apuntarlo. El velo, y no una caja debajo: la fotografía sigue siendo la banda. La primera imagen carga `eager` y las demás `lazy`. Sin fotografías la banda no se dibuja.
+Banda propia entre el mosaico de portales y «Lo más reciente», con la cabecera cerrada por una regla de 2px en azul marino. Cada diapositiva es una fotografía a 16/9 (4/3 por debajo de 900px) de `min(100%, 880px)`, esquina `rounded.lg`, sobre el marino noche del portal mientras carga. El pie va **sobre** la fotografía con su velo —degradado vertical de transparente a rgba(6,20,43,.88) al 62 %—, con el título en Open Sans, el texto a 58ch en azul claro y un enlace opcional que pasa a blanco al apuntarlo. El velo, y no una caja debajo: la fotografía sigue siendo la banda. La primera imagen carga `eager` y las demás `lazy`. Sin fotografías la banda no se dibuja.
 
 ### Tarjeta de persona y su ficha (Portal de Planeación)
 
 La misma tarjeta y la misma ficha sirven al carril de la portada y a la rejilla de `/equipo`.
 
-- **Tarjeta:** retrato 4/5 arriba (o las iniciales en Fraunces sobre azul suave cuando no hay foto), nombre en 800, cargo, ficha de área en píldora azul suave y el foco recortado a tres líneas. Esquina 18px, borde line, superficie blanca. Al apuntarla sube 3px con sombra teñida; abierta, borde azul institucional con anillo de 1px y el chevron del pie girado. Quien no tiene nada más que contar —ni bio, ni formación, ni correo, ni enlaces— no se dibuja como si se pudiera abrir: su tarjeta es una tarjeta, no un botón que no lleva a ninguna parte.
-- **Ficha:** retrato a la izquierda (clamp 180–232px) y cuerpo a la derecha, esquina `rounded.xl`, sombra levantada; entra subiendo 10px con fundido en `--dur-slow`. Nombre en Fraunces, cargo con su área, el foco en azul marino a 62ch, la bio a 68ch, la formación en lista con viñeta azul de 5px y los contactos como enlaces del portal. Cierre en círculo de 36px arriba a la derecha. Una sola columna por debajo de 900px.
+- **Tarjeta:** retrato 4/5 arriba (o las iniciales en Open Sans sobre azul suave cuando no hay foto), nombre en 800, cargo, ficha de área en píldora azul suave y el foco recortado a tres líneas. Esquina 18px, borde line, superficie blanca. Al apuntarla sube 3px con sombra teñida; abierta, borde azul institucional con anillo de 1px y el chevron del pie girado. Quien no tiene nada más que contar —ni bio, ni formación, ni correo, ni enlaces— no se dibuja como si se pudiera abrir: su tarjeta es una tarjeta, no un botón que no lleva a ninguna parte.
+- **Ficha:** retrato a la izquierda (clamp 180–232px) y cuerpo a la derecha, esquina `rounded.xl`, sombra levantada; entra subiendo 10px con fundido en `--dur-slow`. Nombre en Open Sans, cargo con su área, el foco en azul marino a 62ch, la bio a 68ch, la formación en lista con viñeta azul de 5px y los contactos como enlaces del portal. Cierre en círculo de 36px arriba a la derecha. Una sola columna por debajo de 900px.
 - Al abrir, el foco entra en el nombre de la ficha; Escape la cierra y devuelve el foco a su tarjeta.
 
 **The File Opens In Place Rule.** La ficha de una persona se abre dentro de la página, bajo el carril o la rejilla, nunca en una ventana emergente: no es una tarea que haya que interrumpir. Así el resto del equipo sigue a la vista, se pasa de una persona a la siguiente sin cerrar nada, y en el móvil el detalle aparece bajo la tarjeta que se tocó en lugar de tapar la pantalla.
@@ -476,9 +476,9 @@ La misma tarjeta y la misma ficha sirven al carril de la portada y a la rejilla 
 
 Cada colección del repositorio es un tomo encuadernado, no una tarjeta con una foto de adorno: se puede descartar sin abrirlo, que es lo que un repositorio le debe a quien busca un papel concreto.
 
-- **El tomo** (`.dc-volume`): rejilla de dos columnas —lomo de 34px y cuerpo— sobre superficie blanca, borde `line` y sombra en dos capas teñida de marino. El lomo es el marino del portal (`--pl-navy`, que en oscuro baja a #081d40) con tinta blanca y el rango de años en `writing-mode: vertical-rl` y numerales tabulares. La tapa es la fotografía a 4/3 sobre azul suave, o la inicial del nombre en Fraunces cuando no hay foto. La banda lleva el título en Fraunces (1.35rem, 600), el subtítulo y un pie que cuenta los documentos y, si las hay, en cuántas secciones. Al apuntarlo sube 4px y la sombra se abre; el foco del enlace se dibuja sobre el tomo entero (`:has(:focus-visible)`), no alrededor del texto. Una ficha azul suave al pie dice cuántas coincidencias trae cuando hay búsqueda.
+- **El tomo** (`.dc-volume`): rejilla de dos columnas —lomo de 34px y cuerpo— sobre superficie blanca, borde `line` y sombra en dos capas teñida de marino. El lomo es el marino del portal (`--pl-navy`, que en oscuro baja a #081d40) con tinta blanca y el rango de años en `writing-mode: vertical-rl` y numerales tabulares. La tapa es la fotografía a 4/3 sobre azul suave, o la inicial del nombre en Open Sans cuando no hay foto. La banda lleva el título en Open Sans (1.35rem, 600), el subtítulo y un pie que cuenta los documentos y, si las hay, en cuántas secciones. Al apuntarlo sube 4px y la sombra se abre; el foco del enlace se dibuja sobre el tomo entero (`:has(:focus-visible)`), no alrededor del texto. Una ficha azul suave al pie dice cuántas coincidencias trae cuando hay búsqueda.
 - **El tomo apagado** (`[data-dimmed]`): fondo hundido a `surface-2`, sin sombra, tapa en `grayscale(1)` al 45 % y lomo en tinta tenue. El lomo conserva el rango completo del tomo; el pie es el que cuenta lo filtrado («0 documentos de 2018»). Sin enlace: apagado no se abre.
-- **El índice:** entradas numeradas en tinta tenue (2.6rem de columna), título en Fraunces 1.2rem que se vuelve azul al apuntar la fila, descripción a 72ch, tipo y peso del archivo en la línea de abajo, y a la derecha el glifo de descarga o de enlace externo, que baja 2px al apuntarlo. Cada entrada cierra con un filete `line`; la versión vigente lleva su ficha «v4» en píldora azul suave.
+- **El índice:** entradas numeradas en tinta tenue (2.6rem de columna), título en Open Sans 1.2rem que se vuelve azul al apuntar la fila, descripción a 72ch, tipo y peso del archivo en la línea de abajo, y a la derecha el glifo de descarga o de enlace externo, que baja 2px al apuntarlo. Cada entrada cierra con un filete `line`; la versión vigente lleva su ficha «v4» en píldora azul suave.
 - **El pliegue de ediciones anteriores** (`.dc-versions`): un `<details>` cuyo resumen es una píldora en `surface-3` con el chevron dibujado que gira al abrirse. Las ediciones retiradas cuelgan de un filete izquierdo, con su enlace y su fecha en numerales tabulares. Es deliberadamente distinto de los enlaces de archivo que tiene encima: consultable, nunca compitiendo con la vigente.
 - **Su editor en la intranet:** carril de colecciones con la tapa en miniatura (38×30px) en lugar de un código de color —en un repositorio la portada es parte de la identidad del tomo—, y las secciones colgando de su colección con sangría y filete izquierdo. Cada fila de documento dice su tipo con glifo y palabra, nunca solo con color.
 
@@ -529,7 +529,7 @@ El boletín es papel, no pantalla: un documento A4 de 210×297 mm que se imprime
 
 **The Chapter Colour Rule.** La barra y la franja de la cabecera son las dos únicas piezas del papel que cambian de color con el capítulo. Cada página de informe reescribe `--bol-chrome-band` con el color de línea de su informe —el mismo de su insignia en el portal y de su pestaña en el borde— y `--bol-chrome-bar` con ese color mezclado al 58 % sobre azul noche, para que el logo blanco siga leyéndose; la insignia rellena escribe su código en ese mismo tono. Portada, contenido y resumen no pertenecen a ningún informe y se quedan con el tema, y desde la plantilla («Color de la cabecera») se puede volver al tema en todas las páginas. Los datos no se tiñen: `--bol-band` sigue mandando en gráficas, mapas y tablas, porque el color de una serie no depende de en qué capítulo cayó la hoja.
 
-**The Plantilla Colours Rule.** `bol-navy`, `bol-band` y `bol-accent` son los valores por defecto de la plantilla y se pueden cambiar desde la intranet; las series de campus (`--bol-s2` a `--bol-s5`) y las líneas de informe repiten las del portal en claro. La fuente por defecto es Montserrat (la del modelo); Manrope, Source Sans 3, Roboto y Lato se cargan desde Google Fonts solo si la plantilla las elige.
+**The Plantilla Colours Rule.** `bol-navy`, `bol-band` y `bol-accent` son los valores por defecto de la plantilla y se pueden cambiar desde la intranet; las series de campus (`--bol-s2` a `--bol-s5`) y las líneas de informe repiten las del portal en claro. La fuente por defecto es Montserrat (la del modelo); Open Sans, Manrope, Source Sans 3, Roboto y Lato se cargan desde Google Fonts solo si la plantilla las elige.
 
 ### Components
 - **Hoja de indicador:** columna de notas de 38 mm en `bol-paper-2` con rótulos en mayúsculas de 2,3 mm; cuerpo con título de 4,4 mm, cifra ancla Montserrat 800 de 9 mm, gráficas de 36 mm de alto y tabla de reglas finas con cabecera azul marino y la columna del corte resaltada. Tiene variante compacta para no dejar media página vacía.
@@ -560,12 +560,12 @@ El boletín es papel, no pantalla: un documento A4 de 210×297 mm que se imprime
 - **Do** let a band vanish when it has nothing to show: no gallery without photos, no team band without people, no frame promising a picture nobody uploaded.
 - **Do** build an in-app preview from the real public components at measured scale, and mark the copy `inert`.
 - **Do** dim a filtered-out card instead of removing it when the shape of the set is itself information: veil the picture and the chrome, keep the text at full ink, and let the footer name the filtered count.
-- **Do** distinguish two stacked levels of grouping by voice (Fraunces over Manrope) before reaching for size.
+- **Do** distinguish two stacked levels of grouping by voice (weight 600 over 800) before reaching for size.
 - **Do** keep a nested list vertical at every width; the indentation and its left rule are the relationship.
 
 ### Don't:
 - **Don't** reuse status green, amber, or red as a data series or decoration.
-- **Don't** use the signal amber, Barlow Condensed, or uppercase sign labels outside UDES en Cifras.
+- **Don't** use the signal amber, the condensed Open Sans, or uppercase sign labels outside UDES en Cifras.
 - **Don't** show money figures on any public page.
 - **Don't** rest destructive links in red; red arrives on hover, focus, and confirmation.
 - **Don't** cycle categorical hues past `od-cat-6`; fold extras into "Otros". A twelfth report line needs the same measured proof the tenth and eleventh got, not a hue picked by eye.

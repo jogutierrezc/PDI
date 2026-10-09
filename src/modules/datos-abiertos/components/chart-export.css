@@ -27,7 +27,7 @@
   background: transparent;
   border: 0;
   border-radius: 6px;
-  font-family: var(--font-sign);
+  font-family: var(--font-sign); font-stretch: var(--sign-stretch);
   font-size: 0.85rem;
   font-weight: 600;
   letter-spacing: var(--tracking-wide);
@@ -108,7 +108,7 @@
   background: transparent;
   border: 0;
   border-radius: 6px;
-  font-family: var(--font-sign);
+  font-family: var(--font-sign); font-stretch: var(--sign-stretch);
   font-size: 0.8rem;
   font-weight: 600;
   letter-spacing: var(--tracking-wide);
@@ -222,7 +222,7 @@
   margin: 0;
   padding: var(--space-2) var(--space-5) var(--space-3);
   color: var(--od-board-muted);
-  font-family: var(--font-sign);
+  font-family: var(--font-sign); font-stretch: var(--sign-stretch);
   font-size: 0.8rem;
   font-weight: 600;
   letter-spacing: var(--tracking-wide);

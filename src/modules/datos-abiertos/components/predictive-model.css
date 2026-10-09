@@ -31,7 +31,7 @@
 
 .od-model__facts b {
   color: var(--od-board-ink);
-  font-family: var(--font-sign);
+  font-family: var(--font-sign); font-stretch: var(--sign-stretch);
   font-size: 1.2rem;
   font-weight: 700;
   font-variant-numeric: tabular-nums;
@@ -65,7 +65,7 @@
 .od-model__result-label {
   margin: 0;
   color: var(--od-signal-text);
-  font-family: var(--font-sign);
+  font-family: var(--font-sign); font-stretch: var(--sign-stretch);
   font-size: 1rem;
   font-weight: 600;
   letter-spacing: 0.08em;
@@ -102,7 +102,7 @@
   background: transparent;
   border: 0;
   border-radius: 5px;
-  font-family: var(--font-sign);
+  font-family: var(--font-sign); font-stretch: var(--sign-stretch);
   font-size: 0.98rem;
   font-weight: 600;
   letter-spacing: 0.02em;
@@ -369,7 +369,7 @@
 
 .od-model__matrix-head {
   align-self: center;
-  font-family: var(--font-sign);
+  font-family: var(--font-sign); font-stretch: var(--sign-stretch);
   font-size: 0.98rem;
   font-weight: 600;
   letter-spacing: 0.03em;
@@ -390,7 +390,7 @@
 
 .od-model__cell b {
   color: var(--ink);
-  font-family: var(--font-sign);
+  font-family: var(--font-sign); font-stretch: var(--sign-stretch);
   font-size: 1.7rem;
   font-weight: 700;
   line-height: 1;
@@ -423,7 +423,7 @@
 
 .od-model__fit dt {
   color: var(--ink-muted);
-  font-family: var(--font-sign);
+  font-family: var(--font-sign); font-stretch: var(--sign-stretch);
   font-size: 0.85rem;
   font-weight: 600;
   letter-spacing: 0.06em;

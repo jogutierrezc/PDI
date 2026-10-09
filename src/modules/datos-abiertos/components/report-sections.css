@@ -11,7 +11,7 @@
 
 .od-points-index h2 {
   margin: 0 0 var(--space-3);
-  font-family: var(--font-sign);
+  font-family: var(--font-sign); font-stretch: var(--sign-stretch);
   font-size: 1rem;
   letter-spacing: var(--tracking-wide);
   text-transform: uppercase;
@@ -40,7 +40,7 @@
 
 .od-points-index a b {
   color: var(--ink-muted);
-  font-family: var(--font-sign);
+  font-family: var(--font-sign); font-stretch: var(--sign-stretch);
   font-variant-numeric: tabular-nums;
 }
 
@@ -78,7 +78,7 @@
   background: var(--od-flap);
   border-radius: 6px;
   box-shadow: var(--od-flap-shadow);
-  font-family: var(--font-sign);
+  font-family: var(--font-sign); font-stretch: var(--sign-stretch);
   font-size: 1.6rem;
   font-weight: 700;
   font-variant-numeric: tabular-nums;
@@ -92,7 +92,7 @@
 
 .od-point__kicker {
   color: var(--od-board-muted);
-  font-family: var(--font-sign);
+  font-family: var(--font-sign); font-stretch: var(--sign-stretch);
   font-size: 0.9rem;
   font-weight: 600;
   letter-spacing: var(--tracking-wide);
@@ -102,7 +102,7 @@
 .od-point__titles h2 {
   max-width: 60rem;
   margin: 0;
-  font-family: var(--font-sign);
+  font-family: var(--font-sign); font-stretch: var(--sign-stretch);
   font-size: clamp(1.5rem, 2.4vw, 2.2rem);
   line-height: 1.1;
   text-transform: uppercase;
@@ -167,7 +167,7 @@
 .od-point__missing h3 {
   margin: 0 0 var(--space-2);
   color: var(--od-board-muted);
-  font-family: var(--font-sign);
+  font-family: var(--font-sign); font-stretch: var(--sign-stretch);
   font-size: 0.95rem;
   font-weight: 600;
   letter-spacing: var(--tracking-wide);
@@ -219,7 +219,7 @@
 
 .od-figures__value {
   color: var(--od-board-ink);
-  font-family: var(--font-sign);
+  font-family: var(--font-sign); font-stretch: var(--sign-stretch);
   font-size: clamp(2rem, 3vw, 2.6rem);
   font-weight: 700;
   line-height: 1;
@@ -263,7 +263,7 @@
 
 .od-cards__item h4 {
   margin: 0 0 var(--space-3);
-  font-family: var(--font-sign);
+  font-family: var(--font-sign); font-stretch: var(--sign-stretch);
   font-size: 1.5rem;
   letter-spacing: var(--tracking-wide);
 }
@@ -316,7 +316,7 @@
 .od-tableblock__rank {
   width: 2.5rem;
   color: var(--ink-muted);
-  font-family: var(--font-sign);
+  font-family: var(--font-sign); font-stretch: var(--sign-stretch);
   font-variant-numeric: tabular-nums;
   text-align: center;
 }
@@ -382,7 +382,7 @@
   background: var(--od-divider, var(--ink));
   border-radius: 6px;
   box-shadow: 0 1px 2px rgba(0, 0, 0, 0.25);
-  font-family: var(--font-sign);
+  font-family: var(--font-sign); font-stretch: var(--sign-stretch);
   font-size: 2rem;
   font-weight: 700;
   font-variant-numeric: tabular-nums;
@@ -395,7 +395,7 @@
 
 .od-divider__kicker {
   color: var(--ink-muted);
-  font-family: var(--font-sign);
+  font-family: var(--font-sign); font-stretch: var(--sign-stretch);
   font-size: 0.9rem;
   font-weight: 600;
   letter-spacing: var(--tracking-wide);
@@ -405,7 +405,7 @@
 .od-divider h2 {
   margin: 0;
   color: var(--ink);
-  font-family: var(--font-sign);
+  font-family: var(--font-sign); font-stretch: var(--sign-stretch);
   font-size: clamp(2.8rem, 5.4vw, 4.4rem);
   font-weight: 700;
   line-height: 0.95;

@@ -54,8 +54,8 @@
   --moji-shadow: rgba(10, 34, 73, 0.22);
   --ap-ease: cubic-bezier(0.23, 1, 0.32, 1);
   --ap-ease-drawer: cubic-bezier(0.32, 0.72, 0, 1);
-  --ap-sans: "Manrope", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
-  --ap-serif: "Fraunces", "Iowan Old Style", Georgia, serif;
+  --ap-sans: "Open Sans", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  --ap-serif: "Open Sans", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
   color-scheme: light;
 }
 

@@ -185,7 +185,7 @@
 .pl-blueprint__grid path { stroke: #ffffff; stroke-opacity: 0.07; fill: none; }
 .pl-blueprint__plan * { stroke: var(--pl-plan); stroke-opacity: 0.55; stroke-width: 1.5; fill: none; }
 .pl-blueprint__marks circle { fill: var(--od-signal); }
-.pl-blueprint__labels text { fill: var(--pl-on-navy-3); font-family: var(--font-sign); font-size: 13px; letter-spacing: 1.5px; }
+.pl-blueprint__labels text { fill: var(--pl-on-navy-3); font-family: var(--font-sign); font-stretch: var(--sign-stretch); font-size: 13px; letter-spacing: 1.5px; }
 
 /* Dibujo del plano: una sola vez, al entrar. */
 @media (prefers-reduced-motion: no-preference) {
@@ -380,7 +380,7 @@
   color: #ffffff;
   background: color-mix(in srgb, var(--tone, #1b52ad) 78%, #06142b);
   border-radius: 6px;
-  font-family: var(--font-sign);
+  font-family: var(--font-sign); font-stretch: var(--sign-stretch);
   font-size: 16px;
   font-weight: 700;
   letter-spacing: 0.04em;
@@ -397,7 +397,7 @@
 
 .pl-result__figure > b {
   color: #0a2d63;
-  font-family: var(--font-sign);
+  font-family: var(--font-sign); font-stretch: var(--sign-stretch);
   font-size: 1.55rem;
   font-weight: 700;
   line-height: 1;
@@ -495,7 +495,7 @@
 .pl-tile__bottom { flex-direction: column; gap: var(--space-3); }
 .pl-tile--cifras h3,
 .pl-tile--obs h3 { color: var(--pl-on-navy); }
-.pl-tile--cifras h3 { font-family: var(--font-sign); font-size: clamp(2.6rem, 4.6vw, 4rem); font-weight: 700; line-height: 0.92; letter-spacing: 0.01em; text-transform: uppercase; }
+.pl-tile--cifras h3 { font-family: var(--font-sign); font-stretch: var(--sign-stretch); font-size: clamp(2.6rem, 4.6vw, 4rem); font-weight: 700; line-height: 0.92; letter-spacing: 0.01em; text-transform: uppercase; }
 .pl-tile--cifras p { max-width: 50ch; color: var(--pl-on-navy-2); }
 
 .pl-flaps { display: flex; gap: 4px; }
@@ -508,7 +508,7 @@
   color: var(--od-signal);
   background: linear-gradient(180deg, #13294f 50%, #0f2447 50%);
   border-radius: 5px;
-  font-family: var(--font-sign);
+  font-family: var(--font-sign); font-stretch: var(--sign-stretch);
   font-size: 36px;
   font-weight: 700;
 }
@@ -542,7 +542,7 @@
   color: #ffffff;
   background: color-mix(in srgb, var(--tone) 82%, #06142b);
   border-radius: 5px;
-  font-family: var(--font-sign);
+  font-family: var(--font-sign); font-stretch: var(--sign-stretch);
   font-size: 15px;
   font-weight: 700;
   letter-spacing: 0.06em;
@@ -584,7 +584,7 @@
 .pl-pillars__name { overflow: hidden; font-size: var(--text-sm); font-weight: 700; text-overflow: ellipsis; white-space: nowrap; }
 .pl-pillars__bar { height: 8px; overflow: hidden; background: color-mix(in srgb, var(--tone) 14%, var(--surface-3)); border-radius: 4px; }
 .pl-pillars__bar i { display: block; width: var(--fill); min-width: 3px; height: 100%; background: var(--tone); border-radius: 4px; }
-.pl-pillars b { color: color-mix(in srgb, var(--tone) 55%, var(--ink)); font-family: var(--font-sign); font-size: 1.1rem; font-variant-numeric: tabular-nums; text-align: right; }
+.pl-pillars b { color: color-mix(in srgb, var(--tone) 55%, var(--ink)); font-family: var(--font-sign); font-stretch: var(--sign-stretch); font-size: 1.1rem; font-variant-numeric: tabular-nums; text-align: right; }
 .pl-pillars a:hover { background: color-mix(in srgb, var(--tone) 10%, var(--surface)); }
 
 /* Boletines */
@@ -636,7 +636,7 @@
   color: #ffffff;
   background: color-mix(in srgb, var(--tone) 82%, #06142b);
   border-radius: 4px;
-  font-family: var(--font-sign);
+  font-family: var(--font-sign); font-stretch: var(--sign-stretch);
   font-size: 13px;
   font-weight: 700;
 }

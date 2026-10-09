@@ -18,11 +18,11 @@ import type { ReactNode } from "react";
 import { Link } from "react-router-dom";
 import type { SpaceId } from "../pregunta/space";
 import { APP_ACCOUNT, APP_CLASSES, APP_GEMINI, APP_GRADES, APP_LOGIN, APP_PILOS, APP_PROFILE, APP_SAVED, APP_SPACES } from "./routes";
-import { APP_THEMES } from "./themes";
 import type { AppTheme } from "./themes";
 import { dayLabel } from "./saved";
 import type { SavedEntry } from "./saved";
 import { Icon } from "./icons";
+import { ThemePicker } from "./account/parts";
 import { PolicyLink } from "./terms/PolicyLink";
 import { tr, useLang, LangSwitch } from "../../components/pilo/i18n";
 
@@ -302,16 +302,7 @@ export function AppSide({
             <p className="pa-side__label" id="pa-s-tema">
               {tr("Tema")}
             </p>
-            <div className="pa-temas" role="group" aria-labelledby="pa-s-tema">
-              {APP_THEMES.map((t) => (
-                <button key={t.id} type="button" className="pa-tema" aria-pressed={t.id === theme} onClick={() => onTheme(t.id)}>
-                  <span className="pa-tema__ring">
-                    <i className="pa-swatch" data-tema={t.id} aria-hidden="true" />
-                  </span>
-                  {tr(t.label)}
-                </button>
-              ))}
-            </div>
+            <ThemePicker value={theme} onPick={(id) => onTheme(id)} labelledBy="pa-s-tema" />
             <button
               type="button"
               className="pa-sl"

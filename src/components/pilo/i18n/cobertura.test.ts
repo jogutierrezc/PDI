@@ -36,6 +36,9 @@ const SURFACES = [
   "src/modules/pilo-app/account/ProfilePane.tsx",
   "src/modules/pilo-app/account/SavedPane.tsx",
   "src/modules/pilo-app/account/parts.tsx",
+  "src/modules/pilo-app/llamada/CallScreen.tsx",
+  "src/modules/pilo-app/llamada/CallPreview.tsx",
+  "src/modules/pilo-app/llamada/AnuncioLlamada.tsx",
 ];
 
 /** Lo que además llama a `tr()` pero no tiene JSX, o guarda sus textos en constantes. */
@@ -52,6 +55,8 @@ const DATA = [
   "src/modules/pilo-app/account/useAccount.ts",
   "src/modules/pilo-app/account/AccountGate.tsx",
   "src/components/pilo/ai/client.ts",
+  "src/modules/pilo-app/llamada/logic.ts",
+  "src/modules/pilo-app/llamada/useCall.ts",
 ];
 
 /** Nombres propios y marcas: no se traducen. */

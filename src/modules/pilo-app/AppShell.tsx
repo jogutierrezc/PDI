@@ -26,7 +26,8 @@ import { askQuestionStream, buildHistory, PiloError, rateAnswer } from "../../co
 import type { AskHandlers, AskMeta, AskOptions, AskSource } from "../../components/pilo/ai/client";
 import { Pilo } from "../pregunta/Pilo";
 import type { PiloMojiHandle } from "../pregunta/Pilo";
-import { newId, useConversations } from "../pregunta/store";
+import { newId, readStored, storageKey, useConversations, writeStored } from "../pregunta/store";
+import { APP_PREFIX } from "./themes";
 import type { Conversation, Turn } from "../pregunta/store";
 import { asksRol, ROLE_OPTIONS, ROLE_QUESTION, roleView, wireRol } from "../pregunta/space";
 import type { Rol, SpaceId, SpaceProfile } from "../pregunta/space";
@@ -43,7 +44,13 @@ import { APP_LOGIN, APP_PILOS, APP_SPACES } from "./routes";
 import type { AppTheme } from "./themes";
 import { loadSaved, nextLast, openingId, readLast, removeSaved, savedEntries, writeLast } from "./saved";
 import type { SavedEntry } from "./saved";
-import { stopOfficial } from "./official-voice";
+import { prefetchOfficial, sayOfficial, stopOfficial } from "./official-voice";
+import { pausePiloAudio, resumePiloAudio } from "../../components/pilo/ai/voice-player";
+import { CallPreview } from "./llamada/CallPreview";
+import { CallScreen } from "./llamada/CallScreen";
+import { AnuncioLlamada } from "./llamada/AnuncioLlamada";
+import { recognitionSupported } from "./llamada/logic";
+import { NEWS_MARK, newsSeen, shouldAnnounce } from "./llamada/novedad";
 import { APP_APK, fromKeyboard, isAndroidDevice, isStandalone, reducedMotion } from "./pwa";
 import type { InstallWay } from "./pwa";
 import { SuperContext, SuperDefs } from "../pregunta/super/Gear";
@@ -66,7 +73,12 @@ import { pickPassages, turnFile } from "../pregunta/attach";
 import { AttachButton, AttachTray, useAttachment } from "../pregunta/Extras";
 import { tr, useLang } from "../../components/pilo/i18n";
 
-type Over = null | "menu" | "ajustes" | "fuentes" | "cuenta" | "iphone" | "android";
+type Over = null | "menu" | "ajustes" | "fuentes" | "cuenta" | "iphone" | "android" | "llamada" | "novedad";
+
+/** La llamada recuerda en el dispositivo que ya se activó (no se vuelve a mostrar el aviso) y el idioma elegido. */
+const KEY_CALL = storageKey(APP_PREFIX, "llamada");
+/** El anuncio de lanzamiento de la llamada: una sola vez por dispositivo (llamada/novedad.ts). */
+const KEY_NEWS = storageKey(APP_PREFIX, "novedad-llamada");
 
 export interface ShellProps {
   space: SpaceProfile;
@@ -90,12 +102,14 @@ export interface ShellProps {
   faceSlot: RefObject<HTMLDivElement>;
   /** La bienvenida está encima: la cara de la cabecera espera a que Pilo llegue. */
   welcoming: boolean;
+  /** La política de uso está pendiente: lo obligatorio va antes que cualquier anuncio. */
+  gating: boolean;
   onWelcome: () => void;
   onSwitch: (space: SpaceId, open?: string) => void;
   install: { way: InstallWay; dismissed: boolean; run: () => void; dismiss: () => void };
 }
 
-export function AppShell({ space, door, waking, online, person, member, wide, theme, onTheme, voiceOn, onVoice, rol, onRol, faceSlot, welcoming, onWelcome, onSwitch, install }: ShellProps) {
+export function AppShell({ space, door, waking, online, person, member, wide, theme, onTheme, voiceOn, onVoice, rol, onRol, faceSlot, welcoming, gating, onWelcome, onSwitch, install }: ShellProps) {
   useLang();
   const prefix = space.storagePrefix;
   const usual = space.id === "planeacion";
@@ -148,6 +162,35 @@ export function AppShell({ space, door, waking, online, person, member, wide, th
   const open = door.state === "abierto";
   const can = open && online && !waking;
   const autoRead = voiceOn && voice.advanced;
+
+  /* --- La llamada ------------------------------------------------------------------------------- */
+
+  // La primera vez, el aviso previo; después, directo a la llamada.
+  const [calling, setCalling] = useState(false);
+  const startCall = (event: MouseEvent) => {
+    if (readStored(KEY_CALL) === "1") {
+      stopOfficial();
+      setCalling(true);
+      return;
+    }
+    show("llamada", event);
+  };
+  const activateCall = () => {
+    writeStored(KEY_CALL, "1");
+    stopOfficial();
+    setOver(null);
+    setCalling(true);
+  };
+  // La llamada pregunta lo mismo que el chat: el mismo Pilo, el mismo pedido, las mismas fuentes.
+  const callAsk = async (question: string, history: { q: string; a: string }[], onDelta: (text: string) => void, signal: AbortSignal) => {
+    const visitor = visitorWire(readVisitor(), member);
+    const options = { ...(wire ?? {}), ...(visitor ? { visitor } : {}) };
+    const result = await askQuestionStream(question, history, { signal, onDelta }, options);
+    return result.text;
+  };
+  const callVoice = { portal: voice.portal, advanced: voice.advanced, rol: voice.rol };
+  const callSpeak = (text: string, onSound: (on: boolean) => void) => sayOfficial(text, { ...callVoice, onSound });
+  const callPrefetch = (text: string) => prefetchOfficial([text], callVoice);
 
   /* --- Estado de la conversación -------------------------------------------------------------- */
 
@@ -442,6 +485,50 @@ export function AppShell({ space, door, waking, online, person, member, wide, th
     setOver(null);
   };
 
+  /* --- El anuncio de la llamada: una sola vez ---------------------------------------------------- */
+
+  const [newsDone, setNewsDone] = useState(() => newsSeen(readStored(KEY_NEWS)));
+  const [hint, setHint] = useState(false);
+  const announce = shouldAnnounce({
+    seen: newsDone,
+    activated: readStored(KEY_CALL) === "1",
+    blocked: welcoming || gating || over !== null || calling,
+    online,
+    voice: voice.advanced,
+    recognition: recognitionSupported(),
+    busy,
+    open: can,
+  });
+  // Sale un momento después de que todo lo demás quedó en calma.
+  useEffect(() => {
+    if (!announce) return;
+    const id = window.setTimeout(() => {
+      setQuick(false);
+      setOver("novedad");
+    }, 900);
+    return () => window.clearTimeout(id);
+  }, [announce]);
+  // Cerrarlo de cualquier forma (los dos botones, tocar fuera, Escape) cuenta como verlo: no vuelve.
+  const wasNews = useRef(false);
+  useEffect(() => {
+    if (over === "novedad") wasNews.current = true;
+    else if (wasNews.current) {
+      wasNews.current = false;
+      writeStored(KEY_NEWS, NEWS_MARK);
+      setNewsDone(true);
+      // Si no pasó a probar la llamada, el botón del teléfono late dos veces para mostrar dónde está.
+      if (over === null) {
+        setHint(true);
+        window.setTimeout(() => setHint(false), 4200);
+      }
+    }
+  }, [over]);
+  /** «Probar la llamada» desde el anuncio: pasa al aviso de funciones, donde se pide el micrófono. */
+  const tryCallFromNews = () => {
+    setQuick(false);
+    setOver("llamada");
+  };
+
   const startNew = () => {
     stopOfficial();
     cancelRun();
@@ -483,7 +570,7 @@ export function AppShell({ space, door, waking, online, person, member, wide, th
   const writing = busy && !working;
 
   // Cambiar de tema: un pulso de la cara lo confirma (entera, sin deformarla).
-  const pulse = (event: MouseEvent) => {
+  const pulse = (event: { detail: number }) => {
     const el = faceSlot.current;
     if (!el || reducedMotion() || fromKeyboard(event)) return;
     gsap.fromTo(el, { scale: 0.96 }, { scale: 1, duration: 0.22, ease: "power3.out", overwrite: true, clearProps: "transform" });
@@ -555,6 +642,9 @@ export function AppShell({ space, door, waking, online, person, member, wide, th
             <strong>Mr. Pilo</strong>
             <span>{working ? tr("Pensando…") : sounding ? tr("Hablando") : writing ? tr("Escribiendo…") : modo ? tr("Modo {name}", { name: SUPER[modo].name }) : under}</span>
           </div>
+          <button type="button" className="pa-icon" disabled={!can || welcoming} data-hint={hint || undefined} aria-haspopup="dialog" aria-label={tr("Llamar a Pilo")} title={tr("Llamar a Pilo")} onClick={startCall}>
+            {Icon.phone}
+          </button>
           <button type="button" className="pa-icon" aria-pressed={autoRead} aria-disabled={!voice.advanced || undefined} aria-label={voiceLabel} title={voiceLabel} onClick={toggleVoice}>
             {autoRead ? Icon.voice : Icon.mute}
           </button>
@@ -770,6 +860,24 @@ export function AppShell({ space, door, waking, online, person, member, wide, th
         setOver(null);
         install.run();
       }} />
+      <CallPreview open={over === "llamada"} quick={quick} onClose={hide} onActivate={activateCall} available={voice.advanced} />
+      <AnuncioLlamada open={over === "novedad"} quick={quick} onClose={hide} onTry={tryCallFromNews} />
+      {calling && (
+        <CallScreen
+          ask={callAsk}
+          speak={callSpeak}
+          hush={stopOfficial}
+          prefetch={callPrefetch}
+          pauseVoice={pausePiloAudio}
+          resumeVoice={resumePiloAudio}
+          online={online}
+          onEnd={() => {
+            stopOfficial();
+            setSounding(false);
+            setCalling(false);
+          }}
+        />
+      )}
       {entrance && <SuperEntrance key={entrance.turnId} mode={entrance.mode} short={entrance.short} sound={autoRead} target={() => faceSlot.current} onDone={landSuper} />}
     </SuperContext.Provider>
   );

@@ -34,8 +34,8 @@ const ORIGIN = "https://pilo.test";
 const get = (path: string, mode = "no-cors") => ({ method: "GET", url: path.startsWith("http") ? path : `${ORIGIN}${path}`, mode });
 
 describe("el service worker de la app", () => {
-  it("escucha lo que debe: instalarse, activarse, los pedidos y el aviso de la página", () => {
-    expect([...events].sort()).toEqual(["activate", "fetch", "install", "message"]);
+  it("escucha lo que debe: instalarse, activarse, los pedidos, el aviso de la página y las alertas de emergencia", () => {
+    expect([...events].sort()).toEqual(["activate", "fetch", "install", "message", "notificationclick", "push"]);
   });
 
   it("precarga el esqueleto, el manifiesto, los iconos y los cuadros de la cara de Pilo", () => {

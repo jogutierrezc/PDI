@@ -22,7 +22,7 @@
    (src/modules/pilo-app/sw.test.ts), que carga este mismo archivo.
    ========================================================================== */
 
-const VERSION = "v2";
+const VERSION = "v3";
 const PREFIX = "pilo-app-";
 const SHELL = `${PREFIX}esqueleto-${VERSION}`;
 const ASSETS = `${PREFIX}archivos-${VERSION}`;
@@ -167,5 +167,61 @@ self.addEventListener("message", (event) => {
       }
       await trim(cache);
     })(),
+  );
+});
+
+/* =============================================================================
+
+   ALERTAS DE EMERGENCIA DE ALUNA (sismo, incendio, seguridad).
+
+   Aluna es el sistema de jornada y emergencias del campus; este mismo par de
+   claves VAPID firma sus push, y quien activo Alertas de emergencia en
+   Ajustes (alertas.ts) registro este telefono en su tabla. La carga viaja
+   cifrada y trae lo minimo:
+
+     { clase: "aviso", id, codigo, tipo, titulo, resumen, bloquea_salida }
+
+   Que se distinga a OIDOS es regla del proyecto: una emergencia insiste
+   renovando la misma notificacion, y un comunicado no. Aqui no hay sirena
+   propia: con la app cerrada suena el tono del sistema, que es lo que la
+   plataforma permite a una PWA.
+   ========================================================================== */
+
+self.addEventListener("push", (event) => {
+  let aviso = {};
+  try {
+    aviso = event.data ? event.data.json() : {};
+  } catch (error) {
+    aviso = {};
+  }
+  const esEmergencia = aviso.tipo === "emergencia";
+  event.waitUntil(
+    self.registration.showNotification(aviso.titulo || "Alerta de emergencia", {
+      body: aviso.resumen || "Emergencia reportada en el campus. Siga las indicaciones del personal de seguridad.",
+      icon: "/pilo-app/icon-192.png",
+      badge: "/pilo-app/icon-192.png",
+      /* El codigo agrupa: cada renovacion de la misma emergencia reemplaza
+         a la anterior en la bandeja en vez de apilar copias. */
+      tag: aviso.codigo || "aluna-emergencia",
+      /* Solo la emergencia vuelve a alertar cuando se renueva: es lo mas
+         parecido a una sirena que la bandeja de notificaciones permite. */
+      renotify: esEmergencia,
+      vibrate: esEmergencia ? [400, 120, 400, 120, 400] : [200],
+      data: { url: "/app" },
+    }),
+  );
+});
+
+/* Un toque en la alerta abre (o trae al frente) la app. */
+self.addEventListener("notificationclick", (event) => {
+  event.notification.close();
+  const url = (event.notification.data && event.notification.data.url) || "/app";
+  event.waitUntil(
+    self.clients.matchAll({ type: "window", includeUncontrolled: true }).then((list) => {
+      for (const client of list) {
+        if ("focus" in client) return client.focus();
+      }
+      return self.clients.openWindow(url);
+    }),
   );
 });

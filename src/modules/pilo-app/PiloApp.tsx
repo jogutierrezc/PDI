@@ -340,6 +340,7 @@ export function PiloApp() {
           onRol={pickRol}
           faceSlot={faceSlot}
           welcoming={welcoming}
+          gating={gating}
           onWelcome={() => setWelcoming(true)}
           onSwitch={(next, open) => navigate(APP_PATHS[next], { replace: true, state: open ? { open } : null })}
           install={{

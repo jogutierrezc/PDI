@@ -9,9 +9,12 @@
      habla     laten con la voz
      pausa     quietos y apagados
 
-   Debajo, el estado en el idioma de la llamada, lo que se oyó y lo que Pilo va
-   diciendo. Al pie, tres controles: micrófono, colgar y ver la conversación.
-   Tocar a Pilo mientras habla lo interrumpe.
+   Debajo, el estado, lo que se oyó y lo que Pilo va diciendo. Al pie, tres
+   controles: micrófono, colgar y ver la conversación. Si usted habla mientras
+   Pilo habla, Pilo se pausa y le escucha; tocarlo también lo interrumpe.
+
+   El idioma es el de todo Pilo (los botones ES · EN · PT cambian el de la app
+   entera), y todos los textos pasan por tr().
 
    Entra abriéndose desde el botón de la cabecera (de dónde vino) y sale más
    rápido de lo que entró. Con movimiento reducido, solo cambian la opacidad
@@ -21,88 +24,59 @@
 import { useEffect, useRef, useState } from "react";
 import gsap from "gsap";
 import { useGSAP } from "@gsap/react";
+import { PILO_LANGS, setLang, tr, useLang } from "../../../components/pilo/i18n";
 import { Pilo } from "../../pregunta/Pilo";
 import { useFocusTrap } from "../Layer";
 import { Icon } from "../icons";
 import { reducedMotion } from "../pwa";
-import { CALL_LANGS, clock } from "./logic";
-import type { CallLang } from "./logic";
+import { clock } from "./logic";
 import { useCall } from "./useCall";
 import type { CallOptions, CallPhase } from "./useCall";
 import "./llamada.css";
 
 gsap.registerPlugin(useGSAP);
 
-const TEXT: Record<CallLang, { phase: Record<CallPhase, string>; tap: string; mute: string; unmute: string; hangup: string; talk: string; log: string; you: string; pilo: string; retry: string; close: string; empty: string; live: string }> = {
-  es: {
-    phase: { conectando: "Conectando…", escucha: "Le escucho", piensa: "Pensando…", habla: "Pilo habla", pausa: "Micrófono en pausa", error: "Se cortó la llamada", fin: "Llamada terminada" },
-    tap: "Toque a Pilo para interrumpir",
-    mute: "Silenciar el micrófono",
-    unmute: "Activar el micrófono",
-    hangup: "Colgar",
-    talk: "Ver la conversación",
-    log: "La conversación",
-    you: "Usted",
-    pilo: "Pilo",
-    retry: "Volver a llamar",
-    close: "Cerrar",
-    empty: "Aún no hay nada dicho.",
-    live: "En llamada",
-  },
-  en: {
-    phase: { conectando: "Connecting…", escucha: "Listening", piensa: "Thinking…", habla: "Pilo is speaking", pausa: "Microphone paused", error: "The call dropped", fin: "Call ended" },
-    tap: "Tap Pilo to interrupt",
-    mute: "Mute the microphone",
-    unmute: "Unmute the microphone",
-    hangup: "Hang up",
-    talk: "Show the conversation",
-    log: "The conversation",
-    you: "You",
-    pilo: "Pilo",
-    retry: "Call again",
-    close: "Close",
-    empty: "Nothing said yet.",
-    live: "On call",
-  },
-  pt: {
-    phase: { conectando: "Conectando…", escucha: "Estou ouvindo", piensa: "Pensando…", habla: "O Pilo está falando", pausa: "Microfone em pausa", error: "A chamada caiu", fin: "Chamada encerrada" },
-    tap: "Toque no Pilo para interromper",
-    mute: "Silenciar o microfone",
-    unmute: "Ativar o microfone",
-    hangup: "Desligar",
-    talk: "Ver a conversa",
-    log: "A conversa",
-    you: "Você",
-    pilo: "Pilo",
-    retry: "Ligar de novo",
-    close: "Fechar",
-    empty: "Ainda não foi dito nada.",
-    live: "Em chamada",
-  },
-};
+/** Lo que dice cada punto del ciclo, en el idioma de ahora. */
+function phaseText(phase: CallPhase): string {
+  switch (phase) {
+    case "conectando":
+      return tr("Conectando…");
+    case "escucha":
+      return tr("Le escucho");
+    case "piensa":
+      return tr("Pensando…");
+    case "habla":
+      return tr("Pilo habla");
+    case "pausa":
+      return tr("Micrófono en pausa");
+    case "error":
+      return tr("Se cortó la llamada");
+    default:
+      return tr("Llamada terminada");
+  }
+}
 
 type Mood = "feliz" | "piensa" | "atento" | "duda";
 const MOOD: Record<CallPhase, Mood> = { conectando: "atento", escucha: "atento", piensa: "piensa", habla: "feliz", pausa: "feliz", error: "duda", fin: "feliz" };
 
 export function CallScreen({
-  lang,
-  onLang,
   ask,
   speak,
   hush,
   prefetch,
+  pauseVoice,
+  resumeVoice,
   onEnd,
   online,
-}: CallOptions & {
-  onLang: (lang: CallLang) => void;
+}: Omit<CallOptions, "lang"> & {
   onEnd: () => void;
   online: boolean;
 }) {
   const root = useRef<HTMLDivElement>(null);
   const rings = useRef<SVGSVGElement>(null);
-  const call = useCall({ lang, ask, speak, hush, prefetch });
+  const lang = useLang();
+  const call = useCall({ lang, ask, speak, hush, prefetch, pauseVoice, resumeVoice });
   const { phase, sounding } = call;
-  const t = TEXT[lang];
   const [log, setLog] = useState(false);
   const [seconds, setSeconds] = useState(0);
 
@@ -120,11 +94,12 @@ export function CallScreen({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [online]);
 
+  const running = phase !== "conectando" && phase !== "error" && phase !== "fin";
   useEffect(() => {
-    if (phase === "conectando" || phase === "error" || phase === "fin") return;
+    if (!running) return;
     const id = window.setInterval(() => setSeconds((s) => s + 1), 1000);
     return () => window.clearInterval(id);
-  }, [phase === "conectando" || phase === "error" || phase === "fin"]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [running]);
 
   /* --- Entrar y salir ------------------------------------------------------------------------ */
 
@@ -178,7 +153,7 @@ export function CallScreen({
     { scope: root, dependencies: [phase, sounding], revertOnUpdate: true },
   );
 
-  const orbLabel = phase === "habla" || phase === "piensa" ? t.tap : t.phase[phase];
+  const canTap = phase === "habla" || phase === "piensa";
   const failed = phase === "error";
 
   return (
@@ -186,20 +161,20 @@ export function CallScreen({
       <header className="pc-top">
         <p className="pc-live">
           <i aria-hidden="true" />
-          <span>{t.live}</span>
+          <span>{tr("En llamada")}</span>
           <time dateTime={`PT${seconds}S`}>{clock(seconds)}</time>
         </p>
-        <div className="pc-langs" role="radiogroup" aria-label="Idioma / Language / Idioma">
-          {CALL_LANGS.map((l) => (
-            <button key={l.id} type="button" role="radio" aria-checked={l.id === lang} lang={l.id} title={l.name} onClick={() => onLang(l.id)}>
-              {l.short}
+        <div className="pc-langs" role="radiogroup" aria-label={tr("Idioma de la llamada")}>
+          {PILO_LANGS.map((l) => (
+            <button key={l.id} type="button" role="radio" aria-checked={l.id === lang} lang={l.id} title={l.name} onClick={() => setLang(l.id)}>
+              {l.code}
             </button>
           ))}
         </div>
       </header>
 
       <main className="pc-stage">
-        <button type="button" className="pc-orb" onClick={call.interrupt} disabled={phase !== "habla" && phase !== "piensa"} aria-label={orbLabel}>
+        <button type="button" className="pc-orb" onClick={call.interrupt} disabled={!canTap} aria-label={canTap ? tr("Toque a Pilo para interrumpir") : phaseText(phase)}>
           <svg ref={rings} className="pc-rings" viewBox="0 0 240 240" aria-hidden="true">
             <circle className="pc-ring" cx="120" cy="120" r="84" />
             <circle className="pc-ring" cx="120" cy="120" r="100" />
@@ -207,15 +182,15 @@ export function CallScreen({
             <circle className="pc-ring pc-ring--think" cx="120" cy="120" r="108" />
           </svg>
           <span className="pc-face">
-            <Pilo size="100%" mood={MOOD[phase]} talking={sounding} alive label="" />
+            <Pilo size="100%" mood={MOOD[phase]} talking={sounding} alive />
           </span>
         </button>
 
-        <h2 className="pc-state" lang={lang} aria-live="polite">
-          {t.phase[phase]}
+        <h2 className="pc-state" aria-live="polite">
+          {phaseText(phase)}
         </h2>
-        <p className="pc-hint" aria-hidden="true" data-on={phase === "habla" || undefined}>
-          {t.tap}
+        <p className="pc-hint" aria-hidden="true" data-on={canTap || undefined}>
+          {tr("Toque a Pilo para interrumpir")}
         </p>
 
         {failed ? (
@@ -223,10 +198,10 @@ export function CallScreen({
             <p>{call.error}</p>
             <div>
               <button type="button" className="pa-btn pc-btn" onClick={call.start}>
-                {t.retry}
+                {tr("Volver a llamar")}
               </button>
               <button type="button" className="pa-btn pc-btn pc-btn--line" onClick={call.end}>
-                {t.close}
+                {tr("Cerrar")}
               </button>
             </div>
           </div>
@@ -242,14 +217,14 @@ export function CallScreen({
         )}
       </main>
 
-      <section className="pc-log" aria-label={t.log} hidden={!log}>
+      <section className="pc-log" aria-label={tr("La conversación")} hidden={!log}>
         {call.lines.length === 0 ? (
-          <p className="pc-log__empty">{t.empty}</p>
+          <p className="pc-log__empty">{tr("Aún no hay nada dicho.")}</p>
         ) : (
           <ol>
             {call.lines.map((l, i) => (
-              <li key={i} data-who={l.who}>
-                <b>{l.who === "yo" ? t.you : t.pilo}</b>
+              <li key={i} data-who={l.who} lang={lang}>
+                <b>{l.who === "yo" ? tr("Usted") : "Pilo"}</b>
                 <span>{l.text}</span>
               </li>
             ))}
@@ -258,13 +233,13 @@ export function CallScreen({
       </section>
 
       <footer className="pc-bar">
-        <button type="button" className="pc-ctl" aria-pressed={call.muted} onClick={() => call.mute(!call.muted)} aria-label={call.muted ? t.unmute : t.mute} disabled={failed}>
+        <button type="button" className="pc-ctl" aria-pressed={call.muted} onClick={() => call.mute(!call.muted)} aria-label={call.muted ? tr("Activar el micrófono") : tr("Silenciar el micrófono")} disabled={failed}>
           {call.muted ? Icon.micOff : Icon.mic}
         </button>
-        <button type="button" className="pc-ctl pc-ctl--end" onClick={call.end} aria-label={t.hangup}>
+        <button type="button" className="pc-ctl pc-ctl--end" onClick={call.end} aria-label={tr("Colgar")}>
           {Icon.hangup}
         </button>
-        <button type="button" className="pc-ctl" aria-pressed={log} onClick={() => setLog((v) => !v)} aria-label={t.talk}>
+        <button type="button" className="pc-ctl" aria-pressed={log} onClick={() => setLog((v) => !v)} aria-label={tr("Ver la conversación")}>
           {Icon.chat}
         </button>
       </footer>

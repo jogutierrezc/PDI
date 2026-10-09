@@ -114,6 +114,17 @@ if (typeof window !== "undefined") {
   window.addEventListener("keydown", first, true);
 }
 
+/** Pone en pausa lo que suene, sin soltar a quien espera: `resumePiloAudio` lo retoma donde iba. */
+export function pausePiloAudio() {
+  if (player && !player.paused && !player.ended) player.pause();
+}
+
+/** Retoma lo que `pausePiloAudio` detuvo. Si ya no hay nada por seguir, no hace nada. */
+export function resumePiloAudio() {
+  if (!player || !settle || !player.paused || player.ended) return;
+  player.play().catch(() => stopPiloAudio());
+}
+
 /** Calla lo que suene. Quien esperaba a que terminara recibe `false`. */
 export function stopPiloAudio() {
   player?.pause();

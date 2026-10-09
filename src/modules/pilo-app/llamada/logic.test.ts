@@ -1,32 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { callLanguage, CALL_FEATURES, CALL_LANGS, clock, guessLang, MAX_SENTENCE, parseCallLang, recognitionSupported, spokenQuestion, spokenText, takeSentences } from "./logic";
-
-describe("idiomas de la llamada", () => {
-  it("son tres y cada uno trae su reconocimiento y su orden para Pilo", () => {
-    expect(CALL_LANGS.map((l) => l.id)).toEqual(["es", "en", "pt"]);
-    expect(callLanguage("pt").speech).toBe("pt-BR");
-    for (const l of CALL_LANGS) expect(l.directive.length).toBeGreaterThan(10);
-  });
-
-  it("lo guardado que no se conoce vuelve al español", () => {
-    expect(parseCallLang("EN")).toBe("en");
-    expect(parseCallLang("pt-BR")).toBe("pt");
-    expect(parseCallLang("fr")).toBe("es");
-    expect(parseCallLang(null)).toBe("es");
-  });
-
-  it("la pregunta lleva la orden del idioma y el espacio justo", () => {
-    expect(spokenQuestion("  how many   students? ", "en")).toBe("how many students? (Answer out loud, in short sentences, in English.)");
-    expect(spokenQuestion("quantos alunos", "pt")).toContain("português");
-  });
-
-  it("adivina el idioma solo con pruebas claras", () => {
-    expect(guessLang("hola cuántos estudiantes hay en los programas")).toBe("es");
-    expect(guessLang("what are the programs and how many students")).toBe("en");
-    expect(guessLang("olá quantos alunos você tem não")).toBe("pt");
-    expect(guessLang("hola")).toBeNull();
-  });
-});
+import { CALL_FEATURES, clock, MAX_SENTENCE, recognitionSupported, spokenText, takeSentences } from "./logic";
 
 describe("takeSentences", () => {
   it("entrega las frases completas y deja la que aún se escribe", () => {

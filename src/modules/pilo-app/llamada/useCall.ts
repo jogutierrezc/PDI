@@ -17,8 +17,12 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { buildHistory } from "../../../components/pilo/ai/client";
-import { callLanguage, spokenQuestion, spokenText, takeSentences } from "./logic";
-import type { CallLang } from "./logic";
+import { tr } from "../../../components/pilo/i18n";
+import { spokenText, takeSentences } from "./logic";
+import { speechLang, spokenQuestion } from "./idiomas";
+import type { CallLang } from "./idiomas";
+import { openMeter, VoiceGate } from "./vad";
+import type { Meter } from "./vad";
 
 export type CallPhase = "conectando" | "escucha" | "piensa" | "habla" | "pausa" | "error" | "fin";
 
@@ -45,15 +49,23 @@ const recognitionCtor = (): (new () => Recognition) | null => {
   return w.SpeechRecognition ?? w.webkitSpeechRecognition ?? null;
 };
 
-/** Qué dice la persona cuando el navegador no la oye, en palabras y con salida. */
-export const CALL_ERRORS: Record<string, string> = {
-  "not-allowed": "El navegador no dejó usar el micrófono. Permítalo en el candado de la barra de direcciones y vuelva a llamar.",
-  "service-not-allowed": "Este navegador no deja usar el reconocimiento de voz aquí. Pruebe con Chrome, Edge o Safari.",
-  "audio-capture": "No encuentro un micrófono. Conecte uno y vuelva a llamar.",
-  network: "El reconocimiento de voz perdió la conexión. Revise internet y vuelva a llamar.",
-  sin_voz: "La voz de Pilo no está disponible ahora. Puede seguir por escrito en el chat.",
-  pilo: "No pude hablar con Pilo ahora. Vuelva a intentarlo en un momento.",
-};
+/** Qué se le dice a la persona cuando la llamada se corta, en palabras y con salida. En el idioma de ahora. */
+export function callError(code: string): string {
+  switch (code) {
+    case "not-allowed":
+      return tr("El navegador no dejó usar el micrófono. Permítalo en el candado de la barra de direcciones y vuelva a llamar.");
+    case "service-not-allowed":
+      return tr("Este navegador no deja usar el reconocimiento de voz aquí. Pruebe con Chrome, Edge o Safari.");
+    case "audio-capture":
+      return tr("No encuentro un micrófono. Conecte uno y vuelva a llamar.");
+    case "network":
+      return tr("El reconocimiento de voz perdió la conexión. Revise internet y vuelva a llamar.");
+    case "sin_voz":
+      return tr("La voz de Pilo no está disponible ahora. Puede seguir por escrito en el chat.");
+    default:
+      return tr("No pude hablar con Pilo ahora. Vuelva a intentarlo en un momento.");
+  }
+}
 
 export interface CallOptions {
   lang: CallLang;
@@ -65,9 +77,12 @@ export interface CallOptions {
   hush: () => void;
   /** Pide por adelantado el audio de una frase que aún espera su turno: así no hay pausas entre una y otra. */
   prefetch?: (text: string) => void;
+  /** Pone en pausa la voz de Pilo en cuanto se oye a la persona; `resumeVoice` la retoma si era ruido o eco. */
+  pauseVoice?: () => void;
+  resumeVoice?: () => void;
 }
 
-export function useCall({ lang, ask, speak, hush, prefetch }: CallOptions) {
+export function useCall({ lang, ask, speak, hush, prefetch, pauseVoice, resumeVoice }: CallOptions) {
   const [phase, setPhase] = useState<CallPhase>("conectando");
   const [heard, setHeard] = useState("");
   const [said, setSaid] = useState("");
@@ -89,12 +104,23 @@ export function useCall({ lang, ask, speak, hush, prefetch }: CallOptions) {
     speak,
     hush,
     prefetch,
+    pauseVoice,
+    resumeVoice,
+    // El micrófono que escucha mientras Pilo habla, para callarlo cuando la persona empieza.
+    meter: null as Meter | null,
+    meterTimer: 0,
+    lastTick: 0,
+    gate: new VoiceGate(),
+    barge: null as { at: number; level: number; samples: number; hits: number; from: CallPhase; timer: number } | null,
+    open: true,
   });
   live.current.lang = lang;
   live.current.ask = ask;
   live.current.speak = speak;
   live.current.hush = hush;
   live.current.prefetch = prefetch;
+  live.current.pauseVoice = pauseVoice;
+  live.current.resumeVoice = resumeVoice;
 
   const go = useCallback((next: CallPhase) => {
     live.current.phase = next;
@@ -113,17 +139,27 @@ export function useCall({ lang, ask, speak, hush, prefetch }: CallOptions) {
     }
   }, []);
 
+  const stopMeter = useCallback(() => {
+    const run = live.current;
+    window.clearInterval(run.meterTimer);
+    window.clearTimeout(run.barge?.timer);
+    run.barge = null;
+    run.meter?.stop();
+    run.meter = null;
+  }, []);
+
   const fail = useCallback(
     (code: string) => {
       live.current.epoch += 1;
+      stopMeter();
       closeEar();
       live.current.ctl?.abort();
       live.current.hush();
       setSounding(false);
-      setError(CALL_ERRORS[code] ?? CALL_ERRORS.pilo);
+      setError(callError(code));
       go("error");
     },
-    [closeEar, go],
+    [closeEar, go, stopMeter],
   );
 
   /** Pilo piensa y habla. Termina cuando dijo la última frase, y entonces vuelve a escuchar. */
@@ -226,7 +262,7 @@ export function useCall({ lang, ask, speak, hush, prefetch }: CallOptions) {
     if (!Ctor) return fail("service-not-allowed");
     closeEar();
     const rec = new Ctor();
-    rec.lang = callLanguage(run.lang).speech;
+    rec.lang = speechLang(run.lang);
     rec.continuous = false;
     rec.interimResults = true;
     let finalText = "";
@@ -263,6 +299,65 @@ export function useCall({ lang, ask, speak, hush, prefetch }: CallOptions) {
     }
   }, [answer, closeEar, fail, go]);
 
+  /* --- Hablar encima de Pilo ------------------------------------------------------------------- */
+
+  /** Hay una voz mientras Pilo habla o piensa: se lo pausa y se abre el oído, y a los 340 ms se decide. */
+  const beginBarge = useCallback(
+    (level: number) => {
+      const run = live.current;
+      if (run.barge) return;
+      const from = run.phase;
+      run.pauseVoice?.();
+      setSounding(false);
+      listen();
+      run.barge = { at: performance.now(), level, samples: 0, hits: 0, from, timer: window.setTimeout(() => settleBarge(), 340) };
+    },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [listen],
+  );
+
+  /** Pausado Pilo, ¿sigue la voz? Si sí, era la persona: Pilo cede el turno. Si no, era eco o ruido: Pilo sigue. */
+  const settleBarge = useCallback(() => {
+    const run = live.current;
+    const b = run.barge;
+    run.barge = null;
+    if (!b) return;
+    const real = b.samples >= 3 && b.hits / b.samples >= 0.6;
+    if (real) {
+      run.epoch += 1;
+      run.ctl?.abort();
+      run.hush();
+      setSounding(false);
+      return;
+    }
+    // Eco o ruido: el umbral aprende ese nivel para no volver a caer en lo mismo.
+    run.gate.floor = Math.max(run.gate.floor, b.level / 2.2);
+    closeEar();
+    go(b.from);
+    run.resumeVoice?.();
+  }, [closeEar, go]);
+
+  const tickMeter = () => {
+    const run = live.current;
+    const meter = run.meter;
+    if (!meter) return;
+    const now = performance.now();
+    const dt = now - run.lastTick;
+    run.lastTick = now;
+    const level = meter.level();
+    const event = run.gate.push(level, dt);
+    const b = run.barge;
+    if (b) {
+      // Se cuenta solo lo que suena después de pausar a Pilo: lo anterior puede ser su propio eco.
+      if (now - b.at > 120) {
+        b.samples += 1;
+        if (run.gate.loud(level)) b.hits += 1;
+      }
+      return;
+    }
+    if (event === "voz" && !run.muted && (run.phase === "habla" || run.phase === "piensa")) beginBarge(level);
+  };
+
   /** Empezar: el primer turno es de la persona. */
   const start = useCallback(() => {
     live.current.muted = false;
@@ -270,7 +365,21 @@ export function useCall({ lang, ask, speak, hush, prefetch }: CallOptions) {
     setError("");
     setLines([]);
     live.current.history = [];
+    live.current.open = true;
     listen();
+    // Con el micrófono abierto durante toda la llamada, Pilo se calla en cuanto la persona habla.
+    if (!live.current.meter) {
+      void openMeter().then((meter) => {
+        const run = live.current;
+        if (!meter) return;
+        if (!run.open || run.meter) return meter.stop();
+        run.meter = meter;
+        run.lastTick = performance.now();
+        run.gate = new VoiceGate();
+        run.meterTimer = window.setInterval(() => tickMeter(), 40);
+      });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [listen]);
 
   /** Tocar a Pilo mientras habla o piensa: se calla y escucha. */
@@ -290,6 +399,10 @@ export function useCall({ lang, ask, speak, hush, prefetch }: CallOptions) {
       const run = live.current;
       run.muted = on;
       setMuted(on);
+      if (on && run.barge) {
+        window.clearTimeout(run.barge.timer);
+        run.barge = null;
+      }
       if (on) {
         if (run.phase === "escucha") {
           closeEar();
@@ -303,23 +416,27 @@ export function useCall({ lang, ask, speak, hush, prefetch }: CallOptions) {
   const end = useCallback(() => {
     const run = live.current;
     run.epoch += 1;
+    run.open = false;
+    stopMeter();
     closeEar();
     run.ctl?.abort();
     run.hush();
     setSounding(false);
     go("fin");
-  }, [closeEar, go]);
+  }, [closeEar, go, stopMeter]);
 
   // Si la pantalla se cierra por cualquier camino, todo se calla.
   useEffect(
     () => () => {
       const run = live.current;
       run.epoch += 1;
+      run.open = false;
+      stopMeter();
       closeEar();
       run.ctl?.abort();
       run.hush();
     },
-    [closeEar],
+    [closeEar, stopMeter],
   );
 
   // Cambiar de idioma en plena llamada: el oído se vuelve a abrir en el nuevo.

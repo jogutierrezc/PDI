@@ -82,7 +82,7 @@
   list-style: none;
 }
 
-.pc-feat li {
+.pa-sheet .pc-feat li {
   display: grid;
   gap: 2px;
   padding: 12px 0;
@@ -106,9 +106,10 @@
   margin-top: 8px;
 }
 
-.pc-know li {
+.pa-sheet .pc-know li {
   position: relative;
-  padding-left: 16px;
+  padding: 0 0 0 16px;
+  border-top: 0;
   max-width: 60ch;
   color: var(--c-ink2);
   font-size: 0.8125rem;
@@ -138,9 +139,14 @@
 }
 
 .pc-actions {
+  position: sticky;
+  bottom: calc(-22px - env(safe-area-inset-bottom, 0px));
+  z-index: 1;
   display: grid;
   gap: 8px;
-  margin-top: 4px;
+  margin: 4px -4px -4px;
+  padding: 12px 4px calc(4px + env(safe-area-inset-bottom, 0px));
+  background: linear-gradient(to bottom, transparent, var(--c-sheet) 14px);
 }
 
 .pc-actions .pa-btn:disabled {
@@ -241,9 +247,9 @@
   position: relative;
   display: grid;
   place-items: center;
-  width: min(64vw, 300px, 40dvh);
+  width: min(70vw, 320px, 42dvh);
   aspect-ratio: 1;
-  margin-bottom: 18px;
+  margin-bottom: clamp(28px, 7dvh, 48px);
   border-radius: 50%;
   cursor: default;
 }
@@ -266,6 +272,7 @@
   fill: none;
   stroke: var(--acc);
   stroke-width: 1.4;
+  max-width: none;
   pointer-events: none;
 }
 
@@ -285,12 +292,19 @@
 .pc-face {
   position: relative;
   display: block;
-  width: 66%;
+  width: 84%;
   aspect-ratio: 1;
-  padding: 5%;
+  /* La mascota no es redonda: se apoya sobre la escena con una luz detrás, no dentro de un círculo. */
+  filter: drop-shadow(0 14px 22px var(--c-shadow));
+}
+
+.pc-face::before {
+  content: "";
+  position: absolute;
+  inset: 6%;
+  z-index: -1;
   border-radius: 50%;
-  background: var(--s-chip);
-  box-shadow: 0 18px 40px var(--c-shadow);
+  background: radial-gradient(closest-side, var(--s-glow), transparent);
 }
 
 .pc-state {
@@ -549,5 +563,131 @@
   .pc-langs button:active,
   .pc-lang button:active {
     transform: none;
+  }
+}
+
+/* --- El anuncio de lanzamiento --------------------------------------------------------------- */
+
+.pn-in {
+  gap: 12px;
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.pn-hero {
+  position: relative;
+  display: grid;
+  place-items: center;
+  height: 136px;
+  overflow: hidden;
+  border-radius: 16px;
+  background: radial-gradient(120% 120% at 50% 40%, var(--s1), var(--s2) 60%, var(--s3));
+}
+
+.pn-rings {
+  position: absolute;
+  width: 200px;
+  height: 200px;
+  max-width: none;
+  fill: none;
+  stroke: var(--acc);
+  stroke-width: 1.4;
+}
+
+.pn-ring {
+  opacity: 0.4;
+  transform-box: fill-box;
+  transform-origin: center;
+}
+
+.pn-face {
+  position: relative;
+  display: block;
+  width: 104px;
+  height: 104px;
+  filter: drop-shadow(0 10px 16px var(--c-shadow));
+}
+
+.pn-in h2 {
+  font-size: 1.45rem;
+  text-wrap: balance;
+}
+
+.pn-how {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  counter-reset: pn;
+}
+
+.pa-sheet .pn-how li {
+  counter-increment: pn;
+  display: grid;
+  grid-template-columns: 30px minmax(0, 1fr);
+  gap: 1px 12px;
+  padding: 9px 0;
+  border-top: 1px solid var(--c-line);
+}
+
+/* Es una secuencia de verdad: el número dice el orden en que se hace. */
+.pn-how li::before {
+  content: counter(pn);
+  grid-row: span 2;
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  border: 1.5px solid var(--c-link);
+  border-radius: 50%;
+  color: var(--c-link);
+  font-size: 0.75rem;
+  font-weight: 800;
+}
+
+.pn-how strong {
+  font-size: 0.92rem;
+}
+
+.pa-sheet .pn-how span {
+  color: var(--c-ink2);
+  font-size: 0.8125rem;
+  text-wrap: pretty;
+}
+
+.pa-sheet .pn-langs {
+  margin: 0;
+  font-size: 0.8125rem;
+  color: var(--c-ink2);
+}
+
+/* Tras cerrar el anuncio, el botón del teléfono late dos veces para mostrar dónde está. */
+.pa-bar .pa-icon[data-hint] {
+  position: relative;
+}
+
+.pa-bar .pa-icon[data-hint]::after {
+  content: "";
+  position: absolute;
+  inset: 2px;
+  border: 2px solid var(--acc);
+  border-radius: 50%;
+  opacity: 0;
+  animation: pn-ping 1.8s var(--ease-out) 2;
+  pointer-events: none;
+}
+
+@keyframes pn-ping {
+  0% {
+    transform: scale(0.8);
+    opacity: 0.9;
+  }
+  100% {
+    transform: scale(1.55);
+    opacity: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pa-bar .pa-icon[data-hint]::after {
+    animation: none;
   }
 }

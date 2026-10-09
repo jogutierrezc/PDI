@@ -33,6 +33,8 @@ import type { AccountState } from "./useAccount";
 import { readVisitor, visitorNick, visitorNickProblem, writeVisitor } from "./visitor";
 import { Benefits, Field, Msg, Seg, ThemePicker } from "./parts";
 import { tr, useLang } from "../../../components/pilo/i18n";
+import { MisDatos } from "../yo/MisDatos";
+import { LimitesCard } from "../limites/LimitesCard";
 
 gsap.registerPlugin(useGSAP);
 
@@ -273,6 +275,10 @@ function MemberPrefs({ state, theme, onTheme }: { state: AccountState; theme: Ap
         </div>
 
         <div className="pc-aside">
+          {/* Los datos del carnet y lo que la administración le asignó a su cuenta. */}
+          <MisDatos state={state} />
+          <LimitesCard state={state} />
+
           {/* La muestra acompaña a los controles: al lado en el escritorio, justo encima en el teléfono. */}
           <section className="pc-sheet pc-sample" aria-labelledby="pc-p-muestra">
             <div className="pc-sheet__in">

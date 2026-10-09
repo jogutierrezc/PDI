@@ -13,6 +13,12 @@
    el teléfono deja; el pico se mueve mientras suena el audio de verdad. Sin
    voz, el pico acompaña a las palabras mientras aparecen.
 
+   La guía son cinco momentos en el teléfono con cuenta obligatoria (hola, una
+   pregunta de ejemplo que se toca, la fuente, con cuál Pilo y la cuenta): se
+   avanza con «Siguiente», con «Atrás» o deslizando. «Saltar guía» lleva a la
+   cuenta, que no se salta. La pregunta de ejemplo es un ejemplo (lleva la marca)
+   con respuestas verdaderas de PRODUCT.md, nunca datos inventados.
+
    Movimiento: transform y opacidad, y clip-path solo para el cierre. Cada
    animación se monta en un contexto de GSAP que, al interrumpirse (otra frase,
    Saltar, desmontaje), devuelve todo a su estado visible: ningún texto queda
@@ -20,7 +26,7 @@
    ========================================================================== */
 
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
-import type { RefObject } from "react";
+import type { PointerEvent as ReactPointerEvent, RefObject } from "react";
 import gsap from "gsap";
 import { Pilo } from "../pregunta/Pilo";
 import type { PiloMojiHandle } from "../pregunta/Pilo";
@@ -28,7 +34,7 @@ import { RolePicker } from "../pregunta/RolePicker";
 import type { Rol, SpaceId } from "../pregunta/space";
 import type { AppVoice } from "./access";
 import { APP_PILOS, APP_SPACES } from "./routes";
-import { APP_ASKS, APP_KNOWS, APP_TITLE, ROLE_BEAT, voiceRequest, welcomeBeats, welcomeVoicePlan } from "./welcome-script";
+import { APP_KNOWS, APP_TITLE, ROLE_BEAT, WELCOME_EXAMPLES, voiceRequest, welcomeBeats, welcomeVoicePlan } from "./welcome-script";
 import { keepOnlyVoices, prefetchOfficial, sayOfficial, stopOfficial } from "./official-voice";
 import { useFocusTrap } from "./Layer";
 import { reducedMotion } from "./pwa";
@@ -44,6 +50,36 @@ const VoiceIcon = ({ on }: { on: boolean }) => (
   </svg>
 );
 
+const DocIcon = () => (
+  <svg className="pa-i" viewBox="0 0 20 20" aria-hidden="true">
+    <path d="M5 3.5h7l3 3v10H5zM12 3.5v3h3M7.5 10h5M7.5 13h5" />
+  </svg>
+);
+
+/** La respuesta de ejemplo: marcada «Ejemplo», palabra por palabra, con su fuente. */
+function ExampleAnswer({ id }: { id: string }) {
+  const q = WELCOME_EXAMPLES.find((e) => e.id === id);
+  if (!q) return null;
+  const text = tr(q.a);
+  return (
+    <div className="pa-ex">
+      <span className="pa-ex-tag">{tr("Ejemplo")}</span>
+      <p className="pa-sr">{text}</p>
+      <p aria-hidden="true">
+        {text.split(" ").map((w, i) => (
+          <span key={`${id}:${i}`} className="wd">
+            {w}{" "}
+          </span>
+        ))}
+      </p>
+      <span className="pa-ex-src pa-srcchip">
+        <DocIcon />
+        {tr(q.source)}
+      </span>
+    </div>
+  );
+}
+
 export function AppWelcome({
   target,
   voice,
@@ -55,6 +91,7 @@ export function AppWelcome({
   onRol,
   onDone,
   desktop = false,
+  native = false,
   needsAccount = false,
   onAccount,
 }: {
@@ -73,6 +110,8 @@ export function AppWelcome({
   onDone: () => void;
   /** La app de escritorio (desktop.ts): Pilo se presenta para el computador. */
   desktop?: boolean;
+  /** La app de Android (native.ts): Pilo se presenta en el teléfono y pide la cuenta, que allí es obligatoria. */
+  native?: boolean;
   /** En el escritorio y sin haber entrado: al final Pilo pide la cuenta en vez de elegir Pilo. */
   needsAccount?: boolean;
   /** Crear la cuenta o entrar con ella, desde la última parte. */
@@ -89,8 +128,12 @@ export function AppWelcome({
   const [asking, setAsking] = useState(false);
   const [armed, setArmed] = useState(touched);
   const [silent, setSilent] = useState(false);
+  /** La pregunta de ejemplo tocada (momento 2) y el Pilo elegido (momento 4). */
+  const [example, setExample] = useState<string | null>(null);
+  const [chosen, setChosen] = useState<SpaceId | null>(null);
+  const swipe = useRef<{ x: number; y: number } | null>(null);
 
-  const beats = useMemo(() => welcomeBeats({ desktop, account: needsAccount }), [desktop, needsAccount]);
+  const beats = useMemo(() => welcomeBeats({ desktop, native, account: needsAccount }), [desktop, native, needsAccount]);
   const current = asking ? localizeDeep(ROLE_BEAT) : beat >= 0 ? beats[beat] : null;
   // Habla si hay voz oficial, está encendida, ya hubo un toque y el servicio no ha fallado.
   const speaks = Boolean(voice) && voiceOn && armed && !silent;
@@ -169,7 +212,8 @@ export function AppWelcome({
     const next = () => {
       if (cancelled || !typed || !spoken) return;
       pilo.current?.talk(false);
-      if (b.pick) return;
+      // Donde se elige o se toca algo, la guía espera a la persona.
+      if (b.pick || b.touch) return;
       const i = beats.indexOf(b);
       const seg = root.querySelectorAll(".pa-segs span i")[i];
       // La barra del segmento marca la pausa antes de la frase siguiente.
@@ -230,6 +274,40 @@ export function AppWelcome({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [beat, asking, speaks]);
 
+  /* El ejemplo tocado: la respuesta llega palabra por palabra y, si hay voz y ya hubo un toque, Pilo la dice. */
+  useLayoutEffect(() => {
+    const picked = WELCOME_EXAMPLES.find((e) => e.id === example);
+    if (!picked || leaving.current) return;
+    const root = stage.current!;
+    const still = reducedMotion();
+    let cancelled = false;
+    const per = still ? 0 : speaks ? 0.12 : 0.04;
+    const ctx = gsap.context(() => {
+      const words = root.querySelectorAll(".pa-ex .wd");
+      const tl = gsap.timeline();
+      tl.fromTo(root.querySelector(".pa-ex"), { autoAlpha: 0, y: still ? 0 : 12 }, { autoAlpha: 1, y: 0, duration: still ? 0.2 : 0.3, ease: "expo.out" }, 0);
+      if (words.length) tl.fromTo(words, { autoAlpha: 0 }, { autoAlpha: 1, duration: still ? 0.15 : 0.25, stagger: per, ease: "power2.out" }, 0.1);
+      tl.fromTo(root.querySelector(".pa-ex-src"), { autoAlpha: 0, y: still ? 0 : 6 }, { autoAlpha: 1, y: 0, duration: 0.3, ease: "expo.out" }, words.length * per + 0.2);
+    }, root);
+    pilo.current?.mood("feliz");
+    if (speaks && voice) {
+      pilo.current?.talk(true);
+      void sayOfficial(tr(picked.a), { portal: voice.portal, advanced: voice.advanced, rate: voice.rate, keep: true, onSound: (on) => !cancelled && pilo.current?.talk(on) }).then((result) => {
+        if (cancelled) return;
+        if (result === "sin voz") setSilent(true);
+        pilo.current?.talk(false);
+      });
+    }
+    return () => {
+      cancelled = true;
+      // Interrumpida (otra pregunta, otro momento), la respuesta queda entera y visible.
+      ctx.revert();
+      stopOfficial();
+      pilo.current?.talk(false);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [example]);
+
   /* La salida: Pilo vuela a la cabecera y el escenario se cierra sobre él. */
   const finish = () => {
     if (leaving.current) return;
@@ -266,8 +344,12 @@ export function AppWelcome({
   useFocusTrap(stage, true, () => skip());
 
   const skip = () => {
-    // Sin cuenta en el escritorio, saltar lleva a la cuenta: no hay conversación a la que ir.
-    if (needsAccount) return toAccount("registro");
+    // Sin cuenta no hay conversación a la que ir: saltar la guía lleva a su último momento, la cuenta, que no se salta.
+    if (needsAccount) {
+      setAsking(false);
+      setBeat(beats.length - 1);
+      return;
+    }
     onChoose(fallback);
     finish();
   };
@@ -277,9 +359,28 @@ export function AppWelcome({
     setBeat(beat + 1);
   };
 
+  const back = () => {
+    if (beat > 0) setBeat(beat - 1);
+  };
+
+  /** Deslizar: a la izquierda avanza, a la derecha vuelve (los botones hacen lo mismo). */
+  const onSwipeEnd = (e: ReactPointerEvent) => {
+    const from = swipe.current;
+    swipe.current = null;
+    if (!from || asking || leaving.current) return;
+    const dx = e.clientX - from.x;
+    const dy = e.clientY - from.y;
+    if (Math.abs(dx) < 60 || Math.abs(dx) < Math.abs(dy) * 1.4) return;
+    if (dx < 0 && !current?.pick) advance();
+    else if (dx > 0) back();
+  };
+
   const choose = (space: SpaceId) => {
     onChoose(space);
-    if (asksRol(space)) setAsking(true);
+    setChosen(space);
+    // Con la cuenta obligatoria la guía sigue a la cuenta (el perfil lo da la cuenta); si no, Pilo en Enseñanza pregunta quién habla.
+    if (needsAccount && beat < beats.length - 1) setBeat(beat + 1);
+    else if (asksRol(space)) setAsking(true);
     else finish();
   };
 
@@ -309,7 +410,7 @@ export function AppWelcome({
   const voiceLabel = !voice || silent ? tr("La voz de Pilo no está disponible ahora") : voiceOn ? tr("Voz de Pilo activada. Apagar") : tr("Voz de Pilo apagada. Activar");
 
   return (
-    <div className="pa-w" ref={stage} data-escritorio={desktop || undefined} role="dialog" aria-modal="true" aria-label={tr("Bienvenida de Mr. Pilo")} tabIndex={-1}>
+    <div className="pa-w" ref={stage} data-escritorio={desktop || undefined} data-momento={asking ? "rol" : current?.id} role="dialog" aria-modal="true" aria-label={tr("Bienvenida de Mr. Pilo")} tabIndex={-1}>
       <div className="pa-w-bg">
         <div className="pa-w-glow" />
         <div className="pa-w-rings" aria-hidden="true">
@@ -336,12 +437,14 @@ export function AppWelcome({
         >
           <VoiceIcon on={Boolean(voice) && !silent && voiceOn} />
         </button>
-        <button type="button" className="pa-sbtn" onClick={skip}>
-          {tr("Saltar")}
-        </button>
+        {!(needsAccount && current?.id === "cuenta") && (
+          <button type="button" className="pa-sbtn" onClick={skip}>
+            {tr("Saltar guía")}
+          </button>
+        )}
       </header>
 
-      <div className="pa-w-center">
+      <div className="pa-w-center" onPointerDown={(e) => (swipe.current = { x: e.clientX, y: e.clientY })} onPointerUp={onSwipeEnd} onPointerCancel={() => (swipe.current = null)}>
         <div className="pa-w-slot">
           <div className="pa-w-fly" ref={holder}>
             <Pilo ref={pilo} size="100%" alive label="Mr. Pilo" />
@@ -384,19 +487,28 @@ export function AppWelcome({
             </div>
           )}
           {current?.id === "preguntar" && (
-            <div className="pa-w-demo">
-              {APP_ASKS.map((q) => (
-                <span key={q} className="pa-qchip">
-                  {tr(q)}
-                </span>
-              ))}
-            </div>
+            <>
+              <div className="pa-w-demo" role="group" aria-label={tr("Preguntas de ejemplo")}>
+                {WELCOME_EXAMPLES.map((q) => (
+                  <button key={q.id} type="button" className="pa-qchip" aria-pressed={example === q.id} onClick={() => setExample(q.id)}>
+                    {tr(q.q)}
+                  </button>
+                ))}
+              </div>
+              {example && <ExampleAnswer id={example} />}
+            </>
           )}
           {current?.id === "fuente" && (
             <div className="pa-w-demo">
               <div className="pa-ticket">
                 {tr("Cada respuesta dice de dónde viene")}
-                <em>{tr("CON SU FUENTE")}</em>
+                <span className="pa-ticket-row">
+                  <span className="pa-srcchip">
+                    <DocIcon />
+                    {tr("UDES en Cifras")}
+                  </span>
+                  <em>{tr("Orientación general · sin fuente UDES")}</em>
+                </span>
               </div>
             </div>
           )}
@@ -404,7 +516,7 @@ export function AppWelcome({
             <div className="pa-w-demo">
               <div className="pa-choose" role="group" aria-label={current.say}>
                 {APP_SPACES.map((space) => (
-                  <button key={space} type="button" onClick={() => choose(space)}>
+                  <button key={space} type="button" aria-pressed={chosen === space} onClick={() => choose(space)}>
                     {APP_PILOS[space].label}
                     <small>{APP_PILOS[space].hint}</small>
                   </button>
@@ -446,6 +558,11 @@ export function AppWelcome({
           </small>
         </div>
         <div className="pa-w-actions">
+          {beat > 0 && !asking && (
+            <button type="button" className="pa-w-back" onClick={back}>
+              {tr("Atrás")}
+            </button>
+          )}
           {!current?.pick && (
             <button type="button" className="pa-w-next" onClick={advance} disabled={beat < 0}>
               {tr("Siguiente")}

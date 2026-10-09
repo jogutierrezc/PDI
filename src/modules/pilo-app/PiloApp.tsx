@@ -38,7 +38,11 @@ import { ASK_SPACES, asksRol } from "../pregunta/space";
 import type { Rol, SpaceId } from "../pregunta/space";
 import { spaceDoor } from "./access";
 import { APP_ACCOUNT, APP_BASE, APP_LOGIN, APP_PATHS, readAppPath, startTarget } from "./routes";
+import { AppTabs } from "./AppTabs";
+import { UPane } from "./u/UPane";
+import { CarnetPane } from "./carnet/CarnetPane";
 import { desktopGate, isDesktopApp } from "./desktop";
+import { isNative } from "./native";
 import { AppPage, AppSide, useWide } from "./AppSide";
 import type { Person } from "./AppSide";
 import { loadSaved, readLast, removeSaved, savedEntries } from "./saved";
@@ -85,6 +89,10 @@ export function PiloApp() {
   const { account, member } = cuenta;
   // La app instalada en un computador (desktop.ts): ahí Pilo pide cuenta siempre.
   const [desktop] = useState(isDesktopApp);
+  // La app de Android (native.ts): igual que en el computador, aquí Pilo pide cuenta siempre.
+  const [native] = useState(isNative);
+  // El Pilo que se eligió en la bienvenida (antes de entrar con la cuenta).
+  const chosen = useRef<SpaceId | null>(null);
   // Lo que se eligió al final de la bienvenida de escritorio: crear la cuenta o entrar.
   const accountWay = useRef<"registro" | "ingreso" | null>(null);
   const wide = useWide();
@@ -112,7 +120,7 @@ export function PiloApp() {
   const terms = useMemo(() => (acceptedNow ? "vigente" : readAcceptanceState()), [acceptedNow, location.pathname]);
   // En el escritorio, sin cuenta no hay conversación: la bienvenida y las pantallas de la cuenta, nada más.
   // Vale la cuenta de Pilo o la sesión de la intranet.
-  const desk = desktopGate({ desktop, pending: loading || cuenta.pending, signedIn: member || Boolean(role) });
+  const desk = desktopGate({ desktop: desktop || native, pending: loading || cuenta.pending, signedIn: member || Boolean(role) });
   // La política se acepta al crear la cuenta o, ya dentro, antes de conversar: sin cuenta en el escritorio no se pide aún.
   const gating = desk === "libre" && terms !== "vigente" && (place.kind === "pilo" || place.kind === "inicio");
   // Con la aceptación pendiente, la bienvenida no vuela a la cabecera (queda tapada): se funde sobre ella.
@@ -197,6 +205,8 @@ export function PiloApp() {
   const willAskRol = useCallback((space: SpaceId) => space === "ensenanza" && rol === null && asksRol(ENSENANZA, doors.ensenanza.cfg), [rol, doors.ensenanza.cfg]);
 
   if (place.kind === "otra") return <Navigate to={APP_BASE} replace />;
+  // Pantallas angostas: la barra de pestañas (Pilo, Pilo U, Carnet, Yo). En el computador manda la barra lateral.
+  const tabsOn = !wide;
   // /app, ya vista la bienvenida: al Pilo de la última conversación.
   if (place.kind === "inicio" && !welcoming && desk === "libre") return <Navigate to={APP_PATHS[home]} replace />;
 
@@ -232,8 +242,8 @@ export function PiloApp() {
           pending={cuenta.pending}
           hasSession={Boolean(session)}
           intranetName={person.intranet}
-          home={APP_PATHS[home]}
-          required={desktop}
+          home={APP_PATHS[chosen.current ?? home]}
+          required={desktop || native}
         />
       </div>
     );
@@ -248,7 +258,7 @@ export function PiloApp() {
   if (place.kind === "perfil" || place.kind === "guardadas") {
     const profilePage = place.kind === "perfil";
     return (
-      <div className="pa" ref={root} data-tema={theme}>
+      <div className="pa" ref={root} data-tema={theme} data-tabs={tabsOn || undefined}>
         <AppPage
           title={profilePage ? (account ? tr("Mi perfil") : tr("Mis preferencias")) : tr("Respuestas guardadas")}
           lead={
@@ -273,6 +283,7 @@ export function PiloApp() {
             <SavedPane userId={session?.user.id} member={member} pending={cuenta.pending} />
           )}
         </AppPage>
+        {tabsOn && <AppTabs active="yo" home={APP_PATHS[home]} />}
       </div>
     );
   }
@@ -314,15 +325,44 @@ export function PiloApp() {
     );
   }
 
+  /* --- Pilo U y el carnet: las pestañas nuevas ----------------------------------------------- */
+
+  if (place.kind === "u" || place.kind === "carnet") {
+    const isU = place.kind === "u";
+    const pane = isU ? (
+      <UPane vista={place.vista} state={cuenta} online={online} person={person} wide={wide} voice={greeting} voiceOn={voiceOn} onVoice={pickVoice} />
+    ) : (
+      <CarnetPane state={cuenta} online={online} person={person} wide={wide} />
+    );
+    return (
+      <div className="pa" ref={root} data-tema={theme} data-tabs={tabsOn || undefined}>
+        {wide ? (
+          <AppPage
+            title={isU ? "Pilo U" : tr("Carnet digital")}
+            lead={isU ? tr("Sus clases, sus notas y su calendario, con Pilo.") : tr("Su identificación de la universidad, en el teléfono.")}
+            home={APP_PATHS[home]}
+            side={<PageSide home={home} active={isU ? "u" : "carnet"} person={person} userId={session?.user.id} member={member} theme={theme} onTheme={pickTheme} onWelcome={welcomeAgain} />}
+          >
+            {pane}
+          </AppPage>
+        ) : (
+          <div className="pa-frame pa-frame--tab">{pane}</div>
+        )}
+        {tabsOn && <AppTabs active={isU ? "u" : "carnet"} home={APP_PATHS[home]} />}
+      </div>
+    );
+  }
+
   const spaceId: SpaceId = place.kind === "pilo" ? place.space : home;
   const space = localizeDeep(ASK_SPACES[spaceId]);
   const door = doors[spaceId];
 
   return (
-    <div className="pa" ref={root} data-tema={theme}>
+    <div className="pa" ref={root} data-tema={theme} data-tabs={tabsOn && !welcoming && !gating ? true : undefined}>
       {/* Mientras la bienvenida o la aceptación están encima, lo de debajo no se enfoca ni se lee. */}
       <ShellFrame inert={welcoming || gating}>
         <AppShell
+          account={cuenta}
           // Cada Pilo monta su propia conversación: nada de uno queda en la memoria del otro.
           key={space.id}
           space={space}
@@ -354,6 +394,7 @@ export function PiloApp() {
           }}
         />
       </ShellFrame>
+      {tabsOn && !welcoming && !gating && <AppTabs active="pilo" home={APP_PATHS[home]} />}
 
       {/* «Antes de empezar»: debajo de la bienvenida mientras dura, y activa cuando esta termina. */}
       {gating && <TermsGate active={!welcoming} changed={terms === "cambio"} onAccept={() => setAcceptedNow(true)} />}
@@ -367,6 +408,8 @@ export function PiloApp() {
           asksRol={willAskRol}
           fallback={spaceId}
           onChoose={(next) => {
+            // Con la cuenta obligatoria, el Pilo elegido aquí es al que se vuelve tras crearla o entrar.
+            chosen.current = next;
             if (place.kind !== "pilo" || place.space !== next) navigate(APP_PATHS[next], { replace: true });
           }}
           onRol={pickRol}
@@ -375,6 +418,7 @@ export function PiloApp() {
             setWelcoming(false);
           }}
           desktop={desktop}
+          native={native}
           needsAccount={desk !== "libre"}
           onAccount={(way) => (accountWay.current = way)}
         />
@@ -395,7 +439,7 @@ function PageSide({
   onWelcome,
 }: {
   home: SpaceId;
-  active: "perfil" | "guardadas" | "clases" | "notas";
+  active: "perfil" | "guardadas" | "clases" | "notas" | "u" | "carnet";
   person: Person;
   userId: string | undefined;
   member: boolean;

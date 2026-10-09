@@ -17,7 +17,7 @@ import { useEffect, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import { Link } from "react-router-dom";
 import type { SpaceId } from "../pregunta/space";
-import { APP_ACCOUNT, APP_CLASSES, APP_GEMINI, APP_GRADES, APP_LOGIN, APP_PILOS, APP_PROFILE, APP_SAVED, APP_SPACES } from "./routes";
+import { APP_ACCOUNT, APP_CARNET, APP_CLASSES, APP_GEMINI, APP_GRADES, APP_LOGIN, APP_PILOS, APP_PROFILE, APP_SAVED, APP_SPACES, APP_U } from "./routes";
 import type { AppTheme } from "./themes";
 import { dayLabel } from "./saved";
 import type { SavedEntry } from "./saved";
@@ -158,7 +158,7 @@ export function AppSide({
   saved: SavedEntry[];
   currentId: string | null;
   /** La pantalla que se está viendo. */
-  active: "chat" | "guardadas" | "perfil" | "clases" | "notas";
+  active: "chat" | "guardadas" | "perfil" | "clases" | "notas" | "u" | "carnet";
   person: Person;
   onOpen: (entry: SavedEntry) => void;
   onDelete: (entry: SavedEntry) => void;
@@ -219,6 +219,14 @@ export function AppSide({
 
       <nav className="pa-side__nav" aria-label={tr("Secciones de la app")}>
         <p className="pa-side__label">{person.clases ? tr("Para estudiar") : tr("Mi Pilo")}</p>
+        <Link className="pa-sl" to={APP_U} aria-current={active === "u" ? "page" : undefined}>
+          {Icon.cap}
+          <span>{tr("Pilo U")}</span>
+        </Link>
+        <Link className="pa-sl" to={APP_CARNET} aria-current={active === "carnet" ? "page" : undefined}>
+          {Icon.id}
+          <span>{tr("Carnet digital")}</span>
+        </Link>
         {/* Mis clases (clases/) y Gemini: solo para estudiantes y profesores con cuenta. */}
         {person.clases && (
           <Link className="pa-sl" to={APP_CLASSES} aria-current={active === "clases" ? "page" : undefined}>

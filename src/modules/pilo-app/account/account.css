@@ -1238,3 +1238,62 @@
     transform: none;
   }
 }
+
+/* --- En el teléfono: Pilo guía en una fila (su cara y su frase) y debajo va la pregunta ----------- */
+
+@media (max-width: 899px) {
+  .pc-stage {
+    grid-template-columns: 72px minmax(0, 1fr);
+    justify-items: stretch;
+    align-items: center;
+    column-gap: 12px;
+    padding-bottom: 14px;
+    text-align: left;
+  }
+
+  .pc-stage-top {
+    grid-column: 1 / -1;
+  }
+
+  .pc-face {
+    grid-column: 1;
+    grid-row: 2 / span 2;
+    align-self: start;
+  }
+
+  .pc-face,
+  .pc-face__in {
+    width: 72px;
+    height: 72px;
+  }
+
+  .pc-bubble {
+    grid-column: 2;
+    grid-row: 2;
+    max-width: none;
+    min-height: 0;
+    font-size: 0.9375rem;
+    text-wrap: pretty;
+  }
+
+  .pc-stage > .pa-w-mood {
+    grid-column: 2;
+    grid-row: 3;
+    justify-self: start;
+  }
+
+  /* El botón principal ocupa el ancho: lo que se hace en cada pantalla es una cosa. */
+  .pc-step .pc-actions {
+    flex-direction: column-reverse;
+    align-items: stretch;
+  }
+
+  .pc-step .pc-actions .pa-btn {
+    width: 100%;
+  }
+
+  .pc-step .pc-actions .pc-quiet {
+    justify-content: center;
+    min-height: 48px;
+  }
+}

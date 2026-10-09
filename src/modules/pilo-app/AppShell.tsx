@@ -51,6 +51,8 @@ import { CallScreen } from "./llamada/CallScreen";
 import { AnuncioLlamada } from "./llamada/AnuncioLlamada";
 import { recognitionSupported } from "./llamada/logic";
 import { NEWS_MARK, newsSeen, shouldAnnounce } from "./llamada/novedad";
+import type { AccountState } from "./account/useAccount";
+import { LimitBanner } from "./limites/LimitBanner";
 import { APP_APK, fromKeyboard, isAndroidDevice, isStandalone, reducedMotion } from "./pwa";
 import type { InstallWay } from "./pwa";
 import { SuperContext, SuperDefs } from "../pregunta/super/Gear";
@@ -81,6 +83,8 @@ const KEY_CALL = storageKey(APP_PREFIX, "llamada");
 const KEY_NEWS = storageKey(APP_PREFIX, "novedad-llamada");
 
 export interface ShellProps {
+  /** La cuenta de Pilo: de ella salen los límites que el chat avisa antes de agotarse. */
+  account: AccountState;
   space: SpaceProfile;
   door: Door;
   /** La configuración o la sesión aún se están leyendo. */
@@ -109,7 +113,7 @@ export interface ShellProps {
   install: { way: InstallWay; dismissed: boolean; run: () => void; dismiss: () => void };
 }
 
-export function AppShell({ space, door, waking, online, person, member, wide, theme, onTheme, voiceOn, onVoice, rol, onRol, faceSlot, welcoming, gating, onWelcome, onSwitch, install }: ShellProps) {
+export function AppShell({ account, space, door, waking, online, person, member, wide, theme, onTheme, voiceOn, onVoice, rol, onRol, faceSlot, welcoming, gating, onWelcome, onSwitch, install }: ShellProps) {
   useLang();
   const prefix = space.storagePrefix;
   const usual = space.id === "planeacion";
@@ -753,6 +757,7 @@ export function AppShell({ space, door, waking, online, person, member, wide, th
 
       <div className="pa-dock">
         <div className="pa-dock__in">
+          {member && <LimitBanner state={account} space={space.id} refreshKey={current?.turns.length ?? 0} />}
           {!current && can && (
             <div className="pa-sugs" role="group" aria-label={tr("Preguntas sugeridas")}>
               {view.suggestions.map((s) => (
@@ -803,9 +808,16 @@ export function AppShell({ space, door, waking, online, person, member, wide, th
                 }
               }}
             />
+            {can && !welcoming && !busy && !draft.trim() ? (
+              // Sin nada escrito, el botón es el micrófono: habla con Pilo por voz (la misma llamada del encabezado).
+              <button type="button" className="pa-send" data-mic aria-haspopup="dialog" aria-label={tr("Hablar con Pilo por voz")} title={tr("Hablar con Pilo por voz")} onClick={startCall}>
+                {Icon.mic}
+              </button>
+            ) : (
             <button type="submit" className="pa-send" disabled={!can || (!busy && !draft.trim())} aria-label={busy && !draft.trim() ? tr("Detener la respuesta") : busy ? tr("Detener y preguntar esto") : tr("Enviar la pregunta")}>
               {busy && !draft.trim() ? Icon.stop : Icon.send}
             </button>
+            )}
           </form>
         </div>
         <div className="pa-sr" role="status" aria-live="polite">

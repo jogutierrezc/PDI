@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { audioKey, voiceBody } from "../../components/pilo/ai/client";
 import type { AppVoice } from "./access";
-import { APP_BEATS, APP_TITLE, ROLE_BEAT, voiceRequest, welcomeVoice, welcomeVoicePlan } from "./welcome-script";
+import { APP_BEATS, APP_TITLE, NATIVE_ACCOUNT_BEAT, NATIVE_HELLO, ROLE_BEAT, WELCOME_EXAMPLES, voiceRequest, welcomeBeats, welcomeVoice, welcomeVoicePlan } from "./welcome-script";
 import { voiceCacheUrl } from "./official-voice";
 import { isIosDevice } from "./pwa";
 
@@ -23,6 +23,37 @@ describe("lo que dice la bienvenida", () => {
     expect(APP_BEATS[3].say).toBe("¿Con cuál Pilo quiere hablar hoy?");
     expect(ROLE_BEAT.pick).toBe(true);
     for (const b of [...APP_BEATS, ROLE_BEAT]) expect(b.label.length).toBeGreaterThan(0);
+  });
+});
+
+describe("la bienvenida de la app de Android", () => {
+  it("son cinco momentos: se elige Pilo y al final se pide la cuenta, sin salida", () => {
+    const beats = welcomeBeats({ native: true, account: true });
+    expect(beats.map((b) => b.id)).toEqual(["hola", "preguntar", "fuente", "elegir", "cuenta"]);
+    expect(beats[0]).toBe(NATIVE_HELLO);
+    expect(beats[0].say).toMatch(/teléfono/);
+    expect(beats[4]).toBe(NATIVE_ACCOUNT_BEAT);
+    expect(beats[4].say).toMatch(/necesito su cuenta/);
+    expect(beats.map((b) => Boolean(b.pick))).toEqual([false, false, false, true, true]);
+  });
+
+  it("quien ya entró, o el navegador, ve los cuatro de siempre", () => {
+    expect(welcomeBeats({ native: true, account: false })).toBe(APP_BEATS);
+    expect(welcomeBeats({ native: false, account: true })).toBe(APP_BEATS);
+  });
+
+  it("la pregunta de ejemplo se toca: no avanza sola", () => {
+    expect(APP_BEATS[1].touch).toBe(true);
+  });
+
+  it("los ejemplos traen fuente, y ninguno inventa una cifra", () => {
+    expect(WELCOME_EXAMPLES.length).toBeGreaterThanOrEqual(2);
+    for (const e of WELCOME_EXAMPLES) {
+      expect(e.source.length).toBeGreaterThan(0);
+      expect(e.a.length).toBeGreaterThan(20);
+      // Solo el nombre del plan lleva números.
+      expect(e.a.replace(/2024-2028/g, "")).not.toMatch(/\d/);
+    }
   });
 });
 

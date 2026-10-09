@@ -325,10 +325,12 @@ export function AppTurn({
               {a.unknown && a.unknown.length > 0 && <p className="pa-note">{tr("Revise estos números antes de citarlos: no los encontré en las fuentes ({numbers}).", { numbers: a.unknown.join(", ") })}</p>}
               <div className="pa-after">
                 {listed.length > 0 && (
-                  <button type="button" className="pa-src" onClick={(e) => onSources(listed, null, e.currentTarget)}>
-                    {tr("Fuentes")} ({listed.length})
+                  <button type="button" className="pa-src" aria-label={`${tr("Fuentes")} (${listed.length}): ${listed[0].title}`} onClick={(e) => onSources(listed, null, e.currentTarget)}>
+                    <span className="pa-src__t">{listed[0].title}</span>
+                    {listed.length > 1 && <span className="pa-src__n">+{listed.length - 1}</span>}
                   </button>
                 )}
+                {listed.length === 0 && a.grounding === "general" && !incomplete && !turn.local && !turn.error && text.trim() && <span className="pa-gen">{tr("Orientación general · sin fuente UDES")}</span>}
                 {onSave && !incomplete && !turn.error && !turn.local && text.trim() && (
                   <button type="button" className="pa-src pa-keep" aria-pressed={saved} aria-busy={saving || undefined} disabled={saving} onClick={(e) => onSave(e.currentTarget, e.detail === 0)}>
                     {saved ? Icon.check : Icon.mark}

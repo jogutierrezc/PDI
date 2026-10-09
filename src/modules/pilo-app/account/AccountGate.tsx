@@ -36,6 +36,7 @@ import { APP_PROFILE, gateMode, linkExpired } from "../routes";
 import type { AppTheme } from "../themes";
 import { sayOfficial, stopOfficial } from "../official-voice";
 import { reducedMotion } from "../pwa";
+import { isNative } from "../native";
 import { Icon } from "../icons";
 import { asCuentaError, checkUsername, loginAccount, recoverPassword, registerAccount, resendConfirmation } from "./api";
 import { acceptPolicy } from "../terms/acceptance";
@@ -126,6 +127,15 @@ const OPENING_REQUIRED: Partial<Record<Mode, string>> = {
   ingreso: "¡Qué bueno verle! Entre con su usuario de Pilo para usarme en este computador.",
 };
 
+/** Lo mismo, en la app de Android: allí Pilo vive en el teléfono. */
+const OPENING_PHONE: Partial<Record<Mode, string>> = {
+  registro: "En el teléfono trabajo con su cuenta de Pilo. Para crearla, empecemos por su correo de la UDES.",
+  ingreso: "¡Qué bueno verle! Entre con su usuario de Pilo para usarme en este teléfono.",
+};
+
+/** Segundos que se espera para reenviar el correo de confirmación. */
+const RESEND_WAIT = 30;
+
 export function AccountGate({ voice, voiceOn, onVoice, theme, onTheme, account, pending, hasSession, intranetName, home, required = false }: GateProps) {
   useLang();
   const location = useLocation();
@@ -148,7 +158,11 @@ export function AccountGate({ voice, voiceOn, onVoice, theme, onTheme, account, 
   const [reveal, setReveal] = useState(false);
   const [userEdited, setUserEdited] = useState(false);
   const [userCheck, setUserCheck] = useState<{ state: "idle" | "checking" | "free" | "taken" | "unknown"; reason?: string }>({ state: "idle" });
-  const [done, setDone] = useState<{ username: string; rol: string; campus: string; nick: string; after: "entro" | "ingresar" | "confirmar" } | null>(null);
+  const [done, setDone] = useState<{ username: string; email: string; rol: string; campus: string; nick: string; after: "entro" | "ingresar" | "confirmar" } | null>(null);
+  // La espera entre un envío del correo y el siguiente: corre mientras se ve «Revise su correo».
+  const [wait, setWait] = useState(0);
+  const phone = useMemo(() => required && isNative(), [required]);
+  const openingOf = (m: Mode) => (required && ((phone ? OPENING_PHONE[m] : undefined) ?? OPENING_REQUIRED[m])) || OPENING[m][0];
   // Ingreso, olvido y contraseña nueva.
   const [login, setLogin] = useState({ username: "", password: "" });
   const [loginError, setLoginError] = useState<{ code: CuentaCode; message: string } | null>(null);
@@ -179,7 +193,7 @@ export function AccountGate({ voice, voiceOn, onVoice, theme, onTheme, account, 
   const [silent, setSilent] = useState(false);
   const [line, setLine] = useState<Line>(() => {
     const [text, face, mood, label] = OPENING[asked];
-    return { key: 0, text: (required && OPENING_REQUIRED[asked]) || text, face, mood, label: label ?? MOOD_LABEL[mood] };
+    return { key: 0, text: openingOf(asked) || text, face, mood, label: label ?? MOOD_LABEL[mood] };
   });
   const say = (text: string, face: MojiMood = "feliz", mood: Line["mood"] = "atento", label?: string) => setLine((l) => ({ key: l.key + 1, text: tr(text), face, mood, label: tr(label ?? MOOD_LABEL[mood]) }));
   const speaks = Boolean(voice) && voiceOn && armed && !silent;
@@ -269,8 +283,13 @@ export function AccountGate({ voice, voiceOn, onVoice, theme, onTheme, account, 
 
   /* --- Cambiar de pantalla y de paso ------------------------------------------------------- */
 
-  // El foco va al paso nuevo; lo que se avanzó con el puntero entra con un fundido corto.
+  // El foco va al paso nuevo, que entra deslizando y desvaneciéndose (hacia adelante desde la derecha, hacia atrás desde la izquierda).
+  // Corto (menos de 320 ms) y se puede interrumpir: otro paso lo deja terminado y visible.
+  const lastAt = useRef(0);
   useLayoutEffect(() => {
+    const at = mode === "registro" ? (step === "listo" ? steps.length : Math.max(0, steps.indexOf(step))) : 0;
+    const dir = at >= lastAt.current ? 1 : -1;
+    lastAt.current = at;
     if (first.current) {
       first.current = false;
       return;
@@ -279,16 +298,29 @@ export function AccountGate({ voice, voiceOn, onVoice, theme, onTheme, account, 
     if (!el) return;
     (el.querySelector<HTMLElement>("[data-first]") ?? el.querySelector<HTMLElement>("h2"))?.focus({ preventScroll: true });
     el.scrollIntoView({ block: "nearest" });
-    if (performance.now() - pointerAt.current > 900 || reducedMotion()) return;
-    const tween = gsap.fromTo(el.children, { opacity: 0, y: 10 }, { opacity: 1, y: 0, duration: 0.24, stagger: 0.04, ease: "expo.out", clearProps: "opacity,transform" });
+    if (reducedMotion()) {
+      const fade = gsap.fromTo(el, { opacity: 0 }, { opacity: 1, duration: 0.15, clearProps: "opacity" });
+      return () => {
+        fade.progress(1).kill();
+      };
+    }
+    const tween = gsap.fromTo(el, { opacity: 0, x: dir * 28 }, { opacity: 1, x: 0, duration: 0.3, ease: "expo.out", clearProps: "opacity,transform" });
     return () => {
       tween.progress(1).kill();
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [mode, step]);
+
+  // La espera para reenviar el correo baja de a un segundo.
+  useEffect(() => {
+    if (wait <= 0) return;
+    const timer = window.setTimeout(() => setWait((w) => Math.max(0, w - 1)), 1000);
+    return () => window.clearTimeout(timer);
+  }, [wait]);
 
   const stepLine = (next: Step, d: RegData = data) => {
     const r = emailRule(d.email);
-    if (next === "correo") say(tr(OPENING.registro[0]), "feliz", "emocionado");
+    if (next === "correo") say(tr(openingOf("registro")), "feliz", "emocionado");
     else if (next === "perfil" && r) say(rolQuestion(r), "feliz", "atento");
     else if (next === "sede") say(tr("¿En cuál sede está? Así le respondo con lo de su sede."), "feliz", "atento");
     else if (next === "identidad") say(tr("Mucho gusto. ¿Cómo se llama? Le propongo un usuario para entrar; cámbielo si quiere."), "feliz", "atento");
@@ -320,7 +352,7 @@ export function AccountGate({ voice, voiceOn, onVoice, theme, onTheme, account, 
       stepLine(at);
     } else {
       const [text, face, mood, label] = OPENING[next];
-      say(tr((required && OPENING_REQUIRED[next]) || text), face, mood, label ? tr(label) : label);
+      say(tr(openingOf(next) || text), face, mood, label ? tr(label) : label);
     }
   };
 
@@ -446,7 +478,8 @@ export function AccountGate({ voice, voiceOn, onVoice, theme, onTheme, account, 
       const nick = data.nick.trim() || firstName(data.fullName);
       // Si aún no entra (falta confirmar o abrir sesión), conversa sin cuenta: Pilo ya le dice como pidió.
       writeVisitor({ nick: visitorNick(nick), tone: data.tone });
-      setDone({ username, rol: rolLabel(data.rol), campus: campusLabel(rule?.campus || data.campus), nick, after });
+      setDone({ username, email: cleanEmail(data.email), rol: rolLabel(data.rol), campus: campusLabel(rule?.campus || data.campus), nick, after });
+      if (after === "confirmar") setWait(RESEND_WAIT);
       // La contraseña no se queda en la memoria de la página.
       setData((d) => ({ ...d, password: "" }));
       setReveal(false);
@@ -494,6 +527,7 @@ export function AccountGate({ voice, voiceOn, onVoice, theme, onTheme, account, 
     setBusy(true);
     try {
       await resendConfirmation(who);
+      setWait(RESEND_WAIT);
       setNotice({ tone: "ok", text: tr("Si esa cuenta está por confirmar, le enviamos el correo otra vez. Revise también el correo no deseado.") });
     } catch (e) {
       setNotice({ tone: "bad", text: asCuentaError(e).message });
@@ -634,16 +668,15 @@ export function AccountGate({ voice, voiceOn, onVoice, theme, onTheme, account, 
 
         {step === "listo" ? (
           <div className="pc-step" ref={setBody}>
-            <h2 tabIndex={-1}>{tr("Cuenta creada")}</h2>
+            <h2 tabIndex={-1}>{done?.after === "confirmar" ? tr("Revise su correo") : tr("Cuenta creada")}</h2>
             <p>
               {done?.after === "confirmar"
-                ? required
-                  ? tr("Le enviamos un mensaje a su correo para confirmar que es suyo. Abra el enlace de ese correo y entre con su usuario: en el computador Pilo trabaja con la cuenta confirmada.")
-                  : tr("Le enviamos un mensaje a su correo para confirmar que es suyo. Hasta que lo confirme puede conversar con Pilo sin cuenta; entrar, guardar respuestas y las respuestas a su medida se activan al confirmar.")
+                ? tr("Le enviamos un enlace a {email}. Ábralo para confirmar que el correo es suyo; después entre con su usuario.", { email: done.email })
                 : done?.after === "ingresar"
                   ? tr("Su cuenta quedó lista. Entre con su usuario y su contraseña para guardar respuestas y recibir respuestas a su medida.")
                   : tr("Su cuenta quedó lista y ya entró con ella: puede guardar respuestas y Pilo le responde a su medida.")}
             </p>
+            {done?.after === "confirmar" && !required && <p>{tr("Hasta que lo confirme puede conversar con Pilo sin cuenta; entrar, guardar respuestas y las respuestas a su medida se activan al confirmar.")}</p>}
             <dl className="pc-rows">
               <div>
                 <dt>{tr("Usuario")}</dt>
@@ -663,13 +696,13 @@ export function AccountGate({ voice, voiceOn, onVoice, theme, onTheme, account, 
             {notice && <Msg tone={notice.tone}>{notice.text}</Msg>}
             <div className="pc-actions">
               {done?.after === "confirmar" && (
-                <button type="button" className="pc-quiet" disabled={busy} onClick={() => done && void resend(done.username)}>
-                  {busy ? tr("Enviando…") : tr("Reenviar el correo")}
+                <button type="button" className="pc-quiet" disabled={busy || wait > 0} onClick={() => done && void resend(done.username)}>
+                  {busy ? tr("Enviando…") : wait > 0 ? tr("Reenviar en {s} s", { s: wait }) : tr("Reenviar el correo")}
                 </button>
               )}
               {required && done?.after !== "entro" ? (
                 <button type="button" className="pa-btn pa-btn--main" onClick={() => goMode("ingreso")}>
-                  {tr("Entrar con mi usuario")}
+                  {done?.after === "confirmar" ? tr("Ya abrí el enlace: entrar") : tr("Entrar con mi usuario")}
                 </button>
               ) : (
                 <Link className="pa-btn pa-btn--main" to={home} replace>

@@ -33,6 +33,10 @@ export const Icon = {
   // La llamada con Pilo.
   phone: <Svg><path d="M5.2 3.5h2.6l1.2 3.4-1.7 1.2a9 9 0 004.2 4.2l1.2-1.7 3.4 1.2v2.6a1.6 1.6 0 01-1.7 1.6A12.7 12.7 0 013.6 5.2a1.6 1.6 0 011.6-1.7z" /></Svg>,
   hangup: <Svg><path transform="rotate(135 10 10)" d="M5.2 3.5h2.6l1.2 3.4-1.7 1.2a9 9 0 004.2 4.2l1.2-1.7 3.4 1.2v2.6a1.6 1.6 0 01-1.7 1.6A12.7 12.7 0 013.6 5.2a1.6 1.6 0 011.6-1.7z" /></Svg>,
+  // La barra de pestañas y Pilo U.
+  cap: <Svg><path d="M1.5 7.5L10 3.5l8.5 4-8.5 4z" /><path d="M5 9.5v4c0 1.2 2.2 2.5 5 2.5s5-1.3 5-2.5v-4M18.5 7.5v4.5" /></Svg>,
+  id: <Svg><rect x="2.5" y="4.5" width="15" height="11" rx="2" /><circle cx="7" cy="9.5" r="1.7" /><path d="M11 8.5h4M11 11.5h3M4.8 13.4c.4-1.1 1.2-1.6 2.2-1.6s1.8.5 2.2 1.6" /></Svg>,
+  qr: <Svg><path d="M3.5 3.5h5v5h-5zM11.5 3.5h5v5h-5zM3.5 11.5h5v5h-5zM11.5 11.5h2v2h-2zM15 15h1.5v1.5H15zM15 11.5h1.5V13H15zM11.5 15H13v1.5h-1.5z" /></Svg>,
   mic: <Svg><rect x="7.5" y="2.5" width="5" height="9" rx="2.5" /><path d="M4.5 9.5a5.5 5.5 0 0011 0M10 15v2.5" /></Svg>,
   micOff: <Svg><path d="M7.5 6V5a2.5 2.5 0 015 0v4.5M12.4 12a2.5 2.5 0 01-4.9-.7M4.5 9.5a5.5 5.5 0 009.2 4.1M15.5 9.5v.2M10 15v2.5M3.5 3.5l13 13" /></Svg>,
 };

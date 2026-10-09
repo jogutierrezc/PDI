@@ -285,13 +285,11 @@
   justify-items: start;
 }
 
+/* Las respuestas de Pilo no llevan burbuja: su cara a la izquierda y el texto a la derecha, sobre el fondo. */
 .pa-bubble {
   max-width: 100%;
   min-width: 0;
-  padding: 10px 14px;
-  border-radius: var(--pa-r-bubble);
-  background: var(--c-bubble);
-  border: 1px solid var(--c-line);
+  padding: 2px 0 0;
   overflow-wrap: anywhere;
 }
 
@@ -337,6 +335,32 @@
   align-items: center;
   gap: 4px 0;
   max-width: 100%;
+}
+
+.pa-src__t {
+  min-width: 0;
+  max-width: 22ch;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.pa-src__n {
+  color: var(--c-ink2);
+}
+
+/* Sin fuente de la UDES: se dice, con palabras y con su marca. */
+.pa-gen {
+  display: inline-flex;
+  align-items: center;
+  min-height: 32px;
+  margin-right: 4px;
+  padding: 0 12px;
+  border: 1px dashed var(--c-ink2);
+  border-radius: var(--radius-pill);
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: var(--c-ink2);
 }
 
 .pa-src {
@@ -491,6 +515,11 @@
   border-top: 1px solid var(--c-line);
 }
 
+/* Con la barra de pestañas puesta, ella ya cubre el borde inferior seguro: aquí no se repite. */
+.pa[data-tabs="true"] .pa-compose {
+  padding-bottom: 10px;
+}
+
 /* 16 px: con menos, iOS acerca la página al enfocar el campo. */
 .pa-compose textarea {
   display: block;
@@ -536,6 +565,12 @@
   background: var(--c-mine);
   color: var(--c-mine-ink);
   transition: transform var(--dur-press) var(--ease-out), opacity var(--dur-fast) ease;
+}
+
+/* El micrófono: el mismo círculo, en el color de acento en vez del de «mi mensaje». */
+.pa-send[data-mic] {
+  background: var(--c-chip);
+  color: var(--c-link);
 }
 
 .pa-send:disabled {
@@ -1187,7 +1222,10 @@
   min-width: 0;
   padding: 0 18px;
   text-align: center;
-  overflow: hidden;
+  overflow-x: hidden;
+  overflow-y: auto;
+  scrollbar-width: none;
+  touch-action: pan-y;
 }
 
 .pa-w-slot,
@@ -1283,8 +1321,118 @@
 }
 
 .pa-qchip {
-  padding: 8px 13px;
+  min-height: 48px;
+  padding: 8px 14px;
   border-radius: 16px 16px 16px 4px;
+  text-align: left;
+  line-height: 1.3;
+  transition: transform var(--dur-press) var(--ease-out), box-shadow var(--dur-fast) ease;
+}
+
+.pa-qchip:active {
+  transform: scale(0.97);
+}
+
+/* Elegida: el anillo y la marca lo dicen, no solo el color. */
+.pa-qchip[aria-pressed="true"] {
+  box-shadow: 0 0 0 2px var(--acc), 0 10px 22px -8px var(--c-shadow);
+}
+
+.pa-qchip[aria-pressed="true"]::before {
+  content: "\2713\00a0";
+  font-weight: 800;
+}
+
+.pa-qchip:focus-visible {
+  border-radius: 16px 16px 16px 4px;
+}
+
+/* La respuesta de ejemplo: marcada como ejemplo, con su fuente. */
+.pa-w-exhibit {
+  align-content: center;
+  gap: 10px;
+}
+
+.pa-ex {
+  display: grid;
+  gap: 8px;
+  justify-items: start;
+  padding: 12px 14px;
+  border-radius: var(--radius-sm);
+  background: var(--w-card);
+  color: var(--w-card-ink);
+  font-size: 0.875rem;
+  font-weight: 600;
+  line-height: 1.45;
+  text-align: left;
+  box-shadow: 0 10px 22px -8px var(--c-shadow);
+}
+
+.pa-ex .wd {
+  display: inline-block;
+  white-space: pre;
+}
+
+.pa-ex-tag {
+  padding: 1px 8px;
+  border-radius: var(--radius-pill);
+  background: var(--acc);
+  color: var(--acc-ink);
+  font-size: 0.6875rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.pa-srcchip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 32px;
+  padding: 0 12px;
+  border: 1px solid currentColor;
+  border-radius: var(--radius-pill);
+  color: var(--w-card-ok);
+  font-size: 0.78rem;
+  font-weight: 800;
+}
+
+.pa-srcchip .pa-i {
+  width: 16px;
+  height: 16px;
+}
+
+.pa-ticket-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-top: 6px;
+}
+
+.pa-ticket-row em {
+  font-size: 0.75rem;
+  letter-spacing: 0;
+  color: var(--w-card-ink);
+  opacity: 0.8;
+}
+
+.pa-choose button[aria-pressed="true"] {
+  border-color: var(--acc);
+  box-shadow: 0 0 0 2px var(--acc);
+}
+
+/* Después del saludo la guía deja el título y achica a Pilo, para que quepan el ejemplo y la elección. */
+.pa-w[data-momento]:not([data-momento="hola"]) .pa-w-title {
+  display: none;
+}
+
+@media (max-height: 820px) {
+  .pa-w[data-momento="preguntar"] .pa-w-slot,
+  .pa-w[data-momento="preguntar"] .pa-w-fly {
+    width: 104px;
+    height: 104px;
+  }
 }
 
 .pa-ticket {
@@ -1373,8 +1521,28 @@
 
 .pa-w-actions {
   display: flex;
-  justify-content: flex-end;
-  min-height: 46px;
+  align-items: center;
+  justify-content: space-between;
+  flex-direction: row-reverse;
+  min-height: 48px;
+}
+
+.pa-w-actions:has(.pa-w-back:only-child) {
+  justify-content: flex-start;
+  flex-direction: row;
+}
+
+.pa-w-back {
+  min-height: 48px;
+  padding: 10px 18px;
+  border-radius: var(--radius-pill);
+  color: var(--s-muted);
+  font-weight: 800;
+  transition: transform var(--dur-press) var(--ease-out);
+}
+
+.pa-w-back:active {
+  transform: scale(0.97);
 }
 
 .pa-w-next {
@@ -1399,7 +1567,7 @@
     height: 132px;
   }
   .pa-w-exhibit {
-    min-height: 92px;
+    min-height: 72px;
   }
   .pa-w-title {
     font-size: 1.6rem;

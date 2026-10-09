@@ -34,13 +34,15 @@ export interface AppBeat {
   look: [number, number];
   /** Aquí se elige: no hay «Siguiente» ni avanza sola. */
   pick?: boolean;
+  /** Aquí se toca algo (una pregunta de ejemplo): no avanza sola, pero sí hay «Siguiente». */
+  touch?: boolean;
 }
 
 export const APP_TITLE = "Hola, soy Mr. Pilo";
 
 export const APP_BEATS: AppBeat[] = [
   { id: "hola", say: "¡Hola! Soy Mr. Pilo, la Inteligencia Artificial de la Universidad de Santander.", face: "feliz", mood: "emocionado", label: "Emocionado", look: [0, -0.1] },
-  { id: "preguntar", say: "Pregúnteme por la universidad, o hablemos de enseñar y aprender.", face: "feliz", mood: "atento", label: "Atento", look: [0, 0.7] },
+  { id: "preguntar", say: "Pregúnteme por la universidad, o hablemos de enseñar y aprender. Toque una pregunta y vea cómo respondo.", face: "feliz", mood: "atento", label: "Atento", look: [0, 0.7], touch: true },
   { id: "fuente", say: "Le respondo con lo que la universidad ha publicado y le muestro la fuente.", face: "sorpresa", mood: "pensar", label: "Reflexivo", look: [0.2, 0.8] },
   { id: "elegir", say: "¿Con cuál Pilo quiere hablar hoy?", face: "feliz", mood: "emocionado", label: "Emocionado", look: [0, 0.6], pick: true },
 ];
@@ -71,12 +73,37 @@ export const ACCOUNT_BEAT: AppBeat = {
   pick: true,
 };
 
+/* --- En la app de Android (native.ts) ------------------------------------------------------
+   Pilo se presenta en el teléfono y, tras elegir con cuál Pilo hablar, pide la cuenta:
+   allí es obligatoria, así que no hay «seguir sin cuenta». */
+
+export const NATIVE_HELLO: AppBeat = {
+  id: "hola",
+  say: "¡Hola! Soy Mr. Pilo, la Inteligencia Artificial de la Universidad de Santander. Ahora vivo en su teléfono.",
+  face: "feliz",
+  mood: "emocionado",
+  label: "Emocionado",
+  look: [0, -0.1],
+};
+
+export const NATIVE_ACCOUNT_BEAT: AppBeat = {
+  id: "cuenta",
+  say: "Para empezar necesito su cuenta de Pilo. Toma un minuto. ¿La creamos, o ya tiene una?",
+  face: "feliz",
+  mood: "atento",
+  label: "Atento",
+  look: [0, 0.6],
+  pick: true,
+};
+
 /**
  * Las partes de la bienvenida: las de siempre en el teléfono y en el navegador;
+ * en la app de Android sin cuenta, cinco: se elige Pilo y al final se pide la cuenta;
  * en la app de escritorio, el saludo de escritorio y, si falta entrar, la cuenta
  * en vez de la elección de Pilo.
  */
-export function welcomeBeats(options: { desktop?: boolean; account?: boolean } = {}): AppBeat[] {
+export function welcomeBeats(options: { desktop?: boolean; native?: boolean; account?: boolean } = {}): AppBeat[] {
+  if (options.native && !options.desktop && options.account) return localizeDeep([NATIVE_HELLO, APP_BEATS[1], APP_BEATS[2], APP_BEATS[3], NATIVE_ACCOUNT_BEAT]);
   if (!options.desktop) return localizeDeep(APP_BEATS);
   return localizeDeep([DESK_HELLO, APP_BEATS[1], APP_BEATS[2], options.account ? ACCOUNT_BEAT : APP_BEATS[3]]);
 }
@@ -84,6 +111,40 @@ export function welcomeBeats(options: { desktop?: boolean; account?: boolean } =
 /** Lo que conoce Pilo, para la primera muestra: lo de sus dos versiones. */
 export const APP_KNOWS = ["UDES en Cifras", "Plan de Desarrollo", "Impacto", "Innovación educativa", "Políticas"];
 export const APP_ASKS = ["¿Qué es el PDI?", "¿Qué es el aprendizaje activo?"];
+
+/**
+ * Las preguntas de ejemplo de la bienvenida. Cada respuesta es verdad y sale de lo
+ * que el portal dice de sí mismo (PRODUCT.md): ninguna cifra inventada. En pantalla
+ * van marcadas «Ejemplo»: no son una respuesta de Pilo.
+ */
+export interface WelcomeExample {
+  id: string;
+  q: string;
+  a: string;
+  /** La fuente que se muestra con la respuesta. */
+  source: string;
+}
+
+export const WELCOME_EXAMPLES: WelcomeExample[] = [
+  {
+    id: "pdi",
+    q: "¿Qué es el PDI 2024-2028?",
+    a: "Es el Plan de Desarrollo Institucional de la Universidad de Santander. Su seguimiento se ve en el Portal PDI, con sus pilares, áreas, líneas, proyectos e indicadores.",
+    source: "Portal PDI",
+  },
+  {
+    id: "cifras",
+    q: "¿Dónde veo las cifras oficiales?",
+    a: "En UDES en Cifras, el portal estadístico de la universidad. Reúne once informes con las cifras que reporta cada oficina.",
+    source: "UDES en Cifras",
+  },
+  {
+    id: "quien",
+    q: "¿Quién publica las cifras?",
+    a: "La Oficina de Planeación Institucional, a partir de lo que reporta cada oficina, siempre con su corte y su procedencia.",
+    source: "UDES en Cifras",
+  },
+];
 
 /**
  * Con qué voz habla la bienvenida: la de la primera versión de Pilo que tenga

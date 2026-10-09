@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { ASK_SPACES } from "../pregunta/space";
-import { APP_ACCOUNT, APP_BASE, APP_GUEST, APP_LOGIN, APP_PATHS, APP_PILOS, APP_PROFILE, APP_SAVED, APP_SPACES, gateMode, isAppPath, linkExpired, readAppPath, startTarget } from "./routes";
+import { APP_ACCOUNT, APP_BASE, APP_GUEST, APP_LOGIN, APP_PATHS, APP_PILOS, APP_PROFILE, APP_SAVED, APP_SPACES, gateMode, isAppPath, linkExpired, readAppPath, startTarget, U_VISTAS, uPath } from "./routes";
 
 describe("las rutas de la app y su Pilo", () => {
   it("cada ruta abre su espacio", () => {
@@ -92,5 +92,17 @@ describe("las rutas de la app y su Pilo", () => {
     expect(startTarget({ seen: true, last: "planeacion" })).toBe("planeacion");
     expect(startTarget({ seen: true, last: null })).toBe("planeacion");
     expect(startTarget({ seen: true, last: undefined })).toBe("planeacion");
+  });
+
+  it("reconoce Pilo U, sus vistas y el carnet", () => {
+    expect(readAppPath("/app/u")).toEqual({ kind: "u", vista: null });
+    expect(readAppPath("/app/u/")).toEqual({ kind: "u", vista: null });
+    expect(readAppPath("/app/u/notas")).toEqual({ kind: "u", vista: "notas" });
+    expect(readAppPath("/APP/U/Asistencia?x=1")).toEqual({ kind: "u", vista: "asistencia" });
+    expect(readAppPath("/app/u/inventada")).toEqual({ kind: "otra" });
+    expect(readAppPath("/app/carnet")).toEqual({ kind: "carnet" });
+    expect(uPath()).toBe("/app/u");
+    expect(uPath("grupos")).toBe("/app/u/grupos");
+    expect(U_VISTAS.every((v) => readAppPath(uPath(v)).kind === "u")).toBe(true);
   });
 });

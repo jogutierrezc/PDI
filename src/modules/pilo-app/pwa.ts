@@ -77,10 +77,10 @@ export type InstallWay = "aviso" | "iphone" | null;
 
 export const APP_APK = {
   /** Ruta pública del archivo, tal como la sirve el portal. */
-  url: "/pilo-app/apk/Mr-Pilo-1.0.0.apk",
-  file: "Mr-Pilo-1.0.0.apk",
-  version: "1.0.0",
-  size: "1,5 MB",
+  url: "/pilo-app/apk/Mr-Pilo-1.2.0.apk",
+  file: "Mr-Pilo-1.2.0.apk",
+  version: "1.2.0",
+  size: "11,9 MB",
 } as const;
 
 /** ¿Es un teléfono o tableta Android? (No las apps que ya corren instaladas: a esas no se les ofrece el APK.) */

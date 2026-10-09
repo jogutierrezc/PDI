@@ -40,7 +40,16 @@ export const APP_GRADES = "/app/notas";
 export const APP_LOGIN = `${APP_ACCOUNT}?entrar=1`;
 export const APP_GUEST = `${APP_ACCOUNT}?visita=1`;
 
-export type AppPlace = { kind: "inicio" } | { kind: "pilo"; space: SpaceId } | { kind: "cuenta" } | { kind: "perfil" } | { kind: "guardadas" } | { kind: "clases" } | { kind: "notas" } | { kind: "otra" };
+/** Pilo U: lo universitario de la persona (clases, notas, calendario; grupos y asistencia para quien enseña). */
+export const APP_U = "/app/u";
+/** Las vistas de Pilo U: /app/u/<vista>. Cuáles ve cada quien lo decide su rol (u/vistas.ts). */
+export const U_VISTAS = ["presenciales", "virtuales", "notas", "calendario", "grupos", "gruposv", "horario", "boletin", "asistencia", "riesgo", "mensaje", "dependencia", "avisos"] as const;
+export type UVista = (typeof U_VISTAS)[number];
+export const uPath = (vista?: UVista | null): string => (vista ? `${APP_U}/${vista}` : APP_U);
+/** El carnet digital: tarjeta con código que cambia, datos del perfil y Google Wallet. */
+export const APP_CARNET = "/app/carnet";
+
+export type AppPlace = { kind: "inicio" } | { kind: "pilo"; space: SpaceId } | { kind: "cuenta" } | { kind: "perfil" } | { kind: "guardadas" } | { kind: "clases" } | { kind: "notas" } | { kind: "u"; vista: UVista | null } | { kind: "carnet" } | { kind: "otra" };
 
 /** Qué pantalla de la app pide una dirección. «otra» = no es de la app, o no existe dentro de ella. */
 export function readAppPath(pathname: string): AppPlace {
@@ -52,6 +61,12 @@ export function readAppPath(pathname: string): AppPlace {
   if (p === APP_SAVED) return { kind: "guardadas" };
   if (p === APP_CLASSES) return { kind: "clases" };
   if (p === APP_GRADES) return { kind: "notas" };
+  if (p === APP_U) return { kind: "u", vista: null };
+  if (p.startsWith(`${APP_U}/`)) {
+    const vista = p.slice(APP_U.length + 1);
+    return (U_VISTAS as readonly string[]).includes(vista) ? { kind: "u", vista: vista as UVista } : { kind: "otra" };
+  }
+  if (p === APP_CARNET) return { kind: "carnet" };
   return { kind: "otra" };
 }
 

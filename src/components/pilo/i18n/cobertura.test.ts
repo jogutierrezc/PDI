@@ -30,13 +30,25 @@ const SURFACES = [
   "src/modules/pilo-app/AppSide.tsx",
   "src/modules/pilo-app/AppMenu.tsx",
   "src/modules/pilo-app/AppShell.tsx",
+  "src/modules/pilo-app/AppTabs.tsx",
   "src/modules/pilo-app/AppWelcome.tsx",
   "src/modules/pilo-app/PiloApp.tsx",
   "src/modules/pilo-app/account/AccountGate.tsx",
   "src/modules/pilo-app/account/ProfilePane.tsx",
+  "src/modules/pilo-app/carnet/CarnetPane.tsx",
+  "src/modules/pilo-app/carnet/Hojas.tsx",
+  "src/modules/pilo-app/carnet/Sheet.tsx",
+  "src/modules/pilo-app/yo/PerfilSheet.tsx",
+  "src/modules/pilo-app/yo/MisDatos.tsx",
+  "src/modules/pilo-app/limites/LimitBanner.tsx",
+  "src/modules/pilo-app/limites/LimitesCard.tsx",
   "src/modules/pilo-app/account/SavedPane.tsx",
   "src/modules/pilo-app/account/parts.tsx",
   "src/modules/pilo-app/llamada/CallScreen.tsx",
+  "src/modules/pilo-app/u/UPane.tsx",
+  "src/modules/pilo-app/u/parts.tsx",
+  "src/modules/pilo-app/u/lectura.tsx",
+  "src/modules/pilo-app/u/vistas-docente.tsx",
   "src/modules/pilo-app/llamada/CallPreview.tsx",
   "src/modules/pilo-app/llamada/AnuncioLlamada.tsx",
 ];
@@ -53,14 +65,18 @@ const DATA = [
   "src/modules/pilo-app/account/answers.ts",
   "src/modules/pilo-app/account/visitor.ts",
   "src/modules/pilo-app/account/useAccount.ts",
+  "src/modules/pilo-app/carnet/rules.ts",
+  "src/modules/pilo-app/carnet/logic.ts",
+  "src/modules/pilo-app/limites/logic.ts",
   "src/modules/pilo-app/account/AccountGate.tsx",
   "src/components/pilo/ai/client.ts",
   "src/modules/pilo-app/llamada/logic.ts",
   "src/modules/pilo-app/llamada/useCall.ts",
+  "src/modules/pilo-app/u/vistas.ts",
 ];
 
 /** Nombres propios y marcas: no se traducen. */
-const NO_TRADUCIR = new Set(["Mr. Pilo", "Pilo", "Gemini", "beta", "Bucaramanga", "Cúcuta", "Valledupar", "Bogotá", "Universidad de Santander", "UDES", "Mr. Pilo:", "Pilo:"]);
+const NO_TRADUCIR = new Set(["Mr. Pilo", "Pilo", "Pilo U", "Gemini", "Génesis", "Moodle", "Google Wallet", "beta", "Bucaramanga", "Cúcuta", "Valledupar", "Bogotá", "Universidad de Santander", "UDES", "Mr. Pilo:", "Pilo:"]);
 
 /** Cadenas de las constantes que no son texto para mostrar. */
 const NO_ES_TEXTO = new Set(["sin respuesta", "pc-terminos-texto pc-terminos-error", "id, username, full_name, email, rol, campus, status, nick, tone, length, about, program", "Universidad de Santander · Pregúntele a Pilo"]);

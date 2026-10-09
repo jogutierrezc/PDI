@@ -18,7 +18,7 @@ import { useAuth } from "../../lib/auth";
 import { FaltaMigracion, cargarRutas, crearRuta, guardarFlota, guardarPropuesta, leerParadas, listarRutas } from "./datos";
 import { ESQUELETO } from "./esqueleto";
 import { montarRutas } from "./motor";
-import type { DatosRutas } from "./tipos";
+import type { DatosRutas, RegresoRuta } from "./tipos";
 import "./rutas.css";
 
 const EJEMPLO = "Parqueadero UDES; 7,10524; -73,09510\nCementerio La Colina; 7,10860; -73,09823\nCra 45 con Calle 65; 7,1070; -73,1010";
@@ -108,7 +108,7 @@ function FormularioRuta({ onCerrar, onCreada }: { onCerrar: () => void; onCreada
   const [puestos, setPuestos] = useState(40);
   const [cada, setCada] = useState(15);
   const [parada, setParada] = useState(5);
-  const [circuito, setCircuito] = useState(true);
+  const [regreso, setRegreso] = useState<RegresoRuta>("directo");
   const [texto, setTexto] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [trabajando, setTrabajando] = useState(false);
@@ -121,7 +121,7 @@ function FormularioRuta({ onCerrar, onCreada }: { onCerrar: () => void; onCreada
     if (!codigo.trim() || !nombre.trim()) return setError("Falta el código y el nombre de la ruta.");
     setTrabajando(true);
     try {
-      const id = await crearRuta({ code: codigo.trim(), name: nombre.trim(), vehiculos: buses, capacidad: puestos, intervaloMin: cada, paradaCampusMin: parada, paradas: leidas.paradas, circuito });
+      const id = await crearRuta({ code: codigo.trim(), name: nombre.trim(), vehiculos: buses, capacidad: puestos, intervaloMin: cada, paradaCampusMin: parada, paradas: leidas.paradas, regreso });
       await onCreada(id);
     } catch (err) {
       setError(err instanceof Error ? err.message : "No se pudo crear la ruta.");
@@ -164,9 +164,12 @@ function FormularioRuta({ onCerrar, onCreada }: { onCerrar: () => void; onCreada
         <textarea value={texto} onChange={(e) => setTexto(e.target.value)} rows={7} placeholder={EJEMPLO} spellCheck={false} required />
         <small>Formato: nombre; latitud; longitud</small>
       </label>
-      <label className="rutas-check">
-        <input type="checkbox" checked={circuito} onChange={(e) => setCircuito(e.target.checked)} />
-        El bus regresa a la primera parada
+      <label>
+        Cómo regresa el bus a la UDES
+        <select value={regreso} onChange={(e) => setRegreso(e.target.value as RegresoRuta)}>
+          <option value="directo">Directo, por el camino más corto</option>
+          <option value="mismas">Pasando por las mismas paradas, al revés</option>
+        </select>
       </label>
       {error && (
         <p className="rutas-error" role="alert">

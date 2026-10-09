@@ -12,7 +12,10 @@
    ========================================================================== */
 
 import { supabase } from "../../lib/supabase";
+import { paradasDelRecorrido } from "./paradas";
 import type { DatosRutas, FlotaGuardar, ParadaRuta, PropuestaGuardar, ResumenRuta, RutaNueva } from "./tipos";
+
+export { leerParadas, paradasDelRecorrido } from "./paradas";
 
 export class FaltaMigracion extends Error {}
 
@@ -121,30 +124,6 @@ export async function guardarFlota(rutaId: string, f: FlotaGuardar): Promise<voi
 
 const OSRM = (import.meta.env.VITE_OSRM_URL as string | undefined)?.replace(/\/$/, "") ?? "https://router.project-osrm.org";
 
-/** Colombia, con holgura: una coordenada fuera es casi seguro lat y lon invertidas. */
-const dentroDeColombia = (lon: number, lat: number) => lat >= -4.5 && lat <= 13.5 && lon >= -82 && lon <= -66;
-
-/**
- * Lee las paradas pegadas, una por línea: «nombre; latitud; longitud».
- * Acepta ; o tabulación y coma decimal. Devuelve las paradas o el motivo del primer error.
- */
-export function leerParadas(texto: string): { paradas: ParadaRuta[]; error: string | null } {
-  const paradas: ParadaRuta[] = [];
-  const lineas = texto.split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
-  for (let i = 0; i < lineas.length; i++) {
-    const partes = lineas[i].split(/[;\t]/).map((p) => p.trim());
-    if (partes.length < 3) return { paradas, error: `Línea ${i + 1}: use «nombre; latitud; longitud».` };
-    const lat = Number(partes[1].replace(",", "."));
-    const lon = Number(partes[2].replace(",", "."));
-    if (!Number.isFinite(lat) || !Number.isFinite(lon)) return { paradas, error: `Línea ${i + 1}: la latitud y la longitud deben ser números.` };
-    if (!dentroDeColombia(lon, lat)) return { paradas, error: `Línea ${i + 1}: esa coordenada queda fuera de Colombia. ¿Están invertidas la latitud y la longitud?` };
-    if (!partes[0] || partes[0].length > 120) return { paradas, error: `Línea ${i + 1}: falta el nombre de la parada (hasta 120 caracteres).` };
-    paradas.push({ name: partes[0], lat, lon });
-  }
-  if (paradas.length < 2) return { paradas, error: "Una ruta necesita al menos dos paradas." };
-  return { paradas, error: null };
-}
-
 interface RespuestaOsrm {
   code: string;
   routes?: { distance: number; duration: number; geometry: { coordinates: [number, number][] }; legs: { distance: number }[] }[];
@@ -173,7 +152,7 @@ export async function trazarRuta(paradas: ParadaRuta[]): Promise<{ coords: [numb
 
 /** Crea la ruta, sus paradas y su trazado. Si algo falla a medias, deshace la ruta. Devuelve su id. */
 export async function crearRuta(nueva: RutaNueva): Promise<string> {
-  const base = nueva.circuito ? [...nueva.paradas, nueva.paradas[0]] : nueva.paradas;
+  const base = paradasDelRecorrido(nueva.paradas, nueva.regreso);
   const trazo = await trazarRuta(base);
   const ins = await supabase
     .from("bus_routes" as never)

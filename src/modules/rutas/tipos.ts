@@ -63,6 +63,8 @@ export interface RutaNueva {
   paradaCampusMin: number;
   /** Las paradas en orden. La primera es la UDES. */
   paradas: ParadaRuta[];
-  /** Agrega la primera parada al final para cerrar el circuito. */
-  circuito: boolean;
+  /** Cómo cierra el recorrido: directo a la UDES o pasando por las mismas paradas. */
+  regreso: RegresoRuta;
 }
+
+export type RegresoRuta = "directo" | "mismas";

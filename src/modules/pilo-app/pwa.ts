@@ -77,9 +77,9 @@ export type InstallWay = "aviso" | "iphone" | null;
 
 export const APP_APK = {
   /** Ruta pública del archivo, tal como la sirve el portal. */
-  url: "/pilo-app/apk/Mr-Pilo-1.2.0.apk",
-  file: "Mr-Pilo-1.2.0.apk",
-  version: "1.2.0",
+  url: "/pilo-app/apk/Mr-Pilo-1.2.1.apk",
+  file: "Mr-Pilo-1.2.1.apk",
+  version: "1.2.1",
   size: "11,9 MB",
 } as const;
 

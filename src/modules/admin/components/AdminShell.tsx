@@ -49,7 +49,8 @@ export type AdminSection =
   | "pilo"
   | "pilo_ensenanza"
   | "reportes"
-  | "correos";
+  | "correos"
+  | "rutas";
 
 export interface NavItem {
   id: AdminSection;
@@ -179,6 +180,8 @@ export const navigation: NavGroup[] = [
       // Los correos de cuenta de Planeación y de Pilo: plantillas, conexión y bitácora.
       // Planeación entra a leer la bitácora; lo demás es de la administración.
       { id: "correos", label: "Correos", icon: "mail", to: "/admin/correos", minimum: "planeacion" },
+      // El mapa de la ruta del bus UDES: calles de OpenStreetMap, flujo de estudiantes y paradas nuevas.
+      { id: "rutas", label: "Rutas del bus", icon: "pin", to: "/admin/rutas", minimum: "planeacion" },
       // Copia otro servidor de Supabase en este. Reemplaza datos: solo administración.
       { id: "transfer", label: "Traslado de datos", icon: "upload", to: "/admin/traslado", minimum: "admin" },
     ],

@@ -188,6 +188,7 @@ const DataTransfer = lazy(() =>
 const Correos = lazy(() =>
   import("./modules/admin/correos/Correos").then((m) => ({ default: m.Correos })),
 );
+const Rutas = lazy(() => import("./modules/rutas/Rutas").then((m) => ({ default: m.Rutas })));
 const ReportesInstitucionales = lazy(() =>
   import("./modules/reportes/ReportesInstitucionales").then((m) => ({ default: m.ReportesInstitucionales })),
 );
@@ -590,6 +591,15 @@ export default function App() {
             element={
               <RequireRole minimum="planeacion" screen="correos">
                 <Correos />
+              </RequireRole>
+            }
+          />
+
+          <Route
+            path="/admin/rutas"
+            element={
+              <RequireRole minimum="planeacion" screen="rutas">
+                <Rutas />
               </RequireRole>
             }
           />

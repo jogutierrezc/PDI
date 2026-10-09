@@ -69,6 +69,8 @@ export function spokenText(raw: string): string {
   return raw
     .replace(/```[\s\S]*?```/g, " ")
     .replace(/`([^`]*)`/g, "$1")
+    // Las citas de las fuentes ([1], [2, 3]) se ven en pantalla; en voz no se leen.
+    .replace(/\s*\[\d+(?:\s*[,;-]\s*\d+)*\]/g, "")
     .replace(/!\[[^\]]*\]\([^)]*\)/g, " ")
     .replace(/\[([^\]]+)\]\([^)]*\)/g, "$1")
     .replace(/https?:\/\/\S+/g, " ")

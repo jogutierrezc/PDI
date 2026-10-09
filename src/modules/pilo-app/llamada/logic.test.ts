@@ -59,6 +59,10 @@ describe("spokenText", () => {
     expect(spokenText(raw)).toBe("Sedes Bucaramanga: la principal Cúcuta activa");
   });
 
+  it("no lee las citas de las fuentes", () => {
+    expect(spokenText("La UDES tiene sedes en tres ciudades [1]. Bucaramanga es la principal [2, 3].")).toBe("La UDES tiene sedes en tres ciudades. Bucaramanga es la principal.");
+  });
+
   it("no deja direcciones sueltas", () => {
     expect(spokenText("Más en https://udes.edu.co/pdi hoy")).toBe("Más en hoy");
   });

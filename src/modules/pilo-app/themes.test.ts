@@ -1,30 +1,45 @@
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { APP_THEMES, DEFAULT_THEME, parseTheme, readTheme, writeTheme } from "./themes";
+import { APP_THEMES, DEFAULT_THEME, THEME_GROUPS, parseTheme, readTheme, writeTheme } from "./themes";
 
 describe("la elección de tema", () => {
   afterEach(() => vi.unstubAllGlobals());
 
-  it("son cinco, con «Mi UDES» por defecto", () => {
-    expect(APP_THEMES.map((t) => t.label)).toEqual(["Mi UDES", "Blanco", "Negro", "Futurista", "Estilo Pilo"]);
-    expect(APP_THEMES.map((t) => t.id)).toEqual(["udes", "blanco", "negro", "futurista", "pilo"]);
+  it("son doce, en tres grupos, con «Azul UDES» por defecto", () => {
+    expect(APP_THEMES.map((t) => t.id)).toEqual(["udes", "dorado", "gris", "noche", "salud", "bio", "magenta", "social", "purpura", "ambar", "turquesa", "granate"]);
+    expect(THEME_GROUPS).toEqual(["Institucionales", "Por facultad", "Propuestos"]);
+    const sizes = THEME_GROUPS.map((g) => APP_THEMES.filter((t) => t.group === g).length);
+    expect(sizes).toEqual([4, 5, 3]);
+    expect(APP_THEMES.find((t) => t.id === "udes")?.label).toBe("Azul UDES");
+    expect(new Set(APP_THEMES.map((t) => t.label)).size).toBe(12);
     expect(DEFAULT_THEME).toBe("udes");
   });
 
-  it("lo guardado que no es un tema es «Mi UDES»", () => {
-    expect(parseTheme("negro")).toBe("negro");
-    expect(parseTheme(" Futurista ")).toBe("futurista");
-    for (const v of [null, undefined, "", "soleado", "dark", 3, {}]) expect(parseTheme(v)).toBe("udes");
+  it("lo guardado que no es un tema es «Azul UDES»", () => {
+    expect(parseTheme("noche")).toBe("noche");
+    expect(parseTheme(" Magenta ")).toBe("magenta");
+    for (const v of [null, undefined, "", "soleado", "dark", 3, {}, "constructor", "__proto__"]) expect(parseTheme(v)).toBe("udes");
+  });
+
+  it("los cinco temas de antes no se pierden: cada uno pasa al nuevo más cercano", () => {
+    expect(parseTheme("udes")).toBe("udes");
+    expect(parseTheme("blanco")).toBe("gris");
+    expect(parseTheme("negro")).toBe("noche");
+    expect(parseTheme(" Futurista ")).toBe("purpura");
+    expect(parseTheme("pilo")).toBe("dorado");
   });
 
   it("se guarda por dispositivo, y sin almacenamiento sigue funcionando", () => {
     const data = new Map<string, string>();
     vi.stubGlobal("window", { localStorage: { getItem: (k: string) => data.get(k) ?? null, setItem: (k: string, v: string) => void data.set(k, v), removeItem: (k: string) => void data.delete(k) } });
     expect(readTheme()).toBe("udes");
-    writeTheme("pilo");
-    expect(data.get("pilo-app:tema")).toBe("pilo");
-    expect(readTheme()).toBe("pilo");
+    writeTheme("bio");
+    expect(data.get("pilo-app:tema")).toBe("bio");
+    expect(readTheme()).toBe("bio");
+    // Lo que guardó la versión anterior se lee como su tema nuevo, sin borrar nada.
+    data.set("pilo-app:tema", "negro");
+    expect(readTheme()).toBe("noche");
     // No toca el tema de las páginas de Pilo ni el del portal.
     expect([...data.keys()]).toEqual(["pilo-app:tema"]);
     vi.stubGlobal("window", {
@@ -33,11 +48,11 @@ describe("la elección de tema", () => {
       },
     });
     expect(readTheme()).toBe("udes");
-    expect(() => writeTheme("negro")).not.toThrow();
+    expect(() => writeTheme("noche")).not.toThrow();
   });
 });
 
-/* --- Los colores: una sola hoja, y contraste de texto de 4.5:1 en los cinco temas ------------- */
+/* --- Los colores: una sola hoja, y contraste de texto de 4.5:1 en los doce temas -------------- */
 
 const DIR = resolve(process.cwd(), "src/modules/pilo-app");
 const strip = (css: string) => css.replace(/\/\*[\s\S]*?\*\//g, "");
@@ -86,12 +101,21 @@ const PAIRS: [string, string[]][] = [
   ["--c-s2", ["--c-sheet"]],
   ["--w-card-ink", ["--w-card"]],
   ["--w-card-ok", ["--w-card"]],
+  // El texto de color (enlaces, etiquetas) también sobre el tono suave, que es donde más se usa.
+  ["--c-link", ["--c-chip"]],
+  ["--c-ok", ["--c-chip"]],
 ];
 
-describe("los cinco temas", () => {
+/** Lo que se ve pero no se lee (los anillos de Pilo): al menos 3:1 contra la escena (WCAG, objetos gráficos). */
+const GRAPHICS: [string, string[]][] = [
+  ["--ring-1", ["--s2"]],
+  ["--ring-2", ["--s2"]],
+];
+
+describe("los doce temas", () => {
   const themes = themeVars();
 
-  it("la hoja define los cinco, con las mismas variables", () => {
+  it("la hoja define los doce, con las mismas variables", () => {
     expect(Object.keys(themes).sort()).toEqual(APP_THEMES.map((t) => t.id).sort());
     const names = Object.keys(themes.udes).sort();
     expect(names.length).toBeGreaterThan(25);
@@ -107,6 +131,24 @@ describe("los cinco temas", () => {
         const ratio = contrast(v[ink], v[ground]);
         expect(ratio, `${id}: ${ink} sobre ${ground} = ${ratio.toFixed(2)}`).toBeGreaterThanOrEqual(4.5);
       }
+    }
+  });
+
+  it.each(APP_THEMES.map((t) => t.id))("«%s»: los anillos de Pilo se ven (3:1) sobre su escena", (id) => {
+    const v = themes[id];
+    for (const [ink, grounds] of GRAPHICS) {
+      for (const ground of grounds) {
+        const ratio = contrast(v[ink], v[ground]);
+        expect(ratio, `${id}: ${ink} sobre ${ground} = ${ratio.toFixed(2)}`).toBeGreaterThanOrEqual(3);
+      }
+    }
+  });
+
+  it("el color puro solo es acento: la barra y el botón de cada tema son el profundo (7,5:1 con blanco) salvo el oscuro", () => {
+    for (const t of APP_THEMES) {
+      if (t.id === "gris" || t.id === "noche") continue;
+      expect(contrast(themes[t.id]["--c-bar"], "#ffffff"), t.id).toBeGreaterThanOrEqual(7.5);
+      expect(themes[t.id]["--c-mine"], t.id).toBe(themes[t.id]["--c-bar"]);
     }
   });
 

@@ -8,7 +8,8 @@
    mientras se ajusta: al lado en el escritorio, justo encima en el teléfono.
    Al final y aparte, la cuenta (lo que no se cambia aquí) y «Cerrar sesión».
    Se guarda con `pilo_user_update_prefs`; «Guardar» aparece cuando hay algo
-   que guardar. El tema ya no está aquí: vive en Ajustes (el menú).
+   que guardar. El tema de la app (doce, en tres grupos) está aquí, bajo el
+   encabezado, y también en Ajustes (el menú).
 
    Sin cuenta: las dos preferencias de un visitante (cómo le dice y el tono),
    que quedan en este dispositivo, y lo que gana quien se registra.

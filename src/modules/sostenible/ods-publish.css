@@ -1,0 +1,20 @@
+/* Panel «Emitir edición» del boletín ODS. Solo tokens --o-* de .odsx. */
+.opp { border-top: 1px solid var(--o-line); padding-top: 16px; margin-top: 8px; display: grid; gap: 10px; }
+.opp-form { display: grid; gap: 10px; }
+.opp-field { display: grid; gap: 4px; font-size: 13px; color: var(--o-muted); }
+.opp-field input, .opp-field textarea {
+  font: inherit; color: var(--o-ink); background: var(--o-surface);
+  border: 1px solid var(--o-line); border-radius: 8px; padding: 8px 10px;
+}
+.opp-msg { margin: 0; padding: 8px 10px; border-radius: 8px; font-size: 13px; }
+.opp-msg--ok { background: var(--o-ok-soft); color: var(--o-ok); }
+.opp-msg--err { background: var(--o-rev-soft); color: var(--o-rev); }
+.opp-sub { margin: 8px 0 0; font-size: 14px; color: var(--o-ink); }
+.opp-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.opp-item { display: grid; gap: 8px; padding: 10px; background: var(--o-surface-2); border: 1px solid var(--o-line); border-radius: 10px; }
+.opp-info { display: grid; gap: 2px; font-size: 13px; color: var(--o-muted); }
+.opp-info b { color: var(--o-ink); }
+.opp-state { font-style: normal; font-size: 12px; font-weight: 600; }
+.opp-state--publicado { color: var(--o-ok); }
+.opp-state--retirado { color: var(--o-rev); }
+.opp-actions, .opp-confirm { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; font-size: 13px; color: var(--o-ink); }

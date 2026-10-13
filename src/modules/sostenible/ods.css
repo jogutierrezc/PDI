@@ -1,0 +1,242 @@
+/* =============================================================================
+   UDES Sostenible · informes ODS: tokens en claro y piezas compartidas.
+
+   `.odsx` no hereda el tema del sistema: las vistas de informes son de fondo
+   claro (portal, informe, presentación rectoral y boletín). Las vistas ponen
+   sus propias reglas en ods-report.css y ods-portal.css.
+   ========================================================================== */
+
+.odsx {
+  --o-bg: #f5f7fa;
+  --o-surface: #ffffff;
+  --o-surface-2: #eef2f7;
+  --o-ink: #14233b;
+  --o-muted: #566782;
+  --o-line: #dbe2ec;
+  --o-brand: #014898;
+  --o-brand-soft: #e5eefa;
+  --o-acc: #3f7e44;
+  --o-acc-deep: #2b5c30;
+  --o-acc-soft: #e8f2e9;
+  --o-ok: #1e7a4d;
+  --o-ok-soft: #e1f3e9;
+  --o-rev: #a86100;
+  --o-rev-soft: #fcefd9;
+  --o-falta: #b3342a;
+  --o-falta-soft: #fbe6e3;
+  --o-ease: cubic-bezier(0.23, 1, 0.32, 1);
+  color-scheme: light;
+  background: var(--o-bg);
+  color: var(--o-ink);
+  font-family: var(--font-sans);
+  font-size: 15px;
+  line-height: 1.6;
+  min-height: 60vh;
+}
+
+.odsx *,
+.odsx *::before,
+.odsx *::after {
+  box-sizing: border-box;
+}
+
+.odsx h1,
+.odsx h2,
+.odsx h3,
+.odsx p {
+  margin: 0;
+  color: inherit;
+}
+
+.odsx h1,
+.odsx h2,
+.odsx h3 {
+  font-family: var(--font-sans);
+  line-height: 1.15;
+  text-wrap: balance;
+}
+
+.odsx :focus-visible {
+  outline: 2px solid var(--o-brand);
+  outline-offset: 3px;
+  border-radius: 4px;
+}
+
+.odsx-wrap {
+  width: min(1180px, 100% - 32px);
+  margin-inline: auto;
+}
+
+.odsx-eyebrow {
+  font-size: 11.5px;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--o-acc-deep);
+}
+
+/* Barra de vistas */
+.odsx-bar {
+  background: color-mix(in srgb, var(--o-bg) 90%, transparent);
+  backdrop-filter: blur(10px);
+  border-bottom: 1px solid var(--o-line);
+}
+
+.odsx-bar__row {
+  display: flex;
+  align-items: center;
+  gap: 12px 20px;
+  flex-wrap: wrap;
+  min-height: 52px;
+  padding-block: 6px;
+}
+
+.odsx-back {
+  color: var(--o-muted);
+  font-size: 13px;
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.odsx-tabs {
+  display: flex;
+  gap: 4px;
+  margin-left: auto;
+  flex-wrap: wrap;
+}
+
+.odsx-tab {
+  padding: 8px 14px;
+  border-radius: 9px;
+  color: var(--o-muted);
+  font-size: 13.5px;
+  font-weight: 700;
+  text-decoration: none;
+  transition: color 0.15s ease, background-color 0.15s ease;
+}
+
+.odsx-tab[aria-current="page"] {
+  background: var(--o-acc);
+  color: #fff;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .odsx-tab:not([aria-current="page"]):hover,
+  .odsx-back:hover {
+    color: var(--o-ink);
+  }
+}
+
+/* Rótulos y botones */
+.odsx-ilus {
+  display: inline-flex;
+  align-items: center;
+  font-size: 11.5px;
+  font-weight: 700;
+  color: var(--o-rev);
+  background: var(--o-rev-soft);
+  padding: 3px 10px;
+  border-radius: 99px;
+  white-space: nowrap;
+}
+
+.odsx-chip {
+  display: inline-flex;
+  font-size: 11.5px;
+  font-weight: 800;
+  padding: 3px 10px;
+  border-radius: 99px;
+  white-space: nowrap;
+}
+.odsx-chip.ok { background: var(--o-ok-soft); color: var(--o-ok); }
+.odsx-chip.rev { background: var(--o-rev-soft); color: var(--o-rev); }
+.odsx-chip.falta { background: var(--o-falta-soft); color: var(--o-falta); }
+.odsx-chip.the { background: var(--o-brand-soft); color: var(--o-brand); }
+
+.odsx-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border: 1px solid var(--o-line);
+  background: var(--o-surface);
+  color: var(--o-ink);
+  border-radius: 10px;
+  padding: 8px 14px;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 700;
+  text-decoration: none;
+  cursor: pointer;
+  transition: transform 0.12s var(--o-ease), border-color 0.15s ease;
+}
+.odsx-btn:active { transform: scale(0.97); }
+.odsx-btn--pri { background: var(--o-acc); border-color: var(--o-acc); color: #fff; }
+.odsx-btn[disabled] { opacity: 0.5; cursor: not-allowed; }
+@media (hover: hover) and (pointer: fine) {
+  .odsx-btn:hover:not([disabled]) { border-color: var(--o-acc); }
+}
+
+.odsx-note {
+  font-size: 12.5px;
+  color: var(--o-muted);
+  line-height: 1.5;
+}
+
+@media (max-width: 760px) {
+  .odsx-tabs { margin-left: 0; width: 100%; }
+  .odsx-tab { flex: 1; text-align: center; padding-inline: 6px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .odsx * { transition-duration: 0.01ms !important; }
+}
+
+/* Entrada desde el micrositio de THE Impact Rankings (se ve dentro de `.sos`, no de `.odsx`) */
+.odsx-entry {
+  display: grid;
+  gap: 18px;
+}
+
+.odsx-entry__tiles {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(52px, 1fr));
+  gap: 8px;
+  max-width: 760px;
+}
+
+.odsx-entry__tile {
+  display: grid;
+  place-items: center;
+  aspect-ratio: 1;
+  border-radius: 12px;
+  background: var(--c);
+  color: #fff;
+  font-weight: 800;
+  font-size: 18px;
+  text-decoration: none;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.25);
+  transition: transform 0.16s cubic-bezier(0.23, 1, 0.32, 1), box-shadow 0.16s ease;
+}
+
+.odsx-entry__tile:active {
+  transform: scale(0.95);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .odsx-entry__tile:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 10px 22px color-mix(in srgb, var(--c) 35%, transparent);
+  }
+}
+
+.odsx-entry__acts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px 12px;
+  align-items: center;
+}
+
+.odsx-entry__ed {
+  font-size: 12.5px;
+  color: var(--ink-muted);
+}

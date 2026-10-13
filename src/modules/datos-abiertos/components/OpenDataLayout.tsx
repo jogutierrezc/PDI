@@ -9,6 +9,7 @@ import { useEffect } from "react";
 import type { ReactNode } from "react";
 import { Link } from "react-router-dom";
 import { SiteHeader } from "../../../components/layout/SiteHeader";
+import { SiteFooter } from "../../../components/layout/SiteFooter";
 import { useOpenDataCatalog, formatCutoff } from "../data/open-data";
 
 interface OpenDataLayoutProps {
@@ -58,29 +59,13 @@ export function OpenDataLayout({ children, title, className = "" }: OpenDataLayo
 
       <main id="contenido">{children}</main>
 
-      <footer className="od-footer">
-        <div className="u-container od-footer__inner">
-          <div className="od-footer__brand">
-            <strong>Universidad de Santander · UDES en Cifras</strong>
-            <span>Oficina de Planeación Institucional</span>
-            {catalog.data && (
-              <span>
-                Periodo {catalog.data.period?.label} · corte publicado el {formatCutoff(catalog.data.cutoffDate)}
-                {catalog.data.illustrative ? " · cifras ilustrativas" : ""}.
-              </span>
-            )}
-          </div>
-          <nav aria-label="Enlaces del pie">
-            <Link to="/datos-abiertos#informes">Informes</Link>
-            <Link to="/datos-abiertos/boletines">Boletines</Link>
-            <Link to="/datos-abiertos#lectura">Cómo leer las cifras</Link>
-            <Link to="/pdi">Portal PDI</Link>
-            <Link to="/">Planeación Institucional</Link>
-            <a href="mailto:planeacion@udes.edu.co">planeacion@udes.edu.co</a>
-          </nav>
-          <small>© {new Date().getFullYear()} Universidad de Santander. Datos publicados para consulta y reutilización citando la fuente.</small>
-        </div>
-      </footer>
+      <SiteFooter
+        note={
+          catalog.data
+            ? `Periodo ${catalog.data.period?.label} · corte del ${formatCutoff(catalog.data.cutoffDate)}${catalog.data.illustrative ? " · cifras ilustrativas" : ""}`
+            : undefined
+        }
+      />
     </div>
   );
 }

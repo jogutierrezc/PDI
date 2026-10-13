@@ -590,52 +590,6 @@
   }
 }
 
-.od-footer {
-  color: var(--od-board-muted);
-  background: var(--od-board);
-  border-top: 1px solid var(--od-board-line);
-}
-
-.od-footer__inner {
-  display: grid;
-  gap: var(--space-5);
-  padding-block: var(--space-8);
-}
-
-.od-footer__brand {
-  display: grid;
-  gap: var(--space-1);
-  font-size: var(--text-sm);
-}
-
-.od-footer__brand strong {
-  color: var(--od-board-ink);
-  font-family: var(--font-sign); font-stretch: var(--sign-stretch);
-  font-size: 1.15rem;
-  font-weight: 600;
-  letter-spacing: 0.02em;
-  text-transform: uppercase;
-}
-
-.od-footer nav {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--space-2) var(--space-6);
-}
-
-.od-footer nav a {
-  color: var(--od-board-ink);
-  font-size: var(--text-sm);
-  font-weight: 600;
-  text-decoration: none;
-}
-
-.od-footer small { font-size: var(--text-xs); }
-
-@media (hover: hover) and (pointer: fine) {
-  .od-footer nav a:hover { color: var(--od-signal-text); }
-}
-
 /* =============================================================================
    Portada · vídeo y llegadas
    ========================================================================== */

@@ -75,6 +75,13 @@ const StructureNormalize = lazy(() =>
     default: m.StructureNormalize,
   })),
 );
+const SostenibleHome = lazy(() => import("./modules/sostenible/SostenibleHome").then((m) => ({ default: m.SostenibleHome })));
+const SostenibleRanking = lazy(() => import("./modules/sostenible/SostenibleRanking").then((m) => ({ default: m.SostenibleRanking })));
+const OdsPortal = lazy(() => import("./modules/sostenible/OdsPortal").then((m) => ({ default: m.OdsPortal })));
+const OdsReport = lazy(() => import("./modules/sostenible/OdsReport").then((m) => ({ default: m.OdsReport })));
+const OdsRector = lazy(() => import("./modules/sostenible/OdsRector").then((m) => ({ default: m.OdsRector })));
+const OdsBulletin = lazy(() => import("./modules/sostenible/OdsBulletin").then((m) => ({ default: m.OdsBulletin })));
+const SostenibleCategory =lazy(() => import("./modules/sostenible/SostenibleRanking").then((m) => ({ default: m.SostenibleCategory })));
 const OpenDataPortal = lazy(() =>
   import("./modules/datos-abiertos/OpenDataPortal").then((m) => ({ default: m.OpenDataPortal })),
 );
@@ -284,6 +291,13 @@ export default function App() {
           {/* El tablero de una unidad: misma dirección sea privado o público.
               Lo que cambia es a quién le responde la base, no la ruta. */}
           <Route path="/tableros/:unidad/:tablero" element={<BoardPage />} />
+          <Route path="/sostenible" element={<SostenibleHome />} />
+          <Route path="/sostenible/impact/informes" element={<OdsPortal />} />
+          <Route path="/sostenible/impact/informes/ods/:n" element={<OdsReport />} />
+          <Route path="/sostenible/impact/rector" element={<OdsRector />} />
+          <Route path="/sostenible/impact/boletin" element={<OdsBulletin />} />
+          <Route path="/sostenible/:ranking" element={<SostenibleRanking />} />
+          <Route path="/sostenible/:ranking/:categoria" element={<SostenibleCategory />} />
           <Route path="/datos-abiertos" element={<OpenDataPortal />} />
           <Route path="/datos-abiertos/observatorio" element={<ObservatoryHub />} />
           <Route path="/datos-abiertos/observatorio/:tema" element={<ObservatoryTopic />} />

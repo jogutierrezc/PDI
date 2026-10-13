@@ -156,7 +156,6 @@
 .pl-page :is(a, button, input):focus-visible { outline: 2px solid var(--brand-blue); outline-offset: 2px; }
 /* Sobre marino el azul institucional no se ve: el foco va en azul claro. */
 .pl-hero :is(a, button):focus-visible,
-.pl-footer a:focus-visible,
 .pl-tile--cifras :is(a, button):focus-visible,
 .pl-tile--obs a:focus-visible { outline-color: var(--pl-on-navy-3); }
 
@@ -734,19 +733,6 @@
 .pl-people li > span:last-child { display: grid; gap: 1px; }
 .pl-people small { color: var(--ink-muted); }
 
-/* --- Pie ------------------------------------------------------------------------------------ */
-
-.pl-footer { margin-top: auto; padding: 56px 0 40px; color: var(--pl-on-navy-2); background: var(--pl-night); font-size: var(--text-sm); line-height: 1.7; }
-.pl-footer__grid { display: grid; grid-template-columns: 2fr 1fr 1fr; gap: var(--space-7); }
-.pl-footer__brand { display: grid; gap: var(--space-2); align-content: start; }
-.pl-footer__brand img { justify-self: start; height: 40px; width: auto; padding: 6px 10px; background: #ffffff; border-radius: 8px; }
-.pl-footer__brand strong { color: #ffffff; font-family: var(--font-display); font-size: 1.25rem; font-weight: 600; }
-.pl-footer nav { display: grid; gap: 4px; align-content: start; }
-.pl-footer nav strong { color: #ffffff; }
-.pl-footer a { color: var(--pl-on-navy-2); text-decoration: none; }
-.pl-footer a:hover { color: #ffffff; text-decoration: underline; }
-.pl-footer__legal { grid-column: 1 / -1; padding-top: var(--space-5); color: #8ea6c8; border-top: 1px solid rgba(255, 255, 255, 0.12); font-size: var(--text-xs); }
-
 /* --- Adaptación ------------------------------------------------------------------------------- */
 
 @media (max-width: 1180px) {
@@ -827,8 +813,6 @@
   .pl-recent li a { grid-column: 1 / -1; }
   .pl-recent li > svg { display: none; }
   .pl-area-list { grid-template-columns: minmax(0, 1fr); }
-  .pl-footer__grid { grid-template-columns: 1fr 1fr; }
-  .pl-footer__brand { grid-column: 1 / -1; }
 }
 
 @media (prefers-reduced-motion: reduce) {

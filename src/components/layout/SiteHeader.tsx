@@ -22,6 +22,7 @@ import { Icon } from "../ui/Icon";
 import { useTheme } from "../../lib/theme";
 import { INTRANET_HOME, useAuth } from "../../lib/auth";
 import { SessionMenu } from "./SessionMenu";
+import { UdesLogo } from "./UdesLogo";
 import { useIntranetLinks } from "./intranet-links";
 import type { PortalId } from "./MegaPanel";
 import "./site-header.css";
@@ -176,7 +177,7 @@ export function SiteHeader({ onSearch }: { onSearch?: () => void }) {
     <header ref={header} className="sh" data-open={open ?? undefined} data-compact={compact || undefined} onPointerLeave={() => finePointer && open && later(null, CLOSE_DELAY)} onPointerEnter={() => window.clearTimeout(timer.current)}>
       <div ref={bar} className="sh-bar">
         <Link className="sh-brand" to="/" aria-label="Planeación Institucional, inicio">
-          <img src="/logo-udes.svg" alt="" width={95} height={34} decoding="async" />
+          <UdesLogo height={38} decorative />
           <span>
             <strong>Planeación Institucional</strong>
             <small>Universidad de Santander</small>
@@ -209,6 +210,9 @@ export function SiteHeader({ onSearch }: { onSearch?: () => void }) {
               </button>
             );
           })}
+          <NavLink to="/sostenible" className="sh-nav__link">
+            UDES Sostenible
+          </NavLink>
           <NavLink to="/datos-abiertos/boletines" className="sh-nav__link">
             Boletines
           </NavLink>
@@ -275,6 +279,9 @@ export function SiteHeader({ onSearch }: { onSearch?: () => void }) {
             </Link>
             <Link to="/equipo" onClick={close}>
               La oficina
+            </Link>
+            <Link to="/sostenible" onClick={close}>
+              UDES Sostenible
             </Link>
             <Link to="/datos-abiertos/boletines" onClick={close}>
               Boletines

@@ -1,0 +1,261 @@
+/* =============================================================================
+   Pie de página único · gris claro, logo suelto, entrada escalonada.
+
+   El fondo sale de mezclar un poco de tinta con la superficie: gris claro en el
+   tema claro y gris azulado en el oscuro, sin color escrito a mano. Solo se
+   anima transform, opacidad y el barrido del filete superior.
+   ========================================================================== */
+
+.sf {
+  position: relative;
+  margin-top: auto;
+  color: var(--ink-secondary);
+  background: color-mix(in srgb, var(--ink) 7%, var(--surface));
+  border-top: 1px solid var(--line);
+  font-size: var(--text-sm);
+  line-height: var(--leading-relaxed);
+}
+
+/* El filete: un barrido lento entre los colores del portal. */
+.sf::before {
+  content: "";
+  position: absolute;
+  inset: -1px 0 auto;
+  height: 3px;
+  background: linear-gradient(90deg, var(--brand-blue), var(--brand-teal), var(--pillar-5), var(--brand-teal), var(--brand-blue));
+  background-size: 300% 100%;
+  animation: sf-sweep 16s linear infinite;
+}
+
+@keyframes sf-sweep {
+  to {
+    background-position: -300% 0;
+  }
+}
+
+.sf-wrap {
+  width: min(var(--content-max), 100% - 2 * var(--gutter));
+  margin-inline: auto;
+}
+
+.sf-main {
+  display: grid;
+  grid-template-columns: 1.7fr 1fr 1fr;
+  gap: var(--space-9);
+  padding-block: var(--space-10) var(--space-7);
+}
+
+/* Entrada: cada bloque sube y aparece con un retraso corto. */
+.sf[data-seen="false"] .sf-r {
+  opacity: 0;
+  transform: translateY(14px);
+}
+
+.sf-r {
+  transition: opacity 420ms var(--ease-out), transform 420ms var(--ease-out);
+  transition-delay: calc(var(--i, 0) * 70ms);
+}
+
+/* Marca y contacto */
+.sf-brand {
+  display: grid;
+  gap: var(--space-4);
+  align-content: start;
+  justify-items: start;
+}
+
+.sf-tag {
+  display: grid;
+  gap: 2px;
+  max-width: 38ch;
+  color: var(--ink-secondary);
+  line-height: var(--leading-normal);
+}
+
+.sf-tag strong {
+  line-height: var(--leading-snug);
+  color: var(--ink);
+  font-family: var(--font-display);
+  font-size: var(--text-md);
+  font-weight: 700;
+}
+
+.sf-contact {
+  display: grid;
+  gap: var(--space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.sf-contact li {
+  display: grid;
+  grid-template-columns: 18px 1fr;
+  gap: var(--space-3);
+  align-items: start;
+}
+
+.sf-contact svg {
+  margin-top: 4px;
+  color: var(--brand-blue-strong);
+}
+
+.sf-contact a {
+  color: inherit;
+  text-decoration: none;
+  overflow-wrap: anywhere;
+}
+
+.sf-note {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: 6px 12px;
+  border-radius: var(--radius-pill);
+  border: 1px solid var(--line);
+  background: var(--surface);
+  color: var(--ink-secondary);
+  font-size: var(--text-xs);
+  font-weight: 600;
+}
+
+.sf-note::before {
+  content: "";
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--status-done);
+}
+
+/* Columnas de enlaces */
+.sf-col {
+  display: grid;
+  gap: 0;
+  align-content: start;
+}
+
+.sf-h {
+  margin: 0 0 var(--space-3);
+  color: var(--ink-muted);
+  font-family: var(--font-sans);
+  font-size: var(--text-xs);
+  font-weight: 700;
+  letter-spacing: var(--tracking-caps);
+  text-transform: uppercase;
+}
+
+.sf-link {
+  width: fit-content;
+  padding-block: 6px;
+  color: var(--ink-secondary);
+  text-decoration: none;
+  font-weight: 600;
+  background: linear-gradient(currentColor, currentColor) 0 calc(100% - 4px) / 0 1.5px no-repeat;
+  transition: color var(--dur-fast) ease, background-size 240ms var(--ease-out);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .sf-link:hover,
+  .sf-contact a:hover {
+    color: var(--brand-blue-strong);
+  }
+  .sf-link:hover {
+    background-size: 100% 1.5px;
+  }
+}
+
+@media (pointer: coarse) {
+  .sf-link {
+    padding-block: 11px;
+  }
+}
+
+.sf a:focus-visible,
+.sf button:focus-visible {
+  outline: 2px solid var(--brand-blue-strong);
+  outline-offset: 3px;
+  border-radius: var(--radius-xs);
+}
+
+/* Barra final */
+.sf-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-5);
+  padding-block: var(--space-5) var(--space-6);
+  border-top: 1px solid var(--line);
+  color: var(--ink-muted);
+  font-size: var(--text-xs);
+}
+
+.sf-top {
+  --p: 0;
+  position: relative;
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  color: var(--brand-blue-strong);
+  background: conic-gradient(var(--brand-blue-strong) calc(var(--p) * 1%), var(--track) 0);
+  cursor: pointer;
+  transition: transform var(--dur-press) var(--ease-out);
+}
+
+.sf-top::before {
+  content: "";
+  position: absolute;
+  inset: 3px;
+  border-radius: 50%;
+  background: var(--surface);
+}
+
+.sf-top svg {
+  position: relative;
+  transition: transform var(--dur-base) var(--ease-out);
+}
+
+.sf-top:active {
+  transform: scale(0.95);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .sf-top:hover svg {
+    transform: translateY(-2px);
+  }
+}
+
+@media (max-width: 900px) {
+  .sf-main {
+    grid-template-columns: 1fr 1fr;
+    gap: var(--space-8) var(--space-7);
+    padding-block: var(--space-9) var(--space-6);
+  }
+  .sf-brand {
+    grid-column: 1 / -1;
+  }
+}
+
+@media (max-width: 520px) {
+  .sf-main {
+    grid-template-columns: 1fr;
+  }
+  .sf-bar {
+    align-items: flex-start;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sf::before {
+    animation: none;
+  }
+  .sf-r,
+  .sf-link,
+  .sf-top,
+  .sf-top svg {
+    transition-duration: 0.01ms;
+    transition-delay: 0s;
+  }
+}

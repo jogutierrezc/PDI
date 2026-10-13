@@ -57,6 +57,7 @@ export const SCREEN_PATHS: Record<AdminScreen, string> = {
   reportes: "/admin/reportes-institucionales",
   correos: "/admin/correos",
   rutas: "/admin/rutas",
+  rankings: "/admin/rankings",
 };
 
 export interface AuthContextValue {
@@ -114,6 +115,8 @@ export function screenVisible(
   if (screen === "correos") return RANK[profile.role] >= RANK.planeacion;
   // Rutas del bus: solo por el rol, como en la base (0139).
   if (screen === "rutas") return RANK[profile.role] >= RANK.planeacion;
+  // Rankings (THE, UI GreenMetric y el recolector de noticias): solo por el rol, como en la base (0143).
+  if (screen === "rankings") return RANK[profile.role] >= RANK.planeacion;
   // Mis Tableros se gana perteneciendo a una unidad, no marcándolo aparte.
   if (screen === "tableros" && inAnyUnit) return true;
   // Impacto, solo a quien tiene algo que hacer en él: un programa o una

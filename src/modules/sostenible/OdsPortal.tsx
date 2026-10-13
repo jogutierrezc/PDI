@@ -23,6 +23,7 @@ import gsap from "gsap";
 import { Flip } from "gsap/Flip";
 import { useGSAP } from "@gsap/react";
 import { OdsShell } from "./OdsShell";
+import { contarPorOds, useApprovedNews } from "../rankings/noticias";
 import { ODS_EDITIONS, ODS_LIST, ODS_PUBLIC, ODS_ROUTES, RECTOR, STATUS_LABEL, odsArt, odsEdition, odsPct, odsStatus, odsTotals } from "./ods-data";
 import { odsOn, odsTone } from "./OdsArt";
 import { OdsBulletinDownload } from "./OdsBulletinDownload";
@@ -53,6 +54,8 @@ const matches = (o: Ods, filter: Filter, q: string) => {
 const sizeOf = (o: Ods): WallSize => (o.the && o.real ? "xl" : o.the ? "w" : "s");
 
 export function OdsPortal() {
+  const noticias = useApprovedNews();
+  const notas = useMemo(() => contarPorOds(noticias.data ?? []), [noticias.data]);
   const [params, setParams] = useSearchParams();
   const edition = odsEdition(params.get("edicion"));
   const [filter, setFilter] = useState<Filter>("all");
@@ -269,15 +272,17 @@ export function OdsPortal() {
               four={layout.four.get(o.n)}
               two={layout.two.get(o.n)}
               included={isIncluded(o.n)}
+              news={notas[o.n] ?? 0}
               onToggle={() => toggle(o.n)}
             />
           ))}
         </ol>
-        {shown.length === 0 && <p className="odsx-wrap opt-empty">Ningún informe coincide con la búsqueda.</p>}
-
-        <p className="odsx-wrap odsx-note opt-foot">
-          <span className="odsx-ilus">Dato ilustrativo</span> La selección de THE y las cifras de los ODS distintos del 4 y el 13 son de muestra.
-        </p>
+        <div className="odsx-wrap">
+          {shown.length === 0 && <p className="opt-empty">Ningún informe coincide con la búsqueda.</p>}
+          <p className="odsx-note opt-foot">
+            <span className="odsx-ilus">Dato ilustrativo</span> La selección de THE y las cifras de los ODS distintos del 4 y el 13 son de muestra.
+          </p>
+        </div>
       </div>
     </OdsShell>
   );
@@ -291,6 +296,7 @@ function OdsPortalPoster({
   four,
   two,
   included,
+  news,
   onToggle,
 }: {
   o: Ods;
@@ -298,6 +304,7 @@ function OdsPortalPoster({
   four?: WallSlot;
   two?: WallSlot;
   included: boolean;
+  news: number;
   onToggle: () => void;
 }) {
   const off = !four;
@@ -338,6 +345,7 @@ function OdsPortalPoster({
           <span className="opt-card__line">
             {line}
             {o.the && <> · Para THE</>}
+            {edition === 2025 && news > 0 && <> · {news === 1 ? "1 noticia" : `${news} noticias`}</>}
           </span>
         </span>
         <span className="opt-card__slip">

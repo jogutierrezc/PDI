@@ -50,7 +50,8 @@ export type AdminSection =
   | "pilo_ensenanza"
   | "reportes"
   | "correos"
-  | "rutas";
+  | "rutas"
+  | "rankings";
 
 export interface NavItem {
   id: AdminSection;
@@ -62,7 +63,7 @@ export interface NavItem {
 }
 
 export interface NavGroup {
-  id: "planeacion" | "pdi" | "cifras" | "observatorio" | "impacto" | "tableros" | "reportes" | "sistema";
+  id: "planeacion" | "pdi" | "cifras" | "observatorio" | "impacto" | "tableros" | "reportes" | "rankings" | "sistema";
   label: string;
   /** Ícono y nombre corto: el riel solo tiene 78 px, ahí no cabe el rótulo largo. */
   icon: IconName;
@@ -156,6 +157,18 @@ export const navigation: NavGroup[] = [
     label: "Reportes Institucionales",
     items: [
       { id: "reportes", label: "SNIES y CNA", icon: "table", to: "/admin/reportes-institucionales", minimum: "consulta" },
+    ],
+  },
+  {
+    // Lo que la Universidad le muestra al mundo: THE Impact Rankings, THE World University
+    // Rankings y UI GreenMetric, más el recolector que busca en las noticias de la UDES
+    // lo que cada ODS puede mostrar como evidencia.
+    id: "rankings",
+    icon: "chart",
+    short: "Rankings",
+    label: "Rankings",
+    items: [
+      { id: "rankings", label: "Tablero de rankings", icon: "chart", to: "/admin/rankings", minimum: "planeacion" },
     ],
   },
   {

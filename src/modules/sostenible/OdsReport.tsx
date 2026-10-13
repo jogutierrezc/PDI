@@ -37,6 +37,7 @@ import { OdsShell } from "./OdsShell";
 import { OdsBulletinDownloadLink } from "./OdsBulletinDownload";
 import { EVIDENCE_LABEL, ODS13, ODS_EDITIONS, ODS_PUBLIC, ODS_ROUTES, STATUS_LABEL, odsArt, odsByNumber, odsEdition, odsEvidenceTotals, odsPct, odsStatus } from "./ods-data";
 import type { Bi, Ods, OdsEdition } from "./ods-data";
+import { OdsNews } from "./OdsNews";
 import { Arrow, Counter, CutFilter, OdsReportIntro, OdsReportVideo, PlayMark, Words, fmtN, introSeen, parseFigure } from "./OdsReportParts";
 import { OdsArtStrip, odsArtSize, odsOn, odsTone } from "./OdsArt";
 import type { Lang } from "./OdsReportParts";
@@ -565,6 +566,9 @@ function ReportView({ o, edition }: { o: Ods; edition: OdsEdition }) {
         ) : (
           <GenericSections o={o} published={published} />
         )}
+
+        {/* Las notas de udes.edu.co que Planeación aprobó para este ODS (solo la edición 2025: son noticias de 2025). */}
+        {edition === 2025 && <OdsNews n={o.n} />}
 
         {/* ODS anterior y siguiente: el cartel vecino asoma */}
         <nav className={`ors-pager${prev && next ? "" : " ors-pager--one"}`} aria-label={tx("Otros informes ODS", "Other SDG reports")}>

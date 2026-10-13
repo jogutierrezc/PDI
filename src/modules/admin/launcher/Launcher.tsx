@@ -38,6 +38,7 @@ const GROUP_TEXT: Record<NavGroup["id"], string> = {
   impacto: "Los indicadores de impacto, sus metas y sus cifras",
   tableros: "Los tableros de datos de sus unidades",
   reportes: "Las plantillas SNIES por periodo: captura, validación y envío",
+  rankings: "THE, UI GreenMetric y el recolector de noticias por ODS",
   sistema: "Estructura, usuarios, parámetros, correos y traslado de datos",
 };
 

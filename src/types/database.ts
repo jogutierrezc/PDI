@@ -58,7 +58,8 @@ export type AdminScreen =
   | "pilo_ensenanza"
   | "reportes"
   | "correos"
-  | "rutas";
+  | "rutas"
+  | "rankings";
 
 /** Un rol de acceso: qué puede hacer, qué pantallas ve y sobre qué informes escribe. */
 export interface AccessRole {

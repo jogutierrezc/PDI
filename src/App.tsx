@@ -77,6 +77,7 @@ const StructureNormalize = lazy(() =>
 );
 const SostenibleHome = lazy(() => import("./modules/sostenible/SostenibleHome").then((m) => ({ default: m.SostenibleHome })));
 const SostenibleRanking = lazy(() => import("./modules/sostenible/SostenibleRanking").then((m) => ({ default: m.SostenibleRanking })));
+const RankingsAdmin = lazy(() => import("./modules/rankings/RankingsAdmin").then((m) => ({ default: m.RankingsAdmin })));
 const OdsPortal = lazy(() => import("./modules/sostenible/OdsPortal").then((m) => ({ default: m.OdsPortal })));
 const OdsReport = lazy(() => import("./modules/sostenible/OdsReport").then((m) => ({ default: m.OdsReport })));
 const OdsRector = lazy(() => import("./modules/sostenible/OdsRector").then((m) => ({ default: m.OdsRector })));
@@ -617,6 +618,15 @@ export default function App() {
             element={
               <RequireRole minimum="planeacion" screen="rutas">
                 <Rutas />
+              </RequireRole>
+            }
+          />
+
+          <Route
+            path="/admin/rankings/:seccion?"
+            element={
+              <RequireRole minimum="planeacion" screen="rankings">
+                <RankingsAdmin />
               </RequireRole>
             }
           />

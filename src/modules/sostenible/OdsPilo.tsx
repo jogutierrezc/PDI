@@ -7,14 +7,19 @@
    pieza como vista previa, con los datos del borrador y sin movimiento.
 
      tesis          una frase grande, condensada
-     cifras         tipografía en la rejilla de 12 columnas
+     cifras         tipografía; en los ODS con cifras reales de ods-data.ts
+                    (hoy 4 y 13) mandan esas; en los demás, el bloque «cifras»
      portada        la fotografía ancha (recorte 3:1 o 16:9), a sangre
-     relato         una columna de texto justificado (≈66 caracteres) con las
-                    fotografías y las demás cifras en el margen; cada párrafo
-                    lleva referencias numeradas que llevan a la nota del carrusel
+     relato         subtítulos temáticos y una columna de texto justificado
+                    (≈66 caracteres) con las fotografías y las demás cifras en
+                    el margen; referencias numeradas que llevan al carrusel
      galería        rejilla con el recorte de cada foto (4:3 o 1:1)
      proyectos      rejilla
      viene          bloque a sangre del color del ODS
+     registro       todas las notas del ODS (OdsRegistro)
+
+   Español e inglés: cada párrafo en el idioma pedido (text_en, heading_en);
+   si falta el inglés, el español con la marca «ES», nunca un hueco.
 
    Movimiento (solo en el portal): cortina del color sobre la portada, titulares
    por líneas enmascaradas, entrada al hacer scroll y cifras que cuentan. Todo
@@ -22,18 +27,23 @@
    `clearProps: "all"` (borraría las variables de color en línea).
    ========================================================================== */
 
-import { useRef } from "react";
+import { Fragment, useRef } from "react";
 import type { ReactNode } from "react";
 import gsap from "gsap";
 import { ScrollTrigger } from "gsap/ScrollTrigger";
 import { useGSAP } from "@gsap/react";
-import type { InformePublico, RanuraFoto, Seccion } from "../rankings/informes/tipos";
+import type { Cifra as CifraT, InformePublico, RanuraFoto, Seccion } from "../rankings/informes/tipos";
+import { textoEnIdioma } from "../rankings/informes/pagina";
 import { estiloRecorte, numerarReferencias } from "../rankings/informes/recorte";
-import { useApprovedNews } from "../rankings/noticias";
 import { odsArt } from "./ods-data";
 import type { Ods } from "./ods-data";
 import { odsArtSize } from "./OdsArt";
 import { Words, fmtN, parseFigure } from "./OdsReportParts";
+import { useNoticiasPublicas } from "./ods-noticias";
+import { ODS_CIFRAS_EN, tr } from "./i18n";
+import type { Lang } from "./i18n";
+import { MarcaEs } from "./LangSwitch";
+import { OdsRegistro } from "./OdsRegistro";
 import { reduced } from "./widgets";
 import "./ods-report.css";
 import "./ods-pilo.css";
@@ -44,7 +54,7 @@ gsap.registerPlugin(useGSAP);
 type BloquePub = InformePublico["bloques"][number];
 type FotoPub = InformePublico["fotos"][number];
 
-/** Lo que el informe necesita de cada nota: su imagen y, para el pie, su título. */
+/** Lo que el informe necesita de cada nota: su imagen (si la foto no trae la suya) y, para el alt, su título. */
 export interface NotaInforme {
   id: string;
   image_url: string | null;
@@ -55,14 +65,15 @@ const porPos = (a: BloquePub, b: BloquePub) => a.pos - b.pos;
 const deSeccion = (inf: InformePublico, sec: Seccion) => inf.bloques.filter((b) => b.sec === sec && b.text.trim()).sort(porPos);
 
 /** Secciones que el informe tiene, para la barra de OdsReport: [id sin «ors-», rótulo]. */
-export function seccionesPilo(inf: InformePublico | null | undefined, soloRelato = false): [string, string][] {
+export function seccionesPilo(inf: InformePublico | null | undefined, soloRelato = false, lang: Lang = "es"): [string, string][] {
   if (!inf) return [];
   const s: [string, string][] = [];
   const figs = inf.bloques.some((b) => b.sec === "cifras" && b.figs.length) || deSeccion(inf, "tesis").length > 0;
-  if (!soloRelato && figs) s.push(["cifras", "Cifras"]);
-  if (deSeccion(inf, "hicimos").length) s.push(["relato", "Qué hicimos"]);
-  if (!soloRelato && deSeccion(inf, "proyectos").length) s.push(["proyectos", "Proyectos"]);
-  if (!soloRelato && deSeccion(inf, "viene").length) s.push(["viene", "Lo que viene"]);
+  if (!soloRelato && figs) s.push(["cifras", tr(lang, "sec_cifras")]);
+  if (deSeccion(inf, "hicimos").length) s.push(["relato", tr(lang, "sec_relato")]);
+  if (!soloRelato && deSeccion(inf, "proyectos").length) s.push(["proyectos", tr(lang, "sec_proyectos")]);
+  if (!soloRelato && deSeccion(inf, "viene").length) s.push(["viene", tr(lang, "sec_viene")]);
+  if (inf.registro?.length) s.push(["registro", tr(lang, "sec_registro")]);
   return s;
 }
 
@@ -73,43 +84,85 @@ export function partirProyecto(t: string): { nombre: string; texto: string } {
   return { nombre: t.slice(0, i), texto: t.slice(i + 2) };
 }
 
+/**
+ * Las cifras grandes del informe: en un ODS con cifras reales en ods-data.ts
+ * (hoy el 4 y el 13) mandan esas; en los demás, las del bloque «cifras».
+ */
+export function cifrasDelInforme(o: Ods, inf: InformePublico, lang: Lang): { grandes: CifraT[]; margen: CifraT[] } {
+  const delBloque = inf.bloques
+    .filter((b) => b.sec === "cifras")
+    .sort(porPos)
+    .flatMap((b) => b.figs)
+    .filter((f) => f.v);
+  if (!o.real) return { grandes: delBloque.slice(0, 2), margen: delBloque.slice(2) };
+  const grandes = o.figures.map((f, i) => {
+    const en = ODS_CIFRAS_EN[o.n - 1]?.[i];
+    const [unit, label] = lang === "en" && en ? en : [f.unit, f.label];
+    return { v: f.value, label: `${unit} ${label}`.trim(), src: lang === "en" ? "2025 report" : "Informe 2025" };
+  });
+  const usadas = new Set(grandes.map((g) => g.v.replace(/\s/g, "")));
+  return { grandes, margen: delBloque.filter((f) => !usadas.has(f.v.replace(/\s/g, ""))) };
+}
+
+/** Un texto del informe en el idioma pedido, con la marca «ES» si falta el inglés. */
+function Texto({ b, lang }: { b: Pick<BloquePub, "text" | "text_en">; lang: Lang }) {
+  const t = textoEnIdioma(b, lang);
+  return (
+    <span lang={t.idioma}>
+      {t.texto}
+      {lang === "en" && t.idioma === "es" && (
+        <>
+          {" "}
+          <MarcaEs lang={lang} />
+        </>
+      )}
+    </span>
+  );
+}
+
 /* ---------- Piezas ------------------------------------------------------------- */
 
-function Titular({ id, text }: { id: string; text: string }) {
+function Titular({ id, text, lang }: { id: string; text: string; lang?: string }) {
   return (
-    <h2 id={id} className="opi-h2" aria-label={text}>
+    <h2 id={id} className="opi-h2" aria-label={text} lang={lang}>
       <Words text={text} cls="opi-w" />
     </h2>
   );
 }
 
 /** Una cifra que cuenta al entrar (en reposo ya muestra el valor final). */
-function Cifra({ v }: { v: string }) {
+function Cifra({ v, lang }: { v: string; lang: Lang }) {
   const p = parseFigure(v);
   if (!p) return <>{v}</>;
   return (
     <>
       {p.before}
-      <span className="opi-cnt" data-to={p.to} data-dec={p.decimals}>
-        {fmtN(p.to, "es", p.decimals)}
+      <span className="opi-cnt" data-to={p.to} data-dec={p.decimals} data-lang={lang}>
+        {fmtN(p.to, lang, p.decimals)}
       </span>
       {p.after}
     </>
   );
 }
 
-function Foto({ f, nota, slot, className, cortina }: { f: FotoPub; nota?: NotaInforme; slot: RanuraFoto; className: string; cortina?: boolean }) {
-  if (!nota?.image_url) return null;
+function Foto({ f, nota, slot, className, cortina, lang }: { f: FotoPub; nota?: NotaInforme; slot: RanuraFoto; className: string; cortina?: boolean; lang: Lang }) {
+  const src = f.url || nota?.image_url;
+  if (!src) return null;
   return (
     <figure className={className}>
       <div className="opi-frame">
-        <img src={nota.image_url} alt={f.alt || f.caption || nota.title} style={estiloRecorte(f.crop, slot)} loading="lazy" decoding="async" referrerPolicy="no-referrer" />
+        <img src={src} alt={f.alt || f.caption || nota?.title || ""} lang="es" style={estiloRecorte(f.crop, slot)} loading="lazy" decoding="async" referrerPolicy="no-referrer" />
         {cortina && <span className="opi-curtain" aria-hidden="true" />}
       </div>
       {(f.caption || f.credit) && (
         <figcaption>
-          {f.caption}
-          {f.credit && <span className="opi-credit"> Foto: {f.credit}</span>}
+          <span lang="es">{f.caption}</span>
+          {f.credit && (
+            <span className="opi-credit">
+              {" "}
+              {tr(lang, "foto")}: <span lang="es">{f.credit}</span>
+            </span>
+          )}
         </figcaption>
       )}
     </figure>
@@ -122,40 +175,41 @@ export function OdsPiloCuerpo({
   o,
   informe,
   notas,
+  lang = "es",
   animar = true,
   soloRelato = false,
 }: {
   o: Ods;
   informe: InformePublico;
   notas: NotaInforme[];
+  lang?: Lang;
   animar?: boolean;
   soloRelato?: boolean;
 }) {
   const scope = useRef<HTMLDivElement>(null);
   const edicion = informe.informe.edition;
   const nota = new Map(notas.map((n) => [n.id, n]));
-  const fotos = informe.fotos.filter((f) => nota.get(f.news_id)?.image_url);
+  const fotos = informe.fotos.filter((f) => f.url || nota.get(f.news_id)?.image_url);
   const enRanura = (s: RanuraFoto) => fotos.find((f) => f.slot === s);
   const galeria = fotos.filter((f) => f.slot === "galeria");
 
   const tesis = deSeccion(informe, "tesis");
   const cifrasB = informe.bloques.filter((b) => b.sec === "cifras").sort(porPos);
-  const figs = cifrasB.flatMap((b) => b.figs).filter((f) => f.v);
+  const { grandes, margen } = cifrasDelInforme(o, informe, lang);
   const notaCifras = cifrasB.filter((b) => b.text.trim() && !b.figs.length);
-  const grandes = figs.slice(0, 2);
-  const margen = figs.slice(2);
   const hicimos = deSeccion(informe, "hicimos");
   const proyectos = deSeccion(informe, "proyectos");
   const viene = deSeccion(informe, "viene");
   const refs = numerarReferencias(hicimos);
+  const idDe = new Map([...refs.entries()].map(([id, k]) => [k, id]));
 
   /* Al margen del relato: la foto 1 junto al segundo párrafo, la 2 junto al cuarto, y las cifras que sobran en los demás. */
   const margenDe = new Map<number, ReactNode[]>();
   const poner = (i: number, n: ReactNode) => margenDe.set(i, [...(margenDe.get(i) ?? []), n]);
   const n1 = enRanura("n1");
   const n2 = enRanura("n2");
-  if (n1) poner(Math.min(1, hicimos.length - 1), <Foto key="n1" f={n1} nota={nota.get(n1.news_id)} slot="n1" className="opi-shot opi-rise" />);
-  if (n2) poner(Math.min(3, hicimos.length - 1), <Foto key="n2" f={n2} nota={nota.get(n2.news_id)} slot="n2" className="opi-shot opi-rise" />);
+  if (n1) poner(Math.min(1, hicimos.length - 1), <Foto key="n1" f={n1} nota={nota.get(n1.news_id)} slot="n1" className="opi-shot opi-rise" lang={lang} />);
+  if (n2) poner(Math.min(3, hicimos.length - 1), <Foto key="n2" f={n2} nota={nota.get(n2.news_id)} slot="n2" className="opi-shot opi-rise" lang={lang} />);
   const libres = hicimos.map((_, i) => i).filter((i) => !margenDe.has(i));
   margen.forEach((f, k) => {
     const i = libres[k % Math.max(1, libres.length)] ?? 0;
@@ -163,9 +217,9 @@ export function OdsPiloCuerpo({
       i,
       <div key={`f${k}`} className="opi-mfig opi-rise">
         <b>
-          <Cifra v={f.v} />
+          <Cifra v={f.v} lang={lang} />
         </b>
-        <span>{f.label}</span>
+        <span lang="es">{f.label}</span>
       </div>,
     );
   });
@@ -183,7 +237,8 @@ export function OdsPiloCuerpo({
       });
       /* Titulares por líneas enmascaradas. */
       q(".opi-h2").forEach((h) => {
-        gsap.fromTo(h.querySelectorAll(".opi-w"), { yPercent: 110 }, { yPercent: 0, duration: 0.6, ease: "power4.out", stagger: 0.025, clearProps: "transform", scrollTrigger: { trigger: h, start: "top 88%", once: true } });
+        const w = h.querySelectorAll(".opi-w");
+        if (w.length) gsap.fromTo(w, { yPercent: 110 }, { yPercent: 0, duration: 0.6, ease: "power4.out", stagger: 0.025, clearProps: "transform", scrollTrigger: { trigger: h, start: "top 88%", once: true } });
       });
       /* Entrada al hacer scroll. */
       ScrollTrigger.batch(q(".opi-rise"), {
@@ -195,6 +250,7 @@ export function OdsPiloCuerpo({
       q(".opi-cnt").forEach((c) => {
         const to = Number(c.dataset.to) || 0;
         const dec = Number(c.dataset.dec) || 0;
+        const lg = (c.dataset.lang as Lang) || "es";
         const s = { v: 0 };
         ScrollTrigger.create({
           trigger: c,
@@ -205,29 +261,29 @@ export function OdsPiloCuerpo({
               v: to,
               duration: 1.1,
               ease: "power4.out",
-              onUpdate: () => void (c.textContent = fmtN(dec ? s.v : Math.round(s.v), "es", dec)),
-              onComplete: () => void (c.textContent = fmtN(to, "es", dec)),
+              onUpdate: () => void (c.textContent = fmtN(dec ? s.v : Math.round(s.v), lg, dec)),
+              onComplete: () => void (c.textContent = fmtN(to, lg, dec)),
             }),
         });
       });
       ScrollTrigger.refresh();
     },
-    { scope, dependencies: [animar, informe.informe.id, informe.informe.updated_at, notas.length] },
+    { scope, dependencies: [animar, lang, informe.informe.id, informe.informe.updated_at, notas.length] },
   );
 
   const portada = enRanura("portada");
 
   return (
-    <div ref={scope} className="opi" lang="es">
+    <div ref={scope} className="opi" lang={lang}>
       {!soloRelato && (tesis.length > 0 || grandes.length > 0) && (
         <section className="ors-sec opi-sec opi-top" id="ors-cifras" aria-labelledby="opi-cifras-h">
           <div className="odsx-wrap">
             <h2 id="opi-cifras-h" className="opi-vh">
-              Tesis y cifras
+              {tr(lang, "tesis_cifras")}
             </h2>
             {tesis.map((b) => (
               <p key={b.id} className="opi-thesis opi-rise">
-                {b.text}
+                <Texto b={b} lang={lang} />
               </p>
             ))}
             {grandes.length > 0 && (
@@ -235,63 +291,77 @@ export function OdsPiloCuerpo({
                 {grandes.map((f, i) => (
                   <div key={i} className="opi-fig opi-rise">
                     <p className="opi-fig__big">
-                      <Cifra v={f.v} />
+                      <Cifra v={f.v} lang={lang} />
                     </p>
-                    <p className="opi-fig__label">{f.label}</p>
-                    {f.src && <p className="opi-fig__src">Fuente: {f.src}</p>}
+                    <p className="opi-fig__label" lang={o.real ? lang : "es"}>
+                      {f.label}
+                    </p>
+                    {f.src && (
+                      <p className="opi-fig__src">
+                        {tr(lang, "fuente")}: <span lang={o.real ? lang : "es"}>{f.src}</span>
+                      </p>
+                    )}
                   </div>
                 ))}
               </div>
             )}
             {notaCifras.map((b) => (
               <p key={b.id} className="opi-figs__note opi-just">
-                {b.text}
+                <Texto b={b} lang={lang} />
               </p>
             ))}
           </div>
         </section>
       )}
 
-      {!soloRelato && portada && <Foto f={portada} nota={nota.get(portada.news_id)} slot="portada" className="opi-cover" cortina />}
+      {!soloRelato && portada && <Foto f={portada} nota={nota.get(portada.news_id)} slot="portada" className="opi-cover" cortina lang={lang} />}
 
       {hicimos.length > 0 && (
         <section className="ors-sec opi-sec" id="ors-relato" aria-labelledby="opi-relato-h">
           <div className="odsx-wrap">
             <header className="opi-head">
-              <Titular id="opi-relato-h" text={`Lo que hicimos en ${edicion}`} />
+              <Titular id="opi-relato-h" text={tr(lang, "hicimos_en", { e: edicion })} />
             </header>
             <div className="opi-story">
               {hicimos.map((b, i) => {
                 const nums = Array.from(new Set(b.sources.map((s) => refs.get(s.news_id) ?? 0)))
                   .filter(Boolean)
                   .sort((a, c) => a - c);
-                const idDe = (k: number) => [...refs.entries()].find(([, v]) => v === k)?.[0] ?? "";
+                const h = b.heading?.trim();
+                const abre = h && h !== hicimos[i - 1]?.heading?.trim();
                 return (
-                  <div key={b.id} className="opi-unit">
-                    {margenDe.has(i) && <aside className="opi-side">{margenDe.get(i)}</aside>}
-                    <p className="opi-p opi-just opi-rise">
-                      {b.text}
-                      {nums.length > 0 && (
-                        <sup className="opi-refs">
-                          {nums.map((k, j) => (
-                            <span key={k}>
-                              {j > 0 && ","}
-                              <a href={`#osn-${idDe(k)}`} aria-label={`Fuente ${k}: la nota en el carrusel de noticias`}>
-                                {k}
-                              </a>
-                            </span>
-                          ))}
-                        </sup>
-                      )}
-                    </p>
-                  </div>
+                  <Fragment key={b.id}>
+                    {abre && (
+                      <h3 className="opi-sub opi-rise">
+                        <Texto b={{ text: h, text_en: b.heading_en }} lang={lang} />
+                      </h3>
+                    )}
+                    <div className="opi-unit">
+                      {margenDe.has(i) && <aside className="opi-side">{margenDe.get(i)}</aside>}
+                      <p className="opi-p opi-just opi-rise">
+                        <Texto b={b} lang={lang} />
+                        {nums.length > 0 && (
+                          <sup className="opi-refs">
+                            {nums.map((k, j) => (
+                              <span key={k}>
+                                {j > 0 && ","}
+                                <a href={`#osn-${idDe.get(k) ?? ""}`} aria-label={tr(lang, "fuente_n", { n: k })}>
+                                  {k}
+                                </a>
+                              </span>
+                            ))}
+                          </sup>
+                        )}
+                      </p>
+                    </div>
+                  </Fragment>
                 );
               })}
             </div>
             {galeria.length > 0 && (
               <div className="opi-gallery">
                 {galeria.map((f) => (
-                  <Foto key={f.news_id} f={f} nota={nota.get(f.news_id)} slot="galeria" className="opi-gshot opi-rise" />
+                  <Foto key={f.image_id ?? f.news_id} f={f} nota={nota.get(f.news_id)} slot="galeria" className="opi-gshot opi-rise" lang={lang} />
                 ))}
               </div>
             )}
@@ -303,15 +373,24 @@ export function OdsPiloCuerpo({
         <section className="ors-sec ors-sec--white opi-sec" id="ors-proyectos" aria-labelledby="opi-proy-h">
           <div className="odsx-wrap">
             <header className="opi-head">
-              <Titular id="opi-proy-h" text="Proyectos que lo hacen posible" />
+              <Titular id="opi-proy-h" text={tr(lang, "proyectos_t")} />
             </header>
             <ul className="opi-proj">
               {proyectos.map((b) => {
-                const p = partirProyecto(b.text);
+                const t = textoEnIdioma(b, lang);
+                const p = partirProyecto(t.texto);
                 return (
-                  <li key={b.id} className="opi-rise">
+                  <li key={b.id} className="opi-rise" lang={t.idioma}>
                     {p.nombre && <b>{p.nombre}</b>}
-                    <span>{p.texto}</span>
+                    <span>
+                      {p.texto}
+                      {lang === "en" && t.idioma === "es" && (
+                        <>
+                          {" "}
+                          <MarcaEs lang={lang} />
+                        </>
+                      )}
+                    </span>
                   </li>
                 );
               })}
@@ -326,25 +405,39 @@ export function OdsPiloCuerpo({
             <img src={odsArt(o.n)} alt="" {...odsArtSize(o.n)} loading="lazy" decoding="async" />
           </div>
           <div className="odsx-wrap ors-block__wrap">
-            <p className="opi-next__k">Hacia la próxima edición</p>
-            <Titular id="opi-viene-h" text={viene.map((b) => b.text).join(" ")} />
+            <p className="opi-next__k">{tr(lang, "hacia_proxima")}</p>
+            <VieneTitular viene={viene} lang={lang} />
           </div>
         </section>
       )}
+
+      <OdsRegistro registro={informe.registro} lang={lang} edicion={edicion} />
     </div>
   );
 }
 
-/** El cuerpo del informe en el portal: las imágenes salen de las notas aprobadas del ODS. */
-export function OdsPilo({ o, informe, soloRelato = false }: { o: Ods; informe: InformePublico; soloRelato?: boolean }) {
-  const q = useApprovedNews(o.n);
-  const notas: NotaInforme[] = (q.data ?? []).map((n) => ({ id: n.id, image_url: n.image_url, title: n.title }));
-  return <OdsPiloCuerpo o={o} informe={informe} notas={notas} soloRelato={soloRelato} />;
+/** «Hacia la próxima edición»: en inglés si todos sus párrafos lo tienen; si no, el español con la marca. */
+function VieneTitular({ viene, lang }: { viene: BloquePub[]; lang: Lang }) {
+  const enIngles = lang === "en" && viene.every((b) => b.text_en?.trim());
+  const texto = viene.map((b) => (enIngles ? b.text_en : b.text)).join(" ");
+  return (
+    <>
+      <Titular id="opi-viene-h" text={texto} lang={enIngles || lang === "es" ? lang : "es"} />
+      {lang === "en" && !enIngles && <MarcaEs lang={lang} />}
+    </>
+  );
 }
 
-/** Recortes del informe por nota, para que el carrusel use el mismo punto de interés. */
+/** El cuerpo del informe en el portal: si una foto no trae su imagen, se usa la de su nota. */
+export function OdsPilo({ o, informe, soloRelato = false, lang = "es" }: { o: Ods; informe: InformePublico; soloRelato?: boolean; lang?: Lang }) {
+  const q = useNoticiasPublicas(o.n);
+  const notas: NotaInforme[] = (q.data ?? []).map((n) => ({ id: n.id, image_url: n.image_url, title: n.title }));
+  return <OdsPiloCuerpo o={o} informe={informe} notas={notas} soloRelato={soloRelato} lang={lang} />;
+}
+
+/** Recortes del informe por nota, para que el carrusel use el mismo punto de interés (el de su foto más destacada). */
 export function recortesDe(informe: InformePublico | null | undefined) {
   const r: Record<string, InformePublico["fotos"][number]["crop"]> = {};
-  for (const f of informe?.fotos ?? []) r[f.news_id] = f.crop;
+  for (const f of informe?.fotos ?? []) if (!r[f.news_id] || f.slot !== "galeria") r[f.news_id] = f.crop;
   return r;
 }

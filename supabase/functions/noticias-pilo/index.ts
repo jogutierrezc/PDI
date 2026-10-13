@@ -37,7 +37,8 @@
    ========================================================================== */
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.58.0";
-import { decidirEstado, foldSystem, fusionarOds, leerAjustes, leerRespuesta, mensajesParaPilo, roleRejected, textTarget, type Ajustes, type NotaActual } from "./logica.ts";
+import { decidirEstado, foldSystem, fusionarOds, leerAjustes, leerRespuesta, mensajesParaPilo, roleRejected, type Ajustes, type NotaActual } from "./logica.ts";
+import { elegirProveedor, esperaTras429, leerAjustesIA } from "../pilo-rankingsod/proveedor.ts";
 import { leer } from "../noticias-ods/clasificar.ts";
 
 const ENV = (name: string) => Deno.env.get(name) ?? "";
@@ -101,20 +102,15 @@ Deno.serve(async (request: Request) => {
   const [{ data: settings }, { data: secret }, ajustesFila] = await Promise.all([
     admin.from("pilo_ai_settings").select("*").eq("id", 1).maybeSingle(),
     admin.from("pilo_ai_secret").select("*").eq("id", 1).maybeSingle(),
-    admin.from("news_settings").select("pilo_aprueba, umbral").eq("id", 1).maybeSingle(),
+    admin.from("news_settings").select("*").eq("id", 1).maybeSingle(),
   ]);
   if (ajustesFila.error) return json(faltaMigracion(ajustesFila.error) ? MIGRACION : { error: ajustesFila.error.message }, 500);
   const ajustes: Ajustes = leerAjustes(ajustesFila.data as Record<string, unknown> | null);
-  const proveedor = String(settings?.provider ?? "mistral");
-  const clave = String(secret?.[`${proveedor}_key`] ?? "") || String(secret?.api_key ?? "");
-  const destino = textTarget(proveedor, String(settings?.base_url ?? ""), String(settings?.chat_path ?? ""), String(settings?.text_model ?? ""));
-  const motivo = !settings
-    ? "Falta la migración 0089 de Mr. Pilo con IA."
-    : !settings.enabled
-      ? "Mr. Pilo con IA está apagado: la administración lo enciende en Mr. Pilo con IA › Conexión."
-      : !(destino.url.startsWith("https://") && destino.model && clave)
-        ? "Mr. Pilo con IA aún no está conectado: la administración debe poner el proveedor y la clave."
-        : null;
+  // El proveedor de los rankings (0146): el de Mr. Pilo o Mistral con su clave guardada.
+  const destino = elegirProveedor(leerAjustesIA(ajustesFila.data as Record<string, unknown> | null), settings as Record<string, unknown> | null, secret as Record<string, unknown> | null);
+  const proveedor = destino.proveedor;
+  const clave = destino.clave;
+  const motivo = destino.ok ? null : destino.motivo ?? "La IA de los rankings no está lista.";
 
   const contar = async (estado: string) =>
     admin.from("news_items").select("id", { count: "exact", head: true }).eq("ai_status", estado).is("reviewed_by", null);
@@ -124,7 +120,7 @@ Deno.serve(async (request: Request) => {
   if (step === "estado") {
     const [p, e] = await Promise.all([contar("pendiente"), contar("error")]);
     if (p.error) return json(faltaMigracion(p.error) ? MIGRACION : { error: p.error.message }, 500);
-    return json({ ok: true, pendientes: p.count ?? 0, errores: e.count ?? 0, ia: !motivo, ...(motivo ? { motivo } : {}), ajustes });
+    return json({ ok: true, pendientes: p.count ?? 0, errores: e.count ?? 0, ia: !motivo, ...(motivo ? { motivo } : {}), ajustes, eleccion: destino.eleccion, proveedor: destino.proveedor, modelo: destino.model, lote: destino.lote });
   }
 
   if (step === "reintentar") {
@@ -136,7 +132,8 @@ Deno.serve(async (request: Request) => {
   if (step !== "lote") return json({ error: "Paso desconocido." }, 400);
   if (motivo) return json({ error: motivo, code: "sin_ia" }, 503);
 
-  const limite = Math.max(1, Math.min(3, Math.floor(Number(cuerpo.limite) || 2)));
+  // ai_batch (0146) o, si no lo dice, el automático del proveedor (5 con Mistral, 2 con los demás).
+  const limite = Math.max(1, Math.min(8, Math.floor(Number(cuerpo.limite) || destino.lote)));
   const { data: filas, error } = await admin
     .from("news_items")
     .select("id, title, body, section, campus, published_on, state, reviewed_by, decided_by, news_ods(ods, manual)")
@@ -149,7 +146,7 @@ Deno.serve(async (request: Request) => {
   const inicio = Date.now();
   const cuenta = { procesadas: 0, aprobadas_por_pilo: 0, para_revisar: 0, descartadas: 0, errores: 0 };
   let alto: { error: string; code: string } | null = null;
-  const plegar = settings?.system_role === "user";
+  const plegar = settings?.system_role === "user" && destino.eleccion === "pilo";
 
   type Fila = { id: string; title: string; body: string; section: string; campus: string; published_on: string | null; state: "pending" | "ok" | "no"; reviewed_by: string | null; decided_by: "persona" | "pilo" | null; news_ods: { ods: number; manual: boolean }[] | null };
 
@@ -164,7 +161,7 @@ Deno.serve(async (request: Request) => {
     if (cuenta.procesadas > 0 && pasado > PRESUPUESTO_MS) break;
     const { pistas } = leer(fila.title, fila.body);
     const mensajes = mensajesParaPilo(fila, pistas);
-    const enviar = (doblar: boolean) =>
+    const unaVez = (doblar: boolean) =>
       fetch(destino.url, {
         method: "POST",
         headers: { Authorization: `Bearer ${clave}`, "Content-Type": "application/json" },
@@ -174,9 +171,18 @@ Deno.serve(async (request: Request) => {
           messages: doblar ? foldSystem(mensajes) : mensajes,
           temperature: 0.1,
           max_tokens: 700,
-          ...(proveedor === "mistral" ? { response_format: { type: "json_object" } } : {}),
+          ...(destino.json ? { response_format: { type: "json_object" } } : {}),
         }),
       });
+    // Ante un 429 (límite por segundo del plan gratuito de Mistral) espera hasta 3 s y reintenta una vez.
+    const enviar = async (doblar: boolean) => {
+      const r = await unaVez(doblar);
+      if (r.status !== 429) return r;
+      const espera = esperaTras429(r.headers.get("retry-after"));
+      await r.body?.cancel();
+      await new Promise((ok) => setTimeout(ok, espera));
+      return unaVez(doblar);
+    };
 
     let respuesta: Response;
     try {

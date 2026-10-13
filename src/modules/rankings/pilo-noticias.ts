@@ -84,7 +84,8 @@ async function invocar<T>(body: Record<string, unknown>): Promise<T> {
 }
 
 export const estadoPilo = () => invocar<EstadoPilo>({ step: "estado" });
-export const clasificarLote = (limite = 2) => invocar<RespuestaLote>({ step: "lote", limite: Math.max(1, Math.min(3, Math.floor(limite))) });
+/** Sin `limite`, la función usa el lote de los ajustes de IA de los rankings (0146: 5 con Mistral, 2 con los demás). */
+export const clasificarLote = (limite?: number) => invocar<RespuestaLote>({ step: "lote", ...(limite ? { limite: Math.max(1, Math.min(8, Math.floor(limite))) } : {}) });
 export const reintentarErrores = () => invocar<{ ok: boolean; devueltas: number }>({ step: "reintentar" });
 
 export function useEstadoPilo() {
@@ -138,7 +139,7 @@ const dormir = (ms: number) => new Promise((r) => setTimeout(r, ms));
  * refresca la bandeja (query ["noticias"]); al terminar, siempre. Ante el
  * límite del proveedor (429) espera 30 s y reintenta hasta 3 veces.
  */
-export function usePiloNoticias({ limite = 2, invalidarCada = 3 }: { limite?: number; invalidarCada?: number } = {}): UsoPilo {
+export function usePiloNoticias({ limite, invalidarCada = 3 }: { limite?: number; invalidarCada?: number } = {}): UsoPilo {
   const cliente = useQueryClient();
   const [progreso, setProgreso] = useState<ProgresoPilo>(PROGRESO_CERO);
   const [corriendo, setCorriendo] = useState(false);

@@ -134,6 +134,49 @@
   .ors .opi-p { font-size: 17px; }
 }
 
+/* Subtítulo temático: abre cada grupo de párrafos de «Qué hicimos». */
+.ors .opi-sub {
+  clear: both;
+  max-width: 30ch;
+  margin: 2em 0 0.7em;
+  padding-top: 10px;
+  border-top: 2px solid var(--ods);
+  color: var(--o-ink);
+  font-size: clamp(22px, 2.4vw, 30px);
+  font-weight: 800;
+  font-stretch: 75%;
+  line-height: 1.05;
+  letter-spacing: -0.015em;
+}
+.ors .opi-story > .opi-sub:first-child { margin-top: 0; }
+
+/* --- Registro de actividades -------------------------------------------------- */
+
+.ors .opi-h2--plain { max-width: none; }
+.ors .opi-reg__p { margin-top: 10px; color: var(--o-muted); font-size: 15px; }
+.opi-reg__p b { color: var(--o-ink); font-variant-numeric: tabular-nums; }
+.opi-reg__t { width: 100%; border-collapse: collapse; font-size: 14.5px; line-height: 1.4; }
+.opi-reg__t th { padding: 8px 10px 8px 0; color: var(--o-muted); border-bottom: 2px solid var(--o-ink); font-size: 12px; font-weight: 800; letter-spacing: 0.08em; text-align: left; text-transform: uppercase; }
+.opi-reg__t td { padding: 9px 12px 9px 0; vertical-align: top; border-bottom: 1px solid var(--ors-rule); }
+.opi-reg__f { width: 7.5em; color: var(--o-muted); white-space: nowrap; font-variant-numeric: tabular-nums; }
+.opi-reg__s { width: 9em; color: var(--o-muted); }
+.ors .opi-reg__a a { color: var(--o-ink); font-weight: 600; text-decoration: none; }
+.ors .opi-reg__a a:hover { text-decoration: underline; text-decoration-color: var(--ods); text-decoration-thickness: 2px; }
+.opi-reg__tag { display: inline-block; margin-left: 8px; padding: 0 5px; color: var(--ors-deep); border: 1px solid currentColor; font-size: 10.5px; font-weight: 800; letter-spacing: 0.06em; text-transform: uppercase; vertical-align: 0.1em; }
+.opi-reg__num { width: 14em; text-align: right; }
+.opi-reg__num b { color: var(--ors-deep); font-size: 16px; font-weight: 800; font-stretch: 75%; font-variant-numeric: tabular-nums; }
+.opi-reg__num span { color: var(--o-muted); font-size: 13px; }
+
+/* En el teléfono, una lista: cada fila es una tarjeta plana. */
+@media (max-width: 720px) {
+  .opi-reg__t thead { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
+  .opi-reg__t, .opi-reg__t tbody, .opi-reg__t tr, .opi-reg__t td { display: block; width: auto; }
+  .opi-reg__t tr { display: grid; grid-template-columns: auto 1fr; gap: 2px 10px; padding: 12px 0; border-bottom: 1px solid var(--ors-rule); }
+  .opi-reg__t td { padding: 0; border: 0; text-align: left; }
+  .opi-reg__a, .opi-reg__num { grid-column: 1 / -1; }
+  .opi-reg__num:has(b) { margin-top: 2px; }
+}
+
 /* --- Galería y proyectos ------------------------------------------------------- */
 
 .opi-gallery {

@@ -7,6 +7,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { createTestDb, errorOf, PEOPLE, type TestDb } from "../db/harness";
 
 const MIGRATION = resolve(__dirname, "../../supabase/migrations/0145_informes_ods_con_pilo.sql");
+const MIGRATION_0146 = resolve(__dirname, "../../supabase/migrations/0146_informes_bilingue_imagenes_cifras.sql");
 let t: TestDb;
 let nota = "";
 let notaNinos = "";
@@ -14,7 +15,7 @@ let informe = "";
 let bloquePilo = "";
 
 beforeAll(async () => {
-  t = await createTestDb();
+  t = await createTestDb({ before: "0147" }); // sin el informe 2025 importado (0147), que ya trae (4, 2025)
   await t.q("update public.profiles set role = 'planeacion', is_active = true where id = $1", [PEOPLE.admin]);
   [{ id: nota }] = await t.q<{ id: string }>(
     "insert into public.news_items (url, title, body, image_url, state, published_on) values ('https://udes.edu.co/r', 'El Recolector', 'Más de 400 estudiantes de bachillerato.', 'https://udes.edu.co/r.jpg', 'ok', '2025-03-20') returning id",
@@ -43,6 +44,8 @@ afterAll(async () => t?.close());
 describe("0145 · Informes ODS con Pilo", () => {
   it("es idempotente", async () => {
     await t.db.exec(readFileSync(MIGRATION, "utf8"));
+    // 0146 amplía lo de 0145: se vuelve a aplicar detrás para dejar la base como en producción.
+    await t.db.exec(readFileSync(MIGRATION_0146, "utf8"));
     const [s] = await t.q<{ n: number }>("select count(*)::int as n from public.ods_report_blocks");
     expect(s.n).toBe(3);
   });

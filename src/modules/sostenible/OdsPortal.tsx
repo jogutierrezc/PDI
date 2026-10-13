@@ -34,20 +34,22 @@ import type { WallSize, WallSlot } from "./ods-portal-wall";
 import { useSlidingRule } from "./ods-portal-rule";
 import { OdsPortalArrow } from "./OdsPortalArrow";
 import { reduced } from "./widgets";
+import { nombreOds, tesisOds, tr, useLang } from "./i18n";
+import type { Lang } from "./i18n";
 import "./ods-portal.css";
 
 gsap.registerPlugin(useGSAP, Flip);
 
 type Filter = "all" | "the";
-const FILTERS: [Filter, string][] = [
-  ["all", "Todos"],
-  ["the", "Para THE"],
+const FILTERS: [Filter, "filtro_todos" | "filtro_the"][] = [
+  ["all", "filtro_todos"],
+  ["the", "filtro_the"],
 ];
 
-const matches = (o: Ods, filter: Filter, q: string) => {
+const matches = (o: Ods, filter: Filter, q: string, lang: Lang = "es") => {
   const byFilter = filter === "all" || (filter === "the" && o.the);
   const needle = q.trim().toLowerCase();
-  return byFilter && (!needle || `${o.n} ${o.name} ${o.thesis}`.toLowerCase().includes(needle));
+  return byFilter && (!needle || `${o.n} ${o.name} ${o.thesis} ${nombreOds(o, lang)} ${tesisOds(o, lang)}`.toLowerCase().includes(needle));
 };
 
 /** Los que van a THE con cifras publicadas son los carteles mayores; el resto de THE, apaisados. */
@@ -55,6 +57,7 @@ const sizeOf = (o: Ods): WallSize => (o.the && o.real ? "xl" : o.the ? "w" : "s"
 
 export function OdsPortal() {
   const noticias = useApprovedNews();
+  const { lang, t } = useLang();
   const notas = useMemo(() => contarPorOds(noticias.data ?? []), [noticias.data]);
   const [params, setParams] = useSearchParams();
   const edition = odsEdition(params.get("edicion"));
@@ -66,7 +69,7 @@ export function OdsPortal() {
   const grid = useRef<HTMLOListElement>(null);
   const flipState = useRef<Flip.FlipState | null>(null);
 
-  const shown = useMemo(() => ODS_LIST.filter((o) => matches(o, filter, q)), [filter, q]);
+  const shown = useMemo(() => ODS_LIST.filter((o) => matches(o, filter, q, lang)), [filter, q, lang]);
   const layout = useMemo(() => {
     const items = shown.map((o) => ({ id: o.n, size: sizeOf(o) }));
     return { four: wallLayout(items, 4), two: wallLayout(items, 2) };
@@ -137,7 +140,7 @@ export function OdsPortal() {
   useSlidingRule(filterBox, filter);
 
   return (
-    <OdsShell title="Los 17 informes ODS" active="portal">
+    <OdsShell title={t("informes_17")} active="portal">
       <div ref={root} className="opt-view">
         <div className="opt-bands" aria-hidden="true">
           {ODS_LIST.map((o) => (
@@ -149,19 +152,18 @@ export function OdsPortal() {
           <div className="opt-head__main">
             <h1 className="opt-title">
               <span className="opt-line">
-                <span>17 objetivos,</span>
+                <span>{t("portal_t1")}</span>
               </span>{" "}
               <span className="opt-line">
-                <span>una sola UDES.</span>
+                <span>{t("portal_t2")}</span>
               </span>
             </h1>
             <p className="opt-lede">
-              Los informes con los que la Universidad de Santander rinde cuentas de su aporte a los Objetivos de Desarrollo Sostenible en THE Impact Rankings {edition}: uno por objetivo, cada uno con
-              sus cifras y sus evidencias.
+              {t("portal_lede", { e: edition })}
             </p>
           </div>
 
-          <figure className="opt-word">
+          <figure className="opt-word" lang="es">
             <blockquote className="opt-word__quote">
               <p>«{RECTOR.quote}»</p>
             </blockquote>
@@ -175,7 +177,7 @@ export function OdsPortal() {
               </span>
             </figcaption>
             <Link to={ODS_ROUTES.rector} className="opt-link">
-              Leer la presentación rectoral <OdsPortalArrow />
+              <span lang={lang}>{t("leer_rector")}</span> <OdsPortalArrow />
             </Link>
           </figure>
         </header>
@@ -184,7 +186,7 @@ export function OdsPortal() {
           <div className="opt-figs">
             <p className="opt-fig">
               <b>{totals.count}</b>
-              <span>informes de la edición 2025 publicados</span>
+              <span>{t("informes_publicados")}</span>
             </p>
             {ODS_PUBLIC.status && (
               <>
@@ -192,18 +194,18 @@ export function OdsPortal() {
                   <b>
                     {totals.ok}/{totals.total}
                   </b>
-                  <span>evidencias 2026 verificadas</span>
+                  <span>{t("evidencias_verificadas_2026")}</span>
                 </p>
                 <p className="opt-fig">
                   <b>{totals.ready}</b>
-                  <span>ODS listos para revisión</span>
+                  <span>{t("ods_listos")}</span>
                 </p>
               </>
             )}
             <p className="opt-fig">
               <b>{totals.the}</b>
               <span>
-                ODS que se envían a THE <span className="odsx-ilus">Dato ilustrativo</span>
+                {t("ods_a_the")} <span className="odsx-ilus">{t("dato_ilustrativo")}</span>
               </span>
             </p>
             <div className="opt-figs__act">
@@ -212,18 +214,18 @@ export function OdsPortal() {
           </div>
 
           <div className="opt-tools">
-            <div ref={editionBox} className="opt-switch" role="group" aria-label="Edición">
+            <div ref={editionBox} className="opt-switch" role="group" aria-label={t("edicion")}>
               <span className="opt-switch__label" aria-hidden="true">
-                Edición
+                {t("edicion")}
               </span>
               {ODS_EDITIONS.map((e) => (
-                <button key={e} type="button" aria-pressed={edition === e} aria-label={`Edición ${e}`} onClick={() => setEdition(e)}>
+                <button key={e} type="button" aria-pressed={edition === e} aria-label={t("edicion_n", { e })} onClick={() => setEdition(e)}>
                   {e}
                 </button>
               ))}
               <i className="opt-rule" aria-hidden="true" />
             </div>
-            <div ref={filterBox} className="opt-switch" role="group" aria-label="Filtrar informes">
+            <div ref={filterBox} className="opt-switch" role="group" aria-label={t("filtrar_informes")}>
               {FILTERS.map(([id, label]) => (
                 <button
                   key={id}
@@ -235,20 +237,20 @@ export function OdsPortal() {
                     setFilter(id);
                   }}
                 >
-                  {label}
+                  {t(label)}
                 </button>
               ))}
               <i className="opt-rule" aria-hidden="true" />
             </div>
             <label className="opt-search">
-              <span className="opt-vh">Buscar un ODS</span>
+              <span className="opt-vh">{t("buscar_ods")}</span>
               <svg viewBox="0 0 16 16" width="15" height="15" aria-hidden="true" focusable="false">
                 <circle cx="7" cy="7" r="4.75" fill="none" stroke="currentColor" strokeWidth="1.75" />
                 <path d="m10.5 10.5 3.5 3.5" stroke="currentColor" strokeWidth="1.75" strokeLinecap="square" />
               </svg>
               <input
                 type="search"
-                placeholder="Buscar un ODS"
+                placeholder={t("buscar_ods")}
                 value={q}
                 onChange={(e) => {
                   capture();
@@ -257,12 +259,12 @@ export function OdsPortal() {
               />
             </label>
             <p className="opt-count" role="status">
-              {shown.length === ODS_LIST.length ? "Los 17 informes" : shown.length === 1 ? "1 informe" : `${shown.length} informes`}
+              {shown.length === ODS_LIST.length ? t("informes_17") : shown.length === 1 ? t("informes_1") : t("informes_n", { n: shown.length })}
             </p>
           </div>
         </div>
 
-        <h2 className="opt-vh">Los 17 informes</h2>
+        <h2 className="opt-vh">{t("informes_17")}</h2>
         <ol ref={grid} className="odsx-wrap opt-wall">
           {ODS_LIST.map((o) => (
             <OdsPortalPoster
@@ -273,14 +275,15 @@ export function OdsPortal() {
               two={layout.two.get(o.n)}
               included={isIncluded(o.n)}
               news={notas[o.n] ?? 0}
+              lang={lang}
               onToggle={() => toggle(o.n)}
             />
           ))}
         </ol>
         <div className="odsx-wrap">
-          {shown.length === 0 && <p className="opt-empty">Ningún informe coincide con la búsqueda.</p>}
+          {shown.length === 0 && <p className="opt-empty">{t("ninguno_coincide")}</p>}
           <p className="odsx-note opt-foot">
-            <span className="odsx-ilus">Dato ilustrativo</span> La selección de THE y las cifras de los ODS distintos del 4 y el 13 son de muestra.
+            <span className="odsx-ilus">{t("dato_ilustrativo")}</span> {t("pie_portal")}
           </p>
         </div>
       </div>
@@ -298,6 +301,7 @@ function OdsPortalPoster({
   included,
   news,
   onToggle,
+  lang,
 }: {
   o: Ods;
   edition: OdsEdition;
@@ -306,6 +310,7 @@ function OdsPortalPoster({
   included: boolean;
   news: number;
   onToggle: () => void;
+  lang: Lang;
 }) {
   const off = !four;
   const tone = odsTone(o.color) as Record<string, string>;
@@ -318,7 +323,8 @@ function OdsPortalPoster({
   const st = odsStatus(o);
   const pct = odsPct(o);
   const thesisId = `ods-tesis-${o.n}`;
-  const line = edition === 2025 ? "Informe 2025 publicado" : `Informe ${edition}`;
+  const line = edition === 2025 ? tr(lang, "informe_2025_publicado") : tr(lang, "informe_e", { e: edition });
+  const nombre = nombreOds(o, lang);
 
   return (
     <li
@@ -330,7 +336,7 @@ function OdsPortalPoster({
       <Link
         to={ODS_ROUTES.report(o.n, edition)}
         className="opt-card__link"
-        aria-label={`ODS ${o.n}, ${o.name}`}
+        aria-label={`${tr(lang, "sdg_n", { n: o.n })}, ${nombre}`}
         aria-describedby={thesisId}
         tabIndex={off ? -1 : undefined}
       >
@@ -341,19 +347,19 @@ function OdsPortalPoster({
           <img src={odsArt(o.n)} alt="" width={800} height={1085} decoding="async" loading={o.n > 8 ? "lazy" : undefined} />
         </span>
         <span className="opt-card__id">
-          <b className="opt-card__name">{o.name}</b>
+          <b className="opt-card__name">{nombre}</b>
           <span className="opt-card__line">
             {line}
-            {o.the && <> · Para THE</>}
-            {edition === 2025 && news > 0 && <> · {news === 1 ? "1 noticia" : `${news} noticias`}</>}
+            {o.the && <> · {tr(lang, "filtro_the")}</>}
+            {edition === 2025 && news > 0 && <> · {news === 1 ? tr(lang, "noticias_1") : tr(lang, "noticias_n", { n: news })}</>}
           </span>
         </span>
         <span className="opt-card__slip">
           <span className="opt-card__slipname" aria-hidden="true">
-            {o.name}
+            {nombre}
           </span>
           <span className="opt-card__thesis" id={thesisId}>
-            {o.thesis}
+            {tesisOds(o, lang)}
           </span>
           {edition === 2026 && ODS_PUBLIC.status && (
             <span className="opt-card__st">
@@ -364,14 +370,14 @@ function OdsPortalPoster({
             </span>
           )}
           <span className="opt-card__go" aria-hidden="true">
-            Leer el informe {edition} <OdsPortalArrow />
+            {tr(lang, "leer_informe_e", { e: edition })} <OdsPortalArrow />
           </span>
         </span>
       </Link>
       {ODS_PUBLIC.bulletinPick && (
         <label className="opt-inc">
           <input type="checkbox" checked={included} onChange={onToggle} tabIndex={off ? -1 : undefined} />
-          Incluir en el boletín
+          {tr(lang, "incluir_boletin")}
         </label>
       )}
     </li>

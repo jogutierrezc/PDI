@@ -40,6 +40,8 @@ import type { Bi, Ods, OdsEdition } from "./ods-data";
 import { OdsNews } from "./OdsNews";
 import { OdsPilo, recortesDe, seccionesPilo } from "./OdsPilo";
 import { usePublicInforme } from "../rankings/informes/datos";
+import { ODS_CIFRAS_EN, ODS_VIENE_EN, nombreOds, tesisOds, tr, useLang } from "./i18n";
+import { LangSwitch } from "./LangSwitch";
 import { Arrow, Counter, CutFilter, OdsReportIntro, OdsReportVideo, PlayMark, Words, fmtN, introSeen, parseFigure } from "./OdsReportParts";
 import { OdsArtStrip, odsArtSize, odsOn, odsTone } from "./OdsArt";
 import type { Lang } from "./OdsReportParts";
@@ -85,14 +87,15 @@ type Phase = "check" | "intro" | "ready";
 function ReportView({ o, edition }: { o: Ods; edition: OdsEdition }) {
   const full = o.n === 13;
   const published = edition === 2025;
-  const [lang, setLang] = useState<Lang>("es");
-  const L: Lang = full ? lang : "es";
+  /* Un solo idioma para todo el portal (?lang= y lo recordado); el 13 ya era bilingüe. */
+  const { lang, setLang } = useLang();
+  const L: Lang = lang;
   const tx = (es: string, en: string) => (L === "es" ? es : en);
   const t = (b: Bi) => b[L];
-  /* El informe redactado con Pilo, si está publicado para esta edición (solo en español). */
+  /* El informe redactado con Pilo, si está publicado para esta edición (español e inglés). */
   const piloQ = usePublicInforme(o.n, edition);
-  const pilo = L === "es" ? (piloQ.data ?? null) : null;
-  const piloSecs = seccionesPilo(pilo, full);
+  const pilo = piloQ.data ?? null;
+  const piloSecs = seccionesPilo(pilo, full, L);
 
   /* «check» es el HTML inicial: contenido completo, sin intro. En el navegador se decide antes de pintar. */
   const [phase, setPhase] = useState<Phase>("check");
@@ -120,11 +123,11 @@ function ReportView({ o, edition }: { o: Ods; edition: OdsEdition }) {
           ["ruta", tx("Ruta", "Timeline")],
         ]
     : published
-      ? [["cifras", "Cifras"]]
+      ? [["cifras", tr(L, "sec_cifras")]]
       : [
-          ["cifras", "Cifras"],
-          ...(ODS_PUBLIC.evidence ? [["avance", "Avance"] as [string, string]] : []),
-          ["viene", "Lo que viene"],
+          ["cifras", tr(L, "sec_cifras")],
+          ...(ODS_PUBLIC.evidence ? [["avance", tr(L, "sec_avance")] as [string, string]] : []),
+          ["viene", tr(L, "sec_viene")],
         ];
   /* Con informe publicado: los demás ODS usan sus secciones; el 13 suma el relato. */
   const sections: [string, string][] = !pilo || !piloSecs.length ? baseSections : full ? [...baseSections, ...piloSecs] : piloSecs;
@@ -247,11 +250,11 @@ function ReportView({ o, edition }: { o: Ods; edition: OdsEdition }) {
 
   const prev = o.n > 1 ? odsByNumber(o.n - 1) : undefined;
   const next = o.n < 17 ? odsByNumber(o.n + 1) : undefined;
-  const name = full ? tx("Acción por el clima", "Climate action") : o.name;
-  const title = full ? tx("ODS 13: Acción por el clima", "SDG 13: Climate Action") : `ODS ${o.n}: ${o.name}`;
+  const name = full ? tx("Acción por el clima", "Climate action") : nombreOds(o, L);
+  const title = full ? tx("ODS 13: Acción por el clima", "SDG 13: Climate Action") : tr(L, "sdg_titulo", { n: o.n, name: nombreOds(o, L) });
   const status = odsStatus(o);
   const totals = odsEvidenceTotals();
-  const stripesCaption = full ? tx("CO₂ evitado por mes, 2025–2026", "CO₂ avoided per month, 2025–2026") : "Actividad mensual del ODS, 2025–2026";
+  const stripesCaption = full ? tx("CO₂ evitado por mes, 2025–2026", "CO₂ avoided per month, 2025–2026") : tr(L, "actividad_mensual");
   const ilus = tx("Dato ilustrativo", "Illustrative data");
 
   return (
@@ -274,7 +277,7 @@ function ReportView({ o, edition }: { o: Ods; edition: OdsEdition }) {
         <div className="odsx-wrap ors-bar__row">
           <span className="ors-mark">
             <b>UDES</b>
-            <span>{full ? tx(`Informe ODS 13 · ${edition}`, `SDG 13 report · ${edition}`) : `Informe ODS ${o.n} · ${edition}`}</span>
+            <span>{tr(L, "informe_ods_e", { n: o.n, e: edition })}</span>
           </span>
           <nav className="ors-nav" aria-label={tx("Secciones del informe", "Report sections")}>
             {sections.map(([id, label]) => (
@@ -292,15 +295,8 @@ function ReportView({ o, edition }: { o: Ods; edition: OdsEdition }) {
               </a>
             ))}
           </nav>
-          {full && (
-            <div className="ors-lang" role="group" aria-label={tx("Idioma", "Language")}>
-              {(["es", "en"] as Lang[]).map((l) => (
-                <button key={l} type="button" aria-pressed={lang === l} onClick={() => setLang(l)} lang={l} aria-label={l === "es" ? "Español" : "English"}>
-                  {l.toUpperCase()}
-                </button>
-              ))}
-            </div>
-          )}
+          {/* El mismo selector del portal: cambiarlo aquí cambia todo el sitio. */}
+          <LangSwitch lang={lang} onChange={setLang} className="ors-lang" />
         </div>
       </div>
 
@@ -336,7 +332,7 @@ function ReportView({ o, edition }: { o: Ods; edition: OdsEdition }) {
                 <Words text={title} cls="ors-w ors-w--h1" />
               </h1>
               <p className="ors-lede ors-hero__in">
-                {full ? tx("Cómo la Universidad de Santander reduce su huella de carbono e investiga las soluciones energéticas que definirán un futuro sostenible para Colombia.", "How Universidad de Santander reduces its carbon footprint and researches the energy solutions that will define a sustainable future for Colombia.") : o.thesis}
+                {full ? tx("Cómo la Universidad de Santander reduce su huella de carbono e investiga las soluciones energéticas que definirán un futuro sostenible para Colombia.", "How Universidad de Santander reduces its carbon footprint and researches the energy solutions that will define a sustainable future for Colombia.") : tesisOds(o, L)}
               </p>
               <dl className="ors-meta ors-hero__in">
                 <div>
@@ -572,27 +568,27 @@ function ReportView({ o, edition }: { o: Ods; edition: OdsEdition }) {
             </section>
           </>
         ) : pilo ? (
-          <OdsPilo o={o} informe={pilo} />
+          <OdsPilo o={o} informe={pilo} lang={L} />
         ) : (
-          <GenericSections o={o} published={published} />
+          <GenericSections o={o} published={published} lang={L} />
         )}
 
         {/* El ODS 13 conserva su detalle y recibe el relato de Pilo antes de las noticias. */}
-        {full && pilo && <OdsPilo o={o} informe={pilo} soloRelato />}
+        {full && pilo && <OdsPilo o={o} informe={pilo} lang={L} soloRelato />}
 
         {/* Las notas de udes.edu.co que Planeación aprobó para este ODS (solo la edición 2025: son noticias de 2025). */}
-        {edition === 2025 && <OdsNews n={o.n} recortes={recortesDe(pilo)} />}
+        {edition === 2025 && <OdsNews n={o.n} recortes={recortesDe(pilo)} lang={L} />}
 
         {/* ODS anterior y siguiente: el cartel vecino asoma */}
-        <nav className={`ors-pager${prev && next ? "" : " ors-pager--one"}`} aria-label={tx("Otros informes ODS", "Other SDG reports")}>
-          {prev && <PagerLink o={prev} edition={edition} label={tx("ODS anterior", "Previous SDG")} dir="left" />}
-          {next && <PagerLink o={next} edition={edition} label={tx("ODS siguiente", "Next SDG")} dir="right" />}
+        <nav className={`ors-pager${prev && next ? "" : " ors-pager--one"}`} aria-label={tr(L, "otros_informes")}>
+          {prev && <PagerLink o={prev} edition={edition} label={tr(L, "ods_anterior")} dir="left" lang={L} />}
+          {next && <PagerLink o={next} edition={edition} label={tr(L, "ods_siguiente")} dir="right" lang={L} />}
         </nav>
 
         <footer className="ors-foot">
           <div className="odsx-wrap">
             <span>
-              © {edition} · {full ? tx("Informe ODS 13 · Universidad de Santander · Oficina de Planeación", "SDG 13 report · Universidad de Santander · Planning Office") : `Informe ODS ${o.n} · Universidad de Santander · Oficina de Planeación`}
+              © {edition} · {tr(L, "pie_informe", { n: o.n })}
             </span>
             <span>
               {tx(
@@ -639,7 +635,7 @@ function Figure({ slot, big, unit, text }: { slot: Slot; big: ReactNode; unit: s
 }
 
 /** Enlace al cartel vecino: su color, su número colosal y su nombre. */
-function PagerLink({ o, edition, label, dir }: { o: Ods; edition: OdsEdition; label: string; dir: "left" | "right" }) {
+function PagerLink({ o, edition, label, dir, lang }: { o: Ods; edition: OdsEdition; label: string; dir: "left" | "right"; lang: Lang }) {
   return (
     <Link to={ODS_ROUTES.report(o.n, edition)} className={`ors-pager__a ors-pager__a--${dir}`} style={{ "--c": o.color, "--c-on": odsOn(o.color) } as CSSProperties}>
       <span className="ors-pager__in">
@@ -648,7 +644,7 @@ function PagerLink({ o, edition, label, dir }: { o: Ods; edition: OdsEdition; la
           {label}
           {dir === "right" && <Arrow dir="right" />}
         </small>
-        <b>{o.name}</b>
+        <b>{nombreOds(o, lang)}</b>
       </span>
       <span className="ors-pager__n" aria-hidden="true">
         {o.n}
@@ -761,17 +757,26 @@ function OdsReportTabs({ tab, setTab, lang }: { tab: number; setTab: (i: number)
 
 /* --- Plantilla genérica (ODS sin detalle) ------------------------------------------------------------------ */
 
-function GenericSections({ o, published }: { o: Ods; published: boolean }) {
+/** Unidad y texto de una cifra de ods-data en el idioma pedido. */
+export function cifraOds(o: Ods, i: number, lang: Lang): { unit: string; label: string } {
+  const f = o.figures[i];
+  const en = ODS_CIFRAS_EN[o.n - 1]?.[i];
+  return lang === "en" && en ? { unit: en[0], label: en[1] } : { unit: f.unit, label: f.label };
+}
+
+function GenericSections({ o, published, lang }: { o: Ods; published: boolean; lang: Lang }) {
   const pct = odsPct(o);
   const status = odsStatus(o);
+  const L = lang;
   return (
     <>
       <section className="ors-sec" id="ors-cifras" aria-labelledby="ors-cifras-h">
         <div className="odsx-wrap">
-          <SecHead id="ors-cifras-h" text="Lo que la UDES ya puede mostrar." />
+          <SecHead id="ors-cifras-h" text={tr(L, "ya_puede")} />
           <div className="ors-figs">
             {o.figures.map((f, i) => {
               const p = parseFigure(f.value);
+              const c = cifraOds(o, i, L);
               return (
                 <Figure
                   key={f.label}
@@ -780,29 +785,29 @@ function GenericSections({ o, published }: { o: Ods; published: boolean }) {
                     p ? (
                       <>
                         {p.before}
-                        <Counter to={p.to} lang="es" decimals={p.decimals} />
+                        <Counter to={p.to} lang={L} decimals={p.decimals} />
                         {p.after}
                       </>
                     ) : (
                       f.value
                     )
                   }
-                  unit={f.unit}
-                  text={f.label}
+                  unit={c.unit}
+                  text={c.label}
                 />
               );
             })}
           </div>
           <p className="ors-source">
-            {published && <b>Informe publicado de la edición 2025. </b>}
-            Cifras de la edición 2025. El detalle por indicador se carga desde el editor de informes.
-            {!o.real && <span className="ors-ilus">Dato ilustrativo</span>}
+            {published && <b>{tr(L, "publicado_2025")} </b>}
+            {tr(L, "cifras_2025_detalle")}
+            {!o.real && <span className="ors-ilus">{tr(L, "dato_ilustrativo")}</span>}
           </p>
         </div>
       </section>
 
       {ODS_PUBLIC.evidence && !published && (
-        <section className="ors-sec ors-sec--white" id="ors-avance" aria-labelledby="ors-avance-h">
+        <section className="ors-sec ors-sec--white" id="ors-avance" aria-labelledby="ors-avance-h" lang="es">
           <div className="odsx-wrap">
             <SecHead id="ors-avance-h" text={`${o.ok} de ${o.total} evidencias verificadas.`} />
             <div className="ors-progress">
@@ -821,7 +826,7 @@ function GenericSections({ o, published }: { o: Ods; published: boolean }) {
             <img src={odsArt(o.n)} alt="" {...odsArtSize(o.n)} loading="lazy" decoding="async" />
           </div>
           <div className="odsx-wrap ors-block__wrap">
-            <SecHead id="ors-viene-h" text={`La UDES prevé ${o.next}`} />
+            <SecHead id="ors-viene-h" text={tr(L, "preve", { x: L === "en" ? (ODS_VIENE_EN[o.n - 1] ?? o.next) : o.next })} />
           </div>
         </section>
       )}

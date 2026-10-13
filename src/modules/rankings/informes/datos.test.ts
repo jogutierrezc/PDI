@@ -4,7 +4,7 @@ import { describe, expect, it, vi } from "vitest";
 
 vi.mock("../../../lib/supabase", () => ({ supabase: {} }));
 
-import { bloquesDePartida, cifrasSinFuente, leerAjustes, ordenarBloques, puedePublicar, resumenCobertura } from "./datos";
+import { bloquesDePartida, cifrasSinFuente, fichaCompleta, idiomaPreferido, leerAjustes, leerAjustesRankingsIA, ordenarBloques, paginaDeEleccion, puedePublicar, registroActividades, resumenCobertura, textoProgresoTema } from "./datos";
 import type { Bloque, EleccionIndicador, Foto, IndicadorTHE, InformeCompleto } from "./tipos";
 
 const bloque = (c: Partial<Bloque> = {}): Bloque => ({
@@ -156,5 +156,54 @@ describe("informe nuevo", () => {
 
   it("ajustes de partida", () => {
     expect(leerAjustes(undefined)).toEqual({ tone: "cercano", person: "nosotros" });
+  });
+});
+
+describe("0146: cobertura total y registro de actividades", () => {
+  const notas = [
+    { id: "a", published_on: "2025-03-20", campus: "Bucaramanga", section: "Extensión", title: "El Recolector", title_en: "The Collector", url: "https://udes.edu.co/a" },
+    { id: "b", published_on: "2025-01-10", campus: "", section: "Enseñanza", title: "Becas de movilidad", title_en: "", url: "https://udes.edu.co/b" },
+    { id: "c", published_on: null, campus: "", section: "", title: "Sin fecha", title_en: "", url: "https://udes.edu.co/c" },
+  ];
+  const bloques = [
+    bloque({ id: "1", sources: [{ news_id: "a", quote: "x" }] }),
+    bloque({ id: "2", sources: [{ news_id: "c", quote: "x" }], enabled: false }),
+    bloque({ id: "3", sources: [{ news_id: "", ref: "cifras:x:2025", kind: "cifras", quote: "x" }] }),
+  ];
+
+  it("el registro lista TODAS las notas en orden cronológico, con su cifra principal y si la narrativa la cita", () => {
+    const r = registroActividades(notas, [{ news_id: "a", value: "400", label: "estudiantes", score: 80 }, { news_id: "a", value: "3", label: "talleres", score: 20 }, { news_id: "b", value: "9", label: "x", score: 0 }], bloques);
+    expect(r.map((x) => x.news_id)).toEqual(["b", "a", "c"]);
+    expect(r.find((x) => x.news_id === "a")).toMatchObject({ figure_value: "400", en_narrativa: true });
+    expect(r.find((x) => x.news_id === "b")).toMatchObject({ figure_value: null, en_narrativa: false });
+    expect(r.find((x) => x.news_id === "c")!.en_narrativa).toBe(false);
+  });
+
+  it("resumenCobertura cuenta las notas en la narrativa y las que están solo en el registro", () => {
+    const r = resumenCobertura(completo(bloques), [], notas);
+    expect(r).toMatchObject({ notasTotal: 3, notasEnNarrativa: 1, notasSoloRegistro: 2 });
+    expect(resumenCobertura(completo(bloques), []).notasTotal).toBeUndefined();
+  });
+
+  it("progreso por tema", () => {
+    expect(textoProgresoTema({ tema: { indice: 3, total: 11, heading: "Formación continua" }, cubiertas: 24, total_notas: 61 })).toBe("Tema 3 de 11 («Formación continua») · 24 de 61 notas cubiertas");
+    expect(textoProgresoTema({ tema: null })).toBe("");
+  });
+});
+
+describe("0146: proveedor de IA, idioma y ficha", () => {
+  it("los ajustes de IA de los rankings se leen con cuidado", () => {
+    expect(leerAjustesRankingsIA(null)).toEqual({ ai_provider: "pilo", ai_model: "", ai_vision_model: "", ai_batch: 0 });
+    expect(leerAjustesRankingsIA({ ai_provider: "mistral", ai_model: " mistral-large-latest ", ai_vision_model: "pixtral-12b-2409", ai_batch: 5 })).toEqual({ ai_provider: "mistral", ai_model: "mistral-large-latest", ai_vision_model: "pixtral-12b-2409", ai_batch: 5 });
+    expect(leerAjustesRankingsIA({ ai_provider: "x", ai_batch: 40 }).ai_batch).toBe(0);
+  });
+
+  it("inglés por defecto; ficha completa; página de una elección", () => {
+    expect(idiomaPreferido(null)).toBe("en");
+    expect(fichaCompleta({ answer: "x", who: "x", what: "x", when: "", where: "x" })).toEqual({ completa: false, faltan: ["when"] });
+    const p = paginaDeEleccion({ indicator: "4.3.3", ficha: { answer: "In 2025, the Universidad de Santander trained 400 students." }, page_es: ["Una frase."], page_en: "One sentence." }, { id: "4.3.3", titulo: "Colegios", pregunta: "Outreach?" });
+    expect(p.titulo).toBe("Indicator 4.3.3 — Outreach?");
+    expect(p.frases).toEqual(["One sentence."]);
+    expect(leerAjustes({ vision: true })).toEqual({ tone: "cercano", person: "nosotros", vision: true });
   });
 });

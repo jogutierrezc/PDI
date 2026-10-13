@@ -17,6 +17,11 @@
          pages   cuántas páginas del listado en esta llamada (1 o 2)
        → { ok, seen, saved, skipped, next, fin }
 
+     { action: "imagenes", start?, limite?, ods? }   (0146) repasa las notas
+       aprobadas ya cargadas (de un ODS, si se da), vuelve a pedir cada página y
+       guarda sus imágenes en news_images. Salta las que ya tienen imágenes.
+       → { ok, seen, saved, next, fin }
+
      { action: "nuevas" }   con el encabezado x-noticias-cron (secreto NOTICIAS_CRON):
        lee la primera página de cada fuente y guarda lo nuevo del año en curso.
        Pensada para una tarea diaria (pg_cron o cron externo).
@@ -40,7 +45,8 @@
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.58.0";
 import { extracto, leer } from "./clasificar.ts";
-import { enlacesDelListado, leerK2 } from "./parseo.ts";
+import { enlacesDelListado, imagenesDeK2, leerK2, tamanoOg, type ImagenNota } from "./parseo.ts";
+import { hablaDeMenores } from "../pilo-rankingsod/logica.ts";
 
 const FUENTES: Record<string, { host: string; ruta: string; sede: string; seccion: string }> = {
   comunicaciones: { host: "udes.edu.co", ruta: "/comunicaciones/noticias", sede: "", seccion: "Comunicaciones" },
@@ -93,6 +99,8 @@ interface Nota {
   image_url: string | null;
   published_on: string | null;
   section: string;
+  /** 0146: la portada y las imágenes del texto. */
+  imagenes: ImagenNota[];
 }
 
 async function leerNota(host: string, ruta: string, seccion: string): Promise<Nota | null> {
@@ -116,7 +124,26 @@ async function leerNota(host: string, ruta: string, seccion: string): Promise<No
     image_url: imagen && imagen.startsWith("https://") ? imagen : null,
     published_on: /^\d{4}-\d{2}-\d{2}$/.test(fecha) ? fecha : null,
     section: cat || seccion,
+    imagenes: imagenesDeK2(k2, host, tamanoOg(html)),
   };
+}
+
+/**
+ * Guarda las imágenes de una nota sin repetir (news_images_unique). Los
+ * menores se marcan por el texto de la nota: Pilo no ve las imágenes. Sin la
+ * migración 0146 no hace nada.
+ */
+async function guardarImagenes(admin: ReturnType<typeof createClient>, newsId: string, nota: Pick<Nota, "title" | "body" | "imagenes">): Promise<number> {
+  if (!nota.imagenes.length) return 0;
+  const menores = hablaDeMenores({ title: nota.title, body: nota.body });
+  const { data, error } = await admin
+    .from("news_images")
+    .upsert(
+      nota.imagenes.map((i) => ({ news_id: newsId, url: i.url, width: i.width, height: i.height, caption: i.caption.slice(0, 400), credit: i.credit.slice(0, 200), pos: i.pos, is_cover: i.is_cover, kind: i.kind, minors: menores, alt: i.alt.slice(0, 400) })),
+      { onConflict: "news_id,url", ignoreDuplicates: true },
+    )
+    .select("id");
+  return error ? 0 : (data ?? []).length;
 }
 
 interface Resultado {
@@ -189,6 +216,7 @@ async function cargarFuente(admin: ReturnType<typeof createClient>, clave: strin
         ({ data: fila, error } = await guardar(false));
       }
       if (error || !fila) continue;
+      await guardarImagenes(admin, fila.id, nota);
       if (afinidad.length || (conPilo && candidata)) {
         if (afinidad.length) await admin.from("news_ods").insert(afinidad.map((a) => ({ news_id: fila.id, ods: a.ods, score: a.score, reason: a.reason, manual: false })));
         r.saved++;
@@ -217,7 +245,7 @@ Deno.serve(async (request: Request) => {
   if (!url || !serviceKey) return json({ error: "La función no está configurada." }, 500);
   const admin = createClient(url, serviceKey, { auth: { persistSession: false, autoRefreshToken: false } });
 
-  let cuerpo: { action?: string; fuente?: string; start?: number; year?: number; pages?: number } = {};
+  let cuerpo: { action?: string; fuente?: string; start?: number; year?: number; pages?: number; limite?: number; ods?: number } = {};
   try {
     cuerpo = JSON.parse((await request.text()) || "{}");
   } catch {
@@ -254,6 +282,45 @@ Deno.serve(async (request: Request) => {
     const r = await cargarFuente(admin, fuente, start, year, pages);
     await admin.from("news_runs").insert({ started_at: inicio, finished_at: new Date().toISOString(), source: `${fuente} ${year} (${autor ? "intranet" : "cron"})`, seen: r.seen, saved: r.saved, skipped: r.skipped });
     return json({ ok: true, ...r });
+  }
+
+  if (action === "imagenes") {
+    // Las notas aprobadas ya cargadas, en orden estable; se saltan las que ya tienen imágenes.
+    const start = Math.max(0, Math.min(50_000, Math.floor(Number(cuerpo.start) || 0)));
+    const limite = Math.max(1, Math.min(8, Math.floor(Number(cuerpo.limite) || 5)));
+    const ods = Math.floor(Number(cuerpo.ods) || 0);
+    const inicio = new Date().toISOString();
+    let consulta = admin
+      .from("news_items")
+      .select(ods ? "id, url, title, body, news_images(id), news_ods!inner(ods)" : "id, url, title, body, news_images(id)")
+      .eq("state", "ok")
+      .order("created_at", { ascending: true })
+      .range(start, start + limite - 1);
+    if (ods >= 1 && ods <= 17) consulta = consulta.eq("news_ods.ods", ods);
+    const { data, error } = await consulta;
+    if (error) return json({ error: /news_images|42P01|PGRST2/.test(`${error.code} ${error.message}`) ? "Falta aplicar la migración 0146." : error.message, code: "migracion" }, 500);
+    type Fila = { id: string; url: string; title: string; body: string; news_images: { id: string }[] | null };
+    const filas = (data ?? []) as unknown as Fila[];
+    let seen = 0;
+    let saved = 0;
+    for (const f of filas) {
+      seen++;
+      if ((f.news_images ?? []).length) continue;
+      let destino: URL;
+      try {
+        destino = new URL(f.url);
+      } catch {
+        continue;
+      }
+      if (destino.protocol !== "https:" || !/(^|\.)udes\.edu\.co$/.test(destino.hostname)) continue;
+      await dormir(450);
+      const nota = await leerNota(destino.hostname, destino.pathname, "");
+      if (!nota) continue;
+      saved += await guardarImagenes(admin, f.id, { title: f.title, body: f.body, imagenes: nota.imagenes });
+    }
+    const fin = filas.length < limite;
+    await admin.from("news_runs").insert({ started_at: inicio, finished_at: new Date().toISOString(), source: `imagenes${ods ? ` ODS ${ods}` : ""} (intranet)`, seen, saved, skipped: 0 });
+    return json({ ok: true, seen, saved, next: start + filas.length, fin });
   }
 
   if (action === "nuevas") {

@@ -2,7 +2,7 @@
 import { createElement as h } from "react";
 import { describe, expect, it, vi } from "vitest";
 import { renderToString } from "react-dom/server";
-import type { NewsItem } from "../rankings/noticias";
+import type { NotaPublica } from "./ods-noticias";
 
 vi.hoisted(() => {
   Object.defineProperty(window, "matchMedia", {
@@ -10,17 +10,23 @@ vi.hoisted(() => {
   });
 });
 
-const datos = vi.hoisted(() => ({ data: [] as NewsItem[] }));
-vi.mock("../rankings/noticias", async (original) => ({
-  ...(await original<typeof import("../rankings/noticias")>()),
-  useApprovedNews: () => ({ data: datos.data }),
-}));
+const datos = vi.hoisted(() => ({ data: [] as NotaPublica[] }));
+vi.mock("./ods-noticias", () => ({ useNoticiasPublicas: () => ({ data: datos.data }) }));
 
-import { OdsNews, ordenarCarrusel } from "./OdsNews";
+import { LOTE_CARRUSEL, OdsNews, ordenarCarrusel } from "./OdsNews";
 
-const nota = (id: string, over: Partial<NewsItem> = {}): NewsItem => ({
-  id, url: `https://udes.edu.co/investigacion/noticias/${id}`, title: `Título ${id}`, excerpt: `Extracto ${id}.`, image_url: "https://udes.edu.co/media/k2/items/cache/a.jpg",
-  published_on: "2025-05-02", section: "Investigación", campus: "Bucaramanga", state: "ok", ods: [{ ods: 13, score: 80, reason: "Menciona clima", manual: false }], ...over,
+const nota = (id: string, over: Partial<NotaPublica> = {}): NotaPublica => ({
+  id,
+  url: `https://udes.edu.co/investigacion/noticias/${id}`,
+  title: `Título ${id}`,
+  title_en: "",
+  excerpt: `Extracto ${id}.`,
+  excerpt_en: "",
+  image_url: "https://udes.edu.co/media/k2/items/cache/a.jpg",
+  published_on: "2025-05-02",
+  section: "Investigación",
+  campus: "Bucaramanga",
+  ...over,
 });
 
 const render = (props: Parameters<typeof OdsNews>[0]) => renderToString(h(OdsNews, props)).replace(/<!-- -->/g, "");
@@ -29,6 +35,7 @@ describe("OdsNews · carrusel final", () => {
   it("sin notas aprobadas no pinta nada", () => {
     datos.data = [];
     expect(render({ n: 13 })).toBe("");
+    expect(render({ n: 13, lang: "en" })).toBe("");
   });
 
   it("cada tarjeta: foto, fecha, título, extracto y enlace a udes.edu.co; sin porcentajes ni estados", () => {
@@ -40,13 +47,26 @@ describe("OdsNews · carrusel final", () => {
     expect(html).toContain("Leer la nota en udes.edu.co");
     expect(html).toContain("Extracto b.");
     expect(html).toContain("1 ago 2025");
-    expect(html).not.toMatch(/Menciona clima|80 ?%|Por revisar/);
+    expect(html).not.toMatch(/80 ?%|Por revisar/);
     expect(html).toContain('rel="noopener noreferrer"');
-    /* De la más reciente a la más antigua; la tarjeta lleva el id al que apuntan las referencias del relato. */
     expect(html.indexOf('id="osn-b"')).toBeLessThan(html.indexOf('id="osn-a"'));
     expect(html.indexOf('id="osn-a"')).toBeLessThan(html.indexOf('id="osn-c"'));
-    /* Sin imagen queda el campo del color del ODS. */
     expect(html).toContain(">UDES</span>");
+    expect(html).not.toContain('class="lng-es"');
+  });
+
+  it("en inglés: título y extracto en inglés si existen; si no, el original con la marca «ES»", () => {
+    datos.data = [nota("a", { title_en: "Title a", excerpt_en: "Excerpt a." }), nota("b", { published_on: "2025-01-01" })];
+    const html = render({ n: 13, lang: "en" });
+    expect(html).toContain("UDES in the news");
+    expect(html).toContain("2 news stories from 2025");
+    expect(html).toContain('<span lang="en">Title a</span>');
+    expect(html).toContain("Excerpt a.");
+    expect(html).toMatch(/<span lang="es">Título b <abbr class="lng-es"[^>]*>ES<\/abbr><\/span>/);
+    expect(html).toContain("Read the story on udes.edu.co");
+    expect(html).toContain("1 Jan 2025");
+    expect(html).toContain('aria-label="Next stories"');
+    expect(html).not.toContain("Leer la nota");
   });
 
   it("es un carrusel accesible: flechas, contador anunciado y pista con foco", () => {
@@ -57,7 +77,14 @@ describe("OdsNews · carrusel final", () => {
     expect(html).toContain('aria-live="polite"');
     expect(html).toContain("1–3 de 4");
     expect(html).toMatch(/class="osn-track" tabindex="0"/);
-    expect(html).toMatch(/aria-label="Noticias anteriores" aria-controls="osn-track" disabled=""|disabled=""[^>]*aria-label="Noticias anteriores"/);
+  });
+
+  it("todas las notas, sin tope: de 24 en 24 con «Ver N más»", () => {
+    datos.data = Array.from({ length: 61 }, (_, i) => nota(`n${i}`, { published_on: `2025-${String((i % 12) + 1).padStart(2, "0")}-10` }));
+    const html = render({ n: 4 });
+    expect(html).toContain("61 notas de 2025");
+    expect(html.match(/class="osn-card"/g)?.length).toBe(LOTE_CARRUSEL);
+    expect(html).toContain(`Ver ${LOTE_CARRUSEL} más`);
   });
 
   it("si el informe recortó la foto, la tarjeta usa su punto de interés", () => {

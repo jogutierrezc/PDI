@@ -14,6 +14,8 @@ import { useGSAP } from "@gsap/react";
 import { PlanLayout } from "../planeacion/PlanLayout";
 import { RANKINGS } from "./data";
 import { reduced } from "./widgets";
+import { useLang } from "./i18n";
+import { LangSwitch } from "./LangSwitch";
 import "./sostenible.css";
 
 const INTRO_KEY = "udes-sostenible-intro";
@@ -28,13 +30,14 @@ const introSeen = () => {
 
 export function SostenibleLayout({ title, children }: { title: string; children: ReactNode }) {
   const { pathname, hash } = useLocation();
+  const { lang, setLang, t } = useLang();
   return (
     <PlanLayout title={`${title} · UDES Sostenible`}>
-      <div className="sos">
+      <div className="sos" lang={lang}>
         <nav className="sos-sub" aria-label="UDES Sostenible">
           <div className="sos-wrap">
             <NavLink to="/sostenible" end className="sos-sub__link" aria-current={pathname === "/sostenible" && !hash ? "page" : undefined}>
-              Inicio
+              {t("nav_inicio")}
             </NavLink>
             {RANKINGS.map((r) => (
               <NavLink key={r.id} to={`/sostenible/${r.id}`} className="sos-sub__link">
@@ -42,11 +45,13 @@ export function SostenibleLayout({ title, children }: { title: string; children:
               </NavLink>
             ))}
             <Link to="/sostenible#indicadores" className="sos-sub__link">
-              Indicadores
+              {t("nav_indicadores")}
             </Link>
             <Link to="/sostenible#informes" className="sos-sub__link">
-              Informes
+              {t("nav_informes")}
             </Link>
+            {/* Español e inglés en todo el portal de los rankings: ?lang= y lo recordado. */}
+            <LangSwitch lang={lang} onChange={setLang} className="sos-sub__lang" />
           </div>
         </nav>
         {children}
@@ -100,10 +105,11 @@ export function useIntro(): { showing: boolean; skip: () => void; scope: React.R
 }
 
 export function Intro({ scope, skip }: { scope: React.RefObject<HTMLDivElement>; skip: () => void }) {
+  const { t } = useLang();
   return (
     <div ref={scope} className="sos-intro" role="presentation">
       <button type="button" className="sos-intro__skip" onClick={skip}>
-        Saltar intro
+        {t("saltar_intro")}
       </button>
       <div className="sos-intro__stage">
         <svg viewBox="0 0 120 150" aria-hidden="true">

@@ -19,6 +19,8 @@ import { ODS_CURRENT, ODS_LIST, ODS_ROUTES, RECTOR, odsTotals, rectorParagraphs 
 import { useRectorText } from "./ods-selection";
 import { OdsPortalArrow } from "./OdsPortalArrow";
 import { reduced } from "./widgets";
+import { useLang } from "./i18n";
+import { MarcaEs } from "./LangSwitch";
 import "./ods-portal.css";
 
 gsap.registerPlugin(useGSAP);
@@ -28,6 +30,7 @@ export function OdsRector() {
   const paras = rectorParagraphs(text);
   const totals = odsTotals();
   const root = useRef<HTMLDivElement>(null);
+  const { lang, t } = useLang();
 
   /* El bloque verde se abre de abajo arriba y la tira se dibuja; la carta entra por líneas y bloques. */
   useGSAP(
@@ -43,13 +46,13 @@ export function OdsRector() {
   );
 
   return (
-    <OdsShell title="Presentación rectoral" active="rector">
+    <OdsShell title={t("tab_rector")} active="rector">
       <div ref={root} className="opt-view opt-rect">
-        <figure className="opt-plate" aria-label="Fotografía del Rector pendiente">
+        <figure className="opt-plate" aria-label={t("rector_foto_pendiente")}>
           <span className="opt-plate__mark" aria-hidden="true">
             R
           </span>
-          <figcaption>Aquí va la fotografía oficial del Rector</figcaption>
+          <figcaption>{t("rector_foto_aqui")}</figcaption>
           <span className="opt-bands" aria-hidden="true">
             {ODS_LIST.map((o) => (
               <i key={o.n} style={{ background: o.color }} />
@@ -57,14 +60,22 @@ export function OdsRector() {
           </span>
         </figure>
 
-        <article className="opt-letter">
+        <article className="opt-letter" lang="es">
           <h1 className="opt-letter__title">
             <span className="opt-line">
               <span>{RECTOR.title}</span>
             </span>
           </h1>
           <div className="opt-letter__body">
-            <p className="opt-letter__meta">Presentación rectoral · THE Impact Rankings {ODS_CURRENT}</p>
+            <p className="opt-letter__meta" lang={lang}>
+              {t("rector_meta", { e: ODS_CURRENT })}
+              {lang === "en" && (
+                <>
+                  {" "}
+                  <MarcaEs lang={lang} /> <span className="opt-vh">{t("contenido_es")}</span>
+                </>
+              )}
+            </p>
             {paras.slice(0, 1).map((p, i) => (
               <p key={`a${i}`} className="opt-letter__p opt-letter__p--lead">
                 {p}
@@ -82,34 +93,34 @@ export function OdsRector() {
               <b>{RECTOR.name}</b>
               <span>{RECTOR.role}</span>
             </div>
-            <div className="opt-figs opt-figs--letter">
+            <div className="opt-figs opt-figs--letter" lang={lang}>
               <p className="opt-fig">
                 <b>{ODS_LIST.length}</b>
-                <span>informes ODS</span>
+                <span>{t("informes_ods_n")}</span>
               </p>
               <p className="opt-fig">
                 <b>{totals.the}</b>
                 <span>
-                  ODS para THE <span className="odsx-ilus">Dato ilustrativo</span>
+                  {t("ods_para_the")} <span className="odsx-ilus">{t("dato_ilustrativo")}</span>
                 </span>
               </p>
               <p className="opt-fig">
                 <b>{ODS_CURRENT}</b>
-                <span>edición vigente</span>
+                <span>{t("edicion_vigente")}</span>
               </p>
             </div>
-            <div className="opt-letter__acts">
+            <div className="opt-letter__acts" lang={lang}>
               <OdsBulletinDownload />
               <Link to={ODS_ROUTES.portal} className="opt-link">
-                Ver los 17 informes <OdsPortalArrow />
+                {t("ver_17")} <OdsPortalArrow />
               </Link>
             </div>
             {(RECTOR.illustrative || edited) && (
-              <p className="odsx-note opt-foot">
-                {RECTOR.illustrative && <span className="odsx-ilus">Texto de ejemplo</span>} {edited ? "Este texto se editó en el generador del boletín y solo se ve en este navegador. " : ""}
-                La presentación la redacta y aprueba la Rectoría. El mismo texto se usa en esta página, en el portal y en la segunda página del boletín. Se edita en la vista{" "}
+              <p className="odsx-note opt-foot" lang={lang}>
+                {RECTOR.illustrative && <span className="odsx-ilus">{t("texto_ejemplo")}</span>} {edited ? `${t("rector_editado")} ` : ""}
+                {t("rector_nota")}{" "}
                 <Link to={ODS_ROUTES.bulletin} className="opt-inline">
-                  «Boletín PDF»
+                  «{t("tab_boletin")}»
                 </Link>
                 .
               </p>

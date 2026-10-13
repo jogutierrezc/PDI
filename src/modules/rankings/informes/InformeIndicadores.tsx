@@ -4,18 +4,21 @@
    THE no hace clic en enlaces y rechaza páginas con muchos: cada indicador
    lleva UNA sola nota y una página de evidencia limpia. Pilo propone las
    candidatas con sus alertas; la persona elige, responde lo que solo ella sabe
-   («¿los actos son gratuitos?»), aprueba y ve la página tal como la verá THE.
+   («¿los actos son gratuitos?»), completa la ficha de hechos, ve cómo lo
+   evaluaría THE (una simulación de Pilo) y la página tal como la verá THE:
+   en inglés primero, con el español a un clic. Aprobar es siempre de una persona.
    ========================================================================== */
 
 import { useMemo, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
-import { piloIndicador, resumenCobertura, useGuardarEleccion, useNoticiasDeOds } from "./datos";
+import { paginaDeEleccion, piloIndicador, resumenCobertura, useGuardarEleccion, useNoticiasDeOds } from "./datos";
 import type { EvidenciaPublica, NoticiaOds } from "./datos";
 import { indicadoresDe } from "./the-indicadores";
 import { puntosEvidencia } from "./tipos";
 import type { Candidata, EleccionIndicador, Foto, IndicadorTHE, InformeCompleto } from "./tipos";
 import { EvidenciaHoja } from "../../sostenible/OdsEvidence";
 import "../../sostenible/ods-evidence.css";
+import { Evaluador, FichaEditor } from "./InformeFicha";
 
 const f1 = (x: number) => String(Math.round(x * 100) / 100).replace(".", ",");
 const errorTexto = (e: unknown) => (e instanceof Error ? e.message : String(e));
@@ -53,6 +56,7 @@ export function evidenciaDesde(ods: number, ind: string, el: EleccionIndicador, 
     indicator: ind,
     ods,
     title: n.title,
+    title_en: n.title_en ?? "",
     date: n.published_on,
     section: n.section,
     campus: n.campus,
@@ -60,6 +64,7 @@ export function evidenciaDesde(ods: number, ind: string, el: EleccionIndicador, 
     url: n.url,
     page_es: el.page_es,
     page_en: el.page_en,
+    ficha: el.ficha && Object.keys(el.ficha).length ? { indicator: ind, question: "", answer: "", who: "", what: "", when: "", where: "", how_many: "", beneficiaries: "", partners: "", evidence_type: "", period: "", ...el.ficha } : null,
   };
 }
 
@@ -137,6 +142,7 @@ function Indicador({ completo, ind, el, notas }: { completo: InformeCompleto; in
   const cliente = useQueryClient();
   const [pilo, setPilo] = useState(false);
   const [error, setError] = useState("");
+  const [idiomaHoja, setIdiomaHoja] = useState<"en" | "es">("en");
   const base: EleccionIndicador = el ?? { report_id: inf.id, indicator: ind.id, news_id: null, candidates: [], ask: {}, page_es: [], page_en: "", approved: false };
   const escribir = (c: Partial<EleccionIndicador>) => {
     setError("");
@@ -291,14 +297,34 @@ function Indicador({ completo, ind, el, notas }: { completo: InformeCompleto; in
             </section>
           )}
 
+          {elegida && (
+            <FichaEditor
+              ficha={base.ficha}
+              textoPagina={paginaDeEleccion(base, ind, "en").texto}
+              anio={inf.edition}
+              guardando={guardar.isPending}
+              onGuardar={(ficha) => escribir({ ficha, approved: false })}
+            />
+          )}
+
+          <Evaluador report_id={inf.id} indicator={ind.id} ev={base.eval} listo={Boolean(elegida)} />
+
           {elegida && notaElegida && (
             <section className="ri-card">
               <div className="ri-edhead">
                 <h3 className="ri-h4">Página de evidencia</h3>
-                <span className="ri-mute">Español e inglés, sin menú, sin enlaces y sin adjuntos.</span>
+                <div className="ri-seg" role="group" aria-label="Idioma de la página">
+                  <button type="button" lang="en" aria-pressed={idiomaHoja === "en"} onClick={() => setIdiomaHoja("en")}>
+                    English
+                  </button>
+                  <button type="button" aria-pressed={idiomaHoja === "es"} onClick={() => setIdiomaHoja("es")}>
+                    Español
+                  </button>
+                </div>
               </div>
+              <p className="ri-mute">En el orden de THE: indicador y pregunta, respuesta, ficha y frases de la nota. Sin menú, sin enlaces y sin adjuntos.</p>
               <div className="ri-evprev">
-                <EvidenciaHoja ev={evidenciaDesde(inf.ods, ind.id, base, notaElegida, completo.fotos.find((f) => f.news_id === notaElegida.id))} />
+                <EvidenciaHoja ev={evidenciaDesde(inf.ods, ind.id, base, notaElegida, completo.fotos.find((f) => f.news_id === notaElegida.id))} lang={idiomaHoja} />
               </div>
               <p className="ri-mute">
                 Dirección pública: <code>planeacion.udes.edu.co{ruta}</code>. Se ve cuando la evidencia está aprobada y el informe publicado.

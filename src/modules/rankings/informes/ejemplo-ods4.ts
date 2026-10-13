@@ -4,7 +4,7 @@
    ninguna pantalla lo importa.
    ========================================================================== */
 
-import type { Bloque, EleccionIndicador, Foto, InformeCompleto } from "./tipos";
+import type { Bloque, CifraNota, EleccionIndicador, Foto, ImagenNota, InformeCompleto, RegistroActividad } from "./tipos";
 
 const R = "inf-4-2025";
 const IMG = (k: string) => `https://udes.edu.co/images/noticias/2025/${k}.jpg`;
@@ -14,6 +14,8 @@ export const NOTAS_EJEMPLO = [
     id: "recolector",
     url: "https://udes.edu.co/comunicaciones/noticias/el-recolector-la-libertad",
     title: "«El Recolector» llevó la cultura del reciclaje a la Institución Educativa La Libertad",
+    title_en: "“El Recolector” brought a recycling culture to the La Libertad school",
+    excerpt_en: "More than 400 secondary students took part in workshops on recyclable waste.",
     excerpt: "Más de 400 estudiantes de bachillerato participaron en talleres sobre residuos reciclables.",
     body: "En los meses de febrero y marzo de 2025, la Institución Educativa La Libertad de Bucaramanga fue sede de jornadas de sensibilización y capacitación del proyecto El Recolector, liderada por el programa de Instrumentación Quirúrgica. A lo largo de los talleres, más de 400 estudiantes de bachillerato participaron junto con sus docentes, con el apoyo de un representante de la empresa Veolia.",
     image_url: IMG("recolector"),
@@ -99,6 +101,13 @@ export const BLOQUES_EJEMPLO: Bloque[] = [
       { news_id: "recolector", quote: "más de 400 estudiantes de bachillerato" },
       { news_id: "recolector", quote: "representante de la empresa Veolia" },
     ],
+    [],
+    {
+      heading: "Educación en los colegios",
+      heading_en: "Education in schools",
+      text_en:
+        "Between February and March, the La Libertad school in Bucaramanga became a recycling classroom: more than 400 secondary students learned with the Surgical Instrumentation programme and the company Veolia how to sort and reuse waste.",
+    },
   ),
   bloque(
     "b5",
@@ -110,6 +119,8 @@ export const BLOQUES_EJEMPLO: Bloque[] = [
       { news_id: "mutis", quote: "ha vinculado a 271 personas, incluyendo profesores y estudiantes de pregrado de Medicina" },
       { news_id: "mutis", quote: "información confiable sobre métodos de planificación familiar" },
     ],
+    [],
+    { heading: "Educación en los colegios", heading_en: "Education in schools" },
   ),
   bloque(
     "b6",
@@ -121,8 +132,11 @@ export const BLOQUES_EJEMPLO: Bloque[] = [
       { news_id: "diplomado", quote: "modalidad híbrida y con una intensidad de 80 horas" },
       { news_id: "diplomado", quote: "profesionales de Costa Rica, El Salvador y diversas ciudades de Colombia" },
     ],
+    [],
+    { heading: "Formación continua" },
   ),
   bloque("b7", "hicimos", 4, "pilo", "Un párrafo de reserva que Pilo preparó con una nota sin usar.", [], [], { enabled: false, spare: true }),
+  bloque("b10", "hicimos", 5, "persona", "Texto repetido del informe del ODS 1 que la importación dejó fuera.", [], [], { enabled: false, warn: "Texto repetido de otro ODS: revisa si corresponde a este." }),
   bloque("b8", "proyectos", 1, "pilo", "El Recolector. El programa de Instrumentación Quirúrgica enseña a la comunidad escolar a clasificar y aprovechar los residuos reciclables.", [
     { news_id: "recolector", quote: "El Recolector" },
   ]),
@@ -176,3 +190,21 @@ export const INFORME_EJEMPLO: InformeCompleto = {
   fotos: FOTOS_EJEMPLO,
   elecciones: ELECCIONES_EJEMPLO,
 };
+
+export const IMAGENES_EJEMPLO: ImagenNota[] = [
+  { id: "img-rec-1", news_id: "recolector", url: IMG("recolector"), width: 1200, height: 400, caption: "Jornada en La Libertad.", credit: "Comunicaciones UDES", pos: 0, is_cover: true, kind: "foto", minors: false, alt: "Estudiantes con uniforme gris." },
+  { id: "img-rec-2", news_id: "recolector", url: IMG("recolector-2"), width: 800, height: 1100, caption: "Afiche del taller.", credit: "Comunicaciones UDES", pos: 1, is_cover: false, kind: "grafica", minors: false, alt: "Afiche con el texto «El Recolector»." },
+  { id: "img-mutis-1", news_id: "mutis", url: IMG("mutis"), width: 1200, height: 400, caption: "", credit: "", pos: 0, is_cover: true, kind: "foto", minors: false, alt: "" },
+  { id: "img-dip-1", news_id: "diplomado", url: IMG("diplomado"), width: 1200, height: 400, caption: "", credit: "Educación Continua", pos: 0, is_cover: true, kind: "foto", minors: true, alt: "" },
+];
+
+export const CIFRAS_EJEMPLO: CifraNota[] = [
+  { id: "c1", news_id: "recolector", value: "400", num: 400, unit: "estudiantes", label: "estudiantes de bachillerato", quote: "más de 400 estudiantes de bachillerato", kind: "personas", score: 0.9, checked: true },
+  { id: "c2", news_id: "mutis", value: "271", num: 271, unit: "personas", label: "personas vinculadas", quote: "ha vinculado a 271 personas", kind: "personas", score: 0.8, checked: true },
+  { id: "c3", news_id: "diplomado", value: "80 horas", num: 80, unit: "horas", label: "de formación", quote: "con una intensidad de 80 horas", kind: "horas", score: 0, checked: false },
+];
+
+export const REGISTRO_EJEMPLO: RegistroActividad[] = [
+  { news_id: "recolector", published_on: "2025-03-28", campus: "Bucaramanga", section: "Comunicaciones", title: NOTAS_EJEMPLO[0].title, title_en: NOTAS_EJEMPLO[0].title_en ?? "", url: NOTAS_EJEMPLO[0].url, figure_value: "400", figure_label: "estudiantes de bachillerato", en_narrativa: true },
+  { news_id: "otra", published_on: "2025-06-02", campus: "Cúcuta", section: "Extensión", title: "Nota que solo está en el registro", title_en: "", url: "https://udes.edu.co/x", figure_value: null, figure_label: null, en_narrativa: false },
+];

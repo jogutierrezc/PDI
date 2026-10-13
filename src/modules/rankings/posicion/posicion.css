@@ -1,0 +1,484 @@
+/* =============================================================================
+   Posicionamiento en THE Impact · estilos. Prefijo rp-.
+   Solo tokens de src/styles/tokens.css (claro y oscuro salen de ahí) y las
+   clases rk- del módulo. Sin gradientes, sin sombras, sin animación salvo el
+   cambio de fondo del peldaño (120 ms).
+   ========================================================================== */
+
+.rp {
+  display: grid;
+  gap: var(--space-8);
+  max-width: 1040px;
+  min-width: 0;
+}
+
+.rp-block {
+  display: grid;
+  gap: var(--space-3);
+  min-width: 0;
+  padding-top: var(--space-4);
+  border-top: 1px solid var(--line);
+}
+
+.rp-block:first-child {
+  border-top: 2px solid var(--brand-navy);
+}
+
+.rp-block .rk-lead {
+  margin-bottom: 0;
+}
+
+.rp-h3 {
+  margin: 0 0 var(--space-2);
+  color: var(--ink);
+  font-size: var(--text-sm);
+  font-weight: 800;
+}
+
+.rp-muted {
+  color: var(--ink-muted);
+}
+
+.rp-source {
+  margin: 0;
+  color: var(--ink-muted);
+  font-size: var(--text-2xs);
+}
+
+.rp :is(button, a, input, select, summary):focus-visible {
+  outline: 2px solid var(--brand-blue);
+  outline-offset: 2px;
+}
+
+/* ---------- a. Escalera ---------- */
+
+.rp-ladder {
+  --rp-cols: 2.5rem minmax(9rem, 15rem) minmax(8rem, 1fr) 9.5rem;
+  min-width: 0;
+}
+
+.rp-ladder__axis,
+.rp-rung {
+  display: grid;
+  grid-template-columns: var(--rp-cols);
+  gap: var(--space-3);
+  align-items: center;
+}
+
+.rp-ladder__axis {
+  padding: 0 var(--space-2) var(--space-1);
+  color: var(--ink-muted);
+  font-size: var(--text-2xs);
+  font-variant-numeric: tabular-nums;
+}
+
+.rp-ladder__ticks {
+  position: relative;
+  height: 1em;
+}
+
+.rp-ladder__ticks span {
+  position: absolute;
+  transform: translateX(-50%);
+}
+
+.rp-ladder__head {
+  font-weight: 700;
+}
+
+.rp-ladder__list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  border-top: 1px solid var(--line);
+}
+
+.rp-rung {
+  width: 100%;
+  min-height: 36px;
+  padding: 6px var(--space-2);
+  color: var(--ink);
+  background: transparent;
+  border: 0;
+  border-bottom: 1px solid var(--line);
+  font: inherit;
+  font-size: var(--text-sm);
+  text-align: left;
+  cursor: pointer;
+  transition: background-color 120ms ease-out;
+}
+
+.rp-rung:hover {
+  background: var(--surface-2);
+}
+
+.rp-rung[aria-pressed="true"] {
+  background: var(--surface-3);
+}
+
+.rp-rung__pos {
+  color: var(--ink-muted);
+  font-weight: 700;
+}
+
+.rp-rung__name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.rp-rung__bar {
+  display: block;
+  width: 100%;
+  height: 18px;
+}
+
+.rp-rung__band {
+  font-size: var(--text-xs);
+  font-weight: 700;
+}
+
+.rp-rung__score {
+  color: var(--ink-muted);
+  font-weight: 400;
+}
+
+.rp-band {
+  fill: var(--line-faint);
+}
+
+.rp-grid {
+  stroke: var(--gridline);
+  stroke-width: 1;
+}
+
+.rp-range {
+  fill: var(--ink-muted);
+}
+
+.rp-rung--udes {
+  font-weight: 800;
+}
+
+.rp-rung--udes .rp-range {
+  fill: var(--brand-blue);
+}
+
+.rp-rung--udes .rp-rung__pos,
+.rp-rung--udes .rp-rung__name {
+  color: var(--brand-navy);
+}
+
+.rp-row--udes th,
+.rp-row--udes td {
+  font-weight: 800;
+}
+
+/* ---------- Mejores ODS ---------- */
+
+.rp-best {
+  padding: var(--space-3) 0;
+}
+
+.rp-best__list {
+  display: grid;
+  gap: var(--space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: var(--text-sm);
+}
+
+.rp-best__list li {
+  display: flex;
+  gap: var(--space-2);
+  align-items: center;
+}
+
+/* ---------- b. Escenario ---------- */
+
+.rp-controls,
+.rp-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3) var(--space-5);
+  align-items: flex-end;
+}
+
+.rp-field {
+  display: grid;
+  gap: 4px;
+  color: var(--ink-secondary);
+  font-size: var(--text-2xs);
+  font-weight: 700;
+}
+
+.rp-field small {
+  max-width: 14rem;
+  color: var(--ink-muted);
+  font-weight: 400;
+}
+
+.rp-field :is(input, select) {
+  min-height: 36px;
+  padding: 6px 10px;
+  color: var(--ink);
+  background: var(--surface-2);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-sm);
+  font: 600 var(--text-sm) var(--font-sans);
+  font-variant-numeric: tabular-nums;
+}
+
+.rp-field input {
+  width: 7rem;
+}
+
+.rp-meta .rp-field select {
+  max-width: 100%;
+}
+
+.rp-check {
+  display: flex;
+  gap: var(--space-2);
+  align-items: center;
+  min-height: 36px;
+  color: var(--ink-secondary);
+  font-size: var(--text-sm);
+}
+
+.rp-table td,
+.rp-table th {
+  vertical-align: middle;
+}
+
+.rp-table input[type="checkbox"] {
+  width: 18px;
+  height: 18px;
+}
+
+.rp-table tbody th {
+  color: var(--ink);
+  font-size: var(--text-xs);
+  font-weight: 600;
+}
+
+.rp-row--off :is(td, th) {
+  color: var(--ink-muted);
+}
+
+.rp-wrap {
+  min-width: 14rem;
+  white-space: normal !important;
+}
+
+/* ---------- c. Resultados ---------- */
+
+.rp-figs {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(10rem, 1fr));
+  gap: var(--space-4) var(--space-6);
+  margin: var(--space-2) 0;
+}
+
+.rp-fig {
+  padding-top: var(--space-2);
+  border-top: 1px solid var(--line-strong);
+}
+
+.rp-fig:first-child {
+  border-top: 2px solid var(--brand-blue);
+}
+
+.rp-fig__n {
+  margin: 0;
+  color: var(--brand-navy);
+  font-size: var(--text-2xl);
+  font-weight: 800;
+  line-height: 1.1;
+  letter-spacing: var(--tracking-tight);
+}
+
+.rp-fig__label {
+  margin: var(--space-1) 0 0;
+  color: var(--ink);
+  font-size: var(--text-sm);
+  font-weight: 700;
+}
+
+.rp-fig__note {
+  margin: 2px 0 0;
+  color: var(--ink-muted);
+  font-size: var(--text-2xs);
+}
+
+.rp-split {
+  display: grid;
+  grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr);
+  gap: var(--space-6);
+}
+
+.rp-hist {
+  margin: 0;
+}
+
+.rp-hist svg {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+.rp-hist__bar {
+  fill: var(--brand-blue);
+}
+
+.rp-hist__now {
+  fill: var(--track);
+}
+
+.rp-hist__cut {
+  stroke: var(--ink-secondary);
+  stroke-width: 1;
+  stroke-dasharray: 3 3;
+}
+
+.rp-hist__axis {
+  stroke: var(--line-strong);
+}
+
+.rp-hist__tick {
+  fill: var(--ink-muted);
+  font-size: 10px;
+  font-variant-numeric: tabular-nums;
+}
+
+.rp-dist {
+  display: grid;
+  gap: var(--space-1);
+  margin: 0 0 var(--space-4);
+  padding: 0;
+  list-style: none;
+  font-size: var(--text-sm);
+}
+
+.rp-dist li {
+  display: grid;
+  grid-template-columns: 5.5rem minmax(0, 1fr) 4rem;
+  gap: var(--space-2);
+  align-items: center;
+}
+
+.rp-dist b {
+  text-align: right;
+}
+
+.rp-dist__track {
+  height: 10px;
+  background: var(--track);
+}
+
+.rp-dist__track span {
+  display: block;
+  height: 100%;
+  background: var(--ink-faint);
+}
+
+.rp-dist--now .rp-dist__track span {
+  background: var(--brand-blue);
+}
+
+.rp-dist--now > span:first-child::after {
+  content: " (hoy)";
+  color: var(--ink-muted);
+  font-weight: 400;
+}
+
+.rp-pos {
+  margin: 0 0 var(--space-2);
+  font-size: var(--text-sm);
+  line-height: 1.5;
+}
+
+/* ---------- d. Qué mover ---------- */
+
+.rp-callout {
+  margin: 0;
+  max-width: 72ch;
+  padding: var(--space-3) var(--space-4);
+  color: var(--ink);
+  background: var(--brand-blue-soft);
+  border-left: 3px solid var(--brand-blue);
+  font-size: var(--text-sm);
+  line-height: 1.5;
+}
+
+/* ---------- e. Método ---------- */
+
+.rp-method {
+  max-width: 76ch;
+  font-size: var(--text-sm);
+  line-height: 1.55;
+}
+
+.rp-method ul {
+  margin: 0 0 var(--space-4);
+  padding-left: 1.2em;
+}
+
+.rp-method li + li {
+  margin-top: var(--space-1);
+}
+
+.rp-fold summary {
+  min-height: 32px;
+}
+
+/* ---------- Angosto ---------- */
+
+@media (max-width: 760px) {
+  .rp-split {
+    grid-template-columns: 1fr;
+  }
+
+  .rp-ladder {
+    --rp-cols: 2rem minmax(0, 1fr) auto;
+  }
+
+  .rp-ladder__axis {
+    display: none;
+  }
+
+  .rp-rung {
+    grid-template-areas:
+      "pos name band"
+      "pos bar bar";
+    row-gap: 4px;
+  }
+
+  .rp-rung__pos {
+    grid-area: pos;
+  }
+
+  .rp-rung__name {
+    grid-area: name;
+  }
+
+  .rp-rung__bar {
+    grid-area: bar;
+  }
+
+  .rp-rung__band {
+    grid-area: band;
+  }
+
+  .rp-rung__score {
+    display: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .rp-rung {
+    transition: none;
+  }
+}

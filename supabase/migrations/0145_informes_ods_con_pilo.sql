@@ -212,6 +212,8 @@ grant select (report_id, indicator, news_id, page_es, page_en, approved, updated
 -- Una fila: la nota elegida para el indicador en el informe publicado más
 -- reciente del ODS, con sus frases y su texto en inglés. La imagen, solo si la
 -- foto está en uso y se puede publicar (sin menores o con autorización).
+-- 0146 cambia lo que devuelve: se borra antes para poder volver a aplicar esta migración.
+drop function if exists public.ods_evidencia(int, text);
 create or replace function public.ods_evidencia(p_ods int, p_indicator text)
 returns table (
   indicator    text,

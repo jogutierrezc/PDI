@@ -31,10 +31,22 @@ export type EstadoInforme = "borrador" | "revision" | "publicado";
 export type Tono = "cercano" | "institucional";
 export type Persona = "tercera" | "nosotros";
 
-/** La frase de una nota que sostiene lo que dice un párrafo. `quote` es un trozo literal de la nota. */
+/** De dónde sale una fuente (0146). Las noticias siguen siendo la mayoría. */
+export type TipoFuente = "noticia" | "proyecto" | "cifras" | "impacto" | "documento";
+
+/**
+ * La frase que sostiene lo que dice un párrafo. `quote` es un trozo literal de
+ * la fuente. Para una noticia, `news_id` es su id (como en 0145). Para otra
+ * fuente, `news_id` va vacío, `ref` es su referencia («cifras:<id>:2025»,
+ * «impacto:…», «proyecto:…», «documento:…») y `origen` lo que se muestra
+ * («Fuente: UDES en Cifras 2025»).
+ */
 export interface Fuente {
   news_id: string;
   quote: string;
+  kind?: TipoFuente;
+  ref?: string;
+  origen?: string;
 }
 
 /** Una cifra que Pilo encontró: valor tal como se muestra, qué mide y de dónde sale. */
@@ -58,8 +70,15 @@ export interface Bloque {
   /** Aviso de Pilo para quien revisa («la nota anuncia, no cuenta»). */
   warn: string | null;
   enabled: boolean;
-  /** Párrafo de reserva: Pilo lo preparó pero no está en el informe hasta que se añade. */
+  /** Párrafo de reserva: desde 0146, solo los casi idénticos a otro. */
   spare: boolean;
+  /** 0146: el párrafo en inglés (THE lee en inglés; el español siempre existe). */
+  text_en?: string;
+  /** 0146: el inglés tal como lo escribió Pilo. */
+  orig_en?: string;
+  /** 0146: el subtítulo temático dentro de «Qué hicimos» («Educación en los colegios»). */
+  heading?: string;
+  heading_en?: string;
 }
 
 export type RanuraFoto = "portada" | "n1" | "n2" | "galeria";
@@ -87,6 +106,69 @@ export interface Foto {
   /** Una persona confirmó la autorización de imagen. */
   cleared: boolean;
   crop: Recorte;
+  /** 0146: la imagen elegida de la nota (news_images). null o ausente: la portada de la nota, como en 0145. */
+  image_id?: string | null;
+}
+
+/** 0146: una imagen que trae una nota (portada o cuerpo). Pilo solo elige entre estas; no crea imágenes. */
+export interface ImagenNota {
+  id: string;
+  news_id: string;
+  url: string;
+  width: number | null;
+  height: number | null;
+  caption: string;
+  credit: string;
+  pos: number;
+  is_cover: boolean;
+  kind: "foto" | "grafica";
+  minors: boolean;
+  alt: string;
+}
+
+/** 0146: una cifra del libro de cifras de una nota, con su cita literal. */
+export interface CifraNota {
+  id: string;
+  news_id: string;
+  value: string;
+  num: number | null;
+  unit: string;
+  label: string;
+  quote: string;
+  kind: "personas" | "instituciones" | "horas" | "dinero" | "porcentaje" | "eventos" | "otro";
+  /** 0 = Pilo dijo que no es un logro de la UDES. */
+  score: number;
+  /** Pilo ya la revisó. */
+  checked: boolean;
+}
+
+/** 0146: la ficha de hechos de una evidencia, en inglés (la define pagina.ts). */
+export type { FichaEvidencia } from "./pagina";
+
+/** 0146: la pre-evaluación de Pilo como evaluador de THE (interna; nunca aprueba). */
+export interface Evaluacion {
+  grade: "s" | "g" | "n";
+  confidence: number;
+  reasons: string[];
+  /** Qué dato faltaría para que sea específica. */
+  missing: string[];
+  risks: string[];
+  at?: string;
+}
+
+/** 0146: una fila del «Registro de actividades» (todas las notas del ODS). */
+export interface RegistroActividad {
+  news_id: string;
+  published_on: string | null;
+  campus: string;
+  section: string;
+  title: string;
+  title_en: string;
+  url: string;
+  figure_value: string | null;
+  figure_label: string | null;
+  /** La cita algún párrafo; si no, la nota está solo en el registro. */
+  en_narrativa: boolean;
 }
 
 /** Valoración de Pilo de una nota para un indicador. */
@@ -112,11 +194,17 @@ export interface EleccionIndicador {
   /** Texto de envío en inglés. */
   page_en: string;
   approved: boolean;
+  /** 0146: la ficha de hechos para el LLM de THE ({} si aún no hay). */
+  ficha?: Partial<import("./pagina").FichaEvidencia>;
+  /** 0146: la pre-evaluación de Pilo, o null. Interna: el público no la ve. */
+  eval?: Evaluacion | null;
 }
 
 export interface AjustesInforme {
   tone: Tono;
   person: Persona;
+  /** 0146: describir fotos con el modelo de visión (si está configurado). Apagado por defecto. */
+  vision?: boolean;
 }
 
 export interface Informe {
@@ -139,8 +227,11 @@ export interface InformeCompleto {
 /** Lo que lee el portal público: solo lo aprobado y publicado. */
 export interface InformePublico {
   informe: Pick<Informe, "id" | "ods" | "edition" | "updated_at">;
-  bloques: Pick<Bloque, "id" | "sec" | "pos" | "text" | "sources" | "figs">[];
-  fotos: Pick<Foto, "news_id" | "slot" | "caption" | "alt" | "credit" | "crop">[];
+  bloques: Pick<Bloque, "id" | "sec" | "pos" | "text" | "sources" | "figs" | "text_en" | "heading" | "heading_en">[];
+  /** `url`: la imagen elegida (0146) o la portada de la nota. */
+  fotos: (Pick<Foto, "news_id" | "slot" | "caption" | "alt" | "credit" | "crop" | "image_id"> & { url?: string | null })[];
+  /** 0146: el «Registro de actividades»: todas las notas del ODS, en orden cronológico. */
+  registro?: RegistroActividad[];
 }
 
 /** Un indicador de THE de los que piden evidencia o datos, sacado de la metodología. */

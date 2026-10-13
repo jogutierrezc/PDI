@@ -26,6 +26,7 @@ import { OdsBulletinSheet, odsBulletinPages, odsBulletinText } from "./OdsBullet
 import type { OdsBulletinFont, OdsBulletinOptions, OdsBulletinPageFlags } from "./OdsBulletinSheet";
 import { loadBulletinFont } from "../boletin/fonts";
 import { reduced } from "./widgets";
+import { useLang } from "./i18n";
 import "./ods-portal.css";
 
 gsap.registerPlugin(useGSAP);
@@ -46,27 +47,26 @@ const FONTS: OdsBulletinFont[] = ["Open Sans", "Montserrat"];
 /** Puerta de acceso: el generador es para el equipo de Planeación; el público solo descarga la edición publicada. */
 export function OdsBulletin() {
   const auth = useAuth();
+  const { t } = useLang();
   if (auth.loading) {
     return (
-      <OdsShell title="Boletín de informes ODS" active="boletin">
+      <OdsShell title={t("boletin_title")} active="boletin">
         <div className="odsx-wrap">
-          <p className="odsx-note" role="status">Verificando tu sesión…</p>
+          <p className="odsx-note" role="status">{t("verificando")}</p>
         </div>
       </OdsShell>
     );
   }
   if (!auth.profile || !canIssueOdsBulletin(auth)) {
     return (
-      <OdsShell title="Boletín de informes ODS" active="boletin">
+      <OdsShell title={t("boletin_title")} active="boletin">
         <div className="odsx-wrap">
-          <h1>El generador del boletín es para el equipo de Planeación</h1>
-          <p className="odsx-note">
-            Si ya hay una edición publicada, puedes descargarla en PDF. Si eres parte del equipo, ingresa a la intranet para generar y emitir ediciones.
-          </p>
+          <h1>{t("boletin_equipo_t")}</h1>
+          <p className="odsx-note">{t("boletin_equipo_p")}</p>
           <p>
             <OdsBulletinDownload />{" "}
             <Link className="odsx-btn" to="/acceso-intranet" state={{ from: "/sostenible/impact/boletin" }}>
-              Ingresar a la intranet
+              {t("ingresar_intranet")}
             </Link>
           </p>
         </div>
@@ -87,6 +87,7 @@ function OdsBulletinGenerator() {
   const { included, isIncluded, toggle, setIncluded } = useBulletinSelection();
   const rector = useRectorText();
   const root = useRef<HTMLDivElement>(null);
+  const { lang, t } = useLang();
   const toastTimer = useRef<number>();
 
   useEffect(() => {
@@ -142,8 +143,14 @@ function OdsBulletinGenerator() {
   const sheets = (prefix: string) => pages.map((p) => <OdsBulletinSheet key={`${prefix}${p.t}-${p.i}`} page={p} pages={pages} opts={opts} />);
 
   return (
-    <OdsShell title="Boletín de informes ODS" active="boletin">
-      <div ref={root} className="odsx-wrap opt-view">
+    <OdsShell title={t("boletin_title")} active="boletin">
+      {/* El generador es una herramienta interna, en español; el boletín también. */}
+      <div ref={root} className="odsx-wrap opt-view" lang="es">
+        {lang === "en" && (
+          <p className="odsx-note" lang="en">
+            {t("generador_es")}
+          </p>
+        )}
         <div className="opb-layout">
           <aside className="opb-panel" aria-label="Opciones del boletín">
             <section>

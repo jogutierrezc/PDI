@@ -1,0 +1,39 @@
+/* El selector ES | EN y la marca «ES» del portal público (siempre claro). Prefijo lng-. */
+
+.lng-switch { display: inline-flex; gap: 2px; padding: 2px; background: color-mix(in srgb, currentColor 18%, transparent); }
+.lng-switch button {
+  min-width: 40px;
+  min-height: 32px;
+  padding: 2px 10px;
+  color: inherit;
+  background: transparent;
+  border: 0;
+  font: 800 12.5px/1 var(--font-sans, "Open Sans", system-ui, sans-serif);
+  letter-spacing: 0.08em;
+  cursor: pointer;
+  transition: background-color 0.15s ease, color 0.15s ease;
+}
+.lng-switch button[aria-pressed="true"] { color: #fff; background: #14233b; cursor: default; }
+.lng-switch button:focus-visible { outline: 2px solid currentColor; outline-offset: 2px; }
+
+.lng-es {
+  display: inline-block;
+  margin-left: 0.15em;
+  padding: 0 4px;
+  color: inherit;
+  border: 1px solid currentColor;
+  font: 700 10px/1.45 var(--font-sans, "Open Sans", system-ui, sans-serif);
+  font-stretch: 100%;
+  letter-spacing: 0.08em;
+  text-decoration: none;
+  vertical-align: 0.25em;
+  cursor: help;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .lng-switch button { transition: none; }
+}
+
+/* En la barra oscura del portal. */
+.sos-sub__lang { flex: none; margin-left: auto; }
+.sos-sub__lang button[aria-pressed="true"] { color: var(--sos-bar, #0b1017); background: var(--sos-stage-ink, #fff); }

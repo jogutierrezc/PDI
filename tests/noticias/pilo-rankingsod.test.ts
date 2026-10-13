@@ -13,23 +13,32 @@ import {
   esAnuncio,
   esCitaLiteral,
   esPiezaGrafica,
-  esReserva,
   frasesPorPrefijo,
   hablaDeMenores,
   indicadoresConNoticias,
   leerAjustes,
   leerIndicador,
   leerParrafo,
-  leerPlan,
   mensajesIndicador,
   mensajesParrafo,
-  mensajesPlan,
   mensajesReintento,
   notasParaIndicador,
   notasSinUsar,
   numerosDe,
   ordenarNotas,
   planGuardado,
+  planInicial,
+  agruparNotas,
+  siguienteGrupo,
+  cubiertas,
+  esDuplicado,
+  leerTemas,
+  lotesDeTemas,
+  mensajesTemas,
+  aplicarLote,
+  sumarNuevas,
+  partirParejo,
+  NOTAS_POR_PARRAFO,
   proponerFotos,
   puedeReescribir,
   siguientePos,
@@ -119,11 +128,12 @@ const aParrafo = (d: (typeof DEMO)[number]): Parrafo => ({
   sources: d.src.map(([news_id, quote]) => ({ news_id, quote })),
   figs: (d.figs ?? []).map(([v, label, src]) => ({ v, label, src })),
   warn: null,
+  text_en: "",
 });
 
 /** El JSON que devolvería el modelo con referencias N1, N2… para las notas dadas. */
 const comoModelo = (p: Parrafo, notas: NotaInforme[]) =>
-  JSON.stringify({ ...p, sources: p.sources.map((s) => ({ news_id: `N${notas.findIndex((n) => n.id === s.news_id) + 1}`, quote: s.quote })) });
+  JSON.stringify({ ...p, text_en: p.text_en || p.text, sources: p.sources.map((s) => ({ news_id: `N${notas.findIndex((n) => n.id === s.news_id) + 1}`, quote: s.quote })) });
 
 describe("mensajes", () => {
   it("el párrafo lleva la voz, las notas como dato con N1… y el formato JSON", () => {
@@ -149,10 +159,12 @@ describe("mensajes", () => {
     expect(u.match(/<<<NOTAS/g)).toHaveLength(1);
   });
 
-  it("el plan pide las tres secciones y los descartes; el indicador puede obligar una nota", () => {
-    const p = mensajesPlan(ODS4, 2025, NOTAS.slice(0, 3))[1].content;
-    expect(p).toMatch(/convocatorias de movilidad/);
-    expect(p).toMatch(/\[N3\]/);
+  it("los temas se nombran sin descartar notas; el indicador puede obligar una nota", () => {
+    const temas = agruparNotas(NOTAS, []);
+    const p = mensajesTemas(ODS4, lotesDeTemas(temas)[0], NOTAS)[1].content;
+    expect(p).toMatch(/Ninguna nota se descarta/);
+    expect(p).toMatch(/\[T1\]/);
+    expect(p).not.toMatch(/«descartar»/);
     const ind = { id: "4.3.4", ods: 4, titulo: "Educación abierta", tipo: "ev" as const, pregunta: "¿Hay actos educativos abiertos?", regla: "Existencia + evidencia + pública" };
     expect(mensajesIndicador(ind, 2025, NOTAS.slice(0, 2), "N2")[1].content).toMatch(/La nota elegida debe ser N2/);
     expect(mensajesIndicador(ind, 2025, NOTAS.slice(0, 2))[1].content).not.toMatch(/debe ser/);
@@ -167,15 +179,15 @@ describe("mensajes", () => {
   });
 
   it("ajustes de partida: cercano y nosotros", () => {
-    expect(leerAjustes(null)).toEqual({ tone: "cercano", person: "nosotros" });
-    expect(leerAjustes({ tone: "institucional", person: "tercera" })).toEqual({ tone: "institucional", person: "tercera" });
+    expect(leerAjustes(null)).toEqual({ tone: "cercano", person: "nosotros", vision: false });
+    expect(leerAjustes({ tone: "institucional", person: "tercera", vision: true })).toEqual({ tone: "institucional", person: "tercera", vision: true });
     expect(leerAjustes({ tone: "gritón" }).tone).toBe("cercano");
   });
 });
 
 describe("leerParrafo: salidas malformadas", () => {
   const notas = [nota("recolector")];
-  const bueno = { text: "Entre febrero y marzo, más de 400 estudiantes de bachillerato aprendieron a reciclar.", sources: [{ news_id: "N1", quote: "más de 400 estudiantes de bachillerato" }], figs: [], warn: null };
+  const bueno = { text: "Entre febrero y marzo, más de 400 estudiantes de bachillerato aprendieron a reciclar.", text_en: "Between February and March, more than 400 secondary school students learned to recycle.", sources: [{ news_id: "N1", quote: "más de 400 estudiantes de bachillerato" }], figs: [], warn: null };
   const casos: [string, string, RegExp][] = [
     ["vacío", "", /no devolvió JSON/],
     ["solo texto", "Claro, aquí va el párrafo.", /no devolvió JSON/],
@@ -185,7 +197,9 @@ describe("leerParrafo: salidas malformadas", () => {
     ["sin text", JSON.stringify({ ...bueno, text: undefined }), /Falta «text»/],
     ["text no es texto", JSON.stringify({ ...bueno, text: 42 }), /Falta «text»/],
     ["text corto", JSON.stringify({ ...bueno, text: "Muy corto." }), /demasiado corto/],
-    ["text larguísimo", JSON.stringify({ ...bueno, text: "palabra ".repeat(300) }), /demasiado largo/],
+    ["text larguísimo", JSON.stringify({ ...bueno, text: "palabra ".repeat(400) }), /demasiado largo/],
+    ["sin inglés", JSON.stringify({ ...bueno, text_en: undefined }), /text_en/],
+    ["inglés vacío", JSON.stringify({ ...bueno, text_en: "  " }), /text_en/],
     ["sin sources", JSON.stringify({ ...bueno, sources: undefined }), /Faltan las fuentes/],
     ["sources vacío", JSON.stringify({ ...bueno, sources: [] }), /Faltan las fuentes/],
     ["fuente sin forma", JSON.stringify({ ...bueno, sources: ["N1"] }), /no tiene forma/],
@@ -344,59 +358,115 @@ describe("párrafos de una persona y reservas", () => {
 
   const b = (sec: string, pos: number, extra: Partial<BloqueExistente> = {}): BloqueExistente => ({ id: `${sec}${pos}`, sec, pos, origin: "pilo", enabled: true, spare: false, sources: [], ...extra });
 
-  it("las notas sin usar salen del plan menos las citadas y las fallidas", () => {
-    const plan = { hicimos: ["recolector", "aire", "mutis", "gestion"], proyectos: [], cifras: [], descartadas: [], fallidas: ["gestion"] };
-    const bloques = [b("hicimos", 0, { sources: [{ news_id: "recolector", quote: "x" }] }), b("proyectos", 0, { sources: [{ news_id: "aire", quote: "x" }] })];
-    expect(notasSinUsar("hicimos", plan, bloques)).toEqual(["aire", "mutis"]);
+  it("las fuentes sin usar son las de la lista menos las citadas en la sección y las fallidas", () => {
+    const bloques = [b("hicimos", 0, { sources: [{ news_id: "recolector", quote: "x" }] }), b("proyectos", 0, { sources: [{ news_id: "aire", quote: "x" }] }), b("cifras", 0, { sources: [{ news_id: "", ref: "cifras:x:2025", quote: "x" }] })];
+    expect(notasSinUsar("hicimos", ["recolector", "aire", "mutis", "gestion"], bloques, [{ news_id: "gestion", motivo: "x" }])).toEqual(["aire", "mutis"]);
+    expect(notasSinUsar("cifras", ["cifras:x:2025", "cifras:y:2025"], bloques)).toEqual(["cifras:y:2025"]);
   });
 
-  it("desde el sexto párrafo activo de «hicimos», lo nuevo es de reserva; la posición va al final", () => {
-    const cinco = [0, 1, 2, 3, 4].map((i) => b("hicimos", i));
-    expect(esReserva("hicimos", cinco)).toBe(false);
-    expect(esReserva("hicimos", [...cinco, b("hicimos", 5)])).toBe(true);
-    expect(esReserva("hicimos", [...cinco, b("hicimos", 5, { enabled: false })])).toBe(false);
-    expect(esReserva("cifras", [b("cifras", 0, { origin: "persona" })])).toBe(true);
-    expect(siguientePos("hicimos", [...cinco, b("tesis", 9)])).toBe(5);
-    expect(siguientePos("viene", cinco)).toBe(0);
+  it("ya no hay tope de párrafos ni reserva por exceso: solo los casi idénticos quedan de reserva", () => {
+    const temas = ["salud", "agua", "becas", "colegios", "deporte", "arte", "ciencia", "inclusión", "familia", "campo", "empresa", "paz"];
+    const muchos = temas.map((t, i) => b("hicimos", i, { text: `Párrafo distinto número ${i} sobre ${t}.` }));
+    expect(esDuplicado("Un párrafo completamente nuevo sobre la feria de emprendimiento regional.", "hicimos", muchos)).toBe(false);
+    expect(esDuplicado("Párrafo distinto número 3 sobre colegios.", "hicimos", muchos)).toBe(true);
+    expect(esDuplicado("Párrafo distinto número 3 sobre colegios.", "proyectos", muchos)).toBe(false);
+    expect(siguientePos("hicimos", [...muchos, b("tesis", 99)])).toBe(12);
+    expect(siguientePos("viene", muchos)).toBe(0);
+    expect(NOTAS_POR_PARRAFO.hicimos).toBeGreaterThanOrEqual(5);
   });
 });
 
-describe("plan", () => {
-  it("traduce N1… y quita de las secciones lo descartado", () => {
-    const lista = NOTAS.slice(0, 8);
-    const r = leerPlan(
-      JSON.stringify({ hicimos: ["N1", "N2", "N7"], proyectos: ["N2"], cifras: ["N1"], descartar: [{ nota: "N7", razon: "Anuncia inscripciones." }] }),
-      lista,
-    );
-    expect(r.ok).toBe(true);
-    if (r.ok) {
-      expect(r.valor.hicimos).toEqual(["recolector", "superheroes"]);
-      expect(r.valor.proyectos).toEqual(["superheroes"]);
-      expect(r.valor.descartadas).toEqual([{ news_id: "gestion", razon: "Anuncia inscripciones." }]);
+describe("plan: TODAS las notas, por temas", () => {
+  const IND = [
+    { id: "4.3.4", titulo: "Educación pública abierta y gratuita: actos y cursos", pregunta: "¿La universidad ofrece cursos, talleres o eventos educativos abiertos al público?", tipo: "ev" as const },
+    { id: "4.3.3", titulo: "Actividades de divulgación en colegios", pregunta: "¿La universidad realiza actividades educativas en colegios y escuelas de la comunidad?", tipo: "ev" as const },
+  ];
+
+  it("agrupa sin IA: cada nota en exactamente un tema y un grupo, temas por peso, grupos de hasta 5", () => {
+    const temas = agruparNotas(NOTAS, IND);
+    const todas = temas.flatMap((t) => t.notas);
+    expect([...todas].sort()).toEqual(NOTAS.map((n) => n.id).sort());
+    expect(new Set(todas).size).toBe(NOTAS.length);
+    for (const t of temas) {
+      expect(t.grupos.flat().sort()).toEqual([...t.notas].sort());
+      for (const g of t.grupos) expect(g.length).toBeLessThanOrEqual(5);
+    }
+    for (let i = 1; i < temas.length; i++) expect(temas[i - 1].notas.length).toBeGreaterThanOrEqual(temas[i].notas.length);
+    for (const t of temas) {
+      const fechas = t.notas.map((id) => nota(id).published_on ?? "");
+      expect([...fechas].sort()).toEqual(fechas);
     }
   });
 
-  it.each([
-    ['{"hicimos":"N1"}', /no es una lista/],
-    ['{"hicimos":["N99"]}', /no está en la lista/],
-    ['{"hicimos":["N1"],"descartar":[{"nota":"N2"}]}', /no trae razón/],
-    ['{"hicimos":[],"proyectos":[],"cifras":[]}', /ninguna nota/],
-  ])("plan malformado %s", (crudo, error) => {
-    const r = leerPlan(crudo, NOTAS.slice(0, 3));
-    expect(r.ok).toBe(false);
-    if (!r.ok) expect(r.error).toMatch(error);
+  it("el plan inicial no descarta nada, ni la convocatoria del diplomado", () => {
+    const plan = planInicial(NOTAS, IND);
+    expect(plan.descartadas).toEqual([]);
+    expect(plan.hicimos).toContain("gestion");
+    expect(plan.hicimos).toHaveLength(NOTAS.length);
   });
 
-  it("el plan guardado se lee con cuidado", () => {
+  it("parte parejo y sin tope: 12 notas en 3 grupos de 4; 61 en 13", () => {
+    expect(partirParejo(Array.from({ length: 12 }, (_, i) => i)).map((g) => g.length)).toEqual([4, 4, 4]);
+    const g61 = partirParejo(Array.from({ length: 61 }, (_, i) => i));
+    expect(g61).toHaveLength(13);
+    expect(g61.flat()).toHaveLength(61);
+  });
+
+  it("40 ya no es tope: con 61 notas, las 61 están en el plan", () => {
+    const muchas = Array.from({ length: 61 }, (_, i) => ({ id: `n${i}`, title: `Nota ${i}`, body: "Una jornada.", section: ["Extensión", "Enseñanza", "Investigación"][i % 3], score: i % 3, published_on: `2025-01-${String((i % 28) + 1).padStart(2, "0")}` }));
+    expect(ordenarNotas(muchas)).toHaveLength(61);
+    const plan = planInicial(muchas, IND);
+    expect(plan.temas.flatMap((t) => t.notas)).toHaveLength(61);
+  });
+
+  it("cobertura: cada nota queda citada en la narrativa o en el registro (fallidas incluidas); siguienteGrupo avanza por temas", () => {
+    let plan = planInicial(NOTAS, IND);
+    const bloques: BloqueExistente[] = [];
+    let vueltas = 0;
+    for (let s = siguienteGrupo(plan, bloques); s; s = siguienteGrupo(plan, bloques)) {
+      vueltas++;
+      if (s.grupo.includes("gestion")) plan = { ...plan, fallidas: [...plan.fallidas, { news_id: "gestion", motivo: "anuncio sin verificar" }] };
+      const citadas = s.grupo.filter((id) => id !== "gestion");
+      bloques.push({ id: `b${vueltas}`, sec: "hicimos", pos: s.pos, origin: "pilo", enabled: true, spare: false, sources: citadas.map((news_id) => ({ news_id, quote: "x" })) });
+      expect(vueltas).toBeLessThan(30);
+    }
+    const c = cubiertas(plan, bloques);
+    expect(c.total).toBe(NOTAS.length);
+    expect(c.cubiertas + c.fallidas).toBe(NOTAS.length);
+    const nueva = { id: "nueva", title: "Jornada nueva", body: "Una jornada.", published_on: "2025-12-01" };
+    const conNueva = sumarNuevas(plan, [...NOTAS, nueva]);
+    expect(conNueva.temas.flatMap((t) => t.notas)).toContain("nueva");
+    expect(siguienteGrupo(conNueva, bloques)?.grupo).toEqual(["nueva"]);
+  });
+
+  it("Pilo nombra un lote y puede mover notas, pero no perder ninguna", () => {
+    const temas = agruparNotas(NOTAS, IND);
+    const lote = lotesDeTemas(temas)[0];
+    const mostradas = lote.flatMap((t) => t.notas.slice(0, 8));
+    const ref = (id: string) => `N${mostradas.indexOf(id) + 1}`;
+    const bueno = JSON.stringify({ temas: lote.map((t, i) => ({ tema: `T${i + 1}`, heading: `Tema ${i + 1}`, heading_en: `Topic ${i + 1}`, notas: t.notas.slice(0, 8).map(ref) })), proyectos: [ref(mostradas[0])] });
+    const r = leerTemas(bueno, lote, NOTAS);
+    expect(r.ok).toBe(true);
+    if (r.ok) {
+      expect(r.valor.temas.flatMap((t) => t.notas).sort()).toEqual(lote.flatMap((t) => t.notas).sort());
+      expect(r.valor.temas[0]).toMatchObject({ heading: "Tema 1", heading_en: "Topic 1", nombrado: true });
+      const plan = aplicarLote(planInicial(NOTAS, IND), lote, r.valor.temas, r.valor.proyectos);
+      expect(plan.temas.flatMap((t) => t.notas)).toHaveLength(NOTAS.length);
+      expect(plan.proyectos).toEqual([mostradas[0]]);
+    }
+    const sinUna = JSON.stringify({ temas: [{ tema: "T1", heading: "A", heading_en: "A", notas: [ref(mostradas[0])] }] });
+    if (mostradas.length > 1) expect(leerTemas(sinUna, lote, NOTAS)).toMatchObject({ ok: false });
+    expect(leerTemas('{"temas":[{"tema":"T9","heading":"a","heading_en":"a","notas":[]}]}', lote, NOTAS)).toMatchObject({ ok: false });
+    expect(leerTemas('{"temas":[{"tema":"T1","heading":"","heading_en":"a","notas":[]}]}', lote, NOTAS)).toMatchObject({ ok: false });
+  });
+
+  it("el plan guardado se lee con cuidado, también el de 0145", () => {
     expect(planGuardado({ tone: "cercano" })).toBeNull();
-    expect(planGuardado({ plan: { hicimos: ["a", 3], descartadas: [{ news_id: "b", razon: "x" }, null] } })).toEqual({ hicimos: ["a"], proyectos: [], cifras: [], descartadas: [{ news_id: "b", razon: "x" }], fallidas: [] });
-  });
-
-  it("las notas se ordenan por afinidad y fecha, hasta 40", () => {
-    const muchas = Array.from({ length: 50 }, (_, i) => ({ id: `n${i}`, title: "t", body: "b", score: i % 3, published_on: `2025-01-${String((i % 28) + 1).padStart(2, "0")}` }));
-    const o = ordenarNotas(muchas);
-    expect(o).toHaveLength(40);
-    expect(o[0].score).toBe(2);
+    const viejo = planGuardado({ plan: { hicimos: ["a", 3], descartadas: [{ news_id: "b", razon: "x" }], fallidas: ["c"] } })!;
+    expect(viejo.temas).toHaveLength(1);
+    expect(viejo.hicimos).toEqual(["a"]);
+    expect(viejo.descartadas).toEqual([]);
+    expect(viejo.fallidas).toEqual([{ news_id: "c", motivo: "" }]);
   });
 });
 
@@ -513,7 +583,7 @@ describe("fotos", () => {
     const de = (k: string) => f.find((x) => x.news_id === k)!;
     expect(de("recolector")).toMatchObject({ minors: true, use: false, slot: "galeria", kind: "foto" });
     expect(de("gestion")).toMatchObject({ kind: "grafica", use: false });
-    expect(de("diplomado")).toMatchObject({ use: true, slot: "portada", minors: false, cleared: false, crop: { fx: 0.5, fy: 0.4, ratio: "16:9" } });
+    expect(de("diplomado")).toMatchObject({ use: true, slot: "portada", minors: false, cleared: false, crop: { fx: 0.5, fy: 0.35, ratio: "16:9" } });
     expect(de("inclusiva").slot).toBe("n1");
     expect(de("paipe").slot).toBe("n2");
     expect(de("diplomado").credit).toBe(CREDITO_POR_DEFECTO);

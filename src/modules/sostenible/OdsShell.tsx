@@ -15,31 +15,34 @@ import { SostenibleLayout } from "./SostenibleLayout";
 import { ODS_ROUTES } from "./ods-data";
 import { useSlidingRule } from "./ods-portal-rule";
 import { OdsPortalArrow } from "./OdsPortalArrow";
+import { useLang } from "./i18n";
+import type { Clave } from "./i18n";
 import "./ods.css";
 
 export type OdsView = "portal" | "rector" | "boletin";
 
-const TABS: [OdsView, string, string][] = [
-  ["portal", ODS_ROUTES.portal, "Los 17 informes"],
-  ["rector", ODS_ROUTES.rector, "Presentación rectoral"],
-  ["boletin", ODS_ROUTES.bulletin, "Boletín PDF"],
+const TABS: [OdsView, string, Clave][] = [
+  ["portal", ODS_ROUTES.portal, "tab_portal"],
+  ["rector", ODS_ROUTES.rector, "tab_rector"],
+  ["boletin", ODS_ROUTES.bulletin, "tab_boletin"],
 ];
 
 export function OdsShell({ title, active, children }: { title: string; active?: OdsView; children: ReactNode }) {
   const tabs = useRef<HTMLElement>(null);
+  const { lang, t } = useLang();
   useSlidingRule(tabs, active, "odsx-tabs");
   return (
     <SostenibleLayout title={title}>
-      <div className="odsx">
+      <div className="odsx" lang={lang}>
         <div className="odsx-bar">
           <div className="odsx-wrap odsx-bar__row">
             <Link to="/sostenible/impact" className="odsx-back">
               <OdsPortalArrow dir="left" /> THE Impact Rankings
             </Link>
-            <nav ref={tabs} className="odsx-tabs" aria-label="Informes ODS">
+            <nav ref={tabs} className="odsx-tabs" aria-label={t("informes_ods")}>
               {TABS.map(([id, to, label]) => (
                 <NavLink key={id} to={to} end className="odsx-tab" aria-current={active === id ? "page" : undefined}>
-                  {label}
+                  {t(label)}
                 </NavLink>
               ))}
               <i className="opt-rule" aria-hidden="true" />

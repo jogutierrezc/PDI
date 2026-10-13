@@ -1,12 +1,20 @@
 /* =============================================================================
-   Informes ODS con Pilo · datos (migración 0145, función pilo-rankingsod).
+   Informes ODS con Pilo · datos (migraciones 0145 y 0146, función pilo-rankingsod).
+
+   0146: español e inglés en cada párrafo, subtítulo temático, imágenes de las
+   notas (Pilo solo elige; no crea), libro de cifras, ficha y pre-evaluación
+   por indicador, otras fuentes (Impacto, UDES en Cifras, proyectos del PDI),
+   registro de actividades con TODAS las notas y proveedor de IA propio de los
+   rankings (igual que Pilo o Mistral). Las lecturas van por páginas: nada se
+   trunca.
 
    · Intranet (Planeación o más): useInforme y las mutaciones de bloques,
      fotos, elecciones, ajustes y estado. Las políticas de la base deciden
      quién escribe; este archivo no lo vigila.
    · Pilo: piloInformeEstado, piloPlan, piloRedactar, piloIndicador, piloFotos
      (una llamada a la función; la clave del proveedor nunca llega aquí) y
-     usePiloInforme, el ciclo plan → párrafos → indicadores → fotos.
+     usePiloInforme, el ciclo imágenes → cifras → plan → párrafos (es+en) →
+    fotos → indicadores (ficha) → evaluar → traducir.
    · Público: usePublicInforme y useEvidenciaPublica (solo lo publicado).
    · Funciones puras al final, con pruebas en datos.test.ts.
 
@@ -19,8 +27,13 @@ import { supabase } from "../../../lib/supabase";
 import { ODS_LIST } from "../../sostenible/ods-data";
 import { FaltaMigracion } from "../noticias";
 import { ErrorPilo } from "../pilo-noticias";
+import { fichaCompleta, idiomaPreferido, leerFicha, paginaEvidencia, textoEnIdioma, type FichaEvidencia, type Idioma, type PaginaEvidencia } from "./pagina";
 import {
   SECCIONES,
+  type CifraNota,
+  type Evaluacion,
+  type ImagenNota,
+  type RegistroActividad,
   type AjustesInforme,
   type Bloque,
   type Candidata,
@@ -36,14 +49,30 @@ import {
   type Seccion,
 } from "./tipos";
 
-export { ErrorPilo };
+export { ErrorPilo, fichaCompleta, idiomaPreferido, paginaEvidencia, textoEnIdioma };
+export type { FichaEvidencia, Idioma, PaginaEvidencia };
 
 const MIGRACION_0145 = "Falta aplicar la migración 0145 (Informes ODS con Pilo).";
 const noExiste = (e: { code?: string; message?: string } | null) =>
   Boolean(e && (e.code === "42P01" || e.code === "42703" || e.code === "PGRST205" || e.code === "PGRST202" || /does not exist|schema cache/i.test(e.message ?? "")));
 const fallo = (e: { code?: string; message?: string }) => (noExiste(e) ? new FaltaMigracion(MIGRACION_0145) : new Error(e.message ?? "Error de la base."));
 
-const tabla = (t: "ods_reports" | "ods_report_blocks" | "ods_report_photos" | "ods_report_indicators" | "news_ods") => supabase.from(t as never);
+const tabla = (t: "ods_reports" | "ods_report_blocks" | "ods_report_photos" | "ods_report_indicators" | "news_ods" | "news_images" | "news_figures" | "news_items" | "news_settings") =>
+  supabase.from(t as never);
+
+const PAGINA = 1000;
+/** Todas las filas de una consulta, por páginas de 1.000: nada se trunca. */
+async function todas<T>(consulta: (desde: number, hasta: number) => PromiseLike<{ data: unknown; error: { code?: string; message?: string } | null }>): Promise<T[]> {
+  const out: T[] = [];
+  for (let desde = 0; ; desde += PAGINA) {
+    const { data, error } = await consulta(desde, desde + PAGINA - 1);
+    if (error) throw error;
+    const filas = (data ?? []) as T[];
+    out.push(...filas);
+    if (filas.length < PAGINA) return out;
+  }
+}
+const trozos = <T>(xs: T[], n = 150): T[][] => Array.from({ length: Math.ceil(xs.length / n) }, (_, i) => xs.slice(i * n, i * n + n));
 
 async function quienSoy(): Promise<string | null> {
   try {
@@ -58,9 +87,11 @@ async function quienSoy(): Promise<string | null> {
 
 const AJUSTES_DE_PARTIDA: AjustesInforme = { tone: "cercano", person: "nosotros" };
 
+/** Tono y persona (y, con 0146, `vision` solo si está encendida). */
 export function leerAjustes(s: unknown): AjustesInforme {
   const o = (s ?? {}) as Record<string, unknown>;
-  return { tone: o.tone === "institucional" ? "institucional" : "cercano", person: o.person === "tercera" ? "tercera" : "nosotros" };
+  const base: AjustesInforme = { tone: o.tone === "institucional" ? "institucional" : "cercano", person: o.person === "tercera" ? "tercera" : "nosotros" };
+  return o.vision === true ? { ...base, vision: true } : base;
 }
 
 const lista = <T>(v: unknown): T[] => (Array.isArray(v) ? (v as T[]) : []);
@@ -87,9 +118,13 @@ const aBloque = (f: Record<string, unknown>): Bloque => ({
   warn: (f.warn as string | null) ?? null,
   enabled: f.enabled !== false,
   spare: f.spare === true,
+  text_en: String(f.text_en ?? ""),
+  orig_en: String(f.orig_en ?? ""),
+  heading: String(f.heading ?? ""),
+  heading_en: String(f.heading_en ?? ""),
 });
 
-const RECORTE: Foto["crop"] = { fx: 0.5, fy: 0.4, ratio: "16:9" };
+const RECORTE: Foto["crop"] = { fx: 0.5, fy: 0.35, ratio: "16:9" };
 
 const aFoto = (f: Record<string, unknown>): Foto => ({
   report_id: String(f.report_id),
@@ -103,6 +138,7 @@ const aFoto = (f: Record<string, unknown>): Foto => ({
   minors: f.minors === true,
   cleared: f.cleared === true,
   crop: { ...RECORTE, ...((f.crop as Partial<Foto["crop"]>) ?? {}) },
+  image_id: (f.image_id as string | null) ?? null,
 });
 
 const aEleccion = (f: Record<string, unknown>): EleccionIndicador => ({
@@ -114,23 +150,24 @@ const aEleccion = (f: Record<string, unknown>): EleccionIndicador => ({
   page_es: lista<string>(f.page_es),
   page_en: String(f.page_en ?? ""),
   approved: f.approved === true,
+  ficha: f.ficha && typeof f.ficha === "object" && Object.keys(f.ficha).length ? leerFicha(f.ficha) : {},
+  eval: f.eval && typeof f.eval === "object" && (f.eval as Evaluacion).grade ? (f.eval as Evaluacion) : null,
 });
 
 /* ---------- Intranet: lectura --------------------------------------------- */
 
 async function cargarCompleto(fila: Record<string, unknown>): Promise<InformeCompleto> {
   const id = String(fila.id);
-  const [b, f, e] = await Promise.all([
-    tabla("ods_report_blocks").select("*").eq("report_id", id),
-    tabla("ods_report_photos").select("*").eq("report_id", id),
-    tabla("ods_report_indicators").select("*").eq("report_id", id),
-  ]);
-  for (const r of [b, f, e]) if (r.error) throw fallo(r.error);
+  const leer = (t: "ods_report_blocks" | "ods_report_photos" | "ods_report_indicators") =>
+    todas<Record<string, unknown>>((a, z) => tabla(t).select("*").eq("report_id", id).range(a, z)).catch((e) => {
+      throw fallo(e as { code?: string; message?: string });
+    });
+  const [b, f, e] = await Promise.all([leer("ods_report_blocks"), leer("ods_report_photos"), leer("ods_report_indicators")]);
   return {
     informe: aInforme(fila),
-    bloques: ordenarBloques(((b.data as unknown as Record<string, unknown>[]) ?? []).map(aBloque)),
-    fotos: ((f.data as unknown as Record<string, unknown>[]) ?? []).map(aFoto),
-    elecciones: ((e.data as unknown as Record<string, unknown>[]) ?? []).map(aEleccion).sort((x, y) => x.indicator.localeCompare(y.indicator, "es", { numeric: true })),
+    bloques: ordenarBloques(b.map(aBloque)),
+    fotos: f.map(aFoto),
+    elecciones: e.map(aEleccion).sort((x, y) => x.indicator.localeCompare(y.indicator, "es", { numeric: true })),
   };
 }
 
@@ -169,6 +206,9 @@ export interface NoticiaOds {
   /** Afinidad con el ODS (0 a 100). */
   score: number;
   reason: string;
+  /** 0146: título y extracto en inglés ('' si aún no hay). */
+  title_en?: string;
+  excerpt_en?: string;
 }
 
 export function useNoticiasDeOds(ods: number): UseQueryResult<NoticiaOds[]> {
@@ -178,14 +218,20 @@ export function useNoticiasDeOds(ods: number): UseQueryResult<NoticiaOds[]> {
     retry: false,
     enabled: ods >= 1 && ods <= 17,
     queryFn: async (): Promise<NoticiaOds[]> => {
-      const r = await tabla("news_ods")
-        .select("score, reason, news_items!inner(id, url, title, excerpt, body, image_url, published_on, section, campus, state)")
-        .eq("ods", ods)
-        .eq("news_items.state", "ok")
-        .limit(1000);
-      if (r.error) throw noExiste(r.error) ? new FaltaMigracion("Falta aplicar la migración 0143 (recolector de noticias).") : new Error(r.error.message);
       type Fila = { score: number; reason: string; news_items: Omit<NoticiaOds, "score" | "reason"> | null };
-      return ((r.data as unknown as Fila[]) ?? [])
+      const pedir = (columnas: string) =>
+        todas<Fila>((a, z) => tabla("news_ods").select(`score, reason, news_items!inner(${columnas})`).eq("ods", ods).eq("news_items.state", "ok").order("news_id").range(a, z));
+      const BASE = "id, url, title, excerpt, body, image_url, published_on, section, campus, state";
+      let filas: Fila[];
+      try {
+        filas = await pedir(`${BASE}, title_en, excerpt_en`);
+      } catch (e) {
+        const err = e as { code?: string; message?: string };
+        // Sin 0146 no hay inglés: las de siempre.
+        if (err.code === "42703" || /title_en|excerpt_en/.test(err.message ?? "")) filas = await pedir(BASE);
+        else throw noExiste(err) ? new FaltaMigracion("Falta aplicar la migración 0143 (recolector de noticias).") : new Error(err.message);
+      }
+      return filas
         .filter((f) => f.news_items)
         .map((f) => {
           const n = f.news_items!;
@@ -201,6 +247,8 @@ export function useNoticiasDeOds(ods: number): UseQueryResult<NoticiaOds[]> {
             campus: n.campus ?? "",
             score: Number(f.score ?? 0),
             reason: f.reason ?? "",
+            title_en: n.title_en ?? "",
+            excerpt_en: n.excerpt_en ?? "",
           };
         })
         .sort((a, b) => b.score - a.score || String(b.published_on ?? "").localeCompare(String(a.published_on ?? "")));
@@ -290,7 +338,7 @@ export function useGuardarAjustes() {
   });
 }
 
-const CAMPOS_BLOQUE = ["sec", "pos", "origin", "text", "orig", "sources", "figs", "warn", "enabled", "spare"] as const;
+const CAMPOS_BLOQUE = ["sec", "pos", "origin", "text", "orig", "sources", "figs", "warn", "enabled", "spare", "text_en", "orig_en", "heading", "heading_en"] as const;
 
 export function useGuardarBloque() {
   const refrescar = useRefrescar();
@@ -331,6 +379,8 @@ export function useAgregarBloque() {
           warn: b.warn ?? null,
           enabled: b.enabled ?? true,
           spare: b.spare ?? false,
+          ...(b.text_en !== undefined ? { text_en: b.text_en, orig_en: b.orig_en ?? b.text_en } : {}),
+          ...(b.heading !== undefined ? { heading: b.heading, heading_en: b.heading_en ?? "" } : {}),
           updated_by: await quienSoy(),
         } as never)
         .select("*")
@@ -362,14 +412,16 @@ export function useGuardarFoto() {
   return useMutation({
     mutationFn: async (f: Foto) => {
       const fila = { report_id: f.report_id, news_id: f.news_id, use: f.use, slot: f.slot, caption: f.caption, alt: f.alt, credit: f.credit, kind: f.kind, minors: f.minors, cleared: f.cleared, crop: f.crop };
-      const r = await tabla("ods_report_photos").upsert(fila as never, { onConflict: "report_id,news_id" });
+      // 0146: la clave es (report_id, photo_key = coalesce(image_id, news_id)). Sin 0146, la de 0145.
+      let r = await tabla("ods_report_photos").upsert({ ...fila, image_id: f.image_id ?? null } as never, { onConflict: "report_id,photo_key" });
+      if (r.error && /photo_key|image_id|42703|42P10/.test(`${r.error.code} ${r.error.message}`)) r = await tabla("ods_report_photos").upsert(fila as never, { onConflict: "report_id,news_id" });
       if (r.error) throw fallo(r.error);
     },
     onSuccess: refrescar,
   });
 }
 
-const CAMPOS_ELECCION = ["news_id", "candidates", "ask", "page_es", "page_en", "approved"] as const;
+const CAMPOS_ELECCION = ["news_id", "candidates", "ask", "page_es", "page_en", "approved", "ficha", "eval"] as const;
 
 export function useGuardarEleccion() {
   const refrescar = useRefrescar();
@@ -412,42 +464,186 @@ export function useCambiarEstadoInforme() {
   });
 }
 
+/* ---------- Intranet: imágenes y cifras de las notas del ODS (0146) --------- */
+
+/** Las imágenes de las notas aprobadas del ODS (news_images), por nota y posición. */
+export function useImagenesDeOds(ods: number): UseQueryResult<ImagenNota[]> {
+  return useQuery({
+    queryKey: ["informe", "imagenes", ods],
+    staleTime: 60_000,
+    retry: false,
+    enabled: ods >= 1 && ods <= 17,
+    queryFn: async (): Promise<ImagenNota[]> => {
+      try {
+        const ids = (await todas<{ news_id: string }>((a, z) => tabla("news_ods").select("news_id, news_items!inner(state)").eq("ods", ods).eq("news_items.state", "ok").order("news_id").range(a, z))).map((f) => f.news_id);
+        const out: ImagenNota[] = [];
+        for (const t of trozos(ids)) out.push(...(await todas<ImagenNota>((a, z) => tabla("news_images").select("id, news_id, url, width, height, caption, credit, pos, is_cover, kind, minors, alt").in("news_id", t).order("pos").range(a, z))));
+        return out;
+      } catch (e) {
+        throw noExiste(e as { code?: string; message?: string }) ? new FaltaMigracion("Falta aplicar la migración 0146 (imágenes de las notas).") : e;
+      }
+    },
+  });
+}
+
+/** El libro de cifras de las notas aprobadas del ODS (news_figures), de la mejor a la peor. */
+export function useCifrasDeOds(ods: number): UseQueryResult<CifraNota[]> {
+  return useQuery({
+    queryKey: ["informe", "cifras", ods],
+    staleTime: 60_000,
+    retry: false,
+    enabled: ods >= 1 && ods <= 17,
+    queryFn: async (): Promise<CifraNota[]> => {
+      try {
+        const ids = (await todas<{ news_id: string }>((a, z) => tabla("news_ods").select("news_id, news_items!inner(state)").eq("ods", ods).eq("news_items.state", "ok").order("news_id").range(a, z))).map((f) => f.news_id);
+        const out: CifraNota[] = [];
+        for (const t of trozos(ids)) out.push(...(await todas<CifraNota>((a, z) => tabla("news_figures").select("id, news_id, value, num, unit, label, quote, kind, score, checked").in("news_id", t).range(a, z))));
+        return out.sort((a, b) => b.score - a.score);
+      } catch (e) {
+        throw noExiste(e as { code?: string; message?: string }) ? new FaltaMigracion("Falta aplicar la migración 0146 (libro de cifras).") : e;
+      }
+    },
+  });
+}
+
+/* ---------- Proveedor de IA de los rankings (news_settings, 0146) ------------ */
+
+export interface AjustesRankingsIA {
+  /** «pilo»: el mismo de Mr. Pilo. «mistral»: Mistral con la clave guardada para Mr. Pilo. */
+  ai_provider: "pilo" | "mistral";
+  /** '' = el del proveedor («mistral-small-latest» con Mistral; también «mistral-large-latest»). */
+  ai_model: string;
+  /** '' = sin visión; con Mistral, «pixtral-12b-2409». */
+  ai_vision_model: string;
+  /** Notas o párrafos por llamada; 0 = automático (5 con Mistral, 2 con NVIDIA y los demás). */
+  ai_batch: number;
+}
+
+export const AJUSTES_IA_DE_PARTIDA: AjustesRankingsIA = { ai_provider: "pilo", ai_model: "", ai_vision_model: "", ai_batch: 0 };
+export const MODELOS_MISTRAL = ["mistral-small-latest", "mistral-large-latest"];
+export const VISION_MISTRAL = "pixtral-12b-2409";
+
+/** Los ajustes, leídos con cuidado (lo mismo que hace la función). */
+export function leerAjustesRankingsIA(f: Record<string, unknown> | null | undefined): AjustesRankingsIA {
+  const lote = Math.floor(Number(f?.ai_batch));
+  return {
+    ai_provider: f?.ai_provider === "mistral" ? "mistral" : "pilo",
+    ai_model: typeof f?.ai_model === "string" ? f.ai_model.trim() : "",
+    ai_vision_model: typeof f?.ai_vision_model === "string" ? f.ai_vision_model.trim() : "",
+    ai_batch: Number.isFinite(lote) && lote >= 0 && lote <= 8 ? lote : 0,
+  };
+}
+
+/** Planeación los lee; la base solo deja cambiarlos a la administración. */
+export function useAjustesRankingsIA(): UseQueryResult<AjustesRankingsIA> {
+  return useQuery({
+    queryKey: ["informe", "ajustes-ia"],
+    staleTime: 60_000,
+    retry: false,
+    queryFn: async () => {
+      const r = await tabla("news_settings").select("ai_provider, ai_model, ai_vision_model, ai_batch").eq("id", 1).maybeSingle();
+      if (r.error) {
+        if (noExiste(r.error)) return AJUSTES_IA_DE_PARTIDA;
+        throw new Error(r.error.message);
+      }
+      return leerAjustesRankingsIA(r.data as unknown as Record<string, unknown> | null);
+    },
+  });
+}
+
+export function useGuardarAjustesRankingsIA() {
+  const cliente = useQueryClient();
+  return useMutation({
+    mutationFn: async (a: Partial<AjustesRankingsIA>) => {
+      const v = leerAjustesRankingsIA({ ...AJUSTES_IA_DE_PARTIDA, ...a });
+      const r = await tabla("news_settings").update(v as never).eq("id", 1);
+      if (r.error) {
+        if (r.error.code === "42501" || /Solo la administración/.test(r.error.message)) throw new Error("Solo la administración cambia el proveedor de IA de los rankings.");
+        throw noExiste(r.error) ? new FaltaMigracion("Falta aplicar la migración 0146 (proveedor de IA de los rankings).") : new Error(r.error.message);
+      }
+    },
+    onSuccess: () => {
+      void cliente.invalidateQueries({ queryKey: ["informe", "ajustes-ia"] });
+      void cliente.invalidateQueries({ queryKey: ["pilo-rankingsod"] });
+      void cliente.invalidateQueries({ queryKey: ["noticias"] });
+    },
+  });
+}
+
 /* ---------- Pilo (función pilo-rankingsod) -------------------------------- */
+
+export interface EstadoFuente {
+  conectada: boolean;
+  nota: string;
+}
 
 export interface EstadoPiloInforme {
   ok: boolean;
-  /** ¿Está Mr. Pilo con IA encendido y conectado? */
+  /** ¿Está lista la IA de los rankings? */
   ai: boolean;
   /** Lo mismo que `ai`, para las pantallas que preguntan «¿está lista?». */
   lista: boolean;
   motivo?: string;
   /** Con `ods`: los indicadores de THE de ese ODS que se arman con noticias. */
   indicadores?: string[];
+  /** 0146: lo que se usa: «pilo» o «mistral», el proveedor real, el modelo, el de visión y el lote. */
+  eleccion?: "pilo" | "mistral";
+  proveedor?: string;
+  modelo?: string;
+  vision?: string | null;
+  lote?: number;
+  /** 0146: qué fuentes están conectadas (noticia, impacto, cifras, proyecto, documento). */
+  fuentes?: Record<string, EstadoFuente>;
+}
+
+export interface TemaPlan {
+  id: string;
+  heading: string;
+  heading_en: string;
+  indicador: string | null;
+  notas: string[];
+  grupos: string[][];
+  nombrado: boolean;
 }
 
 export interface PlanPilo {
+  /** 0146: todas las notas en temas. */
+  temas?: TemaPlan[];
   hicimos: string[];
   proyectos: string[];
   cifras: string[];
+  /** Siempre vacío desde 0146: ninguna nota se descarta. */
   descartadas: { news_id: string; razon: string }[];
-  fallidas?: string[];
+  /** Notas que no lograron un párrafo verificable, con el motivo (siguen en el registro). */
+  fallidas?: { news_id: string; motivo: string }[];
   at?: string;
 }
 export interface RespuestaPlan {
   ok: boolean;
   plan: PlanPilo;
   indicadores: string[];
+  temas?: number;
+  notas?: number;
+  /** Lotes de temas que Pilo aún no nombra. */
+  quedan?: number;
+  avisos?: string[];
 }
 export interface RespuestaRedactar {
   ok: boolean;
   escritos: number;
   bloques: string[];
-  /** Cuántos de los escritos quedaron de reserva. */
+  /** Siempre 0 desde 0146 (solo los duplicados quedan de reserva). */
   reserva: number;
-  /** Notas del plan que aún no usa ningún párrafo de la sección. */
+  /** Grupos (o fuentes) de la sección que aún faltan. */
   quedan: number;
   fallos: { notas: string[]; motivo: string }[];
   motivo?: string;
+  /** 0146: el tema del último párrafo («tema 3 de 11»). */
+  tema?: { indice: number; total: number; heading: string } | null;
+  cubiertas?: number;
+  total_notas?: number;
+  fallidas?: number;
+  avisos?: string[];
 }
 export interface RespuestaIndicador {
   ok: boolean;
@@ -455,19 +651,55 @@ export interface RespuestaIndicador {
   candidatas: number;
   page_es: string[];
   page_en: string;
+  ficha?: FichaEvidencia | null;
   motivo?: string;
 }
 export interface RespuestaFotos {
   ok: boolean;
   propuestas: number;
+  /** 0146 */
+  en_uso?: number;
   menores: number;
   graficas: number;
-  /** «Pilo no ve las imágenes…». */
+  vision?: boolean;
+  /** «Pilo no ve las imágenes…» o el aviso de visión. */
   aviso: string;
+  avisos?: string[];
+}
+export interface RespuestaCifras {
+  ok: boolean;
+  extraidas: number;
+  confirmadas: number;
+  /** Cifras que Pilo aún no revisa. */
+  quedan: number;
+  motivo?: string;
+}
+export interface RespuestaEvaluar {
+  ok: boolean;
+  eval: Evaluacion;
+}
+export interface RespuestaMejorar {
+  ok: boolean;
+  antes: { ficha: Partial<FichaEvidencia>; eval: Evaluacion | null };
+  despues: { ficha: FichaEvidencia; eval: Evaluacion | null };
+}
+export interface RespuestaTraducir {
+  ok: boolean;
+  bloques: number;
+  noticias: number;
+  fallos: { ref: string; error: string }[];
+  quedan: number;
+}
+export interface RespuestaImagenes {
+  ok: boolean;
+  seen: number;
+  saved: number;
+  next: number;
+  fin: boolean;
 }
 
-async function invocar<T>(body: Record<string, unknown>): Promise<T> {
-  const r = await supabase.functions.invoke("pilo-rankingsod", { body: { action: "informes", ...body } });
+async function invocarEn<T>(funcion: string, body: Record<string, unknown>): Promise<T> {
+  const r = await supabase.functions.invoke(funcion, { body });
   if (r.error) {
     const ctx = (r.error as { context?: Response }).context;
     let mensaje = r.error.message;
@@ -480,49 +712,69 @@ async function invocar<T>(body: Record<string, unknown>): Promise<T> {
       /* se queda el mensaje general */
     }
     if (code === "migracion") throw new FaltaMigracion(mensaje || MIGRACION_0145);
-    if (!ctx && /failed to send|fetch/i.test(mensaje)) mensaje = "No se pudo llegar a la función pilo-rankingsod: ¿está desplegada?";
+    if (!ctx && /failed to send|fetch/i.test(mensaje)) mensaje = `No se pudo llegar a la función ${funcion}: ¿está desplegada?`;
     throw new ErrorPilo(mensaje, code);
   }
   return r.data as T;
 }
+const invocar = <T>(body: Record<string, unknown>) => invocarEn<T>("pilo-rankingsod", { action: "informes", ...body });
 
 export async function piloInformeEstado(ods?: number): Promise<EstadoPiloInforme> {
   const r = await invocar<Omit<EstadoPiloInforme, "lista">>({ step: "estado", ...(ods ? { ods } : {}) });
   return { ...r, lista: r.ai === true };
 }
-export const piloPlan = (report_id: string) => invocar<RespuestaPlan>({ step: "plan", report_id });
+export const piloPlan = (report_id: string, opciones: { rehacer?: boolean; reintentar?: boolean } = {}) => invocar<RespuestaPlan>({ step: "plan", report_id, ...opciones });
 export const piloRedactar = (o: { report_id: string; sec: Seccion; block_id?: string; count?: number }) => invocar<RespuestaRedactar>({ step: "redactar", ...o });
 export const piloIndicador = (o: { report_id: string; indicator: string }) => invocar<RespuestaIndicador>({ step: "indicador", ...o });
 export const piloFotos = (o: { report_id: string }) => invocar<RespuestaFotos>({ step: "fotos", ...o });
+/** 0146: libro de cifras: paso 1 sin IA (extraer con cita literal) y paso 2 con IA (¿es logro de la UDES?). */
+export const piloCifras = (o: { report_id: string } | { ods: number }) => invocar<RespuestaCifras>({ step: "cifras", ...o });
+/** 0146: completa el inglés de los párrafos y de las notas del informe (nunca cambia el español). */
+export const piloTraducir = (o: { report_id: string; news_ids?: string[] }) => invocar<RespuestaTraducir>({ step: "traducir", ...o });
+/** 0146: Pilo como evaluador de THE (solo la pregunta y el texto de la página). Nunca aprueba. */
+export const piloEvaluar = (o: { report_id: string; indicator: string }) => invocar<RespuestaEvaluar>({ step: "evaluar", ...o });
+/** 0146: reescribe la ficha con datos de la nota que faltaban y vuelve a evaluar (antes/después). */
+export const piloMejorar = (o: { report_id: string; indicator: string }) => invocar<RespuestaMejorar>({ step: "mejorar", ...o });
+/** 0146: trae las imágenes de las notas aprobadas ya cargadas (función noticias-ods), por lotes. */
+export const piloImagenes = (o: { start?: number; limite?: number; ods?: number } = {}) => invocarEn<RespuestaImagenes>("noticias-ods", { action: "imagenes", ...o });
 
 /* ---------- El ciclo de Pilo ---------------------------------------------- */
 
-export type PasoPilo = "plan" | "redactar" | "indicadores" | "fotos" | "listo";
+export type PasoPilo = "imagenes" | "cifras" | "plan" | "redactar" | "fotos" | "indicadores" | "evaluar" | "traducir" | "listo";
 
 export interface ProgresoInforme {
   paso: PasoPilo | null;
-  /** En palabras, para la pantalla. */
+  /** En palabras, para la pantalla («Tema 3 de 11 · 24 de 61 notas cubiertas»). */
   mensaje: string;
   hechos: number;
   total: number;
   escritos: number;
   indicadores: number;
   fotos: number;
+  /** 0146: el tema en curso y la cobertura de la narrativa. */
+  tema?: { indice: number; total: number; heading: string } | null;
+  cubiertas?: number;
+  totalNotas?: number;
   /** Avisos que no detienen el ciclo (un párrafo que no pasó la verificación…). */
   avisos: string[];
 }
 
-export const PROGRESO_INFORME_CERO: ProgresoInforme = { paso: null, mensaje: "", hechos: 0, total: 0, escritos: 0, indicadores: 0, fotos: 0, avisos: [] };
+export const PROGRESO_INFORME_CERO: ProgresoInforme = { paso: null, mensaje: "", hechos: 0, total: 0, escritos: 0, indicadores: 0, fotos: 0, tema: null, avisos: [] };
 
 export interface OpcionesPilo {
   /** Rehacer el plan aunque ya exista. */
   replanear?: boolean;
+  /** Volver a intentar las notas que fallaron la verificación. */
+  reintentarFallidas?: boolean;
   /** Secciones que redacta (por defecto, las tres de Pilo). */
   secciones?: ("hicimos" | "proyectos" | "cifras")[];
   /** Indicadores que arma (por defecto, los «ev» del ODS que aún no tienen evidencia). */
   indicadores?: string[];
-  /** Saltar las fotos. */
+  /** Saltar pasos. */
+  sinImagenes?: boolean;
   sinFotos?: boolean;
+  sinEvaluar?: boolean;
+  sinTraducir?: boolean;
 }
 
 export interface UsoPiloInforme {
@@ -537,11 +789,20 @@ export interface UsoPiloInforme {
 const dormir = (ms: number) => new Promise((r) => setTimeout(r, ms));
 const CORTE_IA = new Set(["sin_ia", "clave", "proveedor", "publicado", "migracion"]);
 
+/** El progreso en palabras: «Tema 3 de 11 («Formación continua») · 24 de 61 notas cubiertas». */
+export function textoProgresoTema(r: Pick<RespuestaRedactar, "tema" | "cubiertas" | "total_notas">): string {
+  const partes: string[] = [];
+  if (r.tema) partes.push(`Tema ${r.tema.indice} de ${r.tema.total}${r.tema.heading ? ` («${r.tema.heading}»)` : ""}`);
+  if (typeof r.cubiertas === "number" && typeof r.total_notas === "number") partes.push(`${r.cubiertas} de ${r.total_notas} notas cubiertas`);
+  return partes.join(" · ");
+}
+
 /**
- * Pilo arma el informe sin bloquear la pantalla: plan (si no hay), párrafos
- * de cada sección hasta que no queden notas, la evidencia de cada indicador
- * «ev» sin elegir y las fichas de las fotos. Cada paso refresca el informe.
- * Es reanudable: lo hecho vive en la base y no se repite. Ante el límite del
+ * Pilo arma el informe sin bloquear la pantalla, en este orden: imágenes de
+ * las notas (solo si faltan) → libro de cifras → plan por temas → párrafos en
+ * español e inglés, tema por tema → fotos (elegir) → evidencia por indicador
+ * (ficha) → evaluar → traducir lo que falte. Cada paso refresca el informe.
+ * Reanudable: lo hecho vive en la base y no se repite. Ante el límite del
  * proveedor (429) espera 30 s y reintenta hasta 3 veces.
  */
 export function usePiloInforme(report_id: string): UsoPiloInforme {
@@ -574,10 +835,9 @@ export function usePiloInforme(report_id: string): UsoPiloInforme {
       setProgreso(PROGRESO_INFORME_CERO);
       setCorriendo(true);
       const avanzar = (c: Partial<ProgresoInforme>) => vivo.current && setProgreso((p) => ({ ...p, ...c }));
-      const avisar = (a: string) => vivo.current && setProgreso((p) => ({ ...p, avisos: [...p.avisos, a].slice(-20) }));
+      const avisar = (a: string) => vivo.current && setProgreso((p) => ({ ...p, avisos: [...p.avisos, a].slice(-30) }));
 
-      /** Una llamada con espera ante el 429. */
-      const conEspera = async <T>(f: () => Promise<T>): Promise<T> => {
+      const conEspera = async <T,>(f: () => Promise<T>): Promise<T> => {
         for (let esperas = 0; ; esperas++) {
           try {
             return await f();
@@ -599,28 +859,62 @@ export function usePiloInforme(report_id: string): UsoPiloInforme {
           const { ods, settings } = fila.data as unknown as { ods: number; settings: Record<string, unknown> | null };
 
           const estado = await piloInformeEstado(ods);
-          if (!estado.ai) throw new ErrorPilo(`La IA de Pilo no está lista${estado.motivo ? `: ${estado.motivo}` : "."}`, "sin_ia");
 
-          // 1. Plan
-          let indicadores = opciones.indicadores ?? estado.indicadores ?? [];
-          if (opciones.replanear || !settings?.plan) {
-            avanzar({ paso: "plan", mensaje: "Pilo lee las notas aprobadas y arma el plan…" });
-            const p = await conEspera(() => piloPlan(report_id));
-            if (!opciones.indicadores) indicadores = p.indicadores;
+          // 1. Imágenes de las notas (sin IA), solo las que faltan.
+          if (!opciones.sinImagenes) {
+            avanzar({ paso: "imagenes", mensaje: "Pilo trae las imágenes de las notas que aún no las tienen…" });
+            try {
+              for (let start = 0, vueltas = 0; !parar.current && vueltas < 200; vueltas++) {
+                const r = await piloImagenes({ start, ods });
+                start = r.next;
+                if (r.fin) break;
+              }
+            } catch (e) {
+              avisar(`Imágenes: ${e instanceof Error ? e.message : String(e)}`);
+            }
             refrescar();
           }
 
-          // 2. Párrafos, sección por sección, hasta que no queden notas del plan.
+          // 2. Libro de cifras (paso 1 sin IA; paso 2 con IA si está lista).
+          if (!parar.current) {
+            avanzar({ paso: "cifras", mensaje: "Pilo arma el libro de cifras de las notas…" });
+            for (let vueltas = 0; vueltas < 40 && !parar.current; vueltas++) {
+              const r = await conEspera(() => piloCifras({ report_id }));
+              if (r.motivo) avisar(r.motivo);
+              if (!r.quedan || !estado.ai || (!r.confirmadas && !r.extraidas)) break;
+            }
+            refrescar();
+          }
+
+          if (!estado.ai) throw new ErrorPilo(`La IA de los rankings no está lista${estado.motivo ? `: ${estado.motivo}` : "."} Las imágenes y el libro de cifras quedaron listos.`, "sin_ia");
+
+          // 3. Plan: todas las notas en temas; Pilo los nombra por lotes.
+          let indicadores = opciones.indicadores ?? estado.indicadores ?? [];
+          if (!parar.current) {
+            avanzar({ paso: "plan", mensaje: "Pilo agrupa todas las notas por tema…" });
+            let primera = true;
+            for (let vueltas = 0; vueltas < 30 && !parar.current; vueltas++) {
+              const p = await conEspera(() => piloPlan(report_id, primera ? { rehacer: Boolean(opciones.replanear || !settings?.plan), reintentar: opciones.reintentarFallidas } : {}));
+              primera = false;
+              if (!opciones.indicadores) indicadores = p.indicadores;
+              for (const a of p.avisos ?? []) avisar(a);
+              avanzar({ mensaje: `Plan: ${p.temas ?? p.plan.temas?.length ?? 0} temas con ${p.notas ?? p.plan.hicimos.length} notas.` });
+              refrescar();
+              if (!p.quedan) break;
+            }
+          }
+
+          // 4. Párrafos, tema por tema, hasta cubrir todas las notas.
           const secciones = opciones.secciones ?? ["hicimos", "proyectos", "cifras"];
           for (const sec of secciones) {
             const etiqueta = SECCIONES.find((s) => s.id === sec)?.label ?? sec;
-            for (let vuelta = 0; vuelta < 30 && !parar.current; vuelta++) {
-              avanzar({ paso: "redactar", mensaje: `Pilo redacta «${etiqueta}»…` });
+            for (let vuelta = 0; vuelta < 200 && !parar.current; vuelta++) {
+              avanzar({ paso: "redactar", mensaje: progresoTexto(etiqueta) });
               let r: RespuestaRedactar;
               try {
-                r = await conEspera(() => piloRedactar({ report_id, sec, count: 2 }));
+                r = await conEspera(() => piloRedactar({ report_id, sec, count: Math.max(2, estado.lote ?? 2) }));
               } catch (e) {
-                // Un párrafo que no pasó la verificación no detiene el ciclo: esas notas quedan marcadas y se sigue.
+                // Un grupo que no pasó la verificación queda en «fallidas» (y en el registro): se sigue.
                 if (e instanceof ErrorPilo && e.code === "verificacion") {
                   avisar(`«${etiqueta}»: ${e.message}`);
                   refrescar();
@@ -629,25 +923,44 @@ export function usePiloInforme(report_id: string): UsoPiloInforme {
                 throw e;
               }
               for (const f of r.fallos ?? []) avisar(`«${etiqueta}»: ${f.motivo}`);
-              if (r.escritos) setProgreso((p) => ({ ...p, escritos: p.escritos + r.escritos }));
+              for (const a of r.avisos ?? []) avisar(a);
+              setProgreso((p) => ({
+                ...p,
+                escritos: p.escritos + (r.escritos || 0),
+                tema: r.tema ?? p.tema,
+                cubiertas: r.cubiertas ?? p.cubiertas,
+                totalNotas: r.total_notas ?? p.totalNotas,
+                mensaje: textoProgresoTema(r) || p.mensaje,
+              }));
               refrescar();
-              if (!r.escritos || !r.quedan) break;
+              if (!r.quedan || (!r.escritos && !(r.fallos ?? []).length)) break;
             }
             if (parar.current) break;
           }
 
-          // 3. Indicadores «ev» sin evidencia elegida.
+          // 5. Fotos: elegir y organizar entre las de las notas (Pilo no crea imágenes).
+          if (!parar.current && !opciones.sinFotos) {
+            avanzar({ paso: "fotos", mensaje: "Pilo elige y organiza las fotos de las notas…" });
+            const f = await piloFotos({ report_id });
+            setProgreso((p) => ({ ...p, fotos: p.fotos + f.propuestas }));
+            if (f.propuestas) avisar(f.aviso);
+            for (const a of f.avisos ?? []) avisar(a);
+            refrescar();
+          }
+
+          // 6. Indicadores «ev» sin evidencia elegida: UNA por indicador, con su ficha.
+          const hechas = async () => {
+            const r = await tabla("ods_report_indicators").select("indicator, news_id, approved, eval").eq("report_id", report_id);
+            if (r.error) throw fallo(r.error);
+            return (r.data as unknown as { indicator: string; news_id: string | null; approved: boolean; eval: { grade?: string } | null }[]) ?? [];
+          };
           if (!parar.current && indicadores.length) {
-            const hechas = await tabla("ods_report_indicators").select("indicator, news_id, approved").eq("report_id", report_id);
-            if (hechas.error) throw fallo(hechas.error);
-            const listos = new Set(
-              ((hechas.data as unknown as { indicator: string; news_id: string | null; approved: boolean }[]) ?? []).filter((x) => x.approved || x.news_id).map((x) => x.indicator),
-            );
+            const listos = new Set((await hechas()).filter((x) => x.approved || x.news_id).map((x) => x.indicator));
             const pendientes = indicadores.filter((i) => !listos.has(i));
             avanzar({ paso: "indicadores", hechos: 0, total: pendientes.length });
             for (const [i, ind] of pendientes.entries()) {
               if (parar.current) break;
-              avanzar({ mensaje: `Pilo busca la evidencia del indicador ${ind}…`, hechos: i, total: pendientes.length });
+              avanzar({ mensaje: `Pilo busca la evidencia del indicador ${ind} (${i + 1} de ${pendientes.length})…`, hechos: i, total: pendientes.length });
               try {
                 const r = await conEspera(() => piloIndicador({ report_id, indicator: ind }));
                 if (r.news_id) setProgreso((p) => ({ ...p, indicadores: p.indicadores + 1 }));
@@ -663,12 +976,35 @@ export function usePiloInforme(report_id: string): UsoPiloInforme {
             }
           }
 
-          // 4. Fotos (sin IA: Pilo no ve las imágenes).
-          if (!parar.current && !opciones.sinFotos) {
-            avanzar({ paso: "fotos", mensaje: "Pilo prepara las fichas de las fotografías…" });
-            const f = await piloFotos({ report_id });
-            setProgreso((p) => ({ ...p, fotos: p.fotos + f.propuestas }));
-            if (f.propuestas) avisar(f.aviso);
+          // 7. Evaluar las evidencias sin evaluación (nunca aprueba).
+          if (!parar.current && !opciones.sinEvaluar) {
+            const sinEval = (await hechas()).filter((x) => x.news_id && !x.approved && !x.eval?.grade).map((x) => x.indicator);
+            avanzar({ paso: "evaluar", hechos: 0, total: sinEval.length });
+            for (const [i, ind] of sinEval.entries()) {
+              if (parar.current) break;
+              avanzar({ mensaje: `Pilo evalúa la evidencia de ${ind} como lo haría THE (${i + 1} de ${sinEval.length})…`, hechos: i });
+              try {
+                await conEspera(() => piloEvaluar({ report_id, indicator: ind }));
+              } catch (e) {
+                if (e instanceof ErrorPilo && e.code === "verificacion") {
+                  avisar(`${ind}: ${e.message}`);
+                  continue;
+                }
+                throw e;
+              }
+              refrescar();
+            }
+          }
+
+          // 8. Traducir lo que falte.
+          if (!parar.current && !opciones.sinTraducir) {
+            avanzar({ paso: "traducir", mensaje: "Pilo completa el inglés que falta…" });
+            for (let vueltas = 0; vueltas < 30 && !parar.current; vueltas++) {
+              const r = await conEspera(() => piloTraducir({ report_id }));
+              for (const f of r.fallos) avisar(`Traducción: ${f.error}`);
+              refrescar();
+              if (!r.quedan || (!r.bloques && !r.noticias)) break;
+            }
           }
           avanzar(parar.current ? { mensaje: "Detenido. Al volver a iniciar, Pilo sigue donde iba." } : { paso: "listo", mensaje: "Listo: revisa lo que escribió Pilo." });
         } catch (e) {
@@ -694,9 +1030,11 @@ export function usePiloInforme(report_id: string): UsoPiloInforme {
   return { corriendo, progreso, error, faltaMigracion, iniciar, detener };
 }
 
+const progresoTexto = (etiqueta: string) => `Pilo redacta «${etiqueta}»…`;
+
 /* ---------- Público -------------------------------------------------------- */
 
-/** El informe publicado de un ODS y una edición; null si no hay (o sin la migración). */
+/** El informe publicado de un ODS y una edición, con el inglés, las fotos con su imagen y el registro; null si no hay. */
 export function usePublicInforme(ods: number, edition: number): UseQueryResult<InformePublico | null> {
   return useQuery({
     queryKey: ["informe-publico", ods, edition],
@@ -707,23 +1045,71 @@ export function usePublicInforme(ods: number, edition: number): UseQueryResult<I
       const r = await tabla("ods_reports").select("id, ods, edition, updated_at").eq("ods", ods).eq("edition", edition).eq("state", "publicado").maybeSingle();
       if (r.error || !r.data) return null;
       const inf = r.data as unknown as InformePublico["informe"];
-      const [b, f] = await Promise.all([
-        tabla("ods_report_blocks").select("id, sec, pos, text, sources, figs").eq("report_id", inf.id),
-        tabla("ods_report_photos").select("news_id, slot, caption, alt, credit, crop").eq("report_id", inf.id),
-      ]);
-      if (b.error || f.error) return null;
+      const leerBloques = async (columnas: string) => todas<Record<string, unknown>>((a, z) => tabla("ods_report_blocks").select(columnas).eq("report_id", inf.id).order("pos").range(a, z));
+      const leerFotos = async (columnas: string) => todas<Record<string, unknown>>((a, z) => tabla("ods_report_photos").select(columnas).eq("report_id", inf.id).range(a, z));
+      let b: Record<string, unknown>[];
+      let f: Record<string, unknown>[];
+      try {
+        [b, f] = await Promise.all([leerBloques("id, sec, pos, text, sources, figs, text_en, heading, heading_en"), leerFotos("news_id, image_id, slot, caption, alt, credit, crop")]);
+      } catch {
+        // Sin 0146: lo de 0145.
+        try {
+          [b, f] = await Promise.all([leerBloques("id, sec, pos, text, sources, figs"), leerFotos("news_id, slot, caption, alt, credit, crop")]);
+        } catch {
+          return null;
+        }
+      }
+      // La URL de cada foto: la imagen elegida o la portada de la nota.
+      const imageIds = [...new Set(f.map((x) => x.image_id).filter((x): x is string => typeof x === "string"))];
+      const newsIds = [...new Set(f.map((x) => String(x.news_id)))];
+      const urlImagen = new Map<string, string>();
+      const urlNota = new Map<string, string | null>();
+      try {
+        for (const t of trozos(imageIds)) {
+          const im = await tabla("news_images").select("id, url").in("id", t);
+          for (const x of (im.data as unknown as { id: string; url: string }[]) ?? []) urlImagen.set(x.id, x.url);
+        }
+        for (const t of trozos(newsIds)) {
+          const n = await tabla("news_items").select("id, image_url").in("id", t);
+          for (const x of (n.data as unknown as { id: string; image_url: string | null }[]) ?? []) urlNota.set(x.id, x.image_url);
+        }
+      } catch {
+        /* sin imágenes: el portal muestra la ficha sin foto */
+      }
+      let registro: RegistroActividad[] = [];
+      try {
+        const rg = await supabase.rpc("ods_registro" as never, { p_ods: ods, p_edition: edition } as never);
+        if (!rg.error) registro = ((rg.data as unknown as RegistroActividad[]) ?? []).map((x) => ({ ...x, title_en: x.title_en ?? "", campus: x.campus ?? "", section: x.section ?? "" }));
+      } catch {
+        /* sin 0146: sin registro */
+      }
       const bloques = ordenarBloques(
-        ((b.data as unknown as Record<string, unknown>[]) ?? []).map((x) => ({ id: String(x.id), sec: x.sec as Seccion, pos: Number(x.pos ?? 0), text: String(x.text ?? ""), sources: lista<Fuente>(x.sources), figs: lista<Cifra>(x.figs) })),
+        b.map((x) => ({
+          id: String(x.id),
+          sec: x.sec as Seccion,
+          pos: Number(x.pos ?? 0),
+          text: String(x.text ?? ""),
+          sources: lista<Fuente>(x.sources),
+          figs: lista<Cifra>(x.figs),
+          text_en: String(x.text_en ?? ""),
+          heading: String(x.heading ?? ""),
+          heading_en: String(x.heading_en ?? ""),
+        })),
       );
-      const fotos = ((f.data as unknown as Record<string, unknown>[]) ?? []).map((x) => ({
-        news_id: String(x.news_id),
-        slot: (x.slot as Foto["slot"]) ?? "galeria",
-        caption: String(x.caption ?? ""),
-        alt: String(x.alt ?? ""),
-        credit: String(x.credit ?? ""),
-        crop: { ...RECORTE, ...((x.crop as Partial<Foto["crop"]>) ?? {}) },
-      }));
-      return { informe: { id: inf.id, ods: Number(inf.ods), edition: Number(inf.edition), updated_at: String(inf.updated_at ?? "") }, bloques, fotos };
+      const fotos = f.map((x) => {
+        const imageId = typeof x.image_id === "string" ? x.image_id : null;
+        return {
+          news_id: String(x.news_id),
+          image_id: imageId,
+          url: (imageId && urlImagen.get(imageId)) || urlNota.get(String(x.news_id)) || null,
+          slot: (x.slot as Foto["slot"]) ?? "galeria",
+          caption: String(x.caption ?? ""),
+          alt: String(x.alt ?? ""),
+          credit: String(x.credit ?? ""),
+          crop: { ...RECORTE, ...((x.crop as Partial<Foto["crop"]>) ?? {}) },
+        };
+      });
+      return { informe: { id: inf.id, ods: Number(inf.ods), edition: Number(inf.edition), updated_at: String(inf.updated_at ?? "") }, bloques, fotos, registro };
     },
   });
 }
@@ -733,6 +1119,8 @@ export interface EvidenciaPublica {
   indicator: string;
   ods: number;
   title: string;
+  /** 0146 */
+  title_en?: string;
   date: string | null;
   section: string;
   campus: string;
@@ -740,6 +1128,8 @@ export interface EvidenciaPublica {
   url: string;
   page_es: string[];
   page_en: string;
+  /** 0146: la ficha de hechos (vacía si la evidencia es de antes de 0146). */
+  ficha?: FichaEvidencia | null;
 }
 
 export function useEvidenciaPublica(ods: number, indicator: string): UseQueryResult<EvidenciaPublica | null> {
@@ -753,10 +1143,12 @@ export function useEvidenciaPublica(ods: number, indicator: string): UseQueryRes
       if (r.error) return null;
       const f = ((r.data as unknown as Record<string, unknown>[]) ?? [])[0];
       if (!f) return null;
+      const ficha = f.ficha && typeof f.ficha === "object" && Object.keys(f.ficha).length ? leerFicha(f.ficha) : null;
       return {
         indicator: String(f.indicator),
         ods: Number(f.ods),
         title: String(f.title ?? ""),
+        title_en: String(f.title_en ?? ""),
         date: (f.published_on as string | null) ?? null,
         section: String(f.section ?? ""),
         campus: String(f.campus ?? ""),
@@ -764,6 +1156,7 @@ export function useEvidenciaPublica(ods: number, indicator: string): UseQueryRes
         url: String(f.url ?? ""),
         page_es: lista<string>(f.page_es),
         page_en: String(f.page_en ?? ""),
+        ficha,
       };
     },
   });
@@ -825,6 +1218,40 @@ export function ordenarBloques<T extends Pick<Bloque, "sec" | "pos" | "id">>(blo
   return bloques.slice().sort((a, b) => (ORDEN_SECCION.get(a.sec) ?? 99) - (ORDEN_SECCION.get(b.sec) ?? 99) || a.pos - b.pos || a.id.localeCompare(b.id));
 }
 
+/** Las noticias que cita la narrativa (párrafos activos, no de reserva). */
+export function notasEnNarrativa(bloques: Pick<Bloque, "sources" | "enabled" | "spare">[]): Set<string> {
+  return new Set(bloques.filter(activo).flatMap((b) => (b.sources ?? []).map((s) => s.news_id).filter(Boolean)));
+}
+
+/**
+ * El «Registro de actividades» en la intranet (el mismo que da ods_registro al
+ * público): TODAS las notas, en orden cronológico, con su cifra principal y si
+ * la narrativa la cita. Ninguna nota queda fuera.
+ */
+export function registroActividades(
+  notas: Pick<NoticiaOds, "id" | "published_on" | "campus" | "section" | "title" | "title_en" | "url">[],
+  cifras: Pick<CifraNota, "news_id" | "value" | "label" | "score">[],
+  bloques: Pick<Bloque, "sources" | "enabled" | "spare">[],
+): RegistroActividad[] {
+  const citadas = notasEnNarrativa(bloques);
+  const mejor = new Map<string, Pick<CifraNota, "value" | "label" | "score">>();
+  for (const c of cifras) if (c.score > 0 && (!mejor.has(c.news_id) || c.score > mejor.get(c.news_id)!.score)) mejor.set(c.news_id, c);
+  return notas
+    .map((n) => ({
+      news_id: n.id,
+      published_on: n.published_on ?? null,
+      campus: n.campus ?? "",
+      section: n.section ?? "",
+      title: n.title,
+      title_en: n.title_en ?? "",
+      url: n.url,
+      figure_value: mejor.get(n.id)?.value ?? null,
+      figure_label: mejor.get(n.id)?.label ?? null,
+      en_narrativa: citadas.has(n.id),
+    }))
+    .sort((a, b) => String(a.published_on ?? "9999").localeCompare(String(b.published_on ?? "9999")) || a.title.localeCompare(b.title, "es"));
+}
+
 export type EstadoIndicador = "aprobada" | "propuesta" | "falta" | "documento" | "dato" | "investigacion";
 
 export interface ResumenCobertura {
@@ -840,10 +1267,14 @@ export interface ResumenCobertura {
   /** Los que piden un documento institucional. */
   documentos: string[];
   porIndicador: { id: string; tipo: IndicadorTHE["tipo"]; estado: EstadoIndicador }[];
+  /** 0146 (con `notas`): cuántas notas aprobadas tiene el ODS, cuántas cita la narrativa y cuántas están solo en el registro. */
+  notasTotal?: number;
+  notasEnNarrativa?: number;
+  notasSoloRegistro?: number;
 }
 
-/** Cuánto del ODS cubre el informe: evidencias propuestas y aprobadas por indicador. */
-export function resumenCobertura(completo: InformeCompleto, indicadores: IndicadorTHE[]): ResumenCobertura {
+/** Cuánto del ODS cubre el informe: evidencias por indicador y, si se dan las notas, cobertura de la narrativa. */
+export function resumenCobertura(completo: InformeCompleto, indicadores: IndicadorTHE[], notas?: Pick<NoticiaOds, "id">[]): ResumenCobertura {
   const delOds = indicadores.filter((i) => Number(i.ods) === completo.informe.ods);
   const porId = new Map(completo.elecciones.map((e) => [e.indicator, e]));
   const porIndicador = delOds.map((i) => {
@@ -858,7 +1289,7 @@ export function resumenCobertura(completo: InformeCompleto, indicadores: Indicad
     return { id: i.id, tipo: i.tipo, estado };
   });
   const ev = porIndicador.filter((x) => x.tipo === "ev");
-  return {
+  const base: ResumenCobertura = {
     total: delOds.length,
     conNoticias: ev.length,
     propuestas: ev.filter((x) => x.estado === "propuesta" || x.estado === "aprobada").length,
@@ -867,4 +1298,13 @@ export function resumenCobertura(completo: InformeCompleto, indicadores: Indicad
     documentos: porIndicador.filter((x) => x.estado === "documento").map((x) => x.id),
     porIndicador,
   };
+  if (!notas) return base;
+  const citadas = notasEnNarrativa(completo.bloques);
+  const enNarrativa = notas.filter((n) => citadas.has(n.id)).length;
+  return { ...base, notasTotal: notas.length, notasEnNarrativa: enNarrativa, notasSoloRegistro: notas.length - enNarrativa };
+}
+
+/** La página de evidencia de una elección, en el idioma pedido (inglés por defecto). */
+export function paginaDeEleccion(e: Pick<EleccionIndicador, "indicator" | "ficha" | "page_es" | "page_en">, ind: Pick<IndicadorTHE, "id" | "titulo" | "pregunta"> | undefined, idioma: Idioma = "en"): PaginaEvidencia {
+  return paginaEvidencia({ id: e.indicator, titulo: ind?.titulo, pregunta: ind?.pregunta }, e.ficha ?? null, e.page_es, e.page_en, idioma);
 }

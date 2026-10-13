@@ -5,6 +5,7 @@
    ========================================================================== */
 
 import { useOdsBulletinEditions } from "./ods-bulletin-data";
+import { fechaLarga, tr, useLang } from "./i18n";
 
 export function formatEditionDate(iso: string): string {
   const d = new Date(iso);
@@ -12,13 +13,14 @@ export function formatEditionDate(iso: string): string {
   return d.toLocaleDateString("es-CO", { day: "numeric", month: "long", year: "numeric" });
 }
 
-export function OdsBulletinDownload({ className = "odsx-btn odsx-btn--pri", text = "Descargar boletín (PDF)" }: { className?: string; text?: string }) {
+export function OdsBulletinDownload({ className = "odsx-btn odsx-btn--pri", text }: { className?: string; text?: string }) {
   const { edition, url } = useOdsBulletinEditions();
+  const { lang } = useLang();
   if (!edition || !url) return null;
-  const date = formatEditionDate(edition.published_at);
+  const date = lang === "en" ? fechaLarga(edition.published_at.slice(0, 10), "en") : formatEditionDate(edition.published_at);
   return (
     <a className={className} href={url} target="_blank" rel="noopener" title={`${edition.label}${date ? ` · ${date}` : ""}`}>
-      {text}
+      {text ?? tr(lang, "descargar_boletin")}
       <small>
         {" "}
         · {edition.label}

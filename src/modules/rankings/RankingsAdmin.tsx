@@ -8,6 +8,8 @@
                            trabajo (?buscar=1 abre el panel de búsqueda)
      informes              Informes ODS con Pilo (informes/InformesOds.tsx):
                            ?ods=4&tab=redactar|indicadores|fotos|vista
+     posicion              Posicionamiento en THE Impact (posicion/Posicion.tsx):
+                           la tabla oficial 2026 (0148) y el escenario 2027
    La búsqueda de noticias vive aquí (CargaProvider), no en el recolector: sigue
    corriendo y se ve en la barra de progreso aunque se cambie de sección.
    Las cifras de los rankings salen de sostenible/data.ts (las de World y
@@ -26,9 +28,10 @@ import { Recolector } from "./Recolector";
 import { InformesOds } from "./informes/InformesOds";
 import { BarraCarga, CargaProvider } from "./carga";
 import { odsVars } from "./ods";
+import { Posicion, ResultadoTHE } from "./posicion/Posicion";
 import "./rankings.css";
 
-type Seccion = "tablero" | RankingId | "noticias" | "informes";
+type Seccion = "tablero" | RankingId | "noticias" | "informes" | "posicion";
 const BASE = "/admin/rankings";
 const KICKER = "Tablero de rankings";
 
@@ -51,7 +54,7 @@ export function RankingsAdmin() {
   const inbox = useNewsInbox();
 
   const seccion: Seccion | null =
-    param === undefined ? "tablero" : param === "noticias" || param === "informes" ? param : rankingById(param) ? (param as RankingId) : null;
+    param === undefined ? "tablero" : param === "noticias" || param === "informes" || param === "posicion" ? param : rankingById(param) ? (param as RankingId) : null;
   if (!seccion) return <Navigate to={BASE} replace />;
 
   const porRevisar = inbox.data?.filter((n) => n.state === "pending").length;
@@ -72,6 +75,9 @@ export function RankingsAdmin() {
       <AdminRailTab current={seccion === "informes"} to={`${BASE}/informes`}>
         Informes ODS con Pilo
       </AdminRailTab>
+      <AdminRailTab current={seccion === "posicion"} to={`${BASE}/posicion`}>
+        Posicionamiento THE
+      </AdminRailTab>
     </AdminRail>
   );
 
@@ -88,6 +94,10 @@ export function RankingsAdmin() {
     titulo = "Informes ODS con Pilo";
     descripcion = "Pilo redacta cada ODS con las noticias aprobadas; tú revisas, eliges la evidencia de THE y publicas";
     cuerpo = <InformesOds />;
+  } else if (seccion === "posicion") {
+    titulo = "Posicionamiento en THE Impact";
+    descripcion = "Dónde está la UDES en THE Impact 2026 frente a Colombia y qué tan probable es moverse en 2027, con supuestos a la vista";
+    cuerpo = <Posicion />;
   } else {
     const ranking = rankingById(seccion) as Ranking;
     titulo = NOMBRE[ranking.id];
@@ -150,6 +160,13 @@ function Externo({ to, children }: { to: string; children: ReactNode }) {
 function AccesosRanking({ ranking }: { ranking: Ranking }) {
   return (
     <ul className="rk-links">
+      {ranking.id === "impact" && (
+        <li>
+          <Link className="rk-go" to={`${BASE}/posicion`}>
+            Analizar el posicionamiento
+          </Link>
+        </li>
+      )}
       <li>
         <Externo to={`/sostenible/${ranking.id}`}>Ver portal público</Externo>
       </li>
@@ -183,6 +200,7 @@ function Tablero({ inbox }: { inbox: ReturnType<typeof useNewsInbox> }) {
               <Link to={`${BASE}/${r.id}`}>{NOMBRE[r.id]}</Link>
             </h2>
             <EstadoRanking ranking={r} />
+            {r.id === "impact" && <ResultadoTHE />}
             <AccesosRanking ranking={r} />
           </li>
         ))}
@@ -257,6 +275,7 @@ function PaginaRanking({ ranking }: { ranking: Ranking }) {
         </h2>
         <p className="rk-lead">{ranking.about}</p>
         <EstadoRanking ranking={ranking} />
+        {ranking.id === "impact" && <ResultadoTHE />}
       </section>
 
       <section className="rk-page__block" aria-labelledby="rk-cats">

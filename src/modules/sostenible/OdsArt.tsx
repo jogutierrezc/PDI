@@ -7,10 +7,12 @@
                          pequeño cumple contraste AA sobre el fondo tintado
                          (el 7 amarillo y el 2 mostaza nunca van como texto puro)
        --o-acc-soft      fondo tintado muy claro (secciones, cápsulas)
-       --o-acc-tint      tinte del encabezado (degradado radial)
+       --o-acc-tint      tinte un poco más fuerte que el suave
        --o-acc-on        texto legible sobre el color oficial (blanco o tinta)
-   - `OdsArtStrip`: la tira de los 17 colores del informe original, con la
-     tarjeta del dibujo al pasar el cursor o enfocar (solo con hover fino).
+   - `odsArtSize(n)`: ancho y alto reales de cada dibujo (no todos son 800 × 1085).
+   - `OdsArtStrip`: la tira de los 17 colores del informe original; al pasar el
+     cursor o enfocar se abre el cartel en miniatura de ese ODS (campo de su
+     color, número y dibujo), solo con hover fino.
    ========================================================================== */
 
 import { useState } from "react";
@@ -66,6 +68,16 @@ export function odsTone(hex: string): CSSProperties {
   } as CSSProperties;
 }
 
+/* --- Tamaño real de cada dibujo ------------------------------------------------------------------ */
+
+/** Alto de cada PNG de public/ods (todos miden 800 de ancho): el 4 es apaisado, el 1, 3 y 7 muy altos. */
+const ART_H = [1200, 670, 1200, 460, 680, 680, 1200, 695, 1092, 864, 1040, 900, 1085, 887, 910, 820, 780];
+
+/** Ancho y alto del dibujo del ODS `n`, para reservar su caja sin saltos. */
+export function odsArtSize(n: number): { width: number; height: number } {
+  return { width: 800, height: ART_H[n - 1] ?? 1085 };
+}
+
 /* --- Tira de los 17 colores ------------------------------------------------------------------------ */
 
 /**
@@ -83,9 +95,9 @@ export function OdsArtStrip({ current, edition, label = "Los 17 informes ODS" }:
           <li key={x.n} style={{ "--c": x.color, "--c-on": odsOn(x.color) } as CSSProperties} className={x.n === current ? "is-on" : undefined}>
             <Link to={ODS_ROUTES.report(x.n, edition)} aria-current={x.n === current ? "page" : undefined} aria-label={`ODS ${x.n}: ${x.name}`}>
               <span className="ods-art-card" aria-hidden="true">
-                <span className="ods-art-card__img">{armed && <img src={odsArt(x.n)} alt="" width={800} height={1085} decoding="async" />}</span>
-                <b>ODS {x.n}</b>
-                <span>{x.name}</span>
+                <b className="ods-art-card__n">{x.n}</b>
+                <span className="ods-art-card__img">{armed && <img src={odsArt(x.n)} alt="" {...odsArtSize(x.n)} decoding="async" />}</span>
+                <span className="ods-art-card__name">{x.name}</span>
               </span>
             </Link>
           </li>

@@ -1,18 +1,19 @@
 /* =============================================================================
-   UDES Sostenible · piezas del informe de un ODS: formato de cifras, intro del
-   número, ventana de video y la copia limpia que se imprime en A4.
+   UDES Sostenible · piezas del informe de un ODS: formato de cifras, titulares
+   por palabras enmascaradas, marcas dibujadas (flecha, reproducir), el filtro
+   de recorte del dibujo, la intro del número y la ventana de video.
 
    La intro solo se monta en el navegador (nunca en el HTML inicial) y se ve
    una vez por sesión; con movimiento reducido no aparece.
    ========================================================================== */
 
 import { useEffect, useRef } from "react";
+import type { CSSProperties } from "react";
 import gsap from "gsap";
 import { useGSAP } from "@gsap/react";
 import { SDG } from "./data";
-import { EVIDENCE_LABEL, ODS13, ODS_PUBLIC, odsArt, odsEvidenceTotals, odsPct, STATUS_LABEL, odsStatus } from "./ods-data";
-import { odsOn, odsTone } from "./OdsArt";
-import type { Bi, Ods, OdsEdition } from "./ods-data";
+import { odsOn } from "./OdsArt";
+import type { Bi } from "./ods-data";
 import { reduced } from "./widgets";
 
 gsap.registerPlugin(useGSAP);
@@ -52,9 +53,75 @@ export function Counter({ to, lang, decimals = 0 }: { to: number; lang: Lang; de
   );
 }
 
+/* --- Titulares por palabras --------------------------------------------------------------------------- */
+
+/**
+ * Cada palabra en su máscara, para que el titular entre por líneas. El texto completo queda en
+ * `aria-label` del titular; las palabras sueltas se ocultan a los lectores de pantalla.
+ */
+export function Words({ text, cls = "ors-w" }: { text: string; cls?: string }) {
+  const words = text.split(" ");
+  return (
+    <>
+      {words.map((w, i) => (
+        <span key={i} className="ors-mask" aria-hidden="true">
+          <span className={cls}>{w}</span>
+          {i < words.length - 1 ? " " : ""}
+        </span>
+      ))}
+    </>
+  );
+}
+
+/* --- Marcas dibujadas ---------------------------------------------------------------------------------- */
+
+/** Flecha de trazo (no un carácter): izquierda, derecha o salida a otra pestaña. */
+export function Arrow({ dir }: { dir: "left" | "right" | "out" }) {
+  const d = dir === "out" ? "M5 11 11 5M6 5h5v5" : "M3 8h10M9 4l4 4-4 4";
+  return (
+    <svg className={`ors-arrow ors-arrow--${dir}`} viewBox="0 0 16 16" width="16" height="16" aria-hidden="true" focusable="false">
+      <path d={d} fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="square" />
+    </svg>
+  );
+}
+
+/** Triángulo de reproducir, centrado ópticamente. */
+export function PlayMark() {
+  return (
+    <svg className="ors-playmark" viewBox="0 0 24 24" width="24" height="24" aria-hidden="true" focusable="false">
+      <path d="M8 5.5v13l10.5-6.5z" fill="currentColor" />
+    </svg>
+  );
+}
+
+/**
+ * Filtro de recorte: dilata el canal alfa del dibujo y lo rellena de papel, como un troquel. Los
+ * personajes vienen en el tono de su ODS y sin este borde se pierden sobre su propio color.
+ */
+export function CutFilter() {
+  return (
+    <svg className="ors-defs" width="0" height="0" aria-hidden="true" focusable="false">
+      <filter id="ors-cut" x="-4%" y="-4%" width="108%" height="108%" colorInterpolationFilters="sRGB">
+        <feMorphology in="SourceAlpha" operator="dilate" radius="3" result="d" />
+        <feFlood floodColor="#fff" />
+        <feComposite in2="d" operator="in" result="o" />
+        <feMerge>
+          <feMergeNode in="o" />
+          <feMergeNode in="SourceGraphic" />
+        </feMerge>
+      </filter>
+    </svg>
+  );
+}
+
 /* --- Intro del número --------------------------------------------------------------------------------- */
 
-export function OdsReportIntro({ n, label, skipLabel, onDone }: { n: number; label: string; skipLabel: string; onDone: () => void }) {
+/**
+ * El campo del color entra como cortina, el número cuenta hasta el del ODS y la intro se funde con
+ * el encabezado, que es el mismo campo. `onReady` arranca la coreografía del informe mientras la
+ * intro se desvanece; `onGone` la desmonta.
+ */
+export function OdsReportIntro({ n, color, label, skipLabel, onReady, onGone }: { n: number; color: string; label: string; skipLabel: string; onReady: () => void; onGone: () => void }) {
   const scope = useRef<HTMLDivElement>(null);
   const done = useRef(false);
   const tl = useRef<gsap.core.Timeline | null>(null);
@@ -68,9 +135,10 @@ export function OdsReportIntro({ n, label, skipLabel, onDone }: { n: number; lab
     } catch {
       /* sin almacenamiento: la intro se verá otra vez */
     }
+    onReady();
     const el = scope.current;
-    if (!el || reduced()) return onDone();
-    gsap.to(el, { yPercent: -100, duration: 0.55, ease: "power3.inOut", onComplete: onDone });
+    if (!el || reduced()) return onGone();
+    gsap.to(el, { opacity: 0, duration: 0.35, ease: "power2.out", onComplete: onGone });
   };
 
   useGSAP(
@@ -78,10 +146,11 @@ export function OdsReportIntro({ n, label, skipLabel, onDone }: { n: number; lab
       const num = scope.current?.querySelector(".ors-intro__n");
       const count = { v: 1 };
       tl.current = gsap
-        .timeline({ onComplete: () => void gsap.delayedCall(0.25, finish) })
-        .from(".ors-intro__strip i", { scaleX: 0, duration: 0.45, stagger: 0.02, ease: "power2.out" })
-        .to(count, { v: n, duration: 0.8, ease: "power2.out", onUpdate: () => void (num && (num.textContent = String(Math.round(count.v)))) }, 0.1)
-        .from(".ors-intro p", { y: 12, opacity: 0, duration: 0.35, ease: "power3.out" }, "-=0.3");
+        .timeline({ onComplete: () => void gsap.delayedCall(0.2, finish) })
+        .from(".ors-intro__strip i", { scaleY: 0, duration: 0.35, stagger: 0.015, ease: "power3.out" })
+        .fromTo(".ors-intro__field", { clipPath: "inset(0 100% 0 0)" }, { clipPath: "inset(0 0% 0 0)", duration: 0.6, ease: "power4.out" }, 0.15)
+        .to(count, { v: n, duration: 0.7, ease: "power4.out", onUpdate: () => void (num && (num.textContent = String(Math.round(count.v)))) }, 0.3)
+        .from(".ors-intro p", { yPercent: 110, duration: 0.45, ease: "power4.out" }, 0.55);
       const safety = window.setTimeout(finish, 4000);
       return () => window.clearTimeout(safety);
     },
@@ -89,15 +158,18 @@ export function OdsReportIntro({ n, label, skipLabel, onDone }: { n: number; lab
   );
 
   return (
-    <div ref={scope} className="ors-intro" role="presentation">
+    <div ref={scope} className="ors-intro" role="presentation" style={{ "--ods": color, "--ors-on": odsOn(color) } as CSSProperties}>
+      <div className="ors-intro__field" aria-hidden="true" />
       <div className="ors-intro__strip" aria-hidden="true">
         {SDG.map((s, i) => (
-          <i key={s.name} style={{ background: i === n - 1 ? "#fff" : s.color }} />
+          <i key={s.name} style={{ background: s.color, flexGrow: i === n - 1 ? 3.5 : 1 }} />
         ))}
       </div>
-      <div>
+      <div className="ors-intro__in">
         <div className="ors-intro__n">{n}</div>
-        <p>{label}</p>
+        <span className="ors-intro__mask">
+          <p>{label}</p>
+        </span>
       </div>
       <button type="button" className="ors-intro__skip" onClick={finish}>
         {skipLabel}
@@ -132,7 +204,7 @@ export function OdsReportVideo({ video, lang, onClose }: { video: VideoInfo | nu
       if (typeof d.showModal === "function") d.showModal();
       else d.setAttribute("open", "");
     }
-    if (!reduced()) gsap.from(d, { scale: 0.96, opacity: 0, duration: 0.22, ease: "power3.out", clearProps: "opacity,transform" });
+    if (!reduced()) gsap.from(d, { y: 12, opacity: 0, duration: 0.24, ease: "power3.out", clearProps: "opacity,transform" });
   }, [video]);
   const close = () => {
     const d = ref.current;
@@ -152,169 +224,27 @@ export function OdsReportVideo({ video, lang, onClose }: { video: VideoInfo | nu
     >
       {video && (
         <div className="ors-dlg__in">
-          <h3 id="ors-dlg-t">{video.title[lang]}</h3>
           <div className="ors-dlg__screen">
-            <span className="ors-dlg__play" aria-hidden="true">
-              ▶
+            <span className="ors-play" aria-hidden="true">
+              <PlayMark />
             </span>
-            <span>{es ? "El video de esta evidencia está publicado en YouTube y se abre en una pestaña nueva." : "This evidence video is published on YouTube and opens in a new tab."}</span>
+            <h3 id="ors-dlg-t">{video.title[lang]}</h3>
           </div>
-          <p className="ors-dlg__text">{video.text[lang]}</p>
-          <div className="ors-dlg__acts">
-            <button type="button" className="odsx-btn" onClick={close}>
-              {es ? "Cerrar" : "Close"}
-            </button>
-            <a className="odsx-btn odsx-btn--pri" href={`https://www.youtube.com/watch?v=${video.id}`} target="_blank" rel="noopener noreferrer">
-              {es ? "Ver en YouTube" : "Watch on YouTube"} <span aria-hidden="true">↗</span>
-              <span className="ors-sr">{es ? "(abre una pestaña nueva)" : "(opens a new tab)"}</span>
-            </a>
+          <div className="ors-dlg__body">
+            <p>{video.text[lang]}</p>
+            <p className="ors-dlg__note">{es ? "El video está publicado en YouTube y se abre en una pestaña nueva." : "The video is published on YouTube and opens in a new tab."}</p>
+            <div className="ors-dlg__acts">
+              <button type="button" className="ors-btn" onClick={close}>
+                {es ? "Cerrar" : "Close"}
+              </button>
+              <a className="ors-btn ors-btn--pri" href={`https://www.youtube.com/watch?v=${video.id}`} target="_blank" rel="noopener noreferrer">
+                {es ? "Ver en YouTube" : "Watch on YouTube"} <Arrow dir="out" />
+                <span className="ors-sr">{es ? "(abre una pestaña nueva)" : "(opens a new tab)"}</span>
+              </a>
+            </div>
           </div>
         </div>
       )}
     </dialog>
-  );
-}
-
-/* --- Copia para imprimir (A4) ------------------------------------------------------------------------------ */
-
-/** Versión estática del informe: todas las evidencias abiertas, sin barras ni animación. Va en `.sos-print-root`. */
-export function OdsReportPrint({ o, edition, lang }: { o: Ods; edition: OdsEdition; lang: Lang }) {
-  const full = o.n === 13;
-  const L: Lang = full ? lang : "es";
-  const tx = (es: string, en: string) => (L === "es" ? es : en);
-  const published = edition === 2025;
-  const totals = odsEvidenceTotals();
-  return (
-    <div className="odsx ors-print" lang={L} style={odsTone(o.color)}>
-      <header className="ors-print__head">
-        <span>Universidad de Santander · {tx("Oficina de Planeación", "Planning Office")}</span>
-        <span>THE Impact Rankings {edition}</span>
-      </header>
-      <div className="ors-print__title">
-        <b>{o.n}</b>
-        <div>
-          <p className="odsx-eyebrow">{published ? tx("Informe publicado · edición 2025", "Published report · 2025 edition") : tx("Informe · edición 2026", "Report · 2026 edition")}</p>
-          <h1>{full ? tx("ODS 13: Acción por el clima", "SDG 13: Climate Action") : `ODS ${o.n}: ${o.name}`}</h1>
-        </div>
-        <img className="ors-print__art" src={odsArt(o.n)} alt={tx(`Ilustración del ODS ${o.n}`, `SDG ${o.n} illustration`)} width={800} height={1085} loading="eager" />
-      </div>
-      <p className="ors-print__lede">
-        {full ? tx("Cómo la Universidad de Santander reduce su huella de carbono e investiga las soluciones energéticas que definirán un futuro sostenible para Colombia.", "How Universidad de Santander reduces its carbon footprint and researches the energy solutions that will define a sustainable future for Colombia.") : o.thesis}
-      </p>
-
-      <h2>{tx("Cifras de la edición 2025", "Figures from the 2025 edition")}</h2>
-      <div className="ors-print__figs">
-        {full
-          ? ODS13.stats.map((s, i) => (
-              <div key={i}>
-                <b>{s.to === null ? tx("Certificada", "Certified") : `${fmtN(s.to, L)} ${s.unit[L]}`}</b>
-                <span>{s.text[L]}</span>
-              </div>
-            ))
-          : o.figures.map((f) => (
-              <div key={f.label}>
-                <b>
-                  {f.value} {f.unit}
-                </b>
-                <span>{f.label}</span>
-              </div>
-            ))}
-      </div>
-      {!full && !o.real && <p className="ors-print__note">{tx("Dato ilustrativo", "Illustrative data")}</p>}
-
-      {ODS_PUBLIC.evidence && !published && full && (
-        <>
-          <h2>
-            {tx("Evidencias por indicador", "Evidence by indicator")} · {totals.ok}/{totals.total} {tx("verificadas", "verified")}
-          </h2>
-          {ODS13.indicators.map((ind) => (
-            <div key={ind.id} className="ors-print__ind">
-              <h3>
-                {ind.id} · {ind.name[L]}
-              </h3>
-              <ul>
-                {ind.evidence.map((e) => (
-                  <li key={e.title.es}>
-                    <span>
-                      {e.title[L]} <small>· {e.type[L]} · {e.source[L]}</small>
-                    </span>
-                    <em className={`odsx-chip ${e.status}`}>{EVIDENCE_LABEL[e.status][L]}</em>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          ))}
-        </>
-      )}
-
-      {!published && full && (
-        <>
-          <h2>{tx("Comparación 2025 → 2026", "Comparison 2025 → 2026")}</h2>
-          <table className="ors-print__tbl">
-            <thead>
-              <tr>
-                <th>{tx("Indicador", "Indicator")}</th>
-                <th>2025</th>
-                <th>2026*</th>
-              </tr>
-            </thead>
-            <tbody>
-              {ODS13.compare.map((c) => (
-                <tr key={c.label.es}>
-                  <td>{c.label[L]}</td>
-                  <td>{fmtN(c.y2025, L) + c.suffix}</td>
-                  <td>{fmtN(c.y2026, L) + c.suffix}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-          <p className="ors-print__note">* {tx("Cifras 2026 ilustrativas", "2026 figures are illustrative")}</p>
-        </>
-      )}
-
-      {full && (
-        <>
-          <h2>{tx("Ruta 2025 → 2026", "Roadmap 2025 → 2026")}</h2>
-          <ul className="ors-print__tl">
-            {ODS13.timeline.map((s) => (
-              <li key={s.title.es}>
-                <b>
-                  {s.when}
-                  {s.planned ? tx(" · previsto", " · planned") : ""} — {s.title[L]}
-                </b>
-                <span>{s.text[L]}</span>
-              </li>
-            ))}
-          </ul>
-          {!published && (
-            <p>
-              <b>{tx("Alianzas", "Partnerships")}:</b> {ODS13.allies.join(" · ")}
-            </p>
-          )}
-        </>
-      )}
-
-      {!full && !published && (
-        <>
-          {ODS_PUBLIC.evidence && (
-            <>
-              <h2>Avance de evidencias</h2>
-              <p>
-                {o.ok} de {o.total} evidencias verificadas ({odsPct(o)} %) · {STATUS_LABEL[odsStatus(o)]}
-              </p>
-            </>
-          )}
-          <h2>Lo que viene</h2>
-          <p>La UDES prevé {o.next}</p>
-        </>
-      )}
-
-      <footer className="ors-print__foot">
-        {tx(
-          "Las cifras de 2025 provienen del informe publicado. Las marcadas como ilustrativas se reemplazan por los datos oficiales antes de enviarlas.",
-          "2025 figures come from the published report. Those marked illustrative are replaced with official data before submission.",
-        )}
-      </footer>
-    </div>
   );
 }

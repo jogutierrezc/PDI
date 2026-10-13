@@ -5,22 +5,30 @@
 
    - ODS 13: el informe completo (expediente de evidencias en 2026; informe
      publicado en 2025), en español o inglés.
-   - Los demás ODS: plantilla con el color oficial, el dibujo, la tesis, las
+   - Los demás ODS: el cartel con su color oficial y su dibujo, la tesis, las
      dos cifras y lo que viene, hasta que el editor de informes cargue el detalle.
+
+   Composición «cartel»: cada informe es un pliego que nace de su cartel. El
+   primer pliego es el campo plano del color del ODS, con el número colosal
+   detrás del personaje (el PNG tiene transparencia y la figura tapa parte del
+   número) y el dibujo sangrando por el borde inferior. Luego se alternan pliegos
+   de papel (apenas un matiz del ODS) y bloques a sangre del color pleno. Las
+   cifras son tipografía sobre una rejilla de 12 columnas, no tarjetas.
 
    Las evidencias, su avance y el estado son internos: todo ese bloque queda
    detrás de `ODS_PUBLIC.evidence` (apagado), que el importador de informes de
    la intranet activará informe por informe. Con el interruptor apagado no
-   aparecen ni en el menú, ni en el scroll-spy, ni en la copia de impresión.
+   aparecen ni en el menú ni en el scroll-spy.
 
-   Siempre en fondo claro (tokens `--o-*` de `.odsx`). Movimiento con GSAP:
-   todo el contenido está completo en reposo; las entradas usan gsap.from con
-   clearProps y, con movimiento reducido, no hay animación.
+   Siempre en fondo claro (tokens `--o-*` de `.odsx`). Movimiento con GSAP: una
+   sola coreografía de entrada (cortina del campo, máscara del número, la
+   figura que sube, el titular por líneas) y revelados al hacer scroll. Todo el
+   contenido está completo en reposo; con movimiento reducido no hay animación.
+   Nunca `clearProps: "all"`: borraría las variables de color en línea.
    ========================================================================== */
 
-import { useEffect, useLayoutEffect, useRef, useState } from "react";
-import type { CSSProperties, KeyboardEvent } from "react";
-import { createPortal } from "react-dom";
+import { Fragment, useEffect, useLayoutEffect, useRef, useState } from "react";
+import type { CSSProperties, KeyboardEvent, ReactNode } from "react";
 import { Link, Navigate, useParams, useSearchParams } from "react-router-dom";
 import gsap from "gsap";
 import { ScrollTrigger } from "gsap/ScrollTrigger";
@@ -29,8 +37,8 @@ import { OdsShell } from "./OdsShell";
 import { OdsBulletinDownloadLink } from "./OdsBulletinDownload";
 import { EVIDENCE_LABEL, ODS13, ODS_EDITIONS, ODS_PUBLIC, ODS_ROUTES, STATUS_LABEL, odsArt, odsByNumber, odsEdition, odsEvidenceTotals, odsPct, odsStatus } from "./ods-data";
 import type { Bi, Ods, OdsEdition } from "./ods-data";
-import { Counter, OdsReportIntro, OdsReportPrint, OdsReportVideo, fmtN, introSeen, parseFigure } from "./OdsReportParts";
-import { OdsArtStrip, odsTone } from "./OdsArt";
+import { Arrow, Counter, CutFilter, OdsReportIntro, OdsReportVideo, PlayMark, Words, fmtN, introSeen, parseFigure } from "./OdsReportParts";
+import { OdsArtStrip, odsArtSize, odsOn, odsTone } from "./OdsArt";
 import type { Lang } from "./OdsReportParts";
 import { reduced } from "./widgets";
 import "./ods-report.css";
@@ -39,8 +47,22 @@ gsap.registerPlugin(useGSAP, ScrollTrigger);
 
 const useIsoLayoutEffect = typeof window === "undefined" ? useEffect : useLayoutEffect;
 
-/** Valores de la franja de «stripes» del encabezado (CO₂ evitado por mes, ilustrativo). */
+/** Valores de la franja de «stripes» bajo el cartel (actividad mensual, ilustrativo). */
 const STRIPES = [0.45, 0.5, 0.38, 0.6, 0.55, 0.7, 0.62, 0.48, 0.8, 0.74, 0.9, 0.66, 0.58, 0.72, 0.95, 0.82, 0.68, 0.77, 0.88, 0.7, 0.6, 0.84, 0.92, 0.8];
+
+/** Reparto de las cifras en la rejilla de 12 columnas: columna y tamaño. Las de una misma fila comparten línea base. */
+type Slot = { col: string; size: "xl" | "l" | "m" };
+const SLOTS_13: Slot[] = [
+  { col: "1 / 8", size: "xl" },
+  { col: "9 / 13", size: "l" },
+  { col: "1 / 5", size: "m" },
+  { col: "5 / 9", size: "m" },
+  { col: "9 / 13", size: "m" },
+];
+const SLOTS_2: Slot[] = [
+  { col: "1 / 8", size: "xl" },
+  { col: "9 / 13", size: "l" },
+];
 
 export function OdsReport() {
   const { n } = useParams();
@@ -67,10 +89,13 @@ function ReportView({ o, edition }: { o: Ods; edition: OdsEdition }) {
 
   /* «check» es el HTML inicial: contenido completo, sin intro. En el navegador se decide antes de pintar. */
   const [phase, setPhase] = useState<Phase>("check");
-  const [mounted, setMounted] = useState(false);
+  const [overlay, setOverlay] = useState(false);
+  const withIntro = useRef(false);
   useIsoLayoutEffect(() => {
-    setMounted(true);
-    setPhase(!reduced() && !introSeen(o.n) ? "intro" : "ready");
+    const intro = !reduced() && !introSeen(o.n);
+    withIntro.current = intro;
+    setOverlay(intro);
+    setPhase(intro ? "intro" : "ready");
   }, [o.n]);
 
   const sections: [string, string][] = full
@@ -114,37 +139,48 @@ function ReportView({ o, edition }: { o: Ods; edition: OdsEdition }) {
     { scope, dependencies: [sectionIds] },
   );
 
-  /* Entradas y cifras: cuando termina la intro. */
+  /* La coreografía: arranca cuando termina la intro (o de una vez si no la hay). */
   useGSAP(
     () => {
       if (phase !== "ready" || reduced()) return;
       const root = scope.current;
       if (!root) return;
       const q = <T extends Element = HTMLElement>(s: string) => Array.from(root.querySelectorAll<T>(s));
+      const hero = root.querySelector<HTMLElement>(".ors-hero");
 
-      gsap.fromTo(".ors-w", { yPercent: 108 }, { yPercent: 0, duration: 0.5, ease: "power4.out", stagger: 0.05, delay: 0.05, clearProps: "transform" });
-      gsap.from(".ors-hero__in", { y: 14, opacity: 0, duration: 0.45, ease: "power3.out", stagger: 0.08, delay: 0.15, clearProps: "opacity,transform" });
-      gsap.from(".ors-art__img", { y: 18, opacity: 0, duration: 0.55, ease: "power3.out", delay: 0.1, clearProps: "opacity,transform" });
-      gsap.from(".ors-tile", { scale: 0.92, opacity: 0, duration: 0.45, ease: "power3.out", delay: 0.2, clearProps: "opacity,transform" });
-      gsap.from(".ors-stripes__row i", { scaleY: 0, duration: 0.45, ease: "power3.out", stagger: 0.02, delay: 0.25, clearProps: "opacity,transform" });
+      /* 1. El cartel. Sin intro, el campo entra como cortina desde la tira; con intro, ya está puesto. */
+      const tl = gsap.timeline({ defaults: { ease: "power4.out" } });
+      if (!withIntro.current) tl.fromTo(".ors-hero__field", { clipPath: "inset(0 100% 0 0)" }, { clipPath: "inset(0 0% 0 0)", duration: 0.6, clearProps: "clipPath" }, 0);
+      const t0 = withIntro.current ? 0 : 0.22;
+      tl.fromTo(".ors-num", { clipPath: "inset(100% 0 0 0)", yPercent: 10 }, { clipPath: "inset(0% 0 0 0)", yPercent: 0, duration: 0.6, clearProps: "clipPath,transform" }, t0)
+        .from(".ors-fig-art", { yPercent: 14, opacity: 0, duration: 0.6, ease: "power3.out", clearProps: "opacity,transform" }, t0 + 0.12)
+        .fromTo(".ors-w--h1", { yPercent: 110 }, { yPercent: 0, duration: 0.55, stagger: 0.04, clearProps: "transform" }, t0 + 0.05)
+        .from(".ors-hero__in", { y: 12, opacity: 0, duration: 0.45, ease: "power3.out", stagger: 0.06, clearProps: "opacity,transform" }, t0 + 0.25)
+        .from(".ors-stripes__row i", { scaleY: 0, duration: 0.4, ease: "power3.out", stagger: 0.012, clearProps: "transform" }, t0 + 0.3);
 
-      ScrollTrigger.batch(q(".ors-ind, .ors-stat, .ors-vid, .ors-step, .ors-fig, .ors-card"), {
+      /* 2. Profundidad al hacer scroll: la figura baja un poco y el número sube (solo transform). */
+      if (hero) {
+        gsap.to(".ors-hero__figure", { yPercent: 6, ease: "none", scrollTrigger: { trigger: hero, start: "top top", end: "bottom top", scrub: 0.3 } });
+        gsap.to(".ors-hero__num", { yPercent: -6, ease: "none", scrollTrigger: { trigger: hero, start: "top top", end: "bottom top", scrub: 0.3 } });
+      }
+
+      /* 3. Titulares de sección: por líneas enmascaradas. */
+      q(".ors-h2").forEach((h) => {
+        const words = h.querySelectorAll(".ors-w");
+        gsap.fromTo(words, { yPercent: 110 }, { yPercent: 0, duration: 0.6, ease: "power4.out", stagger: 0.025, clearProps: "transform", scrollTrigger: { trigger: h, start: "top 88%", once: true } });
+      });
+
+      /* 4. Reglas finas que se trazan y piezas que llegan. */
+      q(".ors-rule").forEach((r) => {
+        gsap.fromTo(r, { scaleX: 0 }, { scaleX: 1, duration: 0.6, ease: "power3.out", clearProps: "transform", scrollTrigger: { trigger: r, start: "top 92%", once: true } });
+      });
+      ScrollTrigger.batch(q(".ors-rise"), {
         start: "top 92%",
         once: true,
-        onEnter: (b) => void gsap.from(b, { y: 22, opacity: 0, duration: 0.45, ease: "power3.out", stagger: 0.06, clearProps: "opacity,transform" }),
+        onEnter: (b) => void gsap.from(b, { y: 18, opacity: 0, duration: 0.5, ease: "power3.out", stagger: 0.06, clearProps: "opacity,transform" }),
       });
 
-      q(".ors-ring").forEach((r) => {
-        const p = Number(r.dataset.p) || 0;
-        const s = { v: 0 };
-        ScrollTrigger.create({
-          trigger: r,
-          start: "top 92%",
-          once: true,
-          onEnter: () => void gsap.to(s, { v: p, duration: 0.9, ease: "power3.out", onStart: () => r.style.setProperty("--p", "0"), onUpdate: () => r.style.setProperty("--p", String(s.v)) }),
-        });
-      });
-
+      /* 5. Las cifras cuentan con salida fuerte. */
       q(".ors-cnt").forEach((c) => {
         const to = Number(c.dataset.to) || 0;
         const dec = Number(c.dataset.dec) || 0;
@@ -157,24 +193,28 @@ function ReportView({ o, edition }: { o: Ods; edition: OdsEdition }) {
           onEnter: () =>
             void gsap.to(s, {
               v: to,
-              duration: 1.1,
-              ease: "power2.out",
+              duration: 1,
+              ease: "power4.out",
               onUpdate: () => void (c.textContent = fmtN(dec ? s.v : Math.round(s.v), lg, dec)),
               onComplete: () => void (c.textContent = fmtN(to, lg, dec)),
             }),
         });
       });
 
-      q(".ors-fill").forEach((f) => {
-        ScrollTrigger.create({
-          trigger: f,
-          start: "top 94%",
-          once: true,
-          onEnter: () =>
-            void gsap.fromTo(f, { clipPath: "inset(0 100% 0 0)" }, { clipPath: "inset(0 0% 0 0)", duration: 0.7, ease: "power3.out", delay: f.classList.contains("y26") ? 0.15 : 0, clearProps: "clipPath" }),
-        });
+      /* 6. Comparación: el tramo se traza desde 2025 y el punto de 2026 llega a su sitio. */
+      q(".ors-dot-row").forEach((row) => {
+        const a = row.querySelector<HTMLElement>(".ors-dot--a");
+        const b = row.querySelector<HTMLElement>(".ors-dot--b");
+        const seg = row.querySelector<HTMLElement>(".ors-seg");
+        if (!a || !b || !seg) return;
+        gsap
+          .timeline({ scrollTrigger: { trigger: row, start: "top 90%", once: true }, defaults: { ease: "power3.out" } })
+          .fromTo(seg, { clipPath: "inset(0 100% 0 0)" }, { clipPath: "inset(0 0% 0 0)", duration: 0.6, clearProps: "clipPath" }, 0)
+          .from(b, { x: () => a.offsetLeft - b.offsetLeft, duration: 0.6, clearProps: "transform" }, 0)
+          .from(row.querySelectorAll(".ors-dot-row__v"), { opacity: 0, duration: 0.3, ease: "power2.out", clearProps: "opacity" }, 0.35);
       });
 
+      /* 7. La ruta: la línea se dibuja con el scroll. */
       const line = root.querySelector(".ors-tl__line");
       if (line) gsap.fromTo(line, { scaleY: 0 }, { scaleY: 1, ease: "none", scrollTrigger: { trigger: ".ors-tl", start: "top 75%", end: "bottom 70%", scrub: 0.4 } });
     },
@@ -189,7 +229,7 @@ function ReportView({ o, edition }: { o: Ods; edition: OdsEdition }) {
       return;
     }
     ScrollTrigger.refresh();
-    if (!reduced() && scope.current) gsap.fromTo(scope.current.querySelector(".ors-main"), { opacity: 0.35 }, { opacity: 1, duration: 0.25, ease: "power2.out", clearProps: "opacity" });
+    if (!reduced() && scope.current) gsap.fromTo(scope.current.querySelector(".ors-main"), { opacity: 0.4 }, { opacity: 1, duration: 0.25, ease: "power2.out", clearProps: "opacity" });
   }, [lang]);
 
   const goTo = (id: string) => {
@@ -198,21 +238,34 @@ function ReportView({ o, edition }: { o: Ods; edition: OdsEdition }) {
 
   const prev = o.n > 1 ? odsByNumber(o.n - 1) : undefined;
   const next = o.n < 17 ? odsByNumber(o.n + 1) : undefined;
-  const title = full ? (L === "es" ? ["ODS", "13:", "Acción", "por", "el", "clima"] : ["SDG", "13:", "Climate", "Action"]) : ["ODS", `${o.n}:`, ...o.name.split(" ")];
+  const name = full ? tx("Acción por el clima", "Climate action") : o.name;
+  const title = full ? tx("ODS 13: Acción por el clima", "SDG 13: Climate Action") : `ODS ${o.n}: ${o.name}`;
   const status = odsStatus(o);
   const totals = odsEvidenceTotals();
   const stripesCaption = full ? tx("CO₂ evitado por mes, 2025–2026", "CO₂ avoided per month, 2025–2026") : "Actividad mensual del ODS, 2025–2026";
+  const ilus = tx("Dato ilustrativo", "Illustrative data");
 
   return (
     <div ref={scope} className="ors" lang={L} style={odsTone(o.color)}>
-      {phase === "intro" && <OdsReportIntro n={o.n} label={full ? tx("Acción por el clima", "Climate action") : o.name} skipLabel={tx("Saltar", "Skip")} onDone={() => setPhase("ready")} />}
+      <CutFilter />
+      {overlay && (
+        <OdsReportIntro
+          n={o.n}
+          color={o.color}
+          label={name}
+          skipLabel={tx("Saltar", "Skip")}
+          onReady={() => setPhase("ready")}
+          onGone={() => setOverlay(false)}
+        />
+      )}
 
-      {/* Barra del informe: secciones, idioma y avance de lectura */}
+      {/* Barra del informe: la tira de los 17, las secciones y el idioma */}
       <div className="ors-bar">
         <OdsArtStrip current={o.n} edition={edition} label={tx("Los 17 informes ODS", "The 17 SDG reports")} />
         <div className="odsx-wrap ors-bar__row">
           <span className="ors-mark">
-            UDES<small>{full ? tx(`Informe ODS 13 · ${edition}`, `SDG 13 report · ${edition}`) : `Informe ODS ${o.n} · ${edition}`}</small>
+            <b>UDES</b>
+            <span>{full ? tx(`Informe ODS 13 · ${edition}`, `SDG 13 report · ${edition}`) : `Informe ODS ${o.n} · ${edition}`}</span>
           </span>
           <nav className="ors-nav" aria-label={tx("Secciones del informe", "Report sections")}>
             {sections.map(([id, label]) => (
@@ -231,7 +284,7 @@ function ReportView({ o, edition }: { o: Ods; edition: OdsEdition }) {
             ))}
           </nav>
           {full && (
-            <div className="ors-seg" role="group" aria-label={tx("Idioma", "Language")}>
+            <div className="ors-lang" role="group" aria-label={tx("Idioma", "Language")}>
               {(["es", "en"] as Lang[]).map((l) => (
                 <button key={l} type="button" aria-pressed={lang === l} onClick={() => setLang(l)} lang={l} aria-label={l === "es" ? "Español" : "English"}>
                   {l.toUpperCase()}
@@ -243,208 +296,188 @@ function ReportView({ o, edition }: { o: Ods; edition: OdsEdition }) {
       </div>
 
       <div className="ors-main">
-        {/* Acciones */}
-        <div className="odsx-wrap ors-tools">
-          <Link to={ODS_ROUTES.portal} className="odsx-btn ors-tools__back">
-            <span aria-hidden="true">←</span> {tx("Volver a los 17 informes", "Back to the 17 reports")}
-          </Link>
-          <div className="ors-seg ors-seg--ed" role="group" aria-label={tx("Edición", "Edition")}>
-            {ODS_EDITIONS.map((e) => (
-              <Link key={e} to={ODS_ROUTES.report(o.n, e)} replace aria-current={e === edition ? "page" : undefined} aria-label={tx(`Edición ${e}`, `${e} edition`)}>
-                {e}
-              </Link>
-            ))}
-          </div>
-          <button type="button" className="odsx-btn odsx-btn--pri" onClick={() => window.print()}>
-            <span aria-hidden="true">↓</span> {tx("Descargar PDF", "Download PDF")}
-          </button>
-          <OdsBulletinDownloadLink />
-        </div>
-
-        {/* Encabezado */}
+        {/* El cartel */}
         <section className="ors-hero" aria-labelledby="ors-h1">
-          <div className="odsx-wrap">
-            <div className="ors-hero__grid">
-              <div>
-                <p className="odsx-eyebrow ors-hero__in">
-                  {published ? tx("Informe publicado · THE Impact Rankings 2025", "Published report · THE Impact Rankings 2025") : tx("Informe 2026 · THE Impact Rankings", "2026 report · THE Impact Rankings")}
-                </p>
-                <h1 id="ors-h1" className="ors-h1" key={L} aria-label={title.join(" ")}>
-                  {title.map((w, i) => (
-                    <span key={i} className="ors-mask" aria-hidden="true">
-                      <span className="ors-w">{w}</span>
-                      {i < title.length - 1 ? " " : ""}
-                    </span>
-                  ))}
-                </h1>
-                <p className="ors-lede ors-hero__in">
-                  {full ? tx("Cómo la Universidad de Santander reduce su huella de carbono e investiga las soluciones energéticas que definirán un futuro sostenible para Colombia.", "How Universidad de Santander reduces its carbon footprint and researches the energy solutions that will define a sustainable future for Colombia.") : o.thesis}
-                </p>
-                <div className="ors-meta ors-hero__in">
-                  <div>
-                    {tx("Periodo", "Period")}
-                    <b>{edition}</b>
-                  </div>
-                  {!published && (
-                    <div>
-                      {tx("Edición anterior", "Previous edition")}
-                      <b>2025</b>
-                    </div>
-                  )}
-                  <div>
-                    {tx("Responsable", "Owner")}
-                    <b>{tx("Oficina de Planeación", "Planning Office")}</b>
-                  </div>
-                  {(published || ODS_PUBLIC.status) && (
-                    <div>
-                      {tx("Estado", "Status")}
-                      <b>{published ? tx("Publicado", "Published") : full ? tx("Borrador para revisión", "Draft for review") : STATUS_LABEL[status]}</b>
-                    </div>
-                  )}
-                </div>
-              </div>
-              <div className="ors-art">
-                <img className="ors-art__img" src={odsArt(o.n)} alt={tx(`Ilustración del ODS ${o.n}`, `SDG ${o.n} illustration`)} width={800} height={1085} loading="eager" decoding="async" />
-                <div className="ors-tile" role="img" aria-label={full ? tx("ODS 13, Acción por el clima", "SDG 13, Climate action") : `ODS ${o.n}, ${o.name}`}>
-                  <b>{o.n}</b>
-                  <span>{full ? tx("Acción por el clima", "Climate action") : o.name}</span>
-                </div>
-              </div>
+          <div className="ors-hero__field" aria-hidden="true" />
+          <div className="ors-hero__art">
+            <div className="ors-hero__num" aria-hidden="true">
+              <span className="ors-num">{o.n}</span>
             </div>
-            {published && (
-              <p className="ors-notice ors-hero__in" role="note">
-                <b>{tx("Informe publicado de la edición 2025.", "Published report of the 2025 edition.")}</b>{" "}
-                {tx("Muestra las cifras y la ruta tal como se enviaron; la comparación con el nuevo periodo está en la edición 2026.", "It shows the figures and roadmap as submitted; the comparison with the new period lives in the 2026 edition.")}{" "}
-                <Link to={ODS_ROUTES.report(o.n, 2026)} replace>
-                  {tx("Ver la edición 2026", "See the 2026 edition")}
-                </Link>
-              </p>
-            )}
-            <figure className="ors-stripes">
-              <div className="ors-stripes__row" role="img" aria-label={`${stripesCaption}. ${tx("Dato ilustrativo", "Illustrative data")}`}>
-                {STRIPES.map((v, i) => (
-                  <i key={i} style={{ background: `color-mix(in srgb, var(--ors-c) ${Math.round(v * 100)}%, var(--o-surface-2))` }} />
+            <div className="ors-hero__figure">
+              <img className="ors-fig-art" src={odsArt(o.n)} alt={tx(`Ilustración del ODS ${o.n}`, `SDG ${o.n} illustration`)} {...odsArtSize(o.n)} loading="eager" decoding="async" />
+            </div>
+          </div>
+          <div className="odsx-wrap ors-hero__wrap">
+            <div className="ors-hero__tools ors-hero__in">
+              <Link to={ODS_ROUTES.portal} className="ors-hero__back">
+                <Arrow dir="left" /> {tx("Volver a los 17 informes", "Back to the 17 reports")}
+              </Link>
+              <div className="ors-ed" role="group" aria-label={tx("Edición", "Edition")}>
+                {ODS_EDITIONS.map((e) => (
+                  <Link key={e} to={ODS_ROUTES.report(o.n, e)} replace aria-current={e === edition ? "page" : undefined} aria-label={tx(`Edición ${e}`, `${e} edition`)}>
+                    {e}
+                  </Link>
                 ))}
               </div>
-              <figcaption>
-                <span>{stripesCaption}</span>
-                <span className="odsx-ilus">{tx("Dato ilustrativo", "Illustrative data")}</span>
-              </figcaption>
-            </figure>
+              <OdsBulletinDownloadLink className="ors-hero__link" text={tx("Boletín (PDF)", "Bulletin (PDF)")} />
+            </div>
+
+            <div className="ors-hero__text">
+              <h1 id="ors-h1" className="ors-h1" key={L} aria-label={title}>
+                <Words text={title} cls="ors-w ors-w--h1" />
+              </h1>
+              <p className="ors-lede ors-hero__in">
+                {full ? tx("Cómo la Universidad de Santander reduce su huella de carbono e investiga las soluciones energéticas que definirán un futuro sostenible para Colombia.", "How Universidad de Santander reduces its carbon footprint and researches the energy solutions that will define a sustainable future for Colombia.") : o.thesis}
+              </p>
+              <dl className="ors-meta ors-hero__in">
+                <div>
+                  <dt>{tx("Ranking", "Ranking")}</dt>
+                  <dd>THE Impact Rankings</dd>
+                </div>
+                <div>
+                  <dt>{tx("Periodo", "Period")}</dt>
+                  <dd>{edition}</dd>
+                </div>
+                {!published && (
+                  <div>
+                    <dt>{tx("Edición anterior", "Previous edition")}</dt>
+                    <dd>2025</dd>
+                  </div>
+                )}
+                <div>
+                  <dt>{tx("Responsable", "Owner")}</dt>
+                  <dd>{tx("Oficina de Planeación", "Planning Office")}</dd>
+                </div>
+                {(published || ODS_PUBLIC.status) && (
+                  <div>
+                    <dt>{tx("Estado", "Status")}</dt>
+                    <dd>{published ? tx("Publicado", "Published") : full ? tx("Borrador para revisión", "Draft for review") : STATUS_LABEL[status]}</dd>
+                  </div>
+                )}
+              </dl>
+            </div>
           </div>
         </section>
+
+        {/* La franja de actividad, a sangre, cierra el cartel */}
+        <figure className="ors-stripes">
+          <div className="ors-stripes__row" role="img" aria-label={`${stripesCaption}. ${ilus}`}>
+            {STRIPES.map((v, i) => (
+              <i key={i} style={{ background: `color-mix(in srgb, var(--ods) ${Math.round(v * 100)}%, #fff)` }} />
+            ))}
+          </div>
+          <figcaption className="odsx-wrap">
+            <span>{stripesCaption}</span>
+            <span className="ors-ilus">{ilus}</span>
+          </figcaption>
+        </figure>
+
+        {published && (
+          <div className="odsx-wrap">
+            <p className="ors-note" role="note">
+              <b>{tx("Informe publicado de la edición 2025.", "Published report of the 2025 edition.")}</b>{" "}
+              {tx("Muestra las cifras y la ruta tal como se enviaron; la comparación con el nuevo periodo está en la edición 2026.", "It shows the figures and roadmap as submitted; the comparison with the new period lives in the 2026 edition.")}{" "}
+              <Link to={ODS_ROUTES.report(o.n, 2026)} replace>
+                {tx("Ver la edición 2026", "See the 2026 edition")}
+              </Link>
+            </p>
+          </div>
+        )}
 
         {full ? (
           <>
             {ODS_PUBLIC.evidence && !published && (
               <section className="ors-sec" id="ors-resumen" aria-labelledby="ors-resumen-h">
                 <div className="odsx-wrap">
-                  <div className="ors-head">
-                    <p className="odsx-eyebrow">{tx("Resumen para el evaluador", "Summary for the reviewer")}</p>
-                    <h2 id="ors-resumen-h">{tx("Cuatro indicadores, un avance de evidencias.", "Four indicators, one evidence tracker.")}</h2>
-                    <p>{tx("Cada indicador del ODS 13 muestra cuántas evidencias están verificadas. Toca uno para ir a su detalle.", "Each SDG 13 indicator shows how many pieces of evidence are verified. Tap one to see its detail.")}</p>
-                  </div>
-                  <div className="ors-inds">
+                  <SecHead id="ors-resumen-h" text={tx("Cuatro indicadores, un avance de evidencias.", "Four indicators, one evidence tracker.")}>
+                    {tx("Cada indicador del ODS 13 muestra cuántas evidencias están verificadas. Toca uno para ir a su detalle.", "Each SDG 13 indicator shows how many pieces of evidence are verified. Tap one to see its detail.")}
+                  </SecHead>
+                  <ol className="ors-inds">
                     {ODS13.indicators.map((ind, ix) => {
                       const ok = ind.evidence.filter((e) => e.status === "ok").length;
                       return (
-                        <button
-                          key={ind.id}
-                          type="button"
-                          className="ors-ind"
-                          onClick={() => {
-                            setTab(ix);
-                            goTo("evidencias");
-                          }}
-                        >
-                          <span className="ors-ind__code">{ind.id}</span>
-                          <h3>{t(ind.name)}</h3>
-                          <span className="ors-ind__r">
+                        <li key={ind.id}>
+                          <button
+                            type="button"
+                            className="ors-ind ors-rise"
+                            onClick={() => {
+                              setTab(ix);
+                              goTo("evidencias");
+                            }}
+                          >
+                            <span className="ors-ind__code">{ind.id}</span>
+                            <span className="ors-ind__name">{t(ind.name)}</span>
                             <Ring ok={ok} total={ind.evidence.length} label={tx(`${ok} de ${ind.evidence.length} evidencias verificadas`, `${ok} of ${ind.evidence.length} pieces of evidence verified`)} />
-                            <span>{tx("evidencias verificadas", "verified evidence")}</span>
-                          </span>
-                        </button>
+                          </button>
+                        </li>
                       );
                     })}
-                  </div>
-                  <div className="ors-total">
-                    <span>
-                      {tx("Total verificado", "Total verified")}: <b>{totals.ok} / {totals.total}</b>
-                    </span>
-                    <span>
-                      {tx("En revisión", "In review")}: <b>{totals.rev}</b>
-                    </span>
-                    <span>
-                      {tx("Por conseguir", "Still to gather")}: <b>{totals.falta}</b>
-                    </span>
-                  </div>
+                  </ol>
+                  <p className="ors-total">
+                    {tx("Total verificado", "Total verified")}: <b>{totals.ok} / {totals.total}</b> · {tx("En revisión", "In review")}: <b>{totals.rev}</b> · {tx("Por conseguir", "Still to gather")}: <b>{totals.falta}</b>
+                  </p>
                 </div>
               </section>
             )}
 
-            <section className="ors-sec ors-sec--alt" id="ors-cifras" aria-labelledby="ors-cifras-h">
+            <section className="ors-sec" id="ors-cifras" aria-labelledby="ors-cifras-h">
               <div className="odsx-wrap">
-                <div className="ors-head">
-                  <p className="odsx-eyebrow">{tx("Cifras de la edición 2025", "Figures from the 2025 edition")}</p>
-                  <h2 id="ors-cifras-h">{tx("Resultados medibles de la gestión climática.", "Measurable results of climate management.")}</h2>
-                </div>
-                <div className="ors-stats">
+                <SecHead id="ors-cifras-h" text={tx("Resultados medibles de la gestión climática.", "Measurable results of climate management.")} />
+                <div className="ors-figs">
                   {ODS13.stats.map((s, i) => (
-                    <div key={i} className="ors-stat">
-                      <div className="ors-stat__big">
-                        {s.to === null ? (
-                          <span className="ors-stat__word">{tx("Certificada", "Certified")}</span>
-                        ) : (
-                          <>
-                            <Counter key={L} to={s.to} lang={L} />
-                            <small>{t(s.unit)}</small>
-                          </>
-                        )}
-                      </div>
-                      <p>{t(s.text)}</p>
-                    </div>
+                    <Figure
+                      key={i}
+                      slot={SLOTS_13[i] ?? SLOTS_13[4]}
+                      big={s.to === null ? <span className="ors-fig__word">{tx("Certificada", "Certified")}</span> : <Counter key={L} to={s.to} lang={L} />}
+                      unit={t(s.unit)}
+                      text={t(s.text)}
+                    />
                   ))}
                 </div>
+                <p className="ors-source">{tx("Cifras del informe publicado de la edición 2025.", "Figures from the published report of the 2025 edition.")}</p>
               </div>
             </section>
 
             {!published && (
-              <section className="ors-sec" id="ors-avance" aria-labelledby="ors-avance-h">
+              <section className="ors-sec ors-sec--white" id="ors-avance" aria-labelledby="ors-avance-h">
                 <div className="odsx-wrap">
-                  <div className="ors-head">
-                    <p className="odsx-eyebrow">{tx("Comparación entre periodos", "Period comparison")}</p>
-                    <h2 id="ors-avance-h">{tx("Lo que cambia entre 2025 y 2026.", "What changes between 2025 and 2026.")}</h2>
-                    <p>
-                      <span className="odsx-ilus">{tx("Cifras 2026 ilustrativas", "2026 figures are illustrative")}</span>
-                    </p>
-                  </div>
-                  <div className="ors-cmp">
+                  <SecHead id="ors-avance-h" text={tx("Lo que cambia entre 2025 y 2026.", "What changes between 2025 and 2026.")}>
+                    <span className="ors-ilus">{tx("Cifras 2026 ilustrativas", "2026 figures are illustrative")}</span>
+                  </SecHead>
+                  <div className="ors-dots">
+                    <div className="ors-dots__key" aria-hidden="true">
+                      <span>
+                        <i className="ors-dot ors-dot--a" /> 2025
+                      </span>
+                      <span>
+                        <i className="ors-dot ors-dot--b" /> 2026
+                      </span>
+                    </div>
                     {ODS13.compare.map((c) => {
-                      const mx = Math.max(c.y2025, c.y2026) * 1.04;
+                      const mx = Math.max(c.y2025, c.y2026) * 1.08;
                       const gain = Math.round(((c.y2026 - c.y2025) / c.y2025) * 100);
+                      const pa = (c.y2025 / mx) * 100;
+                      const pb = (c.y2026 / mx) * 100;
                       return (
-                        <div key={c.label.es} className="ors-cmp__it">
-                          <div className="ors-cmp__t">
-                            <span>{t(c.label)}</span>
-                            <em>+{gain}%</em>
+                        <div key={c.label.es} className="ors-dot-row">
+                          <span className="ors-rule" aria-hidden="true" />
+                          <p className="ors-dot-row__label">{t(c.label)}</p>
+                          <div className="ors-dot-row__plot" role="img" aria-label={`${t(c.label)}: 2025, ${fmtN(c.y2025, L)}${c.suffix}; 2026, ${fmtN(c.y2026, L)}${c.suffix}`}>
+                            <span className="ors-track" />
+                            <span className="ors-seg" style={{ left: `${pa}%`, width: `${pb - pa}%` }} />
+                            <i className="ors-dot ors-dot--a" style={{ left: `${pa}%` }} />
+                            <i className="ors-dot ors-dot--b" style={{ left: `${pb}%` }} />
+                            <span className="ors-dot-row__v ors-dot-row__v--a" style={{ left: `${pa}%` }}>
+                              {fmtN(c.y2025, L) + c.suffix}
+                            </span>
+                            <span className="ors-dot-row__v ors-dot-row__v--b" style={{ left: `${pb}%` }}>
+                              {fmtN(c.y2026, L) + c.suffix}
+                            </span>
                           </div>
-                          <div className="ors-bars">
-                            {(
-                              [
-                                [2025, c.y2025, ""],
-                                [2026, c.y2026, "y26"],
-                              ] as const
-                            ).map(([y, v, cls]) => (
-                              <div key={y} className="ors-bar2">
-                                <span>{y}</span>
-                                <div className="ors-track">
-                                  <div className={`ors-fill ${cls}`} style={{ width: `${(v / mx) * 100}%` }}>
-                                    {fmtN(v, L) + c.suffix}
-                                  </div>
-                                </div>
-                              </div>
-                            ))}
-                          </div>
+                          <p className="ors-dot-row__gain">
+                            +{gain}
+                            <small>%</small>
+                          </p>
                         </div>
                       );
                     })}
@@ -454,78 +487,78 @@ function ReportView({ o, edition }: { o: Ods; edition: OdsEdition }) {
             )}
 
             {ODS_PUBLIC.evidence && !published && (
-              <section className="ors-sec ors-sec--alt" id="ors-evidencias" aria-labelledby="ors-evidencias-h">
+              <section className="ors-sec" id="ors-evidencias" aria-labelledby="ors-evidencias-h">
                 <div className="odsx-wrap">
-                  <div className="ors-head">
-                    <p className="odsx-eyebrow">{tx("Evidencias por indicador", "Evidence by indicator")}</p>
-                    <h2 id="ors-evidencias-h">{tx("Cada afirmación tiene su soporte.", "Every claim has its support.")}</h2>
-                    <p>
-                      <span className="odsx-ilus">{tx("Evidencias de muestra", "Sample evidence")}</span>
-                    </p>
-                  </div>
+                  <SecHead id="ors-evidencias-h" text={tx("Cada afirmación tiene su soporte.", "Every claim has its support.")}>
+                    <span className="ors-ilus">{tx("Evidencias de muestra", "Sample evidence")}</span>
+                  </SecHead>
                   <OdsReportTabs tab={tab} setTab={setTab} lang={L} />
                 </div>
               </section>
             )}
 
             {!published && (
-              <section className={`ors-sec${ODS_PUBLIC.evidence ? "" : " ors-sec--alt"}`} id="ors-hidrogeno" aria-labelledby="ors-hidrogeno-h">
-                <div className="odsx-wrap">
-                  <div className="ors-head">
-                    <p className="odsx-eyebrow">{tx("Vanguardia", "Forefront")}</p>
-                    <h2 id="ors-hidrogeno-h">{tx("El Centro de Hidrógeno de la UDES.", "The UDES Hydrogen Center.")}</h2>
-                    <p>{tx("Apoyado por el Doctorado en Recursos Energéticos Renovables, es un referente nacional e internacional.", "Backed by the PhD in Renewable Energy Resources, it is a national and international benchmark.")}</p>
-                  </div>
-                  <div className="ors-vids">
+              <section className="ors-sec ors-block" id="ors-hidrogeno" aria-labelledby="ors-hidrogeno-h">
+                <div className="odsx-wrap ors-block__wrap">
+                  <SecHead id="ors-hidrogeno-h" text={tx("El Centro de Hidrógeno de la UDES.", "The UDES Hydrogen Center.")}>
+                    {tx("Apoyado por el Doctorado en Recursos Energéticos Renovables, es un referente nacional e internacional.", "Backed by the PhD in Renewable Energy Resources, it is a national and international benchmark.")}
+                  </SecHead>
+                  <ul className="ors-vids">
                     {ODS13.videos.map((v, i) => (
-                      <button key={v.id} type="button" className="ors-vid" onClick={() => setVideo(i)} aria-haspopup="dialog">
-                        <span className="ors-vid__poster">
-                          <span className="ors-vid__play" aria-hidden="true">
-                            ▶
+                      <li key={v.id}>
+                        <button type="button" className="ors-vid ors-rise" onClick={() => setVideo(i)} aria-haspopup="dialog">
+                          <span className="ors-play" aria-hidden="true">
+                            <PlayMark />
                           </span>
-                        </span>
-                        <span className="ors-vid__tx">
-                          <b>{t(v.title)}</b>
-                          <span>{t(v.text)}</span>
-                        </span>
-                      </button>
+                          <span className="ors-vid__t">{t(v.title)}</span>
+                          <span className="ors-vid__x">{t(v.text)}</span>
+                        </button>
+                      </li>
                     ))}
-                  </div>
+                  </ul>
                 </div>
               </section>
             )}
 
-            <section className={`ors-sec${ODS_PUBLIC.evidence && !published ? " ors-sec--alt" : ""}`} id="ors-ruta" aria-labelledby="ors-ruta-h">
-              <div className="odsx-wrap">
-                <div className="ors-head">
-                  <p className="odsx-eyebrow">{tx("Ruta 2025 → 2026", "Roadmap 2025 → 2026")}</p>
-                  <h2 id="ors-ruta-h">{tx("De lo logrado a lo que viene.", "From what was achieved to what comes next.")}</h2>
+            <section className="ors-sec" id="ors-ruta" aria-labelledby="ors-ruta-h">
+              <div className="odsx-wrap ors-ruta">
+                <div className="ors-ruta__anchor" aria-hidden="true">
+                  <div className="ors-crop">
+                    <img src={odsArt(o.n)} alt="" {...odsArtSize(o.n)} loading="lazy" decoding="async" />
+                  </div>
                 </div>
-                <div className="ors-tl">
-                  <span className="ors-tl__line" aria-hidden="true" />
-                  <ol>
-                  {ODS13.timeline.map((s) => (
-                    <li key={s.title.es} className={`ors-step${s.planned ? " plan" : ""}`}>
-                      <span className="ors-step__when">
-                        {s.when}
-                        {s.planned ? tx(" · previsto", " · planned") : ""}
-                      </span>
-                      <b>{t(s.title)}</b>
-                      <span>{t(s.text)}</span>
-                    </li>
-                  ))}
-                  </ol>
-                </div>
-                {!published && (
-                  <>
-                    <p className="odsx-eyebrow ors-allies-h">{tx("Alianzas", "Partnerships")}</p>
-                    <ul className="ors-ally">
-                      {ODS13.allies.map((a) => (
-                        <li key={a}>{a}</li>
+                <div className="ors-ruta__body">
+                  <SecHead id="ors-ruta-h" text={tx("De lo logrado a lo que viene.", "From what was achieved to what comes next.")} />
+                  <div className="ors-tl">
+                    <span className="ors-tl__line" aria-hidden="true" />
+                    <ol>
+                      {ODS13.timeline.map((s, i) => (
+                        <Fragment key={s.title.es}>
+                          {(i === 0 || ODS13.timeline[i - 1].when !== s.when) && (
+                            <li className="ors-tl__year" aria-hidden="true">
+                              {s.when}
+                            </li>
+                          )}
+                          <li className={`ors-step ors-rise${s.planned ? " plan" : ""}`}>
+                            {s.planned && <span className="ors-step__when">{tx("Previsto", "Planned")}</span>}
+                            <b>{t(s.title)}</b>
+                            <span>{t(s.text)}</span>
+                          </li>
+                        </Fragment>
                       ))}
-                    </ul>
-                  </>
-                )}
+                    </ol>
+                  </div>
+                  {!published && (
+                    <div className="ors-allies">
+                      <h3>{tx("Alianzas", "Partnerships")}</h3>
+                      <ul>
+                        {ODS13.allies.map((a) => (
+                          <li key={a}>{a}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                </div>
               </div>
             </section>
           </>
@@ -533,26 +566,10 @@ function ReportView({ o, edition }: { o: Ods; edition: OdsEdition }) {
           <GenericSections o={o} published={published} />
         )}
 
-        {/* ODS anterior y siguiente */}
-        <nav className="odsx-wrap ors-pager" aria-label={tx("Otros informes ODS", "Other SDG reports")}>
-          {prev ? (
-            <Link to={ODS_ROUTES.report(prev.n, edition)} className="ors-pager__a" style={{ "--c": prev.color } as CSSProperties}>
-              <small>← {tx("ODS anterior", "Previous SDG")}</small>
-              <b>
-                ODS {prev.n} · {prev.name}
-              </b>
-            </Link>
-          ) : (
-            <span />
-          )}
-          {next && (
-            <Link to={ODS_ROUTES.report(next.n, edition)} className="ors-pager__a ors-pager__a--next" style={{ "--c": next.color } as CSSProperties}>
-              <small>{tx("ODS siguiente", "Next SDG")} →</small>
-              <b>
-                ODS {next.n} · {next.name}
-              </b>
-            </Link>
-          )}
+        {/* ODS anterior y siguiente: el cartel vecino asoma */}
+        <nav className={`ors-pager${prev && next ? "" : " ors-pager--one"}`} aria-label={tx("Otros informes ODS", "Other SDG reports")}>
+          {prev && <PagerLink o={prev} edition={edition} label={tx("ODS anterior", "Previous SDG")} dir="left" />}
+          {next && <PagerLink o={next} edition={edition} label={tx("ODS siguiente", "Next SDG")} dir="right" />}
         </nav>
 
         <footer className="ors-foot">
@@ -571,23 +588,67 @@ function ReportView({ o, edition }: { o: Ods; edition: OdsEdition }) {
       </div>
 
       {full && <OdsReportVideo video={video === null ? null : ODS13.videos[video]} lang={L} onClose={() => setVideo(null)} />}
-      {mounted &&
-        createPortal(
-          <div className="sos-print-root">
-            <OdsReportPrint o={o} edition={edition} lang={L} />
-          </div>,
-          document.body,
-        )}
     </div>
   );
 }
 
-/* --- Anillo de evidencias ------------------------------------------------------------------------------ */
+/* --- Piezas de composición ------------------------------------------------------------------------------- */
+
+/** Titular de sección: el texto entero en `aria-label`, las palabras en máscaras; debajo, la entrada. */
+function SecHead({ id, text, children }: { id: string; text: string; children?: ReactNode }) {
+  return (
+    <header className="ors-head">
+      <h2 id={id} className="ors-h2" aria-label={text}>
+        <Words text={text} />
+      </h2>
+      {children && <p className="ors-head__p">{children}</p>}
+    </header>
+  );
+}
+
+/** Una cifra como tipografía: regla fina, número grande y su pie como nota al margen. */
+function Figure({ slot, big, unit, text }: { slot: Slot; big: ReactNode; unit: string; text: string }) {
+  return (
+    <div className={`ors-fig ors-fig--${slot.size}`} style={{ "--col": slot.col } as CSSProperties}>
+      <span className="ors-rule" aria-hidden="true" />
+      <p className="ors-fig__big">
+        {big}
+        {unit && !unit.includes(" ") && <small>{unit}</small>}
+        {unit.includes(" ") && <span className="ors-fig__unit">{unit}</span>}
+      </p>
+      <p className="ors-fig__note">{text}</p>
+    </div>
+  );
+}
+
+/** Enlace al cartel vecino: su color, su número colosal y su nombre. */
+function PagerLink({ o, edition, label, dir }: { o: Ods; edition: OdsEdition; label: string; dir: "left" | "right" }) {
+  return (
+    <Link to={ODS_ROUTES.report(o.n, edition)} className={`ors-pager__a ors-pager__a--${dir}`} style={{ "--c": o.color, "--c-on": odsOn(o.color) } as CSSProperties}>
+      <span className="ors-pager__in">
+        <small>
+          {dir === "left" && <Arrow dir="left" />}
+          {label}
+          {dir === "right" && <Arrow dir="right" />}
+        </small>
+        <b>{o.name}</b>
+      </span>
+      <span className="ors-pager__n" aria-hidden="true">
+        {o.n}
+      </span>
+    </Link>
+  );
+}
+
+/* --- Anillo de evidencias (interno: solo con ODS_PUBLIC.evidence) ------------------------------------------ */
 
 function Ring({ ok, total, label }: { ok: number; total: number; label: string }) {
   const p = Math.round((ok / total) * 100);
   return (
-    <span className="ors-ring" data-p={p} style={{ "--p": p } as CSSProperties} role="img" aria-label={label}>
+    <span className="ors-ring" style={{ "--p": p } as CSSProperties} role="img" aria-label={label}>
+      <span className="ors-ring__bar" aria-hidden="true">
+        <i />
+      </span>
       <b aria-hidden="true">
         {ok}/{total}
       </b>
@@ -595,7 +656,7 @@ function Ring({ ok, total, label }: { ok: number; total: number; label: string }
   );
 }
 
-/* --- Pestañas de evidencias (ODS 13) ---------------------------------------------------------------------- */
+/* --- Pestañas de evidencias (ODS 13, internas) -------------------------------------------------------------- */
 
 function OdsReportTabs({ tab, setTab, lang }: { tab: number; setTab: (i: number) => void; lang: Lang }) {
   const list = useRef<HTMLDivElement>(null);
@@ -611,7 +672,7 @@ function OdsReportTabs({ tab, setTab, lang }: { tab: number; setTab: (i: number)
       const l = line.current;
       if (!el || !l) return;
       const to = { x: el.offsetLeft, scaleX: el.offsetWidth / 100 };
-      if (animate && !reduced()) gsap.to(l, { ...to, duration: 0.3, ease: "power3.out" });
+      if (animate && !reduced()) gsap.to(l, { ...to, duration: 0.28, ease: "power3.out" });
       else gsap.set(l, to);
     };
     place(!first.current);
@@ -672,7 +733,7 @@ function OdsReportTabs({ tab, setTab, lang }: { tab: number; setTab: (i: number)
                   {e.type[lang]} · {e.source[lang]}
                 </small>
               </div>
-              <span className={`odsx-chip ${e.status}`}>{EVIDENCE_LABEL[e.status][lang]}</span>
+              <span className={`ors-ev__st ${e.status}`}>{EVIDENCE_LABEL[e.status][lang]}</span>
             </li>
           ))}
         </ul>
@@ -688,24 +749,18 @@ function GenericSections({ o, published }: { o: Ods; published: boolean }) {
   const status = odsStatus(o);
   return (
     <>
-      <section className="ors-sec ors-sec--alt" id="ors-cifras" aria-labelledby="ors-cifras-h">
+      <section className="ors-sec" id="ors-cifras" aria-labelledby="ors-cifras-h">
         <div className="odsx-wrap">
-          <div className="ors-head">
-            <p className="odsx-eyebrow">Cifras de la edición 2025</p>
-            <h2 id="ors-cifras-h">Lo que la UDES ya puede mostrar.</h2>
-            {!o.real && (
-              <p>
-                <span className="odsx-ilus">Dato ilustrativo</span>
-              </p>
-            )}
-          </div>
-          <div className="ors-stats ors-stats--two">
-            {o.figures.map((f) => {
+          <SecHead id="ors-cifras-h" text="Lo que la UDES ya puede mostrar." />
+          <div className="ors-figs">
+            {o.figures.map((f, i) => {
               const p = parseFigure(f.value);
               return (
-                <div key={f.label} className="ors-stat">
-                  <div className="ors-stat__big">
-                    {p ? (
+                <Figure
+                  key={f.label}
+                  slot={SLOTS_2[i]}
+                  big={
+                    p ? (
                       <>
                         {p.before}
                         <Counter to={p.to} lang="es" decimals={p.decimals} />
@@ -713,50 +768,43 @@ function GenericSections({ o, published }: { o: Ods; published: boolean }) {
                       </>
                     ) : (
                       f.value
-                    )}
-                    <small>{f.unit}</small>
-                  </div>
-                  <p>{f.label}</p>
-                </div>
+                    )
+                  }
+                  unit={f.unit}
+                  text={f.label}
+                />
               );
             })}
           </div>
-          <p className="ors-notice" role="note">
+          <p className="ors-source">
             {published && <b>Informe publicado de la edición 2025. </b>}
-            El detalle por indicador se carga desde el editor de informes.
+            Cifras de la edición 2025. El detalle por indicador se carga desde el editor de informes.
+            {!o.real && <span className="ors-ilus">Dato ilustrativo</span>}
           </p>
         </div>
       </section>
 
       {ODS_PUBLIC.evidence && !published && (
-        <section className="ors-sec" id="ors-avance" aria-labelledby="ors-avance-h">
+        <section className="ors-sec ors-sec--white" id="ors-avance" aria-labelledby="ors-avance-h">
           <div className="odsx-wrap">
-            <div className="ors-head">
-              <p className="odsx-eyebrow">Avance de evidencias · edición 2026</p>
-              <h2 id="ors-avance-h">
-                {o.ok} de {o.total} evidencias verificadas.
-              </h2>
-            </div>
-            <div className="ors-card ors-progress">
+            <SecHead id="ors-avance-h" text={`${o.ok} de ${o.total} evidencias verificadas.`} />
+            <div className="ors-progress">
               <Ring ok={o.ok} total={o.total} label={`${o.ok} de ${o.total} evidencias verificadas (${pct} %)`} />
-              <div>
-                <span className={`odsx-chip ${status}`}>{STATUS_LABEL[status]}</span>
-                <p>
-                  {pct} % del expediente listo. {o.the ? "Este ODS se envía a THE en la edición 2026." : "Este ODS no se envía a THE en la edición 2026; el expediente se mantiene para el informe institucional."}
-                </p>
-              </div>
+              <p>
+                <b>{STATUS_LABEL[status]}.</b> {pct} % del expediente listo. {o.the ? "Este ODS se envía a THE en la edición 2026." : "Este ODS no se envía a THE en la edición 2026; el expediente se mantiene para el informe institucional."}
+              </p>
             </div>
           </div>
         </section>
       )}
 
       {!published && (
-        <section className={`ors-sec${ODS_PUBLIC.evidence ? " ors-sec--alt" : ""}`} id="ors-viene" aria-labelledby="ors-viene-h">
-          <div className="odsx-wrap">
-            <div className="ors-head">
-              <p className="odsx-eyebrow">Lo que viene</p>
-              <h2 id="ors-viene-h">La UDES prevé {o.next}</h2>
-            </div>
+        <section className="ors-sec ors-block ors-block--next" id="ors-viene" aria-labelledby="ors-viene-h">
+          <div className="ors-block__art" aria-hidden="true">
+            <img src={odsArt(o.n)} alt="" {...odsArtSize(o.n)} loading="lazy" decoding="async" />
+          </div>
+          <div className="odsx-wrap ors-block__wrap">
+            <SecHead id="ors-viene-h" text={`La UDES prevé ${o.next}`} />
           </div>
         </section>
       )}

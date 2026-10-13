@@ -25,8 +25,11 @@
      · Con sesión: solo Planeación o administración.
      · Una nota que ya existe no se toca: su estado y sus ODS corregidos a mano
        se respetan.
-     · Una nota sin ningún ODS por encima del umbral se guarda como «no» (así no
-       se vuelve a descargar) y Planeación puede rescatarla.
+     · Con 0144, una nota con CUALQUIER coincidencia del léxico (aunque no
+       llegue al umbral) queda «pending» con ai_status = 'pendiente': Mr. Pilo
+       la lee después (función noticias-pilo). Una sin ninguna coincidencia se
+       guarda como «no» (así no se vuelve a descargar), sin gastar IA, y
+       Planeación puede rescatarla. Sin 0144, se guarda como antes.
      · Una nota cada ~450 ms, con un identificador claro, para ser amable con el
        servidor de la Universidad.
 
@@ -36,7 +39,7 @@
    ========================================================================== */
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.58.0";
-import { clasificar, extracto } from "./clasificar.ts";
+import { extracto, leer } from "./clasificar.ts";
 import { enlacesDelListado, leerK2 } from "./parseo.ts";
 
 const FUENTES: Record<string, { host: string; ruta: string; sede: string; seccion: string }> = {
@@ -157,28 +160,37 @@ async function cargarFuente(admin: ReturnType<typeof createClient>, clave: strin
         continue;
       }
       if (anio !== year) continue;
-      const afinidad = clasificar(nota.title, nota.body);
-      const { data: fila, error } = await admin
-        .from("news_items")
-        .upsert(
-          {
-            url: nota.url,
-            title: nota.title,
-            excerpt: extracto(nota.body),
-            body: nota.body,
-            image_url: nota.image_url,
-            published_on: nota.published_on,
-            section: nota.section,
-            campus: f.sede,
-            state: afinidad.length ? "pending" : "no",
-          },
-          { onConflict: "url", ignoreDuplicates: true },
-        )
-        .select("id")
-        .maybeSingle();
+      const { afinidad, candidata } = leer(nota.title, nota.body);
+      const guardar = (conPilo: boolean) =>
+        admin
+          .from("news_items")
+          .upsert(
+            {
+              url: nota.url,
+              title: nota.title,
+              excerpt: extracto(nota.body),
+              body: nota.body,
+              image_url: nota.image_url,
+              published_on: nota.published_on,
+              section: nota.section,
+              campus: f.sede,
+              state: afinidad.length || (conPilo && candidata) ? "pending" : "no",
+              ...(conPilo ? { ai_status: candidata ? "pendiente" : "none" } : {}),
+            },
+            { onConflict: "url", ignoreDuplicates: true },
+          )
+          .select("id")
+          .maybeSingle();
+      let conPilo = true;
+      let { data: fila, error } = await guardar(true);
+      // Sin la migración 0144 la columna ai_status no existe: se guarda como antes.
+      if (error && /ai_status|PGRST204|42703/.test(`${error.code ?? ""} ${error.message ?? ""}`)) {
+        conPilo = false;
+        ({ data: fila, error } = await guardar(false));
+      }
       if (error || !fila) continue;
-      if (afinidad.length) {
-        await admin.from("news_ods").insert(afinidad.map((a) => ({ news_id: fila.id, ods: a.ods, score: a.score, reason: a.reason, manual: false })));
+      if (afinidad.length || (conPilo && candidata)) {
+        if (afinidad.length) await admin.from("news_ods").insert(afinidad.map((a) => ({ news_id: fila.id, ods: a.ods, score: a.score, reason: a.reason, manual: false })));
         r.saved++;
       } else {
         r.skipped++;

@@ -19,7 +19,13 @@ export interface NewsOds {
   score: number;
   reason: string;
   manual: boolean;
+  /** 0144: el indicador de THE que propuso Pilo («13.2») y si la fila es de Pilo. Solo en la intranet. */
+  indicator?: string | null;
+  by_ai?: boolean;
 }
+
+/** 0144: la lectura de Mr. Pilo (función noticias-pilo). Solo en la intranet; el público no recibe estas columnas. */
+export type NewsAiStatus = "none" | "pendiente" | "hecho" | "error";
 
 export interface NewsItem {
   id: string;
@@ -32,6 +38,13 @@ export interface NewsItem {
   campus: string;
   state: NewsState;
   ods: NewsOds[];
+  ai_status?: NewsAiStatus;
+  ai_decision?: "aprobar" | "revisar" | "descartar" | null;
+  ai_summary?: string | null;
+  ai_confidence?: number | null;
+  ai_error?: string | null;
+  ai_at?: string | null;
+  decided_by?: "persona" | "pilo" | null;
 }
 
 /** Las fuentes que recorre la función; la clave es la que entiende `noticias-ods`. */
@@ -57,6 +70,11 @@ interface FilaNota extends Omit<NewsItem, "ods"> {
 
 const COLUMNAS_PUBLICAS = "id, url, title, excerpt, image_url, published_on, section, campus, state, news_ods(ods, score, reason, manual)";
 
+/** La intranet también lee la lectura de Pilo (0144). Sin esa migración, las de siempre. */
+const COLUMNAS_INTRANET =
+  "id, url, title, excerpt, image_url, published_on, section, campus, state, ai_status, ai_decision, ai_summary, ai_confidence, ai_error, ai_at, decided_by, news_ods(ods, score, reason, manual, indicator, by_ai)";
+const faltaColumna = (e: { code?: string; message?: string } | null) => Boolean(e && (e.code === "42703" || /column .* does not exist/i.test(e.message ?? "")));
+
 const aNota = (f: FilaNota): NewsItem => ({ ...f, ods: (f.news_ods ?? []).slice().sort((a, b) => b.score - a.score) });
 
 /* ---------- Intranet ------------------------------------------------------- */
@@ -67,11 +85,14 @@ export function useNewsInbox() {
     staleTime: 30_000,
     retry: false,
     queryFn: async (): Promise<NewsItem[]> => {
-      const r = await supabase
-        .from("news_items" as never)
-        .select(COLUMNAS_PUBLICAS)
-        .order("published_on", { ascending: false, nullsFirst: false })
-        .limit(2000);
+      const pedir = (columnas: string) =>
+        supabase
+          .from("news_items" as never)
+          .select(columnas)
+          .order("published_on", { ascending: false, nullsFirst: false })
+          .limit(2000);
+      let r = await pedir(COLUMNAS_INTRANET);
+      if (r.error && faltaColumna(r.error)) r = await pedir(COLUMNAS_PUBLICAS);
       if (r.error) throw noExiste(r.error) ? falta() : new Error(r.error.message);
       return ((r.data as unknown as FilaNota[] | null) ?? []).map(aNota);
     },

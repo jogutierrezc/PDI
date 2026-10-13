@@ -4,31 +4,28 @@
    Una sola ruta: /admin/rankings/:seccion?
      (sin sección)         el tablero: los tres rankings y el recolector
      impact|world|green    una página corta de cada ranking, con sus accesos
-     noticias              el recolector de noticias por ODS
-                           ?vista=bandeja (por defecto) | carga
+     noticias              el recolector de noticias por ODS: una sola mesa de
+                           trabajo (?buscar=1 abre el panel de búsqueda)
+   La búsqueda de noticias vive aquí (CargaProvider), no en el recolector: sigue
+   corriendo y se ve en la barra de progreso aunque se cambie de sección.
    Las cifras de los rankings salen de sostenible/data.ts (las de World y
    GreenMetric son ilustrativas); las del recolector, de la base (0143).
    ========================================================================== */
 
 import type { ReactNode } from "react";
-import { Link, Navigate, useParams, useSearchParams } from "react-router-dom";
-import {
-  AdminRail,
-  AdminRailTab,
-  AdminShell,
-} from "../admin/components/AdminShell";
+import { Link, Navigate, useParams } from "react-router-dom";
+import { AdminRail, AdminRailTab, AdminShell } from "../admin/components/AdminShell";
 import { Icon } from "../../components/ui/Icon";
 import { LAST, RANKINGS, YEARS, fmt, rankingById } from "../sostenible/data";
 import type { Ranking, RankingId } from "../sostenible/data";
 import { FaltaMigracion, useNewsInbox } from "./noticias";
 import type { NewsItem } from "./noticias";
-import { NewsInbox } from "./NewsInbox";
-import { NewsLoader } from "./NewsLoader";
+import { Recolector } from "./Recolector";
+import { BarraCarga, CargaProvider } from "./carga";
 import { odsVars } from "./ods";
 import "./rankings.css";
 
 type Seccion = "tablero" | RankingId | "noticias";
-type Vista = "bandeja" | "carga";
 const BASE = "/admin/rankings";
 const KICKER = "Tablero de rankings";
 
@@ -48,18 +45,10 @@ const NOMBRE: Record<RankingId, string> = {
 
 export function RankingsAdmin() {
   const { seccion: param } = useParams();
-  const [params] = useSearchParams();
-  const vista: Vista = params.get("vista") === "carga" ? "carga" : "bandeja";
   const inbox = useNewsInbox();
 
   const seccion: Seccion | null =
-    param === undefined
-      ? "tablero"
-      : param === "noticias"
-        ? "noticias"
-        : rankingById(param)
-          ? (param as RankingId)
-          : null;
+    param === undefined ? "tablero" : param === "noticias" ? "noticias" : rankingById(param) ? (param as RankingId) : null;
   if (!seccion) return <Navigate to={BASE} replace />;
 
   const porRevisar = inbox.data?.filter((n) => n.state === "pending").length;
@@ -70,39 +59,25 @@ export function RankingsAdmin() {
         Tablero
       </AdminRailTab>
       {RANKINGS.map((r) => (
-        <AdminRailTab
-          key={r.id}
-          current={seccion === r.id}
-          to={`${BASE}/${r.id}`}
-        >
-          {r.id === "green"
-            ? "GreenMetric"
-            : `THE ${r.id === "impact" ? "Impact" : "World"}`}
+        <AdminRailTab key={r.id} current={seccion === r.id} to={`${BASE}/${r.id}`}>
+          {r.id === "green" ? "GreenMetric" : `THE ${r.id === "impact" ? "Impact" : "World"}`}
         </AdminRailTab>
       ))}
-      <AdminRailTab
-        current={seccion === "noticias"}
-        to={`${BASE}/noticias`}
-        count={porRevisar}
-      >
+      <AdminRailTab current={seccion === "noticias"} to={`${BASE}/noticias`} count={porRevisar}>
         Recolector de noticias
       </AdminRailTab>
     </AdminRail>
   );
 
   let titulo = "Tablero de rankings";
-  let descripcion =
-    "THE Impact, THE World University, UI GreenMetric y las noticias de la UDES por ODS";
+  let descripcion = "THE Impact, THE World University, UI GreenMetric y las noticias de la UDES por ODS";
   let cuerpo: ReactNode;
-  let acciones: ReactNode;
   if (seccion === "tablero") {
     cuerpo = <Tablero inbox={inbox} />;
   } else if (seccion === "noticias") {
     titulo = "Recolector de noticias";
-    descripcion =
-      "Las noticias de udes.edu.co clasificadas por ODS; lo aprobado aparece en los informes públicos";
-    acciones = <VistasRecolector vista={vista} />;
-    cuerpo = vista === "carga" ? <NewsLoader /> : <NewsInbox />;
+    descripcion = "Las noticias de udes.edu.co clasificadas por ODS; lo aprobado aparece en los informes públicos";
+    cuerpo = <Recolector />;
   } else {
     const ranking = rankingById(seccion) as Ranking;
     titulo = NOMBRE[ranking.id];
@@ -111,40 +86,32 @@ export function RankingsAdmin() {
   }
 
   return (
-    <AdminShell
-      section="rankings"
-      kicker={KICKER}
-      title={titulo}
-      description={descripcion}
-      actions={acciones}
-      rail={rail}
-    >
-      <div className="rk">{cuerpo}</div>
-    </AdminShell>
+    <CargaProvider>
+      <AdminShell section="rankings" kicker={KICKER} title={titulo} description={descripcion} rail={rail}>
+        <div className="rk">
+          {/* En el recolector la barra va bajo su franja de flujo. */}
+          {seccion !== "noticias" && <BarraCarga />}
+          {cuerpo}
+        </div>
+      </AdminShell>
+    </CargaProvider>
   );
 }
 
 /* ---------- Lo que se dice de un ranking ---------------------------------- */
 
 function EstadoRanking({ ranking }: { ranking: Ranking }) {
-  const mejor = ranking.mid.reduce(
-    (b, v, i) => (v < ranking.mid[b] ? i : b),
-    0,
-  );
+  const mejor = ranking.mid.reduce((b, v, i) => (v < ranking.mid[b] ? i : b), 0);
   const puntaje = ranking.score?.[LAST];
   return (
     <>
       <p className="rk-status">
-        Edición {YEARS[LAST]}:{" "}
-        <strong className="rk-num">{ranking.world[LAST]}</strong> en el mundo{" "}
-        {ranking.unit} ·{" "}
-        <strong className="rk-num">{ranking.national[LAST]}.º</strong> en
-        Colombia
+        Edición {YEARS[LAST]}: <strong className="rk-num">{ranking.world[LAST]}</strong> en el mundo {ranking.unit} ·{" "}
+        <strong className="rk-num">{ranking.national[LAST]}.º</strong> en Colombia
         {puntaje !== undefined && (
           <>
             {" "}
-            · <strong className="rk-num">{fmt(puntaje)}</strong> puntos de
-            10.000
+            · <strong className="rk-num">{fmt(puntaje)}</strong> puntos de 10.000
           </>
         )}{" "}
         · {ranking.world.length} ediciones
@@ -155,11 +122,7 @@ function EstadoRanking({ ranking }: { ranking: Ranking }) {
           </>
         )}
       </p>
-      {ILUSTRATIVOS.includes(ranking.id) && (
-        <p className="rk-note">
-          Cifras ilustrativas hasta cargar las oficiales.
-        </p>
-      )}
+      {ILUSTRATIVOS.includes(ranking.id) && <p className="rk-note">Cifras ilustrativas hasta cargar las oficiales.</p>}
     </>
   );
 }
@@ -225,12 +188,12 @@ function Tablero({ inbox }: { inbox: ReturnType<typeof useNewsInbox> }) {
           <ul className="rk-links">
             <li>
               <Link className="rk-go" to={`${BASE}/noticias`}>
-                Bandeja de revisión
+                Revisar noticias
               </Link>
             </li>
             <li>
-              <Link className="rk-go" to={`${BASE}/noticias?vista=carga`}>
-                Carga desde el sitio
+              <Link className="rk-go" to={`${BASE}/noticias?buscar=1`}>
+                Buscar noticias
               </Link>
             </li>
           </ul>
@@ -246,38 +209,22 @@ export function contarEstados(notas: NewsItem[]) {
   return c;
 }
 
-function EstadoRecolector({
-  inbox,
-}: {
-  inbox: ReturnType<typeof useNewsInbox>;
-}) {
+function EstadoRecolector({ inbox }: { inbox: ReturnType<typeof useNewsInbox> }) {
   if (inbox.error instanceof FaltaMigracion) {
     return (
       <p className="rk-status rk-status--warn" role="note">
-        <Icon name="alert" size={15} aria-hidden="true" /> Falta aplicar la
-        migración 0143: el recolector todavía no tiene dónde guardar las notas.
+        <Icon name="alert" size={15} aria-hidden="true" /> Falta aplicar la migración 0143: el recolector todavía no tiene dónde guardar las
+        notas.
       </p>
     );
   }
-  if (inbox.error)
-    return (
-      <p className="rk-status">
-        No se pudieron contar las notas: {inbox.error.message}
-      </p>
-    );
-  if (!inbox.data)
-    return <p className="rk-status rk-status--muted">Contando las notas…</p>;
+  if (inbox.error) return <p className="rk-status">No se pudieron contar las notas: {inbox.error.message}</p>;
+  if (!inbox.data) return <p className="rk-status rk-status--muted">Contando las notas…</p>;
   const c = contarEstados(inbox.data);
-  if (!c.total)
-    return (
-      <p className="rk-status">
-        Aún no se ha cargado ninguna nota. Empieza por la carga desde el sitio.
-      </p>
-    );
+  if (!c.total) return <p className="rk-status">Aún no se ha cargado ninguna nota. Empieza por «Buscar noticias».</p>;
   return (
     <p className="rk-status">
-      <strong className="rk-num">{fmt(c.pending)}</strong> por revisar ·{" "}
-      <strong className="rk-num">{fmt(c.ok)}</strong> aprobadas ·{" "}
+      <strong className="rk-num">{fmt(c.pending)}</strong> por revisar · <strong className="rk-num">{fmt(c.ok)}</strong> aprobadas ·{" "}
       <strong className="rk-num">{fmt(c.no)}</strong> descartadas
     </p>
   );
@@ -312,9 +259,7 @@ function PaginaRanking({ ranking }: { ranking: Ranking }) {
                 <span className="rk-cats__code">{c.code}</span>
               )}
               {c.name}
-              {c.weight !== undefined && (
-                <span className="rk-cats__weight rk-num">{c.weight} %</span>
-              )}
+              {c.weight !== undefined && <span className="rk-cats__weight rk-num">{c.weight} %</span>}
             </li>
           ))}
         </ul>
@@ -327,8 +272,7 @@ function PaginaRanking({ ranking }: { ranking: Ranking }) {
         <AccesosRanking ranking={ranking} />
         {ranking.id === "impact" && (
           <p className="rk-hint">
-            Las noticias que sirven de evidencia para cada ODS se revisan en el{" "}
-            <Link to={`${BASE}/noticias`}>Recolector de noticias</Link>.
+            Las noticias que sirven de evidencia para cada ODS se revisan en el <Link to={`${BASE}/noticias`}>Recolector de noticias</Link>.
           </p>
         )}
       </section>
@@ -338,33 +282,10 @@ function PaginaRanking({ ranking }: { ranking: Ranking }) {
           Próximamente: carga de datos
         </h2>
         <p>
-          Hoy las posiciones y puntajes de esta página salen de un archivo del
-          portal, no de la base. Aquí se podrán cargar los resultados oficiales
-          de cada edición; mientras tanto no hay importador y el portal público
-          muestra esas mismas cifras.
+          Hoy las posiciones y puntajes de esta página salen de un archivo del portal, no de la base. Aquí se podrán cargar los resultados
+          oficiales de cada edición; mientras tanto no hay importador y el portal público muestra esas mismas cifras.
         </p>
       </section>
     </div>
-  );
-}
-
-/* ---------- Las dos vistas del recolector, en la cabecera ----------------- */
-
-function VistasRecolector({ vista }: { vista: Vista }) {
-  return (
-    <nav className="rk-views" aria-label="Vistas del recolector">
-      <Link
-        to={`${BASE}/noticias`}
-        aria-current={vista === "bandeja" ? "page" : undefined}
-      >
-        Bandeja
-      </Link>
-      <Link
-        to={`${BASE}/noticias?vista=carga`}
-        aria-current={vista === "carga" ? "page" : undefined}
-      >
-        Carga desde el sitio
-      </Link>
-    </nav>
   );
 }

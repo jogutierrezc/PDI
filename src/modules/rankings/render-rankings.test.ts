@@ -28,6 +28,7 @@ vi.mock("./noticias", async (orig) => {
     useNewsInbox: () => ({ data: datos.error ? undefined : datos.notas, error: datos.error, isPending: false, refetch: () => {} }),
     useNewsRuns: () => ({ data: [], error: null, isPending: false, refetch: () => {} }),
     useSetNewsState: mutacion,
+    useSetNewsStates: mutacion,
     useToggleNewsOds: mutacion,
   };
 });
@@ -56,7 +57,7 @@ const page = (path: string) =>
       { client: new QueryClient() },
       h(MemoryRouter, { initialEntries: [path] }, h(Routes, null, h(Route, { path: "/admin/rankings/:seccion?", element: h(RankingsAdmin) }))),
     ),
-  );
+  ).replace(/<!-- -->/g, ""); // los separadores de texto del render no son contenido
 
 describe("Tablero de rankings", () => {
   it("el tablero ofrece los tres rankings y el recolector con sus contadores reales", () => {
@@ -87,24 +88,29 @@ describe("Tablero de rankings", () => {
     expect(html).not.toContain("Los 17 informes");
   });
 
-  it("la bandeja muestra por revisar, con ODS, afinidad, razón y acciones; pagina de 30 en 30", () => {
+  it("el recolector es una sola mesa: franja de flujo, riel de ODS, lista paginada y detalle", () => {
     datos.error = null;
     datos.notas = [
       ...Array.from({ length: 35 }, (_, i) => nota(`p${i}`, { published_on: `2025-01-${String((i % 28) + 1).padStart(2, "0")}` })),
       nota("aprobada", { state: "ok", title: "Ya aprobada" }),
-      nota("manual", { title: "Con foto", image_url: "https://udes.edu.co/x.jpg", ods: [{ ods: 7, score: 100, reason: "Agregado por Planeación", manual: true }] }),
+      nota("alta", { title: "Alta afinidad", published_on: "2025-12-31", ods: [{ ods: 13, score: 91, reason: "Muy clara", manual: false }] }),
     ];
     const html = page("/admin/rankings/noticias");
-    expect(html.match(/class="rk-item[ "]/g)?.length).toBe(30);
+    expect(html).not.toContain("Bandeja de revisión");
+    expect(html).toMatch(/36<\/span> (<!-- -->)?por revisar/);
+    expect(html).toContain("(en los informes públicos)");
+    expect(html).toContain("Buscar noticias");
+    expect(html.match(/class="rk-row[ "]/g)?.length).toBe(30);
     expect(html).toContain("Mostrar más");
     expect(html).not.toContain("Ya aprobada");
-    expect(html).toContain("Siembra y cuenca");
-    expect(html).toContain("82 %");
-    expect(html).toContain("Aprobar");
-    expect(html).toContain("Descartar");
-    expect(html).toContain("Corregir ODS");
-    expect(html).toContain('aria-pressed="true"');
+    expect(html.match(/class="rk-railbtn[ "]/g)?.length).toBe(19);
+    expect(html).toContain("Aprobar las de afinidad ≥ 80 % (36)");
+    /* El detalle abre la más reciente, con su razón y la nota original en pestaña nueva. */
+    expect(html).toContain("Muy clara");
     expect(html).toContain('rel="noopener"');
+    expect(html).toContain("Corregir ODS");
+    expect(html).toContain("<kbd>Z</kbd>");
+    expect(html).not.toContain("NOTICIAS_CRON");
   });
 
   it("la nota con foto la pide perezosa y sin referer; la afinidad manual se rotula", () => {
@@ -116,15 +122,19 @@ describe("Tablero de rankings", () => {
     expect(html).toContain(">manual<");
   });
 
-  it("la carga trae el formulario con todas las fuentes, el año 2025 y las reglas", () => {
+  it("«Buscar noticias» abre el panel con todas las fuentes, el año 2025 y las últimas cargas plegadas", () => {
     datos.error = null;
-    const html = page("/admin/rankings/noticias?vista=carga");
-    expect(html).toContain("Cargar noticias de udes.edu.co");
+    const html = page("/admin/rankings/noticias?buscar=1");
+    expect(html).toContain("Buscar noticias en udes.edu.co");
     expect(html.match(/type="checkbox" checked=""/g)?.length).toBe(7);
     expect(html).toContain('value="2025"');
-    expect(html).toContain("NOTICIAS_CRON");
-    expect(html).toContain("Últimas cargas");
-    expect(html).toContain('role="log"');
+    expect(html).toContain("<summary>Últimas cargas</summary>");
+  });
+
+  it("sin notas, invita a buscarlas", () => {
+    datos.error = null;
+    datos.notas = [];
+    expect(page("/admin/rankings/noticias")).toContain("Aún no hay noticias cargadas");
   });
 
   it("una sección desconocida vuelve al tablero", () => {

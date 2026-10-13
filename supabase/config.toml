@@ -50,6 +50,11 @@ verify_jwt = false
 # y una tarea diaria con el encabezado x-noticias-cron: la función comprueba por su cuenta cada camino.
 verify_jwt = false
 
+[functions.noticias-pilo]
+# Mr. Pilo lee y clasifica las noticias del recolector (0144). Solo la intranet (sesión de Planeación
+# o administración): la función comprueba la sesión por su cuenta y lee el proveedor de Pilo de la base.
+verify_jwt = false
+
 [functions.pilo-alertas]
 # La capa de emergencias de Pilo. La llaman Aluna (webhook firmado con x-aluna-firma),
 # pg_cron (encabezado x-pilo-cron) y la intranet (sesión de la administración):

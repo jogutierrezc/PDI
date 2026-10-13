@@ -1,0 +1,147 @@
+/* =============================================================================
+   Página de evidencia para THE (OdsEvidence). Prefijo `oev-`.
+   Siempre clara, sin animación, sin enlaces. Texto justificado con medida de
+   unos 66 caracteres; en pantallas angostas, alineado a la izquierda.
+   ========================================================================== */
+
+.oev {
+  min-height: 100vh;
+  min-height: 100dvh;
+  padding: clamp(16px, 5vw, 64px) 16px 64px;
+  background: #f4f5f2;
+  color: #17211b;
+  color-scheme: light;
+  font-family: var(--font-sans, "Open Sans", system-ui, sans-serif);
+}
+
+.oev-sheet {
+  box-sizing: border-box;
+  width: min(760px, 100%);
+  margin-inline: auto;
+  padding: clamp(20px, 4vw, 44px);
+  background: #fff;
+  color: #17211b;
+  border: 1px solid #cfd3cc;
+}
+
+.oev-sheet *,
+.oev-sheet *::before,
+.oev-sheet *::after {
+  box-sizing: border-box;
+}
+
+.oev-kick {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 4px 16px;
+  margin: 0 0 18px;
+  padding-bottom: 8px;
+  border-bottom: 2px solid #17211b;
+  color: #4a5750;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.oev-title {
+  margin: 0 0 8px;
+  color: #17211b;
+  font-size: clamp(26px, 3.4vw, 34px);
+  font-weight: 800;
+  font-stretch: 87.5%;
+  line-height: 1.12;
+  letter-spacing: -0.01em;
+  text-wrap: balance;
+}
+
+.oev-meta {
+  margin: 0 0 20px;
+  color: #4a5750;
+  font-size: 14px;
+}
+
+.oev-photo {
+  margin: 0 0 22px;
+}
+
+.oev-photo img {
+  display: block;
+  width: 100%;
+  height: auto;
+  max-height: 340px;
+  object-fit: cover;
+  background: #eceee9;
+}
+
+.oev-es,
+.oev-en {
+  max-width: 66ch;
+}
+
+.oev-es p,
+.oev-en p {
+  margin: 0 0 14px;
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: 17px;
+  line-height: 1.65;
+  text-align: justify;
+  text-justify: inter-word;
+  hyphens: auto;
+  -webkit-hyphens: auto;
+}
+
+.oev-en {
+  margin-top: 26px;
+  padding-top: 16px;
+  border-top: 1px solid #d9ddd6;
+}
+
+.oev-en h2 {
+  margin: 0 0 8px;
+  color: #4a5750;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.oev-en .oev-en__date {
+  color: #4a5750;
+  font-family: inherit;
+  font-size: 14px;
+  text-align: left;
+}
+
+.oev-foot {
+  margin-top: 26px;
+  padding-top: 10px;
+  border-top: 1px solid #d9ddd6;
+  color: #4a5750;
+  font-size: 13px;
+  overflow-wrap: anywhere;
+}
+
+.oev-wait {
+  margin: 0;
+  font-size: 16px;
+}
+
+@media (max-width: 560px) {
+  .oev-es p,
+  .oev-en p {
+    text-align: left;
+    hyphens: manual;
+  }
+}
+
+@media print {
+  .oev {
+    padding: 0;
+    background: #fff;
+  }
+  .oev-sheet {
+    border: 0;
+  }
+}

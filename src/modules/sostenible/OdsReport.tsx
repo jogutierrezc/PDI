@@ -38,6 +38,8 @@ import { OdsBulletinDownloadLink } from "./OdsBulletinDownload";
 import { EVIDENCE_LABEL, ODS13, ODS_EDITIONS, ODS_PUBLIC, ODS_ROUTES, STATUS_LABEL, odsArt, odsByNumber, odsEdition, odsEvidenceTotals, odsPct, odsStatus } from "./ods-data";
 import type { Bi, Ods, OdsEdition } from "./ods-data";
 import { OdsNews } from "./OdsNews";
+import { OdsPilo, recortesDe, seccionesPilo } from "./OdsPilo";
+import { usePublicInforme } from "../rankings/informes/datos";
 import { Arrow, Counter, CutFilter, OdsReportIntro, OdsReportVideo, PlayMark, Words, fmtN, introSeen, parseFigure } from "./OdsReportParts";
 import { OdsArtStrip, odsArtSize, odsOn, odsTone } from "./OdsArt";
 import type { Lang } from "./OdsReportParts";
@@ -87,6 +89,10 @@ function ReportView({ o, edition }: { o: Ods; edition: OdsEdition }) {
   const L: Lang = full ? lang : "es";
   const tx = (es: string, en: string) => (L === "es" ? es : en);
   const t = (b: Bi) => b[L];
+  /* El informe redactado con Pilo, si está publicado para esta edición (solo en español). */
+  const piloQ = usePublicInforme(o.n, edition);
+  const pilo = L === "es" ? (piloQ.data ?? null) : null;
+  const piloSecs = seccionesPilo(pilo, full);
 
   /* «check» es el HTML inicial: contenido completo, sin intro. En el navegador se decide antes de pintar. */
   const [phase, setPhase] = useState<Phase>("check");
@@ -99,7 +105,7 @@ function ReportView({ o, edition }: { o: Ods; edition: OdsEdition }) {
     setPhase(intro ? "intro" : "ready");
   }, [o.n]);
 
-  const sections: [string, string][] = full
+  const baseSections: [string, string][] = full
     ? published
       ? [
           ["cifras", tx("Cifras", "Figures")],
@@ -120,6 +126,8 @@ function ReportView({ o, edition }: { o: Ods; edition: OdsEdition }) {
           ...(ODS_PUBLIC.evidence ? [["avance", "Avance"] as [string, string]] : []),
           ["viene", "Lo que viene"],
         ];
+  /* Con informe publicado: los demás ODS usan sus secciones; el 13 suma el relato. */
+  const sections: [string, string][] = !pilo || !piloSecs.length ? baseSections : full ? [...baseSections, ...piloSecs] : piloSecs;
   const [active, setActive] = useState(sections[0][0]);
   const [tab, setTab] = useState(0);
   const [video, setVideo] = useState<number | null>(null);
@@ -563,12 +571,17 @@ function ReportView({ o, edition }: { o: Ods; edition: OdsEdition }) {
               </div>
             </section>
           </>
+        ) : pilo ? (
+          <OdsPilo o={o} informe={pilo} />
         ) : (
           <GenericSections o={o} published={published} />
         )}
 
+        {/* El ODS 13 conserva su detalle y recibe el relato de Pilo antes de las noticias. */}
+        {full && pilo && <OdsPilo o={o} informe={pilo} soloRelato />}
+
         {/* Las notas de udes.edu.co que Planeación aprobó para este ODS (solo la edición 2025: son noticias de 2025). */}
-        {edition === 2025 && <OdsNews n={o.n} />}
+        {edition === 2025 && <OdsNews n={o.n} recortes={recortesDe(pilo)} />}
 
         {/* ODS anterior y siguiente: el cartel vecino asoma */}
         <nav className={`ors-pager${prev && next ? "" : " ors-pager--one"}`} aria-label={tx("Otros informes ODS", "Other SDG reports")}>

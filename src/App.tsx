@@ -82,6 +82,7 @@ const OdsPortal = lazy(() => import("./modules/sostenible/OdsPortal").then((m) =
 const OdsReport = lazy(() => import("./modules/sostenible/OdsReport").then((m) => ({ default: m.OdsReport })));
 const OdsRector = lazy(() => import("./modules/sostenible/OdsRector").then((m) => ({ default: m.OdsRector })));
 const OdsBulletin = lazy(() => import("./modules/sostenible/OdsBulletin").then((m) => ({ default: m.OdsBulletin })));
+const OdsEvidence = lazy(() => import("./modules/sostenible/OdsEvidence").then((m) => ({ default: m.OdsEvidence })));
 const SostenibleCategory =lazy(() => import("./modules/sostenible/SostenibleRanking").then((m) => ({ default: m.SostenibleCategory })));
 const OpenDataPortal = lazy(() =>
   import("./modules/datos-abiertos/OpenDataPortal").then((m) => ({ default: m.OpenDataPortal })),
@@ -297,6 +298,8 @@ export default function App() {
           <Route path="/sostenible/impact/informes/ods/:n" element={<OdsReport />} />
           <Route path="/sostenible/impact/rector" element={<OdsRector />} />
           <Route path="/sostenible/impact/boletin" element={<OdsBulletin />} />
+          {/* La página de evidencia que abre el evaluador de THE: sin marco, sin menú y sin enlaces. */}
+          <Route path="/sostenible/impact/evidencia/:n/:indicador" element={<OdsEvidence />} />
           <Route path="/sostenible/:ranking" element={<SostenibleRanking />} />
           <Route path="/sostenible/:ranking/:categoria" element={<SostenibleCategory />} />
           <Route path="/datos-abiertos" element={<OpenDataPortal />} />

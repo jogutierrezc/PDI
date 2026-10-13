@@ -6,6 +6,8 @@
      impact|world|green    una página corta de cada ranking, con sus accesos
      noticias              el recolector de noticias por ODS: una sola mesa de
                            trabajo (?buscar=1 abre el panel de búsqueda)
+     informes              Informes ODS con Pilo (informes/InformesOds.tsx):
+                           ?ods=4&tab=redactar|indicadores|fotos|vista
    La búsqueda de noticias vive aquí (CargaProvider), no en el recolector: sigue
    corriendo y se ve en la barra de progreso aunque se cambie de sección.
    Las cifras de los rankings salen de sostenible/data.ts (las de World y
@@ -21,11 +23,12 @@ import type { Ranking, RankingId } from "../sostenible/data";
 import { FaltaMigracion, useNewsInbox } from "./noticias";
 import type { NewsItem } from "./noticias";
 import { Recolector } from "./Recolector";
+import { InformesOds } from "./informes/InformesOds";
 import { BarraCarga, CargaProvider } from "./carga";
 import { odsVars } from "./ods";
 import "./rankings.css";
 
-type Seccion = "tablero" | RankingId | "noticias";
+type Seccion = "tablero" | RankingId | "noticias" | "informes";
 const BASE = "/admin/rankings";
 const KICKER = "Tablero de rankings";
 
@@ -48,7 +51,7 @@ export function RankingsAdmin() {
   const inbox = useNewsInbox();
 
   const seccion: Seccion | null =
-    param === undefined ? "tablero" : param === "noticias" ? "noticias" : rankingById(param) ? (param as RankingId) : null;
+    param === undefined ? "tablero" : param === "noticias" || param === "informes" ? param : rankingById(param) ? (param as RankingId) : null;
   if (!seccion) return <Navigate to={BASE} replace />;
 
   const porRevisar = inbox.data?.filter((n) => n.state === "pending").length;
@@ -66,6 +69,9 @@ export function RankingsAdmin() {
       <AdminRailTab current={seccion === "noticias"} to={`${BASE}/noticias`} count={porRevisar}>
         Recolector de noticias
       </AdminRailTab>
+      <AdminRailTab current={seccion === "informes"} to={`${BASE}/informes`}>
+        Informes ODS con Pilo
+      </AdminRailTab>
     </AdminRail>
   );
 
@@ -78,6 +84,10 @@ export function RankingsAdmin() {
     titulo = "Recolector de noticias";
     descripcion = "Las noticias de udes.edu.co clasificadas por ODS; lo aprobado aparece en los informes públicos";
     cuerpo = <Recolector />;
+  } else if (seccion === "informes") {
+    titulo = "Informes ODS con Pilo";
+    descripcion = "Pilo redacta cada ODS con las noticias aprobadas; tú revisas, eliges la evidencia de THE y publicas";
+    cuerpo = <InformesOds />;
   } else {
     const ranking = rankingById(seccion) as Ranking;
     titulo = NOMBRE[ranking.id];
@@ -196,6 +206,11 @@ function Tablero({ inbox }: { inbox: ReturnType<typeof useNewsInbox> }) {
                 Buscar noticias
               </Link>
             </li>
+            <li>
+              <Link className="rk-go" to={`${BASE}/informes`}>
+                Redactar informes con Pilo
+              </Link>
+            </li>
           </ul>
         </li>
       </ol>
@@ -272,7 +287,8 @@ function PaginaRanking({ ranking }: { ranking: Ranking }) {
         <AccesosRanking ranking={ranking} />
         {ranking.id === "impact" && (
           <p className="rk-hint">
-            Las noticias que sirven de evidencia para cada ODS se revisan en el <Link to={`${BASE}/noticias`}>Recolector de noticias</Link>.
+            Las noticias que sirven de evidencia para cada ODS se revisan en el <Link to={`${BASE}/noticias`}>Recolector de noticias</Link>. Con ellas, Pilo
+            redacta cada informe: <Link to={`${BASE}/informes`}>Redactar informes con Pilo</Link>.
           </p>
         )}
       </section>

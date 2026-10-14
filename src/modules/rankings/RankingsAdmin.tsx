@@ -29,6 +29,7 @@ import { InformesOds } from "./informes/InformesOds";
 import { BarraCarga, CargaProvider } from "./carga";
 import { odsVars } from "./ods";
 import { Posicion, ResultadoTHE } from "./posicion/Posicion";
+import { ReportePlaneacion } from "./reporte/ui/ReportePlaneacion";
 import "./rankings.css";
 
 type Seccion = "tablero" | RankingId | "noticias" | "informes" | "posicion";
@@ -53,8 +54,15 @@ export function RankingsAdmin() {
   const { seccion: param } = useParams();
   const inbox = useNewsInbox();
 
+  if (param === "reporte") return <Navigate to={`${BASE}/impact`} replace />;
   const seccion: Seccion | null =
-    param === undefined ? "tablero" : param === "noticias" || param === "informes" || param === "posicion" ? param : rankingById(param) ? (param as RankingId) : null;
+    param === undefined
+      ? "tablero"
+      : param === "noticias" || param === "informes" || param === "posicion"
+        ? param
+        : rankingById(param)
+          ? (param as RankingId)
+          : null;
   if (!seccion) return <Navigate to={BASE} replace />;
 
   const porRevisar = inbox.data?.filter((n) => n.state === "pending").length;
@@ -265,62 +273,54 @@ function EstadoRecolector({ inbox }: { inbox: ReturnType<typeof useNewsInbox> })
 
 /* ---------- Página de un ranking ------------------------------------------- */
 
+/**
+ * THE Impact es un espacio de trabajo (franja, subpestañas y tablas); los demás
+ * rankings muestran su aviso. «Qué es», las categorías y los accesos se pliegan
+ * al final, en «Sobre este ranking».
+ */
 function PaginaRanking({ ranking }: { ranking: Ranking }) {
   return (
     <div className="rk-page">
-      <section className="rk-page__block" aria-labelledby="rk-que-es">
-        <p className="rk-entry__by">{EDITOR[ranking.publisher]}</p>
-        <h2 id="rk-que-es" className="rk-h2">
-          Qué es
-        </h2>
-        <p className="rk-lead">{ranking.about}</p>
-        <EstadoRanking ranking={ranking} />
-        {ranking.id === "impact" && <ResultadoTHE />}
-      </section>
-
-      <section className="rk-page__block" aria-labelledby="rk-cats">
-        <h2 id="rk-cats" className="rk-h2">
-          {ranking.categoryLabel} en los que se presenta la UDES
-        </h2>
-        <ul className="rk-cats">
-          {ranking.categories.map((c) => (
-            <li key={c.id}>
-              {c.sdg ? (
-                <span className="rk-odsmark" style={odsVars(c.sdg)}>
-                  {c.sdg}
-                </span>
-              ) : (
-                <span className="rk-cats__code">{c.code}</span>
-              )}
-              {c.name}
-              {c.weight !== undefined && <span className="rk-cats__weight rk-num">{c.weight} %</span>}
-            </li>
-          ))}
-        </ul>
-      </section>
-
-      <section className="rk-page__block" aria-labelledby="rk-accesos">
-        <h2 id="rk-accesos" className="rk-h2">
-          Accesos
-        </h2>
-        <AccesosRanking ranking={ranking} />
-        {ranking.id === "impact" && (
-          <p className="rk-hint">
-            Las noticias que sirven de evidencia para cada ODS se revisan en el <Link to={`${BASE}/noticias`}>Recolector de noticias</Link>. Con ellas, Pilo
-            redacta cada informe: <Link to={`${BASE}/informes`}>Redactar informes con Pilo</Link>.
+      {ranking.id === "impact" ? (
+        <ReportePlaneacion />
+      ) : (
+        <section className="rk-soon" aria-labelledby="rk-soon">
+          <h2 id="rk-soon" className="rk-h2">
+            Próximamente: carga de datos
+          </h2>
+          <p>
+            Hoy las posiciones y puntajes de esta página salen de un archivo del portal, no de la base. Aquí se podrán cargar los resultados
+            oficiales de cada edición; mientras tanto no hay importador y el portal público muestra esas mismas cifras.
           </p>
-        )}
-      </section>
+        </section>
+      )}
 
-      <section className="rk-soon" aria-labelledby="rk-soon">
-        <h2 id="rk-soon" className="rk-h2">
-          Próximamente: carga de datos
-        </h2>
-        <p>
-          Hoy las posiciones y puntajes de esta página salen de un archivo del portal, no de la base. Aquí se podrán cargar los resultados
-          oficiales de cada edición; mientras tanto no hay importador y el portal público muestra esas mismas cifras.
-        </p>
-      </section>
+      <details className="rk-sobre">
+        <summary>Sobre este ranking</summary>
+        <div className="rk-sobre__cuerpo">
+          <p className="rk-entry__by">{EDITOR[ranking.publisher]}</p>
+          <p className="rk-lead">{ranking.about}</p>
+          <EstadoRanking ranking={ranking} />
+          {ranking.id === "impact" && <ResultadoTHE />}
+          <p className="rk-sobre__titulo">{ranking.categoryLabel} en los que se presenta la UDES</p>
+          <ul className="rk-cats">
+            {ranking.categories.map((c) => (
+              <li key={c.id}>
+                {c.sdg ? (
+                  <span className="rk-odsmark" style={odsVars(c.sdg)}>
+                    {c.sdg}
+                  </span>
+                ) : (
+                  <span className="rk-cats__code">{c.code}</span>
+                )}
+                {c.name}
+                {c.weight !== undefined && <span className="rk-cats__weight rk-num">{c.weight} %</span>}
+              </li>
+            ))}
+          </ul>
+          <AccesosRanking ranking={ranking} />
+        </div>
+      </details>
     </div>
   );
 }

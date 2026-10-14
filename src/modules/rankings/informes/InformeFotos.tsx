@@ -71,8 +71,8 @@ type Filtro = "todas" | "uso";
 
 export function InformeFotos({ completo }: { completo: InformeCompleto }) {
   const inf = completo.informe;
-  const notasQ = useNoticiasDeOds(inf.ods);
-  const imgsQ = useImagenesDeOds(inf.ods);
+  const notasQ = useNoticiasDeOds(inf.ods, inf.edition);
+  const imgsQ = useImagenesDeOds(inf.ods, inf.edition);
   const notas = useMemo(() => new Map((notasQ.data ?? []).map((n) => [n.id, n])), [notasQ.data]);
   const guardar = useGuardarFoto();
   const cliente = useQueryClient();

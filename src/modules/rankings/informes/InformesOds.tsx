@@ -18,16 +18,21 @@
                   Fotografías · Vista previa
 
    Todo se lee y se guarda en la base (datos.ts); nada vive solo en pantalla.
-   Sin animación en lo de todos los días: los cambios son secos.
+   Movimiento (GSAP, ../movimiento.ts): la marca de la subpestaña se desliza
+   (en seco si se cambió con el teclado), el panel se funde al cambiar de
+   vista y la barra de Pilo avanza con su progreso real.
    ========================================================================== */
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { CSSProperties, KeyboardEvent, ReactNode } from "react";
+import gsap from "gsap";
 import { Link, useSearchParams } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { useMemo } from "react";
 import { ErrorBlock, LoadingBlock } from "../../../components/ui/QueryState";
-import { ODS_NUMEROS, odsCorto, odsNombre, odsVars } from "../ods";
+import { ODS_NUMEROS, odsNombre, odsVars } from "../ods";
+import { usePreferencia } from "../preferencias";
+import { movimientoReducido, useFundido, useIndicador } from "../movimiento";
 import {
   piloInformeEstado,
   puedePublicar,
@@ -89,6 +94,7 @@ export function InformesOds() {
   const q = useInforme(ods, edicion);
   const resumen = useResumenInformes(edicion);
   const propio = resumen.data?.find((r) => r.ods === ods);
+  const [enfoque, setEnfoque] = usePreferencia("enfoque");
 
   const cambiar = (cambios: Record<string, string>) => {
     const next = new URLSearchParams(params);
@@ -97,7 +103,7 @@ export function InformesOds() {
   };
 
   return (
-    <div className="ri" style={odsVars(ods)}>
+    <div className="ri" style={odsVars(ods)} data-enfoque={enfoque || undefined}>
       <SelectorOds actual={ods} resumen={resumen.data} cargando={resumen.isPending} onElegir={(n) => cambiar({ ods: String(n) })} />
 
       {q.isPending ? (
@@ -107,7 +113,16 @@ export function InformesOds() {
       ) : !q.data ? (
         <SinInforme ods={ods} edicion={edicion} onEdicion={(e) => cambiar({ edicion: String(e) })} />
       ) : (
-        <ConInforme completo={q.data} resumen={propio} tab={tab} edicion={edicion} onTab={(t) => cambiar({ tab: t })} onEdicion={(e) => cambiar({ edicion: String(e) })} />
+        <ConInforme
+          completo={q.data}
+          resumen={propio}
+          tab={tab}
+          edicion={edicion}
+          enfoque={enfoque}
+          onEnfoque={() => setEnfoque(!enfoque)}
+          onTab={(t) => cambiar({ tab: t })}
+          onEdicion={(e) => cambiar({ edicion: String(e) })}
+        />
       )}
     </div>
   );
@@ -140,6 +155,7 @@ function SelectorOds({ actual, resumen, cargando, onElegir }: { actual: number; 
 function FranjaOds({ n, r, cargando, actual, onClick, onKey }: { n: number; r?: ResumenInforme; cargando: boolean; actual: boolean; onClick: () => void; onKey: (e: KeyboardEvent<HTMLButtonElement>) => void }) {
   const estado: EstadoInforme | "sin" = r ? r.state : "sin";
   const importado = Boolean(r?.legado.importado);
+  const texto = `ODS ${n} · ${odsNombre(n)} · ${cargando ? "cargando" : ESTADO_LABEL[estado]}${importado ? " · 2025 importado" : ""}`;
   return (
     <button
       type="button"
@@ -152,12 +168,11 @@ function FranjaOds({ n, r, cargando, actual, onClick, onKey }: { n: number; r?: 
       onKeyDown={onKey}
       style={odsVars(n) as CSSProperties}
       data-importado={importado ? "" : undefined}
-      title={`ODS ${n} · ${odsNombre(n)} · ${ESTADO_LABEL[estado]}${importado ? " · 2025 importado" : ""}`}
+      title={texto}
+      aria-label={texto}
     >
       <b className="ri-franja__n">{n}</b>
-      <span className="ri-franja__name">{odsCorto(n)}</span>
-      <span className="ri-franja__st">{cargando ? "…" : ESTADO_LABEL[estado]}</span>
-      {importado && <span className="ri-franja__imp">2025 importado</span>}
+      <i className="ri-franja__dot" aria-hidden="true" />
     </button>
   );
 }
@@ -170,21 +185,19 @@ function Encabezado({ ods, edicion, onEdicion, children }: { ods: number; edicio
       <span className="ri-head__n" aria-hidden="true">
         {ods}
       </span>
-      <div className="ri-head__t">
-        <h2>
-          ODS {ods} · {odsNombre(ods)}
-        </h2>
-        <label className="ri-ed">
-          Edición
-          <select value={edicion} onChange={(e) => onEdicion(Number(e.target.value))}>
-            {EDICIONES.map((e) => (
-              <option key={e} value={e}>
-                {e}
-              </option>
-            ))}
-          </select>
-        </label>
-      </div>
+      <h2 className="ri-head__h">
+        ODS {ods} · {odsNombre(ods)}
+      </h2>
+      <label className="ri-ed">
+        Edición
+        <select value={edicion} onChange={(e) => onEdicion(Number(e.target.value))}>
+          {EDICIONES.map((e) => (
+            <option key={e} value={e}>
+              {e}
+            </option>
+          ))}
+        </select>
+      </label>
       {children}
     </header>
   );
@@ -194,7 +207,11 @@ function SinInforme({ ods, edicion, onEdicion }: { ods: number; edicion: number;
   const crear = useCrearInforme();
   return (
     <>
-      <Encabezado ods={ods} edicion={edicion} onEdicion={onEdicion} />
+      <Encabezado ods={ods} edicion={edicion} onEdicion={onEdicion}>
+        <span className="ri-tag" data-estado="sin">
+          {ESTADO_LABEL.sin}
+        </span>
+      </Encabezado>
       <section className="ri-empty" aria-labelledby="ri-empty-h">
         <h3 id="ri-empty-h">El ODS {ods} todavía no tiene informe de la edición {edicion}.</h3>
         <p>
@@ -224,6 +241,8 @@ function ConInforme({
   resumen,
   tab,
   edicion,
+  enfoque,
+  onEnfoque,
   onTab,
   onEdicion,
 }: {
@@ -231,16 +250,24 @@ function ConInforme({
   resumen?: ResumenInforme;
   tab: VistaInforme;
   edicion: number;
+  enfoque: boolean;
+  onEnfoque: () => void;
   onTab: (t: VistaInforme) => void;
   onEdicion: (e: number) => void;
 }) {
   const inf = completo.informe;
+  const pestanas = useRef<HTMLDivElement>(null);
+  const panel = useRef<HTMLDivElement>(null);
+  const [conTeclado, setConTeclado] = useState(false);
+  useIndicador(pestanas, "[aria-selected='true']", tab, !conTeclado);
+  useFundido(panel, `${inf.ods}-${tab}`, { activo: !conTeclado, desplazamiento: 6 });
   const onKeyTabs = (e: KeyboardEvent<HTMLButtonElement>) => {
     const i = VISTAS.findIndex((v) => v.id === tab);
     const d = e.key === "ArrowRight" ? 1 : e.key === "ArrowLeft" ? -1 : 0;
     if (!d) return;
     e.preventDefault();
     const sig = VISTAS[(i + d + VISTAS.length) % VISTAS.length].id;
+    setConTeclado(true);
     onTab(sig);
     (e.currentTarget.parentElement?.querySelector(`#ri-tab-${sig}`) as HTMLElement | null)?.focus();
   };
@@ -248,40 +275,45 @@ function ConInforme({
     <>
       <Encabezado ods={inf.ods} edicion={edicion} onEdicion={onEdicion}>
         <EstadoInformeBox completo={completo} />
+        <BarraPilo completo={completo} resumen={resumen} parte="accion" />
+        <button type="button" className="rk-toggle" aria-pressed={enfoque} title="Pliega el esquema y las fuentes de Pilo" onClick={onEnfoque}>
+          Enfoque
+        </button>
+        <div className="ri-tabs" role="tablist" aria-label="Partes del informe" ref={pestanas}>
+          <span data-indicador aria-hidden="true" />
+          {VISTAS.map((v) => (
+            <button
+              key={v.id}
+              id={`ri-tab-${v.id}`}
+              type="button"
+              role="tab"
+              className="ri-tab"
+              aria-selected={tab === v.id}
+              aria-controls="ri-panel"
+              tabIndex={tab === v.id ? 0 : -1}
+              onClick={() => {
+                setConTeclado(false);
+                onTab(v.id);
+              }}
+              onKeyDown={onKeyTabs}
+            >
+              {v.label}
+            </button>
+          ))}
+        </div>
       </Encabezado>
 
-      <Cobertura completo={completo} resumen={resumen} />
-
-      <BarraPilo completo={completo} resumen={resumen} />
-
-      <div className="ri-tabs" role="tablist" aria-label="Partes del informe">
-        {VISTAS.map((v, i) => (
-          <button
-            key={v.id}
-            id={`ri-tab-${v.id}`}
-            type="button"
-            role="tab"
-            className="ri-tab"
-            aria-selected={tab === v.id}
-            aria-controls="ri-panel"
-            tabIndex={tab === v.id ? 0 : -1}
-            onClick={() => onTab(v.id)}
-            onKeyDown={onKeyTabs}
-          >
-            <span className="ri-tab__i" aria-hidden="true">
-              {i + 1}
-            </span>
-            {v.label}
-          </button>
-        ))}
+      <div className="ri-meta">
+        <Cobertura completo={completo} resumen={resumen} />
+        <BarraPilo completo={completo} resumen={resumen} parte="detalle" />
       </div>
 
-      <div id="ri-panel" role="tabpanel" aria-labelledby={`ri-tab-${tab}`} className="ri-panel">
-        {tab === "redactar" && <InformeRedactar completo={completo} importado={Boolean(resumen?.legado.importado)} />}
-        {tab === "cifras" && <InformeCifras completo={completo} />}
-        {tab === "indicadores" && <InformeIndicadores completo={completo} />}
-        {tab === "fotos" && <InformeFotos completo={completo} />}
-        {tab === "vista" && <InformeVista completo={completo} />}
+      <div id="ri-panel" role="tabpanel" aria-labelledby={`ri-tab-${tab}`} className="ri-panel" ref={panel}>
+        {tab === "redactar" && <InformeRedactar key={inf.id} completo={completo} importado={Boolean(resumen?.legado.importado)} enfoque={enfoque} />}
+        {tab === "cifras" && <InformeCifras key={inf.id} completo={completo} />}
+        {tab === "indicadores" && <InformeIndicadores key={inf.id} completo={completo} />}
+        {tab === "fotos" && <InformeFotos key={inf.id} completo={completo} />}
+        {tab === "vista" && <InformeVista key={inf.id} completo={completo} />}
       </div>
     </>
   );
@@ -374,11 +406,40 @@ export function textoProgreso(p: ProgresoInforme): string {
   return [p.mensaje, ...conTema, cuenta, hechos && `Lleva ${hechos}.`].filter(Boolean).join(" · ");
 }
 
+/** Cuánto lleva Pilo, de 0 a 1, si el progreso lo dice (temas o indicadores); nulo si no se sabe. */
+export function fraccionProgreso(p: ProgresoInforme): number | null {
+  if (p.paso === "listo") return 1;
+  if (p.tema && p.tema.total > 0) return Math.min(1, Math.max(0, (p.tema.indice - 1) / p.tema.total));
+  if (p.total && p.total > 0) return Math.min(1, Math.max(0, (p.hechos ?? 0) / p.total));
+  return null;
+}
+
+/** La barra de avance: crece hasta la fracción real (expo.out); sin fracción, un barrido continuo. */
+function AvancePilo({ fraccion }: { fraccion: number | null }) {
+  const barra = useRef<HTMLElement>(null);
+  useEffect(() => {
+    const el = barra.current;
+    if (!el || fraccion === null) return;
+    const destino = Math.max(0.04, fraccion);
+    if (movimientoReducido()) {
+      gsap.set(el, { scaleX: destino });
+      return;
+    }
+    const tw = gsap.to(el, { scaleX: destino, duration: 0.42, ease: "expo.out" });
+    return () => void tw.kill();
+  }, [fraccion]);
+  return (
+    <span className="ri-pilo__bar" data-modo={fraccion === null ? "continuo" : "real"} aria-hidden="true">
+      <i ref={barra} />
+    </span>
+  );
+}
+
 /* ---------- Cobertura y notas fallidas ------------------------------------------------------------- */
 
 /** Cuántas notas del ODS cita el relato y cuántas quedan solo en el registro; y, si viene de 2025, sus notas de revisión. */
 function Cobertura({ completo, resumen }: { completo: InformeCompleto; resumen?: ResumenInforme }) {
-  const notasQ = useNoticiasDeOds(completo.informe.ods);
+  const notasQ = useNoticiasDeOds(completo.informe.ods, completo.informe.edition);
   const inds = useMemo(() => indicadoresDe(completo.informe.ods), [completo.informe.ods]);
   const cov = resumenCobertura(completo, inds, notasQ.data ?? undefined);
   const legado = resumen?.legado;
@@ -429,8 +490,8 @@ function Cobertura({ completo, resumen }: { completo: InformeCompleto; resumen?:
 }
 
 /** Las notas que no lograron un párrafo verificable, con su motivo, y «Reintentar fallidas». */
-function Fallidas({ resumen, corriendo, puede, onReintentar }: { resumen?: ResumenInforme; corriendo: boolean; puede: boolean; onReintentar: () => void }) {
-  const notasQ = useNoticiasDeOds(resumen?.ods ?? 0);
+function Fallidas({ resumen, edicion, corriendo, puede, onReintentar }: { resumen?: ResumenInforme; edicion: number; corriendo: boolean; puede: boolean; onReintentar: () => void }) {
+  const notasQ = useNoticiasDeOds(resumen?.ods ?? 0, edicion);
   const notas = new Map<string, NoticiaOds>((notasQ.data ?? []).map((n) => [n.id, n]));
   const fallidas = resumen?.fallidas ?? [];
   if (!fallidas.length) return null;
@@ -454,12 +515,13 @@ function Fallidas({ resumen, corriendo, puede, onReintentar }: { resumen?: Resum
   );
 }
 
-function BarraPilo({ completo, resumen }: { completo: InformeCompleto; resumen?: ResumenInforme }) {
+function BarraPilo({ completo, resumen, parte }: { completo: InformeCompleto; resumen?: ResumenInforme; parte: "accion" | "detalle" }) {
   const inf = completo.informe;
   const estado = useQuery({ queryKey: ["pilo-rankingsod", "estado", inf.ods], queryFn: () => piloInformeEstado(inf.ods), staleTime: 60_000, retry: false });
   const pilo = usePiloInforme(inf.id);
   const lista = estado.data?.lista === true;
   const progreso = textoProgreso(pilo.progreso);
+  const frase = useRef<HTMLSpanElement>(null);
   const avisos = pilo.progreso.avisos;
   const publicado = inf.state === "publicado";
   let texto: string;
@@ -471,13 +533,10 @@ function BarraPilo({ completo, resumen }: { completo: InformeCompleto; resumen?:
   else if (!lista) texto = `La IA de Pilo no está lista${estado.data?.motivo ? `: ${estado.data.motivo}` : ""}. Puedes redactar tú mientras tanto.`;
   else if (pilo.progreso.paso === "listo") texto = progreso;
   else texto = "Lee las notas aprobadas, redacta cada sección, propone la evidencia por indicador y prepara las fotografías. No toca lo que escribió una persona.";
-  return (
-    <section className="ri-pilo" aria-label="Que Pilo redacte este ODS" data-run={pilo.corriendo ? "" : undefined}>
-      <div className="ri-pilo__t">
-        <b>Que Pilo redacte este ODS</b>
-        <span className={pilo.error && !pilo.corriendo ? "ri-error" : "ri-mute"} role="status" aria-live="polite">
-          {texto}
-        </span>
+  useFundido(frase, texto, { activo: pilo.corriendo });
+  if (parte === "detalle")
+    return (
+      <div className="ri-pilo-detalle">
         {avisos.length > 0 && (
           <details className="ri-avisos">
             <summary>
@@ -490,21 +549,25 @@ function BarraPilo({ completo, resumen }: { completo: InformeCompleto; resumen?:
             </ul>
           </details>
         )}
+        <Fallidas resumen={resumen} edicion={completo.informe.edition} corriendo={pilo.corriendo} onReintentar={() => pilo.iniciar({ reintentarFallidas: true, sinImagenes: true })} puede={lista && !publicado} />
+        <ProveedorIA estado={estado.data} />
       </div>
-      <div className="ri-row">
-        {pilo.corriendo ? (
-          <button type="button" className="button-secondary rk-sm" onClick={() => pilo.detener()}>
-            Detener
-          </button>
-        ) : (
-          <button type="button" className="button-primary rk-sm" disabled={!lista || publicado} onClick={() => pilo.iniciar()}>
-            {pilo.progreso.paso && pilo.progreso.paso !== "listo" ? "Seguir donde iba" : "Que Pilo redacte este ODS"}
-          </button>
-        )}
-      </div>
-      <Fallidas resumen={resumen} corriendo={pilo.corriendo} onReintentar={() => pilo.iniciar({ reintentarFallidas: true, sinImagenes: true })} puede={lista && !publicado} />
-      <ProveedorIA estado={estado.data} />
-      {pilo.corriendo && <span className="ri-pilo__bar" aria-hidden="true" />}
+    );
+  return (
+    <section className="ri-pilo" aria-label="Que Pilo redacte este ODS" data-run={pilo.corriendo ? "" : undefined}>
+      <span className={pilo.error && !pilo.corriendo ? "ri-error ri-pilo__t" : "ri-mute ri-pilo__t"} role="status" aria-live="polite" title={texto} ref={frase}>
+        {texto}
+      </span>
+      {pilo.corriendo ? (
+        <button type="button" className="button-secondary rk-sm" onClick={() => pilo.detener()}>
+          Detener
+        </button>
+      ) : (
+        <button type="button" className="button-primary rk-sm" disabled={!lista || publicado} onClick={() => pilo.iniciar()}>
+          {pilo.progreso.paso && pilo.progreso.paso !== "listo" ? "Seguir donde iba" : "Que Pilo redacte este ODS"}
+        </button>
+      )}
+      {pilo.corriendo && <AvancePilo fraccion={fraccionProgreso(pilo.progreso)} />}
     </section>
   );
 }

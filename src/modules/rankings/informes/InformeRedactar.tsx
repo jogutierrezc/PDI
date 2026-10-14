@@ -3,6 +3,9 @@
 
    Secciones a la izquierda, párrafos al centro y, a la derecha, «Lo que Pilo
    tomó»: el pasaje literal de cada fuente resaltado, para comprobar cada frase.
+   Por dispositivo: en pantallas anchas, tres columnas («Enfoque» pliega las
+   laterales con GSAP); en tableta, las fuentes son un panel que entra desde la
+   derecha; en el teléfono, una columna y el esquema es un selector.
 
    Cada párrafo, en español e inglés: dos columnas en pantallas anchas (una
    debajo de la otra en las angostas); cada idioma se edita por separado y
@@ -21,6 +24,7 @@
 import { Fragment, useEffect, useMemo, useRef, useState } from "react";
 import type { KeyboardEvent as KE } from "react";
 import { useQueryClient } from "@tanstack/react-query";
+import { useHoja, usePliegue } from "../movimiento";
 import {
   cifrasSinFuente,
   ordenarBloques,
@@ -102,10 +106,10 @@ interface Edicion {
   idioma: Idioma;
 }
 
-export function InformeRedactar({ completo, importado = false }: { completo: InformeCompleto; importado?: boolean }) {
+export function InformeRedactar({ completo, importado = false, enfoque = false }: { completo: InformeCompleto; importado?: boolean; enfoque?: boolean }) {
   const inf = completo.informe;
-  const notasQ = useNoticiasDeOds(inf.ods);
-  const libroQ = useCifrasDeOds(inf.ods);
+  const notasQ = useNoticiasDeOds(inf.ods, inf.edition);
+  const libroQ = useCifrasDeOds(inf.ods, inf.edition);
   const notas = useMemo(() => new Map((notasQ.data ?? []).map((n) => [n.id, n])), [notasQ.data]);
   const libro = libroQ.data ?? [];
   const guardar = useGuardarBloque();
@@ -128,6 +132,11 @@ export function InformeRedactar({ completo, importado = false }: { completo: Inf
   const [error, setError] = useState("");
   const [notaAbierta, setNotaAbierta] = useState<string | null>(null);
   const mesa = useRef<HTMLDivElement>(null);
+  const prov = useRef<HTMLElement>(null);
+  const velo = useRef<HTMLButtonElement>(null);
+  const [fuentes, setFuentes] = useState(false);
+  const hoja = useHoja(prov, fuentes, { lado: "derecha", alCerrar: () => setFuentes(false), velo });
+  usePliegue(mesa, enfoque);
   const faltaIngles = sinIngles(completo.bloques);
 
   const refrescar = () => void cliente.invalidateQueries({ queryKey: ["informe"] });
@@ -315,8 +324,26 @@ export function InformeRedactar({ completo, importado = false }: { completo: Inf
     );
   };
 
+  const elegirSec = (id: Seccion) => {
+    setSec(id);
+    setFoco(null);
+    setEditando(null);
+    setNuevo(null);
+    setSubtitulo(null);
+  };
+
   return (
     <div className="ri-desk" ref={mesa}>
+      <label className="ri-secs-sel">
+        <span className="ri-k">Sección</span>
+        <select value={sec} onChange={(e) => elegirSec(e.target.value as Seccion)}>
+          {SECCIONES.map((s) => (
+            <option key={s.id} value={s.id}>
+              {s.label} ({visibles(completo.bloques, s.id).length})
+            </option>
+          ))}
+        </select>
+      </label>
       <nav className="ri-secs" aria-label="Estructura del informe">
         <h3 className="ri-k">Estructura del informe</h3>
         <ul>
@@ -325,13 +352,7 @@ export function InformeRedactar({ completo, importado = false }: { completo: Inf
               <button
                 type="button"
                 aria-current={sec === s.id ? "true" : undefined}
-                onClick={() => {
-                  setSec(s.id);
-                  setFoco(null);
-                  setEditando(null);
-                  setNuevo(null);
-                  setSubtitulo(null);
-                }}
+                onClick={() => elegirSec(s.id)}
               >
                 <span>{s.label}</span>
                 <small>{visibles(completo.bloques, s.id).length}</small>
@@ -348,6 +369,9 @@ export function InformeRedactar({ completo, importado = false }: { completo: Inf
         <div className="ri-edhead">
           <h3>{etiquetaSec}</h3>
           <div className="ri-row">
+            <button type="button" className="button-ghost rk-sm ri-ver-fuentes" aria-expanded={fuentes} aria-controls="ri-prov" onClick={() => setFuentes(true)}>
+              Lo que Pilo tomó
+            </button>
             <button type="button" className="button-ghost rk-sm ri-pilo-btn" disabled={pilo.has("traducir") || !faltaIngles} onClick={() => void traducir()} title={faltaIngles ? undefined : "Todo el informe tiene inglés"}>
               {pilo.has("traducir") ? "Pilo está traduciendo…" : `Que Pilo traduzca${faltaIngles ? ` (${faltaIngles} sin inglés)` : ""}`}
             </button>
@@ -523,6 +547,7 @@ export function InformeRedactar({ completo, importado = false }: { completo: Inf
                           onClick={() => {
                             setFoco(b.id);
                             setNotaAbierta(id);
+                            setFuentes(true);
                           }}
                         >
                           {(notas.get(id)?.title ?? "Nota").slice(0, 52)}
@@ -579,7 +604,26 @@ export function InformeRedactar({ completo, importado = false }: { completo: Inf
         )}
       </div>
 
-      <aside className="ri-prov" aria-label="Lo que Pilo tomó">
+      {fuentes && <button type="button" className="ri-velo" ref={velo} tabIndex={-1} aria-label="Cerrar las fuentes" onClick={() => hoja.cerrar()} />}
+      <aside
+        id="ri-prov"
+        className="ri-prov"
+        aria-label="Lo que Pilo tomó"
+        ref={prov}
+        tabIndex={-1}
+        data-open={fuentes ? "" : undefined}
+        onKeyDown={(e) => {
+          if (e.key === "Escape" && fuentes) {
+            e.stopPropagation();
+            hoja.cerrar({ animar: false });
+          }
+        }}
+      >
+        <div className="ri-prov__cerrar">
+          <button type="button" className="button-ghost rk-sm" onClick={() => hoja.cerrar()}>
+            Cerrar
+          </button>
+        </div>
         <Procedencia bloque={activo} notas={notas} abierta={notaAbierta} cargando={notasQ.isPending} />
         <hr className="ri-hr" />
         <Voz completo={completo} />

@@ -27,7 +27,8 @@
      traducir  { report_id, news_ids? }→ { ok, bloques, noticias, fallos, quedan }
 
    Reglas:
-     · Solo Planeación o la administración, con sesión.
+     · Solo Planeación o la administración, con sesión; «traducir-texto» también
+       Gestor o Contribuyente de alguna oficina (reporte THE, 0149).
      · Ninguna nota aprobada se descarta: queda citada en la narrativa o en el
        registro (ods_registro); las que fallan la verificación quedan en
        settings.plan.fallidas con el motivo.
@@ -47,8 +48,9 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.58.0";
 import { foldSystem, roleRejected } from "../noticias-pilo/logica.ts";
 import { INDICADORES_THE } from "./indicadores.ts";
+import { anioDeNoticias, rangoFechasDeAnio } from "./anios.ts";
 import { extraerCifras, leerConfirmacion, mensajesConfirmarCifras, type CifraParaConfirmar } from "./cifras.ts";
-import { combinarRiesgos, completarFicha, leerEvaluacion, leerFichaMejorada, leerTraducciones, mensajesEvaluar, mensajesMejorar, mensajesTraducir, validarFicha, verificarTraduccion, type Evaluacion, type ItemTraducir } from "./ficha.ts";
+import { combinarRiesgos, completarFicha, leerEvaluacion, leerFichaMejorada, leerTextoParaTraducir, leerTraduccionTexto, leerTraducciones, mensajesEvaluar, mensajesMejorar, mensajesTraducir, puedeLlamar, validarFicha, verificarTraduccion, type Evaluacion, type ItemTraducir } from "./ficha.ts";
 import { aNotaVirtual, datosCifras, datosImpacto, datosProyectos, ESTADO_FUENTES, type Criterio, type DatoFuente, type FilaCifras, type FilaImpacto, type FilaProyecto } from "./fuentes.ts";
 import { leerVision, mensajesVision, organizarImagenes, type ImagenDeNota, type UsoNota } from "./imagenes.ts";
 import {
@@ -170,7 +172,7 @@ Deno.serve(async (request: Request) => {
   if (!url || !serviceKey) return json({ error: "La función no está configurada." }, 500);
   const admin = createClient(url, serviceKey, { auth: { persistSession: false, autoRefreshToken: false } });
 
-  let cuerpo: { action?: string; step?: string; report_id?: string; ods?: number; sec?: string; block_id?: string; count?: number; indicator?: string; rehacer?: boolean; reintentar?: boolean; news_ids?: string[] } = {};
+  let cuerpo: { action?: string; step?: string; report_id?: string; ods?: number; sec?: string; block_id?: string; count?: number; indicator?: string; rehacer?: boolean; reintentar?: boolean; news_ids?: string[]; texto?: unknown } = {};
   try {
     cuerpo = JSON.parse((await request.text()) || "{}");
   } catch {
@@ -178,15 +180,22 @@ Deno.serve(async (request: Request) => {
   }
   const PASOS = ["estado", "cifras", "plan", "redactar", "fotos", "indicador", "evaluar", "mejorar", "traducir"];
   const step = PASOS.includes(String(cuerpo.step)) ? String(cuerpo.step) : PASOS.includes(String(cuerpo.action)) ? String(cuerpo.action) : "";
-  if (!step) return json({ error: "Paso desconocido." }, 400);
+  // «traducir-texto»: un comentario suelto (no es un informe); no guarda nada.
+  const TEXTO = cuerpo.action === "traducir-texto";
+  if (!step && !TEXTO) return json({ error: "Paso desconocido." }, 400);
 
-  // Quién llama: solo Planeación o la administración, con sesión activa.
+  // Quién llama: Planeación o la administración, con sesión activa; «traducir-texto», también
+  // quien es Gestor o Contribuyente (jefe o editor) de alguna oficina (puedeLlamar, ficha.ts).
   const authorization = request.headers.get("Authorization") ?? "";
   if (!authorization.startsWith("Bearer ") || authorization.slice(7) === anonKey) return json({ error: "Falta la sesión." }, 401);
   const who = await admin.auth.getUser(authorization.slice(7));
   if (who.error || !who.data.user) return json({ error: "Sesión inválida." }, 401);
   const { data: perfil } = await admin.from("profiles").select("role, is_active").eq("id", who.data.user.id).maybeSingle();
-  if (!perfil?.is_active || !["planeacion", "admin"].includes(perfil.role)) return json({ error: "Solo Planeación o la administración." }, 403);
+  const { data: membresias } = TEXTO ? await admin.from("unit_members").select("role").eq("profile_id", who.data.user.id) : { data: [] };
+  const rolesUnidad = ((membresias ?? []) as { role: string }[]).map((m) => m.role);
+  if (!puedeLlamar({ texto: TEXTO, perfil, rolesUnidad })) {
+    return json({ error: TEXTO ? "Solo Planeación o quien diligencia el reporte en una oficina (Gestor o Contribuyente)." : "Solo Planeación o la administración." }, 403);
+  }
 
   // El proveedor de los rankings (0146) sobre el de Mr. Pilo (0089, 0091).
   const [{ data: settings }, { data: secret }, ajustesFila, prueba] = await Promise.all([
@@ -214,25 +223,30 @@ Deno.serve(async (request: Request) => {
     if (error) return json(faltaMigracion(error) ? MIGRACION : { error: error.message }, 500);
     if (!data) return json({ error: "No existe ese informe." }, 404);
     informe = data as unknown as Informe;
-  } else if (!(step === "cifras" && Number(cuerpo.ods) >= 1 && Number(cuerpo.ods) <= 17)) {
+  } else if (!TEXTO && !(step === "cifras" && Number(cuerpo.ods) >= 1 && Number(cuerpo.ods) <= 17)) {
     return json({ error: "Falta el informe (report_id)." }, 400);
   }
   if (informe && informe.state === "publicado" && step !== "cifras") return json({ error: "El informe está publicado: pásalo a revisión para que Pilo escriba en él.", code: "publicado" }, 409);
   const odsN = informe ? Number(informe.ods) : Math.floor(Number(cuerpo.ods));
   const ods = { n: odsN, name: ODS_NOMBRES[odsN - 1] ?? `ODS ${odsN}` };
   const edition = informe ? Number(informe.edition) : new Date().getFullYear() - 1;
+  // Regla: las noticias del año N van a la edición N+1. Sin informe, las del último año.
+  const anioNoticias = informe ? anioDeNoticias(edition) : new Date().getFullYear() - 1;
   const ajustes = leerAjustes(informe?.settings);
   const indicadoresOds = INDICADORES.filter((i) => Number(i.ods) === odsN);
 
-  // TODAS las notas aprobadas con este ODS, con su texto, por páginas.
+  // Las notas aprobadas con este ODS publicadas en el año de noticias de la edición, con su texto, por páginas.
   const cargarNotas = async (): Promise<NotaInforme[]> => {
     type Fila = { score: number; indicator: string | null; news_items: Omit<NotaInforme, "score" | "indicator"> & { state: string } };
+    const { desde, hasta } = rangoFechasDeAnio(anioNoticias);
     const filas = await todas<Fila>((a, b) =>
       admin
         .from("news_ods")
         .select("score, indicator, news_items!inner(id, title, body, published_on, section, campus, url, image_url, state)")
         .eq("ods", odsN)
         .eq("news_items.state", "ok")
+        .gte("news_items.published_on", desde)
+        .lt("news_items.published_on", hasta)
         .order("news_id")
         .range(a, b),
     );
@@ -409,6 +423,24 @@ Deno.serve(async (request: Request) => {
     await bitacora(guardados, fallidos, m);
     return json(faltaMigracion(e as { code?: string; message?: string }) ? MIGRACION : { error: m }, 500);
   };
+
+  // Un comentario en español → inglés (≤1000 caracteres). Solo devuelve la traducción; no guarda nada ---
+  if (TEXTO) {
+    const leido = leerTextoParaTraducir(cuerpo.texto);
+    if (!leido.ok) return json({ error: leido.error, code: "texto" }, 400);
+    if (motivo) return json({ error: motivo, code: "sin_ia", ...enUso }, 503);
+    try {
+      const r = await llamarVerificado(mensajesTraducir([{ ref: "T1", es: leido.valor }], "comentario"), 1200, (c) => leerTraduccionTexto(c, leido.valor));
+      if (!r.ok) {
+        await bitacora(0, 1, r.error);
+        return json({ error: `Pilo no logró una traducción verificable: ${r.error}`, code: "verificacion" }, 422);
+      }
+      await bitacora(1, 0, null);
+      return json({ ok: true, en: r.valor });
+    } catch (e) {
+      return alto(e);
+    }
+  }
 
   // Cifras: paso 1 sin IA, paso 2 con IA ---------------------------------------------------
   if (step === "cifras") {
@@ -739,14 +771,14 @@ Deno.serve(async (request: Request) => {
         await guardar({ news_id: null, candidates: [], page_es: [], page_en: "", ficha: {} });
         return json({ ok: true, news_id: null, candidatas: 0, page_es: [], page_en: "", ficha: null, motivo: `No hay notas aprobadas con el ODS ${ods.n}.` });
       }
-      const r = await llamarVerificado(mensajesIndicador(def, edition, lista), 2000, (crudo) => {
+      const r = await llamarVerificado(mensajesIndicador(def, anioNoticias, lista), 2000, (crudo) => {
         const l = leerIndicador(crudo, lista);
         if (!l.ok) return l;
-        const a = armarEleccion(l.valor, lista, edition);
+        const a = armarEleccion(l.valor, lista, anioNoticias);
         if (!a.ok || !a.valor.news_id) return a;
         const nota = lista.find((n) => n.id === a.valor.news_id)!;
-        const ficha = completarFicha(a.valor.ficha, def, edition);
-        const errores = validarFicha(ficha, nota, edition);
+        const ficha = completarFicha(a.valor.ficha, def, anioNoticias);
+        const errores = validarFicha(ficha, nota, anioNoticias);
         return errores.length ? { ok: false, error: `La ficha no cumple: ${errores.join(" ")}` } : { ok: true, valor: { ...a.valor, ficha } };
       });
       if (!r.ok) {
@@ -786,7 +818,7 @@ Deno.serve(async (request: Request) => {
       const evaluar = async (ficha: unknown): Promise<Lectura<Evaluacion & { at: string }>> => {
         const pagina = paginaEvidencia({ id: def.id, titulo: def.titulo, pregunta: def.pregunta }, ficha as Record<string, unknown>, (fila.page_es ?? []) as string[], String(fila.page_en ?? ""), "en");
         const r = await llamarVerificado(mensajesEvaluar(def.pregunta, pagina.texto), 900, (c) => leerEvaluacion(c));
-        return r.ok ? { ok: true, valor: { ...combinarRiesgos(r.valor, pagina.texto, edition, esAnuncio(nota as NotaInforme)), at: new Date().toISOString() } } : r;
+        return r.ok ? { ok: true, valor: { ...combinarRiesgos(r.valor, pagina.texto, anioNoticias, esAnuncio(nota as NotaInforme)), at: new Date().toISOString() } } : r;
       };
 
       if (step === "evaluar") {
@@ -804,7 +836,7 @@ Deno.serve(async (request: Request) => {
       const previa = fila.eval as Partial<Evaluacion> | null;
       if (!previa?.grade) return json({ error: "Primero evalúa la evidencia.", code: "sin_eval" }, 409);
       if (previa.grade === "s" || !previa.missing?.length) return json({ error: "El evaluador ya la ve específica o no dijo qué falta: no hay nada que mejorar.", code: "nada" }, 409);
-      const r = await llamarVerificado(mensajesMejorar(def, leerFicha(fila.ficha), previa.missing, nota as NotaInforme, edition), 1200, (c) => leerFichaMejorada(c, def, nota as NotaInforme, edition));
+      const r = await llamarVerificado(mensajesMejorar(def, leerFicha(fila.ficha), previa.missing, nota as NotaInforme, anioNoticias), 1200, (c) => leerFichaMejorada(c, def, nota as NotaInforme, anioNoticias));
       if (!r.ok) {
         await bitacora(0, 1, r.error);
         return json({ error: `Pilo no logró una ficha mejor con lo que dice la nota: ${r.error}`, code: "verificacion" }, 422);

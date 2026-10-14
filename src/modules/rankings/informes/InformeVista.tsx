@@ -38,9 +38,9 @@ export function aPublico(c: InformeCompleto, urls: Map<string, string> = new Map
 export function InformeVista({ completo }: { completo: InformeCompleto }) {
   const inf = completo.informe;
   const o = odsByNumber(inf.ods);
-  const notasQ = useNoticiasDeOds(inf.ods);
-  const imgsQ = useImagenesDeOds(inf.ods);
-  const cifrasQ = useCifrasDeOds(inf.ods);
+  const notasQ = useNoticiasDeOds(inf.ods, inf.edition);
+  const imgsQ = useImagenesDeOds(inf.ods, inf.edition);
+  const cifrasQ = useCifrasDeOds(inf.ods, inf.edition);
   const [lang, setLang] = useState<Lang>("es");
   if (!o) return null;
   const notas = notasQ.data ?? [];
@@ -65,7 +65,12 @@ export function InformeVista({ completo }: { completo: InformeCompleto }) {
             </div>
           </header>
           <OdsPiloCuerpo o={o} informe={pub} notas={notas.map((n) => ({ id: n.id, image_url: n.image_url, title: n.title }))} animar={false} lang={lang} />
-          {inf.edition === 2025 && <OdsNewsCarousel n={o.n} notas={notas} recortes={recortesDe(pub)} lang={lang} />}
+          {inf.edition >= 2025 && (
+            <>
+              <p className="ri-mute">{lang === "en" ? `News from ${inf.edition - 1}` : `Noticias de ${inf.edition - 1}`}</p>
+              <OdsNewsCarousel n={o.n} notas={notas} recortes={recortesDe(pub)} lang={lang} />
+            </>
+          )}
         </div>
       </div>
     </div>

@@ -78,6 +78,7 @@ const StructureNormalize = lazy(() =>
 const SostenibleHome = lazy(() => import("./modules/sostenible/SostenibleHome").then((m) => ({ default: m.SostenibleHome })));
 const SostenibleRanking = lazy(() => import("./modules/sostenible/SostenibleRanking").then((m) => ({ default: m.SostenibleRanking })));
 const RankingsAdmin = lazy(() => import("./modules/rankings/RankingsAdmin").then((m) => ({ default: m.RankingsAdmin })));
+const ReporteOficina = lazy(() => import("./modules/rankings/reporte/ui/ReporteOficina").then((m) => ({ default: m.ReporteOficina })));
 const OdsPortal = lazy(() => import("./modules/sostenible/OdsPortal").then((m) => ({ default: m.OdsPortal })));
 const OdsReport = lazy(() => import("./modules/sostenible/OdsReport").then((m) => ({ default: m.OdsReport })));
 const OdsRector = lazy(() => import("./modules/sostenible/OdsRector").then((m) => ({ default: m.OdsRector })));
@@ -630,6 +631,15 @@ export default function App() {
             element={
               <RequireRole minimum="planeacion" screen="rankings">
                 <RankingsAdmin />
+              </RequireRole>
+            }
+          />
+          {/* Reporte por oficinas de THE: cualquier persona activa; la base decide qué oficina ve (RLS). */}
+          <Route
+            path="/admin/reporte-rankings"
+            element={
+              <RequireRole minimum="consulta">
+                <ReporteOficina />
               </RequireRole>
             }
           />

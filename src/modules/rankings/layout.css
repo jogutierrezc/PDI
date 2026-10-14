@@ -1,0 +1,304 @@
+/* =============================================================================
+   Rankings · base compartida de las pantallas de trabajo (Recolector,
+   Informes con Pilo, Posicionamiento, THE Impact). La importa rankings.css.
+
+   · Escala del módulo: espacio y tipografía fluidos con clamp(); el resto son
+     tokens de src/styles/tokens.css. Tema claro único.
+   · La mesa (.rk-mesa): una sola superficie de 1 a 3 paneles, sin cajas
+     anidadas, que ocupa el ancho y el alto disponibles:
+       ≥ 1000 px de contenido (≈ pantallas de 1440): tres paneles;
+       menos de eso: dos paneles, el izquierdo pasa a cajón deslizable;
+       tableta y móvil (< 900 px de pantalla): una columna, el cajón izquierdo
+       sale de la orilla y el panel derecho es una hoja inferior con manija.
+   · Piezas: .rk-seg (control segmentado con indicador que se desliza),
+     [data-indicador] (la marca que mueve useIndicador), .rk-velo (velo de los
+     paneles flotantes), .rk-hoja__asa (manija para arrastrar la hoja).
+   El movimiento lo hace GSAP desde movimiento.ts; aquí solo hay estados.
+   ========================================================================== */
+
+.rk {
+  container: rk / inline-size;
+
+  /* Espacio fluido: aprieta en el móvil, respira en pantallas grandes. */
+  --rk-s1: 4px;
+  --rk-s2: 8px;
+  --rk-s3: clamp(8px, 0.5vw + 5px, 12px);
+  --rk-s4: clamp(12px, 0.6vw + 8px, 16px);
+  --rk-s5: clamp(14px, 1vw + 8px, 24px);
+  --rk-s6: clamp(20px, 1.6vw + 10px, 32px);
+
+  /* Tipografía fluida del módulo (Open Sans; jerarquía por peso y tamaño). */
+  --rk-t-meta: var(--text-2xs);
+  --rk-t-ui: var(--text-xs);
+  --rk-t-body: var(--text-sm);
+  --rk-t-title: clamp(0.9375rem, 0.25vw + 0.87rem, 1.0625rem);
+  --rk-t-head: clamp(1.0625rem, 0.5vw + 0.95rem, 1.25rem);
+  --rk-t-figure: clamp(1.375rem, 1.1vw + 1.05rem, 1.875rem);
+
+  /* Alto útil bajo la cabecera de la intranet (sin el relleno de admin-main). */
+  --rk-alto: calc(100dvh - var(--admin-topbar-h, 96px) - 2 * var(--space-7));
+  --rk-radio: var(--radius-sm);
+}
+
+/* Selección de texto y barras de desplazamiento con la paleta del sistema. */
+.rk ::selection {
+  color: var(--ink);
+  background: color-mix(in srgb, var(--brand-blue) 22%, transparent);
+}
+
+.rk * {
+  scrollbar-width: thin;
+  scrollbar-color: var(--line-strong) transparent;
+}
+
+/* ---------- Mesa ---------------------------------------------------------- */
+
+.rk-mesa {
+  --mesa-izq: clamp(10.5rem, 13vw, 12.5rem);
+  --mesa-der: clamp(19rem, 26vw, 24rem);
+  position: relative;
+  display: grid;
+  grid-template-columns: var(--mesa-izq) minmax(0, 1fr) var(--mesa-der);
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--rk-radio);
+  box-shadow: var(--shadow-xs);
+}
+
+.rk-mesa__panel {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.rk-mesa__izq {
+  background: var(--surface-2);
+  border-right: 1px solid var(--line);
+}
+
+.rk-mesa__der {
+  border-left: 1px solid var(--line);
+}
+
+/* Al plegarse, el contenido conserva su ancho y se recorta: no se reacomoda. */
+.rk-mesa__izq > *,
+.rk-mesa__der > * {
+  min-width: var(--mesa-min, 0);
+}
+
+.rk-mesa__scroll {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.rk-mesa__barra,
+.rk-mesa__pie {
+  display: flex;
+  flex: none;
+  flex-wrap: wrap;
+  gap: var(--rk-s2) var(--rk-s3);
+  align-items: center;
+  padding: var(--rk-s2) var(--rk-s4);
+  background: var(--surface);
+}
+
+.rk-mesa__barra {
+  border-bottom: 1px solid var(--line);
+}
+
+.rk-mesa__pie {
+  border-top: 1px solid var(--line);
+}
+
+/* El botón que abre el cajón izquierdo solo existe cuando hay cajón. */
+.rk-mesa__abrir {
+  display: none;
+}
+
+/* Velo de los paneles flotantes: solo cuando flotan. */
+.rk-velo {
+  display: none;
+}
+
+.rk-hoja__asa {
+  display: none;
+}
+
+/* ---------- Control segmentado con indicador deslizante ------------------ */
+
+.rk-seg {
+  position: relative;
+  display: inline-flex;
+  flex: none;
+  gap: 2px;
+  max-width: 100%;
+  padding: 3px;
+  overflow-x: auto;
+  background: var(--surface-3);
+  border-radius: var(--radius-pill);
+  scrollbar-width: none;
+}
+
+.rk-seg::-webkit-scrollbar {
+  display: none;
+}
+
+.rk-seg > button {
+  position: relative;
+  z-index: 1;
+  padding: 5px 12px;
+  color: var(--ink-secondary);
+  background: none;
+  border: 0;
+  border-radius: var(--radius-pill);
+  font: 600 var(--rk-t-ui) / 1.3 var(--font-sans);
+  white-space: nowrap;
+  cursor: pointer;
+  transition: color var(--dur-fast) ease;
+}
+
+.rk-seg > button[aria-pressed="true"],
+.rk-seg > button[aria-selected="true"] {
+  color: var(--brand-navy);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .rk-seg > button:not([aria-pressed="true"]):not([aria-selected="true"]):hover {
+    color: var(--ink);
+  }
+}
+
+/* La marca que desliza useIndicador. Antes de medir, el activo lleva fondo. */
+[data-indicador] {
+  position: absolute;
+  top: 0;
+  left: 0;
+  z-index: 0;
+  pointer-events: none;
+  opacity: 0;
+}
+
+.rk-seg > [data-indicador] {
+  background: var(--surface);
+  border-radius: var(--radius-pill);
+  box-shadow: 0 1px 2px rgba(10, 34, 73, 0.12), 0 1px 1px rgba(10, 34, 73, 0.06);
+}
+
+.rk-seg:not([data-marca]) > button:is([aria-pressed="true"], [aria-selected="true"]) {
+  background: var(--surface);
+  box-shadow: 0 1px 2px rgba(10, 34, 73, 0.12);
+}
+
+/* ---------- Dos paneles: el izquierdo es un cajón ------------------------- */
+
+@container rk (max-width: 999px) {
+  .rk-mesa {
+    grid-template-columns: minmax(0, 1fr) var(--mesa-der);
+    --mesa-der: clamp(17.5rem, 40cqi, 22rem);
+  }
+
+  .rk-mesa__abrir {
+    display: inline-flex;
+  }
+
+  .rk-mesa__izq {
+    position: absolute;
+    inset: 0 auto 0 0;
+    z-index: 6;
+    width: min(18rem, 82%);
+    visibility: hidden;
+    border-right: 1px solid var(--line-strong);
+    box-shadow: var(--shadow-xl);
+  }
+
+  .rk-mesa__izq[data-open] {
+    visibility: visible;
+  }
+
+  .rk-velo {
+    position: absolute;
+    inset: 0;
+    z-index: 5;
+    display: block;
+    padding: 0;
+    background: rgba(10, 34, 73, 0.18);
+    border: 0;
+    cursor: pointer;
+  }
+}
+
+/* ---------- Tableta y móvil: una columna y hoja inferior ------------------ */
+
+@media (max-width: 899px) {
+  .rk-mesa {
+    grid-template-columns: minmax(0, 1fr);
+    overflow: visible;
+    border-radius: var(--radius-xs);
+  }
+
+  .rk-mesa__izq {
+    position: fixed;
+    inset: 0 auto 0 0;
+    z-index: var(--z-overlay);
+    width: min(19rem, 86vw);
+    padding-top: env(safe-area-inset-top);
+    padding-left: env(safe-area-inset-left);
+    border-radius: 0;
+  }
+
+  .rk-mesa__der {
+    position: fixed;
+    inset: auto 0 0 0;
+    z-index: var(--z-overlay);
+    display: none;
+    max-height: min(88dvh, 100% - env(safe-area-inset-top) - 24px);
+    padding-left: env(safe-area-inset-left);
+    padding-right: env(safe-area-inset-right);
+    background: var(--surface);
+    border: 1px solid var(--line-strong);
+    border-bottom: 0;
+    border-radius: var(--radius-md) var(--radius-md) 0 0;
+    box-shadow: var(--shadow-xl);
+  }
+
+  .rk-mesa__der[data-open] {
+    display: flex;
+  }
+
+  .rk-mesa__der .rk-mesa__pie {
+    padding-bottom: max(var(--rk-s3), env(safe-area-inset-bottom));
+  }
+
+  .rk-velo {
+    position: fixed;
+    z-index: calc(var(--z-overlay) - 1);
+  }
+
+  .rk-hoja__asa {
+    display: grid;
+    flex: none;
+    place-items: center;
+    width: 100%;
+    height: 22px;
+    padding: 0;
+    background: none;
+    border: 0;
+    touch-action: none;
+    cursor: grab;
+  }
+
+  .rk-hoja__asa::before {
+    content: "";
+    width: 40px;
+    height: 4px;
+    background: var(--line-strong);
+    border-radius: var(--radius-pill);
+  }
+}

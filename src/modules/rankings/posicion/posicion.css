@@ -1,27 +1,208 @@
 /* =============================================================================
    Posicionamiento en THE Impact · estilos. Prefijo rp-.
-   Solo tokens de src/styles/tokens.css (claro y oscuro salen de ahí) y las
-   clases rk- del módulo. Sin gradientes, sin sombras, sin animación salvo el
-   cambio de fondo del peldaño (120 ms).
+   Solo tokens de src/styles/tokens.css (tema claro) y la escala del módulo
+   (layout.css: --rk-s*, --rk-t-*). Sin gradientes. Movimiento con GSAP desde
+   movimiento.ts (contadores, barras que crecen la primera vez, pliegue de los
+   controles); aquí solo transiciones de color y el giro del chevrón.
    ========================================================================== */
 
 .rp {
   display: grid;
-  gap: var(--space-8);
-  max-width: 1040px;
+  gap: var(--rk-s3);
   min-width: 0;
 }
 
-.rp-block {
+.rp-top {
+  display: flex;
+  justify-content: flex-end;
+}
+
+/* Una sola pantalla: controles a la izquierda, resultado a la derecha. */
+.rp-screen {
   display: grid;
-  gap: var(--space-3);
+  grid-template-columns: var(--rp-ctl, clamp(17rem, 21vw, 19.5rem)) minmax(0, 1fr);
+  gap: var(--rk-s6);
+  align-items: start;
   min-width: 0;
-  padding-top: var(--space-4);
+}
+
+.rp[data-enfoque] {
+  --rp-ctl: 10px;
+}
+
+/* La columna de controles: un plano tonal, pegado bajo la cabecera, con su
+   propio desplazamiento. min-width:0 y los campos al 100 % evitan que un
+   select largo se monte sobre su vecino. */
+.rp-ctl {
+  position: sticky;
+  top: calc(var(--admin-topbar-h, 96px) + var(--rk-s2));
+  min-width: 0;
+  max-height: calc(100dvh - var(--admin-topbar-h, 96px) - var(--rk-s5));
+  overflow: hidden auto;
+  overscroll-behavior: contain;
+  background: var(--surface-2);
+  border: 1px solid var(--line);
+  border-radius: var(--rk-radio);
+}
+
+.rp[data-enfoque] .rp-ctl {
+  overflow: visible;
+  background: none;
+  border-color: transparent;
+}
+
+.rp-controles {
+  display: grid;
+  gap: var(--rk-s4);
+  align-content: start;
+  min-width: 15rem;
+  padding: var(--rk-s4);
+}
+
+.rp-controles .rk-h2 {
+  margin: 0;
+}
+
+.rp-sub {
+  display: grid;
+  gap: var(--rk-s2);
+  padding-top: var(--rk-s3);
   border-top: 1px solid var(--line);
 }
 
-.rp-block:first-child {
-  border-top: 2px solid var(--brand-navy);
+.rp-sub .rk-hint {
+  font-size: var(--text-xs);
+  line-height: 1.45;
+}
+
+.rp-tag {
+  margin-left: 4px;
+  padding: 1px 6px;
+  color: var(--ink);
+  background: var(--status-pending-soft);
+  border-radius: 4px;
+  font-size: var(--text-2xs);
+  font-weight: 700;
+  vertical-align: 1px;
+}
+
+/* ODS enviados: el enviado lleva su color oficial; el que no, solo el contorno. */
+.rp-odsgrid {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 6px 4px;
+}
+
+.rp-od {
+  display: grid;
+  place-items: center;
+  gap: 3px;
+  padding: 4px 0;
+  border-radius: var(--radius-xs);
+  cursor: pointer;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .rp-od:hover {
+    background: var(--surface-3);
+  }
+}
+
+.rp-od input {
+  width: 14px;
+  height: 14px;
+  margin: 0;
+  accent-color: var(--brand-blue-strong);
+  cursor: pointer;
+}
+
+.rp-od .rk-odsmark {
+  min-width: 28px;
+  height: 20px;
+  transition: background-color var(--dur-fast) ease, color var(--dur-fast) ease;
+}
+
+.rp-od:not(:has(input:checked)) .rk-odsmark {
+  color: var(--ink-secondary);
+  background: var(--surface);
+  box-shadow: inset 0 0 0 1px var(--line-strong);
+}
+
+.rp-od:has(input:disabled) {
+  cursor: default;
+}
+
+/* El resultado se adapta a su propio ancho, no al de la pantalla. */
+.rp-main {
+  container: rpmain / inline-size;
+  display: grid;
+  gap: var(--rk-s6);
+  min-width: 0;
+}
+
+/* ---------- Indicadores clave: una banda con cuatro celdas ---------- */
+
+.rp-kpis {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  overflow: hidden;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--rk-radio);
+  box-shadow: var(--shadow-xs);
+}
+
+.rp-kpi {
+  display: grid;
+  gap: 2px;
+  align-content: start;
+  min-width: 0;
+  padding: var(--rk-s3) var(--rk-s4) var(--rk-s4);
+  border-left: 1px solid var(--line);
+}
+
+.rp-kpi:first-child {
+  border-left: 0;
+}
+
+.rp-kpi span {
+  color: var(--ink-secondary);
+  font-size: var(--text-xs);
+  font-weight: 700;
+}
+
+.rp-kpi b {
+  color: var(--brand-navy);
+  font-size: var(--rk-t-figure);
+  font-weight: 800;
+  line-height: 1.15;
+  letter-spacing: var(--tracking-tight);
+  white-space: nowrap;
+}
+
+.rp-kpi--meta b {
+  color: var(--brand-blue-strong);
+}
+
+.rp-kpi small {
+  color: var(--ink-muted);
+  font-size: var(--text-2xs);
+  line-height: 1.4;
+}
+
+/* ---------- Bloques ---------- */
+
+.rp-block {
+  display: grid;
+  gap: var(--rk-s3);
+  min-width: 0;
+  padding-top: var(--rk-s5);
+  border-top: 1px solid var(--line);
+}
+
+.rp-block .rk-h2 {
+  margin: 0;
+  font-size: var(--rk-t-head);
 }
 
 .rp-block .rk-lead {
@@ -29,7 +210,7 @@
 }
 
 .rp-h3 {
-  margin: 0 0 var(--space-2);
+  margin: 0 0 var(--rk-s2);
   color: var(--ink);
   font-size: var(--text-sm);
   font-weight: 800;
@@ -50,7 +231,16 @@
   outline-offset: 2px;
 }
 
-/* ---------- a. Escalera ---------- */
+/* Franja de ODS de Enfoque: vive en la columna izquierda. */
+.rp-franja {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  width: 8px;
+  height: min(68dvh, 620px);
+}
+
+/* ---------- a. Escalera de Colombia ---------- */
 
 .rp-ladder {
   --rp-cols: 2.5rem minmax(9rem, 15rem) minmax(8rem, 1fr) 9.5rem;
@@ -61,12 +251,12 @@
 .rp-rung {
   display: grid;
   grid-template-columns: var(--rp-cols);
-  gap: var(--space-3);
+  gap: var(--rk-s3);
   align-items: center;
 }
 
 .rp-ladder__axis {
-  padding: 0 var(--space-2) var(--space-1);
+  padding: 0 var(--rk-s2) var(--rk-s1);
   color: var(--ink-muted);
   font-size: var(--text-2xs);
   font-variant-numeric: tabular-nums;
@@ -87,8 +277,10 @@
 }
 
 .rp-ladder__list {
+  max-height: 24rem;
   margin: 0;
   padding: 0;
+  overflow-y: auto;
   list-style: none;
   border-top: 1px solid var(--line);
 }
@@ -96,20 +288,22 @@
 .rp-rung {
   width: 100%;
   min-height: 36px;
-  padding: 6px var(--space-2);
+  padding: 6px var(--rk-s2);
   color: var(--ink);
   background: transparent;
   border: 0;
-  border-bottom: 1px solid var(--line);
+  border-bottom: 1px solid var(--line-faint);
   font: inherit;
   font-size: var(--text-sm);
   text-align: left;
   cursor: pointer;
-  transition: background-color 120ms ease-out;
+  transition: background-color var(--dur-fast) ease;
 }
 
-.rp-rung:hover {
-  background: var(--surface-2);
+@media (hover: hover) and (pointer: fine) {
+  .rp-rung:hover {
+    background: var(--surface-2);
+  }
 }
 
 .rp-rung[aria-pressed="true"] {
@@ -132,6 +326,7 @@
   display: block;
   width: 100%;
   height: 18px;
+  overflow: visible;
 }
 
 .rp-rung__band {
@@ -154,11 +349,20 @@
 }
 
 .rp-range {
-  fill: var(--ink-muted);
+  fill: var(--ink-faint);
 }
 
-.rp-rung--udes {
+/* La UDES se destaca con el azul de selección, no con una franja lateral. */
+.rp-rung--udes,
+.rp-rung--udes[aria-pressed="true"] {
+  background: var(--brand-blue-soft);
   font-weight: 800;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .rp-rung--udes:hover {
+    background: color-mix(in srgb, var(--brand-blue) 14%, var(--surface));
+  }
 }
 
 .rp-rung--udes .rp-range {
@@ -178,12 +382,15 @@
 /* ---------- Mejores ODS ---------- */
 
 .rp-best {
-  padding: var(--space-3) 0;
+  padding: var(--rk-s3) var(--rk-s4);
+  background: var(--surface-2);
+  border-radius: var(--radius-xs);
 }
 
 .rp-best__list {
   display: grid;
-  gap: var(--space-2);
+  grid-template-columns: repeat(auto-fill, minmax(17rem, 1fr));
+  gap: var(--rk-s2) var(--rk-s5);
   margin: 0;
   padding: 0;
   list-style: none;
@@ -192,60 +399,69 @@
 
 .rp-best__list li {
   display: flex;
-  gap: var(--space-2);
+  gap: var(--rk-s2);
   align-items: center;
 }
 
-/* ---------- b. Escenario ---------- */
+/* ---------- Campos de la columna de controles ---------- */
 
-.rp-controls,
-.rp-meta {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--space-3) var(--space-5);
-  align-items: flex-end;
+/* Dos campos por fila solo si caben de verdad; si no, uno (sin selects recortados). */
+.rp-controls {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 8.5rem), 1fr));
+  gap: var(--rk-s3);
+  align-items: start;
 }
 
 .rp-field {
   display: grid;
   gap: 4px;
+  min-width: 0;
   color: var(--ink-secondary);
   font-size: var(--text-2xs);
   font-weight: 700;
 }
 
 .rp-field small {
-  max-width: 14rem;
   color: var(--ink-muted);
-  font-weight: 400;
+  font-weight: 500;
+  line-height: 1.35;
 }
 
 .rp-field :is(input, select) {
+  width: 100%;
+  min-width: 0;
   min-height: 36px;
   padding: 6px 10px;
   color: var(--ink);
-  background: var(--surface-2);
+  background: var(--surface);
   border: 1px solid var(--line-strong);
-  border-radius: var(--radius-sm);
+  border-radius: var(--radius-xs);
   font: 600 var(--text-sm) var(--font-sans);
   font-variant-numeric: tabular-nums;
+  transition: border-color var(--dur-fast) ease, box-shadow var(--dur-fast) ease;
 }
 
-.rp-field input {
-  width: 7rem;
-}
-
-.rp-meta .rp-field select {
-  max-width: 100%;
+.rp-field :is(input, select):focus-visible {
+  border-color: var(--brand-blue);
+  outline: none;
+  box-shadow: var(--ring);
 }
 
 .rp-check {
   display: flex;
-  gap: var(--space-2);
+  gap: var(--rk-s2);
   align-items: center;
   min-height: 36px;
   color: var(--ink-secondary);
   font-size: var(--text-sm);
+}
+
+.rp-check input {
+  width: 16px;
+  height: 16px;
+  margin: 0;
+  accent-color: var(--brand-blue);
 }
 
 .rp-table td,
@@ -253,9 +469,8 @@
   vertical-align: middle;
 }
 
-.rp-table input[type="checkbox"] {
-  width: 18px;
-  height: 18px;
+.rp .rk-table thead th {
+  background: var(--surface-2);
 }
 
 .rp-table tbody th {
@@ -264,26 +479,22 @@
   font-weight: 600;
 }
 
-.rp-row--off :is(td, th) {
-  color: var(--ink-muted);
-}
-
 .rp-wrap {
   min-width: 14rem;
   white-space: normal !important;
 }
 
-/* ---------- c. Resultados ---------- */
+/* ---------- b. Qué tan probable es ---------- */
 
 .rp-figs {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(10rem, 1fr));
-  gap: var(--space-4) var(--space-6);
-  margin: var(--space-2) 0;
+  grid-template-columns: repeat(auto-fit, minmax(7.25rem, 1fr));
+  gap: var(--rk-s3) var(--rk-s5);
+  margin: var(--rk-s1) 0 var(--rk-s2);
 }
 
 .rp-fig {
-  padding-top: var(--space-2);
+  padding-top: var(--rk-s2);
   border-top: 1px solid var(--line-strong);
 }
 
@@ -294,14 +505,14 @@
 .rp-fig__n {
   margin: 0;
   color: var(--brand-navy);
-  font-size: var(--text-2xl);
+  font-size: var(--rk-t-figure);
   font-weight: 800;
   line-height: 1.1;
   letter-spacing: var(--tracking-tight);
 }
 
 .rp-fig__label {
-  margin: var(--space-1) 0 0;
+  margin: var(--rk-s1) 0 0;
   color: var(--ink);
   font-size: var(--text-sm);
   font-weight: 700;
@@ -315,18 +526,20 @@
 
 .rp-split {
   display: grid;
-  grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr);
-  gap: var(--space-6);
+  grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr);
+  gap: var(--rk-s6);
 }
 
 .rp-hist {
-  margin: 0;
+  margin: 0 0 var(--rk-s2);
 }
 
 .rp-hist svg {
   display: block;
+  overflow: visible;
   width: 100%;
   height: auto;
+  font-family: var(--font-sans);
 }
 
 .rp-hist__bar {
@@ -334,7 +547,12 @@
 }
 
 .rp-hist__now {
-  fill: var(--track);
+  fill: color-mix(in srgb, var(--brand-blue) 9%, transparent);
+}
+
+.rp-hist__grid {
+  stroke: var(--gridline);
+  stroke-width: 1;
 }
 
 .rp-hist__cut {
@@ -349,14 +567,27 @@
 
 .rp-hist__tick {
   fill: var(--ink-muted);
-  font-size: 10px;
+  font-size: 9.5px;
   font-variant-numeric: tabular-nums;
+}
+
+.rp-hist__band {
+  fill: var(--ink-secondary);
+  font-size: 9px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.rp-hist__title {
+  fill: var(--ink-secondary);
+  font-size: 9.5px;
+  font-weight: 600;
 }
 
 .rp-dist {
   display: grid;
-  gap: var(--space-1);
-  margin: 0 0 var(--space-4);
+  gap: 6px;
+  margin: 0 0 var(--rk-s4);
   padding: 0;
   list-style: none;
   font-size: var(--text-sm);
@@ -364,8 +595,8 @@
 
 .rp-dist li {
   display: grid;
-  grid-template-columns: 5.5rem minmax(0, 1fr) 4rem;
-  gap: var(--space-2);
+  grid-template-columns: 6.5rem minmax(0, 1fr) 4rem;
+  gap: var(--rk-s2);
   align-items: center;
 }
 
@@ -375,17 +606,24 @@
 
 .rp-dist__track {
   height: 10px;
+  overflow: hidden;
   background: var(--track);
+  border-radius: 3px;
 }
 
 .rp-dist__track span {
   display: block;
   height: 100%;
   background: var(--ink-faint);
+  border-radius: 3px;
 }
 
 .rp-dist--now .rp-dist__track span {
   background: var(--brand-blue);
+}
+
+.rp-dist--now > span:first-child {
+  font-weight: 700;
 }
 
 .rp-dist--now > span:first-child::after {
@@ -395,20 +633,144 @@
 }
 
 .rp-pos {
-  margin: 0 0 var(--space-2);
+  margin: 0 0 var(--rk-s2);
   font-size: var(--text-sm);
   line-height: 1.5;
+}
+
+/* ---------- c. Mis indicadores frente a lo publicado ---------- */
+
+.rp-mis {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  border-top: 1px solid var(--line);
+}
+
+.rp-mis__item {
+  min-width: 0;
+  border-bottom: 1px solid var(--line);
+}
+
+.rp-mis__ods summary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--rk-s2) var(--rk-s3);
+  align-items: center;
+  min-height: 44px;
+  padding: 6px var(--rk-s2);
+  list-style: none;
+  cursor: pointer;
+  font-size: var(--text-sm);
+  transition: background-color var(--dur-fast) ease;
+}
+
+.rp-mis__ods summary::-webkit-details-marker {
+  display: none;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .rp-mis__ods summary:hover {
+    background: var(--surface-2);
+  }
+}
+
+.rp-mis__name {
+  flex: 1 1 8rem;
+  min-width: 7rem;
+  font-weight: 700;
+}
+
+.rp-mis__meter {
+  width: clamp(3.5rem, 8cqi, 7rem);
+  height: 6px;
+  overflow: hidden;
+  background: var(--track);
+  border-radius: 3px;
+}
+
+.rp-mis__meter i {
+  display: block;
+  height: 100%;
+  background: var(--brand-blue);
+  border-radius: 3px;
+}
+
+.rp-mis__pts {
+  min-width: 5.5rem;
+  font-weight: 800;
+  text-align: right;
+}
+
+.rp-mis__falta,
+.rp-mis__the,
+.rp-mis__cambio {
+  color: var(--ink-secondary);
+  font-size: var(--text-xs);
+}
+
+.rp-mis__falta {
+  min-width: 5.5rem;
+}
+
+.rp-mis__the {
+  min-width: 8rem;
+}
+
+.rp-mis__chev {
+  flex: none;
+  margin-left: auto;
+  color: var(--ink-muted);
+  transition: transform var(--dur-base) var(--ease-out);
+}
+
+.rp-mis__ods[open] .rp-mis__chev {
+  transform: rotate(180deg);
+}
+
+.rp-est {
+  padding: 1px 8px;
+  border: 1px solid currentColor;
+  border-radius: var(--radius-pill);
+  font-size: var(--text-2xs);
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.rp-est--publicado { color: var(--status-done); }
+.rp-est--revision { color: var(--status-pending); }
+.rp-est--borrador,
+.rp-est--sin { color: var(--ink-muted); }
+.rp-est--no { color: var(--status-risk); }
+
+.rp-mis__ods .rk-table-wrap {
+  padding: 0 0 var(--rk-s3) var(--space-8);
+}
+
+.rp-mis__ods table {
+  min-width: 0;
+}
+
+.rp-mis__ods .rk-table th,
+.rp-mis__ods .rk-table td {
+  white-space: normal;
+}
+
+.rp-mis__ods[open] summary {
+  color: var(--ink);
 }
 
 /* ---------- d. Qué mover ---------- */
 
 .rp-callout {
   margin: 0;
-  max-width: 72ch;
-  padding: var(--space-3) var(--space-4);
+  max-width: 76ch;
+  padding: var(--rk-s3) var(--rk-s4);
   color: var(--ink);
   background: var(--brand-blue-soft);
-  border-left: 3px solid var(--brand-blue);
+  border-radius: var(--radius-xs);
   font-size: var(--text-sm);
   line-height: 1.5;
 }
@@ -422,25 +784,81 @@
 }
 
 .rp-method ul {
-  margin: 0 0 var(--space-4);
+  margin: 0 0 var(--rk-s4);
   padding-left: 1.2em;
 }
 
 .rp-method li + li {
-  margin-top: var(--space-1);
+  margin-top: var(--rk-s1);
 }
 
 .rp-fold summary {
   min-height: 32px;
 }
 
-/* ---------- Angosto ---------- */
+/* ---------- Contenido mediano ---------- */
 
-@media (max-width: 760px) {
+@container rpmain (max-width: 720px) {
   .rp-split {
-    grid-template-columns: 1fr;
+    grid-template-columns: minmax(0, 1fr);
   }
 
+  .rp-kpis {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .rp-kpi:nth-child(3) {
+    border-left: 0;
+  }
+
+  .rp-kpi:nth-child(n + 3) {
+    border-top: 1px solid var(--line);
+  }
+}
+
+/* ---------- Tableta y móvil ---------- */
+
+@media (max-width: 899px) {
+  .rp-screen,
+  .rp[data-enfoque] .rp-screen {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .rp-ctl {
+    position: static;
+    max-height: none;
+  }
+
+  .rp-controles {
+    min-width: 0;
+  }
+
+  .rp-odsgrid {
+    grid-template-columns: repeat(auto-fill, minmax(2.6rem, 1fr));
+  }
+
+  .rp-franja {
+    flex-direction: row;
+    width: 100%;
+    height: 10px;
+  }
+
+  .rp-franja .rk-franja {
+    width: auto;
+    height: 10px;
+  }
+
+  .rp-mis__ods .rk-table-wrap {
+    padding-left: 0;
+  }
+
+  .rp-mis__the,
+  .rp-mis__falta {
+    min-width: 0;
+  }
+}
+
+@media (max-width: 760px) {
   .rp-ladder {
     --rp-cols: 2rem minmax(0, 1fr) auto;
   }
@@ -475,10 +893,16 @@
   .rp-rung__score {
     display: none;
   }
+
+  .rp-kpi b {
+    white-space: normal;
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .rp-rung {
+  .rp-rung,
+  .rp-mis__chev,
+  .rp-od .rk-odsmark {
     transition: none;
   }
 }

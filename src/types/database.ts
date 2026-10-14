@@ -1581,3 +1581,84 @@ export interface OdMedalEntryRow {
   note: string;
   position: number;
 }
+
+/* ---------- Reporte por oficinas del ranking THE (0149) ------------------- */
+
+/** Un ciclo de reporte por ranking y año de edición (`ranking_cycles`). */
+export interface RankingCycleRow {
+  id: string;
+  ranking: string;
+  anio: number;
+  anio_datos: number;
+  ods_priorizados: number[];
+  fecha_limite: string | null;
+  estado: "preparacion" | "abierto" | "cerrado";
+}
+
+/** Una fila del catálogo del ciclo (`ranking_indicators`). */
+export interface RankingIndicatorRow {
+  ciclo: string;
+  id: string;
+  ods: number;
+  nivel: "metric" | "indicator" | "option";
+  padre: string | null;
+  tipo: "ev" | "doc" | "dato" | "inv" | null;
+  texto_en: string;
+  texto_es: string;
+  peso: number | null;
+  prioridad: "alta" | "media" | "baja" | null;
+  tipo_requerimiento: string;
+  orden: number;
+}
+
+/** Indicador asignado a una oficina (`ranking_assignments`). */
+export interface RankingAssignmentRow {
+  ciclo: string;
+  indicador: string;
+  unidad: string;
+  rol: "principal" | "apoyo";
+}
+
+/** La respuesta de una oficina a un indicador (`ranking_responses`). */
+export interface RankingResponseRow {
+  id: string;
+  ciclo: string;
+  indicador: string;
+  unidad: string;
+  valores: Record<string, number | null>;
+  si_no: boolean | null;
+  estado: "none" | "draft" | "sent" | "back" | "ok";
+  comentario_es: string;
+  comentario_en: string;
+  nota_revision: string;
+  /** La que va a THE por este indicador (0150). Una por indicador; solo Planeación, sobre una aprobada. */
+  oficial: boolean;
+  updated_by: string | null;
+  updated_at: string;
+}
+
+/** Un aporte a un indicador, de cualquier oficina, sin su contenido (RPC `ranking_aportes`, 0150). */
+export interface RankingAporteRow {
+  indicador: string;
+  unidad: string;
+  unidad_nombre: string;
+  estado: RankingResponseRow["estado"];
+  oficial: boolean;
+  updated_at: string;
+}
+
+/** Una evidencia de una respuesta: archivo del bucket o URL https (`ranking_evidence`). */
+export interface RankingEvidenceRow {
+  id: string;
+  response_id: string;
+  kind: "file" | "url";
+  url: string | null;
+  storage_path: string | null;
+  nombre: string;
+  mime: string | null;
+  tamano: number | null;
+  publica: boolean;
+  analisis: { nivel: "ok" | "warn" | "risk"; texto: string }[];
+  optimizada: boolean;
+  created_at: string;
+}

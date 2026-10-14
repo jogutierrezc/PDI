@@ -1,25 +1,32 @@
 /* =============================================================================
    Posicionamiento en THE Impact · /admin/rankings/posicion
 
-   Una herramienta de trabajo, no un pronóstico mágico: todo lo que muestra sale
+   Una sola pantalla de trabajo, no un pronóstico mágico: todo lo que muestra sale
    de la tabla pública de THE 2026 (migración 0148), de las evidencias elegidas
    en los informes por ODS (0145) y de supuestos que se ven y se cambian aquí.
-     a. Dónde está la UDES hoy: la escalera de Colombia.
-     b. Escenario 2027: ODS enviados, evidencia, supuestos y meta.
-     c. Resultados: probabilidades (redondeadas a 5 %), distribución, Colombia.
-     d. Qué mover: indicadores ordenados por lo que suman al general.
-     e. Cómo se calcula y qué no sabemos.
+     · izquierda: el escenario (ODS enviados, supuestos y meta). Con «Enfoque» se
+       pliega a una franja de 17 líneas: cada ODS enviado es una línea de su color.
+     · arriba: los indicadores clave (banda esperada, probabilidad de la meta,
+       puntaje esperado y ODS enviados).
+     · cuerpo: qué tan probable es cada cosa, dónde está la UDES en Colombia,
+       «Mis indicadores frente a lo publicado» (puntos de las evidencias por ODS y
+       por indicador, lo que falta primero) y qué mover.
+     · al final, plegados: cómo se calcula y qué no sabemos.
    Lógica pura en bandas/calibracion/colombia/evidencia/modelo/palancas.ts.
    ========================================================================== */
 
-import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { Link } from "react-router-dom";
 import { Icon } from "../../../components/ui/Icon";
 import { FaltaMigracion } from "../noticias";
-import { odsCorto, odsVars } from "../ods";
+import { ODS_NUMEROS, odsCorto, odsNombre, odsVars } from "../ods";
+import { useResumenInformes } from "../informes/ajustes-informe";
 import { INDICADORES_EVIDENCIA } from "../informes/the-indicadores";
+import type { EstadoInforme } from "../informes/tipos";
+import { usePreferencia } from "../preferencias";
+import { useContador, useCrecer, useFundido, usePliegue, usePresion } from "../movimiento";
 import { textoRango } from "./bandas";
-import { calibrarTodo, ubicar, umbralesDeBanda, type CalibracionCompleta } from "./calibracion";
+import { calibrarTodo, umbralesDeBanda, type CalibracionCompleta } from "./calibracion";
 import { brechaHastaSiguiente, escaleraNacional, esUdes, filasDeColombia, type PeldanoNacional } from "./colombia";
 import { useCoberturaTodos, useFilasTHE, useUdesTHE, guardar, leerGuardado, type CoberturaEdiciones } from "./datos";
 import { coberturaOds, deltaEvidencia, type CoberturaOds } from "./evidencia";
@@ -133,10 +140,16 @@ export function Analizador({ filas, udes, captura }: { filas: FilaTHE[]; udes: F
     const g = leerGuardado(ESCENARIO_BASE);
     return { ...g, enviados: g.enviados.length ? g.enviados : enviadosPublicados(udes) };
   });
+  const [enfoque, setEnfoque] = usePreferencia("enfoque");
+  const pantalla = useRef<HTMLDivElement>(null);
+  const raiz = useRef<HTMLDivElement>(null);
+  usePliegue(pantalla, enfoque);
+  usePresion(raiz, ".rk-toggle, .rp-od, .rp-rung, .rk-franja");
   useEffect(() => guardar(esc), [esc]);
   const cambiar = (p: Partial<Escenario>) => setEsc((e) => ({ ...e, ...p }));
 
   const cob = useCoberturaTodos(EDICIONES);
+  const informes = useResumenInformes(esc.actual);
   const { actual, base: edBase, soloAprobadas, enviados, k, rigor, deriva } = esc;
   const coberturas = useMemo(() => calcularCoberturas(cob.data, actual, edBase, soloAprobadas), [cob.data, actual, edBase, soloAprobadas]);
   const base = useMemo(() => lineaBase(udes), [udes]);
@@ -147,6 +160,10 @@ export function Analizador({ filas, udes, captura }: { filas: FilaTHE[]; udes: F
   );
   const sim = useMemo(() => simular({ udes, rivales, ods, supuestos, cal }), [udes, rivales, ods, supuestos, cal]);
   const resumen = useMemo(() => resumir(sim, cal), [sim, cal]);
+  const estados = useMemo(
+    () => Object.fromEntries(ODS_NUMEROS.map((n) => [n, (informes.data?.find((r) => r.ods === n)?.state ?? "sin") as EstadoInforme | "sin"])),
+    [informes.data],
+  );
 
   const tercero = udes.best.length ? udes.best.reduce((m, b) => (b.lo + b.hi < m.lo + m.hi ? b : m)) : null;
   const esperado: Record<number, { centro: number; sigma: number }> = {};
@@ -162,23 +179,42 @@ export function Analizador({ filas, udes, captura }: { filas: FilaTHE[]; udes: F
     soloAprobadas: esc.soloAprobadas,
   });
 
+  const alternar = (n: number) => cambiar({ enviados: esc.enviados.includes(n) ? esc.enviados.filter((x) => x !== n) : [...esc.enviados, n].sort((a, b) => a - b) });
+  const enviadosTodos = [...new Set([17, ...enviados])];
+
   return (
-    <div className="rp">
-      <Hoy escalera={escalera} cal={cal} udes={udes} captura={captura} />
-      <EscenarioTabla
-        base={base}
-        esc={esc}
-        cambiar={cambiar}
-        coberturas={coberturas}
-        esperado={esperado}
-        cal={cal}
-        supuestos={supuestos}
-        cargando={cob.isPending}
-        errorCob={cob.error}
-      />
-      <Resultados sim={sim} resumen={resumen} cal={cal} meta={esc.meta} udes={udes} cambiarMeta={(meta) => cambiar({ meta })} />
-      <QueMover lista={lista} />
-      <Metodo captura={captura} />
+    <div ref={raiz} className="rp" data-enfoque={enfoque || undefined}>
+      <div className="rp-top">
+        <button type="button" className="rk-toggle" aria-pressed={enfoque} title="Pliega los controles; los ODS enviados quedan como franja" onClick={() => setEnfoque(!enfoque)}>
+          Enfoque
+        </button>
+      </div>
+      <div ref={pantalla} className="rp-screen">
+        <aside className="rp-ctl" aria-label="Escenario">
+          {enfoque ? (
+            <FranjaEnviados enviados={enviadosTodos} onAlternar={alternar} />
+          ) : (
+            <Controles
+              esc={esc}
+              cambiar={cambiar}
+              enviados={enviadosTodos}
+              onAlternar={alternar}
+              coberturas={coberturas}
+              cargando={cob.isPending}
+              errorCob={cob.error}
+            />
+          )}
+        </aside>
+
+        <div className="rp-main">
+          {sim.valido && <Kpis sim={sim} resumen={resumen} cal={cal} meta={esc.meta} enviados={enviadosTodos.length} />}
+          <Resultados sim={sim} resumen={resumen} cal={cal} meta={esc.meta} udes={udes} />
+          <Hoy escalera={escalera} cal={cal} udes={udes} captura={captura} />
+          <MisIndicadores coberturas={coberturas} base={base} enviados={enviadosTodos} estados={estados} supuestos={supuestos} />
+          <QueMover lista={lista} />
+          <Metodo captura={captura} />
+        </div>
+      </div>
     </div>
   );
 }
@@ -216,6 +252,180 @@ function calcularCoberturas(datos: CoberturaEdiciones | undefined, actual: numbe
   return out;
 }
 
+/* ---------- Controles y franja de ODS enviados ----------------------------- */
+
+function Campo({ label, children, ayuda }: { label: string; children: ReactNode; ayuda?: string }) {
+  return (
+    <label className="rp-field">
+      <span>{label}</span>
+      {children}
+      {ayuda && <small>{ayuda}</small>}
+    </label>
+  );
+}
+
+function Numero({ value, onChange, min, max, step }: { value: number; onChange: (v: number) => void; min: number; max: number; step: number }) {
+  return (
+    <input
+      type="number"
+      inputMode="decimal"
+      value={value}
+      min={min}
+      max={max}
+      step={step}
+      onChange={(e) => {
+        const v = Number(e.target.value);
+        if (Number.isFinite(v)) onChange(Math.min(max, Math.max(min, v)));
+      }}
+    />
+  );
+}
+
+function Controles(p: {
+  esc: Escenario;
+  cambiar: (x: Partial<Escenario>) => void;
+  enviados: number[];
+  onAlternar: (n: number) => void;
+  coberturas: Coberturas;
+  cargando: boolean;
+  errorCob: Error | null;
+}) {
+  const { esc, cambiar, coberturas: c, enviados } = p;
+  const valido = envioValido(enviados);
+  const comparados = Object.values(c.motivo).filter((m) => m === "comparado").length;
+
+  return (
+    <section className="rp-controles" aria-labelledby="rp-esc">
+      <h2 id="rp-esc" className="rk-h2">
+        Escenario 2027
+      </h2>
+
+      <div className="rp-controls">
+        <Campo label="Informes de la edición">
+          <select
+            value={esc.actual}
+            onChange={(e) => {
+              const v = Number(e.target.value);
+              cambiar({ actual: v, base: esc.base === v ? (EDICIONES.find((x) => x !== v) ?? null) : esc.base });
+            }}
+          >
+            {EDICIONES.map((e) => (
+              <option key={e} value={e}>
+                {e}
+              </option>
+            ))}
+          </select>
+        </Campo>
+        <Campo label="Comparada con">
+          <select value={esc.base ?? "igual"} onChange={(e) => cambiar({ base: e.target.value === "igual" ? null : Number(e.target.value) })}>
+            {EDICIONES.filter((e) => e !== esc.actual).map((e) => (
+              <option key={e} value={e}>
+                la edición {e}
+              </option>
+            ))}
+            <option value="igual">nada (estatus quo)</option>
+          </select>
+        </Campo>
+      </div>
+
+      <div className="rp-sub">
+        <h3 className="rp-h3">ODS enviados a THE</h3>
+        <div className="rp-odsgrid" role="group" aria-label="ODS enviados a THE">
+          {ODS_NUMEROS.map((n) => {
+            const on = enviados.includes(n);
+            return (
+              <label key={n} className="rp-od" title={`ODS ${n} · ${odsNombre(n)}`}>
+                <input type="checkbox" checked={on} disabled={n === 17} onChange={() => p.onAlternar(n)} aria-label={n === 17 ? "ODS 17: obligatorio" : `Enviar el ODS ${n}`} />
+                <span className="rk-odsmark" style={odsVars(n)}>
+                  {n}
+                </span>
+              </label>
+            );
+          })}
+        </div>
+        <p className="rk-hint">El 17 es obligatorio. «Evidencia» sale de las notas elegidas en los <Link to="/admin/rankings/informes">informes</Link>.</p>
+      </div>
+
+      <div className="rp-sub">
+        <h3 className="rp-h3">
+          Supuestos <span className="rp-tag">Ilustrativo</span>
+        </h3>
+        <div className="rp-controls">
+          <Campo label="k · escala de THE" ayuda="1 = un punto del ODS vale un punto escalado">
+            <Numero value={esc.k} onChange={(k) => cambiar({ k })} min={0} max={3} step={0.1} />
+          </Campo>
+          <Campo label="Rigor del evaluador" ayuda="0,9 = THE reconoce el 90 %">
+            <Numero value={esc.rigor} onChange={(rigor) => cambiar({ rigor })} min={0} max={1} step={0.05} />
+          </Campo>
+          <Campo label="Deriva anual (puntos)" ayuda="lo que se mueve un año sin hacer nada">
+            <Numero value={esc.deriva} onChange={(deriva) => cambiar({ deriva })} min={0} max={10} step={0.5} />
+          </Campo>
+        </div>
+        <label className="rp-check">
+          <input type="checkbox" checked={esc.soloAprobadas} onChange={(e) => cambiar({ soloAprobadas: e.target.checked })} /> Contar solo evidencias aprobadas
+        </label>
+      </div>
+
+      <div className="rp-sub">
+        <Campo label="Meta a evaluar («destacar» lo defines tú)">
+          <select value={idMeta(esc.meta)} onChange={(e) => cambiar({ meta: METAS.find((m) => m.id === e.target.value)!.meta })}>
+            {METAS.map((m) => (
+              <option key={m.id} value={m.id}>
+                {m.label}
+              </option>
+            ))}
+          </select>
+        </Campo>
+      </div>
+
+      {p.errorCob instanceof FaltaMigracion ? (
+        <p className="rk-status rk-status--warn" role="note">
+          <Icon name="alert" size={15} aria-hidden="true" /> Sin la migración 0145 no hay informes: el escenario es el estatus quo.
+        </p>
+      ) : p.errorCob ? (
+        <p className="rk-status">No se pudieron leer las evidencias: {p.errorCob.message}. El escenario es el estatus quo.</p>
+      ) : p.cargando ? (
+        <p className="rk-status rk-status--muted">Leyendo las evidencias de los informes…</p>
+      ) : comparados === 0 ? (
+        <p className="rk-status" role="note">
+          {esc.base === null ? "Sin edición de comparación: " : `Ningún ODS tiene informe en las dos ediciones (${esc.actual} y ${esc.base}): `}
+          el cambio estimado es 0 y el escenario es el <b>estatus quo</b> (THE 2026 repetido, con la deriva del año).
+        </p>
+      ) : null}
+
+      {!valido && (
+        <p className="rk-status rk-status--warn" role="alert">
+          <Icon name="alert" size={15} aria-hidden="true" /> Para entrar al general hay que enviar al menos 4 ODS, el 17 entre ellos. Con {enviados.length} no hay puntaje general.
+        </p>
+      )}
+    </section>
+  );
+}
+
+/** Con «Enfoque»: los 17 ODS como franja de 8 px; los enviados, de su color. */
+function FranjaEnviados({ enviados, onAlternar }: { enviados: number[]; onAlternar: (n: number) => void }) {
+  return (
+    <nav className="rk-rail rk-rail--franja rp-franja" aria-label="ODS enviados a THE">
+      {ODS_NUMEROS.map((n) => {
+        const on = enviados.includes(n);
+        return (
+          <button
+            key={n}
+            type="button"
+            className="rk-franja"
+            style={odsVars(n)}
+            aria-pressed={on}
+            disabled={n === 17}
+            aria-label={`ODS ${n}: ${odsNombre(n)}, ${on ? "enviado" : "no enviado"}${n === 17 ? " (obligatorio)" : ""}`}
+            title={`${n} · ${odsNombre(n)}${on ? " · enviado" : ""}`}
+            onClick={() => onAlternar(n)}
+          />
+        );
+      })}
+    </nav>
+  );
+}
+
 /* ---------- a. Hoy ---------------------------------------------------------- */
 
 function Hoy({ escalera, cal, udes, captura }: { escalera: PeldanoNacional[]; cal: CalibracionCompleta; udes: FilaTHE; captura: string | null }) {
@@ -229,6 +439,8 @@ function Hoy({ escalera, cal, udes, captura }: { escalera: PeldanoNacional[]; ca
   const brecha = brechaHastaSiguiente(udes, cal.general);
   const yo = escalera.find((p) => p.esUdes);
   const sel = escalera.find((p) => p.fila.iid === abierta);
+  const lista = useRef<HTMLOListElement>(null);
+  useCrecer(lista, ".rp-range", { escalonado: 0.025 });
 
   return (
     <section className="rp-block" aria-labelledby="rp-hoy">
@@ -265,7 +477,7 @@ function Hoy({ escalera, cal, udes, captura }: { escalera: PeldanoNacional[]; ca
           </span>
           <span className="rp-ladder__head">Banda mundial</span>
         </div>
-        <ol className="rp-ladder__list">
+        <ol ref={lista} className="rp-ladder__list">
           {escalera.map((p) => (
             <li key={p.fila.iid}>
               <button
@@ -365,189 +577,7 @@ function MejoresOds({ fila }: { fila: FilaTHE }) {
   );
 }
 
-/* ---------- b. Escenario ---------------------------------------------------- */
-
-function Campo({ label, children, ayuda }: { label: string; children: ReactNode; ayuda?: string }) {
-  return (
-    <label className="rp-field">
-      <span>{label}</span>
-      {children}
-      {ayuda && <small>{ayuda}</small>}
-    </label>
-  );
-}
-
-function Numero({ value, onChange, min, max, step }: { value: number; onChange: (v: number) => void; min: number; max: number; step: number }) {
-  return (
-    <input
-      type="number"
-      inputMode="decimal"
-      value={value}
-      min={min}
-      max={max}
-      step={step}
-      onChange={(e) => {
-        const v = Number(e.target.value);
-        if (Number.isFinite(v)) onChange(Math.min(max, Math.max(min, v)));
-      }}
-    />
-  );
-}
-
-function EscenarioTabla(p: {
-  base: LineaBaseOds[];
-  esc: Escenario;
-  cambiar: (x: Partial<Escenario>) => void;
-  coberturas: Coberturas;
-  esperado: Record<number, { centro: number; sigma: number }>;
-  cal: CalibracionCompleta;
-  supuestos: Supuestos;
-  cargando: boolean;
-  errorCob: Error | null;
-}) {
-  const { esc, cambiar, coberturas: c } = p;
-  const enviados = [...new Set([17, ...esc.enviados])];
-  const valido = envioValido(enviados);
-  const comparados = Object.values(c.motivo).filter((m) => m === "comparado").length;
-  const toggle = (n: number) => cambiar({ enviados: esc.enviados.includes(n) ? esc.enviados.filter((x) => x !== n) : [...esc.enviados, n].sort((a, b) => a - b) });
-
-  return (
-    <section className="rp-block" aria-labelledby="rp-esc">
-      <h2 id="rp-esc" className="rk-h2">
-        Escenario 2027
-      </h2>
-      <p className="rk-lead">
-        El puntaje de cada ODS parte de lo publicado en 2026 y se mueve con la evidencia que cambió entre la edición base y la actual de los informes. El general publicado
-        de 2027 será el promedio de 2026 y 2027: lo que se gane este año cuenta la mitad.
-      </p>
-
-      <div className="rp-controls">
-        <Campo label="Informes de la edición">
-          <select value={esc.actual} onChange={(e) => {
-              const v = Number(e.target.value);
-              cambiar({ actual: v, base: esc.base === v ? (EDICIONES.find((x) => x !== v) ?? null) : esc.base });
-            }}
-          >
-            {EDICIONES.map((e) => (
-              <option key={e} value={e}>
-                {e}
-              </option>
-            ))}
-          </select>
-        </Campo>
-        <Campo label="Comparada con">
-          <select value={esc.base ?? "igual"} onChange={(e) => cambiar({ base: e.target.value === "igual" ? null : Number(e.target.value) })}>
-            {EDICIONES.filter((e) => e !== esc.actual).map((e) => (
-              <option key={e} value={e}>
-                la edición {e}
-              </option>
-            ))}
-            <option value="igual">nada (estatus quo)</option>
-          </select>
-        </Campo>
-        <Campo label="k · escala de THE" ayuda="1 = un punto del ODS vale un punto escalado">
-          <Numero value={esc.k} onChange={(k) => cambiar({ k })} min={0} max={3} step={0.1} />
-        </Campo>
-        <Campo label="Rigor del evaluador" ayuda="0,9 = THE reconoce el 90 %">
-          <Numero value={esc.rigor} onChange={(rigor) => cambiar({ rigor })} min={0} max={1} step={0.05} />
-        </Campo>
-        <Campo label="Deriva anual (puntos)" ayuda="lo que se mueve un año sin hacer nada">
-          <Numero value={esc.deriva} onChange={(deriva) => cambiar({ deriva })} min={0} max={10} step={0.5} />
-        </Campo>
-        <label className="rp-check">
-          <input type="checkbox" checked={esc.soloAprobadas} onChange={(e) => cambiar({ soloAprobadas: e.target.checked })} /> Contar solo evidencias aprobadas
-        </label>
-      </div>
-
-      {p.errorCob instanceof FaltaMigracion ? (
-        <p className="rk-status rk-status--warn" role="note">
-          <Icon name="alert" size={15} aria-hidden="true" /> Sin la migración 0145 no hay informes: el escenario es el estatus quo.
-        </p>
-      ) : p.errorCob ? (
-        <p className="rk-status">No se pudieron leer las evidencias: {p.errorCob.message}. El escenario es el estatus quo.</p>
-      ) : p.cargando ? (
-        <p className="rk-status rk-status--muted">Leyendo las evidencias de los informes…</p>
-      ) : comparados === 0 ? (
-        <p className="rk-status" role="note">
-          {esc.base === null
-            ? "Sin edición de comparación: "
-            : `Ningún ODS tiene informe en las dos ediciones (${esc.actual} y ${esc.base}): `}
-          el cambio estimado es 0 y el escenario es el <b>estatus quo</b> (THE 2026 repetido, con la deriva del año). Cambia los ODS enviados o completa los informes para ver
-          un efecto.
-        </p>
-      ) : null}
-
-      {!valido && (
-        <p className="rk-status rk-status--warn" role="alert">
-          <Icon name="alert" size={15} aria-hidden="true" /> Para entrar al general hay que enviar al menos 4 ODS, el 17 entre ellos. Con {enviados.length} no hay puntaje general.
-        </p>
-      )}
-
-      <div className="rk-table-wrap">
-        <table className="rk-table rp-table">
-          <caption className="sr-only">Escenario por ODS</caption>
-          <thead>
-            <tr>
-              <th scope="col">Enviar</th>
-              <th scope="col">ODS</th>
-              <th scope="col">THE 2026</th>
-              <th scope="col" className="rk-r">
-                Evidencia {esc.actual}
-              </th>
-              <th scope="col" className="rk-r">
-                Cambio
-              </th>
-              <th scope="col" className="rk-r">
-                Esperado 2027
-              </th>
-              <th scope="col">Banda del ODS</th>
-            </tr>
-          </thead>
-          <tbody>
-            {p.base.map((b) => {
-              const e = p.esperado[b.sdg];
-              const enviado = enviados.includes(b.sdg);
-              const a = c.actual[b.sdg];
-              const d = cambioOds({ deltaEvidencia: c.delta[b.sdg] ?? 0 }, p.supuestos);
-              return (
-                <tr key={b.sdg} className={enviado ? undefined : "rp-row--off"}>
-                  <td>
-                    <input
-                      type="checkbox"
-                      checked={enviado}
-                      disabled={b.sdg === 17}
-                      onChange={() => toggle(b.sdg)}
-                      aria-label={b.sdg === 17 ? "ODS 17: obligatorio" : `Enviar el ODS ${b.sdg}`}
-                    />
-                  </td>
-                  <th scope="row">
-                    <span className="rk-odsmark" style={odsVars(b.sdg)}>
-                      {b.sdg}
-                    </span>{" "}
-                    {odsCorto(b.sdg)}
-                  </th>
-                  <td className="rk-num">{b.publicado ? `${b.banda} · ${textoRango(b.publicado)}` : <span className="rp-muted">no publicado (≤ el tercero)</span>}</td>
-                  <td className="rk-r rk-num">{a.hayInforme ? `${f1(a.puntos)} de ${f1(a.techo)}` : <span className="rp-muted">sin informe</span>}</td>
-                  <td className="rk-r rk-num">{signo(d)}</td>
-                  <td className="rk-r rk-num">
-                    {f1(e.centro)} <span className="rp-muted">± {f1(e.sigma)}</span>
-                  </td>
-                  <td className="rk-num">{enviado ? ubicar(p.cal.ods[b.sdg], e.centro).label : <span className="rp-muted">—</span>}</td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
-      </div>
-      <p className="rk-hint">
-        «Evidencia» son puntos del ODS que aportan las notas elegidas en los <Link to="/admin/rankings/informes">informes</Link> (Σ peso × puntos ÷ máximo de los indicadores de
-        evidencia y documento). «Cambio» = (actual − base) × k × rigor. «± » es una desviación: la banda publicada y la deriva del año.
-      </p>
-    </section>
-  );
-}
-
-/* ---------- c. Resultados --------------------------------------------------- */
+/* ---------- b. Indicadores clave -------------------------------------------- */
 
 const METAS: { id: string; label: string; meta: Meta }[] = [
   { id: "subir", label: "Subir de banda mundial", meta: { tipo: "subir" } },
@@ -565,6 +595,60 @@ const METAS: { id: string; label: string; meta: Meta }[] = [
 
 const idMeta = (m: Meta) => METAS.find((x) => JSON.stringify(x.meta) === JSON.stringify(m))?.id ?? "subir";
 
+function Kpis({ sim, resumen, cal, meta, enviados }: { sim: Simulacion; resumen: ReturnType<typeof resumir>; cal: CalibracionCompleta; meta: Meta; enviados: number }) {
+  const pMeta = probMeta(sim, meta, cal);
+  const banda = resumen.bandas.reduce((m, b) => (b.p > m.p ? b : m));
+  const elegida = METAS.find((m) => m.id === idMeta(meta));
+  return (
+    <div className="rp-kpis" role="list" aria-label="Indicadores clave del escenario">
+      <div className="rp-kpi" role="listitem">
+        <span>Banda mundial esperada</span>
+        <TextoFundido texto={banda.label} />
+        <small>{textoProb(banda.p)} de los escenarios</small>
+      </div>
+      <div className="rp-kpi rp-kpi--meta" role="listitem">
+        <span>Probabilidad de la meta</span>
+        <Contador valor={pMeta} formato={textoProb} />
+        <small>{elegida?.label}</small>
+      </div>
+      <div className="rp-kpi" role="listitem">
+        <span>Puntaje esperado 2027</span>
+        <Contador valor={resumen.media} formato={f1} />
+        <small>8 de cada 10 entre {f1(resumen.p10)} y {f1(resumen.p90)}</small>
+      </div>
+      <div className="rp-kpi" role="listitem">
+        <span>ODS enviados</span>
+        <Contador valor={enviados} formato={(n) => String(Math.round(n))} />
+        <small>el 17 incluido; mínimo 4</small>
+      </div>
+    </div>
+  );
+}
+
+/** La cifra de un indicador clave cuenta desde la anterior al cambiar el escenario. */
+function Contador({ valor, formato }: { valor: number; formato: (n: number) => string }) {
+  const ref = useRef<HTMLElement>(null);
+  useContador(ref, valor, formato);
+  return (
+    <b ref={ref} className="rk-num">
+      {formato(valor)}
+    </b>
+  );
+}
+
+/** Un texto que no se cuenta (una banda): se funde al cambiar. */
+function TextoFundido({ texto }: { texto: string }) {
+  const ref = useRef<HTMLElement>(null);
+  useFundido(ref, texto, { desplazamiento: 4 });
+  return (
+    <b ref={ref} className="rk-num">
+      {texto}
+    </b>
+  );
+}
+
+/* ---------- c. Resultados --------------------------------------------------- */
+
 function Cifra({ p, label, nota }: { p: number; label: string; nota?: string }) {
   return (
     <div className="rp-fig">
@@ -581,18 +665,18 @@ function Resultados({
   cal,
   meta,
   udes,
-  cambiarMeta,
 }: {
   sim: Simulacion;
   resumen: ReturnType<typeof resumir>;
   cal: CalibracionCompleta;
   meta: Meta;
   udes: FilaTHE;
-  cambiarMeta: (m: Meta) => void;
 }) {
   const pMeta = probMeta(sim, meta, cal);
   const elegida = METAS.find((m) => m.id === idMeta(meta));
   const p401 = probMeta(sim, { tipo: "banda", rank_lo: 401 }, cal);
+  const dist = useRef<HTMLUListElement>(null);
+  useCrecer(dist, ".rp-dist__track span", { escalonado: 0.04 });
   if (!sim.valido)
     return (
       <section className="rp-block" aria-labelledby="rp-res">
@@ -607,17 +691,6 @@ function Resultados({
       <h2 id="rp-res" className="rk-h2">
         Qué tan probable es
       </h2>
-      <div className="rp-meta">
-        <Campo label="Meta a evaluar («destacar» lo defines tú)">
-          <select value={idMeta(meta)} onChange={(e) => cambiarMeta(METAS.find((m) => m.id === e.target.value)!.meta)}>
-            {METAS.map((m) => (
-              <option key={m.id} value={m.id}>
-                {m.label}
-              </option>
-            ))}
-          </select>
-        </Campo>
-      </div>
       <div className="rp-figs">
         <Cifra p={pMeta} label={elegida?.label ?? "Meta"} nota="la meta elegida" />
         <Cifra p={resumen.subir} label={`Subir de ${udes.rank_label}`} />
@@ -637,7 +710,7 @@ function Resultados({
         </div>
         <div>
           <h3 className="rp-h3">Banda mundial 2027</h3>
-          <ul className="rp-dist">
+          <ul ref={dist} className="rp-dist">
             {resumen.bandas.map((b) => (
               <li key={b.rank_lo} className={b.rank_lo === udes.rank_lo ? "rp-dist--now" : undefined}>
                 <span className="rk-num">{b.label}</span>
@@ -663,43 +736,194 @@ function Resultados({
   );
 }
 
+/** Paso «redondo» para el eje de % de escenarios. */
+const pasoEje = (max: number) => [1, 2, 5, 10, 20, 25, 50].find((p) => max / p <= 4) ?? 50;
+
 function Histograma({ sim, cal, actual }: { sim: Simulacion; cal: CalibracionCompleta; actual: FilaTHE }) {
+  const svg = useRef<SVGSVGElement>(null);
+  // Las barras crecen la primera vez; al mover un supuesto cambian en seco (se está explorando).
+  useCrecer(svg, ".rp-hist__bar", { eje: "y", escalonado: 0.006 });
   const cubos = histograma(sim.general, 0.5);
   if (!cubos.length) return null;
   const lo = Math.min(cubos[0].desde, actual.overall_lo - 1);
   const hi = Math.max(cubos[cubos.length - 1].hasta, actual.overall_hi + 1);
-  const top = Math.max(...cubos.map((c) => c.n));
-  const W = 320;
-  const H = 120;
-  const x = (s: number) => ((s - lo) / (hi - lo)) * W;
-  const y = (n: number) => H - (n / top) * (H - 8);
-  const cortes = umbralesDeBanda(cal.general)
-    .map((b) => b.lo)
-    .filter((s) => s > lo && s < hi);
+  /* Lienzo con márgenes para los ejes y sus rótulos. */
+  const W = 360;
+  const H = 168;
+  const izq = 44;
+  const der = 8;
+  const arr = 18;
+  const abj = 36;
+  const ancho = W - izq - der;
+  const alto = H - arr - abj;
+  const base = arr + alto;
+  const pct = (n: number) => (n / Math.max(1, sim.n)) * 100;
+  const paso = pasoEje(Math.max(...cubos.map((c) => pct(c.n))));
+  const techo = Math.max(paso, Math.ceil(Math.max(...cubos.map((c) => pct(c.n))) / paso) * paso);
+  const x = (s: number) => izq + ((s - lo) / (hi - lo)) * ancho;
+  const y = (p: number) => base - (p / techo) * alto;
+  const bandas = umbralesDeBanda(cal.general).filter((b) => b.hi > lo && b.lo < hi);
+  const cortes = bandas.map((b) => b.lo).filter((s) => s > lo && s < hi);
   const ticks: number[] = [];
   for (let t = Math.ceil(lo); t <= hi; t += Math.max(1, Math.round((hi - lo) / 6))) ticks.push(t);
+  const lineasY: number[] = [];
+  for (let v = 0; v <= techo + 1e-9; v += paso) lineasY.push(v);
   return (
     <figure className="rp-hist">
-      <svg viewBox={`0 0 ${W} ${H + 18}`} role="img" aria-label={`Distribución del puntaje general 2027 de la UDES, entre ${f1(lo)} y ${f1(hi)} puntos`}>
-        <rect className="rp-hist__now" x={x(actual.overall_lo)} width={x(actual.overall_hi) - x(actual.overall_lo)} y={0} height={H} />
+      <svg ref={svg} viewBox={`0 0 ${W} ${H}`} role="img" aria-label={`Distribución del puntaje general 2027 de la UDES, entre ${f1(lo)} y ${f1(hi)} puntos`}>
+        <rect className="rp-hist__now" x={x(actual.overall_lo)} width={x(actual.overall_hi) - x(actual.overall_lo)} y={arr} height={alto} />
+        {lineasY.map((v) => (
+          <g key={v}>
+            <line className="rp-hist__grid" x1={izq} x2={W - der} y1={y(v)} y2={y(v)} />
+            <text className="rp-hist__tick" x={izq - 6} y={y(v) + 3.5} textAnchor="end">
+              {v} %
+            </text>
+          </g>
+        ))}
         {cubos.map((c) => (
-          <rect key={c.desde} className="rp-hist__bar" x={x(c.desde) + 0.5} width={Math.max(0.5, x(c.hasta) - x(c.desde) - 1)} y={y(c.n)} height={H - y(c.n)} />
+          <rect key={c.desde} className="rp-hist__bar" x={x(c.desde) + 0.5} width={Math.max(0.5, x(c.hasta) - x(c.desde) - 1)} y={y(pct(c.n))} height={base - y(pct(c.n))} rx={1} />
         ))}
         {cortes.map((s) => (
-          <line key={s} className="rp-hist__cut" x1={x(s)} x2={x(s)} y1={0} y2={H} />
+          <line key={s} className="rp-hist__cut" x1={x(s)} x2={x(s)} y1={arr - 4} y2={base} />
         ))}
-        <line className="rp-hist__axis" x1={0} x2={W} y1={H} y2={H} />
+        {bandas.map((b) => {
+          const a = x(Math.max(b.lo, lo));
+          const z = x(Math.min(b.hi, hi));
+          return z - a > 40 ? (
+            <text key={b.label} className="rp-hist__band" x={(a + z) / 2} y={arr - 6} textAnchor="middle">
+              {b.label}
+            </text>
+          ) : null;
+        })}
+        <line className="rp-hist__axis" x1={izq} x2={W - der} y1={base} y2={base} />
         {ticks.map((t) => (
-          <text key={t} className="rp-hist__tick" x={x(t)} y={H + 13} textAnchor="middle">
+          <text key={t} className="rp-hist__tick" x={x(t)} y={base + 13} textAnchor="middle">
             {t}
           </text>
         ))}
+        <text className="rp-hist__title" x={izq + ancho / 2} y={H - 4} textAnchor="middle">
+          Puntaje general publicado
+        </text>
+        <text className="rp-hist__title" x={9} y={arr + alto / 2} textAnchor="middle" transform={`rotate(-90 9 ${arr + alto / 2})`}>
+          Escenarios
+        </text>
       </svg>
     </figure>
   );
 }
 
-/* ---------- d. Qué mover ---------------------------------------------------- */
+/* ---------- d. Mis indicadores frente a lo publicado -------------------------- */
+
+const ESTADO_INFORME: Record<EstadoInforme | "sin", string> = { sin: "Sin informe", borrador: "Borrador", revision: "En revisión", publicado: "Publicado" };
+
+/** Lo que falta de un indicador de evidencia: su peso × lo que no tiene ÷ máximo. */
+const faltaInd = (x: { peso: number; maximo: number; puntos: number }) => (x.maximo > 0 ? (x.peso * (x.maximo - x.puntos)) / x.maximo : 0);
+
+function MisIndicadores({
+  coberturas,
+  base,
+  enviados,
+  estados,
+  supuestos,
+}: {
+  coberturas: Coberturas;
+  base: LineaBaseOds[];
+  enviados: number[];
+  estados: Record<number, EstadoInforme | "sin">;
+  supuestos: Supuestos;
+}) {
+  const ods = ODS_NUMEROS.map((n) => {
+    const c = coberturas.actual[n];
+    const indicadores = [...c.indicadores].sort((a, b) => faltaInd(b) - faltaInd(a));
+    return { n, c, indicadores, falta: c.techo - c.puntos };
+  })
+    .filter((o) => o.c.techo > 0)
+    .sort((a, b) => b.falta - a.falta);
+
+  return (
+    <section className="rp-block" aria-labelledby="rp-mis">
+      <h2 id="rp-mis" className="rk-h2">
+        Mis indicadores frente a lo publicado
+      </h2>
+      <p className="rk-lead">
+        Puntos que dan las evidencias elegidas en los informes, frente al máximo de cada ODS. Primero lo que más falta. Lo que se publicó en THE 2026 va junto a cada ODS.
+      </p>
+      <ol className="rp-mis">
+        {ods.map((o, i) => {
+          const b = base.find((x) => x.sdg === o.n);
+          const st = estados[o.n] ?? "sin";
+          const envia = enviados.includes(o.n);
+          const cambio = cambioOds({ deltaEvidencia: coberturas.delta[o.n] ?? 0 }, supuestos);
+          return (
+            <li key={o.n} className="rp-mis__item">
+              <details className="rp-mis__ods" open={i < 3 || undefined}>
+                <summary>
+                  <span className="rk-odsmark" style={odsVars(o.n)}>
+                    {o.n}
+                  </span>
+                  <span className="rp-mis__name">{odsCorto(o.n)}</span>
+                  <span className={`rp-est rp-est--${st}`}>{ESTADO_INFORME[st]}</span>
+                  <span className="rp-mis__meter" aria-hidden="true">
+                    <i style={{ width: `${Math.round(Math.min(1, o.c.puntos / o.c.techo) * 100)}%` }} />
+                  </span>
+                  <span className="rp-mis__pts rk-num">
+                    {f1(o.c.puntos)} / {f1(o.c.techo)}
+                  </span>
+                  <span className="rp-mis__falta rk-num">{o.falta > 0.05 ? `faltan ${f1(o.falta)}` : "completo"}</span>
+                  <span className="rp-mis__the rk-num">{b?.publicado ? `THE: ${b.banda}` : "THE: no publicado"}</span>
+                  {!envia && <span className="rp-est rp-est--no">no enviado</span>}
+                  <span className="rp-mis__cambio rk-num">{cambio === 0 ? "" : `cambio ${signo(cambio)}`}</span>
+                  <Icon name="chevron-down" size={16} className="rp-mis__chev" aria-hidden="true" />
+                </summary>
+                <div className="rk-table-wrap">
+                  <table className="rk-table rp-table">
+                    <caption className="sr-only">Indicadores de evidencia del ODS {o.n}</caption>
+                    <thead>
+                      <tr>
+                        <th scope="col">Indicador</th>
+                        <th scope="col">Tipo</th>
+                        <th scope="col" className="rk-r">
+                          Puntos
+                        </th>
+                        <th scope="col" className="rk-r">
+                          Peso
+                        </th>
+                        <th scope="col" className="rk-r">
+                          Falta
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {o.indicadores.map((x) => (
+                        <tr key={x.id}>
+                          <th scope="row" className="rp-wrap">
+                            <span className="rk-num">{x.id}</span> {TITULOS[x.id] ?? ""}
+                          </th>
+                          <td className="rp-muted">{x.tipo === "doc" ? "documento" : "evidencia"}</td>
+                          <td className="rk-r rk-num">
+                            {f1(x.puntos)} / {x.maximo}
+                          </td>
+                          <td className="rk-r rk-num">{f1(x.peso)} %</td>
+                          <td className="rk-r rk-num">{faltaInd(x) > 0.05 ? `+${f1(faltaInd(x))}` : "—"}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </details>
+            </li>
+          );
+        })}
+      </ol>
+      <p className="rk-hint">
+        «Puntos / máximo» son los puntos del ODS que da cada indicador (peso × puntos ÷ máximo). «Falta» es lo que sumaría completar ese indicador con la evidencia que ya existe
+        o una mejor nota. Si un ODS no tiene informe en la edición elegida, va en cero.
+      </p>
+    </section>
+  );
+}
+
+/* ---------- e. Qué mover ---------------------------------------------------- */
 
 const PAPEL: Record<Palanca["papel"], string> = { "17": "ODS 17 · 22 %", top3: "entre los 3 mejores · 26 %", entra: "entraría a los 3 mejores", fuera: "no entra al general" };
 
@@ -780,7 +1004,7 @@ function QueMover({ lista }: { lista: Palanca[] }) {
   );
 }
 
-/* ---------- e. Método ------------------------------------------------------- */
+/* ---------- f. Método ------------------------------------------------------- */
 
 function Metodo({ captura }: { captura: string | null }) {
   return (

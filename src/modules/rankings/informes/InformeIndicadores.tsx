@@ -7,9 +7,15 @@
    («¿los actos son gratuitos?»), completa la ficha de hechos, ve cómo lo
    evaluaría THE (una simulación de Pilo) y la página tal como la verá THE:
    en inglés primero, con el español a un clic. Aprobar es siempre de una persona.
+
+   Composición: la tabla de indicadores (tipo, evidencia elegida, puntos) a la
+   izquierda y, a la derecha, las propuestas de Pilo del indicador elegido. En
+   tableta y teléfono van una debajo de la otra; en el teléfono la tabla se
+   vuelve tarjetas.
    ========================================================================== */
 
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
+import { useFundido } from "../movimiento";
 import { useQueryClient } from "@tanstack/react-query";
 import { paginaDeEleccion, piloIndicador, resumenCobertura, useGuardarEleccion, useNoticiasDeOds } from "./datos";
 import type { EvidenciaPublica, NoticiaOds } from "./datos";
@@ -21,6 +27,7 @@ import "../../sostenible/ods-evidence.css";
 import { Evaluador, FichaEditor } from "./InformeFicha";
 
 const f1 = (x: number) => String(Math.round(x * 100) / 100).replace(".", ",");
+const TIPO: Record<IndicadorTHE["tipo"], string> = { ev: "Evidencia", doc: "Documento", dato: "Dato", inv: "Scopus" };
 const errorTexto = (e: unknown) => (e instanceof Error ? e.message : String(e));
 
 /** La existencia que cuenta: la respuesta de la persona si el indicador la pide; si no, 1. */
@@ -71,13 +78,15 @@ export function evidenciaDesde(ods: number, ind: string, el: EleccionIndicador, 
 export function InformeIndicadores({ completo }: { completo: InformeCompleto }) {
   const inf = completo.informe;
   const inds = useMemo(() => indicadoresDe(inf.ods), [inf.ods]);
-  const notasQ = useNoticiasDeOds(inf.ods);
+  const notasQ = useNoticiasDeOds(inf.ods, inf.edition);
   const notas = useMemo(() => new Map((notasQ.data ?? []).map((n) => [n.id, n])), [notasQ.data]);
   const eleccion = (id: string) => completo.elecciones.find((e) => e.indicator === id);
   /* Abre el primer indicador de noticias con algo que revisar; si no hay, el primero de noticias. */
   const primero = inds.find((i) => i.tipo === "ev" && eleccion(i.id)?.news_id && !eleccion(i.id)?.approved) ?? inds.find((i) => i.tipo === "ev") ?? inds[0];
   const [sel, setSel] = useState<string | null>(null);
   const ind = inds.find((i) => i.id === sel) ?? primero;
+  const detalle = useRef<HTMLDivElement>(null);
+  useFundido(detalle, ind?.id, { desplazamiento: 6 });
 
   const cov = resumenCobertura(completo, inds);
   /* Cobertura: puntos de los indicadores de evidencia que ya tienen nota elegida. */
@@ -101,25 +110,56 @@ export function InformeIndicadores({ completo }: { completo: InformeCompleto }) 
   return (
     <div className="ri-ig">
       <div className="ri-ilist">
-        <h3 className="ri-k">Indicadores del ODS {inf.ods}</h3>
-        <ul>
-          {inds.map((x) => {
-            const st = estadoIndicador(x, eleccion(x.id));
-            return (
-              <li key={x.id}>
-                <button type="button" className="ri-ind" aria-current={ind?.id === x.id ? "true" : undefined} onClick={() => setSel(x.id)}>
-                  <span className="ri-ind__id">{x.id}</span>
-                  <span>
-                    <b>{x.titulo}</b>
-                    <span className="ri-tag" data-tono={st.tono}>
-                      {st.texto}
-                    </span>
-                  </span>
-                </button>
-              </li>
-            );
-          })}
-        </ul>
+        <div className="ri-etabla-marco">
+          <table className="ri-etabla">
+            <caption className="sr-only">Indicadores del ODS {inf.ods}: evidencia elegida y puntos</caption>
+            <thead>
+              <tr>
+                <th scope="col">Indicador</th>
+                <th scope="col">Tipo</th>
+                <th scope="col">Evidencia elegida</th>
+                <th scope="col">Puntos</th>
+              </tr>
+            </thead>
+            <tbody>
+              {inds.map((x) => {
+                const el = eleccion(x.id);
+                const st = estadoIndicador(x, el);
+                const nota = el?.news_id ? notas.get(el.news_id) : undefined;
+                const actual = ind?.id === x.id;
+                return (
+                  <tr key={x.id} aria-current={actual ? "true" : undefined} onClick={() => setSel(x.id)}>
+                    <td data-label="Indicador">
+                      <button type="button" className="ri-ind" aria-current={actual ? "true" : undefined} onClick={() => setSel(x.id)}>
+                        <span className="ri-ind__id">{x.id}</span>
+                        <b>{x.titulo}</b>
+                      </button>
+                    </td>
+                    <td data-label="Tipo">
+                      <span className="ri-tag" data-tono={x.tipo === "ev" || x.tipo === "doc" ? "pilo" : "mute"}>
+                        {TIPO[x.tipo]}
+                      </span>
+                    </td>
+                    <td data-label="Evidencia elegida" className="ri-etabla__ev">
+                      {x.tipo === "dato" || x.tipo === "inv" ? (
+                        <span className="ri-mute">{x.tipo === "dato" ? "Cifra institucional" : "Lo calcula THE"}</span>
+                      ) : nota ? (
+                        <span className="ri-etabla__nota">{nota.title}</span>
+                      ) : (
+                        <span className="ri-mute">{el?.candidates.length ? "Sin elegir" : "Sin candidatas"}</span>
+                      )}
+                    </td>
+                    <td data-label="Puntos">
+                      <span className="ri-tag" data-tono={st.tono}>
+                        {st.texto}
+                      </span>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
         <div className="ri-cov">
           <h3 className="ri-k">Cobertura de evidencia</h3>
           <p>
@@ -131,7 +171,9 @@ export function InformeIndicadores({ completo }: { completo: InformeCompleto }) 
           </p>
         </div>
       </div>
-      {ind && <Indicador key={ind.id} completo={completo} ind={ind} el={eleccion(ind.id)} notas={notas} />}
+      <div className="ri-idet" ref={detalle}>
+        {ind && <Indicador key={ind.id} completo={completo} ind={ind} el={eleccion(ind.id)} notas={notas} />}
+      </div>
     </div>
   );
 }

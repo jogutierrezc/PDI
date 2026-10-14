@@ -48,6 +48,7 @@ import {
   type InformePublico,
   type Seccion,
 } from "./tipos";
+import { anioDeNoticias, rangoFechasDeAnio } from "./anios";
 
 export { ErrorPilo, fichaCompleta, idiomaPreferido, paginaEvidencia, textoEnIdioma };
 export type { FichaEvidencia, Idioma, PaginaEvidencia };
@@ -211,16 +212,27 @@ export interface NoticiaOds {
   excerpt_en?: string;
 }
 
-export function useNoticiasDeOds(ods: number): UseQueryResult<NoticiaOds[]> {
+/**
+ * Las notas aprobadas del ODS. Con `edicion`, solo las publicadas en su año de
+ * noticias (la de 2025 va a la edición 2026); sin ella, todas (como antes).
+ */
+function notasDeOds(ods: number, columnas: string, edicion?: number) {
+  const base = tabla("news_ods").select(`news_id, ${columnas}`).eq("ods", ods).eq("news_items.state", "ok");
+  if (!edicion) return base;
+  const { desde, hasta } = rangoFechasDeAnio(anioDeNoticias(edicion));
+  return base.gte("news_items.published_on", desde).lt("news_items.published_on", hasta);
+}
+
+export function useNoticiasDeOds(ods: number, edicion?: number): UseQueryResult<NoticiaOds[]> {
   return useQuery({
-    queryKey: ["informe", "noticias", ods],
+    queryKey: ["informe", "noticias", ods, edicion ?? 0],
     staleTime: 60_000,
     retry: false,
     enabled: ods >= 1 && ods <= 17,
     queryFn: async (): Promise<NoticiaOds[]> => {
       type Fila = { score: number; reason: string; news_items: Omit<NoticiaOds, "score" | "reason"> | null };
       const pedir = (columnas: string) =>
-        todas<Fila>((a, z) => tabla("news_ods").select(`score, reason, news_items!inner(${columnas})`).eq("ods", ods).eq("news_items.state", "ok").order("news_id").range(a, z));
+        todas<Fila>((a, z) => notasDeOds(ods, `score, reason, news_items!inner(${columnas})`, edicion).order("news_id").range(a, z));
       const BASE = "id, url, title, excerpt, body, image_url, published_on, section, campus, state";
       let filas: Fila[];
       try {
@@ -467,15 +479,15 @@ export function useCambiarEstadoInforme() {
 /* ---------- Intranet: imágenes y cifras de las notas del ODS (0146) --------- */
 
 /** Las imágenes de las notas aprobadas del ODS (news_images), por nota y posición. */
-export function useImagenesDeOds(ods: number): UseQueryResult<ImagenNota[]> {
+export function useImagenesDeOds(ods: number, edicion?: number): UseQueryResult<ImagenNota[]> {
   return useQuery({
-    queryKey: ["informe", "imagenes", ods],
+    queryKey: ["informe", "imagenes", ods, edicion ?? 0],
     staleTime: 60_000,
     retry: false,
     enabled: ods >= 1 && ods <= 17,
     queryFn: async (): Promise<ImagenNota[]> => {
       try {
-        const ids = (await todas<{ news_id: string }>((a, z) => tabla("news_ods").select("news_id, news_items!inner(state)").eq("ods", ods).eq("news_items.state", "ok").order("news_id").range(a, z))).map((f) => f.news_id);
+        const ids = (await todas<{ news_id: string }>((a, z) => notasDeOds(ods, "news_items!inner(state)", edicion).order("news_id").range(a, z))).map((f) => f.news_id);
         const out: ImagenNota[] = [];
         for (const t of trozos(ids)) out.push(...(await todas<ImagenNota>((a, z) => tabla("news_images").select("id, news_id, url, width, height, caption, credit, pos, is_cover, kind, minors, alt").in("news_id", t).order("pos").range(a, z))));
         return out;
@@ -487,15 +499,15 @@ export function useImagenesDeOds(ods: number): UseQueryResult<ImagenNota[]> {
 }
 
 /** El libro de cifras de las notas aprobadas del ODS (news_figures), de la mejor a la peor. */
-export function useCifrasDeOds(ods: number): UseQueryResult<CifraNota[]> {
+export function useCifrasDeOds(ods: number, edicion?: number): UseQueryResult<CifraNota[]> {
   return useQuery({
-    queryKey: ["informe", "cifras", ods],
+    queryKey: ["informe", "cifras", ods, edicion ?? 0],
     staleTime: 60_000,
     retry: false,
     enabled: ods >= 1 && ods <= 17,
     queryFn: async (): Promise<CifraNota[]> => {
       try {
-        const ids = (await todas<{ news_id: string }>((a, z) => tabla("news_ods").select("news_id, news_items!inner(state)").eq("ods", ods).eq("news_items.state", "ok").order("news_id").range(a, z))).map((f) => f.news_id);
+        const ids = (await todas<{ news_id: string }>((a, z) => notasDeOds(ods, "news_items!inner(state)", edicion).order("news_id").range(a, z))).map((f) => f.news_id);
         const out: CifraNota[] = [];
         for (const t of trozos(ids)) out.push(...(await todas<CifraNota>((a, z) => tabla("news_figures").select("id, news_id, value, num, unit, label, quote, kind, score, checked").in("news_id", t).range(a, z))));
         return out.sort((a, b) => b.score - a.score);

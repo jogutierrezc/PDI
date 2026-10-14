@@ -10,6 +10,7 @@ import { Icon } from "../../components/ui/Icon";
 import { fmt } from "../sostenible/data";
 import { NEWS_SOURCES, useNewsRuns } from "./noticias";
 import { etiquetaFuente, useCarga } from "./carga";
+import { useHoja } from "./movimiento";
 import { fechaCorta, pendientesDe } from "./recolector-logica";
 
 const ANIO_ACTUAL = new Date().getFullYear();
@@ -20,6 +21,9 @@ export function CargaPanel({ onClose }: { onClose: () => void }) {
   const [fuentes, setFuentes] = useState<string[]>(() => NEWS_SOURCES.map((f) => f.key));
   const [inicio, setInicio] = useState(0);
   const primero = useRef<HTMLInputElement>(null);
+  const cajon = useRef<HTMLElement>(null);
+  // Entra desde la derecha; la X sale en 160 ms. Esc y «Buscar» cierran en seco.
+  const { cerrar } = useHoja(cajon, true, { lado: "derecha", alCerrar: onClose });
   const corriendo = estado.fase === "corriendo" || estado.fase === "deteniendo";
 
   useEffect(() => {
@@ -42,12 +46,12 @@ export function CargaPanel({ onClose }: { onClose: () => void }) {
   };
 
   return (
-    <aside className="rk-drawer" role="dialog" aria-modal="false" aria-labelledby="rk-drawer-title">
+    <aside ref={cajon} className="rk-drawer" role="dialog" aria-modal="false" aria-labelledby="rk-drawer-title">
       <header className="rk-drawer__head">
         <h2 id="rk-drawer-title" className="rk-h2">
           Buscar noticias en udes.edu.co
         </h2>
-        <button type="button" className="rk-icon-btn" onClick={onClose} aria-label="Cerrar el panel">
+        <button type="button" className="rk-icon-btn" onClick={() => cerrar()} aria-label="Cerrar el panel">
           <Icon name="close" size={18} />
         </button>
       </header>

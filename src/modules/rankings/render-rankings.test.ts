@@ -98,7 +98,7 @@ describe("Tablero de rankings", () => {
     const html = page("/admin/rankings/noticias");
     expect(html).not.toContain("Bandeja de revisión");
     expect(html).toMatch(/36<\/span> (<!-- -->)?por revisar/);
-    expect(html).toContain("(en los informes públicos)");
+    expect(html).toContain("se ven en los informes públicos");
     expect(html).toContain("Buscar noticias");
     expect(html.match(/class="rk-row[ "]/g)?.length).toBe(30);
     expect(html).toContain("Mostrar más");

@@ -68,8 +68,8 @@ function Cita({ quote, value }: { quote: string; value: string }) {
 
 export function InformeCifras({ completo }: { completo: InformeCompleto }) {
   const inf = completo.informe;
-  const q = useCifrasDeOds(inf.ods);
-  const notasQ = useNoticiasDeOds(inf.ods);
+  const q = useCifrasDeOds(inf.ods, inf.edition);
+  const notasQ = useNoticiasDeOds(inf.ods, inf.edition);
   const notas = useMemo(() => new Map((notasQ.data ?? []).map((n) => [n.id, n])), [notasQ.data]);
   const guardar = useGuardarBloque();
   const agregar = useAgregarBloque();

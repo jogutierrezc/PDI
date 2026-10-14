@@ -59,6 +59,7 @@ export const SCREEN_PATHS: Record<AdminScreen, string> = {
   rutas: "/admin/rutas",
   rankings: "/admin/rankings",
   internacionalizacion: "/admin/internacionalizacion",
+  informes: "/admin/informes-gestion",
 };
 
 export interface AuthContextValue {
@@ -123,6 +124,9 @@ export function screenVisible(
   // Internacionalización: pertenecer al módulo (director, coordinador o gestor
   // en int_miembros, 0151) ES el permiso, como en la base; la administración, siempre.
   if (screen === "internacionalizacion") return RANK[profile.role] >= RANK.admin || Boolean(who.inInternacionalizacion);
+  // Informes Institucionales: quien pertenece a una unidad escribe el suyo;
+  // Planeación los abre, revisa y consolida todos (0153).
+  if (screen === "informes" && (inAnyUnit || RANK[profile.role] >= RANK.planeacion)) return true;
   // Mis Tableros se gana perteneciendo a una unidad, no marcándolo aparte.
   if (screen === "tableros" && inAnyUnit) return true;
   // Impacto, solo a quien tiene algo que hacer en él: un programa o una

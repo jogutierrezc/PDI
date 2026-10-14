@@ -203,6 +203,7 @@ const RutasPublico = lazy(() => import("./modules/rutas/RutasPublico").then((m) 
 const Internacionalizacion = lazy(() =>
   import("./modules/internacionalizacion/ui/Internacionalizacion").then((m) => ({ default: m.Internacionalizacion })),
 );
+const InformesAdmin = lazy(() => import("./modules/informes/InformesAdmin").then((m) => ({ default: m.InformesAdmin })));
 const ReportesInstitucionales = lazy(() =>
   import("./modules/reportes/ReportesInstitucionales").then((m) => ({ default: m.ReportesInstitucionales })),
 );
@@ -446,6 +447,15 @@ export default function App() {
             element={
               <RequireRole minimum="consulta" screen="internacionalizacion">
                 <Internacionalizacion />
+              </RequireRole>
+            }
+          />
+          {/* Informes Institucionales (informes de gestión, 0153): unidades y Planeación. */}
+          <Route
+            path="/admin/informes-gestion/:seccion?"
+            element={
+              <RequireRole minimum="consulta" screen="informes">
+                <InformesAdmin />
               </RequireRole>
             }
           />

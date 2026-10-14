@@ -52,7 +52,8 @@ export type AdminSection =
   | "correos"
   | "rutas"
   | "rankings"
-  | "internacionalizacion";
+  | "internacionalizacion"
+  | "informes";
 
 export interface NavItem {
   id: AdminSection;
@@ -64,7 +65,7 @@ export interface NavItem {
 }
 
 export interface NavGroup {
-  id: "planeacion" | "pdi" | "cifras" | "observatorio" | "impacto" | "tableros" | "reportes" | "internacionalizacion" | "rankings" | "sistema";
+  id: "planeacion" | "pdi" | "cifras" | "observatorio" | "impacto" | "tableros" | "reportes" | "informes" | "internacionalizacion" | "rankings" | "sistema";
   label: string;
   /** Ícono y nombre corto: el riel solo tiene 78 px, ahí no cabe el rótulo largo. */
   icon: IconName;
@@ -158,6 +159,18 @@ export const navigation: NavGroup[] = [
     label: "Reportes Institucionales",
     items: [
       { id: "reportes", label: "SNIES y CNA", icon: "table", to: "/admin/reportes-institucionales", minimum: "consulta" },
+    ],
+  },
+  {
+    // El informe de gestión anual de decanaturas, vicerrectorías y rectorías,
+    // sobre las plantillas A–D, con cifras vivas de UDES en Cifras y del PDI.
+    // Lo ve quien pertenece a una unidad, y Planeación.
+    id: "informes",
+    icon: "document",
+    short: "Informes",
+    label: "Informes Institucionales",
+    items: [
+      { id: "informes", label: "Informes de gestión", icon: "document", to: "/admin/informes-gestion", minimum: "consulta" },
     ],
   },
   {

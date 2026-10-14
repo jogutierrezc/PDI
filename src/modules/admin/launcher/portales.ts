@@ -169,6 +169,29 @@ export const MODULES: Record<ModuleId, ModuleMeta> = {
       },
     ],
   },
+  informes: {
+    text: "El informe de gestión anual de cada unidad, con cifras vivas",
+    color: "var(--wall-informes)",
+    rank: 5.5,
+    sections: (ctx) => {
+      const base = "/admin/informes-gestion";
+      const planeacion = ctx.hasRole("planeacion");
+      return [
+        {
+          title: "El informe",
+          cards: [{ key: "inf-mi", title: "Mi informe", text: "Secciones, cifras vivas, evidencias y envío", to: `${base}/mi-informe` }],
+        },
+        {
+          title: "Planeación",
+          cards: [
+            { key: "inf-tablero", title: "Tablero del ciclo", text: "Estado por unidad, plantillas y qué se justifica", to: base, when: () => planeacion },
+            { key: "inf-revision", title: "Revisión", text: "Aprobar o devolver con nota por sección", to: `${base}/revision`, when: () => planeacion },
+            { key: "inf-pilo", title: "Capacitación de Pilo", text: "Los informes de 2025 y lo que Pilo aprendió", to: `${base}/capacitacion`, when: () => planeacion },
+          ],
+        },
+      ];
+    },
+  },
   internacionalizacion: {
     text: "Movilidad, convenios y visitantes por campus, para SNIES, CNA y rankings",
     color: "var(--wall-internacionalizacion)",

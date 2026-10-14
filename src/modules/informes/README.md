@@ -40,3 +40,72 @@ Tablero del ciclo (Planeación) · Mi informe (editor) · Revisión (Planeación
 
 ## Reglas de trabajo
 Sin commit. No se aplican migraciones ni se despliegan funciones (lo hace el usuario). Todo DELETE lleva WHERE (safeupdate, 0095). Solo tema claro. Textos en español. Pruebas con Vitest.
+
+## Esquema final (migración `0153_informes_institucionales.sql`)
+
+Lo que quedó en la base. La interfaz y `pilo-informes` se apoyan en esto; las pruebas están en `tests/informes/sql-*.test.ts`.
+
+### Ajustes al contrato
+1. **Rectorías como unidades:** se usan con `units.kind = 'otra'` (el enum no cambia, nada más se rompe). Qué es cada unidad en el informe lo dice la **plantilla** de la instancia (C = rectoría de campus, D = Rectoría General), no `kind`.
+2. **A quién sube cada informe:** columna nueva `informe_instancias.destino` (unidad que lo consolida). No se usa `parent_id` para esto: colgar facultades de una rectoría les daría a los rectores, por herencia de 0057, edición sobre ellas. `informe_abrir` la llena con `p_destino`, o con `units.reports_to`, o con `units.parent_id`; Planeación la corrige con un `update` directo.
+3. **`informe_cifras` lleva tres columnas más:** `seccion_clave` (para contar los datos propios por sección), `fuente_clave` (qué fila de `informe_fuentes` usa; vacía = la misma `clave`) y `consulta` jsonb (ajuste por unidad que se mezcla sobre la consulta del catálogo, p. ej. `{"sede":"cucuta"}`). `propia` es calculada (`excel`, `manual` o `url`).
+4. **Función nueva `informe_cifras_vivas(p_instancia)`:** la misma lectura que usa la foto al enviar. La interfaz la llama para mostrar las cifras en vivo y el aviso «cambió de X a Y» (comparando con `visto`). Así el valor en pantalla y la foto salen del mismo cálculo.
+5. **La foto la toma un disparador**, no solo `informe_enviar`: cualquier paso a `sent` (también un `update` directo) fotografía las cifras; cualquier paso a `back` las borra (vuelven a vivas). Las validaciones de envío también van en el disparador.
+6. **Devolver pide nota** (`p_nota` obligatoria en `back`). Guardar una sección o una cifra en un informe `back` lo pasa solo a `draft`.
+7. **`informe_ejemplos.hash`** es calculado (`md5(texto)`): `pilo-informes` inserta con `on conflict (hash) do nothing`.
+8. Pantalla de roles `informes`: los roles de fábrica la alcanzan por `all_screens`; la migración la añade a los roles hechos a mano que ya tenían `rankings` o `reportes`. El tipo `AdminScreen` y la ruta van en la interfaz.
+
+### Tablas y columnas definitivas
+| Tabla | Columnas |
+| --- | --- |
+| `informe_ciclos` | `id` uuid · `anio` int único · `nombre` text · `fecha_limite` date · `corte` date · `estado` (`preparacion`\|`abierto`\|`cerrado`) · `config` jsonb `{limite_propios:3, exigir_fuente:true, exigir_pilar:false}` · `created_at` · `updated_at` |
+| `informe_requisitos` | `id` · `ciclo_id` · `plantilla` (A–D) · `clave` · `condicion` (`justificar`\|`sugerido`\|`no`); único (`ciclo_id`,`plantilla`,`clave`) |
+| `informe_instancias` | `id` · `ciclo_id` · `unit_id` · `plantilla` (A–D) · `destino` uuid (unidad) · `estado` (`draft`\|`sent`\|`ok`\|`back`) · `nota_revision` text · `enviado_en` · `enviado_por` · `aprobado_en` · `aprobado_por` · `updated_by` · `created_at` · `updated_at`; único (`ciclo_id`,`unit_id`) |
+| `informe_secciones` | `id` · `instancia_id` · `clave` (`s1`…) · `orden` int (sale de la clave) · `contenido` jsonb (objeto) · `listo` bool · `updated_by` · `updated_at`; único (`instancia_id`,`clave`) |
+| `informe_cifras` | `id` · `instancia_id` · `clave` · `etiqueta` · `seccion_clave` · `fuente_tipo` (`auto`\|`pdi`\|`aportes`\|`excel`\|`manual`\|`url`) · `fuente_nombre` · `fuente_clave` · `consulta` jsonb · `valor` numeric (nulo en `auto`/`pdi`) · `unidad` text · `meta` · `anterior` · `incluida` bool (true) · `justificacion` text · `propia` bool calculada · `pilar` text · `visto` numeric · `foto_valor` numeric · `foto_en` timestamptz · `foto_fuente` text · `updated_by` · `updated_at`; único (`instancia_id`,`clave`) |
+| `informe_fuentes` | `clave` text pk · `nombre` · `tipo` (`auto`\|`pdi`) · `consulta` jsonb · `activa` bool · `created_at` · `updated_at` |
+| `informe_anexos` | `id` · `instancia_id` · `n` int · `nombre` · `tipo` (`archivo`\|`url`) · `ruta` (ruta del bucket o URL https) · `descripcion` · `created_by` · `created_at`; único (`instancia_id`,`n`) |
+| `informe_revisiones` | `id` · `instancia_id` · `seccion_clave` (opcional) · `decision` (`aprobado`\|`devuelto`) · `nota` · `por` · `en` |
+| `informe_ejemplos` | `id` · `origen` (`informe2025`\|`aprobado`) · `anio` · `plantilla` (A–D o nulo) · `seccion_tipo` · `unidad_nombre` · `titulo` · `texto` · `hash` (= md5(texto), único) · `aprobado` bool · `created_at` |
+| `informe_aprendizaje` | `id` · `instancia_id` · `seccion_clave` · `borrador_pilo` · `final_unidad` · `creado_en` |
+
+Bucket privado **`informe-anexos`** (15 MB): ruta `<unit_id>/<instancia_id>/<archivo>`. Lee quien ve la unidad (o Planeación); sube, reemplaza o borra quien puede editar la instancia mientras esté abierta.
+
+### Funciones (firmas exactas, todas para `authenticated`)
+```sql
+informe_abrir(p_ciclo uuid, p_unit uuid, p_plantilla text, p_destino uuid default null) returns uuid
+  -- crea la instancia (o devuelve la que ya hay). Planeación siempre; jefe/editor de la unidad con el ciclo abierto.
+informe_guardar_seccion(p_instancia uuid, p_clave text, p_contenido jsonb, p_listo boolean default false) returns informe_secciones
+informe_guardar_cifra(p_instancia uuid, p_clave text, p_datos jsonb) returns informe_cifras
+  -- p_datos: solo las claves que cambian, de: etiqueta, seccion_clave, fuente_tipo, fuente_nombre, fuente_clave,
+  -- consulta, valor, unidad, meta, anterior, incluida, justificacion, pilar, visto. Revisa el límite de datos propios por sección.
+informe_cifras_vivas(p_instancia uuid) returns table (clave text, fuente_tipo text, valor numeric, fuente text, corte text)
+informe_enviar(p_instancia uuid) returns informe_instancias            -- jefe o Planeación; draft|back → sent; toma la foto
+informe_cambiar_estado(p_instancia uuid, p_a text, p_nota text default null) returns informe_instancias
+  -- sent→ok|back y ok→back (solo Planeación; back pide nota; deja fila en informe_revisiones); back→draft (jefe, editor o Planeación)
+informe_consolidado(p_instancia uuid) returns table (instancia_id uuid, unit_id uuid, unit_nombre text, plantilla text,
+  seccion_clave text, orden int, contenido jsonb, aprobado_en timestamptz)
+  -- secciones de las instancias aprobadas (ok) del mismo ciclo cuyo destino es la unidad de p_instancia
+-- auxiliar (la usan las dos de guardar): informe_reabrir_si_devuelto(p_instancia uuid) returns void
+```
+Reglas en la base (disparador `informe_instancias_guard`): transiciones `draft→sent` (jefe, Planeación), `sent→ok|back`, `ok→back` (Planeación), `back→draft` (jefe, editor, Planeación). Al enviar se exige: ciclo abierto, al menos una sección y todas `listo`, cada cifra incluida con fuente propia con `fuente_nombre` (si `exigir_fuente`) y `pilar` (si `exigir_pilar`), y justificación en las claves que `informe_requisitos` marca `justificar` para su plantilla. Con la instancia en `sent` u `ok` nadie más que Planeación cambia secciones, cifras ni anexos. Visor (Consulta) solo lee. `informe_ejemplos` e `informe_aprendizaje`: solo Planeación/admin y `service_role`.
+
+### Cifras vivas: mapa clave → consulta
+La cifra busca su fila en `informe_fuentes` por `coalesce(fuente_clave, clave)` y mezcla encima `informe_cifras.consulta`. El año es `consulta.anio` o, si falta, `informe_ciclos.anio`.
+
+| `fuente_tipo` | `consulta` | Qué lee (lo mismo que el portal) |
+| --- | --- | --- |
+| `auto` (UDES en Cifras) | `{"indicador":"<od_indicators.key>", "informe":"<od_reports.slug>"?, "sede":"<campuses.slug>"?, "periodo":"<od_periods.label>"?, "anio":n?}` | `od_indicators` + `od_values` de un informe y periodo **publicados** que cubren el año (gana el periodo vigente). Cifra del año con la regla del portal (`annualFigure` de `datos-abiertos/data/terms.ts`): `suma` A+B, `promedio` (A+B)/2, `ultimo` B o A, `reportado` (o `reporting='anual'`) el valor anual. Sin sede = toda la UDES; si el total no se capturó y `aggregation='suma'`, sale de sumar todas las sedes del periodo (`od_period_campuses`), como en `repository.ts`. Corte: `od_periods.cutoff_date`. |
+| `pdi` (indicador del PDI / Impacto) | `{"indicador":"<imp_indicators.code>", "programa":"<units.id>"?, "sede":"<campuses.slug>"?, "anio":n?}` | `imp_values.value_num` del indicador **publicado** en ese año; sin programa, la cifra global de la unidad dueña. `not_applicable` = sin cifra. |
+| `aportes` | — | Suma de `foto_valor` de la misma `clave` en las instancias aprobadas (`ok`) del ciclo cuyo `destino` es esta unidad. |
+| `excel`, `manual`, `url` | — | Su `valor`, con `fuente_nombre` como fuente. |
+
+Ejemplos de catálogo: `('matric','Matrícula total','auto','{"indicador":"matriculados","informe":"poblacion-estudiantil"}')`, `('rc','Registros calificados','pdi','{"indicador":"EN3"}')`. La foto guarda en `foto_fuente` el texto «UDES en Cifras · <indicador> · <periodo>» (o «PDI · <código>», «Aportes aprobados», o el `fuente_nombre`).
+
+## Interfaz (fase 1)
+`InformesAdmin.tsx` monta la ruta y el riel; todo el acceso a Supabase y a `pilo-informes` está en `datos.ts`. Lógica pura con pruebas: `plantillas.ts`, `tokens.ts`, `cifras-vivas.ts`, `estados.ts`, `validacion.ts`, `capacitacion.ts`. Pantallas en `ui/`: `Tablero`, `MiInforme` (+ `Cifras`, `Bloques`, `Texto`, `modelo`), `Revision`, `Capacitacion`. Movimiento: hooks de `rankings/movimiento.ts`; base visual: `rankings/layout.css` + `informes.css`.
+- El editor crea con `informe_guardar_cifra` las cifras de la plantilla que aún no tienen fila (sin fila, `informe_cifras_vivas` no las lee) y fija su primer `visto`.
+- `listo` de cada sección lo calcula `validacion.ts` y el editor lo sincroniza aunque nadie escriba (p. ej. «Anexos» o una sección sin cifras que justificar).
+- La nota de devolución va en `nota_revision` con una línea por sección («§s3 · Título: nota», `estados.ts`) y, además, una fila por sección en `informe_revisiones`.
+- Datos propios: clave `propio_<seccion>_<base36>`, `fuente_tipo` `manual`.
+- Pendiente (próxima fase): Consolidador (`informe_consolidado`, editar `destino`), Vista A4/PDF, acción `mejorar` de Pilo.

@@ -66,3 +66,9 @@ verify_jwt = false
 # pg_cron (encabezado x-pilo-cron) y la intranet (sesión de la administración):
 # la función comprueba por su cuenta cada camino.
 verify_jwt = false
+
+[functions.pilo-informes]
+# Mr. Pilo redacta y aprende en los informes de gestión (0153): borradores con cifras enlazadas [[clave]],
+# mejora de textos, corpus de estilo con lo aprobado y los informes 2025. Solo la intranet (sesión de
+# Planeación, la administración o quien diligencia el informe): la función comprueba la sesión y los papeles.
+verify_jwt = false

@@ -8,7 +8,8 @@
 
 import type { PdfPage } from "./pdf";
 
-export async function loadPdfPages(bytes: Uint8Array): Promise<PdfPage[]> {
+/** `maxPages`: lee solo las primeras páginas (la biblioteca de rankings lo usa para no leer PDF enormes). */
+export async function loadPdfPages(bytes: Uint8Array, maxPages = Infinity): Promise<PdfPage[]> {
   const pdfjs = await import("pdfjs-dist");
   // Vite emite el worker como archivo propio y entrega su dirección.
   const { default: workerSrc } = await import("pdfjs-dist/build/pdf.worker.min.mjs?url");
@@ -18,7 +19,7 @@ export async function loadPdfPages(bytes: Uint8Array): Promise<PdfPage[]> {
   const doc = await task.promise;
   const pages: PdfPage[] = [];
   try {
-    for (let number = 1; number <= doc.numPages; number += 1) {
+    for (let number = 1; number <= Math.min(doc.numPages, maxPages); number += 1) {
       const page = await doc.getPage(number);
       const content = await page.getTextContent();
       const items: PdfPage["items"] = [];

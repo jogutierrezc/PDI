@@ -200,6 +200,9 @@ const Correos = lazy(() =>
 );
 const Rutas = lazy(() => import("./modules/rutas/Rutas").then((m) => ({ default: m.Rutas })));
 const RutasPublico = lazy(() => import("./modules/rutas/RutasPublico").then((m) => ({ default: m.RutasPublico })));
+const Internacionalizacion = lazy(() =>
+  import("./modules/internacionalizacion/ui/Internacionalizacion").then((m) => ({ default: m.Internacionalizacion })),
+);
 const ReportesInstitucionales = lazy(() =>
   import("./modules/reportes/ReportesInstitucionales").then((m) => ({ default: m.ReportesInstitucionales })),
 );
@@ -434,6 +437,15 @@ export default function App() {
             element={
               <RequireRole minimum="consulta" screen="tableros">
                 <BoardsAdmin />
+              </RequireRole>
+            }
+          />
+          {/* Internacionalización: pertenecer al módulo (int_miembros) es el permiso, como en Mis Tableros. */}
+          <Route
+            path="/admin/internacionalizacion/:seccion?"
+            element={
+              <RequireRole minimum="consulta" screen="internacionalizacion">
+                <Internacionalizacion />
               </RequireRole>
             }
           />

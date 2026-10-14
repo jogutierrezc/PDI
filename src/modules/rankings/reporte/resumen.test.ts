@@ -4,6 +4,8 @@ import type { RespuestaFechada } from "./resumen";
 import {
   aportesDe,
   asignacionDe,
+  avanceDeUnidad,
+  unidadPlaneacion,
   camposDeDato,
   catalogoOrdenado,
   coincide,
@@ -175,5 +177,19 @@ describe("camposDeDato", () => {
   it("toma las opciones del indicador, no las de otro", () => {
     expect(camposDeDato("4.3.1", catalogo).map((c) => c.id)).toEqual(["4.3.1/1"]);
     expect(camposDeDato("4.2.1", catalogo)).toEqual([]);
+  });
+});
+
+describe("lo reportado por Planeación", () => {
+  it("cuenta lo reportado, aprobado y oficial de una oficina", () => {
+    const rs = [resp("4.2.1", "P", "ok", "2026-10-05T00:00:00Z"), resp("4.2.1", "A", "ok", "2026-10-01T00:00:00Z"), resp("4.3.1", "P", "draft"), resp("10.6.7", "P", "none"), resp("10.5.1", "A", "ok")];
+    expect(avanceDeUnidad("P", catalogo, rs)).toEqual({ reportados: 2, aprobados: 1, oficiales: 1 });
+    expect(avanceDeUnidad("A", catalogo, rs)).toEqual({ reportados: 2, aprobados: 2, oficiales: 1 });
+  });
+
+  it("encuentra la oficina de Planeación Institucional por su nombre", () => {
+    const us = [{ id: "1", name: "Vicerrectoría Académica" }, { id: "2", name: "Planeación  Institucional" }];
+    expect(unidadPlaneacion(us)?.id).toBe("2");
+    expect(unidadPlaneacion([{ id: "1", name: "Otra" }])).toBeUndefined();
   });
 });

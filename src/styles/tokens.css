@@ -326,6 +326,27 @@
   --ease-flap-settle: cubic-bezier(0.2, 1.6, 0.45, 1);
   --dur-image-flap: 720ms;
 
+  /* --- Intranet · muro de módulos (lanzador /admin) ------------------------
+     Un campo plano por módulo, los mismos tonos de las franjas de informe:
+     todos sostienen tinta blanca por encima de 5,4:1. Solo tema claro.      */
+  --wall-planeacion: var(--od-line-6);
+  --wall-pdi: var(--brand-navy);
+  --wall-cifras: var(--od-line-2);
+  --wall-observatorio: var(--od-line-8);
+  --wall-impacto: var(--od-line-4);
+  --wall-tableros: var(--od-line-7);
+  --wall-reportes: var(--od-line-3);
+  --wall-rankings: var(--od-line-1);
+  --wall-sistema: var(--od-line-5);
+  --wall-internacionalizacion: var(--od-line-10);
+  --wall-ink: #ffffff;
+  --wall-numeral: rgba(255, 255, 255, 0.16);
+  --wall-veil: rgba(255, 255, 255, 0.14);
+  --wall-veil-strong: rgba(255, 255, 255, 0.26);
+  --wall-rule: rgba(255, 255, 255, 0.32);
+  --wall-rule-strong: rgba(255, 255, 255, 0.6);
+  --radius-tile: 6px;
+
   /* --- Capas -------------------------------------------------------------- */
   --z-sticky: 20;
   --z-header: 50;

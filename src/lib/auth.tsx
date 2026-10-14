@@ -58,6 +58,7 @@ export const SCREEN_PATHS: Record<AdminScreen, string> = {
   correos: "/admin/correos",
   rutas: "/admin/rutas",
   rankings: "/admin/rankings",
+  internacionalizacion: "/admin/internacionalizacion",
 };
 
 export interface AuthContextValue {
@@ -87,6 +88,8 @@ export interface AuthContextValue {
   impactoSide: ImpactoSide;
   /** ¿Pertenece a alguna unidad? */
   inAnyUnit: boolean;
+  /** ¿Trabaja en Internacionalización (int_miembros, 0151)? */
+  inInternacionalizacion: boolean;
 }
 
 /**
@@ -102,7 +105,7 @@ export type ImpactoSide = "programa" | "funcion" | "ambos" | null;
  */
 export function screenVisible(
   screen: AdminScreen,
-  who: { profile: Profile | null; access: AccessScope | null; inAnyUnit: boolean; impactoSide: ImpactoSide },
+  who: { profile: Profile | null; access: AccessScope | null; inAnyUnit: boolean; impactoSide: ImpactoSide; inInternacionalizacion?: boolean },
 ): boolean {
   const { profile, access, inAnyUnit, impactoSide } = who;
   if (!profile?.is_active) return false;
@@ -117,6 +120,9 @@ export function screenVisible(
   if (screen === "rutas") return RANK[profile.role] >= RANK.planeacion;
   // Rankings (THE, UI GreenMetric y el recolector de noticias): solo por el rol, como en la base (0143).
   if (screen === "rankings") return RANK[profile.role] >= RANK.planeacion;
+  // Internacionalización: pertenecer al módulo (director, coordinador o gestor
+  // en int_miembros, 0151) ES el permiso, como en la base; la administración, siempre.
+  if (screen === "internacionalizacion") return RANK[profile.role] >= RANK.admin || Boolean(who.inInternacionalizacion);
   // Mis Tableros se gana perteneciendo a una unidad, no marcándolo aparte.
   if (screen === "tableros" && inAnyUnit) return true;
   // Impacto, solo a quien tiene algo que hacer en él: un programa o una
@@ -161,6 +167,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   /** ¿Está en alguna unidad de Mis Tableros? Pertenecer ES el permiso. */
   const [inAnyUnit, setInAnyUnit] = useState(false);
   const [impactoSide, setImpactoSide] = useState<ImpactoSide>(null);
+  const [inInternacionalizacion, setInInternacionalizacion] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -183,6 +190,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       scope: AccessScope | null,
       anyUnit: boolean,
       side: ImpactoSide,
+      internacionalizacion = false,
     ) => {
       if (mine !== ticket.current) return;
       // Releer el perfil sin cambios no debe repintar toda la intranet.
@@ -190,6 +198,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setAccess((previous) => (JSON.stringify(previous) === JSON.stringify(scope) ? previous : scope));
       setInAnyUnit(anyUnit);
       setImpactoSide(side);
+      setInInternacionalizacion(internacionalizacion);
     };
 
     if (!userId) {
@@ -248,7 +257,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         : null;
     }
 
-    publish(person, scope, rows.length > 0, side);
+    // Internacionalización: pertenecer es el permiso. Sin la migración 0151
+    // la consulta falla y queda en falso.
+    const intl = await supabase.from("int_miembros").select("id").eq("user_id", person.id).limit(1);
+    const inIntl = !intl.error && (intl.data ?? []).length > 0;
+
+    publish(person, scope, rows.length > 0, side, inIntl);
   }, []);
 
   useEffect(() => {
@@ -316,6 +330,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setAccess(null);
     setInAnyUnit(false);
     setImpactoSide(null);
+    setInInternacionalizacion(false);
     setSession(null);
   }, []);
 
@@ -334,8 +349,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // Espejo de has_screen(): la pantalla de usuarios siempre pide administración,
   // y un perfil sin rol de acceso ve lo de siempre.
   const canSee = useCallback(
-    (screen: AdminScreen) => screenVisible(screen, { profile, access, inAnyUnit, impactoSide }),
-    [profile, access, inAnyUnit, impactoSide],
+    (screen: AdminScreen) => screenVisible(screen, { profile, access, inAnyUnit, impactoSide, inInternacionalizacion }),
+    [profile, access, inAnyUnit, impactoSide, inInternacionalizacion],
   );
 
   const reachesReport = useCallback(
@@ -368,10 +383,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     () => ({
       session, profile, loading, error, signIn, signOut, requestPasswordReset, hasRole,
       access, canSee, canSeeReport: reachesReport, canEditReport, canEditPeriod, home, impactoSide, inAnyUnit,
+      inInternacionalizacion,
     }),
     [
       session, profile, loading, error, signIn, signOut, requestPasswordReset, hasRole,
       access, canSee, reachesReport, canEditReport, canEditPeriod, home, impactoSide, inAnyUnit,
+      inInternacionalizacion,
     ],
   );
 

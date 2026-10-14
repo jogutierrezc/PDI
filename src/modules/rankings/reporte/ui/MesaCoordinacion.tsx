@@ -1,8 +1,9 @@
 /* Mesa de coordinación: cada indicador con sus aportaciones de varias oficinas. Planeación aprueba, devuelve y marca la oficial. */
 
 import { Fragment, useMemo, useRef, useState } from "react";
+import { Link } from "react-router-dom";
 import type { RankingCycleRow, RankingResponseRow } from "../../../../types/database";
-import { aportesDe, asignacionDe, catalogoOrdenado, estadoIndicador, oficialMarcada, respuestaOficial } from "../resumen";
+import { aportesDe, asignacionDe, catalogoOrdenado, estadoIndicador, oficialMarcada, respuestaOficial, unidadPlaneacion } from "../resumen";
 import { ETIQUETA_ESTADO, ESTADOS, transicionPermitida } from "../estados";
 import { useAsignarIndicador, useMarcarOficial, useRevisarRespuesta } from "../datos";
 import type { UnidadRef } from "../datos";
@@ -28,6 +29,7 @@ export function MesaCoordinacion({ ciclo, indicadores, asignaciones, respuestas,
   const [abierto, setAbierto] = useState<{ id: string; modo: Modo } | null>(null);
 
   const nombre = useMemo(() => new Map(unidades.map((u) => [u.id, u.name])), [unidades]);
+  const planeacion = useMemo(() => unidadPlaneacion(unidades)?.id ?? null, [unidades]);
   const nombreDe = (id: string) => nombre.get(id) ?? "Oficina";
 
   const todas = useMemo(
@@ -184,6 +186,13 @@ export function MesaCoordinacion({ ciclo, indicadores, asignaciones, respuestas,
                         >
                           Responsable
                         </button>
+                        <Link
+                          className="rk-rep-btn is-sm is-ghost"
+                          to={`/admin/reporte-rankings?indicador=${encodeURIComponent(f.ind.id)}${planeacion ? `&oficina=${planeacion}` : ""}`}
+                          title="Diligenciar este indicador como Planeación Institucional (o cambiar la oficina en el formulario)"
+                        >
+                          Reportar
+                        </Link>
                       </div>
                     </td>
                   </tr>

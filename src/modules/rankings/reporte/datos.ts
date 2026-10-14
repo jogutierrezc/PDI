@@ -13,15 +13,22 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type { QueryClient } from "@tanstack/react-query";
 import { supabase } from "../../../lib/supabase";
 import type { RankingAporteRow, RankingAssignmentRow, RankingCycleRow, RankingEvidenceRow, RankingIndicatorRow, RankingResponseRow } from "../../../types/database";
+import type { RankingEvidenceExt } from "../../../types/database";
 import { FaltaMigracion } from "../noticias";
+import { analizarEvidencia } from "./analisis-evidencia";
 import type { CatalogoExcel } from "./catalogo-excel";
+import { caminoEstados } from "./diligenciado-excel";
+import type { PlanImportacion } from "./diligenciado-excel";
 import type { Membresia } from "./envio";
 import { transicionPermitida } from "./estados";
+
+/** Evidencia con lo de 0152: `biblioteca` y la clase «nota». */
+export type EvidenciaReporte = RankingEvidenceExt;
 import type { Chequeo, Indicador, RolActor } from "./tipos";
 
 export const RANKING_THE = "the-impact";
 export const ODS_PRIORIZADOS = [4, 5, 10, 17];
-const ANIO_EDICION = 2026;
+export const ANIO_EDICION = 2026;
 const ANIO_DATOS = 2024;
 const BUCKET = "ranking-evidencias";
 const CLAVE_RESPUESTA = "ciclo,indicador,unidad";
@@ -174,23 +181,25 @@ export function useAportesReporte(ciclo: string | undefined) {
   });
 }
 
-/** Evidencias de una respuesta (las que la persona puede ver por RLS). */
+/**
+ * Evidencias de una respuesta (las que la persona puede ver por RLS). Con «*»:
+ * si 0152 está aplicada llega también `biblioteca` (y las notas); si no, igual funciona.
+ */
 export function useEvidenciasReporte(respuesta: string | undefined) {
   return useQuery({
     queryKey: CLAVES.evidencias(respuesta ?? ""),
     enabled: Boolean(respuesta),
     retry: false,
-    queryFn: async (): Promise<RankingEvidenceRow[]> => {
-      const r = await supabase
-        .from("ranking_evidence")
-        .select("id, response_id, kind, url, storage_path, nombre, mime, tamano, publica, analisis, optimizada, created_at")
-        .eq("response_id", respuesta ?? "")
-        .order("created_at", { ascending: true });
+    queryFn: async (): Promise<EvidenciaReporte[]> => {
+      const r = await supabase.from("ranking_evidence").select("*").eq("response_id", respuesta ?? "").order("created_at", { ascending: true });
       if (r.error) throw errorDe(r.error);
-      return (r.data as RankingEvidenceRow[] | null) ?? [];
+      return ((r.data as EvidenciaReporte[] | null) ?? []).map((e) => ({ ...e, biblioteca: e.biblioteca ?? null }));
     },
   });
 }
+
+/** ¿Cuenta como evidencia para enviar y para los puntos? Las notas (0152) no. */
+export const esEvidenciaReal = (e: { kind: string }) => e.kind !== "nota";
 
 export interface UnidadRef {
   id: string;
@@ -265,9 +274,11 @@ export function useGuardarRespuesta() {
       siNo: boolean | null;
       comentarioEs: string;
       comentarioEn: string;
+      /** Planeación puede corregir una enviada o aprobada sin cambiarle el estado. */
+      actor?: RolActor | null;
     }): Promise<RankingResponseRow> => {
       const estado = p.respuesta.estado === "none" || p.respuesta.estado === "back" ? "draft" : p.respuesta.estado;
-      if (estado === "sent" || estado === "ok") throw new Error("La respuesta ya se envió: solo Planeación la puede cambiar.");
+      if ((estado === "sent" || estado === "ok") && p.actor !== "planeacion") throw new Error("La respuesta ya se envió: solo Planeación la puede cambiar.");
       const r = await supabase
         .from("ranking_responses")
         .update({ valores: p.valores, si_no: p.siNo, comentario_es: p.comentarioEs, comentario_en: p.comentarioEn, estado })
@@ -310,6 +321,28 @@ export function useRevisarRespuesta() {
         .single();
       if (r.error) throw errorDe(r.error);
       return r.data as RankingResponseRow;
+    },
+    onSuccess: (fila) => invalidarCiclo(cliente, fila.ciclo),
+  });
+}
+
+/**
+ * Planeación reporta y aprueba en un paso: recorre los estados que le permite el
+ * flujo (none → draft → sent → ok, back → draft → sent → ok). Cada paso lo vuelve
+ * a comprobar el disparador de la base.
+ */
+export function useAprobarDirecto() {
+  const cliente = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ respuesta, actor }: { respuesta: RankingResponseRow; actor: RolActor | null }): Promise<RankingResponseRow> => {
+      if (actor !== "planeacion") throw new Error("Solo Planeación aprueba.");
+      let fila = respuesta;
+      for (const a of caminoEstados(respuesta.estado, "ok")) {
+        const r = await supabase.from("ranking_responses").update({ estado: a, nota_revision: "" }).eq("id", fila.id).select("*").single();
+        if (r.error) throw errorDe(r.error);
+        fila = r.data as RankingResponseRow;
+      }
+      return fila;
     },
     onSuccess: (fila) => invalidarCiclo(cliente, fila.ciclo),
   });
@@ -390,10 +423,12 @@ export function useAgregarEnlace() {
 export function useQuitarEvidencia() {
   const cliente = useQueryClient();
   return useMutation({
-    mutationFn: async ({ evidencia }: { evidencia: RankingEvidenceRow }) => {
+    mutationFn: async ({ evidencia }: { evidencia: RankingEvidenceRow | EvidenciaReporte }) => {
       const r = await supabase.from("ranking_evidence").delete().eq("id", evidencia.id);
       if (r.error) throw errorDe(r.error);
-      if (evidencia.storage_path) await supabase.storage.from(BUCKET).remove([evidencia.storage_path]);
+      // Un archivo de la biblioteca sigue en la biblioteca: solo se quita el enlace.
+      const deBiblioteca = "biblioteca" in evidencia && evidencia.biblioteca;
+      if (evidencia.storage_path && !deBiblioteca) await supabase.storage.from(BUCKET).remove([evidencia.storage_path]);
     },
     onSuccess: (_x, v) => void cliente.invalidateQueries({ queryKey: CLAVES.evidencias(v.evidencia.response_id) }),
   });
@@ -446,10 +481,23 @@ export function useImportarCatalogo() {
       cicloExistente: RankingCycleRow | null;
       unidadesPorNombre: Map<string, string>;
       indicadoresConPrincipal: Set<string>;
+      /** Año de la edición que eligió Planeación (por defecto, el del ciclo existente o 2026). */
+      anio?: number;
+      anioDatos?: number;
     }): Promise<ResultadoImportacion> => {
-      let cicloId = p.cicloExistente?.id;
-      if (cicloId) {
-        const r = await supabase.from("ranking_cycles").update({ ods_priorizados: ODS_PRIORIZADOS }).eq("id", cicloId);
+      const anio = p.anio ?? p.cicloExistente?.anio ?? ANIO_EDICION;
+      // Otro año que el del ciclo abierto: se crea (o se usa) el ciclo de ese año.
+      let cicloId = p.cicloExistente && p.cicloExistente.anio === anio ? p.cicloExistente.id : undefined;
+      if (!cicloId && p.anio !== undefined) {
+        const r = await supabase
+          .from("ranking_cycles")
+          .upsert({ ranking: RANKING_THE, anio, anio_datos: p.anioDatos ?? anio - 2, ods_priorizados: ODS_PRIORIZADOS }, { onConflict: "ranking,anio" })
+          .select("id")
+          .single();
+        if (r.error) throw errorDe(r.error);
+        cicloId = (r.data as { id: string }).id;
+      } else if (cicloId) {
+        const r = await supabase.from("ranking_cycles").update({ ods_priorizados: ODS_PRIORIZADOS, ...(p.anioDatos ? { anio_datos: p.anioDatos } : {}) }).eq("id", cicloId);
         if (r.error) throw errorDe(r.error);
       } else {
         const r = await supabase
@@ -505,4 +553,83 @@ export function useImportarCatalogo() {
       invalidarCiclo(cliente, r.cicloId);
     },
   });
+}
+
+/* ---------- Excel diligenciado ------------------------------------------------- */
+
+export interface ResultadoDiligenciado {
+  creadas: number;
+  actualizadas: number;
+  evidencias: number;
+  errores: string[];
+}
+
+/**
+ * Aplica el plan del Excel diligenciado como la oficina `unidad` (Planeación
+ * Institucional u otra). Una respuesta por indicador: crea o actualiza, recorre
+ * los estados hasta borrador o aprobada y agrega solo las evidencias nuevas.
+ * Un indicador que falla no detiene a los demás: su error vuelve en la lista.
+ */
+export function useImportarDiligenciado() {
+  const cliente = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ ciclo, unidad, plan }: { ciclo: string; unidad: string; plan: PlanImportacion }): Promise<ResultadoDiligenciado> => {
+      const res: ResultadoDiligenciado = { creadas: 0, actualizadas: 0, evidencias: 0, errores: [] };
+      for (const a of plan.acciones) {
+        try {
+          let id = a.respuestaId;
+          const datos = { valores: a.valores, si_no: a.siNo, comentario_es: a.comentario };
+          if (!id) {
+            const r = await supabase
+              .from("ranking_responses")
+              .insert({ ciclo, indicador: a.indicador, unidad, ...datos, estado: a.pasos[a.pasos.length - 1] ?? "draft" })
+              .select("id")
+              .single();
+            if (r.error) throw errorDe(r.error);
+            id = (r.data as { id: string }).id;
+            res.creadas++;
+          } else {
+            const previa = await supabase.from("ranking_responses").select("comentario_es").eq("id", id).single();
+            const cambia = !previa.error && (previa.data as { comentario_es: string }).comentario_es !== a.comentario;
+            const r = await supabase.from("ranking_responses").update({ ...datos, ...(cambia ? { comentario_en: "" } : {}) }).eq("id", id);
+            if (r.error) throw errorDe(r.error);
+            for (const estado of a.pasos) {
+              const nota = estado === "back" ? "Reabierta por la importación del Excel de THE." : "";
+              const u = await supabase.from("ranking_responses").update({ estado, nota_revision: nota }).eq("id", id);
+              if (u.error) throw errorDe(u.error);
+            }
+            res.actualizadas++;
+          }
+          const filas = a.evidencias.map((e) =>
+            e.kind === "url"
+              ? { response_id: id, kind: "url", url: e.valor, nombre: "", publica: e.publica, analisis: analizarEvidencia({ kind: "url", url: e.valor }).chequeos, optimizada: false }
+              : { response_id: id, kind: "nota", nombre: e.valor, publica: false, analisis: [], optimizada: false },
+          );
+          if (filas.length) {
+            const ins = await supabase.from("ranking_evidence").insert(filas);
+            if (ins.error) throw errorDe(ins.error);
+            res.evidencias += filas.length;
+          }
+        } catch (e) {
+          res.errores.push(`${a.indicador}: ${e instanceof Error ? e.message : "no se pudo guardar"}`);
+        }
+      }
+      return res;
+    },
+    onSuccess: (_r, v) => {
+      invalidarCiclo(cliente, v.ciclo);
+      void cliente.invalidateQueries({ queryKey: ["reporte", "evidencias"] });
+    },
+  });
+}
+
+/** Evidencias de varias respuestas a la vez (para que la importación no repita). */
+export async function evidenciasDe(respuestas: string[]): Promise<{ response_id: string; kind: string; url: string | null; nombre: string }[]> {
+  const salida: { response_id: string; kind: string; url: string | null; nombre: string }[] = [];
+  for (let i = 0; i < respuestas.length; i += 200) {
+    const r = await supabase.from("ranking_evidence").select("response_id, kind, url, nombre").in("response_id", respuestas.slice(i, i + 200));
+    if (r.error) throw errorDe(r.error);
+    salida.push(...((r.data as typeof salida | null) ?? []));
+  }
+  return salida;
 }

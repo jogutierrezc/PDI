@@ -1,11 +1,13 @@
 /* Pantalla de la oficina: su formulario del reporte THE Impact (/admin/reporte-rankings). */
 
 import { useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import { AdminShell } from "../../../admin/components/AdminShell";
 import { useAuth } from "../../../../lib/auth";
 import { FaltaMigracion } from "../../noticias";
 import { actorDe } from "../envio";
 import { useAportesReporte, useAsignacionesReporte, useCatalogoReporte, useCicloReporte, useMembresiasPropias, useRespuestasReporte, useUnidadesReporte } from "../datos";
+import { unidadPlaneacion } from "../resumen";
 import { FormularioOficina } from "./FormularioOficina";
 import type { OficinaRef } from "./FormularioOficina";
 import { AvisoMigracion, Cargando, Vacio } from "./comunes";
@@ -23,13 +25,18 @@ export function ReporteOficina() {
   const asignaciones = useAsignacionesReporte(cicloId);
   const respuestas = useRespuestasReporte(cicloId);
   const aportes = useAportesReporte(cicloId);
-  const [elegida, setElegida] = useState<string | null>(null);
+  // ?oficina=<id>&indicador=5.6.3 abre esa ficha (la mesa de coordinación enlaza así).
+  const [params] = useSearchParams();
+  const [elegida, setElegida] = useState<string | null>(params.get("oficina"));
+  const indicadorInicial = params.get("indicador");
 
   // Planeación ve cualquier oficina; el resto, solo las suyas.
   const opciones: OficinaRef[] = planeacion
     ? (unidades.data ?? []).map((u) => ({ id: u.id, nombre: u.name }))
     : (membresias.data ?? []).map((m) => ({ id: m.unidad, nombre: m.nombre }));
-  const oficina = opciones.find((o) => o.id === elegida) ?? opciones[0] ?? null;
+  // Planeación reporta, por defecto, como «Planeación Institucional».
+  const porDefecto = planeacion ? unidadPlaneacion((unidades.data ?? []).map((u) => ({ id: u.id, name: u.name })))?.id : undefined;
+  const oficina = opciones.find((o) => o.id === elegida) ?? opciones.find((o) => o.id === porDefecto) ?? opciones[0] ?? null;
 
   const errores = [ciclo.error, catalogo.error, asignaciones.error, respuestas.error, aportes.error, unidades.error, membresias.error].filter((e): e is Error => e instanceof Error);
   const falta = errores.find((e) => e instanceof FaltaMigracion);
@@ -75,6 +82,7 @@ export function ReporteOficina() {
           asignaciones={asignaciones.data ?? []}
           respuestas={respuestas.data ?? []}
           aportes={aportes.data ?? []}
+          indicadorInicial={oficina.id === elegida || !elegida ? indicadorInicial : null}
         />
       </>
     );

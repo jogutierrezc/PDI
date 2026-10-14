@@ -158,3 +158,20 @@ function normaliza(texto: string): string {
 function porNumero(a: ItemOficina, b: ItemOficina): number {
   return a.indicador.ods - b.indicador.ods || a.indicador.id.localeCompare(b.indicador.id, "es", { numeric: true });
 }
+
+/** Lo que reportó una oficina (p. ej. Planeación Institucional): con contenido, aprobado y oficial. */
+export function avanceDeUnidad<T extends RespuestaFechada>(unidad: string, indicadores: Indicador[], respuestas: T[]): { reportados: number; aprobados: number; oficiales: number } {
+  const ids = new Set(indicadores.filter((i) => i.nivel === "indicator").map((i) => i.id));
+  const propias = respuestas.filter((r) => r.unidad === unidad && r.estado !== "none" && ids.has(r.indicador));
+  return {
+    reportados: propias.length,
+    aprobados: propias.filter((r) => r.estado === "ok").length,
+    oficiales: propias.filter((r) => r.estado === "ok" && respuestaOficial(r.indicador, respuestas)?.id === r.id).length,
+  };
+}
+
+/** La oficina de Planeación Institucional entre las unidades (por nombre, sin tildes). */
+export function unidadPlaneacion<U extends { id: string; name: string }>(unidades: U[]): U | undefined {
+  const n = (s: string) => normaliza(s).replace(/\s+/g, " ");
+  return unidades.find((u) => n(u.name) === "planeacion institucional") ?? unidades.find((u) => /planeacion/.test(n(u.name)));
+}

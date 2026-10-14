@@ -1,23 +1,27 @@
 /* Espacio de trabajo de Planeación en THE Impact: una franja de resumen y tres vistas. */
 
-import { useRef, useState } from "react";
+import { Suspense, lazy, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { FaltaMigracion } from "../../noticias";
 import { useAsignacionesReporte, useCatalogoReporte, useCicloReporte, useRespuestasReporte, useUnidadesReporte } from "../datos";
 import type { RankingResponseRow } from "../../../../types/database";
-import { resumenPorOds } from "../resumen";
+import { avanceDeUnidad, resumenPorOds, unidadPlaneacion } from "../resumen";
 import type { Indicador } from "../tipos";
 import { ImportarCatalogo } from "./ImportarCatalogo";
+import { ImportarDiligenciado } from "./ImportarDiligenciado";
 import { MesaCoordinacion } from "./MesaCoordinacion";
 import { ResumenOds } from "./ResumenOds";
 import { AvisoMigracion, Barra, Cargando, Vacio, fmtNumero } from "./comunes";
 import { useContador, useCrecer, useEntrada, useIndicador } from "../../movimiento";
 import "../reporte.css";
 
-type Vista = "resumen" | "mesa" | "importar";
+// La biblioteca (ZIP, lectores de texto, pdf.js bajo demanda) se carga solo al abrirla.
+const Biblioteca = lazy(() => import("../../biblioteca/ui/Biblioteca").then((m) => ({ default: m.Biblioteca })));
+
+type Vista = "resumen" | "mesa" | "biblioteca" | "importar";
 type Densidad = "normal" | "compacta";
 
-const VISTAS: readonly Vista[] = ["resumen", "mesa", "importar"];
+const VISTAS: readonly Vista[] = ["resumen", "mesa", "biblioteca", "importar"];
 const DENSIDADES: readonly Densidad[] = ["normal", "compacta"];
 const CLAVE_VISTA = "rk-rep-vista";
 const CLAVE_DENSIDAD = "rk-rep-densidad";
@@ -82,7 +86,13 @@ export function ReportePlaneacion() {
 
   return (
     <div className="rk-rep rk-ws" data-densidad={densidad}>
-      <Franja ciclo={c} indicadores={catalogo.data} respuestas={respuestas.data} cargando={Boolean(c) && !listo} />
+      <Franja
+        ciclo={c}
+        indicadores={catalogo.data}
+        respuestas={respuestas.data}
+        planeacion={unidadPlaneacion(unidades.data ?? [])?.id ?? null}
+        cargando={Boolean(c) && !listo}
+      />
 
       <div className="rk-ws-barra">
         <div className="rk-seg" role="group" aria-label="Vista del reporte" ref={segVista}>
@@ -92,6 +102,9 @@ export function ReportePlaneacion() {
           </button>
           <button type="button" aria-pressed={vista === "mesa"} onClick={() => setVista("mesa")}>
             Mesa de coordinación
+          </button>
+          <button type="button" aria-pressed={vista === "biblioteca"} onClick={() => setVista("biblioteca")}>
+            Biblioteca
           </button>
           <button type="button" aria-pressed={vista === "importar"} onClick={() => setVista("importar")}>
             Importar Excel
@@ -154,7 +167,18 @@ export function ReportePlaneacion() {
           </>
         )}
 
-        {vista === "importar" && <ImportarCatalogo ciclo={c} />}
+        {vista === "biblioteca" && (
+          <Suspense fallback={<Cargando texto="Abriendo la biblioteca…" />}>
+            <Biblioteca ciclo={c} indicadores={catalogo.data ?? []} unidades={unidades.data ?? []} />
+          </Suspense>
+        )}
+
+        {vista === "importar" && (
+          <div className="rk-rep-stack">
+            <ImportarCatalogo ciclo={c} />
+            <ImportarDiligenciado ciclo={c} indicadores={catalogo.data ?? []} respuestas={respuestas.data ?? []} unidades={unidades.data ?? []} />
+          </div>
+        )}
       </div>
     </div>
   );
@@ -164,11 +188,13 @@ interface FranjaProps {
   ciclo: { anio: number; anio_datos: number; ods_priorizados: number[]; fecha_limite: string | null } | null;
   indicadores: Indicador[] | undefined;
   respuestas: RankingResponseRow[] | undefined;
+  /** Oficina «Planeación Institucional», para contar lo que reporta ella misma. */
+  planeacion: string | null;
   cargando: boolean;
 }
 
 /** Franja de resumen: ciclo, avance general con contador, priorizados y accesos a lo que se trabaja fuera de esta página. */
-function Franja({ ciclo, indicadores, respuestas, cargando }: FranjaProps) {
+function Franja({ ciclo, indicadores, respuestas, planeacion, cargando }: FranjaProps) {
   const porOds = indicadores && respuestas ? resumenPorOds(indicadores, respuestas) : [];
   const total = porOds.reduce((s, f) => s + f.total, 0);
   const aprobados = porOds.reduce((s, f) => s + f.ok, 0);
@@ -177,6 +203,7 @@ function Franja({ ciclo, indicadores, respuestas, cargando }: FranjaProps) {
   const totalPri = porOds.filter((f) => priorizados.includes(f.ods)).reduce((s, f) => s + f.total, 0);
   const okPri = porOds.filter((f) => priorizados.includes(f.ods)).reduce((s, f) => s + f.ok, 0);
   const avance = total ? aprobados / total : 0;
+  const propio = planeacion && indicadores && respuestas ? avanceDeUnidad(planeacion, indicadores, respuestas) : null;
   const cierre = ciclo?.fecha_limite ? new Date(`${ciclo.fecha_limite}T00:00:00`).toLocaleDateString("es-CO", { day: "numeric", month: "short" }) : null;
   const ref = useRef<HTMLElement>(null);
   const pct = useRef<HTMLElement>(null);
@@ -214,6 +241,12 @@ function Franja({ ciclo, indicadores, respuestas, cargando }: FranjaProps) {
         <span>Por revisar</span>
         <b className="rk-rep-num">{ciclo ? fmtNumero(enviados, 0) : "—"}</b>
         <small>enviados por las oficinas</small>
+      </div>
+
+      <div className="rk-ws-dato">
+        <span>Reportado por Planeación</span>
+        <b className="rk-rep-num">{propio ? fmtNumero(propio.reportados, 0) : "—"}</b>
+        <small>{propio ? `${fmtNumero(propio.aprobados, 0)} aprobados · ${fmtNumero(propio.oficiales, 0)} oficiales` : "sin oficina de Planeación"}</small>
       </div>
 
       <div className="rk-ws-dato">

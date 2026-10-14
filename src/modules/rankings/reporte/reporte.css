@@ -1758,3 +1758,15 @@
     white-space: normal;
   }
 }
+
+/* Ficha · «Agregar de la biblioteca» (0152, solo Planeación). */
+.rk-rep-delabib > summary {
+  width: fit-content;
+  cursor: pointer;
+  color: var(--brand-blue-strong);
+  font-weight: 700;
+}
+
+.rk-rep-delabib[open] > summary {
+  margin-bottom: var(--space-2);
+}

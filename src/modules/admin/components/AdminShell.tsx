@@ -51,7 +51,8 @@ export type AdminSection =
   | "reportes"
   | "correos"
   | "rutas"
-  | "rankings";
+  | "rankings"
+  | "internacionalizacion";
 
 export interface NavItem {
   id: AdminSection;
@@ -63,7 +64,7 @@ export interface NavItem {
 }
 
 export interface NavGroup {
-  id: "planeacion" | "pdi" | "cifras" | "observatorio" | "impacto" | "tableros" | "reportes" | "rankings" | "sistema";
+  id: "planeacion" | "pdi" | "cifras" | "observatorio" | "impacto" | "tableros" | "reportes" | "internacionalizacion" | "rankings" | "sistema";
   label: string;
   /** Ícono y nombre corto: el riel solo tiene 78 px, ahí no cabe el rótulo largo. */
   icon: IconName;
@@ -157,6 +158,18 @@ export const navigation: NavGroup[] = [
     label: "Reportes Institucionales",
     items: [
       { id: "reportes", label: "SNIES y CNA", icon: "table", to: "/admin/reportes-institucionales", minimum: "consulta" },
+    ],
+  },
+  {
+    // El repositorio de la Oficina de Internacionalización: movilidad,
+    // convenios y visitantes por campus, que responden a SNIES, CNA y rankings.
+    // Lo ve quien está en el módulo (int_miembros) y la administración.
+    id: "internacionalizacion",
+    icon: "compass",
+    short: "Internac.",
+    label: "Internacionalización",
+    items: [
+      { id: "internacionalizacion", label: "Repositorio de datos", icon: "compass", to: "/admin/internacionalizacion", minimum: "consulta" },
     ],
   },
   {

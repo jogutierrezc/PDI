@@ -3,8 +3,9 @@
 import { useMemo, useRef, useState } from "react";
 import type { RankingCycleRow } from "../../../../types/database";
 import { indicadoresPorOds, leerCatalogo } from "../catalogo-excel";
+import { aniosDelArchivo } from "../diligenciado-excel";
 import type { CatalogoExcel } from "../catalogo-excel";
-import { ODS_PRIORIZADOS, claveNombre, useAsignacionesReporte, useImportarCatalogo, useUnidadesReporte } from "../datos";
+import { ANIO_EDICION, ODS_PRIORIZADOS, claveNombre, useAsignacionesReporte, useImportarCatalogo, useUnidadesReporte } from "../datos";
 import { odsNombre, odsVars } from "../../ods";
 import { useEntrada } from "../../movimiento";
 import { fmtNumero } from "./comunes";
@@ -21,7 +22,9 @@ export function ImportarCatalogo({ ciclo }: Props) {
   const importar = useImportarCatalogo();
   const [leyendo, setLeyendo] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [vista, setVista] = useState<{ nombre: string; catalogo: CatalogoExcel } | null>(null);
+  const [vista, setVista] = useState<{ nombre: string; catalogo: CatalogoExcel; anioArchivo: number | null; anioDatosArchivo: number | null } | null>(null);
+  const [anio, setAnio] = useState("");
+  const [anioDatos, setAnioDatos] = useState("");
   const [listo, setListo] = useState<string | null>(null);
   const previa = useRef<HTMLDivElement>(null);
   useEntrada(previa, ".rk-rep-vista > *", vista?.nombre ?? null);
@@ -43,7 +46,11 @@ export function ImportarCatalogo({ ciclo }: Props) {
       await libro.xlsx.load(await archivo.arrayBuffer());
       const catalogo = leerCatalogo(libro);
       if (catalogo.ods.length === 0) throw new Error("No se encontraron hojas SDG1 a SDG17 en el archivo.");
-      setVista({ nombre: archivo.name, catalogo });
+      const anios = aniosDelArchivo(libro, archivo.name);
+      const edicion = ciclo?.anio ?? anios.anioArchivo ?? ANIO_EDICION;
+      setAnio(String(edicion));
+      setAnioDatos(String(ciclo && ciclo.anio === edicion ? ciclo.anio_datos : (anios.anioDatos ?? edicion - 2)));
+      setVista({ nombre: archivo.name, catalogo, anioArchivo: anios.anioArchivo, anioDatosArchivo: anios.anioDatos });
     } catch (e) {
       setVista(null);
       setError(`No se pudo leer el archivo: ${e instanceof Error ? e.message : "formato no reconocido"}.`);
@@ -56,6 +63,12 @@ export function ImportarCatalogo({ ciclo }: Props) {
     if (!vista) return;
     setError(null);
     const nombres = new Map((unidades.data ?? []).map((u) => [claveNombre(u.name), u.id]));
+    const nAnio = Number(anio);
+    const nDatos = Number(anioDatos);
+    if (!Number.isInteger(nAnio) || nAnio < 2020 || nAnio > 2100 || !Number.isInteger(nDatos) || nDatos < 2015 || nDatos > nAnio) {
+      setError("Revise los años: la edición es un año como 2027 y el de los datos no puede ser posterior.");
+      return;
+    }
     const conPrincipal = new Set((asignaciones.data ?? []).filter((a) => a.rol === "principal").map((a) => a.indicador));
     try {
       const r = await importar.mutateAsync({
@@ -63,6 +76,8 @@ export function ImportarCatalogo({ ciclo }: Props) {
         cicloExistente: ciclo,
         unidadesPorNombre: nombres,
         indicadoresConPrincipal: conPrincipal,
+        anio: nAnio,
+        anioDatos: nDatos,
       });
       setListo(`Catálogo guardado: ${fmtNumero(r.indicadores, 0)} filas y ${fmtNumero(r.asignaciones, 0)} asignaciones nuevas. Los ODS 4, 5, 10 y 17 quedan priorizados.`);
       setVista(null);
@@ -151,6 +166,21 @@ export function ImportarCatalogo({ ciclo }: Props) {
               </li>
             ))}
           </ul>
+          <div className="rk-rep-grid-2">
+            <label className="rk-rep-field">
+              <span className="rk-rep-lbl">Edición del ranking (ciclo)</span>
+              <input className="rk-rep-input" type="number" inputMode="numeric" min={2020} max={2100} value={anio} onChange={(e) => setAnio(e.target.value)} />
+              <span className="rk-rep-small rk-rep-muted">
+                {vista.anioArchivo ? `El archivo dice ${vista.anioArchivo}.` : "El archivo no dice la edición."}
+                {ciclo ? ` El ciclo abierto es ${ciclo.anio}; otro año crea (o usa) el ciclo de ese año; el reporte trabaja siempre con el más reciente.` : ""}
+              </span>
+            </label>
+            <label className="rk-rep-field">
+              <span className="rk-rep-lbl">Año de los datos</span>
+              <input className="rk-rep-input" type="number" inputMode="numeric" min={2015} max={2100} value={anioDatos} onChange={(e) => setAnioDatos(e.target.value)} />
+              <span className="rk-rep-small rk-rep-muted">{vista.anioDatosArchivo ? `El archivo pide datos de ${vista.anioDatosArchivo}.` : "THE suele pedir datos de dos años antes."}</span>
+            </label>
+          </div>
           <p className="rk-rep-small">
             {sinOficina > 0 ? (
               <>

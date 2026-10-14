@@ -183,8 +183,8 @@ export const TOURS: Tour[] = [
       {
         route: "/admin",
         target: "[data-tour='launcher-modules']",
-        title: "Todo, agrupado como el menú",
-        body: "Cada persona ve solo sus módulos: lo que usted habilite en Usuarios y roles, y en Impacto, según su unidad.",
+        title: "Un cartel por módulo",
+        body: "Los que tienen varias pantallas se abren como portal. Cada persona ve solo sus módulos: lo que usted habilite en Usuarios y roles, y en Impacto, según su unidad.",
         mood: "bien",
       },
       {

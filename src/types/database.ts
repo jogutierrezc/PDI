@@ -59,7 +59,8 @@ export type AdminScreen =
   | "reportes"
   | "correos"
   | "rutas"
-  | "rankings";
+  | "rankings"
+  | "internacionalizacion";
 
 /** Un rol de acceso: qué puede hacer, qué pantallas ve y sobre qué informes escribe. */
 export interface AccessRole {
@@ -1662,3 +1663,227 @@ export interface RankingEvidenceRow {
   optimizada: boolean;
   created_at: string;
 }
+
+/* --- Internacionalización (migración 0151) ----------------------------------------- */
+
+/** Papel en el módulo de Internacionalización. */
+export type IntRol = "director" | "coordinador" | "gestor";
+/** Tipo de una columna o de un concepto. */
+export type IntTipo = "texto" | "numero" | "fecha" | "lista" | "calculado";
+/** Estado de (hoja, periodo, campus). Sin fila en int_envios = borrador. */
+export type IntEstado = "borrador" | "enviado" | "validado" | "aprobado";
+
+/** Quién trabaja en el módulo (`int_miembros`). El director no lleva campus. */
+export interface IntMiembroRow {
+  id: string;
+  user_id: string;
+  rol: IntRol;
+  campus_id: string | null;
+  created_at: string;
+}
+
+/** Un concepto del catálogo compartido (`int_conceptos`). */
+export interface IntConceptoRow {
+  id: string;
+  nombre: string;
+  tipo: IntTipo;
+  opciones: string[];
+  sinonimos: string[];
+  descripcion: string;
+  /** periodo y campus: van en la fila, no en una columna. */
+  implicito: boolean;
+  /** Dato personal: la pantalla lo enmascara. */
+  personal: boolean;
+  orden: number;
+}
+
+/** Un libro de tablas (`int_libros`). captura «oficina»: solo el Director escribe filas. */
+export interface IntLibroRow {
+  id: string;
+  nombre: string;
+  descripcion: string;
+  captura: "campus" | "oficina";
+  orden: number;
+  created_at: string;
+}
+
+/** Una hoja de un libro (`int_hojas`). clase y sentido alimentan las cifras. */
+export interface IntHojaRow {
+  id: string;
+  libro_id: string;
+  nombre: string;
+  clase: "movilidad" | "convenio" | "general";
+  sentido: "saliente" | "entrante" | null;
+  orden: number;
+}
+
+/** Cálculo de una columna calculada. */
+export interface IntCalculo {
+  tipo: "dias_entre";
+  desde: string;
+  hasta: string;
+}
+
+/** Una columna (`int_columnas`). Con concepto, clave = concepto_id; sin él, «propio_…». */
+export interface IntColumnaRow {
+  id: string;
+  hoja_id: string;
+  clave: string;
+  etiqueta: string;
+  tipo: IntTipo;
+  concepto_id: string | null;
+  obligatorio: boolean;
+  opciones: string[];
+  calculo: IntCalculo | null;
+  orden: number;
+}
+
+export interface IntPeriodoRow {
+  id: string;
+  /** «2026-2». */
+  codigo: string;
+  nombre: string;
+  abre: string | null;
+  cierra: string | null;
+  estado: "abierto" | "cerrado";
+}
+
+/** Ventana de captura de una hoja en un periodo; campus_id nulo = todos. */
+export interface IntVentanaRow {
+  id: string;
+  periodo_id: string;
+  hoja_id: string;
+  campus_id: string | null;
+  abre: string;
+  cierra: string;
+}
+
+/** Valor guardado en una celda: texto, número, fecha «AAAA-MM-DD» o nulo. */
+export type IntValor = string | number | null;
+
+export interface IntFilaRow {
+  id: string;
+  hoja_id: string;
+  periodo_id: string;
+  campus_id: string;
+  datos: Record<string, IntValor>;
+  orden: number;
+  origen: "manual" | "excel";
+  created_by: string | null;
+  updated_by: string | null;
+  updated_at: string;
+}
+
+export interface IntEnvioRow {
+  periodo_id: string;
+  hoja_id: string;
+  campus_id: string;
+  estado: IntEstado;
+  nota: string;
+  enviado_en: string | null;
+  validado_en: string | null;
+  aprobado_en: string | null;
+  updated_by: string | null;
+  updated_at: string;
+}
+
+export interface IntEnvioHistorialRow {
+  id: number;
+  periodo_id: string;
+  hoja_id: string;
+  campus_id: string;
+  de: IntEstado;
+  a: IntEstado;
+  nota: string;
+  actor: string | null;
+  actor_rol: IntRol | null;
+  en: string;
+}
+
+export interface IntReaperturaRow {
+  id: number;
+  tipo: "envio" | "ventana" | "periodo";
+  periodo_id: string;
+  hoja_id: string | null;
+  campus_id: string | null;
+  motivo: string;
+  detalle: Record<string, unknown>;
+  actor: string | null;
+  en: string;
+}
+
+/** Plantilla CNA / ranking / otra que carga el Director (`int_plantillas`). */
+export interface IntPlantillaRow {
+  id: string;
+  nombre: string;
+  tipo: "cna" | "ranking" | "otra";
+  descripcion: string;
+  created_at: string;
+}
+
+export interface IntPlantillaColumnaRow {
+  id: string;
+  plantilla_id: string;
+  orden: number;
+  etiqueta: string;
+  concepto_id: string | null;
+  modo: "directo" | "derivado" | "falta";
+  nota: string;
+}
+
+/** Un envío del puente a Reportes Institucionales (`int_envios_snies`). */
+export interface IntEnvioSniesRow {
+  id: string;
+  periodo_id: string;
+  plantilla: string;
+  ri_periodo: string;
+  entrega_id: string | null;
+  insertadas: number;
+  omitidas: number;
+  actor: string | null;
+  en: string;
+}
+
+/* --- Biblioteca de evidencias del ranking THE (migración 0152) ---------------------- */
+
+/** Una propuesta de Pilo para un archivo de la biblioteca. */
+export interface RankingPropuestaBiblioteca {
+  indicador: string;
+  ods: number;
+  puntaje: number;
+  razones: string[];
+}
+
+/** Un archivo de la biblioteca (`ranking_biblioteca`). */
+export interface RankingBibliotecaRow {
+  id: string;
+  ciclo: string | null;
+  zip_nombre: string;
+  ruta_zip: string;
+  nombre: string;
+  carpeta: string;
+  ext: string;
+  tamano: number;
+  mime: string | null;
+  sha256: string;
+  storage_path: string;
+  anio_detectado: number | null;
+  texto: string;
+  estado_texto: "ok" | "sin_texto" | "no_aplica" | "error";
+  nota_texto: string | null;
+  ods_propuestos: number[];
+  propuestas: RankingPropuestaBiblioteca[];
+  estado: "sin_clasificar" | "propuesta" | "aceptada" | "descartada";
+  indicador_aceptado: string | null;
+  respuesta_aceptada: string | null;
+  evidencia: string | null;
+  subido_por: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+/** Evidencia con lo que agrega 0152: la clase «nota» y el archivo de la biblioteca. */
+export type RankingEvidenceExt = Omit<RankingEvidenceRow, "kind"> & {
+  kind: "file" | "url" | "nota";
+  biblioteca: string | null;
+};

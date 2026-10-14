@@ -35,7 +35,14 @@ vi.mock("./datos", async (orig) => {
     useQuitarEvidencia: datos.sinEfecto,
     useAsignarIndicador: datos.sinEfecto,
     useImportarCatalogo: datos.sinEfecto,
+    useImportarDiligenciado: datos.sinEfecto,
+    useAprobarDirecto: datos.sinEfecto,
   };
+});
+
+vi.mock("../biblioteca/datos", async (orig) => {
+  const real = await orig<typeof import("../biblioteca/datos")>();
+  return { ...real, useBiblioteca: () => ({ data: [], error: null, isPending: false }), useAceptarArchivos: datos.sinEfecto };
 });
 
 import { ResumenOds } from "./ui/ResumenOds";
@@ -234,7 +241,7 @@ describe("FormularioOficina · comentario largo", () => {
 describe("MesaCoordinacion", () => {
   it("lista los indicadores con su oficina, el estado y la acción de revisar", () => {
     const html = renderToString(
-      h(MesaCoordinacion, {
+      h(MemoryRouter, null, h(MesaCoordinacion, {
         ciclo,
         indicadores: catalogo,
         asignaciones,
@@ -244,7 +251,7 @@ describe("MesaCoordinacion", () => {
           { id: "U-PLAN", name: "Planeación Institucional", kind: "oficina", code: null },
         ],
         odsInicial: null,
-      }),
+      })),
     );
     expect(html).toContain("Responsable sugerido");
     expect(html).toContain("EDUCON");
@@ -259,25 +266,25 @@ describe("MesaCoordinacion", () => {
       { id: "U-OTRA", name: "Talento Humano", kind: "oficina", code: null },
     ];
     const conMarca = renderToString(
-      h(MesaCoordinacion, {
+      h(MemoryRouter, null, h(MesaCoordinacion, {
         ciclo,
         indicadores: catalogo,
         asignaciones,
         respuestas: [resp({ estado: "ok", oficial: true, updated_at: "2026-09-01T00:00:00Z" }), resp({ id: "r9", unidad: "U-OTRA", estado: "ok", updated_at: "2026-10-05T00:00:00Z" })],
         unidades,
         odsInicial: 4,
-      }),
+      })),
     );
     expect(conMarca).toContain(">marcada<");
     const sinMarca = renderToString(
-      h(MesaCoordinacion, {
+      h(MemoryRouter, null, h(MesaCoordinacion, {
         ciclo,
         indicadores: catalogo,
         asignaciones,
         respuestas: [resp({ estado: "ok", updated_at: "2026-09-01T00:00:00Z" }), resp({ id: "r9", unidad: "U-OTRA", estado: "ok", updated_at: "2026-10-05T00:00:00Z" })],
         unidades,
         odsInicial: 4,
-      }),
+      })),
     );
     expect(sinMarca).toContain(">la más reciente<");
     expect(sinMarca).toContain("Talento Humano");
@@ -300,5 +307,38 @@ describe("ReportePlaneacion sin la migración", () => {
     const html = renderToString(h(MemoryRouter, null, h(ReportePlaneacion)));
     expect(html).toContain("Aún no hay ciclo de THE Impact");
     expect(html).toContain("Importar Excel");
+  });
+});
+
+describe("FormularioOficina · Planeación reporta", () => {
+  it("Planeación corrige una aprobada, ve «Guardar y aprobar» en lo abierto y puede agregar de la biblioteca", () => {
+    const aprobada = renderToString(
+      h(FormularioOficina, {
+        ciclo,
+        oficina: { id: "U-PLAN", nombre: "Planeación Institucional" },
+        actor: "planeacion",
+        indicadores: catalogo,
+        asignaciones,
+        respuestas: [resp({ unidad: "U-PLAN", estado: "ok" })],
+        indicadorInicial: "4.3.1",
+      }),
+    );
+    expect(aprobada).toContain("Como Planeación, puede corregirla");
+    expect(aprobada).not.toContain("Guardar y aprobar");
+    const borrador = renderToString(
+      h(FormularioOficina, {
+        ciclo,
+        oficina: { id: "U-PLAN", nombre: "Planeación Institucional" },
+        actor: "planeacion",
+        indicadores: catalogo,
+        asignaciones,
+        respuestas: [resp({ unidad: "U-PLAN", estado: "draft", indicador: "5.6.3" })],
+        indicadorInicial: "5.6.3",
+      }),
+    );
+    expect(borrador).toContain("Guardar y aprobar");
+    expect(borrador).toContain("Qué falta para aprobar");
+    expect(borrador).toContain("Política de maternidad");
+    expect(borrador).toContain("Agregar de la biblioteca");
   });
 });

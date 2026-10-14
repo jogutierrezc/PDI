@@ -2,7 +2,7 @@
 
 import { useEffect, useId, useMemo, useRef, useState } from "react";
 import type { DragEvent, ChangeEvent } from "react";
-import type { RankingCycleRow, RankingEvidenceRow, RankingResponseRow } from "../../../../types/database";
+import type { RankingCycleRow, RankingResponseRow } from "../../../../types/database";
 import { camposDeDato, catalogoOrdenado, coincide, conteoAportes, indicadoresDeUnidad, otrosAportes, respuestaDe } from "../resumen";
 import { analizarEvidencia, FORMATOS_EVIDENCIA } from "../analisis-evidencia";
 import type { ResultadoAnalisis } from "../analisis-evidencia";
@@ -13,6 +13,8 @@ import type { DatosEnvio } from "../envio";
 import { bloqueadaParaOficina, ETIQUETA_ESTADO, puedeEditar, transicionPermitida } from "../estados";
 import { traducir, TraduccionNoDisponible } from "../traducir";
 import {
+  esEvidenciaReal,
+  useAprobarDirecto,
   useAgregarEnlace,
   useAsegurarRespuesta,
   useEnviarRespuesta,
@@ -21,6 +23,8 @@ import {
   useQuitarEvidencia,
   useSubirEvidencia,
 } from "../datos";
+import type { EvidenciaReporte } from "../datos";
+import { DeLaBiblioteca } from "./DeLaBiblioteca";
 import type { AporteRef, Asignacion, Chequeo, Indicador, RolActor, RolAsignacion, TipoIndicador } from "../tipos";
 import { Chequeos, EstadoPill, Cargando, OdsChip, fmtNumero } from "./comunes";
 import { useCrecer, useEntrada, useIndicador, usePliegue } from "../../movimiento";
@@ -39,6 +43,8 @@ interface Props {
   respuestas: RankingResponseRow[];
   /** Quién aportó a cada indicador, de cualquier oficina, sin contenido (RPC ranking_aportes, 0150). */
   aportes?: AporteRef[];
+  /** Indicador que se abre primero (p. ej. desde la mesa de coordinación). */
+  indicadorInicial?: string | null;
 }
 
 const ETIQUETA_TIPO: Record<TipoIndicador, string> = { ev: "Evidencia", doc: "Documento", dato: "Dato", inv: "Investigación" };
@@ -51,15 +57,16 @@ type Lista = "sugeridos" | "todos";
  * los 17 ODS (los priorizados al frente). Cualquier indicador se puede responder: la
  * asignación solo sugiere.
  */
-export function FormularioOficina({ ciclo, oficina, actor, indicadores, asignaciones, respuestas, aportes = [] }: Props) {
+export function FormularioOficina({ ciclo, oficina, actor, indicadores, asignaciones, respuestas, aportes = [], indicadorInicial = null }: Props) {
   const sugeridos = useMemo(() => indicadoresDeUnidad(oficina.id, indicadores, asignaciones), [oficina.id, indicadores, asignaciones]);
   const catalogo = useMemo(() => catalogoOrdenado(indicadores, ciclo.ods_priorizados), [indicadores, ciclo.ods_priorizados]);
   const rolDe = useMemo(() => new Map(sugeridos.map((s) => [s.indicador.id, s.rol])), [sugeridos]);
   const conteo = useMemo(() => conteoAportes(aportes, oficina.id), [aportes, oficina.id]);
-  const [lista, setLista] = useState<Lista>(sugeridos.length > 0 ? "sugeridos" : "todos");
+  const inicialEnSugeridos = !indicadorInicial || sugeridos.some((x) => x.indicador.id === indicadorInicial);
+  const [lista, setLista] = useState<Lista>(sugeridos.length > 0 && inicialEnSugeridos ? "sugeridos" : "todos");
   const [busqueda, setBusqueda] = useState("");
   const [plegada, setPlegada] = useState(false);
-  const [sel, setSel] = useState<string | null>(null);
+  const [sel, setSel] = useState<string | null>(indicadorInicial);
   const asegurar = useAsegurarRespuesta();
   const dos = useRef<HTMLDivElement>(null);
   const seg = useRef<HTMLDivElement>(null);
@@ -279,17 +286,22 @@ function FichaIndicador({ ciclo, oficina, actor, indicador, rol, campos, respues
   const quitar = useQuitarEvidencia();
   const guardar = useGuardarRespuesta();
   const enviar = useEnviarRespuesta();
-  const evs: RankingEvidenceRow[] = useMemo(() => {
-    const todas = evidencias.data ?? [];
+  const aprobar = useAprobarDirecto();
+  const evs: EvidenciaReporte[] = useMemo(() => {
+    const todas = (evidencias.data ?? []).filter(esEvidenciaReal);
     // La pública primero, luego el orden de llegada.
     return [...todas].sort((a, b) => Number(b.publica) - Number(a.publica));
   }, [evidencias.data]);
+  // Notas que trajo el Excel de THE: recuerdan lo que falta, no cuentan como evidencia.
+  const notas = useMemo(() => (evidencias.data ?? []).filter((e) => !esEvidenciaReal(e)), [evidencias.data]);
+  const esPlaneacion = actor === "planeacion";
 
   const medidor = useRef<HTMLUListElement>(null);
   useEntrada(ficha, ".rk-rep-anim", indicador.id);
   useEntrada(listaEv, ".rk-rep-ev", evs.length);
 
-  const editable = puedeEditar(respuesta.estado, actor) && !bloqueadaParaOficina(respuesta.estado);
+  // Planeación corrige también lo enviado o aprobado; la oficina, solo lo abierto.
+  const editable = esPlaneacion || (puedeEditar(respuesta.estado, actor) && !bloqueadaParaOficina(respuesta.estado));
   const otras = evs.map((e) => ({ nombre: e.nombre, url: e.url ?? undefined }));
   const numeros = Object.fromEntries(camposDato.map((c) => {
     const v = aNumero(cifras[c.id] ?? "");
@@ -313,6 +325,8 @@ function FichaIndicador({ ciclo, oficina, actor, indicador, rol, campos, respues
     actor,
   };
   const motivos = motivosNoEnviar(datos);
+  // Lo que le falta para que Planeación la apruebe directamente (las mismas reglas que enviar).
+  const motivosAprobar = esPlaneacion && respuesta.estado !== "ok" ? motivosNoEnviar({ ...datos, estado: "draft" }) : [];
 
   const estimacion = !esDato && !esInv
     ? estimarPuntos({
@@ -337,6 +351,7 @@ function FichaIndicador({ ciclo, oficina, actor, indicador, rol, campos, respues
       siNo: esDato || esInv ? null : siNo,
       comentarioEs: normalizarComentario(comentario),
       comentarioEn: en,
+      actor,
     });
     setGuardadoA(new Date().toLocaleTimeString("es-CO", { hour: "2-digit", minute: "2-digit" }));
     return fila;
@@ -364,6 +379,18 @@ function FichaIndicador({ ciclo, oficina, actor, indicador, rol, campos, respues
       setAviso({ tipo: "ok", texto: "Enviada a Planeación. Puede seguir con el siguiente indicador; Planeación la revisa aquí mismo." });
     } catch (e) {
       setAviso({ tipo: "risk", texto: e instanceof Error ? e.message : "No se pudo enviar la respuesta." });
+    }
+  }
+
+  async function aprobarDirecto() {
+    setAviso(null);
+    if (motivosAprobar.length > 0) return setAviso({ tipo: "risk", texto: `Antes de aprobar: ${motivosAprobar.join(" ")}` });
+    try {
+      const fila = await persistir();
+      await aprobar.mutateAsync({ respuesta: fila, actor });
+      setAviso({ tipo: "ok", texto: `Aprobada a nombre de ${oficina.nombre}. Cuenta en el avance; márquela como oficial en la mesa si hay otras aprobadas.` });
+    } catch (e) {
+      setAviso({ tipo: "risk", texto: e instanceof Error ? e.message : "No se pudo aprobar." });
     }
   }
 
@@ -475,12 +502,12 @@ function FichaIndicador({ ciclo, oficina, actor, indicador, rol, campos, respues
       )}
       {respuesta.estado === "sent" && (
         <p className="rk-rep-note is-info rk-rep-anim" role="status">
-          Enviada a Planeación. Solo Planeación puede cambiarla ahora.
+          {esPlaneacion ? "Enviada a Planeación. Como Planeación, puede corregirla y aprobarla aquí mismo." : "Enviada a Planeación. Solo Planeación puede cambiarla ahora."}
         </p>
       )}
       {respuesta.estado === "ok" && (
         <p className="rk-rep-note is-ok rk-rep-anim" role="status">
-          Aprobada por Planeación.
+          {esPlaneacion ? "Aprobada. Como Planeación, puede corregirla: los cambios se guardan sin cambiarle el estado." : "Aprobada por Planeación."}
         </p>
       )}
 
@@ -621,6 +648,16 @@ function FichaIndicador({ ciclo, oficina, actor, indicador, rol, campos, respues
               </p>
             )}
 
+            {esPlaneacion && editable && (
+              <DeLaBiblioteca
+                ciclo={ciclo.id}
+                indicador={indicador.id}
+                unidad={oficina.id}
+                yaLigados={(evidencias.data ?? []).map((e) => e.biblioteca).filter((x): x is string => Boolean(x))}
+                onLigado={() => void tocarBorrador()}
+              />
+            )}
+
             {subiendo > 0 && (
               <p className="rk-rep-small rk-rep-muted" role="status">
                 <span className="rk-rep-spin" aria-hidden="true" /> Subiendo {subiendo} {subiendo === 1 ? "archivo" : "archivos"}…
@@ -643,6 +680,26 @@ function FichaIndicador({ ciclo, oficina, actor, indicador, rol, campos, respues
               </div>
             ))}
 
+            {notas.length > 0 && (
+              <ul className="rk-rep-lista-ev" aria-label="Notas del Excel de THE">
+                {notas.map((n) => (
+                  <li className="rk-rep-ev" key={n.id}>
+                    <div className="rk-rep-ev-cuerpo">
+                      <div className="rk-rep-row">
+                        <span className="rk-rep-pill is-warn">Nota del Excel · no cuenta como evidencia</span>
+                      </div>
+                      <p className="rk-rep-small rk-rep-wrap">{n.nombre}</p>
+                    </div>
+                    {editable && (
+                      <button type="button" className="rk-rep-btn is-sm" disabled={quitar.isPending} aria-label="Quitar la nota" onClick={() => quitar.mutate({ evidencia: n })}>
+                        Quitar
+                      </button>
+                    )}
+                  </li>
+                ))}
+              </ul>
+            )}
+
             {evs.length === 0 ? (
               <p className="rk-rep-small rk-rep-muted">Aún no hay evidencias. Suba un archivo o pegue un enlace público.</p>
             ) : (
@@ -658,6 +715,7 @@ function FichaIndicador({ ciclo, oficina, actor, indicador, rol, campos, respues
                         ) : (
                           <b className="rk-rep-wrap">{ev.nombre}</b>
                         )}
+                        {ev.biblioteca && <span className="rk-rep-pill is-blue">De la biblioteca</span>}
                         {i === 0 && ev.publica ? <span className="rk-rep-pill is-ok">Principal · pública</span> : ev.publica ? <span className="rk-rep-pill is-ok">Pública</span> : <span className="rk-rep-pill">Privada</span>}
                       </div>
                       <Chequeos items={ev.analisis} />
@@ -760,9 +818,9 @@ function FichaIndicador({ ciclo, oficina, actor, indicador, rol, campos, respues
       </fieldset>
 
       <footer className="rk-rep-acciones">
-        {motivos.length > 0 && (
-          <ul className="rk-rep-motivos" aria-label="Por qué no se puede enviar">
-            {motivos.map((m) => (
+        {(esPlaneacion ? motivosAprobar : motivos).length > 0 && (
+          <ul className="rk-rep-motivos" aria-label={esPlaneacion ? "Qué falta para aprobar" : "Por qué no se puede enviar"}>
+            {(esPlaneacion ? motivosAprobar : motivos).map((m) => (
               <li key={m}>{m}</li>
             ))}
           </ul>
@@ -788,6 +846,11 @@ function FichaIndicador({ ciclo, oficina, actor, indicador, rol, campos, respues
             >
               {enviar.isPending ? "Enviando…" : "Enviar a Planeación"}
             </button>
+            {esPlaneacion && respuesta.estado !== "ok" && (
+              <button type="button" className="rk-rep-btn is-primary" onClick={() => void aprobarDirecto()} disabled={aprobar.isPending || guardar.isPending}>
+                {aprobar.isPending ? "Aprobando…" : "Guardar y aprobar"}
+              </button>
+            )}
           </div>
         </div>
       </footer>

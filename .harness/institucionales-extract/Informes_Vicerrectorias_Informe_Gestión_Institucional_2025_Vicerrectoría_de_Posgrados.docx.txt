@@ -1,0 +1,285 @@
+FUENTE: Informes Vicerrectorias\Informe_Gestión_Institucional_2025_Vicerrectoría de Posgrados.docx
+TIPO: DOCX 225 parrafos, 3 tablas
+[Heading 1] Resumen Ejecutivo
+[Heading 2] Síntesis
+[Normal] Durante el 2025, la Vicerrectoría de Posgrados consolidó su liderazgo regional mediante la operación de 66 programas académicos, alcanzando una tasa de graduación histórica del 75% (incremento significativo frente al 71% de 2024). Este periodo marcó la transición exitosa de 15 propuestas de microcredenciales hacia una oferta activa con 220 estudiantes matriculados, fortaleciendo la flexibilidad curricular y la sostenibilidad financiera institucional.
+[Normal] Mientras la vigencia 2024 se centró en el diagnóstico y la organización de procesos, el año 2025 se caracterizó por la toma de decisiones estratégicas y la obtención de resultados de alto impacto, alineados con el Proyecto Educativo Institucional (PEI) y el Plan de Desarrollo Institucional (PDI) 2024–2028.
+[Heading 2] Hitos de Impacto Estratégico:
+[List Paragraph] Aseguramiento de la Calidad y Permanencia: Se estabilizó la deserción en niveles óptimos (bajo el 7.5%) mediante el éxito de los "Talleres de Trabajo de Grado". En términos de excelencia, se destaca la culminación de la fase de autoevaluación y la programación de la visita de verificación del CNA para la Maestría en Enfermedades Infecciosas, así como el inicio del proceso de acreditación para un segundo programa de maestría, consolidando una cultura de mejora continua.
+[List Paragraph] Expansión Dinámica de la Oferta: Se obtuvieron 16 nuevos registros calificados y se lidera el diseño de 30 programas adicionales, asegurando que la universidad responda con agilidad a las nuevas demandas del mercado laboral y la sociedad.
+[List Paragraph] Internacionalización y Movilidad: La alianza estratégica UDES - Universidad para la Paz (UPAZ) se ratificó como un referente de cooperación, movilizando a 347 participantes con una retención del 98.8%. Este ecosistema permitió que 120 profesionales iniciaran su tránsito hacia titulaciones internacionales.
+[List Paragraph] Liderazgo en Transición Energética: A través del Instituto de Hidrógeno, la Vicerrectoría impulsó proyectos de producción de hidrógeno verde, logrando una articulación con el Ministerio de Minas y Energía, Ecopetrol y el SENA, visibilizando a la UDES en la agenda energética nacional.
+[List Paragraph] Modelo de Gestión de Matrícula: Se implementó una estrategia integral de captación que optimizó los tiempos de respuesta y la conversión de aspirantes. Estos ajustes no solo aumentaron la confomación de las cohortes, sino que garantizaron la sostenibilidad académica y financiera de los programas estratégicos.
+[Normal] Conclusión: La gestión 2025 trascendió el cumplimiento operativo para elevar el prestigio institucional. Los resultados tangibles en investigación aplicada, internacionalización y acreditación dejan una base sólida para proyectar a la UDES como un referente de excelencia en formación posgradual para el próximo trienio.
+[Heading 1] 1. Introducción y Contexto Estratégico
+[Heading 2] 1.1. Tendencias globales y regionales en educación posgradual y su incidencia en la gestión 2025
+[Heading 3] 1.1.1. Aprendizaje a lo largo de la vida y personalización de las trayectorias formativas
+[Normal] Ejes PDI asociados: Personalización – Sostenibilidad
+[Normal] La gestión 2025 transformó el concepto de formación continua en un modelo de continuidad académica efectiva. Se consolidaron itinerarios que permiten el tránsito fluido entre el pregrado, la educación continua y el posgrado, reconociendo que el estudiante actual requiere flexibilidad para adaptar su formación a los cambios del mercado laboral. Esta personalización no solo mejora la experiencia del usuario, sino que asegura la sostenibilidad institucional al aumentar la retención y el "valor de vida" del estudiante dentro del ecosistema UDES.
+[Heading 3] 1.1.2. Microcredenciales y trayectorias formativas articuladas
+[Normal] Ejes PDI asociados: Personalización – Entorno Emprendedor – Sostenibilidad
+[Normal] Más allá de la exploración, en 2025 se materializó la operatividad de 15 rutas de microcredenciales. Esta estrategia permitió desglosar competencias complejas en certificaciones modulares de rápida inserción laboral, las cuales son acumulables para la obtención de títulos de posgrado. Con esto, la Vicerrectoría responde a la tendencia global de desagregación de la educación superior, fortaleciendo el vínculo con el sector productivo y diversificando las fuentes de ingreso (Sostenibilidad).
+[Heading 3] 1.1.3. Virtualización y modalidades híbridas de la formación posgradual
+[Normal] Ejes PDI asociados: Ambiente Tecnológico – Personalización
+[Normal] En 2025, la virtualización dejó de ser una respuesta de emergencia para convertirse en una ventaja competitiva. Se optimizó el ecosistema digital (Moodle y aulas extendidas) para garantizar que la calidad académica en modalidades híbridas sea equivalente a la presencial. La gestión se enfocó en derribar barreras geográficas, permitiendo la expansión de la oferta hacia los campus de Cúcuta y Valledupar, y facilitando la participación de estudiantes internacionales, lo que impacta directamente en la democratización del acceso a la formación avanzada.
+[Heading 3] 1.1.4. Investigación aplicada, innovación y articulación con el entorno
+[Normal] Ejes PDI asociados: Entorno Emprendedor – Apropiación Social
+[Normal] La gestión 2025 posicionó a los posgrados como el principal motor de transferencia tecnológica de la universidad. El fortalecimiento del Instituto de Hidrógeno es la evidencia máxima de este eje, donde la formación doctoral y de maestría se vincula directamente con retos nacionales de transición energética. Al articular la academia con aliados como Ecopetrol y el Ministerio de Minas, se demuestra una gestión que trasciende el aula para generar impacto social y soluciones basadas en ciencia aplicada.
+[Heading 3] 1.1.5. Aseguramiento de la calidad, gobernanza académica y mejora continua
+[Normal] Ejes PDI asociados: Gobernanza para el Buen Gobierno – Sostenibilidad
+[Normal] La buena gestión se sustentó en el Sistema de Aseguramiento Interno de la Calidad. En 2025, se migró de un seguimiento administrativo a una gobernanza basada en datos, donde la autoevaluación permanente permitió anticipar las necesidades de renovación de registros calificados y avanzar con éxito en la acreditación de programas estratégicos (como la Maestría en Enfermedades Infecciosas). Este enfoque garantiza que la expansión de la oferta no comprometa los estándares de excelencia que exigen el CNA y el Ministerio de Educación.
+[Heading 1] Objetivos y Metas Anuales de la Unidad
+[Heading 2] 2.1. Objetivo Estratégico 2025 de la Vicerrectoría de Posgrados
+[Normal] Consolidar la excelencia y la sostenibilidad del ecosistema de posgrados de la Universidad de Santander, mediante la diversificación de la oferta académica, el fortalecimiento de los procesos de acreditación de alta calidad y la implementación de modelos de aprendizaje flexibles que respondan a las demandas de innovación del entorno regional e internacional.
+[Heading 2] 2.2. Metas Específicas 2025
+[Normal] Para dar cumplimiento al objetivo estratégico, se definieron las siguientes metas e indicadores de gestión:
+[Heading 1] Gestión Académica y desarrollo de la oferta de Posgrados 2025
+[Heading 2] 3.1 Planeación y fortalecimiento de la oferta académica de posgrados
+[Normal (Web)] La gestión 2025 se consolidó como un periodo de expansión sin precedentes. Mientras que el 2024 fue un año de diagnóstico de la oferta, en 2025 la Vicerrectoría ejecutó un plan de choque para la diversificación académica. El resultado fue la obtención de 16 nuevos Registros Calificados, una cifra que fortalece la presencia institucional en áreas de alta demanda.
+[Normal (Web)] Esta expansión no es aislada; se complementa con la estructuración y diseño de 30 nuevos programas curriculares que actualmente conforman el banco de proyectos de la Universidad. Esta dinámica asegura que la UDES mantenga una oferta vigente, competitiva y alineada con las necesidades de los sectores productivos regionales y nacionales.
+[Heading 3] 3.1.2. Desarrollo y actualización curricular de programas de maestría y doctorado
+[Normal] La actualización curricular de 2025 trascendió el cumplimiento normativo para enfocarse en la pertinencia y la flexibilidad. Se lideró la revisión de los planes de estudio de los programas activos, integrando tres componentes transversales:
+[List Paragraph] Transformación Digital: Incorporación de herramientas de IA aplicada y análisis de datos en currículos de ciencias sociales y de la salud.
+[List Paragraph] Sostenibilidad: Alineación de los resultados de aprendizaje con los ODS y la transición energética.
+[List Paragraph] Certificaciones Intermedias: El diseño curricular ahora permite que los estudiantes obtengan insignias digitales por competencias específicas antes de finalizar el título global, aumentando el valor percibido del programa desde el primer semestre.
+[Heading 3] 3.1.3. Articulación de la oferta posgradual con la educación continua
+[Normal] Se adelantó la creación de un ecosistema de formación continua. En 2025, la Vicerrectoría siguió con la consolidación de la Alianza UDES-UPAZ, logrando que 347 participantes se vincularan a procesos formativos de alto nivel. Igualmente, 120 de estos profesionales ya realizaron el tránsito formal hacia maestrías internacionales, demostrando que la universidad es un puente efectivo para la movilidad académica global.
+[Normal] Asimismo, la operatividad de las 15 rutas de microcredenciales con 180 estudiantes matriculados ratifica la efectividad de la política de flexibilidad. Este modelo permite que el pregrado y el posgrado de la UDES dejen de ser compartimentos aislados y se conviertan en una trayectoria única y personalizada para el estudiante.
+[Heading 3] 3.1.4. Consolidación de procesos académicos y acompañamiento a los programas
+[Normal] La calidad de la formación posgradual está estrechamente ligada a la consolidación de los procesos académicos y al acompañamiento permanente a los programas. En este marco, la Vicerrectoría de Posgrados fortaleció en 2025 los mecanismos de seguimiento académico, acompañamiento a las direcciones de programa y articulación con las dependencias administrativas y académicas.
+[Normal] Estas acciones permitieron optimizar la gestión académica, fortalecer la toma de decisiones basada en evidencias y garantizar la coherencia entre la planeación, la ejecución y la evaluación de la oferta posgradual, en alineación con los principios del eje de Gobernanza para el Buen Gobierno y los criterios de Sostenibilidad institucional.
+[Heading 2] 3.2. Investigación, Innovación y articulación con el entorno – Gestión 2025
+[Heading 3] 3.2.1.  Articulación de los programas de posgrado con la investigación institucional
+[Normal] La formación posgradual constituye un eje central para el desarrollo de la investigación institucional, en la medida en que integra la generación de conocimiento avanzado con la formación de investigadores y la solución de problemáticas del entorno. En este contexto, la Vicerrectoría de Posgrados orientó su gestión durante 2025 al fortalecimiento de la articulación entre los programas de maestría y doctorado y los grupos de investigación institucionales.
+[Normal] Esta articulación permitió consolidar la coherencia entre los objetivos formativos de los posgrados, las líneas de investigación y los proyectos estratégicos institucionales, promoviendo una mayor integración entre la docencia, la investigación y la innovación. Dichas acciones se alinean con el eje de Entorno Emprendedor, al fortalecer la generación de conocimiento con potencial aplicado, y con el eje de Gobernanza para el Buen Gobierno, al consolidar procesos académicos estructurados y orientados al impacto.
+[Heading 3] 3.2.2. Articulación entre Programas de Posgrado y Grupos de Investigación
+[Normal] En 2025, se consolidó la integración de los estudiantes de maestría y doctorado en los grupos de investigación de excelencia de la UDES. Esta sinergia permitió que el 75% de los proyectos de grado estuvieran vinculados a líneas de investigación activas, garantizando que el conocimiento generado en las aulas responda a problemas reales y cuente con el respaldo de investigadores categorizados. Esta articulación ha sido clave para la maduración de productos de nuevo conocimiento y desarrollo tecnológico.
+[Heading 3] 3.2.3. Investigación Aplicada, Innovación y Transferencia de Conocimiento
+[Normal] La educación posgradual está llamada a desempeñar un papel protagónico en la investigación aplicada y la transferencia de conocimiento, mediante su articulación con el sector productivo, el Estado y la sociedad. En respuesta a esta dinámica, la Vicerrectoría de Posgrados promovió en 2025 el fortalecimiento de proyectos de investigación aplicada asociados a programas de maestría y doctorado, orientados a la solución de problemáticas relevantes del contexto regional y nacional.
+[Normal] En este marco, La gestión de la investigación en los programas de posgrado durante 2025 se orientó a la resolución de desafíos estructurales del entorno, trascendiendo la producción científica tradicional hacia modelos de transferencia tecnológica y articulación de alto nivel con sectores estratégicos.
+[Heading 3] 3.2.4. Vinculación con el sector externo y pertinencia social
+[Normal] La vinculación efectiva con el entorno constituye un criterio fundamental de pertinencia de la formación posgradual. En este sentido, la gestión de la Vicerrectoría de Posgrados en 2025 fortaleció la articulación de los programas con actores del sector productivo, institucional y social, promoviendo espacios de cooperación académica, investigación conjunta y transferencia de resultados.
+[Normal] Estas acciones contribuyeron a posicionar los posgrados como escenarios de generación de soluciones basadas en conocimiento, alineadas con las necesidades del territorio, en coherencia con los principios del eje de Apropiación Social y del eje de Sostenibilidad, al fortalecer el impacto y la proyección institucional de la Universidad.
+[Heading 3] 3.2.5. Formación investigativa avanzada en los programas de posgrado
+[Normal] La formación investigativa constituye un componente estructural de los programas de maestría y doctorado. En correspondencia con ello, la Vicerrectoría de Posgrados fortaleció durante 2025 los procesos de formación investigativa avanzada, promoviendo la articulación entre seminarios de investigación, proyectos de grado y líneas institucionales de investigación.
+[Normal] Este enfoque favoreció el desarrollo de competencias investigativas diferenciadas, acordes con los niveles de formación y los intereses académicos y profesionales de los estudiantes, en coherencia con el eje de Personalización, y contribuyó al fortalecimiento del Entorno Emprendedor, al formar talento humano con capacidad de generar conocimiento aplicable e innovador.
+[Heading 3] 3.2.6. Gestión de la Propiedad Intelectual y Patentes
+[Normal] Dando continuidad a la gestión iniciada en 2024, el 2025 marcó un avance decisivo en la protección del conocimiento. Se gestionó el seguimiento y consolidación de las patentes en áreas críticas:
+[List Paragraph] Enfermedades Infecciosas: Avance en la fase nacional/internacional de la patente derivada de la investigación doctoral, fortaleciendo el expediente para la acreditación de la Maestría.
+[List Paragraph] Energías Renovables: Radicación y defensa técnica de innovaciones generadas de la investigación en producción de hidrógeno verde, en el marco del Doctorado en Recursos Energéticos Renovables.
+[Normal] Estas acciones demuestran una gestión que protege el capital intelectual de la universidad y lo proyecta hacia su futura comercialización o licenciamiento.
+[Heading 2] 3.3. Modelo institucional de aseguramiento de la calidad de los posgrados
+[Normal] La calidad de la formación posgradual se sustenta en el modelo institucional de aseguramiento que articule planeación, autoevaluación y mejora continua. En este marco, la Vicerrectoría de Posgrados orientó durante 2025 el fortalecimiento del modelo institucional de aseguramiento de la calidad de los programas de maestría y doctorado, en coherencia con los lineamientos del MEN, los criterios del CNA y las disposiciones del PDI 2024–2028.
+[Normal] Esta gestión se centró en la consolidación de procesos sistemáticos de seguimiento académico y administrativo, fortaleciendo la toma de decisiones basada en evidencias, en consonancia con el eje de Gobernanza para el Buen Gobierno y los principios de Sostenibilidad institucional.
+[Heading 3] 3.3.1. Autoevaluación, seguimiento y planes de mejoramiento
+[Normal] La autoevaluación permanente constituye un pilar fundamental de la cultura de la calidad en los posgrados. En este sentido, la Vicerrectoría de Posgrados fortaleció en 2025 los procesos de autoevaluación de los programas, promoviendo el seguimiento sistemático de indicadores académicos, administrativos y financieros, y la actualización de los planes de mejoramiento.
+[Normal] Estas acciones permitieron identificar oportunidades de fortalecimiento, orientar estrategias de mejora focalizadas y garantizar la coherencia entre los objetivos de los programas y los estándares institucionales y nacionales, contribuyendo al fortalecimiento del eje de Gobernanza para el Buen Gobierno y al aseguramiento de la Sostenibilidad de la oferta posgradual.
+[Heading 3] 3.3.2. Procesos de registro calificado, renovación y acreditación de alta calidad
+[Normal] Los procesos de registro calificado, renovación y acreditación de alta calidad constituyen referentes esenciales para la consolidación y posicionamiento de la oferta posgradual. En este marco, la Vicerrectoría de Posgrados lideró y acompañó durante 2025 los procesos asociados a la obtención, renovación y fortalecimiento de los registros calificados y a la preparación de programas para escenarios de acreditación, en articulación con las facultades y las unidades académicas.
+[Normal] Esta gestión fortaleció el cumplimiento de las condiciones de calidad exigidas por la normativa vigente y consolidó una cultura institucional orientada a la excelencia académica, en consonancia con el eje de Gobernanza para el Buen Gobierno y los lineamientos de Sostenibilidad institucional del PDI.
+[Heading 3] 3.3.3. Fortalecimiento de la gobernanza académica de los posgrados
+[Normal] La gobernanza académica de los programas de posgrado es un elemento clave para garantizar la coherencia institucional, la transparencia y la calidad de las decisiones. Durante 2025, la Vicerrectoría de Posgrados fortaleció los espacios y mecanismos de gobernanza académica, promoviendo la articulación entre los consejos académicos, comités curriculares, direcciones de programa y demás instancias institucionales.
+[Normal] Estas acciones contribuyeron a mejorar la coordinación académica, optimizar los procesos decisorios y fortalecer la responsabilidad institucional en la gestión de la formación avanzada, en coherencia con los principios del eje de Gobernanza para el Buen Gobierno.
+[Heading 1] Resultados relevantes, logros y proyección de la Vicerrectoría De Posgrados – 2025
+[Heading 2] Principales resultados y logros de la gestión 2025
+[Normal] Durante el periodo 2025, la Vicerrectoría de Posgrados consolidó avances significativos en el fortalecimiento académico, investigativo y organizacional de la formación avanzada, materializando los compromisos establecidos en el informe de gestión 2024 y alineando su actuación con los ejes estratégicos del PDI 2024–2028.
+[Normal] Entre los principales resultados se destacan el fortalecimiento de la planeación y gestión académica de los programas de maestría y doctorado; la consolidación de modelos curriculares flexibles y pertinentes; el avance en la virtualización y modalidades híbridas; la articulación efectiva con la investigación institucional y los centros estratégicos; y el fortalecimiento de los procesos de aseguramiento interno de la calidad y gobernanza académica.
+[Normal] Estos logros reflejan una gestión orientada a la calidad, pertinencia, impacto social y sostenibilidad de la oferta posgradual, en coherencia con los principios del PEI y las prioridades estratégicas institucionales.
+[Heading 2] Cumplimiento de compromisos y avances frente al informe de gestión 2024
+[Normal] La gestión 2025 evidenció una evolución sustantiva respecto a los compromisos y proyecciones consignados en el informe de gestión 2024, particularmente en lo relacionado con el fortalecimiento de la planeación académica, la consolidación de procesos de autoevaluación y la articulación de los posgrados con la investigación y el entorno.
+[Normal] En este sentido, la Vicerrectoría de Posgrados avanzó en la materialización de las líneas de acción priorizadas, fortaleciendo la coherencia entre la planeación estratégica y la ejecución académica, y consolidando una cultura institucional de seguimiento, evaluación y mejora continua, en consonancia con el eje de Gobernanza para el Buen Gobierno.
+[Heading 2] Impacto institucional y aporte al desarrollo regional y nacional
+[Normal] La formación posgradual constituye un componente esencial del compromiso institucional con el desarrollo regional y nacional. En este marco, la gestión 2025 de la Vicerrectoría de Posgrados fortaleció el impacto de los programas de maestría y doctorado a través de su articulación con proyectos de investigación aplicada, innovación y transferencia de conocimiento, orientados a la solución de problemáticas del entorno.
+[Normal] Este impacto se ve reflejado en el fortalecimiento de capacidades académicas y científicas, la formación de talento humano altamente cualificado y la generación de conocimiento pertinente, contribuyendo a los objetivos de desarrollo territorial y alineándose con el eje de Apropiación Social del PDI.
+[Heading 2] Proyección estratégica de la Vicerrectoría de Posgrados
+[Normal] A partir de los resultados alcanzados en 2025, la Vicerrectoría de Posgrados proyecta su gestión hacia la consolidación de una oferta posgradual académicamente sólida, pertinente y sostenible, en coherencia con las metas del PDI 2024–2028.
+[Normal] Las líneas estratégicas de proyección se orientan al fortalecimiento de la personalización de las trayectorias formativas, la profundización de la transformación digital de los posgrados, el avance sistemático en procesos de calidad y acreditación, y la consolidación de una gobernanza académica robusta, que garantice la mejora continua y el posicionamiento institucional de la Universidad.
+[Heading 2] Gestión Académica y desarrollo de la oferta de Posgrados 2025
+[Heading 3] Planeación y fortalecimiento de la oferta académica de posgrados
+[Normal] Durante el periodo 2025, la Vicerrectoría de Posgrados orientó su gestión al fortalecimiento, consolidación y proyección estratégica de la oferta académica de maestrías y doctorados, en coherencia con las prioridades institucionales definidas en el PDI 2024–2028 y los lineamientos del PEI.
+[Normal] En el marco del eje de Gobernanza para el Buen Gobierno, se fortalecieron los procesos de planeación académica, análisis de pertinencia y toma de decisiones informadas para el desarrollo de la oferta posgradual, garantizando coherencia entre las necesidades del entorno, la capacidad institucional y la sostenibilidad de los programas.
+[Normal] De manera complementaria, la gestión se articuló con el eje de Personalización, al promover diseños curriculares orientados al desarrollo de competencias avanzadas, a la flexibilidad académica y a la atención de diversos perfiles profesionales. Asimismo, desde el eje de Sostenibilidad, se priorizó la consolidación de programas estratégicos, asegurando su viabilidad académica, financiera y administrativa en el mediano plazo.
+[Caption] Tabla 1. Oferta académica de programas de posgrados UDES por campus. 2025
+[Normal] Fuente: SNIES. Consultado en diciembre de 2025
+[Caption] Gráfica 1. Número de estudiantes matriculados 2025B
+[Normal] Fuente: elaboración propia
+[Caption] Ilustración 1. Programas nuevos 2025
+[Normal] Fuente: elaboración propia
+[Caption] Ilustración 2. Programas nuevos Especialidades Médico- Quirúrgicas UDES 2025
+[Normal] Fuente: elaboración propia
+[Heading 3] Estrategias implementadas para el fortalecimiento y reorientación de programas que no aperturaron cohortes en 2025
+[Normal (Web)] MAESTRÍA EN GESTIÓN PÚBLICA Y GOBIERNO - MGPG
+[Normal (Web)] En atención al análisis de la dinámica de matrícula y con el propósito de fortalecer la pertinencia, sostenibilidad y atractivo del programa, se adoptaron las siguientes estrategias:
+[Normal (Web)] Reforma curricular: ajuste de la duración del programa a tres (3) semestres, con implementación en modalidad híbrida, orientada a responder a las necesidades de los profesionales y a las tendencias actuales de formación posgradual.
+[Normal (Web)] Reconfiguración de convenios: finalización del convenio articulado con el IIOG y redefinición del componente internacional, manteniendo alianzas estratégicas con UPAZ y GOBERNA, bajo un modelo académico y administrativo más eficiente.
+[Normal (Web)] Articulación de oferta académica: estructuración de dos especializaciones articuladas al programa, como estrategia para diversificar las rutas de ingreso, favorecer la progresión académica y ampliar el público objetivo.
+[Normal (Web)] MAESTRÍA EN ADMINISTRACIÓN DE EMPRSAS - MBA
+[Normal (Web)] Como resultado del análisis de pertinencia académica y comportamiento de la demanda, se definieron las siguientes estrategias de fortalecimiento:
+[Normal (Web)] Reforma curricular: rediseño del programa a una duración de tres (3) semestres, con desarrollo en modalidad virtual, orientado a ampliar el acceso, mejorar la flexibilidad y responder a las dinámicas actuales de formación posgradual.
+[Normal (Web)] Fortalecimiento del componente práctico: incorporación de estrategias de aprendizaje experiencial, mediante prácticas intensivas, Living Labs y escenarios reales de aplicación, que favorecen el desarrollo de competencias aplicadas, la innovación y la solución de problemáticas del entorno.
+[Normal (Web)] MAESTRÍA EN GESTIÓN DE CIENCIA, TECNOLOGÍA E INNOVACIÓN - MGCTEI
+[Normal] El análisis académico del programa evidenció que el perfil de egreso presenta ambigüedades, lo que dificulta identificar con claridad los campos de desempeño profesional, los escenarios de inserción laboral y el valor diferencial del magíster frente a otras ofertas similares. Esta situación limita la comprensión del alcance del programa por parte de potenciales aspirantes y actores externos.
+[Normal] En respuesta a este diagnóstico, se adelanta un proceso de reflexión y redefinición curricular, orientado a precisar el perfil del graduado, fortalecer la coherencia entre el plan de estudios, los resultados de aprendizaje y los sectores de impacto, y reorientar el énfasis del programa hacia áreas de mayor pertinencia y atractivo académico y profesional.
+[Normal] Líneas de transformación del programa
+[Normal] Como resultado de este proceso, se analizan las siguientes opciones de transformación, orientadas a clarificar el perfil de egreso y ampliar los escenarios de aporte del graduado:
+[Normal] Maestría en Innovación, Ciencia y Transformación Digital, con énfasis en la aplicación de la innovación y la ciencia para la transformación de organizaciones, procesos y territorios, en contextos públicos y privados.
+[Normal] Maestría en Innovación y Salud Digital, orientada al desarrollo de soluciones innovadoras y digitales para el sector salud, integrando tecnologías emergentes, gestión de la innovación y mejora de sistemas y servicios de salud.
+[Normal] Estas alternativas permiten visibilizar con mayor claridad el campo de acción del graduado, su aporte al entorno y su contribución a la solución de problemáticas estratégicas del país.
+[Normal (Web)] MAESTRÍA EN PSICOLOGÍA JURÍDICA Y FORENSE – MPJYF
+[Normal] Estrategias de ajuste
+[Normal] La Maestría mantiene como requisito de ingreso el título de Psicólogo, en coherencia con el perfil profesional requerido para el ejercicio en el campo jurídico y forense.
+[Normal] El programa complementa el actuar de los abogados, pero no se amplía su admisión a otras disciplinas para preservar su rigor y especificidad profesional.
+[Normal] Como estrategia de ampliación de cobertura, se propone la creación de la Especialización en Psicología Jurídica y Ciencias Criminológicas, abierta a psicólogos, abogados y profesionales afines, que responde a una demanda recurrente del entorno.
+[Normal] La especialización permitirá diversificar la oferta, atraer nuevos públicos y servir como ruta de articulación hacia la maestría.
+[Normal] Se identifica como reto la ausencia de articulación interna, por lo cual se definirán mecanismos de trayectorias académicas progresivas entre programas.
+[Heading 3] Desarrollo y actualización curricular de programas de maestría y doctorado
+[Normal] La actualización y mejora permanente de los planes de estudio constituyen un factor clave para garantizar la calidad y pertinencia de la formación posgradual. En este sentido, la Vicerrectoría de Posgrados lideró en 2025 procesos de revisión, ajuste y actualización curricular, en articulación con las facultades, los comités curriculares y las unidades académicas responsables de los programas.
+[Normal] Estos procesos se orientaron al fortalecimiento de los resultados de aprendizaje, la integración de competencias investigativas y profesionales, y la coherencia entre los componentes curriculares, en concordancia con el eje de Gobernanza para el Buen Gobierno, al institucionalizar prácticas académicas transparentes y sistemáticas. De igual forma, se avanzó en el eje de Personalización, al promover estructuras curriculares más flexibles y adaptadas a las necesidades de los estudiantes y del entorno.
+[Heading 3] Articulación de la oferta posgradual con la educación continua
+[Normal] En coherencia con los enfoques de aprendizaje a lo largo de la vida y formación permanente, la Vicerrectoría de Posgrados fortaleció durante 2025 la articulación entre la oferta de posgrados y las estrategias de educación continua, promoviendo rutas formativas integradas y mecanismos de reconocimiento de aprendizajes previos.
+[Normal] Esta articulación contribuyó al eje de Personalización, al ofrecer alternativas formativas acordes con distintas trayectorias profesionales; al eje de Entorno Emprendedor, al responder a necesidades específicas del sector productivo y social; y al eje de Sostenibilidad, al ampliar el alcance y proyección de la formación avanzada como estrategia institucional de largo plazo.
+[Heading 3] Consolidación de procesos académicos y acompañamiento a los programas
+[Normal] La calidad de la formación posgradual está estrechamente ligada a la consolidación de los procesos académicos y al acompañamiento permanente a los programas. En este marco, la Vicerrectoría de Posgrados fortaleció en 2025 los mecanismos de seguimiento académico, acompañamiento a las direcciones de programa y articulación con las dependencias administrativas y académicas.
+[Normal] Estas acciones permitieron optimizar la gestión académica, fortalecer la toma de decisiones basada en evidencias y garantizar la coherencia entre la planeación, la ejecución y la evaluación de la oferta posgradual, en alineación con los principios del eje de Gobernanza para el Buen Gobierno y los criterios de Sostenibilidad institucional.
+[Heading 2] Investigación, Innovación y articulación con el entorno – Gestión 2025
+[Heading 3] Articulación de los programas de posgrado con la investigación institucional
+[Normal] La formación posgradual constituye un eje central para el desarrollo de la investigación institucional, en la medida en que integra la generación de conocimiento avanzado con la formación de investigadores y la solución de problemáticas del entorno. En este contexto, la Vicerrectoría de Posgrados orientó su gestión durante 2025 al fortalecimiento de la articulación entre los programas de maestría y doctorado y los grupos de investigación institucionales.
+[Normal] Esta articulación permitió consolidar la coherencia entre los objetivos formativos de los posgrados, las líneas de investigación y los proyectos estratégicos institucionales, promoviendo una mayor integración entre la docencia, la investigación y la innovación. Dichas acciones se alinean con el eje de Entorno Emprendedor, al fortalecer la generación de conocimiento con potencial aplicado, y con el eje de Gobernanza para el Buen Gobierno, al consolidar procesos académicos estructurados y orientados al impacto.
+[Heading 3] Investigación aplicada y transferencia de conocimiento
+[Normal] La educación posgradual está llamada a desempeñar un papel protagónico en la investigación aplicada y la transferencia de conocimiento, mediante su articulación con el sector productivo, el Estado y la sociedad. En respuesta a esta dinámica, la Vicerrectoría de Posgrados promovió en 2025 el fortalecimiento de proyectos de investigación aplicada asociados a programas de maestría y doctorado, orientados a la solución de problemáticas relevantes del contexto regional y nacional.
+[Normal] En este marco, se destaca el fortalecimiento del Instituto de Investigación en Hidrógeno como plataforma estratégica para la formación avanzada, la investigación aplicada y la transferencia tecnológica, consolidándolo como un referente institucional en el desarrollo de soluciones innovadoras en el campo energético. Estas acciones se articulan con el eje de Entorno Emprendedor, al impulsar innovación con impacto productivo, y con el eje de Apropiación Social, al favorecer la transferencia de conocimiento y su apropiación por parte de la sociedad.
+[Heading 3] Vinculación con el sector externo y pertinencia social
+[Normal] La vinculación efectiva con el entorno constituye un criterio fundamental de pertinencia de la formación posgradual. En este sentido, la gestión de la Vicerrectoría de Posgrados en 2025 fortaleció la articulación de los programas con actores del sector productivo, institucional y social, promoviendo espacios de cooperación académica, investigación conjunta y transferencia de resultados.
+[Normal] Estas acciones contribuyeron a posicionar los posgrados como escenarios de generación de soluciones basadas en conocimiento, alineadas con las necesidades del territorio, en coherencia con los principios del eje de Apropiación Social y del eje de Sostenibilidad, al fortalecer el impacto y la proyección institucional de la Universidad.
+[Heading 3] Formación investigativa avanzada en los programas de posgrado
+[Normal] La formación investigativa constituye un componente estructural de los programas de maestría y doctorado. En correspondencia con ello, la Vicerrectoría de Posgrados fortaleció durante 2025 los procesos de formación investigativa avanzada, promoviendo la articulación entre seminarios de investigación, proyectos de grado y líneas institucionales de investigación.
+[Normal] Este enfoque favoreció el desarrollo de competencias investigativas diferenciadas, acordes con los niveles de formación y los intereses académicos y profesionales de los estudiantes, en coherencia con el eje de Personalización, y contribuyó al fortalecimiento del Entorno Emprendedor, al formar talento humano con capacidad de generar conocimiento aplicable e innovador.
+[Heading 2] Modelo institucional de aseguramiento de la calidad de los posgrados
+[Normal] La calidad de la formación posgradual se sustenta en el modelo institucional de aseguramiento que articule planeación, autoevaluación y mejora continua. En este marco, la Vicerrectoría de Posgrados orientó durante 2025 el fortalecimiento del modelo institucional de aseguramiento de la calidad de los programas de maestría y doctorado, en coherencia con los lineamientos del MEN, los criterios del CNA y las disposiciones del PDI 2024–2028.
+[Normal] Esta gestión se centró en la consolidación de procesos sistemáticos de seguimiento académico y administrativo, fortaleciendo la toma de decisiones basada en evidencias, en consonancia con el eje de Gobernanza para el Buen Gobierno y los principios de Sostenibilidad institucional.
+[Heading 3] Autoevaluación, seguimiento y planes de mejoramiento
+[Normal] La autoevaluación permanente constituye un pilar fundamental de la cultura de la calidad en los posgrados. En este sentido, la Vicerrectoría de Posgrados fortaleció en 2025 los procesos de autoevaluación de los programas, promoviendo el seguimiento sistemático de indicadores académicos, administrativos y financieros, y la actualización de los planes de mejoramiento.
+[Normal] Estas acciones permitieron identificar oportunidades de fortalecimiento, orientar estrategias de mejora focalizadas y garantizar la coherencia entre los objetivos de los programas y los estándares institucionales y nacionales, contribuyendo al fortalecimiento del eje de Gobernanza para el Buen Gobierno y al aseguramiento de la Sostenibilidad de la oferta posgradual.
+[Heading 3] Procesos de registro calificado, renovación y acreditación de alta calidad
+[Normal] Los procesos de registro calificado, renovación y acreditación de alta calidad constituyen referentes esenciales para la consolidación y posicionamiento de la oferta posgradual. En este marco, la Vicerrectoría de Posgrados lideró y acompañó durante 2025 los procesos asociados a la obtención, renovación y fortalecimiento de los registros calificados y a la preparación de programas para escenarios de acreditación, en articulación con las facultades y las unidades académicas.
+[Normal] Esta gestión fortaleció el cumplimiento de las condiciones de calidad exigidas por la normativa vigente y consolidó una cultura institucional orientada a la excelencia académica, en consonancia con el eje de Gobernanza para el Buen Gobierno y los lineamientos de Sostenibilidad institucional del PDI.
+[Heading 3] Fortalecimiento de la gobernanza académica de los posgrados
+[Normal] La gobernanza académica de los programas de posgrado es un elemento clave para garantizar la coherencia institucional, la transparencia y la calidad de las decisiones. Durante 2025, la Vicerrectoría de Posgrados fortaleció los espacios y mecanismos de gobernanza académica, promoviendo la articulación entre los consejos académicos, comités curriculares, direcciones de programa y demás instancias institucionales.
+[Normal] Estas acciones contribuyeron a mejorar la coordinación académica, optimizar los procesos decisorios y fortalecer la responsabilidad institucional en la gestión de la formación avanzada, en coherencia con los principios del eje de Gobernanza para el Buen Gobierno.
+[Heading 1] 5. Resultados y Evidencias
+[Caption] Cuadro 1. Metas alcanzadas 2025
+[Normal] Fuente: elaboración propia
+[Caption] Cuadro 2. Producción académica Maestría en Investigación de enfermedades infecciosas y el Doctorado en Enfermedades Infecciosas. 2025
+[Caption] Cuadro 3. Producción académica Maestría en recursos energéticos y el Doctorado en Energías Renovables
+[Caption] Cuadro 4. Producción académica Maestría en Ciencias Veterinarias
+[Caption] Cuadro 5. Producción académica Maestría en Biotecnología
+[Heading 1] 6. Distinguir logros innovadores/excepcionales
+[Heading 2] Síntesis
+[Normal] Este apartado resalta los máximos logros del periodo que van más allá del cumplimiento rutinario de metas, mostrando aportes distintivos, innovaciones, premios, reconocimientos o proyectos disruptivos que generen alto impacto institucional, regional o nacional.
+[Heading 2] Logros innovadores/excepcionales
+[Normal] Se realizaron las siguientes acciones de transferencia tecnológica:
+[List Paragraph] Desde el I3H2/DRER, se ha diseñado un modelo específico de transferencia tecnológica que facilita la comercialización y la adopción de productos relacionados con la producción y almacenamiento de hidrógeno a través de una empresa afiliada
+[List Paragraph] Proceso de vigilancia Tecnológica, levantamiento de información técnica y científica, solicitud de patente con Olarte MOURE: DISPOSITIVO ELECTRÓLISIS CON MEZCLA PORCENTUAL DE GASES A DISTINTAS ALTURAS.
+[List Paragraph] DEI / MINEI - Efecto antimicrobiano, inmunoregulador y osteogénico de membranas para regeneración óseas guiada adicionadas con aceites esenciales y terpenos: estudio in vitro e in vivo
+[List Paragraph] Dispositivo que se acopla a catéteres venosos tanto periféricos como centrales para disminuir la colonización e infección
+[Normal] En el Pilar de sostenibilidad:
+[List Paragraph] Acompañamiento técnico y científico a los proyectos UDES VERDE
+[List Paragraph] En el marco de la estrategia de cursos coterminales, se habilitaron cuatro módulos especializados en sostenibilidad y energías renovables de la Maestría en Recursos Energéticos, dirigidos a estudiantes de pregrado.
+[List Paragraph] Reestructuración del Laboratorio de Energía, que operará como Laboratorio de Innovación Sostenible
+[Normal] Articulación con sectores productivos, social y gubernamental:
+[List Paragraph] MINISTERIO DE MINAS Y ENERGÍA
+[List Paragraph] MINISTERIO DE CTEI
+[List Paragraph] Secretaría de salud de Santander
+[List Paragraph] ⁠Instituto nacional de salud
+[List Paragraph] GOBERNACIÓN DE SANTANDER
+[List Paragraph] ALCALDÍA DE BUCARAMANGA
+[List Paragraph] FENOGE
+[List Paragraph] ANH
+[List Paragraph] UPME
+[List Paragraph] ECOPETROL / ICPET
+[List Paragraph] SENA
+[List Paragraph] ICETEX
+[List Paragraph] UNIVERSIDADES: UIS, ⁠El Bosque, ⁠Santo Tomas, Católica de Manizales, ⁠Militar Nueva Granada, ⁠Antioquia, ⁠Corporación para Investigaciones Biológicas, ⁠UNAB, ⁠Santiago de Cali, UNAL
+[List Paragraph] Asociación e Ingenieros ACIEM
+[List Paragraph] Redes H2TRANSEK y CYTED
+[List Paragraph] WEC
+[Heading 1] 7. Análisis de Retos y Oportunidades
+[Normal] La gestión de 2025 permitió identificar las variables críticas que inciden en la competitividad de los posgrados. A continuación, se analizan los retos enfrentados y las oportunidades proyectadas para cada eje estratégico:
+[Heading 2] 7.1 Calidad, Pertinencia e Innovación de la Oferta
+[Normal] Reto: La rápida evolución de las demandas del sector productivo exige ciclos de actualización curricular más cortos.
+[Normal] Oportunidad: La exitosa implementación de las 15 rutas de microcredenciales abre la puerta a un modelo de "Currículo Vivo". Se proyecta la actualización del 100% de los planes de estudio de maestría para incluir componentes de Inteligencia Artificial aplicada y Sostenibilidad antes de finalizar el próximo bienio.
+[Heading 2] 7.2. Impacto Regional y Proyección Institucional
+[Normal] Reto: Traducir la producción científica en soluciones tangibles para la industria local.
+[Normal] Oportunidad: El liderazgo alcanzado con el Instituto de Hidrógeno I3H2 y el Laboratorio de Innovación Sostenible posiciona a la UDES como el socio estratégico ideal para el Gobierno Nacional y empresas como Ecopetrol. La oportunidad radica en monetizar esta capacidad mediante contratos de transferencia tecnológica y consultoría especializada.
+[Heading 2] 7.3. Articulación e Internacionalización
+[Normal] Reto: Superar las barreras lingüísticas y financieras que limitan la movilidad internacional de doble vía.
+[Normal] Oportunidad: El modelo de la Alianza UDES-UPAZ (con su retención del 98.8%) es escalable. Se propone replicar esta estructura con otras universidades globales para crear programas de doble titulación virtual, reduciendo costos y aumentando el atractivo internacional.
+[Heading 2] 7.4. Sostenibilidad, Gestión y Captación
+[Normal] Reto: La alta competencia y la sensibilidad al precio en el mercado de posgrados virtuales y presenciales.
+[Normal] Oportunidad: Optimizar el embudo de conversión mediante el fortalecimiento de los cursos coterminales. Al captar al estudiante desde el pregrado, se reduce el costo de adquisición y se garantiza la sostenibilidad financiera a largo plazo. Se planea la automatización del proceso de admisión para reducir los tiempos de respuesta a menos de 24 horas.
+[Heading 2] 7.5. Liderazgo Estratégico de la Vicerrectoría
+[Normal] Reto: Mantener la cohesión estratégica en una unidad que gestiona 66 programas en diferentes campus.
+[Normal] Oportunidad: Consolidar un Cuadro de Mando Integral (Dashboard) en tiempo real que permita a los directores de programa tomar decisiones basadas en datos de deserción y matrícula, fortaleciendo la gobernanza basada en resultados.
+[Heading 1] 8. Conclusiones de Gestión 2025
+[Normal] Madurez del Modelo de Posgrados: El 2025 representó la consolidación del sistema de formación avanzada de la UDES. La obtención de 16 nuevos registros calificados y el diseño de 30 programas adicionales evidencian una capacidad de respuesta ágil a las dinámicas del entorno educativo.
+[Normal] Excelencia Académica y Retención: El incremento de la tasa de graduación al 75% y la estabilidad en los niveles de permanencia ratifican que las estrategias pedagógicas, como los Talleres de Trabajo de Grado, son efectivas y generan valor real para el estudiante.
+[Normal] Liderazgo en la Agenda Nacional: La articulación de la Vicerrectoría con grandes actores nacionales (MinMinas, SENA, Ecopetrol) a través del Instituto de Hidrógeno ha elevado el prestigio de la institución, moviendo a los posgrados de un plano meramente académico a uno de impacto transformador en la transición energética.
+[Normal] Resiliencia y Visión Prospectiva: A pesar de los retos de mercado, la Vicerrectoría cierra el año con un cumplimiento promedio de metas superior al 110%. La base instalada en términos de calidad, tecnología y alianzas internacionales permite proyectar el 2026 como el año de la expansión masiva y la acreditación de alta calidad para nuestros programas bandera.
+
+===== TABLAS: 3 =====
+--- tabla 1: 7 filas x 4 cols
+Eje de Gestión | Meta Específica 2025 | Resultado 2025 (Logro) | % Cumplimiento
+Crecimiento y Cobertura | Lograr la obtención de 12 nuevos Registr | 16
+
+
+
+
+30 | 133% de Registros obtenidos frente a pro
+Calidad y Excelencia | Radicar oportunamente los documentos req | 100%
+
+
+
+
+
+
+20% | 100%
+
+
+
+10%
+Permanencia y Graduación | Incrementar la tasa de graduación histór | Graduación 75%
+
+Deserción 7.5% | 96.1%
+
+93.3%
+--- tabla 2: 7 filas x 4 cols
+Eje de Gestión | Meta Específica 2025 | Resultado 2025 (Logro) | % Cumplimiento
+Crecimiento y Cobertura | Lograr la obtención de 12 nuevos Registr | 16
+
+
+
+
+
+30 | 133% de Registros obtenidos frente a pro
+Calidad y Excelencia | Radicar oportunamente los documentos req | 100%
+
+
+
+
+
+
+20% | 100%
+
+
+
+10%
+Permanencia y Graduación | Incrementar la tasa de graduación histór | Graduación 75%
+
+Deserción 7.5% | 96.1%
+
+93.3%
+--- tabla 3: 5 filas x 3 cols
+Indicador | Maestría en Enfermedades Infecciosas MIN | Doctorado en Enfermedades Infecciosas
+Liderazgo de proyectos | 6 proyectos liderados por estudiantes (1 | 13 proyectos liderados por estudiantes (
+Producción académica (acumulada) | 35 publicaciones de estudiantes (2015-20 | 18 publicaciones de estudiantes (2021 – 
+Participación en eventos | 6 participaciones estudiantiles en event | 7 participaciones estudiantiles internac

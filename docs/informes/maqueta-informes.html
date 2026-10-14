@@ -1,0 +1,722 @@
+<title>Informes Institucionales</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Open+Sans:wght@400;500;600;700;800&family=Montserrat:wght@600;700;800&family=Source+Serif+4:ital,wght@0,400;0,600;1,400&display=swap" rel="stylesheet">
+<style>
+/* Portal de informes de gestión: flujo de trabajo de tres paneles (secciones | editor | conexiones). Solo tema claro, como los portales de Planeación. */
+:root{
+  --page:#f4f7fb;--surface:#fff;--surface2:#f8fafd;--surface3:#eef3fa;
+  --ink:#0d1c31;--ink2:#45566d;--muted:#6b7c93;--faint:#93a2b6;
+  --line:rgba(13,40,84,.12);--line2:rgba(13,40,84,.22);
+  --navy:#0a2d63;--navy-d:#061e46;--blue:#2166d6;--blue-s:#eaf1fd;--teal:#0096a5;--teal-s:#e3f4f6;--teal-ink:#00717d;
+  --amber:#e8892b;--amber-s:#fdf0e1;--amber-ink:#8a4f0a;
+  --ok:#12833a;--ok-s:#e4f3e9;--mid:#b07d00;--mid-s:#fbf2e0;--bad:#d03b3b;--bad-s:#fbe9e9;
+  --ease:cubic-bezier(.23,1,.32,1);
+  --sans:"Open Sans",ui-sans-serif,system-ui,sans-serif;--head:"Montserrat","Open Sans",sans-serif;--serif:"Source Serif 4",Georgia,serif;
+  color-scheme:light;
+}
+*{box-sizing:border-box}
+body{background:var(--page);color:var(--ink);font:500 14px/1.5 var(--sans);padding-inline:clamp(16px,3vw,32px);padding-block:20px 64px;margin:0}
+button,input,select,textarea{font:inherit;color:inherit}
+button{cursor:pointer;border:0;background:none;padding:0}
+:focus-visible{outline:2px solid var(--blue);outline-offset:2px}
+h1,h2,h3,h4,p{margin:0}
+.wrap{max-width:1480px;margin:0 auto}
+.num{font-variant-numeric:tabular-nums}
+.btn{display:inline-flex;align-items:center;gap:8px;min-height:38px;padding:0 16px;border-radius:10px;font-weight:700;font-size:13px;border:1px solid var(--line2);background:var(--surface);transition:transform .16s var(--ease),background .15s}
+.btn:active{transform:scale(.97)}
+.btn.pri{background:var(--navy);border-color:var(--navy);color:#fff}
+.btn.pri:disabled{background:var(--surface3);border-color:var(--line);color:var(--faint);cursor:not-allowed}
+.btn.sm{min-height:32px;padding:0 12px;font-size:12px}
+.btn.ghost{border-color:transparent;color:var(--blue)}
+@media (hover:hover){.btn:not(:disabled):hover{background:var(--surface3)}.btn.pri:not(:disabled):hover{background:var(--navy-d)}}
+.eyebrow{font:700 11px/1.3 var(--sans);letter-spacing:.09em;text-transform:uppercase;color:var(--muted)}
+/* cabecera */
+.top{display:flex;flex-wrap:wrap;align-items:flex-end;justify-content:space-between;gap:12px 24px;padding-bottom:14px}
+.top h1{font:800 clamp(1.5rem,2vw+1rem,2.1rem)/1.1 var(--head);letter-spacing:-.025em;color:var(--navy)}
+.top p{color:var(--ink2);margin-top:4px;max-width:62ch}
+.demo{font-size:12px;font-weight:700;background:var(--mid-s);color:var(--amber-ink);padding:5px 10px;border-radius:6px}
+.tabs{display:flex;gap:2px;border-bottom:1px solid var(--line2);overflow-x:auto;scrollbar-width:none;margin-bottom:18px}
+.tabs button{padding:12px 16px;font-weight:700;color:var(--ink2);border-bottom:3px solid transparent;margin-bottom:-1px;white-space:nowrap;transition:color .15s}
+.tabs button[aria-selected="true"]{color:var(--navy);border-color:var(--navy)}
+@media (hover:hover){.tabs button:hover{color:var(--ink)}}
+.seg{display:inline-flex;background:var(--surface3);border-radius:10px;padding:3px;gap:2px;flex-wrap:wrap}
+.seg button{padding:6px 12px;border-radius:8px;font-weight:700;font-size:12.5px;color:var(--ink2)}
+.seg button[aria-pressed="true"]{background:var(--surface);color:var(--navy);box-shadow:0 1px 2px rgba(13,40,84,.12)}
+.panel[hidden]{display:none}
+/* tab 1 */
+.ed{display:grid;grid-template-columns:260px minmax(0,1fr) 310px;gap:18px;align-items:start}
+@media (max-width:1180px){.ed{grid-template-columns:230px minmax(0,1fr)}.ed aside.side{grid-column:1/-1}}
+@media (max-width:780px){.ed{grid-template-columns:minmax(0,1fr)}}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:14px}
+.rail{padding:14px;position:sticky;top:12px;display:grid;gap:10px}
+@media (max-width:780px){.rail{position:static}}
+.unit{display:grid;gap:2px;padding-bottom:12px;border-bottom:1px solid var(--line)}
+.unit b{font:700 15px/1.25 var(--head);color:var(--navy)}
+.unit span{font-size:12.5px;color:var(--ink2)}
+.stat{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.pill{display:inline-flex;align-items:center;gap:6px;font-size:11.5px;font-weight:700;padding:3px 9px;border-radius:99px;background:var(--surface3);color:var(--ink2)}
+.pill.ok{background:var(--ok-s);color:var(--ok)}.pill.mid{background:var(--mid-s);color:var(--mid)}.pill.bad{background:var(--bad-s);color:var(--bad)}.pill.teal{background:var(--teal-s);color:var(--teal-ink)}.pill.blue{background:var(--blue-s);color:var(--blue)}
+.bar{height:6px;background:var(--surface3);border-radius:4px;overflow:hidden}
+.bar i{display:block;height:100%;background:var(--navy);transform-origin:left;border-radius:4px}
+.secs{display:grid;gap:2px}
+.secs button{display:grid;grid-template-columns:22px minmax(0,1fr) auto;gap:8px;align-items:center;text-align:left;padding:8px 8px;border-radius:9px;font-weight:600;font-size:13px;color:var(--ink2);transition:background .15s}
+.secs button[aria-current="true"]{background:var(--blue-s);color:var(--navy)}
+@media (hover:hover){.secs button:hover{background:var(--surface3)}.secs button[aria-current="true"]:hover{background:var(--blue-s)}}
+.secs .n{font:700 11px var(--head);color:var(--faint);text-align:center}
+.dot{width:9px;height:9px;border-radius:50%;border:2px solid var(--line2);justify-self:end}
+.dot.done{background:var(--ok);border-color:var(--ok)}.dot.part{border-color:var(--mid);background:linear-gradient(90deg,var(--mid) 50%,transparent 50%)}
+.send{display:grid;gap:6px;padding-top:12px;border-top:1px solid var(--line)}
+.send small{color:var(--muted);font-size:12px}
+.editor{padding:22px clamp(16px,2.2vw,28px)}
+.ehd{display:flex;flex-wrap:wrap;justify-content:space-between;align-items:flex-start;gap:10px 16px;margin-bottom:6px}
+.ehd h2{font:800 clamp(1.25rem,1vw+1rem,1.6rem)/1.15 var(--head);letter-spacing:-.02em;color:var(--navy)}
+.lead{color:var(--ink2);max-width:70ch;margin-bottom:18px}
+.blk{margin-top:20px}
+.lab{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:8px}
+.tag{font:800 10.5px/1 var(--sans);letter-spacing:.08em;text-transform:uppercase;padding:5px 8px;border-radius:5px}
+.tag.auto{background:var(--teal);color:#fff}.tag.apo{background:var(--navy);color:#fff}
+.lab .src{font-size:12px;color:var(--muted)}
+.autobox{background:var(--teal-s);border-radius:12px;padding:14px}
+.tiles{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:10px}
+.tile{background:var(--surface);border:1px solid rgba(0,150,165,.28);border-radius:10px;padding:12px;display:grid;gap:6px;align-content:start;transition:opacity .15s,border-color .15s}
+.tile.off{opacity:.55;border-style:dashed;background:transparent}
+.tile.own{border-color:var(--amber);background:#fffaf3}
+.tile .row1{display:flex;justify-content:space-between;gap:8px;align-items:flex-start}
+.tile .l{font-weight:700;font-size:12.5px;line-height:1.3}
+.tile .v{font:800 26px/1 var(--head);letter-spacing:-.02em;color:var(--navy)}
+.tile .v small{font-size:13px;font-weight:700;color:var(--ink2);margin-left:2px}
+.tile .cmp{font-size:12px;color:var(--ink2);display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+.tile .s{font-size:11px;color:var(--muted);line-height:1.35}
+.chk{display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:700;color:var(--ink2);cursor:pointer}
+.chk input{width:16px;height:16px;accent-color:var(--navy)}
+.lock{display:inline-flex;align-items:center;gap:4px;font-size:11px;font-weight:700;color:var(--teal-ink)}
+.just{width:100%;min-height:34px;border:1px solid var(--line2);border-radius:7px;padding:6px 8px;font-size:12.5px;background:var(--surface)}
+.just.need{border-color:var(--amber);background:#fffaf3}
+.fld{border:1px solid var(--line2);border-radius:10px;background:var(--surface);transition:border-color .15s}
+.fld:focus-within{border-color:var(--blue)}
+.fld textarea{display:block;width:100%;min-height:170px;border:0;outline:0;background:none;resize:vertical;padding:14px 16px;font:400 16px/1.65 var(--serif)}
+.fld .ft{display:flex;flex-wrap:wrap;gap:8px 14px;align-items:center;justify-content:space-between;border-top:1px solid var(--line);padding:8px 12px;background:var(--surface2);border-radius:0 0 10px 10px;font-size:12px;color:var(--ink2)}
+input.in,select.in,textarea.in{width:100%;border:1px solid var(--line2);border-radius:8px;padding:8px 10px;background:var(--surface);min-height:36px}
+textarea.in{min-height:70px;resize:vertical}
+.tbl{width:100%;border-collapse:collapse;font-size:13px}
+.tbl th{background:var(--navy);color:#fff;text-align:left;font-weight:700;font-size:12px;padding:9px 10px}
+.tbl td{padding:6px 8px;border-bottom:1px solid var(--line);vertical-align:middle}
+.tbl td input,.tbl td select{width:100%;border:1px solid transparent;background:transparent;border-radius:6px;padding:6px 6px;min-height:32px}
+.tbl td input:focus,.tbl td select:focus{border-color:var(--blue);background:var(--surface)}
+.tbl .num{text-align:right}
+.tw{overflow-x:auto;border:1px solid var(--line);border-radius:10px;background:var(--surface)}
+.tw .tbl{min-width:560px}
+.sem{display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:700}
+.sem i{width:10px;height:10px;border-radius:50%;background:var(--ok)}.sem.mid i{background:var(--mid)}.sem.bad i{background:var(--bad)}
+.sem.mid{color:var(--mid)}.sem.bad{color:var(--bad)}.sem.ok{color:var(--ok)}
+.chips{display:flex;flex-wrap:wrap;gap:6px}
+.chip{padding:6px 11px;border-radius:99px;border:1px solid var(--line2);font-weight:700;font-size:12.5px;color:var(--ink2);background:var(--surface)}
+.chip[aria-pressed="true"]{background:var(--navy);color:#fff;border-color:var(--navy)}
+.own-form{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:8px;padding:12px;border:1px dashed var(--amber);border-radius:10px;background:#fffaf3;margin-top:10px}
+.own-form label{display:grid;gap:3px;font-size:11.5px;font-weight:700;color:var(--ink2)}
+.own-form .acts{grid-column:1/-1;display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.logro{border:1px solid var(--line);border-radius:10px;padding:12px;display:grid;gap:8px;background:var(--surface)}
+.logros{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:10px}
+/* aside */
+.side{display:grid;gap:14px;position:sticky;top:12px}
+@media (max-width:1180px){.side{position:static;grid-template-columns:repeat(auto-fit,minmax(280px,1fr))}}
+.side .card{padding:14px}
+.side h3{font:700 13px var(--head);color:var(--navy);margin-bottom:10px}
+.ctl{display:grid;gap:8px}
+.ctl li{display:grid;grid-template-columns:18px minmax(0,1fr);gap:8px;font-size:12.5px;line-height:1.4;color:var(--ink2)}
+.ctl ul,.conx ul{list-style:none;margin:0;padding:0;display:grid;gap:8px}
+.ico{width:18px;height:18px;border-radius:50%;display:grid;place-items:center;font-size:11px;font-weight:800;color:#fff;background:var(--ok);margin-top:1px}
+.ico.w{background:var(--amber)}
+.conx li{display:grid;gap:2px;font-size:12.5px;padding-bottom:8px;border-bottom:1px solid var(--line)}
+.conx li:last-child{border:0;padding:0}
+.conx b{font-weight:700;color:var(--ink)}
+.conx span{color:var(--muted)}
+.conx button{justify-self:start;color:var(--blue);font-weight:700;font-size:12px}
+/* tab 2 */
+.two{display:grid;grid-template-columns:minmax(0,1.5fr) minmax(0,1fr);gap:18px;align-items:start}
+@media (max-width:1000px){.two{grid-template-columns:minmax(0,1fr)}}
+.pad{padding:18px}
+.card h3.t{font:800 17px/1.2 var(--head);color:var(--navy);margin-bottom:4px}
+.sub{color:var(--ink2);font-size:13px;margin-bottom:14px;max-width:64ch}
+.ask{width:100%;border-collapse:collapse;font-size:13px}
+.ask td,.ask th{padding:9px 8px;border-bottom:1px solid var(--line);text-align:left;vertical-align:middle}
+.ask th{font:700 11px var(--sans);letter-spacing:.07em;text-transform:uppercase;color:var(--muted)}
+.ask tr.grp td{background:var(--surface3);font-weight:800;color:var(--navy);font-size:12px;padding:7px 8px}
+.ask .src{color:var(--muted);font-size:12px}
+.cnt{display:flex;gap:18px;flex-wrap:wrap;margin-bottom:14px}
+.cnt div{display:grid}.cnt b{font:800 28px/1 var(--head);color:var(--navy)}.cnt span{font-size:12px;color:var(--ink2)}
+.step{display:inline-flex;align-items:center;border:1px solid var(--line2);border-radius:9px;overflow:hidden}
+.step button{width:34px;height:34px;font-weight:800;font-size:16px}
+.step b{min-width:34px;text-align:center}
+.units{display:grid;gap:8px}
+.u{display:grid;grid-template-columns:minmax(0,1.2fr) minmax(90px,.8fr) auto;gap:10px;align-items:center;padding:10px 12px;border:1px solid var(--line);border-radius:10px;background:var(--surface)}
+@media (max-width:560px){.u{grid-template-columns:minmax(0,1fr) auto}.u .bar{grid-column:1/-1;order:3}}
+.u b{font-size:13px;display:block;line-height:1.3}.u small{color:var(--muted);font-size:12px}
+.u .ret{grid-column:1/-1;display:grid;gap:6px}
+/* tab 3 */
+.chain{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:0;margin-bottom:18px}
+@media (max-width:820px){.chain{grid-template-columns:minmax(0,1fr)}}
+.node{padding:14px 16px;background:var(--surface);border:1px solid var(--line);display:grid;gap:4px;position:relative}
+.node:first-child{border-radius:14px 0 0 14px}.node:last-child{border-radius:0 14px 14px 0}
+@media (max-width:820px){.node:first-child{border-radius:14px 14px 0 0}.node:last-child{border-radius:0 0 14px 14px}}
+.node+.node{border-left:0}
+@media (max-width:820px){.node+.node{border-left:1px solid var(--line);border-top:0}}
+.node b{font:800 14px/1.25 var(--head);color:var(--navy)}
+.node .n{font:800 30px/1 var(--head);color:var(--navy)}
+.node .you{position:absolute;top:10px;right:10px}
+.node.me{background:var(--blue-s)}
+.drop{border:1.5px dashed var(--line2);border-radius:10px;padding:16px;text-align:center;color:var(--ink2);font-size:13px;cursor:pointer;display:grid;gap:4px;justify-items:center;transition:border-color .15s,background .15s}
+.drop.over,.drop:hover{border-color:var(--blue);background:var(--blue-s)}
+.files{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+.file{display:inline-flex;gap:6px;align-items:center;background:var(--surface3);border-radius:6px;padding:4px 8px;font-size:12px;font-weight:600}
+.form{display:grid;gap:12px}
+.form label.l{display:grid;gap:4px;font-size:12px;font-weight:700;color:var(--ink2)}
+.ap{display:grid;gap:8px;padding:12px;border:1px solid var(--line);border-radius:10px;background:var(--surface)}
+.ap p{font-size:13px;color:var(--ink2)}
+.ap .h{display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap;align-items:center}
+.ap .h b{font-size:13px}
+.aps{display:grid;gap:8px}
+/* tab 4: PDF */
+.pdfbar{display:flex;flex-wrap:wrap;gap:10px 16px;align-items:center;justify-content:space-between;margin-bottom:16px}
+.pages{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,330px),1fr));gap:20px;align-items:start}
+.pgw{display:grid;gap:8px}
+.pgw .cap{font-size:12px;color:var(--ink2);display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.pg{container-type:inline-size;aspect-ratio:210/297;background:#fff;border:1px solid var(--line2);box-shadow:0 8px 24px rgba(13,40,84,.12);position:relative;overflow:hidden;color:#16243a;font-family:var(--serif)}
+.pg *{box-sizing:border-box}
+.pg .in{position:absolute;inset:7cqw 8cqw 9cqw 8cqw;display:flex;flex-direction:column;gap:2.4cqw}
+.pg h4{font:800 4.4cqw/1.1 var(--head);color:#072b58;letter-spacing:-.015em;margin:0}
+.pg .k{font:700 1.9cqw/1.2 var(--head);letter-spacing:.12em;text-transform:uppercase;color:#4078b9}
+.pg p{font-size:2.5cqw;line-height:1.5;margin:0}
+.pg .ft2{position:absolute;left:8cqw;right:8cqw;bottom:4cqw;display:flex;justify-content:space-between;font:600 1.7cqw var(--head);color:#6b7c93;border-top:.2cqw solid #d6dee8;padding-top:1.4cqw}
+.pg.cover{background:#072b58;color:#fff;border-color:#072b58}
+.cover .x1,.cover .x2{position:absolute;background:#4078b9;opacity:.95}
+.cover .x1{width:14cqw;height:98cqw;right:14cqw;top:-8cqw;transform:rotate(32deg)}
+.cover .x2{width:14cqw;height:98cqw;right:14cqw;top:-8cqw;transform:rotate(-32deg);background:#e8892b}
+.cover .ring{position:absolute;right:2cqw;top:20cqw;width:52cqw;height:52cqw;border-radius:50%;border:.9cqw solid rgba(255,255,255,.22)}
+.cover .t{position:absolute;left:8cqw;right:8cqw;top:62cqw;font-family:var(--head)}
+.cover .t small{display:block;font:700 2.4cqw var(--head);letter-spacing:.14em;text-transform:uppercase;color:#f3b36f;margin-bottom:2.4cqw}
+.cover .t h4{color:#fff;font-size:9.4cqw;line-height:1.02;letter-spacing:-.03em}
+.cover .t h4 em{font-style:normal;color:#f3b36f}
+.cover .u2{position:absolute;left:8cqw;right:8cqw;bottom:20cqw;font-family:var(--head)}
+.cover .u2 b{display:block;font-size:4cqw;font-weight:700}.cover .u2 span{font-size:2.5cqw;opacity:.8}
+.cover .ids{position:absolute;left:8cqw;right:8cqw;bottom:7cqw;display:flex;justify-content:space-between;font:600 1.8cqw var(--head);opacity:.85;border-top:.2cqw solid rgba(255,255,255,.3);padding-top:2cqw}
+.kpis{display:grid;grid-template-columns:repeat(2,1fr);gap:2cqw}
+.kpi{background:#eef3f9;padding:2.4cqw;display:grid;gap:.6cqw}
+.kpi b{font:800 5.6cqw/1 var(--head);color:#072b58}.kpi span{font:600 2cqw/1.25 var(--head);color:#16243a}.kpi small{font:500 1.6cqw var(--head);color:#6b7c93}
+.pt{width:100%;border-collapse:collapse;font:600 2cqw var(--head)}
+.pt th{background:#072b58;color:#fff;text-align:left;padding:1.2cqw 1.4cqw;font-size:1.8cqw}
+.pt td{padding:1.2cqw 1.4cqw;border-bottom:.2cqw solid #d6dee8}
+.pt td.r,.pt th.r{text-align:right}
+.pt i{display:inline-block;width:2cqw;height:2cqw;border-radius:50%;background:#12833a;vertical-align:-.3cqw;margin-right:.8cqw}
+.pt i.mid{background:#b07d00}.pt i.bad{background:#d03b3b}
+.pbars{display:grid;gap:1.8cqw}
+.pbars div{display:grid;grid-template-columns:20cqw 1fr 6cqw;gap:2cqw;align-items:center;font:600 2.1cqw var(--head)}
+.pbars .tr{height:2.6cqw;background:#e4ebf3}.pbars .tr i{display:block;height:100%;background:#4078b9}
+.pg .auto{font:700 1.6cqw var(--head);color:#00717d;letter-spacing:.06em;text-transform:uppercase}
+/* tab 5 */
+.facts{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:12px;margin-bottom:20px}
+.facts div{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:14px;display:grid;gap:4px}
+.facts b{font:800 30px/1 var(--head);color:var(--navy)}.facts span{font-size:12.5px;color:var(--ink2)}
+.cmp2{display:grid;gap:8px}
+.cr{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:0;border:1px solid var(--line);border-radius:12px;overflow:hidden;background:var(--surface)}
+@media (max-width:700px){.cr{grid-template-columns:minmax(0,1fr)}}
+.cr>div{padding:12px 14px;display:grid;gap:3px;align-content:start}
+.cr>div:first-child{background:var(--surface2)}
+.cr>div+div{border-left:1px solid var(--line)}
+@media (max-width:700px){.cr>div+div{border-left:0;border-top:1px solid var(--line)}}
+.cr small{font:700 10.5px var(--sans);letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+.cr .y{font-size:13px}.cr .n{font-size:13px;color:var(--ink);font-weight:600}
+.cr .f{font-size:11.5px;color:var(--muted)}
+.road{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px;margin-top:20px}
+.road div{border-top:3px solid var(--navy);padding-top:10px;display:grid;gap:4px}
+.road b{font:800 13.5px var(--head);color:var(--navy)}.road span{font-size:13px;color:var(--ink2)}
+/* cifras vivas, fuentes propias, texto con cifras enlazadas */
+.lv{width:7px;height:7px;border-radius:50%;background:var(--teal);display:inline-block;animation:lvp 1.6s ease-in-out infinite}
+@keyframes lvp{50%{opacity:.35}}
+.chg{background:var(--amber-s);border-radius:7px;padding:6px 8px;font-size:12px;color:var(--amber-ink);display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.chg button,.lnk{color:var(--blue);font-weight:700;font-size:12px}
+.tile .s{display:flex;flex-wrap:wrap;gap:4px 6px;align-items:center}
+.srced{display:grid;gap:6px;padding-top:6px;border-top:1px dashed var(--line2)}
+.cite{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:8px}
+.cite select{width:auto;flex:1 1 220px;max-width:340px}
+.hint{font-size:12px;color:var(--muted)}
+.chipc{background:var(--teal-s);color:var(--teal-ink);font-weight:700;padding:1px 6px;border-radius:5px;font-family:var(--sans);font-size:.88em;white-space:nowrap;font-variant-numeric:tabular-nums}
+.prev{margin-top:10px;display:grid;gap:6px}
+.pv{background:var(--surface2);border:1px solid var(--line);border-radius:10px;padding:12px 14px;font:400 15px/1.65 var(--serif);min-height:48px}
+.muted{color:var(--muted);font-family:var(--sans);font-size:13px}
+.eh{margin-bottom:18px;display:grid;gap:4px;max-width:78ch}
+.eh h2{font:800 clamp(1.4rem,1.4vw+1rem,1.9rem)/1.15 var(--head);letter-spacing:-.02em;color:var(--navy)}
+.eh p{color:var(--ink2)}
+.flow{display:grid;grid-template-columns:repeat(auto-fit,minmax(165px,1fr));gap:10px;margin:0 0 22px;padding:0;list-style:none;counter-reset:f}
+.flow li{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:12px;display:grid;gap:4px;counter-increment:f;align-content:start}
+.flow li::before{content:"Paso " counter(f);font:700 10.5px var(--sans);letter-spacing:.09em;text-transform:uppercase;color:var(--muted)}
+.flow b{font:800 14px/1.25 var(--head);color:var(--navy)}.flow span{font-size:12.5px;color:var(--ink2)}
+.mods{display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:12px;margin-bottom:22px}
+.mod{padding:16px;display:grid;gap:8px;align-content:start}
+.mod h3{font:800 15px/1.25 var(--head);color:var(--navy);margin:0}
+.mod p{font-size:13px;color:var(--ink2)}
+.mod .who{font-size:12px;color:var(--muted)}
+.mod .new{font-size:12.5px;background:var(--teal-s);color:var(--teal-ink);padding:6px 8px;border-radius:7px}
+.sec2{margin-top:26px}
+.sec2>h3{font:800 18px var(--head);color:var(--navy);margin:0 0 4px}
+.sec2>p.sub{margin-bottom:12px}
+.life{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin-bottom:14px}
+@media (max-width:760px){.life{grid-template-columns:minmax(0,1fr)}}
+.life>div{border:1px solid var(--line);border-radius:12px;padding:14px;background:var(--surface);display:grid;gap:6px;align-content:start}
+.life>div.hot{background:var(--teal-s);border-color:rgba(0,150,165,.3)}
+.life b{font:800 14px var(--head);color:var(--navy)}.life span{font-size:13px;color:var(--ink2)}
+.ex{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:16px;display:grid;gap:10px}
+.ex .pv{background:var(--surface)}
+.blks{display:flex;flex-wrap:wrap;gap:6px}
+.blks span{background:var(--surface3);border-radius:7px;padding:5px 10px;font-weight:700;font-size:12.5px;color:var(--ink2)}
+.cols2{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:12px}
+.toast{position:fixed;left:50%;bottom:calc(20px + env(safe-area-inset-bottom,0px));transform:translate(-50%,16px);background:var(--navy-d);color:#fff;padding:10px 16px;border-radius:10px;font-weight:700;font-size:13px;opacity:0;pointer-events:none;transition:opacity .2s,transform .2s var(--ease);max-width:calc(100vw - 32px);z-index:10}
+.toast.on{opacity:1;transform:translate(-50%,0)}
+@media (prefers-reduced-motion:reduce){*{transition-duration:.01ms!important;animation:none!important}}
+</style>
+
+<div class="wrap">
+  <header class="top">
+    <div>
+      <div class="eyebrow">Planeación Institucional · Informe de gestión 2026</div>
+      <h1>Informes Institucionales</h1>
+      <p>Cada decanatura, vicerrectoría y rectoría arma su informe con las cifras de UDES en Cifras y del Plan de Desarrollo ya cargadas, y escribe solo lo que únicamente ella puede decir.</p>
+    </div>
+    <span class="demo">Datos de ejemplo · en el portal vienen de UDES en Cifras y del PDI</span>
+  </header>
+  <nav class="tabs" role="tablist" id="tabs">
+    <button role="tab" data-t="estr" aria-selected="true">Estructura de la plataforma</button>
+    <button role="tab" data-t="mi" aria-selected="false">Mi informe</button>
+    <button role="tab" data-t="pide" aria-selected="false">Lo que pide Planeación</button>
+    <button role="tab" data-t="cadena" aria-selected="false">Cadena de aportes</button>
+    <button role="tab" data-t="pdf" aria-selected="false">El PDF</button>
+    <button role="tab" data-t="cambia" aria-selected="false">Qué cambia frente a 2025</button>
+  </nav>
+  <section class="panel" id="p-estr"></section>
+  <section class="panel" id="p-mi" hidden></section>
+  <section class="panel" id="p-pide" hidden></section>
+  <section class="panel" id="p-cadena" hidden></section>
+  <section class="panel" id="p-pdf" hidden></section>
+  <section class="panel" id="p-cambia" hidden></section>
+</div>
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
+<script>
+(function(){
+var $=function(s,r){return(r||document).querySelector(s)},$$=function(s,r){return Array.prototype.slice.call((r||document).querySelectorAll(s))};
+var esc=function(s){return String(s==null?'':s).replace(/[&<>"]/g,function(c){return{'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]})};
+var RM=matchMedia('(prefers-reduced-motion: reduce)').matches;
+var fmt=function(n,u){return(typeof n==='number'?n.toLocaleString('es-CO'):n)+(u||'')};
+var words=function(t){t=(t||'').trim();return t?t.split(/\s+/).length:0};
+function toast(m){var t=$('#toast');t.textContent=m;t.classList.add('on');clearTimeout(toast.h);toast.h=setTimeout(function(){t.classList.remove('on')},2200)}
+function enter(root,sel){if(RM||!window.gsap)return;var els=$$(sel,root);if(!els.length)return;gsap.fromTo(els,{opacity:0,y:10},{opacity:1,y:0,duration:.28,ease:'expo.out',stagger:.04,clearProps:'opacity,transform'})}
+
+/* ---------- datos de ejemplo ---------- */
+var CUT='31 dic 2026';
+var DIMS={
+ acad:{t:'Gestión académica',fn:'Enseñanza',m:[
+  {k:'matric',l:'Matrícula total',u:'',v:2840,p:2765,m:2900,hi:1,src:'UDES en Cifras · Matrícula'},
+  {k:'deser',l:'Deserción anual',u:' %',v:7.8,p:8.6,m:8,hi:0,src:'UDES en Cifras · SPADIES'},
+  {k:'reten',l:'Retención de primer semestre',u:' %',v:82.1,p:80.4,m:81,hi:1,src:'UDES en Cifras · Permanencia'},
+  {k:'tyt',l:'Saber PRO · promedio global',u:'',v:151,p:148,m:150,hi:1,src:'UDES en Cifras · Saber PRO'}]},
+ prof:{t:'Gestión profesoral',fn:'Enseñanza',m:[
+  {k:'doc',l:'Profesores con doctorado',u:' %',v:34,p:31,m:35,hi:1,src:'UDES en Cifras · Profesorado'},
+  {k:'eval',l:'Evaluación docente',u:'',v:4.4,p:4.3,m:4.3,hi:1,src:'UDES en Cifras · Evaluación'}]},
+ cal:{t:'Calidad y oferta',fn:'Enseñanza',m:[
+  {k:'rc',l:'Registros calificados vigentes',u:'',v:18,p:17,m:18,hi:1,src:'UDES en Cifras · Oferta'},
+  {k:'rct',l:'Registros en trámite',u:'',v:3,p:4,m:3,hi:0,src:'Oferta de programas · SACES'}]},
+ inv:{t:'Investigación',fn:'Investigación',m:[
+  {k:'gru',l:'Grupos categorizados',u:'',v:7,p:6,m:7,hi:1,src:'UDES en Cifras · Minciencias'},
+  {k:'sem',l:'Semilleros activos',u:'',v:12,p:10,m:12,hi:1,src:'UDES en Cifras · Semilleros'},
+  {k:'nuc',l:'Productos de nuevo conocimiento',u:'',v:58,p:49,m:55,hi:1,src:'UDES en Cifras · Producción'}]},
+ ext:{t:'Extensión e internacionalización',fn:'Extensión',m:[
+  {k:'con',l:'Convenios activos',u:'',v:21,p:17,m:20,hi:1,src:'UDES en Cifras · Convenios'},
+  {k:'pext',l:'Proyectos de extensión',u:'',v:14,p:11,m:15,hi:1,src:'UDES en Cifras · Extensión'}]},
+ fin:{t:'Gestión administrativa y financiera',fn:'Administrativa y financiera',m:[
+  {k:'ejec',l:'Ejecución presupuestal',u:' %',v:96.2,p:94,m:95,hi:1,src:'Vicerrectoría Administrativa y Financiera'}]}
+};
+var PIL=[['I','Personalización','Acompañamiento estudiantil',5,78],['II','Ambiente tecnológico','Transformación digital',4,64],['III','Entorno emprendedor','Emprendimiento e innovación',3,71],['IV','Gobernanza para el buen gobierno','Gestión y trazabilidad',4,83],['V','Sostenibilidad','Campus y ODS',3,57],['VI','Apropiación social','Extensión y región',4,69]];
+var TPL={
+ A:{n:'Plantilla A',who:'Decanatura',unit:'Facultad de Ciencias de la Salud',sub:'Bucaramanga · Decana',to:'Rectoría de Campus',secs:[
+  {t:'Resumen ejecutivo',ty:'narr',len:'1 a 3 párrafos',draft:1,need:25},
+  {t:'Alineación estratégica con el PDI',ty:'pdi'},
+  {t:'Objetivos y metas 2026',ty:'metas'},
+  {t:'Resultados por dimensión estratégica',ty:'dim',dims:['acad','prof','cal','inv','ext','fin']},
+  {t:'Síntesis de resultados institucionales',ty:'matriz'},
+  {t:'Puntos críticos y acciones de mejora',ty:'filas',cols:['Dimensión','Punto crítico','Acción','Tiempo','Recursos']},
+  {t:'Logros destacados',ty:'logros'},
+  {t:'Evidencias y fuentes de verificación',ty:'evid'},
+  {t:'Conclusiones',ty:'narr',len:'1 a 3 párrafos',need:25},
+  {t:'Anexos',ty:'anexos'}]},
+ B:{n:'Plantilla B',who:'Vicerrectoría u oficina',unit:'Vicerrectoría de Extensión',sub:'Institucional · Vicerrector',to:'Rectoría General',secs:[
+  {t:'Resumen ejecutivo',ty:'narr',len:'1 a 3 párrafos, máximo dos páginas',draft:1,need:25},
+  {t:'Alineación estratégica',ty:'pdi'},
+  {t:'Objetivos y metas anuales de la unidad',ty:'metas'},
+  {t:'Resultados y evidencias',ty:'dim',dims:['ext','inv','fin']},
+  {t:'Logros innovadores o excepcionales',ty:'logros'},
+  {t:'Análisis de retos y oportunidades',ty:'filas',cols:['Reto','Aprendizaje','Oportunidad','Propuesta']},
+  {t:'Evidencia y fuentes de verificación',ty:'evid'},
+  {t:'Conclusiones',ty:'narr',len:'1 a 3 párrafos, tono claro y propositivo',need:25},
+  {t:'Anexos',ty:'anexos'}]},
+ C:{n:'Plantilla C',who:'Rectoría de campus',unit:'Rectoría Campus Cúcuta',sub:'Cúcuta · Rector',to:'Rectoría General',secs:[
+  {t:'Resumen ejecutivo del campus',ty:'narr',len:'1 a 3 párrafos del rector',draft:1,need:25},
+  {t:'Alineación estratégica con el PDI',ty:'pdi'},
+  {t:'Objetivos y metas del campus',ty:'metas'},
+  {t:'Consolidado por función sustantiva',ty:'dim',dims:['inv','ext','acad','fin'],cons:1},
+  {t:'Resultados y evidencias',ty:'matriz'},
+  {t:'Análisis de retos y oportunidades',ty:'filas',cols:['Reto','Aprendizaje','Oportunidad','Propuesta']},
+  {t:'Conclusiones',ty:'narr',len:'1 a 3 párrafos',need:25},
+  {t:'Anexos',ty:'anexos'}]},
+ D:{n:'Plantilla D',who:'Rectoría General',unit:'Rectoría General UDES',sub:'Nivel institucional · Rector general',to:'Consejo Superior',secs:[
+  {t:'Presentación del Rector',ty:'narr',len:'una página',draft:1,need:40},
+  {t:'Introducción',ty:'narr',len:'2 a 3 párrafos: propósito, periodo y organización',need:30},
+  {t:'I. Investigación',ty:'dim',dims:['inv'],cons:1,fn:'Investigación'},
+  {t:'II. Extensión',ty:'dim',dims:['ext'],cons:1,fn:'Extensión'},
+  {t:'III. Enseñanza',ty:'dim',dims:['acad','prof','cal'],cons:1,fn:'Enseñanza'},
+  {t:'IV. Gestión administrativa y financiera',ty:'dim',dims:['fin'],cons:1,fn:'Administrativa y financiera'},
+  {t:'V. Síntesis y proyecciones 2027',ty:'matriz'},
+  {t:'Anexos',ty:'anexos'}]}
+};
+var CON={pdi:['Plan de Desarrollo','Pilares, líneas y proyectos con su avance','Portal de implementación'],dim:['UDES en Cifras','Cifras del periodo con su fuente y corte','Taller de UDES en Cifras'],matriz:['Indicadores','Serie 2025–2026 y cumplimiento de meta','Portal PDI · Tablero'],narr:['Informe 2025','Lo que dijo esta unidad el año pasado','Archivo de informes'],metas:['Informe 2025','Metas comprometidas el año anterior','Archivo de informes']};
+var S={tpl:'A',sec:0,tab:'estr',ack:{},src:{},srcOpen:{},inc:{},note:{},own:{},txt:{},rows:{},logros:{},files:['Acta-comité-curricular.pdf','Convenio-Universidad-del-Norte.pdf'],req:{},limit:3,needSrc:1,needPil:1,ownOpen:0,status:'Borrador',draftOf:{},art:{}};
+var statuses=['Borrador','Enviado','Aprobado'];
+/* estado inicial de ejemplo para la plantilla A */
+S.txt['A:8']='En 2026 la facultad consolidó su oferta, redujo la deserción y fortaleció la investigación con más semilleros y productos. Los retos de 2027 son la renovación de dos registros calificados y la vinculación de profesores con doctorado.';
+S.art['A:1']={0:1,1:1,3:1};S.txt['A:1']='';
+S.rows['A:2']=[['Programas con acompañamiento académico reforzado',6,6],['Convenios nuevos de práctica',4,6],['Semilleros en líneas nuevas',3,2]];
+S.rows['A:5']=[['Investigación','Un solo grupo en categoría B','Plan de fortalecimiento con la Vicerrectoría de Investigaciones','2027','Dos profesores con dedicación']];
+var APORTES=[
+ {id:1,unit:'Decanatura FIT',fn:'Investigación',st:'Aprobado',inc:1,txt:'Tres semilleros nuevos en energías renovables y dos artículos en revistas Q2.'},
+ {id:2,unit:'Oficina de Extensión Cúcuta',fn:'Extensión',st:'Aprobado',inc:1,txt:'Catorce proyectos de proyección social con 1.200 beneficiarios en el área metropolitana.'},
+ {id:3,unit:'Centro de Graduados',fn:'Enseñanza',st:'Enviado',inc:0,txt:'Encuesta de seguimiento a 410 graduados con tasa de empleabilidad del 91 %.'},
+ {id:4,unit:'Decanatura FCS',fn:'Enseñanza',st:'Devuelto',inc:0,txt:'Falta la fuente del dato de retención.'}
+];
+var UNITS=[
+ ['Decanatura FCS','Decanatura','Enviado',100],['Decanatura FIT','Decanatura','Borrador',62],['Decanatura FCENA','Decanatura','Borrador',35],['Decanatura FCMS','Decanatura','Aprobado',100],['Decanatura CFT','Decanatura','Sin iniciar',0],
+ ['VAF · Planeación','Vicerrectoría','Aprobado',100],['Vicerrectoría de Extensión','Vicerrectoría','Enviado',100],['Vicerrectoría de Posgrados','Vicerrectoría','Borrador',48],['Investigaciones','Vicerrectoría','Sin iniciar',0],
+ ['Rectoría Campus Cúcuta','Campus','Borrador',55],['Rectoría Campus Valledupar','Campus','Sin iniciar',0]
+];
+var CMTS={};
+
+/* ---------- lógica de datos ---------- */
+function T(){return TPL[S.tpl]}
+function dimsOf(t){var o={};t.secs.forEach(function(s){(s.dims||[]).forEach(function(d){o[d]=1})});return Object.keys(o)}
+function sem(m){var r=m.hi?m.v/m.m:m.m/m.v;return r>=1?'ok':r>=.9?'mid':'bad'}
+var SEMT={ok:'Cumplida',mid:'En camino',bad:'Rezagada'};
+function reqOf(k){if(S.req[k])return S.req[k];var all=[];Object.keys(DIMS).forEach(function(d){DIMS[d].m.forEach(function(x){all.push(x.k)})});return all.indexOf(k)%3===2?'sug':'req'}
+function isInc(k){var r=reqOf(k);if(r==='off')return false;if(r==='req')return true;return S.inc[k]!==false}
+function metricsOf(dims){var o=[];dims.forEach(function(d){DIMS[d].m.forEach(function(x){o.push({d:d,m:x})})});return o}
+function ownKey(i){return S.tpl+':'+i}
+function ownList(i){return S.own[ownKey(i)]||[]}
+function includedAll(){var t=T(),o=[];dimsOf(t).forEach(function(d){DIMS[d].m.forEach(function(m){if(isInc(m.k))o.push({d:d,m:m})})});return o}
+function needNote(i){var s=T().secs[i],c=0;(s.dims||[]).forEach(function(d){DIMS[d].m.forEach(function(m){if(reqOf(m.k)==='req'&&!(S.note[S.tpl+':'+m.k]||'').trim())c++})});return c}
+function secState(i){
+ var t=T(),s=t.secs[i],key=ownKey(i);
+ if(s.ty==='narr'){var w=words(S.txt[key]);return w>=s.need?2:w>0?1:0}
+ if(s.ty==='pdi'){var a=S.art[key]||{},n=Object.keys(a).filter(function(x){return a[x]}).length;return n>=3?2:n>0?1:0}
+ if(s.ty==='metas'){var r=S.rows[key]||[];if(!r.length)return 0;return r.every(function(x){return x[0]&&x[2]!==''&&x[2]!=null})?2:1}
+ if(s.ty==='dim'){var tot=0,ok=0;s.dims.forEach(function(d){DIMS[d].m.forEach(function(m){if(reqOf(m.k)==='req'){tot++;if((S.note[S.tpl+':'+m.k]||'').trim())ok++}})});return !tot?2:ok===tot?2:ok>0?1:0}
+ if(s.ty==='matriz'){return words(S.txt[key])>=10?2:words(S.txt[key])>0?1:0}
+ if(s.ty==='filas'){var f=S.rows[key]||[];if(!f.length)return 0;return f.some(function(r){return r.every(function(c){return(''+c).trim()})})?2:1}
+ if(s.ty==='logros'){var l=S.logros[key]||[];return l.some(function(x){return x&&x.t&&x.r})?2:l.length?1:0}
+ if(s.ty==='evid')return S.files.length?2:0;
+ return 2;
+}
+function overall(){var t=T(),d=0;t.secs.forEach(function(_,i){if(secState(i)===2)d++});return d}
+
+/* ---------- cifras vivas, fuentes propias y texto con cifras enlazadas ---------- */
+var SRCT={auto:'UDES en Cifras (en vivo)',pdi:'Indicador del PDI (en vivo)',excel:'Excel propio',manual:'Dato manual'};
+function frozen(){return S.status!=='Borrador'}
+function findM(k){var r=null;Object.keys(DIMS).forEach(function(d){DIMS[d].m.forEach(function(m){if(m.k===k)r=m})});return r}
+function srcOf(m){return S.src[m.k]||{t:'auto',n:m.src}}
+function srcBlock(m){
+ var s=srcOf(m),k=m.k,live=s.t==='auto'||s.t==='pdi',fz=frozen();
+ if(S.ack[k]==null)S.ack[k]=m.v;
+ var ch=(live&&!fz&&S.ack[k]!==m.v)?'<div class="chg">Cambió desde que lo revisó: <b class="num">'+fmt(S.ack[k])+esc(m.u)+' → '+fmt(m.v)+esc(m.u)+'</b><button data-ack="'+k+'">Aceptar</button></div>':'';
+ var st=fz?'<span class="pill">Foto del 14 oct 2026</span>':live?'<span class="pill teal"><i class="lv"></i>En vivo</span>':'<span class="pill" style="background:var(--amber-s);color:var(--amber-ink)">Fuente propia</span>';
+ return ch+'<div class="s">'+st+'<span>'+esc(s.n||'Sin nombre de fuente')+(live?' · corte '+CUT:'')+'</span>'+(fz?'':'<button class="lnk" data-srcx="'+k+'">'+(S.srcOpen[k]?'Cerrar':'Cambiar fuente')+'</button>')+'</div>'+((!fz&&S.srcOpen[k])?srcEditor(m,s):'');
+}
+function srcEditor(m,s){
+ var own=s.t==='manual'||s.t==='excel';
+ return'<div class="srced"><select class="in" data-stype="'+m.k+'" aria-label="Fuente">'+Object.keys(SRCT).map(function(t){return'<option value="'+t+'"'+(s.t===t?' selected':'')+'>'+SRCT[t]+'</option>'}).join('')+'</select>'+
+ (own?'<input class="in" data-sname="'+m.k+'" value="'+esc(s.n)+'" placeholder="Nombre de la fuente (obligatorio)" aria-label="Nombre de la fuente"><input class="in num" type="number" data-sval="'+m.k+'" value="'+m.v+'" aria-label="Valor">'+(s.t==='excel'?'<label class="btn sm" for="fx'+m.k+'" style="justify-self:start">Cargar Excel</label><input type="file" id="fx'+m.k+'" data-sfile="'+m.k+'" hidden>':'')+'<span class="hint">Un dato propio queda marcado en el informe como «fuente propia».</span>':'')+'</div>';
+}
+function liveBtn(i){return frozen()?'':'<button class="btn sm" data-sim="'+i+'">Simular actualización de UDES en Cifras</button>'}
+function simulate(i){var s=T().secs[i],n=0;(s.dims||[]).forEach(function(d){DIMS[d].m.forEach(function(m){var q=srcOf(m);if(n<2&&(q.t==='auto'||q.t==='pdi')){var b=m.u.trim()==='%'?.3:Math.max(1,Math.round(m.v*.004));m.v=Math.round((m.v+b)*10)/10;n++}})});renderEditor(false);refreshAux();toast('UDES en Cifras actualizó '+n+' cifras. Revise los avisos.')}
+function citeBar(){var inc=includedAll();return'<div class="cite"><select class="in" id="cs" aria-label="Cifra a insertar"><option value="">Insertar una cifra viva…</option>'+inc.map(function(x){return'<option value="'+x.m.k+'">'+esc(x.m.l)+' ('+fmt(x.m.v)+esc(x.m.u)+')</option>'}).join('')+'</select><button class="btn sm" id="ci">Insertar</button><span class="hint">La cifra queda como vínculo: si la fuente cambia, el texto cambia.</span></div>'}
+function resolve(t){return esc(t||'').replace(/\[\[(\w+)\]\]/g,function(_,k){var m=findM(k);if(!m)return'[['+k+']]';return'<span class="chipc" title="'+esc(srcOf(m).n)+'">'+fmt(m.v)+esc(m.u)+'</span>'}).replace(/\n/g,'<br>')}
+function plain(t){return(t||'').replace(/\[\[(\w+)\]\]/g,function(_,k){var m=findM(k);return m?fmt(m.v)+m.u:''})}
+function prevBox(key){var t=S.txt[key];return'<div class="prev"><span class="eyebrow">Así se leerá, con las cifras vivas</span><div class="pv" id="pv">'+(t?resolve(t):'<span class="muted">Escriba o inserte una cifra.</span>')+'</div></div>'}
+
+/* ---------- estructura de la plataforma ---------- */
+function renderEstr(){
+ var ex='En 2026 la matrícula llegó a [[matric]] estudiantes y la deserción bajó a [[deser]], por debajo de la meta. Los [[con]] convenios activos sostienen la movilidad.';
+ var tr=function(a){return a.map(function(r){return'<tr><td><b>'+esc(r[0])+'</b></td><td>'+esc(r[1])+'</td><td>'+esc(r[2])+'</td><td>'+esc(r[3])+'</td></tr>'}).join('')};
+ $('#p-estr').innerHTML=
+ '<div class="eh"><span class="eyebrow">/admin/informes-gestion</span><h2>Estructura de la plataforma</h2><p>Un ciclo anual por unidad, con el mismo recorrido que ya funciona en el reporte de rankings THE: abrir, diligenciar, enviar, aprobar o devolver. Los datos viajan vivos mientras se escribe y se congelan al enviar.</p></div>'+
+ '<ol class="flow"><li><b>Abrir el ciclo</b><span>Planeación elige plantillas, fechas límite y qué datos se justifican.</span></li><li><b>Diligenciar</b><span>El encargado de cada unidad escribe su informe sobre cifras vivas.</span></li><li><b>Enviar</b><span>Se toma la foto de las cifras y el informe se bloquea.</span></li><li><b>Revisar</b><span>Planeación aprueba o devuelve con una nota.</span></li><li><b>Consolidar</b><span>Campus y vicerrectorías suben a la Rectoría General.</span></li><li><b>Radicar</b><span>PDF oficial generado desde el portal.</span></li></ol>'+
+ '<div class="mods">'+
+ [['1 · Tablero del ciclo','Planeación ve todas las unidades: estado, fecha límite y avance por sección.','Planeación','pide','Se añade el semáforo de plazo y un recordatorio por correo.'],
+  ['2 · Editor del informe','Bloques automáticos con cifras vivas y bloques de aporte que la unidad construye: texto, cifras enlazadas, tablas, evidencias.','Gestor y Contribuyente','mi','Fuentes propias y narrativa libre con cifras enlazadas.'],
+  ['3 · Revisión','Planeación aprueba o devuelve con nota, como en el reporte THE.','Planeación','pide','La nota queda anclada a la sección que se devuelve.'],
+  ['4 · Consolidador','Cada nivel recibe lo aprobado del nivel de abajo y decide qué entra.','Rectorías y vicerrectorías','cadena','Se cita el aporte; no se copia el texto.'],
+  ['5 · Vista A4 y exportación','La vista del portal es la misma maqueta del PDF oficial.','Todos','pdf','PDF oficial con el motor del boletín; Word como copia editable.']].map(function(m){return'<div class="card mod"><h3>'+m[0]+'</h3><p>'+m[1]+'</p><span class="who">Usa: '+m[2]+'</span><span class="new">'+m[4]+'</span><button class="btn sm" data-tab="'+m[3]+'" style="justify-self:start">Ver en el piloto</button></div>'}).join('')+'</div>'+
+ '<div class="sec2"><h3>Cómo viajan los datos</h3><p class="sub">Su idea de la foto se conserva, pero se toma al enviar, no al llenar. Mientras se escribe, las cifras siguen a UDES en Cifras y al PDI.</p><div class="life"><div class="hot"><b>Mientras escribe</b><span>Cifras en vivo. Si una cambia, el editor avisa «cambió de 2.840 a 2.851» y la unidad decide si acepta el valor nuevo.</span></div><div><b>Al enviar</b><span>Se guarda la foto de cada cifra con su fuente y fecha. Desde ahí el informe no cambia.</span></div><div><b>Aprobado</b><span>Queda congelado y citable. Planeación lo consolida o lo devuelve; al devolverlo, las cifras vuelven a ser vivas.</span></div></div>'+
+ '<div class="tw"><table class="ask"><thead><tr><th>Fuente</th><th>Cómo entra</th><th>Vivo o fijo</th><th>Quién la usa</th></tr></thead><tbody>'+tr([
+  ['UDES en Cifras','Consulta directa por campus y periodo','Vivo hasta enviar','Todas las unidades'],
+  ['Plan de Desarrollo e indicadores','Portal de implementación e indicadores del campus','Vivo hasta enviar','Todas las unidades'],
+  ['Aportes aprobados','Informes aprobados de las unidades de abajo','Vivo hasta que se aprueba','Campus y rectoría general'],
+  ['Excel o CSV propio','Se carga una vez y queda con su versión y hoja','Fijo','Quien tiene datos que no están en el portal'],
+  ['Dato manual','Valor, nombre de la fuente y evidencia obligatorios','Fijo','Con el límite que fije Planeación'],
+  ['Documento o URL','Numerado y citado desde el texto','Fijo','Todas las unidades']])+'</tbody></table></div></div>'+
+ '<div class="sec2"><h3>Cómo se construye la narrativa</h3><p class="sub">Cada sección es una lista de bloques que la unidad ordena. Un texto puede llevar cifras enlazadas a su fuente, como estas:</p><div class="ex"><div class="pv">'+resolve(ex)+'</div><div class="blks"><span>Texto</span><span>Cifra enlazada</span><span>Tabla de metas</span><span>Gráfico</span><span>Evidencia citada</span><span>Borrador de Pilo</span></div><span class="hint">Pase el cursor sobre una cifra para ver su fuente. En «Mi informe» puede insertarlas con «Insertar una cifra viva».</span></div></div>'+
+ '<div class="sec2"><h3>Quién hace qué</h3><div class="cols2"><div class="tw"><table class="ask"><thead><tr><th>Rol existente</th><th>En un informe</th></tr></thead><tbody><tr><td><b>Gestor</b></td><td>Decano, vicerrector, rector o jefe de oficina: responde y envía.</td></tr><tr><td><b>Contribuyente</b></td><td>Quien aporta una sección o un dato propio, sin enviar.</td></tr><tr><td><b>Consulta</b></td><td>Ve el informe, no lo edita.</td></tr><tr><td><b>Planeación</b></td><td>Abre el ciclo, fija qué se justifica, revisa y consolida.</td></tr></tbody></table></div>'+
+ '<div class="tw"><table class="ask"><thead><tr><th>Tabla (propuesta)</th><th>Guarda</th></tr></thead><tbody><tr><td><b>informe_ciclos</b></td><td>Año, plantillas, fechas límite.</td></tr><tr><td><b>informe_instancias</b></td><td>Una por unidad: estado y quién envió.</td></tr><tr><td><b>informe_secciones</b></td><td>Bloques de cada sección, en orden.</td></tr><tr><td><b>informe_fuentes</b></td><td>Catálogo de fuentes y consultas.</td></tr><tr><td><b>informe_cifras</b></td><td>Fuente, valor y la foto al enviar.</td></tr><tr><td><b>informe_anexos</b></td><td>Archivos y URL numerados.</td></tr><tr><td><b>informe_revisiones</b></td><td>Decisión y nota por sección.</td></tr></tbody></table></div></div></div>'+
+ '<div class="sec2"><h3>Sobre su propuesta</h3><div class="cols2"><div class="card pad"><b>Se conserva</b><p class="sub" style="margin:6px 0 0">El ciclo anual, el flujo del reporte THE, los roles que ya existen, Pilo como asistente de redacción, los anexos numerados y la vista A4 igual al documento final.</p></div><div class="card pad"><b>Cambia</b><p class="sub" style="margin:6px 0 0">La foto se toma al enviar, no al llenar. El PDF es el documento oficial: Word sirve de copia editable, pero no garantiza el mismo diseño. Las fuentes propias se registran con nombre y evidencia. Las validaciones que hallamos en los informes de 2025 corren en el editor.</p></div></div></div>';
+}
+
+/* ---------- tab 1: mi informe ---------- */
+function icon(n){return({lock:'<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 018 0v3"/></svg>',up:'<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 16V4m0 0l-4 4m4-4l4 4M5 20h14"/></svg>'})[n]||''}
+function renderMi(){
+ var t=T(),root=$('#p-mi');
+ root.innerHTML='<div class="ed"><div class="card rail" id="rail"></div><div class="card editor" id="editor"></div><aside class="side" id="side"></aside></div>';
+ renderRail();renderEditor(false);renderSide();
+}
+function renderRail(){
+ var t=T(),done=overall(),n=t.secs.length,pct=Math.round(done/n*100);
+ var tplSel='<div class="seg" id="tplseg" role="group" aria-label="Plantilla">'+Object.keys(TPL).map(function(k){return'<button data-k="'+k+'" aria-pressed="'+(k===S.tpl)+'" title="'+esc(TPL[k].who)+'">'+k+'</button>'}).join('')+'</div>';
+ var sendOk=done===n&&S.status==='Borrador';
+ $('#rail').innerHTML=tplSel+
+ '<div class="unit"><span class="eyebrow">'+esc(t.n)+' · '+esc(t.who)+'</span><b>'+esc(t.unit)+'</b><span>'+esc(t.sub)+' · 2026</span></div>'+
+ '<div class="stat"><span class="pill '+(S.status==='Borrador'?'':S.status==='Enviado'?'blue':'ok')+'">'+S.status+'</span><span class="num" style="font-size:12.5px;font-weight:700">'+done+' de '+n+' listas</span></div>'+
+ '<div class="bar" aria-hidden="true"><i id="pbar" style="width:100%;transform:scaleX('+pct/100+')"></i></div>'+
+ '<small style="color:var(--ink2)">'+(S.status==='Borrador'?'Las cifras siguen en vivo hasta que envíe.':'Las cifras quedaron congeladas al enviar.')+'</small><div class="secs" id="secs">'+t.secs.map(function(s,i){var st=secState(i);return'<button data-i="'+i+'" aria-current="'+(i===S.sec)+'"><span class="n">'+(i+1)+'</span><span>'+esc(s.t)+'</span><span class="dot '+(st===2?'done':st===1?'part':'')+'" title="'+['Sin empezar','En curso','Lista'][st]+'"></span></button>'}).join('')+'</div>'+
+ '<div class="send"><button class="btn pri" id="sendbtn" '+(sendOk?'':'disabled')+'>'+(S.status==='Borrador'?'Enviar a '+esc(t.to):S.status==='Enviado'?'Enviado a '+esc(t.to):'Aprobado')+'</button><small>'+(S.status==='Borrador'?(sendOk?'Todo listo. Al enviar queda la foto de las cifras y el informe se bloquea.':'Se habilita cuando las '+n+' secciones estén listas.'):S.status==='Enviado'?'Esperando revisión. Si la devuelven, vuelve a Borrador con su comentario.':'Informe aprobado y congelado.')+'</small>'+(S.status==='Enviado'?'<button class="btn ghost sm" id="reopen" style="justify-self:start;padding:0">Simular que Planeación lo devuelve</button>':'')+'</div>';
+}
+function tilesHtml(i){
+ var s=T().secs[i],h='',list=[];
+ s.dims.forEach(function(d){list.push('<h4 class="eyebrow" style="margin:14px 0 8px">'+esc(DIMS[d].t)+'</h4><div class="tiles">'+DIMS[d].m.map(function(m){return tileHtml(m)}).join('')+(d===s.dims[s.dims.length-1]?ownList(i).map(function(o,j){return ownTile(o,j)}).join(''):'')+'</div>')});
+ return list.join('');
+}
+function tileHtml(m){
+ var r=reqOf(m.k);if(r==='off')return'';
+ var inc=isInc(m.k),sm=sem(m),key=S.tpl+':'+m.k,note=S.note[key]||'';
+ var delta=m.v-m.p,sign=delta>0?'+':delta<0?'−':'',dtxt=sign+Math.abs(Math.round(delta*10)/10).toLocaleString('es-CO')+(m.u.trim()==='%'?' pp':'');
+ return'<div class="tile '+(inc?'':'off')+'" data-k="'+m.k+'"><div class="row1"><span class="l">'+esc(m.l)+'</span>'+(r==='req'?'<span class="lock" title="Planeación pide este dato">'+icon('lock')+' Lo pide Planeación</span>':'<label class="chk"><input type="checkbox" data-inc="'+m.k+'" '+(inc?'checked':'')+'> Incluir</label>')+'</div>'+
+ '<div class="v num">'+fmt(m.v)+'<small>'+esc(m.u)+'</small></div>'+
+ '<div class="cmp num"><span>2025: '+fmt(m.p)+esc(m.u)+'</span><span>'+dtxt+'</span><span>Meta '+fmt(m.m)+esc(m.u)+'</span><span class="sem '+sm+'"><i></i>'+SEMT[sm]+'</span></div>'+
+ srcBlock(m)+
+ (inc&&r==='req'?'<input class="just '+(note.trim()?'':'need')+'" data-note="'+key+'" value="'+esc(note)+'" placeholder="Explique este resultado en una línea" aria-label="Justificación de '+esc(m.l)+'">':'')+'</div>';
+}
+function ownTile(o,j){
+ var pil=o.pil?PIL[+o.pil][1]:'sin pilar';
+ return'<div class="tile own"><div class="row1"><span class="l">'+esc(o.l)+'</span><span class="pill" style="background:var(--amber-s);color:var(--amber-ink)">Dato propio</span></div><div class="v num">'+esc(o.v)+'</div><div class="s">Fuente: '+esc(o.src||'—')+' · Pilar: '+esc(pil)+'</div><button class="btn ghost sm" data-delown="'+j+'" style="justify-self:start;padding:0">Quitar</button></div>';
+}
+function renderEditor(anim){
+ var t=T(),i=S.sec,s=t.secs[i],key=ownKey(i),h='';
+ var auto={narr:s.draft?'Pilo puede redactar un borrador desde las demás secciones':'Lo escribe la unidad',pdi:'Pilares y proyectos vienen del portal de implementación',metas:'Lo escribe la unidad',dim:'Las cifras vienen solas; usted explica lo que no se ve en ellas',matriz:'La matriz se arma con las cifras de las secciones anteriores',filas:'Lo escribe la unidad',logros:'Máximo tres, cada uno con evidencia',evid:'Cada logro apunta a un archivo cargado',anexos:'Se arma sola con los archivos que cargue'}[s.ty];
+ h+='<div class="ehd"><div><span class="eyebrow">Sección '+(i+1)+' de '+t.secs.length+'</span><h2>'+esc(s.t)+'</h2></div>'+(s.ty!=='anexos'?'<span class="pill '+(secState(i)===2?'ok':'')+'">'+['Sin empezar','En curso','Lista'][secState(i)]+'</span>':'')+'</div><p class="lead">'+esc(auto)+'.</p>';
+ if(s.ty==='narr'){
+  var txt=S.txt[key]||'',w=words(txt);
+  h+='<div class="blk"><div class="lab"><span class="tag apo">Aporte</span><span class="src">'+esc(s.len)+'</span></div>'+citeBar()+'<div class="fld"><textarea id="ta" data-txt="'+key+'" placeholder="Escriba aquí con sus palabras…" aria-label="'+esc(s.t)+'">'+esc(txt)+'</textarea><div class="ft"><span class="num" id="wc">'+w+' palabras · mínimo '+s.need+'</span><span style="display:flex;gap:8px;align-items:center">'+(S.draftOf[key]?'<span class="pill teal">Borrador de Pilo · confirme cada cifra</span>':'')+(s.draft?'<button class="btn sm" id="pilo">Pilo redacta un borrador</button>':'')+'</span></div></div>'+prevBox(key)+'</div>';
+ }
+ if(s.ty==='pdi'){
+  var a=S.art[key]||{};
+  h+='<div class="blk"><div class="lab"><span class="tag auto">Automático</span><span class="src">Portal de implementación · corte '+CUT+'</span></div><div class="autobox"><div class="tw"><table class="tbl"><thead><tr><th style="width:44px">Articula</th><th>Pilar</th><th>Línea</th><th class="num">Proyectos 2026</th><th class="num">Avance</th></tr></thead><tbody>'+PIL.map(function(p,j){return'<tr><td><input type="checkbox" data-art="'+j+'" '+(a[j]?'checked':'')+' aria-label="Articular con '+esc(p[1])+'"></td><td><b>'+p[0]+'.</b> '+esc(p[1])+'</td><td>'+esc(p[2])+'</td><td class="num">'+p[3]+'</td><td class="num"><b>'+p[4]+' %</b></td></tr>'}).join('')+'</tbody></table></div></div></div>'+
+  '<div class="blk"><div class="lab"><span class="tag apo">Aporte</span><span class="src">Media página: cómo contribuye su unidad a los pilares marcados</span></div><div class="fld"><textarea data-txt="'+key+'" placeholder="Cuente cómo se conecta su trabajo con los pilares que marcó…">'+esc(S.txt[key]||'')+'</textarea><div class="ft"><span class="num">'+Object.keys(a).filter(function(x){return a[x]}).length+' pilares articulados · se recomiendan al menos 3</span></div></div></div>';
+ }
+ if(s.ty==='metas'){
+  var rows=S.rows[key]||(S.rows[key]=[]);
+  h+='<div class="blk"><div class="lab"><span class="tag apo">Aporte</span><span class="src">El resultado se calcula solo. Nada de tablas pegadas desde Excel.</span></div><div class="tw"><table class="tbl"><thead><tr><th>Meta</th><th class="num" style="width:110px">Programado</th><th class="num" style="width:110px">Alcanzado</th><th style="width:120px">Resultado</th><th style="width:40px"></th></tr></thead><tbody>'+rows.map(function(r,j){var res=r[2]===''||r[2]==null?'—':r[2]>r[1]?'Superada':r[2]===r[1]?'Cumplida':'Parcial';return'<tr><td><input data-row="'+key+':'+j+':0" value="'+esc(r[0])+'" placeholder="Describa la meta" aria-label="Meta"></td><td><input class="num" type="number" data-row="'+key+':'+j+':1" value="'+r[1]+'" aria-label="Programado"></td><td><input class="num" type="number" data-row="'+key+':'+j+':2" value="'+(r[2]==null?'':r[2])+'" aria-label="Alcanzado"></td><td id="res-'+j+'"><span class="pill '+(res==='Superada'?'ok':res==='Cumplida'?'teal':res==='Parcial'?'mid':'')+'">'+res+'</span></td><td><button class="btn ghost sm" data-delrow="'+key+':'+j+'" aria-label="Quitar fila">✕</button></td></tr>'}).join('')+'</tbody></table></div><button class="btn sm" style="margin-top:10px" data-addrow="'+key+'" data-n="3">Añadir meta</button></div>';
+ }
+ if(s.ty==='dim'){
+  var need=needNote(i);
+  h+='<div class="blk"><div class="lab"><span class="tag auto">Automático</span><span class="src">'+(frozen()?'Foto tomada al enviar · 14 oct 2026':'En vivo hasta que envíe')+' · UDES en Cifras</span>'+liveBtn(i)+(need?'<span class="pill mid">'+need+' sin justificar</span>':'<span class="pill ok">Justificado</span>')+'</div><div class="autobox">'+tilesHtml(i)+
+  '<div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-top:14px"><button class="btn sm" id="addown" '+(ownList(i).length>=S.limit?'disabled':'')+'>Añadir un dato propio</button><span class="num" style="font-size:12px;color:var(--ink2)">'+ownList(i).length+' de '+S.limit+' datos propios que permite Planeación</span></div>'+(S.ownOpen?ownForm():'')+'</div></div>';
+  if(s.cons){var ap=APORTES.filter(function(a){return a.st==='Aprobado'&&a.inc&&(!s.fn||a.fn===s.fn)});h+='<div class="blk"><div class="lab"><span class="tag auto">Automático</span><span class="src">Aportes aprobados de las unidades · se decide en «Cadena de aportes»</span></div>'+(ap.length?'<div class="aps">'+ap.map(function(a){return'<div class="ap"><div class="h"><b>'+esc(a.unit)+'</b><span class="pill ok">Aprobado</span></div><p>'+esc(a.txt)+'</p></div>'}).join('')+'</div>':'<p class="lead" style="margin:0">Aún no hay aportes aprobados para esta función.</p>')+'</div>'}
+  var kd=S.txt[key]||'';
+  h+='<div class="blk"><div class="lab"><span class="tag apo">Aporte</span><span class="src">'+(s.cons?'Análisis de la rectoría':'Logros y lo que las cifras no cuentan')+'</span></div>'+citeBar()+'<div class="fld"><textarea data-txt="'+key+'" placeholder="Escriba su lectura de estos resultados…">'+esc(kd)+'</textarea><div class="ft"><span class="num">'+words(kd)+' palabras</span></div></div>'+prevBox(key)+'</div>';
+ }
+ if(s.ty==='matriz'){
+  var inc=includedAll();
+  h+='<div class="blk"><div class="lab"><span class="tag auto">Automático</span><span class="src">Matriz de indicadores · serie 2025–2026 · corte '+CUT+'</span></div><div class="tw"><table class="tbl"><thead><tr><th>Indicador</th><th class="num">2025</th><th class="num">2026</th><th class="num">Meta</th><th>Cumplimiento</th><th>Fuente</th></tr></thead><tbody>'+inc.map(function(x){var m=x.m,sm=sem(m);return'<tr><td>'+esc(m.l)+'</td><td class="num">'+fmt(m.p)+esc(m.u)+'</td><td class="num"><b>'+fmt(m.v)+esc(m.u)+'</b></td><td class="num">'+fmt(m.m)+esc(m.u)+'</td><td><span class="sem '+sm+'"><i></i>'+SEMT[sm]+'</span></td><td style="font-size:12px;color:var(--muted)">'+esc(m.src)+'</td></tr>'}).join('')+'</tbody></table></div></div>'+
+  '<div class="blk"><div class="lab"><span class="tag apo">Aporte</span><span class="src">Comentario de media página</span></div>'+citeBar()+'<div class="fld"><textarea data-txt="'+key+'" placeholder="¿Qué explica los semáforos amarillos y rojos?">'+esc(S.txt[key]||'')+'</textarea><div class="ft"><span class="num">'+words(S.txt[key])+' palabras · mínimo 10</span></div></div>'+prevBox(key)+'</div>';
+ }
+ if(s.ty==='filas'){
+  var fr=S.rows[key]||(S.rows[key]=[]);
+  h+='<div class="blk"><div class="lab"><span class="tag apo">Aporte</span><span class="src">Una fila por punto. Se recomienda con acción y fecha.</span></div><div class="tw"><table class="tbl"><thead><tr>'+s.cols.map(function(c){return'<th>'+c+'</th>'}).join('')+'<th style="width:40px"></th></tr></thead><tbody>'+fr.map(function(r,j){return'<tr>'+s.cols.map(function(c,x){return'<td><input data-row="'+key+':'+j+':'+x+'" value="'+esc(r[x]||'')+'" aria-label="'+c+'"></td>'}).join('')+'<td><button class="btn ghost sm" data-delrow="'+key+':'+j+'" aria-label="Quitar fila">✕</button></td></tr>'}).join('')+'</tbody></table></div><button class="btn sm" style="margin-top:10px" data-addrow="'+key+'" data-n="'+s.cols.length+'">Añadir fila</button></div>';
+ }
+ if(s.ty==='logros'){
+  var lg=S.logros[key]||(S.logros[key]=[]);
+  h+='<div class="blk"><div class="lab"><span class="tag apo">Aporte</span><span class="src">'+lg.length+' de 3 logros</span></div><div class="logros">'+lg.map(function(l,j){return'<div class="logro"><input class="in" data-lg="'+key+':'+j+':t" value="'+esc(l.t||'')+'" placeholder="Logro" aria-label="Logro"><textarea class="in" data-lg="'+key+':'+j+':r" placeholder="Contexto y resultado" aria-label="Contexto y resultado">'+esc(l.r||'')+'</textarea><select class="in" data-lg="'+key+':'+j+':e" aria-label="Evidencia"><option value="">Evidencia…</option>'+S.files.map(function(f){return'<option'+(l.e===f?' selected':'')+'>'+esc(f)+'</option>'}).join('')+'</select><button class="btn ghost sm" data-dellg="'+key+':'+j+'" style="justify-self:start;padding:0">Quitar</button></div>'}).join('')+'</div>'+(lg.length<3?'<button class="btn sm" style="margin-top:10px" data-addlg="'+key+'">Añadir logro</button>':'')+'</div>';
+ }
+ if(s.ty==='evid'||s.ty==='anexos'){
+  h+='<div class="blk"><div class="lab"><span class="tag '+(s.ty==='anexos'?'auto':'apo')+'">'+(s.ty==='anexos'?'Automático':'Aporte')+'</span><span class="src">'+(s.ty==='anexos'?'Lista numerada con autor y fecha':'Cargue aquí cada archivo una sola vez')+'</span></div>'+
+  (s.ty==='evid'?'<label class="drop" id="drop" for="fi">'+icon('up')+'<b>Suelte archivos o haga clic</b><span>PDF, Word, Excel o imagen · hasta 50 MB</span></label><input type="file" id="fi" multiple hidden>':'')+
+  '<div class="tw" style="margin-top:12px"><table class="tbl"><thead><tr><th style="width:50px">N.º</th><th>Archivo</th><th>Cargó</th><th>Fecha</th></tr></thead><tbody>'+S.files.map(function(f,j){return'<tr><td class="num">'+(j+1)+'</td><td>'+esc(f)+'</td><td>'+esc(T().sub.split(' · ').pop())+'</td><td class="num">14 oct 2026</td></tr>'}).join('')+'</tbody></table></div></div>';
+ }
+ var ed=$('#editor');ed.innerHTML=h;
+ if(anim)enter(ed,'.ehd,.lead,.blk');
+}
+function ownForm(){return'<div class="own-form"><label>Nombre del dato<input class="in" id="o-l" placeholder="Ej.: Estudiantes en movilidad"></label><label>Valor<input class="in" id="o-v" placeholder="Ej.: 38"></label>'+(S.needSrc?'<label>Fuente (obligatoria)<input class="in" id="o-s" placeholder="Ej.: Oficina de Internacionalización"></label>':'')+(S.needPil?'<label>Pilar del PDI<select class="in" id="o-p">'+PIL.map(function(p,j){return'<option value="'+j+'">'+p[0]+'. '+p[1]+'</option>'}).join('')+'</select></label>':'')+'<div class="acts"><button class="btn pri sm" id="o-ok">Añadir</button><button class="btn sm" id="o-no">Cancelar</button><span style="font-size:12px;color:var(--amber-ink)" id="o-err"></span></div></div>'}
+function renderSide(){
+ var t=T(),i=S.sec,s=t.secs[i],key=ownKey(i),c=[];
+ var checks=[];
+ if(s.ty==='dim'){var n=needNote(i);checks.push(n?['w',n+' cifras que Planeación pide aún no tienen justificación']:['ok','Todas las cifras pedidas están justificadas']);var own=ownList(i);checks.push(own.every(function(o){return !S.needSrc||o.src})?['ok','Cada cifra tiene su fuente']:['w','Hay cifras sin fuente'])}
+ if(s.ty==='narr'||s.ty==='matriz'||s.ty==='dim'){var tx=S.txt[key]||'';var ph=/\[[^\[\]]+\]|ejemplo:|lorem|telecentro rural/i.test(tx.replace(/\[\[\w+\]\]/g,''));checks.push(ph?['w','El texto parece un ejemplo de la plantilla. Reemplácelo.']:['ok','Sin frases de ejemplo de la plantilla'])}
+ if(s.ty==='narr'){var w=words(S.txt[key]);checks.push(w>=s.need?['ok','Extensión adecuada ('+w+' palabras)']:['w','Faltan '+(s.need-w)+' palabras para el mínimo']);var raw=((S.txt[key]||'').replace(/\[\[\w+\]\]/g,'').match(/\d[\d.,]*/g)||[]).length;checks.push(raw?['w','Hay '+raw+' cifras escritas a mano. Use «Insertar una cifra viva» para que sigan a su fuente.']:['ok','Las cifras del texto están enlazadas a su fuente'])}
+ if(s.ty==='metas'){var rr=S.rows[key]||[];checks.push(rr.length?['ok','Resultado calculado a partir de programado y alcanzado']:['w','Aún no hay metas'])}
+ if(s.ty==='dim'){var ns=0;(s.dims||[]).forEach(function(d){DIMS[d].m.forEach(function(m){var q=S.src[m.k];if(q&&q.t!=='auto'&&q.t!=='pdi'&&!(q.n||'').trim())ns++})});if(ns)checks.push(['w',ns+' cifras con fuente propia sin nombre de fuente'])}
+ checks.push(['ok',frozen()?'Cifras congeladas al enviar: el informe ya no cambia':'Cifras en vivo hasta que envíe. Corte de referencia: '+CUT]);checks.push(['ok','Año del encabezado tomado del periodo: 2026']);
+ var cx=CON[s.ty==='evid'||s.ty==='logros'||s.ty==='anexos'||s.ty==='filas'?'narr':s.ty]||CON.narr;
+ var cx2=s.ty==='dim'?[CON.dim,CON.pdi]:s.ty==='matriz'?[CON.matriz,CON.dim]:s.ty==='pdi'?[CON.pdi,CON.matriz]:[cx];
+ $('#side').innerHTML='<div class="card"><h3>Controles</h3><div class="ctl"><ul>'+checks.map(function(x){return'<li><span class="ico '+(x[0]==='w'?'w':'')+'">'+(x[0]==='w'?'!':'✓')+'</span><span>'+esc(x[1])+'</span></li>'}).join('')+'</ul></div></div>'+
+ '<div class="card conx"><h3>Datos que puede consultar</h3><ul>'+cx2.map(function(x){return'<li><b>'+x[0]+'</b><span>'+x[1]+'</span><button data-go="'+esc(x[2])+'">Abrir '+esc(x[2])+' ↗</button></li>'}).join('')+'<li><b>Pilo</b><span>Pregunte de dónde sale una cifra o pida comparar con otra facultad.</span><button data-go="Pilo">Preguntar a Pilo ↗</button></li></ul></div>';
+}
+function refreshAux(){renderRail();renderSide()}
+
+/* ---------- tab 2: lo que pide Planeación ---------- */
+function renderPide(){
+ var t=T(),ds=dimsOf(t),req=0,sug=0;
+ var rows=ds.map(function(d){return'<tr class="grp"><td colspan="4">'+esc(DIMS[d].t)+'</td></tr>'+DIMS[d].m.map(function(m){var r=reqOf(m.k);if(r==='req')req++;if(r==='sug')sug++;return'<tr><td>'+esc(m.l)+'</td><td class="src">'+esc(m.src)+'</td><td><div class="seg" data-rk="'+m.k+'" role="group" aria-label="Condición de '+esc(m.l)+'"><button data-r="req" aria-pressed="'+(r==='req')+'">Justificar</button><button data-r="sug" aria-pressed="'+(r==='sug')+'">Sugerido</button><button data-r="off" aria-pressed="'+(r==='off')+'">No pedir</button></div></td></tr>'}).join('')}).join('');
+ $('#p-pide').innerHTML='<div class="two"><div class="card pad"><h3 class="t">Qué datos debe justificar cada unidad</h3><p class="sub">Para la '+esc(t.n.toLowerCase())+' ('+esc(t.who.toLowerCase())+'). Lo que marque como «Justificar» aparece bloqueado en el informe de cada unidad, con una línea de explicación obligatoria.</p>'+
+ '<div class="cnt"><div><b id="c-req">'+req+'</b><span>deben justificarse</span></div><div><b id="c-sug">'+sug+'</b><span>sugeridos</span></div><div><b>'+S.limit+'</b><span>datos propios por sección</span></div></div>'+
+ '<div class="tw"><table class="ask"><thead><tr><th>Dato</th><th>Fuente</th><th>Condición</th></tr></thead><tbody>'+rows+'</tbody></table></div></div>'+
+ '<div style="display:grid;gap:18px"><div class="card pad"><h3 class="t">Los datos libres</h3><p class="sub">Cada unidad puede sumar sus propios datos sin salirse del plan de diseño.</p>'+
+ '<div style="display:grid;gap:12px"><div style="display:flex;justify-content:space-between;align-items:center;gap:10px"><span style="font-weight:700">Datos propios por sección</span><span class="step"><button id="lm" aria-label="Menos">−</button><b class="num" id="lv">'+S.limit+'</b><button id="lp" aria-label="Más">+</button></span></div><label class="chk"><input type="checkbox" id="rs" '+(S.needSrc?'checked':'')+'> Exigir fuente en cada dato propio</label><label class="chk"><input type="checkbox" id="rp" '+(S.needPil?'checked':'')+'> Exigir un pilar del PDI vinculado</label></div></div>'+
+ '<div class="card pad"><h3 class="t">Entrega por unidad</h3><p class="sub">Fecha límite 30 de noviembre de 2026.</p><div class="units" id="units"></div></div></div></div>';
+ renderUnits();
+}
+function renderUnits(){
+ $('#units').innerHTML=UNITS.map(function(u,i){var c=u[2]==='Aprobado'?'ok':u[2]==='Enviado'?'blue':u[2]==='Devuelto'?'bad':u[2]==='Borrador'?'mid':'';return'<div class="u"><div><b>'+esc(u[0])+'</b><small>'+u[1]+'</small></div><div class="bar" aria-hidden="true"><i style="width:100%;transform:scaleX('+u[3]/100+')"></i></div><span class="pill '+c+'">'+u[2]+'</span>'+(u[2]==='Enviado'?'<div class="stat"><button class="btn sm pri" data-ap="'+i+'">Aprobar</button><button class="btn sm" data-dv="'+i+'">Devolver con comentario</button></div>':'')+(CMTS[i]==='open'?'<div class="ret"><textarea class="in" id="cm'+i+'" placeholder="Qué debe corregir la unidad"></textarea><div class="stat"><button class="btn sm pri" data-dvok="'+i+'">Devolver</button><button class="btn sm" data-dvno="'+i+'">Cancelar</button></div></div>':'')+'</div>'}).join('');
+}
+
+/* ---------- tab 3: cadena de aportes ---------- */
+function renderCadena(){
+ var ap=APORTES,c=function(f){return ap.filter(f).length};
+ $('#p-cadena').innerHTML='<div class="chain"><div class="node"><span class="eyebrow">Oficinas y programas</span><b>Aportan el detalle</b><span class="n num">'+c(function(a){return a.st==='Borrador'})+'</span><span style="font-size:12px;color:var(--ink2)">en borrador</span></div><div class="node"><span class="eyebrow">Decanaturas y vicerrectorías</span><b>Revisan y aprueban</b><span class="n num">'+c(function(a){return a.st==='Enviado'})+'</span><span style="font-size:12px;color:var(--ink2)">por revisar</span></div><div class="node me"><span class="eyebrow">Rectoría de campus</span><b>Consolida por función</b><span class="n num">'+c(function(a){return a.st==='Aprobado'&&a.inc})+'</span><span style="font-size:12px;color:var(--ink2)">en el consolidado</span></div><div class="node"><span class="eyebrow">Rectoría general</span><b>Cierra el informe</b><span class="n num">'+c(function(a){return a.st==='Aprobado'})+'</span><span style="font-size:12px;color:var(--ink2)">aprobados</span></div></div>'+
+ '<div class="two"><div class="card pad"><h3 class="t">Una oficina hace su aporte</h3><p class="sub">Ejemplo: la Oficina de Extensión de Cúcuta entrega su parte para el informe de campus.</p><div class="form"><label class="l">Función<select class="in" id="a-fn"><option>Extensión</option><option>Investigación</option><option>Enseñanza</option><option>Administrativa y financiera</option></select></label>'+
+ '<label class="l">Descripción<textarea class="in" id="a-tx" maxlength="600" placeholder="Qué hizo la oficina en 2026 y con qué resultado"></textarea><span class="num" id="a-cnt" style="font-weight:600;color:var(--muted)">0 de 600 caracteres</span></label>'+
+ '<div><span class="eyebrow">Datos que respaldan el aporte</span><div class="chips" id="a-ch" style="margin-top:6px">'+['Convenios activos','Proyectos de extensión','Beneficiarios','Ejecución presupuestal'].map(function(x,j){return'<button class="chip" data-chip aria-pressed="'+(j<2)+'">'+x+'</button>'}).join('')+'</div></div>'+
+ '<div><span class="eyebrow">Evidencia</span><label class="drop" id="drop2" for="fi2" style="margin-top:6px">'+icon('up')+'<b>Suelte archivos o haga clic</b><span>Se asocian a este aporte y quedan en los anexos</span></label><input type="file" id="fi2" multiple hidden><div class="files" id="a-fl"></div></div>'+
+ '<div><button class="btn pri" id="a-send">Enviar aporte a la decanatura</button></div></div></div>'+
+ '<div class="card pad"><h3 class="t">Lo que llega a la Rectoría de campus</h3><p class="sub">Apruebe, devuelva o decida qué entra al consolidado de cada función.</p><div class="aps" id="aps"></div></div></div>';
+ renderAps();
+}
+function renderAps(){
+ $('#aps').innerHTML=APORTES.map(function(a){var c=a.st==='Aprobado'?'ok':a.st==='Enviado'?'blue':a.st==='Devuelto'?'bad':'mid';return'<div class="ap"><div class="h"><b>'+esc(a.unit)+' · '+esc(a.fn)+'</b><span class="pill '+c+'">'+a.st+'</span></div><p>'+esc(a.txt)+'</p>'+(a.st==='Enviado'?'<div class="stat"><button class="btn sm pri" data-apr="'+a.id+'">Aprobar</button><button class="btn sm" data-dev="'+a.id+'">Devolver</button></div>':a.st==='Aprobado'?'<label class="chk"><input type="checkbox" data-aci="'+a.id+'" '+(a.inc?'checked':'')+'> Incluir en el consolidado de '+esc(a.fn)+'</label>':'')+'</div>'}).join('');
+}
+
+/* ---------- tab 4: PDF ---------- */
+function renderPdf(){
+ var t=T(),inc=includedAll(),key0=ownKey(0),res=plain(S.txt[key0])||'El resumen ejecutivo aparecerá aquí cuando la unidad lo escriba o acepte el borrador de Pilo.';
+ var k4=inc.slice(0,4);
+ var a=S.art['A:1']||{};
+ var tbl=inc.slice(0,9).map(function(x){var m=x.m,sm=sem(m);return'<tr><td>'+esc(m.l)+'</td><td class="r">'+fmt(m.p)+esc(m.u)+'</td><td class="r"><b>'+fmt(m.v)+esc(m.u)+'</b></td><td class="r">'+fmt(m.m)+esc(m.u)+'</td><td><i class="'+sm+'"></i>'+SEMT[sm]+'</td></tr>'}).join('');
+ $('#p-pdf').innerHTML='<div class="pdfbar"><div class="seg" id="tplseg2" role="group" aria-label="Plantilla">'+Object.keys(TPL).map(function(k){return'<button data-k="'+k+'" aria-pressed="'+(k===S.tpl)+'">'+TPL[k].n+' · '+TPL[k].who+'</button>'}).join('')+'</div><div class="stat"><span style="font-size:12.5px;color:var(--ink2)">Se arma desde lo que escribió en «Mi informe». Nada se exporta desde Word.</span><button class="btn pri" id="dl">Descargar PDF</button></div></div>'+
+ '<div class="pages">'+
+ '<div class="pgw"><div class="pg cover"><div class="x1"></div><div class="x2"></div><div class="ring"></div><div class="t"><small>Universidad de Santander</small><h4>Informe de<br><em>Gestión</em><br>Institucional 2026</h4></div><div class="u2"><b>'+esc(t.unit)+'</b><span>'+esc(t.sub)+'</span></div><div class="ids"><span>Planeación Institucional</span><span>Periodo enero–diciembre 2026</span></div></div><div class="cap"><b>Portada</b> · unidad, campus y periodo salen del registro; nada se teclea</div></div>'+
+ '<div class="pgw"><div class="pg"><div class="in"><span class="k">1 · Resumen ejecutivo</span><h4>Un año de consolidación</h4><p>'+esc(res.length>420?res.slice(0,420)+'…':res)+'</p><div class="kpis">'+k4.map(function(x){return'<div class="kpi"><b>'+fmt(x.m.v)+'<span style="font-size:55%">'+esc(x.m.u)+'</span></b><span>'+esc(x.m.l)+'</span><small>Fuente: '+esc(x.m.src.split(' · ').pop())+' · '+CUT+'</small></div>'}).join('')+'</div></div><div class="ft2"><span>'+esc(t.unit)+'</span><span>2</span></div></div><div class="cap"><span class="tag auto">Automático</span> cifras con su fuente y corte · <span class="tag apo">Aporte</span> texto</div></div>'+
+ '<div class="pgw"><div class="pg"><div class="in"><span class="k">5 · Síntesis de resultados</span><h4>Indicadores frente a la meta</h4><table class="pt"><thead><tr><th>Indicador</th><th class="r">2025</th><th class="r">2026</th><th class="r">Meta</th><th>Estado</th></tr></thead><tbody>'+tbl+'</tbody></table><p style="font-size:1.8cqw;color:#6b7c93">Semáforo calculado contra la meta. Fuente de cada indicador: UDES en Cifras, corte '+CUT+'.</p></div><div class="ft2"><span>'+esc(t.unit)+'</span><span>3</span></div></div><div class="cap">La tabla es del portal, no una imagen pegada: se puede leer y auditar</div></div>'+
+ '<div class="pgw"><div class="pg"><div class="in"><span class="k">2 · Alineación con el PDI</span><h4>Aporte a los seis pilares</h4><div class="pbars">'+PIL.map(function(p,j){return'<div style="'+(a[j]?'':'opacity:.4')+'"><span>'+p[0]+'. '+esc(p[1].split(' ')[0])+'</span><span class="tr"><i style="width:'+p[4]+'%"></i></span><span style="text-align:right">'+p[4]+' %</span></div>'}).join('')+'</div><p style="margin-top:1cqw">'+esc((S.txt['A:1']||'La unidad contribuye a los pilares marcados; los demás aparecen atenuados.'))+'</p><span class="auto">Avance de proyectos · portal de implementación</span></div><div class="ft2"><span>'+esc(t.unit)+'</span><span>4</span></div></div><div class="cap">Los pilares que la unidad no marcó quedan atenuados</div></div>'+
+ '</div>';
+}
+
+/* ---------- tab 5: qué cambia ---------- */
+function renderCambia(){
+ var R=[
+  ['Cada oficina eligió su estructura: de 4 a 9 secciones; Valledupar salta los números 2 y 5.','INFO GESTIÓN VALLEDUPAR 2025.pdf · INFORME DE GESTION CFT 2025.pdf','Una plantilla por tipo de unidad (A–D), con secciones fijas y numeradas. No se puede quitar una sección.'],
+  ['Portada con año 2024 en informes de 2025.','Cúcuta, Valledupar, Extensión y VEN','El año sale del periodo. No se escribe.'],
+  ['Frases de ejemplo del formato base copiadas como hechos reales.','Extensión · «El telecentro rural fue premiado…»','El ejemplo vive en la ayuda lateral, nunca en el documento. Si el texto lo contiene, el portal avisa.'],
+  ['Cifras sin fuente o con «ver anexo» sin anexo.','FCS · Valledupar','Cada cifra trae fuente y corte. Cada logro apunta a un archivo que existe.'],
+  ['Tablas pegadas como imagen: no se pueden leer ni auditar.','Rector, VAF, FAG','Las tablas se construyen en el portal. Nada de capturas.'],
+  ['Cifras que se contradicen: patrimonio «+3,3 %» y «33,3 %»; corte 15 dic, 31 oct y noviembre en un mismo documento.','VAF · Rector · Investigaciones','Un solo corte por informe y una «foto» de las cifras al enviar. La variación se calcula, no se teclea.'],
+  ['Variación sin signo en una caída (230.717.148 → 192.820.623 aparece «26 %»).','Valledupar','El signo y el porcentaje los calcula el portal.'],
+  ['Texto repetido: el capítulo de la VAF aparece casi literal en el del Rector.','VAF · Rector','El rector recibe los aportes aprobados y los cita; no los copia.'],
+  ['Versiones por correo: V1, V3, V4_13042026. Fechas de archivo de diciembre a mayo.','Rector · campus · VAF','Estados (borrador, enviado, devuelto, aprobado), fecha límite visible y una sola versión viva.']
+ ];
+ $('#p-cambia').innerHTML='<div class="facts"><div><b>14</b><span>documentos de 2025 revisados en tres carpetas</span></div><div><b>4 a 9</b><span>secciones según quién escribió</span></div><div><b>5</b><span>formatos distintos de portada</span></div><div><b>dic → may</b><span>entre el primer y el último informe</span></div></div>'+
+ '<div class="cmp2">'+R.map(function(r){return'<div class="cr"><div><small>2025 · lo que pasó</small><span class="y">'+esc(r[0])+'</span><span class="f">'+esc(r[1])+'</span></div><div><small>2026 · en el portal</small><span class="n">'+esc(r[2])+'</span></div></div>'}).join('')+'</div>'+
+ '<div class="road"><div><b>Fase 1 · Plantillas y PDF</b><span>Las cuatro plantillas con el diseño nuevo, generadas desde el portal con el motor del boletín.</span></div><div><b>Fase 2 · Constructor</b><span>Mi informe, con cifras de UDES en Cifras y del PDI en foto, justificaciones y validaciones.</span></div><div><b>Fase 3 · Cadena de aportes</b><span>Oficinas, decanaturas, campus y rectoría general, con estados y comentarios.</span></div><div><b>Fase 4 · Pilo</b><span>Borradores desde las cifras y el informe de 2025, marcados para que la unidad los confirme.</span></div></div>';
+}
+
+/* ---------- eventos ---------- */
+function setTab(t,anim){
+ S.tab=t;$$('#tabs button').forEach(function(b){b.setAttribute('aria-selected',b.dataset.t===t)});
+ $$('.panel').forEach(function(p){p.hidden=p.id!=='p-'+t});
+ ({estr:renderEstr,mi:renderMi,pide:renderPide,cadena:renderCadena,pdf:renderPdf,cambia:renderCambia})[t]();
+ if(anim)enter($('#p-'+t),'.card,.node,.pgw,.facts>div,.cr,.road>div,.flow li,.life>div');
+}
+document.addEventListener('click',function(e){
+ var el=e.target.closest('button,input[type=checkbox],label.drop'),x;if(!el)return;
+ var d=el.dataset,pointer=e.detail>0;
+ if(d.tab){setTab(d.tab,pointer);return}
+ if(d.ack){S.ack[d.ack]=findM(d.ack).v;renderEditor(false);refreshAux();return}
+ if(d.srcx){S.srcOpen[d.srcx]=!S.srcOpen[d.srcx];renderEditor(false);return}
+ if(d.sim!=null){simulate(+d.sim);return}
+ if(el.id==='reopen'){S.status='Borrador';refreshAux();renderEditor(false);toast('Devuelto con nota: vuelve a Borrador y las cifras se reactivan');return}
+ if(el.id==='ci'){var cs=$('#cs').value,ta=$('#editor textarea[data-txt]');if(!cs||!ta)return;var p=ta.selectionStart==null?ta.value.length:ta.selectionStart;ta.value=ta.value.slice(0,p)+'[['+cs+']]'+ta.value.slice(p);ta.dispatchEvent(new Event('input',{bubbles:true}));ta.focus();return}
+ if(el.closest('#tabs')&&d.t){setTab(d.t,pointer);return}
+ if(el.closest('#tplseg,#tplseg2')&&d.k){S.tpl=d.k;S.sec=0;S.status='Borrador';S.ownOpen=0;setTab(S.tab,pointer);return}
+ if(el.closest('#secs')&&d.i!=null){S.sec=+d.i;S.ownOpen=0;renderRail();renderEditor(pointer);renderSide();return}
+ if(el.id==='sendbtn'&&!el.disabled){S.status='Enviado';refreshAux();toast('Enviado a '+T().to+'. La foto de las cifras quedó guardada.');return}
+ if(el.id==='pilo'){piloDraft();return}
+ if(d.go){toast('En el portal abre '+d.go);return}
+ if(d.inc){S.inc[d.inc]=el.checked;renderEditor(false);refreshAux();return}
+ if(d.art!=null){var k=ownKey(S.sec);(S.art[k]=S.art[k]||{})[d.art]=el.checked;refreshAux();var f=$('#editor .ft .num');if(f)f.textContent=Object.keys(S.art[k]).filter(function(z){return S.art[k][z]}).length+' pilares articulados · se recomiendan al menos 3';return}
+ if(d.addrow){var kk=d.addrow,n=+d.n,r=[];for(var q=0;q<n;q++)r.push(S.tpl&&T().secs[S.sec].ty==='metas'&&q>0?(q===1?0:''):'');(S.rows[kk]=S.rows[kk]||[]).push(r);renderEditor(false);refreshAux();return}
+ if(d.delrow){var p=d.delrow.split(':');S.rows[p[0]+':'+p[1]].splice(+p[2],1);renderEditor(false);refreshAux();return}
+ if(d.addlg){(S.logros[d.addlg]=S.logros[d.addlg]||[]).push({});renderEditor(false);refreshAux();return}
+ if(d.dellg){var q2=d.dellg.split(':');S.logros[q2[0]+':'+q2[1]].splice(+q2[2],1);renderEditor(false);refreshAux();return}
+ if(el.id==='addown'){S.ownOpen=1;renderEditor(false);return}
+ if(el.id==='o-no'){S.ownOpen=0;renderEditor(false);return}
+ if(el.id==='o-ok'){var l=$('#o-l').value.trim(),v=$('#o-v').value.trim(),sr=$('#o-s')?$('#o-s').value.trim():'ok';if(!l||!v||(S.needSrc&&!sr)){$('#o-err').textContent=!l||!v?'Ponga nombre y valor.':'Falta la fuente.';return}var kk2=ownKey(S.sec);(S.own[kk2]=S.own[kk2]||[]).push({l:l,v:v,src:S.needSrc?sr:'',pil:$('#o-p')?$('#o-p').value:''});S.ownOpen=0;renderEditor(false);refreshAux();toast('Dato propio añadido');return}
+ if(d.delown!=null){S.own[ownKey(S.sec)].splice(+d.delown,1);renderEditor(false);refreshAux();return}
+ /* tab 2 */
+ if(el.closest('[data-rk]')&&d.r){var rk=el.closest('[data-rk]').dataset.rk;S.req[rk]=d.r;renderPide();return}
+ if(el.id==='lp'){S.limit=Math.min(6,S.limit+1);renderPide();return}
+ if(el.id==='lm'){S.limit=Math.max(0,S.limit-1);renderPide();return}
+ if(el.id==='rs'){S.needSrc=el.checked?1:0;return}
+ if(el.id==='rp'){S.needPil=el.checked?1:0;return}
+ if(d.ap!=null){var u=UNITS[+d.ap];u[2]='Aprobado';renderUnits();toast(u[0]+' aprobada');return}
+ if(d.dv!=null){CMTS[+d.dv]='open';renderUnits();return}
+ if(d.dvno!=null){CMTS[+d.dvno]='';renderUnits();return}
+ if(d.dvok!=null){var i2=+d.dvok;UNITS[i2][2]='Devuelto';CMTS[i2]='';renderUnits();toast('Devuelta a '+UNITS[i2][0]+' con su comentario');return}
+ /* tab 3 */
+ if(d.chip!=null||el.hasAttribute('data-chip')){el.setAttribute('aria-pressed',el.getAttribute('aria-pressed')!=='true');return}
+ if(el.id==='a-send'){var tx=$('#a-tx').value.trim();if(words(tx)<5){toast('Describa el aporte en al menos cinco palabras');return}APORTES.unshift({id:Date.now(),unit:'Oficina de Extensión Cúcuta',fn:$('#a-fn').value,st:'Enviado',inc:0,txt:tx});renderCadena();toast('Aporte enviado a la decanatura');return}
+ if(d.apr){APORTES.forEach(function(a){if(a.id==+d.apr)a.st='Aprobado',a.inc=1});renderCadena();toast('Aporte aprobado');return}
+ if(d.dev){APORTES.forEach(function(a){if(a.id==+d.dev)a.st='Devuelto'});renderCadena();toast('Aporte devuelto a la oficina');return}
+ if(d.aci){APORTES.forEach(function(a){if(a.id==+d.aci)a.inc=el.checked});renderCadena();return}
+ if(el.id==='dl'){toast('En el portal se genera con el motor del boletín (PDF A4)');return}
+});
+document.addEventListener('input',function(e){
+ var el=e.target,d=el.dataset;
+ if(d.sname){S.src[d.sname].n=el.value;refreshAux();return}
+ if(d.sval){var mm=findM(d.sval);mm.v=+el.value;S.ack[d.sval]=mm.v;refreshAux();return}
+ if(d.txt!==undefined&&d.txt){S.txt[d.txt]=el.value;S.draftOf[d.txt]=0;var pv=$('#pv');if(pv)pv.innerHTML=resolve(el.value)||'<span class="muted">Escriba o inserte una cifra.</span>';var s=T().secs[S.sec],wc=$('#wc');if(wc)wc.textContent=words(el.value)+' palabras · mínimo '+(s.need||0);var ft=el.parentNode.querySelector('.ft .num');if(ft&&!wc)ft.textContent=words(el.value)+' palabras';var pl=el.parentNode.querySelector('.pill.teal');if(pl)pl.remove();refreshAux();return}
+ if(d.note){S.note[d.note]=el.value;el.classList.toggle('need',!el.value.trim());refreshAux();return}
+ if(d.row){var p=d.row.split(':'),r=S.rows[p[0]+':'+p[1]][+p[2]];var v=el.value;r[+p[3]]=(el.type==='number'?(v===''?'':+v):v);if(el.type==='number'){var rs=S.rows[p[0]+':'+p[1]][+p[2]],c=$('#res-'+p[2]);if(c){var res=rs[2]===''||rs[2]==null?'—':rs[2]>rs[1]?'Superada':rs[2]===rs[1]?'Cumplida':'Parcial';c.innerHTML='<span class="pill '+(res==='Superada'?'ok':res==='Cumplida'?'teal':res==='Parcial'?'mid':'')+'">'+res+'</span>'}}refreshAux();return}
+ if(d.lg){var q=d.lg.split(':');S.logros[q[0]+':'+q[1]][+q[2]][q[3]]=el.value;refreshAux();return}
+ if(el.id==='a-tx'){$('#a-cnt').textContent=el.value.length+' de 600 caracteres'}
+});
+document.addEventListener('change',function(e){var el=e.target;
+ if(el.dataset&&el.dataset.stype){var k=el.dataset.stype,m=findM(k),t=el.value;if((t==='manual'||t==='excel')&&m.v0==null)m.v0=m.v;if((t==='auto'||t==='pdi')&&m.v0!=null){m.v=m.v0;m.v0=null}S.src[k]={t:t,n:t==='auto'?m.src:t==='pdi'?'Portal PDI · '+m.l:''};S.ack[k]=m.v;renderEditor(false);refreshAux();return}
+ if(el.dataset&&el.dataset.sfile){var k2=el.dataset.sfile;if(el.files[0]){S.src[k2].n=el.files[0].name;renderEditor(false);refreshAux()}return}
+ if(el.dataset&&el.dataset.sval){renderEditor(false);return}
+ if(el.dataset&&el.dataset.lg){var q=el.dataset.lg.split(':');S.logros[q[0]+':'+q[1]][+q[2]][q[3]]=el.value;refreshAux()}
+ if(el.id==='fi'||el.id==='fi2'){var names=[].map.call(el.files,function(f){return f.name});if(el.id==='fi'){names.forEach(function(n){S.files.push(n)});renderEditor(false);refreshAux();toast(names.length+' archivo(s) cargado(s)')}else{var fl=$('#a-fl');names.forEach(function(n){fl.insertAdjacentHTML('beforeend','<span class="file">'+esc(n)+'</span>')})}}
+});
+['dragover','dragleave','drop'].forEach(function(ev){document.addEventListener(ev,function(e){var z=e.target.closest&&e.target.closest('.drop');if(!z)return;e.preventDefault();z.classList.toggle('over',ev==='dragover');if(ev==='drop'){var inp=$('#'+(z.id==='drop'?'fi':'fi2')),names=[].map.call(e.dataTransfer.files,function(f){return f.name});if(z.id==='drop'){names.forEach(function(n){S.files.push(n)});renderEditor(false);refreshAux()}else{names.forEach(function(n){$('#a-fl').insertAdjacentHTML('beforeend','<span class="file">'+esc(n)+'</span>')})}}})});
+function piloDraft(){
+ var t=T(),key=ownKey(S.sec),inc=includedAll(),good=inc.filter(function(x){return sem(x.m)==='ok'}).slice(0,3),bad=inc.filter(function(x){return sem(x.m)!=='ok'}).slice(0,1);
+ var tx='En 2026 '+(S.tpl==='D'?'la Universidad':'la unidad')+' '+(good.length?'logró resultados por encima de lo comprometido: '+good.map(function(x){return x.m.l.toLowerCase()+' ([['+x.m.k+']] frente a una meta de '+fmt(x.m.m)+x.m.u+')'}).join(', ')+'.':'avanzó en sus metas.')+' '+(bad.length?'El indicador que más atención pide es '+bad[0].m.l.toLowerCase()+', que cerró en [['+bad[0].m.k+']] frente a '+fmt(bad[0].m.m)+bad[0].m.u+'. ':'')+'Las cifras se enlazan a su fuente y se actualizan hasta que se envíe el informe. [La unidad debe añadir aquí las causas y el contexto que las cifras no muestran.]';
+ var ta=$('#ta');ta.value='';S.txt[key]='';S.draftOf[key]=1;var i=0;
+ if(RM){ta.value=tx;S.txt[key]=tx;renderEditor(false);refreshAux();return}
+ var iv=setInterval(function(){i+=4;ta.value=tx.slice(0,i);S.txt[key]=ta.value;if(i>=tx.length){clearInterval(iv);S.txt[key]=tx;renderEditor(false);refreshAux();toast('Borrador listo. Revise las cifras y complete lo que está entre corchetes.')}},16);
+}
+setTab('estr',false);enter($('#p-estr'),'.card,.flow li,.life>div');
+})();
+</script>

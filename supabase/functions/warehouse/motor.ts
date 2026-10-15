@@ -322,3 +322,52 @@ export function recortarPorPolitica(filas: Fila[], politica: { modo: "permitir" 
     return salida;
   });
 }
+
+/* --- Columnas derivadas (no identifican a nadie) --------------------------------------------- */
+
+/** Fecha de un Excel: «2001-04-09», «09/04/2001», «09-04-2001» o el número de serie de Excel. */
+export function leerFecha(valor: unknown): Date | null {
+  if (typeof valor === "number" && Number.isFinite(valor) && valor > 1 && valor < 80_000) return new Date(Date.UTC(1899, 11, 30) + valor * 86_400_000);
+  if (typeof valor !== "string") return null;
+  const t = valor.trim();
+  let m = t.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/);
+  if (m) return new Date(Date.UTC(+m[1], +m[2] - 1, +m[3]));
+  m = t.match(/^(\d{1,2})[/-](\d{1,2})[/-](\d{4})/);
+  if (m) return new Date(Date.UTC(+m[3], +m[2] - 1, +m[1]));
+  return null;
+}
+
+/** Cuándo empieza el periodo (1 de febrero el «a», 1 de agosto el «b»): la edad se cuenta a esa fecha. */
+const inicioDePeriodo = (periodo: string) => new Date(Date.UTC(+periodo.slice(0, 4), periodo.endsWith("a") ? 1 : 7, 1));
+
+/** El grupo etario del estudio UDES (referencia: menores de 20; 21–25 y 26 o más tienen más riesgo de desertar). */
+export function grupoEtario(nacimiento: unknown, periodo: string): "≤20" | "21–25" | "26+" | null {
+  const f = leerFecha(nacimiento);
+  if (!f || !periodoValido(periodo)) return null;
+  const inicio = inicioDePeriodo(periodo);
+  let edad = inicio.getUTCFullYear() - f.getUTCFullYear();
+  if (inicio.getUTCMonth() < f.getUTCMonth() || (inicio.getUTCMonth() === f.getUTCMonth() && inicio.getUTCDate() < f.getUTCDate())) edad--;
+  if (edad < 14 || edad > 90) return null; // un dato mal digitado no es un grupo
+  return edad <= 20 ? "≤20" : edad <= 25 ? "21–25" : "26+";
+}
+
+/** ¿Viene de Santander? Con el departamento de la ficha. Vacío = desconocido. */
+export function origenDe(departamento: unknown): "Santander" | "Otro departamento" | null {
+  if (typeof departamento !== "string" || !departamento.trim()) return null;
+  return normalizarColumna(departamento) === "santander" ? "Santander" : "Otro departamento";
+}
+
+/**
+ * Añade a «Estudiantes matriculados» el grupo etario y el origen, calculados con la fecha de nacimiento y el
+ * departamento ANTES de que la política los descarte. Las dos columnas nuevas no permiten saber quién es.
+ * Cualquier otro conjunto pasa igual.
+ */
+export function derivarColumnas(conjunto: string, hoja: Hoja, periodo: string): Hoja {
+  if (conjunto !== "dv_matric" || !hoja.columnas.includes("fecha_nac")) return hoja;
+  const columnas = [...hoja.columnas, "grupo_etario", "origen"];
+  return {
+    columnas,
+    originales: [...hoja.originales, "Grupo etario (derivado)", "Origen (derivado)"],
+    filas: hoja.filas.map((f) => ({ ...f, grupo_etario: grupoEtario(f.fecha_nac, periodo), origen: origenDe(f.departamento) })),
+  };
+}

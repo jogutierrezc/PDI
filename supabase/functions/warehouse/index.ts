@@ -41,7 +41,7 @@
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.58.0";
 import { unzipSync } from "https://esm.sh/fflate@0.8.2";
-import { FILAS_POR_LOTE, aplanarJson, base64ABytes, enLotes, enParalelo, esExcelBase64, huellaContenido, leerSegun, periodoValido, type Hoja } from "./motor.ts";
+import { FILAS_POR_LOTE, aplanarJson, derivarColumnas, base64ABytes, enLotes, enParalelo, esExcelBase64, huellaContenido, leerSegun, periodoValido, type Hoja } from "./motor.ts";
 import { consultaDe, edificiosDe, estadoTarea, REPORTES, reportePorId, type Contexto, type Peticion, type Reporte, type SistemaApi } from "./reportes.ts";
 
 const ENV = (name: string) => Deno.env.get(name) ?? "";
@@ -268,14 +268,16 @@ Deno.serve(async (request: Request) => {
     sesion = await iniciarSesion(sede, reporte.sistema);
     const periodo = reporte.periodoVia === "ninguno" ? PERMANENTE : reporte.periodoVia === "sesion" ? sesion.periodo : pedido;
     const ctx: Contexto = { sede, periodo: periodo === PERMANENTE ? sesion.periodo : periodo, corte: reporte.corte ? corte : "", usuario: ENV("WAREHOUSE_MASTER_USER") };
-    const hoja = await obtenerHoja(reporte, ctx, sesion);
-    if (hoja.filas.length === 0) throw new ErrorPlataforma("El reporte llegó sin filas.");
+    const original = await obtenerHoja(reporte, ctx, sesion);
+    if (original.filas.length === 0) throw new ErrorPlataforma("El reporte llegó sin filas.");
+    // La huella es del contenido tal como llegó; las columnas derivadas (grupo etario, origen) se añaden después.
+    const hoja = derivarColumnas(conjunto, original, periodo === PERMANENTE ? ctx.periodo : periodo);
 
     if (accion === "sondear") {
       return json({ ok: true, periodo, columnas: hoja.columnas, originales: hoja.originales, filas: hoja.filas.length, verificado: reporte.verificado });
     }
 
-    const huella = await huellaContenido(hoja);
+    const huella = await huellaContenido(original);
     const abierta = await db.rpc("wh_abrir_carga", {
       p_conjunto: conjunto,
       p_periodo: periodo,

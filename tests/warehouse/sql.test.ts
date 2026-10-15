@@ -165,6 +165,33 @@ describe("0155 · la política de privacidad vive en la base", () => {
     });
   });
 
+  it("0159 · Medicina aprueba con 3,5, materias y grupos se resumen, y matriculados admite el grupo etario", async () => {
+    await t.asUser(
+      PLANEACION,
+      async (q) => {
+        await guardar(q, "dv_notas", "2025b", "1".repeat(64), [
+          { codigo_estudiante: "m1", nombre_programa: "MEDICINA", codigo_materia: "C1", nombre_materia: "ANATOMÍA", grupo: "A", p1: "3.2", p2: "-", p3: "-" },
+          { codigo_estudiante: "m2", nombre_programa: "DERECHO", codigo_materia: "C1", nombre_materia: "ANATOMÍA", grupo: "A", p1: "3.2", p2: "-", p3: "-" },
+          { codigo_estudiante: "m3", nombre_programa: "DERECHO", codigo_materia: "C1", nombre_materia: "ANATOMÍA", grupo: "A", p1: "2.5", p2: "-", p3: "-" },
+        ]);
+        await guardar(q, "dv_matric", "2025b", "2".repeat(64), [{ codigo: "m1", fecha_nac: "2000-01-01", ciudad: "BUCARAMANGA", grupo_etario: "21–25", origen: "Santander", programa: "MEDICINA" }]);
+      },
+      { commit: true },
+    );
+    await t.asUser(PLANEACION, async (q) => {
+      const r = await q<{ estudiante: string; riesgo_p1: number }>("select estudiante, riesgo_p1 from public.wh_notas_resumen('2025b', 'buc')");
+      const por = Object.fromEntries(r.map((x) => [x.estudiante, x.riesgo_p1]));
+      expect(Object.values(por).sort()).toEqual([0, 1, 1]); // 3,2 pierde en Medicina (3,5), no en Derecho (3,0); 2,5 pierde
+      const g = await q<{ estudiantes: number; bajo_p1: number; con_p1: number }>("select estudiantes, bajo_p1, con_p1 from public.wh_notas_grupos('2025b', 'buc')");
+      expect(g).toEqual([{ estudiantes: 3, bajo_p1: 2, con_p1: 3 }]);
+    });
+    const [fila] = await t.q<{ datos: Record<string, string> }>("select f.datos from public.wh_filas f join public.wh_cargas c on c.id = f.carga_id where c.conjunto = 'dv_matric' and c.periodo = '2025b'");
+    expect(fila.datos.grupo_etario).toBe("21–25");
+    expect(fila.datos.origen).toBe("Santander");
+    expect(fila.datos).not.toHaveProperty("fecha_nac");
+    expect(fila.datos).not.toHaveProperty("ciudad");
+  });
+
   it("0157 · Consulta no lee notas ni resumen", async () => {
     await t.asUser(CONSULTA, async (q) => {
       expect(await q("select * from public.wh_notas_resumen('2026b', 'buc')")).toEqual([]);

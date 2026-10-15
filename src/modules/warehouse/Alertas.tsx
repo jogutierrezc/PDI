@@ -24,9 +24,12 @@ import {
   type ReglaGrupo,
   type ReglaNotas,
 } from "./reglas";
-import { Apiladas, Lineas } from "./graficos";
+import { Apiladas, Barras, Lineas } from "./graficos";
 import { CORTES, SEDES } from "./conjuntos";
-import { useFilasCompletas, useNotasResumen, useRendimiento, type Cobertura } from "./store";
+import { useFilasCompletas, useNotasGrupos, useNotasResumen, useRendimiento, type Cobertura } from "./store";
+import { ESTUDIO_UDES, NOMBRE_BANDA, NOMBRE_DESEMPENO, materiasCriticas } from "./estudio";
+import { resumenParaPilo } from "./paraPilo";
+import { PanelPilo } from "./PanelPilo";
 import type { Contexto } from "./Warehouse";
 import { EmptyBlock, ErrorBlock, LoadingBlock } from "../../components/ui/QueryState";
 
@@ -331,6 +334,45 @@ function PorGrupo({ ctx }: { ctx: Contexto }) {
   );
 }
 
+/** El semáforo del Monitor: Nivel Esperado, En Desarrollo y Requiere Seguimiento, con su sigla y su palabra. */
+function Desempenos({ evaluados, programa }: { evaluados: AlertaNotas[]; programa: string }) {
+  const lista = programa ? evaluados.filter((a) => a.programa === programa) : evaluados;
+  const n = { NE: 0, ED: 0, RS: 0 };
+  for (const a of lista) if (a.desempeno) n[a.desempeno] += 1;
+  const total = n.NE + n.ED + n.RS;
+  if (total === 0) return null;
+  return (
+    <section className="wh-panel" aria-labelledby="wh-desemp">
+      <div className="wh-panel__cabeza">
+        <div>
+          <h2 id="wh-desemp">Niveles de desempeño</h2>
+          <p className="wh-muted">
+            NE: promedio de 3,5 o más y ninguna materia perdida. ED: entre 3,0 y 3,49, o una materia perdida. RS: promedio menor a 3,0, dos o más materias perdidas o una caída de 0,5 entre cortes. No es una calificación ni una sanción: es una señal para acompañar. Referencia del estudio de la UDES: éxito con promedio superior a {coma(ESTUDIO_UDES.exito, 1)}; periodo de prueba bajo {coma(ESTUDIO_UDES.pruebaAcademica, 1)}.
+          </p>
+        </div>
+        <span className="wh-etiqueta">{total.toLocaleString("es-CO")} estudiantes</span>
+      </div>
+      <div className="wh-panel__cuerpo">
+        <div className="wh-tren" role="img" aria-label={`NE ${n.NE}, ED ${n.ED}, RS ${n.RS}`}>
+          {(["NE", "ED", "RS"] as const).map((d) => (
+            <i key={d} data-d={d} style={{ flexGrow: n[d] }} title={`${NOMBRE_DESEMPENO[d]}: ${n[d]}`} />
+          ))}
+        </div>
+        <p className="wh-leyenda-fila">
+          {(["NE", "ED", "RS"] as const).map((d) => (
+            <span key={d}>
+              <span className="wh-semaforo" data-d={d}>
+                {d}
+              </span>{" "}
+              {NOMBRE_DESEMPENO[d]}: <b>{n[d].toLocaleString("es-CO")}</b> ({coma((100 * n[d]) / total, 1)} %)
+            </span>
+          ))}
+        </p>
+      </div>
+    </section>
+  );
+}
+
 /* --- Por notas de cada estudiante (P1, P2, P3) ------------------------------------- */
 
 function PorNotas({ ctx, cobertura }: { ctx: Contexto; cobertura: Cobertura[] }) {
@@ -344,6 +386,8 @@ function PorNotas({ ctx, cobertura }: { ctx: Contexto; cobertura: Cobertura[] })
 
   const alertas = useMemo(() => evaluarNotas(resumen.data ?? [], umbrales), [resumen.data, umbrales]);
   const evaluados = alertas.filter((a) => a.corte !== null);
+  const grupos = useNotasGrupos(periodo, sede, hay);
+  const criticas = useMemo(() => materiasCriticas(grupos.data ?? []), [grupos.data]);
   const conteo = useMemo(() => contarNiveles(evaluados), [evaluados]);
   const programas = useMemo(() => [...new Set(evaluados.map((a) => a.programa).filter(Boolean))].sort((a, b) => a.localeCompare(b, "es")), [evaluados]);
   const porPrograma = useMemo(() => {
@@ -406,6 +450,42 @@ function PorNotas({ ctx, cobertura }: { ctx: Contexto; cobertura: Cobertura[] })
 
       <Resumen conteo={conteo.porNivel} />
 
+      <Desempenos evaluados={evaluados} programa={programa} />
+
+      <section className="wh-panel" aria-labelledby="wh-crit">
+        <div className="wh-panel__cabeza">
+          <div>
+            <h2 id="wh-crit">Cursos con alta reprobación</h2>
+            <p className="wh-muted">
+              La «Alerta Temprana 4» del estudio de la UDES: materias donde 30 % o más de quienes ya tienen nota va por debajo de la de aprobar (3,0; en Medicina, 3,5), con al menos 15 estudiantes con nota.
+            </p>
+          </div>
+          <span className="wh-etiqueta">{criticas.length} cursos</span>
+        </div>
+        <div className="wh-panel__cuerpo">
+          {grupos.isPending ? (
+            <p className="wh-muted">Calculando…</p>
+          ) : criticas.length === 0 ? (
+            <p className="wh-muted">Ninguna materia llega al 30 % por debajo de la nota de aprobar.</p>
+          ) : (
+            <Barras
+              titulo="Materias con más estudiantes por debajo de la nota de aprobar"
+              sufijo=" %"
+              decimales={1}
+              datos={criticas
+                .filter((m) => !programa || m.programas.includes(programa))
+                .slice(0, 10)
+                .map((m) => ({ etiqueta: `${m.materia} · P${m.corte}`, valor: m.pctBajo, detalle: `${m.estudiantes} estudiantes con nota` }))}
+            />
+          )}
+        </div>
+      </section>
+
+      <PanelPilo
+        etiqueta={programa || "toda la sede"}
+        datos={resumenParaPilo(alertas, criticas, { periodo, sede, programa: programa || undefined, umbrales: { materias: umbrales.materias, promedio: umbrales.promedio, caida: umbrales.caida } })}
+      />
+
       <section className="wh-panel" aria-labelledby="wh-prog-n">
         <div className="wh-panel__cabeza">
           <h2 id="wh-prog-n">Estudiantes en alerta por programa</h2>
@@ -462,6 +542,7 @@ function PorNotas({ ctx, cobertura }: { ctx: Contexto; cobertura: Cobertura[] })
                   <th scope="col" className="wh-num">
                     Promedio
                   </th>
+                  <th scope="col">Desempeño</th>
                   <th scope="col">Nivel</th>
                 </tr>
               </thead>
@@ -473,6 +554,7 @@ function PorNotas({ ctx, cobertura }: { ctx: Contexto; cobertura: Cobertura[] })
                     <td className="wh-num">{a.materias}</td>
                     <td className="wh-num">{a.enRiesgo}</td>
                     <td className="wh-num">{a.promedio === null ? "—" : coma(a.promedio, 2)}</td>
+                    <td>{a.desempeno && <span className="wh-semaforo" data-d={a.desempeno}>{a.desempeno}</span>}</td>
                     <td>
                       <NivelEtiqueta nivel={a.nivel} />
                     </td>
@@ -480,7 +562,7 @@ function PorNotas({ ctx, cobertura }: { ctx: Contexto; cobertura: Cobertura[] })
                 ))}
                 {lista.length === 0 && (
                   <tr>
-                    <td colSpan={6} className="wh-muted">
+                    <td colSpan={7} className="wh-muted">
                       Ningún estudiante cumple el filtro.
                     </td>
                   </tr>
@@ -499,6 +581,20 @@ function PorNotas({ ctx, cobertura }: { ctx: Contexto; cobertura: Cobertura[] })
                   {elegida.materias} materias; corte {elegida.corte}: promedio {elegida.promedio === null ? "—" : coma(elegida.promedio, 2)}
                   {elegida.anterior !== null ? ` (corte anterior ${coma(elegida.anterior, 2)})` : ""}; {elegida.enRiesgo} por debajo de {coma(umbrales.aprueba, 1)}.
                 </p>
+                {elegida.desempeno && (
+                  <p>
+                    <span className="wh-semaforo" data-d={elegida.desempeno}>
+                      {elegida.desempeno}
+                    </span>{" "}
+                    {NOMBRE_DESEMPENO[elegida.desempeno]}
+                    {elegida.banda && elegida.riesgoRelativo !== null && (
+                      <>
+                        . Según el estudio de la UDES, con un {NOMBRE_BANDA[elegida.banda].toLowerCase()} es{" "}
+                        {elegida.riesgoRelativo === 1 ? "el caso de referencia" : `${coma(elegida.riesgoRelativo, 1)} veces más probable desertar que con un promedio alto`} (una asociación entre cohortes, no una predicción de esta persona).
+                      </>
+                    )}
+                  </p>
+                )}
                 <ul style={{ margin: 0, paddingLeft: "1.2em" }}>
                   {elegida.reglas.map((r: ReglaNotas) => (
                     <li key={r}>

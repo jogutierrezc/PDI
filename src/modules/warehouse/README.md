@@ -29,6 +29,11 @@ Guarda por periodo los reportes de Master, Galileo y Davinci para consultarlos s
 - Velocidad (0157): `wh_notas_resumen` entrega un renglón por estudiante (la pantalla no baja las 29.000 filas); las páginas de filas se piden de a cuatro en paralelo; una versión guardada no se vuelve a pedir (no cambia); la sal del seudónimo se lee una vez por llamada.
 - Con los HAR de las tres plataformas, la función `warehouse` sabe pedir los reportes de `reportes.ts` (`sondear` y `cargar`; desde la pantalla, uno o varios a la vez). Cada plataforma inicia sesión aparte en `/{sistema}/mod_auth/login/`. `dv_fin` (tarea sin terminar en el HAR) y `dv_asp` (HAR cortado) quedan sin verificar: se «sondean» para escribir su política. El filtro `courses` de matriculados (semestres 5–8 y electivas en el HAR) hay que confirmarlo.
 
+## Alertas de notas y Pilo (0159, función `warehouse-pilo`)
+Basadas en el estudio de la UDES (Pérez et al., 2023; DOI 10.37885/230914480, `230914480.pdf` en la raíz): nota de aprobar 3,0 (Medicina 3,5), periodo de prueba bajo 3,2, éxito sobre 3,8, deserción 16,7× con promedio < 3,3 y 2,2× con 3,3–4,3, edad (21–25: 3,1×; 26+: 5,1×) y origen fuera de Santander (1,4×). `estudio.ts` guarda esas cifras; `reglas.ts` las usa. Niveles NE / ED / RS. «Cursos con alta reprobación» = Alerta Temprana 4 del estudio (`wh_notas_grupos`). `dv_matric` deriva `grupo_etario` y `origen` al cargar y sigue sin guardar la fecha de nacimiento ni la ciudad.
+Pilo (`PanelPilo.tsx`) recibe solo un resumen agregado (`paraPilo.ts`: conteos por nivel, programa y materia; sin códigos), responde en JSON y cada cifra se verifica contra los datos y el estudio (`warehouse-pilo/analisis.ts`). Usa el proveedor de IA de Mr. Pilo; bitácora en `news_runs`.
+Lo que el estudio usa y estos datos NO tienen: Saber 11, tutorías asistidas, estrato, trabajo, entorno familiar. Con ellos se podría estimar el riesgo de cada estudiante como lo hace el estudio (regresión logística); hoy solo se ordena con sus cifras.
+
 ## Pendiente
 - Aplicar 0155, desplegar la función y definir `WAREHOUSE_MASTER_USER` / `WAREHOUSE_MASTER_PASSWORD` (cuenta de servicio, no la de una persona).
 - Adaptador para los catálogos JSON, para `dv_fin`, `ms_nom` y `ms_doc` (primero su política) y para `gl_uso` (una hoja por semana).

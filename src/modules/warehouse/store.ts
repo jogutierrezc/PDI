@@ -15,8 +15,10 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { unzipSync } from "fflate";
 import { supabase, readFunctionError } from "../../lib/supabase";
 import { useAuth } from "../../lib/auth";
-import { FILAS_POR_LOTE, enLotes, enParalelo, huellaContenido, leerSegun, recortarPorPolitica, type Fila, type Hoja } from "./motor";
+import { FILAS_POR_LOTE, derivarColumnas, enLotes, enParalelo, huellaContenido, leerSegun, recortarPorPolitica, type Fila, type Hoja } from "./motor";
 import { lectorDe } from "./reportes";
+import type { ResumenGrupoNotas } from "./estudio";
+import type { DatosParaPilo } from "./paraPilo";
 
 export const whKeys = {
   all: ["warehouse"] as const,
@@ -288,6 +290,72 @@ export function useNotasResumen(periodo: string, sede: string, habilitado: boole
   });
 }
 
+/* --- El análisis de Pilo (función warehouse-pilo) ----------------------------------------- */
+
+export interface AnalisisPilo {
+  titular: string;
+  resumen: string;
+  hallazgos: { titulo: string; evidencia: string; accion: string; responsable: string }[];
+  prioridades: string[];
+  limites: string[];
+  avisos: string[];
+}
+
+async function invocarPilo<T>(body: Record<string, unknown>): Promise<T> {
+  const r = await supabase.functions.invoke("warehouse-pilo", { body });
+  if (r.error) {
+    const contexto = (r.error as { context?: Response }).context;
+    if (!contexto) throw new Error("No se pudo llegar a la función «warehouse-pilo»: ¿está desplegada?");
+    const detalle = await readFunctionError(r.error);
+    if (detalle) throw new Error(detalle);
+    throw new Error(`La función respondió ${contexto.status}.`);
+  }
+  return r.data as T;
+}
+
+export const analizarConPilo = (datos: DatosParaPilo, pregunta: string) =>
+  invocarPilo<{ ok: boolean; analisis: AnalisisPilo; proveedor: string; modelo: string }>({ action: "analizar", datos, pregunta });
+
+export function useEstadoPilo() {
+  return useQuery({
+    queryKey: ["warehouse", "pilo"],
+    queryFn: () => invocarPilo<{ ok: boolean; ai: boolean; motivo?: string; proveedor: string; modelo: string }>({ action: "estado" }),
+    retry: false,
+    staleTime: 60_000,
+  });
+}
+
+/** Un renglón por materia y grupo (wh_notas_grupos, 0159): los cursos con alta reprobación salen de aquí. */
+export function useNotasGrupos(periodo: string, sede: string, habilitado: boolean) {
+  return useQuery({
+    queryKey: ["warehouse", "notas-grupos", periodo, sede],
+    enabled: habilitado,
+    staleTime: 5 * 60_000,
+    queryFn: async () => {
+      const filas = await todas<Record<string, unknown>>((a, b) => supabase.rpc("wh_notas_grupos", { p_periodo: periodo, p_sede: sede }, { count: "exact" }).range(a, b));
+      const n = (v: unknown) => (v === null || v === undefined ? null : Number(v));
+      return filas.map(
+        (r): ResumenGrupoNotas => ({
+          codigo_materia: String(r.codigo_materia ?? ""),
+          materia: String(r.materia ?? ""),
+          grupo: String(r.grupo ?? ""),
+          programa: String(r.programa ?? ""),
+          estudiantes: Number(r.estudiantes ?? 0),
+          con_p1: Number(r.con_p1 ?? 0),
+          con_p2: Number(r.con_p2 ?? 0),
+          con_p3: Number(r.con_p3 ?? 0),
+          prom_p1: n(r.prom_p1),
+          prom_p2: n(r.prom_p2),
+          prom_p3: n(r.prom_p3),
+          bajo_p1: Number(r.bajo_p1 ?? 0),
+          bajo_p2: Number(r.bajo_p2 ?? 0),
+          bajo_p3: Number(r.bajo_p3 ?? 0),
+        }),
+      );
+    },
+  });
+}
+
 /* --- Cargar ------------------------------------------------------------------ */
 
 export interface PedidoCarga {
@@ -351,7 +419,9 @@ export async function guardarHoja(
 
   // Lo que la política descarta no sale del navegador (la base lo vuelve a aplicar). Los lotes llevan su
   // posición `n`, así que pueden llegar en cualquier orden y de a varios.
-  const filas = politica ? recortarPorPolitica(hoja.filas, politica) : hoja.filas;
+  // El grupo etario y el origen se calculan aquí, antes de descartar la fecha de nacimiento y el departamento.
+  const derivada = derivarColumnas(pedido.conjunto, hoja, pedido.periodo);
+  const filas = politica ? recortarPorPolitica(derivada.filas, politica) : derivada.filas;
   const lotes = enLotes(filas, FILAS_POR_LOTE);
   let enviadas = 0;
   try {

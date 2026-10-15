@@ -16,6 +16,7 @@
    cuántas reglas se cumplen: 1 = Atención, 2 = Riesgo, 3 o más = Crítico.
    ========================================================================== */
 
+import { bandaDe, desempenoDe, riesgoRelativoDe, type Banda, type Desempeno } from "./estudio";
 import type { GrupoRendimiento, ResumenNotas } from "./store";
 
 export type Nivel = 0 | 1 | 2 | 3;
@@ -296,6 +297,11 @@ export interface AlertaNotas {
   enRiesgo: number;
   reglas: ReglaNotas[];
   nivel: Nivel;
+  /** Banda del estudio UDES (bajo < 3,3 · medio · alto > 4,3) y cuántas veces más probable es desertar frente a un promedio alto. */
+  banda: Banda | null;
+  riesgoRelativo: number | null;
+  /** NE, ED o RS: el nivel de desempeño del Monitor. */
+  desempeno: Desempeno | null;
 }
 
 /**
@@ -332,6 +338,9 @@ export function evaluarNotas(resumen: ResumenNotas[], umbrales: UmbralesNotas = 
       enRiesgo: ultimo?.riesgo ?? 0,
       reglas,
       nivel: nivelDe(reglas.length),
+      banda: bandaDe(ultimo?.prom ?? null),
+      riesgoRelativo: riesgoRelativoDe(ultimo?.prom ?? null),
+      desempeno: desempenoDe(ultimo?.prom ?? null, ultimo?.riesgo ?? 0, previo && ultimo?.prom != null && previo.prom != null ? previo.prom - ultimo.prom : null),
     };
   });
 }

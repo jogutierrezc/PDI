@@ -340,6 +340,7 @@
   --wall-sistema: var(--od-line-5);
   --wall-internacionalizacion: var(--od-line-10);
   --wall-informes: var(--od-line-9);
+  --wall-warehouse: var(--od-line-11);
   --wall-ink: #ffffff;
   --wall-numeral: rgba(255, 255, 255, 0.16);
   --wall-veil: rgba(255, 255, 255, 0.14);

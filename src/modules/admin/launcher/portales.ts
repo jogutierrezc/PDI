@@ -192,6 +192,32 @@ export const MODULES: Record<ModuleId, ModuleMeta> = {
       ];
     },
   },
+  warehouse: {
+    text: "Los reportes de Master, Galileo y Davinci guardados por periodo, con alertas tempranas",
+    color: "var(--wall-warehouse)",
+    rank: 5.7,
+    sections: () => {
+      const base = "/admin/warehouse";
+      return [
+        {
+          title: "Consulta",
+          cards: [
+            { key: "wh-tablero", title: "Tablero", text: "Qué hay guardado por periodo, sede y corte", to: base },
+            { key: "wh-explorar", title: "Explorar", text: "Gráficos y tablas de lo guardado", to: `${base}/explorar` },
+            { key: "wh-alertas", title: "Alertas tempranas", text: "Grupos y estudiantes con señales de riesgo académico", to: `${base}/alertas` },
+          ],
+        },
+        {
+          title: "Carga",
+          cards: [
+            { key: "wh-cargas", title: "Cargas", text: "Cargar un reporte, traerlo de Master o ver el historial", to: `${base}/cargas` },
+            { key: "wh-catalogo", title: "Catálogo", text: "Los conjuntos, sus peticiones y qué se guarda de cada uno", to: `${base}/catalogo` },
+            { key: "wh-almacen", title: "Almacén", text: "Capas, periodos cerrados y política de privacidad", to: `${base}/almacen` },
+          ],
+        },
+      ];
+    },
+  },
   internacionalizacion: {
     text: "Movilidad, convenios y visitantes por campus, para SNIES, CNA y rankings",
     color: "var(--wall-internacionalizacion)",

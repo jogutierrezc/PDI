@@ -204,6 +204,7 @@ const Internacionalizacion = lazy(() =>
   import("./modules/internacionalizacion/ui/Internacionalizacion").then((m) => ({ default: m.Internacionalizacion })),
 );
 const InformesAdmin = lazy(() => import("./modules/informes/InformesAdmin").then((m) => ({ default: m.InformesAdmin })));
+const Warehouse = lazy(() => import("./modules/warehouse/Warehouse").then((m) => ({ default: m.Warehouse })));
 const ReportesInstitucionales = lazy(() =>
   import("./modules/reportes/ReportesInstitucionales").then((m) => ({ default: m.ReportesInstitucionales })),
 );
@@ -465,6 +466,15 @@ export default function App() {
             element={
               <RequireRole minimum="consulta" screen="reportes">
                 <ReportesInstitucionales />
+              </RequireRole>
+            }
+          />
+          {/* Warehouse UDES: los reportes de Master, Galileo y Davinci por periodo. Solo Planeación. */}
+          <Route
+            path="/admin/warehouse/:seccion?"
+            element={
+              <RequireRole minimum="planeacion" screen="warehouse">
+                <Warehouse />
               </RequireRole>
             }
           />

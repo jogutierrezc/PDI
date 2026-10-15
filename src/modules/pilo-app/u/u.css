@@ -29,9 +29,16 @@
   padding: max(16px, env(safe-area-inset-top, 0px)) max(16px, env(safe-area-inset-right, 0px)) 24px max(16px, env(safe-area-inset-left, 0px));
 }
 
+/* Ya está dentro de la página (.pc-pane, una rejilla): con margen automático y contención de tamaño la
+   rejilla la encogía a cero de ancho. Por eso ocupa todo el ancho disponible y es la página la que se ensancha. */
 .pu[data-wide="true"] {
+  width: 100%;
   max-width: 1040px;
   margin-inline: auto;
+}
+
+.pc-pane:has(> .pu[data-wide="true"]) {
+  max-width: 1040px;
 }
 
 .pu *:focus-visible {

@@ -60,6 +60,7 @@ export const SCREEN_PATHS: Record<AdminScreen, string> = {
   rankings: "/admin/rankings",
   internacionalizacion: "/admin/internacionalizacion",
   informes: "/admin/informes-gestion",
+  warehouse: "/admin/warehouse",
 };
 
 export interface AuthContextValue {
@@ -119,6 +120,8 @@ export function screenVisible(
   if (screen === "correos") return RANK[profile.role] >= RANK.planeacion;
   // Rutas del bus: solo por el rol, como en la base (0139).
   if (screen === "rutas") return RANK[profile.role] >= RANK.planeacion;
+  // Warehouse UDES: datos de las plataformas institucionales; solo por el rol, como en la base (0155).
+  if (screen === "warehouse") return RANK[profile.role] >= RANK.planeacion;
   // Rankings (THE, UI GreenMetric y el recolector de noticias): solo por el rol, como en la base (0143).
   if (screen === "rankings") return RANK[profile.role] >= RANK.planeacion;
   // Internacionalización: pertenecer al módulo (director, coordinador o gestor

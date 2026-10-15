@@ -55,7 +55,7 @@ export function AnuncioLlamada({ open, quick, onClose, onTry }: { open: boolean;
             {Icon.close}
           </button>
         </div>
-        <p className="pc-lead">{tr("Toque el teléfono de la cabecera y converse en voz alta, como en una llamada. Está en prueba.")}</p>
+        <p className="ll-lead">{tr("Toque el teléfono de la cabecera y converse en voz alta, como en una llamada. Está en prueba.")}</p>
         <ol className="pn-how">
           <li>
             <strong>{tr("Toque el teléfono")}</strong>
@@ -71,7 +71,7 @@ export function AnuncioLlamada({ open, quick, onClose, onTry }: { open: boolean;
           </li>
         </ol>
         <p className="pn-langs">{tr("Español, inglés y portugués.")}</p>
-        <div className="pc-actions">
+        <div className="ll-actions">
           <button type="button" className="pa-btn pa-btn--main" onClick={onTry}>
             {Icon.phone}
             {tr("Probar la llamada")}

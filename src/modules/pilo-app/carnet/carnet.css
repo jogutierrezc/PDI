@@ -853,3 +853,8 @@ button.cn-row:active {
     max-height: 86%;
   }
 }
+
+/* La página se angosta al ancho del carnet, para que el título y la tarjeta queden alineados. */
+.pc-pane:has(> .cn-pane[data-wide]) {
+  max-width: 560px;
+}

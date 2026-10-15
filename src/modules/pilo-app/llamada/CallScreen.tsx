@@ -108,7 +108,7 @@ export function CallScreen({
     () => {
       if (reducedMotion()) return;
       gsap.fromTo(root.current, { clipPath: "circle(0px at calc(100% - 44px) 44px)" }, { clipPath: "circle(160vmax at calc(100% - 44px) 44px)", duration: 0.55, ease: "power3.out", clearProps: "clipPath" });
-      gsap.from(".pc-top, .pc-bar", { autoAlpha: 0, y: (i) => (i ? 12 : -8), duration: 0.35, ease: "power3.out", delay: 0.2 });
+      gsap.from(".ll-top, .ll-bar", { autoAlpha: 0, y: (i) => (i ? 12 : -8), duration: 0.35, ease: "power3.out", delay: 0.2 });
     },
     { scope: root },
   );
@@ -128,8 +128,8 @@ export function CallScreen({
     () => {
       const svg = rings.current;
       if (!svg || reducedMotion()) return;
-      const circles = gsap.utils.toArray<SVGCircleElement>(".pc-ring:not(.pc-ring--think)", svg);
-      const dashed = svg.querySelector<SVGCircleElement>(".pc-ring--think");
+      const circles = gsap.utils.toArray<SVGCircleElement>(".ll-ring:not(.ll-ring--think)", svg);
+      const dashed = svg.querySelector<SVGCircleElement>(".ll-ring--think");
       gsap.set(circles, { scale: 1, opacity: (i) => 0.55 - i * 0.14, transformOrigin: "50% 50%" });
       if (phase === "escucha") {
         gsap.to(circles, { scale: (i) => 1.045 + i * 0.03, duration: 2.1, ease: "sine.inOut", yoyo: true, repeat: -1, stagger: 0.28 });
@@ -157,14 +157,14 @@ export function CallScreen({
   const failed = phase === "error";
 
   return (
-    <div className="pc" ref={root} role="dialog" aria-modal="true" aria-label="Mr. Pilo" data-phase={phase} data-log={log || undefined} tabIndex={-1}>
-      <header className="pc-top">
-        <p className="pc-live">
+    <div className="ll" ref={root} role="dialog" aria-modal="true" aria-label="Mr. Pilo" data-phase={phase} data-log={log || undefined} tabIndex={-1}>
+      <header className="ll-top">
+        <p className="ll-live">
           <i aria-hidden="true" />
           <span>{tr("En llamada")}</span>
           <time dateTime={`PT${seconds}S`}>{clock(seconds)}</time>
         </p>
-        <div className="pc-langs" role="radiogroup" aria-label={tr("Idioma de la llamada")}>
+        <div className="ll-langs" role="radiogroup" aria-label={tr("Idioma de la llamada")}>
           {PILO_LANGS.map((l) => (
             <button key={l.id} type="button" role="radio" aria-checked={l.id === lang} lang={l.id} title={l.name} onClick={() => setLang(l.id)}>
               {l.code}
@@ -173,53 +173,53 @@ export function CallScreen({
         </div>
       </header>
 
-      <main className="pc-stage">
-        <button type="button" className="pc-orb" onClick={call.interrupt} disabled={!canTap} aria-label={canTap ? tr("Toque a Pilo para interrumpir") : phaseText(phase)}>
-          <svg ref={rings} className="pc-rings" viewBox="0 0 240 240" aria-hidden="true">
-            <circle className="pc-ring" cx="120" cy="120" r="84" />
-            <circle className="pc-ring" cx="120" cy="120" r="100" />
-            <circle className="pc-ring" cx="120" cy="120" r="116" />
-            <circle className="pc-ring pc-ring--think" cx="120" cy="120" r="108" />
+      <main className="ll-stage">
+        <button type="button" className="ll-orb" onClick={call.interrupt} disabled={!canTap} aria-label={canTap ? tr("Toque a Pilo para interrumpir") : phaseText(phase)}>
+          <svg ref={rings} className="ll-rings" viewBox="0 0 240 240" aria-hidden="true">
+            <circle className="ll-ring" cx="120" cy="120" r="84" />
+            <circle className="ll-ring" cx="120" cy="120" r="100" />
+            <circle className="ll-ring" cx="120" cy="120" r="116" />
+            <circle className="ll-ring ll-ring--think" cx="120" cy="120" r="108" />
           </svg>
-          <span className="pc-face">
+          <span className="ll-face">
             <Pilo size="100%" mood={MOOD[phase]} talking={sounding} alive />
           </span>
         </button>
 
-        <h2 className="pc-state" aria-live="polite">
+        <h2 className="ll-state" aria-live="polite">
           {phaseText(phase)}
         </h2>
-        <p className="pc-hint" aria-hidden="true" data-on={canTap || undefined}>
+        <p className="ll-hint" aria-hidden="true" data-on={canTap || undefined}>
           {tr("Toque a Pilo para interrumpir")}
         </p>
 
         {failed ? (
-          <div className="pc-fail" role="alert">
+          <div className="ll-fail" role="alert">
             <p>{call.error}</p>
             <div>
-              <button type="button" className="pa-btn pc-btn" onClick={call.start}>
+              <button type="button" className="pa-btn ll-btn" onClick={call.start}>
                 {tr("Volver a llamar")}
               </button>
-              <button type="button" className="pa-btn pc-btn pc-btn--line" onClick={call.end}>
+              <button type="button" className="pa-btn ll-btn ll-btn--line" onClick={call.end}>
                 {tr("Cerrar")}
               </button>
             </div>
           </div>
         ) : (
-          <div className="pc-caption" lang={lang}>
-            <p className="pc-heard" data-empty={!call.heard || undefined}>
+          <div className="ll-caption" lang={lang}>
+            <p className="ll-heard" data-empty={!call.heard || undefined}>
               {call.heard}
             </p>
-            <p className="pc-said" data-empty={!call.said || undefined}>
+            <p className="ll-said" data-empty={!call.said || undefined}>
               {call.said}
             </p>
           </div>
         )}
       </main>
 
-      <section className="pc-log" aria-label={tr("La conversación")} hidden={!log}>
+      <section className="ll-log" aria-label={tr("La conversación")} hidden={!log}>
         {call.lines.length === 0 ? (
-          <p className="pc-log__empty">{tr("Aún no hay nada dicho.")}</p>
+          <p className="ll-log__empty">{tr("Aún no hay nada dicho.")}</p>
         ) : (
           <ol>
             {call.lines.map((l, i) => (
@@ -232,14 +232,14 @@ export function CallScreen({
         )}
       </section>
 
-      <footer className="pc-bar">
-        <button type="button" className="pc-ctl" aria-pressed={call.muted} onClick={() => call.mute(!call.muted)} aria-label={call.muted ? tr("Activar el micrófono") : tr("Silenciar el micrófono")} disabled={failed}>
+      <footer className="ll-bar">
+        <button type="button" className="ll-ctl" aria-pressed={call.muted} onClick={() => call.mute(!call.muted)} aria-label={call.muted ? tr("Activar el micrófono") : tr("Silenciar el micrófono")} disabled={failed}>
           {call.muted ? Icon.micOff : Icon.mic}
         </button>
-        <button type="button" className="pc-ctl pc-ctl--end" onClick={call.end} aria-label={tr("Colgar")}>
+        <button type="button" className="ll-ctl ll-ctl--end" onClick={call.end} aria-label={tr("Colgar")}>
           {Icon.hangup}
         </button>
-        <button type="button" className="pc-ctl" aria-pressed={log} onClick={() => setLog((v) => !v)} aria-label={tr("Ver la conversación")}>
+        <button type="button" className="ll-ctl" aria-pressed={log} onClick={() => setLog((v) => !v)} aria-label={tr("Ver la conversación")}>
           {Icon.chat}
         </button>
       </footer>

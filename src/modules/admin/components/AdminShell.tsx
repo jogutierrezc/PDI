@@ -53,7 +53,8 @@ export type AdminSection =
   | "rutas"
   | "rankings"
   | "internacionalizacion"
-  | "informes";
+  | "informes"
+  | "warehouse";
 
 export interface NavItem {
   id: AdminSection;
@@ -65,7 +66,7 @@ export interface NavItem {
 }
 
 export interface NavGroup {
-  id: "planeacion" | "pdi" | "cifras" | "observatorio" | "impacto" | "tableros" | "reportes" | "informes" | "internacionalizacion" | "rankings" | "sistema";
+  id: "planeacion" | "pdi" | "cifras" | "observatorio" | "impacto" | "tableros" | "reportes" | "informes" | "internacionalizacion" | "rankings" | "warehouse" | "sistema";
   label: string;
   /** Ícono y nombre corto: el riel solo tiene 78 px, ahí no cabe el rótulo largo. */
   icon: IconName;
@@ -159,6 +160,17 @@ export const navigation: NavGroup[] = [
     label: "Reportes Institucionales",
     items: [
       { id: "reportes", label: "SNIES y CNA", icon: "table", to: "/admin/reportes-institucionales", minimum: "consulta" },
+    ],
+  },
+  {
+    // Los reportes de Master, Galileo y Davinci guardados por periodo, para
+    // consultarlos sin volver a pedirlos y vigilar el rendimiento académico.
+    id: "warehouse",
+    icon: "layers",
+    short: "Warehouse",
+    label: "Warehouse UDES",
+    items: [
+      { id: "warehouse", label: "Datos de las plataformas", icon: "layers", to: "/admin/warehouse", minimum: "planeacion" },
     ],
   },
   {

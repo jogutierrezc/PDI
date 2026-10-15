@@ -62,7 +62,7 @@ export function CallPreview({
   useGSAP(
     () => {
       if (!open || reducedMotion()) return;
-      gsap.fromTo(".pc-feat li", { autoAlpha: 0, y: 8 }, { autoAlpha: 1, y: 0, duration: 0.32, ease: "power3.out", stagger: 0.05, delay: quick ? 0 : 0.12, clearProps: "transform,opacity,visibility" });
+      gsap.fromTo(".ll-feat li", { autoAlpha: 0, y: 8 }, { autoAlpha: 1, y: 0, duration: 0.32, ease: "power3.out", stagger: 0.05, delay: quick ? 0 : 0.12, clearProps: "transform,opacity,visibility" });
     },
     { scope: root, dependencies: [open, quick] },
   );
@@ -81,7 +81,7 @@ export function CallPreview({
 
   return (
     <Layer kind="sheet" open={open} quick={quick} label={tr("Llamar a Mr. Pilo")} onClose={onClose}>
-      <div className="pa-sheet__in pc-preview" ref={root}>
+      <div className="pa-sheet__in ll-preview" ref={root}>
         <span className="pa-sheet__grip" aria-hidden="true" />
         <div className="pa-sheet__head">
           <h2>{tr("Llamar a Pilo")}</h2>
@@ -89,13 +89,13 @@ export function CallPreview({
             {Icon.close}
           </button>
         </div>
-        <p className="pc-lead">{tr("Una conversación hablada, como una llamada: usted habla, Pilo escucha y le responde con su voz.")}</p>
+        <p className="ll-lead">{tr("Una conversación hablada, como una llamada: usted habla, Pilo escucha y le responde con su voz.")}</p>
 
-        <section aria-labelledby="pc-lang-l">
-          <p className="pa-label" id="pc-lang-l">
+        <section aria-labelledby="ll-lang-l">
+          <p className="pa-label" id="ll-lang-l">
             {tr("Idioma de la llamada")}
           </p>
-          <div className="pc-lang" role="radiogroup" aria-labelledby="pc-lang-l">
+          <div className="ll-lang" role="radiogroup" aria-labelledby="ll-lang-l">
             {PILO_LANGS.map((l) => (
               <button key={l.id} type="button" role="radio" aria-checked={l.id === lang} lang={l.id} onClick={() => setLang(l.id)}>
                 <b aria-hidden="true">{l.code}</b>
@@ -105,7 +105,7 @@ export function CallPreview({
           </div>
         </section>
 
-        <ul className="pc-feat">
+        <ul className="ll-feat">
           {CALL_FEATURES.map((f) => (
             <li key={f.id}>
               <strong>{tr(f.title)}</strong>
@@ -114,11 +114,11 @@ export function CallPreview({
           ))}
         </ul>
 
-        <section aria-labelledby="pc-know-l">
-          <p className="pa-label" id="pc-know-l">
+        <section aria-labelledby="ll-know-l">
+          <p className="pa-label" id="ll-know-l">
             {tr("Qué conviene saber")}
           </p>
-          <ul className="pc-know">
+          <ul className="ll-know">
             {CALL_NOTICES.map((n) => (
               <li key={n}>{tr(n)}</li>
             ))}
@@ -126,27 +126,27 @@ export function CallPreview({
         </section>
 
         {!supported && (
-          <p className="pc-problem" role="alert">
+          <p className="ll-problem" role="alert">
             {tr("Este navegador no reconoce la voz. Para llamar a Pilo use Chrome, Edge o Safari.")}
           </p>
         )}
         {supported && !available && (
-          <p className="pc-problem" role="alert">
+          <p className="ll-problem" role="alert">
             {tr("La voz de Pilo no está disponible ahora, y sin ella no hay llamada. Puede seguir por escrito en el chat.")}
           </p>
         )}
         {problem === "negado" && (
-          <p className="pc-problem" role="alert">
+          <p className="ll-problem" role="alert">
             {tr("El navegador no dejó usar el micrófono. Permítalo en el candado de la barra de direcciones y vuelva a tocar «Activar».")}
           </p>
         )}
         {problem === "sin micrófono" && (
-          <p className="pc-problem" role="alert">
+          <p className="ll-problem" role="alert">
             {tr("No encuentro un micrófono. Conecte uno y vuelva a tocar «Activar».")}
           </p>
         )}
 
-        <div className="pc-actions">
+        <div className="ll-actions">
           <button type="button" className="pa-btn pa-btn--main" onClick={() => void activate()} disabled={!ready || busy} aria-busy={busy || undefined}>
             {Icon.phone}
             {busy ? tr("Pidiendo el micrófono…") : tr("Activar la llamada")}

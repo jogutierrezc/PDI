@@ -179,7 +179,9 @@ export function PeopleView({
                           </span>
                         ))}
                         {mine.length > 2 && <span className="us-tag us-tag--unit">+{mine.length - 2}</span>}
-                        {!person.is_active && <span className="us-tag us-tag--off">Inactiva</span>}
+                        {!person.is_active && (
+                          <span className="us-tag us-tag--off">{global?.key === "invitado" ? "Sin habilitar" : "Inactiva"}</span>
+                        )}
                       </span>
                     </span>
                   </button>
@@ -197,6 +199,7 @@ export function PeopleView({
             reports={access.data?.reports ?? []}
             roleUnits={access.data?.units ?? []}
             roles={roles}
+            existing={list.map((person) => person.email)}
             onCancel={() => open({})}
             onCreated={(id, text) => {
               onNotice(text);

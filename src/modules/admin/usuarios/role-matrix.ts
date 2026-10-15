@@ -18,6 +18,11 @@
    Separar ver de editar por módulo pediría cambiar las políticas RLS; se
    acordó no hacerlo.
 
+   Cada módulo ofrece los niveles que la base distingue de verdad y nada más:
+   donde solo hay dos (p. ej. Rutas: ver o editar) no se inventa un tercero.
+   `seenFrom` es la capacidad mínima para que la pantalla aparezca: un rol de
+   Consulta con Warehouse marcado no lo verá, y la matriz lo avisa.
+
    Impacto es la excepción, y por eso no depende de la capacidad: allí manda
    la pertenencia a una unidad. El rol lleva su nivel (Ver · Editar ·
    Administrar → impact_level none · editor · admin) y su alcance (todas las
@@ -35,7 +40,9 @@ import type { AccessRole, AdminScreen, AppRole, ImpactLevel } from "../../../typ
 import { UNIT_ROLE } from "../../tableros/model";
 
 export type Level = "none" | "ver" | "editar" | "administrar";
-export type ModuleId = "portal" | "plan" | "cifras" | "observatorio" | "impacto" | "tableros" | "reportes" | "monitor" | "sistema";
+export type ModuleId =
+  | "portal" | "plan" | "cifras" | "observatorio" | "impacto" | "tableros" | "reportes" | "informes"
+  | "monitor" | "warehouse" | "rankings" | "rutas" | "internacionalizacion" | "correos" | "pilo" | "sistema";
 export type TemplateId = "consulta" | "editor" | "administrador" | "personalizada";
 export type BoardRole = "visor" | "editor" | "jefe";
 
@@ -52,6 +59,8 @@ const LEVEL_RANK: Record<Level, number> = { none: 0, ver: 1, editar: 2, administ
 export interface ModuleDef {
   id: ModuleId;
   label: string;
+  /** Capacidad mínima para ver el módulo, si pide más que Consulta. */
+  seenFrom?: AppRole;
   screens: { id: AdminScreen; label: string; note?: string }[];
   /** Niveles que tiene sentido elegir, con lo que significa cada uno. */
   levels: Partial<Record<Exclude<Level, "none">, { hint: string; needs: AppRole }>>;
@@ -147,6 +156,80 @@ export const MODULES: ModuleDef[] = [
     screens: [{ id: "monitor", label: "Alertas tempranas de notas", note: "ve su facultad o programa según la unidad a la que pertenece; Planeación ve todo" }],
     levels: {
       ver: { hint: "Consulta cómo van las notas de lo que su unidad permite, y pide el análisis de Pilo.", needs: "consulta" },
+      editar: { hint: "Además asigna a cada persona los programas o facultades que ve.", needs: "planeacion" },
+    },
+  },
+  {
+    id: "informes",
+    label: "Informes de gestión",
+    screens: [{ id: "informes", label: "Informes Institucionales", note: "quien pertenece a una unidad escribe el de su unidad" }],
+    levels: {
+      ver: { hint: "Abre la pantalla; escribe el informe de su unidad si pertenece a una.", needs: "consulta" },
+      editar: { hint: "Abre, revisa y consolida los informes de todas las unidades.", needs: "planeacion" },
+    },
+  },
+  {
+    id: "warehouse",
+    label: "Warehouse UDES",
+    seenFrom: "planeacion",
+    screens: [{ id: "warehouse", label: "Datos de las plataformas institucionales" }],
+    levels: {
+      ver: { hint: "Aparece en el menú; solo se abre con capacidad de Planeación.", needs: "consulta" },
+      editar: { hint: "Consulta los datos del almacén y las alertas.", needs: "planeacion" },
+      administrar: { hint: "Además configura conexiones y ejecuciones.", needs: "admin" },
+    },
+  },
+  {
+    id: "rankings",
+    label: "Rankings (THE, GreenMetric)",
+    seenFrom: "planeacion",
+    screens: [{ id: "rankings", label: "Rankings y recolector de noticias" }],
+    levels: {
+      ver: { hint: "Aparece en el menú; solo se abre con capacidad de Planeación.", needs: "consulta" },
+      editar: { hint: "Prepara y publica informes de ranking y noticias.", needs: "planeacion" },
+    },
+  },
+  {
+    id: "rutas",
+    label: "Rutas del bus",
+    seenFrom: "planeacion",
+    screens: [{ id: "rutas", label: "Rutas del bus" }],
+    levels: {
+      ver: { hint: "Aparece en el menú; solo se abre con capacidad de Planeación.", needs: "consulta" },
+      editar: { hint: "Crea y cambia rutas y paradas.", needs: "planeacion" },
+    },
+  },
+  {
+    id: "internacionalizacion",
+    label: "Internacionalización",
+    seenFrom: "admin",
+    screens: [{ id: "internacionalizacion", label: "Internacionalización", note: "director, coordinador y gestor entran por pertenencia, sin este rol" }],
+    levels: {
+      ver: { hint: "Aparece en el menú de quien sea administrador.", needs: "consulta" },
+      administrar: { hint: "Administra el módulo y sus miembros.", needs: "admin" },
+    },
+  },
+  {
+    id: "correos",
+    label: "Correos de la intranet",
+    seenFrom: "planeacion",
+    screens: [{ id: "correos", label: "Plantillas y bitácora de correos" }],
+    levels: {
+      ver: { hint: "Lee la bitácora de envíos; solo se abre con capacidad de Planeación.", needs: "consulta" },
+      administrar: { hint: "Cambia plantillas, destinatarios y ajustes de envío.", needs: "admin" },
+    },
+  },
+  {
+    id: "pilo",
+    label: "Pilo (administración)",
+    seenFrom: "admin",
+    screens: [
+      { id: "pilo", label: "Mr. Pilo" },
+      { id: "pilo_ensenanza", label: "Mr. Pilo Enseñanza" },
+    ],
+    levels: {
+      ver: { hint: "Aparece en el menú de quien sea administrador.", needs: "consulta" },
+      administrar: { hint: "Administra a Pilo: conocimiento, voz, accesos y cuentas.", needs: "admin" },
     },
   },
   {
@@ -259,6 +342,7 @@ export function effectiveLevel(matrix: Matrix, id: ModuleId): Level {
   if (id === "impacto") return choice.level;
   const capacity = capacityOf(matrix);
   const module = moduleOf(id);
+  if (module.seenFrom && RANK[capacity] < RANK[module.seenFrom]) return "none";
   let best: Level = choice.level;
   for (const [level, def] of Object.entries(module.levels) as [Exclude<Level, "none">, { needs: AppRole }][]) {
     if (id === "cifras" && level === "administrar" && !matrix.allReports) continue;
@@ -368,6 +452,13 @@ export function templateMatrix(template: Exclude<TemplateId, "personalizada">): 
     modules.tableros = full("tableros", "ver");
     modules.reportes = full("reportes", "administrar");
     modules.monitor = full("monitor", "ver");
+    modules.informes = full("informes", "editar");
+    modules.warehouse = full("warehouse", "editar");
+    modules.rankings = full("rankings", "editar");
+    modules.rutas = full("rutas", "editar");
+    modules.internacionalizacion = full("internacionalizacion", "ver");
+    modules.correos = full("correos", "ver");
+    modules.pilo = full("pilo", "ver");
     modules.sistema = full("sistema", "ver");
     return base;
   }

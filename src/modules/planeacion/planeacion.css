@@ -172,24 +172,25 @@
 
 .pl-hero--compact { padding-block: clamp(40px, 6vw, 72px); }
 
-.pl-blueprint {
+
+/* Video de fondo: el iframe se amplía hasta cubrir todo el hero (cover) sin barras. */
+.pl-backdrop { position: absolute; inset: 0; z-index: -1; overflow: hidden; pointer-events: none; background: var(--pl-navy); }
+.pl-backdrop iframe {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: max(100%, 177.78cqh);
+  height: max(100%, 56.25cqw);
+  transform: translate(-50%, -50%);
+  border: 0;
+}
+.pl-backdrop { container-type: size; }
+/* Velo azul: el texto blanco se lee sobre cualquier fotograma. */
+.pl-backdrop::after {
+  content: "";
   position: absolute;
   inset: 0;
-  z-index: -1;
-  width: 100%;
-  height: 100%;
-  overflow: hidden;
-}
-
-.pl-blueprint__grid path { stroke: #ffffff; stroke-opacity: 0.07; fill: none; }
-.pl-blueprint__plan * { stroke: var(--pl-plan); stroke-opacity: 0.55; stroke-width: 1.5; fill: none; }
-.pl-blueprint__marks circle { fill: var(--od-signal); }
-.pl-blueprint__labels text { fill: var(--pl-on-navy-3); font-family: var(--font-sign); font-stretch: var(--sign-stretch); font-size: 13px; letter-spacing: 1.5px; }
-
-/* Dibujo del plano: una sola vez, al entrar. */
-@media (prefers-reduced-motion: no-preference) {
-  .pl-blueprint__plan * { stroke-dasharray: 1400; stroke-dashoffset: 1400; animation: pl-draw 1.8s var(--ease-out) 0.2s forwards; }
-  @keyframes pl-draw { to { stroke-dashoffset: 0; } }
+  background: linear-gradient(90deg, color-mix(in srgb, var(--pl-navy) 88%, transparent) 0%, color-mix(in srgb, var(--pl-navy) 62%, transparent) 60%, color-mix(in srgb, var(--pl-navy) 45%, transparent) 100%);
 }
 
 .pl-hero__inner { display: grid; gap: var(--space-6); max-width: 1312px; }
@@ -207,6 +208,7 @@
 }
 
 .pl-hero__lede { max-width: 62ch; margin: 0; color: var(--pl-on-navy-2); font-size: clamp(1rem, 1.4vw, 1.2rem); line-height: 1.55; }
+
 
 .pl-back { display: inline-flex; align-items: center; gap: var(--space-2); color: var(--pl-on-navy-3); font-size: var(--text-sm); font-weight: 700; text-decoration: none; }
 .pl-back:hover { color: #ffffff; }
@@ -772,10 +774,6 @@
   .pl-office__text,
   .pl-office__links,
   .pl-office__address { grid-column: auto; }
-  /* El plano se queda en la cuadrícula: los rótulos chocarían con el título. */
-  .pl-blueprint__plan,
-  .pl-blueprint__marks,
-  .pl-blueprint__labels { display: none; }
 }
 
 @media (max-width: 720px) {

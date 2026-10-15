@@ -43,7 +43,7 @@ export function Almacen({ ctx, cobertura, permisos }: { ctx: Contexto; cobertura
           <div className="wh-capa">
             <b>2 · Filas limpias</b>
             <p>
-              Una fila por registro en <span className="wh-mono">wh_filas</span>, ya filtrada por la política de su conjunto: lo personal se descarta y el código del estudiante o el docente queda como seudónimo.
+              Una fila por registro en <span className="wh-mono">wh_filas</span>, ya filtrada por la política de su conjunto: lo personal se descarta, el código del estudiante se conserva como dato personal (solo para el seguimiento académico) y el docente queda como seudónimo.
             </p>
             <p className="wh-nota-chica">La limpieza ocurre dentro de la base. Cargar desde el navegador o desde el servidor da el mismo resultado.</p>
           </div>

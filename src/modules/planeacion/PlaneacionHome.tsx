@@ -38,6 +38,27 @@ import { PlanLayout } from "./PlanLayout";
 import { SiteSearch } from "./SiteSearch";
 import { TeamCarousel } from "./TeamCarousel";
 
+/* Video de fondo del hero (YouTube): mudo, en bucle, sin controles y detrás del contenido.
+   Con «reducir movimiento» no se carga y queda el azul de la portada. */
+const HERO_VIDEO_ID = "Vp8eMV9gHEk";
+
+function HeroBackdrop() {
+  const calm = typeof window !== "undefined" && window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
+  if (calm) return null;
+  const params = `autoplay=1&mute=1&loop=1&playlist=${HERO_VIDEO_ID}&controls=0&modestbranding=1&rel=0&playsinline=1&disablekb=1&iv_load_policy=3&fs=0`;
+  return (
+    <div className="pl-backdrop" aria-hidden="true">
+      <iframe
+        src={`https://www.youtube-nocookie.com/embed/${HERO_VIDEO_ID}?${params}`}
+        title=""
+        tabIndex={-1}
+        allow="autoplay; encrypted-media"
+        referrerPolicy="strict-origin-when-cross-origin"
+      />
+    </div>
+  );
+}
+
 export function PlaneacionHome() {
   const searchInput = useRef<HTMLInputElement>(null);
   const location = useLocation();
@@ -54,7 +75,7 @@ export function PlaneacionHome() {
   return (
     <PlanLayout title="Planeación Institucional | Universidad de Santander" onSearch={focusSearch}>
       <section className="pl-hero" id="buscar" aria-labelledby="pl-titulo">
-        <Blueprint />
+        <HeroBackdrop />
         <div className="pl-container pl-hero__inner">
           <h1 id="pl-titulo">{page.home.title}</h1>
           <p className="pl-hero__lede">{page.home.lede}</p>
@@ -114,39 +135,6 @@ export function PlaneacionHome() {
         </div>
       </section>
     </PlanLayout>
-  );
-}
-
-/* --- El plano del fondo -------------------------------------------------------------- */
-
-function Blueprint() {
-  return (
-    <svg className="pl-blueprint" viewBox="0 0 1440 640" preserveAspectRatio="xMaxYMid slice" aria-hidden="true" focusable="false">
-      <g className="pl-blueprint__grid">
-        {Array.from({ length: 8 }, (_, i) => (
-          <path key={`h${i}`} d={`M0 ${(i + 1) * 80}H1440`} />
-        ))}
-        {Array.from({ length: 17 }, (_, i) => (
-          <path key={`v${i}`} d={`M${(i + 1) * 80} 0V640`} />
-        ))}
-      </g>
-      <g className="pl-blueprint__plan">
-        <path d="M1000 120H1320V440H1160V520H1000Z" />
-        <path d="M1000 280H1160V440" />
-        <circle cx="1160" cy="280" r="46" />
-        <path d="M1080 120V200M1240 360H1320" />
-      </g>
-      <g className="pl-blueprint__marks">
-        <circle cx="1160" cy="280" r="5" />
-        <circle cx="1000" cy="520" r="4" />
-        <circle cx="1320" cy="120" r="4" />
-      </g>
-      <g className="pl-blueprint__labels">
-        <text x="1008" y="112">PDI 2024–2028</text>
-        <text x="1172" y="276">UDES EN CIFRAS</text>
-        <text x="1010" y="540">OBSERVATORIO</text>
-      </g>
-    </svg>
   );
 }
 

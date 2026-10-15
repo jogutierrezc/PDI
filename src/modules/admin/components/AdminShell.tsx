@@ -17,7 +17,7 @@
    En el móvil el menú es siempre el cajón de antes.
    ========================================================================== */
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import type { CSSProperties, ReactNode } from "react";
 import { Link, NavLink, useNavigate } from "react-router-dom";
 import { Icon } from "../../../components/ui/Icon";
@@ -402,6 +402,51 @@ export function AdminShell({
   const topbarRef = useRef<HTMLElement>(null);
   const sidebarRef = useRef<HTMLElement>(null);
 
+  // La barra de menús se comprime por niveles hasta caber en UNA fila, a
+  // cualquier ancho (320-2560 px), con la letra grande del sistema y con nombres
+  // largos: 0 rótulos completos · 1 rótulos cortos · 2 solo íconos y la persona
+  // en sus iniciales · 3 lo mismo con los espacios apretados. Cada nivel se
+  // prueba en el DOM (data-density en la cáscara) y se mide de verdad, así que
+  // el resultado no depende de tamaños adivinados. Con el cajón (≤900 px) no aplica.
+  const groupCount = navigation.filter((g) => g.items.some((item) => hasRole(item.minimum) && canSee(item.id))).length;
+  useLayoutEffect(() => {
+    const shell = shellRef.current;
+    const side = sidebarRef.current;
+    const nav = side?.querySelector<HTMLElement>(".admin-nav");
+    const head = side?.querySelector<HTMLElement>(".admin-sidebar__head");
+    const foot = side?.querySelector<HTMLElement>(".admin-sidebar__foot");
+    if (!shell || !side || !nav || !head || !foot) return;
+    if (bar !== "menus") {
+      shell.removeAttribute("data-density");
+      return;
+    }
+    const fit = () => {
+      if (!window.matchMedia("(min-width: 901px)").matches) {
+        shell.removeAttribute("data-density");
+        return;
+      }
+      let chosen = 3;
+      for (let level = 0; level <= 3; level += 1) {
+        shell.setAttribute("data-density", String(level));
+        const style = getComputedStyle(side);
+        const gap = parseFloat(style.columnGap) || 0;
+        const room = side.clientWidth - parseFloat(style.paddingLeft) - parseFloat(style.paddingRight);
+        const groups = Array.from(nav.children) as HTMLElement[];
+        const navNeed = groups.reduce((sum, el) => sum + el.offsetWidth, 0) + Math.max(0, groups.length - 1) * (parseFloat(getComputedStyle(nav).columnGap) || 0);
+        if (head.offsetWidth + navNeed + foot.offsetWidth + gap * 2 <= room) {
+          chosen = level;
+          break;
+        }
+      }
+      shell.setAttribute("data-density", String(chosen));
+    };
+    fit();
+    const observer = new ResizeObserver(fit);
+    [side, head, foot].forEach((node) => observer.observe(node));
+    void document.fonts?.ready.then(fit);
+    return () => observer.disconnect();
+  }, [bar, groupCount, navMode, profile?.full_name]);
+
   // La cabecera es fija y su alto cambia con la descripción y el ancho. Las
   // cabeceras pegajosas de las pantallas (rejillas, listas) se colocan debajo
   // leyendo --admin-topbar-h.
@@ -535,6 +580,7 @@ export function AdminShell({
                   data-current={(bar === "menus" && holdsCurrent) || undefined}
                   aria-controls={`admin-nav-${navGroup.id}-lista`}
                   data-tip={navGroup.label}
+                  title={bar === "menus" ? navGroup.label : undefined}
                   onClick={(event) => {
                     if (bar === "lateral") {
                       toggleGroup(navGroup.id);

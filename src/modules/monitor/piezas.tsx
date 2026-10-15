@@ -15,19 +15,134 @@ import { NOMBRE_NIVEL, type Nivel, type PuntoCorte } from "./logica";
 
 export const sinMovimiento = () => typeof window !== "undefined" && window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
 
-/** Entrada escalonada de lo marcado con data-in dentro del contenedor; se repite cuando cambia `clave`. */
-export function useEntrada<T extends HTMLElement>(clave: string) {
+/** Curva de salida fuerte (la del sistema: --ease-out) en su equivalente de GSAP. */
+const SALE = "power4.out";
+const MUEVE = "power3.inOut";
+
+export type Sentido = "abajo" | "arriba" | "lado";
+
+/* --- El elemento elegido viaja hasta el título del siguiente nivel -------------------------------- */
+
+interface Vuelo {
+  rect: DOMRect;
+  texto: string;
+  tam: number;
+  estilo: Partial<CSSStyleDeclaration>;
+}
+let vuelo: Vuelo | null = null;
+
+/** Se llama justo antes de navegar: recuerda dónde estaba el nombre elegido y cómo se veía. */
+export function prepararVuelo(origen: Element | null | undefined) {
+  vuelo = null;
+  if (!origen || sinMovimiento()) return;
+  const cs = getComputedStyle(origen);
+  vuelo = {
+    rect: origen.getBoundingClientRect(),
+    texto: (origen.textContent ?? "").trim(),
+    tam: parseFloat(cs.fontSize) || 16,
+    estilo: { fontFamily: cs.fontFamily, fontWeight: cs.fontWeight, color: cs.color, letterSpacing: cs.letterSpacing, lineHeight: cs.lineHeight },
+  };
+}
+
+function volar(raiz: HTMLElement) {
+  const v = vuelo;
+  vuelo = null;
+  const destino = raiz.querySelector<HTMLElement>("[data-destino]");
+  if (!v || !destino || !v.texto) return;
+  const d = destino.getBoundingClientRect();
+  const tamDestino = parseFloat(getComputedStyle(destino).fontSize) || v.tam;
+  const escala = Math.min(2.2, tamDestino / v.tam);
+  const g = document.createElement("div");
+  g.textContent = v.texto;
+  g.setAttribute("aria-hidden", "true");
+  Object.assign(g.style, v.estilo, { position: "fixed", left: `${v.rect.left}px`, top: `${v.rect.top}px`, margin: "0", whiteSpace: "nowrap", fontSize: `${v.tam}px`, pointerEvents: "none", zIndex: "60", transformOrigin: "0 0", willChange: "transform, opacity" });
+  document.body.appendChild(g);
+  gsap.set(destino, { opacity: 0 });
+  gsap
+    .timeline({ onComplete: () => g.remove() })
+    .to(g, { x: d.left - v.rect.left, y: d.top - v.rect.top, scale: escala, duration: 0.28, ease: MUEVE })
+    .to(destino, { opacity: 1, duration: 0.14, ease: "power2.out", clearProps: "opacity" }, 0.16)
+    .to(g, { opacity: 0, duration: 0.14, ease: "power2.out" }, 0.18);
+}
+
+/**
+ * Entrada escalonada de lo marcado con data-in dentro del contenedor; se repite cuando cambia `clave`.
+ * Al bajar de nivel entra desde abajo y el nombre elegido viaja hasta el título; al subir, desde arriba.
+ */
+export function useEntrada<T extends HTMLElement>(clave: string, sentido: Sentido = "abajo") {
   const ref = useRef<T>(null);
   useLayoutEffect(() => {
     const el = ref.current;
-    if (!el || sinMovimiento()) return;
+    if (!el || sinMovimiento()) {
+      vuelo = null;
+      return;
+    }
     const hijos = el.querySelectorAll("[data-in]");
     const ctx = gsap.context(() => {
-      gsap.from(hijos, { opacity: 0, y: 14, duration: 0.45, ease: "power3.out", stagger: 0.05, clearProps: "opacity,transform" });
+      gsap.from(hijos, { opacity: 0, y: sentido === "arriba" ? -8 : sentido === "lado" ? 0 : 12, duration: 0.3, ease: SALE, stagger: 0.045, clearProps: "opacity,transform" });
+      volar(el);
+    }, el);
+    return () => ctx.revert();
+  }, [clave]); // eslint-disable-line react-hooks/exhaustive-deps
+  return ref;
+}
+
+/**
+ * FLIP de una lista: cada hijo marcado con data-k que cambia de lugar (otro orden, otro corte) viaja desde donde
+ * estaba, en lugar de saltar; los nuevos aparecen. Solo transform y opacity.
+ */
+export function useFlip<T extends HTMLElement>(clave: string) {
+  const ref = useRef<T>(null);
+  const antes = useRef<Map<string, number> | null>(null);
+  useLayoutEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const items = Array.from(el.querySelectorAll<HTMLElement>("[data-k]"));
+    const ahora = new Map(items.map((i) => [i.dataset.k as string, i.offsetTop]));
+    const previo = antes.current;
+    antes.current = ahora;
+    if (!previo || sinMovimiento()) return;
+    const ctx = gsap.context(() => {
+      items.forEach((i, n) => {
+        const k = i.dataset.k as string;
+        const era = previo.get(k);
+        if (era === undefined) gsap.from(i, { opacity: 0, y: 8, duration: 0.26, ease: SALE, delay: Math.min(n, 6) * 0.025, clearProps: "opacity,transform" });
+        else if (Math.abs(era - (ahora.get(k) as number)) > 1) gsap.from(i, { y: era - (ahora.get(k) as number), duration: 0.3, ease: MUEVE, clearProps: "transform" });
+      });
     }, el);
     return () => ctx.revert();
   }, [clave]);
   return ref;
+}
+
+/** Una cifra que cuenta hasta su valor (y vuelve a contar al cambiar de corte o de alcance). */
+export function Cuenta({ valor, decimales = 0, sufijo = "" }: { valor: number | null; decimales?: number; sufijo?: string }) {
+  const ref = useRef<HTMLSpanElement>(null);
+  const previo = useRef<number | null>(null);
+  const fmt = (n: number) => n.toLocaleString("es-CO", { minimumFractionDigits: decimales, maximumFractionDigits: decimales }) + sufijo;
+  useLayoutEffect(() => {
+    const el = ref.current;
+    const hasta = valor;
+    const desde = previo.current ?? 0;
+    previo.current = hasta;
+    if (!el || hasta === null) return;
+    if (sinMovimiento() || desde === hasta) {
+      el.textContent = fmt(hasta);
+      return;
+    }
+    const o = { v: desde };
+    el.textContent = fmt(desde);
+    const t = gsap.to(o, { v: hasta, duration: 0.6, ease: SALE, onUpdate: () => (el.textContent = fmt(o.v)), onComplete: () => (el.textContent = fmt(hasta)) });
+    return () => {
+      t.kill();
+      el.textContent = fmt(hasta);
+    };
+  }, [valor]); // eslint-disable-line react-hooks/exhaustive-deps
+  return (
+    <span ref={ref} className="mo-cuenta" role="img" aria-label={valor === null ? "sin dato" : fmt(valor)}>
+      {valor === null ? "—" : fmt(valor)}
+    </span>
+  );
 }
 
 /* --- Semáforo ------------------------------------------------------------------------------- */
@@ -88,31 +203,36 @@ export function Aletas({ valor, sufijo = "", etiqueta }: { valor: number | strin
 export function BarraNiveles({ NE, ED, RS, alto = 14, mostrarCifras = false }: { NE: number; ED: number; RS: number; alto?: number; mostrarCifras?: boolean }) {
   const raiz = useRef<HTMLDivElement>(null);
   const total = NE + ED + RS;
-  const primera = useRef(true);
+  const previo = useRef<{ x: number; w: number }[] | null>(null);
+  // Los anchos son los reales (CSS). Al cambiar, cada tramo viaja desde donde estaba (FLIP): solo transform.
   useLayoutEffect(() => {
     const el = raiz.current;
     if (!el) return;
     const partes = Array.from(el.querySelectorAll<HTMLElement>("[data-parte]"));
-    const objetivo = partes.map((p) => (total ? (100 * Number(p.dataset.valor)) / total : 0));
-    if (sinMovimiento()) {
-      partes.forEach((p, i) => (p.style.width = `${objetivo[i]}%`));
-    } else {
-      partes.forEach((p, i) => {
-        if (primera.current) gsap.fromTo(p, { width: "0%" }, { width: `${objetivo[i]}%`, duration: 0.7, ease: "power3.out", delay: 0.08 * i });
-        else gsap.to(p, { width: `${objetivo[i]}%`, duration: 0.5, ease: "power3.inOut" });
-      });
-    }
-    primera.current = false;
-  }, [NE, ED, RS, total]);
+    const base = el.getBoundingClientRect().left;
+    const ahora = partes.map((p) => {
+      const r = p.getBoundingClientRect();
+      return { x: r.left - base, w: r.width };
+    });
+    const antes = previo.current;
+    previo.current = ahora;
+    if (sinMovimiento()) return;
+    partes.forEach((p, i) => {
+      const a = antes?.[i];
+      const n = ahora[i];
+      if (!a) gsap.fromTo(p, { scaleX: 0 }, { scaleX: 1, transformOrigin: "0 50%", duration: 0.5, ease: SALE, delay: 0.06 * i, clearProps: "transform" });
+      else if (n.w > 0.5 && (Math.abs(a.x - n.x) > 0.5 || Math.abs(a.w - n.w) > 0.5)) gsap.fromTo(p, { x: a.x - n.x, scaleX: Math.max(0.001, a.w / n.w) }, { x: 0, scaleX: 1, transformOrigin: "0 50%", duration: 0.4, ease: MUEVE, clearProps: "transform" });
+    });
+  }, [NE, ED, RS]);
   const valores: [Nivel, number][] = [["NE", NE], ["ED", ED], ["RS", RS]];
   return (
-    <div className="mo-barra" ref={raiz} style={{ height: alto }} role="img" aria-label={`Nivel Esperado ${NE}, En Desarrollo ${ED}, Requiere Seguimiento ${RS}`}>
+    <span className="mo-barra" ref={raiz} style={{ height: alto }} role="img" aria-label={`Nivel Esperado ${NE}, En Desarrollo ${ED}, Requiere Seguimiento ${RS}`}>
       {valores.map(([n, v]) => (
-        <i key={n} data-parte data-valor={v} data-n={n} title={`${NOMBRE_NIVEL[n]}: ${v.toLocaleString("es-CO")}${total ? ` (${((100 * v) / total).toFixed(1).replace(".", ",")} %)` : ""}`}>
+        <i key={n} data-parte data-n={n} style={{ width: total ? `${(100 * v) / total}%` : 0 }} title={`${NOMBRE_NIVEL[n]}: ${v.toLocaleString("es-CO")}${total ? ` (${((100 * v) / total).toFixed(1).replace(".", ",")} %)` : ""}`}>
           {mostrarCifras && v > 0 && total && v / total > 0.09 ? v.toLocaleString("es-CO") : ""}
         </i>
       ))}
-    </div>
+    </span>
   );
 }
 
@@ -159,13 +279,29 @@ export function Evolucion({ serie, titulo }: { serie: PuntoCorte[]; titulo: stri
   });
   const clave = serie.map((s) => `${s.pctNE}/${s.pctRS}`).join("|");
 
+  // Al cambiar de alcance o de corte las columnas se transforman (no se recargan): cada tramo viaja de su
+  // altura anterior a la nueva; las cintas y las cifras se reencienden detrás.
+  const previo = useRef<Map<string, { y: number; h: number }> | null>(null);
   useLayoutEffect(() => {
     const svg = raiz.current;
-    if (!svg || sinMovimiento()) return;
+    if (!svg) return;
+    const rects = Array.from(svg.querySelectorAll<SVGRectElement>("[data-tramo]"));
+    const ahora = new Map(rects.map((r) => [r.dataset.id as string, { y: Number(r.getAttribute("y")), h: Number(r.getAttribute("height")) }]));
+    const antes = previo.current;
+    previo.current = ahora;
+    if (sinMovimiento()) return;
     const ctx = gsap.context(() => {
-      gsap.from(svg.querySelectorAll("[data-tramo]"), { scaleY: 0, transformBox: "fill-box", transformOrigin: "50% 100%", duration: 0.55, ease: "power3.out", stagger: { each: 0.04, from: "start" }, clearProps: "transform" });
-      gsap.from(svg.querySelectorAll("[data-cinta]"), { clipPath: "inset(0 100% 0 0)", duration: 0.7, ease: "power2.out", delay: 0.35, stagger: 0.06, clearProps: "clipPath" });
-      gsap.from(svg.querySelectorAll("[data-cifra]"), { opacity: 0, y: 4, duration: 0.3, ease: "power2.out", delay: 0.5, stagger: 0.03, clearProps: "opacity,transform" });
+      rects.forEach((r, i) => {
+        const id = r.dataset.id as string;
+        const a = antes?.get(id);
+        const n = ahora.get(id) as { y: number; h: number };
+        if (!antes) gsap.from(r, { scaleY: 0, transformBox: "fill-box", transformOrigin: "50% 100%", duration: 0.5, ease: SALE, delay: i * 0.035, clearProps: "transform" });
+        else if (a) gsap.fromTo(r, { attr: { y: a.y, height: a.h } }, { attr: { y: n.y, height: n.h }, duration: 0.4, ease: MUEVE });
+        else gsap.from(r, { opacity: 0, duration: 0.3, ease: SALE, clearProps: "opacity" });
+      });
+      const retraso = antes ? 0.18 : 0.35;
+      gsap.from(svg.querySelectorAll("[data-cinta]"), { opacity: 0, duration: 0.4, ease: SALE, delay: retraso, stagger: 0.05, clearProps: "opacity" });
+      gsap.from(svg.querySelectorAll("[data-cifra]"), { opacity: 0, y: 4, duration: 0.28, ease: SALE, delay: retraso + 0.1, stagger: 0.03, clearProps: "opacity,transform" });
     }, svg);
     return () => ctx.revert();
   }, [clave]);
@@ -221,8 +357,8 @@ export function Evolucion({ serie, titulo }: { serie: PuntoCorte[]; titulo: stri
             const h = y1 - y0;
             const v = valor(n, c.p);
             return (
-              <g key={`${c.p.corte}${n}`} className="mo-evo__tramo" data-n={n}>
-                <rect data-tramo x={x(i)} y={y0} width={cw} height={Math.max(0, h - 1.5)} rx="2" fill={n === "ED" ? "url(#mo-evo-raya)" : undefined} className="mo-evo__rect" data-nivel={n}>
+              <g key={`${c.p.corte}${n}`} className="mo-evo__tramo" data-n={n} onMouseEnter={() => setFoco(n)} onMouseLeave={() => setFoco(null)}>
+                <rect data-tramo data-id={`${c.p.corte}${n}`} x={x(i)} y={y0} width={cw} height={Math.max(0, h - 1.5)} rx="2" fill={n === "ED" ? "url(#mo-evo-raya)" : undefined} className="mo-evo__rect" data-nivel={n}>
                   <title>{`P${c.p.corte} · ${NOMBRE_NIVEL[n]}: ${coma1(v)} %`}</title>
                 </rect>
                 {h >= 17 && cw >= 44 && (

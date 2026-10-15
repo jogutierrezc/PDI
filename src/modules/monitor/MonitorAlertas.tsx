@@ -7,10 +7,12 @@
    deciden los roles y las unidades (migración 0160), no una clave: una
    decanatura ve su facultad; una dirección, su programa; Planeación, todo.
 
+   Cada nivel tiene UNA idea principal («dónde hay que actuar»); el detalle se despliega a petición.
+   Al bajar de nivel, el nombre elegido viaja hasta el título del siguiente (GSAP).
    Pilo va AL FINAL de cada vista: el resto no depende de él.
    ========================================================================== */
 
-import { useMemo, useState } from "react";
+import { useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { AdminShell } from "../admin/components/AdminShell";
 import { EmptyBlock, ErrorBlock, LoadingBlock } from "../../components/ui/QueryState";
@@ -34,21 +36,26 @@ import {
   NIVELES,
   UMBRALES_MONITOR,
   agregar,
+  buscarCodigos,
+  claveGrupo,
   clasificar,
   cortesConNotas,
   criticas,
   nivelDeNota,
   nodosDeGrupos,
+  pareceSeudonimo,
   porFacultad,
   resumenParaPilo,
   type Corte,
   type FilaMonitor,
   type Nivel,
+  type NodoGrupo,
   type Nodo,
   type Programa,
   type Umbrales,
 } from "./logica";
-import { Aletas, BarraNiveles, Escala, Evolucion, Forma, Semaforo, Tendencia, useEntrada } from "./piezas";
+import { MapaRiesgo } from "./MapaRiesgo";
+import { Aletas, BarraNiveles, Cuenta, Escala, Evolucion, Forma, Semaforo, Tendencia, prepararVuelo, useEntrada, useFlip, type Sentido } from "./piezas";
 import "../warehouse/warehouse.css";
 import "./monitor.css";
 
@@ -81,7 +88,7 @@ export function MonitorAlertas() {
     <div className="wh-fila">
       <label className="wh-campo">
         <span className="sr-only">Periodo</span>
-        <select value={periodo} onChange={(e) => fijar({ periodo: e.target.value === periodos[0] ? null : e.target.value, f: null, p: null, m: null, g: null, e: null })}>
+        <select value={periodo} onChange={(e) => fijar({ periodo: e.target.value === periodos[0] ? null : e.target.value, f: null, p: null, c: null, m: null, g: null, e: null })}>
           {periodos.map((p) => (
             <option key={p} value={p}>
               {p}
@@ -91,7 +98,7 @@ export function MonitorAlertas() {
       </label>
       <label className="wh-campo">
         <span className="sr-only">Sede</span>
-        <select value={sede} onChange={(e) => fijar({ sede: e.target.value === SEDES[0].id ? null : e.target.value, f: null, p: null, m: null, g: null, e: null })}>
+        <select value={sede} onChange={(e) => fijar({ sede: e.target.value === SEDES[0].id ? null : e.target.value, f: null, p: null, c: null, m: null, g: null, e: null })}>
           {SEDES.map((s) => (
             <option key={s.id} value={s.id}>
               {s.nombre}
@@ -143,7 +150,7 @@ export function MonitorAlertas() {
   }
 
   return (
-    <AdminShell section="monitor" kicker="Monitor de alertas tempranas" title="Cómo van las notas" description="Por facultad, programa, grupo y estudiante, con el semáforo NE · ED · RS" actions={permisos.ver ? selectores : undefined}>
+    <AdminShell section="monitor" kicker="Monitor de alertas tempranas" title="Cómo van las notas" description="Por facultad, programa, curso, grupo y estudiante: el semáforo NE · ED · RS y el mapa de riesgo de reprobación" actions={permisos.ver ? selectores : undefined}>
       <div className="mo">{cuerpo}</div>
     </AdminShell>
   );
@@ -164,14 +171,40 @@ export interface PropsRecorrido {
   asignar: boolean;
 }
 
-export function Recorrido({ filas, gruposData, programas, periodo, sede, params, fijar, umbrales, setUmbrales, asignar }: PropsRecorrido) {
+type NivelVista = "institucion" | "facultad" | "programa" | "grupo" | "estudiante";
+const PROFUNDIDAD: Record<NivelVista, number> = { institucion: 0, facultad: 1, programa: 2, grupo: 3, estudiante: 4 };
+
+/** Dos miradas al mismo periodo: cómo van los estudiantes (NE · ED · RS) y dónde se reprueba (mapa de riesgo). */
+export function Recorrido(props: PropsRecorrido) {
+  const riesgo = props.params.get("vista") === "riesgo";
+  const nombreSede = SEDES.find((s) => s.id === props.sede)?.nombre ?? props.sede;
+  return (
+    <>
+      <div className="mo-vistas" role="group" aria-label="Qué mirar">
+        <button type="button" aria-pressed={!riesgo} onClick={() => props.fijar({ vista: null, c: null, alc: null })}>
+          <b>Estudiantes</b>
+          <small>NE · ED · RS por corte</small>
+        </button>
+        <button type="button" aria-pressed={riesgo} onClick={() => props.fijar({ vista: "riesgo", e: null, g: null, m: null })}>
+          <b>Mapa de riesgo</b>
+          <small>dónde se reprueba</small>
+        </button>
+      </div>
+      {riesgo ? <MapaRiesgo periodo={props.periodo} sede={props.sede} nombreSede={nombreSede} programas={props.programas} params={props.params} fijar={props.fijar} /> : <RecorridoEstudiantes {...props} />}
+    </>
+  );
+}
+
+function RecorridoEstudiantes({ filas, gruposData, programas, periodo, sede, params, fijar, umbrales, setUmbrales, asignar }: PropsRecorrido) {
   const cortes = useMemo(() => cortesConNotas(filas), [filas]);
   const pedido = Number(params.get("corte")) as Corte;
   const corte: Corte = cortes.includes(pedido) ? pedido : (cortes[cortes.length - 1] ?? 1);
   const f = params.get("f");
   const p = params.get("p");
+  // El grupo es código de materia + letra («SIS101~A»): una sola llave en la URL (?g=). El par antiguo ?m=&g= se sigue leyendo.
   const m = params.get("m");
-  const g = params.get("g");
+  const gRaw = params.get("g");
+  const g = gRaw && m && !gRaw.includes("~") ? claveGrupo(m, gRaw) : gRaw;
   const e = params.get("e");
   const nombreSede = SEDES.find((s) => s.id === sede)?.nombre ?? sede;
 
@@ -193,12 +226,32 @@ export function Recorrido({ filas, gruposData, programas, periodo, sede, params,
   const hijos = useMemo<Nodo[]>(() => (programaCod ? [] : facultad ? facultad.programas : facultades), [programaCod, facultad, facultades]);
   const gruposAlcance = useMemo(() => gruposData.filter((x) => (!programaCod || x.codigo_programa === programaCod) && (!facultad || filasDe.some((y) => y.codigo_programa === x.codigo_programa))), [gruposData, programaCod, facultad, filasDe]);
   const materiasCrit = useMemo(() => criticas(gruposAlcance, programas), [gruposAlcance, programas]);
+  const nodosGrupo = useMemo(() => nodosDeGrupos(gruposAlcance, corte), [gruposAlcance, corte]);
 
-  const nivel: "institucion" | "facultad" | "programa" | "grupo" | "estudiante" = e ? "estudiante" : m && g ? "grupo" : programaCod ? "programa" : facultad ? "facultad" : "institucion";
-  const clave = `${nivel}|${f}|${p}|${m}|${g}|${e}|${corte}`;
-  const ref = useEntrada<HTMLDivElement>(clave);
+  const nivel: NivelVista = e ? "estudiante" : g ? "grupo" : programaCod ? "programa" : facultad ? "facultad" : "institucion";
+  const seudonimos = filas.length > 0 && filas.filter((x) => pareceSeudonimo(x.estudiante)).length / filas.length > 0.5;
+
+  // La dirección del movimiento: bajar un nivel entra desde abajo; subir, desde arriba. El corte no lo repite todo:
+  // las barras, la lista y la evolución se transforman.
+  const antes = useRef(PROFUNDIDAD[nivel]);
+  const sentido: Sentido = PROFUNDIDAD[nivel] > antes.current ? "abajo" : PROFUNDIDAD[nivel] < antes.current ? "arriba" : "lado";
+  const ref = useEntrada<HTMLDivElement>(`${nivel}|${f}|${p}|${g}|${e}`, sentido);
+  useLayoutEffect(() => {
+    antes.current = PROFUNDIDAD[nivel];
+  });
 
   const pilo = nivel === "estudiante" ? null : resumenParaPilo(nodo, hijos, materiasCrit, { periodo, sede, corte, alcance: { nivel: programaCod ? "programa" : facultad ? "facultad" : "institucion", nombre: programaCod || facultad ? alcanceNombre : undefined }, umbrales });
+
+  // «Empiece por aquí»: lo más urgente del nivel, dicho en una frase.
+  const foco = useMemo(() => {
+    if (nivel === "programa") {
+      const x = nodosGrupo.find((y) => y.nivel === "RS");
+      return x ? `Empiece por ${x.materia}, grupo ${x.grupo}: ${coma(x.pctBajo)} % de quienes ya tienen nota va por debajo de la de aprobar.` : null;
+    }
+    const base = hijos.filter((x) => x.estudiantes >= 20);
+    const x = [...(base.length ? base : hijos)].sort((a, b) => b.pctRS - a.pctRS)[0];
+    return x && x.pctRS > 0 ? `Empiece por ${x.nombre}: ${coma(x.pctRS)} % de sus estudiantes requiere seguimiento.` : null;
+  }, [nivel, nodosGrupo, hijos]);
 
   const migas = (
     <nav className="mo-migas" aria-label="Dónde está">
@@ -207,7 +260,7 @@ export function Recorrido({ filas, gruposData, programas, periodo, sede, params,
       </button>
       {facultad && (
         <>
-          <span className="mo-migas__sep">/</span>
+          <span className="mo-migas__sep" aria-hidden="true">/</span>
           <button type="button" onClick={() => fijar({ p: null, m: null, g: null, e: null })} disabled={nivel === "facultad"}>
             {facultad.nombre}
           </button>
@@ -215,23 +268,23 @@ export function Recorrido({ filas, gruposData, programas, periodo, sede, params,
       )}
       {programaCod && (
         <>
-          <span className="mo-migas__sep">/</span>
+          <span className="mo-migas__sep" aria-hidden="true">/</span>
           <button type="button" onClick={() => fijar({ m: null, g: null, e: null })} disabled={nivel === "programa"}>
             {nombreProg(programaCod)}
           </button>
         </>
       )}
-      {m && g && (
+      {g && (
         <>
-          <span className="mo-migas__sep">/</span>
+          <span className="mo-migas__sep" aria-hidden="true">/</span>
           <button type="button" onClick={() => fijar({ e: null })} disabled={nivel === "grupo"}>
-            {gruposData.find((x) => x.codigo_materia === m && x.grupo === g)?.materia ?? m} · {g}
+            {gruposData.find((x) => (x.grupo_clave ?? claveGrupo(x.codigo_materia, x.grupo)) === g)?.materia ?? g.split("~")[0]} · {g.split("~")[1] ?? ""}
           </button>
         </>
       )}
       {e && (
         <>
-          <span className="mo-migas__sep">/</span>
+          <span className="mo-migas__sep" aria-hidden="true">/</span>
           <span className="mo-migas__aqui mo-codigo">{e}</span>
         </>
       )}
@@ -239,10 +292,14 @@ export function Recorrido({ filas, gruposData, programas, periodo, sede, params,
   );
 
   const sinAsignar = programas.filter((x) => !x.unit_id);
+  const elegirEstudiante = (r: FilaMonitor) => fijar({ f: programas.find((x) => x.codigo_programa === r.codigo_programa)?.facultad_id ?? "sin-facultad", p: r.codigo_programa, m: null, g: null, e: r.estudiante });
 
   return (
     <>
-      {migas}
+      <div className="mo-barra-superior">
+        {migas}
+        <Buscador filas={filas} nombreProg={nombreProg} onElegir={elegirEstudiante} />
+      </div>
 
       <div className="mo-controles">
         <div className="mo-tren" role="radiogroup" aria-label="Corte">
@@ -257,23 +314,29 @@ export function Recorrido({ filas, gruposData, programas, periodo, sede, params,
           ))}
         </div>
         <p className="mo-muted">
-          {nombreSede} · {periodo}. Se clasifica a quien ya tiene nota en la mitad o más de sus materias.
+          {nombreSede} · {periodo}
         </p>
       </div>
 
+      {seudonimos && (
+        <p className="mo-aviso mo-aviso--ambar" role="note">
+          Estos códigos todavía son seudónimos: las notas se cargaron antes de que el Monitor guardara el código real. Sirven para seguir un caso, pero no dicen quién es el estudiante. Planeación debe volver a cargar el «Reporte global de notas» para verlos reales.
+        </p>
+      )}
 
-      <div ref={ref} style={{ display: "grid", gap: "var(--space-8)" }}>
+      <div ref={ref} className="mo-cuerpo">
         {nivel === "estudiante" && <VistaEstudiante periodo={periodo} sede={sede} estudiante={e as string} filas={filas} corte={corte} umbrales={umbrales} nombreProg={nombreProg} />}
-        {nivel === "grupo" && <VistaGrupo periodo={periodo} sede={sede} materia={m as string} grupo={g as string} corte={corte} fijar={fijar} gruposData={gruposData} nombreProg={nombreProg} />}
+        {nivel === "grupo" && <VistaGrupo periodo={periodo} sede={sede} clave={g as string} corte={corte} fijar={fijar} gruposData={gruposData} nombreProg={nombreProg} />}
         {(nivel === "institucion" || nivel === "facultad" || nivel === "programa") && (
           <>
-            <Portada nodo={nodo} nivel={nivel} nombre={alcanceNombre} corte={corte} />
-            <Evolucion_ nodo={nodo} />
-            {nivel !== "programa" && <Hijos nivel={nivel} hijos={hijos} onAbrir={(h) => (nivel === "institucion" ? fijar({ f: h.clave, p: null }) : fijar({ p: h.clave }))} />}
-            {nivel === "programa" && <Grupos gruposData={gruposAlcance} corte={corte} onAbrir={(a, b) => fijar({ m: a, g: b })} />}
-            <Criticas materias={materiasCrit} />
-            <ComoSeClasifica umbrales={umbrales} setUmbrales={setUmbrales} />
-            <ComoLeer />
+            <Portada nodo={nodo} nivel={nivel} nombre={alcanceNombre} corte={corte} foco={foco} />
+            {nivel !== "programa" && <Prioridad nivel={nivel} hijos={hijos} corte={corte} onAbrir={(h, el) => (prepararVuelo(el), nivel === "institucion" ? fijar({ f: h.clave, p: null }) : fijar({ p: h.clave }))} />}
+            {nivel === "programa" && <Grupos nodos={nodosGrupo} corte={corte} onAbrir={(clave, el) => (prepararVuelo(el), fijar({ m: null, g: clave }))} />}
+            <Analisis nodo={nodo} materias={materiasCrit} />
+            <div className="mo-detalles" data-in>
+              <ComoSeClasifica umbrales={umbrales} setUmbrales={setUmbrales} />
+              <ComoLeer />
+            </div>
           </>
         )}
       </div>
@@ -291,100 +354,186 @@ export function Recorrido({ filas, gruposData, programas, periodo, sede, params,
   );
 }
 
-/* --- Portada: las cifras como tablero de llegadas ---------------------------------------------------- */
+/* --- Buscar un estudiante por su código ------------------------------------------------------------ */
 
-function Portada({ nodo, nivel, nombre, corte }: { nodo: Nodo; nivel: string; nombre: string; corte: Corte }) {
-  const total = nodo.estudiantes;
-  const titulo = nivel === "institucion" ? "Cómo van los estudiantes" : nombre;
-  const pct = (n: number) => (total ? `${coma((100 * n) / total)} % de ${total.toLocaleString("es-CO")}` : "—");
+/** Busca solo entre lo que la persona ya puede ver: el permiso lo pone la base, no esta caja. */
+function Buscador({ filas, nombreProg, onElegir }: { filas: FilaMonitor[]; nombreProg: (c: string) => string; onElegir: (f: FilaMonitor) => void }) {
+  const [q, setQ] = useState("");
+  const res = useMemo(() => buscarCodigos(filas, q), [filas, q]);
+  const activo = q.trim().length >= 2;
   return (
-    <>
-      <section className="mo-portada" data-in>
-        <div>
-          <h2>
-            <span>{nivel === "institucion" ? `En el corte P${corte}` : `Corte P${corte}`}</span>
-            {titulo}
-          </h2>
-          <p>
-            {total === 0 ? (
-              "Aún no hay estudiantes con notas suficientes en este corte."
-            ) : (
-              <>
-                De <b>{total.toLocaleString("es-CO")} estudiantes</b> con notas, <b>{nodo.RS.toLocaleString("es-CO")}</b> requieren seguimiento ({coma(nodo.pctRS)} %). El promedio es <b>{coma(nodo.promedio, 2)}</b>; aprobar es 3,0.
-              </>
-            )}
-          </p>
-        </div>
-        <div className="mo-tablero" role="group" aria-label="Estudiantes por nivel de desempeño">
-          {NIVELES.map((n) => (
-            <div key={n} className="mo-tablero__fila">
-              <div>
-                <Semaforo nivel={n} />
-                <small>{pct(nodo[n])}</small>
-              </div>
-              <Aletas valor={nodo[n]} etiqueta={NOMBRE_NIVEL[n]} />
-            </div>
+    <div className="mo-busca" role="search">
+      <label className="sr-only" htmlFor="mo-busca-q">
+        Buscar estudiante por código
+      </label>
+      <input id="mo-busca-q" type="search" autoComplete="off" spellCheck={false} placeholder="Buscar código de estudiante" value={q} onChange={(ev) => setQ(ev.target.value)} onKeyDown={(ev) => ev.key === "Escape" && setQ("")} aria-describedby="mo-busca-n" />
+      <span id="mo-busca-n" className="sr-only" aria-live="polite">
+        {activo ? `${res.length} ${res.length === 1 ? "resultado" : "resultados"}` : ""}
+      </span>
+      {activo && (
+        <ul className="mo-busca__res">
+          {res.length === 0 && <li className="mo-muted mo-busca__vacio">Ningún código coincide entre los que usted puede ver.</li>}
+          {res.map((r) => (
+            <li key={`${r.estudiante}|${r.codigo_programa}`}>
+              <button
+                type="button"
+                onClick={() => {
+                  setQ("");
+                  onElegir(r);
+                }}
+              >
+                <b className="mo-codigo">{r.estudiante}</b>
+                <small>{nombreProg(r.codigo_programa)}</small>
+              </button>
+            </li>
           ))}
-          <div className="mo-tablero__pie">
-            <span>Corte P{corte}</span>
-            <span>{total.toLocaleString("es-CO")} clasificados</span>
-          </div>
-        </div>
-      </section>
-      <div className="mo-kpis" data-in>
-        <div className="mo-kpi">
-          <span>Promedio del corte</span>
-          <b>{coma(nodo.promedio, 2)}</b>
-        </div>
-        <div className="mo-kpi">
-          <span>Requieren seguimiento</span>
-          <b>{coma(nodo.pctRS)} %</b>
-        </div>
-        <div className="mo-kpi">
-          <span>En Nivel Esperado</span>
-          <b>{total ? coma((100 * nodo.NE) / total) : "—"} %</b>
-        </div>
-        <div className="mo-kpi">
-          <span>Estudiantes clasificados</span>
-          <b>{total.toLocaleString("es-CO")}</b>
-        </div>
-      </div>
-    </>
+        </ul>
+      )}
+    </div>
   );
 }
 
-function Evolucion_({ nodo }: { nodo: Nodo }) {
-  if (nodo.serie.length < 2) {
-    return (
-      <section className="mo-seccion" data-in>
-        <div className="mo-seccion__cabeza">
-          <h3>Cómo evoluciona</h3>
-          <p>Con dos cortes con notas se ve cómo cambian los niveles. Hoy hay {nodo.serie.length}.</p>
-        </div>
-      </section>
-    );
-  }
+/* --- Portada: la idea principal del nivel ---------------------------------------------------------- */
+
+function Portada({ nodo, nivel, nombre, corte, foco }: { nodo: Nodo; nivel: string; nombre: string; corte: Corte; foco: string | null }) {
+  const total = nodo.estudiantes;
+  const pct = (n: number) => (total ? `${coma((100 * n) / total)} % de ${total.toLocaleString("es-CO")}` : "—");
   return (
-    <section className="mo-seccion" data-in aria-labelledby="mo-evo">
-      <div className="mo-seccion__cabeza">
-        <h3 id="mo-evo">Cómo evoluciona entre cortes</h3>
-        <p>Cada corte es una estación y su columna suma el 100 % de los estudiantes. Las cintas unen cada nivel con el del corte siguiente.</p>
+    <section className="mo-portada" data-in>
+      <div className="mo-portada__texto">
+        <h2>
+          <span>{nivel === "institucion" ? `En el corte P${corte}` : `Corte P${corte}`}</span>
+          <strong data-destino>{nivel === "institucion" ? "Cómo van los estudiantes" : nombre}</strong>
+        </h2>
+        {total === 0 ? (
+          <p>Aún no hay estudiantes con notas suficientes en este corte.</p>
+        ) : (
+          <>
+            {foco && (
+              <p className="mo-foco">
+                <Forma nivel="RS" size={16} />
+                <span>{foco}</span>
+              </p>
+            )}
+            <dl className="mo-cifras">
+              <div>
+                <dt>Clasificados</dt>
+                <dd>
+                  <Cuenta valor={total} />
+                </dd>
+              </div>
+              <div>
+                <dt>En seguimiento</dt>
+                <dd>
+                  <Cuenta valor={nodo.pctRS} decimales={1} sufijo=" %" />
+                </dd>
+              </div>
+              <div>
+                <dt>Promedio</dt>
+                <dd>
+                  <Cuenta valor={nodo.promedio} decimales={2} />
+                </dd>
+              </div>
+            </dl>
+          </>
+        )}
       </div>
-      <Evolucion serie={nodo.serie} titulo="Composición NE, ED y RS en cada corte" />
+      <div className="mo-tablero" role="group" aria-label="Estudiantes por nivel de desempeño">
+        {NIVELES.map((n) => (
+          <div key={n} className="mo-tablero__fila">
+            <div>
+              <Semaforo nivel={n} />
+              <small>{pct(nodo[n])}</small>
+            </div>
+            <Aletas valor={nodo[n]} etiqueta={NOMBRE_NIVEL[n]} />
+          </div>
+        ))}
+        <div className="mo-tablero__pie">
+          <span>Corte P{corte}</span>
+          <span>{total.toLocaleString("es-CO")} clasificados</span>
+        </div>
+      </div>
     </section>
   );
 }
 
-/* --- Las unidades de abajo: facultades o programas --------------------------------------------------- */
+/* --- Una fila de la lista de prioridades ------------------------------------------------------------ */
 
-function Hijos({ nivel, hijos, onAbrir }: { nivel: string; hijos: Nodo[]; onAbrir: (n: Nodo) => void }) {
+interface PropsFila {
+  k: string;
+  nombre: string;
+  sub?: React.ReactNode;
+  barra: { NE: number; ED: number; RS: number };
+  cifra: number;
+  etiqueta: string;
+  nivel: Nivel;
+  marca?: string;
+  extra?: React.ReactNode;
+  onAbrir: (el: HTMLElement) => void;
+}
+
+function Fila({ k, nombre, sub, barra, cifra, etiqueta, nivel, marca, extra, onAbrir }: PropsFila) {
+  return (
+    <li data-k={k} className="mo-fila" data-n={nivel}>
+      <button type="button" onClick={(ev) => onAbrir(ev.currentTarget)}>
+        <span className="mo-fila__nombre">
+          {marca && <em className="mo-fila__marca">{marca}</em>}
+          <b data-ghost>{nombre}</b>
+          {sub && <small>{sub}</small>}
+        </span>
+        <span className="mo-fila__barra">
+          <BarraNiveles NE={barra.NE} ED={barra.ED} RS={barra.RS} alto={12} />
+        </span>
+        <span className="mo-fila__cifra">
+          <b>{coma(cifra)} %</b>
+          <small>{etiqueta}</small>
+        </span>
+        <span className="mo-fila__nivel">
+          <Semaforo nivel={nivel} palabra={false} />
+        </span>
+        {extra && <span className="mo-fila__extra">{extra}</span>}
+        <span className="mo-fila__ir" aria-hidden="true">
+          →
+        </span>
+      </button>
+    </li>
+  );
+}
+
+const VISIBLES = 6;
+
+/** Una lista que muestra primero lo más urgente y deja el resto a un clic. */
+function ListaPrioridad({ clave, children, total, visibles, abierto, setAbierto, que }: { clave: string; children: React.ReactNode; total: number; visibles: number; abierto: boolean; setAbierto: (b: boolean) => void; que: string }) {
+  const ref = useFlip<HTMLUListElement>(clave);
+  return (
+    <>
+      <ul ref={ref} className="mo-lista">
+        {children}
+      </ul>
+      {total > visibles && (
+        <button type="button" className="mo-mas" aria-expanded={abierto} onClick={() => setAbierto(!abierto)}>
+          {abierto ? `Ver solo ${que} más urgentes` : `Ver las ${total - visibles} restantes`}
+        </button>
+      )}
+    </>
+  );
+}
+
+/* --- Dónde hay que actuar: facultades o programas ---------------------------------------------------- */
+
+function Prioridad({ nivel, hijos, corte, onAbrir }: { nivel: string; hijos: Nodo[]; corte: Corte; onAbrir: (n: Nodo, el: HTMLElement) => void }) {
   const [orden, setOrden] = useState<"rs" | "n" | "prom">("rs");
+  const [todo, setTodo] = useState(false);
   const lista = useMemo(() => [...hijos].sort((a, b) => (orden === "rs" ? b.pctRS - a.pctRS : orden === "n" ? b.estudiantes - a.estudiantes : (a.promedio ?? 9) - (b.promedio ?? 9))), [hijos, orden]);
+  const vista = todo ? lista : lista.slice(0, VISIBLES);
   const que = nivel === "institucion" ? "facultades" : "programas";
   return (
     <section className="mo-seccion" data-in aria-labelledby="mo-hijos">
       <div className="mo-seccion__cabeza">
-        <h3 id="mo-hijos">{nivel === "institucion" ? "Las facultades" : "Los programas de la facultad"}</h3>
+        <div>
+          <h3 id="mo-hijos">Dónde hay que actuar</h3>
+          <p>{nivel === "institucion" ? "Las facultades, de más a menos estudiantes en seguimiento." : "Los programas de la facultad, de más a menos estudiantes en seguimiento."} Abra una para bajar un nivel.</p>
+        </div>
         <div className="mo-filtros">
           <label>
             <span className="sr-only">Ordenar</span>
@@ -396,69 +545,52 @@ function Hijos({ nivel, hijos, onAbrir }: { nivel: string; hijos: Nodo[]; onAbri
           </label>
         </div>
       </div>
-      <div className="mo-tabla-envuelta">
-        <table className="mo-tabla">
-          <thead>
-            <tr>
-              <th scope="col">{nivel === "institucion" ? "Facultad" : "Programa"}</th>
-              <th scope="col" className="num">
-                Estudiantes
-              </th>
-              <th scope="col" style={{ width: "34%" }}>
-                NE · ED · RS
-              </th>
-              <th scope="col" className="num">
-                En RS
-              </th>
-              <th scope="col" className="num">
-                Promedio
-              </th>
-              <th scope="col" />
-            </tr>
-          </thead>
-          <tbody>
-            {lista.map((h) => {
-              const dom: Nivel = h.pctRS >= 25 ? "RS" : h.pctRS >= 12 ? "ED" : "NE";
-              return (
-                <tr key={h.clave} data-n={dom} tabIndex={0} onClick={() => onAbrir(h)} onKeyDown={(ev) => (ev.key === "Enter" || ev.key === " ") && (ev.preventDefault(), onAbrir(h))}>
-                  <td>
-                    <span className="mo-nombre">
-                      <b>{h.nombre}</b>
-                      {h.serie.length > 1 && <small>P{h.serie[0].corte} → P{h.serie[h.serie.length - 1].corte}: {coma(h.serie[0].pctRS)} % → {coma(h.serie[h.serie.length - 1].pctRS)} % en RS</small>}
-                    </span>
-                  </td>
-                  <td className="num">{h.estudiantes.toLocaleString("es-CO")}</td>
-                  <td>
-                    <BarraNiveles NE={h.NE} ED={h.ED} RS={h.RS} />
-                  </td>
-                  <td className="num">
-                    <b>{coma(h.pctRS)} %</b>
-                  </td>
-                  <td className="num">{coma(h.promedio, 2)}</td>
-                  <td className="mo-ir">Abrir →</td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
-      </div>
-      {lista.length === 0 && <p className="mo-muted">No hay {que} con estudiantes clasificados en este corte.</p>}
+      {lista.length === 0 ? (
+        <p className="mo-muted">No hay {que} con estudiantes clasificados en este corte.</p>
+      ) : (
+        <ListaPrioridad clave={`${orden}|${corte}|${vista.map((h) => h.clave).join(",")}`} total={lista.length} visibles={VISIBLES} abierto={todo} setAbierto={setTodo} que={`las ${VISIBLES}`}>
+          {vista.map((h, i) => {
+            const dom: Nivel = h.pctRS >= 25 ? "RS" : h.pctRS >= 12 ? "ED" : "NE";
+            const s = h.serie;
+            return (
+              <Fila
+                key={h.clave}
+                k={h.clave}
+                nombre={h.nombre}
+                marca={i === 0 && orden === "rs" && h.pctRS > 0 ? "Empiece por aquí" : undefined}
+                sub={
+                  <>
+                    {h.estudiantes.toLocaleString("es-CO")} estudiantes · promedio {coma(h.promedio, 2)}
+                    {s.length > 1 && ` · P${s[0].corte} → P${s[s.length - 1].corte}: ${coma(s[0].pctRS)} % → ${coma(s[s.length - 1].pctRS)} %`}
+                  </>
+                }
+                barra={{ NE: h.NE, ED: h.ED, RS: h.RS }}
+                cifra={h.pctRS}
+                etiqueta="en seguimiento"
+                nivel={dom}
+                onAbrir={(el) => onAbrir(h, el)}
+              />
+            );
+          })}
+        </ListaPrioridad>
+      )}
     </section>
   );
 }
 
 /* --- Grupos de un programa ------------------------------------------------------------------------------- */
 
-function Grupos({ gruposData, corte, onAbrir }: { gruposData: import("./logica").GrupoMonitor[]; corte: Corte; onAbrir: (materia: string, grupo: string) => void }) {
+function Grupos({ nodos, corte, onAbrir }: { nodos: NodoGrupo[]; corte: Corte; onAbrir: (clave: string, el: HTMLElement) => void }) {
   const [nivel, setNivel] = useState<"todos" | Nivel>("todos");
   const [q, setQ] = useState("");
-  const nodos = useMemo(() => nodosDeGrupos(gruposData, corte), [gruposData, corte]);
-  const lista = nodos.filter((x) => (nivel === "todos" || x.nivel === nivel) && (!q.trim() || `${x.materia} ${x.grupo}`.toLowerCase().includes(q.trim().toLowerCase()))).slice(0, 200);
+  const [todo, setTodo] = useState(false);
+  const lista = useMemo(() => nodos.filter((x) => (nivel === "todos" || x.nivel === nivel) && (!q.trim() || `${x.materia} ${x.grupo}`.toLowerCase().includes(q.trim().toLowerCase()))), [nodos, nivel, q]);
+  const vista = (todo || q.trim() ? lista : lista.slice(0, VISIBLES)).slice(0, 200);
   return (
     <section className="mo-seccion" data-in aria-labelledby="mo-grupos">
       <div className="mo-seccion__cabeza">
         <div>
-          <h3 id="mo-grupos">Los grupos</h3>
+          <h3 id="mo-grupos">Dónde hay que actuar: los grupos</h3>
           <p>Un grupo requiere seguimiento si 30 % o más de quienes ya tienen nota va por debajo de la de aprobar; en desarrollo desde 15 %.</p>
         </div>
         <div className="mo-filtros">
@@ -473,78 +605,96 @@ function Grupos({ gruposData, corte, onAbrir }: { gruposData: import("./logica")
           <input value={q} onChange={(ev) => setQ(ev.target.value)} placeholder="Buscar materia…" aria-label="Buscar materia" />
         </div>
       </div>
-      <div className="mo-tabla-envuelta">
-        <table className="mo-tabla">
-          <thead>
-            <tr>
-              <th scope="col">Materia y grupo</th>
-              <th scope="col" className="num">
-                Con nota
-              </th>
-              <th scope="col" className="num">
-                Bajo la de aprobar
-              </th>
-              <th scope="col" className="num">
-                Promedio
-              </th>
-              <th scope="col">Tendencia</th>
-              <th scope="col">Nivel</th>
-            </tr>
-          </thead>
-          <tbody>
-            {lista.map((x) => (
-              <tr key={x.clave} data-n={x.nivel} tabIndex={0} onClick={() => onAbrir(x.codigo_materia, x.grupo)} onKeyDown={(ev) => (ev.key === "Enter" || ev.key === " ") && (ev.preventDefault(), onAbrir(x.codigo_materia, x.grupo))}>
-                <td>
-                  <span className="mo-nombre">
-                    <b>{x.materia}</b>
-                    <small>Grupo {x.grupo}</small>
-                  </span>
-                </td>
-                <td className="num">{x.estudiantes}</td>
-                <td className="num">
-                  <b>{coma(x.pctBajo)} %</b>
-                </td>
-                <td className="num">{coma(x.promedio, 2)}</td>
-                <td>
-                  <Tendencia valores={x.tendencia} />
-                </td>
-                <td>
-                  <Semaforo nivel={x.nivel} palabra={false} />
-                </td>
-              </tr>
-            ))}
-            {lista.length === 0 && (
-              <tr>
-                <td colSpan={6} className="mo-muted">
-                  Ningún grupo cumple el filtro.
-                </td>
-              </tr>
-            )}
-          </tbody>
-        </table>
+      {lista.length === 0 ? (
+        <p className="mo-muted">Ningún grupo cumple el filtro.</p>
+      ) : (
+        <ListaPrioridad clave={`${nivel}|${q}|${corte}|${vista.map((x) => x.clave).join(",")}`} total={lista.length} visibles={q.trim() ? lista.length : VISIBLES} abierto={todo} setAbierto={setTodo} que={`los ${VISIBLES}`}>
+          {vista.map((x, i) => (
+            <Fila
+              key={x.clave}
+              k={x.clave}
+              nombre={x.materia}
+              marca={i === 0 && x.nivel === "RS" && !q.trim() && nivel === "todos" ? "Empiece por aquí" : undefined}
+              sub={`Grupo ${x.grupo} · ${x.estudiantes} con nota · promedio ${coma(x.promedio, 2)}`}
+              barra={{ NE: 100 - x.pctBajo, ED: 0, RS: x.pctBajo }}
+              cifra={x.pctBajo}
+              etiqueta="bajo la de aprobar"
+              nivel={x.nivel}
+              extra={<Tendencia valores={x.tendencia} />}
+              onAbrir={(el) => onAbrir(x.clave, el)}
+            />
+          ))}
+        </ListaPrioridad>
+      )}
+    </section>
+  );
+}
+
+/* --- Análisis: evolución o cursos críticos, uno a la vez ------------------------------------------------ */
+
+function Analisis({ nodo, materias }: { nodo: Nodo; materias: import("../warehouse/estudio").MateriaCritica[] }) {
+  const [tab, setTab] = useState<"evo" | "crit">("evo");
+  const pestanas: ["evo" | "crit", string][] = [
+    ["evo", "Cómo evoluciona"],
+    ["crit", `Cursos con alta reprobación (${materias.length})`],
+  ];
+  const mover = (ev: React.KeyboardEvent) => {
+    if (ev.key === "ArrowRight" || ev.key === "ArrowLeft") {
+      ev.preventDefault();
+      const otro = tab === "evo" ? "crit" : "evo";
+      setTab(otro);
+      requestAnimationFrame(() => document.getElementById(`mo-tab-${otro}`)?.focus());
+    }
+  };
+  return (
+    <section className="mo-seccion mo-analisis" data-in aria-label="Análisis del alcance">
+      <div className="mo-pestanas" role="tablist" aria-label="Qué mirar" onKeyDown={mover}>
+        {pestanas.map(([id, nombre]) => (
+          <button key={id} id={`mo-tab-${id}`} type="button" role="tab" aria-selected={tab === id} aria-controls={`mo-panel-${id}`} tabIndex={tab === id ? 0 : -1} onClick={() => setTab(id)}>
+            {nombre}
+          </button>
+        ))}
+      </div>
+      <div key={tab} id={`mo-panel-${tab}`} role="tabpanel" aria-labelledby={`mo-tab-${tab}`} className="mo-panel">
+        {tab === "evo" ? <Evolucion_ nodo={nodo} /> : <Criticas materias={materias} />}
       </div>
     </section>
   );
 }
 
+function Evolucion_({ nodo }: { nodo: Nodo }) {
+  if (nodo.serie.length < 2) {
+    return <p className="mo-muted">Con dos cortes con notas se ve cómo cambian los niveles. Hoy hay {nodo.serie.length}.</p>;
+  }
+  return (
+    <>
+      <p className="mo-panel__nota">Cada corte es una estación y su columna suma el 100 % de los estudiantes. Las cintas unen cada nivel con el del corte siguiente.</p>
+      <Evolucion serie={nodo.serie} titulo="Composición NE, ED y RS en cada corte" />
+    </>
+  );
+}
+
 /* --- Un grupo: sus estudiantes por código ----------------------------------------------------------------- */
 
-function VistaGrupo({ periodo, sede, materia, grupo, corte, fijar, gruposData, nombreProg }: { periodo: string; sede: string; materia: string; grupo: string; corte: Corte; fijar: (c: Record<string, string | null>) => void; gruposData: import("./logica").GrupoMonitor[]; nombreProg: (c: string) => string }) {
-  const lista = useGrupoEstudiantes(periodo, sede, materia, grupo);
-  const g = gruposData.find((x) => x.codigo_materia === materia && x.grupo === grupo);
+function VistaGrupo({ periodo, sede, clave, corte, fijar, gruposData, nombreProg }: { periodo: string; sede: string; clave: string; corte: Corte; fijar: (c: Record<string, string | null>) => void; gruposData: import("./logica").GrupoMonitor[]; nombreProg: (c: string) => string }) {
+  const lista = useGrupoEstudiantes(periodo, sede, clave);
+  const [q, setQ] = useState("");
+  const [materia, grupo] = [clave.split("~")[0], clave.split("~")[1] ?? ""];
+  const g = gruposData.find((x) => (x.grupo_clave ?? claveGrupo(x.codigo_materia, x.grupo)) === clave);
   const nota = (r: { p1: number | null; p2: number | null; p3: number | null }) => (corte === 1 ? r.p1 : corte === 2 ? r.p2 : r.p3);
   const filas = useMemo(() => (lista.data ?? []).map((r) => ({ ...r, nota: nota(r), nivel: nivelDeNota(nota(r)) })), [lista.data, corte]); // eslint-disable-line react-hooks/exhaustive-deps
   const n = { NE: 0, ED: 0, RS: 0 };
   for (const r of filas) if (r.nivel) n[r.nivel] += 1;
   const bajo = g ? (corte === 1 ? g.bajo_p1 : corte === 2 ? g.bajo_p2 : g.bajo_p3) : 0;
   const con = g ? (corte === 1 ? g.con_p1 : corte === 2 ? g.con_p2 : g.con_p3) : 0;
+  const visibles = [...filas].filter((r) => !q.trim() || r.estudiante.toLowerCase().includes(q.trim().toLowerCase())).sort((a, b) => (a.nota ?? 9) - (b.nota ?? 9));
   return (
     <>
       <section className="mo-portada" data-in>
-        <div>
+        <div className="mo-portada__texto">
           <h2>
             <span>Grupo {grupo}</span>
-            {g?.materia ?? materia}
+            <strong data-destino>{g?.materia ?? materia}</strong>
           </h2>
           <p>
             {g ? (
@@ -570,8 +720,13 @@ function VistaGrupo({ periodo, sede, materia, grupo, corte, fijar, gruposData, n
       </section>
       <section className="mo-seccion" data-in aria-labelledby="mo-est">
         <div className="mo-seccion__cabeza">
-          <h3 id="mo-est">Los estudiantes, por código</h3>
-          <p>NE: nota de 3,5 o más. ED: de 3,0 a 3,49. RS: menor a 3,0. El código es un seudónimo: no hay nombres.</p>
+          <div>
+            <h3 id="mo-est">Los estudiantes, por código</h3>
+            <p>NE: nota de 3,5 o más. ED: de 3,0 a 3,49. RS: menor a 3,0. Sin nombres: el código es el del estudiante y es un dato personal; úselo solo para su seguimiento académico.</p>
+          </div>
+          <div className="mo-filtros">
+            <input value={q} onChange={(ev) => setQ(ev.target.value)} placeholder="Buscar código…" aria-label="Buscar código en el grupo" spellCheck={false} />
+          </div>
         </div>
         {lista.isPending ? (
           <LoadingBlock rows={4} label="Leyendo el grupo" />
@@ -597,18 +752,32 @@ function VistaGrupo({ periodo, sede, materia, grupo, corte, fijar, gruposData, n
                 </tr>
               </thead>
               <tbody>
-                {[...filas]
-                  .sort((a, b) => (a.nota ?? 9) - (b.nota ?? 9))
-                  .map((r) => (
-                    <tr key={r.estudiante} data-n={r.nivel ?? undefined} tabIndex={0} onClick={() => fijar({ e: r.estudiante })} onKeyDown={(ev) => (ev.key === "Enter" || ev.key === " ") && (ev.preventDefault(), fijar({ e: r.estudiante }))}>
-                      <td className="mo-codigo">{r.estudiante}</td>
-                      <td>{nombreProg(r.codigo_programa)}</td>
-                      <td className="num">{coma(r.p1)}</td>
-                      <td className="num">{coma(r.p2)}</td>
-                      <td className="num">{coma(r.p3)}</td>
-                      <td>{r.nivel ? <Semaforo nivel={r.nivel} palabra={false} /> : <span className="mo-muted">sin nota</span>}</td>
-                    </tr>
-                  ))}
+                {visibles.map((r) => (
+                  <tr
+                    key={r.estudiante}
+                    data-n={r.nivel ?? undefined}
+                    tabIndex={0}
+                    onClick={(ev) => (prepararVuelo(ev.currentTarget.querySelector("[data-ghost]")), fijar({ e: r.estudiante }))}
+                    onKeyDown={(ev) => (ev.key === "Enter" || ev.key === " ") && (ev.preventDefault(), prepararVuelo(ev.currentTarget.querySelector("[data-ghost]")), fijar({ e: r.estudiante }))}
+                  >
+                    <td className="mo-codigo">
+                      <b data-ghost>{r.estudiante}</b>
+                      {pareceSeudonimo(r.estudiante) && <small className="mo-muted"> seudónimo</small>}
+                    </td>
+                    <td>{nombreProg(r.codigo_programa)}</td>
+                    <td className="num">{coma(r.p1)}</td>
+                    <td className="num">{coma(r.p2)}</td>
+                    <td className="num">{coma(r.p3)}</td>
+                    <td>{r.nivel ? <Semaforo nivel={r.nivel} palabra={false} /> : <span className="mo-muted">sin nota</span>}</td>
+                  </tr>
+                ))}
+                {visibles.length === 0 && (
+                  <tr>
+                    <td colSpan={6} className="mo-muted">
+                      Ningún código coincide.
+                    </td>
+                  </tr>
+                )}
               </tbody>
             </table>
           </div>
@@ -626,19 +795,22 @@ function VistaEstudiante({ periodo, sede, estudiante, filas, corte, umbrales, no
   const c = fila ? clasificar(fila, corte, umbrales) : null;
   const banda = bandaDe(c?.promedio ?? null);
   const rr = riesgoRelativoDe(c?.promedio ?? null);
+  const seud = pareceSeudonimo(estudiante);
   return (
     <>
       <section className="mo-portada" data-in>
-        <div>
+        <div className="mo-portada__texto">
           <h2>
             <span>Estudiante</span>
-            <span className="mo-codigo" style={{ fontWeight: 600, fontSize: "0.6em" }}>
+            <strong data-destino className="mo-codigo" style={{ fontWeight: 600, fontSize: "0.6em" }}>
               {estudiante}
-            </span>
+            </strong>
           </h2>
           <p>
             {fila ? `${nombreProg(fila.codigo_programa)}. ` : ""}
-            El código es un seudónimo irreversible: sirve para seguir el caso, no para saber quién es. Planeación puede decir a quién corresponde con Davinci.
+            {seud
+              ? "Este código es un seudónimo: la carga es anterior a que el Monitor guardara el código real. Sirve para seguir el caso, pero no dice quién es; Planeación debe volver a cargar las notas."
+              : "Es el código del estudiante, sin nombre ni documento. Es un dato personal: úselo solo para su seguimiento académico y no lo comparta."}
           </p>
         </div>
         <div className="mo-ficha" data-n={c?.nivel}>
@@ -724,14 +896,8 @@ function VistaEstudiante({ periodo, sede, estudiante, filas, corte, umbrales, no
 
 function Criticas({ materias }: { materias: import("../warehouse/estudio").MateriaCritica[] }) {
   return (
-    <section className="mo-seccion" data-in aria-labelledby="mo-crit">
-      <div className="mo-seccion__cabeza">
-        <div>
-          <h3 id="mo-crit">Cursos con alta reprobación</h3>
-          <p>La «Alerta Temprana 4» del estudio de la UDES: materias donde 30 % o más de quienes ya tienen nota va por debajo de la de aprobar, con al menos 15 estudiantes con nota.</p>
-        </div>
-        <span className="wh-etiqueta">{materias.length} cursos</span>
-      </div>
+    <>
+      <p className="mo-panel__nota">La «Alerta Temprana 4» del estudio de la UDES: materias donde 30 % o más de quienes ya tienen nota va por debajo de la de aprobar, con al menos 15 estudiantes con nota.</p>
       {materias.length === 0 ? (
         <p className="mo-muted">Ninguna materia de este alcance llega al 30 %.</p>
       ) : (
@@ -774,11 +940,11 @@ function Criticas({ materias }: { materias: import("../warehouse/estudio").Mater
           </table>
         </div>
       )}
-    </section>
+    </>
   );
 }
 
-/* --- Cómo se clasifica y cómo leer ---------------------------------------------------------------------------- */
+/* --- Cómo se clasifica y cómo leer (plegados: se abren cuando se necesitan) -------------------------------- */
 
 function ComoSeClasifica({ umbrales, setUmbrales }: { umbrales: Umbrales; setUmbrales: (u: Umbrales) => void }) {
   const campo = (k: keyof Umbrales, nombre: string, ayuda: string, paso: number) => (
@@ -789,52 +955,54 @@ function ComoSeClasifica({ umbrales, setUmbrales }: { umbrales: Umbrales; setUmb
     </div>
   );
   return (
-    <section className="mo-seccion" data-in aria-labelledby="mo-clasifica">
-      <div className="mo-seccion__cabeza">
-        <div>
-          <h3 id="mo-clasifica">Cómo se clasifica</h3>
-          <p>
-            <b>NE</b>: promedio de {coma(umbrales.ne)} o más y ninguna materia perdida. <b>ED</b>: entre {coma(umbrales.rs)} y {coma(umbrales.ne)}, o una materia perdida. <b>RS</b>: promedio menor a {coma(umbrales.rs)}, {umbrales.perdidas} o más materias perdidas, o una caída de {coma(umbrales.caida)} frente al corte anterior. Cambie un valor y todo se recalcula.
-          </p>
+    <details className="mo-detalle" aria-labelledby="mo-clasifica">
+      <summary id="mo-clasifica">Cómo se clasifica</summary>
+      <div className="mo-detalle__cuerpo">
+        <p>
+          <b>NE</b>: promedio de {coma(umbrales.ne)} o más y ninguna materia perdida. <b>ED</b>: entre {coma(umbrales.rs)} y {coma(umbrales.ne)}, o una materia perdida. <b>RS</b>: promedio menor a {coma(umbrales.rs)}, {umbrales.perdidas} o más materias perdidas, o una caída de {coma(umbrales.caida)} frente al corte anterior. Cambie un valor y todo se recalcula.
+        </p>
+        <Escala />
+        <div className="mo-umbrales">
+          {campo("ne", "Promedio para Nivel Esperado", "Desde aquí, sin materias perdidas.", 0.1)}
+          {campo("rs", "Promedio para Requiere Seguimiento", "Por debajo de aquí. Aprobar es 3,0.", 0.1)}
+          {campo("perdidas", "Materias perdidas para RS", "Cuántas materias bajo la de aprobar bastan.", 1)}
+          {campo("caida", "Caída entre cortes para RS", "Cuánto baja el promedio frente al corte anterior.", 0.1)}
         </div>
+        <p className="mo-muted">
+          Son valores de partida del Monitor, apoyados en el estudio de la UDES (aprobar 3,0 —3,5 en Medicina—, periodo de prueba bajo 3,2, éxito sobre 3,8); no una norma de la Universidad. Ajústelos con las facultades.
+        </p>
       </div>
-      <Escala />
-      <div className="mo-umbrales">
-        {campo("ne", "Promedio para Nivel Esperado", "Desde aquí, sin materias perdidas.", 0.1)}
-        {campo("rs", "Promedio para Requiere Seguimiento", "Por debajo de aquí. Aprobar es 3,0.", 0.1)}
-        {campo("perdidas", "Materias perdidas para RS", "Cuántas materias bajo la de aprobar bastan.", 1)}
-        {campo("caida", "Caída entre cortes para RS", "Cuánto baja el promedio frente al corte anterior.", 0.1)}
-      </div>
-      <p className="mo-muted">
-        Son valores de partida del Monitor, apoyados en el estudio de la UDES (aprobar 3,0 —3,5 en Medicina—, periodo de prueba bajo 3,2, éxito sobre 3,8); no una norma de la Universidad. Ajústelos con las facultades.
-      </p>
-    </section>
+    </details>
   );
 }
 
 function ComoLeer() {
   return (
-    <section className="mo-seccion" data-in aria-labelledby="mo-leer">
-      <div className="mo-seccion__cabeza">
-        <h3 id="mo-leer">Cómo leer este monitor</h3>
+    <details className="mo-detalle">
+      <summary>Cómo leer este monitor</summary>
+      <div className="mo-detalle__cuerpo">
+        <div className="mo-explica">
+          <div>
+            <h4>Qué es un corte</h4>
+            <p>El semestre se evalúa en tres cortes: P1, P2 y P3. El Monitor clasifica con el último corte en que la mayoría de las materias ya tiene nota; los cortes siguientes aparecen cuando se cargan.</p>
+          </div>
+          <div>
+            <h4>Qué significan NE, ED y RS</h4>
+            <p>Son señales para acompañar, no una calificación ni una sanción. «Requiere Seguimiento» quiere decir que conviene hablar con el estudiante, ofrecer tutoría o revisar el curso.</p>
+          </div>
+          <div>
+            <h4>De dónde salen las reglas</h4>
+            <p>
+              De las notas del «Reporte global de notas» de Davinci y del estudio de la UDES sobre alertas tempranas (Pérez, Mejía, Serrano, Suescún y León, 2023). El estudio también usa Saber 11, tutorías, estrato y trabajo: aquí no los tenemos, y por eso este monitor no predice, solo ordena.
+            </p>
+          </div>
+          <div>
+            <h4>Los códigos de estudiante</h4>
+            <p>Se muestra el código real, sin nombre, documento, correo ni teléfono. Solo lo ve quien ya puede ver ese programa. Úselo para el seguimiento académico; las cargas anteriores muestran un seudónimo hasta volver a cargarlas.</p>
+          </div>
+        </div>
       </div>
-      <div className="mo-explica">
-        <div>
-          <h4>Qué es un corte</h4>
-          <p>El semestre se evalúa en tres cortes: P1, P2 y P3. El Monitor clasifica con el último corte en que la mayoría de las materias ya tiene nota; los cortes siguientes aparecen cuando se cargan.</p>
-        </div>
-        <div>
-          <h4>Qué significan NE, ED y RS</h4>
-          <p>Son señales para acompañar, no una calificación ni una sanción. «Requiere Seguimiento» quiere decir que conviene hablar con el estudiante, ofrecer tutoría o revisar el curso.</p>
-        </div>
-        <div>
-          <h4>De dónde salen las reglas</h4>
-          <p>
-            De las notas del «Reporte global de notas» de Davinci y del estudio de la UDES sobre alertas tempranas (Pérez, Mejía, Serrano, Suescún y León, 2023). El estudio también usa Saber 11, tutorías, estrato y trabajo: aquí no los tenemos, y por eso este monitor no predice, solo ordena.
-          </p>
-        </div>
-      </div>
-    </section>
+    </details>
   );
 }
 

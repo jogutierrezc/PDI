@@ -415,7 +415,7 @@ function PorNotas({ ctx, cobertura }: { ctx: Contexto; cobertura: Cobertura[] })
     return (
       <EmptyBlock
         title={`Falta «Notas por estudiante y materia» de ${periodo}`}
-        hint="Es el «Reporte global de notas» de Davinci: P1, P2, P3 y la nota acumulada de cada estudiante en cada materia. Se trae de la plataforma o se carga el Excel en la sección Cargas; el nombre no se guarda y el código queda como seudónimo."
+        hint="Es el «Reporte global de notas» de Davinci: P1, P2, P3 y la nota acumulada de cada estudiante en cada materia. Se trae de la plataforma o se carga el Excel en la sección Cargas; el nombre no se guarda y el código real del estudiante se conserva como dato personal."
         action={
           <button type="button" className="button-primary" onClick={() => ctx.ir("cargas", { conjunto: "dv_notas" })}>
             Ir a Cargas
@@ -603,7 +603,7 @@ function PorNotas({ ctx, cobertura }: { ctx: Contexto; cobertura: Cobertura[] })
                   ))}
                   {elegida.reglas.length === 0 && <li>No cumple ninguna regla.</li>}
                 </ul>
-                <p className="wh-nota-chica">El código es un seudónimo irreversible: sirve para contar y seguir casos, no para saber quién es.</p>
+                <p className="wh-nota-chica">El código es el del estudiante, sin nombre: sirve para seguir su caso. Las cargas anteriores a 0161 siguen con seudónimo hasta volver a cargarlas.</p>
               </>
             )}
           </aside>
@@ -651,7 +651,7 @@ function PorEstudiante({ ctx, cobertura }: { ctx: Contexto; cobertura: Cobertura
     return (
       <EmptyBlock
         title={`Falta «Estudiantes matriculados» de ${periodo}`}
-        hint="Las alertas por estudiante salen del promedio acumulado y los créditos de ese reporte. Se cargan en la sección Cargas; el código se guarda como seudónimo y los nombres no se guardan."
+        hint="Las alertas por estudiante salen del promedio acumulado y los créditos de ese reporte. Se cargan en la sección Cargas; el código real se conserva como dato personal y los nombres no se guardan."
         action={
           <button type="button" className="button-primary" onClick={() => ctx.ir("cargas", { conjunto: "dv_matric" })}>
             Ir a Cargas
@@ -789,7 +789,7 @@ function PorEstudiante({ ctx, cobertura }: { ctx: Contexto; cobertura: Cobertura
                   ))}
                   {elegida.reglas.length === 0 && <li>No cumple ninguna regla.</li>}
                 </ul>
-                <p className="wh-nota-chica">El código es un seudónimo irreversible: sirve para contar y seguir casos entre cargas, no para saber quién es. Si Bienestar necesita contactar a estudiantes, hay que decidir si el almacén guarda el código real (decisión pendiente).</p>
+                <p className="wh-nota-chica">El código es el real del estudiante, sin nombre: sirve para seguir casos entre cargas. Las cargas anteriores a 0161 siguen con seudónimo hasta volver a cargarlas.</p>
               </>
             )}
           </aside>

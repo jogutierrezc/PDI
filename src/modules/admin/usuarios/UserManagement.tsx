@@ -1,11 +1,12 @@
 /* =============================================================================
    Usuarios y roles.
 
-   Tres vistas bajo la misma pantalla, cada una con su dirección:
+   Cuatro vistas bajo la misma pantalla, cada una con su dirección:
 
      /admin/usuarios            Personas: lista y ficha (o el asistente).
      /admin/usuarios/roles      Roles: lista y matriz del rol abierto.
      /admin/usuarios/carga      Carga masiva de usuarios y asignaciones.
+     /admin/usuarios/microsoft  Acceso con Microsoft: lista de correos habilitados.
 
    La persona o el rol abiertos van en la dirección (?persona=, ?rol=), así
    que se pueden enlazar: la ficha de una unidad en Estructura institucional
@@ -22,6 +23,7 @@ import { AdminRail, AdminRailTab, AdminShell } from "../components/AdminShell";
 import { Icon } from "../../../components/ui/Icon";
 import { useProfiles } from "../../../data/queries";
 import { BulkUsers } from "./BulkUsers";
+import { MicrosoftAccess } from "./MicrosoftAccess";
 import { PeopleView } from "./PeopleView";
 import { useMemberships, useUnitOptions } from "./people-db";
 import { RolesView } from "./RolesView";
@@ -31,6 +33,7 @@ const VIEWS = [
   { id: "personas", label: "Personas", path: "/admin/usuarios" },
   { id: "roles", label: "Roles", path: "/admin/usuarios/roles" },
   { id: "carga", label: "Carga masiva", path: "/admin/usuarios/carga" },
+  { id: "microsoft", label: "Acceso Microsoft", path: "/admin/usuarios/microsoft" },
 ] as const;
 
 export function UserManagement() {
@@ -88,6 +91,7 @@ export function UserManagement() {
       )}
       {view.id === "roles" && <RolesView profiles={profiles.data ?? []} />}
       {view.id === "carga" && <BulkUsers profiles={profiles.data ?? []} units={units.data ?? []} />}
+      {view.id === "microsoft" && <MicrosoftAccess profiles={profiles.data ?? []} />}
     </AdminShell>
   );
 }

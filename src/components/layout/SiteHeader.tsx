@@ -96,12 +96,21 @@ export function SiteHeader({ onSearch }: { onSearch?: () => void }) {
       const navWidth = nav.scrollWidth;
       if (!navWidth) return;
       const barStyle = getComputedStyle(el);
-      const gap = parseFloat(barStyle.columnGap) || 0;
-      const toggleBtn = tools.querySelector<HTMLElement>(".sh-menu-toggle");
-      const toggleWidth = toggleBtn?.offsetWidth ? toggleBtn.offsetWidth + (parseFloat(getComputedStyle(tools).columnGap) || 0) : 0;
-      const need = brand.offsetWidth + navWidth + tools.offsetWidth - toggleWidth + gap * 2;
       const room = el.clientWidth - parseFloat(barStyle.paddingLeft) - parseFloat(barStyle.paddingRight);
-      setCompact(need > room);
+      // Primero la barra se comprime —«Panel» queda en su ícono, el nombre de la
+      // oficina cede, la persona queda en sus iniciales—; solo si aun así no cabe
+      // pasa al cajón. Cada nivel se prueba en el DOM y se mide de verdad.
+      let chosen = -1;
+      for (let level = 0; level <= 2 && chosen < 0; level += 1) {
+        header.current?.setAttribute("data-density", String(level));
+        const gap = parseFloat(getComputedStyle(el).columnGap) || 0;
+        const toggleBtn = tools.querySelector<HTMLElement>(".sh-menu-toggle");
+        const toggleWidth = toggleBtn?.offsetWidth ? toggleBtn.offsetWidth + (parseFloat(getComputedStyle(tools).columnGap) || 0) : 0;
+        const need = brand.offsetWidth + nav.scrollWidth + tools.offsetWidth - toggleWidth + gap * 2;
+        if (need <= room) chosen = level;
+      }
+      header.current?.setAttribute("data-density", String(Math.max(chosen, 0)));
+      setCompact(chosen < 0);
     };
     fit();
     const observer = new ResizeObserver(fit);
@@ -178,7 +187,7 @@ export function SiteHeader({ onSearch }: { onSearch?: () => void }) {
       <div ref={bar} className="sh-bar">
         <Link className="sh-brand" to="/" aria-label="Planeación Institucional, inicio">
           <UdesLogo height={38} decorative />
-          <span>
+          <span className="sh-brand__text">
             <strong>Planeación Institucional</strong>
             <small>Universidad de Santander</small>
           </span>
@@ -231,7 +240,7 @@ export function SiteHeader({ onSearch }: { onSearch?: () => void }) {
           <button type="button" className="sh-icon" onClick={search} aria-label="Buscar (Ctrl + K)" title="Buscar (Ctrl + K)">
             <Icon name="search" size={18} />
           </button>
-          <button type="button" className="sh-icon" onClick={toggle} aria-label={resolved === "dark" ? "Cambiar a tema claro" : "Cambiar a tema oscuro"}>
+          <button type="button" className="sh-icon sh-theme" onClick={toggle} aria-label={resolved === "dark" ? "Cambiar a tema claro" : "Cambiar a tema oscuro"}>
             <Icon name={resolved === "dark" ? "sun" : "moon"} size={17} />
           </button>
           {/* Con sesión, el panel de la intranet queda a un clic desde cualquier portal. */}
@@ -307,7 +316,7 @@ export function SiteHeader({ onSearch }: { onSearch?: () => void }) {
               </>
             ) : (
               <Link to="/acceso-intranet" onClick={close}>
-                Intranet
+                Iniciar sesión
               </Link>
             )}
           </nav>

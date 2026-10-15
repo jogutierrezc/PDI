@@ -104,7 +104,7 @@ export const CONJUNTOS: Conjunto[] = [
     sistema: "master",
     nombre: "Rendimiento académico por grupo",
     tipo: "hecho",
-    via: "sesion",
+    via: "consulta",
     entrega: "archivo",
     metodo: "POST",
     ruta: "/master/mod_reports/reports/matriculated_mortality/download/",
@@ -113,8 +113,7 @@ export const CONJUNTOS: Conjunto[] = [
     estado: "listo",
     privacidad: "Sin datos de estudiantes. El docente se guarda como seudónimo.",
     nota:
-      "Una fila por grupo y corte: matriculados, aprobados, reprobados, no presenta y promedio. El periodo lo fija la sesión de Master (el abierto): " +
-      "no se puede pedir un periodo anterior, así que el historial se arma cargando cada corte cuando ocurre. La columna «Programa» del reporte nombra al departamento.",
+      "Una fila por grupo y corte: matriculados, aprobados, reprobados, no presenta y promedio. El periodo se pide con selected_period: Master entrega el abierto de la sesión o cualquiera de get_periods (desde 2018b). La columna «Programa» del reporte nombra al departamento.",
     har: "Reporte de notas global y por corte",
   },
   {
@@ -129,7 +128,7 @@ export const CONJUNTOS: Conjunto[] = [
     cuerpo: "type, title, title_doc, report, courses",
     estado: "listo",
     privacidad:
-      "Se guardan programa, jornada, estado, promedios y créditos. Se descartan documento, nombres, contacto, salud y demás; el código queda como seudónimo.",
+      "Se guardan programa, jornada, estado, promedios y créditos. Se descartan documento, nombres, contacto, salud y demás; el código real se conserva (dato personal, solo para el seguimiento académico).",
     nota: "Atención: el HAR muestra el filtro «courses» con los semestres 5 a 8 y electivas; falta confirmar si el reporte trae a todos los semestres. Trae el promedio acumulado y el del último polígrafo: es la base de las alertas por estudiante.",
     har: "davinci estudiantes, master profesores",
   },
@@ -144,7 +143,7 @@ export const CONJUNTOS: Conjunto[] = [
     ruta: "/davinci/mod_reports/reports/global_enrollments/{periodo}/download/",
     cuerpo: "type, title, title_doc, report",
     estado: "listo",
-    privacidad: "Se guardan materia, grupo y departamento por estudiante. Se descartan nombres, correos y el nombre del docente; el código del estudiante y el del docente quedan como seudónimo.",
+    privacidad: "Se guardan materia, grupo y departamento por estudiante. Se descartan nombres, correos y el nombre del docente; el código del estudiante se conserva (dato personal, solo para el seguimiento académico) y el del docente queda como seudónimo.",
     nota: "Una fila por estudiante y materia (~38.000 filas en Bucaramanga): es la base para saber qué cursa cada quien.",
     har: "davincimatricula",
   },
@@ -187,7 +186,7 @@ export const CONJUNTOS: Conjunto[] = [
     ruta: "/davinci/mod_reports/reports/homologations_report/{periodo}/download/",
     cuerpo: "type, title, title_doc, report",
     estado: "listo",
-    privacidad: "Se descarta el nombre del estudiante; el código queda como seudónimo.",
+    privacidad: "Se descarta el nombre del estudiante; el código real se conserva (dato personal, solo para el seguimiento académico).",
     har: "Homologaciones",
   },
   {
@@ -216,7 +215,7 @@ export const CONJUNTOS: Conjunto[] = [
     ruta: "/davinci/mod_reports/reports/global_scores/{periodo}/download/",
     cuerpo: "type, title, title_doc, report",
     estado: "listo",
-    privacidad: "Se guardan programa, materia, grupo y las notas P1, P2, P3 y acumulada. Se descarta el nombre; el código del estudiante queda como seudónimo (el mismo de «Estudiantes matriculados»).",
+    privacidad: "Se guardan programa, materia, grupo y las notas P1, P2, P3 y acumulada. Se descarta el nombre; el código real del estudiante se conserva (dato personal, solo para el seguimiento académico; es el mismo de «Estudiantes matriculados»).",
     nota: "«Reporte global de notas» de Davinci: una fila por estudiante y materia (~29.000 en Bucaramanga). Es la base de las alertas por notas de cada corte.",
     har: "rendimientoacademicoporestudiante",
   },

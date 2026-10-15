@@ -248,8 +248,10 @@ export interface CreateUserInput {
   /** Rol de acceso: pantallas e informes que alcanzará. */
   access_role_id?: string | null;
   unit?: string;
-  /** Vacío = se envía una invitación por correo en vez de fijar contraseña. */
+  /** Vacío = entra con Microsoft: no hay contraseña ni correo que enviar. */
   password?: string;
+  /** Además, mandar una invitación por correo (pide correo saliente configurado). */
+  invite?: boolean;
 }
 
 /** Alta de usuario. Pasa por la Edge Function porque exige la clave de servicio. */

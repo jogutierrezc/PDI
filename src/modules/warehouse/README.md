@@ -16,7 +16,7 @@ Guarda por periodo los reportes de Master, Galileo y Davinci para consultarlos s
 
 ## Decisiones
 1. **Una sola tabla de filas (`wh_filas`, jsonb)** en vez de una tabla por conjunto: el encabezado de muchos reportes no se capturó. Cada conjunto con columnas confirmadas suma una vista tipada (`v_wh_rendimiento` hoy).
-2. **La política de privacidad vive en la base** (`wh_politicas`). `wh_agregar_filas` descarta lo no permitido y reemplaza por un seudónimo (HMAC con sal propia, irreversible) el código del estudiante y el docente. Un conjunto sin política no se puede guardar.
+2. **La política de privacidad vive en la base** (`wh_politicas`). `wh_agregar_filas` descarta lo no permitido y reemplaza por un seudónimo (HMAC con sal propia, irreversible) lo que la política marque en `seudonimizar` (hoy, la identificación del docente). Desde **0161** el **código real del estudiante se conserva** (sin nombre) y la política lo marca como **dato personal** (`datos_personales`; finalidad: seguimiento académico; acceso restringido por unidad: solo Planeación lee `wh_filas`, y el Monitor lo entrega por funciones `security definer` filtradas por `unit_can_view`). Nunca se guardan nombres, documento, nacimiento, dirección, salud, contraseñas, correo ni teléfono: un CHECK impide ponerlos en una lista «permitir». La sal/HMAC sigue disponible como opción de la política para otros conjuntos. Un conjunto sin política no se puede guardar.
 3. **No se guarda el Excel original**: trae documento, dirección, salud, contraseñas. Queda el manifiesto (nombre, huella, columnas).
 4. **La huella es del contenido**, no del archivo: el .xlsx lleva la hora de creación. La misma huella no crea versión.
 5. **Versiones**: recargar con contenido distinto crea otra versión y deja la anterior «reemplazada». Un periodo cerrado exige motivo; cerrarlo es de Planeación, reabrirlo de la administración.
@@ -37,7 +37,7 @@ Lo que el estudio usa y estos datos NO tienen: Saber 11, tutorías asistidas, es
 ## Pendiente
 - Aplicar 0155, desplegar la función y definir `WAREHOUSE_MASTER_USER` / `WAREHOUSE_MASTER_PASSWORD` (cuenta de servicio, no la de una persona).
 - Adaptador para los catálogos JSON, para `dv_fin`, `ms_nom` y `ms_doc` (primero su política) y para `gl_uso` (una hoja por semana).
-- Decidir si el código real del estudiante se guarda (hoy es un seudónimo irreversible: sirve para contar, no para contactar).
+- Aplicar 0161 y **volver a cargar** los reportes de notas y matriculados: lo ya guardado conserva su seudónimo `x-…` (no se revierte) hasta que haya una versión nueva.
 - Re-exportar los HAR de aspirantes y capturar deserciones.
 - Carga programada (cron). Las sedes Cúcuta y Bogotá ya están en el catálogo y en la función (`master-cuc` y `master-bog`, puerto 81).
 - Probar la función contra Master real: la petición está verificada en el HAR, la conexión desde el servidor no.

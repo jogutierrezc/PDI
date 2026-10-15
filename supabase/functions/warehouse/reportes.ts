@@ -83,12 +83,15 @@ export const REPORTES: Reporte[] = [
     sistema: "master",
     entrega: "archivo",
     lector: "hoja",
-    periodoVia: "sesion",
+    // Master acepta selected_period en la URL (verificado contra la plataforma, 2026-10-15):
+    // sin él entrega el periodo abierto de la sesión; con él, cualquiera de get_periods (desde 2018b).
+    periodoVia: "consulta",
     corte: true,
     verificado: true,
     armar: (c) => ({
       metodo: "POST",
       ruta: "/master/mod_reports/reports/matriculated_mortality/download/",
+      consulta: { selected_period: c.periodo },
       cuerpo: { period: c.corte, title: `Reporte de rendimiento académico del corte ${c.corte === "f" ? "definitiva" : c.corte} - ${sedeTxt(c)} ${c.periodo.toUpperCase()}` },
     }),
   },

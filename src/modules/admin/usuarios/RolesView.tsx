@@ -24,7 +24,7 @@ import { roleLabels } from "../../../lib/auth";
 import type { AccessRole, AdminScreen, Profile } from "../../../types/database";
 import { UNIT_KIND, type UnitKind } from "../../tableros/model";
 import { useUnitOptions, type UnitOption } from "./people-db";
-import { roleMatrix } from "./summary";
+import { reason, roleMatrix } from "./summary";
 import {
   LEVEL_LABEL,
   MODULES,
@@ -64,20 +64,24 @@ export function RolesView({ profiles }: { profiles: Profile[] }) {
   const access = useAccessRoles();
   const [params, setParams] = useSearchParams();
   const selected = params.get("rol");
+  const copyOf = params.get("copia");
 
   const roles = access.data?.roles ?? [];
   const reports = access.data?.reports ?? [];
   const units = access.data?.units ?? [];
-  const open = (id: string | null) => {
+  const open = (id: string | null, copy?: string) => {
     const next = new URLSearchParams(params);
     if (id) next.set("rol", id);
     else next.delete("rol");
+    if (copy) next.set("copia", copy);
+    else next.delete("copia");
     setParams(next, { replace: true });
   };
 
   const peopleOf = (role: AccessRole) => profiles.filter((person) => person.access_role_id === role.id).length;
 
   const current = selected === "nuevo" ? null : roles.find((role) => role.id === selected) ?? null;
+  const source = selected === "nuevo" ? roles.find((role) => role.id === copyOf) ?? null : null;
 
   if (access.isPending) return <LoadingBlock rows={4} label="Cargando roles" />;
   if (access.isError) return <ErrorBlock error={access.error} onRetry={() => void access.refetch()} />;
@@ -144,8 +148,10 @@ export function RolesView({ profiles }: { profiles: Profile[] }) {
           </div>
         ) : (
           <RoleEditor
-            key={current?.id ?? "nuevo"}
+            key={current?.id ?? `nuevo-${source?.id ?? ""}`}
             role={current}
+            source={source}
+            onDuplicate={(id) => open("nuevo", id)}
             reports={reports}
             units={units}
             people={current ? peopleOf(current) : 0}
@@ -241,6 +247,8 @@ function ImpactScopePicker({
 
 function RoleEditor({
   role,
+  source,
+  onDuplicate,
   reports,
   units,
   people,
@@ -248,6 +256,9 @@ function RoleEditor({
   onDeleted,
 }: {
   role: AccessRole | null;
+  /** Rol que se duplica: el nuevo parte de su nombre, descripción y matriz. */
+  source: AccessRole | null;
+  onDuplicate: (id: string) => void;
   reports: { access_role_id: string; report_slug: string }[];
   units: { access_role_id: string; unit_id: string }[];
   people: number;
@@ -258,10 +269,11 @@ function RoleEditor({
   const unitOptions = useUnitOptions();
   const save = useSaveAccessRole();
   const remove = useDeleteAccessRole();
-  const [name, setName] = useState(role?.name ?? "");
-  const [description, setDescription] = useState(role?.description ?? "");
+  const base = role ?? source;
+  const [name, setName] = useState(role ? role.name : source ? `${source.name} (copia)` : "");
+  const [description, setDescription] = useState(base?.description ?? "");
   const [matrix, setMatrix] = useState<Matrix>(() =>
-    role ? roleMatrix(role, reports, units) : templateMatrix("consulta"),
+    base ? roleMatrix(base, reports, units) : templateMatrix("consulta"),
   );
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
@@ -361,7 +373,7 @@ function RoleEditor({
       setNotice("Rol guardado.");
       onSaved(saved.id);
     } catch (saveError) {
-      setError(saveError instanceof Error ? saveError.message : "No se pudo guardar el rol.");
+      setError(reason(saveError, "No se pudo guardar el rol."));
     }
   }
 
@@ -371,7 +383,7 @@ function RoleEditor({
     <form className="us-role" onSubmit={handleSubmit} aria-label={role ? `Editar ${role.name}` : "Nuevo rol"}>
       <header className="us-detail__head">
         <div>
-          <h2>{role ? role.name : "Nuevo rol"}</h2>
+          <h2>{role ? role.name : source ? `Nuevo rol, copia de ${source.name}` : "Nuevo rol"}</h2>
           <p>
             {role?.is_system && <span className="record-flag">De fábrica</span>}
             {people > 0
@@ -380,13 +392,18 @@ function RoleEditor({
           </p>
         </div>
         <div className="us-detail__actions">
+          {role && (
+            <button type="button" className="button-ghost" onClick={() => onDuplicate(role.id)}>
+              Duplicar
+            </button>
+          )}
           {role && !system && (
             <button
               type="button"
               className="button-ghost"
               data-tone="danger"
               disabled={people > 0}
-              title={people > 0 ? "Reasigne primero a quienes lo llevan" : undefined}
+              title={people > 0 ? "Reasigne primero a quienes lo llevan (y cambie el rol de los correos de la lista de acceso que lo usan)" : undefined}
               onClick={() => setConfirmDelete(true)}
             >
               Borrar
@@ -450,6 +467,11 @@ function RoleEditor({
         <small className="users-hint">Parta de una plantilla y ajuste la matriz: al tocarla, el rol pasa a «Personalizada».</small>
       </fieldset>
 
+      <p className="users-hint">
+        Qué se hace cumplir: las pantallas que marque se ven en el menú. Lo que cada persona puede cambiar lo decide la
+        capacidad del rol (la mayor que pida un módulo) y, en Impacto, Mis Tableros y el Monitor, su unidad. Si un
+        módulo queda por encima de lo que eligió, la matriz se lo avisa.
+      </p>
       <div className="us-matrix" role="group" aria-label="Qué hace en cada módulo">
         <div className="us-matrix__head" aria-hidden="true">
           <span>Módulo</span>
@@ -513,6 +535,13 @@ function RoleEditor({
                 <div className="us-matrix__more">
                   {module.levels[choice.level as Exclude<Level, "none">] && (
                     <small>{module.levels[choice.level as Exclude<Level, "none">]!.hint}</small>
+                  )}
+                  {effective === "none" && (
+                    <small className="us-raised">
+                      <Icon name="alert" size={13} /> No lo verá: este módulo se abre desde la capacidad{" "}
+                      {roleLabels[module.seenFrom ?? "consulta"]} y la del rol es {roleLabels[capacity]}. Suba otro
+                      módulo a ese nivel o quite este.
+                    </small>
                   )}
                   {isRaised && (
                     <small className="us-raised">
@@ -622,7 +651,7 @@ function RoleEditor({
                   onDeleted();
                 } catch (deleteError) {
                   setConfirmDelete(false);
-                  setError(deleteError instanceof Error ? deleteError.message : "No se pudo borrar el rol.");
+                  setError(reason(deleteError, "No se pudo borrar el rol."));
                 }
               }}
             >

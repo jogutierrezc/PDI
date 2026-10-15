@@ -10,7 +10,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "../../lib/supabase";
 import { useAuth } from "../../lib/auth";
 import { mensajeDe, todas } from "../warehouse/store";
-import type { FilaMonitor, GrupoMonitor, Programa } from "./logica";
+import { claveGrupo, planDe, type CorteRiesgo, type FilaMonitor, type FilaRiesgo, type GrupoMonitor, type Programa, type ResumenPlan } from "./logica";
 
 const n = (v: unknown) => (v === null || v === undefined ? null : Number(v));
 const num = (v: unknown) => Number(v ?? 0);
@@ -69,6 +69,7 @@ export function useGruposMonitor(periodo: string, sede: string) {
           codigo_materia: String(r.codigo_materia ?? ""),
           materia: String(r.materia ?? ""),
           grupo: String(r.grupo ?? ""),
+          grupo_clave: String(r.grupo_clave ?? claveGrupo(String(r.codigo_materia ?? ""), String(r.grupo ?? ""))),
           estudiantes: num(r.estudiantes),
           con_p1: num(r.con_p1),
           con_p2: num(r.con_p2),
@@ -112,6 +113,7 @@ export interface NotaMateria {
   codigo_materia: string;
   materia: string;
   grupo: string;
+  grupo_clave: string;
   p1: number | null;
   p2: number | null;
   p3: number | null;
@@ -134,6 +136,7 @@ export function useEstudianteMonitor(periodo: string, sede: string, estudiante: 
           codigo_materia: String(r.codigo_materia ?? ""),
           materia: String(r.materia ?? ""),
           grupo: String(r.grupo ?? ""),
+          grupo_clave: String(r.grupo_clave ?? ""),
           p1: n(r.p1),
           p2: n(r.p2),
           p3: n(r.p3),
@@ -154,14 +157,14 @@ export interface NotaEstudianteGrupo {
   nota_acumulada: number | null;
 }
 
-/** Los estudiantes de un grupo con sus notas por corte. */
-export function useGrupoEstudiantes(periodo: string, sede: string, materia: string | null, grupo: string | null) {
+/** Los estudiantes de un grupo (clave código de materia + letra) con sus notas por corte. */
+export function useGrupoEstudiantes(periodo: string, sede: string, clave: string | null) {
   return useQuery({
-    queryKey: ["monitor", "grupo", periodo, sede, materia, grupo],
-    enabled: Boolean(materia && grupo),
+    queryKey: ["monitor", "grupo", periodo, sede, clave],
+    enabled: Boolean(clave),
     staleTime: FRESCO,
     queryFn: async () => {
-      const { data, error } = await supabase.rpc("wh_monitor_grupo_estudiantes", { p_periodo: periodo, p_sede: sede, p_codigo_materia: materia, p_grupo: grupo });
+      const { data, error } = await supabase.rpc("wh_monitor_grupo_estudiantes", { p_periodo: periodo, p_sede: sede, p_clave: clave });
       if (error) throw new Error(mensajeDe(error));
       return ((data ?? []) as Record<string, unknown>[]).map(
         (r): NotaEstudianteGrupo => ({
@@ -174,6 +177,45 @@ export function useGrupoEstudiantes(periodo: string, sede: string, materia: stri
           nota_acumulada: n(r.nota_acumulada),
         }),
       );
+    },
+  });
+}
+
+/** La reprobación ya agregada por programa × materia × grupo × corte (ninguna nota individual). */
+export function useRiesgoMonitor(periodo: string, sede: string) {
+  return useQuery({
+    queryKey: ["monitor", "riesgo", periodo, sede],
+    staleTime: FRESCO,
+    queryFn: async () => {
+      const filas = await todas<Record<string, unknown>>((a, b) => supabase.rpc("wh_monitor_riesgo", { p_periodo: periodo, p_sede: sede }, { count: "exact" }).range(a, b));
+      return filas.map(
+        (r): FilaRiesgo => ({
+          codigo_programa: String(r.codigo_programa ?? ""),
+          programa: String(r.programa ?? ""),
+          codigo_materia: String(r.codigo_materia ?? ""),
+          materia: String(r.materia ?? ""),
+          grupo: String(r.grupo ?? ""),
+          grupo_clave: String(r.grupo_clave ?? ""),
+          plan: planDe(String(r.plan ?? "")),
+          corte: Number(r.corte) as CorteRiesgo,
+          con: num(r.con),
+          bajo: num(r.bajo),
+          promedio: n(r.promedio),
+        }),
+      );
+    },
+  });
+}
+
+/** Cuántos grupos de cada plan hay (y si el plan ya llegó de Master). */
+export function usePlanesMonitor(periodo: string, sede: string) {
+  return useQuery({
+    queryKey: ["monitor", "planes", periodo, sede],
+    staleTime: FRESCO,
+    queryFn: async () => {
+      const { data, error } = await supabase.rpc("wh_monitor_planes_resumen", { p_periodo: periodo, p_sede: sede });
+      if (error) throw new Error(mensajeDe(error));
+      return ((data ?? []) as Record<string, unknown>[]).map((r): ResumenPlan => ({ plan: planDe(String(r.plan ?? "")), grupos: num(r.grupos), matriculas: num(r.matriculas), plan_conocido: Boolean(r.plan_conocido) }));
     },
   });
 }

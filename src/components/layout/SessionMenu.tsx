@@ -1,7 +1,7 @@
 /* =============================================================================
    La persona, en la barra de los portales públicos.
 
-   Sin sesión, la barra termina en un candado y la palabra «Intranet»: una
+   Sin sesión, la barra termina en un candado y las palabras «Iniciar sesión»: una
    puerta. Con sesión, ese mismo sitio pasa a ser quien eres, y al abrirlo
    aparece lo único que tú puedes abrir.
 
@@ -64,7 +64,7 @@ export function SessionMenu() {
   if (!profile) {
     return (
       <Link className="sh-intranet" to="/acceso-intranet">
-        <Icon name="lock" size={15} /> Intranet
+        <Icon name="lock" size={15} /> Iniciar sesión
       </Link>
     );
   }
@@ -77,6 +77,7 @@ export function SessionMenu() {
         className="sh-me__trigger"
         aria-expanded={open}
         aria-controls="sh-me-panel"
+        aria-label={`Tu cuenta, ${profile.full_name?.trim() || profile.email}`}
         onClick={() => setOpen((v) => !v)}
       >
         <span className="sh-me__initials" aria-hidden="true">

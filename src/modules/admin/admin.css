@@ -2523,7 +2523,7 @@ fieldset.admin-field legend {
     font-weight: 700;
     letter-spacing: 0;
     white-space: nowrap;
-    transition: background-color var(--dur-fast) ease, color var(--dur-fast) ease;
+    transition: background-color var(--dur-fast) ease, color var(--dur-fast) ease, transform 120ms var(--ease-out);
   }
   .admin-shell[data-bar="menus"] .admin-nav__group-name { flex: none; }
   .admin-shell[data-bar="menus"] .admin-nav__chevron { color: currentColor; transform: none; }
@@ -2574,7 +2574,7 @@ fieldset.admin-field legend {
     border-radius: 10px;
     font-size: var(--text-sm);
     font-weight: 700;
-    transition: background-color var(--dur-fast) ease, border-color var(--dur-fast) ease;
+    transition: background-color var(--dur-fast) ease, border-color var(--dur-fast) ease, transform 120ms var(--ease-out);
   }
   .admin-shell[data-bar="menus"] .admin-profile[aria-expanded="true"] { background: var(--brand-blue-soft); border-color: var(--brand-blue); }
   .admin-shell[data-bar="menus"] .admin-profile__av { width: 32px; height: 32px; border-radius: 8px; font-size: var(--text-xs); }
@@ -2597,6 +2597,7 @@ fieldset.admin-field legend {
     .admin-shell[data-bar="menus"] .admin-profile:hover { background: var(--surface-2); border-color: var(--brand-blue); }
   }
 
+  .admin-shell[data-bar="menus"] :is(.admin-nav__group-label, .admin-bar-icon, .admin-profile):active { transform: scale(0.97); }
   .admin-shell[data-bar="menus"] :is(.admin-bar-icon, .admin-profile):focus-visible { outline: 2px solid var(--brand-blue); outline-offset: 2px; }
 
   /* El tema ya está en la barra: la cabecera de la pantalla no lo repite. */
@@ -2726,6 +2727,7 @@ fieldset.admin-field legend {
 
 @media (prefers-reduced-motion: reduce) {
   .admin-menu { animation: none; }
+  .admin-shell[data-bar="menus"] :is(.admin-nav__group-label, .admin-profile):active { transform: none; }
 }
 
 /* El menú del perfil no se contrae con la barra: aunque la columna esté en
@@ -2752,22 +2754,54 @@ fieldset.admin-field legend {
   }
 }
 
-/* Barra de menús, más estrecha: primero los rótulos cortos y el subtítulo de la
-   marca (como hace la barra de los portales a 1320 px), luego el nombre. Nunca
-   se parte en dos filas. */
-@media (min-width: 901px) and (max-width: 1480px) {
-  .admin-shell[data-bar="menus"] .admin-nav__group-name { display: none; }
-  .admin-shell[data-bar="menus"] .admin-nav__group-short { display: inline; }
-  .admin-shell[data-bar="menus"] .admin-brand small { display: none; }
-  .admin-shell[data-bar="menus"] .admin-nav__group-label { padding: 0 9px; }
+/* Barra de menús comprimida por niveles. AdminShell mide la fila y pone
+   data-density en la cáscara (solo ≥901 px): 1 rótulos cortos y la marca sin
+   subtítulo · 2 íconos, con el rótulo corto solo en la carpeta actual; marca sin
+   nombre y la persona en sus iniciales · 3 solo íconos con los espacios
+   apretados. En los niveles de íconos el rótulo corto queda para lectores de
+   pantalla y el nombre entero sale en el tooltip. Siempre una sola fila. */
+.admin-shell[data-bar="menus"]:is([data-density="1"], [data-density="2"], [data-density="3"]) .admin-nav__group-name { display: none; }
+.admin-shell[data-bar="menus"][data-density="1"] .admin-nav__group-short { display: inline; }
+.admin-shell[data-bar="menus"][data-density="1"] .admin-brand small { display: none; }
+.admin-shell[data-bar="menus"][data-density="1"] .admin-nav__group-label { padding: 0 9px; }
+
+.admin-shell[data-bar="menus"]:is([data-density="2"], [data-density="3"]) .admin-nav__group-short {
+  display: block;
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+.admin-shell[data-bar="menus"]:is([data-density="2"], [data-density="3"]) .admin-nav__group-icon { display: block; flex: none; }
+.admin-shell[data-bar="menus"]:is([data-density="2"], [data-density="3"]) .admin-nav__group-label { justify-content: center; min-width: 44px; padding: 0; }
+.admin-shell[data-bar="menus"]:is([data-density="2"], [data-density="3"]) .admin-nav__group-label > .admin-nav__chevron { display: none; }
+/* Nivel 2: la carpeta donde estás conserva su nombre, para no perderte. */
+.admin-shell[data-bar="menus"][data-density="2"] .admin-nav__group-label[data-current] { padding: 0 12px; }
+.admin-shell[data-bar="menus"][data-density="2"] .admin-nav__group-label[data-current] .admin-nav__group-icon { display: none; }
+.admin-shell[data-bar="menus"][data-density="2"] .admin-nav__group-label[data-current] .admin-nav__group-short {
+  position: static;
+  width: auto;
+  height: auto;
+  overflow: visible;
+  clip: auto;
+}
+.admin-shell[data-bar="menus"]:is([data-density="2"], [data-density="3"]) .admin-brand > span { display: none; }
+.admin-shell[data-bar="menus"]:is([data-density="2"], [data-density="3"]) :is(.admin-identity__first, .admin-profile .admin-nav__chevron) { display: none; }
+.admin-shell[data-bar="menus"]:is([data-density="2"], [data-density="3"]) .admin-profile { padding: 0 5px; }
+.admin-shell[data-bar="menus"][data-density="3"] .admin-sidebar { gap: var(--space-3); }
+.admin-shell[data-bar="menus"][data-density="3"] .admin-nav__group-label { min-width: 40px; }
+.admin-shell[data-bar="menus"][data-density="3"] .admin-nav { gap: 0; }
+
+/* La cabecera de la pantalla también se comprime: primero cede la descripción
+   (a media fila quedaba en «D…») y, más estrecho, la ruta; el título manda. */
+@media (min-width: 641px) and (max-width: 1180px) {
+  .admin-topbar .admin-topbar__meta { display: none; }
 }
 
-@media (min-width: 901px) and (max-width: 1100px) {
-  .admin-shell[data-bar="menus"] .admin-sidebar { gap: var(--space-3); }
-  .admin-shell[data-bar="menus"] .admin-brand > span { display: none; }
-  .admin-shell[data-bar="menus"] .admin-identity__first,
-  .admin-shell[data-bar="menus"] .admin-profile .admin-nav__chevron { display: none; }
-  .admin-shell[data-bar="menus"] .admin-profile { padding: 0 5px; }
+@media (min-width: 641px) and (max-width: 1000px) {
+  .admin-crumbs { display: none; }
 }
 
 /* --- Botón «Panel» de la cabecera ---------------------------------------------- */

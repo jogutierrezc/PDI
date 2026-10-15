@@ -79,7 +79,7 @@ describe("0155 · quién puede qué", () => {
 });
 
 describe("0155 · la política de privacidad vive en la base", () => {
-  it("matriculados: descarta lo personal y seudonimiza el código", async () => {
+  it("matriculados: descarta lo personal y conserva el código real (0161)", async () => {
     await t.asUser(
       PLANEACION,
       async (q) => {
@@ -94,11 +94,11 @@ describe("0155 · la política de privacidad vive en la base", () => {
     );
     const [fila] = await t.q<{ datos: Record<string, unknown> }>("select datos from public.wh_filas f join public.wh_cargas c on c.id = f.carga_id where c.conjunto = 'dv_matric'");
     expect(Object.keys(fila.datos).sort()).toEqual(["codigo", "cred_aprobados", "estado", "programa", "promedio_acumulado"]);
-    expect(fila.datos.codigo).toMatch(/^x-[0-9a-f]{10}$/);
-    expect(JSON.stringify(fila.datos)).not.toContain("U0012345");
+    expect(fila.datos.codigo).toBe("U0012345"); // 0161: el código real se conserva
+    expect(JSON.stringify(fila.datos)).not.toMatch(/ANA|PEREZ|1098765432|Calle 1|3000000000|ana@correo|EPS/);
   });
 
-  it("el mismo código da el mismo seudónimo en otra carga", async () => {
+  it("el mismo código se guarda igual en otra carga", async () => {
     await t.asUser(
       PLANEACION,
       (q) => guardar(q, "dv_matric", "2026a", HUELLA_B, [{ codigo: "U0012345", programa: "DERECHO" }]),
@@ -127,12 +127,12 @@ describe("0155 · la política de privacidad vive en la base", () => {
     expect(Object.keys(nom).sort()).toEqual(["asignatura_actividad", "cedula", "contrato", "horas_semanales"]);
     expect(nom.cedula).toMatch(/^x-/);
     expect(Object.keys(glo).sort()).toEqual(["cod_materia", "codigo", "id_docente", "materia"]);
-    expect(glo.codigo).toMatch(/^x-/);
+    expect(glo.codigo).toBe("01060291015"); // el del estudiante es real; el del docente, seudónimo
     expect(glo.id_docente).toMatch(/^x-/);
     expect(JSON.stringify([nom, glo])).not.toMatch(/DANIELA|BAYRON|INGRID|gmail|hotmail|1095803022|1000270463/);
   });
 
-  it("0157 · las notas por estudiante se resumen por estudiante y su seudónimo coincide con el de matriculados", async () => {
+  it("0157 · las notas por estudiante se resumen por estudiante y su código coincide con el de matriculados", async () => {
     await t.asUser(
       PLANEACION,
       async (q) => {
@@ -146,7 +146,8 @@ describe("0155 · la política de privacidad vive en la base", () => {
       { commit: true },
     );
     const crudas = await t.q<{ datos: Record<string, string> }>("select f.datos from public.wh_filas f join public.wh_cargas c on c.id = f.carga_id where c.conjunto = 'dv_notas'");
-    expect(JSON.stringify(crudas)).not.toMatch(/ROLDAN|JAIRO|01251152003/);
+    expect(JSON.stringify(crudas)).not.toMatch(/ROLDAN|JAIRO/);
+    expect(crudas.map((c) => c.datos.codigo_estudiante)).toContain("01251152003"); // 0161: el código real
     expect(Object.keys(crudas[0].datos).sort()).toEqual(["codigo_materia", "codigo_programa", "codigo_estudiante", "grupo", "nombre_materia", "nombre_programa", "nota_acumulada", "p1", "p2", "p3"].sort());
 
     await t.asUser(PLANEACION, async (q) => {
@@ -159,7 +160,7 @@ describe("0155 · la política de privacidad vive en la base", () => {
       expect(Number(r[0].prom_p2)).toBeCloseTo(5.0);
       expect(r[0].prom_p3).toBeNull(); // «-» no es una nota
       expect(r[1]).toMatchObject({ materias: 1, con_p1: 0 }); // sin ninguna nota todavía
-      // El mismo código da el mismo seudónimo que en matriculados: se pueden cruzar.
+      // El mismo código real que en matriculados: se pueden cruzar.
       const m = await q<{ c: string }>("select f.datos->>'codigo' as c from public.wh_filas f join public.wh_cargas c on c.id = f.carga_id where c.conjunto = 'dv_matric' and c.periodo = '2026b'");
       expect(r.map((x) => x.estudiante)).toContain(m[0].c);
     });

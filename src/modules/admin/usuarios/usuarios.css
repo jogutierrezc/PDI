@@ -1167,3 +1167,121 @@
     transition: none;
   }
 }
+
+/* --- Acceso con Microsoft ------------------------------------------------------------ */
+
+.us-allow {
+  display: grid;
+  gap: var(--space-6);
+}
+
+.us-allow__block {
+  display: grid;
+  gap: var(--space-3);
+  padding: var(--space-4);
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+}
+
+.us-allow__block header h3 {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin: 0;
+  color: var(--ink);
+  font-size: var(--text-md);
+}
+
+.us-allow__block header p {
+  margin: var(--space-1) 0 0;
+  color: var(--ink-muted);
+  font-size: var(--text-sm);
+}
+
+.us-allow__form {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 14rem), 1fr));
+  gap: var(--space-3);
+}
+
+.us-allow__rows {
+  display: grid;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.us-allow__row {
+  display: grid;
+  grid-template-columns: minmax(12rem, 1fr) minmax(10rem, 14rem) auto auto;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-3) 0;
+}
+
+.us-allow__row + .us-allow__row {
+  border-top: 1px solid var(--line-faint);
+}
+
+.us-allow__row[data-off] .us-allow__who {
+  opacity: 0.6;
+}
+
+.us-allow__who {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.us-allow__who strong {
+  overflow-wrap: anywhere;
+  color: var(--ink);
+  font-size: var(--text-sm);
+}
+
+.us-allow__who small {
+  overflow-wrap: anywhere;
+  color: var(--ink-muted);
+  font-size: var(--text-xs);
+}
+
+.us-allow__switch {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  color: var(--ink-secondary);
+  font-size: var(--text-sm);
+  white-space: nowrap;
+}
+
+.us-allow__confirm {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.us-more {
+  display: grid;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+}
+
+.us-more > summary {
+  color: var(--ink);
+  font-size: var(--text-sm);
+  font-weight: 700;
+  cursor: pointer;
+}
+
+@media (max-width: 48rem) {
+  .us-allow__row {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+
+  .us-allow__who {
+    grid-column: 1 / -1;
+  }
+}

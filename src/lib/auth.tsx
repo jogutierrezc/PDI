@@ -112,21 +112,23 @@ export function screenVisible(
 ): boolean {
   const { profile, access, inAnyUnit, impactoSide } = who;
   if (!profile?.is_active) return false;
+  // ¿Está marcada en su rol de acceso? Sin rol, todas lo están.
+  const listed = !access || access.role.all_screens || access.role.screens.includes(screen);
   // Usuarios, traslado de datos y estructura institucional piden administración siempre.
   if ((screen === "users" || screen === "transfer" || screen === "institution" || screen === "pilo" || screen === "pilo_ensenanza") && RANK[profile.role] < RANK.admin) {
     return false;
   }
-  // Correos se decide solo por el rol, como en la base (0137): Planeación lee la
-  // bitácora y la administración lo cambia todo. No depende del rol de acceso.
-  if (screen === "correos") return RANK[profile.role] >= RANK.planeacion;
+  // Correos: la capacidad decide qué puede hacer (0137: Planeación lee la
+  // bitácora, la administración lo cambia) y el rol de acceso, si aparece en el menú.
+  if (screen === "correos") return RANK[profile.role] >= RANK.planeacion && listed;
   // Rutas del bus: solo por el rol, como en la base (0139).
-  if (screen === "rutas") return RANK[profile.role] >= RANK.planeacion;
+  if (screen === "rutas") return RANK[profile.role] >= RANK.planeacion && listed;
   // Warehouse UDES: datos de las plataformas institucionales; solo por el rol, como en la base (0155).
-  if (screen === "warehouse") return RANK[profile.role] >= RANK.planeacion;
+  if (screen === "warehouse") return RANK[profile.role] >= RANK.planeacion && listed;
   // Monitor de alertas tempranas: quien pertenece a una facultad o programa ve lo suyo; Planeación, todo. La base (0160) lo exige también.
   if (screen === "monitor" && (inAnyUnit || RANK[profile.role] >= RANK.planeacion)) return true;
   // Rankings (THE, UI GreenMetric y el recolector de noticias): solo por el rol, como en la base (0143).
-  if (screen === "rankings") return RANK[profile.role] >= RANK.planeacion;
+  if (screen === "rankings") return RANK[profile.role] >= RANK.planeacion && listed;
   // Internacionalización: pertenecer al módulo (director, coordinador o gestor
   // en int_miembros, 0151) ES el permiso, como en la base; la administración, siempre.
   if (screen === "internacionalizacion") return RANK[profile.role] >= RANK.admin || Boolean(who.inInternacionalizacion);
@@ -143,8 +145,7 @@ export function screenVisible(
     if (RANK[profile.role] >= RANK.planeacion && !inAnyUnit) return true;
     return false;
   }
-  if (!access) return true;
-  return access.role.all_screens || access.role.screens.includes(screen);
+  return listed;
 }
 
 /** El panel de la intranet: el lanzador. Sin sesión activa, la portada. */

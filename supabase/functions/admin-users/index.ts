@@ -1,6 +1,8 @@
 /* =============================================================================
    Edge Function · admin-users
-   Crear, invitar, eliminar y reenviar acceso a usuarios del portal.
+   Crear, eliminar y reenviar acceso a usuarios del portal.
+   Crear = agregar el correo a la lista de acceso (access_allowlist) + cuenta +
+   perfil. Sin contraseña no se manda correo: la persona entra con Microsoft.
 
    Existe porque estas operaciones exigen la clave de servicio (service role),
    que no puede viajar al navegador: cualquiera podría leerla del bundle y
@@ -25,12 +27,15 @@ interface CreatePayload {
   action: "create";
   email: string;
   full_name: string;
+  /** Solo si no llega access_role_id; con él, la capacidad sale del rol. */
   role: Role;
-  /** Rol de acceso (access_roles.id): decide pantallas e informes. */
+  /** Rol de acceso (access_roles.id): decide pantallas e informes y entra en la lista de acceso. */
   access_role_id?: string | null;
   unit?: string;
-  /** Sin contraseña se envía una invitación por correo. */
+  /** Contraseña inicial (acceso por correo). Sin ella, la persona entra con Microsoft. */
   password?: string;
+  /** Mandar además una invitación por correo (pide correo saliente configurado). */
+  invite?: boolean;
 }
 
 interface DeletePayload {
@@ -47,6 +52,7 @@ interface ResetPayload {
 type Payload = CreatePayload | DeletePayload | ResetPayload;
 
 const ROLES: Role[] = ["consulta", "responsable", "planeacion", "admin"];
+const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": Deno.env.get("ALLOWED_ORIGIN") ?? "*",
@@ -120,56 +126,92 @@ Deno.serve(async (request) => {
       const email = payload.email?.trim().toLowerCase();
       const fullName = payload.full_name?.trim();
 
-      if (!email || !email.includes("@")) return json({ error: "Correo no válido." }, 400);
+      if (!email || !EMAIL.test(email)) return json({ error: "Escriba un correo completo, como nombre@udes.edu.co." }, 400);
       if (!fullName) return json({ error: "El nombre es obligatorio." }, 400);
-      if (!ROLES.includes(payload.role)) return json({ error: "Rol no válido." }, 400);
       if (payload.password && payload.password.length < 8) {
         return json({ error: "La contraseña debe tener al menos 8 caracteres." }, 400);
       }
 
-      // El rol y el nombre viajan en user_metadata: el disparador
-      // handle_new_user() los copia al perfil en el mismo momento del alta.
-      const metadata = { full_name: fullName, role: payload.role, unit: payload.unit ?? null };
+      // La capacidad sale del rol de acceso, no de lo que mande el navegador: así
+      // el perfil nunca queda con una capacidad que su rol no tiene.
+      let role: Role = payload.role;
+      if (payload.access_role_id) {
+        const { data: accessRole } = await admin
+          .from("access_roles")
+          .select("base_role, key")
+          .eq("id", payload.access_role_id)
+          .maybeSingle();
+        if (!accessRole) return json({ error: "Ese rol de acceso ya no existe." }, 400);
+        if (accessRole.key === "invitado") return json({ error: "«Invitado» es para quien aún no está habilitado: elija otro rol." }, 400);
+        role = accessRole.base_role as Role;
+      }
+      if (!ROLES.includes(role)) return json({ error: "Falta el rol de acceso." }, 400);
 
-      const result = payload.password
-        ? await admin.auth.admin.createUser({
+      const { data: existing } = await admin.from("profiles").select("id").ilike("email", email.replace(/[\\%_]/g, "\\$&")).maybeSingle();
+      if (existing) return json({ error: "Ya existe un usuario con ese correo. Cambie su rol desde su ficha." }, 409);
+
+      // 1. La lista de acceso: es lo que admite a la persona cuando entre con Microsoft.
+      if (payload.access_role_id) {
+        const { error: listError } = await admin.from("access_allowlist").upsert(
+          {
             email,
-            password: payload.password,
-            email_confirm: true,
-            user_metadata: metadata,
-          })
-        : await admin.auth.admin.inviteUserByEmail(email, { data: metadata });
+            full_name: fullName,
+            access_role_id: payload.access_role_id,
+            active: true,
+            created_by: auth.user.id,
+          },
+          { onConflict: "email" },
+        );
+        if (listError) return json({ error: `No se pudo agregar el correo a la lista de acceso: ${listError.message}` }, 500);
+      }
+
+      // 2. La cuenta. Sin contraseña no se manda nada por correo: entra con Microsoft
+      // (la misma dirección se enlaza sola) y solo se invita si se pidió expresamente.
+      const metadata = { full_name: fullName, unit: payload.unit ?? null };
+      const result = payload.password
+        ? await admin.auth.admin.createUser({ email, password: payload.password, email_confirm: true, user_metadata: metadata })
+        : payload.invite
+          ? await admin.auth.admin.inviteUserByEmail(email, { data: metadata })
+          : await admin.auth.admin.createUser({ email, email_confirm: true, user_metadata: metadata });
 
       if (result.error) {
-        const already = /already|registered|exists/i.test(result.error.message);
-        return json(
-          { error: already ? "Ya existe un usuario con ese correo." : result.error.message },
-          already ? 409 : 400,
-        );
+        const message = result.error.message;
+        if (/already|registered|exists/i.test(message)) return json({ error: "Ya existe un usuario con ese correo." }, 409);
+        if (/sending|smtp|mail/i.test(message)) {
+          return json(
+            {
+              error: "No se pudo enviar el correo de invitación.",
+              advice: "Revise el correo saliente de Supabase, o cree la cuenta sin invitación: la persona entra con Microsoft.",
+            },
+            502,
+          );
+        }
+        return json({ error: message }, 400);
       }
 
       const created = result.data.user;
       if (!created) return json({ error: "No se pudo crear el usuario." }, 500);
 
-      // El disparador ya insertó el perfil; aquí se completan los campos que
-      // no viajan en los metadatos y se garantiza el rol pedido.
-      const { error: updateError } = await admin
-        .from("profiles")
-        .update({
+      // 3. El perfil. El disparador de auth.users ya lo creó; si no existe (algunos
+      // proyectos no pueden crearlo) se crea aquí, que es lo que antes se perdía en silencio.
+      const { error: profileWrite } = await admin.from("profiles").upsert(
+        {
+          id: created.id,
+          email,
           full_name: fullName,
-          role: payload.role,
+          role,
           unit: payload.unit ?? null,
-          // El disparador de la base sincroniza role con la capacidad del rol
-          // de acceso, así que basta con apuntar cuál es.
+          is_active: true,
           ...(payload.access_role_id ? { access_role_id: payload.access_role_id } : {}),
-        })
-        .eq("id", created.id);
-
-      if (updateError) return json({ error: updateError.message }, 500);
+        },
+        { onConflict: "id" },
+      );
+      if (profileWrite) return json({ error: `La cuenta se creó, pero no su perfil: ${profileWrite.message}` }, 500);
 
       return json({
-        user: { id: created.id, email, full_name: fullName, role: payload.role },
-        invited: !payload.password,
+        user: { id: created.id, email, full_name: fullName, role },
+        invited: Boolean(payload.invite) && !payload.password,
+        method: payload.password ? "password" : "microsoft",
       });
     }
 

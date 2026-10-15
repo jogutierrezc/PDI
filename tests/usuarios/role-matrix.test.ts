@@ -206,3 +206,49 @@ describe("Indicadores de Impacto: editor y administrador con alcance", () => {
     );
   });
 });
+
+describe("módulos que antes no se podían conceder", () => {
+  const only = (screens: string[], base_role: "consulta" | "planeacion" | "admin") =>
+    decompile({ base_role, screens: screens as never, all_screens: false, all_reports: false }, []);
+
+  it("todas las pantallas de la intranet están en la matriz", () => {
+    const wanted = ["pilo", "pilo_ensenanza", "correos", "rutas", "rankings", "internacionalizacion", "informes", "warehouse", "monitor"];
+    const columns = compile(tpl("administrador"));
+    expect(columns.all_screens).toBe(true);
+    const matrix = tpl("consulta");
+    for (const id of Object.keys(matrix.modules) as (keyof typeof matrix.modules)[]) matrix.modules[id] = { level: "none", screens: [] };
+    matrix.modules.pilo = { level: "ver", screens: ["pilo", "pilo_ensenanza"] };
+    matrix.modules.correos = { level: "ver", screens: ["correos"] };
+    matrix.modules.rutas = { level: "ver", screens: ["rutas"] };
+    matrix.modules.rankings = { level: "ver", screens: ["rankings"] };
+    matrix.modules.internacionalizacion = { level: "ver", screens: ["internacionalizacion"] };
+    matrix.modules.informes = { level: "ver", screens: ["informes"] };
+    matrix.modules.warehouse = { level: "ver", screens: ["warehouse"] };
+    matrix.modules.monitor = { level: "ver", screens: ["monitor"] };
+    expect(compile(matrix).screens.sort()).toEqual([...wanted].sort());
+  });
+
+  it("Editar en Rutas o Warehouse pide Planeación; Administrar Pilo o Correos, administración", () => {
+    const rutas = only(["rutas"], "consulta");
+    rutas.modules.rutas.level = "editar";
+    expect(capacityOf(rutas)).toBe("planeacion");
+    const pilo = only(["pilo"], "consulta");
+    pilo.modules.pilo.level = "administrar";
+    expect(capacityOf(pilo)).toBe("admin");
+  });
+
+  it("Warehouse marcado en un rol de Consulta no se verá, y la matriz lo dice", () => {
+    const matrix = only(["warehouse"], "consulta");
+    expect(effectiveLevel(matrix, "warehouse")).toBe("none");
+    expect(describeRole(matrix)).toEqual(["No ve ninguna pantalla de la intranet."]);
+    expect(effectiveLevel(only(["warehouse"], "planeacion"), "warehouse")).toBe("editar");
+  });
+
+  it("los roles de fábrica siguen leyéndose como su plantilla", () => {
+    const system = (base_role: "consulta" | "planeacion" | "admin") =>
+      decompile({ base_role, screens: [], all_screens: true, all_reports: true }, []);
+    expect(templateOf(system("consulta"))).toBe("consulta");
+    expect(templateOf(system("planeacion"))).toBe("editor");
+    expect(templateOf(system("admin"))).toBe("administrador");
+  });
+});

@@ -3,6 +3,7 @@
    de la persona y el asistente.
    ========================================================================== */
 
+import { FriendlyError } from "../../../data/errors";
 import type { AccessRole } from "../../../types/database";
 import { UNIT_KIND, UNIT_ROLE, type UnitRole } from "../../tableros/model";
 import type { UnitOption } from "./people-db";
@@ -48,3 +49,13 @@ export const initials = (text: string) =>
     .slice(0, 2)
     .map((part) => part[0]!.toUpperCase())
     .join("");
+
+/** Lo que falló, para mostrarlo: el mensaje, qué hacer y —si el mensaje es genérico— el texto original de la base. */
+export function reason(error: unknown, fallback: string): string {
+  if (error instanceof FriendlyError) {
+    const parts = [error.message, error.advice].filter(Boolean) as string[];
+    if (error.original && error.original !== error.message) parts.push(`Detalle: ${error.original}`);
+    return parts.join(" ");
+  }
+  return error instanceof Error && error.message ? error.message : fallback;
+}

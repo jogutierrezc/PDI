@@ -40,6 +40,8 @@ export interface GrupoMonitor {
   codigo_materia: string;
   materia: string;
   grupo: string;
+  /** Código de materia + letra («SIS101~A»): la clave del grupo. */
+  grupo_clave?: string;
   estudiantes: number;
   con_p1: number;
   con_p2: number;
@@ -226,7 +228,7 @@ export function nodosDeGrupos(grupos: GrupoMonitor[], corte: Corte): NodoGrupo[]
       const bajo = corte === 1 ? g.bajo_p1 : corte === 2 ? g.bajo_p2 : g.bajo_p3;
       const pct = redondea((100 * bajo) / n);
       return {
-        clave: `${g.codigo_materia}|${g.grupo}`,
+        clave: claveGrupo(g.codigo_materia, g.grupo),
         codigo_materia: g.codigo_materia,
         materia: g.materia,
         grupo: g.grupo,
@@ -303,4 +305,224 @@ export function resumenParaPilo(
     materias: materias.slice(0, 10).map((m) => ({ nombre: m.materia, estudiantes: m.estudiantes, pctBajo: m.pctBajo, promedio: m.promedio })),
     umbrales: { ne: contexto.umbrales.ne, rs: contexto.umbrales.rs, perdidas: contexto.umbrales.perdidas, caida: contexto.umbrales.caida },
   };
+}
+
+/* --- Código del estudiante ----------------------------------------------------------------- */
+
+/**
+ * Las cargas anteriores a la migración 0161 guardaron el código como seudónimo irreversible («x-» y 10
+ * caracteres hexadecimales). Esos no se revierten: se reconocen para avisar que hay que volver a cargar.
+ */
+export const pareceSeudonimo = (codigo: string) => /^x-[0-9a-f]{10}$/i.test(codigo.trim());
+
+/** Búsqueda por código dentro de lo que la persona ya puede ver: primero los que empiezan por lo escrito. */
+export function buscarCodigos<T extends { estudiante: string }>(filas: T[], consulta: string, max = 8): T[] {
+  const q = consulta.trim().toLowerCase();
+  if (q.length < 2) return [];
+  const empieza: T[] = [];
+  const contiene: T[] = [];
+  for (const f of filas) {
+    const c = f.estudiante.toLowerCase();
+    if (c.startsWith(q)) empieza.push(f);
+    else if (c.includes(q)) contiene.push(f);
+    if (empieza.length >= max) break;
+  }
+  return [...empieza, ...contiene].slice(0, max);
+}
+
+/* --- Clave de grupo: código de materia + letra ----------------------------------------------- */
+
+/** El grupo se identifica por código de materia + letra («SIS101» + «A» → «SIS101~A»). Es la clave de la URL (?g=) y de la base. */
+export const claveGrupo = (codigoMateria: string, letra: string) => `${codigoMateria.trim()}~${letra.trim().toUpperCase()}`;
+
+export function partirClave(clave: string): { codigo_materia: string; grupo: string } | null {
+  const i = clave.lastIndexOf("~");
+  if (i <= 0 || i === clave.length - 1) return null;
+  return { codigo_materia: clave.slice(0, i), grupo: clave.slice(i + 1).toUpperCase() };
+}
+
+/* --- Plan del grupo --------------------------------------------------------------------------- */
+
+export type Plan = "tres_cortes" | "unica" | "permanente";
+export const NOMBRE_PLAN: Record<Plan, string> = { tres_cortes: "Tres cortes", unica: "Única", permanente: "Formación permanente" };
+
+/** El plan que llega de Master («TRES CORTES», «ÚNICA», «FORMACIÓN PERMANENTE»). Sin plan o desconocido = tres cortes. */
+export function planDe(texto: string | null | undefined): Plan {
+  const t = (texto ?? "").normalize("NFD").replace(/[̀-ͯ]/g, "").toUpperCase();
+  if (t.includes("UNICA")) return "unica";
+  if (t.includes("PERMANENTE")) return "permanente";
+  return "tres_cortes";
+}
+
+/* --- Mapa de riesgo (reprobación) -------------------------------------------------------------- */
+
+/** Una fila de wh_monitor_riesgo: programa × materia × grupo × corte (1 a 3; 4 = nota final). */
+export interface FilaRiesgo {
+  codigo_programa: string;
+  programa: string;
+  codigo_materia: string;
+  materia: string;
+  grupo: string;
+  grupo_clave: string;
+  plan: Plan;
+  corte: number;
+  con: number;
+  bajo: number;
+  promedio: number | null;
+}
+
+export type CorteRiesgo = 1 | 2 | 3 | 4;
+export const NOMBRE_CORTE_RIESGO: Record<CorteRiesgo, string> = { 1: "P1", 2: "P2", 3: "P3", 4: "Nota final" };
+export type AlcancePlan = "tres" | "todos";
+/** Con menos matrículas con nota que esto, un curso no se detalla (privacidad y ruido). */
+export const MIN_DETALLE = 5;
+/** Una tasa de reprobación desde aquí es «crítica»; desde ALTA, «alta». */
+export const TASA_CRITICA = 50;
+export const TASA_ALTA = 30;
+
+/** Las filas de un corte, con la regla del plan: los cortes 1 a 3 son solo de «tres cortes»; la nota final, de todos (o solo tres cortes si se elige). */
+export function filasDelCorte(filas: FilaRiesgo[], corte: CorteRiesgo, alcance: AlcancePlan = "tres"): FilaRiesgo[] {
+  return filas.filter((f) => f.corte === corte && (corte !== 4 ? f.plan === "tres_cortes" : alcance === "todos" || f.plan === "tres_cortes"));
+}
+
+export const tasa = (bajo: number, con: number) => (con > 0 ? Math.round((1000 * bajo) / con) / 10 : 0);
+
+export function nivelDeTasa(t: number): Nivel {
+  return t >= TASA_CRITICA ? "RS" : t >= TASA_ALTA ? "ED" : "NE";
+}
+
+export interface CursoRiesgo {
+  codigo_materia: string;
+  materia: string;
+  con: number;
+  bajo: number;
+  tasa: number;
+  grupos: number;
+  programas: number;
+  nivel: Nivel;
+}
+
+export interface GrupoRiesgo {
+  clave: string;
+  codigo_materia: string;
+  materia: string;
+  grupo: string;
+  con: number;
+  bajo: number;
+  tasa: number;
+  nivel: Nivel;
+}
+
+/** Los cursos (por código de materia) de un conjunto de filas, de mayor a menor tasa. */
+export function cursosDe(filas: FilaRiesgo[]): CursoRiesgo[] {
+  const por = new Map<string, { f: FilaRiesgo; con: number; bajo: number; grupos: Set<string>; programas: Set<string> }>();
+  for (const f of filas) {
+    const c = por.get(f.codigo_materia) ?? { f, con: 0, bajo: 0, grupos: new Set<string>(), programas: new Set<string>() };
+    c.con += f.con;
+    c.bajo += f.bajo;
+    c.grupos.add(f.grupo_clave);
+    c.programas.add(f.codigo_programa);
+    por.set(f.codigo_materia, c);
+  }
+  return [...por.values()]
+    .map((c): CursoRiesgo => {
+      const t = tasa(c.bajo, c.con);
+      return { codigo_materia: c.f.codigo_materia, materia: c.f.materia, con: c.con, bajo: c.bajo, tasa: t, grupos: c.grupos.size, programas: c.programas.size, nivel: nivelDeTasa(t) };
+    })
+    .sort((a, b) => b.tasa - a.tasa || b.con - a.con);
+}
+
+/** Los grupos (código + letra) de un conjunto de filas: un punto del diagrama de dispersión. */
+export function gruposDeRiesgo(filas: FilaRiesgo[]): GrupoRiesgo[] {
+  const por = new Map<string, GrupoRiesgo>();
+  for (const f of filas) {
+    const g = por.get(f.grupo_clave) ?? { clave: f.grupo_clave, codigo_materia: f.codigo_materia, materia: f.materia, grupo: f.grupo, con: 0, bajo: 0, tasa: 0, nivel: "NE" as Nivel };
+    g.con += f.con;
+    g.bajo += f.bajo;
+    por.set(f.grupo_clave, g);
+  }
+  return [...por.values()]
+    .map((g) => ({ ...g, tasa: tasa(g.bajo, g.con), nivel: nivelDeTasa(tasa(g.bajo, g.con)) }))
+    .sort((a, b) => b.tasa - a.tasa || b.con - a.con);
+}
+
+export interface IndicadoresRiesgo {
+  /** Tasa de reprobación: matrículas con nota por debajo de la de aprobar sobre las que tienen nota. */
+  tasa: number;
+  matriculas: number;
+  reprobadas: number;
+  /** Cursos con al menos una matrícula reprobada. */
+  cursosConReprobacion: number;
+  /** Cursos con tasa crítica (50 % o más) y detalle. */
+  cursosCriticos: number;
+  /** Programas que tienen al menos un curso crítico. */
+  programasConCritico: number;
+  /** Cursos con matrículas suficientes para detallarse. */
+  cursosDetalle: number;
+  cursos: number;
+}
+
+export function indicadoresDe(filas: FilaRiesgo[], min = MIN_DETALLE): IndicadoresRiesgo {
+  const matriculas = filas.reduce((s, f) => s + f.con, 0);
+  const reprobadas = filas.reduce((s, f) => s + f.bajo, 0);
+  const cursos = cursosDe(filas);
+  const detalle = cursos.filter((c) => c.con >= min);
+  const criticos = detalle.filter((c) => c.tasa >= TASA_CRITICA);
+  const critSet = new Set(criticos.map((c) => c.codigo_materia));
+  const progs = new Set(filas.filter((f) => critSet.has(f.codigo_materia)).map((f) => f.codigo_programa));
+  return {
+    tasa: tasa(reprobadas, matriculas),
+    matriculas,
+    reprobadas,
+    cursosConReprobacion: cursos.filter((c) => c.bajo > 0).length,
+    cursosCriticos: criticos.length,
+    programasConCritico: progs.size,
+    cursosDetalle: detalle.length,
+    cursos: cursos.length,
+  };
+}
+
+export interface PuntoTasaCorte {
+  corte: CorteRiesgo;
+  con: number;
+  bajo: number;
+  tasa: number;
+}
+
+/** La tasa de reprobación en cada corte (P1, P2, P3 y, si hay, la nota final) con la regla del plan. */
+export function tasaPorCorte(filas: FilaRiesgo[], alcance: AlcancePlan = "tres"): PuntoTasaCorte[] {
+  return ([1, 2, 3, 4] as CorteRiesgo[])
+    .map((corte) => {
+      const fs = filasDelCorte(filas, corte, alcance);
+      const con = fs.reduce((s, f) => s + f.con, 0);
+      const bajo = fs.reduce((s, f) => s + f.bajo, 0);
+      return { corte, con, bajo, tasa: tasa(bajo, con) };
+    })
+    .filter((p) => p.con > 0);
+}
+
+export interface TramoTasa {
+  desde: number;
+  hasta: number | null;
+  etiqueta: string;
+  cursos: number;
+  nivel: Nivel;
+}
+
+/** Cuántos cursos (con detalle) caen en cada tramo de tasa: 0–10, 10–20, … y 50 o más. */
+export function histogramaDe(cursos: CursoRiesgo[], min = MIN_DETALLE): TramoTasa[] {
+  const tramos: TramoTasa[] = [0, 10, 20, 30, 40, 50].map((d) => ({ desde: d, hasta: d === 50 ? null : d + 10, etiqueta: d === 50 ? "50 o más" : `${d} a ${d + 10}`, cursos: 0, nivel: nivelDeTasa(d) }));
+  for (const c of cursos) {
+    if (c.con < min) continue;
+    tramos[Math.min(5, Math.floor(c.tasa / 10))].cursos += 1;
+  }
+  return tramos;
+}
+
+/** Cuántos grupos y matrículas hay de cada plan; viene de wh_monitor_planes_resumen. */
+export interface ResumenPlan {
+  plan: Plan;
+  grupos: number;
+  matriculas: number;
+  plan_conocido: boolean;
 }

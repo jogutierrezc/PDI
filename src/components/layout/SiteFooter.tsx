@@ -30,7 +30,7 @@ const OFFICE: [string, string][] = [
   ["/documentos", "Documentos"],
   ["/pregunta", "Pregúntele a Pilo"],
   ["/desarrollo-tecnologico", "Desarrollo tecnológico"],
-  ["/acceso-intranet", "Intranet"],
+  ["/acceso-intranet", "Iniciar sesión"],
 ];
 
 const reduced = () => typeof window !== "undefined" && Boolean(window.matchMedia?.("(prefers-reduced-motion: reduce)").matches);

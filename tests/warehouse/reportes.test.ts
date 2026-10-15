@@ -12,11 +12,12 @@ const ctx: Contexto = { sede: "buc", periodo: "2026b", corte: "2", usuario: "cue
 const pedir = (id: string, c: Partial<Contexto> = {}) => reportePorId(id)!.armar({ ...ctx, ...c });
 
 describe("las peticiones son las de los HAR", () => {
-  it("rendimiento: el corte va en el cuerpo y el periodo lo fija la sesión", () => {
-    const p = pedir("ma_rendimiento", { corte: "1" });
+  it("rendimiento: el corte va en el cuerpo y el periodo con selected_period (verificado contra la plataforma)", () => {
+    const p = pedir("ma_rendimiento", { corte: "1", periodo: "2025b" });
     expect(p).toMatchObject({ metodo: "POST", ruta: "/master/mod_reports/reports/matriculated_mortality/download/" });
     expect(p.cuerpo).toMatchObject({ period: "1" });
-    expect(reportePorId("ma_rendimiento")).toMatchObject({ periodoVia: "sesion", corte: true });
+    expect(p.consulta).toMatchObject({ selected_period: "2025b" });
+    expect(reportePorId("ma_rendimiento")).toMatchObject({ periodoVia: "consulta", corte: true });
   });
 
   it("Davinci: el periodo va en la ruta, cualquier periodo", () => {

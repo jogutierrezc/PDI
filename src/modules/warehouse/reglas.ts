@@ -192,7 +192,7 @@ export const REGLAS_ESTUDIANTE: Record<ReglaEstudiante, { nombre: string; descri
 };
 
 export interface AlertaEstudiante {
-  /** Seudónimo del código (x-…): el nombre nunca se guarda. */
+  /** Código del estudiante (real desde 0161; seudónimo x-… en cargas anteriores): el nombre nunca se guarda. */
   id: string;
   programa: string;
   jornada: string;
@@ -286,7 +286,7 @@ export const REGLAS_NOTAS: Record<ReglaNotas, { nombre: string; descripcion: (u:
 };
 
 export interface AlertaNotas {
-  /** Seudónimo del código (x-…). */
+  /** Código del estudiante (real desde 0161; seudónimo x-… en cargas anteriores). */
   id: string;
   programa: string;
   materias: number;

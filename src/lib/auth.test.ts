@@ -31,6 +31,16 @@ describe("screenVisible: el menú y el lanzador enseñan solo lo que se puede us
     expect(screenVisible("users", admin)).toBe(true);
   });
 
+  it("Correos, Rutas, Rankings y Warehouse piden capacidad Y estar marcados en el rol", () => {
+    const base = { inAnyUnit: false, impactoSide: null };
+    for (const screen of ["correos", "rutas", "rankings", "warehouse"] as const) {
+      expect(screenVisible(screen, { ...base, profile: person("planeacion"), access: scope([screen]) })).toBe(true);
+      expect(screenVisible(screen, { ...base, profile: person("planeacion"), access: scope(["cifras"]) })).toBe(false);
+      expect(screenVisible(screen, { ...base, profile: person("consulta"), access: scope([screen]) })).toBe(false);
+      expect(screenVisible(screen, { ...base, profile: person("planeacion"), access: null })).toBe(true);
+    }
+  });
+
   it("sin sesión activa no se ve nada", () => {
     expect(screenVisible("office", { profile: { ...person("admin"), is_active: false }, access: null, inAnyUnit: false, impactoSide: null })).toBe(false);
     expect(screenVisible("office", { profile: null, access: null, inAnyUnit: false, impactoSide: null })).toBe(false);

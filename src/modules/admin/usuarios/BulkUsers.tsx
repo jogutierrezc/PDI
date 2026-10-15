@@ -25,6 +25,7 @@ import type { Profile } from "../../../types/database";
 import { downloadBlob } from "../traslado/transfer";
 import { UNIT_KIND, UNIT_ROLE } from "../../tableros/model";
 import { peopleKeys, setMemberships, type UnitOption } from "./people-db";
+import { reason } from "./summary";
 import { cellText, planUsers, USER_COLUMNS, type PlannedPerson, type UsersPlan } from "./users-sheet";
 
 const XLSX = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
@@ -43,7 +44,8 @@ export function BulkUsers({ profiles, units }: { profiles: Profile[]; units: Uni
   const [applying, setApplying] = useState(false);
   const [outcomes, setOutcomes] = useState<Outcome[]>([]);
   const [error, setError] = useState("");
-  const roles = access.data?.roles ?? [];
+  // «Invitado» es de quien aún no está habilitado: no se asigna desde la hoja.
+  const roles = (access.data?.roles ?? []).filter((role) => role.key !== "invitado");
   const plan: UsersPlan | null = useMemo(
     () => (sheetRows ? planUsers(sheetRows, { roles, units, profiles }) : null),
     [sheetRows, roles, units, profiles],
@@ -190,10 +192,10 @@ export function BulkUsers({ profiles, units }: { profiles: Profile[]; units: Uni
         done.push({
           email: person.email,
           ok: true,
-          text: person.existingId ? "Actualizada." : "Creada; se le envió la invitación.",
+          text: person.existingId ? "Actualizada." : "Creada y habilitada: entra con Microsoft.",
         });
       } catch (failure) {
-        done.push({ email: person.email, ok: false, text: failure instanceof Error ? failure.message : "Falló." });
+        done.push({ email: person.email, ok: false, text: reason(failure, "Falló.") });
       }
       setOutcomes([...done]);
     }

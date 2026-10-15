@@ -204,6 +204,7 @@ const Internacionalizacion = lazy(() =>
   import("./modules/internacionalizacion/ui/Internacionalizacion").then((m) => ({ default: m.Internacionalizacion })),
 );
 const InformesAdmin = lazy(() => import("./modules/informes/InformesAdmin").then((m) => ({ default: m.InformesAdmin })));
+const MonitorAlertas = lazy(() => import("./modules/monitor/MonitorAlertas").then((m) => ({ default: m.MonitorAlertas })));
 const Warehouse = lazy(() => import("./modules/warehouse/Warehouse").then((m) => ({ default: m.Warehouse })));
 const ReportesInstitucionales = lazy(() =>
   import("./modules/reportes/ReportesInstitucionales").then((m) => ({ default: m.ReportesInstitucionales })),
@@ -466,6 +467,15 @@ export default function App() {
             element={
               <RequireRole minimum="consulta" screen="reportes">
                 <ReportesInstitucionales />
+              </RequireRole>
+            }
+          />
+          {/* Monitor de alertas tempranas: por roles y unidades, no por clave. */}
+          <Route
+            path="/admin/monitor-alertas"
+            element={
+              <RequireRole minimum="consulta" screen="monitor">
+                <MonitorAlertas />
               </RequireRole>
             }
           />

@@ -192,6 +192,17 @@ export const MODULES: Record<ModuleId, ModuleMeta> = {
       ];
     },
   },
+  monitor: {
+    text: "Cómo van las notas por facultad, programa, grupo y estudiante, con alertas tempranas",
+    color: "var(--wall-monitor)",
+    rank: 5.6,
+    sections: () => [
+      {
+        title: "Notas",
+        cards: [{ key: "mon", title: "Monitor de alertas tempranas", text: "Semáforo NE · ED · RS de cada nivel, con análisis de Pilo", to: "/admin/monitor-alertas" }],
+      },
+    ],
+  },
   warehouse: {
     text: "Los reportes de Master, Galileo y Davinci guardados por periodo, con alertas tempranas",
     color: "var(--wall-warehouse)",

@@ -62,7 +62,8 @@ export type AdminScreen =
   | "rankings"
   | "internacionalizacion"
   | "informes"
-  | "warehouse";
+  | "warehouse"
+  | "monitor";
 
 /** Un rol de acceso: qué puede hacer, qué pantallas ve y sobre qué informes escribe. */
 export interface AccessRole {

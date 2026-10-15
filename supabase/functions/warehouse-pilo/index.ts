@@ -62,12 +62,13 @@ Deno.serve(async (request: Request) => {
   if (quien.error || !quien.data.user) return json({ error: "Sesión inválida." }, 401);
 
   const db = createClient(url, anonKey, { auth: { persistSession: false, autoRefreshToken: false }, global: { headers: { Authorization: authorization } } });
-  const permiso = await db.rpc("wh_autorizado");
-  if (permiso.error) {
-    const falta = permiso.error.code === "PGRST202" || /wh_autorizado/.test(permiso.error.message);
-    return json({ error: falta ? "Falta aplicar la migración 0155 (Warehouse UDES)." : permiso.error.message, code: falta ? "migracion" : undefined }, 500);
+  // Planeación con el Warehouse, o quien tiene el Monitor (su facultad o programa): a Pilo solo llega un resumen de lo que esa persona ya ve.
+  const [almacen, monitor] = await Promise.all([db.rpc("wh_autorizado"), db.rpc("wh_monitor_puede")]);
+  if (almacen.error && monitor.error) {
+    const falta = almacen.error.code === "PGRST202" || /wh_autorizado/.test(almacen.error.message);
+    return json({ error: falta ? "Falta aplicar la migración 0155 (Warehouse UDES)." : almacen.error.message, code: falta ? "migracion" : undefined }, 500);
   }
-  if (permiso.data !== true) return json({ error: "Solo Planeación puede pedirle un análisis a Pilo." }, 403);
+  if (almacen.data !== true && monitor.data !== true) return json({ error: "No tiene acceso al Monitor de alertas ni al Warehouse." }, 403);
 
   // El proveedor de IA, el mismo de los informes y los rankings --------------------------
   const [settings, secret, ajustes] = await Promise.all([

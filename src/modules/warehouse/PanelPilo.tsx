@@ -12,7 +12,7 @@ export function PanelPilo({ datos, etiqueta }: { datos: DatosParaPilo | null; et
   const [pregunta, setPregunta] = useState("");
   const [cargando, setCargando] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [resultado, setResultado] = useState<{ analisis: AnalisisPilo; modelo: string; de: string } | null>(null);
+  const [resultado, setResultado] = useState<{ analisis: AnalisisPilo; de: string } | null>(null);
 
   const pedir = async (q = pregunta) => {
     if (!datos) return;
@@ -20,7 +20,7 @@ export function PanelPilo({ datos, etiqueta }: { datos: DatosParaPilo | null; et
     setError(null);
     try {
       const r = await analizarConPilo(datos, q);
-      setResultado({ analisis: r.analisis, modelo: r.modelo, de: etiqueta });
+      setResultado({ analisis: r.analisis, de: etiqueta });
     } catch (e) {
       setError(mensajeDe(e));
     } finally {
@@ -73,7 +73,7 @@ export function PanelPilo({ datos, etiqueta }: { datos: DatosParaPilo | null; et
         {resultado && !cargando && (
           <article className="wh-informe" aria-live="polite">
             <p className="wh-nota-chica">
-              Análisis de {resultado.de} · {resultado.modelo}
+              Análisis de {resultado.de}
             </p>
             <h3>{resultado.analisis.titular}</h3>
             <p>{resultado.analisis.resumen}</p>

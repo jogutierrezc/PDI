@@ -54,7 +54,8 @@ export type AdminSection =
   | "rankings"
   | "internacionalizacion"
   | "informes"
-  | "warehouse";
+  | "warehouse"
+  | "monitor";
 
 export interface NavItem {
   id: AdminSection;
@@ -66,7 +67,7 @@ export interface NavItem {
 }
 
 export interface NavGroup {
-  id: "planeacion" | "pdi" | "cifras" | "observatorio" | "impacto" | "tableros" | "reportes" | "informes" | "internacionalizacion" | "rankings" | "warehouse" | "sistema";
+  id: "planeacion" | "pdi" | "cifras" | "observatorio" | "impacto" | "tableros" | "reportes" | "informes" | "internacionalizacion" | "rankings" | "warehouse" | "monitor" | "sistema";
   label: string;
   /** Ícono y nombre corto: el riel solo tiene 78 px, ahí no cabe el rótulo largo. */
   icon: IconName;
@@ -160,6 +161,17 @@ export const navigation: NavGroup[] = [
     label: "Reportes Institucionales",
     items: [
       { id: "reportes", label: "SNIES y CNA", icon: "table", to: "/admin/reportes-institucionales", minimum: "consulta" },
+    ],
+  },
+  {
+    // Cómo van las notas de los estudiantes, por facultad, programa, grupo y estudiante, con alertas
+    // tempranas. Lo ve quien pertenece a una facultad o programa (su parte) y Planeación (todo).
+    id: "monitor",
+    icon: "spark-chart",
+    short: "Monitor",
+    label: "Monitor de alertas",
+    items: [
+      { id: "monitor", label: "Alertas tempranas de notas", icon: "spark-chart", to: "/admin/monitor-alertas", minimum: "consulta" },
     ],
   },
   {

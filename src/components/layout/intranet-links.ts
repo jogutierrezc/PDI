@@ -38,6 +38,7 @@ const SCREENS: { screen: AdminScreen; label: string; icon: IconName }[] = [
   { screen: "reportes", label: "Reportes Institucionales", icon: "table" },
   { screen: "informes", label: "Informes de gestión", icon: "document" },
   { screen: "warehouse", label: "Warehouse UDES", icon: "layers" },
+  { screen: "monitor", label: "Monitor de alertas tempranas", icon: "spark-chart" },
   { screen: "structure", label: "Normalizar estructura", icon: "settings" },
   { screen: "parameters", label: "Parámetros globales", icon: "settings" },
   { screen: "development", label: "Desarrollo tecnológico", icon: "code" },

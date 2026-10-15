@@ -123,7 +123,7 @@ const PARALELO = 4;
  * con él, las demás se piden de a cuatro en paralelo en vez de una tras otra: 29.000 filas dejan de ser
  * 30 viajes en fila. Sin total, se pide en fila hasta que una página venga corta.
  */
-async function todas<T>(pedir: (desde: number, hasta: number) => PromiseLike<{ data: T[] | null; error: unknown; count?: number | null }>): Promise<T[]> {
+export async function todas<T>(pedir: (desde: number, hasta: number) => PromiseLike<{ data: T[] | null; error: unknown; count?: number | null }>): Promise<T[]> {
   const primera = await pedir(0, PAGINA - 1);
   if (primera.error) throw new Error(mensajeDe(primera.error));
   const salida: T[] = [...(primera.data ?? [])];

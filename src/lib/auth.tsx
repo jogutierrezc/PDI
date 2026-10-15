@@ -237,11 +237,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     // En Impacto: ¿programa (o facultad), vicerrectoría u oficina con función, o ambos?
     const kindOf = (r: (typeof rows)[number]) => (Array.isArray(r.units) ? r.units[0]?.kind : r.units?.kind) ?? "";
-    const programSide = rows.some((r) => kindOf(r) === "programa" || kindOf(r) === "facultad");
+    // Más las unidades que le da su rol de acceso (0154); sin esa migración, ninguna.
+    const given = await supabase.rpc("imp_my_role_scope");
+    const roleRows = given.error ? [] : ((given.data ?? []) as { unit_id: string; unit_kind: string }[]);
+    const programSide =
+      rows.some((r) => kindOf(r) === "programa" || kindOf(r) === "facultad") ||
+      roleRows.some((r) => r.unit_kind === "programa" || r.unit_kind === "facultad");
     let functionSide = false;
-    if (rows.length) {
-      const fns = await supabase.from("imp_unit_functions").select("unit_id").in("unit_id", rows.map((r) => r.unit_id));
-      functionSide = (fns.data ?? []).length > 0;
+    if (rows.length || roleRows.length) {
+      // Las unidades con función son pocas: se leen todas y se cruzan aquí, en vez de
+      // mandar a la URL los cientos de ids que puede dar un rol de toda la estructura.
+      const fns = await supabase.from("imp_unit_functions").select("unit_id");
+      const mine = new Set([...rows.map((r) => r.unit_id), ...roleRows.map((r) => r.unit_id)]);
+      functionSide = (fns.data ?? []).some((f) => mine.has((f as { unit_id: string }).unit_id));
     }
     const side: ImpactoSide = functionSide ? (programSide ? "ambos" : "funcion") : programSide ? "programa" : null;
 

@@ -6584,7 +6584,19 @@ async function handle(request: Request): Promise<Response> {
   const rulesOf = ((SPACE_PORTALS as string[]).includes(portal)
     ? { ...settings, portals: { ...(settings.portals ?? {}), [portal]: profile && SPACES[space].portal === portal ? spaceRule(profile) : undefined } }
     : settings) as unknown as Rules;
-  const allowed = canUse(rulesOf, portal, action, role, Boolean(member));
+  // Informes de Impacto (0154): quien tiene alcance por su rol de acceso (editor o administrador de
+  // indicadores de impacto) los pide sobre ese alcance aunque el interruptor del tipo siga cerrado.
+  // Aquí solo se le deja pasar la puerta del interruptor; qué unidad le toca lo decide la base con su
+  // sesión (imp_report_allowed), más abajo. Sin la migración, la consulta falla y queda en falso.
+  let impactScoped = false;
+  if (portal === "impacto" && action === "analizar" && profileId && role !== "admin") {
+    const { data: held } = await admin.from("profiles").select("access_roles(impact_level)").eq("id", profileId).maybeSingle();
+    const heldRole = (held as { access_roles?: { impact_level?: string } | { impact_level?: string }[] | null } | null)?.access_roles;
+    const level = (Array.isArray(heldRole) ? heldRole[0] : heldRole)?.impact_level;
+    impactScoped = level === "editor" || level === "admin";
+  }
+  const gateRules = impactScoped ? ({ ...rulesOf, impacto_report: { programa: true, facultad: true, vicerrectoria: true } } as Rules) : rulesOf;
+  const allowed = canUse(gateRules, portal, action, role, Boolean(member));
   if (!allowed.ok) return json({ error: allowed.reason }, 403);
 
   const started = Date.now();
@@ -9371,7 +9383,7 @@ async function handle(request: Request): Promise<Response> {
         const scope = a.scope ?? {};
         const kind = String(scope.kind ?? "");
         if (!REPORT_KINDS.includes(kind as ReportKind) || !scope.ref) return json({ error: "Falta la unidad del informe." }, 400);
-        if (rulesOf.impacto_report?.[kind as ReportKind] !== true) {
+        if (rulesOf.impacto_report?.[kind as ReportKind] !== true && !impactScoped) {
           return json({ error: "Ese tipo de informe es, por ahora, solo de la administración." }, 403);
         }
         const anonKey = Deno.env.get("SUPABASE_ANON_KEY");

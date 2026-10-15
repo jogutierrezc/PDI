@@ -15,7 +15,16 @@ const tpl = (id: "consulta" | "editor" | "administrador") => templateMatrix(id);
 describe("plantillas", () => {
   it("Consulta ve todo sin capacidad", () => {
     const columns = compile(tpl("consulta"));
-    expect(columns).toEqual({ base_role: "consulta", screens: [], all_screens: true, all_reports: true, reports: [] });
+    expect(columns).toEqual({
+      base_role: "consulta",
+      screens: [],
+      all_screens: true,
+      all_reports: true,
+      reports: [],
+      impact_level: "none",
+      all_impact_units: false,
+      units: [],
+    });
   });
 
   it("Editor pide Planeación y es lo mismo que el rol Planeación de fábrica", () => {
@@ -109,5 +118,91 @@ describe("ida y vuelta", () => {
       const again = compile(decompile(columns, columns.reports));
       expect(again).toEqual(columns);
     }
+  });
+});
+
+describe("Indicadores de Impacto: editor y administrador con alcance", () => {
+  const PROGRAMA = "00000000-0000-4000-b000-000000000011";
+  const FACULTAD = "00000000-0000-4000-b000-000000000010";
+  const VICERRECTORIA = "00000000-0000-4000-b000-000000000001";
+
+  /** Un rol que solo ve Impacto, al nivel y con el alcance que se pida. */
+  const impact = (level: "ver" | "editar" | "administrar", scope: { allUnits?: boolean; units?: string[] } = {}) => {
+    const matrix = decompile({ base_role: "consulta", screens: ["impacto"], all_screens: false, all_reports: false }, []);
+    matrix.modules.impacto.level = level;
+    matrix.impact = { allUnits: scope.allUnits ?? false, units: scope.units ?? [] };
+    return matrix;
+  };
+
+  it("Editar y Administrar no suben la capacidad: Impacto se decide por unidad", () => {
+    expect(capacityOf(impact("editar", { units: [PROGRAMA] }))).toBe("consulta");
+    expect(capacityOf(impact("administrar", { allUnits: true }))).toBe("consulta");
+    expect(effectiveLevel(impact("editar", { units: [PROGRAMA] }), "impacto")).toBe("editar");
+    expect(effectiveLevel(impact("administrar", { units: [PROGRAMA] }), "impacto")).toBe("administrar");
+  });
+
+  it("Editor: editor de sus programas; las columnas guardan nivel y unidades", () => {
+    expect(compile(impact("editar", { units: [PROGRAMA, FACULTAD] }))).toEqual({
+      base_role: "consulta",
+      screens: ["impacto"],
+      all_screens: false,
+      all_reports: false,
+      reports: [],
+      impact_level: "editor",
+      all_impact_units: false,
+      units: [FACULTAD, PROGRAMA].sort(),
+    });
+  });
+
+  it("Administrador de toda la estructura no guarda lista de unidades", () => {
+    expect(compile(impact("administrar", { allUnits: true, units: [PROGRAMA] }))).toMatchObject({
+      impact_level: "admin",
+      all_impact_units: true,
+      units: [],
+    });
+  });
+
+  it("«Ver» o sin pantalla no da alcance aunque queden unidades marcadas", () => {
+    expect(compile(impact("ver", { allUnits: true, units: [PROGRAMA] }))).toMatchObject({
+      impact_level: "none",
+      all_impact_units: false,
+      units: [],
+    });
+    const hidden = impact("editar", { units: [PROGRAMA] });
+    hidden.modules.impacto = { level: "none", screens: [] };
+    expect(compile(hidden)).toMatchObject({ impact_level: "none", units: [] });
+  });
+
+  it("ida y vuelta: lo guardado se vuelve a leer igual", () => {
+    for (const matrix of [
+      impact("editar", { units: [PROGRAMA] }),
+      impact("administrar", { units: [VICERRECTORIA, FACULTAD] }),
+      impact("administrar", { allUnits: true }),
+    ]) {
+      const columns = compile(matrix);
+      const again = decompile({ ...columns }, columns.reports, columns.units);
+      expect(again.modules.impacto.level).toBe(matrix.modules.impacto.level);
+      expect(compile(again)).toEqual(columns);
+    }
+  });
+
+  it("los roles de fábrica y las plantillas siguen sin alcance de Impacto", () => {
+    for (const id of ["consulta", "editor", "administrador"] as const) {
+      expect(compile(tpl(id))).toMatchObject({ impact_level: "none", all_impact_units: false, units: [] });
+      expect(tpl(id).modules.impacto.level).toBe("ver");
+    }
+  });
+
+  it("se describe con los nombres de las unidades", () => {
+    const names = new Map([[PROGRAMA, "Fisioterapia"], [VICERRECTORIA, "Vicerrectoría de Investigaciones"]]);
+    expect(describeRole(impact("editar", { units: [PROGRAMA, VICERRECTORIA] }), new Map(), names)).toContain(
+      "En Indicadores de Impacto define fichas y captura datos de: Fisioterapia y Vicerrectoría de Investigaciones.",
+    );
+    expect(describeRole(impact("administrar", { allUnits: true }))).toContain(
+      "En Indicadores de Impacto define, captura, publica, revisa y emite informes de toda la estructura.",
+    );
+    expect(describeRole(impact("editar"))).toContain(
+      "En Indicadores de Impacto no tiene unidades asignadas: no actúa sobre ninguna.",
+    );
   });
 });

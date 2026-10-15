@@ -195,6 +195,7 @@ export function PeopleView({
           <UserWizard
             units={units}
             reports={access.data?.reports ?? []}
+            roleUnits={access.data?.units ?? []}
             roles={roles}
             onCancel={() => open({})}
             onCreated={(id, text) => {
@@ -209,6 +210,7 @@ export function PeopleView({
             profiles={list}
             roles={roles}
             reports={access.data?.reports ?? []}
+            roleUnits={access.data?.units ?? []}
             memberships={membershipsOf(current.id)}
             units={units}
             onNotice={onNotice}
@@ -234,6 +236,7 @@ function PersonDetail({
   profiles,
   roles,
   reports,
+  roleUnits = [],
   memberships,
   units,
   onNotice,
@@ -243,6 +246,8 @@ function PersonDetail({
   profiles: Profile[];
   roles: AccessRole[];
   reports: { access_role_id: string; report_slug: string }[];
+  /** Alcance de los roles en Impacto (access_role_units). */
+  roleUnits?: { access_role_id: string; unit_id: string }[];
   memberships: Membership[];
   units: UnitOption[];
   onNotice: (text: string) => void;
@@ -289,6 +294,8 @@ function PersonDetail({
     reports,
     drafts.filter((d) => d.unitId).map((d) => ({ unit: unitById.get(d.unitId), board: d.boardRole, title: d.title })),
     new Map((reportOptions.data ?? []).map((report) => [report.slug, report.name])),
+    roleUnits,
+    new Map(units.map((unit) => [unit.id, unit.name])),
   );
   const myPillars = (pillars.data ?? []).filter((pillar) =>
     (owners.data ?? []).some((row) => row.profile_id === person.id && row.pillar_id === pillar.id),

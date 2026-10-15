@@ -22,6 +22,8 @@ import { useAccessRoles, useOdReportOptions } from "../../../data/queries";
 import { useDeleteAccessRole, useSaveAccessRole } from "../../../data/mutations";
 import { roleLabels } from "../../../lib/auth";
 import type { AccessRole, AdminScreen, Profile } from "../../../types/database";
+import { UNIT_KIND, type UnitKind } from "../../tableros/model";
+import { useUnitOptions, type UnitOption } from "./people-db";
 import { roleMatrix } from "./summary";
 import {
   LEVEL_LABEL,
@@ -31,6 +33,7 @@ import {
   compile,
   describe,
   effectiveLevel,
+  impactLevelOf,
   raisedModules,
   templateMatrix,
   templateOf,
@@ -64,6 +67,7 @@ export function RolesView({ profiles }: { profiles: Profile[] }) {
 
   const roles = access.data?.roles ?? [];
   const reports = access.data?.reports ?? [];
+  const units = access.data?.units ?? [];
   const open = (id: string | null) => {
     const next = new URLSearchParams(params);
     if (id) next.set("rol", id);
@@ -91,7 +95,7 @@ export function RolesView({ profiles }: { profiles: Profile[] }) {
           </header>
           <ul>
                 {roles.map((role) => {
-                  const template = templateOf(roleMatrix(role, reports));
+                  const template = templateOf(roleMatrix(role, reports, units));
                   const people = peopleOf(role);
                   return (
                     <li key={role.id}>
@@ -143,6 +147,7 @@ export function RolesView({ profiles }: { profiles: Profile[] }) {
             key={current?.id ?? "nuevo"}
             role={current}
             reports={reports}
+            units={units}
             people={current ? peopleOf(current) : 0}
             onSaved={(id) => open(id)}
             onDeleted={() => open(null)}
@@ -153,26 +158,110 @@ export function RolesView({ profiles }: { profiles: Profile[] }) {
   );
 }
 
+/** Las unidades sobre las que puede actuar un rol de Impacto, en el orden en que se piensan. */
+const SCOPE_KINDS: UnitKind[] = ["vicerrectoria", "oficina", "facultad", "programa"];
+
+/**
+ * Alcance de un rol de Impacto: toda la estructura o las vicerrectorías,
+ * oficinas, facultades y programas que se marquen. Una facultad alcanza a sus
+ * programas (la base hereda por el árbol), pero una vicerrectoría no alcanza a
+ * las facultades: dependen de ella en el organigrama, no cuelgan de ella.
+ */
+function ImpactScopePicker({
+  units,
+  loading,
+  scope,
+  onChange,
+}: {
+  units: UnitOption[];
+  loading: boolean;
+  scope: { allUnits: boolean; units: string[] };
+  onChange: (change: (scope: { allUnits: boolean; units: string[] }) => void) => void;
+}) {
+  const [filter, setFilter] = useState("");
+  const needle = filter.trim().toLowerCase();
+  const groups = SCOPE_KINDS.map((kind) => ({
+    kind,
+    items: units
+      .filter((unit) => unit.kind === kind && (!needle || `${unit.name} ${unit.code}`.toLowerCase().includes(needle)))
+      .sort((a, b) => a.name.localeCompare(b.name, "es")),
+  })).filter((group) => group.items.length > 0);
+
+  const toggle = (id: string) =>
+    onChange((draft) => {
+      draft.units = draft.units.includes(id) ? draft.units.filter((unit) => unit !== id) : [...draft.units, id];
+    });
+
+  return (
+    <div className="us-reports" role="group" aria-label="Alcance en Indicadores de impacto">
+      <label className="oda-check">
+        <input
+          type="checkbox"
+          checked={scope.allUnits}
+          onChange={(event) => onChange((draft) => void (draft.allUnits = event.target.checked))}
+        />
+        Toda la estructura
+      </label>
+      {!scope.allUnits && (
+        <>
+          <small>
+            {scope.units.length === 0
+              ? "Elija las vicerrectorías, facultades o programas sobre los que actúa. Una facultad incluye a sus programas."
+              : `${scope.units.length} ${scope.units.length === 1 ? "unidad elegida" : "unidades elegidas"}. Una facultad incluye a sus programas.`}
+          </small>
+          <label className="admin-field">
+            <span>Buscar unidad</span>
+            <input value={filter} onChange={(event) => setFilter(event.target.value)} placeholder="Nombre o código" />
+          </label>
+          {loading ? (
+            <small>Cargando unidades…</small>
+          ) : groups.length === 0 ? (
+            <small>{needle ? "Ninguna unidad coincide." : "Todavía no hay unidades en la estructura institucional."}</small>
+          ) : (
+            groups.map((group) => (
+              <div key={group.kind}>
+                <strong>{UNIT_KIND[group.kind].plural}</strong>
+                <div className="us-screens">
+                  {group.items.map((unit) => (
+                    <label key={unit.id} className="oda-check">
+                      <input type="checkbox" checked={scope.units.includes(unit.id)} onChange={() => toggle(unit.id)} />
+                      {unit.name}
+                      <small> · {unit.code}</small>
+                    </label>
+                  ))}
+                </div>
+              </div>
+            ))
+          )}
+        </>
+      )}
+    </div>
+  );
+}
+
 function RoleEditor({
   role,
   reports,
+  units,
   people,
   onSaved,
   onDeleted,
 }: {
   role: AccessRole | null;
   reports: { access_role_id: string; report_slug: string }[];
+  units: { access_role_id: string; unit_id: string }[];
   people: number;
   onSaved: (id: string) => void;
   onDeleted: () => void;
 }) {
   const reportOptions = useOdReportOptions();
+  const unitOptions = useUnitOptions();
   const save = useSaveAccessRole();
   const remove = useDeleteAccessRole();
   const [name, setName] = useState(role?.name ?? "");
   const [description, setDescription] = useState(role?.description ?? "");
   const [matrix, setMatrix] = useState<Matrix>(() =>
-    role ? roleMatrix(role, reports) : templateMatrix("consulta"),
+    role ? roleMatrix(role, reports, units) : templateMatrix("consulta"),
   );
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
@@ -189,7 +278,12 @@ function RoleEditor({
     () => new Map((reportOptions.data ?? []).map((report) => [report.slug, report.name])),
     [reportOptions.data],
   );
-  const summary = describe(matrix, reportNames);
+  const unitNames = useMemo(
+    () => new Map((unitOptions.data ?? []).map((unit) => [unit.id, unit.name])),
+    [unitOptions.data],
+  );
+  const summary = describe(matrix, reportNames, unitNames);
+  const impactNeedsScope = impactLevelOf(matrix.modules.impacto.level) !== "none" && !matrix.impact.allUnits && matrix.impact.units.length === 0;
   const capacityChanged = system && role && capacity !== role.base_role;
 
   const update = (change: (draft: Matrix) => void) =>
@@ -240,6 +334,12 @@ function RoleEditor({
       );
       return;
     }
+    if (impactNeedsScope) {
+      setError(
+        "En Indicadores de impacto, Editar y Administrar piden un alcance: elija al menos una vicerrectoría, facultad o programa, o marque «Toda la estructura».",
+      );
+      return;
+    }
     const columns = compile(matrix);
     try {
       const saved = await save.mutateAsync({
@@ -252,8 +352,11 @@ function RoleEditor({
           screens: columns.screens,
           all_screens: columns.all_screens,
           all_reports: columns.all_reports,
+          impact_level: columns.impact_level,
+          all_impact_units: columns.all_impact_units,
         },
         reports: columns.reports,
+        units: columns.units,
       });
       setNotice("Rol guardado.");
       onSaved(saved.id);
@@ -468,6 +571,14 @@ function RoleEditor({
                         </div>
                       )}
                     </div>
+                  )}
+                  {module.id === "impacto" && impactLevelOf(choice.level) !== "none" && (
+                    <ImpactScopePicker
+                      units={unitOptions.data ?? []}
+                      loading={unitOptions.isPending}
+                      scope={matrix.impact}
+                      onChange={(change) => update((draft) => change(draft.impact))}
+                    />
                   )}
                 </div>
               )}

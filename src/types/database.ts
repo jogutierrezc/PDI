@@ -73,15 +73,27 @@ export interface AccessRole {
   screens: AdminScreen[];
   all_screens: boolean;
   all_reports: boolean;
+  /** Indicadores de Impacto (0154): none · editor (define y captura) · admin (además publica, revisa y emite). */
+  impact_level: ImpactLevel;
+  /** Impacto: el alcance es toda la estructura; si no, las unidades de access_role_units. */
+  all_impact_units: boolean;
   is_system: boolean;
   position: number;
   created_at?: string;
   updated_at?: string;
 }
 
+export type ImpactLevel = "none" | "editor" | "admin";
+
 export interface AccessRoleReport {
   access_role_id: string;
   report_slug: string;
+}
+
+/** Una vicerrectoría, oficina, facultad o programa dentro del alcance de un rol de Impacto. */
+export interface AccessRoleUnit {
+  access_role_id: string;
+  unit_id: string;
 }
 
 export interface Parameter {

@@ -29,12 +29,15 @@ export function UserWizard({
   units,
   roles,
   reports,
+  roleUnits = [],
   onCancel,
   onCreated,
 }: {
   units: UnitOption[];
   roles: AccessRole[];
   reports: { access_role_id: string; report_slug: string }[];
+  /** Alcance de los roles en Impacto (access_role_units). */
+  roleUnits?: { access_role_id: string; unit_id: string }[];
   onCancel: () => void;
   onCreated: (id: string, notice: string) => void;
 }) {
@@ -59,6 +62,8 @@ export function UserWizard({
     reports,
     drafts.filter((d) => d.unitId).map((d) => ({ unit: unitById.get(d.unitId), board: d.boardRole, title: d.title })),
     new Map((reportOptions.data ?? []).map((report) => [report.slug, report.name])),
+    roleUnits,
+    new Map(units.map((item) => [item.id, item.name])),
   );
   const problem = membershipProblem(drafts);
 
@@ -197,7 +202,7 @@ export function UserWizard({
         <fieldset className="us-rolepick">
           <legend className="sr-only">Rol de toda la intranet</legend>
           {globalRoles.map((item) => {
-            const matrix = roleMatrix(item, reports);
+            const matrix = roleMatrix(item, reports, roleUnits);
             const template = templateOf(matrix);
             return (
               <label key={item.id} className="us-option us-option--card">

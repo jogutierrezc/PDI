@@ -83,6 +83,30 @@ export interface Membership {
   unitId: string;
   role: "visor" | "editor" | "jefe";
   campusId: string | null;
+  /** La da el rol de acceso (0154), no una fila de unit_members. */
+  viaRole?: boolean;
+}
+
+interface MembershipRow {
+  unit_id: string;
+  role: Membership["role"];
+  campus_id: string | null;
+  via_role: boolean;
+}
+
+/**
+ * Las pertenencias efectivas: las propias y las que da el rol de acceso
+ * (imp_my_memberships). Es lo mismo que la base usa para decidir, así que
+ * pantalla y permisos no se separan. Sin la migración 0154 la función no
+ * existe y quedan las de unit_members, que es lo que había.
+ */
+async function myMemberships(profileId: string): Promise<MembershipRow[]> {
+  const effective = await supabase.rpc("imp_my_memberships");
+  if (!effective.error) return (effective.data ?? []) as MembershipRow[];
+  const own = await read<{ unit_id: string; role: Membership["role"]; campus_id: string | null }>(
+    supabase.from("unit_members").select("unit_id,role,campus_id").eq("profile_id", profileId),
+  );
+  return own.map((m) => ({ ...m, via_role: false }));
 }
 
 export interface ImpactBase {
@@ -112,9 +136,7 @@ export function useImpactBase(profileId: string | undefined) {
           supabase.from("program_campuses").select("program_id,campus_id,active"),
         ),
         read<{ unit_id: string; fn: SubstantiveFunction }>(supabase.from("imp_unit_functions").select("unit_id,fn")),
-        read<{ unit_id: string; role: Membership["role"]; campus_id: string | null }>(
-          supabase.from("unit_members").select("unit_id,role,campus_id").eq("profile_id", profileId!),
-        ),
+        myMemberships(profileId!),
         read<{ id: string; position: number; numeral: string; name: string }>(
           supabase.from("pillars").select("id,position,numeral,name").order("position"),
         ),
@@ -127,7 +149,7 @@ export function useImpactBase(profileId: string | undefined) {
         campuses,
         offer: offer.filter((o) => o.active !== false).map((o) => ({ programId: o.program_id, campusId: o.campus_id })),
         unitFunctions: unitFunctions.map((f) => ({ unitId: f.unit_id, fn: f.fn })),
-        memberships: memberships.map((m) => ({ unitId: m.unit_id, role: m.role, campusId: m.campus_id })),
+        memberships: memberships.map((m) => ({ unitId: m.unit_id, role: m.role, campusId: m.campus_id, viaRole: m.via_role })),
         pillars,
         dimensions,
         missing: schemaMissing,

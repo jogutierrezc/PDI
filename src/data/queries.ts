@@ -15,6 +15,7 @@ import { supabase } from "../lib/supabase";
 import type {
   AccessRole,
   AccessRoleReport,
+  AccessRoleUnit,
   ActionLineWithArea,
   Activity,
   Campus,
@@ -430,16 +431,21 @@ export function useParameters(category?: ParameterCategory) {
   });
 }
 
-/** Roles de acceso con los informes de UDES en Cifras que alcanza cada uno. */
+/** Roles de acceso con los informes de UDES en Cifras y las unidades de Impacto que alcanza cada uno. */
 export function useAccessRoles() {
   return useQuery({
     queryKey: keys.accessRoles(),
-    queryFn: async (): Promise<{ roles: AccessRole[]; reports: AccessRoleReport[] }> => {
-      const [roles, reports] = await Promise.all([
+    queryFn: async (): Promise<{ roles: AccessRole[]; reports: AccessRoleReport[]; units: AccessRoleUnit[] }> => {
+      const [roles, reports, units] = await Promise.all([
         supabase.from("access_roles").select("*").order("position").then(unwrap<AccessRole[]>),
         supabase.from("access_role_reports").select("*").then(unwrap<AccessRoleReport[]>),
+        // Sin la migración 0154 la tabla no existe: los roles siguen sin alcance de Impacto.
+        supabase
+          .from("access_role_units")
+          .select("*")
+          .then(({ data, error }) => (error ? [] : ((data ?? []) as AccessRoleUnit[]))),
       ]);
-      return { roles, reports };
+      return { roles, reports, units };
     },
     staleTime: 5 * 60 * 1000,
   });

@@ -39,6 +39,7 @@ export type WritableTable =
   | "profiles"
   | "access_roles"
   | "access_role_reports"
+  | "access_role_units"
   | "web_projects"
   | "project_budget_reports"
   | "faculties"
@@ -281,17 +282,20 @@ export function useSendPasswordReset() {
   });
 }
 
-/** Crea o actualiza un rol de acceso con sus informes. Los informes se
- *  reemplazan enteros: la lista que se guarda es la que queda. */
+/** Crea o actualiza un rol de acceso con sus informes y su alcance en Impacto.
+ *  Informes y unidades se reemplazan enteros: la lista que se guarda es la que queda. */
 export function useSaveAccessRole() {
   const invalidate = useInvalidate([keys.accessRoles(), keys.profiles()]);
   return useMutation({
     mutationFn: async ({
       role,
       reports,
+      units = [],
     }: {
       role: Partial<AccessRole> & { key: string; name: string; base_role: AppRole };
       reports: string[];
+      /** Vicerrectorías, oficinas, facultades o programas del alcance (Impacto). */
+      units?: string[];
     }): Promise<AccessRole> => {
       const { id, ...fields } = role;
       const saved = id
@@ -307,6 +311,15 @@ export function useSaveAccessRole() {
           .from("access_role_reports")
           .insert(reports.map((report_slug) => ({ access_role_id: roleId, report_slug })));
         if (insert.error) throw describe(insert.error);
+      }
+
+      const removeUnits = await supabase.from("access_role_units").delete().eq("access_role_id", roleId);
+      if (removeUnits.error) throw describe(removeUnits.error);
+      if (units.length > 0) {
+        const insertUnits = await supabase
+          .from("access_role_units")
+          .insert(units.map((unit_id) => ({ access_role_id: roleId, unit_id })));
+        if (insertUnits.error) throw describe(insertUnits.error);
       }
       return saved.data as AccessRole;
     },

@@ -76,14 +76,15 @@ interface ChoiceBase {
   campuses: { id: string; name: string }[];
   offer: { programId: string; campusId: string }[];
   unitFunctions: { unitId: string; fn: SubstantiveFunction }[];
-  memberships: { unitId: string; campusId: string | null }[];
+  memberships: { unitId: string; campusId: string | null; viaRole?: boolean }[];
 }
 
 /**
  * Las unidades de las que quien mira puede pedir un informe. La administración,
  * todas; los demás, las suyas y solo en los tipos que la administración abrió
  * (como imp_report_allowed: el programa o su facultad; la facultad a la que
- * pertenece; la función de su vicerrectoría u oficina).
+ * pertenece; la función de su vicerrectoría u oficina). Lo que le da su rol de
+ * acceso (viaRole, 0154) vale aunque el tipo siga cerrado.
  */
 export function reportChoices(base: ChoiceBase, admin: boolean, open: Pick<ReportSwitches, ReportKind>): ReportChoices {
   const byId = new Map(base.units.map((u) => [u.id, u]));
@@ -109,9 +110,8 @@ export function reportChoices(base: ChoiceBase, admin: boolean, open: Pick<Repor
     .map((u) => {
       const sites = sitesOf(u.id);
       if (admin) return { id: u.id, name: u.name, faculty: facultyOf(u.id), campuses: sites, allCampuses: true };
-      if (!open.programa) return null;
       const ids = chain(u.id);
-      const mine = base.memberships.filter((m) => ids.includes(m.unitId));
+      const mine = base.memberships.filter((m) => ids.includes(m.unitId) && (open.programa || m.viaRole));
       if (!mine.length) return null;
       const everywhere = mine.some((m) => m.campusId === null);
       const campuses = everywhere ? sites : sites.filter((s) => mine.some((m) => m.campusId === s.id));
@@ -121,12 +121,16 @@ export function reportChoices(base: ChoiceBase, admin: boolean, open: Pick<Repor
     .sort((a, b) => a.name.localeCompare(b.name, "es"));
 
   const faculties = base.units
-    .filter((u) => u.kind === "facultad" && (admin || (open.facultad && base.memberships.some((m) => m.unitId === u.id))))
+    .filter((u) => u.kind === "facultad" && (admin || base.memberships.some((m) => m.unitId === u.id && (open.facultad || m.viaRole))))
     .map((u) => ({ id: u.id, name: u.name }))
     .sort((a, b) => a.name.localeCompare(b.name, "es"));
 
-  const mineFns = new Set(base.unitFunctions.filter((f) => base.memberships.some((m) => m.unitId === f.unitId)).map((f) => f.fn));
-  const functions = FUNCTIONS.filter((fn) => admin || (open.vicerrectoria && mineFns.has(fn)));
+  const mineFns = new Set(
+    base.unitFunctions
+      .filter((f) => base.memberships.some((m) => m.unitId === f.unitId && (open.vicerrectoria || m.viaRole)))
+      .map((f) => f.fn),
+  );
+  const functions = FUNCTIONS.filter((fn) => admin || mineFns.has(fn));
   return { programs, faculties, functions };
 }
 

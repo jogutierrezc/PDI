@@ -38,9 +38,3 @@ export function AvisoMigracion({ mensaje }: { mensaje?: string }) {
     </div>
   );
 }
-
-export function iniciales(nombre: string | null | undefined, correo: string): string {
-  const partes = (nombre ?? "").trim().split(/\s+/).filter(Boolean);
-  if (!partes.length) return (correo[0] ?? "?").toUpperCase();
-  return ((partes[0]?.[0] ?? "") + (partes.length > 1 ? (partes[partes.length - 1][0] ?? "") : "")).toUpperCase();
-}

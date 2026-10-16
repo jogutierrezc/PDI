@@ -329,6 +329,16 @@ export const TOURS: Tour[] = [
     ],
   },
   {
+    id: "internacionalizacion",
+    title: "Internacionalización",
+    scope: "intranet",
+    steps: [
+      { route: "/admin/internacionalizacion", target: "[data-tour='int-riel']", title: "Su espacio de trabajo", body: "A la izquierda están las secciones —resumen, cifras, tablas, plantillas, periodos y accesos— y las carpetas de las tablas del repositorio. «Tablas» muestra cuántas hojas esperan su acción.", mood: "feliz" },
+      { target: "[data-tour='int-buscar']", title: "Busque con Ctrl+K", body: "Encuentre una tabla, salte a una sección o cree una tabla nueva sin buscar el botón.", mood: "idea" },
+      { target: "[data-tour='int-periodo']", title: "El periodo", body: "Todo lo que ve —avance, tablas, cifras— es del periodo que elija aquí. Dentro de «Tablas» también elige el campus.", mood: "bien" },
+    ],
+  },
+  {
     id: "internacionalizacion-tablas",
     title: "Las tablas de Internacionalización",
     scope: "intranet",

@@ -8,8 +8,7 @@
    La pareja programa × campus viaja en la dirección (?p=…&c=…).
    ========================================================================== */
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import type { ReactNode } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { Icon } from "../../../components/ui/Icon";
 import { CardSkeleton, ErrorBlock } from "../../../components/ui/QueryState";
@@ -22,7 +21,8 @@ import { Asistente } from "./Asistente";
 import { Buscador } from "../../../components/espacio/Buscador";
 import type { EntradaBuscador } from "../../../components/espacio/Buscador";
 import { Aviso, useAviso } from "../../../components/espacio/piezas";
-import { AvisoMigracion, iniciales } from "./comunes";
+import { BarraSuperior, EstadoPantalla } from "../../../components/espacio/Marco";
+import { AvisoMigracion } from "./comunes";
 import { carpetaDe, ProveedorEspacio } from "./contexto";
 import type { Espacio, OpcionesAsistente } from "./contexto";
 import { Detalles } from "./Detalles";
@@ -51,19 +51,15 @@ export function ProgramasEnCifras() {
   const pareja = parejaInicial(yo.data, params.get("p"), params.get("c"));
 
   if (yo.isPending) {
-    return <Estado><CardSkeleton count={3} /></Estado>;
+    return <EstadoPantalla><CardSkeleton count={3} /></EstadoPantalla>;
   }
   if (yo.error) {
-    return <Estado>{esFaltaMigracion(yo.error) ? <AvisoMigracion mensaje={yo.error.message} /> : <ErrorBlock error={yo.error} onRetry={() => void yo.refetch()} />}</Estado>;
+    return <EstadoPantalla>{esFaltaMigracion(yo.error) ? <AvisoMigracion mensaje={yo.error.message} /> : <ErrorBlock error={yo.error} onRetry={() => void yo.refetch()} />}</EstadoPantalla>;
   }
   if (!pareja || !yo.data) {
-    return <Estado><div className="es-empty"><b>Todavía no tiene programas asignados</b><span>Pídale a la administración de la intranet que lo nombre Director o Coordinador de un programa.</span><Link className="es-btn" to="/admin">Volver a la intranet</Link></div></Estado>;
+    return <EstadoPantalla><div className="es-empty"><b>Todavía no tiene programas asignados</b><span>Pídale a la administración de la intranet que lo nombre Director o Coordinador de un programa.</span><Link className="es-btn" to="/admin">Volver a la intranet</Link></div></EstadoPantalla>;
   }
   return <Espacio key={claveDePareja(pareja)} yo={yo.data} pareja={pareja} equipoAlAbrir={params.get("seccion") === "equipo"} onPareja={(p) => setParams({ p: p.programa_id, c: p.campus_id }, { replace: true })} />;
-}
-
-function Estado({ children }: { children: ReactNode }) {
-  return <div className="es pc pc-estado"><div>{children}</div></div>;
 }
 
 function Espacio({ yo, pareja, onPareja, equipoAlAbrir }: { yo: NonNullable<ReturnType<typeof useYo>["data"]>; pareja: ProgramaCampus; equipoAlAbrir: boolean; onPareja: (p: ProgramaCampus) => void }) {
@@ -143,7 +139,19 @@ function Espacio({ yo, pareja, onPareja, equipoAlAbrir }: { yo: NonNullable<Retu
   return (
     <ProveedorEspacio value={espacio}>
       <div className="es pc">
-        <BarraSuperior yo={yo} pareja={pareja} onPareja={onPareja} onBuscar={() => setBuscando(true)} />
+        <BarraSuperior
+          sigla="PC"
+          marca="Programas en Cifras"
+          buscar="Buscar archivos y acciones"
+          tourBuscar="pc-buscar"
+          tourSelector="pc-selector"
+          onBuscar={() => setBuscando(true)}
+          selector={
+            <select aria-label="Programa y campus" value={claveDePareja(pareja)} disabled={yo.programas.length < 2} onChange={(e) => { const p = yo.programas.find((x) => claveDePareja(x) === e.target.value); if (p) onPareja(p); }}>
+              {agruparPorCampus(yo.programas).map((g) => <optgroup key={g.campus_id} label={g.campus}>{g.parejas.map((p) => <option key={claveDePareja(p)} value={claveDePareja(p)}>{p.programa}</option>)}</optgroup>)}
+            </select>
+          }
+        />
         <div className="pc-body">
           <Riel control={control} />
           <main className="pc-main">
@@ -179,49 +187,5 @@ function Espacio({ yo, pareja, onPareja, equipoAlAbrir }: { yo: NonNullable<Retu
         <Aviso texto={aviso} />
       </div>
     </ProveedorEspacio>
-  );
-}
-
-function BarraSuperior({ yo, pareja, onPareja, onBuscar }: { yo: NonNullable<ReturnType<typeof useYo>["data"]>; pareja: ProgramaCampus; onPareja: (p: ProgramaCampus) => void; onBuscar: () => void }) {
-  const { profile, signOut } = useAuth();
-  const [abierto, setAbierto] = useState(false);
-  const caja = useRef<HTMLDivElement>(null);
-  useEffect(() => {
-    if (!abierto) return;
-    const fuera = (e: PointerEvent) => !caja.current?.contains(e.target as Node) && setAbierto(false);
-    const esc = (e: KeyboardEvent) => e.key === "Escape" && setAbierto(false);
-    document.addEventListener("pointerdown", fuera);
-    document.addEventListener("keydown", esc);
-    return () => (document.removeEventListener("pointerdown", fuera), document.removeEventListener("keydown", esc));
-  }, [abierto]);
-  return (
-    <header className="pc-top">
-      <div className="pc-brand">
-        <span className="pc-mark" aria-hidden="true">PC</span>
-        Programas en Cifras <small>UDES</small>
-      </div>
-      <button type="button" className="pc-search" data-tour="pc-buscar" onClick={onBuscar}>
-        <Icon name="search" size={16} />
-        Buscar archivos y acciones
-        <kbd>Ctrl K</kbd>
-      </button>
-      <span className="es-grow" />
-      <div className="pc-who" data-tour="pc-selector">
-        <select aria-label="Programa y campus" value={claveDePareja(pareja)} disabled={yo.programas.length < 2} onChange={(e) => { const p = yo.programas.find((x) => claveDePareja(x) === e.target.value); if (p) onPareja(p); }}>
-          {agruparPorCampus(yo.programas).map((g) => <optgroup key={g.campus_id} label={g.campus}>{g.parejas.map((p) => <option key={claveDePareja(p)} value={claveDePareja(p)}>{p.programa}</option>)}</optgroup>)}
-        </select>
-        <Link className="es-btn es-btn--sm es-btn--ghost" style={{ color: "inherit" }} to="/admin"><Icon name="arrow-left" size={14} />Intranet</Link>
-        <div className="pc-me" ref={caja}>
-          <button type="button" className="pc-avatar" aria-expanded={abierto} aria-label="Su cuenta" onClick={() => setAbierto(!abierto)}>{iniciales(profile?.full_name, profile?.email ?? "")}</button>
-          {abierto ? (
-            <div className="pc-me__panel" role="menu">
-              <div className="pc-me__who"><b>{profile?.full_name?.trim() || profile?.email}</b><small>{profile?.email}</small></div>
-              <Link to="/admin"><Icon name="settings" size={16} />Volver a la intranet</Link>
-              <button type="button" onClick={() => void signOut()}><Icon name="arrow-left" size={16} />Cerrar sesión</button>
-            </div>
-          ) : null}
-        </div>
-      </div>
-    </header>
   );
 }

@@ -11,6 +11,7 @@ import { useMemo } from "react";
 import type { ReactNode } from "react";
 import { Icon } from "../../../components/ui/Icon";
 import { Anillo } from "../../../components/espacio/piezas";
+import { EntradaRiel, Riel as RielBase, TituloRiel } from "../../../components/espacio/Marco";
 import { Archivos, Carpetas, Comandos as ComandosBase, Migas as MigasBase, Zona } from "../../../components/espacio/Explorador";
 import type { VistaArchivos } from "../../../components/espacio/Explorador";
 import { haceCuanto } from "../../../components/espacio/logica";
@@ -44,34 +45,25 @@ export function Riel({ control }: { control: ControlExplorador }) {
   const listos = archivos.filter((a) => a.estado === "listo").length;
   const cobertura = useMemo(() => coberturaCuadroMaestro(respuestas.map((r) => ({ archivo_id: r.archivo_id, destino_id: r.destino_id, mapa: r.mapa })), { salud }), [respuestas, salud]);
   return (
-    <nav className="pc-side" id="pc-riel" data-tour="pc-riel" aria-label="Navegación del programa">
-      <div className="pc-cap">Programa</div>
+    <RielBase etiqueta="Navegación del programa" id="pc-riel" tour="pc-riel">
+      <TituloRiel>Programa</TituloRiel>
       {SECCIONES_NAV.filter((n) => n.id !== "equipo" || verEquipo).map((n) => (
-        <button
+        <EntradaRiel
           key={n.id}
-          type="button"
-          className="pc-navb"
-          aria-current={estado.seccion === n.id && !(n.id === "archivos" && estado.carpeta) ? "page" : undefined}
+          icono={n.icono}
+          actual={estado.seccion === n.id && !(n.id === "archivos" && estado.carpeta)}
+          cuenta={n.id === "listos" ? listos : undefined}
           onClick={() => cambiar({ seccion: n.id, carpeta: null, filtro: "todos", seleccion: null })}
         >
-          <Icon name={n.icono} size={18} />
           {n.etiqueta}
-          {n.id === "listos" && listos > 0 ? <span className="pc-badge es-num">{listos}</span> : null}
-        </button>
+        </EntradaRiel>
       ))}
       <hr />
-      <div className="pc-cap">Carpetas</div>
+      <TituloRiel>Carpetas</TituloRiel>
       {carpetasOrdenadas(carpetas).map((c) => (
-        <button
-          key={c.id}
-          type="button"
-          className="pc-navb"
-          aria-current={estado.seccion === "archivos" && estado.carpeta === c.id ? "page" : undefined}
-          onClick={() => cambiar({ seccion: "archivos", carpeta: c.id, filtro: "todos", seleccion: null })}
-        >
-          <Icon name="folder" size={18} />
+        <EntradaRiel key={c.id} icono="folder" actual={estado.seccion === "archivos" && estado.carpeta === c.id} onClick={() => cambiar({ seccion: "archivos", carpeta: c.id, filtro: "todos", seleccion: null })}>
           {c.nombre}
-        </button>
+        </EntradaRiel>
       ))}
       <div className="pc-cover" data-tour="pc-cobertura">
         <Anillo pct={cobertura.pct} etiqueta="Cobertura del Cuadro Maestro del CNA" />
@@ -80,7 +72,7 @@ export function Riel({ control }: { control: ControlExplorador }) {
           <span>{cobertura.pct} % de las columnas de los cuadros ya las responde el sistema o un archivo.</span>
         </div>
       </div>
-    </nav>
+    </RielBase>
   );
 }
 

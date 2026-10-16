@@ -16,7 +16,7 @@
    cómo se guarda.
    ========================================================================== */
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { Icon } from "../../../components/ui/Icon";
 import { useTour } from "../../../components/tour/TourProvider";
@@ -56,12 +56,12 @@ export function Tablas({ ctx }: { ctx: Ctx }) {
   const toast = useToast();
   const aviso = useAviso();
   const [panel, setPanel] = useState<null | "tabla" | "hoja" | "excel">(null);
-  const [carpeta, setCarpeta] = useState<CarpetaId | null>(null);
   const [filtro, setFiltro] = useState("todas");
   const [vista, setVista] = useState<VistaArchivos>("mosaicos");
   const [detalles, setDetalles] = useState(true);
   const [origen, setOrigen] = useState<Caja | null>(null);
 
+  const carpeta: CarpetaId | null = CARPETAS_INT.find((c) => c.id === params.get("carpeta"))?.id ?? null;
   const libros = useMemo(() => estructura.data ?? [], [estructura.data]);
   const libro = libros.find((l) => l.id === params.get("libro")) ?? null;
   const hoja = libro?.hojas.find((h) => h.id === params.get("hoja")) ?? null;
@@ -78,6 +78,17 @@ export function Tablas({ ctx }: { ctx: Ctx }) {
     }
     setParams(p, { replace: true });
   };
+
+  // El buscador Ctrl+K y el riel piden acciones de esta sección por la dirección (?accion=).
+  const accion = params.get("accion");
+  useEffect(() => {
+    if (!accion) return;
+    if (accion === "vista") setVista((v) => (v === "mosaicos" ? "lista" : "mosaicos"));
+    else if (ctx.director && (accion === "nueva" || accion === "excel")) setPanel(accion === "nueva" ? "tabla" : "excel");
+    const p = new URLSearchParams(params);
+    p.delete("accion");
+    setParams(p, { replace: true });
+  }, [accion]); // eslint-disable-line react-hooks/exhaustive-deps -- solo reacciona a la petición
 
   const visibles = useMemo(() => {
     const avances = new Map(libros.map((l) => [l.id, avanceLibro(l, enviosLista, campusIds)] as const));
@@ -127,7 +138,7 @@ export function Tablas({ ctx }: { ctx: Ctx }) {
   return (
     <div className="es it-esp" data-tour="int-tablas">
       <div className="it-esp__main">
-        <Migas partes={[{ texto: "Tablas", onClick: () => (setCarpeta(null), ir({ libro: null, hoja: null })) }, ...(carpeta ? [{ texto: CARPETAS_INT.find((c) => c.id === carpeta)!.nombre }] : [])]} />
+        <Migas partes={[{ texto: "Tablas", onClick: () => ir({ carpeta: null, libro: null, hoja: null }) }, ...(carpeta ? [{ texto: CARPETAS_INT.find((c) => c.id === carpeta)!.nombre }] : [])]} />
         <Comandos
           izquierda={
             <>
@@ -142,16 +153,6 @@ export function Tablas({ ctx }: { ctx: Ctx }) {
                     Desde Excel
                   </button>
                 </>
-              ) : null}
-              {ctx.visibles.length > 1 ? (
-                <select className="es-sel" aria-label="Campus" data-tour="int-campus" value={campusSel} onChange={(e) => ir({ campus: e.target.value || null })}>
-                  <option value="">Todos los campus</option>
-                  {ctx.visibles.map((c) => (
-                    <option key={c.id} value={c.id}>
-                      {c.name}
-                    </option>
-                  ))}
-                </select>
               ) : null}
             </>
           }
@@ -178,7 +179,7 @@ export function Tablas({ ctx }: { ctx: Ctx }) {
                 const n = libros.filter((l) => carpetaDeLibro(l) === c.id).length;
                 return { id: c.id, nombre: c.nombre, subtitulo: `${c.subtitulo} · ${n} ${n === 1 ? "tabla" : "tablas"}` };
               })}
-              onAbrir={(id) => setCarpeta(id as CarpetaId)}
+              onAbrir={(id) => ir({ carpeta: id })}
             />
           ) : items.length ? (
             <Archivos items={items} vista={vista} seleccion={libro?.id ?? null} onSeleccionar={(id) => ir({ libro: id, hoja: null })} onAbrir={abrir} encabezadosLista={["Clase", "Avance", "Hojas", "Captura"]} />

@@ -4,7 +4,6 @@
    vacío y de error, y el aviso de la migración 0151 sin aplicar. */
 
 import { createElement as h } from "react";
-import type { ReactNode } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { renderToString } from "react-dom/server";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
@@ -12,13 +11,6 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import type { Yo } from "../tipos";
 
 vi.mock("../../../components/tour/TourProvider", () => ({ useTour: () => ({ start: () => undefined, isDone: () => true, active: null }) }));
-
-vi.mock("../../admin/components/AdminShell", () => ({
-  AdminShell: ({ title, description, rail, actions, children }: { title: string; description?: string; rail?: ReactNode; actions?: ReactNode; children: ReactNode }) =>
-    h("div", null, h("h1", null, title), h("p", null, description), actions, rail, children),
-  AdminRail: ({ children }: { children: ReactNode }) => h("nav", null, children),
-  AdminRailTab: ({ children, count }: { children: ReactNode; count?: number }) => h("span", { "data-count": count }, children),
-}));
 
 const estado = vi.hoisted(() => ({ admin: false, yo: null as unknown, error: null as Error | null, periodos: null as unknown, vacio: false }));
 
@@ -106,6 +98,9 @@ describe("Resumen", () => {
     expect(t).toContain("Lo aprueba el Director");
     expect(t).toContain("Plantillas que el repositorio ya responde");
     expect(t).toContain("Accesos");
+    // El riel del marco: secciones, carpetas por clase y el buscador.
+    expect(t).toContain("Carpetas");
+    expect(t).toContain("Buscar tablas, secciones y acciones");
   });
 
   it("el Gestor solo ve su campus y no tiene Accesos", () => {

@@ -702,6 +702,10 @@
   min-width: 0;
 }
 
+.it-resumen__carpetas {
+  margin-bottom: var(--rk-s5);
+}
+
 .it-resumen__rejilla {
   display: grid;
   grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr);
@@ -2300,4 +2304,40 @@
   max-height: 40vh;
   overflow-y: auto;
   background: var(--surface-2);
+}
+
+/* ---------- El marco de pantalla completa (components/espacio/Marco) ---------------- */
+
+.it-main {
+  min-width: 0;
+  min-height: 0;
+  overflow-y: auto;
+  background: var(--page);
+}
+
+.it-main > .it {
+  padding: var(--space-5) var(--space-5) var(--space-7);
+  align-content: start;
+}
+
+.it-main--pleno {
+  overflow: hidden;
+}
+
+.it-main > .it--pleno {
+  display: block;
+  height: 100%;
+  padding: 0;
+}
+
+.it-main .it-esp {
+  height: 100%;
+  min-height: 0;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+}
+
+.it-main > .it:not(.it--pleno) .es-crumb {
+  padding-inline: 0;
 }

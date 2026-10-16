@@ -1,7 +1,9 @@
 /* Internacionalización · Resumen: qué falta para cerrar el periodo. */
 
 import { useMemo, useRef } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
+import { Carpetas } from "../../../components/espacio/Explorador";
+import "../../../components/espacio/espacio.css";
 import { useEntrada, useCrecer, useContador } from "./movimiento";
 import { useCifras, useConceptos, useEstructura, usePlantillas, useVentanas } from "../datos";
 import { cobertura, disponiblesDe } from "../lib/cobertura";
@@ -9,6 +11,7 @@ import { ETIQUETA_ESTADO } from "../lib/permisos";
 import { AvisoMigracion, BarraEstados, Cargando, EstadoPill, ErrorCaja, fmt, LeyendaEstados, nombreCampus, Vacio } from "./comunes";
 import type { Ctx } from "./comunes";
 import { avancePorCampus, contarEstados, diasHasta, faltantes, fechaCorta } from "./logica";
+import { avanceLibro, carpetaDeLibro, CARPETAS_INT } from "./adaptador";
 import { listaPlantillas } from "./plantillas-lista";
 import { FaltaMigracion } from "../datos";
 
@@ -29,6 +32,7 @@ export function Cifra({ valor, rotulo, detalle, tono }: { valor: number; rotulo:
 export function Resumen({ ctx }: { ctx: Ctx }) {
   const { periodo } = ctx;
   const raiz = useRef<HTMLDivElement>(null);
+  const navegar = useNavigate();
   const cifras = useCifras(periodo?.id);
   const estructura = useEstructura();
   const plantillas = usePlantillas();
@@ -94,6 +98,15 @@ export function Resumen({ ctx }: { ctx: Ctx }) {
   const falta = faltantes(avance);
   const dias = diasHasta(periodo.cierra);
   const hojaDe = (id: string) => hojas.find((h) => h.id === id);
+  const libros = estructura.data;
+  const carpetas = CARPETAS_INT.flatMap((c) => {
+    const dentro = libros.filter((l) => carpetaDeLibro(l) === c.id);
+    if (!dentro.length) return [];
+    const a = dentro.map((l) => avanceLibro(l, avance, [...ids]));
+    const ap = a.reduce((n, x) => n + x.aprobadas, 0);
+    const tot = a.reduce((n, x) => n + x.total, 0);
+    return [{ id: c.id, nombre: c.nombre, subtitulo: `${dentro.length} ${dentro.length === 1 ? "tabla" : "tablas"} · ${fmt(ap)} de ${fmt(tot)} aprobadas` }];
+  });
   const sinVentana = ventanas.data ? hojas.filter((h) => !ventanas.data!.some((v) => v.hoja_id === h.id)) : [];
 
   return (
@@ -123,6 +136,10 @@ export function Resumen({ ctx }: { ctx: Ctx }) {
           />
         )}
       </div>
+
+      <section className="it-resumen__carpetas" aria-label="Carpetas del repositorio" data-entra>
+        <Carpetas carpetas={carpetas} onAbrir={(id) => navegar(ctx.enlace("tablas", { carpeta: id }))} />
+      </section>
 
       <div className="it-resumen__rejilla">
         <section className="it-panel it-resumen__campus" aria-labelledby="it-av-campus" data-entra>

@@ -18,7 +18,8 @@ import { esFaltaMigracion, useGuardarMiembro, useQuitarMiembro } from "../datos"
 import type { Miembro } from "../datos";
 import { ETIQUETA_ROL, puedeNombrar, rolesQueNombra } from "../lib/permisos";
 import type { PcRol, ProgramaCampus } from "../tipos";
-import { AvisoMigracion, iniciales } from "./comunes";
+import { iniciales } from "../../../components/espacio/Marco";
+import { AvisoMigracion } from "./comunes";
 import { useEspacio } from "./contexto";
 import { CLAVE_EQUIPO, useTodosMiembros } from "./equipo-datos";
 import { agruparPorCampus, claveDePareja, nombreDePareja } from "./logica";

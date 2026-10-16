@@ -23,7 +23,7 @@ import { useSaveBlocks } from "../od-data";
 import { Panel, SaveState, StageEmpty } from "../ui";
 import { ImageGrid } from "./ImageGrid";
 import { BLOCK_HELP } from "../block-help";
-import { KpiModePicker } from "../taller/KpiModePicker";
+import { BreakdownModePicker, KpiModePicker } from "../taller/KpiModePicker";
 
 type DraftBlock = Omit<OdReportBlockRow, "id" | "report_id"> & { id?: string; tempId: string };
 
@@ -342,6 +342,16 @@ function DesignEditor({ data, reportId, reportSlug, blocks, canEdit }: { data: S
                       restState={restState(block, (b) => Boolean(b.ref_id || b.settings.breakdowns?.length))}
                       disabled={!canEdit}
                       onChange={(list) => patch(block.tempId, { settings: { ...block.settings, breakdowns: list.length ? list : undefined } })}
+                    />
+                  )}
+                  {block.kind === "desgloses" && breakdowns.length > 0 && (
+                    <BreakdownModePicker
+                      options={breakdowns
+                        .filter((b) => (block.ref_id ? b.id === block.ref_id : (block.settings.breakdowns?.length ? block.settings.breakdowns.includes(b.key) : true)))
+                        .map((b) => ({ key: b.key, label: b.title }))}
+                      modes={block.settings.breakdownModes}
+                      disabled={!canEdit}
+                      onChange={(breakdownModes) => patch(block.tempId, { settings: { ...block.settings, breakdownModes } })}
                     />
                   )}
                   {block.kind === "mapa" && mapOf(block) && (() => {

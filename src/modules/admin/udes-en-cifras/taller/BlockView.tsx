@@ -27,6 +27,7 @@ import type { LineSeries } from "../../../datos-abiertos/components/LineChart";
 import { TableBlock } from "../../../datos-abiertos/components/TableBlock";
 import { blockPicks, groupedTableViews, lastFreeBlock, orderedBlocks, ownFreeViews } from "../../../datos-abiertos/data/groups";
 import { imagesOf, reportImageUrl } from "../../../datos-abiertos/data/images";
+import { breakdownModeOf } from "../../../datos-abiertos/data/kpi-options";
 import { cutsOf, hasTerms, keyIndicators, valueOf } from "../../../datos-abiertos/data/open-data";
 import type { Cut } from "../../../datos-abiertos/data/period-reading";
 import { ALL_YEARS, cutCode, cutCodeLabel } from "../../../datos-abiertos/data/terms";
@@ -203,7 +204,7 @@ export function renderBlock(block: ReportBlock, { catalog, report, cut, campus, 
         node: (
           <div className="od-breakdowns">
             {only.map((breakdown) => (
-              <BreakdownChart key={breakdown.id} breakdown={breakdown} year={year} term={term} years={catalog.years} setYear={noop} setCut={noop} />
+              <BreakdownChart key={breakdown.id} breakdown={breakdown} year={year} term={term} years={catalog.years} setYear={noop} setCut={noop} mode={breakdownModeOf(block.settings.breakdownModes, breakdown.id)} />
             ))}
           </div>
         ),

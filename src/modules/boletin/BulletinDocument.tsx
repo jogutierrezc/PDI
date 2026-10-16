@@ -358,7 +358,7 @@ export function BulletinDocument({ catalog, settings, report, fitWidth, onReady 
         </div>
         <div>
           <dt>Corte</dt>
-          <dd>{settings.cut === ALL_YEARS ? "Todos los años (promedio anual o último dato)" : settings.cut}</dd>
+          <dd>{settings.cut === ALL_YEARS ? "Todos los años (promedio anual, último dato o variación, según cada cifra)" : settings.cut}</dd>
         </div>
         <div>
           <dt>Campus</dt>
@@ -368,7 +368,7 @@ export function BulletinDocument({ catalog, settings, report, fitWidth, onReady 
       <p className="bol-intro__reading">
         <b>Cómo leer las cifras.</b> Un guion (—) es un dato sin reportar, nunca un cero. Lo que se reporta por periodo académico se
         muestra por periodo (2024-1, 2024-2) junto a la cifra del año, que sale de su regla: suma, promedio o último periodo. Con todo el
-        periodo, cada indicador muestra el promedio anual de los años con dato; las existencias, como la matrícula, su último dato.
+        periodo, cada indicador muestra el promedio anual de los años con dato; las existencias, como la matrícula, su último dato. Cada desglose indica en su hoja si su cifra de todo el periodo es el promedio anual, la última cifra reportada o la variación porcentual entre la primera y la última.
       </p>
       <h2 id={anchored ? "contenido" : undefined}>Contenido</h2>
     </>

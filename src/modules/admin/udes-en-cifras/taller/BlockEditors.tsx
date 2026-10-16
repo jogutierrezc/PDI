@@ -38,6 +38,7 @@ import { SaberTytCapture } from "../stations/SaberTytCapture";
 import { EditDatasetForm, IndicatorForm, NewDatasetForm, emptyIndicator, useDatasetSaves } from "../stations/StructureStation";
 import type { DatasetKind } from "../stations/StructureStation";
 import type { DraftBlock, TallerMode } from "./draft";
+import { BreakdownModePicker } from "./KpiModePicker";
 
 type Settings = DraftBlock["settings"];
 
@@ -124,6 +125,14 @@ export function BlockEditor({ block, shown, station, viewReport, mode, onSetting
               onChange={(keys) => set({ breakdowns: keys.length ? keys : undefined })}
             />
           )}
+          <div data-odt-draft>
+            <BreakdownModePicker
+              options={all.filter((b) => (block.ref_id ? b.id === block.ref_id : shown ? picks.breakdowns(shown).includes(b.key) : false)).map((b) => ({ key: b.key, label: b.title }))}
+              modes={block.settings.breakdownModes}
+              disabled={!canEdit}
+              onChange={(breakdownModes) => set({ breakdownModes })}
+            />
+          </div>
         </div>
       );
     }

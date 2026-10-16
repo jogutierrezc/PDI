@@ -279,6 +279,8 @@ export interface ReportBlock {
     indicators?: string[];
     /** Tablero de indicadores: cómo lee cada KPI su cifra, por clave de indicador. Sin elección, el promedio de siempre. */
     kpiModes?: Record<string, "promedio" | "ultima" | "variacion" | "evolucion">;
+    /** Desgloses: cómo se lee la cifra de «todo el periodo», por clave de desglose. Sin elección, el promedio anual. */
+    breakdownModes?: Record<string, "promedio" | "ultima" | "variacion">;
     /** Evolución por campus: clave del indicador con que abre. Sin ella, la cifra titular. */
     indicator?: string;
     /** Mapas: clave (no id) del otro mapa que se muestra con este. La clave sobrevive a la copia de periodo. */

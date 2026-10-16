@@ -62,6 +62,8 @@ import {
 import { imagesOf, reportImageUrl } from "./data/images";
 import { ALL_YEARS, ANNUAL_RULE_LABEL, cutCode, cutCodeLabel, cutLabel, fromCutCode } from "./data/terms";
 import { periodReading } from "./data/period-reading";
+import { breakdownModeOf } from "./data/kpi-options";
+import type { BreakdownMode } from "./data/kpi-options";
 import type { Breakdown, CampusId, Indicator, MapDataset, OpenDataCatalog, Report, ReportBlock, Term } from "./data/types";
 import { blockPicks, groupedTableViews, inSectionOf, lastFreeBlock as lastFreeBlockOf, orderedBlocks, ownFreeViews as ownFreeViewsOf, pairedMaps as pairedMapsOf, saberProOf, saberTytOf } from "./data/groups";
 import { csvZipName } from "./data/csv-export";
@@ -456,13 +458,13 @@ function ReportContent({ data, report, year, term, campus, setYear, setTerm, set
           return (
             <div className="od-point__block od-breakdowns" key={key}>
               {only.map((breakdown) => (
-                <BreakdownChart key={breakdown.id} breakdown={breakdown} year={year} term={term} years={data.years} setYear={setYear} setCut={setCut} csv={csvById(`desglose:${breakdown.id}`)} />
+                <BreakdownChart key={breakdown.id} breakdown={breakdown} year={year} term={term} years={data.years} setYear={setYear} setCut={setCut} csv={csvById(`desglose:${breakdown.id}`)} mode={breakdownModeOf(block.settings.breakdownModes, breakdown.id)} />
               ))}
             </div>
           );
         }
         return (
-          <Breakdowns key={key} anchor={block.settings.slot ? `od-desgloses-${block.settings.slot}` : "od-desgloses"} breakdowns={only} year={year} campus={campus} setYear={setYear} setCut={setCut} title={block.settings.title} term={term} years={data.years} csvOf={(id) => csvById(`desglose:${id}`)} />
+          <Breakdowns key={key} anchor={block.settings.slot ? `od-desgloses-${block.settings.slot}` : "od-desgloses"} breakdowns={only} year={year} campus={campus} setYear={setYear} setCut={setCut} title={block.settings.title} term={term} years={data.years} csvOf={(id) => csvById(`desglose:${id}`)} modes={block.settings.breakdownModes} />
         );
       }
       case "tabla_dinamica":
@@ -1103,6 +1105,7 @@ function Breakdowns({
   term,
   years,
   csvOf,
+  modes,
 }: {
   /** Id del título: puede haber un bloque de desgloses por sección. */
   anchor: string;
@@ -1116,6 +1119,8 @@ function Breakdowns({
   years: number[];
   /** La descarga en CSV de cada desglose, por su clave. */
   csvOf: (id: string) => ExportSource | undefined;
+  /** Cómo se lee «todo el periodo» en cada desglose, por clave. */
+  modes?: Record<string, BreakdownMode>;
 }) {
 
   return (
@@ -1130,7 +1135,7 @@ function Breakdowns({
         </header>
 
         <div className="od-breakdowns">
-          {breakdowns.map((breakdown) => <BreakdownChart key={breakdown.id} breakdown={breakdown} year={year} term={term} years={years} setYear={setYear} setCut={setCut} csv={csvOf(breakdown.id)} />)}
+          {breakdowns.map((breakdown) => <BreakdownChart key={breakdown.id} breakdown={breakdown} year={year} term={term} years={years} setYear={setYear} setCut={setCut} csv={csvOf(breakdown.id)} mode={breakdownModeOf(modes, breakdown.id)} />)}
         </div>
       </div>
     </section>

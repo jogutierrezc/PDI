@@ -20,8 +20,8 @@
 
 import type { CSSProperties, ReactNode } from "react";import { reportImageUrl } from "../datos-abiertos/data/images";
 
-import { formatVariation, kpiModeOf, lastReported, pointsUpToCut, variationOf, VARIATION_REASON_TEXT } from "../datos-abiertos/data/kpi-options";
-import type { KpiMode, KpiPoint } from "../datos-abiertos/data/kpi-options";
+import { breakdownModeOf, formatVariation, kpiModeOf, lastReported, pointsUpToCut, readBreakdown, variationOf, VARIATION_REASON_TEXT } from "../datos-abiertos/data/kpi-options";
+import type { BreakdownCut, BreakdownMode, KpiMode, KpiPoint } from "../datos-abiertos/data/kpi-options";
 import { basisOf, changeBetween, formatCompact, formatCount, formatValue, periodBasisOf, valueOf } from "../datos-abiertos/data/open-data";
 import { changeText, heatmapCompare, signed } from "../datos-abiertos/data/heatmap-compare";
 import { ALL_YEARS, ANNUAL_RULE_LABEL, cutLabel, TERMS } from "../datos-abiertos/data/terms";
@@ -304,7 +304,7 @@ function PeriodTables({
 }: {
   head: string;
   years: number[];
-  rows: { label: string; strong?: boolean; at: (year: number, term: Term | null) => number | null; grouped?: number | null }[];
+  rows: { label: string; strong?: boolean; at: (year: number, term: Term | null) => number | null; grouped?: number | string | null }[];
   format: ValueFormat;
   highlightYear?: number;
   /** Junto a los periodos va la cifra del año. */
@@ -336,7 +336,7 @@ function PeriodTables({
             rows={rows.map((row) => ({
               label: row.label,
               strong: row.strong,
-              cells: [...columns.map((c) => figure(row.at(c.year, c.term), format)), ...(withGrouped ? [figure(row.grouped ?? null, format)] : [])],
+              cells: [...columns.map((c) => figure(row.at(c.year, c.term), format)), ...(withGrouped ? [typeof row.grouped === "string" ? row.grouped : figure(row.grouped ?? null, format)] : [])],
             }))}
           />
         );
@@ -787,7 +787,16 @@ function DatasetSheet({
 const BREAKDOWN_LONG = 16;
 const BREAKDOWN_ROWS = 30;
 
-function breakdownUnit(b: Breakdown, catalog: OpenDataCatalog, settings: BulletinSettings): { node: ReactNode; tight: boolean }[] {
+/** Cómo lee cada desglose su cifra de «todo el periodo» (la elección vive en los ajustes de los bloques de la ficha). */
+function breakdownModeFor(report: Report, id: string): BreakdownMode {
+  const modes: Record<string, BreakdownMode> = {};
+  for (const block of report.blocks ?? []) Object.assign(modes, block.settings?.breakdownModes ?? {});
+  return breakdownModeOf(modes, id);
+}
+
+const capitalize = (text: string) => text.charAt(0).toUpperCase() + text.slice(1);
+
+function breakdownUnit(b: Breakdown, catalog: OpenDataCatalog, settings: BulletinSettings, mode: BreakdownMode = "promedio"): { node: ReactNode; tight: boolean }[] {
   const years = breakdownYears(b, catalog);
   if (!years.length) return [];
   const byTerm = breakdownByTerm(b);
@@ -819,17 +828,37 @@ function breakdownUnit(b: Breakdown, catalog: OpenDataCatalog, settings: Bulleti
   const labels = long ? allLabels.filter(everyone) : allLabels;
   const nobody = long ? allLabels.filter((l) => !everyone(l)) : [];
 
+  // Otra lectura de todo el periodo (última cifra, variación): sale de los cortes
+  // reportados, no del promedio guardado. Sin ella, todo sigue como siempre.
+  const readCuts: BreakdownCut[] = years.flatMap((y) => {
+    if (!byTerm) return itemsAt(b, y).length ? [{ label: only ? cutLabel(y, only) : String(y), items: itemsAt(b, y) }] : [];
+    const termCuts = TERMS.filter((t) => termItemsAt(b, y, t).length).map((t) => ({ label: cutLabel(y, t), items: termItemsAt(b, y, t) }));
+    const annualCut = itemsAt(b, y).length && ((b.annualRule ?? "reportado") === "reportado" || !termCuts.length) ? [{ label: String(y), items: itemsAt(b, y) }] : [];
+    return [...termCuts, ...annualCut];
+  });
+  const reading = withPeriod ? readBreakdown(readCuts, labels, mode) : null;
+  const readItem = (label: string) => reading?.items.find((i) => i.label === label);
+  /** La celda de la lectura: la cifra, «< 5» si está reservada, el porcentaje o la raya. */
+  const readCell = (label: string) => {
+    const item = readItem(label);
+    if (!item) return "—";
+    if (reading?.mode === "variacion") return formatVariation(item.value);
+    return cellOf(item);
+  };
+  const readHead = reading ? (reading.mode === "variacion" ? "Variación" : "Última cifra") : cutLabel(ALL_YEARS, null);
+
   // Barras del corte: la cifra del año; si el año no cierra, su último periodo.
   const keyPeriod =
     byTerm && key !== ALL_YEARS && !itemsAt(b, key).length ? periodCutsOf([key]).filter((p) => termItemsAt(b, p.year, p.term).length).pop() : undefined;
   const items = labels.map((label) => {
+    if (reading?.mode === "ultima") return { label, value: readItem(label)?.value ?? null, reserved: readItem(label)?.reserved };
     const item = keyPeriod ? (b.terms?.[keyPeriod.year]?.[keyPeriod.term] ?? []).find((i) => i.label === label) : key === ALL_YEARS ? (b.values[key] ?? []).find((i) => i.label === label) : yearItem(label, key);
     return { label, value: item?.value ?? null, reserved: item?.reserved };
   });
   // Barras de un desglose largo: solo lo que tiene cifra; lo reservado se nombra aparte.
   const barItems = long ? items.filter((i) => !i.reserved && (i.value ?? 0) > 0).sort((a, c) => (c.value ?? 0) - (a.value ?? 0)) : items;
   const reservedNow = items.filter((i) => i.reserved).map((i) => i.label);
-  const keyText = key === ALL_YEARS ? `Promedio anual ${cutLabel(ALL_YEARS, null)}` : keyPeriod ? `Periodo ${keyPeriod.label}` : only ? cutLabel(key, only) : String(key);
+  const keyText = reading ? capitalize(reading.caption) : key === ALL_YEARS ? `Promedio anual ${cutLabel(ALL_YEARS, null)}` : keyPeriod ? `Periodo ${keyPeriod.label}` : only ? cutLabel(key, only) : String(key);
 
   // Partes de un todo (personas, programas): columnas apiladas. Tasas o más
   // categorías de las que se distinguen por color: líneas o solo tabla.
@@ -842,7 +871,7 @@ function breakdownUnit(b: Breakdown, catalog: OpenDataCatalog, settings: Bulleti
 
   const rule = b.annualRule;
   const notes: [string, ReactNode][] = [
-    ["Corte", key === ALL_YEARS ? `${cutText(ALL_YEARS)} · promedio anual` : `${keyPeriod ? `Periodo ${keyPeriod.label}` : `Corte ${key}`}${key !== settings.cut ? " (último con dato)" : ""}`],
+    ["Corte", key === ALL_YEARS ? `${cutText(ALL_YEARS)} · ${reading ? reading.caption : "promedio anual"}` : `${keyPeriod ? `Periodo ${keyPeriod.label}` : `Corte ${key}`}${key !== settings.cut ? " (último con dato)" : ""}`],
     ["Alcance", "Total institucional"],
     ...(byTerm && rule ? ([["Cómo se reporta", `Por periodo académico (1 y 2). Año: ${RULE_SHORT[rule]}.`]] as [string, ReactNode][]) : []),
     ...(only ? ([["Cómo se reporta", `Una vez al año, en el ${onlyTermText(only).replace(" de cada año", "")}.`]] as [string, ReactNode][]) : []),
@@ -857,10 +886,10 @@ function breakdownUnit(b: Breakdown, catalog: OpenDataCatalog, settings: Bulleti
     label,
     cells: [
       ...years.map((y) => cellOf(yearItem(label, y))),
-      ...(groupedCol ? [cellOf((b.values[ALL_YEARS] ?? []).find((i) => i.label === label))] : []),
+      ...(groupedCol ? [reading ? readCell(label) : cellOf((b.values[ALL_YEARS] ?? []).find((i) => i.label === label))] : []),
     ],
   }));
-  const tableHead = ["Categoría", ...years.map((y) => (only ? cutLabel(y, only) : String(y))), ...(groupedCol ? [cutLabel(ALL_YEARS, null)] : [])];
+  const tableHead = ["Categoría", ...years.map((y) => (only ? cutLabel(y, only) : String(y))), ...(groupedCol ? [readHead] : [])];
   const tableHighlight = groupedCol ? years.length : years.indexOf(key);
   // Tabla larga: la hoja lleva las primeras filas y el resto sigue en continuación.
   const firstRows = long && tableRows.length > BREAKDOWN_ROWS - 10 ? BREAKDOWN_ROWS - 14 : tableRows.length;
@@ -876,19 +905,19 @@ function breakdownUnit(b: Breakdown, catalog: OpenDataCatalog, settings: Bulleti
       format={b.format}
       highlightYear={key === ALL_YEARS ? undefined : key}
       annual={settings.annualFigures}
-      grouped={groupedCol ? cutLabel(ALL_YEARS, null) : undefined}
+      grouped={groupedCol ? readHead : undefined}
       caption={rule && settings.annualFigures ? `Periodos 1 y 2 como se reportaron; en negrita, la cifra del año (${RULE_SHORT[rule]}).` : "Periodos 1 y 2 como se reportaron."}
       rows={labels.map((label) => ({
         label,
         at: (year, term) => (term ? termValue(label, year, term) : yearValue(label, year)),
-        grouped: (b.values[ALL_YEARS] ?? []).find((i) => i.label === label)?.value ?? null,
+        grouped: reading ? readCell(label) : (b.values[ALL_YEARS] ?? []).find((i) => i.label === label)?.value ?? null,
       }))}
     />
   ) : null;
 
   // Composición fijada en la intranet: sin periodos, las partes de cada año
   // apiladas a lo largo del periodo en vez de las barras de un solo corte.
-  const composition = !byTerm && parts && chartable && years.length > 1 && b.defaultChart === "composicion";
+  const composition = !reading && !byTerm && parts && chartable && years.length > 1 && b.defaultChart === "composicion";
 
   const sheet = (
     <DatasetSheet title={b.title} source={b.source} notes={notes}>
@@ -907,10 +936,22 @@ function breakdownUnit(b: Breakdown, catalog: OpenDataCatalog, settings: Bulleti
           <SwatchLegend labels={labels} />
         </figure>
       ) : (
-        (!byTerm || !chartable) && (
+        (!byTerm || !chartable || reading) && (
           <figure className="bol-wide">
-            <figcaption>{keyText} · {b.unit}{long ? " · categorías con cifra" : ""}</figcaption>
-            <HBars items={barItems} format={b.format} share={parts} width={128} reservedThreshold={threshold} />
+            <figcaption>{keyText} · {reading?.mode === "variacion" ? "variación porcentual" : b.unit}{long && reading?.mode !== "variacion" ? " · categorías con cifra" : ""}</figcaption>
+            {reading?.mode === "variacion" ? (
+              <DataTable
+                head={["Categoría", "Inicial", "Final", "Variación"]}
+                highlightCol={2}
+                rows={labels.map((label) => {
+                  const item = readItem(label);
+                  const at = (cut: string | undefined, value: number | null | undefined) => (cut && value != null ? `${figure(value, b.format)} (${cut})` : "—");
+                  return { label, cells: [at(item?.from, item?.fromValue), at(item?.at, item?.toValue), readCell(label)] };
+                })}
+              />
+            ) : (
+              <HBars items={barItems} format={b.format} share={parts} width={128} reservedThreshold={threshold} />
+            )}
           </figure>
         )
       )}
@@ -2078,7 +2119,7 @@ export function compose(catalog: OpenDataCatalog, settings: BulletinSettings): C
       const nodes: { node: ReactNode; source: string; title: string; tight?: boolean }[] = [];
       if (kind === "desglose") {
         const b = report.breakdowns.find((x) => x.id === key);
-        if (b) breakdownUnit(b, catalog, settings).forEach(({ node, tight }) => nodes.push({ node, source: b.source, title: b.title, tight }));
+        if (b) breakdownUnit(b, catalog, settings, breakdownModeFor(report, b.id)).forEach(({ node, tight }) => nodes.push({ node, source: b.source, title: b.title, tight }));
       } else if (kind === "mapa") {
         const m = report.maps?.find((x) => x.id === key);
         if (m) nodes.push({ node: mapUnit(m, catalog, settings), source: m.source, title: m.title });

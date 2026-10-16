@@ -25,6 +25,8 @@
 import { useEffect, useState } from "react";
 import type { CSSProperties } from "react";
 import { cutTable, showsTotal, sumOfParts } from "../data/breakdown-total";
+import { formatVariation, readBreakdown } from "../data/kpi-options";
+import type { BreakdownMode, BreakdownReadItem } from "../data/kpi-options";
 import { formatReserved, formatValue, formatWithUnit } from "../data/open-data";
 import { ALL_YEARS, ANNUAL_RULE_LABEL, cutCode, cutCodeLabel, cutLabel, fromCutCode, termLabel, TERMS } from "../data/terms";
 import type { Breakdown, BreakdownItem, Term } from "../data/types";
@@ -52,7 +54,32 @@ const sameCut = (a: Cut | undefined, b: Cut | undefined) => Boolean(a && b && a.
 /** "periodo 2025-2" o "año 2025": el rótulo dice qué clase de corte es. */
 const cutText = (cut: Cut) => `${cut.term ? "periodo" : "año"} ${cutLabel(cut.year, cut.term)}`;
 
-export function BreakdownChart({ breakdown, year, term, years, setYear, setCut, csv }: {
+/** Variación por categoría: sin barras (puede ser negativa); la raya donde no hay base. */
+function VariationList({ items, label }: { items: BreakdownReadItem[]; label: string }) {
+  const max = Math.max(0, ...items.map((i) => Math.abs(i.value ?? 0))) || 1;
+  return (
+    <ul className="od-barlist" data-seen aria-label={label}>
+      {items.map((item) => (
+        <li
+          key={item.label}
+          className="od-barlist__item"
+          data-empty={item.value === null || undefined}
+          title={`${item.label}: ${formatVariation(item.value)}${item.from ? ` (${item.from}: ${formatValue(item.fromValue ?? null, "entero")} → ${item.at}: ${formatValue(item.toValue ?? null, "entero")})` : ""}`}
+        >
+          <span className="od-barlist__label">{item.label}</span>
+          <span className="od-barlist__value">{item.value === null ? "—" : formatVariation(item.value)}</span>
+          <span className="od-barlist__track" aria-hidden="true">
+            <span className="od-barlist__fill" style={{ "--w": `${item.value === null ? 0 : (Math.abs(item.value) / max) * 100}%` } as CSSProperties} />
+          </span>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+export function BreakdownChart({ breakdown, year, term, years, setYear, setCut, csv, mode = "promedio" }: {
+  /** Cómo se lee «todo el periodo»; el promedio anual si no se elige otra. */
+  mode?: BreakdownMode;
   breakdown: Breakdown;
   year: number;
   term: Term | null;
@@ -90,8 +117,13 @@ export function BreakdownChart({ breakdown, year, term, years, setYear, setCut, 
   // año no lo tiene, su último corte con dato (un año solo anual lee el año).
   // Todo el periodo: un único corte con el promedio anual de cada categoría.
   const grouped = year === ALL_YEARS;
+  // Otra lectura de «todo el periodo» (última cifra, variación): sale de los
+  // cortes reportados, no del promedio guardado.
+  const reading = grouped
+    ? readBreakdown(available.flatMap(cutsOf).map((cut) => ({ label: cutLabel(cut.year, cut.term), items: itemsAt(cut) })), labels, mode)
+    : null;
   const yearCuts = grouped
-    ? reported(breakdown.values[ALL_YEARS]) ? [{ year: ALL_YEARS, term: null }] : []
+    ? (reading ? reading.items.some((i) => i.value !== null || i.reserved) : reported(breakdown.values[ALL_YEARS])) ? [{ year: ALL_YEARS, term: null }] : []
     : available.includes(year) ? cutsOf(year) : [];
   const [pickedTerm, setPickedTerm] = useState<Term | "anual" | null>(null);
   // La ficha manda: al cambiar su corte, la elección local se suelta.
@@ -103,7 +135,7 @@ export function BreakdownChart({ breakdown, year, term, years, setYear, setCut, 
   // La ficha está en un periodo y este desglose, ese año, solo trae la cifra del año.
   const annualOnly = !grouped && term !== null && selected !== undefined && selected.term === null;
 
-  const partsOfWhole = breakdown.unit !== "%" && available.flatMap(cutsOf).every((cut) => itemsAt(cut).every((i) => i.value === null || i.value >= 0));
+  const partsOfWhole = reading?.mode !== "variacion" && breakdown.unit !== "%" && available.flatMap(cutsOf).every((cut) => itemsAt(cut).every((i) => i.value === null || i.value >= 0));
   const hasPeriods = available.some((y) => hasTerm(y, "A") || hasTerm(y, "B"));
   // La vista de entrada es la que fija la intranet. Composición pide partes de
   // un todo y más de un corte; si no los hay, abre en barras (una tasa) o circular.
@@ -143,7 +175,7 @@ export function BreakdownChart({ breakdown, year, term, years, setYear, setCut, 
   const withTotal = partsOfWhole && namesTotal;
   const table = cutTable(labels, cuts.map((cut) => ({ label: cutLabel(cut.year, cut.term), values: labels.map((label) => valueAt(label, cut)) })), withTotal);
 
-  const selectedItems = selected ? itemsAt(selected) : [];
+  const selectedItems: BreakdownItem[] = reading && selected && grouped ? reading.items : selected ? itemsAt(selected) : [];
   // Cuántas categorías del corte se callan por el umbral. Va en el subtítulo
   // para que viaje también en la imagen exportada, no solo en la pantalla.
   const reservedCount = selectedItems.filter((item) => item.reserved).length;
@@ -153,7 +185,7 @@ export function BreakdownChart({ breakdown, year, term, years, setYear, setCut, 
 
   const subtitle = series
     ? `Total institucional · ${cuts.length ? `${cutLabel(cuts[0].year, cuts[0].term)} a ${cutLabel(cuts[cuts.length - 1].year, cuts[cuts.length - 1].term)}` : "sin cortes"} · ${hasPeriods ? "por periodo" : "por año"} · ${breakdown.unit}`
-    : `Total institucional · ${grouped ? `periodo ${cutLabel(year, null)} · promedio anual` : selected ? cutText(selected) : cutText({ year, term })}${annualOnly ? " · dato anual, no se reporta por periodo" : ""} · ${breakdown.unit}${reserveNote}`;
+    : `Total institucional · ${grouped ? `periodo ${cutLabel(year, null)} · ${reading ? reading.caption : "promedio anual"}` : selected ? cutText(selected) : cutText({ year, term })}${annualOnly ? " · dato anual, no se reporta por periodo" : ""} · ${breakdown.unit}${reserveNote}`;
 
   return (
     <ChartFrame
@@ -227,7 +259,7 @@ export function BreakdownChart({ breakdown, year, term, years, setYear, setCut, 
       )}
 
       {!series ? (
-        !selected || !reported(selectedItems) ? (
+        !selected || !(reading ? selectedItems.some((i) => i.value !== null || i.reserved) : reported(selectedItems)) ? (
           <div className="od-empty">
             <p>
               {grouped || available.includes(year)
@@ -240,6 +272,8 @@ export function BreakdownChart({ breakdown, year, term, years, setYear, setCut, 
               </button>
             )}
           </div>
+        ) : reading?.mode === "variacion" ? (
+          <VariationList label={`${breakdown.title}, ${reading.caption}`} items={reading.items} />
         ) : shownView === "circular" ? (
           <Donut
             label={`${breakdown.title}, ${cutLabel(selected.year, selected.term)}`}

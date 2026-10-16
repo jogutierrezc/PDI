@@ -130,3 +130,126 @@ export const VARIATION_REASON_TEXT: Record<Exclude<KpiVariation["reason"], "calc
   "un-solo-dato": "sin base de comparación: solo hay una cifra reportada",
   "sin-base": "sin base de comparación: la cifra inicial es cero",
 };
+
+/* =============================================================================
+   Desgloses · cómo se lee la cifra de «todo el periodo».
+
+   Con el corte «Todos» un desglose mostraba siempre el promedio anual de cada
+   categoría. Cada desglose puede elegir otra lectura
+   (`settings.breakdownModes`, por clave de desglose, sin migración):
+
+   · «promedio»  (por defecto): lo de siempre, nada cambia.
+   · «ultima»    cada categoría toma su cifra más reciente con dato; el reparto
+                 (%) se calcula sobre esas cifras.
+   · «variacion» ((final − inicial) / inicial) × 100 por categoría, con inicial =
+                 su primera cifra reportada. Sin base (cero o una sola cifra): «—».
+
+   Un hueco (null) nunca es cero. Una celda reservada («< 5») cuenta como dato
+   presente pero no se lee: no se calcula nada con ella.
+   ========================================================================== */
+
+export type BreakdownMode = "promedio" | "ultima" | "variacion";
+
+export const BREAKDOWN_MODES: BreakdownMode[] = ["promedio", "ultima", "variacion"];
+
+export const BREAKDOWN_MODE_LABEL: Record<BreakdownMode, string> = {
+  promedio: "Promedio",
+  ultima: "Última cifra reportada",
+  variacion: "Variación porcentual",
+};
+
+export const BREAKDOWN_MODE_HINT: Record<BreakdownMode, string> = {
+  promedio: "Como hasta ahora: en «todo el periodo», el promedio anual de cada categoría.",
+  ultima: "Cada categoría toma su cifra más reciente con dato; el rótulo dice el corte (p. ej. 2025-2). Los % se calculan sobre esas cifras.",
+  variacion: "((final − inicial) / inicial) × 100 por categoría, con su primera cifra reportada como inicial. Si el inicial es cero, «—».",
+};
+
+/** La lectura de un desglose. Lo que falta o no se reconoce es el promedio. */
+export function breakdownModeOf(modes: Record<string, BreakdownMode> | undefined, id: string): BreakdownMode {
+  const mode = modes?.[id];
+  return mode && BREAKDOWN_MODES.includes(mode) ? mode : "promedio";
+}
+
+/** Lo que se guarda: solo las elecciones distintas del promedio; sin ninguna, nada. */
+export function cleanBreakdownModes(modes: Record<string, BreakdownMode | string> | undefined): Record<string, BreakdownMode> | undefined {
+  const kept: Record<string, BreakdownMode> = {};
+  for (const [id, mode] of Object.entries(modes ?? {})) {
+    if (mode !== "promedio" && BREAKDOWN_MODES.includes(mode as BreakdownMode)) kept[id] = mode as BreakdownMode;
+  }
+  return Object.keys(kept).length ? kept : undefined;
+}
+
+export function withBreakdownMode(modes: Record<string, BreakdownMode> | undefined, id: string, mode: BreakdownMode): Record<string, BreakdownMode> | undefined {
+  return cleanBreakdownModes({ ...modes, [id]: mode });
+}
+
+/** Un corte del desglose (un año o un periodo) con sus categorías, en orden cronológico. */
+export interface BreakdownCut {
+  label: string;
+  items: { label: string; value: number | null; reserved?: boolean }[];
+}
+
+export interface BreakdownReadItem {
+  label: string;
+  /** «ultima»: la cifra; «variacion»: el porcentaje. null = sin cifra o sin base. */
+  value: number | null;
+  reserved?: boolean;
+  /** Corte del que sale la cifra (el final, en la variación). */
+  at?: string;
+  /** Solo en la variación: corte y cifra inicial y final. */
+  from?: string;
+  fromValue?: number | null;
+  toValue?: number | null;
+}
+
+export interface BreakdownReading {
+  mode: Exclude<BreakdownMode, "promedio">;
+  items: BreakdownReadItem[];
+  /** «última cifra · 2025-2» o «variación 2020-1 → 2025-2». */
+  caption: string;
+}
+
+/**
+ * Lee un desglose por todo el periodo con la lectura elegida. Con el promedio
+ * devuelve null: quien llama sigue con su cifra de siempre.
+ */
+export function readBreakdown(cuts: BreakdownCut[], labels: string[], mode: BreakdownMode): BreakdownReading | null {
+  if (mode === "promedio") return null;
+  const find = (cut: BreakdownCut, label: string) => cut.items.find((i) => i.label === label);
+  const index = (label: string | undefined) => (label === undefined ? -1 : cuts.findIndex((c) => c.label === label));
+
+  if (mode === "ultima") {
+    const items: BreakdownReadItem[] = labels.map((label) => {
+      for (let i = cuts.length - 1; i >= 0; i -= 1) {
+        const item = find(cuts[i], label);
+        if (item && (isNumber(item.value) || item.reserved)) {
+          return item.reserved ? { label, value: null, reserved: true, at: cuts[i].label } : { label, value: item.value, at: cuts[i].label };
+        }
+      }
+      return { label, value: null };
+    });
+    const latest = items.reduce((best, i) => Math.max(best, index(i.at)), -1);
+    const mixed = items.some((i) => i.at !== undefined && index(i.at) !== latest);
+    const where = latest >= 0 ? cuts[latest].label : "sin cifras";
+    return { mode, items, caption: `última cifra · ${where}${mixed ? " (algunas categorías, de un corte anterior)" : ""}` };
+  }
+
+  let first = -1;
+  let last = -1;
+  const items: BreakdownReadItem[] = labels.map((label) => {
+    const reported: { i: number; value: number }[] = [];
+    cuts.forEach((cut, i) => {
+      const item = find(cut, label);
+      if (item && !item.reserved && isNumber(item.value)) reported.push({ i, value: item.value });
+    });
+    if (!reported.length) return { label, value: null };
+    const from = reported[0];
+    const to = reported[reported.length - 1];
+    first = first === -1 ? from.i : Math.min(first, from.i);
+    last = Math.max(last, to.i);
+    const base = { label, at: cuts[to.i].label, from: cuts[from.i].label, fromValue: from.value, toValue: to.value };
+    if (reported.length < 2 || from.value === 0) return { ...base, value: null };
+    return { ...base, value: ((to.value - from.value) / from.value) * 100 };
+  });
+  return { mode, items, caption: first >= 0 ? `variación ${cuts[first].label} → ${cuts[last].label}` : "variación · sin cifras" };
+}

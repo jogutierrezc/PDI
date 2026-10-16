@@ -123,7 +123,10 @@ export interface ContenidoSeccion {
   texto?: string;
   /** Pilares del PDI con los que se articula (id del pilar). */
   pilares?: string[];
+  /** Metas adicionales que escribe la unidad (las de sus indicadores no se guardan aquí). */
   metas?: Meta[];
+  /** Análisis por meta de los indicadores del programa, por clave de la cifra. */
+  observaciones?: Record<string, string>;
   filas?: string[][];
   logros?: Logro[];
   /** Último borrador de Pilo sin tocar: sirve para medir cuánto lo cambió la unidad. */
@@ -160,6 +163,8 @@ export interface CifraRow {
   foto_valor: number | null;
   foto_en: string | null;
   foto_fuente: string | null;
+  /** Programa, sede y dirección del indicador (filas «meta_…», 0165). */
+  consulta?: Record<string, unknown> | null;
 }
 
 export interface FuenteRow {

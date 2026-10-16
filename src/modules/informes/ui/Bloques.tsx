@@ -9,7 +9,7 @@ import { MAX_ANEXO, urlAnexo } from "../datos";
 import type { AnexoRow, Logro, Meta, PilarRef } from "../types";
 import { SemaforoPill, fmtFecha, mensajeDe } from "./comunes";
 
-const TONO_RESULTADO = { Superada: "is-ok", Cumplida: "is-teal", Parcial: "is-mid" } as const;
+export const TONO_RESULTADO = { Superada: "is-ok", Cumplida: "is-teal", Parcial: "is-mid" } as const;
 
 export function TablaPilares({ pilares, marcados, editable, cambiar }: { pilares: PilarRef[]; marcados: string[]; editable: boolean; cambiar: (ids: string[]) => void }) {
   if (!pilares.length) return <p className="inf-muted">No se pudieron leer los pilares del Plan de Desarrollo.</p>;

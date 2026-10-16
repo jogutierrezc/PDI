@@ -42,7 +42,7 @@ import { UNIT_ROLE } from "../../tableros/model";
 export type Level = "none" | "ver" | "editar" | "administrar";
 export type ModuleId =
   | "portal" | "plan" | "cifras" | "observatorio" | "impacto" | "tableros" | "reportes" | "informes"
-  | "monitor" | "warehouse" | "rankings" | "rutas" | "internacionalizacion" | "correos" | "pilo" | "sistema";
+  | "monitor" | "programas-en-cifras" | "warehouse" | "rankings" | "rutas" | "internacionalizacion" | "correos" | "pilo" | "sistema";
 export type TemplateId = "consulta" | "editor" | "administrador" | "personalizada";
 export type BoardRole = "visor" | "editor" | "jefe";
 
@@ -148,6 +148,14 @@ export const MODULES: ModuleDef[] = [
       ver: { hint: "Consulta el tablero de entregas y las plantillas, sin cambiarlas.", needs: "consulta" },
       editar: { hint: "Captura y valida plantillas.", needs: "responsable" },
       administrar: { hint: "Catálogos y reapertura.", needs: "planeacion" },
+    },
+  },
+  {
+    id: "programas-en-cifras",
+    label: "Programas en Cifras",
+    screens: [{ id: "programas-en-cifras", label: "Programas en Cifras", note: "director y coordinador entran por pertenencia, sin este rol; Planeación solo observa. Los roles especiales (Director y Coordinador de programa) se nombran dentro de la pantalla, en «Equipo»" }],
+    levels: {
+      ver: { hint: "Aparece en el menú; Planeación ve todos los programas, sin editar.", needs: "consulta" },
     },
   },
   {

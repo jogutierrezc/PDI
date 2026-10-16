@@ -18,12 +18,18 @@ import { INT_CLAVES, useCrearTabla, useGuardarFilas } from "../datos";
 import { analizarLibro, columnasParaCrear, hojaPorNombre, paraGuardar, prepararCarga } from "../lib/importador-excel";
 import type { HojaDetectada, LibroDetectado } from "../lib/importador-excel";
 import type { Columna, IntConceptoRow, IntEnvioRow, IntVentanaRow, LibroCompleto } from "../tipos";
-import { Cajon, fmt, nombreCampus } from "./comunes";
+import { MarcoAsistente } from "../../../components/espacio/MarcoAsistente";
+import { fmt, nombreCampus } from "./comunes";
 import type { Ctx } from "./comunes";
 import { escrituraPorCampus, PARTIDAS } from "./logica";
 import type { Partida } from "./logica";
 
 const LOTE = 500;
+const PILO = [
+  { animo: "feliz" as const, titulo: "Suba su Excel", texto: "Se lee en este equipo, sin subirlo a ningún lado. Yo emparejo cada encabezado con su concepto del catálogo." },
+  { animo: "piensa" as const, titulo: "Revise antes de guardar", texto: "Mire el emparejamiento de columnas y la vista previa. Las filas con error no se guardan; corríjalas en el Excel o en la hoja." },
+  { animo: "excelente" as const, titulo: "Guardando", texto: "Voy por lotes y la base revisa cada fila otra vez. En un momento verá las filas en la hoja." },
+];
 const COMO: Record<HojaDetectada["columnas"][number]["como"], string> = { exacto: "concepto", parecido: "concepto por parecido", propio: "campo propio", implicito: "va en la fila" };
 
 export function CargaExcel({
@@ -178,9 +184,11 @@ export function CargaExcel({
   const ocupado = Boolean(progreso) || crear.isPending;
 
   return (
-    <Cajon
+    <MarcoAsistente
       titulo="Cargar Excel"
-      ancho="ancho"
+      paso={ocupado ? 2 : leido ? 1 : 0}
+      pasos={3}
+      pilo={PILO[ocupado ? 2 : leido ? 1 : 0]}
       onCerrar={onCerrar}
       pie={
         <>
@@ -446,6 +454,6 @@ export function CargaExcel({
           )}
         </>
       )}
-    </Cajon>
+    </MarcoAsistente>
   );
 }

@@ -19,6 +19,8 @@ export interface ContextoSeccion {
   propias: CifraVista[];
   anexos: number;
   exigirFuente: boolean;
+  /** Metas que vienen de los indicadores del programa (0165). */
+  metasPrograma?: number;
 }
 
 /** Cifras que Planeación pide justificar y aún no tienen la línea. */
@@ -38,7 +40,8 @@ export function avanceSeccion(def: SeccionDef, c: ContenidoSeccion | null | unde
     }
     case "metas": {
       const m = x.metas ?? [];
-      return grado(m.length, m.length > 0 && m.every((f) => f.meta.trim() && f.alcanzado !== null));
+      const n = m.length + (ctx.metasPrograma ?? 0);
+      return grado(n, n > 0 && m.every((f) => f.meta.trim() && f.alcanzado !== null));
     }
     case "dim": {
       const pedidas = ctx.cifras.filter((v) => v.condicion === "justificar");
@@ -80,7 +83,11 @@ export function controlesSeccion(def: SeccionDef, c: ContenidoSeccion | null | u
   if (def.tipo === "narr" || def.tipo === "dim" || def.tipo === "matriz" || def.tipo === "pdi") {
     out.push(...validarTexto(x.texto ?? "", { claves: ctx.claves, minimo: def.tipo === "narr" ? def.minimo : undefined }));
   }
-  if (def.tipo === "metas") out.push((x.metas ?? []).length ? { nivel: "ok", texto: "Resultado calculado a partir de programado y alcanzado" } : { nivel: "warn", texto: "Aún no hay metas" });
+  if (def.tipo === "metas") {
+    const delPrograma = ctx.metasPrograma ?? 0;
+    if (delPrograma) out.push({ nivel: "ok", texto: `${delPrograma} ${delPrograma === 1 ? "meta viene" : "metas vienen"} de los indicadores del programa` });
+    out.push((x.metas ?? []).length || delPrograma ? { nivel: "ok", texto: "Resultado calculado a partir de programado y alcanzado" } : { nivel: "warn", texto: "Aún no hay metas" });
+  }
   if (def.tipo === "logros") {
     const sinEvidencia = (x.logros ?? []).filter((l) => l.anexo === null).length;
     if (sinEvidencia) out.push({ nivel: "warn", texto: `${sinEvidencia} ${sinEvidencia === 1 ? "logro" : "logros"} sin evidencia` });

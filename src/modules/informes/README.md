@@ -41,6 +41,17 @@ Tablero del ciclo (Planeación) · Mi informe (editor) · Revisión (Planeación
 ## Reglas de trabajo
 Sin commit. No se aplican migraciones ni se despliegan funciones (lo hace el usuario). Todo DELETE lleva WHERE (safeupdate, 0095). Solo tema claro. Textos en español. Pruebas con Vitest.
 
+## Objetivos y metas desde los indicadores del programa (migración 0165)
+En la sección `metas` de un informe cuya unidad es un **programa** (o una **facultad**, que suma los de sus programas) las filas no se escriben: salen de lo que el programa seleccionó en Impacto.
+- **Qué entra:** fichas adoptadas (`imp_adoptions` activas, publicadas) y indicadores propios (`imp_indicators.program_id`, no retirados), por cada sede donde el programa se ofrece. Quedan fuera los que el programa solo consulta (`program_reports = false`) y los medidos en pesos (el dinero sigue cerrado).
+- **Cómo:** `informe_metas_sincronizar(p_instancia)` (la llama el editor al abrir, solo con el informe en borrador o devuelto y para quien puede editarlo) deja una fila de `informe_cifras` por indicador y sede: clave `meta_<hash>`, fuente `pdi`, `meta` = meta del año del ciclo, `consulta` = programa, sede, origen y si el indicador debe bajar. El valor vivo, el «visto» y la **foto al enviar** son los de siempre (`informe_vivas_de` → `informe_valor_pdi`, que ahora también lee indicadores propios del programa no retirados). Enviado o aprobado no se sincroniza: manda la foto.
+- **Meta del año:** 2026 o antes → `target_2026_num`; 2028 o después → `target_2028_num`; 2027 → sin meta numérica (se muestra el texto de la ficha). La meta propia de la adopción manda sobre la de la ficha.
+- **Resultado:** `resultadoMeta` (Superada / Cumplida / Parcial) y `semaforo`; si el indicador debe bajar (deserción), estar por debajo supera la meta. Lógica pura en `metas-programa.ts`.
+- **Seguridad:** la función exige `informe_instancia_visible`; solo trae los indicadores del programa del informe (o de los programas de la facultad del informe). No abre `imp_*` a nadie más.
+- **Qué escribe la unidad:** un análisis por meta (`contenido.observaciones[clave]`) y, aparte, «Meta adicional» (`contenido.metas`, como antes). Si el programa no ha seleccionado indicadores, el editor lo dice y enlaza a `/admin/impacto/elegir`. Las demás unidades (vicerrectorías, rectorías) no cambian.
+- Las filas `meta_…` no cuentan como datos propios ni entran a la matriz o al texto (`[[clave]]`).
+- Los programas no tienen plantilla propia ni aparecen en el Tablero (`escribeInforme`): hoy no hay botón para abrirles informe (la base lo permite con `informe_abrir`; la plantilla sugerida sería B). Decisión de negocio pendiente.
+
 ## Esquema final (migración `0153_informes_institucionales.sql`)
 
 Lo que quedó en la base. La interfaz y `pilo-informes` se apoyan en esto; las pruebas están en `tests/informes/sql-*.test.ts`.

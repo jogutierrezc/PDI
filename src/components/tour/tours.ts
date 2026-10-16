@@ -304,6 +304,53 @@ export const TOURS: Tour[] = [
       { route: "/impacto/programas", target: "[data-tour='ipo-tour']", title: "Aquí estaré", body: "Cada gráfica tiene mi carita: tóquela y se la explico con sus propios datos. Este recorrido se repite desde aquí.", mood: "excelente" },
     ],
   },
+  {
+    id: "programas",
+    title: "Programas en Cifras",
+    scope: "intranet",
+    steps: [
+      { target: "[data-tour='pc-riel']", title: "Su espacio de trabajo", body: "A la izquierda están sus carpetas. «Cuadro Maestro CNA» reúne los cuadros que pide el CNA y «Reportes SNIES» las plantillas del Ministerio.", mood: "feliz" },
+      { target: "[data-tour='pc-nuevo']", title: "Cree tablas y listas", body: "«Nuevo» abre un asistente de cuatro pasos. Puede partir de cero, de su propio Excel o de la estructura exacta de un cuadro del CNA.", mood: "idea" },
+      { target: "[data-tour='es-archivos']", title: "Sus archivos", body: "Cada mosaico muestra el estado y a qué cuadro responde. Un clic muestra los detalles y un doble clic lo abre a pantalla completa.", mood: "bien" },
+      { target: "[data-tour='es-detalles']", title: "Detalles y cobertura", body: "Aquí ve cuánto cubre cada archivo del cuadro que responde. En la carpeta del CNA también están la ruta de periodos 01 y 02 y el botón para emitir.", mood: "piensa" },
+      { target: "[data-tour='pc-selector']", title: "Quién puede qué", body: "Elija su programa y campus. El Director y el Coordinador editan; Planeación observa todo, pero no modifica nada.", mood: "excelente" },
+    ],
+  },
+  {
+    id: "programas-editor",
+    title: "El editor de Programas en Cifras",
+    scope: "intranet",
+    steps: [
+      { target: "[data-tour='es-hoja']", title: "La hoja de trabajo", body: "Escriba directamente en las celdas. Lo mal escrito se marca en rojo al instante. Ctrl+V pega un rango desde Excel y el encabezado ordena.", mood: "feliz" },
+      { target: "[data-tour='es-herramientas']", title: "Buscar, ordenar y organizar", body: "Busque en todo el archivo, oculte columnas, fije la primera y cambie entre tabla y lista.", mood: "idea" },
+      { target: "[data-tour='pc-campos']", title: "Campos", body: "Defina qué guarda cada columna: texto, número, fecha, lista o porcentaje, y cuáles son obligatorias.", mood: "piensa" },
+      { target: "[data-tour='pc-responde']", title: "Responde a", body: "Aquí une cada columna con la que pide el CNA o el SNIES. Con «Ver la salida» comprueba cómo quedaría en el cuadro.", mood: "bien" },
+      { target: "[data-tour='pc-listo']", title: "Márquelo como listo", body: "Cuando no queden errores, márquelo como listo. Planeación lo verá en «Listos para Planeación».", mood: "excelente" },
+    ],
+  },
+  {
+    id: "internacionalizacion-tablas",
+    title: "Las tablas de Internacionalización",
+    scope: "intranet",
+    steps: [
+      { route: "/admin/internacionalizacion/tablas", target: "[data-tour='int-tablas']", title: "Sus tablas, como archivos", body: "Cada tabla del repositorio es un archivo, agrupado por la clase de sus hojas: movilidad, convenios y general. Un clic muestra sus detalles y un doble clic la abre a pantalla completa.", mood: "feliz" },
+      { target: "[data-tour='int-campus']", title: "Elija el campus", body: "Vea las filas de todos sus campus o de uno solo. El campus que elija es el de las filas nuevas y el del envío.", mood: "idea" },
+      { target: "[data-tour='es-archivos']", title: "Una mirada al avance", body: "Cada tabla dice cuántas de sus hojas están aprobadas en los campus que usted ve. Cambie entre mosaicos y lista, o filtre por lo que falta.", mood: "bien" },
+      { target: "[data-tour='es-detalles']", title: "Detalles de la tabla", body: "Aquí ve el estado de cada hoja por campus: borrador, enviado, validado o aprobado. El Director agrega hojas y borra tablas desde aquí.", mood: "piensa" },
+      { target: "[data-tour='int-nueva']", title: "Nueva tabla", body: "El Director crea una tabla con un asistente de cuatro pasos —conceptos del catálogo y campos propios— o la sube desde un Excel.", mood: "excelente" },
+    ],
+  },
+  {
+    id: "internacionalizacion-hoja",
+    title: "La hoja de captura",
+    scope: "intranet",
+    steps: [
+      { target: "[data-tour='es-hoja']", title: "La hoja de captura", body: "Escriba en las celdas o pegue un rango de Excel con Ctrl+V. Lo mal escrito se marca en rojo al instante, y las columnas calculadas se llenan solas.", mood: "feliz" },
+      { target: "[data-tour='int-envio']", title: "Envío y validación", body: "Aquí está el flujo: el campus envía, el coordinador valida o devuelve con nota, y el Director aprueba o reabre con motivo. Cada papel ve solo sus acciones.", mood: "idea" },
+      { target: "[data-tour='es-herramientas']", title: "Buscar y organizar", body: "Busque en todas las filas, oculte columnas, fije la primera y cambie entre tabla y lista.", mood: "bien" },
+      { target: "[data-tour='es-pestanas']", title: "Las hojas, al pie", body: "Cada hoja de la tabla es una pestaña, como en Excel. Guarde antes de cambiar: las filas con error no se guardan.", mood: "excelente" },
+    ],
+  },
 ];
 
 export const tourById = (id: string) => TOURS.find((t) => t.id === id);

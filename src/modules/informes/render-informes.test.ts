@@ -59,6 +59,7 @@ vi.mock("./datos", async (orig) => {
     useGuardarCifra: m,
     useAsegurarCifras: m,
     useQuitarCifra: m,
+    useSincronizarMetas: m,
     useEnviar: m,
     useRevisar: m,
     useSubirAnexo: m,

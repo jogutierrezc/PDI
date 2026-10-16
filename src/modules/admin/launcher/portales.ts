@@ -192,6 +192,20 @@ export const MODULES: Record<ModuleId, ModuleMeta> = {
       ];
     },
   },
+  "programas-en-cifras": {
+    text: "Los cuadros del CNA y las plantillas del SNIES de cada programa y campus, como en OneDrive",
+    color: "var(--wall-programas-en-cifras)",
+    rank: 5.7,
+    sections: () => [
+      {
+        title: "Mi programa",
+        cards: [
+          { key: "pec", title: "Programas en Cifras", text: "Tablas y listas con el Cuadro Maestro del CNA, periodos y emisión", to: "/admin/programas-en-cifras" },
+          { key: "pec-equipo", title: "Equipo y accesos", text: "Quién es Director o Coordinador de cada programa y campus", to: "/admin/programas-en-cifras?seccion=equipo", when: (ctx) => ctx.hasRole("admin") },
+        ],
+      },
+    ],
+  },
   monitor: {
     text: "Cómo van las notas por facultad, programa, grupo y estudiante, con alertas tempranas",
     color: "var(--wall-monitor)",

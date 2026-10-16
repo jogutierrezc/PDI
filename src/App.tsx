@@ -200,6 +200,7 @@ const Correos = lazy(() =>
 );
 const Rutas = lazy(() => import("./modules/rutas/Rutas").then((m) => ({ default: m.Rutas })));
 const RutasPublico = lazy(() => import("./modules/rutas/RutasPublico").then((m) => ({ default: m.RutasPublico })));
+const ProgramasEnCifras = lazy(() => import("./modules/programas-en-cifras/ui/ProgramasEnCifras").then((m) => ({ default: m.ProgramasEnCifras })));
 const Internacionalizacion = lazy(() =>
   import("./modules/internacionalizacion/ui/Internacionalizacion").then((m) => ({ default: m.Internacionalizacion })),
 );
@@ -449,6 +450,15 @@ export default function App() {
             element={
               <RequireRole minimum="consulta" screen="internacionalizacion">
                 <Internacionalizacion />
+              </RequireRole>
+            }
+          />
+          {/* Programas en Cifras: pantalla completa; pertenecer a pc_miembros (0164) es el permiso. */}
+          <Route
+            path="/admin/programas-en-cifras"
+            element={
+              <RequireRole minimum="consulta" screen="programas-en-cifras">
+                <ProgramasEnCifras />
               </RequireRole>
             }
           />

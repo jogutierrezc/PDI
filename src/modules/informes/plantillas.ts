@@ -114,7 +114,7 @@ export const LETRAS: Plantilla[] = ["A", "B", "C", "D"];
 export const AYUDA_TIPO: Record<TipoSeccion, string> = {
   narr: "Lo escribe la unidad",
   pdi: "Pilares y avance vienen del Plan de Desarrollo; usted marca con cuáles se articula",
-  metas: "Lo escribe la unidad. El resultado se calcula solo",
+  metas: "En un programa o facultad vienen de los indicadores del programa; el resultado se calcula solo",
   dim: "Las cifras vienen solas; usted explica lo que no se ve en ellas",
   matriz: "La matriz se arma con las cifras de las secciones anteriores",
   filas: "Una fila por punto, con acción y fecha",

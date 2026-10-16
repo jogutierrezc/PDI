@@ -63,7 +63,8 @@ export type AdminScreen =
   | "internacionalizacion"
   | "informes"
   | "warehouse"
-  | "monitor";
+  | "monitor"
+  | "programas-en-cifras";
 
 /** Un rol de acceso: qué puede hacer, qué pantallas ve y sobre qué informes escribe. */
 export interface AccessRole {
@@ -1906,3 +1907,168 @@ export type RankingEvidenceExt = Omit<RankingEvidenceRow, "kind"> & {
   kind: "file" | "url" | "nota";
   biblioteca: string | null;
 };
+
+/* --- Programas en Cifras (migración 0164) ------------------------------------------- */
+
+export type PcRol = "director" | "coordinador";
+export type PcTipo = "texto" | "numero" | "fecha" | "lista" | "porcentaje";
+export type PcEstado = "borrador" | "listo";
+export type PcArchivoTipo = "tabla" | "lista";
+export type PcSistema = "CNA" | "SNIES";
+/** Un valor de celda: número, fecha «AAAA-MM-DD», opción de la lista o texto. */
+export type PcValor = string | number | null;
+
+/** Quién trabaja en qué programa y campus (`pc_miembros`). */
+export interface PcMiembroRow {
+  id: string;
+  user_id: string;
+  rol: PcRol;
+  programa_id: string;
+  campus_id: string;
+  created_at: string;
+}
+
+/** Lista cerrada de valores (`pc_dominios`): lo que el CNA o el SNIES aceptan. */
+export interface PcDominioRow {
+  id: string;
+  nombre: string;
+  opciones: string[];
+  /** El CNA numera sus listas («1. Doctorado»): al emitir se antepone la posición. */
+  numerado: boolean;
+}
+
+/** Un cuadro del CNA o una plantilla del SNIES a la que un archivo puede responder (`pc_destinos`). */
+export interface PcDestinoRow {
+  id: string;
+  sistema: PcSistema;
+  /** Id de la plantilla SNIES de Reportes («participante», «graduados»…); nulo en el CNA. */
+  plantilla: string | null;
+  nombre: string;
+  /** «01» … «10» en el CNA. */
+  cuadro: string | null;
+  orden: number;
+  /** Texto de «lo llena el sistema»: el cuadro no tiene archivo. Nulo si lo llena el programa. */
+  automatico: string | null;
+  /** Los archivos de este destino no cambian ni quitan columnas. */
+  estructura_bloqueada: boolean;
+  /** Solo para programas del área de la salud (cuadro 10). */
+  solo_salud: boolean;
+  tipo_archivo: PcArchivoTipo;
+  carpeta: "cna" | "snies";
+}
+
+export interface PcDestinoColumnaRow {
+  id: string;
+  destino_id: string;
+  clave: string;
+  etiqueta: string;
+  tipo: PcTipo;
+  obligatorio: boolean;
+  dominio_id: string | null;
+  /** Origen de sistema (p. ej. «Warehouse»): la columna no se edita. */
+  solo_lectura: string | null;
+  /** Clave de la fecha que esta debe igualar o superar («fin ≥ inicio»). */
+  posterior_a: string | null;
+  /** Dato personal (documento, nombres): lleva la autorización de datos al emitir. */
+  personal: boolean;
+  orden: number;
+  nota: string;
+}
+
+/** Carpeta: las tres fijas (`fija`, sin programa) o una propia de un programa y campus. */
+export interface PcCarpetaRow {
+  id: string;
+  clave: string | null;
+  programa_id: string | null;
+  campus_id: string | null;
+  nombre: string;
+  subtitulo: string;
+  orden: number;
+  fija: boolean;
+}
+
+export interface PcArchivoRow {
+  id: string;
+  programa_id: string;
+  campus_id: string;
+  carpeta_id: string;
+  nombre: string;
+  tipo: PcArchivoTipo;
+  estado: PcEstado;
+  /** Estructura fijada por el CNA: no se cambian ni se quitan columnas ni se borra el archivo. */
+  bloqueado: boolean;
+  destino_origen: string | null;
+  listo_en: string | null;
+  listo_por: string | null;
+  created_by: string | null;
+  updated_by: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface PcColumnaRow {
+  id: string;
+  archivo_id: string;
+  clave: string;
+  etiqueta: string;
+  tipo: PcTipo;
+  obligatorio: boolean;
+  opciones: string[];
+  solo_lectura: string | null;
+  posterior_a: string | null;
+  personal: boolean;
+  orden: number;
+}
+
+export interface PcFilaRow {
+  id: string;
+  archivo_id: string;
+  programa_id: string;
+  campus_id: string;
+  datos: Record<string, PcValor>;
+  orden: number;
+  origen: "manual" | "excel" | "sistema";
+  created_by: string | null;
+  updated_by: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+/** Mapa de un archivo hacia un destino: {clave de la columna del destino → clave de la columna del archivo}. */
+export type PcMapa = Record<string, string>;
+
+export interface PcRespuestaRow {
+  id: string;
+  archivo_id: string;
+  destino_id: string;
+  mapa: PcMapa;
+  updated_at: string;
+}
+
+/** Ventana de observación de un programa y campus: los últimos `anios` años hasta el periodo `hasta`. */
+export interface PcVentanaRow {
+  programa_id: string;
+  campus_id: string;
+  anios: 5 | 6 | 8 | 10;
+  hasta: string;
+  updated_at: string;
+}
+
+export interface PcPeriodoCerradoRow {
+  programa_id: string;
+  campus_id: string;
+  codigo: string;
+  cerrado_en: string;
+  cerrado_por: string | null;
+}
+
+export interface PcActividadRow {
+  id: number;
+  programa_id: string;
+  campus_id: string;
+  archivo_id: string | null;
+  accion: string;
+  detalle: Record<string, unknown>;
+  actor: string | null;
+  en: string;
+}

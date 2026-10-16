@@ -55,7 +55,8 @@ export type AdminSection =
   | "internacionalizacion"
   | "informes"
   | "warehouse"
-  | "monitor";
+  | "monitor"
+  | "programas-en-cifras";
 
 export interface NavItem {
   id: AdminSection;
@@ -67,7 +68,7 @@ export interface NavItem {
 }
 
 export interface NavGroup {
-  id: "planeacion" | "pdi" | "cifras" | "observatorio" | "impacto" | "tableros" | "reportes" | "informes" | "internacionalizacion" | "rankings" | "warehouse" | "monitor" | "sistema";
+  id: "planeacion" | "pdi" | "cifras" | "observatorio" | "impacto" | "tableros" | "reportes" | "informes" | "internacionalizacion" | "rankings" | "warehouse" | "monitor" | "programas-en-cifras" | "sistema";
   label: string;
   /** Ícono y nombre corto: el riel solo tiene 78 px, ahí no cabe el rótulo largo. */
   icon: IconName;
@@ -172,6 +173,17 @@ export const navigation: NavGroup[] = [
     label: "Monitor de alertas",
     items: [
       { id: "monitor", label: "Alertas tempranas de notas", icon: "spark-chart", to: "/admin/monitor-alertas", minimum: "consulta" },
+    ],
+  },
+  {
+    // Cada programa, en cada campus, trabaja sus cuadros del CNA y plantillas del SNIES como en OneDrive.
+    // Lo ve quien es Director o Coordinador (pc_miembros), Planeación y la administración.
+    id: "programas-en-cifras",
+    icon: "folder",
+    short: "Programas",
+    label: "Programas en Cifras",
+    items: [
+      { id: "programas-en-cifras", label: "Programas en Cifras", icon: "folder", to: "/admin/programas-en-cifras", minimum: "consulta" },
     ],
   },
   {

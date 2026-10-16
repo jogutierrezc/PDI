@@ -1,0 +1,699 @@
+(function () {
+  "use strict";
+  var reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  var G = window.gsap, TC = window.TableCore;
+  var $ = function (s, r) { return (r || document).querySelector(s); };
+  var $$ = function (s, r) { return Array.prototype.slice.call((r || document).querySelectorAll(s)); };
+  var esc = function (s) { return String(s == null ? "" : s).replace(/[&<>"]/g, function (c) { return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]; }); };
+  var norm = function (s) { return String(s == null ? "" : s).toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/[^a-z0-9]+/g, " ").trim(); };
+  function anim(fn) { if (G && !reduce) fn(G); }
+
+  /* ---- Iconos ---------------------------------------------------------------------- */
+  var P = {
+    folder: '<path d="M3 7.5A1.5 1.5 0 014.5 6h4l2 2.2h9A1.5 1.5 0 0121 9.7V17a1.5 1.5 0 01-1.5 1.5h-15A1.5 1.5 0 013 17V7.5z"/>',
+    tabla: '<rect x="3.5" y="4.5" width="17" height="15" rx="1.8"/><path d="M3.5 9.5h17M3.5 14.5h17M9.2 4.5v15M14.8 4.5v15"/>',
+    lista: '<path d="M9 7h11M9 12h11M9 17h11"/><circle cx="4.8" cy="7" r="1.1"/><circle cx="4.8" cy="12" r="1.1"/><circle cx="4.8" cy="17" r="1.1"/>',
+    plus: '<path d="M12 5v14M5 12h14"/>', up: '<path d="M12 16V5m0 0L7.5 9.5M12 5l4.5 4.5M5 19h14"/>', search: '<circle cx="11" cy="11" r="6"/><path d="M20 20l-4.2-4.2"/>',
+    chev: '<path d="M9 6l6 6-6 6"/>', x: '<path d="M6 6l12 12M18 6L6 18"/>', back: '<path d="M15 6l-6 6 6 6"/>',
+    tiles: '<rect x="4" y="4" width="6.5" height="6.5" rx="1"/><rect x="13.5" y="4" width="6.5" height="6.5" rx="1"/><rect x="4" y="13.5" width="6.5" height="6.5" rx="1"/><rect x="13.5" y="13.5" width="6.5" height="6.5" rx="1"/>',
+    rows: '<path d="M4 6h16M4 12h16M4 18h16"/>', info: '<circle cx="12" cy="12" r="8.5"/><path d="M12 11v5M12 8v.1"/>',
+    check: '<path d="M5 12.5l4.2 4.2L19 7"/>', lock: '<rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 018 0v3"/>',
+    warn: '<path d="M12 4l9 15.5H3L12 4z"/><path d="M12 10v4.5M12 17v.1"/>', cols: '<rect x="4" y="4.5" width="16" height="15" rx="1.8"/><path d="M10 4.5v15M15 4.5v15"/>',
+    link: '<path d="M10 14a4 4 0 005.7 0l3-3a4 4 0 00-5.7-5.7l-1 1M14 10a4 4 0 00-5.7 0l-3 3A4 4 0 0011 18.7l1-1"/>',
+    sort: '<path d="M12 5v14m0 0l-4-4m4 4l4-4"/>', trash: '<path d="M5 7h14M10 7V4.5h4V7M7 7l1 12.5h8L17 7"/>',
+    pen: '<path d="M4 20l1-4L16 5a2 2 0 013 3L8 19l-4 1z"/>', play: '<path d="M8 5.5v13l11-6.5-11-6.5z"/>', eye: '<path d="M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12z"/><circle cx="12" cy="12" r="3"/>',
+    clock: '<circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/>', share: '<path d="M7 12v6.5h10V12M12 4v10m0-10L8.5 7.5M12 4l3.5 3.5"/>', pin: '<path d="M8 4h8M10 4v6l-3 4h10l-3-4V4M12 14v6"/>',
+    star: '<path d="M12 4l2.4 5 5.5.7-4 3.8 1 5.5-4.9-2.7-4.9 2.7 1-5.5-4-3.8 5.5-.7L12 4z"/>', lib: '<path d="M5 4.5h4v15H5zM11 4.5h4v15h-4zM17 6l3.5 1-3.4 12-3.5-1z"/>'
+  };
+  function ic(n, cls) { return '<svg class="' + (cls || "") + '" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' + P[n] + "</svg>"; }
+
+  /* ---- Catálogo de destinos: lo que piden el CNA y el SNIES ----------------------------- */
+  var CATEG = ["A1", "A", "B", "C", "Reconocido"], TIPOPROY = ["Investigación", "Creación", "Innovación", "Extensión"];
+  var NIV = ["Doctorado", "Maestría", "Especialización", "Profesional"], TDOC = ["Cédula de ciudadanía", "Tarjeta de identidad", "Cédula de extranjería", "Pasaporte"], SEXO = ["Hombre", "Mujer", "Intersexual"];
+  var TARGETS = {
+    cna01: { sis: "CNA", nm: "Cuadro 01 · General", cols: [["Registro Único y modalidades"], ["Resolución de Registro Calificado"], ["Resolución de acreditación"], ["Fecha de diligenciamiento"], ["Fecha de autoevaluación"]] },
+    cna02: { sis: "CNA", nm: "Cuadro 02 · Estudiantes", auto: "Lo llena el sistema con Reportes SNIES y el Warehouse; el programa solo confirma la deserción.", cols: [["Inscritos"], ["Admitidos"], ["Matriculados"], ["Primer curso"], ["Graduados"], ["% deserción al finalizar"]] },
+    cna03: { sis: "CNA", nm: "Cuadro 03 · Profesores resumen", auto: "Lo llena el sistema con la nómina docente del Warehouse.", cols: [["Término indefinido"], ["Término fijo"], ["Hora cátedra"], ["Tiempo completo y medio tiempo"], ["Nivel de formación"]] },
+    cna05: { sis: "CNA", nm: "Cuadro 05 · Interacción de profesores", auto: "Viene de Internacionalización, ya aprobado por campus.", cols: [["Profesor"], ["Institución"], ["País"], ["Fechas"], ["Tipo de movilidad"]] },
+    cna06: { sis: "CNA", nm: "Cuadro 06 · Interacción de estudiantes", auto: "Viene de Internacionalización, ya aprobado por campus.", cols: [["Estudiante"], ["Institución"], ["País"], ["Fechas"], ["Tipo de movilidad"]] },
+    cna07: { sis: "CNA", nm: "Cuadro 07 · Grupos y líneas", cols: [["Nombre del grupo de investigación o creación"], ["Código del grupo en MinCiencias"], ["Categoría 957 de 2024", CATEG], ["Líneas de investigación"]] },
+    cna08: { sis: "CNA", nm: "Cuadro 08 · Proyectos y productos", cols: [["Nombre del proyecto"], ["Tipo de proyecto", TIPOPROY], ["Financiador"], ["Inicio"], ["Fin"], ["Profesores del programa"], ["Estudiantes del programa"]] },
+    cna09: { sis: "CNA", nm: "Cuadro 09 · Bienestar", cols: [["Estrategia, programa o servicio"], ["Año de realización"], ["Actividades realizadas"], ["Estudiantes participantes"], ["Profesores participantes"], ["Administrativos participantes"]] },
+    cna04: { sis: "CNA", nm: "Cuadro 04 · Profesores detallado", cols: [["Cédula"], ["Nombres y apellidos"], ["Tipo de contratación"], ["Horas de docencia"], ["Nivel máximo de formación", NIV], ["Enlace CvLAC u ORCID"], ["Horas de investigación"]] },
+    snpart: { sis: "SNIES", nm: "Plantilla Participante", cols: [["Tipo de documento", TDOC], ["Número de documento"], ["Primer nombre"], ["Primer apellido"], ["Sexo biológico", SEXO], ["Fecha de nacimiento"], ["País de nacimiento"]] },
+    sngrad: { sis: "SNIES", nm: "Plantilla Graduados", cols: [["Código del programa"], ["Tipo de documento", TDOC], ["Número de documento"], ["Fecha de grado"], ["Título otorgado"]] }
+  };
+  var SYN = [["cedula", "numero de documento", "documento", "identificacion", "nro documento"], ["nombre del grupo de investigacion o creacion", "grupo", "nombre del grupo", "grupo de investigacion"], ["codigo del grupo en minciencias", "codigo grupo", "codigo minciencias"],
+    ["nombre del proyecto", "proyecto", "titulo del proyecto"], ["estrategia programa o servicio", "estrategia", "servicio", "actividad"], ["primer nombre", "nombre", "nombres"], ["primer apellido", "apellido", "apellidos"],
+    ["fecha de grado", "grado", "fecha graduacion"], ["titulo otorgado", "titulo", "titulo obtenido"], ["sexo biologico", "sexo", "genero"], ["pais de nacimiento", "pais"], ["inicio", "fecha de inicio", "fecha inicial"], ["fin", "fecha de fin", "fecha final", "fecha de vencimiento"],
+    ["enlace cvlac u orcid", "cvlac", "orcid"], ["nombres y apellidos", "nombre completo", "profesor"]];
+  function score(a, b) {
+    var na = norm(a), nb = norm(b); if (!na || !nb) return 0; if (na === nb) return 3;
+    for (var i = 0; i < SYN.length; i++) { var g = SYN[i]; if (g.indexOf(na) >= 0 && g.indexOf(nb) >= 0) return 2.5; }
+    if (na.length >= 4 && nb.length >= 4 && (na.indexOf(nb) >= 0 || nb.indexOf(na) >= 0)) return 2;
+    return 0;
+  }
+  function autoMap(f, tid) {
+    var used = {}, t = TARGETS[tid];
+    return t.cols.map(function (tc) {
+      var best = null, bs = 0;
+      f.cols.forEach(function (c) { var s = score(c.l, tc[0]); if (s > bs && !used[c.k]) { bs = s; best = c.k; } });
+      if (best && bs >= 2) { used[best] = 1; return best; }
+      return null;
+    });
+  }
+  function covOf(f, tid) { var m = (f.resp[tid] || {}).map || []; var n = m.filter(Boolean).length, t = TARGETS[tid].cols.length; return { n: n, t: t, pct: Math.round((n / t) * 100) }; }
+  function issuesOf(f, tid) {
+    var m = (f.resp[tid] || {}).map || [], out = [];
+    TARGETS[tid].cols.forEach(function (tc, i) {
+      if (!tc[1] || !m[i]) return;
+      var bad = f.rows.map(function (r) { return String(r[m[i]] == null ? "" : r[m[i]]).trim(); }).filter(function (v) { return v && tc[1].indexOf(v) < 0; });
+      if (bad.length) out.push(bad.length + (bad.length === 1 ? " valor" : " valores") + " de «" + tc[0] + "» no están en la lista del " + TARGETS[tid].sis + " (por ejemplo «" + bad[0] + "»).");
+    });
+    return out;
+  }
+
+  /* ---- Validación -------------------------------------------------------------------- */
+  var TIPOS = { x: "Texto", n: "Número", d: "Fecha", l: "Lista", p: "Porcentaje" };
+  function valida(c, v) {
+    v = v == null ? "" : String(v).trim();
+    if (!v) return c.req ? "Obligatorio" : "";
+    if (c.t === "n") return /^\d+([.,]\d+)?$/.test(v) ? "" : "Escriba un número";
+    if (c.t === "p") { var n = parseFloat(v.replace(",", ".")); return isNaN(n) || n < 0 || n > 100 ? "Entre 0 y 100" : ""; }
+    if (c.t === "d") return /^\d{4}-\d{2}-\d{2}$/.test(v) && !isNaN(Date.parse(v)) ? "" : "Use AAAA-MM-DD";
+    if (c.t === "l") return (c.opts || []).indexOf(v) >= 0 ? "" : "Elija de la lista";
+    return "";
+  }
+  function cellError(f, r, c) {
+    if (c.ro) return "";
+    var m = valida(c, r[c.k]); if (m) return m;
+    if (c.k === "fn" && f.cols.some(function (x) { return x.k === "ini"; }) && r.ini && r.fn && !valida(c, r.fn) && r.fn < r.ini) return "El fin es anterior al inicio";
+    return "";
+  }
+  function errCount(f) { var n = 0; f.rows.forEach(function (r) { f.cols.forEach(function (c) { if (cellError(f, r, c)) n++; }); }); return n; }
+
+  /* ---- Estado y datos de ejemplo ---------------------------------------------------------- */
+  var ROLES = { dir: { nm: "Director de programa", edit: true }, coord: { nm: "Coordinador de programa", edit: true }, plan: { nm: "Planeación", edit: false } };
+  var FOLDERS = [{ id: "cna", nm: "Cuadro Maestro CNA 2026", sub: "Cuadros que pide el CNA" }, { id: "snies", nm: "Reportes SNIES", sub: "Plantillas del Ministerio" }, { id: "trabajo", nm: "Trabajo del programa", sub: "Tablas y listas propias" }];
+  var PROGS = ["Ingeniería de Sistemas", "Derecho", "Medicina", "Enfermería"];
+  var S = { rol: "dir", prog: PROGS[0], nav: "archivos", folder: null, vista: "tiles", filtro: "todos", sel: null, info: true, files: [], per: {}, emitido: null, uid: 20 };
+  var PER = []; for (var yy = 2021; yy <= 2025; yy++) { PER.push(yy + "-01"); PER.push(yy + "-02"); }
+  PER.forEach(function (k) { S.per[k] = k < "2025-01"; });
+  function C(k, l, t, o) { o = o || {}; var c = { k: k, l: l, t: t || "x" }; for (var i in o) c[i] = o[i]; return c; }
+  function seed() {
+    S.files = [
+      { id: "f1", nm: "07 Grupos y líneas", kind: "tabla", folder: "cna", est: "borrador", ago: 95, locked: 1, resp: { cna07: {} },
+        cols: [C("gr", "Nombre del grupo de investigación o creación", "x", { req: 1 }), C("cod", "Código del grupo en MinCiencias", "x", { req: 1 }), C("cat", "Categoría 957 de 2024", "l", { req: 1, opts: CATEG }), C("lin", "Líneas de investigación", "x")],
+        rows: [{ gr: "Grupo de Investigación en Ingeniería de Software", cod: "COL0054321", cat: "B", lin: "Calidad de software; analítica de datos" }, { gr: "Grupo de Ciencias de la Computación", cod: "COL0067890", cat: "C", lin: "Algoritmos" }, { gr: "Grupo de Redes y Seguridad", cod: "COL0099002", cat: "Z", lin: "" }] },
+      { id: "f2", nm: "08 Proyectos y productos", kind: "tabla", folder: "cna", est: "borrador", ago: 300, locked: 1, resp: { cna08: {} },
+        cols: [C("pro", "Nombre del proyecto", "x", { req: 1 }), C("tip", "Tipo de proyecto", "l", { req: 1, opts: TIPOPROY }), C("fin", "Financiador", "x"), C("ini", "Inicio", "d", { req: 1 }), C("fn", "Fin", "d", { req: 1 }), C("prf", "Profesores del programa", "n"), C("est", "Estudiantes del programa", "n")],
+        rows: [{ pro: "Plataforma de alertas tempranas", tip: "Investigación", fin: "UDES", ini: "2024-02-01", fn: "2025-11-30", prf: "3", est: "6" }, { pro: "Observatorio de egresados", tip: "Extensión", fin: "UDES", ini: "2025-03-01", fn: "2025-12-15", prf: "2", est: "8" }, { pro: "Laboratorio de IoT", tip: "Innovación", fin: "MinCiencias", ini: "2025-06-10", fn: "2025-01-30", prf: "4", est: "10" }, { pro: "Modelo de analítica académica", tip: "Investigación", fin: "", ini: "2023-08-01", fn: "2024-12-20", prf: "2", est: "4" }] },
+      { id: "f3", nm: "09 Bienestar", kind: "tabla", folder: "cna", est: "listo", ago: 1500, locked: 1, resp: { cna09: {} },
+        cols: [C("est", "Estrategia, programa o servicio", "x", { req: 1 }), C("ano", "Año de realización", "n", { req: 1 }), C("act", "Actividades realizadas", "n", { req: 1 }), C("ne", "Estudiantes participantes", "n"), C("np", "Profesores participantes", "n"), C("na", "Administrativos participantes", "n")],
+        rows: [{ est: "Tutorías entre pares", ano: "2024", act: "36", ne: "120", np: "0", na: "0" }, { est: "Salud mental y bienestar", ano: "2025", act: "24", ne: "210", np: "15", na: "30" }] },
+      { id: "f4", nm: "04 Profesores detallado", kind: "tabla", folder: "cna", est: "borrador", ago: 2900, locked: 1, resp: { cna04: {} },
+        cols: [C("ced", "Cédula", "x", { ro: "Warehouse" }), C("nom", "Nombres y apellidos", "x", { ro: "Warehouse" }), C("ctr", "Tipo de contratación", "x", { ro: "Warehouse" }), C("hd", "Horas de docencia", "n", { ro: "Warehouse" }), C("niv", "Nivel máximo de formación", "l", { req: 1, opts: NIV }), C("cv", "Enlace CvLAC u ORCID", "x", { req: 1 }), C("hi", "Horas de investigación", "n", { req: 1 })],
+        rows: [{ ced: "1098765432", nom: "Marta Elena Ruiz Pardo", ctr: "Indefinido TC", hd: "18", niv: "Doctorado", cv: "https://scienti.minciencias.gov.co/cvlac/1", hi: "12" }, { ced: "91234567", nom: "Carlos Andrés Vega León", ctr: "Fijo TC", hd: "16", niv: "Maestría", cv: "", hi: "" }, { ced: "63456789", nom: "Luisa Fernanda Mora", ctr: "Cátedra", hd: "8", niv: "", cv: "", hi: "" }, { ced: "13987654", nom: "Jorge Iván Castro", ctr: "Indefinido MT", hd: "10", niv: "Maestría", cv: "https://orcid.org/0000-0002-0000-0001", hi: "6" }] },
+      { id: "f5", nm: "Participantes del programa", kind: "tabla", folder: "snies", est: "borrador", ago: 60, resp: { snpart: {} },
+        cols: [C("td", "Tipo de documento", "l", { req: 1, opts: TDOC }), C("nd", "Número de documento", "x", { req: 1 }), C("pn", "Primer nombre", "x", { req: 1 }), C("pa", "Primer apellido", "x", { req: 1 }), C("sx", "Sexo", "x"), C("fn", "Fecha de nacimiento", "d"), C("ps", "País de nacimiento", "x")],
+        rows: [{ td: "Cédula de ciudadanía", nd: "1098111222", pn: "Ana", pa: "Pérez", sx: "Femenino", fn: "2003-04-12", ps: "Colombia" }, { td: "Cédula de ciudadanía", nd: "1098333444", pn: "Luis", pa: "Gómez", sx: "Masculino", fn: "2002-11-30", ps: "Colombia" }, { td: "Pasaporte", nd: "AB123456", pn: "Sofía", pa: "Duarte", sx: "Mujer", fn: "2001-07-08", ps: "Venezuela" }] },
+      { id: "f6", nm: "Graduados 2025", kind: "tabla", folder: "snies", est: "listo", ago: 4300, resp: { sngrad: {} },
+        cols: [C("cp", "Código del programa", "x", { req: 1 }), C("td", "Tipo de documento", "l", { req: 1, opts: TDOC }), C("nd", "Número de documento", "x", { req: 1 }), C("fg", "Fecha de grado", "d", { req: 1 }), C("ti", "Título otorgado", "x", { req: 1 })],
+        rows: [{ cp: "104523", td: "Cédula de ciudadanía", nd: "1098555666", fg: "2025-06-20", ti: "Ingeniero de Sistemas" }, { cp: "104523", td: "Cédula de ciudadanía", nd: "1098777888", fg: "2025-06-20", ti: "Ingeniero de Sistemas" }] },
+      { id: "f7", nm: "Convenios de práctica", kind: "lista", folder: "trabajo", est: "borrador", ago: 20, resp: {},
+        cols: [C("ent", "Institución", "x", { req: 1 }), C("tp", "Tipo de convenio", "l", { opts: ["Docencia-servicio", "Cooperación", "Movilidad"] }), C("vn", "Vencimiento", "d"), C("rs", "Responsable", "x")],
+        rows: [{ ent: "Clínica Foscal", tp: "Docencia-servicio", vn: "2027-03-31", rs: "Dirección del programa" }, { ent: "Universidad de Guadalajara", tp: "Movilidad", vn: "2026-12-15", rs: "Coordinación" }, { ent: "Alcaldía de Bucaramanga", tp: "Cooperación", vn: "2028-01-20", rs: "Dirección del programa" }] },
+      { id: "f8", nm: "Pendientes de acreditación", kind: "lista", folder: "trabajo", est: "borrador", ago: 8200, resp: {},
+        cols: [C("ta", "Tarea", "x", { req: 1 }), C("rs", "Responsable", "x"), C("fl", "Fecha límite", "d"), C("hc", "¿Hecha?", "l", { opts: ["Sí", "No"] })],
+        rows: [{ ta: "Consolidar el informe de autoevaluación", rs: "Dirección", fl: "2026-11-15", hc: "No" }, { ta: "Actualizar grupos de investigación", rs: "Coordinación", fl: "2026-10-30", hc: "Sí" }, { ta: "Recoger encuestas de egresados", rs: "Coordinación", fl: "2026-11-05", hc: "No" }, { ta: "Revisar plan de mejoramiento", rs: "Dirección", fl: "2026-12-01", hc: "No" }] }
+    ];
+    S.files.forEach(function (f) { Object.keys(f.resp).forEach(function (tid) { f.resp[tid] = { map: autoMap(f, tid) }; }); });
+  }
+  seed();
+  function fileById(id) { return S.files.filter(function (f) { return f.id === id; })[0]; }
+  function canEdit() { return ROLES[S.rol].edit; }
+  function agoTxt(m) { return m < 60 ? "hace " + m + " min" : m < 1440 ? "hace " + Math.round(m / 60) + " h" : "hace " + Math.round(m / 1440) + " d"; }
+  function estOf(f) { var e = errCount(f); return f.est === "listo" ? ["listo", "Listo para Planeación", "check"] : e ? ["err", e + (e === 1 ? " error" : " errores"), "warn"] : ["borrador", "Borrador", "pen"]; }
+  function estChip(f) { var x = estOf(f); return '<span class="est" data-e="' + x[0] + '">' + ic(x[2]) + x[1] + "</span>"; }
+  function sisTags(f) { return Object.keys(f.resp).map(function (tid) { return '<span class="tag" data-s="' + TARGETS[tid].sis + '">' + TARGETS[tid].sis + " · " + esc(TARGETS[tid].nm.split(" · ")[0].replace("Plantilla ", "")) + "</span>"; }).join(""); }
+  function coverageCNA() {
+    var tot = 0, got = 0;
+    Object.keys(TARGETS).filter(function (t) { return TARGETS[t].sis === "CNA"; }).forEach(function (tid) {
+      var n = TARGETS[tid].cols.length; tot += n;
+      if (TARGETS[tid].auto) { got += n; return; }
+      var best = 0; S.files.forEach(function (f) { if (f.resp[tid]) best = Math.max(best, covOf(f, tid).n); }); got += best;
+    });
+    return tot ? Math.round((got / tot) * 100) : 0;
+  }
+  function ring(pct, cls) { var r = 21, c = 2 * Math.PI * r; return '<span class="ring ' + (cls || "") + '"><svg viewBox="0 0 52 52" aria-hidden="true"><circle class="bg" cx="26" cy="26" r="' + r + '"/><circle class="fg" cx="26" cy="26" r="' + r + '" stroke-dasharray="' + c.toFixed(1) + '" stroke-dashoffset="' + (c * (1 - pct / 100)).toFixed(1) + '"/></svg><span class="t num">' + pct + "</span></span>"; }
+  function toast(t) { var el = $("#toast"); el.textContent = t; el.setAttribute("data-on", "true"); clearTimeout(toast.t); toast.t = setTimeout(function () { el.setAttribute("data-on", "false"); }, 2800); }
+
+  /* ---- Miniaturas ------------------------------------------------------------------------- */
+  function thumb(f) {
+    var col = f.kind === "lista" ? "var(--k-lista)" : "var(--k-tabla)", n = Math.min(f.cols.length, 5), s = '<svg viewBox="0 0 160 84" aria-hidden="true">';
+    if (f.kind === "lista") {
+      for (var i = 0; i < 4; i++) s += '<rect x="8" y="' + (8 + i * 18) + '" width="144" height="14" rx="3" fill="var(--panel)" stroke="var(--line)"/><circle cx="17" cy="' + (15 + i * 18) + '" r="3" fill="' + col + '" opacity="' + (0.9 - i * 0.15) + '"/><rect x="26" y="' + (12 + i * 18) + '" width="' + (70 + ((i * 23) % 40)) + '" height="5" rx="2.5" fill="var(--line-2)"/>';
+    } else {
+      var w = 144 / n; s += '<rect x="8" y="6" width="144" height="72" rx="4" fill="var(--panel)" stroke="var(--line)"/><rect x="8" y="6" width="144" height="14" rx="4" fill="' + col + '" opacity="0.9"/>';
+      for (var j = 1; j < n; j++) s += '<path d="M' + (8 + j * w) + ' 6V78" stroke="var(--line)"/>';
+      for (var r = 1; r < 5; r++) { s += '<path d="M8 ' + (6 + 14 * r) + 'H152" stroke="var(--line)"/>'; for (var k = 0; k < n; k++) s += '<rect x="' + (12 + k * w) + '" y="' + (9 + 14 * r) + '" width="' + (w - 12 - ((r * 7 + k * 5) % 14)) + '" height="4" rx="2" fill="var(--line-2)"/>'; }
+    }
+    return s + "</svg>";
+  }
+  function folderThumb() { return '<svg viewBox="0 0 160 84" aria-hidden="true"><path d="M22 20a5 5 0 015-5h30l10 10h66a5 5 0 015 5v40a5 5 0 01-5 5H27a5 5 0 01-5-5V20z" fill="var(--k-carpeta)" opacity="0.85"/><path d="M22 34h116v31a5 5 0 01-5 5H27a5 5 0 01-5-5V34z" fill="var(--k-carpeta)"/></svg>'; }
+
+  /* ---- Explorador ------------------------------------------------------------------------- */
+  var NAV = [["archivos", "Mis archivos", "folder"], ["recientes", "Recientes", "clock"], ["listos", "Listos para Planeación", "share"], ["plantillas", "Plantillas CNA y SNIES", "lib"]];
+  function visibleFiles() {
+    var xs = S.files.slice();
+    if (S.nav === "archivos" && S.folder) xs = xs.filter(function (f) { return f.folder === S.folder; });
+    if (S.nav === "listos") xs = xs.filter(function (f) { return f.est === "listo"; });
+    if (S.filtro === "tabla" || S.filtro === "lista") xs = xs.filter(function (f) { return f.kind === S.filtro; });
+    if (S.filtro === "errores") xs = xs.filter(function (f) { return f.est !== "listo" && errCount(f) > 0; });
+    if (S.filtro === "listo") xs = xs.filter(function (f) { return f.est === "listo"; });
+    return xs.sort(function (a, b) { return a.ago - b.ago; });
+  }
+  function renderSide() {
+    var listos = S.files.filter(function (f) { return f.est === "listo"; }).length, cov = coverageCNA();
+    $("#side").innerHTML = '<div class="cap">Programa</div>' + NAV.map(function (n) {
+      return '<button class="navb" data-nav="' + n[0] + '"' + (S.nav === n[0] ? ' aria-current="page"' : "") + ">" + ic(n[2]) + n[1] + (n[0] === "listos" && listos ? '<span class="badge num">' + listos + "</span>" : "") + "</button>";
+    }).join("") + '<hr><div class="cap">Carpetas</div>' + FOLDERS.map(function (f) {
+      return '<button class="navb" data-folder="' + f.id + '"' + (S.nav === "archivos" && S.folder === f.id ? ' aria-current="page"' : "") + ">" + ic("folder") + f.nm + "</button>";
+    }).join("") + '<div class="cover" id="cover">' + ring(cov) + "<div><b>Cuadro Maestro CNA</b><span>" + cov + " % de las columnas de los 9 cuadros ya las responde el sistema o un archivo.</span></div></div>";
+  }
+  function renderCrumb() {
+    var parts = ['<button data-crumb="root">' + esc(S.prog) + "</button>"];
+    var lab = { recientes: "Recientes", listos: "Listos para Planeación", plantillas: "Plantillas CNA y SNIES" };
+    if (S.nav === "archivos") { parts.push(ic("chev")); parts.push('<button data-crumb="root">Mis archivos</button>'); if (S.folder) { parts.push(ic("chev")); parts.push("<button>" + esc(FOLDERS.filter(function (f) { return f.id === S.folder; })[0].nm) + "</button>"); } }
+    else { parts.push(ic("chev")); parts.push("<button>" + lab[S.nav] + "</button>"); }
+    $("#crumb").innerHTML = parts.join("");
+  }
+  function renderCmd() {
+    var ed = canEdit(), lib = S.nav === "plantillas", inRoot = S.nav === "archivos" && !S.folder;
+    var chips = lib || inRoot ? "" : '<div class="chips" id="chips" role="group" aria-label="Filtrar archivos">' + [["todos", "Todos"], ["tabla", "Tablas"], ["lista", "Listas"], ["errores", "Con errores"], ["listo", "Listos"]].map(function (c) { return '<button class="chip" data-f="' + c[0] + '" aria-pressed="' + (S.filtro === c[0]) + '">' + c[1] + "</button>"; }).join("") + "</div>";
+    $("#cmd").innerHTML = '<button class="btn pri" id="btnNuevo"' + (ed ? "" : ' disabled title="Planeación solo observa"') + ">" + ic("plus") + 'Nuevo</button><button class="btn" id="btnSubir"' + (ed ? "" : " disabled") + ">" + ic("up") + "Subir plantilla</button><span class=\"sep\"></span>" + chips +
+      '<span class="grow"></span><button class="btn ghost" id="btnTour">' + ic("play") + 'Recorrido</button><div class="seg" role="group" aria-label="Vista"><button data-v="tiles" aria-pressed="' + (S.vista === "tiles") + '" aria-label="Mosaicos">' + ic("tiles") + '</button><button data-v="lista" aria-pressed="' + (S.vista === "lista") + '" aria-label="Lista">' + ic("rows") + '</button></div><button class="btn ghost" id="btnInfo" aria-pressed="' + S.info + '" aria-label="Detalles">' + ic("info") + "</button>";
+  }
+  function fileTile(f) {
+    return '<button class="tile" role="option" data-id="' + f.id + '" aria-selected="' + (S.sel === f.id) + '"><span class="thumb">' + thumb(f) + '</span><span class="meta"><span class="nm">' + ic(f.kind, "kico") .replace('class="kico"', 'class="kico" data-k="' + f.kind + '"') + "<span>" + esc(f.nm) + '</span></span><span class="sub">' + (f.kind === "lista" ? "Lista" : "Tabla") + " · " + agoTxt(f.ago) + " · <span class=num>" + f.rows.length + "</span> filas</span><span class=\"row2\">" + estChip(f) + sisTags(f) + "</span></span></button>";
+  }
+  function renderFiles() {
+    var el = $("#files"), html = "";
+    if (S.nav === "plantillas") {
+      html = '<div class="tiles">' + Object.keys(TARGETS).map(function (tid) {
+        var t = TARGETS[tid], fs = S.files.filter(function (f) { return f.resp[tid]; });
+        return '<div class="tile" style="padding:14px;gap:10px;grid-template-rows:none"><div class="nm" style="display:flex;gap:8px;align-items:center"><span class="tag" data-s="' + t.sis + '">' + t.sis + '</span><b>' + esc(t.nm) + '</b></div><span class="sub">' + t.cols.length + " columnas · " + (t.auto ? esc(t.auto) : fs.length ? "lo responde: " + fs.map(function (f) { return esc(f.nm); }).join(", ") : "nadie lo responde todavía") + '</span><div class="chiprow" style="display:flex;flex-wrap:wrap;gap:4px">' + t.cols.map(function (c) { return '<span class="tag">' + esc(c[0]) + "</span>"; }).join("") + '</div>' + (t.auto ? '<span class="est" data-e="listo">' + ic("check") + "Automático</span>" : '<button class="btn sm" data-crear="' + tid + '"' + (canEdit() ? "" : " disabled") + ">" + ic("plus") + "Crear archivo para este destino</button>") + "</div>";
+      }).join("") + "</div>";
+    } else if (S.nav === "archivos" && !S.folder) {
+      html = '<div class="tiles">' + FOLDERS.map(function (fo) {
+        var n = S.files.filter(function (f) { return f.folder === fo.id; }).length;
+        return '<button class="tile folder-tile" data-open-folder="' + fo.id + '"><span class="thumb">' + folderThumb() + '</span><span class="meta"><span class="nm">' + ic("folder", "kico").replace('class="kico"', 'class="kico" data-k="carpeta"') + "<span>" + esc(fo.nm) + '</span></span><span class="sub">' + esc(fo.sub) + " · " + n + " archivos</span></span></button>";
+      }).join("") + "</div>";
+    } else {
+      var xs = visibleFiles();
+      if (!xs.length) html = '<div class="empty"><b>No hay archivos aquí</b><span>' + (S.nav === "listos" ? "Cuando un archivo se marque como listo, Planeación lo verá en esta vista." : "Cambie el filtro o cree un archivo nuevo.") + "</span>" + (canEdit() && S.nav !== "listos" ? '<button class="btn pri" data-newfromempty="1">' + ic("plus") + "Nuevo archivo</button>" : "") + "</div>";
+      else if (S.vista === "tiles") html = '<div class="tiles" role="listbox" aria-label="Archivos">' + xs.map(fileTile).join("") + "</div>";
+      else html = '<table class="lista" role="listbox"><thead><tr><th>Nombre</th><th>Responde a</th><th>Estado</th><th>Modificado</th><th class="num">Filas</th></tr></thead><tbody>' + xs.map(function (f) { return '<tr role="option" tabindex="0" data-id="' + f.id + '" aria-selected="' + (S.sel === f.id) + '"><td><span class="fn">' + ic(f.kind, "kico").replace('class="kico"', 'class="kico" data-k="' + f.kind + '"') + esc(f.nm) + "</span></td><td>" + (sisTags(f) || '<span class="note">Sin destino</span>') + "</td><td>" + estChip(f) + "</td><td>" + agoTxt(f.ago) + '</td><td class="num">' + f.rows.length + "</td></tr>"; }).join("") + "</tbody></table>";
+    }
+    el.innerHTML = (canEdit() ? "" : '<div class="banner" style="margin:0 0 14px">' + ic("eye") + "Modo observador: Planeación puede ver los archivos del programa, pero no editarlos.</div>") + html;
+  }
+  function renderDetails() {
+    var d = $("#details"), f = S.sel && fileById(S.sel);
+    d.setAttribute("data-open", String(S.info));
+    var body;
+    if (S.nav === "archivos" && S.folder === "cna" && !f) body = detalleCarpetaCNA();
+    else if (!f) body = '<div class="dsec"><h3>Detalles</h3><p class="note">Seleccione un archivo para ver su estado, a qué cuadro responde y cuánto cubre.</p></div>';
+    else {
+      var rs = Object.keys(f.resp);
+      body = '<div class="dhead"><span class="kbig">' + ic(f.kind, "").replace("<svg", '<svg style="color:var(--k-' + f.kind + ')"') + "</span><h2>" + esc(f.nm) + "</h2></div>" +
+        '<dl class="kv2"><dt>Tipo</dt><dd>' + (f.kind === "lista" ? "Lista" : "Tabla") + "</dd><dt>Estado</dt><dd>" + estChip(f) + "</dd><dt>Modificado</dt><dd>" + agoTxt(f.ago) + "</dd><dt>Propietario</dt><dd>" + esc(S.prog) + "</dd><dt>Contenido</dt><dd class=num>" + f.rows.length + " filas · " + f.cols.length + " campos</dd></dl>" +
+        '<div class="act"><button class="btn pri sm" data-abrir="' + f.id + '">' + ic("pen") + (canEdit() ? "Abrir" : "Ver") + "</button>" + (canEdit() && !f.locked ? '<button class="btn sm" data-borrar="' + f.id + '">' + ic("trash") + "Eliminar</button>" : "") + "</div>" +
+        '<div class="dsec"><h3>Responde a</h3>' + (rs.length ? rs.map(function (tid) { var cv = covOf(f, tid); return '<div class="cov">' + ring(cv.pct, "sm") + "<div><b>" + TARGETS[tid].sis + " · " + esc(TARGETS[tid].nm.replace(/^.*? · /, "").replace("Plantilla ", "")) + "</b><span class=num>" + cv.n + " de " + cv.t + " columnas</span></div></div>"; }).join("") : '<p class="note">Todavía no responde a ningún cuadro del CNA ni plantilla del SNIES. Ábralo y conéctelo desde «Responde a».</p>') + "</div>" +
+        '<div class="dsec"><h3>Actividad</h3><ul class="list-plain"><li>' + agoTxt(f.ago) + ": edición de " + esc(ROLES.dir.nm.toLowerCase()) + "</li><li>Creado por el programa</li></ul></div>";
+    }
+    d.innerHTML = '<div class="in">' + body + "</div>";
+  }
+  function nextPer() { for (var i = 0; i < PER.length; i++) if (!S.per[PER[i]]) return PER[i]; return null; }
+  function detalleCarpetaCNA() {
+    var cnaFiles = S.files.filter(function (f) { return f.folder === "cna"; }), np = nextPer();
+    var hechos = PER.filter(function (k) { return S.per[k]; }).length, sinErr = cnaFiles.every(function (f) { return errCount(f) === 0; });
+    var todosListos = cnaFiles.every(function (f) { return f.est === "listo"; });
+    var puedeEmitir = !np && todosListos;
+    return '<div class="dhead"><span class="kbig">' + ic("folder").replace("<svg", '<svg style="color:var(--k-carpeta)"') + "</span><h2>Cuadro Maestro CNA 2026</h2></div>" +
+      '<div class="dsec"><h3>Ventana de observación</h3><div class="route">' + PER.map(function (k) { return '<span class="rp num" data-s="' + (S.per[k] ? "ok" : k === np ? "open" : "") + '">' + k + "</span>"; }).join("") + '</div><p class="note" style="margin-top:8px"><b class=num>' + hechos + " de " + PER.length + "</b> periodos cerrados. Se cierran en orden, año por año y semestre a semestre (01 y 02).</p>" +
+      (canEdit() && np ? '<button class="btn sm" id="cerrarPer" style="margin-top:8px"' + (sinErr ? "" : " disabled") + ">Cerrar el periodo " + np + "</button>" + (sinErr ? "" : '<p class="note" style="margin-top:6px">Corrija los errores de los archivos de esta carpeta para cerrarlo.</p>') : "") + "</div>" +
+      '<div class="dsec"><h3>Emitir</h3>' + (S.emitido ? '<p class="note" style="color:var(--ok);font-weight:700">Generado: ' + esc(S.emitido) + "</p>" : "") + '<button class="btn pri sm" id="btnEmitir"' + (puedeEmitir && canEdit() ? "" : " disabled") + ">Emitir el Cuadro Maestro</button><p class=\"note\" style=\"margin-top:6px\">" + (puedeEmitir ? "Todo listo. El prototipo simula la generación." : !np ? "Marque como listos los " + cnaFiles.filter(function (f) { return f.est !== "listo"; }).length + " archivos pendientes." : "Se habilita con todos los periodos cerrados y los archivos del CNA listos.") + "</p></div>";
+  }
+  function renderAll(a) {
+    renderSide(); renderCrumb(); renderCmd(); renderFiles(); renderDetails();
+    if (a) anim(function (g) { var t = $$("#files .tile"), r = $$("#files .lista tbody tr"); if (t.length) g.from(t, { opacity: 0, y: 8, duration: 0.24, ease: "power3.out", stagger: 0.03, clearProps: "opacity,transform" }); if (r.length) g.from(r, { opacity: 0, y: 4, duration: 0.2, ease: "power3.out", stagger: 0.02, clearProps: "opacity,transform" }); });
+  }
+
+  /* ---- Editor a pantalla completa ---------------------------------------------------------------- */
+  var E = null;
+  function colMeta(f) { return f.cols; }
+  function makeTable(f) {
+    var cols = f.cols.map(function (c) {
+      var num = c.t === "n" || c.t === "p";
+      return { id: c.k, header: c.l, meta: c, sortingFn: num ? "basic" : "alphanumeric", accessorFn: function (r) { var v = r[c.k]; if (num) { var n = parseFloat(String(v == null ? "" : v).replace(",", ".")); return isNaN(n) ? undefined : n; } return v == null ? "" : String(v); } };
+    });
+    var tb;
+    tb = TC.createTable({
+      data: f.rows.slice(), columns: cols, state: {}, renderFallbackValue: "", globalFilterFn: "includesString", getColumnCanGlobalFilter: function () { return true; }, enableRowSelection: true,
+      getCoreRowModel: TC.getCoreRowModel(), getSortedRowModel: TC.getSortedRowModel(), getFilteredRowModel: TC.getFilteredRowModel(),
+      onStateChange: function (up) { E.st = typeof up === "function" ? up(E.st) : up; tb.setOptions(function (o) { return Object.assign({}, o, { state: E.st }); }); renderCanvas(); renderTool(); }
+    });
+    E.st = Object.assign({}, tb.initialState); tb.setOptions(function (o) { return Object.assign({}, o, { state: E.st }); });
+    E.tb = tb;
+  }
+  function refreshData() { var f = E.f; E.tb.setOptions(function (o) { return Object.assign({}, o, { data: f.rows.slice() }); }); }
+  function openEditor(id, rect) {
+    var f = fileById(id); if (!f) return;
+    E = { f: f, fid: id, vista: f.kind === "lista" ? "lista" : "tabla", pl: false, pr: Object.keys(f.resp).length > 0, openField: null, out: {}, menu: null, saved: "Guardado" };
+    makeTable(f);
+    var el = $("#editor");
+    el.setAttribute("data-open", "true");
+    el.innerHTML = '<div class="eh" id="eh"></div><div class="etool" id="etool"></div><div class="ework"><aside class="panel l" id="pl" aria-label="Campos"></aside><div class="canvas" id="canvas"></div><aside class="panel r" id="pr" aria-label="Responde a"></aside></div><div class="estat" id="estat"></div>';
+    renderHead(); renderTool(); renderCanvas(); renderPanels(); renderStat();
+    document.body.style.overflow = "hidden";
+    var r = rect || { left: innerWidth / 2 - 60, top: innerHeight / 2 - 40, width: 120, height: 80 };
+    if (G && !reduce) {
+      G.fromTo(el, { clipPath: "inset(" + r.top + "px " + (innerWidth - r.left - r.width) + "px " + (innerHeight - r.top - r.height) + "px " + r.left + "px round 10px)", opacity: 0.6 }, { clipPath: "inset(0px 0px 0px 0px round 0px)", opacity: 1, duration: 0.42, ease: "expo.out", clearProps: "clipPath,opacity" });
+      G.from("#etool, #estat", { opacity: 0, duration: 0.2, delay: 0.14 });
+      G.from("#canvas tbody tr, #canvas .li", { opacity: 0, y: 6, duration: 0.22, ease: "power3.out", stagger: 0.02, delay: 0.12, clearProps: "opacity,transform" });
+    }
+    E.origin = r;
+    var first = $("#canvas .cell:not(:disabled)"); if (first && canEdit()) setTimeout(function () { first.focus({ preventScroll: true }); }, 60);
+  }
+  function closeEditor() {
+    if (!E) return; var el = $("#editor"), r = E.origin;
+    function fin() { el.setAttribute("data-open", "false"); el.innerHTML = ""; document.body.style.overflow = ""; E = null; renderAll(false); }
+    if (G && !reduce) G.to(el, { clipPath: "inset(" + r.top + "px " + (innerWidth - r.left - r.width) + "px " + (innerHeight - r.top - r.height) + "px " + r.left + "px round 10px)", opacity: 0.4, duration: 0.26, ease: "power3.inOut", onComplete: function () { G.set(el, { clearProps: "clipPath,opacity" }); fin(); } });
+    else fin();
+  }
+  function renderHead() {
+    var f = E.f, ed = canEdit(), x = estOf(f);
+    $("#eh").innerHTML = '<button class="back" id="eBack">' + ic("back") + 'Archivos</button><div class="ename">' + ic(f.kind).replace("<svg", '<svg style="width:20px;height:20px;color:#fff"') + '<input id="eName" value="' + esc(f.nm) + '" aria-label="Nombre del archivo"' + (ed && !f.locked ? "" : " disabled") + '></div><span class="est" data-e="' + x[0] + '">' + ic(x[2]) + x[1] + '</span><span class="st" id="eSaved">' + ic("check").replace("<svg", '<svg style="width:13px;height:13px"') + "<span>" + E.saved + '</span></span><span class="grow"></span>' +
+      (ed ? "" : '<span class="ro">' + ic("eye") + "Solo lectura · Planeación</span>") +
+      '<button class="btn" id="eTour">' + ic("play") + "Recorrido</button>" +
+      (ed ? (f.est === "listo" ? '<button class="btn" id="eListo" data-v="0">Volver a borrador</button>' : '<button class="btn pri" id="eListo" data-v="1">' + ic("check") + "Marcar como listo</button>") : "");
+  }
+  function renderTool() {
+    var f = E.f, ed = canEdit(), sel = E.tb.getSelectedRowModel().rows.length, q = E.tb.getState().globalFilter || "";
+    var t = $("#etool"), had = t.contains(document.activeElement) && document.activeElement.id === "eFind";
+    t.innerHTML = '<label class="find">' + ic("search") + '<input id="eFind" placeholder="Buscar en el archivo" value="' + esc(q) + '" aria-label="Buscar en el archivo"></label>' +
+      '<button class="btn sm" id="bCols" aria-haspopup="true">' + ic("cols") + 'Columnas</button><button class="btn sm" id="bPin" aria-pressed="' + (E.tb.getAllLeafColumns()[0] && E.tb.getAllLeafColumns()[0].getIsPinned() === "left") + '">' + ic("pin") + 'Fijar la primera</button><span class="sep"></span>' +
+      '<div class="seg" role="group" aria-label="Vista del archivo"><button data-ev="tabla" aria-pressed="' + (E.vista === "tabla") + '" aria-label="Tabla">' + ic("tabla") + '</button><button data-ev="lista" aria-pressed="' + (E.vista === "lista") + '" aria-label="Lista">' + ic("lista") + "</button></div><span class=\"sep\"></span>" +
+      (ed ? '<button class="btn sm" id="bAdd">' + ic("plus") + (E.vista === "lista" ? "Agregar elemento" : "Agregar fila") + "</button>" : "") + (ed && sel ? '<button class="btn sm" id="bDel">' + ic("trash") + "Eliminar " + sel + (sel === 1 ? " fila" : " filas") + "</button>" : "") +
+      '<span class="grow" style="flex:1"></span><button class="btn sm" id="bPL" aria-pressed="' + E.pl + '">Campos</button><button class="btn sm" id="bPR" aria-pressed="' + E.pr + '">' + ic("link") + "Responde a</button>";
+    if (had) { var inp = $("#eFind"); inp.focus(); inp.setSelectionRange(q.length, q.length); }
+    ["bPL", "bPR"].forEach(function (id) { var b = $("#" + id); if (b && b.getAttribute("aria-pressed") === "true") { b.style.background = "var(--accent-soft)"; b.style.borderColor = "var(--accent)"; } });
+  }
+  function cellHTML(f, row, c, ed, list) {
+    var v = row.original[c.k] == null ? "" : row.original[c.k], err = cellError(f, row.original, c), bad = err && (v !== "" || c.req);
+    if (c.ro) return '<td class="lk" title="Viene del ' + esc(c.ro) + '">' + esc(v) + "</td>";
+    var inp;
+    if (c.t === "l") inp = '<select class="cell" data-ri="' + row.index + '" data-k="' + c.k + '" aria-label="' + esc(c.l) + '"' + (ed ? "" : " disabled") + '><option value=""></option>' + (c.opts || []).map(function (o) { return "<option" + (o === v ? " selected" : "") + ">" + esc(o) + "</option>"; }).join("") + "</select>";
+    else inp = '<input class="cell" data-ri="' + row.index + '" data-k="' + c.k + '" value="' + esc(v) + '" aria-label="' + esc(c.l) + '"' + (c.t === "d" ? ' placeholder="AAAA-MM-DD"' : c.req ? ' placeholder="obligatorio"' : "") + (c.t === "n" || c.t === "p" ? ' inputmode="decimal"' : "") + (ed ? "" : " disabled") + ">";
+    return list ? inp : '<td class="' + (bad ? "bad" : "") + '" title="' + esc(bad ? err : "") + '">' + inp + "</td>";
+  }
+  function renderCanvas() {
+    var f = E.f, ed = canEdit(), tb = E.tb, rows = tb.getRowModel().rows, cv = $("#canvas"), top = cv.scrollTop, left = cv.scrollLeft, html;
+    if (E.vista === "lista") {
+      var cols = f.cols;
+      html = '<div class="lview">' + (rows.length ? rows.map(function (row) {
+        var tc = cols[0], rest = cols.slice(1);
+        return '<div class="li"><div class="t">' + cellHTML(f, row, tc, ed, true).replace('class="cell"', 'class="cell" style="flex:1"') + (ed ? '<button class="mini" data-delrow="' + row.index + '" aria-label="Quitar elemento">' + ic("x") + "</button>" : "") + '</div><div class="fs">' + rest.map(function (c) {
+          var v = row.original[c.k] == null ? "" : row.original[c.k], err = cellError(f, row.original, c), bad = err && (v !== "" || c.req);
+          return '<label class="' + (bad ? "bad" : "") + '" title="' + esc(bad ? err : "") + '">' + esc(c.l) + (c.req ? ' <span style="color:var(--bad)">*</span>' : "") + cellHTML(f, row, c, ed, true) + "</label>";
+        }).join("") + "</div></div>";
+      }).join("") : '<div class="empty"><b>' + (tb.getState().globalFilter ? "Nada coincide con la búsqueda" : "Todavía no hay elementos") + "</b></div>") + "</div>";
+    } else {
+      var pinned = tb.getAllLeafColumns()[0] && tb.getAllLeafColumns()[0].getIsPinned() === "left", first = tb.getVisibleLeafColumns()[0] && tb.getVisibleLeafColumns()[0].id;
+      var allSel = tb.getIsAllRowsSelected();
+      html = '<table class="tbl" role="grid"><thead><tr><th class="rn">' + (ed ? '<input type="checkbox" id="selAll" aria-label="Seleccionar todas las filas"' + (allSel ? " checked" : "") + ">" : "#") + "</th>" + tb.getHeaderGroups()[0].headers.map(function (h) {
+        var c = h.column.columnDef.meta, s = h.column.getIsSorted(), pin = pinned && h.column.id === first;
+        return '<th class="' + (pin ? "pin" : "") + '"' + (s ? ' aria-sort="' + (s === "asc" ? "ascending" : "descending") + '"' : "") + '><div class="hc"><button class="hs" data-sort="' + h.column.id + '" title="Ordenar (Mayús para varias columnas)"><span>' + esc(c.l) + (c.req ? ' <span class="req">*</span>' : "") + '</span><svg class="sortic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="' + (s === "desc" ? "M12 19V5m0 14l-5-5m5 5l5-5" : "M12 5v14m0-14l-5 5m5-5l5 5") + '"/></svg></button>' + (c.ro ? ic("lock").replace("<svg", '<svg style="width:12px;height:12px;color:var(--ink-3)"') : "") + "</div></th>";
+      }).join("") + "</tr></thead><tbody>" + (rows.length ? rows.map(function (row, i) {
+        return '<tr data-sel="' + row.getIsSelected() + '"><td class="rn">' + (ed ? '<input type="checkbox" data-selrow="' + row.id + '"' + (row.getIsSelected() ? " checked" : "") + ' aria-label="Seleccionar la fila ' + (i + 1) + '">' : i + 1) + "</td>" + row.getVisibleCells().map(function (cell) {
+          var c = cell.column.columnDef.meta, h = cellHTML(f, row, c, ed, false);
+          return pinned && cell.column.id === first ? h.replace("<td", '<td style="position:sticky;left:44px;z-index:2;box-shadow:1px 0 0 var(--line-2)"') : h;
+        }).join("") + "</tr>";
+      }).join("") : '<tr><td class="lk" colspan="' + (f.cols.length + 1) + '" style="padding:24px;text-align:center">' + (tb.getState().globalFilter ? "Nada coincide con la búsqueda." : "Todavía no hay filas. " + (ed ? "Agregue una, pegue desde Excel o cargue un archivo." : "")) + "</td></tr>") + "</tbody></table>";
+    }
+    cv.innerHTML = html; cv.scrollTop = top; cv.scrollLeft = left;
+    renderStat();
+  }
+  function renderStat() {
+    var f = E.f, e = errCount(f), vis = E.tb.getRowModel().rows.length, st = $("#estat"); if (!st) return;
+    st.innerHTML = "<span><b class=num>" + vis + "</b> de <b class=num>" + f.rows.length + "</b> filas</span><span><b class=num>" + f.cols.length + "</b> campos</span>" + (e ? '<span class="bad">' + e + (e === 1 ? " celda con error" : " celdas con error") + '</span><button class="btn sm" id="nextErr">Siguiente error (F8)</button>' : '<span style="color:var(--ok);font-weight:700">Sin errores</span>') +
+      '<span style="margin-left:auto">Enter baja · Ctrl+V pega desde Excel · Ctrl+S guarda · Esc cierra</span>';
+  }
+  function renderPanels() {
+    var f = E.f, ed = canEdit(), pl = $("#pl"), pr = $("#pr");
+    pl.setAttribute("data-open", String(E.pl)); pr.setAttribute("data-open", String(E.pr));
+    pl.innerHTML = '<div class="in"><div><h3>Campos</h3><p class="sub">' + (f.locked ? "La estructura la fija el CNA; no se puede cambiar." : "Defina qué guarda cada columna.") + "</p></div>" + f.cols.map(function (c) {
+      var open = E.openField === c.k;
+      return '<div class="fld" data-open="' + open + '"><button data-fld="' + c.k + '" aria-expanded="' + open + '"><span class="ft" aria-hidden="true">' + (c.t === "n" ? "#" : c.t === "d" ? "F" : c.t === "l" ? "▾" : c.t === "p" ? "%" : "T") + '</span><span class="fn">' + esc(c.l) + "</span>" + (c.req ? '<span style="color:var(--bad)">*</span>' : "") + (c.ro ? ic("lock").replace("<svg", '<svg style="width:13px;height:13px;color:var(--ink-3)"') : "") + "</button>" +
+        (open ? '<div class="fe"><label class="fl">Nombre<input type="text" data-fe="l" data-k="' + c.k + '" value="' + esc(c.l) + '"' + (ed && !f.locked ? "" : " disabled") + '></label><label class="fl">Tipo<select data-fe="t" data-k="' + c.k + '"' + (ed && !f.locked ? "" : " disabled") + ">" + Object.keys(TIPOS).map(function (t) { return '<option value="' + t + '"' + (c.t === t ? " selected" : "") + ">" + TIPOS[t] + "</option>"; }).join("") + "</select></label>" +
+          (c.t === "l" ? '<label class="fl">Opciones, separadas por coma<textarea data-fe="opts" data-k="' + c.k + '"' + (ed && !f.locked ? "" : " disabled") + ">" + esc((c.opts || []).join(", ")) + "</textarea></label>" : "") +
+          '<label class="ck"><input type="checkbox" data-fe="req" data-k="' + c.k + '"' + (c.req ? " checked" : "") + (ed && !f.locked ? "" : " disabled") + '> Obligatorio</label>' + (c.ro ? '<p class="note">Viene del ' + esc(c.ro) + " y no se edita aquí.</p>" : "") +
+          (ed && !f.locked ? '<button class="btn sm" data-delcol="' + c.k + '">' + ic("trash") + "Quitar el campo</button>" : "") + "</div>" : "") + "</div>";
+    }).join("") + (ed && !f.locked ? '<div class="fld"><div class="fe" style="border:0"><label class="fl">Nuevo campo<input type="text" id="newName" placeholder="Ej. Responsable"></label><div class="chips" id="newType" role="group" aria-label="Tipo del nuevo campo">' + Object.keys(TIPOS).map(function (t, i) { return '<button class="chip" data-nt="' + t + '" aria-pressed="' + (t === (E.nt || "x")) + '">' + TIPOS[t] + "</button>"; }).join("") + '</div><button class="btn pri sm" id="addCol">' + ic("plus") + "Agregar campo</button></div></div>" : "") + "</div>";
+    var rs = Object.keys(f.resp), libres = Object.keys(TARGETS).filter(function (t) { return !f.resp[t]; });
+    pr.innerHTML = '<div class="in"><div><h3>Responde a</h3><p class="sub">Une cada columna con la que pide el CNA o el SNIES. Con esto el archivo alimenta las salidas.</p></div>' + (rs.length ? rs.map(function (tid) {
+      var t = TARGETS[tid], cv = covOf(f, tid), is = issuesOf(f, tid), m = f.resp[tid].map || [];
+      return '<div class="tgt"><header>' + ring(cv.pct, "sm") + '<div><span class="tag" data-s="' + t.sis + '">' + t.sis + "</span><b>" + esc(t.nm.replace(/^.*? · /, "").replace("Plantilla ", "")) + '</b><span class="note num">' + cv.n + " de " + cv.t + " columnas</span></div>" + (ed && !f.locked ? '<button class="mini" data-desc="' + tid + '" aria-label="Desconectar">' + ic("x") + "</button>" : "") + '</header><div class="map">' + t.cols.map(function (tc, i) {
+        return '<span class="tc">' + esc(tc[0]) + '</span><span class="ar' + (m[i] ? "" : " no") + '"></span><select data-map="' + tid + ':' + i + '" aria-label="Columna para ' + esc(tc[0]) + '"' + (ed ? "" : " disabled") + '><option value="">— sin columna —</option>' + f.cols.map(function (c) { return '<option value="' + c.k + '"' + (m[i] === c.k ? " selected" : "") + ">" + esc(c.l) + "</option>"; }).join("") + "</select>";
+      }).join("") + "</div>" + (is.length ? '<ul class="issues">' + is.map(function (x) { return "<li>" + esc(x) + "</li>"; }).join("") + "</ul>" : "") + '<div style="padding:0 12px 12px"><button class="btn sm" data-out="' + tid + '">' + ic("eye") + (E.out[tid] ? "Ocultar la salida" : "Ver la salida") + "</button></div>" + (E.out[tid] ? salida(f, tid) : "") + "</div>";
+    }).join("") : '<p class="note">Este archivo todavía no responde a ningún cuadro. Conéctelo para que alimente el CNA o el SNIES.</p>') +
+      (ed && !f.locked && libres.length ? '<label class="fl">Conectar a…<select id="conectar"><option value="">Elegir un destino</option>' + libres.map(function (t) { return '<option value="' + t + '">' + TARGETS[t].sis + " · " + esc(TARGETS[t].nm) + "</option>"; }).join("") + "</select></label>" : "") + "</div>";
+  }
+  function salida(f, tid) {
+    var t = TARGETS[tid], m = f.resp[tid].map || [];
+    return '<div class="prevt"><table><thead><tr>' + t.cols.map(function (c) { return "<th>" + esc(c[0]) + "</th>"; }).join("") + "</tr></thead><tbody>" + f.rows.slice(0, 4).map(function (r) {
+      return "<tr>" + t.cols.map(function (tc, i) { var v = m[i] ? String(r[m[i]] == null ? "" : r[m[i]]) : null; return v === null ? '<td class="m">—</td>' : (tc[1] && v && tc[1].indexOf(v) < 0 ? '<td class="x" title="No está en la lista del ' + t.sis + '">' + esc(v) + "</td>" : "<td>" + esc(v) + "</td>"); }).join("") + "</tr>";
+    }).join("") + "</tbody></table></div>";
+  }
+
+  /* ---- Asistente de creación ------------------------------------------------------------------------ */
+  var W = null;
+  var PARTIDAS = {
+    grupos: ["Grupos y líneas", [["Nombre del grupo", "x", 1], ["Código en MinCiencias", "x", 1], ["Categoría", "l", 0, CATEG], ["Líneas de investigación", "x"]]],
+    proyectos: ["Proyectos", [["Nombre del proyecto", "x", 1], ["Tipo", "l", 1, TIPOPROY], ["Financiador", "x"], ["Inicio", "d"], ["Fin", "d"]]],
+    actividades: ["Actividades con participantes", [["Actividad", "x", 1], ["Año", "n", 1], ["Estudiantes participantes", "n"], ["Profesores participantes", "n"]]],
+    personas: ["Personas", [["Tipo de documento", "l", 1, TDOC], ["Número de documento", "x", 1], ["Primer nombre", "x", 1], ["Primer apellido", "x", 1]]]
+  };
+  var TIPS = [
+    ["Empiece por lo que quiere guardar", "Una tabla sirve para filas con las mismas columnas. Una lista es más liviana, para tareas o elementos sueltos. Si ya tiene un Excel, súbalo y yo armo las columnas."],
+    ["Aquí armamos la estructura", "Elija una partida, suba su archivo o escoja el cuadro del CNA o la plantilla del SNIES. Después puede cambiar cualquier columna."],
+    ["Revise los campos", "Marque como obligatorio lo que no puede faltar. Si una columna se parece a una del CNA o del SNIES, se lo aviso debajo para que el archivo responda solo."],
+    ["Último paso", "Póngale un nombre claro y elija la carpeta. Marqué con una casilla los cuadros a los que ya puede responder; los conecta ahora o después."]
+  ];
+  function infer(label, vals) {
+    var v = vals.filter(function (x) { return x !== "" && x != null; }); if (!v.length) return { t: "x" };
+    if (/(codigo|cedula|documento|nit|telefono|celular)/.test(norm(label))) return { t: "x" };
+    if (v.every(function (x) { return /^\d{4}-\d{2}-\d{2}$/.test(x); })) return { t: "d" };
+    if (v.every(function (x) { return /^-?\d+([.,]\d+)?$/.test(x); })) return { t: "n" };
+    var u = Array.from(new Set(v)); if (v.length >= 5 && u.length <= 6 && u.length < v.length * 0.7 && v.every(function (x) { return x.length < 40; })) return { t: "l", opts: u };
+    return { t: "x" };
+  }
+  function colsFromMatrix(m) {
+    var hdr = (m[0] || []).map(function (h) { return String(h == null ? "" : h).trim(); }), body = m.slice(1).filter(function (r) { return r.some(function (x) { return String(x == null ? "" : x).trim() !== ""; }); });
+    var cols = [], keys = [];
+    hdr.forEach(function (h, i) { if (!h) return; var k = "c" + i; keys.push([k, i]); var it = infer(h, body.map(function (r) { return String(r[i] == null ? "" : r[i]).trim(); })); cols.push(C(k, h, it.t, it.opts ? { opts: it.opts } : {})); });
+    var rows = body.map(function (r) { var o = {}; keys.forEach(function (p) { o[p[0]] = String(r[p[1]] == null ? "" : r[p[1]]).trim(); }); return o; });
+    return { cols: cols, rows: rows };
+  }
+  function suggest(label) {
+    var best = null, bs = 0;
+    Object.keys(TARGETS).forEach(function (tid) { TARGETS[tid].cols.forEach(function (tc) { var s = score(label, tc[0]); if (s > bs) { bs = s; best = [tid, tc[0]]; } }); });
+    return bs >= 2 ? best : null;
+  }
+  function wizOpen(preset) {
+    W = { step: 0, tipo: "tabla", origen: null, partida: null, cols: [], rows: [], nm: "", folder: "trabajo", targets: {}, archivo: "", tid: null };
+    if (preset) { W.origen = "destino"; W.tid = preset; loadTarget(preset); W.step = 1; W.folder = TARGETS[preset].sis === "CNA" ? "cna" : "snies"; W.nm = TARGETS[preset].nm.replace(/^.*? · /, "").replace("Plantilla ", ""); }
+    $("#wiz").setAttribute("data-open", "true"); wizRender(); setTimeout(function () { var b = $("#wiz .choice, #wiz [data-next]"); if (b) b.focus(); }, 80);
+  }
+  function loadTarget(tid) { var t = TARGETS[tid]; W.cols = t.cols.map(function (tc, i) { var l = norm(tc[0]); var ty = tc[1] ? "l" : /fecha|inicio$|^fin$/.test(l) ? "d" : /horas|numero de|actividades|estudiantes|profesores|administrativos|^ano| ano/.test(l) && !/documento|codigo/.test(l) ? "n" : "x"; return C("t" + i, tc[0], ty, tc[1] ? { opts: tc[1], req: i < 2 ? 1 : 0 } : { req: i < 2 ? 1 : 0 }); }); W.rows = []; }
+  function wizCanNext() {
+    if (W.step === 0) return !!W.origen; if (W.step === 1) return W.cols.length > 0; if (W.step === 2) return W.cols.length > 0 && W.cols.every(function (c) { return c.l.trim(); }); return !!W.nm.trim();
+  }
+  function wizRender() {
+    var s = W.step, stage = "";
+    if (s === 0) {
+      var ch = [["tabla", "tabla", "Tabla en blanco", "Filas y columnas con tipos, como una hoja de cálculo."], ["lista", "lista", "Lista", "Elementos sueltos: tareas, convenios, pendientes."], ["excel", "up", "Desde mi plantilla de Excel", "Suba su archivo y armo las columnas por usted."], ["destino", "link", "Para un cuadro del CNA o del SNIES", "Parta de la estructura que pide el Ministerio o el CNA."]];
+      stage = '<div class="choices" role="group" aria-label="Qué quiere crear">' + ch.map(function (c) { var on = (c[0] === "tabla" && W.origen === "blanco" && W.tipo === "tabla") || (c[0] === "lista" && W.origen === "blanco" && W.tipo === "lista") || W.origen === c[0]; return '<button class="choice" data-choice="' + c[0] + '" aria-pressed="' + on + '">' + ic(c[1]) + "<b>" + c[2] + "</b><span>" + c[3] + "</span></button>"; }).join("") + "</div>";
+    } else if (s === 1) {
+      if (W.origen === "blanco") stage = '<div><b>Elija una partida</b><p class="note">Son estructuras comunes. Podrá cambiarlas en el siguiente paso.</p></div><div class="chips" role="group" aria-label="Partidas">' + Object.keys(PARTIDAS).map(function (k) { return '<button class="chip" data-part="' + k + '" aria-pressed="' + (W.partida === k) + '">' + PARTIDAS[k][0] + "</button>"; }).join("") + '<button class="chip" data-part="vacia" aria-pressed="' + (W.partida === "vacia") + '">Empezar vacía</button></div>' + (W.cols.length ? '<p class="note">' + W.cols.length + " columnas: " + W.cols.map(function (c) { return esc(c.l); }).join(", ") + ".</p>" : "");
+      else if (W.origen === "excel") stage = '<div class="drop" id="drop" data-over="false">' + ic("up") + "<b>Arrastre su Excel aquí</b><span class=\"note\">Se lee en su navegador. Acepta .xlsx, .xls y .csv.</span><div class=\"act\"><label class=\"btn pri sm\" style=\"cursor:pointer\">Elegir archivo<input type=\"file\" id=\"wfile\" accept=\".xlsx,.xls,.csv\" hidden></label><button class=\"btn sm\" id=\"wejemplo\">Usar una plantilla de ejemplo</button></div></div>" + (W.archivo ? '<div class="prev" style="border:1px solid var(--line);border-radius:10px;padding:10px 12px;background:var(--panel-2)"><b>' + esc(W.archivo) + '</b><p class="note num" style="margin-top:4px">' + W.cols.length + " columnas detectadas y " + W.rows.length + " filas de muestra. Tipos inferidos: " + W.cols.map(function (c) { return esc(c.l) + " (" + TIPOS[c.t].toLowerCase() + ")"; }).join(", ") + ".</p></div>" : "");
+      else stage = '<div><b>Elija el cuadro o la plantilla</b><p class="note">Las columnas arrancan como las pide el destino. Puede agregar campos propios después.</p></div><div class="tpl" role="group" aria-label="Destinos">' + Object.keys(TARGETS).map(function (tid) { var t = TARGETS[tid]; return '<button class="tplb" data-tid="' + tid + '" aria-pressed="' + (W.tid === tid) + '"><span class="tag" data-s="' + t.sis + '">' + t.sis + "</span><span><b>" + esc(t.nm) + "</b><span>" + t.cols.length + " columnas</span></span></button>"; }).join("") + "</div>";
+    } else if (s === 2) {
+      stage = '<div><b>Revise los campos</b><p class="note">Nombre, tipo y si es obligatorio. Debajo verá si una columna ya coincide con el CNA o el SNIES.</p></div><div class="colrows">' + W.cols.map(function (c, i) {
+        var sg = suggest(c.l);
+        return '<div class="colrow"><input class="inp" data-wc="l:' + i + '" value="' + esc(c.l) + '" aria-label="Nombre del campo ' + (i + 1) + '"><select class="inp" data-wc="t:' + i + '" aria-label="Tipo del campo ' + (i + 1) + '">' + Object.keys(TIPOS).map(function (t) { return '<option value="' + t + '"' + (c.t === t ? " selected" : "") + ">" + TIPOS[t] + "</option>"; }).join("") + '</select><label class="ck"><input type="checkbox" data-wc="r:' + i + '"' + (c.req ? " checked" : "") + '> Obligatorio</label><button class="mini" data-wdel="' + i + '" aria-label="Quitar el campo">' + ic("x") + "</button>" + (sg ? '<div class="hint"><span class="tag" data-s="' + TARGETS[sg[0]].sis + '">' + TARGETS[sg[0]].sis + "</span>Coincide con «" + esc(sg[1]) + "» de " + esc(TARGETS[sg[0]].nm.replace(/^.*? · /, "").replace("Plantilla ", "")) + "</div>" : "") + "</div>";
+      }).join("") + '</div><button class="btn sm" id="wadd" style="justify-self:start">' + ic("plus") + "Agregar campo</button>";
+    } else {
+      var cand = Object.keys(TARGETS).map(function (tid) { var f = { cols: W.cols }; var mp = autoMap(f, tid); var n = mp.filter(Boolean).length; return { tid: tid, n: n, t: TARGETS[tid].cols.length, pct: Math.round(n / TARGETS[tid].cols.length * 100) }; }).filter(function (x) { return x.pct >= 40; }).sort(function (a, b) { return b.pct - a.pct; });
+      if (!W.touched) { cand.forEach(function (x) { W.targets[x.tid] = x.pct >= 60; }); W.touched = 1; }
+      stage = '<label class="fl">Nombre del archivo<input type="text" class="inp" id="wnm" value="' + esc(W.nm) + '" placeholder="Ej. Convenios de práctica"></label><div style="display:flex;gap:16px;flex-wrap:wrap;align-items:flex-end"><label class="fl">Carpeta<select class="inp" id="wfol">' + FOLDERS.map(function (f) { return '<option value="' + f.id + '"' + (W.folder === f.id ? " selected" : "") + ">" + esc(f.nm) + "</option>"; }).join("") + '</select></label><div><div class="fl" style="margin-bottom:4px">Formato</div><div class="seg" role="group" aria-label="Formato"><button data-wt="tabla" aria-pressed="' + (W.tipo === "tabla") + '" style="width:auto;padding:0 12px;font-weight:600">Tabla</button><button data-wt="lista" aria-pressed="' + (W.tipo === "lista") + '" style="width:auto;padding:0 12px;font-weight:600">Lista</button></div></div></div>' +
+        '<div><b>Puede responder a</b><p class="note">Sus columnas ya coinciden con estos destinos. Marque los que quiera conectar.</p></div>' + (cand.length ? cand.map(function (x) { return '<label class="tplb" style="grid-template-columns:auto auto 1fr auto;cursor:pointer"><input type="checkbox" data-wtg="' + x.tid + '"' + (W.targets[x.tid] ? " checked" : "") + ' style="accent-color:var(--accent);width:16px;height:16px"><span class="tag" data-s="' + TARGETS[x.tid].sis + '">' + TARGETS[x.tid].sis + "</span><span><b>" + esc(TARGETS[x.tid].nm.replace(/^.*? · /, "").replace("Plantilla ", "")) + '</b><span class="num">' + x.n + " de " + x.t + " columnas</span></span>" + ring(x.pct, "sm") + "</label>"; }).join("") : '<p class="note">Todavía ninguna columna coincide con un cuadro. Podrá conectarlo después desde «Responde a».</p>');
+    }
+    var tip = TIPS[s];
+    $("#wiz .dlg").innerHTML = '<header><h2>Nuevo archivo</h2><div class="steps" aria-label="Paso ' + (s + 1) + ' de 4">' + [0, 1, 2, 3].map(function (i) { return '<i data-on="' + (i <= s) + '"></i>'; }).join("") + '</div><button class="x" data-wclose="1" aria-label="Cerrar">' + ic("x") + '</button></header><div class="dbody"><div class="stage" id="wstage">' + stage + '</div><aside class="pilo" aria-label="Pilo"><div class="h"><span class="face">P</span>Pilo</div><b>' + tip[0] + "</b><p>" + tip[1] + "</p></aside></div><footer>" + (s > 0 ? '<button class="btn" data-wback="1">Atrás</button>' : "<span></span>") + (s < 3 ? '<button class="btn pri" data-next="1"' + (wizCanNext() ? "" : " disabled") + ">Siguiente</button>" : '<button class="btn pri" data-create="1"' + (wizCanNext() ? "" : " disabled") + ">Crear y abrir</button>") + "</footer>";
+  }
+  function wizStep(dir) {
+    W.step = Math.max(0, Math.min(3, W.step + dir));
+    if (W.step === 3 && !W.nm) W.nm = W.archivo ? W.archivo.replace(/\.[a-z0-9]+$/i, "").replace(/[_-]+/g, " ") : (W.partida && PARTIDAS[W.partida] ? PARTIDAS[W.partida][0] : "");
+    wizRender();
+    anim(function (g) { g.fromTo("#wstage", { x: dir * 14, opacity: 0 }, { x: 0, opacity: 1, duration: 0.22, ease: "power3.out", clearProps: "transform,opacity" }); });
+  }
+  function wizClose() { $("#wiz").setAttribute("data-open", "false"); W = null; }
+  function wizCreate() {
+    var cols = W.cols.map(function (c, i) { return C("n" + i + "_" + Date.now() % 1000, c.l.trim(), c.t, (c.t === "l" ? { opts: c.opts || [] } : {}) ); }), keyOf = {};
+    W.cols.forEach(function (c, i) { keyOf[c.k] = cols[i].k; if (c.req) cols[i].req = 1; });
+    var rows = W.rows.map(function (r) { var o = {}; Object.keys(r).forEach(function (k) { if (keyOf[k]) o[keyOf[k]] = r[k]; }); return o; });
+    var f = { id: "f" + (++S.uid), nm: W.nm.trim(), kind: W.tipo, folder: W.folder, est: "borrador", ago: 0, resp: {}, cols: cols, rows: rows };
+    Object.keys(W.targets).forEach(function (t) { if (W.targets[t]) f.resp[t] = { map: autoMap(f, t) }; });
+    S.files.push(f); S.folder = W.folder; S.nav = "archivos"; S.filtro = "todos"; S.sel = f.id;
+    var b = $("#btnNuevo"), r = b ? b.getBoundingClientRect() : null;
+    wizClose(); renderAll(false);
+    openEditor(f.id, r ? { left: r.left, top: r.top, width: r.width, height: r.height } : null);
+    toast("«" + f.nm + "» creado en " + FOLDERS.filter(function (x) { return x.id === f.folder; })[0].nm + ".");
+  }
+  function readExcel(file, cb) {
+    if (!file) return; if (!window.XLSX) return toast("No se pudo cargar el lector de Excel.");
+    var rd = new FileReader();
+    rd.onload = function () {
+      try {
+        var wb = window.XLSX.read(rd.result, { type: "array", cellDates: true }), ws = wb.Sheets[wb.SheetNames[0]];
+        var m = window.XLSX.utils.sheet_to_json(ws, { header: 1, defval: "", raw: true }).map(function (r) { return r.map(function (v) { if (v instanceof Date) return v.toISOString().slice(0, 10); return v == null ? "" : String(v); }); });
+        cb(file.name, m, wb.SheetNames[0]);
+      } catch (e) { toast("No se pudo leer el archivo."); }
+    };
+    rd.readAsArrayBuffer(file);
+  }
+  function aplicaMatriz(nombre, m) { var r = colsFromMatrix(m); W.cols = r.cols; W.rows = r.rows; W.archivo = nombre; wizRender(); }
+
+  /* ---- Buscador ---------------------------------------------------------------------------------------- */
+  var K = null;
+  function kItems(q) {
+    var acts = [["Nuevo archivo", "plus", "accion", "new"], ["Subir una plantilla de Excel", "up", "accion", "upload"], ["Recorrido guiado de Pilo", "play", "accion", "tour"], ["Ver plantillas CNA y SNIES", "lib", "accion", "lib"], ["Cambiar entre mosaicos y lista", "rows", "accion", "vista"]];
+    var all = S.files.map(function (f) { return [f.nm, f.kind, (f.kind === "lista" ? "Lista" : "Tabla") + " · " + FOLDERS.filter(function (x) { return x.id === f.folder; })[0].nm, "file", f.id]; }).concat(acts.map(function (a) { return [a[0], a[1], "Acción", a[3], a[3]]; }));
+    var n = norm(q); return n ? all.filter(function (x) { return norm(x[0]).indexOf(n) >= 0; }) : all;
+  }
+  function kOpen() { K = { q: "", i: 0 }; $("#kscrim").setAttribute("data-open", "true"); kRender(); setTimeout(function () { $("#kq").focus(); }, 40); }
+  function kClose() { $("#kscrim").setAttribute("data-open", "false"); K = null; }
+  function kRender() {
+    var it = kItems(K.q); K.items = it; K.i = Math.min(K.i, Math.max(0, it.length - 1));
+    $("#kl").innerHTML = it.length ? it.map(function (x, i) { return '<li role="option" data-ki="' + i + '" aria-selected="' + (i === K.i) + '">' + ic(x[1]) + esc(x[0]) + "<small>" + esc(x[2]) + "</small></li>"; }).join("") : '<li style="cursor:default;color:var(--ink-3)">Sin resultados</li>';
+  }
+  function kRun(x) {
+    kClose();
+    if (x[3] === "file") { var f = fileById(x[4]); S.nav = "archivos"; S.folder = f.folder; S.filtro = "todos"; S.sel = f.id; renderAll(false); var t = $('[data-id="' + f.id + '"]'); openEditor(f.id, t ? rectOf(t) : null); }
+    else if (x[3] === "new") { if (canEdit()) wizOpen(); else toast("Planeación solo observa."); }
+    else if (x[3] === "upload") { if (canEdit()) { wizOpen(); W.origen = "excel"; W.step = 1; wizRender(); } else toast("Planeación solo observa."); }
+    else if (x[3] === "tour") startTour("home");
+    else if (x[3] === "lib") { S.nav = "plantillas"; S.folder = null; renderAll(true); }
+    else if (x[3] === "vista") { S.vista = S.vista === "tiles" ? "lista" : "tiles"; renderAll(false); }
+  }
+  function rectOf(el) { var r = el.getBoundingClientRect(); return { left: r.left, top: r.top, width: r.width, height: r.height }; }
+
+  /* ---- Recorrido de Pilo ---------------------------------------------------------------------------------------- */
+  var TOURS = {
+    home: [
+      { sel: "#side", t: "Su espacio de trabajo", b: "A la izquierda están sus carpetas. «Cuadro Maestro CNA» reúne los cuadros que pide el CNA y «Reportes SNIES» las plantillas del Ministerio." },
+      { sel: "#btnNuevo", t: "Cree tablas y listas", b: "«Nuevo» abre un asistente de cuatro pasos. Puede partir de cero, de su propio Excel o de la estructura exacta de un cuadro del CNA." },
+      { sel: "#files", t: "Sus archivos", b: "Cada mosaico muestra el estado y a qué cuadro responde. Haga clic para ver detalles y doble clic para abrirlo a pantalla completa." },
+      { sel: "#details", t: "Detalles y cobertura", b: "Aquí ve cuánto cubre cada archivo del cuadro que responde. En la carpeta del CNA también está la ruta de periodos 01 y 02 y el botón para emitir." },
+      { sel: "#selRol", t: "Quién puede qué", b: "Director y Coordinador de programa editan. Planeación observa todo, pero no modifica nada. Cámbielo aquí para ver cada pantalla." }
+    ],
+    edit: [
+      { sel: "#canvas", t: "La hoja de trabajo", b: "Escriba directamente en las celdas. Lo mal escrito se marca en rojo al instante. Ctrl+V pega un rango desde Excel y el encabezado ordena." },
+      { sel: "#etool", t: "Buscar, ordenar y organizar", b: "Busque en todo el archivo, oculte columnas y fije la primera. Todo esto lo resuelve TanStack Table, sin código a mano." },
+      { sel: "#bPL", t: "Campos", b: "Defina qué guarda cada columna: texto, número, fecha, lista o porcentaje, y cuáles son obligatorias." },
+      { sel: "#bPR", t: "Responde a", b: "Aquí une cada columna con la que pide el CNA o el SNIES. Con «Ver la salida» comprueba cómo quedaría en el cuadro." },
+      { sel: "#eListo", t: "Márquelo como listo", b: "Cuando no queden errores, márquelo como listo. Planeación lo verá en «Listos para Planeación»." }
+    ]
+  };
+  var T = null;
+  function startTour(name) {
+    var steps = TOURS[name]; if (!steps) return; T = { steps: steps, i: 0 };
+    $("#tour").setAttribute("data-open", "true"); tourShow(true);
+  }
+  function tourShow(first) {
+    var s = T.steps[T.i], el = $(s.sel), sp = $("#spot"), pop = $("#tpop"), vw = innerWidth, vh = innerHeight, r;
+    if (el) { el.scrollIntoView({ block: "nearest" }); var b = el.getBoundingClientRect(); r = { x: Math.max(4, b.left - 6), y: Math.max(4, b.top - 6), w: Math.min(vw - 8, b.width + 12), h: Math.min(vh - 8, b.height + 12) }; } else r = { x: vw / 2 - 1, y: vh / 2 - 1, w: 2, h: 2 };
+    pop.innerHTML = '<div class="h"><span class="face">P</span>' + esc(s.t) + "</div><p>" + esc(s.b) + '</p><div class="f"><span class="note num">' + (T.i + 1) + " de " + T.steps.length + '</span><span style="display:flex;gap:6px"><button class="btn sm ghost" data-tskip="1">Saltar</button>' + (T.i ? '<button class="btn sm" data-tprev="1">Atrás</button>' : "") + '<button class="btn sm pri" data-tnext="1">' + (T.i === T.steps.length - 1 ? "Terminar" : "Siguiente") + "</button></span></div>";
+    var pw = Math.min(330, vw - 24), ph = pop.offsetHeight || 150, px = r.x + r.w + 14, py = r.y;
+    if (px + pw > vw - 12) { px = Math.max(12, Math.min(vw - pw - 12, r.x)); py = r.y + r.h + 14; }
+    if (py + ph > vh - 12) py = Math.max(12, vh - ph - 12);
+    if (G && !reduce && !first) { G.to(sp, { x: r.x, y: r.y, width: r.w, height: r.h, duration: 0.38, ease: "expo.out" }); G.to(pop, { x: px, y: py, duration: 0.38, ease: "expo.out" }); G.fromTo(pop, { opacity: 0.4 }, { opacity: 1, duration: 0.2 }); }
+    else { G ? (G.set(sp, { x: r.x, y: r.y, width: r.w, height: r.h }), G.set(pop, { x: px, y: py }), first && !reduce && G.from(pop, { opacity: 0, duration: 0.25 })) : (sp.style.cssText = "left:" + r.x + "px;top:" + r.y + "px;width:" + r.w + "px;height:" + r.h + "px", pop.style.cssText = "left:" + px + "px;top:" + py + "px"); }
+    var nb = pop.querySelector("[data-tnext]"); if (nb) nb.focus({ preventScroll: true });
+  }
+  function tourEnd() { $("#tour").setAttribute("data-open", "false"); T = null; }
+
+  /* ---- Eventos globales ------------------------------------------------------------------------------------------ */
+  document.addEventListener("click", function (ev) {
+    var t = ev.target, b = t.closest("button, .tile, tr[data-id], li[data-ki]"); if (!b && !t.closest(".menu")) { if (E && E.menu && !t.closest("#bCols")) closeMenu(); return; }
+    if (!b) return;
+    var d = b.dataset;
+    if (E && E.menu && !b.closest(".menu") && b.id !== "bCols") closeMenu();
+    // tour
+    if (d.tnext) { if (T.i >= T.steps.length - 1) return tourEnd(); T.i++; return tourShow(); }
+    if (d.tprev) { T.i--; return tourShow(); }
+    if (d.tskip) return tourEnd();
+    // buscador
+    if (d.ki != null) return kRun(K.items[parseInt(d.ki, 10)]);
+    // asistente
+    if (W) {
+      if (d.wclose) return wizClose(); if (d.next) return wizCanNext() && wizStep(1); if (d.wback) return wizStep(-1); if (d.create) return wizCanNext() && wizCreate();
+      if (d.choice) { var c = d.choice; W.origen = c === "tabla" || c === "lista" ? "blanco" : c; W.tipo = c === "lista" ? "lista" : "tabla"; W.cols = []; W.rows = []; W.partida = null; W.tid = null; W.archivo = ""; wizRender(); return; }
+      if (d.part) { W.partida = d.part; W.cols = d.part === "vacia" ? [] : PARTIDAS[d.part][1].map(function (p, i) { return C("p" + i, p[0], p[1], p[3] ? { opts: p[3], req: p[2] } : { req: p[2] }); }); if (d.part === "vacia") W.cols = [C("p0", "Nombre", "x", { req: 1 })]; W.rows = []; wizRender(); return; }
+      if (d.tid) { W.tid = d.tid; loadTarget(d.tid); W.folder = TARGETS[d.tid].sis === "CNA" ? "cna" : "snies"; W.nm = TARGETS[d.tid].nm.replace(/^.*? · /, "").replace("Plantilla ", ""); W.touched = 0; wizRender(); return; }
+      if (d.wdel != null) { W.cols.splice(parseInt(d.wdel, 10), 1); wizRender(); return; }
+      if (b.id === "wadd") { W.cols.push(C("a" + Date.now() % 100000, "Nuevo campo", "x")); wizRender(); var ins = $$("#wstage .colrow .inp[data-wc^='l:']"); if (ins.length) { ins[ins.length - 1].focus(); ins[ins.length - 1].select(); } return; }
+      if (b.id === "wejemplo") { aplicaMatriz("Convenios-de-práctica.xlsx", [["Nombre del convenio", "Institución", "Tipo de convenio", "Fecha de inicio", "Fecha de vencimiento", "Estudiantes en práctica", "Responsable"], ["Docencia-servicio 2024", "Clínica Foscal", "Docencia-servicio", "2024-03-01", "2027-03-31", "24", "Dirección"], ["Cooperación académica", "Universidad de Guadalajara", "Cooperación", "2023-12-15", "2026-12-15", "6", "Coordinación"], ["Prácticas sociales", "Alcaldía de Bucaramanga", "Cooperación", "2025-01-20", "2028-01-20", "12", "Dirección"], ["Docencia-servicio 2025", "Hospital Universitario", "Docencia-servicio", "2025-02-10", "2028-02-10", "30", "Dirección"], ["Movilidad entrante", "Universidad de Valencia", "Movilidad", "2025-05-12", "2026-05-12", "2", "Coordinación"], ["Cooperación tecnológica", "Clínica del Norte", "Cooperación", "2025-07-01", "2027-07-01", "8", "Coordinación"]]); return; }
+      if (d.wt) { W.tipo = d.wt; wizRender(); return; }
+      return;
+    }
+    // editor
+    if (E) {
+      if (b.id === "eBack") return closeEditor(); if (b.id === "eTour") return startTour("edit");
+      if (b.id === "eListo") { var f = E.f; if (d.v === "1") { var n = errCount(f); if (n) { toast("Corrija " + n + (n === 1 ? " celda" : " celdas") + " antes de marcarlo como listo."); return nextError(); } f.est = "listo"; toast("Listo. Planeación ya puede verlo."); } else f.est = "borrador"; renderHead(); renderStat(); return; }
+      if (d.sort) { var col = E.tb.getColumn(d.sort); col.toggleSorting(undefined, ev.shiftKey); return; }
+      if (b.id === "bCols") return openMenu(b); if (b.id === "bPin") { var c0 = E.tb.getAllLeafColumns()[0]; c0.pin(c0.getIsPinned() ? false : "left"); return; }
+      if (d.ev) { E.vista = d.ev; renderTool(); renderCanvas(); return; }
+      if (b.id === "bAdd") { E.f.rows.push({}); E.f.est = E.f.est === "listo" ? "borrador" : E.f.est; refreshData(); renderCanvas(); renderHead(); var last = $$("#canvas .cell:not(:disabled)"); var nf = E.vista === "lista" ? $$("#canvas .li:last-child .cell")[0] : $$("#canvas tbody tr:last-child .cell")[0]; if (nf) nf.focus(); (nf || {}).scrollIntoView && nf.scrollIntoView({ block: "nearest" }); return; }
+      if (b.id === "bDel") { var idx = E.tb.getSelectedRowModel().rows.map(function (r) { return r.index; }).sort(function (a, c) { return c - a; }); idx.forEach(function (i) { E.f.rows.splice(i, 1); }); E.tb.resetRowSelection(); refreshData(); renderCanvas(); renderTool(); toast(idx.length + (idx.length === 1 ? " fila eliminada." : " filas eliminadas.")); return; }
+      if (d.delrow != null) { E.f.rows.splice(parseInt(d.delrow, 10), 1); refreshData(); renderCanvas(); return; }
+      if (b.id === "bPL") { E.pl = !E.pl; renderTool(); renderPanels(); return; } if (b.id === "bPR") { E.pr = !E.pr; renderTool(); renderPanels(); return; }
+      if (b.id === "nextErr") return nextError();
+      if (d.fld) { E.openField = E.openField === d.fld ? null : d.fld; renderPanels(); return; }
+      if (d.nt) { E.nt = d.nt; $$("#newType .chip").forEach(function (x) { x.setAttribute("aria-pressed", String(x.dataset.nt === E.nt)); }); return; }
+      if (b.id === "addCol") { var nm = ($("#newName").value || "").trim(); if (!nm) return toast("Escriba el nombre del campo."); E.f.cols.push(C("n" + Date.now() % 100000, nm, E.nt || "x", E.nt === "l" ? { opts: ["Sí", "No"] } : {})); rebuild(); return; }
+      if (d.delcol) { E.f.cols = E.f.cols.filter(function (c) { return c.k !== d.delcol; }); Object.keys(E.f.resp).forEach(function (tid) { E.f.resp[tid].map = (E.f.resp[tid].map || []).map(function (k) { return k === d.delcol ? null : k; }); }); E.openField = null; rebuild(); return; }
+      if (d.desc) { delete E.f.resp[d.desc]; renderPanels(); return; }
+      if (d.out) { E.out[d.out] = !E.out[d.out]; renderPanels(); return; }
+      return;
+    }
+    // explorador
+    if (d.nav) { S.nav = d.nav; S.folder = null; S.filtro = "todos"; S.sel = null; renderAll(true); return; }
+    if (d.folder) { S.nav = "archivos"; S.folder = d.folder; S.filtro = "todos"; S.sel = null; renderAll(true); return; }
+    if (d.crumb) { S.nav = "archivos"; S.folder = null; S.sel = null; renderAll(true); return; }
+    if (d.openFolder) { S.folder = d.openFolder; S.sel = null; renderAll(true); return; }
+    if (d.f) { S.filtro = d.f; renderCmd(); renderFiles(); return; }
+    if (d.v) { S.vista = d.v; renderCmd(); renderFiles(); return; }
+    if (b.id === "btnInfo") { S.info = !S.info; renderCmd(); renderDetails(); return; }
+    if (b.id === "btnNuevo" || d.newfromempty) return canEdit() ? wizOpen() : toast("Planeación solo observa.");
+    if (b.id === "btnSubir") { if (!canEdit()) return; wizOpen(); W.origen = "excel"; W.step = 1; wizRender(); return; }
+    if (b.id === "btnTour") return startTour("home");
+    if (d.crear) return canEdit() && wizOpen(d.crear);
+    if (d.abrir) { var el = $('[data-id="' + d.abrir + '"]'); return openEditor(d.abrir, el ? rectOf(el) : null); }
+    if (d.borrar) { var fb = fileById(d.borrar); S.files = S.files.filter(function (x) { return x.id !== d.borrar; }); S.sel = null; renderAll(false); toast("«" + fb.nm + "» eliminado."); return; }
+    if (b.id === "cerrarPer") { var np = nextPer(); S.per[np] = true; renderDetails(); renderSide(); toast("Periodo " + np + " cerrado." + (nextPer() ? " Sigue " + nextPer() + "." : " La ventana está completa.")); return; }
+    if (b.id === "btnEmitir") { b.disabled = true; b.textContent = "Generando…"; var nm2 = "Cuadro Maestro Programas - " + S.prog + " - Bucaramanga - 2025-02.xlsx"; setTimeout(function () { S.emitido = nm2; renderDetails(); toast("Cuadro Maestro generado. En el módulo real se descarga el Excel."); }, reduce ? 0 : 900); return; }
+    if (b.classList.contains("tile") || b.tagName === "TR") {
+      if (d.id) { S.sel = d.id; $$(".tile[data-id], tr[data-id]").forEach(function (x) { x.setAttribute("aria-selected", String(x.dataset.id === S.sel)); }); renderDetails(); if (!S.info && innerWidth > 1100) { S.info = true; renderCmd(); renderDetails(); } }
+    }
+  });
+  document.addEventListener("dblclick", function (ev) {
+    var t = ev.target.closest(".tile[data-id], tr[data-id]"); if (t && !E && !W) openEditor(t.dataset.id, rectOf(t));
+    var fo = ev.target.closest("[data-open-folder]"); if (fo && !E) { /* handled by click */ }
+  });
+  function openMenu(btn) {
+    closeMenu(); var tb = E.tb, r = btn.getBoundingClientRect(), m = document.createElement("div"); m.className = "menu"; m.id = "cmenu"; m.setAttribute("role", "menu");
+    m.innerHTML = '<div class="h">Columnas visibles</div>' + tb.getAllLeafColumns().map(function (c) { return '<label><input type="checkbox" data-vis="' + c.id + '"' + (c.getIsVisible() ? " checked" : "") + ">" + esc(c.columnDef.meta.l) + "</label>"; }).join("");
+    m.style.left = Math.min(r.left, innerWidth - 230) + "px"; m.style.top = r.bottom + 4 + "px"; m.style.position = "fixed"; document.body.appendChild(m); E.menu = m;
+    anim(function (g) { g.from(m, { opacity: 0, y: -4, scale: 0.97, transformOrigin: "top left", duration: 0.16, ease: "power3.out" }); });
+  }
+  function closeMenu() { var m = $("#cmenu"); if (m) m.remove(); if (E) E.menu = null; }
+  function rebuild() { var q = E.tb.getState().globalFilter; makeTable(E.f); if (q) E.tb.setGlobalFilter(q); E.f.est = E.f.est === "listo" ? "borrador" : E.f.est; renderHead(); renderTool(); renderCanvas(); renderPanels(); }
+  function nextError() {
+    var f = E.f; if (E.vista === "tabla") { /* nada */ }
+    var cells = $$("#canvas td.bad .cell, #canvas label.bad .cell"); if (!cells.length) return toast("No hay errores.");
+    var act = document.activeElement, i = cells.indexOf(act); var nx = cells[(i + 1) % cells.length]; nx.focus(); nx.scrollIntoView({ block: "center", inline: "nearest" });
+  }
+  document.addEventListener("input", function (ev) {
+    var t = ev.target;
+    if (E && t.classList.contains("cell") && t.dataset.ri != null) {
+      var f = E.f, c = f.cols.filter(function (x) { return x.k === t.dataset.k; })[0], row = f.rows[parseInt(t.dataset.ri, 10)]; row[c.k] = t.value;
+      var err = cellError(f, row, c), bad = err && (t.value !== "" || c.req), host = t.closest("td") || t.closest("label"); if (host) { host.classList.toggle("bad", !!bad); host.title = bad ? err : ""; }
+      if (c.k === "ini" || c.k === "fn") { /* revalida el par */ }
+      if (f.est === "listo") { f.est = "borrador"; renderHead(); }
+      refreshData(); renderStat(); saveFlash(); renderHeadEst();
+      return;
+    }
+    if (E && t.id === "eFind") { E.tb.setGlobalFilter(t.value); return; }
+    if (E && t.id === "eName") { E.f.nm = t.value; saveFlash(); return; }
+    if (E && t.dataset.fe) { return; }
+    if (W && t.dataset.wc) { var p = t.dataset.wc.split(":"), i = parseInt(p[1], 10); if (p[0] === "l") W.cols[i].l = t.value; return; }
+    if (W && t.id === "wnm") { W.nm = t.value; var nb = $("[data-create]"); if (nb) nb.disabled = !wizCanNext(); return; }
+    if (K && t.id === "kq") { K.q = t.value; K.i = 0; kRender(); }
+  });
+  function renderHeadEst() { var x = estOf(E.f), e = $("#eh .est"); if (e) { e.setAttribute("data-e", x[0]); e.innerHTML = ic(x[2]) + x[1]; } }
+  function saveFlash() { var s = $("#eSaved span"); if (!s) return; s.textContent = "Guardando…"; clearTimeout(saveFlash.t); saveFlash.t = setTimeout(function () { var s2 = $("#eSaved span"); if (s2) s2.textContent = "Guardado"; }, 500); }
+  document.addEventListener("change", function (ev) {
+    var t = ev.target;
+    if (E && t.tagName === "SELECT" && t.classList.contains("cell")) { var f = E.f, row = f.rows[parseInt(t.dataset.ri, 10)]; row[t.dataset.k] = t.value; if (f.est === "listo") f.est = "borrador"; refreshData(); renderCanvas(); renderHead(); saveFlash(); return; }
+    if (E && t.dataset.vis) { E.tb.getColumn(t.dataset.vis).toggleVisibility(t.checked); return; }
+    if (E && t.id === "selAll") { E.tb.toggleAllRowsSelected(t.checked); return; }
+    if (E && t.dataset.selrow != null) { E.tb.getRow(t.dataset.selrow).toggleSelected(t.checked); return; }
+    if (E && t.dataset.fe) {
+      var c = E.f.cols.filter(function (x) { return x.k === t.dataset.k; })[0], k = t.dataset.fe;
+      if (k === "l") c.l = t.value.trim() || c.l; if (k === "t") { c.t = t.value; if (c.t === "l" && !(c.opts || []).length) c.opts = ["Sí", "No"]; } if (k === "opts") c.opts = t.value.split(",").map(function (x) { return x.trim(); }).filter(Boolean); if (k === "req") c.req = t.checked ? 1 : 0;
+      rebuild(); return;
+    }
+    if (E && t.dataset.map) { var q = t.dataset.map.split(":"); var mp = E.f.resp[q[0]].map = E.f.resp[q[0]].map || []; mp[parseInt(q[1], 10)] = t.value || null; renderPanels(); renderTool(); return; }
+    if (E && t.id === "conectar" && t.value) { E.f.resp[t.value] = { map: autoMap(E.f, t.value) }; E.pr = true; renderPanels(); toast("Conectado. Revise el emparejamiento."); return; }
+    if (W && t.dataset.wc) { var p = t.dataset.wc.split(":"), i = parseInt(p[1], 10); if (p[0] === "t") { W.cols[i].t = t.value; if (t.value === "l" && !(W.cols[i].opts || []).length) W.cols[i].opts = ["Sí", "No"]; } if (p[0] === "r") W.cols[i].req = t.checked ? 1 : 0; if (p[0] === "l") W.cols[i].l = t.value; wizRender(); return; }
+    if (W && t.id === "wfol") { W.folder = t.value; return; }
+    if (W && t.dataset.wtg) { W.targets[t.dataset.wtg] = t.checked; return; }
+    if (W && t.id === "wfile") return readExcel(t.files[0], function (nm, m) { aplicaMatriz(nm, m); });
+    if (t.id === "selRol") { S.rol = t.value; if (S.rol !== "plan") S.prog = PROGS[0]; $("#selProg").value = S.prog; $("#selProg").disabled = S.rol !== "plan"; if (E) { renderHead(); renderTool(); renderCanvas(); renderPanels(); } renderAll(false); toast("Rol: " + ROLES[S.rol].nm + "."); return; }
+    if (t.id === "selProg") { S.prog = t.value; renderAll(false); renderCrumb(); }
+  });
+  document.addEventListener("dragover", function (ev) { var d = ev.target.closest && ev.target.closest("#drop"); if (d) { ev.preventDefault(); d.setAttribute("data-over", "true"); } });
+  document.addEventListener("dragleave", function (ev) { var d = ev.target.closest && ev.target.closest("#drop"); if (d) d.setAttribute("data-over", "false"); });
+  document.addEventListener("drop", function (ev) { var d = ev.target.closest && ev.target.closest("#drop"); if (d) { ev.preventDefault(); d.setAttribute("data-over", "false"); readExcel(ev.dataTransfer.files[0], function (nm, m) { aplicaMatriz(nm, m); }); } });
+  document.addEventListener("keydown", function (ev) {
+    var t = ev.target, k = ev.key;
+    if ((ev.ctrlKey || ev.metaKey) && k.toLowerCase() === "k") { ev.preventDefault(); return K ? kClose() : kOpen(); }
+    if (K) { if (k === "Escape") return kClose(); if (k === "ArrowDown") { ev.preventDefault(); K.i = Math.min(K.items.length - 1, K.i + 1); return kRender(); } if (k === "ArrowUp") { ev.preventDefault(); K.i = Math.max(0, K.i - 1); return kRender(); } if (k === "Enter" && K.items[K.i]) { ev.preventDefault(); return kRun(K.items[K.i]); } return; }
+    if (T) { if (k === "Escape") return tourEnd(); if (k === "ArrowRight") { var n = $("[data-tnext]"); return n && n.click(); } if (k === "ArrowLeft") { var p = $("[data-tprev]"); return p && p.click(); } return; }
+    if (W) { if (k === "Escape") return wizClose(); return; }
+    if (E) {
+      if (k === "Escape") { if (E.menu) return closeMenu(); if (t.tagName === "TEXTAREA") return; return closeEditor(); }
+      if ((ev.ctrlKey || ev.metaKey) && k.toLowerCase() === "s") { ev.preventDefault(); saveFlash(); return toast("Guardado."); }
+      if (k === "F8") { ev.preventDefault(); return nextError(); }
+      if (t.classList && t.classList.contains("cell") && t.dataset.ri != null && t.tagName === "INPUT" && (k === "Enter" || k === "ArrowDown" || k === "ArrowUp")) {
+        var tr = t.closest("tr, .li"), sib = k === "ArrowUp" ? tr.previousElementSibling : tr.nextElementSibling, idx = $$(".cell", tr).indexOf(t);
+        if (sib) { var dest = $$(".cell", sib)[idx]; if (dest && !dest.disabled) { ev.preventDefault(); dest.focus(); dest.select && dest.select(); } }
+      }
+      return;
+    }
+    if ((k === "Enter") && t.classList && (t.classList.contains("tile") || t.tagName === "TR") && t.dataset.id) { ev.preventDefault(); openEditor(t.dataset.id, rectOf(t)); }
+  });
+  document.addEventListener("paste", function (ev) {
+    var t = ev.target; if (!E || !canEdit() || !t.classList || !t.classList.contains("cell") || t.dataset.ri == null) return;
+    var txt = (ev.clipboardData || window.clipboardData).getData("text"); if (!/[\t\n]/.test(txt.replace(/\n$/, ""))) return;
+    ev.preventDefault();
+    var f = E.f, lines = txt.replace(/\r/g, "").replace(/\n$/, "").split("\n"), vis = E.tb.getVisibleLeafColumns().map(function (c) { return c.columnDef.meta; }).filter(function (c) { return !c.ro; }), c0 = vis.map(function (c) { return c.k; }).indexOf(t.dataset.k);
+    var order = E.tb.getRowModel().rows.map(function (r) { return r.index; }), p0 = order.indexOf(parseInt(t.dataset.ri, 10));
+    lines.forEach(function (ln, i) { var ri = order[p0 + i]; if (ri == null) { f.rows.push({}); ri = f.rows.length - 1; } ln.split("\t").forEach(function (v, j) { var c = vis[c0 + j]; if (c) f.rows[ri][c.k] = v.trim(); }); });
+    if (f.est === "listo") f.est = "borrador"; refreshData(); renderCanvas(); renderHead(); saveFlash(); toast(lines.length + (lines.length === 1 ? " fila pegada." : " filas pegadas."));
+  });
+  $("#btnK").addEventListener("click", kOpen);
+  $("#kscrim").addEventListener("mousedown", function (e) { if (e.target.id === "kscrim") kClose(); });
+  $("#wiz").addEventListener("mousedown", function (e) { if (e.target.id === "wiz") wizClose(); });
+  window.addEventListener("resize", function () { if (T) tourShow(); });
+
+  /* ---- Arranque ---------------------------------------------------------------------------------------------------- */
+  $("#selRol").innerHTML = Object.keys(ROLES).map(function (k) { return '<option value="' + k + '">' + ROLES[k].nm + "</option>"; }).join("");
+  $("#selProg").innerHTML = PROGS.map(function (p) { return "<option>" + p + "</option>"; }).join("");
+  $("#selProg").disabled = true;
+  S.nav = "archivos"; S.folder = "cna";
+  renderAll(true);
+  window.__pc = { S: S, openEditor: openEditor, wizOpen: wizOpen, E: function () { return E; }, W: function () { return W; } };
+})();

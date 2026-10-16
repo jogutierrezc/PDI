@@ -46,7 +46,22 @@ export type IconName =
   | "layers"
   | "filter"
   | "spark-chart"
-  | "grip";
+  | "grip"
+  | "folder"
+  | "list"
+  | "tiles"
+  | "rows"
+  | "info"
+  | "link"
+  | "trash"
+  | "pen"
+  | "play"
+  | "share"
+  | "library"
+  | "columns-view"
+  | "chevron-right"
+  | "sort-asc"
+  | "users";
 
 const paths: Record<IconName, JSX.Element> = {
   /* --- Pilares ---------------------------------------------------------- */
@@ -237,6 +252,51 @@ const paths: Record<IconName, JSX.Element> = {
       <circle cx="9" cy="18" r="1.5" />
       <circle cx="15" cy="18" r="1.5" />
     </g>
+  ),
+  // Programas en Cifras: el lenguaje de un explorador de archivos.
+  folder: <path d="M3 7.5A1.5 1.5 0 0 1 4.5 6h4l2 2.2h9A1.5 1.5 0 0 1 21 9.7V17a1.5 1.5 0 0 1-1.5 1.5h-15A1.5 1.5 0 0 1 3 17V7.5z" />,
+  list: (
+    <>
+      <path d="M9 7h11M9 12h11M9 17h11" />
+      <circle cx="4.8" cy="7" r="1.1" />
+      <circle cx="4.8" cy="12" r="1.1" />
+      <circle cx="4.8" cy="17" r="1.1" />
+    </>
+  ),
+  tiles: (
+    <>
+      <rect x="4" y="4" width="6.5" height="6.5" rx="1" />
+      <rect x="13.5" y="4" width="6.5" height="6.5" rx="1" />
+      <rect x="4" y="13.5" width="6.5" height="6.5" rx="1" />
+      <rect x="13.5" y="13.5" width="6.5" height="6.5" rx="1" />
+    </>
+  ),
+  rows: <path d="M4 6h16M4 12h16M4 18h16" />,
+  info: (
+    <>
+      <circle cx="12" cy="12" r="8.5" />
+      <path d="M12 11v5M12 8v.1" />
+    </>
+  ),
+  link: <path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1M14 10a4 4 0 0 0-5.7 0l-3 3A4 4 0 0 0 11 18.7l1-1" />,
+  trash: <path d="M5 7h14M10 7V4.5h4V7M7 7l1 12.5h8L17 7" />,
+  pen: <path d="M4 20l1-4L16 5a2 2 0 0 1 3 3L8 19l-4 1z" />,
+  play: <path d="M8 5.5v13l11-6.5-11-6.5z" />,
+  share: <path d="M7 12v6.5h10V12M12 4v10m0-10L8.5 7.5M12 4l3.5 3.5" />,
+  library: <path d="M5 4.5h4v15H5zM11 4.5h4v15h-4zM17 6l3.5 1-3.4 12-3.5-1z" />,
+  "columns-view": (
+    <>
+      <rect x="4" y="4.5" width="16" height="15" rx="1.8" />
+      <path d="M10 4.5v15M15 4.5v15" />
+    </>
+  ),
+  "chevron-right": <path d="M9 6l6 6-6 6" />,
+  "sort-asc": <path d="M12 5v14m0-14l-5 5m5-5l5 5" />,
+  users: (
+    <>
+      <circle cx="9" cy="8.5" r="3.2" />
+      <path d="M3.5 19.5a5.5 5.5 0 0 1 11 0M16 5.6a3.2 3.2 0 0 1 0 5.8M17.5 14.2a5.5 5.5 0 0 1 3 5.3" />
+    </>
   ),
 };
 

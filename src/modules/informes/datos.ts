@@ -208,7 +208,7 @@ export function useGuardarSeccion(ciclo: string) {
 }
 
 const COLS_CIFRA =
-  "instancia_id, clave, etiqueta, seccion_clave, fuente_tipo, fuente_nombre, valor, unidad, meta, anterior, incluida, justificacion, propia, pilar, visto, foto_valor, foto_en, foto_fuente";
+  "instancia_id, clave, etiqueta, seccion_clave, fuente_tipo, fuente_nombre, valor, unidad, meta, anterior, incluida, justificacion, propia, pilar, visto, foto_valor, foto_en, foto_fuente, consulta";
 
 export function useCifras(instancia: string | undefined) {
   return useQuery({
@@ -258,6 +258,18 @@ export function useAsegurarCifras() {
     onSuccess: (_x, p) => {
       void cliente.invalidateQueries({ queryKey: CLAVES.cifras(p.instancia) });
       void cliente.invalidateQueries({ queryKey: CLAVES.vivas(p.instancia) });
+    },
+  });
+}
+
+/** Pone al día las metas que vienen de los indicadores del programa (0165); solo programas y facultades. */
+export function useSincronizarMetas() {
+  const cliente = useQueryClient();
+  return useMutation({
+    mutationFn: async (instancia: string): Promise<number> => Number(revisar<number>(await supabase.rpc("informe_metas_sincronizar", { p_instancia: instancia }))),
+    onSuccess: (_n, instancia) => {
+      void cliente.invalidateQueries({ queryKey: CLAVES.cifras(instancia) });
+      void cliente.invalidateQueries({ queryKey: CLAVES.vivas(instancia) });
     },
   });
 }

@@ -13,12 +13,9 @@
 import type { CifrasRpc } from "../lib/cifras";
 import { CALCULO_DURACION } from "../lib/conceptos";
 import { accionesPermitidas, ETIQUETA_ESTADO, hoyBogota, motivoBloqueoFilas, pideNota, rolEn, ventanaAbierta } from "../lib/permisos";
-import { calcular, leerValor, validarDatos } from "../lib/validacion";
 import type {
   Campus,
   Columna,
-  Datos,
-  ErrorCelda,
   IntConceptoRow,
   IntEnvioRow,
   IntEstado,
@@ -240,43 +237,6 @@ export function escrituraPorCampus(args: {
 
 /** Texto de una celda guardada, para el campo de la grilla. */
 export const textoDe = (v: IntValor | undefined) => (v === null || v === undefined ? "" : String(v));
-
-/**
- * Lee una fila de la grilla (textos tal como se escriben) con las reglas de
- * lib/validacion: tipos, listas, obligatorios, fin ≥ inicio y las calculadas.
- * Devuelve los datos tipados y los errores por celda, en español.
- */
-export function leerFilaGrilla(columnas: readonly Columna[], crudo: Readonly<Record<string, string>>, fila: number): { datos: Datos; errores: ErrorCelda[] } {
-  const errores: ErrorCelda[] = [];
-  let datos: Datos = {};
-  for (const c of columnas) {
-    if (c.tipo === "calculado") continue;
-    const l = leerValor(c, crudo[c.clave]);
-    datos[c.clave] = l.valor;
-    if (l.error) errores.push({ fila, columna: c.clave, mensaje: l.error });
-  }
-  datos = calcular(columnas, datos);
-  const marcadas = new Set(errores.map((e) => e.columna));
-  for (const e of validarDatos(columnas, datos, fila)) if (!marcadas.has(e.columna)) errores.push(e);
-  return { datos, errores };
-}
-
-/**
- * Pegar un rango de Excel (texto con tabuladores y saltos de línea) desde la
- * celda (fila, columna): devuelve las celdas que cambian, una por cada valor.
- * Las filas que pasan del final se marcan con fila ≥ total (hay que crearlas).
- */
-export function pegarRango(texto: string, fila: number, columna: number, claves: readonly string[]): { fila: number; clave: string; valor: string }[] {
-  const lineas = texto.replace(/\r\n?/g, "\n").replace(/\n$/, "").split("\n");
-  const salida: { fila: number; clave: string; valor: string }[] = [];
-  lineas.forEach((linea, i) => {
-    linea.split("\t").forEach((valor, j) => {
-      const clave = claves[columna + j];
-      if (clave) salida.push({ fila: fila + i, clave, valor: valor.trim() });
-    });
-  });
-  return salida;
-}
 
 /** «••••4821»: lo personal se ve enmascarado donde no se edita. */
 export function enmascarar(v: string): string {

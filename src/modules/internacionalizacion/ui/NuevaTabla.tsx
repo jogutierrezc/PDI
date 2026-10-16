@@ -1,20 +1,21 @@
 /* =============================================================================
    Internacionalización · «Nueva tabla» y «Nueva hoja» (solo el Director).
 
-   El panel del diseño: nombre, la clase de la hoja (movilidad saliente,
-   movilidad entrante, convenio o general: decide qué cuenta en Cifras), los
-   conceptos del catálogo que lleva (un concepto que ya existe se reutiliza y
+   El asistente de cuatro pasos, con Pilo al costado: 1 nombre y quién captura,
+   2 la clase de la hoja (movilidad saliente, movilidad entrante, convenio o general: decide qué cuenta
+   en Cifras), 3 los conceptos del catálogo que lleva (un concepto que ya existe se reutiliza y
    así todas las plantillas lo reconocen), campos propios si hacen falta, cuáles
-   son obligatorios, la vista previa de las columnas y quién captura.
+   son obligatorios, y 4 la vista previa de las columnas.
    Periodo y campus no son columnas: van en cada fila.
    ========================================================================== */
 
 import { useMemo, useState } from "react";
+import type { PiloMood } from "../../../components/pilo/PiloAvatar";
 import { Icon } from "../../../components/ui/Icon";
 import { useCrearTabla, useGuardarColumnas, useGuardarHoja } from "../datos";
 import { claveDePropio } from "../lib/conceptos";
 import type { Columna, IntConceptoRow, IntLibroRow, IntTipo, LibroCompleto } from "../tipos";
-import { Cajon } from "./comunes";
+import { MarcoAsistente } from "../../../components/espacio/MarcoAsistente";
 import { columnasDesdeConceptos, PARTIDAS } from "./logica";
 import type { Partida } from "./logica";
 
@@ -26,6 +27,13 @@ const TIPOS: { id: Exclude<IntTipo, "calculado">; rotulo: string }[] = [
 ];
 
 const ETIQUETA_TIPO: Record<IntTipo, string> = { texto: "texto", numero: "número", fecha: "fecha", lista: "lista", calculado: "calculado" };
+
+const PASOS: { titulo: string; texto: string; animo: PiloMood }[] = [
+  { titulo: "Empecemos por el nombre", texto: "Póngale un nombre claro. Si es una tabla nueva, diga también quién captura: cada campus sus filas o solo la oficina principal.", animo: "feliz" },
+  { titulo: "¿Qué clase de hoja es?", texto: "La clase decide qué cuenta en Cifras: la movilidad saliente y la entrante se suman aparte, y los convenios van por su lado.", animo: "idea" },
+  { titulo: "Elija los campos", texto: "Reutilice los del catálogo: así todas las plantillas los reconocen. Si falta uno, créelo como campo propio.", animo: "piensa" },
+  { titulo: "Revise y cree", texto: "Periodo y campus no son columnas: van en cada fila. Si todo está bien, la creo ahora y usted define la ventana en «Periodos».", animo: "excelente" },
+];
 
 export function NuevaTabla({
   libro,
@@ -48,6 +56,7 @@ export function NuevaTabla({
   const [propio, setPropio] = useState({ etiqueta: "", tipo: "texto" as Exclude<IntTipo, "calculado">, opciones: "" });
   const [captura, setCaptura] = useState<IntLibroRow["captura"]>("campus");
   const [error, setError] = useState<string | null>(null);
+  const [paso, setPaso] = useState(0);
   const crear = useCrearTabla();
   const guardarHoja = useGuardarHoja();
   const guardarColumnas = useGuardarColumnas();
@@ -94,136 +103,162 @@ export function NuevaTabla({
     }
   };
 
-  return (
-    <Cajon
-      titulo={libro ? `Nueva hoja en «${libro.nombre}»` : "Nueva tabla"}
-      onCerrar={onCerrar}
-      pie={
-        <>
-          {error && (
-            <p className="it-error" role="alert">
-              {error}
-            </p>
-          )}
-          <span className="it-espacio" />
-          <button type="button" className="button-secondary it-btn" onClick={onCerrar}>
-            Cancelar
-          </button>
-          <button type="button" className="button-primary it-btn" disabled={ocupado} onClick={() => void enviar()}>
-            {ocupado ? "Creando…" : libro ? "Crear hoja" : "Crear tabla"}
-          </button>
-        </>
-      }
-    >
-      {!libro && (
-        <label className="it-campo">
-          <span>Nombre de la tabla</span>
-          <input data-autofocus type="text" value={nombre} onChange={(e) => setNombre(e.target.value)} placeholder="Ej. Movilidad estudiantil" />
-        </label>
+  const puede = [Boolean((libro ? hojaNombre : nombre).trim()), true, columnas.length > 0, true][paso];
+  const pie = (
+    <>
+      {error && (
+        <p className="it-error" role="alert">
+          {error}
+        </p>
       )}
-      <label className="it-campo">
-        <span>{libro ? "Nombre de la hoja" : "Nombre de la primera hoja"}</span>
-        <input data-autofocus={libro ? true : undefined} type="text" value={hojaNombre} onChange={(e) => setHojaNombre(e.target.value)} placeholder={PARTIDAS[partida].rotulo} />
-      </label>
+      {paso > 0 ? (
+        <button type="button" className="es-btn" onClick={() => setPaso(paso - 1)}>
+          Atrás
+        </button>
+      ) : (
+        <button type="button" className="es-btn" onClick={onCerrar}>
+          Cancelar
+        </button>
+      )}
+      {paso < 3 ? (
+        <button type="button" className="es-btn es-btn--pri" disabled={!puede} onClick={() => setPaso(paso + 1)}>
+          Siguiente
+        </button>
+      ) : (
+        <button type="button" className="es-btn es-btn--pri" disabled={ocupado} onClick={() => void enviar()}>
+          {ocupado ? "Creando…" : libro ? "Crear hoja" : "Crear tabla"}
+        </button>
+      )}
+    </>
+  );
 
-      <fieldset className="it-campo">
-        <legend>Clase de la hoja</legend>
-        <div className="it-opciones">
-          {(Object.keys(PARTIDAS) as Partida[]).map((p) => (
-            <label key={p} className="it-opcion">
-              <input type="radio" name="it-partida" checked={partida === p} onChange={() => cambiarPartida(p)} />
-              <span>
-                <b>{PARTIDAS[p].rotulo}</b>
-                <small>{PARTIDAS[p].ayuda}</small>
-              </span>
-            </label>
-          ))}
-        </div>
-      </fieldset>
+  return (
+    <MarcoAsistente titulo={libro ? `Nueva hoja en «${libro.nombre}»` : "Nueva tabla"} paso={paso} pasos={4} pilo={{ animo: error ? "cuidado" : ocupado ? "piensa2" : PASOS[paso].animo, titulo: PASOS[paso].titulo, texto: PASOS[paso].texto }} onCerrar={onCerrar} pie={pie}>
+      {paso === 0 && (
+        <>
+      {!libro && (
+          <label className="it-campo">
+            <span>Nombre de la tabla</span>
+            <input data-autofocus type="text" value={nombre} onChange={(e) => setNombre(e.target.value)} placeholder="Ej. Movilidad estudiantil" />
+          </label>
+        )}
+        <label className="it-campo">
+          <span>{libro ? "Nombre de la hoja" : "Nombre de la primera hoja"}</span>
+          <input data-autofocus={libro ? true : undefined} type="text" value={hojaNombre} onChange={(e) => setHojaNombre(e.target.value)} placeholder={PARTIDAS[partida].rotulo} />
+        </label>
 
+      {!libro && (
+          <label className="it-campo">
+            <span>Quién captura</span>
+            <select value={captura} onChange={(e) => setCaptura(e.target.value as IntLibroRow["captura"])}>
+              <option value="campus">Cada campus sus filas</option>
+              <option value="oficina">Solo la oficina principal (el Director)</option>
+            </select>
+          </label>
+        )}
+        </>
+      )}
+      {paso === 1 && (
+        <>
       <fieldset className="it-campo">
-        <legend>Campos del catálogo de conceptos</legend>
-        <p className="it-ayuda">Un campo que ya existe se reutiliza: así todas las plantillas lo reconocen. Periodo y campus van en cada fila.</p>
-        <ul className="it-conceptos">
-          {elegibles.map((c) => {
-            const si = elegidos.includes(c.id);
-            return (
-              <li key={c.id}>
-                <label>
-                  <input type="checkbox" checked={si} onChange={() => setElegidos((x) => (si ? x.filter((k) => k !== c.id) : [...x, c.id]))} />
-                  <span>{c.nombre}</span>
-                </label>
-                <span className="it-chip">{ETIQUETA_TIPO[c.tipo]}</span>
-                {si && c.id !== "duracion_dias" && (
-                  <label className="it-mini">
-                    <input
-                      type="checkbox"
-                      checked={obligatorios.has(c.id)}
-                      onChange={() => {
-                        const s = new Set(obligatorios);
-                        if (s.has(c.id)) s.delete(c.id);
-                        else s.add(c.id);
-                        setObligatorios(s);
-                      }}
-                    />
-                    obligatorio
+          <legend>Clase de la hoja</legend>
+          <div className="it-opciones">
+            {(Object.keys(PARTIDAS) as Partida[]).map((p) => (
+              <label key={p} className="it-opcion">
+                <input type="radio" name="it-partida" checked={partida === p} onChange={() => cambiarPartida(p)} />
+                <span>
+                  <b>{PARTIDAS[p].rotulo}</b>
+                  <small>{PARTIDAS[p].ayuda}</small>
+                </span>
+              </label>
+            ))}
+          </div>
+        </fieldset>
+
+        </>
+      )}
+      {paso === 2 && (
+        <>
+      <fieldset className="it-campo">
+          <legend>Campos del catálogo de conceptos</legend>
+          <p className="it-ayuda">Un campo que ya existe se reutiliza: así todas las plantillas lo reconocen. Periodo y campus van en cada fila.</p>
+          <ul className="it-conceptos">
+            {elegibles.map((c) => {
+              const si = elegidos.includes(c.id);
+              return (
+                <li key={c.id}>
+                  <label>
+                    <input type="checkbox" checked={si} onChange={() => setElegidos((x) => (si ? x.filter((k) => k !== c.id) : [...x, c.id]))} />
+                    <span>{c.nombre}</span>
                   </label>
+                  <span className="it-chip">{ETIQUETA_TIPO[c.tipo]}</span>
+                  {si && c.id !== "duracion_dias" && (
+                    <label className="it-mini">
+                      <input
+                        type="checkbox"
+                        checked={obligatorios.has(c.id)}
+                        onChange={() => {
+                          const s = new Set(obligatorios);
+                          if (s.has(c.id)) s.delete(c.id);
+                          else s.add(c.id);
+                          setObligatorios(s);
+                        }}
+                      />
+                      obligatorio
+                    </label>
+                  )}
+                </li>
+              );
+            })}
+          </ul>
+        </fieldset>
+
+      <fieldset className="it-campo">
+          <legend>Campo propio (si el catálogo no lo tiene)</legend>
+          <div className="it-fila it-fila--campos">
+            <input type="text" aria-label="Nombre del campo propio" placeholder="Ej. Nº de créditos" value={propio.etiqueta} onChange={(e) => setPropio({ ...propio, etiqueta: e.target.value })} />
+            <select aria-label="Tipo del campo propio" value={propio.tipo} onChange={(e) => setPropio({ ...propio, tipo: e.target.value as Exclude<IntTipo, "calculado"> })}>
+              {TIPOS.map((t) => (
+                <option key={t.id} value={t.id}>
+                  {t.rotulo}
+                </option>
+              ))}
+            </select>
+            <button type="button" className="button-secondary it-btn" onClick={agregarPropio} disabled={!propio.etiqueta.trim()}>
+              Agregar
+            </button>
+          </div>
+          {propio.tipo === "lista" && (
+            <input type="text" aria-label="Opciones de la lista" placeholder="Opciones separadas por punto y coma" value={propio.opciones} onChange={(e) => setPropio({ ...propio, opciones: e.target.value })} />
+          )}
+          <p className="it-ayuda">Un campo propio no lo reconocen las plantillas hasta que se empareje con un concepto.</p>
+        </fieldset>
+
+        </>
+      )}
+      {paso === 3 && (
+        <>
+      <div className="it-campo">
+          <span>Vista previa de columnas ({columnas.length})</span>
+          <ol className="it-previa">
+            <li className="is-implicito">Periodo</li>
+            <li className="is-implicito">Campus</li>
+            {columnas.map((c) => (
+              <li key={c.clave} className={c.concepto_id ? undefined : "is-propio"}>
+                {c.etiqueta}
+                {c.obligatorio && " *"}
+                {!c.concepto_id && (
+                  <button type="button" aria-label={`Quitar ${c.etiqueta}`} onClick={() => setPropios((p) => p.filter((x) => x.clave !== c.clave))}>
+                    <Icon name="close" size={12} aria-hidden="true" />
+                  </button>
                 )}
               </li>
-            );
-          })}
-        </ul>
-      </fieldset>
-
-      <fieldset className="it-campo">
-        <legend>Campo propio (si el catálogo no lo tiene)</legend>
-        <div className="it-fila it-fila--campos">
-          <input type="text" aria-label="Nombre del campo propio" placeholder="Ej. Nº de créditos" value={propio.etiqueta} onChange={(e) => setPropio({ ...propio, etiqueta: e.target.value })} />
-          <select aria-label="Tipo del campo propio" value={propio.tipo} onChange={(e) => setPropio({ ...propio, tipo: e.target.value as Exclude<IntTipo, "calculado"> })}>
-            {TIPOS.map((t) => (
-              <option key={t.id} value={t.id}>
-                {t.rotulo}
-              </option>
             ))}
-          </select>
-          <button type="button" className="button-secondary it-btn" onClick={agregarPropio} disabled={!propio.etiqueta.trim()}>
-            Agregar
-          </button>
+          </ol>
         </div>
-        {propio.tipo === "lista" && (
-          <input type="text" aria-label="Opciones de la lista" placeholder="Opciones separadas por punto y coma" value={propio.opciones} onChange={(e) => setPropio({ ...propio, opciones: e.target.value })} />
-        )}
-        <p className="it-ayuda">Un campo propio no lo reconocen las plantillas hasta que se empareje con un concepto.</p>
-      </fieldset>
 
-      <div className="it-campo">
-        <span>Vista previa de columnas ({columnas.length})</span>
-        <ol className="it-previa">
-          <li className="is-implicito">Periodo</li>
-          <li className="is-implicito">Campus</li>
-          {columnas.map((c) => (
-            <li key={c.clave} className={c.concepto_id ? undefined : "is-propio"}>
-              {c.etiqueta}
-              {c.obligatorio && " *"}
-              {!c.concepto_id && (
-                <button type="button" aria-label={`Quitar ${c.etiqueta}`} onClick={() => setPropios((p) => p.filter((x) => x.clave !== c.clave))}>
-                  <Icon name="close" size={12} aria-hidden="true" />
-                </button>
-              )}
-            </li>
-          ))}
-        </ol>
-      </div>
-
-      {!libro && (
-        <label className="it-campo">
-          <span>Quién captura</span>
-          <select value={captura} onChange={(e) => setCaptura(e.target.value as IntLibroRow["captura"])}>
-            <option value="campus">Cada campus sus filas</option>
-            <option value="oficina">Solo la oficina principal (el Director)</option>
-          </select>
-        </label>
+        </>
       )}
-    </Cajon>
+    </MarcoAsistente>
   );
 }

@@ -62,6 +62,7 @@ export const SCREEN_PATHS: Record<AdminScreen, string> = {
   informes: "/admin/informes-gestion",
   warehouse: "/admin/warehouse",
   monitor: "/admin/monitor-alertas",
+  "programas-en-cifras": "/admin/programas-en-cifras",
 };
 
 export interface AuthContextValue {
@@ -93,6 +94,8 @@ export interface AuthContextValue {
   inAnyUnit: boolean;
   /** ¿Trabaja en Internacionalización (int_miembros, 0151)? */
   inInternacionalizacion: boolean;
+  /** ¿Es Director o Coordinador de un programa (pc_miembros, 0164)? */
+  inProgramasEnCifras: boolean;
 }
 
 /**
@@ -108,7 +111,7 @@ export type ImpactoSide = "programa" | "funcion" | "ambos" | null;
  */
 export function screenVisible(
   screen: AdminScreen,
-  who: { profile: Profile | null; access: AccessScope | null; inAnyUnit: boolean; impactoSide: ImpactoSide; inInternacionalizacion?: boolean },
+  who: { profile: Profile | null; access: AccessScope | null; inAnyUnit: boolean; impactoSide: ImpactoSide; inInternacionalizacion?: boolean; inProgramasEnCifras?: boolean },
 ): boolean {
   const { profile, access, inAnyUnit, impactoSide } = who;
   if (!profile?.is_active) return false;
@@ -132,6 +135,8 @@ export function screenVisible(
   // Internacionalización: pertenecer al módulo (director, coordinador o gestor
   // en int_miembros, 0151) ES el permiso, como en la base; la administración, siempre.
   if (screen === "internacionalizacion") return RANK[profile.role] >= RANK.admin || Boolean(who.inInternacionalizacion);
+  // Programas en Cifras: pertenecer a pc_miembros ES el permiso (0164); Planeación y la administración, todo.
+  if (screen === "programas-en-cifras") return RANK[profile.role] >= RANK.planeacion || Boolean(who.inProgramasEnCifras);
   // Informes Institucionales: quien pertenece a una unidad escribe el suyo;
   // Planeación los abre, revisa y consolida todos (0153).
   if (screen === "informes" && (inAnyUnit || RANK[profile.role] >= RANK.planeacion)) return true;
@@ -179,6 +184,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [inAnyUnit, setInAnyUnit] = useState(false);
   const [impactoSide, setImpactoSide] = useState<ImpactoSide>(null);
   const [inInternacionalizacion, setInInternacionalizacion] = useState(false);
+  const [inProgramasEnCifras, setInProgramasEnCifras] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -202,6 +208,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       anyUnit: boolean,
       side: ImpactoSide,
       internacionalizacion = false,
+      programasEnCifras = false,
     ) => {
       if (mine !== ticket.current) return;
       // Releer el perfil sin cambios no debe repintar toda la intranet.
@@ -210,6 +217,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setInAnyUnit(anyUnit);
       setImpactoSide(side);
       setInInternacionalizacion(internacionalizacion);
+      setInProgramasEnCifras(programasEnCifras);
     };
 
     if (!userId) {
@@ -281,7 +289,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const intl = await supabase.from("int_miembros").select("id").eq("user_id", person.id).limit(1);
     const inIntl = !intl.error && (intl.data ?? []).length > 0;
 
-    publish(person, scope, rows.length > 0, side, inIntl);
+    // Programas en Cifras: sin la migración 0164 la consulta falla y queda en falso.
+    const pc = await supabase.from("pc_miembros").select("id").eq("user_id", person.id).limit(1);
+    const inPc = !pc.error && (pc.data ?? []).length > 0;
+
+    publish(person, scope, rows.length > 0, side, inIntl, inPc);
   }, []);
 
   useEffect(() => {
@@ -350,6 +362,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setInAnyUnit(false);
     setImpactoSide(null);
     setInInternacionalizacion(false);
+    setInProgramasEnCifras(false);
     setSession(null);
   }, []);
 
@@ -368,8 +381,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // Espejo de has_screen(): la pantalla de usuarios siempre pide administración,
   // y un perfil sin rol de acceso ve lo de siempre.
   const canSee = useCallback(
-    (screen: AdminScreen) => screenVisible(screen, { profile, access, inAnyUnit, impactoSide, inInternacionalizacion }),
-    [profile, access, inAnyUnit, impactoSide, inInternacionalizacion],
+    (screen: AdminScreen) => screenVisible(screen, { profile, access, inAnyUnit, impactoSide, inInternacionalizacion, inProgramasEnCifras }),
+    [profile, access, inAnyUnit, impactoSide, inInternacionalizacion, inProgramasEnCifras],
   );
 
   const reachesReport = useCallback(
@@ -402,12 +415,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     () => ({
       session, profile, loading, error, signIn, signOut, requestPasswordReset, hasRole,
       access, canSee, canSeeReport: reachesReport, canEditReport, canEditPeriod, home, impactoSide, inAnyUnit,
-      inInternacionalizacion,
+      inInternacionalizacion, inProgramasEnCifras,
     }),
     [
       session, profile, loading, error, signIn, signOut, requestPasswordReset, hasRole,
       access, canSee, reachesReport, canEditReport, canEditPeriod, home, impactoSide, inAnyUnit,
-      inInternacionalizacion,
+      inInternacionalizacion, inProgramasEnCifras,
     ],
   );
 

@@ -13,6 +13,7 @@ import { componerNota, leerNota } from "../estados";
 import type { CicloRow, ContenidoSeccion, EstadoInstancia, InstanciaRow, PilarRef, RequisitoRow, SeccionDef } from "../types";
 import { Matriz, TablaAnexos, TablaFilas, TablaMetas } from "./Bloques";
 import { Aviso, Cargando, EstadoPill, Vacio, fmtFecha, mensajeDe } from "./comunes";
+import { TablaMetasPrograma } from "./MetasPrograma";
 import { useModeloInforme } from "./modelo";
 import type { ModeloInforme } from "./modelo";
 import { LecturaTexto, resolverDe } from "./Texto";
@@ -218,8 +219,21 @@ export function LecturaSeccion({ def, c, m, pilares, resolver }: { def: SeccionD
         </>
       );
     }
-    case "metas":
-      return (c.metas ?? []).length ? <TablaMetas metas={c.metas ?? []} editable={false} cambiar={() => {}} /> : sinNada;
+    case "metas": {
+      const propias = c.metas ?? [];
+      if (!propias.length && !m.metasPrograma.length) return sinNada;
+      return (
+        <>
+          <TablaMetasPrograma filas={m.metasPrograma} observaciones={c.observaciones ?? {}} editable={false} cambiarObservacion={() => {}} aceptar={() => {}} esperaIndicadores={false} />
+          {propias.length > 0 && (
+            <>
+              {m.metasPrograma.length > 0 && <p className="inf-muted">Metas adicionales</p>}
+              <TablaMetas metas={propias} editable={false} cambiar={() => {}} />
+            </>
+          )}
+        </>
+      );
+    }
     case "dim": {
       const ctx = m.contexto(def);
       const cifras = [...ctx.cifras.filter((x) => x.incluida), ...ctx.propias];

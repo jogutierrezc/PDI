@@ -25,16 +25,19 @@ import {
   usePilares,
   useQuitarAnexo,
   useQuitarCifra,
+  useSincronizarMetas,
   useSubirAnexo,
   useUnidades,
 } from "../datos";
 import type { DatosCifra } from "../datos";
 import { leerNota, motivosNoEnviar, puedeEditar } from "../estados";
+import { recibeMetasDeImpacto } from "../metas-programa";
 import { AYUDA_TIPO, clavesDe, cifraDef } from "../plantillas";
 import { controlesSeccion, ETIQUETA_AVANCE } from "../validacion";
 import type { AnexoRow, CicloRow, ContenidoSeccion, InstanciaRow, PilarRef, RequisitoRow, RolActor, SeccionDef, UnidadRef } from "../types";
 import { CargaEvidencias, Logros, Matriz, TablaAnexos, TablaFilas, TablaMetas, TablaPilares } from "./Bloques";
 import { BloqueCifras } from "./Cifras";
+import { TablaMetasPrograma } from "./MetasPrograma";
 import type { NuevoPropio } from "./Cifras";
 import { Aviso, Barra, Cargando, Controles, EstadoPill, Tag, Vacio, fmtFecha, mensajeDe } from "./comunes";
 import { useModeloInforme } from "./modelo";
@@ -128,6 +131,7 @@ function Editor({ inst, ciclo, requisitos, unidad, actor }: { inst: InstanciaRow
   const guardarCifra = useGuardarCifra(ciclo.id);
   const asegurar = useAsegurarCifras();
   const quitarCifra = useQuitarCifra();
+  const sincronizarMetas = useSincronizarMetas();
   const enviar = useEnviar();
   const subir = useSubirAnexo();
   const enlazar = useAgregarEnlace();
@@ -208,6 +212,12 @@ function Editor({ inst, ciclo, requisitos, unidad, actor }: { inst: InstanciaRow
     asegurar.mutate({ instancia: inst.id, faltan: [...faltan, ...sinVisto] }, { onSettled: () => void (asegurando.current = false) });
     // eslint-disable-next-line react-hooks/exhaustive-deps -- cuenta lo leído
   }, [m.filas.data, m.vivas.data, fuentes.data, fuentes.isPending, editable]);
+
+  // Programa o facultad: las metas se traen de los indicadores que el programa seleccionó.
+  useEffect(() => {
+    if (editable && recibeMetasDeImpacto(unidad.kind)) sincronizarMetas.mutate(inst.id);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- una vez por informe y estado
+  }, [inst.id, inst.estado, editable]);
 
   // «Lista» en la base sigue a las reglas (cifras justificadas, anexos cargados…), también sin escribir.
   useEffect(() => {
@@ -361,6 +371,7 @@ function Editor({ inst, ciclo, requisitos, unidad, actor }: { inst: InstanciaRow
           c={c}
           m={m}
           inst={inst}
+          recibeMetas={recibeMetasDeImpacto(unidad.kind)}
           editable={editable}
           resolver={resolver}
           pilares={pilares.data ?? []}
@@ -433,6 +444,7 @@ function CuerpoSeccion({
   c,
   m,
   inst,
+  recibeMetas,
   editable,
   resolver,
   pilares,
@@ -449,6 +461,8 @@ function CuerpoSeccion({
   c: ContenidoSeccion;
   m: ModeloInforme;
   inst: InstanciaRow;
+  /** Programa o facultad: sus metas vienen de los indicadores del programa. */
+  recibeMetas: boolean;
   editable: boolean;
   resolver: ReturnType<typeof resolverDe>;
   pilares: PilarRef[];
@@ -506,16 +520,40 @@ function CuerpoSeccion({
           </div>
         </>
       );
-    case "metas":
+    case "metas": {
+      const delPrograma = recibeMetas || m.metasPrograma.length > 0;
       return (
-        <div className="inf-blk">
-          <div className="inf-blk__lab">
-            <Tag />
-            <span className="inf-src">El resultado se calcula solo. Nada de tablas pegadas desde Excel.</span>
+        <>
+          {delPrograma && (
+            <div className="inf-blk">
+              <div className="inf-blk__lab">
+                <Tag auto />
+                <span className="inf-src">
+                  {m.frio ? "Foto tomada al enviar" : "En vivo hasta que envíe"} · Indicadores del programa en Impacto. Las filas no se editan; añada su análisis.
+                </span>
+              </div>
+              <TablaMetasPrograma
+                filas={m.metasPrograma}
+                observaciones={c.observaciones ?? {}}
+                editable={editable}
+                cambiarObservacion={(clave, t) => cambiar({ ...c, observaciones: { ...c.observaciones, [clave]: t } })}
+                aceptar={(clave, valor) => guardar(clave, { visto: valor })}
+                esperaIndicadores={recibeMetas}
+              />
+            </div>
+          )}
+          <div className="inf-blk">
+            <div className="inf-blk__lab">
+              <Tag />
+              <span className="inf-src">
+                {delPrograma ? "Meta adicional: solo lo que no está en los indicadores del programa. El resultado se calcula solo." : "El resultado se calcula solo. Nada de tablas pegadas desde Excel."}
+              </span>
+            </div>
+            <TablaMetas metas={c.metas ?? []} editable={editable} cambiar={(metas) => cambiar({ ...c, metas })} />
           </div>
-          <TablaMetas metas={c.metas ?? []} editable={editable} cambiar={(metas) => cambiar({ ...c, metas })} />
-        </div>
+        </>
       );
+    }
     case "dim": {
       const propias = m.propias.filter((p) => p.fila.seccion_clave === def.clave);
       return (

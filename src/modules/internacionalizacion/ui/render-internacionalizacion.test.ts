@@ -11,6 +11,8 @@ import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import type { Yo } from "../tipos";
 
+vi.mock("../../../components/tour/TourProvider", () => ({ useTour: () => ({ start: () => undefined, isDone: () => true, active: null }) }));
+
 vi.mock("../../admin/components/AdminShell", () => ({
   AdminShell: ({ title, description, rail, actions, children }: { title: string; description?: string; rail?: ReactNode; actions?: ReactNode; children: ReactNode }) =>
     h("div", null, h("h1", null, title), h("p", null, description), actions, rail, children),
@@ -145,28 +147,62 @@ describe("Cifras", () => {
 });
 
 describe("Tablas", () => {
-  it("el Director crea tablas y hojas y puede aprobar lo validado", () => {
+  it("el Director ve las tablas como archivos, por clase, y puede crear tablas", () => {
     const t = texto(pintar("/admin/internacionalizacion/tablas?campus=c-vup", YO.director));
     expect(t).toContain("Nueva tabla");
     expect(t).toContain("Desde Excel");
-    expect(t).toContain("Nueva hoja");
-    expect(t).toContain("Aprobar");
+    expect(t).toContain("Movilidad");
+    expect(t).toContain("Convenios");
+    expect(t).toContain("Seleccione una tabla");
+  });
+
+  it("al abrir una carpeta se ven sus tablas con el avance por campus", () => {
+    // Una sola clase en el libro seleccionado: el detalle muestra hojas, campus y las acciones del Director.
+    const t = texto(pintar("/admin/internacionalizacion/tablas?libro=l-mov&campus=c-vup", YO.director));
     expect(t).toContain("Movilidad estudiantil");
+    expect(t).toContain("Hojas por campus");
+    expect(t).toContain("Nueva hoja");
+    expect(t).toContain("Borrar tabla");
+    expect(t).toContain("aprobadas");
+  });
+
+  it("el Director abre la hoja: pestañas, carga de Excel y puede aprobar lo validado", () => {
+    const t = texto(pintar("/admin/internacionalizacion/tablas?libro=l-mov&hoja=h-sal&campus=c-vup", YO.director));
+    expect(t).toContain("Aprobar");
+    expect(t).toContain("Cargar Excel");
+    expect(t).toContain("Nueva hoja");
+    expect(t).toContain("Entrante");
+    expect(t).toContain("Historial de estados");
   });
 
   it("el Coordinador valida o devuelve su campus, sin crear tablas", () => {
-    const t = texto(pintar("/admin/internacionalizacion/tablas", YO.coordinador));
+    const html = pintar("/admin/internacionalizacion/tablas?libro=l-mov&hoja=h-sal", YO.coordinador);
+    const t = texto(html);
     expect(t).not.toContain("Nueva tabla");
+    expect(t).not.toContain("Nueva hoja");
     expect(t).toContain("Validar");
     expect(t).toContain("Devolver");
     // Solo las filas de su campus: la de Bucaramanga no se pinta.
-    expect(t).not.toContain("Ingeniería de Sistemas");
+    // La ventana de su campus está cerrada: la fila se ve como texto y lo personal, oculto.
+    expect(t).toContain("Derecho");
+    expect(t).toContain("••••3456");
+    expect(html).not.toContain("Ingeniería de Sistemas");
   });
 
-  it("la grilla marca el error de la fecha de fin antes del inicio", () => {
-    const html = pintar("/admin/internacionalizacion/tablas", YO.coordinador);
+  it("la hoja marca el error de la fecha de fin antes del inicio", () => {
+    const html = pintar("/admin/internacionalizacion/tablas?libro=l-mov&hoja=h-sal&campus=c-cuc", YO.director);
     expect(html).toContain('aria-invalid="true"');
-    expect(html).toContain('data-rotulo="Fecha de fin"');
+    expect(html).toContain('aria-label="Fecha de fin"');
+    expect(html).toContain("Fecha de fin");
+  });
+
+  it("el Gestor ve su campus en la hoja y el estado del envío", () => {
+    const html = pintar("/admin/internacionalizacion/tablas?libro=l-mov&hoja=h-sal", YO.gestor);
+    // La hoja de Bucaramanga está aprobada: solo lectura.
+    expect(texto(html)).toContain("Bucaramanga");
+    expect(texto(html)).toContain("Ingeniería de Sistemas");
+    expect(texto(html)).toContain("Solo lectura");
+    expect(html).not.toContain("Derecho");
   });
 
   it("sin tablas, el Director recibe cómo empezar", () => {

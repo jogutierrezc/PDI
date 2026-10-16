@@ -214,3 +214,24 @@ describe("tamaños del muro", () => {
     }
   });
 });
+
+describe("Programas en Cifras en el muro", () => {
+  it("la administración ve el cartel con su color y abre el portal con «Equipo y accesos»", async () => {
+    await mount();
+    expect(tiles()).toContain("Programas en Cifras");
+    const cartel = Array.from(host.querySelectorAll<HTMLElement>("[style]")).find((n) => n.style.getPropertyValue("--k") === "var(--wall-programas-en-cifras)");
+    expect(cartel, "el cartel usa el color del muro").toBeTruthy();
+    await click(host.querySelector("button[aria-label^='Abrir el portal de Programas en Cifras']"));
+    const hrefs = Array.from(portal()!.querySelectorAll("a")).map((a) => a.getAttribute("href"));
+    expect(hrefs).toEqual(expect.arrayContaining(["/admin/programas-en-cifras", "/admin/programas-en-cifras?seccion=equipo"]));
+    expect(portal()!.textContent).toContain("Equipo y accesos");
+  });
+
+  it("un Director (sin rol de administración) ve el cartel, va directo y no ve «Equipo y accesos»", async () => {
+    Object.assign(who, { role: "consulta", screens: ["programas-en-cifras"], side: null });
+    await mount();
+    expect(tiles()).toEqual(["Programas en Cifras"]);
+    expect(host.querySelector("a.ln-tile__go[href='/admin/programas-en-cifras']")).toBeTruthy();
+    expect(host.textContent).not.toContain("Equipo y accesos");
+  });
+});

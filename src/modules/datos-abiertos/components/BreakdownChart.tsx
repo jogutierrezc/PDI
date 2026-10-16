@@ -33,11 +33,12 @@ import { BarList } from "./Charts";
 import { ChartFrame, ViewSwitch } from "./ChartFrame";
 import type { CsvSource } from "./CsvAction";
 import { Donut } from "./Donut";
+import { DualAxisChart } from "./DualAxisChart";
 import { LineChart } from "./LineChart";
 import { YearFilter, useVisibleYears } from "./YearFilter";
 import "./breakdowns.css";
 
-type View = "circular" | "barras" | "composicion" | "lineas" | "combinada";
+type View = "circular" | "barras" | "composicion" | "lineas" | "combinada" | "comparar";
 
 interface Cut {
   year: number;
@@ -114,10 +115,15 @@ export function BreakdownChart({ breakdown, year, term, years, setYear, setCut, 
         : "circular",
   );
   const shownView: View =
-    (view === "circular" || view === "composicion") && !partsOfWhole ? "barras" : view === "combinada" && !hasPeriods ? "lineas" : view;
-  const series = shownView === "composicion" || shownView === "lineas" || shownView === "combinada";
+    (view === "circular" || view === "composicion") && !partsOfWhole ? "barras" : view === "combinada" && !hasPeriods ? "lineas" : view === "comparar" && labels.length < 2 ? "lineas" : view;
+  const series = shownView === "composicion" || shownView === "lineas" || shownView === "combinada" || shownView === "comparar";
   const [picked, setPicked] = useState<string | null>(null);
   const category = picked && labels.includes(picked) ? picked : labels[0];
+  // «Barras y línea»: dos categorías del desglose, cada una con su eje.
+  const [pickedBar, setPickedBar] = useState<string | null>(null);
+  const [pickedLine, setPickedLine] = useState<string | null>(null);
+  const barCategory = pickedBar && labels.includes(pickedBar) ? pickedBar : labels[0];
+  const lineCategory = pickedLine && labels.includes(pickedLine) ? pickedLine : labels[1] ?? labels[0];
   const [focus, setFocus] = useState<number | null>(null);
   const focusCut = cuts[focus ?? -1] ?? cuts.find((cut) => sameCut(cut, selected)) ?? cuts[cuts.length - 1];
 
@@ -130,6 +136,7 @@ export function BreakdownChart({ breakdown, year, term, years, setYear, setCut, 
     ...(partsOfWhole ? [{ value: "composicion" as const, label: "Composición" }] : []),
     { value: "lineas" as const, label: "Líneas" },
     ...(hasPeriods ? [{ value: "combinada" as const, label: "Líneas y barras" }] : []),
+    ...(labels.length > 1 ? [{ value: "comparar" as const, label: "Barras y línea" }] : []),
   ];
 
   // «Ver datos por corte»: el total solo sale en partes de un todo y si el desglose lo pide.
@@ -184,6 +191,26 @@ export function BreakdownChart({ breakdown, year, term, years, setYear, setCut, 
               ))}
             </select>
           </label>
+        )}
+        {shownView === "comparar" && (
+          <>
+            <label className="od-select od-breakdown__category">
+              <span>Barras (eje izquierdo)</span>
+              <select value={barCategory ?? ""} onChange={(e) => setPickedBar(e.target.value)}>
+                {labels.map((label) => (
+                  <option key={label}>{label}</option>
+                ))}
+              </select>
+            </label>
+            <label className="od-select od-breakdown__category">
+              <span>Línea (eje derecho)</span>
+              <select value={lineCategory ?? ""} onChange={(e) => setPickedLine(e.target.value)}>
+                {labels.map((label) => (
+                  <option key={label}>{label}</option>
+                ))}
+              </select>
+            </label>
+          </>
         )}
       </div>
       )}
@@ -306,6 +333,21 @@ export function BreakdownChart({ breakdown, year, term, years, setYear, setCut, 
             </div>
           )}
         </>
+      ) : shownView === "comparar" ? (
+        <DualAxisChart
+          key={`${breakdown.id}-${visible.years.join()}`}
+          label={`${breakdown.title}: ${barCategory} en barras y ${lineCategory} en línea, por corte`}
+          points={cuts.map((cut) => ({
+            key: String(cutCode(cut.year, cut.term)),
+            label: cutLabel(cut.year, cut.term),
+            bar: valueAt(barCategory, cut),
+            line: valueAt(lineCategory, cut),
+          }))}
+          barLabel={barCategory}
+          lineLabel={lineCategory}
+          format={breakdown.format}
+          unit={breakdown.unit}
+        />
       ) : shownView === "lineas" ? (
         <LineChart
           key={`${breakdown.id}-${visible.years.join()}`}

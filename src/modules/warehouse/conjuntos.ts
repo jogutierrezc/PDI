@@ -13,7 +13,7 @@ import { reportePorId } from "./reportes";
 export type Sistema = "master" | "galileo" | "davinci";
 export type TipoConjunto = "hecho" | "instantanea" | "catalogo";
 /** Cómo viaja el periodo en la petición (hallazgo 1 de los HAR). */
-export type ViaPeriodo = "ruta" | "cuerpo" | "sesion" | "semana" | "ninguno";
+export type ViaPeriodo = "ruta" | "consulta" | "cuerpo" | "sesion" | "semana" | "ninguno";
 export type Entrega = "archivo" | "tarea" | "json";
 
 /**
@@ -53,6 +53,7 @@ export const SISTEMAS: Record<Sistema, { nombre: string; detalle: string }> = {
 export const TIPOS: Record<TipoConjunto, string> = { hecho: "Por periodo", instantanea: "Instantánea", catalogo: "Catálogo" };
 export const VIAS: Record<ViaPeriodo, string> = {
   ruta: "La ruta (/{periodo}/)",
+  consulta: "La consulta (selected_period)",
   cuerpo: "El cuerpo de la petición",
   sesion: "La sesión (current_period)",
   semana: "Periodo de sesión + semana",

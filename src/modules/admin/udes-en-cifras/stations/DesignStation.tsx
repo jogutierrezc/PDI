@@ -23,6 +23,7 @@ import { useSaveBlocks } from "../od-data";
 import { Panel, SaveState, StageEmpty } from "../ui";
 import { ImageGrid } from "./ImageGrid";
 import { BLOCK_HELP } from "../block-help";
+import { KpiModePicker } from "../taller/KpiModePicker";
 
 type DraftBlock = Omit<OdReportBlockRow, "id" | "report_id"> & { id?: string; tempId: string };
 
@@ -266,6 +267,14 @@ function DesignEditor({ data, reportId, reportSlug, blocks, canEdit }: { data: S
                       restState={restState(block, (b) => Boolean(b.settings.indicators?.length))}
                       disabled={!canEdit}
                       onChange={(list) => patch(block.tempId, { settings: { ...block.settings, indicators: list.length ? list : undefined } })}
+                    />
+                  )}
+                  {block.kind === "kpis" && (block.settings.indicators?.length ?? 0) > 0 && (
+                    <KpiModePicker
+                      options={indicators.filter((i) => block.settings.indicators?.includes(i.key)).map((i) => ({ key: i.key, label: i.label }))}
+                      modes={block.settings.kpiModes}
+                      disabled={!canEdit}
+                      onChange={(kpiModes) => patch(block.tempId, { settings: { ...block.settings, kpiModes } })}
                     />
                   )}
                   {block.kind === "rankings" && rankings.length > 0 && (

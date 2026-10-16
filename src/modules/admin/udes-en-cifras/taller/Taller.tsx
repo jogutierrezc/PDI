@@ -89,6 +89,7 @@ import {
 } from "./draft";
 import type { BlocksDraft, DraftBlock, IndicatorPatch, TallerDraft, TallerMode } from "./draft";
 import { KpiEditor } from "./KpiEditor";
+import { KpiModePicker } from "./KpiModePicker";
 import { PiloHelper } from "./PiloHelper";
 import type { PiloSay } from "./PiloHelper";
 import { enterToast, settleBlock } from "./pilo-motion";
@@ -904,6 +905,12 @@ function TallerReport({ data, report, reportId, periodId, canEdit, progress, cla
                         onChange={(keys) =>
                           changeBlocks(patchBlock(currentBlocks(), block.tempId, { settings: { ...block.settings, indicators: keys.length ? keys : undefined } }))
                         }
+                      />
+                      <KpiModePicker
+                        options={boardRows.map((row) => ({ key: row.key, label: row.label }))}
+                        modes={block.settings.kpiModes}
+                        disabled={saving}
+                        onChange={(kpiModes) => changeBlocks(patchBlock(currentBlocks(), block.tempId, { settings: { ...block.settings, kpiModes } }))}
                       />
                     </div>
                   )}

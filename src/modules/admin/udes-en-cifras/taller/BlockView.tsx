@@ -150,6 +150,7 @@ export function renderBlock(block: ReportBlock, { catalog, report, cut, campus, 
             illustrative={catalog.illustrative}
             selectedId={undefined}
             onSelect={noop}
+            modes={block.settings.kpiModes}
           />
         ),
       };

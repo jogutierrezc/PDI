@@ -1332,6 +1332,8 @@ export interface OdReportBlockRow {
     chart?: OdChartKind;
     title?: string;
     indicators?: string[];
+    /** Tablero de indicadores: cómo lee cada KPI su cifra, por clave de indicador. Sin elección, el promedio (sin migración: va en el JSON). */
+    kpiModes?: Record<string, "promedio" | "ultima" | "variacion" | "evolucion">;
     /** Evolución por campus: clave del indicador con que abre. Sin ella, la cifra titular. */
     indicator?: string;
     /** Mapas: clave (no id) del otro mapa que se muestra con este. La clave sobrevive a la copia de periodo. */

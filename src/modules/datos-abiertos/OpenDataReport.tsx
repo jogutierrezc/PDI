@@ -239,6 +239,7 @@ function ReportContent({ data, report, year, term, campus, setYear, setTerm, set
             illustrative={data.illustrative}
             selectedId={selected?.id}
             onSelect={pickIndicator}
+            modes={block.settings.kpiModes}
           />
         );
         // Los indicadores de este tablero, en CSV: la acción va bajo la rejilla.
@@ -257,6 +258,7 @@ function ReportContent({ data, report, year, term, campus, setYear, setTerm, set
                     <>
                       {campusName} · todo el periodo {cutLabel(year, term)}: promedio anual de cada indicador (las existencias, como la matrícula,
                       muestran su último dato). Elige un año arriba para ver ese corte.
+                      {block.settings.kpiModes ? " Los indicadores con otra lectura (última cifra, variación o evolución) lo dicen en su celda." : ""}
                     </>
                   ) : term ? (
                     <>

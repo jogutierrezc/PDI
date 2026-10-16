@@ -12,10 +12,13 @@
 
 import { splitBig } from "../data/big-numbers";
 import type { CSSProperties } from "react";
-import { basisOf, changeBetween, cutsOf, formatValue, formatWithUnit, valueOf } from "../data/open-data";
+import { basisOf, changeBetween, cutsOf, formatCompact, formatValue, formatWithUnit, valueOf } from "../data/open-data";
 import { comparisonText, periodReading, readingCutText } from "../data/period-reading";
+import { formatVariation, kpiModeOf, lastReported, pointsUpToCut, variationOf, VARIATION_REASON_TEXT } from "../data/kpi-options";
+import type { KpiMode, KpiPoint } from "../data/kpi-options";
 import { cutLabel } from "../data/terms";
 import type { CampusId, Indicator, Term } from "../data/types";
+import { KpiSpark } from "./KpiSpark";
 import { SplitFlap } from "./SplitFlap";
 
 interface KpiBoardProps {
@@ -29,9 +32,11 @@ interface KpiBoardProps {
   illustrative: boolean;
   selectedId: string | undefined;
   onSelect: (id: string) => void;
+  /** Cómo lee cada KPI su cifra (ajustes del bloque). Sin elección, el promedio de siempre. */
+  modes?: Record<string, KpiMode>;
 }
 
-export function KpiBoard({ indicators, years, year, term = null, campus, campusName, illustrative, selectedId, onSelect }: KpiBoardProps) {
+export function KpiBoard({ indicators, years, year, term = null, campus, campusName, illustrative, selectedId, onSelect, modes }: KpiBoardProps) {
   return (
     <div className="od-kpis">
       {indicators.map((indicator, index) => {
@@ -53,6 +58,22 @@ export function KpiBoard({ indicators, years, year, term = null, campus, campusN
         const rising = value !== null && previous !== null && value > previous;
         const falling = value !== null && previous !== null && value < previous;
 
+        // La lectura que eligió el bloque para este KPI. «promedio» es la de siempre y no toca nada de lo de abajo.
+        const mode = kpiModeOf(modes, indicator.id);
+        const series: KpiPoint[] = own.map((c, i) => ({ year: c.year, term: c.term, label: cutLabel(c.year, c.term), value: trail[i] }));
+        const range = pointsUpToCut(series, cut);
+        const latest = mode === "ultima" ? lastReported(range) : null;
+        const variation = mode === "variacion" ? variationOf(range) : null;
+        const shownValue = mode === "ultima" ? latest?.value ?? null : value;
+        const figureText = variation ? formatVariation(variation.pct) : splitBig(shownValue)?.text ?? formatValue(shownValue, indicator.format);
+        const figureSpoken = variation
+          ? variation.pct === null
+            ? `Variación porcentual: ${VARIATION_REASON_TEXT[variation.reason as Exclude<typeof variation.reason, "calculada">]}`
+            : `Variación porcentual de ${variation.from!.label} a ${variation.to!.label}: ${figureText}`
+          : mode === "ultima"
+            ? `${formatWithUnit(shownValue, indicator.format, indicator.unit)}, última cifra reportada${latest ? `, ${latest.label}` : ""}`
+            : `${formatWithUnit(value, indicator.format, indicator.unit)}, ${readingCutText(reading)}`;
+
         return (
           <button
             key={indicator.id}
@@ -63,19 +84,47 @@ export function KpiBoard({ indicators, years, year, term = null, campus, campusN
           >
             <span className="od-kpi__label">{indicator.label}</span>
 
-            <span className="od-kpi__figure">
-              <SplitFlap
-                value={splitBig(value)?.text ?? formatValue(value, indicator.format)}
-                size="md"
-                align="end"
-                numeric
-                delay={160 + index * 120}
-                label={`${formatWithUnit(value, indicator.format, indicator.unit)}, ${readingCutText(reading)}`}
-              />
-              {/* Trece dígitos no caben en la paleta: va el número y la escala baja a la unidad («miles de millones de pesos»). */}
-              <span className="od-kpi__unit">{value === null ? "sin reportar" : [splitBig(value)?.long, indicator.unit].filter(Boolean).join(" de ")}</span>
-            </span>
+            {mode === "evolucion" ? (
+              <KpiSpark label={indicator.label} points={range} format={indicator.format} unit={indicator.unit} />
+            ) : (
+              <span className="od-kpi__figure">
+                <SplitFlap
+                  value={figureText}
+                  size="md"
+                  align="end"
+                  numeric
+                  delay={160 + index * 120}
+                  label={figureSpoken}
+                />
+                {/* Trece dígitos no caben en la paleta: va el número y la escala baja a la unidad («miles de millones de pesos»). */}
+                <span className="od-kpi__unit">
+                  {variation
+                    ? variation.pct === null
+                      ? VARIATION_REASON_TEXT[variation.reason as Exclude<typeof variation.reason, "calculada">]
+                      : "variación porcentual"
+                    : shownValue === null
+                      ? "sin reportar"
+                      : [splitBig(shownValue)?.long, indicator.unit].filter(Boolean).join(" de ")}
+                </span>
+              </span>
+            )}
 
+            {mode === "ultima" ? (
+              <span className="od-kpi__change" data-reading="neutro">
+                {latest
+                  ? `Última cifra reportada · ${latest.label}${latest.label !== reading.label && !grouped ? ` (${reading.label} sin dato)` : ""}`
+                  : "Sin cifras reportadas"}
+              </span>
+            ) : mode === "variacion" ? (
+              <span className="od-kpi__change" data-reading="neutro">
+                {variation?.from && variation.to && variation.from !== variation.to
+                  ? `De ${variation.from.label} (${formatCompact(variation.from.value, indicator.format)}) a ${variation.to.label} (${formatCompact(variation.to.value, indicator.format)})`
+                  : variation?.from
+                    ? `Única cifra: ${variation.from.label} (${formatCompact(variation.from.value, indicator.format)})`
+                    : "Sin cifras reportadas"}
+              </span>
+            ) : mode === "evolucion" ? null : (
+              <>
             <span className="od-kpi__change" data-reading={lead?.change?.reading ?? "neutro"}>
               {grouped ? (
                 <>Periodo {reading.label} · {basis ?? "sin cifras"}</>
@@ -99,8 +148,10 @@ export function KpiBoard({ indicators, years, year, term = null, campus, campusN
                 {change ? `${change.label} frente a ${comparisonText(comparison)}` : `Sin comparación con ${comparisonText(comparison)}`}
               </span>
             ))}
+              </>
+            )}
 
-            <span className="od-kpi__trail" aria-hidden="true" data-cuts={own.length}>
+            {mode !== "evolucion" && <span className="od-kpi__trail" aria-hidden="true" data-cuts={own.length}>
               {trail.map((v, i) => {
                 const c = own[i];
                 return (
@@ -114,7 +165,7 @@ export function KpiBoard({ indicators, years, year, term = null, campus, campusN
                   />
                 );
               })}
-            </span>
+            </span>}
 
             <span className="od-stub">
               <span className="od-stub__source">{indicator.source}</span>

@@ -20,7 +20,9 @@
 
 import type { CSSProperties, ReactNode } from "react";import { reportImageUrl } from "../datos-abiertos/data/images";
 
-import { basisOf, changeBetween, formatCount, formatValue, periodBasisOf, valueOf } from "../datos-abiertos/data/open-data";
+import { formatVariation, kpiModeOf, lastReported, pointsUpToCut, variationOf, VARIATION_REASON_TEXT } from "../datos-abiertos/data/kpi-options";
+import type { KpiMode, KpiPoint } from "../datos-abiertos/data/kpi-options";
+import { basisOf, changeBetween, formatCompact, formatCount, formatValue, periodBasisOf, valueOf } from "../datos-abiertos/data/open-data";
 import { changeText, heatmapCompare, signed } from "../datos-abiertos/data/heatmap-compare";
 import { ALL_YEARS, ANNUAL_RULE_LABEL, cutLabel, TERMS } from "../datos-abiertos/data/terms";
 import type { AnnualRule, Term } from "../datos-abiertos/data/terms";
@@ -190,6 +192,63 @@ function figureAt(indicator: Indicator, catalog: OpenDataCatalog, cut: number, c
 
 /** Una categoría con cifra o reservada («< 5»): las dos existen; el vacío no. */
 const present = (i: { value: number | null; reserved?: boolean }) => i.value !== null || Boolean(i.reserved);
+
+/**
+ * La lectura que el tablero de KPI de la ficha eligió para un indicador. Sin
+ * elección (o «promedio») devuelve null y el boletín sigue con su cifra de
+ * siempre; así el PDF dice lo mismo que el portal.
+ */
+interface KpiReading {
+  mode: Exclude<KpiMode, "promedio">;
+  /** La cifra grande; vacía en «evolución», que no lleva número. */
+  text: string;
+  unit: string;
+  note: string;
+  points: KpiPoint[];
+}
+
+function kpiReadingOf(report: Report, indicator: Indicator, catalog: OpenDataCatalog, settings: BulletinSettings): KpiReading | null {
+  const modes: Record<string, KpiMode> = {};
+  for (const block of report.blocks ?? []) Object.assign(modes, block.settings?.kpiModes ?? {});
+  const mode = kpiModeOf(modes, indicator.id);
+  if (mode === "promedio") return null;
+  const series: KpiPoint[] = yearsOf(catalog, indicator.years).map((y) => ({
+    year: y,
+    term: null,
+    label: String(y),
+    value: valueOf(indicator, y, settings.campus),
+  }));
+  const range = pointsUpToCut(series, { year: settings.cut, term: null });
+  const reported = range.filter((p) => p.value !== null);
+  const first = reported[0];
+  const last = lastReported(range);
+  if (mode === "ultima") {
+    return {
+      mode,
+      text: last ? formatCompact(last.value, indicator.format) : "—",
+      unit: last ? unitOf(indicator) : "sin reportar",
+      note: last ? `Última cifra reportada · ${last.label}` : "Sin cifras reportadas",
+      points: range,
+    };
+  }
+  if (mode === "variacion") {
+    const v = variationOf(range);
+    return {
+      mode,
+      text: formatVariation(v.pct),
+      unit: v.pct === null ? VARIATION_REASON_TEXT[v.reason as Exclude<typeof v.reason, "calculada">] : "variación porcentual",
+      note: v.from && v.to && v.from !== v.to ? `De ${v.from.label} (${formatCompact(v.from.value, indicator.format)}) a ${v.to.label} (${formatCompact(v.to.value, indicator.format)})` : "",
+      points: range,
+    };
+  }
+  return {
+    mode,
+    text: "",
+    unit: "",
+    note: first && last ? (first === last ? `Única cifra · ${first.label}: ${formatCompact(first.value, indicator.format)}` : `Inicial ${first.label}: ${formatCompact(first.value, indicator.format)} · Final ${last.label}: ${formatCompact(last.value, indicator.format)}`) : "Sin cifras reportadas",
+    points: range,
+  };
+}
 
 function termItemsAt(breakdown: Breakdown, year: number, term: Term) {
   return (breakdown.terms?.[year]?.[term] ?? []).filter(present);
@@ -617,6 +676,18 @@ function ChapterOpener({
       {keys.length > 0 && (
         <dl className="bol-chapter__keys">
           {keys.map((indicator) => {
+            const reading = kpiReadingOf(report, indicator, catalog, settings);
+            if (reading) {
+              return (
+                <div key={indicator.id}>
+                  <dt>{indicator.label}</dt>
+                  <dd>
+                    {reading.text && <b>{reading.text}</b>}
+                    <small>{[reading.unit, reading.note].filter(Boolean).join(" · ")}</small>
+                  </dd>
+                </div>
+              );
+            }
             const { value: v, period } = figureAt(indicator, catalog, settings.cut, settings.campus);
             return (
               <div key={indicator.id}>
@@ -1641,6 +1712,18 @@ function ExecutiveSummary({ items, catalog, settings }: { items: ExecutiveItem[]
             </a>
             <dl>
               {indicators.slice(0, 3).map((indicator) => {
+                const reading = kpiReadingOf(report, indicator, catalog, settings);
+                if (reading) {
+                  return (
+                    <div key={indicator.id}>
+                      <dt>{indicator.label}</dt>
+                      <dd>
+                        {reading.text && <b>{reading.text}</b>}
+                        <small>{[reading.unit, reading.note].filter(Boolean).join(" · ")}</small>
+                      </dd>
+                    </div>
+                  );
+                }
                 const { value: v, period } = figureAt(indicator, catalog, settings.cut, settings.campus);
                 return (
                   <div key={indicator.id}>
@@ -1722,6 +1805,28 @@ function SummaryBoard({ item, catalog, settings }: { item: ExecutiveItem; catalo
       {tiles.length > 0 && (
         <div className="bol-board__tiles">
           {tiles.map((indicator) => {
+            const reading = kpiReadingOf(report, indicator, catalog, settings);
+            if (reading) {
+              const ys = reading.points.map((p) => p.year);
+              const vs = reading.points.map((p) => p.value);
+              return (
+                <div key={indicator.id} className="bol-board__tile">
+                  <span className="bol-board__label">{indicator.label}</span>
+                  {reading.text && (
+                    <b className="bol-board__value">
+                      {reading.text}
+                      <small> {reading.unit}</small>
+                    </b>
+                  )}
+                  <span className="bol-board__meta">{reading.note}</span>
+                  {(reading.mode === "evolucion" || vs.filter((v) => v !== null).length > 1) && (
+                    <span className="bol-board__trend">
+                      <Trend years={ys} values={vs} format={indicator.format} height={reading.mode === "evolucion" ? 22 : 9} />
+                    </span>
+                  )}
+                </div>
+              );
+            }
             const { value, period } = figureAt(indicator, catalog, settings.cut, settings.campus);
             const years = yearsOf(catalog, indicator.years);
             const series = years.map((y) => valueOf(indicator, y, settings.campus));

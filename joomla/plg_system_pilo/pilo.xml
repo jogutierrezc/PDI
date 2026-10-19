@@ -1,0 +1,57 @@
+<?xml version="1.0" encoding="utf-8"?>
+<extension type="plugin" group="system" method="upgrade">
+	<name>Mr. Pilo en el portal</name>
+	<author>Planeación Institucional UDES</author>
+	<creationDate>2026-10-19</creationDate>
+	<version>1.0.0</version>
+	<description>Incrusta el asistente Mr. Pilo (portal de Planeación Institucional) como botón flotante en las páginas públicas del sitio.</description>
+
+	<files>
+		<filename plugin="pilo">pilo.php</filename>
+		<filename>index.html</filename>
+	</files>
+
+	<config>
+		<fields name="params">
+			<fieldset name="basic" label="Mr. Pilo">
+				<field name="pilourl" type="text" default="https://planeacion.udes.edu.co/pilo.js"
+					label="Cargador de Mr. Pilo"
+					description="La dirección del pilo.js del portal de Planeación. No debe cambiarse salvo indicación de Planeación." />
+
+				<field name="espacio" type="list" default=""
+					label="Qué Pilo aparece"
+					description="«El Pilo de Planeación» responde con el conocimiento institucional del portal de Planeación. Los demás espacios son Pilos con conocimiento propio; solo aparecen si el dominio de este sitio está autorizado para ellos.">
+					<option value="">El Pilo de Planeación</option>
+					<option value="ensenanza">Mr. Pilo en Enseñanza</option>
+				</field>
+
+				<field name="esquina" type="list" default="izquierda"
+					label="Esquina del botón"
+					description="En el sitio de la universidad el chat de atención (Zendesk) ocupa la esquina inferior derecha; Mr. Pilo va en la izquierda para no taparlo.">
+					<option value="izquierda">Inferior izquierda</option>
+					<option value="derecha">Inferior derecha</option>
+				</field>
+
+				<field name="tema" type="list" default="blanco"
+					label="Apariencia"
+					description="El tono del botón y del chat. «Soleado» es el color de la marca.">
+					<option value="blanco">Blanco</option>
+					<option value="soleado">Soleado</option>
+					<option value="negro">Negro</option>
+				</field>
+
+				<field name="leer" type="list" default="si"
+					label="Leer la página"
+					description="Con «Solo lo visible», Mr. Pilo lee el texto de la página que la persona está viendo para responder sobre ella. Con «Todo» lee también lo plegado en pestañas y desplegables. Nunca lee formularios, menús ni lo marcado con data-pilo-ignorar.">
+					<option value="si">Solo lo visible</option>
+					<option value="todo">Todo, incluso lo plegado</option>
+					<option value="no">No leer la página</option>
+				</field>
+
+				<field name="excluir" type="textarea" default="" rows="4" filter="raw"
+					label="No aparecer en estas páginas"
+					description="Una dirección (o un pedazo de ella) por línea. Ej.: /index.php?option=com_users para las páginas de ingreso y registro. Se compara con la dirección tal como la ve el navegador." />
+			</fieldset>
+		</fields>
+	</config>
+</extension>

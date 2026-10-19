@@ -129,25 +129,32 @@ export function screenVisible(
   // Warehouse UDES: datos de las plataformas institucionales; solo por el rol, como en la base (0155).
   if (screen === "warehouse") return RANK[profile.role] >= RANK.planeacion && listed;
   // Monitor de alertas tempranas: quien pertenece a una facultad o programa ve lo suyo; Planeación, todo. La base (0160) lo exige también.
-  if (screen === "monitor" && (inAnyUnit || RANK[profile.role] >= RANK.planeacion)) return true;
+  if (screen === "monitor") {
+    if (inAnyUnit) return true;
+    return listed && RANK[profile.role] >= RANK.planeacion;
+  }
   // Rankings (THE, UI GreenMetric y el recolector de noticias): solo por el rol, como en la base (0143).
   if (screen === "rankings") return RANK[profile.role] >= RANK.planeacion && listed;
   // Internacionalización: pertenecer al módulo (director, coordinador o gestor
   // en int_miembros, 0151) ES el permiso, como en la base; Planeación y la administración, siempre (0166).
-  if (screen === "internacionalizacion") return RANK[profile.role] >= RANK.planeacion || Boolean(who.inInternacionalizacion);
+  if (screen === "internacionalizacion") return Boolean(who.inInternacionalizacion) || (listed && RANK[profile.role] >= RANK.planeacion);
   // Programas en Cifras: pertenecer a pc_miembros ES el permiso (0164); Planeación y la administración, todo.
-  if (screen === "programas-en-cifras") return RANK[profile.role] >= RANK.planeacion || Boolean(who.inProgramasEnCifras);
+  if (screen === "programas-en-cifras") return Boolean(who.inProgramasEnCifras) || (listed && RANK[profile.role] >= RANK.planeacion);
   // Informes Institucionales: quien pertenece a una unidad escribe el suyo;
   // Planeación los abre, revisa y consolida todos (0153).
-  if (screen === "informes" && (inAnyUnit || RANK[profile.role] >= RANK.planeacion)) return true;
+  if (screen === "informes") {
+    if (inAnyUnit) return true;
+    return listed && RANK[profile.role] >= RANK.planeacion;
+  }
   // Mis Tableros se gana perteneciendo a una unidad, no marcándolo aparte.
   if (screen === "tableros" && inAnyUnit) return true;
   // Impacto, solo a quien tiene algo que hacer en él: un programa o una
   // unidad con función sustantiva, Planeación sin unidades (lo lee todo)
   // y la administración. Pertenecer a una oficina sin función no basta.
   if (screen === "impacto") {
-    if (RANK[profile.role] >= RANK.admin || impactoSide) return true;
-    if (RANK[profile.role] >= RANK.planeacion && !inAnyUnit) return true;
+    if (impactoSide) return true;
+    if (RANK[profile.role] >= RANK.admin) return listed;
+    if (RANK[profile.role] >= RANK.planeacion && !inAnyUnit) return listed;
     return false;
   }
   return listed;

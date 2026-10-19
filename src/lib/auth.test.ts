@@ -41,6 +41,27 @@ describe("screenVisible: el menú y el lanzador enseñan solo lo que se puede us
     }
   });
 
+  it("la capacidad no salta la lista: un rol restringido enseña solo lo marcado", () => {
+    const who = { profile: person("planeacion"), access: scope(["rankings", "internacionalizacion"]), inAnyUnit: false, impactoSide: null };
+    expect(screenVisible("rankings", who)).toBe(true);
+    expect(screenVisible("internacionalizacion", who)).toBe(true);
+    expect(screenVisible("monitor", who)).toBe(false);
+    expect(screenVisible("informes", who)).toBe(false);
+    expect(screenVisible("impacto", who)).toBe(false);
+    expect(screenVisible("programas-en-cifras", who)).toBe(false);
+    expect(screenVisible("correos", who)).toBe(false);
+    expect(screenVisible("pillars", who)).toBe(false);
+  });
+
+  it("la administración con rol restringido tampoco ve lo que no está marcado", () => {
+    const who = { profile: person("admin"), access: scope(["cifras"]), inAnyUnit: false, impactoSide: null };
+    expect(screenVisible("cifras", who)).toBe(true);
+    expect(screenVisible("impacto", who)).toBe(false);
+    expect(screenVisible("monitor", who)).toBe(false);
+    expect(screenVisible("informes", who)).toBe(false);
+    expect(screenVisible("programas-en-cifras", who)).toBe(false);
+  });
+
   it("sin sesión activa no se ve nada", () => {
     expect(screenVisible("office", { profile: { ...person("admin"), is_active: false }, access: null, inAnyUnit: false, impactoSide: null })).toBe(false);
     expect(screenVisible("office", { profile: null, access: null, inAnyUnit: false, impactoSide: null })).toBe(false);

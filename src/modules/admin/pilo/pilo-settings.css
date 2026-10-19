@@ -987,3 +987,53 @@
 .pis-users__confirm form { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2) var(--space-3); }
 .pis-users__confirm label { flex: 1 1 22rem; color: var(--ink); font-weight: 700; }
 .pis-users__confirm input { flex: 0 1 12rem; background: var(--surface); }
+
+/* --- Qué puede leer el público (0173) ------------------------------------------------------- */
+.pis-approval {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+}
+.pis-approval__row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: 0.5rem 1rem;
+  padding: 0.7rem 0;
+  border-top: 1px solid var(--line, rgb(0 0 0 / 0.08));
+}
+.pis-approval__row:first-child {
+  border-top: 0;
+}
+.pis-approval__name {
+  display: grid;
+  gap: 0.15rem;
+  min-width: 0;
+}
+.pis-approval__name small {
+  color: var(--muted, #5b6470);
+}
+.pis-approval__confirm {
+  grid-column: 1 / -1;
+}
+@media (max-width: 640px) {
+  .pis-approval__row {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+  .pis-approval__row > .pis-mark {
+    grid-column: 1;
+    grid-row: 2;
+  }
+}
+
+/* --- Saludos del chat incrustado (0173) ------------------------------------------------------ */
+.pis-greet { list-style: none; margin: 0 0 0.75rem; padding: 0; display: grid; }
+.pis-greet__row { display: grid; grid-template-columns: minmax(0, 1fr) auto auto auto; align-items: center; gap: 0.5rem 0.75rem; padding: 0.5rem 0; border-top: 1px solid var(--line, rgb(0 0 0 / 0.08)); }
+.pis-greet__row:first-child { border-top: 0; }
+.pis-greet__problem { grid-column: 1 / -1; margin: 0; }
+.pis-greet__add { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; gap: 0.5rem 0.75rem; align-items: center; }
+@media (max-width: 640px) {
+  .pis-greet__row { grid-template-columns: minmax(0, 1fr) auto; }
+  .pis-greet__add { grid-template-columns: minmax(0, 1fr); }
+}

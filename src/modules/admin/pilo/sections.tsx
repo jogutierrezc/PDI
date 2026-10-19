@@ -28,6 +28,7 @@ import type { Tone } from "./ui";
 import { VoiceStyles } from "./VoiceStyles";
 import { WidgetGroup } from "./WidgetGroup";
 import { ExtrasGroup } from "./ExtrasGroup";
+import { ElevenLabsVoice } from "./ElevenLabsVoice";
 import { VoiceExpressionsEditor } from "./VoiceExpressionsEditor";
 
 export interface EditorApi {
@@ -340,9 +341,9 @@ export function ConnectionSection({ ed, test, onTest }: { ed: EditorApi; test: T
 
 export function VoiceSection({ ed }: { ed: EditorApi }) {
   const { s, setS, set, dirty, keys } = ed;
-  const choice: "freeai" | "nvidia" | "fishaudio" | "navegador" =
-    s.voice_engine !== "proveedor" ? "navegador" : s.speech_provider === "nvidia" || s.speech_provider === "fishaudio" ? s.speech_provider : "freeai";
-  const who = choice === "nvidia" ? "NVIDIA" : choice === "fishaudio" ? "Fish Audio" : "Free.ai";
+  const choice: "freeai" | "nvidia" | "fishaudio" | "elevenlabs" | "navegador" =
+    s.voice_engine !== "proveedor" ? "navegador" : s.speech_provider === "nvidia" || s.speech_provider === "fishaudio" || s.speech_provider === "elevenlabs" ? s.speech_provider : "freeai";
+  const who = choice === "nvidia" ? "NVIDIA" : choice === "fishaudio" ? "Fish Audio" : choice === "elevenlabs" ? "ElevenLabs" : "Free.ai";
   const [sampling, setSampling] = useState(false);
   const [sampleText, setSampleText] = useState("Escuche cómo suena Mr. Pilo.");
   const pick = (next: typeof choice) =>
@@ -380,6 +381,10 @@ export function VoiceSection({ ed }: { ed: EditorApi }) {
             <strong>Voz de Fish Audio</strong>
             <span>La voz propia de Pilo, clonada de la misma muestra, con un tono por estilo (tranquilo, entusiasta…). Gratis hasta el 30 de noviembre de 2026.</span>
           </button>
+          <button type="button" role="radio" aria-checked={choice === "elevenlabs"} onClick={() => pick("elevenlabs")}>
+            <strong>Voz de ElevenLabs</strong>
+            <span>Voz con emociones (etiquetas de audio con Eleven v3) y que también puede cantar. Cobra por caracteres.</span>
+          </button>
           <button type="button" role="radio" aria-checked={choice === "freeai"} onClick={() => pick("freeai")}>
             <strong>Voz de Free.ai</strong>
             <span>Masculina y natural (em_alex). Usa la clave de Free.ai y su cupo.</span>
@@ -395,6 +400,7 @@ export function VoiceSection({ ed }: { ed: EditorApi }) {
       </Group>
 
       {(choice === "nvidia" || choice === "fishaudio") && <VoiceStyles key={choice} ed={ed} provider={choice} />}
+      {choice === "elevenlabs" && <ElevenLabsVoice ed={ed} />}
 
       <Group title="Cómo suena">
         <div className="pis-grid pis-grid--3">
@@ -415,6 +421,9 @@ export function VoiceSection({ ed }: { ed: EditorApi }) {
         </div>
         {choice === "nvidia" && (
           <p className="pis-small">Con NVIDIA, el tono y la manera de hablar los pone la muestra: para otro tono, grabe otro estilo. La velocidad sí se aplica.</p>
+        )}
+        {choice === "elevenlabs" && (
+          <p className="pis-small">Con ElevenLabs, la voz y la emoción se eligen arriba; la velocidad de aquí no se usa (use la de ElevenLabs). El tono de arriba es solo del navegador.</p>
         )}
         {choice === "fishaudio" && (
           <p className="pis-small">Con Fish Audio, la voz la pone la muestra y el tono se elige en cada estilo. La velocidad sí se aplica; el tono de arriba es solo del navegador.</p>

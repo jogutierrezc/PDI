@@ -29,6 +29,7 @@ import type { FormEvent, ReactNode } from "react";
 import gsap from "gsap";
 import { useAuth } from "../../lib/auth";
 import { usePiloAiConfig } from "../../components/pilo/ai/config";
+import { useGreeting } from "../../components/pilo/greetings";
 import type { SpaceConfig } from "../../components/pilo/ai/config";
 import { canUse } from "../../components/pilo/ai/logic";
 import type { Role } from "../../components/pilo/ai/logic";
@@ -234,7 +235,8 @@ function Widget({ space, cfg, tema, lado, host, voice: baseVoice }: { space: Spa
   const wire: AskOptions | undefined = useMemo(() => (usual ? undefined : { portal: space.portal, rol: sent }), [usual, space.portal, sent]);
   const voice = useMemo(() => (usual ? baseVoice : { ...baseVoice, rol: sent, mood: view.mood }), [usual, baseVoice, sent, view.mood]);
   const suggestions = sent ? view.suggestions.slice(0, 3).map((x) => x.q) : space.widget.suggestions;
-  const greeting = cfg?.greeting || space.widget.greeting;
+  // El saludo sale de la lista que edita la administración (0173), sin cifras y sin repetir el último; sin lista, el único de siempre.
+  const greeting = useGreeting(space.id, cfg?.greeting || space.widget.greeting);
   const home = sourceUrl(space.route, window.location.origin);
 
   const [open, setOpen] = useState(false);

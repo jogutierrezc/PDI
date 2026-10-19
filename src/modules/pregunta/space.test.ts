@@ -75,7 +75,7 @@ describe("el perfil «planeacion» es Pregúntele a Pilo tal como era", () => {
   it("conserva los textos del chat emergente", () => {
     expect(p.widget).toEqual({
       frameTitle: "Chat con Pilo, la Inteligencia Artificial de la Universidad de Santander",
-      greeting: "Hola, soy Pilo, la Inteligencia Artificial de la Universidad de Santander. Pregúnteme por las cifras de la UDES y le digo de dónde sale cada una.",
+      greeting: "Hola, soy Mr. Pilo, la AI de la UDES. ¿En qué te ayudo hoy?",
       hello: "¿Busca una cifra de la UDES? Pregúnteme.",
       idle: "Cifras de la UDES",
       suggestions: ["¿Qué es UDES en Cifras?", "¿Cómo va el Plan de Desarrollo?", "¿Qué programas ofrece la UDES?"],
@@ -109,7 +109,7 @@ describe("el perfil «ensenanza»", () => {
     const intro = "la Inteligencia Artificial de la Universidad de Santander";
     expect(e.beats[0].say).toContain(intro);
     expect(e.hello.p).toContain(intro);
-    expect(e.widget.greeting).toContain(intro);
+    expect(e.widget.greeting).toContain("Mr. Pilo, la AI de la UDES");
     expect(e.widget.frameTitle).toContain(intro);
     expect(e.beats).toHaveLength(3);
   });

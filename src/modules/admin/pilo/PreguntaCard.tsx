@@ -48,6 +48,8 @@ import { revealList } from "./motion";
 import { CatalogModal } from "./CatalogModal";
 import { GeneralDocs } from "./GeneralDocs";
 import { PortalsMatrix } from "./PortalsMatrix";
+import { SourcesApproval } from "./SourcesApproval";
+import { GreetingsEditor } from "./GreetingsEditor";
 import { ReasoningGroup } from "./Razonamiento";
 import { reasonHint, reasonLabel, useCloseInbox, useInbox } from "./inbox";
 import type { InboxItem } from "./inbox";
@@ -74,7 +76,7 @@ export function PreguntaSection({ ed }: { ed: EditorApi }) {
   // «Leer» en Pregúntele a Pilo: las respuestas suenan con la voz de IA (la de Voz), no con la del navegador.
   const speaks = rule.fns.includes("leer");
   const fns = (voice: boolean): Fn[] => (voice ? ["preguntar", "leer"] : ["preguntar"]);
-  const voiceName = s.voice_engine !== "proveedor" ? "" : s.speech_provider === "nvidia" ? "NVIDIA" : s.speech_provider === "fishaudio" ? "Fish Audio" : "Free.ai";
+  const voiceName = s.voice_engine !== "proveedor" ? "" : s.speech_provider === "nvidia" ? "NVIDIA" : s.speech_provider === "fishaudio" ? "Fish Audio" : s.speech_provider === "elevenlabs" ? "ElevenLabs" : "Free.ai";
   const answers = useSavedAnswers();
   const hide = useHideAnswer();
   const [modalOpen, setModalOpen] = useState(false);
@@ -536,6 +538,10 @@ export function MemorySection({
       </Group>
 
       <PortalsMatrix onHomeSource={onSourceApplied} />
+
+      <SourcesApproval />
+
+      <GreetingsEditor space="planeacion" />
 
       <GeneralDocs disabled={s.needs0094} />
 

@@ -1814,6 +1814,8 @@ export interface VoiceStyle {
   /** Fish Audio (0102): el id de la voz creada con esta muestra y su tono («calm»). */
   fish_id?: string;
   tone?: string;
+  /** ElevenLabs (0172): el id de la voz de este estilo. */
+  eleven_id?: string;
 }
 
 function joinBytes(parts: Uint8Array[]): Uint8Array {

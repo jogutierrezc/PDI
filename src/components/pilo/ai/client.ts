@@ -618,9 +618,9 @@ export async function cloneFishVoice(style: string): Promise<{ id: string; state
   return data as { id: string; state: string };
 }
 
-export async function probeVoice(text: string, style?: string): Promise<{ audio: Blob; ms: number } | { error: string }> {
+export async function probeVoice(text: string, style?: string, tone?: string): Promise<{ audio: Blob; ms: number } | { error: string }> {
   const started = performance.now();
-  const { data, error } = await supabase.functions.invoke<Blob>("pilo-ia", { body: { action: "voz", portal: "prueba", text, style } });
+  const { data, error } = await supabase.functions.invoke<Blob>("pilo-ia", { body: { action: "voz", portal: "prueba", text, style, ...(tone ? { tone } : {}) } });
   if (error) return { error: (await failure(error)).message };
   if (!(data instanceof Blob) || data.size === 0) return { error: tr("El servicio de voz no devolvió audio.") };
   return { audio: data, ms: Math.round(performance.now() - started) };

@@ -53,7 +53,7 @@ const neighbors = (q: Query, refs: string[], args = "'ensenanza'") =>
 const topic = (slug: string, label: string) => ({ id: `tema:${slug}`, label });
 
 beforeAll(async () => {
-  t = await createTestDb();
+  t = await createTestDb({ before: "0173" }); // la lectura de la memoria cambió en 0173: ver pilo-memoria-unificada.test.ts
   await t.q("update profiles set access_role_id = (select id from access_roles where key = 'admin') where id = $1", [PEOPLE.admin]);
 
   await asAdmin(async (q) => {

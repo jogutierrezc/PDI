@@ -23,7 +23,7 @@ const nodes = () => t.q<{ id: string; source: string; space: string; type: strin
 const keys = async (fn: string, args: unknown[] = []) => (await asAdmin((q) => q<{ key: string }>(`select key from ${fn}`, args), false)).map((r) => r.key);
 
 beforeAll(async () => {
-  t = await createTestDb();
+  t = await createTestDb({ before: "0173" }); // 0121–0127 tal como eran: 0173 unifica la lectura (ver pilo-memoria-unificada.test.ts)
   await t.q("update profiles set access_role_id = (select id from access_roles where key = 'admin') where id = $1", [PEOPLE.admin]);
   await t.db.exec(`
     create domain extensions.vector as text;

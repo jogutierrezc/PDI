@@ -105,6 +105,8 @@
    que el filtro lo aplique la base. Sin 0121 todo sigue como antes: las fuentes
    de partida (`SPACES`) y los filtros de 0113. */
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.58.0";
+// La voz de ElevenLabs y «cantar» (0172) viven en sus propios archivos.
+import { makeEleven } from "./elevenlabs-voz.ts";
 
 // --- lógica: copia exacta de src/components/pilo/ai/logic.ts (la prueba logic-sync lo vigila)
 // Va dentro para que la función sea un solo archivo y se pueda desplegar
@@ -1910,6 +1912,8 @@ export interface VoiceStyle {
   /** Fish Audio (0102): el id de la voz creada con esta muestra y su tono («calm»). */
   fish_id?: string;
   tone?: string;
+  /** ElevenLabs (0172): el id de la voz de este estilo. */
+  eleven_id?: string;
 }
 
 function joinBytes(parts: Uint8Array[]): Uint8Array {
@@ -6330,6 +6334,8 @@ let spacesCache: { at: number; ready: boolean } | null = null;
 let scopeCache: { at: number; ready: boolean } | null = null;
 /** ¿Está la migración 0122 (la lectura de visita y los puentes)? Si la base no la tiene, no se vuelve a preguntar por un minuto: las cifras se piden como antes y no se lee nada de visita. */
 let visitCache: { at: number; ready: boolean } | null = null;
+/** ¿Está 0173 (la búsqueda unificada `pilo_memory_find`)? Sin ella se busca por palabras y por significado en dos llamadas, como antes. */
+let findCache: { at: number; ready: boolean } | null = null;
 /**
  * Si el modelo acepta el rol `system`. Se aprende con el primer 400 que lo
  * rechaza y se recuerda mientras viva la instancia: no se paga un pedido
@@ -6440,11 +6446,12 @@ async function handle(request: Request): Promise<Response> {
   // La lectura de una página (0127) trae su texto entero: tiene su propio tope.
   if (body.action === "captura" && bodySize > CAPTURE_BODY_MAX) return json({ status: "no" });
   const requested = body.action;
-  if (!requested || !["resumir", "sintetizar", "explicar", "voz", "probar", "preguntar", "calificar", "captura", "recoger", "entender", "analizar", "indexar", "comprender", "moodle", "puentes", "web", "premisas", "evolucion"].includes(requested)) {
+  if (!requested || !["resumir", "sintetizar", "explicar", "voz", "probar", "preguntar", "calificar", "captura", "recoger", "entender", "analizar", "indexar", "comprender", "moodle", "puentes", "web", "premisas", "evolucion", "cantar"].includes(requested)) {
     return json({ error: "Acción desconocida." }, 400);
   }
   // Calificar una respuesta, mandar la lectura de una página (0127) y recoger una respuesta (0128) piden los mismos permisos que preguntar.
-  const action: Action = requested === "calificar" || requested === "captura" || requested === "recoger" ? "preguntar" : requested;
+  // «cantar» (0172) pide y gasta como la voz: mismos permisos de canUse y mismo cupo; su propio permiso lo revisa makeEleven.
+  const action: Action = requested === "calificar" || requested === "captura" || requested === "recoger" ? "preguntar" : requested === "cantar" ? "voz" : requested;
   const asking = action === "preguntar";
   /** El mapa y Moodle (0115, 0116): mantenimiento de un espacio. Sirven con o sin IA y no gastan cupo. */
   // Las premisas de las capciosas (0130) también: son del catálogo de un espacio, que la administración nombra.
@@ -6878,7 +6885,9 @@ async function handle(request: Request): Promise<Response> {
     // Solo los estilos con muestra: una voz ya creada en Fish Audio no le sirve a NVIDIA.
     const styles = ((Array.isArray(settings.voice_styles) ? settings.voice_styles : []) as VoiceStyle[]).filter((x) => x.path);
     const style = styleFor(styles, portal, voiceByPortal, String(settings.voice_style ?? ""), typeof body.style === "string" ? body.style : undefined, voiceModeOf(body.tone));
-    if ((!testing && settings.voice_engine !== "proveedor") || !speechKey || !looksLikeFunctionId(functionId) || !style) {
+    // Con ElevenLabs como voz principal, el respaldo de NVIDIA usa SU clave, no la de ElevenLabs (0172).
+    const nvidiaKey = settings.speech_provider === "nvidia" ? speechKey : keyOf("nvidia");
+    if ((!testing && settings.voice_engine !== "proveedor") || !nvidiaKey || !looksLikeFunctionId(functionId) || !style) {
       return json({ error: "La voz de NVIDIA no está configurada (clave, function-id y una muestra); se usa la del navegador.", code: "sin_voz" }, 503);
     }
     const language = String(settings.voice_language || "es-US");
@@ -6906,7 +6915,7 @@ async function handle(request: Request): Promise<Response> {
     for (const chunk of speechChunks(text)) {
       const response = await fetch(RIVA_URL, {
         method: "POST",
-        headers: { "content-type": "application/grpc", te: "trailers", authorization: `Bearer ${speechKey}`, "function-id": functionId },
+        headers: { "content-type": "application/grpc", te: "trailers", authorization: `Bearer ${nvidiaKey}`, "function-id": functionId },
         body: rivaRequest({ text: chunk, language, voice: voiceName, prompt: { pcm: prompt.pcm, rate: prompt.rate }, quality }),
       });
       const raw = new Uint8Array(await response.arrayBuffer());
@@ -6950,7 +6959,9 @@ async function handle(request: Request): Promise<Response> {
     const styles = (Array.isArray(settings.voice_styles) ? settings.voice_styles : []) as VoiceStyle[];
     const style = styleFor(styles, portal, voiceByPortal, String(settings.voice_style ?? ""), typeof body.style === "string" ? body.style : undefined, voiceModeOf(body.tone));
     const voiceId = String(style?.fish_id ?? "").trim();
-    if ((!testing && settings.voice_engine !== "proveedor") || !speechKey || !style || !voiceId) {
+    // Con ElevenLabs como voz principal, el respaldo de Fish Audio usa SU clave, no la de ElevenLabs (0172).
+    const fishKey = settings.speech_provider === "fishaudio" ? speechKey : keyOf("fishaudio");
+    if ((!testing && settings.voice_engine !== "proveedor") || !fishKey || !style || !voiceId) {
       return json({ error: `La voz de Fish Audio no está configurada (clave y la voz del estilo${style ? ` «${style.name}»` : ""} creada en Fish Audio); se usa la del navegador.`, code: "sin_voz" }, 503);
     }
     const model = fishModel(String(settings.fish_model ?? ""));
@@ -6969,7 +6980,7 @@ async function handle(request: Request): Promise<Response> {
 
     const response = await callProvider(FISH_TTS_URL, {
       method: "POST",
-      headers: { Authorization: `Bearer ${speechKey}`, "Content-Type": "application/json", model },
+      headers: { Authorization: `Bearer ${fishKey}`, "Content-Type": "application/json", model },
       body: JSON.stringify({ text: spoken, reference_id: voiceId, format: "mp3", mp3_bitrate: 128, latency: "normal", normalize: true }),
     });
     if (!response.ok) {
@@ -8183,6 +8194,19 @@ async function handle(request: Request): Promise<Response> {
     const search = async (q: string): Promise<Hit[]> => {
       // Un portal con todas sus fuentes apagadas no busca (una lista vacía no debe leerse como «todas»).
       if ((spaced || reader) && !sources.length) return [];
+      // 0173: UNA sola búsqueda sobre toda la memoria que esta persona puede leer (palabras + significado,
+      // con la procedencia de cada pasaje). Quién pregunta decide qué se lee, no el portal. Sin esa
+      // migración, o si falla, se sigue con las dos llamadas de siempre.
+      if (reader && !(findCache && !findCache.ready && Date.now() - findCache.at < 60_000)) {
+        const v = await queryVector(q);
+        const found = await admin.rpc("pilo_memory_find", { p_q: q, p_embedding: v, p_model: v ? model : null, p_sources: sources, p_limit: 8, p_min: SEMANTIC_MIN, ...reader });
+        if (!found.error) {
+          findCache = { at: Date.now(), ready: true };
+          return ((found.data ?? []) as (Row & { rank: number; via: "palabras" | "significado" | "ambas"; sim: number | null })[]).map(({ sim, ...hit }) => ({ ...hit, ...(sim !== null && sim !== undefined ? { sim } : {}) }));
+        }
+        if (!missingInDb(found.error.message)) throw new Error(`memoria: ${found.error.message}`);
+        findCache = { at: Date.now(), ready: false };
+      }
       // La búsqueda por palabras sale ya; no espera al vector de la pregunta (un pedido al proveedor).
       const [lex, sem] = await Promise.all([
         admin.rpc("pilo_memory_search", { p_q: q, p_sources: sources, p_limit: 8, ...scope }), // p_space
@@ -8504,7 +8528,9 @@ async function handle(request: Request): Promise<Response> {
       if (!related.length) return { related, pool: memory, joined: [] };
       // De qué trata cada pasaje, para la línea de su fuente. Solo temas y referencias de este espacio.
       const all = [...memory, ...related];
-      const links = await admin.from("pilo_edges").select("from_id, to_id").eq("space", space).in("rel", ["trata", "cita"]).in("from_id", all.map((p) => p.ref));
+      // Con la memoria unificada (0173) los pasajes de cualquier ámbito traen sus temas: sin filtro de espacio.
+      const linkRows = admin.from("pilo_edges").select("from_id, to_id");
+      const links = await (reader ? linkRows : linkRows.eq("space", space)).in("rel", ["trata", "cita"]).in("from_id", all.map((p) => p.ref));
       const edges = (links.error ? [] : links.data ?? []) as { from_id: string; to_id: string }[];
       const ids = [...new Set(edges.map((e) => e.to_id))].slice(0, 80);
       // Desde 0121 los temas y las referencias son nodos comunes (el ámbito que los nombró primero
@@ -8547,7 +8573,8 @@ async function handle(request: Request): Promise<Response> {
       const between: MeshLink[] = mesh.edges.filter((e) => home.includes(e.from) && home.includes(e.to)).map((e) => ({ from: e.from, to: e.to, rel: e.rel }));
       const mapKnown = mapCache.get(space);
       if (!home.length || !(spaced || reader) || (mapKnown && !mapKnown.ready)) return between;
-      const found = await admin.from("pilo_edges").select("from_id, to_id, rel").eq("space", space).in("rel", ["trata", "cita"]).in("from_id", home);
+      const foundRows = admin.from("pilo_edges").select("from_id, to_id, rel");
+      const found = await (reader ? foundRows : foundRows.eq("space", space)).in("rel", ["trata", "cita"]).in("from_id", home);
       const edges = (found.error ? [] : found.data ?? []) as { from_id: string; to_id: string; rel?: unknown }[];
       const ids = [...new Set(edges.map((e) => e.to_id))].slice(0, 80);
       // Como en el mapa: con la vista (0121) los temas son nodos comunes y se leen por su id; sin ella, los de este espacio.
@@ -8634,7 +8661,11 @@ async function handle(request: Request): Promise<Response> {
     if (memory.length) {
       const where = [...new Set(memory.map((p) => names[p.source] ?? p.source))].join(", ");
       const bySenseOnly = memory.filter((p) => p.via === "significado").length;
-      step("Fuentes", "ok", `${memory.length} ${memory.length === 1 ? "pasaje" : "pasajes"} en ${where}${bySenseOnly ? ` (${bySenseOnly} ${bySenseOnly === 1 ? "hallado" : "hallados"} solo por significado)` : ""}.`);
+      // Memoria unificada (0173): se dice de qué ámbito y capa llegó lo que no es de este portal.
+      const scopeOf = (p: Passage) => String((p as Passage & { space?: unknown }).space ?? view?.scopes[p.source] ?? "");
+      const elsewhere = memory.filter((p) => scopeOf(p) && scopeOf(p) !== space).length;
+      const deepCount = memory.filter((p) => (p as Passage & { layer?: unknown }).layer === "profunda").length;
+      step("Fuentes", "ok", `${memory.length} ${memory.length === 1 ? "pasaje" : "pasajes"} en ${where}${bySenseOnly ? ` (${bySenseOnly} ${bySenseOnly === 1 ? "hallado" : "hallados"} solo por significado)` : ""}${elsewhere ? `; ${elsewhere} del otro hemisferio de Pilo` : ""}${deepCount ? `; ${deepCount} de la capa profunda` : ""}.`);
     } else if (!chatty) step("Fuentes", "skip", dataPassages.length ? "La memoria no suma nada a la cifra." : "Ningún pasaje de lo publicado coincide con la pregunta.");
 
     if (related.length) {
@@ -9159,9 +9190,29 @@ async function handle(request: Request): Promise<Response> {
     // --- Voz -------------------------------------------------------------------
     if (action === "voz") {
       if (portal === "prueba" && typeof body.clone === "string") return await fishClone(body.clone);
+      // ElevenLabs (0172): la voz, «cantar», el estado de la cuenta y la lista de voces (estos dos, solo la administración).
+      const eleven = makeEleven({
+        admin,
+        settings,
+        key: keyOf("elevenlabs"),
+        body,
+        portal,
+        role,
+        space,
+        style: styleFor((Array.isArray(settings.voice_styles) ? settings.voice_styles : []) as VoiceStyle[], portal, voiceByPortal, String(settings.voice_style ?? ""), typeof body.style === "string" ? body.style : undefined, voiceModeOf(body.tone)),
+        json,
+        audioHeaders: { ...corsHeaders, "Content-Type": "application/octet-stream" },
+        sha256,
+        log,
+        fallback: settings.eleven_fallback === "fishaudio" ? fishVoice : settings.eleven_fallback === "nvidia" ? nvidiaVoice : undefined,
+      });
+      if (requested === "cantar") return await eleven.sing();
+      if (portal === "prueba" && role === "admin" && body.eleven === "estado") return await eleven.probe();
+      if (portal === "prueba" && role === "admin" && body.eleven === "voces") return await eleven.voices();
       const text = String(body.text ?? "").replace(/\s+/g, " ").trim().slice(0, 4000);
       if (!text) return json({ error: "No hay texto para leer." }, 400);
       const provider = settings.speech_provider ?? "navegador";
+      if (provider === "elevenlabs") return await eleven.voice(text);
       if (provider === "nvidia") return await nvidiaVoice(text);
       if (provider === "fishaudio") return await fishVoice(text);
       const voice = speechTarget(provider, settings.speech_base_url || settings.base_url || "", settings.speech_path ?? "", settings.speech_model ?? "", settings.speech_voice ?? "");

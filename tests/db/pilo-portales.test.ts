@@ -266,7 +266,7 @@ const asAdmin = <T>(work: (q: Query) => Promise<T>, commit = false) => t.asUser(
 let start: Record<string, Record<string, Cell>> = {};
 
 beforeAll(async () => {
-  t = await createTestDb();
+  t = await createTestDb({ before: "0173" }); // 0121–0127 tal como eran: 0173 unifica la lectura (ver pilo-memoria-unificada.test.ts)
   await t.q("update profiles set access_role_id = (select id from access_roles where key = 'admin') where id = $1", [PEOPLE.admin]);
   await t.q("update profiles set access_role_id = (select id from access_roles where key = 'consulta'), role = 'consulta' where id = $1", [PEOPLE.vx]);
   await vectorDouble(t);
@@ -867,7 +867,7 @@ describe("con la matriz de partida, los resultados son los de antes de la migrac
 
   beforeAll(async () => {
     old = await createTestDb({ before: "0121" });
-    now = await createTestDb();
+    now = await createTestDb({ before: "0173" });
     for (const db of [old, now]) {
       await vectorDouble(db);
       await seed(db, LEGACY);

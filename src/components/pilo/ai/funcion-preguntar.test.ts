@@ -82,6 +82,8 @@ interface World {
   portals?: Record<string, { scope: string; matrix: Record<string, string> }>;
   /** La base tiene 0121, pero pilo_scope falla esta vez. */
   scopeFails?: boolean;
+  /** La búsqueda unificada (0173): lo que traería `pilo_memory_find`. Sin esto, la base no tiene esa migración y se busca como antes. */
+  unifiedFind?: Row[];
   /** La base tiene 0121 pero no 0122: ni lectura de visita, ni puentes, ni «quién lee» en las cifras. */
   noVisit?: boolean;
   /** Los puentes aprobados (0122): lo que pilo_bridge_neighbors traería, con `from_ref` (el pasaje de casa del que salen) y su porqué. */
@@ -253,7 +255,8 @@ function fakeClient(w: World) {
       }
       // El mapa (0115) y Moodle (0116). Como la base: sin el filtro de espacio no sale nada.
       const within = (column: string) => (filters.find(([kind, c]) => kind === "in" && c === column)?.[2] as unknown[] | undefined) ?? [];
-      if (table === "pilo_edges") return { data: w.edges.filter((e) => spaceOf(e) === eq("space") && within("from_id").includes(e.from_id) && within("rel").includes(e.rel ?? "trata")), error: null };
+      // Con la memoria unificada (0173) la función no filtra por espacio las relaciones de los pasajes que lee; sin ella, sí.
+      if (table === "pilo_edges") return { data: w.edges.filter((e) => (eq("space") === undefined || spaceOf(e) === eq("space")) && within("from_id").includes(e.from_id) && within("rel").includes(e.rel ?? "trata")), error: null };
       // Los temas: sin 0121, solo los del espacio; con la vista (0121) son comunes y se piden por su id, del mapa.
       if (table === "pilo_nodes") return { data: w.nodes.filter((n) => (eq("space") === undefined ? eq("source") === "mapa" : spaceOf(n) === eq("space")) && within("id").includes(n.id)), error: null };
       // Los sitios de Moodle (0133). El de estas pruebas es «principal» y sale de la ficha de prueba del espacio
@@ -310,6 +313,9 @@ function fakeClient(w: World) {
           return { data: ["Bucaramanga", "Cúcuta"], error: null };
         case "pilo_embed_status":
           return { data: { memory_done: w.embedded ?? 0, facts_done: 0 }, error: null };
+        // La búsqueda unificada (0173): sin la migración, la función cae a las dos búsquedas de siempre.
+        case "pilo_memory_find":
+          return w.unifiedFind ? { data: w.unifiedFind, error: null } : missing(name);
         case "pilo_memory_search":
           return w.memoryFails
             ? { data: null, error: { message: "tiempo agotado en la base" } }
@@ -479,6 +485,8 @@ beforeAll(async () => {
   const patched = source.replace(importLine, "const createClient = (globalThis as any).__piloCreateClient;");
   code = (await transform(patched, { loader: "ts", format: "esm", target: "es2022" })).code;
   dir = mkdtempSync(join(tmpdir(), "pilo-ia-"));
+  // index.ts importa los archivos de la voz de ElevenLabs (0172): se copian junto a cada instancia.
+  for (const name of ["elevenlabs.ts", "elevenlabs-voz.ts"]) writeFileSync(join(dir, name), readFileSync(resolve(__dirname, "../../../../supabase/functions/pilo-ia", name), "utf8"));
 });
 
 afterAll(() => {
@@ -2741,8 +2749,8 @@ describe("los portales como vistas (0121)", () => {
     expect((done.sources as Row[]).map((s) => [s.ref, s.via])).toEqual([["doc:9:1", undefined], ["doc:9:2", "mapa"]]);
     expect(systemOf(calls[0])).toContain("[1] Normativa › Estatuto profesoral › Capítulo 1 · temas: Escalafón docente\n");
     expect(JSON.stringify(calls[0].body)).not.toContain("retroalimentación oportuna");
-    // Las relaciones se leen del ámbito del portal; el tema, por su id.
-    expect(w.queries.find((q) => q.table === "pilo_edges")!.filters).toContainEqual(["eq", "space", "planeacion"]);
+    // Con la memoria unificada (0173) las relaciones de los pasajes se leen sin filtrar por ámbito; el tema, por su id.
+    expect(w.queries.find((q) => q.table === "pilo_edges")!.filters).not.toContainEqual(["eq", "space", "planeacion"]);
     expect(w.queries.find((q) => q.table === "pilo_nodes")!.filters).toContainEqual(["eq", "source", "mapa"]);
   });
 
@@ -3946,5 +3954,38 @@ describe("si insultan a Pilo", () => {
     expect(en.text).toMatch(/^Ouch!/);
     const pt = (await (await ask(handler, { question: "você é um lixo", lang: "pt" })).json()) as Row;
     expect(pt.text).toMatch(/^Opa!/);
+  });
+});
+
+describe("la memoria unificada (0173)", () => {
+  const otherSide = { ...policy, ref: "doc:1:1", space: "ensenanza", layer: "base", via: "palabras", rank: 1, sim: null, vis: "publico" };
+  const deep = { ...passage, ref: "prof:cifras:matriculados", space: "planeacion", layer: "profunda", via: "ambas", rank: 0.8, sim: 0.7, vis: "publico" };
+
+  it("busca con UNA sola llamada, sin las dos de siempre, y dice de dónde viene cada pasaje", async () => {
+    const w = viewed(teachWorld());
+    w.unifiedFind = [deep, otherSide];
+    provider(stream("En 2024 hubo 20.500 estudiantes matriculados [1]. "));
+    const handler = await boot(w);
+    const all = await allEvents(await ask(handler, { question: "¿Cuántos estudiantes matriculados hay y qué dice la evaluación?", stream: true }));
+    const finds = argsOf(w, "pilo_memory_find");
+    expect(finds).toHaveLength(1);
+    expect(finds[0]).toMatchObject({ p_q: expect.any(String), p_limit: 8, p_space: "planeacion", p_public_only: true, p_member: false });
+    expect(finds[0].p_sources).toEqual(expect.arrayContaining(["cifras"]));
+    expect(argsOf(w, "pilo_memory_search")).toEqual([]);
+    expect(argsOf(w, "pilo_memory_semantic")).toEqual([]);
+    const done = all.find((e) => e.event === "done")!.data;
+    const fuentes = (done.trail as Row[]).find((s) => s.step === "Fuentes")!;
+    expect(String(fuentes.detail)).toContain("del otro hemisferio de Pilo");
+    expect(String(fuentes.detail)).toContain("capa profunda");
+  });
+
+  it("sin la migración 0173 cae a las dos búsquedas de siempre y lo recuerda un minuto", async () => {
+    const w = viewed(teachWorld());
+    provider(stream("En 2024 hubo 20.500 estudiantes matriculados [1]. "), stream("En 2024 hubo 20.500 estudiantes matriculados [1]. "));
+    const handler = await boot(w);
+    await events(await ask(handler, { question: "¿Cuántos estudiantes matriculados hay?", stream: true }));
+    await events(await ask(handler, { question: "¿Cuántos estudiantes matriculados hubo?", stream: true }));
+    expect(argsOf(w, "pilo_memory_find")).toHaveLength(1);
+    expect(argsOf(w, "pilo_memory_search")).toHaveLength(2);
   });
 });

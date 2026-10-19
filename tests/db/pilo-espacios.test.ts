@@ -41,7 +41,7 @@ const keys = (rows: { key: string }[]) => rows.map((r) => r.key).sort();
 const QNORM = "que es la evaluacion formativa";
 
 beforeAll(async () => {
-  t = await createTestDb();
+  t = await createTestDb({ before: "0173" }); // la lectura de la memoria cambió en 0173: ver pilo-memoria-unificada.test.ts
   await t.q("update profiles set access_role_id = (select id from access_roles where key = 'admin') where id = $1", [PEOPLE.admin]);
   await t.q("update profiles set access_role_id = (select id from access_roles where key = 'consulta'), role = 'consulta' where id = $1", [PEOPLE.vx]);
 

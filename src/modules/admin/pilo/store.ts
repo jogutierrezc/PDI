@@ -19,7 +19,8 @@ import { DEFAULT_SPACE, readInSpace, spaceKey } from "./space";
 import type { PiloSpace } from "./space";
 
 export type Provider = "mistral" | "freeai" | "nvidia" | "otro";
-export type SpeechProvider = "freeai" | "nvidia" | "fishaudio" | "otro" | "navegador";
+export type SpeechProvider = "freeai" | "nvidia" | "fishaudio" | "elevenlabs" | "otro" | "navegador";
+export type ElevenFallback = "ninguno" | "fishaudio" | "nvidia";
 
 /** Cómo va la persona de Pilo al modelo (0110): con rol system, dentro del primer mensaje, o lo uno y lo otro según responda el proveedor. */
 export type SystemRole = "auto" | "system" | "user";
@@ -73,6 +74,16 @@ export interface PiloSettings {
   voice_portal_styles: Partial<Record<Portal, string>>;
   /** Fish Audio (0102): el modelo (s2.1-pro-free es el gratuito). */
   fish_model: string;
+  /** ElevenLabs (0172): modelo, voz de siempre, formato, ajustes de partida y voz de respaldo. */
+  eleven_model: string;
+  eleven_voice_id: string;
+  eleven_format: string;
+  eleven_stability: number;
+  eleven_similarity: number;
+  eleven_style: number;
+  eleven_speed: number;
+  eleven_speaker_boost: boolean;
+  eleven_fallback: ElevenFallback;
   functions: Record<Fn, boolean>;
   portals: Record<Portal, PortalRule>;
   daily_limit: number;
@@ -118,6 +129,8 @@ export interface PiloSettings {
   needs0101?: boolean;
   /** La base aún no tiene la migración 0102 (voz de Fish Audio). */
   needs0102?: boolean;
+  /** La base aún no tiene la migración 0172 (voz de ElevenLabs y cantar). */
+  needs0172?: boolean;
   /** La base aún no tiene la migración 0090 (Mistral y voz aparte). */
   needs0090?: boolean;
   /** La base aún no tiene la migración 0094 (Pregúntele a Pilo). */
@@ -133,6 +146,11 @@ const DEFAULT_PORTALS: Record<Portal, PortalRule> = {
 };
 
 const ALL_SOURCES: Record<MemorySource, boolean> = { cifras: true, boletines: true, pdi: true, observatorio: true, impacto: true };
+
+/** Los modelos y formatos de ElevenLabs que la base acepta (0172); los mismos de supabase/functions/pilo-ia/elevenlabs.ts. */
+export const ELEVEN_MODEL_IDS = ["eleven_v3", "eleven_v4", "eleven_multilingual_v2", "eleven_flash_v2_5"] as const;
+export const ELEVEN_FORMATS = ["mp3_22050_32", "mp3_24000_48", "mp3_44100_32", "mp3_44100_64", "mp3_44100_96", "mp3_44100_128"] as const;
+const clampNum = (v: unknown, d: number, lo: number, hi: number) => (v === null || v === undefined || v === "" || !Number.isFinite(Number(v)) ? d : Math.min(hi, Math.max(lo, Number(v))));
 
 /** Un nombre de modelo, no una ruta pegada por error («/tts-1»). */
 const validModel = (m: string) => (/^[\w.:-][\w.:/-]*$/.test(m) && !/^https?:/.test(m) ? m : "");
@@ -154,7 +172,7 @@ export function normalizeSettings(raw: Record<string, unknown>): PiloSettings {
     base_url: str("base_url", "") || PROVIDERS[provider].base,
     chat_path: str("chat_path", "") || "/chat/completions",
     text_model: validModel(str("text_model", "")) || PROVIDERS[provider].model,
-    speech_provider: (["freeai", "nvidia", "fishaudio", "otro", "navegador"] as const).find((p) => p === raw.speech_provider) ?? "navegador",
+    speech_provider: (["freeai", "nvidia", "fishaudio", "elevenlabs", "otro", "navegador"] as const).find((p) => p === raw.speech_provider) ?? "navegador",
     speech_base_url: str("speech_base_url", ""),
     speech_path: str("speech_path", "/audio/speech"),
     speech_model: str("speech_model", ""),
@@ -169,6 +187,15 @@ export function normalizeSettings(raw: Record<string, unknown>): PiloSettings {
     voice_style: str("voice_style", ""),
     voice_portal_styles: (raw.voice_portal_styles as Partial<Record<Portal, string>>) ?? {},
     fish_model: str("fish_model", "") || "s2.1-pro-free",
+    eleven_model: ELEVEN_MODEL_IDS.find((m) => m === raw.eleven_model) ?? "eleven_v3",
+    eleven_voice_id: str("eleven_voice_id", ""),
+    eleven_format: ELEVEN_FORMATS.find((f) => f === raw.eleven_format) ?? "mp3_44100_128",
+    eleven_stability: clampNum(raw.eleven_stability, 0.5, 0, 1),
+    eleven_similarity: clampNum(raw.eleven_similarity, 0.75, 0, 1),
+    eleven_style: clampNum(raw.eleven_style, 0, 0, 1),
+    eleven_speed: clampNum(raw.eleven_speed, 1, 0.7, 1.2),
+    eleven_speaker_boost: raw.eleven_speaker_boost === undefined ? true : Boolean(raw.eleven_speaker_boost),
+    eleven_fallback: (["ninguno", "fishaudio", "nvidia"] as const).find((f) => f === raw.eleven_fallback) ?? "ninguno",
     functions: { leer: true, resumir: true, sintetizar: true, explicar: true, preguntar: true, ...((raw.functions as Partial<Record<Fn, boolean>>) ?? {}) } as Record<Fn, boolean>,
     portals,
     daily_limit: num("daily_limit", 200),
@@ -204,12 +231,13 @@ export function normalizeSettings(raw: Record<string, unknown>): PiloSettings {
     needs0100: !("impacto_report" in raw),
     needs0101: !("voice_styles" in raw),
     needs0102: !("fish_model" in raw),
+    needs0172: !("eleven_model" in raw),
     needs0090: !("provider" in raw),
     needs0094: !("memory_sources" in raw),
   };
 }
 
-export type KeySlot = "mistral" | "freeai" | "nvidia" | "fishaudio" | "otro" | "voz";
+export type KeySlot = "mistral" | "freeai" | "nvidia" | "fishaudio" | "elevenlabs" | "otro" | "voz";
 
 export interface KeyStatus {
   /** Una por proveedor (0091). Sin 0091, no viene. */
@@ -317,7 +345,7 @@ export function useSavePiloSettings() {
   const client = useQueryClient();
   return useMutation({
     mutationFn: async (settings: PiloSettings) => {
-      const { updated_at: _ignored, needs0090, needs0094, needs0100, needs0101, needs0102, needs0106, needs0109, needs0110, needs0111, memory_indexed_at: _indexed, ...all } = settings;
+      const { updated_at: _ignored, needs0090, needs0094, needs0100, needs0101, needs0102, needs0172, needs0106, needs0109, needs0110, needs0111, memory_indexed_at: _indexed, ...all } = settings;
       // Sin 0090 no existen las columnas nuevas: no se mandan.
       const rest: Record<string, unknown> = { ...all };
       if (needs0090) for (const k of ["provider", "speech_provider", "speech_base_url"]) delete rest[k];
@@ -334,6 +362,11 @@ export function useSavePiloSettings() {
       if (needs0102) {
         delete rest.fish_model;
         if (rest.speech_provider === "fishaudio") rest.speech_provider = "navegador";
+      }
+      // Sin 0172, tampoco ElevenLabs.
+      if (needs0172) {
+        for (const k of Object.keys(rest).filter((x) => x.startsWith("eleven_"))) delete rest[k];
+        if (rest.speech_provider === "elevenlabs") rest.speech_provider = "navegador";
       }
       // Sin 0109, tampoco el modelo de embeddings.
       if (needs0109) delete rest.embed_model;

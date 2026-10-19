@@ -169,7 +169,7 @@ export const ASK_SPACES: Record<SpaceId, SpaceProfile> = {
     },
     widget: {
       frameTitle: "Chat con Pilo, la Inteligencia Artificial de la Universidad de Santander",
-      greeting: "Hola, soy Pilo, la Inteligencia Artificial de la Universidad de Santander. Pregúnteme por las cifras de la UDES y le digo de dónde sale cada una.",
+      greeting: "Hola, soy Mr. Pilo, la AI de la UDES. ¿En qué te ayudo hoy?",
       hello: "¿Busca una cifra de la UDES? Pregúnteme.",
       idle: "Cifras de la UDES",
       suggestions: ["¿Qué es UDES en Cifras?", "¿Cómo va el Plan de Desarrollo?", "¿Qué programas ofrece la UDES?"],
@@ -261,7 +261,7 @@ export const ASK_SPACES: Record<SpaceId, SpaceProfile> = {
     },
     widget: {
       frameTitle: "Chat con Pilo, la Inteligencia Artificial de la Universidad de Santander",
-      greeting: "Hola, soy Pilo, la Inteligencia Artificial de la Universidad de Santander. Pregúnteme por enseñanza, políticas institucionales o educación superior.",
+      greeting: "Hola, soy Mr. Pilo, la AI de la UDES. ¿Qué quieres saber sobre enseñanza y aprendizaje?",
       hello: "¿Una duda sobre enseñar o aprender? Pregúnteme.",
       idle: "Enseñanza · UDES",
       suggestions: ["¿Qué es el aprendizaje activo?", "¿Cómo se evalúa por resultados de aprendizaje?", "¿Qué tendencias hay en educación superior?"],

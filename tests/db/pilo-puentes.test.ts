@@ -56,7 +56,7 @@ const across = (refs: string[], portal: string, publicOnly = true, member = fals
 const refsOf = async (refs: string[], portal: string, publicOnly = true, member = false) => (await across(refs, portal, publicOnly, member)).map((r) => r.ref);
 
 beforeAll(async () => {
-  t = await createTestDb();
+  t = await createTestDb({ before: "0173" }); // 0121–0127 tal como eran: 0173 unifica la lectura (ver pilo-memoria-unificada.test.ts)
   await t.q("update profiles set access_role_id = (select id from access_roles where key = 'admin') where id = $1", [PEOPLE.admin]);
   await t.q("update profiles set access_role_id = (select id from access_roles where key = 'consulta'), role = 'consulta' where id = $1", [PEOPLE.vx]);
 

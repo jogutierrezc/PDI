@@ -35,6 +35,7 @@ import type { Lado, LeerModo } from "../../pilo-embed/embed";
 import { TEMAS } from "../../pregunta/store";
 import type { Tema } from "../../pregunta/store";
 import { AudiencePicker } from "../pilo/sections";
+import { GreetingsEditor } from "../pilo/GreetingsEditor";
 import { PROVIDERS } from "../pilo/store";
 import type { PiloSettings } from "../pilo/store";
 import { NumField, StatusMark, Switch, plural } from "../pilo/ui";
@@ -185,7 +186,7 @@ export function PreguntaPanel({ ed, active }: { ed: SpaceEditor; /** La pestaña
           />
           <TextArea
             label="Saludo de la página"
-            hint="Lo primero que lee quien entra. Vacío, saluda con el de partida."
+            hint="Lo primero que lee quien entra a la página. Vacío, saluda con el de partida. En el chat incrustado entra como uno más de la lista de saludos."
             value={s.greeting}
             max={TEXT_MAX.greeting}
             rows={2}
@@ -193,6 +194,7 @@ export function PreguntaPanel({ ed, active }: { ed: SpaceEditor; /** La pestaña
             onChange={(v) => set("greeting", v)}
           />
         </div>
+        <GreetingsEditor space="ensenanza" />
         <TextArea
           label="Enfoque"
           hint="De qué habla y de qué no. Sirve para que no se salga del tema; no reemplaza la memoria ni el catálogo."

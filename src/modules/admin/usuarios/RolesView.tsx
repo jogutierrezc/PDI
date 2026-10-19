@@ -25,7 +25,7 @@ import type { AccessRole, AdminScreen, InformeLevel, Profile } from "../../../ty
 import { UNIT_KIND, type UnitKind } from "../../tableros/model";
 import { PLANTILLAS, plantillaSugerida } from "../../informes/plantillas";
 import type { Plantilla } from "../../informes/types";
-import { useUnitOptions, type UnitOption } from "./people-db";
+import { useProgramOffer, useUnitOptions, type UnitOption } from "./people-db";
 import { reason, roleMatrix } from "./summary";
 import {
   LEVEL_LABEL,
@@ -189,6 +189,11 @@ function ImpactScopePicker({
   onChange: (change: (scope: { allUnits: boolean; units: string[] }) => void) => void;
 }) {
   const [filter, setFilter] = useState("");
+  const offer = useProgramOffer().data;
+  const campusName = new Map((offer?.campuses ?? []).map((c) => [c.id, c.name]));
+  /** Un programa se reconoce por las sedes donde se ofrece. */
+  const sedesDe = (unit: UnitOption) =>
+    unit.kind === "programa" ? (offer?.byProgram.get(unit.id) ?? []).map((id) => campusName.get(id) ?? "Sede").join(", ") : "";
   const needle = filter.trim().toLowerCase();
   const groups = SCOPE_KINDS.map((kind) => ({
     kind,
@@ -236,13 +241,21 @@ function ImpactScopePicker({
                     <label key={unit.id} className="oda-check">
                       <input type="checkbox" checked={scope.units.includes(unit.id)} onChange={() => toggle(unit.id)} />
                       {unit.name}
-                      <small> · {unit.code}</small>
+                      <small>
+                        {" "}
+                        · {unit.code}
+                        {sedesDe(unit) ? ` · ${sedesDe(unit)}` : ""}
+                      </small>
                     </label>
                   ))}
                 </div>
               </div>
             ))
           )}
+          <small>
+            Aquí la unidad vale en todas sus sedes. Para limitar a una sede (un programa que se ofrece en varias), asigne la unidad y la sede en
+            la ficha de la persona.
+          </small>
         </>
       )}
     </div>

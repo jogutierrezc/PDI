@@ -14,7 +14,7 @@
 import { useMemo } from "react";
 import { Icon } from "../../../components/ui/Icon";
 import { UNIT_KIND, type UnitKind, type UnitRole } from "../../tableros/model";
-import { useProgramOffer, type UnitOption } from "./people-db";
+import { useProgramOffer, type PcRol, type UnitOption } from "./people-db";
 import { BOARD_ROLE_LABEL } from "./role-matrix";
 
 export interface MembershipDraft {
@@ -26,6 +26,8 @@ export interface MembershipDraft {
   title: string;
   /** Sede a la que se limita; null = todas. */
   campusId: string | null;
+  /** Programas en Cifras: Director o Coordinador del programa en esa sede (o en todas); null = no trabaja allí. */
+  pcRol: PcRol | null;
 }
 
 const KIND_ORDER: UnitKind[] = ["vicerrectoria", "facultad", "programa", "oficina", "otra"];
@@ -37,6 +39,7 @@ export const newDraft = (partial: Partial<MembershipDraft> = {}): MembershipDraf
   boardRole: null,
   title: "",
   campusId: null,
+  pcRol: null,
   ...partial,
 });
 
@@ -54,11 +57,15 @@ export function MembershipEditor({
   const byId = useMemo(() => new Map(units.map((unit) => [unit.id, unit])), [units]);
   const offer = useProgramOffer().data;
   const campusName = useMemo(() => new Map((offer?.campuses ?? []).map((c) => [c.id, c.name])), [offer]);
-  /** Las sedes donde se ofrece un programa; vacío si no es programa o se ofrece en una sola. */
+  /** Las sedes donde se ofrece un programa; vacío si no es programa. */
   const campusesOf = (unit: UnitOption | undefined) => {
     if (!unit || unit.kind !== "programa") return [];
-    const ids = offer?.byProgram.get(unit.id) ?? [];
-    return ids.length > 1 ? ids : [];
+    return offer?.byProgram.get(unit.id) ?? [];
+  };
+  /** «Medicina · MED — Bucaramanga, Cúcuta»: un programa se reconoce por las sedes donde se ofrece. */
+  const optionLabel = (item: UnitOption) => {
+    const sedes = campusesOf(item).map((id) => campusName.get(id) ?? "Sede");
+    return `${item.name} · ${item.code}${sedes.length > 0 ? ` — ${sedes.join(", ")}` : ""}`;
   };
   const grouped = useMemo(
     () =>
@@ -89,14 +96,14 @@ export function MembershipEditor({
               <select
                 value={row.unitId}
                 disabled={disabled}
-                onChange={(event) => patch(row.key, { unitId: event.target.value, campusId: null })}
+                onChange={(event) => patch(row.key, { unitId: event.target.value, campusId: null, pcRol: null })}
               >
                 <option value="">Elija una unidad…</option>
                 {grouped.map((group) => (
                   <optgroup key={group.kind} label={UNIT_KIND[group.kind].plural}>
                     {group.items.map((item) => (
                       <option key={item.id} value={item.id} disabled={taken.has(item.id) && item.id !== row.unitId}>
-                        {item.name} · {item.code}
+                        {optionLabel(item)}
                       </option>
                     ))}
                   </optgroup>
@@ -138,12 +145,26 @@ export function MembershipEditor({
                   disabled={disabled}
                   onChange={(event) => patch(row.key, { campusId: event.target.value || null })}
                 >
-                  <option value="">Todas las sedes</option>
+                  <option value="">{campuses.length > 1 ? "Todas las sedes" : "Su única sede"}</option>
                   {campuses.map((id) => (
                     <option key={id} value={id}>
                       {campusName.get(id) ?? "Sede"}
                     </option>
                   ))}
+                </select>
+              </label>
+            )}
+            {campuses.length > 0 && (
+              <label className="admin-field">
+                <span>Programas en Cifras</span>
+                <select
+                  value={row.pcRol ?? ""}
+                  disabled={disabled}
+                  onChange={(event) => patch(row.key, { pcRol: (event.target.value || null) as PcRol | null })}
+                >
+                  <option value="">No trabaja allí</option>
+                  <option value="coordinador">Coordinador: edita los archivos</option>
+                  <option value="director">Director: edita y nombra coordinadores</option>
                 </select>
               </label>
             )}
@@ -156,9 +177,14 @@ export function MembershipEditor({
             >
               <Icon name="close" size={15} />
             </button>
-            {(duplicated || row.boardRole) && (
+            {(duplicated || row.boardRole || row.pcRol) && (
               <div className="us-member__notes">
                 {row.boardRole && <small>{BOARD_ROLE_LABEL[row.boardRole].hint}</small>}
+                {row.pcRol && (
+                  <small>
+                    En Programas en Cifras edita {row.campusId ? `en ${campusName.get(row.campusId) ?? "esa sede"}` : "en todas las sedes donde se ofrece"}.
+                  </small>
+                )}
                 {duplicated && (
                   <small className="us-raised">
                     <Icon name="alert" size={13} /> Esta unidad ya está en la lista: en cada unidad va una sola función.
@@ -187,6 +213,10 @@ export function membershipProblem(value: MembershipDraft[]): string | null {
   if (new Set(value.map((row) => row.unitId)).size !== value.length) return "Hay una unidad repetida.";
   return null;
 }
+
+/** Lo que cambia al guardar: la unidad y su función, y el papel en Programas en Cifras. */
+export const draftSignature = (value: MembershipDraft[]) =>
+  JSON.stringify([toInput(value), value.map((row) => row.pcRol)]);
 
 export const toInput = (value: MembershipDraft[]) =>
   value.map((row) => ({

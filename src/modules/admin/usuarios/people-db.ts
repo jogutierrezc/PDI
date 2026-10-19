@@ -52,7 +52,17 @@ export interface ProgramOffer {
   byProgram: Map<string, string[]>;
 }
 
+/** Papel en Programas en Cifras (pc_miembros, 0164): quién edita los archivos de un programa en un campus. */
+export type PcRol = "director" | "coordinador";
+
+export interface PcNombramiento {
+  programaId: string;
+  campusId: string;
+  rol: PcRol;
+}
+
 export const peopleKeys = {
+  pc: (profileId: string) => [...keys.all, "personas", "pc", profileId] as const,
   all: [...keys.all, "personas"] as const,
   units: () => [...peopleKeys.all, "unidades"] as const,
   memberships: () => [...peopleKeys.all, "pertenencias"] as const,
@@ -143,6 +153,83 @@ export function useSetMemberships() {
       void client.invalidateQueries({ queryKey: boardKeys.units });
     },
   });
+}
+
+/** Los nombramientos de la persona en Programas en Cifras. Sin la migración 0164, ninguno. */
+export function usePcNombramientos(profileId: string | undefined) {
+  return useQuery({
+    queryKey: peopleKeys.pc(profileId ?? ""),
+    enabled: Boolean(profileId),
+    retry: false,
+    queryFn: async (): Promise<PcNombramiento[]> => {
+      const r = await supabase.from("pc_miembros").select("programa_id,campus_id,rol").eq("user_id", profileId ?? "");
+      if (r.error) return [];
+      return ((r.data ?? []) as { programa_id: string; campus_id: string; rol: PcRol }[]).map((m) => ({
+        programaId: m.programa_id,
+        campusId: m.campus_id,
+        rol: m.rol,
+      }));
+    },
+  });
+}
+
+/**
+ * El papel de una fila (programa y sede elegida) en Programas en Cifras. «Todas
+ * las sedes» vale si en cada sede donde se ofrece tiene el mismo papel.
+ */
+export function pcRolDe(
+  nombramientos: PcNombramiento[],
+  programaId: string,
+  campusId: string | null,
+  offer: ProgramOffer | undefined,
+): PcRol | null {
+  const sedes = campusId ? [campusId] : (offer?.byProgram.get(programaId) ?? []);
+  if (sedes.length === 0) return null;
+  const roles = sedes.map((sede) => nombramientos.find((n) => n.programaId === programaId && n.campusId === sede)?.rol ?? null);
+  return roles.every((rol) => rol && rol === roles[0]) ? roles[0] : null;
+}
+
+/**
+ * Deja los nombramientos de la persona como los dicen sus filas de programa.
+ * Solo toca los programas que están en la lista: lo que alguien le dio en el
+ * Equipo de otro programa no se borra. Los escribe la administración (RLS).
+ */
+export async function syncProgramasEnCifras(
+  profileId: string,
+  rows: { unitId: string; campusId: string | null; pcRol: PcRol | null }[],
+  offer: ProgramOffer | undefined,
+) {
+  const queremos = new Map<string, PcRol>();
+  for (const row of rows) {
+    if (!row.pcRol) continue;
+    const sedes = row.campusId ? [row.campusId] : (offer?.byProgram.get(row.unitId) ?? []);
+    for (const sede of sedes) queremos.set(`${row.unitId}|${sede}`, row.pcRol);
+  }
+  const actuales = await supabase.from("pc_miembros").select("id,programa_id,campus_id,rol").eq("user_id", profileId);
+  if (actuales.error) {
+    if (queremos.size === 0) return;
+    throw describeDatabaseError(actuales.error as never);
+  }
+  const lista = (actuales.data ?? []) as { id: string; programa_id: string; campus_id: string; rol: PcRol }[];
+  const tocados = new Set(rows.map((row) => row.unitId));
+  const sobran = lista.filter((m) => tocados.has(m.programa_id) && !queremos.has(`${m.programa_id}|${m.campus_id}`)).map((m) => m.id);
+  if (sobran.length > 0) {
+    const del = await supabase.from("pc_miembros").delete().in("id", sobran);
+    if (del.error) throw describeDatabaseError(del.error as never);
+  }
+  const nuevos = [...queremos.entries()]
+    .filter(([clave, rol]) => {
+      const [programa, sede] = clave.split("|");
+      return lista.find((m) => m.programa_id === programa && m.campus_id === sede)?.rol !== rol;
+    })
+    .map(([clave, rol]) => {
+      const [programa_id, campus_id] = clave.split("|");
+      return { user_id: profileId, programa_id, campus_id, rol };
+    });
+  if (nuevos.length > 0) {
+    const up = await supabase.from("pc_miembros").upsert(nuevos, { onConflict: "user_id,programa_id,campus_id" });
+    if (up.error) throw describeDatabaseError(up.error as never);
+  }
 }
 
 /** Nombre de la unidad con su código, para listas. */

@@ -158,7 +158,7 @@ export const MODULES: ModuleDef[] = [
   {
     id: "programas-en-cifras",
     label: "Programas en Cifras",
-    screens: [{ id: "programas-en-cifras", label: "Programas en Cifras", note: "director y coordinador entran por pertenencia, sin este rol; Planeación solo observa. Los roles especiales (Director y Coordinador de programa) se nombran dentro de la pantalla, en «Equipo»" }],
+    screens: [{ id: "programas-en-cifras", label: "Programas en Cifras", note: "edita quien sea Director o Coordinador de un programa en una sede: se nombra al crear o editar a la persona (unidad y sede), o en «Equipo» dentro de la pantalla. Planeación solo observa"}],
     levels: {
       ver: { hint: "Aparece en el menú; Planeación ve todos los programas, sin editar.", needs: "consulta" },
     },

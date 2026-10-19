@@ -21,13 +21,15 @@ import { roleLabels, useAuth } from "../../../lib/auth";
 import type { AccessRole, Profile } from "../../../types/database";
 import {
   MembershipEditor,
+  draftSignature,
   membershipProblem,
   toInput,
   newDraft,
   type MembershipDraft,
 } from "./MembershipEditor";
 import { UNIT_ROLE } from "../../tableros/model";
-import { useSetMemberships, type Membership, type UnitOption } from "./people-db";
+import { useQueryClient } from "@tanstack/react-query";
+import { pcRolDe, peopleKeys, syncProgramasEnCifras, useProgramOffer, usePcNombramientos, useSetMemberships, type Membership, type UnitOption } from "./people-db";
 import { initials, personSummary } from "./summary";
 import { UserWizard } from "./UserWizard";
 
@@ -268,20 +270,31 @@ function PersonDetail({
   const sendReset = useSendPasswordReset();
   const deleteUser = useDeleteUser();
   const saveMemberships = useSetMemberships();
+  const queryClient = useQueryClient();
   const [error, setError] = useState("");
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const offer = useProgramOffer().data;
+  const pcRows = usePcNombramientos(person.id).data;
+  const pcSignature = JSON.stringify(pcRows ?? []);
   const initial = useMemo(
     () =>
       memberships.map((m) =>
-        newDraft({ unitId: m.unitId, boardRole: m.role, title: m.title, campusId: m.campusId }),
+        newDraft({
+          unitId: m.unitId,
+          boardRole: m.role,
+          title: m.title,
+          campusId: m.campusId,
+          pcRol: pcRolDe(pcRows ?? [], m.unitId, m.campusId, offer),
+        }),
       ),
-    [memberships],
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [memberships, pcSignature, offer],
   );
   const [drafts, setDrafts] = useState<MembershipDraft[]>(initial);
   // Tras guardar, la lista vuelve de la base: se toma como punto de partida.
   // Solo si cambió de verdad, para no borrar lo que se está editando cuando
   // la consulta se repite al volver a la pestaña.
-  const signature = JSON.stringify(memberships.map((m) => [m.unitId, m.role, m.title, m.campusId]));
+  const signature = JSON.stringify([memberships.map((m) => [m.unitId, m.role, m.title, m.campusId]), pcSignature, Boolean(offer)]);
   useEffect(() => setDrafts(initial), [signature]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const globalRoles = roles;
@@ -292,8 +305,7 @@ function PersonDetail({
   const activeAdmins = profiles.filter((p) => p.role === "admin" && p.is_active).length;
   const isLastAdmin = person.role === "admin" && person.is_active && activeAdmins <= 1;
   const dirty =
-    JSON.stringify(toInput(drafts)) !==
-    JSON.stringify(toInput(initial));
+    draftSignature(drafts) !== draftSignature(initial);
   const problem = membershipProblem(drafts);
   const unitById = new Map(units.map((unit) => [unit.id, unit]));
   const summary = personSummary(
@@ -441,7 +453,11 @@ function PersonDetail({
               disabled={Boolean(problem) || saveMemberships.isPending}
               onClick={() =>
                 void run(
-                  () => saveMemberships.mutateAsync({ profileId: person.id, rows: toInput(drafts) }),
+                  async () => {
+                    await saveMemberships.mutateAsync({ profileId: person.id, rows: toInput(drafts) });
+                    await syncProgramasEnCifras(person.id, drafts, offer);
+                    void queryClient.invalidateQueries({ queryKey: peopleKeys.pc(person.id) });
+                  },
                   `Se guardaron las unidades de ${name}.`,
                 )
               }

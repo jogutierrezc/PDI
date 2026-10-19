@@ -18,7 +18,7 @@ import { useCreateUser } from "../../../data/mutations";
 import { useOdReportOptions } from "../../../data/queries";
 import type { AccessRole } from "../../../types/database";
 import { MembershipEditor, membershipProblem, toInput, type MembershipDraft } from "./MembershipEditor";
-import { setMemberships, type UnitOption } from "./people-db";
+import { setMemberships, syncProgramasEnCifras, useProgramOffer, type UnitOption } from "./people-db";
 import { describe, templateOf } from "./role-matrix";
 import { personSummary, reason, roleMatrix } from "./summary";
 
@@ -59,6 +59,7 @@ export function UserWizard({
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
 
+  const offer = useProgramOffer().data;
   const role = globalRoles.find((item) => item.id === roleId);
   const unitById = new Map(units.map((item) => [item.id, item]));
   const summary = personSummary(
@@ -100,7 +101,10 @@ export function UserWizard({
         password: mode === "password" ? password : undefined,
       });
       createdId = result.user.id;
-      if (drafts.length > 0) await setMemberships(createdId, toInput(drafts));
+      if (drafts.length > 0) {
+        await setMemberships(createdId, toInput(drafts));
+        await syncProgramasEnCifras(createdId, drafts, offer);
+      }
       onCreated(
         createdId,
         mode === "password"

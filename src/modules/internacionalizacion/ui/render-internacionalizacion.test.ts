@@ -12,11 +12,20 @@ import type { Yo } from "../tipos";
 
 vi.mock("../../../components/tour/TourProvider", () => ({ useTour: () => ({ start: () => undefined, isDone: () => true, active: null }) }));
 
-const estado = vi.hoisted(() => ({ admin: false, yo: null as unknown, error: null as Error | null, periodos: null as unknown, vacio: false }));
+const estado = vi.hoisted(() => ({
+  admin: false,
+  planeacion: false,
+  yo: null as unknown,
+  error: null as Error | null,
+  periodos: null as unknown,
+  vacio: false,
+  carpetas: [] as unknown[],
+  moldear: null as null | ((libros: unknown[]) => unknown[]),
+}));
 
 vi.mock("../../../lib/auth", async (orig) => ({
   ...(await orig<typeof import("../../../lib/auth")>()),
-  useAuth: () => ({ loading: false, profile: { id: "u1", role: estado.admin ? "admin" : "consulta" }, hasRole: (r: string) => (r === "admin" ? estado.admin : true) }),
+  useAuth: () => ({ loading: false, profile: { id: "u1", role: estado.admin ? "admin" : "consulta" }, hasRole: (r: string) => (r === "admin" ? estado.admin : r === "planeacion" ? estado.planeacion : true) }),
 }));
 
 vi.mock("../../reportes/store", async (orig) => ({
@@ -39,7 +48,12 @@ vi.mock("../datos", async (orig) => {
     useEnvios: () => ok(f.ENVIOS),
     useCifras: () => ok(f.CIFRAS),
     useCifrasPeriodos: (ids: string[]) => ids.map(() => ok(f.CIFRAS)),
-    useEstructura: () => ok(estado.vacio ? [] : f.ESTRUCTURA),
+    useEstructura: () => ok(estado.vacio ? [] : estado.moldear ? estado.moldear(f.ESTRUCTURA) : f.ESTRUCTURA),
+    useCarpetas: () => ok(estado.carpetas),
+    useCrearCarpeta: mut,
+    useActualizarCarpeta: mut,
+    useBorrarCarpeta: mut,
+    useMoverLibro: mut,
     useConceptos: () => ok(f.CONCEPTOS),
     usePlantillas: () => ok([]),
     useVentanas: () => ok(f.VENTANAS),
@@ -88,7 +102,7 @@ function pintar(ruta: string, yo: Yo, admin = false): string {
 
 const texto = (html: string) => html.replace(/<[^>]+>/g, " ").replace(/&#x27;/g, "'").replace(/&quot;/g, '"').replace(/&amp;/g, "&").replace(/\s+/g, " ");
 
-afterEach(() => Object.assign(estado, { admin: false, yo: null, error: null, periodos: null, vacio: false }));
+afterEach(() => Object.assign(estado, { admin: false, planeacion: false, yo: null, error: null, periodos: null, vacio: false, carpetas: [], moldear: null }));
 
 describe("Resumen", () => {
   it("el Director ve los cuatro campus, lo pendiente y la cobertura de las plantillas", () => {
@@ -98,8 +112,8 @@ describe("Resumen", () => {
     expect(t).toContain("Lo aprueba el Director");
     expect(t).toContain("Plantillas que el repositorio ya responde");
     expect(t).toContain("Accesos");
-    // El riel del marco: secciones, carpetas por clase y el buscador.
-    expect(t).toContain("Carpetas");
+    // El riel del marco: secciones y el buscador; las carpetas están en el resumen («Sin carpeta» agrupa las que no tienen).
+    expect(t).toContain("Sin carpeta");
     expect(t).toContain("Buscar tablas, secciones y acciones");
   });
 
@@ -142,13 +156,57 @@ describe("Cifras", () => {
 });
 
 describe("Tablas", () => {
-  it("el Director ve las tablas como archivos, por clase, y puede crear tablas", () => {
+  it("el Director ve el árbol de carpetas, las tablas como archivos y el menú «Nuevo»", () => {
     const t = texto(pintar("/admin/internacionalizacion/tablas?campus=c-vup", YO.director));
-    expect(t).toContain("Nueva tabla");
-    expect(t).toContain("Desde Excel");
-    expect(t).toContain("Movilidad");
+    expect(t).toContain("Nuevo");
+    expect(t).toContain("Todas las tablas");
+    expect(t).toContain("Multicampus");
+    expect(t).toContain("Sin carpeta");
+    expect(t).toContain("Nueva carpeta");
+    expect(t).toContain("Movilidad estudiantil");
     expect(t).toContain("Convenios");
     expect(t).toContain("Seleccione una tabla");
+  });
+
+  it("las carpetas reales muestran sus subcarpetas y solo las tablas que contienen", () => {
+    estado.carpetas = [
+      { id: "cp-mov", nombre: "Movilidad", parent_id: null, orden: 0, created_by: null, created_at: "" },
+      { id: "cp-ent", nombre: "Entrantes 2026", parent_id: "cp-mov", orden: 0, created_by: null, created_at: "" },
+    ];
+    estado.moldear = (libros) => (libros as { id: string }[]).map((l) => (l.id === "l-mov" ? { ...l, carpeta_id: "cp-mov" } : l));
+    const dentro = texto(pintar("/admin/internacionalizacion/tablas?carpeta=cp-mov", YO.director));
+    expect(dentro).toContain("Entrantes 2026");
+    expect(dentro).toContain("Vacía");
+    expect(dentro).toContain("Movilidad estudiantil");
+    expect(dentro).not.toContain("Convenios por");
+    const sin = texto(pintar("/admin/internacionalizacion/tablas?carpeta=sin", YO.director));
+    expect(sin).not.toContain("Movilidad estudiantil");
+    expect(sin).toContain("Convenios");
+  });
+
+  it("Planeación, sin ser miembro, entra a Tablas y puede crear", () => {
+    estado.planeacion = true;
+    const t = texto(pintar("/admin/internacionalizacion/tablas", { director: false, coordinador: [], gestor: [], planeacion: true, crea: true, multicampus: true }));
+    expect(t).not.toContain("Todavía no tiene campus asignado");
+    expect(t).toContain("Nuevo");
+    expect(t).toContain("Movilidad estudiantil");
+  });
+
+  it("en una tabla Multicampus la hoja muestra quién registró cada fila, cuándo y de dónde vino", () => {
+    estado.moldear = (libros) => (libros as { id: string }[]).map((l) => (l.id === "l-mov" ? { ...l, captura: "multicampus" } : l));
+    const t = texto(pintar("/admin/internacionalizacion/tablas?libro=l-mov&hoja=h-sal", YO.director));
+    expect(t).toContain("Registró");
+    expect(t).toContain("Cuándo");
+    expect(t).toContain("Origen");
+    expect(t).toContain("Subir mi aporte (Excel)");
+    expect(t).toContain("Excel · visitantes_cuc.xlsx");
+    expect(t).toContain("Multicampus: aportan todos los campus");
+  });
+
+  it("en una tabla por campus la hoja no lleva las columnas de autoría", () => {
+    const t = texto(pintar("/admin/internacionalizacion/tablas?libro=l-mov&hoja=h-sal", YO.director));
+    expect(t).not.toContain("Registró");
+    expect(t).toContain("Cargar Excel");
   });
 
   it("al abrir una carpeta se ven sus tablas con el avance por campus", () => {

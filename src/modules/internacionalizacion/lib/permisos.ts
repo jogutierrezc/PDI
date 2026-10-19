@@ -6,6 +6,9 @@
      transicionPermitida   ↔ int_transicion_permitida
      motivoBloqueoFilas    ↔ int_motivo_bloqueo
      ventanaAbierta        ↔ int_ventana_abierta
+     rolFila               ↔ int_rol_fila (0166: Multicampus)
+     puedeCrear, controlaMulticampus, puedeCrearLibro, puedeEditarLibro
+                           ↔ int_puede_crear, int_controla_multicampus, int_puede_crear_libro, int_puede_editar_libro
 
    Flujo por (hoja, periodo, campus):
 
@@ -83,9 +86,61 @@ export function campusVisibles(yo: Yo | null | undefined, todos: readonly string
   return todos.filter((id) => yo.coordinador.includes(id) || yo.gestor.includes(id));
 }
 
-/** ¿Pertenece al módulo? (lo que abre la pantalla en el menú). */
+/** ¿Pertenece al módulo? (lo que abre la pantalla en el menú). Planeación lo ve sin ser miembro. */
 export function esMiembro(yo: Yo | null | undefined): boolean {
-  return Boolean(yo && (yo.director || yo.coordinador.length > 0 || yo.gestor.length > 0));
+  return Boolean(yo && (yo.director || yo.planeacion || yo.coordinador.length > 0 || yo.gestor.length > 0));
+}
+
+/* ---------- Carpetas y tablas Multicampus (0166) ---------------------------------- */
+
+/** Crea carpetas y tablas «por campus»: el Director, Planeación o un Coordinador. */
+export function puedeCrear(yo: Yo | null | undefined): boolean {
+  if (!yo) return false;
+  return Boolean(yo.director || yo.planeacion || yo.coordinador.length > 0);
+}
+
+/** Controla las tablas Multicampus: el Director, Planeación o el Coordinador del campus central (Bucaramanga). */
+export function controlaMulticampus(yo: Yo | null | undefined): boolean {
+  if (!yo) return false;
+  return Boolean(yo.director || yo.planeacion || (yo.central && yo.coordinador.includes(yo.central)));
+}
+
+/** ¿Puede crear una tabla con esta forma de captura? */
+export function puedeCrearLibro(yo: Yo | null | undefined, captura: IntLibroRow["captura"]): boolean {
+  if (!yo) return false;
+  if (captura === "multicampus") return controlaMulticampus(yo);
+  if (captura === "oficina") return Boolean(yo.director || yo.planeacion);
+  return puedeCrear(yo);
+}
+
+/** ¿Cambia la estructura de este libro (o lo borra)? El Director y Planeación, todos; un Coordinador, los suyos; Multicampus, quien la controla. */
+export function puedeEditarLibro(yo: Yo | null | undefined, libro: Pick<IntLibroRow, "captura" | "created_by">, userId: string | null | undefined): boolean {
+  if (!yo) return false;
+  if (yo.director || yo.planeacion) return true;
+  if (libro.captura === "multicampus") return controlaMulticampus(yo);
+  if (libro.captura === "campus") return Boolean(userId && libro.created_by === userId && yo.coordinador.length > 0);
+  return false;
+}
+
+/**
+ * Papel frente a las filas de un campus en una hoja. En una tabla Multicampus se
+ * suma el mejor entre el de ese campus y el que da Planeación (coordinador) o la
+ * persona en el campus central (Bucaramanga edita las de todos).
+ */
+export function rolFila(yo: Yo | null | undefined, campusId: string, multicampus: boolean): RolEnCampus {
+  const base = rolEn(yo, campusId);
+  if (base === "director" || !multicampus || !yo) return base;
+  const extra: RolEnCampus = yo.planeacion ? "coordinador" : yo.central ? rolEn(yo, yo.central) : null;
+  if (!base) return extra;
+  if (!extra) return base;
+  if (extra === "coordinador" || base === "coordinador") return "coordinador";
+  return "gestor";
+}
+
+/** Campus cuyas filas se ven: en Multicampus, todos para quien pertenece al módulo. */
+export function campusVisiblesEn(yo: Yo | null | undefined, todos: readonly string[], multicampus: boolean): string[] {
+  if (multicampus && esMiembro(yo)) return [...todos];
+  return campusVisibles(yo, todos);
 }
 
 /** «AAAA-MM-DD» de hoy en Bogotá (como int_hoy()). */

@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { ESTRUCTURA } from "../../../../tests/internacionalizacion/fixtures";
 import { aplicarPegado, cambiarCelda, erroresEnCeldas } from "../../../components/espacio/logica";
 import type { FilaLocal } from "../../../components/espacio/tipos";
-import { avanceLibro, carpetaDeLibro, columnaEsp, reglasInt } from "./adaptador";
+import { avanceDeLibro, avanceLibro, avanceMulticampus, columnaEsp, reglasInt } from "./adaptador";
 
 const hoja = ESTRUCTURA[0].hojas[0]; // Movilidad estudiantil · Saliente
 const columnas = hoja.columnas.map(columnaEsp);
@@ -54,11 +54,7 @@ describe("adaptador de Internacionalización", () => {
     expect(reglas.textoBloqueado!(col("programa"), "Derecho")).toBe("Derecho");
   });
 
-  it("agrupa los libros por la clase de sus hojas y cuenta lo aprobado en los campus que se ven", () => {
-    expect(carpetaDeLibro(ESTRUCTURA[0])).toBe("movilidad");
-    expect(carpetaDeLibro(ESTRUCTURA[1])).toBe("convenio");
-    expect(carpetaDeLibro({ hojas: [...ESTRUCTURA[0].hojas, ...ESTRUCTURA[1].hojas] })).toBe("varias");
-    expect(carpetaDeLibro({ hojas: [] })).toBe("general");
+  it("cuenta lo aprobado en los campus que se ven", () => {
     const envios = [
       { hoja_id: "h-sal", campus_id: "c-bga", estado: "aprobado" as const },
       { hoja_id: "h-sal", campus_id: "c-cuc", estado: "aprobado" as const },
@@ -66,5 +62,18 @@ describe("adaptador de Internacionalización", () => {
     ];
     expect(avanceLibro(ESTRUCTURA[0], envios, ["c-bga"])).toEqual({ aprobadas: 1, total: 2 });
     expect(avanceLibro(ESTRUCTURA[0], envios, ["c-bga", "c-cuc"])).toEqual({ aprobadas: 2, total: 4 });
+  });
+
+  it("en Multicampus cuentan solo los campus que enviaron algo, y queda aprobada cuando todos ellos lo están", () => {
+    const envios = [
+      { hoja_id: "h-sal", campus_id: "c-bga", estado: "aprobado" as const },
+      { hoja_id: "h-sal", campus_id: "c-cuc", estado: "enviado" as const },
+      { hoja_id: "otra", campus_id: "c-val", estado: "aprobado" as const },
+    ];
+    expect(avanceMulticampus(ESTRUCTURA[0], envios)).toEqual({ aprobadas: 1, total: 2 });
+    expect(avanceMulticampus(ESTRUCTURA[0], [])).toEqual({ aprobadas: 0, total: 0 });
+    // El mismo libro, tratado como «por campus», cuenta hojas × campus que se ven.
+    expect(avanceDeLibro({ ...ESTRUCTURA[0], captura: "campus" }, envios, ["c-bga", "c-cuc"])).toEqual({ aprobadas: 1, total: 4 });
+    expect(avanceDeLibro({ ...ESTRUCTURA[0], captura: "multicampus" }, envios, ["c-bga", "c-cuc"])).toEqual({ aprobadas: 1, total: 2 });
   });
 });

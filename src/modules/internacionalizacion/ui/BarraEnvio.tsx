@@ -43,7 +43,8 @@ export function BarraEnvio({
   const deHoja = (historial.data ?? []).filter((x) => x.hoja_id === hojaId && (!campusSel || x.campus_id === campusSel));
   const nombres = useNombres(deHoja.map((x) => x.actor));
   const sel = escritura.find((e) => e.campus_id === campusSel);
-  const acciones = sel ? accionesEnvio(sel.estado, sel.rol) : [];
+  // Enviar, validar y aprobar son de cada campus: en Multicampus, quien edita filas ajenas no envía por ellas.
+  const acciones = sel ? accionesEnvio(sel.estado, sel.rolEnvio) : [];
   const ventana = sel && ctx.periodo ? ventanaVigente(ventanas, ctx.periodo.id, hojaId, sel.campus_id) : null;
   const dias = diasHasta(ventana?.cierra);
 
@@ -64,7 +65,7 @@ export function BarraEnvio({
   return (
     <section className="it-envio" aria-label="Envío y validación">
       <div className="it-campus-sel" role="group" aria-label="Campus">
-        {ctx.visibles.length > 1 && (
+        {escritura.length > 1 && (
           <button type="button" aria-pressed={!campusSel} onClick={() => onCampus("")}>
             <b>Todos</b>
             <small>ver todas las filas</small>

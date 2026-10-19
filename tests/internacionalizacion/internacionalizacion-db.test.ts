@@ -366,7 +366,8 @@ describe("0151 · accesos", () => {
 
   it("int_yo dice los papeles de cada quien", async () => {
     const yo = await t.asUser(P.coordCuc, async (q) => (await q<{ y: unknown }>("select public.int_yo() as y"))[0].y);
-    expect(yo).toEqual({ director: false, coordinador: [C.cuc], gestor: [] });
+    // 0166 añade lo que cada quien puede crear y cuál es el campus central; los papeles de 0151 no cambian.
+    expect(yo).toEqual({ director: false, coordinador: [C.cuc], gestor: [], planeacion: false, crea: true, multicampus: false, central: C.buc });
   });
 
   it("la migración es idempotente", async () => {

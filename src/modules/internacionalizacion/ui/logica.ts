@@ -12,7 +12,7 @@
 
 import type { CifrasRpc } from "../lib/cifras";
 import { CALCULO_DURACION } from "../lib/conceptos";
-import { accionesPermitidas, ETIQUETA_ESTADO, hoyBogota, motivoBloqueoFilas, pideNota, rolEn, ventanaAbierta } from "../lib/permisos";
+import { accionesPermitidas, ETIQUETA_ESTADO, hoyBogota, motivoBloqueoFilas, pideNota, rolEn, rolFila, ventanaAbierta } from "../lib/permisos";
 import type {
   Campus,
   Columna,
@@ -202,7 +202,10 @@ export const GLIFO: Record<IntEstado, string> = { borrador: "○", enviado: "◐
 
 export interface PuedeEscribir {
   campus_id: string;
+  /** Papel para escribir filas (en Multicampus puede venir de Bucaramanga o de Planeación). */
   rol: RolEnCampus;
+  /** Papel para enviar, validar y aprobar: solo el que tiene en ese campus (int_cambiar_estado). */
+  rolEnvio: RolEnCampus;
   estado: IntEstado;
   abierta: boolean;
   /** Por qué no puede escribir, o nulo. */
@@ -220,8 +223,10 @@ export function escrituraPorCampus(args: {
   envios: readonly IntEnvioRow[];
   hoy?: string;
 }): PuedeEscribir[] {
+  // Multicampus (0166): el papel sale de rolFila (Bucaramanga edita las filas de todos).
+  const multicampus = args.libro.captura === "multicampus";
   return args.campus.map((id) => {
-    const rol = rolEn(args.yo, id);
+    const rol = rolFila(args.yo, id, multicampus);
     const estado = args.envios.find((e) => e.hoja_id === args.hoja.id && e.campus_id === id)?.estado ?? "borrador";
     const abierta = ventanaAbierta(args.periodo, args.ventanas, args.hoja.id, id, args.hoy);
     const bloqueo = !args.periodo
@@ -229,7 +234,7 @@ export function escrituraPorCampus(args: {
       : args.periodo.estado === "cerrado" && rol !== "director"
         ? "El periodo está cerrado."
         : motivoBloqueoFilas({ rol, estado, captura: args.libro.captura, ventanaAbierta: abierta });
-    return { campus_id: id, rol, estado, abierta, bloqueo };
+    return { campus_id: id, rol, rolEnvio: rolEn(args.yo, id), estado, abierta, bloqueo };
   });
 }
 

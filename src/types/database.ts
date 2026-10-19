@@ -1717,13 +1717,29 @@ export interface IntConceptoRow {
   orden: number;
 }
 
-/** Un libro de tablas (`int_libros`). captura «oficina»: solo el Director escribe filas. */
+/**
+ * Un libro de tablas (`int_libros`). captura «oficina»: solo el Director y Planeación escriben filas;
+ * «multicampus» (0166): un archivo al que aportan todos los campus, con Bucaramanga editando las de todos.
+ */
 export interface IntLibroRow {
   id: string;
   nombre: string;
   descripcion: string;
-  captura: "campus" | "oficina";
+  captura: "campus" | "oficina" | "multicampus";
   orden: number;
+  /** Carpeta que lo contiene (0166); nulo = «Sin carpeta». */
+  carpeta_id: string | null;
+  created_by: string | null;
+  created_at: string;
+}
+
+/** Una carpeta de tablas (`int_carpetas`, 0166); parent_id nulo = carpeta de primer nivel. */
+export interface IntCarpetaRow {
+  id: string;
+  nombre: string;
+  parent_id: string | null;
+  orden: number;
+  created_by: string | null;
   created_at: string;
 }
 
@@ -1789,8 +1805,11 @@ export interface IntFilaRow {
   datos: Record<string, IntValor>;
   orden: number;
   origen: "manual" | "excel";
+  /** Nombre del Excel de donde vino (0166). */
+  archivo: string | null;
   created_by: string | null;
   updated_by: string | null;
+  created_at: string;
   updated_at: string;
 }
 

@@ -1,29 +1,29 @@
 /* =============================================================================
    Edge Function · sync-facultades
-   Trae los planes de acción de las facultades desde la aplicación de Google.
+   Trae los planes de trabajo de las facultades desde la API «Plan de Trabajo
+   Decanatura UDES 2026» (api-planes), con la misma clave que usa informe-plan.
 
-   El origen ya existe y ya publica: un Apps Script desplegado como aplicación
-   web que responde dos cosas.
+     GET /planes       → { total, datos: [ { facultad, decano, fase_actual, … } ] }
+     GET /acciones     → { total, datos: [ { facultad, accion por id d1_2, … } ] }
+     GET /actividades  → { total, datos: [ { facultad, accion_id, id, corte, … } ] }
+     GET /seguimientos → { total, datos: [ { facultad, accion_id, corte, … } ] }
 
-     GET ?action=list        → { ok, data: [ {facultad, decano, fase_actual, …} ] }
-     GET ?facultad=<CÓDIGO>  → { ok, found, row: { …, json_data: "<JSON>" } }
-
-   `json_data` es una cadena con el plan entero dentro: la facultad, sus
-   acciones, las actividades de cada acción y sus seguimientos por corte.
+   Sin `?facultad=` cada ruta devuelve todas; la sincronización llama cada una
+   una sola vez y agrupa en memoria. `faculties.code` usa los mismos códigos
+   que la API (FCS, FIT, FCMS, FCN, FCAV, FCEAC, CFTT), así que el encuentro
+   con el catálogo del portal es directo.
 
    -----------------------------------------------------------------------------
-   Por qué el portal tira del origen en vez de leerlo en cada visita
+   Por qué el portal sincroniza en vez de leer el origen en cada visita
 
-   Se puede llamar a esa URL desde el navegador —responde JSON y permite
-   cualquier origen— y durante un rato pareció lo más simple. No lo es: cada
-   visitante esperaría entre uno y tres segundos, sin caché, y una página
-   pública se quedaría en blanco cada vez que Google tarde o el despliegue del
-   script cambie de identificador. Además el plan llega sin ninguna relación con
-   el PDI: el pilar viene como texto y hay que resolverlo contra `pillars`.
+   Cada visitante esperaría la respuesta de la API, sin caché, y una página
+   pública se quedaría en blanco cada vez que la API tarde o cambie. Además
+   el pilar llega como texto y hay que resolverlo contra `pillars`.
 
    Sincronizando, el portal sirve siempre lo último que trajo, con la misma
-   caché que el resto del sitio, y una caída del origen se nota en la bandeja de
-   la intranet —donde alguien puede hacer algo— y no en la cara del visitante.
+   caché que el resto del sitio, y una caída del origen se nota en la bandeja
+   de la intranet —donde alguien puede hacer algo— y no en la cara del
+   visitante.
 
    -----------------------------------------------------------------------------
    LA REGLA: la sincronización no pisa lo que decidió el portal
@@ -40,14 +40,15 @@
 
    Tampoco borra. Una acción que desaparece del origen se reporta en la
    respuesta (`orphans`) y se deja como está: borrarla se llevaría por delante
-   lo que alguien revisó, y no hay forma de distinguir "la quitaron" de "la hoja
-   vino incompleta esta vez".
+   lo que alguien revisó, y no hay forma de distinguir "la quitaron" de "la
+   hoja vino incompleta esta vez".
 
    -----------------------------------------------------------------------------
    Despliegue
 
-     supabase functions deploy sync-facultades
-     supabase secrets set FACULTY_SOURCE_URL="https://script.google.com/macros/s/<ID>/exec"
+     La clave y la dirección de la API son los secretos de informe-plan:
+     PLAN_API_KEY y PLAN_API_URL (migración de configuración 0167).
+
      supabase secrets set FACULTY_SYNC_TOKEN="<una cadena larga y aleatoria>"
 
    Quien la llama se identifica de una de dos maneras:
@@ -59,42 +60,52 @@
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.58.0";
 
-/* --- La forma que sirve el origen ----------------------------------------- */
+/* --- Lo que devuelve cada ruta de la API ------------------------------------ */
 
-interface SourceActivity {
+interface ApiPlan {
+  facultad?: string;
+  decano?: string;
+  fase_actual?: string;
+  actualizado?: string;
+}
+
+interface ApiAccion {
+  facultad?: string;
+  id?: string;
+  dimension?: string;
+  dimension_nombre?: string;
+  accion?: string;
+  pilar?: string;
+  responsable?: string;
+  fecha_limite?: string;
+  recursos?: string;
+  meta?: string;
+  estado_inicial?: string;
+  presupuesto_ordinario?: boolean;
+  presupuesto_mejoramiento?: boolean;
+}
+
+interface ApiActividad {
+  facultad?: string;
+  accion_id?: string;
   id?: string;
   descripcion?: string;
   responsable?: string;
   fecha?: string;
+  corte?: string;
   estado?: string;
-  linkEvidencia?: string;
+  link_evidencia?: string;
 }
 
-interface SourceFollowup {
+interface ApiSeguimiento {
+  facultad?: string;
+  accion_id?: string;
   corte?: string;
   fecha?: string;
   avance?: number;
   estado?: string;
   notas?: string;
-  linkEvidenciaAccion?: string;
-  actividades?: SourceActivity[];
-}
-
-interface SourceAction {
-  id?: string;
-  dimension?: string;
-  dimensionNombre?: string;
-  accion?: string;
-  pilar?: string;
-  responsable?: string;
-  fechaLimite?: string;
-  recursos?: string;
-  meta?: string;
-  estadoInicial?: string;
-  presupuestoOrdinario?: boolean;
-  presupuestoMejoramiento?: boolean;
-  actividades?: SourceActivity[];
-  seguimientos?: SourceFollowup[];
+  link_evidencia_accion?: string;
 }
 
 /** La fila de `faculties` que necesita la sincronización. */
@@ -110,14 +121,6 @@ interface KnownAction {
   id: string;
   source_id: string;
   title: string;
-}
-
-interface SourcePlan {
-  facultad?: { codigo?: string; nombre?: string; tieneInforme?: boolean };
-  decano?: string;
-  fechaElaboracion?: string;
-  periodo?: string;
-  acciones?: SourceAction[];
 }
 
 const corsHeaders = {
@@ -173,17 +176,20 @@ function toStatus(value: unknown): "pendiente" | "proceso" | "completado" {
 }
 
 /** El avance llega de 0 a 100. Se recorta en vez de rechazarse: un 120 mal
- *  escrito en la hoja no debe tumbar la sincronización de toda una facultad. */
+ *  escrito en el origen no debe tumbar la sincronización de toda una facultad. */
 function toProgress(value: unknown): number | null {
   if (typeof value !== "number" || Number.isNaN(value)) return null;
   return Math.max(0, Math.min(100, Math.round(value)));
 }
 
-async function readSource(base: string, query: string): Promise<unknown> {
-  const url = `${base}${base.includes("?") ? "&" : "?"}${query}`;
-  const response = await fetch(url, { redirect: "follow" });
-  if (!response.ok) throw new Error(`El origen respondió ${response.status} en ${query}`);
-  return await response.json();
+async function pedir(base: string, clave: string, ruta: string): Promise<Record<string, unknown>[]> {
+  const response = await fetch(`${base.replace(/\/$/, "")}/${ruta}`, {
+    headers: { "x-api-key": clave },
+    signal: AbortSignal.timeout(25_000),
+  });
+  if (!response.ok) throw new Error(`El origen respondió ${response.status} en /${ruta}.`);
+  const body = (await response.json()) as { datos?: Record<string, unknown>[] };
+  return body.datos ?? [];
 }
 
 /* -----------------------------------------------------------------------------
@@ -217,17 +223,19 @@ async function handle(request: Request): Promise<Response> {
   const url = Deno.env.get("SUPABASE_URL");
   const anonKey = Deno.env.get("SUPABASE_ANON_KEY");
   const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
-  const source = Deno.env.get("FACULTY_SOURCE_URL");
+  const apiBase = Deno.env.get("PLAN_API_URL");
+  const apiKey = Deno.env.get("PLAN_API_KEY");
   const expected = Deno.env.get("FACULTY_SYNC_TOKEN");
 
   // Decir cuál falta, y no "algo falta". Las tres primeras las inyecta la
-  // plataforma; `FACULTY_SOURCE_URL` hay que ponerla a mano con
-  // `supabase secrets set`, y es la que se olvida.
+  // plataforma; la clave y la dirección de la API hay que ponerlas a mano, y
+  // son las mismas de informe-plan.
   const missing = [
     !url && "SUPABASE_URL",
     !anonKey && "SUPABASE_ANON_KEY",
     !serviceKey && "SUPABASE_SERVICE_ROLE_KEY",
-    !source && "FACULTY_SOURCE_URL",
+    !apiBase && "PLAN_API_URL",
+    !apiKey && "PLAN_API_KEY",
   ].filter(Boolean);
 
   if (missing.length > 0) {
@@ -235,8 +243,7 @@ async function handle(request: Request): Promise<Response> {
     return json(
       {
         error: `Falta configurar ${missing.join(", ")}.`,
-        advice:
-          "Ponlas con: supabase secrets set FACULTY_SOURCE_URL=\"https://script.google.com/macros/s/<ID>/exec\"",
+        advice: "Son los secretos de informe-plan: PLAN_API_URL y PLAN_API_KEY.",
       },
       500,
     );
@@ -300,22 +307,61 @@ async function handle(request: Request): Promise<Response> {
     ((faculties ?? []) as FacultyRow[]).map((row) => [row.code.toUpperCase(), row]),
   );
 
-  /* --- Qué facultades trae el origen --------------------------------------- */
+  /* --- El origen: las cuatro rutas, cada una una sola vez ------------------ */
 
-  let list: { data?: { facultad?: string; timestamp?: string }[] };
+  let planes: ApiPlan[];
+  let acciones: ApiAccion[];
+  let actividades: ApiActividad[];
+  let seguimientos: ApiSeguimiento[];
   try {
-    list = (await readSource(source, "action=list")) as typeof list;
+    [planes, acciones, actividades, seguimientos] = (await Promise.all([
+      pedir(apiBase as string, apiKey as string, "planes"),
+      pedir(apiBase as string, apiKey as string, "acciones"),
+      pedir(apiBase as string, apiKey as string, "actividades"),
+      pedir(apiBase as string, apiKey as string, "seguimientos"),
+    ])) as [ApiPlan[], ApiAccion[], ApiActividad[], ApiSeguimiento[]];
   } catch (cause) {
     return json({ error: cause instanceof Error ? cause.message : "El origen no respondió." }, 502);
   }
 
-  const codes = (list.data ?? []).map((row) => text(row.facultad)).filter(Boolean);
-  const stampByCode = new Map(
-    (list.data ?? []).map((row) => [text(row.facultad).toUpperCase(), text(row.timestamp)]),
-  );
+  // El corte de cada acción que trae datos más recientes: el seguimiento con
+  // la fecha más alta. Las actividades se reportan por corte, y la fila que
+  // manda es la de ese último corte.
+  const lastCutByAction = new Map<string, { corte: string; fecha: string }>();
+  for (const row of seguimientos) {
+    const key = `${text(row.facultad).toUpperCase()}|${text(row.accion_id)}`;
+    const corte = text(row.corte);
+    const fecha = text(row.fecha);
+    if (!corte || !fecha) continue;
+    const best = lastCutByAction.get(key);
+    if (!best || fecha > best.fecha) lastCutByAction.set(key, { corte, fecha });
+  }
+
+  const actividadesByAction = new Map<string, ApiActividad[]>();
+  for (const row of actividades) {
+    const key = `${text(row.facultad).toUpperCase()}|${text(row.accion_id)}`;
+    if (!actividadesByAction.has(key)) actividadesByAction.set(key, []);
+    actividadesByAction.get(key)!.push(row);
+  }
+
+  const seguimientosByAction = new Map<string, ApiSeguimiento[]>();
+  for (const row of seguimientos) {
+    const key = `${text(row.facultad).toUpperCase()}|${text(row.accion_id)}`;
+    if (!seguimientosByAction.has(key)) seguimientosByAction.set(key, []);
+    seguimientosByAction.get(key)!.push(row);
+  }
+
+  const accionesByFaculty = new Map<string, ApiAccion[]>();
+  for (const row of acciones) {
+    const key = text(row.facultad).toUpperCase();
+    if (!accionesByFaculty.has(key)) accionesByFaculty.set(key, []);
+    accionesByFaculty.get(key)!.push(row);
+  }
+
+  /* --- El reporte de la corrida -------------------------------------------- */
 
   const report = {
-    source: codes.length,
+    source: planes.length,
     faculties: 0,
     actions: { created: 0, updated: 0 },
     activities: 0,
@@ -326,8 +372,10 @@ async function handle(request: Request): Promise<Response> {
     skipped: [] as { faculty: string; reason: string }[],
   };
 
-  for (const code of codes) {
-    const faculty = facultyByCode.get(code.toUpperCase());
+  for (const plan of planes) {
+    const code = text(plan.facultad).toUpperCase();
+    const faculty = facultyByCode.get(code);
+
     if (!faculty) {
       // No se inventa la facultad: se crea desde la intranet con su slug y su
       // código, y la corrida siguiente la encuentra.
@@ -335,30 +383,15 @@ async function handle(request: Request): Promise<Response> {
       continue;
     }
 
-    let plan: SourcePlan;
     try {
-      const detail = (await readSource(source, `facultad=${encodeURIComponent(code)}`)) as {
-        found?: boolean;
-        row?: { decano?: string; fase_actual?: string; json_data?: string };
-      };
-
-      if (!detail.found || !detail.row?.json_data) {
-        report.skipped.push({ faculty: code, reason: "el origen no devolvió el plan" });
-        continue;
-      }
-
-      plan = JSON.parse(detail.row.json_data) as SourcePlan;
-
       await admin
         .from("faculties")
         .update({
-          // El nombre y la decanatura los manda el origen: es quien los sabe.
-          name: text(plan.facultad?.nombre) || faculty.name,
-          dean: text(plan.decano) || text(detail.row.decano),
-          phase: text(detail.row.fase_actual),
-          period: text(plan.periodo),
-          plan_date: toDate(plan.fechaElaboracion),
-          source_updated_at: stampByCode.get(code.toUpperCase()) || null,
+          // El nombre, el período y la fecha del plan ya no los manda el
+          // origen: se quedan con lo que tiene el portal.
+          dean: text(plan.decano),
+          phase: text(plan.fase_actual),
+          source_updated_at: toDate(plan.actualizado),
           synced_at: new Date().toISOString(),
         })
         .eq("id", faculty.id);
@@ -396,7 +429,7 @@ async function handle(request: Request): Promise<Response> {
 
     let position = 0;
 
-    for (const action of plan.acciones ?? []) {
+    for (const action of accionesByFaculty.get(code) ?? []) {
       const sourceId = text(action.id);
       const title = text(action.accion);
       if (!sourceId || !title) continue;
@@ -410,17 +443,17 @@ async function handle(request: Request): Promise<Response> {
         faculty_id: faculty.id,
         source_id: sourceId,
         dimension: text(action.dimension),
-        dimension_name: text(action.dimensionNombre),
+        dimension_name: text(action.dimension_nombre),
         declared_pillar: text(action.pilar),
         title,
         owner: text(action.responsable),
         goal: text(action.meta),
         resources: text(action.recursos),
-        deadline: toDate(action.fechaLimite),
-        deadline_label: text(action.fechaLimite),
-        initial_status: toStatus(action.estadoInicial),
-        budget_ordinary: action.presupuestoOrdinario === true,
-        budget_improvement: action.presupuestoMejoramiento === true,
+        deadline: toDate(action.fecha_limite),
+        deadline_label: text(action.fecha_limite),
+        initial_status: toStatus(action.estado_inicial),
+        budget_ordinary: action.presupuesto_ordinario === true,
+        budget_improvement: action.presupuesto_mejoramiento === true,
         position,
       };
 
@@ -449,33 +482,28 @@ async function handle(request: Request): Promise<Response> {
 
       /* --- Las actividades ------------------------------------------------ */
 
-      // El estado de cada actividad no está en la actividad: vive en el último
-      // seguimiento, que las vuelve a listar con su avance. Se indexa primero.
-      const latest = [...(action.seguimientos ?? [])].sort((a, b) =>
-        text(a.fecha) < text(b.fecha) ? 1 : -1,
-      )[0];
-      const stateBySource = new Map(
-        (latest?.actividades ?? []).map((row) => [text(row.id), row]),
-      );
+      // Cada actividad llega una vez por corte; se guarda la fila del último
+      // corte con datos, que es la que trae el estado vigente.
+      const lastCut = lastCutByAction.get(`${code}|${sourceId}`)?.corte ?? "";
+      const byId = new Map<string, ApiActividad>();
+      for (const row of actividadesByAction.get(`${code}|${sourceId}`) ?? []) {
+        const id = text(row.id);
+        if (!id || !text(row.descripcion)) continue;
+        const current = byId.get(id);
+        if (!current || (lastCut && text(row.corte) === lastCut)) byId.set(id, row);
+      }
 
-      const activities = (action.actividades ?? [])
-        .map((activity, index) => {
-          const id = text(activity.id);
-          if (!id || !text(activity.descripcion)) return null;
-          const reported = stateBySource.get(id);
-          return {
-            action_id: actionId,
-            source_id: id,
-            description: text(activity.descripcion),
-            owner: text(activity.responsable),
-            due_date: toDate(activity.fecha),
-            due_label: text(activity.fecha),
-            status_label: text(reported?.estado),
-            evidence_url: text(reported?.linkEvidencia),
-            position: index + 1,
-          };
-        })
-        .filter((row): row is NonNullable<typeof row> => row !== null);
+      const activities = [...byId.values()].map((activity, index) => ({
+        action_id: actionId,
+        source_id: text(activity.id),
+        description: text(activity.descripcion),
+        owner: text(activity.responsable),
+        due_date: toDate(activity.fecha),
+        due_label: text(activity.fecha),
+        status_label: text(activity.estado),
+        evidence_url: text(activity.link_evidencia),
+        position: index + 1,
+      }));
 
       if (activities.length > 0) {
         const { error } = await admin
@@ -487,7 +515,7 @@ async function handle(request: Request): Promise<Response> {
 
       /* --- Los seguimientos ----------------------------------------------- */
 
-      const followups = (action.seguimientos ?? [])
+      const followups = (seguimientosByAction.get(`${code}|${sourceId}`) ?? [])
         .map((followup) => {
           const cut = text(followup.corte);
           if (!cut) return null;
@@ -498,7 +526,7 @@ async function handle(request: Request): Promise<Response> {
             progress: toProgress(followup.avance),
             status_label: text(followup.estado),
             note: text(followup.notas),
-            evidence_url: text(followup.linkEvidenciaAccion),
+            evidence_url: text(followup.link_evidencia_accion),
           };
         })
         .filter((row): row is NonNullable<typeof row> => row !== null);

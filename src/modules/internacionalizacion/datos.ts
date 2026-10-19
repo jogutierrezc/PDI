@@ -21,6 +21,7 @@ import type {
   Campus,
   Columna,
   Datos,
+  IntCarpetaRow,
   IntConceptoRow,
   IntEnvioHistorialRow,
   IntEnvioRow,
@@ -55,7 +56,11 @@ const noExiste = (e: ErrorBase) =>
 
 /** Error legible; si faltan las tablas o las funciones, el aviso de migración. */
 export function errorDe(e: ErrorBase): Error {
-  return noExiste(e) ? new FaltaMigracion("Falta aplicar la migración 0151 (Internacionalización).") : new Error(e.message ?? "Error de la base de datos");
+  if (!noExiste(e)) return new Error(e.message ?? "Error de la base de datos");
+  // Las carpetas, Multicampus y la autoría salen de la 0166; lo demás, de la 0151.
+  return /int_carpetas|carpeta_id|int_rol_fila|int_puede_|int_controla|archivo/i.test(e.message ?? "")
+    ? new FaltaMigracion("Falta aplicar la migración 0166 (carpetas y tablas Multicampus de Internacionalización).")
+    : new FaltaMigracion("Falta aplicar la migración 0151 (Internacionalización).");
 }
 
 async function todasLas<T>(pedir: (desde: number, hasta: number) => PromiseLike<{ data: unknown[] | null; error: ErrorBase | null }>): Promise<T[]> {
@@ -82,6 +87,7 @@ export const INT_CLAVES = {
   campus: ["int", "campus"] as const,
   conceptos: ["int", "conceptos"] as const,
   estructura: ["int", "estructura"] as const,
+  carpetas: ["int", "carpetas"] as const,
   periodos: ["int", "periodos"] as const,
   ventanas: (periodo: string) => ["int", "ventanas", periodo] as const,
   filas: (hoja: string, periodo: string) => ["int", "filas", hoja, periodo] as const,
@@ -141,7 +147,7 @@ export function useEstructura() {
     staleTime: 30_000,
     queryFn: async (): Promise<LibroCompleto[]> => {
       const [libros, hojas, columnas] = await Promise.all([
-        supabase.from("int_libros").select("id, nombre, descripcion, captura, orden, created_at").order("orden").order("nombre"),
+        supabase.from("int_libros").select("id, nombre, descripcion, captura, orden, carpeta_id, created_by, created_at").order("orden").order("nombre"),
         supabase.from("int_hojas").select("id, libro_id, nombre, clase, sentido, orden").order("orden").order("nombre"),
         todasLas<Columna & { id: string; hoja_id: string; orden: number }>((d, h) =>
           supabase.from("int_columnas").select("id, hoja_id, clave, etiqueta, tipo, concepto_id, obligatorio, opciones, calculo, orden").order("orden").range(d, h),
@@ -160,6 +166,20 @@ export function armarEstructura(libros: IntLibroRow[], hojas: IntHojaRow[], colu
     ...l,
     hojas: hojas.filter((h) => h.libro_id === l.id).map((h) => ({ ...h, columnas: columnas.filter((c) => c.hoja_id === h.id) })),
   }));
+}
+
+/** Las carpetas (con subcarpetas por parent_id). El árbol lo arma lib/carpetas. */
+export function useCarpetas() {
+  return useQuery({
+    queryKey: INT_CLAVES.carpetas,
+    retry: false,
+    staleTime: 30_000,
+    queryFn: async (): Promise<IntCarpetaRow[]> => {
+      const r = await supabase.from("int_carpetas").select("id, nombre, parent_id, orden, created_by, created_at").order("orden").order("nombre");
+      if (r.error) throw errorDe(r.error);
+      return (r.data as IntCarpetaRow[] | null) ?? [];
+    },
+  });
 }
 
 export function usePeriodos() {
@@ -198,7 +218,7 @@ export function useFilas(hoja: string | undefined, periodo: string | undefined) 
       todasLas<IntFilaRow>((d, h) =>
         supabase
           .from("int_filas")
-          .select("id, hoja_id, periodo_id, campus_id, datos, orden, origen, created_by, updated_by, updated_at")
+          .select("id, hoja_id, periodo_id, campus_id, datos, orden, origen, archivo, created_by, updated_by, created_at, updated_at")
           .eq("hoja_id", hoja ?? "")
           .eq("periodo_id", periodo ?? "")
           .order("campus_id")
@@ -417,6 +437,56 @@ export function useGuardarLibro() {
   });
 }
 
+/** Crea una carpeta (dentro de otra o en la raíz). La base comprueba quién puede, los ciclos y los 5 niveles. */
+export function useCrearCarpeta() {
+  const cliente = useQueryClient();
+  return useMutation({
+    mutationFn: async (c: { nombre: string; parent_id: string | null }): Promise<string> => {
+      const r = await supabase.from("int_carpetas").insert({ nombre: c.nombre, parent_id: c.parent_id }).select("id").single();
+      if (r.error) throw errorDe(r.error);
+      return (r.data as { id: string }).id;
+    },
+    onSuccess: () => invalidar(cliente, INT_CLAVES.carpetas),
+  });
+}
+
+/** Renombra una carpeta o la mueve a otra (parent_id nulo = a la raíz). */
+export function useActualizarCarpeta() {
+  const cliente = useQueryClient();
+  return useMutation({
+    mutationFn: async (c: { id: string; nombre?: string; parent_id?: string | null }) => {
+      const { id, ...cambios } = c;
+      const r = await supabase.from("int_carpetas").update(cambios).eq("id", id);
+      if (r.error) throw errorDe(r.error);
+    },
+    onSuccess: () => invalidar(cliente, INT_CLAVES.carpetas),
+  });
+}
+
+/** Borra una carpeta vacía: con tablas o subcarpetas la base no deja. */
+export function useBorrarCarpeta() {
+  const cliente = useQueryClient();
+  return useMutation({
+    mutationFn: async (id: string) => {
+      const r = await supabase.from("int_carpetas").delete().eq("id", id);
+      if (r.error) throw errorDe(r.error);
+    },
+    onSuccess: () => invalidar(cliente, INT_CLAVES.carpetas),
+  });
+}
+
+/** Cambia la carpeta de una tabla (nulo = «Sin carpeta»). */
+export function useMoverLibro() {
+  const cliente = useQueryClient();
+  return useMutation({
+    mutationFn: async (a: { libro: string; carpeta: string | null }) => {
+      const r = await supabase.from("int_libros").update({ carpeta_id: a.carpeta }).eq("id", a.libro);
+      if (r.error) throw errorDe(r.error);
+    },
+    onSuccess: () => invalidar(cliente, INT_CLAVES.estructura),
+  });
+}
+
 /** Director: borra un libro con sus hojas y filas (no deja si alguna hoja está aprobada en algún campus: reabra primero). */
 export function useBorrarLibro() {
   const cliente = useQueryClient();
@@ -485,6 +555,8 @@ export interface TablaNueva {
   nombre: string;
   descripcion?: string;
   captura?: IntLibroRow["captura"];
+  /** Carpeta donde queda (0166); nulo o ausente = «Sin carpeta». */
+  carpeta_id?: string | null;
   hojas: { nombre: string; clase?: IntHojaRow["clase"]; sentido?: IntHojaRow["sentido"]; columnas: (Columna & { orden?: number })[] }[];
 }
 
@@ -498,7 +570,7 @@ export function useCrearTabla() {
     mutationFn: async (t: TablaNueva): Promise<string> => {
       const libro = await supabase
         .from("int_libros")
-        .insert({ nombre: t.nombre, descripcion: t.descripcion ?? "", captura: t.captura ?? "campus" })
+        .insert({ nombre: t.nombre, descripcion: t.descripcion ?? "", captura: t.captura ?? "campus", carpeta_id: t.carpeta_id ?? null })
         .select("id")
         .single();
       if (libro.error) throw errorDe(libro.error);
@@ -588,13 +660,14 @@ export interface FilaParaGuardar {
 export function useGuardarFilas() {
   const cliente = useQueryClient();
   return useMutation({
-    mutationFn: (a: { hoja: string; periodo: string; filas: FilaParaGuardar[]; reemplazar?: string[]; origen?: "manual" | "excel" }) =>
+    mutationFn: (a: { hoja: string; periodo: string; filas: FilaParaGuardar[]; reemplazar?: string[]; origen?: "manual" | "excel"; archivo?: string | null }) =>
       rpc<{ insertadas: number; actualizadas: number; borradas: number }>("int_guardar_filas", {
         p_hoja: a.hoja,
         p_periodo: a.periodo,
         p_filas: a.filas,
         p_reemplazar: a.reemplazar ?? null,
         p_origen: a.origen ?? "excel",
+        p_archivo: a.archivo ?? null,
       }),
     onSuccess: (_x, a) => invalidar(cliente, INT_CLAVES.filas(a.hoja, a.periodo), ["int", "cifras", a.periodo]),
   });

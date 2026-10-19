@@ -2,7 +2,7 @@
    Internacionalización · el adaptador del espacio de archivos.
 
    Traduce lo de Internacionalización a lo que pide components/espacio:
-   cada LIBRO es un archivo del explorador, agrupado por la clase de sus hojas;
+   cada LIBRO es un archivo del explorador (dentro de la carpeta que le puso quien lo creó, 0166);
    cada columna por concepto es una EspColumna; y las reglas de lectura,
    validación, columnas calculadas y datos personales de lib/validacion se
    ofrecen como `Reglas`. Sin React ni red, para probarlo aparte.
@@ -53,23 +53,7 @@ export function reglasInt(columnas: readonly IntColumnaRow[], personales: Readon
   };
 }
 
-/* ---------- carpetas: la clase de las hojas -------------------------------------- */
-
-export type CarpetaId = "movilidad" | "convenio" | "general" | "varias";
-
-export const CARPETAS_INT: { id: CarpetaId; nombre: string; subtitulo: string }[] = [
-  { id: "movilidad", nombre: "Movilidad", subtitulo: "Entrantes y salientes" },
-  { id: "convenio", nombre: "Convenios", subtitulo: "Convenios con otras instituciones" },
-  { id: "general", nombre: "General", subtitulo: "Otras tablas del repositorio" },
-  { id: "varias", nombre: "Varias clases", subtitulo: "Tablas con hojas de distinta clase" },
-];
-
-/** La carpeta de un libro: la clase de sus hojas, o «varias» si mezcla; sin hojas, general. */
-export function carpetaDeLibro(libro: Pick<LibroCompleto, "hojas">): CarpetaId {
-  const clases = new Set(libro.hojas.map((h) => h.clase));
-  if (clases.size === 0) return "general";
-  return clases.size === 1 ? [...clases][0] : "varias";
-}
+/* ---------- avance de una tabla ----------------------------------------------------- */
 
 /** Hojas aprobadas sobre hojas × campus que se ven: «3 de 8 aprobadas». */
 export function avanceLibro(libro: Pick<LibroCompleto, "hojas">, envios: readonly Pick<IntEnvioRow, "hoja_id" | "campus_id" | "estado">[], campusVisibles: readonly string[]): { aprobadas: number; total: number } {
@@ -79,4 +63,24 @@ export function avanceLibro(libro: Pick<LibroCompleto, "hojas">, envios: readonl
     total: libro.hojas.length * campusVisibles.length,
     aprobadas: envios.filter((e) => e.estado === "aprobado" && ids.has(e.hoja_id) && vistos.has(e.campus_id)).length,
   };
+}
+
+/**
+ * Multicampus (0166): cada campus envía su parte y la tabla queda aprobada cuando lo están todos
+ * los que aportan. Aportan los campus que tienen un envío en alguna de sus hojas; los que nunca
+ * enviaron no cuentan (no hay forma de saber si les toca). Sin ningún envío: 0 de 0.
+ */
+export function avanceMulticampus(libro: Pick<LibroCompleto, "hojas">, envios: readonly Pick<IntEnvioRow, "hoja_id" | "campus_id" | "estado">[]): { aprobadas: number; total: number } {
+  const ids = new Set(libro.hojas.map((h) => h.id));
+  const propios = envios.filter((e) => ids.has(e.hoja_id));
+  return { total: propios.length, aprobadas: propios.filter((e) => e.estado === "aprobado").length };
+}
+
+/** El avance de una tabla en las tarjetas y el resumen, según cómo se captura. */
+export function avanceDeLibro(
+  libro: Pick<LibroCompleto, "hojas" | "captura">,
+  envios: readonly Pick<IntEnvioRow, "hoja_id" | "campus_id" | "estado">[],
+  campusVisibles: readonly string[],
+): { aprobadas: number; total: number } {
+  return libro.captura === "multicampus" ? avanceMulticampus(libro, envios) : avanceLibro(libro, envios, campusVisibles);
 }

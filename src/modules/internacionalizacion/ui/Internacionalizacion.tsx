@@ -25,9 +25,9 @@ import type { EntradaBuscador } from "../../../components/espacio/Buscador";
 import { Migas } from "../../../components/espacio/Explorador";
 import { BarraSuperior, EntradaRiel, Riel, TituloRiel } from "../../../components/espacio/Marco";
 import type { IconName } from "../../../components/ui/Icon";
-import { FaltaMigracion, useCampus, useEnvios, useEstructura, usePeriodos, useYo } from "../datos";
-import { campusVisibles } from "../lib/permisos";
-import { carpetaDeLibro, CARPETAS_INT } from "./adaptador";
+import { FaltaMigracion, useCampus, useCarpetas, useEnvios, useEstructura, usePeriodos, useYo } from "../datos";
+import { rutaDe } from "../lib/carpetas";
+import { campusVisibles, puedeCrear } from "../lib/permisos";
 import { AvisoMigracion, Cargando, ErrorCaja, Vacio } from "./comunes";
 import type { Ctx } from "./comunes";
 import { pendientesDe, periodoInicial, SECCIONES, seccionDe, seccionesPara } from "./logica";
@@ -48,7 +48,7 @@ export function Internacionalizacion() {
   const [params, setParams] = useSearchParams();
   const navegar = useNavigate();
   const tour = useTour();
-  const { hasRole } = useAuth();
+  const { hasRole, profile } = useAuth();
   const yo = useYo();
   const campus = useCampus();
   const periodos = usePeriodos();
@@ -56,18 +56,22 @@ export function Internacionalizacion() {
 
   const admin = hasRole("admin");
   const director = Boolean(yo.data?.director) || admin;
+  const planeacion = Boolean(yo.data?.planeacion) || hasRole("planeacion");
   const periodo = periodoInicial(periodos.data ?? [], params.get("periodo"));
   const envios = useEnvios(periodo?.id);
   const estructura = useEstructura();
+  const carpetasQ = useCarpetas();
   const seccion = seccionDe(param, director);
 
   const ctx = useMemo<Ctx | null>(() => {
     if (!yo.data || !campus.data) return null;
     const ids = campusVisibles(yo.data, campus.data.map((c) => c.id));
     return {
-      yo: { ...yo.data, director },
+      yo: { ...yo.data, director, planeacion },
       director,
       admin,
+      planeacion,
+      userId: profile?.id ?? null,
       campus: campus.data,
       visibles: campus.data.filter((c) => ids.includes(c.id)),
       periodo,
@@ -80,7 +84,7 @@ export function Internacionalizacion() {
         return `${BASE}${s === "resumen" ? "" : `/${s}`}${qs ? `?${qs}` : ""}`;
       },
     };
-  }, [yo.data, campus.data, periodos.data, periodo, director, admin]);
+  }, [yo.data, campus.data, periodos.data, periodo, director, admin, planeacion, profile?.id]);
 
   useEffect(() => {
     const alTeclear = (e: KeyboardEvent) => {
@@ -99,13 +103,13 @@ export function Internacionalizacion() {
   const meta = SECCIONES.find((s) => s.id === actual)!;
   const pendientes = pendientesDe(ctx?.yo, envios.data ?? []);
   const libros = estructura.data ?? [];
-  const carpetaActual = actual === "tablas" ? (CARPETAS_INT.find((c) => c.id === params.get("carpeta"))?.id ?? null) : null;
+  const carpetas = carpetasQ.data ?? [];
   const enlace = (s: SeccionId, extra?: Record<string, string | null | undefined>) => ctx?.enlace(s, extra) ?? `${BASE}${s === "resumen" ? "" : `/${s}`}`;
 
   const entradas: EntradaBuscador[] = [
-    ...libros.map((l) => ({ id: `l:${l.id}`, titulo: l.nombre, icono: "table" as const, pista: `Tabla · ${CARPETAS_INT.find((c) => c.id === carpetaDeLibro(l))?.nombre ?? ""}` })),
+    ...libros.map((l) => ({ id: `l:${l.id}`, titulo: l.nombre, icono: "table" as const, pista: `Tabla · ${l.captura === "multicampus" ? "Multicampus" : rutaDe(carpetas, l.carpeta_id).map((c) => c.nombre).join(" / ") || "Sin carpeta"}` })),
     ...seccionesPara(director).map((s) => ({ id: `s:${s.id}`, titulo: s.rotulo, icono: ICONO[s.id], pista: "Sección" })),
-    ...(director
+    ...(puedeCrear(ctx?.yo)
       ? [
           { id: "nueva", titulo: "Nueva tabla", icono: "plus" as const, pista: "Acción" },
           { id: "excel", titulo: "Crear una tabla desde Excel", icono: "upload" as const, pista: "Acción" },
@@ -163,11 +167,11 @@ export function Internacionalizacion() {
   const falta = errores.find((e) => e instanceof FaltaMigracion);
   let cuerpo: ReactNode;
   // «Pleno»: Tablas trae su propio explorador y ocupa todo el espacio, sin margen ni título.
-  const pleno = !falta && !errores.length && Boolean(ctx) && !periodos.isPending && (director || (ctx?.visibles.length ?? 0) > 0) && actual === "tablas";
+  const pleno = !falta && !errores.length && Boolean(ctx) && !periodos.isPending && (director || planeacion || (ctx?.visibles.length ?? 0) > 0) && actual === "tablas";
   if (falta) cuerpo = <AvisoMigracion error={falta} />;
   else if (errores.length) cuerpo = <ErrorCaja error={errores[0]} />;
   else if (!ctx || periodos.isPending) cuerpo = <Cargando texto="Leyendo el módulo…" />;
-  else if (!director && ctx.visibles.length === 0)
+  else if (!director && !planeacion && ctx.visibles.length === 0)
     cuerpo = (
       <Vacio titulo="Todavía no tiene campus asignado en el módulo.">
         Pida al Director de Internacionalización que lo nombre coordinador o gestor de su campus.
@@ -187,15 +191,8 @@ export function Internacionalizacion() {
         <Riel etiqueta="Secciones de Internacionalización" tour="int-riel">
           <TituloRiel>Repositorio</TituloRiel>
           {seccionesPara(director).map((s) => (
-            <EntradaRiel key={s.id} icono={ICONO[s.id]} actual={s.id === actual && !carpetaActual} to={enlace(s.id)} cuenta={s.id === "tablas" ? pendientes.total : undefined}>
+            <EntradaRiel key={s.id} icono={ICONO[s.id]} actual={s.id === actual} to={enlace(s.id)} cuenta={s.id === "tablas" ? pendientes.total : undefined}>
               {s.rotulo}
-            </EntradaRiel>
-          ))}
-          <hr />
-          <TituloRiel>Carpetas</TituloRiel>
-          {CARPETAS_INT.filter((c) => libros.some((l) => carpetaDeLibro(l) === c.id)).map((c) => (
-            <EntradaRiel key={c.id} icono="folder" actual={carpetaActual === c.id} to={enlace("tablas", { carpeta: c.id })}>
-              {c.nombre}
             </EntradaRiel>
           ))}
         </Riel>

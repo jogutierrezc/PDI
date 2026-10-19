@@ -7,7 +7,10 @@
    «campo propio» y su tipo, y los errores por fila y celda en español
    (lib/importador-excel). Si el Excel no trae columna de campus, se elige el
    campus. Se guarda con int_guardar_filas por lotes, con su progreso.
-   El Director puede, además, crear una tabla nueva con las hojas del archivo.
+   Quien puede crear (Director, Planeación o un Coordinador) puede, además, crear una
+   tabla nueva con las hojas del archivo (también Multicampus, si la controla).
+   En una tabla Multicampus todos los campus suben su aporte: el nombre del archivo
+   queda en cada fila (int_filas.archivo) junto a quién la subió y cuándo.
    ========================================================================== */
 
 import { useMemo, useRef, useState } from "react";
@@ -17,7 +20,8 @@ import { Icon } from "../../../components/ui/Icon";
 import { INT_CLAVES, useCrearTabla, useGuardarFilas } from "../datos";
 import { analizarLibro, columnasParaCrear, hojaPorNombre, paraGuardar, prepararCarga } from "../lib/importador-excel";
 import type { HojaDetectada, LibroDetectado } from "../lib/importador-excel";
-import type { Columna, IntConceptoRow, IntEnvioRow, IntVentanaRow, LibroCompleto } from "../tipos";
+import { puedeCrear, puedeCrearLibro, rolFila } from "../lib/permisos";
+import type { Columna, IntConceptoRow, IntEnvioRow, IntLibroRow, IntVentanaRow, LibroCompleto } from "../tipos";
 import { MarcoAsistente } from "../../../components/espacio/MarcoAsistente";
 import { fmt, nombreCampus } from "./comunes";
 import type { Ctx } from "./comunes";
@@ -32,10 +36,19 @@ const PILO = [
 ];
 const COMO: Record<HojaDetectada["columnas"][number]["como"], string> = { exacto: "concepto", parecido: "concepto por parecido", propio: "campo propio", implicito: "va en la fila" };
 
+/** Lo que el panel «Nuevo» ya decidió cuando se elige «Desde un Excel». */
+export interface PrevioExcel {
+  nombre: string;
+  captura: IntLibroRow["captura"];
+  carpeta: string | null;
+}
+
 export function CargaExcel({
   ctx,
   estructura,
   libro,
+  previo = null,
+  carpetaId = null,
   hojaActual,
   ventanas,
   envios,
@@ -46,6 +59,10 @@ export function CargaExcel({
   ctx: Ctx;
   estructura: LibroCompleto[];
   libro: LibroCompleto | null;
+  /** Viene de «Nuevo → Desde un Excel»: la tabla nueva ya tiene nombre, captura y carpeta. */
+  previo?: PrevioExcel | null;
+  /** Carpeta que está abierta: donde queda una tabla nueva si el panel no eligió otra. */
+  carpetaId?: string | null;
   hojaActual: string | null;
   ventanas: IntVentanaRow[];
   envios: IntEnvioRow[];
@@ -58,8 +75,9 @@ export function CargaExcel({
   const [leyendo, setLeyendo] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [encima, setEncima] = useState(false);
-  const [destino, setDestino] = useState<"existente" | "nueva">(libro ? "existente" : "nueva");
-  const [nombreTabla, setNombreTabla] = useState("");
+  const [destino, setDestino] = useState<"existente" | "nueva">(libro && !previo ? "existente" : "nueva");
+  const [nombreTabla, setNombreTabla] = useState(previo?.nombre ?? "");
+  const capturaNueva: IntLibroRow["captura"] = previo?.captura ?? "campus";
   const [destinos, setDestinos] = useState<Record<string, string>>({});
   const [clases, setClases] = useState<Record<string, Partida>>({});
   const [campusFijo, setCampusFijo] = useState<string>("");
@@ -122,11 +140,9 @@ export function CargaExcel({
       }
       const permitidos =
         destino === "nueva"
-          ? ctx.director
-            ? ctx.visibles.map((c) => c.id)
-            : []
+          ? ctx.campus.filter((c) => puedeCrearLibro(ctx.yo, capturaNueva) && rolFila(ctx.yo, c.id, capturaNueva === "multicampus") !== null).map((c) => c.id)
           : hojaId
-            ? escrituraPorCampus({ yo: ctx.yo, campus: ctx.visibles.map((c) => c.id), hoja: { id: hojaId }, libro: { captura }, periodo, ventanas, envios })
+            ? escrituraPorCampus({ yo: ctx.yo, campus: (captura === "multicampus" ? ctx.campus : ctx.visibles).map((c) => c.id), hoja: { id: hojaId }, libro: { captura }, periodo, ventanas, envios })
                 .filter((e) => !e.bloqueo)
                 .map((e) => e.campus_id)
             : [];
@@ -134,7 +150,7 @@ export function CargaExcel({
       const carga = columnas ? prepararCarga(h, columnas, { campus: ctx.campus, permitidos, campusFijo: campusFijo || null, periodo: periodo.codigo }) : null;
       return { h, hojaId, columnas, permitidos, conCampus, carga };
     });
-  }, [leido, periodo, destino, destinos, estructura, ctx, ventanas, envios, campusFijo]);
+  }, [leido, periodo, destino, destinos, estructura, ctx, ventanas, envios, campusFijo, capturaNueva]);
 
   const plan = planes[activa];
   const pideCampus = planes.some((p) => !p.conCampus && p.permitidos.length > 1);
@@ -152,6 +168,8 @@ export function CargaExcel({
         if (!nombreTabla.trim()) return setError("Escriba el nombre de la tabla nueva.");
         libroId = await crear.mutateAsync({
           nombre: nombreTabla.trim(),
+          captura: capturaNueva,
+          carpeta_id: previo ? previo.carpeta : carpetaId,
           hojas: planes.map((p) => {
             const def = PARTIDAS[clases[p.h.nombre] ?? "general"];
             return { nombre: p.h.nombre, clase: def.clase, sentido: def.sentido, columnas: columnasParaCrear(p.h) };
@@ -169,7 +187,7 @@ export function CargaExcel({
         if (!t.hoja) continue;
         for (let i = 0; i < t.filas.length; i += LOTE) {
           const lote = t.filas.slice(i, i + LOTE);
-          await guardar.mutateAsync({ hoja: t.hoja, periodo: periodo.id, filas: lote, reemplazar: i === 0 && reemplazar ? t.campus : undefined, origen: "excel" });
+          await guardar.mutateAsync({ hoja: t.hoja, periodo: periodo.id, filas: lote, reemplazar: i === 0 && reemplazar ? t.campus : undefined, origen: "excel", archivo });
           hechas += lote.length;
           setProgreso({ hechas, total });
         }
@@ -254,7 +272,7 @@ export function CargaExcel({
             </ul>
           )}
 
-          {ctx.director && (
+          {puedeCrear(ctx.yo) && (
             <fieldset className="it-campo">
               <legend>Destino</legend>
               <div className="it-opciones it-opciones--fila">

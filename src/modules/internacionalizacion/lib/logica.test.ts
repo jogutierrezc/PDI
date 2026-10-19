@@ -114,7 +114,8 @@ describe("permisos (espejo de int_transicion_permitida e int_motivo_bloqueo)", (
     const perfil = (role: Profile["role"]) => ({ id: "x", role, is_active: true }) as Profile;
     const who = { access: null, inAnyUnit: false, impactoSide: null };
     expect(screenVisible("internacionalizacion", { ...who, profile: perfil("consulta"), inInternacionalizacion: true })).toBe(true);
-    expect(screenVisible("internacionalizacion", { ...who, profile: perfil("planeacion") })).toBe(false);
+    expect(screenVisible("internacionalizacion", { ...who, profile: perfil("planeacion") })).toBe(true);
+    expect(screenVisible("internacionalizacion", { ...who, profile: perfil("responsable") })).toBe(false);
     expect(screenVisible("internacionalizacion", { ...who, profile: perfil("admin") })).toBe(true);
   });
 });

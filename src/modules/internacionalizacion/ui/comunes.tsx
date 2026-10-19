@@ -16,6 +16,10 @@ export interface Ctx {
   director: boolean;
   /** Administración de la intranet (puede nombrar Directores). */
   admin: boolean;
+  /** Planeación (0166): ve el módulo y crea carpetas y tablas sin ser Director. */
+  planeacion: boolean;
+  /** Mi id de usuario: dice qué tablas creé yo (un Coordinador cambia solo las suyas). */
+  userId: string | null;
   /** Todos los campus de public.campuses. */
   campus: Campus[];
   /** Los que esta persona ve: todos (Director) o los suyos. */

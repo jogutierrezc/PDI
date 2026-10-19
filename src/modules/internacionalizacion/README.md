@@ -202,3 +202,32 @@ No cambia ninguna tabla de Reportes.
 ```
 npx vitest run src/modules/internacionalizacion tests/internacionalizacion
 ```
+
+
+## Carpetas, Multicampus y autoría (migración 0166)
+
+Rediseño de «Tablas» (maqueta aprobada «Internacionalización · Tablas y Multicampus»).
+
+**Carpetas con subcarpetas.** `int_carpetas` (`parent_id`, hasta 5 niveles, sin ciclos: disparador `int_carpetas_guard`; dos hermanas no se llaman igual sin distinguir mayúsculas). `int_libros.carpeta_id` nulo = «Sin carpeta». Una carpeta con tablas o subcarpetas no se borra (FK `restrict`). Antes eran cuatro constantes deducidas de la clase de las hojas (`CARPETAS_INT`, retiradas). Lógica pura en `lib/carpetas.ts`; barra lateral en `ui/ArbolCarpetas.tsx`.
+
+**Captura `multicampus`.** Un archivo al que aportan todos los campus:
+- Todos los miembros (y Planeación) **ven todas las filas** y todos los estados de envío.
+- **Escribir filas:** Bucaramanga (Gestor y Coordinador) edita las de cualquier campus; Valledupar, Cúcuta y Bogotá, solo las suyas; Planeación edita todas (con papel de Coordinador); el Director, todas. Lo decide `int_rol_fila(campus, hoja)` (espejo: `rolFila` en `lib/permisos.ts`); el disparador de filas y la ventana siguen igual.
+- **Enviar, validar y aprobar sigue siendo por campus** (`int_cambiar_estado` usa el papel en ese campus: quien edita filas ajenas desde Bucaramanga no las envía). El avance de la tarjeta cuenta los campus que enviaron algo (`avanceMulticampus`): queda aprobada cuando lo están todos esos.
+- **Quién la controla** (crear, cambiar estructura, borrar): Director, Planeación y el Coordinador de Bucaramanga. El campus central se busca por `slug = 'bucaramanga'` (`int_campus_central()`).
+
+**Quién crea.**
+| Qué | Quién |
+|---|---|
+| Carpetas y tablas «por campus» | Director, Planeación y cualquier Coordinador. Un Coordinador cambia y borra solo lo que creó. |
+| Tablas «solo la oficina» | Director y Planeación |
+| Tablas Multicampus | Director, Planeación y el Coordinador de Bucaramanga |
+| Ventana de captura de una hoja | el Director, o quien administra esa tabla (`int_ventanas`). Los periodos siguen siendo del Director. |
+
+Planeación **ve el módulo sin ser miembro** (`int_ve_modulo()`; pantalla visible por rol en `auth.tsx`), pero no aprueba, no reabre y no nombra miembros.
+
+**Autoría.** Cada fila ya guardaba `created_by`, `updated_by` y `origen`; 0166 añade `archivo` (nombre del Excel) y `created_at` se muestra. En una tabla Multicampus la hoja trae las columnas de solo lectura **Registró · Cuándo · Origen** (`columnasInfo` de la rejilla compartida `components/espacio/Hoja`). `int_guardar_filas` recibe `p_archivo` (la versión de 5 parámetros se reemplaza; el cliente viejo sigue funcionando porque el parámetro nuevo tiene valor por defecto).
+
+**Pantalla.** «Nuevo» es un menú (Carpeta · Tabla · Multicampus · Subir un Excel) y «Nueva tabla» es un solo panel (`ui/NuevoPanel.tsx`: nombre, carpeta, quién escribe, cómo empieza). Agregar una hoja a una tabla existente sigue en `NuevaTabla`. Movimiento: solo `transform`/`opacity`, 160 ms, `ease-out` fuerte, sin animación en el árbol y sin movimiento con `prefers-reduced-motion` (`ui/carpetas.css`).
+
+**Pruebas.** `tests/internacionalizacion/multicampus-db.test.ts` (19 casos sobre la base: permisos, ciclos, 5 niveles, RLS, autoría y archivo), `lib/carpetas.test.ts`, `lib/multicampus.test.ts` y las de renderizado.

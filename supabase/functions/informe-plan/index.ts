@@ -13,8 +13,10 @@
    Reglas:
      · Solo con sesión. Planeación o la administración, o quien tenga algún
        papel en la unidad (unit_role_at, con herencia).
-     · La unidad debe ser una facultad con código de la API (FCS, FIT, FCMS,
-       FCN, FCAV, FCEAC o CFTT); si no, 404.
+     · La unidad debe ser una facultad con plan en la API (FCS, FIT, FCMS, FCN,
+       FCAV, FCEAC o CFTT); si no, 404. El portal usa sus propios códigos en
+       units.code: se traducen con la tabla facultades_plan (0167) y, a falta
+       de esa, con el mapa FACULTADES_API de respaldo.
      · Sin corte: la API devuelve el último seguimiento guardado por acción.
 
    Secretos (los pone el administrador, no el código):
@@ -33,7 +35,18 @@ const CORS = {
   "Access-Control-Allow-Methods": "POST, OPTIONS",
 };
 const json = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status, headers: { ...CORS, "Content-Type": "application/json" } });
-const FACULTADES = ["FCS", "FIT", "FCMS", "FCN", "FCAV", "FCEAC", "CFTT"];
+// Códigos de la API del plan ← códigos de facultad del portal (units.code).
+// Es el respaldo: lo mandatorio es la tabla facultades_plan (migración 0167),
+// donde Planeación corrige o agrega sin redesplegar la función.
+const FACULTADES_API: Record<string, string> = {
+  FACSOC: "FCS",
+  FAINT: "FIT",
+  FACSALUD: "FCMS",
+  FACCNA: "FCN",
+  FACAVET: "FCAV",
+  FCEAC: "FCEAC",
+  UDESTEC: "CFTT",
+};
 const UUID = /^[0-9a-f-]{36}$/i;
 const TIEMPO_MAX_MS = 25_000;
 
@@ -83,8 +96,14 @@ Deno.serve(async (request: Request) => {
   // La unidad y su código en la API -------------------------------------------------
   const { data: unidad, error: errUnidad } = await admin.from("units").select("id, name, code, kind").eq("id", unitId).maybeSingle();
   if (errUnidad) return json({ error: "No se pudo leer la unidad." }, 500);
-  const facultad = String(unidad?.code ?? "").toUpperCase();
-  if (!unidad || !FACULTADES.includes(facultad)) return json({ error: "Esta unidad no tiene plan de trabajo en la API." }, 404);
+  if (!unidad) return json({ error: "Esta unidad no tiene plan de trabajo en la API." }, 404);
+
+  // El código de la API: primero la tabla facultades_plan, si no el mapa de respaldo.
+  const codigoPortal = String(unidad.code ?? "").toUpperCase();
+  let facultad = FACULTADES_API[codigoPortal] ?? "";
+  const { data: equivalencia } = await admin.from("facultades_plan").select("codigo_api").eq("codigo_portal", codigoPortal).maybeSingle();
+  if (equivalencia?.codigo_api) facultad = String(equivalencia.codigo_api).toUpperCase();
+  if (!facultad) return json({ error: "Esta unidad no tiene plan de trabajo en la API." }, 404);
 
   try {
     const [planes, acciones, actividades, seguimientos] = await Promise.all([

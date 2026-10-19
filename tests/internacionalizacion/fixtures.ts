@@ -65,6 +65,8 @@ export const ESTRUCTURA: LibroCompleto[] = [
     descripcion: "",
     captura: "campus",
     orden: 1,
+    carpeta_id: null,
+    created_by: null,
     created_at: "2026-08-01T00:00:00Z",
     hojas: [
       {
@@ -92,6 +94,8 @@ export const ESTRUCTURA: LibroCompleto[] = [
     descripcion: "",
     captura: "oficina",
     orden: 2,
+    carpeta_id: null,
+    created_by: null,
     created_at: "2026-08-01T00:00:00Z",
     hojas: [{ id: "h-conv", libro_id: "l-conv", nombre: "Vigentes", clase: "convenio", sentido: null, orden: 1, columnas: [col("h-conv", "institucion_contraparte", "Institución", "texto", 1)] }],
   },
@@ -127,8 +131,10 @@ export const FILAS: IntFilaRow[] = [
     datos: { programa: "Ingeniería de Sistemas", numero_documento: "1098765432", pais_contraparte: "México", fecha_inicio: "2026-08-17", fecha_fin: "2026-12-11", duracion_dias: 116 },
     orden: 1,
     origen: "manual",
+    archivo: null,
     created_by: null,
     updated_by: null,
+    created_at: "2026-10-01T00:00:00Z",
     updated_at: "2026-10-01T00:00:00Z",
   },
   {
@@ -139,8 +145,10 @@ export const FILAS: IntFilaRow[] = [
     datos: { programa: "Derecho", numero_documento: "1090123456", pais_contraparte: "Chile", fecha_inicio: "2026-09-14", fecha_fin: "2026-09-01", duracion_dias: null },
     orden: 1,
     origen: "excel",
+    archivo: "visitantes_cuc.xlsx",
     created_by: null,
     updated_by: null,
+    created_at: "2026-10-01T00:00:00Z",
     updated_at: "2026-10-01T00:00:00Z",
   },
 ];

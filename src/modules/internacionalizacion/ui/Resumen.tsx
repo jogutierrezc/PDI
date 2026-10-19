@@ -5,13 +5,14 @@ import { Link, useNavigate } from "react-router-dom";
 import { Carpetas } from "../../../components/espacio/Explorador";
 import "../../../components/espacio/espacio.css";
 import { useEntrada, useCrecer, useContador } from "./movimiento";
-import { useCifras, useConceptos, useEstructura, usePlantillas, useVentanas } from "../datos";
+import { useCarpetas, useCifras, useConceptos, useEstructura, usePlantillas, useVentanas } from "../datos";
+import { librosDe, librosEnRama } from "../lib/carpetas";
 import { cobertura, disponiblesDe } from "../lib/cobertura";
 import { ETIQUETA_ESTADO } from "../lib/permisos";
 import { AvisoMigracion, BarraEstados, Cargando, EstadoPill, ErrorCaja, fmt, LeyendaEstados, nombreCampus, Vacio } from "./comunes";
 import type { Ctx } from "./comunes";
 import { avancePorCampus, contarEstados, diasHasta, faltantes, fechaCorta } from "./logica";
-import { avanceLibro, carpetaDeLibro, CARPETAS_INT } from "./adaptador";
+import { avanceDeLibro } from "./adaptador";
 import { listaPlantillas } from "./plantillas-lista";
 import { FaltaMigracion } from "../datos";
 
@@ -35,6 +36,7 @@ export function Resumen({ ctx }: { ctx: Ctx }) {
   const navegar = useNavigate();
   const cifras = useCifras(periodo?.id);
   const estructura = useEstructura();
+  const carpetasQ = useCarpetas().data ?? [];
   const plantillas = usePlantillas();
   const conceptos = useConceptos();
   const ventanas = useVentanas(periodo?.id);
@@ -99,10 +101,15 @@ export function Resumen({ ctx }: { ctx: Ctx }) {
   const dias = diasHasta(periodo.cierra);
   const hojaDe = (id: string) => hojas.find((h) => h.id === id);
   const libros = estructura.data;
-  const carpetas = CARPETAS_INT.flatMap((c) => {
-    const dentro = libros.filter((l) => carpetaDeLibro(l) === c.id);
+  // Las carpetas de primer nivel (con todo lo que cuelga de ellas) y «Sin carpeta».
+  const grupos = [
+    ...carpetasQ.filter((c) => c.parent_id === null).map((c) => ({ id: c.id, nombre: c.nombre, dentro: librosEnRama(libros, carpetasQ, c.id) })),
+    { id: "sin", nombre: "Sin carpeta", dentro: librosDe(libros, null) },
+  ];
+  const carpetas = grupos.flatMap((c) => {
+    const dentro = c.dentro;
     if (!dentro.length) return [];
-    const a = dentro.map((l) => avanceLibro(l, avance, [...ids]));
+    const a = dentro.map((l) => avanceDeLibro(l, avance, [...ids]));
     const ap = a.reduce((n, x) => n + x.aprobadas, 0);
     const tot = a.reduce((n, x) => n + x.total, 0);
     return [{ id: c.id, nombre: c.nombre, subtitulo: `${dentro.length} ${dentro.length === 1 ? "tabla" : "tablas"} · ${fmt(ap)} de ${fmt(tot)} aprobadas` }];

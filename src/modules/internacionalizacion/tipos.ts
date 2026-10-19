@@ -20,6 +20,7 @@ import type {
 
 export type {
   IntCalculo,
+  IntCarpetaRow,
   IntColumnaRow,
   IntConceptoRow,
   IntEnvioHistorialRow,
@@ -55,6 +56,14 @@ export interface Yo {
   coordinador: string[];
   /** Campus donde es gestor. */
   gestor: string[];
+  /** Planeación (0166): ve y administra el módulo sin ser Director. */
+  planeacion?: boolean;
+  /** Puede crear carpetas y tablas por campus (Director, Planeación o un Coordinador). */
+  crea?: boolean;
+  /** Controla las tablas Multicampus (Director, Planeación o el Coordinador de Bucaramanga). */
+  multicampus?: boolean;
+  /** El campus central (Bucaramanga): sus Gestores y Coordinador editan las filas de todos en Multicampus. */
+  central?: string | null;
 }
 
 /** Lo mínimo de un concepto que usa la lógica pura (el catálogo de la base o CONCEPTOS_BASE). */

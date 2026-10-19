@@ -211,7 +211,7 @@ export const MODULES: ModuleDef[] = [
     id: "internacionalizacion",
     label: "Internacionalización",
     seenFrom: "admin",
-    screens: [{ id: "internacionalizacion", label: "Internacionalización", note: "director, coordinador y gestor entran por pertenencia, sin este rol" }],
+    screens: [{ id: "internacionalizacion", label: "Internacionalización", note: "director, coordinador y gestor entran por pertenencia, sin este rol; Planeación y la administración la ven siempre (0166)" }],
     levels: {
       ver: { hint: "Aparece en el menú de quien sea administrador.", needs: "consulta" },
       administrar: { hint: "Administra el módulo y sus miembros.", needs: "admin" },

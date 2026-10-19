@@ -103,6 +103,8 @@ export interface PropsEditor {
   /** Grupo de una fila nueva; nulo si no se pueden agregar filas. */
   grupoNuevo?: () => string | null | undefined;
   columnaGrupo?: { etiqueta: string; texto: (grupo: string | undefined) => string };
+  /** Columnas de solo lectura tras el grupo (autoría de cada fila). */
+  columnasInfo?: { etiqueta: string; ancho?: number; texto: (f: FilaLocal) => string }[];
   /** Pide confirmación antes de quitar filas. */
   confirmarQuitar?: boolean;
   /** Franja entre la cabecera y las herramientas (p. ej. el envío de una hoja). */
@@ -574,6 +576,7 @@ function Motor(p: PropsEditor) {
           onAgregar={agregar}
           bloqueoFila={p.bloqueoFila}
           columnaGrupo={p.columnaGrupo}
+          columnasInfo={p.columnasInfo}
           puedeAgregar={puedeAgregar}
           columnaEstado={
             manual

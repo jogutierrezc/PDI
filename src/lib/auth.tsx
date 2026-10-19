@@ -133,8 +133,8 @@ export function screenVisible(
   // Rankings (THE, UI GreenMetric y el recolector de noticias): solo por el rol, como en la base (0143).
   if (screen === "rankings") return RANK[profile.role] >= RANK.planeacion && listed;
   // Internacionalización: pertenecer al módulo (director, coordinador o gestor
-  // en int_miembros, 0151) ES el permiso, como en la base; la administración, siempre.
-  if (screen === "internacionalizacion") return RANK[profile.role] >= RANK.admin || Boolean(who.inInternacionalizacion);
+  // en int_miembros, 0151) ES el permiso, como en la base; Planeación y la administración, siempre (0166).
+  if (screen === "internacionalizacion") return RANK[profile.role] >= RANK.planeacion || Boolean(who.inInternacionalizacion);
   // Programas en Cifras: pertenecer a pc_miembros ES el permiso (0164); Planeación y la administración, todo.
   if (screen === "programas-en-cifras") return RANK[profile.role] >= RANK.planeacion || Boolean(who.inProgramasEnCifras);
   // Informes Institucionales: quien pertenece a una unidad escribe el suyo;

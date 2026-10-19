@@ -44,6 +44,8 @@ export interface HojaProps {
   bloqueoFila?: (f: FilaLocal) => string | null;
   /** Columna de solo lectura al comienzo con el grupo de la fila (p. ej. el campus). */
   columnaGrupo?: { etiqueta: string; texto: (grupo: string | undefined) => string };
+  /** Más columnas de solo lectura tras el grupo (p. ej. quién registró la fila, cuándo y de dónde). */
+  columnasInfo?: { etiqueta: string; ancho?: number; texto: (f: FilaLocal) => string }[];
   /** Última columna con el estado de cada fila (guardado manual). */
   columnaEstado?: { etiqueta: string; celda: (f: FilaLocal) => ReactNode };
   /** Se pueden agregar filas (muestra el botón del estado vacío). */
@@ -60,6 +62,7 @@ const ALTO_FILA = 34;
 const ANCHO_N = 44;
 const ANCHO_GRUPO = 140;
 const ANCHO_ESTADO = 130;
+const ANCHO_INFO = 150;
 
 export function anchoDe(c: Pick<EspColumna, "tipo" | "etiqueta">): number {
   if (c.tipo === "numero" || c.tipo === "porcentaje") return 128;
@@ -225,7 +228,8 @@ export const Hoja = forwardRef<HojaApi, HojaProps>(function Hoja(p, ref) {
 
   const g = p.columnaGrupo;
   const est = p.columnaEstado;
-  const izquierda = ANCHO_N + (g ? ANCHO_GRUPO : 0);
+  const info = p.columnasInfo ?? [];
+  const izquierda = ANCHO_N + (g ? ANCHO_GRUPO : 0) + info.reduce((s, x) => s + (x.ancho ?? ANCHO_INFO), 0);
   const ancho = columnas.reduce((s, c) => s + anchoDe(c), izquierda + (est ? ANCHO_ESTADO : 0));
   const primera = columnas[0]?.clave;
   // Antes de medir la ventana (y sin pantalla, como en el servidor y las pruebas) se pintan las primeras filas.
@@ -311,6 +315,11 @@ export const Hoja = forwardRef<HojaApi, HojaProps>(function Hoja(p, ref) {
               {g.etiqueta}
             </div>
           ) : null}
+          {info.map((x) => (
+            <div key={x.etiqueta} className="es-gh" role="columnheader" style={{ width: x.ancho ?? ANCHO_INFO }}>
+              {x.etiqueta}
+            </div>
+          ))}
           {columnas.map((c) => {
             const orden = p.ordenes.get(c.clave);
             const pin = p.fijarPrimera && c.clave === primera;
@@ -351,6 +360,11 @@ export const Hoja = forwardRef<HojaApi, HojaProps>(function Hoja(p, ref) {
                       {g.texto(f.grupo)}
                     </div>
                   ) : null}
+                  {info.map((x) => (
+                    <div key={x.etiqueta} className="es-gc es-gc--lk" role="gridcell" style={{ width: x.ancho ?? ANCHO_INFO }} title={x.texto(f)}>
+                      {x.texto(f)}
+                    </div>
+                  ))}
                   {columnas.map((c) => {
                     const pin = p.fijarPrimera && c.clave === primera;
                     const estilo = { width: anchoDe(c), left: pin ? izquierda : undefined };

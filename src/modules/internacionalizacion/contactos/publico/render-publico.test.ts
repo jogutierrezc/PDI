@@ -14,7 +14,9 @@ import { ContactosPublico } from "./ContactosPublico";
 import { ImportarArchivo } from "./ImportarArchivo";
 import { UnoAUno } from "./UnoAUno";
 
-vi.mock("../../../../lib/supabase", () => ({ supabase: { functions: { invoke: vi.fn() } } }));
+vi.mock("../../../../lib/supabase", () => ({
+  supabase: { functions: { invoke: vi.fn() }, auth: { getSession: vi.fn(), signOut: vi.fn(), signInWithOAuth: vi.fn() } },
+}));
 
 const TOKEN = "7Kq9x2mVb4zQ";
 const info: InvitacionPublica = {
@@ -57,17 +59,50 @@ function pagina(inv: Partial<InvitacionPublica> | null, s: Sesion | null = null,
 beforeEach(() => window.sessionStorage.clear());
 
 describe("el enlace de invitación", () => {
-  it("sin sesión pide nombre, cargo en la UDES y correo institucional, con el aviso de datos", () => {
+  it("sin sesión abre con el titular de Pilo, la puerta de Microsoft y el formulario", () => {
     const t = pagina({}, null);
-    expect(t).toContain("Comparta los contactos que ya conoce");
+    expect(t).toContain("Primero necesitamos saber quién es usted.");
+    expect(t).toContain("Son tres datos y menos de un minuto.");
+    expect(t).toContain("Continuar con Microsoft");
     expect(t).toContain("Nombre completo");
     expect(t).toContain("Cargo en la UDES");
     expect(t).toContain("Correo institucional");
-    expect(t).toContain("@udes.edu.co");
     expect(t).toContain("Acepto el tratamiento de los datos");
+    expect(t).toContain("por aprobar");
     expect(t).toContain("Contactos 2026-2 · Cúcuta");
     expect(t).toContain("Continuar");
+    expect(t).toContain("Mr. Pilo");
     expect(t).not.toContain("Uno a uno");
+  });
+
+  it("el correo sugiere los cinco dominios de la UDES, con el del campus del enlace por defecto", () => {
+    const html = renderToString(h(QueryClientProvider, { client: cliente({}, null) }, h(MemoryRouter, { initialEntries: [`/contactos/i/${TOKEN}`] }, h(Routes, null, h(Route, { path: "/contactos/i/:token", element: h(ContactosPublico) })))));
+    const t = texto(html);
+    for (const d of ["udes.edu.co", "valledupar.udes.edu.co", "cucuta.udes.edu.co", "bogota.udes.edu.co", "mail.udes.edu.co"]) {
+      expect(t).toContain(`@${d}`);
+      expect(html).toContain(`value="${d}"`);
+    }
+    // Enlace de Cúcuta: el dominio de Cúcuta viene elegido.
+    expect(html).toMatch(/<option value="cucuta\.udes\.edu\.co" selected/);
+    // Y los dominios de la invitación se suman a los cinco.
+    expect(pagina({ dominios: ["udes.edu.co", "aliado.org"] }, null)).toContain("@aliado.org");
+  });
+
+  it("tiene un interruptor de tema Claro / Oscuro / Automático", () => {
+    const t = pagina({}, null);
+    expect(t).toContain("Claro");
+    expect(t).toContain("Oscuro");
+    expect(t).toContain("Automático");
+    expect(renderToString(h(QueryClientProvider, { client: cliente({}, null) }, h(MemoryRouter, { initialEntries: [`/contactos/i/${TOKEN}`] }, h(Routes, null, h(Route, { path: "/contactos/i/:token", element: h(ContactosPublico) })))))).toContain('role="radiogroup" aria-label="Tema de la página"');
+  });
+
+  it("el pie y los avisos nombran a Planeación Institucional, no a Internacionalización", () => {
+    const t = pagina({}, null);
+    expect(t).toContain("Universidad de Santander · Planeación Institucional");
+    expect(t).not.toContain("Oficina de Internacionalización");
+    expect(t).not.toContain("Relaciones Internacionales");
+    expect(pagina({ estado: "pausada" }, null)).toContain("Planeación Institucional");
+    expect(pagina({ estado: "vencida" }, null)).toContain("pida a Planeación Institucional");
   });
 
   it("si la invitación no trae campus, la persona lo elige", () => {
@@ -110,16 +145,17 @@ describe("los formularios salen de las plantillas de Rua", () => {
   const renderizar = (el: ReturnType<typeof h>) => texto(renderToString(h(QueryClientProvider, { client: cliente({}, sesion) }, el)));
 
   it("académico: las once columnas, con la cabecera original entre paréntesis", () => {
-    const t = renderizar(h(UnoAUno, { token: TOKEN, sesion, tipo: "academico", onVolver: () => undefined, onListo: () => undefined, onSesionVencida: () => undefined }));
+    const t = renderizar(h(UnoAUno, { token: TOKEN, sesion, tipo: "academico", onVolver: () => undefined, onTerminado: () => undefined, onSesionVencida: () => undefined }));
     for (const c of ["Source", "Title", "First Name", "Last Name", "Job Title", "Department", "Institution", "Country or Territory", "Email", "Subject", "Phone (Optional)"]) expect(t).toContain(`(${c})`);
     expect(t).toContain("Nombres *");
     expect(t).toContain("Correo *");
     expect(t).toContain("Enviar y agregar otro");
-    expect(t).toContain("Ana Gómez");
+    expect(t).toContain("Terminar y enviar");
+    expect(t).toContain("1 enviado hasta ahora");
   });
 
   it("empleador: las diez columnas, con sector y empresa en lugar de departamento e institución", () => {
-    const t = renderizar(h(UnoAUno, { token: TOKEN, sesion, tipo: "empleador", onVolver: () => undefined, onListo: () => undefined, onSesionVencida: () => undefined }));
+    const t = renderizar(h(UnoAUno, { token: TOKEN, sesion, tipo: "empleador", onVolver: () => undefined, onTerminado: () => undefined, onSesionVencida: () => undefined }));
     expect(t).toContain("(Position)");
     expect(t).toContain("(Industry)");
     expect(t).toContain("(Company Name)");
@@ -128,13 +164,13 @@ describe("los formularios salen de las plantillas de Rua", () => {
   });
 
   it("importar: ofrece la plantilla del tipo con su número de columnas", () => {
-    const ac = renderizar(h(ImportarArchivo, { token: TOKEN, sesion, tipo: "academico", onVolver: () => undefined, onSesionVencida: () => undefined }));
+    const ac = renderizar(h(ImportarArchivo, { token: TOKEN, sesion, tipo: "academico", onVolver: () => undefined, onEnviado: () => undefined, onSesionVencida: () => undefined }));
     expect(ac).toContain("Descargue la plantilla");
     expect(ac).toContain("11 columnas");
     expect(ac).toContain("Excel (.xlsx)");
     expect(ac).toContain("CSV");
     expect(ac).toContain("Arrastre aquí su Excel o CSV");
-    const em = renderizar(h(ImportarArchivo, { token: TOKEN, sesion, tipo: "empleador", onVolver: () => undefined, onSesionVencida: () => undefined }));
+    const em = renderizar(h(ImportarArchivo, { token: TOKEN, sesion, tipo: "empleador", onVolver: () => undefined, onEnviado: () => undefined, onSesionVencida: () => undefined }));
     expect(em).toContain("10 columnas");
   });
 });

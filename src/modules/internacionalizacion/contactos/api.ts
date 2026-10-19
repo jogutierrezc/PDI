@@ -38,6 +38,8 @@ export interface Sesion {
   correo: string;
   campus_id: string;
   enviados: number;
+  /** El correo lo confirmó Microsoft (migración 0171); a mano queda sin confirmar. */
+  correo_verificado?: boolean;
 }
 
 export interface RespuestaRevisar {
@@ -75,8 +77,8 @@ export class ErrorContactos extends Error {
   }
 }
 
-async function llamar<T>(accion: string, token: string, cuerpo: Record<string, unknown> = {}): Promise<T> {
-  const r = await supabase.functions.invoke("int-contactos", { body: { action: accion, token, web: "", ...cuerpo } });
+async function llamar<T>(accion: string, token: string, cuerpo: Record<string, unknown> = {}, headers?: Record<string, string>): Promise<T> {
+  const r = await supabase.functions.invoke("int-contactos", { body: { action: accion, token, web: "", ...cuerpo }, ...(headers ? { headers } : {}) });
   if (r.error) {
     const ctx = (r.error as { context?: Response }).context;
     let mensaje = "No se pudo conectar. Revise su internet e intente de nuevo.";
@@ -97,6 +99,70 @@ export const infoInvitacion = (token: string) => llamar<InvitacionPublica>("info
 
 export const identificar = (token: string, d: { nombre: string; cargo: string; correo: string; campus_id: string | null }) =>
   llamar<Sesion>("identificar", token, d);
+
+/* ---------- Continuar con Microsoft ----------------------------------------------------- */
+
+export interface DatosMicrosoft {
+  nombre: string;
+  correo: string;
+}
+
+const conJwt = (jwt: string) => ({ Authorization: `Bearer ${jwt}` });
+
+/** Lo que Microsoft dice de la cuenta (nombre y correo), ya comprobado el dominio. No guarda nada. */
+export const datosMicrosoft = (token: string, jwt: string) => llamar<DatosMicrosoft>("microsoft_datos", token, {}, conJwt(jwt));
+
+/** Identifica a la persona con su cuenta de Microsoft: pide solo el cargo (y el campus si el enlace no lo fija). */
+export const identificarMicrosoft = (token: string, jwt: string, d: { cargo: string; campus_id: string | null; nombre?: string }) =>
+  llamar<Sesion>("identificar_microsoft", token, d, conJwt(jwt));
+
+/** Abre Microsoft (proveedor Azure de Supabase) y vuelve a esta misma dirección. El navegador sale de la página. */
+export async function iniciarMicrosoft(token: string): Promise<void> {
+  marcarSalidaMicrosoft(token);
+  const { error } = await supabase.auth.signInWithOAuth({
+    provider: "azure",
+    options: { scopes: "email", redirectTo: `${window.location.origin}${window.location.pathname}` },
+  });
+  if (error) {
+    consumirRegresoMicrosoft(token);
+    throw error;
+  }
+}
+
+/** Cierra la sesión de Supabase de este navegador (solo local): quien entró por Microsoft no queda con una sesión de intranet. */
+export async function cerrarSesionMicrosoft(): Promise<void> {
+  try {
+    await supabase.auth.signOut({ scope: "local" });
+  } catch {
+    // sin sesión que cerrar
+  }
+}
+
+/** El token de la sesión de Microsoft que dejó el regreso, si hay una. */
+export async function tokenDeMicrosoft(): Promise<string | null> {
+  const { data } = await supabase.auth.getSession();
+  return data.session?.access_token ?? null;
+}
+
+/** Marca que la persona salió hacia Microsoft desde este enlace, para reconocer su regreso (y no confundir una sesión de intranet). */
+const llaveMs = (token: string) => `int-contactos-ms:${token}`;
+export function marcarSalidaMicrosoft(token: string): void {
+  try {
+    window.sessionStorage.setItem(llaveMs(token), String(Date.now()));
+  } catch {
+    // sin almacenamiento: no se podrá reconocer el regreso
+  }
+}
+/** ¿Volvió de Microsoft? Lee y borra la marca; vale 15 minutos. */
+export function consumirRegresoMicrosoft(token: string): boolean {
+  try {
+    const t = Number(window.sessionStorage.getItem(llaveMs(token)));
+    window.sessionStorage.removeItem(llaveMs(token));
+    return Number.isFinite(t) && t > 0 && Date.now() - t < 15 * 60_000;
+  } catch {
+    return false;
+  }
+}
 
 const conSesion = (s: Sesion) => ({ aportante_id: s.aportante_id, sesion: s.sesion });
 

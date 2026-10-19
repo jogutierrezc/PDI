@@ -7,7 +7,7 @@
    envían: se descargan aparte para corregirlas en el archivo y volver a subirlo.
    ========================================================================== */
 
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type { DragEvent } from "react";
 import { aCsv, MAX_FILAS_ARCHIVO, MAX_FILAS_POR_ENVIO, plantillaDeTipo, validarFila } from "../../../../../supabase/functions/int-contactos/contactos";
 import type { AccionFila, FilaEnvio, ResultadoFila, TipoContacto } from "../../../../../supabase/functions/int-contactos/contactos";
@@ -15,8 +15,24 @@ import { enviar, revisar, sesionVencida, TEXTO_ACCION } from "../api";
 import type { Sesion } from "../api";
 import { descargar, descargarPlantillaCsv, descargarPlantillaXlsx, leerArchivo } from "../archivos";
 import type { ArchivoLeido } from "../archivos";
+import { useDecir } from "./GuiaPilo";
 
-type Fase = "inicio" | "leyendo" | "revisado" | "enviando" | "enviado";
+type Fase = "inicio" | "leyendo" | "revisado" | "enviando";
+
+/** Lo que Pilo dice al terminar de revisar: cuántas filas están listas y cuáles necesitan una mirada. */
+function resumenPilo(resultados: readonly ResultadoFila[]): string {
+  const listas = resultados.filter((r) => r.accion === "crear" || r.accion === "actualizar").length;
+  const errores = resultados.filter((r) => r.accion === "error");
+  const avisos = resultados.filter((r) => r.accion !== "error" && r.avisos.length > 0);
+  const ya = resultados.filter((r) => r.accion === "omitir").length;
+  const partes: string[] = [];
+  if (listas) partes.push(listas === 1 ? "Hay 1 fila lista" : `Hay ${listas} filas listas`);
+  else partes.push("Ninguna fila quedó lista para enviar");
+  if (avisos.length) partes.push(`${avisos.length} con aviso (${avisos[0].avisos[0].replace(/\.$/, "")})`);
+  if (ya) partes.push(`${ya} ya estaban`);
+  if (errores.length) partes.push(`${errores.length} con error: ${errores.slice(0, 3).map((r) => `la ${r.fila}`).join(", ")}${errores.length > 3 ? "…" : ""}`);
+  return `${partes.join("; ")}. ${errores.length ? "Puede corregirlas en el archivo y volver a subirlo, o enviar las que están bien." : "Si todo le parece bien, envíelas."}`;
+}
 
 const trozos = <T,>(xs: readonly T[], n: number): T[][] => Array.from({ length: Math.ceil(xs.length / n) }, (_, i) => xs.slice(i * n, i * n + n));
 
@@ -25,15 +41,19 @@ export function ImportarArchivo({
   sesion,
   tipo,
   onVolver,
+  onEnviado,
   onSesionVencida,
 }: {
   token: string;
   sesion: Sesion;
   tipo: TipoContacto;
   onVolver: () => void;
+  /** Se envió bien: cuántos contactos entraron (nuevos y actualizados). La pantalla de arriba muestra el «recibido». */
+  onEnviado: (contactos: number) => void;
   onSesionVencida: () => void;
 }) {
   const plantilla = plantillaDeTipo(tipo);
+  const decir = useDecir();
   const [fase, setFase] = useState<Fase>("inicio");
   const [archivo, setArchivo] = useState<ArchivoLeido | null>(null);
   const [resultados, setResultados] = useState<ResultadoFila[]>([]);
@@ -44,16 +64,24 @@ export function ImportarArchivo({
   const [limite, setLimite] = useState<{ enviados: number; limite: number } | null>(null);
   const entrada = useRef<HTMLInputElement>(null);
 
+  useEffect(() => {
+    decir("Primero descargue la plantilla, llénela con sus contactos y súbala aquí. Yo la reviso fila por fila.", "idea");
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- solo al entrar
+  }, [tipo]);
+
   const crudaDe = useMemo(() => new Map((archivo?.lectura.filas ?? []).map((f) => [f.fila, f.cruda])), [archivo]);
   const cuenta = useMemo(() => {
     const c: Record<AccionFila, number> = { crear: 0, actualizar: 0, omitir: 0, error: 0 };
     for (const r of resultados) c[r.accion]++;
     return c;
   }, [resultados]);
+  const conAviso = useMemo(() => resultados.filter((r) => r.accion !== "error" && r.avisos.length > 0).length, [resultados]);
 
   const fallo = (e: unknown) => {
     if (sesionVencida(e)) return onSesionVencida();
-    setError(e instanceof Error ? e.message : "Algo falló. Intente de nuevo.");
+    const m = e instanceof Error ? e.message : "Algo falló. Intente de nuevo.";
+    setError(m);
+    decir(m.length > 220 ? "Hay un problema con el archivo. Lea el aviso de abajo." : m, "duda");
   };
 
   const reiniciar = () => {
@@ -84,6 +112,7 @@ export function ImportarArchivo({
   const alElegir = async (f: File) => {
     reiniciar();
     setFase("leyendo");
+    decir("Estoy leyendo su archivo, fila por fila…", "piensa");
     try {
       const leido = await leerArchivo(f, plantilla);
       const { filaEncabezado, emparejo, filas } = leido.lectura;
@@ -100,9 +129,11 @@ export function ImportarArchivo({
         todos = todos.concat(r.resultados);
         ultimo = { enviados: r.enviados, limite: r.limite };
       }
-      setResultados(todos.sort((a, b) => a.fila - b.fila));
+      const ordenados = todos.sort((a, b) => a.fila - b.fila);
+      setResultados(ordenados);
       setLimite(ultimo);
       setFase("revisado");
+      decir(resumenPilo(ordenados), ordenados.some((r) => r.accion === "crear" || r.accion === "actualizar") ? "bien" : "duda");
     } catch (e) {
       setFase("inicio");
       fallo(e);
@@ -113,6 +144,7 @@ export function ImportarArchivo({
     if (!archivo) return;
     setFase("enviando");
     setError(null);
+    decir("Enviando sus contactos, ya casi.", "piensa");
     const buenas = archivo.lectura.filas.filter((f) => ["crear", "actualizar"].includes(resultados.find((r) => r.fila === f.fila)?.accion ?? "")).map((f) => ({ fila: f.fila, cruda: f.cruda }));
     const lotes = trozos(buenas, MAX_FILAS_POR_ENVIO);
     setProgreso({ hechas: 0, total: buenas.length });
@@ -126,8 +158,14 @@ export function ImportarArchivo({
         setProgreso({ hechas, total: buenas.length });
         setLimite({ enviados: r.enviados, limite: r.limite });
       }
-      setResultados(finales.sort((a, b) => a.fila - b.fila));
-      setFase("enviado");
+      const ordenados = finales.sort((a, b) => a.fila - b.fila);
+      setResultados(ordenados);
+      const recibidos = ordenados.filter((r) => r.accion === "crear" || r.accion === "actualizar").length;
+      if (recibidos === 0) {
+        setFase("revisado");
+        return fallo(new Error("No entró ningún contacto. Revise las filas e intente de nuevo."));
+      }
+      onEnviado(recibidos);
     } catch (e) {
       // Lo que alcanzó a entrar queda; se vuelve a revisar el archivo para ver qué falta.
       fallo(e);
@@ -152,58 +190,77 @@ export function ImportarArchivo({
   const filasVista = (soloErrores ? resultados.filter((r) => r.accion === "error") : resultados).slice(0, 200);
   const validas = cuenta.crear + cuenta.actualizar;
   const ocupado = fase === "leyendo" || fase === "enviando";
+  const pedirPlantilla = (descarga: () => void) => () => {
+    decir("Ahí va la plantilla. Llénela con calma y vuelva cuando la tenga lista; aquí lo espero.", "feliz");
+    descarga();
+  };
 
   return (
-    <div className="cp-card" data-entra>
-      <div className="cp-acciones">
-        <h1>{tipo === "academico" ? "Importar contactos académicos" : "Importar contactos de empleadores"}</h1>
-        <button type="button" className="cp-btn" onClick={onVolver} disabled={ocupado}>
-          Volver
-        </button>
+    <div className="cp-panel" data-entra>
+      <div data-entra>
+        <h2>Su archivo, en tres pasos</h2>
+        <p className="cp-sub">{tipo === "academico" ? "Contactos académicos" : "Contactos de empleadores"}</p>
       </div>
 
-      <div className="cp-paso" data-entra>
-        <b>1 · Descargue la plantilla</b>
-        <p className="cp-ayuda">
-          Tiene {plantilla.columnas.length} columnas, en su orden, y una hoja de instrucciones. No cambie los encabezados.
-        </p>
-        <div style={{ display: "flex", gap: "var(--space-3)", flexWrap: "wrap" }}>
-          <button type="button" className="cp-btn" onClick={() => void descargarPlantillaXlsx(plantilla)}>
-            Excel (.xlsx)
-          </button>
-          <button type="button" className="cp-btn" onClick={() => descargarPlantillaCsv(plantilla)}>
-            CSV
-          </button>
-        </div>
-      </div>
-
-      <div className="cp-paso" data-entra>
-        <b>2 · Suba su archivo</b>
-        <div
-          className="cp-suelta"
-          data-encima={encima}
-          onDragOver={(e) => {
-            e.preventDefault();
-            setEncima(true);
-          }}
-          onDragLeave={() => setEncima(false)}
-          onDrop={soltar}
-        >
-          <div style={{ flex: 1 }}>
-            <b>{archivo ? archivo.nombre : "Arrastre aquí su Excel o CSV"}</b>
-            <p className="cp-ayuda">{archivo ? `${archivo.lectura.filas.length} filas leídas en este equipo.${archivo.hoja ? ` Hoja: ${archivo.hoja}.` : ""} Aún no se ha enviado nada.` : "Se lee en su equipo; hasta que usted envíe, nada sale de él."}</p>
+      <ol className="cp-como" data-entra>
+        <li>
+          <i>1</i>
+          <div>
+            <b>Descargue la plantilla</b>
+            <span>Tiene {plantilla.columnas.length} columnas, en su orden, y una hoja de instrucciones. No cambie los encabezados.</span>
+            <span className="cp-grupo">
+              <button type="button" className="cp-btn cp-btn--suave" onClick={pedirPlantilla(() => void descargarPlantillaXlsx(plantilla))}>
+                Excel (.xlsx)
+              </button>
+              <button type="button" className="cp-btn cp-btn--suave" onClick={pedirPlantilla(() => descargarPlantillaCsv(plantilla))}>
+                CSV
+              </button>
+            </span>
           </div>
-          <button type="button" className="cp-btn" disabled={ocupado} onClick={() => entrada.current?.click()}>
-            {archivo ? "Cambiar archivo" : "Elegir archivo"}
-          </button>
-          <input ref={entrada} className="cp-sr" type="file" accept=".xlsx,.csv,.txt" aria-label="Archivo de contactos" onChange={(e) => e.target.files?.[0] && void alElegir(e.target.files[0])} />
+        </li>
+        <li>
+          <i>2</i>
+          <div>
+            <b>Llénela con sus contactos</b>
+            <span>Una fila por persona. No cambie los títulos de las columnas.</span>
+          </div>
+        </li>
+        <li>
+          <i>3</i>
+          <div>
+            <b>Súbala aquí</b>
+            <span>
+              Excel (.xlsx) o CSV. Hasta {MAX_FILAS_ARCHIVO} filas; se envían en tandas de {MAX_FILAS_POR_ENVIO}.
+            </span>
+          </div>
+        </li>
+      </ol>
+
+      <div
+        className="cp-suelta"
+        data-encima={encima}
+        data-entra
+        onDragOver={(e) => {
+          e.preventDefault();
+          setEncima(true);
+        }}
+        onDragLeave={() => setEncima(false)}
+        onDrop={soltar}
+      >
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <b>{archivo ? archivo.nombre : "Arrastre aquí su Excel o CSV"}</b>
+          <p className="cp-ayuda">{archivo ? `${archivo.lectura.filas.length} filas leídas en este equipo.${archivo.hoja ? ` Hoja: ${archivo.hoja}.` : ""} Aún no se ha enviado nada.` : "Se lee en su equipo; hasta que usted envíe, nada sale de él."}</p>
         </div>
-        {fase === "leyendo" && (
-          <p role="status" className="cp-ayuda">
-            Leyendo y revisando el archivo…
-          </p>
-        )}
+        <button type="button" className="cp-btn cp-btn--suave" disabled={ocupado} onClick={() => entrada.current?.click()}>
+          {archivo ? "Cambiar archivo" : "Elegir archivo"}
+        </button>
+        <input ref={entrada} className="cp-sr" type="file" accept=".xlsx,.csv,.txt" aria-label="Archivo de contactos" onChange={(e) => e.target.files?.[0] && void alElegir(e.target.files[0])} />
       </div>
+      {fase === "leyendo" && (
+        <p role="status" className="cp-ayuda">
+          Leyendo y revisando el archivo…
+        </p>
+      )}
 
       {error && (
         <p className="cp-aviso is-mal" role="alert">
@@ -211,19 +268,20 @@ export function ImportarArchivo({
         </p>
       )}
 
-      {(fase === "revisado" || fase === "enviando" || fase === "enviado") && (
-        <div className="cp-paso" data-entra>
-          <div style={{ display: "flex", gap: "var(--space-2)", alignItems: "center", flexWrap: "wrap" }}>
-            <b>{fase === "enviado" ? "Listo: esto fue lo que pasó" : "3 · Revise antes de enviar"}</b>
-            <span className="cp-chip is-crear">{cuenta.crear} {fase === "enviado" ? "enviadas" : "nuevas"}</span>
-            {cuenta.actualizar > 0 && <span className="cp-chip is-actualizar">{cuenta.actualizar} {fase === "enviado" ? "actualizadas" : "se actualizarán"}</span>}
+      {(fase === "revisado" || fase === "enviando") && (
+        <div className="cp-resultado" data-entra>
+          <div className="cp-pastillas">
+            <span className="cp-chip is-crear">
+              {validas} {validas === 1 ? "lista" : "listas"}
+            </span>
+            {conAviso > 0 && <span className="cp-chip is-aviso">{conAviso} con aviso</span>}
             {cuenta.omitir > 0 && <span className="cp-chip">{cuenta.omitir} ya estaban</span>}
             {cuenta.error > 0 && <span className="cp-chip is-error">{cuenta.error} con error</span>}
           </div>
 
           {cuenta.error > 0 && (
-            <label style={{ display: "flex", gap: "var(--space-2)", alignItems: "center" }}>
-              <input type="checkbox" checked={soloErrores} onChange={(e) => setSoloErrores(e.target.checked)} /> Ver solo las filas con error
+            <label className="cp-check">
+              <input type="checkbox" checked={soloErrores} onChange={(e) => setSoloErrores(e.target.checked)} /> <span>Ver solo las filas con error</span>
             </label>
           )}
 
@@ -260,7 +318,11 @@ export function ImportarArchivo({
               </tbody>
             </table>
           </div>
-          {resultados.length > filasVista.length && <p className="cp-ayuda">Se muestran las primeras {filasVista.length} de {resultados.length} filas.</p>}
+          {resultados.length > filasVista.length && (
+            <p className="cp-ayuda">
+              Se muestran las primeras {filasVista.length} de {resultados.length} filas.
+            </p>
+          )}
 
           {fase === "enviando" && (
             <div className="cp-progreso" role="progressbar" aria-valuemin={0} aria-valuemax={progreso.total} aria-valuenow={progreso.hechas} aria-label="Contactos enviados">
@@ -270,38 +332,28 @@ export function ImportarArchivo({
 
           <div className="cp-acciones">
             <span className="cp-ayuda">
-              {fase === "enviado"
-                ? limite
-                  ? `Lleva ${limite.enviados} de ${limite.limite} contactos permitidos.`
-                  : ""
-                : cuenta.error > 0
-                  ? `Las ${cuenta.error} filas con error no se envían. Corríjalas en su archivo y súbalo de nuevo.`
-                  : "Todo está en orden."}
+              {limite ? `Lleva ${limite.enviados} de ${limite.limite} contactos permitidos. ` : ""}
+              {cuenta.error > 0 ? `Las ${cuenta.error} filas con error no se envían.` : ""}
             </span>
-            <span style={{ display: "flex", gap: "var(--space-3)", flexWrap: "wrap" }}>
+            <span className="cp-grupo">
               {cuenta.error > 0 && (
-                <button type="button" className="cp-btn" onClick={descargarErrores}>
+                <button type="button" className="cp-btn cp-btn--suave" onClick={descargarErrores}>
                   Descargar las filas con error
                 </button>
               )}
-              {fase === "enviado" ? (
-                <>
-                  <button type="button" className="cp-btn" onClick={reiniciar}>
-                    Subir otro archivo
-                  </button>
-                  <button type="button" className="cp-btn cp-btn--pri" onClick={onVolver}>
-                    Terminar
-                  </button>
-                </>
-              ) : (
-                <button type="button" className="cp-btn cp-btn--pri" disabled={validas === 0 || fase === "enviando"} onClick={() => void alEnviar()}>
-                  {fase === "enviando" ? `Enviando ${progreso.hechas} de ${progreso.total}…` : `Enviar ${validas} ${validas === 1 ? "contacto" : "contactos"}`}
-                </button>
-              )}
+              <button type="button" className="cp-btn cp-btn--pri" disabled={validas === 0 || fase === "enviando"} onClick={() => void alEnviar()}>
+                {fase === "enviando" ? `Enviando ${progreso.hechas} de ${progreso.total}…` : `Enviar ${validas} ${validas === 1 ? "contacto" : "contactos"}`}
+              </button>
             </span>
           </div>
         </div>
       )}
+
+      <div className="cp-acciones">
+        <button type="button" className="cp-btn cp-btn--suave" onClick={onVolver} disabled={ocupado}>
+          Volver
+        </button>
+      </div>
     </div>
   );
 }

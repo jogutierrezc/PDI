@@ -2,7 +2,12 @@ import { describe, expect, it } from "vitest";
 import {
   aCsv,
   combinarResultados,
+  analizarCorreo,
   correoPermitido,
+  DOMINIOS_INSTITUCIONALES,
+  dominioDeCampus,
+  dominiosAceptados,
+  dominiosSugeridos,
   crudaDesdeDatos,
   emparejarEncabezados,
   filaParaExportar,
@@ -190,5 +195,63 @@ describe("un envío completo", () => {
     const todo = combinarResultados(locales, [{ fila: 5, accion: "actualizar", motivo: null }, { fila: 2, accion: "crear", motivo: null }], avisos);
     expect(todo.map((r) => r.fila)).toEqual([2, 3, 4, 5]);
     expect(totales(todo)).toEqual({ crear: 1, actualizar: 1, omitir: 0, error: 2 });
+  });
+});
+
+describe("dominios institucionales de la UDES", () => {
+  const CINCO = ["udes.edu.co", "valledupar.udes.edu.co", "cucuta.udes.edu.co", "bogota.udes.edu.co", "mail.udes.edu.co"];
+
+  it("se sugieren los cinco, y después los de la invitación, sin repetir", () => {
+    expect(DOMINIOS_INSTITUCIONALES).toEqual(CINCO);
+    expect(dominiosSugeridos([])).toEqual(CINCO);
+    expect(dominiosSugeridos(["udes.edu.co", "@Aliado.org", " aliado.org "])).toEqual([...CINCO, "aliado.org"]);
+  });
+
+  it("se aceptan siempre los cinco además de los de la invitación; sin dominios no se restringe", () => {
+    expect(dominiosAceptados(["aliado.org"])).toEqual([...CINCO, "aliado.org"]);
+    expect(dominiosAceptados(["udes.edu.co"])).toEqual(CINCO);
+    expect(dominiosAceptados([])).toEqual([]);
+    // Una invitación vieja que solo permitía otro dominio igual deja entrar a la UDES.
+    expect(validarAportante({ nombre: "Ana Gómez", cargo: "Docente", correo: "ana@bogota.udes.edu.co" }, ["aliado.org"]).errores).toEqual([]);
+    expect(validarAportante({ nombre: "Ana Gómez", cargo: "Docente", correo: "ana@aliado.org" }, ["aliado.org"]).errores).toEqual([]);
+    expect(validarAportante({ nombre: "Ana Gómez", cargo: "Docente", correo: "ana@falsoudes.edu.co" }, ["aliado.org"]).errores[0]).toMatch(/correo institucional.*@mail\.udes\.edu\.co/);
+    expect(validarAportante({ nombre: "Ana Gómez", cargo: "Docente", correo: "ana@gmail.com" }, []).errores).toEqual([]);
+  });
+
+  it("al campus le toca su dominio; sin reconocerlo, udes.edu.co", () => {
+    expect(dominioDeCampus("Valledupar")).toBe("valledupar.udes.edu.co");
+    expect(dominioDeCampus("Cúcuta")).toBe("cucuta.udes.edu.co");
+    expect(dominioDeCampus("BOGOTÁ")).toBe("bogota.udes.edu.co");
+    expect(dominioDeCampus("Bucaramanga")).toBe("udes.edu.co");
+    expect(dominioDeCampus(null)).toBe("udes.edu.co");
+  });
+
+  const acept = dominiosAceptados(["udes.edu.co"]);
+  it("lo que va antes de la arroba usa el dominio elegido", () => {
+    expect(analizarCorreo("LMendoza", "cucuta.udes.edu.co", acept)).toMatchObject({ estado: "ok", local: "LMendoza", dominio: "cucuta.udes.edu.co", correo: "lmendoza@cucuta.udes.edu.co", separado: false });
+    expect(analizarCorreo("", "udes.edu.co", acept).estado).toBe("vacio");
+    expect(analizarCorreo("l mendoza", "udes.edu.co", acept).correo).toBe("lmendoza@udes.edu.co");
+    expect(analizarCorreo("l$mendoza", "udes.edu.co", acept).estado).toBe("invalido");
+  });
+
+  it("si trae arroba, reconoce y separa el dominio", () => {
+    for (const d of CINCO) expect(analizarCorreo(`lmendoza@${d}`, "udes.edu.co", acept)).toMatchObject({ estado: "ok", local: "lmendoza", dominio: d, separado: true, correo: `lmendoza@${d}` });
+    expect(analizarCorreo("LMendoza@MAIL.UDES.EDU.CO", "udes.edu.co", acept)).toMatchObject({ dominio: "mail.udes.edu.co", correo: "lmendoza@mail.udes.edu.co" });
+    // un subdominio que la regla ya permite también se reconoce
+    expect(analizarCorreo("ana@facultad.udes.edu.co", "udes.edu.co", acept)).toMatchObject({ estado: "ok", dominio: "facultad.udes.edu.co" });
+  });
+
+  it("mientras escribe el dominio no regaña; un dominio ajeno completo, sí", () => {
+    expect(analizarCorreo("lmendoza@", "udes.edu.co", acept).estado).toBe("escribiendo");
+    expect(analizarCorreo("lmendoza@ude", "udes.edu.co", acept).estado).toBe("escribiendo");
+    expect(analizarCorreo("lmendoza@gmail", "udes.edu.co", acept).estado).toBe("escribiendo");
+    expect(analizarCorreo("lmendoza@gmail.com", "udes.edu.co", acept)).toMatchObject({ estado: "dominio_no_permitido", escrito: "gmail.com", correo: "" });
+    expect(analizarCorreo("ana@falsoudes.edu.co", "udes.edu.co", acept).estado).toBe("dominio_no_permitido");
+  });
+
+  it("un dominio que suma la invitación se reconoce; sin restricción, cualquiera", () => {
+    const s = dominiosSugeridos(["aliado.org"]);
+    expect(analizarCorreo("ana@aliado.org", "udes.edu.co", dominiosAceptados(["aliado.org"]), s)).toMatchObject({ estado: "ok", dominio: "aliado.org" });
+    expect(analizarCorreo("ana@gmail.com", "udes.edu.co", [], dominiosSugeridos([]))).toMatchObject({ estado: "ok", dominio: "gmail.com" });
   });
 });

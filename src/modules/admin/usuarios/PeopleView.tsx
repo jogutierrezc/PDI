@@ -273,6 +273,12 @@ function PersonDetail({
   const queryClient = useQueryClient();
   const [error, setError] = useState("");
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const [editingName, setEditingName] = useState(false);
+  const [nameDraft, setNameDraft] = useState(person.full_name);
+  useEffect(() => {
+    setEditingName(false);
+    setNameDraft(person.full_name);
+  }, [person.id, person.full_name]);
   const offer = useProgramOffer().data;
   const pcRows = usePcNombramientos(person.id).data;
   const pcSignature = JSON.stringify(pcRows ?? []);
@@ -340,10 +346,49 @@ function PersonDetail({
             {initials(name)}
           </span>
           <div>
-            <h2 id="persona-nombre">
-              {person.full_name || "Sin nombre"}
-              {isMe && <span className="record-flag">Usted</span>}
-            </h2>
+            {editingName ? (
+              <form
+                className="us-name-edit"
+                onSubmit={(event) => {
+                  event.preventDefault();
+                  const next = nameDraft.trim();
+                  if (!next) {
+                    setError("El nombre no puede quedar vacío.");
+                    return;
+                  }
+                  void run(async () => {
+                    await updateProfile.mutateAsync({ id: person.id, values: { full_name: next } });
+                    setEditingName(false);
+                  }, `Se guardó el nombre: ${next}.`);
+                }}
+              >
+                <label className="admin-field">
+                  <span className="sr-only">Nombre completo</span>
+                  <input autoFocus value={nameDraft} maxLength={120} onChange={(event) => setNameDraft(event.target.value)} />
+                </label>
+                <button type="submit" className="button-primary" disabled={updateProfile.isPending}>
+                  {updateProfile.isPending ? "Guardando…" : "Guardar nombre"}
+                </button>
+                <button
+                  type="button"
+                  className="button-ghost"
+                  onClick={() => {
+                    setEditingName(false);
+                    setNameDraft(person.full_name);
+                  }}
+                >
+                  Cancelar
+                </button>
+              </form>
+            ) : (
+              <h2 id="persona-nombre">
+                {person.full_name || "Sin nombre"}
+                {isMe && <span className="record-flag">Usted</span>}
+                <button type="button" className="us-link" onClick={() => setEditingName(true)}>
+                  Editar nombre
+                </button>
+              </h2>
+            )}
             <p>
               {person.email}
               {person.unit ? ` · ${person.unit}` : ""}

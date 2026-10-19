@@ -7,7 +7,7 @@
    función lo vuelve a validar al recibirlo.
    ========================================================================== */
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type { FormEvent } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { PAISES } from "../../../../../supabase/functions/int-contactos/paises";
@@ -15,6 +15,7 @@ import { plantillaDeTipo, resolverPais, SECTORES, validarFila } from "../../../.
 import type { FilaCruda, TipoContacto } from "../../../../../supabase/functions/int-contactos/contactos";
 import { enviar, misContactos, sesionVencida } from "../api";
 import type { Sesion } from "../api";
+import { useDecir } from "./GuiaPilo";
 
 const ETIQUETA: Record<string, string> = {
   Source: "¿De dónde sale?",
@@ -33,75 +34,151 @@ const ETIQUETA: Record<string, string> = {
   "Phone (Optional)": "Teléfono (opcional)",
 };
 
+/** Lo que Pilo dice al enfocar cada campo. */
+const AYUDA: Record<string, string> = {
+  Source: "Cuénteme de dónde sale este contacto: un convenio, un congreso o la persona que lo propuso. Puede quedar vacío.",
+  Title: "El tratamiento de su contacto, como Dr. o Prof. Va aparte del nombre y puede quedar vacío.",
+  "First Name": "Los nombres de su contacto, tal como los usa en su correo o en su tarjeta.",
+  "Last Name": "Sus apellidos. Si tiene dos, escríbalos los dos.",
+  "Job Title": "El cargo que tiene hoy esa persona en su institución.",
+  Position: "El cargo que tiene hoy esa persona en su empresa.",
+  Department: "La facultad, escuela o unidad donde trabaja. Puede quedar vacío.",
+  Institution: "La universidad o centro donde trabaja. Escríbalo completo, sin siglas si puede.",
+  Industry: "El sector de la empresa. Elija uno de la lista o escriba el suyo. Puede quedar vacío.",
+  "Company Name": "El nombre de la empresa. Escríbalo completo, sin siglas si puede.",
+  "Country or Territory": "El país donde trabaja. Escríbalo en español o en inglés y yo lo reconozco.",
+  Email: "Su correo directo. Es lo más importante: sin él no podemos contactarlo, y no se repite entre contactos.",
+  Subject: "El área en la que trabaja o investiga. Este campo puede quedar vacío.",
+  "Phone (Optional)": "El teléfono con indicativo del país, si lo sabe. Este campo puede quedar vacío.",
+};
+
 const TRATAMIENTOS = ["Dr.", "Dra.", "Prof.", "Mr.", "Ms.", "Mrs."];
 const TIPO_INPUT: Record<string, string> = { Email: "email", "Phone (Optional)": "tel" };
 const AUTOCOMPLETAR: Record<string, string> = { "First Name": "off", "Last Name": "off", Email: "off" };
+
+const idDe = (encabezado: string) => `cp-${encabezado.replace(/[^a-z]/gi, "").toLowerCase()}`;
+const enEspanol = (e: string) => e.replace(/«([^»]+)»/g, (_, h: string) => `«${ETIQUETA[h] ?? h}»`);
 
 export function UnoAUno({
   token,
   sesion,
   tipo,
   onVolver,
-  onListo,
+  onTerminado,
   onSesionVencida,
 }: {
   token: string;
   sesion: Sesion;
   tipo: TipoContacto;
   onVolver: () => void;
-  /** Se envió bien: la pantalla de arriba decide qué sigue y qué dice. */
-  onListo: (texto: string, otro: boolean) => void;
+  /** Terminó: cuántos contactos envió en esta ronda. La pantalla de arriba muestra el «recibido». */
+  onTerminado: (contactos: number) => void;
   onSesionVencida: () => void;
 }) {
   const plantilla = plantillaDeTipo(tipo);
+  const decir = useDecir();
   const cliente = useQueryClient();
   const vacio = useMemo<FilaCruda>(() => Object.fromEntries(plantilla.columnas.map((c) => [c.encabezado, ""])), [plantilla]);
   const [v, setV] = useState<FilaCruda>(vacio);
   const [errores, setErrores] = useState<string[]>([]);
   const [mensaje, setMensaje] = useState<{ clase: "ok" | "mal" | "info"; texto: string } | null>(null);
+  const [rondas, setRondas] = useState(0);
+  const primero = useRef<HTMLInputElement>(null);
+  // Al volver al primer campo tras un envío, Pilo no lo tapa con la ayuda del campo.
+  const sinAyuda = useRef(false);
 
   const mis = useQuery({ queryKey: ["int-contactos", "mis", token, sesion.aportante_id], queryFn: () => misContactos(token, sesion), retry: false });
-  const propios = (mis.data?.filas ?? []).filter((f) => f.tipo === tipo);
+  const enviados = mis.data?.filas.length ?? sesion.enviados;
+
+  useEffect(() => {
+    decir(
+      tipo === "academico"
+        ? "Empiece por el nombre de la persona. Toque cualquier campo y le explico qué necesito."
+        : "Empiece por el nombre de su contacto en la empresa. Toque cualquier campo y le explico qué necesito.",
+      "idea",
+    );
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- solo al entrar
+  }, [tipo]);
 
   const mandar = useMutation({
     mutationFn: () => enviar(token, sesion, tipo, [{ fila: 1, cruda: v }], "manual"),
     onError: (e) => {
       if (sesionVencida(e)) return onSesionVencida();
-      setMensaje({ clase: "mal", texto: e instanceof Error ? e.message : "No se pudo enviar." });
+      const texto = e instanceof Error ? e.message : "No se pudo enviar.";
+      setMensaje({ clase: "mal", texto });
+      decir(texto, "duda");
     },
   });
 
   const pais = v["Country or Territory"]?.trim() ? resolverPais(v["Country or Territory"]) : null;
+  const hayAlgo = Object.values(v).some((x) => x.trim());
 
   const alEnviar = (otro: boolean) => (e?: FormEvent) => {
     e?.preventDefault();
     setMensaje(null);
+    if (!hayAlgo) {
+      if (rondas > 0) return onTerminado(rondas);
+      setErrores([]);
+      return decir("Todavía no hay ningún contacto escrito. Empiece por el nombre y el correo de la persona.", "duda");
+    }
     const local = validarFila(plantilla, v);
-    setErrores(local.errores);
-    if (local.errores.length) return;
+    const lista = local.errores.map(enEspanol);
+    setErrores(lista);
+    if (local.errores.length) {
+      decir(`${lista[0].replace(/^Falta /, "Me falta ").replace(/\.$/, "")}. Complételo y seguimos.`, "duda");
+      const faltante = plantilla.columnas.find((c) => local.errores.some((x) => x.includes(`«${c.encabezado}»`)));
+      document.getElementById(idDe(faltante?.encabezado ?? "First Name"))?.focus();
+      return;
+    }
     mandar.mutate(undefined, {
       onSuccess: (r) => {
         const fila = r.resultados[0];
         if (!fila) return setMensaje({ clase: "mal", texto: "No se recibió respuesta. Intente de nuevo." });
-        if (fila.accion === "error") return setMensaje({ clase: "mal", texto: fila.motivo ?? "La fila tiene errores." });
-        if (fila.accion === "omitir") return setMensaje({ clase: "info", texto: `No se guardó: ${fila.motivo ?? "ya estaba"}` });
+        if (fila.accion === "error") {
+          const texto = fila.motivo ?? "La fila tiene errores.";
+          decir(texto, "duda");
+          return setMensaje({ clase: "mal", texto });
+        }
+        if (fila.accion === "omitir") {
+          const texto = `No se guardó: ${fila.motivo ?? "ya estaba"}`;
+          decir(texto, "duda");
+          return setMensaje({ clase: "info", texto });
+        }
         void cliente.invalidateQueries({ queryKey: ["int-contactos", "mis", token] });
         setV(vacio);
-        onListo(fila.accion === "actualizar" ? "Ese correo ya lo había enviado usted: se actualizó el contacto." : "Contacto enviado. Gracias.", otro);
+        setErrores([]);
+        const n = rondas + 1;
+        setRondas(n);
+        if (!otro) return onTerminado(n);
+        decir(`${fila.accion === "actualizar" ? "Ese correo ya lo había enviado usted: lo actualicé." : "Recibido."} Ya lleva ${n} en esta ronda. Cuando quiera, escriba el siguiente.`, "bien");
+        sinAyuda.current = true;
+        primero.current?.focus();
       },
     });
   };
 
   const campo = (encabezado: string) => {
     const col = plantilla.columnas.find((c) => c.encabezado === encabezado)!;
-    const id = `cp-${encabezado.replace(/[^a-z]/gi, "").toLowerCase()}`;
+    const id = idDe(encabezado);
+    const malo = errores.some((x) => x.includes(`«${ETIQUETA[encabezado] ?? encabezado}»`) || x.includes(`«${encabezado}»`));
     const etiqueta = (
       <span>
         {ETIQUETA[encabezado] ?? encabezado}
         {col.obligatoria ? " *" : ""} <small>({encabezado})</small>
       </span>
     );
-    const comun = { id, value: v[encabezado] ?? "", onChange: (e: { target: { value: string } }) => setV((x) => ({ ...x, [encabezado]: e.target.value })) };
+    const comun = {
+      id,
+      value: v[encabezado] ?? "",
+      onChange: (e: { target: { value: string } }) => setV((x) => ({ ...x, [encabezado]: e.target.value })),
+      onFocus: () => {
+        if (sinAyuda.current) {
+          sinAyuda.current = false;
+          return;
+        }
+        decir(AYUDA[encabezado] ?? "", "idea");
+      },
+    };
     if (encabezado === "Title") {
       return (
         <label className="cp-campo" key={encabezado} htmlFor={id}>
@@ -116,15 +193,16 @@ export function UnoAUno({
       );
     }
     return (
-      <label className="cp-campo" key={encabezado} htmlFor={id}>
+      <label className="cp-campo" key={encabezado} htmlFor={id} data-malo={malo || undefined}>
         {etiqueta}
         <input
           {...comun}
+          ref={encabezado === "First Name" ? primero : undefined}
           type={TIPO_INPUT[encabezado] ?? "text"}
           autoComplete={AUTOCOMPLETAR[encabezado] ?? "off"}
           maxLength={200}
           list={encabezado === "Country or Territory" ? "cp-paises" : encabezado === "Industry" ? "cp-sectores" : undefined}
-          aria-invalid={errores.some((x) => x.includes(`«${encabezado}»`)) || undefined}
+          aria-invalid={malo || undefined}
         />
         {encabezado === "Country or Territory" && pais ? (
           pais.ok ? (
@@ -140,76 +218,58 @@ export function UnoAUno({
   };
 
   const resto = plantilla.columnas.map((c) => c.encabezado).filter((e) => !["Title", "First Name", "Last Name"].includes(e));
-  const quedan = mis.data ? Math.max(0, mis.data.limite - (mis.data.filas.length ?? 0)) : null;
+  const nombreTipo = tipo === "academico" ? "Contacto académico" : "Contacto de un empleador";
 
   return (
-    <div className="cp-dos" data-entra-grupo>
-      <form className="cp-card" onSubmit={alEnviar(false)} aria-label={tipo === "academico" ? "Un contacto académico" : "Un contacto de empleador"} data-entra noValidate>
-        <div className="cp-acciones">
-          <h1>{tipo === "academico" ? "Un contacto académico" : "Un contacto de empleador"}</h1>
-          <button type="button" className="cp-btn" onClick={onVolver}>
-            Volver
-          </button>
-        </div>
-        <div className="cp-campos">
-          <div className="cp-fila3">{["Title", "First Name", "Last Name"].map(campo)}</div>
-          <div className="cp-fila2">{resto.map(campo)}</div>
-        </div>
-        <datalist id="cp-paises">
-          {PAISES.map(([codigo, nombre]) => (
-            <option key={codigo} value={nombre} />
-          ))}
-        </datalist>
-        <datalist id="cp-sectores">
-          {SECTORES.map((s) => (
-            <option key={s} value={s} />
-          ))}
-        </datalist>
-        {errores.length > 0 && (
-          <ul className="cp-aviso is-mal" role="alert" style={{ margin: 0, paddingLeft: "1.4rem" }}>
-            {errores.map((x) => (
-              <li key={x}>{x}</li>
-            ))}
-          </ul>
-        )}
-        {mensaje && (
-          <p className={`cp-aviso ${mensaje.clase === "ok" ? "is-ok" : mensaje.clase === "mal" ? "is-mal" : ""}`} role="status">
-            {mensaje.texto}
-          </p>
-        )}
-        <div className="cp-acciones">
-          <span className="cp-ayuda">* obligatorios. Los nombres entre paréntesis son los de la plantilla.</span>
-          <span style={{ display: "flex", gap: "var(--space-3)", flexWrap: "wrap" }}>
-            <button type="button" className="cp-btn" disabled={mandar.isPending} onClick={() => alEnviar(true)()}>
-              Enviar y agregar otro
-            </button>
-            <button type="submit" className="cp-btn cp-btn--pri" disabled={mandar.isPending}>
-              {mandar.isPending ? "Enviando…" : "Enviar"}
-            </button>
+    <form className="cp-panel" onSubmit={alEnviar(false)} aria-label={nombreTipo} data-entra noValidate>
+      <div data-entra>
+        <h2>{nombreTipo}</h2>
+        <p className="cp-sub">
+          <span className="cp-cnt">
+            <b>{enviados}</b> {enviados === 1 ? "enviado" : "enviados"} hasta ahora
           </span>
-        </div>
-      </form>
-
-      <aside className="cp-card" aria-label="Lo que ya envió" data-entra>
-        <h2>
-          Lo que ya envió <span className="cp-ayuda">· {propios.length}</span>
-        </h2>
-        <p className="cp-ayuda">Puede quitarlo mientras su campus no envíe la hoja a revisión.</p>
-        <ul className="cp-mis">
-          {propios.slice(0, 5).map((f) => (
-            <li key={f.id}>
-              <span>
-                <b>{[f.datos.propio_first_name, f.datos.propio_last_name].filter(Boolean).join(" ")}</b>
-                <small>{[f.datos.propio_institution ?? f.datos.propio_company_name, f.datos.propio_country].filter(Boolean).join(" · ")}</small>
-              </span>
-              <span className="cp-chip is-crear">Recibido</span>
-            </li>
+        </p>
+      </div>
+      <div className="cp-campos" data-entra>
+        <div className="cp-fila3">{["Title", "First Name", "Last Name"].map(campo)}</div>
+        <div className="cp-fila2">{resto.map(campo)}</div>
+      </div>
+      <datalist id="cp-paises">
+        {PAISES.map(([codigo, nombre]) => (
+          <option key={codigo} value={nombre} />
+        ))}
+      </datalist>
+      <datalist id="cp-sectores">
+        {SECTORES.map((s) => (
+          <option key={s} value={s} />
+        ))}
+      </datalist>
+      {errores.length > 0 && (
+        <ul className="cp-aviso is-mal" role="alert" style={{ margin: 0, paddingLeft: "1.4rem" }}>
+          {errores.map((x) => (
+            <li key={x}>{x}</li>
           ))}
-          {propios.length === 0 && <li className="cp-ayuda">Todavía no ha enviado contactos de este tipo.</li>}
         </ul>
-        <p className="cp-aviso">Si escribe un correo que ya está en la lista, no se duplica: el contacto se actualiza.</p>
-        {quedan !== null && <p className="cp-ayuda">Puede enviar hasta {mis.data?.limite} contactos en total.</p>}
-      </aside>
-    </div>
+      )}
+      {mensaje && (
+        <p className={`cp-aviso ${mensaje.clase === "ok" ? "is-ok" : mensaje.clase === "mal" ? "is-mal" : ""}`} role="status">
+          {mensaje.texto}
+        </p>
+      )}
+      <p className="cp-ayuda">* obligatorios. Si escribe un correo que ya está en la lista, no se duplica: el contacto se actualiza.{mis.data ? ` Puede enviar hasta ${mis.data.limite} contactos en total.` : ""}</p>
+      <div className="cp-acciones" data-entra>
+        <button type="button" className="cp-btn cp-btn--suave" onClick={onVolver} disabled={mandar.isPending}>
+          Volver
+        </button>
+        <span className="cp-grupo">
+          <button type="button" className="cp-btn cp-btn--suave" disabled={mandar.isPending} onClick={() => alEnviar(true)()}>
+            Enviar y agregar otro
+          </button>
+          <button type="submit" className="cp-btn cp-btn--pri" disabled={mandar.isPending}>
+            {mandar.isPending ? "Enviando…" : "Terminar y enviar"}
+          </button>
+        </span>
+      </div>
+    </form>
   );
 }

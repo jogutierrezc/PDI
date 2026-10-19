@@ -7,10 +7,12 @@ import { useEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { misContactos, quitarContactos, sesionVencida } from "../api";
 import type { Sesion } from "../api";
+import { useDecir } from "./GuiaPilo";
 
 const cuando = (iso: string) => new Intl.DateTimeFormat("es-CO", { timeZone: "America/Bogota", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit", hour12: false }).format(new Date(iso));
 
 export function MisAportes({ token, sesion, onVolver, onSesionVencida }: { token: string; sesion: Sesion; onVolver: () => void; onSesionVencida: () => void }) {
+  const decir = useDecir();
   const cliente = useQueryClient();
   const clave = ["int-contactos", "mis", token, sesion.aportante_id];
   const mis = useQuery({ queryKey: clave, queryFn: () => misContactos(token, sesion), retry: false });
@@ -43,16 +45,21 @@ export function MisAportes({ token, sesion, onVolver, onSesionVencida }: { token
     });
 
   useEffect(() => {
+    decir("Aquí está todo lo que ha enviado. Puede quitar un contacto mientras su campus no envíe la hoja a revisión.", "idea");
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- solo al entrar
+  }, []);
+
+  useEffect(() => {
     if (mis.error && sesionVencida(mis.error)) onSesionVencida();
   }, [mis.error]); // eslint-disable-line react-hooks/exhaustive-deps -- solo cuando llega el error
 
   return (
-    <div className="cp-card" data-entra>
+    <div className="cp-panel" data-entra>
       <div className="cp-acciones">
-        <h1>
+        <h2>
           Lo que ya envió <span className="cp-ayuda">· {filas.length}</span>
-        </h1>
-        <button type="button" className="cp-btn" onClick={onVolver}>
+        </h2>
+        <button type="button" className="cp-btn cp-btn--suave" onClick={onVolver}>
           Volver
         </button>
       </div>
@@ -92,7 +99,7 @@ export function MisAportes({ token, sesion, onVolver, onSesionVencida }: { token
               ¿Quitar {marcados.size} {marcados.size === 1 ? "contacto" : "contactos"}? No se puede deshacer.
             </span>
             <span style={{ display: "flex", gap: "var(--space-3)" }}>
-              <button type="button" className="cp-btn" onClick={() => setConfirmar(false)}>
+              <button type="button" className="cp-btn cp-btn--suave" onClick={() => setConfirmar(false)}>
                 No
               </button>
               <button type="button" className="cp-btn cp-btn--pri" disabled={quitar.isPending} onClick={() => quitar.mutate()}>
@@ -103,7 +110,7 @@ export function MisAportes({ token, sesion, onVolver, onSesionVencida }: { token
         ) : (
           <div className="cp-acciones">
             <span className="cp-ayuda">{marcados.size} elegidos</span>
-            <button type="button" className="cp-btn" onClick={() => setConfirmar(true)}>
+            <button type="button" className="cp-btn cp-btn--suave" onClick={() => setConfirmar(true)}>
               Quitar los elegidos
             </button>
           </div>

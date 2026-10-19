@@ -1,51 +1,79 @@
 /* =============================================================================
    Contactos · la página pública del enlace de invitación (/contactos/i/:token).
 
-   Una persona invitada, sin cuenta: se identifica (nombre, cargo en la UDES y
-   correo institucional), elige Académicos o Empleadores y aporta uno a uno o
-   importando un archivo. Lo que envía cae en la carpeta «Contactos» de Tablas,
-   con su nombre, cargo y correo en cada fila. Migración 0167; función int-contactos.
+   Un proceso guiado de cuatro pasos con Mr. Pilo hablando en cada uno:
+     1 Quién es usted      «Continuar con Microsoft» o nombre, cargo y correo
+     2 Cómo aportar        académicos o empleadores · uno a uno o importar un archivo
+     3 Sus contactos       el formulario (con ayuda de Pilo por campo) o el archivo
+     4 Recibido            Pilo celebra; sale cada vez que un envío termina bien
+   Lo que se envía cae en la carpeta «Contactos» de Tablas, con el nombre, el cargo y
+   el correo de quien lo aportó en cada fila. Migraciones 0167 y 0171; función int-contactos.
 
-   El correo no se confirma todavía (no se envían correos): se comprueba el
-   dominio permitido por la invitación.
+   El correo se confirma solo si la persona entra con Microsoft (0171); a mano se
+   comprueba el dominio permitido. Tema claro, oscuro o automático (solo en esta página).
    ========================================================================== */
 
-import { useEffect, useRef, useState } from "react";
-import type { FormEvent } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useParams } from "react-router-dom";
-import { esTipoContacto } from "../../../../../supabase/functions/int-contactos/contactos";
 import type { TipoContacto } from "../../../../../supabase/functions/int-contactos/contactos";
 import { useEntrada, usePresion } from "../../ui/movimiento";
-import { ErrorContactos, guardarSesion, identificar, infoInvitacion, leerSesion, misContactos, olvidarSesion } from "../api";
+import { cerrarSesionMicrosoft, consumirRegresoMicrosoft, datosMicrosoft, ErrorContactos, guardarSesion, infoInvitacion, leerSesion, olvidarSesion, tokenDeMicrosoft } from "../api";
 import type { InvitacionPublica, Sesion } from "../api";
+import { ComoAportar } from "./ComoAportar";
+import { CaraPilo, DecirProvider, PiloHabla, Titular } from "./GuiaPilo";
+import type { Decir, MensajePilo } from "./GuiaPilo";
+import { Identificacion } from "./Identificacion";
+import type { EstadoMicrosoft } from "./Identificacion";
 import { ImportarArchivo } from "./ImportarArchivo";
 import { MisAportes } from "./MisAportes";
-import { TEXTO_AUTORIZACION, TEXTO_SUS_DATOS } from "./texto-legal";
+import { Recibido } from "./Recibido";
+import { atributoTema, InterruptorTema, useTema } from "./tema";
 import { UnoAUno } from "./UnoAUno";
 import "./publico.css";
 
-type Vista = "camino" | "uno" | "importar" | "mis";
+type Pantalla = "camino" | "uno" | "importar" | "mis" | "recibido";
 
 const MOTIVO_CERRADA: Record<Exclude<InvitacionPublica["estado"], "activa">, string> = {
-  pausada: "La invitación está en pausa. Pida a la Oficina de Internacionalización que la reactive.",
-  vencida: "La invitación ya venció. Si todavía tiene contactos por compartir, pida a la Oficina que le envíe una nueva.",
+  pausada: "La invitación está en pausa. Pida a Planeación Institucional que la reactive.",
+  vencida: "La invitación ya venció. Si todavía tiene contactos por compartir, pida a Planeación Institucional que le envíe una nueva.",
   periodo_cerrado: "El periodo de esta invitación ya cerró y no se reciben más contactos.",
 };
+
+/** Lo que dice la página grande en cada pantalla: titular, bajada y a qué paso del recorrido pertenece. */
+export const TITULARES: Record<"identificar" | Pantalla, { paso: 1 | 2 | 3 | 4; titulo: string; bajada: string }> = {
+  identificar: { paso: 1, titulo: "Primero necesitamos saber quién es usted.", bajada: "Son tres datos y menos de un minuto." },
+  camino: { paso: 2, titulo: "Ahora cuénteme cómo prefiere compartir sus contactos.", bajada: "Puede hacerlo uno por uno o subir una lista completa." },
+  mis: { paso: 2, titulo: "Esto es lo que ya me ha enviado.", bajada: "Puede quitar un contacto mientras su campus no envíe la hoja a revisión." },
+  uno: { paso: 3, titulo: "Escriba los datos de su contacto, yo le voy diciendo qué poner.", bajada: "Cada vez que toque un campo le explico qué va ahí." },
+  importar: { paso: 3, titulo: "Suba su archivo y yo lo reviso antes de enviarlo.", bajada: "Son tres pasos y le aviso si algo no cuadra." },
+  recibido: { paso: 4, titulo: "¡Felicidades! Los datos compartidos fueron recibidos con éxito.", bajada: "Gracias por ayudarnos a construir las relaciones de la UDES con el mundo." },
+};
+
+const PASOS = ["Quién es usted", "Cómo aportar", "Sus contactos", "Recibido"] as const;
+const SALUDO = "¡Hola! Soy Mr. Pilo y voy a acompañarlo en todo el camino. Empecemos por lo básico: si tiene correo de la UDES, lo más rápido es continuar con Microsoft.";
 
 export function ContactosPublico() {
   const { token = "" } = useParams();
   const info = useQuery({ queryKey: ["int-contactos", "info", token], queryFn: () => infoInvitacion(token), retry: false, staleTime: 60_000 });
   const [sesion, setSesion] = useState<Sesion | null>(() => leerSesion(token));
-  const [vista, setVista] = useState<Vista>("camino");
+  const [pantalla, setPantalla] = useState<Pantalla>("camino");
   const [tipo, setTipo] = useState<TipoContacto>("academico");
-  const [aviso, setAviso] = useState("");
+  const [recibidos, setRecibidos] = useState(0);
   const [vencida, setVencida] = useState(false);
+  const [ms, setMs] = useState<EstadoMicrosoft>({ fase: "inactivo" });
+  const [tema, setTema] = useTema();
+  const [mensaje, setMensaje] = useState<MensajePilo>({ id: 1, texto: SALUDO, gesto: "feliz" });
   const raiz = useRef<HTMLDivElement>(null);
+  const regreso = useRef(false);
+
+  const decir = useCallback<Decir>((texto, gesto = "idea", nota) => {
+    setMensaje((m) => (m.texto === texto && m.gesto === gesto && m.nota === nota ? m : { id: m.id + 1, texto, gesto, nota }));
+  }, []);
 
   useEffect(() => {
     const previo = document.title;
-    document.title = "Compartir contactos · Internacionalización UDES";
+    document.title = "Compartir contactos · Planeación Institucional UDES";
     const meta = document.createElement("meta");
     meta.name = "robots";
     meta.content = "noindex, nofollow";
@@ -56,260 +84,222 @@ export function ContactosPublico() {
     };
   }, []);
 
+  // Al volver de Microsoft: se lee la cuenta, se comprueba con la función y se cierra
+  // enseguida la sesión de Supabase de este navegador (el invitado no queda con una de intranet).
+  useEffect(() => {
+    if (regreso.current) return;
+    regreso.current = true;
+    if (!consumirRegresoMicrosoft(token)) return;
+    setMs({ fase: "verificando" });
+    void (async () => {
+      try {
+        const jwt = await tokenDeMicrosoft();
+        if (!jwt) throw new Error("No llegó la confirmación de Microsoft. Pruebe de nuevo o escriba sus datos.");
+        const datos = await datosMicrosoft(token, jwt);
+        setMs({ fase: "listo", cuenta: { ...datos, jwt } });
+      } catch (e) {
+        setMs({ fase: "error", mensaje: e instanceof Error ? e.message : "No se pudo confirmar la cuenta de Microsoft." });
+      } finally {
+        await cerrarSesionMicrosoft();
+      }
+    })();
+  }, [token]);
+
   // El primer tipo que la invitación recibe.
   useEffect(() => {
     if (info.data && !info.data.tipos.includes(tipo)) setTipo(info.data.tipos[0] ?? "academico");
   }, [info.data, tipo]);
 
-  useEntrada(raiz, "[data-entra]", `${vista}|${sesion ? "con" : "sin"}|${info.data?.estado ?? ""}`);
-  usePresion(raiz, ".cp-btn, .cp-camino");
+  const invitacion = info.data;
+  const cerrada = invitacion && invitacion.estado !== "activa" ? invitacion : null;
+  useEffect(() => {
+    if (cerrada) decir("Lo siento, por ahora este enlace no está recibiendo contactos.", "duda");
+  }, [cerrada?.estado]); // eslint-disable-line react-hooks/exhaustive-deps -- solo cuando cambia el estado
+
+  useEffect(() => {
+    if (info.error) decir("No encuentro esa invitación. Revise el enlace o pida uno nuevo a Planeación Institucional.", "duda");
+  }, [info.error]); // eslint-disable-line react-hooks/exhaustive-deps -- solo cuando llega el error
 
   const salir = () => {
     olvidarSesion(token);
     setSesion(null);
-    setVista("camino");
+    setPantalla("camino");
+    setMs({ fase: "inactivo" });
+    decir("Sin problema. Cuéntenos quién es y seguimos.", "idea");
   };
   const sesionVencida = () => {
     olvidarSesion(token);
     setSesion(null);
     setVencida(true);
+    setMs({ fase: "inactivo" });
   };
 
-  const invitacion = info.data;
   const campusNombre = invitacion ? (invitacion.campus?.name ?? invitacion.campuses.find((c) => c.id === sesion?.campus_id)?.name ?? "") : "";
+  const vista: "identificar" | Pantalla = sesion ? pantalla : "identificar";
+
+  useEntrada(raiz, "[data-entra]", `${vista}|${ms.fase}|${info.data?.estado ?? ""}`);
+  usePresion(raiz, ".cp-btn, .cp-camino, .cp-ms, .cp-seg button");
 
   let cuerpo;
-  if (info.isPending) cuerpo = <p className="cp-ayuda" role="status">Abriendo la invitación…</p>;
-  else if (info.error || !invitacion) {
+  let titulos: { paso: number; titulo: string; bajada: string } | null = null;
+  if (info.isPending) {
+    cuerpo = (
+      <p className="cp-ayuda cp-centrado" role="status">
+        Abriendo la invitación…
+      </p>
+    );
+  } else if (info.error || !invitacion) {
     const e = info.error;
-    cuerpo = (
-      <section className="cp-card cp-cerrada" data-entra>
-        <h1>{e instanceof ErrorContactos && e.estado === 404 ? "Este enlace no es válido" : "No se pudo abrir la invitación"}</h1>
-        <p>{e instanceof ErrorContactos && e.estado === 404 ? "Revise que haya copiado el enlace completo o pida uno nuevo a la Oficina de Internacionalización." : e instanceof Error ? e.message : "Intente de nuevo en un momento."}</p>
-      </section>
-    );
-  } else if (invitacion.estado !== "activa") {
-    cuerpo = (
-      <section className="cp-card cp-cerrada" data-entra>
-        <span className="cp-eyebrow">{invitacion.nombre}</span>
-        <h1>Esta invitación no recibe contactos</h1>
-        <p>{MOTIVO_CERRADA[invitacion.estado]}</p>
-      </section>
-    );
+    const noValido = e instanceof ErrorContactos && e.estado === 404;
+    titulos = {
+      paso: 0,
+      titulo: noValido ? "Este enlace no es válido" : "No se pudo abrir la invitación",
+      bajada: noValido ? "Revise que haya copiado el enlace completo o pida uno nuevo a Planeación Institucional." : e instanceof Error ? e.message : "Intente de nuevo en un momento.",
+    };
+  } else if (cerrada) {
+    titulos = { paso: 0, titulo: "Esta invitación no recibe contactos", bajada: MOTIVO_CERRADA[cerrada.estado as Exclude<InvitacionPublica["estado"], "activa">] };
   } else if (!sesion) {
-    cuerpo = <Identificacion token={token} invitacion={invitacion} vencida={vencida} onListo={(s) => { guardarSesion(token, s); setSesion(s); setVencida(false); setVista("camino"); }} />;
-  } else if (vista === "uno") {
+    titulos = TITULARES.identificar;
     cuerpo = (
-      <UnoAUno
+      <Identificacion
         token={token}
-        sesion={sesion}
-        tipo={tipo}
-        onVolver={() => setVista("camino")}
-        onSesionVencida={sesionVencida}
-        onListo={(texto, otro) => {
-          setAviso(otro ? "" : texto);
-          if (!otro) setVista("camino");
+        invitacion={invitacion}
+        vencida={vencida}
+        microsoft={ms}
+        onListo={(s) => {
+          guardarSesion(token, s);
+          setSesion(s);
+          setVencida(false);
+          setMs({ fase: "inactivo" });
+          setPantalla("camino");
         }}
+        onDescartarMicrosoft={() => setMs({ fase: "inactivo" })}
       />
     );
-  } else if (vista === "importar") cuerpo = <ImportarArchivo token={token} sesion={sesion} tipo={tipo} onVolver={() => setVista("camino")} onSesionVencida={sesionVencida} />;
-  else if (vista === "mis") cuerpo = <MisAportes token={token} sesion={sesion} onVolver={() => setVista("camino")} onSesionVencida={sesionVencida} />;
-  else cuerpo = <Camino token={token} sesion={sesion} invitacion={invitacion} tipo={tipo} onTipo={setTipo} aviso={aviso} onVista={(v) => { setAviso(""); setVista(v); }} onSesionVencida={sesionVencida} />;
+  } else {
+    titulos = TITULARES[pantalla];
+    if (pantalla === "uno") {
+      cuerpo = (
+        <UnoAUno
+          token={token}
+          sesion={sesion}
+          tipo={tipo}
+          onVolver={() => setPantalla("camino")}
+          onSesionVencida={sesionVencida}
+          onTerminado={(n) => {
+            setRecibidos(n);
+            setPantalla("recibido");
+          }}
+        />
+      );
+    } else if (pantalla === "importar") {
+      cuerpo = (
+        <ImportarArchivo
+          token={token}
+          sesion={sesion}
+          tipo={tipo}
+          onVolver={() => setPantalla("camino")}
+          onSesionVencida={sesionVencida}
+          onEnviado={(n) => {
+            setRecibidos(n);
+            setPantalla("recibido");
+          }}
+        />
+      );
+    } else if (pantalla === "mis") cuerpo = <MisAportes token={token} sesion={sesion} onVolver={() => setPantalla("camino")} onSesionVencida={sesionVencida} />;
+    else if (pantalla === "recibido") cuerpo = <Recibido contactos={recibidos} campus={campusNombre} periodo={invitacion.periodo} nombre={sesion.nombre} onMas={() => setPantalla("camino")} onMis={() => setPantalla("mis")} />;
+    else {
+      cuerpo = (
+        <ComoAportar
+          token={token}
+          sesion={sesion}
+          invitacion={invitacion}
+          campusNombre={campusNombre}
+          tipo={tipo}
+          onTipo={setTipo}
+          onUno={() => setPantalla("uno")}
+          onImportar={() => setPantalla("importar")}
+          onMis={() => setPantalla("mis")}
+          onSalir={salir}
+          onSesionVencida={sesionVencida}
+        />
+      );
+    }
+  }
+
+  const paso = titulos?.paso ?? 0;
 
   return (
-    <div className="cp" ref={raiz}>
+    <div className="cp" ref={raiz} data-theme={atributoTema(tema)}>
       <header className="cp-top">
         <div className="cp-marca">
-          <span className="cp-sigla" aria-hidden="true">IN</span>
-          <span>Internacionalización UDES</span>
+          <span className="cp-avatar" aria-hidden="true">
+            <CaraPilo gesto="feliz" tamano={40} />
+          </span>
+          <span>
+            <b>Planeación Institucional UDES</b>
+            <small>Universidad de Santander · con Mr. Pilo</small>
+          </span>
         </div>
-        <span className="cp-quien">
-          {sesion ? (
-            <>
-              {sesion.nombre}
-              {campusNombre ? ` · Campus ${campusNombre}` : ""}
-              <button type="button" onClick={salir}>No soy yo</button>
-            </>
-          ) : (
-            "Invitación para compartir contactos"
-          )}
-        </span>
+        <div className="cp-top-der">
+          <span className="cp-quien">
+            {sesion ? (
+              <>
+                <span>
+                  {sesion.nombre}
+                  {campusNombre ? ` · Campus ${campusNombre}` : ""}
+                </span>
+                {sesion.correo_verificado && <span className="cp-sello">Correo confirmado por Microsoft</span>}
+                <button type="button" onClick={salir}>
+                  No soy yo
+                </button>
+              </>
+            ) : (
+              "Invitación para compartir contactos"
+            )}
+          </span>
+          <InterruptorTema tema={tema} onTema={setTema} />
+        </div>
       </header>
-      <main className="cp-main">{cuerpo}</main>
-      <footer className="cp-pie">Universidad de Santander · Oficina de Internacionalización</footer>
-    </div>
-  );
-}
 
-/* ---------- Paso 1: quién es -------------------------------------------------------------- */
-
-function Identificacion({ token, invitacion, vencida, onListo }: { token: string; invitacion: InvitacionPublica; vencida: boolean; onListo: (s: Sesion) => void }) {
-  const [nombre, setNombre] = useState("");
-  const [cargo, setCargo] = useState("");
-  const [correo, setCorreo] = useState("");
-  const [campus, setCampus] = useState("");
-  const [acepta, setAcepta] = useState(false);
-  const [trampa, setTrampa] = useState("");
-  const [error, setError] = useState<string | null>(null);
-  const [enviando, setEnviando] = useState(false);
-  const dominios = invitacion.dominios.map((d) => `@${d.replace(/^@/, "")}`).join(" o ");
-
-  const alEnviar = async (e: FormEvent) => {
-    e.preventDefault();
-    setError(null);
-    if (trampa) return;
-    if (!invitacion.campus && !campus) return setError("Elija su campus.");
-    if (!acepta) return setError("Para continuar, acepte el tratamiento de los datos.");
-    setEnviando(true);
-    try {
-      onListo(await identificar(token, { nombre, cargo, correo, campus_id: invitacion.campus ? null : campus }));
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "No se pudo continuar. Intente de nuevo.");
-    } finally {
-      setEnviando(false);
-    }
-  };
-
-  return (
-    <form className="cp-card" onSubmit={alEnviar} data-entra noValidate aria-label="Sus datos">
-      <div data-entra>
-        <span className="cp-eyebrow">Paso 1 de 2 · Sus datos</span>
-        <h1 style={{ marginTop: 8 }}>Comparta los contactos que ya conoce</h1>
-        <p style={{ marginTop: 8 }}>Primero necesitamos saber quién es usted. Son tres datos y menos de un minuto.</p>
-      </div>
-      <p className="cp-aviso" data-entra>
-        <b>{invitacion.nombre}</b> · Periodo {invitacion.periodo}
-        {invitacion.campus ? ` · Campus ${invitacion.campus.name}` : ""} · vigente hasta el {new Date(`${invitacion.vence}T12:00:00`).toLocaleDateString("es-CO", { day: "numeric", month: "long", year: "numeric" })}
-      </p>
-      {vencida && (
-        <p className="cp-aviso is-mal" role="alert">
-          Su sesión venció. Vuelva a identificarse con el mismo correo.
-        </p>
-      )}
-      <div className="cp-campos" data-entra>
-        <label className="cp-campo">
-          <span>Nombre completo</span>
-          <input value={nombre} onChange={(e) => setNombre(e.target.value)} autoComplete="name" maxLength={160} required />
-        </label>
-        <label className="cp-campo">
-          <span>Cargo en la UDES</span>
-          <input value={cargo} onChange={(e) => setCargo(e.target.value)} autoComplete="organization-title" maxLength={120} required />
-        </label>
-        <label className="cp-campo">
-          <span>Correo institucional</span>
-          <input type="email" value={correo} onChange={(e) => setCorreo(e.target.value)} autoComplete="email" inputMode="email" maxLength={254} required />
-          {dominios && <span className="cp-ayuda">Debe terminar en {dominios}.</span>}
-        </label>
-        {!invitacion.campus && (
-          <label className="cp-campo">
-            <span>Su campus</span>
-            <select value={campus} onChange={(e) => setCampus(e.target.value)} required>
-              <option value="">Elija…</option>
-              {invitacion.campuses.map((c) => (
-                <option key={c.id} value={c.id}>
-                  {c.name}
-                </option>
-              ))}
-            </select>
-          </label>
-        )}
-        <div className="cp-honey" aria-hidden="true">
-          <label>
-            No llenar este campo
-            <input tabIndex={-1} autoComplete="off" value={trampa} onChange={(e) => setTrampa(e.target.value)} />
-          </label>
-        </div>
-      </div>
-      <label style={{ display: "flex", gap: "var(--space-3)", alignItems: "flex-start", color: "var(--ink-secondary)" }} data-entra>
-        <input type="checkbox" checked={acepta} onChange={(e) => setAcepta(e.target.checked)} style={{ marginTop: 3 }} />
-        <span>{TEXTO_AUTORIZACION}</span>
-      </label>
-      {error && (
-        <p className="cp-aviso is-mal" role="alert">
-          {error}
-        </p>
-      )}
-      <div className="cp-acciones" data-entra>
-        <span className="cp-ayuda">{TEXTO_SUS_DATOS}</span>
-        <button type="submit" className="cp-btn cp-btn--pri" disabled={enviando}>
-          {enviando ? "Un momento…" : "Continuar"}
-        </button>
-      </div>
-    </form>
-  );
-}
-
-/* ---------- Paso 2: cómo aportar ----------------------------------------------------------- */
-
-function Camino({
-  token,
-  sesion,
-  invitacion,
-  tipo,
-  onTipo,
-  aviso,
-  onVista,
-  onSesionVencida,
-}: {
-  token: string;
-  sesion: Sesion;
-  invitacion: InvitacionPublica;
-  tipo: TipoContacto;
-  onTipo: (t: TipoContacto) => void;
-  aviso: string;
-  onVista: (v: Vista) => void;
-  onSesionVencida: () => void;
-}) {
-  const mis = useQuery({ queryKey: ["int-contactos", "mis", token, sesion.aportante_id], queryFn: () => misContactos(token, sesion), retry: false });
-  useEffect(() => {
-    if (mis.error && mis.error instanceof ErrorContactos && mis.error.estado === 401) onSesionVencida();
-  }, [mis.error]); // eslint-disable-line react-hooks/exhaustive-deps -- solo cuando llega el error
-  const enviados = mis.data?.filas.length ?? sesion.enviados;
-  const primerNombre = sesion.nombre.split(" ")[0];
-
-  return (
-    <section className="cp-paso" aria-label="Cómo aportar">
-      <div className="cp-acciones" data-entra>
-        <div>
-          <span className="cp-eyebrow">Paso 2 de 2 · Cómo aportar</span>
-          <h1 style={{ marginTop: 8 }}>Hola, {primerNombre}. ¿Qué contactos va a compartir?</h1>
-        </div>
-        {enviados > 0 && (
-          <button type="button" className="cp-btn" onClick={() => onVista("mis")}>
-            Ya envió {enviados} · Ver mis aportes
-          </button>
-        )}
-      </div>
-
-      {aviso && (
-        <p className="cp-aviso is-ok" role="status" data-entra>
-          {aviso}
-        </p>
-      )}
-
-      {invitacion.tipos.length > 1 && (
-        <div className="cp-seg" role="radiogroup" aria-label="Tipo de contacto" data-entra>
-          {invitacion.tipos.filter(esTipoContacto).map((t) => (
-            <button key={t} type="button" role="radio" aria-checked={tipo === t} onClick={() => onTipo(t)}>
-              {t === "academico" ? "Académicos" : "Empleadores"}
-              <small>{t === "academico" ? "docentes e investigadores" : "empresas que contratan egresados"}</small>
-            </button>
+      {invitacion && !cerrada && !info.error && (
+        <ol className="cp-ruta" aria-label="Progreso">
+          {PASOS.map((nombre, i) => (
+            <li key={nombre} data-s={i + 1 < paso ? "hecho" : i + 1 === paso ? "ahora" : undefined} aria-current={i + 1 === paso ? "step" : undefined}>
+              <i />
+              <span>
+                {i + 1} · {nombre}
+              </span>
+            </li>
           ))}
-        </div>
+        </ol>
       )}
 
-      <div className="cp-caminos" data-entra>
-        <button type="button" className="cp-camino" onClick={() => onVista("uno")}>
-          <b>Uno a uno</b>
-          <span>Escriba los datos de cada persona en un formulario corto. Ideal para unos pocos contactos.</span>
-          <em>Empezar →</em>
-        </button>
-        <button type="button" className="cp-camino" onClick={() => onVista("importar")}>
-          <b>Importar un archivo</b>
-          <span>Suba un Excel o CSV con la plantilla. Antes de enviar verá qué filas están bien y cuáles hay que corregir.</span>
-          <em>Descargar plantilla o subir →</em>
-        </button>
-      </div>
-    </section>
+      <DecirProvider value={decir}>
+        <main className="cp-main">
+          {info.isPending ? (
+            cuerpo
+          ) : (
+            <div className="cp-escena" data-solo={cuerpo ? undefined : ""}>
+              <section className="cp-historia">
+                {paso > 0 ? (
+                  <span className="cp-eyebrow">
+                    <i>{paso}</i>
+                    <span>Paso {paso} de 4</span>
+                  </span>
+                ) : (
+                  invitacion && <span className="cp-eyebrow">{invitacion.nombre}</span>
+                )}
+                {titulos && <Titular texto={titulos.titulo} bajada={titulos.bajada} clave={`${vista}|${titulos.titulo}`} />}
+                <PiloHabla mensaje={mensaje} />
+              </section>
+              {cuerpo && <div className="cp-escenario">{cuerpo}</div>}
+            </div>
+          )}
+        </main>
+      </DecirProvider>
+
+      <footer className="cp-pie">Universidad de Santander · Planeación Institucional</footer>
+    </div>
   );
 }

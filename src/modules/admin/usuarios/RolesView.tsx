@@ -168,100 +168,6 @@ export function RolesView({ profiles }: { profiles: Profile[] }) {
   );
 }
 
-/** Las unidades sobre las que puede actuar un rol de Impacto, en el orden en que se piensan. */
-const SCOPE_KINDS: UnitKind[] = ["vicerrectoria", "oficina", "facultad", "programa"];
-
-/**
- * Alcance de un rol de Impacto: toda la estructura o las vicerrectorías,
- * oficinas, facultades y programas que se marquen. Una facultad alcanza a sus
- * programas (la base hereda por el árbol), pero una vicerrectoría no alcanza a
- * las facultades: dependen de ella en el organigrama, no cuelgan de ella.
- */
-function ImpactScopePicker({
-  units,
-  loading,
-  scope,
-  onChange,
-}: {
-  units: UnitOption[];
-  loading: boolean;
-  scope: { allUnits: boolean; units: string[] };
-  onChange: (change: (scope: { allUnits: boolean; units: string[] }) => void) => void;
-}) {
-  const [filter, setFilter] = useState("");
-  const offer = useProgramOffer().data;
-  const campusName = new Map((offer?.campuses ?? []).map((c) => [c.id, c.name]));
-  /** Un programa se reconoce por las sedes donde se ofrece. */
-  const sedesDe = (unit: UnitOption) =>
-    unit.kind === "programa" ? (offer?.byProgram.get(unit.id) ?? []).map((id) => campusName.get(id) ?? "Sede").join(", ") : "";
-  const needle = filter.trim().toLowerCase();
-  const groups = SCOPE_KINDS.map((kind) => ({
-    kind,
-    items: units
-      .filter((unit) => unit.kind === kind && (!needle || `${unit.name} ${unit.code}`.toLowerCase().includes(needle)))
-      .sort((a, b) => a.name.localeCompare(b.name, "es")),
-  })).filter((group) => group.items.length > 0);
-
-  const toggle = (id: string) =>
-    onChange((draft) => {
-      draft.units = draft.units.includes(id) ? draft.units.filter((unit) => unit !== id) : [...draft.units, id];
-    });
-
-  return (
-    <div className="us-reports" role="group" aria-label="Alcance en Indicadores de impacto">
-      <label className="oda-check">
-        <input
-          type="checkbox"
-          checked={scope.allUnits}
-          onChange={(event) => onChange((draft) => void (draft.allUnits = event.target.checked))}
-        />
-        Toda la estructura
-      </label>
-      {!scope.allUnits && (
-        <>
-          <small>
-            {scope.units.length === 0
-              ? "Elija las vicerrectorías, facultades o programas sobre los que actúa. Una facultad incluye a sus programas."
-              : `${scope.units.length} ${scope.units.length === 1 ? "unidad elegida" : "unidades elegidas"}. Una facultad incluye a sus programas.`}
-          </small>
-          <label className="admin-field">
-            <span>Buscar unidad</span>
-            <input value={filter} onChange={(event) => setFilter(event.target.value)} placeholder="Nombre o código" />
-          </label>
-          {loading ? (
-            <small>Cargando unidades…</small>
-          ) : groups.length === 0 ? (
-            <small>{needle ? "Ninguna unidad coincide." : "Todavía no hay unidades en la estructura institucional."}</small>
-          ) : (
-            groups.map((group) => (
-              <div key={group.kind}>
-                <strong>{UNIT_KIND[group.kind].plural}</strong>
-                <div className="us-screens">
-                  {group.items.map((unit) => (
-                    <label key={unit.id} className="oda-check">
-                      <input type="checkbox" checked={scope.units.includes(unit.id)} onChange={() => toggle(unit.id)} />
-                      {unit.name}
-                      <small>
-                        {" "}
-                        · {unit.code}
-                        {sedesDe(unit) ? ` · ${sedesDe(unit)}` : ""}
-                      </small>
-                    </label>
-                  ))}
-                </div>
-              </div>
-            ))
-          )}
-          <small>
-            Aquí la unidad vale en todas sus sedes. Para limitar a una sede (un programa que se ofrece en varias), asigne la unidad y la sede en
-            la ficha de la persona.
-          </small>
-        </>
-      )}
-    </div>
-  );
-}
-
 /** Las unidades que escriben informe, como en el Tablero del ciclo: todas menos los programas. */
 const escribeInforme = (kind: UnitKind) => kind !== "programa";
 
@@ -439,7 +345,6 @@ function RoleEditor({
     [unitOptions.data],
   );
   const summary = describe(matrix, reportNames, unitNames);
-  const impactNeedsScope = impactLevelOf(matrix.modules.impacto.level) !== "none" && !matrix.impact.allUnits && matrix.impact.units.length === 0;
   const informeNeedsScope =
     matrix.modules.informes.level !== "none" &&
     matrix.informe.level !== "none" &&
@@ -498,12 +403,6 @@ function RoleEditor({
     if (informeNeedsScope) {
       setError(
         "En Informes de gestión, el papel de Diligencia o Envío pide un alcance: elija al menos una unidad, o marque «Toda la estructura». Si solo debe escribir el informe de la unidad a la que pertenece, deje el papel en «Solo el de su unidad».",
-      );
-      return;
-    }
-    if (impactNeedsScope) {
-      setError(
-        "En Indicadores de impacto, Editar y Administrar piden un alcance: elija al menos una vicerrectoría, facultad o programa, o marque «Toda la estructura».",
       );
       return;
     }
@@ -765,14 +664,6 @@ function RoleEditor({
                       loading={unitOptions.isPending}
                       scope={matrix.informe}
                       onChange={(change) => update((draft) => change(draft.informe))}
-                    />
-                  )}
-                  {module.id === "impacto" && impactLevelOf(choice.level) !== "none" && (
-                    <ImpactScopePicker
-                      units={unitOptions.data ?? []}
-                      loading={unitOptions.isPending}
-                      scope={matrix.impact}
-                      onChange={(change) => update((draft) => change(draft.impact))}
                     />
                   )}
                 </div>

@@ -205,17 +205,41 @@ describe("Indicadores de Impacto: editor y administrador con alcance", () => {
     }
   });
 
-  it("se describe con los nombres de las unidades", () => {
+  it("se describe por la ficha de la persona y cuenta el alcance heredado si existe", () => {
     const names = new Map([[PROGRAMA, "Fisioterapia"], [VICERRECTORIA, "Vicerrectoría de Investigaciones"]]);
-    expect(describeRole(impact("editar", { units: [PROGRAMA, VICERRECTORIA] }), new Map(), names)).toContain(
-      "En Indicadores de Impacto define fichas y captura datos de: Fisioterapia y Vicerrectoría de Investigaciones.",
+    const heredado = describeRole(impact("editar", { units: [PROGRAMA, VICERRECTORIA] }), new Map(), names);
+    expect(heredado).toContain(
+      "En Indicadores de Impacto define fichas y captura datos en las unidades donde se le asigne Contribuyente (se asignan en su ficha).",
+    );
+    expect(heredado).toContain(
+      "Además, por el alcance que ya traía el rol, actúa sobre: Fisioterapia y Vicerrectoría de Investigaciones.",
     );
     expect(describeRole(impact("administrar", { allUnits: true }))).toContain(
-      "En Indicadores de Impacto define, captura, publica, revisa y emite informes de toda la estructura.",
+      "Además, por el alcance que ya traía el rol, actúa sobre toda la estructura.",
     );
-    expect(describeRole(impact("editar"))).toContain(
-      "En Indicadores de Impacto no tiene unidades asignadas: no actúa sobre ninguna.",
+  });
+
+  it("un rol nuevo sin alcance no miente ni exige alcance", () => {
+    const lines = describeRole(impact("administrar"));
+    expect(lines).toContain(
+      "En Indicadores de Impacto define, captura, publica, revisa y emite informes en las unidades donde se le asigne Gestor (se asignan en su ficha).",
     );
+    expect(lines.join(" ")).not.toContain("no actúa sobre ninguna");
+    expect(compile(impact("editar"))).toMatchObject({ impact_level: "editor", all_impact_units: false, units: [] });
+  });
+
+  it("guardar un rol con alcance heredado desde el editor no lo pierde", () => {
+    const stored = decompile(
+      { base_role: "consulta", screens: ["impacto"], all_screens: false, all_reports: false, impact_level: "editor", all_impact_units: false },
+      [],
+      [PROGRAMA, FACULTAD],
+    );
+    expect(compile(stored)).toMatchObject({ impact_level: "editor", all_impact_units: false, units: [FACULTAD, PROGRAMA].sort() });
+    const todo = decompile(
+      { base_role: "consulta", screens: ["impacto"], all_screens: false, all_reports: false, impact_level: "admin", all_impact_units: true },
+      [],
+    );
+    expect(compile(todo)).toMatchObject({ impact_level: "admin", all_impact_units: true });
   });
 });
 

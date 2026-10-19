@@ -19,7 +19,7 @@ Crear un usuario (botón «Crear usuario» o carga masiva) agrega su correo a la
 - La base (RLS, funciones, disparadores): quién es administrador, la lista de acceso, el rol de cada perfil, que nadie se asigne un rol, que no se quede el portal sin administradores.
 - `base_role` de un rol de acceso = la **mayor** capacidad que pida alguno de sus módulos. La base no distingue módulos: por eso la matriz de Roles avisa cuando un módulo marcado «Ver» acabará editando.
 - Las pantallas marcadas en un rol son el menú. Correos, Rutas y Rankings, además, abren datos solo con capacidad de Planeación; Pilo e Internacionalización, solo a administración (director, coordinador y gestor de Internacionalización entran por pertenencia).
-- Impacto, Mis Tableros y el Monitor se deciden por la unidad a la que pertenece cada persona.
+- Impacto, Mis Tableros y el Monitor se deciden por la unidad a la que pertenece cada persona. El rol de acceso solo fija el nivel en Impacto (Ver · Editar · Administrar); las unidades y la sede se asignan en la ficha de la persona (Gestor o Contribuyente por unidad). Un rol guardado con alcance antiguo (`all_impact_units`, `access_role_units`) lo conserva al guardarse, aunque el editor ya no lo muestre.
 
 ## Pasos externos para activar Microsoft (no están en el repo)
 

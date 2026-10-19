@@ -12,6 +12,12 @@
      info       { token }                       → la invitación (sin secretos) o 404
      identificar{ token, nombre, cargo, correo, campus_id? }
                                                 → { aportante_id, sesion, nombre, cargo, correo, campus_id, enviados }
+     microsoft_datos
+                { token }  + Authorization: Bearer <access_token de Microsoft>
+                                                → { nombre, correo } de la cuenta (no guarda nada)
+     identificar_microsoft
+                { token, cargo, campus_id?, nombre? } + Authorization: Bearer <access_token>
+                                                → lo mismo que identificar, con el correo confirmado
      revisar    { token, aportante_id, sesion, tipo, filas:[{fila, cruda}] }
                                                 → { resultados, enviados, limite }      (no guarda)
      enviar     { token, aportante_id, sesion, tipo, origen, archivo?, filas }
@@ -23,8 +29,11 @@
      · Sin sesión de Supabase: es una página pública. Lo que la protege es el token
        de la invitación y, por persona, un secreto de sesión que solo vive en su
        navegador (la base guarda su SHA-256).
-     · El correo de quien aporta NO se verifica todavía (no hay envío de correos):
-       se comprueba el dominio permitido y queda `correo_verificado = false`.
+     · El correo de quien aporta a mano NO se verifica (no hay envío de correos): se
+       comprueba el dominio permitido y queda `correo_verificado = false`. Quien entra
+       con «Continuar con Microsoft» (migración 0171) queda con el correo confirmado: la
+       función valida su token con Supabase Auth, exige que la identidad sea de Azure y
+       que el dominio sea permitido. Los cinco dominios de la UDES se aceptan siempre.
      · Un campo oculto («web») cazado por un robot rechaza la petición; hay un tope
        de peticiones por minuto y por IP (en memoria, lo mejor que se puede aquí).
      · Hasta 500 filas por envío; el archivo grande lo parte la pantalla en tandas.
@@ -109,7 +118,7 @@ Deno.serve(async (request: Request) => {
     const r = await admin.rpc(nombre, args);
     if (r.error) {
       if (esDePersona(r.error)) return { data: null, respuesta: json({ error: r.error.message }, r.error.code === "P0002" ? 404 : r.error.code === "P0004" ? 401 : 400) };
-      if (/does not exist|schema cache|permission denied/i.test(r.error.message)) return { data: null, respuesta: json({ error: "Falta aplicar la migración 0167 (Contactos).", code: "migracion" }, 500) };
+      if (/does not exist|schema cache|permission denied/i.test(r.error.message)) return { data: null, respuesta: json({ error: "Falta aplicar la migración 0167 o la 0171 (Contactos).", code: "migracion" }, 500) };
       console.error("int-contactos", nombre, r.error.message);
       return { data: null, respuesta: json({ error: "No se pudo completar la operación. Intente de nuevo." }, 500) };
     }
@@ -134,6 +143,45 @@ Deno.serve(async (request: Request) => {
     if (campus && !UUID.test(campus)) return json({ error: "Campus no válido." }, 400);
     const clave = secreto();
     const r = await rpc<Record<string, unknown>>("int_contactos_identificar", {
+      p_token: token,
+      p_nombre: datos.nombre,
+      p_cargo: datos.cargo,
+      p_correo: datos.correo,
+      p_campus: campus || null,
+      p_hash: await sha256(clave),
+    });
+    if (r.respuesta) return r.respuesta;
+    return json({ ...r.data, sesion: clave });
+  }
+
+  if (accion === "microsoft_datos" || accion === "identificar_microsoft") {
+    const info = await rpc<{ dominios: string[]; campus: { id: string } | null } | null>("int_contactos_invitacion", { p_token: token });
+    if (info.respuesta) return info.respuesta;
+    if (!info.data) return json({ error: "Este enlace no es válido." }, 404);
+    // La cuenta de Microsoft: el token lo emitió Supabase Auth al volver de Azure.
+    const jwt = (request.headers.get("authorization") ?? "").replace(/^Bearer\s+/i, "").trim();
+    if (jwt.length < 20) return json({ error: "No llegó la confirmación de Microsoft. Intente de nuevo.", code: "microsoft" }, 401);
+    const u = await admin.auth.getUser(jwt);
+    const usuario = u.data.user;
+    if (u.error || !usuario) return json({ error: "La confirmación de Microsoft venció. Vuelva a pulsar «Continuar con Microsoft».", code: "microsoft" }, 401);
+    const deAzure = usuario.app_metadata?.provider === "azure" || (usuario.identities ?? []).some((x) => x.provider === "azure");
+    if (!deAzure) return json({ error: "Esa sesión no es de una cuenta de Microsoft.", code: "microsoft" }, 401);
+    const meta = (usuario.user_metadata ?? {}) as Record<string, unknown>;
+    const correo = limpiar(usuario.email ?? meta.email).toLowerCase();
+    const nombreMs = limpiar(meta.full_name ?? meta.name);
+    const prueba = validarAportante({ nombre: nombreMs || "Sin nombre", cargo: "Cargo", correo }, info.data.dominios);
+    if (prueba.errores.some((e) => /correo/i.test(e))) {
+      return json({ error: `El correo de su cuenta Microsoft (${correo || "sin correo"}) no es un correo institucional de la UDES.`, code: "dominio" }, 400);
+    }
+    if (accion === "microsoft_datos") return json({ nombre: nombreMs, correo });
+
+    const nombre = nombreMs || limpiar(c.nombre);
+    const { errores, datos } = validarAportante({ nombre, cargo: String(c.cargo ?? ""), correo }, info.data.dominios);
+    if (errores.length) return json({ error: errores.join(" ") }, 400);
+    const campus = String(c.campus_id ?? "");
+    if (campus && !UUID.test(campus)) return json({ error: "Campus no válido." }, 400);
+    const clave = secreto();
+    const r = await rpc<Record<string, unknown>>("int_contactos_identificar_microsoft", {
       p_token: token,
       p_nombre: datos.nombre,
       p_cargo: datos.cargo,

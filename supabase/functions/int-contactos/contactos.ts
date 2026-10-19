@@ -228,6 +228,83 @@ export function correoPermitido(correo: string, dominios: readonly string[]): bo
   });
 }
 
+/** Los dominios de correo institucional de la UDES: siempre se aceptan, además de los de cada invitación. */
+export const DOMINIOS_INSTITUCIONALES: readonly string[] = ["udes.edu.co", "valledupar.udes.edu.co", "cucuta.udes.edu.co", "bogota.udes.edu.co", "mail.udes.edu.co"];
+
+const limpioDominio = (x: string) => x.trim().toLowerCase().replace(/^@/, "");
+
+/**
+ * Los dominios que se SUGIEREN en el formulario: los cinco institucionales y, después,
+ * los que la invitación sume. Sin repetidos y sin «@».
+ */
+export function dominiosSugeridos(deLaInvitacion: readonly string[] = []): string[] {
+  return [...new Set([...DOMINIOS_INSTITUCIONALES, ...deLaInvitacion.map(limpioDominio)].filter(Boolean))];
+}
+
+/**
+ * Los dominios que se ACEPTAN (lo que valida el servidor): los de la invitación más los cinco
+ * institucionales, siempre. Una invitación sin dominios (lista vacía) no restringe a nadie.
+ */
+export function dominiosAceptados(deLaInvitacion: readonly string[] = []): string[] {
+  return deLaInvitacion.some((d) => limpioDominio(d)) ? dominiosSugeridos(deLaInvitacion) : [];
+}
+
+/** El dominio institucional que le toca a un campus (por su nombre); udes.edu.co si no se reconoce. */
+export function dominioDeCampus(nombre: string | null | undefined): string {
+  const n = normalizar(nombre ?? "");
+  if (n.includes("valledupar")) return "valledupar.udes.edu.co";
+  if (n.includes("cucuta")) return "cucuta.udes.edu.co";
+  if (n.includes("bogota")) return "bogota.udes.edu.co";
+  return "udes.edu.co";
+}
+
+export type EstadoCorreo = "vacio" | "escribiendo" | "invalido" | "dominio_no_permitido" | "ok";
+
+export interface AnalisisCorreo {
+  estado: EstadoCorreo;
+  /** Lo que va antes de la arroba. */
+  local: string;
+  /** El dominio reconocido (de la lista o un subdominio permitido), o null si aún no hay uno. */
+  dominio: string | null;
+  /** Lo que la persona escribió después de la arroba, si escribió una. */
+  escrito: string | null;
+  /** El correo completo, solo si está bien. */
+  correo: string;
+  /** Hubo una arroba y se separó solo el dominio. */
+  separado: boolean;
+}
+
+const LOCAL = /^[A-Za-z0-9._%+-]+$/;
+
+/**
+ * Lee lo que la persona escribe en el campo de correo. Si trae arroba, separa el dominio
+ * (el que reconoce de la lista); si no, usa el dominio elegido. `aceptados` vacío no restringe.
+ */
+export function analizarCorreo(entrada: string, elegido: string, aceptados: readonly string[], sugeridos: readonly string[] = dominiosSugeridos()): AnalisisCorreo {
+  const t = entrada.replace(/\s+/g, "").trim();
+  const base = { estado: "vacio" as EstadoCorreo, local: "", dominio: null as string | null, escrito: null as string | null, correo: "", separado: false };
+  if (!t) return base;
+  const arroba = t.lastIndexOf("@");
+  if (arroba < 0) {
+    const local = t;
+    if (!LOCAL.test(local)) return { ...base, estado: "invalido", local, dominio: elegido };
+    const correo = `${local.toLowerCase()}@${elegido}`;
+    return { ...base, estado: "ok", local, dominio: elegido, correo };
+  }
+  const local = t.slice(0, arroba);
+  const escrito = t.slice(arroba + 1).toLowerCase();
+  if (local && !LOCAL.test(local)) return { ...base, estado: "invalido", local, escrito };
+  if (!local) return { ...base, estado: "escribiendo", escrito };
+  if (!escrito) return { ...base, estado: "escribiendo", local, escrito: "" };
+  const exacto = sugeridos.find((d) => d === escrito);
+  const permitido = exacto ?? (correoPermitido(`${local}@${escrito}`, aceptados) && /^[a-z0-9-]+(\.[a-z0-9-]+)+$/.test(escrito) ? escrito : null);
+  if (permitido) return { estado: "ok", local, dominio: permitido, escrito, correo: `${local.toLowerCase()}@${permitido}`, separado: true };
+  // A medias («ude» puede ser el principio de «udes.edu.co» y «gmail» aún no es un dominio): no se regaña mientras escribe.
+  const completo = /^[a-z0-9-]+(\.[a-z0-9-]+)+$/.test(escrito);
+  if (!completo || sugeridos.some((d) => d.startsWith(escrito))) return { ...base, estado: "escribiendo", local, escrito };
+  return { ...base, estado: "dominio_no_permitido", local, escrito };
+}
+
 /* ---------- Quién aporta ------------------------------------------------------------- */
 
 export interface DatosAportante {
@@ -240,10 +317,11 @@ export interface DatosAportante {
 export function validarAportante(a: Partial<DatosAportante>, dominios: readonly string[]): { errores: string[]; datos: DatosAportante } {
   const datos = { nombre: limpiar(a.nombre), cargo: limpiar(a.cargo), correo: normalizarCorreo(a.correo) };
   const errores: string[] = [];
+  const aceptados = dominiosAceptados(dominios);
   if (datos.nombre.length < 3 || datos.nombre.length > 160) errores.push("Escriba su nombre completo.");
   if (datos.cargo.length < 2 || datos.cargo.length > 120) errores.push("Escriba su cargo en la UDES.");
   if (!correoValido(datos.correo)) errores.push("El correo no tiene forma de correo.");
-  else if (!correoPermitido(datos.correo, dominios)) errores.push(`Use su correo institucional (${dominios.map((d) => `@${d.replace(/^@/, "")}`).join(" o ")}).`);
+  else if (!correoPermitido(datos.correo, aceptados)) errores.push(`Use su correo institucional (${aceptados.map((d) => `@${d}`).join(", ")}).`);
   return { errores, datos };
 }
 

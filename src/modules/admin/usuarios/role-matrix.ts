@@ -25,11 +25,11 @@
 
    Impacto es la excepción, y por eso no depende de la capacidad: allí manda
    la pertenencia a una unidad. El rol lleva su nivel (Ver · Editar ·
-   Administrar → impact_level none · editor · admin) y su alcance (todas las
-   unidades, o las vicerrectorías, oficinas, facultades y programas de
-   access_role_units). La base lo traduce a pertenencias efectivas
-   (imp_my_memberships, 0154): Editar es lo que hace un Contribuyente de esa
-   unidad y Administrar, lo que hace un Gestor.
+   Administrar → impact_level none · editor · admin). Las unidades y la sede ya
+   no se eligen en el rol: se asignan en la ficha de la persona (función
+   Gestor o Contribuyente por unidad). Un rol guardado con alcance antiguo
+   (all_impact_units / access_role_units, 0154) lo conserva: el editor no lo
+   muestra pero lo respeta al guardar, y la base lo sigue sumando.
 
    Informes de gestión sigue el mismo camino en pequeño (0169): quien pertenece a
    una unidad escribe el informe de su unidad; el rol puede además darle el de
@@ -128,11 +128,11 @@ export const MODULES: ModuleDef[] = [
     levels: {
       ver: { hint: "Consulta las fichas y cifras de lo suyo; la vista completa es de Planeación.", needs: "consulta" },
       editar: {
-        hint: "Define fichas y captura datos de las vicerrectorías, facultades y programas que se le asignen.",
+        hint: "Define fichas y captura datos de las unidades donde se le asigne Contribuyente. Las unidades y la sede se asignan en la ficha de la persona.",
         needs: "consulta",
       },
       administrar: {
-        hint: "Además publica, revisa y emite los informes de las unidades que se le asignen.",
+        hint: "Además publica, revisa y emite los informes de las unidades donde se le asigne Gestor. Las unidades y la sede se asignan en la ficha de la persona.",
         needs: "consulta",
       },
     },
@@ -284,7 +284,7 @@ export interface ModuleChoice {
   screens: AdminScreen[];
 }
 
-/** Alcance en Impacto: toda la estructura, o estas unidades (ids de `units`). */
+/** Alcance heredado en Impacto (ya no se edita en el rol, pero se conserva): toda la estructura, o estas unidades (ids de `units`). */
 export interface ImpactScope {
   allUnits: boolean;
   units: string[];
@@ -302,7 +302,7 @@ export interface Matrix {
   /** UDES en Cifras: todos los informes o estos. */
   allReports: boolean;
   reports: string[];
-  /** Indicadores de Impacto: sobre qué unidades edita o administra. */
+  /** Indicadores de Impacto: alcance heredado de roles guardados antes; el editor lo conserva sin mostrarlo. */
   impact: ImpactScope;
   /** Informes de gestión: las unidades cuyo informe escribe el rol. */
   informe: InformeScope;
@@ -497,8 +497,8 @@ export function templateMatrix(template: Exclude<TemplateId, "personalizada">): 
   }
   for (const module of MODULES) {
     const levels = Object.keys(module.levels) as Level[];
-    // Impacto se queda en «ver»: la administración ya manda sobre todo, y Editar
-    // o Administrar allí piden un alcance, que una plantilla no puede adivinar.
+    // Impacto se queda en «ver»: sus unidades se asignan en la ficha de cada
+    // persona, y una plantilla no puede adivinarlas.
     modules[module.id] = full(module.id, module.id === "impacto" ? "ver" : levels[levels.length - 1]);
   }
   return base;
@@ -561,13 +561,10 @@ export function describe(
   if (impacto === "editar" || impacto === "administrar") {
     const does = impacto === "editar" ? "define fichas y captura datos" : "define, captura, publica, revisa y emite informes";
     const names = matrix.impact.units.map((id) => unitNames.get(id) ?? "una unidad retirada");
-    lines.push(
-      matrix.impact.allUnits
-        ? `En Indicadores de Impacto ${does} de toda la estructura.`
-        : names.length > 0
-          ? `En Indicadores de Impacto ${does} de: ${list(names)}.`
-          : "En Indicadores de Impacto no tiene unidades asignadas: no actúa sobre ninguna.",
-    );
+    const own = `En Indicadores de Impacto ${does} en las unidades donde se le asigne ${impacto === "editar" ? "Contribuyente" : "Gestor"} (se asignan en su ficha).`;
+    lines.push(own);
+    if (matrix.impact.allUnits) lines.push("Además, por el alcance que ya traía el rol, actúa sobre toda la estructura.");
+    else if (names.length > 0) lines.push(`Además, por el alcance que ya traía el rol, actúa sobre: ${list(names)}.`);
   }
   const informes = effectiveLevel(matrix, "informes");
   if (informes !== "none" && matrix.informe.level !== "none") {

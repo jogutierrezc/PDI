@@ -792,7 +792,10 @@ export function decidirEnvio(caso: { tipo: Tipo; encendido: boolean; permitido: 
 
 /* --- El servidor de correo ------------------------------------------------------------------- */
 
-export type Seguridad = "starttls" | "ssl";
+/** «none»: sin cifrado ni contraseña, para un servidor de pruebas como Mailpit (puerto 1025). */
+export type Seguridad = "starttls" | "ssl" | "none";
+
+export const seguridadDe = (v: unknown): Seguridad => (v === "ssl" ? "ssl" : v === "none" ? "none" : "starttls");
 
 export interface Conexion {
   host: string;
@@ -819,14 +822,15 @@ export function conexionDe(ajustes: unknown, clave: unknown, env: Record<string,
   };
   if (s(a.smtp_host)) {
     const port = puerto(a.smtp_port, 587);
-    return { host: s(a.smtp_host), port, seguridad: a.smtp_security === "ssl" ? "ssl" : "starttls", user: s(a.smtp_user), pass: (typeof clave === "string" && clave) || env.SMTP_PASS || "", origen: "base" };
+    return { host: s(a.smtp_host), port, seguridad: seguridadDe(a.smtp_security), user: s(a.smtp_user), pass: (typeof clave === "string" && clave) || env.SMTP_PASS || "", origen: "base" };
   }
   const host = s(env.SMTP_HOST);
   if (!host) return { host: "", port: 587, seguridad: "starttls", user: "", pass: "", origen: "ninguno" };
   const port = puerto(env.SMTP_PORT, 587);
   const seguro = s(env.SMTP_SECURE).toLowerCase();
   const ssl = seguro ? ["ssl", "tls", "ssl/tls", "true", "1", "si", "sí"].includes(seguro) : port === 465;
-  return { host, port, seguridad: ssl ? "ssl" : "starttls", user: s(env.SMTP_USER), pass: env.SMTP_PASS ?? "", origen: "entorno" };
+  const sinCifrado = ["none", "ninguna", "no", "false", "0", "plain"].includes(seguro);
+  return { host, port, seguridad: sinCifrado ? "none" : ssl ? "ssl" : "starttls", user: s(env.SMTP_USER), pass: env.SMTP_PASS ?? "", origen: "entorno" };
 }
 
 /** Tiempos límite del servidor de correo, en milisegundos. Cortos: el servidor de cuentas espera pocos segundos. */

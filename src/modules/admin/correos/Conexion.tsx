@@ -166,9 +166,10 @@ export function Conexion({ config }: { config: Configuracion }) {
             </label>
             <label className="admin-field">
               <span>Seguridad</span>
-              <select value={ajustes.seguridad} onChange={(e) => poner("seguridad", e.target.value === "ssl" ? "ssl" : "starttls")}>
+              <select value={ajustes.seguridad} onChange={(e) => poner("seguridad", e.target.value === "ssl" ? "ssl" : e.target.value === "none" ? "none" : "starttls")}>
                 <option value="starttls">STARTTLS (con 587)</option>
                 <option value="ssl">SSL/TLS (con 465)</option>
+                <option value="none">Sin cifrado (Mailpit, con 1025)</option>
               </select>
             </label>
           </div>

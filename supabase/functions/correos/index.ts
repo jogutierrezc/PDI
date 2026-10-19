@@ -836,7 +836,10 @@ export function decidirEnvio(caso: { tipo: Tipo; encendido: boolean; permitido: 
 
 /* --- El servidor de correo ------------------------------------------------------------------- */
 
-export type Seguridad = "starttls" | "ssl";
+/** «none»: sin cifrado ni contraseña, para un servidor de pruebas como Mailpit (puerto 1025). */
+export type Seguridad = "starttls" | "ssl" | "none";
+
+export const seguridadDe = (v: unknown): Seguridad => (v === "ssl" ? "ssl" : v === "none" ? "none" : "starttls");
 
 export interface Conexion {
   host: string;
@@ -863,14 +866,15 @@ export function conexionDe(ajustes: unknown, clave: unknown, env: Record<string,
   };
   if (s(a.smtp_host)) {
     const port = puerto(a.smtp_port, 587);
-    return { host: s(a.smtp_host), port, seguridad: a.smtp_security === "ssl" ? "ssl" : "starttls", user: s(a.smtp_user), pass: (typeof clave === "string" && clave) || env.SMTP_PASS || "", origen: "base" };
+    return { host: s(a.smtp_host), port, seguridad: seguridadDe(a.smtp_security), user: s(a.smtp_user), pass: (typeof clave === "string" && clave) || env.SMTP_PASS || "", origen: "base" };
   }
   const host = s(env.SMTP_HOST);
   if (!host) return { host: "", port: 587, seguridad: "starttls", user: "", pass: "", origen: "ninguno" };
   const port = puerto(env.SMTP_PORT, 587);
   const seguro = s(env.SMTP_SECURE).toLowerCase();
   const ssl = seguro ? ["ssl", "tls", "ssl/tls", "true", "1", "si", "sí"].includes(seguro) : port === 465;
-  return { host, port, seguridad: ssl ? "ssl" : "starttls", user: s(env.SMTP_USER), pass: env.SMTP_PASS ?? "", origen: "entorno" };
+  const sinCifrado = ["none", "ninguna", "no", "false", "0", "plain"].includes(seguro);
+  return { host, port, seguridad: sinCifrado ? "none" : ssl ? "ssl" : "starttls", user: s(env.SMTP_USER), pass: env.SMTP_PASS ?? "", origen: "entorno" };
 }
 
 /** Tiempos límite del servidor de correo, en milisegundos. Cortos: el servidor de cuentas espera pocos segundos. */
@@ -987,6 +991,8 @@ function transporteDe(c: Conexion) {
     port: c.port,
     secure: c.seguridad === "ssl",
     requireTLS: c.seguridad === "starttls",
+    // Sin cifrado (Mailpit): ni siquiera se ofrece STARTTLS.
+    ...(c.seguridad === "none" ? { ignoreTLS: true } : {}),
     ...(c.user ? { auth: { user: c.user, pass: c.pass } } : {}),
     connectionTimeout: SMTP_CONEXION_MS,
     greetingTimeout: SMTP_SALUDO_MS,
@@ -1208,7 +1214,7 @@ async function panel(request: Request, crudo: string, url: string, anonKey: stri
     const ctx = await contextoDe(admin, "", "");
     // Se prueba lo que está escrito en la pantalla, aunque aún no se haya guardado; la contraseña es la guardada.
     const escrito = s(body.host, 200)
-      ? { smtp_host: s(body.host, 200).toLowerCase(), smtp_port: Number(body.port), smtp_security: body.security === "ssl" ? "ssl" : "starttls", smtp_user: s(body.user, 254) }
+      ? { smtp_host: s(body.host, 200).toLowerCase(), smtp_port: Number(body.port), smtp_security: seguridadDe(body.security), smtp_user: s(body.user, 254) }
       : (ctx?.settings ?? null);
     const conexion = conexionDe(escrito, ctx?.password ?? "", variablesSmtp());
     if (conexion.origen === "ninguno") return json({ ok: false, code: "config", error: "Escriba el servidor antes de probar." });

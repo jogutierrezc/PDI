@@ -106,7 +106,7 @@ export async function leerConfiguracion(): Promise<Leido<Configuracion>> {
         encendido: a.enabled !== false,
         host: s(a.smtp_host),
         puerto: String(a.smtp_port ?? 587),
-        seguridad: a.smtp_security === "ssl" ? "ssl" : "starttls",
+        seguridad: a.smtp_security === "ssl" ? "ssl" : a.smtp_security === "none" ? "none" : "starttls",
         usuario: s(a.smtp_user),
         topeHora: String(a.hourly_limit ?? 200),
         topePersona: String(a.person_daily_limit ?? 5),

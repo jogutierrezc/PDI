@@ -477,6 +477,15 @@ describe("el servidor de correo", () => {
     expect(conexionDe(null, "", { ...ENV, SMTP_PORT: "nada" })).toMatchObject({ port: 587 });
   });
 
+  it("un servidor sin cifrado (Mailpit) se guarda y se respeta, sin usuario ni contraseña", () => {
+    expect(conexionDe({ smtp_host: "mailpit", smtp_port: 1025, smtp_security: "none", smtp_user: "" }, "", {})).toEqual({
+      host: "mailpit", port: 1025, seguridad: "none", user: "", pass: "", origen: "base",
+    });
+    expect(conexionDe(null, "", { ...ENV, SMTP_PORT: "1025", SMTP_SECURE: "none" })).toMatchObject({ seguridad: "none", port: 1025 });
+    // Cualquier otro valor guardado sigue siendo STARTTLS.
+    expect(conexionDe({ smtp_host: "x.co", smtp_security: "ninguna" }, "", {})).toMatchObject({ seguridad: "starttls" });
+  });
+
   it("sin nada, lo dice", () => {
     expect(conexionDe(null, "", {}).origen).toBe("ninguno");
   });

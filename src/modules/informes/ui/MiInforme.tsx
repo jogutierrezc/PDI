@@ -14,6 +14,7 @@ import { useEntrada } from "../../rankings/movimiento";
 import { esViva } from "../cifras-vivas";
 import {
   piloRedactar,
+  usePlanUnidad,
   useAgregarEnlace,
   useAsegurarCifras,
   useEnviar,
@@ -38,6 +39,7 @@ import type { AnexoRow, CicloRow, ContenidoSeccion, InstanciaRow, PilarRef, Requ
 import { CargaEvidencias, Logros, Matriz, TablaAnexos, TablaFilas, TablaMetas, TablaPilares } from "./Bloques";
 import { BloqueCifras } from "./Cifras";
 import { TablaMetasPrograma } from "./MetasPrograma";
+import { ResumenPlan, TablaPlan } from "./PlanFacultad";
 import type { NuevoPropio } from "./Cifras";
 import { Aviso, Barra, Cargando, Controles, EstadoPill, Tag, Vacio, fmtFecha, mensajeDe } from "./comunes";
 import { useModeloInforme } from "./modelo";
@@ -123,7 +125,10 @@ export function MiInforme({ ciclo, requisitos }: { ciclo: CicloRow; requisitos: 
 /* ---------- El editor ---------------------------------------------------------- */
 
 function Editor({ inst, ciclo, requisitos, unidad, actor }: { inst: InstanciaRow; ciclo: CicloRow; requisitos: RequisitoRow[]; unidad: UnidadRef; actor: RolActor | null }) {
-  const m = useModeloInforme(inst, ciclo, requisitos);
+  // Facultad: el Plan de Trabajo (API) trae las acciones de las secciones de metas y de dimensiones.
+  const esFacultad = unidad.kind === "facultad";
+  const plan = usePlanUnidad(unidad.id, esFacultad);
+  const m = useModeloInforme(inst, ciclo, requisitos, plan.data?.acciones ?? []);
   const editable = puedeEditar(inst.estado, actor);
   const pilares = usePilares();
   const fuentes = useFuentes();
@@ -234,7 +239,7 @@ function Editor({ inst, ciclo, requisitos, unidad, actor }: { inst: InstanciaRow
       );
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps -- cuenta lo leído
-  }, [m.secciones.data, m.filas.data, m.anexos.data, m.vivas.data, editable, m.cargando]);
+  }, [m.secciones.data, m.filas.data, m.anexos.data, m.vivas.data, plan.data, editable, m.cargando]);
 
   if (m.error) return <Aviso error={m.error} />;
   if (m.cargando) return <Cargando texto="Cargando las secciones…" />;
@@ -372,6 +377,8 @@ function Editor({ inst, ciclo, requisitos, unidad, actor }: { inst: InstanciaRow
           m={m}
           inst={inst}
           recibeMetas={recibeMetasDeImpacto(unidad.kind)}
+          esFacultad={esFacultad}
+          plan={plan}
           editable={editable}
           resolver={resolver}
           pilares={pilares.data ?? []}
@@ -445,6 +452,8 @@ function CuerpoSeccion({
   m,
   inst,
   recibeMetas,
+  esFacultad,
+  plan,
   editable,
   resolver,
   pilares,
@@ -463,6 +472,9 @@ function CuerpoSeccion({
   inst: InstanciaRow;
   /** Programa o facultad: sus metas vienen de los indicadores del programa. */
   recibeMetas: boolean;
+  /** Facultad: metas y resultados por dimensión salen del Plan de Trabajo. */
+  esFacultad: boolean;
+  plan: ReturnType<typeof usePlanUnidad>;
   editable: boolean;
   resolver: ReturnType<typeof resolverDe>;
   pilares: PilarRef[];
@@ -524,6 +536,22 @@ function CuerpoSeccion({
       const delPrograma = recibeMetas || m.metasPrograma.length > 0;
       return (
         <>
+          {esFacultad && (
+            <div className="inf-blk">
+              <div className="inf-blk__lab">
+                <Tag auto />
+                <span className="inf-src">Plan de Trabajo 2026 · las acciones vienen del plan; las filas no se editan, añada su análisis</span>
+              </div>
+              <TablaPlan
+                plan={plan.data}
+                cargando={plan.isPending}
+                error={plan.error instanceof Error ? plan.error : null}
+                observaciones={c.observaciones ?? {}}
+                editable={editable}
+                cambiarObservacion={(clave, t) => cambiar({ ...c, observaciones: { ...c.observaciones, [clave]: t } })}
+              />
+            </div>
+          )}
           {delPrograma && (
             <div className="inf-blk">
               <div className="inf-blk__lab">
@@ -577,6 +605,15 @@ function CuerpoSeccion({
               quitarPropio={quitarPropio}
             />
           </div>
+          {esFacultad && (
+            <div className="inf-blk">
+              <div className="inf-blk__lab">
+                <Tag auto />
+                <span className="inf-src">Avance del Plan de Trabajo por dimensión</span>
+              </div>
+              <ResumenPlan plan={plan.data} cargando={plan.isPending} error={plan.error instanceof Error ? plan.error : null} />
+            </div>
+          )}
           {def.consolida && (
             <div className="inf-blk">
               <div className="inf-blk__lab">

@@ -5,6 +5,7 @@ import { congelado, vistaCifra } from "../cifras-vivas";
 import type { CifraVista } from "../cifras-vivas";
 import { condicionDe, useAnexos, useCifras, useCifrasVivas, useSecciones } from "../datos";
 import { esMetaDelPrograma, filasMetaPrograma } from "../metas-programa";
+import type { PlanAccion } from "../plan-decanatura";
 import { PLANTILLAS, clavesDe, DIMS } from "../plantillas";
 import { avanceSeccion } from "../validacion";
 import type { Avance, ContextoSeccion } from "../validacion";
@@ -13,7 +14,8 @@ import type { CicloRow, ConfigCiclo, ContenidoSeccion, InstanciaRow, RequisitoRo
 export const CONFIG_BASE: ConfigCiclo = { limite_propios: 3, exigir_fuente: true, exigir_pilar: false };
 export const configDe = (ciclo: CicloRow | null | undefined): ConfigCiclo => ({ ...CONFIG_BASE, ...(ciclo?.config ?? {}) });
 
-export function useModeloInforme(inst: InstanciaRow, ciclo: CicloRow, requisitos: RequisitoRow[]) {
+/** `acciones`: las del Plan de Trabajo de la facultad (vacío si la unidad no tiene plan). */
+export function useModeloInforme(inst: InstanciaRow, ciclo: CicloRow, requisitos: RequisitoRow[], acciones: PlanAccion[] = []) {
   const secciones = useSecciones(inst.id);
   const filas = useCifras(inst.id);
   const frio = congelado(inst.estado);
@@ -43,6 +45,7 @@ export function useModeloInforme(inst: InstanciaRow, ciclo: CicloRow, requisitos
     anexos: anexos.data?.length ?? 0,
     exigirFuente: config.exigir_fuente,
     metasPrograma: metasPrograma.length,
+    metasPlan: acciones.length,
   });
 
   const avance = (def: SeccionDef, contenido?: ContenidoSeccion): Avance => avanceSeccion(def, contenido ?? contenidoGuardado(def.clave), contexto(def));

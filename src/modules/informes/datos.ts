@@ -13,6 +13,7 @@ import { supabase } from "../../lib/supabase";
 import { FaltaMigracion } from "../rankings/noticias";
 import { nombreSeguro } from "../rankings/reporte/datos";
 import { aNumero } from "./cifras-vivas";
+import type { RespuestaPlan } from "./plan-decanatura";
 import type {
   AnexoRow,
   CicloRow,
@@ -309,6 +310,31 @@ export function useFuentes() {
     staleTime: 5 * 60_000,
     queryFn: async (): Promise<FuenteRow[]> =>
       revisar<FuenteRow[] | null>(await supabase.from("informe_fuentes").select("clave, nombre, tipo, consulta, activa").eq("activa", true)) ?? [],
+  });
+}
+
+/** El plan de trabajo de la facultad de la unidad (API del plan, por la función informe-plan). */
+export function usePlanUnidad(unitId: string | undefined, activo: boolean) {
+  return useQuery({
+    queryKey: ["informes", "plan", unitId ?? ""],
+    enabled: activo && Boolean(unitId),
+    retry: false,
+    staleTime: 10 * 60_000,
+    queryFn: async (): Promise<RespuestaPlan> => {
+      const r = await supabase.functions.invoke("informe-plan", { body: { unit_id: unitId } });
+      if (r.error) {
+        const ctx = (r.error as { context?: Response }).context;
+        let mensaje = r.error.message;
+        try {
+          const j = ctx ? ((await ctx.json()) as { error?: string }) : null;
+          if (j?.error) mensaje = j.error;
+        } catch {
+          // Sin cuerpo JSON: queda el mensaje del cliente.
+        }
+        throw new Error(mensaje);
+      }
+      return r.data as RespuestaPlan;
+    },
   });
 }
 

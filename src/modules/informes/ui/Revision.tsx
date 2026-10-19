@@ -8,7 +8,7 @@
 import { useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { useFundido } from "../../rankings/movimiento";
-import { useInstancias, usePilares, useRevisar, useUnidades } from "../datos";
+import { useInstancias, usePilares, usePlanUnidad, useRevisar, useUnidades } from "../datos";
 import { componerNota, leerNota } from "../estados";
 import type { CicloRow, ContenidoSeccion, EstadoInstancia, InstanciaRow, PilarRef, RequisitoRow, SeccionDef } from "../types";
 import { Matriz, TablaAnexos, TablaFilas, TablaMetas } from "./Bloques";
@@ -40,6 +40,7 @@ export function Revision({ ciclo, requisitos }: { ciclo: CicloRow; requisitos: R
   if (instancias.isPending || unidades.isPending) return <Cargando texto="Cargando los informes…" />;
 
   const nombre = new Map((unidades.data ?? []).map((u) => [u.id, u.name]));
+  const kindDe = new Map((unidades.data ?? []).map((u) => [u.id, u.kind]));
   const lista = (instancias.data ?? []).filter((i) => filtro === "todos" || i.estado === filtro);
   const inst = (instancias.data ?? []).find((i) => i.id === elegido) ?? null;
   const elegir = (id: string) => {
@@ -85,7 +86,7 @@ export function Revision({ ciclo, requisitos }: { ciclo: CicloRow; requisitos: R
       </div>
       <div ref={detalle}>
         {inst ? (
-          <Detalle key={inst.id} inst={inst} ciclo={ciclo} requisitos={requisitos} unidad={nombre.get(inst.unit_id) ?? "Unidad"} />
+          <Detalle key={inst.id} inst={inst} ciclo={ciclo} requisitos={requisitos} unidad={nombre.get(inst.unit_id) ?? "Unidad"} esFacultad={kindDe.get(inst.unit_id) === "facultad"} />
         ) : (
           <Vacio>Elija un informe de la lista para leerlo y decidir.</Vacio>
         )}
@@ -94,8 +95,9 @@ export function Revision({ ciclo, requisitos }: { ciclo: CicloRow; requisitos: R
   );
 }
 
-function Detalle({ inst, ciclo, requisitos, unidad }: { inst: InstanciaRow; ciclo: CicloRow; requisitos: RequisitoRow[]; unidad: string }) {
-  const m = useModeloInforme(inst, ciclo, requisitos);
+function Detalle({ inst, ciclo, requisitos, unidad, esFacultad }: { inst: InstanciaRow; ciclo: CicloRow; requisitos: RequisitoRow[]; unidad: string; esFacultad: boolean }) {
+  const plan = usePlanUnidad(inst.unit_id, esFacultad);
+  const m = useModeloInforme(inst, ciclo, requisitos, plan.data?.acciones ?? []);
   const pilares = usePilares();
   const revisar = useRevisar();
   const previa = leerNota(inst.nota_revision);

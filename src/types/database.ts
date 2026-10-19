@@ -80,6 +80,10 @@ export interface AccessRole {
   impact_level: ImpactLevel;
   /** Impacto: el alcance es toda la estructura; si no, las unidades de access_role_units. */
   all_impact_units: boolean;
+  /** Informes Institucionales (0169): none · editor (diligencia) · jefe (además envía) los informes de su alcance. */
+  informe_level?: InformeLevel;
+  /** Informes: el alcance es toda la estructura; si no, las unidades de access_role_informe_units. */
+  all_informe_units?: boolean;
   is_system: boolean;
   position: number;
   created_at?: string;
@@ -87,6 +91,7 @@ export interface AccessRole {
 }
 
 export type ImpactLevel = "none" | "editor" | "admin";
+export type InformeLevel = "none" | "editor" | "jefe";
 
 export interface AccessRoleReport {
   access_role_id: string;

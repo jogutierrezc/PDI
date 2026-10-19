@@ -198,6 +198,7 @@ export function PeopleView({
             units={units}
             reports={access.data?.reports ?? []}
             roleUnits={access.data?.units ?? []}
+            informeUnits={access.data?.informeUnits ?? []}
             roles={roles}
             existing={list.map((person) => person.email)}
             onCancel={() => open({})}
@@ -214,6 +215,7 @@ export function PeopleView({
             roles={roles}
             reports={access.data?.reports ?? []}
             roleUnits={access.data?.units ?? []}
+            informeUnits={access.data?.informeUnits ?? []}
             memberships={membershipsOf(current.id)}
             units={units}
             onNotice={onNotice}
@@ -240,6 +242,7 @@ function PersonDetail({
   roles,
   reports,
   roleUnits = [],
+  informeUnits = [],
   memberships,
   units,
   onNotice,
@@ -251,6 +254,7 @@ function PersonDetail({
   reports: { access_role_id: string; report_slug: string }[];
   /** Alcance de los roles en Impacto (access_role_units). */
   roleUnits?: { access_role_id: string; unit_id: string }[];
+  informeUnits?: { access_role_id: string; unit_id: string }[];
   memberships: Membership[];
   units: UnitOption[];
   onNotice: (text: string) => void;
@@ -299,6 +303,7 @@ function PersonDetail({
     new Map((reportOptions.data ?? []).map((report) => [report.slug, report.name])),
     roleUnits,
     new Map(units.map((unit) => [unit.id, unit.name])),
+    informeUnits,
   );
   const myPillars = (pillars.data ?? []).filter((pillar) =>
     (owners.data ?? []).some((row) => row.profile_id === person.id && row.pillar_id === pillar.id),

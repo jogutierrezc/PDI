@@ -293,11 +293,14 @@ export function useSaveAccessRole() {
       role,
       reports,
       units = [],
+      informeUnits = [],
     }: {
       role: Partial<AccessRole> & { key: string; name: string; base_role: AppRole };
       reports: string[];
       /** Vicerrectorías, oficinas, facultades o programas del alcance (Impacto). */
       units?: string[];
+      /** Unidades cuyo informe escribe el rol (Informes Institucionales, 0169). */
+      informeUnits?: string[];
     }): Promise<AccessRole> => {
       const { id, ...fields } = role;
       const saved = id
@@ -322,6 +325,15 @@ export function useSaveAccessRole() {
           .from("access_role_units")
           .insert(units.map((unit_id) => ({ access_role_id: roleId, unit_id })));
         if (insertUnits.error) throw describe(insertUnits.error);
+      }
+      // Sin la migración 0169 la tabla no existe: solo falla si el rol de verdad pide un alcance de informes.
+      const removeInformes = await supabase.from("access_role_informe_units").delete().eq("access_role_id", roleId);
+      if (removeInformes.error && informeUnits.length > 0) throw describe(removeInformes.error);
+      if (informeUnits.length > 0) {
+        const insertInformes = await supabase
+          .from("access_role_informe_units")
+          .insert(informeUnits.map((unit_id) => ({ access_role_id: roleId, unit_id })));
+        if (insertInformes.error) throw describe(insertInformes.error);
       }
       return saved.data as AccessRole;
     },

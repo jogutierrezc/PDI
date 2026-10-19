@@ -30,6 +30,7 @@ export function UserWizard({
   roles,
   reports,
   roleUnits = [],
+  informeUnits = [],
   existing = [],
   onCancel,
   onCreated,
@@ -39,6 +40,7 @@ export function UserWizard({
   reports: { access_role_id: string; report_slug: string }[];
   /** Alcance de los roles en Impacto (access_role_units). */
   roleUnits?: { access_role_id: string; unit_id: string }[];
+  informeUnits?: { access_role_id: string; unit_id: string }[];
   /** Correos que ya tienen perfil, para avisar de un duplicado antes de enviar. */
   existing?: string[];
   onCancel: () => void;
@@ -66,6 +68,7 @@ export function UserWizard({
     new Map((reportOptions.data ?? []).map((report) => [report.slug, report.name])),
     roleUnits,
     new Map(units.map((item) => [item.id, item.name])),
+    informeUnits,
   );
   const problem = membershipProblem(drafts);
 
@@ -157,7 +160,7 @@ export function UserWizard({
       <fieldset className="us-rolepick">
         <legend>Rol de acceso</legend>
         {globalRoles.map((item) => {
-          const matrix = roleMatrix(item, reports, roleUnits);
+          const matrix = roleMatrix(item, reports, roleUnits, informeUnits);
           const template = templateOf(matrix);
           return (
             <label key={item.id} className="us-option us-option--card">

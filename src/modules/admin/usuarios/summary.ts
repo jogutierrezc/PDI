@@ -12,11 +12,12 @@ import { decompile, describe, type Matrix } from "./role-matrix";
 export type RoleReports = { access_role_id: string; report_slug: string }[];
 export type RoleUnits = { access_role_id: string; unit_id: string }[];
 
-export function roleMatrix(role: AccessRole, reports: RoleReports, units: RoleUnits = []): Matrix {
+export function roleMatrix(role: AccessRole, reports: RoleReports, units: RoleUnits = [], informeUnits: RoleUnits = []): Matrix {
   return decompile(
     role,
     reports.filter((row) => row.access_role_id === role.id).map((row) => row.report_slug),
     units.filter((row) => row.access_role_id === role.id).map((row) => row.unit_id),
+    informeUnits.filter((row) => row.access_role_id === role.id).map((row) => row.unit_id),
   );
 }
 
@@ -28,9 +29,10 @@ export function personSummary(
   reportNames: Map<string, string> = new Map(),
   roleUnits: RoleUnits = [],
   unitNames: Map<string, string> = new Map(),
+  informeUnits: RoleUnits = [],
 ): string[] {
   const lines = global
-    ? describe(roleMatrix(global, reports, roleUnits), reportNames, unitNames)
+    ? describe(roleMatrix(global, reports, roleUnits, informeUnits), reportNames, unitNames)
     : ["Sin rol de toda la intranet: entra con lo de siempre."];
   for (const { unit, board, title } of rows) {
     if (!unit) continue;

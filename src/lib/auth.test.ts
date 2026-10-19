@@ -10,12 +10,33 @@ const scope = (screens: string[]): AccessScope =>
 
 describe("screenVisible: el menú y el lanzador enseñan solo lo que se puede usar", () => {
   it("un programa ve Impacto y Mis Tableros, y nada de lo que su rol no abre", () => {
-    const who = { profile: person("responsable"), access: scope(["cifras"]), inAnyUnit: true, impactoSide: "programa" as const };
+    const who = { profile: person("responsable"), access: scope(["cifras", "impacto", "tableros"]), inAnyUnit: true, impactoSide: "programa" as const };
     expect(screenVisible("impacto", who)).toBe(true);
     expect(screenVisible("tableros", who)).toBe(true);
     expect(screenVisible("cifras", who)).toBe(true);
     expect(screenVisible("pillars", who)).toBe(false);
     expect(screenVisible("users", who)).toBe(false);
+  });
+
+  it("pertenecer a una unidad no abre lo que el rol no marca: el rol manda", () => {
+    const who = { profile: person("planeacion"), access: scope(["cifras"]), inAnyUnit: true, impactoSide: "programa" as const };
+    expect(screenVisible("tableros", who)).toBe(false);
+    expect(screenVisible("impacto", who)).toBe(false);
+    expect(screenVisible("monitor", who)).toBe(false);
+    expect(screenVisible("informes", who)).toBe(false);
+    expect(screenVisible("cifras", who)).toBe(true);
+    // Sin rol asignado, pertenecer sí abre, como siempre.
+    const sinRol = { profile: person("responsable"), access: null, inAnyUnit: true, impactoSide: "programa" as const };
+    for (const screen of ["tableros", "impacto", "monitor", "informes"] as const) expect(screenVisible(screen, sinRol)).toBe(true);
+  });
+
+  it("un rol que escribe informes de otras unidades abre Informes sin pertenecer a ninguna", () => {
+    const rol = (informe_level: string) =>
+      ({ role: { all_screens: false, screens: ["informes"], all_reports: true, informe_level }, reports: [] }) as unknown as AccessScope;
+    const base = { profile: person("consulta"), inAnyUnit: false, impactoSide: null };
+    expect(screenVisible("informes", { ...base, access: rol("editor") })).toBe(true);
+    expect(screenVisible("informes", { ...base, access: rol("jefe") })).toBe(true);
+    expect(screenVisible("informes", { ...base, access: rol("none") })).toBe(false);
   });
 
   it("pertenecer a una oficina sin función no da Impacto", () => {

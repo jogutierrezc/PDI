@@ -32,6 +32,38 @@ import type {
 } from "./types";
 
 export { useMembresiasPropias } from "../rankings/reporte/datos";
+
+/** Papel por unidad, de menor a mayor, para quedarse con el más fuerte cuando se suman dos fuentes. */
+const FUERZA: Record<string, number> = { visor: 1, editor: 2, jefe: 3 };
+
+/**
+ * Las unidades cuyo informe escribe la persona: aquellas a las que pertenece
+ * (unit_members) más las que le da su rol de acceso (informe_mis_unidades, 0169).
+ * Sin esa migración solo cuentan las primeras.
+ */
+export function useMembresiasInforme(perfil: string | undefined) {
+  return useQuery({
+    queryKey: ["informes", "membresias", perfil ?? ""],
+    enabled: Boolean(perfil),
+    retry: false,
+    queryFn: async (): Promise<{ unidad: string; rol: "visor" | "editor" | "jefe"; nombre: string }[]> => {
+      const propias = await supabase.from("unit_members").select("unit_id, role, units(name)").eq("profile_id", perfil ?? "");
+      if (propias.error) throw errorDe(propias.error);
+      const porUnidad = new Map<string, { unidad: string; rol: "visor" | "editor" | "jefe"; nombre: string }>();
+      const poner = (unidad: string, rol: "visor" | "editor" | "jefe", nombre: string) => {
+        const previa = porUnidad.get(unidad);
+        if (!previa || FUERZA[rol] > FUERZA[previa.rol]) porUnidad.set(unidad, { unidad, rol, nombre: nombre || previa?.nombre || "Unidad" });
+      };
+      const filas = (propias.data as { unit_id: string; role: "visor" | "editor" | "jefe"; units: { name: string } | { name: string }[] | null }[] | null) ?? [];
+      for (const f of filas) poner(f.unit_id, f.role, (Array.isArray(f.units) ? f.units[0]?.name : f.units?.name) ?? "");
+      const delRol = await supabase.rpc("informe_mis_unidades");
+      if (!delRol.error) {
+        for (const f of (delRol.data as { unit_id: string; role: "editor" | "jefe" }[] | null) ?? []) poner(f.unit_id, f.role, "");
+      }
+      return [...porUnidad.values()];
+    },
+  });
+}
 export { FaltaMigracion };
 
 export const BUCKET = "informe-anexos";

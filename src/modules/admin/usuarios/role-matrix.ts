@@ -31,12 +31,17 @@
    (imp_my_memberships, 0154): Editar es lo que hace un Contribuyente de esa
    unidad y Administrar, lo que hace un Gestor.
 
+   Informes de gestión sigue el mismo camino en pequeño (0169): quien pertenece a
+   una unidad escribe el informe de su unidad; el rol puede además darle el de
+   otras (informe_level none · editor · jefe, y su alcance en
+   access_role_informe_units). La base lo une a la pertenencia en informe_actor().
+
    El rol va en el perfil de la persona. Lo que hace en cada unidad donde
    trabaja —Gestor, Contribuyente o Consulta— no es un rol de acceso: es su
    función en esa pertenencia (unit_members.role).
    ========================================================================== */
 
-import type { AccessRole, AdminScreen, AppRole, ImpactLevel } from "../../../types/database";
+import type { AccessRole, AdminScreen, AppRole, ImpactLevel, InformeLevel } from "../../../types/database";
 import { UNIT_ROLE } from "../../tableros/model";
 
 export type Level = "none" | "ver" | "editar" | "administrar";
@@ -170,7 +175,7 @@ export const MODULES: ModuleDef[] = [
   {
     id: "informes",
     label: "Informes de gestión",
-    screens: [{ id: "informes", label: "Informes Institucionales", note: "quien pertenece a una unidad escribe el de su unidad" }],
+    screens: [{ id: "informes", label: "Informes Institucionales", note: "quien pertenece a una unidad escribe el de su unidad; el rol puede darle además el de otras (0169)" }],
     levels: {
       ver: { hint: "Abre la pantalla; escribe el informe de su unidad si pertenece a una.", needs: "consulta" },
       editar: { hint: "Abre, revisa y consolida los informes de todas las unidades.", needs: "planeacion" },
@@ -285,6 +290,13 @@ export interface ImpactScope {
   units: string[];
 }
 
+/** Informes de gestión: qué papel da el rol y sobre qué unidades (ids de `units`). */
+export interface InformeScope {
+  level: InformeLevel;
+  allUnits: boolean;
+  units: string[];
+}
+
 export interface Matrix {
   modules: Record<ModuleId, ModuleChoice>;
   /** UDES en Cifras: todos los informes o estos. */
@@ -292,6 +304,8 @@ export interface Matrix {
   reports: string[];
   /** Indicadores de Impacto: sobre qué unidades edita o administra. */
   impact: ImpactScope;
+  /** Informes de gestión: las unidades cuyo informe escribe el rol. */
+  informe: InformeScope;
 }
 
 /** Lo que se guarda en access_roles (más las listas de informes y de unidades). */
@@ -304,9 +318,13 @@ export interface RoleColumns {
   impact_level: ImpactLevel;
   all_impact_units: boolean;
   units: string[];
+  informe_level: InformeLevel;
+  all_informe_units: boolean;
+  informe_units: string[];
 }
 
 const emptyImpact = (): ImpactScope => ({ allUnits: false, units: [] });
+const emptyInforme = (): InformeScope => ({ level: "none", allUnits: false, units: [] });
 
 /** Nivel de la matriz → columna de la base. Solo Editar y Administrar dan actuar sobre unidades. */
 export const impactLevelOf = (level: Level): ImpactLevel =>
@@ -381,6 +399,8 @@ export function compile(matrix: Matrix): RoleColumns {
   const allReports = cifras && (matrix.allReports || matrix.modules.cifras.level === "administrar");
   const impactChoice = matrix.modules.impacto;
   const impactLevel = impactChoice.screens.length > 0 ? impactLevelOf(impactChoice.level) : "none";
+  const informeOn = matrix.modules.informes.level !== "none" && matrix.modules.informes.screens.length > 0;
+  const informeLevel: InformeLevel = informeOn ? matrix.informe.level : "none";
   return {
     base_role: capacityOf(matrix),
     screens: screens.length === ALL_SCREENS.length ? [] : screens,
@@ -390,15 +410,19 @@ export function compile(matrix: Matrix): RoleColumns {
     impact_level: impactLevel,
     all_impact_units: impactLevel !== "none" && matrix.impact.allUnits,
     units: impactLevel !== "none" && !matrix.impact.allUnits ? [...matrix.impact.units].sort() : [],
+    informe_level: informeLevel,
+    all_informe_units: informeLevel !== "none" && matrix.informe.allUnits,
+    informe_units: informeLevel !== "none" && !matrix.informe.allUnits ? [...matrix.informe.units].sort() : [],
   };
 }
 
 /** Columnas de un rol guardado → matriz, para editarlo. */
 export function decompile(
   role: Pick<AccessRole, "base_role" | "screens" | "all_screens" | "all_reports"> &
-    Partial<Pick<AccessRole, "impact_level" | "all_impact_units">>,
+    Partial<Pick<AccessRole, "impact_level" | "all_impact_units" | "informe_level" | "all_informe_units">>,
   reports: string[],
   units: string[] = [],
+  informeUnits: string[] = [],
 ): Matrix {
   const modules = emptyModules();
   const seen = role.all_screens ? ALL_SCREENS : role.screens;
@@ -407,6 +431,7 @@ export function decompile(
     allReports: role.all_reports,
     reports: [...reports],
     impact: { allUnits: role.all_impact_units ?? false, units: [...units] },
+    informe: { level: role.informe_level ?? "none", allUnits: role.all_informe_units ?? false, units: [...informeUnits] },
   };
   for (const module of MODULES) {
     const screens = module.screens.map((screen) => screen.id).filter((screen) => seen.includes(screen));
@@ -446,7 +471,7 @@ function full(id: ModuleId, level: Level): ModuleChoice {
 /** La matriz de una plantilla. */
 export function templateMatrix(template: Exclude<TemplateId, "personalizada">): Matrix {
   const modules = emptyModules();
-  const base: Matrix = { modules, allReports: true, reports: [], impact: emptyImpact() };
+  const base: Matrix = { modules, allReports: true, reports: [], impact: emptyImpact(), informe: emptyInforme() };
   if (template === "consulta") {
     for (const module of MODULES) modules[module.id] = full(module.id, "ver");
     return base;
@@ -485,6 +510,9 @@ const sameColumns = (a: RoleColumns, b: RoleColumns) =>
   a.all_reports === b.all_reports &&
   a.impact_level === b.impact_level &&
   a.all_impact_units === b.all_impact_units &&
+  a.informe_level === b.informe_level &&
+  a.all_informe_units === b.all_informe_units &&
+  [...a.informe_units].sort().join() === [...b.informe_units].sort().join() &&
   [...a.screens].sort().join() === [...b.screens].sort().join() &&
   [...a.reports].sort().join() === [...b.reports].sort().join() &&
   [...a.units].sort().join() === [...b.units].sort().join();
@@ -539,6 +567,18 @@ export function describe(
         : names.length > 0
           ? `En Indicadores de Impacto ${does} de: ${list(names)}.`
           : "En Indicadores de Impacto no tiene unidades asignadas: no actúa sobre ninguna.",
+    );
+  }
+  const informes = effectiveLevel(matrix, "informes");
+  if (informes !== "none" && matrix.informe.level !== "none") {
+    const does = matrix.informe.level === "jefe" ? "escribe y envía" : "escribe";
+    const names = matrix.informe.units.map((id) => unitNames.get(id) ?? "una unidad retirada");
+    lines.push(
+      matrix.informe.allUnits
+        ? `En Informes de gestión ${does} el informe de toda la estructura.`
+        : names.length > 0
+          ? `En Informes de gestión ${does} el informe de: ${list(names)}.`
+          : "En Informes de gestión no tiene unidades asignadas: solo escribe el de su unidad, si pertenece a una.",
     );
   }
   return lines;

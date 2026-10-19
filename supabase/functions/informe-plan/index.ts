@@ -88,7 +88,9 @@ Deno.serve(async (request: Request) => {
   const { data: perfil } = await admin.from("profiles").select("role").eq("id", who.data.user.id).maybeSingle();
   if (!["planeacion", "admin"].includes(String(perfil?.role))) {
     const comoUsuario = createClient(url, anonKey, { auth: { persistSession: false, autoRefreshToken: false }, global: { headers: { Authorization: authorization } } });
-    const { data: rol, error: errRol } = await comoUsuario.rpc("unit_role_at", { target: unitId });
+    // Su pertenencia y lo que le da su rol de acceso (informe_actor, 0169); sin esa migración, solo la pertenencia.
+    let { data: rol, error: errRol } = await comoUsuario.rpc("informe_actor", { unidad: unitId });
+    if (errRol) ({ data: rol, error: errRol } = await comoUsuario.rpc("unit_role_at", { target: unitId }));
     if (errRol) return json({ error: "No se pudo comprobar su papel en la unidad." }, 500);
     if (!rol) return json({ error: "No tiene acceso a esta unidad." }, 403);
   }

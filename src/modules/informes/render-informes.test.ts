@@ -44,7 +44,7 @@ vi.mock("./datos", async (orig) => {
       ]),
     useInstancias: () => q(d.instancias),
     useListas: () => q(new Map([["i1", 4]])),
-    useMembresiasPropias: () => q([{ unidad: "U1", rol: "jefe", nombre: "Facultad de Ciencias de la Salud" }]),
+    useMembresiasInforme: () => q([{ unidad: "U1", rol: "jefe", nombre: "Facultad de Ciencias de la Salud" }]),
     useSecciones: () => q([{ instancia_id: "i1", clave: "s1", orden: 1, contenido: { texto: "La matrícula llegó a [[matric]] estudiantes en 2026." }, listo: false }]),
     useCifras: () => q(d.cifras),
     useCifrasVivas: () => q(d.vivas),

@@ -29,15 +29,26 @@ async function todas<T>(consulta: (desde: number, hasta: number) => PromiseLike<
 /* ---------- Quién llama ------------------------------------------------------ */
 
 export async function leerPerfil(admin: DB, userId: string) {
-  const [{ data: perfil }, { data: membresias }] = await Promise.all([
+  const [{ data: perfil }, { data: membresias }, { data: acceso }] = await Promise.all([
     admin.from("profiles").select("role, is_active").eq("id", userId).maybeSingle(),
     admin.from("unit_members").select("role").eq("profile_id", userId),
+    // Lo que le da su rol de acceso (0169); sin esa migración la consulta falla y no suma nada.
+    admin.from("profiles").select("access_roles(informe_level)").eq("id", userId).maybeSingle(),
   ]);
-  return { perfil: perfil as { role?: string; is_active?: boolean } | null, rolesUnidad: ((membresias ?? []) as { role: string }[]).map((m) => m.role) };
+  const nivel = (acceso as { access_roles?: { informe_level?: string } | { informe_level?: string }[] | null } | null)?.access_roles;
+  const delRol = (Array.isArray(nivel) ? nivel[0]?.informe_level : nivel?.informe_level) ?? "none";
+  const rolesUnidad = ((membresias ?? []) as { role: string }[]).map((m) => m.role);
+  if (delRol === "editor" || delRol === "jefe") rolesUnidad.push(delRol);
+  return { perfil: perfil as { role?: string; is_active?: boolean } | null, rolesUnidad };
 }
 
-/** El papel de quien llama en una unidad, con la herencia del árbol (unit_role_at, con SU sesión). */
+/**
+ * El papel de quien llama en una unidad, con SU sesión: su pertenencia con la herencia del árbol
+ * (unit_role_at) y lo que le da su rol de acceso (informe_actor, 0169). Sin 0169, solo lo primero.
+ */
 export async function rolEnUnidad(comoUsuario: DB, unitId: string): Promise<string | null> {
+  const porRol = await comoUsuario.rpc("informe_actor", { unidad: unitId });
+  if (!porRol.error) return (porRol.data as string | null) ?? null;
   const { data, error } = await comoUsuario.rpc("unit_role_at", { target: unitId });
   if (error) throw error;
   return (data as string | null) ?? null;

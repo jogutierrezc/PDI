@@ -21,8 +21,10 @@ import { ErrorBlock, LoadingBlock } from "../../../components/ui/QueryState";
 import { useAccessRoles, useOdReportOptions } from "../../../data/queries";
 import { useDeleteAccessRole, useSaveAccessRole } from "../../../data/mutations";
 import { roleLabels } from "../../../lib/auth";
-import type { AccessRole, AdminScreen, Profile } from "../../../types/database";
+import type { AccessRole, AdminScreen, InformeLevel, Profile } from "../../../types/database";
 import { UNIT_KIND, type UnitKind } from "../../tableros/model";
+import { PLANTILLAS, plantillaSugerida } from "../../informes/plantillas";
+import type { Plantilla } from "../../informes/types";
 import { useUnitOptions, type UnitOption } from "./people-db";
 import { reason, roleMatrix } from "./summary";
 import {
@@ -69,6 +71,7 @@ export function RolesView({ profiles }: { profiles: Profile[] }) {
   const roles = access.data?.roles ?? [];
   const reports = access.data?.reports ?? [];
   const units = access.data?.units ?? [];
+  const informeUnits = access.data?.informeUnits ?? [];
   const open = (id: string | null, copy?: string) => {
     const next = new URLSearchParams(params);
     if (id) next.set("rol", id);
@@ -99,7 +102,7 @@ export function RolesView({ profiles }: { profiles: Profile[] }) {
           </header>
           <ul>
                 {roles.map((role) => {
-                  const template = templateOf(roleMatrix(role, reports, units));
+                  const template = templateOf(roleMatrix(role, reports, units, informeUnits));
                   const people = peopleOf(role);
                   return (
                     <li key={role.id}>
@@ -154,6 +157,7 @@ export function RolesView({ profiles }: { profiles: Profile[] }) {
             onDuplicate={(id) => open("nuevo", id)}
             reports={reports}
             units={units}
+            informeUnits={informeUnits}
             people={current ? peopleOf(current) : 0}
             onSaved={(id) => open(id)}
             onDeleted={() => open(null)}
@@ -245,12 +249,138 @@ function ImpactScopePicker({
   );
 }
 
+/** Las unidades que escriben informe, como en el Tablero del ciclo: todas menos los programas. */
+const escribeInforme = (kind: UnitKind) => kind !== "programa";
+
+const PAPEL_INFORME: { id: InformeLevel; label: string; hint: string }[] = [
+  { id: "none", label: "Solo el de su unidad", hint: "Escribe el informe de la unidad a la que pertenece, si pertenece a una." },
+  { id: "editor", label: "Diligencia", hint: "Escribe el informe de las unidades que elija, como un Contribuyente." },
+  { id: "jefe", label: "Diligencia y envía", hint: "Además lo envía a revisión, como un Gestor." },
+];
+
+/**
+ * Quién hace el informe: las unidades cuyo informe escribe quien lleve el rol,
+ * agrupadas por el modelo (plantilla A–D) que les toca. El alcance es exacto:
+ * una facultad no arrastra a sus programas, cada informe es de una unidad.
+ */
+function InformeScopePicker({
+  units,
+  loading,
+  scope,
+  onChange,
+}: {
+  units: UnitOption[];
+  loading: boolean;
+  scope: { level: InformeLevel; allUnits: boolean; units: string[] };
+  onChange: (change: (scope: { level: InformeLevel; allUnits: boolean; units: string[] }) => void) => void;
+}) {
+  const [filter, setFilter] = useState("");
+  const needle = filter.trim().toLowerCase();
+  const letras: Plantilla[] = ["A", "B", "C", "D"];
+  const writing = units.filter((unit) => escribeInforme(unit.kind));
+  const groups = letras
+    .map((letra) => ({
+      letra,
+      items: writing
+        .filter((unit) => plantillaSugerida(unit.kind, unit.name) === letra)
+        .filter((unit) => !needle || `${unit.name} ${unit.code}`.toLowerCase().includes(needle))
+        .sort((a, b) => a.name.localeCompare(b.name, "es")),
+    }))
+    .filter((group) => group.items.length > 0);
+
+  const toggle = (id: string) =>
+    onChange((draft) => {
+      draft.units = draft.units.includes(id) ? draft.units.filter((unit) => unit !== id) : [...draft.units, id];
+    });
+  const toggleGroup = (ids: string[], on: boolean) =>
+    onChange((draft) => {
+      const rest = draft.units.filter((unit) => !ids.includes(unit));
+      draft.units = on ? [...rest, ...ids] : rest;
+    });
+
+  return (
+    <div className="us-reports" role="group" aria-label="Quién hace el informe en Informes de gestión">
+      <strong>Quién hace el informe</strong>
+      <div className="us-screens">
+        {PAPEL_INFORME.map((option) => (
+          <label key={option.id} className="oda-check" title={option.hint}>
+            <input
+              type="radio"
+              name="papel-informe"
+              checked={scope.level === option.id}
+              onChange={() => onChange((draft) => void (draft.level = option.id))}
+            />
+            {option.label}
+          </label>
+        ))}
+      </div>
+      <small>{PAPEL_INFORME.find((option) => option.id === scope.level)?.hint}</small>
+      {scope.level !== "none" && (
+        <>
+          <label className="oda-check">
+            <input
+              type="checkbox"
+              checked={scope.allUnits}
+              onChange={(event) => onChange((draft) => void (draft.allUnits = event.target.checked))}
+            />
+            Toda la estructura
+          </label>
+          {!scope.allUnits && (
+            <>
+              <small>
+                {scope.units.length === 0
+                  ? "Elija las unidades cuyo informe escribe, por modelo: A decanaturas, B vicerrectorías y oficinas, C rectorías de campus, D Rectoría General."
+                  : `${scope.units.length} ${scope.units.length === 1 ? "unidad elegida" : "unidades elegidas"}.`}
+              </small>
+              <label className="admin-field">
+                <span>Buscar unidad</span>
+                <input value={filter} onChange={(event) => setFilter(event.target.value)} placeholder="Nombre o código" />
+              </label>
+              {loading ? (
+                <small>Cargando unidades…</small>
+              ) : groups.length === 0 ? (
+                <small>{needle ? "Ninguna unidad coincide." : "Todavía no hay unidades en la estructura institucional."}</small>
+              ) : (
+                groups.map((group) => {
+                  const ids = group.items.map((unit) => unit.id);
+                  const all = ids.every((id) => scope.units.includes(id));
+                  return (
+                    <div key={group.letra}>
+                      <strong>
+                        Modelo {group.letra} · {PLANTILLAS[group.letra].quien}
+                      </strong>
+                      <label className="oda-check">
+                        <input type="checkbox" checked={all} onChange={(event) => toggleGroup(ids, event.target.checked)} />
+                        Marcar todas ({ids.length})
+                      </label>
+                      <div className="us-screens">
+                        {group.items.map((unit) => (
+                          <label key={unit.id} className="oda-check">
+                            <input type="checkbox" checked={scope.units.includes(unit.id)} onChange={() => toggle(unit.id)} />
+                            {unit.name}
+                            <small> · {unit.code}</small>
+                          </label>
+                        ))}
+                      </div>
+                    </div>
+                  );
+                })
+              )}
+            </>
+          )}
+        </>
+      )}
+    </div>
+  );
+}
+
 function RoleEditor({
   role,
   source,
   onDuplicate,
   reports,
   units,
+  informeUnits,
   people,
   onSaved,
   onDeleted,
@@ -261,6 +391,7 @@ function RoleEditor({
   onDuplicate: (id: string) => void;
   reports: { access_role_id: string; report_slug: string }[];
   units: { access_role_id: string; unit_id: string }[];
+  informeUnits: { access_role_id: string; unit_id: string }[];
   people: number;
   onSaved: (id: string) => void;
   onDeleted: () => void;
@@ -273,7 +404,7 @@ function RoleEditor({
   const [name, setName] = useState(role ? role.name : source ? `${source.name} (copia)` : "");
   const [description, setDescription] = useState(base?.description ?? "");
   const [matrix, setMatrix] = useState<Matrix>(() =>
-    base ? roleMatrix(base, reports, units) : templateMatrix("consulta"),
+    base ? roleMatrix(base, reports, units, informeUnits) : templateMatrix("consulta"),
   );
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
@@ -296,6 +427,11 @@ function RoleEditor({
   );
   const summary = describe(matrix, reportNames, unitNames);
   const impactNeedsScope = impactLevelOf(matrix.modules.impacto.level) !== "none" && !matrix.impact.allUnits && matrix.impact.units.length === 0;
+  const informeNeedsScope =
+    matrix.modules.informes.level !== "none" &&
+    matrix.informe.level !== "none" &&
+    !matrix.informe.allUnits &&
+    matrix.informe.units.length === 0;
   const capacityChanged = system && role && capacity !== role.base_role;
 
   const update = (change: (draft: Matrix) => void) =>
@@ -346,6 +482,12 @@ function RoleEditor({
       );
       return;
     }
+    if (informeNeedsScope) {
+      setError(
+        "En Informes de gestión, el papel de Diligencia o Envío pide un alcance: elija al menos una unidad, o marque «Toda la estructura». Si solo debe escribir el informe de la unidad a la que pertenece, deje el papel en «Solo el de su unidad».",
+      );
+      return;
+    }
     if (impactNeedsScope) {
       setError(
         "En Indicadores de impacto, Editar y Administrar piden un alcance: elija al menos una vicerrectoría, facultad o programa, o marque «Toda la estructura».",
@@ -366,9 +508,12 @@ function RoleEditor({
           all_reports: columns.all_reports,
           impact_level: columns.impact_level,
           all_impact_units: columns.all_impact_units,
+          informe_level: columns.informe_level,
+          all_informe_units: columns.all_informe_units,
         },
         reports: columns.reports,
         units: columns.units,
+        informeUnits: columns.informe_units,
       });
       setNotice("Rol guardado.");
       onSaved(saved.id);
@@ -600,6 +745,14 @@ function RoleEditor({
                         </div>
                       )}
                     </div>
+                  )}
+                  {module.id === "informes" && (
+                    <InformeScopePicker
+                      units={unitOptions.data ?? []}
+                      loading={unitOptions.isPending}
+                      scope={matrix.informe}
+                      onChange={(change) => update((draft) => change(draft.informe))}
+                    />
                   )}
                   {module.id === "impacto" && impactLevelOf(choice.level) !== "none" && (
                     <ImpactScopePicker

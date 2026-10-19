@@ -120,3 +120,12 @@ Ejemplos de catálogo: `('matric','Matrícula total','auto','{"indicador":"matri
 - La nota de devolución va en `nota_revision` con una línea por sección («§s3 · Título: nota», `estados.ts`) y, además, una fila por sección en `informe_revisiones`.
 - Datos propios: clave `propio_<seccion>_<base36>`, `fuente_tipo` `manual`.
 - Pendiente (próxima fase): Consolidador (`informe_consolidado`, editar `destino`), Vista A4/PDF, acción `mejorar` de Pilo.
+
+## Roles que escriben informes (0169)
+
+Antes solo escribía el informe de una unidad quien pertenecía a ella (`unit_members`). Al crear un rol, el módulo «Informes de gestión» de la matriz ofrece ahora **Quién hace el informe**: «Solo el de su unidad» (como antes), «Diligencia» (Contribuyente) o «Diligencia y envía» (Gestor), sobre «Toda la estructura» o las unidades que se marquen, agrupadas por modelo (plantilla A–D).
+
+- Columnas: `access_roles.informe_level` (`none|editor|jefe`), `all_informe_units` y la tabla `access_role_informe_units`. Alcance exacto: una facultad no arrastra a sus programas.
+- `informe_actor(unidad)` une Planeación, la pertenencia (con la herencia del árbol) y lo que da el rol, y se queda con el papel más fuerte. Las funciones de 0153 (`informe_instancia_visible/abierta`, `informe_abrir`, el disparador y las políticas de `informe_instancias`) preguntan ahora a `informe_can_view/edit` y `informe_actor`. `unit_role_at` y `unit_can_*` no cambian: los siguen usando Mis Tableros y Rankings.
+- La interfaz usa `useMembresiasInforme` (pertenencias + `informe_mis_unidades()`); las funciones `pilo-informes` e `informe-plan` preguntan a `informe_actor` y, sin 0169, a `unit_role_at`.
+- El menú respeta el rol: quien lleva un rol que no marca «Informes» (ni Mis Tableros, Monitor o Impacto) no los ve aunque pertenezca a una unidad. Sin rol asignado, todo sigue como antes.

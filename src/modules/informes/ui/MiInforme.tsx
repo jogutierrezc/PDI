@@ -22,7 +22,7 @@ import {
   useGuardarCifra,
   useGuardarSeccion,
   useInstancias,
-  useMembresiasPropias,
+  useMembresiasInforme,
   usePilares,
   useQuitarAnexo,
   useQuitarCifra,
@@ -51,7 +51,7 @@ const BASE = "/admin/informes-gestion";
 export function MiInforme({ ciclo, requisitos }: { ciclo: CicloRow; requisitos: RequisitoRow[] }) {
   const { profile, hasRole } = useAuth();
   const planeacion = hasRole("planeacion");
-  const membresias = useMembresiasPropias(profile?.id);
+  const membresias = useMembresiasInforme(profile?.id);
   const unidades = useUnidades();
   const instancias = useInstancias(ciclo.id);
   const [params, setParams] = useSearchParams();

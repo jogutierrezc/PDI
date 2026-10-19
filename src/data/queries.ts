@@ -435,8 +435,8 @@ export function useParameters(category?: ParameterCategory) {
 export function useAccessRoles() {
   return useQuery({
     queryKey: keys.accessRoles(),
-    queryFn: async (): Promise<{ roles: AccessRole[]; reports: AccessRoleReport[]; units: AccessRoleUnit[] }> => {
-      const [roles, reports, units] = await Promise.all([
+    queryFn: async (): Promise<{ roles: AccessRole[]; reports: AccessRoleReport[]; units: AccessRoleUnit[]; informeUnits: AccessRoleUnit[] }> => {
+      const [roles, reports, units, informeUnits] = await Promise.all([
         supabase.from("access_roles").select("*").order("position").then(unwrap<AccessRole[]>),
         supabase.from("access_role_reports").select("*").then(unwrap<AccessRoleReport[]>),
         // Sin la migración 0154 la tabla no existe: los roles siguen sin alcance de Impacto.
@@ -444,8 +444,13 @@ export function useAccessRoles() {
           .from("access_role_units")
           .select("*")
           .then(({ data, error }) => (error ? [] : ((data ?? []) as AccessRoleUnit[]))),
+        // Sin la migración 0169 la tabla no existe: los roles siguen sin alcance de informes.
+        supabase
+          .from("access_role_informe_units")
+          .select("*")
+          .then(({ data, error }) => (error ? [] : ((data ?? []) as AccessRoleUnit[]))),
       ]);
-      return { roles, reports, units };
+      return { roles, reports, units, informeUnits };
     },
     staleTime: 5 * 60 * 1000,
   });

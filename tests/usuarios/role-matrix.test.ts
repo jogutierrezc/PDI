@@ -23,6 +23,9 @@ describe("plantillas", () => {
       reports: [],
       impact_level: "none",
       all_impact_units: false,
+      informe_level: "none",
+      all_informe_units: false,
+      informe_units: [],
       units: [],
     });
   });
@@ -150,6 +153,9 @@ describe("Indicadores de Impacto: editor y administrador con alcance", () => {
       reports: [],
       impact_level: "editor",
       all_impact_units: false,
+      informe_level: "none",
+      all_informe_units: false,
+      informe_units: [],
       units: [FACULTAD, PROGRAMA].sort(),
     });
   });
@@ -158,6 +164,9 @@ describe("Indicadores de Impacto: editor y administrador con alcance", () => {
     expect(compile(impact("administrar", { allUnits: true, units: [PROGRAMA] }))).toMatchObject({
       impact_level: "admin",
       all_impact_units: true,
+      informe_level: "none",
+      all_informe_units: false,
+      informe_units: [],
       units: [],
     });
   });
@@ -166,6 +175,9 @@ describe("Indicadores de Impacto: editor y administrador con alcance", () => {
     expect(compile(impact("ver", { allUnits: true, units: [PROGRAMA] }))).toMatchObject({
       impact_level: "none",
       all_impact_units: false,
+      informe_level: "none",
+      all_informe_units: false,
+      informe_units: [],
       units: [],
     });
     const hidden = impact("editar", { units: [PROGRAMA] });
@@ -250,5 +262,41 @@ describe("módulos que antes no se podían conceder", () => {
     expect(templateOf(system("consulta"))).toBe("consulta");
     expect(templateOf(system("planeacion"))).toBe("editor");
     expect(templateOf(system("admin"))).toBe("administrador");
+  });
+});
+
+describe("Informes de gestión: quién hace el informe", () => {
+  const conInformes = (informe: { level: "none" | "editor" | "jefe"; allUnits?: boolean; units?: string[] }) => {
+    const matrix = templateMatrix("consulta");
+    matrix.informe = { level: informe.level, allUnits: informe.allUnits ?? false, units: informe.units ?? [] };
+    return matrix;
+  };
+
+  it("el papel y las unidades se guardan en las columnas del rol", () => {
+    const columns = compile(conInformes({ level: "editor", units: ["u2", "u1"] }));
+    expect(columns).toMatchObject({ informe_level: "editor", all_informe_units: false, informe_units: ["u1", "u2"] });
+    expect(compile(conInformes({ level: "jefe", allUnits: true, units: ["u1"] }))).toMatchObject({
+      informe_level: "jefe",
+      all_informe_units: true,
+      informe_units: [],
+    });
+  });
+
+  it("sin el módulo, el alcance no se guarda aunque quedara marcado", () => {
+    const matrix = conInformes({ level: "editor", units: ["u1"] });
+    matrix.modules.informes = { level: "none", screens: [] };
+    expect(compile(matrix)).toMatchObject({ informe_level: "none", all_informe_units: false, informe_units: [] });
+  });
+
+  it("un rol guardado se lee de vuelta con su papel y sus unidades", () => {
+    const columns = compile(conInformes({ level: "jefe", units: ["u1", "u2"] }));
+    const again = compile(decompile({ ...columns }, columns.reports, columns.units, columns.informe_units));
+    expect(again).toEqual(columns);
+  });
+
+  it("lo dice en palabras", () => {
+    const names = new Map([["u1", "Facultad de Salud"]]);
+    expect(describeRole(conInformes({ level: "editor", units: ["u1"] }), new Map(), names).join(" ")).toContain("escribe el informe de: Facultad de Salud");
+    expect(describeRole(conInformes({ level: "jefe", allUnits: true })).join(" ")).toContain("escribe y envía el informe de toda la estructura");
   });
 });

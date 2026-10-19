@@ -38,10 +38,11 @@ import { Tablas } from "./Tablas";
 import { Plantillas } from "./Plantillas";
 import { Periodos } from "./Periodos";
 import { Accesos } from "./Accesos";
+import { Contactos } from "./Contactos";
 import "./internacionalizacion.css";
 
 const BASE = "/admin/internacionalizacion";
-const ICONO: Record<SeccionId, IconName> = { resumen: "grid", cifras: "chart", tablas: "table", plantillas: "library", periodos: "clock", accesos: "users" };
+const ICONO: Record<SeccionId, IconName> = { resumen: "grid", cifras: "chart", tablas: "table", contactos: "mail", plantillas: "library", periodos: "clock", accesos: "users" };
 
 export function Internacionalizacion() {
   const { seccion: param } = useParams();
@@ -61,7 +62,8 @@ export function Internacionalizacion() {
   const envios = useEnvios(periodo?.id);
   const estructura = useEstructura();
   const carpetasQ = useCarpetas();
-  const seccion = seccionDe(param, director);
+  const crea = director || planeacion || (yo.data ? puedeCrear(yo.data) : false);
+  const seccion = seccionDe(param, director, crea);
 
   const ctx = useMemo<Ctx | null>(() => {
     if (!yo.data || !campus.data) return null;
@@ -108,7 +110,7 @@ export function Internacionalizacion() {
 
   const entradas: EntradaBuscador[] = [
     ...libros.map((l) => ({ id: `l:${l.id}`, titulo: l.nombre, icono: "table" as const, pista: `Tabla · ${l.captura === "multicampus" ? "Multicampus" : rutaDe(carpetas, l.carpeta_id).map((c) => c.nombre).join(" / ") || "Sin carpeta"}` })),
-    ...seccionesPara(director).map((s) => ({ id: `s:${s.id}`, titulo: s.rotulo, icono: ICONO[s.id], pista: "Sección" })),
+    ...seccionesPara(director, crea).map((s) => ({ id: `s:${s.id}`, titulo: s.rotulo, icono: ICONO[s.id], pista: "Sección" })),
     ...(puedeCrear(ctx?.yo)
       ? [
           { id: "nueva", titulo: "Nueva tabla", icono: "plus" as const, pista: "Acción" },
@@ -180,6 +182,7 @@ export function Internacionalizacion() {
   else if (actual === "resumen") cuerpo = <Resumen ctx={ctx} />;
   else if (actual === "cifras") cuerpo = <Cifras ctx={ctx} />;
   else if (actual === "tablas") cuerpo = <Tablas ctx={ctx} />;
+  else if (actual === "contactos") cuerpo = <Contactos ctx={ctx} />;
   else if (actual === "plantillas") cuerpo = <Plantillas ctx={ctx} />;
   else if (actual === "periodos") cuerpo = <Periodos ctx={ctx} />;
   else cuerpo = <Accesos ctx={ctx} />;
@@ -190,7 +193,7 @@ export function Internacionalizacion() {
       <div className="pc-body it-marco">
         <Riel etiqueta="Secciones de Internacionalización" tour="int-riel">
           <TituloRiel>Repositorio</TituloRiel>
-          {seccionesPara(director).map((s) => (
+          {seccionesPara(director, crea).map((s) => (
             <EntradaRiel key={s.id} icono={ICONO[s.id]} actual={s.id === actual} to={enlace(s.id)} cuenta={s.id === "tablas" ? pendientes.total : undefined}>
               {s.rotulo}
             </EntradaRiel>

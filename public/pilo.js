@@ -30,7 +30,20 @@
 (function () {
   "use strict";
   var script = document.currentScript;
+  // Optimizadores de CMS (Rocket Loader de Cloudflare, LiteSpeed, WP Rocket) vuelven a insertar el script y
+  // currentScript llega vacío: se busca la etiqueta por su dirección (la última que apunta a /pilo.js).
+  if (!script || !script.src) {
+    var tags = document.querySelectorAll("script[src*='/pilo.js']");
+    script = null;
+    for (var t = tags.length - 1; t >= 0; t--) {
+      if (!tags[t].__piloUsed) {
+        script = tags[t];
+        break;
+      }
+    }
+  }
   if (!script || !script.src) return;
+  script.__piloUsed = true;
 
   // Qué Pilo: el de siempre, o el de otro espacio. Lo que no se conoce cae en el de siempre.
   var SPACES = {

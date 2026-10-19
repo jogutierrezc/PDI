@@ -47,7 +47,7 @@
    Despliegue
 
      La clave y la dirección de la API son los secretos de informe-plan:
-     PLAN_API_KEY y PLAN_API_URL (migración de configuración 0167).
+     PLAN_API_KEY y PLAN_API_URL (migración de configuración 0168).
 
      supabase secrets set FACULTY_SYNC_TOKEN="<una cadena larga y aleatoria>"
 

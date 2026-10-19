@@ -29,8 +29,10 @@ import type { VistaArchivos } from "../../../components/espacio/Explorador";
 import { haceCuanto } from "../../../components/espacio/logica";
 import { Aviso, Ficha, useAviso as useToast } from "../../../components/espacio/piezas";
 import type { Caja, FilaGuardada, FilaLocal } from "../../../components/espacio/tipos";
-import { FaltaMigracion, useBorrarFilas, useBorrarLibro, useCarpetas, useConceptos, useEnvios, useEstructura, useFilas, useGuardarFilas, useMoverLibro, useNombres, useVentanas } from "../datos";
+import { FaltaMigracion, useAportantes, useBorrarFilas, useBorrarLibro, useCarpetas, useConceptos, useEnvios, useEstructura, useFilas, useGuardarFilas, useMoverLibro, useNombres, useVentanas } from "../datos";
 import { aplanar, armarArbol, librosDe, rutaDe } from "../lib/carpetas";
+import { entroPor } from "../lib/exportar-contactos";
+import type { Salida } from "../lib/exportar-contactos";
 import { controlaMulticampus, ETIQUETA_ROL, puedeCrear, puedeCrearLibro, puedeEditarLibro } from "../lib/permisos";
 import type { IntCarpetaRow, IntLibroRow, LibroCompleto } from "../tipos";
 import { avanceDeLibro, columnaEsp, reglasInt } from "./adaptador";
@@ -41,6 +43,7 @@ import { CargaExcel } from "./CargaExcel";
 import type { PrevioExcel } from "./CargaExcel";
 import { AvisoMigracion, Cargando, Confirmar, ErrorCaja, EstadoPill, fmt, nombreCampus, useAviso } from "./comunes";
 import type { Ctx } from "./comunes";
+import { ExportarContactos } from "./ExportarContactos";
 import { escrituraPorCampus } from "./logica";
 import { MenuNuevo } from "./MenuNuevo";
 import type { OpcionNuevo } from "./MenuNuevo";
@@ -85,6 +88,7 @@ export function Tablas({ ctx }: { ctx: Ctx }) {
   const [capturaNueva, setCapturaNueva] = useState<IntLibroRow["captura"]>("campus");
   const [previoExcel, setPrevioExcel] = useState<PrevioExcel | null>(null);
   const [nuevaCarpeta, setNuevaCarpeta] = useState(0);
+  const [exportar, setExportar] = useState<Salida | null>(null);
   const [filtro, setFiltro] = useState("todas");
   const [vista, setVista] = useState<VistaArchivos>("mosaicos");
   const [detalles, setDetalles] = useState(true);
@@ -268,7 +272,7 @@ export function Tablas({ ctx }: { ctx: Ctx }) {
       </div>
       <PanelDetalles abierto={detalles}>
         {libro ? (
-          <DetallesLibro libro={libro} ctx={ctx} carpetas={carpetas} envios={enviosLista} campusSel={campusSel} onAbrir={(caja) => abrir(libro.id, caja)} onNuevaHoja={() => setPanel("hoja")} aviso={aviso} />
+          <DetallesLibro libro={libro} ctx={ctx} carpetas={carpetas} envios={enviosLista} campusSel={campusSel} onAbrir={(caja) => abrir(libro.id, caja)} onNuevaHoja={() => setPanel("hoja")} onExportar={(s) => setExportar(s)} aviso={aviso} />
         ) : (
           <div className="es-dsec">
             <h3>Detalles</h3>
@@ -353,6 +357,7 @@ export function Tablas({ ctx }: { ctx: Ctx }) {
           }}
         />
       )}
+      {exportar && <ExportarContactos ctx={ctx} libros={libros.filter((l) => l.plantilla_contactos)} inicial={exportar} onCerrar={() => setExportar(null)} />}
       {aviso.nodo}
     </div>
   );
@@ -368,6 +373,7 @@ function DetallesLibro({
   campusSel,
   onAbrir,
   onNuevaHoja,
+  onExportar,
   aviso,
 }: {
   libro: LibroCompleto;
@@ -377,6 +383,8 @@ function DetallesLibro({
   campusSel: string;
   onAbrir: (caja: Caja | null) => void;
   onNuevaHoja: () => void;
+  /** Tablas de contactos (0167): abre la exportación con la plantilla de esta tabla. */
+  onExportar: (salida: Salida) => void;
   aviso: ReturnType<typeof useAviso>;
 }) {
   const [borrar, setBorrar] = useState(false);
@@ -418,6 +426,12 @@ function DetallesLibro({
           <Icon name="pen" size={16} />
           Abrir
         </button>
+        {libro.plantilla_contactos ? (
+          <button type="button" className="es-btn es-btn--sm" onClick={() => onExportar(libro.plantilla_contactos!)}>
+            <Icon name="download" size={16} />
+            Exportar
+          </button>
+        ) : null}
         {puedeEditar ? (
           <>
             <button type="button" className="es-btn es-btn--sm" onClick={onNuevaHoja}>
@@ -560,9 +574,14 @@ function EditorTabla({
   // Autoría de cada fila (quién la registró, cuándo y de dónde vino): se muestra en Multicampus.
   const porId = useMemo(() => new Map((filasQ.data ?? []).map((f) => [f.id, f])), [filasQ.data]);
   const nombres = useNombres((filasQ.data ?? []).flatMap((f) => [f.created_by, f.updated_by]));
+  // Las filas que llegaron por el enlace de Contactos (0167) traen quién aportó: nombre y cargo declarados.
+  const aportantes = useAportantes();
+  const delEnlace = useMemo(() => new Map((aportantes.data ?? []).map((a) => [a.id, a])), [aportantes.data]);
   const quien = (f: FilaLocal) => {
     const fila = f.id ? porId.get(f.id) : undefined;
     if (!fila) return "Fila nueva";
+    const aporta = fila.aportante_id ? delEnlace.get(fila.aportante_id) : undefined;
+    if (aporta) return `${aporta.nombre} · ${aporta.cargo}`;
     const autor = fila.created_by ? (nombres.data?.[fila.created_by] ?? "…") : "—";
     return fila.updated_by && fila.updated_by !== fila.created_by ? `${autor} · editó ${nombres.data?.[fila.updated_by] ?? "…"}` : autor;
   };
@@ -575,7 +594,7 @@ function EditorTabla({
           ancho: 190,
           texto: (f: FilaLocal) => {
             const fila = f.id ? porId.get(f.id) : undefined;
-            return !fila ? "A mano" : fila.origen === "excel" ? `Excel${fila.archivo ? ` · ${fila.archivo}` : ""}` : "A mano";
+            return !fila ? "A mano" : fila.canal === "enlace" ? entroPor(fila) : fila.origen === "excel" ? `Excel${fila.archivo ? ` · ${fila.archivo}` : ""}` : "A mano";
           },
         },
       ]

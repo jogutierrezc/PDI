@@ -41,7 +41,7 @@ export function Ventana({
     const anterior = document.activeElement as HTMLElement | null;
     entrarFondo(fondo.current);
     entrarVentana(caja.current);
-    const primero = caja.current?.querySelector<HTMLElement>("[data-foco], .pc-choice, input, select, button:not(.pc-x)");
+    const primero = caja.current?.querySelector<HTMLElement>("[data-foco], .es-choice, input, select, button:not(.es-x)");
     window.setTimeout(() => (primero ?? caja.current)?.focus({ preventScroll: true }), 60);
     const alTeclear = (e: KeyboardEvent) => {
       if (hayRecorrido()) return;
@@ -72,12 +72,12 @@ export function Ventana({
   }, []);
 
   return (
-    <div ref={fondo} className="pc-scrim" role="presentation" onMouseDown={(e) => e.target === e.currentTarget && onCerrar()}>
-      <div ref={caja} className={`pc-dlg${ancho === "chica" ? " pc-dlg--sm" : ""}`} role="dialog" aria-modal="true" aria-label={etiqueta ?? titulo} tabIndex={-1}>
+    <div ref={fondo} className="es-scrim" role="presentation" onMouseDown={(e) => e.target === e.currentTarget && onCerrar()}>
+      <div ref={caja} className={`es-dlg${ancho === "chica" ? " es-dlg--sm" : ""}`} role="dialog" aria-modal="true" aria-label={etiqueta ?? titulo} tabIndex={-1}>
         <header>
           <h2>{titulo}</h2>
           {cabecera}
-          <button className="pc-x" type="button" onClick={onCerrar} aria-label="Cerrar">
+          <button className="es-x" type="button" onClick={onCerrar} aria-label="Cerrar">
             <Icon name="close" size={16} />
           </button>
         </header>

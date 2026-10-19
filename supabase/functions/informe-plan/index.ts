@@ -15,7 +15,7 @@
        papel en la unidad (unit_role_at, con herencia).
      · La unidad debe ser una facultad con plan en la API (FCS, FIT, FCMS, FCN,
        FCAV, FCEAC o CFTT); si no, 404. El portal usa sus propios códigos en
-       units.code: se traducen con la tabla facultades_plan (0167) y, a falta
+       units.code: se traducen con la tabla facultades_plan (0168) y, a falta
        de esa, con el mapa FACULTADES_API de respaldo.
      · Sin corte: la API devuelve el último seguimiento guardado por acción.
 
@@ -36,7 +36,7 @@ const CORS = {
 };
 const json = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status, headers: { ...CORS, "Content-Type": "application/json" } });
 // Códigos de la API del plan ← códigos de facultad del portal (units.code).
-// Es el respaldo: lo mandatorio es la tabla facultades_plan (migración 0167),
+// Es el respaldo: lo mandatorio es la tabla facultades_plan (migración 0168),
 // donde Planeación corrige o agrega sin redesplegar la función.
 const FACULTADES_API: Record<string, string> = {
   FACSOC: "FCS",

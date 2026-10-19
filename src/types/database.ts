@@ -1729,8 +1729,40 @@ export interface IntLibroRow {
   orden: number;
   /** Carpeta que lo contiene (0166); nulo = «Sin carpeta». */
   carpeta_id: string | null;
+  /** Contactos (0167): marca las dos tablas de contactos y su plantilla de Rua. */
+  plantilla_contactos: "academica" | "empleadores" | null;
   created_by: string | null;
   created_at: string;
+}
+
+/** El enlace de invitación de Contactos (`int_invitaciones`, 0167). */
+export interface IntInvitacionRow {
+  id: string;
+  token: string;
+  nombre: string;
+  periodo_id: string;
+  /** Nulo: la persona elige su campus al entrar. */
+  campus_id: string | null;
+  dominios: string[];
+  tipos: ("academico" | "empleador")[];
+  limite_por_persona: number;
+  vence: string;
+  estado: "activa" | "pausada";
+  created_by: string | null;
+  created_at: string;
+}
+
+/** Quién aportó por un enlace (`int_aportantes`, 0167). Nombre, cargo y correo los declara la persona. */
+export interface IntAportanteRow {
+  id: string;
+  invitacion_id: string;
+  nombre: string;
+  cargo: string;
+  correo: string;
+  campus_id: string;
+  correo_verificado: boolean;
+  creado_en: string;
+  ultimo_envio: string | null;
 }
 
 /** Una carpeta de tablas (`int_carpetas`, 0166); parent_id nulo = carpeta de primer nivel. */
@@ -1807,6 +1839,9 @@ export interface IntFilaRow {
   origen: "manual" | "excel";
   /** Nombre del Excel de donde vino (0166). */
   archivo: string | null;
+  /** Contactos (0167): quien la aportó por un enlace público; nulo si la cargó el equipo. */
+  aportante_id: string | null;
+  canal: "interno" | "enlace";
   created_by: string | null;
   updated_by: string | null;
   created_at: string;

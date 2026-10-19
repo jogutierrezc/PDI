@@ -19,6 +19,7 @@ import type {
 } from "../../types/database";
 
 export type {
+  IntAportanteRow,
   IntCalculo,
   IntCarpetaRow,
   IntColumnaRow,
@@ -29,6 +30,7 @@ export type {
   IntEstado,
   IntFilaRow,
   IntHojaRow,
+  IntInvitacionRow,
   IntLibroRow,
   IntMiembroRow,
   IntPeriodoRow,

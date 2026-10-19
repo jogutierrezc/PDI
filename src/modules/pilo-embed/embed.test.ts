@@ -94,7 +94,7 @@ describe("widgetAllowed", () => {
 
 describe("widgetSnippet", () => {
   it("arma la línea con el tema y la esquina", () => {
-    expect(widgetSnippet("https://portal.example/", "negro", "izq")).toBe('<script src="https://portal.example/pilo.js" data-tema="negro" data-esquina="izquierda" defer></script>');
+    expect(widgetSnippet("https://portal.example/", "negro", "izq")).toBe('<script src="https://portal.example/pilo.js" data-cfasync="false" data-tema="negro" data-esquina="izquierda" defer></script>');
   });
 });
 
@@ -121,7 +121,7 @@ describe("widgetSnippet con un espacio", () => {
   });
 
   it("Enseñanza se pide con data-pilo", () => {
-    expect(widgetSnippet("https://portal.example", "blanco", "der", "ensenanza")).toBe('<script src="https://portal.example/pilo.js" data-pilo="ensenanza" data-tema="blanco" data-esquina="derecha" defer></script>');
+    expect(widgetSnippet("https://portal.example", "blanco", "der", "ensenanza")).toBe('<script src="https://portal.example/pilo.js" data-cfasync="false" data-pilo="ensenanza" data-tema="blanco" data-esquina="derecha" defer></script>');
   });
 });
 

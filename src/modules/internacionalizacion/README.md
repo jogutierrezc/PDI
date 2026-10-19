@@ -231,3 +231,32 @@ Planeación **ve el módulo sin ser miembro** (`int_ve_modulo()`; pantalla visib
 **Pantalla.** «Nuevo» es un menú (Carpeta · Tabla · Multicampus · Subir un Excel) y «Nueva tabla» es un solo panel (`ui/NuevoPanel.tsx`: nombre, carpeta, quién escribe, cómo empieza). Agregar una hoja a una tabla existente sigue en `NuevaTabla`. Movimiento: solo `transform`/`opacity`, 160 ms, `ease-out` fuerte, sin animación en el árbol y sin movimiento con `prefers-reduced-motion` (`ui/carpetas.css`).
 
 **Pruebas.** `tests/internacionalizacion/multicampus-db.test.ts` (19 casos sobre la base: permisos, ciclos, 5 niveles, RLS, autoría y archivo), `lib/carpetas.test.ts`, `lib/multicampus.test.ts` y las de renderizado.
+
+
+## Contactos: enlace público de invitación (migración 0167)
+
+Personas invitadas, **sin cuenta**, comparten contactos académicos o de empleadores. Entran por `/contactos/i/:token`, se identifican (nombre, cargo en la UDES, correo institucional), eligen **uno a uno** o **importar un archivo**, y todo cae en la carpeta **«Contactos»** de Tablas: dos tablas Multicampus («Contactos académicos», 11 columnas; «Contactos de empleadores», 10) con las plantillas de Rua. Cada fila guarda quién la aportó (nombre, cargo, correo), cuándo y por dónde entró.
+
+| Pieza | Dónde |
+|---|---|
+| Plantillas de Rua, países, validación, CSV, lectura de archivos (puro, sin imports; lo usan igual el servidor y la pantalla) | `supabase/functions/int-contactos/contactos.ts` y `paises.ts` |
+| Función pública (valida con lo anterior y llama a la base con la clave de servicio) | `supabase/functions/int-contactos/index.ts` (`--no-verify-jwt`) |
+| Tablas y reglas | `0167_int_contactos.sql`: `int_invitaciones`, `int_aportantes`, `int_filas.aportante_id/canal`, `int_libros.plantilla_contactos`, `int_contactos_preparar()` y las `int_contactos_*` (solo `service_role`) |
+| Página pública | `contactos/publico/` (`ContactosPublico`, `UnoAUno`, `ImportarArchivo`, `MisAportes`, `texto-legal.ts`) y `contactos/api.ts`, `contactos/archivos.ts` |
+| Pantalla del equipo | sección «Contactos» (`ui/Contactos.tsx`): preparar la carpeta, crear/pausar enlaces, quién aportó, exportar |
+| Exportar | `lib/exportar-contactos.ts` (puro) + `ui/ExportarContactos.tsx`; también el botón «Exportar» en los detalles de las dos tablas |
+
+**Cómo funciona el aporte**
+- La invitación lleva periodo, campus (o «que cada persona elija»), dominios de correo permitidos (por defecto `udes.edu.co`), tipos, máximo por persona (200) y vencimiento. Se crea quien puede crear (Director, Planeación, Coordinadores); cambia o borra su autor o quien controla Multicampus.
+- **El correo de quien aporta NO se confirma** (todavía no se envían correos): se comprueba que sea del dominio permitido y queda `correo_verificado = false`. Volver a identificarse con el mismo correo da una sesión nueva y cancela la anterior. Si más adelante hay envío de correos, basta un código y poner `correo_verificado` en verdadero.
+- La sesión de la persona es un secreto en su navegador (`sessionStorage`); la base guarda su SHA-256. Solo puede ver y quitar **sus** filas.
+- **El correo del contacto es la identidad** (como en Rua): si la misma persona lo vuelve a enviar, se actualiza; si lo aportó otra persona o está en la otra lista (académicos/empleadores), se conserva el primero y se avisa. Un correo repetido dentro del mismo envío se omite.
+- Cuando el campus **envía su hoja a revisión**, ya no entran ni se quitan contactos; mientras esté en borrador, sí. El máximo por persona y el cierre los hace cumplir la base.
+- Anti-abuso: dominio permitido, campo trampa para robots, tope de peticiones por IP y de ingresos por hora, hasta 500 filas por envío y 2.000 por archivo.
+- La invitación reemplaza a la ventana de captura para el enlace público; al crearla, las dos hojas quedan con ventana (si no tenían) para que el equipo pueda corregir filas a mano en Tablas.
+
+**Exportar.** Plantilla académica y de empleadores: solo las columnas de Rua con su grafía original (se pueden volver a importar), un correo una sola vez (queda la fila más reciente). Libreta completa: las dos listas con campus, periodo, quién aportó, cuándo y por dónde entró, sin quitar repetidos. Filtros: campus, periodo, todo lo recibido o solo lo aprobado (con un periodo elegido). Excel o CSV UTF-8 con BOM.
+
+**Pendiente (fase 3).** Verificar que el buzón existe (el proveedor de Rua, paso aparte y de pago), confirmar el correo de quien aporta cuando haya envío de correos, y el texto de autorización de datos que debe aprobar la Universidad (`contactos/publico/texto-legal.ts`).
+
+**Pruebas.** `tests/internacionalizacion/contactos-db.test.ts` (24 casos contra la base real), `contactos-lib.test.ts`, `lib/exportar-contactos.test.ts`, `contactos/publico/render-publico.test.ts` y los casos de «Contactos» en `render-internacionalizacion.test.ts`.

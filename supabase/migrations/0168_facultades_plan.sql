@@ -1,5 +1,5 @@
 -- =============================================================================
--- PDI · 0167 · Equivalencias de facultad entre el portal y la API del plan
+-- PDI · 0168 · Equivalencias de facultad entre el portal y la API del plan
 -- =============================================================================
 -- El portal identifica cada facultad con su propio código en units.code
 -- (FACSOC, FAINT, FACSALUD, FACCNA, FACAVET, FCEAC, UDESTEC); la API

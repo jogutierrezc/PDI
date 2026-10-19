@@ -72,3 +72,9 @@ verify_jwt = false
 # mejora de textos, corpus de estilo con lo aprobado y los informes 2025. Solo la intranet (sesión de
 # Planeación, la administración o quien diligencia el informe): la función comprueba la sesión y los papeles.
 verify_jwt = false
+
+[functions.int-contactos]
+# La cara pública de «Contactos» de Internacionalización: una persona invitada, sin cuenta,
+# comparte contactos académicos o de empleadores por un enlace con token. La función valida
+# por su cuenta el token, la sesión por persona y el tope de peticiones por IP.
+verify_jwt = false

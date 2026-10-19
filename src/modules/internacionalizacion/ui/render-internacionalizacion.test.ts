@@ -20,6 +20,8 @@ const estado = vi.hoisted(() => ({
   periodos: null as unknown,
   vacio: false,
   carpetas: [] as unknown[],
+  invitaciones: [] as unknown[],
+  aportantes: [] as unknown[],
   moldear: null as null | ((libros: unknown[]) => unknown[]),
 }));
 
@@ -50,6 +52,12 @@ vi.mock("../datos", async (orig) => {
     useCifrasPeriodos: (ids: string[]) => ids.map(() => ok(f.CIFRAS)),
     useEstructura: () => ok(estado.vacio ? [] : estado.moldear ? estado.moldear(f.ESTRUCTURA) : f.ESTRUCTURA),
     useCarpetas: () => ok(estado.carpetas),
+    useInvitaciones: () => ok(estado.invitaciones),
+    useAportantes: () => ok(estado.aportantes),
+    useFilasContactos: () => ok([]),
+    useCrearInvitacion: mut,
+    useActualizarInvitacion: mut,
+    usePrepararContactos: mut,
     useCrearCarpeta: mut,
     useActualizarCarpeta: mut,
     useBorrarCarpeta: mut,
@@ -102,7 +110,7 @@ function pintar(ruta: string, yo: Yo, admin = false): string {
 
 const texto = (html: string) => html.replace(/<[^>]+>/g, " ").replace(/&#x27;/g, "'").replace(/&quot;/g, '"').replace(/&amp;/g, "&").replace(/\s+/g, " ");
 
-afterEach(() => Object.assign(estado, { admin: false, planeacion: false, yo: null, error: null, periodos: null, vacio: false, carpetas: [], moldear: null }));
+afterEach(() => Object.assign(estado, { admin: false, planeacion: false, yo: null, error: null, periodos: null, vacio: false, carpetas: [], invitaciones: [], aportantes: [], moldear: null }));
 
 describe("Resumen", () => {
   it("el Director ve los cuatro campus, lo pendiente y la cobertura de las plantillas", () => {
@@ -307,5 +315,75 @@ describe("Accesos", () => {
 
   it("quien no es Director no entra: vuelve al resumen", () => {
     expect(texto(pintar("/admin/internacionalizacion/accesos", YO.gestor))).not.toContain("Equipo del módulo");
+  });
+});
+
+
+describe("Contactos", () => {
+  const preparadas = (libros: unknown[]) =>
+    (libros as { id: string }[]).map((l) => (l.id === "l-mov" ? { ...l, captura: "multicampus", plantilla_contactos: "academica" } : l.id === "l-conv" ? { ...l, plantilla_contactos: "empleadores" } : l));
+  const invitacion = {
+    id: "inv-1",
+    token: "7Kq9x2mVb4zQ",
+    nombre: "Contactos 2026-2 · Cúcuta",
+    periodo_id: "p-2",
+    campus_id: "c-cuc",
+    dominios: ["udes.edu.co"],
+    tipos: ["academico", "empleador"],
+    limite_por_persona: 200,
+    vence: "2099-11-30",
+    estado: "activa",
+    created_by: null,
+    created_at: "2026-10-01T00:00:00Z",
+  };
+
+  it("sin preparar, el Director recibe el paso de una sola vez y no ve invitaciones", () => {
+    const t = texto(pintar("/admin/internacionalizacion/contactos", YO.director));
+    expect(t).toContain("Todavía no está lista la carpeta");
+    expect(t).toContain("Preparar la carpeta");
+    expect(t).not.toContain("Nueva invitación");
+  });
+
+  it("preparada, muestra las invitaciones con su enlace, quién aportó y las acciones", () => {
+    estado.moldear = preparadas;
+    estado.invitaciones = [invitacion];
+    estado.aportantes = [{ id: "ap-1", invitacion_id: "inv-1", nombre: "Laura Mendoza", cargo: "Directora de programa", correo: "lmendoza@udes.edu.co", campus_id: "c-cuc", correo_verificado: false, creado_en: "2026-10-10T00:00:00Z", ultimo_envio: null }];
+    const t = texto(pintar("/admin/internacionalizacion/contactos", YO.director));
+    expect(t).toContain("Contactos 2026-2 · Cúcuta");
+    expect(t).toContain("Nueva invitación");
+    expect(t).toContain("Exportar");
+    expect(t).toContain("Abrir la carpeta Contactos");
+    expect(t).toContain("Copiar");
+    expect(t).toContain("Laura Mendoza");
+    expect(t).toContain("correo sin verificar");
+    expect(t).toContain("1 persona aportó");
+  });
+
+  it("el enlace público lleva el token de la invitación", () => {
+    estado.moldear = preparadas;
+    estado.invitaciones = [invitacion];
+    const html = pintar("/admin/internacionalizacion/contactos", YO.director);
+    expect(html).toContain("/contactos/i/7Kq9x2mVb4zQ");
+  });
+
+  it("la sección la ven quienes pueden crear, no un Gestor", () => {
+    expect(texto(pintar("/admin/internacionalizacion", YO.director))).toContain("Contactos");
+    expect(texto(pintar("/admin/internacionalizacion", YO.coordinador))).toContain("Contactos");
+    expect(texto(pintar("/admin/internacionalizacion", YO.gestor))).not.toContain("Contactos");
+    // Un Gestor que escribe la dirección vuelve al resumen.
+    expect(texto(pintar("/admin/internacionalizacion/contactos", YO.gestor))).not.toContain("Nueva invitación");
+  });
+
+  it("las tablas de contactos ofrecen exportar desde sus detalles", () => {
+    estado.moldear = preparadas;
+    const t = texto(pintar("/admin/internacionalizacion/tablas?libro=l-mov", YO.director));
+    expect(t).toContain("Exportar");
+    const otra = texto(pintar("/admin/internacionalizacion/tablas?libro=l-conv", YO.director));
+    expect(otra).toContain("Exportar");
+  });
+
+  it("una tabla que no es de contactos no ofrece exportar", () => {
+    const t = texto(pintar("/admin/internacionalizacion/tablas?libro=l-mov", YO.director));
+    expect(t).not.toContain("Exportar");
   });
 });

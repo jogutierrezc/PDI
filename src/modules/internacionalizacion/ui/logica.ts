@@ -30,7 +30,7 @@ import type {
 
 /* ---------- Secciones ------------------------------------------------------ */
 
-export type SeccionId = "resumen" | "cifras" | "tablas" | "plantillas" | "periodos" | "accesos";
+export type SeccionId = "resumen" | "cifras" | "tablas" | "contactos" | "plantillas" | "periodos" | "accesos";
 
 export interface Seccion {
   id: SeccionId;
@@ -39,25 +39,28 @@ export interface Seccion {
   descripcion: string;
   /** Solo el Director (y la administración) la ve. */
   director?: boolean;
+  /** La ve quien puede crear (Director, Planeación o un Coordinador): las invitaciones de Contactos (0167). */
+  crea?: boolean;
 }
 
 export const SECCIONES: readonly Seccion[] = [
   { id: "resumen", rotulo: "Resumen", titulo: "Resumen del periodo", descripcion: "Qué falta para cerrar el periodo, campus por campus" },
   { id: "cifras", rotulo: "Cifras", titulo: "Cifras de internacionalización", descripcion: "Movilidad, países, convenios y personas de lo aprobado" },
   { id: "tablas", rotulo: "Tablas", titulo: "Tablas del repositorio", descripcion: "Las hojas de captura de cada campus, su envío y su validación" },
+  { id: "contactos", rotulo: "Contactos", titulo: "Contactos de personas invitadas", descripcion: "Enlaces de invitación, quién aportó y la exportación con las plantillas de Rua", crea: true },
   { id: "plantillas", rotulo: "Plantillas", titulo: "Plantillas y cobertura", descripcion: "Qué responde el repositorio de SNIES, CNA y rankings" },
   { id: "periodos", rotulo: "Periodos", titulo: "Periodos y ventanas", descripcion: "Cuándo captura cada campus y qué se reabrió" },
   { id: "accesos", rotulo: "Accesos", titulo: "Accesos al módulo", descripcion: "Director, coordinadores de campus y gestores", director: true },
 ];
 
-export function seccionesPara(director: boolean): Seccion[] {
-  return SECCIONES.filter((s) => !s.director || director);
+export function seccionesPara(director: boolean, crea = director): Seccion[] {
+  return SECCIONES.filter((s) => (!s.director || director) && (!s.crea || crea || director));
 }
 
 /** La sección pedida en la dirección, si existe y esta persona la puede ver; si no, nula. */
-export function seccionDe(param: string | undefined, director: boolean): SeccionId | null {
+export function seccionDe(param: string | undefined, director: boolean, crea = director): SeccionId | null {
   if (param === undefined) return "resumen";
-  return seccionesPara(director).find((s) => s.id === param)?.id ?? null;
+  return seccionesPara(director, crea).find((s) => s.id === param)?.id ?? null;
 }
 
 /* ---------- Periodo -------------------------------------------------------- */

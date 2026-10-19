@@ -231,7 +231,7 @@ export function dirtyTabs(now: SpaceSettings, saved: SpaceSettings): TabId[] {
 /** La línea que se pega en otro portal: la misma de siempre, con `data-pilo` diciendo qué Pilo es. */
 /** Con `read`, la línea pide además que Pilo lea la página que lo aloja (0127): lo visible («si») o todo, también lo plegado («todo»). */
 export function spaceSnippet(origin: string, space: PiloSpace, tema: string, lado: "der" | "izq", read: boolean | LeerModo = false): string {
-  return `<script src="${origin.replace(/\/+$/, "")}/pilo.js" data-pilo="${space}" data-tema="${tema}" data-esquina="${lado === "izq" ? "izquierda" : "derecha"}"${leerAttr(read)} defer></script>`;
+  return `<script src="${origin.replace(/\/+$/, "")}/pilo.js" data-cfasync="false" data-pilo="${space}" data-tema="${tema}" data-esquina="${lado === "izq" ? "izquierda" : "derecha"}"${leerAttr(read)} defer></script>`;
 }
 
 /* --- Leer y guardar la ficha ---------------------------------------------------------- */

@@ -292,7 +292,7 @@ export function widgetSnippet(origin: string, tema: Tema, lado: Lado, space: Spa
   const leer = leerAttr(read);
   // El idioma con que arranca el chat (la persona puede cambiarlo dentro): sin atributo, español.
   const idioma = lang === "en" || lang === "pt" ? " data-lang=\"" + lang + "\"" : "";
-  return `<script src="${origin.replace(/\/+$/, "")}/pilo.js"${pilo} data-tema="${tema}" data-esquina="${lado === "izq" ? "izquierda" : "derecha"}"${leer}${idioma} defer></script>`;
+  return `<script src="${origin.replace(/\/+$/, "")}/pilo.js" data-cfasync="false"${pilo} data-tema="${tema}" data-esquina="${lado === "izq" ? "izquierda" : "derecha"}"${leer}${idioma} defer></script>`;
 }
 
 /** El atributo de la línea: nada, data-leer="si" o data-leer="todo". `true` es «si», como antes. */

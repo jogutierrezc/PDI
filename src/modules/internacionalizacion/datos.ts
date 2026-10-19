@@ -21,6 +21,7 @@ import type {
   Campus,
   Columna,
   Datos,
+  IntAportanteRow,
   IntCarpetaRow,
   IntConceptoRow,
   IntEnvioHistorialRow,
@@ -29,6 +30,7 @@ import type {
   IntEstado,
   IntFilaRow,
   IntHojaRow,
+  IntInvitacionRow,
   IntLibroRow,
   IntMiembroRow,
   IntPeriodoRow,
@@ -58,7 +60,9 @@ const noExiste = (e: ErrorBase) =>
 export function errorDe(e: ErrorBase): Error {
   if (!noExiste(e)) return new Error(e.message ?? "Error de la base de datos");
   // Las carpetas, Multicampus y la autoría salen de la 0166; lo demás, de la 0151.
-  return /int_carpetas|carpeta_id|int_rol_fila|int_puede_|int_controla|archivo/i.test(e.message ?? "")
+  const m = e.message ?? "";
+  if (/int_invitaciones|int_aportantes|plantilla_contactos|int_contactos|aportante_id|canal/i.test(m)) return new FaltaMigracion("Falta aplicar la migración 0167 (Contactos de Internacionalización).");
+  return /int_carpetas|carpeta_id|int_rol_fila|int_puede_|int_controla|archivo/i.test(m)
     ? new FaltaMigracion("Falta aplicar la migración 0166 (carpetas y tablas Multicampus de Internacionalización).")
     : new FaltaMigracion("Falta aplicar la migración 0151 (Internacionalización).");
 }
@@ -88,6 +92,8 @@ export const INT_CLAVES = {
   conceptos: ["int", "conceptos"] as const,
   estructura: ["int", "estructura"] as const,
   carpetas: ["int", "carpetas"] as const,
+  invitaciones: ["int", "invitaciones"] as const,
+  aportantes: ["int", "aportantes"] as const,
   periodos: ["int", "periodos"] as const,
   ventanas: (periodo: string) => ["int", "ventanas", periodo] as const,
   filas: (hoja: string, periodo: string) => ["int", "filas", hoja, periodo] as const,
@@ -147,7 +153,7 @@ export function useEstructura() {
     staleTime: 30_000,
     queryFn: async (): Promise<LibroCompleto[]> => {
       const [libros, hojas, columnas] = await Promise.all([
-        supabase.from("int_libros").select("id, nombre, descripcion, captura, orden, carpeta_id, created_by, created_at").order("orden").order("nombre"),
+        supabase.from("int_libros").select("id, nombre, descripcion, captura, orden, carpeta_id, plantilla_contactos, created_by, created_at").order("orden").order("nombre"),
         supabase.from("int_hojas").select("id, libro_id, nombre, clase, sentido, orden").order("orden").order("nombre"),
         todasLas<Columna & { id: string; hoja_id: string; orden: number }>((d, h) =>
           supabase.from("int_columnas").select("id, hoja_id, clave, etiqueta, tipo, concepto_id, obligatorio, opciones, calculo, orden").order("orden").range(d, h),
@@ -218,7 +224,7 @@ export function useFilas(hoja: string | undefined, periodo: string | undefined) 
       todasLas<IntFilaRow>((d, h) =>
         supabase
           .from("int_filas")
-          .select("id, hoja_id, periodo_id, campus_id, datos, orden, origen, archivo, created_by, updated_by, created_at, updated_at")
+          .select("id, hoja_id, periodo_id, campus_id, datos, orden, origen, archivo, aportante_id, canal, created_by, updated_by, created_at, updated_at")
           .eq("hoja_id", hoja ?? "")
           .eq("periodo_id", periodo ?? "")
           .order("campus_id")
@@ -792,5 +798,93 @@ export function useEnviarSnies() {
       // Reportes Institucionales relee sus entregas y filas.
       void cliente.invalidateQueries({ queryKey: reportesKeys.all });
     },
+  });
+}
+
+/* ---------- Contactos (0167) ---------------------------------------------------------- */
+
+/** Las invitaciones (con su enlace). Solo las ve quien puede crearlas. */
+export function useInvitaciones() {
+  return useQuery({
+    queryKey: INT_CLAVES.invitaciones,
+    retry: false,
+    staleTime: 30_000,
+    queryFn: async (): Promise<IntInvitacionRow[]> => {
+      const r = await supabase
+        .from("int_invitaciones")
+        .select("id, token, nombre, periodo_id, campus_id, dominios, tipos, limite_por_persona, vence, estado, created_by, created_at")
+        .order("created_at", { ascending: false });
+      if (r.error) throw errorDe(r.error);
+      return (r.data as IntInvitacionRow[] | null) ?? [];
+    },
+  });
+}
+
+export type InvitacionNueva = Pick<IntInvitacionRow, "nombre" | "periodo_id" | "campus_id" | "vence"> & Partial<Pick<IntInvitacionRow, "dominios" | "tipos" | "limite_por_persona">>;
+
+/** Crea una invitación y devuelve su token. */
+export function useCrearInvitacion() {
+  const cliente = useQueryClient();
+  return useMutation({
+    mutationFn: async (i: InvitacionNueva): Promise<string> => {
+      const r = await supabase.from("int_invitaciones").insert(i).select("token").single();
+      if (r.error) throw errorDe(r.error);
+      return (r.data as { token: string }).token;
+    },
+    onSuccess: () => invalidar(cliente, INT_CLAVES.invitaciones, INT_CLAVES.todo),
+  });
+}
+
+/** Pausa, reactiva o cambia una invitación (vencimiento, tipos, máximo por persona). */
+export function useActualizarInvitacion() {
+  const cliente = useQueryClient();
+  return useMutation({
+    mutationFn: async (a: { id: string } & Partial<Pick<IntInvitacionRow, "estado" | "vence" | "tipos" | "limite_por_persona" | "nombre" | "dominios">>) => {
+      const { id, ...cambios } = a;
+      const r = await supabase.from("int_invitaciones").update(cambios).eq("id", id);
+      if (r.error) throw errorDe(r.error);
+    },
+    onSuccess: () => invalidar(cliente, INT_CLAVES.invitaciones),
+  });
+}
+
+/** Quién aportó por los enlaces (nombre, cargo, correo declarados). Nunca trae el secreto de sesión. */
+export function useAportantes() {
+  return useQuery({
+    queryKey: INT_CLAVES.aportantes,
+    retry: false,
+    staleTime: 30_000,
+    queryFn: () =>
+      todasLas<IntAportanteRow>((d, h) =>
+        supabase.from("int_aportantes").select("id, invitacion_id, nombre, cargo, correo, campus_id, correo_verificado, creado_en, ultimo_envio").order("creado_en", { ascending: false }).range(d, h),
+      ),
+  });
+}
+
+/** Crea (o completa) la carpeta «Contactos» y sus dos tablas Multicampus. Idempotente. */
+export function usePrepararContactos() {
+  const cliente = useQueryClient();
+  return useMutation({
+    mutationFn: () => rpc<{ carpeta_id: string; tablas: { codigo: string; libro_id: string; hoja_id: string }[] }>("int_contactos_preparar", {}),
+    onSuccess: () => invalidar(cliente, INT_CLAVES.estructura, INT_CLAVES.carpetas),
+  });
+}
+
+/** Todas las filas de una hoja (de un periodo, o de todos si no se pide), para exportar. */
+export function useFilasContactos(hoja: string | undefined, periodo: string | null | undefined, activo: boolean) {
+  return useQuery({
+    queryKey: ["int", "filas-contactos", hoja ?? "", periodo ?? "todos"],
+    enabled: activo && Boolean(hoja),
+    retry: false,
+    staleTime: 15_000,
+    queryFn: () =>
+      todasLas<IntFilaRow>((d, h) => {
+        let q = supabase
+          .from("int_filas")
+          .select("id, hoja_id, periodo_id, campus_id, datos, orden, origen, archivo, aportante_id, canal, created_by, updated_by, created_at, updated_at")
+          .eq("hoja_id", hoja ?? "");
+        if (periodo) q = q.eq("periodo_id", periodo);
+        return q.order("created_at", { ascending: false }).range(d, h);
+      }),
   });
 }

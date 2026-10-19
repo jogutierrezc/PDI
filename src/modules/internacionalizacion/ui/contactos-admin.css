@@ -1,0 +1,210 @@
+/* =============================================================================
+   Internacionalización · Contactos, la pantalla del equipo (0167). Tokens del
+   proyecto; solo transform/opacity cuando algo se mueve y nada animado en la lista.
+   ========================================================================== */
+
+.it-ct {
+  display: grid;
+  gap: var(--space-4);
+  align-content: start;
+}
+
+.it-ct-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-4);
+  flex-wrap: wrap;
+  padding: var(--space-4) var(--space-5);
+  border: 1px dashed var(--line-strong);
+  border-radius: var(--radius-md);
+  background: var(--surface);
+}
+
+.it-ct-banner p {
+  margin: var(--space-1) 0 0;
+  color: var(--ink-secondary);
+}
+
+.it-ct-atajos {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+  justify-content: flex-end;
+}
+
+.it-ct-cols {
+  display: grid;
+  grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr);
+  gap: var(--space-4);
+  align-items: start;
+}
+
+.it-ct-lista {
+  display: grid;
+  gap: var(--space-3);
+}
+
+.it-ct-inv {
+  display: grid;
+  gap: var(--space-2);
+  padding: var(--space-3) var(--space-4);
+  text-align: left;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  background: var(--surface);
+  color: var(--ink);
+  font: inherit;
+  cursor: pointer;
+  transition: border-color 120ms ease;
+}
+
+.it-ct-inv[aria-pressed="true"] {
+  border: 2px solid var(--brand-blue);
+  background: color-mix(in srgb, var(--brand-blue) 5%, var(--surface));
+}
+
+.it-ct-inv__cab {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--space-3);
+  align-items: center;
+}
+
+.it-ct-inv__pie {
+  color: var(--ink-secondary);
+  font-size: var(--text-xs);
+}
+
+.it-ct-chip {
+  padding: 2px 9px;
+  border-radius: 999px;
+  font-size: var(--text-2xs);
+  font-weight: 700;
+  white-space: nowrap;
+  background: var(--surface-3);
+  color: var(--ink-secondary);
+}
+
+.it-ct-chip.is-activa {
+  background: color-mix(in srgb, var(--status-done) 14%, var(--surface));
+  color: var(--status-done);
+}
+
+.it-ct-detalle {
+  display: grid;
+  gap: var(--space-4);
+  padding: var(--space-5);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  background: var(--surface);
+}
+
+.it-ct-detalle h2 {
+  margin: 0;
+  font-size: var(--text-lg, 1.2rem);
+  color: var(--brand-navy);
+}
+
+.it-ct-lab {
+  display: block;
+  margin-bottom: 6px;
+  font-weight: 700;
+  font-size: var(--text-xs);
+}
+
+.it-ct-enlace {
+  display: flex;
+  gap: var(--space-2);
+}
+
+.it-ct-enlace input {
+  flex: 1;
+  min-width: 0;
+  padding: 9px 12px;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-sm);
+  background: var(--surface-2);
+  color: var(--ink-secondary);
+  font: inherit;
+}
+
+.it-ct-ancho {
+  grid-column: 1 / -1;
+}
+
+.it-ct-quien ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+}
+
+.it-ct-quien li {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding: 10px 12px;
+  font-size: var(--text-xs);
+  border-bottom: 1px solid var(--line);
+}
+
+.it-ct-quien li:last-child {
+  border-bottom: 0;
+}
+
+.it-ct-quien small {
+  display: block;
+  color: var(--ink-muted);
+}
+
+.it-ct-pie {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+}
+
+/* La vista previa de las cabeceras del archivo a exportar */
+.it-ct-vista {
+  display: grid;
+  gap: var(--space-2);
+  padding: var(--space-3);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+}
+
+.it-ct-cabeceras {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.it-ct-cabeceras code {
+  padding: 4px 8px;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-xs);
+  background: var(--surface-3);
+  color: var(--brand-navy);
+  font-size: var(--text-xs);
+  white-space: nowrap;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .it-ct-inv:hover {
+    border-color: var(--brand-blue);
+  }
+}
+
+@media (max-width: 60rem) {
+  .it-ct-cols {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .it-ct-inv {
+    transition: none;
+  }
+}

@@ -23,6 +23,7 @@ import { Home } from "./routes/Home";
 const Launcher = lazy(() => import("./modules/admin/launcher/Launcher").then((m) => ({ default: m.Launcher })));
 const PlaneacionHome = lazy(() => import("./modules/planeacion/PlaneacionHome").then((m) => ({ default: m.PlaneacionHome })));
 const TeamPage = lazy(() => import("./modules/planeacion/TeamPage").then((m) => ({ default: m.TeamPage })));
+const ContactosPublico = lazy(() => import("./modules/internacionalizacion/contactos/publico/ContactosPublico").then((m) => ({ default: m.ContactosPublico })));
 const AskPilo = lazy(() => import("./modules/pregunta/AskPilo").then((m) => ({ default: m.AskPilo })));
 const PiloEmbed = lazy(() => import("./modules/pilo-embed/PiloEmbed").then((m) => ({ default: m.PiloEmbed })));
 const PiloApp = lazy(() => import("./modules/pilo-app/PiloApp").then((m) => ({ default: m.PiloApp })));
@@ -279,6 +280,8 @@ export default function App() {
           <Route path="/pregunta" element={<AskPilo />} />
           {/* La ruta del bus UDES para el público (migración 0140): sin iniciar sesión, solo ruta, paradas y horario. */}
           <Route path="/rutas" element={<RutasPublico />} />
+          {/* Contactos (0167): el enlace de invitación de Internacionalización; sin iniciar sesión, con el token como llave. */}
+          <Route path="/contactos/i/:token" element={<ContactosPublico />} />
           {/* El chat emergente de Pilo, para verse dentro de un marco en otros portales (public/pilo.js). */}
           <Route path="/pilo-embed" element={<PiloEmbed />} />
           {/* Mr. Pilo en Enseñanza (0113): la misma página y el mismo chat emergente, en su propio espacio. */}

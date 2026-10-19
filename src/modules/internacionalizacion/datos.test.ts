@@ -14,7 +14,7 @@ describe("datos", () => {
 
   it("arma libros → hojas → columnas", () => {
     const e = armarEstructura(
-      [{ id: "l", nombre: "Movilidad", descripcion: "", captura: "campus", orden: 1, carpeta_id: null, created_by: null, created_at: "" }],
+      [{ id: "l", nombre: "Movilidad", descripcion: "", captura: "campus", orden: 1, carpeta_id: null, plantilla_contactos: null, created_by: null, created_at: "" }],
       [
         { id: "h1", libro_id: "l", nombre: "Saliente", clase: "movilidad", sentido: "saliente", orden: 1 },
         { id: "h2", libro_id: "otro", nombre: "X", clase: "general", sentido: null, orden: 1 },

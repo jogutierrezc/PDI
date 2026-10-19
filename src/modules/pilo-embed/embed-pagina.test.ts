@@ -72,7 +72,7 @@ describe("leer la página anfitriona", () => {
   });
 
   it("la línea para pegar pide leer solo si se marca", () => {
-    expect(widgetSnippet("https://portal.example", "blanco", "der", "planeacion", true)).toBe('<script src="https://portal.example/pilo.js" data-tema="blanco" data-esquina="derecha" data-leer="si" defer></script>');
+    expect(widgetSnippet("https://portal.example", "blanco", "der", "planeacion", true)).toBe('<script src="https://portal.example/pilo.js" data-cfasync="false" data-tema="blanco" data-esquina="derecha" data-leer="si" defer></script>');
     expect(readHostMessage({ source: "pilo-host", full: false, read: true })).toEqual({ full: false, read: true });
   });
 
@@ -81,7 +81,7 @@ describe("leer la página anfitriona", () => {
     expect(line("no")).toBe(line(false));
     expect(line("no")).not.toContain("data-leer");
     expect(line("si")).toBe(line(true));
-    expect(line("todo")).toBe('<script src="https://portal.example/pilo.js" data-tema="blanco" data-esquina="derecha" data-leer="todo" defer></script>');
+    expect(line("todo")).toBe('<script src="https://portal.example/pilo.js" data-cfasync="false" data-tema="blanco" data-esquina="derecha" data-leer="todo" defer></script>');
     expect(widgetSnippet("https://portal.example", "blanco", "der", "ensenanza", "todo")).toContain('data-pilo="ensenanza" data-tema="blanco" data-esquina="derecha" data-leer="todo"');
     expect(leerAttr("otra" as never)).toBe("");
     expect(LEER_MODOS.map((m) => m.id)).toEqual(["no", "si", "todo"]);

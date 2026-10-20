@@ -309,13 +309,12 @@ export function elevenFault(status: number, rawBody: string): ElevenFault {
 /* --- Cantar --------------------------------------------------------------------------------------- */
 
 /**
- * Gancho para que Pilo cante en el chat: hoy NO canta solo. Para activarlo, el
- * chat tendría que (1) detectar el pedido, (2) llamar a la acción «cantar» con
- * una letra o tema original y (3) respetar `sing_aud` del espacio. Mientras
- * esto sea false, `cantar` solo se pide desde Voz (administración) y desde
- * quien tenga permiso en pilo_extras.
+ * Que Pilo canta en el chat (la app, /app): la pantalla detecta el pedido
+ * («cántame…»), llama a la acción «cantar» con una letra o tema original y
+ * respeta `sing_aud` del espacio. Apagado (nadie) o sin permiso, el servidor
+ * responde con el aviso de la administración y el chat lo enseña.
  */
-export const CHAT_SING_ENABLED = false;
+export const CHAT_SING_ENABLED = true;
 
 export const SING_STYLES = {
   jingle: "upbeat, catchy advertising jingle with bright acoustic guitar and light percussion",

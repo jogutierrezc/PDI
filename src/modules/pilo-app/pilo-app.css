@@ -2385,3 +2385,20 @@
   font-size: 0.75rem;
   color: var(--c-ink2);
 }
+
+/* La canción de un turno (0172): el reproductor y su pie. */
+.pa-song {
+  margin: 10px 0 0;
+  display: grid;
+  gap: 4px;
+}
+
+.pa-song audio {
+  width: 100%;
+  border-radius: 12px;
+}
+
+.pa-song figcaption {
+  font-size: 0.75rem;
+  color: var(--c-ink2);
+}

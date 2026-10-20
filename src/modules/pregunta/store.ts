@@ -114,6 +114,8 @@ export interface Turn {
   page?: TurnPage;
   /** La respuesta se guardó en la cuenta de Pilo de la persona (0120, solo la app): el id de lo guardado. */
   savedId?: number;
+  /** Pilo cantó (0172): con qué estilo y modo, y cuánto tardó. El audio no se guarda: al recargar, queda el dato. */
+  song?: { estilo: string; modo: "voz" | "musica"; ms: number };
 }
 
 export interface Conversation {

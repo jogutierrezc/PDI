@@ -31,4 +31,4 @@ Composiciones **originales** (jingle, saludo, cumpleaños). Dos rutas:
 
 Reglas: apagado por defecto (`pilo_extras.sing_aud` = `nadie`); la administración siempre prueba desde esta pantalla; el servidor rechaza «la canción X de <artista>», «al estilo de», covers, karaoke, remix y parodias (`songRefusal`), y ElevenLabs rechaza por su lado lo que reconoce (`bad_prompt`). Topes por espacio: canciones nuevas al día, caracteres de la letra y duración máxima. Lo cantado se guarda en la caché por hash.
 
-**Gancho para el chat** (hoy apagado): `CHAT_SING_ENABLED` en `elevenlabs.ts`. Para que Pilo cante en el chat habría que detectar el pedido, llamar a `cantar` con una letra original y respetar `sing_aud` del espacio.
+**El chat de la app ya canta** (`CHAT_SING_ENABLED` en `elevenlabs.ts`): la app detecta «cántame…» (`src/modules/pregunta/sing.ts`), llama a `cantar` con un tema o una letra original y respeta `sing_aud` del espacio. La página pública de Pregúntele a Pilo, todavía no.

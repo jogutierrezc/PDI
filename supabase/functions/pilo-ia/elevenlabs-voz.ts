@@ -216,9 +216,9 @@ export function makeEleven(ctx: ElevenCtx) {
    *                (experimental en la documentación de ElevenLabs).
    *  modo «musica» con Eleven Music (/v1/music): canta con la voz de su propio
    *                cantante; no se puede elegir la voz de Pilo.
-   * Apagada por defecto (pilo_extras.sing_aud). Hoy solo la pide la
-   * administración y quien tenga el permiso; Pilo no canta solo en el chat
-   * (ver CHAT_SING_ENABLED en elevenlabs.ts).
+   * Apagada por defecto (pilo_extras.sing_aud). La pide la administración
+   * desde Voz y, desde el chat de la app, quien tenga permiso en su espacio
+   * (CHAT_SING_ENABLED en elevenlabs.ts).
    */
   async function sing(): Promise<Response> {
     const { data: row, error } = await ctx.admin.from("pilo_extras").select("*").eq("space", ctx.space).maybeSingle();

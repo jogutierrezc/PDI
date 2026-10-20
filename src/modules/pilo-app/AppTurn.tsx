@@ -26,6 +26,7 @@ import type { ThinkStep } from "../pregunta/answer-state";
 import type { AppVoice } from "./access";
 import { prefetchOfficial, sayOfficial, stopOfficial } from "./official-voice";
 import { isSuperMode, voiceTone, SUPER } from "../pregunta/super/modes";
+import { songUrlOf } from "../pregunta/sing";
 import { reducedMotion } from "./pwa";
 import { Icon } from "./icons";
 import { FileChip, FileFoot, FileLog } from "../pregunta/Extras";
@@ -121,6 +122,8 @@ export function AppTurn({
   const incomplete = Boolean(a && turn.incomplete);
   const text = a?.text ?? stream?.text ?? "";
   const sources = useMemo(() => a?.sources ?? stream?.meta?.sources ?? [], [a, stream?.meta]);
+  // La canción de este turno (0172): el audio vive en memoria; tras recargar queda el dato, sin reproductor.
+  const songUrl = songUrlOf(turn.id);
   const parsed = useMemo(() => parseAnswer(text, { streaming }), [text, streaming]);
   const elapsed = useElapsed(stream?.startedAt, working);
   const step = working ? waitingLine({ steps: stream?.steps ?? [], meta: stream?.meta ?? null, seconds: elapsed }) : "";
@@ -294,6 +297,16 @@ export function AppTurn({
                 onFinish={finish}
               />
             </div>
+          )}
+
+          {songUrl && (
+            <figure className="pa-song">
+              <audio controls src={songUrl} preload="metadata" />
+              <figcaption>
+                {tr("Canción original de Pilo")}
+                {turn.song ? ` · ${turn.song.modo === "musica" ? tr("con música") : tr("con su voz")} · ${turn.song.estilo}` : ""}
+              </figcaption>
+            </figure>
           )}
 
           {turn.error && (

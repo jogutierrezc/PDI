@@ -474,7 +474,7 @@ function ElevenSing({ ed }: { ed: EditorApi }) {
     <Group title="Hacer cantar a Pilo" aside={<small>Composiciones originales</small>}>
       <p className="pis-lead">
         Pilo canta <strong>composiciones originales</strong>: un jingle de la UDES, un saludo cantado, un cumpleaños. No canta canciones de otras personas ni «al estilo de» un artista: el servidor rechaza esos pedidos y
-        ElevenLabs también. Hoy solo se pide desde aquí o por quien tenga permiso; Pilo no canta solo en el chat.
+        ElevenLabs también. Se pide desde aquí y, en el chat de la app, escribiendo «cántame…» (un tema o una letra original): lo decide la audiencia de abajo.
       </p>
       <p className="pis-small" role="note">{COST_NOTICE}</p>
 

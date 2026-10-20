@@ -35,6 +35,8 @@ import { RolePicker } from "../pregunta/RolePicker";
 import { parseAnswer } from "../pregunta/AnswerText";
 import { toPlain } from "../pregunta/markdown";
 import { interruptedTurn, reduceSteps } from "../pregunta/answer-state";
+import { askSong, rememberSong, singRequestOf } from "../pregunta/sing";
+import type { SongRequest } from "../pregunta/sing";
 import type { ThinkStep } from "../pregunta/answer-state";
 import { useQueryClient } from "@tanstack/react-query";
 import { extrasRole } from "./access";
@@ -335,11 +337,55 @@ export function AppShell({ account, space, door, waking, online, person, member,
     if (slot) gsap.fromTo(slot, { scale: 0.7 }, { scale: 1, duration: 0.5, ease: "back.out(2.4)", clearProps: "transform" });
   };
 
+  /**
+   * «Cántame…» (0172): el turno es una canción. No se le pregunta nada al
+   * modelo: la acción «cantar» del servidor compone (con música) o canta la
+   * letra con la voz de Pilo, y el turno trae el audio y el error en español,
+   * si lo hubo. No entra en la historia que se le manda al servidor.
+   */
+  const singIt = async (q: string, song: SongRequest) => {
+    stopOfficial();
+    setNote("");
+    const cut = run.current;
+    const cutPatch = cut ? interruptedTurn(cut.text, cut.meta) : null;
+    if (cut) {
+      run.current = null;
+      cut.ctl.abort();
+    }
+    const patched = (turns: Turn[]) => (cut && cutPatch ? turns.map((t) => (t.id === cut.turnId ? { ...t, ...cutPatch } : t)) : turns);
+    const conv: Conversation = current ?? { id: newId(), title: q.slice(0, 80), at: Date.now(), turns: [] };
+    const turn: Turn = { id: newId(), q, local: true };
+    setConvs((list) => [{ ...conv, at: Date.now(), turns: [...patched(conv.turns), turn] }, ...list.filter((c) => c.id !== conv.id).map((c) => (cut && c.id === cut.convId ? { ...c, turns: patched(c.turns) } : c))]);
+    setCurrentId(conv.id);
+    setBusy(true);
+    setStatus(tr(song.modo === "musica" ? "Pilo está componiendo una canción; puede tardar un minuto." : "Pilo está cantando."));
+    toBottom();
+    try {
+      const result = await askSong(space.portal, song);
+      if ("error" in result) {
+        patchTurn(conv.id, turn.id, { error: result.error });
+        setStatus(result.error);
+        return;
+      }
+      rememberSong(turn.id, result.audio);
+      patchTurn(conv.id, turn.id, {
+        song: { estilo: song.estilo, modo: song.modo, ms: result.ms },
+        answer: { kind: "ia", text: tr(song.modo === "musica" ? "¡Aquí va mi canción! Compuse algo original sobre «{v0}». Pulse play para oírla." : "¡Aquí va mi canción! Canté esa letra con mi voz. Pulse play para oírla.", { v0: song.tema }), sources: [], trail: [] },
+      });
+      setStatus(tr("Pilo cantó una canción."));
+    } finally {
+      setBusy(false);
+    }
+  };
+
   const ask = async (raw: string, replaceTurn?: string) => {
     const q = raw.replace(/\s+/g, " ").trim();
     if (!q || !can) return;
     // Los modos secretos se atienden antes de llamar al servidor. Con un archivo adjunto, la pregunta es de verdad.
     if (!replaceTurn && !attach.attachment && handleSuper(q)) return;
+    // «Cántame…» (0172): el turno es una canción, no una pregunta; el servidor la canta y el turno trae el audio.
+    const song = !replaceTurn && !attach.attachment ? singRequestOf(q) : null;
+    if (song) return void singIt(q, song);
     stopOfficial();
     setNote("");
     // Otra pregunta mientras Pilo escribe: la anterior se corta y queda como incompleta.

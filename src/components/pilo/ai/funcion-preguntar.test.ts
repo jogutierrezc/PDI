@@ -10,7 +10,7 @@
    No se llama a ningún proveedor real.
    ========================================================================== */
 
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
@@ -485,8 +485,10 @@ beforeAll(async () => {
   const patched = source.replace(importLine, "const createClient = (globalThis as any).__piloCreateClient;");
   code = (await transform(patched, { loader: "ts", format: "esm", target: "es2022" })).code;
   dir = mkdtempSync(join(tmpdir(), "pilo-ia-"));
-  // index.ts importa los archivos de la voz de ElevenLabs (0172): se copian junto a cada instancia.
+  // index.ts importa los archivos de la voz de ElevenLabs (0172) y los lectores de la capa profunda (0173): se copian junto a cada instancia.
   for (const name of ["elevenlabs.ts", "elevenlabs-voz.ts"]) writeFileSync(join(dir, name), readFileSync(resolve(__dirname, "../../../../supabase/functions/pilo-ia", name), "utf8"));
+  mkdirSync(join(dir, "lectores"), { recursive: true });
+  for (const name of readdirSync(resolve(__dirname, "../../../../supabase/functions/pilo-ia/lectores"))) writeFileSync(join(dir, "lectores", name), readFileSync(resolve(__dirname, "../../../../supabase/functions/pilo-ia/lectores", name), "utf8"));
 });
 
 afterAll(() => {

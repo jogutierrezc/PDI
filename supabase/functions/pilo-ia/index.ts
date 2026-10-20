@@ -28,8 +28,13 @@
                                                  · { status: "error", message } · 404 { status: "desconocida" }
      { action: "calificar", portal: "pregunta", answerId?, vote: "up" | "down", question?, text?, kind? }
                                                  «No me sirvió» anota la pregunta en la bandeja (0109)
-     { action: "indexar", step: "estado" | "lote" | "probar" | "catalogo" | "modelos", q? }   (solo administración, 0108)
+     { action: "indexar", step: "estado" | "lote" | "probar" | "catalogo" | "modelos" | "profunda", q? }   (solo administración, 0108; «profunda», 0173)
                                                  → { status } · { saved, status } · { semantic, hits } · { models }
+                                                 «profunda» (0173) actualiza la capa profunda, la que arman los lectores
+                                                 directos de los portales: sin `fuente` abre la corrida y lista las fuentes
+                                                 con sus partes → { run, fuentes }; con `fuente` y `parte` lee esa parte y
+                                                 la guarda → { seen, added, changed }; con `cerrar` poda lo que la corrida
+                                                 no tocó → { removed, total }. Sin embeddings: lo nuevo se indexa con «lote».
      { action: "analizar", portal: "cifras" | "impacto", analysis: {brief, part, title, facts, pdi, doc?, scope?} }
                                                  → { summary, paragraphs, alerts, recommendations, unknown, verified }
      { action: "comprender", space, doc?, step: "estado" | "lote" }                            (solo administración, 0115)
@@ -107,6 +112,15 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.58.0";
 // La voz de ElevenLabs y «cantar» (0172) viven en sus propios archivos.
 import { makeEleven } from "./elevenlabs-voz.ts";
+// La capa profunda (0173): los lectores directos de los portales, que arman pasajes desde las tablas.
+import { contexto, ErrorFilas, ErrorTiempo, FUENTES, type Fuente, type Lector } from "./lectores/comun.ts";
+import { lectorBoletines } from "./lectores/boletines.ts";
+import { lectorCifras } from "./lectores/cifras.ts";
+import { lectorPdi } from "./lectores/pdi.ts";
+import { lectorImpacto } from "./lectores/impacto.ts";
+
+/** Los lectores de la capa profunda (0173), uno por fuente de portal de Planeación. */
+const LECTORES: Record<Fuente, Lector> = { cifras: lectorCifras, boletines: lectorBoletines, pdi: lectorPdi, impacto: lectorImpacto };
 
 // --- lógica: copia exacta de src/components/pilo/ai/logic.ts (la prueba logic-sync lo vigila)
 // Va dentro para que la función sea un solo archivo y se pueda desplegar
@@ -6160,6 +6174,11 @@ function platformCap(): number {
   return Number.isFinite(asked) && asked >= 60_000 ? asked : 150_000;
 }
 const PLATFORM_CAP_MS = platformCap();
+/** Lo que dura leyendo una parte de la capa profunda (0173): deja sitio a las llamadas de la base.
+ * Es el tope de `vence` del contexto de los lectores; una parte que no alcanza queda para la siguiente. */
+const DEEP_READ_MS = PLATFORM_CAP_MS - 40_000;
+/** Cuántos pasajes profundos van en cada llamada a `pilo_deep_save`. */
+const DEEP_BATCH = 40;
 /** Lo más que dura la redacción entera, con sitio para la búsqueda y para guardar. */
 const DRAFT_TOTAL_MS = PLATFORM_CAP_MS - 20_000;
 /** La primera palabra puede tardar lo mismo que la redacción entera. */
@@ -6407,6 +6426,12 @@ async function handle(request: Request): Promise<Response> {
     /** Indexar por significado (0108): qué paso y, al probar, la pregunta. */
     step?: string;
     q?: string;
+    /** Indexar, paso «profunda» (0173): la fuente de la capa profunda, la parte que se lee, la hora de la
+     * corrida (la abrió el paso sin fuente) y si ya se leyó todo, para podar lo que la corrida no tocó. */
+    fuente?: string;
+    parte?: string;
+    run?: string;
+    cerrar?: boolean;
     /** Para quién se redacta y se lee (0113): "estudiante" | "profesor". Solo cuenta fuera del espacio de partida. */
     rol?: unknown;
     /** Indexar (0113), comprender (0115) y moodle (0116): de qué espacio. En las demás acciones el espacio sale del portal. */
@@ -6769,12 +6794,76 @@ async function handle(request: Request): Promise<Response> {
   };
 
   /**
+   * Actualizar la capa profunda (0173), solo administración y solo en Planeación: los
+   * lectores directos de los portales arman pasajes desde las tablas y los guardan con
+   * `pilo_deep_save`, por partes (la página pasa una a una para no agotar el tiempo de
+   * la función) y con la misma corrida; al terminar cada fuente, la página pide `cerrar` y
+   * `pilo_deep_prune` borra lo que la corrida no tocó. Sin `fuente` se abre la corrida y
+   * se listan las fuentes con sus partes. No necesita embeddings: lo nuevo se indexa con
+   * «lote», como los demás pasajes.
+   */
+  async function deepLayer(): Promise<Response> {
+    if (space !== "planeacion") return json({ error: "La capa profunda es de los portales de Planeación." }, 400);
+    const fuente = typeof body.fuente === "string" ? body.fuente.trim() : "";
+    const lector = fuente ? LECTORES[fuente as Fuente] : undefined;
+    if (fuente && !lector) return json({ error: "Esa fuente no tiene capa profunda." }, 400);
+    const ctx = contexto(admin, { ms: DEEP_READ_MS, urlBase: url });
+    // La corrida: sin fuente se abre (su reloj marca lo que esta pasada tocó) y se listan las partes.
+    if (!fuente) {
+      const fuentes: { fuente: Fuente; nombre: string; sesion: boolean; partes: { id: string; etiqueta: string }[] }[] = [];
+      try {
+        for (const id of FUENTES) {
+          const partes = await LECTORES[id].partes(ctx);
+          fuentes.push({ fuente: id, nombre: LECTORES[id].nombre, sesion: LECTORES[id].conSesion, partes: partes.map(({ id: parte, etiqueta }) => ({ id: parte, etiqueta })) });
+        }
+      } catch (error) {
+        return json({ error: `${(error as Error).message} Vuelva a intentarlo.` }, 500);
+      }
+      return json({ ok: true, run: new Date().toISOString(), fuentes });
+    }
+    // La hora de la corrida la abrió el paso sin fuente; sin ella no se sabe qué es de esta pasada.
+    const run = typeof body.run === "string" ? body.run.trim() : "";
+    if (!run || Number.isNaN(Date.parse(run))) return json({ error: "Falta la hora de la corrida (la abre el primer paso)." }, 400);
+    try {
+      if (body.cerrar === true) {
+        const { data, error } = await admin.rpc("pilo_deep_prune", { p_source: fuente, p_run: run });
+        if (error) return json({ error: /pilo_deep_prune|function/i.test(error.message) ? "Falta la migración 0173 de la memoria unificada." : error.message }, 500);
+        const r = (data ?? {}) as Record<string, unknown>;
+        await log("listo · profunda", `${lector!.nombre}: poda, ${Number(r.removed ?? 0)} salieron`, true);
+        return json({ ok: true, fuente, ...r });
+      }
+      const parteId = typeof body.parte === "string" ? body.parte.trim() : "";
+      const parte = (await lector!.partes(ctx)).find((p) => p.id === parteId);
+      if (!parte) return json({ error: "Esa parte ya no existe: vuelva a abrir la actualización." }, 400);
+      const pasajes = await lector!.leer(ctx, parte);
+      let seen = 0;
+      let added = 0;
+      let changed = 0;
+      for (let i = 0; i < pasajes.length; i += DEEP_BATCH) {
+        const { data, error } = await admin.rpc("pilo_deep_save", { p_source: fuente, p_run: run, p_rows: pasajes.slice(i, i + DEEP_BATCH) });
+        if (error) return json({ error: /pilo_deep_save|function/i.test(error.message) ? "Falta la migración 0173 de la memoria unificada." : error.message }, 500);
+        const r = (data ?? {}) as Record<string, unknown>;
+        seen += Number(r.seen ?? 0);
+        added += Number(r.added ?? 0);
+        changed += Number(r.changed ?? 0);
+      }
+      await log("listo · profunda", `${lector!.nombre} · ${parte.etiqueta}: ${seen} pasajes`, true);
+      return json({ ok: true, fuente, parte: parteId, etiqueta: parte.etiqueta, pasajes: pasajes.length, seen, added, changed });
+    } catch (error) {
+      if (error instanceof ErrorTiempo || error instanceof ErrorFilas) return json({ error: `No dio tiempo de leer ${lector!.nombre}: ${(error as Error).message} Lo que ya pasó quedó guardado; siga con lo que falta.` }, 504);
+      return json({ error: `${lector!.nombre}: ${(error as Error)?.message ?? error}` }, 500);
+    }
+  }
+
+  /**
    * Indexar la memoria (solo administración). «estado»: cuántos vectores
    * están al día; «lote»: convierte los siguientes 64 textos (la página
    * repite hasta terminar); «probar»: los cinco pasajes que Pilo encontraría,
-   * con la búsqueda híbrida.
+   * con la búsqueda híbrida; «profunda»: actualizar la capa profunda (0173).
    */
   async function indexMemory(): Promise<Response> {
+    // La capa profunda no necesita el proveedor de significado: sus pasajes se indexan después con «lote».
+    if (String(body.step ?? "estado") === "profunda") return await deepLayer();
     if (!embedder) {
       return json({ error: "Este proveedor no ofrece búsqueda por significado.", advice: "Use NVIDIA o Mistral en Conexión: la misma clave sirve para los embeddings." }, 400);
     }

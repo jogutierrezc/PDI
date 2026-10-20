@@ -1012,6 +1012,85 @@ export function useTryMemory(space: PiloSpace = DEFAULT_SPACE) {
   });
 }
 
+/* --- La capa profunda (0173) ----------------------------------------------------------------- */
+
+/** Una fuente con capa profunda y sus partes, como las lista la función. */
+export interface DeepSource {
+  fuente: string;
+  nombre: string;
+  /** Sus pasajes nacen «con sesión»: nunca los lee el público. */
+  sesion: boolean;
+  partes: { id: string; etiqueta: string }[];
+}
+
+/** Lo que dejó actualizar una fuente de la capa profunda. */
+export interface DeepResult {
+  fuente: string;
+  nombre: string;
+  /** Partes leídas y pasajes que la corrida tocó. */
+  partes: number;
+  seen: number;
+  added: number;
+  changed: number;
+  /** La poda (solo si todas las partes pasaron): lo que salió y lo que quedó. */
+  removed?: number;
+  total?: number;
+  /** Por qué no se terminó: lo que ya pasó quedó guardado. */
+  error?: string;
+}
+
+/**
+ * Actualiza la capa profunda (0173): la que arman los lectores directos de los
+ * portales (UDES en Cifras, Boletines, Plan de Desarrollo e Impacto). La
+ * función abre la corrida y lista las partes; la página pasa una a una (así
+ * ninguna agota el tiempo de la función) y, al terminar cada fuente, pide la
+ * poda, que borra lo que la corrida no tocó. Una parte que falla no poda su
+ * fuente: sus pasajes de antes se quedan y la actualización se puede repetir.
+ */
+export function useDeepMemory() {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: async (onProgress?: (r: DeepResult) => void): Promise<DeepResult[]> => {
+      const open = await indexStep<{ run?: string; fuentes?: DeepSource[] }>({ step: "profunda" });
+      const run = clean(open.run);
+      const out: DeepResult[] = [];
+      for (const f of arrayOf<DeepSource>(open.fuentes)) {
+        const result: DeepResult = { fuente: clean(f.fuente), nombre: clean(f.nombre), partes: 0, seen: 0, added: 0, changed: 0 };
+        // Sin corrida no se sabe qué es nuevo: nada se guarda ni se poda.
+        let ok = Boolean(run);
+        for (const p of arrayOf<DeepSource["partes"][number]>(f.partes)) {
+          try {
+            const r = await indexStep<{ seen?: number; added?: number; changed?: number }>({ step: "profunda", fuente: f.fuente, parte: p.id, run });
+            result.partes += 1;
+            result.seen += numberOrNull(r.seen) ?? 0;
+            result.added += numberOrNull(r.added) ?? 0;
+            result.changed += numberOrNull(r.changed) ?? 0;
+          } catch (error) {
+            ok = false;
+            result.error = `${clean(p.etiqueta)}: ${problemMessage(error)}`;
+            break;
+          }
+        }
+        // Solo poda quien pasó entero: lo que falló conserva sus pasajes de antes.
+        if (ok) {
+          try {
+            const r = await indexStep<{ removed?: number; total?: number }>({ step: "profunda", fuente: f.fuente, run, cerrar: true });
+            result.removed = numberOrNull(r.removed) ?? 0;
+            result.total = numberOrNull(r.total) ?? 0;
+          } catch (error) {
+            result.error = `no se pudo podar: ${problemMessage(error)}`;
+          }
+        }
+        out.push(result);
+        onProgress?.(result);
+      }
+      return out;
+    },
+    // La memoria cambió: los conteos y la aprobación se refrescan.
+    onSettled: () => client.invalidateQueries({ queryKey: ["pilo-ia", "memoria"] }),
+  });
+}
+
 export interface CatalogHit {
   key: string;
   kind: "respuesta" | "capciosa";

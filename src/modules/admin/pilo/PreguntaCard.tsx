@@ -36,8 +36,8 @@ import { useEffect, useRef, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { Icon } from "../../../components/ui/Icon";
 import type { Fn } from "../../../components/pilo/ai/config";
-import { MEMORY_SOURCES, pendingOf, useEmbedModels, useEmbedStatus, useHideAnswer, useIndexMemory, useMemoryCounts, useMemoryInputs, useReplaceMemory, useSavedAnswers, useTryMemory } from "./memory";
-import type { EmbedStatus, MemorySource, ReplaceResult, SourceProblem } from "./memory";
+import { MEMORY_SOURCES, pendingOf, useDeepMemory, useEmbedModels, useEmbedStatus, useHideAnswer, useIndexMemory, useMemoryCounts, useMemoryInputs, useReplaceMemory, useSavedAnswers, useTryMemory } from "./memory";
+import type { DeepResult, EmbedStatus, MemorySource, ReplaceResult, SourceProblem } from "./memory";
 import { AudiencePicker } from "./sections";
 import type { EditorApi } from "./sections";
 import { Group, NumField, StatusMark, Switch, plural, when } from "./ui";
@@ -417,6 +417,20 @@ export function MemorySection({
   const inputs = useMemoryInputs();
   const replace = useReplaceMemory();
   const tryIt = useTryMemory();
+  const deep = useDeepMemory();
+  const [deepAt, setDeepAt] = useState(0);
+  const [deepResults, setDeepResults] = useState<DeepResult[]>([]);
+  const [deepPart, setDeepPart] = useState("");
+  const runDeep = () =>
+    deep.mutate((r) => setDeepPart(r.nombre), {
+      onSuccess: (r) => {
+        setDeepResults(r);
+        setDeepAt(Date.now());
+        if (r.length) onIndexed(new Date().toISOString());
+        // Lo nuevo o cambiado se indexa por significado enseguida, si el proveedor lo permite.
+        if (embedStatus.isSuccess && !indexer.isPending) runIndex();
+      },
+    });
   const embedStatus = useEmbedStatus(!s.needs0094);
   const indexer = useIndexMemory();
   const [progress, setProgress] = useState<EmbedStatus | null>(null);
@@ -507,6 +521,33 @@ export function MemorySection({
           <p className="pis-error" role="alert">
             No se actualizó: {(replace.error as Error).message}
           </p>
+        )}
+        <div className="pis-row">
+          <p className="pis-note">
+            «Actualizar la capa profunda» relee los portales directo de la base (UDES en Cifras, Boletines, Plan de Desarrollo e Impacto) y arma pasajes más ricos que los de las páginas: fichas completas, cascada del plan, cumplimiento por programa. Va por partes y lo que ya pasó queda guardado si algo se corta; conviene repetirlo cuando cambien esos portales.
+          </p>
+          <button type="button" className="button-secondary" onClick={runDeep} disabled={deep.isPending || s.needs0094}>
+            {deep.isPending ? `Actualizando…${deepPart ? ` (${deepPart})` : ""}` : "Actualizar la capa profunda"}
+          </button>
+        </div>
+        {deep.isError && (
+          <p className="pis-error" role="alert">
+            No se actualizó la capa profunda: {(deep.error as Error).message}
+          </p>
+        )}
+        {deepResults.length > 0 && (
+          <ul className="pis-results" role="status" aria-label="Resultado de la capa profunda" key={deepAt}>
+            {deepResults.map((r) => (
+              <li key={r.fuente}>
+                <StatusMark tone={r.error ? "fail" : "ok"}>{r.nombre}</StatusMark>
+                <span>
+                  {plural(r.seen, "pasaje", "pasajes")} · {r.added} nuevos · {r.changed} cambiaron
+                  {r.removed !== undefined ? ` · ${r.removed} salieron (${plural(r.total ?? 0, "pasaje", "pasajes")})` : ""}
+                  {r.error ? ` · ${r.error}` : ""}
+                </span>
+              </li>
+            ))}
+          </ul>
         )}
         {results && (
           <ul className="pis-results" role="status" ref={resultsRef} aria-label="Resultado de la actualización">

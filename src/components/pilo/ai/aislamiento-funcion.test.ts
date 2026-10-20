@@ -72,6 +72,9 @@ const ALLOWED: Allowed[] = [
   { name: "pilo_wait_open", near: "p_ticket: ticket, p_portal: portal", why: "abre el tiquete de una respuesta en curso: lleva el portal y la llave es el tiquete" },
   { name: "pilo_wait_close", near: "p_ticket: ticket, p_status: status", why: "cierra el mismo tiquete con la respuesta ya calculada en su espacio" },
   { name: "pilo_wait_read", near: "p_ticket: ticket", why: "lee por tiquete (llave única); no hay contenido de un espacio por consultar" },
+  // La capa profunda (0173): cada fuente de portal es de Planeación y sus pasajes nacen del ámbito de la fuente; solo la administración la actualiza.
+  { name: "pilo_deep_save", near: "p_source: fuente, p_run: run, p_rows", why: "guarda la capa profunda de UNA fuente de portal de Planeación (planeacion): los pasajes nacen del ámbito de la fuente, no de un espacio por elegir" },
+  { name: "pilo_deep_prune", near: "p_source: fuente, p_run: run", why: "poda la capa profunda de esa misma fuente según la hora de la corrida; sin espacio por la misma razón" },
 ];
 
 const calls = lines.flatMap((line, i) => {

@@ -11,8 +11,9 @@
    ========================================================================== */
 
 import { supabase } from "../../../lib/supabase";
-import { cleanUsername, cuentaFailure, cuentaMessage } from "./rules";
-import type { CuentaCode, RegData } from "./rules";
+import { cleanEmail, cleanName, cleanNick, cleanUsername, cuentaFailure, cuentaMessage, firstName } from "./rules";
+import { isCampus, isRol } from "./rules";
+import type { Campus, CuentaCode, PiloRol, RegData } from "./rules";
 import { registerBody } from "./rules";
 
 export class CuentaError extends Error {
@@ -89,6 +90,50 @@ export async function registerAccount(data: RegData): Promise<"entro" | "ingresa
   if (!access_token || !refresh_token) return "ingresar";
   const { error } = await supabase.auth.setSession({ access_token, refresh_token });
   return error ? "ingresar" : "entro";
+}
+
+/** Pide el código de 6 cifras que Pilo envía al correo antes de crear la cuenta (0175). */
+export async function sendRegisterCode(email: string): Promise<{ wait: number; ttl: number }> {
+  const out = await call<{ wait?: number; ttl?: number }>({ action: "codigo_enviar", email: cleanEmail(email) });
+  return { wait: Number(out?.wait) > 0 ? Number(out.wait) : 60, ttl: Number(out?.ttl) > 0 ? Number(out.ttl) : 600 };
+}
+
+/** Comprueba el código y devuelve el tiquete con el que se puede crear la cuenta. */
+export async function verifyRegisterCode(email: string, code: string): Promise<string> {
+  const out = await call<{ ticket?: string }>({ action: "codigo_verificar", email: cleanEmail(email), code: code.replace(/\s/g, "") });
+  if (!out?.ticket) throw new CuentaError(cuentaMessage("desconocido"), "desconocido");
+  return out.ticket;
+}
+
+/* --- Continuar con Microsoft (0175) ------------------------------------------------------------ */
+
+/** A dónde vuelve Microsoft: la misma pantalla de la cuenta, con la marca para reconocer el regreso. */
+export const MICROSOFT_RETURN = "/app/cuenta?ms=1";
+
+/** Sale hacia Microsoft con el proveedor de la intranet; si no hay error, el navegador ya va camino. */
+export async function startMicrosoft(): Promise<void> {
+  const { error } = await supabase.auth.signInWithOAuth({ provider: "azure", options: { scopes: "email", redirectTo: `${window.location.origin}${MICROSOFT_RETURN}` } });
+  if (error) throw new CuentaError(cuentaMessage("microsoft"), "microsoft");
+}
+
+export type MicrosoftPrep =
+  | { kind: "existe" }
+  | { kind: "intranet" }
+  | { kind: "nuevo"; email: string; fullName: string; roles: PiloRol[]; campus: Campus | "" };
+
+/** Lo que dice el servidor de quien volvió de Microsoft: si ya tiene cuenta, si es de la intranet o si falta crearla. */
+export async function prepareMicrosoft(): Promise<MicrosoftPrep> {
+  const out = await call<{ existe?: boolean; intranet?: boolean; roles?: unknown; campus?: unknown; full_name?: unknown; email?: unknown }>({ action: "ms_preparar" }, true);
+  if (out?.existe) return { kind: "existe" };
+  if (out?.intranet) return { kind: "intranet" };
+  const roles = Array.isArray(out?.roles) ? out.roles.filter(isRol) : [];
+  return { kind: "nuevo", email: typeof out?.email === "string" ? out.email : "", fullName: typeof out?.full_name === "string" ? out.full_name : "", roles, campus: isCampus(out?.campus) ? out.campus : "" };
+}
+
+/** Crea la cuenta de Pilo de quien entró con Microsoft: sin contraseña ni código. */
+export async function createMicrosoftAccount(data: RegData): Promise<void> {
+  const fullName = cleanName(data.fullName);
+  await call({ action: "ms_crear", rol: data.rol, campus: data.campus, full_name: fullName, username: cleanUsername(data.username), nick: cleanNick(data.nick) || firstName(fullName), tone: data.tone }, true);
 }
 
 /** Entra con usuario y contraseña: la función devuelve la sesión y aquí se instala. */

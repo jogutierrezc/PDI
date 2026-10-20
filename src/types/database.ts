@@ -64,7 +64,9 @@ export type AdminScreen =
   | "informes"
   | "warehouse"
   | "monitor"
-  | "programas-en-cifras";
+  | "programas-en-cifras"
+  | "datos-sostenibilidad"
+  | "cms";
 
 /** Un rol de acceso: qué puede hacer, qué pantallas ve y sobre qué informes escribe. */
 export interface AccessRole {

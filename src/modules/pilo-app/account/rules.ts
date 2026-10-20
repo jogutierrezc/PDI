@@ -70,6 +70,7 @@ export const DOMAINS: EmailRule[] = [
   { domain: "bucaramanga.udes.edu.co", roles: STAFF, campus: "bucaramanga" },
   { domain: "cucuta.udes.edu.co", roles: STAFF, campus: "cucuta" },
   { domain: "valledupar.udes.edu.co", roles: STAFF, campus: "valledupar" },
+  { domain: "bogota.udes.edu.co", roles: STAFF, campus: "bogota" },
 ];
 
 const EMAIL = /^[a-z0-9._%+-]+@[a-z0-9.-]+$/;
@@ -165,11 +166,17 @@ export const cleanNick = (nick: string): string => nick.replace(/\s+/g, " ").tri
 
 /* --- Los pasos del registro ------------------------------------------------------------------ */
 
-export type RegStep = "correo" | "perfil" | "sede" | "identidad" | "clave" | "trato";
+export type RegStep = "correo" | "codigo" | "perfil" | "sede" | "identidad" | "clave" | "trato";
 
-/** Los pasos, en orden. La sede solo se pregunta si el dominio no la dice. */
-export function regSteps(rule: EmailRule | null): RegStep[] {
-  return ["correo", "perfil", ...(rule && rule.campus ? [] : (["sede"] as RegStep[])), "identidad", "clave", "trato"];
+/**
+ * Los pasos, en orden. La sede solo se pregunta si el dominio no la dice. Con el correo por correo y contraseña se
+ * confirma con un código antes de seguir; quien entra con Microsoft ya trae el correo comprobado y no tiene
+ * contraseña de Pilo, así que se salta el correo, el código y la contraseña.
+ */
+export function regSteps(rule: EmailRule | null, microsoft = false): RegStep[] {
+  const sede: RegStep[] = rule && rule.campus ? [] : ["sede"];
+  if (microsoft) return ["perfil", ...sede, "identidad", "trato"];
+  return ["correo", "codigo", "perfil", ...sede, "identidad", "clave", "trato"];
 }
 
 export interface RegData {
@@ -183,9 +190,13 @@ export interface RegData {
   tone: Tone;
   /** Leyó y aceptó los términos y la política de uso de Mr. Pilo (terms/policy.ts): sin esto no se crea. */
   terms: boolean;
+  /** El tiquete que entrega la verificación del código (0175); sin él la función no crea la cuenta. */
+  ticket: string;
+  /** Viene de «Continuar con Microsoft»: el correo ya está comprobado y no hay contraseña. */
+  ms: boolean;
 }
 
-export const EMPTY_REG: RegData = { email: "", rol: "", campus: "", fullName: "", username: "", password: "", nick: "", tone: "cercano", terms: false };
+export const EMPTY_REG: RegData = { email: "", rol: "", campus: "", fullName: "", username: "", password: "", nick: "", tone: "cercano", terms: false, ticket: "", ms: false };
 
 /*
  * Los términos que se aceptan al crear la cuenta son los de Mr. Pilo, y viven
@@ -195,7 +206,7 @@ export const EMPTY_REG: RegData = { email: "", rol: "", campus: "", fullName: ""
  */
 
 export interface StepProblem {
-  field: "email" | "rol" | "campus" | "fullName" | "username" | "password" | "nick" | "terms";
+  field: "email" | "code" | "rol" | "campus" | "fullName" | "username" | "password" | "nick" | "terms";
   message: string;
 }
 
@@ -204,6 +215,7 @@ export function stepProblem(step: RegStep, data: RegData): StepProblem | null {
   const rule = emailRule(data.email);
   const bad = (field: StepProblem["field"], message: string): StepProblem | null => (message ? { field, message } : null);
   if (step === "correo") return bad("email", emailProblem(data.email));
+  if (step === "codigo") return bad("code", data.ticket ? "" : tr("Escriba el código que le enviamos a su correo."));
   if (step === "perfil") return bad("rol", rule && data.rol && rule.roles.includes(data.rol) ? "" : tr("Elija su perfil en la universidad."));
   if (step === "sede") return bad("campus", rule?.campus || isCampus(data.campus) ? "" : tr("Elija su sede: Bucaramanga, Cúcuta, Valledupar o Bogotá."));
   if (step === "identidad") return bad("fullName", nameProblem(data.fullName)) ?? bad("username", usernameProblem(data.username));
@@ -213,7 +225,7 @@ export function stepProblem(step: RegStep, data: RegData): StepProblem | null {
 
 /** El primer paso incompleto: hasta ahí puede llegar la persona. */
 export function firstOpenStep(data: RegData): RegStep | null {
-  return regSteps(emailRule(data.email)).find((s) => stepProblem(s, data)) ?? null;
+  return regSteps(emailRule(data.email), data.ms).find((s) => stepProblem(s, data)) ?? null;
 }
 
 /** Lo que viaja a `registrar`. La sede del dominio manda sobre la elegida. */
@@ -229,6 +241,7 @@ export function registerBody(data: RegData) {
     password: data.password,
     nick: cleanNick(data.nick) || firstName(fullName),
     tone: data.tone,
+    ticket: data.ticket,
   };
 }
 
@@ -236,11 +249,11 @@ export function registerBody(data: RegData) {
 
 export type CuentaCode =
   | "correo" | "rol" | "sede" | "nombre" | "usuario" | "clave" | "existe" | "intranet" | "correos" | "alta"
-  | "credenciales" | "sin_confirmar" | "suspendida" | "bloqueada" | "limite" | "migracion"
+  | "credenciales" | "sin_confirmar" | "suspendida" | "bloqueada" | "limite" | "migracion" | "codigo" | "codigo_requerido" | "espera" | "microsoft"
   /** Los que pone la página: sin red, la función no está desplegada, o respondió algo que no se entiende. */
   | "red" | "sin_funcion" | "desconocido";
 
-const KNOWN: string[] = ["correo", "rol", "sede", "nombre", "usuario", "clave", "existe", "intranet", "correos", "alta", "credenciales", "sin_confirmar", "suspendida", "bloqueada", "limite", "migracion"];
+const KNOWN: string[] = ["correo", "rol", "sede", "nombre", "usuario", "clave", "existe", "intranet", "correos", "alta", "credenciales", "sin_confirmar", "suspendida", "bloqueada", "limite", "migracion", "codigo", "codigo_requerido", "espera", "microsoft"];
 
 const waitText = (seconds: number) => (seconds >= 90 ? `${Math.round(seconds / 60)} minutos` : `${Math.max(1, Math.round(seconds))} segundos`);
 
@@ -262,6 +275,10 @@ const FALLBACK: Record<CuentaCode, string> = {
   bloqueada: "Demasiados intentos. Espere unos minutos antes de volver a intentarlo.",
   limite: "Va muy rápido: espere un momento antes de volver a intentarlo.",
   migracion: "Las cuentas de Pilo todavía no están disponibles: la administración debe terminar de instalarlas. Mientras tanto puede usar a Pilo sin cuenta.",
+  codigo: "Ese código no sirve. Revise el correo que le enviamos o pida uno nuevo.",
+  codigo_requerido: "Primero confirme el código que le enviamos a su correo.",
+  espera: "Espere un momento antes de pedir otro código.",
+  microsoft: "No pude seguir con Microsoft. Intente entrar de nuevo con su cuenta de la UDES.",
   red: "No pude conectarme. Revise su conexión a internet e intente de nuevo.",
   sin_funcion: "Las cuentas de Pilo todavía no están disponibles. Mientras tanto puede usar a Pilo sin cuenta.",
   desconocido: "Algo falló. Intente de nuevo en un momento.",
@@ -288,6 +305,11 @@ export function cuentaFailure(status: number, body: unknown): CuentaFailure {
   const code: CuentaCode = KNOWN.includes(raw) ? (raw as CuentaCode) : status === 429 ? "limite" : "desconocido";
   if (code === "migracion") return { code, message: FALLBACK.migracion };
   if (code === "credenciales") return { code, message: FALLBACK.credenciales };
+  if (code === "espera") {
+    const n = Number(b.retry_after);
+    const retryAfter = Number.isFinite(n) && n > 0 ? Math.ceil(n) : undefined;
+    return { code, message: said || FALLBACK.espera, retryAfter };
+  }
   if (code === "limite") {
     const n = Number(b.retry_after);
     const retryAfter = Number.isFinite(n) && n > 0 ? Math.ceil(n) : undefined;
@@ -302,7 +324,7 @@ export const cuentaMessage = (code: CuentaCode): string => tr(FALLBACK[code]);
 
 /** A qué paso del registro pertenece un error del servidor; null = no es de un campo (se dice donde esté la persona). */
 export function registerErrorStep(code: CuentaCode, steps: RegStep[]): RegStep | null {
-  const step: Partial<Record<CuentaCode, RegStep>> = { correo: "correo", existe: "correo", intranet: "correo", rol: "perfil", sede: "sede", nombre: "identidad", usuario: "identidad", clave: "clave" };
+  const step: Partial<Record<CuentaCode, RegStep>> = { correo: "correo", existe: "correo", intranet: "correo", codigo_requerido: "codigo", rol: "perfil", sede: "sede", nombre: "identidad", usuario: "identidad", clave: "clave" };
   const s = step[code];
   if (!s) return null;
   // Sin el paso de la sede (el dominio la dice), un error de sede se dice en el del perfil.
@@ -311,7 +333,7 @@ export function registerErrorStep(code: CuentaCode, steps: RegStep[]): RegStep |
 
 /** El campo que marca un error del servidor. */
 export function registerErrorField(code: CuentaCode): StepProblem["field"] | null {
-  const field: Partial<Record<CuentaCode, StepProblem["field"]>> = { correo: "email", existe: "email", intranet: "email", rol: "rol", sede: "campus", nombre: "fullName", usuario: "username", clave: "password" };
+  const field: Partial<Record<CuentaCode, StepProblem["field"]>> = { correo: "email", existe: "email", intranet: "email", codigo_requerido: "code", rol: "rol", sede: "campus", nombre: "fullName", usuario: "username", clave: "password" };
   return field[code] ?? null;
 }
 

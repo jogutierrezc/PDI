@@ -17,7 +17,8 @@
       van a funcionar.
    ========================================================================== */
 
-import type { ObsAnonymization, ObsColumn, ObsDataType } from "../admin/observatorio/model";
+import type { ObsAnonymization, ObsColumn, ObsDataType, ObsSection, ObsTemplate } from "../admin/observatorio/model";
+import { TEMPLATES as OBS_TEMPLATES } from "../admin/observatorio/model";
 import type { FreeRow, FreeTemporality } from "../datos-abiertos/data/free-sets";
 
 /* --- El organigrama ---------------------------------------------------------- */
@@ -211,6 +212,24 @@ export function reachOf(
 
 export type BoardVisibility = "unidad" | "universidad" | "publico";
 
+/*
+ * Cómo se lee una página del tablero. Son las cuatro plantillas del
+ * Observatorio, con sus mismos nombres y sus mismas maneras: si allí se sabe
+ * armar, aquí se sabe leer.
+ */
+export type BoardTemplate = ObsTemplate;
+
+export const PAGE_TEMPLATES = OBS_TEMPLATES;
+
+export interface BoardPage {
+  slug: string;
+  title: string;
+  /** Cómo se ordena la página. Lo que ya existía queda como «tablero». */
+  template: BoardTemplate;
+  /** El texto que abre la página: en el narrativo es lo que la cuenta. */
+  intro: string;
+}
+
 export const VISIBILITY: Record<BoardVisibility, { label: string; short: string; hint: string }> = {
   unidad: {
     label: "Solo la unidad",
@@ -228,11 +247,6 @@ export const VISIBILITY: Record<BoardVisibility, { label: string; short: string;
     hint: "Queda en el portal como un tablero más, sin sesión. Lo aprueba Planeación.",
   },
 };
-
-export interface BoardPage {
-  slug: string;
-  title: string;
-}
 
 export interface Board {
   id: string;
@@ -274,11 +288,18 @@ export interface BoardView {
   boardId: string;
   datasetId: string;
   page: string;
+  /** En qué parte de la página se lee: panorama, tendencia… Como en el Observatorio. */
+  section: ObsSection;
   /** Tipo, columnas y opciones; lo mismo que `ObsView` guarda en su `spec`. */
   spec: Record<string, unknown>;
   size: "media" | "completa";
   visible: boolean;
   position: number;
+}
+
+/** Una página leída con lo que ya se guardó, por si migró sin plantilla. */
+export function pageOrDefault(page: Pick<BoardPage, "slug" | "title"> & Partial<BoardPage>): BoardPage {
+  return { template: "tablero", intro: "", ...page };
 }
 
 /* --- La publicación ------------------------------------------------------------ */
@@ -324,6 +345,9 @@ export function reviewChecks(board: Board, datasets: BoardDataset[], views: Boar
   const withoutSource = inPlay.filter((d) => !d.source.trim());
   const reserved = inPlay.reduce((sum, d) => sum + (d.anonymization?.reservedCells ?? 0), 0);
   const removed = inPlay.flatMap((d) => d.anonymization?.removed ?? []);
+  // Columnas de dato personal que un tablero interno decidió conservar: para
+  // el portal no valen, y quien pide la publicación tiene que saberlo antes.
+  const personal = inPlay.flatMap((d) => d.anonymization?.sensitive ?? []);
 
   return [
     {
@@ -355,12 +379,18 @@ export function reviewChecks(board: Board, datasets: BoardDataset[], views: Boar
       label: withoutSource.length === 0 ? "Todas las tablas dicen quién las reporta" : `${withoutSource.length} ${withoutSource.length === 1 ? "tabla" : "tablas"} sin oficina que reporte`,
       detail: withoutSource.length === 0 ? "" : `Una cifra publicada sin origen no se puede citar: ${withoutSource.map((d) => d.title).join(", ")}.`,
     },
+    {
+      key: "personales",
+      ok: personal.length === 0,
+      label: personal.length === 0 ? "Ninguna tabla guarda datos personales" : `${personal.length} ${personal.length === 1 ? "columna de dato personal" : "columnas de dato personal"} en las tablas`,
+      detail: personal.length === 0 ? "" : `El portal es público: hay que subir de nuevo sin ellas (${personal.join(", ")}). En un tablero interno sí pueden quedar.`,
+    },
   ];
 }
 
 /** Lo que impide pedir la publicación, en palabras. Vacío, se puede pedir. */
 export function blockingProblems(checks: ReviewCheck[]): string[] {
-  return checks.filter((c) => !c.ok && (c.key === "contenido" || c.key === "acta")).map((c) => c.label);
+  return checks.filter((c) => !c.ok && (c.key === "contenido" || c.key === "acta" || c.key === "personales")).map((c) => c.label);
 }
 
 /* --- Direcciones --------------------------------------------------------------- */

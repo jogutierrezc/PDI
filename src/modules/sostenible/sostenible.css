@@ -286,6 +286,37 @@
     linear-gradient(0deg, color-mix(in srgb, var(--sos-veil) 62%, transparent), transparent 40%);
 }
 
+/* Franja de los 17 ODS que avanza sin fin bajo la portada. */
+.sos-ods-strip {
+  overflow: hidden;
+  background: var(--sos-stage);
+  border-top: 1px solid var(--pilo-stage-line);
+  border-bottom: 1px solid var(--pilo-stage-line);
+  padding-block: 16px;
+}
+
+.sos-ods-strip__track {
+  display: flex;
+  gap: 28px;
+  width: max-content;
+  padding-inline: 14px;
+  will-change: transform;
+}
+
+.sos-ods-strip img {
+  flex: none;
+  width: 64px;
+  height: 64px;
+  object-fit: contain;
+  transition: transform 220ms var(--ease-out);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .sos-ods-strip img:hover {
+    transform: scale(1.12);
+  }
+}
+
 .sos-hero__grid {
   display: grid;
   grid-template-columns: 1.1fr 0.9fr;

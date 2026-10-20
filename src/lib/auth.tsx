@@ -63,6 +63,8 @@ export const SCREEN_PATHS: Record<AdminScreen, string> = {
   warehouse: "/admin/warehouse",
   monitor: "/admin/monitor-alertas",
   "programas-en-cifras": "/admin/programas-en-cifras",
+  "datos-sostenibilidad": "/admin/datos-sostenibilidad",
+  cms: "/admin/cms",
 };
 
 export interface AuthContextValue {
@@ -96,6 +98,8 @@ export interface AuthContextValue {
   inInternacionalizacion: boolean;
   /** ¿Es Director o Coordinador de un programa (pc_miembros, 0164)? */
   inProgramasEnCifras: boolean;
+  /** ¿Es gestor o colaborador de una oficina (ds_miembros, 0178)? */
+  inDatosSostenibilidad: boolean;
 }
 
 /**
@@ -111,7 +115,7 @@ export type ImpactoSide = "programa" | "funcion" | "ambos" | null;
  */
 export function screenVisible(
   screen: AdminScreen,
-  who: { profile: Profile | null; access: AccessScope | null; inAnyUnit: boolean; impactoSide: ImpactoSide; inInternacionalizacion?: boolean; inProgramasEnCifras?: boolean },
+  who: { profile: Profile | null; access: AccessScope | null; inAnyUnit: boolean; impactoSide: ImpactoSide; inInternacionalizacion?: boolean; inProgramasEnCifras?: boolean; inDatosSostenibilidad?: boolean },
 ): boolean {
   const { profile, access, inAnyUnit, impactoSide } = who;
   if (!profile?.is_active) return false;
@@ -135,11 +139,15 @@ export function screenVisible(
   }
   // Rankings (THE, UI GreenMetric y el recolector de noticias): solo por el rol, como en la base (0143).
   if (screen === "rankings") return RANK[profile.role] >= RANK.planeacion && listed;
+  // CMS Portales: planeación y la administración, según el rol; el rol de acceso debe marcar la pantalla.
+  if (screen === "cms") return RANK[profile.role] >= RANK.planeacion && listed;
   // Internacionalización: pertenecer al módulo (director, coordinador o gestor
   // en int_miembros, 0151) ES el permiso, como en la base; Planeación y la administración, siempre (0166).
   if (screen === "internacionalizacion") return Boolean(who.inInternacionalizacion) || (listed && RANK[profile.role] >= RANK.planeacion);
   // Programas en Cifras: pertenecer a pc_miembros ES el permiso (0164); Planeación y la administración, todo.
   if (screen === "programas-en-cifras") return Boolean(who.inProgramasEnCifras) || (listed && RANK[profile.role] >= RANK.planeacion);
+  // Datos de Sostenibilidad: pertenecer a ds_miembros ES el permiso (0178); Planeación y la administración, todo.
+  if (screen === "datos-sostenibilidad") return Boolean(who.inDatosSostenibilidad) || (listed && RANK[profile.role] >= RANK.planeacion);
   // Informes Institucionales: quien pertenece a una unidad escribe el suyo, o el
   // de las unidades que su rol le da (0169); Planeación los abre, revisa y
   // consolida todos (0153). Un rol que no marca la pantalla la cierra, aunque
@@ -195,6 +203,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [impactoSide, setImpactoSide] = useState<ImpactoSide>(null);
   const [inInternacionalizacion, setInInternacionalizacion] = useState(false);
   const [inProgramasEnCifras, setInProgramasEnCifras] = useState(false);
+  const [inDatosSostenibilidad, setInDatosSostenibilidad] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -219,6 +228,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       side: ImpactoSide,
       internacionalizacion = false,
       programasEnCifras = false,
+      datosSostenibilidad = false,
     ) => {
       if (mine !== ticket.current) return;
       // Releer el perfil sin cambios no debe repintar toda la intranet.
@@ -228,6 +238,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setImpactoSide(side);
       setInInternacionalizacion(internacionalizacion);
       setInProgramasEnCifras(programasEnCifras);
+      setInDatosSostenibilidad(datosSostenibilidad);
     };
 
     if (!userId) {
@@ -303,7 +314,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const pc = await supabase.from("pc_miembros").select("id").eq("user_id", person.id).limit(1);
     const inPc = !pc.error && (pc.data ?? []).length > 0;
 
-    publish(person, scope, rows.length > 0, side, inIntl, inPc);
+    // Datos de Sostenibilidad: sin la migración 0178 la consulta falla y queda en falso.
+    const ds = await supabase.from("ds_miembros").select("id").eq("user_id", person.id).limit(1);
+    const inDs = !ds.error && (ds.data ?? []).length > 0;
+
+    publish(person, scope, rows.length > 0, side, inIntl, inPc, inDs);
   }, []);
 
   useEffect(() => {
@@ -391,8 +406,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // Espejo de has_screen(): la pantalla de usuarios siempre pide administración,
   // y un perfil sin rol de acceso ve lo de siempre.
   const canSee = useCallback(
-    (screen: AdminScreen) => screenVisible(screen, { profile, access, inAnyUnit, impactoSide, inInternacionalizacion, inProgramasEnCifras }),
-    [profile, access, inAnyUnit, impactoSide, inInternacionalizacion, inProgramasEnCifras],
+    (screen: AdminScreen) => screenVisible(screen, { profile, access, inAnyUnit, impactoSide, inInternacionalizacion, inProgramasEnCifras, inDatosSostenibilidad }),
+    [profile, access, inAnyUnit, impactoSide, inInternacionalizacion, inProgramasEnCifras, inDatosSostenibilidad],
   );
 
   const reachesReport = useCallback(
@@ -425,12 +440,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     () => ({
       session, profile, loading, error, signIn, signOut, requestPasswordReset, hasRole,
       access, canSee, canSeeReport: reachesReport, canEditReport, canEditPeriod, home, impactoSide, inAnyUnit,
-      inInternacionalizacion, inProgramasEnCifras,
+      inInternacionalizacion, inProgramasEnCifras, inDatosSostenibilidad,
     }),
     [
       session, profile, loading, error, signIn, signOut, requestPasswordReset, hasRole,
       access, canSee, reachesReport, canEditReport, canEditPeriod, home, impactoSide, inAnyUnit,
-      inInternacionalizacion, inProgramasEnCifras,
+      inInternacionalizacion, inProgramasEnCifras, inDatosSostenibilidad,
     ],
   );
 

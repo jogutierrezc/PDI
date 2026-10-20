@@ -26,6 +26,7 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import type { FormEvent, ReactNode } from "react";
 import { Link, Navigate, useLocation, useNavigate } from "react-router-dom";
+import { useQueryClient } from "@tanstack/react-query";
 import gsap from "gsap";
 import { modulateVoice, normalizeMood } from "../../../components/pilo/ai/voice-expressions";
 import { supabase } from "../../../lib/supabase";
@@ -38,7 +39,7 @@ import { sayOfficial, stopOfficial } from "../official-voice";
 import { reducedMotion } from "../pwa";
 import { isNative } from "../native";
 import { Icon } from "../icons";
-import { asCuentaError, checkUsername, loginAccount, recoverPassword, registerAccount, resendConfirmation } from "./api";
+import { asCuentaError, checkUsername, createMicrosoftAccount, loginAccount, prepareMicrosoft, recoverPassword, registerAccount, resendConfirmation, sendRegisterCode, startMicrosoft, verifyRegisterCode } from "./api";
 import { acceptPolicy } from "../terms/acceptance";
 import { CONSENT_LABEL, POLICY_LINK_LABEL, RULES_TITLE } from "../terms/policy";
 import { GoldenRules } from "../terms/GoldenRules";
@@ -88,7 +89,22 @@ const MOOD_LABEL: Record<Line["mood"], string> = { emocionado: "Emocionado", ate
 /** Ya hubo un toque o una tecla en esta página: el dispositivo deja sonar. */
 const touched = () => typeof navigator !== "undefined" && Boolean((navigator as Navigator & { userActivation?: { hasBeenActive: boolean } }).userActivation?.hasBeenActive);
 
-const FIELD_ID: Record<StepProblem["field"], string> = { email: "pc-correo", rol: "pc-perfil", campus: "pc-sede", fullName: "pc-nombre", username: "pc-usuario", password: "pc-clave", nick: "pc-trato", terms: "pc-terminos" };
+const FIELD_ID: Record<StepProblem["field"], string> = { email: "pc-correo", code: "pc-codigo", rol: "pc-perfil", campus: "pc-sede", fullName: "pc-nombre", username: "pc-usuario", password: "pc-clave", nick: "pc-trato", terms: "pc-terminos" };
+
+/** Las cuatro casillas de Microsoft, como en la entrada de la intranet. */
+function MicrosoftMark() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 21 21" aria-hidden="true" focusable="false">
+      <rect x="1" y="1" width="9" height="9" fill="#f25022" />
+      <rect x="11" y="1" width="9" height="9" fill="#7fba00" />
+      <rect x="1" y="11" width="9" height="9" fill="#00a4ef" />
+      <rect x="11" y="11" width="9" height="9" fill="#ffb900" />
+    </svg>
+  );
+}
+
+/** Seis casillas vacías: una muestra de lo que se escribe, no un texto que traducir. */
+const CODE_PLACEHOLDER = "000000";
 
 const TONE_OPTIONS = TONES.map((t) => ({ id: t.id, label: t.label }));
 
@@ -157,6 +173,10 @@ export function AccountGate({ voice, voiceOn, onVoice, theme, onTheme, account, 
   const [busy, setBusy] = useState(false);
   const [reveal, setReveal] = useState(false);
   const [userEdited, setUserEdited] = useState(false);
+  // El código de 6 cifras del registro (0175) y la espera para pedir otro.
+  const [code, setCode] = useState("");
+  const [codeWait, setCodeWait] = useState(0);
+  const client = useQueryClient();
   const [userCheck, setUserCheck] = useState<{ state: "idle" | "checking" | "free" | "taken" | "unknown"; reason?: string }>({ state: "idle" });
   const [done, setDone] = useState<{ username: string; email: string; rol: string; campus: string; nick: string; after: "entro" | "ingresar" | "confirmar" } | null>(null);
   // La espera entre un envío del correo y el siguiente: corre mientras se ve «Revise su correo».
@@ -175,7 +195,7 @@ export function AccountGate({ voice, voiceOn, onVoice, theme, onTheme, account, 
   const [guestError, setGuestError] = useState("");
 
   const rule = useMemo(() => emailRule(data.email), [data.email]);
-  const steps = useMemo(() => regSteps(rule), [rule]);
+  const steps = useMemo(() => regSteps(rule, data.ms), [rule, data.ms]);
 
   /* --- Pilo en su escenario --------------------------------------------------------------- */
 
@@ -318,9 +338,60 @@ export function AccountGate({ voice, voiceOn, onVoice, theme, onTheme, account, 
     return () => window.clearTimeout(timer);
   }, [wait]);
 
+  // La espera para pedir otro código baja de a un segundo.
+  useEffect(() => {
+    if (codeWait <= 0) return;
+    const timer = window.setTimeout(() => setCodeWait((w) => Math.max(0, w - 1)), 1000);
+    return () => window.clearTimeout(timer);
+  }, [codeWait]);
+
+  // Al volver de Microsoft (?ms=1): el servidor dice si ya tiene cuenta, si es de la intranet o si falta crearla.
+  // Microsoft ya comprobó el correo: se salta el correo, el código y la contraseña.
+  const cameFromMicrosoft = useMemo(() => new URLSearchParams(location.search).get("ms") === "1", [location.search]);
+  const microsoftTried = useRef(false);
+  useEffect(() => {
+    if (!cameFromMicrosoft || microsoftTried.current || pending || !hasSession || account || intranetName) return;
+    microsoftTried.current = true;
+    setBusy(true);
+    setMode("registro");
+    prepareMicrosoft()
+      .then((prep) => {
+        if (prep.kind === "existe") {
+          void client.invalidateQueries({ queryKey: ["pilo-cuenta"] });
+          return;
+        }
+        if (prep.kind === "intranet") {
+          setNotice({ tone: "bad", text: tr("Ese correo tiene una cuenta en la intranet de la universidad que está desactivada. Escriba a la administración.") });
+          return;
+        }
+        const next: RegData = { ...EMPTY_REG, ms: true, email: prep.email, fullName: prep.fullName, username: suggestUsername(prep.fullName), campus: prep.campus };
+        setUserEdited(false);
+        setData(next);
+        setStep("perfil");
+        const first = firstName(prep.fullName);
+        const r = emailRule(prep.email);
+        say(
+          first ? tr("¡Hola, {name}! Microsoft ya me confirmó su correo. Solo me faltan unos datos.", { name: first }) : tr("Microsoft ya me confirmó su correo. Solo me faltan unos datos."),
+          "feliz",
+          "emocionado",
+        );
+        if (r) window.setTimeout(() => say(rolQuestion(r), "feliz", "atento"), 0);
+      })
+      .catch((e) => {
+        const err = asCuentaError(e);
+        setMode("ingreso");
+        setNotice({ tone: "bad", text: err.message });
+        // Un correo que no es de la UDES no se queda con una sesión abierta en Pilo.
+        if (err.code === "correo") void supabase.auth.signOut();
+      })
+      .finally(() => setBusy(false));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [cameFromMicrosoft, pending, hasSession, account, intranetName]);
+
   const stepLine = (next: Step, d: RegData = data) => {
     const r = emailRule(d.email);
     if (next === "correo") say(tr(openingOf("registro")), "feliz", "emocionado");
+    else if (next === "codigo") say(tr("Le envié un código a su correo. Escríbalo aquí para confirmar que es suyo."), "feliz", "atento");
     else if (next === "perfil" && r) say(rolQuestion(r), "feliz", "atento");
     else if (next === "sede") say(tr("¿En cuál sede está? Así le respondo con lo de su sede."), "feliz", "atento");
     else if (next === "identidad") say(tr("Mucho gusto. ¿Cómo se llama? Le propongo un usuario para entrar; cámbielo si quiere."), "feliz", "atento");
@@ -433,6 +504,8 @@ export function AccountGate({ voice, voiceOn, onVoice, theme, onTheme, account, 
   const advance = async () => {
     if (busy || step === "listo") return;
     setNotice(null);
+    // El código ya verificado no se pide dos veces: quien vuelve a este paso sigue de largo.
+    if (step === "codigo") return data.ticket ? goStep(steps[steps.indexOf("codigo") + 1] ?? "perfil") : verifyCode(code);
     const problem = stepProblem(step, data);
     if (problem) {
       const said =
@@ -443,7 +516,7 @@ export function AccountGate({ voice, voiceOn, onVoice, theme, onTheme, account, 
       // Otro correo puede admitir otros perfiles u otra sede: lo elegido antes solo se conserva si sigue sirviendo.
       const next: RegData = { ...data, email: cleanEmail(data.email), rol: data.rol && rule.roles.includes(data.rol) ? data.rol : "", campus: rule.campus || data.campus };
       setData(next);
-      return goStep("perfil", next);
+      return sendCode(next);
     }
     if (step === "identidad") {
       // Si la comprobación aún no terminó, se hace ahora; si no se pudo comprobar, lo dirá el servidor al crear la cuenta.
@@ -469,10 +542,87 @@ export function AccountGate({ voice, voiceOn, onVoice, theme, onTheme, account, 
     goStep(steps[steps.indexOf(step) + 1] ?? "trato");
   };
 
+  /** Pide el código al correo y pasa al paso donde se escribe. `again` es el «Reenviar». */
+  const sendCode = async (next: RegData, again = false) => {
+    setBusy(true);
+    try {
+      const sent = await sendRegisterCode(next.email);
+      setCodeWait(sent.wait);
+      setCode("");
+      if (again) {
+        setNotice({ tone: "ok", text: tr("Le enviamos un código nuevo. El anterior ya no sirve.") });
+        say(tr("Listo, le envié otro código."), "feliz", "atento");
+      } else goStep("codigo", next);
+    } catch (e) {
+      const err = asCuentaError(e);
+      if (cuentasOff(err.code)) setOff(true);
+      if (err.code === "espera" && !again) {
+        // Ya se le envió uno hace poco: se sigue al paso donde se escribe, con la espera que falta.
+        setCodeWait(err.retryAfter ?? 60);
+        setCode("");
+        goStep("codigo", next);
+        setNotice({ tone: "info", text: tr("Ya le enviamos un código hace poco. Búsquelo en su correo, también en el no deseado.") });
+        return;
+      }
+      const field = registerErrorField(err.code);
+      if (field && !again) {
+        setError({ field, message: err.message });
+        focusField(field);
+        say(err.code === "existe" || err.code === "intranet" ? tr("Ese correo ya tiene cuenta.") : tr("Ese correo no me sirve."), "atento", "atento", tr("De cuidado"));
+      } else {
+        setNotice({ tone: "bad", text: err.message });
+        say(tr("No pude enviarle el código ahora."), "duda", "atento", tr("De cuidado"));
+      }
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const verifyCode = async (value: string) => {
+    const digits = value.replace(/\D/g, "");
+    if (digits.length !== 6) return fail({ field: "code", message: tr("Escriba las 6 cifras del código.") }, tr("Me faltan cifras del código."));
+    setBusy(true);
+    try {
+      const ticket = await verifyRegisterCode(data.email, digits);
+      const next: RegData = { ...data, ticket };
+      setData(next);
+      setCode("");
+      goStep(steps[steps.indexOf("codigo") + 1] ?? "perfil", next);
+    } catch (e) {
+      const err = asCuentaError(e);
+      if (cuentasOff(err.code)) setOff(true);
+      setCode("");
+      setError({ field: "code", message: err.message });
+      focusField("code");
+      say(tr("Ese código no coincide."), "atento", "atento", tr("De cuidado"));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  /** Sale hacia Microsoft. Si no hay error el navegador ya va camino: el botón queda ocupado. */
+  const toMicrosoft = async () => {
+    if (busy) return;
+    setNotice(null);
+    setBusy(true);
+    say(tr("Voy con Microsoft. Allí confirma que el correo es suyo."), "feliz", "atento");
+    try {
+      await startMicrosoft();
+    } catch (e) {
+      setBusy(false);
+      setNotice({ tone: "bad", text: asCuentaError(e).message });
+    }
+  };
+
   const create = async () => {
     setBusy(true);
     try {
-      const after = await registerAccount(data);
+      const after = data.ms
+        ? await createMicrosoftAccount(data).then(async () => {
+            await client.invalidateQueries({ queryKey: ["pilo-cuenta"] });
+            return "entro" as const;
+          })
+        : await registerAccount(data);
       // Aceptó la política al crear la cuenta: la app no se la vuelve a pedir en este dispositivo.
       acceptPolicy();
       const nick = data.nick.trim() || firstName(data.fullName);
@@ -490,6 +640,8 @@ export function AccountGate({ voice, voiceOn, onVoice, theme, onTheme, account, 
       const target = registerErrorStep(err.code, steps);
       const field = registerErrorField(err.code);
       if (cuentasOff(err.code)) setOff(true);
+      // Un tiquete que el servidor no acepta (venció o ya se usó) no se sigue mostrando como confirmado.
+      if (err.code === "codigo_requerido") setData((d) => ({ ...d, ticket: "" }));
       if (target && field) {
         setStep(target);
         setError({ field, message: err.message });
@@ -506,6 +658,13 @@ export function AccountGate({ voice, voiceOn, onVoice, theme, onTheme, account, 
   };
 
   const back = () => {
+    // Quien llegó de Microsoft y cancela no se queda con una sesión a medias.
+    if (data.ms && step === steps[0]) {
+      void supabase.auth.signOut();
+      setData(EMPTY_REG);
+      setStep("correo");
+      return goMode("ingreso");
+    }
     if (step === "correo" || step === "listo") return goMode("ingreso");
     goStep(steps[Math.max(0, steps.indexOf(step) - 1)]);
   };
@@ -725,6 +884,15 @@ export function AccountGate({ voice, voiceOn, onVoice, theme, onTheme, account, 
               <>
                 <h2 tabIndex={-1}>{tr("Su correo de la UDES")}</h2>
                 <p>{tr("Con él Pilo sabe a qué parte de la universidad pertenece. Esta cuenta es solo para Pilo: no da acceso a la intranet.")}</p>
+                {!isNative() && (
+                  <>
+                    <button type="button" className="pc-ms" disabled={busy} onClick={() => void toMicrosoft()}>
+                      <MicrosoftMark />
+                      {tr("Continuar con Microsoft")}
+                    </button>
+                    <p className="pc-or">{tr("Con su cuenta de la UDES, sin contraseña ni código. O escriba su correo y le enviamos un código.")}</p>
+                  </>
+                )}
                 <Field id={FIELD_ID.email} label={tr("Correo institucional")} error={errorOf("email")}>
                   {(aria) => (
                     <input
@@ -739,7 +907,7 @@ export function AccountGate({ voice, voiceOn, onVoice, theme, onTheme, account, 
                       value={data.email}
                       maxLength={160}
                       onChange={(e) => {
-                        setData({ ...data, email: e.target.value });
+                        setData({ ...data, email: e.target.value, ticket: "" });
                         if (error) setError(null);
                       }}
                     />
@@ -753,6 +921,48 @@ export function AccountGate({ voice, voiceOn, onVoice, theme, onTheme, account, 
                     ))}
                   </ul>
                 </div>
+              </>
+            )}
+
+            {step === "codigo" && (
+              <>
+                <h2 tabIndex={-1}>{tr("Confirme su correo")}</h2>
+                <p>{data.ticket ? tr("Su correo ya está confirmado. Puede seguir.") : tr("Le enviamos un código de 6 cifras a {email}. Vale 10 minutos y sirve una sola vez.", { email: data.email })}</p>
+                {!data.ticket && (
+                  <>
+                    <Field id={FIELD_ID.code} label={tr("Código")} error={errorOf("code")}>
+                      {(aria) => (
+                        <input
+                          {...aria}
+                          data-first
+                          className="pc-code"
+                          inputMode="numeric"
+                          autoComplete="one-time-code"
+                          pattern="[0-9]*"
+                          maxLength={6}
+                          placeholder={CODE_PLACEHOLDER}
+                          value={code}
+                          onChange={(e) => {
+                            const value = e.target.value.replace(/\D/g, "").slice(0, 6);
+                            setCode(value);
+                            if (error) setError(null);
+                            // Con las 6 cifras no hace falta pulsar nada.
+                            if (value.length === 6) void verifyCode(value);
+                          }}
+                        />
+                      )}
+                    </Field>
+                    <div className="pc-links">
+                      <button type="button" className="pc-quiet" disabled={busy || codeWait > 0} onClick={() => void sendCode(data, true)}>
+                        {codeWait > 0 ? tr("Reenviar en {s} s", { s: codeWait }) : tr("Reenviar el código")}
+                      </button>
+                      <button type="button" className="pc-quiet" disabled={busy} onClick={() => goStep("correo")}>
+                        {tr("Cambiar el correo")}
+                      </button>
+                    </div>
+                    <p className="pc-hint">{tr("Si no llega, revise el correo no deseado.")}</p>
+                  </>
+                )}
               </>
             )}
 
@@ -944,7 +1154,7 @@ export function AccountGate({ voice, voiceOn, onVoice, theme, onTheme, account, 
 
             <div className="pc-actions">
               <button type="button" className="pc-quiet" onClick={back} disabled={busy}>
-                {step === "correo" ? tr("Ya tengo cuenta") : tr("Atrás")}
+                {step === "correo" ? tr("Ya tengo cuenta") : data.ms && step === steps[0] ? tr("Cancelar") : tr("Atrás")}
               </button>
               {step !== "perfil" && step !== "sede" && (
                 <button type="submit" className="pa-btn pa-btn--main" disabled={busy}>
@@ -1028,6 +1238,15 @@ export function AccountGate({ voice, voiceOn, onVoice, theme, onTheme, account, 
         <h2 tabIndex={-1}>{tr("Entrar a Pilo")}</h2>
         <p>{tr("Con su usuario de Pilo. Si es personal con cuenta en la intranet, esa cuenta es aparte.")}</p>
         {notice && <Msg tone={notice.tone}>{notice.text}</Msg>}
+        {!isNative() && (
+          <>
+            <button type="button" className="pc-ms" disabled={busy} onClick={() => void toMicrosoft()}>
+              <MicrosoftMark />
+              {tr("Entrar con Microsoft")}
+            </button>
+            <p className="pc-or">{tr("Con su correo de la UDES. O con su usuario de Pilo:")}</p>
+          </>
+        )}
         <Field id="pc-entrar-usuario" label={tr("Nombre de usuario")}>
           {(aria) => (
             <input

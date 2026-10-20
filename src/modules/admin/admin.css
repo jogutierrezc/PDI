@@ -700,7 +700,6 @@
   color: var(--ink-secondary);
   background: var(--surface-2);
   border: 1px solid var(--line);
-  border-left: 3px solid var(--line-strong);
   border-radius: var(--radius-sm);
   text-align: left;
   transition:
@@ -712,7 +711,6 @@
 .area-card.is-active {
   background: var(--brand-blue-soft);
   border-color: var(--brand-blue);
-  border-left-color: var(--brand-blue);
 }
 
 @media (hover: hover) and (pointer: fine) {
@@ -1279,8 +1277,7 @@
 .role-legend > div {
   padding: var(--space-4);
   background: var(--surface);
-  border: 1px solid var(--line);
-  border-left: 3px solid var(--brand-blue);
+  border: 1px solid color-mix(in srgb, var(--brand-blue) 35%, var(--line));
   border-radius: var(--radius-sm);
 }
 
@@ -2085,7 +2082,7 @@ fieldset.admin-field legend {
   padding: var(--space-2) var(--space-3);
   color: var(--ink);
   background: var(--status-pending-soft);
-  border-left: 3px solid var(--status-pending);
+  border: 1px solid color-mix(in srgb, var(--status-pending) 45%, transparent);
   border-radius: var(--radius-sm);
 }
 

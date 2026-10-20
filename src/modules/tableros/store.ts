@@ -18,6 +18,7 @@ import type { AppRole } from "../../types/database";
 import type {
   Board,
   BoardDataset,
+  BoardPage,
   BoardReview,
   BoardView,
   BoardVisibility,
@@ -25,6 +26,7 @@ import type {
   UnitMember,
   UnitRole,
 } from "./model";
+import { pageOrDefault } from "./model";
 
 
 export const boardKeys = {
@@ -172,7 +174,7 @@ interface BoardRow {
   title: string;
   description: string;
   visibility: BoardVisibility;
-  pages: { slug: string; title: string }[];
+  pages: (Pick<BoardPage, "slug" | "title"> & Partial<BoardPage>)[];
   position: number;
   updated_at: string;
 }
@@ -184,7 +186,9 @@ const toBoard = (r: BoardRow): Board => ({
   title: r.title,
   description: r.description,
   visibility: r.visibility,
-  pages: Array.isArray(r.pages) && r.pages.length ? r.pages : [{ slug: "panorama", title: "Panorama" }],
+  // Lo que venía sin plantilla ni intro —todo lo guardado antes de la 0176—
+  // sigue siendo lo que siempre fue: una página tablero sin texto.
+  pages: (Array.isArray(r.pages) && r.pages.length ? r.pages : [{ slug: "panorama", title: "Panorama" }]).map(pageOrDefault),
   position: r.position,
   updatedAt: r.updated_at,
 });
@@ -242,6 +246,7 @@ interface ViewRow {
   board_id: string;
   dataset_id: string;
   page: string;
+  section: BoardView["section"];
   spec: Record<string, unknown>;
   size: "media" | "completa";
   visible: boolean;
@@ -269,6 +274,9 @@ const toView = (r: ViewRow): BoardView => ({
   boardId: r.board_id,
   datasetId: r.dataset_id,
   page: r.page,
+  // Los visores guardados antes de la 0176 no traen sección: se leen en
+  // «detalle», que es donde siempre salieron.
+  section: r.section ?? "detalle",
   spec: r.spec ?? {},
   size: r.size,
   visible: r.visible,

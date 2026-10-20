@@ -27,6 +27,7 @@ import {
   personaDe,
   plantillaDeBorrador,
   plantillaDeFila,
+  PLANTILLA_PILO_CODIGO,
   plantillaOriginal,
   rellenar,
   rolDe,
@@ -35,6 +36,14 @@ import {
   PERSONAS_DE_EJEMPLO,
   PLANTILLA_CODIGO,
   PLANTILLAS,
+  claveNueva,
+  htmlDeCampos,
+  rellenarHtml,
+  revisarHtml,
+  sanearHtml,
+  TOPE_HTML,
+  VALORES_DE_EJEMPLO,
+  VARIABLES_POR_TIPO,
   type Plantilla,
 } from "./servidor-logica";
 
@@ -430,6 +439,23 @@ describe("dominios y topes", () => {
     expect(decidirEnvio({ ...caso, enHora: 5000 })).toEqual({ sale: true });
   });
 
+  it("un código para crear la cuenta de Pilo sigue la regla de la cuenta", () => {
+    const codigo = { ...caso, tipo: "codigo" as const };
+    expect(decidirEnvio({ ...codigo, enHora: 5000 })).toEqual({ sale: true });
+    expect(decidirEnvio({ ...codigo, encendido: false })).toMatchObject({ sale: false, http: 503 });
+    expect(decidirEnvio({ ...codigo, permitido: false })).toMatchObject({ sale: false, http: 403 });
+  });
+
+  it("el correo del código lleva las cifras, la firma de Pilo y ningún botón", () => {
+    const c = armarCorreo({ plantilla: PLANTILLA_PILO_CODIGO, persona: personaDe({ correo: "laura@mail.udes.edu.co" }), rol: "estudiante", enlace: "", codigo: "482913", sitio: "https://planeacion.udes.edu.co" });
+    expect(c.html).toContain("482913");
+    expect(c.texto).toContain("482913");
+    expect(c.html).not.toContain("href=\"\"");
+    expect(c.html).toContain("Mr. Pilo");
+    expect(c.asunto).toBe("Su código de Mr. Pilo");
+    expect(c.desconocidos).toEqual([]);
+  });
+
   it("el tope por persona sí lo corta, con un error que se entiende", () => {
     expect(decidirEnvio({ ...caso, dePersonaHoy: 4 })).toEqual({ sale: true });
     const d = decidirEnvio({ ...caso, dePersonaHoy: 5 });
@@ -507,5 +533,186 @@ describe("el servidor de correo", () => {
     const f = falloSmtp({ code: "EENVELOPE", responseCode: 550, message: "550 5.1.1 <laura.gomez@mail.udes.edu.co>: Recipient address rejected" });
     expect(f.mensaje).not.toContain("laura");
     expect(f.mensaje).toContain("550");
+  });
+});
+
+describe("sanear el HTML de una plantilla propia", () => {
+  it("quita scripts con su contenido, iframes, objetos, formularios, controles y metadatos; el texto de un botón se queda", () => {
+    const { html, quitado } = sanearHtml(
+      '<p>Hola</p><script>alert(1)</script><iframe src="https://x.co"></iframe><object data="a.swf"></object><form action="/x"><input name="a"></form><button>Pulse</button><embed src="a.swf"><meta http-equiv="refresh" content="0"><link rel="stylesheet" href="x.css"><base href="https://evil.co/">',
+    );
+    expect(html).toBe("<p>Hola</p>Pulse");
+    expect([...new Set(quitado)].sort()).toEqual(["base", "button", "embed", "form", "iframe", "link", "meta", "object", "script"]);
+  });
+
+  it("quita los eventos aunque vengan en mayúsculas, con comillas simples o sin comillas", () => {
+    const r = sanearHtml(`<a href="https://udes.edu.co" OnClIcK="x()" onmouseover='y()' onfocus=z()>enlace</a><img src=https://udes.edu.co/a.png onerror=alert(1)>`);
+    expect(r.html).toBe('<a href="https://udes.edu.co">enlace</a><img src="https://udes.edu.co/a.png">');
+    expect(r.quitado).toEqual(["onclick", "onmouseover", "onfocus", "onerror"]);
+  });
+
+  it("quita las direcciones de script aunque vengan con mayúsculas, espacios, saltos, entidades o sin comillas", () => {
+    const casos = [
+      `<a href="javascript:alert(1)">x</a>`,
+      `<a href="JaVaScRiPt:alert(1)">x</a>`,
+      `<a href='  javascript:alert(1)'>x</a>`,
+      `<a href="java\nscript:alert(1)">x</a>`,
+      `<a href="java&#x09;script:alert(1)">x</a>`,
+      `<a href="&#106;avascript:alert(1)">x</a>`,
+      `<a href="&#x6A;avascript&colon;alert(1)">x</a>`,
+      `<a href=javascript:alert(1)>x</a>`,
+      `<a href="java&Tab;script:alert(1)">x</a>`,
+      `<a href="vbscript:msgbox(1)">x</a>`,
+      `<a href="data:text/html,<script>alert(1)</script>">x</a>`,
+      `<img src="javascript:alert(1)">`,
+    ];
+    for (const caso of casos) {
+      const { html } = sanearHtml(caso);
+      expect(html, caso).not.toMatch(/javascript|vbscript|data:text|script/i);
+    }
+    expect(sanearHtml(`<a href="javascript:x()">x</a>`).quitado).toEqual(["href peligroso"]);
+  });
+
+  it("un script partido para esconderlo no sobrevive: lo que queda es una etiqueta que se quita", () => {
+    const { html } = sanearHtml("<scr<script>alert(1)</script>ipt>texto");
+    expect(html).not.toMatch(/script/i);
+    expect(html).toContain("texto");
+  });
+
+  it("deja lo que es seguro tal cual: estilos en línea, enlaces e imágenes https, y el & de los enlaces", () => {
+    const html = '<p style="color:#0a2d63;margin:0 0 16px">Hola «Ana» &amp; compañía</p><a href="https://planeacion.udes.edu.co/x?a=1&amp;b=2">ver</a><img src="https://udes.edu.co/a.png" alt="UDES" width="46">';
+    const r = sanearHtml(html);
+    expect(r.quitado).toEqual([]);
+    expect(r.html).toBe(html);
+  });
+
+  it("los marcos y los applets también se quitan", () => {
+    expect(sanearHtml("<p>a</p><frame src=\"x.html\"><frameset><applet code=\"A\"></applet>").html).toBe("<p>a</p>");
+  });
+
+  it("un < que no es etiqueta se escapa, y un comentario se va", () => {
+    expect(sanearHtml("<p>1 < 2 <!-- oculto --> y </p>").html).toBe("<p>1 &lt; 2  y </p>");
+  });
+
+  it("un valor entre comillas con > dentro no deja pasar un atributo de evento", () => {
+    const r = sanearHtml('<img title=">" onerror=alert(1)>');
+    expect(r.html).not.toMatch(/onerror/i);
+    expect(r.quitado).toEqual(["onerror"]);
+  });
+});
+
+describe("una plantilla propia: su fila, su borrador y su correo", () => {
+  const ENLACE = "https://planeacion.udes.edu.co/auth/v1/verify?token=abc&type=invite&redirect_to=https%3A%2F%2Fplaneacion.udes.edu.co";
+  const SITIO = "https://planeacion.udes.edu.co";
+  const propia = (sobre: Partial<Plantilla> = {}): Plantilla => ({ ...activar, clave: "c-prueba", tipo: "enlace", html: null, alcance: "cuerpo", ...sobre });
+  const fila = { identity: "plan", grp: "Personalizadas", name: "Bienvenida", subject: "Hola", title: "Hola", body: "Texto", button: "Abrir", active: true, tipo: "codigo", html: "<p>{{codigo}}</p>", html_scope: "completo" };
+
+  it("una fila de la base trae su tipo, su HTML y su alcance; una propia sin fila no existe", () => {
+    const p = plantillaDeFila(fila, "c-bienvenida") as Plantilla;
+    expect({ tipo: p.tipo, html: p.html, alcance: p.alcance, clave: p.clave, identidad: p.identidad }).toEqual({
+      tipo: "codigo",
+      html: "<p>{{codigo}}</p>",
+      alcance: "completo",
+      clave: "c-bienvenida",
+      identidad: "plan",
+    });
+    expect(plantillaDeFila({ ...fila, tipo: "otra", html_scope: "x" }, "c-bienvenida")).toMatchObject({ tipo: "enlace", alcance: "cuerpo" });
+    expect(plantillaDeFila({ ...fila, html: 7 }, "c-bienvenida")?.html).toBeNull();
+    expect(plantillaDeFila({ ...fila, html: "x".repeat(TOPE_HTML + 10) }, "c-bienvenida")?.html).toHaveLength(TOPE_HTML);
+    expect(plantillaDeFila(null, "c-bienvenida")).toBeNull();
+    expect(plantillaDeFila({ identity: "pilo", subject: "x" }, "plan-invite")).toMatchObject({ tipo: "enlace", html: null, alcance: "cuerpo" });
+  });
+
+  it("un borrador de una propia sale con los datos de su fila y con su HTML, sin cambiar de identidad ni de tipo", () => {
+    const f = { ...fila, identity: "pilo", tipo: "aviso", html: null, html_scope: "cuerpo" };
+    const b = plantillaDeBorrador({ identidad: "plan", tipo: "enlace", html: "<p>{{detalle}}</p>", alcance: "completo", asunto: "Nuevo" }, "c-aviso-propio", f) as Plantilla;
+    expect(b).toMatchObject({ clave: "c-aviso-propio", identidad: "pilo", tipo: "aviso", html: "<p>{{detalle}}</p>", alcance: "completo", asunto: "Nuevo" });
+    expect(plantillaDeBorrador({ asunto: "x" }, "c-aviso-propio")).toBeNull();
+    expect(plantillaDeBorrador({ html: null }, "plan-invite")?.html).toBeNull();
+  });
+
+  it("con alcance «cuerpo», el HTML va dentro de la marca; el enlace se escapa en el atributo y en el texto", () => {
+    const c = armarCorreo({
+      plantilla: propia({ html: '<p>Hola {{nombre}}, abra <a href="{{enlace}}">este enlace</a>.</p><p>{{correo}} · {{sede}}</p>' }),
+      persona: laura,
+      enlace: 'https://x.co/a?b=1&c="2"',
+      sitio: SITIO,
+    });
+    expect(c.html).toContain('<p>Hola Laura Gómez, abra <a href="https://x.co/a?b=1&amp;c=&quot;2&quot;">este enlace</a>.</p>');
+    expect(c.html).toContain("Universidad de Santander");
+    expect(c.html).toContain("laura.gomez@mail.udes.edu.co · Bucaramanga");
+    expect(c.texto).toContain('(https://x.co/a?b=1&c="2")');
+    expect(c.desconocidos).toEqual([]);
+  });
+
+  it("con alcance «completo», el HTML es el correo entero, sin la marca, y sin lo peligroso", () => {
+    const c = armarCorreo({ plantilla: propia({ alcance: "completo", html: "<h1>Hola {{nombre}}</h1><script>x()</script>" }), persona: laura, enlace: ENLACE, sitio: SITIO });
+    expect(c.html).toContain("<h1>Hola Laura Gómez</h1>");
+    expect(c.html).not.toContain("Universidad de Santander");
+    expect(c.html).not.toContain("<script");
+    expect(c.html.startsWith("<!doctype html>")).toBe(true);
+  });
+
+  it("un dato que no es de su tipo queda tal cual y se avisa; el código y el aviso llevan sus datos", () => {
+    const enlace = armarCorreo({ plantilla: propia({ html: "<p>{{codigo}} y {{enlace}}</p>" }), persona: laura, enlace: ENLACE, sitio: SITIO });
+    expect(enlace.html).toContain("<p>{{codigo}} y ");
+    expect(enlace.desconocidos).toEqual(["{{codigo}}"]);
+
+    const codigo = armarCorreo({ plantilla: propia({ tipo: "codigo", html: "<p>Su código: {{codigo}}, vale {{vigencia}}</p>" }), persona: laura, enlace: "", codigo: "482913", valores: VALORES_DE_EJEMPLO, sitio: SITIO });
+    expect(codigo.html).toContain("Su código: 482913, vale 10 minutos");
+    expect(codigo.desconocidos).toEqual([]);
+
+    const aviso = armarCorreo({ plantilla: propia({ tipo: "aviso", html: "<p>{{detalle}}</p>" }), persona: laura, enlace: ENLACE, sitio: SITIO, valores: VALORES_DE_EJEMPLO, resaltar: true });
+    expect(aviso.html).toContain("El corte de matrícula 2026-1 quedó validado");
+    expect(aviso.html).toContain("background:#fff3c4");
+  });
+
+  it("la vista previa resalta el dato, pero no dentro de un enlace", () => {
+    const c = armarCorreo({ plantilla: propia({ html: '<a href="{{enlace}}">{{nombre}}</a>' }), persona: laura, enlace: ENLACE, sitio: SITIO, resaltar: true });
+    expect(c.html).toContain(`href="${escapar(ENLACE)}"`);
+    expect(c.html).toContain('<span style="background:#fff3c4;border-radius:3px;padding:0 2px;">Laura Gómez</span>');
+  });
+
+  it("rellenar acepta otros valores del correo; sin ellos, el marcador queda tal cual", () => {
+    expect(rellenar("Vale {{vigencia}}", laura, "texto", { vigencia: "10 minutos" }).salida).toBe("Vale 10 minutos");
+    expect(rellenar("Vale {{vigencia}}", laura)).toEqual({ salida: "Vale {{vigencia}}", desconocidos: ["{{vigencia}}"] });
+    expect(rellenarHtml("<p>{{nombre}} &amp; {{x}}</p>", laura, {}).salida).toBe("<p>Laura Gómez &amp; {{x}}</p>");
+  });
+
+  it("cada tipo admite sus datos; los de otro tipo se avisan", () => {
+    expect(VARIABLES_POR_TIPO.codigo).toEqual(expect.arrayContaining(["codigo", "vigencia", "nombre"]));
+    expect(marcadoresDesconocidos(propia({ tipo: "codigo", html: "<p>{{codigo}} {{enlace}}</p>" }))).toEqual(["{{enlace}}"]);
+    expect(marcadoresDesconocidos(propia({ tipo: "aviso", html: "<p>{{detalle}} {{modulo}}</p>" }))).toEqual([]);
+  });
+});
+
+describe("la lista de comprobaciones y el HTML inicial", () => {
+  it("pide el enlace o el código según el tipo, y dice lo que quitaría el envío", () => {
+    expect(revisarHtml("<p>Hola</p>", "enlace")[0]).toEqual({ tono: "mal", texto: "Falta {{enlace}}: sin él, el correo no sirve para lo que se envía." });
+    const cod = revisarHtml('<p>{{codigo}}</p><script>x()</script><img src="http://x.co/a.png">{{foo}}', "codigo");
+    expect(cod.map((r) => r.tono)).toEqual(["ok", "aviso", "aviso", "mal", "ok"]);
+    expect(cod[1].texto).toContain("script");
+    expect(cod[3].texto).toContain("{{foo}}");
+    expect(revisarHtml("<p>Sin nada</p>", "aviso")[0].tono).toBe("ok");
+    const grande = revisarHtml("x".repeat(110 * 1024), "aviso");
+    expect(grande[grande.length - 1].tono).toBe("mal");
+  });
+
+  it("el HTML inicial de una plantilla de campos lleva el enlace en el botón y pasa la revisión", () => {
+    const h = htmlDeCampos(activar);
+    expect(h).toContain('href="{{enlace}}"');
+    expect(h).toContain("Activar mi cuenta");
+    expect(revisarHtml(h, "enlace")[0].tono).toBe("ok");
+    expect(sanearHtml(h).quitado).toEqual([]);
+    expect(htmlDeCampos(PLANTILLA_PILO_CODIGO)).toContain("{{codigo}}");
+  });
+
+  it("la clave de una propia empieza por c-, no tiene acentos ni espacios, y no repite ninguna", () => {
+    expect(claveNueva("Bienvenida a nuevos contribuyentes", [])).toBe("c-bienvenida-a-nuevos-contribu");
+    expect(claveNueva("Ñandú ¡Hola!", [])).toBe("c-nandu-hola");
+    expect(claveNueva("Prueba", ["c-prueba"])).toBe("c-prueba-2");
+    expect(claveNueva("Prueba", ["c-prueba", "c-prueba-2"])).toBe("c-prueba-3");
+    expect(claveNueva("¡¡¡", [])).toBe("c-plantilla");
+    expect(claveNueva("a".repeat(200), [])).toMatch(/^[a-z][a-z0-9_-]{2,39}$/);
   });
 });

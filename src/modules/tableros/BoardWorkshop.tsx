@@ -18,13 +18,15 @@ import { Icon } from "../../components/ui/Icon";
 import { useAuth } from "../../lib/auth";
 import { ConfirmButton, Panel, SaveState, StageEmpty } from "../admin/udes-en-cifras/ui";
 import { parseClipboardGrid, parseCsv } from "../admin/udes-en-cifras/sheet";
-import { analyzeGrid, buildDataset, defaultPlan, fitEncoding, recommend } from "../admin/observatorio/analyze";
-import { ObsChart, RawTable } from "../admin/observatorio/ObsCharts";
-import { ChartFrame } from "../datos-abiertos/components/ChartFrame";
-import { CHARTS } from "../admin/observatorio/model";
-import type { ObsChartType, ObsDataset, ObsView } from "../admin/observatorio/model";
-import { VISIBILITY, atLeast, blockingProblems, boardPath, canLead, freeSlug, reviewChecks, roleAt } from "./model";
-import type { BoardDataset, BoardView, BoardVisibility } from "./model";
+import { analyzeGrid, buildDataset, defaultPlan } from "../admin/observatorio/analyze";
+import type { Analysis, Plan } from "../admin/observatorio/analyze";
+import { AnalysisStep, Acta } from "../admin/observatorio/stations/CaptureStation";
+import { RawTable } from "../admin/observatorio/ObsCharts";
+import { plural } from "../admin/observatorio/model";
+import type { ObsDataset } from "../admin/observatorio/model";
+import { PAGE_TEMPLATES, VISIBILITY, atLeast, blockingProblems, boardPath, canLead, freeSlug, reviewChecks, roleAt } from "./model";
+import type { BoardDataset, BoardPage, BoardTemplate, BoardView, BoardVisibility } from "./model";
+import { DesignStudio, asObsDataset } from "./DesignStudio";
 import {
   useBoardContent,
   useBoards,
@@ -49,28 +51,9 @@ type Station = "datos" | "visores" | "paginas" | "publicar";
 const STATIONS: { id: Station; label: string; hint: string }[] = [
   { id: "datos", label: "Datos", hint: "Sube las tablas. El taller lee las columnas y deja el acta." },
   { id: "visores", label: "Visores", hint: "Dibuja cada tabla y colócala en una página." },
-  { id: "paginas", label: "Páginas", hint: "Las pestañas con las que se recorre el tablero." },
+  { id: "paginas", label: "Páginas", hint: "Las pestañas del tablero: cómo se lee cada una y con qué texto." },
   { id: "publicar", label: "Publicar", hint: "Quién lo ve, y el visto bueno de Planeación." },
 ];
-
-/** El puente entre la tabla de un tablero y lo que dibujan las piezas del Observatorio. */
-const asObsDataset = (d: BoardDataset): ObsDataset => ({
-  id: d.id,
-  topic: "",
-  title: d.title,
-  description: d.description,
-  source: d.source,
-  dataType: d.dataType,
-  temporality: d.temporality,
-  periodLabel: d.periodLabel,
-  columns: d.columns,
-  rows: d.rows,
-  anonymization: d.anonymization,
-  sample: false,
-  status: "publicado",
-  position: d.position,
-  updatedAt: d.updatedAt,
-});
 
 export function BoardWorkshop() {
   const { unidad, tablero, estacion } = useParams<{ unidad?: string; tablero?: string; estacion?: Station }>();
@@ -158,7 +141,7 @@ export function BoardWorkshop() {
       ) : station === "datos" ? (
         <DataStation boardId={board.id} datasets={datasets} views={views} canEdit={canEdit} />
       ) : station === "visores" ? (
-        <ViewStation board={board} datasets={datasets} views={views} canEdit={canEdit} />
+        <DesignStudio board={board} unit={unit} datasets={datasets} views={views} canEdit={canEdit} />
       ) : station === "paginas" ? (
         <PageStation board={board} views={views} canEdit={leads} />
       ) : (
@@ -187,14 +170,19 @@ function DataStation({
   const [open, setOpen] = useState<string | null>(datasets[0]?.id ?? null);
   const [problem, setProblem] = useState("");
   const [pasted, setPasted] = useState("");
+  // Un libro de Excel puede traer varias hojas con datos: se elige cuál.
+  const [book, setBook] = useState<{ name: string; sheets: { sheet: string; data: string[][] }[] } | null>(null);
+  // La importación en marcha: el análisis del archivo y el plan que la unidad
+  // está afinando, como en Captura del Observatorio.
+  const [flow, setFlow] = useState<{ step: "analisis" | "resultado"; analysis: Analysis; plan: Plan } | null>(null);
+  const [meta, setMeta] = useState({ title: "", source: "", description: "" });
+  const result = useMemo(() => (flow ? buildDataset(flow.analysis, flow.plan) : null), [flow]);
 
   /**
-   * Del archivo a la tabla guardada, con el mismo analizador del Observatorio.
-   *
-   * Se usa el plan que propone por defecto: agrega los microdatos, descarta lo
-   * que parece identificar a una persona y aplica la reserva por debajo del
-   * umbral. Afinar ese plan es cosa del Observatorio, que tiene la pantalla
-   * para hacerlo; aquí lo que importa es que nada personal llegue a la base.
+   * Del archivo al análisis, con el mismo analizador del Observatorio. Aquí no
+   * se guarda nada todavía: el taller abre el paso de análisis, donde la
+   * unidad decide qué columnas entran, si se cuentan registros o se guarda
+   * como viene, y con cuánta reserva. Lo que se hizo queda en el acta.
    */
   const adopt = (name: string, grid: string[][]) => {
     setProblem("");
@@ -203,42 +191,168 @@ function DataStation({
       setProblem("No se reconoció una tabla: hace falta una fila de encabezados y al menos una de datos.");
       return;
     }
-    const built = buildDataset(analysis, defaultPlan(analysis));
-    save.mutate({
-      board_id: boardId,
-      title: name.replace(/\.[^.]+$/, ""),
-      source: "",
-      temporality: built.temporality,
-      columns: built.columns,
-      rows: built.rows,
-      anonymization: built.anonymization,
-      position: datasets.length + 1,
-    });
+    setFlow({ step: "analisis", analysis, plan: defaultPlan(analysis) });
+    setMeta({ title: name.replace(/\.(xlsx|csv)( · .*)?$/i, ""), source: "", description: "" });
   };
 
   const onFile = async (chosen: File | null) => {
     if (!chosen) return;
+    setProblem("");
     try {
-      if (chosen.name.toLowerCase().endsWith(".csv")) {
+      if (/\.csv$/i.test(chosen.name) || chosen.type === "text/csv") {
         adopt(chosen.name, parseCsv(await chosen.text()));
       } else {
         const { default: readXlsxFile } = await import("read-excel-file/browser");
-        const grid = (await readXlsxFile(chosen)) as unknown as unknown[][];
-        adopt(chosen.name, grid.map((row) => row.map((cell) => (cell === null || cell === undefined ? "" : String(cell)))));
+        // La versión 9 de read-excel-file devuelve las hojas del libro —
+        // [{sheet, data}]—, no las filas de la primera. La misma lectura que
+        // hace Captura del Observatorio.
+        const raw = (await readXlsxFile(chosen)) as unknown as { sheet: string; data: unknown[][] }[];
+        const sheets = raw
+          .map((s) => ({
+            sheet: s.sheet,
+            data: s.data.map((row) => row.map((cell) => (cell instanceof Date ? cell.toISOString().slice(0, 10) : String(cell ?? "")))),
+          }))
+          .filter((s) => s.data.length > 1);
+        if (sheets.length > 1) setBook({ name: chosen.name, sheets });
+        else if (sheets.length === 1) adopt(chosen.name, sheets[0].data);
+        else setProblem(`«${chosen.name}» no trae una hoja con fila de títulos y al menos una fila de datos.`);
       }
-    } catch {
-      setProblem("No se pudo leer el archivo. Prueba con un .xlsx de una sola hoja o con un .csv.");
+    } catch (e) {
+      setProblem(`No se pudo leer «${chosen.name}»: ${e instanceof Error ? e.message : "no parece un .xlsx o .csv válido"}.`);
     }
     if (file.current) file.current.value = "";
   };
 
   const dataset = datasets.find((d) => d.id === open) ?? datasets[0] ?? null;
 
+  // La importación en marcha ocupa la estación, como en el Observatorio: el
+  // paso de análisis y el de resultado, con el acta a la vista antes de guardar.
+  if (flow && result) {
+    const preview: ObsDataset = {
+      id: "borrador",
+      topic: "",
+      title: meta.title || flow.analysis.fileName,
+      description: meta.description,
+      source: meta.source,
+      dataType: "conteo",
+      temporality: result.temporality,
+      periodLabel: "",
+      columns: result.columns,
+      rows: result.rows,
+      anonymization: result.anonymization,
+      sample: false,
+      status: "borrador",
+      position: 0,
+      updatedAt: "",
+    };
+    const commitTable = () =>
+      save.mutate(
+        {
+          board_id: boardId,
+          title: meta.title.trim() || "Tabla importada",
+          source: meta.source.trim(),
+          description: meta.description.trim(),
+          temporality: result.temporality,
+          columns: result.columns,
+          rows: result.rows,
+          anonymization: result.anonymization,
+          position: datasets.length + 1,
+        },
+        { onSuccess: () => setFlow(null) },
+      );
+
+    return (
+      <Panel
+        title="Importar datos"
+        description="El archivo se lee y se prepara en este navegador. La unidad decide qué columnas entran y con cuánta reserva; lo que se hizo queda escrito en el acta."
+        actions={
+          <button type="button" className="oda-link-button" onClick={() => setFlow(null)}>
+            Cancelar
+          </button>
+        }
+      >
+        <ol className="obs-steps" aria-label="Pasos de la importación">
+          {(["analisis", "resultado"] as const).map((step, i) => (
+            <li key={step} aria-current={flow.step === step ? "step" : undefined} data-done={flow.step === "resultado" && i === 0 ? true : undefined}>
+              <span aria-hidden="true">{flow.step === "resultado" && i === 0 ? <Icon name="check" size={12} /> : i + 1}</span>
+              {step === "analisis" ? "Análisis" : "Resultado"}
+            </li>
+          ))}
+        </ol>
+
+        {flow.step === "analisis" ? (
+          <AnalysisStep
+            analysis={flow.analysis}
+            plan={flow.plan}
+            internal
+            onPlan={(plan) => setFlow({ ...flow, plan })}
+            onBack={() => setFlow(null)}
+            onNext={() => setFlow({ ...flow, step: "resultado" })}
+            canContinue={result.rows.length > 0}
+          />
+        ) : (
+          <div className="obs-result">
+            <div className="obs-result__main">
+              <div className="obs-result__facts">
+                <span>
+                  <b>{plural(result.anonymization.sourceRows, "fila", "filas")}</b> entraron
+                </span>
+                <Icon name="arrow-right" size={14} />
+                <span>
+                  <b>{plural(result.rows.length, "fila", "filas")}</b> se guardan
+                </span>
+                <span>
+                  <b>{result.anonymization.removed.length}</b> columnas fuera
+                </span>
+                <span>
+                  <b>{result.anonymization.reservedCells}</b> casillas en reserva
+                </span>
+              </div>
+
+              {result.anonymization.sensitive && result.anonymization.sensitive.length > 0 && (
+                <p className="oda-banner" role="note">
+                  <Icon name="alert" size={16} /> Esta tabla conserva {plural(result.anonymization.sensitive.length, "columna de dato personal", "columnas de dato personal")} (
+                  {result.anonymization.sensitive.join(", ")}). Sirve mientras el tablero es de la unidad o de la universidad; para publicarlo en el portal habrá que subirla de nuevo sin ellas.
+                </p>
+              )}
+
+              <RawTable dataset={preview} limit={40} />
+            </div>
+            <aside className="obs-result__side">
+              <label className="obs-field">
+                <span>Título de la tabla</span>
+                <input value={meta.title} onChange={(e) => setMeta({ ...meta, title: e.target.value })} />
+              </label>
+              <label className="obs-field">
+                <span>Quién la reporta</span>
+                <input value={meta.source} onChange={(e) => setMeta({ ...meta, source: e.target.value })} placeholder="Decanatura, Registro Académico…" />
+              </label>
+              <label className="obs-field">
+                <span>Qué contiene</span>
+                <textarea rows={2} value={meta.description} onChange={(e) => setMeta({ ...meta, description: e.target.value })} placeholder="Matriculados por programa y año, todos los campus." />
+              </label>
+              <Acta act={result.anonymization} />
+              <div className="obs-detail__actions">
+                <button type="button" className="button-ghost" onClick={() => setFlow({ ...flow, step: "analisis" })}>
+                  Volver al análisis
+                </button>
+                <button type="button" className="button-primary" disabled={!result.rows.length || save.isPending} onClick={commitTable}>
+                  <Icon name="shield" size={15} /> Guardar tabla
+                </button>
+              </div>
+              <SaveState pending={save.isPending} error={save.error} success={save.isSuccess} />
+            </aside>
+          </div>
+        )}
+      </Panel>
+    );
+  }
+
   return (
     <div className="oda-stack">
       <Panel
         title="Tablas de datos"
-        description="Al subir, el taller lee las columnas, propone el tipo de cada una y deja el acta de anonimización. Nada personal llega a la base."
+        description="Al subir, el taller perfila cada columna y abre el análisis: la unidad decide qué entra —contar registros o guardar como viene— y lo que se hizo queda en el acta."
         actions={
           <>
             <SaveState pending={save.isPending || remove.isPending} error={save.error ?? remove.error} success={save.isSuccess} />
@@ -262,6 +376,29 @@ function DataStation({
           <p className="oda-banner" role="alert">
             <Icon name="alert" size={16} /> {problem}
           </p>
+        )}
+
+        {book && (
+          <div className="tb-sheets">
+            <strong>
+              «{book.name}» tiene {book.sheets.length} {book.sheets.length === 1 ? "hoja" : "hojas"} con datos. ¿Cuál se importa?
+            </strong>
+            <div>
+              {book.sheets.map((s) => (
+                <button
+                  key={s.sheet}
+                  type="button"
+                  className="oda-chip"
+                  onClick={() => {
+                    adopt(`${book.name} · ${s.sheet}`, s.data);
+                    setBook(null);
+                  }}
+                >
+                  {s.sheet} <small>{s.data.length - 1} {s.data.length - 1 === 1 ? "fila" : "filas"}</small>
+                </button>
+              ))}
+            </div>
+          </div>
         )}
 
         {canEdit && (
@@ -390,197 +527,6 @@ function DatasetDetail({ dataset, canEdit, onDelete }: { dataset: BoardDataset; 
   );
 }
 
-/* --- 2 · Visores ---------------------------------------------------------------- */
-
-function ViewStation({
-  board,
-  datasets,
-  views,
-  canEdit,
-}: {
-  board: { id: string; pages: { slug: string; title: string }[] };
-  datasets: BoardDataset[];
-  views: BoardView[];
-  canEdit: boolean;
-}) {
-  const save = useSaveView();
-  const remove = useDeleteView();
-  const [picked, setPicked] = useState<string | null>(null);
-
-  if (datasets.length === 0) {
-    return (
-      <StageEmpty title="Primero hacen falta datos">
-        Un visor dibuja una tabla. Sube una en la estación anterior y vuelve.
-      </StageEmpty>
-    );
-  }
-
-  const add = (datasetId: string) => {
-    const dataset = datasets.find((d) => d.id === datasetId);
-    if (!dataset) return;
-    const obs = asObsDataset(dataset);
-    // El primer consejo del analizador es el punto de partida: casi siempre es
-    // la gráfica que esa tabla pedía.
-    const advice = recommend(obs)[0];
-    const type: ObsChartType = advice?.type ?? "barras";
-    const encoding = fitEncoding(obs, type, advice?.encoding ?? {});
-    save.mutate(
-      {
-        board_id: board.id,
-        dataset_id: datasetId,
-        page: board.pages[0]?.slug ?? "panorama",
-        spec: { title: dataset.title, ...encoding, type } as Record<string, unknown>,
-        size: "media",
-        visible: true,
-        position: views.length + 1,
-      },
-      { onSuccess: () => setPicked(null) },
-    );
-  };
-
-  return (
-    <div className="oda-stack">
-      <Panel
-        title="Visores"
-        description="Cada visor dibuja una tabla y vive en una página. Lo que se ve aquí es lo que verá quien abra el tablero."
-        actions={
-          <>
-            <SaveState pending={save.isPending || remove.isPending} error={save.error ?? remove.error} success={save.isSuccess} />
-            {canEdit && (
-              <label className="oda-add-select">
-                <span className="sr-only">Añadir visor</span>
-                <select
-                  value={picked ?? ""}
-                  onChange={(e) => {
-                    setPicked(e.target.value || null);
-                    if (e.target.value) add(e.target.value);
-                  }}
-                >
-                  <option value="">Dibujar una tabla…</option>
-                  {datasets.map((d) => (
-                    <option key={d.id} value={d.id}>
-                      {d.title}
-                    </option>
-                  ))}
-                </select>
-              </label>
-            )}
-          </>
-        }
-      >
-        {views.length === 0 ? (
-          <StageEmpty title="Ninguna tabla dibujada todavía">
-            Elige una arriba: el taller propone la gráfica que esa tabla pedía, y desde ahí se afina.
-          </StageEmpty>
-        ) : (
-          <div className="tb-views">
-            {views.map((view) => {
-              const dataset = datasets.find((d) => d.id === view.datasetId);
-              if (!dataset) return null;
-              return (
-                <ViewCard
-                  key={view.id}
-                  view={view}
-                  dataset={dataset}
-                  pages={board.pages}
-                  canEdit={canEdit}
-                  onPatch={(patch) => save.mutate({ id: view.id, board_id: view.boardId, dataset_id: view.datasetId, ...patch })}
-                  onDelete={() => remove.mutate(view.id)}
-                />
-              );
-            })}
-          </div>
-        )}
-      </Panel>
-    </div>
-  );
-}
-
-function ViewCard({
-  view,
-  dataset,
-  pages,
-  canEdit,
-  onPatch,
-  onDelete,
-}: {
-  view: BoardView;
-  dataset: BoardDataset;
-  pages: { slug: string; title: string }[];
-  canEdit: boolean;
-  onPatch: (patch: Record<string, unknown>) => void;
-  onDelete: () => void;
-}) {
-  const obs = useMemo(() => asObsDataset(dataset), [dataset]);
-  const spec = view.spec as Partial<ObsView> & { type?: ObsChartType };
-  const type = (spec.type ?? "barras") as ObsChartType;
-
-  const drawable = { ...spec, type, title: spec.title ?? dataset.title } as Parameters<typeof ObsChart>[0]["view"];
-
-  return (
-    <article className="tb-view" data-size={view.size}>
-      <header className="tb-view__head">
-        <input
-          className="tb-view__title"
-          value={(spec.title as string) ?? dataset.title}
-          disabled={!canEdit}
-          onChange={(e) => onPatch({ spec: { ...spec, title: e.target.value } })}
-          aria-label="Título del visor"
-        />
-        {canEdit && <ConfirmButton label="Quitar" confirmLabel="Quitar el visor" onConfirm={onDelete} />}
-      </header>
-
-      <div className="tb-view__canvas">
-        <ChartFrame title={(spec.title as string) ?? dataset.title} source={dataset.source || undefined}>
-          <ObsChart dataset={obs} view={drawable} />
-        </ChartFrame>
-      </div>
-
-      {canEdit && (
-        <div className="tb-view__controls">
-          <label className="admin-field">
-            <span>Gráfica</span>
-            <select
-              value={type}
-              onChange={(e) => {
-                const next = e.target.value as ObsChartType;
-                onPatch({ spec: { ...spec, ...fitEncoding(obs, next, spec), type: next } });
-              }}
-            >
-              {(Object.keys(CHARTS) as ObsChartType[]).map((kind) => (
-                <option key={kind} value={kind}>
-                  {CHARTS[kind].label}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label className="admin-field">
-            <span>Página</span>
-            <select value={view.page} onChange={(e) => onPatch({ page: e.target.value })}>
-              {pages.map((p) => (
-                <option key={p.slug} value={p.slug}>
-                  {p.title}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label className="admin-field">
-            <span>Ancho</span>
-            <select value={view.size} onChange={(e) => onPatch({ size: e.target.value })}>
-              <option value="media">Media fila</option>
-              <option value="completa">Fila entera</option>
-            </select>
-          </label>
-          <label className="tb-view__toggle">
-            <input type="checkbox" checked={view.visible} onChange={(e) => onPatch({ visible: e.target.checked })} />
-            <span>A la vista</span>
-          </label>
-        </div>
-      )}
-    </article>
-  );
-}
-
 /* --- 3 · Páginas ---------------------------------------------------------------- */
 
 function PageStation({
@@ -588,22 +534,24 @@ function PageStation({
   views,
   canEdit,
 }: {
-  board: { id: string; unitId: string; title: string; slug: string; pages: { slug: string; title: string }[] };
+  board: { id: string; unitId: string; title: string; slug: string; pages: BoardPage[] };
   views: BoardView[];
   canEdit: boolean;
 }) {
   const save = useSaveBoard();
-  const [pages, setPages] = useState(board.pages);
+  const [pages, setPages] = useState<BoardPage[]>(board.pages);
   const [adding, setAdding] = useState("");
   const dirty = JSON.stringify(pages) !== JSON.stringify(board.pages);
 
   const rename = (slug: string, title: string) => setPages(pages.map((p) => (p.slug === slug ? { ...p, title } : p)));
+  const setTemplate = (slug: string, template: BoardTemplate) => setPages(pages.map((p) => (p.slug === slug ? { ...p, template } : p)));
+  const setIntro = (slug: string, intro: string) => setPages(pages.map((p) => (p.slug === slug ? { ...p, intro } : p)));
   const drop = (slug: string) => setPages(pages.filter((p) => p.slug !== slug));
 
   return (
     <Panel
       title="Páginas del tablero"
-      description="Las pestañas con las que se recorre. Un visor vive en una de ellas; si se borra la página, sus visores se quedan sin sitio y dejan de verse."
+      description="Las pestañas con las que se recorre, cada una con su manera de leerse: la rejilla densa del tablero, la columna del narrativo, el contraste del comparativo o la ficha que abre con sus tablas. Un visor vive en una de ellas; si se borra la página, sus visores se quedan sin sitio y dejan de verse."
       actions={
         <>
           <SaveState pending={save.isPending} error={save.error} success={save.isSuccess} idle={dirty ? "Sin guardar" : undefined} />
@@ -623,24 +571,49 @@ function PageStation({
       <ul className="tb-pages">
         {pages.map((page) => {
           const count = views.filter((v) => v.page === page.slug).length;
+          const template = PAGE_TEMPLATES.find((t) => t.id === page.template);
           return (
             <li key={page.slug}>
-              <input
-                value={page.title}
-                disabled={!canEdit}
-                onChange={(e) => rename(page.slug, e.target.value)}
-                aria-label={`Nombre de la página ${page.title}`}
-              />
-              <span className="tb-pages__count">
-                {count} {count === 1 ? "visor" : "visores"}
-              </span>
-              {canEdit && pages.length > 1 && (
-                <ConfirmButton
-                  label="Quitar"
-                  confirmLabel={count > 0 ? `Quitar y dejar ${count} sin sitio` : "Quitar la página"}
-                  onConfirm={() => drop(page.slug)}
+              <div className="tb-pages__row">
+                <input
+                  value={page.title}
+                  disabled={!canEdit}
+                  onChange={(e) => rename(page.slug, e.target.value)}
+                  aria-label={`Nombre de la página ${page.title}`}
                 />
-              )}
+                <span className="tb-pages__count">
+                  {count} {count === 1 ? "visor" : "visores"}
+                </span>
+                {canEdit && pages.length > 1 && (
+                  <ConfirmButton
+                    label="Quitar"
+                    confirmLabel={count > 0 ? `Quitar y dejar ${count} sin sitio` : "Quitar la página"}
+                    onConfirm={() => drop(page.slug)}
+                  />
+                )}
+              </div>
+              <div className="tb-pages__extra">
+                <label className="admin-field">
+                  <span>Cómo se lee</span>
+                  <select value={page.template} disabled={!canEdit} onChange={(e) => setTemplate(page.slug, e.target.value as BoardTemplate)}>
+                    {PAGE_TEMPLATES.map((t) => (
+                      <option key={t.id} value={t.id}>
+                        {t.label}
+                      </option>
+                    ))}
+                  </select>
+                  {template && <small className="oda-field-hint">{template.hint}</small>}
+                </label>
+                <label className="admin-field admin-field--wide">
+                  <span>El texto que la abre <small>opcional</small></span>
+                  <input
+                    value={page.intro}
+                    disabled={!canEdit}
+                    onChange={(e) => setIntro(page.slug, e.target.value)}
+                    placeholder={page.template === "narrativo" ? "La página se lee de arriba abajo: este texto es la guía." : "Qué se va a encontrar quien la abra."}
+                  />
+                </label>
+              </div>
             </li>
           );
         })}
@@ -653,7 +626,7 @@ function PageStation({
             e.preventDefault();
             const title = adding.trim();
             if (!title || pages.length >= 12) return;
-            setPages([...pages, { slug: freeSlug(title, pages.map((p) => p.slug)), title }]);
+            setPages([...pages, { slug: freeSlug(title, pages.map((p) => p.slug)), title, template: "tablero", intro: "" }]);
             setAdding("");
           }}
         >

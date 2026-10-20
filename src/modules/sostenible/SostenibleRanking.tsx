@@ -160,7 +160,7 @@ function ReportPanel({ ranking: r, onSheet }: { ranking: Ranking; onSheet: (year
 
 
 /** Entrada desde el micrositio de THE Impact Rankings a los informes por ODS y por edición. */
-function OdsEntry() {
+export function OdsEntry() {
   return (
     <section className="sos-section sos-section--alt" aria-labelledby="sos-ods">
       <div className="sos-wrap">
@@ -197,6 +197,176 @@ function OdsEntry() {
   );
 }
 
+/* --- Secciones del micrositio de un ranking. Las usan estas páginas y los bloques vivos del CMS. --- */
+
+/** «Resultados de la UDES en X»: el informe individual (medallas, tabla, evolución y PDF). */
+export function RankingResultados({ ranking: r, onSheet }: { ranking: Ranking; onSheet: (yearIndex: number) => void }) {
+  return (
+    <section className="sos-section sos-section--tight" aria-labelledby="sos-informe">
+      <div className="sos-wrap">
+        <div className="sos-head">
+          <p className="sos-eyebrow">Informe individual</p>
+          <h2 id="sos-informe">Resultados de la UDES en {r.short}.</h2>
+        </div>
+        <ReportPanel ranking={r} onSheet={onSheet} />
+        <p className="sos-note">
+          <i aria-hidden="true" />
+          Dato ilustrativo: cifras de muestra.
+        </p>
+      </div>
+    </section>
+  );
+}
+
+/** «Cada subcategoría tiene su microportal»: tarjetas con su puntaje y sus indicadores. */
+export function RankingCategorias({ ranking: r }: { ranking: Ranking }) {
+  return (
+    <section className="sos-section" aria-labelledby="sos-cats">
+      <div className="sos-wrap">
+        <div className="sos-head">
+          <p className="sos-eyebrow">{r.categoryLabel}</p>
+          <h2 id="sos-cats">Cada subcategoría tiene su microportal.</h2>
+          <p>Entra a una para ver su puntaje, su evolución y los indicadores de la UDES que la explican.</p>
+        </div>
+        <div className="sos-cats">
+          {r.categories.map((c) => (
+            <Link key={c.id} to={`/sostenible/${r.id}/${c.id}`} className="sos-cat" style={{ "--sos-accent": catColor(r, c) } as CSSProperties}>
+              <div className="sos-cat__top">
+                <span className="sos-cat__code">{c.sdg ?? c.code}</span>
+                <Ring value={c.scores[LAST]} color={catColor(r, c)} />
+              </div>
+              <h3>{c.name}</h3>
+              <span className="sos-cat__meta">
+                {c.weight ? `Peso ${c.weight}% · ` : ""}
+                {c.indicators.length === 1 ? "1 indicador UDES" : `${c.indicators.length} indicadores UDES`}
+              </span>
+            </Link>
+          ))}
+        </div>
+      </div>
+    </section>
+  );
+}
+
+/** «Lo que mueve a X»: los indicadores de todas las subcategorías del ranking. */
+export function RankingIndicadores({ ranking: r }: { ranking: Ranking }) {
+  return (
+    <section className="sos-section" aria-labelledby="sos-inds">
+      <div className="sos-wrap">
+        <div className="sos-head">
+          <p className="sos-eyebrow">Indicadores</p>
+          <h2 id="sos-inds">Lo que mueve a {r.short}.</h2>
+        </div>
+        <IndicatorBoard keys={rankingIndicators(r)} />
+      </div>
+    </section>
+  );
+}
+
+/** La hoja PDF de una subcategoría: su puntaje, lo que ha subido y su evolución. */
+export function categoriaSheet(r: Ranking, c: Category): SheetData {
+  const gain = c.scores[LAST] - c.scores[0];
+  return {
+    title: `${r.short} · ${c.code} ${c.name}`,
+    publisher: r.publisher,
+    stats: [
+      [String(c.scores[LAST]), `Puntaje ${YEARS[LAST]}`],
+      [`+${gain}`, `Puntos desde ${YEARS[0]}`],
+      [String(c.indicators.length), "Indicadores UDES"],
+    ],
+    chart: <LineChart paper values={c.scores} min={0} max={100} width={520} height={230} label={`Evolución de ${c.name}`} color="#014898" />,
+  };
+}
+
+/** Cabecera «Puntaje y evolución» de una subcategoría: anillo, evolución y exportar. */
+export function CategoriaPuntaje({ ranking: r, categoria: c, onExportar }: { ranking: Ranking; categoria: Category; onExportar: () => void }) {
+  const color = catColor(r, c);
+  const gain = c.scores[LAST] - c.scores[0];
+  return (
+    <section className="sos-section sos-section--tight" aria-label="Puntaje y evolución">
+      <div className="sos-wrap sos-twocol">
+        <div className="sos-box sos-box--center">
+          <Ring value={c.scores[LAST]} color={color} size="xl" />
+          <div>
+            <strong>Puntaje {YEARS[LAST]}</strong>
+            <p className="sos-muted">+{gain} puntos desde {YEARS[0]}</p>
+          </div>
+          <button type="button" className="sos-btn" onClick={onExportar}>
+            Exportar PDF
+          </button>
+        </div>
+        <div className="sos-box">
+          <p className="sos-eyebrow">Evolución por edición</p>
+          <LineChart values={c.scores} min={0} max={100} height={260} label={`Evolución de ${c.name}`} />
+        </div>
+      </div>
+    </section>
+  );
+}
+
+/** «Lo que explica este resultado»: los indicadores UDES de la subcategoría. */
+export function CategoriaIndicadores({ categoria: c }: { categoria: Category }) {
+  return (
+    <section className="sos-section sos-section--alt" aria-labelledby="sos-cind">
+      <div className="sos-wrap">
+        <div className="sos-head">
+          <p className="sos-eyebrow">Indicadores de la UDES</p>
+          <h2 id="sos-cind">Lo que explica este resultado.</h2>
+        </div>
+        {c.indicators.length ? (
+          <IndicatorBoard keys={c.indicators} />
+        ) : (
+          <div className="sos-box">
+            <p className="sos-muted">Los indicadores académicos de este pilar se publicarán cuando la oficina responsable los cargue. Mientras tanto se muestra el puntaje del ranking.</p>
+          </div>
+        )}
+      </div>
+    </section>
+  );
+}
+
+/** «Iniciativas ligadas a…» y la navegación entre subcategorías del ranking. */
+export function CategoriaIniciativas({ ranking: r, categoria: c }: { ranking: Ranking; categoria: Category }) {
+  const i = r.categories.indexOf(c);
+  const prev = r.categories[i - 1];
+  const next = r.categories[i + 1];
+  return (
+    <section className="sos-section" aria-labelledby="sos-inic">
+      <div className="sos-wrap">
+        <div className="sos-head">
+          <p className="sos-eyebrow">Qué hace la UDES</p>
+          <h2 id="sos-inic">Iniciativas ligadas a {c.name.toLowerCase()}.</h2>
+        </div>
+        <div className="sos-box">
+          <ul className="sos-list">
+            <li>Programa o proyecto institucional por registrar con su oficina responsable.</li>
+            <li>Evidencia que se reporta al ranking: documento, enlace o cifra con corte.</li>
+            <li>Meta propuesta para la próxima edición y responsable de seguirla.</li>
+          </ul>
+          <p className="sos-note">
+            <i aria-hidden="true" />
+            Texto de ejemplo por reemplazar con las iniciativas reales.
+          </p>
+        </div>
+        <div className="sos-pn">
+          {prev ? (
+            <Link className="sos-btn sos-btn--ghost" to={`/sostenible/${r.id}/${prev.id}`}>
+              <Icon name="arrow-left" size={15} /> {prev.name}
+            </Link>
+          ) : (
+            <span />
+          )}
+          {next && (
+            <Link className="sos-btn sos-btn--ghost" to={`/sostenible/${r.id}/${next.id}`}>
+              {next.name} <Icon name="arrow-right" size={15} />
+            </Link>
+          )}
+        </div>
+      </div>
+    </section>
+  );
+}
+
 export function SostenibleRanking() {
   const { ranking: id } = useParams();
   const r = rankingById(id);
@@ -224,56 +394,13 @@ export function SostenibleRanking() {
           </div>
         </div>
 
-        <section className="sos-section sos-section--tight" aria-labelledby="sos-informe">
-          <div className="sos-wrap">
-            <div className="sos-head">
-              <p className="sos-eyebrow">Informe individual</p>
-              <h2 id="sos-informe">Resultados de la UDES en {r.short}.</h2>
-            </div>
-            <ReportPanel ranking={r} onSheet={(i) => setSheet(rankingSheet(r, i))} />
-            <p className="sos-note">
-              <i aria-hidden="true" />
-              Dato ilustrativo: cifras de muestra.
-            </p>
-          </div>
-        </section>
+        <RankingResultados ranking={r} onSheet={(i) => setSheet(rankingSheet(r, i))} />
 
         {r.id === "impact" && <OdsEntry />}
 
-        <section className="sos-section" aria-labelledby="sos-cats">
-          <div className="sos-wrap">
-            <div className="sos-head">
-              <p className="sos-eyebrow">{r.categoryLabel}</p>
-              <h2 id="sos-cats">Cada subcategoría tiene su microportal.</h2>
-              <p>Entra a una para ver su puntaje, su evolución y los indicadores de la UDES que la explican.</p>
-            </div>
-            <div className="sos-cats">
-              {r.categories.map((c) => (
-                <Link key={c.id} to={`/sostenible/${r.id}/${c.id}`} className="sos-cat" style={{ "--sos-accent": catColor(r, c) } as CSSProperties}>
-                  <div className="sos-cat__top">
-                    <span className="sos-cat__code">{c.sdg ?? c.code}</span>
-                    <Ring value={c.scores[LAST]} color={catColor(r, c)} />
-                  </div>
-                  <h3>{c.name}</h3>
-                  <span className="sos-cat__meta">
-                    {c.weight ? `Peso ${c.weight}% · ` : ""}
-                    {c.indicators.length === 1 ? "1 indicador UDES" : `${c.indicators.length} indicadores UDES`}
-                  </span>
-                </Link>
-              ))}
-            </div>
-          </div>
-        </section>
+        <RankingCategorias ranking={r} />
 
-        <section className="sos-section" aria-labelledby="sos-inds">
-          <div className="sos-wrap">
-            <div className="sos-head">
-              <p className="sos-eyebrow">Indicadores</p>
-              <h2 id="sos-inds">Lo que mueve a {r.short}.</h2>
-            </div>
-            <IndicatorBoard keys={rankingIndicators(r)} />
-          </div>
-        </section>
+        <RankingIndicadores ranking={r} />
       </div>
       {sheet && <SheetDialog data={sheet} onClose={() => setSheet(null)} />}
     </SostenibleLayout>
@@ -299,21 +426,7 @@ export function SostenibleCategory() {
   if (!c) return <Navigate to={`/sostenible/${r.id}`} replace />;
 
   const color = catColor(r, c);
-  const i = r.categories.indexOf(c);
-  const prev = r.categories[i - 1];
-  const next = r.categories[i + 1];
-  const gain = c.scores[LAST] - c.scores[0];
-  const openSheet = () =>
-    setSheet({
-      title: `${r.short} · ${c.code} ${c.name}`,
-      publisher: r.publisher,
-      stats: [
-        [String(c.scores[LAST]), `Puntaje ${YEARS[LAST]}`],
-        [`+${gain}`, `Puntos desde ${YEARS[0]}`],
-        [String(c.indicators.length), "Indicadores UDES"],
-      ],
-      chart: <LineChart paper values={c.scores} min={0} max={100} width={520} height={230} label={`Evolución de ${c.name}`} color="#014898" />,
-    });
+  const openSheet = () => setSheet(categoriaSheet(r, c));
 
   return (
     <SostenibleLayout title={`${c.name} · ${r.short}`}>
@@ -333,74 +446,11 @@ export function SostenibleCategory() {
           </div>
         </div>
 
-        <section className="sos-section sos-section--tight" aria-label="Puntaje y evolución">
-          <div className="sos-wrap sos-twocol">
-            <div className="sos-box sos-box--center">
-              <Ring value={c.scores[LAST]} color={color} size="xl" />
-              <div>
-                <strong>Puntaje {YEARS[LAST]}</strong>
-                <p className="sos-muted">+{gain} puntos desde {YEARS[0]}</p>
-              </div>
-              <button type="button" className="sos-btn" onClick={openSheet}>
-                Exportar PDF
-              </button>
-            </div>
-            <div className="sos-box">
-              <p className="sos-eyebrow">Evolución por edición</p>
-              <LineChart values={c.scores} min={0} max={100} height={260} label={`Evolución de ${c.name}`} />
-            </div>
-          </div>
-        </section>
+        <CategoriaPuntaje ranking={r} categoria={c} onExportar={openSheet} />
 
-        <section className="sos-section sos-section--alt" aria-labelledby="sos-cind">
-          <div className="sos-wrap">
-            <div className="sos-head">
-              <p className="sos-eyebrow">Indicadores de la UDES</p>
-              <h2 id="sos-cind">Lo que explica este resultado.</h2>
-            </div>
-            {c.indicators.length ? (
-              <IndicatorBoard keys={c.indicators} />
-            ) : (
-              <div className="sos-box">
-                <p className="sos-muted">Los indicadores académicos de este pilar se publicarán cuando la oficina responsable los cargue. Mientras tanto se muestra el puntaje del ranking.</p>
-              </div>
-            )}
-          </div>
-        </section>
+        <CategoriaIndicadores categoria={c} />
 
-        <section className="sos-section" aria-labelledby="sos-inic">
-          <div className="sos-wrap">
-            <div className="sos-head">
-              <p className="sos-eyebrow">Qué hace la UDES</p>
-              <h2 id="sos-inic">Iniciativas ligadas a {c.name.toLowerCase()}.</h2>
-            </div>
-            <div className="sos-box">
-              <ul className="sos-list">
-                <li>Programa o proyecto institucional por registrar con su oficina responsable.</li>
-                <li>Evidencia que se reporta al ranking: documento, enlace o cifra con corte.</li>
-                <li>Meta propuesta para la próxima edición y responsable de seguirla.</li>
-              </ul>
-              <p className="sos-note">
-                <i aria-hidden="true" />
-                Texto de ejemplo por reemplazar con las iniciativas reales.
-              </p>
-            </div>
-            <div className="sos-pn">
-              {prev ? (
-                <Link className="sos-btn sos-btn--ghost" to={`/sostenible/${r.id}/${prev.id}`}>
-                  <Icon name="arrow-left" size={15} /> {prev.name}
-                </Link>
-              ) : (
-                <span />
-              )}
-              {next && (
-                <Link className="sos-btn sos-btn--ghost" to={`/sostenible/${r.id}/${next.id}`}>
-                  {next.name} <Icon name="arrow-right" size={15} />
-                </Link>
-              )}
-            </div>
-          </div>
-        </section>
+        <CategoriaIniciativas ranking={r} categoria={c} />
       </div>
       {sheet && <SheetDialog data={sheet} onClose={() => setSheet(null)} />}
     </SostenibleLayout>

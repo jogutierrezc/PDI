@@ -38,8 +38,9 @@ export function usePiloAccount(): AccountState {
   const { session, profile, loading, signOut: leave } = useAuth();
   const client = useQueryClient();
   const userId = session?.user.id;
-  // Quien tiene perfil de intranet no es un usuario de Pilo: no hay nada que leer.
-  const enabled = Boolean(userId) && !loading && !profile;
+  // Quien tiene perfil de intranet no es un usuario de Pilo: no hay nada que leer. Un perfil inactivo (el
+  // «invitado» que la intranet le crea a quien entra por Microsoft) no es de intranet: ahí sí puede haber cuenta.
+  const enabled = Boolean(userId) && !loading && !profile?.is_active;
   const query = useQuery({
     queryKey: accountKey(userId),
     enabled,

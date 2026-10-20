@@ -31,6 +31,29 @@
      { action: "recuperar", username }                          → { ok: true }
      { action: "eliminar",  user_id }   (solo administración)   → { ok: true }
 
+   Desde 0175, antes de crear la cuenta se comprueba el correo con un código:
+
+     { action: "codigo_enviar",   email }                           → { ok: true, ttl, wait }
+     { action: "codigo_verificar", email, code }                    → { ok: true, ticket }
+     { action: "registrar", …, ticket }                             (sin ticket válido no se crea)
+
+   El código no se guarda: la base solo ve huellas con sal (correo_codigos). El
+   correo sale por la función `correos` (plantilla «pilo-codigo»). Para volver
+   al registro sin código: PILO_CODIGO_REGISTRO=no. Si la función `correos` no se
+   alcanza por SUPABASE_URL, CORREOS_FUNCION_URL dice dónde está.
+
+   Y el ingreso con Microsoft (el proveedor «azure» de Supabase Auth). La
+   persona vuelve de Microsoft con su sesión y estas dos acciones, con ese token:
+
+     { action: "ms_preparar" }                                      → { ok, existe? | intranet? | roles, campus, full_name }
+     { action: "ms_crear", rol, campus?, full_name, username, nick?, tone? } → { ok: true }
+
+   Microsoft ya comprobó el correo: no se pide código ni contraseña. Un ingreso
+   nuevo por Microsoft crea, por el disparador de la intranet (0162), un perfil
+   INACTIVO de «invitado»; aquí se retira (solo ese perfil recién creado) y la
+   cuenta queda marcada como de Pilo. Quien ya tiene perfil activo de intranet
+   no recibe cuenta de Pilo: esa cuenta ya le sirve.
+
    Los errores llevan `error` (para la persona) y `code` (para la página).
 
    Despliegue:
@@ -58,6 +81,18 @@ const RESERVED = ["admin", "administrador", "pilo", "mrpilo", "mr.pilo", "udes",
 const USERNAME = /^[a-z0-9._]{4,20}$/;
 const MAX_FAILS = 5;
 const LOCK_MINUTES = 10;
+
+/** El código de creación de cuenta (0175): 6 cifras, 10 minutos, 5 intentos, 60 segundos entre envíos. */
+const OTP_PURPOSE = "pilo_registro";
+const OTP_TTL = 600;
+const OTP_WAIT = 60;
+const OTP_TRIES = 5;
+
+const newCode = () => {
+  const bytes = crypto.getRandomValues(new Uint32Array(6));
+  return [...bytes].map((n) => String(n % 10)).join("");
+};
+const newTicket = () => [...crypto.getRandomValues(new Uint8Array(24))].map((b) => b.toString(16).padStart(2, "0")).join("");
 
 const text = (v: unknown, max: number) => (typeof v === "string" ? v.replace(/\s+/g, " ").trim().slice(0, max) : "");
 
@@ -125,7 +160,157 @@ Deno.serve(async (request) => {
   const missing = (error: { message?: string } | null) => /pilo_users|pilo_email_rule/.test(error?.message ?? "") && /does not exist|could not find|schema cache|no existe/i.test(error?.message ?? "");
   const noMigration = () => json({ error: "Las cuentas de Pilo todavía no están instaladas: falta la migración 0120.", code: "migracion" }, 500);
 
+  // --- El código de creación de cuenta (0175) ---
+  const otpOn = Deno.env.get("PILO_CODIGO_REGISTRO") !== "no";
+  const otpSalt = Deno.env.get("PILO_VISITOR_SALT") || serviceKey;
+  const hashOf = (...parts: string[]) => sha256(`otp|${otpSalt}|${parts.join("|")}`);
+  const noOtpMigration = (error: { message?: string } | null) => /correo_codigo/.test(error?.message ?? "") && /does not exist|could not find|schema cache|no existe/i.test(error?.message ?? "");
+  const otpOff = () => json({ error: "Falta instalar la migración 0175 para pedir el código.", code: "migracion" }, 500);
+  const site = /^https?:\/\/[^/]+$/.test(origin) ? origin : "";
+
+  /** Le pide a la función `correos` que envíe el código. Solo ella tiene el servidor de correo. */
+  const sendCode = async (email: string, code: string): Promise<{ ok: true } | { ok: false; message: string }> => {
+    const generic = "No pudimos enviarle el código. Intente de nuevo en un momento; si sigue igual, escriba a la Dirección de Planeación.";
+    try {
+      const reply = await fetch(Deno.env.get("CORREOS_FUNCION_URL") || `${url.replace(/\/+$/, "")}/functions/v1/correos`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${serviceKey}`, apikey: serviceKey },
+        body: JSON.stringify({ action: "codigo", to: email, codigo: code, sitio: site }),
+      });
+      const out = (await reply.json().catch(() => null)) as { ok?: boolean; code?: string; error?: string } | null;
+      if (reply.ok && out?.ok) return { ok: true };
+      // Un tope o un dominio no permitido se le dicen; lo técnico queda en la bitácora de Correos.
+      return { ok: false, message: out?.code === "tope" && typeof out.error === "string" ? out.error : generic };
+    } catch {
+      return { ok: false, message: generic };
+    }
+  };
+
+  /** La persona que vuelve de Microsoft: su sesión, y solo si entró por el proveedor «azure». */
+  const microsoftUser = async () => {
+    const authorization = request.headers.get("Authorization") ?? "";
+    if (!authorization.startsWith("Bearer ") || authorization.slice(7) === anonKey) return null;
+    const who = await admin.auth.getUser(authorization.slice(7));
+    const u = who.data?.user;
+    if (who.error || !u?.email) return null;
+    const viaAzure = u.app_metadata?.provider === "azure" || (u.identities ?? []).some((i) => i.provider === "azure");
+    return viaAzure ? u : null;
+  };
+
+  /**
+   * Deja listo a quien vino de Microsoft: comprueba el correo, retira el perfil de «invitado» que el disparador
+   * de la intranet le creó al entrar y marca su cuenta como de Pilo. Devuelve lo que admite su dominio, o la
+   * respuesta que ya hay que dar (cuenta existente, cuenta de intranet, correo que no es de la UDES).
+   */
+  const prepareMicrosoft = async (u: NonNullable<Awaited<ReturnType<typeof microsoftUser>>>) => {
+    const email = (u.email ?? "").toLowerCase();
+    const rule = await admin.rpc("pilo_email_rule", { p_email: email });
+    if (rule.error) return { reply: missing(rule.error) ? noMigration() : json({ error: "No pude revisar ese correo." }, 500) };
+    const allowed = rule.data as { roles: string[]; campus: string } | null;
+    if (!allowed) return { reply: json({ error: `«@${email.split("@")[1] ?? ""}» no es un correo de la UDES. Entre con su cuenta institucional de Microsoft.`, code: "correo" }, 400) };
+
+    const mine = await admin.from("pilo_users").select("id").eq("id", u.id).maybeSingle();
+    if (mine.error) return { reply: missing(mine.error) ? noMigration() : json({ error: "No pude revisar su cuenta." }, 500) };
+    if (mine.data) return { reply: json({ ok: true, existe: true }) };
+
+    const prof = await admin.from("profiles").select("id, is_active, access_role_id, created_at").eq("id", u.id).maybeSingle();
+    const row = prof.data as { is_active: boolean; access_role_id: string | null; created_at: string } | null;
+    if (row) {
+      const guest = await admin.from("access_roles").select("id").eq("key", "invitado").maybeSingle();
+      const fresh = Date.now() - new Date(row.created_at).getTime() < 24 * 3600_000;
+      const isGuest = !row.is_active && Boolean(guest.data) && row.access_role_id === (guest.data as { id: string }).id && fresh;
+      // Un perfil activo (o uno desactivado a propósito) es de la intranet: esa cuenta ya le sirve en Pilo.
+      if (!isGuest) return { reply: json({ ok: true, intranet: true }) };
+      const removed = await admin.from("profiles").delete().eq("id", u.id);
+      if (removed.error) return { reply: json({ error: "No pude preparar su cuenta. Intente de nuevo.", code: "alta" }, 500) };
+    }
+    const marked = await admin.auth.admin.updateUserById(u.id, { user_metadata: { ...(u.user_metadata ?? {}), pilo: true } });
+    if (marked.error) return { reply: json({ error: "No pude preparar su cuenta. Intente de nuevo.", code: "alta" }, 502) };
+    return { email, allowed };
+  };
+
   try {
+    /* --- Ingreso con Microsoft: preparar y crear -------------------------------------------- */
+    if (action === "ms_preparar" || action === "ms_crear") {
+      const retry = await limited("m", 30, 3600);
+      if (retry) return tooFast(retry);
+      const u = await microsoftUser();
+      if (!u) return json({ error: "Falta entrar con su cuenta de Microsoft.", code: "microsoft" }, 401);
+      const ready = await prepareMicrosoft(u);
+      if ("reply" in ready) return ready.reply;
+      const meta = (u.user_metadata ?? {}) as Record<string, unknown>;
+      const said = text(meta.full_name ?? meta.name, 120);
+
+      if (action === "ms_preparar") return json({ ok: true, roles: ready.allowed.roles, campus: ready.allowed.campus, full_name: said, email: ready.email });
+
+      const rol = text(body.rol, 20).toLowerCase();
+      if (!ready.allowed.roles.includes(rol)) return json({ error: "Ese perfil no corresponde a su correo.", code: "rol" }, 400);
+      const campus = ready.allowed.campus || text(body.campus, 20).toLowerCase();
+      if (!CAMPUSES.includes(campus)) return json({ error: "Elija su sede: Bucaramanga, Cúcuta, Valledupar o Bogotá.", code: "sede" }, 400);
+      const fullName = text(body.full_name, 120) || said;
+      if (fullName.length < 3) return json({ error: "Escriba su nombre completo.", code: "nombre" }, 400);
+      const username = text(body.username, 40).toLowerCase();
+      const userProblem = usernameProblem(username);
+      if (userProblem) return json({ error: userProblem, code: "usuario" }, 400);
+      const nick = text(body.nick, 40) || fullName.split(" ")[0];
+      const tone = TONES.includes(String(body.tone)) ? String(body.tone) : "cercano";
+      const saved = await admin.from("pilo_users").insert({ id: u.id, username, full_name: fullName, email: ready.email, rol, campus, nick, tone, last_seen_at: new Date().toISOString() });
+      if (saved.error) {
+        const clash = /duplicate|unique/i.test(saved.error.message);
+        return json({ error: clash ? "Ese usuario ya está tomado. Pruebe con otro." : "No pude guardar la cuenta. Intente de nuevo.", code: clash ? "usuario" : "alta" }, clash ? 409 : 500);
+      }
+      return json({ ok: true });
+    }
+
+    /* --- El código: enviar y verificar ------------------------------------------------------ */
+    if (action === "codigo_enviar") {
+      const retry = await limited("o", 12, 3600);
+      if (retry) return tooFast(retry);
+      const email = text(body.email, 160).toLowerCase();
+      const rule = await admin.rpc("pilo_email_rule", { p_email: email });
+      if (rule.error) return missing(rule.error) ? noMigration() : json({ error: "No pude revisar ese correo." }, 500);
+      if (!rule.data) return json({ error: "Ese correo no es de la UDES. Solo se aceptan correos institucionales.", code: "correo" }, 400);
+      const [pilo, intranet] = await Promise.all([admin.from("pilo_users").select("id").eq("email", email).maybeSingle(), admin.from("profiles").select("id").ilike("email", email).maybeSingle()]);
+      if (pilo.error) return missing(pilo.error) ? noMigration() : json({ error: "No pude revisar si la cuenta ya existe." }, 500);
+      if (pilo.data) return json({ error: "Ese correo ya tiene una cuenta de Pilo. Entre con su usuario.", code: "existe" }, 409);
+      if (intranet.data) return json({ error: "Ese correo ya tiene una cuenta en la intranet de la universidad. Entre a Pilo con esa cuenta.", code: "intranet" }, 409);
+
+      const code = newCode();
+      const emailHash = await hashOf(email);
+      const issued = await admin.rpc("correo_codigo_emitir", { p_purpose: OTP_PURPOSE, p_email: emailHash, p_code: await hashOf(email, code), p_ttl: OTP_TTL, p_wait: OTP_WAIT, p_tries: OTP_TRIES, p_hourly: 6 });
+      if (issued.error) return noOtpMigration(issued.error) ? otpOff() : json({ error: "No pude preparar el código.", code: "alta" }, 500);
+      const out = issued.data as { ok?: boolean; reason?: string; wait?: number } | null;
+      if (!out?.ok) {
+        const wait = Math.max(1, Number(out?.wait) || OTP_WAIT);
+        const message = out?.reason === "limite" ? "Ya se pidieron varios códigos para ese correo. Intente de nuevo en una hora." : `Espere ${wait} segundos antes de pedir otro código.`;
+        return json({ error: message, code: "espera", retry_after: wait }, 429, { "Retry-After": String(wait) });
+      }
+      const sent = await sendCode(email, code);
+      if (!sent.ok) {
+        // Un código que no salió no debe frenar el siguiente intento.
+        await admin.from("correo_codigos").update({ used_at: new Date().toISOString() }).eq("purpose", OTP_PURPOSE).eq("email_hash", emailHash).is("used_at", null);
+        return json({ error: sent.message, code: "correos" }, 502);
+      }
+      return json({ ok: true, ttl: OTP_TTL, wait: OTP_WAIT });
+    }
+
+    if (action === "codigo_verificar") {
+      const retry = await limited("v", 40, 3600);
+      if (retry) return tooFast(retry);
+      const email = text(body.email, 160).toLowerCase();
+      const code = text(body.code, 12).replace(/\s/g, "");
+      if (!/^[0-9]{6}$/.test(code)) return json({ error: "Escriba el código de 6 cifras.", code: "codigo" }, 400);
+      const ticket = newTicket();
+      const checked = await admin.rpc("correo_codigo_verificar", { p_purpose: OTP_PURPOSE, p_email: await hashOf(email), p_code: await hashOf(email, code), p_ticket: await sha256(ticket) });
+      if (checked.error) return noOtpMigration(checked.error) ? otpOff() : json({ error: "No pude comprobar el código." }, 500);
+      const out = checked.data as { ok?: boolean; reason?: string; left?: number } | null;
+      if (out?.ok) return json({ ok: true, ticket });
+      if (out?.reason === "vencido") return json({ error: "El código venció o no hay uno pendiente. Pida uno nuevo.", code: "codigo", reason: "vencido" }, 400);
+      if (out?.reason === "bloqueado") return json({ error: "Agotó los intentos. Pida un código nuevo.", code: "codigo", reason: "bloqueado" }, 400);
+      const left = Number(out?.left) || 0;
+      return json({ error: `No coincide. Le ${left === 1 ? "queda 1 intento" : `quedan ${left} intentos`}.`, code: "codigo", reason: "incorrecto", left }, 400);
+    }
+
     /* --- ¿Está libre este nombre de usuario? ------------------------------------------------ */
     if (action === "usuario") {
       const retry = await limited("u", 60, 600);
@@ -179,9 +364,20 @@ Deno.serve(async (request) => {
       if (byEmail.data) return json({ error: "Ese correo ya tiene una cuenta de Pilo. Entre con su usuario.", code: "existe" }, 409);
       if (byUser.data) return json({ error: "Ese usuario ya está tomado. Pruebe con otro.", code: "usuario" }, 409);
 
+      // Desde 0175 el correo se comprueba con un código antes de pedir los demás datos: sin el tiquete que
+      // entrega la verificación no se crea la cuenta. Se comprueba aquí y se gasta cuando la cuenta ya existe.
+      const emailHash = await hashOf(email);
+      const ticketHash = otpOn ? await sha256(text(body.ticket, 80)) : "";
+      if (otpOn) {
+        const valid = await admin.rpc("correo_codigo_ticket", { p_purpose: OTP_PURPOSE, p_email: emailHash, p_ticket: ticketHash, p_consume: false });
+        if (valid.error) return noOtpMigration(valid.error) ? otpOff() : json({ error: "No pude comprobar el código." }, 500);
+        if (!valid.data) return json({ error: "Primero confirme el código que le enviamos a su correo.", code: "codigo_requerido" }, 400);
+      }
+
       // El usuario de auth nace con la marca de Pilo: así no recibe perfil de intranet (0120).
       // Con la confirmación apagada nace confirmado y con su contraseña; encendida, con una invitación.
-      const confirm = Deno.env.get("PILO_CONFIRMAR_CORREO") === "si";
+      // Con el código ya verificado, el correo está comprobado: no hace falta un enlace después.
+      const confirm = !otpOn && Deno.env.get("PILO_CONFIRMAR_CORREO") === "si";
       // El perfil y la sede viajan con la cuenta: la bienvenida se envía antes de guardar pilo_users,
       // y la función `correos` los necesita para escoger el mensaje de ese perfil.
       const marks = { pilo: true, full_name: fullName, rol, campus };
@@ -211,6 +407,7 @@ Deno.serve(async (request) => {
         const clash = /duplicate|unique/i.test(saved.error.message);
         return json({ error: clash ? "Ese usuario ya está tomado. Pruebe con otro." : "No pude guardar la cuenta. Intente de nuevo.", code: clash ? "usuario" : "alta" }, clash ? 409 : 500);
       }
+      if (otpOn) await admin.rpc("correo_codigo_ticket", { p_purpose: OTP_PURPOSE, p_email: emailHash, p_ticket: ticketHash, p_consume: true });
       if (confirm) return json({ ok: true, confirm: true });
       // Sin confirmación, la persona entra de una vez: se le devuelve su sesión. Si no se pudo abrir, entra con su usuario.
       const signed = await visitor().auth.signInWithPassword({ email, password });

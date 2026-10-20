@@ -17,10 +17,12 @@ import { Intro, SostenibleLayout, useIntro } from "./SostenibleLayout";
 import { IndicatorBoard, SdgWheel, SheetDialog, LineChart, reduced } from "./widgets";
 import type { SheetData } from "./widgets";
 import type { Ranking } from "./data";
+import { odsArt } from "./ods-data";
 
 gsap.registerPlugin(ScrollTrigger);
 
 const TITLE = ["Una", "universidad", "que", "se", "mide", "contra", "el", "mundo", "y", "cuida", "su", "territorio."];
+const ODS_NUMBERS = Array.from({ length: 17 }, (_, i) => i + 1);
 
 export function rankingSheet(r: Ranking, yearIndex: number): SheetData {
   return {
@@ -44,8 +46,11 @@ export function SostenibleHome() {
   useGSAP(
     () => {
       if (reduced() || showing) return;
-      gsap.from(".sos-w", { yPercent: 105, duration: 0.7, ease: "power4.out", stagger: 0.045, clearProps: "opacity,transform" });
-      gsap.from(".sos-hero .sos-eyebrow, .sos-hero__lead, .sos-hero__cta", { y: 16, opacity: 0, duration: 0.6, ease: "power3.out", stagger: 0.1, delay: 0.3, clearProps: "opacity,transform" });
+      // Al levantarse la cortina: la foto baja de zoom y el título sube palabra por palabra.
+      gsap.from(".sos-hero__photo", { scale: 1.16, duration: 2.4, ease: "power2.out", clearProps: "transform" });
+      gsap.from(".sos-w", { yPercent: 105, duration: 0.8, ease: "power4.out", stagger: 0.05, delay: 0.1, clearProps: "opacity,transform" });
+      gsap.from(".sos-hero .sos-eyebrow, .sos-hero__lead, .sos-hero__cta", { y: 16, opacity: 0, duration: 0.6, ease: "power3.out", stagger: 0.1, delay: 0.5, clearProps: "opacity,transform" });
+      gsap.from(".sos-ods-strip", { opacity: 0, duration: 0.8, delay: 0.9, clearProps: "opacity" });
     },
     { scope: root, dependencies: [showing] },
   );
@@ -53,6 +58,7 @@ export function SostenibleHome() {
   useGSAP(
     () => {
       if (reduced()) return;
+      gsap.to(".sos-ods-strip__track", { xPercent: -50, ease: "none", duration: 34, repeat: -1 });
       gsap.to(".sos-hero__photo", { yPercent: 10, ease: "none", scrollTrigger: { trigger: ".sos-hero", start: "top top", end: "bottom top", scrub: true } });
       ScrollTrigger.batch(".sos-rcard, .sos-axis, .sos-rep", {
         start: "top 90%",
@@ -95,6 +101,18 @@ export function SostenibleHome() {
           </div>
           <span className="sos-credit">Foto: ladera UDES Verde</span>
         </section>
+
+        <div className="sos-ods-strip" aria-hidden="true">
+          <div className="sos-ods-strip__track">
+            {[0, 1].map((copy) => (
+              <Fragment key={copy}>
+                {ODS_NUMBERS.map((n) => (
+                  <img key={n} src={odsArt(n)} alt="" width={64} height={64} loading="lazy" decoding="async" />
+                ))}
+              </Fragment>
+            ))}
+          </div>
+        </div>
 
         <section className="sos-section" aria-labelledby="sos-rk">
           <div className="sos-wrap">

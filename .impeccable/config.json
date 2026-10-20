@@ -1,0 +1,44 @@
+{
+  "detector": {
+    "ignoreRules": [],
+    "ignoreFiles": [],
+    "ignoreValues": [
+      {
+        "rule": "side-tab",
+        "value": "*",
+        "files": [
+          "src/modules/admin/admin.css"
+        ],
+        "createdAt": "2026-10-20T19:37:00.792Z",
+        "reason": "Falso positivo verificado en código: L394 es una franja superior de 3px (.managed-card::before, top 0), no un borde lateral; L2532 es una sombra interior inferior (inset 0 -2px), no un borde. Los tres bordes laterales reales de este archivo ya fueron corregidos. Decisión propia del asistente, sin confirmación del usuario."
+      },
+      {
+        "rule": "broken-image",
+        "value": "*",
+        "files": [
+          "src/modules/admin/correos/servidor-logica.ts"
+        ],
+        "createdAt": "2026-10-20T20:56:50.525Z",
+        "reason": "falso positivo: la línea es una expresión regular que revisa si las imágenes de una plantilla son https, no una etiqueta img; lo decidió Claude al revisar el código"
+      },
+      {
+        "rule": "broken-image",
+        "value": "*",
+        "files": [
+          "supabase/functions/correos/index.ts"
+        ],
+        "createdAt": "2026-10-20T20:56:52.190Z",
+        "reason": "falso positivo: la línea es una expresión regular que revisa si las imágenes de una plantilla son https, no una etiqueta img; lo decidió Claude al revisar el código"
+      },
+      {
+        "rule": "side-tab",
+        "value": "*",
+        "files": [
+          "src/modules/admin/cms/cms.css"
+        ],
+        "createdAt": "2026-10-20T21:38:19.153Z",
+        "reason": "Falso positivo verificado en código: cms.css L656 es el indicador de destino del arrastre (línea horizontal de 3px con left:0/right:0 en el borde superior o inferior de la celda), no un borde lateral de tarjeta. Los bordes laterales reales del archivo son de 1px. Decisión propia del asistente, sin confirmación del usuario."
+      }
+    ]
+  }
+}

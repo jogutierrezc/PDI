@@ -142,7 +142,7 @@ export function PlaneacionHome() {
 
 const REPORT_TONES = ["PB", "PE", "VI", "EN", "EX", "IN"];
 
-function CifrasTile() {
+export function CifrasTile() {
   const catalog = useOpenDataCatalog();
   const video = useRef<HTMLVideoElement>(null);
   const tile = useRef<HTMLElement>(null);
@@ -244,7 +244,7 @@ const PauseGlyph = () => (
   </svg>
 );
 
-function PdiTile() {
+export function PdiTile() {
   const pillars = usePillars();
   const summary = useSummary();
   const progress = summary.data?.progress ?? null;
@@ -293,7 +293,7 @@ function PdiTile() {
   );
 }
 
-function BulletinsTile() {
+export function BulletinsTile() {
   const catalog = useOpenDataCatalog();
   const bulletins = usePublicBulletins(catalog.data?.period?.uuid);
   const latest = bulletins.data?.editions[0];
@@ -320,7 +320,7 @@ function BulletinsTile() {
   );
 }
 
-function TeamTile({ areas, people }: { areas: OfficeAreaItem[]; people: TeamPerson[] }) {
+export function TeamTile({ areas, people }: { areas: OfficeAreaItem[]; people: TeamPerson[] }) {
   return (
     <article className="pl-tile pl-tile--team">
       <h3>
@@ -343,7 +343,7 @@ function TeamTile({ areas, people }: { areas: OfficeAreaItem[]; people: TeamPers
   );
 }
 
-function ObservatoryTile() {
+export function ObservatoryTile() {
   const live = useObservatoryLive();
   const published = live.data?.size ?? 0;
   return (
@@ -384,7 +384,7 @@ interface RecentItem {
 
 const shortDate = new Intl.DateTimeFormat("es-CO", { day: "numeric", month: "short", year: "numeric" });
 
-function Recent() {
+export function Recent() {
   const catalog = useOpenDataCatalog();
   const bulletins = usePublicBulletins(catalog.data?.period?.uuid);
   const live = useObservatoryLive();

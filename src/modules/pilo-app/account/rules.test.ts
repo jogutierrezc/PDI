@@ -50,9 +50,9 @@ const cuenta = (over: Partial<PiloAccount> = {}): PiloAccount => ({
 });
 
 describe("qué correo entra y qué admite (espejo de pilo_email_rule)", () => {
-  it("solo los cinco dominios de la UDES", () => {
-    expect(DOMAINS.map((d) => d.domain)).toEqual(["mail.udes.edu.co", "udes.edu.co", "bucaramanga.udes.edu.co", "cucuta.udes.edu.co", "valledupar.udes.edu.co"]);
-    for (const email of ["a@gmail.com", "a@udes.edu", "a@mail.udes.edu.co.co", "a@otra.udes.edu.co", "a@bogota.udes.edu.co", "sin-arroba", "", "a b@udes.edu.co", "a@@udes.edu.co"]) {
+  it("solo los seis dominios de la UDES", () => {
+    expect(DOMAINS.map((d) => d.domain)).toEqual(["mail.udes.edu.co", "udes.edu.co", "bucaramanga.udes.edu.co", "cucuta.udes.edu.co", "valledupar.udes.edu.co", "bogota.udes.edu.co"]);
+    for (const email of ["a@gmail.com", "a@udes.edu", "a@mail.udes.edu.co.co", "a@otra.udes.edu.co", "a@bogota.mail.udes.edu.co", "sin-arroba", "", "a b@udes.edu.co", "a@@udes.edu.co"]) {
       expect(emailRule(email), email).toBeNull();
     }
   });
@@ -83,8 +83,12 @@ describe("qué correo entra y qué admite (espejo de pilo_email_rule)", () => {
     expect(emailProblem("laura@mail.udes.edu.co")).toBe("");
   });
 
-  it("es la misma regla que la de la base (0120)", () => {
-    const sql = readFileSync(resolve(process.cwd(), "supabase/migrations/0120_pilo_usuarios.sql"), "utf8");
+  it("Bogotá es administrativa, con su sede", () => {
+    expect(emailRule("a@bogota.udes.edu.co")).toEqual({ domain: "bogota.udes.edu.co", roles: ["administrativo", "profesor"], campus: "bogota" });
+  });
+
+  it("es la misma regla que la de la base (0120, con Bogotá desde 0175)", () => {
+    const sql = ["0120_pilo_usuarios.sql", "0175_pilo_codigo_y_microsoft.sql"].map((f) => readFileSync(resolve(process.cwd(), "supabase/migrations", f), "utf8")).join("\n");
     for (const d of DOMAINS) {
       const line = sql.split("\n").find((l) => l.includes(`when '${d.domain}'`)) ?? "";
       expect(line, d.domain).toContain(`jsonb_build_array(${d.roles.map((r) => `'${r}'`).join(", ")})`);
@@ -157,10 +161,23 @@ describe("la contraseña (espejo de la función)", () => {
 
 describe("los pasos del registro", () => {
   it("la sede solo se pregunta si el dominio no la dice", () => {
-    expect(regSteps(null)).toEqual(["correo", "perfil", "sede", "identidad", "clave", "trato"]);
-    expect(regSteps(emailRule("x@mail.udes.edu.co"))).toEqual(["correo", "perfil", "sede", "identidad", "clave", "trato"]);
+    expect(regSteps(null)).toEqual(["correo", "codigo", "perfil", "sede", "identidad", "clave", "trato"]);
+    expect(regSteps(emailRule("x@mail.udes.edu.co"))).toEqual(["correo", "codigo", "perfil", "sede", "identidad", "clave", "trato"]);
     expect(regSteps(emailRule("x@udes.edu.co"))).toContain("sede");
-    expect(regSteps(emailRule("x@cucuta.udes.edu.co"))).toEqual(["correo", "perfil", "identidad", "clave", "trato"]);
+    expect(regSteps(emailRule("x@cucuta.udes.edu.co"))).toEqual(["correo", "codigo", "perfil", "identidad", "clave", "trato"]);
+    expect(regSteps(emailRule("x@bogota.udes.edu.co"))).not.toContain("sede");
+  });
+
+  it("con Microsoft no hay correo, código ni contraseña: el correo ya viene comprobado", () => {
+    expect(regSteps(emailRule("x@mail.udes.edu.co"), true)).toEqual(["perfil", "sede", "identidad", "trato"]);
+    expect(regSteps(emailRule("x@cucuta.udes.edu.co"), true)).toEqual(["perfil", "identidad", "trato"]);
+  });
+
+  it("el código se pide antes del perfil, y sin tiquete no se pasa", () => {
+    const steps = regSteps(emailRule("x@mail.udes.edu.co"));
+    expect(steps.indexOf("codigo")).toBe(steps.indexOf("correo") + 1);
+    expect(stepProblem("codigo", reg({ email: "x@mail.udes.edu.co" }))?.field).toBe("code");
+    expect(stepProblem("codigo", reg({ email: "x@mail.udes.edu.co", ticket: "abc" }))).toBeNull();
   });
 
   it("cada paso dice lo primero que le falta", () => {
@@ -192,10 +209,13 @@ describe("los pasos del registro", () => {
 
   it("el primer paso incompleto es hasta donde se llega", () => {
     expect(firstOpenStep(reg())).toBe("correo");
-    expect(firstOpenStep(reg({ email: "x@cucuta.udes.edu.co", rol: "profesor" }))).toBe("identidad");
-    expect(firstOpenStep(reg({ email: "x@mail.udes.edu.co", rol: "profesor" }))).toBe("sede");
-    const full = reg({ email: "x@mail.udes.edu.co", rol: "estudiante", campus: "bogota", fullName: "Laura Gómez", username: "laura.gomez", password: "pilo2026x", terms: true });
+    expect(firstOpenStep(reg({ email: "x@cucuta.udes.edu.co", rol: "profesor" }))).toBe("codigo");
+    expect(firstOpenStep(reg({ email: "x@cucuta.udes.edu.co", rol: "profesor", ticket: "t" }))).toBe("identidad");
+    expect(firstOpenStep(reg({ email: "x@mail.udes.edu.co", rol: "profesor", ticket: "t" }))).toBe("sede");
+    const full = reg({ email: "x@mail.udes.edu.co", rol: "estudiante", campus: "bogota", fullName: "Laura Gómez", username: "laura.gomez", password: "pilo2026x", terms: true, ticket: "t" });
     expect(firstOpenStep(full)).toBeNull();
+    // Quien viene de Microsoft no necesita ticket ni contraseña.
+    expect(firstOpenStep({ ...full, ticket: "", password: "", ms: true })).toBeNull();
   });
 
   it("lo que viaja a «registrar» es lo del contrato, limpio", () => {
@@ -211,6 +231,7 @@ describe("los pasos del registro", () => {
       password: " con espacios 1 ",
       nick: "Laura",
       tone: "formal",
+      ticket: "",
     });
     expect(registerBody(reg({ email: "x@mail.udes.edu.co", rol: "estudiante", campus: "bogota", fullName: "Ana Ruiz", username: "ana.ruiz", password: "pilo2026x", nick: " Anita " }))).toMatchObject({ campus: "bogota", nick: "Anita", tone: "cercano" });
   });
@@ -265,6 +286,7 @@ describe("lo que responde la función, en palabras de la persona", () => {
     expect(registerErrorStep("correo", withSede)).toBe("correo");
     expect(registerErrorStep("existe", withSede)).toBe("correo");
     expect(registerErrorStep("intranet", withSede)).toBe("correo");
+    expect(registerErrorStep("codigo_requerido", withSede)).toBe("codigo");
     expect(registerErrorStep("rol", withSede)).toBe("perfil");
     expect(registerErrorStep("sede", withSede)).toBe("sede");
     expect(registerErrorStep("sede", noSede)).toBe("perfil");

@@ -199,9 +199,16 @@ const DataTransfer = lazy(() =>
 const Correos = lazy(() =>
   import("./modules/admin/correos/Correos").then((m) => ({ default: m.Correos })),
 );
+const CmsPortales = lazy(() =>
+  import("./modules/admin/cms/CmsPortales").then((m) => ({ default: m.CmsPortales })),
+);
+const PaginaPublica = lazy(() =>
+  import("./modules/admin/cms/PaginaPublica").then((m) => ({ default: m.PaginaPublica })),
+);
 const Rutas = lazy(() => import("./modules/rutas/Rutas").then((m) => ({ default: m.Rutas })));
 const RutasPublico = lazy(() => import("./modules/rutas/RutasPublico").then((m) => ({ default: m.RutasPublico })));
 const ProgramasEnCifras = lazy(() => import("./modules/programas-en-cifras/ui/ProgramasEnCifras").then((m) => ({ default: m.ProgramasEnCifras })));
+const DatosSostenibilidad = lazy(() => import("./modules/datos-sostenibilidad/ui/DatosSostenibilidad").then((m) => ({ default: m.DatosSostenibilidad })));
 const Internacionalizacion = lazy(() =>
   import("./modules/internacionalizacion/ui/Internacionalizacion").then((m) => ({ default: m.Internacionalizacion })),
 );
@@ -304,6 +311,8 @@ export default function App() {
           {/* El tablero de una unidad: misma dirección sea privado o público.
               Lo que cambia es a quién le responde la base, no la ruta. */}
           <Route path="/tableros/:unidad/:tablero" element={<BoardPage />} />
+          {/* Las páginas publicadas desde CMS Portales (0174). La portada es /portales/:portal y los micrositios, /portales/:portal/ruta/hija. */}
+          <Route path="/portales/:portal/*" element={<PaginaPublica />} />
           <Route path="/sostenible" element={<SostenibleHome />} />
           <Route path="/sostenible/impact/informes" element={<OdsPortal />} />
           <Route path="/sostenible/impact/informes/ods/:n" element={<OdsReport />} />
@@ -462,6 +471,15 @@ export default function App() {
             element={
               <RequireRole minimum="consulta" screen="programas-en-cifras">
                 <ProgramasEnCifras />
+              </RequireRole>
+            }
+          />
+          {/* Datos de Sostenibilidad: libros de datos por oficina conectados a los indicadores (0178). */}
+          <Route
+            path="/admin/datos-sostenibilidad"
+            element={
+              <RequireRole minimum="consulta" screen="datos-sostenibilidad">
+                <DatosSostenibilidad />
               </RequireRole>
             }
           />
@@ -659,6 +677,15 @@ export default function App() {
             element={
               <RequireRole minimum="admin" screen="transfer">
                 <DataTransfer />
+              </RequireRole>
+            }
+          />
+
+          <Route
+            path="/admin/cms"
+            element={
+              <RequireRole minimum="planeacion" screen="cms">
+                <CmsPortales />
               </RequireRole>
             }
           />

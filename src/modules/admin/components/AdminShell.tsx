@@ -56,7 +56,9 @@ export type AdminSection =
   | "informes"
   | "warehouse"
   | "monitor"
-  | "programas-en-cifras";
+  | "programas-en-cifras"
+  | "datos-sostenibilidad"
+  | "cms";
 
 export interface NavItem {
   id: AdminSection;
@@ -68,7 +70,7 @@ export interface NavItem {
 }
 
 export interface NavGroup {
-  id: "planeacion" | "pdi" | "cifras" | "observatorio" | "impacto" | "tableros" | "reportes" | "informes" | "internacionalizacion" | "rankings" | "warehouse" | "monitor" | "programas-en-cifras" | "sistema";
+  id: "planeacion" | "pdi" | "cifras" | "observatorio" | "impacto" | "tableros" | "reportes" | "informes" | "internacionalizacion" | "rankings" | "warehouse" | "monitor" | "programas-en-cifras" | "datos-sostenibilidad" | "sistema";
   label: string;
   /** Ícono y nombre corto: el riel solo tiene 78 px, ahí no cabe el rótulo largo. */
   icon: IconName;
@@ -187,6 +189,18 @@ export const navigation: NavGroup[] = [
     ],
   },
   {
+    // Los libros de datos de las oficinas (UDES Verde, Planeación institucional…)
+    // conectados a los indicadores de sostenibilidad de UDES Sostenible.
+    // Lo ve quien es gestor o colaborador (ds_miembros), Planeación y la administración.
+    id: "datos-sostenibilidad",
+    icon: "leaf",
+    short: "Sostenibilidad",
+    label: "Datos de Sostenibilidad",
+    items: [
+      { id: "datos-sostenibilidad", label: "Datos de Sostenibilidad", icon: "leaf", to: "/admin/datos-sostenibilidad", minimum: "consulta" },
+    ],
+  },
+  {
     // Los reportes de Master, Galileo y Davinci guardados por periodo, para
     // consultarlos sin volver a pedirlos y vigilar el rendimiento académico.
     id: "warehouse",
@@ -257,6 +271,8 @@ export const navigation: NavGroup[] = [
       { id: "correos", label: "Correos", icon: "mail", to: "/admin/correos", minimum: "planeacion" },
       // El mapa de la ruta del bus UDES: calles de OpenStreetMap, flujo de estudiantes y paradas nuevas.
       { id: "rutas", label: "Rutas del bus", icon: "pin", to: "/admin/rutas", minimum: "planeacion" },
+      // Las páginas de la landing, de Planeación y de UDES Sostenible, con sus micrositios y su editor visual.
+      { id: "cms", label: "CMS Portales", icon: "document", to: "/admin/cms", minimum: "planeacion" },
       // Copia otro servidor de Supabase en este. Reemplaza datos: solo administración.
       { id: "transfer", label: "Traslado de datos", icon: "upload", to: "/admin/traslado", minimum: "admin" },
     ],

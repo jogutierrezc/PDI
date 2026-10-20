@@ -206,6 +206,19 @@ export const MODULES: Record<ModuleId, ModuleMeta> = {
       },
     ],
   },
+  "datos-sostenibilidad": {
+    text: "Libros de datos de las oficinas, conectados a los indicadores de sostenibilidad de UDES Sostenible",
+    color: "var(--wall-programas-en-cifras)",
+    rank: 5.65,
+    sections: () => [
+      {
+        title: "Mi oficina",
+        cards: [
+          { key: "ds-libros", title: "Datos de Sostenibilidad", text: "Libros de datos con columnas tipadas, conectados a los indicadores de sostenibilidad", to: "/admin/datos-sostenibilidad" },
+        ],
+      },
+    ],
+  },
   monitor: {
     text: "Cómo van las notas por facultad, programa, grupo y estudiante, con alertas tempranas",
     color: "var(--wall-monitor)",
@@ -315,6 +328,7 @@ export const MODULES: Record<ModuleId, ModuleMeta> = {
           nav("parameters", "Los ajustes globales de los portales"),
           nav("correos", "Plantillas, conexión y bitácora de los correos"),
           nav("rutas", "Calles, flujo de estudiantes y paradas del bus UDES"),
+          nav("cms", "Las páginas de la landing, de Planeación y de UDES Sostenible, con sus micrositios"),
           nav("development", "Los proyectos web de la oficina"),
         ],
       },

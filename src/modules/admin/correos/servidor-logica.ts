@@ -112,11 +112,63 @@ export interface Plantilla {
   nota: string;
   /** Un mensaje por rol, cuando la plantilla cambia según quién crea la cuenta. */
   roles: Record<Rol, string> | null;
+  /** Qué lleva el correo: un enlace personal, un código para escribir o un aviso. Las de fábrica son de enlace. */
+  tipo: TipoPlantilla;
+  /** El HTML que escribió la administración (modo HTML), o null si el correo se escribe por campos. */
+  html: string | null;
+  /** Dónde va el HTML: el cuerpo, dentro de la marca, o el correo entero. */
+  alcance: Alcance;
 }
 
 /** Los campos que la administración escribe. */
 export const CAMPOS = ["asunto", "previa", "titulo", "saludo", "mensaje", "boton", "nota"] as const;
 export type Campo = (typeof CAMPOS)[number];
+
+/* --- Plantillas propias y HTML --------------------------------------------------------------- */
+
+/** Lo que lleva el correo: un enlace personal, un código para escribir o un aviso. */
+export type TipoPlantilla = "enlace" | "codigo" | "aviso";
+export const TIPOS_PLANTILLA: readonly TipoPlantilla[] = ["enlace", "codigo", "aviso"];
+export const TIPO_NOMBRE: Record<TipoPlantilla, string> = { enlace: "Enlace", codigo: "Código", aviso: "Aviso" };
+
+/** Dónde se escribe el HTML: solo el cuerpo (la cabecera y el pie de la marca se mantienen) o el correo entero. */
+export type Alcance = "cuerpo" | "completo";
+
+/** Los datos que una plantilla puede insertar, según lo que lleve. Los de la persona valen para todas. */
+export const VARIABLES_POR_TIPO: Record<TipoPlantilla, readonly string[]> = {
+  enlace: [...DATOS, "enlace"],
+  codigo: [...DATOS, "codigo", "vigencia"],
+  aviso: [...DATOS, "enlace", "modulo", "titulo_aviso", "detalle"],
+};
+
+/** Cómo se llama cada dato en los botones de «Insertar un dato». */
+export const ETIQUETA_VARIABLE: Record<string, string> = {
+  nombre: "Nombre",
+  correo: "Correo",
+  sede: "Sede",
+  rol: "Rol",
+  enlace: "Enlace",
+  codigo: "Código",
+  vigencia: "Vigencia",
+  modulo: "Módulo",
+  titulo_aviso: "Título del aviso",
+  detalle: "Detalle",
+};
+
+/** Valores de ejemplo para la vista previa y para «Enviar una prueba». Los datos de la persona vienen de PERSONAS_DE_EJEMPLO. */
+export const VALORES_DE_EJEMPLO: Record<string, string> = {
+  enlace: "https://planeacion.udes.edu.co",
+  codigo: "482913",
+  vigencia: "10 minutos",
+  modulo: "UDES en Cifras",
+  titulo_aviso: "Matrícula 2026-1",
+  detalle: "El corte de matrícula 2026-1 quedó validado y publicado.",
+};
+
+/** El tope del HTML de una plantilla, en caracteres (la base lo rechaza más allá). */
+export const TOPE_HTML = 100_000;
+/** El mismo tope, en bytes, para la lista de comprobaciones de la intranet. */
+export const TOPE_HTML_BYTES = 100 * 1024;
 
 const P_CUENTA = "Cuentas de la intranet";
 const K_CUENTA = "Cuenta de Pilo";
@@ -126,6 +178,9 @@ export const PLANTILLAS: readonly Plantilla[] = [
   {
     clave: "plan-invite",
     identidad: "plan",
+    tipo: "enlace",
+    html: null,
+    alcance: "cuerpo",
     grupo: P_CUENTA,
     nombre: "Activar la cuenta",
     cuando: "Al crear un usuario",
@@ -141,6 +196,9 @@ export const PLANTILLAS: readonly Plantilla[] = [
   {
     clave: "plan-recovery",
     identidad: "plan",
+    tipo: "enlace",
+    html: null,
+    alcance: "cuerpo",
     grupo: P_CUENTA,
     nombre: "Cambiar la contraseña",
     cuando: "«Olvidé mi contraseña»",
@@ -156,6 +214,9 @@ export const PLANTILLAS: readonly Plantilla[] = [
   {
     clave: "plan-email_change",
     identidad: "plan",
+    tipo: "enlace",
+    html: null,
+    alcance: "cuerpo",
     grupo: P_CUENTA,
     nombre: "Confirmar el correo nuevo",
     cuando: "Al cambiar el correo",
@@ -171,6 +232,9 @@ export const PLANTILLAS: readonly Plantilla[] = [
   {
     clave: "plan-signup",
     identidad: "plan",
+    tipo: "enlace",
+    html: null,
+    alcance: "cuerpo",
     grupo: P_CUENTA,
     nombre: "Confirmar el correo",
     cuando: "Si alguien se registra por su cuenta",
@@ -186,6 +250,9 @@ export const PLANTILLAS: readonly Plantilla[] = [
   {
     clave: "plan-magiclink",
     identidad: "plan",
+    tipo: "enlace",
+    html: null,
+    alcance: "cuerpo",
     grupo: P_CUENTA,
     nombre: "Enlace de acceso",
     cuando: "Al pedir entrar con un enlace",
@@ -201,6 +268,9 @@ export const PLANTILLAS: readonly Plantilla[] = [
   {
     clave: "pilo-invite",
     identidad: "pilo",
+    tipo: "enlace",
+    html: null,
+    alcance: "cuerpo",
     grupo: K_CUENTA,
     nombre: "Bienvenida y confirmación",
     cuando: "Al crear la cuenta de Pilo",
@@ -223,6 +293,9 @@ export const PLANTILLAS: readonly Plantilla[] = [
   {
     clave: "pilo-recovery",
     identidad: "pilo",
+    tipo: "enlace",
+    html: null,
+    alcance: "cuerpo",
     grupo: K_CUENTA,
     nombre: "Cambiar la contraseña",
     cuando: "«Olvidé mi contraseña» en Pilo",
@@ -249,6 +322,9 @@ export function plantillaOriginal(clave: string): Plantilla | null {
 export const PLANTILLA_CODIGO: Plantilla = {
   clave: "codigo",
   identidad: "plan",
+  tipo: "codigo",
+  html: null,
+  alcance: "cuerpo",
   grupo: P_CUENTA,
   nombre: "Código de verificación",
   cuando: "Al confirmar un cambio delicado",
@@ -262,12 +338,39 @@ export const PLANTILLA_CODIGO: Plantilla = {
   roles: null,
 };
 
+/**
+ * El código que Pilo envía al crear una cuenta (0175), antes de pedir el resto de los datos.
+ * Vale 10 minutos. Si en la intranet hay una fila con esta clave, manda la fila.
+ */
+export const PLANTILLA_PILO_CODIGO: Plantilla = {
+  clave: "pilo-codigo",
+  identidad: "pilo",
+  tipo: "codigo",
+  html: null,
+  alcance: "cuerpo",
+  grupo: K_CUENTA,
+  nombre: "Código para crear la cuenta",
+  cuando: "Al crear la cuenta de Pilo",
+  asunto: "Su código de Mr. Pilo",
+  previa: "Escríbalo en la pantalla donde se lo pidieron.",
+  titulo: "Confirmemos su correo",
+  saludo: "Hola, {{nombre}}.",
+  mensaje: "Para crear su cuenta de Mr. Pilo, escriba este código en la pantalla donde se lo pidieron.\nVale por 10 minutos y sirve una sola vez.",
+  boton: "",
+  nota: "Nadie de la universidad le pedirá este código por teléfono ni por mensaje. Si usted no creó una cuenta, ignore este correo.",
+  roles: null,
+};
+
 const texto = (v: unknown, max: number): string => (typeof v === "string" ? v.slice(0, max) : "");
+
+const esTipo = (v: unknown): v is TipoPlantilla => typeof v === "string" && (TIPOS_PLANTILLA as readonly string[]).includes(v);
+const alcanceDe = (v: unknown, def: Alcance): Alcance => (v === "completo" || v === "cuerpo" ? v : def);
 
 /**
  * Una fila de `correo_templates` como plantilla. Lo que falte o venga mal se
  * completa con el texto original, para que un correo de cuenta nunca salga
- * vacío. Devuelve null si no hay ni fila útil ni original.
+ * vacío. Una plantilla propia (`c-…`) no tiene original: sin su fila no existe,
+ * y el resultado es null. Lo mismo si no hay ni fila útil ni original.
  */
 export function plantillaDeFila(fila: unknown, clave: string): Plantilla | null {
   const base = plantillaOriginal(clave);
@@ -293,16 +396,20 @@ export function plantillaDeFila(fila: unknown, clave: string): Plantilla | null 
     boton: texto(f.button, 80) || base?.boton || "Abrir",
     nota: texto(f.note, 600),
     roles,
+    tipo: esTipo(f.tipo) ? f.tipo : (base?.tipo ?? "enlace"),
+    html: typeof f.html === "string" ? f.html.slice(0, TOPE_HTML) : null,
+    alcance: alcanceDe(f.html_scope, "cuerpo"),
   };
 }
 
 /**
- * Un borrador que llega de la pantalla («Enviar una prueba» antes de guardar),
- * recortado a lo que una plantilla admite. La identidad y la clave son las de
- * la plantilla de fábrica: un borrador no puede hacerse pasar por otra.
+ * Un borrador que llega de la pantalla («Enviar una prueba», guardado o no),
+ * recortado a lo que una plantilla admite. La identidad, la clave y el tipo son
+ * los de la plantilla (la de fábrica, o la fila de la base si es propia): un
+ * borrador no puede hacerse pasar por otra ni cambiar lo que lleva el correo.
  */
-export function plantillaDeBorrador(borrador: unknown, clave: string): Plantilla | null {
-  const base = plantillaOriginal(clave);
+export function plantillaDeBorrador(borrador: unknown, clave: string, fila?: unknown): Plantilla | null {
+  const base = plantillaOriginal(clave) ?? plantillaDeFila(fila, clave);
   if (!base) return null;
   const b = borrador && typeof borrador === "object" ? (borrador as Record<string, unknown>) : null;
   if (!b) return base;
@@ -317,6 +424,8 @@ export function plantillaDeBorrador(borrador: unknown, clave: string): Plantilla
     boton: texto(b.boton, 80) || base.boton,
     nota: texto(b.nota, 600),
     roles: base.roles && rb ? { estudiante: texto(rb.estudiante, 4000), profesor: texto(rb.profesor, 4000), administrativo: texto(rb.administrativo, 4000) } : base.roles,
+    html: b.html === undefined ? base.html : typeof b.html === "string" ? b.html.slice(0, TOPE_HTML) : null,
+    alcance: alcanceDe(b.alcance, base.alcance),
   };
 }
 
@@ -455,12 +564,18 @@ function sinNombre(crudo: string): string {
 
 export type Modo = "texto" | "html" | "resaltado";
 
+/** El valor de un marcador: primero los datos de la persona, luego los demás valores del correo. */
+function valorDe(k: string, persona: Persona, valores: Record<string, string>): string | undefined {
+  if ((DATOS as readonly string[]).includes(k)) return persona[k as Dato] ?? "";
+  return Object.prototype.hasOwnProperty.call(valores, k) ? (valores[k] ?? "") : undefined;
+}
+
 /**
- * Pone los datos de la persona en un texto. Cada dato se escapa al insertarse
- * (en HTML); un marcador que no es un dato conocido se deja tal cual y se
- * devuelve en `desconocidos`, para avisarlo antes de guardar.
+ * Pone los datos de la persona, y los demás valores del correo, en un texto.
+ * Cada valor se escapa al insertarse (en HTML); un marcador que no es un dato
+ * conocido se deja tal cual y se devuelve en `desconocidos`, para avisarlo antes de guardar.
  */
-export function rellenar(crudo: string, persona: Persona, modo: Modo = "texto"): { salida: string; desconocidos: string[] } {
+export function rellenar(crudo: string, persona: Persona, modo: Modo = "texto", valores: Record<string, string> = {}): { salida: string; desconocidos: string[] } {
   const desconocidos: string[] = [];
   const fuente = persona.nombre.trim() ? String(crudo ?? "") : sinNombre(String(crudo ?? ""));
   const literal = (t: string) => (modo === "texto" ? t : escapar(t));
@@ -470,25 +585,51 @@ export function rellenar(crudo: string, persona: Persona, modo: Modo = "texto"):
     const i = m.index ?? 0;
     salida += literal(fuente.slice(desde, i));
     desde = i + m[0].length;
-    const k = m[1];
-    if ((DATOS as readonly string[]).includes(k)) {
-      const valor = literal(persona[k as Dato] ?? "");
-      salida += modo === "resaltado" ? `<span style="${RESALTE}">${valor}</span>` : valor;
-    } else {
+    const v = valorDe(m[1], persona, valores);
+    if (v === undefined) {
       desconocidos.push(m[0]);
       salida += literal(m[0]);
+    } else {
+      const dato = literal(v);
+      salida += modo === "resaltado" ? `<span style="${RESALTE}">${dato}</span>` : dato;
     }
   }
   salida += literal(fuente.slice(desde));
   return { salida, desconocidos };
 }
 
-/** Los marcadores de una plantilla que el sistema no conoce, sin repetir. */
-export function marcadoresDesconocidos(plantilla: Plantilla): string[] {
-  const textos = [...CAMPOS.map((c) => plantilla[c]), ...(plantilla.roles ? ROLES.map((r) => plantilla.roles?.[r] ?? "") : [])];
-  const malos: string[] = [];
-  for (const t of textos) for (const m of String(t ?? "").matchAll(MARCADOR)) if (!(DATOS as readonly string[]).includes(m[1])) malos.push(m[0]);
+/**
+ * Lo mismo que `rellenar`, para el HTML que escribe la administración: sustituye
+ * los marcadores (escapados) y deja el resto del HTML tal cual; después lo limpia
+ * `sanearHtml`. En la vista previa, el dato resaltado no se pone dentro de una
+ * etiqueta, porque rompería un enlace.
+ */
+export function rellenarHtml(html: string, persona: Persona, valores: Record<string, string>, resaltar = false): { salida: string; desconocidos: string[] } {
+  const desconocidos: string[] = [];
+  const salida = String(html ?? "").replace(MARCADOR, (marca: string, k: string, i: number, todo: string) => {
+    const v = valorDe(k, persona, valores);
+    if (v === undefined) {
+      desconocidos.push(marca);
+      return marca;
+    }
+    const dato = escapar(v);
+    const dentroDeEtiqueta = todo.lastIndexOf("<", i) > todo.lastIndexOf(">", i);
+    return resaltar && !dentroDeEtiqueta ? `<span style="${RESALTE}">${dato}</span>` : dato;
+  });
+  return { salida, desconocidos };
+}
+
+/** Los marcadores de un texto que no están entre los permitidos, sin repetir. */
+function fueraDeLos(texto: string, permitidos: readonly string[]): string[] {
+  const malos = [...String(texto ?? "").matchAll(MARCADOR)].filter((m) => !permitidos.includes(m[1])).map((m) => m[0]);
   return [...new Set(malos)];
+}
+
+/** Los marcadores de una plantilla que el sistema no conoce para su tipo, sin repetir. */
+export function marcadoresDesconocidos(plantilla: Plantilla): string[] {
+  const permitidos: readonly string[] = VARIABLES_POR_TIPO[plantilla.tipo] ?? DATOS;
+  const textos = [...CAMPOS.map((c) => plantilla[c]), ...(plantilla.roles ? ROLES.map((r) => plantilla.roles?.[r] ?? "") : []), ...(plantilla.html != null ? [plantilla.html] : [])];
+  return [...new Set(textos.flatMap((t) => fueraDeLos(t, permitidos)))];
 }
 
 /* --- El correo ------------------------------------------------------------------------------- */
@@ -512,6 +653,8 @@ export interface PedidoDeCorreo {
   sitio: string;
   /** Un código para escribir, en vez del botón. */
   codigo?: string;
+  /** Otros valores para los marcadores (vigencia, módulo, aviso…). Lo que no está aquí queda tal cual. */
+  valores?: Record<string, string>;
   /** Si el remitente tiene «responder a», el pie no dice «No responda». */
   respondible?: boolean;
   /** Solo para la vista previa: marca en amarillo los datos insertados. */
@@ -527,6 +670,9 @@ const SERIF = "Georgia,'Times New Roman',serif";
  * identidad, más su versión en texto plano. No usa hojas de estilo, ni
  * JavaScript, ni SVG. La cara de Pilo es una imagen del portal con `alt` y
  * tamaño fijo: si el programa de correo la oculta, el correo se entiende igual.
+ *
+ * Con HTML propio (la plantilla lo lleva), ese HTML sustituye a los campos: con
+ * alcance «cuerpo» va dentro de la misma marca; con «completo», es el correo entero.
  */
 export function armarCorreo(pedido: PedidoDeCorreo): Correo {
   const { plantilla: p, persona } = pedido;
@@ -534,12 +680,17 @@ export function armarCorreo(pedido: PedidoDeCorreo): Correo {
   const sitio = origen(pedido.sitio);
   const desconocidos: string[] = [];
   const modo: Modo = pedido.resaltar ? "resaltado" : "html";
+  const enlace = pedido.codigo ? "" : pedido.enlace;
+  // Los valores del correo: el enlace y el código según el caso, y los demás que llegaron.
+  const valores: Record<string, string> = { ...(pedido.valores ?? {}) };
+  if (enlace) valores.enlace = enlace;
+  if (pedido.codigo) valores.codigo = pedido.codigo;
   const H = (t: string) => {
-    const r = rellenar(t, persona, modo);
+    const r = rellenar(t, persona, modo, valores);
     desconocidos.push(...r.desconocidos);
     return r.salida;
   };
-  const T = (t: string) => rellenar(t, persona, "texto").salida.trim();
+  const T = (t: string) => rellenar(t, persona, "texto", valores).salida.trim();
   const unaLinea = (t: string) => T(t).replace(/\s+/g, " ").trim();
   const parrafos = (t: string) => String(t ?? "").split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
 
@@ -547,10 +698,27 @@ export function armarCorreo(pedido: PedidoDeCorreo): Correo {
   const asunto = unaLinea(p.asunto).slice(0, 200);
   const previa = unaLinea(p.previa).slice(0, 200);
   // Los marcadores del asunto y de la línea previa también se avisan.
-  desconocidos.push(...rellenar(p.asunto, persona).desconocidos, ...rellenar(p.previa, persona).desconocidos);
+  desconocidos.push(...rellenar(p.asunto, persona, "texto", valores).desconocidos, ...rellenar(p.previa, persona, "texto", valores).desconocidos);
 
-  const enlace = pedido.codigo ? "" : pedido.enlace;
+  // El HTML propio: sus marcadores se sustituyen y el resultado se sanea antes de usarse.
+  const propio = p.html != null ? rellenarHtml(p.html, persona, valores, Boolean(pedido.resaltar)) : null;
+  if (propio) desconocidos.push(...propio.desconocidos);
+  const cuerpoPropio = propio ? sanearHtml(propio.salida).html : null;
+
   const pie = `${marca.pie}${pedido.respondible ? "" : " No responda a esta dirección."}`;
+  const pieSitio = sitio ? `<br>\n            <a href="${escapar(sitio)}" style="color:#1b52ad;">${escapar(sitio)}</a>` : "";
+  const previaHtml = previa ? `<div style="display:none;max-height:0;overflow:hidden;opacity:0;">${escapar(previa)}</div>\n` : "";
+
+  // Con alcance «completo», el HTML propio es el correo entero: sin la marca alrededor.
+  if (cuerpoPropio != null && p.alcance === "completo") {
+    return {
+      asunto,
+      previa,
+      html: `<!doctype html>\n<meta charset="utf-8">\n${previaHtml}${cuerpoPropio}\n`,
+      texto: `${aTexto(cuerpoPropio)}\n`,
+      desconocidos: [...new Set(desconocidos)],
+    };
+  }
 
   const cabecera = marca.cara && sitio
     ? `<table role="presentation" cellpadding="0" cellspacing="0"><tr>
@@ -576,8 +744,12 @@ export function armarCorreo(pedido: PedidoDeCorreo): Correo {
             <p style="margin:0 0 24px;font-size:13px;line-height:1.45;color:#1b52ad;word-break:break-all;">${escapar(enlace)}</p>`;
 
   const nota = p.nota.trim() ? `<p style="margin:0;font-size:14px;color:#45566d;">${H(p.nota)}</p>` : "";
-  const previaHtml = previa ? `<div style="display:none;max-height:0;overflow:hidden;opacity:0;">${escapar(previa)}</div>\n` : "";
-  const pieSitio = sitio ? `<br>\n            <a href="${escapar(sitio)}" style="color:#1b52ad;">${escapar(sitio)}</a>` : "";
+  const contenido = cuerpoPropio != null
+    ? cuerpoPropio
+    : `<h1 style="margin:0 0 16px;font-family:${SERIF};font-size:24px;line-height:1.2;color:${marca.titulo};">${H(p.titulo)}</h1>
+            ${cuerpo}
+            ${accion}
+            ${nota}`;
 
   const html = `<!doctype html>
 <html lang="es">
@@ -598,10 +770,7 @@ ${previaHtml}<table role="presentation" width="100%" cellpadding="0" cellspacing
         </tr>
         <tr>
           <td style="padding:32px;font-family:${FUENTE};font-size:16px;line-height:1.55;color:#0d1c31;">
-            <h1 style="margin:0 0 16px;font-family:${SERIF};font-size:24px;line-height:1.2;color:${marca.titulo};">${H(p.titulo)}</h1>
-            ${cuerpo}
-            ${accion}
-            ${nota}
+            ${contenido}
           </td>
         </tr>
         <tr>
@@ -617,16 +786,192 @@ ${previaHtml}<table role="presentation" width="100%" cellpadding="0" cellspacing
 </html>
 `;
 
-  const lineas = [
-    T(p.titulo),
-    T(p.saludo),
-    ...parrafos(mensaje).map(T),
-    pedido.codigo ? `Código: ${pedido.codigo}` : `${T(p.boton)}:\n${enlace}`,
-    T(p.nota),
-    `--\n${pie}${sitio ? `\n${sitio}` : ""}`,
-  ].filter((l) => l.trim());
+  const lineas = cuerpoPropio != null
+    ? [aTexto(cuerpoPropio), `--\n${pie}${sitio ? `\n${sitio}` : ""}`]
+    : [
+        T(p.titulo),
+        T(p.saludo),
+        ...parrafos(mensaje).map(T),
+        pedido.codigo ? `Código: ${pedido.codigo}` : `${T(p.boton)}:\n${enlace}`,
+        T(p.nota),
+        `--\n${pie}${sitio ? `\n${sitio}` : ""}`,
+      ];
 
-  return { asunto, previa, html, texto: `${lineas.join("\n\n")}\n`, desconocidos: [...new Set(desconocidos)] };
+  return { asunto, previa, html, texto: `${lineas.filter((l) => l.trim()).join("\n\n")}\n`, desconocidos: [...new Set(desconocidos)] };
+}
+
+/* --- El HTML propio de una plantilla --------------------------------------------------------- */
+
+/** Lo que no puede llevar un correo escrito a mano: el elemento entero, con lo que tiene dentro. */
+const ELEMENTOS_QUITADOS = ["script", "iframe", "object", "form"] as const;
+/** Lo que se quita solo por la etiqueta: el texto que lleve dentro se queda. */
+const ETIQUETAS_QUITADAS = ["embed", "input", "button", "meta", "link", "base", "frame", "frameset", "applet"] as const;
+const PROHIBIDAS: ReadonlySet<string> = new Set<string>([...ELEMENTOS_QUITADOS, ...ETIQUETAS_QUITADAS]);
+/** Atributos que llevan una dirección: si la dirección es de script o de datos ejecutables, el atributo se quita. */
+const ATRIBUTOS_DIRECCION: ReadonlySet<string> = new Set(["href", "src", "xlink:href", "background", "action", "formaction"]);
+const DIRECCION_PELIGROSA = /^(javascript|vbscript|data:text)/;
+const ENTIDADES_DIRECCION: Record<string, string> = { colon: ":", tab: "\t", newline: "\n", lpar: "(", rpar: ")", sol: "/" };
+/** Una etiqueta: `<nombre atributos>` o `</nombre>`. Un valor entre comillas puede llevar `<` y `>`. */
+const ETIQUETA = /<(\/?)([a-zA-Z][a-zA-Z0-9:-]*)((?:[^<>"']|"[^"]*"|'[^']*')*)>/g;
+const ATRIBUTO = /([^\s"'<>/=]+)(?:\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s"'<>=`]+)))?/g;
+
+/** Lo que el navegador entiende como dirección: entidades decodificadas, sin espacios ni controles, en minúsculas. */
+function direccionReal(valor: string): string {
+  const punto = (n: number) => (n > 0 && n <= 0x10ffff ? String.fromCodePoint(n) : "");
+  return valor
+    .replace(/&#x([0-9a-f]+);?/gi, (_, h: string) => punto(parseInt(h, 16)))
+    .replace(/&#(\d+);?/g, (_, d: string) => punto(parseInt(d, 10)))
+    .replace(/&(colon|tab|newline|lpar|rpar|sol);?/gi, (_, n: string) => ENTIDADES_DIRECCION[n.toLowerCase()] ?? "")
+    .replace(/[\u0000- \u007f-\u009f]/g, "")
+    .toLowerCase();
+}
+
+/**
+ * Quita de un HTML lo que un correo no puede llevar: scripts, iframes, objetos,
+ * formularios, controles, metadatos, eventos (on…) y direcciones de script. Sin
+ * DOM, para que corra igual en el navegador, en Node y en Deno. Devuelve lo que
+ * quitó, para avisarlo antes de guardar.
+ */
+export function sanearHtml(html: string): { html: string; quitado: string[] } {
+  const quitado: string[] = [];
+  let t = String(html ?? "").replace(/<!--[\s\S]*?(?:-->|$)/g, "").replace(/<![^>]*>?/g, "");
+
+  // Los elementos de script y de formulario van con su contenido: el código de un script no debe quedar como texto.
+  // Se repite hasta que no quede ninguno («<scr<script>…</script>ipt>» no debe sobrevivir).
+  for (let vuelta = 0; vuelta < 5; vuelta += 1) {
+    const antes = t;
+    for (const nombre of ELEMENTOS_QUITADOS) {
+      t = t.replace(new RegExp(`<\\s*${nombre}\\b[\\s\\S]*?<\\s*\\/\\s*${nombre}\\s*>`, "gi"), () => {
+        quitado.push(nombre);
+        return "";
+      });
+    }
+    if (t === antes) break;
+  }
+
+  // Cada etiqueta se rehace sin lo que sobra, con sus valores entre comillas dobles. Lo que no es etiqueta se escapa,
+  // así que el navegador no puede encontrar ninguna etiqueta que no haya pasado por aquí.
+  let salida = "";
+  let desde = 0;
+  for (const m of t.matchAll(ETIQUETA)) {
+    const i = m.index ?? 0;
+    salida += t.slice(desde, i).replace(/</g, "&lt;");
+    desde = i + m[0].length;
+    const cierre = m[1] === "/";
+    const nombre = m[2].toLowerCase();
+    if (PROHIBIDAS.has(nombre)) {
+      if (!cierre) quitado.push(nombre);
+      continue;
+    }
+    if (cierre) {
+      salida += `</${nombre}>`;
+      continue;
+    }
+    let atributos = "";
+    for (const a of m[3].matchAll(ATRIBUTO)) {
+      const nombreA = a[1];
+      const valor = a[2] ?? a[3] ?? a[4] ?? "";
+      const n = nombreA.toLowerCase();
+      if (n.startsWith("on")) {
+        quitado.push(n);
+        continue;
+      }
+      if (ATRIBUTOS_DIRECCION.has(n) && DIRECCION_PELIGROSA.test(direccionReal(valor))) {
+        quitado.push(`${n} peligroso`);
+        continue;
+      }
+      atributos += ` ${nombreA}="${valor.replace(/"/g, "&quot;").replace(/</g, "&lt;").replace(/>/g, "&gt;")}"`;
+    }
+    salida += `<${nombre}${atributos}>`;
+  }
+  salida += t.slice(desde).replace(/</g, "&lt;");
+  return { html: salida, quitado };
+}
+
+/** La versión de texto de un HTML ya saneado: párrafos y saltos de línea, y los enlaces con su dirección entre paréntesis. */
+function aTexto(html: string): string {
+  return html
+    .replace(/<a\s[^>]*?href="([^"]*)"[^>]*>([\s\S]*?)<\/a>/gi, (_, href: string, dentro: string) => {
+      const txto = dentro.replace(/<[^>]+>/g, "").trim();
+      if (!href) return txto;
+      return !txto || txto === href ? href : `${txto} (${href})`;
+    })
+    .replace(/<br\s*\/?>/gi, "\n")
+    .replace(/<\/(p|div|h[1-6]|li|tr|table|blockquote)\s*>/gi, "\n\n")
+    .replace(/<[^>]+>/g, "")
+    .replace(/&nbsp;/g, " ")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+    .replace(/&amp;/g, "&")
+    .replace(/[ \t]+\n/g, "\n")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
+}
+
+/** El HTML equivalente a los campos de una plantilla: para pasar de «Campos» a «HTML» sin empezar de cero. */
+export function htmlDeCampos(p: Plantilla, rol: Rol = "estudiante"): string {
+  const marca = MARCAS[p.identidad] ?? MARCAS.plan;
+  const partes = [`<h1 style="margin:0 0 16px;font-family:${SERIF};font-size:24px;line-height:1.2;color:${marca.titulo};">${escapar(p.titulo)}</h1>`];
+  if (p.saludo.trim()) partes.push(`<p style="margin:0 0 16px;">${escapar(p.saludo)}</p>`);
+  for (const linea of mensajeDe(p, rol).split(/\r?\n/).map((l) => l.trim()).filter(Boolean)) partes.push(`<p style="margin:0 0 16px;">${escapar(linea)}</p>`);
+  if (p.tipo === "codigo") {
+    partes.push(`<p style="margin:0 0 24px;font-family:${SERIF};font-size:30px;font-weight:bold;letter-spacing:6px;color:${marca.titulo};">{{codigo}}</p>`);
+  } else if (p.boton.trim()) {
+    partes.push(
+      `<p style="margin:24px 0;"><a href="{{enlace}}" style="display:inline-block;padding:14px 28px;font-family:${FUENTE};font-size:16px;font-weight:bold;color:${marca.botonTinta};background:${marca.boton};border-radius:999px;text-decoration:none;">${escapar(p.boton)}</a></p>`,
+    );
+  }
+  if (p.nota.trim()) partes.push(`<p style="margin:0;font-size:14px;color:#45566d;">${escapar(p.nota)}</p>`);
+  return partes.join("\n");
+}
+
+export interface Revision {
+  tono: "ok" | "aviso" | "mal";
+  texto: string;
+}
+
+/** La lista de comprobaciones de un HTML propio: qué le faltaría, qué quitaría el envío y cuánto pesa. */
+export function revisarHtml(html: string, tipo: TipoPlantilla): Revision[] {
+  const revision: Revision[] = [];
+  if (tipo === "aviso") {
+    revision.push({ tono: "ok", texto: "Un aviso no necesita enlace ni código." });
+  } else {
+    const dato = tipo === "codigo" ? "codigo" : "enlace";
+    const lleva = new RegExp(`\\{\\{\\s*${dato}\\s*\\}\\}`).test(html);
+    revision.push(lleva ? { tono: "ok", texto: `Lleva el dato {{${dato}}}.` } : { tono: "mal", texto: `Falta {{${dato}}}: sin él, el correo no sirve para lo que se envía.` });
+  }
+  const { quitado } = sanearHtml(html);
+  revision.push(
+    quitado.length
+      ? { tono: "aviso", texto: `Se quitarían ${quitado.length} elemento(s) no permitidos: ${[...new Set(quitado)].join(", ")}.` }
+      : { tono: "ok", texto: "Sin scripts, formularios ni eventos." },
+  );
+  const noHttps = (html.match(/<img\b[^>]*>/gi) ?? []).filter((img) => !/\bsrc\s*=\s*["']?https:\/\//i.test(img));
+  revision.push(noHttps.length ? { tono: "aviso", texto: "Hay imágenes que no son https: muchos programas de correo las bloquean." } : { tono: "ok", texto: "Las imágenes, si las hay, son https." });
+  const malos = fueraDeLos(html, VARIABLES_POR_TIPO[tipo]);
+  revision.push(malos.length ? { tono: "mal", texto: `Dato desconocido: ${malos.join(", ")}.` } : { tono: "ok", texto: "Todos los datos existen para este tipo de correo." });
+  const bytes = new TextEncoder().encode(html).length;
+  const kb = Math.round(bytes / 102.4) / 10;
+  revision.push(bytes > TOPE_HTML_BYTES ? { tono: "mal", texto: `Pesa ${kb} KB: el tope es 100 KB.` } : { tono: "ok", texto: `Pesa ${kb} KB (tope 100 KB).` });
+  return revision;
+}
+
+/** Una clave nueva para una plantilla propia: «c-» y el nombre sin acentos ni espacios, sin repetir ninguna que ya exista. */
+export function claveNueva(nombre: string, usadas: readonly string[]): string {
+  const raiz = nombre
+    .normalize("NFD")
+    .replace(/[̀-ͯ]/g, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 28)
+    .replace(/-+$/, "");
+  const base = `c-${raiz || "plantilla"}`;
+  let clave = base;
+  for (let n = 2; usadas.includes(clave); n += 1) clave = `${base}-${n}`;
+  return clave;
 }
 
 /* --- La firma del pedido (Standard Webhooks) ------------------------------------------------- */
@@ -757,7 +1102,7 @@ export function dominioPermitido(correo: string, dominios: readonly string[]): b
   return dominios.some((p) => d === p || d.endsWith(`.${p}`));
 }
 
-export type Tipo = "cuenta" | "prueba" | "aviso";
+export type Tipo = "cuenta" | "prueba" | "aviso" | "codigo";
 export type Resultado = "aceptado" | "rechazado" | "en_espera";
 export type Decision = { sale: true } | { sale: false; resultado: Resultado; motivo: string; http: number };
 
@@ -770,6 +1115,10 @@ export type Decision = { sale: true } | { sale: false; resultado: Resultado; mot
  * interruptor general, los dominios permitidos y el tope por persona y día,
  * que es el que impide usar «olvidé mi contraseña» para molestar a otro.
  *
+ * Un CÓDIGO (crear la cuenta de Pilo) sigue la regla de la cuenta: nadie se
+ * queda sin poder registrarse por el tope por hora; la base ya limita cuántos
+ * códigos recibe un correo y cada cuánto.
+ *
  * Una PRUEBA no cuenta para el tope por persona, pero sí respeta el tope por
  * hora y los dominios. Un AVISO (para después) espera su turno si se pasa el
  * tope por hora. Un tope en 0 es «sin tope».
@@ -778,7 +1127,7 @@ export function decidirEnvio(caso: { tipo: Tipo; encendido: boolean; permitido: 
   const no = (resultado: Resultado, motivo: string, http: number): Decision => ({ sale: false, resultado, motivo, http });
   if (caso.tipo !== "prueba" && !caso.encendido) return no("rechazado", "El envío de correos está apagado en la intranet.", 503);
   if (!caso.permitido) return no("rechazado", "Esa dirección no es de un dominio permitido.", 403);
-  if (caso.tipo === "cuenta") {
+  if (caso.tipo === "cuenta" || caso.tipo === "codigo") {
     if (caso.topePersona > 0 && caso.dePersonaHoy >= caso.topePersona) {
       return no("rechazado", `Ya se enviaron ${caso.topePersona} correos de cuenta a esta dirección hoy. Revise su bandeja (y el correo no deseado) o intente mañana.`, 429);
     }

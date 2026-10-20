@@ -197,6 +197,14 @@ export interface Plan {
   measures: Record<string, "suma" | "promedio">;
   /** Tal cual: columnas de conteo de personas a las que se aplica la reserva. */
   reserveColumns: string[];
+  /**
+   * Mis Tableros: conservar también lo que el perfil marcó como sensible.
+   * El Observatorio nunca lo activa; una oficina lo decide para su tablero
+   * interno, y la revisión de publicación se lo recuerda al pedir el portal.
+   */
+  allowSensitive?: boolean;
+  /** Reserva estadística: conteos menores que este número se reservan. Cero la apaga. Sin ella, RESERVE. */
+  threshold?: number;
 }
 
 export function defaultPlan(analysis: Analysis): Plan {
@@ -260,16 +268,33 @@ export interface BuildResult {
 /** Aplica el plan: la tabla que se guardará y el acta de lo que se hizo. */
 export function buildDataset(analysis: Analysis, plan: Plan): BuildResult {
   const byKey = new Map(analysis.profiles.map((p) => [p.key, p]));
+  const threshold = plan.threshold ?? RESERVE;
+  // Lo sensible solo entra si el importador lo decide a mano (Mis Tableros,
+  // tablero interno); el Observatorio nunca lo decide.
+  const blocked = (p: ColumnProfile) => SENSITIVE.includes(p.role) && !plan.allowSensitive;
   const removed = analysis.profiles
-    .filter((p) => !plan.keep.includes(p.key) || SENSITIVE.includes(p.role))
+    .filter((p) => !plan.keep.includes(p.key) || blocked(p))
     .map((p) => ({
       column: p.header,
       reason: SENSITIVE.includes(p.role) ? ROLE_LABEL[p.role] : p.role === "vacia" ? "Vacía" : plan.mode === "agregar" ? "No se usa en el conteo" : "Excluida al importar",
     }));
-  const keep = plan.keep.map((k) => byKey.get(k)).filter((p): p is ColumnProfile => Boolean(p) && !SENSITIVE.includes(p!.role));
+  const keep = plan.keep.map((k) => byKey.get(k)).filter((p): p is ColumnProfile => Boolean(p) && !blocked(p!));
+  const sensitiveKept = keep.filter((p) => SENSITIVE.includes(p.role));
   const timeProfile = keep.find((p) => p.role === "tiempo" && p.time !== undefined && (plan.mode === "tal_cual" || plan.groupBy.includes(p.key)));
   const temporality: FreeTemporality = timeProfile ? "anual" : "sin_tiempo";
   let reservedCells = 0;
+  /** El acta de lo que este plan hizo, con lo sensible conservado a la vista. */
+  const acta = (groupedBy: string[]): ObsAnonymization => ({
+    fileName: analysis.fileName,
+    sourceRows: analysis.body.length,
+    sourceColumns: analysis.header.length,
+    removed,
+    groupedBy,
+    reservedCells,
+    threshold,
+    sensitive: sensitiveKept.length ? sensitiveKept.map((p) => p.header) : undefined,
+    at: new Date().toISOString(),
+  });
 
   if (plan.mode === "tal_cual") {
     const columns = keep.map((p) => columnFor(p, false));
@@ -277,7 +302,7 @@ export function buildDataset(analysis: Analysis, plan: Plan): BuildResult {
       const cells: Record<string, FreeCell> = {};
       for (const p of keep) {
         let value = normalizeCell(p, line[p.index]);
-        if (plan.reserveColumns.includes(p.key) && typeof value === "number" && value > 0 && value < RESERVE) {
+        if (plan.reserveColumns.includes(p.key) && typeof value === "number" && value > 0 && value < threshold) {
           value = RESERVED_TEXT;
           reservedCells += 1;
         }
@@ -286,25 +311,11 @@ export function buildDataset(analysis: Analysis, plan: Plan): BuildResult {
       const year = timeProfile ? yearOf(String(cells[timeProfile.key] ?? "")) : null;
       return { year, kind: "dato", label: "", cells };
     });
-    return {
-      columns,
-      rows,
-      temporality,
-      anonymization: {
-        fileName: analysis.fileName,
-        sourceRows: analysis.body.length,
-        sourceColumns: analysis.header.length,
-        removed,
-        groupedBy: [],
-        reservedCells,
-        threshold: RESERVE,
-        at: new Date().toISOString(),
-      },
-    };
+    return { columns, rows, temporality, anonymization: acta([]) };
   }
 
   // Agregar: una fila por combinación de las columnas elegidas.
-  const dims = plan.groupBy.map((k) => byKey.get(k)).filter((p): p is ColumnProfile => Boolean(p) && !SENSITIVE.includes(p!.role));
+  const dims = plan.groupBy.map((k) => byKey.get(k)).filter((p): p is ColumnProfile => Boolean(p) && !blocked(p!));
   const measureKeys = Object.keys(plan.measures).filter((k) => byKey.get(k)?.role === "cifra" && !plan.groupBy.includes(k));
   const groups = new Map<string, { cells: Record<string, FreeCell>; count: number; sums: Record<string, number>; n: Record<string, number> }>();
   for (const line of analysis.body) {
@@ -345,7 +356,7 @@ export function buildDataset(analysis: Analysis, plan: Plan): BuildResult {
   });
   const rows: FreeRow[] = sorted.map((g) => {
     const cells: Record<string, FreeCell> = { ...g.cells };
-    const small = g.count < RESERVE;
+    const small = threshold > 0 && g.count < threshold;
     cells.registros = small ? RESERVED_TEXT : g.count;
     if (small) reservedCells += 1;
     for (const key of measureKeys) {
@@ -363,21 +374,7 @@ export function buildDataset(analysis: Analysis, plan: Plan): BuildResult {
     const year = timeProfile ? yearOf(String(cells[timeProfile.key] ?? "")) : null;
     return { year, kind: "dato", label: "", cells };
   });
-  return {
-    columns,
-    rows,
-    temporality,
-    anonymization: {
-      fileName: analysis.fileName,
-      sourceRows: analysis.body.length,
-      sourceColumns: analysis.header.length,
-      removed,
-      groupedBy: dims.map((d) => d.header),
-      reservedCells,
-      threshold: RESERVE,
-      at: new Date().toISOString(),
-    },
-  };
+  return { columns, rows, temporality, anonymization: acta(dims.map((d) => d.header)) };
 }
 
 /* --- Recomendación --------------------------------------------------------------------- */

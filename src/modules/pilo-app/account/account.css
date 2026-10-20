@@ -1297,3 +1297,66 @@
     min-height: 48px;
   }
 }
+
+/* --- Continuar con Microsoft y el código del registro (0175) ---------------------------------- */
+
+.pc-ms {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  width: 100%;
+  min-height: 48px;
+  padding: 0 16px;
+  border: 1px solid var(--pc-line);
+  border-radius: var(--radius-md);
+  background: var(--c-bubble);
+  color: var(--c-ink);
+  font: inherit;
+  font-weight: 800;
+  cursor: pointer;
+  transition: transform var(--dur-press) var(--ease-out), background-color var(--dur-fast) ease, border-color var(--dur-fast) ease;
+}
+
+.pc-ms:active:not(:disabled) {
+  transform: scale(0.97);
+}
+
+.pc-ms:disabled {
+  opacity: 0.6;
+  cursor: progress;
+}
+
+.pc-ms:focus-visible {
+  outline: 2px solid var(--c-link);
+  outline-offset: 2px;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .pc-ms:hover:not(:disabled) {
+    border-color: var(--c-link);
+    background: var(--c-chip);
+  }
+}
+
+.pc-or {
+  margin: 0;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: var(--c-ink2);
+  text-wrap: pretty;
+}
+
+/* Las 6 cifras: grandes, con aire entre ellas y alineadas en columnas. */
+.pc-code {
+  font-size: 1.75rem;
+  font-weight: 800;
+  letter-spacing: 0.4em;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+
+.pc-code::placeholder {
+  letter-spacing: 0.4em;
+  opacity: 0.35;
+}

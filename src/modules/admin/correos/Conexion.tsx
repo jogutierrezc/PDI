@@ -151,156 +151,177 @@ export function Conexion({ config }: { config: Configuracion }) {
       </div>
 
       <div className="cor-columnas">
-        <section className="cor-caja" aria-labelledby="cor-smtp">
-          <h2 id="cor-smtp">Conexión SMTP</h2>
-          <label className="admin-field">
-            <span>Servidor</span>
-            <input value={ajustes.host} placeholder="smtp.office365.com" autoCapitalize="none" spellCheck={false} onChange={(e) => poner("host", e.target.value)} {...marca("host")} />
-            {error("host")}
-          </label>
-          <div className="cor-par">
+        <div className="cor-columna">
+          <section className="cor-caja" aria-labelledby="cor-remitentes">
+            <h2 id="cor-remitentes">Quién firma</h2>
+            <p className="cor-chica">Cada correo sale con la identidad de su plantilla. Dirección vacía usa el usuario de la conexión, que con Microsoft 365 es lo que no falla.</p>
+            {IDENTIDADES.map((id) => (
+              <fieldset key={id} className="cor-remitente">
+                <legend>{MARCAS[id].nombre}</legend>
+                <label className="admin-field">
+                  <span>Nombre que ve quien recibe</span>
+                  <input value={remitentes[id].nombre} maxLength={80} onChange={(e) => ponerRemitente(id, "nombre", e.target.value)} {...marca(`${id}-nombre`)} />
+                  {error(`${id}-nombre`)}
+                </label>
+                <label className="admin-field">
+                  <span>
+                    Dirección
+                    <small>Vacía: la del usuario de la conexión.</small>
+                  </span>
+                  <input type="email" value={remitentes[id].direccion} autoCapitalize="none" spellCheck={false} onChange={(e) => ponerRemitente(id, "direccion", e.target.value)} {...marca(`${id}-direccion`)} />
+                  {error(`${id}-direccion`)}
+                </label>
+                <label className="admin-field">
+                  <span>
+                    Responder a
+                    <small>Vacío: no se espera respuesta.</small>
+                  </span>
+                  <input type="email" value={remitentes[id].responder} autoCapitalize="none" spellCheck={false} onChange={(e) => ponerRemitente(id, "responder", e.target.value)} {...marca(`${id}-responder`)} />
+                  {error(`${id}-responder`)}
+                </label>
+              </fieldset>
+            ))}
+            <p className="cor-chica">Con Microsoft 365, la dirección de cada remitente debe ser el buzón de la conexión o uno sobre el que ese buzón tenga permiso «Enviar como».</p>
+          </section>
+          <section className="cor-caja" aria-labelledby="cor-no-deseado">
+            <h2 id="cor-no-deseado">Para que no caiga en correo no deseado</h2>
+            <ul className="cor-dns">
+              <li>
+                <b>SPF</b>
+                <span>El DNS del dominio debe autorizar al servidor que envía los correos.</span>
+              </li>
+              <li>
+                <b>DKIM</b>
+                <span>El servidor firma cada correo; la clave pública va en el DNS del dominio.</span>
+              </li>
+              <li>
+                <b>DMARC</b>
+                <span>Indica qué hacer con los correos que no pasan SPF ni DKIM.</span>
+              </li>
+            </ul>
+            <p className="cor-chica">La intranet no consulta el DNS: compruebe estos tres registros con quien administra el dominio.</p>
+          </section>
+        </div>
+        <div className="cor-columna">
+          <section className="cor-caja" aria-labelledby="cor-smtp">
+            <h2 id="cor-smtp">Conexión con el servidor de correo</h2>
             <label className="admin-field">
-              <span>Puerto</span>
-              <input value={ajustes.puerto} inputMode="numeric" onChange={(e) => poner("puerto", e.target.value)} {...marca("puerto")} />
-              {error("puerto")}
+              <span>Servidor</span>
+              <input value={ajustes.host} placeholder="smtp.office365.com" autoCapitalize="none" spellCheck={false} onChange={(e) => poner("host", e.target.value)} {...marca("host")} />
+              {error("host")}
             </label>
+            <div className="cor-par">
+              <label className="admin-field">
+                <span>Puerto</span>
+                <input value={ajustes.puerto} inputMode="numeric" onChange={(e) => poner("puerto", e.target.value)} {...marca("puerto")} />
+                {error("puerto")}
+              </label>
+              <label className="admin-field">
+                <span>Seguridad</span>
+                <select value={ajustes.seguridad} onChange={(e) => poner("seguridad", e.target.value === "ssl" ? "ssl" : e.target.value === "none" ? "none" : "starttls")}>
+                  <option value="starttls">STARTTLS (con 587)</option>
+                  <option value="ssl">SSL/TLS (con 465)</option>
+                  <option value="none">Sin cifrado (Mailpit, con 1025)</option>
+                </select>
+              </label>
+            </div>
             <label className="admin-field">
-              <span>Seguridad</span>
-              <select value={ajustes.seguridad} onChange={(e) => poner("seguridad", e.target.value === "ssl" ? "ssl" : e.target.value === "none" ? "none" : "starttls")}>
-                <option value="starttls">STARTTLS (con 587)</option>
-                <option value="ssl">SSL/TLS (con 465)</option>
-                <option value="none">Sin cifrado (Mailpit, con 1025)</option>
-              </select>
+              <span>Usuario</span>
+              <input value={ajustes.usuario} placeholder="buzon@udes.edu.co" autoCapitalize="none" autoComplete="off" spellCheck={false} onChange={(e) => poner("usuario", e.target.value)} {...marca("usuario")} />
+              {error("usuario")}
             </label>
-          </div>
-          <label className="admin-field">
-            <span>Usuario</span>
-            <input value={ajustes.usuario} placeholder="buzon@udes.edu.co" autoCapitalize="none" autoComplete="off" spellCheck={false} onChange={(e) => poner("usuario", e.target.value)} {...marca("usuario")} />
-            {error("usuario")}
-          </label>
 
-          <div className="admin-field">
-            <span>
-              Contraseña
-              <small>Se escribe una vez y no vuelve a mostrarse.</small>
-            </span>
-            {escribiendo ? (
-              <div className="cor-clave">
-                <input
-                  type="password"
-                  autoComplete="new-password"
-                  aria-label="Contraseña nueva"
-                  placeholder="Escriba la contraseña"
-                  value={nueva}
-                  onChange={(e) => setNueva(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter") {
-                      e.preventDefault();
-                      void guardarLaClave();
-                    }
-                  }}
-                />
-                <button type="button" className="button-secondary" disabled={!nueva || ocupado !== null} onClick={() => void guardarLaClave()}>
-                  {ocupado === "clave" ? "Guardando…" : "Guardar contraseña"}
-                </button>
-                {clave.hay && (
-                  <button type="button" className="button-ghost" onClick={() => (setEscribiendo(false), setNueva(""), setClaveAviso(null))}>
-                    Cancelar
+            <div className="admin-field">
+              <span>
+                Contraseña
+                <small>Se escribe una vez y no vuelve a mostrarse.</small>
+              </span>
+              {escribiendo ? (
+                <div className="cor-clave">
+                  <input
+                    type="password"
+                    autoComplete="new-password"
+                    aria-label="Contraseña nueva"
+                    placeholder="Escriba la contraseña"
+                    value={nueva}
+                    onChange={(e) => setNueva(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") {
+                        e.preventDefault();
+                        void guardarLaClave();
+                      }
+                    }}
+                  />
+                  <button type="button" className="button-secondary" disabled={!nueva || ocupado !== null} onClick={() => void guardarLaClave()}>
+                    {ocupado === "clave" ? "Guardando…" : "Guardar contraseña"}
                   </button>
-                )}
-              </div>
-            ) : (
-              <div className="cor-clave cor-clave--guardada">
-                <span>
-                  <Icon name="lock" size={15} />
-                  Guardada en el servidor{clave.ultimos ? (
-                    <>
-                      {" "}
-                      · termina en <b>••••{clave.ultimos}</b>
-                    </>
-                  ) : null}
-                </span>
-                <button type="button" className="button-secondary" onClick={() => setEscribiendo(true)}>
-                  Cambiar
-                </button>
-              </div>
+                  {clave.hay && (
+                    <button type="button" className="button-ghost" onClick={() => (setEscribiendo(false), setNueva(""), setClaveAviso(null))}>
+                      Cancelar
+                    </button>
+                  )}
+                </div>
+              ) : (
+                <div className="cor-clave cor-clave--guardada">
+                  <span>
+                    <Icon name="lock" size={15} />
+                    Guardada en el servidor{clave.ultimos ? (
+                      <>
+                        {" "}
+                        · termina en <b>••••{clave.ultimos}</b>
+                      </>
+                    ) : null}
+                  </span>
+                  <button type="button" className="button-secondary" onClick={() => setEscribiendo(true)}>
+                    Cambiar
+                  </button>
+                </div>
+              )}
+              <small>La contraseña se guarda al momento, aparte de «Guardar».</small>
+              <Estado aviso={claveAviso} />
+            </div>
+
+            <div className="cor-probar">
+              <button type="button" className="button-secondary" disabled={ocupado !== null} onClick={() => void probar()}>
+                Probar conexión
+              </button>
+              <Estado aviso={conexion} />
+            </div>
+            {!config.ajustes.host && (
+              <p className="cor-chica">Sin servidor escrito aquí, la función usa la conexión de respaldo de sus variables en Coolify, si la tiene.</p>
             )}
-            <small>La contraseña se guarda al momento, aparte de «Guardar».</small>
-            <Estado aviso={claveAviso} />
-          </div>
-
-          <div className="cor-probar">
-            <button type="button" className="button-secondary" disabled={ocupado !== null} onClick={() => void probar()}>
-              Probar conexión
-            </button>
-            <Estado aviso={conexion} />
-          </div>
-          {!config.ajustes.host && (
-            <p className="cor-chica">Sin servidor escrito aquí, la función usa la conexión de respaldo de sus variables en Coolify, si la tiene.</p>
-          )}
-        </section>
-
-        <section className="cor-caja" aria-labelledby="cor-remitentes">
-          <h2 id="cor-remitentes">Remitentes</h2>
-          {IDENTIDADES.map((id) => (
-            <fieldset key={id} className="cor-remitente">
-              <legend>{MARCAS[id].nombre}</legend>
-              <label className="admin-field">
-                <span>Nombre que ve quien recibe</span>
-                <input value={remitentes[id].nombre} maxLength={80} onChange={(e) => ponerRemitente(id, "nombre", e.target.value)} {...marca(`${id}-nombre`)} />
-                {error(`${id}-nombre`)}
-              </label>
-              <label className="admin-field">
-                <span>
-                  Dirección
-                  <small>Vacía: la del usuario de la conexión.</small>
-                </span>
-                <input type="email" value={remitentes[id].direccion} autoCapitalize="none" spellCheck={false} onChange={(e) => ponerRemitente(id, "direccion", e.target.value)} {...marca(`${id}-direccion`)} />
-                {error(`${id}-direccion`)}
-              </label>
-              <label className="admin-field">
-                <span>
-                  Responder a
-                  <small>Vacío: no se espera respuesta.</small>
-                </span>
-                <input type="email" value={remitentes[id].responder} autoCapitalize="none" spellCheck={false} onChange={(e) => ponerRemitente(id, "responder", e.target.value)} {...marca(`${id}-responder`)} />
-                {error(`${id}-responder`)}
-              </label>
-            </fieldset>
-          ))}
-          <p className="cor-chica">Con Microsoft 365, la dirección de cada remitente debe ser el buzón de la conexión o uno sobre el que ese buzón tenga permiso «Enviar como».</p>
-        </section>
-
-        <section className="cor-caja" aria-labelledby="cor-limites">
-          <h2 id="cor-limites">Límites y resguardo</h2>
-          <label className="admin-field">
-            <span>
-              Correos por hora, como máximo
-              <small>Frena los avisos. Los correos de cuenta salen siempre: nadie se queda sin poder entrar.</small>
-            </span>
-            <input value={ajustes.topeHora} inputMode="numeric" onChange={(e) => poner("topeHora", e.target.value)} {...marca("topeHora")} />
-            {error("topeHora")}
-          </label>
-          <label className="admin-field">
-            <span>
-              Correos de cuenta por persona al día
-              <small>Evita que alguien use «olvidé mi contraseña» para molestar a otro.</small>
-            </span>
-            <input value={ajustes.topePersona} inputMode="numeric" onChange={(e) => poner("topePersona", e.target.value)} {...marca("topePersona")} />
-            {error("topePersona")}
-          </label>
-          <label className="admin-field">
-            <span>
-              Solo se envía a estos dominios
-              <small>Vacío: a cualquiera. Un dominio incluye sus subdominios.</small>
-            </span>
-            <input value={ajustes.dominios} placeholder="udes.edu.co, mail.udes.edu.co" autoCapitalize="none" spellCheck={false} onChange={(e) => poner("dominios", e.target.value)} {...marca("dominios")} />
-            {error("dominios")}
-          </label>
-          {dominiosDe(ajustes.dominios).length > 0 && (
-            <p className="cor-chica">Ojo: quien tenga su cuenta con un correo de otro dominio no recibirá ni el de «olvidé mi contraseña».</p>
-          )}
-        </section>
+          </section>
+          <section className="cor-caja" aria-labelledby="cor-limites">
+            <h2 id="cor-limites">Límites y resguardo</h2>
+            <label className="admin-field">
+              <span>
+                Correos por hora, como máximo
+                <small>Frena los avisos. Los correos de cuenta salen siempre: nadie se queda sin poder entrar.</small>
+              </span>
+              <input value={ajustes.topeHora} inputMode="numeric" onChange={(e) => poner("topeHora", e.target.value)} {...marca("topeHora")} />
+              {error("topeHora")}
+            </label>
+            <label className="admin-field">
+              <span>
+                Correos de cuenta por persona al día
+                <small>Evita que alguien use «olvidé mi contraseña» para molestar a otro.</small>
+              </span>
+              <input value={ajustes.topePersona} inputMode="numeric" onChange={(e) => poner("topePersona", e.target.value)} {...marca("topePersona")} />
+              {error("topePersona")}
+            </label>
+            <label className="admin-field">
+              <span>
+                Solo se envía a estos dominios
+                <small>Vacío: a cualquiera. Un dominio incluye sus subdominios.</small>
+              </span>
+              <input value={ajustes.dominios} placeholder="udes.edu.co, mail.udes.edu.co" autoCapitalize="none" spellCheck={false} onChange={(e) => poner("dominios", e.target.value)} {...marca("dominios")} />
+              {error("dominios")}
+            </label>
+            {dominiosDe(ajustes.dominios).length > 0 && (
+              <p className="cor-chica">Ojo: quien tenga su cuenta con un correo de otro dominio no recibirá ni el de «olvidé mi contraseña».</p>
+            )}
+          </section>
+        </div>
       </div>
     </form>
   );

@@ -47,7 +47,7 @@ import { UNIT_ROLE } from "../../tableros/model";
 export type Level = "none" | "ver" | "editar" | "administrar";
 export type ModuleId =
   | "portal" | "plan" | "cifras" | "observatorio" | "impacto" | "tableros" | "reportes" | "informes"
-  | "monitor" | "programas-en-cifras" | "warehouse" | "rankings" | "rutas" | "internacionalizacion" | "correos" | "pilo" | "sistema";
+  | "monitor" | "programas-en-cifras" | "warehouse" | "rankings" | "rutas" | "cms" | "internacionalizacion" | "correos" | "pilo" | "sistema";
 export type TemplateId = "consulta" | "editor" | "administrador" | "personalizada";
 export type BoardRole = "visor" | "editor" | "jefe";
 
@@ -210,6 +210,16 @@ export const MODULES: ModuleDef[] = [
     levels: {
       ver: { hint: "Aparece en el menú; solo se abre con capacidad de Planeación.", needs: "consulta" },
       editar: { hint: "Crea y cambia rutas y paradas.", needs: "planeacion" },
+    },
+  },
+  {
+    id: "cms",
+    label: "CMS Portales",
+    seenFrom: "planeacion",
+    screens: [{ id: "cms", label: "CMS Portales" }],
+    levels: {
+      ver: { hint: "Aparece en el menú; solo se abre con capacidad de Planeación.", needs: "consulta" },
+      editar: { hint: "Escribe, ordena y publica las páginas y micrositios de la landing, Planeación y UDES Sostenible.", needs: "planeacion" },
     },
   },
   {
@@ -489,6 +499,7 @@ export function templateMatrix(template: Exclude<TemplateId, "personalizada">): 
     modules.warehouse = full("warehouse", "editar");
     modules.rankings = full("rankings", "editar");
     modules.rutas = full("rutas", "editar");
+    modules.cms = full("cms", "editar");
     modules.internacionalizacion = full("internacionalizacion", "ver");
     modules.correos = full("correos", "ver");
     modules.pilo = full("pilo", "ver");

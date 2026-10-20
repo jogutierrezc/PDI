@@ -16,6 +16,7 @@ import { createTestDb, errorOf, PEOPLE, type Query, type TestDb } from "./harnes
 import { PLANTILLAS, enmascarar } from "../../src/modules/admin/correos/servidor-logica";
 
 const MIGRATION = resolve(__dirname, "../../supabase/migrations/0137_correos.sql");
+const MIGRATION_PROPIAS = resolve(__dirname, "../../supabase/migrations/0177_correos_plantillas_propias.sql");
 const TABLES = ["correo_identities", "correo_templates", "correo_settings", "correo_secret", "correo_log"];
 const FUNCTIONS = ["correo_context", "correo_secret_set", "correo_secret_status", "correo_touch"];
 const CLAVE = "Una-contraseña con espacios_x7Qa";
@@ -164,10 +165,10 @@ describe("plantillas, remitentes y ajustes: solo la administración", () => {
     expect(await t.q("select from_name from correo_identities where id = 'plan'")).toEqual([{ from_name: "Planeación UDES" }]);
   });
 
-  it("ni la administración cambia la clave o la identidad de una plantilla, ni crea o borra plantillas desde el portal", async () => {
+  it("ni la administración cambia la clave o la identidad de una plantilla, ni borra una de fábrica, ni crea una que no sea propia", async () => {
     expect(await errorOf(asAdmin((q) => q("update correo_templates set identity = 'pilo' where key = 'plan-invite'")))).toMatch(/permission denied/);
     expect(await errorOf(asAdmin((q) => q("update correo_templates set key = 'otra-clave' where key = 'plan-invite'")))).toMatch(/permission denied/);
-    expect(await errorOf(asAdmin((q) => q("delete from correo_templates where key = 'plan-invite'")))).toMatch(/permission denied/);
+    expect(await asAdmin((q) => q("delete from correo_templates where key = 'plan-invite' returning key"))).toEqual([]);
     expect(await errorOf(asAdmin((q) => q("insert into correo_identities (id, from_name) values ('plan', 'x')")))).toMatch(/permission denied/);
   });
 
@@ -243,6 +244,91 @@ describe("la bitácora", () => {
   });
 });
 
+describe("plantillas propias, HTML y alcance (0176)", () => {
+  const PROPIA = {
+    key: "c-bienvenida-prueba",
+    identity: "plan",
+    grp: "Personalizadas",
+    name: "Bienvenida de prueba",
+    sent_when: "Sin evento conectado",
+    action: "",
+    subject: "Bienvenido",
+    preheader: "",
+    title: "Bienvenido",
+    greeting: "Hola, {{nombre}}.",
+    body: "Texto de prueba.",
+    button: "Abrir",
+    note: "",
+    role_bodies: null,
+    active: true,
+    sort: 1000,
+    tipo: "enlace",
+    html: "<p>{{enlace}}</p>",
+    html_scope: "completo",
+  };
+  const insertarPropia = (q: Query, datos: Record<string, unknown> = PROPIA) => {
+    const cols = Object.keys(datos);
+    return q(`insert into correo_templates (${cols.join(", ")}) values (${cols.map((_, i) => `$${i + 1}`).join(", ")}) returning key`, Object.values(datos));
+  };
+  const borrarPropia = () => asAdmin((q) => q("delete from correo_templates where key = 'c-bienvenida-prueba' returning key"), true);
+
+  it("las siete de fábrica tienen su tipo, sin HTML y con alcance de cuerpo", async () => {
+    expect(await t.q("select count(*)::int as n from correo_templates where tipo = 'enlace' and html is null and html_scope = 'cuerpo'")).toEqual([{ n: PLANTILLAS.length }]);
+  });
+
+  it("la administración crea una plantilla propia, la lee la función con su tipo y su HTML, y la borra", async () => {
+    expect(await asAdmin((q) => insertarPropia(q), true)).toEqual([{ key: "c-bienvenida-prueba" }]);
+    expect(await t.q("select key, tipo, html_scope, grp, updated_by from correo_templates where key = 'c-bienvenida-prueba'")).toEqual([
+      { key: "c-bienvenida-prueba", tipo: "enlace", html_scope: "completo", grp: "Personalizadas", updated_by: PEOPLE.admin },
+    ]);
+    const [{ c }] = await asService((q) => q<{ c: { templates: Record<string, Record<string, unknown>> } }>("select correo_context('', '') as c"));
+    expect(c.templates["c-bienvenida-prueba"]).toMatchObject({ tipo: "enlace", html: "<p>{{enlace}}</p>", html_scope: "completo", active: true });
+    expect(await borrarPropia()).toEqual([{ key: "c-bienvenida-prueba" }]);
+    expect(await t.q("select count(*)::int as n from correo_templates")).toEqual([{ n: PLANTILLAS.length }]);
+  });
+
+  it("una clave sin «c-» no se puede crear, aunque sea válida para la base", async () => {
+    expect(await errorOf(asAdmin((q) => insertarPropia(q, { ...PROPIA, key: "otra-clave" })))).toMatch(/row-level security/);
+    expect(await errorOf(asAdmin((q) => insertarPropia(q, { ...PROPIA, key: "pilo-invite" })))).toMatch(/duplicate key|row-level security/);
+  });
+
+  it("una plantilla de fábrica no se borra, aunque la administración lo pida", async () => {
+    expect(await asAdmin((q) => q("delete from correo_templates where key = 'plan-invite' returning key"), true)).toEqual([]);
+    expect(await asAdmin((q) => q("delete from correo_templates where key like 'pilo-%' returning key"), true)).toEqual([]);
+    expect(await t.q("select count(*)::int as n from correo_templates")).toEqual([{ n: PLANTILLAS.length }]);
+  });
+
+  it("Planeación y consulta no crean ni borran plantillas propias, ni cambian su HTML", async () => {
+    await asAdmin((q) => insertarPropia(q), true);
+    for (const as of [asPlaneacion, asConsulta]) {
+      expect(await errorOf(as((q) => insertarPropia(q, { ...PROPIA, key: "c-intruso" })))).toMatch(/row-level security/);
+      expect(await as((q) => q("delete from correo_templates where key = 'c-bienvenida-prueba' returning key"))).toEqual([]);
+      expect(await as((q) => q("update correo_templates set html = '<p>x</p>' where key = 'c-bienvenida-prueba' returning key"))).toEqual([]);
+    }
+    expect(await t.q("select html from correo_templates where key = 'c-bienvenida-prueba'")).toEqual([{ html: "<p>{{enlace}}</p>" }]);
+    expect(await borrarPropia()).toEqual([{ key: "c-bienvenida-prueba" }]);
+  });
+
+  it("el HTML de más de 100 000 caracteres se rechaza; en el tope, se acepta", async () => {
+    expect(await errorOf(asAdmin((q) => insertarPropia(q, { ...PROPIA, html: "x".repeat(100_001) })))).toMatch(/correo_templates_html/);
+    expect(await errorOf(asAdmin((q) => q("update correo_templates set html = $1 where key = 'plan-invite'", ["x".repeat(100_001)])))).toMatch(/correo_templates_html/);
+    expect(await asAdmin((q) => q("update correo_templates set html = $1 where key = 'plan-invite' returning key", ["x".repeat(100_000)]))).toEqual([{ key: "plan-invite" }]);
+  });
+
+  it("el tipo y el alcance solo admiten sus valores", async () => {
+    expect(await errorOf(asAdmin((q) => q("update correo_templates set tipo = 'otro' where key = 'plan-invite'")))).toMatch(/correo_templates_tipo/);
+    expect(await errorOf(asAdmin((q) => q("update correo_templates set html_scope = 'entero' where key = 'plan-invite'")))).toMatch(/correo_templates_html_scope/);
+    expect(await errorOf(asAdmin((q) => insertarPropia(q, { ...PROPIA, tipo: "otro" })))).toMatch(/correo_templates_tipo/);
+  });
+
+  it("la administración edita el HTML de una de fábrica, y una clave repetida no se crea otra vez", async () => {
+    expect(await asAdmin((q) => q("update correo_templates set html = '<p>{{enlace}}</p>', html_scope = 'completo' where key = 'plan-recovery' returning key"))).toEqual([{ key: "plan-recovery" }]);
+    await asAdmin((q) => insertarPropia(q), true);
+    expect(await errorOf(asAdmin((q) => insertarPropia(q)))).toMatch(/duplicate key/);
+    expect(await borrarPropia()).toEqual([{ key: "c-bienvenida-prueba" }]);
+  });
+});
+
 describe("la migración", () => {
   it("activa RLS en todas sus tablas y fija el search_path de sus funciones", async () => {
     expect(await t.q("select relname from pg_class where relname = any($1) and not relrowsecurity", [TABLES])).toEqual([]);
@@ -267,10 +353,19 @@ describe("la migración", () => {
     expect(await errorOf(asAdmin((q) => q("select * from correo_secret")))).toMatch(/permission denied/);
   });
 
-  it("todo UPDATE y DELETE de la migración lleva WHERE", () => {
-    const sql = readFileSync(MIGRATION, "utf8").replace(/--.*$/gm, "");
-    for (const stmt of sql.split(";")) {
-      if (/^\s*(update|delete)\b/i.test(stmt)) expect(stmt).toMatch(/\bwhere\b/i);
+  it("volver a aplicar 0176 no pisa las plantillas, y la administración sigue pudiendo crear", async () => {
+    await t.db.exec(readFileSync(MIGRATION_PROPIAS, "utf8"));
+    expect(await t.q("select count(*)::int as n from correo_templates")).toEqual([{ n: PLANTILLAS.length }]);
+    expect(await t.q("select subject from correo_templates where key = 'plan-invite'")).toEqual([{ subject: "Bienvenido a Planeación" }]);
+    expect(await asAdmin((q) => q("insert into correo_templates (key, identity, grp, name, subject, title, button, body) values ('c-reaplicada', 'plan', 'Personalizadas', 'Reaplicada', 'Asunto', 'Título', 'Abrir', 'Texto') returning key"))).toEqual([{ key: "c-reaplicada" }]);
+  });
+
+  it("todo UPDATE y DELETE de las migraciones lleva WHERE", () => {
+    for (const archivo of [MIGRATION, MIGRATION_PROPIAS]) {
+      const sql = readFileSync(archivo, "utf8").replace(/--.*$/gm, "");
+      for (const stmt of sql.split(";")) {
+        if (/^\s*(update|delete)\b/i.test(stmt)) expect(stmt, archivo).toMatch(/\bwhere\b/i);
+      }
     }
   });
 });

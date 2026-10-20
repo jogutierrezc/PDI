@@ -255,7 +255,7 @@ function DatasetDetail({ dataset, views, canEdit, go }: { dataset: ObsDataset; v
   );
 }
 
-function Acta({ act }: { act: NonNullable<ObsDataset["anonymization"]> }) {
+export function Acta({ act }: { act: NonNullable<ObsDataset["anonymization"]> }) {
   return (
     <section className="obs-acta" aria-label="Acta de anonimización">
       <strong>
@@ -281,9 +281,19 @@ function Acta({ act }: { act: NonNullable<ObsDataset["anonymization"]> }) {
         <div>
           <dt>Reserva</dt>
           <dd>
-            {act.reservedCells ? `${plural(act.reservedCells, "casilla", "casillas")} con menos de ${act.threshold}` : `ninguna casilla con menos de ${act.threshold}`}
+            {act.threshold === 0
+              ? "sin reserva"
+              : act.reservedCells
+                ? `${plural(act.reservedCells, "casilla", "casillas")} con menos de ${act.threshold}`
+                : `ninguna casilla con menos de ${act.threshold}`}
           </dd>
         </div>
+        {act.sensitive && act.sensitive.length > 0 && (
+          <div>
+            <dt>Conserva</dt>
+            <dd>{act.sensitive.join(", ")} — marcadas como dato personal. Solo para tableros internos.</dd>
+          </div>
+        )}
       </dl>
       {act.removed.length > 0 && (
         <ul>
@@ -634,13 +644,14 @@ const ROLE_TONE: Record<string, string> = {
   vacia: "muted",
 };
 
-function AnalysisStep({
+export function AnalysisStep({
   analysis,
   plan,
   onPlan,
   onBack,
   onNext,
   canContinue,
+  internal = false,
 }: {
   analysis: Analysis;
   plan: Plan;
@@ -648,19 +659,27 @@ function AnalysisStep({
   onBack: () => void;
   onNext: () => void;
   canContinue: boolean;
+  /** Mis Tableros: el tablero es de una unidad y su escalera de visibilidad decide quién lo ve; aquí lo sensible se puede conservar a mano y la reserva se afina. */
+  internal?: boolean;
 }) {
   const sensitive = analysis.profiles.filter((p) => SENSITIVE.includes(p.role));
+  const sensitiveKeys = new Set(sensitive.map((p) => p.key));
   const aggregate = plan.mode === "agregar";
+  const threshold = plan.threshold ?? RESERVE;
   const toggle = (list: string[], key: string) => (list.includes(key) ? list.filter((k) => k !== key) : [...list, key]);
+  // Marca el plan como «con sensibles» cuando alguna columna marcada entra a
+  // la tabla; sin eso, buildDataset las volvería a quitar.
+  const patch = (next: Plan) =>
+    onPlan({ ...next, allowSensitive: next.keep.some((k) => sensitiveKeys.has(k)) || next.groupBy.some((k) => sensitiveKeys.has(k)) ? true : next.allowSensitive });
 
   const setMode = (mode: Plan["mode"]) => {
     if (mode === plan.mode) return;
     const base = defaultPlan({ ...analysis, shape: mode === "agregar" ? "microdatos" : "agregada" });
-    onPlan({ ...base, mode });
+    patch({ ...base, mode, threshold: plan.threshold, allowSensitive: plan.allowSensitive });
   };
 
   const control = (p: ColumnProfile) => {
-    if (SENSITIVE.includes(p.role))
+    if (SENSITIVE.includes(p.role) && !internal)
       return (
         <span className="obs-profile__out">
           <Icon name="shield" size={13} /> Se quita
@@ -677,7 +696,7 @@ function AnalysisStep({
               const measures = { ...plan.measures };
               if (e.target.value) measures[p.key] = e.target.value as "suma" | "promedio";
               else delete measures[p.key];
-              onPlan({ ...plan, measures, keep: e.target.value ? [...new Set([...plan.keep, p.key])] : plan.keep.filter((k) => k !== p.key || plan.groupBy.includes(k)) });
+              patch({ ...plan, measures, keep: e.target.value ? [...new Set([...plan.keep, p.key])] : plan.keep.filter((k) => k !== p.key || plan.groupBy.includes(k)) });
             }}
           >
             <option value="">No usar</option>
@@ -688,7 +707,7 @@ function AnalysisStep({
       const on = plan.groupBy.includes(p.key);
       return (
         <label className="obs-toggle">
-          <input type="checkbox" checked={on} onChange={() => onPlan({ ...plan, groupBy: toggle(plan.groupBy, p.key), keep: toggle(plan.keep, p.key) })} />
+          <input type="checkbox" checked={on} onChange={() => patch({ ...plan, groupBy: toggle(plan.groupBy, p.key), keep: toggle(plan.keep, p.key) })} />
           Contar por
         </label>
       );
@@ -697,12 +716,12 @@ function AnalysisStep({
     return (
       <span className="obs-profile__controls">
         <label className="obs-toggle">
-          <input type="checkbox" checked={kept} onChange={() => onPlan({ ...plan, keep: toggle(plan.keep, p.key) })} />
+          <input type="checkbox" checked={kept} onChange={() => patch({ ...plan, keep: toggle(plan.keep, p.key) })} />
           Conservar
         </label>
         {p.role === "cifra" && p.format === "entero" && kept && (
-          <label className="obs-toggle" title={`Los valores entre 1 y ${RESERVE - 1} se publican como ${RESERVED_TEXT}`}>
-            <input type="checkbox" checked={plan.reserveColumns.includes(p.key)} onChange={() => onPlan({ ...plan, reserveColumns: toggle(plan.reserveColumns, p.key) })} />
+          <label className="obs-toggle" title={threshold > 0 ? `Los valores entre 1 y ${threshold - 1} se guardan como ${RESERVED_TEXT}` : "La reserva está apagada: los valores se guardan como vienen"}>
+            <input type="checkbox" checked={plan.reserveColumns.includes(p.key)} onChange={() => patch({ ...plan, reserveColumns: toggle(plan.reserveColumns, p.key) })} />
             Reserva {RESERVED_TEXT}
           </label>
         )}
@@ -724,14 +743,30 @@ function AnalysisStep({
             Guardar como viene
           </button>
         </div>
+        {internal && (
+          <label className="obs-select obs-select--inline">
+            <span>Reserva</span>
+            <select value={plan.threshold ?? RESERVE} onChange={(e) => patch({ ...plan, threshold: Number(e.target.value) })}>
+              <option value={5}>Menos de 5, como «&lt; 5»</option>
+              <option value={3}>Menos de 3, como «&lt; 3»</option>
+              <option value={0}>Sin reserva</option>
+            </select>
+          </label>
+        )}
       </div>
-      {sensitive.length > 0 && (
-        <p className="obs-guard" role="note">
-          <Icon name="shield" size={16} />
-          {plural(sensitive.length, "columna sensible se quita", "columnas sensibles se quitan")} antes de guardar: {sensitive.map((p) => `«${p.header}»`).join(", ")}. Sus valores no se muestran aquí.
-          {!aggregate && " Aun sin ellas, una fila por persona puede identificar a alguien: conviene contar registros."}
-        </p>
-      )}
+      {sensitive.length > 0 &&
+        (internal ? (
+          <p className="obs-guard" role="note">
+            <Icon name="shield" size={16} />
+            El perfil marcó {plural(sensitive.length, "columna como dato personal", "columnas como dato personal")}: {sensitive.map((p) => `«${p.header}»`).join(", ")}. En un tablero de unidad se pueden conservar —se dice en el acta—; para publicarlo en el portal habrá que subirla sin ellas.
+          </p>
+        ) : (
+          <p className="obs-guard" role="note">
+            <Icon name="shield" size={16} />
+            {plural(sensitive.length, "columna sensible se quita", "columnas sensibles se quitan")} antes de guardar: {sensitive.map((p) => `«${p.header}»`).join(", ")}. Sus valores no se muestran aquí.
+            {!aggregate && " Aun sin ellas, una fila por persona puede identificar a alguien: conviene contar registros."}
+          </p>
+        ))}
 
       <div className="obs-profile" role="region" aria-label="Perfil de las columnas" tabIndex={0}>
         <table>
@@ -772,8 +807,15 @@ function AnalysisStep({
 
       {aggregate && (
         <p className="obs-analysis__note">
-          Cada fila del resultado es una combinación de {plan.groupBy.length ? plan.groupBy.map((k) => `«${analysis.profiles.find((p) => p.key === k)?.header}»`).join(" × ") : "—"} con su número de registros. Las combinaciones con menos de {RESERVE} registros se publican como {RESERVED_TEXT}
-          {Object.keys(plan.measures).length ? ", y también sus promedios o sumas" : ""}.
+          Cada fila del resultado es una combinación de {plan.groupBy.length ? plan.groupBy.map((k) => `«${analysis.profiles.find((p) => p.key === k)?.header}»`).join(" × ") : "—"} con su número de registros.{" "}
+          {threshold > 0 ? (
+            <>
+              Las combinaciones con menos de {threshold} registros se publican como {RESERVED_TEXT}
+              {Object.keys(plan.measures).length ? ", y también sus promedios o sumas" : ""}.
+            </>
+          ) : (
+            <>La reserva está apagada: toda combinación sale con su cuenta.</>
+          )}
         </p>
       )}
 

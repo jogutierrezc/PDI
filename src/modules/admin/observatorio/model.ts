@@ -58,6 +58,12 @@ export interface ObsAnonymization {
   /** Casillas con menos de 5 registros que se publican como «< 5». */
   reservedCells: number;
   threshold: number;
+  /**
+   * Columnas que el perfil marcó como dato personal y este importador decidió
+   * conservar. Solo pasa en Mis Tableros, en tableros internos; el
+   * Observatorio nunca las guarda y la revisión de publicación las bloquea.
+   */
+  sensitive?: string[];
   at: string;
 }
 

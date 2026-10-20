@@ -2,7 +2,9 @@
    Correos · lo que la pantalla lee y escribe.
 
    Plantillas, remitentes y ajustes se leen y se guardan directo en la base
-   (migración 0137): las políticas RLS dejan pasar solo a la administración.
+   (migraciones 0137 y 0176): las políticas RLS dejan pasar solo a la
+   administración. Las plantillas propias («c-…») se crean y se borran desde
+   aquí; las de fábrica no se borran nunca.
    La contraseña SMTP va por su función (`correo_secret_set`) y nunca vuelve:
    solo sus 4 últimos. «Probar conexión» y «Enviar una prueba» los hace la
    función del servidor `correos`, que es la única que conoce la contraseña.
@@ -12,6 +14,9 @@ import { supabase } from "../../../lib/supabase";
 import { PLANTILLAS, plantillaDeFila, type Identidad, type Plantilla, type Rol, type Seguridad } from "./servidor-logica";
 
 export const MIGRACION = "0137";
+/** Las plantillas propias, el modo HTML y el alcance (0176). */
+export const MIGRACION_PROPIAS = "0176";
+export const GRUPO_PROPIAS = "Personalizadas";
 
 export interface Remitente {
   nombre: string;
@@ -45,13 +50,22 @@ export interface Configuracion {
 export interface Envio {
   id: number;
   cuando: string;
-  tipo: "cuenta" | "prueba" | "aviso";
+  tipo: "cuenta" | "prueba" | "aviso" | "codigo";
   identidad: Identidad;
   plantilla: string;
   rol: string;
   para: string;
   resultado: "aceptado" | "rechazado" | "en_espera";
   motivo: string;
+  /** El número de pedido del servidor de cuentas. Sin contenido ni enlace. */
+  pedido: string;
+}
+
+/** Cuántos envíos hubo en las últimas 24 horas, por resultado. */
+export interface Resumen {
+  aceptado: number;
+  rechazado: number;
+  en_espera: number;
 }
 
 /** Una lectura que puede decir «falta la migración». */
@@ -65,6 +79,9 @@ function faltaMigracion(error: DbError | null): boolean {
   return ["PGRST205", "PGRST202", "42P01", "42883"].includes(error.code ?? "") || /could not find the (table|function)|does not exist/i.test(error.message ?? "");
 }
 
+/** ¿El error es que la base todavía no tiene las columnas de las plantillas propias? */
+const faltaPropias = (error: DbError) => /column .*(tipo|html|html_scope)|correo_templates_(tipo|html)/i.test(error.message ?? "");
+
 const fallo = (error: DbError, que: string): Error =>
   new Error(error.code === "42501" ? "Su rol no permite hacer esto." : `${que}${error.message ? ` (${error.message})` : ""}`);
 
@@ -73,6 +90,7 @@ const s = (v: unknown) => (typeof v === "string" ? v : "");
 export const claves = {
   configuracion: ["correos", "configuracion"] as const,
   bitacora: ["correos", "bitacora"] as const,
+  resumen: ["correos", "resumen"] as const,
 };
 
 export async function leerConfiguracion(): Promise<Leido<Configuracion>> {
@@ -90,7 +108,13 @@ export async function leerConfiguracion(): Promise<Leido<Configuracion>> {
 
   const filas = (plantillas.data ?? []) as unknown as Record<string, unknown>[];
   // Las de fábrica, en su orden, con lo que haya guardado; una fila apagada se muestra con lo escrito, no con el original.
-  const lista = PLANTILLAS.map((original) => plantillaDeFila({ ...(filas.find((f) => f.key === original.clave) ?? {}), active: true }, original.clave) ?? original);
+  const factorias = PLANTILLAS.map((original) => plantillaDeFila({ ...(filas.find((f) => f.key === original.clave) ?? {}), active: true }, original.clave) ?? original);
+  // Las propias van después, por nombre.
+  const propias = filas
+    .filter((f) => s(f.key).startsWith("c-"))
+    .map((f) => plantillaDeFila({ ...f, active: true }, s(f.key)))
+    .filter((p): p is Plantilla => p !== null)
+    .sort((a, b) => a.nombre.localeCompare(b.nombre, "es"));
 
   const porId = new Map(((remitentes.data ?? []) as unknown as Record<string, unknown>[]).map((r) => [s(r.id), r]));
   const remitente = (id: Identidad): Remitente => ({ nombre: s(porId.get(id)?.from_name), direccion: s(porId.get(id)?.address), responder: s(porId.get(id)?.reply_to) });
@@ -100,7 +124,7 @@ export async function leerConfiguracion(): Promise<Leido<Configuracion>> {
   return {
     falta: false,
     datos: {
-      plantillas: lista,
+      plantillas: [...factorias, ...propias],
       remitentes: { plan: remitente("plan"), pilo: remitente("pilo") },
       ajustes: {
         encendido: a.enabled !== false,
@@ -120,14 +144,72 @@ export async function leerConfiguracion(): Promise<Leido<Configuracion>> {
 export async function guardarPlantilla(p: Plantilla): Promise<void> {
   const { error, data } = await supabase
     .from("correo_templates" as never)
-    .update({ subject: p.asunto.trim(), preheader: p.previa.trim(), title: p.titulo.trim(), greeting: p.saludo.trim(), body: p.mensaje, button: p.boton.trim(), note: p.nota, role_bodies: p.roles, active: true } as never)
+    .update({
+      subject: p.asunto.trim(),
+      preheader: p.previa.trim(),
+      title: p.titulo.trim(),
+      greeting: p.saludo.trim(),
+      body: p.mensaje,
+      button: p.boton.trim(),
+      note: p.nota,
+      role_bodies: p.roles,
+      active: true,
+      tipo: p.tipo,
+      html: p.html,
+      html_scope: p.alcance,
+    } as never)
     .eq("key", p.clave)
     .select("key");
   if (error) {
     if (/correo_templates_(lines|message)/.test(error.message)) throw new Error("El asunto, el título, el botón y el mensaje no pueden quedar vacíos, y el asunto va en una sola línea.");
+    if (/correo_templates_html/.test(error.message)) throw new Error("El HTML pasa del tope de 100 000 caracteres: acórtelo antes de guardar.");
+    if (faltaPropias(error)) throw new Error(`Falta aplicar la migración ${MIGRACION_PROPIAS} (plantillas propias y HTML). Sin ella no se guarda el HTML.`);
     throw fallo(error, "No se guardó la plantilla.");
   }
   if (!data || (data as unknown[]).length === 0) throw new Error("No se guardó: su rol no permite cambiar plantillas, o la plantilla ya no existe.");
+}
+
+/** Crea una plantilla propia («c-…») en el grupo «Personalizadas». Sin evento conectado: no se envía sola. */
+export async function crearPlantilla(p: Plantilla): Promise<void> {
+  const { error, data } = await supabase
+    .from("correo_templates" as never)
+    .insert({
+      key: p.clave,
+      identity: p.identidad,
+      grp: GRUPO_PROPIAS,
+      name: p.nombre,
+      sent_when: p.cuando,
+      action: "",
+      subject: p.asunto.trim(),
+      preheader: p.previa.trim(),
+      title: p.titulo.trim(),
+      greeting: p.saludo.trim(),
+      body: p.mensaje,
+      button: p.boton.trim() || "Abrir",
+      note: p.nota,
+      role_bodies: p.roles,
+      active: true,
+      sort: 1000,
+      tipo: p.tipo,
+      html: p.html,
+      html_scope: p.alcance,
+    } as never)
+    .select("key");
+  if (error) {
+    if (error.code === "23505") throw new Error("Ya hay una plantilla con ese nombre. Cámbiele el nombre y vuelva a crearla.");
+    if (error.code === "42501" || /row-level security/i.test(error.message ?? "")) throw new Error("Su rol no permite crear plantillas.");
+    if (/correo_templates_(lines|message|key)/.test(error.message ?? "")) throw new Error("El nombre o el mensaje no son válidos: el asunto, el título y el botón no pueden quedar vacíos.");
+    if (faltaPropias(error)) throw new Error(`Falta aplicar la migración ${MIGRACION_PROPIAS} (plantillas propias y HTML).`);
+    throw fallo(error, "No se creó la plantilla.");
+  }
+  if (!data || (data as unknown[]).length === 0) throw new Error("No se creó la plantilla: su rol no lo permite.");
+}
+
+/** Borra una plantilla propia. Las de fábrica no se borran: la base lo rechaza y aquí se avisa. */
+export async function borrarPlantilla(clave: string): Promise<void> {
+  const { error, data } = await supabase.from("correo_templates" as never).delete().eq("key", clave).like("key", "c-%").select("key");
+  if (error) throw fallo(error, "No se borró la plantilla.");
+  if (!data || (data as unknown[]).length === 0) throw new Error("No se borró: solo se borran las plantillas propias, y su rol debe permitirlo.");
 }
 
 export async function guardarConexion(ajustes: Ajustes, dominios: string[], remitentes: Record<Identidad, Remitente>): Promise<void> {
@@ -167,7 +249,7 @@ export async function guardarClave(valor: string): Promise<string> {
 export async function leerBitacora(): Promise<Leido<Envio[]>> {
   const { data, error } = await supabase
     .from("correo_log" as never)
-    .select("id, created_at, kind, identity, template, rol, recipient, result, reason")
+    .select("id, created_at, kind, identity, template, rol, recipient, result, reason, hook_id")
     .order("created_at", { ascending: false })
     .limit(200);
   if (error) {
@@ -179,15 +261,26 @@ export async function leerBitacora(): Promise<Leido<Envio[]>> {
     datos: ((data ?? []) as unknown as Record<string, unknown>[]).map((f) => ({
       id: Number(f.id),
       cuando: s(f.created_at),
-      tipo: f.kind === "prueba" || f.kind === "aviso" ? f.kind : "cuenta",
+      tipo: f.kind === "prueba" || f.kind === "aviso" || f.kind === "codigo" ? f.kind : "cuenta",
       identidad: f.identity === "pilo" ? "pilo" : "plan",
       plantilla: s(f.template),
       rol: s(f.rol),
       para: s(f.recipient),
       resultado: f.result === "rechazado" || f.result === "en_espera" ? f.result : "aceptado",
       motivo: s(f.reason),
+      pedido: s(f.hook_id),
     })),
   };
+}
+
+/** Cuántos envíos hubo en las últimas 24 horas. Si no se puede leer, null: la bitácora sigue sin el resumen. */
+export async function leerResumen(): Promise<Resumen | null> {
+  const desde = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+  const cuenta = (resultado: keyof Resumen) =>
+    supabase.from("correo_log" as never).select("id", { count: "exact", head: true }).eq("result", resultado).gte("created_at", desde);
+  const [aceptado, rechazado, en_espera] = await Promise.all([cuenta("aceptado"), cuenta("rechazado"), cuenta("en_espera")]);
+  if (aceptado.error || rechazado.error || en_espera.error) return null;
+  return { aceptado: aceptado.count ?? 0, rechazado: rechazado.count ?? 0, en_espera: en_espera.count ?? 0 };
 }
 
 /* --- La función del servidor ----------------------------------------------------------------- */

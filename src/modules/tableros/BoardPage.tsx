@@ -23,9 +23,10 @@ import { ObsChart } from "../admin/observatorio/ObsCharts";
 import { ChartFrame } from "../datos-abiertos/components/ChartFrame";
 import { freeSetToTable } from "../datos-abiertos/data/csv-export";
 import { slugify } from "../datos-abiertos/data/slug";
+import { SECTIONS, SECTION_LABEL } from "../admin/observatorio/model";
 import type { ObsChartType, ObsDataset, ObsView } from "../admin/observatorio/model";
-import { UNIT_KIND, VISIBILITY } from "./model";
-import type { BoardDataset } from "./model";
+import { UNIT_KIND, VISIBILITY, pageOrDefault } from "./model";
+import type { BoardDataset, BoardView } from "./model";
 import { useBoardBySlug } from "./store";
 import "../admin/udes-en-cifras/od-admin.css";
 import "../datos-abiertos/datos-abiertos.css";
@@ -51,6 +52,8 @@ const asObsDataset = (d: BoardDataset): ObsDataset => ({
   updatedAt: d.updatedAt,
 });
 
+const chartTypeOf = (view: BoardView): ObsChartType => ((view.spec as Partial<ObsView> & { type?: ObsChartType }).type ?? "barras") as ObsChartType;
+
 export function BoardPage() {
   const { unidad, tablero } = useParams<{ unidad: string; tablero: string }>();
   const { session, loading } = useAuth();
@@ -66,7 +69,15 @@ export function BoardPage() {
   );
 
   const current = page ?? board?.pages[0]?.slug ?? "panorama";
+  const currentPage = pageOrDefault(board?.pages.find((p) => p.slug === current) ?? { slug: current, title: current });
   const shown = views.filter((v) => v.page === current);
+  // Las secciones que tienen algo, en el orden de lectura. En la plantilla
+  // «ficha» las tablas de metodología abren la página: salen primero.
+  const sections = SECTIONS.filter((s) => shown.some((v) => v.section === s));
+  const ordered =
+    currentPage.template === "ficha"
+      ? [...shown].sort((a, b) => Number(chartTypeOf(b) === "tabla") - Number(chartTypeOf(a) === "tabla") || a.position - b.position)
+      : shown;
   // Varias vistas pueden leer la misma tabla: su CSV es uno, y lo ofrece solo la primera de la página.
   const firstOfDataset = new Map<string, string>();
   for (const view of shown) {
@@ -125,38 +136,53 @@ export function BoardPage() {
               {shown.length === 0 ? (
                 <p className="tb-prose">Este tablero todavía no tiene nada a la vista.</p>
               ) : (
-                <div className="tb-page__grid">
-                  {shown.map((view) => {
-                    const dataset = datasets.find((d) => d.id === view.datasetId);
-                    if (!dataset) return null;
-                    const spec = view.spec as Partial<ObsView> & { type?: ObsChartType };
-                    const drawable = {
-                      ...spec,
-                      type: (spec.type ?? "barras") as ObsChartType,
-                      title: (spec.title as string) ?? dataset.title,
-                    } as Parameters<typeof ObsChart>[0]["view"];
-                    const title = (spec.title as string) ?? dataset.title;
-                    return (
-                      <div key={view.id} className="tb-page__view" data-size={view.size}>
-                        <ChartFrame
-                          title={title}
-                          source={dataset.source || undefined}
-                          exportName={`${unit?.slug ?? "tablero"}-${title}`}
-                          stamp={unit?.name ?? board.title}
-                          csv={
-                            firstOfDataset.get(view.datasetId) === view.id
-                              ? {
-                                  files: [{ filename: `${slugify(unit?.name ?? board.title)}-${slugify(dataset.title, "datos")}.csv`, build: () => freeSetToTable(dataset) }],
-                                  name: dataset.title,
-                                }
-                              : undefined
-                          }
-                        >
-                          <ObsChart dataset={asObsDataset(dataset)} view={drawable} />
-                        </ChartFrame>
+                <div className="tb-page__content" data-template={currentPage.template}>
+                  {currentPage.intro && <p className="tb-page__intro">{currentPage.intro}</p>}
+                  {sections.map((section) => (
+                    <section key={section} className="tb-page__section" aria-label={SECTION_LABEL[section]}>
+                      <h2 className="tb-page__heading">{SECTION_LABEL[section]}</h2>
+                      <div className="tb-page__grid">
+                        {ordered
+                          .filter((view) => view.section === section)
+                          .map((view) => {
+                            const dataset = datasets.find((d) => d.id === view.datasetId);
+                            if (!dataset) return null;
+                            const spec = view.spec as Partial<ObsView> & { type?: ObsChartType };
+                            const type = chartTypeOf(view);
+                            const drawable = {
+                              ...spec,
+                              type,
+                              title: (spec.title as string) ?? dataset.title,
+                            } as Parameters<typeof ObsChart>[0]["view"];
+                            const title = (spec.title as string) ?? dataset.title;
+                            // La misma regla del Observatorio: el narrativo se lee en
+                            // una columna; la tabla ocupa su fila entera donde esté.
+                            const wide = currentPage.template === "narrativo" || view.size === "completa" || type === "tabla";
+                            return (
+                              <div key={view.id} className="tb-page__view" data-size={wide ? "completa" : view.size}>
+                                <ChartFrame
+                                  title={title}
+                                  subtitle={(spec.description as string) || dataset.description || undefined}
+                                  source={dataset.source || undefined}
+                                  exportName={`${unit?.slug ?? "tablero"}-${title}`}
+                                  stamp={unit?.name ?? board.title}
+                                  csv={
+                                    firstOfDataset.get(view.datasetId) === view.id
+                                      ? {
+                                          files: [{ filename: `${slugify(unit?.name ?? board.title)}-${slugify(dataset.title, "datos")}.csv`, build: () => freeSetToTable(dataset) }],
+                                          name: dataset.title,
+                                        }
+                                      : undefined
+                                  }
+                                >
+                                  <ObsChart dataset={asObsDataset(dataset)} view={drawable} />
+                                </ChartFrame>
+                              </div>
+                            );
+                          })}
                       </div>
-                    );
-                  })}
+                    </section>
+                  ))}
                 </div>
               )}
             </div>

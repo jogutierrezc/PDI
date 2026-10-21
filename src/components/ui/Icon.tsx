@@ -61,7 +61,10 @@ export type IconName =
   | "columns-view"
   | "chevron-right"
   | "sort-asc"
-  | "users";
+  | "users"
+  | "undo"
+  | "clipboard"
+  | "next";
 
 const paths: Record<IconName, JSX.Element> = {
   /* --- Pilares ---------------------------------------------------------- */
@@ -298,6 +301,21 @@ const paths: Record<IconName, JSX.Element> = {
       <path d="M3.5 19.5a5.5 5.5 0 0 1 11 0M16 5.6a3.2 3.2 0 0 1 0 5.8M17.5 14.2a5.5 5.5 0 0 1 3 5.3" />
     </>
   ),
+  /* Libros de Datos de Sostenibilidad: deshacer, pegar desde Excel y saltar al
+     siguiente error. */
+  undo: (
+    <>
+      <path d="M8 5.5 4.5 9 8 12.5" />
+      <path d="M4.5 9H15a5.5 5.5 0 0 1 0 11H8" />
+    </>
+  ),
+  clipboard: (
+    <>
+      <path d="M8 4.5H6A1.5 1.5 0 0 0 4.5 6v12.5A1.5 1.5 0 0 0 6 20h12a1.5 1.5 0 0 0 1.5-1.5V6A1.5 1.5 0 0 0 18 4.5h-2" />
+      <rect x="8.5" y="2.5" width="7" height="4" rx="1" />
+    </>
+  ),
+  next: <path d="m6.5 6 6 6-6 6M13 6l6 6-6 6" />,
 };
 
 interface IconProps extends Omit<SVGProps<SVGSVGElement>, "name"> {

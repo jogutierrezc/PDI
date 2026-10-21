@@ -91,8 +91,9 @@ export async function guardarEncuesta(id: string, cambios: Partial<CambiosEncues
 
 /* ---------- Página pública (función Edge `encuestas`) ---------- */
 
+// Sin token de Microsoft va la clave anónima: una sesión vieja guardada en el navegador no debe tumbar la página pública.
 async function llamar<T>(accion: string, cuerpo: Record<string, unknown>, jwt?: string): Promise<T> {
-  const r = await supabase.functions.invoke("encuestas", { body: { accion, ...cuerpo }, ...(jwt ? { headers: { Authorization: `Bearer ${jwt}` } } : {}) });
+  const r = await supabase.functions.invoke("encuestas", { body: { accion, ...cuerpo }, headers: { Authorization: `Bearer ${jwt ?? import.meta.env.VITE_SUPABASE_ANON_KEY}` } });
   if (r.error) {
     const ctx = (r.error as { context?: Response }).context;
     let mensaje = "No se pudo conectar. Revise su internet e intente de nuevo.";

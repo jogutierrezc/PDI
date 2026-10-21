@@ -66,6 +66,7 @@ export type AdminScreen =
   | "monitor"
   | "programas-en-cifras"
   | "datos-sostenibilidad"
+  | "encuestas"
   | "cms";
 
 /** Un rol de acceso: qué puede hacer, qué pantallas ve y sobre qué informes escribe. */
@@ -2132,4 +2133,46 @@ export interface PcActividadRow {
   detalle: Record<string, unknown>;
   actor: string | null;
   en: string;
+}
+
+/** Encuestas con Pilo (0179): una encuesta pública (la primera, `rendicion-2026`). */
+export interface EncEncuestaRow {
+  id: string;
+  slug: string;
+  titulo: string;
+  anio: string;
+  abierta: boolean;
+  cierra_el: string | null;
+  intro: string;
+  despedida: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export type EncTipoAporte = "logro" | "reto";
+export type EncEstadoAporte = "recibido" | "revisado" | "para_video";
+export type EncTipoCifra = "estudiantes" | "programas" | "porcentaje" | "dinero" | "otro";
+
+/** Un logro o reto de una dependencia. Solo se inserta con enc_enviar; el personal cambia `estado`. */
+export interface EncAporteRow {
+  id: string;
+  encuesta_id: string;
+  correo: string;
+  correo_verificado: boolean;
+  dependencia: string;
+  tipo: EncTipoAporte;
+  titulo: string;
+  descripcion: string;
+  estado: EncEstadoAporte;
+  created_at: string;
+}
+
+export interface EncCifraRow {
+  id: string;
+  aporte_id: string;
+  orden: number;
+  que: string;
+  tipo: EncTipoCifra;
+  otro: string | null;
+  valor: number;
 }

@@ -47,7 +47,7 @@ import { UNIT_ROLE } from "../../tableros/model";
 export type Level = "none" | "ver" | "editar" | "administrar";
 export type ModuleId =
   | "portal" | "plan" | "cifras" | "observatorio" | "impacto" | "tableros" | "reportes" | "informes"
-  | "monitor" | "programas-en-cifras" | "warehouse" | "rankings" | "rutas" | "cms" | "internacionalizacion" | "correos" | "pilo" | "sistema";
+  | "monitor" | "programas-en-cifras" | "warehouse" | "rankings" | "rutas" | "cms" | "internacionalizacion" | "correos" | "encuestas" | "pilo" | "sistema";
 export type TemplateId = "consulta" | "editor" | "administrador" | "personalizada";
 export type BoardRole = "visor" | "editor" | "jefe";
 
@@ -230,6 +230,15 @@ export const MODULES: ModuleDef[] = [
     levels: {
       ver: { hint: "Aparece en el menú de quien sea administrador.", needs: "consulta" },
       administrar: { hint: "Administra el módulo y sus miembros.", needs: "admin" },
+    },
+  },
+  {
+    id: "encuestas",
+    label: "Encuestas con Pilo",
+    screens: [{ id: "encuestas", label: "Encuestas públicas y sus respuestas" }],
+    levels: {
+      ver: { hint: "Lee la tabla de respuestas; pide capacidad de Responsable.", needs: "responsable" },
+      editar: { hint: "Cambia título y mensajes de Pilo, abre o cierra la encuesta y marca el estado de cada aporte.", needs: "planeacion" },
     },
   },
   {
@@ -502,6 +511,7 @@ export function templateMatrix(template: Exclude<TemplateId, "personalizada">): 
     modules.cms = full("cms", "editar");
     modules.internacionalizacion = full("internacionalizacion", "ver");
     modules.correos = full("correos", "ver");
+    modules.encuestas = full("encuestas", "editar");
     modules.pilo = full("pilo", "ver");
     modules.sistema = full("sistema", "ver");
     return base;

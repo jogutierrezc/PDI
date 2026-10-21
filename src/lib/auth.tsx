@@ -64,6 +64,7 @@ export const SCREEN_PATHS: Record<AdminScreen, string> = {
   monitor: "/admin/monitor-alertas",
   "programas-en-cifras": "/admin/programas-en-cifras",
   "datos-sostenibilidad": "/admin/datos-sostenibilidad",
+  encuestas: "/admin/encuestas",
   cms: "/admin/cms",
 };
 
@@ -127,6 +128,8 @@ export function screenVisible(
   }
   // Correos: la capacidad decide qué puede hacer (0137: Planeación lee la
   // bitácora, la administración lo cambia) y el rol de acceso, si aparece en el menú.
+  // Encuestas con Pilo: la pantalla del rol y capacidad de Responsable o más para verla, como enc_puede_ver (0179); editar pide Planeación.
+  if (screen === "encuestas") return RANK[profile.role] >= RANK.responsable && listed;
   if (screen === "correos") return RANK[profile.role] >= RANK.planeacion && listed;
   // Rutas del bus: solo por el rol, como en la base (0139).
   if (screen === "rutas") return RANK[profile.role] >= RANK.planeacion && listed;

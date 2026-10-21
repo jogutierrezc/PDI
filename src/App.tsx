@@ -208,6 +208,8 @@ const PaginaPublica = lazy(() =>
 const Rutas = lazy(() => import("./modules/rutas/Rutas").then((m) => ({ default: m.Rutas })));
 const RutasPublico = lazy(() => import("./modules/rutas/RutasPublico").then((m) => ({ default: m.RutasPublico })));
 const ProgramasEnCifras = lazy(() => import("./modules/programas-en-cifras/ui/ProgramasEnCifras").then((m) => ({ default: m.ProgramasEnCifras })));
+const Encuestas = lazy(() => import("./modules/encuestas/ui/Encuestas").then((m) => ({ default: m.Encuestas })));
+const EncuestaPublica = lazy(() => import("./modules/encuestas/publico/EncuestaPublica").then((m) => ({ default: m.EncuestaPublica })));
 const DatosSostenibilidad = lazy(() => import("./modules/datos-sostenibilidad/ui/DatosSostenibilidad").then((m) => ({ default: m.DatosSostenibilidad })));
 const Internacionalizacion = lazy(() =>
   import("./modules/internacionalizacion/ui/Internacionalizacion").then((m) => ({ default: m.Internacionalizacion })),
@@ -289,6 +291,7 @@ export default function App() {
           <Route path="/rutas" element={<RutasPublico />} />
           {/* Contactos (0167): el enlace de invitación de Internacionalización; sin iniciar sesión, con el token como llave. */}
           <Route path="/contactos/i/:token" element={<ContactosPublico />} />
+          <Route path="/encuesta/:slug" element={<EncuestaPublica />} />
           {/* El chat emergente de Pilo, para verse dentro de un marco en otros portales (public/pilo.js). */}
           <Route path="/pilo-embed" element={<PiloEmbed />} />
           {/* Mr. Pilo en Enseñanza (0113): la misma página y el mismo chat emergente, en su propio espacio. */}
@@ -480,6 +483,15 @@ export default function App() {
             element={
               <RequireRole minimum="consulta" screen="datos-sostenibilidad">
                 <DatosSostenibilidad />
+              </RequireRole>
+            }
+          />
+          {/* Encuestas con Pilo: la tabla de respuestas y los mensajes de cada encuesta (0179). */}
+          <Route
+            path="/admin/encuestas"
+            element={
+              <RequireRole minimum="responsable" screen="encuestas">
+                <Encuestas />
               </RequireRole>
             }
           />

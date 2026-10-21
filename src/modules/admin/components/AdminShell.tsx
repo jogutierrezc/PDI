@@ -58,6 +58,7 @@ export type AdminSection =
   | "monitor"
   | "programas-en-cifras"
   | "datos-sostenibilidad"
+  | "encuestas"
   | "cms";
 
 export interface NavItem {
@@ -70,7 +71,7 @@ export interface NavItem {
 }
 
 export interface NavGroup {
-  id: "planeacion" | "pdi" | "cifras" | "observatorio" | "impacto" | "tableros" | "reportes" | "informes" | "internacionalizacion" | "rankings" | "warehouse" | "monitor" | "programas-en-cifras" | "datos-sostenibilidad" | "sistema";
+  id: "planeacion" | "pdi" | "cifras" | "observatorio" | "impacto" | "tableros" | "reportes" | "informes" | "internacionalizacion" | "rankings" | "warehouse" | "monitor" | "programas-en-cifras" | "datos-sostenibilidad" | "encuestas" | "sistema";
   label: string;
   /** Ícono y nombre corto: el riel solo tiene 78 px, ahí no cabe el rótulo largo. */
   icon: IconName;
@@ -198,6 +199,16 @@ export const navigation: NavGroup[] = [
     label: "Datos de Sostenibilidad",
     items: [
       { id: "datos-sostenibilidad", label: "Datos de Sostenibilidad", icon: "leaf", to: "/admin/datos-sostenibilidad", minimum: "consulta" },
+    ],
+  },
+  {
+    // Encuestas públicas con Mr. Pilo (la primera: Rendición de cuentas 2026) y la tabla de lo que responden.
+    id: "encuestas",
+    icon: "mail",
+    short: "Encuestas",
+    label: "Encuestas con Pilo",
+    items: [
+      { id: "encuestas", label: "Encuestas con Pilo", icon: "mail", to: "/admin/encuestas", minimum: "responsable" },
     ],
   },
   {

@@ -219,6 +219,17 @@ export const MODULES: Record<ModuleId, ModuleMeta> = {
       },
     ],
   },
+  encuestas: {
+    text: "Encuestas públicas con Mr. Pilo y la tabla de lo que responden las dependencias",
+    color: "var(--wall-programas-en-cifras)",
+    rank: 5.7,
+    sections: () => [
+      {
+        title: "Encuestas",
+        cards: [{ key: "enc", title: "Encuestas con Pilo", text: "Enlace público, título y mensajes de Pilo, y la tabla de respuestas lista para Excel", to: "/admin/encuestas" }],
+      },
+    ],
+  },
   monitor: {
     text: "Cómo van las notas por facultad, programa, grupo y estudiante, con alertas tempranas",
     color: "var(--wall-monitor)",

@@ -197,7 +197,7 @@ as $$
   select public.current_role() is not null and public.has_role_at_least('planeacion');
 $$;
 
-/** Papel frente a una oficina: gestor | colaborador (editan), planeacion (solo lee) o nulo. */
+/** Papel frente a una oficina: gestor | colaborador | admin (editan), planeacion (solo lee) o nulo. */
 create or replace function public.ds_rol_en(p_oficina uuid)
 returns text
 language sql
@@ -211,6 +211,9 @@ as $$
                   where m.user_id = auth.uid() and m.oficina_id = p_oficina and m.rol = 'gestor') then 'gestor'
     when exists (select 1 from public.ds_miembros m
                   where m.user_id = auth.uid() and m.oficina_id = p_oficina and m.rol = 'colaborador') then 'colaborador'
+    -- La administración (y los roles de acceso con base administrador, como el
+    -- de UDES Verde) dirige el módulo: crea, edita y nombra en cualquier oficina.
+    when public.current_role() = 'admin' then 'admin'
     when public.has_role_at_least('planeacion') then 'planeacion'
     else null
   end;
@@ -233,7 +236,7 @@ stable
 security definer
 set search_path = public
 as $$
-  select coalesce(public.ds_rol_en(p_oficina) in ('gestor', 'colaborador'), false);
+  select coalesce(public.ds_rol_en(p_oficina) in ('gestor', 'colaborador', 'admin'), false);
 $$;
 
 /** ¿Trabaja en el módulo (alguna oficina) o es de Planeación? Abre el catálogo y las carpetas fijas. */
@@ -260,8 +263,8 @@ $$;
 
 /**
  * Mis papeles, para la pantalla: {planeacion, oficinas: [{oficina_id, oficina,
- * codigo, rol}]}. Gestores y colaboradores ven sus oficinas; Planeación, todas
- * las unidades del organigrama, que es quien consolida.
+ * codigo, rol}]}. Gestores y colaboradores ven sus oficinas; Planeación y la
+ * administración, todas las unidades del organigrama.
  */
 create or replace function public.ds_yo()
 returns jsonb
@@ -277,7 +280,7 @@ as $$
         from (
           select jsonb_build_object(
                    'oficina_id', u.id, 'oficina', u.name, 'codigo', u.code,
-                   'rol', coalesce(m.rol, 'planeacion')) as x
+                   'rol', coalesce(m.rol, case when public.current_role() = 'admin' then 'admin' else 'planeacion' end)) as x
             from public.units u
             left join public.ds_miembros m
               on m.oficina_id = u.id and m.user_id = auth.uid()
@@ -528,7 +531,7 @@ begin
     v_oficina := new.oficina_id;
   end if;
   if not public.ds_puede_editar(v_oficina) then
-    raise exception 'Solo el gestor o un colaborador de la oficina crea y edita sus libros.' using errcode = '42501';
+    raise exception 'La oficina o la administración crea y edita los libros.' using errcode = '42501';
   end if;
   if tg_op = 'DELETE' then
     if old.estado = 'listo' then
@@ -606,7 +609,7 @@ begin
     raise exception 'El libro no existe.' using errcode = 'P0002';
   end if;
   if not public.ds_puede_editar(v_libro.oficina_id) then
-    raise exception 'Solo el gestor o un colaborador de la oficina edita las columnas.' using errcode = '42501';
+    raise exception 'La oficina o la administración edita las columnas.' using errcode = '42501';
   end if;
   if tg_op <> 'DELETE' then
     if btrim(new.clave) = '' or btrim(new.clave) !~ '^[a-z0-9_]+$' then
@@ -885,7 +888,7 @@ declare
   v_libro public.ds_libros;
 begin
   if not public.ds_puede_editar(p_oficina) then
-    raise exception 'Solo el gestor o un colaborador de la oficina crea libros.' using errcode = '42501';
+    raise exception 'La oficina o la administración crea los libros.' using errcode = '42501';
   end if;
   if p_filas is null or jsonb_typeof(p_filas) <> 'array' or jsonb_array_length(p_filas) > 20000 then
     raise exception 'Las filas deben llegar como una lista de hasta 20.000.' using errcode = '22023';
@@ -948,7 +951,7 @@ begin
     raise exception 'El libro no existe.' using errcode = 'P0002';
   end if;
   if not public.ds_puede_editar(v_l.oficina_id) then
-    raise exception 'Solo el gestor o un colaborador de la oficina edita sus libros.' using errcode = '42501';
+    raise exception 'La oficina o la administración edita sus libros.' using errcode = '42501';
   end if;
   if p_filas is null or jsonb_typeof(p_filas) <> 'array' then
     raise exception 'Las filas deben llegar como una lista.' using errcode = '22023';
@@ -1010,7 +1013,7 @@ begin
     raise exception 'El libro no existe.' using errcode = 'P0002';
   end if;
   if not public.ds_puede_editar(v_l.oficina_id) then
-    raise exception 'Solo el gestor o un colaborador de la oficina marca sus libros.' using errcode = '42501';
+    raise exception 'La oficina o la administración marca los libros.' using errcode = '42501';
   end if;
   if p_listo then
     select count(*) into v_errores from public.ds_errores_internos(p_libro);
@@ -1050,44 +1053,59 @@ alter table public.ds_respuestas   enable row level security;
 alter table public.ds_actividad    enable row level security;
 
 -- El catálogo lo lee quien pertenece al módulo; lo mantiene la administración.
+drop policy if exists ds_indicadores_select on public.ds_indicadores;
 create policy ds_indicadores_select on public.ds_indicadores
   for select using (public.ds_es_participante());
+drop policy if exists ds_indicadores_admin on public.ds_indicadores;
 create policy ds_indicadores_admin on public.ds_indicadores
   for all to authenticated using (public.current_role() = 'admin') with check (public.current_role() = 'admin');
 
 -- Las carpetas fijas las ve quien pertenece al módulo; las de una oficina, quien la ve.
+drop policy if exists ds_carpetas_select on public.ds_carpetas;
 create policy ds_carpetas_select on public.ds_carpetas
   for select using (public.ds_es_participante() and (fija or (oficina_id is not null and public.ds_puede_ver(oficina_id))));
+drop policy if exists ds_carpetas_write on public.ds_carpetas;
 create policy ds_carpetas_write on public.ds_carpetas
   for all to authenticated using (oficina_id is not null and public.ds_puede_editar(oficina_id)) with check (oficina_id is not null and public.ds_puede_editar(oficina_id));
 
+drop policy if exists ds_libros_select on public.ds_libros;
 create policy ds_libros_select on public.ds_libros
   for select using (public.ds_puede_ver(oficina_id));
+drop policy if exists ds_libros_write on public.ds_libros;
 create policy ds_libros_write on public.ds_libros
   for all to authenticated using (public.ds_puede_editar(oficina_id)) with check (public.ds_puede_editar(oficina_id));
 
+drop policy if exists ds_columnas_select on public.ds_columnas;
 create policy ds_columnas_select on public.ds_columnas
   for select using (exists (select 1 from public.ds_libros l where l.id = ds_columnas.libro_id and public.ds_puede_ver(l.oficina_id)));
+drop policy if exists ds_columnas_write on public.ds_columnas;
 create policy ds_columnas_write on public.ds_columnas
   for all to authenticated using (exists (select 1 from public.ds_libros l where l.id = ds_columnas.libro_id and public.ds_puede_editar(l.oficina_id))) with check (exists (select 1 from public.ds_libros l where l.id = ds_columnas.libro_id and public.ds_puede_editar(l.oficina_id)));
 
+drop policy if exists ds_filas_select on public.ds_filas;
 create policy ds_filas_select on public.ds_filas
   for select using (exists (select 1 from public.ds_libros l where l.id = ds_filas.libro_id and public.ds_puede_ver(l.oficina_id)));
+drop policy if exists ds_filas_write on public.ds_filas;
 create policy ds_filas_write on public.ds_filas
   for all to authenticated using (exists (select 1 from public.ds_libros l where l.id = ds_filas.libro_id and public.ds_puede_editar(l.oficina_id))) with check (exists (select 1 from public.ds_libros l where l.id = ds_filas.libro_id and public.ds_puede_editar(l.oficina_id)));
 
+drop policy if exists ds_respuestas_select on public.ds_respuestas;
 create policy ds_respuestas_select on public.ds_respuestas
   for select using (exists (select 1 from public.ds_libros l where l.id = ds_respuestas.libro_id and public.ds_puede_ver(l.oficina_id)));
+drop policy if exists ds_respuestas_write on public.ds_respuestas;
 create policy ds_respuestas_write on public.ds_respuestas
   for all to authenticated using (exists (select 1 from public.ds_libros l where l.id = ds_respuestas.libro_id and public.ds_puede_editar(l.oficina_id))) with check (exists (select 1 from public.ds_libros l where l.id = ds_respuestas.libro_id and public.ds_puede_editar(l.oficina_id)));
 
+drop policy if exists ds_actividad_select on public.ds_actividad;
 create policy ds_actividad_select on public.ds_actividad
   for select using (public.ds_puede_ver(oficina_id));
 
 -- El equipo de una oficina lo ve quien pertenece al módulo; repartirlo es del
 -- gestor de esa oficina o de la administración.
+drop policy if exists ds_miembros_select on public.ds_miembros;
 create policy ds_miembros_select on public.ds_miembros
   for select using (public.ds_es_participante());
+drop policy if exists ds_miembros_write on public.ds_miembros;
 create policy ds_miembros_write on public.ds_miembros
   for all to authenticated using (public.ds_rol_en(oficina_id) = 'gestor' or public.current_role() = 'admin') with check (public.ds_rol_en(oficina_id) = 'gestor' or public.current_role() = 'admin');
 

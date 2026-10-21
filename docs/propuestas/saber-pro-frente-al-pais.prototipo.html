@@ -1,0 +1,1149 @@
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<title>Saber PRO frente al país</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Open+Sans:ital,wdth,wght@0,75..100,400..800;1,75..100,400..700&display=swap">
+<style>
+/* Concepto: un tablero de llegadas con dos bandas sobre la misma escala de puntos.
+   Arriba el país (marca cuadrada de tinta); abajo la UDES (punto azul) con una barra
+   desde el promedio nacional hasta su cifra, en la escala divergente del tablero. */
+:root {
+  --page: #eef2f8;
+  --ink: #0d1c31;
+  --muted: #4e5f77;
+  --board: #ffffff;
+  --board-raised: #f1f5fa;
+  --board-line: rgba(13, 40, 84, 0.11);
+  --board-line-strong: rgba(13, 40, 84, 0.22);
+  --flap: #f6f8fc;
+  --flap-hinge: #b7c3d6;
+  --flap-ink: #0a2d63;
+  --flap-shadow: 0 0 0 1px rgba(13, 40, 84, 0.1), 0 1px 2px rgba(13, 40, 84, 0.12);
+  --signal: #f6b93f;
+  --signal-ink: #1d1402;
+  --signal-text: #8a5700;
+  --series-udes: #1f5fbf;
+  --series-nat: #0d1c31;
+  --div-neg-2: #b9541f;
+  --div-neg-1: #e79c69;
+  --div-mid: #e9edf3;
+  --div-pos-1: #6fa4e8;
+  --div-pos-2: #2a63b8;
+  --div-neg-2-ink: #ffffff;
+  --div-neg-1-ink: #0d1c31;
+  --div-pos-1-ink: #0d1c31;
+  --div-pos-2-ink: #ffffff;
+  --focus: #1f5fbf;
+  --font-sign: "Open Sans", "Arial Narrow", "Roboto Condensed", sans-serif;
+  --font-body: "Open Sans", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --page: #040e20;
+    --ink: #e8eef7;
+    --muted: #9aaecb;
+    --board: #06142b;
+    --board-raised: #0b1f3f;
+    --board-line: rgba(147, 170, 206, 0.16);
+    --board-line-strong: rgba(147, 170, 206, 0.3);
+    --flap: #132b52;
+    --flap-hinge: #020a18;
+    --flap-ink: #f3f6fb;
+    --flap-shadow: 0 0.05em 0.12em rgba(0, 0, 0, 0.45);
+    --signal-text: #f6b93f;
+    --series-udes: #4a86e0;
+    --series-nat: #e8eef7;
+    --div-neg-2: #cf6a33;
+    --div-neg-1: #86340e;
+    --div-mid: #1a2d4d;
+    --div-pos-1: #2c62ad;
+    --div-pos-2: #72aaf0;
+    --div-neg-2-ink: #06142b;
+    --div-neg-1-ink: #ffffff;
+    --div-pos-1-ink: #ffffff;
+    --div-pos-2-ink: #06142b;
+    --focus: #72aaf0;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --page: #040e20;
+  --ink: #e8eef7;
+  --muted: #9aaecb;
+  --board: #06142b;
+  --board-raised: #0b1f3f;
+  --board-line: rgba(147, 170, 206, 0.16);
+  --board-line-strong: rgba(147, 170, 206, 0.3);
+  --flap: #132b52;
+  --flap-hinge: #020a18;
+  --flap-ink: #f3f6fb;
+  --flap-shadow: 0 0.05em 0.12em rgba(0, 0, 0, 0.45);
+  --signal-text: #f6b93f;
+  --series-udes: #4a86e0;
+  --series-nat: #e8eef7;
+  --div-neg-2: #cf6a33;
+  --div-neg-1: #86340e;
+  --div-mid: #1a2d4d;
+  --div-pos-1: #2c62ad;
+  --div-pos-2: #72aaf0;
+  --div-neg-2-ink: #06142b;
+  --div-neg-1-ink: #ffffff;
+  --div-pos-1-ink: #ffffff;
+  --div-pos-2-ink: #06142b;
+  --focus: #72aaf0;
+  color-scheme: dark;
+}
+
+*, *::before, *::after { box-sizing: border-box; }
+body {
+  background: var(--page);
+  color: var(--ink);
+  font: 400 15px/1.55 var(--font-body);
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-block: 40px 72px;
+}
+.wrap { max-width: 1120px; margin: 0 auto; display: grid; grid-template-columns: minmax(0, 1fr); gap: 28px; }
+.wrap > *, .board, .band, .doc { min-width: 0; }
+.board, .band, .rows, .doc, .doc section { grid-template-columns: minmax(0, 1fr); }
+h1, h2, h3 { margin: 0; text-wrap: balance; }
+h1, .band__title, .sign {
+  font-family: var(--font-sign);
+  font-stretch: 75%;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+h1 { font-size: clamp(2.1rem, 5vw, 3.2rem); line-height: 1; font-weight: 800; }
+.lede { margin: 12px 0 0; max-width: 68ch; color: var(--muted); }
+:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+button { font: inherit; color: inherit; cursor: pointer; }
+.sr-only { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
+.notice { margin: 0; padding: 10px 14px; border: 1px dashed var(--board-line-strong); border-radius: 6px; color: var(--muted); font-size: 0.86rem; max-width: 100ch; }
+.notice b { color: var(--ink); }
+
+/* ---------- tablero ---------- */
+.board { background: var(--board); border: 1px solid var(--board-line); border-radius: 8px; box-shadow: 0 1px 2px rgba(13,40,84,.08); padding: clamp(14px, 2.4vw, 28px); display: grid; gap: 22px; }
+.bar { display: flex; flex-wrap: wrap; gap: 14px 24px; align-items: center; justify-content: space-between; }
+.ctl { display: flex; align-items: center; gap: 10px; min-width: 0; max-width: 100%; }
+.ctl__name { font-family: var(--font-sign); font-stretch: 75%; text-transform: uppercase; letter-spacing: .08em; font-size: .78rem; font-weight: 700; color: var(--muted); }
+.years { min-width: 0; display: flex; gap: 4px; overflow-x: auto; padding: 2px; scrollbar-width: thin; max-width: 100%; }
+.chip { position: relative; flex: none; white-space: nowrap; min-width: 3.2rem; padding: 7px 10px; border: 1px solid transparent; border-radius: 4px; background: var(--board-raised); color: var(--muted); font-weight: 700; font-variant-numeric: tabular-nums; font-size: .88rem; transition: color 160ms ease-out, background-color 160ms ease-out, transform 120ms ease-out; }
+.chip:active, .seg button:active, .lab:active, .exp button:active { transform: scale(.97); }
+.chip[aria-checked="true"] { background: var(--board); color: var(--signal-text); border-color: var(--board-line-strong); box-shadow: 0 0 0 1px var(--board-line-strong); }
+.chip[data-partial]::after { content: ""; position: absolute; left: 8px; right: 8px; bottom: 3px; height: 3px; background: repeating-linear-gradient(135deg, var(--muted) 0 1px, transparent 1px 3px); }
+.seg { display: inline-flex; padding: 3px; gap: 2px; background: var(--board-raised); border-radius: 6px; }
+.seg button { padding: 7px 14px; border: 0; border-radius: 4px; background: transparent; color: var(--muted); font-weight: 700; font-size: .88rem; transition: color 160ms ease-out, background-color 160ms ease-out, transform 120ms ease-out; }
+.seg button[aria-checked="true"] { background: var(--board); color: var(--signal-text); box-shadow: 0 0 0 1px var(--board-line-strong); }
+.exp { display: flex; gap: 4px; align-items: center; }
+.exp button { padding: 7px 12px; border: 1px solid var(--board-line-strong); border-radius: 4px; background: transparent; font-family: var(--font-sign); font-stretch: 75%; letter-spacing: .08em; font-weight: 700; font-size: .8rem; transition: transform 120ms ease-out, background-color 160ms ease-out; }
+@media (hover: hover) and (pointer: fine) { .chip:hover, .exp button:hover, .seg button:hover { background-color: var(--board-raised); color: var(--ink); } }
+
+.band { display: grid; gap: 6px; }
+.band + .band { padding-top: 18px; border-top: 1px solid var(--board-line-strong); }
+.band__head { display: flex; flex-wrap: wrap; gap: 8px 20px; align-items: end; justify-content: space-between; margin-bottom: 4px; }
+.band__title { font-size: 1.35rem; font-weight: 800; line-height: 1.1; }
+.band__sub { margin: 2px 0 0; color: var(--muted); font-size: .86rem; }
+
+.axis, .row { display: grid; grid-template-columns: 14rem minmax(0, 1fr) 9.5rem; column-gap: 16px; align-items: center; }
+.axis { min-height: 1.3rem; }
+.axis__unit { font-size: .74rem; color: var(--muted); text-transform: uppercase; letter-spacing: .08em; font-weight: 700; }
+.ticks { position: relative; height: 1.3rem; }
+.ticks span { position: absolute; top: 0; transform: translateX(-50%); font-size: .74rem; color: var(--muted); font-variant-numeric: tabular-nums; }
+.rows { list-style: none; margin: 0; padding: 0; display: grid; gap: 2px; }
+.row { padding: 5px 8px; margin-inline: -8px; border-radius: 4px; transition: background-color 200ms ease-out, opacity 200ms ease-out; }
+.row[data-active] { background: var(--board-raised); }
+.row[data-low] { opacity: .66; }
+.lab { display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: center; gap: 10px; text-align: left; border: 0; background: none; padding: 0; min-width: 0; }
+.lab--static { cursor: default; }
+.code { position: relative; display: grid; place-items: center; width: 2.2rem; height: 2.2rem; border-radius: 3px; background: var(--flap); color: var(--flap-ink); box-shadow: var(--flap-shadow); font-family: var(--font-sign); font-stretch: 75%; font-weight: 800; font-size: 1.05rem; letter-spacing: .04em; transition: background-color 200ms ease-out, color 200ms ease-out; }
+.code::after { content: ""; position: absolute; inset: 50% 0 auto; height: 1px; background: var(--flap-hinge); opacity: .7; }
+.row[data-active] .code { background: var(--signal); color: var(--signal-ink); }
+.lab__text { min-width: 0; font-weight: 600; font-size: .92rem; line-height: 1.2; }
+.lab__text small { display: block; margin-top: 2px; font-weight: 400; color: var(--muted); font-size: .76rem; }
+.lab--campus { grid-template-columns: minmax(0, 1fr); }
+.lab--campus .lab__text { font-size: .95rem; }
+
+.trk { position: relative; height: 2.7rem; background-image: linear-gradient(to right, var(--board-line) 1px, transparent 1px); background-size: calc(100% / 6) 100%; border-right: 1px solid var(--board-line); }
+.trk i { position: absolute; display: block; pointer-events: none; }
+.stem { left: 0; top: calc(50% - 1px); width: 1px; height: 2px; background: var(--series-nat); transform-origin: 0 50%; }
+.sq { left: 0; top: calc(50% - 7px); width: 14px; height: 14px; margin-left: -7px; background: var(--series-nat); border-radius: 2px; }
+.ghost { left: 0; top: 4px; bottom: 4px; width: 0; border-left: 1.5px dashed var(--series-nat); opacity: .8; }
+.gbar { left: 0; top: calc(50% - 8px); width: 1px; height: 16px; transform-origin: 0 50%; }
+.dot { left: 0; top: calc(50% - 8px); width: 16px; height: 16px; margin-left: -8px; border-radius: 50%; background: var(--series-udes); box-shadow: 0 0 0 2px var(--board); }
+.row[data-kind="few"] .dot { background: var(--board); box-shadow: none; border: 2px dashed var(--series-udes); }
+.row[data-kind="few"] .gbar, .row[data-kind="empty"] .gbar, .row[data-kind="empty"] .dot, .row[data-kind="empty"] .ghost, .row[data-kind="nonat"] .gbar, .row[data-kind="nonat"] .ghost { opacity: 0; }
+.trk .none { position: absolute; inset: 0; display: none; place-items: center; padding: 0 10px; text-align: center; font-size: .8rem; font-style: italic; color: var(--muted); }
+.trk[data-empty] { background-image: repeating-linear-gradient(135deg, var(--board-line-strong) 0 1px, transparent 1px 7px); }
+.trk[data-empty] .none, .row[data-kind="empty"] .none { display: grid; }
+.row[data-kind="empty"] .trk { background-image: repeating-linear-gradient(135deg, var(--board-line-strong) 0 1px, transparent 1px 7px); }
+.row[data-kind="empty"] .none span { background: var(--board); padding: 2px 8px; border-radius: 3px; }
+.trk[data-empty] .none span { background: var(--board); padding: 2px 8px; border-radius: 3px; }
+
+.val { display: grid; gap: 4px; justify-items: end; text-align: right; }
+.flaps { display: inline-flex; gap: 3px; perspective: 320px; }
+.fl { position: relative; display: grid; place-items: center; width: 1.7rem; height: 2.3rem; background: var(--flap); border-radius: 3px; box-shadow: var(--flap-shadow); overflow: hidden; }
+.fl::after { content: ""; position: absolute; inset: 50% 0 auto; height: 1px; background: var(--flap-hinge); opacity: .8; }
+.fl b { display: block; font-family: var(--font-sign); font-stretch: 75%; font-weight: 800; font-size: 1.55rem; line-height: 1; color: var(--flap-ink); font-variant-numeric: tabular-nums; backface-visibility: hidden; }
+.fl--dash { width: 1.3rem; }
+.sub { display: grid; justify-items: end; font-size: .76rem; color: var(--muted); line-height: 1.25; }
+.gap { display: inline-flex; align-items: center; gap: 5px; font-weight: 700; font-size: .84rem; color: var(--ink); font-variant-numeric: tabular-nums; }
+.gap svg { width: .7rem; height: .7rem; fill: currentColor; flex: none; }
+.gap[data-tone="down"] svg { color: var(--div-neg-2); }
+.gap[data-tone="up"] svg { color: var(--div-pos-2); }
+.gap[data-tone="same"] svg { color: var(--muted); }
+.gap[data-few] { font-style: italic; font-weight: 600; color: var(--muted); }
+
+.readout { margin: 0; padding-top: 14px; border-top: 1px solid var(--board-line); min-height: 3.4em; font-size: .95rem; }
+.legend { display: flex; flex-wrap: wrap; gap: 8px 18px; list-style: none; margin: 0; padding: 0; font-size: .78rem; color: var(--muted); align-items: center; }
+.legend li { display: inline-flex; align-items: center; gap: 6px; }
+.legend i { display: inline-block; width: 12px; height: 12px; border-radius: 2px; }
+.legend .k-sq { background: var(--series-nat); }
+.legend .k-dot { background: var(--series-udes); border-radius: 50%; }
+.legend .k-few { background: var(--board); border: 2px dashed var(--series-udes); border-radius: 50%; }
+.legend .k-ghost { width: 0; height: 14px; border-left: 1.5px dashed var(--series-nat); border-radius: 0; }
+.legend .k-hatch { background: repeating-linear-gradient(135deg, var(--board-line-strong) 0 1px, transparent 1px 4px); border: 1px solid var(--board-line-strong); }
+.legend .k-yr { background: repeating-linear-gradient(135deg, var(--muted) 0 1px, transparent 1px 3px); height: 4px; }
+.foot { margin: 0; color: var(--muted); font-size: .8rem; max-width: 90ch; }
+.exp-msg { min-height: 1.2em; margin: 0; font-size: .8rem; color: var(--muted); }
+
+details.tbl { border-top: 1px solid var(--board-line); padding-top: 10px; }
+details.tbl summary { cursor: pointer; font-weight: 700; font-size: .88rem; width: fit-content; }
+.tblwrap { overflow-x: auto; margin-top: 10px; }
+table { border-collapse: collapse; width: 100%; font-size: .86rem; font-variant-numeric: tabular-nums; }
+th, td { text-align: left; padding: 7px 10px; border-bottom: 1px solid var(--board-line); vertical-align: top; }
+th { font-weight: 700; }
+td.num, th.num { text-align: right; }
+caption { text-align: left; color: var(--muted); padding-bottom: 6px; font-size: .8rem; }
+
+@media (max-width: 760px) {
+  .axis { grid-template-columns: minmax(0, 1fr); }
+  .axis__unit { display: none; }
+  .row { grid-template-columns: minmax(0, 1fr) auto; grid-template-areas: "lab val" "trk trk"; row-gap: 6px; padding-block: 8px; }
+  .row .lab { grid-area: lab; }
+  .row .trk { grid-area: trk; }
+  .row .val { grid-area: val; grid-auto-flow: column; align-items: center; gap: 8px; }
+  #rows1 .sub, .sub > span:not(.gap) { display: none; }
+  .fl { width: 1.4rem; height: 1.95rem; }
+  .fl b { font-size: 1.3rem; }
+  .trk { height: 2.3rem; }
+  .ticks { margin-inline: 0; }
+}
+
+
+[hidden] { display: none !important; }
+.axis--evo, .row--evo { grid-template-columns: 14rem minmax(0, 1fr) 14.5rem; }
+.ticks--yr span { font-size: .72rem; }
+.row--evo { align-items: start; padding-block: 8px; }
+.row--evo .lab { align-self: center; }
+.evo-chart { min-width: 0; }
+.evo-chart svg { display: block; width: 100%; height: auto; overflow: hidden; }
+.close { display: grid; gap: 2px; justify-items: start; text-align: left; }
+.close .cl { font-size: .76rem; color: var(--muted); line-height: 1.3; }
+.close .cl b { color: var(--ink); font-size: .82rem; }
+.hlbar { margin-bottom: 2px; flex-wrap: wrap; }
+.legend--evo .k-line { width: 18px; height: 0; border-top: 2.5px solid var(--series-udes); border-radius: 0; }
+.legend--evo .k-faint { width: 18px; height: 0; border-top: 1.25px solid var(--muted); border-radius: 0; opacity: .7; }
+.legend--evo .k-zero { width: 18px; height: 0; border-top: 1.5px solid var(--ink); border-radius: 0; }
+.spec svg { display: block; width: 100%; height: auto; }
+.spec .close { margin-top: 2px; }
+@media (max-width: 760px) {
+  .axis--evo { grid-template-columns: minmax(0, 1fr); }
+  .row.row--evo { grid-template-columns: minmax(0, 1fr); grid-template-areas: none; }
+  .row.row--evo .lab, .row.row--evo .evo-chart, .row.row--evo .val { grid-area: auto; }
+  .row.row--evo .val { grid-auto-flow: row; justify-items: start; align-items: start; }
+  .ticks--yr span:nth-child(even) { display: none; }
+}
+
+/* ---------- movimiento ---------- */
+@media (prefers-reduced-motion: reduce) {
+  * { transition-duration: 0.01ms !important; }
+}
+
+/* ---------- Cómo lo construimos ---------- */
+.doc { display: grid; gap: 44px; max-width: 880px; }
+.doc h2 { font-size: clamp(1.5rem, 3.4vw, 2.1rem); font-family: var(--font-sign); font-stretch: 75%; text-transform: uppercase; font-weight: 800; letter-spacing: .02em; }
+.doc h3 { font-size: 1.05rem; font-weight: 700; margin-bottom: 6px; }
+.doc section { display: grid; gap: 14px; }
+.doc p, .doc li { max-width: 72ch; }
+.doc p { margin: 0; }
+.doc ul, .doc ol { margin: 0; padding-left: 1.3rem; display: grid; gap: 6px; }
+.doc code { font-family: ui-monospace, "Cascadia Mono", Consolas, monospace; font-size: .84em; background: var(--board-raised); padding: 1px 5px; border-radius: 3px; overflow-wrap: anywhere; }
+.dl { display: grid; grid-template-columns: minmax(8rem, 12rem) minmax(0, 1fr); gap: 0 22px; margin: 0; }
+.dl dt { font-weight: 700; padding: 10px 0; border-top: 1px solid var(--board-line); }
+.dl dd { margin: 0; padding: 10px 0; border-top: 1px solid var(--board-line); color: var(--ink); }
+@media (max-width: 640px) { .dl { grid-template-columns: minmax(0, 1fr); } .dl dt { padding-bottom: 0; } .dl dd { border-top: 0; padding-top: 2px; } }
+.scroll { overflow-x: auto; border: 1px solid var(--board-line); border-radius: 6px; background: var(--board); }
+.scroll table { min-width: 640px; }
+.scroll th { background: var(--board-raised); }
+.pick { border-left: 3px solid var(--signal); padding: 2px 0 2px 14px; }
+.specimens { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 14px; }
+.spec { background: var(--board); border: 1px solid var(--board-line); border-radius: 6px; padding: 12px; display: grid; gap: 8px; align-content: start; }
+.spec .trk { height: 2.2rem; }
+.spec small { color: var(--muted); font-size: .78rem; }
+.spec .row { display: block; padding: 0; margin: 0; }
+.spec .valline { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+.skel { display: grid; gap: 6px; }
+.skel span { height: 1.4rem; background: var(--board-raised); border-radius: 3px; }
+.skel span:nth-child(odd) { width: 86%; }
+</style>
+
+<div class="wrap">
+  <header>
+    <h1>Saber PRO frente al país</h1>
+    <p class="lede">Propuesta de gráfico para el bloque «Resultados Saber PRO» de UDES en Cifras. Arriba, el promedio nacional del ICFES en el puntaje global y en cada competencia. Abajo, solo la UDES, por campus o solo Bucaramanga, sobre la misma escala de puntos.</p>
+  </header>
+
+  <p class="notice"><b>Cifras del repositorio, diseño de propuesta.</b> El promedio nacional y el oficial de la UDES son los de <code>0032_saber_pro_resultados.sql</code>. Los promedios por campus los calculé ponderando por evaluados los programas de esa migración. El tablero de abajo todavía no está en el portal.</p>
+
+  <section class="board" id="tablero" aria-labelledby="t-board">
+    <h2 id="t-board" class="sr-only">Saber PRO frente al país, por competencia y campus</h2>
+    <div class="bar">
+      <div class="ctl" id="ctl-year">
+        <span class="ctl__name" id="lbl-year">Año</span>
+        <div class="years" id="years" role="radiogroup" aria-labelledby="lbl-year"></div>
+      </div>
+      <span class="ctl__name" id="evo-range" hidden>Años 2016 a 2025</span>
+      <div class="seg" id="view" role="radiogroup" aria-label="Qué mostrar">
+        <button type="button" role="radio" data-view="year" aria-checked="true">Un año</button>
+        <button type="button" role="radio" data-view="evo" aria-checked="false">Evolución</button>
+      </div>
+      <div class="exp" role="group" aria-label="Exportar el gráfico">
+        <button type="button" data-exp="CSV">CSV</button>
+        <button type="button" data-exp="PNG">PNG</button>
+        <button type="button" data-exp="JPG">JPG</button>
+      </div>
+    </div>
+
+    <div class="band" id="band1">
+      <div class="band__head">
+        <div>
+          <h3 class="band__title">Resultados nacionales</h3>
+          <p class="band__sub" id="b1-sub"></p>
+        </div>
+      </div>
+      <div class="axis"><span class="axis__unit">Puntos</span><div class="ticks" data-ticks></div><span></span></div>
+      <ol class="rows" id="rows1" aria-label="Promedio nacional por competencia"></ol>
+    </div>
+
+    <div class="band" id="band2">
+      <div class="band__head">
+        <div>
+          <h3 class="band__title">Cifras UDES</h3>
+          <p class="band__sub" id="b2-sub"></p>
+        </div>
+        <div class="seg modeseg" id="mode" role="radiogroup" aria-label="Qué campus mostrar">
+          <button type="button" role="radio" data-mode="campus" aria-checked="true">Por campus</button>
+          <button type="button" role="radio" data-mode="bucaramanga" aria-checked="false">Solo Bucaramanga</button>
+        </div>
+      </div>
+      <div class="axis"><span class="axis__unit">Puntos</span><div class="ticks" data-ticks></div><span></span></div>
+      <ol class="rows" id="rows2"></ol>
+    </div>
+
+    <div class="band" id="evo" hidden>
+      <div class="band__head">
+        <div>
+          <h3 class="band__title">Evolución frente al país</h3>
+          <p class="band__sub" id="evo-sub"></p>
+        </div>
+        <div class="seg modeseg" id="mode2" role="radiogroup" aria-label="Qué campus mostrar en la evolución">
+          <button type="button" role="radio" data-mode="campus" aria-checked="true">Por campus</button>
+          <button type="button" role="radio" data-mode="bucaramanga" aria-checked="false">Solo Bucaramanga</button>
+        </div>
+      </div>
+      <div class="ctl hlbar" id="hlbar">
+        <span class="ctl__name" id="lbl-hl">Resaltar</span>
+        <div class="years" id="hl" role="radiogroup" aria-labelledby="lbl-hl"></div>
+      </div>
+      <div class="axis axis--evo"><span class="axis__unit">Brecha, en puntos</span><div class="ticks ticks--yr" id="yrticks"></div><span class="axis__unit">Cómo cambió</span></div>
+      <ol class="rows" id="rowsE" aria-label="Brecha con el país por competencia y año"></ol>
+    </div>
+
+
+    <p class="readout" id="readout" aria-live="polite"></p>
+    <ul class="legend" id="legend-year" aria-label="Cómo leer el gráfico">
+      <li><i class="k-sq"></i> Promedio nacional</li>
+      <li><i class="k-dot"></i> UDES</li>
+      <li><i class="k-ghost"></i> El país, como referencia</li>
+      <li><i style="background:var(--div-neg-2)"></i> 10 o más bajo</li>
+      <li><i style="background:var(--div-neg-1)"></i> 3 a 9 bajo</li>
+      <li><i style="background:var(--div-mid);border:1px solid var(--board-line-strong)"></i> como el país</li>
+      <li><i style="background:var(--div-pos-1)"></i> 3 a 9 sobre</li>
+      <li><i style="background:var(--div-pos-2)"></i> 10 o más sobre</li>
+      <li><i class="k-few"></i> menos de 10 evaluados</li>
+      <li><i class="k-hatch"></i> sin dato</li>
+      <li><i class="k-yr"></i> año solo con promedio oficial</li>
+    </ul>
+    <ul class="legend legend--evo" id="legend-evo" aria-label="Cómo leer la evolución" hidden>
+      <li><i class="k-line"></i> UDES, o el campus resaltado</li>
+      <li><i class="k-faint"></i> los demás campus</li>
+      <li><i class="k-zero"></i> promedio nacional (cero)</li>
+      <li><i style="background:var(--div-pos-1)"></i> sobre el país</li>
+      <li><i style="background:var(--div-neg-1)"></i> bajo el país</li>
+      <li><i class="k-hatch"></i> año sin dato: la línea se interrumpe</li>
+      <li><i class="k-few"></i> menos de 30 evaluados</li>
+    </ul>
+    <p class="foot" id="foot-year">El eje va de 110 a 170 puntos y no parte de cero: así se ven diferencias de pocos puntos. Todas las competencias usan los mismos puntos del ICFES. Fuente: ICFES, resultados Saber PRO. El promedio de toda la UDES es el oficial del ICFES; el de un campus es el promedio de sus evaluados.</p>
+    <p class="foot" id="foot-evo" hidden></p>
+    <p class="exp-msg" id="exp-msg" role="status"></p>
+
+    <details class="tbl">
+      <summary>Ver como tabla</summary>
+      <div class="tblwrap"><table id="tbl"></table></div>
+    </details>
+  </section>
+
+  <div class="doc">
+    <section id="decisiones">
+      <h2>Cómo se lee y por qué se dibuja así</h2>
+      <dl class="dl">
+        <dt>Qué se dibuja arriba</dt>
+        <dd>El promedio nacional por año, una marca por competencia. El ICFES publica solo ese promedio (un entero por año y competencia). No hay desviación, percentiles ni distribución nacional en <code>0031</code> ni en <code>0032</code>, así que no se dibuja una banda de dispersión.</dd>
+        <dt>Escala común</dt>
+        <dd>Las seis filas usan los puntos del ICFES (0 a 300) en un eje de 110 a 170, fijo para todos los años y las dos bandas. El eje se calcula de los datos: mínimo y máximo de todas las cifras, redondeados a decenas. No hay conversión por competencia. Inglés también se dibuja en puntos; sus niveles (Pre A1 a B2) no tienen un puntaje de corte guardado, por eso siguen en la vista Niveles.</dd>
+        <dt>La brecha</dt>
+        <dd>Una barra va desde la marca del país hasta el punto de la UDES. Su tono sigue la escala divergente (<code>--od-div-*</code>: terracota debajo, azul encima) y lleva siempre la cifra con signo y un triángulo: ▼ −5, ▲ +3, ▬ 0. El color no va solo.</dd>
+        <dt>Año</dt>
+        <dd>Se elige uno a la vez en la franja de años; arranca en el último con dato. El 2025 trae solo el promedio oficial de la UDES y el nacional: el campus queda rayado y la fila «Toda la UDES» sigue. Comunicación escrita 2016 no existe: la fila nacional queda rayada.</dd>
+        <dt>Pocos evaluados</dt>
+        <dd>Menos de 10: el punto va hueco con contorno punteado, sin barra de color, la cifra en cursiva. Menos de 30: la fila se atenúa y dice «pocos para comparar». Un vacío nunca se dibuja en cero ni en el borde del eje. En los datos reales, Bogotá (un solo programa, 22 a 40 evaluados) cae en el caso de menos de 30 en cuatro años.</dd>
+        <dt>Campus que existen</dt>
+        <dd>Bogotá, Bucaramanga, Cúcuta y Valledupar, en el orden de <code>saberCatalog</code>. En «Solo Bucaramanga» la banda de abajo repite las seis competencias, alineadas fila por fila con la de arriba.</dd>
+        <dt>Evolución</dt>
+        <dd>Un conmutador «Un año / Evolución» junto a la franja de años. «Un año» deja el tablero de arriba. «Evolución» lo reemplaza por seis pequeños múltiplos, uno por competencia, con el mismo eje horizontal (los años) y el mismo eje vertical (en puntos, calculado de los datos y ajustado al campus resaltado). Cada uno dibuja la brecha por año, UDES menos promedio nacional, alrededor de una línea del cero que es el país. El área entre la línea y el cero se pinta en azul cuando la UDES va arriba y en terracota cuando va abajo, con la escala divergente. A la derecha de cada fila, la cifra de cierre: variación de la brecha desde el primer año con dato, con signo y triángulo, la lectura en palabras (se acerca, se mantiene, se aleja), los años seguidos sobre o bajo el país y la mejor y la peor brecha.</dd>
+        <dt>Por qué esta forma</dt>
+        <dd>Dos líneas por serie, seis competencias y cinco ámbitos serían un enredo. La brecha ya contiene la comparación: una línea por competencia, sin cruces entre series. Quedó el área entre la línea de la brecha y el cero, no entre dos líneas, porque así el signo se lee de un vistazo y la altura es la diferencia en puntos.</dd>
+        <dt>Qué es mejorar</dt>
+        <dd>Que suba la brecha (UDES menos país), no el puntaje bruto: el puntaje del país también cambia de año en año, por la prueba y por quién la presenta. «Se acerca» significa que la distancia al país se reduce en 3 puntos o más; «se aleja», que crece 3 o más; entre ambos, «se mantiene». Si la UDES cruza el cero, la fila lo dice.</dd>
+        <dt>Campus en la evolución</dt>
+        <dd>Con «Por campus», la línea gruesa es la de Toda la UDES (promedio oficial) y los cuatro campus van como líneas delgadas atenuadas detrás; una franja «Resaltar» cambia cuál es la gruesa y las demás se atenúan. Con «Solo Bucaramanga» queda solo esa serie. Las filas con campus no se aíslan en cuatro gráficos: seis filas por cuatro campus serían 24 gráficos.</dd>
+        <dt>Huecos y pocos evaluados</dt>
+        <dd>Un año sin dato (2025 por campus, Comunicación escrita 2016 sin promedio nacional) deja una franja rayada y la línea se corta: nunca se une ni se proyecta. Con menos de 30 evaluados el punto va hueco; con menos de 10, hueco y punteado, y la variación entre paréntesis y en cursiva. Bogotá (un solo programa) cae en el primer caso en cuatro años.</dd>
+        <dt>Teclado y lector</dt>
+        <dd>Año, campus y competencia son grupos de opciones con flechas. Las etiquetas de competencia de la banda nacional son botones. La frase bajo el gráfico se anuncia al cambiar la selección y «Ver como tabla» da los mismos datos en una tabla con encabezados.</dd>
+        <dt>Claro, oscuro y móvil</dt>
+        <dd>Todo sale de los tokens del tablero, con la escala divergente de los dos temas. En pantalla angosta cada fila pasa a dos líneas: nombre y cifra arriba, la pista a todo el ancho debajo; la franja de años se desplaza dentro de su caja.</dd>
+        <dt>Movimiento</dt>
+        <dd>Una sola secuencia al entrar en pantalla, una vez: las marcas del país recorren su pista, las barras de la UDES crecen desde la marca del país y las cifras voltean. Cambiar año, competencia o campus mueve las marcas en 260 ms con salida fuerte y se puede interrumpir. En «Evolución», la primera vez que se abre, cada línea se dibuja desde el primer año con <code>strokeDashoffset</code>, el área se revela después y las cifras de cierre llegan al final, escalonado por competencia. Las siguientes veces, y al cambiar de competencia o de campus, solo hay un cambio de 220 ms. Nada en bucle; con movimiento reducido se ve el estado final.</dd>
+      </dl>
+      <div class="pick">
+        <h3>Dónde vive: una cuarta vista, «Frente al país»</h3>
+        <p>La evolución no es una quinta vista: es un conmutador dentro de «Frente al país», porque comparte la competencia activa, el campus, los filtros y la exportación. Recomiendo agregarla al selector de vistas del bloque, junto a Niveles, Brecha con el país y Evolución. No reemplaza ninguna: Niveles dice cómo se reparte la gente, la brecha por sede y programa dice dónde está cada grupo año por año, la evolución dice la tendencia. Esta vista contesta otra pregunta, cómo está la UDES hoy en las seis competencias frente al país. Como vive en el mismo bloque, hereda la URL, los filtros de sede, facultad y programa, la exportación y el boletín. Un bloque nuevo repetiría todo eso.</p>
+      </div>
+    </section>
+
+    <section id="estados">
+      <h2>Estados</h2>
+      <p>Cada uno usa las mismas marcas del tablero. Los números de este cuadro son de ejemplo.</p>
+      <div class="specimens" id="specimens"></div>
+    </section>
+
+    <section id="datos">
+      <h2>Contrato de datos</h2>
+      <p>No hace falta una migración nueva. La vista se arma en el navegador con lo que ya carga el bloque (<code>SaberProData</code>).</p>
+      <div class="scroll">
+        <table>
+          <thead><tr><th>Qué se dibuja</th><th>De dónde sale</th><th>Qué verifiqué</th></tr></thead>
+          <tbody>
+            <tr><td>Banda 1: promedio nacional por competencia y año</td><td><code>od_saber_pro_results</code> con <code>scope = 'nacional'</code> (campus, facultad y programa vacíos), leído con <code>saberFigure(...).national</code></td><td>2016 a 2025 en las seis competencias, salvo Comunicación escrita 2016. Valores enteros del ICFES. <code>evaluated</code>, <code>levels</code> e <code>histogram</code> vienen vacíos: no hay distribución.</td></tr>
+            <tr><td>Banda 2, fila «Toda la UDES»</td><td><code>scope = 'institucion'</code> (promedio oficial, manda sobre el ponderado, como en <code>saberFigure</code>)</td><td>2016 a 2025. Sin <code>evaluated</code>: el conteo sale de sumar programas, así que 2025 no lo tiene.</td></tr>
+            <tr><td>Banda 2, filas por campus</td><td><code>scope = 'programa'</code> sumado por <code>campus</code> con <code>saberFigure(data, comp, year, {campus})</code></td><td>Cuatro campus, 2016 a 2024. 2025 no tiene filas de programa. Bogotá es un solo programa.</td></tr>
+            <tr><td>Evolución: brecha por año</td><td>Las mismas filas, sin consulta nueva: <code>saberFigure</code> para cada año, y la brecha es <code>shown − national</code></td><td>Cada año de 2016 a 2025 sale de la misma fuente que el tablero de un año. Faltan los años ya dichos: campus 2025 y Comunicación escrita 2016. Un año sin dato queda como hueco en la serie.</td></tr>
+            <tr><td>Reglas de pocos evaluados</td><td><code>SABER_FEW_MEAN = 10</code> y <code>SABER_FEW_LEVELS = 30</code> en <code>data/saber-pro.ts</code></td><td>Existen y se reutilizan.</td></tr>
+            <tr><td>Orden y códigos</td><td><code>SABER_COMPETENCIES</code>: PG, LC, RC, CC, CE, IN con claves <code>global, lc, rc, cc, ce, ing</code></td><td>Verificado en el código. La restricción <code>od_saber_pro_results_competency</code> admite esas seis claves.</td></tr>
+            <tr><td>Tonos de la brecha</td><td><code>saberGapTone</code> y <code>SABER_GAP_LEGEND</code></td><td>Existen: menos de 3 puntos es «como el país»; 10 o más es una brecha.</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p><b>Lo que falta y no se inventa:</b> la dispersión nacional (desviación o percentiles) y cualquier dato de campus para 2025. Si la Oficina quiere la distribución nacional, habría que cargar esas cifras del ICFES con otra migración; el diseño tiene espacio para una franja detrás de la marca del país, pero hoy no la dibuja.</p>
+    </section>
+
+    <section id="archivos">
+      <h2>Componentes y archivos</h2>
+      <ul>
+        <li><code>src/modules/datos-abiertos/data/saber-pro.ts</code>: función pura <code>saberPanorama(data, year, filter)</code> que devuelve las filas de las dos bandas (valor, país, brecha, evaluados, tipo: normal, pocos, sin dato) y, para cada fila, su <code>serie</code> por año (valor, país, brecha, evaluados, tipo; <code>null</code> en los años sin dato) y su <code>variacion</code> (primer y último año con dato, cambio de la brecha, años seguidos, mejor, peor y la lectura: se acerca, se mantiene, se aleja). <code>SABER_PANORAMA_DOMAIN</code> da el eje horizontal de puntos y el eje vertical de brecha, calculados de los datos.</li>
+        <li><code>src/modules/datos-abiertos/components/SaberPanoramaEvolucion.tsx</code> (nuevo): los seis pequeños múltiplos de la brecha, en SVG propio, con la franja «Resaltar» y las cifras de cierre.</li>
+        <li><code>src/modules/datos-abiertos/components/SaberPanorama.tsx</code> (nuevo): dibuja las dos bandas y aloja el conmutador «Un año / Evolución»; usa <code>useInView</code> y <code>usePrefersReducedMotion</code> de <code>motion.ts</code> y <code>SplitFlap</code> para las cifras.</li>
+        <li><code>src/modules/datos-abiertos/components/saber-pro.css</code>: estilos <code>od-pano__*</code>; o <code>saber-panorama.css</code> si crece.</li>
+        <li><code>src/modules/datos-abiertos/components/SaberProBlock.tsx</code>: cuarta opción en <code>VIEWS</code> (<code>pais</code>), el año como parámetro nuevo y envolver la vista en <code>ChartFrame</code>.</li>
+        <li><code>src/modules/datos-abiertos/data/csv-export.ts</code> y <code>export-registry.ts</code>: tabla derivada y archivo nuevo en el caso <code>saber_pro</code>.</li>
+        <li><code>src/modules/boletin/saber.tsx</code> y <code>compose.tsx</code>: una hoja nueva para la plantilla de Saber PRO.</li>
+        <li>Pruebas junto a cada uno: <code>data/saber-pro.test.ts</code> (nuevo), <code>csv-export.test.ts</code>, <code>export-registry.test.ts</code>.</li>
+      </ul>
+      <p>Movimiento: el repositorio ya trae <code>gsap</code> (^3.15). El bloque de Saber hoy anima con CSS (<code>useInView</code> más variables), como dice la Motion Rule. Para este gráfico recomiendo GSAP porque la secuencia coordina marcas, barras y cifras con una sola línea de tiempo; las posiciones se mueven con <code>transform</code>, nunca con <code>left</code>.</p>
+      <p><b>URL.</b> Se reutilizan <code>sp</code> (competencia) y <code>sp-sede</code>; «Solo Bucaramanga» escribe <code>sp-sede=Bucaramanga</code> y «Por campus» lo borra. Nuevos: <code>sp-vista=pais</code>, <code>sp-anio=2024</code>, <code>sp-pano=evo</code> para la evolución y <code>sp-resalta=Cúcuta</code> para el campus resaltado. Con otra sede en el filtro, la banda de abajo muestra esa sede, y los filtros de facultad y programa también aplican.</p>
+    </section>
+
+    <section id="pasos">
+      <h2>Orden de trabajo</h2>
+      <ol>
+        <li><b>Datos.</b> <code>saberPanorama</code> con la serie y la variación, y su prueba. Se verifica con <code>vitest</code> contra filas de 0032 copiadas como fixture.</li>
+        <li><b>Un año, fijo.</b> <code>SaberPanorama</code> sin movimiento, con la tabla equivalente. Se verifica a mano en claro, oscuro y 390 px.</li>
+        <li><b>Evolución, fija.</b> <code>SaberPanoramaEvolucion</code> sin movimiento: líneas, área, huecos rayados, cifras de cierre y tabla con la serie. Se verifica contra la tabla que sale de la misma función.</li>
+        <li><b>Vista y URL.</b> Cuarta opción en <code>SaberProBlock</code>, <code>sp-anio</code>, <code>sp-pano</code> y <code>sp-resalta</code>. Se verifica que un enlace copiado abre lo mismo.</li>
+        <li><b>Movimiento.</b> Línea de tiempo de entrada, dibujo de líneas con <code>strokeDashoffset</code> y cambios de estado. Se verifica con movimiento reducido activo y recargando con la vista fuera de pantalla.</li>
+        <li><b>Exportación.</b> CSV derivado con la serie, PNG y JPG por <code>ChartFrame</code>. Se verifica que el CSV abre en Excel con los vacíos en blanco.</li>
+        <li><b>Boletín.</b> Hoja nueva en milímetros, con la evolución. Se verifica en la vista previa del boletín.</li>
+        <li><b>Revisión.</b> Teclado completo, lector de pantalla y la prueba de contraste de los tokens.</li>
+      </ol>
+    </section>
+
+    <section id="pruebas">
+      <h2>Qué prueba cubre cada regla</h2>
+      <div class="scroll">
+        <table>
+          <thead><tr><th>Regla</th><th>Prueba</th></tr></thead>
+          <tbody>
+            <tr><td>Un vacío no es un cero</td><td>Con Comunicación escrita 2016 y con campus 2025, <code>saberPanorama</code> devuelve <code>kind: "empty"</code> y <code>value: null</code>; ninguna fila trae 0. En el componente, la fila lleva la clase rayada y el texto «Sin dato».</td></tr>
+            <tr><td>Menos de 10 evaluados</td><td>Un programa de 7 evaluados devuelve <code>kind: "few"</code>, sin tono y sin barra; con 10 exactos devuelve tono.</td></tr>
+            <tr><td>Menos de 30 evaluados</td><td>Con 29, la fila trae <code>low: true</code>; con 30, no. Bogotá 2024 (29) es el caso real.</td></tr>
+            <tr><td>Orden de las competencias</td><td>Las filas salen siempre en el orden de <code>SABER_COMPETENCIES</code> (PG, LC, RC, CC, CE, IN), con cualquier competencia activa y en las dos bandas.</td></tr>
+            <tr><td>El oficial manda</td><td>«Toda la UDES» usa el promedio institucional aunque los programas den otro ponderado.</td></tr>
+            <tr><td>Un programa es de una sede</td><td>Dos sedes con el mismo nombre de programa nunca se suman.</td></tr>
+            <tr><td>Brecha con signo</td><td>El texto de la brecha lleva el signo y el glifo para −5, 0 y +3; el tono sale de <code>saberGapTone</code>.</td></tr>
+            <tr><td>Eje común</td><td>Las dos bandas usan el mismo dominio y la misma función de posición; el dominio contiene todos los valores del conjunto. Las seis filas de la evolución comparten dominio vertical y contiene la brecha de todos los campus.</td></tr>
+            <tr><td>Variación de la brecha con huecos</td><td>Con una serie −7, −5, sin dato, −3, sin dato (el 2025 de un campus), la variación es +4 entre el primer y el último año con dato, y no cuenta el hueco ni lo interpola.</td></tr>
+            <tr><td>Años seguidos</td><td>Una serie bajo el país, bajo, sobre, sobre, sobre da 3 años seguidos sobre el país; un hueco corta la cuenta; un año con brecha 0 corta la de «sobre» y la de «bajo».</td></tr>
+            <tr><td>Mejor y peor brecha</td><td>Devuelven el valor y el año; con dos años iguales, el más reciente.</td></tr>
+            <tr><td>Lectura de la evolución</td><td>«Se acerca» con distancia que baja 3 o más; «se aleja» con 3 o más; «se mantiene» en medio; cruzar el cero tiene su propio texto. Con un solo año con dato, no hay variación.</td></tr>
+            <tr><td>Vacío no es cero en la serie</td><td>Comunicación escrita 2016 y los campus de 2025 traen <code>gap: null</code>; ningún punto vale 0 y la línea queda cortada en esos años.</td></tr>
+            <tr><td>Mínimos en la serie</td><td>Un punto con 29 evaluados trae <code>low</code>; con 9, <code>few</code> y la variación va entre paréntesis si un extremo es <code>few</code>.</td></tr>
+            <tr><td>URL</td><td>Un <code>sp-anio</code> inválido cae al último año con dato; <code>sp-sede=Bucaramanga</code> activa «Solo Bucaramanga».</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section id="salida">
+      <h2>Exportación y boletín</h2>
+      <p><b>Exportación.</b> El CSV actual (<code>saberProToTable</code>) ya lleva el promedio nacional como filas de ámbito «Nacional». Se agrega un archivo derivado <code>saber-pro-frente-al-pais</code> con una fila por año, competencia y ámbito: año, competencia, código, ámbito (nacional, UDES o campus), promedio, promedio nacional, diferencia en puntos, evaluados, origen del promedio (oficial o ponderado) y la marca de pocos evaluados. Para la evolución se agrega un segundo archivo, <code>saber-pro-evolucion-brecha</code>, con una fila por año, competencia y ámbito: promedio UDES, promedio nacional, brecha, evaluados y tipo (normal, pocos, sin dato), y las columnas de resumen en la primera fila de cada serie (variación, años seguidos, mejor, peor). Los vacíos van en blanco, nunca en cero. PNG y JPG salen de <code>ChartFrame</code> con el nombre <code>saber-pro-frente-al-pais</code>.</p>
+      <p><b>Boletín.</b> Una hoja ancha nueva, «Frente al país», con el mismo dibujo en milímetros y la paleta fija del papel (<code>--bol-div-*</code>), sin movimiento, y debajo la tabla con las mismas cifras para leerla sin color. Con menos de 10 evaluados la cifra va entre paréntesis y sin tono, como en la hoja de brecha. La hoja lleva además la evolución: los seis pequeños múltiplos de la brecha en milímetros, con la paleta fija del papel y sin movimiento, el área bajo la línea en los tonos <code>--bol-div-*</code>, los años sin dato rayados, y debajo la tabla con la serie por año y las cifras de cierre. Se ofrece en la plantilla como una entrada más: <code>saber:&lt;conjunto&gt;:pais</code>.</p>
+    </section>
+
+    <section id="decidir">
+      <h2>Riesgos y decisiones</h2>
+      <ol>
+        <li><b>Dónde vive.</b> Cuarta vista en el bloque actual. <i>Recomiendo esta.</i> Alternativas: reemplazar la Brecha con el país (pierde el detalle por programa) o un bloque nuevo (duplica filtros, URL y exportación).</li>
+        <li><b>Eje de 110 a 170.</b> Hace visibles diferencias de 3 a 5 puntos, pero no parte de cero y lo dice al pie. <i>Recomiendo el eje recortado</i> con la cifra con signo siempre al lado; un eje de 0 a 300 aplastaría todo en una décima del ancho.</li>
+        <li><b>Dispersión nacional.</b> Hoy no existe en la base. <i>Recomiendo no pedirla todavía</i>: el promedio basta para la brecha. Si se pide, lleva migración y carga nueva.</li>
+        <li><b>Bogotá y 2025.</b> Bogotá es un programa con menos de 30 evaluados en cuatro años; 2025 no trae campus. <i>Recomiendo mostrarlos</i> atenuado y rayado, con la razón escrita, en vez de ocultar filas.</li>
+        <li><b>Vista por defecto.</b> Hoy abre en Niveles, y los enlaces ya compartidos sin <code>sp-vista</code> dependen de eso. <i>Recomiendo mantener Niveles</i> en esta entrega y decidir después si «Frente al país» pasa a ser la primera.</li>
+      </ol>
+      <ol start="6"><li><b>Qué cuenta como mejora.</b> El cambio de la brecha con el país, no el puntaje bruto, porque el promedio nacional también sube y baja por la prueba y por quién la presenta. <i>Recomiendo la brecha</i> y decirlo al pie. Con menos de 3 puntos de cambio se lee «se mantiene».</li></ol>
+      <p>Riesgo de ejecución: la secuencia de entrada no debe esconder el gráfico si la persona llega con la vista ya fuera de pantalla o con movimiento reducido; por eso el estado dibujado es siempre el final y la animación solo lo recorre.</p>
+    </section>
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
+<script>
+(function () {
+  var D = {"sede":{"Bogotá":{"cc":{"2016":[40,147.4],"2017":[27,127.3],"2018":[37,130.1],"2019":[22,134.7],"2020":[36,146.0],"2021":[30,129.7],"2022":[25,129.4],"2023":[28,126.1],"2024":[29,141.8]},"global":{"2016":[40,142.4],"2017":[27,134.8],"2018":[37,137.8],"2019":[22,142.9],"2020":[36,142.2],"2021":[30,141.2],"2022":[25,140.4],"2023":[28,136.1],"2024":[29,143.6]},"ing":{"2016":[40,145.1],"2017":[27,136.4],"2018":[37,136.6],"2019":[22,148.8],"2020":[36,144.2],"2021":[30,155.7],"2022":[25,148.4],"2023":[28,142.2],"2024":[29,154.0]},"lc":{"2016":[40,146.0],"2017":[27,138.5],"2018":[37,139.5],"2019":[22,144.1],"2020":[36,152.1],"2021":[30,135.8],"2022":[25,140.5],"2023":[28,137.8],"2024":[29,148.1]},"rc":{"2016":[40,134.9],"2017":[27,134.1],"2018":[37,138.5],"2019":[22,133.7],"2020":[36,145.9],"2021":[30,140.1],"2022":[25,140.0],"2023":[28,127.4],"2024":[29,134.2]},"ce":{"2017":[26,143.3],"2018":[37,144.7],"2019":[21,160.6],"2020":[33,129.4],"2021":[30,144.5],"2022":[22,163.1],"2023":[26,158.7],"2024":[28,144.6]}},"Bucaramanga":{"cc":{"2016":[653,147.8],"2017":[648,140.4],"2018":[567,140.8],"2019":[656,143.6],"2020":[660,154.0],"2021":[576,146.4],"2022":[579,144.4],"2023":[641,140.3],"2024":[631,146.2]},"global":{"2016":[653,148.7],"2017":[649,145.7],"2018":[567,148.3],"2019":[656,148.0],"2020":[660,151.4],"2021":[576,148.5],"2022":[581,145.9],"2023":[644,144.8],"2024":[631,148.4]},"ing":{"2016":[652,147.0],"2017":[648,146.3],"2018":[566,151.6],"2019":[655,151.8],"2020":[657,153.7],"2021":[575,158.0],"2022":[578,160.5],"2023":[640,154.9],"2024":[630,158.9]},"lc":{"2016":[653,149.0],"2017":[649,147.8],"2018":[567,150.5],"2019":[656,150.4],"2020":[660,153.9],"2021":[576,149.6],"2022":[580,149.3],"2023":[642,150.7],"2024":[631,153.9]},"rc":{"2016":[653,151.4],"2017":[649,149.0],"2018":[567,154.5],"2019":[656,149.7],"2020":[660,152.4],"2021":[576,149.7],"2022":[581,148.5],"2023":[642,147.1],"2024":[631,147.3]},"ce":{"2017":[624,150.5],"2018":[550,148.9],"2019":[632,150.2],"2020":[641,144.1],"2021":[566,141.7],"2022":[535,138.9],"2023":[593,144.3],"2024":[598,143.7]}},"Cúcuta":{"cc":{"2016":[466,140.9],"2017":[380,131.7],"2018":[357,131.3],"2019":[341,132.3],"2020":[466,145.1],"2021":[479,137.5],"2022":[340,135.3],"2023":[418,133.3],"2024":[416,137.0]},"global":{"2016":[466,142.2],"2017":[380,137.6],"2018":[357,140.2],"2019":[342,138.1],"2020":[468,143.5],"2021":[480,140.0],"2022":[341,139.0],"2023":[418,139.8],"2024":[416,139.8]},"ing":{"2016":[465,140.2],"2017":[378,141.0],"2018":[355,142.7],"2019":[339,144.6],"2020":[465,151.0],"2021":[475,153.6],"2022":[339,157.0],"2023":[415,150.2],"2024":[415,151.9]},"lc":{"2016":[466,141.2],"2017":[380,141.1],"2018":[357,142.2],"2019":[341,137.9],"2020":[467,146.6],"2021":[479,140.3],"2022":[340,144.0],"2023":[418,143.7],"2024":[416,144.7]},"rc":{"2016":[466,141.5],"2017":[379,139.4],"2018":[357,141.9],"2019":[342,139.8],"2020":[468,144.4],"2021":[480,139.5],"2022":[340,142.6],"2023":[418,136.9],"2024":[416,133.5]},"ce":{"2017":[357,144.1],"2018":[351,146.2],"2019":[327,144.0],"2020":[447,139.7],"2021":[462,136.0],"2022":[298,135.6],"2023":[389,146.1],"2024":[392,140.4]}},"Valledupar":{"cc":{"2016":[286,140.2],"2017":[280,132.9],"2018":[265,133.4],"2019":[264,130.1],"2020":[272,140.5],"2021":[276,133.4],"2022":[213,131.3],"2023":[268,130.0],"2024":[390,132.0]},"global":{"2016":[286,136.9],"2017":[280,133.4],"2018":[266,134.8],"2019":[266,133.1],"2020":[273,135.1],"2021":[276,133.8],"2022":[214,132.7],"2023":[271,132.2],"2024":[390,130.7]},"ing":{"2016":[286,135.5],"2017":[280,131.7],"2018":[262,136.7],"2019":[263,136.3],"2020":[274,147.8],"2021":[275,141.9],"2022":[211,148.9],"2023":[268,142.7],"2024":[390,139.1]},"lc":{"2016":[286,137.8],"2017":[280,137.6],"2018":[266,135.7],"2019":[266,134.0],"2020":[272,137.3],"2021":[276,136.3],"2022":[213,139.7],"2023":[268,138.7],"2024":[390,139.2]},"rc":{"2016":[286,132.6],"2017":[280,131.9],"2018":[266,133.9],"2019":[266,129.1],"2020":[273,131.3],"2021":[276,129.3],"2022":[213,131.8],"2023":[269,126.9],"2024":[390,123.9]},"ce":{"2017":[255,141.5],"2018":[259,140.7],"2019":[254,145.1],"2020":[257,134.1],"2021":[263,135.1],"2022":[182,133.1],"2023":[250,139.2],"2024":[337,138.2]}}},"ins":{"rc":{"2016":144.01,"2017":142.29,"2018":145.89,"2019":142.55,"2020":145.62,"2021":141.76,"2022":143.12,"2023":140.0,"2024":137.0,"2025":137.0},"cc":{"2016":144.08,"2017":135.98,"2018":135.99,"2019":137.35,"2020":148.34,"2021":140.16,"2022":138.41,"2023":136.0,"2024":140.0,"2025":141.0},"lc":{"2016":144.2,"2017":143.56,"2018":144.0,"2019":143.48,"2020":148.32,"2021":143.24,"2022":145.29,"2023":146.0,"2024":148.0,"2025":151.0},"ing":{"2016":142.29,"2017":141.23,"2018":144.0,"2019":145.88,"2020":151.45,"2021":152.36,"2022":155.85,"2023":151.0,"2024":152.0,"2025":152.0},"global":{"2016":144.09,"2017":140.59,"2018":142.71,"2019":142.2,"2020":145.49,"2021":142.37,"2022":141.22,"2023":141.0,"2024":141.0,"2025":146.0},"ce":{"2017":146.73,"2018":146.22,"2019":141.96,"2020":135.0,"2021":134.27,"2022":122.66,"2023":134.0,"2024":131.0,"2025":151.0}},"nac":{"rc":{"2016":150.0,"2017":149.0,"2018":150.0,"2019":147.0,"2020":149.0,"2021":144.0,"2022":145.0,"2023":143.0,"2024":144.0,"2025":143.0},"cc":{"2016":150.0,"2017":142.0,"2018":142.0,"2019":142.0,"2020":152.0,"2021":143.0,"2022":144.0,"2023":140.0,"2024":146.0,"2025":144.0},"lc":{"2016":150.0,"2017":150.0,"2018":150.0,"2019":149.0,"2020":152.0,"2021":146.0,"2022":150.0,"2023":149.0,"2024":153.0,"2025":152.0},"ing":{"2016":150.0,"2017":150.0,"2018":151.0,"2019":152.0,"2020":156.0,"2021":154.0,"2022":155.0,"2023":153.0,"2024":155.0,"2025":153.0},"global":{"2016":150.0,"2017":147.0,"2018":148.0,"2019":147.0,"2020":149.0,"2021":145.0,"2022":145.0,"2023":145.0,"2024":146.0,"2025":148.0},"ce":{"2017":151.0,"2018":149.0,"2019":144.0,"2020":137.0,"2021":137.0,"2022":129.0,"2023":141.0,"2024":134.0,"2025":149.0}},"nAll":{"global":{"2016":1445,"2017":1336,"2018":1227,"2019":1286,"2020":1437,"2021":1362,"2022":1161,"2023":1361,"2024":1466},"lc":{"2016":1445,"2017":1336,"2018":1227,"2019":1285,"2020":1435,"2021":1361,"2022":1158,"2023":1356,"2024":1466},"rc":{"2016":1445,"2017":1335,"2018":1227,"2019":1286,"2020":1437,"2021":1362,"2022":1159,"2023":1357,"2024":1466},"cc":{"2016":1445,"2017":1335,"2018":1226,"2019":1283,"2020":1434,"2021":1361,"2022":1157,"2023":1355,"2024":1466},"ce":{"2017":1262,"2018":1197,"2019":1234,"2020":1378,"2021":1321,"2022":1037,"2023":1258,"2024":1355},"ing":{"2016":1443,"2017":1333,"2018":1220,"2019":1279,"2020":1432,"2021":1355,"2022":1153,"2023":1351,"2024":1464}}};
+  var COMPS = [
+    { k: "global", code: "PG", label: "Puntaje global" },
+    { k: "lc", code: "LC", label: "Lectura crítica" },
+    { k: "rc", code: "RC", label: "Razonamiento cuantitativo" },
+    { k: "cc", code: "CC", label: "Competencias ciudadanas" },
+    { k: "ce", code: "CE", label: "Comunicación escrita" },
+    { k: "ing", code: "IN", label: "Inglés" }
+  ];
+  var CAMPUS = ["Bucaramanga", "Cúcuta", "Valledupar", "Bogotá"];
+  var YEARS = []; for (var y = 2016; y <= 2025; y++) YEARS.push(y);
+  var LO = 110, HI = 170, FEW10 = 10, FEW30 = 30;
+  var S = { year: 2024, comp: "global", mode: "campus", view: "year", hl: "todas" };
+  var EASE = "power4.out", T = 0.26;
+
+  var $ = function (s, r) { return (r || document).querySelector(s); };
+  var el = function (tag, cls, html) { var n = document.createElement(tag); if (cls) n.className = cls; if (html != null) n.innerHTML = html; return n; };
+  var reduced = function () { return window.matchMedia && matchMedia("(prefers-reduced-motion: reduce)").matches; };
+  var hasG = typeof gsap !== "undefined";
+  var nf0 = new Intl.NumberFormat("es-CO", { maximumFractionDigits: 0 });
+  var nf1 = new Intl.NumberFormat("es-CO", { minimumFractionDigits: 1, maximumFractionDigits: 1 });
+  var signed = function (n) { var r = Math.round(n); return r > 0 ? "+" + r : r < 0 ? "−" + Math.abs(r) : "0"; };
+  var tone = function (g) { var s = Math.abs(Math.round(g)); if (s < 3) return "mid"; return (g > 0 ? "pos" : "neg") + "-" + (s >= 10 ? 2 : 1); };
+  var dir = function (g) { var r = Math.round(g); return r > 0 ? "up" : r < 0 ? "down" : "same"; };
+  var GL = { up: "M5 1.5 9 7.5H1z", down: "M5 8.5 9 2.5H1z", same: "M1 4.2h8v1.6H1z" };
+  var glyph = function (d) { return '<svg viewBox="0 0 10 10" aria-hidden="true"><path d="' + GL[d] + '"/></svg>'; };
+  var words = function (g) { var r = Math.round(g), a = Math.abs(r); return r === 0 ? "igual al promedio del país" : a + (a === 1 ? " punto " : " puntos ") + (r > 0 ? "sobre" : "bajo") + " el país"; };
+
+  /* ---------- datos ---------- */
+  function nat(k, y) { var v = D.nac[k] && D.nac[k][y]; return v == null ? null : v; }
+  function udes(k, y, campus) {
+    if (campus == null) {
+      var v = D.ins[k] && D.ins[k][y]; var n = D.nAll[k] && D.nAll[k][y];
+      return { val: v == null ? null : v, n: n == null ? null : n, official: true };
+    }
+    var e = D.sede[campus] && D.sede[campus][k] && D.sede[campus][k][y];
+    return e ? { val: e[1], n: e[0] } : { val: null, n: null };
+  }
+  function spec(label, k, campus, extra) {
+    var u = udes(k, S.year, campus), nv = nat(k, S.year), kind = "ok", note = "";
+    if (u.val == null) { kind = "empty"; note = (campus != null && S.year === 2025) ? "El ICFES publicó 2025 solo para toda la UDES" : "Sin evaluados"; }
+    else if (!u.official && u.n < FEW10) kind = "few";
+    else if (nv == null) kind = "nonat";
+    var gap = (u.val != null && nv != null) ? u.val - nv : null;
+    return Object.assign({ label: label, k: k, campus: campus, val: u.val, n: u.n, official: !!u.official, nat: nv, gap: gap, kind: kind, note: note, low: !u.official && u.n != null && u.n < FEW30 && kind !== "empty" }, extra || {});
+  }
+  function model() {
+    var b1 = COMPS.map(function (c) { return { c: c, key: "n-" + c.k, val: nat(c.k, S.year) }; });
+    var b2;
+    if (S.mode === "campus") {
+      b2 = [spec("Toda la UDES", S.comp, null, { key: "u-todas" })].concat(CAMPUS.map(function (cp) { return spec(cp, S.comp, cp, { key: "u-" + cp }); }));
+    } else {
+      b2 = COMPS.map(function (c) { return spec(c.label, c.k, "Bucaramanga", { key: "b-" + c.k, c: c }); });
+    }
+    return { b1: b1, b2: b2 };
+  }
+
+  /* ---------- escala y posición ---------- */
+  var W = 600;
+  function px(v) { return ((v - LO) / (HI - LO)) * W; }
+  function measure() { var t = $("#rows1 .trk"); if (t && t.clientWidth) W = t.clientWidth; }
+
+  /* ---------- cifras que voltean ---------- */
+  function setFlaps(box, str, animate) {
+    var cells = box.children;
+    while (cells.length > str.length) box.removeChild(box.lastChild);
+    while (cells.length < str.length) box.appendChild(el("span", "fl", "<b></b>"));
+    for (var i = 0; i < str.length; i++) {
+      var cell = cells[i], b = cell.firstChild, ch = str.charAt(i);
+      cell.classList.toggle("fl--dash", ch === "—");
+      if (b.textContent !== ch) {
+        b.textContent = ch;
+        if (animate && hasG && !reduced()) gsap.fromTo(b, { rotationX: -90, opacity: 0.2, transformOrigin: "50% 0%" }, { rotationX: 0, opacity: 1, duration: 0.24, ease: EASE, delay: i * 0.03, overwrite: true });
+      }
+    }
+  }
+  function flapIntro(box, delay) {
+    var bs = box.querySelectorAll("b");
+    return { targets: bs, delay: delay };
+  }
+
+  /* ---------- construcción de filas ---------- */
+  function mkTicks() {
+    document.querySelectorAll("[data-ticks]").forEach(function (t) {
+      t.innerHTML = "";
+      for (var v = LO; v <= HI; v += 10) { var s = el("span", null, String(v)); s.style.left = ((v - LO) / (HI - LO)) * 100 + "%"; t.appendChild(s); }
+    });
+  }
+  function row1(m) {
+    var li = el("li", "row");
+    li.dataset.key = m.key;
+    var b = el("button", "lab", '<span class="code" aria-hidden="true">' + m.c.code + '</span><span class="lab__text">' + m.c.label + "</span>");
+    b.type = "button"; b.setAttribute("aria-pressed", "false"); b.dataset.k = m.c.k;
+    b.setAttribute("aria-label", m.c.label + ", elegir competencia");
+    var trk = el("div", "trk", '<i class="stem"></i><i class="sq"></i><span class="none"><span>Sin promedio nacional</span></span>');
+    var val = el("div", "val", '<span class="flaps" aria-hidden="true"></span><span class="sub"></span>');
+    li.append(b, trk, val);
+    li._b = b; li._stem = trk.children[0]; li._sq = trk.children[1]; li._trk = trk; li._flaps = val.children[0]; li._sub = val.children[1];
+    b.addEventListener("click", function () { S.comp = m.c.k; update("comp"); });
+    li.addEventListener("pointerenter", function () { showRead(m.c.k, "n"); });
+    li.addEventListener("pointerleave", function () { showRead(); });
+    b.addEventListener("focus", function () { showRead(m.c.k, "n"); });
+    return li;
+  }
+  function row2(s) {
+    var li = el("li", "row");
+    li.dataset.key = s.key;
+    var lab;
+    if (s.c) lab = el("div", "lab lab--static", '<span class="code" aria-hidden="true">' + s.c.code + '</span><span class="lab__text">' + s.c.label + "</span>");
+    else lab = el("div", "lab lab--static lab--campus", '<span class="lab__text">' + s.label + "<small></small></span>");
+    var trk = el("div", "trk", '<i class="ghost"></i><i class="gbar"></i><i class="dot"></i><span class="none"><span></span></span>');
+    var val = el("div", "val", '<span class="flaps" aria-hidden="true"></span><span class="sub"></span>');
+    li.append(lab, trk, val);
+    li.tabIndex = 0; li.setAttribute("role", "group");
+    li._lab = lab; li._ghost = trk.children[0]; li._bar = trk.children[1]; li._dot = trk.children[2]; li._none = trk.children[3].firstChild;
+    li._flaps = val.children[0]; li._sub = val.children[1];
+    li.addEventListener("pointerenter", function () { showRead(s.k, "u", li._spec); });
+    li.addEventListener("pointerleave", function () { showRead(); });
+    li.addEventListener("focus", function () { showRead(s.k, "u", li._spec); });
+    li.addEventListener("blur", function () { showRead(); });
+    return li;
+  }
+
+  /* ---------- colocar (animate = true mueve en 260 ms) ---------- */
+  function put(target, props, animate) {
+    if (!hasG) { /* sin GSAP: estado final directo */ target.style.transform = ""; }
+    if (animate && !reduced() && hasG) gsap.to(target, Object.assign({ duration: T, ease: EASE, overwrite: "auto" }, props));
+    else if (hasG) gsap.set(target, props);
+  }
+  function place1(li, m, animate) {
+    var has = m.val != null;
+    li._trk.toggleAttribute("data-empty", !has);
+    li._stem.style.opacity = has ? 1 : 0; li._sq.style.opacity = has ? 1 : 0;
+    if (has) { put(li._stem, { scaleX: Math.max(px(m.val), 1) }, animate); put(li._sq, { x: px(m.val) }, animate); }
+    setFlaps(li._flaps, has ? String(Math.round(m.val)) : "—", animate);
+    li._sub.textContent = has ? "promedio del país" : "";
+    li._b.setAttribute("aria-pressed", String(m.c.k === S.comp));
+    li.toggleAttribute("data-active", m.c.k === S.comp);
+  }
+  function place2(li, s, animate) {
+    li._spec = s;
+    li.dataset.kind = s.kind;
+    li.toggleAttribute("data-low", s.low);
+    li.toggleAttribute("data-active", S.mode === "bucaramanga" && s.k === S.comp);
+    var has = s.val != null;
+    if (s.nat != null) put(li._ghost, { x: px(s.nat) }, animate);
+    if (has) {
+      put(li._dot, { x: px(s.val) }, animate);
+      if (s.nat != null && s.kind === "ok") {
+        var lo = Math.min(px(s.val), px(s.nat)), len = Math.abs(px(s.val) - px(s.nat));
+        li._bar.style.background = "var(--div-" + tone(s.gap) + ")";
+        li._bar.style.outline = tone(s.gap) === "mid" ? "1px solid var(--board-line-strong)" : "none";
+        put(li._bar, { x: lo, scaleX: Math.max(len, 2) }, animate);
+      }
+    }
+    li._none.textContent = s.note;
+    var t = has ? String(Math.round(s.val)) : "—";
+    setFlaps(li._flaps, t, animate);
+    var sub = "";
+    if (!has) sub = "sin dato";
+    else if (s.gap != null) {
+      var d = dir(s.gap);
+      sub = '<span class="gap" data-tone="' + d + '"' + (s.kind === "few" ? " data-few" : "") + ">" + glyph(d) + (s.kind === "few" ? "(" + signed(s.gap) + ")" : signed(s.gap)) + " puntos</span>";
+    } else sub = '<span class="gap" data-tone="same" data-few>sin país</span>';
+    var n2 = s.official ? "oficial ICFES" : (s.n != null ? nf0.format(s.n) + " evaluados" : "");
+    if (s.low && has) n2 += (n2 ? " · " : "") + (s.kind === "few" ? "menos de 10" : "pocos para comparar");
+    li._sub.innerHTML = sub + (n2 ? "<span>" + n2 + "</span>" : "");
+    var small = li._lab.querySelector("small");
+    if (small) small.textContent = s.official ? "Promedio oficial del ICFES" : (s.n != null ? nf0.format(s.n) + " evaluados" : "");
+    li.setAttribute("aria-label", sentence(s, true));
+  }
+
+  /* ---------- texto ---------- */
+  function cname(k) { return COMPS.filter(function (c) { return c.k === k; })[0].label; }
+  function sentence(s, short) {
+    var nm = s.label + (s.c ? "" : ", " + cname(s.k));
+    if (s.val == null) return nm + ", " + S.year + ": sin dato. " + (s.note || "");
+    var base = nm + ", " + S.year + ": " + nf1.format(s.val) + " puntos";
+    if (s.nat != null) base += "; el país, " + nf0.format(s.nat) + ". " + (s.kind === "few" ? "Con menos de 10 evaluados no se compara. " : "La UDES queda " + words(s.gap) + ". ");
+    else base += ". Sin promedio nacional ese año. ";
+    if (!short) {
+      if (s.official) base += "Promedio oficial del ICFES.";
+      else if (s.n != null) base += nf0.format(s.n) + " evaluados" + (s.low ? (s.kind === "few" ? ", menos de 10." : ", pocos para comparar.") : ".");
+    }
+    return base;
+  }
+  var readEl = $("#readout");
+  function showRead(k, band, s) {
+    var text;
+    if (S.view === "evo") { readEl.textContent = evoSentence(k || S.comp); return; }
+    if (!k) { k = S.comp; band = "def"; }
+    if (band === "n") { var v = nat(k, S.year); text = cname(k) + ", " + S.year + ": " + (v == null ? "el ICFES no publicó promedio nacional ese año." : "el promedio nacional fue " + nf0.format(v) + " puntos."); }
+    else if (band === "u") text = sentence(s);
+    else {
+      var rows = S.mode === "campus" ? model().b2.slice(0, 1) : model().b2.filter(function (x) { return x.k === S.comp; });
+      text = sentence(rows[0]);
+    }
+    readEl.textContent = text;
+  }
+  function subtitles(m) {
+    $("#b1-sub").textContent = "Promedio nacional del ICFES, " + S.year + ", en las seis competencias.";
+    $("#b2-sub").textContent = S.mode === "campus" ? "Por campus, en " + cname(S.comp).toLowerCase() + ". La línea punteada es el promedio del país." : "Solo Bucaramanga, las seis competencias. Cada línea punteada es el país en esa competencia.";
+  }
+  function table(m) {
+    var h = '<caption>Promedio por competencia y ámbito, ' + S.year + ', en puntos del ICFES</caption><thead><tr><th scope="col">Ámbito</th><th scope="col">Competencia</th><th scope="col" class="num">Promedio</th><th scope="col" class="num">País</th><th scope="col" class="num">Diferencia</th><th scope="col" class="num">Evaluados</th><th scope="col">Nota</th></tr></thead><tbody>';
+    m.b1.forEach(function (r) { h += "<tr><th scope='row'>País</th><td>" + r.c.label + "</td><td class='num'>" + (r.val == null ? "Sin dato" : nf0.format(r.val)) + "</td><td class='num'></td><td class='num'></td><td class='num'></td><td>" + (r.val == null ? "Sin promedio nacional ese año" : "") + "</td></tr>"; });
+    m.b2.forEach(function (s) {
+      var nt = s.val == null ? (s.note || "Sin dato") : (s.official ? "Oficial ICFES" : (s.kind === "few" ? "Menos de 10 evaluados, sin comparar" : (s.low ? "Pocos para comparar" : "")));
+      h += "<tr><th scope='row'>" + (s.c ? "Bucaramanga" : s.label) + "</th><td>" + cname(s.k) + "</td><td class='num'>" + (s.val == null ? "Sin dato" : nf1.format(s.val)) + "</td><td class='num'>" + (s.nat == null ? "" : nf0.format(s.nat)) + "</td><td class='num'>" + (s.gap == null ? "" : (s.kind === "few" ? "(" + signed(s.gap) + ")" : signed(s.gap))) + "</td><td class='num'>" + (s.n == null ? "" : nf0.format(s.n)) + "</td><td>" + nt + "</td></tr>";
+    });
+    $("#tbl").innerHTML = h + "</tbody>";
+  }
+
+  /* ---------- render ---------- */
+  var rows1 = $("#rows1"), rows2 = $("#rows2");
+  var els1 = {}, els2 = {}, mode2 = null, introTl = null, introDone = false;
+
+  function build1(m) {
+    rows1.innerHTML = ""; els1 = {};
+    m.b1.forEach(function (r) { var li = row1(r); els1[r.key] = li; rows1.appendChild(li); });
+  }
+  function build2(m) {
+    rows2.innerHTML = ""; els2 = {};
+    rows2.setAttribute("aria-label", S.mode === "campus" ? "Cifras UDES por campus" : "Cifras de Bucaramanga por competencia");
+    m.b2.forEach(function (r) { var li = row2(r); els2[r.key] = li; rows2.appendChild(li); });
+    mode2 = S.mode;
+  }
+  function draw(animate) {
+    var m = model();
+    subtitles(m);
+    m.b1.forEach(function (r) { place1(els1[r.key], r, animate); });
+    m.b2.forEach(function (r) { place2(els2[r.key], r, animate); });
+    table(m);
+    showRead();
+  }
+  function killIntro() { if (introTl) { introTl.progress(1).kill(); introTl = null; } }
+
+  function update(what) {
+    killIntro();
+    syncControls();
+    if (what === "view") { switchView(); return; }
+    if (S.view === "evo") {
+      if (what === "comp") { markEvoActive(); showRead(); }
+      else refreshEvo();
+      return;
+    }
+    if (what === "mode" && hasG && !reduced()) {
+      var old = Array.prototype.slice.call(rows2.children);
+      gsap.killTweensOf(old);
+      gsap.to(old, { opacity: 0, duration: 0.1, ease: "power2.out", onComplete: swapMode });
+    } else if (what === "mode") swapMode();
+    else { measure(); draw(true); }
+  }
+  function swapMode() {
+    measure();
+    build2(model()); draw(false);
+    if (hasG && !reduced()) enter2(0);
+  }
+  function enter2(at, tl) {
+    var rs = Array.prototype.slice.call(rows2.children);
+    var t = tl || gsap.timeline();
+    rs.forEach(function (li, i) {
+      var s = li._spec, p = at + i * 0.04;
+      t.from(li, { opacity: 0, y: 6, duration: 0.2, ease: EASE, clearProps: "opacity,transform" }, p);
+      if (s.val != null) {
+        t.from(li._dot, { x: s.nat != null ? px(s.nat) : px(s.val), opacity: 0, duration: 0.3, ease: EASE }, p);
+        if (s.kind === "ok" && s.nat != null) {
+          var lo = Math.min(px(s.val), px(s.nat));
+          t.fromTo(li._bar, { x: px(s.nat), scaleX: 0 }, { x: lo, scaleX: Math.max(Math.abs(px(s.val) - px(s.nat)), 2), duration: 0.3, ease: EASE }, p);
+        }
+        if (s.nat != null) t.from(li._ghost, { opacity: 0, duration: 0.2, ease: "power2.out" }, p);
+        t.from(li._flaps.querySelectorAll("b"), { rotationX: -90, opacity: 0.2, transformOrigin: "50% 0%", duration: 0.24, ease: EASE, stagger: 0.04 }, p + 0.06);
+      }
+    });
+    return t;
+  }
+  function intro() {
+    if (introDone || !hasG || reduced()) { introDone = true; return; }
+    introDone = true;
+    var tl = gsap.timeline({ onComplete: function () { introTl = null; } });
+    introTl = tl;
+    var r1 = Array.prototype.slice.call(rows1.children);
+    tl.from(".ticks span", { opacity: 0, duration: 0.25, ease: "power2.out" }, 0);
+    r1.forEach(function (li, i) {
+      var v = li._stem.style.opacity === "0" ? null : gsap.getProperty(li._sq, "x");
+      var p = 0.04 + i * 0.045;
+      tl.from(li._b, { opacity: 0, y: 6, duration: 0.25, ease: EASE, clearProps: "opacity,transform" }, p);
+      if (v != null) {
+        tl.from(li._stem, { scaleX: 0, duration: 0.55, ease: EASE }, p);
+        tl.from(li._sq, { x: 0, duration: 0.55, ease: EASE }, p);
+        tl.from(li._flaps.querySelectorAll("b"), { rotationX: -90, opacity: 0.2, transformOrigin: "50% 0%", duration: 0.26, ease: EASE, stagger: 0.04 }, p + 0.2);
+      }
+    });
+    enter2(0.5, tl);
+  }
+
+  /* ---------- controles ---------- */
+  function syncControls() {
+    document.querySelectorAll("#years .chip").forEach(function (c) { c.setAttribute("aria-checked", String(+c.dataset.y === S.year)); c.tabIndex = +c.dataset.y === S.year ? 0 : -1; });
+    document.querySelectorAll("[data-mode]").forEach(function (b) { b.setAttribute("aria-checked", String(b.dataset.mode === S.mode)); b.tabIndex = b.dataset.mode === S.mode ? 0 : -1; });
+    document.querySelectorAll("[data-view]").forEach(function (b) { b.setAttribute("aria-checked", String(b.dataset.view === S.view)); b.tabIndex = b.dataset.view === S.view ? 0 : -1; });
+    document.querySelectorAll("#hl .chip").forEach(function (c) { c.setAttribute("aria-checked", String(c.dataset.hl === S.hl)); c.tabIndex = c.dataset.hl === S.hl ? 0 : -1; });
+    var hb = $("#hlbar"); if (hb) hb.hidden = !(S.view === "evo" && S.mode === "campus");
+  }
+  function arrows(group, onPick) {
+    group.addEventListener("keydown", function (e) {
+      var keys = { ArrowRight: 1, ArrowDown: 1, ArrowLeft: -1, ArrowUp: -1 };
+      if (!(e.key in keys)) return;
+      e.preventDefault();
+      var items = Array.prototype.slice.call(group.querySelectorAll('[role="radio"]'));
+      var i = items.indexOf(document.activeElement); if (i < 0) i = items.findIndex(function (x) { return x.getAttribute("aria-checked") === "true"; });
+      var n = items[(i + keys[e.key] + items.length) % items.length];
+      n.focus(); onPick(n);
+    });
+  }
+  var yearsEl = $("#years");
+  YEARS.forEach(function (y) {
+    var b = el("button", "chip", String(y)); b.type = "button"; b.setAttribute("role", "radio"); b.dataset.y = y;
+    if (y === 2025) { b.dataset.partial = ""; b.title = "Solo el promedio oficial de la UDES y el nacional"; b.setAttribute("aria-label", "2025, solo promedio oficial"); }
+    b.addEventListener("click", function () { S.year = y; update("year"); });
+    yearsEl.appendChild(b);
+  });
+  arrows(yearsEl, function (n) { S.year = +n.dataset.y; update("year"); });
+  function pickMode(n) { if (S.mode === n.dataset.mode) return; S.mode = n.dataset.mode; update("mode"); }
+  document.querySelectorAll("[data-mode]").forEach(function (b) { b.addEventListener("click", function () { pickMode(b); }); });
+  document.querySelectorAll(".modeseg").forEach(function (g) { arrows(g, pickMode); });
+  function pickView(n) { if (S.view === n.dataset.view) return; S.view = n.dataset.view; update("view"); }
+  document.querySelectorAll("[data-view]").forEach(function (b) { b.addEventListener("click", function () { pickView(b); }); });
+  arrows($("#view"), pickView);
+  var hlEl = $("#hl");
+  ["todas"].concat(CAMPUS).forEach(function (x) {
+    var b = el("button", "chip", x === "todas" ? "Toda la UDES" : x); b.type = "button"; b.setAttribute("role", "radio"); b.dataset.hl = x;
+    b.addEventListener("click", function () { S.hl = x; update("hl"); });
+    hlEl.appendChild(b);
+  });
+  arrows(hlEl, function (n) { S.hl = n.dataset.hl; update("hl"); });
+  document.querySelectorAll("[data-exp]").forEach(function (b) {
+    b.addEventListener("click", function () { $("#exp-msg").textContent = "En el portal, " + b.dataset.exp + " descarga el gráfico tal como está. Aquí es solo el diseño."; });
+  });
+
+  /* ---------- evolución: la brecha con el país año por año ---------- */
+  var NY = YEARS.length, EH = 84, evoTl = null, evoSeen = false, evoW = 0;
+  function gapSeries(k, campus) {
+    return YEARS.map(function (y) {
+      var u = udes(k, y, campus), nv = nat(k, y);
+      var gap = (u.val != null && nv != null) ? u.val - nv : null;
+      return { y: y, val: u.val, nat: nv, gap: gap, n: u.n, official: !!u.official, low: !u.official && u.n != null && u.n < FEW30, few: !u.official && u.n != null && u.n < FEW10 };
+    });
+  }
+  var DLO = -10, DHI = 10;
+  /* El eje se ajusta a la serie resaltada y a las series con 30 evaluados o más; una serie con menos puede salirse y se corta en el borde. */
+  function setDomain(cp) {
+    var mn = 0, mx = 0;
+    COMPS.forEach(function (c) {
+      [null].concat(CAMPUS).forEach(function (x) {
+        gapSeries(c.k, x).forEach(function (p) {
+          if (p.gap == null) return;
+          if (x !== cp && (p.low || p.few)) return;
+          mn = Math.min(mn, p.gap); mx = Math.max(mx, p.gap);
+        });
+      });
+    });
+    DLO = Math.floor((mn - 1) / 5) * 5; DHI = Math.ceil((mx + 1) / 5) * 5;
+    if (DHI - DLO < 15) { DLO = Math.min(DLO, -10); DHI = Math.max(DHI, 5); }
+  }
+  var sg = function (g) { var r = Math.round(g); return r > 0 ? 1 : r < 0 ? -1 : 0; };
+  function stats(ser) {
+    var pts = ser.filter(function (p) { return p.gap != null; });
+    if (!pts.length) return null;
+    var f = pts[0], l = pts[pts.length - 1];
+    var best = pts.reduce(function (a, p) { return p.gap > a.gap ? p : a; }, pts[0]);
+    var worst = pts.reduce(function (a, p) { return p.gap < a.gap ? p : a; }, pts[0]);
+    var s = sg(l.gap), n = 0;
+    for (var i = ser.length - 1; i >= 0; i--) { if (ser[i].y > l.y) continue; if (ser[i].gap == null || sg(ser[i].gap) !== s) break; n++; }
+    var d = Math.abs(l.gap) - Math.abs(f.gap);
+    var cross = sg(f.gap) !== sg(l.gap) && sg(f.gap) !== 0 && sg(l.gap) !== 0;
+    var tag = pts.length < 2 ? "Un solo año con dato" : cross ? (sg(l.gap) > 0 ? "Pasa a estar sobre el país" : "Pasa a estar bajo el país") : d <= -3 ? "Se acerca al país" : d >= 3 ? "Se aleja del país" : "Se mantiene";
+    return { f: f, l: l, delta: l.gap - f.gap, best: best, worst: worst, streak: n, sign: s, tag: tag, count: pts.length, few: f.few || l.few, low: pts.some(function (p) { return p.low; }) };
+  }
+  function whoCampus() { return S.mode === "bucaramanga" ? "Bucaramanga" : (S.hl === "todas" ? null : S.hl); }
+  function whoName() { return whoCampus() || "Toda la UDES"; }
+  function evoSentence(k) {
+    var ser = gapSeries(k, whoCampus()), st = stats(ser), nm = whoName();
+    if (!st) return cname(k) + ", " + nm + ": sin dato frente al país.";
+    var t = cname(k) + ", " + nm + ": en " + st.f.y + ", " + words(st.f.gap) + "; en " + st.l.y + ", " + words(st.l.gap) + ". ";
+    t += st.count < 2 ? "Solo hay un año con dato. " : st.tag + ": la brecha cambia " + signed(st.delta) + " puntos. ";
+    t += st.streak + (st.streak === 1 ? " año seguido " : " años seguidos ") + (st.sign > 0 ? "sobre" : st.sign < 0 ? "bajo" : "igual que") + " el país. La mejor brecha fue " + signed(st.best.gap) + " (" + st.best.y + ") y la peor " + signed(st.worst.gap) + " (" + st.worst.y + ").";
+    var miss = ser.filter(function (p) { return p.gap == null && p.y > st.f.y; }).map(function (p) { return p.y; });
+    if (miss.length) t += " Sin dato: " + miss.join(", ") + ".";
+    if (st.few) t += " Con menos de 10 evaluados en un extremo, la cifra no se compara."; else if (st.low) t += " Algunos años tienen menos de 30 evaluados.";
+    return t;
+  }
+  function closeHtml(st) {
+    if (!st) return '<span class="cl">Sin dato frente al país</span>';
+    var d = dir(st.delta);
+    var fig = st.few ? "(" + signed(st.delta) + ")" : signed(st.delta);
+    return '<span class="gap" data-tone="' + d + '"' + (st.few ? " data-few" : "") + ">" + glyph(d) + fig + " puntos desde " + st.f.y + "</span>" +
+      '<span class="cl"><b>' + st.tag + "</b></span>" +
+      '<span class="cl">' + st.streak + (st.streak === 1 ? " año seguido " : " años seguidos ") + (st.sign > 0 ? "sobre" : st.sign < 0 ? "bajo" : "igual que") + " el país</span>" +
+      '<span class="cl">Mejor ' + signed(st.best.gap) + " (" + st.best.y + ") · peor " + signed(st.worst.gap) + " (" + st.worst.y + ")</span>" +
+      (st.low ? '<span class="cl">Pocos evaluados en algún año</span>' : "");
+  }
+  function runsOf(ser) {
+    var runs = [], cur = null;
+    ser.forEach(function (p, i) { if (p.gap == null) { cur = null; return; } if (!cur) { cur = []; runs.push(cur); } cur.push({ i: i, p: p }); });
+    return runs;
+  }
+  function evoSvg(ser, others, w, h, id) {
+    var pad = 10, step = (w - 2 * pad) / (NY - 1);
+    var X = function (i) { return pad + i * step; };
+    var Y = function (g) { return 4 + (h - 8) * (DHI - g) / (DHI - DLO); };
+    var z = Y(0), g, s = '<svg viewBox="0 0 ' + w + " " + h + '" width="' + w + '" height="' + h + '" aria-hidden="true" focusable="false">';
+    s += '<defs><pattern id="hp' + id + '" width="6" height="6" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><line x1="0" y1="0" x2="0" y2="6" style="stroke:var(--board-line-strong)" stroke-width="1"/></pattern>' +
+      '<clipPath id="ca' + id + '"><rect x="0" y="0" width="' + w + '" height="' + z + '"/></clipPath><clipPath id="cb' + id + '"><rect x="0" y="' + z + '" width="' + w + '" height="' + (h - z) + '"/></clipPath></defs>';
+    ser.forEach(function (p, i) {
+      if (p.gap == null) s += '<rect x="' + Math.max(0, X(i) - step / 2) + '" y="0" width="' + (Math.min(w, X(i) + step / 2) - Math.max(0, X(i) - step / 2)) + '" height="' + h + '" fill="url(#hp' + id + ')"/>';
+    });
+    for (g = Math.ceil(DLO / 5) * 5; g <= DHI; g += 5) {
+      if (g === 0) continue;
+      s += '<line x1="0" x2="' + w + '" y1="' + Y(g) + '" y2="' + Y(g) + '" style="stroke:var(--board-line)" stroke-dasharray="2 4"/>';
+      if (g % 10 === 0) s += '<text x="2" y="' + (Y(g) - 2) + '" font-size="10" style="fill:var(--muted)">' + (g > 0 ? "+" + g : "−" + Math.abs(g)) + "</text>";
+    }
+    var pathOf = function (run) { return run.map(function (r, j) { return (j ? "L" : "M") + X(r.i).toFixed(1) + " " + Y(r.p.gap).toFixed(1); }).join(" "); };
+    others.forEach(function (o) { runsOf(o).forEach(function (run) { if (run.length > 1) s += '<path class="ln faint" d="' + pathOf(run) + '" fill="none" style="stroke:var(--muted)" stroke-width="1.25" opacity=".6" stroke-linejoin="round"/>'; }); });
+    var runs = runsOf(ser);
+    runs.forEach(function (run) {
+      if (run.length < 2) return;
+      var d = pathOf(run) + " L" + X(run[run.length - 1].i).toFixed(1) + " " + z.toFixed(1) + " L" + X(run[0].i).toFixed(1) + " " + z.toFixed(1) + " Z";
+      s += '<path class="ar" d="' + d + '" clip-path="url(#ca' + id + ')" style="fill:var(--div-pos-1)" opacity=".5"/>';
+      s += '<path class="ar" d="' + d + '" clip-path="url(#cb' + id + ')" style="fill:var(--div-neg-1)" opacity=".5"/>';
+    });
+    s += '<line x1="0" x2="' + w + '" y1="' + z + '" y2="' + z + '" style="stroke:var(--ink)" stroke-width="1.5"/>';
+    s += '<text x="2" y="' + (z - 3) + '" font-size="10" font-weight="700" style="fill:var(--ink)">0</text>';
+    runs.forEach(function (run) { if (run.length > 1) s += '<path class="ln hl" d="' + pathOf(run) + '" fill="none" style="stroke:var(--series-udes)" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round"/>'; });
+    var lastI = -1; ser.forEach(function (p, i) { if (p.gap != null) lastI = i; });
+    ser.forEach(function (p, i) {
+      if (p.gap == null) return;
+      var r = i === lastI ? 4.6 : 3.2, hollow = p.low || p.few;
+      s += '<circle class="pt" cx="' + X(i).toFixed(1) + '" cy="' + Y(p.gap).toFixed(1) + '" r="' + r + '" style="' + (hollow ? "fill:var(--board);stroke:var(--series-udes)" : "fill:var(--series-udes);stroke:var(--board)") + '" stroke-width="' + (hollow ? 2 : 1.5) + '"' + (p.few ? ' stroke-dasharray="2 2"' : "") + "/>";
+    });
+    return s + "</svg>";
+  }
+  var rowsE = $("#rowsE"), evoRows = [];
+  function buildEvo() {
+    killEvo();
+    rowsE.innerHTML = ""; evoRows = [];
+    var cp = whoCampus();
+    setDomain(cp);
+    var others = [];
+    COMPS.forEach(function (c) {
+      var li = el("li", "row row--evo");
+      var b = el("button", "lab", '<span class="code" aria-hidden="true">' + c.code + '</span><span class="lab__text">' + c.label + "</span>");
+      b.type = "button"; b.dataset.k = c.k; b.setAttribute("aria-pressed", String(c.k === S.comp));
+      b.setAttribute("aria-label", c.label + ", elegir competencia");
+      var ch = el("div", "evo-chart"), val = el("div", "val close");
+      li.append(b, ch, val);
+      li.dataset.k = c.k; li.toggleAttribute("data-active", c.k === S.comp);
+      li.setAttribute("tabindex", "0"); li.setAttribute("role", "group"); li.setAttribute("aria-label", evoSentence(c.k));
+      b.addEventListener("click", function () { S.comp = c.k; update("comp"); });
+      li.addEventListener("pointerenter", function () { readEl.textContent = evoSentence(c.k); });
+      li.addEventListener("pointerleave", function () { showRead(); });
+      li.addEventListener("focus", function () { readEl.textContent = evoSentence(c.k); });
+      li.addEventListener("blur", function () { showRead(); });
+      rowsE.appendChild(li); evoRows.push({ c: c, li: li, ch: ch, val: val, b: b });
+    });
+    evoW = Math.round(evoRows[0].ch.clientWidth) || 520;
+    evoRows.forEach(function (r) {
+      var ser = gapSeries(r.c.k, cp), st = stats(ser);
+      var oth = [];
+      if (S.mode === "campus") { if (cp != null) oth.push(gapSeries(r.c.k, null)); CAMPUS.forEach(function (x) { if (x !== cp) oth.push(gapSeries(r.c.k, x)); }); }
+      r.ch.innerHTML = evoSvg(ser, oth, evoW, EH, r.c.k);
+      r.val.innerHTML = closeHtml(st);
+    });
+    var sub = "Brecha por año: promedio de " + (cp ? "UDES " + cp : "toda la UDES") + " menos promedio nacional, en puntos. Sobre la línea del cero, la UDES supera al país; un año sin dato interrumpe la línea.";
+    $("#evo-sub").textContent = sub;
+    $("#foot-evo").textContent = "Las seis filas usan el mismo eje vertical, de " + (DLO < 0 ? "−" + Math.abs(DLO) : DLO) + " a +" + DHI + " puntos, y los mismos años. La brecha es el promedio de la UDES menos el promedio nacional del mismo año; no se proyecta ni se une a través de un año sin dato. Mejorar es subir la brecha, no el puntaje bruto. El eje se ajusta al campus resaltado; una serie con menos de 30 evaluados que se sale del eje se corta en el borde. Fuente: ICFES, resultados Saber PRO.";
+    tableEvo(); showRead();
+  }
+  function tableEvo() {
+    var cp = whoCampus();
+    var h = "<caption>Brecha con el país por año, " + whoName() + ": promedio de la UDES menos promedio nacional, en puntos. Entre paréntesis, menos de 10 evaluados.</caption><thead><tr><th scope='col'>Competencia</th>";
+    YEARS.forEach(function (y) { h += "<th scope='col' class='num'>" + y + "</th>"; });
+    h += "<th scope='col' class='num'>Variación</th><th scope='col' class='num'>Años seguidos</th><th scope='col'>Mejor y peor</th><th scope='col'>Nota</th></tr></thead><tbody>";
+    COMPS.forEach(function (c) {
+      var ser = gapSeries(c.k, cp), st = stats(ser);
+      h += "<tr><th scope='row'>" + c.label + "</th>";
+      ser.forEach(function (p) { h += "<td class='num'>" + (p.gap == null ? "Sin dato" : (p.few ? "(" + signed(p.gap) + ")" : signed(p.gap))) + "</td>"; });
+      if (st) h += "<td class='num'>" + signed(st.delta) + " desde " + st.f.y + "</td><td class='num'>" + st.streak + (st.sign > 0 ? " sobre" : st.sign < 0 ? " bajo" : " igual") + "</td><td>Mejor " + signed(st.best.gap) + " (" + st.best.y + "); peor " + signed(st.worst.gap) + " (" + st.worst.y + ")</td><td>" + st.tag + (st.low ? ". Pocos evaluados en algún año" : "") + "</td>";
+      else h += "<td class='num'></td><td class='num'></td><td></td><td>Sin dato</td>";
+      h += "</tr>";
+    });
+    $("#tbl").innerHTML = h + "</tbody>";
+  }
+  function killEvo() { if (evoTl) { evoTl.progress(1).kill(); evoTl = null; } }
+  function playEvo() {
+    if (!hasG || reduced()) return;
+    killEvo();
+    var tl = gsap.timeline({ onComplete: function () { evoTl = null; } }); evoTl = tl;
+    evoRows.forEach(function (r, i) {
+      var p = i * 0.09;
+      tl.from(r.b, { opacity: 0, y: 6, duration: 0.22, ease: EASE, clearProps: "opacity,transform" }, p);
+      r.ch.querySelectorAll(".ln").forEach(function (ln) {
+        var L = ln.getTotalLength();
+        tl.fromTo(ln, { strokeDasharray: L, strokeDashoffset: L }, { strokeDashoffset: 0, duration: 0.7, ease: "power3.out" }, p);
+      });
+      tl.from(r.ch.querySelectorAll(".pt"), { opacity: 0, duration: 0.2, ease: "power2.out", stagger: 0.05 }, p + 0.15);
+      tl.from(r.ch.querySelectorAll(".ar"), { opacity: 0, duration: 0.35, ease: "power2.out" }, p + 0.65);
+      tl.from(r.val.children, { opacity: 0, y: 6, duration: 0.25, ease: EASE, stagger: 0.04, clearProps: "opacity,transform" }, p + 0.55);
+    });
+  }
+  function applyView() {
+    var evo = S.view === "evo";
+    $("#band1").hidden = evo; $("#band2").hidden = evo; $("#evo").hidden = !evo;
+    $("#ctl-year").hidden = evo; $("#evo-range").hidden = !evo;
+    $("#legend-year").hidden = evo; $("#legend-evo").hidden = !evo;
+    $("#foot-year").hidden = evo; $("#foot-evo").hidden = !evo;
+    $("#hlbar").hidden = !(evo && S.mode === "campus");
+  }
+  function switchView() {
+    killIntro(); killEvo();
+    var evo = S.view === "evo";
+    var host = evo ? $("#evo") : [$("#band1"), $("#band2")];
+    if (hasG) gsap.killTweensOf(host);
+    applyView();
+    if (evo) {
+      buildEvo();
+      if (!evoSeen && hasG && !reduced()) { evoSeen = true; playEvo(); }
+      else if (hasG && !reduced()) gsap.fromTo(host, { opacity: 0, y: 6 }, { opacity: 1, y: 0, duration: 0.22, ease: EASE, overwrite: true, clearProps: "opacity,transform" });
+      evoSeen = true;
+    } else {
+      measure();
+      if (mode2 !== S.mode) build2(model());
+      draw(false);
+      if (hasG && !reduced()) gsap.fromTo(host, { opacity: 0, y: 6 }, { opacity: 1, y: 0, duration: 0.22, ease: EASE, overwrite: true, clearProps: "opacity,transform" });
+    }
+  }
+  function refreshEvo() {
+    killEvo(); applyView(); buildEvo();
+    if (hasG && !reduced()) gsap.fromTo(rowsE, { opacity: 0 }, { opacity: 1, duration: 0.22, ease: EASE, overwrite: true, clearProps: "opacity" });
+  }
+  function markEvoActive() {
+    evoRows.forEach(function (r) { r.li.toggleAttribute("data-active", r.c.k === S.comp); r.b.setAttribute("aria-pressed", String(r.c.k === S.comp)); });
+  }
+
+  /* ---------- estados (ejemplos) ---------- */
+  function specimen(title, cls, o) {
+    var d = el("div", "spec");
+    var nv = 145, val = o.val;
+    var g = val == null ? null : val - nv;
+    var trk = '<div class="trk"' + (o.hatch ? " data-empty" : "") + ' style="position:relative">';
+    if (o.hatch) trk += '<span class="none"><span>' + o.hatch + "</span></span>";
+    else {
+      var p = function (v) { return ((v - LO) / (HI - LO)) * 100; };
+      trk += '<i class="ghost" style="left:' + p(nv) + '%"></i>';
+      if (!o.few) trk += '<i class="gbar" style="left:' + Math.min(p(val), p(nv)) + '%;width:' + Math.abs(p(val) - p(nv)) + '%;transform:none;background:var(--div-' + tone(g) + ')"></i>';
+      trk += '<i class="dot" style="left:' + p(val) + '%;' + (o.few ? "background:var(--board);box-shadow:none;border:2px dashed var(--series-udes)" : "") + '"></i>';
+    }
+    trk += "</div>";
+    var line = val == null ? "<span>sin dato</span>" : '<span class="gap" data-tone="' + dir(g) + '"' + (o.few ? " data-few" : "") + ">" + glyph(dir(g)) + (o.few ? "(" + signed(g) + ")" : signed(g)) + " puntos</span><span>" + val + "</span>";
+    d.innerHTML = '<h3 style="margin:0">' + title + "</h3>" + '<div class="row" ' + (o.low ? "data-low" : "") + ">" + trk + "</div>" + '<div class="valline">' + line + "</div><small>" + o.note + "</small>";
+    return d;
+  }
+  var sp = $("#specimens");
+  sp.append(
+    specimen("Brecha normal", "", { val: 139, note: "Ejemplo. 3 a 9 puntos bajo el país: terracota claro, con cifra y triángulo." }),
+    specimen("Pocos para comparar", "", { val: 151, low: true, note: "Ejemplo. Entre 10 y 29 evaluados: la fila se atenúa y lo dice." }),
+    specimen("Menos de 10 evaluados", "", { val: 152, few: true, note: "Ejemplo. Punto hueco, sin tono, cifra entre paréntesis y en cursiva." }),
+    specimen("Sin dato", "", { val: null, hatch: "Sin evaluados", note: "Rayado. Nunca se dibuja en cero ni en el borde del eje." })
+  );
+  var sk = el("div", "spec");
+  sk.innerHTML = '<h3 style="margin:0">Cargando</h3><div class="skel" role="status" aria-label="Cargando resultados"><span></span><span></span><span></span><span></span></div><small>Seis filas quietas, sin brillo que corra. El texto «Cargando resultados» llega al lector de pantalla.</small>';
+  var em = el("div", "spec");
+  em.innerHTML = '<h3 style="margin:0">Sin resultados</h3><p style="margin:0;font-size:.92rem">Este informe todavía no tiene resultados de Saber PRO. Cuando Planeación los cargue, aparecerán aquí.</p><small>Es el mismo aviso del bloque actual cuando no hay años.</small>';
+  sp.append(sk, em);
+  function evoSpecimen(title, gaps, flags, note) {
+    var ser = gaps.map(function (g, i) { var fl = flags[i] || ""; return { y: YEARS[i], gap: g, low: fl === "low", few: fl === "few" }; });
+    var d = el("div", "spec");
+    d.innerHTML = '<h3 style="margin:0">' + title + '</h3><div class="evo-chart">' + evoSvg(ser, [], 300, EH, "s" + Math.abs(title.length * 7)) + '</div><div class="close">' + closeHtml(stats(ser)) + "</div><small>" + note + "</small>";
+    return d;
+  }
+  sp.append(
+    evoSpecimen("Un año sin dato", [-9, -7, -6, null, -3, -1, 1, 2, null, null], {}, "Ejemplo. La línea se interrumpe sobre un tramo rayado y no se une. No se proyecta."),
+    evoSpecimen("Pocos evaluados", [-4, -6, -3, -5, -2, -4, -3, -1, 0, -2], { 5: "low", 6: "low", 7: "low", 8: "low", 9: "low" }, "Ejemplo. Punto hueco con menos de 30 evaluados; con menos de 10, además punteado y entre paréntesis."),
+    evoSpecimen("Menos de 10 evaluados", [-2, -3, -1, -2, -4, -3, 2, 1, 3, 4], { 8: "few", 9: "few" }, "Ejemplo. La variación va entre paréntesis y en cursiva: no se compara.")
+  );
+
+  /* ---------- arranque ---------- */
+  mkTicks();
+  var m0 = model();
+  measure(); build1(m0); build2(m0); syncControls(); draw(false);
+  var ro = typeof ResizeObserver !== "undefined" ? new ResizeObserver(function () { var old = W; measure(); if (W !== old) { killIntro(); draw(false); } }) : null;
+  if (ro) ro.observe($("#rows1 .trk"));
+  (function () {
+    var yt = $("#yrticks");
+    YEARS.forEach(function (y, i) { var s = el("span", null, String(y)); s.style.left = "calc(10px + (100% - 20px) * " + (i / (NY - 1)) + ")"; yt.appendChild(s); });
+    if (typeof ResizeObserver !== "undefined") {
+      var last = 0;
+      new ResizeObserver(function () { var w = Math.round($("#evo").clientWidth); if (S.view === "evo" && w && w !== last) { last = w; killEvo(); buildEvo(); } else if (w) last = w; }).observe($("#evo"));
+    }
+  })();
+  if (typeof IntersectionObserver !== "undefined" && hasG) {
+    var io = new IntersectionObserver(function (es) { if (es[0].isIntersecting) { io.disconnect(); requestAnimationFrame(intro); } }, { threshold: 0.25 });
+    io.observe($("#tablero"));
+  }
+})();
+</script>
+
+
+</body></html>

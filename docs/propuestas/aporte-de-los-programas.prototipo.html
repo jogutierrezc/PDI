@@ -1,0 +1,1164 @@
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<title>Aporte de los programas</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Montserrat:wght@500;600;700;800&family=Open+Sans:wght@400;600;700;800&display=swap">
+<style>
+/* Concepto: el tablero de llegadas de UDES en Cifras (azul noche / papel azulado, un solo ámbar,
+   escala divergente terracota-azul) con la sección «Aporte de los programas» debajo de Saber PRO;
+   y el boletín A4 a escala, con la paleta fija del papel. Tokens tomados de src/styles/tokens.css. */
+:root {
+  --page: #eef2f8; --surface: #ffffff; --board: #ffffff; --raised: #f1f5fa;
+  --line: rgba(13,40,84,.11); --line-strong: rgba(13,40,84,.22);
+  --ink: #0d1c31; --muted: #4e5f77;
+  --signal: #f6b93f; --signal-ink: #1d1402; --signal-text: #8a5700; --prev: #0a6f7c;
+  --neg-3:#7c2f0d; --neg-2:#b9541f; --neg-1:#e79c69; --mid:#e9edf3; --pos-1:#6fa4e8; --pos-2:#2a63b8;
+  --neg-3-ink:#fff; --neg-2-ink:#fff; --neg-1-ink:#0d1c31; --mid-ink:#0d1c31; --pos-1-ink:#0d1c31; --pos-2-ink:#fff;
+  --none: #66768e; --grid: rgba(13,40,84,.08); --zero: #0d1c31;
+  --flap: #f6f8fc; --flap-low: #e8eef6; --flap-hinge: #b7c3d6; --flap-ink: #0a2d63;
+  --seq-2:#9ec5f4; --seq-4:#3987e5; --seq-6:#184f95;
+  --shadow: 0 2px 4px rgba(10,34,73,.05), 0 18px 40px rgba(10,34,73,.10);
+  --ease-out: cubic-bezier(.23,1,.32,1);
+  --font: "Open Sans", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  --paper-font: "Montserrat", "Open Sans", ui-sans-serif, system-ui, sans-serif;
+  --mono: ui-monospace, "Cascadia Mono", Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --page:#07142a; --surface:#0e2141; --board:#06142b; --raised:#0b1f3f;
+  --line: rgba(147,170,206,.16); --line-strong: rgba(147,170,206,.30);
+  --ink:#e8eef7; --muted:#9aaecb; --signal-text:#f6b93f; --prev:#6fd3de;
+  --neg-3:#eea06c; --neg-2:#cf6a33; --neg-1:#86340e; --mid:#1a2d4d; --pos-1:#2c62ad; --pos-2:#72aaf0;
+  --neg-3-ink:#06142b; --neg-2-ink:#06142b; --neg-1-ink:#fff; --mid-ink:#e8eef7; --pos-1-ink:#fff; --pos-2-ink:#06142b;
+  --none:#8fa3c2; --grid: rgba(148,176,214,.12); --zero:#e8eef7;
+  --flap:#0f2a52; --flap-low:#0b2145; --flap-hinge:#06142b; --flap-ink:#f3f6fb;
+  --seq-2:#184f95; --seq-4:#2a78d6; --seq-6:#86b6ef;
+  --shadow: 0 24px 48px rgba(0,0,0,.35); color-scheme: dark; } }
+:root[data-theme="dark"] {
+  --page:#07142a; --surface:#0e2141; --board:#06142b; --raised:#0b1f3f;
+  --line: rgba(147,170,206,.16); --line-strong: rgba(147,170,206,.30);
+  --ink:#e8eef7; --muted:#9aaecb; --signal-text:#f6b93f; --prev:#6fd3de;
+  --neg-3:#eea06c; --neg-2:#cf6a33; --neg-1:#86340e; --mid:#1a2d4d; --pos-1:#2c62ad; --pos-2:#72aaf0;
+  --neg-3-ink:#06142b; --neg-2-ink:#06142b; --neg-1-ink:#fff; --mid-ink:#e8eef7; --pos-1-ink:#fff; --pos-2-ink:#06142b;
+  --none:#8fa3c2; --grid: rgba(148,176,214,.12); --zero:#e8eef7;
+  --flap:#0f2a52; --flap-low:#0b2145; --flap-hinge:#06142b; --flap-ink:#f3f6fb;
+  --seq-2:#184f95; --seq-4:#2a78d6; --seq-6:#86b6ef;
+  --shadow: 0 24px 48px rgba(0,0,0,.35); color-scheme: dark; }
+
+* { box-sizing: border-box; }
+body { background: var(--page); color: var(--ink); font-family: var(--font); font-size: 15px; line-height: 1.55;
+  padding-block: 0 64px; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+.wrap { max-width: 1120px; margin-inline: auto; }
+h1,h2,h3,h4 { margin: 0; line-height: 1.2; text-wrap: balance; font-weight: 700; }
+p { margin: 0; } a { color: inherit; }
+button { font: inherit; color: inherit; cursor: pointer; }
+:focus-visible { outline: 3px solid var(--signal); outline-offset: 2px; }
+.tnum, .fl, td.n, .fr__val, .fr__name small { font-variant-numeric: tabular-nums; }
+.sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+
+/* barra superior */
+.top { position: sticky; top: env(safe-area-inset-top, 0px); z-index: 20; background: var(--surface); border-bottom: 1px solid var(--line);
+  margin-inline: calc(max(16px, env(safe-area-inset-left, 0px)) * -1) calc(max(16px, env(safe-area-inset-right, 0px)) * -1);
+  padding-inline: max(16px, env(safe-area-inset-left, 0px)) max(16px, env(safe-area-inset-right, 0px)); }
+body::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-area-inset-top, 0px); z-index: 30; background: var(--surface); }
+.top__in { max-width: 1120px; margin-inline: auto; display: flex; align-items: center; gap: 20px; flex-wrap: wrap; padding-block: 10px; }
+.top h1 { font-size: 17px; margin-right: auto; }
+.tabs { display: flex; gap: 4px; }
+.tab { background: none; border: 0; padding: 8px 12px; border-radius: 4px; color: var(--muted); font-weight: 600; position: relative; min-height: 44px; transition: color .2s, transform 140ms; }
+.tab:active { transform: scale(.97); }
+.tab[aria-selected="true"] { color: var(--ink); }
+.tab[aria-selected="true"]::after { content: ""; position: absolute; left: 12px; right: 12px; bottom: 3px; height: 3px; background: var(--signal); border-radius: 2px; }
+.theme { background: var(--raised); border: 1px solid var(--line); border-radius: 4px; padding: 8px 12px; min-height: 44px; font-weight: 600; font-size: 13px; transition: transform 140ms; }
+.theme:active { transform: scale(.97); }
+@media (hover:hover) and (pointer:fine) { .tab:hover { color: var(--ink); } .theme:hover { border-color: var(--line-strong); } }
+.view[hidden] { display: none; }
+.lede { max-width: 72ch; color: var(--muted); }
+.view > .wrap > * + * { margin-top: 28px; }
+.view h2.big { font-size: clamp(22px, 3vw, 30px); }
+.note { font-size: 13px; color: var(--muted); max-width: 80ch; }
+.note b, .lede b { color: var(--ink); }
+
+/* dónde vive */
+.place { display: grid; gap: 28px; grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr); align-items: start; }
+.stack { display: grid; gap: 6px; font-size: 12.5px; }
+.stack > div { padding: 9px 12px; border: 1px dashed var(--line-strong); border-radius: 4px; color: var(--muted); background: var(--surface); }
+.stack > div.new { border: 2px solid var(--signal); border-style: solid; color: var(--ink); background: var(--surface); font-weight: 700; }
+.stack > div.other { border-style: dotted; }
+.alts { display: grid; gap: 10px; font-size: 13.5px; }
+.alts li { list-style: none; padding-left: 0; }
+.alts ul { margin: 0; padding: 0; display: grid; gap: 10px; }
+.alts b { color: var(--ink); }
+.alts .no { color: var(--muted); }
+@media (max-width: 800px) { .place { grid-template-columns: minmax(0,1fr); } }
+
+/* herramientas de la vista previa */
+.tools { display: flex; flex-wrap: wrap; gap: 10px 18px; align-items: center; padding: 12px 14px; background: var(--surface); border: 1px solid var(--line); border-radius: 6px; font-size: 13px; }
+.tools b { font-weight: 700; margin-right: 4px; }
+.seg { display: inline-flex; border: 1px solid var(--line-strong); border-radius: 4px; overflow: hidden; background: var(--raised); }
+.seg button { background: none; border: 0; padding: 8px 12px; min-height: 40px; font-size: 13px; font-weight: 600; color: var(--muted); transition: background-color .2s, color .2s, transform 140ms; }
+.seg button:active { transform: scale(.97); }
+.seg button[aria-pressed="true"], .seg button[aria-checked="true"] { background: var(--signal); color: var(--signal-ink); }
+.btn { background: var(--raised); border: 1px solid var(--line-strong); border-radius: 4px; padding: 8px 12px; min-height: 40px; font-size: 13px; font-weight: 600; transition: transform 140ms, border-color .2s; }
+.btn:active { transform: scale(.97); }
+.btn[disabled] { opacity: .5; cursor: not-allowed; }
+@media (hover:hover) and (pointer:fine) { .btn:hover, .seg button:hover { border-color: var(--ink); } }
+label.chk { display: inline-flex; gap: 8px; align-items: center; min-height: 40px; }
+label.chk input { width: 18px; height: 18px; accent-color: var(--signal); }
+
+/* TABLERO (portal) */
+.od { background: var(--board); border: 1px solid var(--line); border-radius: 8px; box-shadow: var(--shadow); padding: clamp(14px, 3vw, 32px); display: grid; gap: 26px; }
+.od-head { display: grid; gap: 8px; padding-bottom: 14px; border-bottom: 1px solid var(--line-strong); }
+.od-head h2 { font-size: clamp(22px, 3vw, 30px); letter-spacing: -.005em; }
+.od-head p { color: var(--muted); max-width: 70ch; font-size: 14.5px; }
+.od-head__pop { display: flex; flex-wrap: wrap; gap: 6px 16px; font-size: 12.5px; color: var(--muted); }
+.od-head__pop b { color: var(--ink); }
+.name-chip { display: inline-flex; gap: 8px; align-items: baseline; padding: 6px 10px; background: var(--raised); border-radius: 4px; font-size: 12.5px; color: var(--muted); }
+.name-chip b { color: var(--ink); }
+.name-chip button { background: none; border: 0; padding: 0; text-decoration: underline; text-underline-offset: 2px; min-height: 28px; }
+
+.rail { display: grid; grid-template-columns: repeat(6, minmax(0,1fr)); gap: 8px; }
+.comp { display: grid; grid-template-columns: auto minmax(0,1fr); align-items: center; gap: 12px; min-height: 56px; padding: 8px 12px; color: var(--muted); text-align: left; background: var(--raised); border: 1px solid transparent; border-radius: 4px; transition: color .2s, background-color .2s, border-color .2s, transform 140ms; }
+.comp:active { transform: scale(.97); }
+.comp__code { font-family: var(--font); font-weight: 800; letter-spacing: .06em; font-size: 15px; }
+.comp__name { font-size: 12.5px; line-height: 1.25; }
+.comp[aria-checked="true"] { color: var(--ink); border-color: var(--signal); background: var(--board); }
+.comp[aria-checked="true"] .comp__code { color: var(--signal-text); }
+.comp[aria-disabled="true"] { cursor: not-allowed; background-image: repeating-linear-gradient(135deg, transparent 0 6px, var(--grid) 6px 7px); }
+.comp small { display: block; font-size: 10.5px; opacity: .85; }
+@media (hover:hover) and (pointer:fine) { .comp:not([aria-disabled="true"]):hover { border-color: var(--line-strong); } }
+@media (max-width: 900px) { .rail { grid-template-columns: repeat(3, minmax(0,1fr)); } }
+@media (max-width: 640px) { .rail { display: flex; overflow-x: auto; scroll-snap-type: x proximity; scrollbar-width: none; margin-inline: -14px; padding-inline: 14px; } .comp { flex: none; width: 9.5rem; scroll-snap-align: start; } }
+
+.arrivals { display: grid; grid-template-columns: repeat(3, minmax(0,1fr)); gap: 10px; }
+.arr { display: grid; gap: 6px; align-content: start; padding: 14px 16px; background: var(--raised); border-radius: 4px; min-width: 0; }
+.arr dt { font-size: 12px; font-weight: 700; color: var(--muted); letter-spacing: .02em; }
+.arr dd { margin: 0; }
+.flaps { display: flex; align-items: center; gap: 3px; min-height: 52px; }
+.fl { display: inline-grid; place-items: center; width: 1.1ch; min-width: 34px; height: 52px; padding-inline: 4px; background: linear-gradient(180deg, var(--flap) 0 50%, var(--flap-low) 50% 100%); color: var(--flap-ink);
+  font-weight: 800; font-size: 32px; border-radius: 3px; box-shadow: 0 0 0 1px var(--line); position: relative; will-change: transform; transform-origin: 50% 50%; }
+.fl::after { content: ""; position: absolute; left: 0; right: 0; top: 50%; height: 1px; background: var(--flap-hinge); }
+.fl.sep { width: auto; min-width: 0; background: none; box-shadow: none; font-size: 22px; padding-inline: 2px; }
+.fl.sep::after { display: none; }
+.flaps .of { font-size: 13px; color: var(--muted); margin-left: 6px; }
+.arr .sub { font-size: 12.5px; color: var(--muted); line-height: 1.4; }
+.arr .sub b { color: var(--ink); }
+.cut { font-size: 11.5px; color: var(--prev); font-weight: 600; }
+@media (max-width: 800px) { .arrivals { grid-template-columns: minmax(0,1fr); } }
+
+/* paneles */
+.panel { display: grid; gap: 14px; }
+.panel > header { display: flex; flex-wrap: wrap; gap: 10px 18px; align-items: end; justify-content: space-between; }
+.panel h3 { font-size: 19px; }
+.panel .sub { color: var(--muted); font-size: 13.5px; max-width: 74ch; }
+.panel__bar { display: flex; flex-wrap: wrap; gap: 8px 14px; align-items: center; font-size: 13px; }
+.divider { display: flex; align-items: center; gap: 14px; color: var(--muted); font-size: 12px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; }
+.divider::before, .divider::after { content: ""; height: 1px; flex: 1; background: var(--line-strong); }
+.src { font-size: 12px; color: var(--muted); display: flex; flex-wrap: wrap; gap: 4px 14px; border-top: 1px solid var(--line); padding-top: 8px; }
+.src b { color: var(--ink); font-weight: 600; }
+.exp { display: inline-flex; gap: 6px; }
+.exp .btn { min-height: 34px; padding: 4px 10px; font-size: 12px; }
+
+/* bosque */
+.axis, .fr__btn { display: grid; grid-template-columns: minmax(150px, 230px) minmax(0, 1fr) minmax(140px, 190px); gap: 14px; align-items: center; }
+.axis { position: sticky; top: 56px; z-index: 5; background: var(--board); padding: 6px 0 4px; border-bottom: 1px solid var(--line-strong); font-size: 11.5px; color: var(--muted); }
+.axis__track { position: relative; height: 30px; }
+.axis__t { position: absolute; transform: translateX(-50%); font-variant-numeric: tabular-nums; top: 0; }
+.axis__dir { position: absolute; bottom: 0; font-size: 11px; white-space: nowrap; font-weight: 600; }
+.forest { list-style: none; margin: 0; padding: 0; }
+.fr { border-bottom: 1px solid var(--line); }
+.fr__btn { width: 100%; background: none; border: 0; text-align: left; padding: 3px 4px; min-height: 31px; border-radius: 3px; transition: background-color .15s; }
+.fr[data-sel="1"] .fr__btn { background: var(--raised); box-shadow: inset 3px 0 0 var(--signal); }
+@media (hover:hover) and (pointer:fine) { .fr__btn:hover { background: var(--raised); } }
+.fr__name { font-size: 13px; line-height: 1.2; min-width: 0; }
+.fr__name small { display: block; font-size: 11.5px; color: var(--muted); }
+.fr__track { position: relative; height: 26px; background-image: linear-gradient(90deg, var(--grid) 1px, transparent 1px); background-size: var(--step) 100%; }
+.fr__track::after { content: ""; position: absolute; top: 0; bottom: 0; left: var(--z); width: 2px; margin-left: -1px; background: var(--zero); }
+.fr__int { position: absolute; top: 50%; height: 3px; margin-top: -1.5px; background: var(--none); border-radius: 1px; transform-origin: var(--org) 50%; z-index: 1; }
+.fr__dot { position: absolute; top: 50%; width: 11px; height: 11px; margin: -5.5px 0 0 -5.5px; border-radius: 50%; background: var(--none); z-index: 2; box-shadow: 0 0 0 2px var(--board); }
+.fr[data-s="up"] .fr__int, .fr[data-s="up"] .fr__dot { background: var(--pos-2); }
+.fr[data-s="down"] .fr__int, .fr[data-s="down"] .fr__dot { background: var(--neg-2); }
+.fr[data-s="edge-up"] .fr__int { background: var(--pos-1); } .fr[data-s="edge-up"] .fr__dot { background: var(--board); box-shadow: 0 0 0 2.5px var(--pos-2); }
+.fr[data-s="edge-down"] .fr__int { background: var(--neg-1); } .fr[data-s="edge-down"] .fr__dot { background: var(--board); box-shadow: 0 0 0 2.5px var(--neg-2); }
+.fr[data-s="none"] .fr__dot { background: var(--board); box-shadow: 0 0 0 2px var(--none); }
+.fr[data-s="few"] .fr__int { background: none; border-top: 2px dotted var(--none); height: 0; } .fr[data-s="few"] .fr__dot { background: var(--board); box-shadow: 0 0 0 2px var(--none); border-radius: 2px; transform: rotate(45deg); width: 9px; height: 9px; margin: -4.5px 0 0 -4.5px; }
+.fr[data-atten="1"] .fr__name, .fr[data-atten="1"] .fr__track, .fr[data-atten="1"] .fr__val { opacity: .66; }
+.fr__val { font-size: 13px; display: flex; gap: 8px; align-items: baseline; justify-content: space-between; }
+.fr__val b { font-weight: 800; min-width: 3.4ch; text-align: right; }
+.fr__verdict { font-size: 12px; color: var(--muted); white-space: nowrap; }
+.fr[data-s="up"] .fr__verdict { color: var(--pos-2); font-weight: 700; } .fr[data-s="down"] .fr__verdict { color: var(--neg-2); font-weight: 700; }
+:root[data-theme="light"] .fr[data-s="up"] .fr__verdict { color: #1d4f9b; } :root[data-theme="light"] .fr[data-s="down"] .fr__verdict { color: #9a4617; }
+@media (prefers-color-scheme: light) { :root:not([data-theme="dark"]) .fr[data-s="up"] .fr__verdict { color: #1d4f9b; } :root:not([data-theme="dark"]) .fr[data-s="down"] .fr__verdict { color: #9a4617; } }
+@media (max-width: 760px) {
+  .axis { grid-template-columns: minmax(0,1fr); top: 56px; } .axis > :first-child, .axis > :last-child { display: none; }
+  .fr__btn { grid-template-columns: minmax(0,1fr) auto; grid-template-areas: "n v" "t t"; row-gap: 4px; padding: 8px 4px; min-height: 56px; }
+  .fr__name { grid-area: n; } .fr__val { grid-area: v; flex-direction: column; align-items: flex-end; gap: 0; } .fr__track { grid-area: t; }
+}
+.read { min-height: 4.6em; padding: 12px 14px; background: var(--raised); border-radius: 4px; font-size: 14px; border-left: 3px solid var(--signal); }
+.read b { font-weight: 700; }
+.legend { display: flex; flex-wrap: wrap; gap: 6px 18px; font-size: 12.5px; color: var(--muted); }
+.legend i { display: inline-block; vertical-align: -2px; width: 22px; height: 11px; margin-right: 6px; position: relative; }
+.legend i::before { content: ""; position: absolute; left: 0; right: 0; top: 4px; height: 3px; background: var(--c, var(--none)); }
+.legend i::after { content: ""; position: absolute; left: 50%; top: 0; width: 11px; height: 11px; margin-left: -5.5px; border-radius: 50%; background: var(--d, var(--c, var(--none))); box-shadow: var(--ring, none); }
+.legend .sw { display: inline-block; width: 14px; height: 14px; border-radius: 2px; vertical-align: -2px; margin-right: 6px; }
+
+/* tabla */
+.tbl { width: 100%; border-collapse: collapse; font-size: 13px; }
+.tbl caption { text-align: left; font-size: 12.5px; color: var(--muted); padding-bottom: 6px; }
+.tbl th { text-align: left; font-weight: 700; font-size: 12px; color: var(--muted); border-bottom: 2px solid var(--line-strong); padding: 6px 8px; }
+.tbl td { padding: 5px 8px; border-bottom: 1px solid var(--line); }
+.tbl td.n, .tbl th.n { text-align: right; }
+.tblwrap { overflow-x: auto; border: 1px solid var(--line); border-radius: 4px; }
+.tblwrap .tbl th:first-child, .tblwrap .tbl td:first-child { position: sticky; left: 0; background: var(--board); }
+
+/* perfil */
+.prof { display: grid; gap: 8px; padding-top: 14px; border-top: 1px solid var(--line-strong); }
+.prof h4 { font-size: 15px; }
+.prof .fr__btn { cursor: default; }
+.prof__x { justify-self: start; }
+
+/* varianza */
+.var-rows { display: grid; gap: 8px; }
+.vrow { display: grid; grid-template-columns: 11rem minmax(0,1fr) 7.5rem; gap: 14px; align-items: center; padding: 6px 8px; border-radius: 4px; border: 1px solid transparent; }
+.vrow[data-sel="1"] { background: var(--raised); border-color: var(--line-strong); }
+.vrow__label { font-size: 13px; font-weight: 600; }
+.vbar { height: 16px; background: var(--flap-low); border-radius: 2px; position: relative; overflow: hidden; box-shadow: inset 0 0 0 1px var(--line); }
+.vbar i { position: absolute; left: 0; top: 0; bottom: 0; background: var(--pos-2); transform-origin: 0 50%; min-width: 2px; }
+.vrow__n { font-weight: 800; text-align: right; font-size: 16px; }
+.vrow__n small { font-weight: 600; font-size: 11px; color: var(--muted); display: block; }
+.vscale { display: grid; grid-template-columns: 11rem minmax(0,1fr) 7.5rem; gap: 14px; font-size: 11.5px; color: var(--muted); padding: 0 8px; }
+.vscale span:nth-child(2) { display: flex; justify-content: space-between; }
+@media (max-width: 640px) { .vrow, .vscale { grid-template-columns: minmax(0,1fr) 4.4rem; } .vrow__label { grid-column: 1 / -1; } .vscale span:first-child { display: none; } }
+.two { display: grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap: 26px; align-items: start; }
+@media (max-width: 860px) { .two { grid-template-columns: minmax(0,1fr); } }
+.cmp td .mini { display: inline-block; height: 9px; background: var(--pos-2); border-radius: 1px; vertical-align: middle; margin-right: 6px; }
+.cmp td .mini.o { background: var(--none); }
+.chip { display: inline-block; padding: 2px 8px; border-radius: 10px; font-size: 11.5px; font-weight: 700; background: var(--raised); border: 1px solid var(--line-strong); }
+
+/* cuadrantes */
+.qrow { display: grid; grid-template-columns: minmax(150px, 230px) minmax(0,1fr) 6rem; gap: 14px; align-items: center; padding: 3px 4px; border-bottom: 1px solid var(--line); min-height: 30px; font-size: 13px; }
+.qrow[data-atten="1"] .qname, .qrow[data-atten="1"] .qbar { opacity: .66; }
+.qrow[data-few="1"] .qbar { filter: grayscale(1); opacity: .55; }
+.qname small { display: block; font-size: 11.5px; color: var(--muted); }
+.qbar { display: flex; height: 20px; border-radius: 2px; overflow: hidden; box-shadow: 0 0 0 1px var(--line); transform-origin: 0 50%; }
+.qbar span { display: grid; place-items: center; font-size: 11px; font-weight: 700; overflow: hidden; min-width: 0; }
+.q-am { background: var(--neg-2); color: var(--neg-2-ink); } .q-a2m { background: var(--neg-1); color: var(--neg-1-ink); }
+.q-ap { background: var(--pos-1); color: var(--pos-1-ink); } .q-a2p { background: var(--pos-2); color: var(--pos-2-ink); }
+.qval { text-align: right; font-weight: 800; }
+.qval small { display: block; font-size: 11px; color: var(--muted); font-weight: 600; }
+.qhead { display: grid; grid-template-columns: repeat(4, minmax(0,1fr)); gap: 8px; }
+.qtile { padding: 10px 12px; border-radius: 4px; background: var(--raised); border-top: 4px solid var(--c); font-size: 12.5px; color: var(--muted); }
+.qtile b { display: block; font-size: 26px; color: var(--ink); font-weight: 800; line-height: 1.1; }
+@media (max-width: 760px) { .qhead { grid-template-columns: repeat(2, minmax(0,1fr)); } .qrow { grid-template-columns: minmax(0,1fr) 4.2rem; } .qrow .qbar { grid-column: 1 / -1; grid-row: 2; } }
+.qlist { display: grid; }
+.pos-bar { display: flex; height: 18px; border-radius: 2px; overflow: hidden; box-shadow: 0 0 0 1px var(--line); }
+.pos-bar span { display: grid; place-items: center; font-size: 11px; font-weight: 700; color: var(--ink); }
+.pos-bar span:nth-child(1) { background: var(--seq-2); } .pos-bar span:nth-child(2){ background: var(--seq-2); filter: brightness(.9);} .pos-bar span:nth-child(3){ background: var(--seq-4); color:#fff;} .pos-bar span:nth-child(4){ background: var(--seq-6); color:#fff;} .pos-bar span:nth-child(5){ background: var(--seq-6); filter: brightness(.8); color:#fff;}
+
+/* coeficientes */
+.co .fr__btn { cursor: default; }
+.empty { padding: 22px 18px; border: 1px dashed var(--line-strong); border-radius: 4px; color: var(--muted); font-size: 14px; display: grid; gap: 6px; }
+.empty b { color: var(--ink); font-size: 15px; }
+.skel { display: grid; gap: 8px; }
+.skel i { display: block; height: 22px; border-radius: 3px; background: linear-gradient(90deg, var(--raised), var(--flap-low), var(--raised)); background-size: 200% 100%; opacity: .8; }
+
+/* método */
+.steps { display: grid; grid-template-columns: repeat(4, minmax(0,1fr)); gap: 18px; counter-reset: s; }
+.steps > div { display: grid; gap: 6px; align-content: start; font-size: 13.5px; border-top: 2px solid var(--line-strong); padding-top: 10px; }
+.steps b { font-size: 14px; }
+.steps svg { width: 100%; height: auto; max-height: 120px; }
+@media (max-width: 900px) { .steps { grid-template-columns: repeat(2, minmax(0,1fr)); } } @media (max-width: 520px) { .steps { grid-template-columns: minmax(0,1fr); } }
+.limits { margin: 0; padding-left: 1.1em; display: grid; gap: 6px; font-size: 13.5px; max-width: 80ch; }
+.cites { display: grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap: 24px; font-size: 13px; }
+.cites > div { border-top: 3px solid var(--signal); padding-top: 10px; display: grid; gap: 6px; align-content: start; }
+.cites .ref { font-size: 13px; }
+@media (max-width: 860px) { .cites { grid-template-columns: minmax(0,1fr); } }
+.names td, .names th { vertical-align: top; }
+pre.csv { font-family: var(--mono); font-size: 11.5px; padding: 12px; background: var(--raised); border-radius: 4px; overflow-x: auto; margin: 0; }
+details > summary { cursor: pointer; font-weight: 600; font-size: 13.5px; min-height: 36px; display: flex; align-items: center; }
+.urlbox { font-family: var(--mono); font-size: 12px; padding: 8px 10px; background: var(--raised); border-radius: 4px; overflow-wrap: anywhere; color: var(--muted); }
+.toast { position: fixed; left: 50%; bottom: max(20px, env(safe-area-inset-bottom, 0px)); transform: translateX(-50%); background: var(--ink); color: var(--board); padding: 10px 14px; border-radius: 4px; font-size: 13px; z-index: 40; max-width: min(90vw, 440px); }
+
+/* PDF */
+.sheets { display: grid; gap: 40px; }
+.sheetcap { display: grid; gap: 4px; margin-bottom: 12px; max-width: 80ch; }
+.sheetcap h3 { font-size: 17px; }
+.sheetcap .meta { display: flex; flex-wrap: wrap; gap: 4px 16px; font-size: 12.5px; color: var(--muted); }
+.fitbox { width: 100%; max-width: 794px; position: relative; overflow: hidden; }
+.fitbox > .bol-page { transform-origin: 0 0; position: absolute; left: 0; top: 0; }
+.viewer { background: #cfd8e6; padding: 18px; border-radius: 6px; display: grid; justify-items: center; }
+:root[data-theme="dark"] .viewer { background: #0a1a33; }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .viewer { background: #0a1a33; } }
+
+.bol-page { --bol-ink:#16243a; --bol-ink-2:#4a5a70; --bol-ink-3:#6f7d90; --bol-rule:#d6dee8; --bol-paper-2:#eef3f9; --bol-navy:#072b58; --bol-band:#4078b9; --bol-accent:#e8892b;
+  --d-n3:#7c2f0d; --d-n2:#b9541f; --d-n1:#e79c69; --d-mid:#e9edf3; --d-p1:#6fa4e8; --d-p2:#2a63b8;
+  position: relative; width: 210mm; height: 297mm; overflow: hidden; background: #fff; color: var(--bol-ink); font-family: var(--paper-font); box-shadow: 0 1px 2px rgba(10,34,73,.1), 0 12px 32px rgba(10,34,73,.14); }
+.bol-page * { box-sizing: border-box; }
+.bol-bar { position: absolute; inset: 0 0 auto; height: 9.1mm; background: var(--bol-navy); color: #fff; display: flex; align-items: center; justify-content: space-between; padding: 0 14mm 0 13.6mm; font-size: 3.4mm; font-weight: 600; }
+.bol-bar b { font-weight: 800; letter-spacing: .01em; font-size: 3.6mm; }
+.bol-band { position: absolute; top: 9.1mm; left: 0; right: 0; height: 18.4mm; background: var(--bol-band); display: flex; align-items: center; padding-left: 14mm; overflow: hidden; }
+.bol-band strong { color: rgba(255,255,255,.92); font-size: 7.2mm; font-weight: 700; letter-spacing: -.005em; position: relative; z-index: 1; }
+.bol-band svg { position: absolute; right: 0; bottom: 0; height: 100%; opacity: .35; }
+.bol-badge { position: absolute; left: 140mm; top: 14.2mm; z-index: 2; background: #fff; color: var(--bol-navy); font-weight: 800; font-size: 3.6mm; padding: .6mm 1.6mm; border-radius: .8mm; }
+.bol-badge + span { position: absolute; left: 152.5mm; top: 14.9mm; z-index: 2; color: #fff; font-weight: 700; font-size: 3.2mm; }
+.bol-body { position: absolute; top: 35.5mm; left: 16mm; right: 16mm; display: grid; gap: 3mm; align-content: start; }
+.bol-foot { position: absolute; left: 16mm; right: 16mm; bottom: 7mm; display: grid; grid-template-columns: 1fr auto auto; gap: 8mm; padding-top: 2mm; border-top: .25mm solid var(--bol-rule); color: var(--bol-ink-3); font-size: 2.55mm; }
+.bol-foot b { color: var(--bol-navy); }
+.bol-tab { position: absolute; right: 0; top: 52mm; width: 8mm; height: 14mm; background: var(--bol-band); color: #fff; font-size: 2.6mm; font-weight: 800; display: grid; place-items: center; border-radius: 1mm 0 0 1mm; }
+.sh-head h3 { color: var(--bol-navy); font-size: 4.4mm; font-weight: 700; }
+.sh-head p { font-size: 2.7mm; color: var(--bol-ink-2); margin-top: 1mm; line-height: 1.35; max-width: 160mm; }
+.bol-notes { display: grid; grid-template-columns: repeat(3, minmax(0,1fr)); gap: 2mm 6mm; padding: 3mm; background: var(--bol-paper-2); border-radius: 1.2mm; }
+.bol-notes dt { color: var(--bol-navy); font-size: 2.3mm; font-weight: 800; letter-spacing: .06em; text-transform: uppercase; }
+.bol-notes dd { margin: .6mm 0 0; font-size: 2.55mm; line-height: 1.35; color: var(--bol-ink); }
+.bol-keys { display: grid; grid-template-columns: repeat(3, minmax(0,1fr)); gap: 3mm; }
+.bol-keys.k4 { grid-template-columns: repeat(4, minmax(0,1fr)); }
+.bol-tile { background: var(--bol-paper-2); border-radius: 1.2mm; padding: 2.4mm 3mm; }
+.bol-tile small { display: block; font-size: 2.3mm; font-weight: 800; letter-spacing: .05em; text-transform: uppercase; color: var(--bol-navy); }
+.bol-tile b { display: block; font-size: 9mm; font-weight: 800; color: var(--bol-navy); line-height: 1.05; margin-top: 1mm; letter-spacing: -.01em; }
+.bol-tile span { display: block; font-size: 2.5mm; color: var(--bol-ink-2); line-height: 1.3; margin-top: .6mm; }
+.bol-fig svg { display: block; }
+.bol-fig text { font-family: var(--paper-font); fill: var(--bol-ink); }
+.bol-read { font-size: 2.8mm; line-height: 1.42; color: var(--bol-ink); border-left: .8mm solid var(--bol-accent); padding-left: 3mm; }
+.bol-read b { color: var(--bol-navy); }
+.bol-legend { display: flex; flex-wrap: wrap; gap: 1mm 5mm; font-size: 2.4mm; color: var(--bol-ink-2); }
+.bol-legend i { display: inline-block; width: 3mm; height: 3mm; vertical-align: -.5mm; margin-right: 1.2mm; border-radius: .4mm; }
+.bol-table { width: 100%; border-collapse: collapse; font-size: 2.45mm; }
+.bol-table th { background: var(--bol-navy); color: #fff; text-align: left; padding: .9mm 1.4mm; font-weight: 700; font-size: 2.3mm; }
+.bol-table td { padding: .75mm 1.4mm; border-bottom: .2mm solid var(--bol-rule); }
+.bol-table td.n, .bol-table th.n { text-align: right; font-variant-numeric: tabular-nums; }
+.bol-h4 { color: var(--bol-navy); font-size: 3.1mm; font-weight: 700; margin-bottom: 1.2mm; }
+.bol-two { display: grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap: 6mm; }
+.bol-cite { font-size: 2.5mm; line-height: 1.38; padding: 2.4mm 3mm; border: .25mm solid var(--bol-rule); border-radius: 1.2mm; }
+.bol-cite b { color: var(--bol-navy); }
+.bol-ul { margin: 0; padding-left: 3.4mm; font-size: 2.55mm; line-height: 1.38; display: grid; gap: .7mm; }
+.bol-table td.n, .bol-table th.n { white-space: nowrap; }
+.bol-two { grid-template-columns: 1.25fr .85fr; }
+
+.fr[data-s="seq"] .fr__int, .fr[data-s="seq"] .fr__dot { background: var(--seq-6); }
+.fr[data-s="seq"] .fr__val b { min-width: 3.4ch; }
+@media (prefers-reduced-motion: reduce) { * { scroll-behavior: auto !important; } }
+
+</style>
+<div class="top"><div class="top__in">
+  <h1>Aporte de los programas</h1>
+  <div class="tabs" role="tablist" aria-label="Partes de la propuesta">
+    <button class="tab" role="tab" id="t-portal" aria-selected="true" aria-controls="v-portal" data-go="portal">Portal</button>
+    <button class="tab" role="tab" id="t-pdf" aria-selected="false" aria-controls="v-pdf" data-go="pdf">Boletín en PDF</button>
+    <button class="tab" role="tab" id="t-construir" aria-selected="false" aria-controls="v-construir" data-go="construir">Cómo lo construimos</button>
+  </div>
+  <button class="theme" id="theme" type="button" aria-label="Cambiar entre tema claro y oscuro">Tema: claro</button>
+</div></div>
+
+<main>
+<section class="view" id="v-portal" role="tabpanel" aria-labelledby="t-portal"><div class="wrap">
+  <div style="padding-top:28px">
+    <h2 class="big">Debajo de los resultados Saber PRO: cuánto aporta cada programa</h2>
+    <p class="lede" style="margin-top:10px">Propuesta de los indicadores de valor agregado de los dos documentos de la carpeta <b>Valoragregado</b>, dentro de UDES en Cifras. Las cifras de esta vista son las de los documentos, con su página; lo que no lo es se marca como ejemplo. Los intervalos del estudio de Saber PRO y las barras del de Saber TyT se midieron sobre sus figuras, porque los documentos no publican las tablas.</p>
+  </div>
+
+  <div class="place">
+    <div>
+      <h3 style="font-size:16px;margin-bottom:10px">Dónde vive: una sección al final del bloque, con su propia cita</h3>
+      <div class="stack" aria-label="Orden de las partes del bloque Saber PRO">
+        <div>Carril de competencias (PG · LC · RC · CC · CE · IN) y filtros de sede, facultad y programa</div>
+        <div>Llegadas: promedio del corte, nacional, participación en niveles altos</div>
+        <div>Niveles · Brecha con el país · Evolución</div>
+        <div class="other">«Resultados nacionales vs UDES» (el otro diseño, en curso)</div>
+        <div class="new">Aporte de los programas (esta propuesta): bosque con intervalos, diferencia entre programas, cuadrantes, perfiles, método y cita</div>
+      </div>
+      <p class="note" style="margin-top:10px">El bloque <b>Saber TyT</b> recibe el mismo componente al final de sus vistas, con los datos del documento de TyT. Cada bloque lee su propia prueba: no se mezclan en una misma sección dos poblaciones (el campus Bucaramanga completo y UDESTEC).</p>
+    </div>
+    <ul class="alts" aria-label="Otras opciones consideradas">
+      <li><b>Un bloque nuevo</b> <span class="no">se descarta: pierde el carril de competencias, los filtros y los parámetros de la dirección que el bloque ya resuelve, y se separaría de las cifras que explica.</span></li>
+      <li><b>Otra pestaña de «Vista»</b> <span class="no">se descarta: «Niveles, Brecha, Evolución» son tres lecturas de un mismo grano (sede y año). El aporte es de otro grano (programa y modelo) y necesita su propia cita en pantalla.</span></li>
+      <li><b>Un selector de prueba dentro del bloque Saber PRO</b> <span class="no">se descarta como valor final: mezcla el campus Bucaramanga con UDESTEC y rompe la regla de que un bloque es una prueba. Aquí lo muestro solo como «vista previa del bloque» para que usted vea las dos colocaciones.</span></li>
+    </ul>
+  </div>
+
+  <div class="tools" role="group" aria-label="Herramientas de la vista previa (no existen en el portal)">
+    <span><b>Vista previa del bloque</b>
+      <span class="seg" role="group" aria-label="Bloque"><button type="button" data-test="pro" aria-pressed="true">Saber PRO</button><button type="button" data-test="tyt" aria-pressed="false">Saber TyT</button></span></span>
+    <span><b>Estado</b>
+      <span class="seg" role="group" aria-label="Estado de la vista"><button type="button" data-state="normal" aria-pressed="true">Con datos</button><button type="button" data-state="carga" aria-pressed="false">Cargando</button><button type="button" data-state="vacio" aria-pressed="false">Sin cifras</button><button type="button" data-state="pocos" aria-pressed="false">Pocos evaluados</button></span></span>
+    <label class="chk"><input type="checkbox" id="reduced"> Simular movimiento reducido</label>
+    <button type="button" class="btn" id="replay">Repetir la entrada</button>
+  </div>
+
+  <div class="od" id="od" aria-live="off"></div>
+</div></section>
+
+<section class="view" id="v-pdf" role="tabpanel" aria-labelledby="t-pdf" hidden><div class="wrap">
+  <div style="padding-top:28px">
+    <h2 class="big">El mismo aporte, en el boletín A4</h2>
+    <p class="lede" style="margin-top:10px">Cinco hojas nuevas, dibujadas a escala real con las medidas de la plantilla actual: cabecera de 9,1 y 18,4 mm, cuerpo desde 35,5 mm con márgenes de 16 mm (178 mm de ancho, 243,5 mm de alto útil), pie a 7 mm. Sin animación, con la paleta fija del papel (<code>--bol-div-*</code>), cifras con paréntesis bajo 10 evaluados y todo legible sin color: cada marca lleva su glifo y su cifra.</p>
+  </div>
+  <div class="two" style="gap:20px">
+    <div class="note"><b>Cuántas hojas ocupa.</b> Saber PRO: por competencia dos hojas (<i>Aporte por programa</i> y <i>Cuadrantes de aporte</i>), cuatro competencias, más una hoja única de <i>método, diferencia entre programas y límites</i>: <b>9 hojas</b>. Saber TyT: una hoja por competencia y una de método: <b>5 hojas</b>. En total 14 unidades nuevas; el boletín del conjunto crece en 14 páginas si se eligen todas, y la plantilla ya permite elegir cada entrada.</div>
+    <div class="note"><b>Cabe en la plantilla actual.</b> Sí, sin cambiar el marco: usan <code>Sheet</code> ancha con franja de notas, <code>.bol-tile</code> y la tabla del boletín. Lo nuevo son dos dibujos en milímetros (<code>PaperForest</code>, <code>PaperQuadrants</code>) en <code>figures.tsx</code>. Con más de 28 programas la hoja sigue en continuación, como ya hace la brecha con el país.</div>
+  </div>
+  <div class="sheets" id="sheets"></div>
+</div></section>
+
+<section class="view" id="v-construir" role="tabpanel" aria-labelledby="t-construir" hidden><div class="wrap">
+  <div style="padding-top:28px">
+    <h2 class="big">Cómo lo construimos</h2>
+    <p class="lede" style="margin-top:10px">Todo lo de abajo es propuesta; no se ha escrito código ni tocado el repositorio.</p>
+  </div>
+  <div id="build"></div>
+</div></section>
+</main>
+<div class="toast" id="toast" role="status" hidden></div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
+<script>
+const PRO={"va": {"lc": [["Medicina Veterinaria", 47, 9.42, 6.74, 12.05], ["Psicología", 35, 9.17, 6.17, 12.12], ["Instrumentación Quirúrgica · Bogotá", 49, 5.48, 2.87, 8.11], ["Fisioterapia", 78, 4.66, 2.53, 6.78], ["Microbiología Industrial", 33, 4.43, 1.4, 7.5], ["Terapia", 34, 4.38, 1.4, 7.42], ["Medicina", 220, 3.82, 2.53, 5.15], ["Derecho", 54, 3.7, 1.21, 6.21], ["Fonoaudiología", 49, 3.44, 0.83, 6.1], ["Bacteriología", 61, 2.86, 0.49, 5.22], ["Geología", 17, 2.16, -1.71, 6.02], ["Administración de Negocios", 28, 0.32, -2.96, 3.56], ["Mercadeo", 35, 0.14, -2.81, 3.1], ["Ingeniería de Software", 15, -0.18, -4.18, 3.82], ["Enfermería", 53, -0.92, -3.46, 1.59], ["Instrumentación Quirúrgica", 120, -1.31, -3.04, 0.45], ["Antropología", 9, -2.3, -6.91, 2.31], ["Ingeniería Ambiental", 13, -2.45, -6.64, 1.74], ["Ingeniería Agroindustrial", 11, -2.66, -7.06, 1.74], ["Ingeniería Industrial", 31, -3.2, -6.34, -0.05], ["Comunicación Social", 9, -5.07, -9.67, -0.46], ["Contaduría Pública", 52, -6.1, -8.69, -3.57], ["Administración Financiera", 29, -6.42, -9.67, -3.19], ["Ingeniería Civil", 91, -7.8, -9.79, -5.81], ["Ingeniería Petroquímica", 11, -15.56, -19.95, -11.15]], "rc": [["Ingeniería Civil", 91, 4.77, 3.03, 6.5], ["Ingeniería Industrial", 31, 3.06, 0.73, 5.38], ["Geología", 17, 2.03, -0.54, 4.6], ["Medicina Veterinaria", 47, 1.77, -0.33, 3.89], ["Fisioterapia", 78, 1.75, -0.08, 3.57], ["Microbiología Industrial", 33, 1.32, -0.97, 3.61], ["Administración de Negocios", 28, 1.3, -1.08, 3.68], ["Bacteriología", 61, 1.2, -0.77, 3.17], ["Ingeniería Ambiental", 13, 0.95, -1.72, 3.62], ["Ingeniería Agroindustrial", 11, 0.78, -1.92, 3.5], ["Medicina", 220, 0.59, -0.64, 1.83], ["Ingeniería Petroquímica", 11, 0.58, -2.12, 3.29], ["Administración Financiera", 29, -0.0, -2.37, 2.35], ["Ingeniería de Software", 15, -0.19, -2.82, 2.42], ["Contaduría Pública", 52, -0.2, -2.26, 1.86], ["Terapia", 34, -0.3, -2.57, 1.99], ["Psicología", 35, -1.15, -3.42, 1.12], ["Comunicación Social", 9, -1.34, -4.12, 1.43], ["Antropología", 9, -1.36, -4.13, 1.4], ["Instrumentación Quirúrgica · Bogotá", 49, -1.38, -3.46, 0.71], ["Mercadeo", 35, -1.47, -3.73, 0.82], ["Enfermería", 53, -2.0, -4.05, 0.07], ["Fonoaudiología", 49, -2.65, -4.75, -0.55], ["Instrumentación Quirúrgica", 120, -3.76, -5.35, -2.19], ["Derecho", 54, -4.3, -6.34, -2.26]], "ing": [["Psicología", 35, 5.23, 2.7, 7.74], ["Administración de Negocios", 28, 5.02, 2.36, 7.68], ["Ingeniería de Software", 15, 3.79, 0.75, 6.83], ["Antropología", 9, 3.26, -0.04, 6.55], ["Mercadeo", 34, 2.49, -0.04, 5.05], ["Fisioterapia", 77, 1.7, -0.25, 3.64], ["Ingeniería Petroquímica", 11, 1.64, -1.58, 4.84], ["Medicina Veterinaria", 47, 1.51, -0.78, 3.81], ["Bacteriología", 60, 1.5, -0.61, 3.64], ["Geología", 17, 1.15, -1.85, 4.13], ["Fonoaudiología", 49, 0.79, -1.47, 3.06], ["Instrumentación Quirúrgica · Bogotá", 48, 0.14, -2.13, 2.4], ["Ingeniería Industrial", 31, -0.37, -2.99, 2.25], ["Ingeniería Agroindustrial", 11, -0.79, -4.01, 2.42], ["Comunicación Social", 9, -0.93, -4.23, 2.38], ["Ingeniería Ambiental", 13, -0.96, -4.08, 2.17], ["Microbiología Industrial", 32, -1.01, -3.61, 1.57], ["Enfermería", 51, -1.22, -3.48, 1.05], ["Terapia", 34, -1.88, -4.42, 0.67], ["Instrumentación Quirúrgica", 120, -2.03, -3.67, -0.4], ["Contaduría Pública", 52, -2.06, -4.29, 0.2], ["Medicina", 220, -2.53, -3.82, -1.25], ["Administración Financiera", 29, -2.83, -5.49, -0.19], ["Derecho", 54, -4.92, -7.13, -2.73], ["Ingeniería Civil", 91, -6.72, -8.54, -4.89]], "cc": [["Bacteriología", 61, 11.09, 8.4, 13.86], ["Psicología", 35, 10.19, 6.76, 13.59], ["Derecho", 54, 9.83, 6.95, 12.72], ["Fisioterapia", 78, 9.75, 7.29, 12.23], ["Medicina", 220, 5.58, 4.07, 7.07], ["Microbiología Industrial", 33, 4.72, 1.19, 8.21], ["Instrumentación Quirúrgica · Bogotá", 49, 3.19, 0.2, 6.19], ["Medicina Veterinaria", 47, 2.83, -0.26, 5.89], ["Ingeniería Agroindustrial", 11, 2.5, -2.53, 7.48], ["Terapia", 34, 1.33, -2.15, 4.79], ["Instrumentación Quirúrgica", 120, 0.09, -1.93, 2.1], ["Ingeniería Industrial", 31, -0.1, -3.75, 3.5], ["Fonoaudiología", 49, -0.5, -3.48, 2.55], ["Enfermería", 53, -0.67, -3.6, 2.25], ["Ingeniería Ambiental", 13, -0.87, -5.64, 3.92], ["Antropología", 9, -2.79, -8.03, 2.48], ["Comunicación Social", 9, -3.42, -8.68, 1.83], ["Ingeniería Civil", 91, -3.64, -5.95, -1.36], ["Administración de Negocios", 28, -3.64, -7.39, 0.09], ["Administración Financiera", 29, -4.67, -8.34, -0.98], ["Geología", 17, -4.84, -9.25, -0.41], ["Ingeniería de Software", 15, -5.89, -10.5, -1.28], ["Contaduría Pública", 52, -7.28, -10.2, -4.35], ["Mercadeo", 35, -9.7, -13.12, -6.25], ["Ingeniería Petroquímica", 11, -13.06, -18.05, -8.07]]}, "aa": {"lc": {"Administración Financiera": [41.4, 17.2, 41.4, 0.0], "Administración de Negocios": [35.7, 10.7, 50.0, 3.6], "Antropología": [44.4, 11.1, 44.4, 0.0], "Bacteriología": [32.8, 3.3, 60.7, 3.3], "Comunicación Social": [44.4, 33.3, 22.2, 0.0], "Contaduría Pública": [51.9, 9.6, 36.5, 1.9], "Derecho": [33.3, 11.1, 53.7, 1.9], "Enfermería": [39.6, 22.6, 37.7, 0.0], "Fisioterapia": [34.6, 19.2, 43.6, 2.6], "Fonoaudiología": [28.6, 20.4, 51.0, 0.0], "Geología": [29.4, 0.0, 70.6, 0.0], "Ingeniería Agroindustrial": [54.5, 0.0, 45.5, 0.0], "Ingeniería Ambiental": [61.5, 0.0, 38.5, 0.0], "Ingeniería Civil": [46.2, 13.2, 40.7, 0.0], "Ingeniería Industrial": [38.7, 12.9, 45.2, 3.2], "Ingeniería Petroquímica": [54.5, 9.1, 36.4, 0.0], "Ingeniería de Software": [33.3, 6.7, 60.0, 0.0], "Instrumentación Quirúrgica": [39.2, 18.3, 40.0, 2.5], "Instrumentación Quirúrgica · Bogotá": [20.4, 28.6, 46.9, 4.1], "Medicina": [20.9, 0.5, 77.7, 0.9], "Mercadeo": [28.6, 2.9, 68.6, 0.0], "Microbiología Industrial": [30.3, 6.1, 63.6, 0.0], "Psicología": [25.7, 8.6, 57.1, 8.6], "Terapia": [32.4, 20.6, 41.2, 5.9], "Medicina Veterinaria": [23.4, 14.9, 55.3, 6.4]}, "rc": {"Administración Financiera": [37.9, 17.2, 44.8, 0.0], "Administración de Negocios": [28.6, 10.7, 60.7, 0.0], "Antropología": [33.3, 33.3, 33.3, 0.0], "Bacteriología": [36.1, 8.2, 55.7, 0.0], "Comunicación Social": [55.6, 22.2, 22.2, 0.0], "Contaduría Pública": [36.5, 15.4, 46.2, 1.9], "Derecho": [46.3, 22.2, 25.9, 5.6], "Enfermería": [41.5, 39.6, 17.0, 1.9], "Fisioterapia": [35.9, 25.6, 38.5, 0.0], "Fonoaudiología": [40.8, 32.7, 26.5, 0.0], "Geología": [17.6, 0.0, 76.5, 5.9], "Ingeniería Agroindustrial": [27.3, 9.1, 54.5, 9.1], "Ingeniería Ambiental": [38.5, 0.0, 53.8, 7.7], "Ingeniería Civil": [23.1, 7.7, 65.9, 3.3], "Ingeniería Industrial": [16.1, 6.5, 77.4, 0.0], "Ingeniería Petroquímica": [36.4, 9.1, 45.5, 9.1], "Ingeniería de Software": [20.0, 13.3, 66.7, 0.0], "Instrumentación Quirúrgica": [51.7, 24.2, 24.2, 0.0], "Instrumentación Quirúrgica · Bogotá": [34.7, 44.9, 18.4, 2.0], "Medicina": [29.1, 2.7, 67.7, 0.5], "Mercadeo": [42.9, 14.3, 42.9, 0.0], "Microbiología Industrial": [36.4, 9.1, 48.5, 6.1], "Psicología": [42.9, 20.0, 31.4, 5.7], "Terapia": [32.4, 32.4, 35.3, 0.0], "Medicina Veterinaria": [38.3, 25.5, 36.2, 0.0]}, "ing": {"Administración Financiera": [27.6, 24.1, 37.9, 10.3], "Administración de Negocios": [0.0, 7.1, 89.3, 3.6], "Antropología": [11.1, 11.1, 77.8, 0.0], "Bacteriología": [21.7, 13.3, 60.0, 5.0], "Comunicación Social": [22.2, 11.1, 55.6, 11.1], "Contaduría Pública": [13.5, 26.9, 50.0, 9.6], "Derecho": [31.5, 20.4, 42.6, 5.6], "Enfermería": [25.5, 33.3, 35.3, 5.9], "Fisioterapia": [24.7, 23.4, 45.5, 6.5], "Fonoaudiología": [16.3, 26.5, 49.0, 8.2], "Geología": [17.6, 5.9, 70.6, 5.9], "Ingeniería Agroindustrial": [27.3, 18.2, 54.5, 0.0], "Ingeniería Ambiental": [38.5, 7.7, 53.8, 0.0], "Ingeniería Civil": [18.7, 26.4, 49.5, 5.5], "Ingeniería Industrial": [3.2, 12.9, 80.6, 3.2], "Ingeniería Petroquímica": [9.1, 9.1, 45.5, 36.4], "Ingeniería de Software": [13.3, 0.0, 86.7, 0.0], "Instrumentación Quirúrgica": [25.0, 23.3, 45.8, 5.8], "Instrumentación Quirúrgica · Bogotá": [12.5, 41.7, 39.6, 6.2], "Medicina": [21.8, 5.9, 71.4, 0.9], "Mercadeo": [17.6, 5.9, 70.6, 5.9], "Microbiología Industrial": [21.9, 6.2, 68.8, 3.1], "Psicología": [11.4, 14.3, 68.6, 5.7], "Terapia": [29.4, 35.3, 35.3, 0.0], "Medicina Veterinaria": [25.5, 17.0, 53.2, 4.3]}, "cc": {"Administración Financiera": [37.9, 27.6, 34.5, 0.0], "Administración de Negocios": [42.9, 17.9, 39.3, 0.0], "Antropología": [22.2, 22.2, 55.6, 0.0], "Bacteriología": [34.4, 4.9, 55.7, 4.9], "Comunicación Social": [22.2, 44.4, 33.3, 0.0], "Contaduría Pública": [46.2, 25.0, 26.9, 1.9], "Derecho": [22.2, 20.4, 42.6, 14.8], "Enfermería": [26.4, 45.3, 24.5, 3.8], "Fisioterapia": [33.3, 28.2, 33.3, 5.1], "Fonoaudiología": [42.9, 32.7, 24.5, 0.0], "Geología": [41.2, 17.6, 41.2, 0.0], "Ingeniería Agroindustrial": [54.5, 9.1, 36.4, 0.0], "Ingeniería Ambiental": [38.5, 15.4, 30.8, 15.4], "Ingeniería Civil": [31.9, 25.3, 41.8, 1.1], "Ingeniería Industrial": [35.5, 16.1, 48.4, 0.0], "Ingeniería Petroquímica": [72.7, 9.1, 18.2, 0.0], "Ingeniería de Software": [33.3, 33.3, 33.3, 0.0], "Instrumentación Quirúrgica": [34.2, 30.8, 31.7, 3.3], "Instrumentación Quirúrgica · Bogotá": [32.7, 36.7, 28.6, 2.0], "Medicina": [34.1, 1.8, 63.6, 0.5], "Mercadeo": [37.1, 11.4, 51.4, 0.0], "Microbiología Industrial": [24.2, 15.2, 60.6, 0.0], "Psicología": [25.7, 22.9, 48.6, 2.9], "Terapia": [32.4, 38.2, 29.4, 0.0], "Medicina Veterinaria": [40.4, 19.1, 38.3, 2.1]}}};
+const TYT={"sd": {"lc": 22.63, "rc": 22.57, "ing": 24.71, "cc": 27.08}, "va": {"lc": [["Comunicación Gráfica", 28, 3.16, -0.88, 7.2], ["Diseño Gráfico Publicitario", 125, 2.82, -0.47, 6.11], ["Producción Gráfica Publicitaria", 32, 1.24, -3.37, 5.85], ["Gestión de Mercadotecnia", 18, 0.68, -3.73, 5.09], ["Desarrollo de Aplicaciones Web", 8, -0.41, -6.43, 5.61], ["Gestión Industrial", 58, -2.07, -6.52, 2.38], ["Supervisión de Obras Civiles", 120, -2.18, -6.75, 2.39], ["Gestión Administrativa", 22, -3.24, -8.77, 2.29]], "rc": [["Supervisión de Obras Civiles", 120, 7.91, 4.09, 11.73], ["Gestión Industrial", 58, 3.7, 0.11, 7.29], ["Desarrollo de Aplicaciones Web", 8, 0.78, -5.69, 7.25], ["Comunicación Gráfica", 28, -0.91, -6.14, 4.32], ["Gestión Administrativa", 22, -2.63, -8.24, 2.98], ["Diseño Gráfico Publicitario", 125, -2.8, -7.13, 1.53], ["Producción Gráfica Publicitaria", 32, -2.85, -8.08, 2.38], ["Gestión de Mercadotecnia", 18, -3.21, -8.46, 2.04]], "ing": [["Diseño Gráfico Publicitario", 291, 4.91, 2.13, 7.69], ["Gestión Financiera y de Sistemas", 9, 1.58, -2.38, 5.54], ["Producción Gráfica Publicitaria", 36, 1.18, -1.82, 4.18], ["Mercadotecnia y Publicidad", 38, 0.79, -2.66, 4.24], ["Comunicación Gráfica", 30, 0.25, -2.71, 3.21], ["Tecnología Industrial", 83, 0.05, -2.75, 2.85], ["Sistemas", 1, -0.09, -4.68, 4.5], ["Gestión de Mercadotecnia", 43, -0.16, -3.94, 3.62], ["Producción", 1, -0.5, -4.22, 3.22], ["Gestión Administrativa", 56, -0.79, -4.46, 2.88], ["Desarrollo de Aplicaciones Web", 11, -1.91, -6.3, 2.48], ["Gestión Industrial", 160, -2.55, -4.98, -0.12], ["Supervisión de Obras Civiles", 354, -2.76, -4.94, -0.58]], "cc": [["Diseño Gráfico Publicitario", 125, 0.07, -0.6, 0.74], ["Gestión Industrial", 58, 0.05, -0.6, 0.7], ["Gestión de Mercadotecnia", 18, 0.02, -0.61, 0.65], ["Comunicación Gráfica", 28, 0.01, -0.62, 0.64], ["Gestión Administrativa", 22, -0.02, -0.65, 0.61], ["Desarrollo de Aplicaciones Web", 8, -0.03, -0.66, 0.6], ["Producción Gráfica Publicitaria", 32, -0.03, -0.66, 0.6], ["Supervisión de Obras Civiles", 120, -0.06, -0.69, 0.57]]}};
+
+/* ===== Datos de los documentos (con su página) ===== */
+const $ = (s, r = document) => r.querySelector(s);
+const $$ = (s, r = document) => Array.from(r.querySelectorAll(s));
+const nf = (n, d = 1) => n.toLocaleString("es-CO", { minimumFractionDigits: d, maximumFractionDigits: d });
+const sg = (n, d = 2) => (n > 0 ? "+" : n < 0 ? "−" : "") + nf(Math.abs(n), d);
+const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+const TOL = 0.15; // margen de lectura de la figura: un extremo a menos de 0,15 puntos del cero se dice «toca el cero»
+const COMPS = [
+  { k: "pg", code: "PG", label: "Puntaje global", model: false },
+  { k: "lc", code: "LC", label: "Lectura crítica" },
+  { k: "rc", code: "RC", label: "Razonamiento cuantitativo" },
+  { k: "cc", code: "CC", label: "Competencias ciudadanas" },
+  { k: "ce", code: "CE", label: "Comunicación escrita", model: false },
+  { k: "ing", code: "IN", label: "Inglés" },
+];
+const cLabel = (k) => COMPS.find((c) => c.k === k).label;
+const MODELED = ["lc", "rc", "cc", "ing"];
+
+/* varianza: [σ², τ00] */
+const VAR_PRO = {
+  nulo: { lc: [610.48, 50.88], rc: [625.46, 88.32], ing: [575.88, 54.65], cc: [786.99, 48.86] }, // Tabla 4, p. 20
+  final: { lc: [405.68, 40.46], rc: [410.76, 9.25], ing: [402.5, 14.48], cc: [546.13, 51.29] }, // Tabla 5, p. 20
+  y23: { lc: [399.3, 42.59], rc: [403.51, 12.84], ing: [415.43, 7.77], cc: [551.66, 39.75] }, // Tabla 6, p. 25
+  y24: { lc: [380.55, 34.44], rc: [436.19, 5.18], ing: [362.16, 36.04], cc: [513.51, 50.6] }, // Tabla 7, p. 31
+};
+const VAR_TYT = {
+  nulo: { lc: [495.51, 19.48], rc: [475.55, 22.95], ing: [561.04, 40.16], cc: [731.17, 0.37] }, // Tabla 6, p. 9
+  final: { lc: [369.77, 10.07], rc: [323.79, 20.77], ing: [403.46, 8.41], cc: [538.49, 0.14] },
+  p: { lc: "p = 0,023", rc: "p < 0,001", ing: "p < 0,001", cc: "p = 0,50" },
+};
+const icc = (a) => (a[1] / (a[0] + a[1])) * 100;
+const NOBS = { pro: { lc: 1184, rc: 1184, ing: 1178, cc: 1184 }, tyt: { lc: 411, rc: 411, ing: 1081, cc: 411 } }; // Tabla 5 p. 20 · Resumen p. 3 y Fig. 1 p. 10
+const NPROG = { pro: 25, tyt: { lc: 8, rc: 8, ing: 13, cc: 8 } };
+const FIG5 = { // Figura 5, p. 10: AA-, AA--, AA+, AA++
+  lc: [33, 12, 53, 2], rc: [36, 17, 46, 2], ing: [21, 18, 56, 5], cc: [34, 21, 42, 2],
+};
+const NCOMP = { 0: 11, 1: 21, 2: 29, 3: 27, 4: 12 }; // Tabla 3 total, p. 12
+const COEF_PRO = { // Tabla 5, p. 20: estimador y error estándar
+  lc: [["Promedio en la UDES: bajo", "frente a promedio alto", -12.58, 3.03], ["Promedio en la UDES: medio", "frente a promedio alto", -9.0, 2.0], ["Promedio en la UDES: medio alto", "frente a promedio alto", -4.47, 1.66]],
+  rc: [["Promedio en la UDES: bajo", "frente a promedio alto", -9.2, 2.94], ["Promedio en la UDES: medio", "frente a promedio alto", -5.94, 1.91], ["Promedio en la UDES: medio alto", "frente a promedio alto", -2.75, 1.61], ["Hombres", "frente a mujeres", 4.85, 1.31], ["Colegio público", "frente a colegio privado", 4.26, 1.23]],
+  ing: [["Promedio en la UDES: bajo", "frente a promedio alto", -7.08, 2.97], ["Promedio en la UDES: medio", "frente a promedio alto", -10.13, 1.94], ["Promedio en la UDES: medio alto", "frente a promedio alto", -5.28, 1.62], ["Colegio público", "frente a colegio privado", -8.25, 1.28], ["Estrato bajo", "referencia no declarada", -13.7, 2.85], ["Estrato medio", "referencia no declarada", -7.72, 2.73], ["Apoyo PAIPE individual", "frente a quien no lo recibió", -3.16, 1.36]],
+  cc: [["Promedio en la UDES: bajo", "frente a promedio alto", -15.26, 3.51], ["Promedio en la UDES: medio", "frente a promedio alto", -14.33, 2.31], ["Promedio en la UDES: medio alto", "frente a promedio alto", -6.5, 1.92], ["Apoyo PAIPE individual", "frente a quien no lo recibió", -3.96, 1.63]],
+};
+const COEF_TYT = { // Tabla 5, p. 8: puntos de Saber TyT por punto de Saber 11
+  lc: [["Lectura crítica, Saber 11", "", 0.56, 0.15], ["Sociales y ciudadanas, Saber 11", "", 0.32, 0.16], ["Ciencias naturales, Saber 11", "", 0.66, 0.15]],
+  rc: [["Matemáticas, Saber 11", "", 0.78, 0.13], ["Ciencias naturales, Saber 11", "", 0.73, 0.14]],
+  ing: [["Lectura crítica, Saber 11", "", 0.45, 0.16], ["Inglés, Saber 11", "", 1.17, 0.07], ["Sociales y ciudadanas, Saber 11", "", 0.42, 0.16], ["Ciencias naturales, Saber 11", "", 0.67, 0.16]],
+  cc: [["Lectura crítica, Saber 11", "", 0.43, 0.18], ["Sociales y ciudadanas, Saber 11", "", 0.92, 0.19], ["Ciencias naturales, Saber 11", "", 0.49, 0.18]],
+};
+const TESTS = {
+  pro: {
+    label: "Saber PRO", dom: [-20, 15], step: 5, data: PRO.va,
+    pop: "Campus Bucaramanga y programa de extensión de Bogotá", cut: "Saber PRO 2023-2024", office: "Vicerrectoría de Enseñanza · Dirección de Analítica Académica",
+    scale: "Escala 0 a 300 puntos", ci: "Intervalo de confianza (el documento no declara su nivel)", ciShort: "intervalo de confianza",
+    src: "Documento de Analítica Académica UDES N.º 30, Figs. 9 a 12 (pp. 22 a 25) y Tabla 2 (p. 11)", defSort: "aporte", doi: "10.5281/zenodo.17661929",
+  },
+  tyt: {
+    label: "Saber TyT", dom: [-15, 15], step: 5, data: TYT.va,
+    pop: "UDESTEC · Campus Bucaramanga", cut: "Saber TyT, aplicaciones 2016-1 a 2024-3", office: "Planeación Institucional",
+    scale: "Escala 0 a 200 puntos", ci: "Intervalo de 95 %", ciShort: "intervalo de 95 %",
+    src: "Documento de trabajo N.º 21, Figs. C1 a C4 (pp. 14 a 16) y Fig. 1 (p. 10)", defSort: "n", doi: "10.5281/zenodo.23500324",
+  },
+};
+const TYT_DISTINGUISH = { rc: ["Supervisión de Obras Civiles"], ing: ["Diseño Gráfico Publicitario", "Supervisión de Obras Civiles"], lc: [], cc: [] }; // p. 9 y p. 10: solo estos se distinguen de cero
+
+/* ===== Estado ===== */
+const S = { tab: "portal", test: "pro", comp: "lc", sort: "aporte", only: false, view: "bosque", sel: null, state: "normal", kb: false };
+const reduced = () => $("#reduced").checked || matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+function status(r) {
+  if (r.n < 10) return "few";
+  if (r.e > 0 && r.lo > -TOL) return r.lo >= TOL ? "up" : "edge-up";
+  if (r.e < 0 && r.hi < TOL) return r.hi <= -TOL ? "down" : "edge-down";
+  return "none";
+}
+const VERDICT = { up: "▲ sobre lo esperado", down: "▼ bajo lo esperado", "edge-up": "◐ toca el cero", "edge-down": "◐ toca el cero", none: "○ no se distingue", few: "◇ pocos evaluados" };
+const VERDICT_SHORT = { up: "▲ sobre", down: "▼ bajo", "edge-up": "◐ límite", "edge-down": "◐ límite", none: "○ sin dif.", few: "◇ n < 10" };
+function rowsFor(test = S.test, comp = S.comp) {
+  const raw = TESTS[test].data[comp] || [];
+  return raw.map(([name, n, e, lo, hi]) => ({ name, n, e, lo, hi, s: status({ n, e, lo, hi }) }));
+}
+const counts = (rows) => {
+  const up = rows.filter((r) => r.s === "up").length, down = rows.filter((r) => r.s === "down").length;
+  const edge = rows.filter((r) => r.s.startsWith("edge")).length, few = rows.filter((r) => r.s === "few").length;
+  return { up, down, edge, few, none: rows.length - up - down - edge - few, dist: up + down, n: rows.length };
+};
+function sorted(rows) {
+  const r = rows.slice();
+  if (S.sort === "aporte") r.sort((a, b) => b.e - a.e);
+  else if (S.sort === "n") r.sort((a, b) => b.n - a.n || b.e - a.e);
+  else r.sort((a, b) => a.name.localeCompare(b.name, "es"));
+  return S.only ? r.filter((x) => x.s === "up" || x.s === "down") : r;
+}
+function say(r, test = S.test, comp = S.comp) {
+  const T = TESTS[test], abs = Math.abs(r.e), pt = abs === 1 ? "punto" : "puntos";
+  let t = `${r.name}: ${nf(abs, 2)} ${pt} ${r.e >= 0 ? "sobre" : "bajo"} lo esperado en ${cLabel(comp).toLowerCase()}. `;
+  t += `${T.ciShort[0].toUpperCase() + T.ciShort.slice(1)}: de ${sg(r.lo)} a ${sg(r.hi)}. `;
+  if (r.s === "few") t += `Con ${r.n} evaluados no se le da tono ni se compara: la cifra va entre paréntesis. `;
+  else if (r.s === "up" || r.s === "down") t += `El intervalo no incluye el cero: se distingue de cero. `;
+  else if (r.s.startsWith("edge")) t += `El intervalo llega al cero por menos de lo que se puede medir en la figura: se dice que toca el cero. `;
+  else t += `El intervalo incluye el cero: no se puede afirmar que esté ${r.e >= 0 ? "sobre" : "bajo"} lo esperado. `;
+  t += `${nf(r.n, 0)} evaluados`;
+  if (r.n < 30 && r.n >= 10) t += " (pocos: la fila va atenuada)";
+  if (test === "tyt") t += `. Equivale a ${nf(abs / TYT.sd[comp], 2)} desviaciones estándar de la prueba`;
+  return t + ".";
+}
+function summary(rows, test = S.test, comp = S.comp) {
+  const c = counts(rows), lab = cLabel(comp).toLowerCase();
+  if (!c.dist) return `En <b>${lab}</b> ningún programa se distingue de cero: con estos datos no hay base para señalar a uno como mejor o peor. ${c.edge ? `${c.edge} ${c.edge === 1 ? "llega" : "llegan"} al cero por poco. ` : ""}`;
+  return `En <b>${lab}</b>, <b>${c.dist} de ${c.n}</b> programas se distinguen de cero con su intervalo: ${c.up} ${c.up === 1 ? "queda" : "quedan"} sobre lo esperado y ${c.down} bajo lo esperado. ${c.edge ? `${c.edge} ${c.edge === 1 ? "toca" : "tocan"} el cero. ` : ""}Los otros ${c.n - c.dist - c.edge} no se distinguen.`;
+}
+
+/* ===== Portal ===== */
+const flapHTML = (str) => Array.from(String(str)).map((c) => (/\d/.test(c) ? `<span class="fl">${c}</span>` : `<span class="fl sep">${c === " " ? "&nbsp;" : c}</span>`)).join("");
+const P = (v, d) => ((v - d[0]) / (d[1] - d[0])) * 100;
+
+function axisHTML(dom, step, left, right) {
+  let ticks = "";
+  for (let v = dom[0]; v <= dom[1] + 1e-9; v += step) ticks += `<span class="axis__t" style="left:${P(v, dom)}%">${v === 0 ? "0" : sg(v, step < 1 ? 1 : 0)}</span>`;
+  const z = P(0, dom);
+  const dirs = left ? `<span class="axis__dir" style="right:${100 - z + 1}%">${left}</span><span class="axis__dir" style="left:${z + 1}%">${right}</span>` : "";
+  return `<div class="axis" aria-hidden="true"><span></span><div class="axis__track">${ticks}${dirs}</div><span></span></div>`;
+}
+function rowHTML(r, dom, step, o = {}) {
+  const z = P(0, dom), lo = P(r.lo, dom), hi = P(r.hi, dom), e = P(r.e, dom);
+  const org = ((z - lo) / (hi - lo)) * 100;
+  const few = r.s === "few";
+  const val = few ? `(${sg(r.e)})` : sg(r.e);
+  const dec = o.dec ?? 2;
+  const attr = (r.n !== null && r.n < 30 && r.n >= 10) ? ' data-atten="1"' : "";
+  const verdict = o.verdict === false ? "" : `<span class="fr__verdict">${VERDICT[r.s]}</span>`;
+  const sub = o.sub !== undefined ? o.sub : r.n !== null ? `n = ${nf(r.n, 0)}` : "";
+  return `<li class="fr" data-s="${o.tone || r.s}"${attr} data-sel="${S.sel === r.name && !o.noSel ? 1 : 0}" style="--z:${z}%;--step:${(step / (dom[1] - dom[0])) * 100}%">
+    <button class="fr__btn" type="button" data-name="${esc(r.name)}" ${o.noSel ? "" : `aria-pressed="${S.sel === r.name}"`} aria-label="${esc(o.label || say(r))}">
+      <span class="fr__name">${esc(r.name)}${sub ? `<small>${sub}</small>` : ""}</span>
+      <span class="fr__track"><i class="fr__int" style="left:${lo}%;width:${hi - lo}%;--org:${org}%" data-zero="${z}" data-e="${e}"></i><i class="fr__dot" style="left:${e}%" data-zero="${z}" data-e="${e}"></i></span>
+      <span class="fr__val"><b>${val.replace(".", ",")}</b>${verdict}</span>
+    </button></li>`;
+}
+function tableHTML(rows, T, comp) {
+  return `<div class="tblwrap"><table class="tbl"><caption>${esc(cLabel(comp))} · aporte de cada programa, en puntos de ${esc(T.label)} · ${esc(T.cut)}</caption>
+   <thead><tr><th scope="col">Programa</th><th scope="col" class="n">Evaluados</th><th scope="col" class="n">Aporte</th><th scope="col" class="n">${esc(T.ciShort[0].toUpperCase() + T.ciShort.slice(1))}</th><th scope="col">Lectura</th></tr></thead><tbody>
+   ${rows.map((r) => `<tr><th scope="row" style="font-weight:600;text-align:left">${esc(r.name)}</th><td class="n">${nf(r.n, 0)}</td><td class="n">${r.s === "few" ? `(${sg(r.e)})` : sg(r.e)}</td><td class="n">${sg(r.lo)} a ${sg(r.hi)}</td><td>${VERDICT[r.s]}</td></tr>`).join("")}</tbody></table></div>`;
+}
+const csvPreview = (T, comp, rows) => {
+  const head = "prueba,competencia,corte,sede,programa,evaluados,aporte_puntos,ic_inferior,ic_superior,se_distingue_de_cero,origen,pagina,oficina";
+  const lines = rows.slice(0, 3).map((r) => [T.label, cLabel(comp), T.cut, S.test === "pro" ? (r.name.includes("Bogotá") ? "Bogotá" : "Bucaramanga") : "Bucaramanga", r.name, r.n, r.e, r.lo, r.hi, r.s === "up" || r.s === "down" ? "sí" : r.s === "few" ? "" : "no", "lectura de figura", S.test === "pro" ? "22-25" : "14-16", T.office].map((v) => /[,"]/.test(String(v)) ? `"${v}"` : v).join(","));
+  return [head, ...lines, "…"].join("\n");
+};
+
+function panelForest() {
+  const T = TESTS[S.test], comp = S.comp;
+  const all = rowsFor();
+  let list = sorted(all);
+  if (S.state === "pocos") list = all.filter((r) => r.n < 30).sort((a, b) => a.n - b.n);
+  const c = counts(all);
+  const sel = all.find((r) => r.name === S.sel);
+  const readDefault = sel ? say(sel) : summary(all);
+  const dir = `← bajo lo esperado`, dir2 = `sobre lo esperado →`;
+  const same = S.test === "pro"
+    ? (comp === "rc" || comp === "ing" ? `Todas las competencias comparten la escala: por eso ${cLabel(comp).toLowerCase()} se ve apretada. Sus diferencias entre programas son pequeñas (${nf(icc(VAR_PRO.final[comp]), 0)} % de la variación, p. 20), y la figura no las infla.` : `Todas las competencias comparten la escala (−20 a +15 puntos), como en el documento.`)
+    : (comp === "cc" ? `Todos los programas quedan en el cero: el documento calcula que no hay diferencias entre programas en competencias ciudadanas (p. 16).` : `Misma escala en las cuatro competencias (−15 a +15 puntos). Las barras del documento original equivalen a ±1 error estándar; aquí se dibuja el intervalo de 95 %.`);
+  let body;
+  if (S.state === "carga") body = `<div class="skel" role="status" aria-label="Cargando el aporte de los programas">${Array.from({ length: 9 }, () => "<i></i>").join("")}</div>`;
+  else if (S.state === "vacio") body = `<div class="empty"><b>Todavía no hay cifras de aporte para este corte</b><span>El aporte se calcula una vez al año con los resultados de Saber PRO y Saber 11 de cada estudiante. Cuando la oficina cargue el estudio de este periodo, aparecerá aquí. Un vacío no es un cero: mientras tanto no se dibuja nada.</span></div>`;
+  else if (S.view === "tabla") body = tableHTML(list, T, comp);
+  else body = `${axisHTML(T.dom, T.step, dir, dir2)}<ul class="forest" aria-label="Aporte de cada programa en ${esc(cLabel(comp))}">${list.map((r) => rowHTML(r, T.dom, T.step)).join("")}</ul>${list.length ? "" : `<div class="empty"><b>Ningún programa se distingue de cero con este filtro</b><span>Quite «Solo los que se distinguen» para ver los demás.</span></div>`}`;
+  const pocosNote = S.state === "pocos" ? `<p class="note"><b>Programas con pocos evaluados.</b> Con menos de 10 evaluados la cifra va entre paréntesis y sin tono; con menos de 30 la fila se atenúa. Aquí se muestran solo esos programas, ordenados por evaluados.</p>` : "";
+  const exportBar = `<span class="exp" role="group" aria-label="Descargar"><button class="btn" type="button" data-exp="CSV">CSV</button><button class="btn" type="button" data-exp="PNG">PNG</button><button class="btn" type="button" data-exp="JPG">JPG</button></span>`;
+  return `<section class="panel" data-panel="forest" aria-labelledby="h-forest">
+    <header><div><h3 id="h-forest">Aporte de cada programa · ${esc(cLabel(comp))}</h3>
+      <p class="sub">Puntos de ${esc(T.label)} por encima o por debajo de lo esperado para estudiantes que llegaron con el mismo resultado en Saber 11. Cero es el programa promedio. ${esc(T.cut)}.</p></div>${exportBar}</header>
+    <div class="panel__bar">
+      <span class="seg" role="group" aria-label="Forma de la lectura"><button type="button" data-view="bosque" aria-pressed="${S.view === "bosque"}">Gráfico</button><button type="button" data-view="tabla" aria-pressed="${S.view === "tabla"}">Tabla</button></span>
+      <span>Ordenar por <span class="seg" role="group" aria-label="Orden"><button type="button" data-sort="aporte" aria-pressed="${S.sort === "aporte"}">Aporte</button><button type="button" data-sort="n" aria-pressed="${S.sort === "n"}">Evaluados</button><button type="button" data-sort="nombre" aria-pressed="${S.sort === "nombre"}">Nombre</button></span></span>
+      <label class="chk"><input type="checkbox" id="only" ${S.only ? "checked" : ""}> Solo los que se distinguen de cero (${c.dist})</label>
+    </div>
+    ${pocosNote}
+    ${body}
+    ${S.state === "normal" ? `<p class="read" id="read">${readDefault}</p>
+    <div class="legend" aria-label="Cómo se lee cada marca">
+      <span><i style="--c:var(--pos-2)"></i>▲ sobre lo esperado: el intervalo no incluye el cero</span>
+      <span><i style="--c:var(--neg-2)"></i>▼ bajo lo esperado: el intervalo no incluye el cero</span>
+      <span><i style="--c:var(--none);--d:var(--board);--ring:0 0 0 2px var(--none)"></i>○ no se distingue de cero</span>
+      <span><i style="--c:var(--pos-1);--d:var(--board);--ring:0 0 0 2.5px var(--pos-2)"></i>◐ toca el cero</span>
+      <span><i style="--c:transparent;--d:var(--board);--ring:0 0 0 2px var(--none)"></i>◇ (entre paréntesis) menos de 10 evaluados</span>
+    </div>
+    <p class="note">${same} ${T.ci} ${S.test === "pro" ? "Los intervalos se midieron sobre el gráfico del documento, con un margen de ±0,1 punto." : "Los intervalos se calculan como el aporte ±1,96 veces el error estándar medido en las barras del anexo, con un margen de ±0,1 punto."}</p>
+    <details><summary>Ver el CSV que descargaría esta vista</summary><pre class="csv">${esc(csvPreview(T, comp, list))}</pre><p class="note">Una fila por programa, con su procedencia, su página y la oficina. Los vacíos salen vacíos, nunca ceros.</p></details>` : ""}
+    ${S.state === "normal" && sel ? profileHTML(sel) : ""}
+    <p class="src"><span><b>Fuente</b> ${esc(T.src)}</span><span><b>Corte</b> ${esc(T.cut)}</span><span><b>Oficina</b> ${esc(T.office)}</span></p>
+  </section>`;
+}
+function profileHTML(sel) {
+  const T = TESTS[S.test];
+  const comps = MODELED.filter((k) => T.data[k].some((r) => r[0] === sel.name));
+  const rows = comps.map((k) => { const r = rowsFor(S.test, k).find((x) => x.name === sel.name); return { ...r, comp: k }; });
+  return `<div class="prof" aria-live="polite"><h4>Perfil de ${esc(sel.name)} en las competencias del estudio</h4>
+    <ul class="forest" aria-label="Perfil de ${esc(sel.name)}">${rows.map((r) => rowHTML({ ...r, name: cLabel(r.comp) }, T.dom, T.step, { noSel: true, sub: `n = ${nf(r.n, 0)}`, label: say(r, S.test, r.comp) })).join("")}</ul>
+    <p class="note">${S.test === "tyt" ? "Un mismo programa puede ser «alto» en una competencia y «bajo» en otra: el documento pide no resumirlo en un solo indicador (p. 11). " : "Cada competencia tiene su propio modelo y su propia muestra: no se suman ni se promedian. "}<button class="btn prof__x" type="button" data-clear style="min-height:32px;padding:4px 10px;font-size:12px;margin-left:6px">Quitar selección</button></p></div>`;
+}
+
+function panelVar() {
+  const T = TESTS[S.test], isPro = S.test === "pro";
+  const V = isPro ? VAR_PRO : VAR_TYT;
+  const fin = (k) => icc(V.final[k]);
+  const rows = MODELED.map((k) => `<div class="vrow" data-sel="${k === S.comp ? 1 : 0}"><span class="vrow__label">${cLabel(k)}</span><span class="vbar" role="img" aria-label="${nf(fin(k), fin(k) < 10 ? 1 : 0)} % entre programas y ${nf(100 - fin(k), 1)} % entre estudiantes del mismo programa"><i style="width:${fin(k)}%"></i></span><span class="vrow__n">${nf(fin(k), fin(k) < 10 ? 1 : 0)} %<small>entre programas</small></span></div>`).join("");
+  const f = fin(S.comp), sentence = `De cada 100 puntos de variación en <b>${cLabel(S.comp).toLowerCase()}</b>, <b>${nf(f, f < 10 ? 1 : 0)}</b> vienen de diferencias entre programas y <b>${nf(100 - f, f < 10 ? 1 : 0)}</b> de diferencias entre estudiantes de un mismo programa.`;
+  const pc = (a) => nf(icc(a), icc(a) < 10 ? 1 : 0) + " %";
+  const tbl = isPro
+    ? `<div class="tblwrap"><table class="tbl cmp"><caption>Parte de la variación que está entre programas (correlación intraclase), Saber PRO</caption><thead><tr><th scope="col">Competencia</th><th scope="col" class="n">Sin controles</th><th scope="col" class="n">Con controles</th><th scope="col" class="n">Solo 2023</th><th scope="col" class="n">Solo 2024</th></tr></thead><tbody>${MODELED.map((k) => `<tr><th scope="row" style="text-align:left;font-weight:600">${cLabel(k)}</th><td class="n">${pc(V.nulo[k])}</td><td class="n"><b>${pc(V.final[k])}</b></td><td class="n">${pc(V.y23[k])}</td><td class="n">${pc(V.y24[k])}</td></tr>`).join("")}</tbody></table></div>
+       <p class="note">Sin controles: p. 20 (Tabla 4). Con controles: Tabla 5. Años por separado: Tablas 6 y 7 (pp. 25 y 31). Inglés pasa de 2 % en 2023 a 9 % en 2024: <b>la diferencia entre programas no es estable de un año a otro</b>. El propio documento espera un valor mayor de 5 % (p. 21, nota 2); razonamiento cuantitativo (2 %) e inglés (3 %) quedan por debajo.</p>`
+    : `<div class="tblwrap"><table class="tbl cmp"><caption>Parte de la variación que está entre programas (CCI), Saber TyT</caption><thead><tr><th scope="col">Competencia</th><th scope="col" class="n">Sin controles</th><th scope="col" class="n">Con controles</th><th scope="col">¿Hay diferencias?</th></tr></thead><tbody>${MODELED.map((k) => `<tr><th scope="row" style="text-align:left;font-weight:600">${cLabel(k)}</th><td class="n">${pc(V.nulo[k])}</td><td class="n"><b>${pc(V.final[k])}</b></td><td>${V.p[k] === "p = 0,50" ? "No · " : "Sí · "}${V.p[k]}</td></tr>`).join("")}</tbody></table></div>
+       <p class="note">Tabla 6, p. 9. En ninguna competencia el programa explica más de 7 % de la varianza; la mayor parte está entre estudiantes del mismo programa (p. 11). La prueba de lectura crítica (p = 0,023) es «el resultado más frágil de la tabla». Al descontar el inglés de entrada, la diferencia entre programas en inglés baja de 6,7 % a 2,0 % (p. 9).</p>`;
+  return `<section class="panel" data-panel="var" aria-labelledby="h-var">
+    <header><div><h3 id="h-var">Cuánta diferencia hay entre programas</h3><p class="sub">Es pequeña, y la sección la dice antes de que alguien lea los nombres de la lista.</p></div></header>
+    <p class="read">${sentence}</p>
+    <div class="var-rows" role="group" aria-label="Parte de la variación entre programas, por competencia">${rows}</div>
+    <div class="vscale" aria-hidden="true"><span></span><span><span>0 %</span><span>50 %</span><span>100 % de la variación</span></span><span></span></div>
+    <div>${tbl}</div>
+    <p class="src"><span><b>Fuente</b> ${isPro ? "Documento N.º 30, Tablas 4 a 7 (pp. 20, 25, 31)" : "Documento N.º 21, Tabla 6 (p. 9)"}</span><span><b>Corte</b> ${esc(T.cut)}</span><span><b>Oficina</b> ${esc(T.office)}</span></p>
+  </section>`;
+}
+
+const QCOL = ["q-am", "q-a2m", "q-ap", "q-a2p"], QNAME = ["AA−", "AA−−", "AA+", "AA++"];
+const QDEF = [
+  "Entró sobre 50 en Saber 11 y salió bajo 150 en Saber PRO",
+  "Entró bajo 50 y salió bajo 150",
+  "Entró sobre 50 y salió sobre 150",
+  "Entró bajo 50 y salió sobre 150",
+];
+function panelQuad() {
+  if (S.test !== "pro") return `<section class="panel" data-panel="quad"><header><div><h3>Cuadrantes de aporte</h3></div></header><div class="empty"><b>Este análisis solo existe para Saber PRO</b><span>El estudio de Saber TyT no clasifica a los estudiantes en cuadrantes. Las dos escalas son distintas (0 a 200 y 0 a 100) y no están equiparadas (p. 4).</span></div></section>`;
+  const comp = S.comp, T = TESTS.pro;
+  const rows = rowsFor("pro", comp).map((r) => ({ ...r, q: PRO.aa[comp][r.name] })).sort((a, b) => (b.q[2] + b.q[3]) - (a.q[2] + a.q[3]));
+  const f5 = FIG5[comp];
+  const tiles = f5.map((v, i) => `<div class="qtile" style="--c:var(--${["neg-2", "neg-1", "pos-1", "pos-2"][i]})"><b>${v} %</b>${QNAME[i]} · ${QDEF[i]}</div>`).join("");
+  const above = f5[2] + f5[3];
+  const disc = comp === "lc" || comp === "rc" ? `<p class="note"><b>Una diferencia dentro del documento.</b> El texto (p. 9) dice que ${comp === "lc" ? "48 %" : "55 %"} de los evaluados en ${cLabel(comp).toLowerCase()} mantuvo o mejoró por encima de lo esperado, pero la Figura 5 (p. 10) da ${above} %. Se muestra la figura; hay que confirmarlo con los autores.</p>` : "";
+  const list = rows.map((r) => {
+    const few = r.n < 10, att = r.n < 30 && !few ? ' data-atten="1"' : "", fmt = (v) => (few ? `(${nf(v, 0)})` : nf(v, 1));
+    return `<div class="qrow"${att}${few ? ' data-few="1"' : ""} role="group" aria-label="${esc(r.name)}: AA− ${nf(r.q[0], 1)} %, AA−− ${nf(r.q[1], 1)} %, AA+ ${nf(r.q[2], 1)} %, AA++ ${nf(r.q[3], 1)} %. ${r.n} evaluados."><span class="qname">${esc(r.name)}<small>n = ${nf(r.n, 0)}</small></span><span class="qbar">${r.q.map((v, i) => `<span class="${QCOL[i]}" style="flex:${v} 1 0" title="${QNAME[i]} ${nf(v, 1)} %">${v >= 9 ? nf(v, 0) : ""}</span>`).join("")}</span><span class="qval">${few ? "(" : ""}${nf(r.q[2] + r.q[3], 0)} %${few ? ")" : ""}<small>sobre 150</small></span></div>`;
+  }).join("");
+  const nc = [NCOMP[0], NCOMP[1], NCOMP[2], NCOMP[3], NCOMP[4]];
+  return `<section class="panel" data-panel="quad" aria-labelledby="h-quad">
+    <header><div><h3 id="h-quad">Cuadrantes de aporte · ${esc(cLabel(comp))}</h3>
+    <p class="sub">Un grupo por estudiante, según su punto de partida y su llegada. Describe el trayecto; no es el aporte del modelo de arriba, porque los cortes (50 y 150) son fijos.</p></div></header>
+    <div class="qhead">${tiles}</div>
+    <p class="read">En toda la muestra, <b>${above} de cada 100</b> evaluados salieron sobre 150 puntos en ${cLabel(comp).toLowerCase()}, y solo <b>${f5[3]}</b> de cada 100 lo hicieron habiendo entrado bajo 50 (el grupo AA++). El 150 es la mitad de la escala de Saber PRO (0 a 300).</p>
+    ${disc}
+    <div class="qlist" aria-label="Reparto de cada programa en los cuatro grupos, ordenado por quienes salen sobre 150">${list}</div>
+    <div class="legend">${QNAME.map((n, i) => `<span><span class="sw ${QCOL[i]}"></span>${n} · ${QDEF[i]}</span>`).join("")}</div>
+    <div class="divider">Cuántas de las cuatro competencias mejoraron frente a Saber 11</div>
+    <div class="pos-bar" role="img" aria-label="Porcentaje de estudiantes con variación positiva en 0, 1, 2, 3 y 4 competencias: ${nc.join(", ")}">${nc.map((v, i) => `<span style="flex:${v} 1 0">${v} %</span>`).join("")}</div>
+    <div class="legend"><span>0 competencias</span><span>1</span><span>2</span><span>3</span><span>4 competencias</span></div>
+    <p class="note">${100 - NCOMP[0]} % mejoró en al menos una competencia, sin importar que supere o no el promedio (Tabla 3, p. 12). Es otra medida, sobre puntajes estandarizados que el documento no detalla.</p>
+    <p class="src"><span><b>Fuente</b> Documento N.º 30, Figura 5 (p. 10), Tabla 2 (p. 11), Tabla 3 (p. 12)</span><span><b>Corte</b> ${esc(T.cut)}</span><span><b>Oficina</b> ${esc(T.office)}</span></p>
+  </section>`;
+}
+
+function panelCoef() {
+  const comp = S.comp;
+  if (S.test === "tyt") {
+    const dom = [0, 1.5], step = 0.5;
+    const rows = COEF_TYT[comp].map(([n, ref, e, se]) => ({ name: n, e, lo: e - 1.96 * se, hi: e + 1.96 * se, n: null, s: "none" }));
+    return `<section class="panel co" data-panel="coef" aria-labelledby="h-co"><header><div><h3 id="h-co">Lo que traían al ingresar · ${esc(cLabel(comp))}</h3><p class="sub">Cuántos puntos de Saber TyT suma cada punto de Saber 11. Es lo que el modelo descuenta antes de calcular el aporte del programa.</p></div></header>
+      ${axisHTML(dom, step, "", "")}<ul class="forest" aria-label="Efecto de Saber 11 sobre Saber TyT">${rows.map((r) => rowHTML(r, dom, step, { tone: "seq", verdict: false, sub: "", noSel: true, label: `${r.name}: ${nf(r.e, 2)} puntos de Saber TyT por punto de Saber 11, entre ${nf(r.lo, 2)} y ${nf(r.hi, 2)}.` })).join("")}</ul>
+      <p class="note">Todos son significativos al 5 % (p. 8). Ciencias naturales es el predictor más constante (0,49 a 0,73) y en inglés pesa sobre todo el inglés de Saber 11 (1,17). Este estudio no incluye variables sociodemográficas: no hay perfiles de estudiantes por programa.</p>
+      <p class="src"><span><b>Fuente</b> Documento N.º 21, Tabla 5 (p. 8), intervalos calculados como ±1,96 errores estándar</span><span><b>Corte</b> ${esc(TESTS.tyt.cut)}</span><span><b>Oficina</b> Planeación Institucional</span></p></section>`;
+  }
+  const dom = [-25, 10], step = 5;
+  const rows = COEF_PRO[comp].map(([n, ref, e, se]) => { const lo = e - 1.96 * se, hi = e + 1.96 * se; return { name: n, ref, e, lo, hi, n: 99, s: lo > 0 ? "up" : hi < 0 ? "down" : "none" }; });
+  return `<section class="panel co" data-panel="coef" aria-labelledby="h-co"><header><div><h3 id="h-co">Qué acompaña al puntaje · ${esc(cLabel(comp))}</h3><p class="sub">Diferencia en puntos de Saber PRO entre grupos de estudiantes, ya descontado lo que traían de Saber 11. Describe quiénes llegan más arriba o más abajo; no dice por qué.</p></div></header>
+    ${axisHTML(dom, step, "← menos puntos", "más puntos →")}
+    <ul class="forest" aria-label="Diferencias en puntos por característica del estudiante">${rows.map((r) => rowHTML(r, dom, step, { noSel: true, sub: r.ref, label: `${r.name} ${r.ref}: ${sg(r.e)} puntos, intervalo de ${sg(r.lo)} a ${sg(r.hi)}. ${r.s === "none" ? "No se distingue de cero." : "Se distingue de cero."}` })).join("")}</ul>
+    <p class="note">Intervalo calculado como el estimador ±1,96 errores estándar (Tabla 5, p. 20). Son asociaciones: el documento advierte que el signo negativo del apoyo PAIPE individual probablemente refleja condiciones iniciales más desfavorables de quienes lo reciben (p. 32). El análisis de correspondencias múltiples (pp. 16 a 19) es exploratorio y sus dos ejes explican solo 4,6 % y 3,9 % de la variabilidad: no se dibuja.</p>
+    <p class="src"><span><b>Fuente</b> Documento N.º 30, Tabla 5 (p. 20)</span><span><b>Corte</b> ${esc(TESTS.pro.cut)}</span><span><b>Oficina</b> ${esc(TESTS.pro.office)}</span></p></section>`;
+}
+
+function stepsSVG() {
+  const c = "var(--ink)", m = "var(--muted)";
+  return [
+    `<svg viewBox="0 0 160 90" role="img" aria-label="Ilustración: de un punto de partida se estima un puntaje esperado"><line x1="12" y1="74" x2="148" y2="74" stroke="${m}"/><line x1="12" y1="74" x2="12" y2="10" stroke="${m}"/><line x1="12" y1="68" x2="148" y2="22" stroke="${c}" stroke-width="2"/><circle cx="60" cy="49" r="4.5" fill="var(--board)" stroke="${c}" stroke-width="2"/><text x="64" y="66" font-size="9" fill="${m}">esperado</text><text x="14" y="87" font-size="8.5" fill="${m}">Saber 11 →</text></svg>`,
+    `<svg viewBox="0 0 160 90" role="img" aria-label="Ilustración: el aporte es la distancia entre lo real y lo esperado"><line x1="12" y1="74" x2="148" y2="74" stroke="${m}"/><line x1="12" y1="68" x2="148" y2="22" stroke="${c}" stroke-width="2"/><circle cx="84" cy="34" r="5" fill="var(--pos-2)"/><line x1="84" y1="39" x2="84" y2="45" stroke="var(--pos-2)" stroke-width="2"/><line x1="84" y1="29" x2="84" y2="45" stroke="var(--pos-2)" stroke-width="2"/><text x="92" y="35" font-size="9" fill="${c}">real</text><text x="92" y="53" font-size="9" fill="${m}">aporte</text></svg>`,
+    `<svg viewBox="0 0 160 90" role="img" aria-label="Ilustración: dos programas con la misma pendiente y distinto punto de partida"><line x1="12" y1="74" x2="148" y2="74" stroke="${m}"/><line x1="12" y1="62" x2="148" y2="24" stroke="${c}" stroke-width="2"/><line x1="12" y1="74" x2="148" y2="40" stroke="${m}" stroke-width="2" stroke-dasharray="4 3"/><text x="116" y="19" font-size="9" fill="${c}">Programa A</text><text x="112" y="62" font-size="9" fill="${m}">Programa B</text></svg>`,
+    `<svg viewBox="0 0 160 90" role="img" aria-label="Ilustración: un intervalo que cruza el cero y otro que no"><line x1="80" y1="8" x2="80" y2="82" stroke="${c}" stroke-width="2"/><line x1="30" y1="30" x2="118" y2="30" stroke="var(--none)" stroke-width="3"/><circle cx="68" cy="30" r="5" fill="var(--board)" stroke="var(--none)" stroke-width="2"/><line x1="94" y1="58" x2="140" y2="58" stroke="var(--pos-2)" stroke-width="3"/><circle cx="117" cy="58" r="5" fill="var(--pos-2)"/><text x="12" y="46" font-size="8.5" fill="${m}">toca el cero: no se afirma</text><text x="84" y="76" font-size="8.5" fill="${m}">no incluye el cero</text></svg>`,
+  ];
+}
+function panelMethod() {
+  const isPro = S.test === "pro", test = isPro ? "Saber PRO" : "Saber TyT", sv = stepsSVG();
+  const steps = [
+    ["Se parte de lo que traían", `Cada estudiante llegó con un resultado en Saber 11. Con él se calcula cuánto se espera que obtenga en ${test}.`],
+    ["Se compara con lo que obtuvo", `Las dos pruebas no son equiparables y no se pueden restar; por eso el puntaje esperado se estima con un modelo${isPro ? "" : " (p. 4)"}. El aporte es lo que queda por encima o por debajo.`],
+    ["Se agrupa por programa", "Quienes estudian el mismo programa comparten docentes y plan de estudios, así que sus resultados no son independientes. El modelo jerárquico estima un efecto por programa."],
+    ["Se dice cuánto se sabe", "Con pocos evaluados la estimación se acerca al promedio para no premiar ni castigar al azar. Si el intervalo toca el cero, no se afirma que el programa esté sobre o bajo lo esperado."],
+  ];
+  const limits = isPro ? [
+    "Es un solo corte, 2023-2024, de quienes presentaron la prueba (p. 6). No sigue a las mismas personas en el tiempo.",
+    "Los controles incluyen el promedio en la UDES y la participación en estrategias de apoyo (p. 7). Nota de esta propuesta: eso hace que el aporte sea lo que el programa suma aparte de esos factores, y no el efecto total del programa.",
+    "Los programas con menos de 10 evaluados (Antropología y Comunicación Social, 9 cada uno) van sin tono y entre paréntesis; con menos de 30 la fila se atenúa.",
+    "Los cuadrantes usan cortes fijos (50 y 150) y no son el valor agregado del modelo.",
+    "Un programa puede estar alto en una competencia y bajo en otra. No es una clasificación de programas ni una evaluación de docentes.",
+    "El estudio incluye la extensión de Instrumentación Quirúrgica en Bogotá junto a las sedes de Bucaramanga (p. 4).",
+  ] : [
+    "El modelo usa 411 estudiantes (34 % de 1.207 registros) de 8 programas; el resto presentó Saber 11 antes de 2014 (pp. 6 y 7). Solo 3 de los valores estimados se distinguen de cero (p. 9).",
+    "Es una medida relativa: compara cada programa con el programa promedio de UDESTEC, no con un estándar externo (p. 12).",
+    "El modelo de inglés usa otra muestra (1.081 estudiantes, 13 programas): los dos aportes de un mismo programa no son del todo comparables (p. 11).",
+    "El documento pide reportar siempre el intervalo y el n, no calificar a ningún programa como «mejor» o «peor» a partir de un valor que no se distingue de cero, y no usarlo como indicador de desempeño docente (pp. 11 y 12).",
+    "Es un documento de trabajo, versión 1 (19 de octubre de 2026).",
+  ];
+  const names = [
+    ["Aporte de los programas", "Efecto de cada programa en un modelo jerárquico, con intervalo y n. Esta sección.", "Saber PRO y Saber TyT: documentos 30 y 21."],
+    ["Valor agregado · Motor Alpha", "Puntaje real menos esperado de cada estudiante con una regresión (León y colaboradores, 2025), promediado por programa. Sin intervalo ni contracción.", "Bloque Saber TyT, vista Valor agregado."],
+    ["Valor agregado · Motor Beta", "Percentil de salida menos percentil de entrada dentro de la cohorte histórica de la UDES. Sin modelo.", "Bloque Saber TyT, vista Valor agregado."],
+    ["Cuadrante de aporte (AA)", "Cuatro grupos según el estudiante entró sobre o bajo 50 y salió sobre o bajo 150. Describe el trayecto.", "Solo Saber PRO, Figura 5 y Tabla 2."],
+  ];
+  return `<section class="panel" data-panel="method" aria-labelledby="h-met">
+    <header><div><h3 id="h-met">Cómo se calcula, en palabras sencillas</h3><p class="sub">Las ilustraciones son esquemas, no datos.</p></div></header>
+    <div class="steps">${steps.map(([t, p], i) => `<div>${sv[i]}<b>${i + 1}. ${t}</b><p>${p}</p></div>`).join("")}</div>
+    <div class="divider">Lo que no dice</div>
+    <ul class="limits">${limits.map((l) => `<li>${l}</li>`).join("")}</ul>
+    <div class="divider">Cómo se llama cada cifra</div>
+    <div class="tblwrap"><table class="tbl names"><caption>Para que nadie confunda este aporte con el valor agregado que ya existe en el portal</caption><thead><tr><th scope="col">Nombre en pantalla</th><th scope="col">Qué es</th><th scope="col">Dónde está</th></tr></thead><tbody>${names.map(([a, b, c], i) => `<tr${i === 0 ? ' style="background:var(--raised)"' : ""}><th scope="row" style="text-align:left">${a}</th><td>${b}</td><td>${c}</td></tr>`).join("")}</tbody></table></div>
+    <div class="divider">Quién lo hizo</div>
+    <div class="cites">
+      <div><b>Saber PRO</b><p class="ref">Pérez Pulido, M. O., León, F. J., Mejía Ardila, O. C., y Pinto Guarguatí, L. A. (2025). <i>Valor agregado académico como estrategia institucional de seguimiento y mejora del aprendizaje: estudio en la Universidad de Santander, Campus Bucaramanga, Saber Pro 2023-2024</i> (Documento de Analítica Académica UDES N.º 30, versión 2). Vicerrectoría de Enseñanza, Dirección de Analítica Académica, Universidad de Santander. <a href="https://doi.org/10.5281/zenodo.17661929" target="_blank" rel="noopener">doi.org/10.5281/zenodo.17661929</a></p><p class="note">Aprobó: Dr. José Asthul Rangel Chacón, Vicerrector de Enseñanza. Licencia: el documento no la declara. El documento no trae «cómo citar»: la referencia se armó en formato APA con sus datos.</p></div>
+      <div><b>Saber TyT</b><p class="ref">Pérez Pulido, M. O., León, F. J., Pinto Guarguatí, L. A., &amp; Calderón Plata, A. M. (2026). <i>Valor agregado académico como estrategia institucional de seguimiento y mejora del aprendizaje: Saber TyT en la Universidad de Santander Campus Bucaramanga</i> (Documento de Trabajo No. 21). Planeación Institucional, Universidad de Santander. <a href="https://doi.org/10.5281/zenodo.23500324" target="_blank" rel="noopener">doi.org/10.5281/zenodo.23500324</a></p><p class="note">Revisó: Krystle Forero, Directora UDESTEC. Versión 1, 19 de octubre de 2026. Licencia: el documento no la declara. Referencia tomada de su «Como citar este documento».</p></div>
+    </div>
+  </section>`;
+}
+
+function arrivalsHTML() {
+  const T = TESTS[S.test], comp = S.comp, isPro = S.test === "pro";
+  if (S.state === "vacio") return `<dl class="arrivals">${["Se distinguen de cero", "Diferencia entre programas", "Evaluados en el modelo"].map((t) => `<div class="arr"><dt>${t}</dt><dd><div class="flaps"><span class="fl sep">—</span></div><p class="sub">Sin cifra para este corte.</p></dd></div>`).join("")}</dl>`;
+  const c = counts(rowsFor()), V = isPro ? VAR_PRO : VAR_TYT, f = icc(V.final[comp]);
+  const nobs = NOBS[S.test][comp], nprog = isPro ? NPROG.pro : NPROG.tyt[comp];
+  const ingTyt = !isPro && comp === "ing";
+  return `<dl class="arrivals">
+    <div class="arr"><dt>Se distinguen de cero</dt><dd><div class="flaps" aria-label="${c.dist} de ${c.n}">${flapHTML(c.dist)}<span class="of">de ${c.n} programas</span></div><p class="sub"><b>▲ ${c.up}</b> sobre lo esperado · <b>▼ ${c.down}</b> bajo lo esperado${c.edge ? ` · <b>◐ ${c.edge}</b> tocan el cero` : ""}</p></dd></div>
+    <div class="arr"><dt>Diferencia entre programas</dt><dd><div class="flaps" aria-label="${nf(f, 1)} por ciento">${flapHTML(nf(f, f < 10 ? 1 : 0) + " %")}</div><p class="sub">de la variación de los puntajes está entre programas (modelo con controles).</p></dd></div>
+    <div class="arr"><dt>Evaluados en el modelo</dt><dd><div class="flaps" aria-label="${nobs}">${flapHTML(nf(nobs, 0))}</div><p class="sub">${nprog} programas.${ingTyt ? " La Tabla 5 (p. 8) dice 410; la Figura 1 (p. 10), 1.081 en 13 programas." : isPro ? " Con cifra completa en Saber PRO y Saber 11." : " Presentaron Saber 11 entre 2014 y 2021."}</p></dd></div>
+  </dl><p class="cut">Corte: ${esc(T.cut)} · ${esc(T.office)}</p>`;
+}
+
+function railHTML() {
+  return `<div class="rail" role="radiogroup" aria-label="Competencia">${COMPS.map((c) => {
+    const dis = c.model === false;
+    return `<button type="button" class="comp" role="radio" data-comp="${c.k}" aria-checked="${!dis && c.k === S.comp}" ${dis ? 'aria-disabled="true" title="El estudio no calcula aporte para esta competencia"' : `tabindex="${c.k === S.comp ? 0 : -1}"`}><span class="comp__code">${c.code}</span><span class="comp__name">${c.label}${dis ? "<small>sin modelo</small>" : ""}</span></button>`;
+  }).join("")}</div>`;
+}
+function urlString() {
+  const q = [`sp=${S.comp}`];
+  if (S.view !== "bosque") q.push(`va-vista=${S.view}`);
+  if (S.sort !== TESTS[S.test].defSort) q.push(`va-orden=${S.sort}`);
+  if (S.only) q.push("va-solo=1");
+  if (S.sel) q.push(`va-programa=${encodeURIComponent(S.sel).replace(/%20/g, "+")}`);
+  return "?" + q.join("&");
+}
+
+function renderPortal({ animate = false } = {}) {
+  const T = TESTS[S.test];
+  if (S.sel && !rowsFor().some((r) => r.name === S.sel)) S.sel = null;
+  const panels = S.state === "carga" ? `<section class="panel"><div class="skel" role="status" aria-label="Cargando">${Array.from({ length: 8 }, () => "<i></i>").join("")}</div></section>` : panelForest() + panelVar() + panelQuad() + panelCoef();
+  $("#od").innerHTML = `
+    <div class="od-head"><h2>Aporte de los programas</h2>
+      <p>Cuánto suma cada programa al puntaje de sus estudiantes, una vez descontado el nivel con que llegaron. Es una medida relativa entre programas de la UDES, no una comparación con el país.</p>
+      <div class="od-head__pop"><span><b>Población</b> ${esc(T.pop)}</span><span><b>Prueba</b> ${esc(T.label)} · ${esc(T.scale)}</span><span><b>Autores</b> ${S.test === "pro" ? "Pérez Pulido, León, Mejía Ardila y Pinto Guarguatí (2025)" : "Pérez Pulido, León, Pinto Guarguatí y Calderón Plata (2026)"} · DOI <a href="https://doi.org/${T.doi}" target="_blank" rel="noopener">${T.doi}</a></span></div>
+      <p class="name-chip"><span><b>Ojo con el nombre.</b> No es el «valor agregado» del Motor Alpha ni el del Motor Beta: usa otro método y lleva intervalo.</span> <button type="button" data-goto-names>Ver cómo se llama cada cifra</button></p>
+    </div>
+    ${railHTML()}
+    <div id="arrivals">${arrivalsHTML()}</div>
+    <div class="divider">Aporte de cada programa</div>
+    ${panels}
+    ${S.state === "carga" ? "" : `<div class="divider">Método, límites y cita</div>${panelMethod()}`}
+    <div class="panel"><p class="sub">Dirección de esta vista (lo que viaja en la URL del bloque):</p><div class="urlbox" id="urlbox">${esc(urlString())}</div></div>`;
+  bindPortal();
+  if (animate && !reduced()) runEntrance();
+}
+
+/* ===== Movimiento: una secuencia de entrada, un disparo por panel; cambios cortos ===== */
+const EASE = "power3.out"; // equivale a la curva fuerte de salida del tablero
+let io = null, pending = [], fallback = null;
+function enterTL(el, { dur = 0.5, paused = false } = {}) {
+  const tl = gsap.timeline({ paused, defaults: { ease: EASE } });
+  const fl = $$(".fl:not(.sep)", el), ints = $$(".fr__int", el), dots = $$(".fr__dot", el), vb = $$(".vbar i", el), qb = $$(".qbar, .pos-bar", el);
+  if (fl.length) tl.from(fl, { rotationX: -80, opacity: 0, transformPerspective: 500, duration: dur * 0.6, stagger: 0.03, clearProps: "transform,opacity" }, 0);
+  if (ints.length) tl.from(ints, { scaleX: 0, duration: dur, stagger: Math.min(0.018, 0.5 / ints.length), clearProps: "transform" }, 0.12);
+  if (dots.length) tl.from(dots, { x: (i, t) => ((+t.dataset.zero - +t.dataset.e) / 100) * t.parentElement.clientWidth, duration: dur, stagger: Math.min(0.018, 0.5 / dots.length), clearProps: "transform" }, 0.12);
+  if (vb.length) tl.from(vb, { scaleX: 0, duration: dur * 0.9, stagger: 0.06, clearProps: "transform" }, 0.1);
+  if (qb.length) tl.from(qb, { scaleX: 0, duration: dur * 0.9, stagger: Math.min(0.02, 0.5 / qb.length), clearProps: "transform" }, 0.1);
+  return tl;
+}
+function setupEntrance() {
+  if (io) io.disconnect();
+  pending.forEach((t) => t.kill()); pending = [];
+  clearTimeout(fallback);
+  if (reduced() || !window.gsap) return;
+  const map = new Map();
+  $$("#od .arrivals, #od [data-panel]").forEach((el) => map.set(el, enterTL(el, { paused: true })));
+  pending = Array.from(map.values());
+  io = new IntersectionObserver((es) => es.forEach((e) => { if (e.isIntersecting) { io.unobserve(e.target); map.get(e.target)?.play(); } }), { rootMargin: "0px 0px -10% 0px" });
+  map.forEach((_, el) => io.observe(el));
+  fallback = setTimeout(() => pending.forEach((t) => t.paused() && t.play()), 6000); // por si la vista no avisa que entró en pantalla
+}
+function runEntrance() { setupEntrance(); }
+function quickChange() { // al cambiar de competencia con el puntero: corto, interrumpible, sin escalonar de más
+  if (reduced() || S.kb || !window.gsap) return;
+  const vis = (el) => { const r = el.getBoundingClientRect(); return r.bottom > 0 && r.top < innerHeight; };
+  $$("#od .arrivals, #od [data-panel]").filter(vis).forEach((el) => enterTL(el, { dur: 0.24 }));
+}
+
+/* ===== Eventos ===== */
+let focusSel = null;
+function rerender(focus, mode) {
+  focusSel = focus || null;
+  const y = scrollY;
+  window.gsap && gsap.killTweensOf("#od *");
+  renderPortal({ animate: mode === "enter" });
+  if (mode === "change") quickChange();
+  scrollTo({ top: y });
+  if (focusSel) { const el = $(focusSel); el && el.focus({ preventScroll: true }); }
+  S.kb = false;
+}
+const quote = (s) => s.replace(/"/g, '\\"');
+function toast(msg) { const t = $("#toast"); t.textContent = msg; t.hidden = false; clearTimeout(toast.t); toast.t = setTimeout(() => (t.hidden = true), 3200); }
+function setComp(k, kb) {
+  if (!MODELED.includes(k) || k === S.comp) return;
+  S.comp = k; S.kb = !!kb; S.sel = S.sel && TESTS[S.test].data[k].some((r) => r[0] === S.sel) ? S.sel : null;
+  rerender(`[data-comp="${k}"]`, "change");
+}
+function bindPortal() { /* los eventos están delegados en #od; aquí solo se actualiza lo que depende del estado */
+  const u = $("#urlbox"); if (u) u.textContent = urlString();
+}
+function showRead(name) {
+  const r = $("#read"); if (!r) return;
+  const row = rowsFor().find((x) => x.name === name);
+  r.innerHTML = row ? say(row) : (rowsFor().find((x) => x.name === S.sel) ? say(rowsFor().find((x) => x.name === S.sel)) : summary(rowsFor()));
+}
+function initPortalEvents() {
+  const od = $("#od");
+  od.addEventListener("click", (e) => {
+    const c = e.target.closest("[data-comp]");
+    if (c) { if (c.getAttribute("aria-disabled") === "true") { toast("El estudio no calcula aporte para esta competencia: el portal dice «sin modelo», no un cero."); return; } return setComp(c.dataset.comp, e.detail === 0); }
+    const v = e.target.closest("[data-view]"); if (v) { S.view = v.dataset.view; return rerender(`[data-view="${S.view}"]`); }
+    const so = e.target.closest("[data-sort]"); if (so) { S.sort = so.dataset.sort; return rerender(`[data-sort="${S.sort}"]`); }
+    const ex = e.target.closest("[data-exp]"); if (ex) return toast(`En el portal se descargaría el ${ex.dataset.exp} de esta vista. La vista previa no descarga archivos.`);
+    if (e.target.closest("[data-clear]")) { S.sel = null; return rerender("#od .fr__btn"); }
+    if (e.target.closest("[data-goto-names]")) { $(".names")?.scrollIntoView({ behavior: reduced() ? "auto" : "smooth", block: "center" }); return; }
+    const b = e.target.closest(".panel[data-panel='forest'] .forest:not(.prof .forest) .fr__btn");
+    if (b) { S.sel = S.sel === b.dataset.name ? null : b.dataset.name; return rerender(`.fr__btn[data-name="${quote(b.dataset.name)}"]`); }
+  });
+  od.addEventListener("change", (e) => { if (e.target.id === "only") { S.only = e.target.checked; rerender("#only"); } });
+  od.addEventListener("keydown", (e) => {
+    const c = e.target.closest("[data-comp]");
+    if (c && /^Arrow(Left|Right|Up|Down)$/.test(e.key)) {
+      e.preventDefault();
+      const ks = MODELED, i = ks.indexOf(S.comp), d = /Right|Down/.test(e.key) ? 1 : -1;
+      setComp(ks[(i + d + ks.length) % ks.length], true);
+    }
+  });
+  const hov = (e) => { const b = e.target.closest(".panel[data-panel='forest'] .forest:not(.prof .forest) .fr__btn"); if (b) showRead(b.dataset.name); };
+  od.addEventListener("mouseover", hov); od.addEventListener("focusin", hov);
+  od.addEventListener("mouseout", (e) => { if (e.target.closest(".forest") && !e.relatedTarget?.closest?.(".forest")) showRead(null); });
+  $$("[data-test]").forEach((b) => b.addEventListener("click", () => {
+    S.test = b.dataset.test; S.sort = TESTS[S.test].defSort; S.sel = null;
+    $$("[data-test]").forEach((x) => x.setAttribute("aria-pressed", x === b));
+    rerender(null, "enter");
+  }));
+  $$("[data-state]").forEach((b) => b.addEventListener("click", () => {
+    S.state = b.dataset.state; $$("[data-state]").forEach((x) => x.setAttribute("aria-pressed", x === b)); rerender(null, "enter");
+  }));
+  $("#reduced").addEventListener("change", () => rerender(null, "enter"));
+  $("#replay").addEventListener("click", () => { scrollTo({ top: $("#od").offsetTop - 80 }); rerender(null, "enter"); });
+}
+
+/* ===== Pestañas y tema ===== */
+function go(tab) {
+  S.tab = tab;
+  $$(".tab").forEach((t) => t.setAttribute("aria-selected", t.dataset.go === tab));
+  $$(".view").forEach((v) => (v.hidden = v.id !== "v-" + tab));
+  try { history.replaceState(null, "", "#" + tab); } catch (_) {}
+  scrollTo({ top: 0 });
+  if (tab === "pdf") { buildSheets(); fitSheets(); }
+  if (tab === "construir") buildGuide();
+}
+function initShell() {
+  $$(".tab").forEach((t) => t.addEventListener("click", () => go(t.dataset.go)));
+  const tb = $("#theme");
+  const isDark = () => document.documentElement.dataset.theme ? document.documentElement.dataset.theme === "dark" : matchMedia("(prefers-color-scheme: dark)").matches;
+  const label = () => (tb.textContent = `Tema: ${isDark() ? "oscuro" : "claro"}`);
+  tb.addEventListener("click", () => { document.documentElement.dataset.theme = isDark() ? "light" : "dark"; label(); });
+  label();
+  const h = location.hash.replace("#", "");
+  addEventListener("resize", () => S.tab === "pdf" && fitSheets());
+  initPortalEvents();
+  renderPortal({ animate: true });
+  if (["pdf", "construir"].includes(h)) go(h);
+}
+
+/* ===== Boletín: hojas A4 a escala ===== */
+const PTONE = {
+  up: { line: "#2a63b8", fill: "#2a63b8", ring: "#2a63b8" },
+  down: { line: "#b9541f", fill: "#b9541f", ring: "#b9541f" },
+  "edge-up": { line: "#6fa4e8", fill: "#ffffff", ring: "#2a63b8" },
+  "edge-down": { line: "#e79c69", fill: "#ffffff", ring: "#b9541f" },
+  none: { line: "#6f7d90", fill: "#ffffff", ring: "#6f7d90" },
+  few: { line: "#6f7d90", fill: "#ffffff", ring: "#6f7d90" },
+};
+const mm = (v) => (Math.round(v * 100) / 100).toString();
+const pn = (n, d = 2) => nf(n, d);
+function paperForest(rows, T) {
+  const W = 178, rh = 3.8, top = 10, px = 62, pw = 66, dom = T.dom, st = T.step, H = top + rows.length * rh + 9;
+  const X = (v) => px + ((v - dom[0]) / (dom[1] - dom[0])) * pw;
+  let s = `<svg viewBox="0 0 ${W} ${H}" width="${W}mm" height="${H}mm" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Aporte por programa con su intervalo">`;
+  s += `<g font-size="2.3" font-weight="700" fill="#072b58"><text x="0" y="6.4">Programa</text><text x="57" y="6.4" text-anchor="end">n</text><text x="141" y="6.4" text-anchor="end">Aporte</text><text x="144" y="6.4">Intervalo</text><text x="166" y="6.4">Lectura</text></g>`;
+  for (let v = dom[0]; v <= dom[1] + 1e-9; v += st) s += `<text x="${mm(X(v))}" y="6.4" font-size="2.2" text-anchor="middle" fill="#6f7d90">${v === 0 ? "0" : sg(v, 0)}</text><line x1="${mm(X(v))}" x2="${mm(X(v))}" y1="${top - 1.4}" y2="${H - 7}" stroke="#d6dee8" stroke-width="0.15"/>`;
+  rows.forEach((r, i) => {
+    const y = top + i * rh, cy = y + rh / 2, t = PTONE[r.s], op = r.n < 30 && r.n >= 10 ? 0.66 : 1, few = r.s === "few";
+    s += `<g opacity="${op}">${i % 2 ? `<rect x="0" y="${mm(y)}" width="${W}" height="${rh}" fill="#eef3f9" opacity="0.6"/>` : ""}`;
+    s += `<text x="0.8" y="${mm(cy + 0.9)}" font-size="2.45">${esc(r.name)}</text><text x="57" y="${mm(cy + 0.9)}" font-size="2.35" text-anchor="end" fill="#4a5a70">${nf(r.n, 0)}</text>`;
+    s += `<line x1="${mm(X(r.lo))}" x2="${mm(X(r.hi))}" y1="${mm(cy)}" y2="${mm(cy)}" stroke="${t.line}" stroke-width="${few ? 0.3 : 0.5}" ${few ? 'stroke-dasharray="0.6 0.6"' : ""}/>`;
+    s += few ? `<rect x="${mm(X(r.e) - 0.8)}" y="${mm(cy - 0.8)}" width="1.6" height="1.6" fill="#fff" stroke="${t.ring}" stroke-width="0.3" transform="rotate(45 ${mm(X(r.e))} ${mm(cy)})"/>` : `<circle cx="${mm(X(r.e))}" cy="${mm(cy)}" r="0.95" fill="${t.fill}" stroke="${t.ring}" stroke-width="0.35"/>`;
+    s += `<text x="141" y="${mm(cy + 0.9)}" font-size="2.45" font-weight="700" text-anchor="end">${few ? "(" + sg(r.e) + ")" : sg(r.e)}</text><text x="144" y="${mm(cy + 0.9)}" font-size="2.3" fill="#4a5a70">${sg(r.lo)} a ${sg(r.hi)}</text><text x="166" y="${mm(cy + 0.9)}" font-size="2.3" fill="${r.s === "up" ? "#2a63b8" : r.s === "down" ? "#b9541f" : "#4a5a70"}" font-weight="${r.s === "up" || r.s === "down" ? 700 : 500}">${VERDICT_SHORT[r.s]}</text></g>`;
+  });
+  s += `<line x1="${mm(X(0))}" x2="${mm(X(0))}" y1="${top - 1.4}" y2="${H - 7}" stroke="#16243a" stroke-width="0.45"/>`;
+  s += `<line x1="${px}" x2="${px + pw}" y1="${H - 7}" y2="${H - 7}" stroke="#16243a" stroke-width="0.2"/><g font-size="2.2" fill="#4a5a70"><text x="${mm(X(0) - 1)}" y="${H - 3.6}" text-anchor="end">← bajo lo esperado</text><text x="${mm(X(0) + 1)}" y="${H - 3.6}">sobre lo esperado →</text></g></svg>`;
+  return s;
+}
+function paperQuads(rows) {
+  const W = 178, rh = 4.2, top = 10, px = 62, pw = 66, H = top + rows.length * rh + 3, cols = ["#b9541f", "#e79c69", "#6fa4e8", "#2a63b8"];
+  let s = `<svg viewBox="0 0 ${W} ${H}" width="${W}mm" height="${H}mm" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Reparto de cada programa en los cuatro grupos de aporte">`;
+  s += `<g font-size="2.3" font-weight="700" fill="#072b58"><text x="0" y="6.4">Programa</text><text x="57" y="6.4" text-anchor="end">n</text><text x="${px}" y="6.4">Reparto de los evaluados (100 %)</text><text x="143" y="6.4" text-anchor="end">AA−</text><text x="152" y="6.4" text-anchor="end">AA−−</text><text x="161" y="6.4" text-anchor="end">AA+</text><text x="170" y="6.4" text-anchor="end">AA++</text><text x="178" y="6.4" text-anchor="end">&gt;150</text></g>`;
+  rows.forEach((r, i) => {
+    const y = top + i * rh, cy = y + rh / 2, few = r.n < 10, op = r.n < 30 && !few ? 0.66 : 1;
+    s += `<g opacity="${op}">${i % 2 ? `<rect x="0" y="${mm(y)}" width="${W}" height="${rh}" fill="#eef3f9" opacity="0.6"/>` : ""}<text x="0.8" y="${mm(cy + 0.9)}" font-size="2.45">${esc(r.name)}</text><text x="57" y="${mm(cy + 0.9)}" font-size="2.35" text-anchor="end" fill="#4a5a70">${nf(r.n, 0)}</text>`;
+    let x = px;
+    r.q.forEach((v, k) => { const w = (v / 100) * pw; s += `<rect x="${mm(x)}" y="${mm(cy - 1.4)}" width="${mm(w)}" height="2.8" fill="${few ? "#c9d2de" : cols[k]}"/>`; x += w; });
+    const cx = [143, 152, 161, 170];
+    r.q.forEach((v, k) => (s += `<text x="${cx[k]}" y="${mm(cy + 0.9)}" font-size="2.3" text-anchor="end">${few ? "(" + nf(v, 1) + ")" : nf(v, 1)}</text>`));
+    s += `<text x="178" y="${mm(cy + 0.9)}" font-size="2.35" font-weight="700" text-anchor="end">${few ? "(" : ""}${nf(r.q[2] + r.q[3], 0)}${few ? ")" : ""}</text></g>`;
+  });
+  return s + `</svg>`;
+}
+function paperCoefTable(coefs, header, rows) {
+  return `<table class="bol-table"><thead><tr><th>${header}</th>${coefs.map((c) => `<th class="n">${c}</th>`).join("")}</tr></thead><tbody>${rows.map((r) => `<tr><td>${r[0]}</td>${r.slice(1).map((c) => `<td class="n">${c}</td>`).join("")}</tr>`).join("")}</tbody></table>`;
+}
+const notesHTML = (n) => `<dl class="bol-notes">${n.map(([a, b]) => `<div><dt>${a}</dt><dd>${b}</dd></div>`).join("")}</dl>`;
+const tile = (l, b, s) => `<div class="bol-tile"><small>${l}</small><b>${b}</b><span>${s}</span></div>`;
+function page({ title, body, chapter, cut, pageNo, tab = "EN" }) {
+  const art = `<svg viewBox="0 0 120 18.4" preserveAspectRatio="xMaxYMax slice" aria-hidden="true"><g fill="none" stroke="#fff" stroke-width=".35">${Array.from({ length: 9 }, (_, i) => `<path d="M${14 + i * 12} 18.4V${6 + (i % 4) * 2.4}h8V18.4M${16 + i * 12} ${8 + (i % 4) * 2.4}v2M${19 + i * 12} ${8 + (i % 4) * 2.4}v2"/>`).join("")}</g></svg>`;
+  return `<div class="bol-page"><div class="bol-bar"><b>Universidad de Santander</b><span>Planeación Institucional</span></div>
+    <div class="bol-band"><strong>${title}</strong>${art}</div><div class="bol-badge">${tab}</div><span>Enseñanza</span>
+    <div class="bol-tab">${tab}</div>
+    <div class="bol-body">${body}</div>
+    <div class="bol-foot"><span><b>${chapter}</b></span><span>${cut}</span><span>pág. ${pageNo}</span></div></div>`;
+}
+function sheetHead(t, d) { return `<div class="sh-head"><h3>${t}</h3><p>${d}</p></div>`; }
+const LEG = `<div class="bol-legend"><span><i style="background:#2a63b8"></i>▲ sobre lo esperado (sin cruzar el cero)</span><span><i style="background:#b9541f"></i>▼ bajo lo esperado</span><span><i style="background:#fff;border:.35mm solid #6f7d90;border-radius:50%"></i>○ no se distingue de cero</span><span><i style="background:#fff;border:.35mm solid #2a63b8;border-radius:50%"></i>◐ toca el cero</span><span><i style="background:#fff;border:.3mm solid #6f7d90;transform:rotate(45deg) scale(.7)"></i>◇ menos de 10 evaluados (entre paréntesis)</span></div>`;
+
+function sheetProA(comp) {
+  const T = TESTS.pro, rows = rowsFor("pro", comp).sort((a, b) => b.e - a.e), c = counts(rows), f = icc(VAR_PRO.final[comp]), lab = cLabel(comp);
+  const body = sheetHead(`Aporte de los programas · ${lab}`, `Cuántos puntos de Saber PRO suma cada programa por encima o por debajo de lo esperado para estudiantes que llegaron con el mismo resultado en Saber 11. Cero es el programa promedio.`) +
+    notesHTML([["Lectura", "Cada fila es un programa: el punto es su aporte y la línea su intervalo. Si no cruza el cero, la fila lleva ▲ o ▼. Método y límites: hoja de método de Saber PRO."], ["Intervalo y pocos evaluados", "Intervalo de confianza; el documento no declara su nivel. Medido sobre sus Figs. 9 a 12 (pp. 22 a 25), ±0,1 punto. Menos de 30 evaluados: fila atenuada; menos de 10: cifra entre paréntesis y sin tono."], ["Corte y procedencia", `${T.cut}; ${T.pop}; escala de 0 a 300. ${T.office}; documento N.º 30, versión 2, DOI ${T.doi}.`]]) +
+    `<div class="bol-keys">${tile("Se distinguen de cero", `${c.dist} de ${c.n}`, `▲ ${c.up} sobre lo esperado · ▼ ${c.down} bajo lo esperado${c.edge ? ` · ◐ ${c.edge} tocan el cero` : ""}`)}${tile("Diferencia entre programas", nf(f, f < 10 ? 1 : 0) + " %", "de la variación de los puntajes está entre programas")}${tile("Evaluados en el modelo", nf(NOBS.pro[comp], 0), "25 programas, con Saber 11 y Saber PRO")}</div>` +
+    LEG + `<div class="bol-fig">${paperForest(rows, T)}</div>` +
+    `<p class="bol-read"><b>Lectura.</b> ${summary(rows).replace(/<\/?b>/g, "")} El programa explica ${nf(f, f < 10 ? 1 : 0)} % de la variación; el resto está entre estudiantes de un mismo programa. No es una clasificación.</p>`;
+  return page({ title: "Resultados Saber PRO", body, chapter: "Enseñanza · Resultados Saber PRO · Aporte de los programas", cut: `Corte: ${T.cut}`, pageNo: 61 });
+}
+function sheetProB(comp) {
+  const T = TESTS.pro, lab = cLabel(comp), f5 = FIG5[comp];
+  const rows = rowsFor("pro", comp).map((r) => ({ ...r, q: PRO.aa[comp][r.name] })).sort((a, b) => b.q[2] + b.q[3] - (a.q[2] + a.q[3]));
+  const names = ["AA−", "AA−−", "AA+", "AA++"], col = ["#b9541f", "#e79c69", "#6fa4e8", "#2a63b8"];
+  const body = sheetHead(`Cuadrantes de aporte · ${lab}`, `Un grupo por estudiante según su punto de partida (Saber 11, corte en 50) y su llegada (Saber PRO, corte en 150, la mitad de la escala). Describe el trayecto; no es el aporte del modelo.`) +
+    notesHTML([["Lectura", "Cada barra suma 100 %. Las cuatro columnas de la derecha repiten el reparto y la última suma los que salieron sobre 150 (AA+ y AA++)."], ["Pocos evaluados", "Menos de 30: fila atenuada. Menos de 10: cifras entre paréntesis y barra gris."], ["Corte", `${T.cut}. ${T.pop}.`], ["Procedencia", `${T.office}. Documento N.º 30, Figura 5 (p. 10) y Tabla 2 (p. 11).`]]) +
+    `<div class="bol-keys k4">${f5.map((v, i) => `<div class="bol-tile" style="border-top:1mm solid ${col[i]}"><small>${names[i]}</small><b>${v} %</b><span>${QDEF[i]}</span></div>`).join("")}</div>` +
+    `<div class="bol-fig">${paperQuads(rows)}</div>` +
+    `<p class="bol-read"><b>Lectura.</b> En toda la muestra, ${f5[2] + f5[3]} de cada 100 evaluados salieron sobre 150 puntos en ${lab.toLowerCase()}. ${comp === "lc" || comp === "rc" ? `El texto del documento (p. 9) da ${comp === "lc" ? "48" : "55"} %; la Figura 5 da ${f5[2] + f5[3]} %: se usa la figura.` : ""}</p>`;
+  return page({ title: "Resultados Saber PRO", body, chapter: "Enseñanza · Resultados Saber PRO · Cuadrantes de aporte", cut: `Corte: ${T.cut}`, pageNo: 62 });
+}
+const CITA_PRO = `<div class="bol-cite"><b>Cita.</b> Pérez Pulido, M. O., León, F. J., Mejía Ardila, O. C., y Pinto Guarguatí, L. A. (2025). <i>Valor agregado académico como estrategia institucional de seguimiento y mejora del aprendizaje: estudio en la Universidad de Santander, Campus Bucaramanga, Saber Pro 2023-2024</i> (Documento de Analítica Académica UDES N.º 30, versión 2). Vicerrectoría de Enseñanza, Dirección de Analítica Académica, Universidad de Santander. https://doi.org/10.5281/zenodo.17661929. Aprobó: Dr. José Asthul Rangel Chacón. Licencia: el documento no la declara.</div>`;
+const CITA_TYT = `<div class="bol-cite"><b>Cita.</b> Pérez Pulido, M. O., León, F. J., Pinto Guarguatí, L. A., &amp; Calderón Plata, A. M. (2026). <i>Valor agregado académico como estrategia institucional de seguimiento y mejora del aprendizaje: Saber TyT en la Universidad de Santander Campus Bucaramanga</i> (Documento de Trabajo No. 21). Planeación Institucional, Universidad de Santander. https://doi.org/10.5281/zenodo.23500324. Revisó: Krystle Forero, Directora UDESTEC. Licencia: el documento no la declara.</div>`;
+const STEPS4 = `<ol class="bol-ul" style="list-style:decimal"><li><b>Se parte de lo que traían:</b> con el resultado de Saber 11 se calcula cuánto se espera que obtenga cada estudiante.</li><li><b>Se compara con lo que obtuvo:</b> las dos pruebas no se pueden restar; el esperado se estima con un modelo y el aporte es lo que queda.</li><li><b>Se agrupa por programa:</b> quienes comparten programa no son independientes; el modelo estima un efecto por programa.</li><li><b>Se dice cuánto se sabe:</b> con pocos evaluados la cifra se acerca al promedio; si el intervalo toca el cero, no se afirma.</li></ol>`;
+function sheetProC() {
+  const V = VAR_PRO, pc = (a) => nf(icc(a), icc(a) < 10 ? 1 : 0) + " %";
+  const co = (k, i) => { const x = COEF_PRO[k][i]; return x; };
+  const cell = (k, label) => { const r = COEF_PRO[k].find((x) => x[0] === label); if (!r) return "—"; const ns = Math.abs(r[2]) < 1.96 * r[3]; return `${sg(r[2])} (${nf(r[3], 2)})${ns ? " *" : ""}`; };
+  const labels = ["Promedio en la UDES: bajo", "Promedio en la UDES: medio", "Promedio en la UDES: medio alto", "Hombres", "Colegio público", "Estrato bajo", "Estrato medio", "Apoyo PAIPE individual"];
+  const nc = [0, 1, 2, 3, 4].map((i) => NCOMP[i]);
+  const strip = `<svg viewBox="0 0 178 9" width="178mm" height="9mm" role="img" aria-label="Competencias con variación positiva: ${nc.join(", ")} por ciento">${(() => { let x = 0, s = ""; const fills = ["#9ec5f4", "#7fb0ee", "#3987e5", "#256abf", "#184f95"]; nc.forEach((v, i) => { const w = (v / 100) * 178; s += `<rect x="${mm(x)}" y="0" width="${mm(w)}" height="5.4" fill="${fills[i]}"/><text x="${mm(x + w / 2)}" y="3.7" font-size="2.4" font-weight="700" text-anchor="middle" fill="${i < 2 ? "#16243a" : "#fff"}">${v} %</text><text x="${mm(x + w / 2)}" y="8.4" font-size="2.2" text-anchor="middle" fill="#4a5a70">${i === 0 ? "0 competencias" : i === 4 ? "4" : i}</text>`; x += w; }); return s; })()}</svg>`;
+  const body = sheetHead("Saber PRO · Diferencia entre programas, método y límites", "Una hoja para toda la prueba: cuánto cambian los resultados de un programa a otro, quién llega más arriba, cómo se calcula y qué no dice.") +
+    `<div class="bol-two"><div><div class="bol-h4">Parte de la variación que está entre programas</div>${paperCoefTable(["Sin controles", "Con controles", "2023", "2024"], "Competencia", MODELED.map((k) => [cLabel(k), pc(V.nulo[k]), `<b>${pc(V.final[k])}</b>`, pc(V.y23[k]), pc(V.y24[k])]))}<p class="bol-read" style="margin-top:2mm"><b>Lectura.</b> De cada 100 puntos de variación en lectura crítica, 9 están entre programas y 91 entre estudiantes del mismo programa. En inglés la diferencia pasa de 2 % (2023) a 9 % (2024): no es estable. El documento espera un valor mayor de 5 % (p. 21): razonamiento cuantitativo (2 %) e inglés (3 %) no lo alcanzan.</p></div><div><div class="bol-h4">Cómo se calcula</div>${STEPS4}</div></div>` +
+    `<div><div class="bol-h4">Qué acompaña al puntaje (puntos de Saber PRO, con su error estándar)</div>${paperCoefTable(["LC", "RC", "CC", "IN"], "Característica", labels.map((l) => [l, cell("lc", l), cell("rc", l), cell("cc", l), cell("ing", l)]))}<p class="bol-read" style="margin-top:1.5mm;font-size:2.4mm">Ya descontado Saber 11. * no se distingue de cero. «—»: no entró al modelo de esa competencia. Son asociaciones, no causas: el documento advierte que el signo negativo del apoyo PAIPE probablemente refleja condiciones iniciales más desfavorables (p. 32). Fuente: Tabla 5, p. 20.</p></div>` +
+    `<div><div class="bol-h4">Cuántas de las cuatro competencias mejoraron frente a Saber 11</div><div class="bol-fig">${strip}</div></div>` +
+    `<div class="bol-two"><div><div class="bol-h4">Lo que no dice</div><ul class="bol-ul"><li>Es un solo corte, 2023-2024; no sigue a las mismas personas.</li><li>Los controles incluyen el promedio en la UDES y el apoyo PAIPE: el aporte no es el efecto total del programa (nota de esta hoja).</li><li>Los cuadrantes usan cortes fijos y no son el aporte del modelo.</li><li>Un programa puede estar alto en una competencia y bajo en otra. No es una clasificación ni una evaluación de docentes.</li><li>Incluye la extensión de Instrumentación Quirúrgica en Bogotá.</li></ul></div>${CITA_PRO}</div>`;
+  return page({ title: "Resultados Saber PRO", body, chapter: "Enseñanza · Resultados Saber PRO · Método y límites del aporte", cut: `Corte: ${TESTS.pro.cut}`, pageNo: 69 });
+}
+function sheetTytA(comp) {
+  const T = TESTS.tyt, rows = rowsFor("tyt", comp).sort((a, b) => b.n - a.n), c = counts(rows), f = icc(VAR_TYT.final[comp]), lab = cLabel(comp);
+  const reads = { rc: "Supervisión de Obras Civiles (+7,91) es el resultado más fuerte, cerca de 0,35 desviaciones estándar de Saber TyT. Gestión Industrial (+3,70) queda cerca, pero su intervalo toca el cero (p. 10).", lc: "Ningún programa se distingue de cero. Diseño Gráfico (+2,82) queda al borde (p. 10).", ing: "Diseño Gráfico Publicitario (+4,91) y Supervisión de Obras Civiles (−2,76) están en lados opuestos, con intervalos más cortos porque el modelo tiene 291 y 354 estudiantes en esos programas (p. 10).", cc: "Ningún programa se distingue; los valores están entre −0,06 y +0,07 puntos. El documento advierte que la figura puede inducir a error si se publica sola (p. 16)." };
+  const co = COEF_TYT[comp].map(([n, , e, se]) => [n, sg(e), nf(se, 2)]);
+  const body = sheetHead(`Aporte de los programas · ${lab}`, `Cuántos puntos de Saber TyT suma cada programa tecnológico de UDESTEC por encima o por debajo de lo esperado para estudiantes que llegaron con el mismo resultado en Saber 11. Cero es el programa promedio de UDESTEC.`) +
+    notesHTML([["Lectura", "Cada fila es un programa; el punto es su aporte y la línea su intervalo de 95 %. Si no cruza el cero, la fila lleva ▲ o ▼."], ["Intervalo", "Aporte ±1,96 errores estándar; el error estándar se midió en las barras del anexo (±1 EE, pp. 14 a 16), con ±0,1 punto de margen."], ["Pocos evaluados", "Menos de 30: fila atenuada. Menos de 10: cifra entre paréntesis y sin tono."], ["Método", "Modelo jerárquico de intercepto aleatorio por programa (lme4, R), con los puntajes de Saber 11 como controles."], ["Corte", `${T.cut}. ${T.pop}. Escala de 0 a 200.`], ["Procedencia", `${T.office}. Documento de trabajo N.º 21, versión 1, DOI ${T.doi}.`]]) +
+    `<div class="bol-keys">${tile("Se distinguen de cero", `${c.dist} de ${c.n}`, c.dist ? `${c.up ? "▲ " + c.up + " sobre lo esperado" : ""}${c.down ? " ▼ " + c.down + " bajo lo esperado" : ""}` : "ninguno")}${tile("Diferencia entre programas", nf(f, 1) + " %", "de la variación entre programas (con controles, p. 9)")}${tile("Evaluados en el modelo", nf(NOBS.tyt[comp], 0), comp === "ing" ? "13 programas (Fig. 1); la Tabla 5 dice 410" : "8 programas, Saber 11 de 2014 a 2021")}</div>` +
+    LEG + `<div class="bol-fig">${paperForest(rows, T)}</div>` +
+    `<p class="bol-read"><b>Lectura.</b> ${reads[comp]} Se reporta con su intervalo y su n; no se usa como clasificación de programas ni como indicador de desempeño docente (pp. 11 y 12).</p>` +
+    `<div><div class="bol-h4">Lo que traían al ingresar: puntos de Saber TyT por punto de Saber 11 (Tabla 5, p. 8)</div>${paperCoefTable(["Estimador", "Error estándar"], "Predictor", co)}</div>`;
+  return page({ title: "Saber TyT · Motor Beta", body, chapter: "Enseñanza · Saber TyT · Aporte de los programas", cut: `Corte: ${T.cut}`, pageNo: 77 });
+}
+function sheetTytC() {
+  const V = VAR_TYT, pc = (a) => nf(icc(a), 1) + " %";
+  const cell = (k, label) => { const r = COEF_TYT[k].find((x) => x[0] === label); return r ? `${nf(r[2], 2)} (${nf(r[3], 2)})` : "—"; };
+  const labels = ["Lectura crítica, Saber 11", "Matemáticas, Saber 11", "Inglés, Saber 11", "Sociales y ciudadanas, Saber 11", "Ciencias naturales, Saber 11"];
+  const body = sheetHead("Saber TyT · Diferencia entre programas, método y límites", "Una hoja para toda la prueba: cuánto cambian los resultados de un programa a otro, qué pesa Saber 11, cómo se calcula y qué no dice.") +
+    `<div class="bol-two"><div><div class="bol-h4">Parte de la variación que está entre programas</div>${paperCoefTable(["Sin controles", "Con controles", "¿Hay diferencias?"], "Competencia", MODELED.map((k) => [cLabel(k), pc(V.nulo[k]), `<b>${pc(V.final[k])}</b>`, (V.p[k] === "p = 0,50" ? "No · " : "Sí · ") + V.p[k]]))}<p class="bol-read" style="margin-top:2mm"><b>Lectura.</b> En ninguna competencia el programa explica más de 7 % de la varianza; la mayor parte está entre estudiantes del mismo programa. En competencias ciudadanas es prácticamente nula. La prueba de lectura crítica (p = 0,023) es el resultado más frágil de la tabla (p. 9).</p></div><div><div class="bol-h4">Cómo se calcula</div>${STEPS4}</div></div>` +
+    `<div><div class="bol-h4">Lo que pesa Saber 11 (puntos de Saber TyT por punto de Saber 11, con su error estándar)</div>${paperCoefTable(["LC", "RC", "CC", "IN"], "Predictor", labels.map((l) => [l, cell("lc", l), cell("rc", l), cell("cc", l), cell("ing", l)]))}<p class="bol-read" style="margin-top:1.5mm;font-size:2.4mm">Todos significativos al 5 % (Tabla 5, p. 8). Ciencias naturales es el predictor más constante (0,49 a 0,73); en inglés pesa sobre todo el inglés de Saber 11 (1,17). Este estudio no incluye variables sociodemográficas.</p></div>` +
+    `<div class="bol-two"><div><div class="bol-h4">Lo que no dice</div><ul class="bol-ul"><li>Usa 411 estudiantes (34 % de 1.207 registros) de 8 programas; solo 3 aportes se distinguen de cero.</li><li>Es relativo al programa promedio de UDESTEC, no a un estándar externo.</li><li>El modelo de inglés usa otra muestra (1.081 estudiantes, 13 programas): los dos aportes de un programa no son del todo comparables (p. 11).</li><li>No es un ranking ni un indicador de desempeño docente (p. 12).</li><li>Documento de trabajo, versión 1.</li></ul></div>${CITA_TYT}</div>`;
+  return page({ title: "Saber TyT · Motor Beta", body, chapter: "Enseñanza · Saber TyT · Método y límites del aporte", cut: `Corte: ${TESTS.tyt.cut}`, pageNo: 81 });
+}
+const SHEETS = [
+  { t: "Hoja 1 de 5 · Aporte por programa (Saber PRO · lectura crítica)", ent: "aporte-pro:<conjunto>:<competencia> · una por competencia (4)", use: "Gráfico-tabla de 25 filas × 3,8 mm: el cuerpo mide 231 mm de 243,5 mm útiles (medido). Cabe en una hoja; con más de 28 filas sigue en continuación.", f: () => sheetProA("lc") },
+  { t: "Hoja 2 de 5 · Cuadrantes de aporte (Saber PRO · lectura crítica)", ent: "aporte-cuadrantes:<conjunto>:<competencia> · una por competencia (4)", use: "Barras de reparto con sus cifras al lado, 25 filas: 227 mm de 243,5 (medido). Cabe en una hoja.", f: () => sheetProB("lc") },
+  { t: "Hoja 3 de 5 · Diferencia entre programas, método y límites (Saber PRO)", ent: "aporte-metodo:<conjunto>:pro · una por prueba", use: "Texto y tres tablas pequeñas, con la cita completa: 206 mm de 243,5 (medido). Cabe en una hoja.", f: sheetProC },
+  { t: "Hoja 4 de 5 · Aporte por programa (Saber TyT · razonamiento cuantitativo)", ent: "aporte-tyt:<conjunto>:<competencia> · una por competencia (4)", use: "8 programas (13 en inglés): 195 mm de 243,5 (medido), unos 214 con inglés. Cabe; sobra espacio, y las cuatro competencias podrían compartir una hoja, como la Figura 1 del documento.", f: () => sheetTytA("rc") },
+  { t: "Hoja 5 de 5 · Diferencia entre programas, método y límites (Saber TyT)", ent: "aporte-metodo:<conjunto>:tyt · una por prueba", use: "Igual que la hoja 3, con los números de TyT: 169 mm de 243,5 (medido). Cabe en una hoja.", f: sheetTytC },
+];
+let sheetsBuilt = false;
+function buildSheets() {
+  if (sheetsBuilt) return; sheetsBuilt = true;
+  $("#sheets").innerHTML = SHEETS.map((s, i) => `<article><div class="sheetcap"><h3>${s.t}</h3><div class="meta"><span><b>Entrada de la plantilla</b> <code>${esc(s.ent)}</code></span></div><p class="note">${s.use}</p></div><div class="viewer"><div class="fitbox" data-i="${i}">${s.f()}</div></div></article>`).join("") +
+    `<p class="note">Los números de página y la portada de cada capítulo son de ejemplo. Los nombres de programa, cifras e intervalos son los de los documentos. Las hojas conservan la paleta fija del papel: no cambian con el tema oscuro del visor.</p>`;
+}
+function fitSheets() {
+  $$(".fitbox").forEach((b) => {
+    const pg = b.firstElementChild; if (!pg) return;
+    const w = b.parentElement.clientWidth - 36, target = Math.min(w, 794), sc = target / (210 * 3.7795275);
+    b.style.width = target + "px"; b.style.height = 297 * 3.7795275 * sc + "px";
+    pg.style.transform = `scale(${sc})`;
+  });
+}
+
+/* ===== Cómo lo construimos ===== */
+let guideBuilt = false;
+function buildGuide() {
+  if (guideBuilt) return; guideBuilt = true;
+  const sec = (id, h, inner) => `<section class="panel" id="${id}" style="margin-top:34px"><h3 style="font-size:20px">${h}</h3>${inner}</section>`;
+  const tb = (head, rows, cls = "") => `<div class="tblwrap"><table class="tbl ${cls}"><thead><tr>${head.map((h) => `<th scope="col">${h}</th>`).join("")}</tr></thead><tbody>${rows.map((r) => `<tr>${r.map((c, i) => (i === 0 ? `<th scope="row" style="text-align:left">${c}</th>` : `<td>${c}</td>`)).join("")}</tr>`).join("")}</tbody></table></div>`;
+  const html = [
+    sec("g-ind", "1. Qué indicadores salen de los documentos", tb(["Indicador", "Dónde está", "Cómo se muestra"], [
+      ["Aporte por programa con intervalo", "N.º 30: Figs. 9 a 12 (pp. 22 a 25, 2023-2024), 12 a 15 (pp. 27 a 30, 2023), 16 a 19 (pp. 32 a 35, 2024). N.º 21: Fig. 1 (p. 10) y anexo C (pp. 14 a 16)", "Bosque con la línea del cero, tabla equivalente y lectura en palabras"],
+      ["Cuadrantes de aporte (AA−, AA−−, AA+, AA++)", "N.º 30: Figura 5 (p. 10) y Tabla 2 (p. 11); definición en p. 8", "Reparto al 100 % por programa, solo Saber PRO"],
+      ["Variación positiva en 0 a 4 competencias; «más bajo» y «más alto» por competencia", "N.º 30: Tablas 3 y 4 (pp. 12 y 13), Fig. 6 (p. 14)", "Tira de cinco tramos (Tabla 3). La Tabla 4 va como columnas del CSV, sin dibujo"],
+      ["Varianza entre programas (correlación intraclase)", "N.º 30: Tablas 4 a 7 (pp. 20, 25, 31). N.º 21: Tabla 6 (p. 9)", "Barras al 100 %, tabla con y sin controles, aviso de estabilidad"],
+      ["Coeficientes: perfiles del estudiante (Saber PRO) y peso de Saber 11 (TyT)", "N.º 30: Tabla 5 (p. 20). N.º 21: Tabla 5 (p. 8)", "Puntos con intervalo, mismo lenguaje del bosque"],
+      ["Reducción de la varianza con controles; magnitud en desviaciones estándar", "N.º 21: pp. 9 a 11", "Frases en la lectura"],
+      ["Perfiles por correspondencias múltiples", "N.º 30: Figs. 7 y 8 (pp. 16 a 19)", "No se dibuja: sus dos ejes explican 4,6 % y 3,9 %"],
+      ["Sistema de alertas tempranas", "N.º 30: objetivo en p. 3", "No se dibuja: el documento no define la regla ni los umbrales"],
+    ])),
+    sec("g-dat", "2. Contrato de datos", `
+      <p class="note">Migración nueva, <code>0179_aporte_programas.sql</code> (el siguiente número libre después de 0178; confirmar). Solo agregados por programa, nunca estudiantes. Lectura pública de los estudios vigentes y escritura por una función nueva de la intranet (<code>aporte-programa</code>), como las demás capturas.</p>
+      ${tb(["Tabla", "Qué guarda", "Columnas principales"], [
+        ["<code>va_estudios</code>", "Un documento: la cita y su versión", "prueba (pro|tyt), titulo, autores, doi, version, fecha_documento, cita_texto, licencia (nula si no la declara), poblacion, corte, oficina_id, reemplaza_id, vigente"],
+        ["<code>va_programa_efectos</code>", "El aporte de cada programa", "estudio_id, periodo, competencia, sede, programa, codigo_snies (nulo), evaluados, efecto, ic_inferior, ic_superior, nivel_ic (95, o nulo si el documento no lo dice), origen (tabla | lectura_de_figura), pagina"],
+        ["<code>va_modelos</code>", "Varianza y ajuste", "estudio_id, periodo, competencia, modelo (nulo|final), sigma2, tau00, n_obs, n_programas, r2_marginal, r2_condicional, p_tau00, pagina"],
+        ["<code>va_cuadrantes</code>", "Reparto AA por programa", "estudio_id, periodo, competencia, sede, programa, evaluados, pct_aa_menos, pct_aa_dos_menos, pct_aa_mas, pct_aa_dos_mas, pagina"],
+        ["<code>va_coeficientes</code>", "Perfiles y peso de Saber 11", "estudio_id, periodo, competencia, termino, referencia, estimador, error_estandar, p, pagina"],
+      ])}
+      <p class="note"><b>Carga desde los documentos.</b> Primera carga: un archivo JSON por estudio en <code>data/seed/</code>, generado con los datos que ya están en esta propuesta, con <code>origen = lectura_de_figura</code> y su página. El bloque muestra esa marca mientras exista. Segunda carga, la buena: los autores entregan la salida de R (efectos aleatorios con error estándar, <code>ranef(condVar = TRUE)</code>) en CSV y la intranet la sube por una plantilla con validación; reemplaza las filas por <code>(estudio, periodo, competencia, programa)</code>.</p>
+      <p class="note"><b>Cómo se versiona la cita.</b> La fila de <code>va_estudios</code> no se edita: una versión nueva del documento es una fila nueva con <code>reemplaza_id</code> y <code>vigente = true</code>; la anterior queda en historia. La sección y el boletín leen la vigente y escriben su cita, autores, DOI, versión y licencia en el mismo bloque (Credit Rule). Programas: se enlazan al catálogo existente por sede + nombre, como Saber PRO; los que no tengan código SNIES van en su fila propia.</p>`),
+    sec("g-arch", "3. Componentes y archivos que se tocarían", `
+      <p class="note"><b>Nuevos.</b></p>
+      <ul class="limits"><li><code>supabase/migrations/0179_aporte_programas.sql</code> y <code>tests/db/aporte-programas.test.ts</code> (RLS de lectura y escritura).</li>
+      <li><code>src/modules/datos-abiertos/data/aporte-programa.ts</code> y su <code>.test.ts</code>: contrato y funciones puras (estado de cada fila, orden, lectura en palabras, conteos, CSV).</li>
+      <li><code>src/modules/datos-abiertos/data/seed/aporte-saber-pro-2023-2024.json</code> y <code>aporte-saber-tyt-2016-2024.json</code>.</li>
+      <li><code>components/AporteProgramaSection.tsx</code> (raíz), <code>AporteForest.tsx</code>, <code>AporteVarianza.tsx</code>, <code>AporteCuadrantes.tsx</code>, <code>AporteCoeficientes.tsx</code>, <code>AporteMetodo.tsx</code> y <code>aporte-programa.css</code>.</li>
+      <li><code>src/modules/boletin/aporte.tsx</code> y <code>aporte.test.ts</code>.</li>
+      <li><code>src/modules/admin/udes-en-cifras/stations/AporteProgramaCapture.tsx</code>: carga y revisión de cada estudio.</li></ul>
+      <p class="note"><b>Editados.</b></p>
+      <ul class="limits"><li><code>SaberProBlock.tsx</code> y <code>SaberTytBlock.tsx</code>: montan la sección al final de sus vistas; leen <code>sp</code>, <code>sp-sede</code> y <code>sp-programa</code> que ya existen. Parámetros nuevos: <code>va-vista</code>, <code>va-orden</code>, <code>va-solo</code>, <code>va-programa</code>.</li>
+      <li><code>data/export-registry.ts</code> (y su test): registra el CSV, PNG y JPG de cada panel, con su corte y su oficina; <code>data/repository.ts</code> para leer.</li>
+      <li><code>boletin/figures.tsx</code> (<code>PaperForest</code>, <code>PaperQuadrants</code>), <code>boletin/compose.tsx</code> y <code>model.ts</code> (las entradas <code>aporte-pro</code>, <code>aporte-cuadrantes</code>, <code>aporte-tyt</code>, <code>aporte-metodo</code>) y <code>boletin.css</code> (<code>.bol-keys.k4</code>, <code>.bol-two</code>).</li>
+      <li><code>DESIGN.md</code>: sección «Aporte de los programas» y tres reglas con nombre (abajo).</li>
+      <li><code>src/styles/tokens.css</code>: un solo token nuevo, <code>--od-mark-none</code> (la marca de «no se distingue de cero»), medido a 3:1 contra la superficie en los dos temas. Todo lo demás reutiliza <code>--od-div-*</code>, <code>--od-seq-*</code> y <code>--bol-div-*</code>.</li></ul>
+      <p class="note"><b>Reglas con nombre que se agregarían al DESIGN.md.</b> <i>The Zero Line Rule</i>: el tono solo lo lleva una fila cuyo intervalo no incluye el cero; las demás van en el neutro y con su glifo. <i>The Small Variance Rule</i>: la sección dice cuánta diferencia hay entre programas antes de listar programas, y dibuja todas las competencias en la misma escala. <i>The Two Names Rule</i>: «Aporte de los programas» no se llama «valor agregado» en pantalla, porque el Motor Alpha y el Beta ya usan esa palabra para otra cifra.</p>`),
+    sec("g-mov", "4. Movimiento", `
+      ${tb(["Qué", "Cómo", "Duración y curva"], [
+        ["Entrada", "Una secuencia definida una vez, que se dispara una sola vez por panel al entrar en pantalla: las cifras de llegada voltean, los intervalos crecen desde la línea del cero y los puntos viajan con ellos, las barras al 100 % crecen desde la izquierda", "0,5 s por pieza, escalonado en 16 a 18 ms; ease-out fuerte (<code>--ease-out</code>)"],
+        ["Cambio de competencia con el puntero", "Las mismas piezas, más cortas; la secuencia anterior se mata antes de pintar la nueva (interrumpible)", "0,24 s, con 3 a 18 ms entre piezas; ≤ 300 ms en total"],
+        ["Cambio de competencia con el teclado", "Sin animación (Emil: lo que se repite cientos de veces por teclado no se anima)", "0 ms"],
+        ["Ordenar, filtrar, tabla", "Sin animación: son acciones frecuentes y la fila ya cambió de lugar", "0 ms"],
+        ["Movimiento reducido", "Nada se anima; el estado final es el mismo que se ve sin animar. Los hooks <code>useInView</code> y <code>usePrefersReducedMotion</code> se llaman siempre", "—"],
+        ["Pulsar", "<code>scale(.97)</code> al presionar los botones; el hover solo con <code>(hover: hover) and (pointer: fine)</code>", "140 ms"],
+      ])}
+      <p class="note">Aquí la secuencia está hecha con GSAP 3.12.5 desde cdnjs, por pedido. En el repositorio, <code>gsap</code> ya está instalado (3.15), pero el bloque Saber PRO sigue la Motion Rule con clases CSS y <code>useInView</code>; recomiendo escribir la misma secuencia con esas clases (<code>od-aporte-grow</code>, <code>od-aporte-pop</code>) y no sumar un segundo sistema de movimiento al bloque. Nada va en bucle.</p>`),
+    sec("g-ord", "5. Orden de trabajo, en pasos pequeños", tb(["Paso", "Qué se hace", "Cómo se verifica"], [
+      ["1", "Migración 0179 y política de acceso", "<code>tests/db</code>: un anónimo lee estudios vigentes y no escribe; una cuenta sin la función no escribe"],
+      ["2", "<code>aporte-programa.ts</code> con las funciones puras", "Pruebas por regla (tabla de abajo) en verde; <code>tsc</code> sin errores"],
+      ["3", "Semilla de los dos documentos", "Una prueba de cifras ancla. Saber PRO: 14 (y 1 en el límite), 5 (y 2), 14 (y 1) y 8 (y 1) programas que se distinguen en lectura crítica, razonamiento, ciudadanas e inglés. Saber TyT: 0, 1 (y 1 en el límite), 0 y 2 (y 1 en el límite), que es lo que dice el documento (p. 9)"],
+      ["4", "Bosque, tabla, lectura y perfil, sin movimiento, bajo Saber PRO", "Captura de pantalla clara y oscura, móvil y escritorio; recorrido con teclado y con lector"],
+      ["5", "Varianza, cuadrantes y coeficientes", "Cada panel con sus tres estados (carga, sin cifras, pocos evaluados)"],
+      ["6", "Método, límites, nombres y cita", "Los dos DOI abren; la prueba revisa que la cita esté en el bloque, no en el pie"],
+      ["7", "Movimiento", "Se ve la entrada una vez; con <code>prefers-reduced-motion</code> no se mueve nada; estado final idéntico"],
+      ["8", "Exportación", "CSV con procedencia y página; PNG y JPG con el mismo dibujo; el vacío sale vacío"],
+      ["9", "Monta el mismo componente bajo Saber TyT", "Misma batería de pruebas con los datos de TyT"],
+      ["10", "Boletín: <code>PaperForest</code>, <code>PaperQuadrants</code> y las cinco hojas", "Medición de las hojas a 297 mm; paréntesis bajo 10; continuación con más de 28 filas"],
+      ["11", "DESIGN.md y carga desde la intranet", "Una carga de prueba con el CSV de R reemplaza la lectura de figura"],
+    ])),
+    sec("g-test", "6. Pruebas por regla", tb(["Regla", "Prueba"], [
+      ["Un vacío no es un cero", "Un programa sin efecto estimado sale sin fila y con la leyenda «sin dato»; en el CSV, celda vacía"],
+      ["Menos de 10 evaluados", "Cifra entre paréntesis, sin tono, sin orden de lectura positivo o negativo, en pantalla, CSV y papel"],
+      ["Menos de 30", "La fila se atenúa; el texto lo dice"],
+      ["Se distingue de cero", "Solo si el intervalo no incluye el cero; un extremo a menos de 0,15 puntos se dice «toca el cero»"],
+      ["Cada cifra con su corte y su oficina", "El CSV y cada panel traen corte, oficina, documento y página"],
+      ["Nunca solo color", "Cada marca tiene glifo y palabra; el contraste de los tonos se mide en los dos temas, como en <code>custom-table.test.ts</code>"],
+      ["Credit Rule", "La cita completa, autores, DOI, versión y licencia, está dentro de la sección y de las hojas de método"],
+      ["Dos nombres", "Ninguna cadena de pantalla del aporte dice «valor agregado» como título; el glosario lista las cuatro cifras"],
+      ["La diferencia entre programas se dice primero", "La lectura de varianza aparece antes de la lista, y todas las competencias comparten escala"],
+    ])),
+    sec("g-exp", "7. Exportación y boletín", `<p class="note"><b>Portal.</b> Cada panel usa <code>ChartFrame</code> con su CSV, PNG y JPG, registrados en <code>export-registry.ts</code> bajo un grupo nuevo. El CSV lleva una fila por programa con prueba, competencia, corte, sede, programa, evaluados, aporte, extremos del intervalo, si se distingue de cero, origen, página y oficina. <b>Boletín.</b> 14 unidades nuevas, elegibles una por una en la plantilla: nueve de Saber PRO y cinco de Saber TyT. Si Planeación las elige todas, el conjunto crece en 14 páginas; las hojas de TyT dejan espacio libre y se podrían reunir.</p>`),
+    sec("g-risk", "8. Riesgos", `<ul class="limits">
+      <li><b>Confundir el aporte con un ranking.</b> El documento de TyT lo prohíbe expresamente. Mitigación: orden por evaluados en TyT, la diferencia entre programas se dice primero, la lectura nunca dice «mejor» o «peor».</li>
+      <li><b>Cifras leídas de figuras.</b> Los intervalos de Saber PRO y las barras de TyT no están publicados como tabla. Mitigación: marca visible «lectura de figura» y reemplazo con la salida de R.</li>
+      <li><b>Dos «valor agregado» para un mismo programa de TyT</b> (Alpha y este) que no coinciden. Mitigación: nombres distintos y glosario en el bloque.</li>
+      <li><b>Nombres de programa.</b> Los documentos usan abreviaturas («Ing Civil») y mezclan la extensión de Bogotá. Mitigación: tabla de alias y revisión en la carga.</li>
+      <li><b>Los documentos cambian.</b> El de TyT es una versión 1 de ayer. Mitigación: versionado de la cita y estudios inmutables.</li>
+      <li><b>Peso de la sección.</b> Cuatro paneles más en un bloque ya largo. Mitigación: el cuerpo de cada panel carga cuando entra en pantalla y la sección se puede plegar.</li></ul>`),
+    sec("g-doubt", "9. Lo que los documentos no dicen o se contradice", `<ul class="limits">
+      <li><b>Intervalos (N.º 30).</b> Las figuras 9 a 19 los dibujan pero no hay tabla ni dicen su nivel.</li>
+      <li><b>Texto y figura (N.º 30).</b> La p. 9 dice 48 % de lectura crítica y 55 % de razonamiento cuantitativo por encima de lo esperado; la Figura 5 (p. 10) da 55 % y 48 %.</li>
+      <li><b>Muestra (N.º 30).</b> p. 5: 1.184 casos válidos, y luego «muestra válida para el análisis de VA campus Bucaramanga: n = 534». Las tablas de modelos usan 1.184. La p. 4 habla de los exámenes de 2022 y el título dice 2023-2024.</li>
+      <li><b>Sus propias reglas (N.º 30).</b> La nota de la p. 21 espera una correlación intraclase mayor de 0,05; razonamiento cuantitativo (0,02) e inglés (0,03) no la cumplen. La p. 14 dice «17 de 25 programas (40 %)». Hay dos «Tabla 4» y dos «Figura 9». El texto de la p. 22 habla de desviaciones estándar y las figuras están en puntos.</li>
+      <li><b>«Nivel de valor agregado» (N.º 30).</b> Lo que el documento llama niveles son cuadrantes por cortes fijos, no categorías del modelo. No hay un nivel de aporte por programa.</li>
+      <li><b>Alertas tempranas.</b> Es un objetivo (p. 3); no hay regla ni umbral.</li>
+      <li><b>Conteo (N.º 21).</b> «3 de 32» (p. 9) y «3 de 37» (resumen y conclusión): 32 son 8 programas × 4 competencias; la Fig. 1 explica que inglés tiene 5 programas más no mostrados (37).</li>
+      <li><b>Inglés (N.º 21).</b> La Tabla 5 dice 410 observaciones; la Fig. 1 dice 1.081 estudiantes en 13 programas. El resumen dice que Saber 11 es de 2014 a 2021 y la p. 5 dice 2000 a 2021. La Fig. 1 está dibujada a mano: sus puntos no coinciden del todo con el anexo (p. ej., Diseño Gráfico en inglés se ve cerca de +5,6, y el anexo da +4,91). El anexo habla de una «sección 7, alerta 1» que no existe.</li>
+      <li><b>Entre los dos.</b> Controles distintos (Saber 11 solo, frente a Saber 11 más promedio en la UDES, género, plantel, estrato y PAIPE), escalas distintas (0 a 200 y 0 a 300) y conclusiones opuestas con magnitudes parecidas: el N.º 30 destaca programas; el N.º 21 dice que no hay base para focalizar acciones. Ninguno declara licencia.</li></ul>`),
+    sec("g-dec", "10. Decisiones que necesito de usted", `<ol class="limits" style="max-width:90ch">
+      <li><b>¿De dónde salen los números?</b> Recomiendo pedir a los autores las salidas de R (aporte con error estándar por programa y año) y, mientras llegan, publicar solo con la marca «lectura de figura». También deciden si se muestran 2023 y 2024 por separado: los documentos los traen y la diferencia entre programas cambia de un año a otro.</li>
+      <li><b>¿Qué nombre lleva en pantalla?</b> Recomiendo «Aporte de los programas», con «valor agregado» solo dentro del método.</li>
+      <li><b>¿Dónde vive?</b> Recomiendo una sección al final de cada bloque, la misma pieza en Saber PRO y en Saber TyT, cada una con su documento.</li>
+      <li><b>¿Se publica con el nombre de cada programa y en qué orden?</b> Recomiendo sí, con intervalo y n, ordenado por evaluados en TyT (como el documento) y por aporte en Saber PRO, sin lenguaje de clasificación. Falta la autorización de la Vicerrectoría y la licencia que ninguno de los dos documentos declara.</li>
+      <li><b>¿Y las alertas tempranas?</b> Recomiendo dejarlas fuera hasta que los autores definan la regla; no la inventamos desde los cuadrantes.</li></ol>`),
+  ].join("");
+  $("#build").innerHTML = html;
+}
+
+
+initShell();
+</script>
+
+</body></html>

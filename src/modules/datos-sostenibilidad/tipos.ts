@@ -31,7 +31,7 @@ export interface DsOficina {
   oficina_id: string;
   oficina: string;
   codigo: string;
-  rol: "gestor" | "colaborador" | "planeacion";
+  rol: "gestor" | "colaborador" | "admin" | "planeacion";
 }
 
 /** Mis papeles en el módulo (RPC ds_yo). */

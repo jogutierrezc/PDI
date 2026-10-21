@@ -1,0 +1,727 @@
+<title>Datos que incluyen</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Open+Sans:wdth,wght@75..100,400..800&display=swap">
+<style>
+/* Mundo: el tablero de llegadas de UDES en Cifras. Azul noche, cifras que voltean, un solo ámbar y el cian reservado para Pilo.
+   Escenario fijo de 1920×1080 que se escala a la pantalla; en vertical las notas pasan debajo. */
+:root{
+  /* Crema claro (por defecto). Los acentos de texto son más oscuros que los de relleno para sostener el contraste. */
+  --bg:#f5eedd; --bg2:#faf5e8; --glow:rgba(242,177,52,.20);
+  --panel:#fffbf1; --panel2:#ece2c9; --line:rgba(80,58,20,.17);
+  --fg:#1b2336; --mut:#505b75; --faint:#6a7289;
+  --amber:#946000; --amber-fill:#f2b134; --amber-ink:#2a1c00;
+  --cyan:#0a7482; --cyan-fill:#27b3c3; --cyan-ink:#04222a;
+  --green:#3f9b2c; --blue:#2e6bd0; --risk:#c4452f;
+  --flap-a:#1a3566; --flap-b:#102751; --flap-ink:#f4f1e6; --flap-amber:#f6b93b; --flap-line:rgba(3,10,25,.75);
+  --win-bar:#e6dcc3; --win-url:#fbf7ea; --track:#e4d9bd; --tag-bg:rgba(255,251,241,.92); --bub-p:#e1f1f0; --nw-bg:rgba(242,177,52,.15);
+  --shadow-win:0 34px 70px rgba(70,50,15,.24); --panel-sh:0 10px 28px rgba(70,50,15,.08);
+  --display:"Open Sans",system-ui,"Segoe UI",sans-serif;
+  --ease:cubic-bezier(.23,1,.32,1);
+  color-scheme:light;
+}
+:root[data-deck="noche"]{
+  --bg:#040d1d; --bg2:#071733; --glow:#0c2750;
+  --panel:#0b1f42; --panel2:#102b58; --line:rgba(150,185,255,.17);
+  --fg:#eef3ff; --mut:#a3b7da; --faint:#6f86b0;
+  --amber:#f6b93b; --amber-fill:#f6b93b; --amber-ink:#2a1c00;
+  --cyan:#7fe7f0; --cyan-fill:#7fe7f0; --cyan-ink:#04222a;
+  --green:#3f9b2c; --blue:#4a86e8; --risk:#ff8a7a;
+  --flap-a:#112d5c; --flap-b:#0b2148; --flap-ink:#eef3ff; --flap-amber:#f6b93b; --flap-line:rgba(2,8,20,.7);
+  --win-bar:#0a1a38; --win-url:#06122a; --track:#040d1d; --tag-bg:rgba(4,13,29,.82); --bub-p:#0a2a38; --nw-bg:rgba(16,43,88,.55);
+  --shadow-win:0 40px 90px rgba(0,0,0,.55); --panel-sh:none;
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+html,body{height:100%}
+body{margin:0;background:var(--bg);color:var(--fg);font:400 16px/1.5 var(--display);overflow:hidden;padding-inline:max(16px,env(safe-area-inset-left,0px)) max(16px,env(safe-area-inset-right,0px));-webkit-font-smoothing:antialiased}
+button{font:inherit;color:inherit;cursor:pointer}
+:focus-visible{outline:3px solid var(--amber);outline-offset:3px;border-radius:6px}
+::selection{background:rgba(242,177,52,.4)}
+h1,h2,h3,p,figure,ul,ol{margin:0;padding:0}
+ul,ol{list-style:none}
+
+.shell{height:100%;display:grid;grid-template-rows:minmax(0,1fr) 56px}
+#view{position:relative;min-height:0;overflow:hidden}
+#stage{position:absolute;left:50%;top:50%;width:1920px;height:1080px;transform-origin:50% 50%;background:radial-gradient(1200px 700px at 78% 10%,var(--glow) 0%,transparent 60%),linear-gradient(180deg,var(--bg2),var(--bg));border-radius:10px;overflow:hidden;box-shadow:0 0 0 1px var(--line)}
+
+/* Barra de control */
+.ctl{display:flex;align-items:center;justify-content:center;gap:14px;padding-block:10px;font-size:14px;color:var(--mut)}
+.ctl button{display:inline-grid;place-items:center;min-width:40px;height:36px;padding:0 12px;border-radius:999px;border:1px solid var(--line);background:transparent;transition:transform .14s var(--ease),background-color .14s,border-color .14s}
+.ctl button:active{transform:scale(.95)}
+@media (hover:hover) and (pointer:fine){.ctl button:hover{background:var(--panel);border-color:var(--faint)}}
+.ctl .n{min-width:64px;text-align:center;font-variant-numeric:tabular-nums;color:var(--fg);font-weight:700}
+.ctl .tick{display:flex;gap:5px;align-items:center}
+.ctl .tick i{width:18px;height:4px;border-radius:2px;background:var(--line);transition:background-color .2s,width .2s var(--ease)}
+.ctl .tick i[data-on]{background:var(--amber-fill);width:28px}
+.ctl .hint{display:none}
+@media (min-width:900px){.ctl .hint{display:inline}}
+
+/* Notas del ponente */
+#notes{position:fixed;z-index:20;right:max(16px,env(safe-area-inset-right,0px));bottom:64px;width:min(30rem,calc(100% - 32px));max-height:50%;overflow:auto;padding:18px 20px;background:var(--panel);border:1px solid var(--line);border-radius:16px;box-shadow:var(--shadow-win);font-size:16px;line-height:1.6;color:var(--fg)}
+#notes[hidden]{display:none}
+#notes h4{margin:0 0 6px;font-size:12px;letter-spacing:.14em;text-transform:uppercase;color:var(--amber)}
+@media (max-aspect-ratio:1/1){
+  .shell{grid-template-rows:auto 56px minmax(0,1fr)}
+  #view{height:calc((100vw - 32px) * 9 / 16)}
+  .ctl{order:2}
+  #notes{position:static;order:3;display:block!important;width:auto;max-height:none;border-radius:12px;margin-bottom:12px}
+  #notesBtn{display:none}
+}
+
+/* Escenario */
+.slide{position:absolute;inset:0;display:none;padding:150px 120px 90px}
+.slide.on{display:block}
+.run{position:absolute;left:120px;right:120px;top:52px;height:52px;display:flex;align-items:center;gap:18px;color:var(--mut);font-size:24px;font-weight:600}
+.run .ic{display:flex;gap:4px}
+.run .ic b{display:grid;place-items:center;width:34px;height:46px;border-radius:5px;background:var(--green);color:#fff;font-stretch:75%;font-weight:800;font-size:30px;line-height:1}
+.run .pg{margin-left:auto;font-variant-numeric:tabular-nums;color:var(--faint)}
+.t-d{font-stretch:75%;font-weight:800;text-transform:uppercase;letter-spacing:-.01em;line-height:.98;text-wrap:balance}
+.h1{font-size:160px}
+.h2{font-size:112px}
+.lead{font-size:40px;line-height:1.35;color:var(--mut);max-width:30em;text-wrap:pretty}
+.body{font-size:32px;line-height:1.4;color:var(--mut);text-wrap:pretty}
+.body b,.lead b{color:var(--fg);font-weight:700}
+.lab{font-stretch:75%;font-weight:700;text-transform:uppercase;letter-spacing:.14em;font-size:26px;color:var(--amber)}
+.amber{color:var(--amber)}
+.cyan{color:var(--cyan)}
+
+/* Marco de navegador */
+.win{border-radius:18px;overflow:hidden;background:var(--panel);border:1px solid var(--line);box-shadow:var(--shadow-win)}
+.win .bar{display:flex;align-items:center;gap:10px;height:46px;padding:0 18px;background:var(--win-bar);border-bottom:1px solid var(--line)}
+.win .bar i{width:13px;height:13px;border-radius:50%;background:var(--faint);opacity:.55}
+.win .url{margin-left:14px;flex:1;height:28px;border-radius:14px;background:var(--win-url);color:var(--faint);font-size:19px;line-height:28px;padding:0 16px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.win img{display:block;width:100%;height:auto}
+
+/* Cifra que voltea */
+.slide .notes{display:none}
+.fl i{font-style:normal}
+.fl{display:inline-flex;gap:.07em;color:var(--flap-ink);font-stretch:75%;font-weight:800;line-height:1}
+.fl .d{position:relative;display:inline-grid;place-items:center;min-width:.62em;padding:.06em .04em .02em;border-radius:.09em;background:linear-gradient(180deg,var(--flap-a),var(--flap-b));box-shadow:inset 0 0 0 1px rgba(150,185,255,.14)}
+.fl .d::after{content:"";position:absolute;left:0;right:0;top:50%;height:2px;background:var(--flap-line)}
+.fl.amber{color:var(--flap-amber)}
+.fl .s{display:inline-grid;place-items:end;padding:0 .02em;color:var(--fg)}
+.fl.amber .s{color:var(--amber)}
+
+/* Piezas */
+.chip{display:inline-flex;align-items:center;gap:10px;height:52px;padding:0 22px;border-radius:26px;border:1px solid var(--line);background:var(--panel);font-size:26px;font-weight:600}
+.chip.am{background:var(--amber-fill);color:var(--amber-ink);border-color:transparent;font-weight:800}
+.chip.cy{border-color:rgba(10,116,130,.45);color:var(--cyan)}
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:22px;box-shadow:var(--panel-sh)}
+
+/* 1 Portada */
+#s1 .t-d{margin-top:60px}
+#s1 .lead{margin-top:44px;max-width:21em}
+#s1 .foot{position:absolute;left:120px;bottom:70px;font-size:26px;color:var(--faint)}
+#s1 .hero{position:absolute;right:-50px;top:190px;width:820px;transform:rotate(-3deg)}
+/* 2 */
+#s2 .big{font-size:430px;margin-top:20px;margin-left:-8px}
+#s2 .grid4{position:absolute;right:120px;top:260px;width:760px;display:grid;gap:22px}
+#s2 .row{display:flex;align-items:baseline;justify-content:space-between;gap:24px;padding-bottom:20px;border-bottom:1px solid var(--line)}
+#s2 .row .fl{font-size:100px}
+#s2 .row span:last-child{font-size:30px;color:var(--mut);max-width:11em;text-align:right}
+/* 3 */
+#s3 .col{position:absolute;left:120px;top:170px;width:640px}
+#s3 .win{position:absolute;right:120px;top:150px;width:1000px}
+#s3 .col ul{margin-top:36px;display:grid;gap:14px}
+#s3 .col li{font-size:28px;color:var(--mut);display:flex;gap:14px}
+#s3 .col li::before{content:"";flex:none;width:12px;height:12px;margin-top:13px;border-radius:3px;background:var(--amber-fill)}
+/* 4 */
+#s4 .qs{margin-top:64px;display:grid;grid-template-columns:repeat(2,1fr);gap:28px 36px}
+#s4 .q{padding:34px 40px;display:grid;gap:14px}
+#s4 .q h3{font-stretch:75%;font-weight:800;font-size:56px;line-height:1.02;text-transform:uppercase}
+#s4 .q p{font-size:30px;color:var(--mut)}
+#s4 .q .ans{font-size:30px;color:var(--fg);padding-top:14px;border-top:1px dashed var(--line)}
+/* 5 */
+#s5 .side{position:absolute;left:120px;top:170px;width:520px}
+#s5 .side .body{margin-top:34px}
+#cmp{position:absolute;right:120px;top:140px;width:1100px;aspect-ratio:1440/900;border-radius:18px;overflow:hidden;border:1px solid var(--line);box-shadow:var(--shadow-win);touch-action:none;cursor:ew-resize;--pos:50}
+#cmp img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;user-select:none;-webkit-user-drag:none}
+#cmp .old{clip-path:inset(0 calc(100% - var(--pos) * 1%) 0 0)}
+#cmp .tag{position:absolute;top:20px;padding:8px 18px;border-radius:20px;font-size:24px;font-weight:800;background:var(--tag-bg);border:1px solid var(--line)}
+#cmp .tag.a{left:20px}#cmp .tag.b{right:20px;color:var(--amber)}
+#cmp .hd{position:absolute;top:0;bottom:0;left:calc(var(--pos) * 1%);width:4px;margin-left:-2px;background:var(--amber-fill)}
+#cmp .hd::after{content:"";position:absolute;left:50%;top:50%;width:64px;height:64px;margin:-32px 0 0 -32px;border-radius:50%;background:var(--amber-fill) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='64' height='64' viewBox='0 0 64 64'%3E%3Cpath d='M26 22 16 32l10 10M38 22l10 10-10 10' fill='none' stroke='%232a1c00' stroke-width='5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") center/64px no-repeat;box-shadow:0 8px 24px rgba(0,0,0,.5)}
+/* 6 */
+#s6 .flow{position:relative;margin-top:84px;display:grid;grid-template-columns:repeat(5,1fr);gap:22px}
+#s6 .line{position:absolute;left:5%;right:5%;top:46px;height:4px;background:var(--line);border-radius:2px}
+#s6 .line i{display:block;height:100%;background:var(--amber-fill);transform-origin:left;transform:scaleX(1);border-radius:2px}
+#s6 .nd{position:relative;padding:0 6px}
+#s6 .dot{width:92px;height:92px;border-radius:50%;display:grid;place-items:center;background:var(--bg);border:4px solid var(--amber-fill);font-stretch:75%;font-weight:800;font-size:46px;color:var(--amber)}
+#s6 .nd.py .dot{border-color:var(--cyan-fill);color:var(--cyan)}
+#s6 h3{margin-top:30px;font-stretch:75%;font-weight:800;font-size:50px;line-height:1;text-transform:uppercase}
+#s6 p{margin-top:16px;font-size:26px;line-height:1.38;color:var(--mut)}
+#s6 .cap{position:absolute;left:120px;right:120px;bottom:80px;font-size:34px;color:var(--fg);display:flex;gap:16px;align-items:center}
+#s6 .cap::before{content:"";width:60px;height:4px;background:var(--amber-fill);border-radius:2px}
+/* 7 */
+#s7 .rules{margin-top:60px;display:grid;grid-template-columns:repeat(3,1fr);gap:28px}
+#s7 .r{padding:34px 36px;display:grid;gap:18px;align-content:start}
+#s7 .r h3{font-stretch:75%;font-weight:800;font-size:50px;line-height:1.02;text-transform:uppercase}
+#s7 .r p{font-size:28px;line-height:1.38;color:var(--mut)}
+#s7 .ex{align-self:end;justify-self:start;font-size:26px;font-weight:700;padding:10px 18px;border-radius:12px;background:var(--bg);border:1px dashed var(--faint);color:var(--amber)}
+/* 8 */
+#s8 .stats{margin-top:64px;display:grid;grid-template-columns:repeat(3,1fr);gap:28px}
+#s8 .st{padding:36px 40px}
+#s8 .st .fl{font-size:170px}
+#s8 .st p{margin-top:14px;font-size:30px;line-height:1.3;color:var(--mut)}
+#s8 .stack{margin-top:48px;display:flex;flex-wrap:wrap;gap:14px}
+#s8 .tx{margin-top:44px;max-width:40em}
+/* 9 */
+#s9 .win{position:absolute;left:120px;top:150px;width:1090px}
+#s9 .txt{position:absolute;right:120px;top:170px;width:480px;display:grid;gap:44px}
+#s9 .txt h3{font-stretch:75%;font-weight:800;font-size:46px;line-height:1.02;text-transform:uppercase;color:var(--fg)}
+#s9 .txt p{margin-top:8px;font-size:28px;line-height:1.38;color:var(--mut)}
+/* 10 */
+#s10 .two{position:absolute;left:120px;right:120px;top:320px;display:grid;grid-template-columns:1fr 1fr;gap:48px;align-items:start}
+#s10 figcaption{margin-top:26px;font-size:28px;line-height:1.38;color:var(--mut)}
+#s10 figcaption b{display:block;margin-bottom:6px;font-stretch:75%;font-size:40px;text-transform:uppercase;color:var(--fg)}
+/* 11 */
+#s11 .steps{margin-top:70px;display:grid;grid-template-columns:repeat(3,1fr);gap:28px;position:relative}
+#s11 .stp{padding:36px 38px;display:grid;gap:16px;align-content:start}
+#s11 .stp .nn{font-stretch:75%;font-weight:800;font-size:44px;color:var(--amber)}
+#s11 .stp h3{font-stretch:75%;font-weight:800;font-size:52px;line-height:1;text-transform:uppercase}
+#s11 .stp p{font-size:28px;line-height:1.38;color:var(--mut)}
+#s11 .formula{margin-top:50px;padding:34px 44px;display:flex;align-items:center;gap:36px;font-size:54px;font-weight:600}
+#s11 .formula small{font-size:26px;color:var(--mut);font-weight:400;max-width:15em;line-height:1.3}
+#s11 .formula .eq{font-family:Cambria,"Cambria Math","Times New Roman",serif;font-style:italic;color:var(--fg)}
+/* 12 */
+#s12 .lab12{display:grid;grid-template-columns:900px 1fr;gap:54px;margin-top:36px;align-items:start}
+#s12 .vars{display:grid;gap:10px}
+#s12 .vr{display:grid;grid-template-columns:300px 1fr;align-items:center;gap:16px}
+#s12 .vr>span{font-size:25px;font-weight:700;line-height:1.1;color:var(--fg)}
+#s12 .opts{display:flex;flex-wrap:wrap;gap:6px;padding:5px;border-radius:14px;background:var(--panel)}
+#s12 .opts button{height:48px;padding:0 18px;border-radius:10px;border:0;background:transparent;color:var(--mut);font-size:24px;font-weight:700;transition:background-color .14s,color .14s,transform .14s var(--ease)}
+#s12 .opts button:active{transform:scale(.96)}
+#s12 .opts button[aria-pressed="true"]{background:var(--amber-fill);color:var(--amber-ink)}
+@media (hover:hover) and (pointer:fine){#s12 .opts button:not([aria-pressed="true"]):hover{color:var(--fg);background:var(--panel2)}}
+#s12 .presets{display:flex;gap:12px;margin-top:10px}
+#s12 .presets button{height:52px;padding:0 24px;border-radius:26px;border:1px solid var(--line);background:transparent;font-size:24px;font-weight:700;transition:transform .14s var(--ease),background-color .14s}
+#s12 .presets button:active{transform:scale(.96)}
+#s12 .presets button[aria-pressed="true"]{border-color:var(--amber-fill);color:var(--amber)}
+#s12 .out{padding:30px 36px 26px}
+#s12 .out .lab{font-size:23px}
+#s12 .pct{font-size:210px;margin-top:8px;display:flex}
+#s12 .meter{position:relative;height:16px;border-radius:8px;background:var(--track);margin-top:20px;overflow:hidden}
+#s12 .meter i{position:absolute;inset:0;background:var(--amber-fill);transform-origin:left;transform:scaleX(.19);border-radius:8px}
+#s12 .cut{position:absolute;left:50%;top:-4px;bottom:-4px;width:3px;background:var(--fg)}
+#s12 .cutl{display:flex;justify-content:space-between;margin-top:8px;font-size:22px;color:var(--faint)}
+#s12 .read{margin-top:14px;font-size:27px;line-height:1.3;color:var(--mut)}
+#s12 .read b{color:var(--fg)}
+#s12 .wf{margin-top:16px;display:grid;gap:6px;font-size:22px;line-height:1.1}
+#s12 .wf div{display:grid;grid-template-columns:1fr 210px 74px;align-items:center;gap:12px;color:var(--mut)}
+#s12 .wf div b{color:var(--fg);font-weight:700}
+#s12 .wf .bar{position:relative;height:12px;background:var(--track);border-radius:6px}
+#s12 .wf .bar i{position:absolute;top:0;bottom:0;border-radius:6px}
+#s12 .wf .bar::before{content:"";position:absolute;left:50%;top:-3px;bottom:-3px;width:2px;background:var(--faint)}
+#s12 .wf .v{text-align:right;font-variant-numeric:tabular-nums;color:var(--fg)}
+#s12 .disc{position:absolute;left:120px;right:120px;bottom:52px;font-size:24px;color:var(--faint)}
+/* 13 */
+#s13 .win{position:absolute;right:120px;top:150px;width:1120px}
+#s13 .facts{position:absolute;left:120px;top:170px;width:540px;display:grid;gap:34px}
+#s13 .facts .fl{font-size:96px}
+#s13 .facts p{margin-top:8px;font-size:26px;line-height:1.3;color:var(--mut)}
+/* 14 */
+#s14 .layers{margin-top:44px;display:grid;gap:14px}
+#s14 .ly{display:grid;grid-template-columns:70px 560px 1fr;align-items:center;gap:30px;padding:16px 36px}
+#s14 .ly .nn{font-stretch:75%;font-weight:800;font-size:54px;color:var(--cyan)}
+#s14 .ly h3{font-stretch:75%;font-weight:800;font-size:40px;line-height:1.02;text-transform:uppercase}
+#s14 .ly p{font-size:25px;line-height:1.3;color:var(--mut)}
+/* 15 */
+#s15 .chat{position:absolute;left:120px;top:150px;width:940px;padding:36px 38px;display:grid;gap:22px}
+#s15 .bub{padding:22px 28px;border-radius:20px;font-size:31px;line-height:1.38}
+#s15 .bub.u{justify-self:end;max-width:78%;background:var(--panel2);border-bottom-right-radius:6px}
+#s15 .bub.p{background:var(--bub-p);border:1px solid rgba(10,116,130,.3);border-bottom-left-radius:6px}
+#s15 .bub.p .who{display:flex;gap:10px;align-items:center;margin-bottom:10px;font-size:22px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--cyan)}
+#s15 .bub.p .who::before{content:"";width:14px;height:14px;border-radius:50%;background:var(--cyan-fill)}
+#s15 .src{display:flex;flex-wrap:wrap;gap:10px;margin-top:6px}
+#s15 .src span{font-size:22px;padding:6px 14px;border-radius:10px;border:1px dashed rgba(10,116,130,.45);color:var(--cyan)}
+#s15 .note{font-size:22px;color:var(--faint)}
+#s15 .right{position:absolute;right:120px;top:170px;width:640px}
+#s15 .right img{width:100%;border-radius:18px;border:1px solid var(--line);display:block}
+#s15 .right ul{margin-top:44px;display:grid;gap:22px}
+#s15 .right li{font-size:30px;line-height:1.32;color:var(--mut);padding-left:34px;position:relative}
+#s15 .right li::before{content:"";position:absolute;left:0;top:14px;width:16px;height:16px;border-radius:50%;background:var(--cyan-fill)}
+#s15 .right li b{color:var(--fg)}
+/* 16 */
+#s16 .tbl{margin-top:54px;display:grid;grid-template-columns:1fr 1fr;gap:0;border-radius:22px;overflow:hidden;border:1px solid var(--line)}
+#s16 .tbl>div{padding:22px 38px;font-size:30px;line-height:1.28;border-bottom:1px solid var(--line)}
+#s16 .tbl .h{font-stretch:75%;font-weight:800;text-transform:uppercase;font-size:34px;background:var(--panel);letter-spacing:.04em}
+#s16 .tbl .h.n{color:var(--amber)}
+#s16 .tbl .o{color:var(--mut)}
+#s16 .tbl .nw{color:var(--fg);background:var(--nw-bg);font-weight:600}
+#s16 .tbl>div:nth-last-child(-n+2){border-bottom:0}
+/* 17 */
+#s17 .road{margin-top:48px;display:grid;grid-template-columns:repeat(2,1fr);gap:28px}
+#s17 .rd{padding:30px 40px;display:grid;gap:12px}
+#s17 .rd h3{font-stretch:75%;font-weight:800;font-size:48px;line-height:1;text-transform:uppercase}
+#s17 .rd p{font-size:27px;line-height:1.34;color:var(--mut)}
+#s17 .tg{justify-self:start;font-size:22px;font-weight:800;letter-spacing:.1em;text-transform:uppercase;padding:6px 16px;border-radius:8px;background:var(--bg);border:1px solid var(--line)}
+#s17 .tg.go{color:var(--cyan);border-color:rgba(10,116,130,.45)}
+/* 18 */
+#s18{display:none}
+#s18.on{display:grid;align-content:center}
+#s18 .h1{font-size:176px}
+#s18 .url{margin-top:56px;display:inline-flex;gap:14px;padding:18px 30px;border-radius:16px;background:var(--panel);border:1px solid var(--line);font-size:34px;font-weight:600;align-items:center;justify-self:start}
+#s18 .url b{color:var(--amber)}
+#s18 .who{margin-top:22px;font-size:28px;color:var(--faint)}
+@media (prefers-reduced-motion:reduce){*{transition-duration:.01ms!important}}
+</style>
+
+<div class="shell">
+  <div id="view">
+    <div id="stage" role="region" aria-label="Presentación">
+
+      <!-- 1 -->
+      <section class="slide" id="s1" data-title="Portada">
+        <div class="run"><span class="ic"><b>I</b><b>C</b></span><span>Inclusión, equidad y diversidad</span><span class="pg"></span></div>
+        <h1 class="t-d h1" data-in>Datos<br>que incluyen</h1>
+        <p class="lead" data-in>Cómo la Universidad de Santander transformó la información de inclusión, equidad y diversidad con inteligencia artificial.</p>
+        <figure class="win hero"><div class="bar"><i></i><i></i><i></i><span class="url">planeacion.udes.edu.co/datos-abiertos/diversidad-equidad-inclusion</span></div><img src="img/new-top.jpg" alt="Portal nuevo de Inclusión, equidad y diversidad" width="1440" height="900"></figure>
+        <p class="foot" data-in>Oficina de Planeación Institucional · Universidad de Santander · 2026</p>
+        <aside class="notes"><h4>Notas</h4>Abra con la idea central: la inclusión no se agota en un número, pero sin números bien contados y bien explicados no se puede mejorar. Hoy cuento cómo pasamos de un tablero embebido en la página institucional a un portal que se reescribe, se explica y conversa con quien lo consulta. Anuncie el recorrido: origen, construcción, transformación de los datos, interacciones, modelo predictivo y Pilo.</aside>
+      </section>
+
+      <!-- 2 -->
+      <section class="slide" id="s2" data-title="661 personas">
+        <div class="run"><span class="ic"><b>I</b><b>C</b></span><span>Inclusión, equidad y diversidad</span><span class="pg"></span></div>
+        <h2 class="t-d h2" data-in>661 personas,<br>no 661 filas</h2>
+        <div class="fl big" id="f661" aria-label="661" data-in></div>
+        <div class="grid4">
+          <div class="row" data-in><span class="fl amber" data-flap="307"></span><span>con pertenencia étnica</span></div>
+          <div class="row" data-in><span class="fl amber" data-flap="415"></span><span>afectados por el conflicto armado</span></div>
+          <div class="row" data-in><span class="fl amber" data-flap="363"></span><span>de zona rural</span></div>
+          <div class="row" data-in><span class="fl amber" data-flap="93"></span><span>con discapacidad declarada</span></div>
+          <p class="body" data-in style="font-size:26px">Estudiantes de grupos de protección constitucional · corte 2025-2 · 1 de cada 15 de los 9.698 estudiantes del corte. Una persona puede estar en más de un grupo.</p>
+        </div>
+        <aside class="notes"><h4>Notas</h4>Empiece por la gente. En el corte 2025-2 hay 661 estudiantes de grupos de protección constitucional, uno de cada quince. Cada categoría cuenta a personas distintas y pueden solaparse. Esta es la razón del proyecto: que cada una de esas personas pueda reconocerse en los datos y que la institución pueda tomar decisiones con ellas a la vista.</aside>
+      </section>
+
+      <!-- 3 -->
+      <section class="slide" id="s3" data-title="El origen">
+        <div class="run"><span class="ic"><b>I</b><b>C</b></span><span>Inclusión, equidad y diversidad</span><span class="pg"></span></div>
+        <div class="col">
+          <h2 class="t-d h2" data-in style="font-size:84px">2021: un tablero dentro de la página</h2>
+          <ul data-in>
+            <li>Lo publicó el Observatorio de analítica académica de la Vicerrectoría de Enseñanza.</li>
+            <li>Un visor externo de Tableau Public con cinco entradas: cifras poblacionales, modelo predictivo, INES, consultorio jurídico y mapa INCLUDES.</li>
+            <li>Fue el primer paso. Ya estaba la intención de medir la inclusión y mostrarla.</li>
+          </ul>
+        </div>
+        <figure class="win" data-in><div class="bar"><i></i><i></i><i></i><span class="url">udes.edu.co/universidad/observatorio/diversidad-equidad-e-inclusion</span></div><img src="img/old-cards.jpg" alt="Portal anterior: visor de Tableau con cinco entradas" width="1140" height="850"></figure>
+        <aside class="notes"><h4>Notas</h4>Reconozca el origen con respeto: el portal de 2021 fue el que abrió el camino. Estaba dentro de la web institucional, con un visor de Tableau y cinco puertas: cifras poblacionales, modelo predictivo, índice INES, consultorio jurídico y el mapa de infraestructura INCLUDES. De ahí salen las preguntas que quisimos resolver mejor.</aside>
+      </section>
+
+      <!-- 4 -->
+      <section class="slide" id="s4" data-title="Cuatro preguntas">
+        <div class="run"><span class="ic"><b>I</b><b>C</b></span><span>Inclusión, equidad y diversidad</span><span class="pg"></span></div>
+        <h2 class="t-d h2" data-in style="font-size:100px">Cuatro preguntas para cada cifra</h2>
+        <div class="qs">
+          <div class="q panel" data-in><h3>¿De qué corte es?</h3><p class="ans">Cada cifra dice su corte y su periodo: <b class="amber">2025-2</b>.</p></div>
+          <div class="q panel" data-in><h3>¿Quién la reporta?</h3><p class="ans">La oficina aparece con la cifra: <b class="amber">Admisiones y Registro Académico</b>.</p></div>
+          <div class="q panel" data-in><h3>¿Puedo llevármela?</h3><p class="ans">Cada bloque se descarga en <b class="amber">CSV, PNG y JPG</b>, y el informe sale en boletín PDF.</p></div>
+          <div class="q panel" data-in><h3>¿Alguien me la explica?</h3><p class="ans"><b class="cyan">Pilo</b> la lee en voz alta o la resume en un minuto.</p></div>
+        </div>
+        <aside class="notes"><h4>Notas</h4>Estas cuatro preguntas son el criterio de diseño de todo el portal. Una cifra sin corte no se puede comparar, sin oficina no se puede confiar, sin descarga no se puede citar y sin explicación no llega a quien no es estadístico. Todo lo que verán después responde a alguna de ellas.</aside>
+      </section>
+
+      <!-- 5 -->
+      <section class="slide" id="s5" data-title="Antes y después">
+        <div class="run"><span class="ic"><b>I</b><b>C</b></span><span>Inclusión, equidad y diversidad</span><span class="pg"></span></div>
+        <div class="side">
+          <h2 class="t-d h2" data-in style="font-size:76px">El mismo tema, otra forma de mirarlo</h2>
+          <p class="body" data-in>Arrastre la línea. A la izquierda, el portal de 2021. A la derecha, el de hoy.</p>
+        </div>
+        <div id="cmp" data-in tabindex="-1">
+          <img class="new" src="img/new-top.jpg" alt="Portal nuevo" width="1440" height="900" draggable="false">
+          <img class="old" src="img/old-top.jpg" alt="Portal antiguo" width="1440" height="900" draggable="false">
+          <span class="tag a">Antes · 2021</span><span class="tag b">Ahora</span>
+          <div class="hd" id="cmpHd" role="slider" tabindex="0" aria-label="Comparar antes y después" aria-valuemin="0" aria-valuemax="100" aria-valuenow="50"></div>
+        </div>
+        <aside class="notes"><h4>Notas</h4>Este es el momento para dejar que la imagen hable. Arrastre la línea despacio. Señale que a la izquierda la inclusión vive dentro de la web de la Vicerrectoría y a la derecha tiene su propia casa, con corte, periodo y campus elegibles, y con Pilo a un lado.</aside>
+      </section>
+
+      <!-- 6 -->
+      <section class="slide" id="s6" data-title="Arquitectura">
+        <div class="run"><span class="ic"><b>I</b><b>C</b></span><span>Inclusión, equidad y diversidad</span><span class="pg"></span></div>
+        <h2 class="t-d h2" data-in>De la fuente a la conversación</h2>
+        <div class="flow">
+          <div class="line"><i id="arrow"></i></div>
+          <div class="nd" data-in><div class="dot">1</div><h3>Fuentes</h3><p>Admisiones y Registro Académico, formularios de inscripción, Saber 11, caracterización multicampus e INES del Ministerio.</p></div>
+          <div class="nd" data-in><div class="dot">2</div><h3>Warehouse UDES</h3><p>Reportes por periodo de Master, Galileo y Davinci. El código del estudiante queda como seudónimo irreversible.</p></div>
+          <div class="nd" data-in><div class="dot">3</div><h3>Supabase</h3><p>Base de datos con reglas por fila, autenticación y funciones del servidor.</p></div>
+          <div class="nd" data-in><div class="dot">4</div><h3>Portal PDI</h3><p>UDES en Cifras: informes, indicadores, desgloses, mapas y modelos, con su ficha enlazable.</p></div>
+          <div class="nd py" data-in><div class="dot">5</div><h3 class="cyan">Pilo</h3><p>Memoria de cifras, búsqueda por significado y voz, siempre citando el corte.</p></div>
+        </div>
+        <p class="cap" data-in>En todo el recorrido cada cifra conserva su corte y su procedencia.</p>
+        <aside class="notes"><h4>Notas</h4>Explique la arquitectura de izquierda a derecha. Las fuentes siguen siendo las oficinas que reportan. El Warehouse UDES reúne los reportes por periodo y protege la identidad: el código del estudiante se guarda como seudónimo irreversible. Supabase aporta la base y los permisos. El Portal PDI muestra y Pilo conversa. Insista en que la procedencia viaja con el dato de punta a punta.</aside>
+      </section>
+
+      <!-- 7 -->
+      <section class="slide" id="s7" data-title="Seis reglas">
+        <div class="run"><span class="ic"><b>I</b><b>C</b></span><span>Inclusión, equidad y diversidad</span><span class="pg"></span></div>
+        <h2 class="t-d h2" data-in style="font-size:96px">Seis reglas para transformar la data</h2>
+        <div class="rules">
+          <div class="r panel" data-in><h3>Un vacío no es un cero</h3><p>Lo que no se reportó se muestra como no reportado.</p><span class="ex">No reportado</span></div>
+          <div class="r panel" data-in><h3>Reserva estadística</h3><p>Con menos de 5 personas no se publica la cifra, para proteger a quien está detrás.</p><span class="ex">&lt; 5</span></div>
+          <div class="r panel" data-in><h3>Cada cifra dice su corte</h3><p>Los años y los periodos se eligen sin perder el de dónde viene cada número.</p><span class="ex">Corte 2025-2</span></div>
+          <div class="r panel" data-in><h3>Cada cifra dice quién reporta</h3><p>La oficina responsable aparece junto al dato.</p><span class="ex">Reporta: Admisiones y Registro</span></div>
+          <div class="r panel" data-in><h3>Nunca solo color</h3><p>Todo estado lleva glifo y texto, y las paletas se verificaron para daltonismo.</p><span class="ex">▲ +187 frente a 2024-2</span></div>
+          <div class="r panel" data-in><h3>Un solo origen</h3><p>El dato sale de una fuente; el texto editorial vive aparte y no lo pisa.</p><span class="ex">Dato ≠ editorial</span></div>
+        </div>
+        <aside class="notes"><h4>Notas</h4>Estas son las reglas con las que transformamos los datos antes de mostrarlos. Dos merecen énfasis en una charla sobre inclusión: el vacío no es un cero, porque no reportar no es lo mismo que no haber nadie, y la reserva estadística, porque con grupos pequeños una cifra puede señalar a una persona.</aside>
+      </section>
+
+      <!-- 8 -->
+      <section class="slide" id="s8" data-title="Cómo lo construimos">
+        <div class="run"><span class="ic"><b>I</b><b>C</b></span><span>Inclusión, equidad y diversidad</span><span class="pg"></span></div>
+        <h2 class="t-d h2" data-in>Cómo lo construimos</h2>
+        <div class="stats">
+          <div class="st panel" data-in><div class="fl amber" data-flap="11"></div><p>informes en UDES en Cifras, uno de ellos el de inclusión</p></div>
+          <div class="st panel" data-in><div class="fl amber" data-flap="3"></div><p>portales en un solo código: la oficina, el PDI y los datos abiertos</p></div>
+          <div class="st panel" data-in><div class="fl amber" data-flap="4.400+"></div><p>pruebas automáticas que vigilan reglas, cifras y permisos</p></div>
+        </div>
+        <p class="body tx" data-in>Los informes son datos, no páginas: un catálogo de indicadores, desgloses, modelos y bloques que una persona de la oficina arma desde el Taller, sin tocar código.</p>
+        <div class="stack" data-in><span class="chip">React y TypeScript</span><span class="chip">Supabase y PostgreSQL</span><span class="chip">Permisos por fila</span><span class="chip">GSAP para el movimiento</span></div>
+        <aside class="notes"><h4>Notas</h4>La idea técnica clave es que los informes son datos. Hay un catálogo y bloques que se componen, y un Taller donde la oficina arma la ficha. Eso permite que cada informe tenga el mismo comportamiento: corte, descarga, permisos. Las más de cuatro mil cuatrocientas pruebas automáticas vigilan que las reglas de la lámina anterior no se rompan.</aside>
+      </section>
+
+      <!-- 9 -->
+      <section class="slide" id="s9" data-title="El tablero">
+        <div class="run"><span class="ic"><b>I</b><b>C</b></span><span>Inclusión, equidad y diversidad</span><span class="pg"></span></div>
+        <figure class="win" data-in><div class="bar"><i></i><i></i><i></i><span class="url">…/diversidad-equidad-inclusion · Tablero de la diversidad</span></div><img src="img/tablero.jpg" alt="Tablero de la diversidad con cifras que voltean" width="1440" height="950"></figure>
+        <div class="txt">
+          <div data-in><h3 class="amber">Un tablero que se reescribe</h3><p>Se elige un corte o un campus y el tablero entero cambia: cifras, barras y comparación.</p></div>
+          <div data-in><h3>Cifras que voltean</h3><p>Los dígitos giran hasta asentarse, como en un tablero de llegadas, y la variación va con glifo y texto.</p></div>
+          <div data-in><h3>Una de cada quince</h3><p>La cifra se traduce a una proporción que cualquiera entiende, con su cuadrícula.</p></div>
+        </div>
+        <aside class="notes"><h4>Notas</h4>Aquí se ve la interacción central. Cambiar el corte reescribe todo el tablero. El movimiento no es adorno: la cifra que voltea le avisa a la persona que cambió el dato, y la variación frente al corte anterior siempre lleva flecha y texto, no solo color.</aside>
+      </section>
+
+      <!-- 10 -->
+      <section class="slide" id="s10" data-title="Pueblos y territorio">
+        <div class="run"><span class="ic"><b>I</b><b>C</b></span><span>Inclusión, equidad y diversidad</span><span class="pg"></span></div>
+        <h2 class="t-d h2" data-in style="font-size:88px">Los pueblos y el territorio, a la vista</h2>
+        <div class="two">
+          <figure data-in><div class="win"><img src="img/mosaico.jpg" alt="Mosaico de pueblos y comunidades" width="1440" height="700"></div><figcaption><b>Mosaico de pueblos</b>Cada pueblo y cada comunidad conserva su color de un corte a otro, y los grupos de menos de 5 se nombran sin cifra.</figcaption></figure>
+          <figure data-in><div class="win"><img src="img/mapa.jpg" alt="Mapa de origen de los estudiantes" width="1440" height="900"></div><figcaption><b>De dónde vienen</b>Por departamento y, al acercarse, por municipio. La base es quien respondió la encuesta ese año.</figcaption></figure>
+        </div>
+        <aside class="notes"><h4>Notas</h4>Dos bloques que muestran el cuidado con la diversidad. El mosaico conserva el color de cada pueblo entre cortes para que se reconozca sin leer, y los grupos con menos de cinco personas aparecen nombrados pero sin cifra. El mapa permite acercarse del departamento al municipio.</aside>
+      </section>
+
+      <!-- 11 -->
+      <section class="slide" id="s11" data-title="Del SPSS al navegador">
+        <div class="run"><span class="ic"><b>I</b><b>C</b></span><span>Inclusión, equidad y diversidad</span><span class="pg"></span></div>
+        <h2 class="t-d h2" data-in style="font-size:100px">Del archivo de SPSS al navegador</h2>
+        <div class="steps">
+          <div class="stp panel" data-in><span class="nn">1</span><h3>El análisis</h3><p>Regresión logística binaria, con selección por pasos hacia adelante (Wald), en SPSS.</p></div>
+          <div class="stp panel" data-in><span class="nn">2</span><h3>Los datos del modelo</h3><p>Los coeficientes, las razones de probabilidades y sus intervalos se guardan como datos en Supabase. Solo agregados, ninguna persona.</p></div>
+          <div class="stp panel" data-in><span class="nn">3</span><h3>El cálculo en vivo</h3><p>El navegador evalúa el modelo cada vez que se mueve un control. No hace falta un servidor.</p></div>
+        </div>
+        <div class="panel formula" data-in><span class="eq">p = 1 / (1 + e<sup>−(−1,472 + Σ b)</sup>)</span><small>Probabilidad de un perfil: el punto de partida del modelo más lo que aporta cada factor elegido.</small></div>
+        <aside class="notes"><h4>Notas</h4>La parte matemática: un modelo de regresión logística hecho en SPSS se convierte en datos y el portal lo evalúa en el navegador. Es transparente: cualquiera puede ver el punto de partida y cuánto empuja cada factor. Aclare que lo que se guarda son resultados agregados del modelo, no datos de estudiantes.</aside>
+      </section>
+
+      <!-- 12 -->
+      <section class="slide" id="s12" data-title="Simulador">
+        <div class="run"><span class="ic"><b>I</b><b>C</b></span><span>Inclusión, equidad y diversidad</span><span class="pg"></span></div>
+        <h2 class="t-d h2" data-in style="font-size:92px">Arme un perfil, mire la probabilidad</h2>
+        <div class="lab12">
+          <div>
+            <div class="vars" id="vars" data-in></div>
+            <div class="presets" id="presets" data-in></div>
+          </div>
+          <div class="out panel" data-in>
+            <span class="lab">Promedio del primer semestre de 3,8 o más</span>
+            <span class="fl pct" id="pct" aria-live="polite"></span>
+            <div class="meter"><i id="meter"></i><b class="cut"></b></div>
+            <div class="cutl"><span>0 %</span><span>corte 50 %</span><span>100 %</span></div>
+            <p class="read" id="read"></p>
+            <div class="wf" id="wf"></div>
+          </div>
+        </div>
+        <p class="disc" data-in>Modelo real, cohortes 2020–2023, 1.539 estudiantes. Es la probabilidad de un perfil en esas cohortes, no el pronóstico de una persona.</p>
+        <aside class="notes"><h4>Notas</h4>Este es el momento interactivo de la charla. Use los coeficientes reales. Empiece en el perfil de referencia, 19 %, y vaya cambiando un factor a la vez para mostrar cuánto empuja cada uno: las pruebas Saber 11 y el área del programa pesan mucho, el género femenino también. Pulse «El más probable» y «El menos probable» para ver los extremos. Repita siempre que no es un pronóstico individual.</aside>
+      </section>
+
+      <!-- 13 -->
+      <section class="slide" id="s13" data-title="Se explica sola">
+        <div class="run"><span class="ic"><b>I</b><b>C</b></span><span>Inclusión, equidad y diversidad</span><span class="pg"></span></div>
+        <div class="facts">
+          <h2 class="t-d h2" data-in style="font-size:64px">La matemática se explica sola</h2>
+          <div data-in><div class="fl amber" data-flap="68,6%"></div><p>bien clasificados: 1.055 de 1.539 casos, cerca de 7 de cada 10.</p></div>
+          <div data-in><div class="fl amber" data-flap="0,273"></div><p>R² de Nagelkerke: los factores explican cerca de la cuarta parte; el resto depende de otras causas.</p></div>
+        </div>
+        <figure class="win" data-in><div class="bar"><i></i><i></i><i></i><span class="url">Factores asociados · ¿Qué tan bien clasifica?</span></div><img src="img/factores.jpg" alt="Razones de probabilidades y tabla de clasificación" width="1440" height="800"></figure>
+        <aside class="notes"><h4>Notas</h4>El portal no deja la estadística sin traducir. Cada razón de probabilidades se dice en palabras, por ejemplo «frente a Masculino, Femenino multiplica por 2,1 las posibilidades de terminar con promedio de 3,8 o más». La tabla de clasificación explica cómo leer los aciertos y los errores. Sea honesto con los límites: el modelo explica cerca de una cuarta parte de la variación.</aside>
+      </section>
+
+      <!-- 14 -->
+      <section class="slide" id="s14" data-title="Preparar a Pilo">
+        <div class="run"><span class="ic"><b>I</b><b>C</b></span><span>Inclusión, equidad y diversidad</span><span class="pg"></span></div>
+        <h2 class="t-d h2" data-in>Cómo preparamos a Pilo</h2>
+        <div class="layers">
+          <div class="ly panel" data-in><span class="nn">1</span><h3>Cifras en vivo</h3><p>Guarda la serie completa de cada indicador por año, periodo y sede, armada desde el mismo catálogo del portal.</p></div>
+          <div class="ly panel" data-in><span class="nn">2</span><h3>Búsqueda por significado</h3><p>Combina palabras y vectores, para encontrar la cifra aunque la pregunta use otras palabras.</p></div>
+          <div class="ly panel" data-in><span class="nn">3</span><h3>Entender la pregunta</h3><p>Reglas sacan sede, año y periodo antes de llamar al modelo, también en las preguntas de seguimiento.</p></div>
+          <div class="ly panel" data-in><span class="nn">4</span><h3>Reglas de honestidad</h3><p>Toda cifra sale de la base y se cita. Lo que no viene de ahí se marca como conocimiento general.</p></div>
+          <div class="ly panel" data-in><span class="nn">5</span><h3>Aprende de lo que no supo</h3><p>Una bandeja reúne lo que Pilo no pudo responder; una persona lo resuelve y queda en el catálogo.</p></div>
+        </div>
+        <aside class="notes"><h4>Notas</h4>Preparar al modelo no es solo conectarle una IA. Primero se le da memoria de cifras reales y citables, luego se le enseña a entender la pregunta, se le ponen reglas de honestidad para que nunca invente un número y se le da una bandeja donde las personas corrigen lo que no supo. La IA redacta; las cifras siempre vienen de la base.</aside>
+      </section>
+
+      <!-- 15 -->
+      <section class="slide" id="s15" data-title="Pilo en acción">
+        <div class="run"><span class="ic"><b>I</b><b>C</b></span><span>Inclusión, equidad y diversidad</span><span class="pg"></span></div>
+        <div class="chat panel">
+          <div class="bub u" data-in>¿Cuántos estudiantes de grupos de protección constitucional hay?</div>
+          <div class="bub p" data-in><div class="who">Mr. Pilo</div><div id="ans">En el corte 2025-2 hay 661 estudiantes de grupos de protección constitucional: uno de cada 15 de los 9.698 estudiantes del corte. Reporta Admisiones y Registro Académico.</div><div class="src"><span>UDES en Cifras</span><span>Inclusión, equidad y diversidad</span><span>Corte 2025-2</span></div></div>
+          <p class="note" data-in>Respuesta armada con las cifras publicadas del portal, como ejemplo del formato.</p>
+        </div>
+        <div class="right">
+          <img src="img/widget.jpg" alt="Pilo ofrece leer la página en voz alta o resumirla en un minuto" width="840" height="280" data-in>
+          <ul data-in>
+            <li><b>En cada página.</b> Pilo ofrece leerla en voz alta o resumirla en un minuto.</li>
+            <li><b>Con cita.</b> La respuesta nombra el informe, el corte y la oficina.</li>
+            <li><b>Sin inventar.</b> Si no hay dato, lo dice y lo deja para que una persona lo resuelva.</li>
+          </ul>
+        </div>
+        <aside class="notes"><h4>Notas</h4>La conversación de la izquierda es un ejemplo armado con las cifras publicadas, para mostrar el formato: respuesta corta, con corte, oficina y fuentes. A la derecha, la ayuda que aparece en cada página del portal. Si tiene conexión durante la charla, puede hacer la pregunta en vivo en «Pregúntele a Pilo».</aside>
+      </section>
+
+      <!-- 16 -->
+      <section class="slide" id="s16" data-title="Lo que cambió">
+        <div class="run"><span class="ic"><b>I</b><b>C</b></span><span>Inclusión, equidad y diversidad</span><span class="pg"></span></div>
+        <h2 class="t-d h2" data-in>Lo que cambió</h2>
+        <div class="tbl" data-in>
+          <div class="h">Antes · 2021</div><div class="h n">Ahora</div>
+          <div class="o">Visor externo de Tableau Public</div><div class="nw">Portal propio, dentro del código institucional</div>
+          <div class="o">Cinco entradas fijas</div><div class="nw">Corte, periodo y campus que se eligen y reescriben el tablero</div>
+          <div class="o">Cifras en láminas</div><div class="nw">Cada cifra con su corte, su oficina y su descarga</div>
+          <div class="o">Modelo predictivo en una lámina</div><div class="nw">Simulador con los coeficientes publicados y explicado en palabras</div>
+          <div class="o">Lectura individual</div><div class="nw">Pilo lee, resume y responde con cita</div>
+        </div>
+        <aside class="notes"><h4>Notas</h4>Cierre del arco de la transformación. Recuerde que no se trata de desmerecer el portal de 2021, que fue el punto de partida, sino de mostrar cuánto se ganó en comparabilidad, procedencia y acceso.</aside>
+      </section>
+
+      <!-- 17 -->
+      <section class="slide" id="s17" data-title="Lo que sigue">
+        <div class="run"><span class="ic"><b>I</b><b>C</b></span><span>Inclusión, equidad y diversidad</span><span class="pg"></span></div>
+        <h2 class="t-d h2" data-in>Lo que sigue</h2>
+        <div class="road">
+          <div class="rd panel" data-in><span class="tg go">Siguiente paso</span><h3>Pilo que lee el modelo</h3><p>Que explique cada razón de probabilidades con las frases que el portal ya publica, y responda dudas sobre cómo leerlo.</p></div>
+          <div class="rd panel" data-in><span class="tg">En construcción</span><h3>Alertas tempranas</h3><p>El Warehouse UDES reúne los reportes por periodo para detectar a tiempo a quien necesita apoyo.</p></div>
+          <div class="rd panel" data-in><span class="tg">Por completar</span><h3>Todos los campus</h3><p>Sumar al desglose por campus a Cúcuta, Valledupar y Bogotá, a medida que cada sede reporta.</p></div>
+          <div class="rd panel" data-in><span class="tg">Por completar</span><h3>Más voces</h3><p>Más formas de consultar: voz, otros idiomas y una lectura sencilla para quien usa poca tecnología.</p></div>
+        </div>
+        <aside class="notes"><h4>Notas</h4>Sea claro sobre qué está hecho y qué falta. El siguiente paso natural es que Pilo lea el modelo predictivo con las frases que ya genera el portal. Hoy el desglose por campus muestra Bucaramanga y el trabajo es sumar el resto de sedes. Las alertas tempranas dependen del Warehouse UDES.</aside>
+      </section>
+
+      <!-- 18 -->
+      <section class="slide" id="s18" data-title="Cierre">
+        <div class="run"><span class="ic"><b>I</b><b>C</b></span><span>Inclusión, equidad y diversidad</span><span class="pg"></span></div>
+        <h2 class="t-d h1" data-in>La inclusión también se conversa</h2>
+        <p class="lead" data-in>Se mide, se explica y se conversa. Cada persona detrás de una cifra merece que alguien la vea.</p>
+        <div class="url" data-in><span>Consulte el portal</span><b>planeacion.udes.edu.co/datos-abiertos/diversidad-equidad-inclusion</b></div>
+        <p class="who" data-in>Oficina de Planeación Institucional · Universidad de Santander</p>
+        <aside class="notes"><h4>Notas</h4>Cierre con calma. Repita la idea: la inclusión se mide, se explica y se conversa. Deje la dirección del portal a la vista y abra el turno de preguntas.</aside>
+      </section>
+    </div>
+  </div>
+  <div class="ctl" role="toolbar" aria-label="Controles">
+    <button id="prev" aria-label="Lámina anterior">‹</button>
+    <span class="n" id="num">1 / 18</span>
+    <button id="next" aria-label="Lámina siguiente">›</button>
+    <span class="tick" id="tick" aria-hidden="true"></span>
+    <button id="notesBtn" aria-pressed="false" aria-controls="notes">Notas</button>
+    <button id="themeBtn" aria-pressed="false" aria-label="Cambiar entre fondo crema y azul noche">Noche</button>
+    <button id="fsBtn" aria-label="Pantalla completa">⛶</button>
+    <span class="hint">← → para avanzar · N notas · T tema</span>
+  </div>
+</div>
+<div id="notes" hidden></div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
+<script>
+(function(){
+"use strict";
+var $=function(s,r){return (r||document).querySelector(s)}, $$=function(s,r){return Array.prototype.slice.call((r||document).querySelectorAll(s))};
+var g=window.gsap, reduce=false; try{reduce=matchMedia("(prefers-reduced-motion: reduce)").matches}catch(e){}
+var slides=$$(".slide"), stage=$("#stage"), view=$("#view"), cur=-1, ctx=null, cleanups=[];
+var total=slides.length;
+
+/* ---- Escala del escenario ---- */
+function fit(){
+  var w=view.clientWidth,h=view.clientHeight; if(!w||!h) return;
+  var s=Math.min(w/1920,h/1080);
+  stage.style.transform="translate(-50%,-50%) scale("+s+")";
+}
+addEventListener("resize",fit); fit();
+try{new ResizeObserver(fit).observe(view)}catch(e){}
+
+/* ---- Cifra que voltea (tablero de llegadas) ---- */
+function build(el,text){
+  el.innerHTML="";
+  return text.split("").map(function(ch){
+    var i=document.createElement("i"); i.className=/\d/.test(ch)?"d":"s"; i.textContent=ch; el.appendChild(i); return {el:i,ch:ch};
+  });
+}
+function flap(el,text,o){
+  o=o||{}; var cells=build(el,text); el.setAttribute("aria-label",text);
+  if(!g||reduce) return;
+  var n=0;
+  cells.forEach(function(c){
+    if(!/\d/.test(c.ch)) return;
+    var p={v:0},last=-1;
+    g.to(p,{v:1,duration:(o.dur||.8)+n*.09,delay:(o.delay||0)+n*.05,ease:"none",onUpdate:function(){
+      var f=Math.floor(p.v*14); if(f===last) return; last=f;
+      c.el.textContent=p.v>=.9?c.ch:String(Math.floor(Math.random()*10));
+    },onComplete:function(){c.el.textContent=c.ch}});
+    n++;
+  });
+  cleanups.push(function(){cells.forEach(function(c){c.el.textContent=c.ch})});
+}
+
+/* ---- Entrada de cada lámina: una sola secuencia corta ---- */
+function enter(slide){
+  var els=$$("[data-in]",slide);
+  if(reduce){g.fromTo(els,{opacity:0},{opacity:1,duration:.15});return}
+  g.from(els,{opacity:0,y:20,filter:"blur(3px)",duration:.55,stagger:.07,ease:"expo.out",clearProps:"transform,filter,opacity"});
+}
+
+/* ---- Ganchos por lámina ---- */
+var HOOKS={
+  1:function(s){ if(!reduce) g.from($(".hero",s),{y:50,rotate:-6,opacity:0,duration:1.1,delay:.35,ease:"expo.out"}); },
+  2:function(s){ flap($("#f661"),"661",{delay:.25,dur:1.1}); $$("[data-flap]",s).forEach(function(e,i){flap(e,e.dataset.flap,{delay:.6+i*.12})}); },
+  6:function(s){ if(!reduce) g.fromTo("#arrow",{scaleX:0},{scaleX:1,duration:1.4,delay:.3,ease:"expo.inOut"}); },
+  8:function(s){ $$("[data-flap]",s).forEach(function(e,i){flap(e,e.dataset.flap,{delay:.3+i*.15})}); },
+  13:function(s){ $$("[data-flap]",s).forEach(function(e,i){flap(e,e.dataset.flap,{delay:.4+i*.2})}); },
+  5:function(s){ if(reduce){setPos(50);return} var o={v:96}; setPos(96); sweep=g.to(o,{v:50,duration:1.5,delay:.5,ease:"expo.inOut",onUpdate:function(){setPos(o.v)}}); },
+  12:function(s){ sim.render(true); },
+  15:function(s){
+    var a=$("#ans"); var txt=a.textContent; if(reduce||!g) return;
+    var words=txt.split(" "); a.innerHTML=words.map(function(w){return '<span style="opacity:0">'+w+' </span>'}).join("");
+    g.to($$("span",a),{opacity:1,duration:.08,stagger:.055,delay:.9,ease:"none"});
+    cleanups.push(function(){a.textContent=txt});
+  }
+};
+
+/* ---- Comparador antes / después ---- */
+var cmp=$("#cmp"), hd=$("#cmpHd"), pos=50, sweep=null;
+function setPos(v){pos=Math.max(0,Math.min(100,v)); cmp.style.setProperty("--pos",pos); hd.setAttribute("aria-valuenow",Math.round(pos))}
+(function(){
+  var down=false;
+  function at(e){var r=cmp.getBoundingClientRect(); setPos((e.clientX-r.left)/r.width*100)}
+  cmp.addEventListener("pointerdown",function(e){down=true;cmp.setPointerCapture(e.pointerId);if(sweep)sweep.kill();at(e)});
+  cmp.addEventListener("pointermove",function(e){if(down)at(e)});
+  cmp.addEventListener("pointerup",function(){down=false});
+  cmp.addEventListener("pointercancel",function(){down=false});
+  hd.addEventListener("keydown",function(e){ if(e.key==="ArrowLeft"||e.key==="ArrowRight"){e.preventDefault();e.stopPropagation();setPos(pos+(e.key==="ArrowRight"?4:-4))} });
+})();
+
+/* ---- Simulador: el modelo real (migración 0047, SPSS paso 7) ---- */
+var MODEL={intercept:-1.472,vars:[
+  {k:"genero",s:"Género",l:"Género",ref:"Masculino",lv:[["Femenino",0.733]]},
+  {k:"trabaja",s:"Trabaja",l:"Trabaja mientras estudia",ref:"No",lv:[["Sí",0.516]]},
+  {k:"campus",s:"Campus",l:"Campus",ref:"Bucaramanga",lv:[["Cúcuta",-0.077],["Valledupar",0.414]]},
+  {k:"area",s:"Área",l:"Área del programa",ref:"Tecnologías",lv:[["Ciencias económicas",0.94],["Ciencias exactas",-1.811],["Ingenierías",-0.163],["Ciencias de la salud",-0.69],["Ciencias sociales",0.721]]},
+  {k:"mat",s:"Matemáticas",l:"Saber 11 · Matemáticas",ref:"Niveles 1-2",lv:[["Niveles 3-4",0.949]]},
+  {k:"soc",s:"Sociales",l:"Saber 11 · Sociales y ciudadanas",ref:"Niveles 1-2",lv:[["Niveles 3-4",0.584]]},
+  {k:"cn",s:"Naturales",l:"Saber 11 · Ciencias naturales",ref:"Niveles 1-2",lv:[["Niveles 3-4",0.748]]}
+]};
+var sim=(function(){
+  var pr={},preset="ref",fmt=new Intl.NumberFormat("es-CO",{minimumFractionDigits:2,maximumFractionDigits:2});
+  function reset(){MODEL.vars.forEach(function(v){pr[v.k]=-1}); preset="ref"}
+  function extreme(best){MODEL.vars.forEach(function(v){var pick=-1,val=0; v.lv.forEach(function(l,i){if(best?l[1]>val:l[1]<val){val=l[1];pick=i}}); pr[v.k]=pick}); preset=best?"max":"min"}
+  function calc(){
+    var parts=MODEL.vars.map(function(v){var i=pr[v.k]; return {l:v.s,lv:i>=0?v.lv[i][0]:v.ref,b:i>=0?v.lv[i][1]:0}});
+    var logit=MODEL.intercept+parts.reduce(function(s,p){return s+p.b},0);
+    return {parts:parts,logit:logit,p:1/(1+Math.exp(-logit))};
+  }
+  var built=false,lastP=null;
+  function ui(){
+    var box=$("#vars"); box.innerHTML="";
+    MODEL.vars.forEach(function(v){
+      var row=document.createElement("div"); row.className="vr";
+      var opts=[v.ref].concat(v.lv.map(function(l){return l[0]}));
+      row.innerHTML='<span>'+v.l+'</span><div class="opts" role="group" aria-label="'+v.l+'"></div>';
+      var og=$(".opts",row);
+      opts.forEach(function(name,j){
+        var b=document.createElement("button"); b.type="button"; b.textContent=name; b.dataset.k=v.k; b.dataset.i=j-1;
+        b.addEventListener("click",function(){pr[v.k]=j-1;preset="";render()});
+        og.appendChild(b);
+      });
+      box.appendChild(row);
+    });
+    var pb=$("#presets"); pb.innerHTML="";
+    [["ref","Perfil de referencia"],["max","El más probable"],["min","El menos probable"]].forEach(function(p){
+      var b=document.createElement("button"); b.type="button"; b.textContent=p[1]; b.dataset.p=p[0];
+      b.addEventListener("click",function(){ if(p[0]==="ref")reset();else extreme(p[0]==="max"); render() });
+      pb.appendChild(b);
+    });
+    built=true;
+  }
+  function render(first){
+    if(!built){reset();ui()}
+    var r=calc(), pct=Math.round(r.p*100);
+    $$("#vars button").forEach(function(b){b.setAttribute("aria-pressed",String(pr[b.dataset.k]===+b.dataset.i))});
+    $$("#presets button").forEach(function(b){b.setAttribute("aria-pressed",String(preset===b.dataset.p))});
+    if(lastP!==pct||first){ var big=$("#pct"); big.dataset.t=pct+"%"; flap(big,pct+"%",{dur:.35}); lastP=pct }
+    if(g&&!reduce) g.to("#meter",{scaleX:r.p,duration:.5,ease:"expo.out"}); else $("#meter").style.transform="scaleX("+r.p+")";
+    $("#read").innerHTML=r.p>=.5?'El modelo lo clasificaría con <b>promedio de 3,8 o más</b>.':'El modelo lo clasificaría con <b>promedio de menos de 3,8</b>.';
+    var rows='<div><b>Punto de partida</b><span class="bar"><i style="'+barStyle(MODEL.intercept)+'"></i></span><span class="v">'+sg(MODEL.intercept)+'</span></div>';
+    r.parts.forEach(function(p){ if(p.b!==0) rows+='<div><span>'+p.l+': <b>'+p.lv+'</b></span><span class="bar"><i style="'+barStyle(p.b)+'"></i></span><span class="v">'+sg(p.b)+'</span></div>'; });
+    rows+='<div><b>Suma (log-odds)</b><span class="bar"><i style="'+barStyle(r.logit)+'"></i></span><span class="v">'+sg(r.logit)+'</span></div>';
+    $("#wf").innerHTML=rows;
+  }
+  function sg(b){return (b>0?"+":b<0?"−":"")+fmt.format(Math.abs(b))}
+  function barStyle(b){var w=Math.min(50,Math.abs(b)/3.6*50); return (b>=0?"left:50%;":"right:50%;")+"width:"+w+"%;background:"+(b>=0?"var(--amber-fill)":"var(--blue)")}
+  return {render:render};
+})();
+
+/* ---- Navegación ---- */
+var tick=$("#tick"); for(var i=0;i<total;i++){var t=document.createElement("i");tick.appendChild(t)}
+var notesBox=$("#notes"), notesBtn=$("#notesBtn");
+function go(n){
+  n=Math.max(0,Math.min(total-1,n)); if(n===cur) return;
+  cleanups.forEach(function(f){try{f()}catch(e){}}); cleanups=[];
+  if(ctx){ctx.revert();ctx=null}
+  if(cur>=0) slides[cur].classList.remove("on");
+  cur=n; var s=slides[n]; s.classList.add("on");
+  $$(".pg",s).forEach(function(p){p.textContent=(n+1)+" / "+total});
+  $("#num").textContent=(n+1)+" / "+total;
+  $$("i",tick).forEach(function(t,i){ if(i===n)t.setAttribute("data-on",""); else t.removeAttribute("data-on") });
+  var nt=$(".notes",s); notesBox.innerHTML=nt?nt.innerHTML:"";
+  if(g){ ctx=g.context(function(){ enter(s); var h=HOOKS[n+1]; if(h) h(s); },s); }
+  else if(HOOKS[n+1]) HOOKS[n+1](s);
+  try{history.replaceState(null,"","#d"+(n+1))}catch(e){}
+}
+$("#next").addEventListener("click",function(){go(cur+1)});
+$("#prev").addEventListener("click",function(){go(cur-1)});
+function toggleNotes(){ var open=notesBox.hidden; notesBox.hidden=!open; notesBtn.setAttribute("aria-pressed",String(open)) }
+notesBtn.addEventListener("click",toggleNotes);
+/* Tema: crema por defecto; azul noche si se proyecta en una sala oscura. Se recuerda en este navegador. */
+var themeBtn=$("#themeBtn"), root=document.documentElement;
+function setTheme(t){ if(t==="noche")root.setAttribute("data-deck","noche"); else root.removeAttribute("data-deck"); themeBtn.setAttribute("aria-pressed",String(t==="noche")); themeBtn.textContent=t==="noche"?"Crema":"Noche"; try{localStorage.setItem("deck-tema",t)}catch(e){} }
+var saved=null; try{saved=localStorage.getItem("deck-tema")}catch(e){}
+setTheme(saved==="noche"?"noche":"crema");
+themeBtn.addEventListener("click",function(){ setTheme(root.hasAttribute("data-deck")?"crema":"noche") });
+$("#fsBtn").addEventListener("click",function(){ try{ var el=document.documentElement; if(document.fullscreenElement){document.exitFullscreen()}else if(el.requestFullscreen){el.requestFullscreen().catch(function(){})} }catch(e){} });
+addEventListener("keydown",function(e){
+  if(e.target&&/INPUT|TEXTAREA|SELECT/.test(e.target.tagName)) return;
+  var k=e.key;
+  if(k==="ArrowRight"||k==="PageDown"||k===" "){e.preventDefault();go(cur+1)}
+  else if(k==="ArrowLeft"||k==="PageUp"){e.preventDefault();go(cur-1)}
+  else if(k==="Home"){go(0)} else if(k==="End"){go(total-1)}
+  else if(k==="n"||k==="N"){toggleNotes()}
+  else if(k==="t"||k==="T"){themeBtn.click()}
+});
+/* Deslizar en pantallas táctiles */
+(function(){var x0=null;
+  view.addEventListener("touchstart",function(e){x0=e.touches[0].clientX},{passive:true});
+  view.addEventListener("touchend",function(e){ if(x0==null||e.target.closest("#cmp")||e.target.closest("#s12")) {x0=null;return} var d=e.changedTouches[0].clientX-x0; if(Math.abs(d)>60) go(cur+(d<0?1:-1)); x0=null },{passive:true});
+})();
+var start=parseInt((location.hash||"").replace("#d",""),10);
+go(isNaN(start)?0:start-1);
+})();
+</script>

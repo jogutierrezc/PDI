@@ -12,6 +12,7 @@ const P = {
   gestor: PEOPLE.director, // Gestor de UDES Verde (oficina A)
   colabo: PEOPLE.reportante, // Colaborador de UDES Verde
   planeacion: PEOPLE.admin, // rol global planeacion: ve todo, no edita
+  admin: PEOPLE.vi, // rol global admin: edita en cualquier oficina
   ajeno: PEOPLE.decano, // sin papel en el módulo
 };
 
@@ -27,6 +28,7 @@ const como = <T,>(quien: string | null, sql: string, params: unknown[] = []) => 
 beforeAll(async () => {
   t = await createTestDb();
   await t.q("update public.profiles set role = 'planeacion', is_active = true where id = $1", [P.planeacion]);
+  await t.q("update public.profiles set role = 'admin', is_active = true where id = $1", [P.admin]);
   await t.q("update public.profiles set role = 'responsable', is_active = true where id = any ($1)", [[P.gestor, P.colabo]]);
   await t.q("update public.profiles set role = 'consulta', is_active = true where id = $1", [P.ajeno]);
   await t.q(`insert into public.ds_miembros (user_id, rol, oficina_id) values ($1, 'gestor', $3), ($2, 'colaborador', $3)`, [P.gestor, P.colabo, A]);
@@ -80,7 +82,7 @@ describe("0178 · quién ve y quién edita", () => {
     expect(new Set(pl.yo.oficinas.map((o) => o.rol))).toEqual(new Set(["planeacion"]));
   });
 
-  it("el gestor y el colaborador crean libros de su oficina; Planeación y el ajeno no", async () => {
+  it("el gestor, el colaborador y la administración crean libros; Planeación y el ajeno no", async () => {
     const columnas = JSON.stringify([
       { clave: "anio", etiqueta: "Año", tipo: "texto", obligatorio: true },
       { clave: "consumo_limpio", etiqueta: "Consumo de energía limpia", tipo: "porcentaje", obligatorio: true },
@@ -92,18 +94,22 @@ describe("0178 · quién ve y quién edita", () => {
     );
     libro = l.id;
     expect(l).toMatchObject({ estado: "borrador", tipo: "tabla" });
-    expect(await falla(P.planeacion, "select * from public.ds_crear_libro($1, $2, 'X', 'tabla', $3::jsonb)", [A, carpetas.trabajo, columnas])).toMatch(/Solo el gestor o un colaborador/);
-    expect(await falla(P.ajeno, "select * from public.ds_crear_libro($1, $2, 'X', 'tabla', $3::jsonb)", [A, carpetas.trabajo, columnas])).toMatch(/Solo el gestor o un colaborador/);
+    expect(await falla(P.planeacion, "select * from public.ds_crear_libro($1, $2, 'X', 'tabla', $3::jsonb)", [A, carpetas.trabajo, columnas])).toMatch(/La oficina o la administración/);
+    expect(await falla(P.ajeno, "select * from public.ds_crear_libro($1, $2, 'X', 'tabla', $3::jsonb)", [A, carpetas.trabajo, columnas])).toMatch(/La oficina o la administración/);
     // El colaborador de la misma oficina sí; una oficina ajena, no.
     const [l2] = await como<{ id: string }>(P.colabo, "select * from public.ds_crear_libro($1, $2, 'Otro libro', 'lista', $3::jsonb)", [A, carpetas.trabajo, columnas]);
     expect(l2.id).toBeTruthy();
-    expect(await falla(P.gestor, "select * from public.ds_crear_libro($1, $2, 'X', 'tabla', $3::jsonb)", [B, carpetas.indicadores, columnas])).toMatch(/Solo el gestor o un colaborador/);
+    expect(await falla(P.gestor, "select * from public.ds_crear_libro($1, $2, 'X', 'tabla', $3::jsonb)", [B, carpetas.indicadores, columnas])).toMatch(/La oficina o la administración/);
+    // La administración (y los roles con base administrador, como UDES Verde) edita en cualquier oficina.
+    const [l3] = await como<{ id: string }>(P.admin, "select * from public.ds_crear_libro($1, $2, 'Libro de la administración', 'tabla', $3::jsonb)", [B, carpetas.trabajo, columnas]);
+    expect(l3.id).toBeTruthy();
   });
 
-  it("la oficina ve lo suyo; Planeación ve todo; el ajeno no ve nada", async () => {
+  it("la oficina ve lo suyo; Planeación y la administración ven todo; el ajeno no ve nada", async () => {
     expect((await t.asUser(P.gestor, (q) => q("select id from public.ds_libros"))).length).toBe(2);
     expect((await t.asUser(P.colabo, (q) => q("select id from public.ds_libros"))).length).toBe(2);
-    expect((await t.asUser(P.planeacion, (q) => q("select id from public.ds_libros"))).length).toBe(2);
+    expect((await t.asUser(P.planeacion, (q) => q("select id from public.ds_libros"))).length).toBe(3);
+    expect((await t.asUser(P.admin, (q) => q("select id from public.ds_libros"))).length).toBe(3);
     expect(await t.asUser(P.ajeno, (q) => q("select id from public.ds_libros"))).toEqual([]);
   });
 });

@@ -121,11 +121,11 @@ export const infoEncuesta = async (slug: string): Promise<InfoEncuesta> => {
   return r.encuesta;
 };
 
-/** Lo que Microsoft dice de la cuenta (correo y nombre), ya comprobado el dominio. No guarda nada. */
-export const datosMicrosoft = (slug: string, jwt: string) => llamar<CuentaMicrosoft>("microsoft_datos", { slug }, jwt);
+/** Lo que Microsoft dice de la cuenta (correo y nombre), ya comprobado el dominio, y un pase firmado para el envío: la sesión de Microsoft se cierra enseguida. No guarda nada. */
+export const datosMicrosoft = (slug: string, jwt: string) => llamar<CuentaMicrosoft & { pase: string }>("microsoft_datos", { slug }, jwt);
 
-export const enviarAportes = (slug: string, jwt: string, dependencia: string, aportes: readonly AporteEnvio[]) =>
-  llamar<RespuestaEnvio>("enviar", cuerpoEnvio(slug, dependencia, aportes), jwt);
+export const enviarAportes = (slug: string, pase: string, dependencia: string, aportes: readonly AporteEnvio[]) =>
+  llamar<RespuestaEnvio>("enviar", { ...cuerpoEnvio(slug, dependencia, aportes), pase });
 
 /** Una sesión de Microsoft vencida o inválida: hay que volver a confirmar. */
 export const sesionVencida = (e: unknown): boolean => e instanceof ErrorEncuestas && (e.estado === 401 || (e.estado === 403 && e.codigo !== "cerrada"));

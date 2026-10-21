@@ -41,6 +41,29 @@ const json = (body: unknown, status = 200) => new Response(JSON.stringify(body),
 const SLUG = /^[a-z0-9]+(-[a-z0-9]+)*$/;
 
 // Un tope por IP: en memoria, por instancia. No es un muro, es un freno.
+/* El pase: lo firma esta función con la clave de servicio (HMAC-SHA256) al confirmar la cuenta de Microsoft. Así el
+   envío no depende de que la sesión de Microsoft siga viva: la página la cierra enseguida. Caduca en 3 horas. */
+const PASE_MS = 3 * 3600_000;
+const b64 = (b: ArrayBuffer | Uint8Array) => btoa(String.fromCharCode(...new Uint8Array(b))).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+const deB64 = (t: string) => Uint8Array.from(atob(t.replace(/-/g, "+").replace(/_/g, "/")), (ch) => ch.charCodeAt(0));
+const llave = (secreto: string) => crypto.subtle.importKey("raw", new TextEncoder().encode(secreto), { name: "HMAC", hash: "SHA-256" }, false, ["sign", "verify"]);
+interface Pase { slug: string; correo: string; nombre: string; exp: number }
+async function firmarPase(p: Pase, secreto: string): Promise<string> {
+  const cuerpo = b64(new TextEncoder().encode(JSON.stringify(p)));
+  return `${cuerpo}.${b64(await crypto.subtle.sign("HMAC", await llave(secreto), new TextEncoder().encode(cuerpo)))}`;
+}
+async function abrirPase(t: string, secreto: string): Promise<Pase | null> {
+  const [cuerpo, firma] = t.split(".");
+  if (!cuerpo || !firma) return null;
+  try {
+    if (!(await crypto.subtle.verify("HMAC", await llave(secreto), deB64(firma), new TextEncoder().encode(cuerpo)))) return null;
+    const p = JSON.parse(new TextDecoder().decode(deB64(cuerpo))) as Pase;
+    return typeof p.exp === "number" && p.exp > Date.now() && typeof p.correo === "string" && typeof p.slug === "string" ? { ...p, nombre: String(p.nombre ?? "") } : null;
+  } catch {
+    return null;
+  }
+}
+
 const PETICIONES = new Map<string, number[]>();
 function demasiadas(ip: string): boolean {
   const ahora = Date.now();
@@ -89,21 +112,31 @@ Deno.serve(async (request: Request) => {
   }
 
   if (accion === "microsoft_datos" || accion === "enviar") {
-    // La cuenta de Microsoft: el token lo emitió Supabase Auth al volver de Azure.
-    const jwt = (request.headers.get("authorization") ?? "").replace(/^Bearer\s+/i, "").trim();
-    if (jwt.length < 20) return json({ error: "No llegó la confirmación de Microsoft. Intente de nuevo.", code: "microsoft" }, 401);
-    const u = await admin.auth.getUser(jwt);
-    const usuario = u.data.user;
-    if (u.error || !usuario) return json({ error: "La confirmación de Microsoft venció. Vuelva a pulsar «Continuar con Microsoft».", code: "microsoft" }, 401);
-    const deAzure = usuario.app_metadata?.provider === "azure" || (usuario.identities ?? []).some((x) => x.provider === "azure");
-    if (!deAzure) return json({ error: "Esa sesión no es de una cuenta de Microsoft.", code: "microsoft" }, 401);
-    const meta = (usuario.user_metadata ?? {}) as Record<string, unknown>;
-    const correo = limpiar(usuario.email ?? meta.email).toLowerCase();
-    const nombre = limpiar(meta.full_name ?? meta.name);
+    let correo = "";
+    let nombre = "";
+    if (accion === "microsoft_datos") {
+      // La cuenta de Microsoft: el token lo emitió Supabase Auth al volver de Azure.
+      const jwt = (request.headers.get("authorization") ?? "").replace(/^Bearer\s+/i, "").trim();
+      if (jwt.length < 20) return json({ error: "No llegó la confirmación de Microsoft. Intente de nuevo.", code: "microsoft" }, 401);
+      const u = await admin.auth.getUser(jwt);
+      const usuario = u.data.user;
+      if (u.error || !usuario) return json({ error: "La confirmación de Microsoft venció. Vuelva a pulsar «Continuar con Microsoft».", code: "microsoft" }, 401);
+      const deAzure = usuario.app_metadata?.provider === "azure" || (usuario.identities ?? []).some((x) => x.provider === "azure");
+      if (!deAzure) return json({ error: "Esa sesión no es de una cuenta de Microsoft.", code: "microsoft" }, 401);
+      const meta = (usuario.user_metadata ?? {}) as Record<string, unknown>;
+      correo = limpiar(usuario.email ?? meta.email).toLowerCase();
+      nombre = limpiar(meta.full_name ?? meta.name);
+    } else {
+      // El envío llega minutos después, cuando la sesión de Microsoft ya se cerró: va con el pase que dio microsoft_datos.
+      const p = await abrirPase(limpiar(c.pase), serviceKey);
+      if (!p || p.slug !== slug) return json({ error: "La confirmación de Microsoft venció. Vuelva a pulsar «Continuar con Microsoft».", code: "microsoft" }, 401);
+      correo = p.correo;
+      nombre = p.nombre;
+    }
     if (!correoPermitido(correo)) {
       return json({ error: `El correo de su cuenta Microsoft (${correo || "sin correo"}) no es un correo institucional de la UDES. Ingrese con su cuenta @udes.edu.co.`, code: "dominio" }, 403);
     }
-    if (accion === "microsoft_datos") return json({ correo, nombre });
+    if (accion === "microsoft_datos") return json({ correo, nombre, pase: await firmarPase({ slug, correo, nombre, exp: Date.now() + PASE_MS }, serviceKey) });
 
     const dependencia = limpiar(c.dependencia);
     const aportes = c.aportes;

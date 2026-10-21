@@ -98,7 +98,7 @@ function Recorrido({ slug, info }: { slug: string; info: InfoEncuesta }) {
   const [paso, setPaso] = useState<Paso>("id");
   const [tipo, setTipo] = useState<TipoAporte>("logro");
   const [cuenta, setCuenta] = useState<CuentaMicrosoft | null>(null);
-  const [jwt, setJwt] = useState<string | null>(null);
+  const [pase, setPase] = useState<string | null>(null);
   const [ms, setMs] = useState<EstadoMicrosoft>({ fase: "inactivo" });
   const [enviando, setEnviando] = useState(false);
   const [errorEnvio, setErrorEnvio] = useState<string | null>(null);
@@ -140,7 +140,7 @@ function Recorrido({ slug, info }: { slug: string; info: InfoEncuesta }) {
         const token = await tokenDeMicrosoft();
         if (!token) throw new Error("No llegó la confirmación de Microsoft. Pruebe de nuevo.");
         const datos = await datosMicrosoft(slug, token);
-        setJwt(token);
+        setPase(datos.pase);
         setCuenta(datos);
         setMs({ fase: "inactivo" });
       } catch (e) {
@@ -182,12 +182,12 @@ function Recorrido({ slug, info }: { slug: string; info: InfoEncuesta }) {
   };
 
   const enviar = async () => {
-    if (!cuenta || !jwt) return;
+    if (!cuenta || !pase) return;
     setEnviando(true);
     setErrorEnvio(null);
     decir(GUIA.enviando, "pensar");
     try {
-      await enviarAportes(slug, jwt, dependencia, aportes);
+      await enviarAportes(slug, pase, dependencia, aportes);
       const resumen: ResumenEnvio = {
         dependencia: dependencia.trim().replace(/\s+/g, " "),
         aportes: aportes.length,
@@ -201,7 +201,7 @@ function Recorrido({ slug, info }: { slug: string; info: InfoEncuesta }) {
     } catch (e) {
       if (sesionVencida(e)) {
         setCuenta(null);
-        setJwt(null);
+        setPase(null);
         setPaso("id");
         setMs({ fase: "inactivo" });
         decir(GUIA.vencida, "neutral");

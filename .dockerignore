@@ -1,0 +1,71 @@
+# =============================================================================
+# Recorte del contexto de build para Coolify.
+#
+# El portal es un frontend Vite: para compilar (`tsc -b && vite build`) basta
+# con src/, public/, index.html, la configuración y lo que src importa de
+# supabase/functions, alexa, navegador y scripts. Sin este archivo Coolify
+# copia ~220 MB al builder en cada deploy (casi un minuto solo en
+# transferirlos): respaldos, informes y capturas de revisión no le sirven
+# de nada. Con él, el contexto queda en ~68 MB (la mayoría, activos que el
+# portal sí sirve: el video y el APK de public/).
+#
+# Si un día el build rompe porque algo de aquí hizo falta, quítelo de esta
+# lista; no afecta a la base ni a las funciones del servidor.
+# =============================================================================
+
+# El repositorio completo: objetos que el build jamás lee.
+.git
+
+# Salidas locales y dependencias (por si el checkout las trae)
+node_modules
+dist
+dist-android
+
+# Herramientas locales y de agentes
+.ccg
+.claude
+.harness
+.impeccable
+.tmp-funciones-servidor
+.vscode
+
+# Binarios de trabajo y respaldos (ninguno lo usa el build).
+# Ojo: las plantillas .xlsx que sirve el portal se re-incluyen abajo.
+*.zip
+*.har
+*.pdf
+*.xlsx
+*.docx
+*.pptx
+*.gz
+!public/plantillas/**/*.xlsx
+!public/plantillas-cna/**/*.xlsx
+
+# Migraciones y semillas de la base: el build del portal no las usa.
+# (supabase/functions SÍ se queda: src/ importa sus módulos compartidos.)
+supabase/migrations
+supabase/seed
+supabase/.temp
+
+# Carpetas de trabajo que no son parte del portal
+assets-source
+api
+bi
+docs
+Informes
+Informes Institucionales
+CNA - Cuadros Maestros
+Impacto
+joomla
+MapRutas
+Modelo
+Modelo Informe
+pilobot
+pilo-android
+pilo-escritorio
+tyt-preview
+Valoragregado
+har warehouse
+
+# Borradores sueltos de la raíz
+Mapa_Red_*.html

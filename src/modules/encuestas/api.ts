@@ -108,7 +108,7 @@ export type AjustesEncuesta = Partial<CambiosEncuesta> &
   Partial<Pick<Encuesta, "abierta" | "acceso" | "dominios_permitidos" | "una_por_persona" | "abre_el" | "limite_respuestas" | "mensaje_cierre" | "estado" | "modo_llenado" | "config_pilo">>;
 
 export async function guardarEncuesta(id: string, cambios: AjustesEncuesta): Promise<void> {
-  const r = await tabla("enc_encuestas").update({ ...cambios, updated_at: new Date().toISOString() }).eq("id", id);
+  const r = await tabla("enc_encuestas").update(cambios).eq("id", id);
   if (r.error) throw errorDe(r.error);
 }
 

@@ -66,6 +66,7 @@ export const SCREEN_PATHS: Record<AdminScreen, string> = {
   "programas-en-cifras": "/admin/programas-en-cifras",
   "datos-sostenibilidad": "/admin/datos-sostenibilidad",
   encuestas: "/admin/encuestas",
+  udrive: "/admin/udrive",
   cms: "/admin/cms",
 };
 

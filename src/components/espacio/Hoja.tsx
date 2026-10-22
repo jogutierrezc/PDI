@@ -50,6 +50,8 @@ export interface HojaProps {
   columnaEstado?: { etiqueta: string; celda: (f: FilaLocal) => ReactNode };
   /** Se pueden agregar filas (muestra el botón del estado vacío). */
   puedeAgregar?: boolean;
+  /** Color de fondo de una celda (mapa de calor); nulo si no lleva. Siempre un tono claro: el texto sigue oscuro. */
+  colorCelda?: (columna: EspColumna, valor: unknown) => string | undefined;
 }
 
 export interface HojaApi {
@@ -77,6 +79,7 @@ function Celda({
   valor,
   mensaje,
   deshabilitada,
+  fondo,
   onCommit,
   onTecla,
   onPegar,
@@ -86,6 +89,7 @@ function Celda({
   valor: unknown;
   mensaje: string;
   deshabilitada: boolean;
+  fondo?: string;
   onCommit: (texto: string) => void;
   onTecla: (e: KeyboardEvent<HTMLElement>, destino: "abajo" | "arriba" | null) => void;
   onPegar: (e: ClipboardEvent<HTMLElement>) => void;
@@ -103,6 +107,7 @@ function Celda({
     "aria-invalid": mensaje ? true : undefined,
     disabled: deshabilitada,
     onPaste: onPegar,
+    style: fondo ? { background: fondo } : undefined,
   };
   if (columna.tipo === "lista") {
     const opciones = columna.opciones.includes(texto) || !texto ? columna.opciones : [texto, ...columna.opciones];
@@ -244,6 +249,7 @@ export const Hoja = forwardRef<HojaApi, HojaProps>(function Hoja(p, ref) {
       valor={f.datos[c.clave]}
       mensaje={errores.get(llaveDeCelda(f.k, c.clave)) ?? ""}
       deshabilitada={!editable || Boolean(c.solo_lectura) || Boolean(bloqueo)}
+      fondo={p.colorCelda?.(c, f.datos[c.clave])}
       onCommit={(t) => p.onCambiar(f.k, c, t)}
       onTecla={(e, d) => d && moverVertical(f.k, c.clave, d, e)}
       onPegar={(e) => pegar(e, f.k, c.clave)}

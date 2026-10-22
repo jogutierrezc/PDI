@@ -211,6 +211,7 @@ const PaginaPublica = lazy(() =>
 );
 const Rutas = lazy(() => import("./modules/rutas/Rutas").then((m) => ({ default: m.Rutas })));
 const RutasPublico = lazy(() => import("./modules/rutas/RutasPublico").then((m) => ({ default: m.RutasPublico })));
+const UDrive = lazy(() => import("./modules/udrive/ui/UDrive").then((m) => ({ default: m.UDrive })));
 const ProgramasEnCifras = lazy(() => import("./modules/programas-en-cifras/ui/ProgramasEnCifras").then((m) => ({ default: m.ProgramasEnCifras })));
 const Encuestas = lazy(() => import("./modules/encuestas/ui/Encuestas").then((m) => ({ default: m.Encuestas })));
 const EncuestaPublica = lazy(() => import("./modules/encuestas/publico/EncuestaPublica").then((m) => ({ default: m.EncuestaPublica })));
@@ -480,6 +481,15 @@ export default function App() {
             element={
               <RequireRole minimum="consulta" screen="programas-en-cifras">
                 <ProgramasEnCifras />
+              </RequireRole>
+            }
+          />
+          {/* UDrive: archivos, tablas y gráficas para informes (0187); las subrutas abren el editor del archivo. */}
+          <Route
+            path="/admin/udrive/:vista?/:id?"
+            element={
+              <RequireRole minimum="consulta" screen="udrive">
+                <UDrive />
               </RequireRole>
             }
           />

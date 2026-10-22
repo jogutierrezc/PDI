@@ -60,6 +60,7 @@ export type AdminSection =
   | "programas-en-cifras"
   | "datos-sostenibilidad"
   | "encuestas"
+  | "udrive"
   | "cms";
 
 export interface NavItem {
@@ -72,7 +73,7 @@ export interface NavItem {
 }
 
 export interface NavGroup {
-  id: "planeacion" | "pdi" | "cifras" | "observatorio" | "impacto" | "tableros" | "reportes" | "informes" | "internacionalizacion" | "rankings" | "warehouse" | "monitor" | "programas-en-cifras" | "datos-sostenibilidad" | "encuestas" | "sistema";
+  id: "planeacion" | "pdi" | "cifras" | "observatorio" | "impacto" | "tableros" | "reportes" | "informes" | "internacionalizacion" | "rankings" | "warehouse" | "monitor" | "programas-en-cifras" | "datos-sostenibilidad" | "encuestas" | "udrive" | "sistema";
   label: string;
   /** Ícono y nombre corto: el riel solo tiene 78 px, ahí no cabe el rótulo largo. */
   icon: IconName;
@@ -200,6 +201,17 @@ export const navigation: NavGroup[] = [
     label: "Datos de Sostenibilidad",
     items: [
       { id: "datos-sostenibilidad", label: "Datos de Sostenibilidad", icon: "leaf", to: "/admin/datos-sostenibilidad", minimum: "consulta" },
+    ],
+  },
+  {
+    // Gestor de archivos, tablas y gráficas para armar informes complejos (0187).
+    // Lo ve cualquier persona activa cuyo rol de acceso marque la pantalla.
+    id: "udrive",
+    icon: "folder",
+    short: "UDrive",
+    label: "UDrive",
+    items: [
+      { id: "udrive", label: "UDrive", icon: "folder", to: "/admin/udrive", minimum: "consulta" },
     ],
   },
   {

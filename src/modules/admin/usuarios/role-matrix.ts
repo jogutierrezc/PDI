@@ -47,7 +47,7 @@ import { UNIT_ROLE } from "../../tableros/model";
 export type Level = "none" | "ver" | "editar" | "administrar";
 export type ModuleId =
   | "portal" | "plan" | "cifras" | "observatorio" | "impacto" | "tableros" | "reportes" | "informes"
-  | "monitor" | "programas-en-cifras" | "warehouse" | "rankings" | "rutas" | "cms" | "internacionalizacion" | "correos" | "encuestas" | "pilo" | "sistema";
+  | "monitor" | "programas-en-cifras" | "warehouse" | "rankings" | "rutas" | "cms" | "internacionalizacion" | "correos" | "encuestas" | "udrive" | "pilo" | "sistema";
 export type TemplateId = "consulta" | "editor" | "administrador" | "personalizada";
 export type BoardRole = "visor" | "editor" | "jefe";
 
@@ -230,6 +230,14 @@ export const MODULES: ModuleDef[] = [
     levels: {
       ver: { hint: "Aparece en el menú de quien sea administrador.", needs: "consulta" },
       administrar: { hint: "Administra el módulo y sus miembros.", needs: "admin" },
+    },
+  },
+  {
+    id: "udrive",
+    label: "UDrive",
+    screens: [{ id: "udrive", label: "UDrive", note: "cada persona ve lo suyo y lo que le comparten; la base (0187) lo hace cumplir" }],
+    levels: {
+      ver: { hint: "Abre UDrive: archivos, tablas y gráficas propias y compartidas.", needs: "consulta" },
     },
   },
   {
@@ -513,6 +521,7 @@ export function templateMatrix(template: Exclude<TemplateId, "personalizada">): 
     modules.internacionalizacion = full("internacionalizacion", "ver");
     modules.correos = full("correos", "ver");
     modules.encuestas = full("encuestas", "editar");
+    modules.udrive = full("udrive", "ver");
     modules.pilo = full("pilo", "ver");
     modules.sistema = full("sistema", "ver");
     return base;

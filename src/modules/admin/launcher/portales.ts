@@ -219,6 +219,17 @@ export const MODULES: Record<ModuleId, ModuleMeta> = {
       },
     ],
   },
+  udrive: {
+    text: "Archivos, tablas editables y gráficas para armar informes complejos",
+    color: "var(--wall-udrive)",
+    rank: 5.75,
+    sections: () => [
+      {
+        title: "Mis archivos",
+        cards: [{ key: "udrive", title: "UDrive", text: "Carpetas, tablas con validación, gráficas y cruce de tablas", to: "/admin/udrive" }],
+      },
+    ],
+  },
   encuestas: {
     text: "Encuestas públicas con Mr. Pilo y la tabla de lo que responden las dependencias",
     color: "var(--wall-programas-en-cifras)",

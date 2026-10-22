@@ -119,6 +119,8 @@ export interface PropsEditor {
   animar?: boolean;
   /** Foco en la primera celda al abrir. */
   enfocarAlAbrir?: boolean;
+  /** Mapa de calor: color de fondo de una celda (lo pone el módulo; ver Hoja). */
+  colorCelda?: (columna: EspColumna, valor: unknown) => string | undefined;
 }
 
 type Guardando = "guardado" | "guardando" | "error";
@@ -578,6 +580,7 @@ function Motor(p: PropsEditor) {
           columnaGrupo={p.columnaGrupo}
           columnasInfo={p.columnasInfo}
           puedeAgregar={puedeAgregar}
+          colorCelda={p.colorCelda}
           columnaEstado={
             manual
               ? {

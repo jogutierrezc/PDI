@@ -343,6 +343,7 @@
   --wall-warehouse: var(--od-line-11);
   --wall-monitor: var(--od-line-8);
   --wall-programas-en-cifras: var(--od-line-4);
+  --wall-udrive: var(--od-line-2);
   --wall-ink: #ffffff;
   --wall-numeral: rgba(255, 255, 255, 0.16);
   --wall-veil: rgba(255, 255, 255, 0.14);

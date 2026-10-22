@@ -343,7 +343,7 @@ export const MODULES: Record<ModuleId, ModuleMeta> = {
           nav("development", "Los proyectos web de la oficina"),
         ],
       },
-      { title: "Mr. Pilo", cards: [nav("pilo", "La conexión, las funciones y a quién se abre"), nav("pilo_ensenanza", "Su página, su memoria, su catálogo y su bitácora")] },
+      { title: "Mr. Pilo", cards: [nav("pilo", "La conexión, las funciones y a quién se abre"), nav("pilo_ensenanza", "Su página, su memoria, su catálogo y su bitácora"), nav("pilo_capacitacion", "Lo que Pilo no supo, sus capas y los permisos por oficina")] },
       { title: "Datos", cards: [nav("transfer", "Copia otro servidor de Supabase en este")] },
     ],
   },

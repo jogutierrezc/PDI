@@ -26,6 +26,8 @@ export interface InboxItem {
   last_at: string;
   /** Para quién era (0113): «estudiante», «profesor» o vacío. Solo en espacios con rol. */
   rol?: string;
+  /** De qué Pilo es (0113): «planeacion» o «ensenanza». Solo lo pide la bandeja paginada. */
+  space?: PiloSpace;
 }
 
 export const REASON_LABEL: Record<InboxReason, string> = {
@@ -59,6 +61,32 @@ export async function fetchInbox(limit = 12, space: PiloSpace = DEFAULT_SPACE): 
     return (scoped ? query.eq("space", space) : query).order("times", { ascending: false }).order("last_at", { ascending: false }).limit(limit);
   });
   if (error) return null;
+  return { rows: (data ?? []) as unknown as InboxItem[], total: count ?? 0 };
+}
+
+/**
+ * Una página de la bandeja, con el total exacto (count) para paginar. `capa`
+ * es el espacio de cada Pilo («todas» no filtra). El orden termina en `id`
+ * para que dos filas empatadas no aparezcan en dos páginas.
+ */
+export async function fetchInboxPage(page: number, size: number, capa: PiloSpace | "todas"): Promise<{ rows: InboxItem[]; total: number }> {
+  const from = (page - 1) * size;
+  let query = supabase.from("pilo_inbox").select(`${INBOX_COLUMNS}, rol, space`, { count: "exact" }).eq("status", "pendiente");
+  if (capa !== "todas") query = query.eq("space", capa);
+  const { data, error, count } = await query
+    .order("times", { ascending: false })
+    .order("last_at", { ascending: false })
+    .order("id", { ascending: false })
+    .range(from, from + size - 1);
+  // PostgREST responde 416 (PGRST103) si la página pedida ya no existe: se devuelve vacía con el total, para que la pantalla vaya a la última.
+  if (error?.code === "PGRST103") {
+    let head = supabase.from("pilo_inbox").select("id", { count: "exact", head: true }).eq("status", "pendiente");
+    if (capa !== "todas") head = head.eq("space", capa);
+    const { count: total, error: headError } = await head;
+    if (headError) throw headError;
+    return { rows: [], total: total ?? 0 };
+  }
+  if (error) throw error;
   return { rows: (data ?? []) as unknown as InboxItem[], total: count ?? 0 };
 }
 

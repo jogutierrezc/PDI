@@ -56,6 +56,7 @@ export type AdminScreen =
   | "institution"
   | "pilo"
   | "pilo_ensenanza"
+  | "pilo_capacitacion"
   | "reportes"
   | "correos"
   | "rutas"

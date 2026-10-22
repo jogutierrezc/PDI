@@ -54,6 +54,7 @@ export const SCREEN_PATHS: Record<AdminScreen, string> = {
   institution: "/admin/estructura-institucional",
   pilo: "/admin/mr-pilo",
   pilo_ensenanza: "/admin/mr-pilo-ensenanza",
+  pilo_capacitacion: "/admin/mr-pilo-capacitacion",
   reportes: "/admin/reportes-institucionales",
   correos: "/admin/correos",
   rutas: "/admin/rutas",
@@ -123,7 +124,7 @@ export function screenVisible(
   // ¿Está marcada en su rol de acceso? Sin rol, todas lo están.
   const listed = !access || access.role.all_screens || access.role.screens.includes(screen);
   // Usuarios, traslado de datos y estructura institucional piden administración siempre.
-  if ((screen === "users" || screen === "transfer" || screen === "institution" || screen === "pilo" || screen === "pilo_ensenanza") && RANK[profile.role] < RANK.admin) {
+  if ((screen === "users" || screen === "transfer" || screen === "institution" || screen === "pilo" || screen === "pilo_ensenanza" || screen === "pilo_capacitacion") && RANK[profile.role] < RANK.admin) {
     return false;
   }
   // Correos: la capacidad decide qué puede hacer (0137: Planeación lee la

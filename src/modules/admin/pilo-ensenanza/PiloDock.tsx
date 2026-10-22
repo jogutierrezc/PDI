@@ -43,17 +43,18 @@ export interface DockFact {
 
 export function PiloDock({
   status,
-  on,
-  disabled,
+  on = false,
+  disabled = false,
   onToggle,
   facts,
   nod,
 }: {
   /** El estado en palabras: «Abierto para quien tiene sesión». */
   status: string;
-  on: boolean;
-  disabled: boolean;
-  onToggle: (on: boolean) => void;
+  /** Sin `onToggle` no hay interruptor (la capacitación no abre ni cierra a Pilo). */
+  on?: boolean;
+  disabled?: boolean;
+  onToggle?: (on: boolean) => void;
   facts: DockFact[];
   /** Cambia cada vez que se guarda: Pilo asiente una vez. */
   nod: number;
@@ -105,10 +106,12 @@ export function PiloDock({
         {view.preview && <em>{view.preview}</em>}
       </p>
 
-      <label className="pen-dock__open">
-        <span>{on ? "Abierto" : "Cerrado"}</span>
-        <Switch big on={on} disabled={disabled} onChange={onToggle} label="Mr. Pilo en Enseñanza abierto" />
-      </label>
+      {onToggle && (
+        <label className="pen-dock__open">
+          <span>{on ? "Abierto" : "Cerrado"}</span>
+          <Switch big on={on} disabled={disabled} onChange={onToggle} label="Mr. Pilo en Enseñanza abierto" />
+        </label>
+      )}
 
       <ul className="pen-dock__facts">
         {facts.map((f) => (

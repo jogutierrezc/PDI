@@ -48,6 +48,7 @@ export type AdminSection =
   | "institution"
   | "pilo"
   | "pilo_ensenanza"
+  | "pilo_capacitacion"
   | "reportes"
   | "correos"
   | "rutas"
@@ -277,6 +278,8 @@ export const navigation: NavGroup[] = [
       { id: "pilo", label: "Mr. Pilo con IA", icon: "spark", to: "/admin/mr-pilo", minimum: "admin" },
       // El segundo Pilo: su página, su memoria, su catálogo y su bitácora. Comparte la conexión y la voz con el de arriba.
       { id: "pilo_ensenanza", label: "Mr. Pilo en Enseñanza", icon: "compass", to: "/admin/mr-pilo-ensenanza", minimum: "admin" },
+      // La capacitación de los dos Pilos: la bandeja de lo que no supo, las capas y los permisos por oficina.
+      { id: "pilo_capacitacion", label: "Capacitación de Pilo", icon: "spark", to: "/admin/mr-pilo-capacitacion", minimum: "admin" },
       // Los correos de cuenta de Planeación y de Pilo: plantillas, conexión y bitácora.
       // Planeación entra a leer la bitácora; lo demás es de la administración.
       { id: "correos", label: "Correos", icon: "mail", to: "/admin/correos", minimum: "planeacion" },

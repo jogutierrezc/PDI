@@ -258,6 +258,7 @@ export const MODULES: ModuleDef[] = [
     screens: [
       { id: "pilo", label: "Mr. Pilo" },
       { id: "pilo_ensenanza", label: "Mr. Pilo Enseñanza" },
+      { id: "pilo_capacitacion", label: "Capacitación de Pilo" },
     ],
     levels: {
       ver: { hint: "Aparece en el menú de quien sea administrador.", needs: "consulta" },

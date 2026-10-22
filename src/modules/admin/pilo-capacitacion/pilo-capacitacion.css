@@ -1,0 +1,297 @@
+/* =============================================================================
+   Capacitación de Pilo · lo que la pantalla añade a los estilos de Mr. Pilo en
+   Enseñanza (pilo-ensenanza.css) y de pilo-settings.css. Solo tokens; ningún
+   color ni duración a mano salvo los del ritmo de «press».
+   ========================================================================== */
+
+/* La cuenta de la bandeja en el riel. */
+.pcap-count {
+  display: inline-grid;
+  place-items: center;
+  min-width: 1.5rem;
+  height: 1.25rem;
+  margin-left: var(--space-2);
+  padding: 0 var(--space-2);
+  border-radius: var(--radius-pill);
+  background: var(--brand-blue-soft);
+  color: var(--brand-blue-strong);
+  font-size: var(--text-xs);
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Las etiquetas de capa: la palabra y el punto, nunca solo el color. */
+.pcap-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  width: fit-content;
+  padding: 2px var(--space-3);
+  border-radius: var(--radius-pill);
+  font-size: var(--text-xs);
+  font-weight: 700;
+  white-space: nowrap;
+}
+.pcap-tag i {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: currentColor;
+}
+.pcap-tag[data-capa="institucional"] { background: var(--brand-blue-soft); color: var(--brand-blue-strong); }
+.pcap-tag[data-capa="academica"] { background: color-mix(in srgb, var(--brand-teal) 16%, transparent); color: color-mix(in srgb, var(--brand-teal) 55%, var(--ink)); }
+.pcap-tag[data-capa="compartida"] { background: var(--status-done-soft); color: var(--status-done); }
+.pcap-tag[data-capa="ninguna"] { background: var(--surface-3); color: var(--ink-secondary); }
+
+.pcap-hint { color: var(--ink-muted); font-size: var(--text-xs); line-height: var(--leading-normal); }
+.pcap-texto { max-width: 70ch; margin: 0; color: var(--ink-secondary); font-size: var(--text-base); line-height: var(--leading-normal); }
+.pcap-chips { display: flex; flex-wrap: wrap; gap: var(--space-2); }
+
+/* Respuesta al toque: la pulsación se nota en 140 ms, sin rebotar. */
+.pcap-q,
+.pcap-pager__num,
+.pcap-of__btn,
+.press {
+  transition: transform var(--dur-press) var(--ease-out), background-color 180ms ease, border-color 180ms ease, color 180ms ease, box-shadow 180ms ease;
+}
+.pcap-q:active,
+.pcap-pager button:not(:disabled):active,
+.pcap-of__btn:active,
+.press:not(:disabled):active {
+  transform: scale(0.97);
+}
+
+/* --- La bandeja ----------------------------------------------------------------------- */
+
+.pcap-range {
+  margin: 0;
+  color: var(--ink-secondary);
+  font-size: var(--text-sm);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Reserva el alto de una página entera: al cambiar de página no se mueve lo de debajo. */
+.pcap-list {
+  display: grid;
+  gap: var(--space-2);
+  min-height: calc(10 * 4.25rem + 9 * var(--space-2));
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  align-content: start;
+}
+.pcap-list:focus { outline: none; }
+
+.pcap-q {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1) var(--space-4);
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  min-height: 44px;
+  box-sizing: border-box;
+  padding: var(--space-3) var(--space-4);
+  background: var(--surface-2);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  color: var(--ink);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.pcap-q[aria-pressed="true"] {
+  background: var(--brand-blue-soft);
+  border-color: var(--brand-blue);
+  box-shadow: inset 0 0 0 1px var(--brand-blue);
+}
+.pcap-q:focus-visible,
+.pcap-pager button:focus-visible,
+.pcap-of__btn:focus-visible,
+.pcap-capas button:focus-visible {
+  outline: 2px solid var(--brand-blue);
+  outline-offset: 2px;
+}
+.pcap-q__text { display: grid; flex: 1 1 320px; gap: 2px; min-width: 0; }
+.pcap-q__text strong { font-size: var(--text-base); font-weight: 700; line-height: 1.4; }
+.pcap-q__text small { color: var(--ink-muted); font-size: var(--text-xs); }
+@media (hover: hover) and (pointer: fine) {
+  .pcap-q:hover { border-color: var(--line-strong); }
+}
+
+.pcap-pager {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+  align-items: center;
+  justify-content: space-between;
+}
+.pcap-pager__pages { display: flex; align-items: center; gap: 4px; margin: 0; padding: 0; list-style: none; }
+.pcap-pager__num {
+  min-width: 44px;
+  min-height: 44px;
+  padding: 0 var(--space-2);
+  background: transparent;
+  border: 0;
+  border-radius: var(--radius-pill);
+  color: var(--ink-secondary);
+  font: inherit;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  cursor: pointer;
+}
+.pcap-pager__num[aria-current="page"] {
+  background: var(--brand-blue-soft);
+  color: var(--brand-blue-strong);
+  box-shadow: inset 0 0 0 1px var(--brand-blue);
+}
+.pcap-pager__gap { padding: 0 var(--space-1); color: var(--ink-muted); }
+.pcap-pager button:disabled { opacity: 0.45; cursor: default; }
+@media (hover: hover) and (pointer: fine) {
+  .pcap-pager__num:not([aria-current="page"]):hover { background: var(--surface-3); color: var(--ink); }
+}
+
+/* --- El formulario para enseñar -------------------------------------------------------- */
+
+.pcap-form { display: grid; gap: var(--space-5); min-width: 0; }
+.pcap-field { display: grid; gap: var(--space-2); min-width: 0; }
+.pcap-prev {
+  display: grid;
+  gap: var(--space-2);
+  padding: var(--space-4);
+  background: var(--surface-3);
+  border-radius: var(--radius-md);
+}
+.pcap-prev p { margin: 0; color: var(--ink); font-size: var(--text-base); line-height: var(--leading-normal); white-space: pre-line; }
+.pcap-actions { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-3); }
+.pcap-hecha { display: grid; gap: var(--space-2); margin: 0; }
+.pcap-hecha .pis-error { font-weight: 600; }
+
+/* --- Capas y memoria -------------------------------------------------------------------- */
+
+.pcap-capa-rows { gap: 0; }
+.pcap-capas { margin-bottom: var(--space-4); }
+.pcap-fuentes { margin: 0; padding: 0; list-style: none; }
+.pcap-fuente {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2) var(--space-4);
+  align-items: center;
+  padding: var(--space-3) 0;
+  border-top: 1px solid var(--line);
+}
+.pcap-fuente:first-child { border-top: 0; }
+.pcap-fuente__name { display: grid; flex: 1 1 14rem; gap: 2px; min-width: 0; }
+.pcap-fuente__name strong { font-size: var(--text-base); }
+.pcap-fuente__name small { color: var(--ink-muted); font-size: var(--text-xs); }
+.pcap-fuente__count { flex: 0 0 9rem; color: var(--ink-secondary); font-size: var(--text-sm); font-weight: 700; font-variant-numeric: tabular-nums; }
+.pcap-fuente__capa { flex: 0 0 9.5rem; }
+.pcap-notas { display: grid; gap: var(--space-4); margin: 0; padding: 0 0 0 var(--space-5); border-left: 2px solid var(--line-strong); list-style: none; }
+.pcap-notas li { display: grid; gap: 2px; }
+.pcap-notas span { color: var(--ink-muted); font-size: var(--text-xs); font-weight: 700; }
+.pcap-notas strong { font-size: var(--text-base); }
+.pcap-notas small { max-width: 68ch; color: var(--ink-secondary); font-size: var(--text-sm); line-height: var(--leading-normal); }
+
+/* --- Oficinas y permisos ---------------------------------------------------------------- */
+
+.pcap-flujo {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.pcap-flujo li {
+  display: grid;
+  flex: 1 1 12rem;
+  align-content: start;
+  gap: var(--space-1);
+  min-width: 0;
+  padding: var(--space-4);
+  background: var(--surface-2);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+}
+.pcap-flujo strong { font-size: var(--text-base); }
+.pcap-flujo span { color: var(--ink-secondary); font-size: var(--text-sm); line-height: var(--leading-normal); }
+
+.pcap-of {
+  display: grid;
+  grid-template-columns: minmax(0, 17rem) minmax(0, 1fr);
+  gap: var(--space-6);
+  align-items: start;
+  min-width: 0;
+}
+.pcap-of__list { display: grid; gap: var(--space-2); margin: 0; padding: 0; list-style: none; }
+.pcap-of__btn {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2) var(--space-3);
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  min-height: 44px;
+  box-sizing: border-box;
+  padding: var(--space-3) var(--space-4);
+  background: var(--surface-2);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  color: var(--ink);
+  font: inherit;
+  font-weight: 700;
+  text-align: left;
+  cursor: pointer;
+}
+.pcap-of__btn[aria-pressed="true"] {
+  background: var(--brand-blue-soft);
+  border-color: var(--brand-blue);
+  box-shadow: inset 0 0 0 1px var(--brand-blue);
+}
+.pcap-of__capas { display: flex; flex-wrap: wrap; gap: var(--space-1); }
+.pcap-of__detail { display: grid; gap: var(--space-5); min-width: 0; }
+.pcap-of__head { display: grid; gap: var(--space-1); }
+.pcap-of__head h4 { margin: 0; color: var(--brand-navy); font-size: var(--text-lg); letter-spacing: var(--tracking-tight); }
+.pcap-of__head p { margin: 0; color: var(--ink-secondary); font-size: var(--text-sm); line-height: var(--leading-normal); }
+.pcap-permisos,
+.pcap-roles { display: grid; gap: var(--space-2); min-width: 0; }
+.pcap-srow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-4);
+  min-height: 44px;
+  padding: var(--space-3) 0;
+  border-top: 1px solid var(--line);
+}
+.pcap-srow:first-of-type { border-top: 0; }
+.pcap-srow span { display: grid; gap: 2px; min-width: 0; }
+.pcap-srow strong { font-size: var(--text-base); }
+.pcap-srow small { color: var(--ink-muted); font-size: var(--text-xs); line-height: var(--leading-normal); }
+.pcap-rol { display: flex; flex-wrap: wrap; gap: var(--space-1) var(--space-4); padding: var(--space-3) 0; border-top: 1px solid var(--line); }
+.pcap-rol:first-of-type { border-top: 0; }
+.pcap-rol strong { flex: 0 0 8rem; font-size: var(--text-base); }
+.pcap-rol span { flex: 1 1 14rem; color: var(--ink-secondary); font-size: var(--text-sm); line-height: var(--leading-normal); }
+
+@media (max-width: 760px) {
+  .pcap-of { grid-template-columns: minmax(0, 1fr); }
+  .pcap-fuente__count, .pcap-fuente__capa { flex: 1 1 8rem; }
+  .pcap-list { min-height: 0; }
+}
+
+/* Con movimiento reducido, sin escala: solo fundidos y colores. */
+@media (prefers-reduced-motion: reduce) {
+  .pcap-q,
+  .pcap-pager__num,
+  .pcap-of__btn,
+  .press {
+    transition: none;
+  }
+  .pcap-q:active,
+  .pcap-pager button:not(:disabled):active,
+  .pcap-of__btn:active,
+  .press:not(:disabled):active {
+    transform: none;
+  }
+}

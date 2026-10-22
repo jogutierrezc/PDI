@@ -162,6 +162,9 @@ const PiloAiSettings = lazy(() =>
 const PiloEnsenanzaSettings = lazy(() =>
   import("./modules/admin/pilo-ensenanza/PiloEnsenanza").then((m) => ({ default: m.PiloEnsenanzaSettings })),
 );
+const PiloCapacitacionPage = lazy(() =>
+  import("./modules/admin/pilo-capacitacion/PiloCapacitacion").then((m) => ({ default: m.PiloCapacitacionPage })),
+);
 const PiloPresentation = lazy(() =>
   import("./modules/admin/pilo/presentacion/Presentation").then((m) => ({ default: m.Presentation })),
 );
@@ -655,6 +658,15 @@ export default function App() {
             element={
               <RequireRole minimum="admin" screen="pilo_ensenanza">
                 <PiloEnsenanzaSettings />
+              </RequireRole>
+            }
+          />
+          {/* Capacitación de Pilo: la bandeja de lo que no supo, las capas y los permisos por oficina. */}
+          <Route
+            path="/admin/mr-pilo-capacitacion"
+            element={
+              <RequireRole minimum="admin" screen="pilo_capacitacion">
+                <PiloCapacitacionPage />
               </RequireRole>
             }
           />

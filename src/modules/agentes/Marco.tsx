@@ -6,11 +6,12 @@
    las respuestas rápidas y etiquetas y los informes.
    ========================================================================== */
 
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { NavLink, Outlet, useLocation, useSearchParams } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
-import { actions, errorText, keys, useConversations, useRealtimeSync } from "./datos";
+import { actions, errorText, keys, useConversations, usePolicy, useRealtimeSync, useUnread } from "./datos";
 import type { Availability } from "./datos";
+import { pedirAvisos, permisoAvisos, useAvisos, useInstalacion, activarPush, apagarPush, type Permiso } from "./avisos";
 import { AVAILABILITY, Avatar, Notice, Seg } from "./ui";
 import { useAgentSession, useMe } from "./sesion";
 import { enVista, isVista, VISTAS } from "./vistas";
@@ -33,8 +34,39 @@ export function Marco() {
   const [params] = useSearchParams();
   const onBandeja = useLocation().pathname.replace(/\/+$/, "") === "/agentes";
   const convs = useConversations();
+  const unread = useUnread();
+  const policy = usePolicy();
   const onStatus = useCallback((ok: boolean) => setConnected(ok), []);
   useRealtimeSync(me.id, onStatus);
+  const tituloBase = useRef(document.title);
+  useEffect(() => {
+    document.title = "Portal de agentes · UDES";
+    tituloBase.current = "Portal de agentes · UDES";
+    return () => {
+      document.title = tituloBase.current === "Portal de agentes · UDES" ? "UDES · Planeación" : tituloBase.current;
+    };
+  }, []);
+  useAvisos(me.id, convs.data, unread.data, policy.data?.accept_seconds ?? 45, "Portal de agentes · UDES");
+
+  /* Los avisos del navegador: permiso y, con él, la suscripción de push. */
+  const [permiso, setPermiso] = useState<Permiso>("sin-api");
+  const [problemaAviso, setProblemaAviso] = useState("");
+  const [pushListo, setPushListo] = useState<boolean | null>(null);
+  const instalacion = useInstalacion();
+  useEffect(() => {
+    setPermiso(permisoAvisos());
+  }, []);
+  const encenderAvisos = async () => {
+    setProblemaAviso("");
+    const dado = await pedirAvisos();
+    setPermiso(dado);
+    if (dado !== "granted") return;
+    setPushListo(await activarPush());
+  };
+  const apagarAvisos = async () => {
+    await apagarPush();
+    setPushListo(false);
+  };
 
   const current = isVista(params.get("v")) ? (params.get("v") as Vista) : "mias";
   const count = (v: Vista) => (convs.data ?? []).filter((c) => enVista(c, v, me.id)).length;
@@ -80,6 +112,34 @@ export function Marco() {
           <span className="ag-lab">Mi disponibilidad</span>
           <Seg value={me.availability} options={SEG} label="Disponibilidad" onChange={(v) => void setAvailability(v)} />
           {problem ? <Notice>{problem}</Notice> : null}
+        </div>
+
+        <div className="ag-field">
+          <span className="ag-lab">Avisos</span>
+          {permiso === "granted" ? (
+            <>
+              <span className="ag-me-sub">
+                {pushListo === false ? "Encendidos en esta pestaña. El push del portal instalado no quedó." : pushListo ? "Encendidos: suenan, avisan y llegan aunque cierres el portal." : "Encendidos: suenan y avisan en el navegador."}
+              </span>
+              <button type="button" className="ag-btn ag-sm ag-press" onClick={() => void apagarAvisos()}>
+                Apagar el push del portal instalado
+              </button>
+            </>
+          ) : permiso === "denied" ? (
+            <span className="ag-me-sub">El navegador tiene los avisos bloqueados. Actívalos en el candado de la barra de direcciones.</span>
+          ) : permiso === "sin-api" ? (
+            <span className="ag-me-sub">Este navegador no trae avisos.</span>
+          ) : (
+            <button type="button" className="ag-btn ag-press" onClick={() => void encenderAvisos()}>
+              Encender avisos
+            </button>
+          )}
+          {problemaAviso ? <Notice>{problemaAviso}</Notice> : null}
+          {instalacion.hay ? (
+            <button type="button" className="ag-btn ag-press" onClick={() => void instalacion.instalar()}>
+              Instalar la app en este equipo
+            </button>
+          ) : null}
         </div>
 
         <nav className="ag-nav" aria-label="Bandeja">

@@ -75,6 +75,38 @@
       })();
     </script>
 
+    <!-- El Portal de agentes (/agentes) es instalable como app: recibe avisos
+         con el navegador cerrado (Web Push). Su manifiesto y su service worker
+         se ponen solo bajo /agentes, igual que la app de Mr. Pilo bajo /app. -->
+    <script>
+      (function () {
+        var path = location.pathname;
+        if (path !== "/agentes" && path.indexOf("/agentes/") !== 0) return;
+        var head = document.head;
+        var add = function (tag, attrs) {
+          var el = document.createElement(tag);
+          for (var key in attrs) el.setAttribute(key, attrs[key]);
+          head.appendChild(el);
+        };
+        add("link", { rel: "manifest", href: "/agentes-manifest.webmanifest" });
+        add("link", { rel: "apple-touch-icon", href: "/pilo-app/apple-touch-icon.png" });
+        add("meta", { name: "mobile-web-app-capable", content: "yes" });
+        add("meta", { name: "apple-mobile-web-app-capable", content: "yes" });
+        add("meta", { name: "apple-mobile-web-app-title", content: "Agentes UDES" });
+        add("meta", { name: "application-name", content: "Agentes UDES" });
+        window.addEventListener("beforeinstallprompt", function (event) {
+          event.preventDefault();
+          window.__agentesInstall = event;
+          window.dispatchEvent(new Event("agentes-install"));
+        });
+        if ("serviceWorker" in navigator) {
+          window.addEventListener("load", function () {
+            navigator.serviceWorker.register("/agentes-sw.js", { scope: "/" }).catch(function () {});
+          });
+        }
+      })();
+    </script>
+
     <!-- El tema se aplica antes del primer pintado. Sin esto, quien tiene el
          tema oscuro guardado ve un destello blanco en cada carga. -->
     <script>

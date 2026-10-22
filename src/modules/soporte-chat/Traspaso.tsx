@@ -319,7 +319,7 @@ export function TraspasoBody({ t, label = "Pilo" }: { t: Traspaso; label?: strin
 /** El formulario: nombre, correo, teléfono, ciudad y la autorización de datos (obligatoria). */
 function HandoffForm({ t }: { t: Traspaso }) {
   const ref = useRef<HTMLFormElement>(null);
-  const [f, setF] = useState({ name: "", email: "", phone: "", city: "", authorized: false });
+  const [f, setF] = useState({ name: "", email: "", phone: "", city: "", authorized: false, web: "" });
   const [touched, setTouched] = useState(false);
   useMotion(ref, () => enterBlock(ref.current), []);
   const problem = formProblem(f);
@@ -330,6 +330,8 @@ function HandoffForm({ t }: { t: Traspaso }) {
   };
   return (
     <form className="ho-form-card" ref={ref} onSubmit={submit} noValidate aria-label="Tus datos para pasar con un agente">
+      {/* El campo escondido: una persona no lo ve, un robot lo llena (0184). */}
+      <input className="ho-honey" type="text" value={f.web} onChange={(e) => setF({ ...f, web: e.target.value })} tabIndex={-1} autoComplete="off" aria-hidden="true" />
       <label className="ho-f">
         Nombre completo
         <input type="text" autoComplete="name" value={f.name} onChange={(e) => setF({ ...f, name: e.target.value })} maxLength={120} required />

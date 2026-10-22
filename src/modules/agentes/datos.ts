@@ -201,8 +201,14 @@ export const useAgents = () =>
   useQuery({
     queryKey: keys.agents,
     staleTime: 20_000,
-    queryFn: async () =>
-      (await must(supabase.from("support_agents").select("id, user_id, name, email, role, photo_url, availability, capacity, active, last_seen_at, invited_at").order("name"))) as Agent[],
+    queryFn: async () => {
+      const filas = (await must(supabase.from("support_agents").select("id, user_id, name, email, role, photo_url, availability, capacity, active, last_seen_at, invited_at").order("name"))) as Agent[];
+      // El agente colgado: quien no late en stale_minutes se muestra «Fuera», aunque su fila diga «En línea».
+      // La base no se toca: si vuelve, el latido lo devuelve solo (0184).
+      const pol = (await supabase.from("support_assignment_policy").select("stale_minutes").eq("id", 1).maybeSingle()).data as { stale_minutes?: number } | null;
+      const vence = Date.now() - Math.max(1, Number(pol?.stale_minutes) || 3) * 60_000;
+      return filas.map((a) => (a.availability === "en_linea" && a.last_seen_at && Date.parse(a.last_seen_at) < vence ? { ...a, availability: "fuera" as Availability } : a));
+    },
   });
 
 export const useTeams = () => useQuery({ queryKey: keys.teams, queryFn: async () => (await must(supabase.from("support_teams").select("id, name").order("name"))) as Team[] });
@@ -223,6 +229,21 @@ export const useLabels = () => useQuery({ queryKey: keys.labels, queryFn: async 
 
 export const useQuickReplies = () =>
   useQuery({ queryKey: keys.quick, queryFn: async () => (await must(supabase.from("support_quick_replies").select("id, shortcut, title, body").order("shortcut"))) as QuickReply[] });
+
+/** Los festivos cierran la atención de todos los portales (0184). */
+export interface Holiday {
+  dia: string;
+  name: string;
+}
+
+export const useHolidays = (year: number) =>
+  useQuery({
+    queryKey: ["soporte", "festivos", year] as const,
+    queryFn: async () =>
+      (await must(
+        supabase.from("support_holidays").select("dia, name").gte("dia", `${year}-01-01`).lte("dia", `${year}-12-31`).order("dia"),
+      )) as Holiday[],
+  });
 
 /** Las conversaciones anteriores de la misma persona. */
 export const useHistory = (contactId: string | null, exceptId: string | null) =>

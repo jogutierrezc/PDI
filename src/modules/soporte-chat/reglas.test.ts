@@ -57,7 +57,7 @@ describe("el resumen para el agente", () => {
 });
 
 describe("el formulario de Pilo", () => {
-  const ok = { name: "Camila Rojas Prada", email: "camila@correo.com", phone: "300 000 0000", city: "Bucaramanga", authorized: true };
+  const ok = { name: "Camila Rojas Prada", email: "camila@correo.com", phone: "300 000 0000", city: "Bucaramanga", authorized: true, web: "" };
   it("pide los datos en orden y la autorización", () => {
     expect(formProblem(ok)).toBe("");
     expect(formProblem({ ...ok, name: "Camila" })).toMatch(/nombre completo/);

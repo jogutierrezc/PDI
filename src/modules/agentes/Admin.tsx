@@ -12,10 +12,10 @@ import type { FormEvent } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { supabase } from "../../lib/supabase";
 import { soporte, asSoporteError } from "../soporte/llamada";
-import { errorText, keys, PORTAL_NAME, useAgents, useLabels, useMembers, usePortals, useQuickReplies, useTeams } from "./datos";
+import { errorText, keys, PORTAL_NAME, useAgents, useHolidays, useLabels, useMembers, usePortals, useQuickReplies, useTeams } from "./datos";
 import type { Agent, Portal, SpaceKey } from "./datos";
 import { enterBlock, enterList, useMotion } from "./motion";
-import { Avatar, Notice, PortalTag, Seg, Switch, Tag } from "./ui";
+import { Avatar, Icon, Notice, PortalTag, Seg, Switch, Tag } from "./ui";
 
 type Result = { error: { message: string } | null };
 
@@ -103,7 +103,6 @@ export function AgentesAdmin() {
   return (
     <main className="ag-page">
       <header className="ag-page-head">
-        <span className="ag-eyebrow">Director</span>
         <h1>Agentes y portales</h1>
       </header>
       {problem ? <Notice>{problem}</Notice> : null}
@@ -144,7 +143,7 @@ export function AgentesAdmin() {
                 {(teams.data ?? []).map((t) => (
                   <span key={t.id} className="ag-tag ag-t-n ag-tag-x">
                     {t.name}
-                    <button type="button" className="ag-x ag-press" aria-label={`Quitar el equipo ${t.name}`} onClick={() => void run(() => supabase.from("support_teams").delete().eq("id", t.id), "", [keys.teams, keys.members, keys.portals])}>✕</button>
+                    <button type="button" className="ag-x ag-press" aria-label={`Quitar el equipo ${t.name}`} onClick={() => void run(() => supabase.from("support_teams").delete().eq("id", t.id), "", [keys.teams, keys.members, keys.portals])}><Icon name="close" size={16} /></button>
                   </span>
                 ))}
               </div>
@@ -307,12 +306,17 @@ export function Catalogos() {
   const { run, problem, ok } = useWrite();
   const [q, setQ] = useState({ shortcut: "", title: "", body: "" });
   const [l, setL] = useState({ name: "", color: "azul" });
+  const [anio, setAnio] = useState(() => new Date().getFullYear());
+  const [festivo, setFestivo] = useState({ dia: "", name: "" });
+  const festivos = useHolidays(anio);
   const ref = useRef<HTMLDivElement>(null);
   useMotion(ref, () => enterList(Array.from(ref.current?.querySelectorAll("[data-row]") ?? []).slice(0, 10)), [quick.data?.length, labels.data?.length]);
+  const comoDia = (dia: string) =>
+    new Date(`${dia}T12:00:00`).toLocaleDateString("es-CO", { weekday: "long", day: "numeric", month: "long" });
 
   return (
     <main className="ag-page" ref={ref as never}>
-      <header className="ag-page-head"><span className="ag-eyebrow">Director</span><h1>Respuestas rápidas y etiquetas</h1></header>
+      <header className="ag-page-head"><h1>Respuestas rápidas y etiquetas</h1></header>
       {problem ? <Notice>{problem}</Notice> : null}
       {ok ? <Notice tone="ok">{ok}</Notice> : null}
       <div className="ag-cols">
@@ -339,7 +343,7 @@ export function Catalogos() {
             {(labels.data ?? []).map((x) => (
               <span key={x.id} className="ag-tag ag-t-n ag-tag-x" data-row>
                 {x.name}
-                <button type="button" className="ag-x ag-press" aria-label={`Borrar la etiqueta ${x.name}`} onClick={() => void run(() => supabase.from("support_labels").delete().eq("id", x.id), "Borrada.", [keys.labels])}>✕</button>
+                <button type="button" className="ag-x ag-press" aria-label={`Borrar la etiqueta ${x.name}`} onClick={() => void run(() => supabase.from("support_labels").delete().eq("id", x.id), "Borrada.", [keys.labels])}><Icon name="close" size={16} /></button>
               </span>
             ))}
             {!labels.data?.length ? <span className="ag-sub">Aún no hay etiquetas.</span> : null}
@@ -347,6 +351,37 @@ export function Catalogos() {
           <form className="ag-pad ag-inline" onSubmit={(e) => { e.preventDefault(); void run(() => supabase.from("support_labels").insert({ name: l.name.trim(), color: l.color }), "Guardada.", [keys.labels]).then((done) => done && setL({ name: "", color: "azul" })); }}>
             <input className="ag-in" value={l.name} onChange={(e) => setL({ ...l, name: e.target.value })} placeholder="Etiqueta nueva" aria-label="Etiqueta nueva" required minLength={2} maxLength={40} />
             <button type="submit" className="ag-btn ag-press">Agregar</button>
+          </form>
+        </section>
+
+        <section className="ag-card" aria-label="Festivos">
+          <div className="ag-card-head">
+            <h2>Festivos</h2>
+            <span className="ag-sub">Los festivos cierran la atención de todos los portales</span>
+          </div>
+          <div className="ag-pad ag-inline">
+            <button type="button" className="ag-btn ag-sm ag-press" aria-label="Año anterior" onClick={() => setAnio((a) => a - 1)}>‹</button>
+            <b className="ag-sub">{anio}</b>
+            <button type="button" className="ag-btn ag-sm ag-press" aria-label="Año siguiente" onClick={() => setAnio((a) => a + 1)}>›</button>
+            <button type="button" className="ag-btn ag-sm ag-press" onClick={() => void run(() => supabase.rpc("support_festivos_cargar", { p_anio: anio }), "Cargados.", [["soporte", "festivos"]])}>
+              Cargar los de {anio}
+            </button>
+          </div>
+          <div className="ag-pad">
+            {(festivos.data ?? []).map((f) => (
+              <div key={f.dia} className="ag-rowq" data-row>
+                <div className="ag-grow"><b>{f.name}</b><div className="ag-sub">{comoDia(f.dia)}</div></div>
+                <button type="button" className="ag-btn ag-sm ag-press" aria-label={`Borrar el festivo ${f.name}`} onClick={() => void run(() => supabase.from("support_holidays").delete().eq("dia", f.dia), "Borrado.", [["soporte", "festivos"]])}>Borrar</button>
+              </div>
+            ))}
+            {!festivos.data?.length ? <p className="ag-empty">Sin festivos en {anio}: pulse «Cargar» o agréguelos a mano.</p> : null}
+          </div>
+          <form className="ag-pad ag-stack" onSubmit={(e) => { e.preventDefault(); void run(() => supabase.from("support_holidays").upsert({ dia: festivo.dia, name: festivo.name.trim() }), "Guardado.", [["soporte", "festivos"]]).then((done) => done && setFestivo({ dia: "", name: "" })); }}>
+            <div className="ag-inline">
+              <input className="ag-in" type="date" value={festivo.dia} onChange={(e) => setFestivo({ ...festivo, dia: e.target.value })} aria-label="Día festivo" required />
+              <input className="ag-in" value={festivo.name} onChange={(e) => setFestivo({ ...festivo, name: e.target.value })} placeholder="Nombre del festivo" aria-label="Nombre del festivo" required maxLength={80} />
+            </div>
+            <div><button type="submit" className="ag-btn ag-press">Agregar festivo</button></div>
           </form>
         </section>
       </div>

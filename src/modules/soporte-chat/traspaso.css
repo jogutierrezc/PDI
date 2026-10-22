@@ -275,12 +275,21 @@
 }
 
 /* --- Formulario, espera, encuesta ------------------------------------------------------------------- */
+/* El campo escondido del formulario (honeypot): una persona no lo ve (0184). */
+.ho-honey {
+  position: absolute;
+  left: -4000px;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+  pointer-events: none;
+}
+
 .ho-form-card {
   display: grid;
   gap: 10px;
   padding: 14px;
-  background: var(--ap-surface);
-  border: 1px solid var(--ap-line);
+  background: var(--ap-surface);  border: 1px solid var(--ap-line);
   border-radius: 14px;
 }
 .ho-f {

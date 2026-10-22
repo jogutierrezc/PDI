@@ -36,13 +36,35 @@
      invitar     { agente_id }                     (director)
      resolver    { id, transcripcion }             (agente)
      tomada      { id }                            (agente; avisa al correo si fue fuera de horario)
+     reanudar    { token }                         → { id, secret, channel, space, nombre, correo }
+                                                  (el enlace de un solo uso del correo de «vuelva a su conversación»)
+     aviso_estudiante { id }                       (agente; correo con el enlace si la persona no está viendo el chat)
+     push_clave  { }                               → { public } (la llave VAPID, o null si el push está apagado)
+     push_guardar { endpoint, p256dh, auth }       (agente; guarda la suscripción de su navegador)
+     push_quitar { endpoint }                      (agente; la borra)
+
+   Tiempo real hacia el agente: el portal de agentes escucha postgres_changes
+   (las tablas support_conversations, support_messages y support_agents están
+   en la publicación supabase_realtime) y, para cuando el portal está cerrado,
+   Web Push: la llave VAPID vive en support_push_config (la tabla) y las
+   suscripciones en support_push_subscriptions.
+
+   Si nadie toma una conversación que espera de más (reglas
+   escalate_after_minutes y escalate_cooldown_hours), se avisa a los directores
+   por correo y push. Eso lo disparan los pedidos de la persona (estado) y la
+   función de tick que corre con los latidos de los agentes (0184).
 
    Variables: SUPABASE_URL, SUPABASE_ANON_KEY, SUPABASE_SERVICE_ROLE_KEY (las
    pone la plataforma); opcionales: ALLOWED_ORIGIN, PILO_VISITOR_SALT,
-   CORREOS_FUNCION_URL, SOPORTE_PORTAL_URL (por defecto https://planeacion.udes.edu.co/agentes).
+   CORREOS_FUNCION_URL, SOPORTE_PORTAL_URL (por defecto https://planeacion.udes.edu.co/agentes),
+   SOPORTE_ESTUDIANTE_URL (enlace del chat en Pilo, por defecto https://planeacion.udes.edu.co/app),
+   SOPORTE_RESUME_KEY (una frase cualquiera que cifra el secreto de reanudación;
+   sin ella se deriva una de la llave del servicio),
+   TURNSTILE_SECRET_KEY (si está, el formulario público exige el captcha invisible de Cloudflare).
 
-   El bloque «adjuntos» es una copia de src/modules/soporte/adjuntos.ts (el
-   editor de Supabase solo acepta un archivo); una prueba falla si se separan.
+   El bloque «adjuntos» es una copia de src/modules/soporte/adjuntos.ts y el
+   bloque «push» de src/modules/soporte/push.ts (el editor de Supabase solo
+   acepta un archivo); una prueba falla si se separan.
 
    Despliegue:  supabase functions deploy soporte
    ========================================================================== */
@@ -99,6 +121,204 @@ export function safeFileName(name: string): string {
   return `${base || "archivo"}${known ? `.${ext}` : ""}`;
 }
 // --- fin adjuntos
+
+// --- inicio push
+export interface PushClaves {
+  /** La pública (65 bytes: 0x04 ‖ x ‖ y, base64url). Va en el manifest del navegador y en el encabezado. */
+  public: string;
+  /** La privada (32 bytes, base64url). Nunca sale del servidor. */
+  private: string;
+  /** Un mailto: para que el servicio de push sepa quién responde por los avisos. */
+  subject: string;
+}
+
+/** A quién le llega el aviso: la suscripción que guardó el navegador del agente. */
+export interface PushDestino {
+  endpoint: string;
+  /** La llave pública de la suscripción (65 bytes, base64url). */
+  p256dh: string;
+  /** El secreto de autenticación (16 bytes, base64url). */
+  auth: string;
+}
+
+/** El texto del aviso. El service worker decide cómo mostrarlo. */
+export interface PushMensaje {
+  titulo: string;
+  cuerpo: string;
+  /** Para agrupar avisos del mismo tema (p. ej. la conversación). */
+  tag?: string;
+  /** A dónde abre el aviso (una ruta del portal). */
+  url?: string;
+  /** Cuánto vale el aviso si el equipo está apagado (segundos). */
+  ttl?: number;
+}
+
+/* --- base64url ------------------------------------------------------------------------------------ */
+
+export function b64url(bytes: Uint8Array): string {
+  let binario = "";
+  for (const b of bytes) binario += String.fromCharCode(b);
+  return btoa(binario).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+}
+
+export function b64urlBytes(texto: string): Uint8Array {
+  const limpio = texto.replace(/-/g, "+").replace(/_/g, "/");
+  const binario = atob(limpio + "=".repeat((4 - (limpio.length % 4)) % 4));
+  const salida = new Uint8Array(binario.length);
+  for (let i = 0; i < binario.length; i++) salida[i] = binario.charCodeAt(i);
+  return salida;
+}
+
+/* --- HMAC y derivación, tal cual el RFC 8291 (pseudocódigo del apartado 3.4) ----------------------- */
+
+const hmac = async (llave: Uint8Array, datos: Uint8Array): Promise<Uint8Array> => {
+  const k = await crypto.subtle.importKey("raw", llave as unknown as ArrayBuffer, { name: "HMAC", hash: "SHA-256" }, false, ["sign"]);
+  return new Uint8Array(await crypto.subtle.sign("HMAC", k, datos as unknown as ArrayBuffer));
+};
+
+const juntar = (...pedazos: (Uint8Array | number[])[]): Uint8Array => {
+  const partes = pedazos.map((p) => (p instanceof Uint8Array ? p : Uint8Array.from(p)));
+  const total = partes.reduce((n, p) => n + p.length, 0);
+  const salida = new Uint8Array(total);
+  let pos = 0;
+  for (const p of partes) {
+    salida.set(p, pos);
+    pos += p.length;
+  }
+  return salida;
+};
+
+/* --- Llaves VAPID ---------------------------------------------------------------------------------- */
+
+/** Un par nuevo de llaves VAPID, en base64url como las guardamos en la base. */
+export async function pushClaves(subject: string): Promise<PushClaves> {
+  const par = await crypto.subtle.generateKey({ name: "ECDH", namedCurve: "P-256" }, true, ["deriveBits"]);
+  const publica = new Uint8Array(await crypto.subtle.exportKey("raw", par.publicKey));
+  const jwk = await crypto.subtle.exportKey("jwk", par.privateKey);
+  if (!jwk.d) throw new Error("La llave privada no salió.");
+  return { public: b64url(publica), private: jwk.d, subject };
+}
+
+/** La llave pública de VAPID partida en x e y (para el JWK de la firma). */
+const partir = (publica: string): { x: string; y: string } => {
+  const bytes = b64urlBytes(publica);
+  if (bytes.length !== 65 || bytes[0] !== 4) throw new Error("La llave pública VAPID no sirve: se esperaba sin comprimir.");
+  return { x: b64url(bytes.slice(1, 33)), y: b64url(bytes.slice(33, 65)) };
+};
+
+/** El JWT ES256 de VAPID (RFC 8292). */
+export async function vapidJwt(claves: PushClaves, audiencia: string, ahora = Math.floor(Date.now() / 1000)): Promise<string> {
+  const codificar = (obj: Record<string, unknown>) => b64url(new TextEncoder().encode(JSON.stringify(obj)));
+  const cabeza = codificar({ typ: "JWT", alg: "ES256" });
+  const cuerpo = codificar({ aud: audiencia, exp: ahora + 12 * 3600, sub: claves.subject });
+  const privada = await crypto.subtle.importKey(
+    "jwk",
+    { kty: "EC", crv: "P-256", ...partir(claves.public), d: claves.private },
+    { name: "ECDSA", namedCurve: "P-256" },
+    false,
+    ["sign"],
+  );
+  const firma = new Uint8Array(await crypto.subtle.sign({ name: "ECDSA", hash: "SHA-256" }, privada, new TextEncoder().encode(`${cabeza}.${cuerpo}`)));
+  return `${cabeza}.${cuerpo}.${b64url(firma)}`;
+}
+
+/* --- El cuerpo cifrado (aes128gcm, RFC 8291) ------------------------------------------------------- */
+
+/**
+ * Cifra el mensaje como lo espera el navegador. Para las pruebas se pueden fijar
+ * la sal y el par efímero del servidor (el RFC 8291 trae un ejemplo completo).
+ */
+export async function cifrarAes128gcm(
+  destino: PushDestino,
+  texto: string,
+  fijar?: { salt?: Uint8Array; privada?: string; publica?: string },
+): Promise<Uint8Array> {
+  const uaPublica = b64urlBytes(destino.p256dh);
+  if (uaPublica.length !== 65 || uaPublica[0] !== 4) throw new Error("La llave de la suscripción no sirve.");
+  const autenticacion = b64urlBytes(destino.auth);
+  const textoBytes = new TextEncoder().encode(texto);
+
+  // La llave efímera del servidor de aplicación.
+  let privada: CryptoKey;
+  let asPublica: Uint8Array;
+  if (fijar?.privada && fijar.publica) {
+    asPublica = b64urlBytes(fijar.publica);
+    privada = await crypto.subtle.importKey(
+      "jwk",
+      { kty: "EC", crv: "P-256", x: b64url(asPublica.slice(1, 33)), y: b64url(asPublica.slice(33, 65)), d: fijar.privada },
+      { name: "ECDH", namedCurve: "P-256" },
+      false,
+      ["deriveBits"],
+    );
+  } else {
+    const par = await crypto.subtle.generateKey({ name: "ECDH", namedCurve: "P-256" }, true, ["deriveBits"]);
+    privada = par.privateKey;
+    asPublica = new Uint8Array(await crypto.subtle.exportKey("raw", par.publicKey));
+  }
+
+  // 1. El secreto compartido con la suscripción.
+  const uaJwk = await crypto.subtle.importKey("jwk", { kty: "EC", crv: "P-256", x: b64url(uaPublica.slice(1, 33)), y: b64url(uaPublica.slice(33, 65)) }, { name: "ECDH", namedCurve: "P-256" }, false, []);
+  const ecdh = new Uint8Array(await crypto.subtle.deriveBits({ name: "ECDH", public: uaJwk }, privada, 256));
+
+  // 2. Combinar con el secreto de autenticación (RFC 8291, 3.2).
+  const prkLlave = await hmac(autenticacion, ecdh);
+  const keyInfo = juntar(new TextEncoder().encode("WebPush: info"), [0], uaPublica, asPublica);
+  const ikm = await hmac(prkLlave, juntar(keyInfo, [1]));
+
+  // 3. El contenido (RFC 8188): una sal por mensaje.
+  const salt = fijar?.salt ?? crypto.getRandomValues(new Uint8Array(16));
+  const prk = await hmac(salt, ikm);
+  const cek = (await hmac(prk, juntar(new TextEncoder().encode("Content-Encoding: aes128gcm"), [0], [1]))).slice(0, 16);
+  const nonce = (await hmac(prk, juntar(new TextEncoder().encode("Content-Encoding: nonce"), [0], [1]))).slice(0, 12);
+
+  // 4. Un solo registro: el texto y el delimitador final (0x02).
+  const cekKey = await crypto.subtle.importKey("raw", cek as unknown as ArrayBuffer, { name: "AES-GCM", length: 128 }, false, ["encrypt"]);
+  const cifrado = new Uint8Array(
+    await crypto.subtle.encrypt({ name: "AES-GCM", iv: nonce as unknown as ArrayBuffer, tagLength: 128 }, cekKey, juntar(textoBytes, [2]) as unknown as ArrayBuffer),
+  );
+
+  // 5. El encabezado del cuerpo: sal ‖ tamaño del registro (4096) ‖ largo de la llave ‖ la llave efímera.
+  const header = juntar(salt, [0x00, 0x00, 0x10, 0x00], [asPublica.length], asPublica);
+  return juntar(header, cifrado);
+}
+
+/* --- El envío -------------------------------------------------------------------------------------- */
+
+export interface PushResultado {
+  ok: boolean;
+  /** El endpoint respondió 404 o 410: la suscripción se murió, hay que borrarla. */
+  gone?: boolean;
+}
+
+/** Despacha un aviso cifrado. Nunca lanza: un aviso que falla no debe tumbar lo demás. */
+export async function pushEnviar(
+  destino: PushDestino,
+  mensaje: PushMensaje,
+  claves: PushClaves,
+  fetchImpl: typeof fetch = fetch,
+): Promise<PushResultado> {
+  try {
+    const cuerpo = await cifrarAes128gcm(destino, JSON.stringify(mensaje));
+    const origen = new URL(destino.endpoint).origin;
+    const jwt = await vapidJwt(claves, origen);
+    const respuesta = await fetchImpl(destino.endpoint, {
+      method: "POST",
+      headers: {
+        "TTL": String(mensaje.ttl ?? 60),
+        "Content-Encoding": "aes128gcm",
+        "Content-Type": "application/octet-stream",
+        "Urgency": "high",
+        "Authorization": `vapid t=${jwt}, k=${claves.public}`,
+      },
+      body: cuerpo as unknown as BodyInit,
+    });
+    if (respuesta.status === 404 || respuesta.status === 410) return { ok: false, gone: true };
+    return { ok: respuesta.status >= 200 && respuesta.status < 300 };
+  } catch {
+    return { ok: false };
+  }
+}
+// --- fin push
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": Deno.env.get("ALLOWED_ORIGIN") ?? "*",
@@ -205,6 +425,133 @@ Deno.serve(async (request) => {
     }
   };
 
+  /** El secreto de reanudación, cifrado con la llave del entorno (o una derivada). */
+  const llaveResume = async (): Promise<CryptoKey> => {
+    const frase = Deno.env.get("SOPORTE_RESUME_KEY") || serviceKey;
+    const semilla = new Uint8Array(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(frase)));
+    return crypto.subtle.importKey("raw", semilla as unknown as ArrayBuffer, "AES-GCM", false, ["encrypt", "decrypt"]);
+  };
+  const cifrarSecreto = async (texto: string): Promise<string> => {
+    const iv = crypto.getRandomValues(new Uint8Array(12));
+    const datos = new Uint8Array(await crypto.subtle.encrypt({ name: "AES-GCM", iv: iv as unknown as ArrayBuffer }, await llaveResume(), new TextEncoder().encode(texto) as unknown as ArrayBuffer));
+    return b64url(juntar(iv, datos));
+  };
+  const descifrarSecreto = async (cifrado: string): Promise<string> => {
+    const todo = b64urlBytes(cifrado);
+    const claro = await crypto.subtle.decrypt({ name: "AES-GCM", iv: todo.slice(0, 12) as unknown as ArrayBuffer }, await llaveResume(), todo.slice(12) as unknown as ArrayBuffer);
+    return new TextDecoder().decode(claro);
+  };
+
+  /** Las llaves VAPID de Web Push (0184), si el director las ha puesto. */
+  const pushConfig = async (): Promise<PushClaves | null> => {
+    const { data } = await admin.from("support_push_config").select("public_key, private_key, subject").eq("id", 1).maybeSingle();
+    const c = data as { public_key: string | null; private_key: string | null; subject: string } | null;
+    return c?.public_key && c.private_key ? { public: c.public_key, private: c.private_key, subject: c.subject } : null;
+  };
+
+  /** Le avisa a un agente por todos los navegadores donde aceptó avisos. */
+  const pushAgente = async (agentId: string, mensaje: PushMensaje): Promise<void> => {
+    try {
+      const claves = await pushConfig();
+      if (!claves) return;
+      const { data } = await admin.from("support_push_subscriptions").select("id, endpoint, p256dh, auth_key").eq("agent_id", agentId).limit(20);
+      for (const sub of (data ?? []) as { id: string; endpoint: string; p256dh: string; auth_key: string }[]) {
+        const salida = await pushEnviar({ endpoint: sub.endpoint, p256dh: sub.p256dh, auth: sub.auth_key }, mensaje, claves);
+        if (salida.gone) await admin.from("support_push_subscriptions").delete().eq("id", sub.id);
+        else if (salida.ok) await admin.from("support_push_subscriptions").update({ last_seen_at: new Date().toISOString() }).eq("id", sub.id);
+      }
+    } catch {
+      /* un aviso que falla no frena nada */
+    }
+  };
+
+  /** Tras el tick: una oferta nueva se avisa por push, una por ventana de aceptación. */
+  const avisarOfertas = async (): Promise<void> => {
+    try {
+      const pol = (await admin.from("support_assignment_policy").select("accept_seconds").eq("id", 1).maybeSingle()).data as { accept_seconds?: number } | null;
+      const acepta = Number(pol?.accept_seconds) || 45;
+      const { data } = await admin.from("support_conversations").select("id, offered_to, offer_expires_at, offered_push_at").eq("status", "offered").not("offered_to", "is", null).limit(10);
+      for (const c of (data ?? []) as { id: string; offered_to: string | null; offer_expires_at: string | null; offered_push_at: string | null }[]) {
+        const vence = Date.parse(c.offer_expires_at ?? "");
+        if (!vence || !c.offered_to) continue;
+        if (c.offered_push_at && Date.parse(c.offered_push_at) >= vence - acepta * 1000) continue;
+        const { data: tomada } = await admin.from("support_conversations").update({ offered_push_at: new Date().toISOString() }).eq("id", c.id)
+          .or(`offered_push_at.is.null,offered_push_at.lt.${new Date(vence - acepta * 1000).toISOString()}`).select("id");
+        if (!tomada?.length) continue;
+        await pushAgente(c.offered_to, { titulo: "Nueva conversación para ti", cuerpo: `Tiene ${acepta} segundos para aceptarla.`, tag: c.id, url: "/agentes", ttl: Math.max(30, acepta) });
+      }
+    } catch {
+      /* el aviso es un atajo */
+    }
+  };
+
+  /** Lo que nadie toma se escala al director, con calma entre avisos (0184). */
+  const avisarEscalado = async (): Promise<void> => {
+    try {
+      const pol = (await admin.from("support_assignment_policy").select("escalate_after_minutes, escalate_cooldown_hours").eq("id", 1).maybeSingle()).data as { escalate_after_minutes?: number; escalate_cooldown_hours?: number } | null;
+      const despues = Number(pol?.escalate_after_minutes) || 15;
+      const calma = Number(pol?.escalate_cooldown_hours) || 2;
+      const hace = new Date(Date.now() - despues * 60000).toISOString();
+      const { data: filas } = await admin.from("support_conversations").select("id, space, contact_id")
+        .in("status", ["queued", "offered"])
+        .or(`waiting_since.lt.${hace},and(queued_at.lt.${hace},waiting_since.is.null)`)
+        .or(`escalated_at.is.null,escalated_at.lt.${new Date().toISOString()}`)
+        .limit(4);
+      if (!filas?.length) return;
+      const directores = (await admin.from("support_agents").select("id, name, email").eq("role", "director").eq("active", true).order("last_seen_at", { ascending: false, nullsFirst: false }).limit(3)).data as { id: string; name: string; email: string }[] | null;
+      if (!directores?.length) return;
+      for (const c of filas as { id: string; space: string; contact_id: string }[]) {
+        const { data: tomada } = await admin.from("support_conversations").update({ escalated_at: new Date(Date.now() + calma * 3600000).toISOString() })
+          .eq("id", c.id).or(`escalated_at.is.null,escalated_at.lt.${new Date().toISOString()}`).select("id");
+        if (!tomada?.length) continue;
+        const nombre = ((await admin.from("support_contacts").select("name").eq("id", c.contact_id).maybeSingle()).data as { name: string } | null)?.name ?? "";
+        for (const d of directores) {
+          await mail(d.email, {
+            asunto: "Nadie ha tomado una conversación",
+            titulo: "Una conversación sigue esperando",
+            nombre: d.name,
+            mensaje: `Lleva más de ${despues} minutos en la fila y nadie la ha aceptado. La persona escribió desde ${c.space === "planeacion" ? "Pilo" : "Pilo Académico"}${nombre ? ` y se llama ${nombre}` : ""}.`,
+            boton: "Ver la cola",
+            enlace: `${portalUrl.replace(/\/+$/, "")}/director`,
+          });
+          void pushAgente(d.id, { titulo: "Nadie ha tomado una conversación", cuerpo: "Lleva rato en la fila. Revise la cola.", tag: c.id, url: "/agentes/director", ttl: 600 });
+        }
+      }
+    } catch {
+      /* el aviso es un atajo */
+    }
+  };
+
+  /** Qué debe traer un archivo según su extensión: los primeros bytes (el «tipo real»). */
+  const MAGICOS: Record<string, number[]> = {
+    jpg: [0xff, 0xd8, 0xff],
+    png: [0x89, 0x50, 0x4e, 0x47],
+    gif: [0x47, 0x49, 0x46, 0x38],
+    webp: [0x52, 0x49, 0x46, 0x46],
+    pdf: [0x25, 0x50, 0x44, 0x46],
+    doc: [0xd0, 0xcf, 0x11, 0xe0],
+    docx: [0x50, 0x4b, 0x03, 0x04],
+    xls: [0xd0, 0xcf, 0x11, 0xe0],
+    xlsx: [0x50, 0x4b, 0x03, 0x04],
+  };
+  /** Mira los primeros bytes del archivo subido: la extensión puede mentir. */
+  const archivoReal = async (ruta: string, nombre: string): Promise<boolean> => {
+    try {
+      const ext = extensionOf(nombre);
+      const firma = MAGICOS[ext];
+      if (!firma) return true;
+      const url = await admin.storage.from("support-attachments").createSignedUrl(ruta, 30);
+      if (!url.data?.signedUrl) return false;
+      const cabeza = await fetch(url.data.signedUrl, { headers: { Range: "bytes=0-15" } });
+      if (!cabeza.ok) return false;
+      const bytes = new Uint8Array(await cabeza.arrayBuffer());
+      const webp = ext === "webp" && bytes.length >= 12 && bytes[8] === 0x57 && bytes[9] === 0x45 && bytes[10] === 0x42 && bytes[11] === 0x50;
+      return webp || firma.every((b, i) => bytes[i] === b);
+    } catch {
+      return false;
+    }
+  };
+
   /** La conversación de la persona, si el secreto coincide con la huella guardada. */
   const mine = async () => {
     const id = text(body.id, 40);
@@ -240,6 +587,25 @@ Deno.serve(async (request) => {
     if (action === "crear") {
       const retry = await limited("c", 6, 3600);
       if (retry) return tooFast(retry);
+      // El campo escondido que solo un formulario de verdad deja vacío.
+      if (text(body.web, 40)) return json({ ok: true, id: crypto.randomUUID(), secret: hex(32), channel: hex(16), after_hours: false });
+      // El captcha invisible de Cloudflare, solo si la universidad lo configuró.
+      const turnstile = Deno.env.get("TURNSTILE_SECRET_KEY");
+      if (turnstile) {
+        const token = text(body.turnstile, 4000);
+        if (!token) return json({ error: "Confirme que no es un robot.", code: "captcha" }, 400);
+        try {
+          const r = await fetch("https://challenges.cloudflare.com/turnstile/v0/siteverify", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ secret: turnstile, response: token, remoteip: ip }),
+          });
+          const out = (await r.json()) as { success?: boolean } | null;
+          if (!out?.success) return json({ error: "Confirme que no es un robot.", code: "captcha" }, 400);
+        } catch {
+          return json({ error: "Confirme que no es un robot.", code: "captcha" }, 400);
+        }
+      }
       const space = text(body.space, 20);
       const name = text(body.nombre, 120);
       const email = text(body.correo, 160).toLowerCase();
@@ -270,6 +636,12 @@ Deno.serve(async (request) => {
       });
       if (error) return fail(error, "No pude pasar su solicitud a un agente.");
       const out = data as { id: string; after_hours: boolean };
+      // El secreto, cifrado, para que el enlace de reanudación pueda traer de vuelta la conversación (0184).
+      try {
+        await admin.from("support_resume_secrets").upsert({ conversation_id: out.id, crypt: await cifrarSecreto(secret) });
+      } catch {
+        /* sin él solo falta el «vuelva a su conversación» */
+      }
       // Lo que Pilo no supo responder alimenta la bandeja de aprendizaje.
       if (question.length >= 2) await admin.rpc("pilo_inbox_add", { p_question: question, p_qnorm: normalize(question), p_reason: "sin_respuesta", p_kind: "agente" });
       if (out.after_hours) {
@@ -288,6 +660,8 @@ Deno.serve(async (request) => {
       const conv = await mine();
       if (!conv) return denied();
       await admin.rpc("support_tick");
+      // De paso: las ofertas nuevas se avisan por push y lo que nadie toma se escala (0184).
+      await Promise.all([avisarOfertas(), avisarEscalado()]);
       const after = Number(body.despues) > 0 ? Number(body.despues) : 0;
       const { data, error } = await admin.rpc("support_student_view", { p_conv: conv.id, p_hash: conv.hash, p_after: after });
       if (error) return fail(error);
@@ -302,9 +676,20 @@ Deno.serve(async (request) => {
       const files = (Array.isArray(body.archivos) ? body.archivos : [])
         .slice(0, MAX_FILES_PER_MESSAGE)
         .map((f) => ({ path: text((f as { ruta?: unknown }).ruta, 200), name: text((f as { nombre?: unknown }).nombre, 120) }));
+      // El tipo real del archivo: la extensión puede mentir (0184). El que no pasa, se borra.
+      for (const f of files) {
+        if (!f.path.startsWith(`${conv.id}/`)) return json({ error: "Un archivo no pasó la revisión de seguridad.", code: "archivo" }, 400);
+        if (f.name && !(await archivoReal(f.path, f.name))) {
+          await admin.storage.from("support-attachments").remove([f.path]);
+          return json({ error: `«${f.name}» no es lo que dice ser. Conviértalo a PDF o imagen y vuelva a subirlo.`, code: "archivo" }, 400);
+        }
+      }
       const { data, error } = await admin.rpc("support_student_send", { p_conv: conv.id, p_hash: conv.hash, p_body: multiline(body.texto, 4000), p_files: files });
       if (error) return fail(error, "No pude enviar su mensaje.");
       await ping(conv.channel, "nuevo", { from: "student" });
+      // Si el agente tiene el portal cerrado, le llega el aviso (0184).
+      const abierta = (await admin.from("support_conversations").select("assignee_id, status").eq("id", conv.id).maybeSingle()).data as { assignee_id: string | null; status: string } | null;
+      if (abierta?.assignee_id && abierta.status === "open") await pushAgente(abierta.assignee_id, { titulo: "La persona le escribió", cuerpo: "Hay un mensaje nuevo en su conversación.", tag: conv.id, url: "/agentes", ttl: 120 });
       return json({ ok: true, id: data });
     }
 
@@ -513,6 +898,85 @@ Deno.serve(async (request) => {
           if (sent) await admin.from("support_conversations").update({ notified_at: new Date().toISOString() }).eq("id", id);
         }
       }
+      return json({ ok: true });
+    }
+
+    /* --- Reanudación y avisos (0184) --------------------------------------------------------- */
+    if (action === "reanudar") {
+      const retry = await limited("r", 30, 3600);
+      if (retry) return tooFast(retry);
+      const token = text(body.token, 120);
+      if (token.length < 32) return json({ error: "El enlace no sirve: pida otro desde su conversación.", code: "datos" }, 400);
+      const { data: tomado } = await admin.from("support_resume_tokens").update({ used_at: new Date().toISOString() })
+        .eq("token_hash", await sha256(token)).is("used_at", null).gt("expires_at", new Date().toISOString()).select("conversation_id");
+      const fila = (tomado as { conversation_id: string }[] | null)?.[0];
+      if (!fila) return denied();
+      const par = (await admin.from("support_resume_secrets").select("crypt").eq("conversation_id", fila.conversation_id).maybeSingle()).data as { crypt: string } | null;
+      const conv = (await admin.from("support_conversations").select("id, channel_key, space, contact_id").eq("id", fila.conversation_id).maybeSingle()).data as { id: string; channel_key: string; space: string; contact_id: string } | null;
+      if (!par || !conv) return denied();
+      let secreto = "";
+      try {
+        secreto = await descifrarSecreto(par.crypt);
+      } catch {
+        return denied();
+      }
+      const contacto = (await admin.from("support_contacts").select("name, email").eq("id", conv.contact_id).maybeSingle()).data as { name: string; email: string } | null;
+      return json({ ok: true, id: conv.id, secret: secreto, channel: conv.channel_key, space: conv.space, nombre: contacto?.name ?? "", correo: contacto?.email ?? "" });
+    }
+
+    if (action === "aviso_estudiante") {
+      const me = await agent();
+      if (!me) return noAgent();
+      const id = text(body.id, 40);
+      const conv = UUID.test(id) ? await admin.from("support_conversations").select("id, status, assignee_id, contact_id, student_last_seen_at").eq("id", id).maybeSingle() : { data: null };
+      const c = conv.data as { id: string; status: string; assignee_id: string | null; contact_id: string; student_last_seen_at: string | null } | null;
+      if (!c || c.status !== "open" || (me.role !== "director" && c.assignee_id !== me.id)) return json({ error: "Conversación desconocida.", code: "datos" }, 400);
+      const hace5 = new Date(Date.now() - 5 * 60000).toISOString();
+      if (c.student_last_seen_at && c.student_last_seen_at > hace5) return json({ ok: true, mensaje: "La persona está viendo la conversación." });
+      const hace30 = new Date(Date.now() - 30 * 60000).toISOString();
+      const { data: tomada } = await admin.from("support_conversations").update({ aviso_at: new Date().toISOString() })
+        .eq("id", c.id).or(`aviso_at.is.null,aviso_at.lt.${hace30}`).select("id");
+      if (!tomada?.length) return json({ ok: true, mensaje: "Ya se avisó hace poco." });
+      const token = hex(32);
+      await admin.from("support_resume_tokens").insert({ conversation_id: c.id, token_hash: await sha256(token), expires_at: new Date(Date.now() + 30 * 86400000).toISOString() });
+      const contacto = (await admin.from("support_contacts").select("name, email").eq("id", c.contact_id).maybeSingle()).data as { name: string; email: string } | null;
+      if (!contacto) return json({ ok: true });
+      const estudianteUrl = (Deno.env.get("SOPORTE_ESTUDIANTE_URL") || "https://planeacion.udes.edu.co/app").replace(/\/+$/, "");
+      const enviado = await mail(contacto.email, {
+        asunto: "Su agente de la UDES le respondió",
+        titulo: "Vuelva a su conversación",
+        nombre: contacto.name,
+        mensaje: "Hay una respuesta nueva de su agente. Entre por el botón y siga donde lo dejó.",
+        boton: "Volver a la conversación",
+        enlace: `${estudianteUrl}?reanudar=${token}`,
+      });
+      return json({ ok: true, enviado });
+    }
+
+    /* --- Web Push: el navegador del agente pide avisos (0184) --------------------------------- */
+    if (action === "push_clave") {
+      const claves = await pushConfig();
+      return json({ ok: true, public: claves?.public ?? null });
+    }
+
+    if (action === "push_guardar") {
+      const me = await agent();
+      if (!me) return noAgent();
+      const retry = await limited("p", 40, 3600, me.id);
+      if (retry) return tooFast(retry);
+      const endpoint = text(body.endpoint, 600);
+      const p256dh = text(body.p256dh, 200);
+      const auth = text(body.auth, 200);
+      if (!/^https:\/\//.test(endpoint) || p256dh.length < 40 || auth.length < 10) return json({ error: "Esa suscripción no sirve.", code: "datos" }, 400);
+      const { error } = await admin.from("support_push_subscriptions").upsert({ agent_id: me.id, endpoint, p256dh, auth_key: auth }, { onConflict: "endpoint" });
+      if (error) return json({ error: "No pude guardar el aviso.", code: "error" }, 500);
+      return json({ ok: true });
+    }
+
+    if (action === "push_quitar") {
+      const me = await agent();
+      if (!me) return noAgent();
+      await admin.from("support_push_subscriptions").delete().eq("agent_id", me.id).eq("endpoint", text(body.endpoint, 600));
       return json({ ok: true });
     }
 

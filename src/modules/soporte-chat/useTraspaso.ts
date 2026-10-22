@@ -22,7 +22,7 @@ import { asSoporteError } from "../soporte/llamada";
 import { createOutbox } from "../soporte/outbox";
 import type { Outbox } from "../soporte/outbox";
 import { POLICY_VERSION } from "../pilo-app/terms/policy";
-import { cancel, createConversation, fetchView, markRead, portalState, rate, readSaved, sendMessage, uploadFile, writeSaved } from "./api";
+import { cancel, createConversation, fetchView, markRead, portalState, rate, readSaved, resumeConversation, sendMessage, uploadFile, writeSaved } from "./api";
 import type { PortalState, Saved, Space, View } from "./api";
 import { esperando, FRASES, formProblem, lastUnanswered, summarizeTurns, wantsAgent } from "./reglas";
 import type { FormData } from "./reglas";
@@ -109,6 +109,29 @@ export function useTraspaso(space: Space, pairs: Pair[]): Traspaso {
       live = false;
     };
   }, [space]);
+
+  /* --- El enlace de «vuelva a su conversación»: ?reanudar=<token> (0184) --- */
+  useEffect(() => {
+    const token = new URLSearchParams(window.location.search).get("reanudar");
+    if (!token) return;
+    history.replaceState(null, "", window.location.pathname);
+    let live = true;
+    void resumeConversation(token).then(
+      (vuelta) => {
+        if (!live) return;
+        const s: Saved = { id: vuelta.id, secret: vuelta.secret, channel: vuelta.channel, name: vuelta.nombre, email: vuelta.correo };
+        writeSaved(vuelta.space, s);
+        setSaved(s);
+        setShown(true);
+      },
+      () => {
+        if (live) setNotice("Ese enlace ya no sirve. Vuelve a pedir un agente desde Pilo.");
+      },
+    );
+    return () => {
+      live = false;
+    };
+  }, []);
 
   /* --- La cola de lo escrito sin conexión --- */
   const outbox = useRef<Outbox<{ text: string; files: { ruta: string; nombre: string }[] }>>();
@@ -257,6 +280,7 @@ export function useTraspaso(space: Space, pairs: Pair[]): Traspaso {
           politica: `v${POLICY_VERSION}`,
           resumen: summarizeTurns(pairsNow),
           pregunta: lastUnanswered(pairsNow),
+          web: form.web,
         });
         const s: Saved = { id: out.id, secret: out.secret, channel: out.channel, name: form.name.trim(), email: form.email.trim().toLowerCase() };
         writeSaved(space, s);

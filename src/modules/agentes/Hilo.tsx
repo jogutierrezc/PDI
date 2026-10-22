@@ -18,9 +18,9 @@ import { createOutbox } from "../soporte/outbox";
 import type { Outbox } from "../soporte/outbox";
 import { actions, errorText, keys, signedUrl, uploadAttachment, useAgents, useHistory, useLabels, useMessages, usePolicy, useQuickReplies, useTeams } from "./datos";
 import type { Attachment, Conv, Msg } from "./datos";
-import { enterDialog, enterMessages, enterPop, scrollToEnd, useMotion } from "./motion";
+import { enterDialog, enterMessages, enterPane, enterPop, scrollToEnd, useMotion } from "./motion";
 import { useMe } from "./sesion";
-import { AVAILABILITY, Avatar, Dot, Notice, PortalTag, Tag, UndoToast } from "./ui";
+import { AVAILABILITY, Avatar, Dot, Icon, Notice, PortalTag, Tag, UndoToast } from "./ui";
 import { fichaDe, tamano } from "./vistas";
 
 const EMOJIS: [string, string][] = [
@@ -72,6 +72,7 @@ export function Hilo({ conv, connected, onBack, onTaken }: { conv: Conv; connect
   const [typing, setTyping] = useState(false);
   const [drag, setDrag] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [info, setInfo] = useState(false);
   const [, tick] = useState(0);
 
   const thread = useRef<HTMLDivElement>(null);
@@ -83,6 +84,7 @@ export function Hilo({ conv, connected, onBack, onTaken }: { conv: Conv; connect
   const dialogRef = useRef<HTMLDivElement>(null);
   const scrimRef = useRef<HTMLDivElement>(null);
   const popRef = useRef<HTMLDivElement>(null);
+  const paneRef = useRef<HTMLElement>(null);
 
   const isMine = conv.assignee_id === me.id;
   const isDirector = me.role === "director";
@@ -100,9 +102,11 @@ export function Hilo({ conv, connected, onBack, onTaken }: { conv: Conv; connect
         await actions.send(conv.id, p.body, p.private, p.files);
       },
       () => (typeof navigator === "undefined" ? true : navigator.onLine),
-      () => {
+      (_, p) => {
         void client.invalidateQueries({ queryKey: keys.msgs(conv.id) });
         void channel.current?.send({ type: "broadcast", event: "nuevo", payload: { from: "agent" } });
+        // Si la persona no está mirando el chat, le llega el correo con el enlace para volver (0184).
+        if (!p.private) void soporte({ action: "aviso_estudiante", id: conv.id }, { session: true }).catch(() => undefined);
       },
     );
   }
@@ -154,6 +158,7 @@ export function Hilo({ conv, connected, onBack, onTaken }: { conv: Conv; connect
     },
     [msgs.length, queued.length, typing],
   );
+  useMotion(paneRef, () => enterPane(paneRef.current), [conv.id]);
   useMotion(popRef, () => enterPop(popRef.current, popup === "move" ? "100% 0%" : "0% 100%"), [popup]);
   useMotion(dialogRef, () => dialog && enterDialog(scrimRef.current, dialogRef.current), [dialog]);
 
@@ -275,10 +280,11 @@ export function Hilo({ conv, connected, onBack, onTaken }: { conv: Conv; connect
 
   return (
     <>
-      <section className="ag-hilo" aria-label="Conversación" onDragEnter={(e) => { e.preventDefault(); if (!composerOff) setDrag(true); }} onDragOver={(e) => e.preventDefault()}>
+      <section className="ag-hilo" ref={paneRef} aria-label="Conversación" onDragEnter={(e) => { e.preventDefault(); if (!composerOff) setDrag(true); }} onDragOver={(e) => e.preventDefault()}>
         <div className="ag-hilo-head">
           <button type="button" className="ag-btn ag-press ag-back" onClick={onBack}>
-            ← Lista
+            <Icon name="back" size={16} />
+            Lista
           </button>
           <div className="ag-hilo-who">
             <div className="ag-hilo-name">{conv.contact.name}</div>
@@ -345,6 +351,10 @@ export function Hilo({ conv, connected, onBack, onTaken }: { conv: Conv; connect
               </button>
             ) : null}
             {conv.status === "open" && !isMine && !isDirector ? <Tag tone="n">Ahora la atiende {agents.data?.find((a) => a.id === conv.assignee_id)?.name ?? "otro agente"}</Tag> : null}
+            <button type="button" className="ag-btn ag-press ag-info-btn" aria-expanded={info} onClick={() => setInfo((v) => !v)}>
+              <Icon name="info" size={16} />
+              Contacto
+            </button>
           </div>
         </div>
 
@@ -427,7 +437,7 @@ export function Hilo({ conv, connected, onBack, onTaken }: { conv: Conv; connect
                       </span>
                     </span>
                     <button type="button" className="ag-x ag-press" aria-label={`Quitar ${p.name}`} onClick={() => setPending((l) => l.filter((x) => x.id !== p.id))}>
-                      ✕
+                      <Icon name="close" size={16} />
                     </button>
                   </div>
                 );
@@ -450,7 +460,7 @@ export function Hilo({ conv, connected, onBack, onTaken }: { conv: Conv; connect
           <form className="ag-form" onSubmit={send}>
             <div className="ag-rel">
               <button type="button" className="ag-ib ag-press" aria-label="Adjuntar" aria-haspopup="menu" aria-expanded={popup === "clip"} disabled={composerOff} onClick={() => setPopup(popup === "clip" ? null : "clip")}>
-                📎
+                <Icon name="clip" />
               </button>
               {popup === "clip" ? (
                 <div className="ag-pop ag-pop-up" ref={popRef} role="menu" aria-label="Adjuntar">
@@ -466,7 +476,7 @@ export function Hilo({ conv, connected, onBack, onTaken }: { conv: Conv; connect
             </div>
             <div className="ag-rel">
               <button type="button" className="ag-ib ag-press" aria-label="Emoticones" aria-haspopup="true" aria-expanded={popup === "emoji"} disabled={composerOff} onClick={() => setPopup(popup === "emoji" ? null : "emoji")}>
-                🙂
+                <Icon name="smile" />
               </button>
               {popup === "emoji" ? (
                 <div className="ag-pop ag-pop-up" ref={popRef} role="group" aria-label="Emoticones frecuentes">
@@ -507,7 +517,7 @@ export function Hilo({ conv, connected, onBack, onTaken }: { conv: Conv; connect
         {undo ? <UndoToast text={undo.text} seconds={Math.max(0, Math.ceil((undo.until - Date.now()) / 1000))} onUndo={undoReassign} /> : null}
       </section>
 
-      <Contacto conv={conv} labels={(labels.data ?? []).map((l) => l.name)} history={history.data ?? []} longWait={policy.data?.long_wait_minutes ?? 10} onChanged={onTaken} popup={popup} setPopup={setPopup} />
+      <Contacto open={info} onClose={() => setInfo(false)} conv={conv} labels={(labels.data ?? []).map((l) => l.name)} history={history.data ?? []} longWait={policy.data?.long_wait_minutes ?? 10} onChanged={onTaken} popup={popup} setPopup={setPopup} />
 
       {dialog ? (
         <div className="ag-scrim" ref={scrimRef}>
@@ -536,7 +546,7 @@ export function Hilo({ conv, connected, onBack, onTaken }: { conv: Conv; connect
           <div className="ag-lbx-top">
             <b>{lightbox.name}</b>
             <button type="button" className="ag-x ag-press" aria-label="Cerrar la vista ampliada" onClick={() => setLightbox(null)} autoFocus>
-              ✕
+              <Icon name="close" />
             </button>
           </div>
           <div className="ag-lbx-img">
@@ -604,7 +614,7 @@ function Bubble({ m, showAck, onZoom }: { m: Msg; showAck: boolean; onZoom: (a: 
                 </span>
               </span>
               <button type="button" className="ag-dl ag-press" aria-label={`Descargar ${f.name}`} onClick={() => void download(f, setProblem)}>
-                ⬇
+                <Icon name="down" />
               </button>
             </div>
           ),
@@ -636,8 +646,10 @@ function ImageThumb({ file, onZoom }: { file: Attachment; onZoom: () => void }) 
 
 /** El panel del contacto: sus datos, el resumen de Pilo, las etiquetas y su historial. */
 function Contacto({
-  conv, labels, history, longWait, onChanged, popup, setPopup,
+  conv, labels, history, longWait, onChanged, popup, setPopup, open, onClose,
 }: {
+  open: boolean;
+  onClose: () => void;
   conv: Conv;
   labels: string[];
   history: { id: string; status: string; created_at: string }[];
@@ -659,10 +671,16 @@ function Contacto({
   const free = labels.filter((l) => !conv.labels.includes(l));
   const waited = conv.waiting_since && (conv.status === "queued" || conv.status === "offered") ? Math.round((Date.now() - Date.parse(conv.waiting_since)) / 60000) : 0;
   return (
-    <aside className="ag-contacto" aria-label="Contacto">
-      <div>
-        <b className="ag-contact-name">{conv.contact.name}</b>
-        <span className="ag-sub"> Datos que dio a Pilo</span>
+    <aside className="ag-contacto" data-open={open || undefined} aria-label="Contacto">
+      <div className="ag-contact-head">
+        <Avatar name={conv.contact.name} size={44} />
+        <div className="ag-grow">
+          <b className="ag-contact-name">{conv.contact.name}</b>
+          <div className="ag-sub">Datos que dio a Pilo</div>
+        </div>
+        <button type="button" className="ag-x ag-press ag-contact-close" aria-label="Cerrar el contacto" onClick={onClose}>
+          <Icon name="close" />
+        </button>
       </div>
       <dl className="ag-rows">
         <div><dt>Correo</dt><dd>{conv.contact.email}</dd></div>
@@ -694,7 +712,7 @@ function Contacto({
             <span key={l} className="ag-tag ag-t-n ag-tag-x">
               {l}
               <button type="button" className="ag-x ag-press" aria-label={`Quitar la etiqueta ${l}`} onClick={() => void set(conv.labels.filter((x) => x !== l), null)}>
-                ✕
+                <Icon name="close" size={14} />
               </button>
             </span>
           ))}

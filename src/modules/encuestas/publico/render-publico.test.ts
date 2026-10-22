@@ -93,7 +93,7 @@ describe("pasos", () => {
   });
 
   it("elegir: lista lo registrado, su número de cifras, y habilita el envío", () => {
-    const t = texto(renderToString(h(Elegir, { cuenta: { correo: "ana@udes.edu.co", nombre: "Ana" }, dependencia: "Biblioteca", aportes, enviando: false, error: null, onElegir: vi.fn(), onQuitar: vi.fn(), onEnviar: vi.fn() })));
+    const t = texto(renderToString(h(Elegir, { cuenta: { correo: "ana@udes.edu.co", nombre: "Ana" }, dependencia: "Biblioteca", aportes, enviando: false, error: null, onElegir: vi.fn(), onEditar: vi.fn(), onQuitar: vi.fn(), onEnviar: vi.fn() })));
     expect(t).toContain("Acreditación del programa");
     expect(t).toContain("1 cifra");
     expect(t).toContain("Enviar todo (1)");
@@ -101,11 +101,23 @@ describe("pasos", () => {
   });
 
   it("elegir: sin nada registrado no deja enviar; con error ofrece reintentar", () => {
-    const vacio = renderToString(h(Elegir, { cuenta: { correo: "a@udes.edu.co", nombre: "" }, dependencia: "Biblioteca", aportes: [], enviando: false, error: null, onElegir: vi.fn(), onQuitar: vi.fn(), onEnviar: vi.fn() }));
+    const vacio = renderToString(h(Elegir, { cuenta: { correo: "a@udes.edu.co", nombre: "" }, dependencia: "Biblioteca", aportes: [], enviando: false, error: null, onElegir: vi.fn(), onEditar: vi.fn(), onQuitar: vi.fn(), onEnviar: vi.fn() }));
     expect(vacio).toMatch(/<button[^>]*disabled[^>]*>Enviar todo<\/button>/);
-    const fallo = texto(renderToString(h(Elegir, { cuenta: { correo: "a@udes.edu.co", nombre: "" }, dependencia: "Biblioteca", aportes, enviando: false, error: "No se pudo conectar.", onElegir: vi.fn(), onQuitar: vi.fn(), onEnviar: vi.fn() })));
+    const fallo = texto(renderToString(h(Elegir, { cuenta: { correo: "a@udes.edu.co", nombre: "" }, dependencia: "Biblioteca", aportes, enviando: false, error: "No se pudo conectar.", onElegir: vi.fn(), onEditar: vi.fn(), onQuitar: vi.fn(), onEnviar: vi.fn() })));
     expect(fallo).toContain("No se pudo conectar.");
     expect(fallo).toContain("Reintentar el envío (1)");
+  });
+
+  it("elegir: cada aporte trae Editar (icono y texto) y Quitar", () => {
+    const html = renderToString(h(Elegir, { cuenta: { correo: "a@udes.edu.co", nombre: "" }, dependencia: "Biblioteca", aportes, enviando: false, error: null, onElegir: vi.fn(), onEditar: vi.fn(), onQuitar: vi.fn(), onEnviar: vi.fn() }));
+    expect(html).toMatch(/aria-label="Editar: [^"]+"[^>]*>.*?<span>Editar<\/span>/);
+    expect(html).toContain("Quitar: ");
+  });
+
+  it("detalle: al editar carga el aporte en el formulario", () => {
+    const t = renderToString(h(Detalle, { tipo: "logro", inicial: aportes[0], onGuardar: vi.fn(), onVolver: vi.fn(), decir }));
+    expect(t).toContain("Editando un ");
+    expect(t).toContain(aportes[0].titulo.replace(/&/g, "&amp;"));
   });
 
   it("detalle: arranca por el título del logro o del reto", () => {

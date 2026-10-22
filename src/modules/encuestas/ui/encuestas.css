@@ -247,8 +247,16 @@
 }
 
 .en-btn:disabled {
-  opacity: 0.5;
+  background: #eef2f7;
+  border-color: var(--line-strong);
+  color: #5b6b86;
   cursor: not-allowed;
+}
+
+.en-btn--pri:disabled {
+  background: #5b6b86;
+  border-color: #5b6b86;
+  color: #fff;
 }
 
 .en-btn--cierre {
@@ -518,6 +526,17 @@ select.en-est {
   color: var(--brand-navy);
 }
 
+.en-est[data-v="rechazado"] {
+  background-color: rgba(180, 35, 24, 0.1);
+  color: #8f1b11;
+}
+
+.en-est[data-v="descartado"] {
+  background-color: var(--surface-3);
+  color: #45566d;
+  text-decoration: line-through;
+}
+
 .en-est[data-v="para_video"] {
   background-color: rgba(23, 112, 63, 0.12);
   color: var(--en-ok);
@@ -781,5 +800,104 @@ select.en-est {
 @media (prefers-reduced-motion: reduce) {
   .en-aviso {
     transition: none;
+  }
+}
+
+/* ---------- Borrar, papelera y deshacer ---------- */
+.en-btn--peligro {
+  color: #8f1b11;
+  border-color: rgba(180, 35, 24, 0.5);
+}
+
+.en-btn--peligro-pri,
+.en-btn--peligro-pri:not(:disabled):hover {
+  background: #b42318;
+  border-color: #b42318;
+  color: #fff;
+}
+
+.en-detalle__acc {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.en-borrar {
+  display: grid;
+  gap: 8px;
+  margin-top: var(--space-3);
+}
+
+.en-papelera {
+  padding: var(--space-3);
+}
+
+.en-pap-lista {
+  list-style: none;
+  margin: var(--space-3) 0 0;
+  padding: 0;
+  display: grid;
+  gap: 10px;
+}
+
+.en-pap-lista li {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  gap: 12px;
+  align-items: center;
+  padding: 12px 14px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+}
+
+.en-pap-lista li > div {
+  display: grid;
+  gap: 2px;
+}
+
+.en-pap-lista span:not(.en-tag) {
+  color: var(--ink-muted);
+  font-size: var(--text-sm);
+}
+
+.en-vacio-simple {
+  padding: 32px 0;
+  text-align: center;
+  color: var(--ink-muted);
+}
+
+.en-aviso {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.en-aviso[data-on="1"] {
+  pointer-events: auto;
+}
+
+.en-aviso__btn {
+  min-height: 44px;
+  padding: 0 14px;
+  border: 1.5px solid #fff;
+  border-radius: 8px;
+  background: transparent;
+  color: #fff;
+  font-weight: 600;
+  cursor: pointer;
+  transition: transform 140ms cubic-bezier(0.23, 1, 0.32, 1);
+}
+
+.en-aviso__btn:active {
+  transform: scale(0.97);
+}
+
+.en-btn:active:not(:disabled) {
+  transform: scale(0.97);
+}
+
+@media (max-width: 560px) {
+  .en-pap-lista li {
+    grid-template-columns: minmax(0, 1fr);
   }
 }

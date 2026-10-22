@@ -17,7 +17,7 @@ import { Hilo } from "./Hilo";
 import type { MarcoContext } from "./Marco";
 import { enterList, enterOffer, useMotion } from "./motion";
 import { useMe } from "./sesion";
-import { Notice, PortalTag, Tag } from "./ui";
+import { Avatar, Notice, PortalTag, Tag } from "./ui";
 import { enVista, isVista, relacion, reloj, TITULO } from "./vistas";
 import type { Vista } from "./vistas";
 
@@ -117,7 +117,7 @@ export function Bandeja() {
         {problem ? <Notice>{problem}</Notice> : null}
 
         <div className="ag-lista-scroll" ref={listRef}>
-          {convs.isPending ? <p className="ag-empty">Cargando conversaciones…</p> : null}
+          {convs.isPending ? <p className="ag-empty" role="status">Cargando conversaciones…</p> : null}
           {convs.isError ? <Notice>No se pudieron leer las conversaciones. Revise que estén aplicadas las migraciones 0181 y 0182.</Notice> : null}
           {list.map((c) => {
             const rel = relacion(c, me.id);
@@ -126,9 +126,11 @@ export function Bandeja() {
             const waiting = c.status === "queued" || c.status === "offered";
             return (
               <div key={c.id} data-row={c.id}>
-                <button type="button" className={`ag-cv${c.id === selectedId ? " on" : ""}`} aria-pressed={c.id === selectedId} onClick={() => select(c.id)}>
+                <button type="button" className={`ag-cv${c.id === selectedId ? " on" : ""}${count > 0 ? " new" : ""}`} aria-pressed={c.id === selectedId} onClick={() => select(c.id)}>
+                  <Avatar name={c.contact.name} size={36} />
+                  <span className="ag-cv-body">
                   <span className="ag-row-between">
-                    <b>{c.contact.name}</b>
+                    <b className="ag-cv-name">{c.contact.name}</b>
                     <span className="ag-cv-when">
                       {count > 0 ? (
                         <span className="ag-bd" role="img" aria-label={`${count} mensajes sin leer`}>
@@ -149,6 +151,7 @@ export function Bandeja() {
                     {waiting && isLongWait(c.waiting_since, longWait, now) ? <Tag tone="y">Supera el tope</Tag> : null}
                     {c.after_hours && waiting ? <Tag tone="n">Fuera de horario</Tag> : null}
                   </span>
+                  </span>
                 </button>
               </div>
             );
@@ -161,7 +164,8 @@ export function Bandeja() {
         <Hilo key={selected.id} conv={selected} connected={connected} onBack={() => select(null)} onTaken={() => void client.invalidateQueries({ queryKey: keys.convs })} />
       ) : (
         <section className="ag-hilo ag-hilo-vacio" aria-label="Conversación">
-          <p>Elija una conversación de la lista.</p>
+          <h2>{list.length ? "Elija una conversación" : "Todo al día"}</h2>
+          <p>{list.length ? "Verá aquí el hilo completo, el resumen que dejó Pilo y los datos de contacto." : "No hay nadie esperando en esta vista. Cuando Pilo entregue una conversación, suena y aparece en la lista."}</p>
         </section>
       )}
     </div>

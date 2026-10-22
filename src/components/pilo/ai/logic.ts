@@ -14,7 +14,7 @@
      responde sin IA (RULE_TEXT, extractAnswer).
    ========================================================================== */
 
-export type Action = "resumir" | "sintetizar" | "explicar" | "voz" | "probar" | "preguntar" | "entender" | "analizar" | "indexar" | "comprender" | "moodle" | "puentes" | "web" | "premisas" | "evolucion";
+export type Action = "resumir" | "sintetizar" | "explicar" | "voz" | "probar" | "preguntar" | "entender" | "analizar" | "sugerir" | "indexar" | "comprender" | "moodle" | "puentes" | "web" | "premisas" | "evolucion";
 export type Fn = "leer" | "resumir" | "sintetizar" | "explicar" | "preguntar";
 export type Audience = "admin" | "sesion" | "publico";
 export type Portal = "cifras" | "pdi" | "observatorio" | "impacto" | "pregunta";
@@ -48,7 +48,7 @@ export interface Section {
 
 export const PORTALS: Portal[] = ["cifras", "pdi", "observatorio", "impacto", "pregunta"];
 export const SPACE_PORTALS: SpacePortal[] = ["ensenanza"];
-export const FN_OF: Record<Exclude<Action, "probar" | "indexar" | "comprender" | "moodle" | "puentes" | "web" | "premisas" | "evolucion">, Fn> = { resumir: "resumir", sintetizar: "sintetizar", explicar: "explicar", voz: "leer", preguntar: "preguntar", entender: "sintetizar", analizar: "sintetizar" };
+export const FN_OF: Record<Exclude<Action, "probar" | "indexar" | "comprender" | "moodle" | "puentes" | "web" | "premisas" | "evolucion" | "sugerir">, Fn> = { resumir: "resumir", sintetizar: "sintetizar", explicar: "explicar", voz: "leer", preguntar: "preguntar", entender: "sintetizar", analizar: "sintetizar" };
 
 /**
  * ¿Puede esta persona (null = sin sesión) usar la acción en el portal?
@@ -75,6 +75,11 @@ export function canUse(rules: Rules, portal: string, action: Action, role: Role 
   if (action === "entender") {
     if (!rules.enabled) return { ok: false, reason: "Mr. Pilo con IA está apagado." };
     return role ? { ok: true } : { ok: false, reason: "Inicie sesión para que Pilo entienda su necesidad." };
+  }
+  // La Capa de Pilo del editor de encuestas (0184): el personal con sesión, con la IA encendida.
+  if (action === "sugerir") {
+    if (!rules.enabled) return { ok: false, reason: "Mr. Pilo con IA está apagado: enciéndalo en Mr. Pilo con IA › Conexión." };
+    return role ? { ok: true } : { ok: false, reason: "Inicie sesión para que Pilo sugiera una explicación." };
   }
   // «Análisis de los datos» (boletines de UDES en Cifras): quien arma boletines, con la IA encendida.
   if (action === "analizar") {

@@ -24,6 +24,7 @@ import { guardarBorrador, leerBorrador } from "../lib/borrador";
 import { estaCerrada } from "../lib/tabla";
 import type { AporteEnvio, CuentaMicrosoft, InfoEncuesta, TipoAporte } from "../tipos";
 import { Bienvenida } from "./Bienvenida";
+import { RecorridoNuevo } from "./RecorridoNuevo";
 import { Despedida } from "./Despedida";
 import type { ResumenEnvio } from "./Despedida";
 import { GUIA } from "./frases";
@@ -84,8 +85,10 @@ export function EncuestaPublica() {
     );
   }
   if (estaCerrada(info.data)) {
-    return <Aviso titulo="Esta encuesta ya no recibe respuestas" texto="El plazo terminó o Planeación Institucional la cerró. Si todavía tiene algo por contar, escríbales para que la reabran." />;
+    return <Aviso titulo="Esta encuesta ya no recibe respuestas" texto={info.data.mensaje_cierre || "El plazo terminó o Planeación Institucional la cerró. Si todavía tiene algo por contar, escríbales para que la reabran."} />;
   }
+  // Las encuestas del modelo nuevo se pintan desde su estructura publicada; la de aportes con cifras (rendicion-2026) sigue su recorrido de siempre.
+  if (info.data.flujo === "respuestas" && info.data.estructura) return <RecorridoNuevo slug={slug} info={info.data} estructura={info.data.estructura} />;
   return <Recorrido slug={slug} info={info.data} />;
 }
 
@@ -97,6 +100,11 @@ function Recorrido({ slug, info }: { slug: string; info: InfoEncuesta }) {
   const [bienvenida, setBienvenida] = useState(!inicial.current.visto);
   const [paso, setPaso] = useState<Paso>("id");
   const [tipo, setTipo] = useState<TipoAporte>("logro");
+  /** Posición del aporte que se está editando; null si es uno nuevo. */
+  const [editando, setEditando] = useState<number | null>(null);
+  /** Lo último que se quitó, para deshacer durante unos segundos. */
+  const [quitado, setQuitado] = useState<{ aporte: AporteEnvio; i: number } | null>(null);
+  const relojQuitado = useRef<number>();
   const [cuenta, setCuenta] = useState<CuentaMicrosoft | null>(null);
   const [pase, setPase] = useState<string | null>(null);
   const [ms, setMs] = useState<EstadoMicrosoft>({ fase: "inactivo" });
@@ -175,8 +183,27 @@ function Recorrido({ slug, info }: { slug: string; info: InfoEncuesta }) {
     await iniciarMicrosoft(slug);
   };
 
+  useEffect(() => () => window.clearTimeout(relojQuitado.current), []);
+
+  const quitarAporte = (i: number) => {
+    const aporte = aportes[i];
+    if (!aporte) return;
+    setAportes((l) => l.filter((_, k) => k !== i));
+    setQuitado({ aporte, i });
+    window.clearTimeout(relojQuitado.current);
+    relojQuitado.current = window.setTimeout(() => setQuitado(null), 8000);
+  };
+  const deshacerQuitar = () => {
+    if (!quitado) return;
+    const { aporte, i } = quitado;
+    setAportes((l) => [...l.slice(0, i), aporte, ...l.slice(i)]);
+    setQuitado(null);
+    window.clearTimeout(relojQuitado.current);
+  };
+
   const guardarAporte = (a: AporteEnvio) => {
-    setAportes((l) => [...l, a]);
+    setAportes((l) => (editando === null ? [...l, a] : l.map((x, k) => (k === editando ? a : x))));
+    setEditando(null);
     setPaso("elegir");
     decir(GUIA.guardado, "emocionado", true);
   };
@@ -270,17 +297,25 @@ function Recorrido({ slug, info }: { slug: string; info: InfoEncuesta }) {
                 error={errorEnvio}
                 onElegir={(t) => {
                   setTipo(t);
+                  setEditando(null);
                   setPaso("detalle");
                 }}
-                onQuitar={(i) => setAportes((l) => l.filter((_, k) => k !== i))}
+                onEditar={(i) => {
+                  setTipo(aportes[i].tipo);
+                  setEditando(i);
+                  setPaso("detalle");
+                }}
+                onQuitar={quitarAporte}
                 onEnviar={() => void enviar()}
               />
             ) : (
               <Detalle
-                key={`${tipo}:${aportes.length}`}
+                key={`${tipo}:${editando ?? "nuevo"}:${aportes.length}`}
                 tipo={tipo}
+                inicial={editando === null ? undefined : aportes[editando]}
                 onGuardar={guardarAporte}
                 onVolver={() => {
+                  setEditando(null);
                   setPaso("elegir");
                   decir(GUIA.sinPrisa, "feliz");
                 }}
@@ -289,6 +324,17 @@ function Recorrido({ slug, info }: { slug: string; info: InfoEncuesta }) {
             )}
           </section>
         </main>
+      </div>
+
+      <div className="ep-deshacer" role="status" aria-live="polite" data-on={quitado ? "1" : undefined}>
+        {quitado && (
+          <>
+            <span>Quitó «{quitado.aporte.titulo}».</span>
+            <button type="button" onClick={deshacerQuitar}>
+              Deshacer
+            </button>
+          </>
+        )}
       </div>
 
       {bienvenida && <Bienvenida titulo={info.titulo} intro={info.intro} destino={hueco} onFin={alTerminarBienvenida} />}

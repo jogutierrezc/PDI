@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { Aporte } from "../tipos";
-import { aCsv, aTsv, celdaSegura, COLUMNAS, dependenciasDe, fechaCorta, filasDe, matrizDe, resumir, SIN_FILTROS } from "./tabla";
+import { aCsv, aTsv, celdaSegura, COLUMNAS, dependenciasDe, fechaCorta, filasDe, matrizDe, resumir, SIN_FILTROS, diasParaPurga, numerar } from "./tabla";
 
 const aporte = (p: Partial<Aporte> & { id: string }): Aporte => ({
   encuesta_id: "e1",
@@ -110,5 +110,29 @@ describe("estaCerrada", () => {
     expect(estaCerrada({ abierta: true, cierra_el: null }, hoy)).toBe(false);
     expect(estaCerrada({ abierta: true, cierra_el: "2026-11-15" }, hoy)).toBe(false);
     expect(estaCerrada({ abierta: true, cierra_el: "2026-11-14" }, hoy)).toBe(true);
+  });
+});
+
+describe("papelera", () => {
+  const vivo = aporte({ id: "v1" });
+  const borrado = aporte({ id: "b1", borrado_en: "2026-10-01T10:00:00Z", estado: "rechazado" });
+
+  it("las consultas, el resumen y la exportación excluyen lo borrado", () => {
+    expect(numerar([vivo, borrado]).map((x) => x.aporte.id)).toEqual(["v1"]);
+    expect(resumir([vivo, borrado]).recibidas).toBe(1);
+    expect(filasDe([vivo, borrado], "aporte", SIN_FILTROS, { clave: "n", sentido: 1 })).toHaveLength(1);
+    expect(dependenciasDe([borrado])).toEqual([]);
+    expect(aCsv(matrizDe(filasDe([vivo, borrado], "aporte", SIN_FILTROS, { clave: "n", sentido: 1 }), "aporte"))).not.toContain("b1");
+  });
+
+  it("cuenta los días que faltan para la purga (30)", () => {
+    expect(diasParaPurga("2026-10-01T10:00:00Z", new Date("2026-10-01T10:00:00Z"))).toBe(30);
+    expect(diasParaPurga("2026-10-01T10:00:00Z", new Date("2026-10-20T10:00:00Z"))).toBe(11);
+    expect(diasParaPurga("2026-10-01T10:00:00Z", new Date("2026-12-01T10:00:00Z"))).toBe(0);
+  });
+
+  it("los estados nuevos se filtran y se muestran", () => {
+    const f = { ...SIN_FILTROS, estado: "rechazado" as const };
+    expect(filasDe([aporte({ id: "r", estado: "rechazado" }), aporte({ id: "d", estado: "descartado" })], "aporte", f, { clave: "n", sentido: 1 }).map((x) => x.aporte.id)).toEqual(["r"]);
   });
 });

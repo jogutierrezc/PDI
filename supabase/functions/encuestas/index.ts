@@ -14,7 +14,11 @@
                                                     → { correo, nombre }   (no guarda nada)
      enviar        { slug, dependencia, aportes:[{tipo,titulo,descripcion,cifras:[{que,tipo,otro?,valor}]}], web? }
                    + Authorization: Bearer <access_token de Microsoft>
-                                                    → { recibidos, cifras }
+                                                    → { recibidos, cifras }        (flujo de aportes: rendicion-2026)
+     reto          { slug }                         → { pregunta, pase }           (verificación contra robots, acceso abierto)
+     responder     { slug, valores, pase?, reto_pase?, reto_respuesta?, nombre?, consentimiento?, web? }
+                                                    → { ok, id }                   (encuestas del modelo nuevo, 0184)
+                   Con Microsoft lleva el pase de microsoft_datos; abierta, el reto resuelto. Sin sesión.
 
    Reglas:
      · El correo sale SIEMPRE del token verificado en Supabase Auth (identidad de
@@ -30,6 +34,10 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.58.0";
 import { correoPermitido, limpiar, normalizarAporte, validarEnvio } from "./encuesta.ts";
 import type { AporteEnvio } from "./encuesta.ts";
+import { comprobarReto, crearReto, dominioPermitido, huellaDe, MENSAJE_CIERRE, motivoCierre } from "./acceso.ts";
+import type { AccesoEncuesta, EstadoEncuesta } from "./acceso.ts";
+import { validarEstructura, validarRespuestas, valoresVisibles } from "./estructura.ts";
+import type { Estructura, Valores } from "./estructura.ts";
 
 const ENV = (name: string) => Deno.env.get(name) ?? "";
 const CORS = {
@@ -74,6 +82,45 @@ function demasiadas(ip: string): boolean {
   return recientes.length > 60;
 }
 
+interface FilaEncuesta {
+  id: string;
+  slug: string;
+  titulo: string;
+  anio: string;
+  intro: string;
+  despedida: string;
+  abierta: boolean;
+  cierra_el: string | null;
+  abre_el: string | null;
+  estado: EstadoEncuesta;
+  acceso: AccesoEncuesta;
+  dominios_permitidos: string[];
+  una_por_persona: boolean;
+  limite_respuestas: number | null;
+  mensaje_cierre: string;
+  modo_llenado: string;
+  config_pilo: Record<string, unknown>;
+  version_publicada_id: string | null;
+}
+
+// deno-lint-ignore no-explicit-any
+type Admin = any;
+
+async function cargar(admin: Admin, slug: string): Promise<{ e: FilaEncuesta | null; error?: string }> {
+  const r = await admin.from("enc_encuestas").select("*").eq("slug", slug).maybeSingle();
+  if (r.error) return { e: null, error: r.error.message as string };
+  return { e: (r.data ?? null) as FilaEncuesta | null };
+}
+
+async function estructuraPublicada(admin: Admin, e: FilaEncuesta): Promise<Estructura | null> {
+  if (!e.version_publicada_id) return null;
+  const v = await admin.from("enc_versiones").select("estructura").eq("id", e.version_publicada_id).maybeSingle();
+  return (v.data?.estructura ?? null) as Estructura | null;
+}
+
+/** El flujo viejo (aportes con cifras, enc_enviar) sigue para las encuestas que lo piden en su configuración. */
+const flujoDe = (e: FilaEncuesta): "aportes" | "respuestas" => (e.config_pilo?.flujo === "aportes" ? "aportes" : "respuestas");
+
 Deno.serve(async (request: Request) => {
   if (request.method === "OPTIONS") return new Response(null, { status: 204, headers: CORS });
   if (request.method !== "POST") return json({ error: "Método no permitido." }, 405);
@@ -101,14 +148,103 @@ Deno.serve(async (request: Request) => {
   const admin = createClient(url, serviceKey, { auth: { persistSession: false, autoRefreshToken: false } });
 
   if (accion === "info") {
-    const r = await admin.from("enc_encuestas").select("slug,titulo,anio,intro,despedida,abierta,cierra_el").eq("slug", slug).maybeSingle();
-    if (r.error) {
-      if (/does not exist|schema cache|permission denied/i.test(r.error.message)) return json({ error: "Falta aplicar la migración 0179 (Encuestas con Pilo).", code: "migracion" }, 500);
-      console.error("encuestas info", r.error.message);
+    const { e, error } = await cargar(admin, slug);
+    if (error) {
+      if (/does not exist|schema cache|permission denied|column/i.test(error)) return json({ error: "Falta aplicar la migración 0184 (Editor de encuestas con Pilo).", code: "migracion" }, 500);
+      console.error("encuestas info", error);
       return json({ error: "No se pudo completar la operación. Intente de nuevo." }, 500);
     }
-    if (!r.data) return json({ error: "Esta encuesta no existe." }, 404);
-    return json({ encuesta: r.data });
+    if (!e) return json({ error: "Esta encuesta no existe." }, 404);
+    const motivo = motivoCierre(e);
+    // La estructura solo sale de una encuesta ya publicada: un borrador no se asoma.
+    const estructura = e.estado === "borrador" ? null : await estructuraPublicada(admin, e);
+    return json({
+      encuesta: {
+        slug: e.slug,
+        titulo: e.titulo,
+        anio: e.anio,
+        intro: e.intro,
+        despedida: e.despedida,
+        abierta: motivo === null,
+        cierra_el: e.cierra_el,
+        abre_el: e.abre_el,
+        estado: e.estado,
+        motivo_cierre: motivo,
+        mensaje_cierre: e.mensaje_cierre || (motivo ? MENSAJE_CIERRE[motivo] : ""),
+        acceso: e.acceso,
+        dominios: e.dominios_permitidos,
+        una_por_persona: e.una_por_persona,
+        modo_llenado: e.modo_llenado,
+        config_pilo: e.config_pilo,
+        flujo: flujoDe(e),
+        estructura,
+      },
+    });
+  }
+
+  // Verificación contra robots (acceso abierto): una cuenta sencilla con su pase firmado.
+  if (accion === "reto") {
+    const { e } = await cargar(admin, slug);
+    if (!e) return json({ error: "Esta encuesta no existe." }, 404);
+    if (e.acceso !== "abierta") return json({ error: "Esta encuesta no usa verificación." }, 400);
+    return json(await crearReto(slug, serviceKey));
+  }
+
+  // Envío de una encuesta del modelo nuevo: con el pase de Microsoft o, si el acceso es abierto, sin sesión.
+  if (accion === "responder") {
+    const { e, error } = await cargar(admin, slug);
+    if (error) return json({ error: "No se pudo completar la operación. Intente de nuevo." }, 500);
+    if (!e) return json({ error: "Esta encuesta no existe." }, 404);
+    const motivo = motivoCierre(e);
+    if (motivo) return json({ error: e.mensaje_cierre || MENSAJE_CIERRE[motivo], code: "cerrada" }, 403);
+    if (flujoDe(e) === "aportes") return json({ error: "Esta encuesta recibe sus aportes por otro camino." }, 400);
+    const estructura = await estructuraPublicada(admin, e);
+    if (!estructura || validarEstructura(estructura).length) return json({ error: "La encuesta no está lista en el servidor. Avise a Planeación Institucional.", code: "migracion" }, 500);
+
+    let correo: string | null = null;
+    let verificado = false;
+    let nombre = "";
+    if (e.acceso === "microsoft") {
+      const p = await abrirPase(limpiar(c.pase), serviceKey);
+      if (!p || p.slug !== slug) return json({ error: "La confirmación de Microsoft venció. Vuelva a pulsar «Continuar con Microsoft».", code: "microsoft" }, 401);
+      if (!correoPermitido(p.correo) || !dominioPermitido(p.correo, e.dominios_permitidos)) return json({ error: `El correo ${p.correo} no está entre los permitidos para esta encuesta.`, code: "dominio" }, 403);
+      correo = p.correo;
+      verificado = true;
+      nombre = p.nombre;
+    } else {
+      const reto = await comprobarReto(slug, c.reto_pase, c.reto_respuesta, serviceKey);
+      if (reto !== "ok") {
+        const m = reto === "rapido" ? "Fue muy rápido. Espere unos segundos y envíe de nuevo." : reto === "vencido" ? "La verificación venció. Resuelva la cuenta de nuevo." : "Resuelva la cuenta para confirmar que es una persona.";
+        return json({ error: m, code: "robot" }, 400);
+      }
+      if (e.config_pilo?.datos_personales === true) {
+        nombre = limpiar(c.nombre).slice(0, 120);
+        if (c.consentimiento !== true) return json({ error: "Para enviar sus datos necesitamos su consentimiento.", campo: "consentimiento" }, 400);
+      }
+    }
+
+    // Solo cuenta lo que se ve con la lógica «mostrar si»; lo demás se descarta.
+    const crudos = (c.valores !== null && typeof c.valores === "object" && !Array.isArray(c.valores) ? c.valores : {}) as Valores;
+    const valores = valoresVisibles(estructura, crudos);
+    const errores = validarRespuestas(estructura, valores);
+    const primero = Object.entries(errores)[0];
+    if (primero) return json({ error: primero[1], campo: primero[0], errores }, 400);
+
+    const ip = (request.headers.get("x-forwarded-for") ?? "").split(",")[0].trim() || "sin-ip";
+    const r = await admin.rpc("enc_enviar_respuesta", { p_slug: slug, p_correo: correo, p_verificado: verificado, p_nombre: nombre || null, p_consentimiento: c.consentimiento === true, p_valores: valores, p_huella: await huellaDe(ip, serviceKey) });
+    if (r.error) {
+      const { code = "", message } = r.error as { code?: string; message: string };
+      if (code === "P0002") return json({ error: message }, 404);
+      if (code === "P0003") return json({ error: e.mensaje_cierre || message, code: "cerrada" }, 403);
+      if (code === "P0004") return json({ error: message, code: "frenado" }, 429);
+      if (code === "P0005") return json({ error: message, code: "ya_respondio" }, 409);
+      if (code === "P0006") return json({ error: e.mensaje_cierre || message, code: "limite" }, 403);
+      if (code === "22023") return json({ error: message }, 400);
+      if (/does not exist|schema cache|permission denied/i.test(message)) return json({ error: "Falta aplicar la migración 0184 (Editor de encuestas con Pilo).", code: "migracion" }, 500);
+      console.error("encuestas responder", message);
+      return json({ error: "No se pudo guardar su respuesta. Intente de nuevo." }, 500);
+    }
+    return json({ ok: true, id: (r.data as { id: string }).id });
   }
 
   if (accion === "microsoft_datos" || accion === "enviar") {
@@ -135,6 +271,11 @@ Deno.serve(async (request: Request) => {
     }
     if (!correoPermitido(correo)) {
       return json({ error: `El correo de su cuenta Microsoft (${correo || "sin correo"}) no es un correo institucional de la UDES. Ingrese con su cuenta @udes.edu.co.`, code: "dominio" }, 403);
+    }
+    // Y de los dominios que esta encuesta permita (los de la encuesta pueden ser menos que los de la UDES).
+    const { e: destino } = await cargar(admin, slug);
+    if (destino && !dominioPermitido(correo, destino.dominios_permitidos)) {
+      return json({ error: `Esta encuesta no admite el correo ${correo}. Ingrese con una cuenta permitida (${destino.dominios_permitidos.map((d) => `@${d}`).join(", ")}).`, code: "dominio" }, 403);
     }
     if (accion === "microsoft_datos") return json({ correo, nombre, pase: await firmarPase({ slug, correo, nombre, exp: Date.now() + PASE_MS }, serviceKey) });
 

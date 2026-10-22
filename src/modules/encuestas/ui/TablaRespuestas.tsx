@@ -8,6 +8,7 @@
    ========================================================================== */
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import { exitRow, kill } from "../motion";
 import type { KeyboardEvent } from "react";
 import { ESTADOS, textoEstado, textoTipoAporte } from "../tipos";
 import type { Aporte, EstadoAporte, TipoAporte } from "../tipos";
@@ -73,7 +74,9 @@ function Celda({ f, clave, puedeEditar, onEstado }: { f: Fila; clave: ClaveColum
   }
 }
 
-function Detalle({ a, onCerrar }: { a: Aporte; onCerrar: () => void }) {
+function Detalle({ a, onCerrar, onBorrar }: { a: Aporte; onCerrar: () => void; onBorrar?: (motivo: string) => void }) {
+  const [motivo, setMotivo] = useState("");
+  const [pidiendo, setPidiendo] = useState(false);
   return (
     <section className="en-detalle" aria-label="Detalle del aporte">
       <div>
@@ -115,9 +118,31 @@ function Detalle({ a, onCerrar }: { a: Aporte; onCerrar: () => void }) {
               ))}
           </tbody>
         </table>
-        <button type="button" className="en-btn en-btn--cierre" onClick={onCerrar}>
-          Cerrar detalle
-        </button>
+        <div className="en-detalle__acc">
+          <button type="button" className="en-btn en-btn--cierre" onClick={onCerrar}>
+            Cerrar detalle
+          </button>
+          {onBorrar && !pidiendo && (
+            <button type="button" className="en-btn en-btn--peligro en-btn--cierre" onClick={() => setPidiendo(true)}>
+              Borrar respuesta
+            </button>
+          )}
+        </div>
+        {onBorrar && pidiendo && (
+          <div className="en-borrar" role="group" aria-label="Borrar la respuesta">
+            <label htmlFor="en-motivo">Motivo (opcional)</label>
+            <input id="en-motivo" className="en-in" maxLength={300} value={motivo} onChange={(e) => setMotivo(e.target.value)} placeholder="Por ejemplo, duplicada" />
+            <span className="en-hint">Va a la papelera 30 días. Desde allí se puede restaurar.</span>
+            <div className="en-fila">
+              <button type="button" className="en-btn en-btn--peligro-pri" onClick={() => onBorrar(motivo)}>
+                Mandar a la papelera
+              </button>
+              <button type="button" className="en-btn" onClick={() => setPidiendo(false)}>
+                Cancelar
+              </button>
+            </div>
+          </div>
+        )}
       </div>
     </section>
   );
@@ -128,12 +153,15 @@ export function TablaRespuestas({
   slug,
   puedeEditar,
   onEstado,
+  onBorrar,
   onAviso,
 }: {
   aportes: readonly Aporte[];
   slug: string;
   puedeEditar: boolean;
   onEstado: (id: string, e: EstadoAporte) => void;
+  /** Manda la respuesta a la papelera. Solo se ofrece si se pasa. */
+  onBorrar?: (id: string, motivo: string) => void;
   onAviso: (texto: string) => void;
 }) {
   const [vista, setVista] = useState<Vista>("aporte");
@@ -142,6 +170,7 @@ export function TablaRespuestas({
   const [cur, setCur] = useState<[number, number]>([0, 0]);
   const [abierto, setAbierto] = useState<string | null>(null);
   const tabla = useRef<HTMLTableElement>(null);
+  useEffect(() => () => kill(tabla.current ? Array.from(tabla.current.querySelectorAll("tr")) : []), []);
 
   const columnas = COLUMNAS[vista];
   const filas = useMemo(() => filasDe(aportes, vista, filtros, orden), [aportes, vista, filtros, orden]);
@@ -277,7 +306,7 @@ export function TablaRespuestas({
               </tr>
             ) : (
               filas.map((f, ri) => (
-                <tr key={f.clave} className={abierto === f.aporte.id ? "is-abierta" : undefined}>
+                <tr key={f.clave} data-id={f.aporte.id} className={abierto === f.aporte.id ? "is-abierta" : undefined}>
                   {columnas.map((c, ci) => {
                     const props = {
                       "data-r": ri,
@@ -308,7 +337,22 @@ export function TablaRespuestas({
         </table>
       </div>
 
-      {detalle && <Detalle a={detalle} onCerrar={() => setAbierto(null)} />}
+      {detalle && (
+        <Detalle
+          key={detalle.id}
+          a={detalle}
+          onCerrar={() => setAbierto(null)}
+          onBorrar={
+            puedeEditar && onBorrar
+              ? (motivo) => {
+                  const fila = tabla.current?.querySelector(`tr[data-id="${detalle.id}"]`) ?? null;
+                  setAbierto(null);
+                  exitRow(fila, () => onBorrar(detalle.id, motivo));
+                }
+              : undefined
+          }
+        />
+      )}
 
       <div className="en-pie">
         <span aria-live="polite">

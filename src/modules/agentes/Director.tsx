@@ -15,7 +15,7 @@ import { actions, errorText, keys, PORTAL_NAME, useAgents, useConversations, use
 import type { Agent, Policy, Report, SpaceKey } from "./datos";
 import { useNow } from "./Bandeja";
 import { enterDrawer, enterList, fillBar, enterPop, useMotion } from "./motion";
-import { AVAILABILITY, Avatar, Dot, Notice, PortalTag, Seg, Switch, Tag } from "./ui";
+import { AVAILABILITY, Avatar, Dot, Icon, Notice, PortalTag, Seg, Switch, Tag } from "./ui";
 import { reloj } from "./vistas";
 import { useQuery } from "@tanstack/react-query";
 
@@ -76,7 +76,6 @@ export function Cola() {
   return (
     <main className="ag-page">
       <header className="ag-page-head">
-        <span className="ag-eyebrow">Director</span>
         <h1>Cola y reparto</h1>
       </header>
 
@@ -234,7 +233,7 @@ function AgentDrawer({ agent, agents, onClose }: { agent: Agent; agents: Agent[]
             <Avatar name={agent.name} url={agent.photo_url} size={44} />
             <div><h2>{agent.name}</h2><div className="ag-sub">{agent.email}</div></div>
           </div>
-          <button type="button" className="ag-btn ag-press" aria-label="Cerrar el panel" onClick={onClose} autoFocus>✕</button>
+          <button type="button" className="ag-btn ag-press" aria-label="Cerrar el panel" onClick={onClose} autoFocus><Icon name="close" /></button>
         </div>
         {problem ? <Notice>{problem}</Notice> : null}
         <div className="ag-drawer-body">
@@ -278,7 +277,6 @@ export function Informes() {
   return (
     <main className="ag-page">
       <header className="ag-page-head">
-        <span className="ag-eyebrow">Director</span>
         <h1>Informes</h1>
         <Seg value={days} label="Periodo" options={[7, 30, 90].map((n) => ({ value: n, label: `${n} días` }))} onChange={setDays} />
       </header>

@@ -37,6 +37,10 @@
                                                  no tocó → { removed, total }. Sin embeddings: lo nuevo se indexa con «lote».
      { action: "analizar", portal: "cifras" | "impacto", analysis: {brief, part, title, facts, pdi, doc?, scope?} }
                                                  → { summary, paragraphs, alerts, recommendations, unknown, verified }
+     { action: "sugerir", portal: "encuestas", pregunta: {tipo, enunciado, apoyo?, opciones?, unidad?, encuesta?} }
+                                                 → { explicacion, model }   (Capa de Pilo del editor de encuestas, 0184)
+                                                 Un borrador de la explicación que Pilo da de ese dato. Con la IA encendida y sesión
+                                                 del personal; nunca inventa cifras ni plazos que no vengan en la pregunta.
      { action: "comprender", space, doc?, step: "estado" | "lote" }                            (solo administración, 0115)
                                                  → { ai, status } · { asked, saved, failed, calls, done, stopped?, status }
      { action: "moodle", space, site, step: "probar" | "categorias" | "cursos" | "curso", category?, course? }   (solo administración, 0116 y 0133)
@@ -126,7 +130,7 @@ const LECTORES: Record<Fuente, Lector> = { cifras: lectorCifras, boletines: lect
 // Va dentro para que la función sea un solo archivo y se pueda desplegar
 // también pegándola en el editor del panel de Supabase.
 
-export type Action = "resumir" | "sintetizar" | "explicar" | "voz" | "probar" | "preguntar" | "entender" | "analizar" | "indexar" | "comprender" | "moodle" | "puentes" | "web" | "premisas" | "evolucion";
+export type Action = "resumir" | "sintetizar" | "explicar" | "voz" | "probar" | "preguntar" | "entender" | "analizar" | "sugerir" | "indexar" | "comprender" | "moodle" | "puentes" | "web" | "premisas" | "evolucion";
 export type Fn = "leer" | "resumir" | "sintetizar" | "explicar" | "preguntar";
 export type Audience = "admin" | "sesion" | "publico";
 export type Portal = "cifras" | "pdi" | "observatorio" | "impacto" | "pregunta";
@@ -160,7 +164,7 @@ export interface Section {
 
 export const PORTALS: Portal[] = ["cifras", "pdi", "observatorio", "impacto", "pregunta"];
 export const SPACE_PORTALS: SpacePortal[] = ["ensenanza"];
-export const FN_OF: Record<Exclude<Action, "probar" | "indexar" | "comprender" | "moodle" | "puentes" | "web" | "premisas" | "evolucion">, Fn> = { resumir: "resumir", sintetizar: "sintetizar", explicar: "explicar", voz: "leer", preguntar: "preguntar", entender: "sintetizar", analizar: "sintetizar" };
+export const FN_OF: Record<Exclude<Action, "probar" | "indexar" | "comprender" | "moodle" | "puentes" | "web" | "premisas" | "evolucion" | "sugerir">, Fn> = { resumir: "resumir", sintetizar: "sintetizar", explicar: "explicar", voz: "leer", preguntar: "preguntar", entender: "sintetizar", analizar: "sintetizar" };
 
 /**
  * ¿Puede esta persona (null = sin sesión) usar la acción en el portal?
@@ -187,6 +191,11 @@ export function canUse(rules: Rules, portal: string, action: Action, role: Role 
   if (action === "entender") {
     if (!rules.enabled) return { ok: false, reason: "Mr. Pilo con IA está apagado." };
     return role ? { ok: true } : { ok: false, reason: "Inicie sesión para que Pilo entienda su necesidad." };
+  }
+  // La Capa de Pilo del editor de encuestas (0184): el personal con sesión, con la IA encendida.
+  if (action === "sugerir") {
+    if (!rules.enabled) return { ok: false, reason: "Mr. Pilo con IA está apagado: enciéndalo en Mr. Pilo con IA › Conexión." };
+    return role ? { ok: true } : { ok: false, reason: "Inicie sesión para que Pilo sugiera una explicación." };
   }
   // «Análisis de los datos» (boletines de UDES en Cifras): quien arma boletines, con la IA encendida.
   if (action === "analizar") {
@@ -6471,7 +6480,7 @@ async function handle(request: Request): Promise<Response> {
   // La lectura de una página (0127) trae su texto entero: tiene su propio tope.
   if (body.action === "captura" && bodySize > CAPTURE_BODY_MAX) return json({ status: "no" });
   const requested = body.action;
-  if (!requested || !["resumir", "sintetizar", "explicar", "voz", "probar", "preguntar", "calificar", "captura", "recoger", "entender", "analizar", "indexar", "comprender", "moodle", "puentes", "web", "premisas", "evolucion", "cantar"].includes(requested)) {
+  if (!requested || !["resumir", "sintetizar", "explicar", "voz", "probar", "preguntar", "calificar", "captura", "recoger", "entender", "analizar", "indexar", "comprender", "moodle", "puentes", "web", "premisas", "evolucion", "cantar", "sugerir"].includes(requested)) {
     return json({ error: "Acción desconocida." }, 400);
   }
   // Calificar una respuesta, mandar la lectura de una página (0127) y recoger una respuesta (0128) piden los mismos permisos que preguntar.
@@ -9597,6 +9606,60 @@ async function handle(request: Request): Promise<Response> {
       if (settings.cache_days > 0) await admin.from("pilo_ai_cache").upsert({ key, result, created_at: new Date().toISOString() });
       await log("listo", `analizar · ${input.title}`);
       return json({ ...result, cached: false });
+    }
+
+    // --- Capa de Pilo del editor de encuestas (0184): un borrador de la explicación de un dato ------
+    // Solo cuenta lo que trae la pregunta; sin cifras, plazos ni nombres inventados. Siempre vuelve como borrador.
+    if (action === "sugerir") {
+      const q = (body as { pregunta?: Record<string, unknown> }).pregunta;
+      const enunciado = typeof q?.enunciado === "string" ? q.enunciado.replace(/\s+/g, " ").trim().slice(0, 300) : "";
+      if (enunciado.length < 3) return json({ error: "Escriba primero la pregunta para que Pilo pueda explicarla." }, 400);
+      const texto = (v: unknown, n: number) => (typeof v === "string" ? v.replace(/\s+/g, " ").trim().slice(0, n) : "");
+      const opciones = Array.isArray(q?.opciones) ? (q?.opciones as unknown[]).slice(0, 20).map((o) => texto(o, 80)).filter(Boolean) : [];
+      const datos = [
+        `Encuesta: ${texto(q?.encuesta, 160) || "(sin título)"}`,
+        `Tipo de dato: ${texto(q?.tipo, 40)}`,
+        `Pregunta: ${enunciado}`,
+        texto(q?.apoyo, 300) ? `Texto de apoyo del editor: ${texto(q?.apoyo, 300)}` : "",
+        texto(q?.unidad, 40) ? `Unidad de la cifra: ${texto(q?.unidad, 40)}` : "",
+        opciones.length ? `Opciones: ${opciones.join(" | ")}` : "",
+      ].filter(Boolean).join("\n");
+      const messages = [
+        { role: "system", content: PERSONA },
+        {
+          role: "user",
+          content: `Escribe, en 2 o 3 frases, lo que Mr. Pilo le dice a quien responde para explicarle qué se le pide en este dato y cómo llenarlo bien: qué debe escribir, con un ejemplo genérico sin cifras, y qué evitar. Háblale de usted. No inventes plazos, cifras reales, nombres de dependencias ni reglas que no estén en los datos. Formato: {"explicacion":"..."}\n\n${datos}`,
+        },
+      ];
+      const { response } = await chat(messages, { temperature: 0.3, max_tokens: 400, json: true, signal: AbortSignal.timeout(40_000) }).catch((error: unknown) => {
+        if (error instanceof DOMException && (error.name === "TimeoutError" || error.name === "AbortError")) return { response: null };
+        throw error;
+      });
+      if (!response) {
+        await log("error tiempo", `sugerir · ${enunciado}`);
+        return json({ error: "El proveedor tardó demasiado. Vuelva a intentarlo.", code: "tiempo" }, 504);
+      }
+      if (!response.ok) {
+        const detail = await providerDetail(response);
+        await log(`error ${response.status}`, `sugerir · ${detail}`);
+        if (response.status === 429) return json({ error: LIMIT_429, code: "limite_proveedor" }, 429);
+        return json({ error: `El proveedor respondió ${response.status}${detail ? `: ${detail}` : ""}.`, code: "proveedor" }, 502);
+      }
+      const data = await response.json();
+      const raw = String(data?.choices?.[0]?.message?.content ?? "");
+      let explicacion = "";
+      try {
+        explicacion = String(JSON.parse(raw.slice(raw.indexOf("{"), raw.lastIndexOf("}") + 1)).explicacion ?? "");
+      } catch {
+        explicacion = raw;
+      }
+      explicacion = explicacion.replace(/\s+/g, " ").trim().slice(0, 600);
+      if (!explicacion) {
+        await log("error vacio", `sugerir · ${enunciado}`);
+        return json({ error: "La IA no devolvió texto. Vuelva a intentarlo.", code: "vacio" }, 502);
+      }
+      await log("listo", `sugerir · ${enunciado}`);
+      return json({ explicacion, model: target.model });
     }
 
     if (action === "entender") {

@@ -402,9 +402,18 @@ select.ep-input {
 
 .ep-btn:disabled,
 .ep-opcion:disabled {
-  opacity: 0.5;
+  background: #eef2f7;
+  border-color: var(--ep-line-2);
+  color: #5b6b86; /* 5.4:1 sobre blanco; sin opacity, que lavaba el texto */
   cursor: not-allowed;
   box-shadow: none;
+}
+
+/* Un botón de acción desactivado conserva letras blancas (5.5:1) sobre gris azulado sólido. */
+.ep-btn--pri:disabled {
+  background: #5b6b86;
+  border-color: #5b6b86;
+  color: #fff;
 }
 
 .ep-btn:disabled:active {
@@ -1021,5 +1030,379 @@ select.ep-input {
   .ep-opcion,
   .ep-input {
     transition-duration: 0.01ms;
+  }
+}
+
+/* ---------- Editar y quitar en «lo que lleva registrado» ---------- */
+.ep-cola__acc {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.ep-accion {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 44px;
+  padding: 0 12px;
+  border: 0;
+  border-radius: 9px;
+  background: transparent;
+  color: var(--ep-blue);
+  font-weight: 600;
+  font-size: 15px;
+  transition: transform 140ms var(--ep-ease), background 140ms ease;
+}
+
+.ep-accion:active {
+  transform: scale(0.97);
+}
+
+.ep-accion:disabled {
+  color: #5b6b86;
+  cursor: not-allowed;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .ep-accion:hover:not(:disabled) {
+    background: var(--ep-blue-soft);
+  }
+}
+
+@media (max-width: 520px) {
+  .ep-accion span {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+  }
+  .ep-accion {
+    width: 44px;
+    padding: 0;
+    justify-content: center;
+  }
+}
+
+.ep-quitar {
+  width: 44px;
+  height: 44px;
+}
+
+/* Aviso de «Deshacer»: fondo marino, letras blancas. */
+.ep-deshacer {
+  position: fixed;
+  left: 50%;
+  bottom: 20px;
+  z-index: 30;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  max-width: min(520px, calc(100vw - 32px));
+  padding: 8px 8px 8px 18px;
+  border-radius: 12px;
+  background: #0d1c31;
+  color: #fff;
+  font-size: 15px;
+  box-shadow: 0 12px 30px -12px rgba(0, 20, 50, 0.6);
+  opacity: 0;
+  pointer-events: none;
+  transform: translate(-50%, 8px);
+  transition: opacity 160ms ease, transform 200ms var(--ep-ease);
+}
+
+.ep-deshacer[data-on] {
+  opacity: 1;
+  pointer-events: auto;
+  transform: translate(-50%, 0);
+}
+
+.ep-deshacer button {
+  min-height: 44px;
+  padding: 0 16px;
+  border: 1.5px solid #fff;
+  border-radius: 9px;
+  background: transparent;
+  color: #fff;
+  font-weight: 600;
+  transition: transform 140ms var(--ep-ease);
+}
+
+.ep-deshacer button:active {
+  transform: scale(0.97);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ep-deshacer {
+    transform: translate(-50%, 0);
+    transition: opacity 120ms linear;
+  }
+}
+
+/* ---------- Encuestas del modelo nuevo: campos, overlay de Pilo, salida ---------- */
+.ep-formulario {
+  display: flex;
+  flex-direction: column;
+}
+
+.ep-seccion {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.ep-q {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px 14px;
+  margin: -12px -14px;
+  border-radius: 14px;
+  border: 1.5px solid transparent;
+  transition: border-color 160ms ease, background-color 160ms ease;
+}
+
+.ep-q[data-foco="1"] {
+  border-color: var(--ep-blue);
+  background: var(--ep-blue-soft);
+}
+
+.ep-q__l {
+  font-weight: 600;
+  font-size: 17px;
+}
+
+.ep-opc {
+  font-weight: 400;
+  color: var(--ep-ink-3);
+}
+
+.ep-fino {
+  font-size: 14px;
+  color: var(--ep-ink-3);
+}
+
+.ep-ayuda {
+  margin: 0;
+  font-size: 14.5px;
+  color: var(--ep-ink-2);
+}
+
+.ep-input--corto {
+  max-width: 220px;
+}
+
+.ep-opciones {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.ep-eleccion {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 48px;
+  padding: 8px 14px;
+  border: 1.5px solid var(--ep-line-2);
+  border-radius: 11px;
+  background: var(--ep-paper);
+  cursor: pointer;
+}
+
+.ep-eleccion input {
+  width: 20px;
+  height: 20px;
+  accent-color: var(--ep-blue);
+}
+
+.ep-escala {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.ep-escala__n {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 48px;
+  height: 48px;
+  border: 1.5px solid var(--ep-line-2);
+  border-radius: 11px;
+  background: var(--ep-paper);
+  font-weight: 700;
+  cursor: pointer;
+  transition: transform 140ms var(--ep-ease), background-color 140ms ease;
+}
+
+.ep-escala__n:active {
+  transform: scale(0.97);
+}
+
+.ep-escala__n input {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+
+.ep-escala__n[data-on="1"] {
+  background: var(--ep-blue);
+  border-color: var(--ep-blue);
+  color: #fff;
+}
+
+.ep-escala__n:focus-within {
+  outline: 2.5px solid var(--ep-blue);
+  outline-offset: 2px;
+}
+
+.ep-escala__ext {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 6px;
+  font-size: 14px;
+  color: var(--ep-ink-3);
+}
+
+.ep-fila-botones {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-bottom: 12px;
+}
+
+.ep-verificacion {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 16px;
+  border: 1.5px dashed var(--ep-line-2);
+  border-radius: 14px;
+}
+
+/* El overlay de Pilo, junto al campo enfocado. */
+.ep-ov {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+  margin-top: 4px;
+  padding: 12px 14px;
+  border-radius: 14px;
+  background: #0d1c31;
+  color: #fff;
+  box-shadow: 0 12px 30px -14px rgba(0, 20, 50, 0.6);
+}
+
+.ep-ov[data-tipo="confirmar"] {
+  background: #5a2a00;
+}
+
+.ep-ov__t p {
+  margin: 2px 0 0;
+  line-height: 1.5;
+  font-size: 15px;
+}
+
+.ep-ov__acc {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-top: 10px;
+}
+
+.ep-ov__acc .ep-btn--pri {
+  background: #fff;
+  border-color: #fff;
+  color: #0d1c31;
+}
+
+.ep-ov__acc .ep-btn:not(.ep-btn--pri) {
+  background: transparent;
+  border-color: #fff;
+  color: #fff;
+}
+
+.ep-deshacer--en-linea {
+  position: static;
+  transform: none;
+  margin-top: 12px;
+  display: none;
+}
+
+.ep-deshacer--en-linea[data-on] {
+  display: flex;
+  transform: none;
+}
+
+.ep-escena--clasica {
+  grid-template-columns: minmax(0, 1fr);
+  max-width: 760px;
+  margin-inline: auto;
+}
+
+.ep-cabecera-img {
+  display: block;
+  width: 100%;
+  max-height: 180px;
+  object-fit: cover;
+  border-radius: 14px;
+  margin-bottom: 12px;
+}
+
+.ep-salida {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 16px;
+  padding: 28px 12px;
+}
+
+.ep-salida__paso {
+  max-width: 52ch;
+  padding: 14px 18px;
+  border-radius: 14px;
+  background: var(--ep-blue-soft);
+  text-align: left;
+}
+
+.ep-salida__paso p {
+  margin: 4px 0 0;
+}
+
+.ep-salida__resumen {
+  width: min(560px, 100%);
+  margin: 0;
+  text-align: left;
+  display: grid;
+  gap: 8px;
+}
+
+.ep-salida__resumen dt {
+  font-size: 14px;
+  color: var(--ep-ink-3);
+}
+
+.ep-salida__resumen dd {
+  margin: 0;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+a.ep-btn {
+  text-decoration: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ep-q,
+  .ep-escala__n {
+    transition: background-color 120ms linear;
+  }
+  .ep-escala__n:active {
+    transform: none;
   }
 }

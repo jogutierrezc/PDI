@@ -13,7 +13,7 @@ import { useEffect, useRef, useState } from "react";
 import type { FormEvent, KeyboardEvent } from "react";
 import { TIPOS_CIFRA, textoTipoAporte } from "../tipos";
 import type { AporteEnvio, CuentaMicrosoft, TipoAporte } from "../tipos";
-import { caben, formatearValor, leerNumero, LIMITES, validarCifras, validarDependencia, validarDescripcion, validarTitulo } from "../lib/validacion";
+import { aBorradorCifra, caben, formatearValor, leerNumero, LIMITES, validarCifras, validarDependencia, validarDescripcion, validarTitulo } from "../lib/validacion";
 import type { CifraBorrador } from "../lib/validacion";
 import { DOMINIOS_VISIBLES, GUIA, guiaDetalle } from "./frases";
 import type { DecirGuia } from "./tipos-pub";
@@ -32,6 +32,12 @@ export const IconoMicrosoft = () => (
 const IconoQuitar = () => (
   <svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
     <path d="M3 5h12M7.5 5V3.5h3V5M5 5l.7 9.5h6.6L13 5" />
+  </svg>
+);
+
+const IconoEditar = () => (
+  <svg width="18" height="18" viewBox="0 0 18 18" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    <path d="M3 15l1-4L13.5 1.5l3 3L7 14l-4 1zM11.5 3.5l3 3" />
   </svg>
 );
 
@@ -171,6 +177,7 @@ export function Elegir({
   enviando,
   error,
   onElegir,
+  onEditar,
   onQuitar,
   onEnviar,
 }: {
@@ -181,6 +188,7 @@ export function Elegir({
   /** El error del último intento de envío, con su reintento. */
   error: string | null;
   onElegir: (t: TipoAporte) => void;
+  onEditar: (i: number) => void;
   onQuitar: (i: number) => void;
   onEnviar: () => void;
 }) {
@@ -227,9 +235,15 @@ export function Elegir({
                   <div className="ep-cola__t">{a.titulo}</div>
                   <div className="ep-cola__m">{a.cifras.length === 1 ? "1 cifra" : `${a.cifras.length} cifras`}</div>
                 </div>
-                <button type="button" className="ep-quitar" aria-label={`Quitar: ${a.titulo}`} onClick={() => onQuitar(i)} disabled={enviando}>
-                  <IconoQuitar />
-                </button>
+                <div className="ep-cola__acc">
+                  <button type="button" className="ep-accion" aria-label={`Editar: ${a.titulo}`} onClick={() => onEditar(i)} disabled={enviando}>
+                    <IconoEditar />
+                    <span>Editar</span>
+                  </button>
+                  <button type="button" className="ep-quitar" aria-label={`Quitar: ${a.titulo}`} onClick={() => onQuitar(i)} disabled={enviando}>
+                    <IconoQuitar />
+                  </button>
+                </div>
               </li>
             ))}
           </ul>
@@ -260,19 +274,22 @@ const cifraNueva = (): CifraBorrador => ({ id: ++contadorCifras, que: "", tipo: 
 
 export function Detalle({
   tipo,
+  inicial,
   onGuardar,
   onVolver,
   decir,
 }: {
   tipo: TipoAporte;
+  /** Al editar, el aporte que se carga en el formulario. */
+  inicial?: AporteEnvio;
   onGuardar: (a: AporteEnvio) => void;
   onVolver: () => void;
   decir: DecirGuia;
 }) {
   const [sub, setSub] = useState<1 | 2 | 3>(1);
-  const [titulo, setTitulo] = useState("");
-  const [descripcion, setDescripcion] = useState("");
-  const [cifras, setCifras] = useState<CifraBorrador[]>(() => [cifraNueva()]);
+  const [titulo, setTitulo] = useState(inicial?.titulo ?? "");
+  const [descripcion, setDescripcion] = useState(inicial?.descripcion ?? "");
+  const [cifras, setCifras] = useState<CifraBorrador[]>(() => (inicial?.cifras.length ? inicial.cifras.map((c) => aBorradorCifra(c, ++contadorCifras)) : [cifraNueva()]));
   const [errorTexto, setErrorTexto] = useState<string | null>(null);
   const [erroresCifra, setErroresCifra] = useState<Map<number, { campo: string; mensaje: string }>>(new Map());
   const [errorCifras, setErrorCifras] = useState<string | null>(null);
@@ -351,7 +368,7 @@ export function Detalle({
 
   return (
     <div className="ep-panel" ref={raiz} onKeyDown={alTeclear}>
-      <span className={`ep-chip ep-tag--${tipo}`}>{tipo === "logro" ? "Registrando un logro" : "Registrando un reto"}</span>
+      <span className={`ep-chip ep-tag--${tipo}`}>{inicial ? (tipo === "logro" ? "Editando un logro" : "Editando un reto") : tipo === "logro" ? "Registrando un logro" : "Registrando un reto"}</span>
 
       {sub === 1 && (
         <div>
@@ -510,7 +527,7 @@ export function Detalle({
           ))}
         </div>
         <button type="button" className="ep-btn ep-btn--pri" onClick={siguiente}>
-          {sub === 3 ? `Guardar ${tipo}` : "Siguiente"}
+          {sub === 3 ? (inicial ? "Guardar cambios" : `Guardar ${tipo}`) : "Siguiente"}
         </button>
       </div>
     </div>

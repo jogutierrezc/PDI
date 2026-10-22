@@ -87,9 +87,22 @@ export function fechaCorta(iso: string): string {
   return `${p.year}-${p.month}-${p.day} ${p.hour === "24" ? "00" : p.hour}:${p.minute}`;
 }
 
-/** Los aportes en orden de llegada, con su número. */
+/** ¿Sigue vigente (no está en la papelera)? */
+export const vigente = (a: Aporte): boolean => !a.borrado_en;
+
+export const DIAS_PAPELERA = 30;
+
+/** Días que le quedan a una respuesta borrada antes de la purga (0 si ya venció). */
+export function diasParaPurga(borradoEn: string, ahora: Date = new Date()): number {
+  const t = new Date(borradoEn).getTime();
+  if (Number.isNaN(t)) return 0;
+  return Math.max(0, Math.ceil(DIAS_PAPELERA - (ahora.getTime() - t) / 86_400_000));
+}
+
+/** Los aportes vigentes en orden de llegada, con su número. */
 export function numerar(aportes: readonly Aporte[]): { aporte: Aporte; n: number }[] {
-  return [...aportes].sort((a, b) => a.created_at.localeCompare(b.created_at) || a.id.localeCompare(b.id)).map((aporte, i) => ({ aporte, n: i + 1 }));
+  return aportes
+    .filter(vigente).sort((a, b) => a.created_at.localeCompare(b.created_at) || a.id.localeCompare(b.id)).map((aporte, i) => ({ aporte, n: i + 1 }));
 }
 
 const cifrasOrdenadas = (a: Aporte): Cifra[] => [...a.cifras].sort((x, y) => x.orden - y.orden);
@@ -151,7 +164,7 @@ export function filasDe(aportes: readonly Aporte[], vista: Vista, filtros: Filtr
 }
 
 /** Las dependencias que hay, en orden alfabético, para el filtro. */
-export const dependenciasDe = (aportes: readonly Aporte[]): string[] => [...new Set(aportes.map((a) => a.dependencia))].sort((a, b) => a.localeCompare(b, "es"));
+export const dependenciasDe = (aportes: readonly Aporte[]): string[] => [...new Set(aportes.filter(vigente).map((a) => a.dependencia))].sort((a, b) => a.localeCompare(b, "es"));
 
 export interface Resumen {
   recibidas: number;
@@ -161,13 +174,14 @@ export interface Resumen {
   cifras: number;
 }
 
-export function resumir(aportes: readonly Aporte[]): Resumen {
+export function resumir(todos: readonly Aporte[]): Resumen {
+  const vivos = todos.filter(vigente);
   return {
-    recibidas: aportes.length,
-    logros: aportes.filter((a) => a.tipo === "logro").length,
-    retos: aportes.filter((a) => a.tipo === "reto").length,
-    dependencias: new Set(aportes.map((a) => a.dependencia)).size,
-    cifras: aportes.reduce((s, a) => s + a.cifras.length, 0),
+    recibidas: vivos.length,
+    logros: vivos.filter((a) => a.tipo === "logro").length,
+    retos: vivos.filter((a) => a.tipo === "reto").length,
+    dependencias: new Set(vivos.map((a) => a.dependencia)).size,
+    cifras: vivos.reduce((s, a) => s + a.cifras.length, 0),
   };
 }
 

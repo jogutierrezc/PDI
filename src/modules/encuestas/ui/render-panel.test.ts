@@ -6,7 +6,15 @@ import { createElement as h } from "react";
 import { describe, expect, it, vi } from "vitest";
 import { renderToString } from "react-dom/server";
 import type { Aporte, Encuesta } from "../tipos";
-import { ConfigEncuesta } from "./ConfigEncuesta";
+import { plantillaDe } from "../lib/plantillas";
+import { preguntasDe } from "../lib/estructura";
+import { leerConfig } from "../lib/config";
+import { Entrada } from "../publico/Campos";
+import { Formulario } from "../publico/Formulario";
+import { Acceso } from "./Acceso";
+import { EstructuraCol } from "./Estructura";
+import { PropiedadesCol } from "./Propiedades";
+import { Resultados } from "./Resultados";
 import { TablaRespuestas } from "./TablaRespuestas";
 
 vi.mock("../../../lib/supabase", () => ({ supabase: {} }));
@@ -72,30 +80,106 @@ describe("TablaRespuestas", () => {
   });
 });
 
-describe("ConfigEncuesta", () => {
-  const encuesta: Encuesta = {
-    id: "e1",
-    slug: "rendicion-2026",
-    titulo: "Construyamos juntos la Rendición de Cuentas",
-    anio: "2026",
-    abierta: true,
-    cierra_el: "2026-11-15",
-    intro: "Estoy recopilando cifras.",
-    despedida: "Gracias por su aporte.",
-    created_at: "2026-10-01T00:00:00Z",
-    updated_at: "2026-10-01T00:00:00Z",
-  };
-  it("quien edita ve el botón de guardar y la vista previa", () => {
-    const html = renderToString(h(ConfigEncuesta, { encuesta, puedeEditar: true, guardando: false, onGuardar: vi.fn() }));
-    expect(html).toContain('value="2026-11-15"');
-    const t = texto(html);
-    expect(t).toContain("Guardar cambios");
-    expect(t).toContain("Estoy recopilando cifras.");
-    expect(t).toContain("Por ahora esta encuesta trae estas preguntas fijas");
+const encuesta: Encuesta = {
+  id: "e1",
+  slug: "satisfaccion",
+  titulo: "Encuesta de satisfacción",
+  anio: "2026",
+  abierta: false,
+  cierra_el: null,
+  intro: "Estoy recopilando opiniones.",
+  despedida: "Gracias por responder.",
+  created_at: "2026-10-01T00:00:00Z",
+  updated_at: "2026-10-01T00:00:00Z",
+  acceso: "microsoft",
+  dominios_permitidos: ["udes.edu.co"],
+  una_por_persona: false,
+  abre_el: null,
+  limite_respuestas: null,
+  mensaje_cierre: "",
+  estado: "borrador",
+  plantilla_origen: "satisfaccion",
+  modo_llenado: "guiado",
+  config_pilo: {},
+  version_publicada_id: null,
+};
+const estructura = plantillaDe("satisfaccion")!.estructura();
+
+describe("editor: columnas", () => {
+  it("la estructura lista las preguntas con asa, subir y bajar", () => {
+    const html = renderToString(h(EstructuraCol, { estructura, seleccion: "servicio", puedeEditar: true, onSeleccionar: vi.fn(), onNombreSeccion: vi.fn(), onMover: vi.fn(), onArrastrar: vi.fn(), onAgregar: vi.fn(), onAgregarSeccion: vi.fn(), onQuitarSeccion: vi.fn(), onMoverSeccion: vi.fn() }));
+    expect(texto(html)).toContain("5 preguntas");
+    expect(html).toContain("arrastre, o use Alt con flecha arriba o abajo");
+    expect(html).toContain('aria-current="true"');
+    expect(html).toContain("Subir «¿Qué servicio utilizó?»");
+    expect(html).toContain('aria-live="polite"');
   });
-  it("quien solo lee no tiene botón de guardar y los campos no se editan", () => {
-    const html = renderToString(h(ConfigEncuesta, { encuesta, puedeEditar: false, guardando: false, onGuardar: vi.fn() }));
-    expect(texto(html)).not.toContain("Guardar cambios");
-    expect(html).toContain(`readonly=""`);
+  it("quien solo lee no ve asas ni botones de mover", () => {
+    const html = renderToString(h(EstructuraCol, { estructura, seleccion: null, puedeEditar: false, onSeleccionar: vi.fn(), onNombreSeccion: vi.fn(), onMover: vi.fn(), onArrastrar: vi.fn(), onAgregar: vi.fn(), onAgregarSeccion: vi.fn(), onQuitarSeccion: vi.fn(), onMoverSeccion: vi.fn() }));
+    expect(html).not.toContain("ed-asa");
+    expect(html).not.toContain("Agregar pregunta");
+  });
+  it("las propiedades traen la Capa de Pilo con su botón de sugerencia", () => {
+    const html = renderToString(h(PropiedadesCol, { pregunta: estructura.secciones[0].preguntas[1], anteriores: [estructura.secciones[0].preguntas[0]], tituloEncuesta: "x", puedeEditar: true, iaEncendida: true, onCambiar: vi.fn() }));
+    const t = texto(html);
+    expect(t).toContain("Capa de Pilo");
+    expect(t).toContain("Que Pilo la sugiera");
+    expect(t).toContain("Mostrar si");
+    expect(html).toContain("1 es nada satisfecho");
+  });
+});
+
+describe("acceso, presentación y resultados", () => {
+  it("el acceso lista «Antes de publicar» y deshabilita Publicar si algo falta", () => {
+    const html = renderToString(h(Acceso, { encuesta: { ...encuesta, mensaje_cierre: "" }, estructura, puedeEditar: true, guardando: false, publicando: false, onGuardar: vi.fn(), onPublicar: vi.fn(), onAviso: vi.fn() }));
+    const t = texto(html);
+    expect(t).toContain("Antes de publicar");
+    expect(t).toContain("Tiene un mensaje para cuando cierre");
+    expect(html).toMatch(/<button[^>]*disabled[^>]*>Publicar encuesta<\/button>/);
+    expect(html).toContain("Código QR del enlace");
+  });
+  it("abierta pide verificación contra robots y no ofrece «una por persona»", () => {
+    const html = renderToString(h(Acceso, { encuesta: { ...encuesta, acceso: "abierta" }, estructura, puedeEditar: true, guardando: false, publicando: false, onGuardar: vi.fn(), onPublicar: vi.fn(), onAviso: vi.fn() }));
+    const t = texto(html);
+    expect(t).toContain("Verificación contra robots");
+    expect(t).not.toContain("Una respuesta por persona");
+  });
+  it("los resultados cuentan por estado y dibujan barras con su número", () => {
+    const r = (id: string, valores: Record<string, unknown>, e: "recibido" | "revisado" = "recibido") => ({ id, estado: e, valores: valores as never });
+    const html = renderToString(h(Resultados, { estructura, respuestas: [r("1", { satisfaccion: 5 }), r("2", { satisfaccion: 5 }, "revisado"), { ...r("3", { satisfaccion: 1 }), borrado_en: "2026-10-01" }] }));
+    const t = texto(html);
+    expect(t).toContain("2 respuestas");
+    expect(t).toContain("Revisado");
+    expect(html).toContain("data-barra");
+  });
+  it("sin respuestas lo dice", () => {
+    expect(texto(renderToString(h(Resultados, { estructura, respuestas: [] })))).toContain("Todavía no hay resultados");
+  });
+});
+
+describe("renderizador público de la estructura", () => {
+  const config = leerConfig({});
+  const base = { estructura, config, valores: {}, onValores: vi.fn(), enviando: false, errorEnvio: null, onEnviar: vi.fn() };
+  it("el clásico pone todas las secciones y la ayuda de Pilo como texto", () => {
+    const html = renderToString(h(Formulario, { ...base, modo: "clasico" }));
+    const t = texto(html);
+    expect(t).toContain("¿Qué servicio utilizó?");
+    expect(t).toContain("1 es nada satisfecho");
+    expect(t).toContain("(opcional)");
+    expect(html).not.toContain("porque_no");
+  });
+  it("la lógica «mostrar si» oculta y muestra", () => {
+    expect(renderToString(h(Formulario, { ...base, modo: "clasico", valores: { volveria: "no" } }))).toContain("q-porque_no");
+  });
+  it("el guiado muestra el avance y botón Siguiente o Enviar", () => {
+    const multi = plantillaDe("evento")!.estructura();
+    const html = renderToString(h(Formulario, { ...base, estructura: multi, modo: "guiado" }));
+    expect(texto(html)).toContain("Parte 1 de 2");
+    expect(texto(html)).toContain("Siguiente");
+  });
+  it("cada tipo de campo se pinta", () => {
+    for (const p of preguntasDe(plantillaDe("evento")!.estructura())) {
+      expect(renderToString(h(Entrada, { p, valor: undefined, decir: vi.fn(), onCambio: vi.fn(), onFoco: vi.fn() }))).toContain(`q-${p.id}`);
+    }
   });
 });

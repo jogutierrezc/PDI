@@ -48,6 +48,17 @@ export function enterMessages(items: Element[]) {
   from(items, {}, 8, 0.22, Math.min(0.04, 0.2 / Math.max(1, items.length)));
 }
 
+/** Cambió la conversación elegida: el panel entra con un fundido y 6 px desde la derecha (180 ms). */
+export function enterPane(pane: Element | null) {
+  if (!pane) return;
+  gsap.killTweensOf(pane);
+  if (reducedMotion()) {
+    gsap.fromTo(pane, { opacity: 0 }, { opacity: 1, duration: 0.12, ease: "none", clearProps: "opacity" });
+    return;
+  }
+  gsap.fromTo(pane, { opacity: 0, x: 6 }, { opacity: 1, x: 0, duration: 0.18, ...D });
+}
+
 /** La oferta de una conversación nueva. */
 export function enterOffer(card: Element | null) {
   if (card) from(card, { scale: 0.97 }, -8, 0.24);

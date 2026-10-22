@@ -9,14 +9,42 @@ import { PORTAL_NAME } from "./datos";
 import type { Availability, SpaceKey } from "./datos";
 import { enterToast } from "./motion";
 
-/** La foto del agente; mientras no exista, sus iniciales dentro de un círculo punteado. */
+const TINTS: [string, string][] = [
+  ["#eaf1fd", "#1b52ad"],
+  ["#dff3f5", "#00505a"],
+  ["#e8ecf5", "#0a2d63"],
+  ["#fbf2e0", "#7a5600"],
+  ["#e6f4ea", "#0d6b2f"],
+];
+
+/** La foto del agente; mientras no exista, sus iniciales sobre un tono suave y estable por nombre. */
 export function Avatar({ name, url, size = 36 }: { name: string; url?: string; size?: number }) {
-  const style = { width: size, height: size, fontSize: Math.max(10, Math.round(size * 0.3)) };
+  const style = { width: size, height: size, fontSize: Math.max(11, Math.round(size * 0.36)) };
   if (url) return <img className="ag-avatar" src={url} alt={`Foto de ${name}`} style={style} />;
+  const [bg, fg] = TINTS[Array.from(name).reduce((n, ch) => n + ch.charCodeAt(0), 0) % TINTS.length];
   return (
-    <span className="ag-avatar ag-avatar-ini" role="img" aria-label={`Foto de ${name} por llegar`} style={style}>
+    <span className="ag-avatar ag-avatar-ini" role="img" aria-label={name} style={{ ...style, background: bg, color: fg }}>
       {initials(name)}
     </span>
+  );
+}
+
+const ICONS: Record<string, string> = {
+  clip: "M21 11.5 12.6 19.9a5 5 0 0 1-7.1-7.1l8.5-8.5a3.3 3.3 0 0 1 4.7 4.7l-8.5 8.5a1.7 1.7 0 0 1-2.4-2.4l7.8-7.8",
+  smile: "M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18ZM8.5 14.2a4.2 4.2 0 0 0 7 0M9 9.5h.01M15 9.5h.01",
+  down: "M12 4v11m0 0-4.5-4.5M12 15l4.5-4.5M5 20h14",
+  close: "M6 6l12 12M18 6 6 18",
+  back: "M15 5l-7 7 7 7",
+  info: "M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18ZM12 11v5.5M12 7.8h.01",
+  send: "M4 12 20 4l-5 16-3.5-6.5L4 12Z",
+};
+
+/** Iconos de trazo (24 px, 1.8 de grosor) en un solo juego; heredan el color del texto. */
+export function Icon({ name, size = 20 }: { name: keyof typeof ICONS; size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" focusable="false">
+      <path d={ICONS[name]} />
+    </svg>
   );
 }
 

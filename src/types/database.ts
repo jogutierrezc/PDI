@@ -2148,10 +2148,64 @@ export interface EncEncuestaRow {
   despedida: string;
   created_at: string;
   updated_at: string;
+  /** Editor de encuestas (0184). */
+  acceso: EncAcceso;
+  dominios_permitidos: string[];
+  una_por_persona: boolean;
+  abre_el: string | null;
+  limite_respuestas: number | null;
+  mensaje_cierre: string;
+  estado: EncEstadoEncuesta;
+  plantilla_origen: string | null;
+  modo_llenado: "guiado" | "clasico";
+  config_pilo: Record<string, unknown>;
+  version_publicada_id: string | null;
+}
+
+export type EncAcceso = "microsoft" | "abierta";
+export type EncEstadoEncuesta = "borrador" | "publicada" | "pausada" | "cerrada";
+
+/** Una versión de la estructura (0184): la fijada es la publicada, no cambia. */
+export interface EncVersionRow {
+  id: string;
+  encuesta_id: string;
+  numero: number;
+  estructura: unknown;
+  nota: string;
+  autor: string | null;
+  fijada: boolean;
+  created_at: string;
+  fijada_en: string | null;
+}
+
+/** Una respuesta del modelo nuevo (0184). Sus valores viven en enc_valores. */
+export interface EncRespuestaRow {
+  id: string;
+  encuesta_id: string;
+  version_id: string | null;
+  correo: string | null;
+  correo_verificado: boolean;
+  nombre: string | null;
+  consentimiento: boolean;
+  estado: EncEstadoAporte;
+  created_at: string;
+  borrado_en: string | null;
+  borrado_por: string | null;
+  borrado_motivo: string | null;
+}
+
+export interface EncBitacoraRow {
+  id: number;
+  encuesta_id: string | null;
+  aporte_id: string | null;
+  accion: string;
+  actor: string | null;
+  detalle: Record<string, unknown>;
+  en: string;
 }
 
 export type EncTipoAporte = "logro" | "reto";
-export type EncEstadoAporte = "recibido" | "revisado" | "para_video";
+export type EncEstadoAporte = "recibido" | "revisado" | "para_video" | "rechazado" | "descartado";
 export type EncTipoCifra = "estudiantes" | "programas" | "porcentaje" | "dinero" | "otro";
 
 /** Un logro o reto de una dependencia. Solo se inserta con enc_enviar; el personal cambia `estado`. */
@@ -2166,6 +2220,10 @@ export interface EncAporteRow {
   descripcion: string;
   estado: EncEstadoAporte;
   created_at: string;
+  /** 0183: cuándo se mandó a la papelera (null = vigente), quién y por qué. */
+  borrado_en?: string | null;
+  borrado_por?: string | null;
+  borrado_motivo?: string | null;
 }
 
 export interface EncCifraRow {

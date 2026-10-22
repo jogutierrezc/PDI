@@ -52,6 +52,9 @@ export interface CifraBorrador {
   valor: string;
 }
 
+/** Una cifra ya enviada de vuelta al formulario (para editar un aporte). El valor se escribe como en Colombia. */
+export const aBorradorCifra = (c: CifraEnvio, id: number): CifraBorrador => ({ id, que: c.que, tipo: c.tipo, otro: c.otro ?? "", valor: String(c.valor).replace(".", ",") });
+
 export type CampoCifra = "que" | "tipo" | "otro" | "valor";
 export interface ErrorCifra {
   campo: CampoCifra;

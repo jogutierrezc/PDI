@@ -27,7 +27,7 @@ const IconoVoz = ({ on }: { on: boolean }) => (
   </svg>
 );
 
-export function Bienvenida({ titulo, intro, destino, onFin }: { titulo: string; intro: string; destino: RefObject<HTMLElement>; onFin: () => void }) {
+export function Bienvenida({ titulo, intro, destino, onFin, vozInicial = true }: { titulo: string; intro: string; destino: RefObject<HTMLElement>; onFin: () => void; vozInicial?: boolean }) {
   const escena = useRef<HTMLDivElement>(null);
   const vuelo = useRef<HTMLDivElement>(null);
   const cara = useRef<PiloFaceHandle>(null);
@@ -35,7 +35,7 @@ export function Bienvenida({ titulo, intro, destino, onFin }: { titulo: string; 
   const entrada = useRef<gsap.core.Timeline | null>(null);
   const saliendo = useRef(false);
   const [paso, setPaso] = useState(-1);
-  const [vozOn, setVozOn] = useState(true);
+  const [vozOn, setVozOn] = useState(vozInicial);
   const [armada, setArmada] = useState(yaTocado);
   const [sinVoz, setSinVoz] = useState(false);
 

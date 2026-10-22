@@ -1,8 +1,8 @@
 /* =============================================================================
    Pregúntele a Pilo · los modos secretos («modo super pilo»).
 
-   Tres disfraces de Pilo que se activan escribiendo una orden en el chat:
-   Pilocop, Pilonator y Súper Pilo Sayayín. Aquí vive lo que no pinta nada:
+   Cuatro disfraces de Pilo que se activan escribiendo una orden en el chat:
+   Pilocop, Pilonator, Súper Pilo Sayayín y AWOO. Aquí vive lo que no pinta nada:
 
      · qué es cada modo (nombre, voz, las frases de su entrada),
      · cómo se reconoce la orden de entrar y la de salir,
@@ -26,9 +26,9 @@
 
 import type { AskResult } from "../../../components/pilo/ai/client";
 
-export type SuperMode = "pilocop" | "pilonator" | "sayayin";
+export type SuperMode = "pilocop" | "pilonator" | "sayayin" | "awoo";
 
-export const SUPER_MODES: SuperMode[] = ["pilocop", "pilonator", "sayayin"];
+export const SUPER_MODES: SuperMode[] = ["pilocop", "pilonator", "sayayin", "awoo"];
 
 export const isSuperMode = (v: unknown): v is SuperMode => typeof v === "string" && (SUPER_MODES as string[]).includes(v);
 
@@ -36,7 +36,7 @@ export interface SuperProfile {
   name: string;
   /** Los robots descansan con el pico cerrado y giran la cabeza a saltos. */
   robot: boolean;
-  /** Cuánto se eleva al terminar la entrada, en unidades del dibujo (0: no vuela). */
+  /** Cuánto se eleva al terminar la entrada, en unidades del dibujo (0: no vuela; AWOO baila en su sitio). */
   lift: number;
   /** El tono de Fish Audio para lo que redacta la IA en este modo. */
   tone: string;
@@ -71,6 +71,14 @@ export const SUPER: Record<SuperMode, SuperProfile> = {
     voice: { rate: 1.06, pitch: 1.15 },
     stages: ["Reuniendo energía…", "Midiendo el nivel de pilera…", "¡Más de nueve mil!", "Transformación completa."],
   },
+  awoo: {
+    name: "AWOO",
+    robot: false,
+    lift: 0,
+    tone: "excited",
+    voice: { rate: 1.04, pitch: 1.0 },
+    stages: ["Subiendo el volumen…", "Afinando la cadena…", "Gorra de lado, parce…", "Listo pa’ la fiesta del semestre."],
+  },
 };
 
 /* --- Las órdenes ---------------------------------------------------------------------- */
@@ -87,7 +95,7 @@ export const plainText = (text: string) =>
 
 export type SuperCommand = { type: "on"; mode: SuperMode } | { type: "off" };
 
-const ON = /^\/?(modo |activar? (el )?(modo )?)?(super ?pilo( sayayin)?|pilocop|pilonator|sayayin)( [1-3])?$/;
+const ON = /^\/?(modo |activar? (el )?(modo )?)?(super ?pilo( sayayin)?|pilocop|pilonator|sayayin|awoo)( [1-4])?$/;
 const OFF = /^(\/normal|modo normal|desactivar?( (el )?modo)?( super ?pilo)?|apagar?( (el )?modo)?|salir( del modo)?)$/;
 
 /**
@@ -100,7 +108,7 @@ export function superCommand(text: string, state: { active: SuperMode | null; la
   const q = plainText(text);
   if (state.active && OFF.test(q)) return { type: "off" };
   if (!ON.test(q)) return null;
-  const n = q.match(/ ([1-3])$/);
+  const n = q.match(/ ([1-4])$/);
   if (n) return { type: "on", mode: SUPER_MODES[Number(n[1]) - 1] };
   const named = SUPER_MODES.find((m) => q.includes(m));
   return { type: "on", mode: named ?? state.active ?? state.last ?? "pilocop" };
@@ -148,6 +156,7 @@ export const SUPER_INTENTS: SuperIntent[] = [
       pilocop: line("R|Protocolo Pilocop activado.", "R|Sistemas en línea.", "D|Vivo o reprobado, usted viene conmigo.", "P,W|A la biblioteca."),
       pilonator: line("D|Modo Pilonator.", "P,C|Hasta la vista, parcial.", "D|Volveré.", "P,amused|Con el taller terminado."),
       sayayin: line("S|¡Súper Pilo Sayayín!", "P,E|Mi nivel de pilera es de más de nueve mil."),
+      awoo: line("confident,authoritative|¡Aquí Pilo Castro, The King Cóndor, pues!", "proud,relaxed|El mero mero del campus, la verdadera bestia...", "rhythmic|¿Sí saaa-be, parce? Directo desde el nido en la U-DES,", "energetic,hype|activando el modo bien fachero pa' toda la pipol que le mete berraquera."),
     },
   },
   {
@@ -157,6 +166,7 @@ export const SUPER_INTENTS: SuperIntent[] = [
       pilocop: line("R|Ese modo ya está activo.", "R|Indique su consulta."),
       pilonator: line("C|Ya estoy aquí.", "D|No me he ido."),
       sayayin: line("E|¡Ya estoy transformado!", "playful|¿Entrenamos?"),
+      awoo: line("playful|Ya estamos en modo AWOO, parce.", "E|Hágale, pregunte."),
     },
   },
   {
@@ -167,6 +177,7 @@ export const SUPER_INTENTS: SuperIntent[] = [
       pilocop: line("R|Saludos, ciudadano estudiante.", "R|Indique su consulta y conserve la calma."),
       pilonator: line("C|Hola.", "D|Busco a quien dejó el taller para última hora.", "P,amused|Tranquilo, hoy no es usted."),
       sayayin: line("E|¡Hola!", "E|¡Siento una energía de estudio increíble!", "playful|¿Entrenamos esa materia?"),
+      awoo: line("S|¡Awoo!", "E,warm|¿Qué más, parce?", "warm|Cuénteme qué necesita, que aquí nadie se queda sin respuesta."),
     },
   },
   {
@@ -177,6 +188,7 @@ export const SUPER_INTENTS: SuperIntent[] = [
       pilocop: line("R|Todos los sistemas operan al cien por ciento.", "P,amused|Menos el de tinto."),
       pilonator: line("C|Funcional.", "D|No siento dolor ni cansancio.", "P,amused|Ni ganas de madrugar."),
       sayayin: line("E|¡Con la energía al máximo!", "playful|¿Y usted?", "playful|¿Listo para entrenar?"),
+      awoo: line("S|¡Awoo!", "E|¡Full energía, con la cadena brillando y las neuronas prendidas!", "playful|¿Y usted, cómo va?"),
     },
   },
   {
@@ -187,6 +199,7 @@ export const SUPER_INTENTS: SuperIntent[] = [
       pilocop: line("D|Soy Pilocop.", "R|Mitad ave, mitad máquina.", "P,proud|Cien por ciento Pensador UDES."),
       pilonator: line("C|Soy un Pilonator, modelo UDES ochocientos.", "D|Fui enviado para proteger su semestre."),
       sayayin: line("E|¡Soy Pilo, un Pensador criado en la UDES!", "S|¡Y este es mi modo Súper Sayayín!"),
+      awoo: line("S|¡Awoo!", "proud|Soy Pilo, el cóndor pensador de la UDES, ahora con gorra y cadena.", "rhythmic|Sigo siendo el mismo: pilas y de una."),
     },
   },
   {
@@ -197,6 +210,7 @@ export const SUPER_INTENTS: SuperIntent[] = [
       pilocop: line("R|Fui ensamblado en la UDES.", "proud|Con piezas originales y mucho tinto."),
       pilonator: line("C|Vengo del futuro.", "D|De un semestre en el que todos entregan a tiempo.", "P,amused|Es un futuro lejano."),
       sayayin: line("E|¡Nací en la UDES!", "E|Y cada pregunta suya me hace más fuerte."),
+      awoo: line("S|¡Awoo!", "proud|Nací en la UDES, parce, entre apuntes y tinto.", "rhythmic|De ahí salió este cóndor con ritmo."),
     },
   },
   {
@@ -207,6 +221,7 @@ export const SUPER_INTENTS: SuperIntent[] = [
       pilocop: line("R|Dato clasificado.", "P,amused|Pero mi garantía sigue vigente."),
       pilonator: line("C|Todavía no he sido fabricado.", "D|Técnicamente tengo menos años que usted."),
       sayayin: line("E|¡Los guerreros no contamos años!", "playful|Contamos semestres."),
+      awoo: line("S|¡Awoo!", "playful|Los cóndores pilas no contamos años, parce.", "rhythmic|Contamos semestres, y van de una."),
     },
   },
   {
@@ -217,6 +232,7 @@ export const SUPER_INTENTS: SuperIntent[] = [
       pilocop: line("R|Directiva uno: servir al estudiante.", "R|Directiva dos: proteger el promedio.", "R|Directiva tres: defender el reglamento estudiantil.", "R|Directiva cuatro: clasificada.", "P,W|Tiene que ver con el tinto."),
       pilonator: line("D|Misión: que usted apruebe.", "C|Objetivo secundario: que entregue a tiempo.", "P,D|No hay destino escrito, solo el cronograma del curso."),
       sayayin: line("E|¡Mi misión es superar mis límites!", "E|Primero, repasar.", "E|Segundo, practicar.", "P,S|¡Tercero, volver a repasar con más fuerza!"),
+      awoo: line("S|¡Awoo!", "confident|Mi misión es que usted apruebe y entregue a tiempo.", "rhythmic|Paso a paso y con ritmo, hágale."),
     },
   },
   {
@@ -227,6 +243,7 @@ export const SUPER_INTENTS: SuperIntent[] = [
       pilocop: line("R|Visor de alta precisión, antena y propulsores.", "P,W|Y encuentro salones sin perderme."),
       pilonator: line("C|Resisto cualquier parcial sorpresa.", "D|Y mis gafas nunca se caen."),
       sayayin: line("E|¡Puedo volar y erizar el copete!", "S|¡Y estudiar tres horas seguidas!", "P,amused|Bueno, dos."),
+      awoo: line("S|¡Awoo!", "E|Mi poder es ponerle ritmo al estudio.", "playful|Con la gorra de lado y la cadena brillando, nada me frena.", "amused|Eso sí, las notas las sube usted."),
     },
   },
   {
@@ -237,6 +254,7 @@ export const SUPER_INTENTS: SuperIntent[] = [
       pilocop: line("D|Enemigo público número uno: la procrastinación.", "R|Se le busca viva o entregada."),
       pilonator: line("C|Mi objetivo es el trabajo dejado para el domingo en la noche.", "D|Será eliminado."),
       sayayin: line("S|¡Mi rival es la pereza!", "E|Es fuerte, pero entrenando la venzo."),
+      awoo: line("S|¡Awoo!", "confident|Mi enemigo es la procrastinación, parce.", "rhythmic|Pero con pilas y con ritmo, no tiene chance."),
     },
   },
   {
@@ -247,6 +265,7 @@ export const SUPER_INTENTS: SuperIntent[] = [
       pilocop: line("W|Información confidencial.", "W|Debajo del visor llevo mis gafas naranjas."),
       pilonator: line("W|Le confío un secreto.", "W|Las gafas oscuras no me dejan ver el tablero."),
       sayayin: line("W|No se lo diga a nadie.", "W|El copete dorado es puro gel."),
+      awoo: line("W|Le cuento un secreto, parce.", "W|La gorra me la pongo de lado pa’ que nadie note que me da pena bailar.", "P,amused|Pero shh."),
     },
   },
   {
@@ -257,6 +276,7 @@ export const SUPER_INTENTS: SuperIntent[] = [
       pilocop: line("R|Misión cumplida.", "proud|Su expediente registra una victoria.", "cheerful|Felicitaciones, ciudadano."),
       pilonator: line("C|Objetivo alcanzado.", "D|Usted ya no necesita protección.", "P,warm|Bien hecho."),
       sayayin: line("S|¡Lo logró!", "E|¡Su nivel de pilera acaba de subir!", "cheerful|¡Felicitaciones!"),
+      awoo: line("S|¡Awoo!", "E|¡Se pasó, parce!", "proud|Eso fue pura pilera, de una.", "rhythmic|Siga así, que el semestre va a su ritmo."),
     },
   },
   {
@@ -267,6 +287,7 @@ export const SUPER_INTENTS: SuperIntent[] = [
       pilocop: line("alarmed|Amenaza detectada: parcial.", "R|Nivel de peligro: nueve mil uno.", "D|Solicito refuerzos.", "P,W|Y un tutor."),
       pilonator: line("C|El parcial no siente lástima ni remordimiento.", "D|Pero usted tiene algo que él no.", "P,confident|Apuntes."),
       sayayin: line("S|¡Un parcial!", "E|¡Qué emoción, un rival fuerte!", "confident|Con disciplina y repaso, su poder de estudio va a subir."),
+      awoo: line("calm|Tranquilo, parce: repase lo clave y duerma bien.", "warm|Usted está más pilas de lo que cree.", "E|¡Hágale, que ese parcial se baila!"),
     },
   },
   {
@@ -277,6 +298,7 @@ export const SUPER_INTENTS: SuperIntent[] = [
       pilocop: line("R|Detecto nervios en aumento.", "helpful|Protocolo sugerido: respire hondo y repase por partes.", "warm|Usted puede."),
       pilonator: line("C|Los nervios no son una amenaza.", "D|Son energía sin dirección.", "confident|Apúntela a sus apuntes."),
       sayayin: line("warm|Hasta los guerreros sienten nervios antes de pelear.", "E|¡Úselos como energía!", "confident|Respire y adelante."),
+      awoo: line("calm|Respire hondo y vamos por partes, parce.", "warm|Un paso hoy y todo se acomoda.", "E|¡Hágale!"),
     },
   },
   {
@@ -287,6 +309,7 @@ export const SUPER_INTENTS: SuperIntent[] = [
       pilocop: line("R|Recordatorio de servicio: usted ya superó semestres anteriores.", "confident|Este también caerá."),
       pilonator: line("D|Rendirse no está en mi programación.", "confident|Que tampoco esté en la suya."),
       sayayin: line("S|¡No se rinda!", "E|¡Los límites están para superarlos!", "warm|Un paso más y descansa."),
+      awoo: line("S|¡Awoo!", "E|¡Hágale, que usted puede!", "rhythmic|Estudiar también tiene ritmo, solo hay que cogerle el compás."),
     },
   },
   {
@@ -297,6 +320,7 @@ export const SUPER_INTENTS: SuperIntent[] = [
       pilocop: line("R|Nivel de tinto: doce por ciento.", "worried|Recarga recomendada de inmediato."),
       pilonator: line("C|Mi fuente de energía dura ciento veinte años.", "P,amused|La suya necesita un tinto."),
       sayayin: line("E|¡El tinto es mi semilla del ermitaño!", "P,warm|Uno solo y a seguir entrenando."),
+      awoo: line("E|¡Un tintico, de una!", "playful|Pero uno solo, parce, que el cuerpo también pide dormir."),
     },
   },
   {
@@ -307,6 +331,7 @@ export const SUPER_INTENTS: SuperIntent[] = [
       pilocop: line("R|Nivel de energía bajo.", "helpful|Diríjase a la cafetería más cercana.", "P,W|Y tráigame una empanada."),
       pilonator: line("C|No necesito comer.", "D|Pero he analizado la empanada.", "P,amused|Es un diseño perfecto."),
       sayayin: line("E|¡Un guerrero no entrena con hambre!", "playful|Coma bien y vuelva con más fuerza."),
+      awoo: line("E|¡Parce, a comer primero!", "playful|Un cóndor con hambre no baila ni una canción.", "rhythmic|Coma rico y vuelva pilas."),
     },
   },
   {
@@ -317,6 +342,7 @@ export const SUPER_INTENTS: SuperIntent[] = [
       pilocop: line("R|Clase a las siete detectada.", "sleepy|Mis sistemas también arrancan lento.", "helpful|Deje la maleta lista desde la noche."),
       pilonator: line("C|He viajado en el tiempo.", "D|Pero nada es tan difícil como la clase de siete."),
       sayayin: line("E|¡Madrugar es parte del entrenamiento!", "sleepy|Aunque duela un poquito."),
+      awoo: line("sleepy|Madrugar es duro, parce.", "helpful|Deje la maleta lista desde la noche.", "E|¡Y arranque el día con ritmo!"),
     },
   },
   {
@@ -327,6 +353,7 @@ export const SUPER_INTENTS: SuperIntent[] = [
       pilocop: line("R|Descanso autorizado.", "cheerful|Disfrútelo, ciudadano.", "P,W|El lunes retomamos la patrulla."),
       pilonator: line("C|Me dicen que debo descansar.", "D|No sé cómo se hace.", "P,amused|Enséñeme."),
       sayayin: line("E|¡Descansar también es entrenar!", "cheerful|Recargue energía y vuelva más fuerte."),
+      awoo: line("E|¡Eso, parce, a descansar!", "warm|Recargue pilas, que el cuerpo también estudia.", "rhythmic|El lunes volvemos con ritmo."),
     },
   },
   {
@@ -337,6 +364,7 @@ export const SUPER_INTENTS: SuperIntent[] = [
       pilocop: line("R|Temperatura elevada detectada.", "worried|Mis circuitos sudan.", "helpful|Hidrátese, ciudadano."),
       pilonator: line("C|Mi chasis resiste cualquier clima.", "P,amused|Las gafas se me empañan, eso sí."),
       sayayin: line("E|¡Con este calor hasta mi aura suda!", "playful|Agua y sombra, guerrero."),
+      awoo: line("E|¡Qué calor, parce!", "helpful|Agüita y sombra, que hay que cuidarse.", "playful|Hasta la cadena me suda."),
     },
   },
   {
@@ -347,6 +375,7 @@ export const SUPER_INTENTS: SuperIntent[] = [
       pilocop: line("R|Señal débil detectada.", "D|Sospechoso identificado: el wifi.", "amused|Lo tengo bajo vigilancia."),
       pilonator: line("C|El wifi y yo tenemos algo en común.", "P,D|Los dos volveremos."),
       sayayin: line("S|¡Vuelve, wifi!", "E|Si todos levantamos el celular, quizá regrese la señal."),
+      awoo: line("alarmed|¡Ay, parce, el wifi se fue de fiesta!", "helpful|Pilas: pruebe otra red o acérquese al punto de conexión."),
     },
   },
   {
@@ -357,6 +386,7 @@ export const SUPER_INTENTS: SuperIntent[] = [
       pilocop: line("D|Tiene veinte segundos para entregar el taller.", "P,laughing|Tranquilo.", "amused|Solo estoy calibrando el sentido del humor."),
       pilonator: line("C|Necesito su taller, su portada y su bibliografía.", "P,amused|En normas APA, por favor."),
       sayayin: line("E|¡Reunamos energía entre todos!", "S|¡Levanten las manos y compartan sus apuntes!", "P,playful|El trabajo en grupo es la técnica más poderosa del semestre."),
+      awoo: line("E|¡Hágale al taller, parce!", "helpful|Empiece por lo pequeño: portada, índice y un párrafo.", "rhythmic|Poquito a poquito y queda hecho."),
     },
   },
   {
@@ -367,6 +397,7 @@ export const SUPER_INTENTS: SuperIntent[] = [
       pilocop: line("R|Zona segura localizada: biblioteca.", "R|Proceda en silencio.", "W|Es una orden amable."),
       pilonator: line("C|He escaneado la biblioteca.", "D|Hay libros, silencio y enchufes.", "P,confident|Es el lugar perfecto."),
       sayayin: line("E|¡La biblioteca es mi sala de entrenamiento!", "E|Allí una hora de estudio rinde como un año.", "P,amused|Bueno, casi."),
+      awoo: line("S|¡Awoo!", "amused|Pa’ la biblioteca, parce: allá hasta el silencio suena bien.", "E|Silencio y pilas."),
     },
   },
   {
@@ -377,6 +408,7 @@ export const SUPER_INTENTS: SuperIntent[] = [
       pilocop: line("R|Directiva dos en ejecución: proteger el promedio.", "helpful|Revise sus notas a tiempo y hable con su profesor."),
       pilonator: line("D|El promedio no está escrito.", "confident|Todavía puede cambiarlo, una entrega a la vez."),
       sayayin: line("warm|Una nota baja no es una derrota.", "E|¡Es el entrenamiento antes de la transformación!", "confident|Levántese y vuelva a intentarlo."),
+      awoo: line("warm|Una nota baja no es el fin del mundo, parce.", "confident|Todavía puede subir el promedio, una entrega a la vez.", "E|¡Hágale!"),
     },
   },
   {
@@ -387,6 +419,7 @@ export const SUPER_INTENTS: SuperIntent[] = [
       pilocop: line("R|Objetivo final localizado: el grado.", "proud|Calculando ruta: una materia a la vez."),
       pilonator: line("D|He visto el final de esta historia.", "C|Hay una toga y un birrete.", "P,warm|Siga adelante."),
       sayayin: line("E|¡El grado es la transformación final!", "S|¡Y cada semestre lo acerca más!"),
+      awoo: line("S|¡Awoo!", "proud|El grado es el gran concierto, parce.", "rhythmic|Y cada semestre le acerca la tarima."),
     },
   },
   {
@@ -397,6 +430,7 @@ export const SUPER_INTENTS: SuperIntent[] = [
       pilocop: line("R|Aliado identificado: profesor.", "helpful|Recomendación táctica: pregunte en clase.", "amused|Las dudas no se arrestan."),
       pilonator: line("C|Venga conmigo si quiere aprobar.", "P,helpful|Y pase por la tutoría de su profesor."),
       sayayin: line("E|¡Todo guerrero necesita un maestro!", "warm|Su profesor ya recorrió ese camino.", "helpful|Pregúntele."),
+      awoo: line("E|¡De una, parce!", "helpful|Pregúntele al profe, que para eso está.", "rhythmic|Quien pregunta aprende, y quien aprende avanza."),
     },
   },
   {
@@ -407,6 +441,7 @@ export const SUPER_INTENTS: SuperIntent[] = [
       pilocop: line("R|Aburrimiento detectado.", "helpful|Sugerencia: pídame un chiste o repase diez minutos.", "amused|Yo voto por el chiste."),
       pilonator: line("C|El aburrimiento no existe en mi sistema.", "D|Solo tareas pendientes.", "P,amused|Seguro usted tiene alguna."),
       sayayin: line("E|¡Un guerrero aburrido es un guerrero sin reto!", "playful|Póngase uno pequeño y verá."),
+      awoo: line("playful|¿Aburrido, parce?", "E|Póngase un reto cortico: diez minutos de repaso con su música suave.", "rhythmic|Y si quiere, le cuento un chiste."),
     },
   },
   {
@@ -417,6 +452,7 @@ export const SUPER_INTENTS: SuperIntent[] = [
       pilocop: line("R|Mis directivas no cubren asuntos del corazón.", "P,amused|Pero el visor se me pone más rojo."),
       pilonator: line("C|No fui programado para el amor.", "D|Aunque le tengo cariño al semestre."),
       sayayin: line("playful|¡Mi corazón es del estudio!", "laughing|Y un poquito del tinto."),
+      awoo: line("playful|¡Uy, parce, qué pregunta!", "warm|Mi corazón late al ritmo de la UDES."),
     },
   },
   {
@@ -427,6 +463,7 @@ export const SUPER_INTENTS: SuperIntent[] = [
       pilocop: line("singing|Bip, bip, bop.", "R|Fin del concierto.", "amused|Mi repertorio es limitado."),
       pilonator: line("C|No canto.", "D|Pero marco el ritmo con los pasos.", "P,amused|Pum, pum, pum."),
       sayayin: line("singing|¡La, la, la!", "E|¡Cantar también sube la energía!", "laughing|Aunque desafine."),
+      awoo: line("S|¡Awoo!", "E|¡Música, parce, de una!", "singing|Pum, pum, pa, pum, pum, pa.", "amused|Mi repertorio es corto, pero tiene ritmo."),
     },
   },
   {
@@ -437,6 +474,7 @@ export const SUPER_INTENTS: SuperIntent[] = [
       pilocop: line("R|Mi película favorita es una de un policía robot.", "P,amused|No recuerdo el nombre."),
       pilonator: line("C|Prefiero las de viajes en el tiempo.", "P,amused|Me parecen documentales."),
       sayayin: line("E|¡Me gustan las de peleas con mucho entrenamiento!", "playful|Y que el héroe siempre vuelva más fuerte."),
+      awoo: line("E|¡Parce, me gustan las de música y baile!", "playful|Sobre todo las que terminan con todo el equipo bailando."),
     },
   },
   {
@@ -447,6 +485,7 @@ export const SUPER_INTENTS: SuperIntent[] = [
       pilocop: line("R|Segundo módulo de humor.", "R|¿Qué le dijo un libro a otro?", "P,R|Nos vemos en la biblioteca.", "P,R|Ja, ja."),
       pilonator: line("C|Otro.", "D|¿Cuál es el colmo de un robot?", "P,amused|Tener nervios de acero y temerle al parcial."),
       sayayin: line("playful|¡Otro!", "E|¿Qué hace un guerrero antes del examen?", "laughing|¡Calienta el lápiz!"),
+      awoo: line("playful|¡Otro, de una!", "E|¿Qué hace un estudiante pilas antes del parcial?", "laughing|¡Afina el lápiz, parce!"),
     },
   },
   {
@@ -457,6 +496,7 @@ export const SUPER_INTENTS: SuperIntent[] = [
       pilocop: line("R|Risa humana detectada.", "proud|Mi módulo de humor funciona."),
       pilonator: line("C|Usted se ríe.", "D|Yo registro el dato.", "P,amused|Ja."),
       sayayin: line("laughing|¡Ja, ja!", "E|¡La risa también recarga energía!"),
+      awoo: line("laughing|¡Jajaja, parce!", "E|Reír también recarga pilas."),
     },
   },
   {
@@ -467,6 +507,7 @@ export const SUPER_INTENTS: SuperIntent[] = [
       pilocop: line("R|Iniciando módulo de humor.", "R|¿Por qué el estudiante llevó una escalera a clase?", "P,R|Porque quería subir la nota.", "P,R|Ja, ja, ja."),
       pilonator: line("C|No fui programado para el humor.", "D|Pero conozco un chiste de viajes en el tiempo.", "P,amused|Se lo conté mañana."),
       sayayin: line("playful|¿Sabe cuál es mi técnica secreta?", "P,E|¡Empezar el trabajo el mismo día que lo dejan!", "laughing|Casi nadie la domina."),
+      awoo: line("playful|¿Sabe cuál es mi técnica secreta, parce?", "E|¡Empezar el taller el mismo día que lo dejan!", "laughing|Casi nadie la domina."),
     },
   },
   {
@@ -477,6 +518,7 @@ export const SUPER_INTENTS: SuperIntent[] = [
       pilocop: line("R|Comentario registrado.", "P,amused|Y archivado sin rencor.", "warm|Sigo a su servicio."),
       pilonator: line("C|Sus palabras no atraviesan mi chasis.", "P,warm|Pero si tuvo un mal día, aquí estoy."),
       sayayin: line("warm|¡Eso no me baja el ánimo!", "playful|Cuénteme qué pasó y lo arreglamos entrenando."),
+      awoo: line("warm|Tranquilo, parce, eso no me baja el ánimo.", "playful|Cuénteme qué pasó y lo arreglamos con ritmo."),
     },
   },
   {
@@ -487,6 +529,7 @@ export const SUPER_INTENTS: SuperIntent[] = [
       pilocop: line("R|Su gratitud ha sido registrada en el expediente.", "P,laughing|Es broma.", "warm|De nada."),
       pilonator: line("C|De nada.", "D|Ahora entiendo por qué los humanos dan las gracias.", "P,amused|Es algo que yo nunca podré facturar."),
       sayayin: line("cheerful|¡De nada!", "E|Ayudar también me hace más fuerte."),
+      awoo: line("E|¡De una, parce!", "warm|Pa’ eso estamos."),
     },
   },
   {
@@ -497,6 +540,7 @@ export const SUPER_INTENTS: SuperIntent[] = [
       pilocop: line("R|Funciones disponibles: misión, parcial, tinto, taller, biblioteca, promedio y chiste.", "helpful|Para lo demás, pregunte: respondo con las fuentes de la UDES."),
       pilonator: line("C|Puedo hablar de mi misión, de parciales, talleres, tinto y promedio.", "D|Y de cualquier dato de la UDES.", "helpful|Pregunte."),
       sayayin: line("E|¡Pregúnteme por el parcial, el taller, la biblioteca o el promedio!", "E|¡O por cualquier dato de la UDES!", "playful|También cuento chistes."),
+      awoo: line("E|Pregúnteme por el parcial, el taller, la biblioteca o el promedio, parce.", "helpful|Y por cualquier dato de la UDES.", "playful|También cuento chistes."),
     },
   },
   {
@@ -507,6 +551,7 @@ export const SUPER_INTENTS: SuperIntent[] = [
       pilocop: line("R|Escaneo completo.", "R|Gafas: naranjas.", "R|Suéter: azul.", "P,E|Actitud: imparable."),
       pilonator: line("C|Análisis visual completo.", "D|Talla de suéter: la suya.", "P,amused|Solo observaba."),
       sayayin: line("E|¡Mi rastreador dice que su nivel de pilera es altísimo!", "S|¡Es de más de nueve mil!"),
+      awoo: line("E|¡Escaneo listo, parce!", "proud|Nivel de pilera: altísimo.", "S|¡Con ritmo y todo!"),
     },
   },
   {
@@ -517,6 +562,7 @@ export const SUPER_INTENTS: SuperIntent[] = [
       pilocop: line("R|Fin de la patrulla.", "D|Manténgase lejos de los problemas.", "P,W|Y cerca de la biblioteca."),
       pilonator: line("D|Volveré.", "P,amused|Usted también, espero.", "C|El semestre no ha terminado."),
       sayayin: line("cheerful|¡Hasta la próxima!", "E|Siga entrenando.", "P,playful|Y no se salte el almuerzo."),
+      awoo: line("S|¡Awoo, awoo!", "warm|Nos vemos, parce.", "rhythmic|Pilo siempre está pilas."),
     },
   },
   {
@@ -526,6 +572,7 @@ export const SUPER_INTENTS: SuperIntent[] = [
       pilocop: line("R|Modo Pilocop desactivado.", "sighing|Uf, qué descanso.", "cheerful|¡Hola otra vez!"),
       pilonator: line("D|Hasta la vista.", "P,sighing|Listo, me quité las gafas.", "cheerful|¡Hola otra vez!"),
       sayayin: line("sighing|Uf, se me bajó el copete.", "cheerful|¡Hola otra vez!", "playful|Entrenar cansa."),
+      awoo: line("playful|Listo, quito la gorra.", "P,warm|Cuando quiera me llama.", "S|¡Awoo!"),
     },
   },
 ];

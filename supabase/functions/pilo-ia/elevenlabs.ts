@@ -139,6 +139,8 @@ const EMOTION_OF: Record<string, EmotionKey> = {
   laughing: "risa", helpful: "atento", cheerful: "alegre", sighing: "suspiro", sleepy: "somnoliento", singing: "canto",
   // Tonos de los estilos de voz (FISH_TONES)
   calm: "tranquilo", happy: "alegre", empathetic: "calido", curious: "pensar", relaxed: "tranquilo", "soft tone": "calido",
+  // Tonos del modo AWOO (voz-awoo.ts): reguetonero paisa, ritmo ágil
+  authoritative: "seguro", rhythmic: "alegre", energetic: "emocionado", hype: "grito",
 };
 
 const fold = (t: string) => t.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/\s+/g, " ").trim();

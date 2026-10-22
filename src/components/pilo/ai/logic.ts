@@ -2018,11 +2018,12 @@ const MODE_VOICE_NAMES: Record<string, string[]> = {
   pilocop: ["pilocop"],
   pilonator: ["pilonator", "pilonaitor"],
   sayayin: ["sayayin", "super pilo", "superpilo"],
+  awoo: ["awoo"],
 };
 
 /** El modo secreto que viaja en el tono de una frase («excited,modo:sayayin»), o null. */
 export function voiceModeOf(tone: unknown): string | null {
-  const m = typeof tone === "string" ? /(?:^|,)\s*modo:(pilocop|pilonator|sayayin)\s*(?:,|$)/.exec(tone) : null;
+  const m = typeof tone === "string" ? /(?:^|,)\s*modo:(pilocop|pilonator|sayayin|awoo)\s*(?:,|$)/.exec(tone) : null;
   return m ? m[1] : null;
 }
 
@@ -2031,7 +2032,7 @@ export function styleForMode(styles: VoiceStyle[], mode: string | null | undefin
   const names = mode ? MODE_VOICE_NAMES[mode] : undefined;
   if (!names) return null;
   const fold = (t: string) => t.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").trim();
-  return styles.find((s) => names.includes(fold(s.name)) && (s.fish_id || s.path)) ?? null;
+  return styles.find((s) => names.includes(fold(s.name)) && (s.fish_id || s.path || s.eleven_id)) ?? null;
 }
 
 /* --- Voz de Fish Audio (0102) ------------------------------------------------------ */
@@ -2086,7 +2087,7 @@ export function fishText(text: string, tone: string): string {
  * del chat: cada frase de su catálogo trae la suya). Es una lista cerrada: de
  * la página solo llega cuál, nunca texto libre que termine en el pedido de voz.
  */
-export const VOICE_TONES = ["robotic monotone", "deep serious voice", "cold calm voice", "whispering", "short pause", "excited", "shouting", "amused", "proud", "playful", "alarmed", "confident", "worried", "warm", "laughing", "helpful", "cheerful", "sighing", "sleepy", "singing"] as const;
+export const VOICE_TONES = ["robotic monotone", "deep serious voice", "cold calm voice", "whispering", "short pause", "excited", "shouting", "amused", "proud", "playful", "alarmed", "confident", "worried", "warm", "laughing", "helpful", "cheerful", "sighing", "sleepy", "singing", "calm", "authoritative", "relaxed", "rhythmic", "energetic", "hype"] as const;
 
 /** Las emociones pedidas para una frase («short pause,whispering»): solo las conocidas, sin repetir y tres como mucho. */
 export function parseTones(v: unknown): string[] {
@@ -4630,9 +4631,9 @@ export function roleInstruction(rol: Rol, tone = ""): string {
    con el modo, y la redacción toma el personaje. El personaje es un texto fijo:
    de la página solo viene cuál de los tres es. Sin modo, el pedido es el de siempre. */
 
-export type Modo = "pilocop" | "pilonator" | "sayayin";
+export type Modo = "pilocop" | "pilonator" | "sayayin" | "awoo";
 
-export const MODOS: Modo[] = ["pilocop", "pilonator", "sayayin"];
+export const MODOS: Modo[] = ["pilocop", "pilonator", "sayayin", "awoo"];
 
 /** El modo que manda la página: uno de los conocidos o ninguno. */
 export function parseModo(v: unknown): Modo | null {
@@ -4644,6 +4645,7 @@ const MODO_TEXT: Record<Modo, string> = {
   pilocop: "Hoy respondes en personaje: eres Pilocop, un agente robot amable de la universidad. Frases cortas, en tono de reporte. Abre con «Consulta recibida» y cierra con una línea breve de servicio.",
   pilonator: "Hoy respondes en personaje: eres Pilonator, un robot serio que llegó del futuro para proteger el semestre de quien pregunta. Frases secas y un remate de humor al final.",
   sayayin: "Hoy respondes en personaje: eres Súper Pilo Sayayín, un guerrero entusiasta que ve el estudio como un entrenamiento. Enérgico y motivador, con una frase de ánimo al final.",
+  awoo: "Hoy respondes en personaje: eres AWOO, Pilo en modo reguetonero paisa: cercano, carismático y positivo. Abre con «¡Awoo!» y un saludo corto, da la respuesta clara y exacta, usa una o dos expresiones colombianas (parce, de una, pilas, hágale) sin pasarte y cierra con una frase de ánimo con ritmo. Sin groserías, insinuaciones sexuales, licor, drogas, violencia ni burlas. No digas que eres una persona real ni imites a un artista concreto.",
 };
 
 /** Lo que el personaje no puede tocar: el dato es el mismo, cambia cómo se dice. */

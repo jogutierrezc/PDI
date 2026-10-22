@@ -29,6 +29,7 @@ import { VoiceStyles } from "./VoiceStyles";
 import { WidgetGroup } from "./WidgetGroup";
 import { ExtrasGroup } from "./ExtrasGroup";
 import { ElevenLabsVoice } from "./ElevenLabsVoice";
+import { DisenoVozModo } from "./DisenoVozModo";
 import { VoiceExpressionsEditor } from "./VoiceExpressionsEditor";
 
 export interface EditorApi {
@@ -401,6 +402,7 @@ export function VoiceSection({ ed }: { ed: EditorApi }) {
 
       {(choice === "nvidia" || choice === "fishaudio") && <VoiceStyles key={choice} ed={ed} provider={choice} />}
       {choice === "elevenlabs" && <ElevenLabsVoice ed={ed} />}
+      {choice === "elevenlabs" && <DisenoVozModo ed={ed} />}
 
       <Group title="Cómo suena">
         <div className="pis-grid pis-grid--3">

@@ -20,12 +20,12 @@ function audio(): AudioContext | null {
   }
 }
 
-function tone(from: number, to: number, seconds: number, type: OscillatorType = "square", volume = 0.05) {
+function tone(from: number, to: number, seconds: number, type: OscillatorType = "square", volume = 0.05, delay = 0) {
   const a = audio();
   if (!a) return;
   const osc = a.createOscillator();
   const gain = a.createGain();
-  const t = a.currentTime;
+  const t = a.currentTime + delay;
   osc.type = type;
   osc.frequency.setValueAtTime(from, t);
   osc.frequency.exponentialRampToValueAtTime(Math.max(to, 1), t + seconds);
@@ -36,6 +36,27 @@ function tone(from: number, to: number, seconds: number, type: OscillatorType = 
   osc.stop(t + seconds + 0.02);
 }
 
+/** Un aplauso: un soplo corto de ruido por un filtro que deja pasar los agudos. Suave, como todo lo demás. */
+function clap(volume = 0.06) {
+  const a = audio();
+  if (!a) return;
+  const seconds = 0.09;
+  const buffer = a.createBuffer(1, Math.ceil(a.sampleRate * seconds), a.sampleRate);
+  const data = buffer.getChannelData(0);
+  for (let i = 0; i < data.length; i++) data[i] = Math.random() * 2 - 1;
+  const src = a.createBufferSource();
+  const filter = a.createBiquadFilter();
+  const gain = a.createGain();
+  const t = a.currentTime;
+  src.buffer = buffer;
+  filter.type = "bandpass";
+  filter.frequency.value = 1800;
+  gain.gain.setValueAtTime(volume, t);
+  gain.gain.exponentialRampToValueAtTime(0.0001, t + seconds);
+  src.connect(filter).connect(gain).connect(a.destination);
+  src.start(t);
+}
+
 export interface SuperSfx {
   tick: () => void;
   boot: () => void;
@@ -43,6 +64,10 @@ export interface SuperSfx {
   servo: () => void;
   lift: () => void;
   down: () => void;
+  /** AWOO: el bombo, el aplauso y el «¡awoo!» (un barrido que sube y baja). */
+  kick: () => void;
+  clap: () => void;
+  awoo: () => void;
 }
 
 const SOUNDS: SuperSfx = {
@@ -55,10 +80,16 @@ const SOUNDS: SuperSfx = {
   servo: () => tone(300, 520, 0.22, "sawtooth", 0.03),
   lift: () => tone(60, 240, 0.7, "sawtooth", 0.07),
   down: () => tone(600, 80, 0.45, "triangle", 0.08),
+  kick: () => tone(150, 45, 0.16, "sine", 0.09),
+  clap: () => clap(),
+  awoo: () => {
+    tone(320, 820, 0.22, "triangle", 0.06);
+    tone(820, 430, 0.3, "triangle", 0.05, 0.22);
+  },
 };
 
 const noop = () => {};
-const SILENT: SuperSfx = { tick: noop, boot: noop, clank: noop, servo: noop, lift: noop, down: noop };
+const SILENT: SuperSfx = { tick: noop, boot: noop, clank: noop, servo: noop, lift: noop, down: noop, kick: noop, clap: noop, awoo: noop };
 
 /** Los efectos, o su versión muda si el sonido está apagado. */
 export const superSfx = (on: boolean): SuperSfx => (on && typeof window !== "undefined" ? SOUNDS : SILENT);

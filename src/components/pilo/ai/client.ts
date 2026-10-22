@@ -27,14 +27,14 @@ export interface AskOptions {
   page?: { url: string; title: string; passages: string[] } | null;
   /** Sin cuenta de Pilo (0120): cómo pidió que la llame y en qué tono. Con cuenta no se manda: el servidor la reconoce por la sesión. */
   visitor?: { nick?: string | null; tone?: string | null } | null;
-  /** El modo secreto que la persona activó en el chat («pilocop», «pilonator» o «sayayin»): el servidor le pone el personaje a la redacción. Cualquier otra cosa no se manda. */
+  /** El modo secreto que la persona activó en el chat («pilocop», «pilonator», «sayayin» o «awoo»): el servidor le pone el personaje a la redacción. Cualquier otra cosa no se manda. */
   modo?: string | null;
   /** El idioma en que la persona usa a Pilo; sin él, el que eligió en la pantalla (español si no eligió). */
   lang?: "es" | "en" | "pt";
 }
 
 /** Los modos secretos que entiende el servidor (logic.ts, `parseModo`). */
-const modoOf = (modo: string | null | undefined): "pilocop" | "pilonator" | "sayayin" | undefined => (modo === "pilocop" || modo === "pilonator" || modo === "sayayin" ? modo : undefined);
+const modoOf = (modo: string | null | undefined): "pilocop" | "pilonator" | "sayayin" | "awoo" | undefined => (modo === "pilocop" || modo === "pilonator" || modo === "sayayin" || modo === "awoo" ? modo : undefined);
 
 const rolOf = (rol: string | null | undefined): "estudiante" | "profesor" | undefined => (rol === "estudiante" || rol === "profesor" ? rol : undefined);
 

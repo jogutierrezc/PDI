@@ -11,6 +11,7 @@
      Pilocop     visor de acero con barrido rojo y antena
      Pilonator   gafas oscuras de píxeles
      Sayayín     rastreador sobre una lente y el copete dorado y erizado
+     AWOO        gorra rosa de lado, gafas de espejo cian y cadena de oro con la «A»
 
    El modo llega a cada cara por contexto: quien pinta a Pilo en la página
    (Pilo.tsx) lo lee y le pone el equipo.
@@ -99,6 +100,42 @@ export const Scouter = () => (
   </>
 );
 
+/** La gorra de AWOO: negra con la visera rosa a un lado (la visera apunta a la izquierda). */
+export const Cap = () => (
+  <>
+    <path d="M338 122 C330 18 430 -34 520 -26 C612 -18 670 40 662 124 C596 104 420 100 338 122 Z" fill="#14041f" stroke="#000" strokeWidth="6" />
+    <path d="M338 122 C330 18 430 -34 520 -26 C500 20 470 70 430 108 C400 112 362 114 338 122 Z" fill="#ff2e93" fillOpacity=".92" />
+    <circle cx="520" cy="-28" r="16" fill="#ffc83d" stroke="#000" strokeWidth="5" />
+    <path d="M344 130 C262 130 188 146 160 176 C186 194 300 184 358 160 Z" fill="#ff2e93" stroke="#000" strokeWidth="6" />
+  </>
+);
+
+/** Las gafas de espejo cian de AWOO, con un destello que solo se ve durante la entrada. */
+export const MirrorShades = () => (
+  <>
+    <rect x="266" y="176" width="130" height="114" rx="34" fill="#0b0613" stroke="#000" strokeWidth="6" />
+    <rect x="424" y="176" width="140" height="114" rx="34" fill="#0b0613" stroke="#000" strokeWidth="6" />
+    <rect x="276" y="186" width="110" height="94" rx="26" fill="#29e0ff" fillOpacity=".72" />
+    <rect x="434" y="186" width="120" height="94" rx="26" fill="#29e0ff" fillOpacity=".72" />
+    <path d="M296 204 L330 204 L296 238 Z M456 204 L494 204 L456 242 Z" fill="#ffffff" fillOpacity=".55" />
+    <path d="M396 214 C404 206 416 206 424 214" fill="none" stroke="#000" strokeWidth="8" />
+    <path data-p="spark" opacity="0" fill="#ffffff" d="M540 166 L549 197 L580 206 L549 215 L540 246 L531 215 L500 206 L531 197 Z" />
+  </>
+);
+
+/** La cadena de oro con el pendiente «A»; el halo detrás del pendiente solo brilla durante la entrada. */
+export const GoldChain = () => (
+  <>
+    <path d="M388 470 C392 596 448 646 520 646 C602 646 668 596 692 470" fill="none" stroke="#000" strokeWidth="22" strokeLinecap="round" />
+    <path d="M388 470 C392 596 448 646 520 646 C602 646 668 596 692 470" fill="none" stroke="#ffc83d" strokeWidth="14" strokeLinecap="round" strokeDasharray="18 6" />
+    <circle data-p="halo" cx="520" cy="686" r="78" fill="#ffc83d" opacity="0" />
+    <rect x="474" y="640" width="92" height="92" rx="16" fill="#14041f" stroke="#ffc83d" strokeWidth="10" />
+    <text x="520" y="706" fontFamily='Bungee, Impact, "Arial Black", sans-serif' fontSize="64" fill="#ff2e93" textAnchor="middle">
+      A
+    </text>
+  </>
+);
+
 /** El copete dorado: cubre el copete café del dibujo y le saca puntas. */
 export const GoldHair = () => (
   <path
@@ -138,6 +175,15 @@ export function Gear({ mode }: { mode: SuperMode }) {
             <g transform={GLASSES_TILT}>
               <Scouter />
             </g>
+          </>
+        )}
+        {mode === "awoo" && (
+          <>
+            <Cap />
+            <g transform={GLASSES_TILT}>
+              <MirrorShades />
+            </g>
+            <GoldChain />
           </>
         )}
       </g>

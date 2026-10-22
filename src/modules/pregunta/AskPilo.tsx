@@ -20,7 +20,7 @@
    cambia las preguntas sugeridas, la cara de partida y el ánimo de la voz.
 
    Los modos secretos (super/): escribir «modo super pilo» disfraza a Pilo de
-   Pilocop, Pilonator o Súper Pilo Sayayín. La orden y la charla corta de cada
+   Pilocop, Pilonator, Súper Pilo Sayayín o AWOO. La orden y la charla corta de cada
    modo se responden aquí, sin ir al servidor; lo demás viaja como siempre, con
    el modo, y la IA redacta en personaje. «Desactivar» vuelve al de siempre.
    ========================================================================== */

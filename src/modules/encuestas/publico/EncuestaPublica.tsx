@@ -100,6 +100,8 @@ function Recorrido({ slug, info }: { slug: string; info: InfoEncuesta }) {
   const [bienvenida, setBienvenida] = useState(!inicial.current.visto);
   const [paso, setPaso] = useState<Paso>("id");
   const [tipo, setTipo] = useState<TipoAporte>("logro");
+  // Los textos de logro y reto que se escribieron en el editor valen también en este flujo.
+  const textosDelBloque = info.estructura?.secciones.flatMap((s) => s.preguntas).find((q) => q.tipo === "bloque_logro_reto")?.textos;
   /** Posición del aporte que se está editando; null si es uno nuevo. */
   const [editando, setEditando] = useState<number | null>(null);
   /** Lo último que se quitó, para deshacer durante unos segundos. */
@@ -312,6 +314,7 @@ function Recorrido({ slug, info }: { slug: string; info: InfoEncuesta }) {
               <Detalle
                 key={`${tipo}:${editando ?? "nuevo"}:${aportes.length}`}
                 tipo={tipo}
+                textos={textosDelBloque?.[tipo]}
                 inicial={editando === null ? undefined : aportes[editando]}
                 onGuardar={guardarAporte}
                 onVolver={() => {

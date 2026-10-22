@@ -1563,6 +1563,59 @@ async function codigoDePilo(request: Request, body: Record<string, unknown>, url
   return json({ ok: true });
 }
 
+/* --- Un aviso del Portal de agentes (0181): invitación, transcripción, «ya lo atiende un agente» ------ */
+
+async function avisoDeSoporte(request: Request, body: Record<string, unknown>, url: string, serviceKey: string): Promise<Response> {
+  // Solo la función `soporte`, con la clave de servicio: el texto lo arma ella, nunca la persona.
+  if ((request.headers.get("Authorization") ?? "") !== `Bearer ${serviceKey}`) return json({ error: "Falta la sesión.", code: "sesion" }, 401);
+  const para = typeof body.to === "string" ? body.to.trim().toLowerCase().slice(0, 254) : "";
+  if (!correoValido(para)) return json({ ok: false, code: "datos", error: "Falta el correo." }, 400);
+  // Un texto de la persona no puede traer marcadores {{…}}: se quitan antes de armar la plantilla.
+  const limpio = (v: unknown, max: number): string => texto(v, max).replace(/\{\{|\}\}/g, "");
+  const enlace = typeof body.enlace === "string" && /^https:\/\//.test(body.enlace) ? body.enlace.slice(0, 500) : "";
+  const boton = enlace ? limpio(body.boton, 60) : "";
+  const asunto = limpio(body.asunto, 150).trim();
+  const mensaje = limpio(body.mensaje, 12000).trim();
+  if (!asunto || !mensaje) return json({ ok: false, code: "datos", error: "Faltan el asunto o el mensaje." }, 400);
+  const plantilla: Plantilla = {
+    clave: "soporte-aviso",
+    identidad: "pilo",
+    tipo: boton ? "enlace" : "aviso",
+    html: null,
+    alcance: "cuerpo",
+    grupo: "Portal de agentes",
+    nombre: "Aviso del Portal de agentes",
+    cuando: "Invitaciones, transcripciones y avisos de atención",
+    asunto,
+    previa: limpio(body.previa, 120),
+    titulo: limpio(body.titulo, 120) || asunto,
+    saludo: "Hola, {{nombre}}.",
+    mensaje,
+    boton,
+    nota: limpio(body.nota, 300),
+    roles: null,
+  };
+  const admin = cliente(url, serviceKey);
+  const hash = await huella(para, ENV("SEND_EMAIL_HOOK_SECRET") || serviceKey);
+  const ctx = await contextoDe(admin, hash, "");
+  const sitio = basePublica(typeof body.sitio === "string" ? body.sitio : "", ENV("CORREOS_URL_PUBLICA"), "");
+  const salida = await enviar(admin, ctx, {
+    tipo: "aviso",
+    plantilla,
+    persona: personaDe({ correo: para, nombre: limpio(body.nombre, 120), sede: "", rol: "" }),
+    rol: "estudiante",
+    para,
+    hash,
+    enlace,
+    sitio,
+    accion: "soporte",
+    hook: "",
+    topeMs: SMTP_TOTAL_GANCHO_MS,
+  });
+  if (!salida.ok) return json({ ok: false, code: salida.code, error: salida.message }, salida.http);
+  return json({ ok: true });
+}
+
 /* --- La intranet: probar la conexión y enviar una prueba --------------------------------------- */
 
 async function panel(request: Request, crudo: string, url: string, anonKey: string, serviceKey: string): Promise<Response> {
@@ -1575,6 +1628,7 @@ async function panel(request: Request, crudo: string, url: string, anonKey: stri
   if (!body || typeof body !== "object" || Array.isArray(body)) return json({ error: "El pedido no es JSON.", code: "datos" }, 400);
   const action = String(body.action ?? "");
   if (action === "codigo") return await codigoDePilo(request, body, url, serviceKey);
+  if (action === "soporte") return await avisoDeSoporte(request, body, url, serviceKey);
   if (action !== "probar" && action !== "prueba") return json({ error: "Acción desconocida.", code: "datos" }, 400);
 
   // Solo la administración, con su sesión.

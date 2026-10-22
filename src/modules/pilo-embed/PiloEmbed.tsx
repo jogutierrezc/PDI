@@ -39,6 +39,9 @@ import { enrichSpokenSentences } from "../../components/pilo/ai/voice-expression
 import { Pilo as PiloMoji } from "../pregunta/Pilo";
 import { newId, readRol, storageKey, writeRol } from "../pregunta/store";
 import type { Turn } from "../pregunta/store";
+import { AgentButton, AgentHeader, TraspasoBody } from "../soporte-chat/Traspaso";
+import { useTraspaso } from "../soporte-chat/useTraspaso";
+import type { Space as AgentSpace } from "../soporte-chat/api";
 import { ASK_SPACES, asksRol, ROLE_OPTIONS, ROLE_QUESTION, roleView, wireRol } from "../pregunta/space";
 import type { Rol, SpaceId, SpaceProfile } from "../pregunta/space";
 import { RolePicker } from "../pregunta/RolePicker";
@@ -255,6 +258,8 @@ function Widget({ space, cfg, tema, lado, host, voice: baseVoice }: { space: Spa
   });
   const sending = useRef(new Set<string>());
   const [turns, setTurns] = useState<Turn[]>(() => loadTurns(KEY_TURNS));
+  // El traspaso a un agente de la UDES (Portal de agentes): solo si el portal lo tiene activo.
+  const handoff = useTraspaso(space.id as AgentSpace, useMemo(() => turns.map((x) => ({ q: x.q, a: x.answer?.text })), [turns]));
   const [live, setLive] = useState<Live | null>(null);
   const [busy, setBusy] = useState(false);
   const [draft, setDraft] = useState("");
@@ -464,6 +469,8 @@ function Widget({ space, cfg, tema, lado, host, voice: baseVoice }: { space: Spa
   const ask = async (raw: string, replaceTurn?: string) => {
     const q = raw.replace(/\s+/g, " ").trim();
     if (!q) return;
+    // «Quiero hablar con una persona»: Pilo no responde, pide los datos para pasar con un agente.
+    if (handoff.intercept(q)) return;
     stopPilo();
     // Otra pregunta mientras Pilo escribe: la anterior se corta y queda como incompleta.
     const cut = run.current;
@@ -585,35 +592,43 @@ function Widget({ space, cfg, tema, lado, host, voice: baseVoice }: { space: Spa
     <div className="ap pe" data-tema={tema} data-espacio={space.accent ?? undefined} data-lado={lado} data-open={open || undefined} data-full={shut || undefined} data-reading={reading || undefined}>
       {open && (
         <div className="pe-panel" ref={panel} role="dialog" aria-label={tr("Chat con Pilo")}>
-          <header className="pe-head">
-            <div className="pe-face">
-              <PiloMoji size={64} mood={working ? "piensa" : "feliz"} emotion={working ? waitingFace(waited) : view.expression} talking={reading || (busy && !working)} alive />
-            </div>
-            <div className="pe-id">
-              <strong>Pilo</strong>
-              <span>{headline}</span>
-            </div>
-            <div className="pe-wave" aria-hidden="true">
-              <i />
-              <i />
-              <i />
-              <i />
-              <i />
-            </div>
-            <LangSwitch className="pe-lang" />
-            {turns.length > 0 && (
-              <button type="button" className="pe-ib" onClick={startNew} aria-label={tr("Empezar una conversación nueva")} title={tr("Conversación nueva")}>
-                {I.fresh}
+          {handoff.shown && handoff.step !== "off" && handoff.step === "chat" ? (
+            <AgentHeader t={handoff} onClose={closePanel} />
+          ) : (
+            <header className="pe-head">
+              <div className="pe-face">
+                <PiloMoji size={64} mood={working ? "piensa" : "feliz"} emotion={working ? waitingFace(waited) : view.expression} talking={reading || (busy && !working)} alive />
+              </div>
+              <div className="pe-id">
+                <strong>Pilo</strong>
+                <span>{headline}</span>
+              </div>
+              <div className="pe-wave" aria-hidden="true">
+                <i />
+                <i />
+                <i />
+                <i />
+                <i />
+              </div>
+              <LangSwitch className="pe-lang" />
+              {turns.length > 0 && (
+                <button type="button" className="pe-ib" onClick={startNew} aria-label={tr("Empezar una conversación nueva")} title={tr("Conversación nueva")}>
+                  {I.fresh}
+                </button>
+              )}
+              <button type="button" className="pe-ib" aria-pressed={autoRead} onClick={toggleAutoRead} aria-label={tr("Leer las respuestas en voz alta")} title={tr("Leer las respuestas en voz alta")}>
+                {autoRead ? I.sound : I.mute}
               </button>
-            )}
-            <button type="button" className="pe-ib" aria-pressed={autoRead} onClick={toggleAutoRead} aria-label={tr("Leer las respuestas en voz alta")} title={tr("Leer las respuestas en voz alta")}>
-              {autoRead ? I.sound : I.mute}
-            </button>
-            <button type="button" className="pe-ib" onClick={closePanel} aria-label={tr("Cerrar el chat")}>
-              {I.down}
-            </button>
-          </header>
+              <button type="button" className="pe-ib" onClick={closePanel} aria-label={tr("Cerrar el chat")}>
+                {I.down}
+              </button>
+            </header>
+          )}
 
+          {handoff.shown && handoff.step !== "off" ? (
+            <TraspasoBody t={handoff} label="Pilo" />
+          ) : (
+            <>
           <div
             className="pe-log"
             ref={log}
@@ -664,6 +679,7 @@ function Widget({ space, cfg, tema, lado, host, voice: baseVoice }: { space: Spa
             <a href={home} target="_blank" rel="noopener">
               {space.widget.open} {I.out}
             </a>
+            <AgentButton t={handoff} />
             {askRol && rol !== null && !asking && (
               <button type="button" className="pe-rol" onClick={() => { setAsking(true); toBottom(); }} aria-label={tr("Quién pregunta: {who}. Cambiar", { who: who ?? "" })}>
                 {who} {tr("· cambiar")}
@@ -673,6 +689,8 @@ function Widget({ space, cfg, tema, lado, host, voice: baseVoice }: { space: Spa
           <div className="ap-sr" role="status" aria-live="polite">
             {status}
           </div>
+            </>
+          )}
         </div>
       )}
 

@@ -43,6 +43,9 @@ import type { Conversation, Tema, Turn } from "./store";
 import { ASK_SPACES, asksRol, ROLE_QUESTION, roleView, wireRol } from "./space";
 import type { Rol, SpaceId, SpaceProfile, Suggestion } from "./space";
 import { RoleMenu, RolePicker } from "./RolePicker";
+import { AgentButton, AgentHeader, TraspasoBody } from "../soporte-chat/Traspaso";
+import { useTraspaso } from "../soporte-chat/useTraspaso";
+import type { Space as AgentSpace } from "../soporte-chat/api";
 import { Welcome } from "./Welcome";
 import { SuperContext, SuperDefs } from "./super/Gear";
 import { SuperEntrance } from "./super/SuperEntrance";
@@ -321,6 +324,9 @@ function Chat({ space, cfg, tema, setTema, role, audience, welcome, voice: baseV
   const slot = useRef<HTMLDivElement>(null);
 
   const current = convs.find((c) => c.id === currentId) ?? null;
+  // El traspaso a un agente de la UDES (Portal de agentes): solo si el portal lo tiene activo.
+  const handoff = useTraspaso(space.id as AgentSpace, useMemo(() => (current?.turns ?? []).map((x) => ({ q: x.q, a: x.answer?.text })), [current]));
+  const handoffOn = handoff.shown && handoff.step !== "off";
 
   // La página sigue a la respuesta solo si la persona está al final: si subió a leer, no se la mueve.
   const pinned = useRef(true);
@@ -453,6 +459,8 @@ function Chat({ space, cfg, tema, setTema, role, audience, welcome, voice: baseV
   const ask = async (raw: string, replaceTurn?: string) => {
     const q = raw.replace(/\s+/g, " ").trim();
     if (!q) return;
+    // «Quiero hablar con una persona»: Pilo no responde, pide los datos para pasar con un agente.
+    if (!replaceTurn && !attach.attachment && handoff.intercept(q)) return;
     // Los modos secretos se atienden antes de llamar al servidor. Con un archivo adjunto, la pregunta es de verdad.
     if (!replaceTurn && !attach.attachment && handleSuper(q)) return;
     setSource(null);
@@ -708,6 +716,13 @@ function Chat({ space, cfg, tema, setTema, role, audience, welcome, voice: baseV
           </div>
         </header>
 
+        {handoffOn ? (
+          <div className="ap-handoff">
+            {handoff.step === "chat" ? <AgentHeader t={handoff} /> : null}
+            <TraspasoBody t={handoff} label="Pilo" />
+          </div>
+        ) : (
+          <>
         <div className="ap-scroll" ref={scroll} onScroll={(e) => onScroll(e.currentTarget)}>
           <div className="ap-col" ref={col}>
             {!current ? (
@@ -793,10 +808,14 @@ function Chat({ space, cfg, tema, setTema, role, audience, welcome, voice: baseV
           <p className="ap-note" id="ap-note">
             {space.note}
           </p>
+          <AgentButton t={handoff} />
           <div className="ap-sr" role="status" aria-live="polite">
             {status}
           </div>
         </div>
+
+          </>
+        )}
 
         <SourceDrawer source={source} onClose={() => setSource(null)} />
       </main>

@@ -101,6 +101,7 @@ function CampoBloque({ p, valor, decir, onCambio }: PropsCampo) {
         tipo={modo.tipo}
         inicial={actual}
         decir={decir}
+        textos={p.textos?.[modo.tipo]}
         onVolver={() => setModo(null)}
         onGuardar={(a) => {
           onCambio(modo.editando === null ? [...items, a] : items.map((x, k) => (k === modo.editando ? a : x)));

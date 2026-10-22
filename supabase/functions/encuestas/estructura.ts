@@ -95,6 +95,30 @@ export interface CapaPilo {
   confirmarSi?: { mayorA?: number; menorA?: number };
 }
 
+/**
+ * Los textos que acompañan un logro o un reto en el bloque «logro_reto»: lo que dice Pilo y lo que
+ * se lee en cada subpaso. Todo es opcional; lo que falta usa el texto por defecto de la intranet.
+ * Admite {max} (largo de la descripción) y {cifras} (cuántas cifras caben).
+ */
+export const CLAVES_TEXTO_APORTE = [
+  "piloTitulo",
+  "tituloPregunta",
+  "tituloAyuda",
+  "tituloEjemplo",
+  "piloDescripcion",
+  "descripcionPregunta",
+  "descripcionAyuda",
+  "piloCifras",
+  "cifrasPregunta",
+  "cifrasAyuda",
+] as const;
+export type ClaveTextoAporte = (typeof CLAVES_TEXTO_APORTE)[number];
+export type TextosAporte = Partial<Record<ClaveTextoAporte, string>>;
+export interface TextosBloque {
+  logro?: TextosAporte;
+  reto?: TextosAporte;
+}
+
 export interface Pregunta {
   id: string;
   tipo: TipoPregunta;
@@ -105,6 +129,8 @@ export interface Pregunta {
   validaciones?: Validaciones;
   mostrarSi?: Condicion;
   pilo?: CapaPilo;
+  /** Solo en el bloque de logros y retos. */
+  textos?: TextosBloque;
 }
 
 export interface Seccion {
@@ -154,6 +180,7 @@ export const LIMITES_ESTRUCTURA = {
   enunciado: { min: 3, max: 300 },
   apoyo: 300,
   explicacion: 600,
+  textoAporte: 700,
   titulo: { min: 2, max: 120 },
   largoTexto: 300,
   largoParrafo: 3000,
@@ -252,6 +279,23 @@ export function validarEstructura(x: unknown): Problema[] {
       if (q.pilo !== undefined) {
         if (!hay(q.pilo) || typeof q.pilo.explicacion !== "string") mal(`${rq}.pilo`, "La capa de Pilo necesita su explicación (puede estar vacía).");
         else if (q.pilo.explicacion.length > LIMITES_ESTRUCTURA.explicacion) mal(`${rq}.pilo.explicacion`, `La explicación de Pilo llega a ${LIMITES_ESTRUCTURA.explicacion} letras.`);
+      }
+      if (q.textos !== undefined) {
+        if (tipo !== "bloque_logro_reto" || !hay(q.textos)) mal(`${rq}.textos`, "Los textos de logro y reto solo van en el bloque de logros y retos.");
+        else {
+          for (const cual of ["logro", "reto"] as const) {
+            const t = (q.textos as Record<string, unknown>)[cual];
+            if (t === undefined) continue;
+            if (!hay(t)) {
+              mal(`${rq}.textos.${cual}`, "Los textos no tienen el formato esperado.");
+              continue;
+            }
+            for (const [k, val] of Object.entries(t)) {
+              if (!(CLAVES_TEXTO_APORTE as readonly string[]).includes(k)) mal(`${rq}.textos.${cual}.${k}`, "Ese texto no existe.");
+              else if (typeof val !== "string" || val.length > LIMITES_ESTRUCTURA.textoAporte) mal(`${rq}.textos.${cual}.${k}`, `Cada texto llega a ${LIMITES_ESTRUCTURA.textoAporte} letras.`);
+            }
+          }
+        }
       }
       // «Mostrar si» solo puede mirar una pregunta anterior: así no hay ciclos ni orden ambiguo.
       const cond = (c: unknown, ruta: string) => {

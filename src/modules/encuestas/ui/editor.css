@@ -1727,3 +1727,15 @@ select.ed-in {
     justify-content: flex-start;
   }
 }
+
+/* Textos del logro y del reto: un grupo por subpaso. */
+.ed-fs {
+  border: 0;
+  margin: 16px 0 0;
+  padding: 12px 0 0;
+  border-top: 1px solid var(--line);
+  min-width: 0;
+}
+.ed-fs > legend {
+  padding: 0 8px 0 0;
+}

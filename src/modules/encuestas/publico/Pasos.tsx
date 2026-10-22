@@ -15,7 +15,9 @@ import { TIPOS_CIFRA, textoTipoAporte } from "../tipos";
 import type { AporteEnvio, CuentaMicrosoft, TipoAporte } from "../tipos";
 import { aBorradorCifra, caben, formatearValor, leerNumero, LIMITES, validarCifras, validarDependencia, validarDescripcion, validarTitulo } from "../lib/validacion";
 import type { CifraBorrador } from "../lib/validacion";
-import { DOMINIOS_VISIBLES, GUIA, guiaDetalle } from "./frases";
+import { DOMINIOS_VISIBLES, GUIA } from "./frases";
+import { textoAporte } from "../lib/textosAporte";
+import type { TextosAporte } from "../lib/estructura";
 import type { DecirGuia } from "./tipos-pub";
 
 export type EstadoMicrosoft = { fase: "inactivo" } | { fase: "verificando" } | { fase: "error"; mensaje: string };
@@ -278,6 +280,7 @@ export function Detalle({
   onGuardar,
   onVolver,
   decir,
+  textos,
 }: {
   tipo: TipoAporte;
   /** Al editar, el aporte que se carga en el formulario. */
@@ -285,6 +288,8 @@ export function Detalle({
   onGuardar: (a: AporteEnvio) => void;
   onVolver: () => void;
   decir: DecirGuia;
+  /** Los textos que quien editó la encuesta escribió para este tipo; lo que falta usa el de por defecto. */
+  textos?: TextosAporte;
 }) {
   const [sub, setSub] = useState<1 | 2 | 3>(1);
   const [titulo, setTitulo] = useState(inicial?.titulo ?? "");
@@ -295,11 +300,12 @@ export function Detalle({
   const [errorCifras, setErrorCifras] = useState<string | null>(null);
   const raiz = useRef<HTMLDivElement>(null);
   const primera = useRef(true);
+  const valoresTexto = { max: LIMITES.descripcion.max, cifras: LIMITES.cifras };
+  const t = (k: Parameters<typeof textoAporte>[2]) => textoAporte(textos, tipo, k, valoresTexto);
 
   // Cada subpaso: Pilo lo explica y el foco va al primer campo.
   useEffect(() => {
-    const [texto, gesto] = guiaDetalle(sub, tipo);
-    decir(texto, gesto, true);
+    decir(textoAporte(textos, tipo, sub === 1 ? "piloTitulo" : sub === 2 ? "piloDescripcion" : "piloCifras", valoresTexto), sub === 1 ? "feliz" : sub === 2 ? "atrevido" : "emocionado", true);
     const t = window.setTimeout(() => {
       const el = raiz.current?.querySelector<HTMLElement>(sub === 1 ? "#ep-titulo" : sub === 2 ? "#ep-desc" : ".ep-cifra input");
       el?.focus({ preventScroll: primera.current });
@@ -372,15 +378,15 @@ export function Detalle({
 
       {sub === 1 && (
         <div>
-          <h2 id="ep-sub1-h">{tipo === "logro" ? "¿Cuál es el logro que quiere destacar?" : "¿Cuál es el reto que enfrenta?"}</h2>
-          <p className="ep-lede">Una frase corta, como el título que verá en el video.</p>
+          <h2 id="ep-sub1-h">{t("tituloPregunta")}</h2>
+          <p className="ep-lede">{t("tituloAyuda")}</p>
           <input
             id="ep-titulo"
             className="ep-input ep-input--sep"
             type="text"
             maxLength={LIMITES.titulo.max}
             autoComplete="off"
-            placeholder={tipo === "logro" ? "Por ejemplo, Acreditación de alta calidad del programa" : "Por ejemplo, Aumentar la permanencia en primer semestre"}
+            placeholder={t("tituloEjemplo")}
             value={titulo}
             aria-labelledby="ep-sub1-h"
             aria-describedby="ep-texto-e ep-titulo-c"
@@ -401,8 +407,8 @@ export function Detalle({
 
       {sub === 2 && (
         <div>
-          <h2>Descríbalo en pocas líneas</h2>
-          <p className="ep-lede">Qué se hizo, para quién y qué cambió. Máximo {LIMITES.descripcion.max} caracteres.</p>
+          <h2>{t("descripcionPregunta")}</h2>
+          <p className="ep-lede">{t("descripcionAyuda")}</p>
           <label className="ep-sr" htmlFor="ep-desc">
             Descripción
           </label>
@@ -429,8 +435,8 @@ export function Detalle({
 
       {sub === 3 && (
         <div>
-          <h2>¿Qué cifras lo respaldan?</h2>
-          <p className="ep-lede">Cada cifra dice qué es, de qué tipo es y cuánto vale. Agregue las que quiera (hasta {LIMITES.cifras}).</p>
+          <h2>{t("cifrasPregunta")}</h2>
+          <p className="ep-lede">{t("cifrasAyuda")}</p>
           <div className="ep-cifras">
             {cifras.map((c) => {
               const err = erroresCifra.get(c.id);

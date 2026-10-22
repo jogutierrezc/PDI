@@ -15,6 +15,7 @@ import { OPERADORES } from "../lib/estructura";
 import type { Condicion, Operador, Pregunta, Validaciones } from "../lib/estructura";
 import { draftIn, kill, thinkingDots } from "../motion";
 import type { CambioPregunta } from "./Lienzo";
+import { TextosAporteSeccion } from "./TextosAporte";
 
 const num = (s: string): number | undefined => (s.trim() === "" || !Number.isFinite(Number(s)) ? undefined : Number(s));
 
@@ -199,6 +200,8 @@ export function PropiedadesCol({
           )}
           {(p.tipo === "opcion_unica" || p.tipo === "opcion_multiple" || p.tipo === "lista") && <p className="ed-fino">Las opciones se editan en el lienzo.</p>}
         </section>
+
+        {p.tipo === "bloque_logro_reto" && <TextosAporteSeccion p={p} puedeEditar={puedeEditar} onCambiar={onCambiar} />}
 
         <section className="ed-card ed-pad">
           <h3 className="ed-h3">Mostrar si…</h3>

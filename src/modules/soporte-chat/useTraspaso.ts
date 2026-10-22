@@ -281,6 +281,7 @@ export function useTraspaso(space: Space, pairs: Pair[]): Traspaso {
           resumen: summarizeTurns(pairsNow),
           pregunta: lastUnanswered(pairsNow),
           web: form.web,
+          turnstile: form.turnstile,
         });
         const s: Saved = { id: out.id, secret: out.secret, channel: out.channel, name: form.name.trim(), email: form.email.trim().toLowerCase() };
         writeSaved(space, s);

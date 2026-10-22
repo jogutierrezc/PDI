@@ -81,6 +81,8 @@ export interface FormData {
   authorized: boolean;
   /** El campo escondido del formulario (honeypot): solo un robot lo llena (0184). */
   web: string;
+  /** El token del captcha invisible de Turnstile; la función lo verifica con siteverify. */
+  turnstile?: string;
 }
 
 /** Qué le falta al formulario, o "" si se puede enviar. El mismo orden en que Pilo pide los datos. */

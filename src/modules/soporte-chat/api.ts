@@ -86,7 +86,7 @@ export function writeSaved(space: Space, saved: Saved | null) {
 
 export const portalState = (space: Space) => soporte<PortalState>({ action: "portal", space });
 
-export const createConversation = (space: Space, body: { nombre: string; correo: string; telefono: string; ciudad: string; politica: string; resumen: string; pregunta: string; web?: string }) =>
+export const createConversation = (space: Space, body: { nombre: string; correo: string; telefono: string; ciudad: string; politica: string; resumen: string; pregunta: string; web?: string; turnstile?: string }) =>
   soporte<{ id: string; secret: string; channel: string; after_hours: boolean }>({ action: "crear", space, ...body, autoriza: true });
 
 /** El enlace del correo de «vuelva a su conversación»: un token de un solo uso. */

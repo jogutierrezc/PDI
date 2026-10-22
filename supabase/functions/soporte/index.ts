@@ -60,7 +60,10 @@
    SOPORTE_ESTUDIANTE_URL (enlace del chat en Pilo, por defecto https://planeacion.udes.edu.co/app),
    SOPORTE_RESUME_KEY (una frase cualquiera que cifra el secreto de reanudación;
    sin ella se deriva una de la llave del servicio),
-   TURNSTILE_SECRET_KEY (si está, el formulario público exige el captcha invisible de Cloudflare).
+   TURNSTILE_SECRET_KEY (si está, el formulario público exige el captcha invisible de
+   Cloudflare: el widget ya está en el formulario con la sitekey y la acción «agente»),
+   TURNSTILE_HOSTNAMES (dominios que acepta siteverify, por defecto planeacion.udes.edu.co),
+   TURNSTILE_ACTION (la acción esperada; por defecto «agente»; vacía, no se revisa).
 
    El bloque «adjuntos» es una copia de src/modules/soporte/adjuntos.ts y el
    bloque «push» de src/modules/soporte/push.ts (el editor de Supabase solo
@@ -589,22 +592,29 @@ Deno.serve(async (request) => {
       if (retry) return tooFast(retry);
       // El campo escondido que solo un formulario de verdad deja vacío.
       if (text(body.web, 40)) return json({ ok: true, id: crypto.randomUUID(), secret: hex(32), channel: hex(16), after_hours: false });
-      // El captcha invisible de Cloudflare, solo si la universidad lo configuró.
+      // El captcha invisible de Cloudflare (Turnstile), solo si la universidad puso la llave
+      // secreta (TURNSTILE_SECRET_KEY). Verificación canónica con siteverify: éxito, dominio y acción.
       const turnstile = Deno.env.get("TURNSTILE_SECRET_KEY");
       if (turnstile) {
         const token = text(body.turnstile, 4000);
         if (!token) return json({ error: "Confirme que no es un robot.", code: "captcha" }, 400);
+        const anfitriones = (Deno.env.get("TURNSTILE_HOSTNAMES") || "planeacion.udes.edu.co").split(",").map((h) => h.trim()).filter(Boolean);
+        const accionEsperada = Deno.env.get("TURNSTILE_ACTION") ?? "agente";
+        let veredicto: { success?: boolean; hostname?: string; action?: string } | null = null;
         try {
           const r = await fetch("https://challenges.cloudflare.com/turnstile/v0/siteverify", {
             method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ secret: turnstile, response: token, remoteip: ip }),
+            headers: { "Content-Type": "application/x-www-form-urlencoded" },
+            signal: AbortSignal.timeout(10_000),
+            body: new URLSearchParams({ secret: turnstile, response: token, remoteip: ip }),
           });
-          const out = (await r.json()) as { success?: boolean } | null;
-          if (!out?.success) return json({ error: "Confirme que no es un robot.", code: "captcha" }, 400);
+          if (r.ok) veredicto = (await r.json()) as { success?: boolean; hostname?: string; action?: string };
         } catch {
-          return json({ error: "Confirme que no es un robot.", code: "captcha" }, 400);
+          /* sin veredicto: abajo no pasa */
         }
+        if (!veredicto?.success) return json({ error: "Confirme que no es un robot.", code: "captcha" }, 400);
+        if (veredicto.hostname && !anfitriones.includes(veredicto.hostname)) return json({ error: "Confirme que no es un robot.", code: "captcha" }, 400);
+        if (accionEsperada && veredicto.action !== accionEsperada) return json({ error: "Confirme que no es un robot.", code: "captcha" }, 400);
       }
       const space = text(body.space, 20);
       const name = text(body.nombre, 120);

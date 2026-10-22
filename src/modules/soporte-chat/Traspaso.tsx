@@ -23,6 +23,7 @@ import { fileUrl } from "./api";
 import type { FileInfo, Saved, View } from "./api";
 import { enterBlock, enterHeader, enterMessages, enterNotice, useMotion } from "./motion";
 import { formProblem } from "./reglas";
+import { montarTurnstile } from "./turnstile";
 import type { Traspaso } from "./useTraspaso";
 import "./traspaso.css";
 
@@ -320,13 +321,30 @@ export function TraspasoBody({ t, label = "Pilo" }: { t: Traspaso; label?: strin
 function HandoffForm({ t }: { t: Traspaso }) {
   const ref = useRef<HTMLFormElement>(null);
   const [f, setF] = useState({ name: "", email: "", phone: "", city: "", authorized: false, web: "" });
+  const [captcha, setCaptcha] = useState("");
+  const huecoCaptcha = useRef<HTMLDivElement>(null);
   const [touched, setTouched] = useState(false);
   useMotion(ref, () => enterBlock(ref.current), []);
+  /* El captcha invisible de Cloudflare: un token de un solo uso para el servidor. */
+  useEffect(() => {
+    const hueco = huecoCaptcha.current;
+    if (!hueco) return;
+    let vivo = true;
+    let soltar: (() => void) | undefined;
+    void montarTurnstile(hueco, setCaptcha, () => setCaptcha("")).then((quitar) => {
+      if (vivo) soltar = quitar;
+      else quitar();
+    });
+    return () => {
+      vivo = false;
+      soltar?.();
+    };
+  }, []);
   const problem = formProblem(f);
   const submit = (e: FormEvent) => {
     e.preventDefault();
     setTouched(true);
-    if (!problem) void t.submit(f);
+    if (!problem) void t.submit({ ...f, turnstile: captcha });
   };
   return (
     <form className="ho-form-card" ref={ref} onSubmit={submit} noValidate aria-label="Tus datos para pasar con un agente">
@@ -361,6 +379,7 @@ function HandoffForm({ t }: { t: Traspaso }) {
       <span id="ho-ack" className="ho-hint" role="status">
         {touched && problem ? problem : t.error}
       </span>
+      <div className="ho-turnstile" ref={huecoCaptcha} aria-label="Verificación de que no es un robot" />
       <button type="submit" className="ho-cta ho-press" disabled={t.busy || !f.authorized}>
         {t.busy ? "Enviando…" : "Enviar y esperar al agente"}
       </button>

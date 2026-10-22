@@ -275,6 +275,13 @@
 }
 
 /* --- Formulario, espera, encuesta ------------------------------------------------------------------- */
+/* El captcha invisible: pequeño y sin empujar el formulario. */
+.ho-turnstile {
+  min-height: 0;
+  display: flex;
+  justify-content: center;
+}
+
 /* El campo escondido del formulario (honeypot): una persona no lo ve (0184). */
 .ho-honey {
   position: absolute;
